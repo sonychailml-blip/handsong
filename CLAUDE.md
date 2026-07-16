@@ -79,3 +79,7 @@ There are no tests. Verification is manual and mandatory:
    break silently.
 
 Never report a change as done without stating which of these steps you could not verify.
+## Language
+
+- Code, comments, UI strings, `SCALES` names: **Russian**. Never translate them, never "clean them up".
+- Chat responses to the user: **English**. The Windows terminal mangles Cyrillic output, so Russian replies arrive unreadable.
