@@ -1,4 +1,5 @@
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+import { FXW, ZB, FINGER_TIPS, FX_META, REV_COLOR, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS, SCHED_AHEAD, SCHED_TICK_MS } from './config.js';
  
 /* =====================================================================
    AIR SYNTH 3 — жестовый синтезатор + интерактивный учебник ладов
@@ -15,8 +16,6 @@ import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@m
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const ROMAN=['I','II','III','IV','V','VI','VII'];
 const OCT_ROMAN=['I','II','III','IV'];
-const FINGER_TIPS=[8,12,16,20];          // указ., средн., безым., мизинец
-const FXW=0.20, ZB=0.595;                // границы зон по X (доли ширины)
 const range=n=>Array.from({length:n},(_,i)=>i);
  
 /* Каждый лад: edo — на сколько равных шагов делится октава,
@@ -59,13 +58,6 @@ const CHORD_INSTR=[
   {label:'Эл. пиано',      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45},
 ];
  
-const FX_META=[                           // эффекты (только соло-канал)
-  {k:'dly', label:'DLY', full:'Делей',   finger:8,  color:'#4cc2ff'},
-  {k:'vib', label:'VIB', full:'Вибрато', finger:12, color:'#ffb84c'},
-  {k:'drv', label:'DRV', full:'Драйв',   finger:16, color:'#ff5d5d'},
-  {k:'trm', label:'TRM', full:'Тремоло', finger:20, color:'#9b7bff'},
-];
-const REV_COLOR='#57d9a3';
  
 /* ================= СОСТОЯНИЕ ================= */
 let scaleIdx=11, tonic=9;                 // старт: минорная пентатоника от A
@@ -486,7 +478,7 @@ function schedStep(st,t){
 /* Планировщик «двух часов»: setInterval будит нас каждые 25 мс,
    а события ставятся точно по часам AudioContext с опережением 0.14 с. */
 function schedTick(){
-  const ahead=0.14;
+  const ahead=SCHED_AHEAD;
   while(back.nextT<AC.currentTime+ahead){
     schedStep(back.step,back.nextT);
     back.nextT+=60/back.bpm/4;
@@ -497,7 +489,7 @@ function toggleBack(){
   if(!AC)return;
   if(!back.playing){
     back.playing=true; back.step=0; back.nextT=AC.currentTime+0.08;
-    back.timer=setInterval(schedTick,25);
+    back.timer=setInterval(schedTick,SCHED_TICK_MS);
     backBtn.textContent='❚❚ фон';
   }else{
     back.playing=false; clearInterval(back.timer);
@@ -611,7 +603,7 @@ function degHyst(y,rows,H,prev){
   const seg=H/rows; let d=degRaw(y,rows,H);
   if(prev>=0&&prev<=rows-1&&Math.abs(d-prev)===1){
     const zTop=rows-1-Math.max(d,prev), b=(zTop+1)*seg;
-    if(Math.abs(y-b)<seg*0.16)return prev;
+    if(Math.abs(y-b)<seg*ROW_HYST)return prev;
   }
   return Math.min(d,rows-1);
 }
@@ -638,7 +630,7 @@ function processHands(res){
  
     const r=pinchRatios(lm), [mf,mv]=minFinger(r);
  
-    if(!S.pinch&&mv<0.45){
+    if(!S.pinch&&mv<PINCH_ON){
       /* Захват щипка: палец задаёт октаву, а ЗОНА фиксируется по точке
          щипка и не меняется до отпускания — двигая руку по X ради
          громкости, нельзя случайно перескочить в соседнюю колонку. */
@@ -652,8 +644,8 @@ function processHands(res){
         leadOwner=key;                       // приоритет последней ноты
       }
     }else if(S.pinch){
-      if(mv>0.72){ endPinch(key,S); }
-      else if(mv<0.5&&FINGER_TIPS.indexOf(mf)!==S.oct){
+      if(mv>PINCH_OFF){ endPinch(key,S); }
+      else if(mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf)!==S.oct){
         S.oct=FINGER_TIPS.indexOf(mf);       // смена пальца = смена октавы на лету
         if(S.zone==='fx'&&S.adj){
           const meta=FX_META.find(m=>m.finger===mf);
@@ -683,7 +675,7 @@ function processHands(res){
         if(S.zone==='ld'){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
-            S.rev=clamp01((0.27-hs)/0.19); revDisp=S.rev;
+            S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); revDisp=S.rev;
             WleadOn({freq:leadFreq(S.deg,S.oct),vol:S.vol,rev:S.rev,
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx});
           }
@@ -699,7 +691,7 @@ function processHands(res){
      release через 120 мс (короткая пауза прощает мигание трекинга). */
   for(const k of Object.keys(HANDS)){
     const S=HANDS[k];
-    if(!seen.has(k)&&now-S.seen>120){ endPinch(k,S); delete HANDS[k]; }
+    if(!seen.has(k)&&now-S.seen>WATCHDOG_MS){ endPinch(k,S); delete HANDS[k]; }
   }
   if(leadOwner&&!HANDS[leadOwner])leadOwner=null;
 }
