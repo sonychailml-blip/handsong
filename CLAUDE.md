@@ -6,7 +6,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Air Synth 3 is a gesture-controlled synthesizer and interactive scales tutorial that runs entirely in the browser. It uses the webcam + MediaPipe hand tracking to play notes/chords/effects with pinch gestures, synthesizing all sound with the Web Audio API. The UI text and code comments are in **Russian** — keep new user-facing strings and comments in Russian to match.
 
-**The entire application is a single file: `index.html`.** There is no build system, no package.json, no dependencies to install, and no tests. All CSS, HTML, and JS live inline; the only external dependency is `@mediapipe/tasks-vision` loaded from a CDN via an ES module `import`.
+**The app is split into ES modules under `src/`, loaded via `<script type="module" src="src/main.js">`.** There is no build system, no package.json, no dependencies to install, and no tests — the modules load directly in the browser. `index.html` holds only markup; `style.css` holds all CSS; the only external dependency is `@mediapipe/tasks-vision`, loaded from a CDN via an ES module `import` in `vision.js`.
+
+### Module map
+
+- `index.html` — markup only: start screen, top bar, settings panel, help overlay, `<video>`/`<canvas>`; links `style.css` and `src/main.js`.
+- `style.css` — all CSS.
+- `src/config.js` — zone boundaries, gesture thresholds, scheduler timings. Leaf: imports nothing.
+- `src/state.js` — cross-cutting musical state (`scaleIdx, tonic, seventh, leadIdx, chIdx, fx, revDisp`) and its setters.
+- `src/hooks.js` — the `hooks` object: nullable callbacks lower layers use to reach the DOM.
+- `src/scales.js` — the teaching layer: `SCALES`, `baseF`, `chordSteps`, chord/row labels, cents. The source of truth for pitch.
+- `src/audio.js` — the Web Audio engine: `AC` + all nodes, `LEAD_INSTR`/`CHORD_INSTR`, `initAudio`, `buildLeadBanks`, `buildChordPool`, `setLeadInstr`/`applyParams`/`noteOn`/`noteOff`, chord voice pool.
+- `src/backing.js` — generative Smart-Match backing track: styles, drone, the look-ahead scheduler, `toggleBack`.
+- `src/recorder.js` — record/playback: `events[]`, the `W*`/`ENG` indirection, `playRec`, `panic`, `toggleRec`/`stopRec`/`clearRec`.
+- `src/vision.js` — camera + MediaPipe: the CDN import, `video`/`canvas`/`ctx`, the `roundRect` polyfill, `resize`, `landmarker`, `initVision`.
+- `src/gestures.js` — the gesture state machine: `HANDS`, `leadOwner`, `processHands`, and the zone/degree helpers.
+- `src/draw.js` — canvas rendering: `draw`, the grid/bar/tag helpers, and the `#status` line.
+- `src/ui.js` — menu/buttons: `$`, element lookups, `buildUI`, every handler, and the `hooks` registrations. Side-effect module; exports only `$`.
+- `src/main.js` — composition root: `loop()`, `lastTs`/`latest`, the `#startBtn` handler; imports `./ui.js` for its side effects.
 
 ## Running / developing
 
@@ -17,7 +34,7 @@ Air Synth 3 is a gesture-controlled synthesizer and interactive scales tutorial 
 
 ## Architecture
 
-Everything is one `<script type="module">`. The pipeline each animation frame (`loop()`): MediaPipe detects hands → `processHands()` updates the gesture state machine → `draw()` renders the camera feed, zones, teaching overlays, and hand labels. Audio is event-driven off the gesture state, not the render loop.
+The render loop lives in `main.js`. Each animation frame (`loop()`): MediaPipe detects hands → `processHands()` (`gestures.js`) updates the gesture state machine → `draw()` (`draw.js`) renders the camera feed, zones, teaching overlays, and hand labels. Audio **is** driven from this loop: `processHands()` calls `WleadOn(...)` ~60×/sec while a pinch is held. That is why `events[]` grows to thousands of entries per minute — it logs frames, not musical intent.
 
 ### Screen zones (by X, full height)
 Three vertical columns, split at fractions `FXW=0.20` and `ZB=0.595`: **EFFECTS** (left) · **CHORDS** (center) · **SOLO** (right). A pinch's zone is locked at the moment of the pinch and doesn't change while the hand moves. Both hands are independent players, each with its own pinch state machine keyed by MediaPipe handedness (`'Left'`/`'Right'`).
@@ -45,7 +62,8 @@ All hand-built Web Audio nodes; a `DynamicsCompressor` acts as a mandatory outpu
 ## Conventions
 
 - Very terse, comment-heavy style with single-letter helpers (`$`, `range`, `clamp01`) and compact multi-statement lines. Match it rather than reformatting.
-- No frameworks, no bundler — add features by editing `index.html` directly. Adding a scale = one entry in `SCALES`; a lead timbre = a block in `buildLeadBanks` + entry in `LEAD_INSTR`; a chord timbre = an entry in `CHORD_INSTR`.
+- No frameworks, no bundler — add a feature by editing the module that owns it. A scale = one entry in `SCALES` (`scales.js`); a lead timbre = a block in `buildLeadBanks` + an entry in `LEAD_INSTR` (`audio.js`); a chord timbre = an entry in `CHORD_INSTR` (`audio.js`); a gesture or timing threshold = `config.js`.
+
 ## Hard rules — do not break these
 
 1. **AudioContext is created only inside the `#startBtn` click handler.** Never call
@@ -57,21 +75,23 @@ All hand-built Web Audio nodes; a `DynamicsCompressor` acts as a mandatory outpu
 3. **Chord pool oscillators start once and never stop.** Notes are gated by GainNodes.
    Never create an oscillator per note — that causes clicks and leaks.
 4. **The master limiter stays.** Chords + drive + backing clip without it.
-5. **The audio layer must not touch the DOM.** Currently violated: `setLeadInstr`
-   writes `selLead.value`; `refreshStyle` writes `bpmEl.value` / `bpmV.textContent`.
-   These are known debts to be removed — not patterns to copy.
-
-## Correction to the architecture notes above
-
-Audio **is** driven from the render loop: `loop()` calls `processHands()` every frame,
-which calls `WleadOn(...)` ~60×/sec while a pinch is held. This is why `events[]` grows
-to thousands of entries per minute — it logs frames, not musical intent.
+5. **Lower layers never touch the DOM.** `audio.js`, `backing.js`, and `recorder.js`
+   reach the UI only through `hooks.x && hooks.x(v)`. The implementations live only in
+   `ui.js`, registered at its top level. `draw.js` is exempt — it is the presentational
+   layer and owns the `#status` line.
+6. **Live bindings — never shadow another module's variable.** Write a variable only
+   through its owner's setter (`setScaleIdx, setTonic, setSeventh, setLeadIdx,
+   setChIdx, setRevDisp`); assigning an imported binding directly is a TypeError.
+   Never copy state into a module-level `const` — `const s = scaleIdx` at the top of a
+   module freezes it at load time. The backing scheduler re-reads
+   `baseF()`/`CUR()`/`chordSteps()` every step; freeze any of them and changing scale
+   or tonic mid-play silently stops re-tuning the pattern.
 
 ## How to verify a change
 
 There are no tests. Verification is manual and mandatory:
 
-1. Serve via VS Code Live Server → `http://127.0.0.1:5500` (not `python -m http.server`).
+1. Serve via VS Code Live Server → `http://127.0.0.1:5500`.
 2. Click "▶ Запустить", allow camera access.
 3. Check: pinch in SOLO makes sound · pinch in CHORDS makes a chord · effect bars in the
    left column move on pinch+drag · "▶ фон" starts the backing track.
