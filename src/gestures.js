@@ -1,5 +1,5 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx } from './state.js';
+import { fx, setRevDisp, leadIdx, chIdx, latchDeg, setLatchDeg } from './state.js';
 import { IVX, leadFreq, chordFreqs } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff } from './recorder.js';
 import { chordHold } from './audio.js';
@@ -32,7 +32,7 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
    видимый размер кисти стабильнее, чем сырая z-координата модели).
    result.handednesses[i][0].categoryName ('Left'/'Right') — стабильный
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
-const HANDS={}; let leadOwner=null;
+const HANDS={}; let leadOwner=null; let chOwner=null;   // chOwner — рука, рулящая защёлкой
 const zoneAt=(x,W)=> x<FXW*W?'fx' : x<ZB*W?'ch':'ld';
 const zoneX =(z,W)=> z==='ch'?[FXW*W,ZB*W]:[ZB*W,W];
 function degRaw(y,rows,H){ const seg=H/rows;
@@ -53,9 +53,11 @@ function degHyst(y,rows,H,prev){
 function endPinch(key,S){
   if(S.pinch){
     if(S.zone==='ld'&&leadOwner===key){ WleadOff(); leadOwner=null; }
-    if(S.zone==='ch')WchOff(key);
+    // 'ch': WchOff НЕ зовём — защёлкнутый аккорд продолжает звучать; лишь отпускаем руль
+    if(S.zone==='ch'&&chOwner===key)chOwner=null;
   }
   S.pinch=false; S.adj=null; S.deg=-1;
+  S.inert=false; S.fresh=false;                // размыкание снимает инертность
 }
 function processHands(res){
   const W=canvas.width, H=canvas.height, now=performance.now();
@@ -68,7 +70,7 @@ function processHands(res){
     let key=(heads[i]&&heads[i][0]&&heads[i][0].categoryName)||('H'+i);
     if(seen.has(key))key+=i;
     seen.add(key);
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{}});
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false});
     S.seen=now; S.lm=lm;
  
     const r=pinchRatios(lm), [mf,mv]=minFinger(r);
@@ -85,6 +87,8 @@ function processHands(res){
         S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]};
       }else if(S.zone==='ld'){
         leadOwner=key;                       // приоритет последней ноты
+      }else if(S.zone==='ch'){
+        S.fresh=true;                        // решение о защёлке примем этот кадр, когда посчитаем ступень
       }
     }else if(S.pinch){
       if(mv>PINCH_OFF){ endPinch(key,S); }
@@ -122,10 +126,25 @@ function processHands(res){
             WleadOn({freq:leadFreq(S.deg,S.oct),vol:S.vol,rev:S.rev,
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx});
           }
-        }else{ // 'ch'
-          const freqs=chordFreqs(S.deg,S.oct);
-          if(!chordHold[key])WchOn(key,freqs,S.vol,chIdx);
-          else WchSet(key,freqs,S.vol);
+        }else{ // 'ch' — колонка аккордов: защёлка (владелец голосов — постоянный ключ 'latch')
+          if(S.inert){
+            // стоп-щипок отработал: рука молчит до размыкания пальцев
+          }else if(S.fresh){
+            S.fresh=false;                        // решение принимается один раз за щипок
+            if(latchDeg>=0&&S.deg===latchDeg){
+              WchOff('latch'); setLatchDeg(-1); chOwner=null; S.inert=true;   // та же ступень → выключаем, рука инертна
+            }else{
+              const freqs=chordFreqs(S.deg,S.oct);
+              if(latchDeg<0)WchOn('latch',freqs,S.vol,chIdx);   // тишина → новый аккорд с атакой
+              else WchSet('latch',freqs,S.vol);                 // другая ступень → глиссандо без переатаки
+              setLatchDeg(S.deg); chOwner=key;                  // рулит последний щипнувший
+            }
+          }else if(chOwner===key&&latchDeg>=0){
+            const freqs=chordFreqs(S.deg,S.oct);  // ведение: Y=ступень (глиссандо), X=громкость
+            WchSet('latch',freqs,S.vol); setLatchDeg(S.deg);
+          }else if(chOwner===key){
+            chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
+          }
         }
       }
     }

@@ -55,9 +55,9 @@ selScale.onchange=e=>{
   setScaleIdx(+e.target.value); softAllOff(); refreshStyle(false);
   scaleBtn.textContent=SCALES[scaleIdx].name;
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); refreshStyle(false); };
-$('qTriad').onclick=()=>{ setSeventh(false); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
-$('qSev').onclick =()=>{ setSeventh(true);  $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
+selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); refreshStyle(false); };
+$('qTriad').onclick=()=>{ setSeventh(false); softAllOff(); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
+$('qSev').onclick =()=>{ setSeventh(true);  softAllOff(); $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
 selLead.onchange=e=>setLeadInstr(+e.target.value);
 selChord.onchange=e=>setChIdx(+e.target.value);
 selStyle.onchange=e=>{ back.styleSel=e.target.value; refreshStyle(back.styleSel!=='auto'); };

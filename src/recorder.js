@@ -1,6 +1,6 @@
 import { AC, setLeadInstr, applyParams, noteOn, noteOff, chordOn, chordGlide, chordOff, chordHold } from './audio.js';
 import { back, toggleBack } from './backing.js';
-import { leadIdx } from './state.js';
+import { leadIdx, setLatchDeg } from './state.js';
 import { hooks } from './hooks.js';
  
 /* ================= ЗАПИСЬ / ВОСПРОИЗВЕДЕНИЕ ================= */
@@ -21,7 +21,8 @@ const WchOn =(id,f,v,i)=>{ if(!inPB()){ENG.chOn(id,f,v,i); recEv('chOn',[id,f,v,
 const WchSet=(id,f,v)=>{ if(!inPB()){ENG.chSet(id,f,v); recEv('chSet',[id,f,v]);} };
 const WchOff=id=>{ if(!inPB()){ENG.chOff(id); recEv('chOff',[id]);} };
 function softAllOff(){ if(!AC)return; ENG.leadOff();
-  Object.keys(chordHold).forEach(k=>ENG.chOff(k)); }
+  Object.keys(chordHold).forEach(k=>ENG.chOff(k));   // ключ 'latch' снимается этим обходом
+  setLatchDeg(-1); }
 function playRec(){
   if(!events.length||!AC)return;
   playTimers.forEach(clearTimeout); playTimers=[];

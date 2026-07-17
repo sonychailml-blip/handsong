@@ -1,7 +1,7 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, centsOf, OCT_ROMAN } from './scales.js';
-import { fx, revDisp } from './state.js';
+import { fx, revDisp, latchDeg } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS } from './config.js';
 import { back, STYLE_LABEL } from './backing.js';
 import { recording, inPB } from './recorder.js';
@@ -84,12 +84,11 @@ function draw(res){
   ctx.fillText('СОЛО',(zbX+W)/2,52);
  
   // активные ступени по зонам
-  let chAct=-1, ldAct=-1;
+  let ldAct=-1;
   for(const k in HANDS){ const S=HANDS[k];
-    if(S.pinch&&S.deg>=0){
-      if(S.zone==='ch')chAct=S.deg;
-      if(S.zone==='ld'&&leadOwner===k)ldAct=S.deg;
-    }}
+    if(S.pinch&&S.deg>=0&&S.zone==='ld'&&leadOwner===k)ldAct=S.deg;
+  }
+  const chAct=latchDeg;                        // подсветка аккорда — по защёлкнутой ступени, горит и без щипка
   // сетки: лестница аккордов и лестница нот — учебный слой
   drawGrid(fxX,zbX,'#b18cff',chordLabel,chAct);
   drawGrid(zbX,W,'#ff9e2c',rowLabel,ldAct);
@@ -128,8 +127,8 @@ function draw(res){
         ctx.fillStyle=col;
         ctx.beginPath(); ctx.arc(x,y,tipPt?6:2.5,0,7); ctx.fill();
       }
-      if(S.pinch&&(S.zone==='ch'||S.zone==='ld')&&S.deg>=0){
-        // светящийся круг вокруг точки щипка
+      if(S.pinch&&!S.inert&&(S.zone==='ch'||S.zone==='ld')&&S.deg>=0){
+        // светящийся круг вокруг точки щипка (инертная рука ничего не звучит — не рисуем)
         ctx.strokeStyle=zcol; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
         ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
         ctx.globalAlpha=.25;
