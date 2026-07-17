@@ -66,6 +66,8 @@ export function chordSteps(deg){
   return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз/хроматика — пауэр-аккорд как раньше
 }
 export function leadFreq(deg,oct){ const s=CUR(); return baseF()*Math.pow(2,oct)*Math.pow(2,IVX()[deg]/s.edo); }
+export function bassFreq(deg,oct){ const s=CUR(); // бас на 2 октавы ниже соло (baseF/4)
+  return baseF()/4*Math.pow(2,oct)*Math.pow(2,IVX()[deg]/s.edo); }
 export function chordFreqs(deg,oct){ const s=CUR(); // база аккордов на октаву ниже соло
   return chordSteps(deg).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
  

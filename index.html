@@ -40,10 +40,12 @@
 <div id="bar">
   <button id="menuBtn">☰ Меню</button>
   <button id="scaleBtn">Лад</button>
+  <button id="instrBtn" title="Соло / Аккорды">🎸 Соло</button>
   <button id="backBtn">▶ фон</button>
-  <button id="rec" title="Запись">●</button>
-  <button id="playBtn" title="Воспроизвести запись">▶</button>
-  <button id="clrBtn" title="Очистить запись">✕</button>
+  <button id="recBtn" title="Запись / наложение слоя">● запись</button>
+  <button id="loopBtn" title="Петля: играть / пауза">⟳ луп</button>
+  <button id="undoBtn" title="Убрать последний слой">⤺</button>
+  <button id="clrBtn" title="Очистить петлю">✕</button>
   <button id="panicBtn" title="Заглушить всё">■</button>
   <button id="helpBtn" title="Учебник">?</button>
 </div>
@@ -51,17 +53,36 @@
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
 <div id="panel">
   <div class="phead"><b>Настройки</b><button id="panelClose">Свернуть ✕</button></div>
- 
+
+  <div class="psep">Режим управления</div>
+  <div class="prow"><label>Режим</label>
+    <div class="seg"><button id="modePC" class="act">ПК</button><button id="modePhone">Смартфон</button></div>
+  </div>
+  <div class="prow" id="swapRow"><label>Правая рука</label>
+    <div class="seg"><button id="swapNotes" class="act">Ноты</button><button id="swapFx">Эффекты</button></div>
+  </div>
+  <p class="phint" id="modeHint">Смартфон: один инструмент на экране (переключатель вверху), правая рука — ноты, левая — эффекты (полоса снизу). ПК: три колонки, любая рука.</p>
+
   <div class="psep">Лад и тоника</div>
   <div class="prow"><label>Лад / строй</label><select id="selScale"></select></div>
   <div class="prow"><label>Тоника</label><select id="selTonic"></select></div>
   <div class="prow"><label>Аккорды</label>
     <div class="seg"><button id="qTriad" class="act">Трезвучия</button><button id="qSev">Септаккорды</button></div>
   </div>
+
+  <div class="psep">Петля (лупер)</div>
+  <div class="prow"><label>Длина (такты)</label>
+    <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
+  </div>
+  <div class="prow"><label>Квантизация</label>
+    <div class="seg"><button id="qOn" class="act">Вкл</button><button id="qOff">Выкл</button></div>
+  </div>
+  <p class="phint">Длина меняется только на пустой петле. «● запись» — отсчёт такта, затем круг; во время игры петли — наложение слоя. «⤺» снимает последний слой.<br>Квантизация к сетке: аккорды — доли (4), бас — восьмые (8), ударные — шестнадцатые (16); соло не квантуется.</p>
  
   <div class="psep">Тембры</div>
   <div class="prow"><label>Соло-инструмент</label><select id="selLead"></select></div>
   <div class="prow"><label>Аккорд-инструмент</label><select id="selChord"></select></div>
+  <div class="prow"><label>Бас-инструмент</label><select id="selBass"></select></div>
  
   <div class="psep">Автоаккомпанемент (Smart Match)</div>
   <div class="prow"><label>Стиль подложки</label><select id="selStyle"></select></div>

@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx } from './state.js';
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx } from './state.js';
 import { baseF } from './scales.js';
 import { hooks } from './hooks.js';
  
@@ -20,6 +20,18 @@ const CHORD_INSTR=[
   {label:'Орган',          t1:'square',   t2:'sine',     ratio:2, det:0, m1:.45, m2:.35, lp:4200, lvl:.15, att:.012, rel:.09},
   {label:'Эл. пиано',      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45},
 ];
+/* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio,
+   расстройка det), НЧ-фильтр lp, огибающая att/rel. */
+const BASS_INSTR=[
+  {label:'Саб-синус', t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  att:.020, rel:.20},
+  {label:'Пила',      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  att:.014, rel:.16},
+  {label:'Кислотный', t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, att:.008, rel:.13},
+  {label:'Синт-бас',  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  att:.020, rel:.24},
+];
+/* Ударные: имена рядов (индекс 0 = низ сетки). Синтез на лету, без сэмплов. */
+const DRUM_NAMES=['Кик','Снейр','Клэп','Хэт','Том','Крэш'];
+const DRUM_ROWS=DRUM_NAMES.length;
+
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter, verb, verbOut;
 let banks=[], vibGain, satWet, satDry, envGain, volGain,
@@ -28,6 +40,8 @@ let chordBus, revCh;                                    // аккорды
 let backBus, backRev, dO1, dO2, dG, noiseBuf;           // подложка
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
 let noteOnFlag=false;
+let bO1,bO2,bLP,bEnv,bVol, bassOnFlag=false;            // моно-бас
+let drumBus;                                             // шина ударных
  
 function makeSatCurve(k=4,n=1024){ const c=new Float32Array(n);
   for(let i=0;i<n;i++){const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x);} return c; }
@@ -194,6 +208,17 @@ function initAudio(){
   revCh=AC.createGain(); revCh.gain.value=0.12; chordBus.connect(revCh); revCh.connect(verb);
   buildChordPool(chordBus);
  
+  /* --- БАС: моно-голос, свой НЧ-путь прямо в master --- */
+  bO1=AC.createOscillator(); bO2=AC.createOscillator();
+  bLP=AC.createBiquadFilter(); bLP.type='lowpass'; bLP.frequency.value=500;
+  bEnv=AC.createGain(); bEnv.gain.value=0; bVol=AC.createGain(); bVol.gain.value=0.5;
+  { const b=BASS_INSTR[bassIdx]; bO1.type=b.t1; bO2.type=b.t2; bO2.detune.value=b.det; bLP.frequency.value=b.lp; }
+  bO1.connect(bLP); bO2.connect(bLP); bLP.connect(bEnv); bEnv.connect(bVol); bVol.connect(master);
+  bO1.start(); bO2.start();
+
+  /* --- УДАРНЫЕ: своя шина в master (мимо эффектов соло) --- */
+  drumBus=AC.createGain(); drumBus.gain.value=0.85; drumBus.connect(master);
+
   /* --- ПОДЛОЖКА: своя шина в обход всех эффектов соло --- */
   backBus=AC.createGain(); backBus.gain.value=0.55; backBus.connect(master);
   backRev=AC.createGain(); backRev.gain.value=0.5; backRev.connect(verb);
@@ -241,11 +266,77 @@ function noteOff(){
   envGain.gain.cancelScheduledValues(t);
   envGain.gain.setTargetAtTime(0,t,LEAD_INSTR[leadIdx].rel);
 }
- 
+/* --- БАС: моно-голос, атака идемпотентна (как соло) --- */
+function setBassInstr(i){
+  setBassIdx(((i%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length);
+  if(!AC)return; const b=BASS_INSTR[bassIdx], t=AC.currentTime;
+  bO1.type=b.t1; bO2.type=b.t2; bO2.detune.setValueAtTime(b.det,t); bLP.frequency.setTargetAtTime(b.lp,t,0.03);
+  hooks.bassInstr && hooks.bassInstr(bassIdx);
+}
+function bassOn(freq,vol,ins){
+  if(!AC)return; if(ins!==undefined&&ins!==bassIdx)setBassInstr(ins);
+  const b=BASS_INSTR[bassIdx], t=AC.currentTime;
+  bO1.frequency.setTargetAtTime(freq,t,0.012); bO2.frequency.setTargetAtTime(freq*b.ratio,t,0.012);
+  bVol.gain.setTargetAtTime(0.3+0.7*vol,t,0.03);
+  if(!bassOnFlag){ bassOnFlag=true; bEnv.gain.cancelScheduledValues(t); bEnv.gain.setTargetAtTime(1,t,b.att); }
+}
+function bassSet(freq,vol){
+  if(!AC)return; const b=BASS_INSTR[bassIdx], t=AC.currentTime;
+  bO1.frequency.setTargetAtTime(freq,t,0.03); bO2.frequency.setTargetAtTime(freq*b.ratio,t,0.03);
+  bVol.gain.setTargetAtTime(0.3+0.7*vol,t,0.05);
+}
+function bassOff(){ if(!bassOnFlag||!AC)return; bassOnFlag=false;
+  const b=BASS_INSTR[bassIdx], t=AC.currentTime;
+  bEnv.gain.cancelScheduledValues(t); bEnv.gain.setTargetAtTime(0,t,b.rel);
+}
+
+/* --- УДАРНЫЕ: однократный синтез по индексу ряда (0=низ сетки) --- */
+function dNoise(t,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.loop=true; s.start(t); s.stop(t+dur); return s; }
+function drumHit(i,vol=1){
+  if(!AC)return; const t=AC.currentTime, v=0.3+0.7*vol;
+  if(i===0){ const o=AC.createOscillator(),g=AC.createGain();     // Кик
+    o.frequency.setValueAtTime(165,t); o.frequency.exponentialRampToValueAtTime(48,t+0.09);
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.22);
+    o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.28); }
+  else if(i===1){ const s=dNoise(t,0.2),f=AC.createBiquadFilter(),g=AC.createGain();  // Снейр
+    f.type='highpass'; f.frequency.value=1400; g.gain.setValueAtTime(0.5*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.17);
+    s.connect(f); f.connect(g); g.connect(drumBus);
+    const o=AC.createOscillator(),og=AC.createGain(); o.type='triangle'; o.frequency.value=185;
+    og.gain.setValueAtTime(0.3*v,t); og.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+    o.connect(og); og.connect(drumBus); o.start(t); o.stop(t+0.11); }
+  else if(i===2){ const s=dNoise(t,0.14),f=AC.createBiquadFilter(),g=AC.createGain();  // Клэп
+    f.type='bandpass'; f.frequency.value=1600; f.Q.value=1.2;
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.55*v,t+0.004); g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+    s.connect(f); f.connect(g); g.connect(drumBus); }
+  else if(i===3){ const s=dNoise(t,0.06),f=AC.createBiquadFilter(),g=AC.createGain();  // Хэт закр.
+    f.type='highpass'; f.frequency.value=8200; g.gain.setValueAtTime(0.32*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05);
+    s.connect(f); f.connect(g); g.connect(drumBus); }
+  else if(i===4){ const o=AC.createOscillator(),g=AC.createGain();  // Том
+    o.frequency.setValueAtTime(230,t); o.frequency.exponentialRampToValueAtTime(92,t+0.18);
+    g.gain.setValueAtTime(0.6*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
+    o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.3); }
+  else{ const s=dNoise(t,0.7),f=AC.createBiquadFilter(),g=AC.createGain();  // Крэш
+    f.type='highpass'; f.frequency.value=6000; g.gain.setValueAtTime(0.3*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.7);
+    s.connect(f); f.connect(g); g.connect(drumBus); }
+}
+
+/* Метроном лупера: короткий щелчок точно по часам AC (отсчёт и сетка овердаба).
+   Идёт прямо в master, мимо громкости фона — слышен даже при выключенной подложке. */
+function metroClick(t,accent){
+  if(!AC)return;
+  const o=AC.createOscillator(), g=AC.createGain();
+  o.type='triangle'; o.frequency.setValueAtTime(accent?2000:1400,t);
+  o.frequency.exponentialRampToValueAtTime(accent?1500:1050,t+0.03);   // короткий «щёлк» вниз — читается как деревяшка
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(accent?0.85:0.5,t+0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+0.09);
+}
+
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
 export {
-  initAudio, AC, setLeadInstr, applyParams, noteOn, noteOff,
+  initAudio, AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick,
   chordOn, chordGlide, chordOff, chordHold,
-  LEAD_INSTR, CHORD_INSTR,
+  setBassInstr, bassOn, bassSet, bassOff, drumHit,
+  LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS,
   backBus, backRev, dG, dO1, dO2, noiseBuf,
 };

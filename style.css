@@ -20,7 +20,18 @@
     border:1px solid rgba(255,255,255,.22); border-radius:11px;
     padding:9px 12px; font-size:14px; line-height:1;}
   button:active{transform:scale(.96);}
-  #rec.on{background:var(--rec); border-color:var(--rec);}
+  #recBtn.on{background:var(--rec); border-color:var(--rec);}
+  #loopBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  #instrBtn{border-color:var(--chord); color:var(--chord); font-weight:600;}
+  /* переключатель инструмента и выбор руки — только в режиме «Смартфон» */
+  body:not(.phone) #instrBtn{display:none;}
+  body:not(.phone) #swapRow{display:none;}
+
+  /* узкий экран / портрет: компактнее верхняя панель */
+  @media (max-width:560px){
+    button{padding:8px 9px; font-size:13px; border-radius:9px;}
+    #bar{gap:5px; padding:6px;}
+  }
   #scaleBtn{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   #menuBtn{border-color:var(--note); color:var(--note); font-weight:700;}
 
@@ -48,6 +59,8 @@
   .phead b{font-size:14px;}
   .psep{border-top:1px solid rgba(255,255,255,.12); margin:10px 0 4px; padding-top:6px;
     font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em;}
+  .phint{font-size:11px; color:var(--dim); line-height:1.4; margin:6px 2px 2px;}
+  #loopBarsV{flex:1; text-align:center; align-self:center;}
 
   /* ---- оверлеи: старт и учебник ---- */
   .ov{position:fixed; inset:0; z-index:25; background:rgba(7,7,13,.94);

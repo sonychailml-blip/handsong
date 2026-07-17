@@ -1,10 +1,14 @@
 import { ctx, canvas, video } from './vision.js';
-import { HANDS, leadOwner, zoneAt, zoneX, degRaw } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, centsOf, OCT_ROMAN } from './scales.js';
-import { fx, revDisp, latchDeg } from './state.js';
-import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS } from './config.js';
+import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN } from './scales.js';
+import { fx, revDisp, latchDeg, uiMode, phoneInstr } from './state.js';
+import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_STRIP_H } from './config.js';
+import { DRUM_NAMES } from './audio.js';
+
+const INSTR_COL={ld:'#ff9e2c', ch:'#b18cff', bs:'#3ad29f', dr:'#ffd23f'};   // цвет по инструменту
+const INSTR_HEAD={ld:'🎸 СОЛО', ch:'🎹 АККОРДЫ', bs:'🎚 БАС', dr:'🥁 УДАРНЫЕ'};
 import { back, STYLE_LABEL } from './backing.js';
-import { recording, inPB } from './recorder.js';
+import { recording, inPB, loop, events, loopPos } from './recorder.js';
  
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
 const statusEl=document.getElementById('status');
@@ -25,8 +29,8 @@ function drawBar(x,w,yTop,yBot,val,color,label,active){
   ctx.fillText(label,x+w/2,yBot+15);
   if(active)ctx.fillText(Math.round(val*100)+'%',x+w/2,yTop-8);
 }
-function drawGrid(zx0,zx1,accent,labelOf,activeDeg){
-  const s=CUR(), ivx=IVX(), rows=ivx.length, seg=canvas.height/rows;
+function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height){
+  const s=CUR(), ivx=IVX(), rows=ivx.length, seg=gridH/rows;
   if(activeDeg>=0){
     ctx.fillStyle=hexA(accent,.26);
     ctx.fillRect(zx0,(rows-1-activeDeg)*seg,zx1-zx0,seg);
@@ -60,6 +64,62 @@ function drawTag(x,y,lines,color){
     ctx.fillText(L,bx+9,by+10+lh*i+lh/2-3);
   });
 }
+/* ================= ВИЗУАЛИЗАЦИЯ ЛУПЕРА =================
+   Полоса-транспорт сверху-по-центру: сетка тактов/долей, бегунок позиции,
+   по строке на слой с метками событий (соло — оранжевые, аккорды — сиреневые).
+   Видна только когда есть петля или идёт запись; иначе не мешает синтезатору. */
+function drawLooper(){
+  if(!loop.on && !events.length) return;
+  const W=canvas.width, info=loopPos();
+  const bars=loop.bars, total=bars*4;
+  const bw=Math.min(560,W-40), x0=(W-bw)/2, x1=x0+bw;
+  const ids=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  const rows=ids.slice();
+  if(recording && !rows.includes(loop.layer)) rows.push(loop.layer);   // пустой слой, что пишется прямо сейчас
+  const nRow=Math.max(1,rows.length), rowH=13, headH=22, pad=7, y0=64;   // ниже заголовков зон (y≈52)
+  const gy0=y0+headH, boxH=headH+nRow*rowH+pad*2, gy1=y0+boxH-pad;
+
+  ctx.fillStyle='rgba(10,10,20,.74)'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(x0-10,y0,bw+20,boxH,11); ctx.fill(); ctx.stroke();
+
+  // заголовок — режим
+  let head, hc;
+  if(info&&info.phase==='count'){ head=`ОТСЧЁТ  ${info.countLeft}`; hc='#57d9a3'; }
+  else if(recording){ head=loop.first?`● ЗАПИСЬ · круг ${bars} т.`:`● НАЛОЖЕНИЕ · слой ${loop.layer+1}`; hc='#e5484d'; }
+  else if(loop.on){ head=`▶ ПЕТЛЯ · ${bars} т. · слоёв ${ids.length}`; hc='#57d9a3'; }
+  else { head=`ПЕТЛЯ · ${bars} т. · слоёв ${ids.length} · «⟳ луп» играть`; hc='rgba(255,255,255,.7)'; }
+  ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
+  ctx.fillStyle=hc; ctx.fillText(head,x0-2,y0+headH/2+1);
+
+  // сетка долей и тактов
+  for(let b=0;b<=total;b++){
+    const gx=x0+bw*b/total, bar=b%4===0;
+    ctx.strokeStyle=bar?'rgba(255,255,255,.34)':'rgba(255,255,255,.11)'; ctx.lineWidth=bar?1.4:0.8;
+    ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
+  }
+  // строки слоёв + метки событий
+  rows.forEach((lid,ri)=>{
+    const ry=gy0+ri*rowH, mid=ry+rowH/2, live=recording&&lid===loop.layer;
+    ctx.fillStyle=live?'rgba(229,72,77,.16)':'rgba(255,255,255,.04)';
+    ctx.fillRect(x0,ry+1,bw,rowH-2);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='10px system-ui'; ctx.textAlign='right';
+    ctx.fillText('L'+(lid+1),x0-4,mid);
+    for(const e of events){ if(e.layer!==lid) continue;
+      if(e.fn==='leadOff'||e.fn==='chOff') continue;
+      const ex=x0+bw*(e.t/total), ch=e.fn[0]==='c';
+      ctx.fillStyle=ch?'#b18cff':'#ff9e2c';
+      ctx.beginPath(); ctx.roundRect(ex-1.5,ry+3,3.5,rowH-6,1.5); ctx.fill();
+    }
+  });
+  // бегунок позиции
+  if(info&&info.phase==='play'){
+    const px=x0+bw*(info.pos/info.total);
+    ctx.strokeStyle=recording?'#e5484d':'#57d9a3'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(px,gy0-2); ctx.lineTo(px,gy1+2); ctx.stroke();
+    ctx.fillStyle=ctx.strokeStyle; ctx.beginPath(); ctx.arc(px,gy0-2,3,0,7); ctx.fill();
+  }
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
 /* Видео-фон рисуем ДО детекции (тот же синхронный тик = тот же кадр видео),
    накладки — ПОСЛЕ. Так пиксели видео и точки руки берутся из ОДНОГО кадра:
    экран показывает то, ЧТО ПРОЗВУЧИТ, а не гонит свежее видео впереди отстающих
@@ -70,7 +130,9 @@ function drawVideoBackground(){
   ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-W,0,W,H); ctx.restore();
   ctx.fillStyle='rgba(7,7,13,.5)'; ctx.fillRect(0,0,W,H);
 }
-function drawOverlays(res){
+function drawOverlays(res){ if(uiMode==='phone') drawPhone(res); else drawPC(res); }
+
+function drawPC(res){
   const W=canvas.width, H=canvas.height;
   const fxX=FXW*W, zbX=ZB*W;
   // лёгкие подкраски зон
@@ -172,7 +234,11 @@ function drawOverlays(res){
     }
   }
  
-  // статус: формула лада — всегда на виду (учебный слой)
+  drawLooper();                                // транспорт лупера (сверху по центру)
+  drawStatus();
+}
+/* Статус-строка (учебный слой) — общая для обоих режимов. */
+function drawStatus(){
   const s=CUR();
   let st=`Лад: ${s.name} · ${s.edo}-TET · ступени: ${s.iv.join('-')}`;
   if(s.edo!==12)st+=` · шаг ${(1200/s.edo).toFixed(1)}c`;
@@ -181,6 +247,102 @@ function drawOverlays(res){
   if(inPB())st='▶ воспроизведение · '+st;
   statusEl.textContent=st;
   ctx.textAlign='left';
+}
+
+/* ================= PHONE-РЕЖИМ (вертикальный) =================
+   Один инструмент на всю ширину (высотой до полосы эффектов), правая рука
+   играет ноты, левая — эффекты в компактной полосе снизу. */
+function drawPhone(res){
+  const W=canvas.width, H=canvas.height;
+  const instr=phoneInstr, accent=INSTR_COL[instr];
+  const playH= instr==='ld' ? Math.max(1,H-FX_STRIP_H) : H;   // полоса эффектов только у соло — прочие инструменты играют во всю высоту
+  if(instr==='dr'){
+    drawDrumGrid(W,playH);
+  }else{
+    // активная ступень: аккорд — по защёлке, соло/бас — по играющей руке
+    let act=-1;
+    if(instr==='ch')act=latchDeg;
+    else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
+    drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH);
+  }
+  ctx.font='700 12px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=hexA(accent,.9);
+  ctx.fillText(INSTR_HEAD[instr], W/2, 40);
+  drawHandsPhone(res,W,H,playH);
+  if(instr==='ld')drawFxStrip(W,H,playH);   // эффекты действуют только на соло-канал
+  drawLooper();
+  drawStatus();
+}
+/* Сетка ударных: по ряду на инструмент кита, без тоники/центов. */
+function drawDrumGrid(W,playH){
+  const rows=DRUM_NAMES.length, seg=playH/rows;
+  ctx.textBaseline='middle'; ctx.textAlign='left';
+  for(let i=0;i<rows;i++){ const y=i*seg, idx=rows-1-i;
+    ctx.fillStyle= i%2? 'rgba(255,210,63,.05)':'rgba(255,255,255,.03)'; ctx.fillRect(0,y,W,seg);
+    ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    ctx.fillStyle='rgba(255,210,63,.85)'; ctx.font='600 14px system-ui';
+    ctx.fillText(DRUM_NAMES[idx], 10, y+seg/2);
+  }
+}
+function drawHandsPhone(res,W,H,playH){
+  if(!res||!res.landmarks)return;
+  const instr=phoneInstr, isCh=instr==='ch', isDr=instr==='dr', accent=INSTR_COL[instr], fxOn=instr==='ld';
+  for(const k in HANDS){
+    const S=HANDS[k], lm=S.lm; if(!lm)continue;
+    const fxHand=fxOn&&handRole(k)==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов есть только у соло
+    for(let i=0;i<lm.length;i++){
+      const x=(1-lm[i].x)*W, y=lm[i].y*H, tipPt=i===4||FINGER_TIPS.includes(i);
+      ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
+      ctx.beginPath(); ctx.arc(x,y,tipPt?6:2.5,0,7); ctx.fill();
+    }
+    if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
+      if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.k);
+        ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+        ctx.fillText(`${meta.full} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); }
+      continue;
+    }
+    // рука нот
+    if(S.pinch&&!S.inert&&S.deg>=0){
+      ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
+      ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
+      ctx.globalAlpha=.25; ctx.beginPath(); ctx.arc(S.x,S.y,26+8*S.vol,0,7); ctx.stroke(); ctx.globalAlpha=1;
+      const s=CUR();
+      if(instr==='ld'||instr==='bs'){
+        const f=instr==='bs'?bassFreq(S.deg,S.oct):leadFreq(S.deg,S.oct);
+        const L1=(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[S.oct]}`:`${rowLabel(S.deg)} · окт ${OCT_ROMAN[S.oct]}`;
+        const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}%`+(s.edo!==12?` · ${centsOf(S.deg)}c`:'');
+        drawTag(S.x,S.y,[L1,L2],accent);
+      }else if(isDr){
+        drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
+      }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
+    }else if(!S.pinch){                          // подсказка до щипка — ряд под указательным на всю ширину
+      const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
+      const rows=isDr?DRUM_NAMES.length:IVX().length, d=degRaw(Math.min(y,playH-1),rows,playH), seg=playH/rows;
+      ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(0,(rows-1-d)*seg,W,seg);
+      ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?chordLabel(d):rowLabel(d)),x+14,y-12);
+    }
+  }
+}
+/* Компактная полоса эффектов снизу: REV (глубина соло-руки) + 4 эффекта. */
+function drawFxStrip(W,H,playH){
+  const items=[{v:revDisp,c:REV_COLOR,l:'REV',fxk:null},
+    ...FX_META.map(m=>({v:fx[m.k],c:m.color,l:m.label,fxk:m.k}))];
+  const n=items.length, m=8, gap=6, bw=(W-2*m-(n-1)*gap)/n;
+  const yLabel=playH+11, y0=playH+15, y1=H-7;
+  ctx.fillStyle='rgba(10,10,20,.55)'; ctx.fillRect(0,playH,W,H-playH);
+  ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.moveTo(0,playH+.5); ctx.lineTo(W,playH+.5); ctx.stroke();
+  items.forEach((it,i)=>{
+    const x=m+i*(bw+gap);
+    let actv=false; for(const k in HANDS){ const S=HANDS[k];
+      if(it.fxk&&S.pinch&&S.zone==='fx'&&S.adj&&S.adj.k===it.fxk)actv=true; }
+    ctx.fillStyle='rgba(255,255,255,.10)'; ctx.fillRect(x,y0,bw,y1-y0);
+    const fh=(y1-y0)*Math.max(0,Math.min(1,it.v));
+    ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.55; ctx.fillRect(x,y1-fh,bw,fh); ctx.globalAlpha=1;
+    if(actv){ ctx.strokeStyle=it.c; ctx.lineWidth=2; ctx.strokeRect(x-1,y0-1,bw+2,(y1-y0)+2); }
+    ctx.fillStyle=actv?it.c:'rgba(255,255,255,.7)'; ctx.font='9px system-ui'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+    ctx.fillText(it.l,x+bw/2,yLabel);
+  });
 }
  
 export { drawVideoBackground, drawOverlays };

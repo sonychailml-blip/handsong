@@ -1,8 +1,8 @@
-import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, latchDeg, setLatchDeg } from './state.js';
-import { IVX, leadFreq, chordFreqs } from './scales.js';
-import { WleadOn, WleadOff, WchOn, WchSet, WchOff } from './recorder.js';
-import { chordHold } from './audio.js';
+import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS, FX_STRIP_H } from './config.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, uiMode, phoneInstr, swapHands } from './state.js';
+import { IVX } from './scales.js';
+import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
+import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
  
 const clamp01=v=>Math.max(0,Math.min(1,v));
@@ -32,9 +32,17 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
    видимый размер кисти стабильнее, чем сырая z-координата модели).
    result.handednesses[i][0].categoryName ('Left'/'Right') — стабильный
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
-const HANDS={}; let leadOwner=null; let chOwner=null;   // chOwner — рука, рулящая защёлкой
+const HANDS={}; let leadOwner=null; let chOwner=null; let bassOwner=null;   // chOwner — рука защёлки, bassOwner — рука баса
 const zoneAt=(x,W)=> x<FXW*W?'fx' : x<ZB*W?'ch':'ld';
 const zoneX =(z,W)=> z==='ch'?[FXW*W,ZB*W]:[ZB*W,W];
+/* phone-режим: роль руки по handedness, а не по X. Правая=ноты, левая=эффекты
+   (swapHands меняет местами). Без метки руки — играем ноты. */
+function handRole(key){
+  if(key.slice(0,4)==='Left')  return swapHands?'notes':'fx';
+  if(key.slice(0,5)==='Right') return swapHands?'fx':'notes';
+  return 'notes';
+}
+const playHeight=H=> (uiMode==='phone'&&phoneInstr==='ld') ? Math.max(1,H-FX_STRIP_H) : H;   // полоса эффектов (и её отступ) только у соло
 function degRaw(y,rows,H){ const seg=H/rows;
   let z=Math.floor(y/seg); if(z<0)z=0; if(z>rows-1)z=rows-1;
   return rows-1-z;
@@ -53,6 +61,7 @@ function degHyst(y,rows,H,prev){
 function endPinch(key,S){
   if(S.pinch){
     if(S.zone==='ld'&&leadOwner===key){ WleadOff(); leadOwner=null; }
+    if(S.zone==='bs'&&bassOwner===key){ WbassOff(); bassOwner=null; }
     // 'ch': WchOff НЕ зовём — защёлкнутый аккорд продолжает звучать; лишь отпускаем руль
     if(S.zone==='ch'&&chOwner===key)chOwner=null;
   }
@@ -80,15 +89,23 @@ function processHands(res){
          щипка и не меняется до отпускания — двигая руку по X ради
          громкости, нельзя случайно перескочить в соседнюю колонку. */
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
-      const px=(1-(lm[4].x+lm[mf].x)/2)*W;
-      S.zone=zoneAt(px,W);
+      if(uiMode==='phone'){
+        S.zone = (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx' : phoneInstr;   // эффекты только у соло; у прочих инструментов обе руки играют ноты
+      }else{
+        const px=(1-(lm[4].x+lm[mf].x)/2)*W;
+        S.zone=zoneAt(px,W);
+      }
       if(S.zone==='fx'){
         const meta=FX_META.find(m=>m.finger===mf);
         S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]};
       }else if(S.zone==='ld'){
         leadOwner=key;                       // приоритет последней ноты
+      }else if(S.zone==='bs'){
+        bassOwner=key;                       // бас моно — рулит последняя рука
       }else if(S.zone==='ch'){
         S.fresh=true;                        // решение о защёлке примем этот кадр, когда посчитаем ступень
+      }else if(S.zone==='dr'){
+        S.fresh=true;                        // удар сработает этот кадр по ряду
       }
     }else if(S.pinch){
       if(mv>PINCH_OFF){ endPinch(key,S); }
@@ -115,17 +132,21 @@ function processHands(res){
            высоты экрана; значение остаётся после отпускания (латч). */
         if(S.adj)fx[S.adj.k]=clamp01(S.adj.base+(S.adj.y0-lm[4].y*H)/(H*0.7));
       }else{
-        const rows=IVX().length;
-        S.deg=degHyst(y,rows,H,S.deg);
-        const[zx0,zx1]=zoneX(S.zone,W);
+        const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length, phone=uiMode==='phone';
+        S.deg=degHyst(y,rows,playHeight(H),S.deg);
+        const[zx0,zx1]= phone ? [0,W] : zoneX(S.zone,W);   // phone: громкость по всей ширине
         S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
         if(S.zone==='ld'){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
-            WleadOn({freq:leadFreq(S.deg,S.oct),vol:S.vol,rev:S.rev,
+            WleadOn({deg:S.deg,oct:S.oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx});
           }
+        }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
+          if(bassOwner===key)WbassOn({deg:S.deg,oct:S.oct,vol:S.vol,inst:bassIdx});
+        }else if(S.zone==='dr'){                            // ударные: один удар на щипок (по ряду)
+          if(S.fresh){ S.fresh=false; WdrumHit(S.deg,S.vol); }
         }else{ // 'ch' — колонка аккордов: защёлка (владелец голосов — постоянный ключ 'latch')
           if(S.inert){
             // стоп-щипок отработал: рука молчит до размыкания пальцев
@@ -134,14 +155,12 @@ function processHands(res){
             if(latchDeg>=0&&S.deg===latchDeg){
               WchOff('latch'); setLatchDeg(-1); chOwner=null; S.inert=true;   // та же ступень → выключаем, рука инертна
             }else{
-              const freqs=chordFreqs(S.deg,S.oct);
-              if(latchDeg<0)WchOn('latch',freqs,S.vol,chIdx);   // тишина → новый аккорд с атакой
-              else WchSet('latch',freqs,S.vol);                 // другая ступень → глиссандо без переатаки
-              setLatchDeg(S.deg); chOwner=key;                  // рулит последний щипнувший
+              if(latchDeg<0)WchOn('latch',S.deg,S.oct,S.vol,chIdx);   // тишина → новый аккорд с атакой
+              else WchSet('latch',S.deg,S.oct,S.vol);                 // другая ступень → глиссандо без переатаки
+              setLatchDeg(S.deg); chOwner=key;                        // рулит последний щипнувший
             }
           }else if(chOwner===key&&latchDeg>=0){
-            const freqs=chordFreqs(S.deg,S.oct);  // ведение: Y=ступень (глиссандо), X=громкость
-            WchSet('latch',freqs,S.vol); setLatchDeg(S.deg);
+            WchSet('latch',S.deg,S.oct,S.vol); setLatchDeg(S.deg);  // ведение: Y=ступень (глиссандо), X=громкость
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }
@@ -156,7 +175,8 @@ function processHands(res){
     if(!seen.has(k)&&now-S.seen>WATCHDOG_MS){ endPinch(k,S); delete HANDS[k]; }
   }
   if(leadOwner&&!HANDS[leadOwner])leadOwner=null;
+  if(bassOwner&&!HANDS[bassOwner]){ WbassOff(); bassOwner=null; }
 }
- 
+
 /* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */
-export { HANDS, leadOwner, processHands, zoneAt, zoneX, degRaw };
+export { HANDS, leadOwner, processHands, zoneAt, zoneX, degRaw, handRole };

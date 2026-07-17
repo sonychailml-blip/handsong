@@ -19,3 +19,10 @@ export const ROW_HYST=0.16;                       // гистерезис сту
 export const WATCHDOG_MS=120;                     // таймаут потери руки, мс
 export const SCHED_AHEAD=0.14;                    // опережение планировщика, с
 export const SCHED_TICK_MS=25;                    // период планировщика, мс
+
+export const FX_STRIP_H=52;                       // высота нижней полосы эффектов в phone-режиме, px
+
+/* Запись как намерение (§3.4) */
+export const BEATS_PER_BAR=4;                     // долей в такте — сетка записи и лупера (§3.5)
+export const REC_VOL_EPS=0.03;                    // мёртвая зона громкости: тише — точку не пишем
+export const REC_REV_EPS=0.03;                    // мёртвая зона реверба

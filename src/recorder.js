@@ -1,59 +1,202 @@
-import { AC, setLeadInstr, applyParams, noteOn, noteOff, chordOn, chordGlide, chordOff, chordHold } from './audio.js';
+import { AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
+         setBassInstr, bassOn, bassSet, bassOff, drumHit } from './audio.js';
 import { back, toggleBack } from './backing.js';
-import { leadIdx, setLatchDeg } from './state.js';
+import { leadIdx, bassIdx, setLatchDeg } from './state.js';
+import { leadFreq, chordFreqs, bassFreq, IVX } from './scales.js';
+import { REC_VOL_EPS, REC_REV_EPS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
 import { hooks } from './hooks.js';
- 
-/* ================= ЗАПИСЬ / ВОСПРОИЗВЕДЕНИЕ ================= */
-let recording=false, recStart=0, events=[], playbackUntil=0, playTimers=[];
+
+/* ================= ЗАПИСЬ И ЛУПЕР =================
+   Событие — НАМЕРЕНИЕ, не кадр: время в ДОЛЯХ внутри петли (t ∈ [0,loopBeats)),
+   высота — СТУПЕНЬ+ОКТАВА (deg/oct); частота выводится на исполнении через
+   leadFreq/chordFreqs → петля перестраивается под текущий строй (§3.7).
+   Пишем по изменению (дискретное — при смене, непрерывное — за мёртвой зоной),
+   так кадровый лог (~60/с) схлопывается в горстку точек на ноту.
+   Схема события: {t, layer, fn, a}. layer — слой овердаба (единица отмены).
+
+   ЛУПЕР. Один насос по часам AudioContext крутит петлю фиксированной длины
+   (loop.bars тактов). Позиция в долях = ((now−t0)·bpm/60) mod loopBeats; на
+   завороте зависшие голоса гасятся, события переигрываются с начала. Живой ввод
+   идёт через W* (звук сразу + запись, если вооружено), переигровка зовёт ENG
+   НАПРЯМУЮ — поэтому переигранное не пишется заново без всякого гейта. Овердаб:
+   петля играет и одновременно пишется новый слой; слой, что пишется прямо сейчас,
+   НЕ переигрывается (его слышно живьём) — иначе двойной триггер.
+   Разные каналы (аккорды 'latch' vs соло) не конфликтуют — это и есть основной
+   сценарий: круг аккордов слоем 0, соло поверх слоем 1. Соло-поверх-соло и
+   аккорд-поверх-аккорда делят один голос: побеждает последний (движок так устроен). */
+let recording=false;                                 // «вооружено»: пишем живой ввод
+const events=[];                                     // стабильная ссылка (её читает визуализация в draw)
+const loop={ on:false, bars:2, t0:0, pos:-1e-9, first:false, layer:0, clickBeat:0, quant:true };
+let recLead=null, recCh=null, recBass=null, pumpTimer=null;
+const loopBeats=()=>loop.bars*BEATS_PER_BAR;
+const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
+/* Позиция для визуализации: фаза отсчёта / игры, доля внутри петли, всего долей. */
+function loopPos(){
+  if(!loop.on||!AC)return null;
+  const e=(AC.currentTime-loop.t0)*back.bpm/60, total=loopBeats();
+  return e<0 ? {phase:'count', countLeft:Math.ceil(-e), pos:0, total, bars:loop.bars}
+             : {phase:'play',  pos:e%total, total, bars:loop.bars};
+}
+
+/* Проигрывание в ДРУГОМ строе может дать ступень выше, чем есть у короткого лада
+   (фраза из диатоники в пентатонике) — зажимаем, чтобы не улететь в NaN-частоту.
+   Межладовый перенос музыкально осмыслен лишь при равной длине лада (§3.7: 7↔7). */
+const lf=(deg,oct)=>leadFreq(Math.min(deg,IVX().length-1),oct);
+const bf=(deg,oct)=>bassFreq(Math.min(deg,IVX().length-1),oct);
+/* ENG — единая точка исполнения (живьём через W* и на переигровке). deg→частота
+   выводится ЗДЕСЬ. Владелец аккордовых голосов всегда 'latch' (защёлка §6). */
 const ENG={
-  leadOn:p=>{ if(p.inst!==undefined&&p.inst!==leadIdx)setLeadInstr(p.inst); applyParams(p); noteOn(); },
+  leadOn:a=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
+              applyParams({freq:lf(a.deg,a.oct),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
+              noteOn(); },
+  leadSet:a=>applyParams({freq:lf(a.deg,a.oct),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
-  chOn:(id,freqs,vol,ins)=>chordOn(id,freqs,vol,ins),
-  chSet:(id,freqs,vol)=>chordGlide(id,freqs,vol),
-  chOff:id=>chordOff(id),
+  chOn:a=>chordOn('latch',chordFreqs(a.deg,a.oct),a.vol,a.inst),
+  chSet:a=>chordGlide('latch',chordFreqs(a.deg,a.oct),a.vol),
+  chOff:()=>chordOff('latch'),
+  bassOn:a=>bassOn(bf(a.deg,a.oct),a.vol,a.inst),
+  bassSet:a=>bassSet(bf(a.deg,a.oct),a.vol),
+  bassOff:()=>bassOff(),
+  drum:a=>drumHit(a.row,a.vol),
 };
-const inPB=()=>performance.now()<playbackUntil;
-function recEv(fn,args){ if(recording&&!inPB())
-  events.push({dt:performance.now()/1000-recStart,fn,args}); }
-const WleadOn =p=>{ if(!inPB()){ENG.leadOn(p); recEv('leadOn',[p]);} };
-const WleadOff=()=>{ if(!inPB()){ENG.leadOff(); recEv('leadOff',[]);} };
-const WchOn =(id,f,v,i)=>{ if(!inPB()){ENG.chOn(id,f,v,i); recEv('chOn',[id,f,v,i]);} };
-const WchSet=(id,f,v)=>{ if(!inPB()){ENG.chSet(id,f,v); recEv('chSet',[id,f,v]);} };
-const WchOff=id=>{ if(!inPB()){ENG.chOff(id); recEv('chOff',[id]);} };
-function softAllOff(){ if(!AC)return; ENG.leadOff();
-  Object.keys(chordHold).forEach(k=>ENG.chOff(k));   // ключ 'latch' снимается этим обходом
-  setLatchDeg(-1); }
-function playRec(){
-  if(!events.length||!AC)return;
-  playTimers.forEach(clearTimeout); playTimers=[];
-  softAllOff();
-  const dur=events[events.length-1].dt;
-  playbackUntil=performance.now()+dur*1000+400;
+const inPB=()=>loop.on;                               // для строки статуса (draw)
+
+/* Сетка квантизации в долях: аккорды — доля (4/такт), бас — восьмая (8/такт),
+   ударные — шестнадцатая (16/такт), соло — не квантуется. Общий тумблер loop.quant. */
+const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?0.25 : 0;
+/* Запись события на текущую позицию в петле; время при квантизации снапится к сетке. */
+function push(fn,a){
+  if(!AC)return;
+  const e=(AC.currentTime-loop.t0)*back.bpm/60;
+  if(e<0)return;                                      // ещё идёт отсчёт
+  let t=e%loopBeats();
+  const g=loop.quant?gridFor(fn):0;
+  if(g>0)t=(Math.round(t/g)*g)%loopBeats();
+  events.push({t,layer:loop.layer,fn,a});
+}
+function recLeadEv(p){
+  if(!recording)return;
+  if(!recLead){ push('leadOn',{...p}); }
+  else if(p.deg!==recLead.deg||p.oct!==recLead.oct||p.inst!==recLead.inst||
+          Math.abs(p.vol-recLead.vol)>REC_VOL_EPS||Math.abs(p.rev-recLead.rev)>REC_REV_EPS){ push('leadSet',{...p}); }
+  else return;
+  recLead={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst};
+}
+function recLeadOff(){ if(recording&&recLead){ push('leadOff',{}); recLead=null; } }
+function recChOn(a){ if(!recording)return; push('chOn',{...a}); recCh={deg:a.deg,oct:a.oct,vol:a.vol}; }
+function recChSet(a){
+  if(!recording)return;
+  if(!recCh){ push('chOn',{...a}); }
+  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS){ push('chSet',{...a}); }
+  else return;
+  recCh={deg:a.deg,oct:a.oct,vol:a.vol};
+}
+function recChOff(){ if(recording&&recCh){ push('chOff',{}); recCh=null; } }
+function recBassEv(p){                                  // бас прореживается как соло
+  if(!recording)return;
+  if(!recBass){ push('bassOn',{...p}); }
+  else if(p.deg!==recBass.deg||p.oct!==recBass.oct||p.inst!==recBass.inst||Math.abs(p.vol-recBass.vol)>REC_VOL_EPS){ push('bassSet',{...p}); }
+  else return;
+  recBass={deg:p.deg,oct:p.oct,vol:p.vol,inst:p.inst};
+}
+function recBassOff(){ if(recording&&recBass){ push('bassOff',{}); recBass=null; } }
+function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — одиночное событие
+
+/* Обёртки W*: живой звук СРАЗУ + запись (если вооружено). Переигровка (насос)
+   зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
+const WleadOn =p=>{ ENG.leadOn(p); recLeadEv(p); };
+const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
+const WchOn =(_o,deg,oct,vol,ins)=>{ const a={deg,oct,vol,inst:ins}; ENG.chOn(a); recChOn(a); };
+const WchSet=(_o,deg,oct,vol)   =>{ const a={deg,oct,vol};          ENG.chSet(a); recChSet(a); };
+const WchOff=_o                 =>{ ENG.chOff(); recChOff(); };
+const WbassOn =p=>{ ENG.bassOn(p); recBassEv(p); };
+const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
+const WdrumHit=(row,vol)=>{ const a={row,vol}; ENG.drum(a); recDrum(a); };
+
+function softAllOff(){ if(!AC)return; noteOff(); bassOff();
+  Object.keys(chordHold).forEach(k=>chordOff(k));   // ключ 'latch' снимается этим обходом
+  setLatchDeg(-1); recLead=null; recCh=null; recBass=null; }
+function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
+
+/* --- Транспорт петли --- */
+function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; } }
+function fireWindow(a,b){                              // события в (a,b], кроме пишущегося сейчас слоя
   for(const ev of events)
-    playTimers.push(setTimeout(()=>ENG[ev.fn](...ev.args), ev.dt*1000));
-  playTimers.push(setTimeout(softAllOff, dur*1000+80));
+    if(ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer)) ENG[ev.fn](ev.a);
+}
+function schedClicks(){                                // щелчки метронома с опережением по AC-часам
+  const spb=60/back.bpm, ahead=AC.currentTime+SCHED_AHEAD;
+  while(loop.t0+loop.clickBeat*spb<ahead){
+    const bt=loop.t0+loop.clickBeat*spb, inCount=loop.clickBeat<0;
+    if(bt>=AC.currentTime-0.001&&(inCount||recording))
+      metroClick(bt, (((loop.clickBeat%BEATS_PER_BAR)+BEATS_PER_BAR)%BEATS_PER_BAR)===0);
+    loop.clickBeat++;
+  }
+}
+function tick(){
+  if(!loop.on||!AC)return;
+  schedClicks();
+  const e=(AC.currentTime-loop.t0)*back.bpm/60;
+  if(e<0)return;                                      // отсчёт: только щелчки
+  const lb=loopBeats(); let pos=e%lb;
+  if(pos<loop.pos){                                   // заворот петли
+    fireWindow(loop.pos,lb);
+    softAllOff();                                     // гасим зависшее к границе
+    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); }
+    fireWindow(-1e-9,pos);
+  }else fireWindow(loop.pos,pos);
+  loop.pos=pos;
+}
+function startTransport(countIn){
+  clearPump();
+  const spb=60/back.bpm;
+  loop.on=true; loop.pos=-1e-9;
+  loop.t0=AC.currentTime+(countIn?BEATS_PER_BAR*spb:0.06);
+  loop.clickBeat=countIn?-BEATS_PER_BAR:0;
+  pumpTimer=setInterval(tick,SCHED_TICK_MS);
+  hooks.loop && hooks.loop(true);
+}
+
+/* Кнопка «● запись»: пусто → запись слоя 0 с отсчётом (авто-луп по завершении круга);
+   играет петля → тумблер овердаба (вкл/выкл новый слой). */
+function onRec(){
+  if(!AC)return;
+  if(!loop.on){ events.length=0; loop.first=true; loop.layer=0; setRecording(true); startTransport(true); }
+  else if(recording){ recLeadOff(); recChOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); }
+  else{ loop.layer=maxLayer()+1; setRecording(true); }
+}
+function onLoop(){                                     // играть/пауза петли
+  if(!AC)return;
+  if(loop.on){ loop.on=false; clearPump(); softAllOff(); setRecording(false);
+    hooks.rec&&hooks.rec(false); hooks.loop&&hooks.loop(false); }
+  else if(events.length)startTransport(false);
+}
+function onUndo(){                                      // снять последний слой (на месте — ссылка events стабильна)
+  if(!events.length)return;
+  const top=maxLayer();
+  for(let i=events.length-1;i>=0;i--)if(events[i].layer===top)events.splice(i,1);
+  softAllOff();
+  if(!events.length)clearRec(); else hooks.loop && hooks.loop(loop.on);
+}
+function setLoopBars(n){                                // длина меняется только на пустой петле
+  if(events.length||loop.on)return;
+  loop.bars=Math.max(1,Math.min(8,n));
+}
+function setLoopQuant(v){ loop.quant=!!v; }             // общий тумблер квантизации
+function clearRec(){
+  clearPump(); events.length=0; loop.on=false; setRecording(false); softAllOff();
+  hooks.loop && hooks.loop(false);
 }
 function panic(){
-  playTimers.forEach(clearTimeout); playTimers=[]; playbackUntil=0;
+  clearPump(); loop.on=false;
   softAllOff();
   if(back.playing)toggleBack();
-  recording=false; hooks.rec && hooks.rec(false);
+  setRecording(false); hooks.loop && hooks.loop(false);
 }
- 
-/* Тела бывших обработчиков ui: пишут recording/recStart/events —
-   через границу модуля это невозможно, поэтому живут здесь. */
-function toggleRec(){
-  recording=!recording;
-  hooks.rec && hooks.rec(recording);
-  if(recording){recStart=performance.now()/1000;events=[];}
-}
-function stopRec(){ recording=false; hooks.rec && hooks.rec(false); }
-function clearRec(){ events=[];playTimers.forEach(clearTimeout);playTimers=[];
-  playbackUntil=0;softAllOff(); }
- 
+
 /* Экспорт: `recording` через export-клаузу — живая связка (её читает draw). */
 export {
-  WleadOn, WleadOff, WchOn, WchSet, WchOff,
-  softAllOff, playRec, panic, inPB, recording,
-  toggleRec, stopRec, clearRec,
+  WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
+  softAllOff, panic, inPB, recording,
+  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, loop, events, loopPos,
 };
