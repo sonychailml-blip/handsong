@@ -60,11 +60,18 @@ function drawTag(x,y,lines,color){
     ctx.fillText(L,bx+9,by+10+lh*i+lh/2-3);
   });
 }
-function draw(res){
+/* Видео-фон рисуем ДО детекции (тот же синхронный тик = тот же кадр видео),
+   накладки — ПОСЛЕ. Так пиксели видео и точки руки берутся из ОДНОГО кадра:
+   экран показывает то, ЧТО ПРОЗВУЧИТ, а не гонит свежее видео впереди отстающих
+   точек. Это фикс когерентности, НЕ латентности — видео становится позже, чтобы
+   совпасть с точками (звук по-прежнему из того же старого кадра). */
+function drawVideoBackground(){
   const W=canvas.width, H=canvas.height;
   ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-W,0,W,H); ctx.restore();
   ctx.fillStyle='rgba(7,7,13,.5)'; ctx.fillRect(0,0,W,H);
- 
+}
+function drawOverlays(res){
+  const W=canvas.width, H=canvas.height;
   const fxX=FXW*W, zbX=ZB*W;
   // лёгкие подкраски зон
   ctx.fillStyle='rgba(177,140,255,.05)'; ctx.fillRect(fxX,0,zbX-fxX,H);
@@ -176,4 +183,4 @@ function draw(res){
   ctx.textAlign='left';
 }
  
-export { draw };
+export { drawVideoBackground, drawOverlays };

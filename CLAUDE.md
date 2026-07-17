@@ -86,6 +86,16 @@ All hand-built Web Audio nodes; a `DynamicsCompressor` acts as a mandatory outpu
    module freezes it at load time. The backing scheduler re-reads
    `baseF()`/`CUR()`/`chordSteps()` every step; freeze any of them and changing scale
    or tonic mid-play silently stops re-tuning the pattern.
+7. **The video draw and `detectForVideo` must read the same camera frame.** `loop()`
+   in `main.js` calls `drawVideoBackground()` (which does `drawImage(video)`) *before*
+   `detectForVideo`, then `drawOverlays()` *after* — all in one synchronous tick. The
+   video element's presented frame is frozen for the whole tick, so the pixels and the
+   landmarks come from one frame and the screen shows *what will sound*, not where the
+   hand is now. This is a coherence fix, not a latency fix — never count it as one.
+   If frame-skipping is ever added (e.g. only detect on new frames, or `requestVideo-
+   FrameCallback`), the video draw and the detect must stay bound to the **same** frame.
+   Draw a fresh frame but reuse older landmarks and the ~200ms desync returns — silently,
+   on exactly the skipped frames.
 
 ## How to verify a change
 

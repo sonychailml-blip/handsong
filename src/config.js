@@ -11,9 +11,9 @@ export const FX_META=[                           // эффекты (только
 export const REV_COLOR='#57d9a3';
 
 /* Пороги жестов и тайминги (значения 1-в-1 из исходника) */
-export const PINCH_ON=0.45;                       // захват щипка
+export const PINCH_ON=0.25;                       // захват щипка
 export const PINCH_HOLD=0.5;                      // смена пальца в щипке
-export const PINCH_OFF=0.72;                      // отпускание
+export const PINCH_OFF=0.25;                      // отпускание
 export const REV_NEAR=0.27, REV_RANGE=0.19;       // реверб: (0.27-hs)/0.19
 export const ROW_HYST=0.16;                       // гистерезис ступени
 export const WATCHDOG_MS=120;                     // таймаут потери руки, мс

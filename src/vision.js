@@ -1,4 +1,4 @@
-import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
  
 /* ================= КАМЕРА + MEDIAPIPE ================= */
 const video=document.getElementById('video');
@@ -12,7 +12,7 @@ addEventListener('resize',resize); resize();
 async function initVision(msg){
   msg('Загружаю модель распознавания рук…');
   const files=await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
   landmarker=await HandLandmarker.createFromOptions(files,{
     baseOptions:{
       modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
