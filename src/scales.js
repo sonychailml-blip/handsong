@@ -24,8 +24,11 @@ export const SCALES=[
  {name:'Хроматика (12 нот)',           grp:'12-TET · пентатоника/блюз', edo:12, iv:range(12),        tag:'chrom'},
  {name:'Макам Раст (¼-тоны)',          grp:'Микротоника',               edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam'},
  {name:'Макам Баяти (¼-тоны)',         grp:'Микротоника',               edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam'},
- {name:'19-TET — весь строй',          grp:'Микротоника',               edo:19, iv:range(19),        tag:'edo'},
- {name:'31-TET — весь строй',          grp:'Микротоника',               edo:31, iv:range(31),        tag:'edo'},
+ {name:'19-TET — весь строй',          grp:'Микротоника',               edo:19, iv:range(19),        tag:'edo',
+   chord:[1, 6/5, 3/2], chord7:[1, 6/5, 3/2, 9/5]},   // мин.терция 5ш (+0.2¢), кв.11, мал.7 16ш (−7¢)
+ {name:'31-TET — весь строй',          grp:'Микротоника',               edo:31, iv:range(31),        tag:'edo',
+   chord:[1, 5/4, 3/2], chord7:[1, 5/4, 3/2, 7/4]},   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
+
 ];
 
 export const CUR=()=>SCALES[scaleIdx];
@@ -39,6 +42,7 @@ export const baseF=()=>220*Math.pow(2,(tonic-9)/12);        // частота т
    для 19-TET = 63.2 цента, для 31-TET = 38.7 цента. */
 export const isTert=s=>s.tag==='dia'||s.tag==='ethnic'||s.tag==='maqam';
 export const fifthStep=edo=>Math.round(edo*Math.log2(1.5)); // шаг, ближайший к чистой квинте 702c
+const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближайший к чистому интервалу ratio
  
 /* КОНТЕКСТНАЯ ЛОГИКА АККОРДОВ:
    · 7-ступенчатые лады (диатоника, венгерский, макамы) — наслоение терций:
@@ -53,7 +57,13 @@ export function chordSteps(deg){
     return ks.map(k=>{const j=deg+k; return s.iv[j%n]+s.edo*Math.floor(j/n);});
   }
   const r=s.iv[deg%n]+s.edo*Math.floor(deg/n);
-  return [r, r+fifthStep(s.edo), r+s.edo];
+  if (s.tag==='edo'){
+    /* Мезотоника (19/31-TET): аккорд строим ПО ИНТЕРВАЛУ, не по индексу.
+       Отношения заданы на ладе (chord/chord7); 31-TET септаккорд = 4:5:6:7. */
+    const rs=seventh?s.chord7:s.chord;
+    return rs.map(ra=>r+stepFor(s.edo,ra));
+  }
+  return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз/хроматика — пауэр-аккорд как раньше
 }
 export function leadFreq(deg,oct){ const s=CUR(); return baseF()*Math.pow(2,oct)*Math.pow(2,IVX()[deg]/s.edo); }
 export function chordFreqs(deg,oct){ const s=CUR(); // база аккордов на октаву ниже соло
