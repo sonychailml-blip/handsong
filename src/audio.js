@@ -1,6 +1,7 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx } from './state.js';
 import { baseF } from './scales.js';
 import { hooks } from './hooks.js';
+import { CHORD_POOL_N, BASS_POOL_N } from './config.js';
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
@@ -40,7 +41,7 @@ let chordBus, revCh;                                    // аккорды
 let backBus, backRev, dO1, dO2, dG, noiseBuf;           // подложка
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
 let noteOnFlag=false;
-let bO1,bO2,bLP,bEnv,bVol, bassOnFlag=false;            // моно-бас
+const bv=[]; const bassHold={}; let bassBus;             // пул баса (моно-голос на слой)
 let drumBus;                                             // шина ударных
  
 function makeSatCurve(k=4,n=1024){ const c=new Float32Array(n);
@@ -101,9 +102,9 @@ function buildLeadBanks(preBus){
     banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02)});
   }
 }
-/* --- Пул аккордовых голосов (8 штук, всегда запущены, гейт по громкости) --- */
-function buildChordPool(dest){
-  for(let i=0;i<8;i++){
+/* --- Пул аккордовых голосов (всегда запущены, гейт по громкости; размер — CHORD_POOL_N) --- */
+function buildChordPool(dest, n=CHORD_POOL_N){
+  for(let i=0;i<n;i++){
     const o1=AC.createOscillator(), o2=AC.createOscillator();
     const g1=AC.createGain(), g2=AC.createGain();
     const f=AC.createBiquadFilter(), g=AC.createGain();
@@ -120,7 +121,8 @@ function cvRelease(v,hard){ const t=AC.currentTime;
   v.owner=null;
 }
 function cvAlloc(){ let v=cv.find(v=>!v.owner);
-  if(!v){ v=cv.reduce((a,b)=>a.tOn<b.tOn?a:b); cvRelease(v,true); }
+  if(!v){ v=cv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; cvRelease(v,true);   // кража: снять голос со старого владельца, иначе его chordOff порвёт чужую ноту
+    if(o&&chordHold[o]){ const a=chordHold[o].filter(x=>x!==v); a.length?chordHold[o]=a:delete chordHold[o]; } }
   return v;
 }
 function chordOn(owner,freqs,vol,insIdx){
@@ -208,13 +210,9 @@ function initAudio(){
   revCh=AC.createGain(); revCh.gain.value=0.12; chordBus.connect(revCh); revCh.connect(verb);
   buildChordPool(chordBus);
  
-  /* --- БАС: моно-голос, свой НЧ-путь прямо в master --- */
-  bO1=AC.createOscillator(); bO2=AC.createOscillator();
-  bLP=AC.createBiquadFilter(); bLP.type='lowpass'; bLP.frequency.value=500;
-  bEnv=AC.createGain(); bEnv.gain.value=0; bVol=AC.createGain(); bVol.gain.value=0.5;
-  { const b=BASS_INSTR[bassIdx]; bO1.type=b.t1; bO2.type=b.t2; bO2.detune.value=b.det; bLP.frequency.value=b.lp; }
-  bO1.connect(bLP); bO2.connect(bLP); bLP.connect(bEnv); bEnv.connect(bVol); bVol.connect(master);
-  bO1.start(); bO2.start();
+  /* --- БАС: пул моно-голосов (слой + живой), общая шина в master --- */
+  bassBus=AC.createGain(); bassBus.gain.value=1; bassBus.connect(master);
+  buildBassPool(bassBus);
 
   /* --- УДАРНЫЕ: своя шина в master (мимо эффектов соло) --- */
   drumBus=AC.createGain(); drumBus.gain.value=0.85; drumBus.connect(master);
@@ -266,29 +264,53 @@ function noteOff(){
   envGain.gain.cancelScheduledValues(t);
   envGain.gain.setTargetAtTime(0,t,LEAD_INSTR[leadIdx].rel);
 }
-/* --- БАС: моно-голос, атака идемпотентна (как соло) --- */
+/* --- БАС: пул моно-голосов (один на слой). Тембр печётся НА АТАКЕ по слою (как аккорд),
+   а не глобально — записанный слой сохраняет свой инструмент (§3.4, как строй/септаккорд). --- */
+function buildBassPool(dest){
+  for(let i=0;i<BASS_POOL_N;i++){
+    const o1=AC.createOscillator(), o2=AC.createOscillator();
+    const lp=AC.createBiquadFilter(), env=AC.createGain(), vol=AC.createGain();
+    o1.type='sawtooth'; o2.type='sawtooth'; lp.type='lowpass'; lp.frequency.value=500;
+    env.gain.value=0; vol.gain.value=0.5;
+    o1.connect(lp); o2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
+    o1.start(); o2.start();
+    bv.push({o1,o2,lp,env,vol,owner:null,ins:null,tOn:0,on:false});
+  }
+}
+function bvRelease(v,hard){ const t=AC.currentTime;
+  v.env.gain.cancelScheduledValues(t);
+  v.env.gain.setTargetAtTime(0,t,hard?0.02:(v.ins?v.ins.rel:0.2));
+  v.owner=null; v.on=false;
+}
+function bvAlloc(){ let v=bv.find(v=>!v.owner);
+  if(!v){ v=bv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; bvRelease(v,true);   // кража: снять голос со старого владельца
+    if(o&&bassHold[o]===v)delete bassHold[o]; }
+  return v;
+}
+/* setBassInstr — ТОЛЬКО живой селектор: глобальный bassIdx + дропдаун. Пул не трогаем;
+   живой бас возьмёт новый тембр на следующей атаке (как аккорды), слои — сохранят свой. */
 function setBassInstr(i){
   setBassIdx(((i%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length);
-  if(!AC)return; const b=BASS_INSTR[bassIdx], t=AC.currentTime;
-  bO1.type=b.t1; bO2.type=b.t2; bO2.detune.setValueAtTime(b.det,t); bLP.frequency.setTargetAtTime(b.lp,t,0.03);
   hooks.bassInstr && hooks.bassInstr(bassIdx);
 }
-function bassOn(freq,vol,ins){
-  if(!AC)return; if(ins!==undefined&&ins!==bassIdx)setBassInstr(ins);
-  const b=BASS_INSTR[bassIdx], t=AC.currentTime;
-  bO1.frequency.setTargetAtTime(freq,t,0.012); bO2.frequency.setTargetAtTime(freq*b.ratio,t,0.012);
-  bVol.gain.setTargetAtTime(0.3+0.7*vol,t,0.03);
-  if(!bassOnFlag){ bassOnFlag=true; bEnv.gain.cancelScheduledValues(t); bEnv.gain.setTargetAtTime(1,t,b.att); }
+function bassOn(owner,freq,vol,ins){
+  if(!AC)return; const t=AC.currentTime;
+  let v=bassHold[owner]; if(!v){ v=bvAlloc(); v.owner=owner; bassHold[owner]=v; }
+  if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
+    v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
+    v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t); v.lp.frequency.setValueAtTime(v.ins.lp,t);
+    v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att);
+  }
+  v.tOn=t;
+  v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);
+  v.vol.gain.setTargetAtTime(0.3+0.7*vol,t,0.03);
 }
-function bassSet(freq,vol){
-  if(!AC)return; const b=BASS_INSTR[bassIdx], t=AC.currentTime;
-  bO1.frequency.setTargetAtTime(freq,t,0.03); bO2.frequency.setTargetAtTime(freq*b.ratio,t,0.03);
-  bVol.gain.setTargetAtTime(0.3+0.7*vol,t,0.05);
+function bassSet(owner,freq,vol){
+  if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=AC.currentTime;
+  v.o1.frequency.setTargetAtTime(freq,t,0.03); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.03);
+  v.vol.gain.setTargetAtTime(0.3+0.7*vol,t,0.05);
 }
-function bassOff(){ if(!bassOnFlag||!AC)return; bassOnFlag=false;
-  const b=BASS_INSTR[bassIdx], t=AC.currentTime;
-  bEnv.gain.cancelScheduledValues(t); bEnv.gain.setTargetAtTime(0,t,b.rel);
-}
+function bassOff(owner){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false); delete bassHold[owner]; }
 
 /* --- УДАРНЫЕ: однократный синтез по индексу ряда (0=низ сетки) --- */
 function dNoise(t,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.loop=true; s.start(t); s.stop(t+dur); return s; }
@@ -336,7 +358,7 @@ function metroClick(t,accent){
 export {
   initAudio, AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick,
   chordOn, chordGlide, chordOff, chordHold,
-  setBassInstr, bassOn, bassSet, bassOff, drumHit,
+  setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS,
   backBus, backRev, dG, dO1, dO2, noiseBuf,
 };

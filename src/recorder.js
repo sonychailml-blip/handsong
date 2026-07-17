@@ -1,5 +1,5 @@
 import { AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
-         setBassInstr, bassOn, bassSet, bassOff, drumHit } from './audio.js';
+         bassOn, bassSet, bassOff, bassHold, drumHit } from './audio.js';
 import { back, toggleBack } from './backing.js';
 import { leadIdx, bassIdx, seventh, setLatchDeg } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
@@ -21,9 +21,11 @@ import { hooks } from './hooks.js';
    НАПРЯМУЮ — поэтому переигранное не пишется заново без всякого гейта. Овердаб:
    петля играет и одновременно пишется новый слой; слой, что пишется прямо сейчас,
    НЕ переигрывается (его слышно живьём) — иначе двойной триггер.
-   Разные каналы (аккорды 'latch' vs соло) не конфликтуют — это и есть основной
-   сценарий: круг аккордов слоем 0, соло поверх слоем 1. Соло-поверх-соло и
-   аккорд-поверх-аккорда делят один голос: побеждает последний (движок так устроен). */
+   ВЛАДЕЛЬЦЫ ГОЛОСОВ ПО СЛОЮ: живой аккорд — 'latch', переигранный — 'loop:N';
+   живой бас — 'bass', переигранный — 'bassloop:N'. Поэтому один и тот же инструмент
+   слоится сам на себя (аккорд поверх аккорда, бас поверх баса) — разные владельцы,
+   разные голоса из пула. Соло остаётся моно (один envGain): соло-поверх-соло делит
+   голос, побеждает последний — легато-глиссандо и есть инструмент, это не баг. */
 let recording=false;                                 // «вооружено»: пишем живой ввод
 const events=[];                                     // стабильная ссылка (её читает визуализация в draw)
 const loop={ on:false, bars:2, t0:0, pos:-1e-9, first:false, layer:0, clickBeat:0, quant:true };
@@ -43,19 +45,22 @@ function loopPos(){
    на переигровке ctx=событие с ЗАМОРОЖЕННЫМ ладом (ev.sc) и септаккордом (ev.sev),
    §3.4. baseF() всегда живой → тоника глобальна, лад заморожен. leadFreq/bassFreq
    сами страхуют ступень вне лада (модуло+октава), так что частота не улетает в NaN.
-   Владелец аккордовых голосов всегда 'latch' (защёлка §6). */
+   Владелец голосов ПО СЛОЮ (ctx=событие переигровки): аккорд — 'loop:'+layer / живой
+   'latch'; бас — 'bassloop:'+layer / живой 'bass'. Так слой не крадёт голос у живого. */
+const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer:'latch';
+const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer:'bass';
 const ENG={
   leadOn:(a,ctx)=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
               applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
               noteOn(); },
   leadSet:(a,ctx)=>applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
-  chOn:(a,ctx)=>chordOn('latch',chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol,a.inst),
-  chSet:(a,ctx)=>chordGlide('latch',chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol),
-  chOff:()=>chordOff('latch'),
-  bassOn:(a,ctx)=>bassOn(bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst),
-  bassSet:(a,ctx)=>bassSet(bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol),
-  bassOff:()=>bassOff(),
+  chOn:(a,ctx)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol,a.inst),
+  chSet:(a,ctx)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol),
+  chOff:(a,ctx)=>chordOff(chOwnerKey(ctx)),
+  bassOn:(a,ctx)=>bassOn(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst),
+  bassSet:(a,ctx)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol),
+  bassOff:(a,ctx)=>bassOff(bassOwnerKey(ctx)),
   drum:a=>drumHit(a.row,a.vol),
 };
 const inPB=()=>loop.on;                               // для строки статуса (draw)
@@ -112,8 +117,9 @@ const WbassOn =p=>{ ENG.bassOn(p); recBassEv(p); };
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
 const WdrumHit=(row,vol)=>{ const a={row,vol}; ENG.drum(a); recDrum(a); };
 
-function softAllOff(){ if(!AC)return; noteOff(); bassOff();
-  Object.keys(chordHold).forEach(k=>chordOff(k));   // ключ 'latch' снимается этим обходом
+function softAllOff(){ if(!AC)return; noteOff();
+  Object.keys(chordHold).forEach(k=>chordOff(k));   // все владельцы аккордов: 'latch' + 'loop:N'
+  Object.keys(bassHold).forEach(k=>bassOff(k));     // все владельцы баса: 'bass' + 'bassloop:N'
   setLatchDeg(-1); recLead=null; recCh=null; recBass=null; }
 function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 
