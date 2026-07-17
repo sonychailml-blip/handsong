@@ -1,8 +1,8 @@
 import { AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
          setBassInstr, bassOn, bassSet, bassOff, drumHit } from './audio.js';
 import { back, toggleBack } from './backing.js';
-import { leadIdx, bassIdx, setLatchDeg } from './state.js';
-import { leadFreq, chordFreqs, bassFreq, IVX } from './scales.js';
+import { leadIdx, bassIdx, seventh, setLatchDeg } from './state.js';
+import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { REC_VOL_EPS, REC_REV_EPS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
 import { hooks } from './hooks.js';
 
@@ -38,24 +38,23 @@ function loopPos(){
              : {phase:'play',  pos:e%total, total, bars:loop.bars};
 }
 
-/* Проигрывание в ДРУГОМ строе может дать ступень выше, чем есть у короткого лада
-   (фраза из диатоники в пентатонике) — зажимаем, чтобы не улететь в NaN-частоту.
-   Межладовый перенос музыкально осмыслен лишь при равной длине лада (§3.7: 7↔7). */
-const lf=(deg,oct)=>leadFreq(Math.min(deg,IVX().length-1),oct);
-const bf=(deg,oct)=>bassFreq(Math.min(deg,IVX().length-1),oct);
 /* ENG — единая точка исполнения (живьём через W* и на переигровке). deg→частота
-   выводится ЗДЕСЬ. Владелец аккордовых голосов всегда 'latch' (защёлка §6). */
+   выводится ЗДЕСЬ. Ладовый КОНТЕКСТ: живьём (ctx нет) — текущий лад/септаккорд;
+   на переигровке ctx=событие с ЗАМОРОЖЕННЫМ ладом (ev.sc) и септаккордом (ev.sev),
+   §3.4. baseF() всегда живой → тоника глобальна, лад заморожен. leadFreq/bassFreq
+   сами страхуют ступень вне лада (модуло+октава), так что частота не улетает в NaN.
+   Владелец аккордовых голосов всегда 'latch' (защёлка §6). */
 const ENG={
-  leadOn:a=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
-              applyParams({freq:lf(a.deg,a.oct),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
+  leadOn:(a,ctx)=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
+              applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
               noteOn(); },
-  leadSet:a=>applyParams({freq:lf(a.deg,a.oct),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
+  leadSet:(a,ctx)=>applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
-  chOn:a=>chordOn('latch',chordFreqs(a.deg,a.oct),a.vol,a.inst),
-  chSet:a=>chordGlide('latch',chordFreqs(a.deg,a.oct),a.vol),
+  chOn:(a,ctx)=>chordOn('latch',chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol,a.inst),
+  chSet:(a,ctx)=>chordGlide('latch',chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol),
   chOff:()=>chordOff('latch'),
-  bassOn:a=>bassOn(bf(a.deg,a.oct),a.vol,a.inst),
-  bassSet:a=>bassSet(bf(a.deg,a.oct),a.vol),
+  bassOn:(a,ctx)=>bassOn(bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst),
+  bassSet:(a,ctx)=>bassSet(bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol),
   bassOff:()=>bassOff(),
   drum:a=>drumHit(a.row,a.vol),
 };
@@ -72,7 +71,7 @@ function push(fn,a){
   let t=e%loopBeats();
   const g=loop.quant?gridFor(fn):0;
   if(g>0)t=(Math.round(t/g)*g)%loopBeats();
-  events.push({t,layer:loop.layer,fn,a});
+  events.push({t,layer:loop.layer,fn,a,sc:CUR(),sev:seventh});   // §3.4: замораживаем ладовый контекст события
 }
 function recLeadEv(p){
   if(!recording)return;
@@ -122,7 +121,7 @@ function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; } }
 function fireWindow(a,b){                              // события в (a,b], кроме пишущегося сейчас слоя
   for(const ev of events)
-    if(ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer)) ENG[ev.fn](ev.a);
+    if(ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer)) ENG[ev.fn](ev.a,ev);   // ev несёт замороженный лад (§3.4)
 }
 function schedClicks(){                                // щелчки метронома с опережением по AC-часам
   const spb=60/back.bpm, ahead=AC.currentTime+SCHED_AHEAD;

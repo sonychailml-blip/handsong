@@ -34,6 +34,9 @@ export const SCALES=[
 export const CUR=()=>SCALES[scaleIdx];
 export const IVX=()=>CUR().iv.concat([CUR().edo]);          // + верхняя тоника
 export const baseF=()=>220*Math.pow(2,(tonic-9)/12);        // частота тоники (C=130.81 Гц)
+/* Совместимость ладов для §3.7 (перенос фразы в другой строй возможен лишь при равном
+   числе ступеней: 7→7 да, 7→5 нет). UI-уровень — принимает индексы, не хранимые данные. */
+export const sameDegrees=(a,b)=>SCALES[a].iv.length===SCALES[b].iv.length;
 
 /* ================= ТЕОРИЯ: СТУПЕНИ, АККОРДЫ, ИМЕНА =================
    МИКРОТОНАЛЬНАЯ ФОРМУЛА: любая ступень n любого строя из N шагов:
@@ -50,26 +53,34 @@ const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближ
    · пентатоника / блюз / хроматика — терции дают кашу → пауэр-аккорды (I + V + октава);
    · 19/31-TET — квинту ищем математически: round(N·log2(3/2)) шагов ≈ 700 центов,
      получаются открытые микротональные аккорды без диссонирующих кластеров. */
-export function chordSteps(deg){
-  const s=CUR(), n=s.iv.length;
+/* s (лад) и sev (септаккорд?) — параметры со значениями по умолчанию из живого состояния:
+   петля передаёт СВОЙ замороженный лад/септаккорд (§3.4), живой ввод — берёт текущие. */
+export function chordSteps(deg, s=CUR(), sev=seventh){
+  const n=s.iv.length;
   if (isTert(s)){
-    const ks=seventh?[0,2,4,6]:[0,2,4];
+    const ks=sev?[0,2,4,6]:[0,2,4];
     return ks.map(k=>{const j=deg+k; return s.iv[j%n]+s.edo*Math.floor(j/n);});
   }
   const r=s.iv[deg%n]+s.edo*Math.floor(deg/n);
   if (s.tag==='edo'){
     /* Мезотоника (19/31-TET): аккорд строим ПО ИНТЕРВАЛУ, не по индексу.
        Отношения заданы на ладе (chord/chord7); 31-TET септаккорд = 4:5:6:7. */
-    const rs=seventh?s.chord7:s.chord;
+    const rs=sev?s.chord7:s.chord;
     return rs.map(ra=>r+stepFor(s.edo,ra));
   }
   return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз/хроматика — пауэр-аккорд как раньше
 }
-export function leadFreq(deg,oct){ const s=CUR(); return baseF()*Math.pow(2,oct)*Math.pow(2,IVX()[deg]/s.edo); }
-export function bassFreq(deg,oct){ const s=CUR(); // бас на 2 октавы ниже соло (baseF/4)
-  return baseF()/4*Math.pow(2,oct)*Math.pow(2,IVX()[deg]/s.edo); }
-export function chordFreqs(deg,oct){ const s=CUR(); // база аккордов на октаву ниже соло
-  return chordSteps(deg).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
+/* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
+   с переносом октавы — сохраняет контур, не роняет частоту в NaN. При ступени внутри лада
+   это тождество (i=deg, o=oct). CLAUDE.md: тихого NaN быть не должно. */
+export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length;
+  const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
+  return baseF()*Math.pow(2,o)*Math.pow(2,ivx[i]/s.edo); }
+export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length; // бас на 2 октавы ниже соло (baseF/4)
+  const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
+  return baseF()/4*Math.pow(2,o)*Math.pow(2,ivx[i]/s.edo); }
+export function chordFreqs(deg,oct, s=CUR(), sev=seventh){ // база аккордов на октаву ниже соло
+  return chordSteps(deg,s,sev).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
