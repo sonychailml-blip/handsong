@@ -47,9 +47,11 @@
   body:not(.phone) #instrBtn{display:none;}
   /* смена рук осмысленна только в «Смартфон»: в ПК роль задаётся МЕСТОМ, а не рукой.
      Видимость — на том же классе .phone, который ставит applyMode (логику не трогаем). */
-  body:not(.phone) #swapBtn{display:none;}
+  /* прячем ВСЮ строку, а не только кнопку: иначе в ПК остался бы висеть
+     ярлык «Смена рук» без контрола. */
+  body:not(.phone) #swapRow{display:none;}
   /* иконки-тумблеры слева: режим [💻/📱] и смена рук [⇄] */
-  #modeBtn,#swapBtn{padding:9px 10px; font-size:15px;}
+  #modeBtn{padding:9px 10px; font-size:15px;}   /* иконка в панели; swapBtn теперь строка меню */
   #swapBtn.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
 
   /* узкий экран / портрет: компактнее верхняя панель */
