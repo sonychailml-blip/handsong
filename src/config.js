@@ -9,6 +9,9 @@ export const FX_META=[                           // эффекты (только
   {k:'trm', label:'TRM', full:'Тремоло', finger:20, color:'#9b7bff'},
 ];
 export const REV_COLOR='#57d9a3';
+/* Акцент роли: холст красит ими сетку/ярлыки, UI — кнопку-переключатель роли.
+   Общая метаданная двух слоёв → живёт здесь, а не дублируется в draw и ui. */
+export const INSTR_COL={ld:'#ff9e2c', ch:'#b18cff', bs:'#3ad29f', dr:'#ffd23f'};
 
 /* Пороги жестов и тайминги (значения 1-в-1 из исходника) */
 export const PINCH_ON=0.25;                       // захват щипка

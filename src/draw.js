@@ -2,11 +2,9 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords } from './scales.js';
 import { fx, revDisp, latchDeg, uiMode, phoneInstr } from './state.js';
-import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_STRIP_H } from './config.js';
+import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_STRIP_H, INSTR_COL } from './config.js';
 import { DRUM_NAMES } from './audio.js';
 
-const INSTR_COL={ld:'#ff9e2c', ch:'#b18cff', bs:'#3ad29f', dr:'#ffd23f'};   // цвет по инструменту
-const INSTR_HEAD={ld:'🎸 СОЛО', ch:'🎹 АККОРДЫ', bs:'🎚 БАС', dr:'🥁 УДАРНЫЕ'};
 import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
  
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
@@ -298,9 +296,8 @@ function drawPhone(res){
     if(instr==='ch'&&!supportsChords())drawNoChordsHint(0,W,0,playH);   // макам: всё поле роли — объяснение
     else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH);
   }
-  ctx.font='700 12px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillStyle=hexA(accent,.9);
-  ctx.fillText(INSTR_HEAD[instr], W/2, 40);
+  /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn
+     в верхней панели (дубль одной и той же информации в двух местах не нужен). */
   drawHandsPhone(res,W,H,playH);
   if(instr==='ld')drawFxStrip(W,H,playH);   // эффекты действуют только на соло-канал
   drawLooper();

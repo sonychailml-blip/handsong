@@ -4,6 +4,7 @@ import { SCALES, NOTE_NAMES, supportsProgressions, supportsChords } from './scal
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
+import { INSTR_COL } from './config.js';
 import { hooks } from './hooks.js';
 
 /* ================= UI ================= */
@@ -137,7 +138,8 @@ function applySwap(){                          // ⇄ — только в «См
 }
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
-function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr]; }
+function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
+  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); }   // цвет роли — в CSS-переменную, оформление в style.css
 modeBtn.onclick  =()=>{ setUiMode(uiMode==='phone'?'pc':'phone'); softAllOff(); applyMode(); };
 instrBtn.onclick =()=>{ setPhoneInstr(INSTR_SEQ[(INSTR_SEQ.indexOf(phoneInstr)+1)%INSTR_SEQ.length]); softAllOff(); applyInstr(); };
 swapBtn.onclick  =()=>{ setSwapHands(!swapHands); softAllOff(); applySwap(); };
