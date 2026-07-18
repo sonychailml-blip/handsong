@@ -38,8 +38,7 @@
  
 <!-- ================= ВЕРХНЯЯ ПАНЕЛЬ ================= -->
 <div id="bar">
-  <button id="menuBtn">☰ Меню</button>
-  <button id="scaleBtn">Лад</button>
+  <button id="scaleBtn" title="Звукоряд: лад, тоника, тембры">Лад</button>
   <button id="instrBtn" title="Соло / Аккорды">🎸 Соло</button>
   <button id="recBtn" title="Запись / наложение слоя">● запись</button>
   <button id="loopBtn" title="Петля: играть / пауза">⟳ луп</button>
@@ -51,7 +50,7 @@
  
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
 <!-- Шаг 1 MENU-PLAN: строки разнесены по двум контейнерам. #panel остаётся внешней
-     обёрткой, чтобы существующие обработчики (menuBtn/scaleBtn/panelClose) работали
+     обёрткой, чтобы существующие обработчики (scaleBtn/panelClose) работали
      без правок ui.js. Шаг 2 сделает #panelScale оверлеем, шаг 3 — #panelLoop
      сворачиваемой рабочей панелью по ⚙. -->
 <div id="panel">

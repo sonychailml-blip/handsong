@@ -19,6 +19,12 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       selProg=$('selProg'), selRhythm=$('selRhythm'), selBassMode=$('selBassMode'), selDrumKit=$('selDrumKit'), addArrBtn=$('addArrBtn'),
       scaleBtn=$('scaleBtn'), panelEl=$('panel');
  
+/* Кнопка-индикатор звукоряда (шаг 2 MENU-PLAN): «лад · тоника», единственный вход в меню.
+   Имя тоники берём из NOTE_NAMES — тем же списком подписан <select id="selTonic">,
+   чтобы подписи не разъехались. Читает живые связки scaleIdx/tonic, поэтому зовётся
+   после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
+function updScaleBtn(){ scaleBtn.textContent=`${SCALES[scaleIdx].name} · ${NOTE_NAMES[tonic]}`; }
+
 function buildUI(){
   // лады с группировкой
   let g=null, og=null;
@@ -45,7 +51,7 @@ function buildUI(){
   RHYTHMS.forEach((r,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=r.name; selRhythm.appendChild(o); });
   BASS_MODES.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.name; selBassMode.appendChild(o); });
   selBassMode.value='roots';
-  scaleBtn.textContent=SCALES[scaleIdx].name;
+  updScaleBtn();                              // 1/3: старт
   loopBarsV.textContent=loop.bars;
   refreshProgAvail();
 }
@@ -68,7 +74,6 @@ function updRecBtn(){                         // ярлык кнопки зап�
 hooks.rec       = () => updRecBtn();
 hooks.loop      = on => { loopBtn.classList.toggle('on', on); loopBtn.textContent = on ? '❚❚ луп' : '⟳ луп'; updRecBtn(); };
 
-$('menuBtn').onclick=()=>panelEl.classList.toggle('on');
 $('panelClose').onclick=()=>panelEl.classList.remove('on');
 scaleBtn.onclick=()=>panelEl.classList.toggle('on');
 $('helpBtn').onclick=()=>$('helpOv').classList.add('on');
@@ -77,9 +82,9 @@ $('panicBtn').onclick=panic;
  
 selScale.onchange=e=>{
   setScaleIdx(+e.target.value); softAllOff();
-  scaleBtn.textContent=SCALES[scaleIdx].name; refreshProgAvail();
+  updScaleBtn(); refreshProgAvail();          // 2/3: смена лада
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); };
+selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); updScaleBtn(); };   // 3/3: смена тоники
 $('qTriad').onclick=()=>{ setSeventh(false); softAllOff(); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
 $('qSev').onclick =()=>{ setSeventh(true);  softAllOff(); $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
 selLead.onchange=e=>setLeadInstr(+e.target.value);
