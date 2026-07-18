@@ -50,47 +50,58 @@
 </div>
  
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
+<!-- Шаг 1 MENU-PLAN: строки разнесены по двум контейнерам. #panel остаётся внешней
+     обёрткой, чтобы существующие обработчики (menuBtn/scaleBtn/panelClose) работали
+     без правок ui.js. Шаг 2 сделает #panelScale оверлеем, шаг 3 — #panelLoop
+     сворачиваемой рабочей панелью по ⚙. -->
 <div id="panel">
   <div class="phead"><b>Настройки</b><button id="panelClose">Свернуть ✕</button></div>
 
-  <div class="psep">Режим управления</div>
-  <div class="prow"><label>Режим</label>
-    <div class="seg"><button id="modePC" class="act">ПК</button><button id="modePhone">Смартфон</button></div>
-  </div>
-  <div class="prow" id="swapRow"><label>Правая рука</label>
-    <div class="seg"><button id="swapNotes" class="act">Ноты</button><button id="swapFx">Эффекты</button></div>
-  </div>
-  <p class="phint" id="modeHint">Смартфон: один инструмент на экране (переключатель вверху), правая рука — ноты, левая — эффекты (полоса снизу). ПК: три колонки, любая рука.</p>
+  <!-- ================= ЗВУКОРЯД: ноты и звук ================= -->
+  <div id="panelScale">
+    <div class="psep">Лад и тоника</div>
+    <div class="prow"><label>Лад / строй</label><select id="selScale"></select></div>
+    <div class="prow"><label>Тоника</label><select id="selTonic"></select></div>
+    <div class="prow"><label>Аккорды</label>
+      <div class="seg"><button id="qTriad" class="act">Трезвучия</button><button id="qSev">Септаккорды</button></div>
+    </div>
 
-  <div class="psep">Лад и тоника</div>
-  <div class="prow"><label>Лад / строй</label><select id="selScale"></select></div>
-  <div class="prow"><label>Тоника</label><select id="selTonic"></select></div>
-  <div class="prow"><label>Аккорды</label>
-    <div class="seg"><button id="qTriad" class="act">Трезвучия</button><button id="qSev">Септаккорды</button></div>
+    <div class="psep">Тембры</div>
+    <div class="prow"><label>Соло-инструмент</label><select id="selLead"></select></div>
+    <div class="prow"><label>Аккорд-инструмент</label><select id="selChord"></select></div>
+    <div class="prow"><label>Бас-инструмент</label><select id="selBass"></select></div>
+    <div class="prow"><label>Набор ударных</label><select id="selDrumKit"></select></div>
+
+    <!-- технические строки: шаг 4 унесёт их в иконки [💻][⇄] слева вверху -->
+    <div class="psep">Режим управления</div>
+    <div class="prow"><label>Режим</label>
+      <div class="seg"><button id="modePC" class="act">ПК</button><button id="modePhone">Смартфон</button></div>
+    </div>
+    <div class="prow" id="swapRow"><label>Правая рука</label>
+      <div class="seg"><button id="swapNotes" class="act">Ноты</button><button id="swapFx">Эффекты</button></div>
+    </div>
+    <p class="phint" id="modeHint">Смартфон: один инструмент на экране (переключатель вверху), правая рука — ноты, левая — эффекты (полоса снизу). ПК: три колонки, любая рука.</p>
   </div>
 
-  <div class="psep">Петля (лупер)</div>
-  <div class="prow"><label>Длина (такты)</label>
-    <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
-  </div>
-  <div class="prow"><label>Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
-  <div class="prow"><label>Квантизация</label>
-    <div class="seg"><button id="qOn" class="act">Вкл</button><button id="qOff">Выкл</button></div>
-  </div>
-  <p class="phint">Длина меняется только на пустой петле. «● запись» — отсчёт такта, затем круг; во время игры петли — наложение слоя. «⤺» снимает последний слой.<br>Квантизация к сетке: аккорды — доли (4), бас — восьмые (8), ударные — шестнадцатые (16); соло не квантуется.</p>
- 
-  <div class="psep">Аранжировка (слои)</div>
-  <div class="prow"><label>Гармония</label><select id="selProg"></select></div>
-  <div class="prow"><label>Ритм</label><select id="selRhythm"></select></div>
-  <div class="prow"><label>Бас-партия</label><select id="selBassMode"></select></div>
-  <div class="prow"><label></label><button id="addArrBtn">＋ Добавить слои</button></div>
-  <p class="phint" id="arrHint">Гармония, ритм и бас — отдельные слои петли; сочетание выбираете вы. «＋ Добавить» кладёт их в текущем ладу и тонике (заморожено), длину берёт из прогрессии. «⤺» снимает верхний слой. Прогрессии — только в 7-ступенчатых ладах; дрон работает в любом строе.</p>
+  <!-- ================= ЛУПЕР: время и слои ================= -->
+  <div id="panelLoop">
+    <div class="psep">Петля (лупер)</div>
+    <div class="prow"><label>Длина (такты)</label>
+      <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
+    </div>
+    <div class="prow"><label>Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
+    <div class="prow"><label>Квантизация</label>
+      <div class="seg"><button id="qOn" class="act">Вкл</button><button id="qOff">Выкл</button></div>
+    </div>
+    <p class="phint">Длина меняется только на пустой петле. «● запись» — отсчёт такта, затем круг; во время игры петли — наложение слоя. «⤺» снимает последний слой.<br>Квантизация к сетке: аккорды — доли (4), бас — восьмые (8), ударные — шестнадцатые (16); соло не квантуется.</p>
 
-  <div class="psep">Тембры</div>
-  <div class="prow"><label>Соло-инструмент</label><select id="selLead"></select></div>
-  <div class="prow"><label>Аккорд-инструмент</label><select id="selChord"></select></div>
-  <div class="prow"><label>Бас-инструмент</label><select id="selBass"></select></div>
-  <div class="prow"><label>Набор ударных</label><select id="selDrumKit"></select></div>
+    <div class="psep">Аранжировка (слои)</div>
+    <div class="prow"><label>Гармония</label><select id="selProg"></select></div>
+    <div class="prow"><label>Ритм</label><select id="selRhythm"></select></div>
+    <div class="prow"><label>Бас-партия</label><select id="selBassMode"></select></div>
+    <div class="prow"><label></label><button id="addArrBtn">＋ Добавить слои</button></div>
+    <p class="phint" id="arrHint">Гармония, ритм и бас — отдельные слои петли; сочетание выбираете вы. «＋ Добавить» кладёт их в текущем ладу и тонике (заморожено), длину берёт из прогрессии. «⤺» снимает верхний слой. Прогрессии — только в 7-ступенчатых ладах; дрон работает в любом строе.</p>
+  </div>
 </div>
  
 <!-- ================= МИНИ-УЧЕБНИК ================= -->
