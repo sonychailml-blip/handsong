@@ -65,10 +65,19 @@ buildUI();
 hooks.leadInstr = v  => selLead.value = v;
 hooks.bassInstr = v  => selBass.value = v;
 hooks.drumKit   = v  => selDrumKit.value = v;
-function updRecBtn(){                         // ярлык кнопки записи зависит от режима
-  recBtn.classList.toggle('on', recording);
-  recBtn.textContent = recording ? (loop.first ? '● …круг' : '● …слой')
-                                  : (loop.on ? '＋ слой' : '● запись');
+/* Кнопка записи — компактная иконка: состояние показываем ВИДОМ (классы + CSS),
+   а не текстом. Подробности («круг N т.» / «слой K») и так пишет холстовая полоса
+   лупера (drawLooper); текст в кнопке был бы вторым, худшим экземпляром той же
+   информации. Смысл иконки раскрывает подсказка (title) — по наведению/долгому тапу. */
+function updRecBtn(){
+  recBtn.classList.toggle('on', recording);                     // идёт запись (любая)
+  recBtn.classList.toggle('first', recording && loop.first);    // первый круг ≠ наложение
+  recBtn.classList.toggle('armed', !recording && loop.on);      // петля играет: тап добавит слой
+  recBtn.title = recording
+    ? (loop.first ? 'Идёт запись круга — тап остановит'
+                  : `Наложение слоя ${loop.layer+1} — тап остановит`)
+    : (loop.on ? 'Петля играет — тап начнёт новый слой'
+               : 'Запись: тап — отсчёт такта, затем круг');
   loopBarsV.textContent = loop.bars;
 }
 hooks.rec       = () => updRecBtn();

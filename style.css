@@ -20,7 +20,22 @@
     border:1px solid rgba(255,255,255,.22); border-radius:11px;
     padding:9px 12px; font-size:14px; line-height:1;}
   button:active{transform:scale(.96);}
-  #recBtn.on{background:var(--rec); border-color:var(--rec);}
+  /* ---- КНОПКА ЗАПИСИ: компактная круглая иконка ----
+     Состояние показываем ВИДОМ, а не словами: подробности («круг N т.» / «слой K»)
+     пишет холстовая полоса лупера (drawLooper). Четыре состояния:
+       без класса — покой (полое кольцо), .armed — петля играет, тап добавит слой,
+       .on.first — пишется первый круг, .on — наложение слоя (белое кольцо внутри).
+     Пульс анимирует ТОЛЬКО transform/opacity на псевдоэлементе: работа композитора,
+     без перерисовки каждый кадр (на телефоне и так ~196 мс инференса + холст 60 fps). */
+  #recBtn{position:relative; width:34px; height:34px; padding:0; border-radius:50%;
+    font-size:15px; line-height:1; color:var(--rec); background:transparent;
+    border-color:rgba(229,72,77,.55);}
+  #recBtn.armed{border-color:var(--rec); box-shadow:inset 0 0 0 3px rgba(229,72,77,.32);}
+  #recBtn.on{background:var(--rec); border-color:var(--rec); color:#fff;}
+  #recBtn.on:not(.first){box-shadow:inset 0 0 0 2px rgba(255,255,255,.85);}  /* наложение ≠ первый круг */
+  #recBtn.on::after{content:''; position:absolute; inset:-3px; border-radius:50%;
+    border:2px solid var(--rec); animation:recPulse 1.1s ease-out infinite; pointer-events:none;}
+  @keyframes recPulse{ 0%{transform:scale(.9); opacity:.85;} 100%{transform:scale(1.55); opacity:0;} }
   #loopBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   #instrBtn{border-color:var(--chord); color:var(--chord); font-weight:600;}
   #loopPanelBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
@@ -37,6 +52,7 @@
   @media (max-width:560px){
     button{padding:8px 9px; font-size:13px; border-radius:9px;}
     #bar{gap:5px; padding:6px;}
+    #recBtn{width:32px; height:32px; padding:0; border-radius:50%; font-size:14px;}
   }
   /* Кнопка-индикатор звукоряда «лад · тоника» — единственный вход в меню.
      Длинные названия ладов режем МНОГОТОЧИЕМ средствами CSS, а не обрезкой строки в JS. */
