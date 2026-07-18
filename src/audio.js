@@ -24,10 +24,10 @@ const CHORD_INSTR=[
 /* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio,
    расстройка det), НЧ-фильтр lp, огибающая att/rel. */
 const BASS_INSTR=[
-  {label:'Саб-синус', t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  att:.020, rel:.20},
-  {label:'Пила',      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  att:.014, rel:.16},
-  {label:'Кислотный', t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, att:.008, rel:.13},
-  {label:'Синт-бас',  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  att:.020, rel:.24},
+  {label:'Саб-синус', t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  lvl:.45, att:.020, rel:.20},
+  {label:'Пила',      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  lvl:.38, att:.014, rel:.16},
+  {label:'Кислотный', t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, lvl:.34, att:.008, rel:.13},
+  {label:'Синт-бас',  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  lvl:.40, att:.020, rel:.24},
 ];
 /* Ударные: имена рядов (индекс 0 = низ сетки). Синтез на лету, без сэмплов. */
 const DRUM_NAMES=['Кик','Снейр','Клэп','Хэт','Том','Крэш'];
@@ -161,10 +161,15 @@ function initAudio(){
   /* Мастер: сумма → лимитер (жёсткий компрессор) → выход.
      Лимитер обязателен: аккорды + драйв + подложка легко клиппируют. */
   limiter=AC.createDynamicsCompressor();
-  limiter.threshold.value=-6; limiter.knee.value=0; limiter.ratio.value=20;
-  limiter.attack.value=0.002; limiter.release.value=0.15;
+  /* Лимитер — АВАРИЙНЫЙ потолок, а не компрессор. Порог/ratio оставлены как защита,
+     но время смягчено: attack 2 мс был КОРОЧЕ периода басовой волны (55 Гц = 18 мс) —
+     детектор шёл по самим колебаниям и модулировал весь микс на частоте баса.
+     10 мс длиннее периода → реагирует на огибающую; release 250 мс превращает
+     остаточное подавление в ровное смещение вместо «дыхания»; knee 6 — мягкий вход. */
+  limiter.threshold.value=-6; limiter.knee.value=6; limiter.ratio.value=20;
+  limiter.attack.value=0.010; limiter.release.value=0.25;
   limiter.connect(AC.destination);
-  master=AC.createGain(); master.gain.value=0.9; master.connect(limiter);
+  master=AC.createGain(); master.gain.value=0.8; master.connect(limiter);
  
   /* Общий ревербератор: один конвольвер, у каждого источника свой send.
      Глубиной руки (Z) управляется только send соло-канала. */
@@ -197,7 +202,7 @@ function initAudio(){
   tremLFO.connect(tremDepth); tremDepth.connect(tremGain.gain); tremLFO.start();
   volGain.connect(tremGain);
  
-  const leadOut=AC.createGain(); leadOut.gain.value=1;
+  const leadOut=AC.createGain(); leadOut.gain.value=0.22;   // сушит и посылы (dly/rev идут ПОСЛЕ leadOut)
   tremGain.connect(leadOut); leadOut.connect(master);
  
   const dly=AC.createDelay(1); dly.delayTime.value=0.35;
@@ -209,19 +214,19 @@ function initAudio(){
   leadOut.connect(revLead); revLead.connect(verb);
  
   /* --- АККОРДЫ: чистая шина + фиксированный маленький send в реверб --- */
-  chordBus=AC.createGain(); chordBus.gain.value=0.9; chordBus.connect(master);
+  chordBus=AC.createGain(); chordBus.gain.value=0.28; chordBus.connect(master);
   revCh=AC.createGain(); revCh.gain.value=0.12; chordBus.connect(revCh); revCh.connect(verb);
   buildChordPool(chordBus);
  
   /* --- БАС: пул моно-голосов (слой + живой), общая шина в master --- */
-  bassBus=AC.createGain(); bassBus.gain.value=1; bassBus.connect(master);
+  bassBus=AC.createGain(); bassBus.gain.value=0.28; bassBus.connect(master);
   buildBassPool(bassBus);
 
   /* --- УДАРНЫЕ: своя шина в master (мимо эффектов соло) --- */
-  drumBus=AC.createGain(); drumBus.gain.value=0.85; drumBus.connect(master);
+  drumBus=AC.createGain(); drumBus.gain.value=0.20; drumBus.connect(master);
 
   /* --- ДРОН: расстроенная пара пил через медленный НЧ-фильтр, на тонике (шина в master) --- */
-  backBus=AC.createGain(); backBus.gain.value=0.55; backBus.connect(master);
+  backBus=AC.createGain(); backBus.gain.value=0.28; backBus.connect(master);
   dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=baseF()/2;
   dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=baseF()/2*1.498;
   const dLP=AC.createBiquadFilter(); dLP.type='lowpass'; dLP.frequency.value=520;
@@ -271,12 +276,17 @@ function noteOff(){
 function buildBassPool(dest){
   for(let i=0;i<BASS_POOL_N;i++){
     const o1=AC.createOscillator(), o2=AC.createOscillator();
+    const g1=AC.createGain(), g2=AC.createGain();
     const lp=AC.createBiquadFilter(), env=AC.createGain(), vol=AC.createGain();
     o1.type='sawtooth'; o2.type='sawtooth'; lp.type='lowpass'; lp.frequency.value=500;
+    /* Осцилляторы приглушены ДО фильтра (как m1/m2 у аккордов): иначе два осциллятора
+       в фазе дают пик 2.0 — в 12 раз громче аккордового голоса, и бас в одиночку
+       вгонял лимитер в 12 дБ подавления, «прижимая» аккорды на всю длину ноты. */
+    g1.gain.value=.5; g2.gain.value=.5;
     env.gain.value=0; vol.gain.value=0.5;
-    o1.connect(lp); o2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
+    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
     o1.start(); o2.start();
-    bv.push({o1,o2,lp,env,vol,owner:null,ins:null,tOn:0,on:false});
+    bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false});
   }
 }
 function bvRelease(v,hard){ const t=AC.currentTime;
@@ -305,12 +315,12 @@ function bassOn(owner,freq,vol,ins){
   }
   v.tOn=t;
   v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);
-  v.vol.gain.setTargetAtTime(0.3+0.7*vol,t,0.03);
+  v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер
 }
 function bassSet(owner,freq,vol){
   if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=AC.currentTime;
   v.o1.frequency.setTargetAtTime(freq,t,0.03); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.03);
-  v.vol.gain.setTargetAtTime(0.3+0.7*vol,t,0.05);
+  v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень
 }
 function bassOff(owner){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false); delete bassHold[owner]; }
 
