@@ -43,6 +43,21 @@
   #scaleBtn{border-color:var(--tonic); color:var(--tonic); font-weight:600;
     max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
+  /* ---- ТРАНСПОРТ ЛУПЕРА: полоса под холстовой полосой лупера ----
+     По ГОРИЗОНТАЛИ повторяет коробку drawLooper: она рисуется как
+     roundRect(x0-10, y0, bw+20, boxH), где bw=min(560, W-40) — это ровно
+     left:10/right:10 при узком экране и центрированные 580px при широком.
+     По ВЕРТИКАЛИ top ставит сам drawLooper (высота коробки растёт со слоями).
+     z-index 11: выше холста, но ниже панелей (14/15) — открытое меню накрывает. */
+  #loopTransport{position:fixed; left:10px; right:10px; max-width:580px; margin:0 auto;
+    z-index:11; display:none; justify-content:center; gap:6px;
+    padding:6px 8px; border-radius:11px;
+    background:rgba(10,10,20,.74); border:1px solid rgba(255,255,255,.14);
+    backdrop-filter:blur(6px);}
+  #loopTransport.on{display:flex;}
+  #loopTransport button{padding:7px 10px; font-size:13px;}
+  @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:12px;} }
+
   #status{position:fixed; left:10px; right:10px; bottom:6px; z-index:10;
     font-size:11px; color:var(--dim); text-shadow:0 1px 2px #000;
     white-space:nowrap; overflow:hidden;}

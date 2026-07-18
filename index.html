@@ -44,11 +44,17 @@
   <button id="instrBtn" title="Соло / Аккорды">🎸 Соло</button>
   <button id="loopPanelBtn" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
   <button id="recBtn" title="Запись / наложение слоя">● запись</button>
+  <button id="helpBtn" title="Учебник">?</button>
+</div>
+
+<!-- Транспорт лупера: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера
+     (drawLooper). Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что
+     высота холстовой коробки растёт со слоями. Видна только когда есть петля. -->
+<div id="loopTransport">
   <button id="loopBtn" title="Петля: играть / пауза">⟳ луп</button>
   <button id="undoBtn" title="Убрать последний слой">⤺</button>
   <button id="clrBtn" title="Очистить петлю">✕</button>
   <button id="panicBtn" title="Заглушить всё">■</button>
-  <button id="helpBtn" title="Учебник">?</button>
 </div>
  
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->

@@ -11,6 +11,21 @@ import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder
  
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
 const statusEl=document.getElementById('status');
+
+/* Транспорт лупера — HTML-полоса под холстовой коробкой drawLooper. Позицию знает
+   только draw: высота коробки boxH зависит от числа слоёв и меняется без всяких
+   хуков (овердаб, loadArrangement в играющую петлю). Поэтому drawLooper САМ
+   публикует нижнюю границу коробки — loopBarBottom — и двигает полосу.
+   Пишем в DOM только при ИЗМЕНЕНИИ, а не каждый кадр (§0.5: draw — презентационный
+   слой, statusEl уже так работает). */
+const loopTransportEl=document.getElementById('loopTransport');
+let loopBarBottom=0;                       // нижний край холстовой полосы лупера, CSS-px (canvas px == CSS px)
+let tpOn=null, tpTop=-1;
+function syncLoopTransport(on,bottom){
+  loopBarBottom = on ? bottom : 0;
+  if(on!==tpOn){ tpOn=on; loopTransportEl.classList.toggle('on',on); }
+  if(on && bottom!==tpTop){ tpTop=bottom; loopTransportEl.style.top=bottom+'px'; }
+}
  
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16);
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
@@ -68,7 +83,7 @@ function drawTag(x,y,lines,color){
    по строке на слой с метками событий (соло — оранжевые, аккорды — сиреневые).
    Видна только когда есть петля или идёт запись; иначе не мешает синтезатору. */
 function drawLooper(){
-  if(!loop.on && !events.length) return;
+  if(!loop.on && !events.length){ syncLoopTransport(false,0); return; }   // нет петли — полоса прячется
   const W=canvas.width, info=loopPos();
   const bars=loop.bars, total=bars*4;
   const bw=Math.min(560,W-40), x0=(W-bw)/2, x1=x0+bw;
@@ -77,6 +92,7 @@ function drawLooper(){
   if(recording && !rows.includes(loop.layer)) rows.push(loop.layer);   // пустой слой, что пишется прямо сейчас
   const nRow=Math.max(1,rows.length), rowH=13, headH=22, pad=7, y0=64;   // ниже заголовков зон (y≈52)
   const gy0=y0+headH, boxH=headH+nRow*rowH+pad*2, gy1=y0+boxH-pad;
+  syncLoopTransport(true, y0+boxH+4);         // считаем из ТОГО ЖЕ boxH, что рисуем → разъехаться не могут
 
   ctx.fillStyle='rgba(10,10,20,.74)'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(x0-10,y0,bw+20,boxH,11); ctx.fill(); ctx.stroke();
@@ -363,4 +379,6 @@ function drawFxStrip(W,H,playH){
   });
 }
  
-export { drawVideoBackground, drawOverlays };
+/* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).
+   Экспортирована, чтобы позицию мог прочитать кто угодно, а не только draw. */
+export { drawVideoBackground, drawOverlays, loopBarBottom };
