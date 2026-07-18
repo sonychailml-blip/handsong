@@ -1,6 +1,6 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS, FX_STRIP_H } from './config.js';
 import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, uiMode, phoneInstr, swapHands } from './state.js';
-import { IVX } from './scales.js';
+import { IVX, supportsChords } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
@@ -147,6 +147,12 @@ function processHands(res){
           if(bassOwner===key)WbassOn({deg:S.deg,oct:S.oct,vol:S.vol,inst:bassIdx});
         }else if(S.zone==='dr'){                            // ударные: один удар на щипок (по ряду)
           if(S.fresh){ S.fresh=false; WdrumHit(S.deg,S.vol); }
+        }else if(!supportsChords()){
+          /* Макам: лестницы аккордов нет — щипок в поле аккордов не строит ничего.
+             Гейт стоит ЗДЕСЬ, после разбора зоны: рука жива (зона, ступень, громкость
+             посчитаны — их читает draw для подсказки), молчит только аккордовая ветка.
+             Соло/бас/ударные — соседние ветки выше, их это не касается; дрон живёт
+             в лупере (ENG.drone), не в руке. Переигровка идёт мимо — по замороженному sc. */
         }else{ // 'ch' — колонка аккордов: защёлка (владелец голосов — постоянный ключ 'latch')
           if(S.inert){
             // стоп-щипок отработал: рука молчит до размыкания пальцев

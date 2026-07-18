@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords } from './scales.js';
 import { fx, revDisp, latchDeg, uiMode, phoneInstr } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_STRIP_H } from './config.js';
 import { DRUM_NAMES } from './audio.js';
@@ -131,6 +131,23 @@ function drawVideoBackground(){
 }
 function drawOverlays(res){ if(uiMode==='phone') drawPhone(res); else drawPC(res); }
 
+/* Лад без лестницы аккордов (макам): поле остаётся НА МЕСТЕ, приглушается, и вместо
+   лестницы объясняет, куда делись аккорды и где взять гармонию. Геометрия колонки —
+   от FXW/ZB, от лада не зависит: раскладка при смене лада не перекраивается. */
+const NO_CHORDS_HINT=['В макаме аккорды не строятся.',
+                      'Дрон — в лупере; аккорды запишите',
+                      'в другом ладу и играйте под макам.'];
+function drawNoChordsHint(x0,x1,yTop,yBot){
+  const cx=(x0+x1)/2, cy=(yTop+yBot)/2;
+  ctx.fillStyle='rgba(10,10,20,.38)'; ctx.fillRect(x0,yTop,x1-x0,yBot-yTop);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=hexA('#b18cff',.7); ctx.font='700 13px system-ui';
+  ctx.fillText('АККОРДОВ НЕТ',cx,cy-32);
+  ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='12px system-ui';
+  NO_CHORDS_HINT.forEach((ln,i)=>ctx.fillText(ln,cx,cy-6+i*17));
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+
 function drawPC(res){
   const W=canvas.width, H=canvas.height;
   const fxX=FXW*W, zbX=ZB*W;
@@ -158,7 +175,8 @@ function drawPC(res){
   }
   const chAct=latchDeg>=0?latchDeg:loopChordDeg();   // подсветка: рука в приоритете, иначе — аккорд петли (§Q5)
   // сетки: лестница аккордов и лестница нот — учебный слой
-  drawGrid(fxX,zbX,'#b18cff',chordLabel,chAct);
+  if(supportsChords())drawGrid(fxX,zbX,'#b18cff',chordLabel,chAct);
+  else drawNoChordsHint(fxX,zbX,0,H);            // макам: колонка на месте, но без лестницы
   drawGrid(zbX,W,'#ff9e2c',rowLabel,ldAct);
  
   // панель эффектов (левая колонка, вся высота)
@@ -195,7 +213,7 @@ function drawPC(res){
         ctx.fillStyle=col;
         ctx.beginPath(); ctx.arc(x,y,tipPt?6:2.5,0,7); ctx.fill();
       }
-      if(S.pinch&&!S.inert&&(S.zone==='ch'||S.zone==='ld')&&S.deg>=0){
+      if(S.pinch&&!S.inert&&(S.zone==='ld'||(S.zone==='ch'&&supportsChords()))&&S.deg>=0){
         // светящийся круг вокруг точки щипка (инертная рука ничего не звучит — не рисуем)
         ctx.strokeStyle=zcol; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
         ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
@@ -220,7 +238,7 @@ function drawPC(res){
         // подсказка до щипка: что прозвучит под пальцем
         const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
         const z=zoneAt(x,W);
-        if(z==='ch'||z==='ld'){
+        if(z==='ld'||(z==='ch'&&supportsChords())){
           const rows=IVX().length, d=degRaw(y,rows,H), seg=H/rows;
           const[zx0,zx1]=zoneX(z,W);
           const col=z==='ch'?'#b18cff':'#ff9e2c';
@@ -261,7 +279,8 @@ function drawPhone(res){
     let act=-1;
     if(instr==='ch')act=latchDeg>=0?latchDeg:loopChordDeg();   // рука в приоритете, иначе аккорд петли (§Q5)
     else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
-    drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH);
+    if(instr==='ch'&&!supportsChords())drawNoChordsHint(0,W,0,playH);   // макам: всё поле роли — объяснение
+    else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH);
   }
   ctx.font='700 12px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillStyle=hexA(accent,.9);
@@ -300,6 +319,7 @@ function drawHandsPhone(res,W,H,playH){
       continue;
     }
     // рука нот
+    if(isCh&&!supportsChords())continue;         // макам: аккордов нет — ни круга, ни ярлыка, ни подсказки
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();

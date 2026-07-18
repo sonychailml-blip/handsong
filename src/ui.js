@@ -1,6 +1,6 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          uiMode, phoneInstr, setUiMode, setPhoneInstr, setSwapHands } from './state.js';
-import { SCALES, NOTE_NAMES, supportsProgressions } from './scales.js';
+import { SCALES, NOTE_NAMES, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
@@ -49,8 +49,8 @@ function buildUI(){
   loopBarsV.textContent=loop.bars;
   refreshProgAvail();
 }
-function refreshProgAvail(){                  // прогрессии — только в 7-ступенчатых ладах (§Q2); дрон — в любом
-  const ok=supportsProgressions();
+function refreshProgAvail(){                  // прогрессии — только там, где строятся аккорды и 7 ступеней; дрон — везде
+  const ok=supportsProgressions()&&supportsChords();   // макам: iv.length===7, но лестницы аккордов нет
   [...selProg.options].forEach((o,i)=>{ o.disabled = !HARMONIES[i].drone && !ok; });
   if(selProg.selectedOptions[0] && selProg.selectedOptions[0].disabled) selProg.value='0';   // упасть на дрон
 }
