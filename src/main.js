@@ -1,5 +1,4 @@
 import { initAudio, AC } from './audio.js';
-import { refreshStyle } from './backing.js';
 import { video, landmarker, initVision } from './vision.js';
 import { processHands } from './gestures.js';
 import { drawVideoBackground, drawOverlays } from './draw.js';
@@ -42,7 +41,6 @@ $('startBtn').onclick=async()=>{
   try{
     initAudio();
     await AC.resume();
-    refreshStyle(true);
     await initVision(msg);
     try{await navigator.wakeLock.request('screen');}catch(e){}
     $('start').classList.remove('on');

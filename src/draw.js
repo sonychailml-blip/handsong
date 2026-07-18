@@ -7,8 +7,7 @@ import { DRUM_NAMES } from './audio.js';
 
 const INSTR_COL={ld:'#ff9e2c', ch:'#b18cff', bs:'#3ad29f', dr:'#ffd23f'};   // цвет по инструменту
 const INSTR_HEAD={ld:'🎸 СОЛО', ch:'🎹 АККОРДЫ', bs:'🎚 БАС', dr:'🥁 УДАРНЫЕ'};
-import { back, STYLE_LABEL } from './backing.js';
-import { recording, inPB, loop, events, loopPos } from './recorder.js';
+import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
  
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
 const statusEl=document.getElementById('status');
@@ -157,7 +156,7 @@ function drawPC(res){
   for(const k in HANDS){ const S=HANDS[k];
     if(S.pinch&&S.deg>=0&&S.zone==='ld'&&leadOwner===k)ldAct=S.deg;
   }
-  const chAct=latchDeg;                        // подсветка аккорда — по защёлкнутой ступени, горит и без щипка
+  const chAct=latchDeg>=0?latchDeg:loopChordDeg();   // подсветка: рука в приоритете, иначе — аккорд петли (§Q5)
   // сетки: лестница аккордов и лестница нот — учебный слой
   drawGrid(fxX,zbX,'#b18cff',chordLabel,chAct);
   drawGrid(zbX,W,'#ff9e2c',rowLabel,ldAct);
@@ -242,9 +241,8 @@ function drawStatus(){
   const s=CUR();
   let st=`Лад: ${s.name} · ${s.edo}-TET · ступени: ${s.iv.join('-')}`;
   if(s.edo!==12)st+=` · шаг ${(1200/s.edo).toFixed(1)}c`;
-  if(back.playing)st=`▶ ${STYLE_LABEL[back.eff]} ${back.bpm} BPM · `+st;
   if(recording)st='● запись · '+st;
-  if(inPB())st='▶ воспроизведение · '+st;
+  else if(inPB())st=`▶ петля · ${loop.bpm} BPM · `+st;
   statusEl.textContent=st;
   ctx.textAlign='left';
 }
@@ -261,7 +259,7 @@ function drawPhone(res){
   }else{
     // активная ступень: аккорд — по защёлке, соло/бас — по играющей руке
     let act=-1;
-    if(instr==='ch')act=latchDeg;
+    if(instr==='ch')act=latchDeg>=0?latchDeg:loopChordDeg();   // рука в приоритете, иначе аккорд петли (§Q5)
     else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
     drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH);
   }

@@ -29,7 +29,7 @@
       <b>Учебный слой:</b> в колонке аккордов подписана вся лестница аккордов лада,
       тоника подсвечена зелёным, наведите палец без щипка — подсказка покажет, что здесь звучит.
       Кнопка «?» — мини-учебник про лады, микротонику и построение аккордов.<br><br>
-      Меню ☰ — лад, тоника, тембры, автоаккомпанемент (Smart Match). Телефон — горизонтально.
+      Меню ☰ — лад, тоника, тембры, аранжировка (слои петли). Телефон — горизонтально.
     </p>
     <button id="startBtn">▶ Запустить</button>
     <p id="loadmsg"></p>
@@ -41,7 +41,6 @@
   <button id="menuBtn">☰ Меню</button>
   <button id="scaleBtn">Лад</button>
   <button id="instrBtn" title="Соло / Аккорды">🎸 Соло</button>
-  <button id="backBtn">▶ фон</button>
   <button id="recBtn" title="Запись / наложение слоя">● запись</button>
   <button id="loopBtn" title="Петля: играть / пауза">⟳ луп</button>
   <button id="undoBtn" title="Убрать последний слой">⤺</button>
@@ -74,20 +73,24 @@
   <div class="prow"><label>Длина (такты)</label>
     <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
   </div>
+  <div class="prow"><label>Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
   <div class="prow"><label>Квантизация</label>
     <div class="seg"><button id="qOn" class="act">Вкл</button><button id="qOff">Выкл</button></div>
   </div>
   <p class="phint">Длина меняется только на пустой петле. «● запись» — отсчёт такта, затем круг; во время игры петли — наложение слоя. «⤺» снимает последний слой.<br>Квантизация к сетке: аккорды — доли (4), бас — восьмые (8), ударные — шестнадцатые (16); соло не квантуется.</p>
  
+  <div class="psep">Аранжировка (слои)</div>
+  <div class="prow"><label>Гармония</label><select id="selProg"></select></div>
+  <div class="prow"><label>Ритм</label><select id="selRhythm"></select></div>
+  <div class="prow"><label>Бас-партия</label><select id="selBassMode"></select></div>
+  <div class="prow"><label></label><button id="addArrBtn">＋ Добавить слои</button></div>
+  <p class="phint" id="arrHint">Гармония, ритм и бас — отдельные слои петли; сочетание выбираете вы. «＋ Добавить» кладёт их в текущем ладу и тонике (заморожено), длину берёт из прогрессии. «⤺» снимает верхний слой. Прогрессии — только в 7-ступенчатых ладах; дрон работает в любом строе.</p>
+
   <div class="psep">Тембры</div>
   <div class="prow"><label>Соло-инструмент</label><select id="selLead"></select></div>
   <div class="prow"><label>Аккорд-инструмент</label><select id="selChord"></select></div>
   <div class="prow"><label>Бас-инструмент</label><select id="selBass"></select></div>
- 
-  <div class="psep">Автоаккомпанемент (Smart Match)</div>
-  <div class="prow"><label>Стиль подложки</label><select id="selStyle"></select></div>
-  <div class="prow"><label>Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
-  <div class="prow"><label>Громкость фона</label><input type="range" id="bvol" min="0" max="100" value="55"><span class="val" id="bvolV">55%</span></div>
+  <div class="prow"><label>Набор ударных</label><select id="selDrumKit"></select></div>
 </div>
  
 <!-- ================= МИНИ-УЧЕБНИК ================= -->
@@ -138,12 +141,12 @@
     чистой квинте (702 цента): в 19-TET это 11 шагов, в 31-TET — 18, и строит из них
     открытые микротональные аккорды-дроны. Ярлыки показывают номер ступени и центы.</p>
  
-    <h2>Smart Match: стиль ↔ лад</h2>
-    <p>Подложка сама подбирает стиль под лад: пентатоника/блюз → Lo-Fi бит со свингом;
-    мажор/минор/моды → Synthwave с арпеджиатором; макамы и венгерский минор →
-    этническая перкуссия (дарбука) + тонический дрон; 19/31-TET → эмбиент-дрон с
-    генеративными перезвонами. Тональность фона всегда следует за вашей тоникой.
-    Стиль можно переопределить вручную в меню.</p>
+    <h2>Аранжировка: слои петли</h2>
+    <p>Гармония, ритм и бас выбираются независимо и кладутся в петлю отдельными слоями —
+    сочетание составляете вы. Прогрессии (II–V–I и т.п.) осмысленны в 7-ступенчатых ладах;
+    дрон (тонический гул, спасённый из старой подложки) работает в любом строе. Набор ударных —
+    Стандарт или Дарбука — и рисунок ритма независимы: бэкбит на дарбуке или маqсум на
+    стандартном ките. Всё замораживается в текущем ладу и тонике; «⤺» снимает верхний слой.</p>
   </div>
 </div>
  

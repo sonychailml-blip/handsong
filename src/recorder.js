@@ -1,8 +1,8 @@
 import { AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
-         bassOn, bassSet, bassOff, bassHold, drumHit } from './audio.js';
-import { back, toggleBack } from './backing.js';
-import { leadIdx, bassIdx, seventh, setLatchDeg } from './state.js';
+         bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff } from './audio.js';
+import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
+import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
 import { hooks } from './hooks.js';
 
@@ -28,14 +28,17 @@ import { hooks } from './hooks.js';
    голос, побеждает последний — легато-глиссандо и есть инструмент, это не баг. */
 let recording=false;                                 // «вооружено»: пишем живой ввод
 const events=[];                                     // стабильная ссылка (её читает визуализация в draw)
-const loop={ on:false, bars:2, t0:0, pos:-1e-9, first:false, layer:0, clickBeat:0, quant:true };
+const loop={ on:false, bars:2, bpm:84, t0:0, pos:-1e-9, first:false, layer:0, clickBeat:0, quant:true };
+const droneActive=()=>events.some(e=>e.fn==='drone');   // жив ли слой-дрон (для гашения при снятии/стопе)
 let recLead=null, recCh=null, recBass=null, pumpTimer=null;
+let curChordDeg=-1;                                  // ступень аккорда, что играет петля сейчас (для подсветки, §Q5)
 const loopBeats=()=>loop.bars*BEATS_PER_BAR;
+const loopChordDeg=()=>loop.on?curChordDeg:-1;       // draw: подсветить аккорд петли, когда рука его не держит
 const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
 /* Позиция для визуализации: фаза отсчёта / игры, доля внутри петли, всего долей. */
 function loopPos(){
   if(!loop.on||!AC)return null;
-  const e=(AC.currentTime-loop.t0)*back.bpm/60, total=loopBeats();
+  const e=(AC.currentTime-loop.t0)*loop.bpm/60, total=loopBeats();
   return e<0 ? {phase:'count', countLeft:Math.ceil(-e), pos:0, total, bars:loop.bars}
              : {phase:'play',  pos:e%total, total, bars:loop.bars};
 }
@@ -61,7 +64,8 @@ const ENG={
   bassOn:(a,ctx)=>bassOn(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst),
   bassSet:(a,ctx)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol),
   bassOff:(a,ctx)=>bassOff(bassOwnerKey(ctx)),
-  drum:a=>drumHit(a.row,a.vol),
+  drum:a=>drumHit(a.row,a.vol,a.kit),
+  drone:a=>droneOn(a.lvl),                            // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 };
 const inPB=()=>loop.on;                               // для строки статуса (draw)
 
@@ -71,7 +75,7 @@ const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?0.25
 /* Запись события на текущую позицию в петле; время при квантизации снапится к сетке. */
 function push(fn,a){
   if(!AC)return;
-  const e=(AC.currentTime-loop.t0)*back.bpm/60;
+  const e=(AC.currentTime-loop.t0)*loop.bpm/60;
   if(e<0)return;                                      // ещё идёт отсчёт
   let t=e%loopBeats();
   const g=loop.quant?gridFor(fn):0;
@@ -115,7 +119,7 @@ const WchSet=(_o,deg,oct,vol)   =>{ const a={deg,oct,vol};          ENG.chSet(a)
 const WchOff=_o                 =>{ ENG.chOff(); recChOff(); };
 const WbassOn =p=>{ ENG.bassOn(p); recBassEv(p); };
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
-const WdrumHit=(row,vol)=>{ const a={row,vol}; ENG.drum(a); recDrum(a); };
+const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDrum(a); };
 
 function softAllOff(){ if(!AC)return; noteOff();
   Object.keys(chordHold).forEach(k=>chordOff(k));   // все владельцы аккордов: 'latch' + 'loop:N'
@@ -127,10 +131,14 @@ function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; } }
 function fireWindow(a,b){                              // события в (a,b], кроме пишущегося сейчас слоя
   for(const ev of events)
-    if(ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer)) ENG[ev.fn](ev.a,ev);   // ev несёт замороженный лад (§3.4)
+    if(ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer)){
+      ENG[ev.fn](ev.a,ev);                            // ev несёт замороженный лад (§3.4)
+      if(ev.fn==='chOn'||ev.fn==='chSet')curChordDeg=ev.a.deg;   // текущий аккорд петли — для подсветки (§Q5)
+      else if(ev.fn==='chOff')curChordDeg=-1;
+    }
 }
 function schedClicks(){                                // щелчки метронома с опережением по AC-часам
-  const spb=60/back.bpm, ahead=AC.currentTime+SCHED_AHEAD;
+  const spb=60/loop.bpm, ahead=AC.currentTime+SCHED_AHEAD;
   while(loop.t0+loop.clickBeat*spb<ahead){
     const bt=loop.t0+loop.clickBeat*spb, inCount=loop.clickBeat<0;
     if(bt>=AC.currentTime-0.001&&(inCount||recording))
@@ -141,7 +149,7 @@ function schedClicks(){                                // щелчки метр�
 function tick(){
   if(!loop.on||!AC)return;
   schedClicks();
-  const e=(AC.currentTime-loop.t0)*back.bpm/60;
+  const e=(AC.currentTime-loop.t0)*loop.bpm/60;
   if(e<0)return;                                      // отсчёт: только щелчки
   const lb=loopBeats(); let pos=e%lb;
   if(pos<loop.pos){                                   // заворот петли
@@ -154,7 +162,7 @@ function tick(){
 }
 function startTransport(countIn){
   clearPump();
-  const spb=60/back.bpm;
+  const spb=60/loop.bpm;
   loop.on=true; loop.pos=-1e-9;
   loop.t0=AC.currentTime+(countIn?BEATS_PER_BAR*spb:0.06);
   loop.clickBeat=countIn?-BEATS_PER_BAR:0;
@@ -170,17 +178,33 @@ function onRec(){
   else if(recording){ recLeadOff(); recChOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); }
   else{ loop.layer=maxLayer()+1; setRecording(true); }
 }
+/* Загрузить аранжировку (гармония+бас+ритм) как ОТДЕЛЬНЫЕ слои, замороженные в текущем
+   ладу/септаккорде (§3.4). Пустая петля → длина из прогрессии + запуск; непустая → только
+   если длина совпадает (как setLoopBars). Слои снимаются undo сверху (сначала ритм). */
+function loadArrangement(sel){
+  if(!AC)return;
+  const arr=buildArrangement(sel, {chIdx, bassIdx});
+  if(!arr||!arr.layers.length)return;
+  if(!events.length){ loop.bars=arr.bars; loop.first=false; }
+  else if(arr.bars!==loop.bars)return;                 // не тот размер — тихо, как setLoopBars
+  const base=events.length?maxLayer()+1:0;
+  arr.layers.forEach((evs,li)=>{ const layer=base+li;
+    for(const e of evs) events.push({t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh}); });
+  events.sort((x,y)=>x.t-y.t);
+  if(!loop.on)startTransport(false);
+  if(droneActive())droneOn();                          // включаем дрон сразу (насос переподтвердит на завороте)
+}
 function onLoop(){                                     // играть/пауза петли
   if(!AC)return;
-  if(loop.on){ loop.on=false; clearPump(); softAllOff(); setRecording(false);
+  if(loop.on){ loop.on=false; clearPump(); softAllOff(); droneOff(); setRecording(false);
     hooks.rec&&hooks.rec(false); hooks.loop&&hooks.loop(false); }
-  else if(events.length)startTransport(false);
+  else if(events.length){ startTransport(false); if(droneActive())droneOn(); }
 }
 function onUndo(){                                      // снять последний слой (на месте — ссылка events стабильна)
   if(!events.length)return;
   const top=maxLayer();
   for(let i=events.length-1;i>=0;i--)if(events[i].layer===top)events.splice(i,1);
-  softAllOff();
+  softAllOff(); if(!droneActive())droneOff();           // сняли слой-дрон → гасим (softAllOff дрон не трогает)
   if(!events.length)clearRec(); else hooks.loop && hooks.loop(loop.on);
 }
 function setLoopBars(n){                                // длина меняется только на пустой петле
@@ -188,14 +212,14 @@ function setLoopBars(n){                                // длина меняе
   loop.bars=Math.max(1,Math.min(8,n));
 }
 function setLoopQuant(v){ loop.quant=!!v; }             // общий тумблер квантизации
+function setLoopBpm(v){ loop.bpm=Math.max(40,Math.min(240,+v||loop.bpm)); }   // темп петли — только пользователь
 function clearRec(){
-  clearPump(); events.length=0; loop.on=false; setRecording(false); softAllOff();
+  clearPump(); events.length=0; loop.on=false; setRecording(false); softAllOff(); droneOff();
   hooks.loop && hooks.loop(false);
 }
 function panic(){
   clearPump(); loop.on=false;
-  softAllOff();
-  if(back.playing)toggleBack();
+  softAllOff(); droneOff();
   setRecording(false); hooks.loop && hooks.loop(false);
 }
 
@@ -203,5 +227,6 @@ function panic(){
 export {
   WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
   softAllOff, panic, inPB, recording,
-  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, loop, events, loopPos,
+  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, events, loopPos,
+  loadArrangement, loopChordDeg,
 };

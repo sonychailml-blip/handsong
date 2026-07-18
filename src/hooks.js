@@ -1,1 +1,1 @@
-export const hooks = { leadInstr: null, bpm: null, back: null, rec: null };
+export const hooks = { leadInstr: null, bassInstr: null, drumKit: null, rec: null, loop: null };

@@ -1,21 +1,22 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          uiMode, phoneInstr, setUiMode, setPhoneInstr, setSwapHands } from './state.js';
-import { SCALES, NOTE_NAMES } from './scales.js';
-import { setLeadInstr, setBassInstr, AC, backBus, LEAD_INSTR, CHORD_INSTR, BASS_INSTR } from './audio.js';
-import { back, toggleBack, refreshStyle } from './backing.js';
-import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, loop, recording } from './recorder.js';
+import { SCALES, NOTE_NAMES, supportsProgressions } from './scales.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
+import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
+import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
 import { hooks } from './hooks.js';
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
-const recBtn=$('recBtn'), loopBtn=$('loopBtn'), backBtn=$('backBtn'),
+const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       instrBtn=$('instrBtn'), modePC=$('modePC'), modePhone=$('modePhone'),
       swapNotes=$('swapNotes'), swapFx=$('swapFx'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selScale=$('selScale'), selTonic=$('selTonic'),
-      selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'), selStyle=$('selStyle'),
+      selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
-      bpmEl=$('bpm'), bpmV=$('bpmV'), bvolEl=$('bvol'), bvolV=$('bvolV'),
+      bpmEl=$('bpm'), bpmV=$('bpmV'),
+      selProg=$('selProg'), selRhythm=$('selRhythm'), selBassMode=$('selBassMode'), selDrumKit=$('selDrumKit'), addArrBtn=$('addArrBtn'),
       scaleBtn=$('scaleBtn'), panelEl=$('panel');
  
 function buildUI(){
@@ -39,19 +40,25 @@ function buildUI(){
   BASS_INSTR.forEach((s,i)=>{
     const o=document.createElement('option'); o.value=i; o.textContent=s.label; selBass.appendChild(o);
   });
-  [['auto','Авто (Smart Match)'],['lofi','Lo-Fi бит'],['synthwave','Synthwave'],
-   ['ethnic','Дарбука + дрон'],['ambient','Ambient-дрон']].forEach(([v,l])=>{
-    const o=document.createElement('option'); o.value=v; o.textContent=l; selStyle.appendChild(o);
-  });
+  DRUM_KITS.forEach((k,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=k.label; selDrumKit.appendChild(o); });
+  HARMONIES.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.name; selProg.appendChild(o); });
+  RHYTHMS.forEach((r,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=r.name; selRhythm.appendChild(o); });
+  BASS_MODES.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.name; selBassMode.appendChild(o); });
+  selBassMode.value='roots';
   scaleBtn.textContent=SCALES[scaleIdx].name;
   loopBarsV.textContent=loop.bars;
+  refreshProgAvail();
+}
+function refreshProgAvail(){                  // прогрессии — только в 7-ступенчатых ладах (§Q2); дрон — в любом
+  const ok=supportsProgressions();
+  [...selProg.options].forEach((o,i)=>{ o.disabled = !HARMONIES[i].drone && !ok; });
+  if(selProg.selectedOptions[0] && selProg.selectedOptions[0].disabled) selProg.value='0';   // упасть на дрон
 }
 buildUI();
 
 hooks.leadInstr = v  => selLead.value = v;
 hooks.bassInstr = v  => selBass.value = v;
-hooks.bpm       = v  => { bpmEl.value = v; bpmV.textContent = v; };
-hooks.back      = p  => backBtn.textContent = p ? '❚❚ фон' : '▶ фон';
+hooks.drumKit   = v  => selDrumKit.value = v;
 function updRecBtn(){                         // ярлык кнопки записи зависит от режима
   recBtn.classList.toggle('on', recording);
   recBtn.textContent = recording ? (loop.first ? '● …круг' : '● …слой')
@@ -69,10 +76,10 @@ $('helpClose').onclick=()=>$('helpOv').classList.remove('on');
 $('panicBtn').onclick=panic;
  
 selScale.onchange=e=>{
-  setScaleIdx(+e.target.value); softAllOff(); refreshStyle(false);
-  scaleBtn.textContent=SCALES[scaleIdx].name;
+  setScaleIdx(+e.target.value); softAllOff();
+  scaleBtn.textContent=SCALES[scaleIdx].name; refreshProgAvail();
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); refreshStyle(false); };
+selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); };
 $('qTriad').onclick=()=>{ setSeventh(false); softAllOff(); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
 $('qSev').onclick =()=>{ setSeventh(true);  softAllOff(); $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
 selLead.onchange=e=>setLeadInstr(+e.target.value);
@@ -80,11 +87,8 @@ selChord.onchange=e=>setChIdx(+e.target.value);
 selBass.onchange=e=>setBassInstr(+e.target.value);
 qOn.onclick =()=>{ setLoopQuant(true);  qOn.classList.add('act');  qOff.classList.remove('act'); };
 qOff.onclick=()=>{ setLoopQuant(false); qOff.classList.add('act'); qOn.classList.remove('act'); };
-selStyle.onchange=e=>{ back.styleSel=e.target.value; refreshStyle(back.styleSel!=='auto'); };
-bpmEl.oninput=e=>{ back.bpm=+e.target.value; bpmV.textContent=back.bpm; };
-bvolEl.oninput=e=>{ bvolV.textContent=e.target.value+'%';
-  if(AC)backBus.gain.setTargetAtTime(e.target.value/100,AC.currentTime,0.05); };
-backBtn.onclick=toggleBack;
+bpmEl.oninput=e=>{ setLoopBpm(+e.target.value); bpmV.textContent=loop.bpm; };
+selDrumKit.onchange=e=>setDrumKit(+e.target.value);
  
 recBtn.onclick=onRec;
 loopBtn.onclick=onLoop;
@@ -92,6 +96,7 @@ $('undoBtn').onclick=onUndo;
 $('clrBtn').onclick=clearRec;
 loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bars; };
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
+addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
 /* Режим управления: ПК ↔ Смартфон, выбор инструмента (phone), обмен рук.
    При любом переключении глушим звук — зоны/роли рук меняются. */

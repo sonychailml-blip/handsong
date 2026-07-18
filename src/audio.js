@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx, bassIdx, setBassIdx } from './state.js';
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx } from './state.js';
 import { baseF } from './scales.js';
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N } from './config.js';
@@ -32,13 +32,16 @@ const BASS_INSTR=[
 /* Ударные: имена рядов (индекс 0 = низ сетки). Синтез на лету, без сэмплов. */
 const DRUM_NAMES=['Кик','Снейр','Клэп','Хэт','Том','Крэш'];
 const DRUM_ROWS=DRUM_NAMES.length;
+/* Наборы ударных: тембр рядов. Стандарт — синтезированный кит; Дарбука — дум/тек
+   (спасены из удалённого backing.js). Селектор той же формы, что LEAD_INSTR и др. */
+const DRUM_KITS=[{label:'Стандарт'},{label:'Дарбука'}];
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter, verb, verbOut;
 let banks=[], vibGain, satWet, satDry, envGain, volGain,
     tremGain, tremDepth, dlyWet, revLead;              // соло-цепочка
 let chordBus, revCh;                                    // аккорды
-let backBus, backRev, dO1, dO2, dG, noiseBuf;           // подложка
+let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
 let noteOnFlag=false;
 const bv=[]; const bassHold={}; let bassBus;             // пул баса (моно-голос на слой)
@@ -217,9 +220,8 @@ function initAudio(){
   /* --- УДАРНЫЕ: своя шина в master (мимо эффектов соло) --- */
   drumBus=AC.createGain(); drumBus.gain.value=0.85; drumBus.connect(master);
 
-  /* --- ПОДЛОЖКА: своя шина в обход всех эффектов соло --- */
+  /* --- ДРОН: расстроенная пара пил через медленный НЧ-фильтр, на тонике (шина в master) --- */
   backBus=AC.createGain(); backBus.gain.value=0.55; backBus.connect(master);
-  backRev=AC.createGain(); backRev.gain.value=0.5; backRev.connect(verb);
   dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=baseF()/2;
   dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=baseF()/2*1.498;
   const dLP=AC.createBiquadFilter(); dLP.type='lowpass'; dLP.frequency.value=520;
@@ -312,10 +314,46 @@ function bassSet(owner,freq,vol){
 }
 function bassOff(owner){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false); delete bassHold[owner]; }
 
-/* --- УДАРНЫЕ: однократный синтез по индексу ряда (0=низ сетки) --- */
+/* --- ДРОН: гейт dG, частота следует за тоникой (baseF/2) в любом ладу (спасён из backing.js) --- */
+function droneOn(level=0.18){ if(!AC)return; const t=AC.currentTime;
+  dG.gain.setTargetAtTime(level,t,1.2);
+  dO1.frequency.setTargetAtTime(baseF()/2,t,0.3);
+  dO2.frequency.setTargetAtTime(baseF()/2*1.498,t,0.3);
+}
+function droneOff(){ if(!AC)return; dG.gain.setTargetAtTime(0,AC.currentTime,0.6); }
+/* Живой селектор набора ударных: только глобальный индекс + дропдаун (удар транзиентный,
+   тембр берётся на КАЖДЫЙ удар из a.kit — заморожен в событии, как бас/аккорд). */
+function setDrumKit(i){
+  setDrumKitIdx(((i%DRUM_KITS.length)+DRUM_KITS.length)%DRUM_KITS.length);
+  hooks.drumKit && hooks.drumKit(drumKitIdx);
+}
+
+/* --- УДАРНЫЕ: однократный синтез по индексу ряда (0=низ сетки), набор — kit --- */
 function dNoise(t,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.loop=true; s.start(t); s.stop(t+dur); return s; }
-function drumHit(i,vol=1){
+/* Дарбука-голоса (спасены из backing.js): Дум — низкий бум, Тек — звонкий щелчок. */
+function dDum(t,v,f0=130,f1=52,d=0.18){ const o=AC.createOscillator(),g=AC.createGain();
+  o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.08);
+  g.gain.setValueAtTime(0.9*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
+  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+d+0.05); }
+function dTek(t,v,hp=4500,f=950){ const s=dNoise(t,0.05),bf=AC.createBiquadFilter(),g=AC.createGain();
+  bf.type='highpass'; bf.frequency.value=hp; g.gain.setValueAtTime(0.3*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.035);
+  s.connect(bf); bf.connect(g); g.connect(drumBus);
+  const o=AC.createOscillator(),og=AC.createGain(); o.type='sine'; o.frequency.value=f;
+  og.gain.setValueAtTime(0.12*v,t); og.gain.exponentialRampToValueAtTime(0.001,t+0.03);
+  o.connect(og); og.connect(drumBus); o.start(t); o.stop(t+0.05); }
+function darbukaHit(i,v,t){                       // 6 рядов → дарбука-голоса
+  if(i===0)dDum(t,v);                             // Дум (низ)
+  else if(i===1)dTek(t,v);                        // Тек
+  else if(i===2)dTek(t,v*1.1,6000,1300);          // Так (ярче)
+  else if(i===3)dTek(t,v*0.7,5200,1100);          // Ка (тише, короче)
+  else if(i===4)dDum(t,v,180,80,0.14);            // Дум высокий
+  else{ const s=dNoise(t,0.5),f=AC.createBiquadFilter(),g=AC.createGain();   // открытый край
+    f.type='highpass'; f.frequency.value=5000; g.gain.setValueAtTime(0.28*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
+    s.connect(f); f.connect(g); g.connect(drumBus); }
+}
+function drumHit(i,vol=1,kit=0){
   if(!AC)return; const t=AC.currentTime, v=0.3+0.7*vol;
+  if(kit===1) return darbukaHit(i,v,t);
   if(i===0){ const o=AC.createOscillator(),g=AC.createGain();     // Кик
     o.frequency.setValueAtTime(165,t); o.frequency.exponentialRampToValueAtTime(48,t+0.09);
     g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.22);
@@ -358,7 +396,6 @@ function metroClick(t,accent){
 export {
   initAudio, AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick,
   chordOn, chordGlide, chordOff, chordHold,
-  setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit,
-  LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS,
-  backBus, backRev, dG, dO1, dO2, noiseBuf,
+  setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
+  LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS,
 };
