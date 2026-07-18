@@ -23,9 +23,15 @@
   #recBtn.on{background:var(--rec); border-color:var(--rec);}
   #loopBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   #instrBtn{border-color:var(--chord); color:var(--chord); font-weight:600;}
+  #loopPanelBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   /* переключатель инструмента и выбор руки — только в режиме «Смартфон» */
   body:not(.phone) #instrBtn{display:none;}
-  body:not(.phone) #swapRow{display:none;}
+  /* смена рук осмысленна только в «Смартфон»: в ПК роль задаётся МЕСТОМ, а не рукой.
+     Видимость — на том же классе .phone, который ставит applyMode (логику не трогаем). */
+  body:not(.phone) #swapBtn{display:none;}
+  /* иконки-тумблеры слева: режим [💻/📱] и смена рук [⇄] */
+  #modeBtn,#swapBtn{padding:9px 10px; font-size:15px;}
+  #swapBtn.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
 
   /* узкий экран / портрет: компактнее верхняя панель */
   @media (max-width:560px){
@@ -41,12 +47,23 @@
     font-size:11px; color:var(--dim); text-shadow:0 1px 2px #000;
     white-space:nowrap; overflow:hidden;}
 
-  /* ---- панель настроек ---- */
-  #panel{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:15;
+  /* ---- МЕНЮ ЗВУКОРЯДА: оверлей (открыл → выбрал → закрыл). Оформление прежней #panel ---- */
+  #panelScale{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:15;
     background:var(--panel); border:1px solid rgba(255,255,255,.18); border-radius:14px;
     padding:12px 14px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
     backdrop-filter:blur(6px);}
-  #panel.on{display:block;}
+  #panelScale.on{display:block;}
+
+  /* ---- ПАНЕЛЬ ЛУПЕРА: рабочая, пришвартована СНИЗУ — играть можно с открытой ----
+     Снизу, потому что наглядную сетку тактов рисует ХОЛСТ сверху-по-центру
+     (draw.js drawLooper, y≈64): верхняя панель закрыла бы ровно то, что должно
+     быть видно. Не оверлей — ограниченная карточка, остальной экран игровой.
+     bottom:24px оставляет видимой строку #status (bottom:6px). */
+  #panelLoop{position:fixed; left:8px; right:8px; bottom:24px; max-width:560px; margin:0 auto; z-index:14;
+    background:var(--panel); border:1px solid rgba(255,255,255,.18); border-radius:14px;
+    padding:10px 14px 12px; display:none; max-height:46vh; overflow-y:auto;
+    backdrop-filter:blur(6px);}
+  #panelLoop.on{display:block;}
   .prow{display:flex; align-items:center; gap:10px; margin:9px 0;}
   .prow label{flex:0 0 122px; font-size:12px; color:var(--dim);}
   .prow select,.prow input[type=range],.prow .seg{flex:1; min-width:0;}
@@ -83,3 +100,5 @@
   #startBtn{font-size:18px; padding:15px 32px; background:var(--note);
     color:#1a1206; border:none; font-weight:700; margin-top:10px;}
   #loadmsg{font-size:12px; color:var(--dim); min-height:1.2em; margin-top:10px;}
+
+  

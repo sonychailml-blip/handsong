@@ -38,8 +38,11 @@
  
 <!-- ================= ВЕРХНЯЯ ПАНЕЛЬ ================= -->
 <div id="bar">
+  <button id="modeBtn" title="Режим управления">💻</button>
+  <button id="swapBtn" title="Смена рук">⇄</button>
   <button id="scaleBtn" title="Звукоряд: лад, тоника, тембры">Лад</button>
   <button id="instrBtn" title="Соло / Аккорды">🎸 Соло</button>
+  <button id="loopPanelBtn" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
   <button id="recBtn" title="Запись / наложение слоя">● запись</button>
   <button id="loopBtn" title="Петля: играть / пауза">⟳ луп</button>
   <button id="undoBtn" title="Убрать последний слой">⤺</button>
@@ -49,15 +52,13 @@
 </div>
  
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
-<!-- Шаг 1 MENU-PLAN: строки разнесены по двум контейнерам. #panel остаётся внешней
-     обёрткой, чтобы существующие обработчики (scaleBtn/panelClose) работали
-     без правок ui.js. Шаг 2 сделает #panelScale оверлеем, шаг 3 — #panelLoop
-     сворачиваемой рабочей панелью по ⚙. -->
-<div id="panel">
-  <div class="phead"><b>Настройки</b><button id="panelClose">Свернуть ✕</button></div>
+<!-- Шаг 3 MENU-PLAN: две панели РАЗНОЙ природы, обёртка #panel удалена.
+     #panelScale — ОВЕРЛЕЙ звукоряда: открыл → выбрал → закрыл.
+     #panelLoop  — РАБОЧАЯ панель лупера снизу: играть можно с открытой. -->
 
-  <!-- ================= ЗВУКОРЯД: ноты и звук ================= -->
-  <div id="panelScale">
+<!-- ================= ЗВУКОРЯД: ноты и звук (оверлей) ================= -->
+<div id="panelScale">
+    <div class="phead"><b>Звукоряд</b><button id="panelClose">Свернуть ✕</button></div>
     <div class="psep">Лад и тоника</div>
     <div class="prow"><label>Лад / строй</label><select id="selScale"></select></div>
     <div class="prow"><label>Тоника</label><select id="selTonic"></select></div>
@@ -71,19 +72,14 @@
     <div class="prow"><label>Бас-инструмент</label><select id="selBass"></select></div>
     <div class="prow"><label>Набор ударных</label><select id="selDrumKit"></select></div>
 
-    <!-- технические строки: шаг 4 унесёт их в иконки [💻][⇄] слева вверху -->
+    <!-- шаг 4: сами тумблеры переехали в иконки [💻/📱][⇄] слева вверху; здесь остаётся пояснение -->
     <div class="psep">Режим управления</div>
-    <div class="prow"><label>Режим</label>
-      <div class="seg"><button id="modePC" class="act">ПК</button><button id="modePhone">Смартфон</button></div>
-    </div>
-    <div class="prow" id="swapRow"><label>Правая рука</label>
-      <div class="seg"><button id="swapNotes" class="act">Ноты</button><button id="swapFx">Эффекты</button></div>
-    </div>
-    <p class="phint" id="modeHint">Смартфон: один инструмент на экране (переключатель вверху), правая рука — ноты, левая — эффекты (полоса снизу). ПК: три колонки, любая рука.</p>
+    <p class="phint" id="modeHint">Смартфон: один инструмент на экране (переключатель вверху), правая рука — ноты, левая — эффекты (полоса снизу). ПК: три колонки, любая рука.<br>Переключатель режима [💻/📱] и смена рук [⇄] — слева в верхней панели. Смена рук доступна только в режиме «Смартфон».</p>
   </div>
 
-  <!-- ================= ЛУПЕР: время и слои ================= -->
-  <div id="panelLoop">
+<!-- ================= ЛУПЕР: время и слои (рабочая панель снизу) ================= -->
+<div id="panelLoop">
+    <div class="phead"><b>Лупер</b></div>
     <div class="psep">Петля (лупер)</div>
     <div class="prow"><label>Длина (такты)</label>
       <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
@@ -100,7 +96,6 @@
     <div class="prow"><label>Бас-партия</label><select id="selBassMode"></select></div>
     <div class="prow"><label></label><button id="addArrBtn">＋ Добавить слои</button></div>
     <p class="phint" id="arrHint">Гармония, ритм и бас — отдельные слои петли; сочетание выбираете вы. «＋ Добавить» кладёт их в текущем ладу и тонике (заморожено), длину берёт из прогрессии. «⤺» снимает верхний слой. Прогрессии — только в 7-ступенчатых ладах; дрон работает в любом строе.</p>
-  </div>
 </div>
  
 <!-- ================= МИНИ-УЧЕБНИК ================= -->

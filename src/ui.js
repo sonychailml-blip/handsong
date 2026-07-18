@@ -1,5 +1,5 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
-         uiMode, phoneInstr, setUiMode, setPhoneInstr, setSwapHands } from './state.js';
+         uiMode, phoneInstr, swapHands, setUiMode, setPhoneInstr, setSwapHands } from './state.js';
 import { SCALES, NOTE_NAMES, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
@@ -9,15 +9,15 @@ import { hooks } from './hooks.js';
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), modePC=$('modePC'), modePhone=$('modePhone'),
-      swapNotes=$('swapNotes'), swapFx=$('swapFx'),
+      instrBtn=$('instrBtn'), modeBtn=$('modeBtn'), swapBtn=$('swapBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
       bpmEl=$('bpm'), bpmV=$('bpmV'),
       selProg=$('selProg'), selRhythm=$('selRhythm'), selBassMode=$('selBassMode'), selDrumKit=$('selDrumKit'), addArrBtn=$('addArrBtn'),
-      scaleBtn=$('scaleBtn'), panelEl=$('panel');
+      scaleBtn=$('scaleBtn'), loopPanelBtn=$('loopPanelBtn'),
+      panelScaleEl=$('panelScale'), panelLoopEl=$('panelLoop');
  
 /* Кнопка-индикатор звукоряда (шаг 2 MENU-PLAN): «лад · тоника», единственный вход в меню.
    Имя тоники берём из NOTE_NAMES — тем же списком подписан <select id="selTonic">,
@@ -74,8 +74,15 @@ function updRecBtn(){                         // ярлык кнопки зап�
 hooks.rec       = () => updRecBtn();
 hooks.loop      = on => { loopBtn.classList.toggle('on', on); loopBtn.textContent = on ? '❚❚ луп' : '⟳ луп'; updRecBtn(); };
 
-$('panelClose').onclick=()=>panelEl.classList.remove('on');
-scaleBtn.onclick=()=>panelEl.classList.toggle('on');
+/* Шаг 3 MENU-PLAN: панели РАЗНОЙ природы. Звукоряд — оверлей (выбрал и закрыл),
+   лупер — рабочая панель снизу (играть можно с открытой). Одна за раз: обе — карточки
+   почти во весь экран, вместе они бы перекрылись, поэтому открытие одной прячет другую. */
+function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.classList.toggle('on',on);
+  if(on)panelScaleEl.classList.remove('on'); }
+function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false); }
+$('panelClose').onclick=()=>showScale(false);
+scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
+loopPanelBtn.onclick=()=>showLoop(!panelLoopEl.classList.contains('on'));
 $('helpBtn').onclick=()=>$('helpOv').classList.add('on');
 $('helpClose').onclick=()=>$('helpOv').classList.remove('on');
 $('panicBtn').onclick=panic;
@@ -105,19 +112,26 @@ addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.
 
 /* Режим управления: ПК ↔ Смартфон, выбор инструмента (phone), обмен рук.
    При любом переключении глушим звук — зоны/роли рук меняются. */
+/* Шаг 4 MENU-PLAN: пара кнопок → ОДНА иконка-тумблер, сама себе индикатор.
+   Логика прежняя (setUiMode + класс .phone на body) — поменялось только отображение
+   и то, чем это дёргают. Видимость ⇄ висит на том же .phone через CSS. */
 function applyMode(){
   document.body.classList.toggle('phone', uiMode==='phone');
-  modePC.classList.toggle('act', uiMode==='pc');
-  modePhone.classList.toggle('act', uiMode==='phone');
+  modeBtn.textContent = uiMode==='phone' ? '📱' : '💻';
+  modeBtn.title = uiMode==='phone' ? 'Режим: Смартфон — тап переключит на ПК'
+                                   : 'Режим: ПК — тап переключит на Смартфон';
+}
+function applySwap(){                          // ⇄ — только в «Смартфон» (в ПК роль по месту, не по руке)
+  swapBtn.classList.toggle('act', swapHands);
+  swapBtn.title = swapHands ? 'Правая рука: эффекты — тап вернёт ей ноты'
+                            : 'Правая рука: ноты — тап отдаст ей эффекты';
 }
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
 function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr]; }
-modePC.onclick   =()=>{ setUiMode('pc');    softAllOff(); applyMode(); };
-modePhone.onclick=()=>{ setUiMode('phone'); softAllOff(); applyMode(); };
+modeBtn.onclick  =()=>{ setUiMode(uiMode==='phone'?'pc':'phone'); softAllOff(); applyMode(); };
 instrBtn.onclick =()=>{ setPhoneInstr(INSTR_SEQ[(INSTR_SEQ.indexOf(phoneInstr)+1)%INSTR_SEQ.length]); softAllOff(); applyInstr(); };
-swapNotes.onclick=()=>{ setSwapHands(false); swapNotes.classList.add('act'); swapFx.classList.remove('act'); softAllOff(); };
-swapFx.onclick   =()=>{ setSwapHands(true);  swapFx.classList.add('act');  swapNotes.classList.remove('act'); softAllOff(); };
-applyMode(); applyInstr();
+swapBtn.onclick  =()=>{ setSwapHands(!swapHands); softAllOff(); applySwap(); };
+applyMode(); applyInstr(); applySwap();
  
 export { $ };
