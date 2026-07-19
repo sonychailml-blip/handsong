@@ -388,6 +388,7 @@ function drawHandsPhone(res,W,H,playH){
    именем аккорда (C · Cmaj7 · C7). Плюс индикатор семейства: оно ЛИПКОЕ, поэтому
    должно быть видно, что сейчас выбрано, даже когда левой руки нет в кадре. */
 const SECT_LABEL_MIN_ROW=44;   // ниже этой высоты ряда подписи карты не влезают — рисуем только разделители
+const FINGER_RU=['указательный','средний','безымянный','мизинец'];   // индекс = CHORD_FAMS[].finger
 function drawChordSectors(W,H){
   const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0], nS=fam.types.length;
   const rows=IVX().length, seg=H/rows, sw=W/nS;
@@ -425,7 +426,7 @@ function drawChordSectors(W,H){
 
   // индикатор семейства — всегда, даже когда левой руки нет в кадре (оно липкое)
   ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
-  ctx.fillText(`Семейство: ${fam.name}  (${fam.finger===0?'указательный':'средний'})`, 12, 22);
+  ctx.fillText(`Семейство: ${fam.name}  (${FINGER_RU[fam.finger]||'?'})`, 12, 22);
   ctx.textBaseline='alphabetic';
 }
 function drawFxBars(W,H){

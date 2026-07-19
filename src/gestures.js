@@ -169,7 +169,7 @@ function processHands(res){
         let ty=null;
         if(S.zone==='ch'&&typedChords()){
           const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0], nS=fam.types.length;
-          const prev=(S.sect==null)?-1:Math.min(S.sect,nS-1);   // семейство могло смениться 3→2 сектора
+          const prev=(S.sect==null)?-1:Math.min(S.sect,nS-1);   // семейство могло сузиться (4→3): сектор мог остаться вне таблицы
           S.sect=sectHyst(x,nS,W,prev);
           ty=fam.types[S.sect].iv;
           S.vol=TYPED_CH_VOL;
