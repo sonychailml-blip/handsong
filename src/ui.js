@@ -28,15 +28,30 @@ function updScaleBtn(){ scaleBtn.textContent=`${SCALES[scaleIdx].name} · ${NOTE
 
 /* Меню лада заполняем ладами ОДНОЙ традиции. value у <option> — абсолютный индекс в
    SCALES (он же scaleIdx), а не позиция в отфильтрованном списке: иначе selScale.onchange
-   выставил бы не тот лад. Подгруппы (grp) рисуем, только если они заданы. */
+   выставил бы не тот лад. Подгруппы (grp) рисуем, только если они заданы.
+   ГРУППИРОВКА ПО КЛЮЧУ (grp), А НЕ ПО СОСЕДСТВУ В МАССИВЕ. Это разные вещи, и разница
+   видна ровно тогда, когда лад дописан В КОНЕЦ SCALES (а правило требует дописывать
+   только туда): раньше сравнивался лишь ПРЕДЫДУЩИЙ grp, поэтому «Диатоника» в конце
+   массива открывала ВТОРУЮ группу «Диатоника» внизу списка. Теперь лады раскладываются
+   по корзинам: порядок КОРЗИН — по первому появлению, порядок ВНУТРИ корзины — по
+   массиву. Позиция в меню и позиция в SCALES развязаны, scaleIdx при этом не трогается.
+   Пустой grp — не корзина: такие лады идут голыми <option> прямо в selScale
+   (Хроматика/Арабская/Микротональная так и рисуются). */
 function fillScales(tradId){
   selScale.textContent='';
-  let g=null, og=null;
+  const order=[], buckets=new Map();            // order — grp в порядке первого появления
   scalesOfTrad(tradId).forEach(({i,s})=>{
-    const parent = s.grp ? (s.grp!==g ? (g=s.grp, og=document.createElement('optgroup'), og.label=g, selScale.appendChild(og), og) : og)
-                         : (g=null, selScale);
-    const o=document.createElement('option'); o.value=i; o.textContent=s.name; parent.appendChild(o);
+    const k=s.grp||'';
+    if(!buckets.has(k)){ buckets.set(k,[]); order.push(k); }
+    buckets.get(k).push({i,s});                 // внутри корзины — порядок массива
   });
+  for(const k of order){
+    const parent = k ? selScale.appendChild(Object.assign(document.createElement('optgroup'),{label:k}))
+                     : selScale;                // '' → без optgroup, прямо в список
+    for(const {i,s} of buckets.get(k)){
+      const o=document.createElement('option'); o.value=i; o.textContent=s.name; parent.appendChild(o);
+    }
+  }
 }
 function buildUI(){
   TRADITIONS.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; selTradition.appendChild(o); });
