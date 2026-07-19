@@ -1,6 +1,6 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          uiMode, phoneInstr, swapHands, setUiMode, setPhoneInstr, setSwapHands } from './state.js';
-import { SCALES, NOTE_NAMES, supportsProgressions, supportsChords } from './scales.js';
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
@@ -12,7 +12,7 @@ const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       instrBtn=$('instrBtn'), modeBtn=$('modeBtn'), swapBtn=$('swapBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
-      selScale=$('selScale'), selTonic=$('selTonic'),
+      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
       bpmEl=$('bpm'), bpmV=$('bpmV'),
@@ -26,13 +26,22 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
 function updScaleBtn(){ scaleBtn.textContent=`${SCALES[scaleIdx].name} · ${NOTE_NAMES[tonic]}`; }
 
-function buildUI(){
-  // лады с группировкой
+/* Меню лада заполняем ладами ОДНОЙ традиции. value у <option> — абсолютный индекс в
+   SCALES (он же scaleIdx), а не позиция в отфильтрованном списке: иначе selScale.onchange
+   выставил бы не тот лад. Подгруппы (grp) рисуем, только если они заданы. */
+function fillScales(tradId){
+  selScale.textContent='';
   let g=null, og=null;
-  SCALES.forEach((s,i)=>{
-    if(s.grp!==g){ g=s.grp; og=document.createElement('optgroup'); og.label=g; selScale.appendChild(og); }
-    const o=document.createElement('option'); o.value=i; o.textContent=s.name; og.appendChild(o);
+  scalesOfTrad(tradId).forEach(({i,s})=>{
+    const parent = s.grp ? (s.grp!==g ? (g=s.grp, og=document.createElement('optgroup'), og.label=g, selScale.appendChild(og), og) : og)
+                         : (g=null, selScale);
+    const o=document.createElement('option'); o.value=i; o.textContent=s.name; parent.appendChild(o);
   });
+}
+function buildUI(){
+  TRADITIONS.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; selTradition.appendChild(o); });
+  selTradition.value=tradOfScale(scaleIdx);      // традицию берём из активного лада, а не из умолчания
+  fillScales(selTradition.value);
   selScale.value=scaleIdx;
   NOTE_NAMES.forEach((n,i)=>{
     const o=document.createElement('option'); o.value=i; o.textContent=n; selTonic.appendChild(o);
@@ -97,6 +106,15 @@ $('helpBtn').onclick=()=>$('helpOv').classList.add('on');
 $('helpClose').onclick=()=>$('helpOv').classList.remove('on');
 $('panicBtn').onclick=panic;
  
+/* Смена традиции = смена лада: иначе продолжал бы звучать лад чужой традиции, а меню
+   показывало бы другой. Переключаемся на ПЕРВЫЙ лад традиции тем же путём, что и selScale. */
+selTradition.onchange=e=>{
+  fillScales(e.target.value);
+  const first=scalesOfTrad(e.target.value)[0];
+  if(!first)return;
+  selScale.value=first.i;
+  setScaleIdx(first.i); softAllOff(); updScaleBtn(); refreshProgAvail();
+};
 selScale.onchange=e=>{
   setScaleIdx(+e.target.value); softAllOff();
   updScaleBtn(); refreshProgAvail();          // 2/3: смена лада

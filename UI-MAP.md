@@ -170,3 +170,42 @@ REC · Play · Loop · число тактов. Тонкая, всегда до�
 Правило: не обустраивать комнаты, пока не согласован план дома. Карта — план дома.
 Меню НЕ трогать, пока не решён состав (эта карта — решение).
 Английский/локализацию — только когда UI застынет.
+Read UI-MAP.md (chord-types section), BACKLOG §3.10, and gestures.js. This is a DESIGN
+task — NO code. Report a plan.
+
+We designed chord-type selection: LEFT hand picks the chord FAMILY (index+thumb =
+major family, middle = minor, ring = diminished, pinky = sus — a sticky toggle, default
+major), RIGHT hand plays as now (Y = note, finger = octave) with a NEW twist: X inside
+a note's rectangle picks the VARIANT (the rectangle splits into vertical sectors, one
+per chord type in the family). Volume in chords is removed; X becomes type-select.
+
+THE BLOCKER we hit: this is a two-free-hands model (PC-style). But we build for PHONE,
+where there's ONE role on screen and a hand is bound to the role by handedness. In the
+"Аккорды" role on phone, where is the free LEFT hand to set the family?
+
+Investigate and propose, don't code:
+
+1. How does the phone "Аккорды" role currently use the two hands? Read gestures.js:
+   in phone mode, when phoneInstr==='ch', do BOTH hands build chords, or is one hand
+   something else? Report exactly what each hand does today in the chord role on phone.
+
+2. Given that, propose how family-selection fits on phone. Options to evaluate:
+   a) In the chord role, let the LEFT hand be the family-selector (its pinch sets
+      family, doesn't play notes) and the RIGHT hand plays. Cost: you lose two-handed
+      chord play on phone (can't hold two chords). Is two-handed chord play even used
+      on phone now?
+   b) Family is set by an on-screen control (tap), not a hand — frees both hands to
+      play, but adds a tap and isn't "finger picks family".
+   c) The family sticks (already decided), so maybe you set it rarely — left hand
+      pinch-to-change, then both hands play in that family until you change it again.
+      Does that reconcile with (a)?
+   Recommend one, with the phone constraint front and centre.
+
+3. X-as-sector needs horizontal hysteresis (like ROW_HYST for Y) or narrow sectors will
+   jitter. Note it, don't solve yet.
+
+4. The chord event in the looper must freeze the TYPE (like it freezes sc/sev). Confirm
+   where that goes.
+
+Report the current phone chord-hand behaviour (1) and your family-selection proposal (2)
+with the phone constraint addressed. NO code. Then stop.

@@ -1,6 +1,6 @@
-import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS, FX_STRIP_H } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, uiMode, phoneInstr, swapHands } from './state.js';
-import { IVX, supportsChords } from './scales.js';
+import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, SECT_HYST, TYPED_CH_VOL, WATCHDOG_MS } from './config.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, uiMode, phoneInstr, swapHands } from './state.js';
+import { IVX, supportsChords, typedChords, CHORD_FAMS } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
@@ -33,6 +33,7 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
    result.handednesses[i][0].categoryName ('Left'/'Right') — стабильный
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
 const HANDS={}; let leadOwner=null; let chOwner=null; let bassOwner=null;   // chOwner — рука защёлки, bassOwner — рука баса
+let latchLen=0;   // сколько нот звучит у 'latch': по нему решаем «глиссандо или переатака»
 const zoneAt=(x,W)=> x<FXW*W?'fx' : x<ZB*W?'ch':'ld';
 const zoneX =(z,W)=> z==='ch'?[FXW*W,ZB*W]:[ZB*W,W];
 /* phone-режим: роль руки по handedness, а не по X. Правая=ноты, левая=эффекты
@@ -42,7 +43,10 @@ function handRole(key){
   if(key.slice(0,5)==='Right') return swapHands?'fx':'notes';
   return 'notes';
 }
-const playHeight=H=> (uiMode==='phone'&&phoneInstr==='ld') ? Math.max(1,H-FX_STRIP_H) : H;   // полоса эффектов (и её отступ) только у соло
+/* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
+   (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
+   рисуется. Эти две высоты обязаны совпадать: разойдутся — палец будет брать не ту
+   ступень, которую видит, и тем сильнее, чем ниже по экрану. */
 function degRaw(y,rows,H){ const seg=H/rows;
   let z=Math.floor(y/seg); if(z<0)z=0; if(z>rows-1)z=rows-1;
   return rows-1-z;
@@ -57,6 +61,17 @@ function degHyst(y,rows,H,prev){
     if(Math.abs(y-b)<seg*ROW_HYST)return prev;
   }
   return Math.min(d,rows-1);
+}
+/* Гистерезис сектора типа по X — тот же приём, что degHyst по Y: соседний сектор
+   берём, только если палец ушёл от границы дальше SECT_HYST ширины сектора.
+   Без него на 2-3 узких секторах тип дребезжал бы от дрожания руки. */
+function sectHyst(x,n,W,prev){
+  const seg=W/n; let d=Math.floor(x/seg); if(d<0)d=0; if(d>n-1)d=n-1;
+  if(prev>=0&&prev<=n-1&&Math.abs(d-prev)===1){
+    const b=Math.max(d,prev)*seg;
+    if(Math.abs(x-b)<seg*SECT_HYST)return prev;
+  }
+  return d;
 }
 function endPinch(key,S){
   if(S.pinch){
@@ -90,7 +105,14 @@ function processHands(res){
          громкости, нельзя случайно перескочить в соседнюю колонку. */
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
       if(uiMode==='phone'){
-        S.zone = (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx' : phoneInstr;   // эффекты только у соло; у прочих инструментов обе руки играют ноты
+        /* Рука-«не-нотная» (handRole==='fx', по умолчанию ЛЕВАЯ) получает особую роль
+           только там, где она есть: эффекты у соло, выбор семейства у типизированных
+           аккордов. Гейт из трёх условий, самое узкое — лад: typedChords стоит ровно
+           на одном ладу из 19. Прочие лады/роли/ПК идут прежним путём. */
+        const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
+        S.zone = famHand ? 'chFam'
+               : (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx'
+               : phoneInstr;
       }else{
         const px=(1-(lm[4].x+lm[mf].x)/2)*W;
         S.zone=zoneAt(px,W);
@@ -131,11 +153,27 @@ function processHands(res){
         /* Регулировка относительная («от текущего»), диапазон — 70%
            высоты экрана; значение остаётся после отпускания (латч). */
         if(S.adj)fx[S.adj.k]=clamp01(S.adj.base+(S.adj.y0-lm[4].y*H)/(H*0.7));
+      }else if(S.zone==='chFam'){
+        /* Рука-семейство: ТОЛЬКО выбирает семейство пальцем и молчит. Ветка стоит рядом
+           с 'fx', ДО общего блока — поэтому не считает ни ступень, ни громкость, не берёт
+           chOwner и не доходит до защёлки. Липкое: держится и после отпускания, и когда
+           руки нет в кадре. Палец вне таблицы (безым./мизинец) — семейство не трогаем. */
+        const f=CHORD_FAMS.findIndex(F=>F.finger===S.oct);
+        if(f>=0&&f!==chordFam)setChordFam(f);
       }else{
         const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length, phone=uiMode==='phone';
-        S.deg=degHyst(y,rows,playHeight(H),S.deg);
+        S.deg=degHyst(y,rows,H,S.deg);              // вся высота — ровно так же, как рисует draw
         const[zx0,zx1]= phone ? [0,W] : zoneX(S.zone,W);   // phone: громкость по всей ширине
         S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
+        /* Типизированный аккорд: X — это СЕКТОР (вариант типа), а не громкость. */
+        let ty=null;
+        if(S.zone==='ch'&&typedChords()){
+          const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0], nS=fam.types.length;
+          const prev=(S.sect==null)?-1:Math.min(S.sect,nS-1);   // семейство могло смениться 3→2 сектора
+          S.sect=sectHyst(x,nS,W,prev);
+          ty=fam.types[S.sect].iv;
+          S.vol=TYPED_CH_VOL;
+        }
         if(S.zone==='ld'){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
@@ -158,15 +196,26 @@ function processHands(res){
             // стоп-щипок отработал: рука молчит до размыкания пальцев
           }else if(S.fresh){
             S.fresh=false;                        // решение принимается один раз за щипок
-            if(latchDeg>=0&&S.deg===latchDeg){
-              WchOff('latch'); setLatchDeg(-1); chOwner=null; S.inert=true;   // та же ступень → выключаем, рука инертна
+            /* Тождество защёлки: вне typedChords — ступень (как было, второй множитель
+               схлопывается в true); в typedChords — ПАРА (ступень+тип), иначе C→C7
+               читалось бы как «та же ступень» и глушило аккорд вместо переключения.
+               Цена: зона выключения сужается до конкретного сектора — это неизбежно. */
+            const same = latchDeg>=0 && S.deg===latchDeg && (!typedChords() || ty===latchTy);
+            if(same){
+              WchOff('latch'); setLatchDeg(-1); setLatchTy(null); chOwner=null; S.inert=true;   // тот же аккорд → выключаем, рука инертна
             }else{
-              if(latchDeg<0)WchOn('latch',S.deg,S.oct,S.vol,chIdx);   // тишина → новый аккорд с атакой
-              else WchSet('latch',S.deg,S.oct,S.vol);                 // другая ступень → глиссандо без переатаки
-              setLatchDeg(S.deg); chOwner=key;                        // рулит последний щипнувший
+              /* Переатака нужна, когда МЕНЯЕТСЯ ЧИСЛО НОТ: chordGlide ведёт только уже
+                 звучащие голоса, и 4-я нота (maj7 из трезвучия) молча не зазвучала бы
+                 до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
+              if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,S.oct,S.vol,chIdx,ty);
+              else WchSet('latch',S.deg,S.oct,S.vol,ty);              // та же плотность → глиссандо без переатаки
+              latchLen=ty?ty.length:0;
+              setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;        // рулит последний щипнувший
             }
           }else if(chOwner===key&&latchDeg>=0){
-            WchSet('latch',S.deg,S.oct,S.vol); setLatchDeg(S.deg);  // ведение: Y=ступень (глиссандо), X=громкость
+            if(ty&&ty.length!==latchLen){ WchOn('latch',S.deg,S.oct,S.vol,chIdx,ty); latchLen=ty.length; }
+            else WchSet('latch',S.deg,S.oct,S.vol,ty);   // ведение: Y=ступень, X=сектор типа (или громкость вне typedChords)
+            setLatchDeg(S.deg); setLatchTy(ty);          // тип ведём вместе со ступенью — иначе сравнение протухнет
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }

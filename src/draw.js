@@ -1,12 +1,17 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords } from './scales.js';
-import { fx, revDisp, latchDeg, uiMode, phoneInstr } from './state.js';
-import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_STRIP_H, INSTR_COL } from './config.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, CHORD_FAMS, rootName } from './scales.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, uiMode, phoneInstr } from './state.js';
+import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL } from './config.js';
 import { DRUM_NAMES } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
  
+/* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
+   ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
+const FX_X0=6, FX_N=1+FX_META.length;                       // REV + эффекты
+const FX_BAND_R=FX_X0+(FX_N-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W;
+
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
 const statusEl=document.getElementById('status');
 
@@ -41,7 +46,9 @@ function drawBar(x,w,yTop,yBot,val,color,label,active){
   ctx.fillText(label,x+w/2,yBot+15);
   if(active)ctx.fillText(Math.round(val*100)+'%',x+w/2,yTop-8);
 }
-function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height){
+/* labelX — где писать подписи ступеней. По умолчанию у левого края зоны; у соло в
+   phone сдвигаем правее, чтобы столбики эффектов слева не легли поверх подписей. */
+function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height,labelX=zx0+7){
   const s=CUR(), ivx=IVX(), rows=ivx.length, seg=gridH/rows;
   if(activeDeg>=0){
     ctx.fillStyle=hexA(accent,.26);
@@ -55,7 +62,7 @@ function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height){
     ctx.beginPath(); ctx.moveTo(zx0,y); ctx.lineTo(zx1,y); ctx.stroke();
     if(ton||deg%every===0){
       ctx.fillStyle=ton?'#57d9a3':'rgba(255,255,255,.55)';
-      ctx.fillText(labelOf(deg),zx0+7,y+seg/2);
+      ctx.fillText(labelOf(deg),labelX,y+seg/2);
     }
   }
 }
@@ -285,7 +292,10 @@ function drawStatus(){
 function drawPhone(res){
   const W=canvas.width, H=canvas.height;
   const instr=phoneInstr, accent=INSTR_COL[instr];
-  const playH= instr==='ld' ? Math.max(1,H-FX_STRIP_H) : H;   // полоса эффектов только у соло — прочие инструменты играют во всю высоту
+  /* Сетка снова во ВСЮ высоту: нижней полосы эффектов больше нет, столбики лежат
+     поверх слева. Та же высота используется в gestures (degHyst) — не расходиться! */
+  const playH=H;
+  const labelX= instr==='ld' ? FX_BAND_R+8 : 7;   // у соло подписи правее столбиков эффектов
   if(instr==='dr'){
     drawDrumGrid(W,playH);
   }else{
@@ -294,12 +304,20 @@ function drawPhone(res){
     if(instr==='ch')act=latchDeg>=0?latchDeg:loopChordDeg();   // рука в приоритете, иначе аккорд петли (§Q5)
     else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
     if(instr==='ch'&&!supportsChords())drawNoChordsHint(0,W,0,playH);   // макам: всё поле роли — объяснение
-    else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH);
+    else{
+      /* У типизированных аккордов ряд подписываем именем КОРНЯ (C, C#…): тип задаёт
+         сектор, а не лад, поэтому обычный chordLabel (он дал бы пауэр-аккорд «C5») врёт. */
+      const chTyped = instr==='ch' && typedChords();
+      /* У типизированных подсветку ряда ГАСИМ (act=-1): её несёт подсветка сектора,
+         иначе полоса во всю ширину противоречила бы точечной. */
+      drawGrid(0,W,accent, instr==='ch'?(chTyped?rootName:chordLabel):rowLabel, chTyped?-1:act, playH, labelX);
+      if(chTyped)drawChordSectors(W,playH);        // карта секторов + подсветка активного
+    }
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn
      в верхней панели (дубль одной и той же информации в двух местах не нужен). */
   drawHandsPhone(res,W,H,playH);
-  if(instr==='ld')drawFxStrip(W,H,playH);   // эффекты действуют только на соло-канал
+  if(instr==='ld')drawFxBars(W,H);          // эффекты действуют только на соло-канал
   drawLooper();
   drawStatus();
 }
@@ -333,6 +351,7 @@ function drawHandsPhone(res,W,H,playH){
     }
     // рука нот
     if(isCh&&!supportsChords())continue;         // макам: аккордов нет — ни круга, ни ярлыка, ни подсказки
+    if(isCh&&typedChords()&&handRole(k)==='fx')continue;   // рука-семейство нот не играет — не рисуем ей подсказку ряда
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
@@ -345,34 +364,86 @@ function drawHandsPhone(res,W,H,playH){
         drawTag(S.x,S.y,[L1,L2],accent);
       }else if(isDr){
         drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
+      }else if(typedChords()){                   // тип задаёт сектор — chordLabel дал бы «C5», это враньё
+        const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0];
+        const ty=fam.types[Math.min(S.sect==null?0:S.sect,fam.types.length-1)];
+        drawTag(S.x,S.y,[rootName(S.deg)+ty.label,`${fam.name} · окт ${OCT_ROMAN[S.oct]}`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
     }else if(!S.pinch){                          // подсказка до щипка — ряд под указательным на всю ширину
       const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
       const rows=isDr?DRUM_NAMES.length:IVX().length, d=degRaw(Math.min(y,playH-1),rows,playH), seg=playH/rows;
       ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(0,(rows-1-d)*seg,W,seg);
       ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-      ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?chordLabel(d):rowLabel(d)),x+14,y-12);
+      ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):rowLabel(d)),x+14,y-12);
     }
   }
 }
 /* Компактная полоса эффектов снизу: REV (глубина соло-руки) + 4 эффекта. */
-function drawFxStrip(W,H,playH){
+/* Эффекты соло: тонкие вертикальные столбики СЛЕВА, поверх сетки — поле под ними
+   играбельно. Высота = величина эффекта, но с потолком FX_BAR_MAX: короткие и
+   неброские, а не во весь экран. Проценты у пальца рисует drawHandsPhone — здесь
+   только полоски. Полупрозрачны, пока эффект не крутят. */
+/* Типизированные аккорды (Хроматика): ряд корня делится на вертикальные СЕКТОРЫ —
+   по одному на вариант семейства. Активный сектор подсвечен, каждый подписан готовым
+   именем аккорда (C · Cmaj7 · C7). Плюс индикатор семейства: оно ЛИПКОЕ, поэтому
+   должно быть видно, что сейчас выбрано, даже когда левой руки нет в кадре. */
+const SECT_LABEL_MIN_ROW=44;   // ниже этой высоты ряда подписи карты не влезают — рисуем только разделители
+function drawChordSectors(W,H){
+  const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0], nS=fam.types.length;
+  const rows=IVX().length, seg=H/rows, sw=W/nS;
+
+  /* КАРТА: все ряды сразу разбиты на секторы и подписаны — пользователь видит,
+     что где лежит, ДО касания. 12 рядов × 3 сектора: по ширине просторно
+     (~127px на сектор), тесно по высоте — поэтому на низких рядах (альбомная
+     ориентация) подписи снимаем и оставляем только разделители: читаемо или никак. */
+  const withLabels = seg>=SECT_LABEL_MIN_ROW;
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='10px system-ui';
+  ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=1;
+  for(let r=0;r<rows;r++){
+    const y=r*seg, d=rows-1-r;
+    for(let i=1;i<nS;i++){                       // разделители секторов внутри ряда
+      const x=i*sw; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+seg); ctx.stroke();
+    }
+    if(!withLabels)continue;
+    ctx.fillStyle='rgba(255,255,255,.38)';
+    for(let i=0;i<nS;i++)ctx.fillText(rootName(d)+fam.types[i].label, i*sw+sw/2, y+seg/2);
+  }
+
+  /* АКТИВНЫЙ сектор: рука в приоритете, иначе — защёлкнутый (deg+ty), чтобы после
+     отпускания было видно, что именно звучит. Подсветка на СЕКТОР, не на весь ряд. */
+  let deg=-1, sect=-1;
+  for(const k in HANDS){ const S=HANDS[k];
+    if(S.zone==='ch'&&S.pinch&&!S.inert&&S.deg>=0){ deg=S.deg; sect=S.sect==null?-1:S.sect; } }
+  if(deg<0&&latchDeg>=0){ deg=latchDeg; sect=fam.types.findIndex(t=>t.iv===latchTy); }
+  if(deg>=0&&sect>=0){
+    const y=(rows-1-deg)*seg, x=sect*sw;
+    ctx.fillStyle=hexA(INSTR_COL.ch,.30); ctx.fillRect(x,y,sw,seg);
+    ctx.strokeStyle=INSTR_COL.ch; ctx.lineWidth=2; ctx.strokeRect(x+1,y+1,sw-2,seg-2);
+    ctx.fillStyle='#fff'; ctx.font='700 15px system-ui';
+    ctx.fillText(rootName(deg)+fam.types[sect].label, x+sw/2, y+seg/2);
+  }
+
+  // индикатор семейства — всегда, даже когда левой руки нет в кадре (оно липкое)
+  ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
+  ctx.fillText(`Семейство: ${fam.name}  (${fam.finger===0?'указательный':'средний'})`, 12, 22);
+  ctx.textBaseline='alphabetic';
+}
+function drawFxBars(W,H){
   const items=[{v:revDisp,c:REV_COLOR,l:'REV',fxk:null},
     ...FX_META.map(m=>({v:fx[m.k],c:m.color,l:m.label,fxk:m.k}))];
-  const n=items.length, m=8, gap=6, bw=(W-2*m-(n-1)*gap)/n;
-  const yLabel=playH+11, y0=playH+15, y1=H-7;
-  ctx.fillStyle='rgba(10,10,20,.55)'; ctx.fillRect(0,playH,W,H-playH);
-  ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.moveTo(0,playH+.5); ctx.lineTo(W,playH+.5); ctx.stroke();
+  const y1=H-40, y0=y1-FX_BAR_MAX;                // низ слева: выше строки статуса, ниже коробки лупера
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
   items.forEach((it,i)=>{
-    const x=m+i*(bw+gap);
+    const x=FX_X0+i*(FX_BAR_W+FX_BAR_GAP);
     let actv=false; for(const k in HANDS){ const S=HANDS[k];
       if(it.fxk&&S.pinch&&S.zone==='fx'&&S.adj&&S.adj.k===it.fxk)actv=true; }
-    ctx.fillStyle='rgba(255,255,255,.10)'; ctx.fillRect(x,y0,bw,y1-y0);
-    const fh=(y1-y0)*Math.max(0,Math.min(1,it.v));
-    ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.55; ctx.fillRect(x,y1-fh,bw,fh); ctx.globalAlpha=1;
-    if(actv){ ctx.strokeStyle=it.c; ctx.lineWidth=2; ctx.strokeRect(x-1,y0-1,bw+2,(y1-y0)+2); }
-    ctx.fillStyle=actv?it.c:'rgba(255,255,255,.7)'; ctx.font='9px system-ui'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
-    ctx.fillText(it.l,x+bw/2,yLabel);
+    ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
+    const fh=FX_BAR_MAX*Math.max(0,Math.min(1,it.v));
+    ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.5;
+    ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;                                // заполнение снизу вверх
+    if(actv){ ctx.strokeStyle=it.c; ctx.lineWidth=1.5; ctx.strokeRect(x-1.5,y0-1.5,FX_BAR_W+3,FX_BAR_MAX+3); }
+    ctx.fillStyle=actv?it.c:'rgba(255,255,255,.5)';
+    ctx.fillText(it.l,x+FX_BAR_W/2,y0-5);
   });
 }
  

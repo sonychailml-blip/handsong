@@ -1,6 +1,6 @@
 import { AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff } from './audio.js';
-import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg } from './state.js';
+import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
@@ -58,8 +58,8 @@ const ENG={
               noteOn(); },
   leadSet:(a,ctx)=>applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
-  chOn:(a,ctx)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol,a.inst),
-  chSet:(a,ctx)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh),a.vol),
+  chOn:(a,ctx)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst),
+  chSet:(a,ctx)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol),
   chOff:(a,ctx)=>chordOff(chOwnerKey(ctx)),
   bassOn:(a,ctx)=>bassOn(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst),
   bassSet:(a,ctx)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol),
@@ -91,13 +91,17 @@ function recLeadEv(p){
   recLead={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst};
 }
 function recLeadOff(){ if(recording&&recLead){ push('leadOff',{}); recLead=null; } }
-function recChOn(a){ if(!recording)return; push('chOn',{...a}); recCh={deg:a.deg,oct:a.oct,vol:a.vol}; }
+/* ty входит в сравнение: у типизированных аккордов громкость ФИКСИРОВАНА, а сектор
+   меняется без смены ступени/октавы — без этой проверки смена типа не попала бы в
+   запись вовсе, и петля играла бы не тот аккорд. Сравнение по ссылке корректно:
+   ty — это всегда один и тот же массив из таблицы CHORD_FAMS. */
+function recChOn(a){ if(!recording)return; push('chOn',{...a}); recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty}; }
 function recChSet(a){
   if(!recording)return;
   if(!recCh){ push('chOn',{...a}); }
-  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS){ push('chSet',{...a}); }
+  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS){ push('chSet',{...a}); }
   else return;
-  recCh={deg:a.deg,oct:a.oct,vol:a.vol};
+  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty};
 }
 function recChOff(){ if(recording&&recCh){ push('chOff',{}); recCh=null; } }
 function recBassEv(p){                                  // бас прореживается как соло
@@ -114,8 +118,11 @@ function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — од�
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
 const WleadOn =p=>{ ENG.leadOn(p); recLeadEv(p); };
 const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
-const WchOn =(_o,deg,oct,vol,ins)=>{ const a={deg,oct,vol,inst:ins}; ENG.chOn(a); recChOn(a); };
-const WchSet=(_o,deg,oct,vol)   =>{ const a={deg,oct,vol};          ENG.chSet(a); recChSet(a); };
+/* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
+   тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
+   Так он замораживается в событии сам собой и переигрывается как сыгран. */
+const WchOn =(_o,deg,oct,vol,ins,ty)=>{ const a={deg,oct,vol,inst:ins,ty}; ENG.chOn(a); recChOn(a); };
+const WchSet=(_o,deg,oct,vol,ty)    =>{ const a={deg,oct,vol,ty};          ENG.chSet(a); recChSet(a); };
 const WchOff=_o                 =>{ ENG.chOff(); recChOff(); };
 const WbassOn =p=>{ ENG.bassOn(p); recBassEv(p); };
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
@@ -124,7 +131,8 @@ const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDr
 function softAllOff(){ if(!AC)return; noteOff();
   Object.keys(chordHold).forEach(k=>chordOff(k));   // все владельцы аккордов: 'latch' + 'loop:N'
   Object.keys(bassHold).forEach(k=>bassOff(k));     // все владельцы баса: 'bass' + 'bassloop:N'
-  setLatchDeg(-1); recLead=null; recCh=null; recBass=null; }
+  setLatchDeg(-1); setLatchTy(null);              // тип гасим вместе со ступенью: иначе после паники/очистки
+  recLead=null; recCh=null; recBass=null; }       // следующий щипок той же ступени прочёлся бы как «тот же аккорд»
 function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 
 /* --- Транспорт петли --- */

@@ -4,6 +4,16 @@ export let seventh=false, leadIdx=0, chIdx=0, bassIdx=0, drumKitIdx=0;
 export const fx={dly:0.25, vib:0.20, drv:0.12, trm:0.0};
 export let revDisp=0;                            // отображение Z-реверба соло-руки
 export let latchDeg=-1;                          // защёлкнутая ступень аккорда, -1 = тишина
+/* Семейство типизированного аккорда (Хроматика): 0 — мажор, 1 — минор. ЛИПКОЕ:
+   ставится пальцем левой руки и держится, пока не сменят. По умолчанию мажор, поэтому
+   правой руке всегда есть что играть — даже если левой в кадре не было. */
+export let chordFam=0;
+/* Тип защёлкнутого аккорда (массив интервалов из CHORD_FAMS) или null. КОМПАНЬОН к
+   latchDeg, а не замена: latchDeg>=0 используется как проверка «звучит ли» в четырёх
+   местах — объект вместо числа сломал бы их молча. В typedChords ладу тождество
+   защёлки = (ступень + тип), иначе C и C7 — «одна и та же» и переключение читается
+   как выключение. Сравнение по ссылке точное: ty всегда из таблицы CHORD_FAMS. */
+export let latchTy=null;
 
 /* Режим управления. 'pc' — три колонки, любая рука играет любую зону (как раньше).
    'phone' — вертикальный: один инструмент на весь экран (phoneInstr), правая рука
@@ -22,6 +32,8 @@ export const setBassIdx=v=>{ bassIdx=v; };
 export const setDrumKitIdx=v=>{ drumKitIdx=v; };
 export const setRevDisp=v=>{ revDisp=v; };
 export const setLatchDeg=v=>{ latchDeg=v; };
+export const setChordFam=v=>{ chordFam=v; };
+export const setLatchTy=v=>{ latchTy=v; };
 export const setUiMode=v=>{ uiMode=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };

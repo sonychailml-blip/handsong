@@ -5,31 +5,51 @@ export const ROMAN=['I','II','III','IV','V','VI','VII'];
 export const OCT_ROMAN=['I','II','III','IV'];
 export const range=n=>Array.from({length:n},(_,i)=>i);
 
-/* Каждый лад: edo — на сколько равных шагов делится октава,
-   iv — ступени лада в этих шагах, tag — семейство (для аккордов и Smart Match). */
-export const SCALES=[
- {name:'Мажор (ионийский)',            grp:'12-TET · диатоника',        edo:12, iv:[0,2,4,5,7,9,11], tag:'dia'},
- {name:'Минор натуральный (эолийский)',grp:'12-TET · диатоника',        edo:12, iv:[0,2,3,5,7,8,10], tag:'dia'},
- {name:'Гармонический минор',          grp:'12-TET · диатоника',        edo:12, iv:[0,2,3,5,7,8,11], tag:'dia'},
- {name:'Мелодический минор',           grp:'12-TET · диатоника',        edo:12, iv:[0,2,3,5,7,9,11], tag:'dia'},
- {name:'Дорийский',                    grp:'12-TET · лады (моды)',      edo:12, iv:[0,2,3,5,7,9,10], tag:'dia'},
- {name:'Фригийский',                   grp:'12-TET · лады (моды)',      edo:12, iv:[0,1,3,5,7,8,10], tag:'dia'},
- {name:'Лидийский',                    grp:'12-TET · лады (моды)',      edo:12, iv:[0,2,4,6,7,9,11], tag:'dia'},
- {name:'Миксолидийский',               grp:'12-TET · лады (моды)',      edo:12, iv:[0,2,4,5,7,9,10], tag:'dia'},
- {name:'Локрийский',                   grp:'12-TET · лады (моды)',      edo:12, iv:[0,1,3,5,6,8,10], tag:'dia'},
- {name:'Венгерский минор',             grp:'12-TET · этнические',       edo:12, iv:[0,2,3,6,7,8,11], tag:'ethnic'},
- {name:'Мажорная пентатоника',         grp:'12-TET · пентатоника/блюз', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
- {name:'Минорная пентатоника',         grp:'12-TET · пентатоника/блюз', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
- {name:'Блюз (с ♭5)',                  grp:'12-TET · пентатоника/блюз', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
- {name:'Хроматика (12 нот)',           grp:'12-TET · пентатоника/блюз', edo:12, iv:range(12),        tag:'chrom'},
- {name:'Макам Раст (¼-тоны)',          grp:'Микротоника',               edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam', noChords:true},
- {name:'Макам Баяти (¼-тоны)',         grp:'Микротоника',               edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam', noChords:true},
- {name:'19-TET — весь строй',          grp:'Микротоника',               edo:19, iv:range(19),        tag:'edo',
-   chord:[1, 6/5, 3/2], chord7:[1, 6/5, 3/2, 9/5]},   // мин.терция 5ш (+0.2¢), кв.11, мал.7 16ш (−7¢)
- {name:'31-TET — весь строй',          grp:'Микротоника',               edo:31, iv:range(31),        tag:'edo',
-   chord:[1, 5/4, 3/2], chord7:[1, 5/4, 3/2, 7/4]},   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
-
+/* ТРАДИЦИИ (ось 1 UI-MAP) — «в каком музыкальном мире я». Меню строя выбирает традицию,
+   меню лада показывает только её лады. Список ведёт порядок традиций в UI. */
+export const TRADITIONS=[
+  {id:'modal', name:'Ладовая (12-TET)'},
+  {id:'arab',  name:'Арабская (24-TET)'},
+  {id:'micro', name:'Микротональная'},
+  {id:'chrom', name:'Хроматика'},
 ];
+
+/* Каждый лад: edo — на сколько равных шагов делится октава, iv — ступени лада в этих
+   шагах, tag — семейство (для аккордов), trad — традиция (меню строя), grp — подгруппа
+   внутри традиции (пусто = без подзаголовка).
+   ПОРЯДОК МАССИВА НЕ МЕНЯТЬ и новые лады добавлять В КОНЕЦ: индекс — это scaleIdx,
+   на него смотрят state и sameDegrees. Меню фильтрует по trad, а не по порядку. */
+export const SCALES=[
+ {name:'Мажор (ионийский)',            trad:'modal', grp:'Диатоника',          edo:12, iv:[0,2,4,5,7,9,11], tag:'dia'},
+ {name:'Минор натуральный (эолийский)',trad:'modal', grp:'Диатоника',          edo:12, iv:[0,2,3,5,7,8,10], tag:'dia'},
+ {name:'Гармонический минор',          trad:'modal', grp:'Диатоника',          edo:12, iv:[0,2,3,5,7,8,11], tag:'dia'},
+ {name:'Мелодический минор',           trad:'modal', grp:'Диатоника',          edo:12, iv:[0,2,3,5,7,9,11], tag:'dia'},
+ {name:'Дорийский',                    trad:'modal', grp:'Лады (моды)',        edo:12, iv:[0,2,3,5,7,9,10], tag:'dia'},
+ {name:'Фригийский',                   trad:'modal', grp:'Лады (моды)',        edo:12, iv:[0,1,3,5,7,8,10], tag:'dia'},
+ {name:'Лидийский',                    trad:'modal', grp:'Лады (моды)',        edo:12, iv:[0,2,4,6,7,9,11], tag:'dia'},
+ {name:'Миксолидийский',               trad:'modal', grp:'Лады (моды)',        edo:12, iv:[0,2,4,5,7,9,10], tag:'dia'},
+ {name:'Локрийский',                   trad:'modal', grp:'Лады (моды)',        edo:12, iv:[0,1,3,5,6,8,10], tag:'dia'},
+ {name:'Венгерский минор',             trad:'modal', grp:'Этнические',         edo:12, iv:[0,2,3,6,7,8,11], tag:'ethnic'},
+ {name:'Мажорная пентатоника',         trad:'modal', grp:'Пентатоника / блюз', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
+ {name:'Минорная пентатоника',         trad:'modal', grp:'Пентатоника / блюз', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
+ {name:'Блюз (с ♭5)',                  trad:'modal', grp:'Пентатоника / блюз', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
+ {name:'Хроматика (12 нот)',           trad:'chrom', grp:'',                   edo:12, iv:range(12),        tag:'chrom', typedChords:true},
+ {name:'Макам Раст (¼-тоны)',          trad:'arab',  grp:'',                   edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam', noChords:true},
+ {name:'Макам Баяти (¼-тоны)',         trad:'arab',  grp:'',                   edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam', noChords:true},
+ {name:'19-TET — весь строй',          trad:'micro', grp:'',                   edo:19, iv:range(19),        tag:'edo',
+   chord:[1, 6/5, 3/2], chord7:[1, 6/5, 3/2, 9/5]},   // мин.терция 5ш (+0.2¢), кв.11, мал.7 16ш (−7¢)
+ {name:'31-TET — весь строй',          trad:'micro', grp:'',                   edo:31, iv:range(31),        tag:'edo',
+   chord:[1, 5/4, 3/2], chord7:[1, 5/4, 3/2, 7/4]},   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
+ /* Хиджаз: джинс Хиджаз (0-1-4-5 полутонов, характерная увеличенная секунда 2→8
+    в четвертях) + джинс Нахаванд сверху. Четвертитонов НЕ содержит — отсюда имя без
+    пометки «¼-тоны», хотя традиция та же, 24-TET. Добавлен В КОНЕЦ: индексы не поехали. */
+ {name:'Макам Хиджаз',                 trad:'arab',  grp:'',                   edo:24, iv:[0,2,8,10,14,16,20], tag:'maqam', noChords:true},
+];
+
+/* Лады традиции — в порядке массива; отдаём вместе с АБСОЛЮТНЫМ индексом,
+   потому что value у <option> обязан остаться scaleIdx. */
+export const scalesOfTrad=id=>SCALES.map((s,i)=>({i,s})).filter(x=>x.s.trad===id);
+export const tradOfScale=i=>SCALES[i].trad;
 
 export const CUR=()=>SCALES[scaleIdx];
 export const IVX=()=>CUR().iv.concat([CUR().edo]);          // + верхняя тоника
@@ -45,6 +65,27 @@ export const supportsProgressions=(s=CUR())=>s.iv.length===7;
    переживёт перегруппировку ладов по традициям. Гейт ТОЛЬКО живого ввода — переигровка
    слоёв идёт по замороженному sc и обязана звучать как записана (полимодальность). */
 export const supportsChords=(s=CUR())=>!s.noChords;
+/* Типизированные аккорды (UI-MAP «Хроматика»): аккорд задаётся не ступенью лада, а
+   СЕМЕЙСТВОМ (палец левой руки) + ВАРИАНТОМ (сектор по X). Шаг 1 — только мажор/минор.
+   Тип попадает в событие данными (a.ty = массив интервалов), поэтому ПК и переигровка
+   старых петель, где ty нет, идут прежним путём. */
+export const typedChords=(s=CUR())=>!!s.typedChords;
+/* Интервалы в ПОЛУТОНАХ от корня. Для 12-TET шаг EDO == полутон, поэтому кладутся
+   напрямую; для 19/31-TET понадобится пересчёт — это следующий шаг, не сейчас. */
+export const CHORD_FAMS=[
+  {id:'maj', name:'Мажор', finger:0, types:[      // палец: указательный
+    {label:'',     iv:[0,4,7]},
+    {label:'maj7', iv:[0,4,7,11]},
+    {label:'7',    iv:[0,4,7,10]},
+  ]},
+  {id:'min', name:'Минор', finger:1, types:[      // палец: средний
+    {label:'m',    iv:[0,3,7]},
+    {label:'m7',   iv:[0,3,7,10]},
+  ]},
+];
+/* Имя корня для подписи типизированного аккорда (тип дописывает вызывающий). */
+export const rootName=deg=>{ const s=CUR(), n=s.iv.length, d=((deg%n)+n)%n;
+  return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
 
 /* ================= ТЕОРИЯ: СТУПЕНИ, АККОРДЫ, ИМЕНА =================
    МИКРОТОНАЛЬНАЯ ФОРМУЛА: любая ступень n любого строя из N шагов:
@@ -63,8 +104,12 @@ const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближ
      получаются открытые микротональные аккорды без диссонирующих кластеров. */
 /* s (лад) и sev (септаккорд?) — параметры со значениями по умолчанию из живого состояния:
    петля передаёт СВОЙ замороженный лад/септаккорд (§3.4), живой ввод — берёт текущие. */
-export function chordSteps(deg, s=CUR(), sev=seventh){
+export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
   const n=s.iv.length;
+  if (ty){                                   // типизированный аккорд: интервалы от корня, лад не диктует
+    const r=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+    return ty.map(iv=>r+iv);
+  }
   if (isTert(s)){
     const ks=sev?[0,2,4,6]:[0,2,4];
     return ks.map(k=>{const j=deg+k; return s.iv[j%n]+s.edo*Math.floor(j/n);});
@@ -87,8 +132,8 @@ export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=
 export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length; // бас на 2 октавы ниже соло (baseF/4)
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
   return baseF()/4*Math.pow(2,o)*Math.pow(2,ivx[i]/s.edo); }
-export function chordFreqs(deg,oct, s=CUR(), sev=seventh){ // база аккордов на октаву ниже соло
-  return chordSteps(deg,s,sev).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
+export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
+  return chordSteps(deg,s,sev,ty).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
