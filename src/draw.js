@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, CHORD_FAMS, rootName } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName } from './scales.js';
 import { fx, revDisp, latchDeg, latchTy, chordFam, uiMode, phoneInstr } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL } from './config.js';
 import { DRUM_NAMES } from './audio.js';
@@ -365,9 +365,10 @@ function drawHandsPhone(res,W,H,playH){
       }else if(isDr){
         drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
       }else if(typedChords()){                   // тип задаёт сектор — chordLabel дал бы «C5», это враньё
-        const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0];
+        const FS=chordFams(), fam=FS[chordFam]||FS[0];
         const ty=fam.types[Math.min(S.sect==null?0:S.sect,fam.types.length-1)];
-        drawTag(S.x,S.y,[rootName(S.deg)+ty.label,`${fam.name} · окт ${OCT_ROMAN[S.oct]}`],accent);
+        drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
+          ty.full||fam.name,`окт ${OCT_ROMAN[S.oct]}`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
     }else if(!S.pinch){                          // подсказка до щипка — ряд под указательным на всю ширину
       const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
@@ -383,20 +384,28 @@ function drawHandsPhone(res,W,H,playH){
    играбельно. Высота = величина эффекта, но с потолком FX_BAR_MAX: короткие и
    неброские, а не во весь экран. Проценты у пальца рисует drawHandsPhone — здесь
    только полоски. Полупрозрачны, пока эффект не крутят. */
-/* Типизированные аккорды (Хроматика): ряд корня делится на вертикальные СЕКТОРЫ —
-   по одному на вариант семейства. Активный сектор подсвечен, каждый подписан готовым
-   именем аккорда (C · Cmaj7 · C7). Плюс индикатор семейства: оно ЛИПКОЕ, поэтому
-   должно быть видно, что сейчас выбрано, даже когда левой руки нет в кадре. */
-const SECT_LABEL_MIN_ROW=44;   // ниже этой высоты ряда подписи карты не влезают — рисуем только разделители
-const FINGER_RU=['указательный','средний','безымянный','мизинец'];   // индекс = CHORD_FAMS[].finger
+/* Типизированные аккорды: ряд корня делится на вертикальные СЕКТОРЫ — по одному на
+   вариант семейства. Число секторов берётся из данных (длина types), поэтому 6 узких
+   рисуется тем же кодом, что 3 широких.
+   ПОДПИСИ В ТРИ ЯРУСА — каждый по месту, которое реально есть:
+     1. ШАПКА КОЛОНОК сверху: тип написан ОДИН раз над колонкой, а не в каждом из 12
+        (31) рядов. Сектор→тип одинаков во всех рядах, построчное повторение было
+        избыточным; при 31 ряде (ряд ~25px) это единственное место, где подпись влезает.
+     2. ЯЧЕЙКА: только короткий тег типа. Корень НЕ дублируем — drawGrid уже пишет его
+        слева у каждого ряда, а в 65px (6 секторов) «ст10·дом7» не помещается.
+     3. ВЕРХНЯЯ СТРОКА: семейство + полное имя активного типа с интервалом
+        («Домин.7 · 4:5:6:7») — здесь есть вся ширина канвы, и только здесь такое
+        имя читается целиком. */
+const SECT_LABEL_MIN_ROW=44;   // ниже этой высоты ряда подписи В ЯЧЕЙКАХ не влезают — только разделители
+const SECT_HEAD_H=16;          // высота шапки колонок
+const FINGER_RU=['указательный','средний','безымянный','мизинец'];   // индекс = семейство.finger
 function drawChordSectors(W,H){
-  const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0], nS=fam.types.length;
+  const FS=chordFams(), fam=FS[chordFam]||FS[0], nS=fam.types.length;
   const rows=IVX().length, seg=H/rows, sw=W/nS;
 
-  /* КАРТА: все ряды сразу разбиты на секторы и подписаны — пользователь видит,
-     что где лежит, ДО касания. 12 рядов × 3 сектора: по ширине просторно
-     (~127px на сектор), тесно по высоте — поэтому на низких рядах (альбомная
-     ориентация) подписи снимаем и оставляем только разделители: читаемо или никак. */
+  /* КАРТА: все ряды разбиты на секторы — видно, что где лежит, ДО касания. Подписи в
+     ячейках снимаем на низких рядах (альбомная ориентация, 31-TET): читаемо или никак.
+     Шапка колонок остаётся всегда — она от высоты ряда не зависит. */
   const withLabels = seg>=SECT_LABEL_MIN_ROW;
   ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='10px system-ui';
   ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=1;
@@ -407,7 +416,7 @@ function drawChordSectors(W,H){
     }
     if(!withLabels)continue;
     ctx.fillStyle='rgba(255,255,255,.38)';
-    for(let i=0;i<nS;i++)ctx.fillText(rootName(d)+fam.types[i].label, i*sw+sw/2, y+seg/2);
+    for(let i=0;i<nS;i++)ctx.fillText(fam.types[i].label||'—', i*sw+sw/2, y+seg/2);
   }
 
   /* АКТИВНЫЙ сектор: рука в приоритете, иначе — защёлкнутый (deg+ty), чтобы после
@@ -420,13 +429,26 @@ function drawChordSectors(W,H){
     const y=(rows-1-deg)*seg, x=sect*sw;
     ctx.fillStyle=hexA(INSTR_COL.ch,.30); ctx.fillRect(x,y,sw,seg);
     ctx.strokeStyle=INSTR_COL.ch; ctx.lineWidth=2; ctx.strokeRect(x+1,y+1,sw-2,seg-2);
-    ctx.fillStyle='#fff'; ctx.font='700 15px system-ui';
-    ctx.fillText(rootName(deg)+fam.types[sect].label, x+sw/2, y+seg/2);
+    /* 12px, а не 15: при 6 секторах ячейка ~65px, и 15px тег с корнем вылезал за край. */
+    ctx.fillStyle='#fff'; ctx.font='700 12px system-ui';
+    ctx.fillText(fam.types[sect].label||'—', x+sw/2, y+seg/2);
   }
 
-  // индикатор семейства — всегда, даже когда левой руки нет в кадре (оно липкое)
+  // ЯРУС 1 — шапка колонок: тип один раз сверху, при любом числе рядов
+  ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(0,SECT_HEAD_H,W,SECT_HEAD_H);
+  ctx.font='700 10px system-ui';
+  for(let i=0;i<nS;i++){
+    if(i){ ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.beginPath();
+           ctx.moveTo(i*sw,SECT_HEAD_H); ctx.lineTo(i*sw,SECT_HEAD_H*2); ctx.stroke(); }
+    ctx.fillStyle = i===sect ? '#fff' : hexA(INSTR_COL.ch,.75);
+    ctx.fillText(fam.types[i].label||'—', i*sw+sw/2, SECT_HEAD_H*1.5);
+  }
+
+  /* ЯРУС 3 — семейство (ЛИПКОЕ: видно и когда левой руки нет в кадре) + полное имя
+     активного типа. full есть только там, где короткий тег непонятен (31-TET). */
+  const t=sect>=0?fam.types[sect]:null, fullNm=t&&(t.full||t.label);
   ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
-  ctx.fillText(`Семейство: ${fam.name}  (${FINGER_RU[fam.finger]||'?'})`, 12, 22);
+  ctx.fillText(`${fam.name} (${FINGER_RU[fam.finger]||'?'})`+(fullNm?`  ·  ${fullNm}`:''), 12, 8);
   ctx.textBaseline='alphabetic';
 }
 function drawFxBars(W,H){

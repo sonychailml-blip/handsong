@@ -1,6 +1,6 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, SECT_HYST, TYPED_CH_VOL, WATCHDOG_MS } from './config.js';
 import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, uiMode, phoneInstr, swapHands } from './state.js';
-import { IVX, supportsChords, typedChords, CHORD_FAMS } from './scales.js';
+import { IVX, supportsChords, typedChords, chordFams } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
@@ -158,7 +158,7 @@ function processHands(res){
            с 'fx', ДО общего блока — поэтому не считает ни ступень, ни громкость, не берёт
            chOwner и не доходит до защёлки. Липкое: держится и после отпускания, и когда
            руки нет в кадре. Палец вне таблицы (безым./мизинец) — семейство не трогаем. */
-        const f=CHORD_FAMS.findIndex(F=>F.finger===S.oct);
+        const f=chordFams().findIndex(F=>F.finger===S.oct);
         if(f>=0&&f!==chordFam)setChordFam(f);
       }else{
         const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length, phone=uiMode==='phone';
@@ -168,7 +168,7 @@ function processHands(res){
         /* Типизированный аккорд: X — это СЕКТОР (вариант типа), а не громкость. */
         let ty=null;
         if(S.zone==='ch'&&typedChords()){
-          const fam=CHORD_FAMS[chordFam]||CHORD_FAMS[0], nS=fam.types.length;
+          const FS=chordFams(), fam=FS[chordFam]||FS[0], nS=fam.types.length;
           const prev=(S.sect==null)?-1:Math.min(S.sect,nS-1);   // семейство могло сузиться (4→3): сектор мог остаться вне таблицы
           S.sect=sectHyst(x,nS,W,prev);
           ty=fam.types[S.sect].iv;
