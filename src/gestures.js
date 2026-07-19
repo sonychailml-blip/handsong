@@ -1,11 +1,13 @@
-import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, SECT_HYST, TYPED_CH_VOL, WATCHDOG_MS } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, uiMode, phoneInstr, swapHands } from './state.js';
+import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
+         CH_PAL_W, CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y } from './config.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
  
 const clamp01=v=>Math.max(0,Math.min(1,v));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
  
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 /* Расстояние «большой палец → кончик» нормируется на размер ладони
@@ -62,16 +64,27 @@ function degHyst(y,rows,H,prev){
   }
   return Math.min(d,rows-1);
 }
-/* Гистерезис сектора типа по X — тот же приём, что degHyst по Y: соседний сектор
-   берём, только если палец ушёл от границы дальше SECT_HYST ширины сектора.
-   Без него на 2-3 узких секторах тип дребезжал бы от дрожания руки. */
-function sectHyst(x,n,W,prev){
-  const seg=W/n; let d=Math.floor(x/seg); if(d<0)d=0; if(d>n-1)d=n-1;
+/* Гистерезис ОДНОЙ оси — общий движок для колонок и рядов палитры: соседнюю ячейку
+   берём, только если палец ушёл от границы дальше hyst её размера. Тот же приём, что
+   degHyst по Y; без него на узких ячейках выбор дребезжал бы от дрожания руки. */
+function axHyst(v,a0,a1,n,prev,hyst){
+  const seg=(a1-a0)/n; let d=Math.floor((v-a0)/seg); if(d<0)d=0; if(d>n-1)d=n-1;
   if(prev>=0&&prev<=n-1&&Math.abs(d-prev)===1){
-    const b=Math.max(d,prev)*seg;
-    if(Math.abs(x-b)<seg*SECT_HYST)return prev;
+    const b=a0+Math.max(d,prev)*seg;
+    if(Math.abs(v-b)<seg*hyst)return prev;
   }
   return d;
+}
+/* Попадание в ячейку палитры: ДВЕ независимые одномерные проверки. Сначала X даёт
+   колонку (семейство), и только потом её types.length задаёт число рядов для Y —
+   порядок важен, наборы могут быть рваными. prev-состояние живёт на РУКЕ (S.pc/S.pr),
+   а не в глобальном стейте: новый щипок начинает с чистого листа, а залипшая ячейка
+   при этом остаётся выбранной. */
+function cellHyst(x,y,x0,x1,y0,y1,fams,prevC,prevR){
+  const c=axHyst(x,x0,x1,fams.length,prevC,PAL_HYST_X);
+  const nR=fams[c].types.length;
+  const r=axHyst(y,y0,y1,nR,(prevR>=0&&prevR<nR)?prevR:-1,PAL_HYST_Y);
+  return [c,r];
 }
 function endPinch(key,S){
   if(S.pinch){
@@ -104,6 +117,7 @@ function processHands(res){
          щипка и не меняется до отпускания — двигая руку по X ради
          громкости, нельзя случайно перескочить в соседнюю колонку. */
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
+      S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       if(uiMode==='phone'){
         /* Рука-«не-нотная» (handRole==='fx', по умолчанию ЛЕВАЯ) получает особую роль
            только там, где она есть: эффекты у соло, выбор семейства у типизированных
@@ -154,25 +168,41 @@ function processHands(res){
            высоты экрана; значение остаётся после отпускания (латч). */
         if(S.adj)fx[S.adj.k]=clamp01(S.adj.base+(S.adj.y0-lm[4].y*H)/(H*0.7));
       }else if(S.zone==='chFam'){
-        /* Рука-семейство: ТОЛЬКО выбирает семейство пальцем и молчит. Ветка стоит рядом
-           с 'fx', ДО общего блока — поэтому не считает ни ступень, ни громкость, не берёт
-           chOwner и не доходит до защёлки. Липкое: держится и после отпускания, и когда
-           руки нет в кадре. Палец вне таблицы (безым./мизинец) — семейство не трогаем. */
-        const f=chordFams().findIndex(F=>F.finger===S.oct);
-        if(f>=0&&f!==chordFam)setChordFam(f);
+        /* Рука-ПАЛИТРА: ТОЛЬКО выбирает ячейку (семейство+вариант) ПОЛОЖЕНИЕМ и молчит.
+           Ветка стоит рядом с 'fx', ДО общего блока — поэтому не считает ни ступень, ни
+           громкость, не берёт chOwner и не доходит до защёлки: левая рука нот не играет.
+           Два гейта, оба оставляют выбор ЛИПКИМ (ничего не трогаем):
+             1. только большой+УКАЗАТЕЛЬНЫЙ (S.oct===0) — щипок средним/безымянным/мизинцем
+                на этой руке ничего не выбирает: палец здесь смысла не несёт, а случайный
+                щипок не должен сбивать заготовленную форму;
+             2. только внутри палитры (S.x < SPLIT) — рука, ушедшая в зону нот, молчит.
+           Ведение непрерывное, пока щипок держат: можно дотянуть до соседней ячейки. */
+        const SPLIT=CH_PAL_W*W;
+        if(S.oct===0 && S.x<SPLIT){
+          const x0=CH_PAL_PAD, x1=SPLIT-CH_PAL_PAD, y0=CH_PAL_HEAD_H, y1=H-CH_PAL_HEAD_H;
+          const [c,r]=cellHyst(clamp(S.x,x0,x1),clamp(S.y,y0,y1),x0,x1,y0,y1,chordFams(),
+                               S.pc==null?-1:S.pc, S.pr==null?-1:S.pr);
+          S.pc=c; S.pr=r;
+          if(c!==chordFam)setChordFam(c);
+          if(r!==chordVar)setChordVar(r);
+        }
       }else{
         const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length, phone=uiMode==='phone';
         S.deg=degHyst(y,rows,H,S.deg);              // вся высота — ровно так же, как рисует draw
-        const[zx0,zx1]= phone ? [0,W] : zoneX(S.zone,W);   // phone: громкость по всей ширине
+        /* Типизированный аккорд в phone: левые CH_PAL_W заняты палитрой, поэтому громкость
+           мерится по ПРАВОЙ зоне [SPLIT,W] — иначе вся половина экрана читалась бы «тихо».
+           Остальные роли (соло/бас/ударные/обычные аккорды) — по всей ширине, как было. */
+        const typed = S.zone==='ch'&&typedChords();
+        const[zx0,zx1]= !phone ? zoneX(S.zone,W) : (typed ? [CH_PAL_W*W,W] : [0,W]);
         S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
-        /* Типизированный аккорд: X — это СЕКТОР (вариант типа), а не громкость. */
+        /* Тип берётся из ЛИПКОГО выбора палитры (левая рука), а не из положения правой.
+           Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
+           ty===latchTy, и заморозка a.ty в событии лупера. Кламп: у семейств может быть
+           разное число вариантов, и chordVar мог остаться от более длинного. */
         let ty=null;
-        if(S.zone==='ch'&&typedChords()){
-          const FS=chordFams(), fam=FS[chordFam]||FS[0], nS=fam.types.length;
-          const prev=(S.sect==null)?-1:Math.min(S.sect,nS-1);   // семейство могло сузиться (4→3): сектор мог остаться вне таблицы
-          S.sect=sectHyst(x,nS,W,prev);
-          ty=fam.types[S.sect].iv;
-          S.vol=TYPED_CH_VOL;
+        if(typed){
+          const FS=chordFams(), fam=FS[chordFam]||FS[0];
+          ty=fam.types[Math.min(chordVar,fam.types.length-1)].iv;
         }
         if(S.zone==='ld'){
           if(leadOwner===key){

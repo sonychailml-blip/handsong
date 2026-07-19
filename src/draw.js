@@ -1,8 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, uiMode, phoneInstr } from './state.js';
-import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL } from './config.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr } from './state.js';
+import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
+         CH_PAL_W, CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY } from './config.js';
 import { DRUM_NAMES } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
@@ -306,12 +307,17 @@ function drawPhone(res){
     if(instr==='ch'&&!supportsChords())drawNoChordsHint(0,W,0,playH);   // макам: всё поле роли — объяснение
     else{
       /* У типизированных аккордов ряд подписываем именем КОРНЯ (C, C#…): тип задаёт
-         сектор, а не лад, поэтому обычный chordLabel (он дал бы пауэр-аккорд «C5») врёт. */
+         палитра, а не лад, поэтому обычный chordLabel (он дал бы пауэр-аккорд «C5») врёт. */
       const chTyped = instr==='ch' && typedChords();
-      /* У типизированных подсветку ряда ГАСИМ (act=-1): её несёт подсветка сектора,
-         иначе полоса во всю ширину противоречила бы точечной. */
-      drawGrid(0,W,accent, instr==='ch'?(chTyped?rootName:chordLabel):rowLabel, chTyped?-1:act, playH, labelX);
-      if(chTyped)drawChordSectors(W,playH);        // карта секторов + подсветка активного
+      if(chTyped){
+        /* Экран поделён: слева палитра типов, справа ряды нот. Подсветка ряда ВЕРНУЛАСЬ —
+           тип больше не живёт в ряду, конкурировать не с чем. */
+        const SPLIT=CH_PAL_W*W;
+        drawGrid(SPLIT,W,accent,rootName,act,playH,SPLIT+7);
+        drawChordPalette(0,SPLIT,playH);
+        ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель зон
+        ctx.beginPath(); ctx.moveTo(SPLIT,0); ctx.lineTo(SPLIT,playH); ctx.stroke();
+      }else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH, labelX);
     }
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn
@@ -364,16 +370,19 @@ function drawHandsPhone(res,W,H,playH){
         drawTag(S.x,S.y,[L1,L2],accent);
       }else if(isDr){
         drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
-      }else if(typedChords()){                   // тип задаёт сектор — chordLabel дал бы «C5», это враньё
-        const FS=chordFams(), fam=FS[chordFam]||FS[0];
-        const ty=fam.types[Math.min(S.sect==null?0:S.sect,fam.types.length-1)];
+      }else if(typedChords()){                   // тип задаёт палитра — chordLabel дал бы «C5», это враньё
+        const FS=chordFams(), fam=FS[Math.min(chordFam,FS.length-1)]||FS[0];
+        const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
-          ty.full||fam.name,`окт ${OCT_ROMAN[S.oct]}`],accent);
+          ty.full||fam.name,`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
-    }else if(!S.pinch){                          // подсказка до щипка — ряд под указательным на всю ширину
+    }else if(!S.pinch){                          // подсказка до щипка — ряд под указательным
       const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
       const rows=isDr?DRUM_NAMES.length:IVX().length, d=degRaw(Math.min(y,playH-1),rows,playH), seg=playH/rows;
-      ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(0,(rows-1-d)*seg,W,seg);
+      /* У типизированных аккордов ряды живут ТОЛЬКО справа от палитры — рамка на всю
+         ширину легла бы поверх ячеек и врала бы, что там играются ноты. */
+      const hx0 = (isCh&&typedChords()) ? CH_PAL_W*W : 0;
+      ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,(rows-1-d)*seg,W-hx0,seg);
       ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
       ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):rowLabel(d)),x+14,y-12);
     }
@@ -384,72 +393,64 @@ function drawHandsPhone(res,W,H,playH){
    играбельно. Высота = величина эффекта, но с потолком FX_BAR_MAX: короткие и
    неброские, а не во весь экран. Проценты у пальца рисует drawHandsPhone — здесь
    только полоски. Полупрозрачны, пока эффект не крутят. */
-/* Типизированные аккорды: ряд корня делится на вертикальные СЕКТОРЫ — по одному на
-   вариант семейства. Число секторов берётся из данных (длина types), поэтому 6 узких
-   рисуется тем же кодом, что 3 широких.
-   ПОДПИСИ В ТРИ ЯРУСА — каждый по месту, которое реально есть:
-     1. ШАПКА КОЛОНОК сверху: тип написан ОДИН раз над колонкой, а не в каждом из 12
-        (31) рядов. Сектор→тип одинаков во всех рядах, построчное повторение было
-        избыточным; при 31 ряде (ряд ~25px) это единственное место, где подпись влезает.
-     2. ЯЧЕЙКА: только короткий тег типа. Корень НЕ дублируем — drawGrid уже пишет его
-        слева у каждого ряда, а в 65px (6 секторов) «ст10·дом7» не помещается.
-     3. ВЕРХНЯЯ СТРОКА: семейство + полное имя активного типа с интервалом
-        («Домин.7 · 4:5:6:7») — здесь есть вся ширина канвы, и только здесь такое
-        имя читается целиком. */
-const SECT_LABEL_MIN_ROW=44;   // ниже этой высоты ряда подписи В ЯЧЕЙКАХ не влезают — только разделители
-const SECT_HEAD_H=16;          // высота шапки колонок
-const FINGER_RU=['указательный','средний','безымянный','мизинец'];   // индекс = семейство.finger
-function drawChordSectors(W,H){
-  const FS=chordFams(), fam=FS[chordFam]||FS[0], nS=fam.types.length;
-  const rows=IVX().length, seg=H/rows, sw=W/nS;
-
-  /* КАРТА: все ряды разбиты на секторы — видно, что где лежит, ДО касания. Подписи в
-     ячейках снимаем на низких рядах (альбомная ориентация, 31-TET): читаемо или никак.
-     Шапка колонок остаётся всегда — она от высоты ряда не зависит. */
-  const withLabels = seg>=SECT_LABEL_MIN_ROW;
-  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='10px system-ui';
-  ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.lineWidth=1;
-  for(let r=0;r<rows;r++){
-    const y=r*seg, d=rows-1-r;
-    for(let i=1;i<nS;i++){                       // разделители секторов внутри ряда
-      const x=i*sw; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+seg); ctx.stroke();
+/* ПАЛИТРА ТИПОВ (левая половина экрана, телефон вертикально).
+   КОЛОНКА = семейство, РЯД внутри колонки = вариант. Число колонок и число рядов —
+   ИЗ ДАННЫХ (chordFams(), у каждой колонки СВОЯ types.length): наборы могут быть
+   рваными, 4×6 — частный случай. Выбор ЛИПКИЙ, поэтому подсветка ячейки видна и когда
+   руки нет в кадре — человек видит заготовленную форму до касания, как аккорд на грифе.
+   Геометрию берём из palColX/palRowY — теми же функциями считает попадание gestures. */
+function wrapLabel(s,maxW){                       // подпись длиннее ячейки — в две строки по границе слова/слога
+  if(ctx.measureText(s).width<=maxW||s.length<4)return[s];
+  let best=-1;
+  for(let i=1;i<s.length;i++){                    // режем как можно ближе к середине
+    if(best<0||Math.abs(i-s.length/2)<Math.abs(best-s.length/2)){
+      if(ctx.measureText(s.slice(0,i)).width<=maxW&&ctx.measureText(s.slice(i)).width<=maxW)best=i;
     }
-    if(!withLabels)continue;
-    ctx.fillStyle='rgba(255,255,255,.38)';
-    for(let i=0;i<nS;i++)ctx.fillText(fam.types[i].label||'—', i*sw+sw/2, y+seg/2);
   }
+  return best<0?[s]:[s.slice(0,best),s.slice(best)];
+}
+function drawChordPalette(x0,x1,H){
+  const FS=chordFams(), nC=FS.length;
+  /* Полосы сверху (имена семейств) и снизу (полное имя выбранного типа) — вне клеток:
+     та же вычиталка стоит в gestures, иначе подпись легла бы на ячейку, а палец брал бы
+     ячейку под подписью. */
+  const px0=x0+CH_PAL_PAD, px1=x1-CH_PAL_PAD, py0=CH_PAL_HEAD_H, py1=H-CH_PAL_HEAD_H;
+  const selC=Math.min(chordFam,nC-1), selF=FS[selC]||FS[0];
+  const selR=Math.min(chordVar,selF.types.length-1);
 
-  /* АКТИВНЫЙ сектор: рука в приоритете, иначе — защёлкнутый (deg+ty), чтобы после
-     отпускания было видно, что именно звучит. Подсветка на СЕКТОР, не на весь ряд. */
-  let deg=-1, sect=-1;
-  for(const k in HANDS){ const S=HANDS[k];
-    if(S.zone==='ch'&&S.pinch&&!S.inert&&S.deg>=0){ deg=S.deg; sect=S.sect==null?-1:S.sect; } }
-  if(deg<0&&latchDeg>=0){ deg=latchDeg; sect=fam.types.findIndex(t=>t.iv===latchTy); }
-  if(deg>=0&&sect>=0){
-    const y=(rows-1-deg)*seg, x=sect*sw;
-    ctx.fillStyle=hexA(INSTR_COL.ch,.30); ctx.fillRect(x,y,sw,seg);
-    ctx.strokeStyle=INSTR_COL.ch; ctx.lineWidth=2; ctx.strokeRect(x+1,y+1,sw-2,seg-2);
-    /* 12px, а не 15: при 6 секторах ячейка ~65px, и 15px тег с корнем вылезал за край. */
-    ctx.fillStyle='#fff'; ctx.font='700 12px system-ui';
-    ctx.fillText(fam.types[sect].label||'—', x+sw/2, y+seg/2);
+  ctx.fillStyle='rgba(10,10,20,.30)'; ctx.fillRect(x0,0,x1-x0,H);   // палитра чуть темнее поля нот
+  ctx.textBaseline='middle';
+  for(let c=0;c<nC;c++){
+    const fam=FS[c], nR=fam.types.length, [cx0,cx1]=palColX(c,px0,px1,nC);
+    // ШАПКА КОЛОНКИ — имя семейства; активная колонка ярче
+    ctx.textAlign='center'; ctx.font='700 10px system-ui';
+    ctx.fillStyle = c===selC ? '#fff' : hexA(INSTR_COL.ch,.7);
+    ctx.fillText(fam.name, (cx0+cx1)/2, CH_PAL_HEAD_H/2);
+    for(let r=0;r<nR;r++){
+      const [cy0,cy1]=palRowY(r,py0,py1,nR);
+      const bx=cx0+CH_PAL_GAP/2, by=cy0+CH_PAL_GAP/2;      // зазор съедается ВНУТРИ клетки: попадание идёт по полной
+      const bw=(cx1-cx0)-CH_PAL_GAP, bh=(cy1-cy0)-CH_PAL_GAP;
+      const on = c===selC && r===selR;
+      ctx.fillStyle = on ? hexA(INSTR_COL.ch,.32) : 'rgba(255,255,255,.05)';
+      ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,5); ctx.fill();
+      ctx.strokeStyle = on ? INSTR_COL.ch : 'rgba(255,255,255,.12)';
+      ctx.lineWidth = on ? 2 : 1; ctx.stroke();
+      /* Подпись НЕ мельчим ниже 10px (после этого не читается на телефоне) — длинные
+         теги 31-TET («нейтр♮7», «субмин») переносим на две строки: высота у клетки есть. */
+      ctx.font = on ? '700 10px system-ui' : '10px system-ui';
+      ctx.fillStyle = on ? '#fff' : 'rgba(255,255,255,.72)';
+      const lines=wrapLabel(fam.types[r].label||'—', bw-6), cy=(by+by+bh)/2;
+      lines.forEach((L,i)=>ctx.fillText(L, bx+bw/2, cy+(i-(lines.length-1)/2)*11));
+    }
   }
-
-  // ЯРУС 1 — шапка колонок: тип один раз сверху, при любом числе рядов
-  ctx.fillStyle='rgba(0,0,0,.45)'; ctx.fillRect(0,SECT_HEAD_H,W,SECT_HEAD_H);
-  ctx.font='700 10px system-ui';
-  for(let i=0;i<nS;i++){
-    if(i){ ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.beginPath();
-           ctx.moveTo(i*sw,SECT_HEAD_H); ctx.lineTo(i*sw,SECT_HEAD_H*2); ctx.stroke(); }
-    ctx.fillStyle = i===sect ? '#fff' : hexA(INSTR_COL.ch,.75);
-    ctx.fillText(fam.types[i].label||'—', i*sw+sw/2, SECT_HEAD_H*1.5);
+  /* Полное имя выбранного типа — одной строкой снизу, где есть вся ширина палитры.
+     full есть только там, где короткий тег непонятен (31-TET). */
+  const t=selF.types[selR], fullNm=t&&(t.full||t.label);
+  if(fullNm){
+    ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
+    ctx.fillText(fullNm, (x0+x1)/2, H-CH_PAL_HEAD_H/2);
   }
-
-  /* ЯРУС 3 — семейство (ЛИПКОЕ: видно и когда левой руки нет в кадре) + полное имя
-     активного типа. full есть только там, где короткий тег непонятен (31-TET). */
-  const t=sect>=0?fam.types[sect]:null, fullNm=t&&(t.full||t.label);
-  ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
-  ctx.fillText(`${fam.name} (${FINGER_RU[fam.finger]||'?'})`+(fullNm?`  ·  ${fullNm}`:''), 12, 8);
-  ctx.textBaseline='alphabetic';
+  ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
 function drawFxBars(W,H){
   const items=[{v:revDisp,c:REV_COLOR,l:'REV',fxk:null},

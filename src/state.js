@@ -4,10 +4,14 @@ export let seventh=false, leadIdx=0, chIdx=0, bassIdx=0, drumKitIdx=0;
 export const fx={dly:0.25, vib:0.20, drv:0.12, trm:0.0};
 export let revDisp=0;                            // отображение Z-реверба соло-руки
 export let latchDeg=-1;                          // защёлкнутая ступень аккорда, -1 = тишина
-/* Семейство типизированного аккорда (Хроматика): 0 — мажор, 1 — минор. ЛИПКОЕ:
-   ставится пальцем левой руки и держится, пока не сменят. По умолчанию мажор, поэтому
-   правой руке всегда есть что играть — даже если левой в кадре не было. */
-export let chordFam=0;
+/* Выбранная ячейка палитры типизированного аккорда (Хроматика, 31-TET):
+   chordFam — КОЛОНКА (семейство), chordVar — РЯД внутри неё (вариант).
+   Выбирается ПОЛОЖЕНИЕМ щипка левой руки по палитре, а не пальцем: палец на левой руке
+   больше ничего не значит (щипок принимается только большой+указательный). ЛИПКОЕ:
+   держится и после отпускания, и когда руки нет в кадре. По умолчанию (0,0) = чистое
+   мажорное трезвучие, поэтому правой руке всегда есть что играть — даже если левой
+   в кадре не было. Наборы семейств разной длины: читатели клампят по types.length. */
+export let chordFam=0, chordVar=0;
 /* Тип защёлкнутого аккорда (массив интервалов из CHORD_FAMS) или null. КОМПАНЬОН к
    latchDeg, а не замена: latchDeg>=0 используется как проверка «звучит ли» в четырёх
    местах — объект вместо числа сломал бы их молча. В typedChords ладу тождество
@@ -33,6 +37,7 @@ export const setDrumKitIdx=v=>{ drumKitIdx=v; };
 export const setRevDisp=v=>{ revDisp=v; };
 export const setLatchDeg=v=>{ latchDeg=v; };
 export const setChordFam=v=>{ chordFam=v; };
+export const setChordVar=v=>{ chordVar=v; };
 export const setLatchTy=v=>{ latchTy=v; };
 export const setUiMode=v=>{ uiMode=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
