@@ -128,9 +128,14 @@ function processHands(res){
            полосу по точке щипка при захвате (зона фиксируется, как и все прочие) — попал в
            полосу 0 → зона 'oct', даже если это fx-рука (левая): тянуться вниз за октавой
            нельзя ценой случайного эффекта. Стоит ПЕРВЫМ в тернаре, поэтому перебивает fx/ld. */
-        const rectRole = (phoneInstr==='ld'||phoneInstr==='bs') && rectGrid();   // rect-раскладка теперь у соло И баса
+        const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
         const py=(lm[4].y+lm[mf].y)/2*H;
-        const octBand = rectRole && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
+        const px=(1-(lm[4].x+lm[mf].x)/2)*W;
+        /* У аккордов октавная полоса живёт ТОЛЬКО в правой половине [SPLIT,W]: левая рука-палитра,
+           дотянувшись до низа-слева, не должна перехватываться как октава — она выбирает тип.
+           Соло/бас — октава по всей ширине (тест px пропускаем для не-'ch'). */
+        const octRight = phoneInstr!=='ch' || px>=CH_PAL_W*W;
+        const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
         const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
         S.zone = octBand ? 'oct'
                : famHand ? 'chFam'
@@ -203,13 +208,14 @@ function processHands(res){
         setRectOctReg(S.oct);
       }else{
         const phone=uiMode==='phone';
-        /* Сетка «4 ноты в прямоугольнике» — phone-соло И бас на ладу с rectGrid (19/31-TET).
+        /* Сетка «4 ноты в прямоугольнике» — phone-соло, бас И аккорды на ладу с rectGrid (19/31-TET).
            Y выбирает ПОЛОСУ полной сетки; полоса 0 — октавная (её перехватывает зона 'oct'),
-           нотный прямоугольник = полоса−1. Палец S.oct (0=указ.=низ … 3=мизинец=верх) — ноту
+           нотный прямоугольник = полоса−1. Палец S.oct (0=указ.=низ … 3=мизинец=верх) — ноту/корень
            ВНУТРИ прямоугольника; октава — липкий регистр роли (rectOctReg). ступень = прямоуг*4
            + нота, кламп в 0..IVX-1 (верх.мизинец = тоника октавой выше). S.oct тут читается как
-           «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава. */
-        const rectPlay = phone && (S.zone==='ld'||S.zone==='bs') && rectGrid();
+           «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава.
+           У аккордов это КОРЕНЬ; тип берётся из палитры отдельно, октава — chordOctReg. */
+        const rectPlay = phone && (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
         if(rectPlay){
           S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
           const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
@@ -233,6 +239,9 @@ function processHands(res){
           const FS=chordFams(), fam=FS[chordFam]||FS[0];
           ty=fam.types[Math.min(chordVar,fam.types.length-1)].iv;
         }
+        /* Октава для аккорда: rect (19/31-TET) — липкий chordOctReg через резолвер; chrom12 —
+           S.oct (палец), как было. Меняется ТОЛЬКО источник октавы, логика защёлки ниже — без изменений. */
+        const chOct = rectPlay?rectOctReg():S.oct;
         if(S.zone==='ld'){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
@@ -267,14 +276,14 @@ function processHands(res){
               /* Переатака нужна, когда МЕНЯЕТСЯ ЧИСЛО НОТ: chordGlide ведёт только уже
                  звучащие голоса, и 4-я нота (maj7 из трезвучия) молча не зазвучала бы
                  до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
-              if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,S.oct,S.vol,chIdx,ty);
-              else WchSet('latch',S.deg,S.oct,S.vol,ty);              // та же плотность → глиссандо без переатаки
+              if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty);
+              else WchSet('latch',S.deg,chOct,S.vol,ty);              // та же плотность → глиссандо без переатаки
               latchLen=ty?ty.length:0;
               setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;        // рулит последний щипнувший
             }
           }else if(chOwner===key&&latchDeg>=0){
-            if(ty&&ty.length!==latchLen){ WchOn('latch',S.deg,S.oct,S.vol,chIdx,ty); latchLen=ty.length; }
-            else WchSet('latch',S.deg,S.oct,S.vol,ty);   // ведение: Y=ступень, X=сектор типа (или громкость вне typedChords)
+            if(ty&&ty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,ty); latchLen=ty.length; }
+            else WchSet('latch',S.deg,chOct,S.vol,ty);   // ведение: Y=корень (rect) или ступень, X=громкость
             setLatchDeg(S.deg); setLatchTy(ty);          // тип ведём вместе со ступенью — иначе сравнение протухнет
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль

@@ -35,6 +35,11 @@ export let octReg=1;
    Диапазон баса не меняется — те же 4 регистра (bassFreq на baseF/4), что и сейчас; меняется
    лишь ИСТОЧНИК номера 0..3: не «какой палец», а что выбрала октавная полоса. Дефолт 1. */
 export let bassOctReg=1;
+/* Аккорды (19/31-TET rect) держат СВОЙ липкий регистр КОРНЯ, отдельный от соло/баса: правая
+   рука выбирает корень прямоугольником, октавная полоса (в правой половине) задаёт регистр.
+   Тип по-прежнему из палитры. Диапазон не меняется — chordFreqs всё так же берёт oct; меняется
+   лишь ИСТОЧНИК номера 0..3: не «какой палец», а что выбрала октавная полоса. Дефолт 1. */
+export let chordOctReg=1;
 
 /* Сеттеры: присваивать импортированному биндингу нельзя (TypeError). */
 export const setScaleIdx=v=>{ scaleIdx=v; };
@@ -54,9 +59,10 @@ export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };
 export const setOctReg=v=>{ octReg=v; };
 export const setBassOctReg=v=>{ bassOctReg=v; };
-/* РОЛЕВОЙ РЕЗОЛВЕР октавного регистра — ОДНО место, где решается «чей регистр»: бас или соло.
-   Ключ — phoneInstr (в phone-режиме он всегда совпадает с активной rect-ролью). Читают его и
-   gestures (запись в октавной полосе + чтение при игре), и draw (подпись октавы) — так они не
-   разъедутся. Нигде больше нет тернара phoneInstr==='bs'. Вызовы — только в рантайме (TDZ ок). */
-export const rectOctReg    = ()=> phoneInstr==='bs' ? bassOctReg : octReg;
-export const setRectOctReg = v => { if(phoneInstr==='bs') setBassOctReg(v); else setOctReg(v); };
+export const setChordOctReg=v=>{ chordOctReg=v; };
+/* РОЛЕВОЙ РЕЗОЛВЕР октавного регистра — ОДНО место, где решается «чей регистр»: аккорды, бас
+   или соло. Ключ — phoneInstr (в phone-режиме он всегда совпадает с активной rect-ролью). Читают
+   его и gestures (запись в октавной полосе + чтение при игре), и draw (подпись октавы) — так они
+   не разъедутся. Нигде больше нет тернара phoneInstr==='ch'/'bs'. Вызовы — только в рантайме (TDZ ок). */
+export const rectOctReg    = ()=> phoneInstr==='ch' ? chordOctReg : phoneInstr==='bs' ? bassOctReg : octReg;
+export const setRectOctReg = v => { if(phoneInstr==='ch') setChordOctReg(v); else if(phoneInstr==='bs') setBassOctReg(v); else setOctReg(v); };
