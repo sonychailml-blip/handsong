@@ -12,6 +12,7 @@ export const TRADITIONS=[
   {id:'arab',  name:'Арабская (24-TET)'},
   {id:'micro', name:'Микротональная'},
   {id:'chrom', name:'Хроматика'},
+  {id:'world', name:'Мировые строи'},
 ];
 
 /* Каждый лад: edo — на сколько равных шагов делится октава, iv — ступени лада в этих
@@ -86,6 +87,12 @@ export const SCALES=[
  {name:'Макам Аджам (строй как у мажора)',         trad:'arab', grp:'Макамы', edo:24, iv:[0,4,8,10,14,18,22], tag:'maqam', noChords:true},
  {name:'Макам Никриз',                            trad:'arab', grp:'Макамы', edo:24, iv:[0,4,6,12,14,18,20], tag:'maqam', noChords:true},
  {name:'Макам Нава Атар',                          trad:'arab', grp:'Макамы', edo:24, iv:[0,4,6,12,14,16,22], tag:'maqam', noChords:true},
+ /* Мировые строи — НЕравномерные лады через поле cents (центы каждой ступени от тоники,
+    length===iv.length). Высоту берёт leadFreq/bassFreq из cents, структуру (число ступеней,
+    сетка, ряды) — из edo/iv. Слендро: приближение яванского гамелана, шаги неравные
+    (2-я ступень 231¢, не 240¢ равной пентатоники). noChords: терции гамелану чужды. */
+ {name:'Слендро (яван. гамелан, приближение)', trad:'world', grp:'', edo:5, iv:[0,1,2,3,4],
+    cents:[0,231,474,717,955], tag:'penta', noChords:true},
 ];
 
 /* Лады традиции — в порядке массива; отдаём вместе с АБСОЛЮТНЫМ индексом,
@@ -292,12 +299,22 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
 /* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
    с переносом октавы — сохраняет контур, не роняет частоту в NaN. При ступени внутри лада
    это тождество (i=deg, o=oct). CLAUDE.md: тихого NaN быть не должно. */
+/* cx — ОВЕРЛЕЙ ЦЕНТОВ: если у лада есть s.cents (неравномерный строй), высоту ступени
+   в пределах октавы задаёт он (2^(центы/1200)), а не равный шаг edo. ivx остаётся
+   СТРУКТУРНЫМ (число ступеней, перенос октавы, оборачивание i) — период по-прежнему
+   октава, регистр Math.pow(2,o) не трогаем. cents.length===iv.length, поэтому дописанные
+   верхушки (edo→структура, 1200→центы) дают cx и ivx одинаковой длины. Нет s.cents —
+   выражение байт-в-байт прежнее. */
 export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length;
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
-  return baseF()*Math.pow(2,o)*Math.pow(2,ivx[i]/s.edo); }
+  const cx=s.cents?s.cents.concat([1200]):null;
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(2,ivx[i]/s.edo);
+  return baseF()*Math.pow(2,o)*r; }
 export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length; // бас на 2 октавы ниже соло (baseF/4)
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
-  return baseF()/4*Math.pow(2,o)*Math.pow(2,ivx[i]/s.edo); }
+  const cx=s.cents?s.cents.concat([1200]):null;
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(2,ivx[i]/s.edo);
+  return baseF()/4*Math.pow(2,o)*r; }
 export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
   return chordSteps(deg,s,sev,ty).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
  
@@ -312,7 +329,11 @@ export function rowLabel(deg){ const s=CUR(), ivx=IVX();
   if (s.edo===12||s.edo===24) return stepName(ivx[deg]);
   const st=ivx[deg]%s.edo; return st===0?'Т':String(st);
 }
-export const centsOf=deg=>Math.round(IVX()[deg]*1200/CUR().edo)%1200;
+/* Центы для экранной подсказки. У лада с s.cents — РЕАЛЬНЫЕ центы ступени (визуальная
+   правда: play-tag показывает 231, а не 240), гейт на s.cents, поэтому прочие лады
+   считают по-прежнему от номинального равного шага. На высоту не влияет. */
+export const centsOf=deg=>{ const s=CUR(); if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
+  return Math.round(IVX()[deg]*1200/s.edo)%1200; };
  
 export function qual(t,f){                         // качество трезвучия по интервалам (полутона)
   if(t===4&&f===7)return''; if(t===3&&f===7)return'm';
