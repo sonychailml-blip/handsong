@@ -1,9 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr } from './state.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull } from './scales.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
-         CH_PAL_W, CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY } from './config.js';
+         CH_PAL_W, CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY } from './config.js';
 import { DRUM_NAMES } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
@@ -66,6 +66,58 @@ function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height,labelX=zx
       ctx.fillText(labelOf(deg),labelX,y+seg/2);
     }
   }
+}
+/* Порядковый номер ноты В РАСКЛАДКЕ прямоугольников (не число шагов от тоники!): Т = тоника
+   (и снизу, и октавная сверху), дальше 2,3,4… — так номера встают в ряд с римскими пальцами
+   I–IV (rowLabel дал бы «1» у пальца II — читается как ошибка). Только для rect-соло. */
+const rectNoteLbl = deg => (deg===0 || centsOf(deg)===0) ? 'Т' : String(deg+1);
+/* Сетка «4 ноты в прямоугольнике» (phone-соло, 19/31-TET). Прямоугольник выбирается по Y,
+   нота внутри него — ПАЛЬЦЕМ (I..IV), а НЕ горизонталью: X здесь — громкость на всю ширину.
+   Поэтому 4 ноты показываем КОМПАКТНОЙ ЛЕГЕНДОЙ по пальцам (I/II/III/IV → нота), а не
+   колонками: колонки читались бы как «двинь вправо — следующая нота», что ложь. Активный
+   палец подсвечен, активный прямоугольник подтонирован. Полосу даёт rectBandY (тот же
+   делитель высоты, что у degHyst в gestures), число полос — rectRowsFull (нотные + октавная):
+   ввод и картинка не разъедутся. Полоса 0 — октавный распорядитель, 1..N — нотные (r=полоса−1). */
+function drawRectGrid(W,playH,accent,activeDeg){
+  const nRfull=rectRowsFull(), maxDeg=IVX().length-1;
+  const aRect=activeDeg>=0?Math.floor(activeDeg/4):-1, aNote=activeDeg>=0?activeDeg%4:-1;
+  const lx=FX_BAND_R+8;                          // легенда правее столбиков эффектов — не лечь под них
+  ctx.textBaseline='middle';
+  for(let b=0;b<nRfull;b++){                     // полос nRfull: полоса 0 — октавная (низ), 1..N — нотные
+    const [yTop,yBot]=rectBandY(b,playH,nRfull), h=yBot-yTop;
+    if(b===0){
+      /* ОКТАВНЫЙ прямоугольник — распорядитель регистра, визуально иной (control-синий).
+         4 строки палец→регистр I–IV → окт I..IV; активный регистр РОЛИ (rectOctReg: соло→octReg,
+         бас→bassOctReg) подсвечен. Текст с lx, чтобы не лечь под столбики эффектов (у баса их нет
+         — просто безвредный отступ, второй геометрии не заводим). */
+      ctx.fillStyle=hexA('#4cc2ff',.10); ctx.fillRect(0,yTop,W,h);
+      ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(0.5,yTop+0.5,W-1,h-1);
+      const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg();
+      ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
+      ctx.fillText('ОКТАВА', lx, sy+eh/2);
+      for(let n=0;n<4;n++){
+        const ey=sy+(n+1)*eh+eh/2, act=n===reg;
+        ctx.font= act?'700 13px system-ui':'12px system-ui';
+        ctx.fillStyle= act?'#4cc2ff':'rgba(255,255,255,.6)';
+        ctx.fillText(`${OCT_ROMAN[n]}  окт ${OCT_ROMAN[n]}`, lx, ey);
+      }
+    }else{
+      const r=b-1, on=r===aRect;                 // нотный прямоугольник = полоса−1
+      ctx.fillStyle= on ? hexA(accent,.16) : (r%2?'rgba(255,255,255,.05)':'rgba(255,255,255,.03)');
+      ctx.fillRect(0,yTop,W,h);
+      ctx.strokeStyle= on ? accent : 'rgba(255,255,255,.12)';
+      ctx.lineWidth= on ? 2 : 1; ctx.strokeRect(0.5,yTop+0.5,W-1,h-1);
+      // легенда 4 пальцев (I=указ.=низ … IV=мизинец=верх), стопкой — это КЛЮЧ, не 4 зоны выбора
+      const eh=Math.min(20,(h-8)/4), sy=yTop+(h-eh*4)/2;
+      for(let n=0;n<4;n++){
+        const deg=Math.min(r*4+n,maxDeg), ey=sy+n*eh+eh/2, act=on&&n===aNote;
+        ctx.font= act?'700 13px system-ui':'12px system-ui';
+        ctx.fillStyle= act?accent:'rgba(255,255,255,.6)'; ctx.textAlign='left';
+        ctx.fillText(`${OCT_ROMAN[n]}  ${rectNoteLbl(deg)} · ${centsOf(deg)}c`, lx, ey);
+      }
+    }
+  }
+  ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
 function drawTag(x,y,lines,color){
   ctx.font='600 15px system-ui';
@@ -317,7 +369,8 @@ function drawPhone(res){
         drawChordPalette(0,SPLIT,playH);
         ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель зон
         ctx.beginPath(); ctx.moveTo(SPLIT,0); ctx.lineTo(SPLIT,playH); ctx.stroke();
-      }else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH, labelX);
+      }else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(W,playH,accent,act);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли
+      else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH, labelX);
     }
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn
@@ -349,6 +402,11 @@ function drawHandsPhone(res,W,H,playH){
       ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
       ctx.beginPath(); ctx.arc(x,y,tipPt?6:2.5,0,7); ctx.fill();
     }
+    if(S.pinch&&S.zone==='oct'){                  // рука в октавной полосе (любая, в т.ч. левая): показываем регистр, эффектов НЕ трогаем
+      ctx.fillStyle='#4cc2ff'; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(`ОКТ ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);
+      continue;
+    }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
       if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.k);
         ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
@@ -364,8 +422,13 @@ function drawHandsPhone(res,W,H,playH){
       ctx.globalAlpha=.25; ctx.beginPath(); ctx.arc(S.x,S.y,26+8*S.vol,0,7); ctx.stroke(); ctx.globalAlpha=1;
       const s=CUR();
       if(instr==='ld'||instr==='bs'){
-        const f=instr==='bs'?bassFreq(S.deg,S.oct):leadFreq(S.deg,S.oct);
-        const L1=(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[S.oct]}`:`${rowLabel(S.deg)} · окт ${OCT_ROMAN[S.oct]}`;
+        /* rectGrid (соло/бас): S.oct — это НОТА в прямоугольнике, а не октава. Октава — липкий
+           регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg); берём его, иначе Гц/«окт» врали бы. */
+        const rectRole=(instr==='ld'||instr==='bs')&&rectGrid();
+        const oShow=rectRole?rectOctReg():S.oct;
+        const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
+        const L1=rectRole?`${rectNoteLbl(S.deg)} · окт ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
+          :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[oShow]}`:`${rowLabel(S.deg)} · окт ${OCT_ROMAN[oShow]}`;
         const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}%`+(s.edo!==12?` · ${centsOf(S.deg)}c`:'');
         drawTag(S.x,S.y,[L1,L2],accent);
       }else if(isDr){
@@ -376,15 +439,28 @@ function drawHandsPhone(res,W,H,playH){
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
           ty.full||fam.name,`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
-    }else if(!S.pinch){                          // подсказка до щипка — ряд под указательным
+    }else if(!S.pinch){                          // подсказка до щипка — под указательным
       const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
-      const rows=isDr?DRUM_NAMES.length:IVX().length, d=degRaw(Math.min(y,playH-1),rows,playH), seg=playH/rows;
-      /* У типизированных аккордов ряды живут ТОЛЬКО справа от палитры — рамка на всю
-         ширину легла бы поверх ячеек и врала бы, что там играются ноты. */
-      const hx0 = (isCh&&typedChords()) ? CH_PAL_W*W : 0;
-      ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,(rows-1-d)*seg,W-hx0,seg);
-      ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-      ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):rowLabel(d)),x+14,y-12);
+      if((instr==='ld'||instr==='bs')&&rectGrid()){
+        /* rectGrid (соло/бас): подсказка кадрирует ПОЛОСУ полной сетки под рукой (то же r=полоса−1,
+           что и в игре). Полоса 0 — октавная: показываем регистр роли; иначе 4 ноты прямоугольника. */
+        const nRfull=rectRowsFull(), band=degRaw(Math.min(y,playH-1),nRfull,playH), maxDeg=IVX().length-1;
+        const [yTop,yBot]=rectBandY(band,playH,nRfull);
+        ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(0,yTop,W,yBot-yTop);
+        let lbl;
+        if(band===0) lbl=`ОКТАВА · палец I–IV → регистр (сейчас ${OCT_ROMAN[rectOctReg()]})`;
+        else{ const r=band-1; lbl=''; for(let n=0;n<4;n++){ const deg=Math.min(r*4+n,maxDeg); lbl+=(n?'  ':'')+OCT_ROMAN[n]+':'+rectNoteLbl(deg); } }
+        ctx.fillStyle=hexA(accent,.8); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+        ctx.fillText(lbl,x+14,y-12);
+      }else{
+        const rows=isDr?DRUM_NAMES.length:IVX().length, d=degRaw(Math.min(y,playH-1),rows,playH), seg=playH/rows;
+        /* У типизированных аккордов ряды живут ТОЛЬКО справа от палитры — рамка на всю
+           ширину легла бы поверх ячеек и врала бы, что там играются ноты. */
+        const hx0 = (isCh&&typedChords()) ? CH_PAL_W*W : 0;
+        ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,(rows-1-d)*seg,W-hx0,seg);
+        ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+        ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):rowLabel(d)),x+14,y-12);
+      }
     }
   }
 }

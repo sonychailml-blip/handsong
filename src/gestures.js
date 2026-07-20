@@ -1,7 +1,7 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_W, CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands } from './state.js';
-import { IVX, supportsChords, typedChords, chordFams } from './scales.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg } from './state.js';
+import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
@@ -93,7 +93,7 @@ function endPinch(key,S){
     // 'ch': WchOff НЕ зовём — защёлкнутый аккорд продолжает звучать; лишь отпускаем руль
     if(S.zone==='ch'&&chOwner===key)chOwner=null;
   }
-  S.pinch=false; S.adj=null; S.deg=-1;
+  S.pinch=false; S.adj=null; S.deg=-1; S.rect=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры
   S.inert=false; S.fresh=false;                // размыкание снимает инертность
 }
 function processHands(res){
@@ -118,13 +118,22 @@ function processHands(res){
          громкости, нельзя случайно перескочить в соседнюю колонку. */
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
+      S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
       if(uiMode==='phone'){
         /* Рука-«не-нотная» (handRole==='fx', по умолчанию ЛЕВАЯ) получает особую роль
            только там, где она есть: эффекты у соло, выбор семейства у типизированных
            аккордов. Гейт из трёх условий, самое узкое — лад: typedChords стоит ровно
            на одном ладу из 19. Прочие лады/роли/ПК идут прежним путём. */
+        /* Октавный прямоугольник (нижняя полоса rect-соло): ПОЛОЖЕНИЕ важнее роли. Считаем
+           полосу по точке щипка при захвате (зона фиксируется, как и все прочие) — попал в
+           полосу 0 → зона 'oct', даже если это fx-рука (левая): тянуться вниз за октавой
+           нельзя ценой случайного эффекта. Стоит ПЕРВЫМ в тернаре, поэтому перебивает fx/ld. */
+        const rectRole = (phoneInstr==='ld'||phoneInstr==='bs') && rectGrid();   // rect-раскладка теперь у соло И баса
+        const py=(lm[4].y+lm[mf].y)/2*H;
+        const octBand = rectRole && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
         const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
-        S.zone = famHand ? 'chFam'
+        S.zone = octBand ? 'oct'
+               : famHand ? 'chFam'
                : (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx'
                : phoneInstr;
       }else{
@@ -186,9 +195,29 @@ function processHands(res){
           if(c!==chordFam)setChordFam(c);
           if(r!==chordVar)setChordVar(r);
         }
+      }else if(S.zone==='oct'){
+        /* Октавная полоса: рука МОЛЧИТ (как палитра/эффекты) — ни ступени, ни громкости,
+           ни владельца. Палец I–IV задаёт липкий регистр РОЛИ (соло→octReg, бас→bassOctReg
+           через резолвер); смена пальца на лету (S.oct обновился выше) двигает регистр.
+           S.oct здесь — «какой палец», как везде. */
+        setRectOctReg(S.oct);
       }else{
-        const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length, phone=uiMode==='phone';
-        S.deg=degHyst(y,rows,H,S.deg);              // вся высота — ровно так же, как рисует draw
+        const phone=uiMode==='phone';
+        /* Сетка «4 ноты в прямоугольнике» — phone-соло И бас на ладу с rectGrid (19/31-TET).
+           Y выбирает ПОЛОСУ полной сетки; полоса 0 — октавная (её перехватывает зона 'oct'),
+           нотный прямоугольник = полоса−1. Палец S.oct (0=указ.=низ … 3=мизинец=верх) — ноту
+           ВНУТРИ прямоугольника; октава — липкий регистр роли (rectOctReg). ступень = прямоуг*4
+           + нота, кламп в 0..IVX-1 (верх.мизинец = тоника октавой выше). S.oct тут читается как
+           «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава. */
+        const rectPlay = phone && (S.zone==='ld'||S.zone==='bs') && rectGrid();
+        if(rectPlay){
+          S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
+          const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
+          S.deg=clamp(r*4+S.oct, 0, IVX().length-1);
+        }else{
+          const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length;
+          S.deg=degHyst(y,rows,H,S.deg);            // вся высота — ровно так же, как рисует draw
+        }
         /* Типизированный аккорд в phone: левые CH_PAL_W заняты палитрой, поэтому громкость
            мерится по ПРАВОЙ зоне [SPLIT,W] — иначе вся половина экрана читалась бы «тихо».
            Остальные роли (соло/бас/ударные/обычные аккорды) — по всей ширине, как было. */
@@ -208,11 +237,12 @@ function processHands(res){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
-            WleadOn({deg:S.deg,oct:S.oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение
+            WleadOn({deg:S.deg,oct:rectPlay?rectOctReg():S.oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; rectGrid — октава из липкого регистра роли
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx});
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
-          if(bassOwner===key)WbassOn({deg:S.deg,oct:S.oct,vol:S.vol,inst:bassIdx});
+          if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg():S.oct,vol:S.vol,inst:bassIdx});   // rect-бас — октава из bassOctReg; 12-TET бас — S.oct (палец), как было
+
         }else if(S.zone==='dr'){                            // ударные: один удар на щипок (по ряду)
           if(S.fresh){ S.fresh=false; WdrumHit(S.deg,S.vol); }
         }else if(!supportsChords()){

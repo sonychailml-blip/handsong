@@ -8,113 +8,106 @@ Air Synth 3 is a gesture-controlled synthesizer and interactive scales/tunings t
 
 **The app is split into ES modules under `src/`, loaded via `<script type="module" src="src/main.js">`.** There is no build system, no package.json, no dependencies to install, and no tests — the modules load directly in the browser. `index.html` holds only markup; `style.css` holds all CSS; the only external dependency is `@mediapipe/tasks-vision`, loaded from a CDN via an ES module `import` in `vision.js`.
 
-**Two control modes.** `phone` (the lead mode, vertical phone) binds a role to a hand by handedness and shows one role on screen at a time; `pc` (frozen, kept working) splits the screen into three X-columns any hand can play. New work targets the phone branch; the PC branch must stay intact but isn't extended. See "Screen model" below.
+**Two control modes.** `phone` (the lead mode, vertical phone) binds a role to a hand by handedness and shows one role on screen at a time; `pc` (frozen, kept working) splits the screen into three X-columns any hand can play. New work targets the phone branch; the PC branch must stay intact but isn't extended.
 
 ### Module map
 
-- `index.html` — markup only: start screen, top bar, two settings panels (`#panelScale` overlay, `#panelLoop` working), help overlay, loop transport strip, `<video>`/`<canvas>`; links `style.css` and `src/main.js`.
+- `index.html` — markup only: start screen, top bar, two settings panels (`#panelScale` overlay, `#panelLoop` working), help overlay, loop transport strip, `<video>`/`<canvas>`.
 - `style.css` — all CSS.
-- `src/config.js` — zone boundaries, gesture thresholds, scheduler timings, voice-pool sizes, FX-bar geometry, and the chord-palette geometry (`CH_PAL_W`, `CH_PAL_PAD`, `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `PAL_HYST_X`, `PAL_HYST_Y`, and the `palColX`/`palRowY` cell-layout helpers shared by hit-testing and drawing). Leaf: imports nothing.
-- `src/state.js` — cross-cutting musical + mode state (`scaleIdx, tonic, seventh, leadIdx, chIdx, bassIdx, drumKitIdx, fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, swapHands`) and its setters. `chordFam` = palette column (family), `chordVar` = palette row (variant) — both selected by **position**, not finger.
+- `src/config.js` — zone boundaries, gesture thresholds, scheduler timings, voice-pool sizes, FX-bar geometry, and the chord-palette geometry (`CH_PAL_W`, `CH_PAL_PAD`, `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `PAL_HYST_X`, `PAL_HYST_Y`, `palColX`/`palRowY`). Leaf: imports nothing.
+- `src/state.js` — cross-cutting musical + mode state (`scaleIdx, tonic, seventh, leadIdx, chIdx, bassIdx, drumKitIdx, fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, swapHands`) and its setters. `chordFam`/`chordVar` = palette column/row, selected by position.
 - `src/hooks.js` — the `hooks` object: nullable callbacks (`leadInstr, bassInstr, drumKit, rec, loop`) lower layers use to reach the DOM.
-- `src/scales.js` — the teaching layer: `TRADITIONS`, `SCALES`, `scalesOfTrad`/`tradOfScale`, `baseF`, `chordSteps`, chord/row labels, cents, and the typed-chord tables (`CHORD_FAM_SETS`, `chordFams`, `rootName`). Predicates that gate behaviour off scale **properties**: `supportsProgressions`, `supportsChords` (`noChords`), `typedChords`. The source of truth for pitch.
-- `src/audio.js` — the Web Audio engine: `AC` + all nodes, `LEAD_INSTR`/`CHORD_INSTR`/`BASS_INSTR`/`DRUM_KITS`, `initAudio`, `buildLeadBanks`, `buildChordPool`, the bass pool, the drone nodes and `droneOn`/`droneOff`, `drumHit` (+ darbuka kit), `metroClick`, `setLeadInstr`/`setBassInstr`/`setDrumKit`/`applyParams`/`noteOn`/`noteOff`, chord voice pool (`chordOn`/`chordGlide`/`chordOff`/`chordHold`), bass voice pool (`bassOn`/`bassSet`/`bassOff`/`bassHold`). The drone and darbuka voices were rescued here when `backing.js` was deleted.
-- `src/arrange.js` — arrangement **data + pure generation**: `PROGRESSIONS`, `HARMONIES` (drone + progressions), `RHYTHMS`, `BASS_MODES`, and `buildArrangement(sel, ctx) → {bars, layers}`. No side effects.
-- `src/recorder.js` — record + **looper**: `events[]`, the `loop` object, the `W*`/`ENG` indirection, the beat-clock scheduler, transport (`onRec`/`onLoop`/`onUndo`/`clearRec`/`panic`), `softAllOff`, `loadArrangement`, `setLoopBars`/`setLoopQuant`/`setLoopBpm`, `loopPos`/`loopChordDeg`. Freezes per-event scale context (`sc`/`sev`); the chord **type** rides in the event payload as `a.ty`.
-- `src/vision.js` — camera + MediaPipe: the CDN import, `video`/`canvas`/`ctx`, the `roundRect` polyfill, `resize`, `landmarker`, `initVision`.
-- `src/gestures.js` — the gesture state machine: `HANDS`, `leadOwner`/`chOwner`/`bassOwner`, `processHands`, `handRole` (phone role-by-handedness), the degree helper `degHyst`, and the palette hit-test (`axHyst` one-axis engine + `cellHyst` two-axis) used by the `chFam` zone.
-- `src/draw.js` — canvas rendering: `drawVideoBackground`, `drawOverlays`, the grid/tag/looper helpers, `drawChordPalette`, the FX bars, the `#status` line, and the loop-transport strip position.
-- `src/ui.js` — menu/buttons: `$`, element lookups, `buildUI`, `fillScales` (groups the scale dropdown **by `grp` key**, not by array order — see Conventions), every handler, the two-panel show/hide, and the `hooks` registrations. Side-effect module; exports only `$`.
-- `src/main.js` — composition root: `loop()`, `lastTs`/`latest`, the `#startBtn` handler; imports `./ui.js` for its side effects.
+- `src/scales.js` — the teaching layer: `TRADITIONS`, `SCALES` (~49 entries, indices 0..48), `scalesOfTrad`/`tradOfScale`, `baseF`, `leadFreq`/`bassFreq`/`chordFreqs`, `chordSteps`, chord/row labels, `centsOf`, and the typed-chord tables (`CHORD_FAM_SETS`, `chordFams`, `rootName`). Predicates that gate behaviour off scale **properties**: `supportsProgressions`, `supportsChords` (`noChords`), `typedChords`. The source of truth for pitch.
+- `src/audio.js` — the Web Audio engine (see "Audio engine").
+- `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`). No side effects.
+- `src/recorder.js` — record + looper (`events[]`, `loop`, the `W*`/`ENG` indirection, beat-clock scheduler, transport, `softAllOff`, `loadArrangement`). Freezes per-event `sc`/`sev`; chord type rides as `a.ty`.
+- `src/vision.js` — camera + MediaPipe (CDN import, `video`/`canvas`/`ctx`, `roundRect` polyfill, `resize`, `landmarker`, `initVision`).
+- `src/gestures.js` — the gesture state machine: `HANDS`, `leadOwner`/`chOwner`/`bassOwner`, `processHands`, `handRole`, `degHyst`, and the palette hit-test (`axHyst` + `cellHyst`) used by the `chFam` zone.
+- `src/draw.js` — canvas rendering: `drawVideoBackground`, `drawOverlays`, grid/tag/looper helpers, `drawChordPalette`, the FX bars, `#status`, the loop-transport strip position.
+- `src/ui.js` — menu/buttons: `$`, `buildUI`, `fillScales` (groups the scale dropdown **by `grp` key**, not by array order), every handler, the two-panel show/hide, the `hooks` registrations. Side-effect module; exports only `$`.
+- `src/main.js` — composition root: `loop()`, `lastTs`/`latest`, the `#startBtn` handler; imports `./ui.js` for side effects.
 
-> There is **no `backing.js`**, and typed chords no longer use per-row sectors. If a doc or comment still mentions `backing.js`, `playRec`, `toggleRec`, `stopRec`, `recStart`, `drawChordSectors`, `sectHyst`, `S.sect`, or `TYPED_CH_VOL`, it is stale — all of those were removed.
+> There is **no `backing.js`**, and typed chords no longer use per-row sectors. Stale names to ignore if seen: `backing.js`, `playRec`, `toggleRec`, `stopRec`, `recStart`, `drawChordSectors`, `sectHyst`, `S.sect`, `TYPED_CH_VOL`.
 
 ## Running / developing
 
-- Serve over **HTTPS or `localhost`** — `getUserMedia` (camera) and `navigator.wakeLock` require a secure context; opening `index.html` via `file://` will fail.
-- Team default is VS Code Live Server on `http://127.0.0.1:5500`. Any static server works.
-- Phone testing: `npx cloudflared tunnel --url http://localhost:5500` gives a fresh short-lived HTTPS URL. Bust cache with `?v=N`.
-- The MediaPipe model, WASM, and library are fetched from `cdn.jsdelivr.net` / `storage.googleapis.com` at runtime — **an internet connection is required** even when serving locally.
-- Requires a webcam and a browser with WebGL/GPU delegate support. Audio starts only after the user clicks "▶ Запустить" (browsers block autoplay before a user gesture).
+- Serve over **HTTPS or `localhost`** — camera + wakeLock need a secure context; `file://` fails. Team default: VS Code Live Server on `http://127.0.0.1:5500`.
+- Phone testing: `npx cloudflared tunnel --url http://localhost:5500` (fresh short-lived HTTPS URL; bust cache with `?v=N`).
+- MediaPipe model/WASM/library are fetched from CDNs at runtime — internet required even when serving locally. Needs a webcam + WebGL. Audio starts only on the "▶ Запустить" click.
 
 ## Architecture
 
-The render loop lives in `main.js`. Each animation frame (`loop()`): draw the video frame → MediaPipe detects hands → `processHands()` (`gestures.js`) updates the gesture state machine and drives audio → `drawOverlays()` (`draw.js`) renders zones, teaching overlays, hand labels, the looper strip. The recorder thins the ~60/sec engine calls into a few intent events per note (it records **intent, not frames** — see Looper).
+The render loop lives in `main.js`. Each frame: draw the video → MediaPipe detects hands → `processHands()` updates the gesture state machine and drives audio → `drawOverlays()` renders. The recorder thins the ~60/sec engine calls into a few intent events per note.
 
 ### Screen model
-- **PC (`uiMode==='pc'`, frozen):** three vertical columns split at `FXW=0.20` and `ZB=0.595` — **EFFECTS** (left) · **CHORDS** (center) · **SOLO** (right). Zone is locked at the moment of the pinch. Both hands independent, keyed by MediaPipe handedness.
-- **Phone (`uiMode==='phone'`, lead):** one role fills the screen, chosen by `phoneInstr` (`'ld'`/`'ch'`/`'bs'`/`'dr'`, cycled by the role button). Role is bound to a **hand**, not a place: `handRole()` maps Right→notes, Left→fx (swapped by `swapHands`). The non-note hand only has a job where one exists — effects in the solo role, the **chord-type palette** in a typed-chord chord role; otherwise it's idle.
+- **PC (frozen):** three columns at `FXW=0.20`/`ZB=0.595` — EFFECTS · CHORDS · SOLO. Zone locks at pinch. Both hands independent, keyed by handedness.
+- **Phone (lead):** one role fills the screen (`phoneInstr` = `'ld'/'ch'/'bs'/'dr'`, cycled by the role button). Role is bound to a hand: `handRole()` maps Right→notes, Left→fx (swapped by `swapHands`). The non-note hand only acts where a job exists — effects in solo, the chord-type palette in a typed-chord chord role.
 
 ### Gesture model
-- **Pinch** = thumb (landmark 4) close to a fingertip (8/12/16/20). Distance is normalized by hand size (`pinchRatios`, wrist→index-base) so it works near and far from the camera.
-- The pinched finger selects the **octave** (index=I … pinky=IV) and can be switched mid-pinch to glide.
-- **Y** = scale degree (with hysteresis in `degHyst`); **X within a column** = volume — in a typed-chord chord role the note rows sit in the right region and X maps to volume over `[SPLIT, W]` (`SPLIT = CH_PAL_W·W`); **hand depth Z** = reverb send, solo channel only.
-- In the EFFECTS role/column, pinch selects an effect and dragging up/down latches its value.
+- **Pinch** = thumb (4) near a fingertip (8/12/16/20), normalized by hand size. The pinched finger selects the **octave register** (index=I … pinky=IV), switchable mid-pinch to glide.
+- **Y** = scale degree (`degHyst`); **X** = volume (in a typed-chord chord role, over `[SPLIT, W]`); **Z** = reverb send, solo only.
 
 ### Typed chords — the palette (Chromatic 12-TET, 31-TET, 19-TET)
-Scales with a `typedChords` property split the phone chord role into two regions with a divider at `SPLIT`:
-- **Left = a palette of chord types.** Columns are families, rows are the variants within a family. Both counts come straight from data (`chordFams().length`; each column's own `types.length`) — the layout is ragged-safe, nothing is hardcoded to 4×6. Geometry lives in `palColX`/`palRowY` in `config.js`, so hit-testing and drawing read the **same** functions and can't drift.
-- **The LEFT (non-note) hand selects a cell by POSITION.** It fires only on a thumb+**index** pinch (`S.oct===0`) that is inside the palette (`S.x < SPLIT`); a middle/ring/pinky pinch, or a left pinch that strays into the note region, changes nothing. Selection is **sticky** — it holds after release and when the hand leaves frame, until another cell is pinched. Default is the first family / first type (major triad), so the right hand plays alone. Finger identity carries **no** meaning on this hand — position does. Two-axis hysteresis (`cellHyst`, built from the one-axis `axHyst`) keeps narrow cells from jittering; its previous state lives on the hand (`S.pc`/`S.pr`) so a re-pinch starts clean.
-- **The RIGHT hand plays as a normal chord role:** Y = root degree, pinched finger = octave, **X = volume** over the right region. The selected type's interval array (`ty`) is added to the root by `chordSteps`. The latch identity is the **pair (degree + type)** — `ty` is a live reference into `CHORD_FAM_SETS`, so `ty===latchTy` and the loop's `a.ty` freeze stay valid.
-- **PC limitation (accepted):** the palette hand exists only in phone mode, so in PC a typed scale plays the sticky selection and its type **cannot be changed by gesture**. Volume works. Typed chords are a phone feature; this is a documented limitation, not a bug (see rule 9).
+Scales with a `typedChords` property split the phone chord role: **left = a palette of chord types** (columns = families, rows = variants; counts from `chordFams()`/`types.length`, geometry in `palColX`/`palRowY`), **right = note rows**. The LEFT hand selects a cell by POSITION on a thumb+**index** pinch inside the palette (`S.oct===0 && S.x<SPLIT`); sticky, default first family/type. The RIGHT hand plays: Y=root, finger=octave, X=volume. `ty` is a live reference into `CHORD_FAM_SETS`; latch identity = (degree + type). Two-axis hysteresis `cellHyst`. **PC limitation (accepted):** the palette hand is phone-only, so PC plays the sticky selection and can't change type by gesture.
 
 ### Behaviour properties (prefer these over `tag`/index checks)
-Gates hang off **scale properties**, so they survive regrouping scales by tradition:
-- `noChords` → the chord role builds nothing (Arabic maqam is monophonic). `supportsChords()`.
-- `typedChords: '<key>'` → palette mode; the value keys a family set in `CHORD_FAM_SETS`. Current keys: `'chrom12'`, `'edo31'`, `'edo19'`. `typedChords()`/`chordFams()`.
-- `supportsProgressions()` = 7 degrees (progressions like II–V–I only make sense there; the drone works in any tuning).
+- `noChords` → chord role builds nothing (`supportsChords()` false). Maqams; also the gamelan cents-scales.
+- `typedChords: '<key>'` → palette mode; keys a set in `CHORD_FAM_SETS`. Current keys: `'chrom12'`, `'edo31'`, `'edo19'`.
+- `supportsProgressions()` = 7 degrees. Note: a 7-note `noChords` scale (maqams, pelog) is still gated out of progressions because `refreshProgAvail` uses `supportsProgressions() && supportsChords()`.
 
-### Music theory
-`SCALES` is the source of truth: each has `edo`, `iv` (degrees in those steps), a `tag`, a `trad` (tradition, for the scale menu), optional `grp` (submenu), and optional behaviour properties. Core formula everywhere: `f = baseF · 2^octave · 2^(step / edo)`.
-- `chordSteps()` branches: a typed chord (`ty` present) adds the interval array to the root and ignores the scale's own chord logic; 7-note diatonic/ethnic/maqam stack thirds; pentatonic/blues/chromatic use power chords; pure-EDO scales (19/31-TET, `tag:'edo'`) build **by interval ratios** given on the scale (`chord`/`chord7`) — the fallback used when no `ty` is supplied (e.g. a PC-recorded layer without a type).
-- `CHORD_FAM_SETS` intervals are **in that scale's own steps** (semitones for `chrom12`; 38.7¢ steps for `edo31`; 63.2¢ steps for `edo19`). Never give a set to a scale with a different `edo`. Each tuning's set is built around what that tuning does best: `edo31` around the just 4:5:6:7 seventh and neutral thirds; `edo19` around its near-just 6/5 minor third and 5/3 sixth (its major third is the compromise).
+### Music theory & pitch
+`SCALES` is the source of truth: each has `edo`, `iv` (degrees in those steps), `tag`, `trad` (tradition, for the menu), optional `grp` (submenu), optional behaviour properties. Traditions (`TRADITIONS`): Ладовая (`modal`), Арабская (`arab`, 24-TET maqamat), Микротональная (`micro`, 19/31-TET), Хроматика (`chrom`), Мировые строи (`world`, non-equal cents tunings). ~49 scales across three waves of additions plus the microtonal/world sets.
 
-### Audio engine (`initAudio`) — five parallel signal chains into one master
-`master → limiter → destination`. One shared `ConvolverNode` reverb; only the solo send (`revLead`) is Z-controlled. Chains: (1) solo — banks → drive → envelope → volume → tremolo → delay/reverb sends; (2) chord pool (`CHORD_POOL_N` always-on 2-osc voices, gated by gain); (3) bass pool (`BASS_POOL_N` mono voices, timbre baked on attack); (4) drums (synth per hit, kit from `a.kit`); (5) drone (detuned saw pair, slow LFO-swept low-pass, follows the tonic). Plus the metronome straight into master.
+**Two ways to define pitch — equal steps OR cents:**
+- **Equal (default):** within-octave ratio = `2^(iv[i]/edo)`. All EDO scales (12/19/24/31-TET etc.).
+- **Cents overlay:** a scale may add an optional `cents:[...]` array (`length === iv.length`) giving each degree's exact cents above the tonic — for **non-equal** tunings (Javanese gamelan Слендро/Пелог; later Partch etc.). When `cents` is present, `leadFreq`/`bassFreq`/`centsOf` use it: within-octave ratio = `2^(cents[i]/1200)`, with the appended top = 1200¢ (octave). The scale STILL carries `edo`/`iv` as **nominal structure** (degree count, on-screen row layout, hysteresis) — cents overrides pitch only. The octave register `2^oct` is unchanged, so the period stays a true 2:1 (octave stretch/ombak is not modelled). Existing scales (no `cents`) run the old path byte-for-byte.
+  - `chordSteps`/`chordFreqs` are NOT cents-aware — they still speak equal-`edo` steps. So a cents-scale must be `noChords` (gamelan is monophonic anyway). Chords on a cents-scale would need a parallel cents branch; that's future work.
+- `chordSteps()` branches: a typed chord (`ty`) adds its interval array to the root; 7-note diatonic/ethnic/maqam stack thirds; pentatonic/blues/chromatic use power chords; pure-EDO (`tag:'edo'`) build by interval ratios (`chord`/`chord7`).
+- `CHORD_FAM_SETS` intervals are in that scale's own steps (semitones/`chrom12`; 38.7¢/`edo31`; 63.2¢/`edo19`). Never give a set to a scale with a different `edo`.
 
-### Looper (`recorder.js`) — records intent, not frames
-An event is `{t, layer, fn, a, sc, sev}`: `t` in beats, pitch as degree+octave, the frozen scale `sc` and seventh flag `sev`, plus `a.ty`/`a.inst`/`a.kit`. Frequency is derived at play time, so the loop re-tunes to the live tonic while each layer keeps its frozen scale. Live input goes through `W*` (sound now + record if armed); replay calls `ENG` directly so it isn't re-recorded. Quantize grid: chords→beat, bass→eighth, drums→sixteenth, solo unquantized.
+### Audio engine (`initAudio`) — five chains into one master
+`master → limiter → destination`. Shared `ConvolverNode` reverb (only the solo send is Z-controlled). Chains: (1) solo — banks → drive → envelope → volume → tremolo → delay/reverb; (2) chord pool (`CHORD_POOL_N` always-on 2-osc voices, gain-gated); (3) bass pool (`BASS_POOL_N` mono, timbre baked on attack); (4) drums (synth per hit, kit from `a.kit`); (5) drone (detuned saw pair, LFO-swept LP, follows the tonic). Plus the metronome.
 
-### Per-event scale freeze = polymodality (load-bearing)
-Each event remembers its own scale/seventh (`sc`/`sev`) and type (`a.ty`). A layer plays in the scale it was recorded in while the live hand plays in the current scale; replay resolves pitch through the frozen `sc`, never the current one. This is how "chords from Chromatic + solo from a maqam" works. With three typed tunings now, a 19-TET layer heard against a 31-TET or 12-TET live scale is an audible check that the freeze holds.
+### Looper & polymodality
+An event is `{t, layer, fn, a, sc, sev}`: `t` in beats, pitch as degree+octave, frozen scale `sc`, `sev`, plus `a.ty`/`a.inst`/`a.kit`. Frequency is derived at play time via `leadFreq/chordFreqs/bassFreq(..., frozenSc)`, so the loop re-tunes to the live tonic while each layer keeps its frozen scale (**and its `cents` tuning**, for free). Replay via `ENG` isn't re-recorded. This is polymodality — don't "simplify" replay to the current scale.
 
 ## Conventions
 
-- Very terse, comment-heavy style with single-letter helpers and compact multi-statement lines. Match it rather than reformatting.
-- No frameworks, no bundler — add a feature by editing the module that owns it:
-  - a **scale** = one entry in `SCALES` (`scales.js`), added **at the end** (index is `scaleIdx`; `state` and `sameDegrees` depend on it). Its menu position is set by `trad`/`grp`, **not** by array position — `fillScales` buckets by `grp` key, so an appended scale still lands inside its group.
-  - a **typed-chord family set** = one entry in `CHORD_FAM_SETS` keyed by a scale's `typedChords` value; intervals in that scale's steps. Adding a family = adding a column; adding a variant = adding a row. Counts flow from array lengths.
-  - a **lead/chord/bass timbre** = an entry in `LEAD_INSTR`/`CHORD_INSTR`/`BASS_INSTR` (+ a bank block for leads); a **drum kit** = a branch in `drumHit` + an entry in `DRUM_KITS`.
-  - a **gesture or timing threshold** = `config.js`; palette geometry also lives there.
-  - a new **behaviour gate** = a scale **property** + a predicate in `scales.js`, never a `tag`/index check.
+- Terse, comment-heavy, single-letter helpers, compact lines. Match it.
+- Add a feature in the module that owns it:
+  - a **scale** = one entry in `SCALES`, **appended at the end** (index is `scaleIdx`; `state` and `sameDegrees` depend on it). Menu position is set by `trad`/`grp`, not array position — `fillScales` buckets by `grp` key.
+  - a **cents (non-equal) scale** = same, plus a `cents:[...]` array (`length === iv.length`) and `noChords:true`; keep a valid `edo`/`iv` as nominal structure. Home tradition: `world`.
+  - a **typed-chord family set** = one entry in `CHORD_FAM_SETS` keyed by a scale's `typedChords` value; intervals in that scale's steps.
+  - a **timbre/kit** = an entry in `LEAD_INSTR`/`CHORD_INSTR`/`BASS_INSTR`/`DRUM_KITS`.
+  - a **gesture/timing threshold** or palette geometry = `config.js`.
+  - a **behaviour gate** = a scale property + a predicate in `scales.js`, never a `tag`/index check.
 
 ## Hard rules — do not break these
 
-1. **AudioContext is created only inside the `#startBtn` click handler.** Never at module load, on import, or from any other event.
-2. **Never hardcode frequencies or note tables.** Every pitch derives from `baseF()` and the current (or frozen) scale's `edo`/`iv`. Typed-chord intervals are per-scale steps for the same reason.
-3. **Pool oscillators start once and never stop.** Chord and bass voices are gated by GainNodes. Per-hit sources (drums, metronome, drone LFO) are the deliberate exception.
-4. **The master limiter stays.** Chords + drive + bass + drums clip without it.
-5. **Lower layers never touch the DOM.** `audio.js`, `arrange.js`, and `recorder.js` reach the UI only through `hooks.x && hooks.x(v)`, registered in `ui.js`. `draw.js` is exempt — it owns the `#status` line and the loop-transport strip.
-6. **Live bindings — never shadow another module's variable.** Write state only through its setter (`setScaleIdx, setTonic, setSeventh, setLeadIdx, setChIdx, setBassIdx, setDrumKitIdx, setRevDisp, setLatchDeg, setLatchTy, setChordFam, setChordVar, setUiMode, setPhoneInstr, setSwapHands`). Never copy state into a module-level `const`. The looper scheduler re-reads `baseF()`/`CUR()`/`chordSteps()` every step.
-7. **Per-event scale freeze is the polymodality mechanism.** `sc`/`sev`/`a.ty` are stamped on every event and resolved through the frozen `sc` on replay. Don't "simplify" replay to use the current scale.
-8. **The video draw and `detectForVideo` must read the same camera frame.** `drawVideoBackground()` before detect, `drawOverlays()` after, all in one synchronous tick. This is a coherence fix, not a latency fix.
-9. **Phone is the lead mode; PC is frozen but must stay intact.** New behaviour goes under the phone branch / scale properties and must not break the PC path. "Don't build for PC" ≠ "break PC" — verify the PC path still works on each change. (Consequence today: typed-chord type-select is phone-only; PC plays the sticky selection.)
+1. **AudioContext is created only inside the `#startBtn` click handler.**
+2. **Never hardcode frequencies or note tables.** Pitch derives from `baseF()` and the current (or frozen) scale — either `2^(iv/edo)` or the `cents` overlay `2^(cents/1200)`. Hardcoding breaks the microtonal and cents tunings.
+3. **Pool oscillators start once and never stop** (chord/bass gated by GainNodes; per-hit drums/metronome/drone LFO are the exception).
+4. **The master limiter stays.**
+5. **Lower layers never touch the DOM** — `audio.js`, `arrange.js`, `recorder.js` reach the UI only via `hooks`. `draw.js` is exempt.
+6. **Live bindings — write state only through its setter**, never a module-level `const`. The looper re-reads `baseF()`/`CUR()`/`chordSteps()` every step.
+7. **Per-event scale freeze is the polymodality mechanism** (`sc`/`sev`/`a.ty`, and `cents` rides on the frozen `sc`).
+8. **The video draw and `detectForVideo` read the same camera frame** (`drawVideoBackground()` before detect, `drawOverlays()` after, one synchronous tick).
+9. **Phone is the lead mode; PC is frozen but must stay intact.** New behaviour goes under the phone branch / scale properties. Consequence today: typed-chord type-select is phone-only.
 
 ## How to verify a change
 
-There are no tests. Verification is **manual, in the browser** — do not run node, a local server, headless Chrome, or any automated test/git command; that is the user's job.
+No tests. Verification is **manual, in the browser** — do not run node, a server, headless Chrome, or any automated test/git command; that is the user's job.
 
-1. Serve, click "▶ Запустить", allow camera, **portrait**.
-2. Solo role: pinch sounds, Y = pitch, moving the pinched finger glides; the left hand moves the FX bars.
-3. Chords role, non-typed (e.g. Мажор): both hands play, X = volume full width.
-4. Looper: "●" counts in, records a layer, wraps into a loop; overdub adds a layer; "⤺" undoes the top layer; "＋ Добавить слои" drops an arrangement in.
-5. Typed chords in **Хроматика**, **31-TET**, **19-TET**: the left **index** pinch selects a palette cell (column = family, row = variant); a middle/ring/pinky left pinch does nothing; the selection sticks and stays highlighted with no hand present; the right hand plays it from any root, finger = octave, X = volume over the right region. 19-TET pure minor should beat noticeably less than a 12-TET minor; 31-TET `дом7` is the just 4:5:6:7. Long 31-/19-TET labels wrap to two lines, never below 10px.
-6. Scale menu: Строй → Ладовая shows **one** Диатоника group with all six diatonic scales (major and minor variants together); other groups render once each; Хроматика/Арабская/Микротональная stay as bare options.
-7. PC mode (`💻`): three columns still play with either hand (typed type-select is expected to be unavailable here).
+1. Serve, "▶ Запустить", allow camera, **portrait**.
+2. Solo/chords/bass/drums roles play; looper records/overdubs/undoes; arrangement drops in.
+3. Typed chords (Хроматика, 31-TET, 19-TET): left index pinch selects a palette cell; right hand plays; 19-TET pure minor beats less than 12-TET minor; 31-TET `дом7` = 4:5:6:7.
+4. Cents scales (Мировые строи → Слендро/Пелог): sound UNEVEN (gamelan), octave a clean 2:1, play-tag cents read the real values; chords show the no-chords hint.
+5. Menu: each tradition's `grp` subgroups render once, in order (Ладовая has Диатоника/Лады(моды)/Этнические/Пентатоника-блюз/Симметричные/Экзотические/Мировые пентатоники/Японские; Арабская has one Макамы group).
+6. A few existing scales unchanged; PC mode still plays three columns.
 
-Never report a change as done without stating which of these steps you could not verify.
+Never report a change as done without stating which steps you could not verify.
 
 ## Language
 
-- Code, comments, UI strings, `SCALES`/`CHORD_FAM_SETS` names: **Russian**. Never translate them, never "clean them up".
-- Chat responses to the user: **English**. The Windows terminal mangles Cyrillic output.
+- Code, comments, UI strings, `SCALES`/`CHORD_FAM_SETS` names: **Russian**. Never translate or "clean up".
+- Chat responses to the user: **English** (the Windows terminal mangles Cyrillic).

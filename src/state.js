@@ -25,6 +25,16 @@ export let latchTy=null;
 export let uiMode='pc';                          // 'pc' | 'phone'
 export let phoneInstr='ld';                      // что показано в phone-режиме: 'ld' соло | 'ch' аккорды
 export let swapHands=false;                      // phone: true → правая=эффекты, левая=ноты
+/* rect-соло (19/31-TET): ЛИПКИЙ октавный регистр (0..3), задаётся нижним «октавным»
+   прямоугольником пальцем I–IV. Заменил фиксированный RECT_OCT. Общий для рук: любая
+   рука, щипнувшая в октавной полосе, ставит его положением/пальцем. Живая связка —
+   писать только через setOctReg (правило #6). Дефолт 1 = прежний RECT_OCT. */
+export let octReg=1;
+/* Бас (19/31-TET rect) держит СВОЙ липкий регистр, отдельный от соло: соло и бас живут в
+   разных октавах, общий номер заставил бы их драться (двинул соло вверх — уехал бы и бас).
+   Диапазон баса не меняется — те же 4 регистра (bassFreq на baseF/4), что и сейчас; меняется
+   лишь ИСТОЧНИК номера 0..3: не «какой палец», а что выбрала октавная полоса. Дефолт 1. */
+export let bassOctReg=1;
 
 /* Сеттеры: присваивать импортированному биндингу нельзя (TypeError). */
 export const setScaleIdx=v=>{ scaleIdx=v; };
@@ -42,3 +52,11 @@ export const setLatchTy=v=>{ latchTy=v; };
 export const setUiMode=v=>{ uiMode=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };
+export const setOctReg=v=>{ octReg=v; };
+export const setBassOctReg=v=>{ bassOctReg=v; };
+/* РОЛЕВОЙ РЕЗОЛВЕР октавного регистра — ОДНО место, где решается «чей регистр»: бас или соло.
+   Ключ — phoneInstr (в phone-режиме он всегда совпадает с активной rect-ролью). Читают его и
+   gestures (запись в октавной полосе + чтение при игре), и draw (подпись октавы) — так они не
+   разъедутся. Нигде больше нет тернара phoneInstr==='bs'. Вызовы — только в рантайме (TDZ ок). */
+export const rectOctReg    = ()=> phoneInstr==='bs' ? bassOctReg : octReg;
+export const setRectOctReg = v => { if(phoneInstr==='bs') setBassOctReg(v); else setOctReg(v); };

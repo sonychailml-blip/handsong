@@ -14,7 +14,7 @@ export const REV_COLOR='#57d9a3';
 export const INSTR_COL={ld:'#ff9e2c', ch:'#b18cff', bs:'#3ad29f', dr:'#ffd23f'};
 
 /* Пороги жестов и тайминги (значения 1-в-1 из исходника) */
-export const PINCH_ON=0.25;                       // захват щипка
+export const PINCH_ON=0.20;                       // захват щипка
 export const PINCH_HOLD=0.5;                      // смена пальца в щипке
 export const PINCH_OFF=0.25;                      // отпускание
 export const REV_NEAR=0.27, REV_RANGE=0.19;       // реверб: (0.27-hs)/0.19
@@ -54,6 +54,15 @@ export const PAL_HYST_Y=0.18;
    палец между ячейками всё равно попадает в ближайшую, мёртвых зон нет. */
 export const palColX=(i,x0,x1,n)=>{ const w=(x1-x0)/n; return [x0+i*w, x0+(i+1)*w]; };
 export const palRowY=(j,y0,y1,n)=>{ const h=(y1-y0)/n; return [y0+j*h, y0+(j+1)*h]; };
+
+/* СЕТКА «4 ноты в прямоугольнике» (phone-соло на 19/31-TET). Октавный регистр БОЛЬШЕ НЕ
+   константа: он играбельный — нижний «октавный» прямоугольник, липкий регистр живёт в
+   state.octReg (см. state.js), палец I–IV задаёт его. Число полос — scales.rectRowsFull. */
+/* Пиксельная полоса прямоугольника i — ЕДИНЫЙ источник геометрии для рисования (draw);
+   попадание (gestures) идёт через degHyst(y,nRect,H), а он делит высоту ТАК ЖЕ
+   (seg=H/nRect, прямоугольник 0 снизу), поэтому ввод и картинка не разъедутся. Зеркало
+   palRowY, но инвертированное по Y: как degRaw, нижний прямоугольник — индекс 0. */
+export const rectBandY=(i,H,nRect)=>{ const seg=H/nRect, z=nRect-1-i; return [z*seg,(z+1)*seg]; };
 
 /* Запись как намерение (§3.4) */
 export const BEATS_PER_BAR=4;                     // долей в такте — сетка записи и лупера (§3.5)
