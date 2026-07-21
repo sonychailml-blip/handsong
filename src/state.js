@@ -25,6 +25,11 @@ export let latchTy=null;
 export let uiMode='pc';                          // 'pc' | 'phone'
 export let phoneInstr='ld';                      // что показано в phone-режиме: 'ld' соло | 'ch' аккорды
 export let swapHands=false;                      // phone: true → правая=эффекты, левая=ноты
+/* Терменвокс (только phone-соло): ON — высота НЕПРЕРЫВНА по y (глиссандо/бенды/вибрато),
+   а не квантуется к ступени; палец в нотном поле больше не выбирает ноту (её задаёт y),
+   октавная полоса и регистр — как были. Живой звук: непрерывные Гц; лупер пишет ближайшую
+   ступень (глиссандо-в-луп — задача позже). Живая связка — писать через setTheremin. */
+export let theremin=false;
 /* rect-соло (19/31-TET): ЛИПКИЙ октавный регистр (0..3), задаётся нижним «октавным»
    прямоугольником пальцем I–IV. Заменил фиксированный RECT_OCT. Общий для рук: любая
    рука, щипнувшая в октавной полосе, ставит его положением/пальцем. Живая связка —
@@ -57,6 +62,7 @@ export const setLatchTy=v=>{ latchTy=v; };
 export const setUiMode=v=>{ uiMode=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };
+export const setTheremin=v=>{ theremin=v; };
 export const setOctReg=v=>{ octReg=v; };
 export const setBassOctReg=v=>{ bassOctReg=v; };
 export const setChordOctReg=v=>{ chordOctReg=v; };

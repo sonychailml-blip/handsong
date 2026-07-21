@@ -1,7 +1,7 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg } from './state.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF } from './scales.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg, theremin } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_W, CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY } from './config.js';
 import { DRUM_NAMES } from './audio.js';
@@ -87,20 +87,7 @@ function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf){
   for(let b=0;b<nRfull;b++){                     // полос nRfull: полоса 0 — октавная (низ), 1..N — нотные
     const [yTop,yBot]=rectBandY(b,playH,nRfull), h=yBot-yTop;
     if(b===0){
-      /* ОКТАВНЫЙ прямоугольник — распорядитель регистра, визуально иной (control-синий).
-         4 строки палец→регистр I–IV → окт I..IV; активный регистр РОЛИ (rectOctReg: соло→octReg,
-         бас→bassOctReg, аккорды→chordOctReg) подсвечен. */
-      ctx.fillStyle=hexA('#4cc2ff',.10); ctx.fillRect(x0,yTop,w,h);
-      ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
-      const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg();
-      ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
-      ctx.fillText('ОКТАВА', lx, sy+eh/2);
-      for(let n=0;n<4;n++){
-        const ey=sy+(n+1)*eh+eh/2, act=n===reg;
-        ctx.font= act?'700 13px system-ui':'12px system-ui';
-        ctx.fillStyle= act?'#4cc2ff':'rgba(255,255,255,.6)';
-        ctx.fillText(`${OCT_ROMAN[n]}  окт ${OCT_ROMAN[n]}`, lx, ey);
-      }
+      drawRectOctBand(x0,w,lx,yTop,h);           // общий с терменвоксом рендер октавной полосы
     }else{
       const r=b-1, on=r===aRect;                 // нотный прямоугольник = полоса−1
       ctx.fillStyle= on ? hexA(accent,.16) : (r%2?'rgba(255,255,255,.05)':'rgba(255,255,255,.03)');
@@ -115,6 +102,54 @@ function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf){
         ctx.fillStyle= act?accent:'rgba(255,255,255,.6)'; ctx.textAlign='left';
         ctx.fillText(`${OCT_ROMAN[n]}  ${lblOf(deg)}`, lx, ey);
       }
+    }
+  }
+  ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+}
+/* ОКТАВНАЯ ПОЛОСА (нижний прямоугольник) — распорядитель регистра, control-синий. 4 строки
+   палец→регистр I–IV → окт I..IV; активный регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg,
+   аккорды→chordOctReg) подсвечен. Общий рендер: зовут и drawRectGrid, и drawThereminGrid. */
+function drawRectOctBand(x0,w,lx,yTop,h){
+  ctx.fillStyle=hexA('#4cc2ff',.10); ctx.fillRect(x0,yTop,w,h);
+  ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
+  const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg();
+  ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
+  ctx.fillText('ОКТАВА', lx, sy+eh/2);
+  for(let n=0;n<4;n++){
+    const ey=sy+(n+1)*eh+eh/2, act=n===reg;
+    ctx.font= act?'700 13px system-ui':'12px system-ui';
+    ctx.fillStyle= act?'#4cc2ff':'rgba(255,255,255,.6)';
+    ctx.fillText(`${OCT_ROMAN[n]}  окт ${OCT_ROMAN[n]}`, lx, ey);
+  }
+}
+/* ТЕРМЕНВОКС (phone-соло, ON): раскладка та же, но каждый прямоугольник ПОДЕЛЁН на тонкие линии
+   — по одной на реальную ноту (у rect-ладов 4 на прямоугольник). Высота НЕПРЕРЫВНА по y; точная
+   нота — в ЦЕНТРЕ своего деления. Геометрия из thereminSpan — ТОТ ЖЕ раздел, что у звука
+   (gestures), поэтому линия и слышимый центр совпадают. Ближайшая нота (activeDeg) ярче —
+   ориентир, высота между ними скользит. Октавная полоса (rect) — как была. */
+function drawThereminGrid(x0,x1,playH,accent,activeDeg){
+  const {M,spanBot,divH}=thereminSpan(playH), last=M-1, w=x1-x0, s=CUR();
+  const lx=Math.max(x0+7,FX_BAND_R+8), rect=rectGrid();
+  ctx.fillStyle='rgba(255,255,255,.03)'; ctx.fillRect(x0,0,w,spanBot);   // нотное поле
+  ctx.textBaseline='middle';
+  if(rect){                                       // октавная полоса снизу — прежний рендер
+    const [yTop,yBot]=rectBandY(0,playH,rectRowsFull());
+    drawRectOctBand(x0,w,lx,yTop,yBot-yTop);
+    // грубые границы прямоугольников (ориентир): каждые 4 линии
+    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+    for(let r=1;r<rectRowsFull();r++){ const yb=spanBot-(r-1)*divH*4; ctx.beginPath(); ctx.moveTo(x0,yb); ctx.lineTo(x1,yb); ctx.stroke(); }
+  }
+  const every=divH>=15?1:divH>=9?2:4;             // подписи прореживаем, если линии частые (Партч=44 нот)
+  for(let d=0;d<=last;d++){                        // d — ступень; линия в ЦЕНТРЕ деления
+    const yc=spanBot-(d+0.5)*divH, on=d===activeDeg;
+    const ton=IVX()[d]%s.edo===0;                  // тоника/октава — зелёным (как drawGrid)
+    ctx.strokeStyle= on?accent : ton?'rgba(87,217,163,.35)':'rgba(255,255,255,.13)';
+    ctx.lineWidth= on?2:0.8;
+    ctx.beginPath(); ctx.moveTo(x0,yc); ctx.lineTo(x1,yc); ctx.stroke();
+    if(on||d%every===0){
+      ctx.fillStyle= on?accent : ton?'#57d9a3':'rgba(255,255,255,.55)';
+      ctx.font= on?'700 12px system-ui':'11px system-ui'; ctx.textAlign='left';
+      ctx.fillText(`${rect?rectNoteLbl(d):rowLabel(d)} · ${centsOf(d)}c`, lx, yc);
     }
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
@@ -370,7 +405,8 @@ function drawPhone(res){
         drawChordPalette(0,SPLIT,playH);
         ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель зон
         ctx.beginPath(); ctx.moveTo(SPLIT,0); ctx.lineTo(SPLIT,playH); ctx.stroke();
-      }else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(0,W,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли
+      }else if(instr==='ld'&&theremin)drawThereminGrid(0,W,playH,accent,act);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло)
+      else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(0,W,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли
       else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH, labelX);
     }
   }
@@ -422,7 +458,13 @@ function drawHandsPhone(res,W,H,playH){
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
       ctx.globalAlpha=.25; ctx.beginPath(); ctx.arc(S.x,S.y,26+8*S.vol,0,7); ctx.stroke(); ctx.globalAlpha=1;
       const s=CUR();
-      if(instr==='ld'||instr==='bs'){
+      if(instr==='ld'&&theremin&&S.hz){
+        /* Терменвокс: высота НЕПРЕРЫВНА — показываем живые Гц и центы над тоникой (не одну ступень).
+           «≈ ближайшая нота» — ориентир; глиссандо скользит между реальными нотами лада. */
+        const cAbs=Math.round(1200*Math.log2(S.hz/baseF()));
+        drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):rowLabel(S.deg)} · глиссандо`,
+          `${Math.round(S.hz)} Гц · ${Math.round(S.vol*100)}% · ${cAbs}c`],accent);
+      }else if(instr==='ld'||instr==='bs'){
         /* rectGrid (соло/бас): S.oct — это НОТА в прямоугольнике, а не октава. Октава — липкий
            регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg); берём его, иначе Гц/«окт» врали бы. */
         const rectRole=(instr==='ld'||instr==='bs')&&rectGrid();

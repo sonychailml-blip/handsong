@@ -162,6 +162,24 @@ export const rectRows=(s=CUR())=>(s.iv.length+1)/4;
    поэтому палец берёт ту полосу, которую видит. Полоса 0 = октавный прямоугольник (низ);
    полосы 1..N = нотные, нотный прямоугольник = полоса−1. */
 export const rectRowsFull=(s=CUR())=>rectRows(s)+1;
+/* ТЕРМЕНВОКС — ОБЩИЙ раздел вертикали для звука (gestures) и рисунка (draw): не разъезжаться,
+   иначе высота под пальцем ≠ высота на линии. M = число нот раскладки (IVX().length); нотное
+   поле [0,spanBot] сверху вниз = ВЫСШАЯ..низшая нота. У rect-лада низ отдан октавной полосе
+   (spanBot = поле без нижней полосы), у 12-TET — вся высота. Тонкое деление divH = spanBot/M
+   (у rect-ладов = seg/4 → 4 линии на прямоугольник). */
+export const thereminSpan=(playH)=>{ const M=IVX().length;
+  const spanBot = rectGrid() ? playH*(rectRowsFull()-1)/rectRowsFull() : playH;
+  return {M, spanBot, divH:spanBot/M}; };
+/* y → ДРОБНАЯ ступень p (0=низ … M-1=верх); центр деления = ТОЧНАЯ нота. Соседи floor/ceil,
+   интерполяция ЛОГАРИФМИЧЕСКАЯ (линейно в центах = геометрически в Гц) через leadFreq — так
+   неравные интервалы Партча/гамелана и любой EDO звучат верно, октавный регистр (oct) в leadFreq.
+   Кламп: y в [0,spanBot], p в [0,last]; на верхнем крае d0=d1=last → тоника октавой выше. */
+export const thereminHz=(y,playH,oct)=>{ const {M,spanBot,divH}=thereminSpan(playH), last=M-1;
+  const yc=Math.max(0,Math.min(spanBot,y)), fp=yc/divH;
+  let p=last-fp+0.5; p=Math.max(0,Math.min(last,p));
+  const d0=Math.floor(p), d1=Math.min(d0+1,last), fr=p-d0;
+  const l0=Math.log2(leadFreq(d0,oct)), l1=Math.log2(leadFreq(d1,oct));
+  return {hz:Math.pow(2,l0+(l1-l0)*fr), deg:Math.round(p), p}; };
 /* НАБОРЫ СЕМЕЙСТВ ПО ЛАДАМ. Интервалы — В ШАГАХ СВОЕГО СТРОЯ от корня; для 12-TET шаг
    это полутон, для 31-TET — 38.7 цента. Ветка `if(ty)` в chordSteps складывает шаги
    с шагами и от edo не зависит — один механизм на оба набора, разная только таблица.

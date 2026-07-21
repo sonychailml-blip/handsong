@@ -1,7 +1,7 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_W, CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg } from './state.js';
-import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull } from './scales.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin } from './state.js';
+import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
@@ -216,7 +216,14 @@ function processHands(res){
            «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава.
            У аккордов это КОРЕНЬ; тип берётся из палитры отдельно, октава — chordOctReg. */
         const rectPlay = phone && (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
-        if(rectPlay){
+        const thereminOn = phone && S.zone==='ld' && theremin;   // терменвокс — ТОЛЬКО phone-соло
+        const oct = rectPlay?rectOctReg():S.oct;                 // октавный регистр роли (WleadOn/бас/терменвокс)
+        if(thereminOn){
+          /* Непрерывная высота: y → Гц через общий раздел (thereminHz), интерполяция в центах
+             между реальными нотами лада. S.deg — ближайшая ступень (для подсветки И записи в лупер:
+             формат события не меняется), S.hz — живые Гц в звук. Палец ноту НЕ выбирает. */
+          const th=thereminHz(y,H,oct); S.deg=th.deg; S.hz=th.hz;
+        }else if(rectPlay){
           S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
           const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
           S.deg=clamp(r*4+S.oct, 0, IVX().length-1);
@@ -246,8 +253,8 @@ function processHands(res){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
-            WleadOn({deg:S.deg,oct:rectPlay?rectOctReg():S.oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; rectGrid — октава из липкого регистра роли
-                     vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx});
+            WleadOn({deg:S.deg,oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; rectGrid — октава из липкого регистра роли
+                     vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 2-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
           if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg():S.oct,vol:S.vol,inst:bassIdx});   // rect-бас — октава из bassOctReg; 12-TET бас — S.oct (палец), как было

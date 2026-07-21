@@ -1,5 +1,5 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
-         uiMode, phoneInstr, swapHands, setUiMode, setPhoneInstr, setSwapHands } from './state.js';
+         uiMode, phoneInstr, swapHands, setUiMode, setPhoneInstr, setSwapHands, theremin, setTheremin } from './state.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
@@ -10,7 +10,7 @@ import { hooks } from './hooks.js';
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), modeBtn=$('modeBtn'), swapBtn=$('swapBtn'),
+      instrBtn=$('instrBtn'), modeBtn=$('modeBtn'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -163,6 +163,7 @@ function applyMode(){
   modeBtn.textContent = uiMode==='phone' ? '📱' : '💻';
   modeBtn.title = uiMode==='phone' ? 'Режим: Смартфон — тап переключит на ПК'
                                    : 'Режим: ПК — тап переключит на Смартфон';
+  applyTheremin();                             // 〰 виден только в phone-соло — обновляем при смене режима
 }
 function applySwap(){                          // ⇄ — только в «Смартфон» (в ПК роль по месту, не по руке)
   swapBtn.classList.toggle('act', swapHands);
@@ -172,10 +173,19 @@ function applySwap(){                          // ⇄ — только в «См
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
 function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
-  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); }   // цвет роли — в CSS-переменную, оформление в style.css
+  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); applyTheremin(); }   // цвет роли — в CSS-переменную; видимость 〰 зависит от роли
+/* 〰 Терменвокс — компаньон кнопки роли: виден ТОЛЬКО в phone-соло (в ПК и на других ролях
+   скрыт, видимость через JS, без style.css). .act — режим включён (как у swapBtn). */
+function applyTheremin(){
+  thereminBtn.classList.toggle('act', theremin);
+  thereminBtn.title = theremin ? 'Терменвокс ВКЛ: непрерывная высота — тап выключит'
+                               : 'Терменвокс: непрерывная высота (глиссандо)';
+  thereminBtn.style.display = (uiMode==='phone'&&phoneInstr==='ld') ? '' : 'none';
+}
 modeBtn.onclick  =()=>{ setUiMode(uiMode==='phone'?'pc':'phone'); softAllOff(); applyMode(); };
 instrBtn.onclick =()=>{ setPhoneInstr(INSTR_SEQ[(INSTR_SEQ.indexOf(phoneInstr)+1)%INSTR_SEQ.length]); softAllOff(); applyInstr(); };
 swapBtn.onclick  =()=>{ setSwapHands(!swapHands); softAllOff(); applySwap(); };
+thereminBtn.onclick=()=>{ setTheremin(!theremin); softAllOff(); applyTheremin(); };
 applyMode(); applyInstr(); applySwap();
  
 export { $ };

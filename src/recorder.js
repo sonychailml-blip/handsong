@@ -53,8 +53,11 @@ function loopPos(){
 const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer:'latch';
 const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer:'bass';
 const ENG={
-  leadOn:(a,ctx)=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
-              applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
+  leadOn:(a,ctx,live)=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
+              /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
+                 Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без 3-го арг → live undefined →
+                 частота из leadFreq по замороженному ладу (полимодальность цела). */
+              applyParams({freq:(live!=null?live:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
               noteOn(); },
   leadSet:(a,ctx)=>applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
@@ -116,7 +119,7 @@ function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — од�
 
 /* Обёртки W*: живой звук СРАЗУ + запись (если вооружено). Переигровка (насос)
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
-const WleadOn =p=>{ ENG.leadOn(p); recLeadEv(p); };
+const WleadOn =(p,live)=>{ ENG.leadOn(p,null,live); recLeadEv(p); };   // live — только в звук (терменвокс); recLeadEv пишет ТОЛЬКО p (deg/oct), формат события не тронут
 const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
 /* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
    тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
