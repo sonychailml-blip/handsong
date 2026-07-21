@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord } from './scales.js';
 import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg, theremin } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_W, CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY } from './config.js';
@@ -122,12 +122,12 @@ function drawRectOctBand(x0,w,lx,yTop,h){
   ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
   const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg();
   ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
-  ctx.fillText('ОКТАВА', lx, sy+eh/2);
+  ctx.fillText(periodOf()===2?'ОКТАВА':regWord().toUpperCase(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.). period=2 байт-в-байт
   for(let n=0;n<4;n++){
     const ey=sy+(n+1)*eh+eh/2, act=n===reg;
     ctx.font= act?'700 13px system-ui':'12px system-ui';
     ctx.fillStyle= act?'#4cc2ff':'rgba(255,255,255,.6)';
-    ctx.fillText(`${OCT_ROMAN[n]}  окт ${OCT_ROMAN[n]}`, lx, ey);
+    ctx.fillText(`${OCT_ROMAN[n]}  ${regWord()} ${OCT_ROMAN[n]}`, lx, ey);
   }
 }
 /* ТЕРМЕНВОКС (phone-соло, ON): раскладка та же, но каждый прямоугольник ПОДЕЛЁН на тонкие линии
@@ -342,14 +342,14 @@ function drawPC(res){
         if(S.zone==='ld'){
           const f=leadFreq(S.deg,S.oct);
           const L1=(s.edo>12&&s.tag==='edo')
-            ? `ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[S.oct]}`
-            : `${rowLabel(S.deg)} · окт ${OCT_ROMAN[S.oct]}`;
+            ? `ступень ${IVX()[S.deg]%s.edo} · ${regWord(s)} ${OCT_ROMAN[S.oct]}`
+            : `${rowLabel(S.deg)} · ${regWord(s)} ${OCT_ROMAN[S.oct]}`;
           const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}%`+
                    (s.edo!==12?` · ${centsOf(S.deg)}c`:'');
           drawTag(S.x,S.y,[L1,L2],'#ff9e2c');
         }else{
           drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),
-            `окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],'#b18cff');
+            `${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],'#b18cff');
         }
       }else if(!S.pinch){
         // подсказка до щипка: что прозвучит под пальцем
@@ -449,7 +449,7 @@ function drawHandsPhone(res,W,H,playH){
     }
     if(S.pinch&&S.zone==='oct'){                  // рука в октавной полосе (любая, в т.ч. левая): показываем регистр, эффектов НЕ трогаем
       ctx.fillStyle='#4cc2ff'; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText(`ОКТ ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);
+      ctx.fillText(`${regWord().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // «ОКТ»/«ТРИТАВА» по периоду; period=2 → 'ОКТ' байт-в-байт
       continue;
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
@@ -478,8 +478,8 @@ function drawHandsPhone(res,W,H,playH){
         const rectRole=(instr==='ld'||instr==='bs')&&rectGrid();
         const oShow=rectRole?rectOctReg():S.oct;
         const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
-        const L1=rectRole?`${rectNoteLbl(S.deg)} · окт ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
-          :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · окт ${OCT_ROMAN[oShow]}`;
+        const L1=rectRole?`${rectNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
+          :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · ${regWord(s)} ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
         const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}%`+(s.edo!==12?` · ${centsOf(S.deg)}c`:'');
         drawTag(S.x,S.y,[L1,L2],accent);
       }else if(isDr){
@@ -489,8 +489,8 @@ function drawHandsPhone(res,W,H,playH){
         const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
         const oShow=rectGrid()?rectOctReg():S.oct;   // rect-аккорды (19/31): октава из chordOctReg; chrom12: S.oct (палец)
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
-          ty.full||fam.name,`окт ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
-      }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`окт ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
+          ty.full||fam.name,`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
+      }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
     }else if(!S.pinch){                          // подсказка до щипка — под указательным
       const tip=lm[8], x=(1-tip.x)*W, y=tip.y*H;
       if((instr==='ld'||instr==='bs'||instr==='ch')&&rectGrid()){
@@ -501,7 +501,7 @@ function drawHandsPhone(res,W,H,playH){
         const [yTop,yBot]=rectBandY(band,playH,nRfull), hx0=instr==='ch'?CH_PAL_W*W:0;
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,yTop,W-hx0,yBot-yTop);
         let lbl;
-        if(band===0) lbl=`ОКТАВА · палец I–IV → регистр (сейчас ${OCT_ROMAN[rectOctReg()]})`;
+        if(band===0) lbl=`${periodOf()===2?'ОКТАВА':regWord().toUpperCase()} · палец I–IV → регистр (сейчас ${OCT_ROMAN[rectOctReg()]})`;
         else{ const r=band-1; lbl=''; for(let n=0;n<4;n++){ const deg=Math.min(r*4+n,maxDeg); lbl+=(n?'  ':'')+OCT_ROMAN[n]+':'+(instr==='ch'?rootName(deg):rectNoteLbl(deg)); } }
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
         ctx.fillText(lbl,x+14,y-12);
