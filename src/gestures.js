@@ -298,6 +298,14 @@ function processHands(res){
         }
       }
     }
+    /* Индикатор реверба (revDisp): у phone-СОЛО НОТНОЙ руки показываем ТЕКУЩУЮ глубину (Z=близость
+       кисти) КАЖДЫЙ кадр — щипок не нужен, можно «прицелиться» ревербом ДО игры. Пропускаем, когда
+       рука уже играет (ветка 'ld'/leadOwner выше сама зовёт setRevDisp — иначе посчитали бы EMA дважды).
+       ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре. ПК не трогаем. */
+    if(uiMode==='phone' && phoneInstr==='ld' && handRole(key)==='notes'
+       && !(S.pinch && S.zone==='ld' && leadOwner===key)){
+      setRevDisp(clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE));
+    }
   }
   /* Watchdog: рука пропала из кадра во время щипка → принудительный
      release через 120 мс (короткая пауза прощает мигание трекинга). */
@@ -307,6 +315,9 @@ function processHands(res){
   }
   if(leadOwner&&!HANDS[leadOwner])leadOwner=null;
   if(bassOwner&&!HANDS[bassOwner]){ WbassOff(); bassOwner=null; }
+  /* Соло-нотной руки нет в кадре → индикатор реверба гасим в 0 (не висит на последнем значении).
+     Только phone-соло; ПК ведёт revDisp по-своему — его не сбрасываем. */
+  if(uiMode==='phone' && phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes')) setRevDisp(0);
 }
 
 /* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */
