@@ -67,19 +67,22 @@ function buildLeadBanks(preBus){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const oscs=[]; for(const sp of [-12,-6,0,6,12]){
       const o=mkOsc('sawtooth',220,ig,0.17); o.detune.value=sp; oscs.push(o); }
-    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02))});
+    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
+                cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t))});
   }
   { // Орган (аддитивный)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const parts=[[1,.42],[2,.22],[3,.14],[4,.09]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
-    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02))});
+    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
+                cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t))});
   }
   { // Пад
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2100; lp.connect(ig);
     const oscs=[]; for(const dt of [-7,0,7]){
       const o=mkOsc('triangle',220,lp,0.34); o.detune.value=dt; oscs.push(o); }
-    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02))});
+    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
+                cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t))});
   }
   { // Колокол (FM)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
@@ -90,19 +93,23 @@ function buildLeadBanks(preBus){
     banks.push({gain:ig,setFreq:(f,t)=>{
       car.frequency.setTargetAtTime(f,t,0.02);
       mod.frequency.setTargetAtTime(f*3.507,t,0.02);
-      mg.gain.setTargetAtTime(f*1.6,t,0.02); }});
+      mg.gain.setTargetAtTime(f*1.6,t,0.02); },
+      cancel:t=>{ car.frequency.cancelScheduledValues(t);
+        mod.frequency.cancelScheduledValues(t); mg.gain.cancelScheduledValues(t); }});
   }
   { // Флейта: треугольник + синус-подпорка
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o1=mkOsc('triangle',220,ig,0.35);
     const o2=mkOsc('sine',220,ig,0.22); o2.detune.value=4;
     banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02);
-      o2.frequency.setTargetAtTime(f,t,0.02);}});
+      o2.frequency.setTargetAtTime(f,t,0.02);},
+      cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);}});
   }
   { // 8-бит: чистый прямоугольник
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o=mkOsc('square',220,ig,0.28);
-    banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02)});
+    banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
+                cancel:t=>o.frequency.cancelScheduledValues(t)});
   }
 }
 /* --- Пул аккордовых голосов (всегда запущены, гейт по громкости; размер — CHORD_POOL_N) --- */
@@ -249,7 +256,7 @@ function setLeadInstr(i){
 }
 function applyParams(p){
   const t=AC.currentTime;
-  banks.forEach(b=>b.setFreq(p.freq,t));
+  if(p.freq!=null)banks.forEach(b=>b.setFreq(p.freq,t));   // freq НЕ трогаем, если не задан (leadSet с hold: обновляем громкость/эффекты, а идущий бенд не сбиваем)
   volGain.gain.setTargetAtTime(p.vol,t,0.04);
   vibGain.gain.setTargetAtTime(p.vib*35,t,0.05);
   satWet.gain.setTargetAtTime(p.drv,t,0.05);
@@ -259,6 +266,20 @@ function applyParams(p){
   dlyWet.gain.setTargetAtTime(p.dly*0.55,t,0.08);
   revLead.gain.setTargetAtTime(p.rev*0.85,t,0.08);
 }
+/* Глиссандо-в-луп (переигровка терменвокса): расписываем ЗАПИСАННУЮ кривую бенда на будущие
+   AC-времена через ТУ ЖЕ setFreq (setTargetAtTime 0.02) — тот же 20мс-глайд, что и живьём.
+   baseFreq — частота ступени по ЗАМОРОЖЕННОМУ ладу (полимодальность), c — центы поверх неё;
+   абсолютных Гц не храним. dt в долях → секунды через secPerBeat. */
+function scheduleBend(points, baseFreq, secPerBeat){
+  const t0=AC.currentTime;
+  for(const pt of points){
+    const f=baseFreq*Math.pow(2,pt.c/1200), at=t0+pt.dt*secPerBeat;
+    banks.forEach(b=>b.setFreq(f,at));
+  }
+}
+/* Снять расписанные рампы частоты (на атаке переигранной ноты, ctx): чтобы бенд предыдущей
+   ноты не перетёк в следующую. Живой путь (без ctx) не зовёт — живой звук не трогаем. */
+function leadCancel(){ const t=AC.currentTime; banks.forEach(b=>b.cancel&&b.cancel(t)); }
 function noteOn(){
   if(noteOnFlag)return; noteOnFlag=true;
   const t=AC.currentTime;
@@ -404,7 +425,7 @@ function metroClick(t,accent){
 
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
 export {
-  initAudio, AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick,
+  initAudio, AC, setLeadInstr, applyParams, scheduleBend, leadCancel, noteOn, noteOff, metroClick,
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS,

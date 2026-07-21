@@ -13,6 +13,7 @@ export const TRADITIONS=[
   {id:'micro', name:'Микротональная'},
   {id:'chrom', name:'Хроматика'},
   {id:'world', name:'Мировые строи'},
+  {id:'nonoct',name:'Неоктавные'},               // период ≠ октава: Болен–Пирс (тритава 3:1); позже Карлос
 ];
 
 /* Каждый лад: edo — на сколько равных шагов делится октава, iv — ступени лада в этих
@@ -119,6 +120,14 @@ export const SCALES=[
            701.96,729.22,764.92,782.49,813.69,852.59,884.36,905.87,933.13,968.83,996.09,1017.6,
            1035.0,1049.36,1088.27,1115.53,1146.73,1178.49],
     tag:'ji', typedChords:'partch', rectGrid:true},
+ /* Болен–Пирс — НЕОКТАВНЫЙ строй: период не октава (2:1), а ТРИТАВА (3:1). 13 РАВНЫХ шагов
+    3^(1/13) ≈ 146.3¢, полная тритава = 1901.955¢. РАВНОМЕРНЫЙ внутри периода (как 19/31-TET
+    внутри октавы) — НЕ cents-лад: свойство period:3 заменяет зашитую октаву в формуле высоты
+    (periodOf: leadFreq/bassFreq берут P^oct и P^(шаг/edo)). Регистр (палец, 0..3) сдвигает на
+    ТРИТАВУ. noChords (стадия 1): аккорды 3:5:7 и Карлос — позже. НЕ rect: (13+1)=14 не делится
+    на 4, rectGrid нельзя. tag:'bp' — инертен у всех читателей (не 'edo'/'penta'/терции). Индекс 50. */
+ {name:'Болен–Пирс (13 равных, тритава)', trad:'nonoct', grp:'', edo:13, iv:range(13),
+    period:3, tag:'bp', noChords:true},
 ];
 
 /* Лады традиции — в порядке массива; отдаём вместе с АБСОЛЮТНЫМ индексом,
@@ -129,6 +138,10 @@ export const tradOfScale=i=>SCALES[i].trad;
 export const CUR=()=>SCALES[scaleIdx];
 export const IVX=()=>CUR().iv.concat([CUR().edo]);          // + верхняя тоника
 export const baseF=()=>220*Math.pow(2,(tonic-9)/12);        // частота тоники (C=130.81 Гц)
+/* ПЕРИОД лада (интервал эквивалентности) — по умолчанию ОКТАВА (2). Неоктавный строй задаёт
+   своё (Болен–Пирс period:3 — тритава). Заменяет зашитую двойку в формуле высоты: и регистр
+   P^oct, и равный шаг P^(шаг/edo). Дефолт 2 ⇒ ВСЕ прежние лады байт-в-байт. */
+export const periodOf=(s=CUR())=>s.period||2;
 /* Совместимость ладов для §3.7 (перенос фразы в другой строй возможен лишь при равном
    числе ступеней: 7→7 да, 7→5 нет). UI-уровень — принимает индексы, не хранимые данные. */
 export const sameDegrees=(a,b)=>SCALES[a].iv.length===SCALES[b].iv.length;
@@ -403,16 +416,16 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
    октава, регистр Math.pow(2,o) не трогаем. cents.length===iv.length, поэтому дописанные
    верхушки (edo→структура, 1200→центы) дают cx и ivx одинаковой длины. Нет s.cents —
    выражение байт-в-байт прежнее. */
-export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length;
+export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
   const cx=s.cents?s.cents.concat([1200]):null;
-  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(2,ivx[i]/s.edo);
-  return baseF()*Math.pow(2,o)*r; }
-export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length; // бас на 2 октавы ниже соло (baseF/4)
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);   // равный шаг — в ПЕРИОДЕ лада (P^(шаг/edo)); cents-ветка октавная (2/1200), её не трогаем
+  return baseF()*Math.pow(P,o)*r; }                             // регистр — на ПЕРИОД (BP: тритава 3^oct); P=2 у прочих — байт-в-байт
+export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s); // бас на 2 октавы ниже соло (baseF/4 — константа-пол, не период)
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
   const cx=s.cents?s.cents.concat([1200]):null;
-  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(2,ivx[i]/s.edo);
-  return baseF()/4*Math.pow(2,o)*r; }
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);
+  return baseF()/4*Math.pow(P,o)*r; }
 export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
   if (s.cents && ty){
     /* Cents-строй + типизированный аккорд (Партч): интервалы — ЧИСТЫЕ ОТНОШЕНИЯ от корня, не
@@ -424,7 +437,8 @@ export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
     const rootF=baseF()/2*Math.pow(2,o)*Math.pow(2,s.cents[d]/1200);
     return ty.map(ra=>rootF*ra);
   }
-  return chordSteps(deg,s,sev,ty).map(st=> baseF()/2*Math.pow(2,oct)*Math.pow(2,st/s.edo)); }
+  const P=periodOf(s);   // равная ветка: регистр и шаг — в ПЕРИОДЕ лада (P=2 у всех аккордовых ладов ⇒ байт-в-байт; для BP дремлет — noChords)
+  return chordSteps(deg,s,sev,ty).map(st=> baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo)); }
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
@@ -441,7 +455,8 @@ export function rowLabel(deg){ const s=CUR(), ivx=IVX();
    правда: play-tag показывает 231, а не 240), гейт на s.cents, поэтому прочие лады
    считают по-прежнему от номинального равного шага. На высоту не влияет. */
 export const centsOf=deg=>{ const s=CUR(); if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
-  return Math.round(IVX()[deg]*1200/s.edo)%1200; };
+  const pc=1200*Math.log2(periodOf(s));   // центы ПЕРИОДА: октава 1200 (P=2, байт-в-байт), тритава ≈1901.955 (BP) — честный шаг ~146.3¢
+  return Math.round(IVX()[deg]*pc/s.edo)%pc; };
  
 export function qual(t,f){                         // качество трезвучия по интервалам (полутона)
   if(t===4&&f===7)return''; if(t===3&&f===7)return'm';

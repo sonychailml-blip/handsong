@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf } from './scales.js';
 import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg, theremin } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_W, CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY } from './config.js';
@@ -71,6 +71,14 @@ function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height,labelX=zx
    (и снизу, и октавная сверху), дальше 2,3,4… — так номера встают в ряд с римскими пальцами
    I–IV (rowLabel дал бы «1» у пальца II — читается как ошибка). Только для rect-соло. */
 const rectNoteLbl = deg => (deg===0 || centsOf(deg)===0) ? 'Т' : String(deg+1);
+/* Подпись ноты нерект-сетки. У НЕОКТАВНЫХ ладов (period≠2, напр. Болен–Пирс) нумеруем ПОРЯДКОВО
+   Т,2,3,4… (как rect-лады), а не номером ШАГА (rowLabel дал бы «1» у второй ноты — off-by-one).
+   Тонику и верхнюю тонику периода ловим СТРУКТУРНО (IVX[deg]%edo===0 — как зелёная линия тоники
+   в drawGrid), а НЕ через centsOf===0: у неоктавного периода центы сверху не округляются в ровный
+   0 (pc=1901.955). period=2 (все прочие лады) → rowLabel как был, байт-в-байт. */
+const gridNoteLbl = deg => periodOf(CUR())!==2
+  ? (IVX()[deg]%CUR().edo===0 ? 'Т' : String(deg+1))
+  : rowLabel(deg);
 /* Сетка «4 ноты в прямоугольнике» (phone-соло/бас/аккорды, 19/31-TET). Прямоугольник выбирается
    по Y, нота/корень внутри — ПАЛЬЦЕМ (I..IV), а НЕ горизонталью: X — громкость. Поэтому 4 ноты
    показываем КОМПАКТНОЙ ЛЕГЕНДОЙ по пальцам (I/II/III/IV → нота), а не колонками. Активный палец
@@ -149,7 +157,7 @@ function drawThereminGrid(x0,x1,playH,accent,activeDeg){
     if(on||d%every===0){
       ctx.fillStyle= on?accent : ton?'#57d9a3':'rgba(255,255,255,.55)';
       ctx.font= on?'700 12px system-ui':'11px system-ui'; ctx.textAlign='left';
-      ctx.fillText(`${rect?rectNoteLbl(d):rowLabel(d)} · ${centsOf(d)}c`, lx, yc);
+      ctx.fillText(`${rect?rectNoteLbl(d):gridNoteLbl(d)} · ${centsOf(d)}c`, lx, yc);   // нерект (BP): порядковый, чтобы совпасть с сеткой/ярлыком; period=2 → rowLabel как был
     }
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
@@ -407,7 +415,7 @@ function drawPhone(res){
         ctx.beginPath(); ctx.moveTo(SPLIT,0); ctx.lineTo(SPLIT,playH); ctx.stroke();
       }else if(instr==='ld'&&theremin)drawThereminGrid(0,W,playH,accent,act);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло)
       else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(0,W,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли
-      else drawGrid(0,W,accent, instr==='ch'?chordLabel:rowLabel, act, playH, labelX);
+      else drawGrid(0,W,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
     }
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn
@@ -462,7 +470,7 @@ function drawHandsPhone(res,W,H,playH){
         /* Терменвокс: высота НЕПРЕРЫВНА — показываем живые Гц и центы над тоникой (не одну ступень).
            «≈ ближайшая нота» — ориентир; глиссандо скользит между реальными нотами лада. */
         const cAbs=Math.round(1200*Math.log2(S.hz/baseF()));
-        drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):rowLabel(S.deg)} · глиссандо`,
+        drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):gridNoteLbl(S.deg)} · глиссандо`,
           `${Math.round(S.hz)} Гц · ${Math.round(S.vol*100)}% · ${cAbs}c`],accent);
       }else if(instr==='ld'||instr==='bs'){
         /* rectGrid (соло/бас): S.oct — это НОТА в прямоугольнике, а не октава. Октава — липкий
@@ -471,7 +479,7 @@ function drawHandsPhone(res,W,H,playH){
         const oShow=rectRole?rectOctReg():S.oct;
         const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
         const L1=rectRole?`${rectNoteLbl(S.deg)} · окт ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
-          :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[oShow]}`:`${rowLabel(S.deg)} · окт ${OCT_ROMAN[oShow]}`;
+          :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · окт ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · окт ${OCT_ROMAN[oShow]}`;
         const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}%`+(s.edo!==12?` · ${centsOf(S.deg)}c`:'');
         drawTag(S.x,S.y,[L1,L2],accent);
       }else if(isDr){
@@ -504,7 +512,7 @@ function drawHandsPhone(res,W,H,playH){
         const hx0 = (isCh&&typedChords()) ? CH_PAL_W*W : 0;
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,(rows-1-d)*seg,W-hx0,seg);
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-        ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):rowLabel(d)),x+14,y-12);
+        ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):gridNoteLbl(d)),x+14,y-12);
       }
     }
   }

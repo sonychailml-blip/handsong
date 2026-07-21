@@ -1,9 +1,9 @@
-import { AC, setLeadInstr, applyParams, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
+import { AC, setLeadInstr, applyParams, scheduleBend, leadCancel, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff } from './audio.js';
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
-import { REC_VOL_EPS, REC_REV_EPS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
+import { REC_VOL_EPS, REC_REV_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
 import { hooks } from './hooks.js';
 
 /* ================= ЗАПИСЬ И ЛУПЕР =================
@@ -31,6 +31,9 @@ const events=[];                                     // стабильная с�
 const loop={ on:false, bars:2, bpm:84, t0:0, pos:-1e-9, first:false, layer:0, clickBeat:0, quant:true };
 const droneActive=()=>events.some(e=>e.fn==='drone');   // жив ли слой-дрон (для гашения при снятии/стопе)
 let recLead=null, recCh=null, recBass=null, pumpTimer=null;
+/* Глиссандо-в-луп: у ОТКРЫТОЙ соло-ноты копим кривую бенда (центы поверх ступени) в массив,
+   лежащий ПО ССЫЛКЕ в событии leadOn. Активно только у терменвокса (гейт live!=null). */
+let recLeadBend=null, noteStartBeat=0, bendLastC=null;
 let curChordDeg=-1;                                  // ступень аккорда, что играет петля сейчас (для подсветки, §Q5)
 const loopBeats=()=>loop.bars*BEATS_PER_BAR;
 const loopChordDeg=()=>loop.on?curChordDeg:-1;       // draw: подсветить аккорд петли, когда рука его не держит
@@ -57,9 +60,12 @@ const ENG={
               /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
                  Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без 3-го арг → live undefined →
                  частота из leadFreq по замороженному ладу (полимодальность цела). */
-              applyParams({freq:(live!=null?live:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
-              noteOn(); },
-  leadSet:(a,ctx)=>applyParams({freq:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
+              if(ctx)leadCancel();                 // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт)
+              const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
+              applyParams({freq:(live!=null?live:base),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
+              noteOn();
+              if(a.bend&&a.bend.length)scheduleBend(a.bend,base,60/loop.bpm); },   // переигровка: кривая бенда поверх ступени замороженного лада
+  leadSet:(a,ctx)=>applyParams({freq:(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
   chOn:(a,ctx)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst),
   chSet:(a,ctx)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol),
@@ -85,15 +91,46 @@ function push(fn,a){
   if(g>0)t=(Math.round(t/g)*g)%loopBeats();
   events.push({t,layer:loop.layer,fn,a,sc:CUR(),sev:seventh});   // §3.4: замораживаем ладовый контекст события
 }
-function recLeadEv(p){
+/* Доля внутри петли СЕЙЧАС (тот же счёт, что и push) — для dt точек бенда. */
+const curBeat=()=>((AC.currentTime-loop.t0)*loop.bpm/60)%loopBeats();
+/* Точка бенда: центы ЖИВОЙ высоты (live) относительно ступени АТАКИ (recLead.deg/oct по
+   замороженному-в-будущем ладу CUR()). Само-прореживание порогом BEND_EPS_CENTS. dt клампим ≥0
+   (нота через заворот петли — редкость; первый круг всё равно кончается на завороте). */
+function pushBend(live){
+  if(!recLeadBend||live==null)return;
+  const c=1200*Math.log2(live/leadFreq(recLead.deg,recLead.oct,CUR()));
+  if(bendLastC!=null&&Math.abs(c-bendLastC)<=BEND_EPS_CENTS)return;
+  recLeadBend.push({dt:Math.max(0,curBeat()-noteStartBeat),c});
+  bendLastC=c;
+}
+/* live!=null ⟺ phone-соло-терменвокс (gestures шлёт S.hz только там). Тогда высоту несёт БЕНД:
+   deg/oct ЗАМОРОЖЕНЫ на атаке (не сравниваем и не обновляем — у c стабильная опора), а leadSet
+   пишем лишь на смену громкости/реверба/тембра с меткой hold (переигровка не сбивает бенд частотой).
+   live==null (терменвокс выкл / бас-как-соло нет / ПК) — код БАЙТ-В-БАЙТ как раньше. */
+function recLeadEv(p,live){
   if(!recording)return;
-  if(!recLead){ push('leadOn',{...p}); }
-  else if(p.deg!==recLead.deg||p.oct!==recLead.oct||p.inst!==recLead.inst||
-          Math.abs(p.vol-recLead.vol)>REC_VOL_EPS||Math.abs(p.rev-recLead.rev)>REC_REV_EPS){ push('leadSet',{...p}); }
+  if(!recLead){
+    const a={...p};
+    if(live!=null){ a.bend=[]; recLeadBend=a.bend; noteStartBeat=curBeat(); bendLastC=null; }
+    push('leadOn',a);
+    recLead={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst};
+    if(live!=null)pushBend(live);                  // стартовая точка (recLead уже есть — опора известна)
+    return;
+  }
+  if(live!=null){                                  // терменвокс: пишем бенд + громкость/реверб (hold), НЕ deg/oct
+    pushBend(live);
+    if(p.inst!==recLead.inst||Math.abs(p.vol-recLead.vol)>REC_VOL_EPS||Math.abs(p.rev-recLead.rev)>REC_REV_EPS){
+      push('leadSet',{...p,hold:true});
+      recLead={deg:recLead.deg,oct:recLead.oct,vol:p.vol,rev:p.rev,inst:p.inst};   // deg/oct остаются на атаке
+    }
+    return;
+  }
+  if(p.deg!==recLead.deg||p.oct!==recLead.oct||p.inst!==recLead.inst||
+     Math.abs(p.vol-recLead.vol)>REC_VOL_EPS||Math.abs(p.rev-recLead.rev)>REC_REV_EPS){ push('leadSet',{...p}); }
   else return;
   recLead={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst};
 }
-function recLeadOff(){ if(recording&&recLead){ push('leadOff',{}); recLead=null; } }
+function recLeadOff(){ if(recording&&recLead){ push('leadOff',{}); recLead=null; } recLeadBend=null; }
 /* ty входит в сравнение: у типизированных аккордов громкость ФИКСИРОВАНА, а сектор
    меняется без смены ступени/октавы — без этой проверки смена типа не попала бы в
    запись вовсе, и петля играла бы не тот аккорд. Сравнение по ссылке корректно:
@@ -119,7 +156,7 @@ function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — од�
 
 /* Обёртки W*: живой звук СРАЗУ + запись (если вооружено). Переигровка (насос)
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
-const WleadOn =(p,live)=>{ ENG.leadOn(p,null,live); recLeadEv(p); };   // live — только в звук (терменвокс); recLeadEv пишет ТОЛЬКО p (deg/oct), формат события не тронут
+const WleadOn =(p,live)=>{ ENG.leadOn(p,null,live); recLeadEv(p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается
 const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
 /* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
    тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
@@ -135,7 +172,7 @@ function softAllOff(){ if(!AC)return; noteOff();
   Object.keys(chordHold).forEach(k=>chordOff(k));   // все владельцы аккордов: 'latch' + 'loop:N'
   Object.keys(bassHold).forEach(k=>bassOff(k));     // все владельцы баса: 'bass' + 'bassloop:N'
   setLatchDeg(-1); setLatchTy(null);              // тип гасим вместе со ступенью: иначе после паники/очистки
-  recLead=null; recCh=null; recBass=null; }       // следующий щипок той же ступени прочёлся бы как «тот же аккорд»
+  recLead=null; recCh=null; recBass=null; recLeadBend=null; }   // следующий щипок той же ступени прочёлся бы как «тот же аккорд»; бенд открытой ноты сбрасываем
 function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 
 /* --- Транспорт петли --- */
