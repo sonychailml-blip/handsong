@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, theremin, splitOn, phoneHalves } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX } from './config.js';
@@ -68,7 +68,8 @@ const rectNoteLbl = deg => (deg===0 || centsOf(deg)===0) ? 'Т' : String(deg+1);
    drawGrid), а НЕ через centsOf===0: у неоктавного периода центы сверху не округляются в ровный 0.
    Октавный НЕ-cents лад (12-TET, макамы: period=2 И нет s.cents) → rowLabel как был, байт-в-байт.
    Партч — cents-лад, НО rect: везде идёт через rectNoteLbl/rect-ветки, сюда не заходит (без регресса). */
-const gridNoteLbl = deg => (periodOf(CUR())!==2 || CUR().cents)
+const gridNoteLbl = deg => CUR().swaraNames ? swaraLbl(deg)   // индийские лады: имена свар (саргам) вместо порядковых
+  : (periodOf(CUR())!==2 || CUR().cents)
   ? (IVX()[deg]%CUR().edo===0 ? 'Т' : String(deg+1))
   : rowLabel(deg);
 /* Сетка «4 ноты в прямоугольнике» (phone-соло/бас/аккорды, 19/31-TET). Прямоугольник выбирается
@@ -260,8 +261,16 @@ function drawNoChordsHint(x0,x1,yTop,yBot){
 /* Статус-строка (учебный слой). */
 function drawStatus(){
   const s=CUR();
-  let st=`Лад: ${s.name} · ${s.edo}-TET · ступени: ${s.iv.join('-')}`;
-  if(s.edo!==12)st+=` · шаг ${(1200/s.edo).toFixed(1)}c`;
+  /* Цент-лады (гамелан/Парч/темперации/индийские) НЕ равномерны: печатать «N-TET» и мнимый шаг
+     1200/edo было бы враньём (шрути неравны, минимум 22¢; edo — лишь номинал). Показываем ЧЕСТНО:
+     «центовый строй · N ступеней» + реальные центы. Нецентовые лады — строка байт-в-байт как была. */
+  let st;
+  if(s.cents){
+    st=`Лад: ${s.name} · центовый строй · ${s.iv.length} ступеней`;   // полный список центов НЕ печатаем (43 у Партча, 22 у сетки — переполняет строку); реальные центы — на каждом ряду и в ярлыке
+  }else{
+    st=`Лад: ${s.name} · ${s.edo}-TET · ступени: ${s.iv.join('-')}`;
+    if(s.edo!==12)st+=` · шаг ${(1200/s.edo).toFixed(1)}c`;
+  }
   if(recording)st='● запись · '+st;
   else if(inPB())st=`▶ петля · ${loop.bpm} BPM · `+st;
   statusEl.textContent=st;
