@@ -67,8 +67,10 @@ export const setOctReg=v=>{ octReg=v; };
 export const setBassOctReg=v=>{ bassOctReg=v; };
 export const setChordOctReg=v=>{ chordOctReg=v; };
 /* РОЛЕВОЙ РЕЗОЛВЕР октавного регистра — ОДНО место, где решается «чей регистр»: аккорды, бас
-   или соло. Ключ — phoneInstr (в phone-режиме он всегда совпадает с активной rect-ролью). Читают
-   его и gestures (запись в октавной полосе + чтение при игре), и draw (подпись октавы) — так они
-   не разъедутся. Нигде больше нет тернара phoneInstr==='ch'/'bs'. Вызовы — только в рантайме (TDZ ок). */
-export const rectOctReg    = ()=> phoneInstr==='ch' ? chordOctReg : phoneInstr==='bs' ? bassOctReg : octReg;
-export const setRectOctReg = v => { if(phoneInstr==='ch') setChordOctReg(v); else if(phoneInstr==='bs') setBassOctReg(v); else setOctReg(v); };
+   или соло. Ключ — ЯВНЫЙ аргумент role ('ld'|'ch'|'bs'), больше НЕ глобальный phoneInstr: при
+   сплит-экране (две роли сразу) phoneInstr перестанет опознавать роль щипнувшей руки, поэтому
+   роль передаём явно. Читают резолвер gestures (запись в октавной полосе + чтение при игре) и
+   draw (подпись октавы) — каждый передаёт роль, которую и так знает (S.zone/instr). Нигде больше
+   нет тернара 'ch'/'bs'. Вызовы — только в рантайме (TDZ ок). */
+export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
+export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };

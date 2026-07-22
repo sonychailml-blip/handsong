@@ -91,7 +91,7 @@ const gridNoteLbl = deg => (periodOf(CUR())!==2 || CUR().cents)
    разъедутся. Полоса 0 — октавный распорядитель, 1..N — нотные (r=полоса−1).
    x0..x1 — X-ПРОТЯЖЁННОСТЬ: соло/бас на всю ширину [0,W]; аккорды — правая половина [SPLIT,W]
    (слева палитра). lblOf(deg) — подпись ноты/корня (соло/бас: порядковый+центы; аккорды: rootName). */
-function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf){
+function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf,role){
   const nRfull=rectRowsFull(), maxDeg=IVX().length-1, w=x1-x0;
   const aRect=activeDeg>=0?Math.floor(activeDeg/4):-1, aNote=activeDeg>=0?activeDeg%4:-1;
   const lx=Math.max(x0+7,FX_BAND_R+8);           // легенда правее столбиков эффектов (соло) и правее палитры (аккорды)
@@ -99,7 +99,7 @@ function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf){
   for(let b=0;b<nRfull;b++){                     // полос nRfull: полоса 0 — октавная (низ), 1..N — нотные
     const [yTop,yBot]=rectBandY(b,playH,nRfull), h=yBot-yTop;
     if(b===0){
-      drawRectOctBand(x0,w,lx,yTop,h);           // общий с терменвоксом рендер октавной полосы
+      drawRectOctBand(x0,w,lx,yTop,h,role);      // общий с терменвоксом рендер октавной полосы (роль → чей регистр подсветить)
     }else{
       const r=b-1, on=r===aRect;                 // нотный прямоугольник = полоса−1
       ctx.fillStyle= on ? hexA(accent,.16) : (r%2?'rgba(255,255,255,.05)':'rgba(255,255,255,.03)');
@@ -121,10 +121,10 @@ function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf){
 /* ОКТАВНАЯ ПОЛОСА (нижний прямоугольник) — распорядитель регистра, control-синий. 4 строки
    палец→регистр I–IV → окт I..IV; активный регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg,
    аккорды→chordOctReg) подсвечен. Общий рендер: зовут и drawRectGrid, и drawThereminGrid. */
-function drawRectOctBand(x0,w,lx,yTop,h){
+function drawRectOctBand(x0,w,lx,yTop,h,role){
   ctx.fillStyle=hexA('#4cc2ff',.10); ctx.fillRect(x0,yTop,w,h);
   ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
-  const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg();
+  const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg(role);
   ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
   ctx.fillText(periodOf()===2?'ОКТАВА':regWord().toUpperCase(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.). period=2 байт-в-байт
   for(let n=0;n<4;n++){
@@ -139,14 +139,14 @@ function drawRectOctBand(x0,w,lx,yTop,h){
    нота — в ЦЕНТРЕ своего деления. Геометрия из thereminSpan — ТОТ ЖЕ раздел, что у звука
    (gestures), поэтому линия и слышимый центр совпадают. Ближайшая нота (activeDeg) ярче —
    ориентир, высота между ними скользит. Октавная полоса (rect) — как была. */
-function drawThereminGrid(x0,x1,playH,accent,activeDeg){
+function drawThereminGrid(x0,x1,playH,accent,activeDeg,role){
   const {M,spanBot,divH}=thereminSpan(playH), last=M-1, w=x1-x0, s=CUR();
   const lx=Math.max(x0+7,FX_BAND_R+8), rect=rectGrid();
   ctx.fillStyle='rgba(255,255,255,.03)'; ctx.fillRect(x0,0,w,spanBot);   // нотное поле
   ctx.textBaseline='middle';
   if(rect){                                       // октавная полоса снизу — прежний рендер
     const [yTop,yBot]=rectBandY(0,playH,rectRowsFull());
-    drawRectOctBand(x0,w,lx,yTop,yBot-yTop);
+    drawRectOctBand(x0,w,lx,yTop,yBot-yTop,role);
     // грубые границы прямоугольников (ориентир): каждые 4 линии
     ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
     for(let r=1;r<rectRowsFull();r++){ const yb=spanBot-(r-1)*divH*4; ctx.beginPath(); ctx.moveTo(x0,yb); ctx.lineTo(x1,yb); ctx.stroke(); }
@@ -412,13 +412,13 @@ function drawPhone(res){
         /* Экран поделён: слева палитра типов, справа ряды/прямоугольники корней. Палитра — как была.
            19/31-TET: правая половина — rect-корни + октавная полоса; chrom12 — узкие ряды как было. */
         const SPLIT=CH_PAL_W*W;
-        if(rectGrid())drawRectGrid(SPLIT,W,playH,INSTR_COL.ch,act, d=>`${rootName(d)} · ${centsOf(d)}c`);   // корни прямоугольниками, в правой половине
+        if(rectGrid())drawRectGrid(SPLIT,W,playH,INSTR_COL.ch,act, d=>`${rootName(d)} · ${centsOf(d)}c`, instr);   // корни прямоугольниками, в правой половине (роль=instr='ch')
         else drawGrid(SPLIT,W,accent,rootName,act,playH,SPLIT+7);
         drawChordPalette(0,SPLIT,playH);
         ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель зон
         ctx.beginPath(); ctx.moveTo(SPLIT,0); ctx.lineTo(SPLIT,playH); ctx.stroke();
-      }else if(instr==='ld'&&theremin)drawThereminGrid(0,W,playH,accent,act);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло)
-      else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(0,W,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли
+      }else if(instr==='ld'&&theremin)drawThereminGrid(0,W,playH,accent,act,instr);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло; роль=instr='ld')
+      else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(0,W,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
       else drawGrid(0,W,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
     }
   }
@@ -480,7 +480,7 @@ function drawHandsPhone(res,W,H,playH){
         /* rectGrid (соло/бас): S.oct — это НОТА в прямоугольнике, а не октава. Октава — липкий
            регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg); берём его, иначе Гц/«окт» врали бы. */
         const rectRole=(instr==='ld'||instr==='bs')&&rectGrid();
-        const oShow=rectRole?rectOctReg():S.oct;
+        const oShow=rectRole?rectOctReg(instr):S.oct;   // роль=instr (rectRole ⇒ 'ld'/'bs')
         const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
         const L1=rectRole?`${rectNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
           :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · ${regWord(s)} ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
@@ -491,7 +491,7 @@ function drawHandsPhone(res,W,H,playH){
       }else if(typedChords()){                   // тип задаёт палитра — chordLabel дал бы «C5», это враньё
         const FS=chordFams(), fam=FS[Math.min(chordFam,FS.length-1)]||FS[0];
         const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
-        const oShow=rectGrid()?rectOctReg():S.oct;   // rect-аккорды (19/31): октава из chordOctReg; chrom12: S.oct (палец)
+        const oShow=rectGrid()?rectOctReg(instr):S.oct;   // rect-аккорды (19/31): октава из chordOctReg (роль=instr='ch'); chrom12: S.oct (палец)
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
           ty.full||fam.name,`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
@@ -505,7 +505,7 @@ function drawHandsPhone(res,W,H,playH){
         const [yTop,yBot]=rectBandY(band,playH,nRfull), hx0=instr==='ch'?CH_PAL_W*W:0;
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,yTop,W-hx0,yBot-yTop);
         let lbl;
-        if(band===0) lbl=`${periodOf()===2?'ОКТАВА':regWord().toUpperCase()} · палец I–IV → регистр (сейчас ${OCT_ROMAN[rectOctReg()]})`;
+        if(band===0) lbl=`${periodOf()===2?'ОКТАВА':regWord().toUpperCase()} · палец I–IV → регистр (сейчас ${OCT_ROMAN[rectOctReg(instr)]})`;   // роль=instr
         else{ const r=band-1; lbl=''; for(let n=0;n<4;n++){ const deg=Math.min(r*4+n,maxDeg); lbl+=(n?'  ':'')+OCT_ROMAN[n]+':'+(instr==='ch'?rootName(deg):rectNoteLbl(deg)); } }
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
         ctx.fillText(lbl,x+14,y-12);

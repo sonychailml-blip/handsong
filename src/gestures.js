@@ -204,8 +204,11 @@ function processHands(res){
         /* Октавная полоса: рука МОЛЧИТ (как палитра/эффекты) — ни ступени, ни громкости,
            ни владельца. Палец I–IV задаёт липкий регистр РОЛИ (соло→octReg, бас→bassOctReg
            через резолвер); смена пальца на лету (S.oct обновился выше) двигает регистр.
-           S.oct здесь — «какой палец», как везде. */
-        setRectOctReg(S.oct);
+           S.oct здесь — «какой палец», как везде.
+           ⚠️ РОЛЬ передаём phoneInstr, а НЕ S.zone: здесь S.zone==='oct' (сама полоса), роль из неё
+           не достать. Пока роль одна — это активный phoneInstr. Когда сядет сплит-экран (две роли
+           сразу), ЭТОТ вызов должен взять инструмент СВОЕЙ половины, а не глобальный phoneInstr. */
+        setRectOctReg(phoneInstr, S.oct);
       }else{
         const phone=uiMode==='phone';
         /* Сетка «4 ноты в прямоугольнике» — phone-соло, бас И аккорды на ладу с rectGrid (19/31-TET).
@@ -217,7 +220,7 @@ function processHands(res){
            У аккордов это КОРЕНЬ; тип берётся из палитры отдельно, октава — chordOctReg. */
         const rectPlay = phone && (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
         const thereminOn = phone && S.zone==='ld' && theremin;   // терменвокс — ТОЛЬКО phone-соло
-        const oct = rectPlay?rectOctReg():S.oct;                 // октавный регистр роли (WleadOn/бас/терменвокс)
+        const oct = rectPlay?rectOctReg(S.zone):S.oct;           // октавный регистр роли (WleadOn/бас/терменвокс); роль = S.zone (при игре ='ld')
         if(thereminOn){
           /* Непрерывная высота: y → Гц через общий раздел (thereminHz), интерполяция в центах
              между реальными нотами лада. S.deg — ближайшая ступень (для подсветки И записи в лупер:
@@ -248,7 +251,7 @@ function processHands(res){
         }
         /* Октава для аккорда: rect (19/31-TET) — липкий chordOctReg через резолвер; chrom12 —
            S.oct (палец), как было. Меняется ТОЛЬКО источник октавы, логика защёлки ниже — без изменений. */
-        const chOct = rectPlay?rectOctReg():S.oct;
+        const chOct = rectPlay?rectOctReg(S.zone):S.oct;   // роль = S.zone (в аккордовой ветке ='ch')
         if(S.zone==='ld'){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
@@ -257,7 +260,7 @@ function processHands(res){
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 2-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
-          if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg():S.oct,vol:S.vol,inst:bassIdx});   // rect-бас — октава из bassOctReg; 12-TET бас — S.oct (палец), как было
+          if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx});   // rect-бас — октава из bassOctReg (роль=S.zone='bs'); 12-TET бас — S.oct (палец), как было
 
         }else if(S.zone==='dr'){                            // ударные: один удар на щипок (по ряду)
           if(S.fresh){ S.fresh=false; WdrumHit(S.deg,S.vol); }
