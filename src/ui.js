@@ -1,5 +1,5 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
-         uiMode, phoneInstr, swapHands, setUiMode, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole } from './state.js';
+         phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole } from './state.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
@@ -10,7 +10,7 @@ import { hooks } from './hooks.js';
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), modeBtn=$('modeBtn'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'),
+      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -153,20 +153,9 @@ loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bar
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
-/* Режим управления: ПК ↔ Смартфон, выбор инструмента (phone), обмен рук.
-   При любом переключении глушим звук — зоны/роли рук меняются. */
-/* Шаг 4 MENU-PLAN: пара кнопок → ОДНА иконка-тумблер, сама себе индикатор.
-   Логика прежняя (setUiMode + класс .phone на body) — поменялось только отображение
-   и то, чем это дёргают. Видимость ⇄ висит на том же .phone через CSS. */
-function applyMode(){
-  document.body.classList.toggle('phone', uiMode==='phone');
-  modeBtn.textContent = uiMode==='phone' ? '📱' : '💻';
-  modeBtn.title = uiMode==='phone' ? 'Режим: Смартфон — тап переключит на ПК'
-                                   : 'Режим: ПК — тап переключит на Смартфон';
-  applyTheremin();                             // 〰 виден только в phone-соло — обновляем при смене режима
-  applySplit();                                // ◨ виден только в phone — обновляем при смене режима
-}
-function applySwap(){                          // ⇄ — только в «Смартфон» (в ПК роль по месту, не по руке)
+/* Выбор инструмента и обмен рук. При любом переключении глушим звук — роли/зоны рук меняются.
+   PC-режим удалён: вертикальная раскладка — единственная, поэтому нет ни modeBtn, ни класса .phone. */
+function applySwap(){                          // ⇄ — меняет местами ноты/эффекты у рук (соло-зона + палитра)
   swapBtn.classList.toggle('act', swapHands);
   swapBtn.title = swapHands ? 'Правая рука: эффекты — тап вернёт ей ноты'
                             : 'Правая рука: ноты — тап отдаст ей эффекты';
@@ -175,29 +164,28 @@ const INSTR_SEQ=['ld','ch','bs','dr'];
 const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
 function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
   instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); applyTheremin(); }   // цвет роли — в CSS-переменную; видимость 〰 зависит от роли
-/* 〰 Терменвокс — компаньон кнопки роли: виден ТОЛЬКО в phone-соло (в ПК и на других ролях
-   скрыт, видимость через JS, без style.css). .act — режим включён (как у swapBtn). */
+/* 〰 Терменвокс — компаньон кнопки роли: виден, когда есть соло-поверхность. .act — режим включён. */
 function applyTheremin(){
   thereminBtn.classList.toggle('act', theremin);
   thereminBtn.title = theremin ? 'Терменвокс ВКЛ: непрерывная высота — тап выключит'
                                : 'Терменвокс: непрерывная высота (глиссандо)';
   /* 〰 виден, когда есть соло-поверхность: вне сплита — если роль соло; в сплите — если одна из
-     половин соло (терменвокс работает в соло-половине по зоне 'ld'). */
-  thereminBtn.style.display = (uiMode==='phone' && (splitOn ? SPLIT_ROLES.includes('ld') : phoneInstr==='ld')) ? '' : 'none';
+     половин соло (терменвокс работает в соло-зоне 'ld'). */
+  thereminBtn.style.display = (splitOn ? SPLIT_ROLES.includes('ld') : phoneInstr==='ld') ? '' : 'none';
 }
 /* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема. */
 const canSplit=()=>innerWidth>innerHeight;
-/* ◨ Сплит-экран — только в «Смартфон» (в ПК свои три колонки) и только в ландшафте (canSplit).
-   .act — включён. Кнопка-тумблер; выбор пары ролей — двумя кнопками половин (instrBtnL/R). */
+/* ◨ Сплит-экран — только в ландшафте (canSplit). .act — включён. Кнопка-тумблер; выбор пары ролей —
+   двумя кнопками половин (instrBtnL/R). */
 function applySplit(){
   splitBtn.classList.toggle('act', splitOn);
   splitBtn.title = splitOn ? 'Сплит-экран ВКЛ — тап выключит'
                            : 'Сплит-экран: две роли на двух половинах';
-  splitBtn.style.display = (uiMode==='phone' && canSplit()) ? '' : 'none';
+  splitBtn.style.display = canSplit() ? '' : 'none';
   /* Одна кнопка роли (instrBtn) — только вне сплита; две кнопки половин — только в сплите. Никогда
-     не видно все три. instrBtn в phone показывает CSS (display:'' снимает инлайн-стиль), в ПК — 'none'. */
-  instrBtn.style.display  = (uiMode==='phone' && !splitOn) ? '' : 'none';
-  instrBtnL.style.display = instrBtnR.style.display = (uiMode==='phone' && splitOn) ? '' : 'none';
+     не видно все три: instrBtn и L/R взаимоисключимы по splitOn. */
+  instrBtn.style.display  = !splitOn ? '' : 'none';
+  instrBtnL.style.display = instrBtnR.style.display = splitOn ? '' : 'none';
   applySplitRoles();
 }
 /* Подписи и акцент двух кнопок половин — из SPLIT_ROLES (та же связка INSTR_LBL/INSTR_COL, что у
@@ -219,7 +207,6 @@ function cycleHalf(i){
   do{ r=INSTR_SEQ[(INSTR_SEQ.indexOf(r)+1)%INSTR_SEQ.length]; }while(r===other);
   setSplitRole(i,r); softAllOff(); applySplitRoles();
 }
-modeBtn.onclick  =()=>{ setUiMode(uiMode==='phone'?'pc':'phone'); softAllOff(); applyMode(); };
 instrBtn.onclick =()=>{ setPhoneInstr(INSTR_SEQ[(INSTR_SEQ.indexOf(phoneInstr)+1)%INSTR_SEQ.length]); softAllOff(); applyInstr(); };
 instrBtnL.onclick=()=>cycleHalf(0);
 instrBtnR.onclick=()=>cycleHalf(1);
@@ -235,6 +222,6 @@ function onResize(){
   applySplit();
 }
 addEventListener('resize', onResize);
-applyMode(); applyInstr(); applySwap();
+applySplit(); applyInstr(); applySwap();      // applySplit → applySplitRoles → applyTheremin (инициализация всех кнопок ролей)
  
 export { $ };

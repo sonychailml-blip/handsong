@@ -1,6 +1,6 @@
-import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
+import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves } from './state.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
@@ -36,9 +36,7 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
 const HANDS={}; let leadOwner=null; let chOwner=null; let bassOwner=null;   // chOwner — рука защёлки, bassOwner — рука баса
 let latchLen=0;   // сколько нот звучит у 'latch': по нему решаем «глиссандо или переатака»
-const zoneAt=(x,W)=> x<FXW*W?'fx' : x<ZB*W?'ch':'ld';
-const zoneX =(z,W)=> z==='ch'?[FXW*W,ZB*W]:[ZB*W,W];
-/* phone-режим: роль руки по handedness, а не по X. Правая=ноты, левая=эффекты
+/* Роль руки по handedness, а не по X. Правая=ноты, левая=эффекты
    (swapHands меняет местами). Без метки руки — играем ноты. */
 function handRole(key){
   if(key.slice(0,4)==='Left')  return swapHands?'notes':'fx';
@@ -123,7 +121,7 @@ function processHands(res){
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
-      if(uiMode==='phone'){
+      {
         const py=(lm[4].y+lm[mf].y)/2*H;
         const px=(1-(lm[4].x+lm[mf].x)/2)*W;
         if(splitOn){
@@ -158,9 +156,6 @@ function processHands(res){
                  : (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx'
                  : phoneInstr;
         }
-      }else{
-        const px=(1-(lm[4].x+lm[mf].x)/2)*W;
-        S.zone=zoneAt(px,W);
       }
       if(S.zone==='fx'){
         const meta=FX_META.find(m=>m.finger===mf);
@@ -230,16 +225,15 @@ function processHands(res){
            смену роли DOM-кнопкой на удержанном щипке — softAllOff щипок не снимает). */
         setRectOctReg(splitOn?S.role:phoneInstr, S.oct);
       }else{
-        const phone=uiMode==='phone';
-        /* Сетка «4 ноты в прямоугольнике» — phone-соло, бас И аккорды на ладу с rectGrid (19/31-TET).
+        /* Сетка «4 ноты в прямоугольнике» — соло, бас И аккорды на ладу с rectGrid (19/31-TET).
            Y выбирает ПОЛОСУ полной сетки; полоса 0 — октавная (её перехватывает зона 'oct'),
            нотный прямоугольник = полоса−1. Палец S.oct (0=указ.=низ … 3=мизинец=верх) — ноту/корень
            ВНУТРИ прямоугольника; октава — липкий регистр роли (rectOctReg). ступень = прямоуг*4
            + нота, кламп в 0..IVX-1 (верх.мизинец = тоника октавой выше). S.oct тут читается как
            «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава.
            У аккордов это КОРЕНЬ; тип берётся из палитры отдельно, октава — chordOctReg. */
-        const rectPlay = phone && (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
-        const thereminOn = phone && S.zone==='ld' && theremin;   // терменвокс — ТОЛЬКО phone-соло
+        const rectPlay = (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
+        const thereminOn = S.zone==='ld' && theremin;   // терменвокс — только соло-зона
         const oct = rectPlay?rectOctReg(S.zone):S.oct;           // октавный регистр роли (WleadOn/бас/терменвокс); роль = S.zone (при игре ='ld')
         if(thereminOn){
           /* Непрерывная высота: y → Гц через общий раздел (thereminHz), интерполяция в центах
@@ -254,11 +248,11 @@ function processHands(res){
           const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length;
           S.deg=degHyst(y,rows,H,S.deg);            // вся высота — ровно так же, как рисует draw
         }
-        /* Типизированный аккорд в phone: левые CH_PAL_W заняты палитрой, поэтому громкость
-           мерится по ПРАВОЙ зоне [SPLIT,W] — иначе вся половина экрана читалась бы «тихо».
-           Остальные роли (соло/бас/ударные/обычные аккорды) — по всей ширине, как было. */
+        /* Типизированный аккорд: левые CH_PAL_W заняты палитрой, поэтому громкость мерится по
+           ПРАВОЙ зоне [split,rx1] — иначе вся половина экрана читалась бы «тихо». Остальные роли
+           (соло/бас/ударные/обычные аккорды) — по всей ширине роли [rx0,rx1]. */
         const typed = S.zone==='ch'&&typedChords();
-        const[zx0,zx1]= !phone ? zoneX(S.zone,W) : (typed ? [psplit,prx1] : [prx0,prx1]);
+        const[zx0,zx1]= typed ? [psplit,prx1] : [prx0,prx1];
         S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
         /* Тип берётся из ЛИПКОГО выбора палитры (левая рука), а не из положения правой.
            Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
@@ -321,13 +315,13 @@ function processHands(res){
         }
       }
     }
-    /* Индикатор реверба (revDisp): у phone-СОЛО НОТНОЙ руки показываем ТЕКУЩУЮ глубину (Z=близость
+    /* Индикатор реверба (revDisp): у СОЛО НОТНОЙ руки показываем ТЕКУЩУЮ глубину (Z=близость
        кисти) КАЖДЫЙ кадр — щипок не нужен, можно «прицелиться» ревербом ДО игры. Пропускаем, когда
        рука уже играет (ветка 'ld'/leadOwner выше сама зовёт setRevDisp — иначе посчитали бы EMA дважды).
-       ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре. ПК не трогаем.
+       ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре.
        При сплите «прицел» ДО щипка отключён (какая рука целится в соло — неоднозначно); живой revDisp
        при игре соло всё равно обновляет ветка 'ld' выше (§шаг3, осознанный выбор). */
-    if(!splitOn && uiMode==='phone' && phoneInstr==='ld' && handRole(key)==='notes'
+    if(!splitOn && phoneInstr==='ld' && handRole(key)==='notes'
        && !(S.pinch && S.zone==='ld' && leadOwner===key)){
       setRevDisp(clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE));
     }
@@ -341,9 +335,9 @@ function processHands(res){
   if(leadOwner&&!HANDS[leadOwner])leadOwner=null;
   if(bassOwner&&!HANDS[bassOwner]){ WbassOff(); bassOwner=null; }
   /* Соло-нотной руки нет в кадре → индикатор реверба гасим в 0 (не висит на последнем значении).
-     Только phone-соло; ПК ведёт revDisp по-своему — его не сбрасываем. */
-  if(!splitOn && uiMode==='phone' && phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes')) setRevDisp(0);
+     Только для одиночного соло (вне сплита). */
+  if(!splitOn && phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes')) setRevDisp(0);
 }
 
 /* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */
-export { HANDS, leadOwner, processHands, zoneAt, zoneX, degRaw, handRole };
+export { HANDS, leadOwner, processHands, degRaw, handRole };

@@ -19,12 +19,10 @@ export let chordFam=0, chordVar=0;
    как выключение. Сравнение по ссылке точное: ty всегда из таблицы CHORD_FAMS. */
 export let latchTy=null;
 
-/* Режим управления. 'pc' — три колонки, любая рука играет любую зону (как раньше).
-   'phone' — вертикальный: один инструмент на весь экран (phoneInstr), правая рука
-   играет ноты где угодно, левая — эффекты где угодно (swapHands меняет руки). */
-export let uiMode='pc';                          // 'pc' | 'phone'
-export let phoneInstr='ld';                      // что показано в phone-режиме: 'ld' соло | 'ch' аккорды
-export let swapHands=false;                      // phone: true → правая=эффекты, левая=ноты
+/* Вертикальная раскладка (единственная): один инструмент на весь экран (phoneInstr), либо две
+   роли на двух половинах при splitOn. Правая рука — ноты, левая — эффекты (swapHands меняет руки). */
+export let phoneInstr='ld';                      // активная роль: 'ld' соло | 'ch' аккорды | 'bs' бас | 'dr' ударные
+export let swapHands=false;                      // true → правая=эффекты, левая=ноты
 /* Сплит-экран (только phone): ON — экран делится на ДВЕ половины, каждая играет свою роль сразу
    (зона = инструмент, любая рука работает любую половину). OFF — сегодняшний single-role на весь
    экран, байт-в-байт. Пара ролей на шаге 3 фиксирована — SPLIT_ROLES. Живая связка — писать через
@@ -78,7 +76,6 @@ export const setLatchDeg=v=>{ latchDeg=v; };
 export const setChordFam=v=>{ chordFam=v; };
 export const setChordVar=v=>{ chordVar=v; };
 export const setLatchTy=v=>{ latchTy=v; };
-export const setUiMode=v=>{ uiMode=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };
 export const setSplitOn=v=>{ splitOn=v; };
