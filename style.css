@@ -40,8 +40,8 @@
   /* Кнопка роли — индикатор И переключатель. Центрируется в панели авто-отступами
      (при нехватке места они схлопываются, кнопка просто остаётся в своём порядке).
      Цвет — акцент текущей роли: --role ставит applyInstr, fallback на сиреневый. */
-  #instrBtn{border-color:var(--role,var(--chord)); color:var(--role,var(--chord)); font-weight:600;
-    margin-left:auto; margin-right:auto;}
+  #instrBtn,#instrBtnL,#instrBtnR{border-color:var(--role,var(--chord)); color:var(--role,var(--chord)); font-weight:600;}
+  #instrBtn{margin-left:auto; margin-right:auto;}
   #loopPanelBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   /* переключатель инструмента и выбор руки — только в режиме «Смартфон» */
   body:not(.phone) #instrBtn{display:none;}

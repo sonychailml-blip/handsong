@@ -1,7 +1,7 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, zoneAt, zoneX, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg, theremin } from './state.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, uiMode, phoneInstr, rectOctReg, theremin, splitOn, phoneHalves } from './state.js';
 import { FXW, ZB, FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX } from './config.js';
 import { DRUM_NAMES } from './audio.js';
@@ -389,67 +389,81 @@ function drawStatus(){
 /* ================= PHONE-РЕЖИМ (вертикальный) =================
    Один инструмент на всю ширину (высотой до полосы эффектов), правая рука
    играет ноты, левая — эффекты в компактной полосе снизу. */
+/* Рендер ОДНОЙ роли в её X-диапазон [rx0,rx1]. Вынесено из drawPhone, чтобы сплит-экран мог
+   позвать её дважды (по половине на роль); single-role зовёт один раз с (phoneInstr,0,W). rx0 —
+   левый край роли (начало столбиков эффектов), ОТДЕЛЬНО от x0 сетки (у аккордов x0=split). */
+function drawRole(instr,rx0,rx1,playH){
+  const accent=INSTR_COL[instr], split=palSplitX(rx0,rx1);
+  const labelX= instr==='ld' ? rx0+FX_BAND_R+8 : rx0+7;   // у соло подписи правее столбиков эффектов
+  if(instr==='dr'){ drawDrumGrid(rx0,rx1,playH); return; }
+  // активная ступень: аккорд — по защёлке, соло/бас — по играющей руке
+  let act=-1;
+  if(instr==='ch')act=latchDeg>=0?latchDeg:loopChordDeg();   // рука в приоритете, иначе аккорд петли (§Q5)
+  else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
+  if(instr==='ch'&&!supportsChords()){ drawNoChordsHint(rx0,rx1,0,playH); return; }   // макам: всё поле роли — объяснение
+  /* У типизированных аккордов ряд подписываем именем КОРНЯ (C, C#…): тип задаёт
+     палитра, а не лад, поэтому обычный chordLabel (он дал бы пауэр-аккорд «C5») врёт. */
+  const chTyped = instr==='ch' && typedChords();
+  if(chTyped){
+    /* Экран поделён: слева палитра типов, справа ряды/прямоугольники корней. Палитра — как была.
+       19/31-TET: правая половина — rect-корни + октавная полоса; chrom12 — узкие ряды как было. */
+    if(rectGrid())drawRectGrid(split,rx1,playH,INSTR_COL.ch,act, d=>`${rootName(d)} · ${centsOf(d)}c`, instr, rx0);   // корни прямоугольниками, в правой половине (роль=instr='ch')
+    else drawGrid(split,rx1,accent,rootName,act,playH,split+7);
+    drawChordPalette(rx0,split,playH);
+    ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель палитра|ноты ВНУТРИ роли
+    ctx.beginPath(); ctx.moveTo(split,0); ctx.lineTo(split,playH); ctx.stroke();
+  }else if(instr==='ld'&&theremin)drawThereminGrid(rx0,rx1,playH,accent,act,instr,rx0);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло; роль=instr='ld')
+  else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(rx0,rx1,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr, rx0);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
+  else drawGrid(rx0,rx1,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
+}
 function drawPhone(res){
   const W=canvas.width, H=canvas.height;
-  const instr=phoneInstr, accent=INSTR_COL[instr];
-  /* Сетка снова во ВСЮ высоту: нижней полосы эффектов больше нет, столбики лежат
-     поверх слева. Та же высота используется в gestures (degHyst) — не расходиться! */
+  /* Сетка во ВСЮ высоту: нижней полосы эффектов больше нет, столбики лежат поверх слева.
+     Та же высота используется в gestures (degHyst) — не расходиться! */
   const playH=H;
-  /* X-диапазон роли и внутренний раздел палитра|ноты. Пока роль одна — весь холст [0,W],
-     split=palSplitX(0,W)=CH_PAL_W*W (как было). Сплит-экран подставит диапазон половины —
-     ТА ЖЕ формула, что у gestures, иначе картинка и попадание разъедутся. rx0 — левый край
-     роли (начало столбиков эффектов), отдельно от x0 сетки (у аккордов x0=split). */
-  const rx0=0, rx1=W, split=palSplitX(rx0,rx1);
-  const labelX= instr==='ld' ? rx0+FX_BAND_R+8 : rx0+7;   // у соло подписи правее столбиков эффектов
-  if(instr==='dr'){
-    drawDrumGrid(W,playH);
+  if(splitOn){
+    /* СПЛИТ-ЭКРАН: по половине на роль (ЕДИНЫЙ источник геометрии — phoneHalves, тот же, что у
+       gestures). Каждая половина — своя роль, своя сетка/палитра/октавная полоса в своём диапазоне. */
+    const halves=phoneHalves(W);
+    for(const h of halves) drawRole(h.role,h.rx0,h.rx1,playH);
+    ctx.strokeStyle=hexA('#fff',.18); ctx.lineWidth=2;   // разделитель половин по центру
+    ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+    const solo=halves.find(h=>h.role==='ld'); if(solo)drawFxBars(solo.rx0,H);   // столбики эффектов — у соло-половины (её rx0)
   }else{
-    // активная ступень: аккорд — по защёлке, соло/бас — по играющей руке
-    let act=-1;
-    if(instr==='ch')act=latchDeg>=0?latchDeg:loopChordDeg();   // рука в приоритете, иначе аккорд петли (§Q5)
-    else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
-    if(instr==='ch'&&!supportsChords())drawNoChordsHint(rx0,rx1,0,playH);   // макам: всё поле роли — объяснение
-    else{
-      /* У типизированных аккордов ряд подписываем именем КОРНЯ (C, C#…): тип задаёт
-         палитра, а не лад, поэтому обычный chordLabel (он дал бы пауэр-аккорд «C5») врёт. */
-      const chTyped = instr==='ch' && typedChords();
-      if(chTyped){
-        /* Экран поделён: слева палитра типов, справа ряды/прямоугольники корней. Палитра — как была.
-           19/31-TET: правая половина — rect-корни + октавная полоса; chrom12 — узкие ряды как было. */
-        if(rectGrid())drawRectGrid(split,rx1,playH,INSTR_COL.ch,act, d=>`${rootName(d)} · ${centsOf(d)}c`, instr, rx0);   // корни прямоугольниками, в правой половине (роль=instr='ch')
-        else drawGrid(split,rx1,accent,rootName,act,playH,split+7);
-        drawChordPalette(rx0,split,playH);
-        ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель зон
-        ctx.beginPath(); ctx.moveTo(split,0); ctx.lineTo(split,playH); ctx.stroke();
-      }else if(instr==='ld'&&theremin)drawThereminGrid(rx0,rx1,playH,accent,act,instr,rx0);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло; роль=instr='ld')
-      else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(rx0,rx1,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr, rx0);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
-      else drawGrid(rx0,rx1,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
-    }
+    drawRole(phoneInstr,0,W,playH);
+    if(phoneInstr==='ld')drawFxBars(0,H);     // эффекты действуют только на соло-канал
   }
-  /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn
-     в верхней панели (дубль одной и той же информации в двух местах не нужен). */
-  drawHandsPhone(res,W,H,playH,rx0,rx1,split);
-  if(instr==='ld')drawFxBars(rx0,H);          // эффекты действуют только на соло-канал (rx0 — левый край роли)
+  /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
+  drawHandsPhone(res,W,H,playH);
   drawLooper();
   drawStatus();
 }
-/* Сетка ударных: по ряду на инструмент кита, без тоники/центов. */
-function drawDrumGrid(W,playH){
-  const rows=DRUM_NAMES.length, seg=playH/rows;
+/* Сетка ударных: по ряду на инструмент кита, без тоники/центов. Рисуем в X-диапазоне роли [rx0,rx1]
+   (сплит: только своя половина; single-role: 0..W, байт-в-байт). */
+function drawDrumGrid(rx0,rx1,playH){
+  const rows=DRUM_NAMES.length, seg=playH/rows, w=rx1-rx0;
   ctx.textBaseline='middle'; ctx.textAlign='left';
   for(let i=0;i<rows;i++){ const y=i*seg, idx=rows-1-i;
-    ctx.fillStyle= i%2? 'rgba(255,210,63,.05)':'rgba(255,255,255,.03)'; ctx.fillRect(0,y,W,seg);
-    ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    ctx.fillStyle= i%2? 'rgba(255,210,63,.05)':'rgba(255,255,255,.03)'; ctx.fillRect(rx0,y,w,seg);
+    ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.moveTo(rx0,y); ctx.lineTo(rx1,y); ctx.stroke();
     ctx.fillStyle='rgba(255,210,63,.85)'; ctx.font='600 14px system-ui';
-    ctx.fillText(DRUM_NAMES[idx], 10, y+seg/2);
+    ctx.fillText(DRUM_NAMES[idx], rx0+10, y+seg/2);
   }
 }
-function drawHandsPhone(res,W,H,playH,rx0,rx1,split){   // rx0/rx1/split — X-диапазон роли и её раздел (из drawPhone, единый источник с сеткой)
+function drawHandsPhone(res,W,H,playH){
   if(!res||!res.landmarks)return;
-  const instr=phoneInstr, isCh=instr==='ch', isDr=instr==='dr', accent=INSTR_COL[instr], fxOn=instr==='ld';
   for(const k in HANDS){
     const S=HANDS[k], lm=S.lm; if(!lm)continue;
-    const fxHand=fxOn&&handRole(k)==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов есть только у соло
+    /* Роль и X-диапазон ЭТОЙ руки: при сплите — щипок берёт ЗАМОРОЗКУ на S (совпадает с попаданием),
+       до щипка — живую половину под указательным (lm[8]); вне сплита — глобальный phoneInstr на весь
+       холст (single-role, байт-в-байт). Раздел палитра|ноты — palSplitX того же диапазона. */
+    let instr,rx0,rx1;
+    if(splitOn){
+      if(S.pinch){ instr=S.role; rx0=S.rx0; rx1=S.rx1; }
+      else { const px=(1-lm[8].x)*W, hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; instr=h.role; rx0=h.rx0; rx1=h.rx1; }
+    }else{ instr=phoneInstr; rx0=0; rx1=W; }
+    const split=palSplitX(rx0,rx1), accent=INSTR_COL[instr], isCh=instr==='ch', isDr=instr==='dr', fxOn=instr==='ld';
+    const fxHand=fxOn&&handRole(k)==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов есть только у соло-половины
     for(let i=0;i<lm.length;i++){
       const x=(1-lm[i].x)*W, y=lm[i].y*H, tipPt=i===4||FINGER_TIPS.includes(i);
       ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
@@ -468,7 +482,9 @@ function drawHandsPhone(res,W,H,playH,rx0,rx1,split){   // rx0/rx1/split — X-�
     }
     // рука нот
     if(isCh&&!supportsChords())continue;         // макам: аккордов нет — ни круга, ни ярлыка, ни подсказки
-    if(isCh&&typedChords()&&handRole(k)==='fx')continue;   // рука-семейство нот не играет — не рисуем ей подсказку ряда
+    // рука-палитра нот не играет — не рисуем ей подсказку ряда. Вне сплита это fx-рука (handRole);
+    // при сплите — по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указательный слева от раздела).
+    if(isCh&&typedChords()&&(splitOn ? (S.pinch?S.zone==='chFam':(1-lm[8].x)*W<split) : handRole(k)==='fx'))continue;
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();

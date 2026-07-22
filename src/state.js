@@ -25,6 +25,25 @@ export let latchTy=null;
 export let uiMode='pc';                          // 'pc' | 'phone'
 export let phoneInstr='ld';                      // что показано в phone-режиме: 'ld' соло | 'ch' аккорды
 export let swapHands=false;                      // phone: true → правая=эффекты, левая=ноты
+/* Сплит-экран (только phone): ON — экран делится на ДВЕ половины, каждая играет свою роль сразу
+   (зона = инструмент, любая рука работает любую половину). OFF — сегодняшний single-role на весь
+   экран, байт-в-байт. Пара ролей на шаге 3 фиксирована — SPLIT_ROLES. Живая связка — писать через
+   setSplitOn (правило #6). */
+export let splitOn=false;
+/* Пара ролей сплита [левая, правая] — РЕДАКТИРУЕМА (шаг 4a): каждую половину крутят своей кнопкой.
+   ИНВАРИАНТ — две РАЗНЫЕ роли (см. cycleHalf в ui.js: при прокрутке пропускаем роль другой половины),
+   поэтому дубль-половины и моно-конфликты (два соло / два баса) НЕДОСТИЖИМЫ по построению. Писать
+   только через setSplitRole (правило #6). Дефолт — аккорды|соло, как на шаге 3. */
+export let SPLIT_ROLES=['ch','ld'];
+export const setSplitRole=(i,role)=>{ SPLIT_ROLES[i]=role; };
+/* ЕДИНЫЙ источник геометрии половин: [левая, правая] с ролью и X-диапазоном. Границу W/2 знает
+   ТОЛЬКО эта функция — и gestures (заморозка половины по точке щипка), и draw (рендер половин)
+   зовут её, поэтому попадание и картинка не разъедутся. Читает SPLIT_ROLES вживую (роли меняются
+   кнопками). Внутренний раздел палитра|ноты каждой половины — palSplitX(rx0,rx1), как и раньше. */
+export const phoneHalves = W => [
+  {role:SPLIT_ROLES[0], rx0:0,   rx1:W/2},
+  {role:SPLIT_ROLES[1], rx0:W/2, rx1:W},
+];
 /* Терменвокс (только phone-соло): ON — высота НЕПРЕРЫВНА по y (глиссандо/бенды/вибрато),
    а не квантуется к ступени; палец в нотном поле больше не выбирает ноту (её задаёт y),
    октавная полоса и регистр — как были. Живой звук: непрерывные Гц; лупер пишет ближайшую
@@ -62,6 +81,7 @@ export const setLatchTy=v=>{ latchTy=v; };
 export const setUiMode=v=>{ uiMode=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };
+export const setSplitOn=v=>{ splitOn=v; };
 export const setTheremin=v=>{ theremin=v; };
 export const setOctReg=v=>{ octReg=v; };
 export const setBassOctReg=v=>{ bassOctReg=v; };

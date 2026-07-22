@@ -1,6 +1,6 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin } from './state.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
@@ -107,11 +107,11 @@ function processHands(res){
     let key=(heads[i]&&heads[i][0]&&heads[i][0].categoryName)||('H'+i);
     if(seen.has(key))key+=i;
     seen.add(key);
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false});
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0});
     S.seen=now; S.lm=lm;
-    /* X-диапазон роли этой руки и внутренний раздел палитра|ноты. Пока роль одна — вся ширина
-       [0,W], раздел = palSplitX(0,W) = CH_PAL_W*W (как было). Шаг 3 (сплит-экран) выведет половину
-       по точке щипка и ЗАМОРОЗИТ её на S — как S.zone, чтобы чтение при игре совпало с захватом. */
+    /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
+       palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
+       на S (S.role/S.rx0/S.rx1) рядом с S.zone — чтобы чтение при игре совпало с захватом. */
     const [rx0,rx1]=[0,W], split=palSplitX(rx0,rx1);
 
     const r=pinchRatios(lm), [mf,mv]=minFinger(r);
@@ -124,27 +124,40 @@ function processHands(res){
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
       if(uiMode==='phone'){
-        /* Рука-«не-нотная» (handRole==='fx', по умолчанию ЛЕВАЯ) получает особую роль
-           только там, где она есть: эффекты у соло, выбор семейства у типизированных
-           аккордов. Гейт из трёх условий, самое узкое — лад: typedChords стоит ровно
-           на одном ладу из 19. Прочие лады/роли/ПК идут прежним путём. */
-        /* Октавный прямоугольник (нижняя полоса rect-соло): ПОЛОЖЕНИЕ важнее роли. Считаем
-           полосу по точке щипка при захвате (зона фиксируется, как и все прочие) — попал в
-           полосу 0 → зона 'oct', даже если это fx-рука (левая): тянуться вниз за октавой
-           нельзя ценой случайного эффекта. Стоит ПЕРВЫМ в тернаре, поэтому перебивает fx/ld. */
-        const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
         const py=(lm[4].y+lm[mf].y)/2*H;
         const px=(1-(lm[4].x+lm[mf].x)/2)*W;
-        /* У аккордов октавная полоса живёт ТОЛЬКО в правой половине [SPLIT,W]: левая рука-палитра,
-           дотянувшись до низа-слева, не должна перехватываться как октава — она выбирает тип.
-           Соло/бас — октава по всей ширине (тест px пропускаем для не-'ch'). */
-        const octRight = phoneInstr!=='ch' || px>=split;
-        const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
-        const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
-        S.zone = octBand ? 'oct'
-               : famHand ? 'chFam'
-               : (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx'
-               : phoneInstr;
+        if(splitOn){
+          /* СПЛИТ-ЭКРАН: половину (роль + X-диапазон) выбираем ПО ТОЧКЕ ЩИПКА и ЗАМОРАЖИВАЕМ на S —
+             как S.zone. Роль этой руки = роль её половины (зона=инструмент). Раздел палитра|ноты —
+             palSplitX диапазона ИМЕННО этой половины. Палитра — ПО ПОЛОЖЕНИЮ (без handRole): любая
+             рука с большим+указательным (S.oct===0) слева от раздела выбирает тип. Эффекты остаются
+             за левой рукой (handRole==='fx'), но ТОЛЬКО в соло-половине (h.role==='ld'). */
+          const halves=phoneHalves(W), h=halves.find(q=>px>=q.rx0&&px<q.rx1)||halves[halves.length-1];
+          S.role=h.role; S.rx0=h.rx0; S.rx1=h.rx1;
+          const hsplit=palSplitX(h.rx0,h.rx1);
+          const rectRole = (h.role==='ld'||h.role==='bs'||h.role==='ch') && rectGrid();
+          const octRight = h.role!=='ch' || px>=hsplit;   // у аккордов октава — только в правой (нотной) части половины
+          const octBand  = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
+          const famHand  = h.role==='ch' && typedChords() && S.oct===0 && px<hsplit;   // ПОЛОЖЕНИЕ, без handRole
+          S.zone = octBand ? 'oct'
+                 : famHand ? 'chFam'
+                 : (h.role==='ld' && handRole(key)==='fx') ? 'fx'   // эффекты — левая рука, только в соло-половине
+                 : h.role;
+        }else{
+          /* ── SINGLE-ROLE (сплит выключен): сегодняшний путь, байт-в-байт ──
+             Рука-«не-нотная» (handRole==='fx', по умолчанию ЛЕВАЯ) получает особую роль только там,
+             где она есть: эффекты у соло, выбор семейства у типизированных аккордов. Октавный
+             прямоугольник — ПОЛОЖЕНИЕ важнее роли (полоса 0 → 'oct', даже если это fx-рука), стоит
+             ПЕРВЫМ в тернаре. У аккордов октава живёт только в правой половине [SPLIT,W]. */
+          const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
+          const octRight = phoneInstr!=='ch' || px>=split;
+          const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
+          const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
+          S.zone = octBand ? 'oct'
+                 : famHand ? 'chFam'
+                 : (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx'
+                 : phoneInstr;
+        }
       }else{
         const px=(1-(lm[4].x+lm[mf].x)/2)*W;
         S.zone=zoneAt(px,W);
@@ -180,7 +193,11 @@ function processHands(res){
       const x=emaS(S,'x',(1-tip.x)*W,0.4);
       const y=emaS(S,'y',tip.y*H,0.4);
       S.x=x; S.y=y;
- 
+      /* X-диапазон роли ЭТОЙ руки при игре: при сплите — ЗАМОРОЖЕННЫЙ на захвате (S.rx0/S.rx1),
+         иначе весь холст [0,W]. Раздел палитра|ноты — palSplitX того же диапазона. OFF → 0/W/split
+         (байт-в-байт: диапазон от phoneInstr не зависел). */
+      const prx0=splitOn?S.rx0:rx0, prx1=splitOn?S.rx1:rx1, psplit=palSplitX(prx0,prx1);
+
       if(S.zone==='fx'){
         /* Регулировка относительная («от текущего»), диапазон — 70%
            высоты экрана; значение остаётся после отпускания (латч). */
@@ -193,10 +210,10 @@ function processHands(res){
              1. только большой+УКАЗАТЕЛЬНЫЙ (S.oct===0) — щипок средним/безымянным/мизинцем
                 на этой руке ничего не выбирает: палец здесь смысла не несёт, а случайный
                 щипок не должен сбивать заготовленную форму;
-             2. только внутри палитры (S.x < split) — рука, ушедшая в зону нот, молчит.
+             2. только внутри палитры (S.x < psplit) — рука, ушедшая в зону нот, молчит.
            Ведение непрерывное, пока щипок держат: можно дотянуть до соседней ячейки. */
-        if(S.oct===0 && S.x<split){
-          const x0=rx0+CH_PAL_PAD, x1=split-CH_PAL_PAD, y0=CH_PAL_HEAD_H, y1=H-CH_PAL_HEAD_H;
+        if(S.oct===0 && S.x<psplit){
+          const x0=prx0+CH_PAL_PAD, x1=psplit-CH_PAL_PAD, y0=CH_PAL_HEAD_H, y1=H-CH_PAL_HEAD_H;
           const [c,r]=cellHyst(clamp(S.x,x0,x1),clamp(S.y,y0,y1),x0,x1,y0,y1,chordFams(),
                                S.pc==null?-1:S.pc, S.pr==null?-1:S.pr);
           S.pc=c; S.pr=r;
@@ -208,10 +225,10 @@ function processHands(res){
            ни владельца. Палец I–IV задаёт липкий регистр РОЛИ (соло→octReg, бас→bassOctReg
            через резолвер); смена пальца на лету (S.oct обновился выше) двигает регистр.
            S.oct здесь — «какой палец», как везде.
-           ⚠️ РОЛЬ передаём phoneInstr, а НЕ S.zone: здесь S.zone==='oct' (сама полоса), роль из неё
-           не достать. Пока роль одна — это активный phoneInstr. Когда сядет сплит-экран (две роли
-           сразу), ЭТОТ вызов должен взять инструмент СВОЕЙ половины, а не глобальный phoneInstr. */
-        setRectOctReg(phoneInstr, S.oct);
+           РОЛЬ регистра: при сплите — инструмент ЭТОЙ половины (S.role, заморожен на захвате: из зоны
+           'oct' роль не достать); иначе — активный phoneInstr (single-role, байт-в-байт, включая
+           смену роли DOM-кнопкой на удержанном щипке — softAllOff щипок не снимает). */
+        setRectOctReg(splitOn?S.role:phoneInstr, S.oct);
       }else{
         const phone=uiMode==='phone';
         /* Сетка «4 ноты в прямоугольнике» — phone-соло, бас И аккорды на ладу с rectGrid (19/31-TET).
@@ -241,7 +258,7 @@ function processHands(res){
            мерится по ПРАВОЙ зоне [SPLIT,W] — иначе вся половина экрана читалась бы «тихо».
            Остальные роли (соло/бас/ударные/обычные аккорды) — по всей ширине, как было. */
         const typed = S.zone==='ch'&&typedChords();
-        const[zx0,zx1]= !phone ? zoneX(S.zone,W) : (typed ? [split,rx1] : [rx0,rx1]);
+        const[zx0,zx1]= !phone ? zoneX(S.zone,W) : (typed ? [psplit,prx1] : [prx0,prx1]);
         S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
         /* Тип берётся из ЛИПКОГО выбора палитры (левая рука), а не из положения правой.
            Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
@@ -307,8 +324,10 @@ function processHands(res){
     /* Индикатор реверба (revDisp): у phone-СОЛО НОТНОЙ руки показываем ТЕКУЩУЮ глубину (Z=близость
        кисти) КАЖДЫЙ кадр — щипок не нужен, можно «прицелиться» ревербом ДО игры. Пропускаем, когда
        рука уже играет (ветка 'ld'/leadOwner выше сама зовёт setRevDisp — иначе посчитали бы EMA дважды).
-       ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре. ПК не трогаем. */
-    if(uiMode==='phone' && phoneInstr==='ld' && handRole(key)==='notes'
+       ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре. ПК не трогаем.
+       При сплите «прицел» ДО щипка отключён (какая рука целится в соло — неоднозначно); живой revDisp
+       при игре соло всё равно обновляет ветка 'ld' выше (§шаг3, осознанный выбор). */
+    if(!splitOn && uiMode==='phone' && phoneInstr==='ld' && handRole(key)==='notes'
        && !(S.pinch && S.zone==='ld' && leadOwner===key)){
       setRevDisp(clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE));
     }
@@ -323,7 +342,7 @@ function processHands(res){
   if(bassOwner&&!HANDS[bassOwner]){ WbassOff(); bassOwner=null; }
   /* Соло-нотной руки нет в кадре → индикатор реверба гасим в 0 (не висит на последнем значении).
      Только phone-соло; ПК ведёт revDisp по-своему — его не сбрасываем. */
-  if(uiMode==='phone' && phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes')) setRevDisp(0);
+  if(!splitOn && uiMode==='phone' && phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes')) setRevDisp(0);
 }
 
 /* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */
