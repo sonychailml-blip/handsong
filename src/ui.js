@@ -185,13 +185,15 @@ function applyTheremin(){
      половин соло (терменвокс работает в соло-половине по зоне 'ld'). */
   thereminBtn.style.display = (uiMode==='phone' && (splitOn ? SPLIT_ROLES.includes('ld') : phoneInstr==='ld')) ? '' : 'none';
 }
-/* ◨ Сплит-экран — только в «Смартфон» (в ПК свои три колонки). .act — включён. Кнопка-тумблер;
-   выбор пары ролей — двумя кнопками половин (instrBtnL/R), появляются при включённом сплите. */
+/* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема. */
+const canSplit=()=>innerWidth>innerHeight;
+/* ◨ Сплит-экран — только в «Смартфон» (в ПК свои три колонки) и только в ландшафте (canSplit).
+   .act — включён. Кнопка-тумблер; выбор пары ролей — двумя кнопками половин (instrBtnL/R). */
 function applySplit(){
   splitBtn.classList.toggle('act', splitOn);
   splitBtn.title = splitOn ? 'Сплит-экран ВКЛ — тап выключит'
                            : 'Сплит-экран: две роли на двух половинах';
-  splitBtn.style.display = (uiMode==='phone') ? '' : 'none';
+  splitBtn.style.display = (uiMode==='phone' && canSplit()) ? '' : 'none';
   /* Одна кнопка роли (instrBtn) — только вне сплита; две кнопки половин — только в сплите. Никогда
      не видно все три. instrBtn в phone показывает CSS (display:'' снимает инлайн-стиль), в ПК — 'none'. */
   instrBtn.style.display  = (uiMode==='phone' && !splitOn) ? '' : 'none';
@@ -224,6 +226,15 @@ instrBtnR.onclick=()=>cycleHalf(1);
 swapBtn.onclick  =()=>{ setSwapHands(!swapHands); softAllOff(); applySwap(); };
 thereminBtn.onclick=()=>{ setTheremin(!theremin); softAllOff(); applyTheremin(); };
 splitBtn.onclick =()=>{ setSplitOn(!splitOn); softAllOff(); applySplit(); };
+/* Поворот экрана: свой слушатель resize у UI (vision.js в UI не лезет — DOM-граница). Повернули в
+   портрет на включённом сплите → выключаем его (softAllOff — ничего не оставляем звучать), иначе
+   застряли бы в неиграбельной двух-половинной раскладке. Обратно в ландшафт НЕ включаем сами —
+   пользователь жмёт ◨ вручную (предсказуемо). applySplit всегда обновляет видимость кнопок. */
+function onResize(){
+  if(splitOn && !canSplit()){ setSplitOn(false); softAllOff(); }
+  applySplit();
+}
+addEventListener('resize', onResize);
 applyMode(); applyInstr(); applySwap();
  
 export { $ };
