@@ -1,5 +1,5 @@
 import { FXW, ZB, FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
-         CH_PAL_W, CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y } from './config.js';
+         CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
 import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, uiMode, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
@@ -109,7 +109,11 @@ function processHands(res){
     seen.add(key);
     const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false});
     S.seen=now; S.lm=lm;
- 
+    /* X-диапазон роли этой руки и внутренний раздел палитра|ноты. Пока роль одна — вся ширина
+       [0,W], раздел = palSplitX(0,W) = CH_PAL_W*W (как было). Шаг 3 (сплит-экран) выведет половину
+       по точке щипка и ЗАМОРОЗИТ её на S — как S.zone, чтобы чтение при игре совпало с захватом. */
+    const [rx0,rx1]=[0,W], split=palSplitX(rx0,rx1);
+
     const r=pinchRatios(lm), [mf,mv]=minFinger(r);
  
     if(!S.pinch&&mv<PINCH_ON){
@@ -134,7 +138,7 @@ function processHands(res){
         /* У аккордов октавная полоса живёт ТОЛЬКО в правой половине [SPLIT,W]: левая рука-палитра,
            дотянувшись до низа-слева, не должна перехватываться как октава — она выбирает тип.
            Соло/бас — октава по всей ширине (тест px пропускаем для не-'ch'). */
-        const octRight = phoneInstr!=='ch' || px>=CH_PAL_W*W;
+        const octRight = phoneInstr!=='ch' || px>=split;
         const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
         const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
         S.zone = octBand ? 'oct'
@@ -189,11 +193,10 @@ function processHands(res){
              1. только большой+УКАЗАТЕЛЬНЫЙ (S.oct===0) — щипок средним/безымянным/мизинцем
                 на этой руке ничего не выбирает: палец здесь смысла не несёт, а случайный
                 щипок не должен сбивать заготовленную форму;
-             2. только внутри палитры (S.x < SPLIT) — рука, ушедшая в зону нот, молчит.
+             2. только внутри палитры (S.x < split) — рука, ушедшая в зону нот, молчит.
            Ведение непрерывное, пока щипок держат: можно дотянуть до соседней ячейки. */
-        const SPLIT=CH_PAL_W*W;
-        if(S.oct===0 && S.x<SPLIT){
-          const x0=CH_PAL_PAD, x1=SPLIT-CH_PAL_PAD, y0=CH_PAL_HEAD_H, y1=H-CH_PAL_HEAD_H;
+        if(S.oct===0 && S.x<split){
+          const x0=rx0+CH_PAL_PAD, x1=split-CH_PAL_PAD, y0=CH_PAL_HEAD_H, y1=H-CH_PAL_HEAD_H;
           const [c,r]=cellHyst(clamp(S.x,x0,x1),clamp(S.y,y0,y1),x0,x1,y0,y1,chordFams(),
                                S.pc==null?-1:S.pc, S.pr==null?-1:S.pr);
           S.pc=c; S.pr=r;
@@ -238,7 +241,7 @@ function processHands(res){
            мерится по ПРАВОЙ зоне [SPLIT,W] — иначе вся половина экрана читалась бы «тихо».
            Остальные роли (соло/бас/ударные/обычные аккорды) — по всей ширине, как было. */
         const typed = S.zone==='ch'&&typedChords();
-        const[zx0,zx1]= !phone ? zoneX(S.zone,W) : (typed ? [CH_PAL_W*W,W] : [0,W]);
+        const[zx0,zx1]= !phone ? zoneX(S.zone,W) : (typed ? [split,rx1] : [rx0,rx1]);
         S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
         /* Тип берётся из ЛИПКОГО выбора палитры (левая рука), а не из положения правой.
            Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
