@@ -52,11 +52,25 @@
   /* 🔄 камера: .act = тыловая (незеркальная); визуально помечаем, что вид уже не «зеркало». */
   #camBtn{padding:9px 10px; font-size:15px;}
   #camBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  /* 🎥 запись клипа: .act = идёт запись (красный + мягкий пульс). Отдельно от ● лупера — другой
+     цвет-каркас и своя иконка, чтобы не путать музыкальную запись с записью видео. */
+  #clipBtn{padding:9px 10px; font-size:15px;}
+  #clipBtn.act{background:var(--rec); border-color:var(--rec); color:#fff; font-weight:600;
+    animation:clipPulse 1.2s ease-in-out infinite;}
+  /* Пульс на box-shadow (не на transform/opacity) — кнопка остаётся на месте и видимой, в отличие
+     от recPulse (тот гасит непрозрачность у ПСЕВДОэлемента-кольца ●). */
+  @keyframes clipPulse{ 0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.55);} 50%{box-shadow:0 0 0 5px rgba(229,72,77,0);} }
 
-  /* узкий экран / портрет: компактнее верхняя панель */
+  /* узкий экран / портрет: компактнее верхняя панель.
+     Кнопок стало много (лад, роль(и), 〰, ◨, 🔄, 🎥, ⚙, ●). На ~390px они не влезали в ОДНУ строку,
+     а полоса скроллилась по горизонтали со СКРЫТЫМ скроллбаром — последние кнопки (🎥, ⚙, ●)
+     уезжали за правый край и выглядели «пропавшими». Решение: РАЗРЕШАЕМ ПЕРЕНОС (flex-wrap) — всё
+     видно и достижимо во вторую строку, без скрытого скролла. auto-поля у #instrBtn (центрируют
+     кнопку роли в ОДНОЙ строке) при переносе мешают — обнуляем, строки центрируем justify-content. */
   @media (max-width:560px){
     button{padding:8px 9px; font-size:13px; border-radius:9px;}
-    #bar{gap:5px; padding:6px;}
+    #bar{gap:5px; padding:6px; flex-wrap:wrap; justify-content:center;}
+    #instrBtn{margin:0;}
     #recBtn{width:32px; height:32px; padding:0; border-radius:50%; font-size:14px;}
   }
   /* Кнопка-индикатор звукоряда «лад · тоника» — единственный вход в меню.

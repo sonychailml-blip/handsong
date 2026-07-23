@@ -2,6 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing } from './state.js';
 import { switchCamera } from './vision.js';
+import { startClip, stopClip, clipActive, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
@@ -12,7 +13,7 @@ import { hooks } from './hooks.js';
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'),
+      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), clipBtn=$('clipBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -238,6 +239,25 @@ async function toggleCamera(){
   camBtn.disabled=false;
 }
 camBtn.onclick=toggleCamera;
+/* 🎥 Запись ВИДЕОКЛИПА (кадр холста + звук в один файл) — отдельно от лупера (● музыкальная запись).
+   Тап старт / тап стоп+сохранение. Индикатор записи — класс .act (красный). Инертно до тапа; кнопка
+   живёт в #bar, а он виден лишь после «▶ Запустить», поэтому до старта записать нельзя. Формат честно
+   WebM (в подсказке предупреждаем про возможную конвертацию в MP4 для соцсетей). */
+function applyClip(){
+  const on=clipActive();
+  clipBtn.classList.toggle('act', on);
+  clipBtn.title = on ? 'Идёт запись клипа — тап остановит и сохранит'
+                     : 'Запись клипа: видео+звук в один файл (WebM; соцсети могут просить MP4 — понадобится конвертация)';
+}
+clipBtn.onclick=()=>{
+  if(clipActive()){ stopClip(); showCamMsg('Сохраняю клип…'); }   // .act снимет onClipChange, когда рекордер РЕАЛЬНО остановится (onstop), не по тапу
+  else{
+    try{ startClip(); showCamMsg('● Идёт запись клипа'); }        // .act поставит onClipChange из startClip
+    catch(err){ applyClip(); showCamMsg('Клип: '+(err&&err.message||err)); }   // старт бросил — состояние точно покой; синхронно приводим кнопку в покой
+  }
+};
+onClipChange(applyClip);                          // единый источник правды в clip.js уведомляет — кнопка/флаг/рекордер не разойдутся
+applyClip();                                     // старт: покой
 /* Поворот экрана: свой слушатель resize у UI (vision.js в UI не лезет — DOM-граница). Повернули в
    портрет на включённом сплите → выключаем его (softAllOff — ничего не оставляем звучать), иначе
    застряли бы в неиграбельной двух-половинной раскладке. Обратно в ландшафт НЕ включаем сами —

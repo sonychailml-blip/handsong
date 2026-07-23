@@ -423,10 +423,22 @@ function metroClick(t,accent){
   o.connect(g); g.connect(master); o.start(t); o.stop(t+0.09);
 }
 
+/* Параллельный ОТВОД звука для записи клипа. НОВЫЙ MediaStreamAudioDestinationNode, к нему цепляем
+   ВЫХОД лимитера — то, что реально слышно (post-limiter). Живой путь limiter→AC.destination НЕ
+   трогаем: это ДОПОЛНИТЕЛЬНОЕ ребро графа, звук в колонках не меняется (правило: живой аудио-путь
+   неизменен). Возвращаем stream (аудиодорожка для MediaRecorder) и dispose — снять ребро по
+   остановке, чтобы граф не копил мёртвые узлы. Вызывается только из записи клипа, после initAudio. */
+function createRecordingTap(){
+  if(!AC) return null;
+  const dest=AC.createMediaStreamDestination();
+  limiter.connect(dest);
+  return { stream:dest.stream, dispose:()=>{ try{ limiter.disconnect(dest); }catch(e){} } };
+}
+
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
 export {
   initAudio, AC, setLeadInstr, applyParams, scheduleBend, leadCancel, noteOn, noteOff, metroClick,
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
-  LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS,
+  LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
 };
