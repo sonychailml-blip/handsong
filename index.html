@@ -31,6 +31,7 @@
       тембры, аранжировка. Телефон — горизонтально.
     </p>
     <button id="startBtn">▶ Запустить</button>
+    <button id="demoBtn" title="Демо: один мотив в шести строях, без камеры">🎧 Послушать строи</button>
     <p id="loadmsg"></p>
   </div>
 </div>
@@ -43,9 +44,14 @@
   <button id="instrBtnR" title="Правая половина: инструмент">🎸 Соло ◨</button>
   <button id="thereminBtn" title="Терменвокс: непрерывная высота (глиссандо)">〰</button>
   <button id="splitBtn" title="Сплит-экран: аккорды | соло на двух половинах">◨</button>
+  <button id="camBtn" title="Переключить камеру: фронтальная / тыловая">🔄</button>
   <button id="loopPanelBtn" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
   <button id="recBtn" title="Запись: тап — отсчёт такта, затем круг">●</button>
 </div>
+
+<!-- Тост камеры: короткое сообщение при отказе переключения (нет второй камеры / нет доступа).
+     Отдельный элемент, а не строка #status — её каждый кадр переписывает drawStatus. -->
+<div id="camMsg"></div>
 
 <!-- Транспорт лупера: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера
      (drawLooper). Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что
@@ -169,6 +175,20 @@
   </div>
 </div>
  
+<!-- ================= ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» =================
+     Отдельный оверлей ПОВЕРХ стартового экрана (z выше #start): показывает подпись сцены,
+     пока звучит мотив. Не трогает стартовый поток — по «Пропустить»/окончании гаснет,
+     под ним снова стартовый экран. Камера не запрашивается. Логика — src/demo.js. -->
+<div id="demoOv" class="ov">
+  <div class="demoInner">
+    <div id="demoScene">1 / 6</div>
+    <div id="demoName"></div>
+    <div id="demoCulture"></div>
+    <p id="demoHint">Один и тот же мотив звучит в шести строях — слушайте, как меняется настройка.</p>
+    <button id="demoSkip">Пропустить ✕</button>
+  </div>
+</div>
+
 <div id="status"></div>
 <video id="video" playsinline muted autoplay></video>
 <canvas id="canvas"></canvas>

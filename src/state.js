@@ -23,6 +23,13 @@ export let latchTy=null;
    роли на двух половинах при splitOn. Правая рука — ноты, левая — эффекты (swapHands меняет руки). */
 export let phoneInstr='ld';                      // активная роль: 'ld' соло | 'ch' аккорды | 'bs' бас | 'dr' ударные
 export let swapHands=false;                      // true → правая=эффекты, левая=ноты
+/* ЕДИНЫЙ ИСТОЧНИК ЗЕРКАЛА (фронт/тыл камеры). Фронтальная ('user') — картинку ЗЕРКАЛИМ (видишь
+   себя как в зеркале, рука совпадает с экраном); тыловая ('environment') — НЕ зеркалим (иначе рука
+   ехала бы против того, что на экране). camFacing пишем ТОЛЬКО через setCamFacing (правило #6).
+   mirrored() — единственное решение «зеркалить ли»; flipX — единственная формула флипа
+   нормированного x∈0..1. И hit-test (gestures), и рендер точек (draw), и видеофон читают ИХ, а не
+   свой «1−x» — вход и картинка не разъедутся при смене камеры (та же дисциплина, что у геометрии). */
+export let camFacing='user';                     // 'user' фронтальная (зеркалим) | 'environment' тыловая (нет)
 /* Сплит-экран (только phone): ON — экран делится на ДВЕ половины, каждая играет свою роль сразу
    (зона = инструмент, любая рука работает любую половину). OFF — сегодняшний single-role на весь
    экран, байт-в-байт. Пара ролей на шаге 3 фиксирована — SPLIT_ROLES. Живая связка — писать через
@@ -78,6 +85,9 @@ export const setChordVar=v=>{ chordVar=v; };
 export const setLatchTy=v=>{ latchTy=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
 export const setSwapHands=v=>{ swapHands=v; };
+export const setCamFacing=v=>{ camFacing=v; };
+export const mirrored=()=>camFacing==='user';    // зеркалим только фронтальную камеру
+export const flipX=nx=> mirrored() ? 1-nx : nx;  // ЕДИНАЯ формула флипа: нормированный x → нормированный (умножь на W у вызывающего)
 export const setSplitOn=v=>{ splitOn=v; };
 export const setTheremin=v=>{ theremin=v; };
 export const setOctReg=v=>{ octReg=v; };

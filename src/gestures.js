@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves } from './state.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves, flipX } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
@@ -28,7 +28,8 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
 /* ================= ОБРАБОТКА РУК =================
    ПАРСИНГ MEDIAPIPE: result.landmarks — массив рук; в каждой 21 точка
    с нормированными координатами (x,y ∈ 0..1, origin слева-сверху КАДРА).
-   Видео зеркалим, поэтому экранный x = (1 − lm.x) · W, y = lm.y · H.
+   Экранный x = flipX(lm.x) · W (ЕДИНЫЙ источник зеркала — state.flipX: фронт-камеру зеркалим,
+   тыловую нет), y = lm.y · H (по вертикали фронт/тыл одинаковы).
    Ключевые точки: 4 — кончик большого, 8/12/16/20 — кончики пальцев,
    0 — запястье, 9 — основание среднего (по паре 0–9 меряем «глубину» Z:
    видимый размер кисти стабильнее, чем сырая z-координата модели).
@@ -123,7 +124,7 @@ function processHands(res){
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
       {
         const py=(lm[4].y+lm[mf].y)/2*H;
-        const px=(1-(lm[4].x+lm[mf].x)/2)*W;
+        const px=flipX((lm[4].x+lm[mf].x)/2)*W;
         if(splitOn){
           /* СПЛИТ-ЭКРАН: половину (роль + X-диапазон) выбираем ПО ТОЧКЕ ЩИПКА и ЗАМОРАЖИВАЕМ на S —
              как S.zone. Роль этой руки = роль её половины (зона=инструмент). Раздел палитра|ноты —
@@ -185,7 +186,7 @@ function processHands(res){
          зажат с большим (S.oct) — переключил палец, слежение мгновенно
          перешло на него. */
       const tip=lm[FINGER_TIPS[S.oct]];
-      const x=emaS(S,'x',(1-tip.x)*W,0.4);
+      const x=emaS(S,'x',flipX(tip.x)*W,0.4);
       const y=emaS(S,'y',tip.y*H,0.4);
       S.x=x; S.y=y;
       /* X-диапазон роли ЭТОЙ руки при игре: при сплите — ЗАМОРОЖЕННЫЙ на захвате (S.rx0/S.rx1),

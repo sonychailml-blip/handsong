@@ -3,6 +3,7 @@ import { video, landmarker, initVision } from './vision.js';
 import { processHands } from './gestures.js';
 import { drawVideoBackground, drawOverlays } from './draw.js';
 import { $ } from './ui.js';                     // side-effect: строит меню, вешает обработчики, регистрирует hooks
+import './demo.js';                              // side-effect: кнопка «Послушать строи» на старте (демо строёв, без камеры)
 
 /* =====================================================================
    AIR SYNTH 3 — жестовый синтезатор + интерактивный учебник ладов

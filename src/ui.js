@@ -1,5 +1,7 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
-         phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole } from './state.js';
+         phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
+         camFacing, setCamFacing } from './state.js';
+import { switchCamera } from './vision.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
@@ -10,7 +12,7 @@ import { hooks } from './hooks.js';
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'),
+      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -213,6 +215,29 @@ instrBtnR.onclick=()=>cycleHalf(1);
 swapBtn.onclick  =()=>{ setSwapHands(!swapHands); softAllOff(); applySwap(); };
 thereminBtn.onclick=()=>{ setTheremin(!theremin); softAllOff(); applyTheremin(); };
 splitBtn.onclick =()=>{ setSplitOn(!splitOn); softAllOff(); applySplit(); };
+/* 🔄 Переключение камеры (фронт↔тыл). Уже ПОСЛЕ старта: кнопка живёт в #bar, а он виден лишь после
+   «▶ Запустить» — камеру на загрузке не трогаем. Запрашиваем ДРУГУЮ facingMode; camFacing (единый
+   источник зеркала flipX/mirrored) двигаем ТОЛЬКО после успеха, чтобы картинка и hit-test флипнулись
+   вместе. Отказ (нет второй камеры / нет доступа) — откат на прежнюю камеру + короткий тост, без слома. */
+let camMsgTimer=0;
+function showCamMsg(t){
+  camMsg.dataset.msg=t; camMsg.classList.add('on');
+  clearTimeout(camMsgTimer); camMsgTimer=setTimeout(()=>camMsg.classList.remove('on'),2600);
+}
+async function toggleCamera(){
+  const next = camFacing==='user' ? 'environment' : 'user';
+  camBtn.disabled=true;
+  try{
+    await switchCamera(next);
+    setCamFacing(next);                          // единый источник зеркала — только после успешного открытия
+    camBtn.classList.toggle('act', next==='environment');   // .act = тыловая (незеркальная)
+  }catch(err){
+    try{ await switchCamera(camFacing); }catch(e){}          // откат: возвращаем прежнюю камеру (camFacing не менялся)
+    showCamMsg('Вторая камера недоступна');
+  }
+  camBtn.disabled=false;
+}
+camBtn.onclick=toggleCamera;
 /* Поворот экрана: свой слушатель resize у UI (vision.js в UI не лезет — DOM-граница). Повернули в
    портрет на включённом сплите → выключаем его (softAllOff — ничего не оставляем звучать), иначе
    застряли бы в неиграбельной двух-половинной раскладке. Обратно в ландшафт НЕ включаем сами —

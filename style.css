@@ -49,6 +49,9 @@
   /* 〰 терменвокс — иконка-компаньон роли (видимость ставит applyTheremin в JS: только phone-соло) */
   #thereminBtn{padding:9px 10px; font-size:15px;}
   #thereminBtn.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
+  /* 🔄 камера: .act = тыловая (незеркальная); визуально помечаем, что вид уже не «зеркало». */
+  #camBtn{padding:9px 10px; font-size:15px;}
+  #camBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
 
   /* узкий экран / портрет: компактнее верхняя панель */
   @media (max-width:560px){
@@ -75,6 +78,16 @@
   #loopTransport.on{display:flex;}
   #loopTransport button{padding:7px 10px; font-size:13px;}
   @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:12px;} }
+
+  /* Тост камеры: всплывает под верхней панелью при отказе переключения; сам гаснет (класс .on
+     снимает JS по таймеру). Не мешает игре — pointer-events:none, показывается только с .on. */
+  #camMsg{position:fixed; top:52px; left:0; right:0; z-index:20; text-align:center;
+    opacity:0; transition:opacity .25s; pointer-events:none;}
+  #camMsg.on{opacity:1;}
+  #camMsg::before{content:attr(data-msg); display:inline-block;
+    background:rgba(10,10,20,.9); color:var(--ink); font-size:13px;
+    padding:8px 14px; border-radius:11px; border:1px solid rgba(255,255,255,.22);
+    backdrop-filter:blur(6px);}
 
   #status{position:fixed; left:10px; right:10px; bottom:6px; z-index:10;
     font-size:11px; color:var(--dim); text-shadow:0 1px 2px #000;
@@ -133,5 +146,17 @@
   #startBtn{font-size:18px; padding:15px 32px; background:var(--note);
     color:#1a1206; border:none; font-weight:700; margin-top:10px;}
   #loadmsg{font-size:12px; color:var(--dim); min-height:1.2em; margin-top:10px;}
+  #demoBtn{font-size:16px; padding:13px 24px; margin:10px 0 0 8px;}
+
+  /* ДЕМО «путешествие по строям»: оверлей поверх стартового (z 35 > start 30). Фон-тинт
+     ставит demo.js поцветно на каждую сцену; здесь — только раскладка подписи. */
+  #demoOv{z-index:35; text-align:center;}
+  #demoOv .demoInner{max-width:560px; margin:0 auto; padding-top:22vh;
+    display:flex; flex-direction:column; align-items:center; gap:12px;}
+  #demoScene{font-size:13px; color:var(--dim); letter-spacing:.18em;}
+  #demoName{font-size:30px; font-weight:800; color:var(--ink); line-height:1.2;}
+  #demoCulture{font-size:18px; color:var(--note);}
+  #demoHint{font-size:13px; color:var(--dim); max-width:420px; margin:6px auto 0;}
+  #demoSkip{margin-top:22px; font-size:16px; padding:12px 26px;}
 
   
