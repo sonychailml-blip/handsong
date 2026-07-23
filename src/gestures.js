@@ -44,6 +44,23 @@ function handRole(key){
   if(key.slice(0,5)==='Right') return swapHands?'fx':'notes';
   return 'notes';
 }
+/* «Солирующая НОТНАЯ рука» — та, что ЦЕЛИТСЯ ревербом (revDisp до щипка): реверб ляжет на её ноту,
+   поэтому прицел ведёт именно она, а не рука эффектов и не рука из чужой половины. ЕДИНЫЙ источник
+   правила для обоих сайтов revDisp (пер-кадровый прицел + сброс в 0). Условия: (1) роль руки=ноты
+   (не fx); (2) её РОЛЬ-ПОЛОВИНА — соло. Single-role: половина одна, поэтому просто phoneInstr==='ld'
+   (байт-в-байт со старым гейтом). Сплит: роль половины — замороженная S.role у щипнувшей руки, иначе
+   живая половина под указательным (lm[8]) через phoneHalves — ТАК ЖЕ, как её берёт drawHandsPhone,
+   чтобы прицел работал ДО щипка (в этом весь смысл). Нет соло-половины в паре → ни у кого не 'ld' →
+   false у всех → второй сайт гасит revDisp в 0. */
+function soloNoteHand(key,S,W){
+  if(handRole(key)!=='notes')return false;
+  if(!splitOn)return phoneInstr==='ld';
+  let hrole;
+  if(S.pinch)hrole=S.role;
+  else{ const lm=S.lm; if(!lm)return false;
+    const px=flipX(lm[8].x)*W, hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; hrole=h.role; }
+  return hrole==='ld';
+}
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
    (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
    рисуется. Эти две высоты обязаны совпадать: разойдутся — палец будет брать не ту
@@ -320,9 +337,9 @@ function processHands(res){
        кисти) КАЖДЫЙ кадр — щипок не нужен, можно «прицелиться» ревербом ДО игры. Пропускаем, когда
        рука уже играет (ветка 'ld'/leadOwner выше сама зовёт setRevDisp — иначе посчитали бы EMA дважды).
        ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре.
-       При сплите «прицел» ДО щипка отключён (какая рука целится в соло — неоднозначно); живой revDisp
-       при игре соло всё равно обновляет ветка 'ld' выше (§шаг3, осознанный выбор). */
-    if(!splitOn && phoneInstr==='ld' && handRole(key)==='notes'
+       Кто целится — решает soloNoteHand (single-role и сплит одинаково): нотная рука соло-половины.
+       При сплите прицел ведёт нотная рука ИМЕННО соло-половины (не fx, не рука из чужой половины). */
+    if(soloNoteHand(key,S,W)
        && !(S.pinch && S.zone==='ld' && leadOwner===key)){
       setRevDisp(clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE));
     }
@@ -335,9 +352,14 @@ function processHands(res){
   }
   if(leadOwner&&!HANDS[leadOwner])leadOwner=null;
   if(bassOwner&&!HANDS[bassOwner]){ WbassOff(); bassOwner=null; }
-  /* Соло-нотной руки нет в кадре → индикатор реверба гасим в 0 (не висит на последнем значении).
-     Только для одиночного соло (вне сплита). */
-  if(!splitOn && phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes')) setRevDisp(0);
+  /* Солирующей НОТНОЙ руки нет в кадре → индикатор реверба гасим в 0 (не висит на последнем значении).
+     Тот же критерий «кто целит» (soloNoteHand): single-role — нотная рука при phoneInstr='ld' (байт-в-байт
+     старое условие); сплит — нотная рука соло-половины. Нет соло-половины в паре (в SPLIT_ROLES нет 'ld')
+     → soloNoteHand ложна у всех → тоже 0 (столбики FX при этом уже не рисуются — стейл не остаётся). */
+  const reset = splitOn
+    ? ![...seen].some(k=>{ const S=HANDS[k]; return S && soloNoteHand(k,S,W); })
+    : (phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes'));   // single-role: условие байт-в-байт как было (гасим только при phoneInstr='ld')
+  if(reset) setRevDisp(0);
 }
 
 /* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */
