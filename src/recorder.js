@@ -229,18 +229,32 @@ function onRec(){
 /* Загрузить аранжировку (гармония+бас+ритм) как ОТДЕЛЬНЫЕ слои, замороженные в текущем
    ладу/септаккорде (§3.4). Пустая петля → длина из прогрессии + запуск; непустая → только
    если длина совпадает (как setLoopBars). Слои снимаются undo сверху (сначала ритм). */
-function loadArrangement(sel){
-  if(!AC)return;
+function loadArrangement(sel, jam=false){
+  if(!AC)return false;
   const arr=buildArrangement(sel, {chIdx, bassIdx});
-  if(!arr||!arr.layers.length)return;
+  if(!arr||!arr.layers.length)return false;
   if(!events.length){ loop.bars=arr.bars; loop.first=false; }
-  else if(arr.bars!==loop.bars)return;                 // не тот размер — тихо, как setLoopBars
+  else if(arr.bars!==loop.bars)return false;           // не тот размер — тихо, как setLoopBars
   const base=events.length?maxLayer()+1:0;
   arr.layers.forEach((evs,li)=>{ const layer=base+li;
-    for(const e of evs) events.push({t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh}); });
+    for(const e of evs){ const ev={t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh};
+      if(jam)ev.jam=true;                              // МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока (см. clearJam)
+      events.push(ev); } });
   events.sort((x,y)=>x.t-y.t);
   if(!loop.on)startTransport(false);
   if(droneActive())droneOn();                          // включаем дрон сразу (насос переподтвердит на завороте)
+  return true;                                         // добавили (джем-контроллер по этому знает, что вариант встал)
+}
+/* Джем — та же аранжировка-shortcut, но её слои ПОМЕЧЕНЫ (e.jam). loadJam кладёт помеченные,
+   clearJam снимает РОВНО их. Записи игрока (push никогда не ставит jam) неуязвимы по построению. */
+const loadJam=sel=>loadArrangement(sel, true);
+function clearJam(){
+  if(!events.length)return;
+  let removed=false;
+  for(let i=events.length-1;i>=0;i--) if(events[i].jam){ events.splice(i,1); removed=true; }
+  if(!removed)return;
+  softAllOff(); if(!droneActive())droneOff();          // бухгалтерия как в onUndo: гасим зависшее, ушёл слой-дрон → гасим дрон
+  if(!events.length)clearRec(); else hooks.loop&&hooks.loop(loop.on);   // пусто → полный сброс; остались записи игрока → петля играет дальше
 }
 function onLoop(){                                     // играть/пауза петли
   if(!AC)return;
@@ -276,5 +290,5 @@ export {
   WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
   softAllOff, panic, inPB, recording,
   onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, events, loopPos,
-  loadArrangement, loopChordDeg,
+  loadArrangement, loadJam, clearJam, loopChordDeg,
 };

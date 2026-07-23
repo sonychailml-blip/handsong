@@ -2,10 +2,10 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing } from './state.js';
 import { switchCamera } from './vision.js';
-import { startClip, stopClip, clipActive, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS } from './audio.js';
-import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement } from './recorder.js';
+import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR } from './scales.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC } from './audio.js';
+import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
 import { INSTR_COL } from './config.js';
 import { hooks } from './hooks.js';
@@ -13,7 +13,7 @@ import { hooks } from './hooks.js';
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), clipBtn=$('clipBtn'),
+      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -122,7 +122,7 @@ scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
 loopPanelBtn.onclick=()=>showLoop(!panelLoopEl.classList.contains('on'));
 $('helpBtn').onclick=()=>$('helpOv').classList.add('on');
 $('helpClose').onclick=()=>$('helpOv').classList.remove('on');
-$('panicBtn').onclick=panic;
+$('panicBtn').onclick=()=>{ panic(); resetJamDisplay(); };   // паника гасит всё → индикатор джема тоже в покой
  
 /* Смена традиции = смена лада: иначе продолжал бы звучать лад чужой традиции, а меню
    показывало бы другой. Переключаемся на ПЕРВЫЙ лад традиции тем же путём, что и selScale. */
@@ -151,7 +151,7 @@ selDrumKit.onchange=e=>setDrumKit(+e.target.value);
 recBtn.onclick=onRec;
 loopBtn.onclick=onLoop;
 $('undoBtn').onclick=onUndo;
-$('clrBtn').onclick=clearRec;
+$('clrBtn').onclick=()=>{ clearRec(); resetJamDisplay(); };   // очистка петли → индикатор джема в покой
 loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bars; };
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
@@ -239,25 +239,89 @@ async function toggleCamera(){
   camBtn.disabled=false;
 }
 camBtn.onclick=toggleCamera;
-/* 🎥 Запись ВИДЕОКЛИПА (кадр холста + звук в один файл) — отдельно от лупера (● музыкальная запись).
-   Тап старт / тап стоп+сохранение. Индикатор записи — класс .act (красный). Инертно до тапа; кнопка
-   живёт в #bar, а он виден лишь после «▶ Запустить», поэтому до старта записать нельзя. Формат честно
-   WebM (в подсказке предупреждаем про возможную конвертацию в MP4 для соцсетей). */
-function applyClip(){
-  const on=clipActive();
-  clipBtn.classList.toggle('act', on);
-  clipBtn.title = on ? 'Идёт запись клипа — тап остановит и сохранит'
-                     : 'Запись клипа: видео+звук в один файл (WebM; соцсети могут просить MP4 — понадобится конвертация)';
+/* 🎥 ВИДЕОКЛИП (кадр холста + звук) и 🎙 АУДИО (только звук) — один движок clip.js на два вида.
+   Тап старт / тап стоп+сохранение. Индикатор записи — .act (красный). Инертно до тапа; кнопки живут
+   в #bar, а он виден лишь после «▶ Запустить». ВЗАИМНОЕ ИСКЛЮЧЕНИЕ: пока идёт одна запись, ДРУГАЯ
+   кнопка disabled (два рекордера на одном отводе недопустимы) — видно, что нельзя, а не «молча не
+   работает». Обе кнопки обновляет applyRec из ЕДИНОГО источника правды (activeKind через onClipChange),
+   поэтому .act/disabled и реальное состояние не разойдутся. Форматы честно: видео WebM (соцсети могут
+   просить MP4), аудио WebM/Opus (Safari может дать mp4) — MP3/WAV не обещаем. */
+function applyRec(){
+  const k=activeKind();                          // 'video' | 'audio' | null
+  clipBtn.classList.toggle('act', k==='video');  clipBtn.disabled  = k==='audio';   // идёт аудио → видео нельзя
+  audioBtn.classList.toggle('act', k==='audio'); audioBtn.disabled = k==='video';   // идёт видео → аудио нельзя
+  clipBtn.title = k==='video' ? 'Идёт запись клипа — тап остановит и сохранит'
+    : 'Запись клипа: видео+звук в один файл (WebM; соцсети могут просить MP4 — понадобится конвертация)';
+  audioBtn.title = k==='audio' ? 'Идёт запись аудио — тап остановит и сохранит'
+    : 'Запись аудио: только звук в файл (WebM/Opus; Safari может дать mp4)';
 }
 clipBtn.onclick=()=>{
-  if(clipActive()){ stopClip(); showCamMsg('Сохраняю клип…'); }   // .act снимет onClipChange, когда рекордер РЕАЛЬНО остановится (onstop), не по тапу
+  if(activeKind()==='video'){ stopClip(); showCamMsg('Сохраняю клип…'); }   // .act снимет onClipChange, когда рекордер РЕАЛЬНО остановится (onstop), не по тапу
   else{
-    try{ startClip(); showCamMsg('● Идёт запись клипа'); }        // .act поставит onClipChange из startClip
-    catch(err){ applyClip(); showCamMsg('Клип: '+(err&&err.message||err)); }   // старт бросил — состояние точно покой; синхронно приводим кнопку в покой
+    try{ startClip('video'); showCamMsg('● Идёт запись клипа'); }           // .act/disabled поставит onClipChange из startClip
+    catch(err){ applyRec(); showCamMsg('Клип: '+(err&&err.message||err)); }   // старт бросил — состояние точно покой; синхронно приводим кнопки в покой
   }
 };
-onClipChange(applyClip);                          // единый источник правды в clip.js уведомляет — кнопка/флаг/рекордер не разойдутся
-applyClip();                                     // старт: покой
+audioBtn.onclick=()=>{
+  if(activeKind()==='audio'){ stopClip(); showCamMsg('Сохраняю аудио…'); }
+  else{
+    try{ startClip('audio'); showCamMsg('● Идёт запись аудио'); }
+    catch(err){ applyRec(); showCamMsg('Аудио: '+(err&&err.message||err)); }
+  }
+};
+onClipChange(applyRec);                           // единый источник правды в clip.js уведомляет обе кнопки — .act/disabled/рекордер не разойдутся
+applyRec();                                       // старт: покой
+
+/* 🎵 ДЖЕМ — подложка по строю одним тапом; каждый следующий тап — СЛЕДУЮЩИЙ вариант (прежний
+   СТОП, новый старт — варианты не слоятся), в конце ВЫКЛ и по кругу. Джем — не режим: это обычные
+   слои лупера, помеченные e.jam (loadJam/clearJam), поэтому ⚙-панель, undo и запись работают как
+   обычно. ВАРИАНТ ВЫБИРАЕТСЯ ПО СВОЙСТВАМ лада, не по имени/индексу. Данные берём из существующих
+   HARMONIES/RHYTHMS/BASS_MODES — джем только ВЫБИРАЕТ. */
+const JH_DRONE=0, JH_IviiiV=2, JH_IIVV=3;         // индексы HARMONIES: Дрон / I–vi–ii–V / I–IV–V
+const JR_BACK=0, JR_MAQSUM=1, JR_NONE=-1;         // индексы RHYTHMS: Бэкбит / Маqсум; -1 → RHYTHMS[-1]=undefined → без ударных
+/* Список вариантов (каждый — sel для лупера) в порядке переключения; выкл добавляет цикл в jamBtn. */
+function jamVariants(){
+  const chords=supportsChords(), prog=supportsProgressions()&&chords;   // 7 ступеней И есть аккорды (макам: 7 ступеней, но noChords → сюда не попадёт)
+  if(prog) return [
+    {prog:JH_IviiiV, rhythm:JR_BACK, bass:'roots'},   // I–vi–ii–V + бас по корням + бэкбит
+    {prog:JH_IIVV,   rhythm:JR_BACK, bass:'roots'},   // I–IV–V + корни + бэкбит
+    {prog:JH_DRONE,  rhythm:JR_NONE, bass:'pedal'},   // дрон + педаль, без ударных
+  ];
+  if(chords) return [                                 // аккорды, но не 7 ступеней: хроматика/19/31/партч/пифагор/натур/мезотон/пентатоники
+    {prog:JH_DRONE, rhythm:JR_BACK, bass:'pedal'},    // дрон + педаль + бэкбит
+    {prog:JH_DRONE, rhythm:JR_NONE, bass:'pedal'},    // дрон + педаль, без ударных
+  ];
+  if(CUR().edo===24) return [                         // !supportsChords + 24-TET = макам: уместен маqсум (24-TET уникален для макамов)
+    {prog:JH_DRONE, rhythm:JR_MAQSUM, bass:'pedal'},  // дрон + педаль + маqсум
+    {prog:JH_DRONE, rhythm:JR_NONE,   bass:'pedal'},  // дрон + педаль, без ударных
+  ];
+  return [                                            // прочие бесаккордовые (гамелан/BP/Карлос/раги): ударные чужды — сразу лёгкий вариант
+    {prog:JH_DRONE, rhythm:JR_NONE, bass:'pedal'},    // дрон + педаль, без ударных
+  ];
+}
+let jamStep=0;                                    // 0 = выкл, 1..N = номер варианта (место в цикле; сам джем — слои лупера)
+function applyJam(){
+  const n=jamVariants().length;
+  jamBtn.classList.toggle('act', jamStep>0);
+  jamBtn.textContent = jamStep>0 ? `🎵 ${jamStep}/${n}` : '🎵 Джем';
+  jamBtn.title = jamStep>0 ? 'Джем играет — тап сменит вариант (в конце выключит)'
+                           : 'Джем: подложка по строю — тап включит, следующий тап сменит вариант';
+}
+function jamTo(step, vars){
+  clearJam();                                     // снять ПРОШЛЫЕ слои джема (записи игрока целы — они без метки jam)
+  if(step>0 && !loadJam(vars[step-1])){           // не встало (петля игрока другого размера) — честно сообщаем, цикл → выкл
+    showCamMsg('Джем: петля другого размера — очистите её (✕)'); jamStep=0; applyJam(); return;
+  }
+  jamStep=step; applyJam();
+}
+jamBtn.onclick=()=>{
+  if(!AC)return;
+  const vars=jamVariants();
+  let next=jamStep+1; if(next>vars.length)next=0;      // …→ vN → выкл → v1
+  jamTo(next, vars);
+};
+function resetJamDisplay(){ jamStep=0; applyJam(); }    // внешняя очистка/паника петли: цикл джема начинается заново
+applyJam();                                       // старт: выкл
 /* Поворот экрана: свой слушатель resize у UI (vision.js в UI не лезет — DOM-граница). Повернули в
    портрет на включённом сплите → выключаем его (softAllOff — ничего не оставляем звучать), иначе
    застряли бы в неиграбельной двух-половинной раскладке. Обратно в ландшафт НЕ включаем сами —
