@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves, flipX } from './state.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves, sx, sy } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
@@ -27,9 +27,13 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
  
 /* ================= ОБРАБОТКА РУК =================
    ПАРСИНГ MEDIAPIPE: result.landmarks — массив рук; в каждой 21 точка
-   с нормированными координатами (x,y ∈ 0..1, origin слева-сверху КАДРА).
-   Экранный x = flipX(lm.x) · W (ЕДИНЫЙ источник зеркала — state.flipX: фронт-камеру зеркалим,
-   тыловую нет), y = lm.y · H (по вертикали фронт/тыл одинаковы).
+   с нормированными координатами (x,y ∈ 0..1, origin слева-сверху КАДРА). Детектор читает ПОЛНЫЙ кадр.
+   ДВЕ РОЛИ координат, строго врозь: (1) СЫРЫЕ lm.x/lm.y — вся гест-математика (щипок pinchRatios,
+   размер ладони dist(0,9), какой палец, Z-реверб, пороги): работает и когда рука наполовину за
+   кадром; (2) ЭКРАННЫЕ — позиция и попадание (половина/прямоугольник/зона, X-громкость) через
+   state.sx/sy: экранный x = sx(lm.x,W) = remapAxis(flipX(lm.x))·W, y = sy(lm.y,H) = remapAxis(lm.y)·H.
+   sx складывает ЗЕРКАЛО (flipX: фронт зеркалим, тыл нет) и ПОЛЯ КАДРА (remapAxis, config.CAM_MARGIN:
+   игровое поле = внутренние ~0.12..0.88, чтобы рука на крайних прямоугольниках ещё была в кадре).
    Ключевые точки: 4 — кончик большого, 8/12/16/20 — кончики пальцев,
    0 — запястье, 9 — основание среднего (по паре 0–9 меряем «глубину» Z:
    видимый размер кисти стабильнее, чем сырая z-координата модели).
@@ -58,7 +62,8 @@ function soloNoteHand(key,S,W){
   let hrole;
   if(S.pinch)hrole=S.role;
   else{ const lm=S.lm; if(!lm)return false;
-    const px=flipX(lm[8].x)*W, hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; hrole=h.role; }
+    // px через sx (поля кадра); для ВЫБОРА половины клампим в [0,W): рука в полях сатурируется к ближней кромке, а не проваливается в чужую половину
+    const px=clamp(sx(lm[8].x,W),0,W-1), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; hrole=h.role; }
   return hrole==='ld';
 }
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
@@ -140,15 +145,15 @@ function processHands(res){
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
       {
-        const py=(lm[4].y+lm[mf].y)/2*H;
-        const px=flipX((lm[4].x+lm[mf].x)/2)*W;
+        const py=sy((lm[4].y+lm[mf].y)/2,H);       // экранные пиксели игрового поля (поля кадра сняты); гест-математику щипка выше это не касается — там сырые lm
+        const px=sx((lm[4].x+lm[mf].x)/2,W);
         if(splitOn){
           /* СПЛИТ-ЭКРАН: половину (роль + X-диапазон) выбираем ПО ТОЧКЕ ЩИПКА и ЗАМОРАЖИВАЕМ на S —
              как S.zone. Роль этой руки = роль её половины (зона=инструмент). Раздел палитра|ноты —
              palSplitX диапазона ИМЕННО этой половины. Палитра — ПО ПОЛОЖЕНИЮ (без handRole): любая
              рука с большим+указательным (S.oct===0) слева от раздела выбирает тип. Эффекты остаются
              за левой рукой (handRole==='fx'), но ТОЛЬКО в соло-половине (h.role==='ld'). */
-          const halves=phoneHalves(W), h=halves.find(q=>px>=q.rx0&&px<q.rx1)||halves[halves.length-1];
+          const halves=phoneHalves(W), hx=clamp(px,0,W-1), h=halves.find(q=>hx>=q.rx0&&hx<q.rx1)||halves[halves.length-1];   // клампим px ТОЛЬКО для выбора половины: щипок в поле полей целится в ближнюю половину, а не в чужую
           S.role=h.role; S.rx0=h.rx0; S.rx1=h.rx1;
           const hsplit=palSplitX(h.rx0,h.rx1);
           const rectRole = (h.role==='ld'||h.role==='bs'||h.role==='ch') && rectGrid();
@@ -203,8 +208,8 @@ function processHands(res){
          зажат с большим (S.oct) — переключил палец, слежение мгновенно
          перешло на него. */
       const tip=lm[FINGER_TIPS[S.oct]];
-      const x=emaS(S,'x',flipX(tip.x)*W,0.4);
-      const y=emaS(S,'y',tip.y*H,0.4);
+      const x=emaS(S,'x',sx(tip.x,W),0.4);         // экранные пиксели игрового поля (поля кадра сняты) — позиция, громкость по X, попадание в прямоугольник/палитру
+      const y=emaS(S,'y',sy(tip.y,H),0.4);
       S.x=x; S.y=y;
       /* X-диапазон роли ЭТОЙ руки при игре: при сплите — ЗАМОРОЖЕННЫЙ на захвате (S.rx0/S.rx1),
          иначе весь холст [0,W]. Раздел палитра|ноты — palSplitX того же диапазона. OFF → 0/W/split

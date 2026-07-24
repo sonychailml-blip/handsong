@@ -147,5 +147,7 @@ Never report a change as done without stating which steps you could not verify.
 
 ## Language
 
-- Code, comments, UI strings, `SCALES`/`CHORD_FAM_SETS` names: **Russian**. Never translate or "clean up".
+- Code comments, and `SCALES`/`CHORD_FAM_SETS` names: **Russian**. Never translate or "clean up" these.
+- **User-facing UI strings: multilingual, with ENGLISH as the default** (plus ru/es/de). The old "UI strings stay Russian, never translate" rule is **retired** for user-facing strings — see BACKLOG §3.18 (Локализация/i18n), which supersedes §3.2.
+  - ⚠️ **The i18n work itself is NOT started and MUST wait for the UI rework** (BACKLOG §3.19/§3.21/§3.22). **Do not start translating or rewriting UI strings into a `{en,ru,es,de}` dictionary yet** — those strings are about to be rewritten by the UI rework, so translating first wastes the effort. Until i18n lands, **keep adding new user-facing strings in Russian** (consistent with the existing code), so there is a single language to migrate cleanly later.
 - Chat responses to the user: **English** (the Windows terminal mangles Cyrillic).

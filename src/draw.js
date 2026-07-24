@@ -1,9 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, theremin, splitOn, phoneHalves, mirrored, flipX, videoRec } from './state.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, theremin, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
-         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX } from './config.js';
+         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN } from './config.js';
 import { DRUM_NAMES } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
@@ -236,10 +236,15 @@ function drawLooper(){
    совпасть с точками (звук по-прежнему из того же старого кадра). */
 function drawVideoBackground(){
   const W=canvas.width, H=canvas.height;
-  /* Зеркалим ТОЛЬКО фронтальную камеру (mirrored — тот же источник, что и flipX у точек): фронт —
-     как в зеркале, тыловая — как есть, иначе картинка и рука ехали бы врозь. */
-  if(mirrored()){ ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-W,0,W,H); ctx.restore(); }
-  else ctx.drawImage(video,0,0,W,H);
+  /* Кадрируем видео в ИГРОВОЕ поле: на экран попадает ровно то, что играбельно, ТОЙ ЖЕ долей полей
+     CAM_MARGIN, что снимает remapAxis у точек (sx/sy) — картинка и рука не разъедутся. Источник —
+     интрин. пиксели видео (videoWidth/Height); режем поля по КАЖДОЙ оси одной долей M, растяжение в
+     холст остаётся ПРЯМЫМ, как было (никакого cover/letterbox тут не было — поля новых искажений не
+     вносят, лишь «зумим» в центр). Зеркалим только фронтальную (mirrored — тот же источник, что flipX/sx). */
+  const vw=video.videoWidth||W, vh=video.videoHeight||H, M=CAM_MARGIN;
+  const cx0=M*vw, cy0=M*vh, cw=(1-2*M)*vw, ch=(1-2*M)*vh;
+  if(mirrored()){ ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,cx0,cy0,cw,ch,-W,0,W,H); ctx.restore(); }
+  else ctx.drawImage(video,cx0,cy0,cw,ch,0,0,W,H);
   ctx.fillStyle='rgba(7,7,13,.5)'; ctx.fillRect(0,0,W,H);
 }
 function drawOverlays(res){ drawPhone(res); }
@@ -354,12 +359,12 @@ function drawHandsPhone(res,W,H,playH){
     let instr,rx0,rx1;
     if(splitOn){
       if(S.pinch){ instr=S.role; rx0=S.rx0; rx1=S.rx1; }
-      else { const px=flipX(lm[8].x)*W, hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; instr=h.role; rx0=h.rx0; rx1=h.rx1; }
+      else { const px=Math.max(0,Math.min(W-1,sx(lm[8].x,W))), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; instr=h.role; rx0=h.rx0; rx1=h.rx1; }   // px через sx (поля кадра); для ВЫБОРА половины сатурируем к кромке — как в gestures
     }else{ instr=phoneInstr; rx0=0; rx1=W; }
     const split=palSplitX(rx0,rx1), accent=INSTR_COL[instr], isCh=instr==='ch', isDr=instr==='dr', fxOn=instr==='ld';
     const fxHand=fxOn&&handRole(k)==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов есть только у соло-половины
     for(let i=0;i<lm.length;i++){
-      const x=flipX(lm[i].x)*W, y=lm[i].y*H, tipPt=i===4||FINGER_TIPS.includes(i);
+      const x=sx(lm[i].x,W), y=sy(lm[i].y,H), tipPt=i===4||FINGER_TIPS.includes(i);   // точки в экранных пикселях игрового поля (поля кадра сняты); НЕ клампим — рука уходит за кромку вместе с картинкой
       ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
       ctx.beginPath(); ctx.arc(x,y,tipPt?6:2.5,0,7); ctx.fill();
     }
@@ -378,7 +383,7 @@ function drawHandsPhone(res,W,H,playH){
     if(isCh&&!supportsChords())continue;         // макам: аккордов нет — ни круга, ни ярлыка, ни подсказки
     // рука-палитра нот не играет — не рисуем ей подсказку ряда. Вне сплита это fx-рука (handRole);
     // при сплите — по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указательный слева от раздела).
-    if(isCh&&typedChords()&&(splitOn ? (S.pinch?S.zone==='chFam':flipX(lm[8].x)*W<split) : handRole(k)==='fx'))continue;
+    if(isCh&&typedChords()&&(splitOn ? (S.pinch?S.zone==='chFam':sx(lm[8].x,W)<split) : handRole(k)==='fx'))continue;
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
@@ -410,7 +415,7 @@ function drawHandsPhone(res,W,H,playH){
           ty.full||fam.name,`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
     }else if(!S.pinch){                          // подсказка до щипка — под указательным
-      const tip=lm[8], x=flipX(tip.x)*W, y=tip.y*H;
+      const tip=lm[8], x=sx(tip.x,W), y=sy(tip.y,H);   // подсказка до щипка — в экранных пикселях игрового поля (поля кадра сняты)
       if((instr==='ld'||instr==='bs'||instr==='ch')&&rectGrid()){
         /* rectGrid (соло/бас/аккорды): подсказка кадрирует ПОЛОСУ полной сетки под рукой (то же
            r=полоса−1, что и в игре). У аккордов рамка/подписи живут в правой половине [SPLIT,W]

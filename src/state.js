@@ -1,3 +1,5 @@
+import { remapAxis } from './config.js';          // config — лист (ничего не импортирует), цикла нет
+
 /* ================= СОСТОЯНИЕ ================= */
 export let scaleIdx=11, tonic=9;                 // старт: минорная пентатоника от A
 export let seventh=false, leadIdx=0, chIdx=0, bassIdx=0, drumKitIdx=0;
@@ -93,6 +95,16 @@ export const setCamFacing=v=>{ camFacing=v; };
 export const setVideoRec=v=>{ videoRec=v; };
 export const mirrored=()=>camFacing==='user';    // зеркалим только фронтальную камеру
 export const flipX=nx=> mirrored() ? 1-nx : nx;  // ЕДИНАЯ формула флипа: нормированный x → нормированный (умножь на W у вызывающего)
+/* СЫРЫЕ vs ЭКРАННЫЕ координаты (поля кадра, config.CAM_MARGIN). Гест-математика (щипок, размер
+   ладони, палец, Z-реверб, пороги) читает СЫРЫЕ lm.x/lm.y — рука работает и наполовину за кадром,
+   в этом весь смысл. Экранная позиция и ПОПАДАНИЕ (половина/прямоугольник/зона, X-громкость) идут
+   через sx/sy: сырой нормированный → ПИКСЕЛЬ игрового поля. sx складывает зеркало (flipX) и поля
+   (remapAxis) — оба симметричны относительно 0.5, порядок не важен. ЕДИНЫЙ источник экранного
+   пересчёта для gestures и draw (в т.ч. кадрирование видеофона тем же CAM_MARGIN): разъедутся —
+   палец возьмёт не то, что видит. НЕ клампим — рука в полях уезжает за кромку (крайний прямоугольник
+   всё ещё в кадре); сатурируется лишь РЕЗУЛЬТАТ выбора у вызывающего. */
+export const sx=(nx,W)=>remapAxis(flipX(nx))*W;
+export const sy=(ny,H)=>remapAxis(ny)*H;
 export const setSplitOn=v=>{ splitOn=v; };
 export const setTheremin=v=>{ theremin=v; };
 export const setOctReg=v=>{ octReg=v; };
