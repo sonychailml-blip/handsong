@@ -2,7 +2,7 @@ import { initAudio, AC } from './audio.js';
 import { video, landmarker, initVision } from './vision.js';
 import { processHands } from './gestures.js';
 import { drawVideoBackground, drawOverlays } from './draw.js';
-import { $ } from './ui.js';                     // side-effect: строит меню, вешает обработчики, регистрирует hooks
+import { $, revealBar } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: кнопка «Послушать строи» на старте (демо строёв, без камеры)
 
 /* =====================================================================
@@ -46,6 +46,7 @@ $('startBtn').onclick=async()=>{
     try{await navigator.wakeLock.request('screen');}catch(e){}
     $('start').classList.remove('on');
     $('bar').classList.add('on');
+    revealBar();                             // панель видна на старте (учит, где меню), затем сама сворачивается через BAR_HIDE_MS
     loop();
   }catch(err){
     btn.disabled=false;

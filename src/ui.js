@@ -12,6 +12,14 @@ import { hooks } from './hooks.js';
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
+
+/* ССЫЛКИ СТАРТОВОЙ КАРТОЧКИ (плейсхолдеры). Впишите URL — ссылка появляется; пустой URL СКРЫВАЕТ её
+   (мёртвых ссылок не рисуем). Меняется ОДНОЙ строкой ЗДЕСЬ. Отзыв без формы падает на e-mail; адрес
+   собираем в JS (FB_MAIL_USER+'@'+FB_MAIL_DOMAIN), а НЕ mailto в HTML-исходнике — лёгкая защита от
+   сборщиков адресов на публичной странице. i18n позже — строки пока русские. */
+const FEEDBACK_URL='';        // Google-форма отзыва (впишется позже)
+const DONATE_URL='';          // страница поддержки (впишется позже)
+const FB_MAIL_USER='chailakhianmikhail', FB_MAIL_DOMAIN='gmail.com';   // fallback-почта, пока нет формы
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
@@ -111,17 +119,69 @@ function updRecBtn(){
 hooks.rec       = () => updRecBtn();
 hooks.loop      = on => { loopBtn.classList.toggle('on', on); loopBtn.textContent = on ? '❚❚ луп' : '⟳ луп'; updRecBtn(); };
 
-/* Шаг 3 MENU-PLAN: панели РАЗНОЙ природы. Звукоряд — оверлей (выбрал и закрыл),
-   лупер — рабочая панель снизу (играть можно с открытой). Одна за раз: обе — карточки
-   почти во весь экран, вместе они бы перекрылись, поэтому открытие одной прячет другую. */
+/* Две панели (звукоряд и лупер) — оба оверлея на ОДНОМ месте (сверху). Одна за раз: открытие одной
+   прячет другую (иначе перекрылись бы). Лупер РАНЬШЕ жил снизу, чтобы холстовая сетка тактов
+   оставалась видна при игре; теперь он тоже сверху (см. #panelLoop в style.css) — сетку видно после
+   закрытия панели. */
 function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.classList.toggle('on',on);
   if(on)panelScaleEl.classList.remove('on'); }
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false); }
 $('panelClose').onclick=()=>showScale(false);
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
 loopPanelBtn.onclick=()=>showLoop(!panelLoopEl.classList.contains('on'));
-$('helpBtn').onclick=()=>$('helpOv').classList.add('on');
+/* Кнопка учебника (#helpBtn) убрана из панели «Звукоряд» — #helpOv и его логика ЖИВЫ, но учебник
+   ВРЕМЕННО недостижим из UI (переедет внутрь «Обучения», когда оно выйдет). Оставляем только
+   закрытие: helpClose живёт внутри #helpOv и понадобится, как только оверлей снова начнут открывать. */
 $('helpClose').onclick=()=>$('helpOv').classList.remove('on');
+
+/* ===== АВТО-СКРЫТИЕ ВЕРХНЕЙ ПАНЕЛИ (#bar) =====
+   Панель разрослась до ~10 кнопок и съедала игровое поле. Теперь она САМА сворачивается (класс .min,
+   CSS): в свёрнутом виде на экране остаются ТОЛЬКО индикатор роли (одна кнопка, или ДВЕ половины при
+   сплите — видно, что играет каждая) и три кнопки записи (🎥/🎙/●). Это ТЕ ЖЕ DOM-элементы, что в
+   раскрытой панели — единый источник состояния, второго набора кнопок нет и рассинхрону неоткуда взяться.
+   Раскрытие — любой тап по экрану (тач) или заметное движение мыши (порог MOUSE_EPS гасит дрожание);
+   через BAR_HIDE_MS без действий — снова .min. НЕ сворачиваем, пока открыта панель (#panelScale/
+   #panelLoop) ИЛИ зажат палец/курсор — иначе меню закрылось бы под рукой. Тап ТОЛЬКО показывает меню:
+   игра идёт с камеры (жесты), ввод с тача не читает никто — раскрытие не крадёт жест и не рождает ноту. */
+const barEl=$('bar');
+const BAR_HIDE_MS=3500, MOUSE_EPS=8;            // BAR_HIDE_MS — авто-скрытие, мс; MOUSE_EPS — порог движения мыши, px
+let barTimer=0, pointerDown=false, lastMX=null, lastMY=null;
+const panelOpen=()=>panelScaleEl.classList.contains('on')||panelLoopEl.classList.contains('on');
+function armBarHide(){
+  clearTimeout(barTimer);
+  barTimer=setTimeout(()=>{
+    if(panelOpen()||pointerDown){ armBarHide(); return; }   // под рукой / открытая панель — не сворачиваем, переставляем таймер
+    barEl.classList.add('min');
+  }, BAR_HIDE_MS);
+}
+function revealBar(){ barEl.classList.remove('min'); armBarHide(); }   // показать панель и перезавести таймер
+addEventListener('pointerdown', ()=>{ pointerDown=true;  revealBar(); });
+addEventListener('pointerup',   ()=>{ pointerDown=false; armBarHide(); });
+addEventListener('pointercancel',()=>{ pointerDown=false; armBarHide(); });
+addEventListener('pointermove', e=>{
+  if(e.pointerType==='mouse'){                  // мышь: раскрываем/сбрасываем таймер лишь при движении больше порога — дрожание не мигает панелью
+    if(lastMX!==null && Math.hypot(e.clientX-lastMX,e.clientY-lastMY)<MOUSE_EPS)return;
+    lastMX=e.clientX; lastMY=e.clientY;
+  }
+  revealBar();
+});
+
+/* СТАРТОВАЯ КАРТОЧКА. Две кнопки: «▶ Играть» (main.js, прежний поток — не трогаем) и «Обучение».
+   «Обучение» видима, но пока без функции: тап показывает заметку «скоро» (читается как ЗАПЛАНИРОВАННОЕ,
+   кнопку НЕ гасим). Демо строёв (demo.js) и мини-учебник (#helpOv) остаются рабочими в коде — кнопки
+   их запуска (со старта и из панели «Звукоряд») сняты, переедут внутрь обучения позже. */
+$('learnBtn').onclick=()=>{ $('learnMsg').textContent='Интерактивное обучение готовится — скоро.'; };
+/* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
+   адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
+function buildStartLinks(){
+  const fb=$('fbLink'), dn=$('donateLink');
+  if(FEEDBACK_URL){ fb.href=FEEDBACK_URL; fb.target='_blank'; fb.textContent='Форма отзыва'; }
+  else{ const a=FB_MAIL_USER+'@'+FB_MAIL_DOMAIN; fb.href='mailto:'+a; fb.removeAttribute('target'); fb.textContent='Написать: '+a; }
+  fb.style.display='';                                   // отзыв виден всегда (форма или почта-fallback)
+  if(DONATE_URL){ dn.href=DONATE_URL; dn.target='_blank'; dn.textContent='Поддержать проект'; dn.style.display=''; }
+  else dn.style.display='none';                          // донат без URL — прячем (мёртвую ссылку не рисуем)
+}
+buildStartLinks();
 $('panicBtn').onclick=()=>{ panic(); resetJamDisplay(); };   // паника гасит всё → индикатор джема тоже в покой
  
 /* Смена традиции = смена лада: иначе продолжал бы звучать лад чужой традиции, а меню
@@ -333,4 +393,4 @@ function onResize(){
 addEventListener('resize', onResize);
 applySplit(); applyInstr(); applySwap();      // applySplit → applySplitRoles → applyTheremin (инициализация всех кнопок ролей)
  
-export { $ };
+export { $, revealBar };

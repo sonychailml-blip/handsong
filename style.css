@@ -16,6 +16,17 @@
     background:linear-gradient(180deg, rgba(7,7,13,.82), transparent);}
   #bar::-webkit-scrollbar{display:none;}
   #bar.on{display:flex;}
+  /* АВТО-СКРЫТИЕ: в свёрнутом виде (.min, ставит ui.js) на экране остаются ТОЛЬКО индикатор роли
+     (одна кнопка или две половины) и три кнопки записи (🎥 клип, 🎙 аудио, ● лупер) — всё прочее
+     скрыто до раскрытия (тап/движение мыши). Это ТЕ ЖЕ элементы, не второй набор. !important
+     перебивает инлайновый display, который JS ставит у ◨/〰 — их собственные правила видимости
+     продолжают действовать, когда панель РАСКРЫТА (.min снят). */
+  #bar.min>#scaleBtn,
+  #bar.min>#thereminBtn,
+  #bar.min>#splitBtn,
+  #bar.min>#camBtn,
+  #bar.min>#jamBtn,
+  #bar.min>#loopPanelBtn{ display:none !important; }
   button{background:var(--panel); color:var(--ink); flex:0 0 auto;
     border:1px solid rgba(255,255,255,.22); border-radius:11px;
     padding:9px 12px; font-size:14px; line-height:1;}
@@ -114,38 +125,52 @@
     font-size:11px; color:var(--dim); text-shadow:0 1px 2px #000;
     white-space:nowrap; overflow:hidden;}
 
-  /* ---- МЕНЮ ЗВУКОРЯДА: оверлей (открыл → выбрал → закрыл). Оформление прежней #panel ---- */
+  /* ---- ПАНЕЛИ (звукоряд + лупер): СВЕТЛАЯ тема, как стартовая карточка ----
+     Панели лежат ПОВЕРХ камеры (обычно ярко освещённая комната), поэтому фон ОПАКОВЫЙ белый —
+     видео не просвечивает и не размывает текст; blur убран (под опаковым фоном он бесполезен).
+     Радиусы (18/12px) и тёмный текст (#1e2233) — из стартовой карточки. Всё СТРОГО под #panelScale/
+     #panelLoop и панельные классы (.prow/.psep/…, они есть только тут); базовые button/#bar/оверлеи
+     не трогаем. Акцент .act (оранжевый var(--note)) на светлом читается — оставлен как «выбрано». */
+  /* ---- МЕНЮ ЗВУКОРЯДА: оверлей (открыл → выбрал → закрыл) ---- */
   #panelScale{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:15;
-    background:var(--panel); border:1px solid rgba(255,255,255,.18); border-radius:14px;
-    padding:12px 14px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
-    backdrop-filter:blur(6px);}
+    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:18px;
+    padding:14px 16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
+    box-shadow:0 16px 44px rgba(40,50,90,.22);}
   #panelScale.on{display:block;}
 
-  /* ---- ПАНЕЛЬ ЛУПЕРА: рабочая, пришвартована СНИЗУ — играть можно с открытой ----
-     Снизу, потому что наглядную сетку тактов рисует ХОЛСТ сверху-по-центру
-     (draw.js drawLooper, y≈64): верхняя панель закрыла бы ровно то, что должно
-     быть видно. Не оверлей — ограниченная карточка, остальной экран игровой.
-     bottom:24px оставляет видимой строку #status (bottom:6px). */
-  #panelLoop{position:fixed; left:8px; right:8px; bottom:24px; max-width:560px; margin:0 auto; z-index:14;
-    background:var(--panel); border:1px solid rgba(255,255,255,.18); border-radius:14px;
-    padding:10px 14px 12px; display:none; max-height:46vh; overflow-y:auto;
-    backdrop-filter:blur(6px);}
+  /* ---- ПАНЕЛЬ ЛУПЕРА ----
+     РАНЬШЕ была пришвартована СНИЗУ (max-height:46vh), чтобы наглядная холстовая сетка тактов
+     сверху-по-центру (draw.js drawLooper, y≈64) оставалась видна при открытой панели. Теперь этот
+     компромисс СОЗНАТЕЛЬНО развёрнут ради удобства: панель занимает то же место, что и «Звукоряд»
+     (сверху, во всю доступную высоту) — так короткая панель без прокрутки читается лучше, а сетку
+     тактов видно после закрытия (панели взаимоисключаемы). Геометрия 1-в-1 с #panelScale. */
+  #panelLoop{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:14;
+    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:18px;
+    padding:14px 16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
+    box-shadow:0 16px 44px rgba(40,50,90,.22);}
   #panelLoop.on{display:block;}
   .prow{display:flex; align-items:center; gap:10px; margin:9px 0;}
-  .prow label{flex:0 0 122px; font-size:12px; color:var(--dim);}
+  .prow label{flex:0 0 122px; font-size:12px; color:#5a6079;}
   .prow select,.prow input[type=range],.prow .seg{flex:1; min-width:0;}
   select{background:#14142a; color:var(--ink); border:1px solid rgba(255,255,255,.22);
     border-radius:9px; padding:7px; font-size:13px; width:100%;}
+  /* Списки светлые (лад — длинный список, должен читаться); опаковый белый фон и тёмный текст. */
+  #panelScale select,#panelLoop select{background:#f4f6fc; color:#1e2233;
+    border:1px solid rgba(20,24,50,.20); border-radius:10px;}
   input[type=range]{accent-color:var(--note);}
-  .val{flex:0 0 44px; font-size:12px; color:var(--ink); text-align:right;}
+  .val{flex:0 0 44px; font-size:12px; color:#1e2233; text-align:right;}
   .seg{display:flex; gap:6px;}
   .seg button{flex:1;}
+  /* Кнопки внутри панелей — светлая второстепенная тема (как #learnBtn), КРОМЕ активных (.act):
+     у активных остаётся оранжевый акцент var(--note) — читается как «выбрано» и на светлом. */
+  #panelScale button:not(.act),#panelLoop button:not(.act){background:#eef1f8; color:#2a2f45;
+    border:1px solid rgba(20,24,50,.16); border-radius:12px; font-weight:600;}
   .seg button.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
   .phead{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
-  .phead b{font-size:14px;}
-  .psep{border-top:1px solid rgba(255,255,255,.12); margin:10px 0 4px; padding-top:6px;
-    font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em;}
-  .phint{font-size:11px; color:var(--dim); line-height:1.4; margin:6px 2px 2px;}
+  .phead b{font-size:14px; color:#1e2233;}
+  .psep{border-top:1px solid rgba(20,24,50,.12); margin:10px 0 4px; padding-top:6px;
+    font-size:11px; color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
+  .phint{font-size:11px; color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
   #loopBarsV{flex:1; text-align:center; align-self:center;}
 
   /* ---- оверлеи: старт и учебник ---- */
@@ -159,15 +184,36 @@
   .ov code{background:#14142a; border-radius:6px; padding:1px 6px; font-size:13px;}
   .ov .closeRow{position:sticky; top:0; text-align:right; z-index:2;}
 
-  #start{z-index:30;}
-  #start .inner{text-align:center;}
-  #start .hint{font-size:13px; color:var(--dim); max-width:520px; line-height:1.55;
-    margin:10px auto; text-align:left;}
-  #start .hint b{color:var(--ink);}
+  /* #helpOv держим выше стартового слоя (z30) и демо (z35) — учебник всплывает над всем. */
+  #helpOv{z-index:40;}
+
+  /* СТАРТ — СВЕТЛЫЙ приветственный слой (после «▶ Играть» экран занимает камера освещённой комнаты;
+     светлый старт с ней созвучен). Светлый фон-градиент + белая карточка с ТЁМНЫМ текстом. ВСЕ стили
+     строго под #start/.startCard — тёмная тема приложения (бар/панели/оверлеи) не затрагивается. */
+  #start{z-index:30; display:none;
+    background:linear-gradient(160deg,#eef2fb 0%,#e3e9f5 55%,#dbe6f1 100%);
+    overflow-y:auto; padding:20px;}
+  #start.on{display:flex; align-items:center; justify-content:center;}   /* id+.on перебивает .ov.on (display:block) */
+  .startCard{width:100%; max-width:340px; margin:auto; text-align:center; color:#1e2233;   /* тёмный текст наследуется всей карточкой; margin:auto центрирует и даёт прокрутку */
+    background:#ffffff; border:1px solid rgba(20,24,50,.12);
+    border-radius:20px; padding:26px 24px 20px; box-shadow:0 16px 44px rgba(40,50,90,.18);}
+  .startCard h1{font-size:28px; margin:2px 0 6px; color:#1e2233;}   /* «Synth» остаётся акцентом var(--note) из .ov h1 span — читается и на белом */
+  .startTag{font-size:13px; color:#5a6079; margin:0 0 20px;}
+  .startBtns{display:flex; flex-direction:column; gap:11px; align-items:stretch;}
+  /* Кнопки старта — СВОЯ светлая тема (базовый button тёмный). «Играть» — акцент var(--note); «Обучение»
+     — светлая второстепенная (НЕ приглушена, читается как задуманная). */
+  #start button{border-radius:12px; line-height:1.1;}
   #startBtn{font-size:18px; padding:15px 32px; background:var(--note);
-    color:#1a1206; border:none; font-weight:700; margin-top:10px;}
-  #loadmsg{font-size:12px; color:var(--dim); min-height:1.2em; margin-top:10px;}
-  #demoBtn{font-size:16px; padding:13px 24px; margin:10px 0 0 8px;}
+    color:#3a2600; border:none; font-weight:700;}
+  #learnBtn{font-size:15px; padding:12px 20px; background:#eef1f8;
+    color:#2a2f45; border:1px solid rgba(20,24,50,.16); font-weight:600;}
+  #loadmsg{font-size:12px; color:#5a6079; min-height:1.2em; margin:12px 0 0;}
+  #learnMsg{font-size:12px; color:#b26a00; min-height:1em; margin:6px 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
+  .startFoot{margin-top:18px; padding-top:13px; border-top:1px solid rgba(20,24,50,.10);
+    font-size:11px; color:#6a7089; line-height:1.5;}
+  .startFoot p{margin:0 0 6px;}
+  .startLinks{display:flex; gap:16px; justify-content:center; margin:0; flex-wrap:wrap;}
+  .startLinks a{color:#2563c9; text-decoration:none; border-bottom:1px solid rgba(37,99,201,.35);}
 
   /* ДЕМО «путешествие по строям»: оверлей поверх стартового (z 35 > start 30). Фон-тинт
      ставит demo.js поцветно на каждую сцену; здесь — только раскладка подписи. */
