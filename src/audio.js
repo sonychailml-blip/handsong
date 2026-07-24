@@ -12,6 +12,10 @@ const LEAD_INSTR=[
   {label:'Колокол',  att:0.004, rel:0.30},
   {label:'Флейта',   att:0.050, rel:0.18},
   {label:'8-бит',    att:0.002, rel:0.05},
+  /* FM-тембры (несущий+модулятор, огибающая индекса) — inгармонические спектры, недостижимые
+     субтрактивным путём. rel длиннее tau индекса → «удар» ярче хвоста (см. buildFMBank). */
+  {label:'Колокол (глубокий)', att:0.004, rel:1.6},
+  {label:'Металлофон',         att:0.002, rel:0.45},
 ];
 /* Аккордовые тембры: 2 осциллятора (типы t1/t2, отношение частот ratio,
    расстройка det в центах, микс m1/m2), общий НЧ-фильтр lp, огибающая att/rel. */
@@ -111,6 +115,43 @@ function buildLeadBanks(preBus){
     banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
                 cancel:t=>o.frequency.cancelScheduledValues(t)});
   }
+  /* Два FM-банка на общем buildFMBank. Порядок push совпадает с хвостом LEAD_INSTR (индексы 6,7).
+     «Колокол (глубокий)»: ratio 1:1.41 (нецелый → плотная звонкая гроздь обертонов), пик индекса
+     высокий и оседает медленно (tau 0.30) при длинном хвосте (rel 1.6) — металлический удар,
+     переходящий в гул. «Металлофон»: ratio 1:3.51, скромнее пик, быстрый спад (tau 0.09) и короткий
+     хвост (rel 0.45) — яркий короткий «тинь», как у гамелановой пластины. */
+  buildFMBank(preBus,{ratio:1.41, peak:10, sus:1.0,  tau:0.30});   // Колокол (глубокий)
+  buildFMBank(preBus,{ratio:3.51, peak:7,  sus:0.35, tau:0.09});   // Металлофон
+}
+/* --- FM-голос: АЛЬТЕРНАТИВНЫЙ способ построить банк, рядом с субтрактивным (не вместо него).
+   Несущий (car) идёт через mkOsc в ОБЩУЮ соло-цепочку (drive → глоб. огибающая → громкость →
+   тремоло → delay/reverb) — как любой банк, поэтому эффекты/посылы/лимитер его не отличают.
+   Модулятор (mod) — ГОЛЫЙ осциллятор → modGain → car.frequency: в выход и в вибрато он НЕ идёт,
+   он лишь качает частоту несущего. Нецелый ratio даёт ИНГАРМОНИЧЕСКИЙ спектр (обертоны не кратны
+   основному тону) — класс тембров, физически недостижимый субтрактивным путём: колокол,
+   гамелановый металл, трубчатый металл. Индекс модуляции = глубина качания в Гц (modGain); он
+   масштабируется частотой (f*sus), чтобы спектр не «плыл» по высоте. attack() даёт индексу СВОЮ
+   огибающую — прыжок к f*peak и спад к f*sus за постоянную tau. Индекс спадает БЫСТРЕЕ амплитуды
+   (rel банка длиннее tau): яркий удар, оседающий в тихий устойчивый гул — именно это ухо читает
+   как «удар по металлу». Нецелый ratio РАЗМЫВАЕТ воспринимаемую высоту: честно для гамелана, но
+   усложняет тонкое сравнение строёв — так задумано, не баг. */
+function buildFMBank(preBus,{ratio,peak,sus,tau}){
+  const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+  let curF=220;                                     // последняя целевая частота: attack() берёт индекс от неё (setFreq идёт ДО noteOn)
+  const car=mkOsc('sine',curF,ig,0.5);              // несущий: в общую цепочку + вибрато (vibGain внутри mkOsc)
+  const mod=AC.createOscillator(); mod.type='sine'; mod.frequency.value=curF*ratio;   // модулятор: голый, только в car.frequency
+  const modGain=AC.createGain(); modGain.gain.value=curF*sus;
+  mod.connect(modGain); modGain.connect(car.frequency); mod.start();
+  banks.push({gain:ig,
+    setFreq:(f,t)=>{ curF=f;                        // несущий, модулятор (f*ratio) и индекс (f*sus) — тем же setTargetAtTime, что и все банки (бенд/глиссандо/терменвокс тянут ВЕСЬ спектр)
+      car.frequency.setTargetAtTime(f,t,0.02);
+      mod.frequency.setTargetAtTime(f*ratio,t,0.02);
+      modGain.gain.setTargetAtTime(f*sus,t,0.02); },
+    cancel:t=>{ car.frequency.cancelScheduledValues(t);
+      mod.frequency.cancelScheduledValues(t); modGain.gain.cancelScheduledValues(t); },
+    attack:t=>{ modGain.gain.cancelScheduledValues(t);   // огибающая индекса: пинок вверх, затем спад
+      modGain.gain.setValueAtTime(curF*peak,t);
+      modGain.gain.setTargetAtTime(curF*sus,t,tau); }});
 }
 /* --- Пул аккордовых голосов (всегда запущены, гейт по громкости; размер — CHORD_POOL_N) --- */
 function buildChordPool(dest, n=CHORD_POOL_N){
@@ -285,6 +326,7 @@ function noteOn(){
   const t=AC.currentTime;
   envGain.gain.cancelScheduledValues(t);
   envGain.gain.setTargetAtTime(1,t,LEAD_INSTR[leadIdx].att);
+  banks[leadIdx].attack && banks[leadIdx].attack(t);   // FM-банки: пинок огибающей индекса на атаке; у остальных .attack нет → no-op, байт-в-байт
 }
 function noteOff(){
   if(!noteOnFlag)return; noteOnFlag=false;
