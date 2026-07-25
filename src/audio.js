@@ -16,22 +16,75 @@ const LEAD_INSTR=[
      субтрактивным путём. rel длиннее tau индекса → «удар» ярче хвоста (см. buildFMBank). */
   {label:'Колокол (глубокий)', att:0.004, rel:1.6},
   {label:'Металлофон',         att:0.002, rel:0.45},
+  /* Четыре новых семейства (индексы 8..15, тот же порядок, что банки в buildLeadBanks). Существующие
+     8 записей выше не тронуты (байт-в-байт), новые сгруппированы по семействам ради читаемого списка.
+     ПАДЫ — att медленный, rel ДЛИННЫЙ (~2.5с): звук должен тянуться, чтобы биения интервалов успели
+     развиться (главное этого захода — слышимость строёв). ЩИПКОВЫЕ — быстрая атака, короткий rel.
+     ДУХОВЫЕ — мягкая атака, умеренный rel. ОРГАНЫ — быстрые атака/релиз, плоско. */
+  {label:'Пад тёплый',      att:0.35,  rel:2.5},   // ПАДЫ
+  {label:'Пад стеклянный',  att:0.30,  rel:2.5},
+  {label:'Уд',              att:0.004, rel:0.35},  // ЩИПКОВЫЕ
+  {label:'Струна щипком',   att:0.003, rel:0.22},
+  {label:'Флейта воздушная',att:0.06,  rel:0.20},  // ДУХОВЫЕ
+  {label:'Тростевой',       att:0.04,  rel:0.16},
+  {label:'Орган полный',    att:0.006, rel:0.06},  // ОРГАННЫЕ
+  {label:'Орган мягкий',    att:0.02,  rel:0.10},
+  /* Карплюс–Стронг (физ. модель щипковой струны) — третий способ построения голоса (ворклет,
+     см. ks-worklet.js и buildKSBank). Быстрая атака, естественный хвост даёт сама петля. */
+  {label:'Струна',    att:0.002, rel:0.4},
+  {label:'Ситар',     att:0.002, rel:0.6},
+  {label:'Уд (струна)', att:0.002, rel:0.3},  // KS-щипковые: параметрические вариации одной струны (см. KS_BANKS). «(струна)» — чтобы не дублировать субтрактивный «Уд» (индекс 10)
+  {label:'Кото',      att:0.002, rel:0.5},
+  {label:'Сантур',    att:0.001, rel:0.25},
+  {label:'Гитара',    att:0.002, rel:0.5},
+  {label:'Пиццикато', att:0.001, rel:0.15},
 ];
-/* Аккордовые тембры: 2 осциллятора (типы t1/t2, отношение частот ratio,
-   расстройка det в центах, микс m1/m2), общий НЧ-фильтр lp, огибающая att/rel. */
+/* Аккордовые тембры: 2 осциллятора (типы t1/t2, отношение частот ratio, расстройка det в центах,
+   микс m1/m2), общий НЧ-фильтр lp, огибающая att/rel. Плюс улучшения качества (per-bank):
+   fo — во сколько раз фильтр открыт в атаке (огибающая фильтра), ft — время оседания, fv — скорость→
+   яркость (cutoff = lp·(1+fv·vol), пол=lp), hj — гуманизация высоты (0 у органа/падов для строёв). */
 const CHORD_INSTR=[
-  {label:'Тёплый пад',     t1:'sawtooth', t2:'sawtooth', ratio:1, det:9, m1:.50, m2:.50, lp:1500, lvl:.17, att:.22,  rel:.50},
-  {label:'Стеклянный пад', t1:'triangle', t2:'sine',     ratio:2, det:5, m1:.55, m2:.30, lp:3400, lvl:.21, att:.14,  rel:.60},
-  {label:'Орган',          t1:'square',   t2:'sine',     ratio:2, det:0, m1:.45, m2:.35, lp:4200, lvl:.15, att:.012, rel:.09},
-  {label:'Эл. пиано',      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45},
+  {label:'Тёплый пад',     t1:'sawtooth', t2:'sawtooth', ratio:1, det:9, m1:.50, m2:.50, lp:1500, lvl:.17, att:.22,  rel:.50, fo:1.4, ft:.30, fv:.6, hj:0},
+  {label:'Стеклянный пад', t1:'triangle', t2:'sine',     ratio:2, det:5, m1:.55, m2:.30, lp:3400, lvl:.21, att:.14,  rel:.60, fo:1.4, ft:.28, fv:.6, hj:0},
+  {label:'Орган',          t1:'square',   t2:'sine',     ratio:2, det:0, m1:.45, m2:.35, lp:4200, lvl:.15, att:.012, rel:.09, fo:1.0, ft:.02, fv:.2, hj:0},
+  {label:'Эл. пиано',      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45, fo:2.2, ft:.12, fv:1.0,hj:1},
+  /* Аккордовые эквиваленты новых семейств. Пул строит голос иначе (o1/o2 → фильтр, тембр печётся на
+     атаке), поэтому характер адаптирован под ЭТУ форму, а не скопирован из лид-банков. Существующие 4
+     записи выше не тронуты (байт-в-байт). Аккордовый голос ДЕРЖИТ уровень, пока зажат → «сустейн» уже
+     есть; для строёв важнее ДЛИННЫЙ rel (хвост, где слышны биения) и СТАБИЛЬНЫЙ тон (органы: det=0,
+     сами не бьются). Имена с «(долгий)»: существующие «Тёплый/Стеклянный пад» короче — новые тянутся. */
+  {label:'Пад тёплый (долгий)',     t1:'sawtooth', t2:'sawtooth', ratio:1, det:10, m1:.50, m2:.50, lp:1300, lvl:.16, att:.35,  rel:1.8, fo:1.4, ft:.35, fv:.6, hj:0},  // ПАДЫ (hj=0 — чистая высота для строёв)
+  {label:'Пад стеклянный (долгий)', t1:'triangle', t2:'sine',     ratio:2, det:6,  m1:.52, m2:.30, lp:3000, lvl:.18, att:.30,  rel:1.8, fo:1.4, ft:.30, fv:.6, hj:0},
+  {label:'Уд',                      t1:'sawtooth', t2:'triangle', ratio:1, det:4,  m1:.50, m2:.34, lp:1200, lvl:.20, att:.004, rel:.30, fo:3.0, ft:.12, fv:1.4,hj:1},  // ЩИПКОВЫЕ (яркое открытие фильтра)
+  {label:'Струна щипком',           t1:'sawtooth', t2:'sawtooth', ratio:1, det:2,  m1:.46, m2:.30, lp:2600, lvl:.18, att:.003, rel:.22, fo:3.2, ft:.09, fv:1.4,hj:1},
+  {label:'Флейта',                  t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.60, m2:.18, lp:2600, lvl:.20, att:.06,  rel:.20, fo:1.3, ft:.08, fv:.5, hj:1},  // ДУХОВЫЕ
+  {label:'Тростевой',               t1:'square',   t2:'sawtooth', ratio:1, det:5,  m1:.34, m2:.26, lp:2200, lvl:.15, att:.05,  rel:.18, fo:2.0, ft:.14, fv:1.0,hj:1},
+  {label:'Орган полный',            t1:'square',   t2:'sine',     ratio:3, det:0,  m1:.42, m2:.30, lp:4800, lvl:.15, att:.008, rel:.10, fo:1.0, ft:.02, fv:.2, hj:0},  // ОРГАННЫЕ (det=0, hj=0 — лучший для строёв)
+  {label:'Орган мягкий',            t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.58, m2:.24, lp:3000, lvl:.17, att:.02,  rel:.12, fo:1.0, ft:.02, fv:.2, hj:0},
+  /* Расширение (индексы 12..15). НЕ дублируем уже имеющееся: «Орган» (idx 2, det=0) — уже чистый
+     эталон для строёв; тёплые/длинные пады и щипковые (Уд/Струна щипком) тоже есть. Добавляем ровно
+     то, чего НЕ было: ПИТЧ-ЧИСТЫЕ пады (существующие все с расстройкой det 5..10 — тембр сам бьётся;
+     здесь det=0, характер из РАЗНЫХ волн, а не из расстройки → биения = ТОЛЬКО строй), смычковые и
+     яркий щипок. hj=0 у падов/струнных (для строёв), hj=1 только у щипковых (не инструмент для строёв). */
+  {label:'Пад тёплый (чистый)',     t1:'sawtooth', t2:'triangle', ratio:1, det:0,  m1:.48, m2:.34, lp:1400, lvl:.16, att:.30,  rel:2.0, fo:1.4, ft:.35, fv:.6, hj:0},  // ЧИСТЫЕ ПАДЫ (det=0 — биения только от строя)
+  {label:'Пад стеклянный (чистый)', t1:'triangle', t2:'sine',     ratio:2, det:0,  m1:.52, m2:.28, lp:3000, lvl:.18, att:.28,  rel:2.0, fo:1.4, ft:.30, fv:.6, hj:0},  // ratio 2 = чистая октава (без биений)
+  {label:'Струнные',                t1:'sawtooth', t2:'sawtooth', ratio:1, det:6,  m1:.46, m2:.40, lp:2200, lvl:.17, att:.18,  rel:.80, fo:1.6, ft:.30, fv:.8, hj:0},  // СМЫЧКОВЫЕ: мягкая атака + медленное открытие фильтра (наплыв), лёгкая ширина ансамбля
+  {label:'Щипковые',                t1:'sawtooth', t2:'square',   ratio:1, det:3,  m1:.44, m2:.28, lp:2800, lvl:.19, att:.003, rel:.20, fo:3.5, ft:.08, fv:1.5, hj:1},  // ЯРКИЙ ЩИПОК: быстрая атака, резкое открытие/закрытие фильтра — для макамов/пентатоник, где пад неуместен
 ];
-/* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio,
-   расстройка det), НЧ-фильтр lp, огибающая att/rel. */
+/* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio, расстройка det),
+   НЧ-фильтр lp, огибающая att/rel. Плюс огибающая фильтра на атаке: fo — открытие, ft — время,
+   fv — скорость→яркость (cutoff = lp·(1+fv·vol), пол=lp). Высоту баса НЕ гуманизируем (низкие
+   биения гулкие); синус (Саб) на фильтр почти не реагирует — fo мал. */
 const BASS_INSTR=[
-  {label:'Саб-синус', t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  lvl:.45, att:.020, rel:.20},
-  {label:'Пила',      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  lvl:.38, att:.014, rel:.16},
-  {label:'Кислотный', t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, lvl:.34, att:.008, rel:.13},
-  {label:'Синт-бас',  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  lvl:.40, att:.020, rel:.24},
+  {label:'Саб-синус', t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  lvl:.45, att:.020, rel:.20, fo:1.0, ft:.03, fv:.2},
+  {label:'Пила',      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  lvl:.38, att:.014, rel:.16, fo:2.5, ft:.10, fv:1.2},
+  {label:'Кислотный', t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, lvl:.34, att:.008, rel:.13, fo:3.5, ft:.12, fv:1.6},
+  {label:'Синт-бас',  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  lvl:.40, att:.020, rel:.24, fo:2.0, ft:.12, fv:1.0},
+  /* Расширение (индексы 4..6). Существующие 4 не тронуты (байт-в-байт). Бас НЕ гуманизируем по высоте
+     (низкие расстройки гулкие) — здесь только огибающая фильтра/скорость→яркость, как у пула. */
+  {label:'Контрабас',        t1:'sawtooth', t2:'triangle', det:4,  ratio:1,   lp:520,  lvl:.38, att:.004, rel:.30, fo:2.5, ft:.10, fv:1.2},  // щипковый контрабас: быстрая атака, тёплый, средний спад
+  {label:'Синт-бас мягкий',  t1:'sine',     t2:'triangle', det:0,  ratio:1,   lp:480,  lvl:.42, att:.020, rel:.22, fo:1.8, ft:.15, fv:.8},   // круглый саб, лёгкое движение фильтра
+  {label:'Орган-бас',        t1:'square',   t2:'sine',     det:0,  ratio:1,   lp:620,  lvl:.36, att:.012, rel:.30, fo:1.0, ft:.02, fv:.3},   // ровный тянущийся низ — для дронов и педалей (fo=1: без наплыва)
 ];
 /* Ударные: имена рядов (индекс 0 = низ сетки). Синтез на лету, без сэмплов. */
 const DRUM_NAMES=['Кик','Снейр','Клэп','Хэт','Том','Крэш'];
@@ -42,8 +95,9 @@ const DRUM_KITS=[{label:'Стандарт'},{label:'Дарбука'}];
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter, verb, verbOut;
-let banks=[], vibGain, satWet, satDry, envGain, volGain,
-    tremGain, tremDepth, dlyWet, revLead;              // соло-цепочка
+let banks=[], vibGain, humDetune, satWet, satDry, envGain, volGain,
+    tremGain, tremDepth, dlyWet, revLead;              // соло-цепочка (humDetune — гуманизация высоты, общий узел в detune всех лид-осц.)
+let lastVel=0.5;                                        // последняя громкость X — скорость→яркость читает её на атаке (формат события не трогаем)
 let chordBus, revCh;                                    // аккорды
 let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
@@ -62,11 +116,22 @@ function makeIR(sec=1.8,decay=2.2){
 function mkOsc(type,freq,dest,gainVal){
   const o=AC.createOscillator(); o.type=type; o.frequency.value=freq;
   const g=AC.createGain(); g.gain.value=gainVal;
-  o.connect(g); g.connect(dest); vibGain.connect(o.detune); o.start();
+  o.connect(g); g.connect(dest); vibGain.connect(o.detune); humDetune.connect(o.detune); o.start();   // вибрато И гуманизация — оба в detune (центы), сумма с собственной расстройкой осц.
   return o;
 }
-/* --- Соло-банки: 4 тембра из версии 2 сохранены 1-в-1, добавлены Флейта и 8-бит --- */
-function buildLeadBanks(preBus){
+const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
+/* Огибающая фильтра + скорость→яркость на атаке (для лид-банков с фильтром). Возвращает strike(t,vel):
+   cutoff прыгает к base*open (ярче в атаке), оседает к base*(1+fv*vel) за tc — громче нота = ярче,
+   ПОЛ = base, поэтому тихая нота не глохнет. setFreq НЕ трогает фильтр → пофреймовая пересылка живого
+   лид-пути не сбивает эту огибающую (в отличие от частоты). */
+const fstrike=(lp,base,open,tc,fv)=>(t,vel)=>{
+  lp.frequency.cancelScheduledValues(t);
+  lp.frequency.setValueAtTime(base*open,t);
+  lp.frequency.setTargetAtTime(base*(1+fv*vel),t,tc); };
+/* --- Соло-банки: 4 тембра из версии 2 сохранены 1-в-1, добавлены Флейта и 8-бит. ksOk — загрузился
+   ли KS-ворклет: если да, хвост списка (Струна/Ситар) строим физ.-моделью, иначе — запасными
+   субтрактивными щипками, чтобы banks[] не разъехался с LEAD_INSTR по индексам. --- */
+function buildLeadBanks(preBus, ksOk){
   { // SuperSaw
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const oscs=[]; for(const sp of [-12,-6,0,6,12]){
@@ -78,7 +143,7 @@ function buildLeadBanks(preBus){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const parts=[[1,.42],[2,.22],[3,.14],[4,.09]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
     banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
-                cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t))});
+                cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый (hum=0): собственная расстройка замаскировала бы биения строёв
   }
   { // Пад
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
@@ -86,7 +151,8 @@ function buildLeadBanks(preBus){
     const oscs=[]; for(const dt of [-7,0,7]){
       const o=mkOsc('triangle',220,lp,0.34); o.detune.value=dt; oscs.push(o); }
     banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
-                cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t))});
+                cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t)),
+                strike:fstrike(lp,2100,1.5,0.35,0.8), hum:0});   // мягкая огибающая фильтра + скорость→яркость; hum=0 — чистая высота для строёв
   }
   { // Колокол (FM)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
@@ -122,6 +188,132 @@ function buildLeadBanks(preBus){
      хвост (rel 0.45) — яркий короткий «тинь», как у гамелановой пластины. */
   buildFMBank(preBus,{ratio:1.41, peak:10, sus:1.0,  tau:0.30});   // Колокол (глубокий)
   buildFMBank(preBus,{ratio:3.51, peak:7,  sus:0.35, tau:0.09});   // Металлофон
+  /* --- Четыре семейства обычных субтрактивных банков (индексы 8..15, порядок push = хвост LEAD_INSTR).
+     Стиль тот же, что у банков выше: ig-гейт → preBus, осцилляторы через mkOsc (вибрато+общая цепочка),
+     статичный НЧ-фильтр на банк. Огибающую громкости даёт ГЛОБАЛЬНЫЙ envGain по att/rel из LEAD_INSTR —
+     сам банк её не трогает. В лид-цепочке нет ПОФАЗНОЙ огибающей фильтра и нет стадии спада-на-удержании
+     (envGain держит 1, пока нота зажата): «щипок» слышен на атаке и на релизе/стаккато, а не как затухание
+     удержанной ноты; «тростевой» призвук — из гармоник и резонанса фильтра, не из его движения. */
+  { // Пад тёплый: расстроенная пара пил через мягкий НЧ — длинный слитный гул для слышимости биений
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1400; lp.connect(ig);
+    const oscs=[]; for(const dt of [-8,8]){ const o=mkOsc('sawtooth',220,lp,0.30); o.detune.value=dt; oscs.push(o); }
+    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
+                cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t)),
+                strike:fstrike(lp,1400,1.5,0.4,0.8), hum:0});   // пад: плавная огибающая фильтра; hum=0 — чистая высота для строёв
+  }
+  { // Пад стеклянный: треугольник+синус, фильтр ярче — воздушнее, тоже длинный
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200; lp.connect(ig);
+    const o1=mkOsc('triangle',220,lp,0.30); o1.detune.value=-5;
+    const o2=mkOsc('sine',220,lp,0.24);     o2.detune.value=6;
+    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f,t,0.02);},
+                cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
+                strike:fstrike(lp,3200,1.4,0.35,0.7), hum:0});   // пад: чуть ярче, тоже чистый для строёв
+  }
+  { // Уд: тёплый щипок — пила+треугольник через низкий НЧ, лёгкая расстройка
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1200; lp.connect(ig);
+    const o1=mkOsc('sawtooth',220,lp,0.28); o1.detune.value=-4;
+    const o2=mkOsc('triangle',220,lp,0.22); o2.detune.value=4;
+    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f,t,0.02);},
+                cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
+                strike:fstrike(lp,1200,3.0,0.12,1.5)});   // щипок: яркое открытие фильтра, быстро закрывается; hum по умолчанию (1)
+  }
+  { // Струна щипком: ярче и суше — одна пила через более открытый фильтр
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; lp.connect(ig);
+    const o=mkOsc('sawtooth',220,lp,0.26);
+    banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
+                cancel:t=>o.frequency.cancelScheduledValues(t),
+                strike:fstrike(lp,2600,3.5,0.08,1.5)});   // щипок ярче/суше — резче открытие и закрытие фильтра
+  }
+  { // Флейта воздушная: почти синус + тихая октавная подпорка. ШУМА НЕТ: лид-банки в этой цепочке —
+    // чисто осцилляторные (noiseBuf рождается позже, в initAudio), «дыхание» дают осцилляторы, не шум.
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const o1=mkOsc('sine',220,ig,0.34);
+    const o2=mkOsc('sine',440,ig,0.05);   // тихая октава — лёгкий призвук вместо шума
+    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f*2,t,0.02);},
+                cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);}});
+  }
+  { // Тростевой: язычковый — прямоугольник+пила через РЕЗОНАНСНЫЙ НЧ (Q даёт формантный призвук)
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2200; lp.Q.value=6; lp.connect(ig);
+    const o1=mkOsc('square',220,lp,0.18);
+    const o2=mkOsc('sawtooth',220,lp,0.14); o2.detune.value=5;
+    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f,t,0.02);},
+                cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
+                strike:fstrike(lp,2200,2.0,0.15,1.2)});   // тростевой: умеренное движение резонансного фильтра — язычковое «оживление»
+  }
+  { // Орган полный: драубары — гармоники 1,2,3,4,6 (октавы+квинты), плоская огибающая, БЕЗ расстройки
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);   // det=0 → тон сам не бьётся: лучший тембр для суждения о темперациях
+    const parts=[[1,.34],[2,.26],[3,.20],[4,.14],[6,.08]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
+    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
+                cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый — лучший тембр для суждения о строях
+  }
+  { // Орган мягкий: меньше верхних гармоник, чуть скруглённая атака (att в LEAD_INSTR)
+    const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+    const parts=[[1,.44],[2,.20],[3,.10]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
+    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
+                cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый — без собственной расстройки
+  }
+  if(ksOk) KS_BANKS.forEach(o=>buildKSBank(preBus,o));               // Струна, Ситар, Уд, Кото, Сантур, Гитара, Пиццикато (индексы 16..22)
+  else KS_BANKS.forEach(()=>buildKSFallback(preBus));               // ворклет не загрузился — столько же запасных щипков держат индексы
+}
+/* Таблица KS-банков (порядок = хвост LEAD_INSTR с индекса 16). Все — ОДНА струна с разными
+   параметрами (никакой новой архитектуры): fb — длина затухания, damp — петлевой фильтр (0.5 =
+   максимум затухания верхов, дальше = ярче), exBase/exSpan — яркость щипка (тихо/громко), nl —
+   нелинейность в петле (джавари/металл), symp — сочувственные струны (тонально следуют за тоникой),
+   body — фиксированный корпусный резонатор. Пустой объект = дефолты ворклета → «Струна» байт-в-байт;
+   «Ситар» = nl 2.5 + тараб (как было). Чем каждый ОТЛИЧАЕТСЯ — в комментарии справа. */
+const KS_BANKS=[
+  {},                                                                                             // Струна: эталон (fb .992, damp .5, щипок .15/.8)
+  {nl:2.5, symp:{ratios:[1,4/3,3/2,2,9/4], Q:60, gain:.10}},                                       // Ситар: джавари (клип в петле) + тараб (5 полос)
+  {fb:.984, damp:.50, exBase:.04, exSpan:.40},                                                     // Уд: тёмный мягкий щипок + короче хвост, без буза — тёплая лютня
+  {fb:.994, damp:.44, exBase:.30, exSpan:.55, symp:{ratios:[1,3/2], Q:50, gain:.05}},              // Кото: яркая атака, длиннее хвост, лёгкий сочувственный звон
+  {fb:.972, damp:.40, exBase:.55, exSpan:.40, nl:1.2, body:{hz:3400, Q:1.2, db:5}},                // Сантур: ЖЁСТКИЙ яркий удар, быстрый спад, мягкий металлический край (но струна, не FM)
+  {fb:.995, damp:.46, exBase:.22, exSpan:.70},                                                     // Гитара: ярко + длинный сустейн — самый «привычный»
+  {fb:.965, damp:.50, exBase:.18, exSpan:.60},                                                     // Пиццикато: очень быстрый спад (низкий fb) — короткий глушёный щипок для ритма
+];
+/* --- KS-банк: обёртка вокруг AudioWorkletNode 'ks-string' в контракт банка {gain,setFreq,cancel,strike}.
+   node → [корпусный резонатор body] → ig → preBus: голос идёт через ОБЩУЮ цепочку (drive → огибающая →
+   тремоло → delay/reverb), как любой банк. setFreq — a-rate param freq (та же setTargetAtTime 0.02, что у
+   всех → глиссандо/бенд/терменвокс без спец-кода). strike — фронт param pluck в момент t (значение=vel).
+   opts (из KS_BANKS): nl/fb/damp/exBase/exSpan → в processorOptions ворклета; symp — сочувственные струны
+   (высокодобротные полосы, звенящие от выхода струны, тонально следуют за baseF(), ретюн на щипке — как
+   droneOn за тоникой); body — фиксированный корпусный резонатор (peaking) в сухом пути.
+   ОГРАНИЧЕНИЯ (осознанно): у KS нет oscillator.detune → детюн-вибрато и humDetune его не касаются (hum:0).
+   Ситар/тараб — УБЕДИТЕЛЬНЫЙ НАМЁК, не копия (реальные джавари — распределённое касание порожка). --- */
+function buildKSBank(preBus, opts){
+  opts=opts||{};
+  const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
+  const po={}; ['nl','fb','damp','exBase','exSpan'].forEach(k=>{ if(opts[k]!=null) po[k]=opts[k]; });   // только заданные — остальное дефолты ворклета
+  const node=new AudioWorkletNode(AC,'ks-string',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1],processorOptions:po});
+  const freqP=node.parameters.get('freq'), pluckP=node.parameters.get('pluck');
+  if(opts.body){ const bd=AC.createBiquadFilter(); bd.type='peaking';   // сухой путь через корпусный резонатор
+    bd.frequency.value=opts.body.hz; bd.Q.value=opts.body.Q; bd.gain.value=opts.body.db; node.connect(bd); bd.connect(ig); }
+  else node.connect(ig);
+  let symp=null;
+  if(opts.symp){ const s=opts.symp, sum=AC.createGain(); sum.gain.value=s.gain;   // сочувственные струны — тихий параллельный посыл
+    symp=s.ratios.map(r=>{ const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=s.Q;
+      bp.frequency.value=baseF()*r; node.connect(bp); bp.connect(sum); return {bp,r}; });
+    sum.connect(ig); }
+  const retune=()=>{ if(!symp)return; const b=baseF(), t=AC.currentTime;   // следуют за тоникой (как дрон)
+    symp.forEach(x=>x.bp.frequency.setTargetAtTime(b*x.r,t,0.05)); };
+  banks.push({gain:ig,
+    setFreq:(f,t)=>freqP.setTargetAtTime(f,t,0.02),
+    cancel:t=>freqP.cancelScheduledValues(t),
+    strike:(t,vel)=>{ retune(); const v=Math.max(0.05,Math.min(1,vel==null?0.6:vel));
+      pluckP.cancelScheduledValues(t); pluckP.setValueAtTime(v,t); pluckP.setValueAtTime(0,t+0.005); },   // импульс: фронт=щипок, спад — чтобы следующая нота дала новый фронт
+    hum:0});
+}
+/* Запасной субтрактивный щипок для слотов Струна/Ситар, если KS-ворклет не загрузился (держит индексы). */
+function buildKSFallback(preBus){
+  const ig=AC.createGain(); ig.gain.value=0;
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; lp.connect(ig); ig.connect(preBus);
+  const o=mkOsc('sawtooth',220,lp,0.26);
+  banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
+              cancel:t=>o.frequency.cancelScheduledValues(t), strike:fstrike(lp,1800,3.0,0.1,1.4)});
 }
 /* --- FM-голос: АЛЬТЕРНАТИВНЫЙ способ построить банк, рядом с субтрактивным (не вместо него).
    Несущий (car) идёт через mkOsc в ОБЩУЮ соло-цепочку (drive → глоб. огибающая → громкость →
@@ -149,7 +341,7 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
       modGain.gain.setTargetAtTime(f*sus,t,0.02); },
     cancel:t=>{ car.frequency.cancelScheduledValues(t);
       mod.frequency.cancelScheduledValues(t); modGain.gain.cancelScheduledValues(t); },
-    attack:t=>{ modGain.gain.cancelScheduledValues(t);   // огибающая индекса: пинок вверх, затем спад
+    strike:(t,vel)=>{ modGain.gain.cancelScheduledValues(t);   // огибающая ИНДЕКСА (не фильтра): пинок вверх, затем спад; vel не используем — у FM нет фильтра
       modGain.gain.setValueAtTime(curF*peak,t);
       modGain.gain.setTargetAtTime(curF*sus,t,tau); }});
 }
@@ -182,13 +374,16 @@ function chordOn(owner,freqs,vol,insIdx){
   chordHold[owner]=freqs.map(fr=>{
     const v=cvAlloc(); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
-    v.o1.detune.setValueAtTime(-ins.det/2,t); v.o2.detune.setValueAtTime(ins.det,t);
+    const hc=(Math.random()*2-1)*HUM_CENTS*(ins.hj||0);   // гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0
+    v.o1.detune.setValueAtTime(-ins.det/2+hc,t); v.o2.detune.setValueAtTime(ins.det+hc,t);
     v.g1.gain.setValueAtTime(ins.m1,t); v.g2.gain.setValueAtTime(ins.m2,t);
-    v.f.frequency.setValueAtTime(ins.lp,t);
+    const fo=ins.fo||1, ft=ins.ft||0.02, fv=ins.fv||0;    // огибающая фильтра + скорость→яркость (пол=lp: тихая нота не глохнет)
+    v.f.frequency.cancelScheduledValues(t); v.f.frequency.setValueAtTime(ins.lp*fo,t);
+    v.f.frequency.setTargetAtTime(ins.lp*(1+fv*vol),t,ft);
     v.o1.frequency.setValueAtTime(fr,t); v.o2.frequency.setValueAtTime(fr*ins.ratio,t);
-    v.lvl=ins.lvl*(0.25+0.75*vol);
+    v.lvl=ins.lvl*(0.25+0.75*vol)*(1-Math.random()*0.05);   // −0..5% уровня — снять машинную ровность
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
-    v.g.gain.setTargetAtTime(v.lvl,t,ins.att);
+    v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+Math.random()*0.2));   // ±10% времени атаки
     return v;
   });
 }
@@ -204,8 +399,14 @@ function chordGlide(owner,freqs,vol){        // смена аккорда без
 function chordOff(owner){ const vs=chordHold[owner]; if(!vs)return;
   vs.forEach(v=>cvRelease(v,false)); delete chordHold[owner]; }
  
-function initAudio(){
+async function initAudio(){
   AC=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+  /* KS-ворклет грузим В НАЧАЛЕ (по-прежнему внутри клика — правило #1 цело), ДО buildLeadBanks,
+     чтобы banks[] строился синхронно и не разъехался с LEAD_INSTR. Провал загрузки — не падаем:
+     ставим запасные субтрактивные щипки в слоты Струна/Ситар. Путь — от корня страницы (не ES-import). */
+  let ksOk=true;
+  try{ await AC.audioWorklet.addModule('src/ks-worklet.js'); }
+  catch(e){ ksOk=false; console.warn('KS-ворклет не загрузился — ставлю запасные щипки:',e); }
   /* Мастер: сумма → лимитер (жёсткий компрессор) → выход.
      Лимитер обязателен: аккорды + драйв + подложка легко клиппируют. */
   limiter=AC.createDynamicsCompressor();
@@ -229,9 +430,13 @@ function initAudio(){
   const vibLFO=AC.createOscillator(); vibLFO.frequency.value=5.5;
   vibGain=AC.createGain(); vibGain.gain.value=0;
   vibLFO.connect(vibGain); vibLFO.start();
- 
+  /* Гуманизация высоты: один ConstantSource в detune ВСЕХ лид-осцилляторов (как vibGain). На каждой
+     атаке ставим свежий случайный сдвиг ±HUM_CENTS·bank.hum; detune не трогается пофреймовой setFreq,
+     поэтому сдвиг держится всю ноту. Создаём ДО buildLeadBanks — mkOsc сразу цепляет его в detune. */
+  humDetune=AC.createConstantSource(); humDetune.offset.value=0; humDetune.start();
+
   const preBus=AC.createGain(); preBus.gain.value=1;
-  buildLeadBanks(preBus);
+  buildLeadBanks(preBus, ksOk);
   banks[leadIdx].gain.gain.value=1;
  
   const shaper=AC.createWaveShaper(); shaper.curve=makeSatCurve(); shaper.oversample='2x';
@@ -299,6 +504,7 @@ function applyParams(p){
   const t=AC.currentTime;
   if(p.freq!=null)banks.forEach(b=>b.setFreq(p.freq,t));   // freq НЕ трогаем, если не задан (leadSet с hold: обновляем громкость/эффекты, а идущий бенд не сбиваем)
   volGain.gain.setTargetAtTime(p.vol,t,0.04);
+  lastVel=p.vol;                                          // запоминаем громкость X → скорость→яркость на следующей атаке
   vibGain.gain.setTargetAtTime(p.vib*35,t,0.05);
   satWet.gain.setTargetAtTime(p.drv,t,0.05);
   satDry.gain.setTargetAtTime(1-p.drv*0.7,t,0.05);
@@ -323,10 +529,17 @@ function scheduleBend(points, baseFreq, secPerBeat){
 function leadCancel(){ const t=AC.currentTime; banks.forEach(b=>b.cancel&&b.cancel(t)); }
 function noteOn(){
   if(noteOnFlag)return; noteOnFlag=true;
-  const t=AC.currentTime;
+  const t=AC.currentTime, b=banks[leadIdx];
+  /* Гуманизация — СВЕЖАЯ случайность на каждую атаку (в т.ч. при переигровке лупа: генерится здесь,
+     в событии НЕ хранится). Высоту дёргаем на bank.hum (у органа/падов 0 — не маскируем биения строёв),
+     уровень и время атаки — всем чуть-чуть (на биения не влияет). */
+  const hum = b.hum==null?1:b.hum;
+  humDetune.offset.setTargetAtTime((Math.random()*2-1)*HUM_CENTS*hum, t, 0.006);
+  const lvlJ = 1 - Math.random()*0.05;                          // −0..5% уровня
+  const attJ = LEAD_INSTR[leadIdx].att*(0.9+Math.random()*0.2);   // ±10% времени атаки
   envGain.gain.cancelScheduledValues(t);
-  envGain.gain.setTargetAtTime(1,t,LEAD_INSTR[leadIdx].att);
-  banks[leadIdx].attack && banks[leadIdx].attack(t);   // FM-банки: пинок огибающей индекса на атаке; у остальных .attack нет → no-op, байт-в-байт
+  envGain.gain.setTargetAtTime(lvlJ,t,attJ);
+  b.strike && b.strike(t, lastVel);   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (от последней громкости X)
 }
 function noteOff(){
   if(!noteOnFlag)return; noteOnFlag=false;
@@ -373,8 +586,11 @@ function bassOn(owner,freq,vol,ins){
   let v=bassHold[owner]; if(!v){ v=bvAlloc(); v.owner=owner; bassHold[owner]=v; }
   if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
     v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
-    v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t); v.lp.frequency.setValueAtTime(v.ins.lp,t);
-    v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att);
+    v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t);
+    const fo=v.ins.fo||1, ft=v.ins.ft||0.03, fv=v.ins.fv||0;   // огибающая фильтра + скорость→яркость на АТАКЕ (не в пофреймовом пути → не сбивается); высоту баса НЕ дёргаем (низ = гулкие биения)
+    v.lp.frequency.cancelScheduledValues(t); v.lp.frequency.setValueAtTime(v.ins.lp*fo,t);
+    v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*vol),t,ft);
+    v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+Math.random()*0.2));   // ±10% времени атаки
   }
   v.tOn=t;
   v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);

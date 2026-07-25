@@ -40,7 +40,7 @@ $('startBtn').onclick=async()=>{
   const btn=$('startBtn'), msgEl=$('loadmsg'), msg=t=>msgEl.textContent=t;
   btn.disabled=true;
   try{
-    initAudio();
+    await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется)
     await AC.resume();
     await initVision(msg);
     try{await navigator.wakeLock.request('screen');}catch(e){}
