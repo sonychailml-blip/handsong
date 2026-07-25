@@ -1,5 +1,5 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
-         phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
+         phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
@@ -21,7 +21,7 @@ const FEEDBACK_URL='';        // Google-форма отзыва (впишетс�
 const DONATE_URL='';          // страница поддержки (впишется позже)
 const FB_MAIL_USER='chailakhianmikhail', FB_MAIL_DOMAIN='gmail.com';   // fallback-почта, пока нет формы
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), fsBtn=$('fsBtn'), fsBtnStart=$('fsBtnStart'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
+      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), fsBtn=$('fsBtn'), fsBtnStart=$('fsBtnStart'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -249,25 +249,42 @@ loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bar
 loopMetre.onchange=e=>{ setLoopMetre(+e.target.value); refreshMetreCtl(); };   // сеттер гейтит пустую петлю; refresh перечитает (клампнутое) значение + перефильтрует ритмы
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
-/* Выбор инструмента и обмен рук. При любом переключении глушим звук — роли/зоны рук меняются.
+/* Выбор инструмента. При любом переключении глушим звук — роли/зоны рук меняются.
    PC-режим удалён: вертикальная раскладка — единственная, поэтому нет ни modeBtn, ни класса .phone. */
-function applySwap(){                          // ⇄ — меняет местами ноты/эффекты у рук (соло-зона + палитра)
-  swapBtn.classList.toggle('act', swapHands);
-  swapBtn.title = swapHands ? 'Правая рука: эффекты — тап вернёт ей ноты'
-                            : 'Правая рука: ноты — тап отдаст ей эффекты';
-}
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
 function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
-  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); applyTheremin(); }   // цвет роли — в CSS-переменную; видимость 〰 зависит от роли
-/* 〰 Терменвокс — компаньон кнопки роли: виден, когда есть соло-поверхность. .act — режим включён. */
-function applyTheremin(){
-  thereminBtn.classList.toggle('act', theremin);
-  thereminBtn.title = theremin ? 'Терменвокс ВКЛ: непрерывная высота — тап выключит'
-                               : 'Терменвокс: непрерывная высота (глиссандо)';
-  /* 〰 виден, когда есть соло-поверхность: вне сплита — если роль соло; в сплите — если одна из
-     половин соло (терменвокс работает в соло-зоне 'ld'). */
-  thereminBtn.style.display = (splitOn ? SPLIT_ROLES.includes('ld') : phoneInstr==='ld') ? '' : 'none';
+  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn(); }   // цвет роли; секция «Функции рук» зависит от активной роли
+/* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ ноте-роли (соло/бас), что сейчас в
+   игре. Строим динамически (как fillScales): single-role — одна роль; сплит — каждая ld/бас-половина
+   (пропуская ch/dr, у них записи нет). Строки помечены РУКОЙ, сгруппированы под ярлыком роли (🎸 Соло /
+   🎚 Бас) — видно, что назначение ПО РУКЕ, не по половине. Бас без 'fx'. Смена — setHandFn + softAllOff. */
+const HANDFN_OPTS={
+  ld:[['fx','Эффекты'],['note','Ноты (непрерывно)'],['hold','Ноты (с удержанием)'],['therm','Терменвокс']],
+  bs:[['note','Ноты (непрерывно)'],['hold','Ноты (с удержанием)'],['therm','Терменвокс']],
+};
+const handFnRows=$('handFnRows'), handFnSep=$('handFnSep');
+function noteRolesInPlay(){
+  if(!splitOn) return (phoneInstr==='ld'||phoneInstr==='bs') ? [phoneInstr] : [];
+  return [...new Set(SPLIT_ROLES)].filter(r=>r==='ld'||r==='bs');   // сплит: уникальные ld/бас-половины
+}
+function renderHandFn(){
+  const roles=noteRolesInPlay();
+  handFnSep.style.display = handFnRows.style.display = roles.length ? '' : 'none';
+  handFnRows.textContent='';
+  for(const role of roles){
+    const rl=document.createElement('div'); rl.className='handFnRole'; rl.textContent=INSTR_LBL[role];   // ярлык роли (🎸 Соло / 🎚 Бас)
+    handFnRows.appendChild(rl);
+    for(const hand of ['L','R']){
+      const row=document.createElement('div'); row.className='prow';
+      const lab=document.createElement('label'); lab.textContent = hand==='L'?'Левая рука':'Правая рука';
+      const sel=document.createElement('select');
+      for(const [v,t] of HANDFN_OPTS[role]){ const o=document.createElement('option'); o.value=v; o.textContent=t; sel.appendChild(o); }
+      sel.value=handFn[role][hand];
+      sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff(); };   // роли/зоны рук меняются → глушим звук (как смена инструмента)
+      row.appendChild(lab); row.appendChild(sel); handFnRows.appendChild(row);
+    }
+  }
 }
 /* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема. */
 const canSplit=()=>innerWidth>innerHeight;
@@ -292,7 +309,7 @@ function applySplitRoles(){
     b.textContent = (i===0?'◧ ':'') + INSTR_LBL[role] + (i===1?' ◨':'');
     b.style.setProperty('--role', INSTR_COL[role]);
   });
-  applyTheremin();                             // соло-половина могла появиться/исчезнуть — обновляем видимость 〰
+  renderHandFn();                             // ld/бас-половина могла появиться/исчезнуть — пересобираем секцию «Функции рук»
 }
 /* Прокрутка роли ОДНОЙ половины: следующий инструмент в INSTR_SEQ, ПРОПУСКАЯ роль ДРУГОЙ половины.
    Так две половины никогда не совпадут → дубль-половины и моно-конфликты (два соло / два баса)
@@ -306,8 +323,6 @@ function cycleHalf(i){
 instrBtn.onclick =()=>{ setPhoneInstr(INSTR_SEQ[(INSTR_SEQ.indexOf(phoneInstr)+1)%INSTR_SEQ.length]); softAllOff(); applyInstr(); };
 instrBtnL.onclick=()=>cycleHalf(0);
 instrBtnR.onclick=()=>cycleHalf(1);
-swapBtn.onclick  =()=>{ setSwapHands(!swapHands); softAllOff(); applySwap(); };
-thereminBtn.onclick=()=>{ setTheremin(!theremin); softAllOff(); applyTheremin(); };
 splitBtn.onclick =()=>{ setSplitOn(!splitOn); softAllOff(); applySplit(); };
 /* 🔄 Переключение камеры (фронт↔тыл). Уже ПОСЛЕ старта: кнопка живёт в #bar, а он виден лишь после
    «▶ Запустить» — камеру на загрузке не трогаем. Запрашиваем ДРУГУЮ facingMode; camFacing (единый
@@ -467,6 +482,6 @@ function onResize(){
   applySplit();
 }
 addEventListener('resize', onResize);
-applySplit(); applyInstr(); applySwap();      // applySplit → applySplitRoles → applyTheremin (инициализация всех кнопок ролей)
+applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHandFn; applyInstr → renderHandFn (инициализация кнопок ролей и секции «Функции рук»)
  
 export { $, revealBar };

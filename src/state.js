@@ -26,9 +26,23 @@ export let chordFam=0, chordVar=0;
 export let latchTy=null;
 
 /* Вертикальная раскладка (единственная): один инструмент на весь экран (phoneInstr), либо две
-   роли на двух половинах при splitOn. Правая рука — ноты, левая — эффекты (swapHands меняет руки). */
+   роли на двух половинах при splitOn. */
 export let phoneInstr='ld';                      // активная роль: 'ld' соло | 'ch' аккорды | 'bs' бас | 'dr' ударные
-export let swapHands=false;                      // true → правая=эффекты, левая=ноты
+/* ФУНКЦИИ РУК — что делает каждая рука (левая L / правая R) В ПРЕДЕЛАХ РОЛИ. Заменяет и swapHands, и
+   глобальный тумблер терменвокса: теперь это выбор НА РУКУ. Роли соло/бас держат СВОЮ пару (переключил
+   роль и назад — вернётся). Функции: 'fx' эффекты (только соло), 'note' ноты непрерывно, 'hold' нота с
+   удержанием (взял на щипке — держится, пока пальцы вместе), 'therm' терменвокс (непрерывная высота).
+   Аккорды/ударные записи НЕ имеют — там рука-палитра ФИКСИРОВАНА за левой (handRole в gestures), swap
+   больше нет. При СПЛИТЕ функция берётся ПО РОЛИ ПОЛОВИНЫ (handFn[роль-половины][сторона]) — соло-/бас-
+   половина работает как single-role, а терменвокс живёт в сплите без спец-флага. Дефолты воспроизводят
+   сегодня: соло левая=эффекты/правая=ноты; бас — обе ноты (у баса fx-руки не было, last-pinch-wins).
+   Писать через setHandFn. */
+export let handFn={ ld:{L:'fx', R:'note'}, bs:{L:'note', R:'note'} };
+export const setHandFn=(role,hand,fn)=>{ handFn[role][hand]=fn; };
+export const handSide=key=> key.slice(0,4)==='Left' ? 'L' : 'R';   // сторона руки из handedness-ключа MediaPipe
+export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)]) || null;   // у ролей без записи (ch/dr) → null
+export const roleHasTherm=role=> !!(handFn[role] && (handFn[role].L==='therm'||handFn[role].R==='therm'));
+export const roleHasFx=role=> role==='ld' && (handFn.ld.L==='fx'||handFn.ld.R==='fx');   // fx только у соло
 /* ЕДИНЫЙ ИСТОЧНИК ЗЕРКАЛА (фронт/тыл камеры). Фронтальная ('user') — картинку ЗЕРКАЛИМ (видишь
    себя как в зеркале, рука совпадает с экраном); тыловая ('environment') — НЕ зеркалим (иначе рука
    ехала бы против того, что на экране). camFacing пишем ТОЛЬКО через setCamFacing (правило #6).
@@ -59,11 +73,10 @@ export const phoneHalves = W => [
   {role:SPLIT_ROLES[0], rx0:0,   rx1:W/2},
   {role:SPLIT_ROLES[1], rx0:W/2, rx1:W},
 ];
-/* Терменвокс (только phone-соло): ON — высота НЕПРЕРЫВНА по y (глиссандо/бенды/вибрато),
-   а не квантуется к ступени; палец в нотном поле больше не выбирает ноту (её задаёт y),
-   октавная полоса и регистр — как были. Живой звук: непрерывные Гц; лупер пишет ближайшую
-   ступень (глиссандо-в-луп — задача позже). Живая связка — писать через setTheremin. */
-export let theremin=false;
+/* Терменвокс теперь — ФУНКЦИЯ РУКИ ('therm' в handFn), а не глобальный тумблер: высота НЕПРЕРЫВНА по y
+   (глиссандо/бенды), палец ноту не выбирает; октавная полоса/регистр — как были. Живой звук —
+   непрерывные Гц; лупер пишет ближайшую ступень. Код терменвокса (thereminHz, оверлей линий, живой
+   3-й арг у WleadOn/WbassOn) ЖИВ — ушёл лишь глобальный флаг. */
 /* rect-соло (19/31-TET): ЛИПКИЙ октавный регистр (0..3), задаётся нижним «октавным»
    прямоугольником пальцем I–IV. Заменил фиксированный RECT_OCT. Общий для рук: любая
    рука, щипнувшая в октавной полосе, ставит его положением/пальцем. Живая связка —
@@ -96,7 +109,6 @@ export const setChordFam=v=>{ chordFam=v; };
 export const setChordVar=v=>{ chordVar=v; };
 export const setLatchTy=v=>{ latchTy=v; };
 export const setPhoneInstr=v=>{ phoneInstr=v; };
-export const setSwapHands=v=>{ swapHands=v; };
 export const setCamFacing=v=>{ camFacing=v; };
 export const setVideoRec=v=>{ videoRec=v; };
 export const mirrored=()=>camFacing==='user';    // зеркалим только фронтальную камеру
@@ -112,7 +124,6 @@ export const flipX=nx=> mirrored() ? 1-nx : nx;  // ЕДИНАЯ формула 
 export const sx=(nx,W)=>remapAxis(flipX(nx))*W;
 export const sy=(ny,H)=>remapAxis(ny)*H;
 export const setSplitOn=v=>{ splitOn=v; };
-export const setTheremin=v=>{ theremin=v; };
 export const setOctReg=v=>{ octReg=v; };
 export const setBassOctReg=v=>{ bassOctReg=v; };
 export const setChordOctReg=v=>{ chordOctReg=v; };

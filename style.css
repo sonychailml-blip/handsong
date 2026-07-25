@@ -22,7 +22,6 @@
      перебивает инлайновый display, который JS ставит у ◨/〰 — их собственные правила видимости
      продолжают действовать, когда панель РАСКРЫТА (.min снят). */
   #bar.min>#scaleBtn,
-  #bar.min>#thereminBtn,
   #bar.min>#splitBtn,
   #bar.min>#camBtn,
   #bar.min>#fsBtn,
@@ -56,11 +55,8 @@
   #instrBtn{margin-left:auto; margin-right:auto;}
   #loopPanelBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   /* Видимость instrBtn (одна роль) и instrBtnL/R (две половины) целиком в JS (applySplit),
-     по splitOn — CSS-правил больше нет. PC-режим удалён: класса .phone нет. */
-  #swapBtn.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
-  /* 〰 терменвокс — иконка-компаньон роли (видимость ставит applyTheremin в JS: только phone-соло) */
-  #thereminBtn{padding:9px 10px; font-size:15px;}
-  #thereminBtn.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
+     по splitOn — CSS-правил больше нет. PC-режим удалён: класса .phone нет. Кнопки ⇄ (swap) и
+     〰 (терменвокс) убраны — их роль забрала секция «Функции рук» в панели звукоряда. */
   /* 🔄 камера: .act = тыловая (незеркальная); визуально помечаем, что вид уже не «зеркало». */
   #camBtn{padding:9px 10px; font-size:15px;}
   #camBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
@@ -176,6 +172,9 @@
   .psep{border-top:1px solid rgba(20,24,50,.12); margin:10px 0 4px; padding-top:6px;
     font-size:11px; color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
   .phint{font-size:11px; color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
+  /* Функции рук: маленький ярлык роли (🎸 Соло / 🎚 Бас) над парой строк Левая/Правая — группирует
+     назначения по роли, но строки помечены РУКОЙ (видно, что выбор на руку, не на половину). */
+  .handFnRole{font-size:11px; color:#6a7089; font-weight:600; margin:8px 2px 2px; letter-spacing:.02em;}
   /* Эталон A4: пресет-список тянется, поле числа узкое справа, «Гц» — подпись. Светлая тема панели. */
   #aRefRow .seg{align-items:center;}
   #aRefRow #aRefSel{flex:1; min-width:0;}

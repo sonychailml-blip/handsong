@@ -86,7 +86,7 @@ const ENG={
   chOn:(a,ctx,when)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,when),
   chSet:(a,ctx,when)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,when),
   chOff:(a,ctx,when)=>chordOff(chOwnerKey(ctx),when),
-  bassOn:(a,ctx,when)=>bassOn(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst,when),
+  bassOn:(a,ctx,when,live)=>bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,when),   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
   bassSet:(a,ctx,when)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
   bassOff:(a,ctx,when)=>bassOff(bassOwnerKey(ctx),when),
   drum:(a,ctx,when)=>drumHit(a.row,a.vol,a.kit,when),
@@ -180,7 +180,7 @@ const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
 const WchOn =(_o,deg,oct,vol,ins,ty)=>{ const a={deg,oct,vol,inst:ins,ty}; ENG.chOn(a); recChOn(a); };
 const WchSet=(_o,deg,oct,vol,ty)    =>{ const a={deg,oct,vol,ty};          ENG.chSet(a); recChSet(a); };
 const WchOff=_o                 =>{ ENG.chOff(); recChOff(); };
-const WbassOn =p=>{ ENG.bassOn(p); recBassEv(p); };
+const WbassOn =(p,live)=>{ ENG.bassOn(p,null,undefined,live); recBassEv(p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
 const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDrum(a); };
 

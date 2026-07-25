@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, swapHands, rectOctReg, setRectOctReg, theremin, splitOn, phoneHalves, sx, sy } from './state.js';
+import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
@@ -41,12 +41,12 @@ function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
 const HANDS={}; let leadOwner=null; let chOwner=null; let bassOwner=null;   // chOwner — рука защёлки, bassOwner — рука баса
 let latchLen=0;   // сколько нот звучит у 'latch': по нему решаем «глиссандо или переатака»
-/* Роль руки по handedness, а не по X. Правая=ноты, левая=эффекты
-   (swapHands меняет местами). Без метки руки — играем ноты. */
+/* Роль руки по handedness — ТОЛЬКО для аккордов/ударных (рука-палитра). Левая=палитра ('fx'),
+   правая=ноты. swapHands УБРАН: рука-палитра аккордов теперь ФИКСИРОВАНА за левой (осознанный размен —
+   обмен рук делается «Функциями рук» для соло/баса, глобального свопа больше нет; аккордам смена
+   палитра↔ноты по руке была некритична). Соло/бас берут функцию из handFn (handFnOf), НЕ отсюда. */
 function handRole(key){
-  if(key.slice(0,4)==='Left')  return swapHands?'notes':'fx';
-  if(key.slice(0,5)==='Right') return swapHands?'fx':'notes';
-  return 'notes';
+  return key.slice(0,4)==='Left' ? 'fx' : 'notes';
 }
 /* «Солирующая НОТНАЯ рука» — та, что ЦЕЛИТСЯ ревербом (revDisp до щипка): реверб ляжет на её ноту,
    поэтому прицел ведёт именно она, а не рука эффектов и не рука из чужой половины. ЕДИНЫЙ источник
@@ -57,14 +57,13 @@ function handRole(key){
    чтобы прицел работал ДО щипка (в этом весь смысл). Нет соло-половины в паре → ни у кого не 'ld' →
    false у всех → второй сайт гасит revDisp в 0. */
 function soloNoteHand(key,S,W){
-  if(handRole(key)!=='notes')return false;
-  if(!splitOn)return phoneInstr==='ld';
-  let hrole;
-  if(S.pinch)hrole=S.role;
+  let role;                                       // роль-половина этой руки (single: phoneInstr; сплит: её половина)
+  if(!splitOn) role=phoneInstr;
+  else if(S.pinch) role=S.role;
   else{ const lm=S.lm; if(!lm)return false;
     // px через sx (поля кадра); для ВЫБОРА половины клампим в [0,W): рука в полях сатурируется к ближней кромке, а не проваливается в чужую половину
-    const px=clamp(sx(lm[8].x,W),0,W-1), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; hrole=h.role; }
-  return hrole==='ld';
+    const px=clamp(sx(lm[8].x,W),0,W-1), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; role=h.role; }
+  return role==='ld' && handFnOf(key,'ld')!=='fx';   // нотная рука соло (функция ≠ эффекты); двух нотных рук — целятся обе, последняя пишет revDisp
 }
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
    (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
@@ -107,15 +106,20 @@ function cellHyst(x,y,x0,x1,y0,y1,fams,prevC,prevR){
   const r=axHyst(y,y0,y1,nR,(prevR>=0&&prevR<nR)?prevR:-1,PAL_HYST_Y);
   return [c,r];
 }
+/* Другая рука, всё ещё держащая щипок в той же зоне — для моно-передачи голоса. */
+function otherPinched(key,zone){ for(const k in HANDS){ if(k!==key){ const S=HANDS[k]; if(S.pinch&&S.zone===zone) return k; } } return null; }
 function endPinch(key,S){
   if(S.pinch){
-    if(S.zone==='ld'&&leadOwner===key){ WleadOff(); leadOwner=null; }
-    if(S.zone==='bs'&&bassOwner===key){ WbassOff(); bassOwner=null; }
+    /* МОНО-ПЕРЕДАЧА: голос (соло/бас) моно; если его отпускает ВЛАДЕЛЕЦ, а другая рука ещё держит щипок
+       в той же зоне — передаём владение ей (подхватит следующим кадром, голос НЕ гасим). Иначе гасим.
+       Так «последний щипок побеждает», а рука, оставшаяся зажатой, не замолкает и не залипает. */
+    if(S.zone==='ld'&&leadOwner===key){ const nx=otherPinched(key,'ld'); if(nx)leadOwner=nx; else{ WleadOff(); leadOwner=null; } }
+    if(S.zone==='bs'&&bassOwner===key){ const nx=otherPinched(key,'bs'); if(nx)bassOwner=nx; else{ WbassOff(); bassOwner=null; } }
     // 'ch': WchOff НЕ зовём — защёлкнутый аккорд продолжает звучать; лишь отпускаем руль
     if(S.zone==='ch'&&chOwner===key)chOwner=null;
   }
   S.pinch=false; S.adj=null; S.deg=-1; S.rect=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры
-  S.inert=false; S.fresh=false;                // размыкание снимает инертность
+  S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
 }
 function processHands(res){
   const W=canvas.width, H=canvas.height, now=performance.now();
@@ -128,7 +132,7 @@ function processHands(res){
     let key=(heads[i]&&heads[i][0]&&heads[i][0].categoryName)||('H'+i);
     if(seen.has(key))key+=i;
     seen.add(key);
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0});
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null});
     S.seen=now; S.lm=lm;
     /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
        palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
@@ -151,8 +155,9 @@ function processHands(res){
           /* СПЛИТ-ЭКРАН: половину (роль + X-диапазон) выбираем ПО ТОЧКЕ ЩИПКА и ЗАМОРАЖИВАЕМ на S —
              как S.zone. Роль этой руки = роль её половины (зона=инструмент). Раздел палитра|ноты —
              palSplitX диапазона ИМЕННО этой половины. Палитра — ПО ПОЛОЖЕНИЮ (без handRole): любая
-             рука с большим+указательным (S.oct===0) слева от раздела выбирает тип. Эффекты остаются
-             за левой рукой (handRole==='fx'), но ТОЛЬКО в соло-половине (h.role==='ld'). */
+             рука с большим+указательным (S.oct===0) слева от раздела выбирает тип. Эффекты — по
+             ФУНКЦИИ руки в соло (handFnOf==='fx'), только в соло-половине (h.role==='ld'): дефолт
+             handFn.ld.L='fx' ДЕРИВИРУЕТ прежний хардкод «эффекты у левой», без отдельного правила. */
           const halves=phoneHalves(W), hx=clamp(px,0,W-1), h=halves.find(q=>hx>=q.rx0&&hx<q.rx1)||halves[halves.length-1];   // клампим px ТОЛЬКО для выбора половины: щипок в поле полей целится в ближнюю половину, а не в чужую
           S.role=h.role; S.rx0=h.rx0; S.rx1=h.rx1;
           const hsplit=palSplitX(h.rx0,h.rx1);
@@ -162,7 +167,7 @@ function processHands(res){
           const famHand  = h.role==='ch' && typedChords() && S.oct===0 && px<hsplit;   // ПОЛОЖЕНИЕ, без handRole
           S.zone = octBand ? 'oct'
                  : famHand ? 'chFam'
-                 : (h.role==='ld' && handRole(key)==='fx') ? 'fx'   // эффекты — левая рука, только в соло-половине
+                 : (h.role==='ld' && handFnOf(key,'ld')==='fx') ? 'fx'   // эффекты — ФУНКЦИЯ руки в соло; дефолт handFn.ld.L='fx' ДЕРИВИРУЕТ прежний хардкод «эффекты у левой в соло-половине»
                  : h.role;
         }else{
           /* ── SINGLE-ROLE (сплит выключен): сегодняшний путь, байт-в-байт ──
@@ -173,12 +178,13 @@ function processHands(res){
           const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
           const octRight = phoneInstr!=='ch' || px>=split;
           const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
-          const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';
+          const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';   // палитра аккордов — фиксировано за левой (handRole)
           S.zone = octBand ? 'oct'
                  : famHand ? 'chFam'
-                 : (phoneInstr==='ld'&&handRole(key)==='fx') ? 'fx'
+                 : (phoneInstr==='ld'&&handFnOf(key,'ld')==='fx') ? 'fx'   // эффекты — если ФУНКЦИЯ этой руки в соло = fx
                  : phoneInstr;
         }
+        S.fn = (S.zone==='ld'||S.zone==='bs') ? handFnOf(key,S.zone) : null;   // нотная функция руки (note/hold/therm) для блока игры; у fx/oct/chFam/аккордов/ударных — null
       }
       if(S.zone==='fx'){
         const meta=FX_META.find(m=>m.finger===mf);
@@ -194,7 +200,7 @@ function processHands(res){
       }
     }else if(S.pinch){
       if(mv>PINCH_OFF){ endPinch(key,S); }
-      else if(mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf)!==S.oct){
+      else if(mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf)!==S.oct&&S.fn!=='hold'){   // 'hold' морозит высоту: смена пальца октаву НЕ двигает
         S.oct=FINGER_TIPS.indexOf(mf);       // смена пальца = смена октавы на лету
         if(S.zone==='fx'&&S.adj){
           const meta=FX_META.find(m=>m.finger===mf);
@@ -256,13 +262,21 @@ function processHands(res){
            «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава.
            У аккордов это КОРЕНЬ; тип берётся из палитры отдельно, октава — chordOctReg. */
         const rectPlay = (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
-        const thereminOn = S.zone==='ld' && theremin;   // терменвокс — только соло-зона
-        const oct = rectPlay?rectOctReg(S.zone):S.oct;           // октавный регистр роли (WleadOn/бас/терменвокс); роль = S.zone (при игре ='ld')
+        const noteZone = S.zone==='ld'||S.zone==='bs';
+        const thereminOn = noteZone && S.fn==='therm';   // терменвокс — ФУНКЦИЯ руки, соло И бас
+        const holdOn     = noteZone && S.fn==='hold';    // удержание — ФУНКЦИЯ руки, соло И бас
+        const oct = rectPlay?rectOctReg(S.zone):S.oct;           // октавный регистр роли (WleadOn/бас/терменвокс); роль = S.zone (при игре ='ld'/'bs')
         if(thereminOn){
-          /* Непрерывная высота: y → Гц через общий раздел (thereminHz), интерполяция в центах
-             между реальными нотами лада. S.deg — ближайшая ступень (для подсветки И записи в лупер:
-             формат события не меняется), S.hz — живые Гц в звук. Палец ноту НЕ выбирает. */
-          const th=thereminHz(y,H,oct); S.deg=th.deg; S.hz=th.hz;
+          /* Непрерывная высота: y → Гц через thereminHz (по leadFreq), интерполяция в центах между
+             реальными нотами лада. БАС на 2 октавы ниже соло (bassFreq=leadFreq/4) — та же кривая ÷4.
+             S.deg — ближайшая ступень (подсветка И запись: формат события не меняется), S.hz — живые Гц
+             в звук. Палец ноту НЕ выбирает. */
+          const th=thereminHz(y,H,oct); S.deg=th.deg; S.hz = S.zone==='bs' ? th.hz/4 : th.hz;
+        }else if(holdOn && S.deg>=0){
+          /* УДЕРЖАНИЕ: высота (S.deg) и октава (S.oct) ЗАМОРОЖЕНЫ с ПЕРВОГО кадра щипка — рука уходит
+             куда угодно, нота держится (смена пальца октаву не двигает — гейт выше). Громкость (X) ниже
+             — ЖИВАЯ (свелл). Стоп — только размыканием пальцев (endPinch). deg берётся на первом кадре
+             ветками ниже (тогда S.deg==-1), дальше сюда — и больше не пересчитывается. */
         }else if(rectPlay){
           S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
           const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
@@ -297,7 +311,7 @@ function processHands(res){
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 2-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
-          if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx});   // rect-бас — октава из bassOctReg (роль=S.zone='bs'); 12-TET бас — S.oct (палец), как было
+          if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из bassOctReg; 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
 
         }else if(S.zone==='dr'){                            // ударные: один удар на щипок (по ряду)
           if(S.fresh){ S.fresh=false; WdrumHit(S.deg,S.vol); }
@@ -361,9 +375,7 @@ function processHands(res){
      Тот же критерий «кто целит» (soloNoteHand): single-role — нотная рука при phoneInstr='ld' (байт-в-байт
      старое условие); сплит — нотная рука соло-половины. Нет соло-половины в паре (в SPLIT_ROLES нет 'ld')
      → soloNoteHand ложна у всех → тоже 0 (столбики FX при этом уже не рисуются — стейл не остаётся). */
-  const reset = splitOn
-    ? ![...seen].some(k=>{ const S=HANDS[k]; return S && soloNoteHand(k,S,W); })
-    : (phoneInstr==='ld' && ![...seen].some(k=>handRole(k)==='notes'));   // single-role: условие байт-в-байт как было (гасим только при phoneInstr='ld')
+  const reset = ![...seen].some(k=>{ const S=HANDS[k]; return S && soloNoteHand(k,S,W); });   // никто не целится соло → гасим revDisp (single-role и сплит одинаково; soloNoteHand сам знает роль-половину)
   if(reset) setRevDisp(0);
 }
 

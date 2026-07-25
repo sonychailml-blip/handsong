@@ -1,7 +1,7 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, theremin, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
+import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN } from './config.js';
 import { DRUM_NAMES, chordHold } from './audio.js';
@@ -110,7 +110,8 @@ function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf,role,rx0=x0){
 }
 /* ОКТАВНАЯ ПОЛОСА (нижний прямоугольник) — распорядитель регистра, control-синий. 4 строки
    палец→регистр I–IV → окт I..IV; активный регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg,
-   аккорды→chordOctReg) подсвечен. Общий рендер: зовут и drawRectGrid, и drawThereminGrid. */
+   аккорды→chordOctReg) подсвечен. Рендер октавной полосы для rect-сетки (drawRectGrid); терменвокс
+   теперь аддитивный оверлей и полосу НЕ перерисовывает (её даёт сетка). */
 function drawRectOctBand(x0,w,lx,yTop,h,role){
   ctx.fillStyle=hexA('#4cc2ff',.10); ctx.fillRect(x0,yTop,w,h);
   ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
@@ -124,34 +125,28 @@ function drawRectOctBand(x0,w,lx,yTop,h,role){
     ctx.fillText(`${OCT_ROMAN[n]}  ${regWord()} ${OCT_ROMAN[n]}`, lx, ey);
   }
 }
-/* ТЕРМЕНВОКС (phone-соло, ON): раскладка та же, но каждый прямоугольник ПОДЕЛЁН на тонкие линии
-   — по одной на реальную ноту (у rect-ладов 4 на прямоугольник). Высота НЕПРЕРЫВНА по y; точная
-   нота — в ЦЕНТРЕ своего деления. Геометрия из thereminSpan — ТОТ ЖЕ раздел, что у звука
-   (gestures), поэтому линия и слышимый центр совпадают. Ближайшая нота (activeDeg) ярче —
-   ориентир, высота между ними скользит. Октавная полоса (rect) — как была. */
-function drawThereminGrid(x0,x1,playH,accent,activeDeg,role,rx0=x0){
-  const {M,spanBot,divH}=thereminSpan(playH), last=M-1, w=x1-x0, s=CUR();
-  const lx=Math.max(x0+7,rx0+FX_BAND_R+8), rect=rectGrid();   // легенда правее столбиков эффектов (от rx0 — левого края роли)
-  ctx.fillStyle='rgba(255,255,255,.03)'; ctx.fillRect(x0,0,w,spanBot);   // нотное поле
-  ctx.textBaseline='middle';
-  if(rect){                                       // октавная полоса снизу — прежний рендер
-    const [yTop,yBot]=rectBandY(0,playH,rectRowsFull());
-    drawRectOctBand(x0,w,lx,yTop,yBot-yTop,role);
-    // грубые границы прямоугольников (ориентир): каждые 4 линии
-    ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
-    for(let r=1;r<rectRowsFull();r++){ const yb=spanBot-(r-1)*divH*4; ctx.beginPath(); ctx.moveTo(x0,yb); ctx.lineTo(x1,yb); ctx.stroke(); }
-  }
+/* ТЕРМЕНВОКС — АДДИТИВНЫЙ ОВЕРЛЕЙ поверх ОБЫЧНОЙ сетки (rect-прямоугольники/узкие ряды остаются как
+   есть; терменвокс их НЕ заменяет — лишь добавляет линии). Рисуем ТОЛЬКО тонкие линии — по одной на
+   реальную ноту (у rect-ладов 4 на прямоугольник), в ЦЕНТРЕ своего деления: ориентир для непрерывной
+   высоты. Поле/октавную полосу/грубые границы уже нарисовала сетка — здесь НЕ повторяем (иначе двойная
+   заливка/затемнение). Геометрия — thereminSpan, ТОТ ЖЕ раздел, что у звука (gestures), поэтому линия и
+   слышимый центр совпадают. Ближайшая нота (activeDeg) ярче. rx0 — левый край роли (легенда правее
+   столбиков эффектов). Показываем ТОЛЬКО когда какая-то рука роли назначена на терменвокс (drawRole). */
+function drawThereminLines(x0,x1,playH,accent,activeDeg,rx0=x0){
+  const {M,spanBot,divH}=thereminSpan(playH), last=M-1, s=CUR(), rect=rectGrid();
+  const lx=Math.max(x0+7,rx0+FX_BAND_R+8);
   const every=divH>=15?1:divH>=9?2:4;             // подписи прореживаем, если линии частые (Партч=44 нот)
+  ctx.textBaseline='middle';
   for(let d=0;d<=last;d++){                        // d — ступень; линия в ЦЕНТРЕ деления
     const yc=spanBot-(d+0.5)*divH, on=d===activeDeg;
     const ton=IVX()[d]%s.edo===0;                  // тоника/октава — зелёным (как drawGrid)
-    ctx.strokeStyle= on?accent : ton?'rgba(87,217,163,.35)':'rgba(255,255,255,.13)';
+    ctx.strokeStyle= on?accent : ton?'rgba(87,217,163,.5)':'rgba(255,255,255,.22)';   // чуть ярче: линии поверх готовой сетки
     ctx.lineWidth= on?2:0.8;
     ctx.beginPath(); ctx.moveTo(x0,yc); ctx.lineTo(x1,yc); ctx.stroke();
     if(on||d%every===0){
-      ctx.fillStyle= on?accent : ton?'#57d9a3':'rgba(255,255,255,.55)';
+      ctx.fillStyle= on?accent : ton?'#57d9a3':'rgba(255,255,255,.6)';
       ctx.font= on?'700 12px system-ui':'11px system-ui'; ctx.textAlign='left';
-      ctx.fillText(`${rect?rectNoteLbl(d):gridNoteLbl(d)} · ${centsOf(d)}c`, lx, yc);   // нерект (BP): порядковый, чтобы совпасть с сеткой/ярлыком; period=2 → rowLabel как был
+      ctx.fillText(`${rect?rectNoteLbl(d):gridNoteLbl(d)} · ${centsOf(d)}c`, lx, yc);   // нерект (BP): порядковый, чтобы совпасть с сеткой/ярлыком
     }
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
@@ -379,9 +374,11 @@ function drawRole(instr,rx0,rx1,playH){
     drawChordPalette(rx0,split,playH);
     ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель палитра|ноты ВНУТРИ роли
     ctx.beginPath(); ctx.moveTo(split,0); ctx.lineTo(split,playH); ctx.stroke();
-  }else if(instr==='ld'&&theremin)drawThereminGrid(rx0,rx1,playH,accent,act,instr,rx0);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло; роль=instr='ld')
-  else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(rx0,rx1,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr, rx0);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
+  }else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(rx0,rx1,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr, rx0);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
   else drawGrid(rx0,rx1,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
+  /* Терменвокс — АДДИТИВНЫЙ оверлей ПОВЕРХ сетки соло/баса: тонкие нотные линии, ТОЛЬКО когда какая-то
+     рука этой роли назначена на терменвокс (иначе линии — мусор). Сетка (rect/ряды) уже нарисована. */
+  if((instr==='ld'||instr==='bs')&&roleHasTherm(instr))drawThereminLines(rx0,rx1,playH,accent,act,rx0);
   /* Живой разбор Гц ПОВЕРХ подсвеченного корня — только у аккордов и только пока аккорд ЗАЩЁЛКНУТ и
      звучит (latchDeg>=0). Аккорд петли (loopChordDeg) сюда НЕ попадает: его владелец — 'loop:N', а не
      'latch'; подсветка ряда у него остаётся прежней (без разбора). Считаем полосу тем же способом, что
@@ -412,10 +409,10 @@ function drawPhone(res){
     for(const h of halves) drawRole(h.role,h.rx0,h.rx1,playH);
     ctx.strokeStyle=hexA('#fff',.18); ctx.lineWidth=2;   // разделитель половин по центру
     ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-    const solo=halves.find(h=>h.role==='ld'); if(solo)drawFxBars(solo.rx0,H);   // столбики эффектов — у соло-половины (её rx0)
+    const solo=halves.find(h=>h.role==='ld'); if(solo&&roleHasFx('ld'))drawFxBars(solo.rx0,H);   // столбики эффектов — у соло-половины, ТОЛЬКО если у соло-роли есть рука-эффекты
   }else{
     drawRole(phoneInstr,0,W,playH);
-    if(phoneInstr==='ld')drawFxBars(0,H);     // эффекты действуют только на соло-канал
+    if(phoneInstr==='ld'&&roleHasFx('ld'))drawFxBars(0,H);   // эффекты действуют на соло-канал; полосу прячем, если НИ ОДНА рука не назначена на fx
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
   drawHandsPhone(res,W,H,playH);
@@ -446,8 +443,8 @@ function drawHandsPhone(res,W,H,playH){
       if(S.pinch){ instr=S.role; rx0=S.rx0; rx1=S.rx1; }
       else { const px=Math.max(0,Math.min(W-1,sx(lm[8].x,W))), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; instr=h.role; rx0=h.rx0; rx1=h.rx1; }   // px через sx (поля кадра); для ВЫБОРА половины сатурируем к кромке — как в gestures
     }else{ instr=phoneInstr; rx0=0; rx1=W; }
-    const split=palSplitX(rx0,rx1), accent=INSTR_COL[instr], isCh=instr==='ch', isDr=instr==='dr', fxOn=instr==='ld';
-    const fxHand=fxOn&&handRole(k)==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов есть только у соло-половины
+    const split=palSplitX(rx0,rx1), accent=INSTR_COL[instr], isCh=instr==='ch', isDr=instr==='dr';
+    const fxHand=instr==='ld'&&handFnOf(k,'ld')==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов = её ФУНКЦИЯ в соло-роли (single И сплит-половина одинаково)
     for(let i=0;i<lm.length;i++){
       const x=sx(lm[i].x,W), y=sy(lm[i].y,H), tipPt=i===4||FINGER_TIPS.includes(i);   // точки в экранных пикселях игрового поля (поля кадра сняты); НЕ клампим — рука уходит за кромку вместе с картинкой
       ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
@@ -466,18 +463,18 @@ function drawHandsPhone(res,W,H,playH){
     }
     // рука нот
     if(isCh&&!supportsChords())continue;         // макам: аккордов нет — ни круга, ни ярлыка, ни подсказки
-    // рука-палитра нот не играет — не рисуем ей подсказку ряда. Вне сплита это fx-рука (handRole);
-    // при сплите — по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указательный слева от раздела).
+    // рука-палитра нот не играет — не рисуем ей подсказку ряда. Вне сплита это ЛЕВАЯ рука (handRole,
+    // фиксировано — swap убран); при сплите — по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указ. слева).
     if(isCh&&typedChords()&&(splitOn ? (S.pinch?S.zone==='chFam':sx(lm[8].x,W)<split) : handRole(k)==='fx'))continue;
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
       ctx.globalAlpha=.25; ctx.beginPath(); ctx.arc(S.x,S.y,26+8*S.vol,0,7); ctx.stroke(); ctx.globalAlpha=1;
       const s=CUR();
-      if(instr==='ld'&&theremin&&S.hz){
-        /* Терменвокс: высота НЕПРЕРЫВНА — показываем живые Гц и центы над тоникой (не одну ступень).
-           «≈ ближайшая нота» — ориентир; глиссандо скользит между реальными нотами лада. */
-        const cAbs=Math.round(1200*Math.log2(S.hz/baseF()));
+      if((instr==='ld'||instr==='bs')&&S.fn==='therm'&&S.hz){
+        /* Терменвокс (соло/бас): высота НЕПРЕРЫВНА — живые Гц и центы над тоникой РОЛИ. Опора центов —
+           тоника соло (baseF) или баса (baseF/4), иначе бас показал бы −2400¢. «≈» — ближайшая нота. */
+        const ref=instr==='bs'?baseF()/4:baseF(), cAbs=Math.round(1200*Math.log2(S.hz/ref));
         drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):gridNoteLbl(S.deg)} · глиссандо`,
           `${Math.round(S.hz)} Гц · ${Math.round(S.vol*100)}% · ${cAbs}c`],accent);
       }else if(instr==='ld'||instr==='bs'){
@@ -496,7 +493,8 @@ function drawHandsPhone(res,W,H,playH){
            — безвредно и держит ярлык на одном месте на всех ладах: единообразие важнее трёх сэкономленных
            символов. Формат и позиция прежние (Гц · % · центы), меняется только условие. */
         const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}% · ${centsOf(S.deg)}c`;
-        drawTag(S.x,S.y,[L1,L2],accent);
+        const hold = S.fn==='hold' ? ' · держ.' : '';   // маркер удержания: нота держится, пока пальцы вместе
+        drawTag(S.x,S.y,[L1+hold,L2],accent);
       }else if(isDr){
         drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
       }else if(typedChords()){                   // тип задаёт палитра — chordLabel дал бы «C5», это враньё
