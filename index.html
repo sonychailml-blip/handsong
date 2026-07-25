@@ -103,11 +103,19 @@
     <div class="prow"><label>Длина (такты)</label>
       <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
     </div>
+    <div class="prow"><label>Размер (долей)</label>
+      <select id="loopMetre">
+        <option value="2">2</option><option value="3">3</option><option value="4" selected>4</option>
+        <option value="5">5</option><option value="6">6</option><option value="7">7</option>
+        <option value="8">8</option><option value="9">9</option><option value="10">10</option>
+        <option value="12">12</option><option value="16">16</option>
+      </select>
+    </div>
     <div class="prow"><label>Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
     <div class="prow"><label>Квантизация</label>
       <div class="seg"><button id="qOn" class="act">Вкл</button><button id="qOff">Выкл</button></div>
     </div>
-    <p class="phint">Длину петли меняют только на пустой петле.</p>
+    <p class="phint">Длину и размер меняют только на пустой петле.</p>
 
     <div class="psep">Аранжировка (слои)</div>
     <div class="prow"><label>Гармония</label><select id="selProg"></select></div>

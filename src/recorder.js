@@ -28,14 +28,28 @@ import { hooks } from './hooks.js';
    голос, побеждает последний — легато-глиссандо и есть инструмент, это не баг. */
 let recording=false;                                 // «вооружено»: пишем живой ввод
 const events=[];                                     // стабильная ссылка (её читает визуализация в draw)
-const loop={ on:false, bars:2, bpm:84, t0:0, pos:-1e-9, first:false, layer:0, clickBeat:0, quant:true };
+const loop={ on:false, bars:2, metre:BEATS_PER_BAR, bpm:84, t0:0, pos:-1e-9, sched:0, first:false, layer:0, clickBeat:0, quant:true };   // metre — долей в такте; pos — «сыгранная» доля (лид/дрон, почти-сейчас); sched — АБСОЛЮТНАЯ доля, до которой СЛОИ (аккорд/бас/удар) уже запланированы вперёд
 const droneActive=()=>events.some(e=>e.fn==='drone');   // жив ли слой-дрон (для гашения при снятии/стопе)
 let recLead=null, recCh=null, recBass=null, pumpTimer=null;
 /* Глиссандо-в-луп: у ОТКРЫТОЙ соло-ноты копим кривую бенда (центы поверх ступени) в массив,
    лежащий ПО ССЫЛКЕ в событии leadOn. Активно только у терменвокса (гейт live!=null). */
 let recLeadBend=null, noteStartBeat=0, bendLastC=null;
 let curChordDeg=-1;                                  // ступень аккорда, что играет петля сейчас (для подсветки, §Q5)
-const loopBeats=()=>loop.bars*BEATS_PER_BAR;
+const loopBeats=()=>loop.bars*loop.metre;
+/* ГРУППИРОВКА (акценты) по размеру — СТАТИЧНАЯ, по умолчанию. Массив длин групп, сумма = размер.
+   Нечётные размеры чувствуются НЕ ровно: балканская 7 = 3+2+2, 9 = 2+2+2+3, 5 = 2+3; индийский
+   тинтал (16) — 4 вибхага по 4. Пользовательский выбор 3+2+2 vs 2+2+3 отложен (BACKLOG §3.23) —
+   один разумный вариант на размер. Дефолт нечислового/неизвестного — одна группа (акцент только сам).
+   khali — индексы ГРУПП, что ОСЛАБЛЕНЫ (не акцент, а «пустая» голова, структурная черта тала). */
+const METRE_GROUPS={ 2:[2],3:[3],4:[4],5:[2,3],6:[3,3],7:[3,2,2],8:[4,4],9:[2,2,2,3],10:[2,3,2,3],12:[3,3,3,3],16:[4,4,4,4] };
+const METRE_KHALI ={ 16:[2] };   // тинтал: 3-й вибхаг (индекс 2 = доля 8) — khali (открытый баян, без баса)
+/* Уровень акцента доли b∈[0,metre): 2 сам (начало такта), 1 голова группы, -1 khali-голова, 0 обычная. */
+function beatLevel(metre,b){
+  const g=METRE_GROUPS[metre]||[metre], kh=METRE_KHALI[metre]||[];
+  let acc=0;
+  for(let i=0;i<g.length;i++){ if(acc===b) return b===0?2:(kh.includes(i)?-1:1); acc+=g[i]; }
+  return 0;   // не голова группы
+}
 const loopChordDeg=()=>loop.on?curChordDeg:-1;       // draw: подсветить аккорд петли, когда рука его не держит
 const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
 /* Позиция для визуализации: фаза отсчёта / игры, доля внутри петли, всего долей. */
@@ -67,13 +81,15 @@ const ENG={
               if(a.bend&&a.bend.length)scheduleBend(a.bend,base,60/loop.bpm); },   // переигровка: кривая бенда поверх ступени замороженного лада
   leadSet:(a,ctx)=>applyParams({freq:(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
   leadOff:()=>noteOff(),
-  chOn:(a,ctx)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst),
-  chSet:(a,ctx)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol),
-  chOff:(a,ctx)=>chordOff(chOwnerKey(ctx)),
-  bassOn:(a,ctx)=>bassOn(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst),
-  bassSet:(a,ctx)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol),
-  bassOff:(a,ctx)=>bassOff(bassOwnerKey(ctx)),
-  drum:a=>drumHit(a.row,a.vol,a.kit),
+  /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
+     → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
+  chOn:(a,ctx,when)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,when),
+  chSet:(a,ctx,when)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,when),
+  chOff:(a,ctx,when)=>chordOff(chOwnerKey(ctx),when),
+  bassOn:(a,ctx,when)=>bassOn(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.inst,when),
+  bassSet:(a,ctx,when)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
+  bassOff:(a,ctx,when)=>bassOff(bassOwnerKey(ctx),when),
+  drum:(a,ctx,when)=>drumHit(a.row,a.vol,a.kit,when),
   drone:a=>droneOn(a.lvl),                            // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 };
 const inPB=()=>loop.on;                               // для строки статуса (draw)
@@ -177,43 +193,89 @@ function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 
 /* --- Транспорт петли --- */
 function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; } }
-function fireWindow(a,b){                              // события в (a,b], кроме пишущегося сейчас слоя
-  for(const ev of events)
-    if(ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer)){
-      ENG[ev.fn](ev.a,ev);                            // ev несёт замороженный лад (§3.4)
-      if(ev.fn==='chOn'||ev.fn==='chSet')curChordDeg=ev.a.deg;   // текущий аккорд петли — для подсветки (§Q5)
-      else if(ev.fn==='chOff')curChordDeg=-1;
+/* СЛОИ (аккорд/бас/удар) идут ВПЕРЁД по явному времени; ЛИД/дрон — «почти сейчас» (моно-соло делит
+   один голос с живой игрой: пред-планировать его далеко вперёд опасно, §6). fn[0]==='c' → аккорд;
+   slice(0,4)==='bass' → бас; 'drum' → удар. Лид (leadOn/leadSet/leadOff) и дрон — НЕ вперёд. */
+const isLayer=fn=> fn[0]==='c' || fn.slice(0,4)==='bass' || fn==='drum';
+
+/* 1) СЛОИ ВПЕРЁД: на каждый опрос планируем события в окне [loop.sched, горизонт) по их ТОЧНОМУ времени
+   loop.t0 + абс.доля*spb, с проекцией через завороты (rep — номер повтора петли). Интервал ПОЛУОТКРЫТ
+   [lo,hi): включает начало → доля 0 (сильный удар) не теряется на старте и после каждого заворота.
+   На границе повтора гасим слои петли по ЯВНОМУ времени (releaseLoopLayersAt) — аналог softAllOff, но
+   не «сейчас». Событие пишущегося слоя пропускаем. loop.sched — абсолютная доля, монотонно растёт. */
+function scheduleLayers(){
+  const spb=60/loop.bpm, lb=loopBeats();
+  const horizon=(AC.currentTime+SCHED_AHEAD-loop.t0)/spb;   // абс. доля на горизонте опережения
+  let guard=0;
+  while(loop.sched<horizon-1e-9 && guard++<64){
+    const rep=Math.floor(loop.sched/lb+1e-9), repEnd=(rep+1)*lb;
+    const segEnd=Math.min(horizon,repEnd);
+    const lo=loop.sched-rep*lb, hi=segEnd-rep*lb;           // [lo,hi) в пределах петли
+    for(const ev of events){
+      if(!isLayer(ev.fn)) continue;
+      if(recording&&ev.layer===loop.layer) continue;
+      if(ev.t>=lo&&ev.t<hi){
+        const when=loop.t0+(rep*lb+ev.t)*spb;               // ТОЧНОЕ время события
+        ENG[ev.fn](ev.a,ev,when);                           // ev несёт замороженный лад (§3.4)
+        if(ev.fn==='chOn'||ev.fn==='chSet')curChordDeg=ev.a.deg;   // подсветка ведёт на опережение (~до окна) — косметика
+        else if(ev.fn==='chOff')curChordDeg=-1;
+      }
     }
+    if(segEnd>=repEnd-1e-9) releaseLoopLayersAt(loop.t0+repEnd*spb);   // достигли границы повтора — гасим слои по явному времени
+    loop.sched=segEnd;
+  }
 }
+/* Гашение СЛОЁВ петли на границе повтора, по явному времени (owner 'loop:'/'bassloop:'; живое — latch/bass —
+   гасит liveWrapRelease почти-сейчас). Читает hold СЕЙЧАС: там уже голоса уходящего повтора (chOn их создал). */
+function releaseLoopLayersAt(when){
+  for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:') chordOff(k,when);
+  for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:') bassOff(k,when);
+}
+/* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем. */
+function fireNear(a,b){
+  for(const ev of events)
+    if(!isLayer(ev.fn)&&ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer))
+      ENG[ev.fn](ev.a,ev);
+}
+/* Гашение ЖИВОГО на завороте (лид/latch/живой бас) — слои петли гасятся вперёд (releaseLoopLayersAt). */
+function liveWrapRelease(){ if(!AC)return; noteOff();
+  chordOff('latch'); bassOff('bass');
+  setLatchDeg(-1); setLatchTy(null);
+  recLead=null; recCh=null; recBass=null; recLeadBend=null; }
 function schedClicks(){                                // щелчки метронома с опережением по AC-часам
   const spb=60/loop.bpm, ahead=AC.currentTime+SCHED_AHEAD;
   while(loop.t0+loop.clickBeat*spb<ahead){
     const bt=loop.t0+loop.clickBeat*spb, inCount=loop.clickBeat<0;
+    /* Просроченный щелчок (bt в прошлом — зависание ДЛИННЕЕ окна) НАМЕРЕННО пропускаем, а не играем
+       поздно: поздний щелчок слышен как «флам»/спотыкание (хуже, чем разовый пропуск, который ухо
+       достраивает). С окном 0.30с пропуски редки; слои же наоборот — просроченные играем (звучат
+       поздно, но не рвут состояние аккорда/баса; деградация к прежнему поведению на огромных столах). */
     if(bt>=AC.currentTime-0.001&&(inCount||recording))
-      metroClick(bt, (((loop.clickBeat%BEATS_PER_BAR)+BEATS_PER_BAR)%BEATS_PER_BAR)===0);
+      metroClick(bt, beatLevel(loop.metre, (((loop.clickBeat%loop.metre)+loop.metre)%loop.metre)));   // акцент по ГРУППЕ, не только по началу такта
     loop.clickBeat++;
   }
 }
 function tick(){
   if(!loop.on||!AC)return;
   schedClicks();
+  scheduleLayers();                                   // СЛОИ — вперёд по явному времени (сэмпл-точно)
   const e=(AC.currentTime-loop.t0)*loop.bpm/60;
-  if(e<0)return;                                      // отсчёт: только щелчки
+  if(e<0)return;                                      // отсчёт: только щелчки/планирование
   const lb=loopBeats(); let pos=e%lb;
-  if(pos<loop.pos){                                   // заворот петли
-    fireWindow(loop.pos,lb);
-    softAllOff();                                     // гасим зависшее к границе
-    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); }
-    fireWindow(-1e-9,pos);
-  }else fireWindow(loop.pos,pos);
+  if(pos<loop.pos){                                   // заворот петли (для лид/дрон)
+    fireNear(loop.pos,lb);
+    liveWrapRelease();                                // гасим ЖИВОЕ к границе (слои — по явному времени)
+    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); loop.sched=e; }   // первая запись только что стала слоем — планировать её с ТЕКУЩЕЙ позиции (во время записи слоёв не планировалось → без дублей)
+    fireNear(-1e-9,pos);
+  }else fireNear(loop.pos,pos);
   loop.pos=pos;
 }
 function startTransport(countIn){
   clearPump();
   const spb=60/loop.bpm;
-  loop.on=true; loop.pos=-1e-9;
-  loop.t0=AC.currentTime+(countIn?BEATS_PER_BAR*spb:0.06);
-  loop.clickBeat=countIn?-BEATS_PER_BAR:0;
+  loop.on=true; loop.pos=-1e-9; loop.sched=0;              // sched=0 → планируем слои с доли 0 (первый удар петли — по явному времени, сэмпл-точно)
+  loop.t0=AC.currentTime+(countIn?loop.metre*spb:0.06);   // отсчёт — ОДИН такт (loop.metre долей), при любом размере (предсказуемое правило)
+  loop.clickBeat=countIn?-loop.metre:0;
   pumpTimer=setInterval(tick,SCHED_TICK_MS);
   hooks.loop && hooks.loop(true);
 }
@@ -231,7 +293,7 @@ function onRec(){
    если длина совпадает (как setLoopBars). Слои снимаются undo сверху (сначала ритм). */
 function loadArrangement(sel, jam=false){
   if(!AC)return false;
-  const arr=buildArrangement(sel, {chIdx, bassIdx});
+  const arr=buildArrangement(sel, {chIdx, bassIdx, metre:loop.metre});
   if(!arr||!arr.layers.length)return false;
   if(!events.length){ loop.bars=arr.bars; loop.first=false; }
   else if(arr.bars!==loop.bars)return false;           // не тот размер — тихо, как setLoopBars
@@ -273,6 +335,11 @@ function setLoopBars(n){                                // длина меняе
   if(events.length||loop.on)return;
   loop.bars=Math.max(1,Math.min(8,n));
 }
+const METRES=[2,3,4,5,6,7,8,9,10,12,16];               // допустимые размеры (долей в такте) — см. UI
+function setLoopMetre(n){                               // размер меняется ТОЛЬКО на пустой петле (как bars: смена переосмыслила бы времена всех событий)
+  if(events.length||loop.on)return;
+  loop.metre = METRES.includes(+n) ? +n : loop.metre;
+}
 function setLoopQuant(v){ loop.quant=!!v; }             // общий тумблер квантизации
 function setLoopBpm(v){ loop.bpm=Math.max(40,Math.min(240,+v||loop.bpm)); }   // темп петли — только пользователь
 function clearRec(){
@@ -289,6 +356,6 @@ function panic(){
 export {
   WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
   softAllOff, panic, inPB, recording,
-  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, events, loopPos,
+  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
   loadArrangement, loadJam, clearJam, loopChordDeg,
 };

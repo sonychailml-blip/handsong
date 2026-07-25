@@ -5,7 +5,7 @@ import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC } from './audio.js';
-import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopQuant, setLoopBpm, loop, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
+import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
 import { INSTR_COL } from './config.js';
 import { hooks } from './hooks.js';
@@ -22,7 +22,7 @@ const DONATE_URL='';          // страница поддержки (впише
 const FB_MAIL_USER='chailakhianmikhail', FB_MAIL_DOMAIN='gmail.com';   // fallback-почта, пока нет формы
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
-      loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'),
+      loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
@@ -96,7 +96,18 @@ function refreshProgAvail(){                  // прогрессии — тол
   [...selProg.options].forEach((o,i)=>{ o.disabled = !HARMONIES[i].drone && !ok; });
   if(selProg.selectedOptions[0] && selProg.selectedOptions[0].disabled) selProg.value='0';   // упасть на дрон
 }
-buildUI();
+/* Размер: значение = loop.metre; БЛОКИРУЕМ селектор на непустой/играющей петле (смена переосмыслила бы
+   времена всех событий — как длина). Плюс фильтруем ритмы: доступны лишь паттерны своего размера
+   (beats===loop.metre); несовместимый ритм buildArrangement всё равно пропустит — тут только визуал. */
+function refreshMetreCtl(){
+  loopMetre.value = loop.metre;
+  loopMetre.disabled = !!(events.length || loop.on);
+  [...selRhythm.options].forEach((o,i)=>{ o.disabled = (RHYTHMS[i].beats||4) !== loop.metre; });
+  if(selRhythm.selectedOptions[0] && selRhythm.selectedOptions[0].disabled){   // выбранный ритм не того размера → упасть на совместимый (как refreshProgAvail)
+    const alt=RHYTHMS.findIndex(r=>(r.beats||4)===loop.metre); if(alt>=0) selRhythm.value=alt;
+  }
+}
+buildUI(); refreshMetreCtl();
 
 hooks.leadInstr = v  => selLead.value = v;
 hooks.bassInstr = v  => selBass.value = v;
@@ -117,14 +128,14 @@ function updRecBtn(){
   loopBarsV.textContent = loop.bars;
 }
 hooks.rec       = () => updRecBtn();
-hooks.loop      = on => { loopBtn.classList.toggle('on', on); loopBtn.textContent = on ? '❚❚ луп' : '⟳ луп'; updRecBtn(); };
+hooks.loop      = on => { loopBtn.classList.toggle('on', on); loopBtn.textContent = on ? '❚❚ луп' : '⟳ луп'; updRecBtn(); refreshMetreCtl(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет)
 
 /* Две панели (звукоряд и лупер) — оба оверлея на ОДНОМ месте (сверху). Одна за раз: открытие одной
    прячет другую (иначе перекрылись бы). Лупер РАНЬШЕ жил снизу, чтобы холстовая сетка тактов
    оставалась видна при игре; теперь он тоже сверху (см. #panelLoop в style.css) — сетку видно после
    закрытия панели. */
 function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.classList.toggle('on',on);
-  if(on)panelScaleEl.classList.remove('on'); }
+  if(on){ panelScaleEl.classList.remove('on'); refreshMetreCtl(); } }   // при открытии — актуализируем блокировку размера (петля могла измениться при закрытой панели)
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false); }
 $('panelClose').onclick=()=>showScale(false);
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
@@ -214,6 +225,7 @@ $('undoBtn').onclick=onUndo;
 $('clrBtn').onclick=()=>{ clearRec(); resetJamDisplay(); };   // очистка петли → индикатор джема в покой
 loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bars; };
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
+loopMetre.onchange=e=>{ setLoopMetre(+e.target.value); refreshMetreCtl(); };   // сеттер гейтит пустую петлю; refresh перечитает (клампнутое) значение + перефильтрует ритмы
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
 /* Выбор инструмента и обмен рук. При любом переключении глушим звук — роли/зоны рук меняются.
@@ -367,9 +379,17 @@ function applyJam(){
   jamBtn.title = jamStep>0 ? 'Джем играет — тап сменит вариант (в конце выключит)'
                            : 'Джем: подложка по строю — тап включит, следующий тап сменит вариант';
 }
+/* Подгоняем ритм варианта под ТЕКУЩИЙ размер петли: паттерн другого размера buildArrangement всё равно
+   пропустит (джем остался бы без ударных) → берём первый RHYTHMS со своим beats===loop.metre, иначе без
+   ударных (-1). На 4/4 ничего не меняется (ритмы джема уже beats:4) — байт-в-байт. */
+function fitRhythm(sel){
+  if(sel.rhythm<0 || (RHYTHMS[sel.rhythm] && (RHYTHMS[sel.rhythm].beats||4)===loop.metre)) return sel;
+  const alt=RHYTHMS.findIndex(r=>(r.beats||4)===loop.metre);
+  return {...sel, rhythm: alt};                   // findIndex вернёт -1, если совместимого нет → без ударных
+}
 function jamTo(step, vars){
   clearJam();                                     // снять ПРОШЛЫЕ слои джема (записи игрока целы — они без метки jam)
-  if(step>0 && !loadJam(vars[step-1])){           // не встало (петля игрока другого размера) — честно сообщаем, цикл → выкл
+  if(step>0 && !loadJam(fitRhythm(vars[step-1]))){   // не встало (петля игрока другого размера) — честно сообщаем, цикл → выкл
     showCamMsg('Джем: петля другого размера — очистите её (✕)'); jamStep=0; applyJam(); return;
   }
   jamStep=step; applyJam();

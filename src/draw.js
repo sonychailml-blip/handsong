@@ -6,7 +6,7 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN } from './config.js';
 import { DRUM_NAMES } from './audio.js';
 
-import { recording, inPB, loop, events, loopPos, loopChordDeg } from './recorder.js';
+import { recording, inPB, loop, events, loopPos, loopChordDeg, beatLevel } from './recorder.js';
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -179,7 +179,7 @@ function drawTag(x,y,lines,color){
 function drawLooper(){
   if(!loop.on && !events.length){ syncLoopTransport(false,0); return; }   // нет петли — полоса прячется
   const W=canvas.width, info=loopPos();
-  const bars=loop.bars, total=bars*4;
+  const bars=loop.bars, total=bars*loop.metre;   // переменный размер; бегунок ниже делит на info.total (тот же loopBeats) → сетка и бегунок заперты вместе
   const bw=Math.min(560,W-40), x0=(W-bw)/2, x1=x0+bw;
   const ids=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
   const rows=ids.slice();
@@ -202,8 +202,13 @@ function drawLooper(){
 
   // сетка долей и тактов
   for(let b=0;b<=total;b++){
-    const gx=x0+bw*b/total, bar=b%4===0;
-    ctx.strokeStyle=bar?'rgba(255,255,255,.34)':'rgba(255,255,255,.11)'; ctx.lineWidth=bar?1.4:0.8;
+    const gx=x0+bw*b/total, bib=b%loop.metre, lvl=beatLevel(loop.metre,bib);   // видно 3+2+2, а не N одинаковых чёрточек
+    let sc,lw;
+    if(bib===0){ sc='rgba(255,255,255,.34)'; lw=1.4; }        // начало такта — как было (4/4 байт-в-байт)
+    else if(lvl===1){ sc='rgba(255,255,255,.24)'; lw=1.1; }   // голова группы
+    else if(lvl===-1){ sc='rgba(140,180,255,.20)'; lw=1.0; }  // khali — холодный тусклый штрих («пустая» голова)
+    else { sc='rgba(255,255,255,.11)'; lw=0.8; }              // обычная доля — как было
+    ctx.strokeStyle=sc; ctx.lineWidth=lw;
     ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
   }
   // строки слоёв + метки событий

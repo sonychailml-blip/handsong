@@ -34,7 +34,7 @@ export const PINCH_OFF=0.25;                      // отпускание
 export const REV_NEAR=0.27, REV_RANGE=0.19;       // реверб: (0.27-hs)/0.19
 export const ROW_HYST=0.16;                       // гистерезис ступени (по Y)
 export const WATCHDOG_MS=120;                     // таймаут потери руки, мс
-export const SCHED_AHEAD=0.14;                    // опережение планировщика, с
+export const SCHED_AHEAD=0.30;                    // опережение планировщика, с. 0.14 было МЕНЬШЕ реальных зависаний main-thread (синхронный MediaPipe + три пути синтеза на одном потоке) → и метроном спотыкался, и слои. 0.30 комфортно перекрывает период опроса (25мс) + типичный стол; ОКНО МАСКИРУЕТ зависания, но не убирает (корень — vision.js в main-thread, см. BACKLOG)
 export const SCHED_TICK_MS=25;                    // период планировщика, мс
 
 /* Эффекты соло в phone-режиме: тонкие вертикальные столбики слева ПОВЕРХ сетки
@@ -85,7 +85,7 @@ export const palSplitX=(x0,x1)=>x0+CH_PAL_W*(x1-x0);
 export const rectBandY=(i,H,nRect)=>{ const seg=H/nRect, z=nRect-1-i; return [z*seg,(z+1)*seg]; };
 
 /* Запись как намерение (§3.4) */
-export const BEATS_PER_BAR=4;                     // долей в такте — сетка записи и лупера (§3.5)
+export const BEATS_PER_BAR=4;                     // ДЕФОЛТНЫЙ размер (сеет loop.metre) — НЕ глобальная истина: живой размер такта = loop.metre (recorder), переменный (§3.5)
 export const REC_VOL_EPS=0.03;                    // мёртвая зона громкости: тише — точку не пишем
 export const REC_REV_EPS=0.03;                    // мёртвая зона реверба
 export const BEND_EPS_CENTS=5;                    // мёртвая зона бенда терменвокса: сдвиг < 5¢ точку не пишет (само-прореживание: держишь ровно — точек мало, ведёшь бенд — гуще)

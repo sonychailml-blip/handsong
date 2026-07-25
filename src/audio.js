@@ -358,21 +358,24 @@ function buildChordPool(dest, n=CHORD_POOL_N){
     cv.push({o1,o2,g1,g2,f,g,owner:null,ins:null,tOn:0,lvl:0});
   }
 }
-function cvRelease(v,hard){ const t=AC.currentTime;
+/* when — ЯВНОЕ время планирования (опережение лупера). По умолчанию AC.currentTime → живые вызовы
+   БАЙТ-В-БАЙТ. Все внутренние setValueAtTime/setTargetAtTime идут на t=when, поэтому голос стартует
+   ровно тогда, когда надо, а не «когда добежал кадр». */
+function cvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   v.g.gain.cancelScheduledValues(t);
   v.g.gain.setTargetAtTime(0,t,hard?0.02:(v.ins?v.ins.rel:0.3));
   v.owner=null;
 }
-function cvAlloc(){ let v=cv.find(v=>!v.owner);
-  if(!v){ v=cv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; cvRelease(v,true);   // кража: снять голос со старого владельца, иначе его chordOff порвёт чужую ноту
+function cvAlloc(when){ let v=cv.find(v=>!v.owner);
+  if(!v){ v=cv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; cvRelease(v,true,when);   // кража: снять голос со старого владельца на ТО ЖЕ время
     if(o&&chordHold[o]){ const a=chordHold[o].filter(x=>x!==v); a.length?chordHold[o]=a:delete chordHold[o]; } }
   return v;
 }
-function chordOn(owner,freqs,vol,insIdx){
-  chordOff(owner);
-  const ins=CHORD_INSTR[insIdx], t=AC.currentTime;
+function chordOn(owner,freqs,vol,insIdx,when){
+  chordOff(owner,when);
+  const ins=CHORD_INSTR[insIdx], t=when!=null?when:AC.currentTime;
   chordHold[owner]=freqs.map(fr=>{
-    const v=cvAlloc(); v.owner=owner; v.ins=ins; v.tOn=t;
+    const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
     const hc=(Math.random()*2-1)*HUM_CENTS*(ins.hj||0);   // гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0
     v.o1.detune.setValueAtTime(-ins.det/2+hc,t); v.o2.detune.setValueAtTime(ins.det+hc,t);
@@ -387,8 +390,8 @@ function chordOn(owner,freqs,vol,insIdx){
     return v;
   });
 }
-function chordGlide(owner,freqs,vol){        // смена аккорда без переатаки — voice leading
-  const vs=chordHold[owner]; if(!vs)return; const t=AC.currentTime;
+function chordGlide(owner,freqs,vol,when){        // смена аккорда без переатаки — voice leading
+  const vs=chordHold[owner]; if(!vs)return; const t=when!=null?when:AC.currentTime;
   vs.forEach((v,i)=>{ const fr=freqs[i]; if(fr==null)return;
     v.o1.frequency.setTargetAtTime(fr,t,0.035);
     v.o2.frequency.setTargetAtTime(fr*v.ins.ratio,t,0.035);
@@ -396,8 +399,8 @@ function chordGlide(owner,freqs,vol){        // смена аккорда без
     if(Math.abs(L-v.lvl)>0.003){ v.lvl=L; v.g.gain.setTargetAtTime(L,t,0.05); }
   });
 }
-function chordOff(owner){ const vs=chordHold[owner]; if(!vs)return;
-  vs.forEach(v=>cvRelease(v,false)); delete chordHold[owner]; }
+function chordOff(owner,when){ const vs=chordHold[owner]; if(!vs)return;
+  vs.forEach(v=>cvRelease(v,false,when)); delete chordHold[owner]; }
  
 async function initAudio(){
   AC=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
@@ -565,13 +568,13 @@ function buildBassPool(dest){
     bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false});
   }
 }
-function bvRelease(v,hard){ const t=AC.currentTime;
+function bvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,hard?0.02:(v.ins?v.ins.rel:0.2));
   v.owner=null; v.on=false;
 }
-function bvAlloc(){ let v=bv.find(v=>!v.owner);
-  if(!v){ v=bv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; bvRelease(v,true);   // кража: снять голос со старого владельца
+function bvAlloc(when){ let v=bv.find(v=>!v.owner);
+  if(!v){ v=bv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; bvRelease(v,true,when);   // кража: снять голос со старого владельца
     if(o&&bassHold[o]===v)delete bassHold[o]; }
   return v;
 }
@@ -581,9 +584,9 @@ function setBassInstr(i){
   setBassIdx(((i%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length);
   hooks.bassInstr && hooks.bassInstr(bassIdx);
 }
-function bassOn(owner,freq,vol,ins){
-  if(!AC)return; const t=AC.currentTime;
-  let v=bassHold[owner]; if(!v){ v=bvAlloc(); v.owner=owner; bassHold[owner]=v; }
+function bassOn(owner,freq,vol,ins,when){
+  if(!AC)return; const t=when!=null?when:AC.currentTime;
+  let v=bassHold[owner]; if(!v){ v=bvAlloc(when); v.owner=owner; bassHold[owner]=v; }
   if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
     v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
     v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t);
@@ -596,12 +599,12 @@ function bassOn(owner,freq,vol,ins){
   v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер
 }
-function bassSet(owner,freq,vol){
-  if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=AC.currentTime;
+function bassSet(owner,freq,vol,when){
+  if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=when!=null?when:AC.currentTime;
   v.o1.frequency.setTargetAtTime(freq,t,0.03); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.03);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень
 }
-function bassOff(owner){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false); delete bassHold[owner]; }
+function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false,when); delete bassHold[owner]; }
 
 /* --- ДРОН: гейт dG, частота следует за тоникой (baseF/2) в любом ладу (спасён из backing.js) --- */
 function droneOn(level=0.18){ if(!AC)return; const t=AC.currentTime;
@@ -704,8 +707,8 @@ function taikoHit(i,v,t){
   else if(i===4)taikoDrum(t,v*0.85,120,70,0.3);     // средний
   else taikoKa(t,v*1.1);                             // яркий обод
 }
-function drumHit(i,vol=1,kit=0){
-  if(!AC)return; const t=AC.currentTime, v=0.3+0.7*vol;
+function drumHit(i,vol=1,kit=0,when){
+  if(!AC)return; const t=when!=null?when:AC.currentTime, v=0.3+0.7*vol;   // when — опережение лупера; удар — одноразовый источник, стартует в t (все под-голоса уже берут t)
   if(kit===1) return darbukaHit(i,v,t);
   if(kit===2) return tablaHit(i,v,t);
   if(kit===3) return gamelanHit(i,v,t);
@@ -737,13 +740,19 @@ function drumHit(i,vol=1,kit=0){
 }
 
 /* Метроном лупера: короткий щелчок точно по часам AC (отсчёт и сетка овердаба).
-   Идёт прямо в master, мимо громкости фона — слышен даже при выключенной подложке. */
-function metroClick(t,accent){
+   Идёт прямо в master, мимо громкости фона — слышен даже при выключенной подложке.
+   level: 2 — сильная доля (сам/начало такта), 1 — голова группы (тали), 0 — обычная доля,
+   -1 — khali: ОСЛАБЛЕННАЯ голова группы (тинтал, 3-й вибхаг пустой). Уровни 2 и 0 дают
+   ТЕ ЖЕ частоты/громкость, что прежние accent true/false → на 4/4 метроном не изменился. */
+function metroClick(t,level){
   if(!AC)return;
   const o=AC.createOscillator(), g=AC.createGain();
-  o.type='triangle'; o.frequency.setValueAtTime(accent?2000:1400,t);
-  o.frequency.exponentialRampToValueAtTime(accent?1500:1050,t+0.03);   // короткий «щёлк» вниз — читается как деревяшка
-  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(accent?0.85:0.5,t+0.002);
+  const f0 = level>=2?2000 : level===1?1750 : level<0?1100 : 1400;   // 2 и 0 — как было (accent true/false)
+  const f1 = level>=2?1500 : level===1?1300 : level<0?860  : 1050;
+  const gp = level>=2?0.85 : level===1?0.66 : level<0?0.30 : 0.5;    // khali ТИШЕ обычной доли — «пустая» голова
+  o.type='triangle'; o.frequency.setValueAtTime(f0,t);
+  o.frequency.exponentialRampToValueAtTime(f1,t+0.03);   // короткий «щёлк» вниз — читается как деревяшка
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gp,t+0.002);
   g.gain.exponentialRampToValueAtTime(0.0001,t+0.06);
   o.connect(g); g.connect(master); o.start(t); o.stop(t+0.09);
 }
