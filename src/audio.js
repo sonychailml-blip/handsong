@@ -1,5 +1,5 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx } from './state.js';
-import { baseF } from './scales.js';
+import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N } from './config.js';
  
@@ -483,8 +483,8 @@ async function initAudio(){
 
   /* --- ДРОН: расстроенная пара пил через медленный НЧ-фильтр, на тонике (шина в master) --- */
   backBus=AC.createGain(); backBus.gain.value=0.28; backBus.connect(master);
-  dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=baseF()/2;
-  dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=baseF()/2*1.498;
+  dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=tonicFreq()/2;         // tonicFreq: у fixedKey — ФИКСИРОВАННАЯ высота ключа (не бьётся с сеткой); у прочих = baseF()
+  dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=tonicFreq()/2*1.498;   // квинту 1.498 пока оставляем ~чистой (не грид-квинта строя) — помечено в BACKLOG
   const dLP=AC.createBiquadFilter(); dLP.type='lowpass'; dLP.frequency.value=520;
   const dLFO=AC.createOscillator(); dLFO.frequency.value=0.06;
   const dLFOg=AC.createGain(); dLFOg.gain.value=260;
@@ -606,11 +606,13 @@ function bassSet(owner,freq,vol,when){
 }
 function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false,when); delete bassHold[owner]; }
 
-/* --- ДРОН: гейт dG, частота следует за тоникой (baseF/2) в любом ладу (спасён из backing.js) --- */
+/* --- ДРОН: гейт dG, частота следует за тоникой (tonicFreq/2) в любом ладу (спасён из backing.js).
+   tonicFreq — единый источник: у fixedKey это высота КЛЮЧА в приколоченной сетке (иначе дрон бился
+   бы с ней), у прочих строёв = baseF() (байт-в-байт). Квинту 1.498 держим ~чистой — см. BACKLOG. */
 function droneOn(level=0.18){ if(!AC)return; const t=AC.currentTime;
   dG.gain.setTargetAtTime(level,t,1.2);
-  dO1.frequency.setTargetAtTime(baseF()/2,t,0.3);
-  dO2.frequency.setTargetAtTime(baseF()/2*1.498,t,0.3);
+  dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
+  dO2.frequency.setTargetAtTime(tonicFreq()/2*1.498,t,0.3);
 }
 function droneOff(){ if(!AC)return; dG.gain.setTargetAtTime(0,AC.currentTime,0.6); }
 /* Живой селектор набора ударных: только глобальный индекс + дропдаун (удар транзиентный,

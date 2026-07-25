@@ -69,6 +69,7 @@ const rectNoteLbl = deg => (deg===0 || centsOf(deg)===0) ? 'Т' : String(deg+1);
    Октавный НЕ-cents лад (12-TET, макамы: period=2 И нет s.cents) → rowLabel как был, байт-в-байт.
    Партч — cents-лад, НО rect: везде идёт через rectNoteLbl/rect-ветки, сюда не заходит (без регресса). */
 const gridNoteLbl = deg => CUR().swaraNames ? swaraLbl(deg)   // индийские лады: имена свар (саргам) вместо порядковых
+  : CUR().fixedKey ? rowLabel(deg)   // фиксированный строй: сетка приколочена к C — имена нот СНОВА правдивы (этот C и есть C, лишь иначе настроен); rowLabel даёт NOTE_NAMES[(tonic+шаг)%12], имя зависит от КЛЮЧА
   : (periodOf(CUR())!==2 || CUR().cents)
   ? (IVX()[deg]%CUR().edo===0 ? 'Т' : String(deg+1))
   : rowLabel(deg);
