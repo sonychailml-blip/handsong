@@ -25,6 +25,7 @@
   #bar.min>#thereminBtn,
   #bar.min>#splitBtn,
   #bar.min>#camBtn,
+  #bar.min>#fsBtn,
   #bar.min>#jamBtn,
   #bar.min>#loopPanelBtn{ display:none !important; }
   button{background:var(--panel); color:var(--ink); flex:0 0 auto;
@@ -63,6 +64,10 @@
   /* 🔄 камера: .act = тыловая (незеркальная); визуально помечаем, что вид уже не «зеркало». */
   #camBtn{padding:9px 10px; font-size:15px;}
   #camBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  /* ⛶ полноэкранный режим (иконка-кнопка бара): .act = уже во весь экран. Прячется целиком в JS,
+     где нет Fullscreen API. Свёрнутый бар её тоже скрывает (список .min выше) — редкая «задал и забыл». */
+  #fsBtn{padding:9px 10px; font-size:15px;}
+  #fsBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
   /* 🎥 клип и 🎙 аудио — один движок записи (clip.js), общий вид: .act = идёт запись (красный +
      мягкий пульс). Отдельно от ● лупера — другой цвет-каркас и своя иконка, чтобы не путать
      музыкальную запись с записью медиа. */
@@ -209,6 +214,13 @@
     color:#2a2f45; border:1px solid rgba(20,24,50,.16); font-weight:600;}
   #loadmsg{font-size:12px; color:#5a6079; min-height:1.2em; margin:12px 0 0;}
   #learnMsg{font-size:12px; color:#b26a00; min-height:1em; margin:6px 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
+  /* ⛶ полноэкранный — ТИХАЯ кнопка (заметно мельче и бледнее двух главных): своя опция, но не спорит с
+     «Играть»/«Обучение». Не в .startBtns (там stretch-колонка) — отдельный ребёнок карточки, центрируется
+     text-align. .act = уже во весь экран (синий акцент ссылок карточки). id-селектор — перебить #start button. */
+  #fsBtnStart{display:inline-flex; align-items:center; gap:6px; margin:14px auto 0;
+    font-size:12px; padding:7px 14px; background:transparent; color:#5a6079;
+    border:1px solid rgba(20,24,50,.18); border-radius:9px; font-weight:500;}
+  #fsBtnStart.act{color:#2563c9; border-color:rgba(37,99,201,.5);}
   .startFoot{margin-top:18px; padding-top:13px; border-top:1px solid rgba(20,24,50,.10);
     font-size:11px; color:#6a7089; line-height:1.5;}
   .startFoot p{margin:0 0 6px;}

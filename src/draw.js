@@ -4,7 +4,7 @@ import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, cent
 import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, theremin, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN } from './config.js';
-import { DRUM_NAMES } from './audio.js';
+import { DRUM_NAMES, chordHold } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, beatLevel } from './recorder.js';
  
@@ -172,6 +172,68 @@ function drawTag(x,y,lines,color){
     ctx.fillText(L,bx+9,by+10+lh*i+lh/2-3);
   });
 }
+/* ================= ЖИВЫЕ ГЦ ЗВУЧАЩЕГО АККОРДА (только роль АККОРДЫ) =================
+   Соло/бас показывают Гц и центы в ярлыке; у аккордов не было НИЧЕГО про верхние голоса —
+   а именно они и есть смысл строя (какая терция, какая септима). Показываем РЕАЛЬНЫЕ Гц каждой
+   ноты + в скобках интервал НАД КОРНЕМ в центах.
+   ЕДИНЫЙ ИСТОЧНИК: берём частоты прямо из звучащих голосов chordHold['latch'] — это в точности
+   вывод того самого вызова chordFreqs(), что породил звук (chordOn: o1.frequency.setValueAtTime(fr);
+   гуманизация сидит на detune, не на frequency, поэтому .value === чистый fr). Ничего не пересчитываем
+   параллельным путём → цифры не могут разойтись со слышимым; замороженный per-event sc уже учтён на
+   стороне движка (latch живёт под текущим ладом — смена лада/тоники гасит его через softAllOff).
+   ПОЧЕМУ интервал НАД КОРНЕМ, а не центы-от-тоники: верхние голоса центами-от-тоники читаются плохо,
+   а «сколько над корнем» — ровно то число, что проверяют на слух (386 = чистая терция, 408 —
+   пифагорова, 400 — 12-TET, 969 — натуральная септима 7/4). Корню скобка не нужна (0). */
+function latchChordFreqs(){                        // частоты звучащего защёлкнутого аккорда, корень первым; null — тишины/нет голосов
+  const vs=chordHold['latch']; if(!vs||!vs.length)return null;
+  return vs.map(v=>v.o1.frequency.value);
+}
+/* Разложить сегменты по строкам (≤maxLines) под ширину maxW. trunc=false → null, если не влезло
+   (пробуем более компактный вариант/шрифт); trunc=true → добиваем «…» на границе СЕГМЕНТА, число
+   не режем никогда. */
+function packSegs(segs,maxW,maxLines,trunc){
+  const lines=[]; let cur='';
+  for(const s of segs){
+    const cand=cur?cur+' · '+s:s;
+    if(ctx.measureText(cand).width<=maxW){ cur=cand; continue; }
+    if(cur){ lines.push(cur); cur=''; }
+    if(lines.length>=maxLines){ if(!trunc)return null; lines[maxLines-1]+=' …'; return lines; }
+    if(ctx.measureText(s).width<=maxW){ cur=s; }
+    else { if(!trunc)return null; lines.push('…'); if(lines.length>=maxLines)return lines.slice(0,maxLines); }
+  }
+  if(cur)lines.push(cur);
+  return lines.length<=maxLines?lines:(trunc?lines.slice(0,maxLines):null);
+}
+/* Подобрать раскладку: сперва все ноты с центами, не влезло — центы только у первых трёх (Гц у всех),
+   не влезло — только Гц. Шрифт 11→10. Гарантированный фолбэк — Гц с «…», без обрезки числа.
+   Единицу «Гц» дописываем ОДИН раз к ПОСЛЕДНЕМУ сегменту (не после каждого числа — строка длиннее не
+   нужна): встаёт в конец последней строки «… 220 (700¢) Гц», как читает и соло-ярлык («Гц» словом, а
+   не «Hz»). Приписана ДО упаковки, поэтому её ширина учтена — за край не вылезет. */
+function fitReadout(freqs,maxW){
+  const f0=freqs[0], hz=f=>String(Math.round(f)),
+        ct=f=>`${Math.round(f)} (${Math.round(1200*Math.log2(f/f0))}¢)`;
+  const unit=a=>{ const b=a.slice(); b[b.length-1]+=' Гц'; return b; };   // «Гц» на последний сегмент → конец последней строки
+  const withC =unit(freqs.map((f,i)=>i===0?hz(f):ct(f)));
+  const first3=unit(freqs.map((f,i)=>i===0?hz(f):(i<3?ct(f):hz(f))));
+  const hzOnly=unit(freqs.map(hz));
+  for(const px of [11,10]){ ctx.font=`600 ${px}px system-ui`;
+    for(const segs of [withC,first3,hzOnly]){ const L=packSegs(segs,maxW,2,false); if(L)return{lines:L,px}; } }
+  ctx.font='600 10px system-ui';
+  return {lines:packSegs(hzOnly,maxW,2,true),px:10};
+}
+/* Нарисовать разбор внутри полосы [x0..x1]×[yTop..yBot], прижав вправо (слева — корневая подпись/легенда
+   пальцев). Тёмная подложка — чтобы Гц читались поверх подсвеченного прямоугольника. */
+function drawChordReadout(x0,x1,yTop,yBot,freqs,accent){
+  const maxW=Math.max(40,x1-x0-10), band=yBot-yTop;
+  const fit=fitReadout(freqs,maxW); ctx.font=`600 ${fit.px}px system-ui`;
+  const lh=fit.px+4, blockH=fit.lines.length*lh, by=yTop+Math.max(0,(band-blockH)/2);
+  let bw=0; for(const L of fit.lines)bw=Math.max(bw,ctx.measureText(L).width);
+  ctx.fillStyle='rgba(10,10,20,.74)';
+  ctx.beginPath(); ctx.roundRect(x1-8-bw-6,by-3,bw+12,blockH+6,5); ctx.fill();
+  ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillStyle=accent;
+  fit.lines.forEach((L,i)=>ctx.fillText(L,x1-10,by+lh*i+lh/2));
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
 /* ================= ВИЗУАЛИЗАЦИЯ ЛУПЕРА =================
    Полоса-транспорт сверху-по-центру: сетка тактов/долей, бегунок позиции,
    по строке на слой с метками событий (соло — оранжевые, аккорды — сиреневые).
@@ -319,6 +381,23 @@ function drawRole(instr,rx0,rx1,playH){
   }else if(instr==='ld'&&theremin)drawThereminGrid(rx0,rx1,playH,accent,act,instr,rx0);   // терменвокс: тонкие нотные линии + непрерывная высота (только соло; роль=instr='ld')
   else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(rx0,rx1,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr, rx0);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
   else drawGrid(rx0,rx1,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
+  /* Живой разбор Гц ПОВЕРХ подсвеченного корня — только у аккордов и только пока аккорд ЗАЩЁЛКНУТ и
+     звучит (latchDeg>=0). Аккорд петли (loopChordDeg) сюда НЕ попадает: его владелец — 'loop:N', а не
+     'latch'; подсветка ряда у него остаётся прежней (без разбора). Считаем полосу тем же способом, что
+     рисовала сетка (rectBandY / seg=playH/rows), поэтому цифры лягут ровно в подсвеченный прямоугольник. */
+  if(instr==='ch'&&latchDeg>=0&&supportsChords()){
+    const freqs=latchChordFreqs();
+    if(freqs&&freqs.length){
+      const nx0 = chTyped ? split : rx0;                     // левый край поля корней (у типизированных — правее палитры)
+      if(rectGrid()){                                        // 19/31-TET/Партч: полоса — прямоуг.=floor(act/4), band=+1 (0 — октавная)
+        const nRfull=rectRowsFull(), [yTop,yBot]=rectBandY(Math.floor(act/4)+1,playH,nRfull);
+        drawChordReadout(nx0+(rx1-nx0)*0.42,rx1,yTop,yBot,freqs,INSTR_COL.ch);   // правая часть прямоугольника (слева — легенда пальцев)
+      }else{                                                  // узкие ряды (chrom12/BP/темперации/диатоника): ряд act
+        const rows=IVX().length, seg=playH/rows, yTop=(rows-1-act)*seg;
+        drawChordReadout(nx0+(chTyped?36:66),rx1,yTop,yTop+seg,freqs,INSTR_COL.ch);   // резерв слева под корневую подпись
+      }
+    }
+  }
 }
 function drawPhone(res){
   const W=canvas.width, H=canvas.height;
@@ -408,7 +487,14 @@ function drawHandsPhone(res,W,H,playH){
         const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
         const L1=rectRole?`${rectNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
           :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · ${regWord(s)} ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
-        const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}%`+(s.edo!==12?` · ${centsOf(S.deg)}c`:'');
+        /* Центы показываем ВСЕГДА, на любом ладу (снят прежний гейт s.edo!==12). Исторические
+           темперации (Пифагоров, оба Натуральных, мезотон, велл-темперации) — это edo:12 cents-лады:
+           ИМЯ ноты одинаковое, а высота гуляет до ~21.5¢ (Пифагорова терция 408¢ vs Натуральная 386¢ на
+           той же ступени) — без числа их не различить ни глазом, ни на короткой ноте ухом. Ровно там,
+           где чтение нужнее всего, оно и пряталось. Чистый 12-TET теперь даёт круглые сотни (0/100/200…)
+           — безвредно и держит ярлык на одном месте на всех ладах: единообразие важнее трёх сэкономленных
+           символов. Формат и позиция прежние (Гц · % · центы), меняется только условие. */
+        const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}% · ${centsOf(S.deg)}c`;
         drawTag(S.x,S.y,[L1,L2],accent);
       }else if(isDr){
         drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);

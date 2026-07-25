@@ -21,7 +21,7 @@ const FEEDBACK_URL='';        // Google-форма отзыва (впишетс�
 const DONATE_URL='';          // страница поддержки (впишется позже)
 const FB_MAIL_USER='chailakhianmikhail', FB_MAIL_DOMAIN='gmail.com';   // fallback-почта, пока нет формы
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
-      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
+      instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), swapBtn=$('swapBtn'), thereminBtn=$('thereminBtn'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), fsBtn=$('fsBtn'), fsBtnStart=$('fsBtnStart'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
@@ -311,6 +311,41 @@ async function toggleCamera(){
   camBtn.disabled=false;
 }
 camBtn.onclick=toggleCamera;
+/* ⛶ ПОЛНОЭКРАННЫЙ РЕЖИМ. Две кнопки на ОДНО состояние: тихая на стартовой карточке (fsBtnStart —
+   полосы браузера съедают вертикаль ДО игры) и иконка в баре (fsBtn — редкая «задал и забыл», в
+   МИНИ-полосу постоянных кнопок НЕ входит, скрыта списком .min в CSS). Обе зовут ОДИН toggle и обе
+   отражают состояние через applyFullscreen.
+   ПРАВИЛО ЖЕСТА (как звук/камера): requestFullscreen — только из клика, никогда сам на старте.
+   ДЕТЕКЦИЯ ПО РЕАЛЬНОМУ API, не по браузеру: iOS Safari на iPhone не умеет полноэкранный для обычных
+   элементов (только «на домашний экран») — там прячем ОБЕ кнопки, а не оставляем мёртвыми. Учитываем
+   webkit-префикс (старый Safari/Chrome). Выход по Esc/системному жесту ловит fullscreenchange —
+   кнопки не соврут о состоянии. Смена размера при входе/выходе идёт обычным путём resize (vision.js
+   ресайзит холст, onResize пересчитывает canSplit — потеря хрома может РАЗРЕШИТЬ сплит). */
+const fsRoot=document.documentElement;
+const fsReq = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen;
+const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+const fsEnabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+const fsSupported = !!(fsReq && fsExit && fsEnabled);
+const fsOn = ()=> !!(document.fullscreenElement || document.webkitFullscreenElement);
+function toggleFullscreen(){
+  if(!fsSupported)return;
+  try{ const p = fsOn() ? fsExit.call(document) : fsReq.call(fsRoot); if(p&&p.catch)p.catch(()=>{}); }
+  catch(e){}                                       // отказ (политика/жест) — молча, applyFullscreen выровняет по факту
+}
+function applyFullscreen(){
+  if(!fsSupported){ fsBtn.style.display='none'; fsBtnStart.style.display='none'; return; }   // нет API — обе кнопки прочь (не мёртвые)
+  const on=fsOn();
+  fsBtn.classList.toggle('act', on);
+  fsBtn.title = on ? 'Выйти из полноэкранного режима' : 'Во весь экран: убрать полосы браузера';
+  fsBtnStart.classList.toggle('act', on);
+  fsBtnStart.textContent = on ? '⛶ Свернуть' : '⛶ Во весь экран';
+  fsBtnStart.title = fsBtn.title;
+}
+fsBtn.onclick=toggleFullscreen;
+fsBtnStart.onclick=toggleFullscreen;
+addEventListener('fullscreenchange', applyFullscreen);
+addEventListener('webkitfullscreenchange', applyFullscreen);   // старый Safari/Chrome — своё имя события
+applyFullscreen();                                 // старт: отразить факт (и спрятать обе, если API нет)
 /* 🎥 ВИДЕОКЛИП (кадр холста + звук) и 🎙 АУДИО (только звук) — один движок clip.js на два вида.
    Тап старт / тап стоп+сохранение. Индикатор записи — .act (красный). Инертно до тапа; кнопки живут
    в #bar, а он виден лишь после «▶ Запустить». ВЗАИМНОЕ ИСКЛЮЧЕНИЕ: пока идёт одна запись, ДРУГАЯ

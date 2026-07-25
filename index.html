@@ -22,6 +22,11 @@
       <button id="startBtn">▶ Играть</button>
       <button id="learnBtn" title="Интерактивное обучение (скоро)">Обучение</button>
     </div>
+    <!-- Полноэкранный режим ОТДЕЛЬНОЙ тихой кнопкой (не влит в «Играть» — выбор за пользователем, и
+         опция заметна ДО игры: полосы браузера съедают вертикаль, а она дорога полю игры). Вызов
+         requestFullscreen — только по клику (правило жеста, как звук/камера). Прячется там, где нет
+         Fullscreen API (iOS Safari на iPhone). Логика — ui.js (applyFullscreen). -->
+    <button id="fsBtnStart" title="Во весь экран: убрать полосы браузера">⛶ Во весь экран</button>
     <p id="loadmsg"></p>
     <p id="learnMsg"></p>
     <!-- Подвал: тихо. Ссылки отзыв/донат собирает ui.js (URL — константы там); пустой URL прячет
@@ -45,6 +50,7 @@
   <button id="thereminBtn" title="Терменвокс: непрерывная высота (глиссандо)">〰</button>
   <button id="splitBtn" title="Сплит-экран: аккорды | соло на двух половинах">◨</button>
   <button id="camBtn" title="Переключить камеру: фронтальная / тыловая">🔄</button>
+  <button id="fsBtn" title="Во весь экран: убрать полосы браузера">⛶</button>
   <button id="clipBtn" title="Запись клипа: видео+звук в один файл (WebM)">🎥</button>
   <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)">🎙</button>
   <button id="jamBtn" title="Джем: подложка по строю — тап включит, следующий тап сменит вариант">🎵 Джем</button>
