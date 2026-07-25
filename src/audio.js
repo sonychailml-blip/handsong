@@ -91,7 +91,7 @@ const DRUM_NAMES=['Кик','Снейр','Клэп','Хэт','Том','Крэш']
 const DRUM_ROWS=DRUM_NAMES.length;
 /* Наборы ударных: тембр рядов. Стандарт — синтезированный кит; Дарбука — дум/тек
    (спасены из удалённого backing.js). Селектор той же формы, что LEAD_INSTR и др. */
-const DRUM_KITS=[{label:'Стандарт'},{label:'Дарбука'}];
+const DRUM_KITS=[{label:'Стандарт'},{label:'Дарбука'},{label:'Табла'},{label:'Гамелан'},{label:'Тайко'}];
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter, verb, verbOut;
@@ -640,9 +640,76 @@ function darbukaHit(i,v,t){                       // 6 рядов → дарбу
     f.type='highpass'; f.frequency.value=5000; g.gain.setValueAtTime(0.28*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
     s.connect(f); f.connect(g); g.connect(drumBus); }
 }
+/* --- ТАБЛА (индийская). Подпись: баян (басовая мембрана) с сильным НИСХОДЯЩИМ бендом высоты —
+   именно он делает возможным аккомпанемент для раг. Даян (высокий) — ясная высота с лёгким
+   металлическим призвуком (пара ингармонических обертонов). --- */
+function tabBaya(t,v,f0=185,f1=70,d=0.35){ const o=AC.createOscillator(),g=AC.createGain();
+  o.type='sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.14);   // бенд вниз — подпись
+  g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
+  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+d+0.05); }
+function tabNa(t,v,f=520,d=0.22){ const g=AC.createGain(); g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d); g.connect(drumBus);
+  [[1,.6],[2.4,.22],[3.8,.12]].forEach(([r,a])=>{ const o=AC.createOscillator(); o.type='sine'; o.frequency.value=f*r;   // тоновый + ингармонический призвук
+    const og=AC.createGain(); og.gain.value=a; o.connect(og); og.connect(g); o.start(t); o.stop(t+d+0.02); }); }
+function tabTick(t,v){ const s=dNoise(t,0.04),f=AC.createBiquadFilter(),g=AC.createGain();   // сухой высокий тычок (тете)
+  f.type='bandpass'; f.frequency.value=3200; f.Q.value=2; g.gain.setValueAtTime(0.5*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.03);
+  s.connect(f); f.connect(g); g.connect(drumBus); }
+function tablaHit(i,v,t){                          // 6 рядов → голоса таблы (low/accent/high как у всех китов)
+  if(i===0)tabBaya(t,v);                           // Ге/дха — баян с бендом (низ)
+  else if(i===1)tabNa(t,v,520);                    // На — звонкий даян (акцент)
+  else if(i===2)tabNa(t,v*0.9,660,0.18);           // Тин — выше, короче
+  else if(i===3)tabTick(t,v);                      // Тете — сухой тычок (высокий)
+  else if(i===4)tabBaya(t,v*0.9,150,80,0.22);      // Дхин — средний
+  else tabNa(t,v,440,0.4);                          // Тун — длинный открытый звон
+}
+/* --- ГАМЕЛАН (яванский). Инструмент — инлайн-FM: несущий+модулятор с НЕЦЕЛЫМ отношением → ИНГАРМОНИЧЕСКИЙ
+   бронзовый спектр (обычный шум/пилы так не умеют). Индекс модуляции спадает быстрее амплитуды — «удар»
+   ярче хвоста. ЧЕСТНО: настоящий гамелан — литая бронза, у каждой пластины своя уникальная ингармоничность
+   и «биение» пар; это ПРИБЛИЖЕНИЕ характера, не копия. --- */
+function gmlFM(t,v,f,ratio,idx,d){ const car=AC.createOscillator(),cg=AC.createGain();
+  car.type='sine'; car.frequency.value=f;
+  const mod=AC.createOscillator(),mg=AC.createGain(); mod.type='sine'; mod.frequency.value=f*ratio;
+  mg.gain.setValueAtTime(f*idx,t); mg.gain.exponentialRampToValueAtTime(f*idx*0.1+0.001,t+d*0.4);   // огибающая индекса → металлический «пинг»
+  mod.connect(mg); mg.connect(car.frequency);
+  cg.gain.setValueAtTime(v,t); cg.gain.exponentialRampToValueAtTime(0.001,t+d);
+  car.connect(cg); cg.connect(drumBus); car.start(t); mod.start(t); car.stop(t+d+0.05); mod.stop(t+d+0.05); }
+function gamelanHit(i,v,t){
+  if(i===0)gmlFM(t,v,82,1.47,6,1.8);               // гонг агенг — глубокий, ДЛИННЫЙ, ингармонический (низ)
+  else if(i===1)gmlFM(t,v*0.9,300,2.76,4,0.7);     // кенонг — средний металлический (акцент)
+  else if(i===2)gmlFM(t,v*0.85,230,2.4,4,0.6);     // кемпул — чуть иной средний
+  else if(i===3)gmlFM(t,v*0.7,900,3.5,3,0.25);     // высокая пластина (сарон) — короткий звон (высокий)
+  else if(i===4)gmlFM(t,v*0.85,400,2.1,3,0.5);     // кенонг выше — средний
+  else gmlFM(t,v*0.7,1300,3.5,2,0.4);               // высокий мерцающий
+}
+/* --- ТАЙКО (японский). Большой мембранный барабан: низкий тон с падением высоты + шумовое тело кожи;
+   деревянный щелчок по ободу (ка). --- */
+function taikoDrum(t,v,f0=95,f1=55,d=0.42){ const o=AC.createOscillator(),g=AC.createGain();
+  o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.10);
+  g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
+  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+d+0.05);
+  const s=dNoise(t,0.06),nf=AC.createBiquadFilter(),ng=AC.createGain();   // тело кожи
+  nf.type='lowpass'; nf.frequency.value=1200; ng.gain.setValueAtTime(0.25*v,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.08);
+  s.connect(nf); nf.connect(ng); ng.connect(drumBus); }
+function taikoKa(t,v){ const o=AC.createOscillator(),g=AC.createGain();   // ка — сухой деревянный щелчок обода
+  o.type='square'; o.frequency.setValueAtTime(1200,t); o.frequency.exponentialRampToValueAtTime(600,t+0.02);
+  g.gain.setValueAtTime(0.4*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.04);
+  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.06);
+  const s=dNoise(t,0.03),f=AC.createBiquadFilter(),ng=AC.createGain();
+  f.type='highpass'; f.frequency.value=4000; ng.gain.setValueAtTime(0.25*v,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.025);
+  s.connect(f); f.connect(ng); ng.connect(drumBus); }
+function taikoHit(i,v,t){
+  if(i===0)taikoDrum(t,v);                          // о-дайко — большой глубокий (низ)
+  else if(i===1)taikoDrum(t,v*0.9,150,85,0.28);     // средний удар (акцент)
+  else if(i===2)taikoDrum(t,v*0.85,190,110,0.22);   // выше
+  else if(i===3)taikoKa(t,v);                       // ка — деревянный щелчок обода (высокий)
+  else if(i===4)taikoDrum(t,v*0.85,120,70,0.3);     // средний
+  else taikoKa(t,v*1.1);                             // яркий обод
+}
 function drumHit(i,vol=1,kit=0){
   if(!AC)return; const t=AC.currentTime, v=0.3+0.7*vol;
   if(kit===1) return darbukaHit(i,v,t);
+  if(kit===2) return tablaHit(i,v,t);
+  if(kit===3) return gamelanHit(i,v,t);
+  if(kit===4) return taikoHit(i,v,t);
   if(i===0){ const o=AC.createOscillator(),g=AC.createGain();     // Кик
     o.frequency.setValueAtTime(165,t); o.frequency.exponentialRampToValueAtTime(48,t+0.09);
     g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.22);
