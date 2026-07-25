@@ -2,6 +2,10 @@ import { remapAxis } from './config.js';          // config — лист (нич
 
 /* ================= СОСТОЯНИЕ ================= */
 export let scaleIdx=11, tonic=9;                 // старт: минорная пентатоника от A
+/* Опорная частота (эталон A4, Гц) — ЖИВАЯ настройка рядом с тоникой. По умолчанию 440 («современный
+   стандарт»); регулируема 380–480. Единственный источник высоты для ВСЕХ строёв (baseF/cFix читают
+   её), поэтому смена ре-настраивает и подвижные, и фиксированные лады вместе. Клампинг — на стороне UI. */
+export let aRef=440;
 export let seventh=false, leadIdx=0, chIdx=0, bassIdx=0, drumKitIdx=0;
 export const fx={dly:0.25, vib:0.20, drv:0.12, trm:0.0};
 export let revDisp=0;                            // отображение Z-реверба соло-руки
@@ -79,6 +83,8 @@ export let chordOctReg=1;
 /* Сеттеры: присваивать импортированному биндингу нельзя (TypeError). */
 export const setScaleIdx=v=>{ scaleIdx=v; };
 export const setTonic=v=>{ tonic=v; };
+export const setARef=v=>{ aRef=v; };             // v уже проверен/клампнут в UI (380–480); высота пересчитается сама
+
 export const setSeventh=v=>{ seventh=v; };
 export const setLeadIdx=v=>{ leadIdx=v; };
 export const setChIdx=v=>{ chIdx=v; };

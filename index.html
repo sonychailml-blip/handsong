@@ -84,6 +84,24 @@
     <div class="prow"><label>Строй</label><select id="selTradition"></select></div>
     <div class="prow"><label>Лад</label><select id="selScale"></select></div>
     <div class="prow"><label>Тоника</label><select id="selTonic"></select></div>
+    <!-- Опорная частота (эталон A4): пресеты-подсказки + свободный ввод, клампится 380–480 в ui.js.
+         Единый источник высоты — двигает ВСЕ строи вместе (подвижные и фиксированные). -->
+    <div class="prow" id="aRefRow"><label>Эталон A4</label>
+      <div class="seg">
+        <select id="aRefSel">
+          <option value="415">415 · барочный</option>
+          <option value="430">430</option>
+          <option value="432">432</option>
+          <option value="435">435</option>
+          <option value="440" selected>440 · современный стандарт</option>
+          <option value="442">442</option>
+          <option value="444">444 · оркестровый</option>
+        </select>
+        <input type="number" id="aRefInput" min="380" max="480" step="1" value="440" inputmode="numeric">
+        <span class="unit">Гц</span>
+      </div>
+    </div>
+    <p class="phint">Единый эталон — изобретение XX века: до него каждый город и церковь настраивались по-своему, барочные ансамбли и сегодня играют на 415.</p>
     <div class="prow"><label>Аккорды</label>
       <div class="seg"><button id="qTriad" class="act">Трезвучия</button><button id="qSev">Септаккорды</button></div>
     </div>

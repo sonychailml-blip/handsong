@@ -176,6 +176,12 @@
   .psep{border-top:1px solid rgba(20,24,50,.12); margin:10px 0 4px; padding-top:6px;
     font-size:11px; color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
   .phint{font-size:11px; color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
+  /* Эталон A4: пресет-список тянется, поле числа узкое справа, «Гц» — подпись. Светлая тема панели. */
+  #aRefRow .seg{align-items:center;}
+  #aRefRow #aRefSel{flex:1; min-width:0;}
+  #aRefRow #aRefInput{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
+    border:1px solid rgba(20,24,50,.20); border-radius:10px; padding:7px; font-size:13px;}
+  #aRefRow .unit{flex:0 0 auto; font-size:12px; color:#5a6079;}
   #loopBarsV{flex:1; text-align:center; align-self:center;}
 
   /* ---- оверлеи: старт и учебник ---- */

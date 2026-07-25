@@ -1,4 +1,4 @@
-import { scaleIdx, tonic, seventh } from './state.js';
+import { scaleIdx, tonic, seventh, aRef } from './state.js';
 
 export const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 export const ROMAN=['I','II','III','IV','V','VI','VII'];
@@ -268,19 +268,19 @@ export const tradOfScale=i=>SCALES[i].trad;
 
 export const CUR=()=>SCALES[scaleIdx];
 export const IVX=()=>CUR().iv.concat([CUR().edo]);          // + верхняя тоника
-/* ЕДИНСТВЕННЫЙ источник опорной частоты: A3 = 220 Гц (⇒ A4 = 440). База тоники baseF() И якорь C
-   фиксированных строёв cFix() берут ЕГО ЖЕ. Копий быть НЕ должно: когда опора станет настройкой
-   (380–480 Гц), подвижные и фиксированные строи поедут ВМЕСТЕ — иначе гамелан уехал бы на 415, а
-   Веркмайстер остался на 440, и это всплыло бы как «расстроенный инструмент». */
-const A_REF=220;                                            // A3, Гц; A4 = 2·A_REF. Станет живой настройкой позже — обе функции ниже пересчитаются сами.
-export const baseF=()=>A_REF*Math.pow(2,(tonic-9)/12);      // частота тоники (C=130.81 Гц)
-/* Якорь C для fixedKey-строёв: сетка приколочена к C. ТА ЖЕ опора A_REF, тоника=C (индекс 0) —
-   от выбранной тоники НЕ зависит (у fixedKey тоника — КЛЮЧ-индекс в сетку, не множитель). Функция,
-   а не const: когда A_REF оживёт, якорь пересчитается сам. */
-const cFix=()=>A_REF*Math.pow(2,(0-9)/12);                  // C3 = 130.81 Гц (та же опора, что baseF)
+/* ЕДИНСТВЕННЫЙ источник опорной частоты — ЖИВАЯ настройка aRef (эталон A4, Гц; 380–480, по умолч. 440,
+   лежит в state рядом с тоникой). База тоники baseF() И якорь C фиксированных строёв cFix() читают ЕЁ
+   ЖЕ через одну деривацию a3()=aRef/2 (A3). Копий 440/220 в коде высоты быть НЕ должно: сменил эталон
+   — уехало ВСЁ, подвижные и фиксированные строи вместе (иначе гамелан уехал бы на 415, а Веркмайстер
+   остался на 440 — «расстроенный инструмент»). aRef — импорт-биндинг, обе функции пересчитываются сами. */
+const a3=()=>aRef/2;                                        // A3 из живого эталона A4 — единственная деривация опоры
+export const baseF=()=>a3()*Math.pow(2,(tonic-9)/12);       // частота тоники (C=130.81 Гц при A4=440)
+/* Якорь C для fixedKey-строёв: сетка приколочена к C. ТА ЖЕ опора a3(), тоника=C (индекс 0) — от
+   выбранной тоники НЕ зависит (у fixedKey тоника — КЛЮЧ-индекс в сетку, не множитель). */
+const cFix=()=>a3()*Math.pow(2,(0-9)/12);                   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
 /* Частота ТОНИКИ/КЛЮЧА для дрона и родственного: у fixedKey — ФИКСИРОВАННАЯ высота ключа
    (cFix·2^(cents[tonic]/1200)), иначе дрон бился бы с приколоченной сеткой; у прочих — baseF()
-   (подвижная тоника). Опора та же (cFix←A_REF) — не разъедется. */
+   (подвижная тоника). Опора та же (cFix←a3←aRef) — не разъедется. */
 export const tonicFreq=(s=CUR())=> s.fixedKey ? cFix()*Math.pow(2,s.cents[tonic]/1200) : baseF();
 /* ПЕРИОД лада (интервал эквивалентности) — по умолчанию ОКТАВА (2). Неоктавный строй задаёт
    своё (Болен–Пирс period:3 — тритава). Заменяет зашитую двойку в формуле высоты: и регистр
@@ -721,7 +721,7 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
    выражение байт-в-байт прежнее. */
 /* fixedKey: сетка приколочена к C, ТОНИКА = КЛЮЧ (индекс в сетку, не множитель). Ступень i звучит
    на АБСОЛЮТНОЙ позиции сетки (tonic+шаг): slot — нота в октаве, carry — перенос октавы (напр. квинта
-   от B уходит в следующую октаву). Якорь cFix (та же опора A_REF). o — регистр (палец), carry
+   от B уходит в следующую октаву). Якорь cFix (та же опора aRef). o — регистр (палец), carry
    складывается с ним. При тонике C (0) — байт-в-байт прежняя cents-ветка. */
 function fixedSlot(s,step){ const L=s.cents.length, abs=tonic+step; return {slot:((abs%L)+L)%L, carry:Math.floor(abs/L)}; }
 export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
@@ -801,7 +801,7 @@ export function rowLabel(deg){ const s=CUR(), ivx=IVX();
    fixedKey: интервал над КЛЮЧОМ = cents[tonic+deg] − cents[tonic] (зависит от тональности —
    у Веркмайстера терция читает 390¢ в C и 408¢ в F#, тот самый урок). При тонике C — как было. */
 export const centsOf=deg=>{ const s=CUR();
-  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round(s.cents[slot]+1200*carry-s.cents[tonic]); }
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round((s.cents[slot]+1200*carry-s.cents[tonic])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет; целые прятали бы точность
   if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
   const pc=1200*Math.log2(periodOf(s));   // центы ПЕРИОДА: октава 1200 (P=2, байт-в-байт), тритава ≈1901.955 (BP) — честный шаг ~146.3¢
   return Math.round(IVX()[deg]*pc/s.edo)%pc; };

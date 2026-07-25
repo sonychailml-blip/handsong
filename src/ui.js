@@ -1,10 +1,10 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, swapHands, setPhoneInstr, setSwapHands, theremin, setTheremin, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
-         camFacing, setCamFacing } from './state.js';
+         camFacing, setCamFacing, aRef, setARef } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC } from './audio.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
 import { INSTR_COL } from './config.js';
@@ -209,6 +209,27 @@ selScale.onchange=e=>{
   updScaleBtn(); refreshProgAvail();          // 2/3: смена лада
 };
 selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); updScaleBtn(); };   // 3/3: смена тоники
+/* ЭТАЛОН A4 — единый источник высоты (двигает ВСЕ строи, подвижные и фиксированные, вместе).
+   Два ввода: пресеты-подсказки (учат: 415 барочный … 444 оркестровый) и свободное число, КЛАМП 380–480;
+   невалид/пусто → откат к последнему валидному, высота НИКОГДА не ломается. Смена ре-настраивает как
+   тоника: softAllOff гасит звучащее (переатакует на новом эталоне), терменвокс и слои петли считают
+   Hz живьём (leadFreq/chordFreqs читают aRef), дрон вне softAllOff — переигрываем сразу, если активен. */
+const AREF_MIN=380, AREF_MAX=480;
+const aRefSel=$('aRefSel'), aRefInput=$('aRefInput');
+let lastARef=aRef;                                 // последнее ВАЛИДНОЕ значение — для отката
+function syncARef(v){ aRefInput.value=v; aRefSel.value=String(v); }   // отразить в обоих; v не из списка → пресет пуст (кастом)
+function applyARef(v){
+  setARef(v); lastARef=v;
+  softAllOff();                                    // звучащее гаснет и переиграется на новом эталоне (как смена тоники)
+  if(events.some(e=>e.fn==='drone'))droneOn();     // дрон softAllOff не трогает — переигрываем на новую опору сразу (lvl 0.18, как в аранжировке)
+}
+aRefSel.onchange=e=>{ const v=+e.target.value; applyARef(v); syncARef(v); };
+aRefInput.onchange=e=>{
+  const v=Math.round(parseFloat(e.target.value));
+  if(!Number.isFinite(v)||v<AREF_MIN||v>AREF_MAX){ syncARef(lastARef); return; }   // мусор/пусто/вне диапазона → откат, высота цела
+  applyARef(v); syncARef(v);
+};
+syncARef(aRef);                                    // старт: 440 в обоих контролах
 $('qTriad').onclick=()=>{ setSeventh(false); softAllOff(); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
 $('qSev').onclick =()=>{ setSeventh(true);  softAllOff(); $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
 selLead.onchange=e=>setLeadInstr(+e.target.value);
