@@ -1,4 +1,4 @@
-import { remapAxis } from './config.js';          // config — лист (ничего не импортирует), цикла нет
+import { CAM_MARGIN } from './config.js';          // config — лист (ничего не импортирует), цикла нет
 
 /* ================= СОСТОЯНИЕ ================= */
 export let scaleIdx=11, tonic=9;                 // старт: минорная пентатоника от A
@@ -134,13 +134,21 @@ export const flipX=nx=> mirrored() ? 1-nx : nx;  // ЕДИНАЯ формула 
 /* СЫРЫЕ vs ЭКРАННЫЕ координаты (поля кадра, config.CAM_MARGIN). Гест-математика (щипок, размер
    ладони, палец, Z-реверб, пороги) читает СЫРЫЕ lm.x/lm.y — рука работает и наполовину за кадром,
    в этом весь смысл. Экранная позиция и ПОПАДАНИЕ (половина/прямоугольник/зона, X-громкость) идут
-   через sx/sy: сырой нормированный → ПИКСЕЛЬ игрового поля. sx складывает зеркало (flipX) и поля
-   (remapAxis) — оба симметричны относительно 0.5, порядок не важен. ЕДИНЫЙ источник экранного
-   пересчёта для gestures и draw (в т.ч. кадрирование видеофона тем же CAM_MARGIN): разъедутся —
+   через sx/sy: сырой нормированный → ПИКСЕЛЬ игрового поля. sx складывает зеркало (flipX) и COVER-
+   кадрирование (viewRect ниже) — оба симметричны относительно 0.5 по X, порядок не важен. ЕДИНЫЙ
+   источник экранного пересчёта для gestures и draw (та же viewRect кадрирует видеофон): разъедутся —
    палец возьмёт не то, что видит. НЕ клампим — рука в полях уезжает за кромку (крайний прямоугольник
    всё ещё в кадре); сатурируется лишь РЕЗУЛЬТАТ выбора у вызывающего. */
-export const sx=(nx,W)=>remapAxis(flipX(nx))*W;
-export const sy=(ny,H)=>remapAxis(ny)*H;
+/* Прямоугольник кадра, попадающий на холст (нормир. 0..1 видео) — ЕДИНЫЙ источник cover-кадрирования
+   (config.coverView), общий у картинки (draw рисует ИМ) и координат (sx/sy ремапят ИМ). Пишет его
+   drawVideoBackground КАЖДЫЙ кадр (перед детекцией, правило #8), поэтому попадание и рендер в одном
+   кадре читают одну область — не разъедутся. Дефолт до готовности видео = прежний квадрат полей
+   [M,1-M]² (тогда sx/sy = старый remapAxis байт-в-байт). Симметричен по X относительно 0.5 → flipX
+   коммутирует. Писать только через setViewRect (правило #6). */
+export let viewRect={ ax0:CAM_MARGIN, ax1:1-CAM_MARGIN, ay0:CAM_MARGIN, ay1:1-CAM_MARGIN };
+export const setViewRect=r=>{ viewRect=r; };
+export const sx=(nx,W)=>{ const x=flipX(nx); return (x-viewRect.ax0)/(viewRect.ax1-viewRect.ax0)*W; };
+export const sy=(ny,H)=> (ny-viewRect.ay0)/(viewRect.ay1-viewRect.ay0)*H;
 export const setSplitOn=v=>{ splitOn=v; };
 export const setOctReg=v=>{ octReg=v; };
 export const setBassOctReg=v=>{ bassOctReg=v; };

@@ -1,9 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
-import { fx, revDisp, chBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, videoRec, looperMsg, looperClear } from './state.js';
+import { fx, revDisp, chBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
-         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN, CLEAR_HOLD_MS } from './config.js';
+         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, beatLevel } from './recorder.js';
@@ -299,15 +299,21 @@ function drawLooper(){
    совпасть с точками (звук по-прежнему из того же старого кадра). */
 function drawVideoBackground(){
   const W=canvas.width, H=canvas.height;
-  /* Кадрируем видео в ИГРОВОЕ поле: на экран попадает ровно то, что играбельно, ТОЙ ЖЕ долей полей
-     CAM_MARGIN, что снимает remapAxis у точек (sx/sy) — картинка и рука не разъедутся. Источник —
-     интрин. пиксели видео (videoWidth/Height); режем поля по КАЖДОЙ оси одной долей M, растяжение в
-     холст остаётся ПРЯМЫМ, как было (никакого cover/letterbox тут не было — поля новых искажений не
-     вносят, лишь «зумим» в центр). Зеркалим только фронтальную (mirrored — тот же источник, что flipX/sx). */
-  const vw=video.videoWidth||W, vh=video.videoHeight||H, M=CAM_MARGIN;
-  const cx0=M*vw, cy0=M*vh, cw=(1-2*M)*vw, ch=(1-2*M)*vh;
-  if(mirrored()){ ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,cx0,cy0,cw,ch,-W,0,W,H); ctx.restore(); }
-  else ctx.drawImage(video,cx0,cy0,cw,ch,0,0,W,H);
+  /* COVER-кадрирование: на холст попадает суб-прямоугольник кадра с соотношением ХОЛСТА, поэтому
+     картинка НЕ растягивается (прежняя прямая растяжка кадра 4:3 в широкое окно давала горизонтальный
+     растяг). Прямоугольник считает config.coverView из интрин. пикселей видео (videoWidth/Height) и
+     формы холста; ТУ ЖЕ область кладём в state.viewRect (setViewRect) — ремап точек (sx/sy) кадрирует
+     ЕЮ ЖЕ, так что картинка и рука режутся ОДНИМ прямоугольником и не разъедутся (правило #12). Пишем
+     rect ДО детекции (правило #8: этот кадр видео → detect → processHands читает свежий viewRect).
+     Пока видео не готово (нет размеров) — держим прежний rect (дефолт полей), рисуем лишь затемнение.
+     Зеркалим только фронтальную (mirrored — тот же источник, что flipX/sx; rect симметричен по X). */
+  const vw=video.videoWidth, vh=video.videoHeight;
+  if(vw&&vh){
+    const r=coverView(vw,vh,W,H); setViewRect(r);
+    const sx0=r.ax0*vw, sy0=r.ay0*vh, sw=(r.ax1-r.ax0)*vw, sh=(r.ay1-r.ay0)*vh;
+    if(mirrored()){ ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,sx0,sy0,sw,sh,-W,0,W,H); ctx.restore(); }
+    else ctx.drawImage(video,sx0,sy0,sw,sh,0,0,W,H);
+  }
   ctx.fillStyle='rgba(7,7,13,.5)'; ctx.fillRect(0,0,W,H);
 }
 function drawOverlays(res){ drawPhone(res); }
