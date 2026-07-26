@@ -98,7 +98,7 @@ let AC=null, master, limiter, verb, verbOut;
 let banks=[], vibGain, humDetune, satWet, satDry, envGain, volGain,
     tremGain, tremDepth, dlyWet, revLead;              // соло-цепочка (humDetune — гуманизация высоты, общий узел в detune всех лид-осц.)
 let lastVel=0.5;                                        // последняя громкость X — скорость→яркость читает её на атаке (формат события не трогаем)
-let chordBus, revCh;                                    // аккорды
+let chordBus, revCh;                                    // аккорды (Z-яркость — пер-голосовой фильтр fb в пуле, не на шине)
 let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
 let noteOnFlag=false;
@@ -120,6 +120,11 @@ function mkOsc(type,freq,dest,gainVal){
   return o;
 }
 const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
+/* Границы cutoff пер-голосового фильтра яркости fb (Hz), см. briToHz. MAX высоко — ВЫШЕ собственных
+   фильтров f аккордовых голосов (lp 1200..5200): при нейтрали (depth=0) fb открыт настолько, что звук
+   практически не меняется (fb в тракте всегда — перцептивно неотличимо, не байт-в-байт). MIN —
+   приглушённый «далёкий» аккорд. */
+const CHORD_LP_MAX=18000, CHORD_LP_MIN=700;
 /* Огибающая фильтра + скорость→яркость на атаке (для лид-банков с фильтром). Возвращает strike(t,vel):
    cutoff прыгает к base*open (ярче в атаке), оседает к base*(1+fv*vel) за tc — громче нота = ярче,
    ПОЛ = base, поэтому тихая нота не глохнет. setFreq НЕ трогает фильтр → пофреймовая пересылка живого
@@ -345,17 +350,29 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
       modGain.gain.setValueAtTime(curF*peak,t);
       modGain.gain.setTargetAtTime(curF*sus,t,tau); }});
 }
-/* --- Пул аккордовых голосов (всегда запущены, гейт по громкости; размер — CHORD_POOL_N) --- */
+/* Карта глубины руки → cutoff яркости (Гц). depth 0 близко/ярко → CHORD_LP_MAX (открыт, НЕЙТРАЛЬ =
+   сегодняшний звук), 1 далеко/глухо → CHORD_LP_MIN. Логарифмическая (перцептивно ровная). Единый
+   источник для атаки (chordOn) и ведения (chordGlide) — раньше жила в удалённом setChordBright. */
+const briToHz=bri=>{ const d=Math.max(0,Math.min(1,bri||0)); return CHORD_LP_MAX*Math.pow(CHORD_LP_MIN/CHORD_LP_MAX,d); };
+/* --- Пул аккордовых голосов (всегда запущены, гейт по громкости; размер — CHORD_POOL_N) ---
+   ДВА фильтра на голос, НЕ один — осознанно, не «избыточность»: f несёт огибающую АТАКИ (fo/ft/fv,
+   тембр), пекётся один раз на атаке и пофреймово не трогается; fb несёт НЕПРЕРЫВНУЮ яркость (Z-глубина
+   руки, выразительность), ведётся setTargetAtTime всю ноту. Свести их в один узел нельзя: смена яркости
+   тогда дралась бы с запланированной рампой атаки (в окне ft), и тембр навсегда сцепился бы с
+   выразительностью. БУДУЩЕЙ СЕССИИ: не «упрощать» f и fb в один фильтр. Порядок o1/o2 → f (атака) → fb
+   (яркость) → g (гейт громкости) → dest. */
 function buildChordPool(dest, n=CHORD_POOL_N){
   for(let i=0;i<n;i++){
     const o1=AC.createOscillator(), o2=AC.createOscillator();
     const g1=AC.createGain(), g2=AC.createGain();
-    const f=AC.createBiquadFilter(), g=AC.createGain();
-    o1.type='sawtooth'; o2.type='sawtooth'; f.type='lowpass'; f.frequency.value=1500;
+    const f=AC.createBiquadFilter(), fb=AC.createBiquadFilter(), g=AC.createGain();
+    o1.type='sawtooth'; o2.type='sawtooth';
+    f.type='lowpass'; f.frequency.value=1500;                 // f — огибающая атаки (тембр)
+    fb.type='lowpass'; fb.frequency.value=CHORD_LP_MAX;       // fb — непрерывная яркость (выразительность); дефолт открыт → нейтраль
     g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
-    o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(g); g.connect(dest);
+    o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(dest);
     o1.start(); o2.start();
-    cv.push({o1,o2,g1,g2,f,g,owner:null,ins:null,tOn:0,lvl:0});
+    cv.push({o1,o2,g1,g2,f,fb,g,owner:null,ins:null,tOn:0,lvl:0});
   }
 }
 /* when — ЯВНОЕ время планирования (опережение лупера). По умолчанию AC.currentTime → живые вызовы
@@ -371,18 +388,24 @@ function cvAlloc(when){ let v=cv.find(v=>!v.owner);
     if(o&&chordHold[o]){ const a=chordHold[o].filter(x=>x!==v); a.length?chordHold[o]=a:delete chordHold[o]; } }
   return v;
 }
-function chordOn(owner,freqs,vol,insIdx,when){
+/* bri — ПЕР-СОБЫТИЙНАЯ яркость (глубина 0..1, 0=нейтраль), стоит ПЕРЕД when: when обязан оставаться
+   ПОСЛЕДНИМ (планировщик-опережение зовёт chordOn(...,when) с явным временем). ИЗОЛЯЦИЯ ПО СЛОЯМ — от
+   ключей владельца: живой аккорд = 'latch', слой петли = 'loop:'+layer, у каждого свои голоса пула →
+   своё fb. Поэтому живая рука ФИЗИЧЕСКИ не может изменить яркость переигранного слоя (она пишет только
+   голоса 'latch'), и наоборот. Ровно это и есть причина ухода с общей шины на пер-голосовой fb. */
+function chordOn(owner,freqs,vol,insIdx,bri,when){
   chordOff(owner,when);
-  const ins=CHORD_INSTR[insIdx], t=when!=null?when:AC.currentTime;
+  const ins=CHORD_INSTR[insIdx], t=when!=null?when:AC.currentTime, briHz=briToHz(bri);   // bri==null (аранжировка/джем) → briToHz→CHORD_LP_MAX (открыт, нейтраль = сегодняшний звук)
   chordHold[owner]=freqs.map(fr=>{
     const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
     const hc=(Math.random()*2-1)*HUM_CENTS*(ins.hj||0);   // гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0
     v.o1.detune.setValueAtTime(-ins.det/2+hc,t); v.o2.detune.setValueAtTime(ins.det+hc,t);
     v.g1.gain.setValueAtTime(ins.m1,t); v.g2.gain.setValueAtTime(ins.m2,t);
-    const fo=ins.fo||1, ft=ins.ft||0.02, fv=ins.fv||0;    // огибающая фильтра + скорость→яркость (пол=lp: тихая нота не глохнет)
+    const fo=ins.fo||1, ft=ins.ft||0.02, fv=ins.fv||0;    // огибающая фильтра f + скорость→яркость (пол=lp: тихая нота не глохнет)
     v.f.frequency.cancelScheduledValues(t); v.f.frequency.setValueAtTime(ins.lp*fo,t);
     v.f.frequency.setTargetAtTime(ins.lp*(1+fv*vol),t,ft);
+    v.fb.frequency.cancelScheduledValues(t); v.fb.frequency.setValueAtTime(briHz,t);   // яркость на АТАКЕ: голос ещё поднимает громкость с 0 → скачка cutoff не слышно
     v.o1.frequency.setValueAtTime(fr,t); v.o2.frequency.setValueAtTime(fr*ins.ratio,t);
     v.lvl=ins.lvl*(0.25+0.75*vol)*(1-Math.random()*0.05);   // −0..5% уровня — снять машинную ровность
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
@@ -390,18 +413,20 @@ function chordOn(owner,freqs,vol,insIdx,when){
     return v;
   });
 }
-function chordGlide(owner,freqs,vol,when){        // смена аккорда без переатаки — voice leading
+function chordGlide(owner,freqs,vol,bri,when){    // смена аккорда без переатаки — voice leading; bri ПЕРЕД when (when — последний, для планировщика)
   const vs=chordHold[owner]; if(!vs)return; const t=when!=null?when:AC.currentTime;
+  const briHz=bri==null?null:briToHz(bri);       // bri==null (аранжировка/джем: chSet без яркости) → fb НЕ трогаем, остаётся с атаки
   vs.forEach((v,i)=>{ const fr=freqs[i]; if(fr==null)return;
     v.o1.frequency.setTargetAtTime(fr,t,0.035);
     v.o2.frequency.setTargetAtTime(fr*v.ins.ratio,t,0.035);
+    if(briHz!=null)v.fb.frequency.setTargetAtTime(briHz,t,0.05);   // яркость ведём setTargetAtTime → без щелчка; f (атака) не трогаем — расцеплены
     const L=v.ins.lvl*(0.25+0.75*vol);
     if(Math.abs(L-v.lvl)>0.003){ v.lvl=L; v.g.gain.setTargetAtTime(L,t,0.05); }
   });
 }
 function chordOff(owner,when){ const vs=chordHold[owner]; if(!vs)return;
   vs.forEach(v=>cvRelease(v,false,when)); delete chordHold[owner]; }
- 
+
 async function initAudio(){
   AC=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
   /* KS-ворклет грузим В НАЧАЛЕ (по-прежнему внутри клика — правило #1 цело), ДО buildLeadBanks,
@@ -469,7 +494,9 @@ async function initAudio(){
   revLead=AC.createGain(); revLead.gain.value=0;
   leadOut.connect(revLead); revLead.connect(verb);
  
-  /* --- АККОРДЫ: чистая шина + фиксированный маленький send в реверб --- */
+  /* --- АККОРДЫ: чистая шина + фиксированный маленький send в реверб ---
+     Z-ЯРКОСТЬ живёт ПЕР-ГОЛОСОВО (фильтр fb каждого голоса, см. buildChordPool), а НЕ на этой шине:
+     общий фильтр не смог бы дать разным слоям петли РАЗНУЮ яркость. Поэтому шина снова простая. */
   chordBus=AC.createGain(); chordBus.gain.value=0.28; chordBus.connect(master);
   revCh=AC.createGain(); revCh.gain.value=0.12; chordBus.connect(revCh); revCh.connect(verb);
   buildChordPool(chordBus);

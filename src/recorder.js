@@ -83,8 +83,8 @@ const ENG={
   leadOff:()=>noteOff(),
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,when)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,when),
-  chSet:(a,ctx,when)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,when),
+  chOn:(a,ctx,when)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
+  chSet:(a,ctx,when)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
   chOff:(a,ctx,when)=>chordOff(chOwnerKey(ctx),when),
   bassOn:(a,ctx,when,live)=>bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,when),   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
   bassSet:(a,ctx,when)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
@@ -151,13 +151,19 @@ function recLeadOff(){ if(recording&&recLead){ push('leadOff',{}); recLead=null;
    меняется без смены ступени/октавы — без этой проверки смена типа не попала бы в
    запись вовсе, и петля играла бы не тот аккорд. Сравнение по ссылке корректно:
    ty — это всегда один и тот же массив из таблицы CHORD_FAMS. */
-function recChOn(a){ if(!recording)return; push('chOn',{...a}); recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty}; }
+/* a.bri (яркость) входит в запись КАК a.rev у соло: ложится в полезную нагрузку a (рядом с ty/inst),
+   слой запоминает свою яркость и переигрывается с ней. Смена ТОЛЬКО яркости (рука двинулась в глубину,
+   ступень/тип/громкость те же) должна попасть в запись → добавляем |Δbri|>REC_REV_EPS в тест chSet
+   (та же мёртвая зона, что у реверба соло). События аккордов КВАНТУЮТСЯ к доле (gridFor='chOn'/'chSet'→1),
+   поэтому при вкл. квантизации кривая яркости привязывается к долям (грубее соло, но согласно с тем, что
+   аккорды и так поbeat-квантованы); при выкл. — полное разрешение жеста. */
+function recChOn(a){ if(!recording)return; push('chOn',{...a}); recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri}; }
 function recChSet(a){
   if(!recording)return;
   if(!recCh){ push('chOn',{...a}); }
-  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS){ push('chSet',{...a}); }
+  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS||Math.abs((a.bri||0)-(recCh.bri||0))>REC_REV_EPS){ push('chSet',{...a}); }
   else return;
-  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty};
+  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri};
 }
 function recChOff(){ if(recording&&recCh){ push('chOff',{}); recCh=null; } }
 function recBassEv(p){                                  // бас прореживается как соло
@@ -177,8 +183,8 @@ const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
 /* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
    тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
    Так он замораживается в событии сам собой и переигрывается как сыгран. */
-const WchOn =(_o,deg,oct,vol,ins,ty)=>{ const a={deg,oct,vol,inst:ins,ty}; ENG.chOn(a); recChOn(a); };
-const WchSet=(_o,deg,oct,vol,ty)    =>{ const a={deg,oct,vol,ty};          ENG.chSet(a); recChSet(a); };
+const WchOn =(_o,deg,oct,vol,ins,ty,bri)=>{ const a={deg,oct,vol,inst:ins,ty,bri}; ENG.chOn(a); recChOn(a); };   // bri — живая яркость руки: в звук (ENG) И в запись (rec), как a.rev у соло
+const WchSet=(_o,deg,oct,vol,ty,bri)    =>{ const a={deg,oct,vol,ty,bri};          ENG.chSet(a); recChSet(a); };
 const WchOff=_o                 =>{ ENG.chOff(); recChOff(); };
 const WbassOn =(p,live)=>{ ENG.bassOn(p,null,undefined,live); recBassEv(p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
@@ -237,11 +243,15 @@ function fireNear(a,b){
     if(!isLayer(ev.fn)&&ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer))
       ENG[ev.fn](ev.a,ev);
 }
-/* Гашение ЖИВОГО на завороте (лид/latch/живой бас) — слои петли гасятся вперёд (releaseLoopLayersAt). */
+/* Гашение ЖИВОГО на завороте — слои петли гасятся вперёд (releaseLoopLayersAt), а ЖИВОЙ аккорд НЕ трогаем.
+   Живой аккорд ('latch') принадлежит РУКЕ, а не петле: удержанный или защёлкнутый, он обязан пережить
+   сколько угодно заворотов, пока игрок не отпустит пальцы (удержание) или не сменит аккорд (защёлка).
+   Раньше здесь стоял chordOff('latch') + сброс latchDeg/latchTy/recCh — он и обрезал аккорд на границе;
+   убрано. Лид/бас гасим по-прежнему: они моно и переатакуются со следующего кадра ещё зажатой рукой
+   (для аккорда так нельзя — живой путь WchSet→chordGlide не пересобирает удалённые голоса). */
 function liveWrapRelease(){ if(!AC)return; noteOff();
-  chordOff('latch'); bassOff('bass');
-  setLatchDeg(-1); setLatchTy(null);
-  recLead=null; recCh=null; recBass=null; recLeadBend=null; }
+  bassOff('bass');
+  recLead=null; recBass=null; recLeadBend=null; }
 function schedClicks(){                                // щелчки метронома с опережением по AC-часам
   const spb=60/loop.bpm, ahead=AC.currentTime+SCHED_AHEAD;
   while(loop.t0+loop.clickBeat*spb<ahead){

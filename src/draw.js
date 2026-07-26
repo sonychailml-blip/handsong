@@ -1,7 +1,7 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
-import { fx, revDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
+import { fx, revDisp, chBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN } from './config.js';
 import { DRUM_NAMES, chordHold } from './audio.js';
@@ -396,6 +396,8 @@ function drawRole(instr,rx0,rx1,playH){
       }
     }
   }
+  // Индикатор Z-яркости — пока звучит защёлкнутый аккорд (та же связка, что разбор Гц выше)
+  if(instr==='ch'&&latchDeg>=0&&supportsChords())drawChordBright(rx0,rx1,playH);
 }
 function drawPhone(res){
   const W=canvas.width, H=canvas.height;
@@ -613,6 +615,20 @@ function drawFxBars(rx0,H){                        // rx0 — левый кра�
   });
 }
  
+/* Индикатор Z-ЯРКОСТИ аккордов — ЗЕРКАЛО столбика реверба (drawFxBars), но у аккордовой роли: одиночный
+   вертикальный столбик, заполнение = ЯРКОСТЬ (chBrightDisp, 1=ярко/открыто/нейтраль → полный столбик,
+   0=глухо/далеко → пустой). Стоит внизу-СПРАВА роли (нотная часть — всегда свободна: палитра слева).
+   Виден только пока звучит защёлкнутый аккорд (гейт в drawRole) — как и живой разбор Гц. */
+function drawChordBright(rx0,rx1,H){
+  const v=Math.max(0,Math.min(1,chBrightDisp));
+  const x=rx1-FX_BAR_W-10, y1=H-40, y0=y1-FX_BAR_MAX;
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
+  ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
+  const fh=FX_BAR_MAX*v;
+  ctx.fillStyle=INSTR_COL.ch; ctx.globalAlpha=0.7; ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;   // заполнение снизу вверх
+  ctx.fillStyle=hexA(INSTR_COL.ch,.85); ctx.fillText('ЯРК',x+FX_BAR_W/2,y0-5);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
 /* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).
    Экспортирована, чтобы позицию мог прочитать кто угодно, а не только draw. */
 export { drawVideoBackground, drawOverlays, loopBarBottom };

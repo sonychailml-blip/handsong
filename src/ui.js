@@ -255,18 +255,21 @@ const INSTR_SEQ=['ld','ch','bs','dr'];
 const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
 function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
   instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn(); }   // цвет роли; секция «Функции рук» зависит от активной роли
-/* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ ноте-роли (соло/бас), что сейчас в
-   игре. Строим динамически (как fillScales): single-role — одна роль; сплит — каждая ld/бас-половина
-   (пропуская ch/dr, у них записи нет). Строки помечены РУКОЙ, сгруппированы под ярлыком роли (🎸 Соло /
-   🎚 Бас) — видно, что назначение ПО РУКЕ, не по половине. Бас без 'fx'. Смена — setHandFn + softAllOff. */
+/* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ роли с записью (соло/бас/аккорды), что
+   сейчас в игре. Строим динамически (как fillScales): single-role — одна роль; сплит — каждая ld/бас/ch-
+   половина (пропуская dr, у неё записи нет). Строки помечены РУКОЙ, сгруппированы под ярлыком роли (🎸
+   Соло / 🎹 Аккорды / 🎚 Бас) — видно, что назначение ПО РУКЕ, не по половине. Бас без 'fx'; аккорды —
+   только защёлка/удержание (ни 'fx', ни терменвокса). Смена — setHandFn + softAllOff. */
 const HANDFN_OPTS={
   ld:[['fx','Эффекты'],['note','Ноты (непрерывно)'],['hold','Ноты (с удержанием)'],['therm','Терменвокс']],
   bs:[['note','Ноты (непрерывно)'],['hold','Ноты (с удержанием)'],['therm','Терменвокс']],
+  ch:[['latch','Аккорды (защёлка)'],['hold','Аккорды (с удержанием)']],
 };
 const handFnRows=$('handFnRows'), handFnSep=$('handFnSep');
+const HAS_HANDFN=r=>r==='ld'||r==='bs'||r==='ch';   // роли с записью в handFn (у dr её нет)
 function noteRolesInPlay(){
-  if(!splitOn) return (phoneInstr==='ld'||phoneInstr==='bs') ? [phoneInstr] : [];
-  return [...new Set(SPLIT_ROLES)].filter(r=>r==='ld'||r==='bs');   // сплит: уникальные ld/бас-половины
+  if(!splitOn) return HAS_HANDFN(phoneInstr) ? [phoneInstr] : [];
+  return [...new Set(SPLIT_ROLES)].filter(HAS_HANDFN);   // сплит: уникальные ld/бас/аккорд-половины
 }
 function renderHandFn(){
   const roles=noteRolesInPlay();

@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy } from './state.js';
+import { fx, setRevDisp, setChBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
@@ -115,8 +115,12 @@ function endPinch(key,S){
        Так «последний щипок побеждает», а рука, оставшаяся зажатой, не замолкает и не залипает. */
     if(S.zone==='ld'&&leadOwner===key){ const nx=otherPinched(key,'ld'); if(nx)leadOwner=nx; else{ WleadOff(); leadOwner=null; } }
     if(S.zone==='bs'&&bassOwner===key){ const nx=otherPinched(key,'bs'); if(nx)bassOwner=nx; else{ WbassOff(); bassOwner=null; } }
-    // 'ch': WchOff НЕ зовём — защёлкнутый аккорд продолжает звучать; лишь отпускаем руль
-    if(S.zone==='ch'&&chOwner===key)chOwner=null;
+    /* 'ch': в ЗАЩЁЛКЕ (S.fn!=='hold') WchOff НЕ зовём — аккорд звучит и после размыкания, лишь отпускаем
+       руль. В УДЕРЖАНИИ (S.fn==='hold') размыкание пальцев ГАСИТ аккорд (как соло-hold) и чистит защёлку. */
+    if(S.zone==='ch'&&chOwner===key){
+      if(S.fn==='hold'){ WchOff('latch'); setLatchDeg(-1); setLatchTy(null); latchLen=0; }
+      chOwner=null;
+    }
   }
   S.pinch=false; S.adj=null; S.deg=-1; S.rect=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
@@ -184,7 +188,7 @@ function processHands(res){
                  : (phoneInstr==='ld'&&handFnOf(key,'ld')==='fx') ? 'fx'   // эффекты — если ФУНКЦИЯ этой руки в соло = fx
                  : phoneInstr;
         }
-        S.fn = (S.zone==='ld'||S.zone==='bs') ? handFnOf(key,S.zone) : null;   // нотная функция руки (note/hold/therm) для блока игры; у fx/oct/chFam/аккордов/ударных — null
+        S.fn = (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') ? handFnOf(key,S.zone) : null;   // функция руки: соло/бас — note/hold/therm; аккорды — latch/hold; у fx/oct/chFam/ударных — null
       }
       if(S.zone==='fx'){
         const meta=FX_META.find(m=>m.finger===mf);
@@ -264,7 +268,7 @@ function processHands(res){
         const rectPlay = (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
         const noteZone = S.zone==='ld'||S.zone==='bs';
         const thereminOn = noteZone && S.fn==='therm';   // терменвокс — ФУНКЦИЯ руки, соло И бас
-        const holdOn     = noteZone && S.fn==='hold';    // удержание — ФУНКЦИЯ руки, соло И бас
+        const holdOn     = (noteZone||S.zone==='ch') && S.fn==='hold';   // удержание — соло/бас И аккорды: корень/октава мёрзнут одним и тем же гейтом (S.deg застыл ниже)
         const oct = rectPlay?rectOctReg(S.zone):S.oct;           // октавный регистр роли (WleadOn/бас/терменвокс); роль = S.zone (при игре ='ld'/'bs')
         if(thereminOn){
           /* Непрерывная высота: y → Гц через thereminHz (по leadFreq), интерполяция в центах между
@@ -276,7 +280,9 @@ function processHands(res){
           /* УДЕРЖАНИЕ: высота (S.deg) и октава (S.oct) ЗАМОРОЖЕНЫ с ПЕРВОГО кадра щипка — рука уходит
              куда угодно, нота держится (смена пальца октаву не двигает — гейт выше). Громкость (X) ниже
              — ЖИВАЯ (свелл). Стоп — только размыканием пальцев (endPinch). deg берётся на первом кадре
-             ветками ниже (тогда S.deg==-1), дальше сюда — и больше не пересчитывается. */
+             ветками ниже (тогда S.deg==-1), дальше сюда — и больше не пересчитывается. ОДИН механизм
+             для соло/баса И аккордов: у аккорда S.deg — это КОРЕНЬ, значит замерзают корень+октава, а
+             тип по-прежнему из палитры (другая рука), громкость свеллит — ровно как задумано «заморожен». */
         }else if(rectPlay){
           S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
           const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
@@ -321,34 +327,57 @@ function processHands(res){
              посчитаны — их читает draw для подсказки), молчит только аккордовая ветка.
              Соло/бас/ударные — соседние ветки выше, их это не касается; дрон живёт
              в лупере (ENG.drone), не в руке. Переигровка идёт мимо — по замороженному sc. */
-        }else{ // 'ch' — колонка аккордов: защёлка (владелец голосов — постоянный ключ 'latch')
+        }else{ // 'ch' — колонка аккордов (владелец голосов — постоянный ключ 'latch'); функция руки latch/hold
+          const hold = S.fn==='hold';             // «удержание» vs «защёлка»
+          /* Z-ЯРКОСТЬ (глубина 0 близко/ярко .. 1 далеко/глухо): тот же размер кисти dist(0,9), что ведёт
+             соло-реверб. Воздух гасит верхи быстрее низов → глубина читается как «аккорд отодвинулся» — та
+             же природа, что реверб у соло, с другой стороны. Высоту НЕ трогает (только тембр). Считаем ДО
+             WchOn/WchSet: bri едет в событие рядом с ty (как a.rev у соло) — слой запомнит свою яркость. */
+          const bd = clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE);
           if(S.inert){
-            // стоп-щипок отработал: рука молчит до размыкания пальцев
+            // стоп-щипок отработал (только защёлка): рука молчит до размыкания пальцев
           }else if(S.fresh){
             S.fresh=false;                        // решение принимается один раз за щипок
-            /* Тождество защёлки: вне typedChords — ступень (как было, второй множитель
-               схлопывается в true); в typedChords — ПАРА (ступень+тип), иначе C→C7
-               читалось бы как «та же ступень» и глушило аккорд вместо переключения.
-               Цена: зона выключения сужается до конкретного сектора — это неизбежно. */
-            const same = latchDeg>=0 && S.deg===latchDeg && (!typedChords() || ty===latchTy);
-            if(same){
-              WchOff('latch'); setLatchDeg(-1); setLatchTy(null); chOwner=null; S.inert=true;   // тот же аккорд → выключаем, рука инертна
-            }else{
-              /* Переатака нужна, когда МЕНЯЕТСЯ ЧИСЛО НОТ: chordGlide ведёт только уже
-                 звучащие голоса, и 4-я нота (maj7 из трезвучия) молча не зазвучала бы
-                 до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
-              if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty);
-              else WchSet('latch',S.deg,chOct,S.vol,ty);              // та же плотность → глиссандо без переатаки
+            if(hold){
+              /* УДЕРЖАНИЕ: каждый щипок — НОВАЯ атака; корень/октава уже заморожены гейтом holdOn выше
+                 (S.deg застыл с первого кадра), тип — из палитры (другая рука). Тумблера «тот же аккорд →
+                 выкл» тут НЕТ: выключение — это размыкание пальцев (endPinch зовёт WchOff). */
+              WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
               latchLen=ty?ty.length:0;
-              setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;        // рулит последний щипнувший
+              setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;
+            }else{
+              /* Тождество защёлки: вне typedChords — ступень (как было, второй множитель
+                 схлопывается в true); в typedChords — ПАРА (ступень+тип), иначе C→C7
+                 читалось бы как «та же ступень» и глушило аккорд вместо переключения.
+                 Цена: зона выключения сужается до конкретного сектора — это неизбежно. */
+              const same = latchDeg>=0 && S.deg===latchDeg && (!typedChords() || ty===latchTy);
+              if(same){
+                WchOff('latch'); setLatchDeg(-1); setLatchTy(null); chOwner=null; S.inert=true;   // тот же аккорд → выключаем, рука инертна
+              }else{
+                /* Переатака нужна, когда МЕНЯЕТСЯ ЧИСЛО НОТ: chordGlide ведёт только уже
+                   звучащие голоса, и 4-я нота (maj7 из трезвучия) молча не зазвучала бы
+                   до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
+                if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
+                else WchSet('latch',S.deg,chOct,S.vol,ty,bd);          // та же плотность → глиссандо без переатаки
+                latchLen=ty?ty.length:0;
+                setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший
+              }
             }
           }else if(chOwner===key&&latchDeg>=0){
-            if(ty&&ty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,ty); latchLen=ty.length; }
-            else WchSet('latch',S.deg,chOct,S.vol,ty);   // ведение: Y=корень (rect) или ступень, X=громкость
+            /* Ведение КАЖДЫЙ кадр (~60/с) → живой звук яркости плавный через chordGlide; запись прорежена
+               мёртвой зоной в recChSet. В защёлке корень следует за рукой (Y); в удержании S.deg заморожен
+               гейтом выше → корень СТОИТ, меняется лишь громкость (свелл) и яркость (Z). */
+            if(ty&&ty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd); latchLen=ty.length; }
+            else WchSet('latch',S.deg,chOct,S.vol,ty,bd);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
             setLatchDeg(S.deg); setLatchTy(ty);          // тип ведём вместе со ступенью — иначе сравнение протухнет
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }
+          /* Индикатор ЯРК показывает ЖИВУЮ руку (эту), НЕ переигранные слои: у каждого слоя своя яркость в
+             событии, но столбик один — как REV у соло показывает живую руку. Пока эта рука ведёт аккорд
+             (chOwner===key), обновляем показ; после отпускания (защёлка) chOwner=null → показ замирает, а
+             при полном отсутствии аккорда сбрасывается ниже (latchDeg<0). НЕ баг, что слои он не отражает. */
+          if(chOwner===key) setChBrightDisp(1-bd);   // храним ЯРКОСТЬ (1=ярко); в событие едет bd (глубина, 0=нейтраль)
         }
       }
     }
@@ -377,6 +406,7 @@ function processHands(res){
      → soloNoteHand ложна у всех → тоже 0 (столбики FX при этом уже не рисуются — стейл не остаётся). */
   const reset = ![...seen].some(k=>{ const S=HANDS[k]; return S && soloNoteHand(k,S,W); });   // никто не целится соло → гасим revDisp (single-role и сплит одинаково; soloNoteHand сам знает роль-половину)
   if(reset) setRevDisp(0);
+  if(latchDeg<0) setChBrightDisp(1);   // нет звучащего защёлкнутого аккорда → показ яркости в нейтраль (сам фильтр отпускать не нужно — следующая атака его перепишет)
 }
 
 /* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */

@@ -9,6 +9,12 @@ export let aRef=440;
 export let seventh=false, leadIdx=0, chIdx=0, bassIdx=0, drumKitIdx=0;
 export const fx={dly:0.25, vib:0.20, drv:0.12, trm:0.0};
 export let revDisp=0;                            // отображение Z-реверба соло-руки
+/* Отображение Z-ЯРКОСТИ аккордов (общий НЧ-фильтр аккордовой шины по глубине руки). 1 = ярко/открыто
+   (нейтраль, рука близко), 0 = глухо (рука далеко). Зеркало revDisp, но своя ось: реверб растёт с
+   удалением, яркость — падает. Читает индикатор в draw; пишет gestures (setChBrightDisp) — ТОЛЬКО по
+   живой руке, не по слоям петли. Дефолт 1 — нейтральная яркость. САМ звук яркости — пер-голосовой
+   фильтр fb (audio.js), ведётся через событие (a.bri); здесь только показ живой руки. */
+export let chBrightDisp=1;
 export let latchDeg=-1;                          // защёлкнутая ступень аккорда, -1 = тишина
 /* Выбранная ячейка палитры типизированного аккорда (Хроматика, 31-TET):
    chordFam — КОЛОНКА (семейство), chordVar — РЯД внутри неё (вариант).
@@ -32,15 +38,18 @@ export let phoneInstr='ld';                      // активная роль: '
    глобальный тумблер терменвокса: теперь это выбор НА РУКУ. Роли соло/бас держат СВОЮ пару (переключил
    роль и назад — вернётся). Функции: 'fx' эффекты (только соло), 'note' ноты непрерывно, 'hold' нота с
    удержанием (взял на щипке — держится, пока пальцы вместе), 'therm' терменвокс (непрерывная высота).
-   Аккорды/ударные записи НЕ имеют — там рука-палитра ФИКСИРОВАНА за левой (handRole в gestures), swap
-   больше нет. При СПЛИТЕ функция берётся ПО РОЛИ ПОЛОВИНЫ (handFn[роль-половины][сторона]) — соло-/бас-
-   половина работает как single-role, а терменвокс живёт в сплите без спец-флага. Дефолты воспроизводят
+   Ударные записи НЕ имеют — там рука-палитра ФИКСИРОВАНА за левой (handRole в gestures), swap больше нет
+   (аккорды запись имеют — latch/hold, см. ниже). При СПЛИТЕ функция берётся ПО РОЛИ ПОЛОВИНЫ (handFn[роль-
+   половины][сторона]) — соло-/бас-/аккорд-половина как single-role, терменвокс живёт в сплите без спец-флага. Дефолты воспроизводят
    сегодня: соло левая=эффекты/правая=ноты; бас — обе ноты (у баса fx-руки не было, last-pinch-wins).
    Писать через setHandFn. */
-export let handFn={ ld:{L:'fx', R:'note'}, bs:{L:'note', R:'note'} };
+/* АККОРДЫ тоже имеют запись, но всего две функции: 'latch' защёлка (сегодня и ДЕФОЛТ — щипок ставит
+   аккорд, он звучит и после размыкания; джем и сплит на этом держатся) и 'hold' удержание (аккорд
+   заморожен, пока пальцы вместе, гаснет при размыкании — как соло-hold). У аккордов НЕТ 'fx'/'therm'. */
+export let handFn={ ld:{L:'fx', R:'note'}, bs:{L:'note', R:'note'}, ch:{L:'latch', R:'latch'} };
 export const setHandFn=(role,hand,fn)=>{ handFn[role][hand]=fn; };
 export const handSide=key=> key.slice(0,4)==='Left' ? 'L' : 'R';   // сторона руки из handedness-ключа MediaPipe
-export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)]) || null;   // у ролей без записи (ch/dr) → null
+export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)]) || null;   // у роли без записи (dr) → null; ch теперь имеет запись ('latch'/'hold')
 export const roleHasTherm=role=> !!(handFn[role] && (handFn[role].L==='therm'||handFn[role].R==='therm'));
 export const roleHasFx=role=> role==='ld' && (handFn.ld.L==='fx'||handFn.ld.R==='fx');   // fx только у соло
 /* ЕДИНЫЙ ИСТОЧНИК ЗЕРКАЛА (фронт/тыл камеры). Фронтальная ('user') — картинку ЗЕРКАЛИМ (видишь
@@ -104,6 +113,7 @@ export const setChIdx=v=>{ chIdx=v; };
 export const setBassIdx=v=>{ bassIdx=v; };
 export const setDrumKitIdx=v=>{ drumKitIdx=v; };
 export const setRevDisp=v=>{ revDisp=v; };
+export const setChBrightDisp=v=>{ chBrightDisp=v; };   // показ Z-яркости аккордов живой руки (сам звук — пер-голосовой fb в audio, через a.bri)
 export const setLatchDeg=v=>{ latchDeg=v; };
 export const setChordFam=v=>{ chordFam=v; };
 export const setChordVar=v=>{ chordVar=v; };
