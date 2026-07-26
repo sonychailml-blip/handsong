@@ -15,6 +15,12 @@ export let revDisp=0;                            // отображение Z-р�
    живой руке, не по слоям петли. Дефолт 1 — нейтральная яркость. САМ звук яркости — пер-голосовой
    фильтр fb (audio.js), ведётся через событие (a.bri); здесь только показ живой руки. */
 export let chBrightDisp=1;
+/* ОБРАТНАЯ СВЯЗЬ рукой-ЛУПЕРОМ (функция 'loop'): у команд нет ноты в звуке, поэтому подтверждаем на
+   экране. looperMsg — всплывающее подтверждение последней команды {text, until (мс performance.now),
+   ok (false = невозможно/предупреждение)}. looperClear — остаток мс 3-секундного отсчёта очистки
+   (мизинец удержан), -1 = отсчёт не идёт. Пишет gestures, читает индикатор в draw. */
+export let looperMsg=null;
+export let looperClear=-1;
 export let latchDeg=-1;                          // защёлкнутая ступень аккорда, -1 = тишина
 /* Выбранная ячейка палитры типизированного аккорда (Хроматика, 31-TET):
    chordFam — КОЛОНКА (семейство), chordVar — РЯД внутри неё (вариант).
@@ -114,6 +120,8 @@ export const setBassIdx=v=>{ bassIdx=v; };
 export const setDrumKitIdx=v=>{ drumKitIdx=v; };
 export const setRevDisp=v=>{ revDisp=v; };
 export const setChBrightDisp=v=>{ chBrightDisp=v; };   // показ Z-яркости аккордов живой руки (сам звук — пер-голосовой fb в audio, через a.bri)
+export const setLooperMsg=v=>{ looperMsg=v; };         // подтверждение команды рукой-лупером (draw гасит по looperMsg.until)
+export const setLooperClear=v=>{ looperClear=v; };     // остаток мс отсчёта очистки (мизинец); -1 = нет
 export const setLatchDeg=v=>{ latchDeg=v; };
 export const setChordFam=v=>{ chordFam=v; };
 export const setChordVar=v=>{ chordVar=v; };

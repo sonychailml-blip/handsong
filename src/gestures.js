@@ -1,8 +1,9 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
-         CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX } from './config.js';
-import { fx, setRevDisp, setChBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy } from './state.js';
+         CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
+import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
-import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit } from './recorder.js';
+import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
+         onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { chordHold, DRUM_ROWS } from './audio.js';
 import { canvas } from './vision.js';
  
@@ -48,6 +49,35 @@ let latchLen=0;   // сколько нот звучит у 'latch': по нем�
 function handRole(key){
   return key.slice(0,4)==='Left' ? 'fx' : 'notes';
 }
+/* Рука-ЛУПЕР (функция 'loop'): нот не играет, командует лупером щипками пальцев. Команды — СОБЫТИЯ, а не
+   непрерывный звук: срабатывают РАЗ на формирование щипка (edge), не повторяются в удержании. Раскладка
+   thumb+палец: указ.→запись, средн.→пуск/пауза, безым.→отмена слоя, мизинец→очистить ВСЁ (только после
+   3с удержания с отсчётом — единственное разрушительное действие). Невозможные команды сообщаются, а не
+   молчат. Здесь только логика; кнопки транспорта в UI работают как прежде (это ЕЩЁ один вход). */
+function looperMsgSet(text,ok){ setLooperMsg({text, until:performance.now()+LOOPER_MSG_MS, ok}); }
+function doLooper(cmd){
+  if(cmd==='rec'){                                        // всегда возможно: пусто→запись, играет→наложение, пишет→стоп
+    onRec(); looperMsgSet(recording ? (loop.first?'● Запись':'● Наложение') : 'Запись стоп', true);
+  }else if(cmd==='play'){
+    if(!loop.on && !events.length){ looperMsgSet('Нет петли', false); return; }   // нечего играть
+    onLoop(); looperMsgSet(loop.on?'▶ Пуск':'⏸ Пауза', true);
+  }else if(cmd==='undo'){
+    if(!events.length){ looperMsgSet('Нет слоёв', false); return; }                // нечего отменять
+    onUndo(); looperMsgSet('↶ Отмена слоя', true);
+  }else if(cmd==='clear'){
+    if(!loop.on && !events.length){ looperMsgSet('Уже пусто', false); return; }    // нечего очищать — движок не дёргаем
+    clearRec(); looperMsgSet('✕ Очищено', true);
+  }
+}
+/* Вызов НА ЗАХВАТЕ щипка (edge) → единичное срабатывание по построению. index/middle/ring — сразу;
+   мизинец только заводит 3с-таймер (S.clearT0) и показывает отсчёт, сама очистка — в блоке удержания. */
+function fireLooperCmd(S,mf){
+  const f=FINGER_TIPS.indexOf(mf);                        // 0 указ · 1 средн · 2 безым · 3 мизинец
+  if(f===3){ S.clearT0=performance.now(); S.clearFired=false; setLooperClear(CLEAR_HOLD_MS); return; }
+  if(f===0) doLooper('rec');
+  else if(f===1) doLooper('play');
+  else if(f===2) doLooper('undo');
+}
 /* «Солирующая НОТНАЯ рука» — та, что ЦЕЛИТСЯ ревербом (revDisp до щипка): реверб ляжет на её ноту,
    поэтому прицел ведёт именно она, а не рука эффектов и не рука из чужой половины. ЕДИНЫЙ источник
    правила для обоих сайтов revDisp (пер-кадровый прицел + сброс в 0). Условия: (1) роль руки=ноты
@@ -63,7 +93,7 @@ function soloNoteHand(key,S,W){
   else{ const lm=S.lm; if(!lm)return false;
     // px через sx (поля кадра); для ВЫБОРА половины клампим в [0,W): рука в полях сатурируется к ближней кромке, а не проваливается в чужую половину
     const px=clamp(sx(lm[8].x,W),0,W-1), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1]; role=h.role; }
-  return role==='ld' && handFnOf(key,'ld')!=='fx';   // нотная рука соло (функция ≠ эффекты); двух нотных рук — целятся обе, последняя пишет revDisp
+  return role==='ld' && handFnOf(key,'ld')!=='fx' && handFnOf(key,'ld')!=='loop';   // нотная рука соло (не эффекты и не лупер); двух нотных рук — целятся обе, последняя пишет revDisp
 }
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
    (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
@@ -121,9 +151,13 @@ function endPinch(key,S){
       if(S.fn==='hold'){ WchOff('latch'); setLatchDeg(-1); setLatchTy(null); latchLen=0; }
       chOwner=null;
     }
+    if(S.zone==='loop'&&S.clearT0!=null&&!S.clearFired){   // мизинец отпущен ДО 3с → очистка ОТМЕНЕНА (ничего не делаем, гасим отсчёт)
+      setLooperClear(-1); setLooperMsg({text:'Очистка отменена', until:performance.now()+LOOPER_MSG_MS, ok:true});
+    }
   }
   S.pinch=false; S.adj=null; S.deg=-1; S.rect=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
+  S.clearT0=null; S.clearFired=false;           // отсчёт очистки лупера — сброс на размыкании
 }
 function processHands(res){
   const W=canvas.width, H=canvas.height, now=performance.now();
@@ -136,7 +170,7 @@ function processHands(res){
     let key=(heads[i]&&heads[i][0]&&heads[i][0].categoryName)||('H'+i);
     if(seen.has(key))key+=i;
     seen.add(key);
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null});
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,clearT0:null,clearFired:false});
     S.seen=now; S.lm=lm;
     /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
        palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
@@ -152,6 +186,7 @@ function processHands(res){
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
+      S.clearT0=null; S.clearFired=false;    // отсчёт очистки лупера — свежий на каждый щипок (мизинец заведёт ниже)
       {
         const py=sy((lm[4].y+lm[mf].y)/2,H);       // экранные пиксели игрового поля (поля кадра сняты); гест-математику щипка выше это не касается — там сырые lm
         const px=sx((lm[4].x+lm[mf].x)/2,W);
@@ -164,12 +199,14 @@ function processHands(res){
              handFn.ld.L='fx' ДЕРИВИРУЕТ прежний хардкод «эффекты у левой», без отдельного правила. */
           const halves=phoneHalves(W), hx=clamp(px,0,W-1), h=halves.find(q=>hx>=q.rx0&&hx<q.rx1)||halves[halves.length-1];   // клампим px ТОЛЬКО для выбора половины: щипок в поле полей целится в ближнюю половину, а не в чужую
           S.role=h.role; S.rx0=h.rx0; S.rx1=h.rx1;
+          const hLoop = (h.role==='ld'||h.role==='bs'||h.role==='ch') && handFnOf(key,h.role)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение на экране НЕважно (октавную полосу/палитру игнорируем)
           const hsplit=palSplitX(h.rx0,h.rx1);
           const rectRole = (h.role==='ld'||h.role==='bs'||h.role==='ch') && rectGrid();
           const octRight = h.role!=='ch' || px>=hsplit;   // у аккордов октава — только в правой (нотной) части половины
           const octBand  = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
           const famHand  = h.role==='ch' && typedChords() && S.oct===0 && px<hsplit;   // ПОЛОЖЕНИЕ, без handRole
-          S.zone = octBand ? 'oct'
+          S.zone = hLoop ? 'loop'
+                 : octBand ? 'oct'
                  : famHand ? 'chFam'
                  : (h.role==='ld' && handFnOf(key,'ld')==='fx') ? 'fx'   // эффекты — ФУНКЦИЯ руки в соло; дефолт handFn.ld.L='fx' ДЕРИВИРУЕТ прежний хардкод «эффекты у левой в соло-половине»
                  : h.role;
@@ -179,16 +216,19 @@ function processHands(res){
              где она есть: эффекты у соло, выбор семейства у типизированных аккордов. Октавный
              прямоугольник — ПОЛОЖЕНИЕ важнее роли (полоса 0 → 'oct', даже если это fx-рука), стоит
              ПЕРВЫМ в тернаре. У аккордов октава живёт только в правой половине [SPLIT,W]. */
+          const sLoop = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && handFnOf(key,phoneInstr)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение НЕважно (октавную полосу/палитру игнорируем)
           const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
           const octRight = phoneInstr!=='ch' || px>=split;
           const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
           const famHand = phoneInstr==='ch' && typedChords() && handRole(key)==='fx';   // палитра аккордов — фиксировано за левой (handRole)
-          S.zone = octBand ? 'oct'
+          S.zone = sLoop ? 'loop'
+                 : octBand ? 'oct'
                  : famHand ? 'chFam'
                  : (phoneInstr==='ld'&&handFnOf(key,'ld')==='fx') ? 'fx'   // эффекты — если ФУНКЦИЯ этой руки в соло = fx
                  : phoneInstr;
         }
-        S.fn = (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') ? handFnOf(key,S.zone) : null;   // функция руки: соло/бас — note/hold/therm; аккорды — latch/hold; у fx/oct/chFam/ударных — null
+        S.fn = S.zone==='loop' ? 'loop'
+             : (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') ? handFnOf(key,S.zone) : null;   // функция руки: соло/бас — note/hold/therm; аккорды — latch/hold; лупер — loop; у fx/oct/chFam/ударных — null
       }
       if(S.zone==='fx'){
         const meta=FX_META.find(m=>m.finger===mf);
@@ -201,10 +241,12 @@ function processHands(res){
         S.fresh=true;                        // решение о защёлке примем этот кадр, когда посчитаем ступень
       }else if(S.zone==='dr'){
         S.fresh=true;                        // удар сработает этот кадр по ряду
+      }else if(S.zone==='loop'){
+        fireLooperCmd(S,mf);                 // команда лупера по пальцу — РАЗ на щипок (блок захвата = edge, единичное срабатывание по построению)
       }
     }else if(S.pinch){
       if(mv>PINCH_OFF){ endPinch(key,S); }
-      else if(mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf)!==S.oct&&S.fn!=='hold'){   // 'hold' морозит высоту: смена пальца октаву НЕ двигает
+      else if(mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf)!==S.oct&&S.fn!=='hold'&&S.fn!=='loop'){   // 'hold'/'loop' морозят палец: у hold — октаву, у лупера — выбранную команду (мизинец не «перескочит» на безымянный)
         S.oct=FINGER_TIPS.indexOf(mf);       // смена пальца = смена октавы на лету
         if(S.zone==='fx'&&S.adj){
           const meta=FX_META.find(m=>m.finger===mf);
@@ -257,6 +299,15 @@ function processHands(res){
            'oct' роль не достать); иначе — активный phoneInstr (single-role, байт-в-байт, включая
            смену роли DOM-кнопкой на удержанном щипке — softAllOff щипок не снимает). */
         setRectOctReg(splitOn?S.role:phoneInstr, S.oct);
+      }else if(S.zone==='loop'){
+        /* Рука-ЛУПЕР при удержании: команды index/middle/ring уже сработали НА ЗАХВАТЕ (edge, раз на
+           щипок — здесь НЕ повторяются). Живёт лишь ОЧИСТКА (мизинец): 3с-обратный отсчёт, срабатывает
+           РАЗ на отметке (гейт S.clearFired), отпускание раньше — отмена (endPinch гасит отсчёт). */
+        if(S.clearT0!=null && !S.clearFired){
+          const rem=CLEAR_HOLD_MS-(performance.now()-S.clearT0);
+          if(rem<=0){ S.clearFired=true; setLooperClear(-1); doLooper('clear'); }
+          else setLooperClear(rem);
+        }
       }else{
         /* Сетка «4 ноты в прямоугольнике» — соло, бас И аккорды на ладу с rectGrid (19/31-TET).
            Y выбирает ПОЛОСУ полной сетки; полоса 0 — октавная (её перехватывает зона 'oct'),

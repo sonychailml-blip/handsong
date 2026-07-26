@@ -1,9 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
-import { fx, revDisp, chBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, videoRec } from './state.js';
+import { fx, revDisp, chBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, videoRec, looperMsg, looperClear } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
-         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN } from './config.js';
+         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, CAM_MARGIN, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold } from './audio.js';
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, beatLevel } from './recorder.js';
@@ -419,7 +419,34 @@ function drawPhone(res){
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
   drawHandsPhone(res,W,H,playH);
   if(!videoRec)drawLooper();                  // при записи клипа полосу лупера (служебная накладка НА ХОЛСТЕ) прячем из кадра; сетка/руки/ярлыки/эффекты — это ИГРА, остаются
+  if(!videoRec)drawLooperFeedback(W,H);       // подтверждение команды рукой-лупером + отсчёт очистки — тоже служебная накладка, прячем в клипе
   drawStatus();                               // #status — HTML-элемент (не холст), в кадр клипа не попадает сам собой, как и кнопки
+}
+/* Обратная связь руки-ЛУПЕРА (у команд нет ноты в звуке — показываем на экране), в стиле коробки лупера
+   (тёмный скруглённый прямоугольник). ДВЕ накладки: (1) обратный отсчёт очистки (мизинец удержан) —
+   заметное красное кольцо с секундами, действие разрушительное; (2) всплывающее подтверждение последней
+   команды (зелёное = ок, красное = невозможно), гаснет по looperMsg.until. */
+function drawLooperFeedback(W,H){
+  const now=performance.now();
+  if(looperClear>=0){
+    const cx=W/2, cy=H*0.42, R=46, frac=Math.max(0,Math.min(1,looperClear/CLEAR_HOLD_MS));   // 1→0
+    ctx.fillStyle='rgba(10,10,20,.82)'; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(cx,cy,R,0,7); ctx.stroke();
+    ctx.strokeStyle='#e5484d'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(cx,cy,R,-Math.PI/2,-Math.PI/2+2*Math.PI*frac); ctx.stroke();   // убывающая дуга = остаток
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='700 26px system-ui'; ctx.fillText(String(Math.ceil(looperClear/1000)), cx, cy-4);
+    ctx.font='600 10px system-ui'; ctx.fillText('ОЧИСТКА', cx, cy+16);
+  }
+  if(looperMsg && now<looperMsg.until){
+    const t=looperMsg.text, cx=W/2, cy=H*0.20;
+    ctx.font='700 16px system-ui'; const w=ctx.measureText(t).width;
+    ctx.fillStyle='rgba(10,10,20,.85)';
+    ctx.beginPath(); ctx.roundRect(cx-w/2-14,cy-16,w+28,32,9); ctx.fill();
+    ctx.strokeStyle=looperMsg.ok?'rgba(87,217,163,.7)':'rgba(229,72,77,.85)'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.fillStyle=looperMsg.ok?'#7ee0b6':'#ff8a8d'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(t, cx, cy);
+  }
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 /* Сетка ударных: по ряду на инструмент кита, без тоники/центов. Рисуем в X-диапазоне роли [rx0,rx1]
    (сплит: только своя половина; single-role: 0..W, байт-в-байт). */
@@ -447,6 +474,7 @@ function drawHandsPhone(res,W,H,playH){
     }else{ instr=phoneInstr; rx0=0; rx1=W; }
     const split=palSplitX(rx0,rx1), accent=INSTR_COL[instr], isCh=instr==='ch', isDr=instr==='dr';
     const fxHand=instr==='ld'&&handFnOf(k,'ld')==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов = её ФУНКЦИЯ в соло-роли (single И сплит-половина одинаково)
+    const loopHand=(instr==='ld'||instr==='bs'||instr==='ch')&&handFnOf(k,instr)==='loop';   // рука-ЛУПЕР: нот не играет, командует пальцами
     for(let i=0;i<lm.length;i++){
       const x=sx(lm[i].x,W), y=sy(lm[i].y,H), tipPt=i===4||FINGER_TIPS.includes(i);   // точки в экранных пикселях игрового поля (поля кадра сняты); НЕ клампим — рука уходит за кромку вместе с картинкой
       ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
@@ -461,6 +489,14 @@ function drawHandsPhone(res,W,H,playH){
       if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.k);
         ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
         ctx.fillText(`${meta.full} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); }
+      continue;
+    }
+    if(loopHand){                                // рука-ЛУПЕР: помечаем, чтобы не казалась «немой»; подсказку раскладки даём до щипка
+      const px=S.pinch?S.x:sx(lm[8].x,W), py=S.pinch?S.y:sy(lm[8].y,H);
+      ctx.fillStyle=hexA('#57d9a3',.95); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText('ЛУПЕР', px+14, py-10);
+      if(!S.pinch){ ctx.fillStyle=hexA('#57d9a3',.6); ctx.font='600 10px system-ui';
+        ctx.fillText('указ.=запись · средн.=пуск · безым.=отмена · мизинец=очистка', px+14, py+6); }   // раскладка команд — только пока не щиплет (не мешает отсчёту/подтверждению)
       continue;
     }
     // рука нот
