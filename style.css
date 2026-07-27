@@ -267,6 +267,12 @@
      с ними. Ссылки узнаются цветом+весом (не только подчёркиванием). */
   .startFoot{margin-top:18px; padding-top:13px; border-top:1px solid rgba(20,24,50,.10);
     font-size:var(--fs-label); color:#5a6079; line-height:1.55;}
+  /* Переключатель языка — тихая строка подвала (i18n). Светлый select (базовый select тёмный —
+     перебиваем id-селектором) шириной под текст, не во всю строку; глобус — нейтральная метка без слов. */
+  .startLang{display:flex; align-items:center; justify-content:center; gap:7px; margin:0 0 12px;}
+  #langSel{width:auto; flex:0 0 auto; background:#f4f6fc; color:#2a2f45;
+    border:1px solid rgba(20,24,50,.16); border-radius:var(--r-sm);
+    padding:6px 10px; font-size:var(--fs-label); font-weight:600;}
   .startFoot p{margin:0 0 8px;}
   .startFoot a{color:var(--accent-ink); font-weight:600; text-decoration:none;
     border-bottom:1px solid rgba(180,83,9,.4); white-space:nowrap;}

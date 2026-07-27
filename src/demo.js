@@ -57,15 +57,18 @@ const LEVELS={
   thin:  {bass:false, drums:false, harmony:true },
 };
 
-/* Сцены: имя лада В ТОЧНОСТИ как в SCALES (индекс ищем по имени в рантайме), строка-культура,
-   длительность (с), уровень плотности, цвет-тинт фона. */
+/* Сцены: idx — СТАБИЛЬНЫЙ индекс лада в SCALES (массив append-only, индексы не двигаются), строка-
+   культура, длительность (с), уровень плотности, цвет-тинт фона. РАНЬШЕ сцену сопоставляли с ладом ПО
+   ИМЕНИ (SCALES.find по s.name) — но имена интернационализируются, и совпадение по имени сломалось бы;
+   индекс от языка не зависит. Имя лада на экране берём из самого лада (SCALES[idx].name), не дублируем.
+   Комментарий рядом — какой это лад (для читаемости, НЕ для сопоставления). */
 const SCENES=[
-  {name:'Мажор (ионийский)',                 culture:'как ваше фортепиано',  dur:4, level:'sparse', tint:'#ff9e2c'},
-  {name:'Пифагоров строй (чистые квинты)',   culture:'средневековая Европа', dur:4, level:'sparse', tint:'#b18cff'},
-  {name:'Макам Хиджаз',                      culture:'Ближний Восток',       dur:5, level:'full',   tint:'#57d9a3'},
-  {name:'Бхайрав',                           culture:'Индия',                dur:5, level:'full',   tint:'#e5484d'},
-  {name:'Пелог (яван. гамелан, приближение)',culture:'Ява',                  dur:5, level:'full',   tint:'#4db3ff'},
-  {name:'Болен–Пирс (13 равных, тритава)',   culture:'строй без октавы',     dur:5, level:'thin',   tint:'#ff5ca8'},
+  {idx:0,  culture:'как ваше фортепиано',  dur:4, level:'sparse', tint:'#ff9e2c'},   // Мажор (ионийский)
+  {idx:57, culture:'средневековая Европа', dur:4, level:'sparse', tint:'#b18cff'},   // Пифагоров строй (чистые квинты)
+  {idx:18, culture:'Ближний Восток',       dur:5, level:'full',   tint:'#57d9a3'},   // Макам Хиджаз
+  {idx:62, culture:'Индия',                dur:5, level:'full',   tint:'#e5484d'},   // Бхайрав
+  {idx:44, culture:'Ява',                  dur:5, level:'full',   tint:'#4db3ff'},   // Пелог (яван. гамелан, приближение)
+  {idx:50, culture:'строй без октавы',     dur:5, level:'thin',   tint:'#ff5ca8'},   // Болен–Пирс (13 равных, тритава)
 ];
 
 let running=false, voices=[], timers=[], pitchBus=null, pitchLP=null, drumBus=null, noiseBuf=null;
@@ -149,7 +152,7 @@ function dNoise(at,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.l
 
 function showScene(sc, idx, n){
   $('demoScene').textContent=(idx+1)+' / '+n;
-  $('demoName').textContent=sc.name;
+  $('demoName').textContent=sc.scale?sc.scale.name:'';   // имя из самого лада (стабильно; позже L(sc.scale.name))
   $('demoCulture').textContent=sc.culture;
   $('demoOv').style.background=
     'radial-gradient(circle at 50% 38%, '+sc.tint+'38, rgba(7,7,13,.96) 70%)';
@@ -174,8 +177,8 @@ function stopDemo(){
 
 async function runDemo(){
   if(running) return;
-  const scenes=SCENES.map(sc=>({...sc, scale:SCALES.find(s=>s.name===sc.name)}))
-                     .filter(sc=>sc.scale);         // не нашли лад — пропускаем сцену (без падения)
+  const scenes=SCENES.map(sc=>({...sc, scale:SCALES[sc.idx]}))
+                     .filter(sc=>sc.scale);         // индекс вне массива — пропускаем сцену (без падения)
   if(!scenes.length) return;
   $('demoBtn').disabled=true; $('startBtn').disabled=true;
   try{

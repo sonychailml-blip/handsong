@@ -52,6 +52,15 @@
          (форма или почта-fallback, адрес собирается в JS, не mailto в исходнике). Строка поддержки —
          тихая заметка, «Donate» = донат-ссылка; при пустом DONATE_URL ui.js прячет всю строку. -->
     <div class="startFoot">
+      <!-- Переключатель языка (i18n этап 0): тихая строка вверху подвала, не спорит с двумя главными
+           кнопками. Опции — ЭНДОНИМЫ (самоназвания). Пока English · Русский; es/de войдут позже. Значение
+           и обработчик ставит ui.js (setLang сохраняет выбор и переживает перезагрузку). -->
+      <p class="startLang"><span aria-hidden="true">🌐</span>
+        <select id="langSel" aria-label="Language / Язык">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+        </select>
+      </p>
       <p>First version — bugs and rough edges are likely. Tell me what breaks: <a id="fbLink" rel="noopener"></a></p>
       <p id="startSupport" class="startSupport">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development: <a id="donateLink" rel="noopener"></a></p>
     </div>

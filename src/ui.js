@@ -9,6 +9,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
 import { INSTR_COL } from './config.js';
 import { hooks } from './hooks.js';
+import { lang, setLang, applyI18n, L } from './i18n.js';
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
@@ -48,19 +49,27 @@ function updScaleBtn(){ scaleBtn.textContent=`${SCALES[scaleIdx].name} · ${NOTE
    массиву. Позиция в меню и позиция в SCALES развязаны, scaleIdx при этом не трогается.
    Пустой grp — не корзина: такие лады идут голыми <option> прямо в selScale
    (Хроматика/Арабская/Микротональная так и рисуются). */
+/* КЛЮЧ КОРЗИНЫ (grpKey) — СТАБИЛЬНЫЙ идентификатор подгруппы, ОТДЕЛЬНЫЙ от показываемой подписи. До
+   i18n grp был И ключом, И подписью; когда на этапе B grp станет локализуемым (строка или объект),
+   бакетинг по ПОДПИСИ раскидал бы одну группу на четыре (по языку). Поэтому корзину определяет grpKey
+   (поле лада, если задано), а подпись — L(grp). Пока grpKey нет и grp — строка: ключ = сама строка,
+   подпись = та же строка (L строку пропускает) → бакетинг и подписи байт-в-байт как сегодня.
+   Этап B: добавить каждому ладу grpKey + перевести grp в объект — бакетинг останется стабильным. */
+const grpKeyOf   = s => s.grpKey != null ? s.grpKey : (s.grp != null ? L(s.grp) : '');
+const grpLabelOf = s => s.grp != null ? L(s.grp) : '';
 function fillScales(tradId){
   selScale.textContent='';
-  const order=[], buckets=new Map();            // order — grp в порядке первого появления
+  const order=[], buckets=new Map(), labels=new Map();   // order — ключ в порядке первого появления
   scalesOfTrad(tradId).forEach(({i,s})=>{
-    const k=s.grp||'';
-    if(!buckets.has(k)){ buckets.set(k,[]); order.push(k); }
+    const k=grpKeyOf(s);
+    if(!buckets.has(k)){ buckets.set(k,[]); order.push(k); labels.set(k, grpLabelOf(s)); }
     buckets.get(k).push({i,s});                 // внутри корзины — порядок массива
   });
   for(const k of order){
-    const parent = k ? selScale.appendChild(Object.assign(document.createElement('optgroup'),{label:k}))
+    const parent = k ? selScale.appendChild(Object.assign(document.createElement('optgroup'),{label:labels.get(k)}))
                      : selScale;                // '' → без optgroup, прямо в список
     for(const {i,s} of buckets.get(k)){
-      const o=document.createElement('option'); o.value=i; o.textContent=s.name; parent.appendChild(o);
+      const o=document.createElement('option'); o.value=i; o.textContent=L(s.name); parent.appendChild(o);
     }
   }
 }
@@ -198,6 +207,12 @@ function buildStartLinks(){
   else sup.style.display='none';
 }
 buildStartLinks();
+/* ПЕРЕКЛЮЧАТЕЛЬ ЯЗЫКА (i18n этап 0). Отражаем ТЕКУЩИЙ язык (сохранённый/угаданный) и на смену зовём
+   setLang (сохранит выбор, перерисует разметку, уведомит подписчиков). Пока строки не перенесены —
+   видимо ничего не меняется, но выбор фиксируется и переживёт перезагрузку. */
+const langSel=$('langSel');
+if(langSel){ langSel.value=lang; langSel.onchange=e=>setLang(e.target.value); }
+applyI18n();   // разовый проход по [data-i18n]; сейчас таких атрибутов нет → no-op (каркас готов к этапу A)
 $('panicBtn').onclick=()=>{ panic(); resetJamDisplay(); };   // паника гасит всё → индикатор джема тоже в покой
  
 /* Смена традиции = смена лада: иначе продолжал бы звучать лад чужой традиции, а меню
