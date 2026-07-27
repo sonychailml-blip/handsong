@@ -138,6 +138,7 @@ function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.class
   if(on){ panelScaleEl.classList.remove('on'); refreshMetreCtl(); } }   // при открытии — актуализируем блокировку размера (петля могла измениться при закрытой панели)
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false); }
 $('panelClose').onclick=()=>showScale(false);
+$('panelCloseLoop').onclick=()=>showLoop(false);   // «Свернуть ✕» лупера — тот же путь закрытия, что и у ⚙/взаимоисключения
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
 loopPanelBtn.onclick=()=>showLoop(!panelLoopEl.classList.contains('on'));
 /* Кнопка учебника (#helpBtn) убрана из панели «Звукоряд» — #helpOv и его логика ЖИВЫ, но учебник
