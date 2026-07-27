@@ -15,6 +15,13 @@ export let revDisp=0;                            // отображение Z-р�
    живой руке, не по слоям петли. Дефолт 1 — нейтральная яркость. САМ звук яркости — пер-голосовой
    фильтр fb (audio.js), ведётся через событие (a.bri); здесь только показ живой руки. */
 export let chBrightDisp=1;
+/* Отображение ЭНЕРГИИ руки-ВЫРАЗИТЕЛЬНОСТИ (функция 'expr', соло): 0..1, «сколько накачано в смычок».
+   Пишет gestures (setExprDisp) по ведущей руке-выразительности, читает индикатор «ВЫР» в draw. 0 =
+   покой (смычок стоит), 1 = поёт. Дефолт 0. Сам звук — выделенные узлы выразительности (audio.js). */
+export let exprDisp=0;
+/* Отображение ШИРИНЫ/раскрытости смычка (0 кулак/узко .. 1 раскрыто/широко) — НЕ отдельная полоса (не
+   превращаем экран в панель приборов), а ТОН точек руки-выразительности в draw. Пишет gestures (setExprBrightDisp). */
+export let exprBrightDisp=0;
 /* ОБРАТНАЯ СВЯЗЬ рукой-ЛУПЕРОМ (функция 'loop'): у команд нет ноты в звуке, поэтому подтверждаем на
    экране. looperMsg — всплывающее подтверждение последней команды {text, until (мс performance.now),
    ok (false = невозможно/предупреждение)}. looperClear — остаток мс 3-секундного отсчёта очистки
@@ -58,6 +65,7 @@ export const handSide=key=> key.slice(0,4)==='Left' ? 'L' : 'R';   // сторо
 export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)]) || null;   // у роли без записи (dr) → null; ch теперь имеет запись ('latch'/'hold')
 export const roleHasTherm=role=> !!(handFn[role] && (handFn[role].L==='therm'||handFn[role].R==='therm'));
 export const roleHasFx=role=> role==='ld' && (handFn.ld.L==='fx'||handFn.ld.R==='fx');   // fx только у соло
+export const roleHasExpr=role=> role==='ld' && (handFn.ld.L==='expr'||handFn.ld.R==='expr');   // выразительность (первый заход — только соло)
 /* ЕДИНЫЙ ИСТОЧНИК ЗЕРКАЛА (фронт/тыл камеры). Фронтальная ('user') — картинку ЗЕРКАЛИМ (видишь
    себя как в зеркале, рука совпадает с экраном); тыловая ('environment') — НЕ зеркалим (иначе рука
    ехала бы против того, что на экране). camFacing пишем ТОЛЬКО через setCamFacing (правило #6).
@@ -120,6 +128,8 @@ export const setBassIdx=v=>{ bassIdx=v; };
 export const setDrumKitIdx=v=>{ drumKitIdx=v; };
 export const setRevDisp=v=>{ revDisp=v; };
 export const setChBrightDisp=v=>{ chBrightDisp=v; };   // показ Z-яркости аккордов живой руки (сам звук — пер-голосовой fb в audio, через a.bri)
+export const setExprDisp=v=>{ exprDisp=v; };           // показ энергии/живости руки-выразительности (сам звук — вибрато-шиммер в audio)
+export const setExprBrightDisp=v=>{ exprBrightDisp=v; };   // показ раскрытости (вау) — тон точек руки (сам звук — вау-пик)
 export const setLooperMsg=v=>{ looperMsg=v; };         // подтверждение команды рукой-лупером (draw гасит по looperMsg.until)
 export const setLooperClear=v=>{ looperClear=v; };     // остаток мс отсчёта очистки (мизинец); -1 = нет
 export const setLatchDeg=v=>{ latchDeg=v; };

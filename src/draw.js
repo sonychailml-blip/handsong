@@ -1,7 +1,7 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
-import { fx, revDisp, chBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
+import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold } from './audio.js';
@@ -33,6 +33,10 @@ function syncLoopTransport(on,bottom){
  
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16);
   return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+/* Смешать два hex-цвета (t: 0→h1, 1→h2), вернуть rgba с альфой a. Для тона точек руки-выразительности. */
+function mixHex(h1,h2,t,a){ const A=parseInt(h1.slice(1),16), B=parseInt(h2.slice(1),16), k=Math.max(0,Math.min(1,t));
+  const r=((A>>16)&255)+(((B>>16)&255)-((A>>16)&255))*k, g=((A>>8)&255)+(((B>>8)&255)-((A>>8)&255))*k, b=(A&255)+((B&255)-(A&255))*k;
+  return `rgba(${r|0},${g|0},${b|0},${a})`; }
  
 /* ================= ОТРИСОВКА ================= */
 /* labelX — где писать подписи ступеней. По умолчанию у левого края зоны; у соло в
@@ -418,9 +422,11 @@ function drawPhone(res){
     ctx.strokeStyle=hexA('#fff',.18); ctx.lineWidth=2;   // разделитель половин по центру
     ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
     const solo=halves.find(h=>h.role==='ld'); if(solo&&roleHasFx('ld'))drawFxBars(solo.rx0,H);   // столбики эффектов — у соло-половины, ТОЛЬКО если у соло-роли есть рука-эффекты
+    if(solo&&roleHasExpr('ld'))drawExprBar(solo.rx0,solo.rx1,H);   // «ВЫР» — энергия смычка у соло-половины, только если назначена рука-выразительность
   }else{
     drawRole(phoneInstr,0,W,playH);
     if(phoneInstr==='ld'&&roleHasFx('ld'))drawFxBars(0,H);   // эффекты действуют на соло-канал; полосу прячем, если НИ ОДНА рука не назначена на fx
+    if(phoneInstr==='ld'&&roleHasExpr('ld'))drawExprBar(0,W,H);   // «ВЫР» — энергия смычка; полосу прячем, если НИ ОДНА рука не назначена на выразительность
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
   drawHandsPhone(res,W,H,playH);
@@ -481,10 +487,22 @@ function drawHandsPhone(res,W,H,playH){
     const split=palSplitX(rx0,rx1), accent=INSTR_COL[instr], isCh=instr==='ch', isDr=instr==='dr';
     const fxHand=instr==='ld'&&handFnOf(k,'ld')==='fx', base=fxHand?'#4cc2ff':accent;   // рука эффектов = её ФУНКЦИЯ в соло-роли (single И сплит-половина одинаково)
     const loopHand=(instr==='ld'||instr==='bs'||instr==='ch')&&handFnOf(k,instr)==='loop';   // рука-ЛУПЕР: нот не играет, командует пальцами
+    const exprHand=instr==='ld'&&handFnOf(k,'ld')==='expr';   // рука-ВЫРАЗИТЕЛЬНОСТЬ: нот не играет, «дышит» в звук
+    /* Одна рука — четыре канала, БЕЗ панели приборов: тон точек = ШИРИНА/раскрытость (тускло-синий кулак →
+       воздушно-голубой раскрытая ладонь), непрозрачность И размер = ЭНЕРГИЯ (движение → свечение). Текстуру и
+       пространство не рисуем (их слышно как грязь и эхо), чтобы не превратить экран в измеритель. */
+    const eTip = exprHand ? mixHex(EXPR_COL_DK,EXPR_COL,exprBrightDisp,0.45+0.55*exprDisp) : null;
     for(let i=0;i<lm.length;i++){
       const x=sx(lm[i].x,W), y=sy(lm[i].y,H), tipPt=i===4||FINGER_TIPS.includes(i);   // точки в экранных пикселях игрового поля (поля кадра сняты); НЕ клампим — рука уходит за кромку вместе с картинкой
-      ctx.fillStyle=tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
-      ctx.beginPath(); ctx.arc(x,y,tipPt?6:2.5,0,7); ctx.fill();
+      ctx.fillStyle= exprHand ? (tipPt?eTip:mixHex(EXPR_COL_DK,EXPR_COL,exprBrightDisp,0.3))
+                   : tipPt?(S.pinch?base:'rgba(255,255,255,.65)'):'rgba(255,255,255,.4)';
+      ctx.beginPath(); ctx.arc(x,y,exprHand&&tipPt?6+3*exprDisp:(tipPt?6:2.5),0,7); ctx.fill();   // кончики растут с энергией
+    }
+    if(exprHand){                                // рука-ВЫРАЗИТЕЛЬНОСТЬ: играет НИЧЕГО — помечаем у основания среднего (lm[9])
+      const px=S.pinch?S.x:sx(lm[9].x,W), py=S.pinch?S.y:sy(lm[9].y,H);
+      ctx.fillStyle=hexA(EXPR_COL,.95); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText('ВЫР', px+14, py-10);
+      continue;
     }
     if(S.pinch&&S.zone==='oct'){                  // рука в октавной полосе (любая, в т.ч. левая): показываем регистр, эффектов НЕ трогаем
       ctx.fillStyle='#4cc2ff'; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
@@ -669,6 +687,22 @@ function drawChordBright(rx0,rx1,H){
   const fh=FX_BAR_MAX*v;
   ctx.fillStyle=INSTR_COL.ch; ctx.globalAlpha=0.7; ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;   // заполнение снизу вверх
   ctx.fillStyle=hexA(INSTR_COL.ch,.85); ctx.fillText('ЯРК',x+FX_BAR_W/2,y0-5);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+/* Индикатор ЭНЕРГИИ руки-ВЫРАЗИТЕЛЬНОСТИ («смычок») — один вертикальный столбик «ВЫР», как ЯРК/REV.
+   Заполнение = exprDisp (0 покой .. 1 поёт). Стоит внизу-СПРАВА соло-поля (там свободно, эффекты —
+   слева). Виден, ТОЛЬКО когда какая-то рука соло назначена на 'expr' (гейт в drawPhone). Столбик
+   отвечает на движение ДО первой ноты — так связка «двигаю → открывается» видна сразу (учебность). */
+const EXPR_COL='#5ad1ff';   // воздушный тон (ЯРКО/раскрыто) — не путать с REV (зелёный) и ролью соло (оранжевый)
+const EXPR_COL_DK='#3a5cff';   // тускло-синий (СЖАТО/тускло) — второй конец тона точек руки
+function drawExprBar(rx0,rx1,H){
+  const v=Math.max(0,Math.min(1,exprDisp));
+  const x=rx1-FX_BAR_W-10, y1=H-40, y0=y1-FX_BAR_MAX;
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
+  ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
+  const fh=FX_BAR_MAX*v;
+  ctx.fillStyle=EXPR_COL; ctx.globalAlpha=0.7; ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;   // заполнение снизу вверх
+  ctx.fillStyle=hexA(EXPR_COL,.85); ctx.fillText('ВЫР',x+FX_BAR_W/2,y0-5);
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 /* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).

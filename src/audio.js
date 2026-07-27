@@ -96,7 +96,7 @@ const DRUM_KITS=[{label:'Стандарт'},{label:'Дарбука'},{label:'Т�
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter, verb, verbOut;
 let banks=[], vibGain, humDetune, satWet, satDry, envGain, volGain,
-    tremGain, tremDepth, dlyWet, revLead;              // соло-цепочка (humDetune — гуманизация высоты, общий узел в detune всех лид-осц.)
+    tremGain, tremDepth, dlyWet, revLead, exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-цепочка (humDetune — гуманизация высоты, общий узел в detune всех лид-осц.; expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
 let lastVel=0.5;                                        // последняя громкость X — скорость→яркость читает её на атаке (формат события не трогаем)
 let chordBus, revCh;                                    // аккорды (Z-яркость — пер-голосовой фильтр fb в пуле, не на шине)
 let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
@@ -107,6 +107,22 @@ let drumBus;                                             // шина ударн�
  
 function makeSatCurve(k=4,n=1024){ const c=new Float32Array(n);
   for(let i=0;i<n;i++){const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x);} return c; }
+/* ЖЁСТКАЯ кривая искажения — ДРУГОЙ ХАРАКТЕР, не «больше того же»: резкий клип (k высокий) + заострение
+   (pow<1) + лёгкая АСИММЕТРИЯ (чётные гармоники → «злее/грязнее», а не просто громче тот же тон). Пара к
+   makeSatCurve (мягкое/тёплое): размах пальцев морфит МЕЖДУ ними, поэтому щепоть = тепло, веер = грязь. */
+function makeHardCurve(k=18,n=1024){ const c=new Float32Array(n);
+  for(let i=0;i<n;i++){ const x=i/(n-1)*2-1; let y=Math.tanh(k*x); y=Math.sign(y)*Math.pow(Math.abs(y),0.7);
+    c[i]=Math.max(-1,Math.min(1, y+0.12*x*x*Math.sign(x))); } return c; }
+/* ВЫРАЗИТЕЛЬНОСТЬ — числа СТОРОНЫ ЗВУКА (канал→узел): здесь, а не в EXPR_CFG (gestures), потому что gestures
+   импортирует audio — обратный импорт запрещён (цикл). EXPR_CFG держит признак→канал (мёртвые зоны/пружины);
+   этот блок — канал→глубина/диапазон/добротность. Все ЭТИ числа тоже крутят НА СЛУХ. */
+const EXPR_A={
+  vibHz:5.2,                 // ЭНЕРГИЯ→ЖИВОСТЬ: частота шиммера (LFO)
+  vibCents:2.5, vibAmp:0.05, // глубина шиммера ВЫСОТЫ (±центы, в пределах пары центов — живьём, в запись НЕ идёт) и АМПЛИТУДЫ (доля)
+  wahLo:350, wahHi:2200, wahQ:5, wahBoost:14,   // НАТЯЖЕНИЕ→ВАУ: пик пробегает lo..hi (лог) с добротностью Q и подъёмом дБ
+  soft:0.5, hard:1.0,        // РАЗМАХ→ТЕКСТУРА: уровни МЯГКОГО (тёплого) и ЖЁСТКОГО (грязного) искажений — меняется ХАРАКТЕР
+  spaceMax:0.5,              // НАКЛОН→ПРОСТРАНСТВО: потолок посыла в делей
+};
 function makeIR(sec=1.8,decay=2.2){
   const len=Math.floor(AC.sampleRate*sec), b=AC.createBuffer(2,len,AC.sampleRate);
   for(let ch=0;ch<2;ch++){const d=b.getChannelData(ch);
@@ -116,7 +132,7 @@ function makeIR(sec=1.8,decay=2.2){
 function mkOsc(type,freq,dest,gainVal){
   const o=AC.createOscillator(); o.type=type; o.frequency.value=freq;
   const g=AC.createGain(); g.gain.value=gainVal;
-  o.connect(g); g.connect(dest); vibGain.connect(o.detune); humDetune.connect(o.detune); o.start();   // вибрато И гуманизация — оба в detune (центы), сумма с собственной расстройкой осц.
+  o.connect(g); g.connect(dest); vibGain.connect(o.detune); humDetune.connect(o.detune); exprVibPitch.connect(o.detune); o.start();   // вибрато fx + гуманизация + шиммер ВЫРАЗИТЕЛЬНОСТИ (энергия→живость) — все в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
   return o;
 }
 const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
@@ -462,6 +478,14 @@ async function initAudio(){
      атаке ставим свежий случайный сдвиг ±HUM_CENTS·bank.hum; detune не трогается пофреймовой setFreq,
      поэтому сдвиг держится всю ноту. Создаём ДО buildLeadBanks — mkOsc сразу цепляет его в detune. */
   humDetune=AC.createConstantSource(); humDetune.offset.value=0; humDetune.start();
+  /* ЖИВОСТЬ (энергия → вибрато): свой LFO шиммера. exprVibPitch → detune ВСЕХ лид-осц. (mkOsc цепляет ниже),
+     глубина = энергия (пишет applyExpr, в пределах пары центов). ОТДЕЛЬНО от vibGain (вибрато fx-руки) — не
+     дерутся, суммируются в detune. На реальном инструменте вибрато рождается из НЕПРЕРЫВНОГО усилия, а
+     идеально статичный тон звучит МЁРТВО — так «смычок» кормит теперь ЖИЗНЬ, а не громкость. Создаём ДО
+     buildLeadBanks, чтобы mkOsc сразу цеплял exprVibPitch (как vibGain/humDetune). Живьём, в запись НЕ идёт. */
+  const exprVibLFO=AC.createOscillator(); exprVibLFO.type='sine'; exprVibLFO.frequency.value=EXPR_A.vibHz;
+  exprVibPitch=AC.createGain(); exprVibPitch.gain.value=0;   // глубина шиммера ВЫСОТЫ (центы), нейтраль 0 → detune += 0 (байт-в-байт)
+  exprVibLFO.connect(exprVibPitch); exprVibLFO.start();
 
   const preBus=AC.createGain(); preBus.gain.value=1;
   buildLeadBanks(preBus, ksOk);
@@ -473,15 +497,50 @@ async function initAudio(){
   preBus.connect(satDry); preBus.connect(shaper); shaper.connect(satWet);
   const satSum=AC.createGain(); satDry.connect(satSum); satWet.connect(satSum);
  
+  /* ВЫРАЗИТЕЛЬНОСТЬ (рука-«смычок»): ЧЕТЫРЕ канала → ЧЕТЫРЕ РАЗНЫЕ оси (см. applyExpr): ЖИВОСТЬ (энергия→
+     вибрато, выше), ВАУ (натяжение→резонансный пик), ТЕКСТУРА (размах→ХАРАКТЕР искажения), ПРОСТРАНСТВО
+     (наклон→делей). Громкость больше НЕ здесь — она целиком у НОТНОЙ руки (volGain, X-позиция): две руки не
+     дерутся за одну величину. Все узлы ниже НЕЙТРАЛЬНЫ по умолчанию (gain 1 или 0, wah при 0дБ — плоский
+     тождественный биквад) → без руки соло-цепочка БИТ-В-БИТ как сегодня. */
   envGain=AC.createGain(); envGain.gain.value=0;
-  volGain=AC.createGain(); volGain.gain.value=0.5;
+  volGain=AC.createGain(); volGain.gain.value=0.5;                 // ГРОМКОСТЬ нотной руки (X) — выразительность её НЕ трогает
   satSum.connect(envGain); envGain.connect(volGain);
- 
+
+  /* ЖИВОСТЬ (амплитудная часть шиммера): exprGain = ЕДИНИЦА (база), её .gain МОДУЛИРУЕТ vibrato-LFO через
+     exprVibAmp (глубина=энергия). applyExpr сам exprGain НЕ пишет (громкость ушла нотной руке). Нейтраль:
+     exprVibAmp=0 → exprGain держит ровно 1 (тождество). Пара к exprVibPitch (высотная часть, в detune). */
+  const exprGain=AC.createGain(); exprGain.gain.value=1;
+  volGain.connect(exprGain);
+  exprVibAmp=AC.createGain(); exprVibAmp.gain.value=0;
+  exprVibLFO.connect(exprVibAmp); exprVibAmp.connect(exprGain.gain);
+
+  /* ТЕКСТУРА (размах пальцев → ХАРАКТЕР искажения, НЕ количество): ДВА шейпера параллельно — МЯГКИЙ (тёплый,
+     makeSatCurve) и ЖЁСТКИЙ (грязный, makeHardCurve). Размах морфит МИКС между ними: щепоть=тёплое, веер=грязное
+     (разный РОД искажения). exprSatLP после ГАСИТ добавленные верхи → «грязнее», а НЕ «ярче» (в этом и была
+     жалоба на текстуру). Сухой всегда полный (параллель). Нейтраль: обе влажные=0 → только сухой = тождество. */
+  const softShaper=AC.createWaveShaper(); softShaper.curve=makeSatCurve();  softShaper.oversample='2x';
+  const hardShaper=AC.createWaveShaper(); hardShaper.curve=makeHardCurve(); hardShaper.oversample='4x';
+  const exprSatLP=AC.createBiquadFilter(); exprSatLP.type='lowpass'; exprSatLP.frequency.value=2500;   // грязь ≠ ярче
+  const exprSatDry=AC.createGain(); exprSatDry.gain.value=1;
+  exprSatSoftG=AC.createGain(); exprSatSoftG.gain.value=0;
+  exprSatHardG=AC.createGain(); exprSatHardG.gain.value=0;
+  const exprSatWetSum=AC.createGain(), exprSatSum=AC.createGain();
+  exprGain.connect(exprSatDry); exprSatDry.connect(exprSatSum);
+  exprGain.connect(softShaper); softShaper.connect(exprSatSoftG); exprSatSoftG.connect(exprSatWetSum);
+  exprGain.connect(hardShaper); hardShaper.connect(exprSatHardG); exprSatHardG.connect(exprSatWetSum);
+  exprSatWetSum.connect(exprSatLP); exprSatLP.connect(exprSatSum);
+
   tremGain=AC.createGain(); tremGain.gain.value=1;
   const tremLFO=AC.createOscillator(); tremLFO.frequency.value=4;
   tremDepth=AC.createGain(); tremDepth.gain.value=0;
   tremLFO.connect(tremDepth); tremDepth.connect(tremGain.gain); tremLFO.start();
-  volGain.connect(tremGain);
+  /* ВАУ (натяжение → частота резонансного пика): высокодобротный PEAKING-биквад — резонансный пик, который
+     ПРОБЕГАЕТ частоту вслед за раскрытием ладони (раскрыто = пик вверх, кулак = вниз). Громче/яснее фейзера,
+     физически читаемо — рука ведёт «голос» звука. Peaking (а не чистый bandpass в разрыв: тот истончил бы
+     тон) — пропускает ВЕСЬ сигнал, поднимает одну полосу. Нейтраль: подъём 0дБ → peaking-биквад ПЛОСКИЙ
+     (тождество), поэтому без руки байт-в-байт. Частота/Q/подъём — EXPR_A (крутить на слух). */
+  exprWah=AC.createBiquadFilter(); exprWah.type='peaking'; exprWah.frequency.value=EXPR_A.wahLo; exprWah.Q.value=EXPR_A.wahQ; exprWah.gain.value=0;
+  exprSatSum.connect(exprWah); exprWah.connect(tremGain);
  
   const leadOut=AC.createGain(); leadOut.gain.value=0.22;   // сушит и посылы (dly/rev идут ПОСЛЕ leadOut)
   tremGain.connect(leadOut); leadOut.connect(master);
@@ -493,7 +552,14 @@ async function initAudio(){
  
   revLead=AC.createGain(); revLead.gain.value=0;
   leadOut.connect(revLead); revLead.connect(verb);
- 
+  /* ПРОСТРАНСТВО (наклон ладони → ЭХО): ОТДЕЛЬНАЯ линия ДЕЛЕЯ руки-выразительности — НЕ реверб, чтобы читалось
+     как ЭХО, а не как комната, которую уже даёт реверб fx-руки. Своя линия + обратная связь + посыл, ДОБАВОЧНО к
+     делею fx-руки (dly/dlyWet), чьи значения она НЕ читает и НЕ пишет. Нейтраль: посыл 0. */
+  const exprDlyLine=AC.createDelay(1); exprDlyLine.delayTime.value=0.28;
+  const exprDlyFb=AC.createGain(); exprDlyFb.gain.value=0.4; exprDlyLine.connect(exprDlyFb); exprDlyFb.connect(exprDlyLine);
+  exprDlyWet=AC.createGain(); exprDlyWet.gain.value=0;
+  leadOut.connect(exprDlyLine); exprDlyLine.connect(exprDlyWet); exprDlyWet.connect(master);
+
   /* --- АККОРДЫ: чистая шина + фиксированный маленький send в реверб ---
      Z-ЯРКОСТЬ живёт ПЕР-ГОЛОСОВО (фильтр fb каждого голоса, см. buildChordPool), а НЕ на этой шине:
      общий фильтр не смог бы дать разным слоям петли РАЗНУЮ яркость. Поэтому шина снова простая. */
@@ -542,6 +608,21 @@ function applyParams(p){
   tremGain.gain.setTargetAtTime(1-p.trm*0.45,t,0.05);
   dlyWet.gain.setTargetAtTime(p.dly*0.55,t,0.08);
   revLead.gain.setTargetAtTime(p.rev*0.85,t,0.08);
+}
+/* ВЫРАЗИТЕЛЬНОСТЬ → звук. gestures прогнал признаки через резонатор/пружину (вся «жизнь» там) и шлёт СГЛАЖЕННЫЕ
+   каналы 0..1 + engage. Мэппинг канал→узел (глубины/диапазоны) — по EXPR_A (числа стороны звука). Через
+   setTargetAtTime (не прямое присваивание — то слышно как щелчок). ЧЕТЫРЕ РАЗНЫЕ оси, в этом весь смысл:
+   en — ЖИВОСТЬ (энергия→вибрато высоты+амплитуды; НЕ громкость — та у нотной руки), ten — ВАУ (натяжение→частота
+   пика), spr — ТЕКСТУРА (размах морфит МЯГК.↔ЖЁСТК. искажение — характер, не количество), ori — ПРОСТРАНСТВО
+   (наклон→делей). Всё гейтится engage (нет руки → 0/тождество). Свои узлы — эффекты fx-руки не читают/не пишут. */
+function applyExpr(en,ten,spr,ori,eng,tc){ if(!AC)return; const t=AC.currentTime;
+  exprVibPitch.gain.setTargetAtTime(en*eng*EXPR_A.vibCents,t,tc);   // ЖИВОСТЬ: шиммер ВЫСОТЫ (±центы, живьём, в запись НЕ идёт)
+  exprVibAmp.gain.setTargetAtTime(en*eng*EXPR_A.vibAmp,t,tc);       // ЖИВОСТЬ: шиммер АМПЛИТУДЫ (модулирует exprGain база 1)
+  exprWah.frequency.setTargetAtTime(EXPR_A.wahLo*Math.pow(EXPR_A.wahHi/EXPR_A.wahLo,ten),t,tc);   // ВАУ: пик пробегает lo..hi (лог) по натяжению
+  exprWah.gain.setTargetAtTime(eng*EXPR_A.wahBoost,t,tc);           // ВАУ: подъём дБ (0 без руки → плоский)
+  exprSatSoftG.gain.setTargetAtTime(eng*(1-spr)*EXPR_A.soft,t,tc);  // ТЕКСТУРА: щепоть → тёплое (мягкий шейпер)
+  exprSatHardG.gain.setTargetAtTime(eng*spr*EXPR_A.hard,t,tc);      // ТЕКСТУРА: веер → грязное (жёсткий шейпер)
+  exprDlyWet.gain.setTargetAtTime(ori*eng*EXPR_A.spaceMax,t,tc);    // ПРОСТРАНСТВО: посыл в делей (эхо)
 }
 /* Глиссандо-в-луп (переигровка терменвокса): расписываем ЗАПИСАННУЮ кривую бенда на будущие
    AC-времена через ТУ ЖЕ setFreq (setTargetAtTime 0.02) — тот же 20мс-глайд, что и живьём.
@@ -800,7 +881,7 @@ function createRecordingTap(){
 
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
 export {
-  initAudio, AC, setLeadInstr, applyParams, scheduleBend, leadCancel, noteOn, noteOff, metroClick,
+  initAudio, AC, setLeadInstr, applyParams, applyExpr, scheduleBend, leadCancel, noteOn, noteOff, metroClick,
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
