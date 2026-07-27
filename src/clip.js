@@ -11,9 +11,42 @@ import { canvas } from './vision.js';
 import { createRecordingTap } from './audio.js';
 import { setVideoRec } from './state.js';
 
-let rec=null, recKind=null, chunks=[], stream=null, tap=null, notify=null;
+let rec=null, recKind=null, chunks=[], stream=null, tap=null, notify=null, vTrack=null, lastCap=0;
+
+/* Параметры ВИДЕОзаписи (звук — своя дорожка, свой дефолтный кодек, ниже не трогаем).
+   Захват ЗАБЛОКИРОВАН НА ОТРИСОВКУ: поток берём как captureStream(0) (кадры только по нашему
+   requestFrame), а сам requestFrame зовёт main.js в КОНЦЕ каждого отрисованного кадра (captureFrame).
+   Почему: captureStream(fps) сэмплит холст по СВОЕМУ таймеру-ограничителю, не совпадающему с ритмом
+   rAF (кадр ~16.7 мс при 60 Гц, ограничитель ~33–42 мс — не делится нацело), поэтому реальные кадры
+   в файл попадают неравномерно (шаблон 2,3,2,3…) → дёрганая запись при ПЛАВНОМ живом холсте. С
+   captureStream(0)+requestFrame момент захвата выбираем МЫ — всегда свежеотрисованный кадр, захват
+   в фазе с отрисовкой. requestFrame ~бесплатен → задержке жестов/детекции ничего не стоит.
+   REC_FPS — ПОТОЛОК частоты захвата (throttle в captureFrame), чтобы не грузить кодер каждым кадром
+   дисплея (60 Гц × 1.7 Мп мог бы заставить кодер ронять кадры — та же дёрганость). 30 — чистый
+   делитель 60 Гц (берём каждый 2-й кадр, ровно) и стандартно плавно. */
+const REC_FPS=30, CAP_MS=1000/REC_FPS;
+/* Битрейт видео по ФАКТИЧЕСКОМУ размеру холста (vision.js: canvas = innerWidth×innerHeight, на
+   десктопе ~1.7 Мп). Без явного значения браузер берёт скромный дефолт (~2.5 Мбит/с у VP9 незави-
+   симо от разрешения) — на большом холсте это мыло/блочность. Цель ≈0.12 бит/пиксель/кадр (хорошо
+   для VP9 с камерой+накладками), с полом 3.5 и потолком 12 Мбит/с. Разрешение записи НЕ понижаем:
+   надёжно это требует либо второй полной отрисовки в офф-скрин холст (запрещено), либо
+   applyConstraints, который на canvas-дорожке обычно игнорируется. Поэтому качество задаём
+   битрейтом под настоящий размер — верно при любом холсте. */
+function videoBitrate(w,h){ return Math.round(Math.min(12e6, Math.max(3.5e6, w*h*REC_FPS*0.12))); }
 
 export const activeKind = () => recKind;         // 'video' | 'audio' | null — читает ui для вида кнопок
+/* Зафиксировать ТЕКУЩИЙ отрисованный кадр в видеозапись. Зовётся из цикла (main.js) в самом КОНЦЕ
+   кадра, ПОСЛЕ drawOverlays — так в файл попадает ровно то, что нарисовано (захват в фазе с
+   отрисовкой). Ничего не делает, пока не идёт ВИДЕОзапись (аудио/покой не трогаем) — по кадру это
+   одна проверка recKind, жестам/детекции ничего не стоит. Троттлинг до REC_FPS: не грузим кодер
+   каждым кадром дисплея, но КАЖДЫЙ зафиксированный кадр — настоящий свежий кадр (без дублей/бинга). */
+export function captureFrame(){
+  if(recKind!=='video'||!vTrack||!vTrack.requestFrame) return;
+  const now=performance.now();
+  if(now-lastCap < CAP_MS) return;
+  lastCap=now;
+  try{ vTrack.requestFrame(); }catch(e){}
+}
 /* ЕДИНЫЙ источник правды — состояние здесь (rec/recKind). ui НЕ гадает по тапу, а ПОДПИСЫВАЕТСЯ:
    notify зовётся ПОСЛЕ каждой смены состояния (старт, реальная остановка, ошибка, внешний обрыв
    дорожки), поэтому кнопки (.act/disabled), флаг videoRec и настоящее состояние рекордера не
@@ -47,12 +80,15 @@ export function startClip(kind='video'){
   if(video && !canvas.captureStream) throw new Error('captureStream не поддерживается браузером');
   tap=createRecordingTap();                      // параллельный отвод звука; живой выход не трогаем
   if(!tap) throw new Error('Звук ещё не запущен');
-  let tracks=[...tap.stream.getAudioTracks()];    // аудио — всегда; видео добавляем сверху
-  if(video){ const vid=canvas.captureStream(30); tracks=[...vid.getVideoTracks(), ...tracks]; }   // 30 fps — хватает для соцсетей, легче для телефона; форма экрана наследуется, без кропа
+  let tracks=[...tap.stream.getAudioTracks()], vBits=0;    // аудио — всегда; видео добавляем сверху
+  if(video){ const vid=canvas.captureStream(0); vTrack=vid.getVideoTracks()[0]; lastCap=0; vBits=videoBitrate(canvas.width, canvas.height); tracks=[...vid.getVideoTracks(), ...tracks]; }   // 0 fps = кадры только по requestFrame (captureFrame из цикла) — захват в фазе с отрисовкой; битрейт по размеру холста; форма экрана наследуется, без кропа
   stream=new MediaStream(tracks);
   const mime=pickMime(kind);
+  const opts={};                                  // videoBitsPerSecond задаём ТОЛЬКО для видео; аудиодорожка остаётся со своим дефолтным кодеком/битрейтом — аудиопуть не трогаем
+  if(mime) opts.mimeType=mime;
+  if(vBits) opts.videoBitsPerSecond=vBits;
   try{
-    rec=new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
+    rec=new MediaRecorder(stream, Object.keys(opts).length?opts:undefined);
   }catch(e){ cleanup(); throw new Error('Не удалось начать запись: '+(e&&e.message||e)); }
   recKind=kind; chunks=[];
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
@@ -81,7 +117,7 @@ function cleanup(){
   if(recKind==='video') setVideoRec(false);      // накладки возвращаются в кадр ТОЛЬКО когда видеозапись реально завершена; аудио этот флаг не трогало
   if(stream) for(const t of stream.getTracks()) t.stop();   // гасим ТОЛЬКО дорожки записи (видео-трек холста + отвод звука); холст и живой звук живут дальше
   if(tap) tap.dispose();                                    // снимаем ребро limiter→отвод
-  rec=null; recKind=null; chunks=[]; stream=null; tap=null;
+  rec=null; recKind=null; chunks=[]; stream=null; tap=null; vTrack=null;   // captureFrame станет no-op (recKind=null)
   fireChange();                                  // ui: снимаем .act/disabled на ЛЮБОМ пути завершения (норм. стоп, ошибка, внешний обрыв)
 }
 

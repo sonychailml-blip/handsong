@@ -2,6 +2,7 @@ import { initAudio, AC } from './audio.js';
 import { video, landmarker, initVision } from './vision.js';
 import { processHands } from './gestures.js';
 import { drawVideoBackground, drawOverlays } from './draw.js';
+import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
 import { $, revealBar } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: кнопка «Послушать строи» на старте (демо строёв, без камеры)
 
@@ -31,6 +32,7 @@ function loop(){
   }
   processHands(latest);
   drawOverlays(latest);                      // накладки — ПОСЛЕ, поверх того же кадра
+  captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр (захват в фазе с отрисовкой); иначе no-op
 }
 
 /* ================= СТАРТ =================
