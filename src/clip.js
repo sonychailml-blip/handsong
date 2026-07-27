@@ -129,10 +129,10 @@ function save(mime){
   const blob=new Blob(chunks,{type:mime});
   const audio=mime.indexOf('audio')===0;
   const ext = mime.includes('mp4') ? (audio?'m4a':'mp4') : 'webm';
-  const name=`эйр-синт-${stamp()}.${ext}`;
+  const name=`handsong-${stamp()}.${ext}`;
   const file=(typeof File!=='undefined') ? new File([blob],name,{type:mime}) : null;
   if(file && navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title:'Air Synth'}).catch(()=>download(blob,name));   // отмена/отказ шэра → скачиваем
+    navigator.share({files:[file], title:'Handsong'}).catch(()=>download(blob,name));   // отмена/отказ шэра → скачиваем
   }else download(blob,name);
 }
 function download(blob,name){

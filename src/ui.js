@@ -17,8 +17,8 @@ const $=id=>document.getElementById(id);
    (мёртвых ссылок не рисуем). Меняется ОДНОЙ строкой ЗДЕСЬ. Отзыв без формы падает на e-mail; адрес
    собираем в JS (FB_MAIL_USER+'@'+FB_MAIL_DOMAIN), а НЕ mailto в HTML-исходнике — лёгкая защита от
    сборщиков адресов на публичной странице. i18n позже — строки пока русские. */
-const FEEDBACK_URL='';        // Google-форма отзыва (впишется позже)
-const DONATE_URL='';          // страница поддержки (впишется позже)
+const FEEDBACK_URL='https://docs.google.com/forms/d/e/1FAIpQLScnVgevwYbUNMUAs1U5vm0DhWyHG2bBAUEGY7tXSqjaLvS2QQ/viewform';   // Google-форма отзыва
+const DONATE_URL='https://paypal.me/chailml';   // страница поддержки (PayPal.Me)
 const FB_MAIL_USER='chailakhianmikhail', FB_MAIL_DOMAIN='gmail.com';   // fallback-почта, пока нет формы
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), fsBtn=$('fsBtn'), fsBtnStart=$('fsBtnStart'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
@@ -185,12 +185,16 @@ $('learnBtn').onclick=()=>{ $('learnMsg').textContent='Интерактивно�
 /* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
    адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
 function buildStartLinks(){
-  const fb=$('fbLink'), dn=$('donateLink');
-  if(FEEDBACK_URL){ fb.href=FEEDBACK_URL; fb.target='_blank'; fb.textContent='Форма отзыва'; }
-  else{ const a=FB_MAIL_USER+'@'+FB_MAIL_DOMAIN; fb.href='mailto:'+a; fb.removeAttribute('target'); fb.textContent='Написать: '+a; }
+  const fb=$('fbLink'), dn=$('donateLink'), sup=$('startSupport');
+  // Отзыв: форма (новая вкладка — не терять игру/несохранённую петлю) или почта-fallback. Т.к. FEEDBACK_URL
+  // задан — идём в первую ветку, mailto не рисуется, адрес в исходник HTML не попадает.
+  if(FEEDBACK_URL){ fb.href=FEEDBACK_URL; fb.target='_blank'; fb.textContent='Feedback'; }
+  else{ const a=FB_MAIL_USER+'@'+FB_MAIL_DOMAIN; fb.href='mailto:'+a; fb.removeAttribute('target'); fb.textContent='Email me'; }
   fb.style.display='';                                   // отзыв виден всегда (форма или почта-fallback)
-  if(DONATE_URL){ dn.href=DONATE_URL; dn.target='_blank'; dn.textContent='Поддержать проект'; dn.style.display=''; }
-  else dn.style.display='none';                          // донат без URL — прячем (мёртвую ссылку не рисуем)
+  // Донат — «Donate» в конце тихой строки поддержки. Новая вкладка (та же причина). Пустой URL — прячем ВСЮ
+  // строку поддержки (без ссылки предложение бессмысленно; мёртвую ссылку и обещание не рисуем).
+  if(DONATE_URL){ dn.href=DONATE_URL; dn.target='_blank'; dn.textContent='Donate'; sup.style.display=''; }
+  else sup.style.display='none';
 }
 buildStartLinks();
 $('panicBtn').onclick=()=>{ panic(); resetJamDisplay(); };   // паника гасит всё → индикатор джема тоже в покой
@@ -388,6 +392,50 @@ fsBtnStart.onclick=toggleFullscreen;
 addEventListener('fullscreenchange', applyFullscreen);
 addEventListener('webkitfullscreenchange', applyFullscreen);   // старый Safari/Chrome — своё имя события
 applyFullscreen();                                 // старт: отразить факт (и спрятать обе, если API нет)
+/* ⬇ УСТАНОВКА НА ДОМАШНИЙ ЭКРАН (PWA). Тот же принцип, что у полноэкранного — ПО РЕАЛЬНОЙ СПОСОБНОСТИ,
+   не по строке браузера:
+   • Chromium (Android/desktop): ловим beforeinstallprompt, ПРИДЕРЖИВАЕМ событие; кнопка появляется ТОЛЬКО
+     после него (до события prompt() пуст → это была бы мёртвая кнопка).
+   • iOS Safari: события нет и установить кнопкой нельзя → показываем короткую инструкцию (Share → на экран).
+   • Уже установлено / запущено как standalone: прячем всё — предлагать нечего.
+   • Что-то ещё без установки: молча прячем, а не оставляем мёртвый контрол.
+   Кнопка живёт на стартовой карточке ПОД двумя главными и тише их (CSS). Стартовый поток и две главные
+   кнопки НЕ трогаем — это отдельный тихий контрол. */
+const installBtn=$('installBtn'), installHint=$('installHint');
+let installPrompt=null;
+const inStandalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone===true;
+const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent)
+  || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);          // iPadOS маскируется под Mac
+const isIOSSafari = isIOS && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
+function hideInstall(){ installBtn.style.display='none'; installHint.style.display='none'; }
+if(inStandalone){ hideInstall(); }                                             // уже установлено — молчим
+else if(isIOSSafari){                                                          // iOS: инструкция вместо кнопки
+  installBtn.style.display='none';
+  installHint.textContent='To install: tap Share, then “Add to Home Screen”.';
+  installHint.style.display='';
+} else {                                                                       // Chromium и пр. — ждём событие
+  hideInstall();
+  addEventListener('beforeinstallprompt', e=>{
+    e.preventDefault();                                                        // без мини-инфобара — показываем свою кнопку
+    installPrompt=e;
+    installHint.textContent='add Handsong to your home screen';
+    installBtn.style.display=''; installHint.style.display='';
+  });
+}
+installBtn.onclick=async ()=>{
+  if(!installPrompt)return;
+  installBtn.disabled=true;
+  installPrompt.prompt();
+  try{ await installPrompt.userChoice; }catch(e){}                             // принял или отклонил — не важно
+  installPrompt=null;                                                          // событие одноразовое, повторно prompt() нельзя
+  installBtn.disabled=false; hideInstall();                                    // предложение отработало — убираем (Chrome пришлёт заново позже)
+};
+addEventListener('appinstalled', ()=>{ installPrompt=null; hideInstall(); });  // установлено — кнопку прочь
+/* Регистрируем МИНИМАЛЬНЫЙ SW (sw.js): нужен только чтобы Chromium считал приложение устанавливаемым.
+   Он БЕЗ КЭША (пустой fetch), поэтому не трогает камеру/звук/ворклет и относительные пути под подпапкой.
+   Путь относительный → scope = папка приложения. Ошибку (file://, нет secure context) молча глотаем. */
+if('serviceWorker' in navigator)
+  addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
 /* 🎥 ВИДЕОКЛИП (кадр холста + звук) и 🎙 АУДИО (только звук) — один движок clip.js на два вида.
    Тап старт / тап стоп+сохранение. Индикатор записи — .act (красный). Инертно до тапа; кнопки живут
    в #bar, а он виден лишь после «▶ Запустить». ВЗАИМНОЕ ИСКЛЮЧЕНИЕ: пока идёт одна запись, ДРУГАЯ

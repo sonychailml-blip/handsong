@@ -4,7 +4,16 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
-<title>Air Synth 3 — жестовый синтезатор и интерактивный учебник ладов</title>
+<title>Handsong — жестовый синтезатор и интерактивный учебник ладов</title>
+<!-- PWA: манифест + светлый theme-color под стартовый экран. start_url/scope в манифесте ОТНОСИТЕЛЬНЫЕ
+     ("."), чтобы работало и на GitHub Pages в подпапке, и позже на своём домене (камера/звук/ворклет не
+     трогаем). iOS не читает display/icons манифеста — для «на домашний экран» дублируем apple-* мета. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e3e9f5">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Handsong">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,27 +25,35 @@
      (#helpOv) остаются в коде и работают — переедут внутрь обучения позже, свои кнопки со старта сняты. -->
 <div id="start" class="ov on">
   <div class="startCard">
-    <h1>Air <span>Synth</span> 3</h1>
+    <h1>Handsong</h1>
     <p class="startTag">Жестовый синтезатор: играйте руками перед камерой.</p>
     <div class="startBtns">
       <button id="startBtn">▶ Играть</button>
       <button id="learnBtn" title="Интерактивное обучение (скоро)">Обучение</button>
     </div>
-    <!-- Полноэкранный режим ОТДЕЛЬНОЙ тихой кнопкой (не влит в «Играть» — выбор за пользователем, и
-         опция заметна ДО игры: полосы браузера съедают вертикаль, а она дорога полю игры). Вызов
+    <!-- ПОРЯДОК на карточке: Играть → Обучение → ⛶ полноэкранный → ⬇ установка → подвал. Полноэкранный
+         ВЫШЕ установки: полезен почти всем и почти каждый сеанс (увеличивает поле игры); установка НИЖЕ —
+         разовое действие и лишь для решивших оставить приложение. Обе кнопки могут отсутствовать (см. ниже);
+         display:none убирает из потока, так что раскладка ровная в любой комбинации. -->
+    <!-- Полноэкранный режим ОТДЕЛЬНОЙ кнопкой (не влит в «Играть» — выбор за пользователем, и опция
+         заметна ДО игры: полосы браузера съедают вертикаль, а она дорога полю игры). Вызов
          requestFullscreen — только по клику (правило жеста, как звук/камера). Прячется там, где нет
          Fullscreen API (iOS Safari на iPhone). Логика — ui.js (applyFullscreen). -->
     <button id="fsBtnStart" title="Во весь экран: убрать полосы браузера">⛶ Во весь экран</button>
+    <!-- Установка на домашний экран (PWA). ПО РЕАЛЬНОЙ СПОСОБНОСТИ, не по браузеру: Chromium присылает
+         beforeinstallprompt — кнопка появляется ТОЛЬКО после него (иначе prompt() пуст); iOS Safari
+         события не даёт → показываем инструкцию в #installHint вместо мёртвой кнопки; уже установлено
+         (standalone) → прячем всё. Обе скрыты по умолчанию (display:none), показывает ui.js. -->
+    <button id="installBtn" title="Add Handsong to your home screen" style="display:none">⬇ Install</button>
+    <p id="installHint" style="display:none"></p>
     <p id="loadmsg"></p>
     <p id="learnMsg"></p>
-    <!-- Подвал: тихо. Ссылки отзыв/донат собирает ui.js (URL — константы там); пустой URL прячет
-         ссылку, отзыв без формы падает на почту (адрес собирается в JS, не mailto в исходнике). -->
+    <!-- Подвал: тихо, но читаемо. Метки ссылок пишет ui.js (URL — константы там). Отзыв виден всегда
+         (форма или почта-fallback, адрес собирается в JS, не mailto в исходнике). Строка поддержки —
+         тихая заметка, «Donate» = донат-ссылка; при пустом DONATE_URL ui.js прячет всю строку. -->
     <div class="startFoot">
-      <p>Это первая версия — возможны ошибки. Буду рад отзывам и замечаниям.</p>
-      <p class="startLinks">
-        <a id="fbLink" rel="noopener"></a>
-        <a id="donateLink" rel="noopener"></a>
-      </p>
+      <p>First version — bugs and rough edges are likely. Tell me what breaks: <a id="fbLink" rel="noopener"></a></p>
+      <p id="startSupport" class="startSupport">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development: <a id="donateLink" rel="noopener"></a></p>
     </div>
   </div>
 </div>
