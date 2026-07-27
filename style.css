@@ -2,11 +2,31 @@
     --bg:#07070d; --ink:#eceaf4; --dim:#8f8ba6;
     --note:#ff9e2c; --chord:#b18cff; --tonic:#57d9a3;
     --rec:#e5484d; --panel:rgba(16,16,28,.86);
+    /* ЕДИНЫЙ ШРИФТ всего интерфейса — системный стек, без внешних файлов (проект без зависимостей,
+       веб-шрифт добавил бы загрузку и мигание нестилизованного текста). Задаётся ЗДЕСЬ, наследуется
+       всем меню и стартом. Холст (draw.js, ctx.font 'system-ui') — отдельно, это игровое поле. */
+    --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    /* ЕДИНЫЙ АКЦЕНТ МЕНЮ И СТАРТА — тёплый оранжевый (исходный var(--note)=#ff9e2c). --accent: основной
+       тон для ЗАЛИВОК/рамок/фокуса и текста на ТЁМНОМ баре (там #ff9e2c читается). На светлом #ff9e2c
+       как ТЕКСТ бледен (≈2.1:1), поэтому --accent-ink — темнее (жжёный янтарь #b45309, ≈5:1 на белом) —
+       для ТЕКСТА и ссылок на светлых панелях/карточке. Роли соло/аккорды/бас/ударные (INSTR_COL,
+       config.js) — игровое поле, НЕ трогаем; у аккордов свой сиреневый на ТЁМНОМ холсте — другой цвет. */
+    --accent:#ff9e2c; --accent-ink:#b45309;
+    /* ШКАЛА РАЗМЕРОВ МЕНЮ (4 шага): заголовок панели · контролы · ярлык строки · подсказка. */
+    --fs-head:16px; --fs-ctl:14px; --fs-label:13px; --fs-hint:12px;
+    /* РАДИУСЫ (2 шага): контролы · панели+стартовая карточка. */
+    --r-sm:10px; --r-lg:18px;
+    accent-color:var(--accent);            /* нативные контролы (ползунок, фокус) — в акцент */
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    font-family:var(--font);
     overflow:hidden; touch-action:none; overscroll-behavior:none;}
+  /* Фокус с клавиатуры — оранжевый контур на всех интерактивных контролах меню/старта. Берём
+     --accent-ink (тёмный янтарь): на СВЕТЛЫХ панелях/карточке даёт ≥3:1 (нетекстовый контраст),
+     а бледный #ff9e2c контуром там был бы слаб. У холста фокусируемых элементов нет — поле не задето. */
+  button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{
+    outline:2px solid var(--accent-ink); outline-offset:2px;}
   #video{display:none;}
   #canvas{position:fixed; inset:0; width:100vw; height:100vh; display:block;}
 
@@ -28,8 +48,8 @@
   #bar.min>#jamBtn,
   #bar.min>#loopPanelBtn{ display:none !important; }
   button{background:var(--panel); color:var(--ink); flex:0 0 auto;
-    border:1px solid rgba(255,255,255,.22); border-radius:11px;
-    padding:9px 12px; font-size:14px; line-height:1;}
+    border:1px solid rgba(255,255,255,.22); border-radius:var(--r-sm);
+    padding:9px 12px; font-size:var(--fs-ctl); line-height:1; font-family:var(--font);}
   button:active{transform:scale(.96);}
   /* ---- КНОПКА ЗАПИСИ: компактная круглая иконка ----
      Состояние показываем ВИДОМ, а не словами: подробности («круг N т.» / «слой K»)
@@ -47,23 +67,23 @@
   #recBtn.on::after{content:''; position:absolute; inset:-3px; border-radius:50%;
     border:2px solid var(--rec); animation:recPulse 1.1s ease-out infinite; pointer-events:none;}
   @keyframes recPulse{ 0%{transform:scale(.9); opacity:.85;} 100%{transform:scale(1.55); opacity:0;} }
-  #loopBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  #loopBtn.on{border-color:var(--accent); color:var(--accent); font-weight:600;}
   /* Кнопка роли — индикатор И переключатель. Центрируется в панели авто-отступами
      (при нехватке места они схлопываются, кнопка просто остаётся в своём порядке).
      Цвет — акцент текущей роли: --role ставит applyInstr, fallback на сиреневый. */
   #instrBtn,#instrBtnL,#instrBtnR{border-color:var(--role,var(--chord)); color:var(--role,var(--chord)); font-weight:600;}
   #instrBtn{margin-left:auto; margin-right:auto;}
-  #loopPanelBtn.on{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  #loopPanelBtn.on{border-color:var(--accent); color:var(--accent); font-weight:600;}
   /* Видимость instrBtn (одна роль) и instrBtnL/R (две половины) целиком в JS (applySplit),
      по splitOn — CSS-правил больше нет. PC-режим удалён: класса .phone нет. Кнопки ⇄ (swap) и
      〰 (терменвокс) убраны — их роль забрала секция «Функции рук» в панели звукоряда. */
   /* 🔄 камера: .act = тыловая (незеркальная); визуально помечаем, что вид уже не «зеркало». */
   #camBtn{padding:9px 10px; font-size:15px;}
-  #camBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  #camBtn.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
   /* ⛶ полноэкранный режим (иконка-кнопка бара): .act = уже во весь экран. Прячется целиком в JS,
      где нет Fullscreen API. Свёрнутый бар её тоже скрывает (список .min выше) — редкая «задал и забыл». */
   #fsBtn{padding:9px 10px; font-size:15px;}
-  #fsBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  #fsBtn.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
   /* 🎥 клип и 🎙 аудио — один движок записи (clip.js), общий вид: .act = идёт запись (красный +
      мягкий пульс). Отдельно от ● лупера — другой цвет-каркас и своя иконка, чтобы не путать
      музыкальную запись с записью медиа. */
@@ -73,9 +93,10 @@
   /* Пока идёт одна запись, ДРУГАЯ кнопка disabled (взаимное исключение видео/аудио): приглушаем,
      чтобы было видно — сейчас нельзя. */
   #clipBtn:disabled,#audioBtn:disabled{opacity:.4;}
-  /* 🎵 джем: .act = играет вариант подложки (текст кнопки показывает N/всего). Акцент — зелёный
-     тоники, как у прочих «играющих» тумблеров (луп/петля), чтобы читалось как активная музыка. */
-  #jamBtn.act{border-color:var(--tonic); color:var(--tonic); font-weight:600;}
+  /* 🎵 джем: .act = играет вариант подложки (текст кнопки показывает N/всего). Акцент — оранжевый
+     var(--accent), как у прочих активных тумблеров бара (единый акцент меню). Запись остаётся
+     красной (--rec) — это статус записи, а не «активный тумблер». */
+  #jamBtn.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
   /* Пульс на box-shadow (не на transform/opacity) — кнопка остаётся на месте и видимой, в отличие
      от recPulse (тот гасит непрозрачность у ПСЕВДОэлемента-кольца ●). */
   @keyframes clipPulse{ 0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.55);} 50%{box-shadow:0 0 0 5px rgba(229,72,77,0);} }
@@ -87,14 +108,14 @@
      видно и достижимо во вторую строку, без скрытого скролла. auto-поля у #instrBtn (центрируют
      кнопку роли в ОДНОЙ строке) при переносе мешают — обнуляем, строки центрируем justify-content. */
   @media (max-width:560px){
-    button{padding:8px 9px; font-size:13px; border-radius:9px;}
+    button{padding:8px 9px; font-size:var(--fs-label); border-radius:var(--r-sm);}
     #bar{gap:5px; padding:6px; flex-wrap:wrap; justify-content:center;}
     #instrBtn{margin:0;}
     #recBtn{width:32px; height:32px; padding:0; border-radius:50%; font-size:14px;}
   }
   /* Кнопка-индикатор звукоряда «лад · тоника» — единственный вход в меню.
      Длинные названия ладов режем МНОГОТОЧИЕМ средствами CSS, а не обрезкой строки в JS. */
-  #scaleBtn{border-color:var(--tonic); color:var(--tonic); font-weight:600;
+  #scaleBtn{border-color:var(--accent); color:var(--accent); font-weight:600;
     max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
   /* ---- ТРАНСПОРТ ЛУПЕРА: полоса под холстовой полосой лупера ----
@@ -105,12 +126,12 @@
      z-index 11: выше холста, но ниже панелей (14/15) — открытое меню накрывает. */
   #loopTransport{position:fixed; left:10px; right:10px; max-width:580px; margin:0 auto;
     z-index:11; display:none; justify-content:center; gap:6px;
-    padding:6px 8px; border-radius:11px;
+    padding:6px 8px; border-radius:var(--r-sm);
     background:rgba(10,10,20,.74); border:1px solid rgba(255,255,255,.14);
     backdrop-filter:blur(6px);}
   #loopTransport.on{display:flex;}
-  #loopTransport button{padding:7px 10px; font-size:13px;}
-  @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:12px;} }
+  #loopTransport button{padding:7px 10px; font-size:var(--fs-label);}
+  @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:var(--fs-hint);} }
 
   /* Тост камеры: всплывает под верхней панелью при отказе переключения; сам гаснет (класс .on
      снимает JS по таймеру). Не мешает игре — pointer-events:none, показывается только с .on. */
@@ -118,24 +139,24 @@
     opacity:0; transition:opacity .25s; pointer-events:none;}
   #camMsg.on{opacity:1;}
   #camMsg::before{content:attr(data-msg); display:inline-block;
-    background:rgba(10,10,20,.9); color:var(--ink); font-size:13px;
-    padding:8px 14px; border-radius:11px; border:1px solid rgba(255,255,255,.22);
+    background:rgba(10,10,20,.9); color:var(--ink); font-size:var(--fs-label);
+    padding:8px 14px; border-radius:var(--r-sm); border:1px solid rgba(255,255,255,.22);
     backdrop-filter:blur(6px);}
 
   #status{position:fixed; left:10px; right:10px; bottom:6px; z-index:10;
-    font-size:11px; color:var(--dim); text-shadow:0 1px 2px #000;
+    font-size:var(--fs-hint); color:var(--dim); text-shadow:0 1px 2px #000;
     white-space:nowrap; overflow:hidden;}
 
   /* ---- ПАНЕЛИ (звукоряд + лупер): СВЕТЛАЯ тема, как стартовая карточка ----
      Панели лежат ПОВЕРХ камеры (обычно ярко освещённая комната), поэтому фон ОПАКОВЫЙ белый —
      видео не просвечивает и не размывает текст; blur убран (под опаковым фоном он бесполезен).
-     Радиусы (18/12px) и тёмный текст (#1e2233) — из стартовой карточки. Всё СТРОГО под #panelScale/
-     #panelLoop и панельные классы (.prow/.psep/…, они есть только тут); базовые button/#bar/оверлеи
-     не трогаем. Акцент .act (оранжевый var(--note)) на светлом читается — оставлен как «выбрано». */
+     Радиусы (--r-lg панель, --r-sm контролы) и тёмный текст (#1e2233) — из стартовой карточки. Всё
+     СТРОГО под #panelScale/#panelLoop и панельные классы (.prow/.psep/…, они есть только тут); базовые
+     button/#bar/оверлеи не трогаем. Акцент .act — оранжевая заливка var(--accent) с тёмным текстом. */
   /* ---- МЕНЮ ЗВУКОРЯДА: оверлей (открыл → выбрал → закрыл) ---- */
   #panelScale{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:15;
-    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:18px;
-    padding:14px 16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
+    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:var(--r-lg);
+    padding:16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
     box-shadow:0 16px 44px rgba(40,50,90,.22);}
   #panelScale.on{display:block;}
 
@@ -146,41 +167,43 @@
      (сверху, во всю доступную высоту) — так короткая панель без прокрутки читается лучше, а сетку
      тактов видно после закрытия (панели взаимоисключаемы). Геометрия 1-в-1 с #panelScale. */
   #panelLoop{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:14;
-    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:18px;
-    padding:14px 16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
+    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:var(--r-lg);
+    padding:16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
     box-shadow:0 16px 44px rgba(40,50,90,.22);}
   #panelLoop.on{display:block;}
-  .prow{display:flex; align-items:center; gap:10px; margin:9px 0;}
-  .prow label{flex:0 0 122px; font-size:12px; color:#5a6079;}
+  .prow{display:flex; align-items:center; gap:10px; margin:10px 0;}
+  .prow label{flex:0 0 128px; font-size:var(--fs-label); color:#5a6079;}
   .prow select,.prow input[type=range],.prow .seg{flex:1; min-width:0;}
   select{background:#14142a; color:var(--ink); border:1px solid rgba(255,255,255,.22);
-    border-radius:9px; padding:7px; font-size:13px; width:100%;}
+    border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl); width:100%; font-family:var(--font);}
   /* Списки светлые (лад — длинный список, должен читаться); опаковый белый фон и тёмный текст. */
   #panelScale select,#panelLoop select{background:#f4f6fc; color:#1e2233;
-    border:1px solid rgba(20,24,50,.20); border-radius:10px;}
-  input[type=range]{accent-color:var(--note);}
-  .val{flex:0 0 44px; font-size:12px; color:#1e2233; text-align:right;}
+    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm);}
+  input[type=range]{accent-color:var(--accent);}
+  .val{flex:0 0 44px; font-size:var(--fs-label); color:#1e2233; text-align:right;}
   .seg{display:flex; gap:6px;}
   .seg button{flex:1;}
   /* Кнопки внутри панелей — светлая второстепенная тема (как #learnBtn), КРОМЕ активных (.act):
-     у активных остаётся оранжевый акцент var(--note) — читается как «выбрано» и на светлом. */
+     у активных оранжевый акцент var(--accent) — читается как «выбрано» и на светлом. */
   #panelScale button:not(.act),#panelLoop button:not(.act){background:#eef1f8; color:#2a2f45;
-    border:1px solid rgba(20,24,50,.16); border-radius:12px; font-weight:600;}
-  .seg button.act{background:var(--note); color:#1a1206; border-color:var(--note); font-weight:600;}
+    border:1px solid rgba(20,24,50,.16); border-radius:var(--r-sm); font-weight:600;}
+  /* Выбранный сегмент — оранжевая заливка var(--accent)=#ff9e2c, ТЁМНЫЙ текст #1a1206 (исходная пара;
+     белый на #ff9e2c был бы ≈2.1:1 — нечитаемо, поэтому текст тёмный). */
+  .seg button.act{background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:600;}
   .phead{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
-  .phead b{font-size:14px; color:#1e2233;}
-  .psep{border-top:1px solid rgba(20,24,50,.12); margin:10px 0 4px; padding-top:6px;
-    font-size:11px; color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
-  .phint{font-size:11px; color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
+  .phead b{font-size:var(--fs-head); color:#1e2233;}
+  .psep{border-top:1px solid rgba(20,24,50,.12); margin:14px 0 4px; padding-top:6px;
+    font-size:var(--fs-hint); color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
+  .phint{font-size:var(--fs-hint); color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
   /* Функции рук: маленький ярлык роли (🎸 Соло / 🎚 Бас) над парой строк Левая/Правая — группирует
      назначения по роли, но строки помечены РУКОЙ (видно, что выбор на руку, не на половину). */
-  .handFnRole{font-size:11px; color:#6a7089; font-weight:600; margin:8px 2px 2px; letter-spacing:.02em;}
+  .handFnRole{font-size:var(--fs-label); color:#6a7089; font-weight:600; margin:10px 2px 2px; letter-spacing:.02em;}
   /* Эталон A4: пресет-список тянется, поле числа узкое справа, «Гц» — подпись. Светлая тема панели. */
   #aRefRow .seg{align-items:center;}
   #aRefRow #aRefSel{flex:1; min-width:0;}
   #aRefRow #aRefInput{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
-    border:1px solid rgba(20,24,50,.20); border-radius:10px; padding:7px; font-size:13px;}
-  #aRefRow .unit{flex:0 0 auto; font-size:12px; color:#5a6079;}
+    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl);}
+  #aRefRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:#5a6079;}
   #loopBarsV{flex:1; text-align:center; align-self:center;}
 
   /* ---- оверлеи: старт и учебник ---- */
@@ -206,46 +229,50 @@
   #start.on{display:flex; align-items:center; justify-content:center;}   /* id+.on перебивает .ov.on (display:block) */
   .startCard{width:100%; max-width:340px; margin:auto; text-align:center; color:#1e2233;   /* тёмный текст наследуется всей карточкой; margin:auto центрирует и даёт прокрутку */
     background:#ffffff; border:1px solid rgba(20,24,50,.12);
-    border-radius:20px; padding:26px 24px 20px; box-shadow:0 16px 44px rgba(40,50,90,.18);}
-  .startCard h1{font-size:28px; margin:2px 0 6px; color:#1e2233;}   /* «Handsong» — простой тёмный текст, без оранжевого акцента (глобальный акцент выберем позже отдельным проходом) */
-  .startTag{font-size:13px; color:#5a6079; margin:0 0 20px;}
+    border-radius:var(--r-lg); padding:26px 24px 20px; box-shadow:0 16px 44px rgba(40,50,90,.18);}
+  /* «Handsong» — двухтоновый заголовок: «Hand» тёмный (#1e2233), «song» в тёплом акценте (--accent-ink,
+     жжёный янтарь ≈5:1 на белом — читаемо; бледный #ff9e2c как крупный текст был бы ≈2.1:1). Оживляет
+     имя, как раньше акцентная «Synth» в «Air Synth 3». Одно слово окрашено наполовину — не радуга. */
+  .startCard h1{font-size:28px; margin:2px 0 6px; color:#1e2233;}
+  .startCard h1 span{color:var(--accent-ink);}
+  .startTag{font-size:var(--fs-label); color:#5a6079; margin:0 0 20px;}
   .startBtns{display:flex; flex-direction:column; gap:11px; align-items:stretch;}
-  /* Кнопки старта — СВОЯ светлая тема (базовый button тёмный). «Играть» — НЕЙТРАЛЬНАЯ тёмная заливка
-     (оранжевый var(--note) убран СО СТАРТА; глобальный акцент приложения не трогаем — выберем позже
-     отдельным проходом), всё равно доминирует над второстепенными; «Обучение» — светлая второстепенная. */
-  #start button{border-radius:12px; line-height:1.1;}
-  #startBtn{font-size:18px; padding:15px 32px; background:#1e2233;
-    color:#ffffff; border:none; font-weight:700;}
+  /* Кнопки старта — СВОЯ светлая тема (базовый button тёмный). «Играть» — ГЛАВНАЯ кнопка, оранжевая
+     заливка var(--accent)=#ff9e2c (единый акцент приложения) с ТЁМНЫМ текстом #3a2600 (исходная пара,
+     высокий контраст на оранжевом), доминирует над второстепенной; «Обучение» — светлая второстепенная. */
+  #start button{border-radius:var(--r-sm); line-height:1.1;}
+  #startBtn{font-size:18px; padding:15px 32px; background:var(--accent);
+    color:#3a2600; border:none; font-weight:700;}
   #learnBtn{font-size:15px; padding:12px 20px; background:#eef1f8;
     color:#2a2f45; border:1px solid rgba(20,24,50,.16); font-weight:600;}
-  #loadmsg{font-size:12px; color:#5a6079; min-height:1.2em; margin:12px 0 0;}
-  #learnMsg{font-size:12px; color:#b26a00; min-height:1em; margin:6px 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
+  #loadmsg{font-size:var(--fs-hint); color:#5a6079; min-height:1.2em; margin:12px 0 0;}
+  #learnMsg{font-size:var(--fs-hint); color:#b26a00; min-height:1em; margin:6px 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
   /* ⬇ Установка (PWA) — ТИХАЯ кнопка ПОД двумя главными: своя тонкая рамка (не заливка var(--note)/светлая
      как у главных), поэтому не спорит с «Играть»/«Обучение». Отдельный ребёнок карточки (не в .startBtns —
      там stretch-колонка), центрируется text-align. #installHint — короткая подпись/iOS-инструкция под ней.
      id-селектор перебивает #start button. Видимостью управляет ui.js (installProbe). */
   #installBtn{display:flex; width:fit-content; align-items:center; gap:6px; margin:14px auto 0;
-    font-size:13px; padding:9px 18px; background:transparent; color:#2563c9;
-    border:1px solid rgba(37,99,201,.5); border-radius:10px; font-weight:600;}
-  #installHint{font-size:12px; color:#6a7089; margin:7px 0 0; line-height:1.45;}
+    font-size:var(--fs-label); padding:9px 18px; background:transparent; color:var(--accent-ink);
+    border:1px solid rgba(180,83,9,.5); border-radius:var(--r-sm); font-weight:600;}
+  #installHint{font-size:var(--fs-hint); color:#6a7089; margin:7px 0 0; line-height:1.45;}
   /* ⛶ полноэкранный — ЗАМЕТНАЯ вторичная кнопка (полезна почти всем каждый сеанс): по весу близка к двум
      главным (15px, крупный padding), но остаётся вторичной — контурная, не залита как «Играть»/«Обучение».
      Не в .startBtns (там stretch-колонка) — отдельный ребёнок карточки, центрируется text-align. .act =
      уже во весь экран (синий акцент ссылок карточки). id-селектор — перебить #start button. */
   #fsBtnStart{display:flex; width:fit-content; align-items:center; gap:7px; margin:16px auto 0;
     font-size:15px; padding:11px 24px; background:transparent; color:#3a4059;
-    border:1px solid rgba(20,24,50,.24); border-radius:11px; font-weight:600;}
-  #fsBtnStart.act{color:#2563c9; border-color:rgba(37,99,201,.5);}
+    border:1px solid rgba(20,24,50,.24); border-radius:var(--r-sm); font-weight:600;}
+  #fsBtnStart.act{color:var(--accent-ink); border-color:rgba(180,83,9,.5);}
   /* Подвал — читаемо на телефоне (13px), но тише и мельче двух главных кнопок (18/15px), чтобы не спорить
      с ними. Ссылки узнаются цветом+весом (не только подчёркиванием). */
   .startFoot{margin-top:18px; padding-top:13px; border-top:1px solid rgba(20,24,50,.10);
-    font-size:13px; color:#5a6079; line-height:1.55;}
+    font-size:var(--fs-label); color:#5a6079; line-height:1.55;}
   .startFoot p{margin:0 0 8px;}
-  .startFoot a{color:#2563c9; font-weight:600; text-decoration:none;
-    border-bottom:1px solid rgba(37,99,201,.4); white-space:nowrap;}
+  .startFoot a{color:var(--accent-ink); font-weight:600; text-decoration:none;
+    border-bottom:1px solid rgba(180,83,9,.4); white-space:nowrap;}
   /* Строка поддержки — чуть тише подвала. «Donate» заметнее «Feedback» (жирнее, ярче подчёркивание). */
   .startSupport{margin:10px 0 0; color:#6a7089;}
-  #donateLink{font-weight:700; border-bottom-color:rgba(37,99,201,.6);}
+  #donateLink{font-weight:700; border-bottom-color:rgba(180,83,9,.6);}
 
   /* ДЕМО «путешествие по строям»: оверлей поверх стартового (z 35 > start 30). Фон-тинт
      ставит demo.js поцветно на каждую сцену; здесь — только раскладка подписи. */
