@@ -467,7 +467,7 @@ function drawDrumGrid(rx0,rx1,playH){
     ctx.fillStyle= i%2? 'rgba(255,210,63,.05)':'rgba(255,255,255,.03)'; ctx.fillRect(rx0,y,w,seg);
     ctx.strokeStyle='rgba(255,255,255,.10)'; ctx.beginPath(); ctx.moveTo(rx0,y); ctx.lineTo(rx1,y); ctx.stroke();
     ctx.fillStyle='rgba(255,210,63,.85)'; ctx.font='600 14px system-ui';
-    ctx.fillText(DRUM_NAMES[idx], rx0+10, y+seg/2);
+    ctx.fillText(L(DRUM_NAMES[idx]), rx0+10, y+seg/2);
   }
 }
 function drawHandsPhone(res,W,H,playH){
@@ -556,13 +556,13 @@ function drawHandsPhone(res,W,H,playH){
         const hold = S.fn==='hold' ? ' · '+t('tag.hold') : '';   // маркер удержания: нота держится, пока пальцы вместе
         drawTag(S.x,S.y,[L1+hold,L2],accent);
       }else if(isDr){
-        drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
+        drawTag(S.x,S.y,[L(DRUM_NAMES[S.deg])||'—',`${Math.round(S.vol*100)}%`],accent);
       }else if(typedChords()){                   // тип задаёт палитра — chordLabel дал бы «C5», это враньё
         const FS=chordFams(), fam=FS[Math.min(chordFam,FS.length-1)]||FS[0];
         const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
         const oShow=rectGrid()?rectOctReg(instr):S.oct;   // rect-аккорды (19/31): октава из chordOctReg (роль=instr='ch'); chrom12: S.oct (палец)
-        drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
-          ty.full||fam.name,`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
+        drawTag(S.x,S.y,[rootName(S.deg)+' '+(L(ty.label)||''),   // у ярлыка есть ширина — пишем полное имя типа
+          L(ty.full)||L(fam.name),`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
       }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
     }else if(!S.pinch){                          // подсказка до щипка — под указательным
       const tip=lm[8], x=sx(tip.x,W), y=sy(tip.y,H);   // подсказка до щипка — в экранных пикселях игрового поля (поля кадра сняты)
@@ -585,7 +585,7 @@ function drawHandsPhone(res,W,H,playH){
         const hx0 = (isCh&&typedChords()) ? split : rx0;
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,(rows-1-d)*seg,rx1-hx0,seg);
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-        ctx.fillText(isDr?(DRUM_NAMES[d]||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):gridNoteLbl(d)),x+14,y-12);
+        ctx.fillText(isDr?(L(DRUM_NAMES[d])||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):gridNoteLbl(d)),x+14,y-12);
       }
     }
   }
@@ -627,7 +627,7 @@ function drawChordPalette(x0,x1,H){
     // ШАПКА КОЛОНКИ — имя семейства; активная колонка ярче
     ctx.textAlign='center'; ctx.font='700 10px system-ui';
     ctx.fillStyle = c===selC ? '#fff' : hexA(INSTR_COL.ch,.7);
-    ctx.fillText(fam.name, (cx0+cx1)/2, CH_PAL_HEAD_H/2);
+    ctx.fillText(L(fam.name), (cx0+cx1)/2, CH_PAL_HEAD_H/2);
     for(let r=0;r<nR;r++){
       const [cy0,cy1]=palRowY(r,py0,py1,nR);
       const bx=cx0+CH_PAL_GAP/2, by=cy0+CH_PAL_GAP/2;      // зазор съедается ВНУТРИ клетки: попадание идёт по полной
@@ -641,13 +641,13 @@ function drawChordPalette(x0,x1,H){
          теги 31-TET («нейтр♮7», «субмин») переносим на две строки: высота у клетки есть. */
       ctx.font = on ? '700 10px system-ui' : '10px system-ui';
       ctx.fillStyle = on ? '#fff' : 'rgba(255,255,255,.72)';
-      const lines=wrapLabel(fam.types[r].label||'—', bw-6), cy=(by+by+bh)/2;
+      const lines=wrapLabel(L(fam.types[r].label)||'—', bw-6), cy=(by+by+bh)/2;
       lines.forEach((L,i)=>ctx.fillText(L, bx+bw/2, cy+(i-(lines.length-1)/2)*11));
     }
   }
   /* Полное имя выбранного типа — одной строкой снизу, где есть вся ширина палитры.
      full есть только там, где короткий тег непонятен (31-TET). */
-  const t=selF.types[selR], fullNm=t&&(t.full||t.label);
+  const t=selF.types[selR], fullNm=t&&(L(t.full)||L(t.label));
   if(fullNm){
     ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
     ctx.fillText(fullNm, (x0+x1)/2, H-CH_PAL_HEAD_H/2);

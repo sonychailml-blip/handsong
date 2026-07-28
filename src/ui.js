@@ -83,18 +83,18 @@ function buildUI(){
   });
   selTonic.value=tonic;
   LEAD_INSTR.forEach((s,i)=>{
-    const o=document.createElement('option'); o.value=i; o.textContent=s.label; selLead.appendChild(o);
+    const o=document.createElement('option'); o.value=i; o.textContent=L(s.label); selLead.appendChild(o);
   });
   CHORD_INSTR.forEach((s,i)=>{
-    const o=document.createElement('option'); o.value=i; o.textContent=s.label; selChord.appendChild(o);
+    const o=document.createElement('option'); o.value=i; o.textContent=L(s.label); selChord.appendChild(o);
   });
   BASS_INSTR.forEach((s,i)=>{
-    const o=document.createElement('option'); o.value=i; o.textContent=s.label; selBass.appendChild(o);
+    const o=document.createElement('option'); o.value=i; o.textContent=L(s.label); selBass.appendChild(o);
   });
-  DRUM_KITS.forEach((k,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=k.label; selDrumKit.appendChild(o); });
-  HARMONIES.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=p.name; selProg.appendChild(o); });
-  RHYTHMS.forEach((r,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=r.name; selRhythm.appendChild(o); });
-  BASS_MODES.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.name; selBassMode.appendChild(o); });
+  DRUM_KITS.forEach((k,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=L(k.label); selDrumKit.appendChild(o); });
+  HARMONIES.forEach((p,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=L(p.name); selProg.appendChild(o); });
+  RHYTHMS.forEach((r,i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=L(r.name); selRhythm.appendChild(o); });
+  BASS_MODES.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=L(m.name); selBassMode.appendChild(o); });
   selBassMode.value='roots';
   updScaleBtn();                              // 1/3: старт
   loopBarsV.textContent=loop.bars;
@@ -562,6 +562,14 @@ onLangChange(()=>{
   // выбор по value=id) и пересобираем список ладов текущей традиции, возвращая выбранный лад (value=индекс).
   [...selTradition.options].forEach(o=>{ const tr=TRADITIONS.find(x=>x.id===o.value); if(tr)o.textContent=L(tr.name); });
   fillScales(selTradition.value); selScale.value=scaleIdx;
+  // Тембры/аранжировка (этап B, часть 2): переподписываем НА МЕСТЕ по индексу (порядок опций = порядок массива).
+  [...selLead.options].forEach((o,i)=>o.textContent=L(LEAD_INSTR[i].label));
+  [...selChord.options].forEach((o,i)=>o.textContent=L(CHORD_INSTR[i].label));
+  [...selBass.options].forEach((o,i)=>o.textContent=L(BASS_INSTR[i].label));
+  [...selDrumKit.options].forEach((o,i)=>o.textContent=L(DRUM_KITS[i].label));
+  [...selProg.options].forEach((o,i)=>o.textContent=L(HARMONIES[i].name));
+  [...selRhythm.options].forEach((o,i)=>o.textContent=L(RHYTHMS[i].name));
+  [...selBassMode.options].forEach((o,i)=>o.textContent=L(BASS_MODES[i].name));
   updScaleBtn(); updRecBtn(); updLoopBtn();
   applyInstr(); applySplit();          // роль + половины + «Функции рук» + видимость/титулы
   refreshMetreCtl();

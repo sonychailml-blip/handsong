@@ -1,5 +1,5 @@
 import { scaleIdx, tonic, seventh, aRef } from './state.js';
-import { t } from './i18n.js';   // t — только для regWord (слово-регистр); имена ладов/групп резолвит L() на стороне рисующих
+import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для свар/шрути в swaraLbl (имена ладов/групп резолвят L() на стороне рисующих)
 
 export const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 export const ROMAN=['I','II','III','IV','V','VI','VII'];
@@ -393,7 +393,7 @@ export const thereminHz=(y,playH,oct)=>{ const {M,spanBot,divH}=thereminSpan(pla
 export const CHORD_FAM_SETS={
  /* ── 12-TET Хроматика: интервалы в ПОЛУТОНАХ ─────────────────────────────── */
  chrom12:[
-  {id:'maj', name:'Мажор', finger:0, types:[            // колонка 0 палитры
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[            // колонка 0 палитры
     {label:'M',      iv:[0,4,7]},
     {label:'maj7',  iv:[0,4,7,11]},
     {label:'7',     iv:[0,4,7,10]},
@@ -401,7 +401,7 @@ export const CHORD_FAM_SETS={
     {label:'add9',  iv:[0,4,7,14]},
     {label:'7#9',   iv:[0,4,7,10,15]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[            // колонка 1 палитры
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[            // колонка 1 палитры
     {label:'m',     iv:[0,3,7]},
     {label:'m7',    iv:[0,3,7,10]},
     {label:'m6',    iv:[0,3,7,9]},
@@ -409,7 +409,7 @@ export const CHORD_FAM_SETS={
     {label:'m9',    iv:[0,3,7,10,14]},
     {label:'madd9', iv:[0,3,7,14]},
   ]},
-  {id:'dim', name:'Ум./Ув.', finger:2, types:[          // колонка 2 палитры
+  {id:'dim', name:{en:'Dim./Aug.', ru:'Ум./Ув.'}, finger:2, types:[          // колонка 2 палитры
     {label:'dim',   iv:[0,3,6]},
     {label:'m7b5',  iv:[0,3,6,10]},
     {label:'dim7',  iv:[0,3,6,9]},
@@ -419,7 +419,7 @@ export const CHORD_FAM_SETS={
   ]},
   /* Последняя колонка: sus + расширенные. Имя семейства не «Sus» — в наборе лежат 6/9, maj9 и 13,
      которые sus не являются; индикатор не должен врать. */
-  {id:'sus', name:'Sus и расшир.', finger:3, types:[    // колонка 3 палитры
+  {id:'sus', name:{en:'Sus & extended', ru:'Sus и расшир.'}, finger:3, types:[    // колонка 3 палитры
     {label:'sus2',  iv:[0,2,7]},
     {label:'sus4',  iv:[0,5,7]},
     {label:'7sus4', iv:[0,5,7,10]},
@@ -435,37 +435,37 @@ export const CHORD_FAM_SETS={
     ближе 31-TET не даёт). Безымянный здесь НЕЙТРАЛЬНЫЕ, а не уменьшённые: ради
     нейтральных интервалов 31-TET и берут. */
  edo31:[
-  {id:'maj', name:'Мажор', finger:0, types:[            // колонка 0 палитры
-    {label:'маж',    full:'Мажор чистый',       iv:[0,10,18]},
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[            // колонка 0 палитры
+    {label:{en:'maj', ru:'маж'},    full:{en:'Pure major', ru:'Мажор чистый'},       iv:[0,10,18]},
     {label:'maj7',   full:'Maj7',               iv:[0,10,18,28]},
-    {label:'дом7',   full:'Домин.7 · 4:5:6:7',  iv:[0,10,18,25]},
-    {label:'супер',  full:'Супермажор · 9/7',   iv:[0,11,18]},
-    {label:'6',      full:'Мажор 6',            iv:[0,10,18,23]},
-    {label:'add9',   full:'Add9 (через октаву)',iv:[0,10,18,36]},
+    {label:{en:'dom7', ru:'дом7'},   full:{en:'Dominant 7th · 4:5:6:7', ru:'Домин.7 · 4:5:6:7'},  iv:[0,10,18,25]},
+    {label:{en:'super', ru:'супер'},  full:{en:'Supermajor · 9/7', ru:'Супермажор · 9/7'},   iv:[0,11,18]},
+    {label:'6',      full:{en:'Major 6', ru:'Мажор 6'},            iv:[0,10,18,23]},
+    {label:'add9',   full:{en:'Add9 (over the octave)', ru:'Add9 (через октаву)'},iv:[0,10,18,36]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[            // колонка 1 палитры
-    {label:'мин',    full:'Минор чистый',       iv:[0,8,18]},
-    {label:'мин7',   full:'Минор 7',            iv:[0,8,18,26]},
-    {label:'субмин', full:'Субминор · 7/6',     iv:[0,7,18]},
-    {label:'мин6',   full:'Минор 6',            iv:[0,8,18,23]},
-    {label:'минМ7',  full:'Мин-мажор 7',        iv:[0,8,18,28]},
-    {label:'субм7',  full:'Субминор 7',         iv:[0,7,18,25]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[            // колонка 1 палитры
+    {label:{en:'min', ru:'мин'},    full:{en:'Pure minor', ru:'Минор чистый'},       iv:[0,8,18]},
+    {label:{en:'min7', ru:'мин7'},   full:{en:'Minor 7', ru:'Минор 7'},            iv:[0,8,18,26]},
+    {label:{en:'submin', ru:'субмин'}, full:{en:'Subminor · 7/6', ru:'Субминор · 7/6'},     iv:[0,7,18]},
+    {label:{en:'min6', ru:'мин6'},   full:{en:'Minor 6', ru:'Минор 6'},            iv:[0,8,18,23]},
+    {label:{en:'minM7', ru:'минМ7'},  full:{en:'Minor-major 7', ru:'Мин-мажор 7'},        iv:[0,8,18,28]},
+    {label:{en:'subm7', ru:'субм7'},  full:{en:'Subminor 7', ru:'Субминор 7'},         iv:[0,7,18,25]},
   ]},
-  {id:'neu', name:'Нейтр./Ум.', finger:2, types:[       // колонка 2 палитры
-    {label:'нейтр',  full:'Нейтральное · 11/9', iv:[0,9,18]},
-    {label:'нейтр7', full:'Нейтральное 7',      iv:[0,9,18,26]},
-    {label:'dim',    full:'Уменьшённое',        iv:[0,8,15]},
-    {label:'m7b5',   full:'Полууменьшённое',    iv:[0,8,15,26]},
-    {label:'dim7',   full:'Ум. септаккорд',     iv:[0,8,15,23]},
-    {label:'нейтр♮7',full:'Нейтр. + нат.7 · 7/4',iv:[0,9,18,25]},
+  {id:'neu', name:{en:'Neutral/Dim.', ru:'Нейтр./Ум.'}, finger:2, types:[       // колонка 2 палитры
+    {label:{en:'neut', ru:'нейтр'},  full:{en:'Neutral · 11/9', ru:'Нейтральное · 11/9'}, iv:[0,9,18]},
+    {label:{en:'neut7', ru:'нейтр7'}, full:{en:'Neutral 7', ru:'Нейтральное 7'},      iv:[0,9,18,26]},
+    {label:'dim',    full:{en:'Diminished', ru:'Уменьшённое'},        iv:[0,8,15]},
+    {label:'m7b5',   full:{en:'Half-diminished', ru:'Полууменьшённое'},    iv:[0,8,15,26]},
+    {label:'dim7',   full:{en:'Diminished 7th', ru:'Ум. септаккорд'},     iv:[0,8,15,23]},
+    {label:{en:'neut♮7', ru:'нейтр♮7'},full:{en:'Neutral + natural 7 · 7/4', ru:'Нейтр. + нат.7 · 7/4'},iv:[0,9,18,25]},
   ]},
   {id:'sus', name:'Sus', finger:3, types:[              // колонка 3 палитры
     {label:'sus2',   full:'Sus2 · 9/8',         iv:[0,5,18]},
     {label:'sus4',   full:'Sus4 · 4/3',         iv:[0,13,18]},
     {label:'7sus4',  full:'7sus4',              iv:[0,13,18,25]},
-    {label:'9sus4',  full:'9sus4 (через окт.)', iv:[0,13,18,36]},
-    {label:'sus2/7', full:'Sus2 + нат.7',       iv:[0,5,18,25]},
-    {label:'кварт',  full:'Квартаккорд',        iv:[0,13,25]},
+    {label:'9sus4',  full:{en:'9sus4 (over the oct.)', ru:'9sus4 (через окт.)'}, iv:[0,13,18,36]},
+    {label:'sus2/7', full:{en:'Sus2 + natural 7', ru:'Sus2 + нат.7'},       iv:[0,5,18,25]},
+    {label:{en:'quart', ru:'кварт'},  full:{en:'Quartal chord', ru:'Квартаккорд'},        iv:[0,13,25]},
   ]},
  ],
  /* ── 19-TET «весь строй»: интервалы в ШАГАХ 19-EDO (шаг = 63.16¢) ──────────
@@ -476,37 +476,37 @@ export const CHORD_FAM_SETS={
     минорной терции. Большая терция 6 шагов (−7.4¢) чуть узка, малая септима
     16 шагов (−7¢) — компромисс, зато 5 шагов и 14 шагов почти идеальны. */
  edo19:[
-  {id:'maj', name:'Мажор', finger:0, types:[            // колонка 0 палитры
-    {label:'маж',    full:'Мажор',               iv:[0,6,11]},
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[            // колонка 0 палитры
+    {label:{en:'maj', ru:'маж'},    full:{en:'Major', ru:'Мажор'},               iv:[0,6,11]},
     {label:'maj7',   full:'Maj7',                iv:[0,6,11,17]},
-    {label:'дом7',   full:'Домин.7',             iv:[0,6,11,16]},
-    {label:'6',      full:'Мажор 6 · 5/3',       iv:[0,6,11,14]},
-    {label:'add9',   full:'Add9 (через окт.)',   iv:[0,6,11,22]},
-    {label:'6/9',    full:'Мажор 6/9',           iv:[0,6,11,14,22]},
+    {label:{en:'dom7', ru:'дом7'},   full:{en:'Dominant 7th', ru:'Домин.7'},             iv:[0,6,11,16]},
+    {label:'6',      full:{en:'Major 6 · 5/3', ru:'Мажор 6 · 5/3'},       iv:[0,6,11,14]},
+    {label:'add9',   full:{en:'Add9 (over the oct.)', ru:'Add9 (через окт.)'},   iv:[0,6,11,22]},
+    {label:'6/9',    full:{en:'Major 6/9', ru:'Мажор 6/9'},           iv:[0,6,11,14,22]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[            // колонка 1 палитры
-    {label:'мин',    full:'Минор чистый · 6/5',  iv:[0,5,11]},
-    {label:'мин7',   full:'Минор 7',             iv:[0,5,11,16]},
-    {label:'мин6',   full:'Минор 6 · 5/3',       iv:[0,5,11,14]},
-    {label:'минМ7',  full:'Мин-мажор 7',         iv:[0,5,11,17]},
-    {label:'мин9',   full:'Минор 9',             iv:[0,5,11,16,22]},
-    {label:'минadd9',full:'Минор add9',          iv:[0,5,11,22]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[            // колонка 1 палитры
+    {label:{en:'min', ru:'мин'},    full:{en:'Pure minor · 6/5', ru:'Минор чистый · 6/5'},  iv:[0,5,11]},
+    {label:{en:'min7', ru:'мин7'},   full:{en:'Minor 7', ru:'Минор 7'},             iv:[0,5,11,16]},
+    {label:{en:'min6', ru:'мин6'},   full:{en:'Minor 6 · 5/3', ru:'Минор 6 · 5/3'},       iv:[0,5,11,14]},
+    {label:{en:'minM7', ru:'минМ7'},  full:{en:'Minor-major 7', ru:'Мин-мажор 7'},         iv:[0,5,11,17]},
+    {label:{en:'min9', ru:'мин9'},   full:{en:'Minor 9', ru:'Минор 9'},             iv:[0,5,11,16,22]},
+    {label:{en:'minadd9', ru:'минadd9'},full:{en:'Minor add9', ru:'Минор add9'},          iv:[0,5,11,22]},
   ]},
-  {id:'dim', name:'Ум./Ув.', finger:2, types:[          // колонка 2 палитры
-    {label:'dim',    full:'Уменьшённое',         iv:[0,5,10]},
-    {label:'m7b5',   full:'Полууменьшённое',     iv:[0,5,10,16]},
-    {label:'dim7',   full:'Ум. септаккорд',      iv:[0,5,10,15]},
-    {label:'aug',    full:'Увеличенное',         iv:[0,6,12]},
-    {label:'aug7',   full:'Увелич. 7',           iv:[0,6,12,16]},
-    {label:'augM7',  full:'Увелич.-мажор 7',     iv:[0,6,12,17]},
+  {id:'dim', name:{en:'Dim./Aug.', ru:'Ум./Ув.'}, finger:2, types:[          // колонка 2 палитры
+    {label:'dim',    full:{en:'Diminished', ru:'Уменьшённое'},         iv:[0,5,10]},
+    {label:'m7b5',   full:{en:'Half-diminished', ru:'Полууменьшённое'},     iv:[0,5,10,16]},
+    {label:'dim7',   full:{en:'Diminished 7th', ru:'Ум. септаккорд'},      iv:[0,5,10,15]},
+    {label:'aug',    full:{en:'Augmented', ru:'Увеличенное'},         iv:[0,6,12]},
+    {label:'aug7',   full:{en:'Augmented 7', ru:'Увелич. 7'},           iv:[0,6,12,16]},
+    {label:'augM7',  full:{en:'Augmented-major 7', ru:'Увелич.-мажор 7'},     iv:[0,6,12,17]},
   ]},
-  {id:'sus', name:'Sus и расшир.', finger:3, types:[    // колонка 3 палитры
+  {id:'sus', name:{en:'Sus & extended', ru:'Sus и расшир.'}, finger:3, types:[    // колонка 3 палитры
     {label:'sus2',   full:'Sus2',                iv:[0,3,11]},
     {label:'sus4',   full:'Sus4 · 4/3',          iv:[0,8,11]},
     {label:'7sus4',  full:'7sus4',               iv:[0,8,11,16]},
-    {label:'9sus4',  full:'9sus4 (через окт.)',  iv:[0,8,11,22]},
+    {label:'9sus4',  full:{en:'9sus4 (over the oct.)', ru:'9sus4 (через окт.)'},  iv:[0,8,11,22]},
     {label:'sus2/7', full:'Sus2 + 7',            iv:[0,3,11,16]},
-    {label:'кварт',  full:'Квартаккорд',         iv:[0,8,16]},
+    {label:{en:'quart', ru:'кварт'},  full:{en:'Quartal chord', ru:'Квартаккорд'},         iv:[0,8,16]},
   ]},
  ],
  /* ── Партч (43 тона, cents-строй): интервалы — ЧИСТЫЕ ОТНОШЕНИЯ (11-предел), НЕ шаги edo.
@@ -515,37 +515,37 @@ export const CHORD_FAM_SETS={
     отношение, а не «Cmaj7». iv начинается с 1 (унисон-корень). Отношения — обычные JS-числа
     (5/4 и т.д.): погрешность float ниже цента, а ссылка на массив iv держит ty===latchTy. */
  partch:[
-  {id:'oton', name:'О (обертон.)', finger:0, types:[
-    {label:'О',    full:'Отональ. триада · 4:5:6',         iv:[1,5/4,3/2]},
-    {label:'О7',   full:'Отональ. тетрада · 4:5:6:7',      iv:[1,5/4,3/2,7/4]},
-    {label:'О9',   full:'Отональ. пентада · 4:5:6:7:9',    iv:[1,5/4,3/2,7/4,9/4]},
-    {label:'О11',  full:'Отональ. гексада · 4:5:6:7:9:11', iv:[1,5/4,3/2,7/4,9/4,11/4]},
-    {label:'О-б5', full:'Отональ. без квинты · 4:5:7',     iv:[1,5/4,7/4]},
-    {label:'О9нч', full:'Отональ. с ноной · 8:9:10:12',    iv:[1,9/8,5/4,3/2]},
+  {id:'oton', name:{en:'O (otonal)', ru:'О (обертон.)'}, finger:0, types:[
+    {label:'O',    full:{en:'Otonal triad · 4:5:6', ru:'Отональ. триада · 4:5:6'},         iv:[1,5/4,3/2]},
+    {label:'O7',   full:{en:'Otonal tetrad · 4:5:6:7', ru:'Отональ. тетрада · 4:5:6:7'},      iv:[1,5/4,3/2,7/4]},
+    {label:'O9',   full:{en:'Otonal pentad · 4:5:6:7:9', ru:'Отональ. пентада · 4:5:6:7:9'},    iv:[1,5/4,3/2,7/4,9/4]},
+    {label:'O11',  full:{en:'Otonal hexad · 4:5:6:7:9:11', ru:'Отональ. гексада · 4:5:6:7:9:11'}, iv:[1,5/4,3/2,7/4,9/4,11/4]},
+    {label:{en:'O no5', ru:'О-б5'}, full:{en:'Otonal, no fifth · 4:5:7', ru:'Отональ. без квинты · 4:5:7'},     iv:[1,5/4,7/4]},
+    {label:{en:'O9n', ru:'О9нч'}, full:{en:'Otonal with ninth · 8:9:10:12', ru:'Отональ. с ноной · 8:9:10:12'},    iv:[1,9/8,5/4,3/2]},
   ]},
-  {id:'uton', name:'У (унтертон.)', finger:1, types:[
-    {label:'У',    full:'Утональ. триада · 10:12:15',      iv:[1,6/5,3/2]},
-    {label:'У7',   full:'Утональ. тетрада · 1/(4:5:6:7)',  iv:[1,6/5,3/2,12/7]},
-    {label:'У9',   full:'Утональ. пентада',                iv:[1,6/5,3/2,12/7,9/4]},
-    {label:'У11',  full:'Утональ. гексада',                iv:[1,6/5,3/2,12/7,9/4,36/11]},
-    {label:'У-б5', full:'Утональ. без квинты · 5:6:8',     iv:[1,6/5,8/5]},
-    {label:'Удоб9',full:'Утональ. с ноной · 9:10:12',      iv:[1,10/9,6/5,3/2]},
+  {id:'uton', name:{en:'U (utonal)', ru:'У (унтертон.)'}, finger:1, types:[
+    {label:'U',    full:{en:'Utonal triad · 10:12:15', ru:'Утональ. триада · 10:12:15'},      iv:[1,6/5,3/2]},
+    {label:'U7',   full:{en:'Utonal tetrad · 1/(4:5:6:7)', ru:'Утональ. тетрада · 1/(4:5:6:7)'},  iv:[1,6/5,3/2,12/7]},
+    {label:'U9',   full:{en:'Utonal pentad', ru:'Утональ. пентада'},                iv:[1,6/5,3/2,12/7,9/4]},
+    {label:'U11',  full:{en:'Utonal hexad', ru:'Утональ. гексада'},                iv:[1,6/5,3/2,12/7,9/4,36/11]},
+    {label:{en:'U no5', ru:'У-б5'}, full:{en:'Utonal, no fifth · 5:6:8', ru:'Утональ. без квинты · 5:6:8'},     iv:[1,6/5,8/5]},
+    {label:{en:'U add9', ru:'Удоб9'},full:{en:'Utonal with ninth · 9:10:12', ru:'Утональ. с ноной · 9:10:12'},      iv:[1,10/9,6/5,3/2]},
   ]},
-  {id:'sept', name:'Диез 7/11', finger:2, types:[
-    {label:'субм', full:'Субминор · 7/6 (267c)',          iv:[1,7/6,3/2]},
-    {label:'супМ', full:'Супермажор · 9/7 (435c)',        iv:[1,9/7,3/2]},
-    {label:'нейтр',full:'Нейтральное · 11/9 (347c)',      iv:[1,11/9,3/2]},
-    {label:'ундец',full:'Ундецимальное · 11/8 (551c)',    iv:[1,11/8,3/2]},
-    {label:'трит7',full:'Септим. тритон · 7/5 (583c)',    iv:[1,7/5,3/2]},
-    {label:'гарм', full:'Обертоновый срез · 8:10:11:12',  iv:[1,5/4,11/8,3/2]},
+  {id:'sept', name:{en:'Sharp 7/11', ru:'Диез 7/11'}, finger:2, types:[
+    {label:{en:'subm', ru:'субм'}, full:{en:'Subminor · 7/6 (267c)', ru:'Субминор · 7/6 (267c)'},          iv:[1,7/6,3/2]},
+    {label:{en:'supM', ru:'супМ'}, full:{en:'Supermajor · 9/7 (435c)', ru:'Супермажор · 9/7 (435c)'},        iv:[1,9/7,3/2]},
+    {label:{en:'neut', ru:'нейтр'},full:{en:'Neutral · 11/9 (347c)', ru:'Нейтральное · 11/9 (347c)'},      iv:[1,11/9,3/2]},
+    {label:{en:'undec', ru:'ундец'},full:{en:'Undecimal · 11/8 (551c)', ru:'Ундецимальное · 11/8 (551c)'},    iv:[1,11/8,3/2]},
+    {label:{en:'trit7', ru:'трит7'},full:{en:'Septimal tritone · 7/5 (583c)', ru:'Септим. тритон · 7/5 (583c)'},    iv:[1,7/5,3/2]},
+    {label:{en:'harm', ru:'гарм'}, full:{en:'Harmonic segment · 8:10:11:12', ru:'Обертоновый срез · 8:10:11:12'},  iv:[1,5/4,11/8,3/2]},
   ]},
-  {id:'std', name:'Станд.', finger:3, types:[
-    {label:'M',    full:'Мажор чистый · 4:5:6',            iv:[1,5/4,3/2]},
-    {label:'m',    full:'Минор чистый · 10:12:15',         iv:[1,6/5,3/2]},
-    {label:'7',    full:'Домин.7 · 4:5:6:7',               iv:[1,5/4,3/2,7/4]},
-    {label:'maj7', full:'Maj7 чистый · 15/8',              iv:[1,5/4,3/2,15/8]},
+  {id:'std', name:{en:'Standard', ru:'Станд.'}, finger:3, types:[
+    {label:'M',    full:{en:'Pure major · 4:5:6', ru:'Мажор чистый · 4:5:6'},            iv:[1,5/4,3/2]},
+    {label:'m',    full:{en:'Pure minor · 10:12:15', ru:'Минор чистый · 10:12:15'},         iv:[1,6/5,3/2]},
+    {label:'7',    full:{en:'Dominant 7th · 4:5:6:7', ru:'Домин.7 · 4:5:6:7'},               iv:[1,5/4,3/2,7/4]},
+    {label:'maj7', full:{en:'Pure maj7 · 15/8', ru:'Maj7 чистый · 15/8'},              iv:[1,5/4,3/2,15/8]},
     {label:'sus4', full:'Sus4 · 4/3',                      iv:[1,4/3,3/2]},
-    {label:'кварт',full:'Квартаккорд · 9:12:16',           iv:[1,4/3,16/9]},
+    {label:{en:'quart', ru:'кварт'},full:{en:'Quartal chord · 9:12:16', ru:'Квартаккорд · 9:12:16'},           iv:[1,4/3,16/9]},
   ]},
  ],
  /* ── Болен–Пирс (неоктавный, период 3): интервалы — ЧИСТЫЕ ОТНОШЕНИЯ подгруппы 3.5.7,
@@ -555,26 +555,26 @@ export const CHORD_FAM_SETS={
     iv с 1 (унисон-корень). Три колонки по 5: Мажор (отональ. вокруг 3:5:7) / Минор (вокруг 5:7:9) /
     Характерные (нечётные терции 9/7·7/5 и симметричные стопки). Отношения — обычные JS-числа. */
  bp:[
-  {id:'maj', name:'Мажор', finger:0, types:[
-    {label:'3:5:7',     full:'Мажорная триада · 3:5:7 (885/1467¢)', iv:[1,5/3,7/3]},
-    {label:'3:5:7:9',   full:'Тетрада · 3:5:7:9 (верх = тритава)',  iv:[1,5/3,7/3,3]},
-    {label:'3:5:7:9:11',full:'Пентада · 3:5:7:9:11',                iv:[1,5/3,7/3,3,11/3]},
-    {label:'3:5',       full:'Диада · 3:5 (885¢)',                  iv:[1,5/3]},
-    {label:'3:7',       full:'Диада · 3:7 (1467¢)',                 iv:[1,7/3]},
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
+    {label:'3:5:7',     full:{en:'Major triad · 3:5:7 (885/1467¢)', ru:'Мажорная триада · 3:5:7 (885/1467¢)'}, iv:[1,5/3,7/3]},
+    {label:'3:5:7:9',   full:{en:'Tetrad · 3:5:7:9 (top = tritave)', ru:'Тетрада · 3:5:7:9 (верх = тритава)'},  iv:[1,5/3,7/3,3]},
+    {label:'3:5:7:9:11',full:{en:'Pentad · 3:5:7:9:11', ru:'Пентада · 3:5:7:9:11'},                iv:[1,5/3,7/3,3,11/3]},
+    {label:'3:5',       full:{en:'Dyad · 3:5 (885¢)', ru:'Диада · 3:5 (885¢)'},                  iv:[1,5/3]},
+    {label:'3:7',       full:{en:'Dyad · 3:7 (1467¢)', ru:'Диада · 3:7 (1467¢)'},                 iv:[1,7/3]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[
-    {label:'5:7:9',    full:'Минорная триада · 5:7:9 (583/1018¢)', iv:[1,7/5,9/5]},
-    {label:'5:7:9:11', full:'Тетрада · 5:7:9:11',                  iv:[1,7/5,9/5,11/5]},
-    {label:'7:9:11',   full:'Триада · 7:9:11 (435/782¢)',          iv:[1,9/7,11/7]},
-    {label:'5:7',      full:'Диада · 5:7 (583¢, септим. тритон)',  iv:[1,7/5]},
-    {label:'5:9',      full:'Диада · 5:9 (1018¢)',                 iv:[1,9/5]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[
+    {label:'5:7:9',    full:{en:'Minor triad · 5:7:9 (583/1018¢)', ru:'Минорная триада · 5:7:9 (583/1018¢)'}, iv:[1,7/5,9/5]},
+    {label:'5:7:9:11', full:{en:'Tetrad · 5:7:9:11', ru:'Тетрада · 5:7:9:11'},                  iv:[1,7/5,9/5,11/5]},
+    {label:'7:9:11',   full:{en:'Triad · 7:9:11 (435/782¢)', ru:'Триада · 7:9:11 (435/782¢)'},          iv:[1,9/7,11/7]},
+    {label:'5:7',      full:{en:'Dyad · 5:7 (583¢, septimal tritone)', ru:'Диада · 5:7 (583¢, септим. тритон)'},  iv:[1,7/5]},
+    {label:'5:9',      full:{en:'Dyad · 5:9 (1018¢)', ru:'Диада · 5:9 (1018¢)'},                 iv:[1,9/5]},
   ]},
-  {id:'char', name:'Характерные', finger:2, types:[
-    {label:'9/7',   full:'Супермажор. терция · 9/7 (435¢) + 7/3', iv:[1,9/7,7/3]},
-    {label:'7/5',   full:'Септим. тритон · 7/5 (583¢) + 7/3',     iv:[1,7/5,7/3]},
-    {label:'15/7',  full:'Верхняя · 3:5:15/7 (885/1319¢)',        iv:[1,5/3,15/7]},
-    {label:'25/9',  full:'Стопка 5/3 · 9:15:25 (симметр.)',       iv:[1,5/3,25/9]},
-    {label:'49/25', full:'Стопка 7/5 · 25:35:49 (симметр.)',      iv:[1,7/5,49/25]},
+  {id:'char', name:{en:'Characteristic', ru:'Характерные'}, finger:2, types:[
+    {label:'9/7',   full:{en:'Supermajor third · 9/7 (435¢) + 7/3', ru:'Супермажор. терция · 9/7 (435¢) + 7/3'}, iv:[1,9/7,7/3]},
+    {label:'7/5',   full:{en:'Septimal tritone · 7/5 (583¢) + 7/3', ru:'Септим. тритон · 7/5 (583¢) + 7/3'},     iv:[1,7/5,7/3]},
+    {label:'15/7',  full:{en:'Upper · 3:5:15/7 (885/1319¢)', ru:'Верхняя · 3:5:15/7 (885/1319¢)'},        iv:[1,5/3,15/7]},
+    {label:'25/9',  full:{en:'Stack of 5/3 · 9:15:25 (symmetric)', ru:'Стопка 5/3 · 9:15:25 (симметр.)'},       iv:[1,5/3,25/9]},
+    {label:'49/25', full:{en:'Stack of 7/5 · 25:35:49 (symmetric)', ru:'Стопка 7/5 · 25:35:49 (симметр.)'},      iv:[1,7/5,49/25]},
   ]},
  ],
  /* ── Пифагоров строй (cents-лад, edo:12): ТА ЖЕ привычная лексика аккордов, что у Хроматики
@@ -586,37 +586,37 @@ export const CHORD_FAM_SETS={
     chordFreqs берёт cents-ветку (s.cents && ty, как Партч): корень из cents-оверлея, аккордовая
     нота = корень·ratio напрямую. Отношения — обычные JS-числа (81/64 и т.п.). Колонки/метки 1-в-1 с chrom12. */
  pyth:[
-  {id:'maj', name:'Мажор', finger:0, types:[
-    {label:'M',     full:'Мажор · терция 81/64 (резкая)', iv:[1,81/64,3/2]},
-    {label:'maj7',  full:'Maj7 · септима 243/128',        iv:[1,81/64,3/2,243/128]},
-    {label:'7',     full:'Домин.7 · 16/9',                iv:[1,81/64,3/2,16/9]},
-    {label:'6',     full:'Мажор 6 · 27/16',               iv:[1,81/64,3/2,27/16]},
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
+    {label:'M',     full:{en:'Major · third 81/64 (sharp)', ru:'Мажор · терция 81/64 (резкая)'}, iv:[1,81/64,3/2]},
+    {label:'maj7',  full:{en:'Maj7 · seventh 243/128', ru:'Maj7 · септима 243/128'},        iv:[1,81/64,3/2,243/128]},
+    {label:'7',     full:{en:'Dominant 7th · 16/9', ru:'Домин.7 · 16/9'},                iv:[1,81/64,3/2,16/9]},
+    {label:'6',     full:{en:'Major 6 · 27/16', ru:'Мажор 6 · 27/16'},               iv:[1,81/64,3/2,27/16]},
     {label:'add9',  full:'Add9 · 9/4',                    iv:[1,81/64,3/2,9/4]},
     {label:'7#9',   full:'7#9 · 64/27',                   iv:[1,81/64,3/2,16/9,64/27]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[
-    {label:'m',     full:'Минор · терция 32/27',          iv:[1,32/27,3/2]},
-    {label:'m7',    full:'Минор 7 · 16/9',                iv:[1,32/27,3/2,16/9]},
-    {label:'m6',    full:'Минор 6 · 27/16',               iv:[1,32/27,3/2,27/16]},
-    {label:'mM7',   full:'Мин-мажор 7 · 243/128',         iv:[1,32/27,3/2,243/128]},
-    {label:'m9',    full:'Минор 9 · 9/4',                 iv:[1,32/27,3/2,16/9,9/4]},
-    {label:'madd9', full:'Минор add9 · 9/4',              iv:[1,32/27,3/2,9/4]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[
+    {label:'m',     full:{en:'Minor · third 32/27', ru:'Минор · терция 32/27'},          iv:[1,32/27,3/2]},
+    {label:'m7',    full:{en:'Minor 7 · 16/9', ru:'Минор 7 · 16/9'},                iv:[1,32/27,3/2,16/9]},
+    {label:'m6',    full:{en:'Minor 6 · 27/16', ru:'Минор 6 · 27/16'},               iv:[1,32/27,3/2,27/16]},
+    {label:'mM7',   full:{en:'Minor-major 7 · 243/128', ru:'Мин-мажор 7 · 243/128'},         iv:[1,32/27,3/2,243/128]},
+    {label:'m9',    full:{en:'Minor 9 · 9/4', ru:'Минор 9 · 9/4'},                 iv:[1,32/27,3/2,16/9,9/4]},
+    {label:'madd9', full:{en:'Minor add9 · 9/4', ru:'Минор add9 · 9/4'},              iv:[1,32/27,3/2,9/4]},
   ]},
-  {id:'dim', name:'Ум./Ув.', finger:2, types:[
-    {label:'dim',   full:'Уменьшённое · 729/512',         iv:[1,32/27,729/512]},
-    {label:'m7b5',  full:'Полууменьшённое',               iv:[1,32/27,729/512,16/9]},
-    {label:'dim7',  full:'Ум. септаккорд · 27/16',        iv:[1,32/27,729/512,27/16]},
-    {label:'aug',   full:'Увеличенное · 128/81',          iv:[1,81/64,128/81]},
-    {label:'aug7',  full:'Увелич. 7',                     iv:[1,81/64,128/81,16/9]},
-    {label:'augM7', full:'Увелич.-мажор 7',               iv:[1,81/64,128/81,243/128]},
+  {id:'dim', name:{en:'Dim./Aug.', ru:'Ум./Ув.'}, finger:2, types:[
+    {label:'dim',   full:{en:'Diminished · 729/512', ru:'Уменьшённое · 729/512'},         iv:[1,32/27,729/512]},
+    {label:'m7b5',  full:{en:'Half-diminished', ru:'Полууменьшённое'},               iv:[1,32/27,729/512,16/9]},
+    {label:'dim7',  full:{en:'Diminished 7th · 27/16', ru:'Ум. септаккорд · 27/16'},        iv:[1,32/27,729/512,27/16]},
+    {label:'aug',   full:{en:'Augmented · 128/81', ru:'Увеличенное · 128/81'},          iv:[1,81/64,128/81]},
+    {label:'aug7',  full:{en:'Augmented 7', ru:'Увелич. 7'},                     iv:[1,81/64,128/81,16/9]},
+    {label:'augM7', full:{en:'Augmented-major 7', ru:'Увелич.-мажор 7'},               iv:[1,81/64,128/81,243/128]},
   ]},
-  {id:'sus', name:'Sus и расшир.', finger:3, types:[
+  {id:'sus', name:{en:'Sus & extended', ru:'Sus и расшир.'}, finger:3, types:[
     {label:'sus2',  full:'Sus2 · 9/8',                    iv:[1,9/8,3/2]},
-    {label:'sus4',  full:'Sus4 · 4/3 (чистая кварта)',    iv:[1,4/3,3/2]},
+    {label:'sus4',  full:{en:'Sus4 · 4/3 (pure fourth)', ru:'Sus4 · 4/3 (чистая кварта)'},    iv:[1,4/3,3/2]},
     {label:'7sus4', full:'7sus4',                         iv:[1,4/3,3/2,16/9]},
-    {label:'6/9',   full:'Мажор 6/9',                     iv:[1,81/64,3/2,27/16,9/4]},
+    {label:'6/9',   full:{en:'Major 6/9', ru:'Мажор 6/9'},                     iv:[1,81/64,3/2,27/16,9/4]},
     {label:'maj9',  full:'Maj9',                          iv:[1,81/64,3/2,243/128,9/4]},
-    {label:'13',    full:'13 · секста 27/8',              iv:[1,81/64,3/2,16/9,27/8]},
+    {label:'13',    full:{en:'13 · sixth 27/8', ru:'13 · секста 27/8'},              iv:[1,81/64,3/2,16/9,27/8]},
   ]},
  ],
  /* ── Натуральный строй (5-предел, cents-лад edo:12): ТА ЖЕ лексика аккордов, что у Хроматики/
@@ -628,37 +628,37 @@ export const CHORD_FAM_SETS={
     аккорде — терция из «бьётся» станет «замерла». chordFreqs берёт cents-ветку (s.cents && ty, как
     Партч/Пифагор): корень из cents-оверлея, аккордовая нота = корень·ratio. Колонки/метки 1-в-1 с chrom12. */
  nat:[
-  {id:'maj', name:'Мажор', finger:0, types:[
-    {label:'M',     full:'Мажор · 4:5:6 чистый, без биения', iv:[1,5/4,3/2]},
-    {label:'maj7',  full:'Maj7 · септима 15/8',              iv:[1,5/4,3/2,15/8]},
-    {label:'7',     full:'Домин.7 · 9/5',                    iv:[1,5/4,3/2,9/5]},
-    {label:'6',     full:'Мажор 6 · секста 5/3',             iv:[1,5/4,3/2,5/3]},
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
+    {label:'M',     full:{en:'Major · 4:5:6 pure, beatless', ru:'Мажор · 4:5:6 чистый, без биения'}, iv:[1,5/4,3/2]},
+    {label:'maj7',  full:{en:'Maj7 · seventh 15/8', ru:'Maj7 · септима 15/8'},              iv:[1,5/4,3/2,15/8]},
+    {label:'7',     full:{en:'Dominant 7th · 9/5', ru:'Домин.7 · 9/5'},                    iv:[1,5/4,3/2,9/5]},
+    {label:'6',     full:{en:'Major 6 · sixth 5/3', ru:'Мажор 6 · секста 5/3'},             iv:[1,5/4,3/2,5/3]},
     {label:'add9',  full:'Add9 · 9/4',                       iv:[1,5/4,3/2,9/4]},
     {label:'7#9',   full:'7#9 · 12/5',                       iv:[1,5/4,3/2,9/5,12/5]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[
-    {label:'m',     full:'Минор · терция 6/5 чистая',        iv:[1,6/5,3/2]},
-    {label:'m7',    full:'Минор 7 · 9/5',                    iv:[1,6/5,3/2,9/5]},
-    {label:'m6',    full:'Минор 6 · 5/3',                    iv:[1,6/5,3/2,5/3]},
-    {label:'mM7',   full:'Мин-мажор 7 · 15/8',               iv:[1,6/5,3/2,15/8]},
-    {label:'m9',    full:'Минор 9 · 9/4',                    iv:[1,6/5,3/2,9/5,9/4]},
-    {label:'madd9', full:'Минор add9 · 9/4',                 iv:[1,6/5,3/2,9/4]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[
+    {label:'m',     full:{en:'Minor · third 6/5 pure', ru:'Минор · терция 6/5 чистая'},        iv:[1,6/5,3/2]},
+    {label:'m7',    full:{en:'Minor 7 · 9/5', ru:'Минор 7 · 9/5'},                    iv:[1,6/5,3/2,9/5]},
+    {label:'m6',    full:{en:'Minor 6 · 5/3', ru:'Минор 6 · 5/3'},                    iv:[1,6/5,3/2,5/3]},
+    {label:'mM7',   full:{en:'Minor-major 7 · 15/8', ru:'Мин-мажор 7 · 15/8'},               iv:[1,6/5,3/2,15/8]},
+    {label:'m9',    full:{en:'Minor 9 · 9/4', ru:'Минор 9 · 9/4'},                    iv:[1,6/5,3/2,9/5,9/4]},
+    {label:'madd9', full:{en:'Minor add9 · 9/4', ru:'Минор add9 · 9/4'},                 iv:[1,6/5,3/2,9/4]},
   ]},
-  {id:'dim', name:'Ум./Ув.', finger:2, types:[
-    {label:'dim',   full:'Уменьшённое · 45/32',              iv:[1,6/5,45/32]},
-    {label:'m7b5',  full:'Полууменьшённое',                  iv:[1,6/5,45/32,9/5]},
-    {label:'dim7',  full:'Ум. септаккорд · 5/3',             iv:[1,6/5,45/32,5/3]},
-    {label:'aug',   full:'Увеличенное · 8/5',                iv:[1,5/4,8/5]},
-    {label:'aug7',  full:'Увелич. 7',                        iv:[1,5/4,8/5,9/5]},
-    {label:'augM7', full:'Увелич.-мажор 7',                  iv:[1,5/4,8/5,15/8]},
+  {id:'dim', name:{en:'Dim./Aug.', ru:'Ум./Ув.'}, finger:2, types:[
+    {label:'dim',   full:{en:'Diminished · 45/32', ru:'Уменьшённое · 45/32'},              iv:[1,6/5,45/32]},
+    {label:'m7b5',  full:{en:'Half-diminished', ru:'Полууменьшённое'},                  iv:[1,6/5,45/32,9/5]},
+    {label:'dim7',  full:{en:'Diminished 7th · 5/3', ru:'Ум. септаккорд · 5/3'},             iv:[1,6/5,45/32,5/3]},
+    {label:'aug',   full:{en:'Augmented · 8/5', ru:'Увеличенное · 8/5'},                iv:[1,5/4,8/5]},
+    {label:'aug7',  full:{en:'Augmented 7', ru:'Увелич. 7'},                        iv:[1,5/4,8/5,9/5]},
+    {label:'augM7', full:{en:'Augmented-major 7', ru:'Увелич.-мажор 7'},                  iv:[1,5/4,8/5,15/8]},
   ]},
-  {id:'sus', name:'Sus и расшир.', finger:3, types:[
+  {id:'sus', name:{en:'Sus & extended', ru:'Sus и расшир.'}, finger:3, types:[
     {label:'sus2',  full:'Sus2 · 9/8',                       iv:[1,9/8,3/2]},
-    {label:'sus4',  full:'Sus4 · 4/3 (чистая кварта)',       iv:[1,4/3,3/2]},
+    {label:'sus4',  full:{en:'Sus4 · 4/3 (pure fourth)', ru:'Sus4 · 4/3 (чистая кварта)'},       iv:[1,4/3,3/2]},
     {label:'7sus4', full:'7sus4',                            iv:[1,4/3,3/2,9/5]},
-    {label:'6/9',   full:'Мажор 6/9',                        iv:[1,5/4,3/2,5/3,9/4]},
+    {label:'6/9',   full:{en:'Major 6/9', ru:'Мажор 6/9'},                        iv:[1,5/4,3/2,5/3,9/4]},
     {label:'maj9',  full:'Maj9',                             iv:[1,5/4,3/2,15/8,9/4]},
-    {label:'13',    full:'13 · секста 10/3',                 iv:[1,5/4,3/2,9/5,10/3]},
+    {label:'13',    full:{en:'13 · sixth 10/3', ru:'13 · секста 10/3'},                 iv:[1,5/4,3/2,9/5,10/3]},
   ]},
  ],
  /* ── Натуральный ФИКСИРОВАННЫЙ (клавесин): ТА ЖЕ 24-аккордовая лексика, что chrom12/nat, но iv —
@@ -667,7 +667,7 @@ export const CHORD_FAM_SETS={
     ветки). Структура/метки 1-в-1 с chrom12; отличается только тем, что лад (gridChords) трактует
     эти же числа через фиксированную сетку, а не 12-TET. Разметки «волк» в UI НЕТ — учит ухо. */
  natfix:[
-  {id:'maj', name:'Мажор', finger:0, types:[
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
     {label:'M',     iv:[0,4,7]},
     {label:'maj7',  iv:[0,4,7,11]},
     {label:'7',     iv:[0,4,7,10]},
@@ -675,7 +675,7 @@ export const CHORD_FAM_SETS={
     {label:'add9',  iv:[0,4,7,14]},
     {label:'7#9',   iv:[0,4,7,10,15]},
   ]},
-  {id:'min', name:'Минор', finger:1, types:[
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[
     {label:'m',     iv:[0,3,7]},
     {label:'m7',    iv:[0,3,7,10]},
     {label:'m6',    iv:[0,3,7,9]},
@@ -683,7 +683,7 @@ export const CHORD_FAM_SETS={
     {label:'m9',    iv:[0,3,7,10,14]},
     {label:'madd9', iv:[0,3,7,14]},
   ]},
-  {id:'dim', name:'Ум./Ув.', finger:2, types:[
+  {id:'dim', name:{en:'Dim./Aug.', ru:'Ум./Ув.'}, finger:2, types:[
     {label:'dim',   iv:[0,3,6]},
     {label:'m7b5',  iv:[0,3,6,10]},
     {label:'dim7',  iv:[0,3,6,9]},
@@ -691,7 +691,7 @@ export const CHORD_FAM_SETS={
     {label:'aug7',  iv:[0,4,8,10]},
     {label:'augM7', iv:[0,4,8,11]},
   ]},
-  {id:'sus', name:'Sus и расшир.', finger:3, types:[
+  {id:'sus', name:{en:'Sus & extended', ru:'Sus и расшир.'}, finger:3, types:[
     {label:'sus2',  iv:[0,2,7]},
     {label:'sus4',  iv:[0,5,7]},
     {label:'7sus4', iv:[0,5,7,10]},
@@ -855,20 +855,22 @@ export const centsOf=deg=>{ const s=CUR();
    меняем; имя шрути — классическое). АЛЬТЕРНАТИВА (НЕ берём): современная позиционная имя[i]↔цент[i],
    Са=Тивра(1)/Па=Кшити(14) — частая в онлайн-таблицах, но поздняя упрощёнка. Источники: Сангита-Ратнакара
    (sreenivasaraos.com), kaminimusic.com (позиционная, для сверки). */
-const SWARA_OF={0:'Са',90:'Ре♭',112:'Ре♭',182:'Ре',204:'Ре',294:'Га♭',316:'Га♭',386:'Га',408:'Га',
-  498:'Ма',520:'Ма',590:'Ма♯',612:'Ма♯',702:'Па',792:'Дха♭',814:'Дха♭',884:'Дха',906:'Дха',
-  996:'Ни♭',1018:'Ни♭',1088:'Ни',1110:'Ни'};
-const SHRUTI_OF={0:'Чхандовати',90:'Дайавати',112:'Ранджани',182:'Ратика',204:'Раудри',294:'Кродха',
-  316:'Ваджрика',386:'Прасарини',408:'Прити',498:'Марджани',520:'Кшити',590:'Ракта',612:'Сандипани',
-  702:'Алапини',792:'Маданти',814:'Рохини',884:'Рамья',906:'Угра',996:'Кшобхини',1018:'Тивра',
-  1088:'Кумудвати',1110:'Манда'};
+/* Свары — транслит {default:латиница, ru:кириллица}: имена собственные, не переводятся (Sa Re Ga Ma Pa Dha Ni). */
+const SWARA_OF={0:{default:'Sa',ru:'Са'},90:{default:'Re♭',ru:'Ре♭'},112:{default:'Re♭',ru:'Ре♭'},182:{default:'Re',ru:'Ре'},204:{default:'Re',ru:'Ре'},294:{default:'Ga♭',ru:'Га♭'},316:{default:'Ga♭',ru:'Га♭'},386:{default:'Ga',ru:'Га'},408:{default:'Ga',ru:'Га'},
+  498:{default:'Ma',ru:'Ма'},520:{default:'Ma',ru:'Ма'},590:{default:'Ma♯',ru:'Ма♯'},612:{default:'Ma♯',ru:'Ма♯'},702:{default:'Pa',ru:'Па'},792:{default:'Dha♭',ru:'Дха♭'},814:{default:'Dha♭',ru:'Дха♭'},884:{default:'Dha',ru:'Дха'},906:{default:'Dha',ru:'Дха'},
+  996:{default:'Ni♭',ru:'Ни♭'},1018:{default:'Ni♭',ru:'Ни♭'},1088:{default:'Ni',ru:'Ни'},1110:{default:'Ni',ru:'Ни'}};
+/* Имена 22 шрути — транслит {default:латиница, ru:кириллица}: санскритские имена собственные. */
+const SHRUTI_OF={0:{default:'Chandovati',ru:'Чхандовати'},90:{default:'Dayavati',ru:'Дайавати'},112:{default:'Ranjani',ru:'Ранджани'},182:{default:'Ratika',ru:'Ратика'},204:{default:'Raudri',ru:'Раудри'},294:{default:'Krodha',ru:'Кродха'},
+  316:{default:'Vajrika',ru:'Ваджрика'},386:{default:'Prasarini',ru:'Прасарини'},408:{default:'Priti',ru:'Прити'},498:{default:'Marjani',ru:'Марджани'},520:{default:'Kshiti',ru:'Кшити'},590:{default:'Rakta',ru:'Ракта'},612:{default:'Sandipani',ru:'Сандипани'},
+  702:{default:'Alapini',ru:'Алапини'},792:{default:'Madanti',ru:'Маданти'},814:{default:'Rohini',ru:'Рохини'},884:{default:'Ramya',ru:'Рамья'},906:{default:'Ugra',ru:'Угра'},996:{default:'Kshobhini',ru:'Кшобхини'},1018:{default:'Tivra',ru:'Тивра'},
+  1088:{default:'Kumudvati',ru:'Кумудвати'},1110:{default:'Manda',ru:'Манда'}};
 /* Подпись ступени deg: РЕАЛЬНЫЕ центы (как centsOf, с дописанной октавой 1200→0→Са) → свара. У полной
    сетки (свойство swaraFull) добавляем имя шрути «свара · имя» (различает комма-пары); у РАГ — только
    свара (раги поют/называют сварами: Са Ре Га Ма Па Дха Ни). Зовётся лишь для swaraNames-ладов, где все
    центы — члены сетки; фолбэк на порядковый — страховка. Точные центы всегда рядом (centsOf). */
 export const swaraLbl=deg=>{ const s=CUR(), cx=(s.cents||[]).concat([1200]), c=cx[deg%cx.length]%1200;
   const sw=SWARA_OF[c]; if(!sw)return String(deg+1);
-  return s.swaraFull ? `${sw} · ${SHRUTI_OF[c]}` : sw; };
+  return s.swaraFull ? `${L(sw)} · ${L(SHRUTI_OF[c])}` : L(sw); };
  
 export function qual(t,f){                         // качество трезвучия по интервалам (полутона)
   if(t===4&&f===7)return''; if(t===3&&f===7)return'm';
