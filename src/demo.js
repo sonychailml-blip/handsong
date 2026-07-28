@@ -28,6 +28,7 @@
 
 import { AC, initAudio } from './audio.js';
 import { SCALES, leadFreq, bassFreq, chordFreqs, supportsChords } from './scales.js';
+import { L } from './i18n.js';
 
 const $ = id => document.getElementById(id);
 
@@ -152,7 +153,7 @@ function dNoise(at,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.l
 
 function showScene(sc, idx, n){
   $('demoScene').textContent=(idx+1)+' / '+n;
-  $('demoName').textContent=sc.scale?sc.scale.name:'';   // имя из самого лада (стабильно; позже L(sc.scale.name))
+  $('demoName').textContent=sc.scale?L(sc.scale.name):'';   // имя из самого лада, локализуем через L()
   $('demoCulture').textContent=sc.culture;
   $('demoOv').style.background=
     'radial-gradient(circle at 50% 38%, '+sc.tint+'38, rgba(7,7,13,.96) 70%)';

@@ -36,7 +36,7 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
    Имя тоники берём из NOTE_NAMES — тем же списком подписан <select id="selTonic">,
    чтобы подписи не разъехались. Читает живые связки scaleIdx/tonic, поэтому зовётся
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
-function updScaleBtn(){ scaleBtn.textContent=`${SCALES[scaleIdx].name} · ${NOTE_NAMES[tonic]}`; }
+function updScaleBtn(){ scaleBtn.textContent=`${L(SCALES[scaleIdx].name)} · ${NOTE_NAMES[tonic]}`; }
 
 /* Меню лада заполняем ладами ОДНОЙ традиции. value у <option> — абсолютный индекс в
    SCALES (он же scaleIdx), а не позиция в отфильтрованном списке: иначе selScale.onchange
@@ -74,7 +74,7 @@ function fillScales(tradId){
   }
 }
 function buildUI(){
-  TRADITIONS.forEach(tr=>{ const o=document.createElement('option'); o.value=tr.id; o.textContent=tr.name; selTradition.appendChild(o); });
+  TRADITIONS.forEach(tr=>{ const o=document.createElement('option'); o.value=tr.id; o.textContent=L(tr.name); selTradition.appendChild(o); });
   selTradition.value=tradOfScale(scaleIdx);      // традицию берём из активного лада, а не из умолчания
   fillScales(selTradition.value);
   selScale.value=scaleIdx;
@@ -558,6 +558,10 @@ applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHan
    Холст не трогаем — он перерисуется сам следующим кадром (t()/L() читаются на кадр). */
 onLangChange(()=>{
   buildStartLinks();
+  // Меню строя/лада: имена теперь локализуются (этап B). Переподписываем традиции НА МЕСТЕ (сохраняя
+  // выбор по value=id) и пересобираем список ладов текущей традиции, возвращая выбранный лад (value=индекс).
+  [...selTradition.options].forEach(o=>{ const tr=TRADITIONS.find(x=>x.id===o.value); if(tr)o.textContent=L(tr.name); });
+  fillScales(selTradition.value); selScale.value=scaleIdx;
   updScaleBtn(); updRecBtn(); updLoopBtn();
   applyInstr(); applySplit();          // роль + половины + «Функции рук» + видимость/титулы
   refreshMetreCtl();
