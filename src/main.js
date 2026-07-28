@@ -5,6 +5,7 @@ import { drawVideoBackground, drawOverlays } from './draw.js';
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
 import { $, revealBar } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: кнопка «Послушать строи» на старте (демо строёв, без камеры)
+import { openLessons, wireStarter } from './tutor.js';   // обучение: «Обучение» открывает список уроков; выбор урока сам поднимает приложение через startApp
 import { t } from './i18n.js';
 
 /* =====================================================================
@@ -37,11 +38,14 @@ function loop(){
 }
 
 /* ================= СТАРТ =================
-   AudioContext создаётся строго по клику пользователя —
-   иначе браузеры блокируют автовоспроизведение. */
-$('startBtn').onclick=async()=>{
-  const btn=$('startBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s;
-  btn.disabled=true;
+   AudioContext создаётся строго по клику пользователя — иначе браузеры блокируют автовоспроизведение.
+   ОДИН путь старта startApp() у «Играть» И «Обучение»: оба зовут его ВНУТРИ клика (правило жеста цело —
+   initAudio создаёт AC в синхронной части клика ещё до первого await). «Обучение» = тот же старт + тур. */
+let started=false;
+async function startApp(){
+  if(started) return true;
+  const btn=$('startBtn'), learn=$('learnBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s;
+  btn.disabled=true; if(learn) learn.disabled=true;
   try{
     await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется)
     await AC.resume();
@@ -50,9 +54,15 @@ $('startBtn').onclick=async()=>{
     $('start').classList.remove('on');
     $('bar').classList.add('on');
     revealBar();                             // панель видна на старте (учит, где меню), затем сама сворачивается через BAR_HIDE_MS
+    started=true;
     loop();
+    return true;
   }catch(err){
-    btn.disabled=false;
+    btn.disabled=false; if(learn) learn.disabled=false;
     msg(t('load.error',{msg:(err&&err.message?err.message:err)}));
+    return false;
   }
-};
+}
+wireStarter(startApp);                                                       // урок/«Свободная игра» поднимают приложение этим (правило #1: старт зовётся в клике выбора)
+$('startBtn').onclick=()=>{ startApp(); };                                   // «Играть» — как прежде
+$('learnBtn').onclick=()=>{ openLessons(); };                                // «Обучение» — открыть список уроков (приложение поднимет уже выбор урока/«Свободная игра»)

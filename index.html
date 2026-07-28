@@ -97,6 +97,29 @@
   <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
 </div>
  
+<!-- ================= ОБУЧЕНИЕ (тур) =================
+     Полупрозрачная полоса-подсказка поверх игры (сетку/руки видно). Текст/точки/кнопки ставит
+     src/tutor.js (динамически, поэтому без data-i18n). Next доступен всегда, Skip оставляет играть. -->
+<div id="tutorBar">
+  <div id="tutorText"></div>
+  <div id="tutorBottom">
+    <span id="tutorDots"></span>
+    <button id="tutorNext"></button>
+    <button id="tutorSkip"></button>
+  </div>
+</div>
+
+<!-- ================= СПИСОК УРОКОВ (обучение) =================
+     Модальное меню уроков: открывается с «Обучение» на старте И при выходе из урока (возврат к списку).
+     Заголовок/строки/кнопки ставит src/tutor.js (динамически, без data-i18n). -->
+<div id="lessonOv" class="ov">
+  <div class="lessonCard">
+    <div class="lessonHead"><b id="lessonTitle"></b><button id="lessonClose"></button></div>
+    <div id="lessonRows"></div>
+    <button id="lessonFree"></button>
+  </div>
+</div>
+
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
 <!-- Шаг 3 MENU-PLAN: две панели РАЗНОЙ природы, обёртка #panel удалена.
      #panelScale — ОВЕРЛЕЙ звукоряда: открыл → выбрал → закрыл.

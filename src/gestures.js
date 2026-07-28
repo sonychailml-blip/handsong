@@ -1,12 +1,18 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy } from './state.js';
+import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
+import { hooks } from './hooks.js';
 import { chordHold, DRUM_ROWS, applyExpr } from './audio.js';
 import { canvas } from './vision.js';
+/* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
+   событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
+   эти зацепки НАДО править вместе с ними. tutorTap — nullsafe обёртка (hooks.tutor ставит src/tutor.js). */
+const tutorTap=(kind,payload)=>{ if(hooks.tutor) hooks.tutor(kind,payload); };
+let tutSeenT=0;   // троттлинг heartbeat 'seen' (рука в кадре) — ~1/с
  
 const clamp01=v=>Math.max(0,Math.min(1,v));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -348,12 +354,14 @@ function processHands(res){
         }
         S.fn = S.zone==='loop' ? 'loop'
              : (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') ? handFnOf(key,S.zone) : null;   // функция руки: соло/бас — note/hold/therm; аккорды — latch/hold; лупер — loop; у fx/oct/chFam/ударных — null
+        // ЗАЦЕПКА ОБУЧЕНИЯ: щипок сформирован (edge) — палец(=октава)+зона+рука. По построению раз на щипок.
+        tutorTap('pinch',{finger:S.oct, zone:S.zone, hand:handSide(key)});
       }
       if(S.zone==='fx'){
         const meta=FX_META.find(m=>m.finger===mf);
-        S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]};
+        S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]}; S.tutFx=null;   // S.tutFx — база для зацепки обучения 'fx' (сдвиг эффекта)
       }else if(S.zone==='ld'){
-        leadOwner=key;                       // приоритет последней ноты
+        leadOwner=key; S.tutDeg=undefined;   // приоритет последней ноты; S.tutDeg сброшен — свежий щипок переизвестит обучение о ноте
       }else if(S.zone==='bs'){
         bassOwner=key;                       // бас моно — рулит последняя рука
       }else if(S.zone==='ch'){
@@ -369,8 +377,10 @@ function processHands(res){
         S.oct=FINGER_TIPS.indexOf(mf);       // смена пальца = смена октавы на лету
         if(S.zone==='fx'&&S.adj){
           const meta=FX_META.find(m=>m.finger===mf);
-          S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]};
+          S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]}; S.tutFx=null;
         }
+        // ЗАЦЕПКА ОБУЧЕНИЯ: палец сменён на лету (=другая октава) — то же событие pinch с новым пальцем.
+        tutorTap('pinch',{finger:S.oct, zone:S.zone, hand:handSide(key)});
       }
     }
  
@@ -390,7 +400,9 @@ function processHands(res){
       if(S.zone==='fx'){
         /* Регулировка относительная («от текущего»), диапазон — 70%
            высоты экрана; значение остаётся после отпускания (латч). */
-        if(S.adj)fx[S.adj.k]=clamp01(S.adj.base+(S.adj.y0-lm[4].y*H)/(H*0.7));
+        if(S.adj){ fx[S.adj.k]=clamp01(S.adj.base+(S.adj.y0-lm[4].y*H)/(H*0.7));
+          // ЗАЦЕПКА ОБУЧЕНИЯ: значение эффекта реально сдвинулось от старта (>3%) — рука эффектов «крутит», не просто щипнула. Троттлинг 5%.
+          if(Math.abs(fx[S.adj.k]-S.adj.base)>0.03 && (S.tutFx==null||Math.abs(fx[S.adj.k]-S.tutFx)>0.05)){ S.tutFx=fx[S.adj.k]; tutorTap('fx',{k:S.adj.k}); } }
       }else if(S.zone==='chFam'){
         /* Рука-ПАЛИТРА: ТОЛЬКО выбирает ячейку (семейство+вариант) ПОЛОЖЕНИЕМ и молчит.
            Ветка стоит рядом с 'fx', ДО общего блока — поэтому не считает ни ступень, ни
@@ -488,6 +500,8 @@ function processHands(res){
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
             WleadOn({deg:S.deg,oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; rectGrid — октава из липкого регистра роли
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 2-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
+            // ЗАЦЕПКА ОБУЧЕНИЯ: соло-нота зазвучала/сменила ступень (не пересчитываем — это ТОТ ЖЕ вызов, что породил звук).
+            if(S.deg!==S.tutDeg){ S.tutDeg=S.deg; tutorTap('note',{deg:S.deg}); }
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
           if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из bassOctReg; 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
@@ -518,6 +532,7 @@ function processHands(res){
               WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
               latchLen=ty?ty.length:0;
               setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;
+              tutorTap('chord',{deg:S.deg});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, удержание)
             }else{
               /* Тождество защёлки: вне typedChords — ступень (как было, второй множитель
                  схлопывается в true); в typedChords — ПАРА (ступень+тип), иначе C→C7
@@ -534,6 +549,7 @@ function processHands(res){
                 else WchSet('latch',S.deg,chOct,S.vol,ty,bd);          // та же плотность → глиссандо без переатаки
                 latchLen=ty?ty.length:0;
                 setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший
+                tutorTap('chord',{deg:S.deg});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, защёлка)
               }
             }
           }else if(chOwner===key&&latchDeg>=0){
@@ -570,6 +586,9 @@ function processHands(res){
       setRevDisp(clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE));
     }
   }
+  // ЗАЦЕПКА ОБУЧЕНИЯ (heartbeat): рука в кадре — троттлинг ~1/с. Обучение так отличит «камера не видит руку»
+  // от «рука есть, но шаг не сделан» и подскажет про камеру/свет, а не про жест невидимой руке.
+  if(hands.length && now-tutSeenT>1000){ tutSeenT=now; tutorTap('seen'); }
   /* Watchdog: рука пропала из кадра во время щипка → принудительный
      release через 120 мс (короткая пауза прощает мигание трекинга). */
   for(const k of Object.keys(HANDS)){

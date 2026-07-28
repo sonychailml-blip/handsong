@@ -192,7 +192,13 @@ addEventListener('pointermove', e=>{
    «Обучение» видима, но пока без функции: тап показывает заметку «скоро» (читается как ЗАПЛАНИРОВАННОЕ,
    кнопку НЕ гасим). Демо строёв (demo.js) и мини-учебник (#helpOv) остаются рабочими в коде — кнопки
    их запуска (со старта и из панели «Звукоряд») сняты, переедут внутрь обучения позже. */
-$('learnBtn').onclick=()=>{ $('learnMsg').textContent=t('start.learnSoon'); };
+/* Кнопку «Обучение» ВЕШАЕТ main.js (тот же startApp, что у «Играть», + запуск тура) — правило жеста
+   (AudioContext по клику) требует общего пути старта. Здесь ставим только tutorReset для тура. */
+export function tutorReset(){   // тур учит SINGLE-ROLE соло: гасим сплит и ставим роль «Соло», чтобы модель совпала с экраном
+  if(splitOn) setSplitOn(false);
+  setPhoneInstr('ld'); softAllOff();
+  applySplit(); applyInstr();
+}
 /* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
    адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
 function buildStartLinks(){
@@ -275,7 +281,8 @@ addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const instrLbl=r=>t('role.'+r);   // подпись роли (🎸 Соло / 🎹 Аккорды / 🎚 Бас / 🥁 Ударные) — через словарь
 function applyInstr(){ instrBtn.textContent = instrLbl(phoneInstr);
-  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn(); }   // цвет роли; секция «Функции рук» зависит от активной роли
+  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn();   // цвет роли; секция «Функции рук» зависит от активной роли
+  if(hooks.tutor) hooks.tutor('role',{role:phoneInstr}); }   // ЗАЦЕПКА ОБУЧЕНИЯ (единственная из UI-слоя): смена роли — на том же канале hooks.tutor
 /* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ роли с записью (соло/бас/аккорды), что
    сейчас в игре. Строим динамически (как fillScales): single-role — одна роль; сплит — каждая ld/бас/ch-
    половина (пропуская dr, у неё записи нет). Строки помечены РУКОЙ, сгруппированы под ярлыком роли (🎸
