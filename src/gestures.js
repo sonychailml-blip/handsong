@@ -4,6 +4,7 @@ import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprD
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
+import { t } from './i18n.js';
 import { chordHold, DRUM_ROWS, applyExpr } from './audio.js';
 import { canvas } from './vision.js';
  
@@ -163,16 +164,16 @@ function handRole(key){
 function looperMsgSet(text,ok){ setLooperMsg({text, until:performance.now()+LOOPER_MSG_MS, ok}); }
 function doLooper(cmd){
   if(cmd==='rec'){                                        // всегда возможно: пусто→запись, играет→наложение, пишет→стоп
-    onRec(); looperMsgSet(recording ? (loop.first?'● Запись':'● Наложение') : 'Запись стоп', true);
+    onRec(); looperMsgSet(recording ? t(loop.first?'msg.recording':'msg.overdub') : t('msg.recStop'), true);
   }else if(cmd==='play'){
-    if(!loop.on && !events.length){ looperMsgSet('Нет петли', false); return; }   // нечего играть
-    onLoop(); looperMsgSet(loop.on?'▶ Пуск':'⏸ Пауза', true);
+    if(!loop.on && !events.length){ looperMsgSet(t('msg.noLoop'), false); return; }   // нечего играть
+    onLoop(); looperMsgSet(t(loop.on?'msg.play':'msg.pause'), true);
   }else if(cmd==='undo'){
-    if(!events.length){ looperMsgSet('Нет слоёв', false); return; }                // нечего отменять
-    onUndo(); looperMsgSet('↶ Отмена слоя', true);
+    if(!events.length){ looperMsgSet(t('msg.noLayers'), false); return; }                // нечего отменять
+    onUndo(); looperMsgSet(t('msg.undo'), true);
   }else if(cmd==='clear'){
-    if(!loop.on && !events.length){ looperMsgSet('Уже пусто', false); return; }    // нечего очищать — движок не дёргаем
-    clearRec(); looperMsgSet('✕ Очищено', true);
+    if(!loop.on && !events.length){ looperMsgSet(t('msg.alreadyEmpty'), false); return; }    // нечего очищать — движок не дёргаем
+    clearRec(); looperMsgSet(t('msg.cleared'), true);
   }
 }
 /* Вызов НА ЗАХВАТЕ щипка (edge) → единичное срабатывание по построению. index/middle/ring — сразу;
@@ -264,7 +265,7 @@ function endPinch(key,S){
       chOwner=null;
     }
     if(S.zone==='loop'&&S.clearT0!=null&&!S.clearFired){   // мизинец отпущен ДО 3с → очистка ОТМЕНЕНА (ничего не делаем, гасим отсчёт)
-      setLooperClear(-1); setLooperMsg({text:'Очистка отменена', until:performance.now()+LOOPER_MSG_MS, ok:true});
+      setLooperClear(-1); setLooperMsg({text:t('msg.clearCancelled'), until:performance.now()+LOOPER_MSG_MS, ok:true});
     }
   }
   S.pinch=false; S.adj=null; S.deg=-1; S.rect=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры

@@ -1,11 +1,11 @@
 /* ================= КОНФИГ: зоны, метаданные, пороги ================= */
 export const FINGER_TIPS=[8,12,16,20];          // указ., средн., безым., мизинец
 
-export const FX_META=[                           // эффекты (только соло-канал)
-  {k:'dly', label:'DLY', full:'Делей',   finger:8,  color:'#4cc2ff'},
-  {k:'vib', label:'VIB', full:'Вибрато', finger:12, color:'#ffb84c'},
-  {k:'drv', label:'DRV', full:'Драйв',   finger:16, color:'#ff5d5d'},
-  {k:'trm', label:'TRM', full:'Тремоло', finger:20, color:'#9b7bff'},
+export const FX_META=[                           // эффекты (только соло-канал). label — межъязыковой токен
+  {k:'dly', label:'DLY', fullKey:'fx.dly', finger:8,  color:'#4cc2ff'},   // fullKey — ключ словаря (полное имя рисует draw через t())
+  {k:'vib', label:'VIB', fullKey:'fx.vib', finger:12, color:'#ffb84c'},
+  {k:'drv', label:'DRV', fullKey:'fx.drv', finger:16, color:'#ff5d5d'},
+  {k:'trm', label:'TRM', fullKey:'fx.trm', finger:20, color:'#9b7bff'},
 ];
 export const REV_COLOR='#57d9a3';
 /* Акцент роли: холст красит ими сетку/ярлыки, UI — кнопку-переключатель роли.

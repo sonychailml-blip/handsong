@@ -1,6 +1,10 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, swaraLbl } from './scales.js';
+import { t } from './i18n.js';
+/* Слово-регистр для ДИСПЛЕЯ — через словарь (scales.regWord оставлен для логики; тут нужен перевод).
+   period 2 → «окт», 3 → «тритава», иначе «рег.». Полное «ОКТАВА» (шапка октавной полосы) — t('reg.octaveFull'). */
+const regW = (s=CUR()) => { const P=periodOf(s); return P===2?t('reg.oct'):P===3?t('reg.tritave'):t('reg.reg'); };
 import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
@@ -121,12 +125,12 @@ function drawRectOctBand(x0,w,lx,yTop,h,role){
   ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
   const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg(role);
   ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
-  ctx.fillText(periodOf()===2?'ОКТАВА':regWord().toUpperCase(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.). period=2 байт-в-байт
+  ctx.fillText(periodOf()===2?t('reg.octaveFull'):regW().toUpperCase(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.)
   for(let n=0;n<4;n++){
     const ey=sy+(n+1)*eh+eh/2, act=n===reg;
     ctx.font= act?'700 13px system-ui':'12px system-ui';
     ctx.fillStyle= act?'#4cc2ff':'rgba(255,255,255,.6)';
-    ctx.fillText(`${OCT_ROMAN[n]}  ${regWord()} ${OCT_ROMAN[n]}`, lx, ey);
+    ctx.fillText(`${OCT_ROMAN[n]}  ${regW()} ${OCT_ROMAN[n]}`, lx, ey);
   }
 }
 /* ТЕРМЕНВОКС — АДДИТИВНЫЙ ОВЕРЛЕЙ поверх ОБЫЧНОЙ сетки (rect-прямоугольники/узкие ряды остаются как
@@ -212,7 +216,7 @@ function packSegs(segs,maxW,maxLines,trunc){
 function fitReadout(freqs,maxW){
   const f0=freqs[0], hz=f=>String(Math.round(f)),
         ct=f=>`${Math.round(f)} (${Math.round(1200*Math.log2(f/f0))}¢)`;
-  const unit=a=>{ const b=a.slice(); b[b.length-1]+=' Гц'; return b; };   // «Гц» на последний сегмент → конец последней строки
+  const unit=a=>{ const b=a.slice(); b[b.length-1]+=' '+t('unit.hz'); return b; };   // «Гц» на последний сегмент → конец последней строки
   const withC =unit(freqs.map((f,i)=>i===0?hz(f):ct(f)));
   const first3=unit(freqs.map((f,i)=>i===0?hz(f):(i<3?ct(f):hz(f))));
   const hzOnly=unit(freqs.map(hz));
@@ -255,10 +259,10 @@ function drawLooper(){
 
   // заголовок — режим
   let head, hc;
-  if(info&&info.phase==='count'){ head=`ОТСЧЁТ  ${info.countLeft}`; hc='#57d9a3'; }
-  else if(recording){ head=loop.first?`● ЗАПИСЬ · круг ${bars} т.`:`● НАЛОЖЕНИЕ · слой ${loop.layer+1}`; hc='#e5484d'; }
-  else if(loop.on){ head=`▶ ПЕТЛЯ · ${bars} т. · слоёв ${ids.length}`; hc='#57d9a3'; }
-  else { head=`ПЕТЛЯ · ${bars} т. · слоёв ${ids.length} · «⟳ луп» играть`; hc='rgba(255,255,255,.7)'; }
+  if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
+  else if(recording){ head=loop.first?t('looper.recFirst',{n:bars}):t('looper.overdub',{n:loop.layer+1}); hc='#e5484d'; }
+  else if(loop.on){ head=t('looper.playing',{bars, layers:ids.length}); hc='#57d9a3'; }
+  else { head=t('looper.paused',{bars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
   ctx.fillStyle=hc; ctx.fillText(head,x0-2,y0+headH/2+1);
 
@@ -325,17 +329,14 @@ function drawOverlays(res){ drawPhone(res); }
 /* Лад без лестницы аккордов (макам): поле остаётся НА МЕСТЕ, приглушается, и вместо
    лестницы объясняет, куда делись аккорды и где взять гармонию. Занимает весь X-диапазон
    роли [x0,x1] (сплит — свою половину), от лада не зависит: раскладка при смене лада не перекраивается. */
-const NO_CHORDS_HINT=['В макаме аккорды не строятся.',
-                      'Дрон — в лупере; аккорды запишите',
-                      'в другом ладу и играйте под макам.'];
 function drawNoChordsHint(x0,x1,yTop,yBot){
   const cx=(x0+x1)/2, cy=(yTop+yBot)/2;
   ctx.fillStyle='rgba(10,10,20,.38)'; ctx.fillRect(x0,yTop,x1-x0,yBot-yTop);
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillStyle=hexA('#b18cff',.7); ctx.font='700 13px system-ui';
-  ctx.fillText('АККОРДОВ НЕТ',cx,cy-32);
+  ctx.fillText(t('nochords.title'),cx,cy-32);
   ctx.fillStyle='rgba(255,255,255,.6)'; ctx.font='12px system-ui';
-  NO_CHORDS_HINT.forEach((ln,i)=>ctx.fillText(ln,cx,cy-6+i*17));
+  [t('nochords.l1'),t('nochords.l2'),t('nochords.l3')].forEach((ln,i)=>ctx.fillText(ln,cx,cy-6+i*17));   // строки коротки под ширину поля роли
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
@@ -347,13 +348,13 @@ function drawStatus(){
      «центовый строй · N ступеней» + реальные центы. Нецентовые лады — строка байт-в-байт как была. */
   let st;
   if(s.cents){
-    st=`Лад: ${s.name} · центовый строй · ${s.iv.length} ступеней`;   // полный список центов НЕ печатаем (43 у Партча, 22 у сетки — переполняет строку); реальные центы — на каждом ряду и в ярлыке
+    st=t('status.centsScale',{name:s.name, n:s.iv.length});   // {name} — имя лада (муз. данные, этап B); полный список центов не печатаем
   }else{
-    st=`Лад: ${s.name} · ${s.edo}-TET · ступени: ${s.iv.join('-')}`;
-    if(s.edo!==12)st+=` · шаг ${(1200/s.edo).toFixed(1)}c`;
+    st=t('status.edoScale',{name:s.name, edo:s.edo, steps:s.iv.join('-')});
+    if(s.edo!==12)st+=t('status.step',{c:(1200/s.edo).toFixed(1)});
   }
-  if(recording)st='● запись · '+st;
-  else if(inPB())st=`▶ петля · ${loop.bpm} BPM · `+st;
+  if(recording)st=t('status.recPrefix')+st;
+  else if(inPB())st=t('status.loopPrefix',{bpm:loop.bpm})+st;
   statusEl.textContent=st;
   ctx.textAlign='left';
 }
@@ -447,16 +448,16 @@ function drawLooperFeedback(W,H){
     ctx.strokeStyle='#e5484d'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(cx,cy,R,-Math.PI/2,-Math.PI/2+2*Math.PI*frac); ctx.stroke();   // убывающая дуга = остаток
     ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.font='700 26px system-ui'; ctx.fillText(String(Math.ceil(looperClear/1000)), cx, cy-4);
-    ctx.font='600 10px system-ui'; ctx.fillText('ОЧИСТКА', cx, cy+16);
+    ctx.font='600 10px system-ui'; ctx.fillText(t('looper.clear'), cx, cy+16);
   }
   if(looperMsg && now<looperMsg.until){
-    const t=looperMsg.text, cx=W/2, cy=H*0.20;
-    ctx.font='700 16px system-ui'; const w=ctx.measureText(t).width;
+    const mtext=looperMsg.text, cx=W/2, cy=H*0.20;
+    ctx.font='700 16px system-ui'; const w=ctx.measureText(mtext).width;
     ctx.fillStyle='rgba(10,10,20,.85)';
     ctx.beginPath(); ctx.roundRect(cx-w/2-14,cy-16,w+28,32,9); ctx.fill();
     ctx.strokeStyle=looperMsg.ok?'rgba(87,217,163,.7)':'rgba(229,72,77,.85)'; ctx.lineWidth=1.5; ctx.stroke();
     ctx.fillStyle=looperMsg.ok?'#7ee0b6':'#ff8a8d'; ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(t, cx, cy);
+    ctx.fillText(mtext, cx, cy);
   }
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
@@ -501,26 +502,26 @@ function drawHandsPhone(res,W,H,playH){
     if(exprHand){                                // рука-ВЫРАЗИТЕЛЬНОСТЬ: играет НИЧЕГО — помечаем у основания среднего (lm[9])
       const px=S.pinch?S.x:sx(lm[9].x,W), py=S.pinch?S.y:sy(lm[9].y,H);
       ctx.fillStyle=hexA(EXPR_COL,.95); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText('ВЫР', px+14, py-10);
+      ctx.fillText(t('hand.expr'), px+14, py-10);
       continue;
     }
     if(S.pinch&&S.zone==='oct'){                  // рука в октавной полосе (любая, в т.ч. левая): показываем регистр, эффектов НЕ трогаем
       ctx.fillStyle='#4cc2ff'; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText(`${regWord().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // «ОКТ»/«ТРИТАВА» по периоду; period=2 → 'ОКТ' байт-в-байт
+      ctx.fillText(`${regW().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // «ОКТ»/«ТРИТАВА» по периоду
       continue;
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
       if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.k);
         ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-        ctx.fillText(`${meta.full} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); }
+        ctx.fillText(`${t(meta.fullKey)} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); }
       continue;
     }
     if(loopHand){                                // рука-ЛУПЕР: помечаем, чтобы не казалась «немой»; подсказку раскладки даём до щипка
       const px=S.pinch?S.x:sx(lm[8].x,W), py=S.pinch?S.y:sy(lm[8].y,H);
       ctx.fillStyle=hexA('#57d9a3',.95); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText('ЛУПЕР', px+14, py-10);
+      ctx.fillText(t('hand.looper'), px+14, py-10);
       if(!S.pinch){ ctx.fillStyle=hexA('#57d9a3',.6); ctx.font='600 10px system-ui';
-        ctx.fillText('указ.=запись · средн.=пуск · безым.=отмена · мизинец=очистка', px+14, py+6); }   // раскладка команд — только пока не щиплет (не мешает отсчёту/подтверждению)
+        ctx.fillText(t('looper.handHint'), px+14, py+6); }   // раскладка команд — только пока не щиплет (не мешает отсчёту/подтверждению)
       continue;
     }
     // рука нот
@@ -537,16 +538,16 @@ function drawHandsPhone(res,W,H,playH){
         /* Терменвокс (соло/бас): высота НЕПРЕРЫВНА — живые Гц и центы над тоникой РОЛИ. Опора центов —
            тоника соло (baseF) или баса (baseF/4), иначе бас показал бы −2400¢. «≈» — ближайшая нота. */
         const ref=instr==='bs'?baseF()/4:baseF(), cAbs=Math.round(1200*Math.log2(S.hz/ref));
-        drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):gridNoteLbl(S.deg)} · глиссандо`,
-          `${Math.round(S.hz)} Гц · ${Math.round(S.vol*100)}% · ${cAbs}c`],accent);
+        drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):gridNoteLbl(S.deg)} · ${t('tag.gliss')}`,
+          `${Math.round(S.hz)} ${t('unit.hz')} · ${Math.round(S.vol*100)}% · ${cAbs}c`],accent);
       }else if(instr==='ld'||instr==='bs'){
         /* rectGrid (соло/бас): S.oct — это НОТА в прямоугольнике, а не октава. Октава — липкий
            регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg); берём его, иначе Гц/«окт» врали бы. */
         const rectRole=(instr==='ld'||instr==='bs')&&rectGrid();
         const oShow=rectRole?rectOctReg(instr):S.oct;   // роль=instr (rectRole ⇒ 'ld'/'bs')
         const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
-        const L1=rectRole?`${rectNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
-          :(s.edo>12&&s.tag==='edo')?`ступень ${IVX()[S.deg]%s.edo} · ${regWord(s)} ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
+        const L1=rectRole?`${rectNoteLbl(S.deg)} · ${regW(s)} ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
+          :(s.edo>12&&s.tag==='edo')?`${t('tag.step')} ${IVX()[S.deg]%s.edo} · ${regW(s)} ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · ${regW(s)} ${OCT_ROMAN[oShow]}`;
         /* Центы показываем ВСЕГДА, на любом ладу (снят прежний гейт s.edo!==12). Исторические
            темперации (Пифагоров, оба Натуральных, мезотон, велл-темперации) — это edo:12 cents-лады:
            ИМЯ ноты одинаковое, а высота гуляет до ~21.5¢ (Пифагорова терция 408¢ vs Натуральная 386¢ на
@@ -554,8 +555,8 @@ function drawHandsPhone(res,W,H,playH){
            где чтение нужнее всего, оно и пряталось. Чистый 12-TET теперь даёт круглые сотни (0/100/200…)
            — безвредно и держит ярлык на одном месте на всех ладах: единообразие важнее трёх сэкономленных
            символов. Формат и позиция прежние (Гц · % · центы), меняется только условие. */
-        const L2=`${Math.round(f)} Гц · ${Math.round(S.vol*100)}% · ${centsOf(S.deg)}c`;
-        const hold = S.fn==='hold' ? ' · держ.' : '';   // маркер удержания: нота держится, пока пальцы вместе
+        const L2=`${Math.round(f)} ${t('unit.hz')} · ${Math.round(S.vol*100)}% · ${centsOf(S.deg)}c`;
+        const hold = S.fn==='hold' ? ' · '+t('tag.hold') : '';   // маркер удержания: нота держится, пока пальцы вместе
         drawTag(S.x,S.y,[L1+hold,L2],accent);
       }else if(isDr){
         drawTag(S.x,S.y,[DRUM_NAMES[S.deg]||'—',`${Math.round(S.vol*100)}%`],accent);
@@ -564,8 +565,8 @@ function drawHandsPhone(res,W,H,playH){
         const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
         const oShow=rectGrid()?rectOctReg(instr):S.oct;   // rect-аккорды (19/31): октава из chordOctReg (роль=instr='ch'); chrom12: S.oct (палец)
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(ty.label||''),   // у ярлыка есть ширина — пишем полное имя типа
-          ty.full||fam.name,`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
-      }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
+          ty.full||fam.name,`${regW(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
+      }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regW(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
     }else if(!S.pinch){                          // подсказка до щипка — под указательным
       const tip=lm[8], x=sx(tip.x,W), y=sy(tip.y,H);   // подсказка до щипка — в экранных пикселях игрового поля (поля кадра сняты)
       if((instr==='ld'||instr==='bs'||instr==='ch')&&rectGrid()){
@@ -576,7 +577,7 @@ function drawHandsPhone(res,W,H,playH){
         const [yTop,yBot]=rectBandY(band,playH,nRfull), hx0=instr==='ch'?split:rx0;
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,yTop,rx1-hx0,yBot-yTop);
         let lbl;
-        if(band===0) lbl=`${periodOf()===2?'ОКТАВА':regWord().toUpperCase()} · палец I–IV → регистр (сейчас ${OCT_ROMAN[rectOctReg(instr)]})`;   // роль=instr
+        if(band===0) lbl=`${periodOf()===2?t('reg.octaveFull'):regW().toUpperCase()} · ${t('tag.octHint',{r:OCT_ROMAN[rectOctReg(instr)]})}`;   // роль=instr
         else{ const r=band-1; lbl=''; for(let n=0;n<4;n++){ const deg=Math.min(r*4+n,maxDeg); lbl+=(n?'  ':'')+OCT_ROMAN[n]+':'+(instr==='ch'?rootName(deg):rectNoteLbl(deg)); } }
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
         ctx.fillText(lbl,x+14,y-12);
@@ -686,7 +687,7 @@ function drawChordBright(rx0,rx1,H){
   ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
   const fh=FX_BAR_MAX*v;
   ctx.fillStyle=INSTR_COL.ch; ctx.globalAlpha=0.7; ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;   // заполнение снизу вверх
-  ctx.fillStyle=hexA(INSTR_COL.ch,.85); ctx.fillText('ЯРК',x+FX_BAR_W/2,y0-5);
+  ctx.fillStyle=hexA(INSTR_COL.ch,.85); ctx.fillText(t('ind.bright'),x+FX_BAR_W/2,y0-5);
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 /* Индикатор ЭНЕРГИИ руки-ВЫРАЗИТЕЛЬНОСТИ («смычок») — один вертикальный столбик «ВЫР», как ЯРК/REV.
@@ -702,7 +703,7 @@ function drawExprBar(rx0,rx1,H){
   ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
   const fh=FX_BAR_MAX*v;
   ctx.fillStyle=EXPR_COL; ctx.globalAlpha=0.7; ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;   // заполнение снизу вверх
-  ctx.fillStyle=hexA(EXPR_COL,.85); ctx.fillText('ВЫР',x+FX_BAR_W/2,y0-5);
+  ctx.fillStyle=hexA(EXPR_COL,.85); ctx.fillText(t('ind.expr'),x+FX_BAR_W/2,y0-5);
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 /* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).

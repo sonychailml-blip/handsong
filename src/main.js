@@ -5,6 +5,7 @@ import { drawVideoBackground, drawOverlays } from './draw.js';
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
 import { $, revealBar } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: кнопка «Послушать строи» на старте (демо строёв, без камеры)
+import { t } from './i18n.js';
 
 /* =====================================================================
    AIR SYNTH 3 — жестовый синтезатор + интерактивный учебник ладов
@@ -39,7 +40,7 @@ function loop(){
    AudioContext создаётся строго по клику пользователя —
    иначе браузеры блокируют автовоспроизведение. */
 $('startBtn').onclick=async()=>{
-  const btn=$('startBtn'), msgEl=$('loadmsg'), msg=t=>msgEl.textContent=t;
+  const btn=$('startBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s;
   btn.disabled=true;
   try{
     await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется)
@@ -52,7 +53,6 @@ $('startBtn').onclick=async()=>{
     loop();
   }catch(err){
     btn.disabled=false;
-    msg('Не получилось: '+(err&&err.message?err.message:err)+
-        '. Проверьте доступ к камере и что страница открыта по https.');
+    msg(t('load.error',{msg:(err&&err.message?err.message:err)}));
   }
 };

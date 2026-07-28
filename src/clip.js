@@ -10,6 +10,7 @@
 import { canvas } from './vision.js';
 import { createRecordingTap } from './audio.js';
 import { setVideoRec } from './state.js';
+import { t } from './i18n.js';
 
 let rec=null, recKind=null, chunks=[], stream=null, tap=null, notify=null, vTrack=null, lastCap=0;
 
@@ -75,11 +76,11 @@ function stamp(){                                // ГГГГММДД-ЧЧММС�
    отводе недопустимы (кнопки ui и так блокируют вторую запись). */
 export function startClip(kind='video'){
   if(rec) return;
-  if(typeof MediaRecorder==='undefined') throw new Error('Запись не поддерживается браузером');
+  if(typeof MediaRecorder==='undefined') throw new Error(t('err.noRecorder'));
   const video = kind==='video';
-  if(video && !canvas.captureStream) throw new Error('captureStream не поддерживается браузером');
+  if(video && !canvas.captureStream) throw new Error(t('err.noCapture'));
   tap=createRecordingTap();                      // параллельный отвод звука; живой выход не трогаем
-  if(!tap) throw new Error('Звук ещё не запущен');
+  if(!tap) throw new Error(t('err.noAudio'));
   let tracks=[...tap.stream.getAudioTracks()], vBits=0;    // аудио — всегда; видео добавляем сверху
   if(video){ const vid=canvas.captureStream(0); vTrack=vid.getVideoTracks()[0]; lastCap=0; vBits=videoBitrate(canvas.width, canvas.height); tracks=[...vid.getVideoTracks(), ...tracks]; }   // 0 fps = кадры только по requestFrame (captureFrame из цикла) — захват в фазе с отрисовкой; битрейт по размеру холста; форма экрана наследуется, без кропа
   stream=new MediaStream(tracks);
@@ -89,7 +90,7 @@ export function startClip(kind='video'){
   if(vBits) opts.videoBitsPerSecond=vBits;
   try{
     rec=new MediaRecorder(stream, Object.keys(opts).length?opts:undefined);
-  }catch(e){ cleanup(); throw new Error('Не удалось начать запись: '+(e&&e.message||e)); }
+  }catch(e){ cleanup(); throw new Error(t('err.recStartPrefix')+(e&&e.message||e)); }
   recKind=kind; chunks=[];
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
   rec.onstop=()=>{ const m=rec&&rec.mimeType||mime||(video?'video/webm':'audio/webm'); save(m); cleanup(); };   // сброс состояния — в cleanup, ПОСЛЕ реальной остановки

@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
-<title>Handsong — жестовый синтезатор и интерактивный учебник ладов</title>
+<title data-i18n="app.title">Handsong — жестовый синтезатор и интерактивный учебник ладов</title>
 <!-- PWA: манифест + светлый theme-color под стартовый экран. start_url/scope в манифесте ОТНОСИТЕЛЬНЫЕ
      ("."), чтобы работало и на GitHub Pages в подпапке, и позже на своём домене (камера/звук/ворклет не
      трогаем). iOS не читает display/icons манифеста — для «на домашний экран» дублируем apple-* мета. -->
@@ -26,10 +26,10 @@
 <div id="start" class="ov on">
   <div class="startCard">
     <h1>Hand<span>song</span></h1>
-    <p class="startTag">Жестовый синтезатор: играйте руками перед камерой.</p>
+    <p class="startTag" data-i18n="start.tag">Жестовый синтезатор: играйте руками перед камерой.</p>
     <div class="startBtns">
-      <button id="startBtn">▶ Играть</button>
-      <button id="learnBtn" title="Интерактивное обучение (скоро)">Обучение</button>
+      <button id="startBtn" data-i18n="start.play">▶ Играть</button>
+      <button id="learnBtn" data-i18n="start.learn" data-i18n-title="start.learnTitle" title="Интерактивное обучение (скоро)">Обучение</button>
     </div>
     <!-- ПОРЯДОК на карточке: Играть → Обучение → ⛶ полноэкранный → ⬇ установка → подвал. Полноэкранный
          ВЫШЕ установки: полезен почти всем и почти каждый сеанс (увеличивает поле игры); установка НИЖЕ —
@@ -44,7 +44,7 @@
          beforeinstallprompt — кнопка появляется ТОЛЬКО после него (иначе prompt() пуст); iOS Safari
          события не даёт → показываем инструкцию в #installHint вместо мёртвой кнопки; уже установлено
          (standalone) → прячем всё. Обе скрыты по умолчанию (display:none), показывает ui.js. -->
-    <button id="installBtn" title="Add Handsong to your home screen" style="display:none">⬇ Install</button>
+    <button id="installBtn" data-i18n="install.btn" data-i18n-title="install.title" title="Add Handsong to your home screen" style="display:none">⬇ Install</button>
     <p id="installHint" style="display:none"></p>
     <p id="loadmsg"></p>
     <p id="learnMsg"></p>
@@ -61,25 +61,25 @@
           <option value="ru">Русский</option>
         </select>
       </p>
-      <p>First version — bugs and rough edges are likely. Tell me what breaks: <a id="fbLink" rel="noopener"></a></p>
-      <p id="startSupport" class="startSupport">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development: <a id="donateLink" rel="noopener"></a></p>
+      <p><span data-i18n="foot.feedbackText">First version — bugs and rough edges are likely. Tell me what breaks:</span> <a id="fbLink" rel="noopener"></a></p>
+      <p id="startSupport" class="startSupport"><span data-i18n="foot.supportText">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development:</span> <a id="donateLink" rel="noopener"></a></p>
     </div>
   </div>
 </div>
  
 <!-- ================= ВЕРХНЯЯ ПАНЕЛЬ ================= -->
 <div id="bar">
-  <button id="scaleBtn" title="Звукоряд: лад, тоника, тембры">Лад</button>
-  <button id="instrBtn" title="Соло / Аккорды">🎸 Соло</button>
-  <button id="instrBtnL" title="Левая половина: инструмент">◧ 🎹 Аккорды</button>
-  <button id="instrBtnR" title="Правая половина: инструмент">🎸 Соло ◨</button>
+  <button id="scaleBtn" data-i18n-title="bar.scaleTitle" title="Звукоряд: лад, тоника, тембры">Лад</button>
+  <button id="instrBtn" data-i18n-title="bar.instrTitle" title="Соло / Аккорды">🎸 Соло</button>
+  <button id="instrBtnL" data-i18n-title="bar.halfLTitle" title="Левая половина: инструмент">◧ 🎹 Аккорды</button>
+  <button id="instrBtnR" data-i18n-title="bar.halfRTitle" title="Правая половина: инструмент">🎸 Соло ◨</button>
   <button id="splitBtn" title="Сплит-экран: аккорды | соло на двух половинах">◨</button>
-  <button id="camBtn" title="Переключить камеру: фронтальная / тыловая">🔄</button>
+  <button id="camBtn" data-i18n-title="bar.camTitle" title="Переключить камеру: фронтальная / тыловая">🔄</button>
   <button id="fsBtn" title="Во весь экран: убрать полосы браузера">⛶</button>
   <button id="clipBtn" title="Запись клипа: видео+звук в один файл (WebM)">🎥</button>
   <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)">🎙</button>
   <button id="jamBtn" title="Джем: подложка по строю — тап включит, следующий тап сменит вариант">🎵 Джем</button>
-  <button id="loopPanelBtn" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
+  <button id="loopPanelBtn" data-i18n="bar.loop" data-i18n-title="bar.loopTitle" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
   <button id="recBtn" title="Запись: тап — отсчёт такта, затем круг">●</button>
 </div>
 
@@ -91,10 +91,10 @@
      (drawLooper). Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что
      высота холстовой коробки растёт со слоями. Видна только когда есть петля. -->
 <div id="loopTransport">
-  <button id="loopBtn" title="Петля: играть / пауза">⟳ луп</button>
-  <button id="undoBtn" title="Убрать последний слой">⤺</button>
-  <button id="clrBtn" title="Очистить петлю">✕</button>
-  <button id="panicBtn" title="Заглушить всё">■</button>
+  <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Петля: играть / пауза">⟳ луп</button>
+  <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Убрать последний слой">⤺</button>
+  <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить петлю">✕</button>
+  <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
 </div>
  
 <!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
@@ -104,54 +104,54 @@
 
 <!-- ================= ЗВУКОРЯД: ноты и звук (оверлей) ================= -->
 <div id="panelScale">
-    <div class="phead"><b>Звукоряд</b><button id="panelClose">Свернуть ✕</button></div>
-    <div class="psep">Лад и тоника</div>
-    <div class="prow"><label>Строй</label><select id="selTradition"></select></div>
-    <div class="prow"><label>Лад</label><select id="selScale"></select></div>
-    <div class="prow"><label>Тоника</label><select id="selTonic"></select></div>
+    <div class="phead"><b data-i18n="panel.scale.head">Звукоряд</b><button id="panelClose" data-i18n="panel.collapse">Свернуть ✕</button></div>
+    <div class="psep" data-i18n="panel.scale.sepScale">Лад и тоника</div>
+    <div class="prow"><label data-i18n="panel.scale.tradition">Строй</label><select id="selTradition"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.mode">Лад</label><select id="selScale"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.tonic">Тоника</label><select id="selTonic"></select></div>
     <!-- Опорная частота (эталон A4): пресеты-подсказки + свободный ввод, клампится 380–480 в ui.js.
          Единый источник высоты — двигает ВСЕ строи вместе (подвижные и фиксированные). -->
-    <div class="prow" id="aRefRow"><label>Эталон A4</label>
+    <div class="prow" id="aRefRow"><label data-i18n="panel.scale.aref">Эталон A4</label>
       <div class="seg">
         <select id="aRefSel">
-          <option value="415">415 · барочный</option>
+          <option value="415" data-i18n="aref.415">415 · барочный</option>
           <option value="430">430</option>
           <option value="432">432</option>
           <option value="435">435</option>
-          <option value="440" selected>440 · современный стандарт</option>
+          <option value="440" selected data-i18n="aref.440">440 · современный стандарт</option>
           <option value="442">442</option>
-          <option value="444">444 · оркестровый</option>
+          <option value="444" data-i18n="aref.444">444 · оркестровый</option>
         </select>
         <input type="number" id="aRefInput" min="380" max="480" step="1" value="440" inputmode="numeric">
-        <span class="unit">Гц</span>
+        <span class="unit" data-i18n="unit.hz">Гц</span>
       </div>
     </div>
-    <p class="phint">Единый эталон — изобретение XX века: до него каждый город и церковь настраивались по-своему, барочные ансамбли и сегодня играют на 415.</p>
-    <div class="prow"><label>Аккорды</label>
-      <div class="seg"><button id="qTriad" class="act">Трезвучия</button><button id="qSev">Септаккорды</button></div>
+    <p class="phint" data-i18n="panel.scale.arefHint">Единый эталон — изобретение XX века: до него каждый город и церковь настраивались по-своему, барочные ансамбли и сегодня играют на 415.</p>
+    <div class="prow"><label data-i18n="panel.scale.chords">Аккорды</label>
+      <div class="seg"><button id="qTriad" class="act" data-i18n="panel.scale.triads">Трезвучия</button><button id="qSev" data-i18n="panel.scale.sevenths">Септаккорды</button></div>
     </div>
 
-    <div class="psep">Тембры</div>
-    <div class="prow"><label>Соло-инструмент</label><select id="selLead"></select></div>
-    <div class="prow"><label>Аккорд-инструмент</label><select id="selChord"></select></div>
-    <div class="prow"><label>Бас-инструмент</label><select id="selBass"></select></div>
-    <div class="prow"><label>Набор ударных</label><select id="selDrumKit"></select></div>
+    <div class="psep" data-i18n="panel.scale.sepTimbre">Тембры</div>
+    <div class="prow"><label data-i18n="panel.scale.leadInstr">Соло-инструмент</label><select id="selLead"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.chordInstr">Аккорд-инструмент</label><select id="selChord"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.bassInstr">Бас-инструмент</label><select id="selBass"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.drumKit">Набор ударных</label><select id="selDrumKit"></select></div>
 
     <!-- ФУНКЦИИ РУК (заменяет ⇄ и тумблер терменвокса): по выпадающему на руку для каждой ноте-роли
          в игре (соло/бас). Строки строит ui.js (renderHandFn) — по роли, помечены Левой/Правой рукой;
          пусто у аккордов/ударных и когда в сплите нет ld/бас-половины. -->
-    <div class="psep" id="handFnSep">Функции рук</div>
+    <div class="psep" id="handFnSep" data-i18n="panel.scale.handFn">Функции рук</div>
     <div id="handFnRows"></div>
   </div>
 
 <!-- ================= ЛУПЕР: время и слои (оверлей на месте «Звукоряда») ================= -->
 <div id="panelLoop">
-    <div class="phead"><b>Лупер</b><button id="panelCloseLoop">Свернуть ✕</button></div>
-    <div class="psep">Петля (лупер)</div>
-    <div class="prow"><label>Длина (такты)</label>
+    <div class="phead"><b data-i18n="panel.loop.head">Лупер</b><button id="panelCloseLoop" data-i18n="panel.collapse">Свернуть ✕</button></div>
+    <div class="psep" data-i18n="panel.loop.sepLoop">Петля (лупер)</div>
+    <div class="prow"><label data-i18n="panel.loop.length">Длина (такты)</label>
       <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
     </div>
-    <div class="prow"><label>Размер (долей)</label>
+    <div class="prow"><label data-i18n="panel.loop.metre">Размер (долей)</label>
       <select id="loopMetre">
         <option value="2">2</option><option value="3">3</option><option value="4" selected>4</option>
         <option value="5">5</option><option value="6">6</option><option value="7">7</option>
@@ -159,17 +159,17 @@
         <option value="12">12</option><option value="16">16</option>
       </select>
     </div>
-    <div class="prow"><label>Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
-    <div class="prow"><label>Квантизация</label>
-      <div class="seg"><button id="qOn" class="act">Вкл</button><button id="qOff">Выкл</button></div>
+    <div class="prow"><label data-i18n="panel.loop.tempo">Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
+    <div class="prow"><label data-i18n="panel.loop.quant">Квантизация</label>
+      <div class="seg"><button id="qOn" class="act" data-i18n="common.on">Вкл</button><button id="qOff" data-i18n="common.off">Выкл</button></div>
     </div>
-    <p class="phint">Длину и размер меняют только на пустой петле.</p>
+    <p class="phint" data-i18n="panel.loop.hint">Длину и размер меняют только на пустой петле.</p>
 
-    <div class="psep">Аранжировка (слои)</div>
-    <div class="prow"><label>Гармония</label><select id="selProg"></select></div>
-    <div class="prow"><label>Ритм</label><select id="selRhythm"></select></div>
-    <div class="prow"><label>Бас-партия</label><select id="selBassMode"></select></div>
-    <div class="prow"><label></label><button id="addArrBtn">＋ Добавить слои</button></div>
+    <div class="psep" data-i18n="panel.loop.sepArr">Аранжировка (слои)</div>
+    <div class="prow"><label data-i18n="panel.loop.harmony">Гармония</label><select id="selProg"></select></div>
+    <div class="prow"><label data-i18n="panel.loop.rhythm">Ритм</label><select id="selRhythm"></select></div>
+    <div class="prow"><label data-i18n="panel.loop.bassMode">Бас-партия</label><select id="selBassMode"></select></div>
+    <div class="prow"><label></label><button id="addArrBtn" data-i18n="panel.loop.addLayers">＋ Добавить слои</button></div>
 </div>
  
 <!-- ================= МИНИ-УЧЕБНИК ================= -->
@@ -254,8 +254,8 @@
     <div id="demoScene">1 / 6</div>
     <div id="demoName"></div>
     <div id="demoCulture"></div>
-    <p id="demoHint">Один и тот же мотив звучит в шести строях — слушайте, как меняется настройка.</p>
-    <button id="demoSkip">Пропустить ✕</button>
+    <p id="demoHint" data-i18n="demo.hint">Один и тот же мотив звучит в шести строях — слушайте, как меняется настройка.</p>
+    <button id="demoSkip" data-i18n="demo.skip">Пропустить ✕</button>
   </div>
 </div>
 

@@ -9,7 +9,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
 import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
 import { INSTR_COL } from './config.js';
 import { hooks } from './hooks.js';
-import { lang, setLang, applyI18n, L } from './i18n.js';
+import { lang, setLang, applyI18n, L, t, onLangChange } from './i18n.js';
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
@@ -74,7 +74,7 @@ function fillScales(tradId){
   }
 }
 function buildUI(){
-  TRADITIONS.forEach(t=>{ const o=document.createElement('option'); o.value=t.id; o.textContent=t.name; selTradition.appendChild(o); });
+  TRADITIONS.forEach(tr=>{ const o=document.createElement('option'); o.value=tr.id; o.textContent=tr.name; selTradition.appendChild(o); });
   selTradition.value=tradOfScale(scaleIdx);      // традицию берём из активного лада, а не из умолчания
   fillScales(selTradition.value);
   selScale.value=scaleIdx;
@@ -130,14 +130,15 @@ function updRecBtn(){
   recBtn.classList.toggle('first', recording && loop.first);    // первый круг ≠ наложение
   recBtn.classList.toggle('armed', !recording && loop.on);      // петля играет: тап добавит слой
   recBtn.title = recording
-    ? (loop.first ? 'Идёт запись круга — тап остановит'
-                  : `Наложение слоя ${loop.layer+1} — тап остановит`)
-    : (loop.on ? 'Петля играет — тап начнёт новый слой'
-               : 'Запись: тап — отсчёт такта, затем круг');
+    ? (loop.first ? t('rec.title.recFirst')
+                  : t('rec.title.overdub',{n:loop.layer+1}))
+    : (loop.on ? t('rec.title.armed')
+               : t('rec.title.idle'));
   loopBarsV.textContent = loop.bars;
 }
+function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' : 'transport.loopPlay'); }   // текст кнопки лупа по состоянию (для смены языка и hooks.loop)
 hooks.rec       = () => updRecBtn();
-hooks.loop      = on => { loopBtn.classList.toggle('on', on); loopBtn.textContent = on ? '❚❚ луп' : '⟳ луп'; updRecBtn(); refreshMetreCtl(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет)
+hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); refreshMetreCtl(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет)
 
 /* Две панели (звукоряд и лупер) — оба оверлея на ОДНОМ месте (сверху). Одна за раз: открытие одной
    прячет другую (иначе перекрылись бы). Лупер РАНЬШЕ жил снизу, чтобы холстовая сетка тактов
@@ -191,19 +192,19 @@ addEventListener('pointermove', e=>{
    «Обучение» видима, но пока без функции: тап показывает заметку «скоро» (читается как ЗАПЛАНИРОВАННОЕ,
    кнопку НЕ гасим). Демо строёв (demo.js) и мини-учебник (#helpOv) остаются рабочими в коде — кнопки
    их запуска (со старта и из панели «Звукоряд») сняты, переедут внутрь обучения позже. */
-$('learnBtn').onclick=()=>{ $('learnMsg').textContent='Интерактивное обучение готовится — скоро.'; };
+$('learnBtn').onclick=()=>{ $('learnMsg').textContent=t('start.learnSoon'); };
 /* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
    адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
 function buildStartLinks(){
   const fb=$('fbLink'), dn=$('donateLink'), sup=$('startSupport');
   // Отзыв: форма (новая вкладка — не терять игру/несохранённую петлю) или почта-fallback. Т.к. FEEDBACK_URL
   // задан — идём в первую ветку, mailto не рисуется, адрес в исходник HTML не попадает.
-  if(FEEDBACK_URL){ fb.href=FEEDBACK_URL; fb.target='_blank'; fb.textContent='Feedback'; }
-  else{ const a=FB_MAIL_USER+'@'+FB_MAIL_DOMAIN; fb.href='mailto:'+a; fb.removeAttribute('target'); fb.textContent='Email me'; }
+  if(FEEDBACK_URL){ fb.href=FEEDBACK_URL; fb.target='_blank'; fb.textContent=t('foot.feedbackLink'); }
+  else{ const a=FB_MAIL_USER+'@'+FB_MAIL_DOMAIN; fb.href='mailto:'+a; fb.removeAttribute('target'); fb.textContent=t('foot.emailLink'); }
   fb.style.display='';                                   // отзыв виден всегда (форма или почта-fallback)
   // Донат — «Donate» в конце тихой строки поддержки. Новая вкладка (та же причина). Пустой URL — прячем ВСЮ
   // строку поддержки (без ссылки предложение бессмысленно; мёртвую ссылку и обещание не рисуем).
-  if(DONATE_URL){ dn.href=DONATE_URL; dn.target='_blank'; dn.textContent='Donate'; sup.style.display=''; }
+  if(DONATE_URL){ dn.href=DONATE_URL; dn.target='_blank'; dn.textContent=t('foot.donateLink'); sup.style.display=''; }
   else sup.style.display='none';
 }
 buildStartLinks();
@@ -272,8 +273,8 @@ addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.
 /* Выбор инструмента. При любом переключении глушим звук — роли/зоны рук меняются.
    PC-режим удалён: вертикальная раскладка — единственная, поэтому нет ни modeBtn, ни класса .phone. */
 const INSTR_SEQ=['ld','ch','bs','dr'];
-const INSTR_LBL={ld:'🎸 Соло', ch:'🎹 Аккорды', bs:'🎚 Бас', dr:'🥁 Ударные'};
-function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
+const instrLbl=r=>t('role.'+r);   // подпись роли (🎸 Соло / 🎹 Аккорды / 🎚 Бас / 🥁 Ударные) — через словарь
+function applyInstr(){ instrBtn.textContent = instrLbl(phoneInstr);
   instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn(); }   // цвет роли; секция «Функции рук» зависит от активной роли
 /* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ роли с записью (соло/бас/аккорды), что
    сейчас в игре. Строим динамически (как fillScales): single-role — одна роль; сплит — каждая ld/бас/ch-
@@ -283,10 +284,10 @@ function applyInstr(){ instrBtn.textContent = INSTR_LBL[phoneInstr];
    рука не играет нот, а «дышит» в звук движением/сжатием (см. gestures: exprFeatures/tickExpr).
    У ВСЕХ трёх ролей есть 'loop' (Лупер): рука нот не играет,
    а командует лупером щипками пальцев (см. gestures: fireLooperCmd). Смена — setHandFn + softAllOff. */
-const HANDFN_OPTS={
-  ld:[['fx','Эффекты'],['note','Ноты (непрерывно)'],['hold','Ноты (с удержанием)'],['therm','Терменвокс'],['expr','Выразительность'],['loop','Лупер (управление)']],
-  bs:[['note','Ноты (непрерывно)'],['hold','Ноты (с удержанием)'],['therm','Терменвокс'],['loop','Лупер (управление)']],
-  ch:[['latch','Аккорды (защёлка)'],['hold','Аккорды (с удержанием)'],['loop','Лупер (управление)']],
+const HANDFN_OPTS={   // [значение, ключ-словаря] — подпись через t(k)
+  ld:[['fx','handfn.fx'],['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['expr','handfn.expr'],['loop','handfn.loop']],
+  bs:[['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['loop','handfn.loop']],
+  ch:[['latch','handfn.latch'],['hold','handfn.chHold'],['loop','handfn.loop']],
 };
 const handFnRows=$('handFnRows'), handFnSep=$('handFnSep');
 const HAS_HANDFN=r=>r==='ld'||r==='bs'||r==='ch';   // роли с записью в handFn (у dr её нет)
@@ -299,13 +300,13 @@ function renderHandFn(){
   handFnSep.style.display = handFnRows.style.display = roles.length ? '' : 'none';
   handFnRows.textContent='';
   for(const role of roles){
-    const rl=document.createElement('div'); rl.className='handFnRole'; rl.textContent=INSTR_LBL[role];   // ярлык роли (🎸 Соло / 🎚 Бас)
+    const rl=document.createElement('div'); rl.className='handFnRole'; rl.textContent=instrLbl(role);   // ярлык роли (🎸 Соло / 🎚 Бас)
     handFnRows.appendChild(rl);
     for(const hand of ['L','R']){
       const row=document.createElement('div'); row.className='prow';
-      const lab=document.createElement('label'); lab.textContent = hand==='L'?'Левая рука':'Правая рука';
+      const lab=document.createElement('label'); lab.textContent = t(hand==='L'?'hand.left':'hand.right');
       const sel=document.createElement('select');
-      for(const [v,t] of HANDFN_OPTS[role]){ const o=document.createElement('option'); o.value=v; o.textContent=t; sel.appendChild(o); }
+      for(const [v,k] of HANDFN_OPTS[role]){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
       sel.value=handFn[role][hand];
       sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff(); };   // роли/зоны рук меняются → глушим звук (как смена инструмента)
       row.appendChild(lab); row.appendChild(sel); handFnRows.appendChild(row);
@@ -318,8 +319,7 @@ const canSplit=()=>innerWidth>innerHeight;
    двумя кнопками половин (instrBtnL/R). */
 function applySplit(){
   splitBtn.classList.toggle('act', splitOn);
-  splitBtn.title = splitOn ? 'Сплит-экран ВКЛ — тап выключит'
-                           : 'Сплит-экран: две роли на двух половинах';
+  splitBtn.title = t(splitOn ? 'split.on' : 'split.off');
   splitBtn.style.display = canSplit() ? '' : 'none';
   /* Одна кнопка роли (instrBtn) — только вне сплита; две кнопки половин — только в сплите. Никогда
      не видно все три: instrBtn и L/R взаимоисключимы по splitOn. */
@@ -332,7 +332,7 @@ function applySplit(){
 function applySplitRoles(){
   [instrBtnL,instrBtnR].forEach((b,i)=>{
     const role=SPLIT_ROLES[i];
-    b.textContent = (i===0?'◧ ':'') + INSTR_LBL[role] + (i===1?' ◨':'');
+    b.textContent = (i===0?'◧ ':'') + instrLbl(role) + (i===1?' ◨':'');
     b.style.setProperty('--role', INSTR_COL[role]);
   });
   renderHandFn();                             // ld/бас-половина могла появиться/исчезнуть — пересобираем секцию «Функции рук»
@@ -355,8 +355,8 @@ splitBtn.onclick =()=>{ setSplitOn(!splitOn); softAllOff(); applySplit(); };
    источник зеркала flipX/mirrored) двигаем ТОЛЬКО после успеха, чтобы картинка и hit-test флипнулись
    вместе. Отказ (нет второй камеры / нет доступа) — откат на прежнюю камеру + короткий тост, без слома. */
 let camMsgTimer=0;
-function showCamMsg(t){
-  camMsg.dataset.msg=t; camMsg.classList.add('on');
+function showCamMsg(msg){
+  camMsg.dataset.msg=msg; camMsg.classList.add('on');
   clearTimeout(camMsgTimer); camMsgTimer=setTimeout(()=>camMsg.classList.remove('on'),2600);
 }
 async function toggleCamera(){
@@ -368,7 +368,7 @@ async function toggleCamera(){
     camBtn.classList.toggle('act', next==='environment');   // .act = тыловая (незеркальная)
   }catch(err){
     try{ await switchCamera(camFacing); }catch(e){}          // откат: возвращаем прежнюю камеру (camFacing не менялся)
-    showCamMsg('Вторая камера недоступна');
+    showCamMsg(t('cam.unavailable'));
   }
   camBtn.disabled=false;
 }
@@ -398,9 +398,9 @@ function applyFullscreen(){
   if(!fsSupported){ fsBtn.style.display='none'; fsBtnStart.style.display='none'; return; }   // нет API — обе кнопки прочь (не мёртвые)
   const on=fsOn();
   fsBtn.classList.toggle('act', on);
-  fsBtn.title = on ? 'Выйти из полноэкранного режима' : 'Во весь экран: убрать полосы браузера';
+  fsBtn.title = t(on ? 'fs.title.exit' : 'fs.title.enter');
   fsBtnStart.classList.toggle('act', on);
-  fsBtnStart.textContent = on ? '⛶ Свернуть' : '⛶ Во весь экран';
+  fsBtnStart.textContent = t(on ? 'fs.start.exit' : 'fs.start.enter');
   fsBtnStart.title = fsBtn.title;
 }
 fsBtn.onclick=toggleFullscreen;
@@ -427,14 +427,14 @@ function hideInstall(){ installBtn.style.display='none'; installHint.style.displ
 if(inStandalone){ hideInstall(); }                                             // уже установлено — молчим
 else if(isIOSSafari){                                                          // iOS: инструкция вместо кнопки
   installBtn.style.display='none';
-  installHint.textContent='To install: tap Share, then “Add to Home Screen”.';
+  installHint.textContent=t('install.ios');
   installHint.style.display='';
 } else {                                                                       // Chromium и пр. — ждём событие
   hideInstall();
   addEventListener('beforeinstallprompt', e=>{
     e.preventDefault();                                                        // без мини-инфобара — показываем свою кнопку
     installPrompt=e;
-    installHint.textContent='add Handsong to your home screen';
+    installHint.textContent=t('install.hint');
     installBtn.style.display=''; installHint.style.display='';
   });
 }
@@ -463,23 +463,21 @@ function applyRec(){
   const k=activeKind();                          // 'video' | 'audio' | null
   clipBtn.classList.toggle('act', k==='video');  clipBtn.disabled  = k==='audio';   // идёт аудио → видео нельзя
   audioBtn.classList.toggle('act', k==='audio'); audioBtn.disabled = k==='video';   // идёт видео → аудио нельзя
-  clipBtn.title = k==='video' ? 'Идёт запись клипа — тап остановит и сохранит'
-    : 'Запись клипа: видео+звук в один файл (WebM; соцсети могут просить MP4 — понадобится конвертация)';
-  audioBtn.title = k==='audio' ? 'Идёт запись аудио — тап остановит и сохранит'
-    : 'Запись аудио: только звук в файл (WebM/Opus; Safari может дать mp4)';
+  clipBtn.title  = t(k==='video' ? 'clip.title.rec'  : 'clip.title.idle');
+  audioBtn.title = t(k==='audio' ? 'audio.title.rec' : 'audio.title.idle');
 }
 clipBtn.onclick=()=>{
-  if(activeKind()==='video'){ stopClip(); showCamMsg('Сохраняю клип…'); }   // .act снимет onClipChange, когда рекордер РЕАЛЬНО остановится (onstop), не по тапу
+  if(activeKind()==='video'){ stopClip(); showCamMsg(t('clip.saving')); }   // .act снимет onClipChange, когда рекордер РЕАЛЬНО остановится (onstop), не по тапу
   else{
-    try{ startClip('video'); showCamMsg('● Идёт запись клипа'); }           // .act/disabled поставит onClipChange из startClip
-    catch(err){ applyRec(); showCamMsg('Клип: '+(err&&err.message||err)); }   // старт бросил — состояние точно покой; синхронно приводим кнопки в покой
+    try{ startClip('video'); showCamMsg(t('clip.recording')); }           // .act/disabled поставит onClipChange из startClip
+    catch(err){ applyRec(); showCamMsg(t('clip.errPrefix')+(err&&err.message||err)); }   // старт бросил — состояние точно покой; синхронно приводим кнопки в покой
   }
 };
 audioBtn.onclick=()=>{
-  if(activeKind()==='audio'){ stopClip(); showCamMsg('Сохраняю аудио…'); }
+  if(activeKind()==='audio'){ stopClip(); showCamMsg(t('audio.saving')); }
   else{
-    try{ startClip('audio'); showCamMsg('● Идёт запись аудио'); }
-    catch(err){ applyRec(); showCamMsg('Аудио: '+(err&&err.message||err)); }
+    try{ startClip('audio'); showCamMsg(t('audio.recording')); }
+    catch(err){ applyRec(); showCamMsg(t('audio.errPrefix')+(err&&err.message||err)); }
   }
 };
 onClipChange(applyRec);                           // единый источник правды в clip.js уведомляет обе кнопки — .act/disabled/рекордер не разойдутся
@@ -516,9 +514,8 @@ let jamStep=0;                                    // 0 = выкл, 1..N = ном
 function applyJam(){
   const n=jamVariants().length;
   jamBtn.classList.toggle('act', jamStep>0);
-  jamBtn.textContent = jamStep>0 ? `🎵 ${jamStep}/${n}` : '🎵 Джем';
-  jamBtn.title = jamStep>0 ? 'Джем играет — тап сменит вариант (в конце выключит)'
-                           : 'Джем: подложка по строю — тап включит, следующий тап сменит вариант';
+  jamBtn.textContent = jamStep>0 ? `🎵 ${jamStep}/${n}` : t('jam.label');
+  jamBtn.title = t(jamStep>0 ? 'jam.title.on' : 'jam.title.off');
 }
 /* Подгоняем ритм варианта под ТЕКУЩИЙ размер петли: паттерн другого размера buildArrangement всё равно
    пропустит (джем остался бы без ударных) → берём первый RHYTHMS со своим beats===loop.metre, иначе без
@@ -531,7 +528,7 @@ function fitRhythm(sel){
 function jamTo(step, vars){
   clearJam();                                     // снять ПРОШЛЫЕ слои джема (записи игрока целы — они без метки jam)
   if(step>0 && !loadJam(fitRhythm(vars[step-1]))){   // не встало (петля игрока другого размера) — честно сообщаем, цикл → выкл
-    showCamMsg('Джем: петля другого размера — очистите её (✕)'); jamStep=0; applyJam(); return;
+    showCamMsg(t('jam.sizeMismatch')); jamStep=0; applyJam(); return;
   }
   jamStep=step; applyJam();
 }
@@ -553,5 +550,18 @@ function onResize(){
 }
 addEventListener('resize', onResize);
 applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHandFn; applyInstr → renderHandFn (инициализация кнопок ролей и секции «Функции рук»)
- 
+
+/* СМЕНА ЯЗЫКА без перезагрузки: applyI18n (в setLang) уже обновил статические [data-i18n]; здесь
+   перерисовываем ДИНАМИКУ — то, что строит/пишет JS (подписи ссылок, кнопка роли + «Функции рук»,
+   кнопки половин, титулы кнопок, тексты записи/джема/полноэкранного, кнопка лупа). Списки ладов/
+   тембров/аранжировки — музыкальные данные (этап B), их не трогаем: их текст пока не меняется.
+   Холст не трогаем — он перерисуется сам следующим кадром (t()/L() читаются на кадр). */
+onLangChange(()=>{
+  buildStartLinks();
+  updScaleBtn(); updRecBtn(); updLoopBtn();
+  applyInstr(); applySplit();          // роль + половины + «Функции рук» + видимость/титулы
+  refreshMetreCtl();
+  applyRec(); applyJam(); applyFullscreen();
+});
+
 export { $, revealBar };

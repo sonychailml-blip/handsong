@@ -1,5 +1,6 @@
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 import { camFacing } from './state.js';
+import { t } from './i18n.js';
 
 /* ================= КАМЕРА + MEDIAPIPE ================= */
 const video=document.getElementById('video');
@@ -15,14 +16,14 @@ addEventListener('resize',resize); resize();
    даёт открыть вторую камеру, пока жива первая. Если новый запрос упадёт — бросаем наверх (дорожки
    уже погашены), откат на прежнюю камеру делает вызывающий (ui.js). */
 async function openCamera(facing){
-  if(stream){ for(const t of stream.getTracks()) t.stop(); stream=null; }
+  if(stream){ for(const tr of stream.getTracks()) tr.stop(); stream=null; }
   stream=await navigator.mediaDevices.getUserMedia({
     video:{facingMode:facing,width:{ideal:640},height:{ideal:480}},audio:false});
   video.srcObject=stream; await video.play();
 }
 
 async function initVision(msg){
-  msg('Загружаю модель распознавания рук…');
+  msg(t('load.model'));
   const files=await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
   landmarker=await HandLandmarker.createFromOptions(files,{
@@ -33,7 +34,7 @@ async function initVision(msg){
     runningMode:"VIDEO", numHands:2,
     minHandDetectionConfidence:0.5, minTrackingConfidence:0.5
   });
-  msg('Включаю камеру…');
+  msg(t('load.camera'));
   await openCamera(camFacing);                   // стартовая камера — из состояния (по умолчанию фронтальная 'user')
 }
 
