@@ -145,8 +145,16 @@ hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updR
    оставалась видна при игре; теперь он тоже сверху (см. #panelLoop в style.css) — сетку видно после
    закрытия панели. */
 function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.classList.toggle('on',on);
-  if(on){ panelScaleEl.classList.remove('on'); refreshMetreCtl(); } }   // при открытии — актуализируем блокировку размера (петля могла измениться при закрытой панели)
-function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false); }
+  if(on){ panelScaleEl.classList.remove('on'); refreshMetreCtl(); }   // при открытии — актуализируем блокировку размера (петля могла измениться при закрытой панели)
+  syncTutorBarPos(); }
+function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false);
+  if(on && hooks.tutor) hooks.tutor('panel',{which:'scale'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли меню лада — урок «Строи и тембры»
+  syncTutorBarPos(); }
+/* Подсказка тура (#tutorBar) при ОТКРЫТОЙ панели уезжает ВНИЗ (класс .low — CSS-сдвиг transform), иначе
+   панель (top:52, z 14/15) накрыла бы инструкцию ровно тогда, когда её надо читать (шаг «открой меню»).
+   Сигнал — panelOpen() (та же панель-стейт, что и у авто-сворачивания бара; новой правды не заводим).
+   Вне тура бар display:none — класс безвреден. Обе панели учтены (лупер-урок наткнётся на то же). */
+function syncTutorBarPos(){ const el=$('tutorBar'); if(el) el.classList.toggle('low', panelOpen()); }
 $('panelClose').onclick=()=>showScale(false);
 $('panelCloseLoop').onclick=()=>showLoop(false);   // «Свернуть ✕» лупера — тот же путь закрытия, что и у ⚙/взаимоисключения
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
@@ -210,6 +218,13 @@ export function tutorSetScale(idx){
   selScale.value=idx;
   updScaleBtn(); refreshProgAvail();
 }
+/* Урок «Функции рук» стартует с ИЗВЕСТНОЙ базы соло: левая=эффекты, правая=ноты (дефолт handFn.ld) —
+   тогда «левая и правая рука получают работу» звучит буквально, и каждый шаг («поставь руку на …») —
+   это РЕАЛЬНАЯ смена (иначе, если функция уже стоит, событие смены не придёт). renderHandFn перерисует
+   селекты. Выбор по КОНЦУ урока НЕ сбрасываем (они только что научились выбирать — см. tutor.js финал). */
+export function tutorResetHandFn(){
+  setHandFn('ld','L','fx'); setHandFn('ld','R','note'); softAllOff(); renderHandFn();
+}
 /* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
    адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
 function buildStartLinks(){
@@ -241,10 +256,12 @@ selTradition.onchange=e=>{
   if(!first)return;
   selScale.value=first.i;
   setScaleIdx(first.i); softAllOff(); updScaleBtn(); refreshProgAvail();
+  if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: смена строя тоже меняет лад (первый в традиции) — тот же сигнал урока «Строи»
 };
 selScale.onchange=e=>{
   setScaleIdx(+e.target.value); softAllOff();
   updScaleBtn(); refreshProgAvail();          // 2/3: смена лада
+  if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
 selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); updScaleBtn(); };   // 3/3: смена тоники
 /* ЭТАЛОН A4 — единый источник высоты (двигает ВСЕ строи, подвижные и фиксированные, вместе).
@@ -270,7 +287,8 @@ aRefInput.onchange=e=>{
 syncARef(aRef);                                    // старт: 440 в обоих контролах
 $('qTriad').onclick=()=>{ setSeventh(false); softAllOff(); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
 $('qSev').onclick =()=>{ setSeventh(true);  softAllOff(); $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
-selLead.onchange=e=>setLeadInstr(+e.target.value);
+selLead.onchange=e=>{ setLeadInstr(+e.target.value);
+  if(hooks.tutor) hooks.tutor('timbre',{slot:'lead'}); };   // ЗАЦЕПКА ОБУЧЕНИЯ: сменили СОЛО-тембр — урок «Строи и тембры»
 selChord.onchange=e=>setChIdx(+e.target.value);
 selBass.onchange=e=>setBassInstr(+e.target.value);
 qOn.onclick =()=>{ setLoopQuant(true);  qOn.classList.add('act');  qOff.classList.remove('act'); };
@@ -326,7 +344,8 @@ function renderHandFn(){
       const sel=document.createElement('select');
       for(const [v,k] of HANDFN_OPTS[role]){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
       sel.value=handFn[role][hand];
-      sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff(); };   // роли/зоны рук меняются → глушим звук (как смена инструмента)
+      sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff();       // роли/зоны рук меняются → глушим звук (как смена инструмента)
+        if(hooks.tutor) hooks.tutor('handfn',{role, hand, fn:e.target.value}); };   // ЗАЦЕПКА ОБУЧЕНИЯ: сменили функцию руки (какая рука, какая функция) — урок «Функции рук»
       row.appendChild(lab); row.appendChild(sel); handFnRows.appendChild(row);
     }
   }

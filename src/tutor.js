@@ -16,7 +16,7 @@
 import { hooks } from './hooks.js';
 import { t, onLangChange, store } from './i18n.js';
 import { SCALES, supportsChords, typedChords } from './scales.js';
-import { $, revealBar, tutorReset, tutorSetScale } from './ui.js';
+import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn } from './ui.js';
 
 /* Хроматика (12-TET) — единственный лад с ПОЛНОЙ палитрой типов аккордов (typedChords:'chrom12'),
    при этом с привычными аккордами. Урок «Аккорды» стартует на ней, иначе шаг палитры молча выпал бы
@@ -56,6 +56,37 @@ const CHORDS_STEPS=[
   {key:'chHold',    final:true},                                                                            // удержание существует и где выбирается (без перенастройки)
 ];
 
+/* ШАГИ УРОКА «Строи и тембры» — идея, ради которой существует проект: та же рука — 75 музыкальных
+   миров. Приходят из «Аккордов» на Хроматике. События из UI-слоя (ЗАЦЕПКА ОБУЧЕНИЯ в ui.js): 'panel'
+   (открыли меню лада), 'scale' {trad} (выбрали лад/строй), 'timbre' {slot} (сменили тембр); 'note' — как
+   в «Основах». Ведём: открыть меню → знакомый лад + игра → КОНТРАСТНЫЙ лад (Пелог, гамелан: неравные
+   шаги слышны за пару нот) + игра → что такое центы → смена соло-тембра → финал (в нём же — одна фраза
+   про эталон A). Гейтов нет: шаги про НАВИГАЦИЮ по меню, работают на любом ладу. */
+const TUNINGS_STEPS=[
+  {key:'tunOpen',     enter:a=>{a.panelOpened=false;}, done:a=>a.panelOpened},                                          // открыть меню лада
+  {key:'tunFamiliar', enter:a=>{a.lastScaleTrad=null; a.noteFired=false;}, done:a=>a.lastScaleTrad==='common' && a.noteFired},   // знакомый лад из «Привычного» + игра
+  {key:'tunJump',     enter:a=>{a.lastScaleTrad=null; a.noteFired=false;}, done:a=>a.lastScaleTrad!=null && a.lastScaleTrad!=='common' && a.noteFired},   // КОНТРАСТНЫЙ лад (вне «Привычного») + та же рука
+  {key:'tunCents'},                                                                                                     // что такое центы — читаем (действия нет, кнопка «Дальше»)
+  {key:'tunTimbre',   enter:a=>{a.timbreChanged=false; a.noteFired=false;}, done:a=>a.timbreChanged && a.noteFired},    // сменить соло-тембр И сыграть (услышать новый звук)
+  {key:'tunFinal',    final:true},                                                                                      // финал: та же рука — 75 миров; + одна фраза про эталон A
+];
+
+/* ШАГИ УРОКА «Функции рук» — целый слой, который находят случайно: каждой руке даётся РАБОТА (ноты,
+   удержание, непрерывная высота, эффекты, лупер, выразительность), и работы РАЗНЫЕ по ролям. Setup ставит
+   известную базу (левая=эффекты, правая=ноты), чтобы каждый «поставь руку на …» был реальной сменой.
+   События (ЗАЦЕПКА ОБУЧЕНИЯ в ui.js/gestures.js): 'handfn' {role,hand,fn} (сменили функцию руки),
+   'exprMove' (рука-выразительность задвигалась), 'note' (нота зазвучала — как в «Основах»). Ведём: где это
+   → УДЕРЖАНИЕ → ТЕРМЕНВОКС (не клавиатура!) → ВЫРАЗИТЕЛЬНОСТЬ (звук дышит) → рука-ЛУПЕР (одна фраза вперёд,
+   к уроку «Лупер») → финал. Функции соло берутся с role==='ld'; гейтов нет. */
+const HANDFN_STEPS=[
+  {key:'hfWhere',  reveal:true, enter:a=>{a.panelOpened=false;}, done:a=>a.panelOpened},                              // открыть меню, найти «Функции рук»
+  {key:'hfHold',   enter:a=>{a.hfHold=false;  a.noteFired=false;}, done:a=>a.hfHold  && a.noteFired},                 // рука на «Ноты (с удержанием)» + сыграть (нота стоит, рука двигается)
+  {key:'hfTherm',  enter:a=>{a.hfTherm=false; a.noteFired=false;}, done:a=>a.hfTherm && a.noteFired},                 // та же рука на «Терменвокс» + сыграть (высота скользит, без ступеней)
+  {key:'hfExpr',   enter:a=>{a.hfExpr=false; a.exprMoved=false; a.noteFired=false;}, done:a=>a.hfExpr && a.exprMoved && a.noteFired},   // ДРУГУЮ руку на «Выразительность» + играть + двигать (звук дышит)
+  {key:'hfLooper'},                                                                                                   // рука-лупер существует — одна фраза вперёд (действия нет, кнопка «Дальше»)
+  {key:'hfFinal',  final:true},                                                                                      // финал: здесь ты ВЫБИРАЕШЬ работу каждой руке
+];
+
 /* СПИСОК УРОКОВ. steps:null → «Скоро» (виден, но не запускается). Наполняем по одному в следующих
    заходах. Порядок = порядок в меню. titleKey/descKey — ключи словаря (en+ru). Поле `next` — id
    следующего урока в ЦЕПОЧКЕ (финал предлагает «Дальше: <урок>», не прыгает сам): это ДАННЫЕ, не
@@ -63,11 +94,12 @@ const CHORDS_STEPS=[
    кнопка «Готово — играть»). next на «Скоро»-урок (steps:null) игнорируется как отсутствующий. */
 const LESSONS=[
   {id:'basics',  titleKey:'lesson.basics.title',  descKey:'lesson.basics.desc',  steps:BASICS_STEPS, next:'chords'},
-  {id:'chords',  titleKey:'lesson.chords.title',  descKey:'lesson.chords.desc',  steps:CHORDS_STEPS,
+  {id:'chords',  titleKey:'lesson.chords.title',  descKey:'lesson.chords.desc',  steps:CHORDS_STEPS, next:'tunings',
    setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); }},   // старт на Хроматике — шаг палитры появляется у всех (объявлено в chSwitch.prompt)
-  {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:null},
+  {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:TUNINGS_STEPS},   // цепочка ведёт сюда с «Аккордов»; свой next появится, когда выйдет «Лупер»
   {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:null},
-  {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:null},
+  {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:HANDFN_STEPS,
+   setup:tutorResetHandFn},   // старт с известной базы (левая=эффекты, правая=ноты); свой next появится, когда выйдет «Сплит»
   {id:'split',   titleKey:'lesson.split.title',   descKey:'lesson.split.desc',   steps:null},
 ];
 const lessonKey=id=>'handsong.lesson.'+id;
@@ -115,7 +147,9 @@ async function freePlay(){ const ok=await starter(); closeLessons(); void ok; } 
 /* ---------- ХОД УРОКА (шаги) ---------- */
 function freshAcc(){ return {noteFired:false, sMin:null, sMax:null, lastLdFinger:null,
   fingerChanged:false, fxMoved:false, role:'ld', chordPlayed:false,
-  chordLatched:false, chDeg0:null, chChanged:false, typePicked:false}; }   // поля урока «Аккорды» (BASICS их не читает — безвредны)
+  chordLatched:false, chDeg0:null, chChanged:false, typePicked:false,
+  panelOpened:false, lastScaleTrad:null, timbreChanged:false,
+  hfHold:false, hfTherm:false, hfExpr:false, exprMoved:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук» (прочие уроки их не читают — безвредны)
 /* Накопитель обновляем ГЕНЕРИЧНО по каждому событию — предикаты done остаются ЧИСТЫМИ (только читают). */
 function apply(kind,p){
   if(kind==='pinch'){ if(p.zone==='ld'){ if(acc.lastLdFinger!=null && p.finger!==acc.lastLdFinger) acc.fingerChanged=true; acc.lastLdFinger=p.finger; } }
@@ -126,6 +160,14 @@ function apply(kind,p){
     if(acc.chDeg0==null) acc.chDeg0=d; else if(d!==acc.chDeg0) acc.chChanged=true; }
   else if(kind==='chordLatch'){ acc.chordLatched=true; }   // защёлкнутый аккорд отпущен, но звучит (шаг chLatch)
   else if(kind==='chordType'){ acc.typePicked=true; }      // выбран тип в палитре (шаг chPalette)
+  else if(kind==='panel'){ if(p.which==='scale') acc.panelOpened=true; }   // открыто меню лада (шаги tunOpen/hfWhere)
+  else if(kind==='scale'){ acc.lastScaleTrad=p.trad; }     // выбран лад/строй — запоминаем традицию (шаги tunFamiliar/tunJump)
+  else if(kind==='timbre'){ if(p.slot==='lead') acc.timbreChanged=true; }  // сменён соло-тембр (шаг tunTimbre)
+  else if(kind==='handfn'){ if(p.role==='ld'){   // соло-руки; ПРАВАЯ — нотная (удержание→терменвокс), ЛЕВАЯ — выразительность, чтобы на шаге expr правая всё ещё играла ноту
+    if(p.hand==='R' && p.fn==='hold')acc.hfHold=true;
+    else if(p.hand==='R' && p.fn==='therm')acc.hfTherm=true;
+    else if(p.hand==='L' && p.fn==='expr')acc.hfExpr=true; } }
+  else if(kind==='exprMove'){ acc.exprMoved=true; }        // рука-выразительность задвигалась (шаг hfExpr)
   else if(kind==='role'){ acc.role=p.role; }
 }
 /* Единая точка приёма (hooks.tutor). 'seen' — heartbeat (не действие шага). Прочее — обновить накопитель
