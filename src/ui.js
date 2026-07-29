@@ -199,6 +199,17 @@ export function tutorReset(){   // тур учит SINGLE-ROLE соло: гас�
   setPhoneInstr('ld'); softAllOff();
   applySplit(); applyInstr();
 }
+/* Урок задаёт стартовый лад (Аккорды → Хроматика: у неё полная палитра типов аккордов). Ставим ТЕМ ЖЕ
+   путём, что selScale.onchange, плюс синхроним выпадашки традиции/лада, чтобы панель показывала выбранный
+   лад (не «украли настройку молча»). Лад по окончании урока НЕ восстанавливаем — человек только что учил
+   на нём аккорды и, вероятно, захочет продолжить играть (см. tutor.js exit). */
+export function tutorSetScale(idx){
+  const trad=tradOfScale(idx);
+  setScaleIdx(idx); softAllOff();
+  if(selTradition){ selTradition.value=trad; fillScales(trad); }
+  selScale.value=idx;
+  updScaleBtn(); refreshProgAvail();
+}
 /* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
    адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
 function buildStartLinks(){

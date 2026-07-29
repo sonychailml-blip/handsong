@@ -268,6 +268,8 @@ function endPinch(key,S){
        руль. В УДЕРЖАНИИ (S.fn==='hold') размыкание пальцев ГАСИТ аккорд (как соло-hold) и чистит защёлку. */
     if(S.zone==='ch'&&chOwner===key){
       if(S.fn==='hold'){ WchOff('latch'); setLatchDeg(-1); setLatchTy(null); latchLen=0; }
+      // ЗАЦЕПКА ОБУЧЕНИЯ: в ЗАЩЁЛКЕ пальцы разомкнуты, а аккорд ЗВУЧИТ дальше — урок «Аккорды» ловит этот момент (в удержании — нет, там аккорд погас выше).
+      else if(latchDeg>=0) tutorTap('chordLatch',{deg:latchDeg});
       chOwner=null;
     }
     if(S.zone==='loop'&&S.clearT0!=null&&!S.clearFired){   // мизинец отпущен ДО 3с → очистка ОТМЕНЕНА (ничего не делаем, гасим отсчёт)
@@ -418,6 +420,8 @@ function processHands(res){
           const [c,r]=cellHyst(clamp(S.x,x0,x1),clamp(S.y,y0,y1),x0,x1,y0,y1,chordFams(),
                                S.pc==null?-1:S.pc, S.pr==null?-1:S.pr);
           S.pc=c; S.pr=r;
+          // ЗАЦЕПКА ОБУЧЕНИЯ: выбран ДРУГОЙ тип аккорда в палитре (положением) — урок «Аккорды» ловит выбор типа.
+          if(c!==chordFam||r!==chordVar) tutorTap('chordType',{fam:c,var:r});
           if(c!==chordFam)setChordFam(c);
           if(r!==chordVar)setChordVar(r);
         }
