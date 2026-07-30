@@ -16,7 +16,7 @@
 import { hooks } from './hooks.js';
 import { t, onLangChange, store } from './i18n.js';
 import { SCALES, supportsChords, typedChords } from './scales.js';
-import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn } from './ui.js';
+import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop } from './ui.js';
 
 /* Хроматика (12-TET) — единственный лад с ПОЛНОЙ палитрой типов аккордов (typedChords:'chrom12'),
    при этом с привычными аккордами. Урок «Аккорды» стартует на ней, иначе шаг палитры молча выпал бы
@@ -78,6 +78,31 @@ const TUNINGS_STEPS=[
    'exprMove' (рука-выразительность задвигалась), 'note' (нота зазвучала — как в «Основах»). Ведём: где это
    → УДЕРЖАНИЕ → ТЕРМЕНВОКС (не клавиатура!) → ВЫРАЗИТЕЛЬНОСТЬ (звук дышит) → рука-ЛУПЕР (одна фраза вперёд,
    к уроку «Лупер») → финал. Функции соло берутся с role==='ld'; гейтов нет. */
+/* ШАГИ УРОКА «Лупер» — фича, что превращает игрушку в инструмент для целых пьес. Ведём в порядке реальной
+   работы: записать круг → наложить слой → отмена → джем → темп/длина (правило пустой петли) → рука-лупер
+   (одна фраза вперёд) → финал. События (ЗАЦЕПКА ОБУЧЕНИЯ в recorder.js — ловят И кнопки, И руку-лупер, т.к.
+   обе идут через onRec/onUndo/loadJam): 'loop' {ev:'recStart'|'loopClosed'|'overdubStart'|'overdubStop'|
+   'undo'|'jam'}; 'panel' {which:'loop'} (открыта панель лупера); 'note' — как в «Основах». Чистый старт даёт
+   tutorReset (clearRec). Кнопки ●/🎵/⚙ — в ВЕРХНЕМ баре (reveal:true), ⤺ отмена — в нижней полосе транспорта
+   (видна при играющей петле). */
+const LOOPER_STEPS=[
+  {key:'lpRec',    reveal:true, enter:a=>{a.loopClosed=false; a.noteFired=false;}, done:a=>a.loopClosed && a.noteFired},   // ● запись: отсчёт → играть → круг «вернулся»
+  /* СЛОЙ ПО РОЛЯМ, не поверх соло: соло — ОДИН моно-голос (audio: banks/envGain делят живую игру И
+     переигровку), поэтому второй соло-слой дерётся с первым и побеждает последний — известное ОГРАНИЧЕНИЕ
+     (см. recorder.js: «соло-поверх-соло делит голос»), не баг здесь. Поэтому: соло → переключить роль на
+     Аккорды/Бас (пул, ключ-владелец 'loop:N'/'bassloop:N') → они звучат ВМЕСТЕ. done: сменил роль на
+     ch/bs, завершил овердаб (● стоп) И реально сыграл в этой роли (chordPlayed/bassPlayed сбрасываются на
+     старте овердаба — засчитываем игру ВО ВРЕМЯ слоя). НИКОГДА не возвращать соло-овердаб (мёртвый по сути). */
+  {key:'lpLayer',  reveal:true, enter:a=>{a.overdubbed=false; a.chordPlayed=false; a.bassPlayed=false;},
+                   done:a=>(a.role==='ch'||a.role==='bs') && a.overdubbed && (a.chordPlayed||a.bassPlayed)},   // сменить роль (Аккорды/Бас) + ● слой + сыграть → две роли звучат вместе
+  {key:'lpUndo',   enter:a=>{a.undone=false;}, done:a=>a.undone},                                                          // ⤺ снять верхний слой
+  {key:'lpJam',    reveal:true, enter:a=>{ tutorClearLoop(); a.jammed=false; a.noteFired=false; a.chordPlayed=false; a.bassPlayed=false; },
+                   done:a=>a.jammed && (a.noteFired||a.chordPlayed||a.bassPlayed)},   // enter чистит петлю → джем встаёт на пустую (любой размер/лад); 🎵 + игра поверх В ЛЮБОЙ роли (после lpLayer роль ch/bs, не только соло)
+  {key:'lpTempo',  reveal:true, enter:a=>{a.loopPanelOpened=false;}, done:a=>a.loopPanelOpened},                           // ⚙ панель: темп/длина/размер; длину и размер меняют только на ПУСТОЙ петле
+  {key:'lpHand'},                                                                                                          // рука-лупер: одна фраза назад к «Функциям рук» (действия нет)
+  {key:'lpFinal',  final:true},
+];
+
 const HANDFN_STEPS=[
   {key:'hfWhere',  reveal:true, enter:a=>{a.panelOpened=false;}, done:a=>a.panelOpened},                              // открыть меню, найти «Функции рук»
   {key:'hfHold',   enter:a=>{a.hfHold=false;  a.noteFired=false;}, done:a=>a.hfHold  && a.noteFired},                 // рука на «Ноты (с удержанием)» + сыграть (нота стоит, рука двигается)
@@ -96,8 +121,8 @@ const LESSONS=[
   {id:'basics',  titleKey:'lesson.basics.title',  descKey:'lesson.basics.desc',  steps:BASICS_STEPS, next:'chords'},
   {id:'chords',  titleKey:'lesson.chords.title',  descKey:'lesson.chords.desc',  steps:CHORDS_STEPS, next:'tunings',
    setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); }},   // старт на Хроматике — шаг палитры появляется у всех (объявлено в chSwitch.prompt)
-  {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:TUNINGS_STEPS},   // цепочка ведёт сюда с «Аккордов»; свой next появится, когда выйдет «Лупер»
-  {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:null},
+  {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:TUNINGS_STEPS, next:'looper'},   // цепочка: «Аккорды»→сюда→«Лупер»
+  {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:LOOPER_STEPS, next:'handfn'},   // чистый старт — tutorReset (clearRec); ведёт дальше к «Функциям рук»
   {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:HANDFN_STEPS,
    setup:tutorResetHandFn},   // старт с известной базы (левая=эффекты, правая=ноты); свой next появится, когда выйдет «Сплит»
   {id:'split',   titleKey:'lesson.split.title',   descKey:'lesson.split.desc',   steps:null},
@@ -149,7 +174,8 @@ function freshAcc(){ return {noteFired:false, sMin:null, sMax:null, lastLdFinger
   fingerChanged:false, fxMoved:false, role:'ld', chordPlayed:false,
   chordLatched:false, chDeg0:null, chChanged:false, typePicked:false,
   panelOpened:false, lastScaleTrad:null, timbreChanged:false,
-  hfHold:false, hfTherm:false, hfExpr:false, exprMoved:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук» (прочие уроки их не читают — безвредны)
+  hfHold:false, hfTherm:false, hfExpr:false, exprMoved:false,
+  loopClosed:false, overdubbed:false, undone:false, jammed:false, loopPanelOpened:false, bassPlayed:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук»/«Лупер» (прочие уроки их не читают — безвредны)
 /* Накопитель обновляем ГЕНЕРИЧНО по каждому событию — предикаты done остаются ЧИСТЫМИ (только читают). */
 function apply(kind,p){
   if(kind==='pinch'){ if(p.zone==='ld'){ if(acc.lastLdFinger!=null && p.finger!==acc.lastLdFinger) acc.fingerChanged=true; acc.lastLdFinger=p.finger; } }
@@ -160,7 +186,14 @@ function apply(kind,p){
     if(acc.chDeg0==null) acc.chDeg0=d; else if(d!==acc.chDeg0) acc.chChanged=true; }
   else if(kind==='chordLatch'){ acc.chordLatched=true; }   // защёлкнутый аккорд отпущен, но звучит (шаг chLatch)
   else if(kind==='chordType'){ acc.typePicked=true; }      // выбран тип в палитре (шаг chPalette)
-  else if(kind==='panel'){ if(p.which==='scale') acc.panelOpened=true; }   // открыто меню лада (шаги tunOpen/hfWhere)
+  else if(kind==='panel'){ if(p.which==='scale') acc.panelOpened=true; else if(p.which==='loop') acc.loopPanelOpened=true; }   // открыта панель лада (tunOpen/hfWhere) / лупера (lpTempo)
+  else if(kind==='bass'){ acc.bassPlayed=true; }            // басовая нота (слой-по-ролям, шаг lpLayer)
+  else if(kind==='loop'){                                   // события лупера (шаги урока «Лупер»)
+    if(p.ev==='recStart'||p.ev==='overdubStart'||p.ev==='jam'){ acc.noteFired=false; acc.chordPlayed=false; acc.bassPlayed=false; }   // сброс: игра ЗАСЧИТЫВАЕТСЯ только ПОСЛЕ старта записи/овердаба/джема (сыграно ВО ВРЕМЯ слоя, а не до)
+    else if(p.ev==='loopClosed') acc.loopClosed=true;
+    else if(p.ev==='overdubStop') acc.overdubbed=true;
+    else if(p.ev==='undo') acc.undone=true;
+    if(p.ev==='jam') acc.jammed=true; }
   else if(kind==='scale'){ acc.lastScaleTrad=p.trad; }     // выбран лад/строй — запоминаем традицию (шаги tunFamiliar/tunJump)
   else if(kind==='timbre'){ if(p.slot==='lead') acc.timbreChanged=true; }  // сменён соло-тембр (шаг tunTimbre)
   else if(kind==='handfn'){ if(p.role==='ld'){   // соло-руки; ПРАВАЯ — нотная (удержание→терменвокс), ЛЕВАЯ — выразительность, чтобы на шаге expr правая всё ещё играла ноту

@@ -275,7 +275,8 @@ function tick(){
   if(pos<loop.pos){                                   // заворот петли (для лид/дрон)
     fireNear(loop.pos,lb);
     liveWrapRelease();                                // гасим ЖИВОЕ к границе (слои — по явному времени)
-    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); loop.sched=e; }   // первая запись только что стала слоем — планировать её с ТЕКУЩЕЙ позиции (во время записи слоёв не планировалось → без дублей)
+    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); loop.sched=e;   // первая запись только что стала слоем — планировать её с ТЕКУЩЕЙ позиции (во время записи слоёв не планировалось → без дублей)
+      hooks.tutor && hooks.tutor('loop',{ev:'loopClosed'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: первый круг замкнулся и пошёл петлёй («вернулся») — урок «Лупер»
     fireNear(-1e-9,pos);
   }else fireNear(loop.pos,pos);
   loop.pos=pos;
@@ -294,9 +295,12 @@ function startTransport(countIn){
    играет петля → тумблер овердаба (вкл/выкл новый слой). */
 function onRec(){
   if(!AC)return;
-  if(!loop.on){ events.length=0; loop.first=true; loop.layer=0; setRecording(true); startTransport(true); }
-  else if(recording){ recLeadOff(); recChOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); }
-  else{ loop.layer=maxLayer()+1; setRecording(true); }
+  if(!loop.on){ events.length=0; loop.first=true; loop.layer=0; setRecording(true); startTransport(true);
+    hooks.tutor && hooks.tutor('loop',{ev:'recStart'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: старт записи первого круга (отсчёт пошёл) — урок «Лупер»
+  else if(recording){ recLeadOff(); recChOff(); setRecording(false); events.sort((x,y)=>x.t-y.t);
+    hooks.tutor && hooks.tutor('loop',{ev:'overdubStop'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: овердаб остановлен (слой готов) — урок «Лупер»
+  else{ loop.layer=maxLayer()+1; setRecording(true);
+    hooks.tutor && hooks.tutor('loop',{ev:'overdubStart'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: начат новый слой поверх петли — урок «Лупер»
 }
 /* Загрузить аранжировку (гармония+бас+ритм) как ОТДЕЛЬНЫЕ слои, замороженные в текущем
    ладу/септаккорде (§3.4). Пустая петля → длина из прогрессии + запуск; непустая → только
@@ -315,6 +319,7 @@ function loadArrangement(sel, jam=false){
   events.sort((x,y)=>x.t-y.t);
   if(!loop.on)startTransport(false);
   if(droneActive())droneOn();                          // включаем дрон сразу (насос переподтвердит на завороте)
+  if(jam) hooks.tutor && hooks.tutor('loop',{ev:'jam'});   // ЗАЦЕПКА ОБУЧЕНИЯ: джем реально встал (слои добавлены) — урок «Лупер»; только для джема, не для ручной аранжировки
   return true;                                         // добавили (джем-контроллер по этому знает, что вариант встал)
 }
 /* Джем — та же аранжировка-shortcut, но её слои ПОМЕЧЕНЫ (e.jam). loadJam кладёт помеченные,
@@ -340,6 +345,7 @@ function onUndo(){                                      // снять после
   for(let i=events.length-1;i>=0;i--)if(events[i].layer===top)events.splice(i,1);
   softAllOff(); if(!droneActive())droneOff();           // сняли слой-дрон → гасим (softAllOff дрон не трогает)
   if(!events.length)clearRec(); else hooks.loop && hooks.loop(loop.on);
+  hooks.tutor && hooks.tutor('loop',{ev:'undo'});       // ЗАЦЕПКА ОБУЧЕНИЯ: снят верхний слой — урок «Лупер» (дошли только при непустой петле — ранний выход выше)
 }
 function setLoopBars(n){                                // длина меняется только на пустой петле
   if(events.length||loop.on)return;

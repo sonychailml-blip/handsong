@@ -365,7 +365,7 @@ function processHands(res){
       }else if(S.zone==='ld'){
         leadOwner=key; S.tutDeg=undefined;   // приоритет последней ноты; S.tutDeg сброшен — свежий щипок переизвестит обучение о ноте
       }else if(S.zone==='bs'){
-        bassOwner=key;                       // бас моно — рулит последняя рука
+        bassOwner=key; S.tutBass=undefined;  // бас моно — рулит последняя рука; S.tutBass сброшен — свежий щипок переизвестит обучение о басовой ноте
       }else if(S.zone==='ch'){
         S.fresh=true;                        // решение о защёлке примем этот кадр, когда посчитаем ступень
       }else if(S.zone==='dr'){
@@ -508,7 +508,9 @@ function processHands(res){
             if(S.deg!==S.tutDeg){ S.tutDeg=S.deg; tutorTap('note',{deg:S.deg}); }
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
-          if(bassOwner===key)WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из bassOctReg; 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
+          if(bassOwner===key){ WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из bassOctReg; 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
+            // ЗАЦЕПКА ОБУЧЕНИЯ: бас зазвучал/сменил ступень (тот же вызов, что дал звук) — урок «Лупер» (слой ДРУГОЙ ролью поверх соло: соло-моно на себя не слоится).
+            if(S.deg!==S.tutBass){ S.tutBass=S.deg; tutorTap('bass',{deg:S.deg}); } }
 
         }else if(S.zone==='dr'){                            // ударные: один удар на щипок (по ряду)
           if(S.fresh){ S.fresh=false; WdrumHit(S.deg,S.vol); }

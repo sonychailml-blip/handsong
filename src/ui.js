@@ -137,8 +137,8 @@ function updRecBtn(){
   loopBarsV.textContent = loop.bars;
 }
 function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' : 'transport.loopPlay'); }   // текст кнопки лупа по состоянию (для смены языка и hooks.loop)
-hooks.rec       = () => updRecBtn();
-hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); refreshMetreCtl(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет)
+hooks.rec       = () => { updRecBtn(); syncTutorBarPos(); };   // запись вкл/выкл → коробка лупера появляется/меняется → переставить подсказку тура
+hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет) И положение подсказки (коробка появилась/ушла)
 
 /* Две панели (звукоряд и лупер) — оба оверлея на ОДНОМ месте (сверху). Одна за раз: открытие одной
    прячет другую (иначе перекрылись бы). Лупер РАНЬШЕ жил снизу, чтобы холстовая сетка тактов
@@ -146,15 +146,20 @@ hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updR
    закрытия панели. */
 function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.classList.toggle('on',on);
   if(on){ panelScaleEl.classList.remove('on'); refreshMetreCtl(); }   // при открытии — актуализируем блокировку размера (петля могла измениться при закрытой панели)
+  if(on && hooks.tutor) hooks.tutor('panel',{which:'loop'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли панель лупера — урок «Лупер»
   syncTutorBarPos(); }
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false);
   if(on && hooks.tutor) hooks.tutor('panel',{which:'scale'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли меню лада — урок «Строи и тембры»
   syncTutorBarPos(); }
-/* Подсказка тура (#tutorBar) при ОТКРЫТОЙ панели уезжает ВНИЗ (класс .low — CSS-сдвиг transform), иначе
-   панель (top:52, z 14/15) накрыла бы инструкцию ровно тогда, когда её надо читать (шаг «открой меню»).
-   Сигнал — panelOpen() (та же панель-стейт, что и у авто-сворачивания бара; новой правды не заводим).
-   Вне тура бар display:none — класс безвреден. Обе панели учтены (лупер-урок наткнётся на то же). */
-function syncTutorBarPos(){ const el=$('tutorBar'); if(el) el.classList.toggle('low', panelOpen()); }
+/* Подсказка тура (#tutorBar) уезжает ВНИЗ (класс .low — CSS-сдвиг transform), когда сверху ЕЁ БЫ НАКРЫЛО:
+   (1) ОТКРЫТАЯ панель (top:52, z 14/15) — иначе накрыла бы инструкцию ровно тогда, когда её читают;
+   (2) ХОЛСТОВАЯ КОРОБКА ЛУПЕРА (drawLooper, y≈64, ТРЕТИЙ элемент, не панель) — рисуется при записи И при
+   играющей/непустой петле, ровно под подсказкой. Условие коробки = drawLooper (loop.on || events.length);
+   конфликт есть и ВНЕ тура (любой урок с играющей петлёй), поэтому гоним по РЕАЛЬНОМУ состоянию лупера, а
+   не по шагу урока. syncTutorBarPos зовут showScale/showLoop (панель) И hooks.rec/hooks.loop (состояние
+   лупера сменилось). Вне тура бар display:none — класс безвреден. */
+const loopBoxShown=()=> loop.on || events.length>0;
+function syncTutorBarPos(){ const el=$('tutorBar'); if(el) el.classList.toggle('low', panelOpen()||loopBoxShown()); }
 $('panelClose').onclick=()=>showScale(false);
 $('panelCloseLoop').onclick=()=>showLoop(false);   // «Свернуть ✕» лупера — тот же путь закрытия, что и у ⚙/взаимоисключения
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
@@ -205,8 +210,13 @@ addEventListener('pointermove', e=>{
 export function tutorReset(){   // тур учит SINGLE-ROLE соло: гасим сплит и ставим роль «Соло», чтобы модель совпала с экраном
   if(splitOn) setSplitOn(false);
   setPhoneInstr('ld'); softAllOff();
+  tutorClearLoop();             // каждый урок начинается с ЧИСТОЙ петли: иначе джем/петля из «Лупера» продолжали бы играть в следующем уроке цепочки
   applySplit(); applyInstr();
 }
+/* Сброс петли/джема для урока (та же связка, что у кнопки ✕): очистить записанное и вернуть индикатор
+   джема в покой. Зовётся из tutorReset (чистый старт любого урока) и из шага «джем» урока «Лупер»
+   (джем встаёт на пустую петлю → любой вариант принимается независимо от размера/лада). */
+export function tutorClearLoop(){ clearRec(); resetJamDisplay(); }
 /* Урок задаёт стартовый лад (Аккорды → Хроматика: у неё полная палитра типов аккордов). Ставим ТЕМ ЖЕ
    путём, что selScale.onchange, плюс синхроним выпадашки традиции/лада, чтобы панель показывала выбранный
    лад (не «украли настройку молча»). Лад по окончании урока НЕ восстанавливаем — человек только что учил
