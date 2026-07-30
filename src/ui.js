@@ -211,6 +211,7 @@ export function tutorReset(){   // тур учит SINGLE-ROLE соло: гас�
   if(splitOn) setSplitOn(false);
   setPhoneInstr('ld'); softAllOff();
   tutorClearLoop();             // каждый урок начинается с ЧИСТОЙ петли: иначе джем/петля из «Лупера» продолжали бы играть в следующем уроке цепочки
+  setHandFn('ld','L','fx'); setHandFn('ld','R','note');   // ЧИСТАЯ база соло-рук (дефолт): «Функции рук» и «Две роли» меняют ld — без сброса «Основы» после них нашли бы левую руку не на эффектах (шаг эффектов бы не сработал)
   applySplit(); applyInstr();
 }
 /* Сброс петли/джема для урока (та же связка, что у кнопки ✕): очистить записанное и вернуть индикатор
@@ -360,8 +361,10 @@ function renderHandFn(){
     }
   }
 }
-/* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема. */
-const canSplit=()=>innerWidth>innerHeight;
+/* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема.
+   ЭКСПОРТ: урок «Две роли» гейтит шаг ориентации ТЕМ ЖЕ предикатом, что и кнопка ◨ — лад и кнопка
+   не разойдутся (правило задачи). */
+export const canSplit=()=>innerWidth>innerHeight;
 /* ◨ Сплит-экран — только в ландшафте (canSplit). .act — включён. Кнопка-тумблер; выбор пары ролей —
    двумя кнопками половин (instrBtnL/R). */
 function applySplit(){
@@ -392,11 +395,25 @@ function cycleHalf(i){
   let r=SPLIT_ROLES[i];
   do{ r=INSTR_SEQ[(INSTR_SEQ.indexOf(r)+1)%INSTR_SEQ.length]; }while(r===other);
   setSplitRole(i,r); softAllOff(); applySplitRoles();
+  if(hooks.tutor) hooks.tutor('splitRole',{half:i, role:r});   // ЗАЦЕПКА ОБУЧЕНИЯ: сменилась роль половины (кнопка половины) — урок «Две роли»
+}
+/* Урок «Две роли» задаёт известную стартовую пару половин СОЛО|АККОРДЫ: игра в обеих половинах даёт
+   настоящую музыку (мелодия над гармонией), а не две голые линии. Аккорды звучат, т.к. setup урока СНАЧАЛА
+   переключает на Хроматику (см. LESSONS: tutorSetScale ПЕРЕД tutorSplitInit). СТРАХОВКА: если у текущего
+   лада аккордов нет (supportsChords false — напр. смена лада не удалась), правая половина падает на БАС,
+   а не на молчащую роль. Обе соло-руки на «ноты», чтобы «любая рука в половине» была БУКВАЛЬНО верна: по
+   умолчанию левая в соло-половине = эффекты (fx-исключение) и ноту бы не дала. Зовётся из setup урока
+   (сплит ещё выключен → кнопки половин скрыты). */
+export function tutorSplitInit(){
+  setHandFn('ld','L','note'); setHandFn('ld','R','note');
+  const right = supportsChords() ? 'ch' : 'bs';   // соло|аккорды, но на бесаккордовом ладу — бас (звучащая роль, не тишина)
+  setSplitRole(0,'ld'); setSplitRole(1,right); applySplit();
 }
 instrBtn.onclick =()=>{ setPhoneInstr(INSTR_SEQ[(INSTR_SEQ.indexOf(phoneInstr)+1)%INSTR_SEQ.length]); softAllOff(); applyInstr(); };
 instrBtnL.onclick=()=>cycleHalf(0);
 instrBtnR.onclick=()=>cycleHalf(1);
-splitBtn.onclick =()=>{ setSplitOn(!splitOn); softAllOff(); applySplit(); };
+splitBtn.onclick =()=>{ setSplitOn(!splitOn); softAllOff(); applySplit();
+  if(hooks.tutor) hooks.tutor('split',{on:splitOn}); };   // ЗАЦЕПКА ОБУЧЕНИЯ: сплит включён/выключен кнопкой ◨ — урок «Две роли»
 /* 🔄 Переключение камеры (фронт↔тыл). Уже ПОСЛЕ старта: кнопка живёт в #bar, а он виден лишь после
    «▶ Запустить» — камеру на загрузке не трогаем. Запрашиваем ДРУГУЮ facingMode; camFacing (единый
    источник зеркала flipX/mirrored) двигаем ТОЛЬКО после успеха, чтобы картинка и hit-test флипнулись
@@ -594,6 +611,7 @@ applyJam();                                       // старт: выкл
 function onResize(){
   if(splitOn && !canSplit()){ setSplitOn(false); softAllOff(); }
   applySplit();
+  if(hooks.tutor) hooks.tutor('orient',{landscape:canSplit()});   // ЗАЦЕПКА ОБУЧЕНИЯ: ориентация сменилась (портрет↔ландшафт) — урок «Две роли» (шаг ориентации + возврат при повороте в портрет)
 }
 addEventListener('resize', onResize);
 applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHandFn; applyInstr → renderHandFn (инициализация кнопок ролей и секции «Функции рук»)

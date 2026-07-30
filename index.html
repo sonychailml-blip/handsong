@@ -102,8 +102,12 @@
      src/tutor.js (динамически, поэтому без data-i18n). Next доступен всегда, Skip оставляет играть. -->
 <div id="tutorBar">
   <div id="tutorText"></div>
+  <!-- Вторая, ТИХАЯ строка: камера-нота (нет руки в кадре) ДОБАВЛЯЕТСЯ рядом с инструкцией, не заменяя её. -->
+  <div id="tutorAside"></div>
   <div id="tutorBottom">
     <span id="tutorDots"></span>
+    <!-- Тик выполненного шага: шаг сделан → подсветка Next + этот ✓; авто-перехода нет, человек жмёт сам. -->
+    <span id="tutorDone"></span>
     <button id="tutorNext"></button>
     <button id="tutorSkip"></button>
   </div>

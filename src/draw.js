@@ -1,5 +1,5 @@
 import { ctx, canvas, video } from './vision.js';
-import { HANDS, leadOwner, degRaw, handRole } from './gestures.js';
+import { HANDS, leadOwner, degRaw } from './gestures.js';
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
 import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
@@ -523,9 +523,10 @@ function drawHandsPhone(res,W,H,playH){
     }
     // рука нот
     if(isCh&&!supportsChords())continue;         // макам: аккордов нет — ни круга, ни ярлыка, ни подсказки
-    // рука-палитра нот не играет — не рисуем ей подсказку ряда. Вне сплита это ЛЕВАЯ рука (handRole,
-    // фиксировано — swap убран); при сплите — по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указ. слева).
-    if(isCh&&typedChords()&&(splitOn ? (S.pinch?S.zone==='chFam':sx(lm[8].x,W)<split) : handRole(k)==='fx'))continue;
+    // рука-палитра нот не играет — не рисуем ей подсказку ряда. Признак ОДИН на оба пути (single-role и
+    // сплит): по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указательный слева от раздела). Привязки
+    // к руке больше нет нигде — ни здесь, ни в hit-test (см. famHand в gestures).
+    if(isCh&&typedChords()&&(S.pinch?S.zone==='chFam':sx(lm[8].x,W)<split))continue;
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();

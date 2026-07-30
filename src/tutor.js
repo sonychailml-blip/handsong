@@ -16,7 +16,7 @@
 import { hooks } from './hooks.js';
 import { t, onLangChange, store } from './i18n.js';
 import { SCALES, supportsChords, typedChords } from './scales.js';
-import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop } from './ui.js';
+import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop, canSplit, tutorSplitInit } from './ui.js';
 
 /* Хроматика (12-TET) — единственный лад с ПОЛНОЙ палитрой типов аккордов (typedChords:'chrom12'),
    при этом с привычными аккордами. Урок «Аккорды» стартует на ней, иначе шаг палитры молча выпал бы
@@ -25,8 +25,10 @@ import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLo
 const CHROMATIC_IDX=SCALES.findIndex(s=>s.typedChords==='chrom12');
 
 const TIMEOUT=15000;    // мс до подробной подсказки
-const HOLD=900;         // мс «услышать сделанное» перед автопереходом
 const SEEN_FRESH=1500;  // мс: heartbeat свежее этого = рука в кадре
+/* HOLD (авто-переход через 0.9с после выполнения) УДАЛЁН: шаг больше не прыгает сам — выполнение лишь
+   подсвечивает Next + ставит тик, человек жмёт Дальше, когда дочитал. Единственное, что делал HOLD, был
+   этот автопрыжок, поэтому таймер (advTimer) убран целиком. */
 const MOVE_SPAN=3;      // ступеней размаха для шага «двигайте руку»
 
 /* ШАГИ УРОКА «Основы» — данные. Ключ → строки 'tutor.<key>.prompt' / '.detail'. enter(acc) — обнулить
@@ -112,6 +114,27 @@ const HANDFN_STEPS=[
   {key:'hfFinal',  final:true},                                                                                      // финал: здесь ты ВЫБИРАЕШЬ работу каждой руке
 ];
 
+/* ШАГИ УРОКА «Две роли сразу» (сплит) — ПОСЛЕДНИЙ в цепочке. Сплит живёт ТОЛЬКО в ландшафте (canSplit),
+   что задаёт весь урок: шаг 0 — ориентация (ждёт поворот; на широком десктопе уже ландшафт → skipIfDone
+   мгновенно пропускает). Событий-зацепок (ui/gestures): 'orient' {landscape} (поворот), 'split' {on}
+   (кнопка ◨), 'splitRole' {half,role} (кнопка половины), note/chord/bass несут {half} (в какой половине).
+   Setup: лад Хроматика (аккорды звучат) + пара половин СОЛО|АККОРДЫ (игра в обеих = музыка: мелодия над
+   гармонией; бесаккордовый лад → правая половина бас, страховка в tutorSplitInit), сплит ВЫКЛючен (включат
+   на шаге 1). ПРАВИЛО: половина решает инструмент, не рука. ПОВОРОТ В ПОРТРЕТ середины урока → сплит сам
+   выключается (ui.onResize) → onEvent возвращает на шаг 0 (иначе застряли бы на шаге про исчезнувший сплит).
+   Роли пары ВСЕГДА разные (cycleHalf пропускает роль другой половины) — на этом держится шаг ролей. */
+const SPLIT_STEPS=[
+  {key:'spOrient', skipIfDone:true, done:a=>canSplit()},                                              // ландшафт нужен: ждём поворот; уже широко (десктоп) → пропуск
+  {key:'spOn',     reveal:true, enter:a=>{a.splitTurnedOn=false;}, done:a=>a.splitTurnedOn},          // ◨ включить сплит — экран делится надвое
+  {key:'spHalves', enter:a=>{a.half0=false; a.half1=false;}, done:a=>a.half0 && a.half1},             // сыграть в КАЖДОЙ половине (соло-нота + аккорд); место решает инструмент, не рука
+  /* Урок СТАРТУЕТ уже в соло|аккорды (шаг spHalves играет музыку), поэтому «выставить аккорды+соло» стало
+     бы no-op. Действие шага — СМЕНИТЬ половину кнопкой (на Бас/Ударные): done по факту смены (cycleHalf →
+     'splitRole'). Не требуем вернуть исходную пару: цикл назад к ch+ld через пропуск-роли — 3 нажатия,
+     мучительно; смена роли и наблюдение «пропускает роль другой половины» уже несут суть шага. */
+  {key:'spRoles',  reveal:true, enter:a=>{a.splitRoleChanged=false;}, done:a=>a.splitRoleChanged},    // кнопкой половины сменить её роль (пара не может совпасть — cycleHalf пропускает роль другой)
+  {key:'spFinal',  final:true},                                                                       // финал: функции рук — по роли половины; поворот в портрет гасит сплит сам
+];
+
 /* СПИСОК УРОКОВ. steps:null → «Скоро» (виден, но не запускается). Наполняем по одному в следующих
    заходах. Порядок = порядок в меню. titleKey/descKey — ключи словаря (en+ru). Поле `next` — id
    следующего урока в ЦЕПОЧКЕ (финал предлагает «Дальше: <урок>», не прыгает сам): это ДАННЫЕ, не
@@ -123,21 +146,22 @@ const LESSONS=[
    setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); }},   // старт на Хроматике — шаг палитры появляется у всех (объявлено в chSwitch.prompt)
   {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:TUNINGS_STEPS, next:'looper'},   // цепочка: «Аккорды»→сюда→«Лупер»
   {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:LOOPER_STEPS, next:'handfn'},   // чистый старт — tutorReset (clearRec); ведёт дальше к «Функциям рук»
-  {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:HANDFN_STEPS,
-   setup:tutorResetHandFn},   // старт с известной базы (левая=эффекты, правая=ноты); свой next появится, когда выйдет «Сплит»
-  {id:'split',   titleKey:'lesson.split.title',   descKey:'lesson.split.desc',   steps:null},
+  {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:HANDFN_STEPS, next:'split',
+   setup:tutorResetHandFn},   // старт с известной базы (левая=эффекты, правая=ноты); ведёт дальше к «Двум ролям»
+  {id:'split',   titleKey:'lesson.split.title',   descKey:'lesson.split.desc',   steps:SPLIT_STEPS,   // ПОСЛЕДНИЙ урок цепочки (без next → финал «Готово — играть»)
+   setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); tutorSplitInit(); }},   // ПОРЯДОК ВАЖЕН: Хроматика СНАЧАЛА (аккорды доступны), потом пара половин соло|аккорды; сплит выключен из tutorReset
 ];
 const lessonKey=id=>'handsong.lesson.'+id;
 const lessonDone=id=>store.get(lessonKey(id))==='1';
 
-let active=false, steps=[], idx=0, acc=null, detailShown=false, completing=false, lastSeenAt=0;
-let detailTimer=0, advTimer=0, curLesson=null;
+let active=false, steps=[], idx=0, acc=null, detailShown=false, completing=false, stepDone=false, lastSeenAt=0;   // stepDone — шаг выполнен (тик+свечение Next), но НЕ перешли: ждём нажатия
+let detailTimer=0, curLesson=null;
 /* starter() — «поднять приложение» (main.js передаёт startApp через wireStarter). Возвращает Promise<bool>.
    Так tutor не зависит от main напрямую (без цикла) и правило #1 цело: старт зовётся в клике выбора. */
 let starter=async()=>false;
 export function wireStarter(fn){ starter=fn; }
 
-const bar=$('tutorBar'), textEl=$('tutorText'), dotsEl=$('tutorDots'),
+const bar=$('tutorBar'), textEl=$('tutorText'), asideEl=$('tutorAside'), doneEl=$('tutorDone'), dotsEl=$('tutorDots'),
       nextBtn=$('tutorNext'), skipBtn=$('tutorSkip'), scaleBtn=$('scaleBtn');
 const lessonOv=$('lessonOv'), lessonTitle=$('lessonTitle'), lessonRows=$('lessonRows'),
       lessonClose=$('lessonClose'), lessonFree=$('lessonFree');
@@ -175,7 +199,8 @@ function freshAcc(){ return {noteFired:false, sMin:null, sMax:null, lastLdFinger
   chordLatched:false, chDeg0:null, chChanged:false, typePicked:false,
   panelOpened:false, lastScaleTrad:null, timbreChanged:false,
   hfHold:false, hfTherm:false, hfExpr:false, exprMoved:false,
-  loopClosed:false, overdubbed:false, undone:false, jammed:false, loopPanelOpened:false, bassPlayed:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук»/«Лупер» (прочие уроки их не читают — безвредны)
+  loopClosed:false, overdubbed:false, undone:false, jammed:false, loopPanelOpened:false, bassPlayed:false,
+  splitTurnedOn:false, half0:false, half1:false, splitRoleChanged:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук»/«Лупер»/«Две роли» (прочие уроки их не читают — безвредны)
 /* Накопитель обновляем ГЕНЕРИЧНО по каждому событию — предикаты done остаются ЧИСТЫМИ (только читают). */
 function apply(kind,p){
   if(kind==='pinch'){ if(p.zone==='ld'){ if(acc.lastLdFinger!=null && p.finger!==acc.lastLdFinger) acc.fingerChanged=true; acc.lastLdFinger=p.finger; } }
@@ -200,30 +225,49 @@ function apply(kind,p){
     if(p.hand==='R' && p.fn==='hold')acc.hfHold=true;
     else if(p.hand==='R' && p.fn==='therm')acc.hfTherm=true;
     else if(p.hand==='L' && p.fn==='expr')acc.hfExpr=true; } }
+  else if(kind==='split'){ if(p.on) acc.splitTurnedOn=true; }        // сплит включён кнопкой ◨ (шаг spOn)
+  else if(kind==='splitRole'){ acc.splitRoleChanged=true; }          // сменилась роль половины кнопкой (шаг spRoles: done по факту смены)
   else if(kind==='exprMove'){ acc.exprMoved=true; }        // рука-выразительность задвигалась (шаг hfExpr)
   else if(kind==='role'){ acc.role=p.role; }
+  // ПОЛОВИНА сплита — ОТДЕЛЬНЫМ if ПОСЛЕ всей цепочки (note/chord/bass уже отметили свой флаг выше): note/chord/bass
+  // несут p.half (0 лев/1 прав) при splitOn → «сыграно в этой половине» (шаг spHalves). 'orient' в накопитель НЕ пишет —
+  // его ловит onEvent (возврат на шаг ориентации), а done шага ориентации читает canSplit() напрямую.
+  if((kind==='note'||kind==='chord'||kind==='bass') && p && p.half!=null){ if(p.half===0)acc.half0=true; else acc.half1=true; }
 }
 /* Единая точка приёма (hooks.tutor). 'seen' — heartbeat (не действие шага). Прочее — обновить накопитель
    и проверить done текущего шага. Готово → complete() (услышать → перейти). */
 function onEvent(kind,p){
   if(!active) return;
   if(kind==='seen'){ lastSeenAt=performance.now(); return; }
+  /* ПОВОРОТ В ПОРТРЕТ середины сплит-урока: сплит сам выключился (ui.onResize) — субъект шага исчез, поэтому
+     возвращаемся на шаг ориентации (0), а не сидим на шаге про пропавший сплит. Только вперёд от шага 0. */
+  if(kind==='orient' && curLesson==='split' && !canSplit() && idx>0){ idx=0; enterStep(); return; }
   apply(kind,p);
   const st=steps[idx];
   if(!st.final && !completing && st.done && st.done(acc)) complete();
 }
 
 const recentlySeen=()=>performance.now()-lastSeenAt<SEEN_FRESH;
-/* Текст полосы: промпт; после таймаута — деталь, а если руки в кадре нет — про камеру. */
-function curText(){
+/* ГЛАВНАЯ строка — ВСЕГДА инструкция: промпт; после таймаута, ЕСЛИ рука в кадре, — деталь (полнее). Деталь
+   ЗАМЕНЯЕТ промпт (осознанный выбор: детали — развёрнутый пересказ того же действия, стопка «промпт+деталь»
+   была бы избыточной и высокой). Инструкция не пропадает НИКОГДА (в т.ч. когда руки нет — тогда главная = промпт). */
+function mainText(){
   const st=steps[idx];
-  if(st.final) return t('tutor.'+st.key+'.prompt');   // финал — по ключу шага (Основы: key='final' → 'tutor.final.prompt', как было; Аккорды: 'chHold')
-  if(detailShown) return recentlySeen() ? t('tutor.'+st.key+'.detail') : t('tutor.noHand');
-  return t('tutor.'+st.key+'.prompt');
+  if(st.final) return t('tutor.'+st.key+'.prompt');   // финал — по ключу шага (Основы: key='final' → 'tutor.final.prompt'; Аккорды: 'chHold')
+  return (detailShown && recentlySeen()) ? t('tutor.'+st.key+'.detail') : t('tutor.'+st.key+'.prompt');
+}
+/* ТИХАЯ вторая строка — камера-нота ДОБАВОЧНО (не заменяет инструкцию): только когда после таймаута руки
+   в кадре нет и шаг ещё не выполнен. Иначе пусто. */
+function asideText(){
+  const st=steps[idx];
+  if(st.final || stepDone) return '';
+  return (detailShown && !recentlySeen()) ? t('tutor.noHand') : '';
 }
 function paint(){
   if(active){
-    textEl.textContent=curText();
+    textEl.textContent=mainText();
+    asideEl.textContent=asideText();
+    asideEl.style.display = asideEl.textContent ? '' : 'none';
     dotsEl.textContent=steps.map((_,i)=>i<=idx?'●':'○').join(' ');
     /* Финал — карточка ВЫБОРА (не автопрыжок): главная кнопка «Дальше: <урок>» (если в цепочке есть
        следующий запускаемый урок), иначе «Готово — играть»; тихая — «Готово — играть» (скрыта, когда
@@ -232,6 +276,11 @@ function paint(){
     nextBtn.textContent = fin ? (nx ? t('tutor.nextLesson',{title:t(nx.titleKey)}) : t('tutor.donePlay')) : t('tutor.next');
     skipBtn.textContent = fin ? t('tutor.donePlay') : t('tutor.skip');
     skipBtn.style.display = (fin && !nx) ? 'none' : '';
+    /* Шаг выполнен → подсветить Next (класс .ready — свечение) + показать тик ✓; НЕ финал. Авто-перехода нет. */
+    const show = stepDone && !fin;
+    nextBtn.classList.toggle('ready', show);
+    doneEl.textContent = show ? '✓' : '';
+    doneEl.style.display = show ? '' : 'none';
   }
   if(lessonOv.classList.contains('on')) renderLessons();   // список открыт (напр. смена языка) — перерисовать
 }
@@ -239,16 +288,22 @@ function showDetail(){ detailShown=true; paint(); }
 function enterStep(){
   const st=steps[idx];
   if(st.enter) st.enter(acc);
-  detailShown=false; completing=false;
-  clearTimeout(detailTimer); clearTimeout(advTimer);
+  /* Шаг с skipIfDone, чьё условие УЖЕ выполнено на входе (напр. ориентация: уже ландшафт на широком
+     десктопе) → мгновенно дальше, без показа. Только по флагу — прочие шаги (флаг сброшен в enter) не
+     проскочат. Рекурсия на один уровень (следующий шаг skipIfDone не имеет). */
+  if(!st.final && st.skipIfDone && st.done && st.done(acc)){ advance(); return; }
+  detailShown=false; completing=false; stepDone=false;   // новый шаг: тик/свечение сняты, эскалация детали заново
+  clearTimeout(detailTimer);
   if(!st.final) detailTimer=setTimeout(showDetail, TIMEOUT);
   if(st.final){ revealBar(); if(scaleBtn) scaleBtn.classList.add('tutorPoint'); }   // финал: показать бар и подсветить кнопку лада (ничего не открываем)
   else if(st.reveal) revealBar();                                                  // шаг с кнопкой в баре (Аккорды chSwitch — «нажми роль») — бар должен быть виден
   paint();
 }
-function complete(){ completing=true; clearTimeout(detailTimer); advTimer=setTimeout(advance, HOLD); }
+/* Шаг ВЫПОЛНЕН: НЕ переходим сами (убран autoadvance). Гасим эскалацию детали, помечаем stepDone → paint
+   подсвечивает Next и ставит тик. completing=true не даёт повторно «выполнить» тот же шаг. Дальше — по нажатию. */
+function complete(){ completing=true; stepDone=true; clearTimeout(detailTimer); paint(); }
 function advance(){
-  clearTimeout(detailTimer); clearTimeout(advTimer);
+  clearTimeout(detailTimer);
   idx++;
   if(idx>=steps.length){ exitToList(true); return; }   // прошли все шаги (не должно случаться — final без done) → как выполнено, к списку
   enterStep();
@@ -270,7 +325,7 @@ function startLesson(L){
    урок), поэтому сам teardown никуда не ведёт. */
 function teardown(completed){
   active=false; hooks.tutor=null;
-  clearTimeout(detailTimer); clearTimeout(advTimer);
+  clearTimeout(detailTimer);
   bar.classList.remove('on');
   if(scaleBtn) scaleBtn.classList.remove('tutorPoint');
   if(completed && curLesson) store.set(lessonKey(curLesson),'1');

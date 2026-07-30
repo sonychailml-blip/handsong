@@ -168,11 +168,18 @@
   #tutorBar.low{ z-index:16; transform:translateY(calc(100vh - 100% - 64px)); }
   #tutorBar.low{ transform:translateY(calc(100dvh - 100% - 64px)); }
   #tutorText{font-size:17px; line-height:1.45;}   /* было var(--fs-ctl)=14px — подсказку читают в игре, подняли до 17 */
+  /* Камера-нота: ВТОРАЯ, тише инструкции строка (меньше, приглушённый цвет). Пусто → скрыта (JS ставит display). */
+  #tutorAside{font-size:14px; line-height:1.4; color:var(--dim); margin-top:6px;}
   #tutorBottom{display:flex; align-items:center; gap:10px; margin-top:11px;}
   #tutorDots{flex:1; min-width:0; letter-spacing:3px; font-size:12px; color:var(--dim);}
+  /* Тик подтверждения выполненного шага — зелёный, рядом с Next. Пусто/не выполнено → скрыт (JS ставит display). */
+  #tutorDone{flex:0 0 auto; color:#57d9a3; font-weight:700; font-size:16px;}
   /* Next — главная (акцент-заливка, тёмный текст, как «Играть»); Skip — тихая ссылка. */
   #tutorNext{flex:0 0 auto; background:var(--accent); color:#3a2600; border:none; font-weight:700;
     border-radius:var(--r-sm); padding:8px 14px; font-size:var(--fs-ctl);}
+  /* Шаг выполнен → мягкое акцент-свечение Next: «сделано, жми Дальше». АВТО-перехода нет — только подсказка глазу. */
+  #tutorNext.ready{animation:tutorReady 1.15s ease-in-out infinite;}
+  @keyframes tutorReady{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,158,44,.6); } 50%{ box-shadow:0 0 0 7px rgba(255,158,44,0); } }
   #tutorSkip{flex:0 0 auto; background:transparent; color:var(--dim); border:none;
     font-size:var(--fs-ctl); text-decoration:underline; padding:8px 6px;}
   /* Финал тура: мягкий пульс акцентом на кнопке лада — указываем, НИЧЕГО не открывая. */
