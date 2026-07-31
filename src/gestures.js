@@ -272,7 +272,7 @@ function endPinch(key,S){
       setLooperClear(-1); setLooperMsg({text:t('msg.clearCancelled'), until:performance.now()+LOOPER_MSG_MS, ok:true});
     }
   }
-  S.pinch=false; S.adj=null; S.deg=-1; S.rect=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры
+  S.pinch=false; S.adj=null; S.deg=-1; S.rect=null; S.ty=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры; S.ty — замороженный на атаке тип аккорда
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
   S.clearT0=null; S.clearFired=false;           // отсчёт очистки лупера — сброс на размыкании
 }
@@ -289,7 +289,7 @@ function processHands(res){
     let key=(heads[i]&&heads[i][0]&&heads[i][0].categoryName)||('H'+i);
     if(seen.has(key))key+=i;
     seen.add(key);
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,clearT0:null,clearFired:false});
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,ty:null,clearT0:null,clearFired:false});
     S.seen=now; S.lm=lm;
     /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
        palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
@@ -305,6 +305,7 @@ function processHands(res){
       S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
+      S.ty=null;                             // ЗАМОРОЖЕННЫЙ тип аккорда — берётся на атаке (ниже), новый щипок начинает с чистого листа
       S.clearT0=null; S.clearFired=false;    // отсчёт очистки лупера — свежий на каждый щипок (мизинец заведёт ниже)
       {
         const py=sy((lm[4].y+lm[mf].y)/2,H);       // экранные пиксели игрового поля (поля кадра сняты); гест-математику щипка выше это не касается — там сырые lm
@@ -474,8 +475,8 @@ function processHands(res){
              куда угодно, нота держится (смена пальца октаву не двигает — гейт выше). Громкость (X) ниже
              — ЖИВАЯ (свелл). Стоп — только размыканием пальцев (endPinch). deg берётся на первом кадре
              ветками ниже (тогда S.deg==-1), дальше сюда — и больше не пересчитывается. ОДИН механизм
-             для соло/баса И аккордов: у аккорда S.deg — это КОРЕНЬ, значит замерзают корень+октава, а
-             тип по-прежнему из палитры (другая рука), громкость свеллит — ровно как задумано «заморожен». */
+             для соло/баса И аккордов: у аккорда S.deg — это КОРЕНЬ, значит замерзают корень+октава, тип
+             тоже заморожен на атаке (S.ty, ниже), громкость свеллит — ровно как задумано «заморожен». */
         }else if(rectPlay){
           S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
           const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
@@ -493,7 +494,8 @@ function processHands(res){
         /* Тип берётся из ЛИПКОГО выбора палитры (любой рукой, по положению), а не из положения играющей.
            Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
            ty===latchTy, и заморозка a.ty в событии лупера. Кламп: у семейств может быть
-           разное число вариантов, и chordVar мог остаться от более длинного. */
+           разное число вариантов, и chordVar мог остаться от более длинного.
+           ЭТО — тип для СЛЕДУЮЩЕЙ атаки. Звучащий аккорд ведётся по ЗАМОРОЖЕННОМУ S.ty (см. ниже). */
         let ty=null;
         if(typed){
           const FS=chordFams(), fam=FS[chordFam]||FS[0];
@@ -537,9 +539,11 @@ function processHands(res){
             S.fresh=false;                        // решение принимается один раз за щипок
             if(hold){
               /* УДЕРЖАНИЕ: каждый щипок — НОВАЯ атака; корень/октава уже заморожены гейтом holdOn выше
-                 (S.deg застыл с первого кадра), тип — из палитры (другая рука). Тумблера «тот же аккорд →
-                 выкл» тут НЕТ: выключение — это размыкание пальцев (endPinch зовёт WchOff). */
+                 (S.deg застыл с первого кадра), тип берётся из палитры ЗДЕСЬ, на атаке, и тоже морозится
+                 (S.ty ниже). Тумблера «тот же аккорд → выкл» тут НЕТ: выключение — это размыкание пальцев
+                 (endPinch зовёт WchOff). */
               WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
+              S.ty=ty;                                // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
               latchLen=ty?ty.length:0;
               setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;
               tutorTap('chord',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, удержание); half — половина сплита (урок «Две роли»)
@@ -557,6 +561,7 @@ function processHands(res){
                    до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
                 if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
                 else WchSet('latch',S.deg,chOct,S.vol,ty,bd);          // та же плотность → глиссандо без переатаки
+                S.ty=ty;                              // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
                 latchLen=ty?ty.length:0;
                 setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший
                 tutorTap('chord',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, защёлка); half — половина сплита (урок «Две роли»)
@@ -565,10 +570,17 @@ function processHands(res){
           }else if(chOwner===key&&latchDeg>=0){
             /* Ведение КАЖДЫЙ кадр (~60/с) → живой звук яркости плавный через chordGlide; запись прорежена
                мёртвой зоной в recChSet. В защёлке корень следует за рукой (Y); в удержании S.deg заморожен
-               гейтом выше → корень СТОИТ, меняется лишь громкость (свелл) и яркость (Z). */
-            if(ty&&ty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd); latchLen=ty.length; }
-            else WchSet('latch',S.deg,chOct,S.vol,ty,bd);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
-            setLatchDeg(S.deg); setLatchTy(ty);          // тип ведём вместе со ступенью — иначе сравнение протухнет
+               гейтом выше → корень СТОИТ, меняется лишь громкость (свелл) и яркость (Z).
+               ТИП — ЗАМОРОЖЕННЫЙ S.ty (взят на атаке), а НЕ живой ty из палитры: аккорд выбран в момент
+               смыкания пальцев и держит свой тип до размыкания. Иначе смена ячейки палитры ДРУГОЙ рукой
+               перестраивала бы уже звучащий аккорд (chordGlide уводит частоты живых голосов, а при другом
+               числе нот была бы ещё и переатака). Новый тип вступает в силу со СЛЕДУЮЩЕЙ атаки — ровно как
+               событие лупера морозит a.ty, а слой — свой лад (sc). Корень при этом по-прежнему следует за
+               рукой: заморожен ТОЛЬКО тип. */
+            const dty=S.ty;
+            if(dty&&dty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,dty,bd); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
+            else WchSet('latch',S.deg,chOct,S.vol,dty,bd);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
+            setLatchDeg(S.deg); setLatchTy(dty);         // тип ведём вместе со ступенью — иначе сравнение протухнет
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }
