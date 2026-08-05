@@ -191,8 +191,8 @@
     transform:translateY(calc(100vh - 100% - 60px)); }
   #tutorBar.mini{ transform:translateY(calc(100dvh - 100% - 60px)); }
   #tutorBar.mini #tutorText{ flex:1; min-width:0; }                 /* инструкция забирает ширину, переносится строками сколько надо */
-  #tutorBar.mini #tutorBottom{ margin-top:0; flex:0 0 auto; pointer-events:auto; }   /* ряд кнопок в ту же строку; внутри виден только Next — и он НАЖИМАЕМ (своя pointer-events поверх сквозной строки) */
-  #tutorBar.mini.hushed #tutorBottom{ pointer-events:none; }         /* приглушено (палец в панели) → и Next сквозной: под пальцем ВСЯ строка пропускает касание (Next всё равно невидим — opacity:0) */
+  #tutorBar.mini #tutorBottom{ margin-top:0; flex:0 0 auto; pointer-events:none; }   /* ряд кнопок в ту же строку, ПО УМОЛЧАНИЮ СКВОЗНОЙ: тап по селекту под строкой (в т.ч. по стрелке справа, где сидит Next) уходит в ПАНЕЛЬ, не в Next — иначе случайный «Дальше» вместо смены функции руки */
+  #tutorBar.mini #tutorNext.ready{ pointer-events:auto; }            /* Next НАЖИМАЕМ только когда шаг ВЫПОЛНЕН (класс .ready — светится): ровно тогда его и жмут (открыл меню → Дальше). Мимо этого он касания НЕ перехватывает */
   #tutorBar.mini #tutorDetail,
   #tutorBar.mini #tutorAside,
   #tutorBar.mini #tutorDots,

@@ -175,9 +175,13 @@ function syncTutorBarPos(){
   el.classList.toggle('low', !panel && loopBoxShown());  // только коробка лупера (панели нет) → полную подсказку вниз
   if(!panel){ clearTimeout(stripReturnTimer); el.classList.remove('hushed'); }   // панель закрыта → подсказка ТОЧНО видима (снимаем «приглушение» и таймер возврата)
 }
-/* Реюз паттерна авто-скрытия #bar, только «наоборот»: активность ПРЯЧЕТ, покой ВОЗВРАЩАЕТ. Касание внутри
-   открытой панели (pointerdown) → hushStrip сразу; палец ушёл (pointerup) → armStripReturn ставит возврат
-   через паузу; новое касание → hushStrip снова гасит таймер (пауза заново, без мигания при прокрутке). */
+/* Реюз паттерна авто-скрытия #bar, только «наоборот»: активность ПРЯЧЕТ, покой ВОЗВРАЩАЕТ.
+   ГЛАВНЫЙ сигнал — ФОКУС контрола панели (focusin/focusout), а НЕ pointerdown/up: у <select> нативный пикер
+   съедает pointerup (подсказка возвращалась и снова накрывала селект — «не прячется»), а фокус приходит на
+   селект надёжно и ДЕРЖИТСЯ, пока открыт пикер, поэтому пока контрол в фокусе — подсказка спрятана. pointerdown
+   в панели тоже прячет (скролл/тап по кнопке/подписи, что не берут фокус). Возврат: focusout контрола ИЛИ
+   pointerup, НО только когда в панели НИЧЕГО не в фокусе (иначе пикер ещё открыт — не возвращаем раньше времени).
+   Новое касание/фокус → hush снова гасит таймер (пауза заново, без мигания между селектами/штрихами). */
 function inOpenPanel(t){ return !!(t && t.closest && t.closest('#panelScale.on, #panelLoop.on')); }
 function hushStrip(){ const el=$('tutorBar'); if(!el)return; clearTimeout(stripReturnTimer); el.classList.add('hushed'); }
 function armStripReturn(){ clearTimeout(stripReturnTimer); stripReturnTimer=setTimeout(()=>{ const el=$('tutorBar'); if(el)el.classList.remove('hushed'); }, STRIP_RETURN_MS); }
@@ -216,17 +220,22 @@ function revealBar(){ barEl.classList.remove('min'); armBarHide(); }   // пок
    пальца во вторую строку → click промахивался мимо неё; «нажать» и делало кнопку недостижимой. downOnBar
    держим весь жест (и в pointermove), чтобы дрожание пальца по кнопке тоже не раскрыло. Тап МИМО бара (по
    холсту) раскрывает как прежде — авто-скрытие/раскрытие для не-барных касаний не меняется. */
+const focusInPanel=()=>inOpenPanel(document.activeElement);   // сейчас в фокусе контрол открытой панели? (нативный пикер держит фокус на <select>)
 addEventListener('pointerdown', e=>{ pointerDown=true;
   downOnBar = !!(e.target && e.target.closest && e.target.closest('#bar button'));
   if(!downOnBar) revealBar();
   if(inOpenPanel(e.target)) hushStrip();          // касание ВНУТРИ открытой панели → подсказку прячем сразу (под пальцем ничего не должно быть накрыто)
 });
 addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide();
-  if(panelOpen()) armStripReturn();               // палец ушёл, панель ещё открыта → вернуть подсказку через паузу
+  if(panelOpen() && !focusInPanel()) armStripReturn();   // палец ушёл; но если контрол панели в фокусе (пикер открыт) — НЕ возвращаем, ждём focusout
 });
 addEventListener('pointercancel',()=>{ pointerDown=false; downOnBar=false; armBarHide();
-  if(panelOpen()) armStripReturn();
+  if(panelOpen() && !focusInPanel()) armStripReturn();
 });
+/* Фокус контрола панели — НАДЁЖНЫЙ сигнал для <select> (переживает нативный пикер, в отличие от pointerup). */
+addEventListener('focusin',  e=>{ if(inOpenPanel(e.target)) hushStrip(); });        // контрол панели взят в фокус → прячем и держим спрятанным, пока он в фокусе
+addEventListener('change',   e=>{ if(inOpenPanel(e.target)) hushStrip(); });        // значение сменилось (пикер закрылся) → держим спрятанным — страховка для браузеров, снимающих фокус при ОТКРЫТИИ пикера
+addEventListener('focusout', e=>{ if(inOpenPanel(e.target)) armStripReturn(); });   // контрол панели потерял фокус → возврат через паузу (новый focusin переставит)
 addEventListener('pointermove', e=>{
   if(downOnBar) return;                         // жест начат по кнопке бара — дрожание пальца не должно раскрыть (и увести кнопку)
   if(e.pointerType==='mouse'){                  // мышь: раскрываем/сбрасываем таймер лишь при движении больше порога — дрожание не мигает панелью
