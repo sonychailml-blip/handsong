@@ -161,8 +161,12 @@
     display:none; background:rgba(10,10,20,.82); color:var(--ink);
     border:1px solid rgba(255,255,255,.16); border-radius:var(--r-lg);
     padding:12px 14px; backdrop-filter:blur(6px); box-shadow:0 8px 30px rgba(0,0,0,.35);
-    transition:transform .28s ease;}
+    transition:transform .28s ease, opacity .25s ease;}
   #tutorBar.on{display:block;}
+  /* .hushed — палец РАБОТАЕТ ВНУТРИ открытой панели: подсказку гасим совсем (плавно, opacity) и делаем
+     кликом-насквозь (pointer-events:none), чтобы касания уходили в панель под ней. Возврат — через паузу
+     (ui.armStripReturn). Кладётся ПОВЕРХ .mini (положение остаётся, меняется лишь видимость). */
+  #tutorBar.hushed{ opacity:0; pointer-events:none; }
   /* ДВА состояния «внизу», их ставит ui.syncTutorBarPos:
      .low — КОРОБКА ЛУПЕРА (drawLooper, y≈64), БЕЗ панели: коробка вверху, поэтому ПОЛНУЮ подсказку двигаем
        ВНИЗ (transform, плавно; top:auto не анимируется), нижний край в 8px от низа. z 16 > панелей (14/15).
@@ -172,17 +176,23 @@
   #tutorBar.low{ z-index:16; transform:translateY(calc(100vh - 100% - 64px)); }
   #tutorBar.low{ transform:translateY(calc(100dvh - 100% - 64px)); }
   /* ПАНЕЛЬ ОТКРЫТА → СВЁРНУТАЯ подсказка у самой нижней кромки: только КРУПНАЯ ИНСТРУКЦИЯ + Next в одной
-     строке; деталь, точки шагов, Skip, камера-нота СПРЯТАНЫ — в панели не нужны, и это сокрытие даёт место.
-     ИНСТРУКЦИЮ НЕ прячем: шаги просят два дела разом («смени строй на Ява…, затем возьми Пелог»), а человек
-     листает длинное меню — без промпта работал бы по памяти. Одна строка коротка → нижние ряды панели
-     («Функции рук») остаются доступны, а панель прокручиваема → скрытое за строкой доскроллится. z 16 >
-     панелей (14/15). Сдвиг transform (плавно, как .low), нижний край в 4px от низа. Ни ширины, ни замеров —
-     работает на любом экране. .on даёт display:block; .mini (ниже по исходнику, та же специфичность) → flex. */
+     строке; деталь, точки, Skip и камера-нота СПРЯТАНЫ — в панели не нужны, это даёт место. ИНСТРУКЦИЮ НЕ
+     прячем: шаги просят два дела разом («смени строй на Ява…, затем возьми Пелог»), а человек листает длинное
+     меню — без промпта работал бы по памяти. z 16 > панелей (14/15). Сдвиг transform (плавно), край в 4px от
+     низа. Ни ширины, ни замеров — работает на любом экране. .on → display:block; .mini (ниже, та же
+     специфичность) → flex.
+     pointer-events:none на СТРОКЕ — КЛИК-НАСКВОЗЬ: подсказка лежит НАД нижними рядами панели, но касания
+     уходят СКВОЗЬ текста в панель, поэтому контрол под строкой доступен ПРЯМЫМ тапом (а тап заодно взводит
+     .hushed — строка гаснет, контрол видно), не только скроллом. Next возвращаем pointer-events:auto: между
+     шагами с ОТКРЫТОЙ панелью (открыл меню → Дальше → выбери лад) его надо нажать; он в углу, крохотный — под
+     ним теряется лишь край строки-контрола, центр контрола сквозной. */
   #tutorBar.mini{ z-index:16; display:flex; align-items:center; gap:10px; padding:10px 14px;
+    pointer-events:none;
     transform:translateY(calc(100vh - 100% - 60px)); }
   #tutorBar.mini{ transform:translateY(calc(100dvh - 100% - 60px)); }
   #tutorBar.mini #tutorText{ flex:1; min-width:0; }                 /* инструкция забирает ширину, переносится строками сколько надо */
-  #tutorBar.mini #tutorBottom{ margin-top:0; flex:0 0 auto; }       /* ряд кнопок в ту же строку; внутри виден только Next */
+  #tutorBar.mini #tutorBottom{ margin-top:0; flex:0 0 auto; pointer-events:auto; }   /* ряд кнопок в ту же строку; внутри виден только Next — и он НАЖИМАЕМ (своя pointer-events поверх сквозной строки) */
+  #tutorBar.mini.hushed #tutorBottom{ pointer-events:none; }         /* приглушено (палец в панели) → и Next сквозной: под пальцем ВСЯ строка пропускает касание (Next всё равно невидим — opacity:0) */
   #tutorBar.mini #tutorDetail,
   #tutorBar.mini #tutorAside,
   #tutorBar.mini #tutorDots,

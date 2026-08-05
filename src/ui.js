@@ -151,21 +151,36 @@ function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.class
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false);
   if(on && hooks.tutor) hooks.tutor('panel',{which:'scale'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли меню лада — урок «Строи и тембры»
   syncTutorBarPos(); }
-/* Подсказка тура (#tutorBar) сверху накрывается двумя вещами — РАЗНАЯ реакция (см. CSS .mini/.low):
-   (1) ОТКРЫТАЯ панель (top:52, z 14/15) → СВОРАЧИВАЕМ подсказку в одну строку у нижней кромки (.mini):
-       полная даже внизу накрывала НИЖНИЕ ряды панели («Функции рук») — урок указывал бы на невидимый контроль;
+/* Подсказка тура (#tutorBar) сверху накрывается двумя вещами — РАЗНАЯ реакция (см. CSS .mini/.low/.hushed):
+   (1) ОТКРЫТАЯ панель (top:52, z 14/15) → подсказку у НИЖНЕЙ кромки одной строкой (.mini): в НОРМАЛЬНОМ
+       положении (top:56) она была бы ЗА панелью и нечитаема, поэтому .mini нужен как ЧИТАЕМОЕ положение,
+       пока панель открыта. НО пока ПАЛЕЦ РАБОТАЕТ ВНУТРИ панели — прячем подсказку совсем (.hushed, ниже):
+       на портретном телефоне панель занимает весь экран, и ЛЮБОЕ положение подсказки что-то накрывает;
+       скрытие НА ВРЕМЯ КАСАНИЯ = ничего не накрыто, когда тянутся к контролу, а инструкция есть ДО и ПОСЛЕ.
+       ПОЧЕМУ И .mini, И .hushed: .mini — читаемое положение в покое; .hushed — временно убрать под пальцем.
+       ПОЧЕМУ НЕ иначе (чтобы не переспорить): прозрачная с кликом-насквозь — текст нечитаем поверх пёстрого
+       меню, целиться вслепую; укоротить панель — зависит от высоты экрана, на низких не спасает; двигать
+       подсказку — при полноэкранной панели двигать некуда.
    (2) ХОЛСТОВАЯ КОРОБКА ЛУПЕРА (drawLooper, y≈64, не панель; loop.on||events.length) БЕЗ панели → двигаем
-       ПОЛНУЮ подсказку вниз (.low), чтобы не накрыть коробку сверху. Открытая панель имеет ПРИОРИТЕТ (mini
-       у нижней кромки не накрывает и коробку вверху). Конфликт есть и ВНЕ тура (любой урок с играющей петлёй),
-       поэтому по РЕАЛЬНОМУ состоянию лупера. Зовут: showScale/showLoop (панель) И hooks.rec/hooks.loop (лупер).
-       Вне тура бар display:none — классы безвредны. */
+       ПОЛНУЮ подсказку вниз (.low), чтобы не накрыть коробку сверху. Открытая панель имеет ПРИОРИТЕТ.
+       Конфликт есть и ВНЕ тура (любой урок с играющей петлёй), поэтому по РЕАЛЬНОМУ состоянию лупера. Зовут:
+       showScale/showLoop (панель) И hooks.rec/hooks.loop (лупер). Вне тура бар display:none — классы безвредны. */
 const loopBoxShown=()=> loop.on || events.length>0;
+const STRIP_RETURN_MS=1800;    // мс: подсказка возвращается через ~1.8с после того, как палец ушёл из панели (переживает паузы между штрихами прокрутки, но сама приходит быстро)
+let stripReturnTimer=0;
 function syncTutorBarPos(){
   const el=$('tutorBar'); if(!el) return;
   const panel=panelOpen();
   el.classList.toggle('mini', panel);                    // панель открыта → свёрнутая строка у нижней кромки
   el.classList.toggle('low', !panel && loopBoxShown());  // только коробка лупера (панели нет) → полную подсказку вниз
+  if(!panel){ clearTimeout(stripReturnTimer); el.classList.remove('hushed'); }   // панель закрыта → подсказка ТОЧНО видима (снимаем «приглушение» и таймер возврата)
 }
+/* Реюз паттерна авто-скрытия #bar, только «наоборот»: активность ПРЯЧЕТ, покой ВОЗВРАЩАЕТ. Касание внутри
+   открытой панели (pointerdown) → hushStrip сразу; палец ушёл (pointerup) → armStripReturn ставит возврат
+   через паузу; новое касание → hushStrip снова гасит таймер (пауза заново, без мигания при прокрутке). */
+function inOpenPanel(t){ return !!(t && t.closest && t.closest('#panelScale.on, #panelLoop.on')); }
+function hushStrip(){ const el=$('tutorBar'); if(!el)return; clearTimeout(stripReturnTimer); el.classList.add('hushed'); }
+function armStripReturn(){ clearTimeout(stripReturnTimer); stripReturnTimer=setTimeout(()=>{ const el=$('tutorBar'); if(el)el.classList.remove('hushed'); }, STRIP_RETURN_MS); }
 $('panelClose').onclick=()=>showScale(false);
 $('panelCloseLoop').onclick=()=>showLoop(false);   // «Свернуть ✕» лупера — тот же путь закрытия, что и у ⚙/взаимоисключения
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
@@ -204,9 +219,14 @@ function revealBar(){ barEl.classList.remove('min'); armBarHide(); }   // пок
 addEventListener('pointerdown', e=>{ pointerDown=true;
   downOnBar = !!(e.target && e.target.closest && e.target.closest('#bar button'));
   if(!downOnBar) revealBar();
+  if(inOpenPanel(e.target)) hushStrip();          // касание ВНУТРИ открытой панели → подсказку прячем сразу (под пальцем ничего не должно быть накрыто)
 });
-addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide(); });
-addEventListener('pointercancel',()=>{ pointerDown=false; downOnBar=false; armBarHide(); });
+addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide();
+  if(panelOpen()) armStripReturn();               // палец ушёл, панель ещё открыта → вернуть подсказку через паузу
+});
+addEventListener('pointercancel',()=>{ pointerDown=false; downOnBar=false; armBarHide();
+  if(panelOpen()) armStripReturn();
+});
 addEventListener('pointermove', e=>{
   if(downOnBar) return;                         // жест начат по кнопке бара — дрожание пальца не должно раскрыть (и увести кнопку)
   if(e.pointerType==='mouse'){                  // мышь: раскрываем/сбрасываем таймер лишь при движении больше порога — дрожание не мигает панелью
