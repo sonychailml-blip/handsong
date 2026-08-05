@@ -151,15 +151,21 @@ function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.class
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false);
   if(on && hooks.tutor) hooks.tutor('panel',{which:'scale'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли меню лада — урок «Строи и тембры»
   syncTutorBarPos(); }
-/* Подсказка тура (#tutorBar) уезжает ВНИЗ (класс .low — CSS-сдвиг transform), когда сверху ЕЁ БЫ НАКРЫЛО:
-   (1) ОТКРЫТАЯ панель (top:52, z 14/15) — иначе накрыла бы инструкцию ровно тогда, когда её читают;
-   (2) ХОЛСТОВАЯ КОРОБКА ЛУПЕРА (drawLooper, y≈64, ТРЕТИЙ элемент, не панель) — рисуется при записи И при
-   играющей/непустой петле, ровно под подсказкой. Условие коробки = drawLooper (loop.on || events.length);
-   конфликт есть и ВНЕ тура (любой урок с играющей петлёй), поэтому гоним по РЕАЛЬНОМУ состоянию лупера, а
-   не по шагу урока. syncTutorBarPos зовут showScale/showLoop (панель) И hooks.rec/hooks.loop (состояние
-   лупера сменилось). Вне тура бар display:none — класс безвреден. */
+/* Подсказка тура (#tutorBar) сверху накрывается двумя вещами — РАЗНАЯ реакция (см. CSS .mini/.low):
+   (1) ОТКРЫТАЯ панель (top:52, z 14/15) → СВОРАЧИВАЕМ подсказку в одну строку у нижней кромки (.mini):
+       полная даже внизу накрывала НИЖНИЕ ряды панели («Функции рук») — урок указывал бы на невидимый контроль;
+   (2) ХОЛСТОВАЯ КОРОБКА ЛУПЕРА (drawLooper, y≈64, не панель; loop.on||events.length) БЕЗ панели → двигаем
+       ПОЛНУЮ подсказку вниз (.low), чтобы не накрыть коробку сверху. Открытая панель имеет ПРИОРИТЕТ (mini
+       у нижней кромки не накрывает и коробку вверху). Конфликт есть и ВНЕ тура (любой урок с играющей петлёй),
+       поэтому по РЕАЛЬНОМУ состоянию лупера. Зовут: showScale/showLoop (панель) И hooks.rec/hooks.loop (лупер).
+       Вне тура бар display:none — классы безвредны. */
 const loopBoxShown=()=> loop.on || events.length>0;
-function syncTutorBarPos(){ const el=$('tutorBar'); if(el) el.classList.toggle('low', panelOpen()||loopBoxShown()); }
+function syncTutorBarPos(){
+  const el=$('tutorBar'); if(!el) return;
+  const panel=panelOpen();
+  el.classList.toggle('mini', panel);                    // панель открыта → свёрнутая строка у нижней кромки
+  el.classList.toggle('low', !panel && loopBoxShown());  // только коробка лупера (панели нет) → полную подсказку вниз
+}
 $('panelClose').onclick=()=>showScale(false);
 $('panelCloseLoop').onclick=()=>showLoop(false);   // «Свернуть ✕» лупера — тот же путь закрытия, что и у ⚙/взаимоисключения
 scaleBtn.onclick=()=>showScale(!panelScaleEl.classList.contains('on'));
