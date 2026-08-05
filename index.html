@@ -78,7 +78,7 @@
   <button id="fsBtn" title="Во весь экран: убрать полосы браузера">⛶</button>
   <button id="clipBtn" title="Запись клипа: видео+звук в один файл (WebM)">🎥</button>
   <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)">🎙</button>
-  <button id="jamBtn" title="Джем: подложка по строю — тап включит, следующий тап сменит вариант">🎵 Джем</button>
+  <button id="jamBtn" title="Подложка: джем целиком или только ударные — тап откроет выбор">🎵 Подложка</button>
   <button id="loopPanelBtn" data-i18n="bar.loop" data-i18n-title="bar.loopTitle" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
   <button id="recBtn" title="Запись: тап — отсчёт такта, затем круг">●</button>
 </div>
@@ -86,6 +86,14 @@
 <!-- Тост камеры: короткое сообщение при отказе переключения (нет второй камеры / нет доступа).
      Отдельный элемент, а не строка #status — её каждый кадр переписывает drawStatus. -->
 <div id="camMsg"></div>
+
+<!-- Выбор подложки: крошечное меню под кнопкой 🎵. Открывается ТОЛЬКО с покоя (первый тап), дальше
+     кнопка переключает варианты внутри выбранного пути одним тапом, как раньше. Долгий тап по 🎵 —
+     вернуться к этому выбору, не докручивая цикл до конца. Позицию ставит ui.js по кнопке. -->
+<div id="backingMenu" hidden>
+  <button id="backingJam" data-i18n="backing.jam">🎵 Джем (вся подложка)</button>
+  <button id="backingDrums" data-i18n="backing.drums">🥁 Только ударные</button>
+</div>
 
 <!-- Транспорт лупера: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера
      (drawLooper). Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что
@@ -191,6 +199,9 @@
     <div class="prow"><label data-i18n="panel.loop.tempo">Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
     <div class="prow"><label data-i18n="panel.loop.quant">Квантизация</label>
       <div class="seg"><button id="qOn" class="act" data-i18n="common.on">Вкл</button><button id="qOff" data-i18n="common.off">Выкл</button></div>
+    </div>
+    <div class="prow"><label data-i18n="panel.loop.sub">Дробление доли</label>
+      <div class="seg"><button id="sub4" class="act" data-i18n="panel.loop.sub4">4 · 16-е</button><button id="sub3" data-i18n="panel.loop.sub3">3 · триоли</button></div>
     </div>
     <p class="phint" data-i18n="panel.loop.hint">Длину и размер меняют только на пустой петле.</p>
 

@@ -28,7 +28,7 @@ import { hooks } from './hooks.js';
    голос, побеждает последний — легато-глиссандо и есть инструмент, это не баг. */
 let recording=false;                                 // «вооружено»: пишем живой ввод
 const events=[];                                     // стабильная ссылка (её читает визуализация в draw)
-const loop={ on:false, bars:2, metre:BEATS_PER_BAR, bpm:84, t0:0, pos:-1e-9, sched:0, first:false, layer:0, clickBeat:0, quant:true };   // metre — долей в такте; pos — «сыгранная» доля (лид/дрон, почти-сейчас); sched — АБСОЛЮТНАЯ доля, до которой СЛОИ (аккорд/бас/удар) уже запланированы вперёд
+const loop={ on:false, bars:2, metre:BEATS_PER_BAR, sub:4, bpm:84, t0:0, pos:-1e-9, sched:0, first:false, layer:0, clickBeat:0, quant:true };   // metre — долей в такте; sub — ДРОБЛЕНИЕ доли для квантизации ударных (4 = 16-е, 3 = триоли); pos — «сыгранная» доля (лид/дрон, почти-сейчас); sched — АБСОЛЮТНАЯ доля, до которой СЛОИ (аккорд/бас/удар) уже запланированы вперёд
 const droneActive=()=>events.some(e=>e.fn==='drone');   // жив ли слой-дрон (для гашения при снятии/стопе)
 let recLead=null, recCh=null, recBass=null, pumpTimer=null;
 /* Глиссандо-в-луп: у ОТКРЫТОЙ соло-ноты копим кривую бенда (центы поверх ступени) в массив,
@@ -94,17 +94,26 @@ const ENG={
 };
 const inPB=()=>loop.on;                               // для строки статуса (draw)
 
-/* Сетка квантизации в долях: аккорды — доля (4/такт), бас — восьмая (8/такт),
-   ударные — шестнадцатая (16/такт), соло — не квантуется. Общий тумблер loop.quant. */
-const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?0.25 : 0;
+/* Сетка квантизации в долях: аккорды — доля, бас — восьмая, соло — не квантуется.
+   УДАРНЫЕ — 1/loop.sub доли: при sub=4 шестнадцатая (как было), при sub=3 ТРИОЛЬ. Дробление —
+   ЯВНАЯ настройка (панель лупера), а НЕ вывод из последнего загруженного паттерна: неявная смена
+   поведения квантизации (снял джем — сетка молча переехала) хуже лишнего контрола. */
+const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?1/(loop.sub||4) : 0;
 /* Запись события на текущую позицию в петле; время при квантизации снапится к сетке. */
 function push(fn,a){
   if(!AC)return;
   const e=(AC.currentTime-loop.t0)*loop.bpm/60;
   if(e<0)return;                                      // ещё идёт отсчёт
-  let t=e%loopBeats();
+  const lb=loopBeats();
+  let t=e%lb;
   const g=loop.quant?gridFor(fn):0;
-  if(g>0)t=(Math.round(t/g)*g)%loopBeats();
+  if(g>0){
+    t=(Math.round(t/g)*g)%lb;
+    /* СКЛАДКА ЗАВОРОТА. При g=0.25 всё точно в двоичном, при g=1/3 — нет: удар у самого конца круга
+       округляется к lb−1e-16, и % его НЕ сворачивает — событие село бы на волосок ДО конца петли
+       вместо доли 0 (слышно как пропавший сильный удар). Дожимаем руками. */
+    if(lb-t<1e-6) t=0;
+  }
   events.push({t,layer:loop.layer,fn,a,sc:CUR(),sev:seventh});   // §3.4: замораживаем ладовый контекст события
 }
 /* Доля внутри петли СЕЙЧАС (тот же счёт, что и push) — для dt точек бенда. */
@@ -307,7 +316,10 @@ function onRec(){
    если длина совпадает (как setLoopBars). Слои снимаются undo сверху (сначала ритм). */
 function loadArrangement(sel, jam=false){
   if(!AC)return false;
-  const arr=buildArrangement(sel, {chIdx, bassIdx, metre:loop.metre});
+  /* drumKitIdx передаём ЯВНО: без него buildArrangement брал дефолт 0 и слои аранжировки всегда играли
+     «Стандартом», какой бы кит ни был выбран — паттерны, писанные В РОЛЯХ ради кит-независимости, звучали
+     одним китом. bars — для пути «только ударные» (длину берёт у петли, см. buildArrangement). */
+  const arr=buildArrangement(sel, {chIdx, bassIdx, drumKitIdx, metre:loop.metre, bars:loop.bars});
   if(!arr||!arr.layers.length)return false;
   if(!events.length){ loop.bars=arr.bars; loop.first=false; }
   else if(arr.bars!==loop.bars)return false;           // не тот размер — тихо, как setLoopBars
@@ -357,6 +369,10 @@ function setLoopMetre(n){                               // размер меня
   loop.metre = METRES.includes(+n) ? +n : loop.metre;
 }
 function setLoopQuant(v){ loop.quant=!!v; }             // общий тумблер квантизации
+const SUBS=[4,3];                                       // дробление доли для квантизации ударных: 4 = 16-е, 3 = триоли
+function setLoopSub(n){                                 // МОЖНО менять когда угодно: это настройка ЗАПИСИ, а не геометрия петли (в отличие от bars/metre)
+  loop.sub = SUBS.includes(+n) ? +n : loop.sub;
+}
 function setLoopBpm(v){ loop.bpm=Math.max(40,Math.min(240,+v||loop.bpm)); }   // темп петли — только пользователь
 function clearRec(){
   clearPump(); events.length=0; loop.on=false; setRecording(false); softAllOff(); droneOff();
@@ -372,6 +388,6 @@ function panic(){
 export {
   WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
   softAllOff, panic, inPB, recording,
-  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
+  onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, setLoopSub, SUBS, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
   loadArrangement, loadJam, clearJam, loopChordDeg,
 };

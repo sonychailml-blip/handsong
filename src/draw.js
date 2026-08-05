@@ -263,6 +263,17 @@ function drawLooper(){
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
   ctx.fillStyle=hc; ctx.fillText(head,x0-2,y0+headH/2+1);
 
+  /* ДРОБЛЕНИЕ ДОЛИ — тонкие короткие штрихи, и ТОЛЬКО когда сетка не шестнадцатая (loop.sub!==4):
+     играющий должен ВИДЕТЬ ту сетку, к которой его квантуют (иначе триольная квантизация — сюрприз).
+     При sub=4 (умолчание) не рисуем ничего → вид 4/4 байт-в-байт. Рисуем ДО долевых линий: те поверх. */
+  if(loop.sub!==4){
+    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=0.8;
+    const sy0=gy0+(gy1-gy0)*0.35;                  // короче долевых — читается как «мельче», не спорит с ними
+    for(let b=0;b<total;b++) for(let k=1;k<loop.sub;k++){
+      const gx=x0+bw*(b+k/loop.sub)/total;
+      ctx.beginPath(); ctx.moveTo(gx,sy0); ctx.lineTo(gx,gy1); ctx.stroke();
+    }
+  }
   // сетка долей и тактов
   for(let b=0;b<=total;b++){
     const gx=x0+bw*b/total, bib=b%loop.metre, lvl=beatLevel(loop.metre,bib);   // видно 3+2+2, а не N одинаковых чёрточек

@@ -16,7 +16,7 @@
 import { hooks } from './hooks.js';
 import { t, onLangChange, store, DICTS } from './i18n.js';   // DICTS — базовый en-словарь: по нему проверяем, ЕСТЬ ли у шага деталь (иначе t() вернул бы сам ключ)
 import { SCALES, supportsChords, typedChords } from './scales.js';
-import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop, canSplit, tutorSplitInit } from './ui.js';
+import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop, canSplit, tutorSplitInit, tutorSyncBar } from './ui.js';
 
 /* Хроматика (12-TET) — единственный лад с ПОЛНОЙ палитрой типов аккордов (typedChords:'chrom12'),
    при этом с привычными аккордами. Урок «Аккорды» стартует на ней, иначе шаг палитры молча выпал бы
@@ -326,6 +326,7 @@ function startLesson(L){
   idx=0; acc=freshAcc(); lastSeenAt=0; active=true; curLesson=L.id;
   hooks.tutor=onEvent;                            // подписка ПОСЛЕ tutorReset (его role='ld' не влетит в шаг)
   bar.classList.add('on');
+  tutorSyncBar();                                 // .on только что появился — пересчитать положение (.mini/.low) по РЕАЛЬНОМУ состоянию панелей/лупера; иначе первый кадр урока лёг бы полной полосой поверх открытого меню
   enterStep();
 }
 /* Разбор урока: снять подписку/таймеры/подсветку, спрятать полосу, поставить тихую галочку (если пройден).
@@ -334,7 +335,11 @@ function startLesson(L){
 function teardown(completed){
   active=false; hooks.tutor=null;
   clearTimeout(detailTimer);
-  bar.classList.remove('on');
+  /* Снимаем НЕ ТОЛЬКО .on, но и все классы ПОЛОЖЕНИЯ (.mini/.low/.hushed): их вешает ui.syncTutorBarPos
+     по открытой панели/коробке лупера, и после урока они оставались висеть. Пока .mini нёс собственный
+     display:flex, такой хвост воскрешал полосу при следующем открытии панели. Сюда приходят ВСЕ выходы из
+     урока — финал, «Готово — играть», Пропустить (к списку), переход по цепочке, защитный автопроход. */
+  bar.classList.remove('on','mini','low','hushed');
   if(scaleBtn) scaleBtn.classList.remove('tutorPoint');
   if(completed && curLesson) store.set(lessonKey(curLesson),'1');
   curLesson=null;

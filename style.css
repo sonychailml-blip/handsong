@@ -150,6 +150,22 @@
     padding:8px 14px; border-radius:var(--r-sm); border:1px solid rgba(255,255,255,.22);
     backdrop-filter:blur(6px);}
 
+  /* 🎵 Подложка: в игре на кнопке стоит ИМЯ звучащего варианта («🥁 Регги (уан-дроп) · 8/12»), поэтому
+     ширину ОГРАНИЧИВАЕМ и режем многоточием средствами CSS — как #scaleBtn с длинными именами ладов.
+     Без этого в портрете бар (flex-wrap) переносился бы из-за одной кнопки. Полное имя есть в title и в
+     тосте смены, так что многоточие ничего не прячет насовсем. */
+  #jamBtn{max-width:44vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+
+  /* Выбор подложки (🎵): два пункта под кнопкой. Позицию (left/top) ставит ui.js по кнопке — бар
+     переносится по ширине, фиксированной колонки у него нет. Пункт без ритмов для текущего размера
+     ГАСНЕТ с причиной в title (disabled), а не открывает пустой цикл. */
+  #backingMenu{position:fixed; z-index:30; display:flex; flex-direction:column; gap:4px;
+    background:rgba(10,10,20,.94); border:1px solid rgba(255,255,255,.22);
+    border-radius:var(--r-sm); padding:5px; backdrop-filter:blur(6px);}
+  #backingMenu[hidden]{display:none;}
+  #backingMenu button{width:100%; text-align:left; white-space:nowrap;}
+  #backingMenu button:disabled{opacity:.45;}
+
   #status{position:fixed; left:10px; right:10px; bottom:6px; z-index:10;
     font-size:var(--fs-hint); color:var(--dim); text-shadow:0 1px 2px #000;
     white-space:nowrap; overflow:hidden;}
@@ -179,17 +195,21 @@
      строке; деталь, точки, Skip и камера-нота СПРЯТАНЫ — в панели не нужны, это даёт место. ИНСТРУКЦИЮ НЕ
      прячем: шаги просят два дела разом («смени строй на Ява…, затем возьми Пелог»), а человек листает длинное
      меню — без промпта работал бы по памяти. z 16 > панелей (14/15). Сдвиг transform (плавно), край в 4px от
-     низа. Ни ширины, ни замеров — работает на любом экране. .on → display:block; .mini (ниже, та же
-     специфичность) → flex.
+     низа. Ни ширины, ни замеров — работает на любом экране. .on → display:block; .on.mini → flex.
      pointer-events:none на СТРОКЕ — КЛИК-НАСКВОЗЬ: подсказка лежит НАД нижними рядами панели, но касания
      уходят СКВОЗЬ текста в панель, поэтому контрол под строкой доступен ПРЯМЫМ тапом (а тап заодно взводит
      .hushed — строка гаснет, контрол видно), не только скроллом. Next возвращаем pointer-events:auto: между
      шагами с ОТКРЫТОЙ панелью (открыл меню → Дальше → выбери лад) его надо нажать; он в углу, крохотный — под
-     ним теряется лишь край строки-контрола, центр контрола сквозной. */
-  #tutorBar.mini{ z-index:16; display:flex; align-items:center; gap:10px; padding:10px 14px;
+     ним теряется лишь край строки-контрола, центр контрола сквозной.
+     ⚠️ ПРАВИЛО ПИШЕТСЯ КАК `.on.mini`, А НЕ `.mini`. Раньше здесь стояло `#tutorBar.mini{display:flex}`
+     БЕЗ `.on` — и оно перебивало базовое `#tutorBar{display:none}` по специфичности (1-1-0 против 1-0-0).
+     А `.mini` вешает syncTutorBarPos на ЛЮБОЕ открытие панели, идёт урок или нет, поэтому ВНЕ обучения
+     открытие «Звукоряда» ВЫЗЫВАЛО пустую полосу с оранжевой кнопкой у нижней кромки. Видимость обязана
+     решаться РОВНО одним классом — `.on`; положение (.mini/.low/.hushed) видимостью НЕ управляет. */
+  #tutorBar.on.mini{ z-index:16; display:flex; align-items:center; gap:10px; padding:10px 14px;
     pointer-events:none;
     transform:translateY(calc(100vh - 100% - 60px)); }
-  #tutorBar.mini{ transform:translateY(calc(100dvh - 100% - 60px)); }
+  #tutorBar.on.mini{ transform:translateY(calc(100dvh - 100% - 60px)); }
   #tutorBar.mini #tutorText{ flex:1; min-width:0; }                 /* инструкция забирает ширину, переносится строками сколько надо */
   #tutorBar.mini #tutorBottom{ margin-top:0; flex:0 0 auto; pointer-events:none; }   /* ряд кнопок в ту же строку, ПО УМОЛЧАНИЮ СКВОЗНОЙ: тап по селекту под строкой (в т.ч. по стрелке справа, где сидит Next) уходит в ПАНЕЛЬ, не в Next — иначе случайный «Дальше» вместо смены функции руки */
   #tutorBar.mini #tutorNext.ready{ pointer-events:auto; }            /* Next НАЖИМАЕМ только когда шаг ВЫПОЛНЕН (класс .ready — светится): ровно тогда его и жмут (открыл меню → Дальше). Мимо этого он касания НЕ перехватывает */

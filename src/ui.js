@@ -5,8 +5,8 @@ import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn } from './audio.js';
-import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
-import { HARMONIES, RHYTHMS, BASS_MODES } from './arrange.js';
+import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
+import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL } from './config.js';
 import { hooks } from './hooks.js';
 import { lang, setLang, applyI18n, L, t, onLangChange } from './i18n.js';
@@ -23,7 +23,9 @@ const DONATE_URL='https://paypal.me/chailml';   // страница поддер
 const FB_MAIL_USER='chailakhianmikhail', FB_MAIL_DOMAIN='gmail.com';   // fallback-почта, пока нет формы
 const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       instrBtn=$('instrBtn'), instrBtnL=$('instrBtnL'), instrBtnR=$('instrBtnR'), splitBtn=$('splitBtn'), camBtn=$('camBtn'), camMsg=$('camMsg'), fsBtn=$('fsBtn'), fsBtnStart=$('fsBtnStart'), clipBtn=$('clipBtn'), audioBtn=$('audioBtn'), jamBtn=$('jamBtn'),
+      backingMenu=$('backingMenu'), backingJam=$('backingJam'), backingDrums=$('backingDrums'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
+      sub4=$('sub4'), sub3=$('sub3'),
       selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
@@ -106,14 +108,15 @@ function refreshProgAvail(){                  // прогрессии — тол
   if(selProg.selectedOptions[0] && selProg.selectedOptions[0].disabled) selProg.value='0';   // упасть на дрон
 }
 /* Размер: значение = loop.metre; БЛОКИРУЕМ селектор на непустой/играющей петле (смена переосмыслила бы
-   времена всех событий — как длина). Плюс фильтруем ритмы: доступны лишь паттерны своего размера
-   (beats===loop.metre); несовместимый ритм buildArrangement всё равно пропустит — тут только визуал. */
+   времена всех событий — как длина). Плюс фильтруем ритмы: доступны лишь ГОДНЫЕ паттерны (свой размер +
+   сошедшаяся сетка) — годность считает rhythmFits в arrange.js, ЕДИНЫМ выражением для всех мест
+   (этот фильтр, подгон джема, цикл «только ударные», сама генерация); раньше копий было три. */
 function refreshMetreCtl(){
   loopMetre.value = loop.metre;
   loopMetre.disabled = !!(events.length || loop.on);
-  [...selRhythm.options].forEach((o,i)=>{ o.disabled = (RHYTHMS[i].beats||4) !== loop.metre; });
+  [...selRhythm.options].forEach((o,i)=>{ o.disabled = !rhythmFits(RHYTHMS[i], loop.metre); });
   if(selRhythm.selectedOptions[0] && selRhythm.selectedOptions[0].disabled){   // выбранный ритм не того размера → упасть на совместимый (как refreshProgAvail)
-    const alt=RHYTHMS.findIndex(r=>(r.beats||4)===loop.metre); if(alt>=0) selRhythm.value=alt;
+    const alt=rhythmsForMetre(loop.metre)[0]; if(alt!=null) selRhythm.value=alt;
   }
 }
 buildUI(); refreshMetreCtl();
@@ -164,12 +167,22 @@ function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(f
    (2) ХОЛСТОВАЯ КОРОБКА ЛУПЕРА (drawLooper, y≈64, не панель; loop.on||events.length) БЕЗ панели → двигаем
        ПОЛНУЮ подсказку вниз (.low), чтобы не накрыть коробку сверху. Открытая панель имеет ПРИОРИТЕТ.
        Конфликт есть и ВНЕ тура (любой урок с играющей петлёй), поэтому по РЕАЛЬНОМУ состоянию лупера. Зовут:
-       showScale/showLoop (панель) И hooks.rec/hooks.loop (лупер). Вне тура бар display:none — классы безвредны. */
+       showScale/showLoop (панель) И hooks.rec/hooks.loop (лупер).
+   ⚠️ РАНЬШЕ ЗДЕСЬ СТОЯЛО «вне тура бар display:none — классы безвредны». ЭТО БЫЛО НЕВЕРНО и стоило бага:
+       правило .mini несло СВОЙ display:flex и перебивало базовое display:none по специфичности, поэтому
+       открытие «Звукоряда» БЕЗ всякого урока выбрасывало пустую полосу с оранжевой кнопкой. Видимость
+       решает РОВНО один класс .on; классы положения ставим ТОЛЬКО при нём (см. ранний выход ниже). */
 const loopBoxShown=()=> loop.on || events.length>0;
 const STRIP_RETURN_MS=1800;    // мс: подсказка возвращается через ~1.8с после того, как палец ушёл из панели (переживает паузы между штрихами прокрутки, но сама приходит быстро)
 let stripReturnTimer=0;
 function syncTutorBarPos(){
   const el=$('tutorBar'); if(!el) return;
+  /* УРОК НЕ ИДЁТ (нет .on) → полосе тут делать нечего: снимаем ВСЕ классы положения и выходим. Раньше
+     считалось, что «вне тура бар display:none — классы безвредны», и .mini вешался всегда. Это было
+     НЕВЕРНО: правило .mini несло собственный display:flex и перебивало базовое display:none, поэтому
+     открытие панели ВНЕ обучения выкидывало пустую полосу с оранжевой кнопкой. CSS теперь требует
+     .on.mini, а здесь — второй замок: без урока классов не остаётся вовсе. */
+  if(!el.classList.contains('on')){ clearTimeout(stripReturnTimer); el.classList.remove('mini','low','hushed'); return; }
   const panel=panelOpen();
   el.classList.toggle('mini', panel);                    // панель открыта → свёрнутая строка у нижней кромки
   el.classList.toggle('low', !panel && loopBoxShown());  // только коробка лупера (панели нет) → полную подсказку вниз
@@ -183,7 +196,7 @@ function syncTutorBarPos(){
    pointerup, НО только когда в панели НИЧЕГО не в фокусе (иначе пикер ещё открыт — не возвращаем раньше времени).
    Новое касание/фокус → hush снова гасит таймер (пауза заново, без мигания между селектами/штрихами). */
 function inOpenPanel(t){ return !!(t && t.closest && t.closest('#panelScale.on, #panelLoop.on')); }
-function hushStrip(){ const el=$('tutorBar'); if(!el)return; clearTimeout(stripReturnTimer); el.classList.add('hushed'); }
+function hushStrip(){ const el=$('tutorBar'); if(!el||!el.classList.contains('on'))return; clearTimeout(stripReturnTimer); el.classList.add('hushed'); }   // без урока класс не вешаем вовсе — нечего гасить
 function armStripReturn(){ clearTimeout(stripReturnTimer); stripReturnTimer=setTimeout(()=>{ const el=$('tutorBar'); if(el)el.classList.remove('hushed'); }, STRIP_RETURN_MS); }
 $('panelClose').onclick=()=>showScale(false);
 $('panelCloseLoop').onclick=()=>showLoop(false);   // «Свернуть ✕» лупера — тот же путь закрытия, что и у ⚙/взаимоисключения
@@ -210,7 +223,9 @@ const panelOpen=()=>panelScaleEl.classList.contains('on')||panelLoopEl.classList
 function armBarHide(){
   clearTimeout(barTimer);
   barTimer=setTimeout(()=>{
-    if(panelOpen()||pointerDown){ armBarHide(); return; }   // под рукой / открытая панель — не сворачиваем, переставляем таймер
+    /* Меню выбора подложки держит бар РАЗВЁРНУТЫМ наравне с панелями: оно привязано к кнопке 🎵, а её
+       свёрнутый бар прячет — меню обвалилось бы само из-под себя (открыто, а якорь исчез). */
+    if(panelOpen()||backingMenuOpen()||pointerDown){ armBarHide(); return; }   // под рукой / открытая панель или меню — не сворачиваем, переставляем таймер
     barEl.classList.add('min');
   }, BAR_HIDE_MS);
 }
@@ -353,6 +368,14 @@ selChord.onchange=e=>setChIdx(+e.target.value);
 selBass.onchange=e=>setBassInstr(+e.target.value);
 qOn.onclick =()=>{ setLoopQuant(true);  qOn.classList.add('act');  qOff.classList.remove('act'); };
 qOff.onclick=()=>{ setLoopQuant(false); qOff.classList.add('act'); qOn.classList.remove('act'); };
+/* ДРОБЛЕНИЕ ДОЛИ — сетка квантизации ЖИВЫХ ударов: 4 = шестнадцатые (умолчание, как было), 3 = триоли
+   (шаффл, блюзовый кач). Меняется КОГДА УГОДНО: это настройка записи, а не геометрия петли (bars/metre
+   гейтятся пустой петлёй, потому что переосмыслили бы времена уже записанного). Триольная сетка ещё и
+   ПОКАЗЫВАЕТСЯ в полосе лупера (drawLooper) — видно ту сетку, к которой квантует. */
+function applySub(){ sub4.classList.toggle('act', loop.sub===4); sub3.classList.toggle('act', loop.sub===3); }
+sub4.onclick=()=>{ setLoopSub(4); applySub(); };
+sub3.onclick=()=>{ setLoopSub(3); applySub(); };
+applySub();
 bpmEl.oninput=e=>{ setLoopBpm(+e.target.value); bpmV.textContent=loop.bpm; };
 selDrumKit.onchange=e=>setDrumKit(+e.target.value);
  
@@ -362,7 +385,7 @@ $('undoBtn').onclick=onUndo;
 $('clrBtn').onclick=()=>{ clearRec(); resetJamDisplay(); };   // очистка петли → индикатор джема в покой
 loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bars; };
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
-loopMetre.onchange=e=>{ setLoopMetre(+e.target.value); refreshMetreCtl(); };   // сеттер гейтит пустую петлю; refresh перечитает (клампнутое) значение + перефильтрует ритмы
+loopMetre.onchange=e=>{ setLoopMetre(+e.target.value); refreshMetreCtl(); applyBacking(); };   // сеттер гейтит пустую петлю; refresh перечитает (клампнутое) значение + перефильтрует ритмы; applyBacking — подпись кнопки подложки зависит от числа доступных ритмов
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
 /* Выбор инструмента. При любом переключении глушим звук — роли/зоны рук меняются.
@@ -596,23 +619,30 @@ audioBtn.onclick=()=>{
 onClipChange(applyRec);                           // единый источник правды в clip.js уведомляет обе кнопки — .act/disabled/рекордер не разойдутся
 applyRec();                                       // старт: покой
 
-/* 🎵 ДЖЕМ — подложка по строю одним тапом; каждый следующий тап — СЛЕДУЮЩИЙ вариант (прежний
-   СТОП, новый старт — варианты не слоятся), в конце ВЫКЛ и по кругу. Джем — не режим: это обычные
-   слои лупера, помеченные e.jam (loadJam/clearJam), поэтому ⚙-панель, undo и запись работают как
-   обычно. ВАРИАНТ ВЫБИРАЕТСЯ ПО СВОЙСТВАМ лада, не по имени/индексу. Данные берём из существующих
-   HARMONIES/RHYTHMS/BASS_MODES — джем только ВЫБИРАЕТ. */
+/* 🎵 ПОДЛОЖКА — два пути от ОДНОЙ кнопки: «Джем» (гармония+бас+ударные) и «Только ударные».
+   ВЗАИМОДЕЙСТВИЕ: тап с покоя открывает крошечное меню из двух пунктов, выбор СРАЗУ запускает
+   подложку (старт = 2 тапа вместо 1); дальше каждый тап переключает вариант ВНУТРИ выбранного пути
+   одним тапом, как было, и в конце цикла — ВЫКЛ (кнопка снова в покое → следующий тап опять спросит).
+   Долгий тап (или правый клик) возвращает к выбору, не докручивая цикл.
+   Подложка — не режим: это обычные слои лупера, помеченные e.jam (loadJam/clearJam), поэтому ⚙-панель,
+   undo и запись работают как обычно. ОБА пути кладутся через loadJam → метка ОДНА, и clearJam снимает
+   ровно подложку, никогда не трогая записи игрока (инвариант неизменен). Следствие, честное: джем и
+   «только ударные» не сосуществуют — переключение пути снимает прежнюю подложку, как и смена варианта.
+   ВАРИАНТ ДЖЕМА ВЫБИРАЕТСЯ ПО СВОЙСТВАМ лада, не по имени/индексу. Данные — из существующих
+   HARMONIES/RHYTHMS/BASS_MODES — подложка только ВЫБИРАЕТ. */
 const JH_DRONE=0, JH_IviiiV=2, JH_IIVV=3;         // индексы HARMONIES: Дрон / I–vi–ii–V / I–IV–V
-const JR_BACK=0, JR_MAQSUM=1, JR_NONE=-1;         // индексы RHYTHMS: Бэкбит / Маqсум; -1 → RHYTHMS[-1]=undefined → без ударных
+const JR_BACK=0, JR_MAQSUM=1, JR_NONE=-1;         // индексы RHYTHMS: Рок (прямой) / Маqсум; -1 → RHYTHMS[-1]=undefined → без ударных
+const JH_NONE=-1;                                 // prog<0 → ветка «только ударные» в buildArrangement (ни гармонии, ни баса)
 /* Список вариантов (каждый — sel для лупера) в порядке переключения; выкл добавляет цикл в jamBtn. */
 function jamVariants(){
   const chords=supportsChords(), prog=supportsProgressions()&&chords;   // 7 ступеней И есть аккорды (макам: 7 ступеней, но noChords → сюда не попадёт)
   if(prog) return [
-    {prog:JH_IviiiV, rhythm:JR_BACK, bass:'roots'},   // I–vi–ii–V + бас по корням + бэкбит
-    {prog:JH_IIVV,   rhythm:JR_BACK, bass:'roots'},   // I–IV–V + корни + бэкбит
+    {prog:JH_IviiiV, rhythm:JR_BACK, bass:'roots'},   // I–vi–ii–V + бас по корням + прямой рок-бит
+    {prog:JH_IIVV,   rhythm:JR_BACK, bass:'roots'},   // I–IV–V + корни + прямой рок-бит
     {prog:JH_DRONE,  rhythm:JR_NONE, bass:'pedal'},   // дрон + педаль, без ударных
   ];
   if(chords) return [                                 // аккорды, но не 7 ступеней: хроматика/19/31/партч/пифагор/натур/мезотон/пентатоники
-    {prog:JH_DRONE, rhythm:JR_BACK, bass:'pedal'},    // дрон + педаль + бэкбит
+    {prog:JH_DRONE, rhythm:JR_BACK, bass:'pedal'},    // дрон + педаль + прямой рок-бит
     {prog:JH_DRONE, rhythm:JR_NONE, bass:'pedal'},    // дрон + педаль, без ударных
   ];
   if(CUR().edo===24) return [                         // !supportsChords + 24-TET = макам: уместен маqсум (24-TET уникален для макамов)
@@ -623,36 +653,103 @@ function jamVariants(){
     {prog:JH_DRONE, rhythm:JR_NONE, bass:'pedal'},    // дрон + педаль, без ударных
   ];
 }
-let jamStep=0;                                    // 0 = выкл, 1..N = номер варианта (место в цикле; сам джем — слои лупера)
-function applyJam(){
-  const n=jamVariants().length;
-  jamBtn.classList.toggle('act', jamStep>0);
-  jamBtn.textContent = jamStep>0 ? `🎵 ${jamStep}/${n}` : t('jam.label');
-  jamBtn.title = t(jamStep>0 ? 'jam.title.on' : 'jam.title.off');
+/* «ТОЛЬКО УДАРНЫЕ»: варианты = ГОДНЫЕ для текущего размера паттерны (rhythmsForMetre — тот же единый
+   фильтр, что у списка ритмов в панели). В 7 это ровно «Балканский 7» — рока там не предложат. Пусто
+   (5/10/12 — паттернов пока нет) → пункт меню ГАСНЕТ с причиной, а не открывает пустой цикл. */
+const drumVariants=()=>rhythmsForMetre(loop.metre).map(i=>({prog:JH_NONE, rhythm:i, bass:'none'}));
+const backingVariants=mode=> mode==='drums' ? drumVariants() : jamVariants();
+let backingMode='jam';                            // выбранный путь: 'jam' | 'drums' (держится, пока цикл не дошёл до выкл)
+let backingStep=0;                                // 0 = выкл, 1..N = номер варианта (место в цикле; сама подложка — слои лупера)
+let backingSel=null;                              // ФАКТИЧЕСКИ поставленный вариант (уже после fitRhythm) — по нему и подписываем: номер «4/10» ничего не говорит, когда паттернов восемнадцать
+/* ИМЯ звучащего варианта. У «только ударных» имя варианта = имя ПАТТЕРНА. У джема вариант — сочетание,
+   поэтому «гармония · ритм»: это ровно то, чем варианты различаются на слух (и ритм джема тоже назван).
+   Читаем ЖИВЬЁМ из RHYTHMS/HARMONIES через L(), поэтому смена языка переподписывает сама (applyBacking). */
+function backingName(sel){
+  if(!sel) return '';
+  const r = sel.rhythm>=0 && RHYTHMS[sel.rhythm] ? L(RHYTHMS[sel.rhythm].name) : '';
+  if(sel.prog<0) return r;                        // только ударные: имя паттерна и есть имя варианта
+  const h = HARMONIES[sel.prog] ? L(HARMONIES[sel.prog].name) : '';
+  return h+' · '+(r||t('backing.noDrums'));
 }
-/* Подгоняем ритм варианта под ТЕКУЩИЙ размер петли: паттерн другого размера buildArrangement всё равно
-   пропустит (джем остался бы без ударных) → берём первый RHYTHMS со своим beats===loop.metre, иначе без
-   ударных (-1). На 4/4 ничего не меняется (ритмы джема уже beats:4) — байт-в-байт. */
+function applyBacking(){
+  const n=backingVariants(backingMode).length, on=backingStep>0, drums=backingMode==='drums';
+  const nm=on?backingName(backingSel):'';
+  jamBtn.classList.toggle('act', on);
+  /* На кнопке — ИМЯ и позиция. Длинное имя («Регги (уан-дроп)») не ломает бар: #jamBtn режется
+     многоточием средствами CSS (как #scaleBtn), а полное имя всегда есть в title и в тосте смены. */
+  jamBtn.textContent = on ? `${drums?'🥁':'🎵'} ${nm} · ${backingStep}/${n}` : t('backing.label');
+  jamBtn.title = on ? t(drums?'backing.title.drums':'backing.title.jam',{name:nm, i:backingStep, n})
+                    : t('backing.title.off');
+}
+/* Подгоняем ритм варианта под ТЕКУЩИЙ размер петли: негодный паттерн buildArrangement всё равно
+   пропустит (джем остался бы без ударных) → берём первый ГОДНЫЙ, иначе без ударных (-1). На 4/4 ничего
+   не меняется (ритмы джема уже beats:4) — байт-в-байт. */
 function fitRhythm(sel){
-  if(sel.rhythm<0 || (RHYTHMS[sel.rhythm] && (RHYTHMS[sel.rhythm].beats||4)===loop.metre)) return sel;
-  const alt=RHYTHMS.findIndex(r=>(r.beats||4)===loop.metre);
-  return {...sel, rhythm: alt};                   // findIndex вернёт -1, если совместимого нет → без ударных
+  if(sel.rhythm<0 || rhythmFits(RHYTHMS[sel.rhythm], loop.metre)) return sel;
+  const alt=rhythmsForMetre(loop.metre)[0];
+  return {...sel, rhythm: alt!=null?alt:-1};      // годного нет → без ударных
 }
-function jamTo(step, vars){
-  clearJam();                                     // снять ПРОШЛЫЕ слои джема (записи игрока целы — они без метки jam)
-  if(step>0 && !loadJam(fitRhythm(vars[step-1]))){   // не встало (петля игрока другого размера) — честно сообщаем, цикл → выкл
-    showCamMsg(t('jam.sizeMismatch')); jamStep=0; applyJam(); return;
-  }
-  jamStep=step; applyJam();
+function backingTo(step, vars){
+  clearJam();                                     // снять ПРОШЛЫЕ слои подложки (записи игрока целы — они без метки jam)
+  if(step>0){
+    const sel=fitRhythm(vars[step-1]);            // подписываем ФАКТИЧЕСКИ поставленное: fitRhythm мог подменить паттерн под размер
+    if(!loadJam(sel)){                            // не встало (петля игрока другой длины) — честно сообщаем, цикл → выкл
+      showCamMsg(t('jam.sizeMismatch')); backingStep=0; backingSel=null; applyBacking(); return;
+    }
+    backingSel=sel;
+  } else backingSel=null;
+  backingStep=step; applyBacking();
+  /* ТОСТ с ПОЛНЫМ именем при каждой смене: кнопку режет многоточие, а в свёрнутом баре её вовсе не видно
+     (#bar.min прячет 🎵) — тост же всплывает поверх всего и читается целиком. Выключение не анонсируем:
+     тишина сама себя объясняет. */
+  if(backingSel) showCamMsg(t(backingMode==='drums'?'backing.nowDrums':'backing.nowJam',{name:backingName(backingSel)}));
 }
+/* --- Меню выбора пути: открывается только с покоя (или долгим тапом), закрывается по выбору/промаху/Esc --- */
+const backingMenuOpen=()=>!backingMenu.hidden;
+function closeBackingMenu(){ backingMenu.hidden=true; }
+function openBackingMenu(){
+  const drums=drumVariants().length;
+  backingDrums.disabled = drums===0;
+  backingDrums.title = drums ? t('backing.drumsTitle',{n:drums}) : t('backing.drumsNone',{metre:loop.metre});
+  const r=jamBtn.getBoundingClientRect();         // бар переносится по ширине — позицию берём у самой кнопки
+  backingMenu.hidden=false;
+  backingMenu.style.left=Math.max(6, Math.min(r.left, innerWidth-backingMenu.offsetWidth-6))+'px';
+  backingMenu.style.top =(r.bottom+6)+'px';
+}
+function pickBacking(mode){
+  closeBackingMenu();
+  backingMode=mode;
+  backingTo(1, backingVariants(mode));            // выбор СРАЗУ запускает первый вариант — второй тап не нужен
+}
+backingJam.onclick  =()=>pickBacking('jam');
+backingDrums.onclick=()=>pickBacking('drums');
 jamBtn.onclick=()=>{
   if(!AC)return;
-  const vars=jamVariants();
-  let next=jamStep+1; if(next>vars.length)next=0;      // …→ vN → выкл → v1
-  jamTo(next, vars);
+  if(backingHoldFired){ backingHoldFired=false; return; }   // меню уже открыл долгий тап — клик по отпусканию не должен его закрыть
+  if(backingMenuOpen()){ closeBackingMenu(); return; }
+  if(backingStep===0){ openBackingMenu(); return; }     // покой → спрашиваем, каким путём
+  const vars=backingVariants(backingMode);
+  let next=backingStep+1; if(next>vars.length)next=0;   // …→ vN → выкл → (следующий тап снова спросит)
+  backingTo(next, vars);
 };
-function resetJamDisplay(){ jamStep=0; applyJam(); }    // внешняя очистка/паника петли: цикл джема начинается заново
-applyJam();                                       // старт: выкл
+jamBtn.oncontextmenu=e=>{ e.preventDefault(); if(AC) openBackingMenu(); };   // правый клик = долгий тап: вернуться к выбору, не докручивая цикл
+/* Долгий тап по 🎵 — тот же вход в выбор (на телефоне правого клика нет). Отпускание/уход пальца отменяет. */
+let backingHoldTimer=0, backingHoldFired=false;
+const cancelBackingHold=()=>{ clearTimeout(backingHoldTimer); backingHoldTimer=0; };
+jamBtn.addEventListener('pointerdown', ()=>{ cancelBackingHold(); backingHoldFired=false;
+  backingHoldTimer=setTimeout(()=>{ backingHoldTimer=0; if(AC){ backingHoldFired=true; openBackingMenu(); } }, 520); });
+jamBtn.addEventListener('pointerup',    cancelBackingHold);
+jamBtn.addEventListener('pointercancel',cancelBackingHold);
+jamBtn.addEventListener('pointerleave', cancelBackingHold);
+/* Промах мимо меню закрывает его (кнопку 🎵 не трогаем — ею же и закрываем, см. onclick). */
+addEventListener('pointerdown', e=>{
+  if(!backingMenuOpen())return;
+  if(e.target.closest && (e.target.closest('#backingMenu')||e.target.closest('#jamBtn')))return;
+  closeBackingMenu();
+});
+addEventListener('keydown', e=>{ if(e.key==='Escape'&&backingMenuOpen())closeBackingMenu(); });
+function resetJamDisplay(){ backingStep=0; backingSel=null; closeBackingMenu(); applyBacking(); }   // внешняя очистка/паника петли: цикл начинается заново, путь спросят снова
+applyBacking();                                   // старт: выкл
 /* Поворот экрана: свой слушатель resize у UI (vision.js в UI не лезет — DOM-граница). Повернули в
    портрет на включённом сплите → выключаем его (softAllOff — ничего не оставляем звучать), иначе
    застряли бы в неиграбельной двух-половинной раскладке. Обратно в ландшафт НЕ включаем сами —
@@ -687,7 +784,7 @@ onLangChange(()=>{
   updScaleBtn(); updRecBtn(); updLoopBtn();
   applyInstr(); applySplit();          // роль + половины + «Функции рук» + видимость/титулы
   refreshMetreCtl();
-  applyRec(); applyJam(); applyFullscreen();
+  applyRec(); applyBacking(); applyFullscreen();
 });
 
-export { $, revealBar };
+export { $, revealBar, syncTutorBarPos as tutorSyncBar };   // tutor зовёт на СТАРТЕ урока: полоса только что получила .on, а положение (.mini при открытой панели) считается по событиям панели/лупера — без этого первый кадр урока лёг бы полной полосой поверх открытого меню
