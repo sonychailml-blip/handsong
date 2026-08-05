@@ -186,7 +186,7 @@ $('helpClose').onclick=()=>$('helpOv').classList.remove('on');
    игра идёт с камеры (жесты), ввод с тача не читает никто — раскрытие не крадёт жест и не рождает ноту. */
 const barEl=$('bar');
 const BAR_HIDE_MS=3500, MOUSE_EPS=8;            // BAR_HIDE_MS — авто-скрытие, мс; MOUSE_EPS — порог движения мыши, px
-let barTimer=0, pointerDown=false, lastMX=null, lastMY=null;
+let barTimer=0, pointerDown=false, downOnBar=false, lastMX=null, lastMY=null;   // downOnBar — жест начат ПО кнопке бара (не раскрываем, см. pointerdown)
 const panelOpen=()=>panelScaleEl.classList.contains('on')||panelLoopEl.classList.contains('on');
 function armBarHide(){
   clearTimeout(barTimer);
@@ -196,10 +196,19 @@ function armBarHide(){
   }, BAR_HIDE_MS);
 }
 function revealBar(){ barEl.classList.remove('min'); armBarHide(); }   // показать панель и перезавести таймер
-addEventListener('pointerdown', ()=>{ pointerDown=true;  revealBar(); });
-addEventListener('pointerup',   ()=>{ pointerDown=false; armBarHide(); });
-addEventListener('pointercancel',()=>{ pointerDown=false; armBarHide(); });
+/* ТАП ПО КНОПКЕ БАРА не раскрывает панель — пусть кнопка сработает НА МЕСТЕ. Иначе раскрытие снимало бы
+   .min, бар в портрете переносился бы на ДВЕ строки (flex-wrap), а последняя кнопка (●) уезжала из-под
+   пальца во вторую строку → click промахивался мимо неё; «нажать» и делало кнопку недостижимой. downOnBar
+   держим весь жест (и в pointermove), чтобы дрожание пальца по кнопке тоже не раскрыло. Тап МИМО бара (по
+   холсту) раскрывает как прежде — авто-скрытие/раскрытие для не-барных касаний не меняется. */
+addEventListener('pointerdown', e=>{ pointerDown=true;
+  downOnBar = !!(e.target && e.target.closest && e.target.closest('#bar button'));
+  if(!downOnBar) revealBar();
+});
+addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide(); });
+addEventListener('pointercancel',()=>{ pointerDown=false; downOnBar=false; armBarHide(); });
 addEventListener('pointermove', e=>{
+  if(downOnBar) return;                         // жест начат по кнопке бара — дрожание пальца не должно раскрыть (и увести кнопку)
   if(e.pointerType==='mouse'){                  // мышь: раскрываем/сбрасываем таймер лишь при движении больше порога — дрожание не мигает панелью
     if(lastMX!==null && Math.hypot(e.clientX-lastMX,e.clientY-lastMY)<MOUSE_EPS)return;
     lastMX=e.clientX; lastMY=e.clientY;
