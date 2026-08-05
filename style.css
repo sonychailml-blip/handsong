@@ -168,8 +168,10 @@
   #tutorBar.low{ z-index:16; transform:translateY(calc(100vh - 100% - 64px)); }
   #tutorBar.low{ transform:translateY(calc(100dvh - 100% - 64px)); }
   #tutorText{font-size:17px; line-height:1.45;}   /* было var(--fs-ctl)=14px — подсказку читают в игре, подняли до 17 */
-  /* Камера-нота: ВТОРАЯ, тише инструкции строка (меньше, приглушённый цвет). Пусто → скрыта (JS ставит display). */
-  #tutorAside{font-size:14px; line-height:1.4; color:var(--dim); margin-top:6px;}
+  /* Объяснение шага: меньше и тише инструкции, ТЕСНО под ней (margin 4px) — читается как продолжение одного блока. Пусто → скрыто. */
+  #tutorDetail{font-size:14px; line-height:1.4; color:var(--dim); margin-top:4px;}
+  /* Камера-нота: тот же тихий размер, но ОТДЕЛЕНА большим зазором сверху — отдельная строка, не часть блока. Пусто → скрыта. */
+  #tutorAside{font-size:14px; line-height:1.4; color:var(--dim); margin-top:11px;}
   #tutorBottom{display:flex; align-items:center; gap:10px; margin-top:11px;}
   #tutorDots{flex:1; min-width:0; letter-spacing:3px; font-size:12px; color:var(--dim);}
   /* Тик подтверждения выполненного шага — зелёный, рядом с Next. Пусто/не выполнено → скрыт (JS ставит display). */

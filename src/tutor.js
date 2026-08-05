@@ -14,7 +14,7 @@
    ⚠️ Уроки учат ТЕКУЩЕЙ жест-модели. Зацепки в gestures.js помечены «ЗАЦЕПКА ОБУЧЕНИЯ» и правятся
    вместе с жестами. draw.js НЕ трогаем: подсказка — DOM-полоса (кнопки должны тапаться), сетка видна. */
 import { hooks } from './hooks.js';
-import { t, onLangChange, store } from './i18n.js';
+import { t, onLangChange, store, DICTS } from './i18n.js';   // DICTS — базовый en-словарь: по нему проверяем, ЕСТЬ ли у шага деталь (иначе t() вернул бы сам ключ)
 import { SCALES, supportsChords, typedChords } from './scales.js';
 import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop, canSplit, tutorSplitInit } from './ui.js';
 
@@ -23,6 +23,12 @@ import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLo
    на дефолтной минорной пентатонике. МАЖОР рассмотрен и ОТВЕРГНУТ: палитры у него НЕТ — его аккорды
    строятся ПО СТУПЕНИ (диатоника), не типом из набора. Ищем индекс, а не хардкодим (append-only массив). */
 const CHROMATIC_IDX=SCALES.findIndex(s=>s.typedChords==='chrom12');
+/* Мажор (ионийский) — «нормальный» лад С АККОРДАМИ. Урок «Лупер» стартует на нём, иначе после «Строёв»
+   (которые нарочно оставляют человека на Пелоге — бесаккордовом) шаг наложения аккордов молчал бы. Ищем
+   по определяющим интервалам (edo:12, iv=[0,2,4,5,7,9,11]) — уникальны (у мод/миноров iv другой), append-
+   only массив не сломает. МАЖОР, а не Хроматика: «Лупер» про запись/наслаивание, и обычный мажор звучит
+   музыкой (мелодия+аккорды), тогда как все 12 нот хроматики — «возврат к нормальному» после экзотики Пелога. */
+const MAJOR_IDX=SCALES.findIndex(s=>s.edo===12 && String(s.iv)==='0,2,4,5,7,9,11');
 
 const TIMEOUT=15000;    // мс до подробной подсказки
 const SEEN_FRESH=1500;  // мс: heartbeat свежее этого = рука в кадре
@@ -145,7 +151,8 @@ const LESSONS=[
   {id:'chords',  titleKey:'lesson.chords.title',  descKey:'lesson.chords.desc',  steps:CHORDS_STEPS, next:'tunings',
    setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); }},   // старт на Хроматике — шаг палитры появляется у всех (объявлено в chSwitch.prompt)
   {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:TUNINGS_STEPS, next:'looper'},   // цепочка: «Аккорды»→сюда→«Лупер»
-  {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:LOOPER_STEPS, next:'handfn'},   // чистый старт — tutorReset (clearRec); ведёт дальше к «Функциям рук»
+  {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:LOOPER_STEPS, next:'handfn',
+   setup:()=>{ if(MAJOR_IDX>=0) tutorSetScale(MAJOR_IDX); }},   // на Мажор (с аккордами): «Строи» оставляют на Пелоге, а шаг наложения просит роль «Аккорды» — объявлено в lpRec.prompt. Чистая петля/роль — из tutorReset
   {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:HANDFN_STEPS, next:'split',
    setup:tutorResetHandFn},   // старт с известной базы (левая=эффекты, правая=ноты); ведёт дальше к «Двум ролям»
   {id:'split',   titleKey:'lesson.split.title',   descKey:'lesson.split.desc',   steps:SPLIT_STEPS,   // ПОСЛЕДНИЙ урок цепочки (без next → финал «Готово — играть»)
@@ -154,14 +161,14 @@ const LESSONS=[
 const lessonKey=id=>'handsong.lesson.'+id;
 const lessonDone=id=>store.get(lessonKey(id))==='1';
 
-let active=false, steps=[], idx=0, acc=null, detailShown=false, completing=false, stepDone=false, lastSeenAt=0;   // stepDone — шаг выполнен (тик+свечение Next), но НЕ перешли: ждём нажатия
+let active=false, steps=[], idx=0, acc=null, camArmed=false, completing=false, stepDone=false, lastSeenAt=0;   // stepDone — шаг выполнен (тик+свечение Next), но НЕ перешли; camArmed — таймаут прошёл, можно показать камера-ноту (если руки нет)
 let detailTimer=0, curLesson=null;
 /* starter() — «поднять приложение» (main.js передаёт startApp через wireStarter). Возвращает Promise<bool>.
    Так tutor не зависит от main напрямую (без цикла) и правило #1 цело: старт зовётся в клике выбора. */
 let starter=async()=>false;
 export function wireStarter(fn){ starter=fn; }
 
-const bar=$('tutorBar'), textEl=$('tutorText'), asideEl=$('tutorAside'), doneEl=$('tutorDone'), dotsEl=$('tutorDots'),
+const bar=$('tutorBar'), textEl=$('tutorText'), detailEl=$('tutorDetail'), asideEl=$('tutorAside'), doneEl=$('tutorDone'), dotsEl=$('tutorDots'),
       nextBtn=$('tutorNext'), skipBtn=$('tutorSkip'), scaleBtn=$('scaleBtn');
 const lessonOv=$('lessonOv'), lessonTitle=$('lessonTitle'), lessonRows=$('lessonRows'),
       lessonClose=$('lessonClose'), lessonFree=$('lessonFree');
@@ -248,24 +255,25 @@ function onEvent(kind,p){
 }
 
 const recentlySeen=()=>performance.now()-lastSeenAt<SEEN_FRESH;
-/* ГЛАВНАЯ строка — ВСЕГДА инструкция: промпт; после таймаута, ЕСЛИ рука в кадре, — деталь (полнее). Деталь
-   ЗАМЕНЯЕТ промпт (осознанный выбор: детали — развёрнутый пересказ того же действия, стопка «промпт+деталь»
-   была бы избыточной и высокой). Инструкция не пропадает НИКОГДА (в т.ч. когда руки нет — тогда главная = промпт). */
-function mainText(){
-  const st=steps[idx];
-  if(st.final) return t('tutor.'+st.key+'.prompt');   // финал — по ключу шага (Основы: key='final' → 'tutor.final.prompt'; Аккорды: 'chHold')
-  return (detailShown && recentlySeen()) ? t('tutor.'+st.key+'.detail') : t('tutor.'+st.key+'.prompt');
-}
-/* ТИХАЯ вторая строка — камера-нота ДОБАВОЧНО (не заменяет инструкцию): только когда после таймаута руки
-   в кадре нет и шаг ещё не выполнен. Иначе пусто. */
+/* ГЛАВНАЯ строка — ВСЕГДА инструкция (промпт), в т.ч. на финале (у него ключ = '<key>.prompt'). */
+function mainText(){ return t('tutor.'+steps[idx].key+'.prompt'); }
+/* ОБЪЯСНЕНИЕ шага — тихая вторая строка ТОГО ЖЕ блока, видна СРАЗУ (прежний свап промпт→деталь по таймауту
+   убран: он прятал объяснение — действие успевали сделать до таймаута). Есть НЕ у всех шагов (инфо-шаги/
+   финалы): проверяем по базовому en-словарю (иначе t() вернул бы сам ключ); нет детали → пусто (пустой
+   строки под промптом не рисуем). */
+function detailText(){ const k='tutor.'+steps[idx].key+'.detail'; return (k in DICTS.en) ? t(k) : ''; }
+/* Камера-нота — ОТДЕЛЬНАЯ добавочная строка (не часть блока «инструкция+объяснение»): когда после таймаута
+   руки в кадре нет и шаг не выполнен. Таймер теперь взводит ТОЛЬКО это (деталь от него не зависит). */
 function asideText(){
   const st=steps[idx];
   if(st.final || stepDone) return '';
-  return (detailShown && !recentlySeen()) ? t('tutor.noHand') : '';
+  return (camArmed && !recentlySeen()) ? t('tutor.noHand') : '';
 }
 function paint(){
   if(active){
     textEl.textContent=mainText();
+    detailEl.textContent=detailText();
+    detailEl.style.display = detailEl.textContent ? '' : 'none';   // нет детали (инфо-шаг/финал) → пустой строки не рисуем
     asideEl.textContent=asideText();
     asideEl.style.display = asideEl.textContent ? '' : 'none';
     dotsEl.textContent=steps.map((_,i)=>i<=idx?'●':'○').join(' ');
@@ -284,7 +292,7 @@ function paint(){
   }
   if(lessonOv.classList.contains('on')) renderLessons();   // список открыт (напр. смена языка) — перерисовать
 }
-function showDetail(){ detailShown=true; paint(); }
+function armCamNote(){ camArmed=true; paint(); }   // таймаут прошёл: разрешаем камера-ноту (покажется, только если руки в кадре нет)
 function enterStep(){
   const st=steps[idx];
   if(st.enter) st.enter(acc);
@@ -292,9 +300,9 @@ function enterStep(){
      десктопе) → мгновенно дальше, без показа. Только по флагу — прочие шаги (флаг сброшен в enter) не
      проскочат. Рекурсия на один уровень (следующий шаг skipIfDone не имеет). */
   if(!st.final && st.skipIfDone && st.done && st.done(acc)){ advance(); return; }
-  detailShown=false; completing=false; stepDone=false;   // новый шаг: тик/свечение сняты, эскалация детали заново
+  camArmed=false; completing=false; stepDone=false;   // новый шаг: тик/свечение сняты, камера-нота снова взводится по таймауту
   clearTimeout(detailTimer);
-  if(!st.final) detailTimer=setTimeout(showDetail, TIMEOUT);
+  if(!st.final) detailTimer=setTimeout(armCamNote, TIMEOUT);
   if(st.final){ revealBar(); if(scaleBtn) scaleBtn.classList.add('tutorPoint'); }   // финал: показать бар и подсветить кнопку лада (ничего не открываем)
   else if(st.reveal) revealBar();                                                  // шаг с кнопкой в баре (Аккорды chSwitch — «нажми роль») — бар должен быть виден
   paint();
