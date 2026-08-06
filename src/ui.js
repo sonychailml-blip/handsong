@@ -1,9 +1,9 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
-         camFacing, setCamFacing, aRef, setARef } from './state.js';
+         camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR } from './scales.js';
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
@@ -101,6 +101,9 @@ function buildUI(){
   updScaleBtn();                              // 1/3: старт
   loopBarsV.textContent=loop.bars;
   refreshProgAvail();
+  /* Раскладку нот здесь НЕ строим: её DOM-ссылка (#rectSel) объявлена ниже по файлу, рядом
+     со своим обработчиком — как у эталона A4. Вызов из buildUI() попадал бы в мёртвую зону const
+     (TDZ) и падал на загрузке. Первичная отрисовка — там же, где объявление (см. renderRectCtl). */
 }
 function refreshProgAvail(){                  // прогрессии — только там, где строятся аккорды и 7 ступеней; дрон — везде
   const ok=supportsProgressions()&&supportsChords();   // макам: iv.length===7, но лестницы аккордов нет
@@ -291,6 +294,9 @@ export function tutorReset(){   // урок учит SINGLE-ROLE соло: га�
   setHandFn('ld','L','fx');    setHandFn('ld','R','note');
   setHandFn('bs','L','note');  setHandFn('bs','R','note');
   setHandFn('ch','L','latch'); setHandFn('ch','R','latch');
+  /* РАСКЛАДКА — тоже назад в дефолт ('auto', по ладу): уроки учат «Y выбирает РЯД ноты», и урок,
+     начатый на ладу, оставленном в прямоугольниках, учил бы не тому, что на экране (правило #24). */
+  setRectPref('auto'); renderRectCtl();
   applySplit(); applyInstr();
 }
 /* Сброс петли и ПОДЛОЖКИ для урока (та же связка, что у кнопки ✕): очистить записанное и вернуть кнопку
@@ -307,7 +313,7 @@ export function tutorSetScale(idx){
   setScaleIdx(idx); softAllOff();
   if(selTradition){ selTradition.value=trad; fillScales(trad); }
   selScale.value=idx;
-  updScaleBtn(); refreshProgAvail();
+  updScaleBtn(); refreshProgAvail(); renderRectCtl();
 }
 /* Урок «Функции рук» стартует с ИЗВЕСТНОЙ базы соло: левая=эффекты, правая=ноты (дефолт handFn.ld) —
    тогда «левая и правая рука получают работу» звучит буквально, и каждый шаг («поставь руку на …») —
@@ -346,12 +352,12 @@ selTradition.onchange=e=>{
   const first=scalesOfTrad(e.target.value)[0];
   if(!first)return;
   selScale.value=first.i;
-  setScaleIdx(first.i); softAllOff(); updScaleBtn(); refreshProgAvail();
+  setScaleIdx(first.i); softAllOff(); updScaleBtn(); refreshProgAvail(); renderRectCtl();
   if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: смена строя тоже меняет лад (первый в традиции) — тот же сигнал урока «Строи»
 };
 selScale.onchange=e=>{
   setScaleIdx(+e.target.value); softAllOff();
-  updScaleBtn(); refreshProgAvail();          // 2/3: смена лада
+  updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
   if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
 selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); updScaleBtn(); };   // 3/3: смена тоники
@@ -376,6 +382,35 @@ aRefInput.onchange=e=>{
   applyARef(v); syncARef(v);
 };
 syncARef(aRef);                                    // старт: 440 в обоих контролах
+/* РАСКЛАДКА НОТ — «прямоугольники по 4 ноты» vs «узкие ряды». Это про то, КАК играть, а не про то,
+   ЧТО звучит: высота, запись и переигровка от раскладки не зависят вовсе (в событие она не идёт).
+   ТРИ значения, а не тумблер (state.rectPref): 'auto' — по ладу (его свойство rectGrid стало
+   ДЕФОЛТОМ), 'rect', 'rows'. Дефолт 'auto' и есть гарантия «нетронутое приложение ведёт себя как
+   сегодня НА КАЖДОМ ладу»: булев флаг, засеянный первым ладом, перетащил бы прямоугольники Партча
+   на мажор при следующей же смене лада.
+   ДОСТУПНОСТЬ. Раньше здесь была ветка «недоступно с причиной» (требовалась кратность 4). Её БОЛЬШЕ
+   НЕТ, и это не упрощение, а следствие новой арифметики: число нот в прямоугольнике переменное
+   (4/3/2), поэтому раскладываются ВСЕ лады без исключения — чётные при k=2, нечётные при k=2+повтор
+   тоники. Причины блокировки не существует, а мёртвое объяснение в панели хуже отсутствующего.
+   Предикат rectEligible жив как защита разрешителя (см. scales.js), но UI его не показывает. */
+const rectSel=$('rectSel');
+const RECT_OPTS=[['auto','rect.auto'],['rect','rect.rect'],['rows','rect.rows']];
+function renderRectCtl(){
+  const s=CUR();
+  rectSel.textContent='';
+  for(const [v,k] of RECT_OPTS){
+    const o=document.createElement('option'); o.value=v;
+    o.textContent = v==='auto' ? t(k,{form:t(rectDefault(s)?'rect.form.rect':'rect.form.rows')}) : t(k);   // «По ладу: прямоугольники» — видно, во что разрешается авто
+    rectSel.appendChild(o);
+  }
+  rectSel.value=rectPref;
+}
+rectSel.onchange=e=>{ setRectPref(e.target.value); softAllOff();   // раскладка меняет СМЫСЛ пальца (октава ↔ нота в прямоугольнике) — гасим звучащее, как при смене лада/функции руки
+  renderRectCtl(); };
+/* ПЕРВИЧНАЯ ОТРИСОВКА — ЗДЕСЬ, а не в buildUI(): buildUI() зовётся выше по файлу, где const-ссылки
+   этого блока ещё в мёртвой зоне (TDZ) — «Cannot access 'rectSel' before initialization» на загрузке.
+   Тот же порядок, что у эталона A4 (элементы → обработчики → первичный syncARef(aRef) рядом). */
+renderRectCtl();
 $('qTriad').onclick=()=>{ setSeventh(false); softAllOff(); $('qTriad').classList.add('act'); $('qSev').classList.remove('act'); };
 $('qSev').onclick =()=>{ setSeventh(true);  softAllOff(); $('qSev').classList.add('act');  $('qTriad').classList.remove('act'); };
 selLead.onchange=e=>{ setLeadInstr(+e.target.value);
@@ -799,6 +834,7 @@ onLangChange(()=>{
   [...selRhythm.options].forEach((o,i)=>o.textContent=L(RHYTHMS[i].name));
   [...selBassMode.options].forEach((o,i)=>o.textContent=L(BASS_MODES[i].name));
   updScaleBtn(); updRecBtn(); updLoopBtn();
+  renderRectCtl();                     // «Раскладка нот»: варианты строит JS (подпись «По ладу: …» составная) + причина недоступности
   applyInstr(); applySplit();          // роль + половины + «Функции рук» + видимость/титулы
   refreshMetreCtl();
   applyRec(); applyBacking(); applyFullscreen();

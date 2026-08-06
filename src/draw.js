@@ -1,13 +1,13 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, leadOwner, degRaw } from './gestures.js';
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectRowsFull, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
+import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold } from './audio.js';
 
-import { recording, inPB, loop, events, loopPos, loopChordDeg, beatLevel } from './recorder.js';
+import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel } from './recorder.js';
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -60,74 +60,113 @@ function drawGrid(zx0,zx1,accent,labelOf,activeDeg,gridH=canvas.height,labelX=zx
     }
   }
 }
-/* Порядковый номер ноты В РАСКЛАДКЕ прямоугольников (не число шагов от тоники!): Т = тоника
-   (и снизу, и октавная сверху), дальше 2,3,4… — так номера встают в ряд с римскими пальцами
-   I–IV (rowLabel дал бы «1» у пальца II — читается как ошибка). Только для rect-соло. */
-const rectNoteLbl = deg => (deg===0 || centsOf(deg)===0) ? 'Т' : String(deg+1);
-/* Подпись ноты нерект-сетки. ПОРЯДКОВЫЙ номер Т,2,3,4… (как rect-лады) берут ДВА рода ладов:
-   (1) НЕОКТАВНЫЕ (period≠2, Болен–Пирс/Карлос) — там номер ШАГА врал бы off-by-one;
-   (2) CENTS-лады (s.cents есть, любой edo, вкл. Пифагоров edo:12) — их ноты НЕ на 12-TET высотах
-   (пифагоров D# = 611.73¢, не темперированные 600¢), поэтому имена C/C#/D (rowLabel через stepName)
-   ВРАЛИ бы; порядковый честнее, живой ярлык всё равно показывает реальные Гц/центы. Тонику и
-   верхнюю тонику периода/октавы ловим СТРУКТУРНО (IVX[deg]%edo===0 — как зелёная линия тоники в
-   drawGrid), а НЕ через centsOf===0: у неоктавного периода центы сверху не округляются в ровный 0.
-   Октавный НЕ-cents лад (12-TET, макамы: period=2 И нет s.cents) → rowLabel как был, байт-в-байт.
-   Партч — cents-лад, НО rect: везде идёт через rectNoteLbl/rect-ветки, сюда не заходит (без регресса). */
-const gridNoteLbl = deg => CUR().swaraNames ? swaraLbl(deg)   // индийские лады: имена свар (саргам) вместо порядковых
-  : CUR().fixedKey ? rowLabel(deg)   // фиксированный строй: сетка приколочена к C — имена нот СНОВА правдивы (этот C и есть C, лишь иначе настроен); rowLabel даёт NOTE_NAMES[(tonic+шаг)%12], имя зависит от КЛЮЧА
-  : (periodOf(CUR())!==2 || CUR().cents)
-  ? (IVX()[deg]%CUR().edo===0 ? 'Т' : String(deg+1))
-  : rowLabel(deg);
-/* Сетка «4 ноты в прямоугольнике» (соло/бас/аккорды на ладах с rectGrid). Прямоугольник выбирается
-   по Y, нота/корень внутри — ПАЛЬЦЕМ (I..IV), а НЕ горизонталью: X — громкость. Поэтому 4 ноты
-   показываем КОМПАКТНОЙ ЛЕГЕНДОЙ по пальцам (I/II/III/IV → нота), а не колонками. Активный палец
-   подсвечен, активный прямоугольник подтонирован. Полосу даёт rectBandY (тот же делитель высоты,
-   что у degHyst в gestures), число полос — rectRowsFull (нотные + октавная): ввод и картинка не
-   разъедутся. Полоса 0 — октавный распорядитель, 1..N — нотные (r=полоса−1).
-   x0..x1 — X-ПРОТЯЖЁННОСТЬ: соло/бас на всю ширину [0,W]; аккорды — правая половина [SPLIT,W]
-   (слева палитра). lblOf(deg) — подпись ноты/корня (соло/бас: порядковый+центы; аккорды: rootName). */
-function drawRectGrid(x0,x1,playH,accent,activeDeg,lblOf,role,rx0=x0){
-  const nRfull=rectRowsFull(), maxDeg=IVX().length-1, w=x1-x0;
-  const aRect=activeDeg>=0?Math.floor(activeDeg/4):-1, aNote=activeDeg>=0?activeDeg%4:-1;
+/* ЕДИНАЯ ПОДПИСЬ НОТЫ — одна на ОБЕ раскладки (прямоугольники и узкие ряды).
+   ⚠️ ПОДПИСЬ ЗАВИСИТ ОТ ЛАДА, А НЕ ОТ РАСКЛАДКИ. Раньше функций было ДВЕ (rectNoteLbl — всегда
+   порядковый; gridNoteLbl — свары/имена нот/порядковый), и это сходило с рук ровно потому, что
+   прямоугольники стояли на четырёх ладах, каждому из которых порядковый и был нужен. Как только
+   мажор можно положить в прямоугольники, две функции начали бы врать друг про друга: одна и та же
+   нота читалась бы «C» в рядах и «2» в прямоугольниках. Слито в одну.
+   Ветки (порядок важен):
+   (1) свары (индийские) — саргам;
+   (2) fixedKey — сетка приколочена к C, имена нот СНОВА правдивы (rowLabel даёт NOTE_NAMES по КЛЮЧУ);
+   (3) ПОРЯДКОВЫЙ Т,2,3,4… — трём родам ладов: НЕОКТАВНЫМ (period≠2: номер шага врал бы off-by-one),
+       CENTS-ладам (их ноты не на 12-TET высотах: пифагоров D#=611.73¢ — имена C/C#/D врали бы) и
+       ладам, у которых edo НЕ 12/24 (19/31-TET): у них rowLabel печатает НОМЕР ШАГА (Т,1,2…), а он
+       на единицу расходится с легендой пальцев I–IV — «5-я нота» звалась бы «4». Тонику ловим
+       СТРУКТУРНО (IVX[deg]%edo===0, как зелёная линия в drawGrid), а не через centsOf===0: у
+       неоктавного периода центы сверху не округляются в ровный ноль;
+   (4) иначе — реальные имена нот (12-TET, макамы 24-TET).
+   БАЙТ-В-БАЙТ у всех четырёх сегодняшних rect-ладов: 19/31-TET (edo∉{12,24} → порядковый),
+   Партч (cents → порядковый), гамма (period≠2 → порядковый) — ровно то, что давал rectNoteLbl;
+   структурная проверка тоники совпадает с прежней centsOf===0 и на нижней, и на верхней тонике.
+   Ветка (3) по edo∉{12,24} СЕГОДНЯ недостижима у нерект-ладов (единственные такие лады — 19/31-TET,
+   а они rect), поэтому нерект-подписи тоже байт-в-байт; достижимой она станет, когда человек
+   переключит 19/31-TET в узкие ряды — и там она как раз и нужна. */
+const noteLbl = deg => { const s=CUR();
+  return s.swaraNames ? swaraLbl(deg)
+    : s.fixedKey ? rowLabel(deg)
+    : (periodOf(s)!==2 || s.cents || (s.edo!==12 && s.edo!==24))
+    ? (IVX()[deg]%s.edo===0 ? 'Т' : String(deg+1))
+    : rowLabel(deg); };
+/* Сетка ПРЯМОУГОЛЬНИКОВ (соло/бас/аккорды). Прямоугольник выбирается по Y, нота/корень внутри —
+   ПАЛЬЦЕМ, а НЕ горизонталью: X — громкость. Поэтому ноты показываем КОМПАКТНОЙ ЛЕГЕНДОЙ по пальцам
+   (I/II/… → нота), а не колонками. Активный палец подсвечен, активный прямоугольник подтонирован.
+   Полосу даёт rectBandY (тот же делитель высоты, что у degHyst в gestures), число полос и ВСЮ
+   арифметику — rectLayout: ввод и картинка не разъедутся.
+   ⚠️ ТРИ ВЕЩИ ЗДЕСЬ ПЕРЕМЕННЫЕ, а не константы:
+   (1) НОТ В ПРЯМОУГОЛЬНИКЕ RL.k (4/3/2) — никаких зашитых четвёрок; лишние пальцы рисуем ТУСКЛЫМ
+       прочерком: молчание без объяснения читается как поломка (при k=2 половина руки холостая);
+   (2) ОКТАВНАЯ ПОЛОСА ЕСТЬ НЕ ВСЕГДА — смещение «полоса→прямоугольник» берём из RL.regBands
+       (при показе всех регистров она равна 0 и полоса === прямоугольник);
+   (3) ПЕРИОДОВ НА ЭКРАНЕ МОЖЕТ БЫТЬ НЕСКОЛЬКО — тогда у каждой полосы свой регистр, и его НАДО
+       показать (маркер справа): четыре одинаковых блока без пометки не дают понять, куда целишься.
+   activeSlot — СЛОТ подсветки (не ступень!), см. правило про подсветку в drawRole.
+   x0..x1 — X-ПРОТЯЖЁННОСТЬ: соло/бас на всю ширину роли; ТИПИЗИРОВАННЫЕ аккорды — правее палитры
+   [palSplitX,rx1], нетипизированные (палитры нет) — тоже на всю ширину роли. lblOf(deg) — подпись
+   ноты/корня, её выбирает вызывающий (соло/бас: нота+центы; аккорды: корень+центы или имя аккорда). */
+function drawRectGrid(x0,x1,playH,accent,activeSlot,lblOf,role,rx0=x0){
+  const RL=rectLayout(), nB=RL.bands, w=x1-x0, base=rectBase(rectOctReg(role));
+  const aRect=activeSlot>=0?Math.floor(activeSlot/RL.k):-1, aNote=activeSlot>=0?activeSlot%RL.k:-1;
   const lx=Math.max(x0+7,rx0+FX_BAND_R+8);       // легенда правее столбиков эффектов (соло, от rx0 — левого края роли) и правее палитры (аккорды). rx0 ОТДЕЛЬНО от x0: у аккордов x0=split, но столбиков там нет
   ctx.textBaseline='middle';
-  for(let b=0;b<nRfull;b++){                     // полос nRfull: полоса 0 — октавная (низ), 1..N — нотные
-    const [yTop,yBot]=rectBandY(b,playH,nRfull), h=yBot-yTop;
-    if(b===0){
+  for(let b=0;b<nB;b++){
+    const [yTop,yBot]=rectBandY(b,playH,nB), h=yBot-yTop;
+    if(RL.hasReg&&b===0){
       drawRectOctBand(x0,w,lx,yTop,h,role);      // общий с терменвоксом рендер октавной полосы (роль → чей регистр подсветить)
     }else{
-      const r=b-1, on=r===aRect;                 // нотный прямоугольник = полоса−1
+      const r=b-RL.regBands, on=r===aRect;       // нотный прямоугольник = полоса − октавная (если она есть)
       ctx.fillStyle= on ? hexA(accent,.16) : (r%2?'rgba(255,255,255,.05)':'rgba(255,255,255,.03)');
       ctx.fillRect(x0,yTop,w,h);
       ctx.strokeStyle= on ? accent : 'rgba(255,255,255,.12)';
       ctx.lineWidth= on ? 2 : 1; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
-      // легенда 4 пальцев (I=указ.=низ … IV=мизинец=верх), стопкой — это КЛЮЧ, не 4 зоны выбора
-      const eh=Math.min(20,(h-8)/4), sy=yTop+(h-eh*4)/2;
-      for(let n=0;n<4;n++){
-        const deg=Math.min(r*4+n,maxDeg), ey=sy+n*eh+eh/2, act=on&&n===aNote;
+      /* Легенда пальцев (I=указ.=низ … ), стопкой — это КЛЮЧ, а не зоны выбора. Строк RL.k;
+         холостые пальцы дорисовываем тусклым прочерком, чтобы «мизинец молчит» читалось как
+         УСТРОЙСТВО, а не как сбой. Высоту делим на ВСЕ ЧЕТЫРЕ пальца — стопка не скачет при смене лада. */
+      const eh=Math.min(20,(h-8)/FINGER_TIPS.length), sy=yTop+(h-eh*FINGER_TIPS.length)/2;
+      for(let n=0;n<FINGER_TIPS.length;n++){
+        const ey=sy+n*eh+eh/2, live=n<RL.k, act=on&&n===aNote;
+        ctx.textAlign='left';
+        if(!live){ ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.22)'; ctx.fillText(`${OCT_ROMAN[n]}  —`, lx, ey); continue; }
+        const deg=rectNoteAt(Math.min(r*RL.k+n,RL.notes-1),base).deg;
         ctx.font= act?'700 13px system-ui':'12px system-ui';
-        ctx.fillStyle= act?accent:'rgba(255,255,255,.6)'; ctx.textAlign='left';
+        ctx.fillStyle= act?accent:'rgba(255,255,255,.6)';
         ctx.fillText(`${OCT_ROMAN[n]}  ${lblOf(deg)}`, lx, ey);
+      }
+      /* МАРКЕР РЕГИСТРА у правого края полосы — только когда периодов на экране несколько.
+         Без него четыре одинаковых блока не отличить, и человек не знает, в какой октаве целится.
+         Регистр берём ТОЙ ЖЕ формулой, что и звук (rectNoteAt), поэтому маркер не может соврать. */
+      if(RL.octaves>1){
+        const o=rectNoteAt(r*RL.k,base).oct;
+        ctx.font='700 11px system-ui'; ctx.textAlign='right';
+        ctx.fillStyle= on ? hexA(accent,.95) : 'rgba(255,255,255,.34)';
+        ctx.fillText(OCT_ROMAN[o]||String(o+1), x1-6, yTop+Math.min(10,h/2));   // ВВЕРХУ полосы, а не по центру: центр справа занимает разбор Гц звучащего аккорда
       }
     }
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
-/* ОКТАВНАЯ ПОЛОСА (нижний прямоугольник) — распорядитель регистра, control-синий. 4 строки
-   палец→регистр I–IV → окт I..IV; активный регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg,
-   аккорды→chordOctReg) подсвечен. Рендер октавной полосы для rect-сетки (drawRectGrid); терменвокс
-   теперь аддитивный оверлей и полосу НЕ перерисовывает (её даёт сетка). */
+/* ОКТАВНАЯ ПОЛОСА (нижний прямоугольник) — распорядитель регистра, control-синий. Строки
+   палец→регистр; активный регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg, аккорды→chordOctReg)
+   подсвечен. Рендер октавной полосы для rect-сетки (drawRectGrid); терменвокс теперь аддитивный
+   оверлей и полосу НЕ перерисовывает (её даёт сетка).
+   ⚠️ ПОЛОСА ЕСТЬ ТОЛЬКО ТАМ, ГДЕ ПОКАЗАН НЕ ВЕСЬ ДИАПАЗОН (rectLayout().hasReg), и она двигает ОКНО
+   из octaves периодов, а не одну октаву. Значит выбираемых баз не всегда четыре: их rectBaseMax()+1
+   (при одном периоде — прежние четыре, байт-в-байт), и лишние пальцы холостые — тем же тусклым
+   прочерком, что и в нотном прямоугольнике. Подпись окна из двух периодов — «окт II–III». */
 function drawRectOctBand(x0,w,lx,yTop,h,role){
   ctx.fillStyle=hexA('#4cc2ff',.10); ctx.fillRect(x0,yTop,w,h);
   ctx.strokeStyle=hexA('#4cc2ff',.55); ctx.lineWidth=1.5; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
-  const eh=Math.min(18,(h-6)/5), sy=yTop+(h-eh*5)/2, reg=rectOctReg(role);
+  const oc=rectLayout().octaves, nSel=rectBaseMax()+1, rows=FINGER_TIPS.length+1;   // строк всегда 5 (шапка+4 пальца) — стопка не скачет от лада к ладу
+  const eh=Math.min(18,(h-6)/rows), sy=yTop+(h-eh*rows)/2, reg=rectBase(rectOctReg(role));
   ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
   ctx.fillText(periodOf()===2?t('reg.octaveFull'):regWord().toUpperCase(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.)
-  for(let n=0;n<4;n++){
-    const ey=sy+(n+1)*eh+eh/2, act=n===reg;
+  for(let n=0;n<FINGER_TIPS.length;n++){
+    const ey=sy+(n+1)*eh+eh/2;
+    if(n>=nSel){ ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.22)'; ctx.fillText(`${OCT_ROMAN[n]}  —`, lx, ey); continue; }   // база вне допустимой — палец холостой
+    const act=n===reg, span = oc>1 ? `${OCT_ROMAN[n]}–${OCT_ROMAN[n+oc-1]}` : OCT_ROMAN[n];
     ctx.font= act?'700 13px system-ui':'12px system-ui';
     ctx.fillStyle= act?'#4cc2ff':'rgba(255,255,255,.6)';
-    ctx.fillText(`${OCT_ROMAN[n]}  ${regWord()} ${OCT_ROMAN[n]}`, lx, ey);
+    ctx.fillText(`${OCT_ROMAN[n]}  ${regWord()} ${span}`, lx, ey);
   }
 }
 /* ТЕРМЕНВОКС — АДДИТИВНЫЙ ОВЕРЛЕЙ поверх ОБЫЧНОЙ сетки (rect-прямоугольники/узкие ряды остаются как
@@ -137,21 +176,25 @@ function drawRectOctBand(x0,w,lx,yTop,h,role){
    заливка/затемнение). Геометрия — thereminSpan, ТОТ ЖЕ раздел, что у звука (gestures), поэтому линия и
    слышимый центр совпадают. Ближайшая нота (activeDeg) ярче. rx0 — левый край роли (легенда правее
    столбиков эффектов). Показываем ТОЛЬКО когда какая-то рука роли назначена на терменвокс (drawRole). */
-function drawThereminLines(x0,x1,playH,accent,activeDeg,rx0=x0){
-  const {M,spanBot,divH}=thereminSpan(playH), last=M-1, s=CUR(), rect=rectGrid();
+function drawThereminLines(x0,x1,playH,accent,activeSlot,rx0=x0,role='ld'){
+  const {M,spanBot,divH}=thereminSpan(playH), last=M-1, s=CUR();   // M = ноты НА СЕТКЕ (см. thereminSpan)
   const lx=Math.max(x0+7,rx0+FX_BAND_R+8);
   const every=divH>=15?1:divH>=9?2:4;             // подписи прореживаем, если линии частые (Партч=44 нот)
+  /* i — СЛОТ, а не ступень: у многопериодной сетки одна ступень встречается в каждом периоде,
+     поэтому подпись и «зелёная тоника» берутся через rectNoteAt — ту же формулу, что даёт звук. */
+  const base=rectGrid()?rectBase(rectOctReg(role)):0;
+  const degOf = i => rectGrid() ? rectNoteAt(i,base).deg : i;
   ctx.textBaseline='middle';
-  for(let d=0;d<=last;d++){                        // d — ступень; линия в ЦЕНТРЕ деления
-    const yc=spanBot-(d+0.5)*divH, on=d===activeDeg;
+  for(let i=0;i<=last;i++){
+    const yc=spanBot-(i+0.5)*divH, on=i===activeSlot, d=degOf(i);
     const ton=IVX()[d]%s.edo===0;                  // тоника/октава — зелёным (как drawGrid)
     ctx.strokeStyle= on?accent : ton?'rgba(87,217,163,.5)':'rgba(255,255,255,.22)';   // чуть ярче: линии поверх готовой сетки
     ctx.lineWidth= on?2:0.8;
     ctx.beginPath(); ctx.moveTo(x0,yc); ctx.lineTo(x1,yc); ctx.stroke();
-    if(on||d%every===0){
+    if(on||i%every===0){
       ctx.fillStyle= on?accent : ton?'#57d9a3':'rgba(255,255,255,.6)';
       ctx.font= on?'700 12px system-ui':'11px system-ui'; ctx.textAlign='left';
-      ctx.fillText(`${rect?rectNoteLbl(d):gridNoteLbl(d)} · ${centsOf(d)}c`, lx, yc);   // нерект (BP): порядковый, чтобы совпасть с сеткой/ярлыком
+      ctx.fillText(`${noteLbl(d)} · ${centsOf(d)}c`, lx, yc);   // та же подпись, что у сетки и у ярлыка — одна функция на все раскладки
     }
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
@@ -374,32 +417,62 @@ function drawStatus(){
    левая эффекты» — лишь ДЕФОЛТ, а не правило раскладки. При splitOn ролей две, по половине экрана. */
 /* Рендер ОДНОЙ роли в её X-диапазон [rx0,rx1]. Вынесено из drawPhone, чтобы сплит-экран мог
    позвать её дважды (по половине на роль); single-role зовёт один раз с (phoneInstr,0,W). rx0 —
-   левый край роли (начало столбиков эффектов), ОТДЕЛЬНО от x0 сетки (у аккордов x0=split). */
+   левый край роли (начало столбиков эффектов), ОТДЕЛЬНО от x0 сетки (у ТИПИЗИРОВАННЫХ аккордов
+   x0=split — слева палитра; у нетипизированных палитры нет и сетка идёт от rx0, как у соло). */
 function drawRole(instr,rx0,rx1,playH){
   const accent=INSTR_COL[instr], split=palSplitX(rx0,rx1);
   const labelX= instr==='ld' ? rx0+FX_BAND_R+8 : rx0+7;   // у соло подписи правее столбиков эффектов
   if(instr==='dr'){ drawDrumGrid(rx0,rx1,playH); return; }
-  // активная ступень: аккорд — по защёлке, соло/бас — по играющей руке
-  let act=-1;
-  if(instr==='ch')act=latchDeg>=0?latchDeg:loopChordDeg();   // рука в приоритете, иначе аккорд петли (§Q5)
-  else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs'))act=S.deg; }
+  /* Активная НОТА подсветки — ПАРА (ступень, регистр): аккорд по защёлке, соло/бас по играющей руке.
+     ⚠️ ПОЧЕМУ ПАРА, А НЕ ОДНА СТУПЕНЬ, И ПОЧЕМУ РАНЬШЕ ХВАТАЛО ОДНОЙ. Пока сетка показывала ОДИН
+     период, ступень ОДНОЗНАЧНО задавала прямоугольник (слот === ступень), и подсветка честно считалась
+     как floor(ступень/4). Теперь периодов на экране до четырёх: ступень 2 живёт в ЧЕТЫРЁХ
+     прямоугольниках, и по одной ступени подсветка всегда падала бы в НИЖНИЙ — то есть была бы верна
+     ровно на тех ладах, что работали и до этого, и неверна на всех новых. Поэтому регистр носится
+     рядом со ступенью (latchOct у защёлки, curChordOct у петли, S.regOct у руки), а прямоугольник
+     ищется ОБРАТНОЙ формулой rectSlotOf — той же, что прямая rectNoteAt в gestures. НЕ возвращать
+     подсветку к одной ступени. */
+  let act=-1, actOct=0;
+  if(instr==='ch'){                                          // рука в приоритете, иначе аккорд петли (§Q5)
+    if(latchDeg>=0){ act=latchDeg; actOct=latchOct; }
+    else { act=loopChordDeg(); actOct=loopChordOct(); }
+  }else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&(S.zone==='ld'||S.zone==='bs')){ act=S.deg; actOct=S.regOct; } }
+  const actSlot = (act>=0&&rectGrid()) ? rectSlotOf(act,actOct,rectBase(rectOctReg(instr))) : -1;   // -1 = ноты нет ИЛИ она вне показанного окна (тогда просто не подсвечиваем)
   if(instr==='ch'&&!supportsChords()){ drawNoChordsHint(rx0,rx1,0,playH); return; }   // макам: всё поле роли — объяснение
   /* У типизированных аккордов ряд подписываем именем КОРНЯ (C, C#…): тип задаёт
      палитра, а не лад, поэтому обычный chordLabel (он дал бы пауэр-аккорд «C5») врёт. */
   const chTyped = instr==='ch' && typedChords();
+  /* ОДНА развилка «прямоугольники vs узкие ряды» на ВСЕ ТРИ ноте-роли (соло/бас/аккорды).
+     ⚠️ ПОЧЕМУ ЭТО ВАЖНО И ПОЧЕМУ ДЫРА ДОЛГО НЕ БЫЛА ВИДНА. gestures решает rect по РОЛИ:
+     rectPlay = (зона ld|bs|ch) && rectGrid(). А здесь rect-ветка аккордов раньше жила ВНУТРИ
+     chTyped, и нетипизированный аккордовый лад падал в drawGrid — узкие ряды. Разойтись это не
+     могло ровно потому, что все четыре rect-лада были либо typedChords (19/31-TET, Партч), либо
+     noChords (гамма): нетипизированного rect-лада с аккордами просто НЕ СУЩЕСТВОВАЛО. Как только
+     раскладку стало можно включать человеку, таких ладов стало большинство (вся диатоника, лады,
+     этнические, октатоники) — и палец брал бы корень, которого не видит (правило #9). НЕ
+     возвращать rect-ветку аккордов внутрь chTyped.
+     Поле нот/корней начинается правее палитры ТОЛЬКО у типизированных (палитра бывает лишь у них);
+     у прочих — от левого края роли, как у соло/баса. */
+  const gx0 = chTyped ? split : rx0;
+  const rowLblOf = instr==='ch' ? (chTyped?rootName:chordLabel) : noteLbl;   // узкие ряды: у типизированных — имя КОРНЯ (chordLabel дал бы «C5», это враньё), у прочих аккордов — имя аккорда, у соло/баса — нота
+  if(rectGrid()){
+    /* Легенда пальцев: соло/бас — нота+центы; типизированные аккорды — корень+центы; прочие
+       аккорды — имя аккорда (ровно то же, что показывал бы ряд). Центы прячем, когда периодов
+       несколько: они одинаковы в каждом блоке, и на 48 слотах это шум — живой ярлык их всё равно
+       показывает. При одном периоде подпись прежняя, байт-в-байт. */
+    const many = rectLayout().octaves>1;
+    const lblOf = instr==='ch' ? (chTyped ? (many ? rootName : d=>`${rootName(d)} · ${centsOf(d)}c`) : chordLabel)
+                               : (many ? noteLbl : d=>`${noteLbl(d)} · ${centsOf(d)}c`);
+    drawRectGrid(gx0,rx1,playH,accent,actSlot,lblOf,instr,rx0);
+  }else drawGrid(gx0,rx1,accent,rowLblOf,act,playH, chTyped?split+7:labelX);
   if(chTyped){
-    /* Экран поделён: слева палитра типов, справа ряды/прямоугольники корней. Палитра — как была.
-       19/31-TET: правая половина — rect-корни + октавная полоса; chrom12 — узкие ряды как было. */
-    if(rectGrid())drawRectGrid(split,rx1,playH,INSTR_COL.ch,act, d=>`${rootName(d)} · ${centsOf(d)}c`, instr, rx0);   // корни прямоугольниками, в правой половине (роль=instr='ch')
-    else drawGrid(split,rx1,accent,rootName,act,playH,split+7);
     drawChordPalette(rx0,split,playH);
     ctx.strokeStyle=hexA(accent,.35); ctx.lineWidth=1.5;   // тонкий разделитель палитра|ноты ВНУТРИ роли
     ctx.beginPath(); ctx.moveTo(split,0); ctx.lineTo(split,playH); ctx.stroke();
-  }else if((instr==='ld'||instr==='bs')&&rectGrid())drawRectGrid(rx0,rx1,playH,accent,act, d=>`${rectNoteLbl(d)} · ${centsOf(d)}c`, instr, rx0);   // 19/31-TET: прямоугольники по 4 ноты (соло И бас), accent = цвет роли, роль=instr
-  else drawGrid(rx0,rx1,accent, instr==='ch'?chordLabel:gridNoteLbl, act, playH, labelX);   // соло/бас: gridNoteLbl = порядковый у неоктавных (BP), rowLabel у прочих
+  }
   /* Терменвокс — АДДИТИВНЫЙ оверлей ПОВЕРХ сетки соло/баса: тонкие нотные линии, ТОЛЬКО когда какая-то
      рука этой роли назначена на терменвокс (иначе линии — мусор). Сетка (rect/ряды) уже нарисована. */
-  if((instr==='ld'||instr==='bs')&&roleHasTherm(instr))drawThereminLines(rx0,rx1,playH,accent,act,rx0);
+  if((instr==='ld'||instr==='bs')&&roleHasTherm(instr))drawThereminLines(rx0,rx1,playH,accent,rectGrid()?actSlot:act,rx0,instr);   // подсветка линии — по СЛОТУ у rect-сетки (у узких рядов слот===ступень)
   /* Живой разбор Гц ПОВЕРХ подсвеченного корня — только у аккордов и только пока аккорд ЗАЩЁЛКНУТ и
      звучит (latchDeg>=0). Аккорд петли (loopChordDeg) сюда НЕ попадает: его владелец — 'loop:N', а не
      'latch'; подсветка ряда у него остаётся прежней (без разбора). Считаем полосу тем же способом, что
@@ -408,10 +481,10 @@ function drawRole(instr,rx0,rx1,playH){
     const freqs=latchChordFreqs();
     if(freqs&&freqs.length){
       const nx0 = chTyped ? split : rx0;                     // левый край поля корней (у типизированных — правее палитры)
-      if(rectGrid()){                                        // 19/31-TET/Партч: полоса — прямоуг.=floor(act/4), band=+1 (0 — октавная)
-        const nRfull=rectRowsFull(), [yTop,yBot]=rectBandY(Math.floor(act/4)+1,playH,nRfull);
+      if(rectGrid()&&actSlot>=0){                            // полоса = прямоуг.(floor(слот/k)) + октавная, если она есть; по СТУПЕНИ её не найти (см. подсветку выше)
+        const RL=rectLayout(), [yTop,yBot]=rectBandY(Math.floor(actSlot/RL.k)+RL.regBands,playH,RL.bands);
         drawChordReadout(nx0+(rx1-nx0)*0.42,rx1,yTop,yBot,freqs,INSTR_COL.ch);   // правая часть прямоугольника (слева — легенда пальцев)
-      }else{                                                  // узкие ряды (chrom12/BP/темперации/диатоника): ряд act
+      }else if(!rectGrid()){                                  // узкие ряды (chrom12/BP/темперации/диатоника): ряд act. rect-сетка с аккордом ВНЕ окна разбор просто не рисует — рисовать его негде
         const rows=IVX().length, seg=playH/rows, yTop=(rows-1-act)*seg;
         drawChordReadout(nx0+(chTyped?36:66),rx1,yTop,yTop+seg,freqs,INSTR_COL.ch);   // резерв слева под корневую подпись
       }
@@ -540,6 +613,14 @@ function drawHandsPhone(res,W,H,playH){
     // сплит): по ЗОНЕ (щипок='chFam') или ПОЛОЖЕНИЮ (до щипка: указательный слева от раздела). Привязки
     // к руке больше нет нигде — ни здесь, ни в hit-test (см. famHand в gestures).
     if(isCh&&typedChords()&&(S.pinch?S.zone==='chFam':sx(lm[8].x,W)<split))continue;
+    /* ХОЛОСТОЙ ПАЛЕЦ (щипок есть, ноты нет — при k<4 лишние пальцы молчат): рука НЕ должна пропадать
+       с экрана, иначе молчание читается как потеря трекинга. Тусклое кольцо + прямая подпись. */
+    if(S.pinch&&!S.inert&&S.deg<0&&rectGrid()&&(instr==='ld'||instr==='bs'||instr==='ch')){
+      ctx.strokeStyle=hexA(accent,.45); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(S.x,S.y,16,0,7); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.7)'; ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText(t('tag.idleFinger'), S.x+14, S.y-10);
+      continue;
+    }
     if(S.pinch&&!S.inert&&S.deg>=0){
       ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.arc(S.x,S.y,16+6*S.vol,0,7); ctx.stroke();
@@ -549,16 +630,20 @@ function drawHandsPhone(res,W,H,playH){
         /* Терменвокс (соло/бас): высота НЕПРЕРЫВНА — живые Гц и центы над тоникой РОЛИ. Опора центов —
            тоника соло (baseF) или баса (baseF/4), иначе бас показал бы −2400¢. «≈» — ближайшая нота. */
         const ref=instr==='bs'?baseF()/4:baseF(), cAbs=Math.round(1200*Math.log2(S.hz/ref));
-        drawTag(S.x,S.y,[`≈ ${rectGrid()?rectNoteLbl(S.deg):gridNoteLbl(S.deg)} · ${t('tag.gliss')}`,
+        drawTag(S.x,S.y,[`≈ ${noteLbl(S.deg)} · ${t('tag.gliss')}`,
           `${Math.round(S.hz)} ${t('unit.hz')} · ${Math.round(S.vol*100)}% · ${cAbs}c`],accent);
       }else if(instr==='ld'||instr==='bs'){
-        /* rectGrid (соло/бас): S.oct — это НОТА в прямоугольнике, а не октава. Октава — липкий
-           регистр РОЛИ (rectOctReg: соло→octReg, бас→bassOctReg); берём его, иначе Гц/«окт» врали бы. */
-        const rectRole=(instr==='ld'||instr==='bs')&&rectGrid();
-        const oShow=rectRole?rectOctReg(instr):S.oct;   // роль=instr (rectRole ⇒ 'ld'/'bs')
+        /* rect-раскладка (соло/бас): S.oct — ПАЛЕЦ, а не октава. Октаву посчитала игра (S.regOct —
+           из слота, единая формула rectNoteAt), берём ЕЁ: пересчитывать вторым путём нельзя, иначе
+           ярлык врал бы про Гц и регистр там, где на экране несколько периодов. */
+        const oShow=S.regOct;
         const f=instr==='bs'?bassFreq(S.deg,oShow):leadFreq(S.deg,oShow);
-        const L1=rectRole?`${rectNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`   // rect: порядковый номер, в лад с легендой/подсказкой
-          :(s.edo>12&&s.tag==='edo')?`${t('tag.step')} ${IVX()[S.deg]%s.edo} · ${regWord(s)} ${OCT_ROMAN[oShow]}`:`${gridNoteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
+        /* Подпись ноты — ТА ЖЕ функция, что у сетки и подсказки (noteLbl): ярлык не может назвать
+           ноту иначе, чем легенда под пальцем. Прежняя спец-ветка «шаг N» (s.edo>12 && tag==='edo')
+           убрана: единственные лады с tag:'edo' — 19/31-TET, а они были rect, так что ветка была
+           НЕДОСТИЖИМА (правка байт-в-байт). Достижимой она стала бы ровно сейчас — когда 19/31-TET
+           можно переключить в узкие ряды, — и там «шаг 5» расходилось бы с сеточным «6». */
+        const L1=`${noteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
         /* Центы показываем ВСЕГДА, на любом ладу (снят прежний гейт s.edo!==12). Исторические
            темперации (Пифагоров, оба Натуральных, мезотон, велл-темперации) — это edo:12 cents-лады:
            ИМЯ ноты одинаковое, а высота гуляет до ~21.5¢ (Пифагорова терция 408¢ vs Натуральная 386¢ на
@@ -574,22 +659,33 @@ function drawHandsPhone(res,W,H,playH){
       }else if(typedChords()){                   // тип задаёт палитра — chordLabel дал бы «C5», это враньё
         const FS=chordFams(), fam=FS[Math.min(chordFam,FS.length-1)]||FS[0];
         const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
-        const oShow=rectGrid()?rectOctReg(instr):S.oct;   // rect-аккорды (19/31): октава из chordOctReg (роль=instr='ch'); chrom12: S.oct (палец)
+        const oShow=S.regOct;   // регистр посчитала игра (из слота либо от пальца) — второй путь врал бы на многопериодной сетке
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(L(ty.label)||''),   // у ярлыка есть ширина — пишем полное имя типа
           L(ty.full)||L(fam.name),`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
-      }else drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[S.oct]} · ${Math.round(S.vol*100)}%`],accent);
+      }else{
+        /* Нетипизированные аккорды (диатоника и пр.): в rect-раскладке S.oct значит «корень в
+           прямоугольнике», а регистр посчитала игра (S.regOct). Раньше здесь всегда стоял S.oct —
+           это не било лишь потому, что нетипизированного rect-лада с аккордами не существовало. */
+        const oShow=S.regOct;
+        drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
+      }
     }else if(!S.pinch){                          // подсказка до щипка — под указательным
       const tip=lm[8], x=sx(tip.x,W), y=sy(tip.y,H);   // подсказка до щипка — в экранных пикселях игрового поля (поля кадра сняты)
       if((instr==='ld'||instr==='bs'||instr==='ch')&&rectGrid()){
-        /* rectGrid (соло/бас/аккорды): подсказка кадрирует ПОЛОСУ полной сетки под рукой (то же
-           r=полоса−1, что и в игре). У аккордов рамка/подписи живут в правой половине [SPLIT,W]
-           (слева палитра). Полоса 0 — октавная: показываем регистр роли; иначе 4 ноты/корня. */
-        const nRfull=rectRowsFull(), band=degRaw(Math.min(y,playH-1),nRfull,playH), maxDeg=IVX().length-1;
-        const [yTop,yBot]=rectBandY(band,playH,nRfull), hx0=instr==='ch'?split:rx0;
+        /* rect-раскладка (соло/бас/аккорды): подсказка кадрирует ПОЛОСУ сетки под рукой (тем же
+           смещением regBands, что и игра). У ТИПИЗИРОВАННЫХ аккордов рамка/подписи живут правее
+           палитры. Октавная полоса (если она есть) — показываем окно регистров; иначе RL.k нот/корней
+           и номер регистра этой полосы, когда периодов несколько. */
+        const RL=rectLayout(), band=degRaw(Math.min(y,playH-1),RL.bands,playH), hbase=rectBase(rectOctReg(instr));
+        const [yTop,yBot]=rectBandY(band,playH,RL.bands), hx0=(instr==='ch'&&typedChords())?split:rx0;   // правее палитры — только когда палитра ЕСТЬ (typedChords), иначе поле роли целиком
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,yTop,rx1-hx0,yBot-yTop);
         let lbl;
-        if(band===0) lbl=`${periodOf()===2?t('reg.octaveFull'):regWord().toUpperCase()} · ${t('tag.octHint',{r:OCT_ROMAN[rectOctReg(instr)]})}`;   // роль=instr
-        else{ const r=band-1; lbl=''; for(let n=0;n<4;n++){ const deg=Math.min(r*4+n,maxDeg); lbl+=(n?'  ':'')+OCT_ROMAN[n]+':'+(instr==='ch'?rootName(deg):rectNoteLbl(deg)); } }
+        if(RL.hasReg&&band===0) lbl=`${periodOf()===2?t('reg.octaveFull'):regWord().toUpperCase()} · ${t('tag.octHint',{r:OCT_ROMAN[hbase]})}`;   // роль=instr
+        /* Подписи нот — ТЕ ЖЕ, что в легенде прямоугольника: типизированные аккорды — корень,
+           нетипизированные — имя аккорда (как в их рядах), соло/бас — noteLbl. Их RL.k, а не всегда 4. */
+        else{ const r=band-RL.regBands, hlbl = instr==='ch' ? (typedChords()?rootName:chordLabel) : noteLbl;
+              lbl=''; for(let n=0;n<RL.k;n++){ const nt=rectNoteAt(Math.min(r*RL.k+n,RL.notes-1),hbase); lbl+=(n?'  ':'')+OCT_ROMAN[n]+':'+hlbl(nt.deg); }
+              if(RL.octaves>1) lbl+='   '+regWord()+' '+(OCT_ROMAN[rectNoteAt(r*RL.k,hbase).oct]||''); }   // какой это период — иначе четыре одинаковых блока не различить
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
         ctx.fillText(lbl,x+14,y-12);
       }else{
@@ -599,7 +695,7 @@ function drawHandsPhone(res,W,H,playH){
         const hx0 = (isCh&&typedChords()) ? split : rx0;
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,(rows-1-d)*seg,rx1-hx0,seg);
         ctx.fillStyle=hexA(accent,.8); ctx.font='600 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
-        ctx.fillText(isDr?(L(DRUM_NAMES[d])||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):gridNoteLbl(d)),x+14,y-12);
+        ctx.fillText(isDr?(L(DRUM_NAMES[d])||''):(isCh?(typedChords()?rootName(d):chordLabel(d)):noteLbl(d)),x+14,y-12);
       }
     }
   }

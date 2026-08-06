@@ -34,7 +34,7 @@ let recLead=null, recCh=null, recBass=null, pumpTimer=null;
 /* Глиссандо-в-луп: у ОТКРЫТОЙ соло-ноты копим кривую бенда (центы поверх ступени) в массив,
    лежащий ПО ССЫЛКЕ в событии leadOn. Активно только у терменвокса (гейт live!=null). */
 let recLeadBend=null, noteStartBeat=0, bendLastC=null;
-let curChordDeg=-1;                                  // ступень аккорда, что играет петля сейчас (для подсветки, §Q5)
+let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГИСТР аккорда, что играет петля сейчас (для подсветки, §Q5). Регистр нужен с многопериодной сеткой: одна ступень живёт в нескольких прямоугольниках, без него подсветка всегда падала бы в нижний
 const loopBeats=()=>loop.bars*loop.metre;
 /* ГРУППИРОВКА (акценты) по размеру — СТАТИЧНАЯ, по умолчанию. Массив длин групп, сумма = размер.
    Нечётные размеры чувствуются НЕ ровно: балканская 7 = 3+2+2, 9 = 2+2+2+3, 5 = 2+3; индийский
@@ -51,6 +51,7 @@ function beatLevel(metre,b){
   return 0;   // не голова группы
 }
 const loopChordDeg=()=>loop.on?curChordDeg:-1;       // draw: подсветить аккорд петли, когда рука его не держит
+const loopChordOct=()=>loop.on?curChordOct:0;        // его регистр — тем же путём (подсветка ищет прямоугольник по ПАРЕ deg+oct)
 const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
 /* Позиция для визуализации: фаза отсчёта / игры, доля внутри петли, всего долей. */
 function loopPos(){
@@ -233,7 +234,7 @@ function scheduleLayers(){
       if(ev.t>=lo&&ev.t<hi){
         const when=loop.t0+(rep*lb+ev.t)*spb;               // ТОЧНОЕ время события
         ENG[ev.fn](ev.a,ev,when);                           // ev несёт замороженный лад (§3.4)
-        if(ev.fn==='chOn'||ev.fn==='chSet')curChordDeg=ev.a.deg;   // подсветка ведёт на опережение (~до окна) — косметика
+        if(ev.fn==='chOn'||ev.fn==='chSet'){ curChordDeg=ev.a.deg; curChordOct=ev.a.oct; }   // подсветка ведёт на опережение (~до окна) — косметика; регистр лежит в том же событии
         else if(ev.fn==='chOff')curChordDeg=-1;
       }
     }
@@ -390,5 +391,5 @@ export {
   WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
   softAllOff, panic, inPB, recording,
   onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, setLoopSub, SUBS, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
-  loadArrangement, loadJam, clearJam, loopChordDeg,
+  loadArrangement, loadJam, clearJam, loopChordDeg, loopChordOct,
 };

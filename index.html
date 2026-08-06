@@ -166,6 +166,10 @@
       </div>
     </div>
     <p class="phint" data-i18n="panel.scale.arefHint">Единый эталон — изобретение XX века: до него каждый город и церковь настраивались по-своему, барочные ансамбли и сегодня играют на 415.</p>
+    <!-- РАСКЛАДКА НОТ: прямоугольники vs узкие ряды. Стоит РЯДОМ С ЛАДОМ, потому что от лада зависит
+         значение варианта «По ладу» (и сама геометрия: сколько нот в прямоугольнике и сколько октав
+         влезло). Варианты строит ui.js (renderRectCtl). Блокировки нет: раскладываются все лады. -->
+    <div class="prow" id="rectRow"><label data-i18n="panel.scale.rectLayout">Раскладка нот</label><select id="rectSel"></select></div>
     <div class="prow"><label data-i18n="panel.scale.chords">Аккорды</label>
       <div class="seg"><button id="qTriad" class="act" data-i18n="panel.scale.triads">Трезвучия</button><button id="qSev" data-i18n="panel.scale.sevenths">Септаккорды</button></div>
     </div>

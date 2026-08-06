@@ -29,6 +29,12 @@ export let exprBrightDisp=0;
 export let looperMsg=null;
 export let looperClear=-1;
 export let latchDeg=-1;                          // защёлкнутая ступень аккорда, -1 = тишина
+/* РЕГИСТР защёлкнутого аккорда — КОМПАНЬОН latchDeg, нужен ПОДСВЕТКЕ. Пока сетка показывала ОДИН
+   период, ступень однозначно задавала прямоугольник, и регистр для подсветки был не нужен. Теперь
+   периодов на экране до четырёх: одна и та же ступень живёт в четырёх прямоугольниках, и без
+   регистра подсветка загоралась бы всегда в нижнем. Пишется рядом с latchDeg (setLatchOct), читает
+   draw через scales.rectSlotOf(deg,oct,base). На ЗВУК не влияет — звук уже задан частотами голосов. */
+export let latchOct=0;
 /* Выбранная ячейка палитры типизированного аккорда (Хроматика, 31-TET):
    chordFam — КОЛОНКА (семейство), chordVar — РЯД внутри неё (вариант).
    Выбирается ПОЛОЖЕНИЕМ щипка по палитре, ЛЮБОЙ рукой (привязки к handedness нет нигде — handRole
@@ -67,6 +73,21 @@ export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)])
 export const roleHasTherm=role=> !!(handFn[role] && (handFn[role].L==='therm'||handFn[role].R==='therm'));
 export const roleHasFx=role=> role==='ld' && (handFn.ld.L==='fx'||handFn.ld.R==='fx');   // fx только у соло
 export const roleHasExpr=role=> role==='ld' && (handFn.ld.L==='expr'||handFn.ld.R==='expr');   // выразительность (первый заход — только соло)
+/* РАСКЛАДКА НОТ — «прямоугольники» vs «узкие ряды». СОСТОЯНИЕ, которое переключает человек, а НЕ
+   свойство лада: свойство s.rectGrid осталось в данных, но теперь оно — ДЕФОЛТ («каким лад
+   открывается»), а не сама раскладка. Три значения:
+     'auto' — по ладу (дефолт s.rectGrid): Партч/31-TET открываются прямоугольниками, мажор/хроматика
+              узкими рядами. ДЕФОЛТ ЗДЕСЬ и есть требование «нетронутое приложение ведёт себя как
+              сегодня НА КАЖДОМ ладу»: простой булев флаг, засеянный первым ладом, перетащил бы
+              прямоугольники Партча на мажор при следующей смене лада;
+     'rect' — прямоугольники везде, где арифметика позволяет (scales.rectEligible);
+     'rows' — узкие ряды везде (ряды возможны ВСЕГДА).
+   ГЛОБАЛЬНОЕ, не по ладу: карта «лад→раскладка» ключевалась бы на scaleIdx, а индекс лада — НЕ
+   стабильный идентификатор (правила #7/#25). Не персистим (как handFn/splitOn — настройка сеанса).
+   Разрешает выбор ОДНО место — scales.rectGrid(); сюда раскладка не записывается никогда.
+   В СОБЫТИЕ НЕ ИДЁТ: раскладка — не музыкальный параметр (см. правило про заморозку sc). */
+export let rectPref='auto';
+export const setRectPref=v=>{ rectPref=v; };
 /* ЕДИНЫЙ ИСТОЧНИК ЗЕРКАЛА (фронт/тыл камеры). Фронтальная ('user') — картинку ЗЕРКАЛИМ (видишь
    себя как в зеркале, рука совпадает с экраном); тыловая ('environment') — НЕ зеркалим (иначе рука
    ехала бы против того, что на экране). camFacing пишем ТОЛЬКО через setCamFacing (правило #6).
@@ -134,6 +155,7 @@ export const setExprBrightDisp=v=>{ exprBrightDisp=v; };   // показ рас�
 export const setLooperMsg=v=>{ looperMsg=v; };         // подтверждение команды рукой-лупером (draw гасит по looperMsg.until)
 export const setLooperClear=v=>{ looperClear=v; };     // остаток мс отсчёта очистки (мизинец); -1 = нет
 export const setLatchDeg=v=>{ latchDeg=v; };
+export const setLatchOct=v=>{ latchOct=v; };     // регистр защёлкнутого аккорда (только для подсветки — см. latchOct)
 export const setChordFam=v=>{ chordFam=v; };
 export const setChordVar=v=>{ chordVar=v; };
 export const setLatchTy=v=>{ latchTy=v; };

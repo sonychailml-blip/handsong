@@ -1,7 +1,7 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide } from './state.js';
-import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRows, rectRowsFull, thereminHz } from './scales.js';
+import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide } from './state.js';
+import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
@@ -280,7 +280,7 @@ function endPinch(key,S){
       setLooperClear(-1); setLooperMsg({text:t('msg.clearCancelled'), until:performance.now()+LOOPER_MSG_MS, ok:true});
     }
   }
-  S.pinch=false; S.adj=null; S.deg=-1; S.rect=null; S.ty=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры; S.ty — замороженный на атаке тип аккорда
+  S.pinch=false; S.adj=null; S.deg=-1; S.slot=-1; S.rect=null; S.ty=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры; S.ty — замороженный на атаке тип аккорда
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
   S.clearT0=null; S.clearFired=false;           // отсчёт очистки лупера — сброс на размыкании
 }
@@ -297,7 +297,10 @@ function processHands(res){
     let key=(heads[i]&&heads[i][0]&&heads[i][0].categoryName)||('H'+i);
     if(seen.has(key))key+=i;
     seen.add(key);
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,ty:null,clearT0:null,clearFired:false});
+    /* regOct — РЕГИСТР сыгранной ноты (посчитан игрой: из слота у rect-раскладки, от пальца у узких
+       рядов), slot — её слот сетки. Оба нужны потому, что на многопериодной сетке ступень уже НЕ
+       задаёт ни высоту целиком, ни прямоугольник подсветки. Пишутся в тех же ветках, что и S.deg. */
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,regOct:0,slot:-1,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,ty:null,clearT0:null,clearFired:false});
     S.seen=now; S.lm=lm;
     /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
        palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
@@ -331,8 +334,10 @@ function processHands(res){
           const hExpr = h.role==='ld' && handFnOf(key,'ld')==='expr';   // рука-ВЫРАЗИТЕЛЬНОСТЬ: щипком НИЧЕГО не играет (считается пофреймово ниже); перебивает положение, как лупер
           const hsplit=palSplitX(h.rx0,h.rx1);
           const rectRole = (h.role==='ld'||h.role==='bs'||h.role==='ch') && rectGrid();
-          const octRight = h.role!=='ch' || px>=hsplit;   // у аккордов октава — только в правой (нотной) части половины
-          const octBand  = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
+          const octRight = !(h.role==='ch'&&typedChords()) || px>=hsplit;   // октаву прячем от палитры, а ПАЛИТРА бывает только у typedChords: без неё (диатоника и т.п.) полоса идёт во всю ширину роли, иначе левая пятая часть была бы мёртвой
+          /* Октавная полоса существует ТОЛЬКО когда показан не весь диапазон (hasReg). Без этого гейта
+             на многопериодной сетке нижний НОТНЫЙ прямоугольник перехватывался бы как регистровый и молчал. */
+          const octBand  = rectRole && rectLayout().hasReg && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
           const famHand  = h.role==='ch' && typedChords() && S.oct===0 && px<hsplit;   // ПОЛОЖЕНИЕ, без handRole
           S.zone = hLoop ? 'loop'
                  : hExpr ? 'expr'
@@ -349,8 +354,8 @@ function processHands(res){
           const sLoop = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && handFnOf(key,phoneInstr)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение НЕважно (октавную полосу/палитру игнорируем)
           const sExpr = phoneInstr==='ld' && handFnOf(key,'ld')==='expr';   // рука-ВЫРАЗИТЕЛЬНОСТЬ: щипком НИЧЕГО не играет (считается пофреймово ниже)
           const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
-          const octRight = phoneInstr!=='ch' || px>=split;
-          const octBand = rectRole && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
+          const octRight = !(phoneInstr==='ch'&&typedChords()) || px>=split;   // см. сплит-ветку: гейт по НАЛИЧИЮ палитры (typedChords), а не по роли
+          const octBand = rectRole && rectLayout().hasReg && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;   // полосы нет, когда показаны все регистры — иначе нижний НОТНЫЙ прямоугольник молчал бы
           /* Палитра типов — ПО ПОЛОЖЕНИЮ, БЕЗ привязки к руке (тот же гейт, что в сплите выше: большой+
              указательный слева от раздела). Прежде здесь стояло handRole(key)==='fx' — левая рука ВСЕГДА
              была палитрой и нот не играла, правая типов не выбирала; при вводе «Функций рук» привязку к
@@ -446,7 +451,11 @@ function processHands(res){
            РОЛЬ регистра: при сплите — инструмент ЭТОЙ половины (S.role, заморожен на захвате: из зоны
            'oct' роль не достать); иначе — активный phoneInstr (single-role, байт-в-байт, включая
            смену роли DOM-кнопкой на удержанном щипке — softAllOff щипок не снимает). */
-        setRectOctReg(splitOn?S.role:phoneInstr, S.oct);
+        /* КЛАМП базы окна: полоса задаёт НАЧАЛО окна из rectLayout().octaves периодов, поэтому база
+           не должна уводить верх окна за последний регистр (rectBase — тот же кламп, что при чтении;
+           у однопериодной сетки это прежние четыре регистра 1-в-1). Палец сверх допустимого — холостой,
+           как и лишние пальцы в прямоугольнике: ничего не меняет. */
+        setRectOctReg(splitOn?S.role:phoneInstr, rectBase(S.oct));
       }else if(S.zone==='loop'){
         /* Рука-ЛУПЕР при удержании: команды index/middle/ring уже сработали НА ЗАХВАТЕ (edge, раз на
            щипок — здесь НЕ повторяются). Живёт лишь ОЧИСТКА (мизинец): 3с-обратный отсчёт, срабатывает
@@ -460,24 +469,36 @@ function processHands(res){
         /* Рука-ВЫРАЗИТЕЛЬНОСТЬ: щипком НИЧЕГО не играет. Её признаки считаются ПОФРЕЙМОВО (вне щипка,
            ниже по циклу, exprFeatures), поэтому здесь — ровно ничего. */
       }else{
-        /* Сетка «4 ноты в прямоугольнике» — соло, бас И аккорды на ладу с rectGrid (19/31-TET).
-           Y выбирает ПОЛОСУ полной сетки; полоса 0 — октавная (её перехватывает зона 'oct'),
-           нотный прямоугольник = полоса−1. Палец S.oct (0=указ.=низ … 3=мизинец=верх) — ноту/корень
-           ВНУТРИ прямоугольника; октава — липкий регистр роли (rectOctReg). ступень = прямоуг*4
-           + нота, кламп в 0..IVX-1 (верх.мизинец = тоника октавой выше). S.oct тут читается как
-           «нота в прямоугольнике» — переосмысление ЛОКАЛЬНОЕ, в прочих местах S.oct по-прежнему октава.
-           У аккордов это КОРЕНЬ; тип берётся из палитры отдельно, октава — chordOctReg. */
+        /* Сетка ПРЯМОУГОЛЬНИКОВ — соло, бас И аккорды. Y выбирает ПОЛОСУ; если у лада есть октавная
+           полоса (RL.hasReg), она внизу и её перехватывает зона 'oct', поэтому нотный прямоугольник =
+           полоса − RL.regBands (при показе ВСЕХ регистров regBands=0 и полоса === прямоугольник).
+           Палец S.oct (0=указ. … 3=мизинец) выбирает ноту ВНУТРИ прямоугольника — их RL.k, а не всегда
+           четыре. СЛОТ g = прямоуг*k + палец; ступень И регистр даёт ЕДИНАЯ формула rectNoteAt(g,база):
+           при многопериодной сетке номер периода приходит из слота, поэтому регистр у каждой полосы
+           свой. S.oct тут читается как «палец», а не «октава» — переосмысление ЛОКАЛЬНОЕ.
+           У аккордов это КОРЕНЬ; тип берётся из палитры отдельно. */
         const rectPlay = (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') && rectGrid();
         const noteZone = S.zone==='ld'||S.zone==='bs';
         const thereminOn = noteZone && S.fn==='therm';   // терменвокс — ФУНКЦИЯ руки, соло И бас
         const holdOn     = (noteZone||S.zone==='ch') && S.fn==='hold';   // удержание — соло/бас И аккорды: корень/октава мёрзнут одним и тем же гейтом (S.deg застыл ниже)
-        const oct = rectPlay?rectOctReg(S.zone):S.oct;           // октавный регистр роли (WleadOn/бас/терменвокс); роль = S.zone (при игре ='ld'/'bs')
-        if(thereminOn){
+        const RL = rectPlay?rectLayout():null;
+        /* БАЗА ОКНА: пока показан не весь диапазон, её задаёт липкий регистр роли и двигает ВСЁ окно
+           (rectBase клампит, чтобы верх окна не уехал за последний регистр); когда показаны все
+           регистры — база 0. У нерект-раскладки «база» = палец, как было (регистр выбирает палец). */
+        const base = rectPlay ? rectBase(rectOctReg(S.zone)) : S.oct;
+        /* ХОЛОСТОЙ ПАЛЕЦ: при k<4 лишние пальцы НЕ играют ничего. Молчание, а не чужая нота —
+           иначе мизинец на 3-нотном прямоугольнике врал бы высотой. Владение НЕ отдаём: сдвинул
+           палец на рабочий — звук вернётся тем же щипком (иначе пришлось бы перещипывать). */
+        const idle = rectPlay && !thereminOn && S.oct>=RL.k;
+        if(idle){
+          S.deg=-1; S.slot=-1;                    // ни ступени, ни подсветки: draw покажет тусклое кольцо и подпись «палец не занят»
+        }else if(thereminOn){
           /* Непрерывная высота: y → Гц через thereminHz (по leadFreq), интерполяция в центах между
              реальными нотами лада. БАС на 2 октавы ниже соло (bassFreq=leadFreq/4) — та же кривая ÷4.
-             S.deg — ближайшая ступень (подсветка И запись: формат события не меняется), S.hz — живые Гц
-             в звук. Палец ноту НЕ выбирает. */
-          const th=thereminHz(y,H,oct); S.deg=th.deg; S.hz = S.zone==='bs' ? th.hz/4 : th.hz;
+             S.deg/S.regOct — ближайшая НОТА (подсветка И запись: формат события не меняется), S.hz —
+             живые Гц в звук. Палец ноту НЕ выбирает (потому холостой палец сюда и не заходит). */
+          const th=thereminHz(y,H,base); S.deg=th.deg; S.regOct=th.oct; S.slot=rectPlay?th.slot:-1;
+          S.hz = S.zone==='bs' ? th.hz/4 : th.hz;
         }else if(holdOn && S.deg>=0){
           /* УДЕРЖАНИЕ: высота (S.deg) и октава (S.oct) ЗАМОРОЖЕНЫ с ПЕРВОГО кадра щипка — рука уходит
              куда угодно, нота держится (смена пальца октаву не двигает — гейт выше). Громкость (X) ниже
@@ -486,12 +507,14 @@ function processHands(res){
              для соло/баса И аккордов: у аккорда S.deg — это КОРЕНЬ, значит замерзают корень+октава, тип
              тоже заморожен на атаке (S.ty, ниже), громкость свеллит — ровно как задумано «заморожен». */
         }else if(rectPlay){
-          S.rect=degHyst(y,rectRowsFull(),H,S.rect==null?-1:S.rect);   // полоса полной сетки
-          const r=clamp(S.rect-1,0,rectRows()-1);                       // нотный прямоугольник = полоса−1 (низ → прямоуг.0, без мёртвой зоны)
-          S.deg=clamp(r*4+S.oct, 0, IVX().length-1);
+          S.rect=degHyst(y,RL.bands,H,S.rect==null?-1:S.rect);          // полоса полной сетки
+          const r=clamp(S.rect-RL.regBands,0,RL.rects-1);               // нотный прямоугольник = полоса − октавная (если она есть); без мёртвой зоны
+          const g=clamp(r*RL.k+S.oct, 0, RL.notes-1);                   // СЛОТ сетки (прямоуг*k + палец)
+          const n=rectNoteAt(g,base); S.deg=n.deg; S.regOct=n.oct; S.slot=g;   // одна формула слот→(ступень,регистр) — её же читает подсветка в обратную сторону
         }else{
           const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length;
           S.deg=degHyst(y,rows,H,S.deg);            // вся высота — ровно так же, как рисует draw
+          S.regOct=S.oct; S.slot=-1;                // узкие ряды: регистр выбирает ПАЛЕЦ (как было)
         }
         /* Типизированный аккорд: левые CH_PAL_W заняты палитрой, поэтому громкость мерится по
            ПРАВОЙ зоне [split,rx1] — иначе вся половина экрана читалась бы «тихо». Остальные роли
@@ -509,20 +532,27 @@ function processHands(res){
           const FS=chordFams(), fam=FS[chordFam]||FS[0];
           ty=fam.types[Math.min(chordVar,fam.types.length-1)].iv;
         }
-        /* Октава для аккорда: rect (19/31-TET) — липкий chordOctReg через резолвер; chrom12 —
-           S.oct (палец), как было. Меняется ТОЛЬКО источник октавы, логика защёлки ниже — без изменений. */
-        const chOct = rectPlay?rectOctReg(S.zone):S.oct;   // роль = S.zone (в аккордовой ветке ='ch')
-        if(S.zone==='ld'){
+        /* Октава для аккорда: rect — из СЛОТА (S.regOct, посчитан выше единой формулой rectNoteAt);
+           узкие ряды — S.oct (палец), как было. Меняется ТОЛЬКО источник октавы, логика защёлки ниже
+           — без изменений. */
+        const chOct = S.regOct;   // роль = S.zone (в аккордовой ветке ='ch')
+        /* ХОЛОСТОЙ ПАЛЕЦ (k<4): ветка стоит ПЕРВОЙ в цепочке зон, поэтому ни нота, ни защёлка, ни
+           удар не срабатывают. Живой голос гасим — молчание должно быть слышно сразу, а не «залипшей»
+           нотой. Владение оставляем за рукой: вернулся на рабочий палец — звук вернулся. */
+        if(idle){
+          if(S.zone==='ld'&&leadOwner===key)WleadOff();
+          else if(S.zone==='bs'&&bassOwner===key)WbassOff();
+        }else if(S.zone==='ld'){
           if(leadOwner===key){
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
-            WleadOn({deg:S.deg,oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; rectGrid — октава из липкого регистра роли
+            WleadOn({deg:S.deg,oct:S.regOct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца
                      vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 2-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
             // ЗАЦЕПКА ОБУЧЕНИЯ: соло-нота зазвучала/сменила ступень (не пересчитываем — это ТОТ ЖЕ вызов, что породил звук). half — половина сплита (0 лев/1 прав по замороженному S.rx0), для урока «Две роли».
             if(S.deg!==S.tutDeg){ S.tutDeg=S.deg; tutorTap('note',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null}); }
           }
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
-          if(bassOwner===key){ WbassOn({deg:S.deg,oct:rectPlay?rectOctReg(S.zone):S.oct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из bassOctReg; 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
+          if(bassOwner===key){ WbassOn({deg:S.deg,oct:S.regOct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из СЛОТА (rectNoteAt); 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
             // ЗАЦЕПКА ОБУЧЕНИЯ: бас зазвучал/сменил ступень (тот же вызов, что дал звук) — урок «Лупер» (слой ДРУГОЙ ролью поверх соло: соло-моно на себя не слоится) И урок «Две роли» (half — половина сплита).
             if(S.deg!==S.tutBass){ S.tutBass=S.deg; tutorTap('bass',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null}); } }
 
@@ -553,14 +583,18 @@ function processHands(res){
               WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
               S.ty=ty;                                // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
               latchLen=ty?ty.length:0;
-              setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;
+              setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(ty); chOwner=key;   // регистр — рядом со ступенью: подсветке нужна ПАРА (одна ступень живёт в нескольких прямоугольниках)
               tutorTap('chord',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, удержание); half — половина сплита (урок «Две роли»)
             }else{
               /* Тождество защёлки: вне typedChords — ступень (как было, второй множитель
                  схлопывается в true); в typedChords — ПАРА (ступень+тип), иначе C→C7
                  читалось бы как «та же ступень» и глушило аккорд вместо переключения.
                  Цена: зона выключения сужается до конкретного сектора — это неизбежно. */
-              const same = latchDeg>=0 && S.deg===latchDeg && (!typedChords() || ty===latchTy);
+              /* ⚠️ РЕГИСТР ВХОДИТ В ТОЖДЕСТВО. Пока сетка показывала один период, ступень задавала
+                 аккорд однозначно. Теперь одна и та же ступень есть в нескольких прямоугольниках, и
+                 без регистра «до» из нижнего блока и «до» из верхнего читались бы как ОДИН аккорд:
+                 второй щипок ГЛУШИЛ бы первый вместо перехода октавой выше. */
+              const same = latchDeg>=0 && S.deg===latchDeg && S.regOct===latchOct && (!typedChords() || ty===latchTy);
               if(same){
                 WchOff('latch'); setLatchDeg(-1); setLatchTy(null); chOwner=null; S.inert=true;   // тот же аккорд → выключаем, рука инертна
               }else{
@@ -571,7 +605,7 @@ function processHands(res){
                 else WchSet('latch',S.deg,chOct,S.vol,ty,bd);          // та же плотность → глиссандо без переатаки
                 S.ty=ty;                              // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
                 latchLen=ty?ty.length:0;
-                setLatchDeg(S.deg); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший
+                setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший; регистр — компаньон ступени для подсветки
                 tutorTap('chord',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, защёлка); half — половина сплита (урок «Две роли»)
               }
             }
@@ -588,7 +622,7 @@ function processHands(res){
             const dty=S.ty;
             if(dty&&dty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,dty,bd); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
             else WchSet('latch',S.deg,chOct,S.vol,dty,bd);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
-            setLatchDeg(S.deg); setLatchTy(dty);         // тип ведём вместе со ступенью — иначе сравнение протухнет
+            setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(dty);   // тип и регистр ведём вместе со ступенью — иначе сравнение (и подсветка) протухнут
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }

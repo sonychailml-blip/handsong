@@ -309,6 +309,11 @@
   .psep{border-top:1px solid rgba(20,24,50,.12); margin:14px 0 4px; padding-top:6px;
     font-size:var(--fs-hint); color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
   .phint{font-size:var(--fs-hint); color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
+  /* Недоступный ряд панели: гасим подпись, но НЕ прячем — пропавший контрол человек объяснить не
+     может. Сейчас ни один ряд «Звукоряда» так не гаснет («Раскладка нот» доступна всем ладам —
+     переменное число нот в прямоугольнике раскладывает любой), правило оставлено как общее. */
+  .prow.off label{opacity:.55;}
+  #panelScale select:disabled,#panelLoop select:disabled{opacity:.5;}
   /* Функции рук: маленький ярлык роли (🎸 Соло / 🎚 Бас) над парой строк Левая/Правая — группирует
      назначения по роли, но строки помечены РУКОЙ (видно, что выбор на руку, не на половину). */
   .handFnRole{font-size:var(--fs-label); color:#6a7089; font-weight:600; margin:10px 2px 2px; letter-spacing:.02em;}
