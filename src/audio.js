@@ -1,7 +1,7 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx } from './state.js';
 import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
-import { CHORD_POOL_N, BASS_POOL_N } from './config.js';
+import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS } from './config.js';
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
@@ -95,13 +95,14 @@ const DRUM_KITS=[{label:{en:'Standard',ru:'Стандарт'}},{label:{default:'
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter, verb, verbOut;
-let banks=[], vibGain, humDetune, satWet, satDry, envGain, volGain,
-    tremGain, tremDepth, dlyWet, revLead, exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-цепочка (humDetune — гуманизация высоты, общий узел в detune всех лид-осц.; expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
-let lastVel=0.5;                                        // последняя громкость X — скорость→яркость читает её на атаке (формат события не трогаем)
+/* banks — СКРАТЧ строителя банков (buildLeadBanks кладёт сюда собранный банк, buildLeadBank забирает).
+   Раньше это был ПОСТОЯННЫЙ массив всех 23 банков соло-цепочки; теперь банк живёт в ГОЛОСЕ пула.
+   bldHum — ConstantSource гуманизации ТОГО голоса, который сейчас строится (его цепляет mkOsc). */
+let banks=[], bldHum=null, vibGain,
+    tremGain, tremDepth, dlyWet, revLead, exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-ШИНА (expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
 let chordBus, revCh;                                    // аккорды (Z-яркость — пер-голосовой фильтр fb в пуле, не на шине)
 let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
-let noteOnFlag=false;
 const bv=[]; const bassHold={}; let bassBus;             // пул баса (моно-голос на слой)
 let drumBus;                                             // шина ударных
  
@@ -132,7 +133,7 @@ function makeIR(sec=1.8,decay=2.2){
 function mkOsc(type,freq,dest,gainVal){
   const o=AC.createOscillator(); o.type=type; o.frequency.value=freq;
   const g=AC.createGain(); g.gain.value=gainVal;
-  o.connect(g); g.connect(dest); vibGain.connect(o.detune); humDetune.connect(o.detune); exprVibPitch.connect(o.detune); o.start();   // вибрато fx + гуманизация + шиммер ВЫРАЗИТЕЛЬНОСТИ (энергия→живость) — все в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
+  o.connect(g); g.connect(dest); vibGain.connect(o.detune); if(bldHum)bldHum.connect(o.detune); exprVibPitch.connect(o.detune); o.start();   // вибрато fx (ОБЩЕЕ) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
   return o;
 }
 const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
@@ -152,21 +153,33 @@ const fstrike=(lp,base,open,tc,fv)=>(t,vel)=>{
 /* --- Соло-банки: 4 тембра из версии 2 сохранены 1-в-1, добавлены Флейта и 8-бит. ksOk — загрузился
    ли KS-ворклет: если да, хвост списка (Струна/Ситар) строим физ.-моделью, иначе — запасными
    субтрактивными щипками, чтобы banks[] не разъехался с LEAD_INSTR по индексам. --- */
-function buildLeadBanks(preBus, ksOk){
-  { // SuperSaw
+/* ⚠️ СТРОИТЕЛЬ БАНКОВ ТЕПЕРЬ СТРОИТ РОВНО ОДИН БАНК — тот, что просят (only = индекс инструмента).
+   ПОЧЕМУ: раньше здесь строились ВСЕ 23 банка сразу и жили вечно, приглушённые гейтом ig (40
+   осцилляторов + 7 KS-ворклетов, всегда, на любом телефоне, каким бы инструментом ни играли). Пока
+   соло было МОНО, это была одна цена на всё приложение. С пулом голосов «строить всё в каждом голосе»
+   дало бы 6×40 осцилляторов и 6×7 ворклетов — вот это и убило бы полифонию. Голос строит СВОЙ банк,
+   лениво, поэтому пул ДЕШЕВЛЕ сегодняшнего: один инструмент в игре = 1..5 осцилляторов вместо 40.
+   ⛔ НЕ возвращать построение «всех банков»: ни глобально, ни тем более в каждом голосе.
+   КАК СДЕЛАНО МАЛОЙ КРОВЬЮ: тела банков НЕ тронуты (в этом и гарантия «одна нота звучит как раньше») —
+   каждый блок лишь обёрнут гейтом sel(i++), а собранный банк по-прежнему кладётся в banks[] через
+   banks.push. banks — СКРАТЧ-массив: вызывающий (buildLeadBank) чистит его и забирает единственный
+   элемент. Счётчик i растёт у КАЖДОГО блока (sel зовётся всегда) — индексы не разъезжаются с LEAD_INSTR. */
+function buildLeadBanks(preBus, ksOk, only){
+  let i=0; const sel=n=>only==null||only===n;
+  if(sel(i++)){ // SuperSaw
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const oscs=[]; for(const sp of [-12,-6,0,6,12]){
       const o=mkOsc('sawtooth',220,ig,0.17); o.detune.value=sp; oscs.push(o); }
     banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
                 cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t))});
   }
-  { // Орган (аддитивный)
+  if(sel(i++)){ // Орган (аддитивный)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const parts=[[1,.42],[2,.22],[3,.14],[4,.09]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
     banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
                 cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый (hum=0): собственная расстройка замаскировала бы биения строёв
   }
-  { // Пад
+  if(sel(i++)){ // Пад
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2100; lp.connect(ig);
     const oscs=[]; for(const dt of [-7,0,7]){
@@ -175,7 +188,7 @@ function buildLeadBanks(preBus, ksOk){
                 cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t)),
                 strike:fstrike(lp,2100,1.5,0.35,0.8), hum:0});   // мягкая огибающая фильтра + скорость→яркость; hum=0 — чистая высота для строёв
   }
-  { // Колокол (FM)
+  if(sel(i++)){ // Колокол (FM)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const car=mkOsc('sine',220,ig,0.5);
     const mod=AC.createOscillator(); mod.type='sine'; mod.frequency.value=220*3.507;
@@ -188,7 +201,7 @@ function buildLeadBanks(preBus, ksOk){
       cancel:t=>{ car.frequency.cancelScheduledValues(t);
         mod.frequency.cancelScheduledValues(t); mg.gain.cancelScheduledValues(t); }});
   }
-  { // Флейта: треугольник + синус-подпорка
+  if(sel(i++)){ // Флейта: треугольник + синус-подпорка
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o1=mkOsc('triangle',220,ig,0.35);
     const o2=mkOsc('sine',220,ig,0.22); o2.detune.value=4;
@@ -196,7 +209,7 @@ function buildLeadBanks(preBus, ksOk){
       o2.frequency.setTargetAtTime(f,t,0.02);},
       cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);}});
   }
-  { // 8-бит: чистый прямоугольник
+  if(sel(i++)){ // 8-бит: чистый прямоугольник
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o=mkOsc('square',220,ig,0.28);
     banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
@@ -207,15 +220,15 @@ function buildLeadBanks(preBus, ksOk){
      высокий и оседает медленно (tau 0.30) при длинном хвосте (rel 1.6) — металлический удар,
      переходящий в гул. «Металлофон»: ratio 1:3.51, скромнее пик, быстрый спад (tau 0.09) и короткий
      хвост (rel 0.45) — яркий короткий «тинь», как у гамелановой пластины. */
-  buildFMBank(preBus,{ratio:1.41, peak:10, sus:1.0,  tau:0.30});   // Колокол (глубокий)
-  buildFMBank(preBus,{ratio:3.51, peak:7,  sus:0.35, tau:0.09});   // Металлофон
+  if(sel(i++))buildFMBank(preBus,{ratio:1.41, peak:10, sus:1.0,  tau:0.30});   // Колокол (глубокий)
+  if(sel(i++))buildFMBank(preBus,{ratio:3.51, peak:7,  sus:0.35, tau:0.09});   // Металлофон
   /* --- Четыре семейства обычных субтрактивных банков (индексы 8..15, порядок push = хвост LEAD_INSTR).
      Стиль тот же, что у банков выше: ig-гейт → preBus, осцилляторы через mkOsc (вибрато+общая цепочка),
-     статичный НЧ-фильтр на банк. Огибающую громкости даёт ГЛОБАЛЬНЫЙ envGain по att/rel из LEAD_INSTR —
+     статичный НЧ-фильтр на банк. Огибающую громкости даёт env ГОЛОСА по att/rel из LEAD_INSTR —
      сам банк её не трогает. В лид-цепочке нет ПОФАЗНОЙ огибающей фильтра и нет стадии спада-на-удержании
-     (envGain держит 1, пока нота зажата): «щипок» слышен на атаке и на релизе/стаккато, а не как затухание
+     (env держит 1, пока нота зажата): «щипок» слышен на атаке и на релизе/стаккато, а не как затухание
      удержанной ноты; «тростевой» призвук — из гармоник и резонанса фильтра, не из его движения. */
-  { // Пад тёплый: расстроенная пара пил через мягкий НЧ — длинный слитный гул для слышимости биений
+  if(sel(i++)){ // Пад тёплый: расстроенная пара пил через мягкий НЧ — длинный слитный гул для слышимости биений
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1400; lp.connect(ig);
     const oscs=[]; for(const dt of [-8,8]){ const o=mkOsc('sawtooth',220,lp,0.30); o.detune.value=dt; oscs.push(o); }
@@ -223,7 +236,7 @@ function buildLeadBanks(preBus, ksOk){
                 cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t)),
                 strike:fstrike(lp,1400,1.5,0.4,0.8), hum:0});   // пад: плавная огибающая фильтра; hum=0 — чистая высота для строёв
   }
-  { // Пад стеклянный: треугольник+синус, фильтр ярче — воздушнее, тоже длинный
+  if(sel(i++)){ // Пад стеклянный: треугольник+синус, фильтр ярче — воздушнее, тоже длинный
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200; lp.connect(ig);
     const o1=mkOsc('triangle',220,lp,0.30); o1.detune.value=-5;
@@ -232,7 +245,7 @@ function buildLeadBanks(preBus, ksOk){
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
                 strike:fstrike(lp,3200,1.4,0.35,0.7), hum:0});   // пад: чуть ярче, тоже чистый для строёв
   }
-  { // Уд: тёплый щипок — пила+треугольник через низкий НЧ, лёгкая расстройка
+  if(sel(i++)){ // Уд: тёплый щипок — пила+треугольник через низкий НЧ, лёгкая расстройка
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1200; lp.connect(ig);
     const o1=mkOsc('sawtooth',220,lp,0.28); o1.detune.value=-4;
@@ -241,7 +254,7 @@ function buildLeadBanks(preBus, ksOk){
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
                 strike:fstrike(lp,1200,3.0,0.12,1.5)});   // щипок: яркое открытие фильтра, быстро закрывается; hum по умолчанию (1)
   }
-  { // Струна щипком: ярче и суше — одна пила через более открытый фильтр
+  if(sel(i++)){ // Струна щипком: ярче и суше — одна пила через более открытый фильтр
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; lp.connect(ig);
     const o=mkOsc('sawtooth',220,lp,0.26);
@@ -249,7 +262,7 @@ function buildLeadBanks(preBus, ksOk){
                 cancel:t=>o.frequency.cancelScheduledValues(t),
                 strike:fstrike(lp,2600,3.5,0.08,1.5)});   // щипок ярче/суше — резче открытие и закрытие фильтра
   }
-  { // Флейта воздушная: почти синус + тихая октавная подпорка. ШУМА НЕТ: лид-банки в этой цепочке —
+  if(sel(i++)){ // Флейта воздушная: почти синус + тихая октавная подпорка. ШУМА НЕТ: лид-банки в этой цепочке —
     // чисто осцилляторные (noiseBuf рождается позже, в initAudio), «дыхание» дают осцилляторы, не шум.
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o1=mkOsc('sine',220,ig,0.34);
@@ -257,7 +270,7 @@ function buildLeadBanks(preBus, ksOk){
     banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f*2,t,0.02);},
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);}});
   }
-  { // Тростевой: язычковый — прямоугольник+пила через РЕЗОНАНСНЫЙ НЧ (Q даёт формантный призвук)
+  if(sel(i++)){ // Тростевой: язычковый — прямоугольник+пила через РЕЗОНАНСНЫЙ НЧ (Q даёт формантный призвук)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2200; lp.Q.value=6; lp.connect(ig);
     const o1=mkOsc('square',220,lp,0.18);
@@ -266,20 +279,19 @@ function buildLeadBanks(preBus, ksOk){
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
                 strike:fstrike(lp,2200,2.0,0.15,1.2)});   // тростевой: умеренное движение резонансного фильтра — язычковое «оживление»
   }
-  { // Орган полный: драубары — гармоники 1,2,3,4,6 (октавы+квинты), плоская огибающая, БЕЗ расстройки
+  if(sel(i++)){ // Орган полный: драубары — гармоники 1,2,3,4,6 (октавы+квинты), плоская огибающая, БЕЗ расстройки
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);   // det=0 → тон сам не бьётся: лучший тембр для суждения о темперациях
     const parts=[[1,.34],[2,.26],[3,.20],[4,.14],[6,.08]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
     banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
                 cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый — лучший тембр для суждения о строях
   }
-  { // Орган мягкий: меньше верхних гармоник, чуть скруглённая атака (att в LEAD_INSTR)
+  if(sel(i++)){ // Орган мягкий: меньше верхних гармоник, чуть скруглённая атака (att в LEAD_INSTR)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const parts=[[1,.44],[2,.20],[3,.10]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
     banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
                 cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый — без собственной расстройки
   }
-  if(ksOk) KS_BANKS.forEach(o=>buildKSBank(preBus,o));               // Струна, Ситар, Уд, Кото, Сантур, Гитара, Пиццикато (индексы 16..22)
-  else KS_BANKS.forEach(()=>buildKSFallback(preBus));               // ворклет не загрузился — столько же запасных щипков держат индексы
+  KS_BANKS.forEach(o=>{ if(sel(i++)){ if(ksOk)buildKSBank(preBus,o); else buildKSFallback(preBus); } });   // Струна, Ситар, Уд, Кото, Сантур, Гитара, Пиццикато (индексы 16..22); ворклет не загрузился — запасной щипок держит индекс
 }
 /* Таблица KS-банков (порядок = хвост LEAD_INSTR с индекса 16). Все — ОДНА струна с разными
    параметрами (никакой новой архитектуры): fb — длина затухания, damp — петлевой фильтр (0.5 =
@@ -303,7 +315,7 @@ const KS_BANKS=[
    opts (из KS_BANKS): nl/fb/damp/exBase/exSpan → в processorOptions ворклета; symp — сочувственные струны
    (высокодобротные полосы, звенящие от выхода струны, тонально следуют за baseF(), ретюн на щипке — как
    droneOn за тоникой); body — фиксированный корпусный резонатор (peaking) в сухом пути.
-   ОГРАНИЧЕНИЯ (осознанно): у KS нет oscillator.detune → детюн-вибрато и humDetune его не касаются (hum:0).
+   ОГРАНИЧЕНИЯ (осознанно): у KS нет oscillator.detune → детюн-вибрато и гуманизация его не касаются (hum:0).
    Ситар/тараб — УБЕДИТЕЛЬНЫЙ НАМЁК, не копия (реальные джавари — распределённое касание порожка). --- */
 function buildKSBank(preBus, opts){
   opts=opts||{};
@@ -451,6 +463,7 @@ async function initAudio(){
   let ksOk=true;
   try{ await AC.audioWorklet.addModule('src/ks-worklet.js'); }
   catch(e){ ksOk=false; console.warn('KS-ворклет не загрузился — ставлю запасные щипки:',e); }
+  ksReady=ksOk;                                    // голоса пула строятся ЛЕНИВО, уже после initAudio — запоминаем результат загрузки
   /* Мастер: сумма → лимитер (жёсткий компрессор) → выход.
      Лимитер обязателен: аккорды + драйв + подложка легко клиппируют. */
   limiter=AC.createDynamicsCompressor();
@@ -474,43 +487,38 @@ async function initAudio(){
   const vibLFO=AC.createOscillator(); vibLFO.frequency.value=5.5;
   vibGain=AC.createGain(); vibGain.gain.value=0;
   vibLFO.connect(vibGain); vibLFO.start();
-  /* Гуманизация высоты: один ConstantSource в detune ВСЕХ лид-осцилляторов (как vibGain). На каждой
-     атаке ставим свежий случайный сдвиг ±HUM_CENTS·bank.hum; detune не трогается пофреймовой setFreq,
-     поэтому сдвиг держится всю ноту. Создаём ДО buildLeadBanks — mkOsc сразу цепляет его в detune. */
-  humDetune=AC.createConstantSource(); humDetune.offset.value=0; humDetune.start();
+  /* Гуманизация высоты — ConstantSource в detune осцилляторов; на каждой атаке свежий случайный сдвиг
+     ±HUM_CENTS·bank.hum, detune не трогается пофреймовой setFreq, поэтому сдвиг держится всю ноту.
+     ⚠️ ОН ПЕР-ГОЛОСОВОЙ (v.hum, см. пул соло), а НЕ общий, как был: с пулом общий узел означал бы, что
+     атака второй ноты перестраивает высоту первой, ещё звучащей. Здесь его больше не создаём. */
   /* ЖИВОСТЬ (энергия → вибрато): свой LFO шиммера. exprVibPitch → detune ВСЕХ лид-осц. (mkOsc цепляет ниже),
      глубина = энергия (пишет applyExpr, в пределах пары центов). ОТДЕЛЬНО от vibGain (вибрато fx-руки) — не
      дерутся, суммируются в detune. На реальном инструменте вибрато рождается из НЕПРЕРЫВНОГО усилия, а
      идеально статичный тон звучит МЁРТВО — так «смычок» кормит теперь ЖИЗНЬ, а не громкость. Создаём ДО
-     buildLeadBanks, чтобы mkOsc сразу цеплял exprVibPitch (как vibGain/humDetune). Живьём, в запись НЕ идёт. */
+     построением голосов, чтобы mkOsc сразу цеплял exprVibPitch (как vibGain). Живьём, в запись НЕ идёт. */
   const exprVibLFO=AC.createOscillator(); exprVibLFO.type='sine'; exprVibLFO.frequency.value=EXPR_A.vibHz;
   exprVibPitch=AC.createGain(); exprVibPitch.gain.value=0;   // глубина шиммера ВЫСОТЫ (центы), нейтраль 0 → detune += 0 (байт-в-байт)
   exprVibLFO.connect(exprVibPitch); exprVibLFO.start();
 
-  const preBus=AC.createGain(); preBus.gain.value=1;
-  buildLeadBanks(preBus, ksOk);
-  banks[leadIdx].gain.gain.value=1;
- 
-  const shaper=AC.createWaveShaper(); shaper.curve=makeSatCurve(); shaper.oversample='2x';
-  satDry=AC.createGain(); satDry.gain.value=1;
-  satWet=AC.createGain(); satWet.gain.value=0;
-  preBus.connect(satDry); preBus.connect(shaper); shaper.connect(satWet);
-  const satSum=AC.createGain(); satDry.connect(satSum); satWet.connect(satSum);
- 
+  /* ВХОД ШИНЫ СОЛО: сюда суммируются голоса пула (каждый со своим банком, шейпером, огибающей и
+     громкостью — см. «ПУЛ ГОЛОСОВ»). Голоса строятся ЛЕНИВО, поэтому здесь ничего не строим: играющий
+     одну ноту получит ровно один голос = ровно один банк (вместо прежних 23 сразу). */
+  leadSum=AC.createGain(); leadSum.gain.value=1;
+  const satSum=leadSum;
+
   /* ВЫРАЗИТЕЛЬНОСТЬ (рука-«смычок»): ЧЕТЫРЕ канала → ЧЕТЫРЕ РАЗНЫЕ оси (см. applyExpr): ЖИВОСТЬ (энергия→
      вибрато, выше), ВАУ (натяжение→резонансный пик), ТЕКСТУРА (размах→ХАРАКТЕР искажения), ПРОСТРАНСТВО
-     (наклон→делей). Громкость больше НЕ здесь — она целиком у НОТНОЙ руки (volGain, X-позиция): две руки не
+     (наклон→делей). Громкость больше НЕ здесь — она целиком у НОТНОЙ руки (vol ГОЛОСА, X-позиция): две руки не
      дерутся за одну величину. Все узлы ниже НЕЙТРАЛЬНЫ по умолчанию (gain 1 или 0, wah при 0дБ — плоский
-     тождественный биквад) → без руки соло-цепочка БИТ-В-БИТ как сегодня. */
-  envGain=AC.createGain(); envGain.gain.value=0;
-  volGain=AC.createGain(); volGain.gain.value=0.5;                 // ГРОМКОСТЬ нотной руки (X) — выразительность её НЕ трогает
-  satSum.connect(envGain); envGain.connect(volGain);
-
+     тождественный биквад) → без руки соло-цепочка БИТ-В-БИТ как сегодня.
+     Огибающая (env) и громкость X (vol) ушли В ГОЛОС пула: у каждой руки свой X и своя нота, делить их
+     одним узлом больше нельзя. Порядок внутри голоса тот же — шейпер → env → vol, — поэтому одна нота
+     звучит как раньше; сюда голоса приходят уже суммой (leadSum). */
   /* ЖИВОСТЬ (амплитудная часть шиммера): exprGain = ЕДИНИЦА (база), её .gain МОДУЛИРУЕТ vibrato-LFO через
      exprVibAmp (глубина=энергия). applyExpr сам exprGain НЕ пишет (громкость ушла нотной руке). Нейтраль:
      exprVibAmp=0 → exprGain держит ровно 1 (тождество). Пара к exprVibPitch (высотная часть, в detune). */
   const exprGain=AC.createGain(); exprGain.gain.value=1;
-  volGain.connect(exprGain);
+  satSum.connect(exprGain);
   exprVibAmp=AC.createGain(); exprVibAmp.gain.value=0;
   exprVibLFO.connect(exprVibAmp); exprVibAmp.connect(exprGain.gain);
 
@@ -589,21 +597,28 @@ async function initAudio(){
   noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
   { const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; }
 }
+/* ⚠️ СМЕНА ИНСТРУМЕНТА БОЛЬШЕ НЕ «ПЕРЕЛИВАЕТ» ЗВУЧАЩУЮ НОТУ. Раньше здесь был кроссфейд гейтов всех 23
+   банков: удержанная нота меняла тембр под пальцами. Теперь тембр ПЕЧЁТСЯ НА АТАКЕ в голосе (по a.inst),
+   ровно как у аккордов и баса, — звучащая нота доигрывает своим тембром, новый инструмент вступает со
+   СЛЕДУЮЩЕЙ атаки. Это осознанная плата за пул, и она же чинит старый баг: переигранный слой звал
+   setLeadInstr(a.inst) и УВОДИЛ живой инструмент вместе с кнопкой в панели (см. ENG.leadOn в recorder). */
 function setLeadInstr(i){
   setLeadIdx(((i%LEAD_INSTR.length)+LEAD_INSTR.length)%LEAD_INSTR.length);
   if(!AC)return;
-  const t=AC.currentTime;
-  banks.forEach((b,j)=>b.gain.gain.setTargetAtTime(j===leadIdx?1:0,t,0.02));
   hooks.leadInstr && hooks.leadInstr(leadIdx);
 }
-function applyParams(p){
+/* ЭФФЕКТЫ соло — ОБЩИЕ НА ВСЕ ГОЛОСА (шина), кроме драйва. Одна идея на изменение: реверб/делей/тремоло/
+   вибрато/выразительность живут на шине, поэтому две руки делят их глубину (последняя пишет). Пер-голосовой
+   посыл в реверб — возможное продолжение, если общая глубина начнёт мешать.
+   ДРАЙВ — ИСКЛЮЧЕНИЕ, И ЭТО НЕ ПРИХОТЬ: сатурация стоит ДО огибающей (bank → shaper → env → vol), а tanh
+   нелинеен, поэтому env·tanh(x) ≠ tanh(env·x). Вынеси драйв на шину — и ОДНА нота при drv>0 (а он по
+   умолчанию 0.12, не ноль!) зазвучала бы иначе, чем сегодня. Поэтому шейпер живёт В ГОЛОСЕ, и порядок
+   узлов внутри голоса — байт-в-байт прежний. */
+function applyFx(p){
   const t=AC.currentTime;
-  if(p.freq!=null)banks.forEach(b=>b.setFreq(p.freq,t));   // freq НЕ трогаем, если не задан (leadSet с hold: обновляем громкость/эффекты, а идущий бенд не сбиваем)
-  volGain.gain.setTargetAtTime(p.vol,t,0.04);
-  lastVel=p.vol;                                          // запоминаем громкость X → скорость→яркость на следующей атаке
   vibGain.gain.setTargetAtTime(p.vib*35,t,0.05);
-  satWet.gain.setTargetAtTime(p.drv,t,0.05);
-  satDry.gain.setTargetAtTime(1-p.drv*0.7,t,0.05);
+  for(const v of lv){ v.satWet.gain.setTargetAtTime(p.drv,t,0.05); v.satDry.gain.setTargetAtTime(1-p.drv*0.7,t,0.05); }
+  lastFx.drv=p.drv;                                       // новый голос строится сразу с текущим драйвом
   tremDepth.gain.setTargetAtTime(p.trm*0.45,t,0.05);
   tremGain.gain.setTargetAtTime(1-p.trm*0.45,t,0.05);
   dlyWet.gain.setTargetAtTime(p.dly*0.55,t,0.08);
@@ -624,40 +639,139 @@ function applyExpr(en,ten,spr,ori,eng,tc){ if(!AC)return; const t=AC.currentTime
   exprSatHardG.gain.setTargetAtTime(eng*spr*EXPR_A.hard,t,tc);      // ТЕКСТУРА: веер → грязное (жёсткий шейпер)
   exprDlyWet.gain.setTargetAtTime(ori*eng*EXPR_A.spaceMax,t,tc);    // ПРОСТРАНСТВО: посыл в делей (эхо)
 }
+/* ================= СОЛО: ПУЛ ГОЛОСОВ (было — ОДИН моно-голос) =================
+   Устройство ровно как у аккордов (cv/chordHold): голоса + владельцы, изоляция по КЛЮЧУ ВЛАДЕЛЬЦА.
+   Живой голос руки = 'lead:L'/'lead:R', переигранный слой = 'leadloop:N:v' — поэтому живая игра и
+   переигровка БОЛЬШЕ НЕ ДЕРУТСЯ за один голос (та же развязка, что 'latch' vs 'loop:N' у аккордов).
+   ОТЛИЧИЕ ОТ АККОРДОВ, важное: аккордовый голос УНИВЕРСАЛЕН (два осциллятора, перенастраиваются на
+   атаке), а соло-банки структурно разные (5-осцилляторный орган, FM-пара, KS-ворклет). Поэтому голос
+   строит СВОЙ банк — и только тот, которым играет (см. buildLeadBank). Лениво: кто не играет вторую
+   ноту, за второй голос не платит.
+   ЧТО В ГОЛОСЕ, А ЧТО НА ШИНЕ (порядок узлов внутри голоса — прежний, до последнего звена):
+     голос: банк → satDry/satWet(шейпер) → satSum → env → vol → leadSum   (+ свой hum в detune)
+     шина:  leadSum → exprGain → expr-шейперы → вау → тремоло → leadOut → делей/реверб
+   Драйв в голосе — не прихоть, см. applyFx. Огибающая и громкость X — очевидно в голосе (у каждой руки
+   свой X). А вот ГУМАНИЗАЦИЯ: раньше humDetune был ОДИН на всю цепочку и переписывался на каждой атаке.
+   ⚠️ С пулом это стало бы БАГОМ: вторая атака перестроила бы высоту ПЕРВОЙ, ещё звучащей ноты. Поэтому
+   ConstantSource гуманизации — ПЕР-ГОЛОСОВОЙ (v.hum), и mkOsc цепляет именно его (bldHum).
+   ⛔ НЕ возвращать общий humDetune и НЕ строить все банки в голосе. */
+const lv=[]; const leadHold={};            // голоса пула и владельцы (ключ → голос)
+let leadSum=null, ksReady=true;            // шина соло (вход эффектов) + загрузился ли KS-ворклет (для ленивой стройки)
+const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого индекса начинаются KS-инструменты (считаем, не зашиваем)
+const lastFx={drv:0};                      // последний драйв — чтобы НОВЫЙ голос строился сразу с ним, а не с нулём
+/* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks). */
+function buildLeadBank(ins, pre, hum){
+  banks.length=0; bldHum=hum;
+  buildLeadBanks(pre, ksReady, ins);
+  bldHum=null;
+  return banks[0];
+}
+function newLeadVoice(){
+  const hum=AC.createConstantSource(); hum.offset.value=0; hum.start();   // гуманизация ЭТОГО голоса
+  const pre=AC.createGain(); pre.gain.value=1;                            // вход банка (бывший общий preBus)
+  const shaper=AC.createWaveShaper(); shaper.curve=makeSatCurve(); shaper.oversample='2x';
+  const satDry=AC.createGain(); satDry.gain.value=1-lastFx.drv*0.7;
+  const satWet=AC.createGain(); satWet.gain.value=lastFx.drv;
+  const satSum=AC.createGain();
+  const env=AC.createGain(); env.gain.value=0;
+  const vol=AC.createGain(); vol.gain.value=0.5;
+  pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
+  satDry.connect(satSum); satWet.connect(satSum);
+  satSum.connect(env); env.connect(vol); vol.connect(leadSum);
+  /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
+     держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
+     ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
+     разойтись со звуком и не может отстать от него на кадр. */
+  const v={hum,pre,satDry,satWet,env,vol,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0};
+  lv.push(v); return v;
+}
+/* Банк голоса ПОД ИНСТРУМЕНТ: строим лениво и КЭШИРУЕМ на голосе. Кэш (а не пересборка) потому, что
+   осциллятор, однажды запущенный, живёт до конца контекста (правило #3) — «выбросить» банк нельзя, его
+   можно только заглушить гейтом, ровно как делал прежний глобальный набор. Практический потолок: число
+   РЕАЛЬНО сыгранных инструментов × число РЕАЛЬНО занятых голосов (обычно 1–2 × 1–2), против 23 сегодня. */
+function leadVoiceBank(v,ins){
+  let b=v.banks[ins];
+  if(!b){ b=v.banks[ins]=buildLeadBank(ins,v.pre,v.hum); b.gain.gain.value=0; }
+  if(v.ins!==ins){
+    /* ПЕРВЫЙ банк голоса открываем МГНОВЕННО — ровно как это делал initAudio (banks[leadIdx].gain.value=1)
+       ещё до первой ноты. Через 20мс-рампу гейта первая атака вышла бы смазанной, и «одна нота звучит
+       как раньше» сломалось бы на самой первой. Смена банка ПОЗЖЕ — прежним кроссфейдом setLeadInstr. */
+    if(v.ins<0) b.gain.gain.value=1;
+    else { const t=AC.currentTime; for(const k in v.banks) v.banks[k].gain.gain.setTargetAtTime(+k===ins?1:0,t,0.02); }
+    v.ins=ins;
+  }
+  return b;
+}
+const leadCap=ins=> ins>=LEAD_KS_FROM ? LEAD_POOL_KS : LEAD_POOL_N;   // KS дороже (ворклет на голос) → свой потолок
+/* Выдача голоса. Порядок: свой (тот же владелец — ведение ноты, НЕ переаллокация) → свободный с УЖЕ
+   построенным нужным банком (сродство: иначе слой на Ситаре и живая рука на Органе строили бы банк на
+   каждой атаке) → любой свободный → новый (лениво, пока не упёрлись в потолок) → КРАЖА.
+   Красть начинаем с ОТПУЩЕННЫХ голосов (у них лишь хвост), и только потом с зажатых: у мелодии
+   оборванная нота слышна куда сильнее, чем у аккорда (там cvAlloc просто берёт самый старый). */
+function leadAlloc(owner,ins){
+  if(leadHold[owner])return leadHold[owner];
+  const cap=leadCap(ins);
+  let v=lv.find(x=>!x.owner&&x.banks[ins]) || lv.find(x=>!x.owner);
+  if(!v&&lv.length<cap) v=newLeadVoice();
+  if(!v){ const free=lv.filter(x=>!x.on); v=(free.length?free:lv).reduce((a,b)=>a.tOn<b.tOn?a:b);
+    if(v.owner) delete leadHold[v.owner]; leadRelease(v,true); }
+  v.owner=owner; leadHold[owner]=v; return v;
+}
+function leadRelease(v,hard){
+  const t=AC.currentTime;
+  v.env.gain.cancelScheduledValues(t);
+  v.env.gain.setTargetAtTime(0,t,hard?0.02:LEAD_INSTR[v.ins<0?leadIdx:v.ins].rel);
+  v.on=false; v.owner=null;
+}
+/* Атака/ведение ноты владельца. Зовётся КАЖДЫЙ КАДР зажатой рукой (как и раньше): частота и громкость
+   едут всегда, а сама атака — один раз (гейт v.on, бывший noteOnFlag). Порядок и постоянные времени
+   1-в-1 прежние: setFreq 0.02 (тот самый 20мс-глайд), vol 0.04, гуманизация 0.006, ±5% уровня, ±10% атаки. */
+function leadOn(owner,freq,vol,ins,deg,oct){
+  const v=leadAlloc(owner,ins), t=AC.currentTime, b=leadVoiceBank(v,ins);
+  if(freq!=null)b.setFreq(freq,t);
+  v.vol.gain.setTargetAtTime(vol,t,0.04);
+  if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
+  if(v.on)return;
+  v.on=true; v.tOn=t;
+  /* Гуманизация — СВЕЖАЯ случайность на каждую атаку (в т.ч. при переигровке лупа: генерится здесь, в
+     событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
+     0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
+  const hum = b.hum==null?1:b.hum;
+  v.hum.offset.setTargetAtTime((Math.random()*2-1)*HUM_CENTS*hum, t, 0.006);
+  const lvlJ = 1 - Math.random()*0.05;                       // −0..5% уровня
+  const attJ = LEAD_INSTR[ins].att*(0.9+Math.random()*0.2);   // ±10% времени атаки
+  v.env.gain.cancelScheduledValues(t);
+  v.env.gain.setTargetAtTime(lvlJ,t,attJ);
+  b.strike && b.strike(t, vol);   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
+}
+function leadSet(owner,freq,vol,deg,oct){                    // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем)
+  const v=leadHold[owner]; if(!v)return; const t=AC.currentTime, b=v.banks[v.ins];
+  if(freq!=null&&b)b.setFreq(freq,t);
+  v.vol.gain.setTargetAtTime(vol,t,0.04);
+  if(deg!=null){ v.deg=deg; v.oct=oct||0; }                  // ступень ведётся вместе с частотой — подсветка идёт за нотой
+}
+/* Отпускание: голос УХОДИТ ИЗ leadHold сразу — подсветка гаснет ровно в тот момент, когда сняли ноту,
+   а хвост релиза дозвучивает (так же вело себя моно-соло: noteOff гасил и S.deg, и картинку). */
+function leadOff(owner){ const v=leadHold[owner]; if(!v)return; delete leadHold[owner]; v.deg=-1; leadRelease(v,false); }
+function leadAllOff(){ for(const k of Object.keys(leadHold)) leadOff(k); }      // паника/смена лада: гасим ВСЕХ владельцев (как chordHold/bassHold)
 /* Глиссандо-в-луп (переигровка терменвокса): расписываем ЗАПИСАННУЮ кривую бенда на будущие
    AC-времена через ТУ ЖЕ setFreq (setTargetAtTime 0.02) — тот же 20мс-глайд, что и живьём.
    baseFreq — частота ступени по ЗАМОРОЖЕННОМУ ладу (полимодальность), c — центы поверх неё;
-   абсолютных Гц не храним. dt в долях → секунды через secPerBeat. */
-function scheduleBend(points, baseFreq, secPerBeat){
+   абсолютных Гц не храним. dt в долях → секунды через secPerBeat.
+   ⚠️ ТОЛЬКО В СВОЙ ГОЛОС: раньше кривая ехала во ВСЕ банки сразу — с пулом это гнуло бы и живую руку. */
+function scheduleBend(owner, points, baseFreq, secPerBeat){
+  const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins]; if(!b)return;
   const t0=AC.currentTime;
   for(const pt of points){
     const f=baseFreq*Math.pow(2,pt.c/1200), at=t0+pt.dt*secPerBeat;
-    banks.forEach(b=>b.setFreq(f,at));
+    b.setFreq(f,at);
   }
 }
 /* Снять расписанные рампы частоты (на атаке переигранной ноты, ctx): чтобы бенд предыдущей
-   ноты не перетёк в следующую. Живой путь (без ctx) не зовёт — живой звук не трогаем. */
-function leadCancel(){ const t=AC.currentTime; banks.forEach(b=>b.cancel&&b.cancel(t)); }
-function noteOn(){
-  if(noteOnFlag)return; noteOnFlag=true;
-  const t=AC.currentTime, b=banks[leadIdx];
-  /* Гуманизация — СВЕЖАЯ случайность на каждую атаку (в т.ч. при переигровке лупа: генерится здесь,
-     в событии НЕ хранится). Высоту дёргаем на bank.hum (у органа/падов 0 — не маскируем биения строёв),
-     уровень и время атаки — всем чуть-чуть (на биения не влияет). */
-  const hum = b.hum==null?1:b.hum;
-  humDetune.offset.setTargetAtTime((Math.random()*2-1)*HUM_CENTS*hum, t, 0.006);
-  const lvlJ = 1 - Math.random()*0.05;                          // −0..5% уровня
-  const attJ = LEAD_INSTR[leadIdx].att*(0.9+Math.random()*0.2);   // ±10% времени атаки
-  envGain.gain.cancelScheduledValues(t);
-  envGain.gain.setTargetAtTime(lvlJ,t,attJ);
-  b.strike && b.strike(t, lastVel);   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (от последней громкости X)
-}
-function noteOff(){
-  if(!noteOnFlag)return; noteOnFlag=false;
-  const t=AC.currentTime;
-  envGain.gain.cancelScheduledValues(t);
-  envGain.gain.setTargetAtTime(0,t,LEAD_INSTR[leadIdx].rel);
-}
+   ноты не перетёк в следующую. Живой путь (без ctx) не зовёт — живой звук не трогаем.
+   Тоже пер-голосово: отмена в чужом голосе оборвала бы чужой бенд. */
+function leadCancel(owner){ const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins];
+  if(b&&b.cancel)b.cancel(AC.currentTime); }
 /* --- БАС: пул моно-голосов (один на слой). Тембр печётся НА АТАКЕ по слою (как аккорд),
    а не глобально — записанный слой сохраняет свой инструмент (§3.4, как строй/септаккорд). --- */
 function buildBassPool(dest){
@@ -881,7 +995,8 @@ function createRecordingTap(){
 
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
 export {
-  initAudio, AC, setLeadInstr, applyParams, applyExpr, scheduleBend, leadCancel, noteOn, noteOff, metroClick,
+  initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, leadCancel, metroClick,
+  leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,

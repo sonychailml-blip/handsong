@@ -161,7 +161,13 @@ function tickExpr(now,dt){
    видимый размер кисти стабильнее, чем сырая z-координата модели).
    result.handednesses[i][0].categoryName ('Left'/'Right') — стабильный
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
-const HANDS={}; let leadOwner=null; let chOwner=null; let bassOwner=null;   // chOwner — рука защёлки, bassOwner — рука баса
+const HANDS={}; let chOwner=null; let bassOwner=null;   // chOwner — рука защёлки, bassOwner — рука баса
+/* ⚠️ leadOwner (ОДНА рука-владелец соло) УДАЛЁН: соло больше не моно. У КАЖДОЙ руки свой голос пула,
+   ключ владельца строит ЭТА функция — единственное место, где он собирается.
+   ПАЛЕЦ В КЛЮЧЕ ЗАЛОЖЕН СРАЗУ, хотя сегодня всегда null: когда ввод научится видеть несколько прижатых
+   пальцев (одна рука — до четырёх нот прямоугольника), многоголосие включится ОДНИМ аргументом здесь,
+   а не переделкой владения. Формат совпадает по духу с 'loop:N'/'latch' у аккордов. */
+const soloKey=(key,finger=null)=> 'lead:'+handSide(key)+(finger==null?'':':'+finger);
 let latchLen=0;   // сколько нот звучит у 'latch': по нему решаем «глиссандо или переатака»
 /* handRole (левая='fx' палитра / правая='ноты') УДАЛЁН: привязки роли к handedness не осталось нигде.
    Соло/бас/аккорды берут функцию руки из handFn (handFnOf), палитра типов выбирается ПО ПОЛОЖЕНИЮ —
@@ -259,15 +265,19 @@ function cellHyst(x,y,x0,x1,y0,y1,fams,prevC,prevR){
   const r=axHyst(y,y0,y1,nR,(prevR>=0&&prevR<nR)?prevR:-1,PAL_HYST_Y);
   return [c,r];
 }
-/* Другая рука, всё ещё держащая щипок в той же зоне — для моно-передачи голоса. */
+/* Другая рука, всё ещё держащая щипок в той же зоне — для моно-передачи голоса БАСА.
+   ⚠️ БАС ВСЁ ЕЩЁ МОНО, соло — уже нет. Не сводить эти две ветки обратно в одну и не «унифицировать»
+   их, пока бас не получит такой же пул: у соло передавать нечего (у каждой руки свой голос). */
 function otherPinched(key,zone){ for(const k in HANDS){ if(k!==key){ const S=HANDS[k]; if(S.pinch&&S.zone===zone) return k; } } return null; }
 function endPinch(key,S){
   if(S.pinch){
-    /* МОНО-ПЕРЕДАЧА: голос (соло/бас) моно; если его отпускает ВЛАДЕЛЕЦ, а другая рука ещё держит щипок
-       в той же зоне — передаём владение ей (подхватит следующим кадром, голос НЕ гасим). Иначе гасим.
-       Так «последний щипок побеждает», а рука, оставшаяся зажатой, не замолкает и не залипает. */
-    if(S.zone==='ld'&&leadOwner===key){ const nx=otherPinched(key,'ld'); if(nx)leadOwner=nx; else{ WleadOff(); leadOwner=null; } }
-    if(S.zone==='bs'&&bassOwner===key){ const nx=otherPinched(key,'bs'); if(nx)bassOwner=nx; else{ WbassOff(); bassOwner=null; } }
+    /* СОЛО: просто гасим ноту ЭТОЙ руки — она играла в своём голосе пула.
+       ⚠️ ЗДЕСЬ БЫЛА МОНО-ПЕРЕДАЧА («отпустил владелец, а другая рука ещё зажата — отдаём владение ей»).
+       Она существовала ТОЛЬКО потому, что голос был один: без неё оставшаяся рука замолкала. С пулом она
+       не просто не нужна — она ВРЕДНА: переназначала бы ключ владельца, который теперь означает
+       конкретную руку, и вторая рука получила бы чужую ноту. Удалена намеренно, не забыта. */
+    if(S.zone==='ld'){ WleadOff(soloKey(key)); }
+    if(S.zone==='bs'&&bassOwner===key){ const nx=otherPinched(key,'bs'); if(nx)bassOwner=nx; else{ WbassOff(); bassOwner=null; } }   // БАС по-прежнему моно — передача владения ему нужна
     /* 'ch': в ЗАЩЁЛКЕ (S.fn!=='hold') WchOff НЕ зовём — аккорд звучит и после размыкания, лишь отпускаем
        руль. В УДЕРЖАНИИ (S.fn==='hold') размыкание пальцев ГАСИТ аккорд (как соло-hold) и чистит защёлку. */
     if(S.zone==='ch'&&chOwner===key){
@@ -381,7 +391,7 @@ function processHands(res){
         const meta=FX_META.find(m=>m.finger===mf);
         S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]}; S.tutFx=null;   // S.tutFx — база для зацепки обучения 'fx' (сдвиг эффекта)
       }else if(S.zone==='ld'){
-        leadOwner=key; S.tutDeg=undefined;   // приоритет последней ноты; S.tutDeg сброшен — свежий щипок переизвестит обучение о ноте
+        S.tutDeg=undefined;                  // владельца назначать больше не нужно (у руки свой голос пула); S.tutDeg сброшен — свежий щипок переизвестит обучение о ноте
       }else if(S.zone==='bs'){
         bassOwner=key; S.tutBass=undefined;  // бас моно — рулит последняя рука; S.tutBass сброшен — свежий щипок переизвестит обучение о басовой ноте
       }else if(S.zone==='ch'){
@@ -540,14 +550,14 @@ function processHands(res){
            удар не срабатывают. Живой голос гасим — молчание должно быть слышно сразу, а не «залипшей»
            нотой. Владение оставляем за рукой: вернулся на рабочий палец — звук вернулся. */
         if(idle){
-          if(S.zone==='ld'&&leadOwner===key)WleadOff();
+          if(S.zone==='ld')WleadOff(soloKey(key));
           else if(S.zone==='bs'&&bassOwner===key)WbassOff();
         }else if(S.zone==='ld'){
-          if(leadOwner===key){
+          {   // без гейта владельца: у КАЖДОЙ соло-руки свой голос пула — играют обе разом
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
-            WleadOn({deg:S.deg,oct:S.regOct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца
-                     vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 2-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
+            WleadOn(soloKey(key),{deg:S.deg,oct:S.regOct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца
+                     vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 3-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
             // ЗАЦЕПКА ОБУЧЕНИЯ: соло-нота зазвучала/сменила ступень (не пересчитываем — это ТОТ ЖЕ вызов, что породил звук). half — половина сплита (0 лев/1 прав по замороженному S.rx0), для урока «Две роли».
             if(S.deg!==S.tutDeg){ S.tutDeg=S.deg; tutorTap('note',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null}); }
           }
@@ -645,12 +655,15 @@ function processHands(res){
     }
     /* Индикатор реверба (revDisp): у СОЛО НОТНОЙ руки показываем ТЕКУЩУЮ глубину (Z=близость
        кисти) КАЖДЫЙ кадр — щипок не нужен, можно «прицелиться» ревербом ДО игры. Пропускаем, когда
-       рука уже играет (ветка 'ld'/leadOwner выше сама зовёт setRevDisp — иначе посчитали бы EMA дважды).
+       рука уже играет (ветка 'ld' выше сама зовёт setRevDisp — иначе посчитали бы EMA дважды).
        ТОЛЬКО дисплей: в звук (WleadOn) реверб по-прежнему уходит лишь при игре.
        Кто целится — решает soloNoteHand (single-role и сплит одинаково): нотная рука соло-половины.
-       При сплите прицел ведёт нотная рука ИМЕННО соло-половины (не fx, не рука из чужой половины). */
+       При сплите прицел ведёт нотная рука ИМЕННО соло-половины (не fx, не рука из чужой половины).
+       Гейт владельца снят вместе с leadOwner: играющая рука теперь ЛЮБАЯ соло-рука с щипком. Реверб —
+       общий на шине (одна глубина на всех), поэтому при двух играющих руках пишет последняя — как и
+       показывал индикатор всегда. */
     if(soloNoteHand(key,S,W)
-       && !(S.pinch && S.zone==='ld' && leadOwner===key)){
+       && !(S.pinch && S.zone==='ld')){
       setRevDisp(clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE));
     }
   }
@@ -663,7 +676,8 @@ function processHands(res){
     const S=HANDS[k];
     if(!seen.has(k)&&now-S.seen>WATCHDOG_MS){ endPinch(k,S); delete HANDS[k]; }
   }
-  if(leadOwner&&!HANDS[leadOwner])leadOwner=null;
+  /* Соло-владельца сбрасывать больше нечего: голос гасит endPinch по ключу СВОЕЙ руки (его зовёт и
+     watchdog выше), а бас — моно, у него владелец один и его надо снять руками. */
   if(bassOwner&&!HANDS[bassOwner]){ WbassOff(); bassOwner=null; }
   /* Солирующей НОТНОЙ руки нет в кадре → индикатор реверба гасим в 0 (не висит на последнем значении).
      Тот же критерий «кто целит» (soloNoteHand): single-role — нотная рука при phoneInstr='ld' (байт-в-байт
@@ -675,5 +689,5 @@ function processHands(res){
   tickExpr(now,dtm);                   // «смычок»: динамика + вывод в звук раз за кадр (или плавный вывод к нейтрали, когда руки-выразительности нет)
 }
 
-/* Экспорт: HANDS/leadOwner — живые связки (их читает draw). */
-export { HANDS, leadOwner, processHands, degRaw };
+/* Экспорт: HANDS — живая связка (её читает draw). leadOwner больше нет (соло полифонично). */
+export { HANDS, processHands, degRaw };

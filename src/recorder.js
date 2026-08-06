@@ -1,4 +1,5 @@
-import { AC, setLeadInstr, applyParams, scheduleBend, leadCancel, noteOn, noteOff, metroClick, chordOn, chordGlide, chordOff, chordHold,
+import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, leadOff, leadAllOff, leadHold,
+         metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff } from './audio.js';
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
@@ -24,16 +25,28 @@ import { hooks } from './hooks.js';
    ВЛАДЕЛЬЦЫ ГОЛОСОВ ПО СЛОЮ: живой аккорд — 'latch', переигранный — 'loop:N';
    живой бас — 'bass', переигранный — 'bassloop:N'. Поэтому один и тот же инструмент
    слоится сам на себя (аккорд поверх аккорда, бас поверх баса) — разные владельцы,
-   разные голоса из пула. Соло остаётся моно (один envGain): соло-поверх-соло делит
-   голос, побеждает последний — легато-глиссандо и есть инструмент, это не баг. */
+   разные голоса из пула.
+   ⚠️ СОЛО ТЕПЕРЬ ТОЖЕ ПОЛИФОНИЧНО И ТОЖЕ РАЗВЕДЕНО ПО ВЛАДЕЛЬЦАМ: живая рука — 'lead:L'/'lead:R'
+   (ключ строит soloKey в gestures, он же расширяется пальцем), переигранный слой — 'leadloop:N:v'.
+   ЗДЕСЬ РАНЬШЕ БЫЛО НАПИСАНО «соло остаётся моно (один envGain): соло-поверх-соло делит голос,
+   побеждает последний — это не баг». БОЛЬШЕ НЕ ТАК, и это была ровно та надпись, что отправляла
+   искать не там: живая игра и переигранный соло-слой больше НЕ дерутся, две руки звучат вместе.
+   v в событии — НОМЕР ОДНОВРЕМЕННОЙ НОТЫ внутри слоя (0,1,…): без него две руки, пишущие разом,
+   не различить на переигровке (leadOff не с чем спарить). Старые события без v читаются как v=0 —
+   один голос на слой, то есть старая петля играет БИТ-В-БИТ как играла. */
 let recording=false;                                 // «вооружено»: пишем живой ввод
 const events=[];                                     // стабильная ссылка (её читает визуализация в draw)
 const loop={ on:false, bars:2, metre:BEATS_PER_BAR, sub:4, bpm:84, t0:0, pos:-1e-9, sched:0, first:false, layer:0, clickBeat:0, quant:true };   // metre — долей в такте; sub — ДРОБЛЕНИЕ доли для квантизации ударных (4 = 16-е, 3 = триоли); pos — «сыгранная» доля (лид/дрон, почти-сейчас); sched — АБСОЛЮТНАЯ доля, до которой СЛОИ (аккорд/бас/удар) уже запланированы вперёд
 const droneActive=()=>events.some(e=>e.fn==='drone');   // жив ли слой-дрон (для гашения при снятии/стопе)
-let recLead=null, recCh=null, recBass=null, pumpTimer=null;
-/* Глиссандо-в-луп: у ОТКРЫТОЙ соло-ноты копим кривую бенда (центы поверх ступени) в массив,
-   лежащий ПО ССЫЛКЕ в событии leadOn. Активно только у терменвокса (гейт live!=null). */
-let recLeadBend=null, noteStartBeat=0, bendLastC=null;
+let recCh=null, recBass=null, pumpTimer=null;
+/* ⚠️ СОСТОЯНИЕ ЗАПИСИ СОЛО — ПО ВЛАДЕЛЬЦУ, а не одно на всех. Раньше это были ОДИНОЧНЫЕ recLead /
+   recLeadBend / noteStartBeat / bendLastC («та самая единственная открытая нота»), и с моно-соло так и
+   было. С полифонией две руки, пишущие ОДНОВРЕМЕННО, слились бы в один поток leadOn/leadSet: сравнение
+   «изменилось ли» шло бы между нотами РАЗНЫХ рук, и в петлю легла бы каша. Теперь на каждого владельца
+   своя запись {deg,oct,vol,rev,inst,bend,t0,lastC,v}. Глиссандо-в-луп (кривая бенда, центы поверх
+   ступени) лежит ПО ССЫЛКЕ в событии leadOn и копится только у терменвокса (гейт live!=null). */
+const recLead=new Map();     // ключ владельца ('lead:L'/'lead:R') → состояние открытой ноты
+const vSlots=new Map();      // ключ владельца → номер одновременной ноты v в СЛОЕ (для пары leadOn/leadOff на переигровке)
 let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГИСТР аккорда, что играет петля сейчас (для подсветки, §Q5). Регистр нужен с многопериодной сеткой: одна ступень живёт в нескольких прямоугольниках, без него подсветка всегда падала бы в нижний
 const loopBeats=()=>loop.bars*loop.metre;
 /* ГРУППИРОВКА (акценты) по размеру — СТАТИЧНАЯ, по умолчанию. Массив длин групп, сумма = размер.
@@ -70,18 +83,27 @@ function loopPos(){
    'latch'; бас — 'bassloop:'+layer / живой 'bass'. Так слой не крадёт голос у живого. */
 const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer:'latch';
 const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer:'bass';
+/* Ключ владельца СОЛО-голоса на ПЕРЕИГРОВКЕ: слой + номер одновременной ноты (a.v). Живой ключ
+   ('lead:L'/'lead:R') строит gestures и передаёт явным аргументом — в событие он НЕ попадает (это
+   состояние руки, а не намерение). a.v||0 — вот та самая совместимость: событие без v = нота №0. */
+const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
 const ENG={
-  leadOn:(a,ctx,live)=>{ if(a.inst!==undefined&&a.inst!==leadIdx)setLeadInstr(a.inst);
+  /* ⚠️ setLeadInstr(a.inst) ОТСЮДА УБРАН, и это ПОЧИНКА, а не потеря: переигранный слой уводил ЖИВОЙ
+     инструмент (и кнопку в панели) — слой на Ситаре молча перекрашивал руку, играющую Органом. Теперь
+     тембр печётся В ГОЛОСЕ на атаке (leadOn получает inst), как это давно делают аккорды и бас. */
+  leadOn:(a,ctx,live,own)=>{ const o=own||ldKey(ctx,a);
               /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
-                 Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без 3-го арг → live undefined →
-                 частота из leadFreq по замороженному ладу (полимодальность цела). */
-              if(ctx)leadCancel();                 // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт)
+                 Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
+                 замороженному ладу (полимодальность цела). */
+              if(ctx)leadCancel(o);                // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
-              applyParams({freq:(live!=null?live:base),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
-              noteOn();
-              if(a.bend&&a.bend.length)scheduleBend(a.bend,base,60/loop.bpm); },   // переигровка: кривая бенда поверх ступени замороженного лада
-  leadSet:(a,ctx)=>applyParams({freq:(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),vol:a.vol,rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly}),
-  leadOff:()=>noteOff(),
+              applyFx({rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});   // эффекты — общие (шина), кроме драйва (он в голосе, см. applyFx)
+              leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              if(a.bend&&a.bend.length)scheduleBend(o,a.bend,base,60/loop.bpm); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос
+  leadSet:(a,ctx,live,own)=>{ const o=own||ldKey(ctx,a);
+              applyFx({rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
+              leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct); },
+  leadOff:(a,ctx,live,own)=>leadOff(own||ldKey(ctx,a)),
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
   chOn:(a,ctx,when)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
@@ -119,45 +141,57 @@ function push(fn,a){
 }
 /* Доля внутри петли СЕЙЧАС (тот же счёт, что и push) — для dt точек бенда. */
 const curBeat=()=>((AC.currentTime-loop.t0)*loop.bpm/60)%loopBeats();
-/* Точка бенда: центы ЖИВОЙ высоты (live) относительно ступени АТАКИ (recLead.deg/oct по
+/* Точка бенда: центы ЖИВОЙ высоты (live) относительно ступени АТАКИ (r.deg/oct по
    замороженному-в-будущем ладу CUR()). Само-прореживание порогом BEND_EPS_CENTS. dt клампим ≥0
-   (нота через заворот петли — редкость; первый круг всё равно кончается на завороте). */
-function pushBend(live){
-  if(!recLeadBend||live==null)return;
-  const c=1200*Math.log2(live/leadFreq(recLead.deg,recLead.oct,CUR()));
-  if(bendLastC!=null&&Math.abs(c-bendLastC)<=BEND_EPS_CENTS)return;
-  recLeadBend.push({dt:Math.max(0,curBeat()-noteStartBeat),c});
-  bendLastC=c;
+   (нота через заворот петли — редкость; первый круг всё равно кончается на завороте).
+   Опора и порог — В ЗАПИСИ ВЛАДЕЛЬЦА (r), поэтому две гнущие руки не путают друг другу отсчёт. */
+function pushBend(r,live){
+  if(!r||!r.bend||live==null)return;
+  const c=1200*Math.log2(live/leadFreq(r.deg,r.oct,CUR()));
+  if(r.lastC!=null&&Math.abs(c-r.lastC)<=BEND_EPS_CENTS)return;
+  r.bend.push({dt:Math.max(0,curBeat()-r.t0),c});
+  r.lastC=c;
 }
+/* СВОБОДНЫЙ НОМЕР одновременной ноты v внутри пишущегося слоя: 0,1,2… Нужен только чтобы переигровка
+   спарила leadOn с его leadOff (в слое может быть открыто несколько соло-нот). Первая всегда получает 0
+   — поэтому обычная одноголосная запись даёт события с v:0, а старые (без v) читаются как v=0. */
+function freeSlot(){ const used=new Set([...vSlots.values()]); let v=0; while(used.has(v))v++; return v; }
 /* live!=null ⟺ соло-рука назначена на ТЕРМЕНВОКС (функция руки 'therm' — gestures шлёт S.hz только
    оттуда). Тогда высоту несёт БЕНД: deg/oct ЗАМОРОЖЕНЫ на атаке (не сравниваем и не обновляем — у c
    стабильная опора), а leadSet пишем лишь на смену громкости/реверба/тембра с меткой hold (переигровка
    не сбивает бенд частотой).
-   live==null (рука на любой ДРУГОЙ функции — ноты/удержание/эффекты) — код БАЙТ-В-БАЙТ как раньше. */
-function recLeadEv(p,live){
+   live==null (рука на любой ДРУГОЙ функции — ноты/удержание/эффекты) — логика БАЙТ-В-БАЙТ как раньше,
+   только состояние взято по владельцу own. */
+function recLeadEv(own,p,live){
   if(!recording)return;
-  if(!recLead){
-    const a={...p};
-    if(live!=null){ a.bend=[]; recLeadBend=a.bend; noteStartBeat=curBeat(); bendLastC=null; }
+  let r=recLead.get(own);
+  if(!r){
+    const v=freeSlot(); vSlots.set(own,v);
+    const a={...p,v};                              // v — номер одновременной ноты в слое (пара для leadOff)
+    r={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst,bend:null,t0:0,lastC:null,v};
+    if(live!=null){ a.bend=[]; r.bend=a.bend; r.t0=curBeat(); }
     push('leadOn',a);
-    recLead={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst};
-    if(live!=null)pushBend(live);                  // стартовая точка (recLead уже есть — опора известна)
+    recLead.set(own,r);
+    if(live!=null)pushBend(r,live);                // стартовая точка (r уже есть — опора известна)
     return;
   }
   if(live!=null){                                  // терменвокс: пишем бенд + громкость/реверб (hold), НЕ deg/oct
-    pushBend(live);
-    if(p.inst!==recLead.inst||Math.abs(p.vol-recLead.vol)>REC_VOL_EPS||Math.abs(p.rev-recLead.rev)>REC_REV_EPS){
-      push('leadSet',{...p,hold:true});
-      recLead={deg:recLead.deg,oct:recLead.oct,vol:p.vol,rev:p.rev,inst:p.inst};   // deg/oct остаются на атаке
+    pushBend(r,live);
+    if(p.inst!==r.inst||Math.abs(p.vol-r.vol)>REC_VOL_EPS||Math.abs(p.rev-r.rev)>REC_REV_EPS){
+      push('leadSet',{...p,hold:true,v:r.v});
+      r.vol=p.vol; r.rev=p.rev; r.inst=p.inst;     // deg/oct остаются на атаке
     }
     return;
   }
-  if(p.deg!==recLead.deg||p.oct!==recLead.oct||p.inst!==recLead.inst||
-     Math.abs(p.vol-recLead.vol)>REC_VOL_EPS||Math.abs(p.rev-recLead.rev)>REC_REV_EPS){ push('leadSet',{...p}); }
+  if(p.deg!==r.deg||p.oct!==r.oct||p.inst!==r.inst||
+     Math.abs(p.vol-r.vol)>REC_VOL_EPS||Math.abs(p.rev-r.rev)>REC_REV_EPS){ push('leadSet',{...p,v:r.v}); }
   else return;
-  recLead={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst};
+  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.rev=p.rev; r.inst=p.inst;
 }
-function recLeadOff(){ if(recording&&recLead){ push('leadOff',{}); recLead=null; } recLeadBend=null; }
+function recLeadOff(own){ const r=recLead.get(own);
+  if(recording&&r) push('leadOff',{v:r.v});
+  recLead.delete(own); vSlots.delete(own); }
+function recLeadReset(){ recLead.clear(); vSlots.clear(); }   // паника/очистка/заворот: открытых нот больше нет
 /* ty входит в сравнение: у типизированных аккордов громкость ФИКСИРОВАНА, а сектор
    меняется без смены ступени/октавы — без этой проверки смена типа не попала бы в
    запись вовсе, и петля играла бы не тот аккорд. Сравнение по ссылке корректно:
@@ -189,8 +223,10 @@ function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — од�
 
 /* Обёртки W*: живой звук СРАЗУ + запись (если вооружено). Переигровка (насос)
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
-const WleadOn =(p,live)=>{ ENG.leadOn(p,null,live); recLeadEv(p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается
-const WleadOff=()=>{ ENG.leadOff(); recLeadOff(); };
+/* own — КЛЮЧ ВЛАДЕЛЬЦА живого голоса ('lead:L'/'lead:R', строит gestures). В событие он НЕ пишется:
+   в петле нота принадлежит СЛОЮ, а не руке — там ключ соберёт ldKey из ctx.layer и a.v. */
+const WleadOn =(own,p,live)=>{ ENG.leadOn(p,null,live,own); recLeadEv(own,p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается
+const WleadOff=own=>{ ENG.leadOff(null,null,null,own); recLeadOff(own); };
 /* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
    тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
    Так он замораживается в событии сам собой и переигрывается как сыгран. */
@@ -201,17 +237,22 @@ const WbassOn =(p,live)=>{ ENG.bassOn(p,null,undefined,live); recBassEv(p); };  
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
 const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDrum(a); };
 
-function softAllOff(){ if(!AC)return; noteOff();
+function softAllOff(){ if(!AC)return;
+  leadAllOff();                                     // все владельцы соло: 'lead:L/R' + 'leadloop:N:v' (раньше был один noteOff — соло было моно)
   Object.keys(chordHold).forEach(k=>chordOff(k));   // все владельцы аккордов: 'latch' + 'loop:N'
   Object.keys(bassHold).forEach(k=>bassOff(k));     // все владельцы баса: 'bass' + 'bassloop:N'
   setLatchDeg(-1); setLatchTy(null);              // тип гасим вместе со ступенью: иначе после паники/очистки
-  recLead=null; recCh=null; recBass=null; recLeadBend=null; }   // следующий щипок той же ступени прочёлся бы как «тот же аккорд»; бенд открытой ноты сбрасываем
+  recLeadReset(); recCh=null; recBass=null; }     // следующий щипок той же ступени прочёлся бы как «тот же аккорд»; открытые соло-ноты (и их бенды) сбрасываем
 function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 
 /* --- Транспорт петли --- */
 function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; } }
-/* СЛОИ (аккорд/бас/удар) идут ВПЕРЁД по явному времени; ЛИД/дрон — «почти сейчас» (моно-соло делит
-   один голос с живой игрой: пред-планировать его далеко вперёд опасно, §6). fn[0]==='c' → аккорд;
+/* СЛОИ (аккорд/бас/удар) идут ВПЕРЁД по явному времени; ЛИД/дрон — «почти сейчас».
+   ⚠️ ПРИЧИНА У ЛИДА БОЛЬШЕ НЕ ТА, что здесь стояла. Было: «моно-соло делит один голос с живой игрой,
+   пред-планировать далеко вперёд опасно». Соло больше НЕ моно — слой и рука сидят в РАЗНЫХ голосах
+   пула, драться им нечем. Лид остался «почти сейчас» лишь потому, что перевод его в планировщик — это
+   отдельная работа: у соло-функций нет аргумента when, а кривые бенда (scheduleBend) расписываются от
+   AC.currentTime. Это ЗАДЕЛ, а не ограничение: см. BACKLOG. fn[0]==='c' → аккорд;
    slice(0,4)==='bass' → бас; 'drum' → удар. Лид (leadOn/leadSet/leadOff) и дрон — НЕ вперёд. */
 const isLayer=fn=> fn[0]==='c' || fn.slice(0,4)==='bass' || fn==='drum';
 
@@ -247,6 +288,11 @@ function scheduleLayers(){
 function releaseLoopLayersAt(when){
   for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:') chordOff(k,when);
   for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:') bassOff(k,when);
+  /* СОЛО-СЛОИ тоже гасим на границе — иначе нота, записанная зажатой ЧЕРЕЗ заворот (leadOn есть,
+     leadOff в слое нет), звучала бы вечно. Раньше её снимал голый noteOff() на завороте, потому что
+     голос был один на всех. `when` соло не принимает: лид идёт «почти сейчас» (см. isLayer), а не
+     планировщиком — гасим текущим временем, ровно как гасил прежний noteOff(). */
+  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:') leadOff(k);
 }
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем. */
 function fireNear(a,b){
@@ -258,11 +304,16 @@ function fireNear(a,b){
    Живой аккорд ('latch') принадлежит РУКЕ, а не петле: удержанный или защёлкнутый, он обязан пережить
    сколько угодно заворотов, пока игрок не отпустит пальцы (удержание) или не сменит аккорд (защёлка).
    Раньше здесь стоял chordOff('latch') + сброс latchDeg/latchTy/recCh — он и обрезал аккорд на границе;
-   убрано. Лид/бас гасим по-прежнему: они моно и переатакуются со следующего кадра ещё зажатой рукой
-   (для аккорда так нельзя — живой путь WchSet→chordGlide не пересобирает удалённые голоса). */
-function liveWrapRelease(){ if(!AC)return; noteOff();
+   убрано. Лид/бас гасим по-прежнему: они переатакуются со следующего кадра ещё зажатой рукой (для
+   аккорда так нельзя — живой путь WchSet→chordGlide не пересобирает удалённые голоса).
+   ⚠️ ЛИД ГАСИМ ТЕПЕРЬ ИЗБИРАТЕЛЬНО — только владельцев 'lead:*' (живые руки). Прежний голый noteOff()
+   означал «моно, гасим единственный голос»; в пуле он снёс бы и переигранные соло-слои, у которых своя
+   граница (её держит releaseLoopLayersAt, там же где аккордовые и басовые слои). Бас остаётся МОНО и
+   гасится по своему ключу — НЕ сводить эти две ветки в одну, пока бас не получит такой же пул. */
+function liveWrapRelease(){ if(!AC)return;
+  for(const k of Object.keys(leadHold)) if(k.slice(0,5)==='lead:') leadOff(k);
   bassOff('bass');
-  recLead=null; recBass=null; recLeadBend=null; }
+  recLeadReset(); recBass=null; }
 function schedClicks(){                                // щелчки метронома с опережением по AC-часам
   const spb=60/loop.bpm, ahead=AC.currentTime+SCHED_AHEAD;
   while(loop.t0+loop.clickBeat*spb<ahead){
