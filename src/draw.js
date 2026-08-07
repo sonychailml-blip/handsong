@@ -2,8 +2,8 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, pinchDebug, handSide } from './state.js';
-import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, PINCH_ON, PINCH_OFF,
+import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
+import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
@@ -583,49 +583,9 @@ function drawPhone(res){
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
   drawHandsPhone(res,W,H,playH);
-  if(pinchDebug)drawPinchDebug(W,H);          // ВРЕМЕННАЯ диагностика щипка (см. drawPinchDebug) — по умолчанию выключена
   if(!videoRec)drawLooper();                  // при записи клипа полосу лупера (служебная накладка НА ХОЛСТЕ) прячем из кадра; сетка/руки/ярлыки/эффекты — это ИГРА, остаются
   if(!videoRec)drawLooperFeedback(W,H);       // подтверждение команды рукой-лупером + отсчёт очистки — тоже служебная накладка, прячем в клипе
   drawStatus();                               // #status — HTML-элемент (не холст), в кадр клипа не попадает сам собой, как и кнопки
-}
-/* ================= ВРЕМЕННАЯ ДИАГНОСТИКА ЩИПКА (замер перед решением) =================
-   ЗАЧЕМ. Узнать, сколько пальцев РЕАЛЬНО различаются, а не предположить. Три пальца, прижатых к
-   большому, камера видит хуже одного: они перекрывают друг друга, и часть точек MediaPipe ДОСТРАИВАЕТ,
-   а не наблюдает. Ложная нота хуже несыгранной, поэтому потолок pinchFingers поднимают ПО ЭТИМ ЧИСЛАМ.
-   ЧТО ПОКАЗЫВАЕМ. По строке на палец: римская цифра, живое отношение dist(большой,палец)/размер ладони
-   (то самое, по которому решается щипок) и полоска. Метки порогов: ON (щипок ловится) и OFF (отпускание)
-   — между ними зона гистерезиса. Прижатый палец — зелёный, звучащий — жирный.
-   НА ЧТО СМОТРЕТЬ: прижатые пальцы должны УВЕРЕННО уходить ниже ON, а свободные — держаться выше OFF.
-   Если при трёх прижатых четвёртый (обычно мизинец) сползает к порогу или числа дрожат — потолок 3
-   ставить нельзя. ⛔ ВРЕМЕННЫЙ КОД: удалить вместе с контролом в панели, когда потолок выбран. */
-function drawPinchDebug(W,H){
-  const rows=[], PON=PINCH_ON, POFF=PINCH_OFF;
-  for(const k in HANDS){ const S=HANDS[k]; if(S.pr) rows.push([k,S]); }
-  if(!rows.length)return;
-  const bw=132, lh=15, hdr=16, pad=8;
-  ctx.textBaseline='middle'; ctx.textAlign='left';
-  rows.forEach(([k,S],i)=>{
-    const bx = i===0 ? 6 : W-bw-6, by = 64 + 0;                     // левая рука слева, правая справа — не наезжают друг на друга
-    const bh = hdr+FINGER_TIPS.length*lh+pad;
-    ctx.fillStyle='rgba(10,10,20,.78)'; ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,6); ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1; ctx.stroke();
-    ctx.font='700 10px system-ui'; ctx.fillStyle='rgba(255,255,255,.75)';
-    ctx.fillText(`${handSide(k)}  ON<${PON}  OFF>${POFF}`, bx+6, by+9);
-    for(let f=0;f<FINGER_TIPS.length;f++){
-      const v=S.pr[FINGER_TIPS[f]], y=by+hdr+f*lh+lh/2;
-      const down=S.touch&&S.touch.has(f), snd=(S.snd||[]).includes(f);
-      ctx.font=snd?'700 10px system-ui':'10px system-ui';
-      ctx.fillStyle= snd?'#57d9a3' : down?'rgba(87,217,163,.75)':'rgba(255,255,255,.55)';
-      ctx.fillText(`${OCT_ROMAN[f]} ${v.toFixed(3)}`, bx+6, y);
-      /* Полоска: 0..0.6 отношения на 56px. Две риски — ON и OFF; между ними палец «залипает» (гистерезис). */
-      const gx=bx+58, gw=56, sc=q=>gx+Math.max(0,Math.min(1,q/0.6))*gw;
-      ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fillRect(gx,y-3,gw,6);
-      ctx.fillStyle= down?'rgba(87,217,163,.85)':'rgba(255,255,255,.45)'; ctx.fillRect(gx,y-3,sc(v)-gx,6);
-      ctx.fillStyle='rgba(255,210,63,.9)'; ctx.fillRect(sc(PON),y-5,1,10);      // ON
-      ctx.fillStyle='rgba(229,72,77,.9)';  ctx.fillRect(sc(POFF),y-5,1,10);     // OFF
-    }
-  });
-  ctx.textBaseline='alphabetic';
 }
 /* Обратная связь руки-ЛУПЕРА (у команд нет ноты в звуке — показываем на экране), в стиле коробки лупера
    (тёмный скруглённый прямоугольник). ДВЕ накладки: (1) обратный отсчёт очистки (мизинец удержан) —

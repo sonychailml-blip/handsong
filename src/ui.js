@@ -1,7 +1,7 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
-         pinchFingers, setPinchFingers, pinchDebug, setPinchDebug } from './state.js';
+         pinchFingers, setPinchFingers } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
@@ -410,21 +410,18 @@ rectSel.onchange=e=>{ setRectPref(e.target.value); softAllOff();   // раскл
   renderRectCtl(); };
 /* МНОГОПАЛЬЦЕВЫЙ ЩИПОК: сколько пальцев руки звучат одновременно. 1 — ровно сегодняшнее поведение
    (включая перевод ноты сменой пальца на лету), 2+ — каждый прижатый палец даёт СВОЮ ноту.
-   Дефолт 2 выбран ОСТОРОЖНО и БЕЗ ЗАМЕРА (см. state.pinchFingers): указательный+средний камера видит
-   увереннее всего. Рядом — ВРЕМЕННАЯ диагностика: живые отношения щипка и пороги ON/OFF на холсте,
-   чтобы поднимать потолок по числам. Смена потолка гасит звучащее (softAllOff): иначе нота пальца,
-   который только что «срезали» потолком, осталась бы висеть. */
-const pinchSel=$('pinchSel'), pinchDbgOn=$('pinchDbgOn'), pinchDbgOff=$('pinchDbgOff');
+   ДЕФОЛТ 4 (см. state.pinchFingers): замысел — сомкнуть все четыре пальца на каждом большом и услышать
+   все восемь нот. Осторожность живёт в самом контроле: камера различает два пальца увереннее, чем
+   четыре, и если безымянный/мизинец срабатывают ложно — потолок опускают здесь же. Смена потолка гасит
+   звучащее (softAllOff): иначе нота пальца, который только что «срезали» потолком, осталась бы висеть. */
+const pinchSel=$('pinchSel');
 function renderPinchCtl(){
   pinchSel.textContent='';
   for(let n=1;n<=4;n++){ const o=document.createElement('option'); o.value=n;
     o.textContent = n===1 ? t('pinch.one') : t('pinch.n',{n}); pinchSel.appendChild(o); }
   pinchSel.value=pinchFingers;
-  pinchDbgOn.classList.toggle('act',pinchDebug); pinchDbgOff.classList.toggle('act',!pinchDebug);
 }
 pinchSel.onchange=e=>{ setPinchFingers(+e.target.value); softAllOff(); renderPinchCtl(); };
-pinchDbgOn.onclick =()=>{ setPinchDebug(true);  renderPinchCtl(); };
-pinchDbgOff.onclick=()=>{ setPinchDebug(false); renderPinchCtl(); };
 renderPinchCtl();
 /* ПЕРВИЧНАЯ ОТРИСОВКА — ЗДЕСЬ, а не в buildUI(): buildUI() зовётся выше по файлу, где const-ссылки
    этого блока ещё в мёртвой зоне (TDZ) — «Cannot access 'rectSel' before initialization» на загрузке.

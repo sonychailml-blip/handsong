@@ -136,11 +136,10 @@ export const DICTS = {
     'panel.scale.handFn':'Hand functions',
     // раскладка нот: прямоугольники vs узкие ряды (доступна ВСЕМ ладам — арифметика в scales.rectLayout подбирает k и повтор тоники)
     'panel.scale.rectLayout':'Note layout',
-    // многопальцевый щипок + ВРЕМЕННАЯ диагностика (удалить вместе с контролом, когда потолок выбран)
+    // многопальцевый щипок: потолок нот на руку (дефолт 4)
     'panel.scale.pinchFingers':'Fingers per hand',
-    'panel.scale.pinchHint':'Several fingers to the thumb — several notes. The camera reads two fingers far more reliably than four: raise the limit only after looking at the pinch diagnostic.',
-    'panel.scale.pinchDebug':'Pinch diagnostic',
-    'pinch.one':'1 — one note (as before)',
+    'panel.scale.pinchHint':'Several fingers to the thumb — several notes. The camera separates two fingers more reliably than four: if the ring or little finger fires falsely, lower the limit.',
+    'pinch.one':'1 — one note',
     'pinch.n':'{n} notes at once',
     'rect.auto':'By scale: {form}',
     'rect.rect':'Rectangles (4 notes each)',
@@ -422,9 +421,8 @@ export const DICTS = {
     'panel.scale.handFn':'Функции рук',
     'panel.scale.rectLayout':'Раскладка нот',
     'panel.scale.pinchFingers':'Пальцев в руке',
-    'panel.scale.pinchHint':'Несколько пальцев к большому — несколько нот. Камера видит два пальца увереннее, чем четыре: поднимайте потолок, посмотрев диагностику щипка.',
-    'panel.scale.pinchDebug':'Диагностика щипка',
-    'pinch.one':'1 — одна нота (как было)',
+    'panel.scale.pinchHint':'Несколько пальцев к большому — несколько нот. Камера различает два пальца увереннее, чем четыре: если безымянный или мизинец срабатывают ложно — опустите потолок.',
+    'pinch.one':'1 — одна нота',
     'pinch.n':'{n} ноты одновременно',
     'rect.auto':'По ладу: {form}',
     'rect.rect':'Прямоугольники (по 4 ноты)',
