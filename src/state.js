@@ -73,6 +73,12 @@ export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)])
 export const roleHasTherm=role=> !!(handFn[role] && (handFn[role].L==='therm'||handFn[role].R==='therm'));
 export const roleHasFx=role=> role==='ld' && (handFn.ld.L==='fx'||handFn.ld.R==='fx');   // fx только у соло
 export const roleHasExpr=role=> role==='ld' && (handFn.ld.L==='expr'||handFn.ld.R==='expr');   // выразительность (первый заход — только соло)
+/* «Рука ИГРАЕТ НОТЫ» — ЕДИНЫЙ закон исключений: 'fx' (эффекты), 'loop' (лупер) и 'expr' (выразительность)
+   нот не играют, всё остальное играет ('note'/'hold'/'therm', у аккордов 'latch'/'hold'). Один источник
+   для двух мест, которые обязаны совпадать: gestures.soloNoteHand (КТО целится ревербом) и draw (показывать
+   ли столбик REV). Разъедутся — индикатор снова начнёт врать про то, что звучит. */
+export const playsNotes=fn=> fn!=='fx' && fn!=='loop' && fn!=='expr';
+export const roleHasNotes=role=> !!(handFn[role] && (playsNotes(handFn[role].L)||playsNotes(handFn[role].R)));   // у роли есть рука, которая реально играет ноты (у 'dr' записи нет → false)
 /* РАСКЛАДКА НОТ — «прямоугольники» vs «узкие ряды». СОСТОЯНИЕ, которое переключает человек, а НЕ
    свойство лада: свойство s.rectGrid осталось в данных, но теперь оно — ДЕФОЛТ («каким лад
    открывается»), а не сама раскладка. Три значения:

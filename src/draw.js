@@ -2,7 +2,7 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, pinchDebug, handSide } from './state.js';
+import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, pinchDebug, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, PINCH_ON, PINCH_OFF,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -12,7 +12,14 @@ import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, bea
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
 const FX_X0=6, FX_N=1+FX_META.length;                       // REV + эффекты
-const FX_BAND_R=FX_X0+(FX_N-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W;
+const fxBandR=n=> n>0 ? FX_X0+(n-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W : 0;   // правый край полосы из n столбиков
+const FX_BAND_R=fxBandR(FX_N);                              // полная полоса (REV + 4 эффекта) — отступ легенды у НЕ-соло ролей, как было
+/* Сколько столбиков соло рисует СЕЙЧАС — и, значит, сколько места им резервировать под легенду.
+   REV живёт, пока соло вообще играет ноты (реверб даёт ГЛУБИНА играющей руки, см. drawFxBars),
+   четыре эффекта — только при руке-эффектах. Отступ считаем от ЭТОГО числа, а не от константы на
+   пять: иначе одинокий REV стоял бы у края с пустой полосой шириной в четыре исчезнувших столбика. */
+const soloBarsN=()=> !roleHasNotes('ld') ? 0 : roleHasFx('ld') ? FX_N : 1;
+const bandR=role=> role==='ld' ? fxBandR(soloBarsN()) : FX_BAND_R;   // у прочих ролей столбиков нет — резерв прежний, байт-в-байт
 
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
 const statusEl=document.getElementById('status');
@@ -113,7 +120,7 @@ function drawRectGrid(x0,x1,playH,accent,activeSlots,lblOf,role,rx0=x0){
   const RL=rectLayout(), nB=RL.bands, w=x1-x0, base=rectBase(rectOctReg(role));
   const aSet=activeSlots||new Set();
   const rectOn=new Set(); for(const g of aSet) rectOn.add(Math.floor(g/RL.k));   // прямоугольники, где звучит хоть одна нота
-  const lx=Math.max(x0+7,rx0+FX_BAND_R+8);       // легенда правее столбиков эффектов (соло, от rx0 — левого края роли) и правее палитры (аккорды). rx0 ОТДЕЛЬНО от x0: у аккордов x0=split, но столбиков там нет
+  const lx=Math.max(x0+7,rx0+bandR(role)+8);     // легенда правее столбиков эффектов (соло, от rx0 — левого края роли) и правее палитры (аккорды). rx0 ОТДЕЛЬНО от x0: у аккордов x0=split, но столбиков там нет. Резерв — по ЧИСЛУ реально нарисованных столбиков (bandR), иначе одинокий REV оставлял бы пустую полосу на месте исчезнувших четырёх
   ctx.textBaseline='middle';
   for(let b=0;b<nB;b++){
     const [yTop,yBot]=rectBandY(b,playH,nB), h=yBot-yTop;
@@ -191,7 +198,7 @@ function drawRectOctBand(x0,w,lx,yTop,h,role){
    должна быть КАЖДАЯ ведомая линия, а не одна. У баса (моно) в множестве максимум одна. */
 function drawThereminLines(x0,x1,playH,accent,activeSlots,rx0=x0,role='ld'){
   const {M,spanBot,divH}=thereminSpan(playH), last=M-1, s=CUR();   // M = ноты НА СЕТКЕ (см. thereminSpan)
-  const lx=Math.max(x0+7,rx0+FX_BAND_R+8);
+  const lx=Math.max(x0+7,rx0+bandR(role)+8);     // тот же резерв, что у сетки: по числу реально нарисованных столбиков
   const every=divH>=15?1:divH>=9?2:4;             // подписи прореживаем, если линии частые (Партч=44 нот)
   /* i — СЛОТ, а не ступень: у многопериодной сетки одна ступень встречается в каждом периоде,
      поэтому подпись и «зелёная тоника» берутся через rectNoteAt — ту же формулу, что даёт звук. */
@@ -457,7 +464,7 @@ function drawStatus(){
    x0=split — слева палитра; у нетипизированных палитры нет и сетка идёт от rx0, как у соло). */
 function drawRole(instr,rx0,rx1,playH){
   const accent=INSTR_COL[instr], split=palSplitX(rx0,rx1);
-  const labelX= instr==='ld' ? rx0+FX_BAND_R+8 : rx0+7;   // у соло подписи правее столбиков эффектов
+  const labelX= instr==='ld' ? rx0+bandR('ld')+8 : rx0+7;   // у соло подписи правее столбиков — ровно тех, что рисуются сейчас (пять с рукой-эффектами, один REV без неё)
   if(instr==='dr'){ drawDrumGrid(rx0,rx1,playH); return; }
   /* Активная НОТА подсветки — ПАРА (ступень, регистр): аккорд по защёлке, соло по звучащим голосам,
      бас по играющей руке.
@@ -567,11 +574,11 @@ function drawPhone(res){
     for(const h of halves) drawRole(h.role,h.rx0,h.rx1,playH);
     ctx.strokeStyle=hexA('#fff',.18); ctx.lineWidth=2;   // разделитель половин по центру
     ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-    const solo=halves.find(h=>h.role==='ld'); if(solo&&roleHasFx('ld'))drawFxBars(solo.rx0,H);   // столбики эффектов — у соло-половины, ТОЛЬКО если у соло-роли есть рука-эффекты
+    const solo=halves.find(h=>h.role==='ld'); if(solo&&roleHasNotes('ld'))drawFxBars(solo.rx0,H);   // столбики у соло-половины: REV — пока соло играет ноты (реверб даёт глубина играющей руки), четыре эффекта внутри drawFxBars — по руке-эффектам
     if(solo&&roleHasExpr('ld'))drawExprBar(solo.rx0,solo.rx1,H);   // «ВЫР» — энергия смычка у соло-половины, только если назначена рука-выразительность
   }else{
     drawRole(phoneInstr,0,W,playH);
-    if(phoneInstr==='ld'&&roleHasFx('ld'))drawFxBars(0,H);   // эффекты действуют на соло-канал; полосу прячем, если НИ ОДНА рука не назначена на fx
+    if(phoneInstr==='ld'&&roleHasNotes('ld'))drawFxBars(0,H);   // REV показываем, пока соло вообще может звучать (реверб — глубина ИГРАЮЩЕЙ руки, не рука-эффекты); сами эффекты прячет drawFxBars по roleHasFx
     if(phoneInstr==='ld'&&roleHasExpr('ld'))drawExprBar(0,W,H);   // «ВЫР» — энергия смычка; полосу прячем, если НИ ОДНА рука не назначена на выразительность
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
@@ -880,9 +887,17 @@ function drawChordPalette(x0,x1,H){
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
+/* ⚠️ REV — НЕ ЭФФЕКТ РУКИ-ЭФФЕКТОВ, и его столбик живёт по своему условию. Реверб задаёт ГЛУБИНА
+   играющей соло-руки (dist(lm[0],lm[9]) → S.rev → payload.rev → revLead.gain), рука эффектов на него
+   не влияет НИКАК — она даже дисквалифицирована из прицела (soloNoteHand). Раньше все пять столбиков
+   гасил один гейт roleHasFx: сними эффекты с обеих рук — и живой, слышимый реверб пропадал с экрана.
+   Теперь: REV — пока соло играет ноты (гейт roleHasNotes в drawPhone), четыре эффекта — пока есть рука
+   эффектов (без неё их нечем двигать: единственный писатель fx[] — ветка зоны 'fx' в gestures).
+   Позиции столбиков НЕ трогаем: REV как был индексом 0 (крайний слева), эффекты 1..4 — с рукой-
+   эффектами картинка байт-в-байт прежняя, без неё одинокий REV стоит на своём месте, а не съезжает. */
 function drawFxBars(rx0,H){                        // rx0 — левый край роли-соло (столбики от него); прежний 1-й арг W не использовался
   const items=[{v:revDisp,c:REV_COLOR,l:'REV',fxk:null},
-    ...FX_META.map(m=>({v:fx[m.k],c:m.color,l:m.label,fxk:m.k}))];
+    ...(roleHasFx('ld') ? FX_META.map(m=>({v:fx[m.k],c:m.color,l:m.label,fxk:m.k})) : [])];
   const y1=H-40, y0=y1-FX_BAR_MAX;                // низ слева: выше строки статуса, ниже коробки лупера
   ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
   items.forEach((it,i)=>{

@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -235,7 +235,7 @@ function soloHalfRole(key,S,W){
 }
 function soloNoteHand(key,S,W){
   const role=soloHalfRole(key,S,W);
-  return role==='ld' && handFnOf(key,'ld')!=='fx' && handFnOf(key,'ld')!=='loop' && handFnOf(key,'ld')!=='expr';   // нотная рука соло (не эффекты, не лупер, не выразительность); двух нотных рук — целятся обе, последняя пишет revDisp
+  return role==='ld' && playsNotes(handFnOf(key,'ld'));   // нотная рука соло (не эффекты, не лупер, не выразительность — закон один, state.playsNotes); двух нотных рук — целятся обе, последняя пишет revDisp
 }
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
    (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
