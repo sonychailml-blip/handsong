@@ -170,6 +170,14 @@
          значение варианта «По ладу» (и сама геометрия: сколько нот в прямоугольнике и сколько октав
          влезло). Варианты строит ui.js (renderRectCtl). Блокировки нет: раскладываются все лады. -->
     <div class="prow" id="rectRow"><label data-i18n="panel.scale.rectLayout">Раскладка нот</label><select id="rectSel"></select></div>
+    <!-- Многопальцевый щипок: сколько пальцев руки звучат одновременно (1 = как было). Рядом —
+         ВРЕМЕННАЯ диагностика щипка: показать живые отношения и пороги, чтобы выбрать потолок по
+         числам, а не на глаз. Оба контрола строит ui.js (renderPinchCtl). -->
+    <div class="prow" id="pinchRow"><label data-i18n="panel.scale.pinchFingers">Пальцев в руке</label><select id="pinchSel"></select></div>
+    <p class="phint" id="pinchHint" data-i18n="panel.scale.pinchHint">Несколько пальцев к большому — несколько нот. Камера видит два пальца увереннее, чем четыре: поднимайте потолок, посмотрев диагностику.</p>
+    <div class="prow" id="pinchDbgRow"><label data-i18n="panel.scale.pinchDebug">Диагностика щипка</label>
+      <div class="seg"><button id="pinchDbgOn" data-i18n="common.on">Вкл</button><button id="pinchDbgOff" class="act" data-i18n="common.off">Выкл</button></div>
+    </div>
     <div class="prow"><label data-i18n="panel.scale.chords">Аккорды</label>
       <div class="seg"><button id="qTriad" class="act" data-i18n="panel.scale.triads">Трезвучия</button><button id="qSev" data-i18n="panel.scale.sevenths">Септаккорды</button></div>
     </div>

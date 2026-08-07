@@ -1,6 +1,7 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
-         camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref } from './state.js';
+         camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
+         pinchFingers, setPinchFingers, pinchDebug, setPinchDebug } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
@@ -407,6 +408,24 @@ function renderRectCtl(){
 }
 rectSel.onchange=e=>{ setRectPref(e.target.value); softAllOff();   // раскладка меняет СМЫСЛ пальца (октава ↔ нота в прямоугольнике) — гасим звучащее, как при смене лада/функции руки
   renderRectCtl(); };
+/* МНОГОПАЛЬЦЕВЫЙ ЩИПОК: сколько пальцев руки звучат одновременно. 1 — ровно сегодняшнее поведение
+   (включая перевод ноты сменой пальца на лету), 2+ — каждый прижатый палец даёт СВОЮ ноту.
+   Дефолт 2 выбран ОСТОРОЖНО и БЕЗ ЗАМЕРА (см. state.pinchFingers): указательный+средний камера видит
+   увереннее всего. Рядом — ВРЕМЕННАЯ диагностика: живые отношения щипка и пороги ON/OFF на холсте,
+   чтобы поднимать потолок по числам. Смена потолка гасит звучащее (softAllOff): иначе нота пальца,
+   который только что «срезали» потолком, осталась бы висеть. */
+const pinchSel=$('pinchSel'), pinchDbgOn=$('pinchDbgOn'), pinchDbgOff=$('pinchDbgOff');
+function renderPinchCtl(){
+  pinchSel.textContent='';
+  for(let n=1;n<=4;n++){ const o=document.createElement('option'); o.value=n;
+    o.textContent = n===1 ? t('pinch.one') : t('pinch.n',{n}); pinchSel.appendChild(o); }
+  pinchSel.value=pinchFingers;
+  pinchDbgOn.classList.toggle('act',pinchDebug); pinchDbgOff.classList.toggle('act',!pinchDebug);
+}
+pinchSel.onchange=e=>{ setPinchFingers(+e.target.value); softAllOff(); renderPinchCtl(); };
+pinchDbgOn.onclick =()=>{ setPinchDebug(true);  renderPinchCtl(); };
+pinchDbgOff.onclick=()=>{ setPinchDebug(false); renderPinchCtl(); };
+renderPinchCtl();
 /* ПЕРВИЧНАЯ ОТРИСОВКА — ЗДЕСЬ, а не в buildUI(): buildUI() зовётся выше по файлу, где const-ссылки
    этого блока ещё в мёртвой зоне (TDZ) — «Cannot access 'rectSel' before initialization» на загрузке.
    Тот же порядок, что у эталона A4 (элементы → обработчики → первичный syncARef(aRef) рядом). */
@@ -835,6 +854,7 @@ onLangChange(()=>{
   [...selBassMode.options].forEach((o,i)=>o.textContent=L(BASS_MODES[i].name));
   updScaleBtn(); updRecBtn(); updLoopBtn();
   renderRectCtl();                     // «Раскладка нот»: варианты строит JS (подпись «По ладу: …» составная) + причина недоступности
+  renderPinchCtl();                    // «Пальцев в руке»: подписи вариантов составные («2 ноты одновременно»)
   applyInstr(); applySplit();          // роль + половины + «Функции рук» + видимость/титулы
   refreshMetreCtl();
   applyRec(); applyBacking(); applyFullscreen();

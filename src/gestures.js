@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide } from './state.js';
+import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -30,6 +30,19 @@ function minFinger(r){
   let mf=FINGER_TIPS[0],mv=Infinity;
   for(const f of FINGER_TIPS)if(r[f]<mv){mv=r[f];mf=f;}
   return[mf,mv];
+}
+/* ВСЕ пальцы, прижатые к большому СЕЙЧАС (индексы 0..3), а не один ближайший. Гистерезис ТОТ ЖЕ, что
+   был у единственного щипка: войти нужно строго ниже PINCH_ON, отпустить — выше PINCH_OFF (между ними
+   палец держится). Поэтому при ОДНОМ прижатом пальце множество совпадает с прежним «mv<PINCH_ON /
+   mv>PINCH_OFF» ровно, порог в порог: одна нота ощущается как раньше.
+   prev — множество прошлого кадра (гистерезис на руке, S.touch). */
+function touchedFingers(r,prev){
+  const now=new Set();
+  for(let i=0;i<FINGER_TIPS.length;i++){
+    const v=r[FINGER_TIPS[i]];
+    if(prev.has(i) ? v<=PINCH_OFF : v<PINCH_ON) now.add(i);
+  }
+  return now;
 }
 function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return S.sm[k]; }
 
@@ -276,7 +289,9 @@ function endPinch(key,S){
        Она существовала ТОЛЬКО потому, что голос был один: без неё оставшаяся рука замолкала. С пулом она
        не просто не нужна — она ВРЕДНА: переназначала бы ключ владельца, который теперь означает
        конкретную руку, и вторая рука получила бы чужую ноту. Удалена намеренно, не забыта. */
-    if(S.zone==='ld'){ WleadOff(soloKey(key)); }
+    /* СОЛО: гасим КАЖДЫЙ звучавший голос по его КЛЮЧУ — рука могла держать до четырёх нот. S.snd хранит
+       именно ключи (их собирает блок игры); при одном пальце это ровно один ключ 'lead:L/R', как было. */
+    if(S.zone==='ld'){ for(const kk of (S.snd||[])) WleadOff(kk); }
     if(S.zone==='bs'&&bassOwner===key){ const nx=otherPinched(key,'bs'); if(nx)bassOwner=nx; else{ WbassOff(); bassOwner=null; } }   // БАС по-прежнему моно — передача владения ему нужна
     /* 'ch': в ЗАЩЁЛКЕ (S.fn!=='hold') WchOff НЕ зовём — аккорд звучит и после размыкания, лишь отпускаем
        руль. В УДЕРЖАНИИ (S.fn==='hold') размыкание пальцев ГАСИТ аккорд (как соло-hold) и чистит защёлку. */
@@ -291,6 +306,7 @@ function endPinch(key,S){
     }
   }
   S.pinch=false; S.adj=null; S.deg=-1; S.slot=-1; S.rect=null; S.ty=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры; S.ty — замороженный на атаке тип аккорда
+  S.snd=[]; S.fing={}; S.order=[]; S.touch=new Set();   // многопальцевое состояние: звучавшие пальцы, их ноты, порядок прижатия, гистерезис касания
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
   S.clearT0=null; S.clearFired=false;           // отсчёт очистки лупера — сброс на размыкании
 }
@@ -310,20 +326,39 @@ function processHands(res){
     /* regOct — РЕГИСТР сыгранной ноты (посчитан игрой: из слота у rect-раскладки, от пальца у узких
        рядов), slot — её слот сетки. Оба нужны потому, что на многопериодной сетке ступень уже НЕ
        задаёт ни высоту целиком, ни прямоугольник подсветки. Пишутся в тех же ветках, что и S.deg. */
-    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,regOct:0,slot:-1,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,ty:null,clearT0:null,clearFired:false});
+    const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,regOct:0,slot:-1,zone:null,vol:.6,rev:0,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,ty:null,clearT0:null,clearFired:false,
+      touch:new Set(),order:[],fing:{},snd:[],pr:null});   // МНОГОПАЛЬЦЕВОЕ: прижатые пальцы (гистерезис), порядок прижатия, нота каждого пальца, звучащие сейчас, живые отношения щипка (диагностика)
     S.seen=now; S.lm=lm;
     /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
        palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
        на S (S.role/S.rx0/S.rx1) рядом с S.zone — чтобы чтение при игре совпало с захватом. */
     const [rx0,rx1]=[0,W], split=palSplitX(rx0,rx1);
 
-    const r=pinchRatios(lm), [mf,mv]=minFinger(r);
- 
-    if(!S.pinch&&mv<PINCH_ON){
+    /* МНОГОПАЛЬЦЕВЫЙ ЩИПОК. r — отношения по ВСЕМ четырём пальцам (они и так считались), touch —
+       множество прижатых. S.order хранит ПОРЯДОК прижатия: первый прижатый остаётся ГЛАВНЫМ пальцем,
+       пока держится, — от него берутся позиция/зона/громкость (у руки одно положение на всех её нот),
+       а остальные добавляют СВОИ ноты. Стабильный порядок важнее «ближайшего»: иначе главный палец
+       перескакивал бы между кадрами и дёргал позицию.
+       ⚠️ ПРИ pinchFingers===1 РАБОТАЕТ СТАРЫЙ ЗАКОН ЦЕЛИКОМ: главный = БЛИЖАЙШИЙ к большому, и его
+       смена на лету по-прежнему переводит ноту (см. ветку удержания ниже). Так «одна нота» остаётся
+       байт-в-байт прежней, а многоголосие — отдельный, осознанно включаемый режим. */
+    const r=pinchRatios(lm), [mf0,mv]=minFinger(r);
+    S.pr=r;                                        // живые отношения — для временной диагностики щипка (draw)
+    const prevTouch=S.touch||new Set();
+    const touch=touchedFingers(r,prevTouch);
+    S.order=(S.order||[]).filter(f=>touch.has(f));                 // ушедшие пальцы вон
+    for(let f=0;f<FINGER_TIPS.length;f++) if(touch.has(f)&&!S.order.includes(f)) S.order.push(f);   // новые — в конец
+    S.touch=touch;
+    const multi=pinchFingers>1;
+    const pf = multi ? (S.order.length?S.order[0]:FINGER_TIPS.indexOf(mf0)) : FINGER_TIPS.indexOf(mf0);   // ГЛАВНЫЙ палец
+    const mf = FINGER_TIPS[pf];
+
+    if(!S.pinch&&touch.size){
       /* Захват щипка: палец задаёт октаву, а ЗОНА фиксируется по точке
          щипка и не меняется до отпускания — двигая руку по X ради
          громкости, нельзя случайно перескочить в соседнюю колонку. */
-      S.pinch=true; S.oct=FINGER_TIPS.indexOf(mf); S.deg=-1; S.sm={};
+      S.pinch=true; S.oct=pf; S.deg=-1; S.sm={};
+      S.fing={};                             // ноты ПО ПАЛЬЦАМ (палец → {deg,regOct,slot}) — новый щипок начинает с чистого листа
       S.pc=null; S.pr=null;                  // память гистерезиса палитры — на руке: новый щипок начинает с чистого листа
       S.rect=null;                           // память гистерезиса прямоугольника — тоже на руке, тем же приёмом
       S.ty=null;                             // ЗАМОРОЖЕННЫЙ тип аккорда — берётся на атаке (ниже), новый щипок начинает с чистого листа
@@ -402,16 +437,27 @@ function processHands(res){
         fireLooperCmd(S,mf);                 // команда лупера по пальцу — РАЗ на щипок (блок захвата = edge, единичное срабатывание по построению)
       }
     }else if(S.pinch){
-      if(mv>PINCH_OFF){ endPinch(key,S); }
-      else if(mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf)!==S.oct&&S.fn!=='hold'&&S.fn!=='loop'){   // 'hold'/'loop' морозят палец: у hold — октаву, у лупера — выбранную команду (мизинец не «перескочит» на безымянный)
-        S.oct=FINGER_TIPS.indexOf(mf);       // смена пальца = смена октавы на лету
+      if(!touch.size){ endPinch(key,S); }
+      /* СМЕНА ГЛАВНОГО ПАЛЬЦА НА ЛЕТУ — прежний закон дословно: ближайший к большому побеждает (порог
+         PINCH_HOLD, свободнее щипкового), и выбор ПЕРЕЕЗЖАЕТ на него.
+         ⚠️ ЗАКОН ОТМЕНЁН РОВНО В ОДНОМ МЕСТЕ: у СОЛО при потолке 2+. Там второй поднесённый палец — это
+         вторая НОТА, а не перескок, и главным остаётся первый прижатый (меняется лишь когда сам
+         отпущен, S.order выше). Всем прочим зонам (эффекты, октавная полоса, палитра, ударные) и соло
+         при потолке 1 закон нужен как был: они одноголосые, и «перевести палец» там — обычный жест. */
+      else if(!(multi&&S.zone==='ld')&&mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf0)!==S.oct&&S.fn!=='hold'&&S.fn!=='loop'){   // 'hold'/'loop' морозят палец: у hold — октаву, у лупера — выбранную команду (мизинец не «перескочит» на безымянный)
+        S.oct=FINGER_TIPS.indexOf(mf0);      // смена пальца = смена октавы на лету (по БЛИЖАЙШЕМУ, как всегда)
         if(S.zone==='fx'&&S.adj){
-          const meta=FX_META.find(m=>m.finger===mf);
+          const meta=FX_META.find(m=>m.finger===mf0);
           S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]}; S.tutFx=null;
         }
         // ЗАЦЕПКА ОБУЧЕНИЯ: палец сменён на лету (=другая октава) — то же событие pinch с новым пальцем.
         tutorTap('pinch',{finger:S.oct, zone:S.zone, hand:handSide(key)});
       }
+      /* Многопальцевое СОЛО: ГЛАВНЫЙ отпущен, но рука ещё держит другие — повышаем следующий по порядку
+         прижатия. Позиция/зона/громкость читаются с главного, поэтому без повышения они остались бы
+         висеть на уже отпущенном пальце. Нота при этом НЕ переезжает: у каждого пальца своя (S.fing),
+         и отпущенный гаснет отдельно. */
+      else if(multi&&S.zone==='ld'&&touch.size&&S.oct!==pf) S.oct=pf;
     }
  
     if(S.pinch){
@@ -499,7 +545,18 @@ function processHands(res){
         /* ХОЛОСТОЙ ПАЛЕЦ: при k<4 лишние пальцы НЕ играют ничего. Молчание, а не чужая нота —
            иначе мизинец на 3-нотном прямоугольнике врал бы высотой. Владение НЕ отдаём: сдвинул
            палец на рабочий — звук вернётся тем же щипком (иначе пришлось бы перещипывать). */
-        const idle = rectPlay && !thereminOn && S.oct>=RL.k;
+        /* ПАЛЬЦЫ, КОТОРЫЕ ЗВУЧАТ (только соло). Порядок прижатия, обрезанный потолком pinchFingers, без
+           холостых (при k<4 лишние пальцы молчат — тот же закон, что и у одного пальца).
+           ТЕРМЕНВОКС — ОДНА НОТА НА РУКУ, намеренно: высоту там ведёт ВЕРТИКАЛЬ РУКИ, а палец ноту не
+           выбирает вовсе, поэтому у всех пальцев вышел бы один и тот же Гц — унисон-дубли. Придумывать
+           им сдвиг («второй палец = ступенью выше») было бы выдумкой без физического основания, а не
+           инструментом. Поэтому у терменвокса играет только главный палец. */
+        const solo=S.zone==='ld';
+        const act = !solo ? []
+          : thereminOn ? [S.oct]                                             // терменвокс — только главный палец (см. выше)
+          : (multi ? S.order : [S.oct])                                      // потолок 1 → ровно прежний ЕДИНСТВЕННЫЙ (ближайший) палец, а не «первый прижатый»
+              .filter(f=>!rectPlay||f<RL.k).slice(0,pinchFingers);
+        const idle = solo ? act.length===0 : (rectPlay && !thereminOn && S.oct>=RL.k);
         if(idle){
           S.deg=-1; S.slot=-1;                    // ни ступени, ни подсветки: draw покажет тусклое кольцо и подпись «палец не занят»
         }else if(thereminOn){
@@ -517,14 +574,30 @@ function processHands(res){
              для соло/баса И аккордов: у аккорда S.deg — это КОРЕНЬ, значит замерзают корень+октава, тип
              тоже заморожен на атаке (S.ty, ниже), громкость свеллит — ровно как задумано «заморожен». */
         }else if(rectPlay){
-          S.rect=degHyst(y,RL.bands,H,S.rect==null?-1:S.rect);          // полоса полной сетки
+          S.rect=degHyst(y,RL.bands,H,S.rect==null?-1:S.rect);          // полоса полной сетки — ОДНА на руку: все её ноты лежат в одном прямоугольнике, в этом весь смысл раскладки
           const r=clamp(S.rect-RL.regBands,0,RL.rects-1);               // нотный прямоугольник = полоса − октавная (если она есть); без мёртвой зоны
-          const g=clamp(r*RL.k+S.oct, 0, RL.notes-1);                   // СЛОТ сетки (прямоуг*k + палец)
+          const g=clamp(r*RL.k+S.oct, 0, RL.notes-1);                   // СЛОТ главного пальца (прямоуг*k + палец)
           const n=rectNoteAt(g,base); S.deg=n.deg; S.regOct=n.oct; S.slot=g;   // одна формула слот→(ступень,регистр) — её же читает подсветка в обратную сторону
         }else{
           const rows= S.zone==='dr' ? DRUM_ROWS : IVX().length;
           S.deg=degHyst(y,rows,H,S.deg);            // вся высота — ровно так же, как рисует draw
           S.regOct=S.oct; S.slot=-1;                // узкие ряды: регистр выбирает ПАЛЕЦ (как было)
+        }
+        /* НОТА КАЖДОГО ЗВУЧАЩЕГО ПАЛЬЦА. Общее у руки — ПОЛОЖЕНИЕ (прямоугольник/ряд по Y, громкость по
+           X, Z-реверб); РАЗНОЕ — что палец берёт внутри него: в rect-сетке это слот прямоугольник*k+палец
+           (четыре соседние ноты — аккорд пальцами), в узких рядах палец по-прежнему значит РЕГИСТР, то
+           есть пальцы дают ту же ступень октавами (честное следствие того, что палец там и означает).
+           УДЕРЖАНИЕ — ПО ПАЛЬЦУ: запись пальца, однажды посчитанная, не пересчитывается, поэтому каждая
+           нота держит СВОЮ высоту и гаснет, когда разомкнётся ИМЕННО ЕЁ палец (см. гашение ниже). */
+        if(solo&&!idle){
+          for(const f of act){
+            if(holdOn && S.fing[f]) continue;                            // удержание: нота этого пальца заморожена с его первого кадра
+            if(rectPlay){ const g=clamp(Math.floor(S.slot/RL.k)*RL.k+f, 0, RL.notes-1), n=rectNoteAt(g,base);
+              S.fing[f]={deg:n.deg,oct:n.oct,slot:g}; }
+            else if(thereminOn) S.fing[f]={deg:S.deg,oct:S.regOct,slot:S.slot};
+            else S.fing[f]={deg:S.deg,oct:f,slot:-1};                    // узкие ряды: ступень от Y (общая), регистр = САМ ПАЛЕЦ
+          }
+          for(const f of Object.keys(S.fing)) if(!act.includes(+f)) delete S.fing[f];   // палец отпущен — его записи больше нет (голос гасим ниже)
         }
         /* Типизированный аккорд: левые CH_PAL_W заняты палитрой, поэтому громкость мерится по
            ПРАВОЙ зоне [split,rx1] — иначе вся половина экрана читалась бы «тихо». Остальные роли
@@ -546,21 +619,37 @@ function processHands(res){
            узкие ряды — S.oct (палец), как было. Меняется ТОЛЬКО источник октавы, логика защёлки ниже
            — без изменений. */
         const chOct = S.regOct;   // роль = S.zone (в аккордовой ветке ='ch')
-        /* ХОЛОСТОЙ ПАЛЕЦ (k<4): ветка стоит ПЕРВОЙ в цепочке зон, поэтому ни нота, ни защёлка, ни
-           удар не срабатывают. Живой голос гасим — молчание должно быть слышно сразу, а не «залипшей»
-           нотой. Владение оставляем за рукой: вернулся на рабочий палец — звук вернулся. */
-        if(idle){
-          if(S.zone==='ld')WleadOff(soloKey(key));
-          else if(S.zone==='bs'&&bassOwner===key)WbassOff();
-        }else if(S.zone==='ld'){
-          {   // без гейта владельца: у КАЖДОЙ соло-руки свой голос пула — играют обе разом
+        /* СОЛО стоит ПЕРВЫМ в цепочке зон и само разбирается с холостыми пальцами: у него нот несколько,
+           и «замолчать» — это не одно действие, а разность множеств (ниже). Прочие роли (бас/аккорды/
+           ударные) остались одноголосыми, у них холостой палец — прежняя ветка `else if(idle)`. */
+        if(S.zone==='ld'){
+          /* КЛЮЧ ВЛАДЕЛЬЦА НОТЫ. При потолке 1 и у терменвокса — БЕЗ номера пальца: нота у руки одна, и
+             ⚠️ ИМЕННО ПОЭТОМУ смена пальца на лету по-прежнему ВЕДЁТ ту же ноту глиссандо, а не
+             переатакует её (ключ не меняется → тот же голос пула → прежний 20мс-глайд). С номером пальца
+             тот же жест дал бы off+on — слышимый щелчок там, где раньше был плавный переезд.
+             При многопальцевом — с номером: у каждого пальца свой голос. */
+          const noteKey = f => (multi&&!thereminOn) ? soloKey(key,f) : soloKey(key);
+          /* ГАШЕНИЕ — сначала и ПО КЛЮЧАМ, а не по пальцам: отпущенный (срезанный потолком, ставший
+             холостым) палец должен замолчать в том же кадре, а «тот же ключ» — наоборот, продолжиться.
+             S.snd — ключи, звучащие СЕЙЧАС. */
+          const keys=act.map(noteKey), prevSnd=S.snd||[];
+          for(const kk of prevSnd) if(!keys.includes(kk)) WleadOff(kk);
+          S.snd=keys;
+          if(!idle){   // без гейта владельца: у КАЖДОЙ соло-руки (и каждого её пальца) свой голос пула
             const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
             S.rev=clamp01((REV_NEAR-hs)/REV_RANGE); setRevDisp(S.rev);
-            WleadOn(soloKey(key),{deg:S.deg,oct:S.regOct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца
-                     vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 3-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
-            // ЗАЦЕПКА ОБУЧЕНИЯ: соло-нота зазвучала/сменила ступень (не пересчитываем — это ТОТ ЖЕ вызов, что породил звук). half — половина сплита (0 лев/1 прав по замороженному S.rx0), для урока «Две роли».
-            if(S.deg!==S.tutDeg){ S.tutDeg=S.deg; tutorTap('note',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null}); }
+            for(const f of act){
+              const n=S.fing[f]; if(!n)continue;
+              WleadOn(noteKey(f),{deg:n.deg,oct:n.oct,vol:S.vol,rev:S.rev,   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца
+                       vib:fx.vib,drv:fx.drv,trm:fx.trm,dly:fx.dly,inst:leadIdx}, thereminOn?S.hz:null);   // 3-й арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт
+            }
+            /* ЗАЦЕПКА ОБУЧЕНИЯ: соло-нота зазвучала/сменила ступень. Считаем по ГЛАВНОМУ пальцу — урокам
+               нужен факт «нота сыграна», а не каждая нота аккорда (иначе одно движение слало бы четыре). */
+            const nMain=S.fing[act[0]];
+            if(nMain&&nMain.deg!==S.tutDeg){ S.tutDeg=nMain.deg; tutorTap('note',{deg:nMain.deg, half:splitOn?(S.rx0>0?1:0):null}); }
           }
+        }else if(idle){
+          if(S.zone==='bs'&&bassOwner===key)WbassOff();
         }else if(S.zone==='bs'){                            // бас: моно-голос, ведётся как соло
           if(bassOwner===key){ WbassOn({deg:S.deg,oct:S.regOct,vol:S.vol,inst:bassIdx}, thereminOn?S.hz:null);   // rect-бас — октава из СЛОТА (rectNoteAt); 2-й арг — живой override Гц (терменвокс-бас), в запись НЕ идёт (как соло)
             // ЗАЦЕПКА ОБУЧЕНИЯ: бас зазвучал/сменил ступень (тот же вызов, что дал звук) — урок «Лупер» (слой ДРУГОЙ ролью поверх соло: соло-моно на себя не слоится) И урок «Две роли» (half — половина сплита).

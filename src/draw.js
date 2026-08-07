@@ -2,8 +2,8 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear } from './state.js';
-import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
+import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, pinchDebug, handSide } from './state.js';
+import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, PINCH_ON, PINCH_OFF,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
@@ -125,12 +125,17 @@ function drawRectGrid(x0,x1,playH,accent,activeSlots,lblOf,role,rx0=x0){
       ctx.fillRect(x0,yTop,w,h);
       ctx.strokeStyle= on ? accent : 'rgba(255,255,255,.12)';
       ctx.lineWidth= on ? 2 : 1; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,h-1);
-      /* Легенда пальцев (I=указ.=низ … ), стопкой — это КЛЮЧ, а не зоны выбора. Строк RL.k;
-         холостые пальцы дорисовываем тусклым прочерком, чтобы «мизинец молчит» читалось как
-         УСТРОЙСТВО, а не как сбой. Высоту делим на ВСЕ ЧЕТЫРЕ пальца — стопка не скачет при смене лада. */
-      const eh=Math.min(20,(h-8)/FINGER_TIPS.length), sy=yTop+(h-eh*FINGER_TIPS.length)/2;
-      for(let n=0;n<FINGER_TIPS.length;n++){
-        const ey=sy+n*eh+eh/2, live=n<RL.k, act=aSet.has(r*RL.k+n);   // подсвечиваем СТРОКУ ЗВУЧАЩЕГО пальца, а не «строку активного прямоугольника»: в одном прямоугольнике их может гореть несколько (две руки, а позже — несколько пальцев одной)
+      /* Легенда пальцев (I=указ. … ), стопкой — это КЛЮЧ, а не зоны выбора. Строк RL.k; холостые пальцы
+         дорисовываем тусклым прочерком, чтобы «мизинец молчит» читалось как УСТРОЙСТВО, а не как сбой.
+         Высоту делим на ВСЕ ЧЕТЫРЕ пальца — стопка не скачет при смене лада.
+         ⚠️ ПОРЯДОК СТРОК ПЕРЕВЁРНУТ: НИЖНЯЯ нота прямоугольника — ВНИЗУ, верхняя — вверху. Раньше
+         список шёл сверху вниз, то есть ВНУТРИ блока высота росла вниз, а сама сетка снаружи растёт
+         ВВЕРХ — «выше звучит, ниже написано». Это ТОЛЬКО ПОРЯДОК ОТРИСОВКИ: палец n по-прежнему берёт
+         слот r*k+n (указательный — первая нота прямоугольника, мизинец — последняя), подсветка ищет тот
+         же слот, звук не тронут. Меняется y строки, и ничего больше. */
+      const NF=FINGER_TIPS.length, eh=Math.min(20,(h-8)/NF), sy=yTop+(h-eh*NF)/2;
+      for(let n=0;n<NF;n++){
+        const ey=sy+(NF-1-n)*eh+eh/2, live=n<RL.k, act=aSet.has(r*RL.k+n);   // (NF-1-n) — тот самый переворот; подсвечиваем СТРОКУ ЗВУЧАЩЕГО пальца, а не «строку активного прямоугольника»: в одном прямоугольнике их может гореть несколько
         ctx.textAlign='left';
         if(!live){ ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.22)'; ctx.fillText(`${OCT_ROMAN[n]}  —`, lx, ey); continue; }
         const deg=rectNoteAt(Math.min(r*RL.k+n,RL.notes-1),base).deg;
@@ -239,6 +244,29 @@ function drawTag(x,y,lines,color){
 function latchChordFreqs(){                        // частоты звучащего защёлкнутого аккорда, корень первым; null — тишины/нет голосов
   const vs=chordHold['latch']; if(!vs||!vs.length)return null;
   return vs.map(v=>v.o1.frequency.value);
+}
+/* ЖИВЫЕ НОТЫ ОДНОЙ РУКИ — из leadHold, реестра ЗВУЧАЩИХ голосов. ТА ЖЕ дисциплина, что у аккордового
+   разбора (latchChordFreqs): показываем то, что ЗВУЧИТ, а не то, что намеревалась рука — HANDS хранит
+   намерение и разошлось бы со звуком там, где голос украли. Ключи этой руки: 'lead:L' (потолок 1 и
+   терменвокс — нота у руки одна) либо 'lead:L:<палец>' (многопальцевый). Гц считаем leadFreq(deg,oct) —
+   ТОЙ ЖЕ функцией, что дала частоту звуку (recorder.ENG.leadOn), поэтому число не может разойтись.
+   Сортируем по высоте: список читается снизу вверх, как сама сетка. */
+function handLeadNotes(key){
+  const pre='lead:'+handSide(key), out=[];
+  for(const k in leadHold){
+    if(k!==pre && k.slice(0,pre.length+1)!==pre+':')continue;
+    const v=leadHold[k]; if(v.deg>=0) out.push({deg:v.deg,oct:v.oct,f:leadFreq(v.deg,v.oct)});
+  }
+  return out.sort((a,b)=>a.f-b.f);
+}
+/* Строки ярлыка для НЕСКОЛЬКИХ нот. Лестница деградации — ТА ЖЕ, что у аккордового разбора (fitReadout):
+   «нота Гц (центы)» на всех → центы только у первых трёх → одни Гц → и лишь в самом конце «…». Число
+   НИКОГДА не режется посередине: packSegs переносит сегментами. */
+function fitLeadNotes(notes,maxW,maxLines){
+  const nm=n=>noteLbl(n.deg), hz=n=>String(Math.round(n.f)), ct=n=>`${nm(n)} ${hz(n)} (${centsOf(n.deg)}c)`;
+  const full=notes.map(ct), first3=notes.map((n,i)=>i<3?ct(n):`${nm(n)} ${hz(n)}`), hzOnly=notes.map(n=>`${nm(n)} ${hz(n)}`);
+  for(const segs of [full,first3,hzOnly]){ const L=packSegs(segs,maxW,maxLines,false); if(L)return L; }
+  return packSegs(hzOnly,maxW,maxLines,true);
 }
 /* Разложить сегменты по строкам (≤maxLines) под ширину maxW. trunc=false → null, если не влезло
    (пробуем более компактный вариант/шрифт); trunc=true → добиваем «…» на границе СЕГМЕНТА, число
@@ -548,9 +576,49 @@ function drawPhone(res){
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
   drawHandsPhone(res,W,H,playH);
+  if(pinchDebug)drawPinchDebug(W,H);          // ВРЕМЕННАЯ диагностика щипка (см. drawPinchDebug) — по умолчанию выключена
   if(!videoRec)drawLooper();                  // при записи клипа полосу лупера (служебная накладка НА ХОЛСТЕ) прячем из кадра; сетка/руки/ярлыки/эффекты — это ИГРА, остаются
   if(!videoRec)drawLooperFeedback(W,H);       // подтверждение команды рукой-лупером + отсчёт очистки — тоже служебная накладка, прячем в клипе
   drawStatus();                               // #status — HTML-элемент (не холст), в кадр клипа не попадает сам собой, как и кнопки
+}
+/* ================= ВРЕМЕННАЯ ДИАГНОСТИКА ЩИПКА (замер перед решением) =================
+   ЗАЧЕМ. Узнать, сколько пальцев РЕАЛЬНО различаются, а не предположить. Три пальца, прижатых к
+   большому, камера видит хуже одного: они перекрывают друг друга, и часть точек MediaPipe ДОСТРАИВАЕТ,
+   а не наблюдает. Ложная нота хуже несыгранной, поэтому потолок pinchFingers поднимают ПО ЭТИМ ЧИСЛАМ.
+   ЧТО ПОКАЗЫВАЕМ. По строке на палец: римская цифра, живое отношение dist(большой,палец)/размер ладони
+   (то самое, по которому решается щипок) и полоска. Метки порогов: ON (щипок ловится) и OFF (отпускание)
+   — между ними зона гистерезиса. Прижатый палец — зелёный, звучащий — жирный.
+   НА ЧТО СМОТРЕТЬ: прижатые пальцы должны УВЕРЕННО уходить ниже ON, а свободные — держаться выше OFF.
+   Если при трёх прижатых четвёртый (обычно мизинец) сползает к порогу или числа дрожат — потолок 3
+   ставить нельзя. ⛔ ВРЕМЕННЫЙ КОД: удалить вместе с контролом в панели, когда потолок выбран. */
+function drawPinchDebug(W,H){
+  const rows=[], PON=PINCH_ON, POFF=PINCH_OFF;
+  for(const k in HANDS){ const S=HANDS[k]; if(S.pr) rows.push([k,S]); }
+  if(!rows.length)return;
+  const bw=132, lh=15, hdr=16, pad=8;
+  ctx.textBaseline='middle'; ctx.textAlign='left';
+  rows.forEach(([k,S],i)=>{
+    const bx = i===0 ? 6 : W-bw-6, by = 64 + 0;                     // левая рука слева, правая справа — не наезжают друг на друга
+    const bh = hdr+FINGER_TIPS.length*lh+pad;
+    ctx.fillStyle='rgba(10,10,20,.78)'; ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,6); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.font='700 10px system-ui'; ctx.fillStyle='rgba(255,255,255,.75)';
+    ctx.fillText(`${handSide(k)}  ON<${PON}  OFF>${POFF}`, bx+6, by+9);
+    for(let f=0;f<FINGER_TIPS.length;f++){
+      const v=S.pr[FINGER_TIPS[f]], y=by+hdr+f*lh+lh/2;
+      const down=S.touch&&S.touch.has(f), snd=(S.snd||[]).includes(f);
+      ctx.font=snd?'700 10px system-ui':'10px system-ui';
+      ctx.fillStyle= snd?'#57d9a3' : down?'rgba(87,217,163,.75)':'rgba(255,255,255,.55)';
+      ctx.fillText(`${OCT_ROMAN[f]} ${v.toFixed(3)}`, bx+6, y);
+      /* Полоска: 0..0.6 отношения на 56px. Две риски — ON и OFF; между ними палец «залипает» (гистерезис). */
+      const gx=bx+58, gw=56, sc=q=>gx+Math.max(0,Math.min(1,q/0.6))*gw;
+      ctx.fillStyle='rgba(255,255,255,.13)'; ctx.fillRect(gx,y-3,gw,6);
+      ctx.fillStyle= down?'rgba(87,217,163,.85)':'rgba(255,255,255,.45)'; ctx.fillRect(gx,y-3,sc(v)-gx,6);
+      ctx.fillStyle='rgba(255,210,63,.9)'; ctx.fillRect(sc(PON),y-5,1,10);      // ON
+      ctx.fillStyle='rgba(229,72,77,.9)';  ctx.fillRect(sc(POFF),y-5,1,10);     // OFF
+    }
+  });
+  ctx.textBaseline='alphabetic';
 }
 /* Обратная связь руки-ЛУПЕРА (у команд нет ноты в звуке — показываем на экране), в стиле коробки лупера
    (тёмный скруглённый прямоугольник). ДВЕ накладки: (1) обратный отсчёт очистки (мизинец удержан) —
@@ -677,6 +745,21 @@ function drawHandsPhone(res,W,H,playH){
            убрана: единственные лады с tag:'edo' — 19/31-TET, а они были rect, так что ветка была
            НЕДОСТИЖИМА (правка байт-в-байт). Достижимой она стала бы ровно сейчас — когда 19/31-TET
            можно переключить в узкие ряды, — и там «шаг 5» расходилось бы с сеточным «6». */
+        const hold = S.fn==='hold' ? ' · '+t('tag.hold') : '';   // маркер удержания: нота держится, пока пальцы вместе
+        /* НЕСКОЛЬКО НОТ ОДНОЙ РУКИ (многопальцевый щипок): показываем ВСЕ, как это давно делает разбор
+           аккорда, — иначе ярлык называл бы одну ноту из четырёх и врал бы о том, что слышно. Заголовок:
+           имена (это и есть аккорд «одним взглядом») + регистр + громкость; ниже — по сегменту на ноту с
+           Гц и центами, упакованные с деградацией (см. fitLeadNotes). Только СОЛО: у баса нота одна.
+           ⚠️ ОДНА НОТА ИДЁТ ПРЕЖНЕЙ ВЕТКОЙ — две строки слово в слово, как было (гарантия «одна нота
+           выглядит как раньше»); ветка ниже включается ровно с ДВУХ. */
+        const many = instr==='ld' ? handLeadNotes(k) : [];
+        if(many.length>1){
+          ctx.font='12px system-ui';                                   // тем же шрифтом packSegs и меряет
+          const lines=fitLeadNotes(many,Math.min(300,W*0.6),3);
+          const head=`${many.map(n=>noteLbl(n.deg)).join(' ')} · ${regWord(s)} ${OCT_ROMAN[oShow]}${hold} · ${Math.round(S.vol*100)}%`;
+          drawTag(S.x,S.y,[head,...lines],accent);
+          continue;
+        }
         const L1=`${noteLbl(S.deg)} · ${regWord(s)} ${OCT_ROMAN[oShow]}`;
         /* Центы показываем ВСЕГДА, на любом ладу (снят прежний гейт s.edo!==12). Исторические
            темперации (Пифагоров, оба Натуральных, мезотон, велл-темперации) — это edo:12 cents-лады:
@@ -686,7 +769,6 @@ function drawHandsPhone(res,W,H,playH){
            — безвредно и держит ярлык на одном месте на всех ладах: единообразие важнее трёх сэкономленных
            символов. Формат и позиция прежние (Гц · % · центы), меняется только условие. */
         const L2=`${Math.round(f)} ${t('unit.hz')} · ${Math.round(S.vol*100)}% · ${centsOf(S.deg)}c`;
-        const hold = S.fn==='hold' ? ' · '+t('tag.hold') : '';   // маркер удержания: нота держится, пока пальцы вместе
         drawTag(S.x,S.y,[L1+hold,L2],accent);
       }else if(isDr){
         drawTag(S.x,S.y,[L(DRUM_NAMES[S.deg])||'—',`${Math.round(S.vol*100)}%`],accent);
