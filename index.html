@@ -15,6 +15,15 @@
 <meta name="apple-mobile-web-app-title" content="Handsong">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="style.css">
+<!-- Vercel Web Analytics — СТАТИЧЕСКАЯ форма (два тега, без npm-пакета: импорт @vercel/analytics
+     собирается только бандлером, а у нас сборки нет — голые ES-модули, он бы просто не завёлся).
+     Считает посетителей ТОЛЬКО на развёртывании Vercel: путь /_vercel/ АБСОЛЮТНЫЙ, а GitHub Pages
+     отдаёт из подпапки — там он не разрешается, и счётчик молча бездействует. Так и задумано.
+     Сбор данных должен быть включён и в панели Vercel (уже включён). -->
+<script>
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+</script>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
  
