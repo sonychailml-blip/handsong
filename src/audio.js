@@ -426,7 +426,10 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
    • НАТИВНЫЕ DelayNode в петле здесь МОЖНО — в отличие от Карплюса (см. ks-worklet.js): петля заперта
      одним квантом (128 сэмплов ≈ 2.9 мс), но все задержки тут 7–44 мс, на порядок выше пола, и строить
      реверб в ноту не нужно, поэтому сэмпловая квантизация неслышна. Ворклет не требуется. */
-let revLines=[];   // [{d,lp,fb,time}] — ручки ЖИВЫХ параметров сети; см. setRevDecay/setRevTone
+/* ⚠️ buildFDN ВОЗВРАЩАЕТ массив линий [{d,lp,fb,time}] — ручки ЖИВЫХ параметров сети. Раньше он писал их
+   в МОДУЛЬНУЮ переменную revLines, и реверб был СИНГЛТОНОМ по построению: второй экземпляр молча делил бы
+   те же линии, и setRevDecay первого перестроил бы второй. Теперь линии живут В ЭКЗЕМПЛЯРЕ (makeReverbFx),
+   а сеттеры берут их аргументом — «модуль эффекта» стал настоящим экземпляром, а не обёрткой над глобалью. */
 /* Аллпас Шрёдера: y = −g·x + z(x + g·y). Задержка БЕЗ окраски спектра — ровно то, что нужно, чтобы
    размазать вход, ничего в нём не подкрасив. Возвращает выход (он же вход следующей ступени). */
 function apStage(src,time,g){
@@ -452,7 +455,7 @@ function buildFDN(inNode,outNode){
   chL.gain.value=1; chR.gain.value=1; trim.gain.value=REV_A.outTrim;
   chL.connect(merge,0,0); chR.connect(merge,0,1); merge.connect(trim); trim.connect(outNode);
   const sgnL=[1,1,-1,-1], sgnR=[1,-1,-1,1];            // разные знаки/линии на каналы → декорреляция (ширина)
-  revLines=REV_A.lines.map((time,i)=>{
+  return REV_A.lines.map((time,i)=>{                     // ← ВОЗВРАЩАЕМ линии (владелец — экземпляр эффекта)
     const inSum=AC.createGain(); inSum.gain.value=1;
     const d=AC.createDelay(0.25); d.delayTime.value=time;
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=REV_A.tone; lp.Q.value=REV_A.toneQ;   // ОКРАСКА (в петле); Q — Баттерворт, БЕЗ пика: см. REV_A.toneQ, дефолтный Q заводил сеть свистом
@@ -478,16 +481,54 @@ function buildFDN(inNode,outNode){
    самовозбудился. Фильтр гасит в полосе ЗАДЕРЖИВАНИЯ, но с дефолтным Q (а он у Web Audio в ДЕЦИБЕЛАХ!)
    УСИЛИВАЕТ на резонансном пике (+1.96 дБ, |LP|≈1.25), а петля живёт как раз в полосе ПРОПУСКАНИЯ:
    0.886·1.25 = 1.11 > 1 → свист на ~3.9 кГц. Убери Баттерворт — вернётся. Считать усиление петли, а не
-   доверять слову «фильтр». Мастер-лимитер — ПОСЛЕДНИЙ РУБЕЖ (он ту аварию и поймал), НЕ гарантия схемы. */
-function setRevDecay(sec){ if(!AC||!revLines.length)return;
+   доверять слову «фильтр». Мастер-лимитер — ПОСЛЕДНИЙ РУБЕЖ (он ту аварию и поймал), НЕ гарантия схемы.
+   ⚠️ ЛИНИИ ПРИХОДЯТ АРГУМЕНТОМ (не из модульной переменной): сеттер принадлежит ЭКЗЕМПЛЯРУ эффекта.
+   Кламп здесь — ЕДИНСТВЕННАЯ власть над диапазоном; min/max в дескрипторе параметра лишь СОВЕТ для UI. */
+function setRevDecay(lines,sec){ if(!AC||!lines.length)return;
   const t=AC.currentTime, rt=Math.max(0.05,sec);
-  for(const L of revLines){ const g=Math.min(REV_A.gMax, Math.pow(10,-3*L.time/rt));
+  for(const L of lines){ const g=Math.min(REV_A.gMax, Math.pow(10,-3*L.time/rt));
     L.fb.gain.setTargetAtTime(g,t,0.05); } }
 /* ОКРАСКА ХВОСТА: cutoff демпфирующих ФНЧ во ВСЕХ петлях. Живой параметр — в отличие от IR, где тембр
-   хвоста был запечён в буфер и менялся только пересборкой буфера. */
-function setRevTone(hz){ if(!AC||!revLines.length)return;
+   хвоста был запечён в буфер и менялся только пересборкой буфера. Линии — аргументом, см. выше. */
+function setRevTone(lines,hz){ if(!AC||!lines.length)return;
   const t=AC.currentTime, f=Math.max(200,Math.min(18000,hz));
-  for(const L of revLines) L.lp.frequency.setTargetAtTime(f,t,0.05); }
+  for(const L of lines) L.lp.frequency.setTargetAtTime(f,t,0.05); }
+/* ================= МОДУЛЬ ЭФФЕКТА — ПЛАСТ 1: абстракция + ТОЛЬКО реверб =================
+   Модуль эффекта — то немногое, что ОБЩЕЕ у эффектов и НЕ зависит от их внутренностей:
+     { id, labelKey, in, out, params:[ {key,labelKey,unit,def,min,max,curve,set} ] }
+   `in` — узел, куда приходят ПОСЫЛЫ; `out` — узел, откуда эффект уходит в шину назначения.
+   ⚠️ ЧЕСТНО О ГРАНИЦАХ ЭТОЙ АБСТРАКЦИИ (чтобы следующий заход не открывал это заново):
+   • Она ПОСЫЛ-ОБРАЗНАЯ. Реверб ложится точно; ДЕЛЕЙ (dly/dlyWet) тоже посыл, но его подмес живёт на
+     ВЫХОДЕ (dlyWet), а у реверба — на ВХОДАХ (revLead/revCh), потому что источников ДВА с РАЗНОЙ
+     величиной. Один узел подмеса на выходе физически не выразил бы 0.85·rev и 0.12 одновременно.
+   • ТРЕМОЛО — ВСТАВКА (exprWah→tremGain→leadOut), у неё in===out, и глагол «прицепить к шине» для неё
+     неверен: вставке нужна врезка в цепь. ВИБРАТО вообще без аудио-входа/выхода (LFO в .detune из mkOsc).
+     ДРАЙВ — N экземпляров ПО ГОЛОСАМ до огибающей (нелинейность tanh, см. applyFx) и на шину не выносится.
+     Ни одно из этого в Пласте 1 НЕ трогается и НЕ готовится — вид крепления здесь ровно один: ПОСЫЛ.
+   • ПОДМЕС (mix) — НЕ параметр модуля, а свойство ПРИЦЕПКИ: у реверба их две (revLead живая, revCh
+     фиксированная 0.12). Поэтому у реверба СВОИХ параметров ДВА, а не три.
+   • id — СТАБИЛЬНЫЙ ключ, никогда не отображаемое имя (hard rule #25). labelKey — ключ словаря, который
+     появится вместе с UI; сейчас его никто не читает, и t() показал бы сам ключ, а не промолчал. */
+let FX_REV=null;                            // единственный экземпляр эффекта в Пласте 1 (не экспортируется — потребителя ещё нет)
+function makeReverbFx(){
+  const inNode=AC.createGain();  inNode.gain.value=1;     // ← этот узел держит переменная verb
+  const outNode=AC.createGain(); outNode.gain.value=0.9;  // ← этот узел держит переменная verbOut
+  const lines=buildFDN(inNode,outNode);                   // СНАЧАЛА сеть — она рождает линии...
+  const setDecay=v=>setRevDecay(lines,v), setTone=v=>setRevTone(lines,v);
+  setDecay(REV_A.decay); setTone(REV_A.tone);             // ...и ТОЛЬКО ПОТОМ параметры. ⚠️ ПОРЯДОК НЕСУЩИЙ:
+  /* сеттеры молча выходят на пустых линиях (guard !lines.length), поэтому вызов ДО buildFDN не упал бы, а
+     оставил бы обратные связи в нуле — реверба не стало бы ВООБЩЕ, без единой ошибки в консоли. */
+  return {
+    id:'reverb', labelKey:'fx.reverb',
+    in:inNode, out:outNode,
+    /* min/max — СОВЕТ для будущего UI, власть у клампа сеттера. У decay потолок 4.0 не случаен: выше
+       gMax начинает резать g короткой линии и не режет длинную — хвост перестаёт расти РОВНО. */
+    params:[
+      {key:'decay',labelKey:'fx.reverb.decay',unit:'s', def:REV_A.decay,min:0.3,max:4.0,   curve:'log',set:setDecay},
+      {key:'tone', labelKey:'fx.reverb.tone', unit:'Hz',def:REV_A.tone, min:200,max:18000, curve:'log',set:setTone},
+    ],
+  };
+}
 /* Карта глубины руки → cutoff яркости (Гц). depth 0 близко/ярко → CHORD_LP_MAX (открыт, НЕЙТРАЛЬ =
    сегодняшний звук), 1 далеко/глухо → CHORD_LP_MIN. Логарифмическая (перцептивно ровная). Единый
    источник для атаки (chordOn) и ведения (chordGlide) — раньше жила в удалённом setChordBright. */
@@ -594,12 +635,13 @@ async function initAudio(){
      живьём по-прежнему рулит ТОЛЬКО глубина руки (Z) через send соло.
      ⚠️ verb остался ВХОДНЫМ УЗЛОМ и сохранил ИМЯ намеренно: оба посыла — соло (leadOut→revLead→verb) и
      аккорды (chordBus→revCh→verb) — приходят сюда, и их проводка ниже НЕ тронута. Общий реверб для
-     соло и аккордов работает ПО ПОСТРОЕНИЮ, а не потому, что кто-то не забыл его перецепить. */
-  verb=AC.createGain(); verb.gain.value=1;
-  verbOut=AC.createGain(); verbOut.gain.value=0.9;
+     соло и аккордов работает ПО ПОСТРОЕНИЮ, а не потому, что кто-то не забыл его перецепить.
+     Реверб — ПЕРВЫЙ и пока ЕДИНСТВЕННЫЙ МОДУЛЬ ЭФФЕКТА (см. makeReverbFx): фабрика сама строит сеть и
+     ставит decay/tone из REV_A в правильном порядке. Остальные четыре эффекта (драйв в голосе, вибрато в
+     detune, тремоло вставкой, делей посылом) НЕ модуляризованы и живут ровно там, где жили. */
+  FX_REV=makeReverbFx();
+  verb=FX_REV.in; verbOut=FX_REV.out;   // ⚠️ СТАРЫЕ ИМЕНА = ТЕ ЖЕ УЗЛЫ: строки посылов ниже не тронуты
   verbOut.connect(master);
-  buildFDN(verb,verbOut);
-  setRevDecay(REV_A.decay); setRevTone(REV_A.tone);   // единственный вызов: параметры живые, но в этом заходе постоянные
  
   /* --- СОЛО-цепочка (как в версии 2) --- */
   const vibLFO=AC.createOscillator(); vibLFO.frequency.value=5.5;
