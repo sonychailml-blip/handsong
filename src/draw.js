@@ -5,7 +5,7 @@ import { t, L } from './i18n.js';
 import { fx, fxLayout, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
-import { DRUM_NAMES, chordHold, leadHold } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
+import { DRUM_NAMES, chordHold, leadHold, FX_MODULES } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel } from './recorder.js';
  
@@ -18,19 +18,36 @@ const fxBandR=n=> n>0 ? FX_X0+(n-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W : 0;   // п�
    задаёт РАСКЛАДКА (state.fxLayout, слот = палец), а раскладка живая. Разойдись счёт с рисованием —
    легенда наехала бы на столбики; поэтому обе стороны зовут ОДНУ функцию (тот же закон, что у сетки:
    попадание и отрисовка от одной геометрии).
-   ⚠️ Слайс 2.2 рисует РОВНО ОДИН столбик на слот (величина первого параметра). Разворот активного
-   слота в несколько столбиков по параметрам — слайс 2.3.
-   Нерезолвимый fxId сейчас НЕВОЗМОЖЕН (назначать эффекты ещё нечем, в слотах только четыре старых);
-   отбрасываем его молча — в 2.3 сюда придёт реестр модулей и реверб получит свою подпись и цвет. */
-const fxBarItems=()=> fxLayout.map((sl,slot)=>{
-  const m=FX_META.find(q=>q.k===sl.fxId);
-  return m ? {v:fx[sl.fxId], c:m.color, l:m.label, slot} : null;
-}).filter(Boolean);
+   Слот с МОДУЛЕМ (реверб) в покое даёт ОДИН столбик (первый параметр), а пока его палец ЗАЖАТ —
+   РАЗВОРАЧИВАЕТСЯ по столбику на параметр (TAIL/TONE): три ручки видно тогда, когда их крутят.
+   Пустой слот («нет эффекта») не даёт столбика вовсе. */
+const fxModOf=sl=> FX_MODULES[sl.fxId];
+/* Слот, чей палец сейчас зажат у руки-эффектов, — он и разворачивается. Щипок fx-руки один, поэтому
+   разворачивается не больше одного слота за раз. */
+const fxActiveSlot=()=>{ for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.zone==='fx'&&S.adj) return S.adj.slot; } return null; };
+const fxBarItems=()=>{
+  const act=fxActiveSlot(), out=[];
+  fxLayout.forEach((sl,slot)=>{
+    const m=FX_META.find(q=>q.k===sl.fxId);
+    if(m){ out.push({v:fx[sl.fxId], c:m.color, l:m.label, slot}); return; }   // старый скалярный — как было
+    const mod=fxModOf(sl); if(!mod) return;                                    // пустой/неизвестный слот — молча без столбика
+    const ps=(slot===act && mod.params.length>1) ? mod.params : [mod.params[0]];
+    for(const p of ps) out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, slot});   // цвет реверба тот же, что у столбика REV: это ТОТ ЖЕ ревербератор, отличают подписи (REV — подмес играющей руки, TAIL/TONE — комната)
+  });
+  return out;
+};
 /* Сколько столбиков соло рисует СЕЙЧАС — и, значит, сколько места им резервировать под легенду.
    REV живёт, пока соло вообще играет ноты (реверб даёт ГЛУБИНА играющей руки, см. drawFxBars),
    эффекты — только при руке-эффектах. Отступ считаем от ЭТОГО числа, а не от константы на
-   пять: иначе одинокий REV стоял бы у края с пустой полосой шириной в исчезнувшие столбики. */
-const fxN=()=> 1+fxBarItems().length;                       // REV + эффекты раскладки (по умолчанию 1+4=5, как было константой)
+   пять: иначе одинокий REV стоял бы у края с пустой полосой шириной в исчезнувшие столбики.
+   ⚠️ ОТСТУП СЧИТАЕМ ПО МАКСИМУМУ (как если бы все слоты были развёрнуты), а НЕ по нарисованному
+   сейчас: иначе разворот активного слота ДВИГАЛ БЫ ЛЕГЕНДУ под рукой при каждом щипке. При раскладке
+   по умолчанию (четыре старых эффекта по одному параметру) максимум = 4, то есть ровно как было. */
+const fxBarsMaxN=()=> fxLayout.reduce((n,sl)=>{
+  if(FX_META.some(q=>q.k===sl.fxId)) return n+1;
+  const mod=fxModOf(sl); return n+(mod?mod.params.length:0);
+},0);
+const fxN=()=> 1+fxBarsMaxN();                              // REV + эффекты раскладки (по умолчанию 1+4=5, как было константой)
 const soloBarsN=()=> !roleHasNotes('ld') ? 0 : roleHasFx('ld') ? fxN() : 1;
 const bandR=role=> role==='ld' ? fxBandR(soloBarsN()) : fxBandR(fxN());   // у прочих ролей столбиков нет — резерв на полную полосу, как было
 

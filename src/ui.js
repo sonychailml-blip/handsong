@@ -1,14 +1,15 @@
 import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
-         pinchFingers, setPinchFingers } from './state.js';
+         pinchFingers, setPinchFingers,
+         fxLayout, setFxSlotId, roleHasFx } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn } from './audio.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_MODULES } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
-import { INSTR_COL } from './config.js';
+import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
 import { lang, setLang, applyI18n, L, t, onLangChange } from './i18n.js';
 
@@ -495,10 +496,52 @@ function renderHandFn(){
       for(const [v,k] of HANDFN_OPTS[role]){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
       sel.value=handFn[role][hand];
       sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff();       // роли/зоны рук меняются → глушим звук (как смена инструмента)
+        renderFxCtl();                                                            // рука могла уйти с 'fx' (или прийти на неё) → секция конструктора появляется/исчезает
         if(hooks.tutor) hooks.tutor('handfn',{role, hand, fn:e.target.value}); };   // ЗАЦЕПКА ОБУЧЕНИЯ: сменили функцию руки (какая рука, какая функция) — урок «Функции рук»
       row.appendChild(lab); row.appendChild(sel); handFnRows.appendChild(row);
     }
   }
+  renderFxCtl();   // конструктор эффектов зависит от того же (есть ли рука на 'fx') — перерисовываем вместе; так же ловим смену языка и роли (обе зовут renderHandFn)
+}
+/* ================= КОНСТРУКТОР ЭФФЕКТОВ (Пласт 2, слайс 2.3) =================
+   КТО НА КАКОМ ПАЛЬЦЕ у руки-эффектов. Раскладка живёт в state.fxLayout и пишется ТОЛЬКО отсюда
+   (правило #5 с обратной стороны: DOM — дело ui, жест-слой раскладку лишь ЧИТАЕТ).
+   Слот = палец: 0 указательный … 3 мизинец (порядок FINGER_TIPS).
+   Секция видна ровно тогда, когда какая-то рука соло назначена на 'fx' — тем же гейтом (roleHasFx),
+   которым рисуются столбики: без такой руки раскладку нечем крутить, и строки были бы обманом.
+   ⚠️ ЭТОТ СЛАЙС — ТОЛЬКО НАЗНАЧЕНИЕ ЭФФЕКТА. Выбор оси и инверсия НА КАЖДЫЙ параметр — слайс 2.4;
+   пока оси стоят по умолчанию (первый параметр на вертикали, второй на горизонтали — FX_AXIS_DEF).
+   ⚠️ Звук НЕ глушим (в отличие от смены функции руки): раскладка не трогает ни голоса, ни роли —
+   меняется лишь то, какую ручку крутит палец. */
+const FINGER_KEYS=['finger.index','finger.middle','finger.ring','finger.pinky'];
+const fxCtlSep=$('fxCtlSep'), fxCtlRows=$('fxCtlRows');
+/* Варианты: «нет» + четыре старых скалярных (из FX_META) + модули из реестра (пока реверб).
+   Реестр читаем НА КАЖДУЮ ОТРИСОВКУ, а не один раз: до initAudio он пуст (узлов ещё нет), а панель
+   может быть перерисована и до старта. */
+function fxOptions(){
+  const o=[['','fx.none']];
+  for(const m of FX_META) o.push([m.k, m.fullKey]);
+  for(const id in FX_MODULES) o.push([id, FX_MODULES[id].labelKey]);
+  return o;
+}
+function renderFxCtl(){
+  if(!fxCtlSep||!fxCtlRows) return;
+  const on=roleHasFx('ld');
+  fxCtlSep.style.display = fxCtlRows.style.display = on ? '' : 'none';
+  fxCtlRows.textContent='';
+  if(!on) return;
+  const opts=fxOptions();
+  fxLayout.forEach((sl,slot)=>{
+    const row=document.createElement('div'); row.className='prow';
+    const lab=document.createElement('label'); lab.textContent=t(FINGER_KEYS[slot]);
+    const sel=document.createElement('select');
+    for(const [v,k] of opts){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
+    sel.value=sl.fxId;
+    sel.onchange=e=>{ const id=e.target.value, mod=FX_MODULES[id];
+      setFxSlotId(slot, id, mod?mod.params.length:1);   // сколько параметров — знает сам модуль; у старых скалярных ровно один
+      renderFxCtl(); };
+    row.appendChild(lab); row.appendChild(sel); fxCtlRows.appendChild(row);
+  });
 }
 /* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема.
    ЭКСПОРТ: урок «Две роли» гейтит шаг ориентации ТЕМ ЖЕ предикатом, что и кнопка ◨ — лад и кнопка

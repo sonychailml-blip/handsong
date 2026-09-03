@@ -509,7 +509,30 @@ function setRevTone(lines,hz){ if(!AC||!lines.length)return;
      фиксированная 0.12). Поэтому у реверба СВОИХ параметров ДВА, а не три.
    • id — СТАБИЛЬНЫЙ ключ, никогда не отображаемое имя (hard rule #25). labelKey — ключ словаря, который
      появится вместе с UI; сейчас его никто не читает, и t() показал бы сам ключ, а не промолчал. */
-let FX_REV=null;                            // единственный экземпляр эффекта в Пласте 1 (не экспортируется — потребителя ещё нет)
+let FX_REV=null;                            // единственный экземпляр эффекта; кладётся в реестр ниже
+/* РЕЕСТР МОДУЛЕЙ ЭФФЕКТОВ (id → модуль). Пласт 2.3: у абстракции появился ПЕРВЫЙ ПОТРЕБИТЕЛЬ —
+   раскладка fx-руки (state.fxLayout + меню в ui), — поэтому реестр ЭКСПОРТИРУЕТСЯ. В Пласте 1 экспорта
+   не было намеренно: потребителя не существовало, и это был бы мёртвый API.
+   Заполняется в initAudio: узлы модуля существуют только после него. До старта реестр ПУСТ, и это
+   нормально — раскладка по умолчанию состоит из четырёх СТАРЫХ скалярных эффектов, модулей ей не надо. */
+const FX_MODULES={};
+/* НОРМИРОВАНИЕ ПАРАМЕТРА: 0..1 ↔ реальная величина. Жест даёт 0..1 (смещение от точки захвата), а
+   параметру нужны секунды/герцы — и ПО ЛОГ-ШКАЛЕ, иначе половина хода уходит на неслышимое: 200→400 Гц
+   слышно как шаг, 17000→18000 — нет. Живёт РЯДОМ С ПАРАМЕТРОМ: одно место, где min/max/curve
+   превращаются в число, и оно же — там, где эти поля объявлены.
+   ⚠️ Кламп СЕТТЕРА остаётся властью (setRevDecay/setRevTone): min/max здесь — диапазон РУЧКИ, а не
+   защита. Потолок decay 4.0 — не каприз: выше gMax режет g короткой линии и не режет длинную. */
+const fxDenorm=(p,x)=> p.curve==='log' ? p.min*Math.pow(p.max/p.min,x) : p.min+(p.max-p.min)*x;
+const fxNorm  =(p,v)=> p.curve==='log' ? Math.log(v/p.min)/Math.log(p.max/p.min) : (v-p.min)/(p.max-p.min);
+/* Достраивает дескриптор: cur — ТЕКУЩЕЕ нормированное (стартует от def), getNorm/setNorm — то, чем его
+   крутит жест. cur несущий, а не удобство: захват берёт getNorm() КАК БАЗУ, поэтому щипок ПРОДОЛЖАЕТ
+   с того места, где комната стоит, а не прыгает с нуля. Это и есть латч (значение живёт в модуле). */
+function fxWrapParam(p){
+  const c01=x=>Math.max(0,Math.min(1,x));
+  p.cur=c01(fxNorm(p,p.def));
+  p.getNorm=()=>p.cur;
+  p.setNorm=x=>{ p.cur=c01(x); p.set(fxDenorm(p,p.cur)); };
+}
 function makeReverbFx(){
   const inNode=AC.createGain();  inNode.gain.value=1;     // ← этот узел держит переменная verb
   const outNode=AC.createGain(); outNode.gain.value=0.9;  // ← этот узел держит переменная verbOut
@@ -518,16 +541,18 @@ function makeReverbFx(){
   setDecay(REV_A.decay); setTone(REV_A.tone);             // ...и ТОЛЬКО ПОТОМ параметры. ⚠️ ПОРЯДОК НЕСУЩИЙ:
   /* сеттеры молча выходят на пустых линиях (guard !lines.length), поэтому вызов ДО buildFDN не упал бы, а
      оставил бы обратные связи в нуле — реверба не стало бы ВООБЩЕ, без единой ошибки в консоли. */
-  return {
-    id:'reverb', labelKey:'fx.reverb',
-    in:inNode, out:outNode,
-    /* min/max — СОВЕТ для будущего UI, власть у клампа сеттера. У decay потолок 4.0 не случаен: выше
-       gMax начинает резать g короткой линии и не режет длинную — хвост перестаёт расти РОВНО. */
-    params:[
-      {key:'decay',labelKey:'fx.reverb.decay',unit:'s', def:REV_A.decay,min:0.3,max:4.0,   curve:'log',set:setDecay},
-      {key:'tone', labelKey:'fx.reverb.tone', unit:'Hz',def:REV_A.tone, min:200,max:18000, curve:'log',set:setTone},
-    ],
-  };
+  /* min/max — диапазон РУЧКИ (власть у клампа сеттера, см. fxWrapParam). short — КОРОТКИЙ межъязыковой
+     токен для столбика на холсте (как label у FX_META: над столбиком в 10px локализованное слово не
+     помещается); labelKey — полное имя для МЕНЮ, через словарь.
+     ⚠️ ПАРАМЕТРОВ ДВА, А НЕ ТРИ. Подмес (mix) — свойство ПРИЦЕПКИ, а не эффекта: у реверба два посыла
+     с разной величиной (соло p.rev*0.85 живой, аккорды revCh=0.12), одним узлом их не выразить. Пока
+     реверб остаётся на ИГРАЮЩЕЙ руке, подмес ей и принадлежит — переезд в конструктор это Пласт 3. */
+  const params=[
+    {key:'decay',labelKey:'fx.reverb.decay',short:'TAIL',unit:'s', def:REV_A.decay,min:0.3,max:4.0,   curve:'log',set:setDecay},
+    {key:'tone', labelKey:'fx.reverb.tone', short:'TONE',unit:'Hz',def:REV_A.tone, min:200,max:18000, curve:'log',set:setTone},
+  ];
+  for(const p of params) fxWrapParam(p);
+  return { id:'reverb', labelKey:'fx.reverb', in:inNode, out:outNode, params };
 }
 /* Карта глубины руки → cutoff яркости (Гц). depth 0 близко/ярко → CHORD_LP_MAX (открыт, НЕЙТРАЛЬ =
    сегодняшний звук), 1 далеко/глухо → CHORD_LP_MIN. Логарифмическая (перцептивно ровная). Единый
@@ -639,7 +664,7 @@ async function initAudio(){
      Реверб — ПЕРВЫЙ и пока ЕДИНСТВЕННЫЙ МОДУЛЬ ЭФФЕКТА (см. makeReverbFx): фабрика сама строит сеть и
      ставит decay/tone из REV_A в правильном порядке. Остальные четыре эффекта (драйв в голосе, вибрато в
      detune, тремоло вставкой, делей посылом) НЕ модуляризованы и живут ровно там, где жили. */
-  FX_REV=makeReverbFx();
+  FX_REV=makeReverbFx(); FX_MODULES[FX_REV.id]=FX_REV;   // в реестр — отсюда его берут раскладка fx-руки и её меню
   verb=FX_REV.in; verbOut=FX_REV.out;   // ⚠️ СТАРЫЕ ИМЕНА = ТЕ ЖЕ УЗЛЫ: строки посылов ниже не тронуты
   verbOut.connect(master);
  
@@ -1160,4 +1185,5 @@ export {
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
+  FX_MODULES,   // реестр модулей эффектов: читают gestures (запись параметров), draw (столбики) и ui (меню раскладки)
 };
