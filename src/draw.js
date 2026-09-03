@@ -2,7 +2,7 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
+import { fx, fxLayout, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -11,15 +11,28 @@ import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, bea
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
-const FX_X0=6, FX_N=1+FX_META.length;                       // REV + эффекты
+const FX_X0=6;
 const fxBandR=n=> n>0 ? FX_X0+(n-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W : 0;   // правый край полосы из n столбиков
-const FX_BAND_R=fxBandR(FX_N);                              // полная полоса (REV + 4 эффекта) — отступ легенды у НЕ-соло ролей, как было
+/* ЕДИНЫЙ ИСТОЧНИК «какие столбики эффектов есть сейчас» — и для ОТРИСОВКИ, и для ШИРИНЫ ОТСТУПА под
+   легенду. Раньше и состав, и счёт брались прямо из FX_META (константа на четыре); теперь состав
+   задаёт РАСКЛАДКА (state.fxLayout, слот = палец), а раскладка живая. Разойдись счёт с рисованием —
+   легенда наехала бы на столбики; поэтому обе стороны зовут ОДНУ функцию (тот же закон, что у сетки:
+   попадание и отрисовка от одной геометрии).
+   ⚠️ Слайс 2.2 рисует РОВНО ОДИН столбик на слот (величина первого параметра). Разворот активного
+   слота в несколько столбиков по параметрам — слайс 2.3.
+   Нерезолвимый fxId сейчас НЕВОЗМОЖЕН (назначать эффекты ещё нечем, в слотах только четыре старых);
+   отбрасываем его молча — в 2.3 сюда придёт реестр модулей и реверб получит свою подпись и цвет. */
+const fxBarItems=()=> fxLayout.map((sl,slot)=>{
+  const m=FX_META.find(q=>q.k===sl.fxId);
+  return m ? {v:fx[sl.fxId], c:m.color, l:m.label, slot} : null;
+}).filter(Boolean);
 /* Сколько столбиков соло рисует СЕЙЧАС — и, значит, сколько места им резервировать под легенду.
    REV живёт, пока соло вообще играет ноты (реверб даёт ГЛУБИНА играющей руки, см. drawFxBars),
-   четыре эффекта — только при руке-эффектах. Отступ считаем от ЭТОГО числа, а не от константы на
-   пять: иначе одинокий REV стоял бы у края с пустой полосой шириной в четыре исчезнувших столбика. */
-const soloBarsN=()=> !roleHasNotes('ld') ? 0 : roleHasFx('ld') ? FX_N : 1;
-const bandR=role=> role==='ld' ? fxBandR(soloBarsN()) : FX_BAND_R;   // у прочих ролей столбиков нет — резерв прежний, байт-в-байт
+   эффекты — только при руке-эффектах. Отступ считаем от ЭТОГО числа, а не от константы на
+   пять: иначе одинокий REV стоял бы у края с пустой полосой шириной в исчезнувшие столбики. */
+const fxN=()=> 1+fxBarItems().length;                       // REV + эффекты раскладки (по умолчанию 1+4=5, как было константой)
+const soloBarsN=()=> !roleHasNotes('ld') ? 0 : roleHasFx('ld') ? fxN() : 1;
+const bandR=role=> role==='ld' ? fxBandR(soloBarsN()) : fxBandR(fxN());   // у прочих ролей столбиков нет — резерв на полную полосу, как было
 
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
 const statusEl=document.getElementById('status');
@@ -663,9 +676,9 @@ function drawHandsPhone(res,W,H,playH){
       continue;
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
-      if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.k);
-        ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-        ctx.fillText(`${t(meta.fullKey)} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); }
+      if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.fxId);   // эффект берём из ЗАХВАТА (S.adj.fxId), а раскладка решила его ещё на щипке
+        if(meta){ ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+          ctx.fillText(`${t(meta.fullKey)} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); } }
       continue;
     }
     if(loopHand){                                // рука-ЛУПЕР: помечаем, чтобы не казалась «немой»; подсказку раскладки даём до щипка
@@ -856,14 +869,15 @@ function drawChordPalette(x0,x1,H){
    Позиции столбиков НЕ трогаем: REV как был индексом 0 (крайний слева), эффекты 1..4 — с рукой-
    эффектами картинка байт-в-байт прежняя, без неё одинокий REV стоит на своём месте, а не съезжает. */
 function drawFxBars(rx0,H){                        // rx0 — левый край роли-соло (столбики от него); прежний 1-й арг W не использовался
-  const items=[{v:revDisp,c:REV_COLOR,l:'REV',fxk:null},
-    ...(roleHasFx('ld') ? FX_META.map(m=>({v:fx[m.k],c:m.color,l:m.label,fxk:m.k})) : [])];
+  const items=[{v:revDisp,c:REV_COLOR,l:'REV',slot:null},   // REV — НЕ слот раскладки (это Z играющей руки), поэтому slot:null и подсветки у него нет
+    ...(roleHasFx('ld') ? fxBarItems() : [])];
   const y1=H-40, y0=y1-FX_BAR_MAX;                // низ слева: выше строки статуса, ниже коробки лупера
   ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
   items.forEach((it,i)=>{
     const x=rx0+FX_X0+i*(FX_BAR_W+FX_BAR_GAP);
     let actv=false; for(const k in HANDS){ const S=HANDS[k];
-      if(it.fxk&&S.pinch&&S.zone==='fx'&&S.adj&&S.adj.k===it.fxk)actv=true; }
+      // Подсветка — ПО СЛОТУ, а не по имени эффекта: слот уникален, а один эффект с 2.3 может лежать на двух пальцах, и подсветились бы оба. ⚠️ it.slot!=null, НЕ truthy: слот 0 (указательный) — валидный и ложный.
+      if(it.slot!=null&&S.pinch&&S.zone==='fx'&&S.adj&&S.adj.slot===it.slot)actv=true; }
     ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
     const fh=FX_BAR_MAX*Math.max(0,Math.min(1,it.v));
     ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.5;
