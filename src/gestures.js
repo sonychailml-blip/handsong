@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxLayout, flipX, setRevDisp, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -310,6 +310,43 @@ function endPinch(key,S){
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
   S.clearT0=null; S.clearFired=false;           // отсчёт очистки лупера — сброс на размыкании
 }
+/* ================= КОНСТРУКТОР ЭФФЕКТОВ — Пласт 2, слайс 2.1 (механизм) =================
+   Было: один палец = один эффект = одна ось (вертикаль), связка захардкожена в FX_META.
+   Стало: СЛОТ РАСКЛАДКИ (state.fxLayout, индекс = палец) говорит, КАКОЙ эффект на пальце и чем
+   ведётся КАЖДЫЙ его параметр — ось (x/y/z) и инверсия. Дефолтная раскладка выведена из FX_META,
+   поэтому в ЭТОМ слайсе поведение обязано быть НЕОТЛИЧИМЫМ: те же четыре эффекта, по одному
+   параметру, ось 'y', тот же размах 70%, тот же латч.
+   ⚠️ ОСИ ОТСЧИТЫВАЮТСЯ ОТ ТОЧКИ ЗАХВАТА ЩИПКА и на СЫРЫХ координатах (правило #12): рука начинает
+   «отсюда», куда бы ни пришла, и работает, даже когда наполовину за кадром. sx/sy здесь НЕЛЬЗЯ —
+   они несут кадрирование COVER, это про ПОПАДАНИЕ, а не про жест.
+   ⚠️ X идёт через flipX (правило #13, единственный источник зеркала): «вправо = больше» обязано
+   значить одно и то же на фронтальной и тыловой камере. У Y такой беды нет и не было (вертикаль не
+   зеркалится) — потому в старом коде флипа и не встречалось.
+   ⚠️ Сплиту ничего не нужно: H в выражении по Y сокращается, а X считается в СЫРЫХ долях кадра, —
+   размах не зависит ни от разрешения, ни от ширины половины. */
+/* Параметры эффекта = чем читать и куда писать. В 2.1 существуют ТОЛЬКО четыре СТАРЫХ СКАЛЯРНЫХ
+   эффекта: у каждого ровно ОДИН параметр, и пишется он ровно туда, куда писался всегда — в state.fx[k].
+   Это НЕ модули (модуль пока один — реверб, и в 2.1 он НЕДОСТИЖИМ: назначить его слоту ещё нечем).
+   Развилку «скаляр или модуль» вводит слайс 2.3.
+   ⚠️ state.fx[k] — ТОТ ЖЕ store, что уезжает в событие ноты (payload vib/drv/trm/dly): формат записи
+   не меняется, старые петли играют как играли. */
+const fxParamsOf=fxId=> FX_META.some(m=>m.k===fxId)
+  ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }]
+  : [];
+/* ЗАХВАТ: морозим точку отсчёта по ТРЁМ осям и стартовые значения ВСЕХ параметров слота.
+   z берётся НЕ здесь, а на первом кадре записи (p0.z=null): глубина сглаживается emaS, и позвать её
+   дважды за кадр значило бы дважды продвинуть фильтр. x/y снимаются сразу — как y снимался всегда.
+   ⚠️ Поле k сохранено НАМЕРЕННО: его читает draw (подпись у руки и подсветка активного столбика).
+   draw станет раскладко-зависимым в слайсе 2.2 — до тех пор совместимость держится этим полем. */
+function captureFx(S,slot,lm,H){
+  const sl=fxLayout[slot];
+  if(!sl){ S.adj=null; S.tutFx=null; return; }
+  const ps=fxParamsOf(sl.fxId);
+  S.adj={ slot, fxId:sl.fxId, k:sl.fxId,
+          p0:{ x:lm[4].x, y:lm[4].y*H, z:null },
+          base:ps.map(p=>p.get()) };
+  S.tutFx=null;   // S.tutFx — база для зацепки обучения 'fx' (сдвиг эффекта)
+}
 function processHands(res){
   const W=canvas.width, H=canvas.height, now=performance.now();
   const dtm=exprPrevT?clamp((now-exprPrevT)/1000,EXPR_CFG.dtMin,EXPR_CFG.dtMax):EXPR_CFG.dtMin;   // dt кадра для «смычка», КЛАМП обязателен (застрявший кадр иначе взорвал бы интеграторы)
@@ -427,8 +464,7 @@ function processHands(res){
         tutorTap('pinch',{finger:S.oct, zone:S.zone, hand:handSide(key)});
       }
       if(S.zone==='fx'){
-        const meta=FX_META.find(m=>m.finger===mf);
-        S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]}; S.tutFx=null;   // S.tutFx — база для зацепки обучения 'fx' (сдвиг эффекта)
+        captureFx(S,FINGER_TIPS.indexOf(mf),lm,H);   // слот = палец; раскладка решает, какой эффект и по каким осям
       }else if(S.zone==='ld'){
         S.tutDeg=undefined;                  // владельца назначать больше не нужно (у руки свой голос пула); S.tutDeg сброшен — свежий щипок переизвестит обучение о ноте
       }else if(S.zone==='bs'){
@@ -451,8 +487,7 @@ function processHands(res){
       else if(!(multi&&S.zone==='ld')&&mv<PINCH_HOLD&&FINGER_TIPS.indexOf(mf0)!==S.oct&&S.fn!=='hold'&&S.fn!=='loop'){   // 'hold'/'loop' морозят палец: у hold — октаву, у лупера — выбранную команду (мизинец не «перескочит» на безымянный)
         S.oct=FINGER_TIPS.indexOf(mf0);      // смена пальца = смена октавы на лету (по БЛИЖАЙШЕМУ, как всегда)
         if(S.zone==='fx'&&S.adj){
-          const meta=FX_META.find(m=>m.finger===mf0);
-          S.adj={k:meta.k,y0:lm[4].y*H,base:fx[meta.k]}; S.tutFx=null;
+          captureFx(S,FINGER_TIPS.indexOf(mf0),lm,H);   // перезахват на лету: точка отсчёта свежая по ВСЕМ трём осям, иначе первый кадр после смены дал бы скачок
         }
         // ЗАЦЕПКА ОБУЧЕНИЯ: палец сменён на лету (=другая октава) — то же событие pinch с новым пальцем.
         tutorTap('pinch',{finger:S.oct, zone:S.zone, hand:handSide(key)});
@@ -478,11 +513,27 @@ function processHands(res){
       const prx0=splitOn?S.rx0:rx0, prx1=splitOn?S.rx1:rx1, psplit=palSplitX(prx0,prx1);
 
       if(S.zone==='fx'){
-        /* Регулировка относительная («от текущего»), диапазон — 70%
-           высоты экрана; значение остаётся после отпускания (латч). */
-        if(S.adj){ fx[S.adj.k]=clamp01(S.adj.base+(S.adj.y0-lm[4].y*H)/(H*0.7));
-          // ЗАЦЕПКА ОБУЧЕНИЯ: значение эффекта реально сдвинулось от старта (>3%) — рука эффектов «крутит», не просто щипнула. Троттлинг 5%.
-          if(Math.abs(fx[S.adj.k]-S.adj.base)>0.03 && (S.tutFx==null||Math.abs(fx[S.adj.k]-S.tutFx)>0.05)){ S.tutFx=fx[S.adj.k]; tutorTap('fx',{k:S.adj.k}); } }
+        /* Регулировка ОТНОСИТЕЛЬНАЯ («от точки захвата»), размах — 70% поля по каждой плоской оси;
+           значение остаётся после отпускания (ЛАТЧ — оно живёт в state.fx, а S.adj гасит endPinch).
+           ⚠️ ВЫРАЖЕНИЕ ПО Y ОСТАВЛЕНО ДОСЛОВНО (·H … /(H*0.7)): H в нём алгебраически сокращается,
+           но сокращать его РУКАМИ нельзя — в плавающей точке это уже другой результат, а критерий
+           слайса 2.1 — «неотличимо от продакшена». */
+        const A=S.adj;
+        if(A){
+          const ps=fxParamsOf(A.fxId), sl=fxLayout[A.slot], np=sl?Math.min(ps.length,sl.params.length):0;
+          const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);   // РОВНО один вызов за кадр (потому z и не берётся в captureFx)
+          if(A.p0.z==null) A.p0.z=hs;                     // точка отсчёта по глубине — первый кадр щипка, off.z там ровно 0 (как у x/y)
+          const off={ x:(flipX(lm[4].x)-flipX(A.p0.x))/0.7,
+                      y:(A.p0.y-lm[4].y*H)/(H*0.7),
+                      z:(hs-A.p0.z)/REV_RANGE };
+          for(let i=0;i<np;i++){
+            const pa=sl.params[i], d=off[pa.axis]||0;
+            const v=clamp01(A.base[i]+(pa.inv?-d:d));
+            ps[i].set(v);
+            // ЗАЦЕПКА ОБУЧЕНИЯ: значение реально сдвинулось от старта (>3%) — рука эффектов «крутит», не просто щипнула. Троттлинг 5%. Годится ЛЮБОЙ параметр: иначе переназначивший палец застрял бы в уроке «Основы».
+            if(Math.abs(v-A.base[i])>0.03 && (S.tutFx==null||Math.abs(v-S.tutFx)>0.05)){ S.tutFx=v; tutorTap('fx',{k:A.k}); }
+          }
+        }
       }else if(S.zone==='chFam'){
         /* Рука-ПАЛИТРА: ТОЛЬКО выбирает ячейку (семейство+вариант) ПОЛОЖЕНИЕМ и молчит.
            Ветка стоит рядом с 'fx', ДО общего блока — поэтому не считает ни ступень, ни
