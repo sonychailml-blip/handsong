@@ -157,6 +157,19 @@ function showLoop(on){ panelLoopEl.classList.toggle('on',on); loopPanelBtn.class
   if(on && hooks.tutor) hooks.tutor('panel',{which:'loop'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли панель лупера — урок «Лупер»
   syncTutorBarPos(); }
 function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(false);
+  /* ПЕРЕСБОРКА ДИНАМИЧЕСКИХ СЕКЦИЙ ИЗ ДАННЫХ ПРИ ОТКРЫТИИ — ровно та же причина, что у showLoop с
+     refreshMetreCtl выше: панель могла простоять закрытой, пока состояние ушло вперёд. Здесь это не
+     мелочь, а ДВЕ дыры разом:
+     (1) список эффектов конструктора строится из FX_MODULES, а тот заполняется В initAudio (по клику ▶);
+         строки же собираются на инициализации ui — РАНЬШЕ. Без пересборки в выпадающих списках НЕТ
+         реверба, хотя он стоит на указательном ПО УМОЛЧАНИЮ и звучит: sel.value='reverb' не находит
+         опции, selectedIndex становится −1, и меню показывает ПУСТОТУ вместо назначенного эффекта.
+         Хуже того — выбор любого другого пункта молча снял бы реверб без пути назад.
+     (2) браузер восстанавливает значения форм ПОСЛЕ отрисовки (перезагрузка/возврат в сессию), а
+         переутвердить данные было некому — меню начинало врать про раскладку (звук при этом верен).
+     Зовём renderHandFn, а НЕ renderFxCtl напрямую: он перерисовывает «Функции рук» и сам дёргает
+     renderFxCtl — одна точка входа на обе секции, разъехаться нечему. */
+  if(on) renderHandFn();
   if(on && hooks.tutor) hooks.tutor('panel',{which:'scale'});   // ЗАЦЕПКА ОБУЧЕНИЯ: открыли меню лада — урок «Строи и тембры»
   syncTutorBarPos(); }
 /* Подсказка тура (#tutorBar) сверху накрывается двумя вещами — РАЗНАЯ реакция (см. CSS .mini/.low/.hushed):
@@ -492,7 +505,7 @@ function renderHandFn(){
     for(const hand of ['L','R']){
       const row=document.createElement('div'); row.className='prow';
       const lab=document.createElement('label'); lab.textContent = t(hand==='L'?'hand.left':'hand.right');
-      const sel=document.createElement('select');
+      const sel=document.createElement('select'); sel.autocomplete='off';   // как в renderFxCtl: не даём браузеру восстановить прежнее значение ПОВЕРХ данных
       for(const [v,k] of HANDFN_OPTS[role]){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
       sel.value=handFn[role][hand];
       sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff();       // роли/зоны рук меняются → глушим звук (как смена инструмента)
