@@ -2,7 +2,7 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, fxLayout, revDisp, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasNotes, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
+import { fx, fxLayout, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold, FX_MODULES } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -32,23 +32,22 @@ const fxBarItems=()=>{
     if(m){ out.push({v:fx[sl.fxId], c:m.color, l:m.label, slot}); return; }   // старый скалярный — как было
     const mod=fxModOf(sl); if(!mod) return;                                    // пустой/неизвестный слот — молча без столбика
     const ps=(slot===act && mod.params.length>1) ? mod.params : [mod.params[0]];
-    for(const p of ps) out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, slot});   // цвет реверба тот же, что у столбика REV: это ТОТ ЖЕ ревербератор, отличают подписи (REV — подмес играющей руки, TAIL/TONE — комната)
+    for(const p of ps) out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, slot});   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
   });
   return out;
 };
 /* Сколько столбиков соло рисует СЕЙЧАС — и, значит, сколько места им резервировать под легенду.
-   REV живёт, пока соло вообще играет ноты (реверб даёт ГЛУБИНА играющей руки, см. drawFxBars),
-   эффекты — только при руке-эффектах. Отступ считаем от ЭТОГО числа, а не от константы на
-   пять: иначе одинокий REV стоял бы у края с пустой полосой шириной в исчезнувшие столбики.
+   ⚠️ ОТДЕЛЬНОГО СТОЛБИКА REV БОЛЬШЕ НЕТ (Пласт 3.1): он показывал глубину ИГРАЮЩЕЙ руки, а реверб ушёл
+   к fx-руке. Поэтому счёт = ровно столбики раскладки, без прежней «+1 на REV», и без руки-эффектов
+   столбиков НЕТ ВОВСЕ (раньше оставался одинокий REV).
    ⚠️ ОТСТУП СЧИТАЕМ ПО МАКСИМУМУ (как если бы все слоты были развёрнуты), а НЕ по нарисованному
-   сейчас: иначе разворот активного слота ДВИГАЛ БЫ ЛЕГЕНДУ под рукой при каждом щипке. При раскладке
-   по умолчанию (четыре старых эффекта по одному параметру) максимум = 4, то есть ровно как было. */
+   сейчас: иначе разворот активного слота ДВИГАЛ БЫ ЛЕГЕНДУ под рукой при каждом щипке. */
 const fxBarsMaxN=()=> fxLayout.reduce((n,sl)=>{
   if(FX_META.some(q=>q.k===sl.fxId)) return n+1;
   const mod=fxModOf(sl); return n+(mod?mod.params.length:0);
 },0);
-const fxN=()=> 1+fxBarsMaxN();                              // REV + эффекты раскладки (по умолчанию 1+4=5, как было константой)
-const soloBarsN=()=> !roleHasNotes('ld') ? 0 : roleHasFx('ld') ? fxN() : 1;
+const fxN=()=> fxBarsMaxN();                                // столбики раскладки (по умолчанию 3 у реверба + 3 старых = 6)
+const soloBarsN=()=> roleHasFx('ld') ? fxN() : 0;           // нет руки-эффектов → нет столбиков (REV, который жил без неё, удалён)
 const bandR=role=> role==='ld' ? fxBandR(soloBarsN()) : fxBandR(fxN());   // у прочих ролей столбиков нет — резерв на полную полосу, как было
 
 /* statusEl — свой lookup: draw пишет статус-строку (презентационный слой, §0.5). */
@@ -604,11 +603,11 @@ function drawPhone(res){
     for(const h of halves) drawRole(h.role,h.rx0,h.rx1,playH);
     ctx.strokeStyle=hexA('#fff',.18); ctx.lineWidth=2;   // разделитель половин по центру
     ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-    const solo=halves.find(h=>h.role==='ld'); if(solo&&roleHasNotes('ld'))drawFxBars(solo.rx0,H);   // столбики у соло-половины: REV — пока соло играет ноты (реверб даёт глубина играющей руки), четыре эффекта внутри drawFxBars — по руке-эффектам
+    const solo=halves.find(h=>h.role==='ld'); if(solo&&roleHasFx('ld'))drawFxBars(solo.rx0,H);   // столбики у соло-половины — ТОЛЬКО при руке-эффектах: с уходом REV (Пласт 3.1) без неё рисовать нечего
     if(solo&&roleHasExpr('ld'))drawExprBar(solo.rx0,solo.rx1,H);   // «ВЫР» — энергия смычка у соло-половины, только если назначена рука-выразительность
   }else{
     drawRole(phoneInstr,0,W,playH);
-    if(phoneInstr==='ld'&&roleHasNotes('ld'))drawFxBars(0,H);   // REV показываем, пока соло вообще может звучать (реверб — глубина ИГРАЮЩЕЙ руки, не рука-эффекты); сами эффекты прячет drawFxBars по roleHasFx
+    if(phoneInstr==='ld'&&roleHasFx('ld'))drawFxBars(0,H);   // ТОЛЬКО при руке-эффектах: столбик REV (он жил по roleHasNotes) удалён в Пласте 3.1 — реверб теперь обычный слот раскладки
     if(phoneInstr==='ld'&&roleHasExpr('ld'))drawExprBar(0,W,H);   // «ВЫР» — энергия смычка; полосу прячем, если НИ ОДНА рука не назначена на выразительность
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
@@ -877,17 +876,14 @@ function drawChordPalette(x0,x1,H){
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
-/* ⚠️ REV — НЕ ЭФФЕКТ РУКИ-ЭФФЕКТОВ, и его столбик живёт по своему условию. Реверб задаёт ГЛУБИНА
-   играющей соло-руки (dist(lm[0],lm[9]) → S.rev → payload.rev → revLead.gain), рука эффектов на него
-   не влияет НИКАК — она даже дисквалифицирована из прицела (soloNoteHand). Раньше все пять столбиков
-   гасил один гейт roleHasFx: сними эффекты с обеих рук — и живой, слышимый реверб пропадал с экрана.
-   Теперь: REV — пока соло играет ноты (гейт roleHasNotes в drawPhone), четыре эффекта — пока есть рука
-   эффектов (без неё их нечем двигать: единственный писатель fx[] — ветка зоны 'fx' в gestures).
-   Позиции столбиков НЕ трогаем: REV как был индексом 0 (крайний слева), эффекты 1..4 — с рукой-
-   эффектами картинка байт-в-байт прежняя, без неё одинокий REV стоит на своём месте, а не съезжает. */
+/* ⚠️ ОТДЕЛЬНОГО СТОЛБИКА REV БОЛЬШЕ НЕТ (Пласт 3.1). Он показывал ГЛУБИНУ ИГРАЮЩЕЙ руки и жил по
+   своему условию (roleHasNotes), потому что реверб принадлежал именно ей: dist(lm[0],lm[9]) → S.rev →
+   payload.rev → revLead.gain. Теперь подмес соло в реверб ведёт FX-РУКА (параметр 'mix' модуля), и
+   реверб показывают ЕГО СОБСТВЕННЫЕ столбики наравне с прочими эффектами: TAIL/TONE/MIX в своём слоте.
+   Следствие, принятое сознательно: НЕТ руки-эффектов — нет и столбиков вообще (двигать нечем), а
+   «прицел до щипка» исчез вместе с revDisp — целиться стало нечем. */
 function drawFxBars(rx0,H){                        // rx0 — левый край роли-соло (столбики от него); прежний 1-й арг W не использовался
-  const items=[{v:revDisp,c:REV_COLOR,l:'REV',slot:null},   // REV — НЕ слот раскладки (это Z играющей руки), поэтому slot:null и подсветки у него нет
-    ...(roleHasFx('ld') ? fxBarItems() : [])];
+  const items = roleHasFx('ld') ? fxBarItems() : [];
   const y1=H-40, y0=y1-FX_BAR_MAX;                // низ слева: выше строки статуса, ниже коробки лупера
   ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
   items.forEach((it,i)=>{
