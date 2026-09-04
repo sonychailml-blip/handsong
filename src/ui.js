@@ -2,7 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxLayout, setFxSlotId, roleHasFx } from './state.js';
+         fxLayout, setFxSlotId, setFxParamAxis, roleHasFx } from './state.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
@@ -509,11 +509,12 @@ function renderHandFn(){
    Слот = палец: 0 указательный … 3 мизинец (порядок FINGER_TIPS).
    Секция видна ровно тогда, когда какая-то рука соло назначена на 'fx' — тем же гейтом (roleHasFx),
    которым рисуются столбики: без такой руки раскладку нечем крутить, и строки были бы обманом.
-   ⚠️ ЭТОТ СЛАЙС — ТОЛЬКО НАЗНАЧЕНИЕ ЭФФЕКТА. Выбор оси и инверсия НА КАЖДЫЙ параметр — слайс 2.4;
-   пока оси стоят по умолчанию (первый параметр на вертикали, второй на горизонтали — FX_AXIS_DEF).
+   Слайс 2.4 добавил ПОДСТРОКИ: у каждого параметра — своя ОСЬ (x/y/z) и ИНВЕРСИЯ. Сами поля жили в
+   данных с 2.1 (жест их читает), 2.4 лишь открыл их человеку — жест-математику не трогали.
    ⚠️ Звук НЕ глушим (в отличие от смены функции руки): раскладка не трогает ни голоса, ни роли —
    меняется лишь то, какую ручку крутит палец. */
 const FINGER_KEYS=['finger.index','finger.middle','finger.ring','finger.pinky'];
+const AXIS_OPTS=[['x','axis.x'],['y','axis.y'],['z','axis.z']];   // [значение в данных, ключ-словаря]
 const fxCtlSep=$('fxCtlSep'), fxCtlRows=$('fxCtlRows');
 /* Варианты: «нет» + четыре старых скалярных (из FX_META) + модули из реестра (пока реверб).
    Реестр читаем НА КАЖДУЮ ОТРИСОВКУ, а не один раз: до initAudio он пуст (узлов ещё нет), а панель
@@ -523,6 +524,17 @@ function fxOptions(){
   for(const m of FX_META) o.push([m.k, m.fullKey]);
   for(const id in FX_MODULES) o.push([id, FX_MODULES[id].labelKey]);
   return o;
+}
+/* Подписи ПАРАМЕТРОВ для подстрок. У СТАРЫХ скалярных параметр ОДИН и он же и есть сам эффект —
+   подписываем нейтрально («Величина»): имя эффекта уже стоит строкой выше, повторять его — шум.
+   У МОДУЛЯ берём labelKey каждого параметра. Пустой/неизвестный слот параметров не имеет — подстрок нет.
+   ⚠️ Развилку «скаляр или модуль» знает и gestures (fxParamsOf), но там она отвечает на ДРУГОЙ вопрос —
+   КУДА ПИСАТЬ, — а здесь на «как подписать». Общего источника нет намеренно: слои разные, и тянуть
+   подписи в жест-слой значило бы тащить туда i18n. */
+function fxParamKeys(fxId){
+  if(FX_META.some(m=>m.k===fxId)) return ['fx.param.amt'];
+  const mod=FX_MODULES[fxId];
+  return mod ? mod.params.map(p=>p.labelKey) : [];
 }
 function renderFxCtl(){
   if(!fxCtlSep||!fxCtlRows) return;
@@ -534,13 +546,35 @@ function renderFxCtl(){
   fxLayout.forEach((sl,slot)=>{
     const row=document.createElement('div'); row.className='prow';
     const lab=document.createElement('label'); lab.textContent=t(FINGER_KEYS[slot]);
-    const sel=document.createElement('select');
+    const sel=document.createElement('select'); sel.autocomplete='off';   // не даём браузеру восстановить прежнее значение ПОВЕРХ данных при перезагрузке
     for(const [v,k] of opts){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
     sel.value=sl.fxId;
     sel.onchange=e=>{ const id=e.target.value, mod=FX_MODULES[id];
       setFxSlotId(slot, id, mod?mod.params.length:1);   // сколько параметров — знает сам модуль; у старых скалярных ровно один
       renderFxCtl(); };
     row.appendChild(lab); row.appendChild(sel); fxCtlRows.appendChild(row);
+    /* ПОДСТРОКИ — ПО ПАРАМЕТРУ: какой ОСЬЮ он ведётся и не перевёрнут ли.
+       ⚠️ КОНФЛИКТ ОСЕЙ РАЗРЕШЁН НАМЕРЕННО: поставил два параметра на одну ось — оба поедут вместе.
+       Это естественный результат жеста, а не ошибка; проверок и предупреждений не городим.
+       Отступ 14px + ровно на столько же более узкая колонка подписи — так органы управления подстрок
+       остаются на одной вертикали с выпадающим списком эффекта над ними (.prow label = 128px). */
+    const pkeys=fxParamKeys(sl.fxId);
+    pkeys.forEach((lk,pi)=>{
+      const pa=sl.params[pi]; if(!pa) return;
+      const sub=document.createElement('div'); sub.className='prow'; sub.style.paddingLeft='14px'; sub.style.margin='4px 0';
+      const plab=document.createElement('label'); plab.textContent=t(lk); plab.style.flex='0 0 114px';
+      const ax=document.createElement('select'); ax.autocomplete='off';
+      for(const [v,k] of AXIS_OPTS){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); ax.appendChild(o); }
+      ax.value=pa.axis;
+      /* Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной ширины: правило
+         .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы целую колонку. */
+      const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='5px';
+      const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
+      invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
+      const apply=()=>{ setFxParamAxis(slot, pi, ax.value, inv.checked); renderFxCtl(); };   // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает fxLayout, а не собственный DOM
+      ax.onchange=apply; inv.onchange=apply;
+      sub.appendChild(plab); sub.appendChild(ax); sub.appendChild(invWrap); fxCtlRows.appendChild(sub);
+    });
   });
 }
 /* Сплит доступен ТОЛЬКО в ландшафте: в портрете две половины ~195px, палитра аккордов нечитаема.

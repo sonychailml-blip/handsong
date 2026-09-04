@@ -221,10 +221,16 @@ export const DICTS = {
     'fx.drv':'Drive',
     'fx.trm':'Tremolo',
     'fx.reverb':'Reverb',
-    'fx.reverb.decay':'Reverb: tail',
-    'fx.reverb.tone':'Reverb: tone',
-    // конструктор эффектов: раскладка по пальцам
+    // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
+    'fx.reverb.decay':'Tail',
+    'fx.reverb.tone':'Tone',
+    'fx.param.amt':'Amount',            // у старых скалярных эффектов параметр один и он же сам эффект
+    // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— none —',
+    'fx.invert':'Invert',
+    'axis.x':'Horizontal',
+    'axis.y':'Vertical',
+    'axis.z':'Depth',
     'panel.scale.fxCtl':'Effects constructor',
     'finger.index':'Index finger',
     'finger.middle':'Middle finger',
@@ -504,10 +510,16 @@ export const DICTS = {
     'fx.drv':'Драйв',
     'fx.trm':'Тремоло',
     'fx.reverb':'Реверб',
-    'fx.reverb.decay':'Реверб: длина',
-    'fx.reverb.tone':'Реверб: окраска',
-    // конструктор эффектов: раскладка по пальцам
+    // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
+    'fx.reverb.decay':'Длина',
+    'fx.reverb.tone':'Окраска',
+    'fx.param.amt':'Величина',          // у старых скалярных эффектов параметр один и он же сам эффект
+    // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— нет —',
+    'fx.invert':'Инверсия',
+    'axis.x':'Горизонталь',
+    'axis.y':'Вертикаль',
+    'axis.z':'Глубина',
     'panel.scale.fxCtl':'Конструктор эффектов',
     'finger.index':'Указательный',
     'finger.middle':'Средний',
