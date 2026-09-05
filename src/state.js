@@ -88,10 +88,11 @@ export const setFxSlotId=(slot,fxId,nParams=1)=>{
 /* Ось и инверсия имеют смысл ТОЛЬКО у ведомого параметра, поэтому запись оси ПОДРАЗУМЕВАЕТ режим
    'drive' (меню и показывает ось лишь в этом режиме). Руку НЕ трогаем: в 3.2 ось будет правиться и у
    параметра, ведомого играющей рукой. */
-export const setFxParamAxis=(slot,pIdx,axis,inv)=>{
+export const setFxParamAxis=(slot,pIdx,axis,inv,hand)=>{
   const s=fxLayout[slot]; if(!s||!s.params[pIdx])return;
   const p=s.params[pIdx];
   p.mode='drive'; p.axis=axis; p.inv=!!inv;
+  if(hand!=null) p.hand=hand;   // 5-й аргумент НЕОБЯЗАТЕЛЕН (Пласт 3.2): не передали — руку не трогаем, поэтому прежние вызовы работают как работали
 };
 /* РЕЖИМ параметра: 'drive' (ведёт рука) ↔ 'fixed' (стоит на значении из меню). axis/inv при переходе
    в 'fixed' НЕ стираем — вернувшись в 'drive', человек получит свою ось обратно.

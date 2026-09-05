@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxLayout, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxLayout, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -217,9 +217,7 @@ function fireLooperCmd(S,mf){
 /* Роль-половина ЭТОЙ руки СЕЙЧАС: single — глобальный phoneInstr; сплит — замороженная S.role (щипок)
    или живая половина под указательным (lm[8]). Правило #18: в сплите функция руки берётся ПО РОЛИ
    ПОЛОВИНЫ.
-   ⚠️ Прежде отсюда кормился ещё и soloNoteHand («кто целится ревербом») — он УДАЛЁН в Пласте 3.1
-   вместе со всем прицелом: реверб ушёл с играющей руки к fx-руке (параметр 'mix'). Остался ОДИН
-   потребитель — проверка руки-ВЫРАЗИТЕЛЬНОСТИ ниже. */
+   Потребителей два: рука-ВЫРАЗИТЕЛЬНОСТЬ и soloNoteHand (ниже). */
 function soloHalfRole(key,S,W){
   if(!splitOn) return phoneInstr;
   if(S.pinch) return S.role;
@@ -227,6 +225,15 @@ function soloHalfRole(key,S,W){
   // px через sx (поля кадра); для ВЫБОРА половины клампим в [0,W): рука в полях сатурируется к ближней кромке, а не проваливается в чужую половину
   const px=clamp(sx(lm[8].x,W),0,W-1), hs=phoneHalves(W), h=hs.find(q=>px>=q.rx0&&px<q.rx1)||hs[hs.length-1];
   return h.role;
+}
+/* «ИГРАЮЩАЯ (нотная) рука СОЛО» — та, чья ГЛУБИНА ведёт назначенный ей параметр (Пласт 3.2).
+   ⚠️ Предикат ВОСКРЕШЁН: в Пласте 3.1 он был удалён вместе с прицелом реверба (его единственным
+   потребителем был ПОКАЗ). Теперь у него снова один потребитель, но уже НАСТОЯЩИЙ — УПРАВЛЕНИЕ.
+   Условия те же: (1) роль-половина этой руки — соло; (2) рука реально играет ноты (не эффекты, не
+   лупер, не выразительность — единый закон state.playsNotes). Двух нотных рук — пишут обе, побеждает
+   последняя за кадр: ровно тем же правилом жил реверб до 3.1. */
+function soloNoteHand(key,S,W){
+  return soloHalfRole(key,S,W)==='ld' && playsNotes(handFnOf(key,'ld'));
 }
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
    (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
@@ -810,6 +817,36 @@ function processHands(res){
       // ЗАЦЕПКА ОБУЧЕНИЯ: рука-выразительность реально ДВИЖЕТСЯ (энергия «смычка» перешла порог) — урок «Функции рук». Гистерезис (0.35↑/0.12↓), чтобы не спамить.
       if(S.exprE>0.35 && !S.tutExpr){ S.tutExpr=true; tutorTap('exprMove'); }
       else if(S.exprE<0.12) S.tutExpr=false;
+    }
+    /* ═══ ГЛУБИНА ИГРАЮЩЕЙ РУКИ → ПАРАМЕТР ЭФФЕКТА (Пласт 3.2) ═══
+       Здесь замыкается разделение ОДНОГО эффекта между ДВУМЯ руками: параметры со своим `hand:'fx'`
+       крутит палец (цикл в ветке зоны 'fx'), а помеченные `hand:'play'` ведёт ГЛУБИНА этой руки. Эффект
+       при этом ОДИН — руки адресованы ПАРАМЕТРАМ, а не копиям эффекта.
+       ⚠️ ОТОБРАЖЕНИЕ АБСОЛЮТНОЕ, а не «от точки захвата», и это не мелочь: играющая рука щиплет НА
+       КАЖДУЮ НОТУ, поэтому захват сбрасывал бы точку отсчёта десятки раз за фразу и положение руки
+       перестало бы что-либо значить. Формула — ДОСЛОВНО прежняя ревербная (и та же, что у яркости
+       аккордов): рука ближе → 0, дальше → 1. Мышечная память с до-3.1 переезжает целиком.
+       ⚠️ ИНВЕРСИЯ здесь ЗЕРКАЛИТ (1-v), а не меняет знак: у fx-руки инвертируется СМЕЩЕНИЕ (−d), а тут
+       величина уже абсолютная 0..1. Перепутать — получить всегда-отрицательное и вечный ноль.
+       ⚠️ УДЕРЖАНИЕ ПРИ ОТСУТСТВИИ: нет нотной руки соло в кадре — НИЧЕГО НЕ ПИШЕМ, параметр стоит на
+       последнем значении. Прежний revDisp в этом случае гасился в 0, но он был ПОКАЗОМ; здесь это ЗВУК,
+       и щелчок в ноль на каждом моргании трекинга был бы слышен.
+       ⚠️ emaS('hs') зовём РОВНО РАЗ НА РУКУ ЗА КАДР. Двойной вызов дважды продвинул бы фильтр (та же
+       ловушка, о которой предупреждает captureFx). Здесь это безопасно ПО ПОСТРОЕНИЮ: два других места
+       считают hs только для ЩИПНУВШЕЙ руки в зоне 'fx' и для АККОРДОВОЙ руки, а нотная рука соло не
+       может быть ни той, ни другой (у неё handFnOf='note'/'hold'/'therm' и зона 'ld'). */
+    if(soloNoteHand(key,S,W)){
+      const hsD=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
+      const vD=clamp01((REV_NEAR-hsD)/REV_RANGE);
+      for(const sl of fxLayout){
+        if(!sl) continue;
+        let ps=null;                                   // дескрипторы слота берём ЛЕНИВО: у большинства слотов play-параметров нет вовсе
+        sl.params.forEach((pa,i)=>{
+          if(pa.mode!=='drive' || pa.hand!=='play') return;
+          if(!ps) ps=fxParamsOf(sl.fxId);
+          const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD);
+        });
+      }
     }
     /* ⚠️ ПРИЦЕЛ РЕВЕРБА ДО ЩИПКА УДАЛЁН (Пласт 3.1). Здесь по каждому кадру считалась глубина нотной
        руки соло и писалась в revDisp, чтобы можно было «прицелиться» ревербом ещё до игры. Реверб ушёл

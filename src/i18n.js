@@ -230,11 +230,12 @@ export const DICTS = {
     'fx.none':'— none —',
     'fx.invert':'Invert',
     // режим параметра: ведёт палец по оси ИЛИ стоит на значении из меню
-    'fx.mode.finger':'Finger',
+    'fx.mode.finger':'Driven',          // не «палец»: вести параметр может и ИГРАЮЩАЯ рука — какая именно, говорит столбец адреса
     'fx.mode.fixed':'Fixed',
     'axis.x':'Horizontal',
     'axis.y':'Vertical',
     'axis.z':'Depth',
+    'axis.play.z':'Depth (playing hand)',
     'panel.scale.fxCtl':'Effects constructor',
     'finger.index':'Index finger',
     'finger.middle':'Middle finger',
@@ -523,11 +524,12 @@ export const DICTS = {
     'fx.none':'— нет —',
     'fx.invert':'Инверсия',
     // режим параметра: ведёт палец по оси ИЛИ стоит на значении из меню
-    'fx.mode.finger':'Палец',
+    'fx.mode.finger':'Ведётся',         // не «палец»: вести параметр может и ИГРАЮЩАЯ рука — какая именно, говорит столбец адреса
     'fx.mode.fixed':'Фиксировано',
     'axis.x':'Горизонталь',
     'axis.y':'Вертикаль',
     'axis.z':'Глубина',
+    'axis.play.z':'Глубина (играющая рука)',
     'panel.scale.fxCtl':'Конструктор эффектов',
     'finger.index':'Указательный',
     'finger.middle':'Средний',

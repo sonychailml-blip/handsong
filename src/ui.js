@@ -531,7 +531,13 @@ function renderHandFn(){
    ⚠️ Звук НЕ глушим (в отличие от смены функции руки): раскладка не трогает ни голоса, ни роли —
    меняется лишь то, какую ручку крутит палец. */
 const FINGER_KEYS=['finger.index','finger.middle','finger.ring','finger.pinky'];
-const AXIS_OPTS=[['x','axis.x'],['y','axis.y'],['z','axis.z']];   // [значение в данных, ключ-словаря]
+/* АДРЕС УПРАВЛЕНИЯ параметра: «какая РУКА какой ОСЬЮ его ведёт». Значение опции кодирует пару
+   `рука:ось` — именно та «control address», ради которой в 2.6.1 рука стала полем ПАРАМЕТРА.
+   У fx-руки три оси (щипок + смещение от точки захвата), у ИГРАЮЩЕЙ — пока одна, ГЛУБИНА: вертикаль
+   у неё занята высотой, горизонталь громкостью (переназначение X — Пласт 3.4).
+   ⚠️ Смешение адресов в ОДНОМ эффекте — это и есть разделение эффекта между руками: у реверба можно
+   оставить длину и окраску на пальце, а подмес отдать глубине играющей. */
+const AXIS_OPTS=[['fx:x','axis.x'],['fx:y','axis.y'],['fx:z','axis.z'],['play:z','axis.play.z']];
 const fxCtlSep=$('fxCtlSep'), fxCtlRows=$('fxCtlRows');
 /* Варианты: «нет» + четыре старых скалярных (из FX_META) + модули из реестра (пока реверб).
    Реестр читаем НА КАЖДУЮ ОТРИСОВКУ, а не один раз: до initAudio он пуст (узлов ещё нет), а панель
@@ -643,13 +649,14 @@ function renderFxCtl(){
       }else{
         const ax=document.createElement('select'); ax.autocomplete='off';
         for(const [v,k] of AXIS_OPTS){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); ax.appendChild(o); }
-        ax.value=pa.axis;
+        ax.value=(pa.hand||'fx')+':'+pa.axis;   // показываем ПАРУ рука:ось; hand||'fx' — страховка на случай параметра из старой раскладки
         /* Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной ширины: правило
            .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы целую колонку. */
         const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='5px';
         const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
         invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
-        const apply=()=>{ setFxParamAxis(slot, pi, ax.value, inv.checked); renderFxCtl(); };   // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает fxLayout, а не собственный DOM
+        const apply=()=>{ const [hnd,axs]=ax.value.split(':');                                 // адрес разбираем ЗДЕСЬ — в данные уезжают отдельные поля hand и axis, строка «рука:ось» живёт только в меню
+          setFxParamAxis(slot, pi, axs, inv.checked, hnd); renderFxCtl(); };                    // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает fxLayout, а не собственный DOM
         ax.onchange=apply; inv.onchange=apply;
         sub.appendChild(ax); sub.appendChild(invWrap);
       }
