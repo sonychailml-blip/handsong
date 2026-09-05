@@ -25,14 +25,21 @@ const fxModOf=sl=> FX_MODULES[sl.fxId];
 /* Слот, чей палец сейчас зажат у руки-эффектов, — он и разворачивается. Щипок fx-руки один, поэтому
    разворачивается не больше одного слота за раз. */
 const fxActiveSlot=()=>{ for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.zone==='fx'&&S.adj) return S.adj.slot; } return null; };
+/* «Этот параметр ведёт ДРУГАЯ (играющая) рука» — Пласт 3.2. Признак берём из РАСКЛАДКИ (адрес
+   управления живёт там), а НЕ из дескриптора модуля: модуль знает про свои секунды и герцы, но не про
+   то, чья рука его крутит. */
+const fxParamIsPlay=la=> !!(la && la.mode==='drive' && la.hand==='play');
 const fxBarItems=()=>{
   const act=fxActiveSlot(), out=[];
   fxLayout.forEach((sl,slot)=>{
     const m=FX_META.find(q=>q.k===sl.fxId);
-    if(m){ out.push({v:fx[sl.fxId], c:m.color, l:m.label, slot}); return; }   // старый скалярный — как было
+    if(m){ out.push({v:fx[sl.fxId], c:m.color, l:m.label, slot, play:fxParamIsPlay(sl.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр)
     const mod=fxModOf(sl); if(!mod) return;                                    // пустой/неизвестный слот — молча без столбика
-    const ps=(slot===act && mod.params.length>1) ? mod.params : [mod.params[0]];
-    for(const p of ps) out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, slot});   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
+    /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
+       связан со своим параметром раскладки (sl.params), где и лежит адрес управления. */
+    const idx=(slot===act && mod.params.length>1) ? mod.params.map((_,i)=>i) : [0];
+    for(const i of idx){ const p=mod.params[i];
+      out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, slot, play:fxParamIsPlay(sl.params[i])}); }   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
   });
   return out;
 };
@@ -896,6 +903,13 @@ function drawFxBars(rx0,H){                        // rx0 — левый кра�
     ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.5;
     ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;                                // заполнение снизу вверх
     if(actv){ ctx.strokeStyle=it.c; ctx.lineWidth=1.5; ctx.strokeRect(x-1.5,y0-1.5,FX_BAR_W+3,FX_BAR_MAX+3); }
+    /* МЕТКА «ведёт ИГРАЮЩАЯ рука» (Пласт 3.2): точка в ЗАЗОРЕ слева от столбика. Зазор уже есть
+       (FX_BAR_GAP=15), поэтому метка НИЧЕГО не двигает — ни столбиков, ни отступа легенды. Точка стоит
+       вплотную к СВОЕМУ столбику (4px) и далеко от соседнего (11px), так что чья она — не спутать.
+       Почему не рамка и не другой оттенок трека: рамку уже занимает подсветка активного слота (actv), а
+       заливка трека меняется с величиной — метка обязана читаться при ЛЮБОМ значении, включая 0 и 100%. */
+    if(it.play){ ctx.fillStyle=it.c; ctx.globalAlpha=0.9;
+      ctx.beginPath(); ctx.arc(x-5, y0+5, 2.5, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
     ctx.fillStyle=actv?it.c:'rgba(255,255,255,.5)';
     ctx.fillText(it.l,x+FX_BAR_W/2,y0-5);
   });

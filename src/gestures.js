@@ -548,7 +548,7 @@ function processHands(res){
             const v=clamp01(A.base[i]+(pa.inv?-d:d));
             ps[i].set(v);
             // ЗАЦЕПКА ОБУЧЕНИЯ: значение реально сдвинулось от старта (>3%) — рука эффектов «крутит», не просто щипнула. Троттлинг 5%. Годится ЛЮБОЙ параметр: иначе переназначивший палец застрял бы в уроке «Основы».
-            if(Math.abs(v-A.base[i])>0.03 && (S.tutFx==null||Math.abs(v-S.tutFx)>0.05)){ S.tutFx=v; tutorTap('fx',{k:A.k}); }
+            if(Math.abs(v-A.base[i])>0.03 && (S.tutFx==null||Math.abs(v-S.tutFx)>0.05)){ S.tutFx=v; tutorTap('fx',{k:A.fxId}); }   // A.fxId, а не снятое в 2.2 A.k (уезжало undefined) — висячая ссылка закрыта
           }
         }
       }else if(S.zone==='chFam'){
