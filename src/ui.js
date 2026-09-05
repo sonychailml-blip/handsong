@@ -2,7 +2,11 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxLayout, setFxSlotId, setFxParamAxis, roleHasFx } from './state.js';
+         fxLayout, setFxSlotId, setFxParamAxis, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
+/* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
+   Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
+   иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
+import { fxParamsOf } from './gestures.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
@@ -574,19 +578,82 @@ function renderFxCtl(){
     const pkeys=fxParamKeys(sl.fxId);
     pkeys.forEach((lk,pi)=>{
       const pa=sl.params[pi]; if(!pa) return;
-      const sub=document.createElement('div'); sub.className='prow'; sub.style.paddingLeft='14px'; sub.style.margin='4px 0';
+      const sub=document.createElement('div'); sub.className='prow fxsub'; sub.style.paddingLeft='14px'; sub.style.margin='4px 0';
       const plab=document.createElement('label'); plab.textContent=t(lk); plab.style.flex='0 0 114px';
-      const ax=document.createElement('select'); ax.autocomplete='off';
-      for(const [v,k] of AXIS_OPTS){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); ax.appendChild(o); }
-      ax.value=pa.axis;
-      /* Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной ширины: правило
-         .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы целую колонку. */
-      const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='5px';
-      const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
-      invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
-      const apply=()=>{ setFxParamAxis(slot, pi, ax.value, inv.checked); renderFxCtl(); };   // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает fxLayout, а не собственный DOM
-      ax.onchange=apply; inv.onchange=apply;
-      sub.appendChild(plab); sub.appendChild(ax); sub.appendChild(invWrap); fxCtlRows.appendChild(sub);
+      /* РЕЖИМ ПАРАМЕТРА (Пласт 2.6) — ведёт палец по оси ИЛИ стоит на значении из меню. Стоит ПЕРВЫМ:
+         он решает, что показывать дальше, и потому занимает узкий столбец по содержимому.
+         ⚠️ Ширину задаёт КЛАСС .fxmode, а НЕ инлайновый flex. Было `md.style.flex='0 0 auto'` — и это
+         ломало ОБА режима: basis:auto подхватывал глобальный `select{width:100%}`, селект требовал всю
+         строку и при shrink:0 выдавливал в нулевую ширину всё, что после него. Подробности — в
+         style.css у правила .prow select.fxmode. */
+      const md=document.createElement('select'); md.autocomplete='off'; md.className='fxmode';
+      for(const [v,k] of [['drive','fx.mode.finger'],['fixed','fx.mode.fixed']]){
+        const o=document.createElement('option'); o.value=v; o.textContent=t(k); md.appendChild(o); }
+      md.value = pa.mode==='fixed' ? 'fixed' : 'drive';
+      md.onchange=e=>{
+        const to=e.target.value, ps=fxParamsOf(sl.fxId), p=ps[pi];
+        /* ⚠️ ЗАСЕВ ПРИ ПЕРЕХОДЕ В «ФИКСИРОВАНО» — обязателен (об этом просил комментарий в state 2.6.1):
+           берём ТЕКУЩЕЕ ЖИВОЕ значение параметра и делаем его фиксированным. Без засева ручка прыгнула бы
+           в ноль, то есть «зафиксировать как есть» звучало бы как «выключить». */
+        if(to==='fixed' && p){ const v01=p.get(); setFxParamMode(slot,pi,'fixed'); setFxParamFixed(slot,pi,v01); p.set(v01); }
+        else setFxParamMode(slot,pi,to);   // обратно в 'drive': ось сохранилась, палец продолжит С ЭТОГО ЖЕ значения (захват берёт базу из живого) — латч цел
+        renderFxCtl();   // смена режима ДИСКРЕТНА: перерисовать можно и нужно (набор контролов другой)
+      };
+      sub.appendChild(plab); sub.appendChild(md);
+      if(pa.mode==='fixed'){
+        /* ФИКСИРОВАННОЕ ЗНАЧЕНИЕ: поле 0..100 = v01*100, чисто для показа. В звук уходит v01 (0..1)
+           ЧЕРЕЗ ТОТ ЖЕ fxParamsOf().set, что и палец, — значит min/max/curve остаются жить только в
+           setNorm/fxDenorm, второго представления диапазона не возникает, а лог-шкала реверба (секунды,
+           герцы) соблюдается сама собой.
+           ⚠️ ЗДЕСЬ БЫЛ ПОЛЗУНОК (<input type=range>) — УДАЛЁН по просьбе пользователя. И ⚠️ ПРИЧИНА ЕГО
+           ПОЛОМКИ БЫЛА НАЗВАНА НЕВЕРНО (здесь стояло «виноват touch-action:none») — исправляю запись,
+           чтобы следующий заход не гонялся за призраком: ползунок стоял в ЭТОЙ ЖЕ переполненной строке
+           (её ломал селект режима, см. .fxmode) и схлопывался в НУЛЕВУЮ ШИРИНУ, а касание по ползунку
+           нулевой ширины читается как его ЛЕВЫЙ КРАЙ, то есть 0; обработчик честно писал этот ноль в
+           состояние — вот и «уехало в ноль и залипло». Дело было в ШИРИНЕ. `touch-action:none` у
+           html,body действительно есть, но к этой поломке отношения не имел.
+           Числовое поле оставляем: оно и надёжнее (клавиатура и кнопки ширины не требуют), и его просил
+           пользователь. Форма «−[поле]＋» — та же, что у тактов лупера (.seg), поле — как у эталона A4. */
+        const seg=document.createElement('div'); seg.className='seg';
+        const dec=document.createElement('button'); dec.type='button'; dec.className='step'; dec.textContent='−';
+        const inc=document.createElement('button'); inc.type='button'; inc.className='step'; inc.textContent='＋';
+        const num=document.createElement('input'); num.type='number'; num.className='numv';
+        num.min='0'; num.max='100'; num.step='1'; num.inputMode='numeric'; num.autocomplete='off';
+        const cur=()=>Math.round((pa.v01||0)*100);   // ИСТОЧНИК — ДАННЫЕ (pa живой объект раскладки), а не текст поля
+        num.value=String(cur());
+        /* ЕДИНСТВЕННАЯ точка записи: кламп → в данные → в звук ТЕМ ЖЕ путём, что у пальца → в поле.
+           ⚠️ ПЕРЕРИСОВКИ ЗДЕСЬ НЕТ — намеренно (как и у прежнего ползунка): renderFxCtl уничтожил бы
+           поле под пальцем/курсором прямо во время ввода. Данные остаются источником правды: следующая
+           перерисовка возьмёт v01 из fxLayout. НЕ «чинить» это обратно на перерисовку. */
+        const put=pct=>{
+          const p100=Math.max(0,Math.min(100,Math.round(pct)));
+          setFxParamFixed(slot,pi,p100/100);
+          const p=fxParamsOf(sl.fxId)[pi]; if(p) p.set(p100/100);
+          if(num.value!==String(p100)) num.value=String(p100);   // не переписываем без нужды — иначе прыгает каретка при наборе
+        };
+        dec.onclick=()=>put(cur()-1);
+        inc.onclick=()=>put(cur()+1);
+        /* Ввод с клавиатуры: ПУСТОЕ или нечисловое — НЕ трактуем как ноль, а ЖДЁМ. Иначе стирание поля
+           ради набора нового числа мгновенно глушило бы параметр (та же ловушка `+''||0`, что помогла
+           ползунку залипнуть в нуле). */
+        num.oninput=e=>{ const s=e.target.value.trim(); if(s==='')return; const n=parseInt(s,10); if(!isNaN(n)) put(n); };
+        num.onchange=()=>{ const n=parseInt(num.value,10); if(isNaN(n)) num.value=String(cur()); else put(n); };   // ушёл фокус с мусором → вернуть показ из данных
+        seg.appendChild(dec); seg.appendChild(num); seg.appendChild(inc);
+        sub.appendChild(seg);
+      }else{
+        const ax=document.createElement('select'); ax.autocomplete='off';
+        for(const [v,k] of AXIS_OPTS){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); ax.appendChild(o); }
+        ax.value=pa.axis;
+        /* Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной ширины: правило
+           .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы целую колонку. */
+        const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='5px';
+        const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
+        invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
+        const apply=()=>{ setFxParamAxis(slot, pi, ax.value, inv.checked); renderFxCtl(); };   // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает fxLayout, а не собственный DOM
+        ax.onchange=apply; inv.onchange=apply;
+        sub.appendChild(ax); sub.appendChild(invWrap);
+      }
+      fxCtlRows.appendChild(sub);
     });
   });
 }
