@@ -22,24 +22,31 @@ const fxBandR=n=> n>0 ? FX_X0+(n-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W : 0;   // п�
    РАЗВОРАЧИВАЕТСЯ по столбику на параметр (TAIL/TONE): три ручки видно тогда, когда их крутят.
    Пустой слот («нет эффекта») не даёт столбика вовсе. */
 const fxModOf=sl=> FX_MODULES[sl.fxId];
-/* Слот, чей палец сейчас зажат у руки-эффектов, — он и разворачивается. Щипок fx-руки один, поэтому
-   разворачивается не больше одного слота за раз. */
-const fxActiveSlot=()=>{ for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.zone==='fx'&&S.adj) return S.adj.slot; } return null; };
+/* ПАЛЕЦ, зажатый сейчас у руки-эффектов (Пласт 3.4.2; прежде — «активный слот», но слот перестал
+   существовать: палец переехал в адрес параметра). Щипок fx-руки один, поэтому активный палец не
+   больше одного за раз. */
+const fxActiveFinger=()=>{ for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.zone==='fx'&&S.adj) return S.adj.finger; } return null; };
+/* «Этот параметр ведёт ВОТ ЭТОТ палец fx-руки» — один предикат на подсветку и на разворот. */
+const fxParamOnFinger=(pa,f)=> !!(pa && f!=null && pa.mode==='drive' && pa.hand==='fx' && pa.finger===f);
 /* «Этот параметр ведёт ДРУГАЯ (играющая) рука» — Пласт 3.2. Признак берём из РАСКЛАДКИ (адрес
    управления живёт там), а НЕ из дескриптора модуля: модуль знает про свои секунды и герцы, но не про
    то, чья рука его крутит. */
 const fxParamIsPlay=la=> !!(la && la.mode==='drive' && la.hand==='play');
 const fxBarItems=()=>{
-  const act=fxActiveSlot(), out=[];
-  fxChainOf('ld').forEach((sl,slot)=>{   // 'ld' — запись факта: столбики рисуются под гейтом roleHasFx('ld'), а fx бывает только у соло. В 3.4/3.5 — переменная роли
-    const m=FX_META.find(q=>q.k===sl.fxId);
-    if(m){ out.push({v:fx[sl.fxId], c:m.color, l:m.label, slot, play:fxParamIsPlay(sl.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр)
-    const mod=fxModOf(sl); if(!mod) return;                                    // пустой/неизвестный слот — молча без столбика
+  const act=fxActiveFinger(), out=[];
+  fxChainOf('ld').forEach(eff=>{   // 'ld' — запись факта: столбики рисуются под гейтом roleHasFx('ld'), а fx бывает только у соло. В 3.5 — переменная роли
+    const m=FX_META.find(q=>q.k===eff.fxId);
+    if(m){ out.push({v:fx[eff.fxId], c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр)
+    const mod=fxModOf(eff); if(!mod) return;                                   // пустая/неизвестная запись — молча без столбика
     /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
-       связан со своим параметром раскладки (sl.params), где и лежит адрес управления. */
-    const idx=(slot===act && mod.params.length>1) ? mod.params.map((_,i)=>i) : [0];
+       связан со своим параметром в цепи (eff.params), где и лежит адрес управления.
+       РАЗВОРОТ (Пласт 3.4.2): разворачивается эффект, У КОТОРОГО ХОТЬ ОДИН параметр сидит на зажатом
+       пальце. Прежде условие звучало «слот === активный слот» — то же самое, пока эффект целиком
+       принадлежал одному пальцу; теперь параметры одного эффекта могут быть на разных пальцах, и
+       разворот обязан следовать за ПАРАМЕТРОМ. На дефолтной цепи это ровно прежнее поведение. */
+    const idx=(mod.params.length>1 && eff.params.some(pa=>fxParamOnFinger(pa,act))) ? mod.params.map((_,i)=>i) : [0];
     for(const i of idx){ const p=mod.params[i];
-      out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, slot, play:fxParamIsPlay(sl.params[i])}); }   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
+      out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, fing:eff.params[i], play:fxParamIsPlay(eff.params[i])}); }   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
   });
   return out;
 };
@@ -705,7 +712,13 @@ function drawHandsPhone(res,W,H,playH){
       continue;
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
-      if(S.pinch&&S.adj){ const meta=FX_META.find(m=>m.k===S.adj.fxId);   // эффект берём из ЗАХВАТА (S.adj.fxId), а раскладка решила его ещё на щипке
+      /* Эффект берём из ЗАХВАТА — но захват теперь ПО ПАЛЬЦУ, и на одном пальце могут сидеть параметры
+         РАЗНЫХ эффектов (Пласт 3.4.2). Подписываем ПЕРВЫЙ СТАРЫЙ СКАЛЯРНЫЙ из захваченных: только у них
+         есть и цвет, и процент в state.fx — у модулей (реверб) ни того, ни другого здесь нет, и раньше
+         подпись на таком пальце просто не рисовалась. На дефолтной цепи это ровно прежняя картинка:
+         средний → «Делей 42%», указательный (реверб) → без подписи, как и было. */
+      if(S.pinch&&S.adj){ let meta=null;
+        for(const e of S.adj.ent){ const m=FX_META.find(q=>q.k===e.fxId); if(m){ meta=m; break; } }
         if(meta){ ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
           ctx.fillText(`${t(meta.fullKey)} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); } }
       continue;
@@ -902,8 +915,13 @@ function drawFxBars(rx0,H){                        // rx0 — левый кра�
   items.forEach((it,i)=>{
     const x=rx0+FX_X0+i*(FX_BAR_W+FX_BAR_GAP);
     let actv=false; for(const k in HANDS){ const S=HANDS[k];
-      // Подсветка — ПО СЛОТУ, а не по имени эффекта: слот уникален, а один эффект с 2.3 может лежать на двух пальцах, и подсветились бы оба. ⚠️ it.slot!=null, НЕ truthy: слот 0 (указательный) — валидный и ложный.
-      if(it.slot!=null&&S.pinch&&S.zone==='fx'&&S.adj&&S.adj.slot===it.slot)actv=true; }
+      /* Подсветка — ПО АДРЕСУ ПАРАМЕТРА этого столбика (Пласт 3.4.2), а не по имени эффекта и уже не
+         по слоту: слота нет, а один эффект может лежать на нескольких пальцах сразу. Светится ровно
+         то, что зажатый палец РЕАЛЬНО ведёт, — параметр, отданный «фиксировано» или играющей руке, не
+         светится, даже если соседний параметр того же эффекта сидит на этом пальце. На дефолтной цепи
+         (все три параметра реверба на указательном) это в точности прежняя картинка.
+         ⚠️ Палец 0 (указательный) — валидный и ложный, поэтому сравнение идёт через предикат с !=null внутри. */
+      if(S.pinch&&S.zone==='fx'&&S.adj&&fxParamOnFinger(it.fing,S.adj.finger))actv=true; }
     ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
     const fh=FX_BAR_MAX*Math.max(0,Math.min(1,it.v));
     ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.5;

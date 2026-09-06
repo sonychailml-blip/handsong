@@ -2,7 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxChainOf, setFxSlotId, setFxParamAxis, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
+         fxChainOf, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -555,43 +555,72 @@ function renderHandFn(){
    ДЫРОЙ: поставь параметру фиксированное значение, сними руку с 'fx' — значение продолжало
    действовать, а меню, чтобы его изменить, исчезало. Теперь секция видна всегда, а отсутствие
    fx-руки объясняется ПОДСКАЗКОЙ (пальцевые адреса не действуют, фиксированные — да).
-   Слайс 2.4 добавил ПОДСТРОКИ: у каждого параметра — своя ОСЬ (x/y/z) и ИНВЕРСИЯ. Сами поля жили в
-   данных с 2.1 (жест их читает), 2.4 лишь открыл их человеку — жест-математику не трогали.
+   ⚠️ МЕНЮ ТЕПЕРЬ «ОТ ПАРАМЕТРА», А НЕ «ОТ ПАЛЬЦА» (Пласт 3.4.2). Было: строка = ПАЛЕЦ, и в ней
+   выбирали, какой ОДИН эффект на нём сидит; параметры шли подстроками и наследовали палец строки.
+   Стало: строка = ПАРАМЕТР, и она выбирает свой АДРЕС УПРАВЛЕНИЯ свободно. Это прямое следствие формы
+   данных — адрес принадлежит ПАРАМЕТРУ (state.fxChains), — и ровно то, ради чего палец переехал внутрь
+   параметра: на один адрес можно подписать параметры РАЗНЫХ эффектов, и они поедут ВМЕСТЕ.
    ⚠️ Звук НЕ глушим (в отличие от смены функции руки): цепь не трогает ни голоса, ни роли —
    меняется лишь то, какую ручку крутит палец. */
 const FINGER_KEYS=['finger.index','finger.middle','finger.ring','finger.pinky'];
-/* АДРЕС УПРАВЛЕНИЯ параметра: «какая РУКА какой ОСЬЮ его ведёт». Значение опции кодирует пару
-   `рука:ось` — именно та «control address», ради которой в 2.6.1 рука стала полем ПАРАМЕТРА.
-   У fx-руки три оси (щипок + смещение от точки захвата), у ИГРАЮЩЕЙ — пока одна, ГЛУБИНА: вертикаль
-   у неё занята высотой, горизонталь громкостью (переназначение X — Пласт 3.4).
+/* АДРЕС УПРАВЛЕНИЯ — ОДИН выпадающий список на параметр (Пласт 3.4.2). Прежде их было ДВА: «режим»
+   (ведётся/фиксировано) плюс «ось». Слияние — не косметика, а вопрос по существу: «откуда берётся эта
+   величина» — ОДИН вопрос с ОДНИМ ответом, и два контрола на строку при четырёх пальцах × трёх осях
+   превратили бы панель в стену. Режим при этом ОСТАЛСЯ В ДАННЫХ (p.mode) — сливается только показ.
+   ФОРМА ЗНАЧЕНИЯ: 'fixed' | 'play:z' | 'fx:<палец>:<ось>'. Разбирается ровно в одном месте (ниже, в
+   обработчике), в данные уезжают отдельные поля hand/finger/axis — строка живёт только в меню.
+   ГРУППЫ (<optgroup>) несут пальцы: нативный список остаётся компактным на любом экране, потому что
+   рисует его ОС. Сегодня 1+4×3+1 = 14 пунктов; после двойного щипка (Пласт 3.6) станет вдвое больше
+   пальцевых групп — форма это выдержит без перестройки.
    ⚠️ Смешение адресов в ОДНОМ эффекте — это и есть разделение эффекта между руками: у реверба можно
    оставить длину и окраску на пальце, а подмес отдать глубине играющей. */
-const AXIS_OPTS=[['fx:x','axis.x'],['fx:y','axis.y'],['fx:z','axis.z'],['play:z','axis.play.z']];
+const FX_AXES=[['y','axis.y'],['x','axis.x'],['z','axis.z']];   // порядок — вертикаль первой: она «главная» ось руки (см. довод о порядке осей в state.js)
+function fxAddrOf(pa){   // адрес параметра → значение <select>; ЕДИНСТВЕННОЕ место, где данные превращаются в строку меню
+  if(pa.mode==='fixed') return 'fixed';
+  if(pa.hand==='play') return 'play:z';
+  return 'fx:'+(pa.finger|0)+':'+(pa.axis||'y');
+}
+function buildAddrSel(pa){
+  const sel=document.createElement('select'); sel.autocomplete='off';
+  const opt=(v,txt)=>{ const o=document.createElement('option'); o.value=v; o.textContent=txt; return o; };
+  sel.appendChild(opt('fixed',t('fx.mode.fixed')));                 // «Фиксировано» — адрес особого рода: руки нет вовсе
+  FINGER_KEYS.forEach((fk,f)=>{
+    const g=document.createElement('optgroup'); g.label=t(fk);
+    for(const [ax,k] of FX_AXES) g.appendChild(opt('fx:'+f+':'+ax, t(k)));
+    sel.appendChild(g);
+  });
+  const gp=document.createElement('optgroup'); gp.label=t('fx.addr.play');
+  gp.appendChild(opt('play:z',t('axis.z')));                        // у играющей руки ось одна — глубина (вертикаль занята высотой, горизонталь громкостью)
+  sel.appendChild(gp);
+  sel.value=fxAddrOf(pa);
+  return sel;
+}
 const fxCtlSep=$('fxCtlSep'), fxCtlRows=$('fxCtlRows');
 /* ЧЬЮ ЦЕПЬ ПРАВИМ — состояние МЕНЮ, а не инструмента, и потому живёт ЗДЕСЬ, а не в state.js.
    ⛔ ЭТО НЕ phoneInstr И НЕ СЛЕДУЕТ ЗА НИМ: человек вправе готовить цепь аккордов, играя соло. Ровно
    поэтому же значение НИКОГДА не должен читать ни gestures, ни draw — иначе правка цепи аккордов в
    меню меняла бы то, что крутит соло-рука. Не экспортируется: читателей вне этого файла нет и не будет.
-   ⚠️ 3.4.1 НЕ трогает данные: сеттеры цепи (setFxSlotId и прочие) по-прежнему пишут ЦЕПЬ СОЛО — роль
-   они получат первым аргументом в 3.4.2. Расхождения сегодня нет ПО ПОСТРОЕНИЮ: строки рисуются
-   только у НЕПУСТОЙ цепи, а непустая сегодня ровно одна — соло. */
+   ⚠️ Сеттеры цепи получают роль ПЕРВЫМ аргументом (3.4.2) — им передаётся ИМЕННО это значение, а не
+   phoneInstr. Расхождения сегодня нет и по построению: строки рисуются только у НЕПУСТОЙ цепи, а
+   непустая сегодня ровно одна — соло. */
 let fxCtlRole='ld';
 const FX_ROLE_SEQ=['ld','ch','bs','dr'];   // порядок ролей в выпадающем списке — тот же, что у INSTR_SEQ (кнопка роли)
 /* Подсказка секции — абзац .phint, как у эталона A4 и «Пальцев в руке». Пересобирается вместе со
    строками (textContent='' выше), поэтому отдельного скрытия/показа не требуется. */
 function fxHint(key){ const p=document.createElement('p'); p.className='phint'; p.textContent=t(key); return p; }
-/* Варианты: «нет» + четыре старых скалярных (из FX_META) + модули из реестра (пока реверб).
+/* Имя эффекта для ЗАГОЛОВКА группы строк: у старых скалярных — из FX_META, у модулей — из реестра.
    Реестр читаем НА КАЖДУЮ ОТРИСОВКУ, а не один раз: до initAudio он пуст (узлов ещё нет), а панель
-   может быть перерисована и до старта. */
-function fxOptions(){
-  const o=[['','fx.none']];
-  for(const m of FX_META) o.push([m.k, m.fullKey]);
-  for(const id in FX_MODULES) o.push([id, FX_MODULES[id].labelKey]);
-  return o;
+   может быть перерисована и до старта (см. довод в showScale).
+   ⚠️ ВЫБОРА ЭФФЕКТА (список «нет / делей / …») в 3.4.2 НЕТ: строка стала параметром, а состав цепи
+   правится операциями «добавить/убрать эффект» — это Пласт 3.4.3. До него цепь соло фиксирована своим
+   дефолтом; адреса параметров при этом правятся полностью. */
+function fxTitleOf(fxId){
+  const m=FX_META.find(q=>q.k===fxId); if(m) return t(m.fullKey);
+  const mod=FX_MODULES[fxId]; return mod ? t(mod.labelKey) : fxId;
 }
-/* Подписи ПАРАМЕТРОВ для подстрок. У СТАРЫХ скалярных параметр ОДИН и он же и есть сам эффект —
-   подписываем нейтрально («Величина»): имя эффекта уже стоит строкой выше, повторять его — шум.
-   У МОДУЛЯ берём labelKey каждого параметра. Пустой/неизвестный слот параметров не имеет — подстрок нет.
+/* Подписи ПАРАМЕТРОВ. У СТАРЫХ скалярных параметр ОДИН и он же и есть сам эффект — подписываем
+   нейтрально («Величина»): имя эффекта уже стоит заголовком выше, повторять его — шум.
+   У МОДУЛЯ берём labelKey каждого параметра. Неизвестный эффект параметров не имеет — строк нет.
    ⚠️ Развилку «скаляр или модуль» знает и gestures (fxParamsOf), но там она отвечает на ДРУГОЙ вопрос —
    КУДА ПИСАТЬ, — а здесь на «как подписать». Общего источника нет намеренно: слои разные, и тянуть
    подписи в жест-слой значило бы тащить туда i18n. */
@@ -625,47 +654,42 @@ function renderFxCtl(){
   /* Цепь ЕСТЬ, но крутить её пальцем сейчас нечем — говорим об этом прямо, а не прячем секцию:
      фиксированные значения продолжают действовать, и менять их надо уметь. */
   if(!roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));
-  const opts=fxOptions();
-  chain.forEach((sl,slot)=>{
-    const row=document.createElement('div'); row.className='prow';
-    const lab=document.createElement('label'); lab.textContent=t(FINGER_KEYS[slot]);
-    const sel=document.createElement('select'); sel.autocomplete='off';   // не даём браузеру восстановить прежнее значение ПОВЕРХ данных при перезагрузке
-    for(const [v,k] of opts){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); sel.appendChild(o); }
-    sel.value=sl.fxId;
-    sel.onchange=e=>{ const id=e.target.value, mod=FX_MODULES[id];
-      setFxSlotId(slot, id, mod?mod.params.length:1);   // сколько параметров — знает сам модуль; у старых скалярных ровно один
-      renderFxCtl(); };
-    row.appendChild(lab); row.appendChild(sel); fxCtlRows.appendChild(row);
-    /* ПОДСТРОКИ — ПО ПАРАМЕТРУ: какой ОСЬЮ он ведётся и не перевёрнут ли.
-       ⚠️ КОНФЛИКТ ОСЕЙ РАЗРЕШЁН НАМЕРЕННО: поставил два параметра на одну ось — оба поедут вместе.
-       Это естественный результат жеста, а не ошибка; проверок и предупреждений не городим.
-       Отступ 14px + ровно на столько же более узкая колонка подписи — так органы управления подстрок
-       остаются на одной вертикали с выпадающим списком эффекта над ними (.prow label = 128px). */
-    const pkeys=fxParamKeys(sl.fxId);
+  chain.forEach((eff,effIdx)=>{
+    /* ЗАГОЛОВОК ЭФФЕКТА — подпись, а не выпадающий список: строка теперь принадлежит ПАРАМЕТРУ, а
+       состав цепи правится «добавить/убрать» (Пласт 3.4.3). Класс тот же, что у заголовка роли в
+       «Функциях рук», — одинаковая по смыслу вещь выглядит одинаково. */
+    const hd=document.createElement('div'); hd.className='handFnRole'; hd.textContent=fxTitleOf(eff.fxId);
+    fxCtlRows.appendChild(hd);
+    /* СТРОКА НА ПАРАМЕТР: [подпись][адрес][инверсия ИЛИ значение].
+       ⚠️ КОНФЛИКТ АДРЕСОВ РАЗРЕШЁН НАМЕРЕННО: подписал два параметра на один адрес — оба поедут вместе,
+       и теперь это возможно даже у РАЗНЫХ эффектов. Это естественный результат жеста, а не ошибка;
+       проверок и предупреждений не городим (показать, ЧТО едет вместе, — задача 3.4.4). */
+    const pkeys=fxParamKeys(eff.fxId);
     pkeys.forEach((lk,pi)=>{
-      const pa=sl.params[pi]; if(!pa) return;
+      const pa=eff.params[pi]; if(!pa) return;
       const sub=document.createElement('div'); sub.className='prow fxsub'; sub.style.paddingLeft='14px'; sub.style.margin='4px 0';
       const plab=document.createElement('label'); plab.textContent=t(lk); plab.style.flex='0 0 114px';
-      /* РЕЖИМ ПАРАМЕТРА (Пласт 2.6) — ведёт палец по оси ИЛИ стоит на значении из меню. Стоит ПЕРВЫМ:
-         он решает, что показывать дальше, и потому занимает узкий столбец по содержимому.
-         ⚠️ Ширину задаёт КЛАСС .fxmode, а НЕ инлайновый flex. Было `md.style.flex='0 0 auto'` — и это
-         ломало ОБА режима: basis:auto подхватывал глобальный `select{width:100%}`, селект требовал всю
-         строку и при shrink:0 выдавливал в нулевую ширину всё, что после него. Подробности — в
-         style.css у правила .prow select.fxmode. */
-      const md=document.createElement('select'); md.autocomplete='off'; md.className='fxmode';
-      for(const [v,k] of [['drive','fx.mode.finger'],['fixed','fx.mode.fixed']]){
-        const o=document.createElement('option'); o.value=v; o.textContent=t(k); md.appendChild(o); }
-      md.value = pa.mode==='fixed' ? 'fixed' : 'drive';
-      md.onchange=e=>{
-        const to=e.target.value, ps=fxParamsOf(sl.fxId), p=ps[pi];
-        /* ⚠️ ЗАСЕВ ПРИ ПЕРЕХОДЕ В «ФИКСИРОВАНО» — обязателен (об этом просил комментарий в state 2.6.1):
-           берём ТЕКУЩЕЕ ЖИВОЕ значение параметра и делаем его фиксированным. Без засева ручка прыгнула бы
-           в ноль, то есть «зафиксировать как есть» звучало бы как «выключить». */
-        if(to==='fixed' && p){ const v01=p.get(); setFxParamMode(slot,pi,'fixed'); setFxParamFixed(slot,pi,v01); p.set(v01); }
-        else setFxParamMode(slot,pi,to);   // обратно в 'drive': ось сохранилась, палец продолжит С ЭТОГО ЖЕ значения (захват берёт базу из живого) — латч цел
-        renderFxCtl();   // смена режима ДИСКРЕТНА: перерисовать можно и нужно (набор контролов другой)
+      /* АДРЕС — ОДИН список вместо прежней пары «режим + ось» (см. довод у buildAddrSel). */
+      const ad=buildAddrSel(pa);
+      ad.onchange=e=>{
+        const val=e.target.value, ps=fxParamsOf(eff.fxId), p=ps[pi];
+        if(val==='fixed'){
+          /* ⚠️ ЗАСЕВ ПРИ ПЕРЕХОДЕ В «ФИКСИРОВАНО» — обязателен (об этом просил комментарий в state 2.6.1):
+             берём ТЕКУЩЕЕ ЖИВОЕ значение параметра и делаем его фиксированным. Без засева ручка прыгнула бы
+             в ноль, то есть «зафиксировать как есть» звучало бы как «выключить». */
+          if(p){ const v01=p.get(); setFxParamMode(fxCtlRole,effIdx,pi,'fixed'); setFxParamFixed(fxCtlRole,effIdx,pi,v01); p.set(v01); }
+          else setFxParamMode(fxCtlRole,effIdx,pi,'fixed');
+        }else{
+          /* АДРЕС РАЗБИРАЕМ ЗДЕСЬ, и только здесь: в данные уезжают отдельные поля hand/finger/axis,
+             строка «рука:палец:ось» живёт исключительно в меню. Обратно в 'drive' — палец продолжит
+             С ЭТОГО ЖЕ значения (захват берёт базу из живого), латч цел. */
+          const [hnd,a,b]=val.split(':');
+          if(hnd==='play') setFxParamAddr(fxCtlRole,effIdx,pi,{hand:'play', axis:a, inv:pa.inv});
+          else             setFxParamAddr(fxCtlRole,effIdx,pi,{hand:'fx', finger:+a, axis:b, inv:pa.inv});
+        }
+        renderFxCtl();   // смена адреса ДИСКРЕТНА: перерисовать можно и нужно (набор контролов другой)
       };
-      sub.appendChild(plab); sub.appendChild(md);
+      sub.appendChild(plab); sub.appendChild(ad);
       if(pa.mode==='fixed'){
         /* ФИКСИРОВАННОЕ ЗНАЧЕНИЕ: поле 0..100 = v01*100, чисто для показа. В звук уходит v01 (0..1)
            ЧЕРЕЗ ТОТ ЖЕ fxParamsOf().set, что и палец, — значит min/max/curve остаются жить только в
@@ -685,7 +709,7 @@ function renderFxCtl(){
         const inc=document.createElement('button'); inc.type='button'; inc.className='step'; inc.textContent='＋';
         const num=document.createElement('input'); num.type='number'; num.className='numv';
         num.min='0'; num.max='100'; num.step='1'; num.inputMode='numeric'; num.autocomplete='off';
-        const cur=()=>Math.round((pa.v01||0)*100);   // ИСТОЧНИК — ДАННЫЕ (pa живой объект раскладки), а не текст поля
+        const cur=()=>Math.round((pa.v01||0)*100);   // ИСТОЧНИК — ДАННЫЕ (pa живой объект параметра в цепи), а не текст поля
         num.value=String(cur());
         /* ЕДИНСТВЕННАЯ точка записи: кламп → в данные → в звук ТЕМ ЖЕ путём, что у пальца → в поле.
            ⚠️ ПЕРЕРИСОВКИ ЗДЕСЬ НЕТ — намеренно (как и у прежнего ползунка): renderFxCtl уничтожил бы
@@ -693,8 +717,8 @@ function renderFxCtl(){
            перерисовка возьмёт v01 из цепи роли. НЕ «чинить» это обратно на перерисовку. */
         const put=pct=>{
           const p100=Math.max(0,Math.min(100,Math.round(pct)));
-          setFxParamFixed(slot,pi,p100/100);
-          const p=fxParamsOf(sl.fxId)[pi]; if(p) p.set(p100/100);
+          setFxParamFixed(fxCtlRole,effIdx,pi,p100/100);
+          const p=fxParamsOf(eff.fxId)[pi]; if(p) p.set(p100/100);
           if(num.value!==String(p100)) num.value=String(p100);   // не переписываем без нужды — иначе прыгает каретка при наборе
         };
         dec.onclick=()=>put(cur()-1);
@@ -707,18 +731,20 @@ function renderFxCtl(){
         seg.appendChild(dec); seg.appendChild(num); seg.appendChild(inc);
         sub.appendChild(seg);
       }else{
-        const ax=document.createElement('select'); ax.autocomplete='off';
-        for(const [v,k] of AXIS_OPTS){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); ax.appendChild(o); }
-        ax.value=(pa.hand||'fx')+':'+pa.axis;   // показываем ПАРУ рука:ось; hand||'fx' — страховка на случай параметра из старой раскладки
-        /* Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной ширины: правило
-           .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы целую колонку. */
+        /* ИНВЕРСИЯ — единственное, что осталось рядом с адресом: сам адрес (рука+палец+ось) выбран
+           списком выше. Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной
+           ширины: правило .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы колонку. */
         const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='5px';
         const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
         invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
-        const apply=()=>{ const [hnd,axs]=ax.value.split(':');                                 // адрес разбираем ЗДЕСЬ — в данные уезжают отдельные поля hand и axis, строка «рука:ось» живёт только в меню
-          setFxParamAxis(slot, pi, axs, inv.checked, hnd); renderFxCtl(); };                    // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает цепь роли, а не собственный DOM
-        ax.onchange=apply; inv.onchange=apply;
-        sub.appendChild(ax); sub.appendChild(invWrap);
+        /* Пишем В ДАННЫЕ адрес ЦЕЛИКОМ (он у параметра один и неделим) и перерисовываем ИЗ них — меню
+           отражает цепь роли, а не собственный DOM. hand/finger/axis берём из ЖИВОГО параметра: галочка
+           меняет только inv, адрес трогать не должна. */
+        inv.onchange=()=>{
+          setFxParamAddr(fxCtlRole,effIdx,pi,{hand:pa.hand, finger:pa.hand==='fx'?pa.finger:null, axis:pa.axis, inv:inv.checked});
+          renderFxCtl();
+        };
+        sub.appendChild(invWrap);
       }
       fxCtlRows.appendChild(sub);
     });
