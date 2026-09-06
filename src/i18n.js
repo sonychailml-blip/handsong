@@ -239,6 +239,7 @@ export const DICTS = {
     'fx.add':'+ Add effect',
     'fx.addAll':'All effects are in the chain',
     'fx.remove':'Remove from chain',
+    'fx.share.title':'Move together:',   // подсказка чипа «×N»: один адрес ведёт несколько параметров (3.4.4)
     'axis.x':'Horizontal',
     'axis.y':'Vertical',
     'axis.z':'Depth',
@@ -544,6 +545,7 @@ export const DICTS = {
     'fx.add':'+ Добавить эффект',
     'fx.addAll':'Все эффекты уже в цепи',
     'fx.remove':'Убрать из цепи',
+    'fx.share.title':'Едут вместе:',     // подсказка чипа «×N»: один адрес ведёт несколько параметров (3.4.4)
     'axis.x':'Горизонталь',
     'axis.y':'Вертикаль',
     'axis.z':'Глубина',

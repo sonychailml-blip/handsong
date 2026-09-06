@@ -340,6 +340,14 @@
   .fxhead .fxdel{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:2px 6px;
     color:#8a90a8; font-size:var(--fs-ctl); line-height:1; border-radius:var(--r-sm);}
   .fxhead .fxdel:hover{color:#d9534f; background:rgba(217,83,79,.10);}
+  /* Чип «×N» — ОДИН АДРЕС ВЕДЁТ НЕСКОЛЬКО ПАРАМЕТРОВ (Пласт 3.4.4). Маркер, а не предупреждение:
+     совместность ЗАДУМАНА, поэтому тон нейтрально-акцентный, а не красный (красный читался бы как
+     ошибка, которую надо чинить, — и человек «чинил» бы то, что нарочно настроил).
+     flex:0 0 auto — чип не сжимается и не обрезается: в заголовке первой уступает сводка (.fxsum),
+     в строке параметра — переносится вся строка (.fxsub{flex-wrap:wrap}). */
+  .fxshare{flex:0 0 auto; cursor:help; font-size:var(--fs-hint); font-weight:600; line-height:1;
+    padding:2px 6px; border-radius:999px; color:#4a5580;
+    background:rgba(76,194,255,.16); border:1px solid rgba(76,194,255,.35);}
   /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: подстрока параметра (адрес + инверсия ИЛИ число со ступеньками) ═══
      ⚠️ ГЛАВНОЕ ПРАВИЛО ЭТОГО БЛОКА — .fxmode, и оно несущее, а не косметика. Глобально у нас
      `select{width:100%}` (строка ~292). Пока селект внутри .prow получает `flex:1` (basis 0), ширина

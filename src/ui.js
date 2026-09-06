@@ -634,6 +634,45 @@ function fxAddrSummary(eff){
     return (FX_FING_ROMAN[pa.finger|0]||'?')+(FX_AXIS_GLYPH[pa.axis]||'');
   }).join(' · ');
 }
+/* ═══ ОБЩИЙ АДРЕС: показываем, ЧТО ПОЕДЕТ ВМЕСТЕ (Пласт 3.4.4) ═══
+   С 3.4.2 один адрес может вести НЕСКОЛЬКО параметров, в том числе у РАЗНЫХ эффектов, — и это
+   задумано, а не дефект (проверок и запретов не городим, см. «конфликт адресов разрешён намеренно»).
+   Но до сих пор факт был НЕВИДИМ: узнать о нём можно было, только двинув палец и услышав, что поехало
+   двое. Вопрос плана «меню ОТ ПАРАМЕТРА или ОТ АДРЕСА» решён в пользу параметра (форма данных), и вот
+   ЦЕНА этого решения, которую и гасит подсказка: «от адреса» показывало бы совместность само собой.
+   ⛔ ЭТО ВЫВОДИМАЯ ВЕЛИЧИНА, А НЕ СОСТОЯНИЕ: карта строится заново на каждую отрисовку из самой цепи.
+   Никакого второго представления связи (обратного индекса, который надо поддерживать) не заводим —
+   разъехаться тогда нечему по построению.
+   ⚠️ ФИКСИРОВАННЫЙ ПАРАМЕТР — НЕ АДРЕС. Два параметра «фиксировано» не едут вместе: они вообще не
+   едут, у каждого своё число. Поэтому ключ у них null, и в карту они не попадают. */
+const fxAddrKey=pa=>{ const k=pa?fxAddrOf(pa):null; return (k&&k!=='fixed')?k:null; };   // ЕДИНАЯ формула адреса — та же fxAddrOf, что кормит <select>; второй копии быть не должно
+/* Карта «адрес → подписи ведомых им параметров». Считаем ТОЛЬКО параметры, у которых есть дескриптор
+   (pi < pkeys.length): ровно их и способен вести жест (captureFx пропускает параметр без дескриптора),
+   а значит только они и могут поехать вместе. До initAudio реестр модулей пуст — реверб в карту не
+   попадает, и это верно: вести его в тот момент всё равно нечем. */
+function fxShareMap(chain){
+  const m=new Map();
+  for(const eff of chain){
+    const pkeys=fxParamKeys(eff.fxId);
+    eff.params.forEach((pa,pi)=>{
+      if(pi>=pkeys.length) return;
+      const k=fxAddrKey(pa); if(!k) return;
+      if(!m.has(k)) m.set(k,[]);
+      m.get(k).push(fxTitleOf(eff.fxId)+' · '+t(pkeys[pi]));
+    });
+  }
+  return m;
+}
+/* ЧИП «×N» — МАРКЕР, А НЕ ПАНЕЛЬ. Тот же приём, что у метки play-параметра на холсте (3.2.2): мелкий
+   знак рядом с тем, к чему он относится, а полный список — в подсказке. Второго вида («от адреса»)
+   не заводим: он стоил бы обратного индекса и отдельного экрана ради факта, который умещается в чип. */
+function fxShareChip(groups){
+  const n=Math.max(...groups.map(g=>g.length));
+  const c=document.createElement('span'); c.className='fxshare'; c.textContent='×'+n;
+  const txt=t('fx.share.title')+'\n'+groups.map(g=>g.join('\n')).join('\n\n');
+  c.title=txt; c.setAttribute('aria-label',txt);
+  return c;
+}
 /* Подсказка секции — абзац .phint, как у эталона A4 и «Пальцев в руке». Пересобирается вместе со
    строками (textContent='' выше), поэтому отдельного скрытия/показа не требуется. */
 function fxHint(key){ const p=document.createElement('p'); p.className='phint'; p.textContent=t(key); return p; }
@@ -683,6 +722,7 @@ function renderFxCtl(){
   /* Цепь ЕСТЬ, но крутить её пальцем сейчас нечем — говорим об этом прямо, а не прячем секцию:
      фиксированные значения продолжают действовать, и менять их надо уметь. */
   if(!roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));
+  const share=fxShareMap(chain);   // выводим ОДИН раз на отрисовку: карту читают и заголовки, и строки параметров
   chain.forEach((eff,effIdx)=>{
     /* ЗАГОЛОВОК ЭФФЕКТА — строка аккордеона: [▸/▾][имя][сводка адресов][✕].
        Свёрнутый заголовок обязан быть САМОДОСТАТОЧНЫМ (см. fxAddrSummary): иначе аккордеон не «убирает
@@ -701,7 +741,18 @@ function renderFxCtl(){
     del.onclick=e=>{ e.stopPropagation();
       if(fxOpenId===eff.fxId) fxOpenId=null;         // разворачивать после удаления нечего
       fxChainRemove(fxCtlRole,effIdx); renderFxCtl(); };
-    hd.appendChild(arw); hd.appendChild(nm); hd.appendChild(sm); hd.appendChild(del);
+    hd.appendChild(arw); hd.appendChild(nm); hd.appendChild(sm);
+    /* ЧИП НА ЗАГОЛОВКЕ — чтобы совместность была видна БЕЗ разворачивания: иначе её пришлось бы искать,
+       разворачивая эффекты по очереди, а это ровно та работа, от которой аккордеон избавлял.
+       Группы берём по ВСЕМ параметрам этого эффекта: их может быть несколько (разные адреса, каждый
+       делится с кем-то своим), поэтому в подсказку уходят все, а на чипе — САМАЯ БОЛЬШАЯ. */
+    {
+      const gs=[]; const seen=new Set();
+      for(const pa of eff.params){ const k=fxAddrKey(pa); if(!k||seen.has(k)) continue; seen.add(k);
+        const g=share.get(k); if(g&&g.length>1) gs.push(g); }
+      if(gs.length) hd.appendChild(fxShareChip(gs));
+    }
+    hd.appendChild(del);   // ✕ всегда ПОСЛЕДНИЙ: край строки — предсказуемое место для «убрать», что бы ни выросло левее
     hd.onclick=()=>fxToggleOpen(eff.fxId);
     hd.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fxToggleOpen(eff.fxId); } };   // заголовок кликабельный, а не <button> (внутри своя кнопка ✕) — клавиатуру доигрываем руками
     fxCtlRows.appendChild(hd);
@@ -737,6 +788,13 @@ function renderFxCtl(){
         renderFxCtl();   // смена адреса ДИСКРЕТНА: перерисовать можно и нужно (набор контролов другой)
       };
       sub.appendChild(plab); sub.appendChild(ad);
+      /* ЧИП РЯДОМ С АДРЕСОМ — там, где принимают решение: видно СРАЗУ при выборе, что этот адрес уже
+         занят кем-то ещё. Стоит ПОСЛЕ списка (адрес — причина, чип — следствие) и не участвует в
+         растяжении строки: у .fxsub включён перенос, чип уедет на вторую строку целиком, а не сплющится. */
+      {
+        const g=share.get(fxAddrKey(pa));
+        if(g&&g.length>1) sub.appendChild(fxShareChip([g]));
+      }
       if(pa.mode==='fixed'){
         /* ФИКСИРОВАННОЕ ЗНАЧЕНИЕ: поле 0..100 = v01*100, чисто для показа. В звук уходит v01 (0..1)
            ЧЕРЕЗ ТОТ ЖЕ fxParamsOf().set, что и палец, — значит min/max/curve остаются жить только в
