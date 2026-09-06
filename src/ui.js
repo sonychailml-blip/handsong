@@ -2,7 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxChainOf, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
+         fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -605,15 +605,44 @@ const fxCtlSep=$('fxCtlSep'), fxCtlRows=$('fxCtlRows');
    непустая сегодня ровно одна — соло. */
 let fxCtlRole='ld';
 const FX_ROLE_SEQ=['ld','ch','bs','dr'];   // порядок ролей в выпадающем списке — тот же, что у INSTR_SEQ (кнопка роли)
+/* КАКОЙ ЭФФЕКТ РАЗВЁРНУТ — тоже состояние МЕНЮ (аккордеон, Пласт 3.4.3), рядом с fxCtlRole и по тем же
+   доводам: gestures/draw о нём знать не должны.
+   ⚠️ ХРАНИМ fxId, А НЕ ИНДЕКС. Индекс поехал бы при каждом «убрать»: удалил первый эффект — развёрнутым
+   вдруг оказался следующий. Это ровно правило #25 в миниатюре (стабильный ключ вместо позиции).
+   ДЕФОЛТ — НИЧЕГО НЕ РАЗВЁРНУТО: ради этого аккордеон и делался. Секция в покое = строка роли + по
+   строке на эффект + строка добавления; ничего при этом не спрятано, потому что каждый заголовок несёт
+   СВОДКУ АДРЕСОВ своих параметров. Разворачивают, чтобы ПРАВИТЬ, а не чтобы УВИДЕТЬ. */
+let fxOpenId=null;
+/* ОДИН РАЗВЁРНУТ ЗА РАЗ: правят один эффект, а не четыре сразу; на телефоне это разница между шестью
+   строками и двадцатью. Клик по уже развёрнутому — сворачивает (второго способа закрыть нет). */
+const fxToggleOpen=id=>{ fxOpenId = (fxOpenId===id) ? null : id; renderFxCtl(); };
+/* Римские I–IV для СВОДКИ: приложение обозначает палец римской цифрой везде (октавная полоса, легенда
+   прямоугольников, ярлык регистра), поэтому в сводке они читаются без обучения и без перевода.
+   ⚠️ Это НЕ OCT_ROMAN из scales: тот считает РЕГИСТРЫ (его длина — REG_N), а здесь пальцы. Совпадение
+   длин случайно, связывать их значило бы связать две несвязанные величины. */
+const FX_FING_ROMAN=['I','II','III','IV'];
+/* Ось в сводке — СТРЕЛКОЙ, а не словом: «Вертикаль» × три параметра не влезет в строку ни на одном
+   телефоне, а стрелка международна (то же правило, что у токенов DLY/VIB на холсте — bare string). */
+const FX_AXIS_GLYPH={y:'↕', x:'↔', z:'◆'};
+/* СВОДКА АДРЕСОВ эффекта — то, ради чего свёрнутый заголовок остаётся честным: видно, ЧЕМ он ведётся,
+   не разворачивая. Инверсию намеренно НЕ показываем: сводка отвечает «где», а не «в какую сторону», и
+   плюс-минус на каждый токен превратил бы её в шум. */
+function fxAddrSummary(eff){
+  return eff.params.map(pa=>{
+    if(pa.mode==='fixed') return t('fx.sum.fixed');
+    if(pa.hand==='play')  return t('fx.sum.play');
+    return (FX_FING_ROMAN[pa.finger|0]||'?')+(FX_AXIS_GLYPH[pa.axis]||'');
+  }).join(' · ');
+}
 /* Подсказка секции — абзац .phint, как у эталона A4 и «Пальцев в руке». Пересобирается вместе со
    строками (textContent='' выше), поэтому отдельного скрытия/показа не требуется. */
 function fxHint(key){ const p=document.createElement('p'); p.className='phint'; p.textContent=t(key); return p; }
 /* Имя эффекта для ЗАГОЛОВКА группы строк: у старых скалярных — из FX_META, у модулей — из реестра.
    Реестр читаем НА КАЖДУЮ ОТРИСОВКУ, а не один раз: до initAudio он пуст (узлов ещё нет), а панель
    может быть перерисована и до старта (см. довод в showScale).
-   ⚠️ ВЫБОРА ЭФФЕКТА (список «нет / делей / …») в 3.4.2 НЕТ: строка стала параметром, а состав цепи
-   правится операциями «добавить/убрать эффект» — это Пласт 3.4.3. До него цепь соло фиксирована своим
-   дефолтом; адреса параметров при этом правятся полностью. */
+   ⚠️ ПРЕЖНЕГО «списка эффекта на строке пальца» больше нет (снят в 3.4.2, когда строка стала
+   ПАРАМЕТРОМ). Состав цепи правится иначе — «+ Добавить эффект» в подвале секции и ✕ в заголовке
+   (Пласт 3.4.3); имя эффекта здесь — только подпись заголовка. */
 function fxTitleOf(fxId){
   const m=FX_META.find(q=>q.k===fxId); if(m) return t(m.fullKey);
   const mod=FX_MODULES[fxId]; return mod ? t(mod.labelKey) : fxId;
@@ -655,12 +684,30 @@ function renderFxCtl(){
      фиксированные значения продолжают действовать, и менять их надо уметь. */
   if(!roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));
   chain.forEach((eff,effIdx)=>{
-    /* ЗАГОЛОВОК ЭФФЕКТА — подпись, а не выпадающий список: строка теперь принадлежит ПАРАМЕТРУ, а
-       состав цепи правится «добавить/убрать» (Пласт 3.4.3). Класс тот же, что у заголовка роли в
-       «Функциях рук», — одинаковая по смыслу вещь выглядит одинаково. */
-    const hd=document.createElement('div'); hd.className='handFnRole'; hd.textContent=fxTitleOf(eff.fxId);
+    /* ЗАГОЛОВОК ЭФФЕКТА — строка аккордеона: [▸/▾][имя][сводка адресов][✕].
+       Свёрнутый заголовок обязан быть САМОДОСТАТОЧНЫМ (см. fxAddrSummary): иначе аккордеон не «убирает
+       лишнее», а ПРЯЧЕТ нужное, и человек разворачивает всё подряд, лишь бы узнать, что где. */
+    const open = fxOpenId===eff.fxId;
+    const hd=document.createElement('div'); hd.className='fxhead'+(open?' open':'');
+    hd.setAttribute('role','button'); hd.tabIndex=0;
+    const arw=document.createElement('span'); arw.className='fxarw'; arw.textContent=open?'▾':'▸';
+    const nm=document.createElement('span'); nm.className='fxname'; nm.textContent=fxTitleOf(eff.fxId);
+    const sm=document.createElement('span'); sm.className='fxsum'; sm.textContent=fxAddrSummary(eff);
+    /* ✕ — СВОЯ кнопка внутри заголовка, поэтому её клик обязан НЕ разворачивать эффект (stopPropagation).
+       Убирание — не «опасное» действие без возврата: эффект возвращается тем же «+ Добавить», а
+       старый скалярный при этом стартует С НУЛЯ (его гасит fxChainRemove → hushUnassignedFx). */
+    const del=document.createElement('button'); del.type='button'; del.className='fxdel'; del.textContent='✕';
+    del.title=t('fx.remove'); del.setAttribute('aria-label',t('fx.remove'));
+    del.onclick=e=>{ e.stopPropagation();
+      if(fxOpenId===eff.fxId) fxOpenId=null;         // разворачивать после удаления нечего
+      fxChainRemove(fxCtlRole,effIdx); renderFxCtl(); };
+    hd.appendChild(arw); hd.appendChild(nm); hd.appendChild(sm); hd.appendChild(del);
+    hd.onclick=()=>fxToggleOpen(eff.fxId);
+    hd.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fxToggleOpen(eff.fxId); } };   // заголовок кликабельный, а не <button> (внутри своя кнопка ✕) — клавиатуру доигрываем руками
     fxCtlRows.appendChild(hd);
-    /* СТРОКА НА ПАРАМЕТР: [подпись][адрес][инверсия ИЛИ значение].
+    if(!open) return;   // СВЁРНУТ — строк параметров не строим вовсе (не прячем стилем: меньше DOM, и «одна строка на эффект» становится буквальной)
+    /* СТРОКА НА ПАРАМЕТР: [подпись][адрес][инверсия ИЛИ значение]. РАЗВЁРНУТЫЙ ВИД — БЕЗ ИЗМЕНЕНИЙ с
+       3.4.2: аккордеон решает, ПОКАЗЫВАТЬ ли эти строки, и ничего не меняет в них самих.
        ⚠️ КОНФЛИКТ АДРЕСОВ РАЗРЕШЁН НАМЕРЕННО: подписал два параметра на один адрес — оба поедут вместе,
        и теперь это возможно даже у РАЗНЫХ эффектов. Это естественный результат жеста, а не ошибка;
        проверок и предупреждений не городим (показать, ЧТО едет вместе, — задача 3.4.4). */
@@ -749,6 +796,44 @@ function renderFxCtl(){
       fxCtlRows.appendChild(sub);
     });
   });
+  /* «+ ДОБАВИТЬ ЭФФЕКТ» — подвал секции (Пласт 3.4.3). ⚠️ Он ЗАКРЫВАЕТ ДЫРУ, а не добавляет удобство:
+     3.4.2 снял выбор эффекта на строке пальца (строка стала параметром), и до этой операции состав цепи
+     был неправим вовсе — тремоло, не назначенное по умолчанию, оказалось недостижимым.
+     ОДИН СЕЛЕКТ, А НЕ КНОПКА+ДИАЛОГ: первый пункт — приглашение, остальные — доступные эффекты; выбор
+     СРАЗУ добавляет. Список строим из FX_META + FX_MODULES и ВЫЧИТАЕМ уже стоящие в цепи — инвариант
+     «одна запись на fxId» человек тогда не может нарушить даже случайно (сеттер его тоже проверяет —
+     два рубежа, потому что цена нарушения молчаливая: два дескриптора на один store).
+     ⚠️ Реестр модулей читаем ЗДЕСЬ ЖЕ, на каждую отрисовку: до initAudio он пуст (см. довод в showScale).
+     ВСЁ ЗАНЯТО — не прячем строку, а ГАСИМ С ПРИЧИНОЙ: исчезнувший контрол человек объяснить не может
+     (то же правило, что у «Раскладки нот»). */
+  {
+    const avail=[];
+    for(const m of FX_META) if(!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);
+    for(const id in FX_MODULES) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_MODULES[id].labelKey), FX_MODULES[id].params.length]);
+    const row=document.createElement('div'); row.className='prow';
+    const sel=document.createElement('select'); sel.autocomplete='off';
+    const head=document.createElement('option'); head.value='';
+    head.textContent = avail.length ? t('fx.add') : t('fx.addAll');
+    sel.appendChild(head);
+    for(const [id,label] of avail){ const o=document.createElement('option'); o.value=id; o.textContent=label; sel.appendChild(o); }
+    sel.value=''; sel.disabled=!avail.length;
+    sel.onchange=e=>{
+      const id=e.target.value; if(!id) return;
+      const n=(avail.find(a=>a[0]===id)||[,,1])[2];        // сколько параметров — знает сам модуль; у старых скалярных ровно один
+      const idx=fxChainAdd(fxCtlRole,id,n);
+      if(idx>=0){
+        /* ЗАСЕВ ФИКСИРОВАННЫХ ЖИВЫМ ЗНАЧЕНИЕМ — обязанность ui (state до audio не дотянется, обратный
+           импорт был бы циклом; об этом и просит комментарий у fxChainAdd). Без него параметр, вставший
+           фиксированным из-за нехватки пальцев, ПОКАЗЫВАЛ бы 0 при живом узле на другом значении —
+           меню бы врало. Для старого скалярного это тот же ноль (его погасило удаление) — сходится. */
+        const ps=fxParamsOf(id), eff=fxChainOf(fxCtlRole)[idx];
+        eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlRole,idx,pi,ps[pi].get()); });
+        fxOpenId=id;   // разворачиваем добавленное: у него может не быть пальца (все заняты), и это надо увидеть сразу, а не искать
+      }
+      renderFxCtl();
+    };
+    row.appendChild(sel); fxCtlRows.appendChild(row);
+  }
 }
 /* ПЕРВИЧНАЯ ОТРИСОВКА — та же причина и тот же приём, что у renderRectCtl/renderPinchCtl выше: пока
    вызов жил в renderHandFn, секция собиралась на инициализации ui заодно с «Функциями рук»; сняв

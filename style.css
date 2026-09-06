@@ -323,7 +323,24 @@
   #aRefRow #aRefInput{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
     border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl);}
   #aRefRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:#5a6079;}
-  /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: подстрока параметра (режим + ось/инверсия ИЛИ число со ступеньками) ═══
+  /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: заголовок эффекта = строка аккордеона (Пласт 3.4.3) ═══
+     [▸/▾][имя][сводка адресов][✕] — одна строка на эффект, пока он свёрнут.
+     ⚠️ НЕСУЩЕЕ ЗДЕСЬ — .fxsum: она одна тянется (flex:1) и одна же обрезается многоточием. Без
+     min-width:0 flex-элемент не сжимается МЕНЬШЕ СВОЕГО СОДЕРЖИМОГО, сводка распёрла бы строку, и на
+     380px ✕ уехал бы за край — то есть кнопка «убрать» стала бы недоступна ровно на том экране, ради
+     которого аккордеон и делался. Имя и ✕ не сжимаются (flex:0 0 auto) — они обязаны быть целыми. */
+  .fxhead{display:flex; align-items:center; gap:8px; cursor:pointer;
+    margin:10px 2px 2px; padding:4px 2px; border-radius:var(--r-sm);}
+  .fxhead:hover{background:rgba(20,24,50,.04);}
+  .fxhead .fxarw{flex:0 0 auto; font-size:10px; color:#8a90a8;}
+  .fxhead .fxname{flex:0 0 auto; font-size:var(--fs-label); color:#3a4060; font-weight:600; letter-spacing:.02em;}
+  .fxhead .fxsum{flex:1; min-width:0; font-size:var(--fs-hint); color:#6a7089;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;}
+  .fxhead.open .fxsum{opacity:.5;}   /* развёрнут — адреса видны в самих строках, сводка становится фоном */
+  .fxhead .fxdel{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:2px 6px;
+    color:#8a90a8; font-size:var(--fs-ctl); line-height:1; border-radius:var(--r-sm);}
+  .fxhead .fxdel:hover{color:#d9534f; background:rgba(217,83,79,.10);}
+  /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: подстрока параметра (адрес + инверсия ИЛИ число со ступеньками) ═══
      ⚠️ ГЛАВНОЕ ПРАВИЛО ЭТОГО БЛОКА — .fxmode, и оно несущее, а не косметика. Глобально у нас
      `select{width:100%}` (строка ~292). Пока селект внутри .prow получает `flex:1` (basis 0), ширина
      игнорируется — всё хорошо. Но стоит дать селекту `flex:0 0 auto`, как basis становится `auto`,
