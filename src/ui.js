@@ -724,6 +724,18 @@ function renderFxCtl(){
   /* Цепь ЕСТЬ, но крутить её пальцем сейчас нечем — говорим об этом прямо, а не прячем секцию:
      фиксированные значения продолжают действовать, и менять их надо уметь. */
   if(!roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));
+  /* ЗАСЕВ ФИКСИРОВАННЫХ ЗНАЧЕНИЙ, ЕЩЁ НЕ ЗАПОЛНЕННЫХ (v01 не задан). Тот же приём, что при добавлении
+     эффекта (3.4.3), распространённый на цепи ПО УМОЛЧАНИЮ: цепь аккордов объявлена в state без
+     чисел, потому что нормировка (лог-шкалы, min/max) живёт исключительно в audio и второго её
+     представления быть не должно. Живое значение спрашиваем у экземпляра — он и есть источник правды.
+     ⚠️ ДО initAudio дескрипторов нет: ps[pi] пуст, засев просто не случится, и параметр останется
+     незаполненным до следующей отрисовки. Это безвредно — панель открывается только после старта. */
+  chain.forEach((eff,ei)=>{
+    const ps=fxParamsOf(fxCtlRole,eff.fxId);
+    eff.params.forEach((pa,pi)=>{
+      if(pa.mode==='fixed' && pa.v01==null && ps[pi]) setFxParamFixed(fxCtlRole,ei,pi,ps[pi].get());
+    });
+  });
   const share=fxShareMap(chain);   // выводим ОДИН раз на отрисовку: карту читают и заголовки, и строки параметров
   chain.forEach((eff,effIdx)=>{
     /* ЗАГОЛОВОК ЭФФЕКТА — строка аккордеона: [▸/▾][имя][сводка адресов][✕].
@@ -868,7 +880,13 @@ function renderFxCtl(){
      (то же правило, что у «Раскладки нот»). */
   {
     const avail=[];
-    for(const m of FX_META) if(!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);
+    /* ⚠️ СТАРЫЕ СКАЛЯРНЫЕ (FX_META) — ТОЛЬКО СОЛО, и это не осторожность, а устройство: их величины
+       живут в ОДНОМ глобальном state.fx и едут в СОЛО-событие ноты, а сами они вкручены в соло-путь
+       четырьмя разными способами (драйв в голосе до огибающей, вибрато в detune, тремоло вставкой,
+       делей посылом). Перенести их на чужую шину — это и своя проводка, и свой store, и вопрос
+       формата события; всё это Пласт 3.7, не 3.5. Жест-слой их и так не отдаст чужой роли
+       (fxParamsOf возвращает [] вне соло) — здесь мы просто не предлагаем того, что не заработает. */
+    if(fxCtlRole==='ld') for(const m of FX_META) if(!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);
     for(const id in FX_FACTORY) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_FACTORY[id].labelKey), FX_FACTORY[id].params.length]);
     const row=document.createElement('div'); row.className='prow';
     const sel=document.createElement('select'); sel.autocomplete='off';
