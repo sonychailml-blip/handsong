@@ -6,7 +6,7 @@ import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
-import { chordHold, DRUM_ROWS, applyExpr, FX_MODULES } from './audio.js';
+import { chordHold, DRUM_ROWS, applyExpr, fxInstance } from './audio.js';
 import { canvas } from './vision.js';
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
@@ -333,10 +333,17 @@ function endPinch(key,S){
    ⚠️ ЖИВЬЁМ, В ЗАПИСЬ НЕ ИДЁТ. Длина и окраска реверба — свойство КОМНАТЫ, а не ноты, и в событие не
    пишутся (тот же закон, что у Гц терменвокса, правило #11). Переигранный слой звучит в ТЕКУЩЕЙ
    комнате — это осознанно; расширение формата события — Пласт 3. */
-const fxParamsOf=fxId=>{
-  if(FX_META.some(m=>m.k===fxId)) return [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }];
-  const mod=FX_MODULES[fxId];
-  return mod ? mod.params.map(p=>({ get:()=>p.getNorm(), set:v=>p.setNorm(v) })) : [];   // пустой слот («нет эффекта») → [] → цикл записи не сделает ни одного шага
+/* ⚠️ РОЛЬ — ПЕРВЫМ АРГУМЕНТОМ (Пласт 3.5.1). Прежде параметры искались по одному fxId, и это молча
+   означало «экземпляр один на всё приложение»: две роли с одним эффектом писали бы одни узлы. Теперь
+   дескрипторы берутся у экземпляра ИМЕННО ЭТОЙ роли (fxInstance).
+   ⚠️ СТАРЫЕ СКАЛЯРНЫЕ (dly/vib/drv/trm) — ТОЛЬКО У СОЛО, и пустой список для прочих ролей здесь не
+   перестраховка, а ЗАЩЁЛКА: их величины живут в ОДНОМ глобальном state.fx и едут в соло-событие ноты
+   (см. WleadOn), поэтому «делей у аккордов» без своего store и своей проводки писал бы соло-делей.
+   Портирование старых эффектов на прочие шины — не 3.5, а вопрос формата события (3.7). */
+const fxParamsOf=(role,fxId)=>{
+  if(FX_META.some(m=>m.k===fxId)) return role==='ld' ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }] : [];
+  const inst=fxInstance(role,fxId);
+  return inst ? inst.params.map(p=>({ get:()=>p.getNorm(), set:v=>p.setNorm(v) })) : [];   // нет эффекта (или ещё нет AudioContext) → [] → цикл записи не сделает ни одного шага
 };
 /* ЗАХВАТ ПО ПАЛЬЦУ (Пласт 3.4.2): морозим точку отсчёта по ТРЁМ осям и стартовые значения ВСЕХ
    параметров, ПОДПИСАННЫХ НА ЭТОТ ПАЛЕЦ, — по ВСЕЙ цепи, у скольких бы эффектов они ни лежали.
@@ -358,10 +365,15 @@ const fxParamsOf=fxId=>{
    ⚠️ ПУСТОЙ СПИСОК = НЕТ ЗАХВАТА (S.adj=null): на этом пальце не подписано ничего. Так же, как раньше
    вёл себя пустой слот, — и так же гаснет подсветка столбиков в draw. */
 function captureFx(S,finger,lm,H){
-  const chain=fxChainOf('ld');   // 'ld' — не хардкод, а ЗАПИСЬ факта: сюда приходят только из зоны 'fx', а она бывает лишь у соло (см. гейты zone). В 3.5 здесь встанет переменная роли
+  /* РОЛЬ ЗАХВАТА — ОДНО ИМЯ НА ДВА ЧТЕНИЯ (цепь и дескрипторы параметров): прежде литерал 'ld' стоял
+     в каждом из них порознь. Значение то же и по той же причине — сюда приходят только из зоны 'fx',
+     а она бывает лишь у соло (см. гейты zone). Разъехаться двум литералам больше нечем, и когда у
+     прочих ролей появится fx-рука, менять придётся одну строку. */
+  const role='ld';
+  const chain=fxChainOf(role);
   const ent=[];
   chain.forEach((eff,effIdx)=>{
-    const ps=fxParamsOf(eff.fxId);
+    const ps=fxParamsOf(role,eff.fxId);
     eff.params.forEach((pa,pIdx)=>{
       if(pa.mode!=='drive' || pa.hand!=='fx' || pa.finger!==finger) return;
       const p=ps[pIdx]; if(!p) return;                       // параметр, которого у эффекта нет (реестр пуст до initAudio) — молча мимо
@@ -861,12 +873,13 @@ function processHands(res){
          цепи и отбирал параметры ПО АДРЕСУ (hand==='play'), а не по слоту-пальцу. Пальцевая ветка
          только теперь пришла к той же форме. Пальца здесь нет по существу: у играющей руки адрес один
          — ГЛУБИНА. */
-      for(const eff of fxChainOf('ld')){   // 'ld' — запись факта: блок под гейтом soloNoteHand, то есть роль-половина этой руки заведомо соло. В 3.5 — переменная роли
+      const role='ld';   // одно имя на оба чтения (цепь + дескрипторы), как в captureFx: блок под гейтом soloNoteHand, то есть роль-половина этой руки заведомо соло
+      for(const eff of fxChainOf(role)){
         if(!eff) continue;
         let ps=null;                                   // дескрипторы эффекта берём ЛЕНИВО: у большинства записей play-параметров нет вовсе
         eff.params.forEach((pa,i)=>{
           if(pa.mode!=='drive' || pa.hand!=='play') return;
-          if(!ps) ps=fxParamsOf(eff.fxId);
+          if(!ps) ps=fxParamsOf(role,eff.fxId);
           const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD);
         });
       }

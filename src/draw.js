@@ -5,7 +5,7 @@ import { t, L } from './i18n.js';
 import { fx, fxChainOf, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
-import { DRUM_NAMES, chordHold, leadHold, FX_MODULES } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
+import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel } from './recorder.js';
  
@@ -21,7 +21,17 @@ const fxBandR=n=> n>0 ? FX_X0+(n-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W : 0;   // п�
    Слот с МОДУЛЕМ (реверб) в покое даёт ОДИН столбик (первый параметр), а пока его палец ЗАЖАТ —
    РАЗВОРАЧИВАЕТСЯ по столбику на параметр (TAIL/TONE): три ручки видно тогда, когда их крутят.
    Пустой слот («нет эффекта») не даёт столбика вовсе. */
-const fxModOf=sl=> FX_MODULES[sl.fxId];
+/* ДВА РАЗНЫХ ВОПРОСА К РЕЕСТРУ — и после раздвоения реестра (Пласт 3.5.1) их нельзя задавать одному
+   и тому же объекту, потому что ответы нужны из разных мест:
+     fxSpecOf — СКОЛЬКО у эффекта параметров. Это СТАТИКА, и берётся из ФАБРИКИ: счёт нужен для
+       ОТСТУПА под легенду, который обязан быть устойчив. Спроси мы экземпляр — отступ зависел бы от
+       того, построен ли он уже, и легенда прыгала бы при первом обращении к эффекту.
+     fxInstOf — ЖИВЫЕ ВЕЛИЧИНЫ (getNorm) и короткие подписи столбиков. Их знает только ЭКЗЕМПЛЯР:
+       у фабрики значений нет и быть не может, она описывает вид, а не звучащий узел.
+   ⚠️ 'ld' — запись факта: столбики рисуются под гейтом roleHasFx('ld'), а fx бывает только у соло.
+   Экземпляр соло строится в initAudio ЯВНО, поэтому к первому кадру он уже есть. */
+const fxSpecOf=eff=> FX_FACTORY[eff.fxId];
+const fxInstOf=eff=> fxInstance('ld',eff.fxId);
 /* ПАЛЕЦ, зажатый сейчас у руки-эффектов (Пласт 3.4.2; прежде — «активный слот», но слот перестал
    существовать: палец переехал в адрес параметра). Щипок fx-руки один, поэтому активный палец не
    больше одного за раз. */
@@ -37,7 +47,7 @@ const fxBarItems=()=>{
   fxChainOf('ld').forEach(eff=>{   // 'ld' — запись факта: столбики рисуются под гейтом roleHasFx('ld'), а fx бывает только у соло. В 3.5 — переменная роли
     const m=FX_META.find(q=>q.k===eff.fxId);
     if(m){ out.push({v:fx[eff.fxId], c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр)
-    const mod=fxModOf(eff); if(!mod) return;                                   // пустая/неизвестная запись — молча без столбика
+    const mod=fxInstOf(eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре
     /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
        связан со своим параметром в цепи (eff.params), где и лежит адрес управления.
        РАЗВОРОТ (Пласт 3.4.2): разворачивается эффект, У КОТОРОГО ХОТЬ ОДИН параметр сидит на зажатом
@@ -58,7 +68,7 @@ const fxBarItems=()=>{
    сейчас: иначе разворот активного слота ДВИГАЛ БЫ ЛЕГЕНДУ под рукой при каждом щипке. */
 const fxBarsMaxN=()=> fxChainOf('ld').reduce((n,sl)=>{
   if(FX_META.some(q=>q.k===sl.fxId)) return n+1;
-  const mod=fxModOf(sl); return n+(mod?mod.params.length:0);
+  const mod=fxSpecOf(sl); return n+(mod?mod.params.length:0);   // ФАБРИКА, не экземпляр: отступ не должен зависеть от того, построен ли эффект (см. довод у fxSpecOf)
 },0);
 /* ⚠️ fxN ЧИТАЕТ ЦЕПЬ СОЛО ВСЕГДА — включая случай, когда bandR зовут с 'ch'/'bs'. Это НАМЕРЕННОЕ
    МЕЖРОЛЕВОЕ чтение, и оно ОТЛИЧАЕТСЯ ПО РОДУ от прочих литералов 'ld' в этом файле (там 'ld' —

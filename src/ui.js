@@ -10,7 +10,7 @@ import { fxParamsOf } from './gestures.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_MODULES } from './audio.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
@@ -164,11 +164,12 @@ function showScale(on){ panelScaleEl.classList.toggle('on',on); if(on)showLoop(f
   /* ПЕРЕСБОРКА ДИНАМИЧЕСКИХ СЕКЦИЙ ИЗ ДАННЫХ ПРИ ОТКРЫТИИ — ровно та же причина, что у showLoop с
      refreshMetreCtl выше: панель могла простоять закрытой, пока состояние ушло вперёд. Здесь это не
      мелочь, а ДВЕ дыры разом:
-     (1) список эффектов конструктора строится из FX_MODULES, а тот заполняется В initAudio (по клику ▶);
-         строки же собираются на инициализации ui — РАНЬШЕ. Без пересборки в выпадающих списках НЕТ
-         реверба, хотя он стоит на указательном ПО УМОЛЧАНИЮ и звучит: sel.value='reverb' не находит
-         опции, selectedIndex становится −1, и меню показывает ПУСТОТУ вместо назначенного эффекта.
-         Хуже того — выбор любого другого пункта молча снял бы реверб без пути назад.
+     (1) ⚠️ ЭТА ПРИЧИНА СНЯТА В ПЛАСТЕ 3.5.1, и запись оставлена, чтобы её не «починили» обратно.
+         Список эффектов строился из реестра ЖИВЫХ модулей, а тот заполнялся только В initAudio (по
+         клику ▶), — поэтому на чистой сессии реверба в списке НЕ БЫЛО, хотя он стоит на указательном
+         по умолчанию и звучит (sel.value='reverb' не находил опции, selectedIndex уходил в −1).
+         Теперь меню перечисляет эффекты по ФАБРИКЕ (FX_FACTORY), которая существует с загрузки
+         модуля и экземпляра не требует, — дыра закрыта В ИСТОЧНИКЕ, а не пересборкой.
      (2) браузер восстанавливает значения форм ПОСЛЕ отрисовки (перезагрузка/возврат в сессию), а
          переутвердить данные было некому — меню начинало врать про раскладку (звук при этом верен).
      ⚠️ ЗОВЁМ ОБЕ СЕКЦИИ ЯВНО (Пласт 3.4.1). Прежде здесь стоял один renderHandFn, который сам дёргал
@@ -684,7 +685,7 @@ function fxHint(key){ const p=document.createElement('p'); p.className='phint'; 
    (Пласт 3.4.3); имя эффекта здесь — только подпись заголовка. */
 function fxTitleOf(fxId){
   const m=FX_META.find(q=>q.k===fxId); if(m) return t(m.fullKey);
-  const mod=FX_MODULES[fxId]; return mod ? t(mod.labelKey) : fxId;
+  const mod=FX_FACTORY[fxId]; return mod ? t(mod.labelKey) : fxId;
 }
 /* Подписи ПАРАМЕТРОВ. У СТАРЫХ скалярных параметр ОДИН и он же и есть сам эффект — подписываем
    нейтрально («Величина»): имя эффекта уже стоит заголовком выше, повторять его — шум.
@@ -694,7 +695,7 @@ function fxTitleOf(fxId){
    подписи в жест-слой значило бы тащить туда i18n. */
 function fxParamKeys(fxId){
   if(FX_META.some(m=>m.k===fxId)) return ['fx.param.amt'];
-  const mod=FX_MODULES[fxId];
+  const mod=FX_FACTORY[fxId];
   return mod ? mod.params.map(p=>p.labelKey) : [];
 }
 function renderFxCtl(){
@@ -716,8 +717,9 @@ function renderFxCtl(){
   /* РОЛЬ БЕЗ ЦЕПИ — объясняем и УХОДИМ. ⛔ Никакого «добавить эффект» здесь быть не должно: обработка
      сегодня физически висит только на соло-шине (открытие Пласта 1), аккорды/бас/ударные идут в мастер
      МИМО эффектов. Дать собрать цепь, которая не может зазвучать, — хуже, чем честно сказать «пока нет».
-     Заодно это защищает нерешённый вопрос ОДНОГО экземпляра в реестре FX_MODULES: две роли, назвавшие
-     один эффект, сегодня получили бы один и тот же узел. */
+     ⚠️ Прежде здесь стояла ВТОРАЯ причина — «защищает нерешённый вопрос одного экземпляра на реестр».
+     Она ОТПАЛА в Пласте 3.5.1: экземпляры теперь по одному на роль (fxInstance). Единственной
+     причиной осталась первая — цепи без обработки звучать нечем. */
   if(!chain.length){ fxCtlRows.appendChild(fxHint('fx.chain.none')); return; }
   /* Цепь ЕСТЬ, но крутить её пальцем сейчас нечем — говорим об этом прямо, а не прячем секцию:
      фиксированные значения продолжают действовать, и менять их надо уметь. */
@@ -770,7 +772,7 @@ function renderFxCtl(){
       /* АДРЕС — ОДИН список вместо прежней пары «режим + ось» (см. довод у buildAddrSel). */
       const ad=buildAddrSel(pa);
       ad.onchange=e=>{
-        const val=e.target.value, ps=fxParamsOf(eff.fxId), p=ps[pi];
+        const val=e.target.value, ps=fxParamsOf(fxCtlRole,eff.fxId), p=ps[pi];
         if(val==='fixed'){
           /* ⚠️ ЗАСЕВ ПРИ ПЕРЕХОДЕ В «ФИКСИРОВАНО» — обязателен (об этом просил комментарий в state 2.6.1):
              берём ТЕКУЩЕЕ ЖИВОЕ значение параметра и делаем его фиксированным. Без засева ручка прыгнула бы
@@ -823,7 +825,7 @@ function renderFxCtl(){
         const put=pct=>{
           const p100=Math.max(0,Math.min(100,Math.round(pct)));
           setFxParamFixed(fxCtlRole,effIdx,pi,p100/100);
-          const p=fxParamsOf(eff.fxId)[pi]; if(p) p.set(p100/100);
+          const p=fxParamsOf(fxCtlRole,eff.fxId)[pi]; if(p) p.set(p100/100);
           if(num.value!==String(p100)) num.value=String(p100);   // не переписываем без нужды — иначе прыгает каретка при наборе
         };
         dec.onclick=()=>put(cur()-1);
@@ -858,7 +860,7 @@ function renderFxCtl(){
      3.4.2 снял выбор эффекта на строке пальца (строка стала параметром), и до этой операции состав цепи
      был неправим вовсе — тремоло, не назначенное по умолчанию, оказалось недостижимым.
      ОДИН СЕЛЕКТ, А НЕ КНОПКА+ДИАЛОГ: первый пункт — приглашение, остальные — доступные эффекты; выбор
-     СРАЗУ добавляет. Список строим из FX_META + FX_MODULES и ВЫЧИТАЕМ уже стоящие в цепи — инвариант
+     СРАЗУ добавляет. Список строим из FX_META + FX_FACTORY и ВЫЧИТАЕМ уже стоящие в цепи — инвариант
      «одна запись на fxId» человек тогда не может нарушить даже случайно (сеттер его тоже проверяет —
      два рубежа, потому что цена нарушения молчаливая: два дескриптора на один store).
      ⚠️ Реестр модулей читаем ЗДЕСЬ ЖЕ, на каждую отрисовку: до initAudio он пуст (см. довод в showScale).
@@ -867,7 +869,7 @@ function renderFxCtl(){
   {
     const avail=[];
     for(const m of FX_META) if(!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);
-    for(const id in FX_MODULES) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_MODULES[id].labelKey), FX_MODULES[id].params.length]);
+    for(const id in FX_FACTORY) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_FACTORY[id].labelKey), FX_FACTORY[id].params.length]);
     const row=document.createElement('div'); row.className='prow';
     const sel=document.createElement('select'); sel.autocomplete='off';
     const head=document.createElement('option'); head.value='';
@@ -884,7 +886,7 @@ function renderFxCtl(){
            импорт был бы циклом; об этом и просит комментарий у fxChainAdd). Без него параметр, вставший
            фиксированным из-за нехватки пальцев, ПОКАЗЫВАЛ бы 0 при живом узле на другом значении —
            меню бы врало. Для старого скалярного это тот же ноль (его погасило удаление) — сходится. */
-        const ps=fxParamsOf(id), eff=fxChainOf(fxCtlRole)[idx];
+        const ps=fxParamsOf(fxCtlRole,id), eff=fxChainOf(fxCtlRole)[idx];
         eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlRole,idx,pi,ps[pi].get()); });
         fxOpenId=id;   // разворачиваем добавленное: у него может не быть пальца (все заняты), и это надо увидеть сразу, а не искать
       }
