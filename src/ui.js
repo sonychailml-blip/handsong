@@ -2,7 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxLayout, setFxSlotId, setFxParamAxis, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
+         fxChainOf, setFxSlotId, setFxParamAxis, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -521,7 +521,8 @@ function renderHandFn(){
   renderFxCtl();   // конструктор эффектов зависит от того же (есть ли рука на 'fx') — перерисовываем вместе; так же ловим смену языка и роли (обе зовут renderHandFn)
 }
 /* ================= КОНСТРУКТОР ЭФФЕКТОВ (Пласт 2, слайс 2.3) =================
-   КТО НА КАКОМ ПАЛЬЦЕ у руки-эффектов. Раскладка живёт в state.fxLayout и пишется ТОЛЬКО отсюда
+   КТО НА КАКОМ ПАЛЬЦЕ у руки-эффектов. Цепь роли СОЛО живёт в state.fxChains.ld (Пласт 3.3; прежде
+   fxLayout — «раскладка fx-руки», см. смену владельца там же) и пишется ТОЛЬКО отсюда
    (правило #5 с обратной стороны: DOM — дело ui, жест-слой раскладку лишь ЧИТАЕТ).
    Слот = палец: 0 указательный … 3 мизинец (порядок FINGER_TIPS).
    Секция видна ровно тогда, когда какая-то рука соло назначена на 'fx' — тем же гейтом (roleHasFx),
@@ -566,7 +567,10 @@ function renderFxCtl(){
   fxCtlRows.textContent='';
   if(!on) return;
   const opts=fxOptions();
-  fxLayout.forEach((sl,slot)=>{
+  /* 'ld' — запись факта: секция целиком под гейтом roleHasFx('ld') (строкой выше), а 'fx' бывает
+     только у соло. ВЫБОРА РОЛИ здесь ещё нет — он и есть Пласт 3.4, там же вместо литерала встанет
+     выбранная роль (и сеттеры получат её ПЕРВЫМ аргументом). */
+  fxChainOf('ld').forEach((sl,slot)=>{
     const row=document.createElement('div'); row.className='prow';
     const lab=document.createElement('label'); lab.textContent=t(FINGER_KEYS[slot]);
     const sel=document.createElement('select'); sel.autocomplete='off';   // не даём браузеру восстановить прежнее значение ПОВЕРХ данных при перезагрузке
@@ -630,7 +634,7 @@ function renderFxCtl(){
         /* ЕДИНСТВЕННАЯ точка записи: кламп → в данные → в звук ТЕМ ЖЕ путём, что у пальца → в поле.
            ⚠️ ПЕРЕРИСОВКИ ЗДЕСЬ НЕТ — намеренно (как и у прежнего ползунка): renderFxCtl уничтожил бы
            поле под пальцем/курсором прямо во время ввода. Данные остаются источником правды: следующая
-           перерисовка возьмёт v01 из fxLayout. НЕ «чинить» это обратно на перерисовку. */
+           перерисовка возьмёт v01 из цепи роли. НЕ «чинить» это обратно на перерисовку. */
         const put=pct=>{
           const p100=Math.max(0,Math.min(100,Math.round(pct)));
           setFxParamFixed(slot,pi,p100/100);
@@ -656,7 +660,7 @@ function renderFxCtl(){
         const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
         invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
         const apply=()=>{ const [hnd,axs]=ax.value.split(':');                                 // адрес разбираем ЗДЕСЬ — в данные уезжают отдельные поля hand и axis, строка «рука:ось» живёт только в меню
-          setFxParamAxis(slot, pi, axs, inv.checked, hnd); renderFxCtl(); };                    // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает fxLayout, а не собственный DOM
+          setFxParamAxis(slot, pi, axs, inv.checked, hnd); renderFxCtl(); };                    // пишем В ДАННЫЕ и перерисовываем ИЗ них — меню отражает цепь роли, а не собственный DOM
         ax.onchange=apply; inv.onchange=apply;
         sub.appendChild(ax); sub.appendChild(invWrap);
       }

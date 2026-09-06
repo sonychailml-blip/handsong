@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxLayout, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxChainOf, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -310,8 +310,9 @@ function endPinch(key,S){
 }
 /* ================= КОНСТРУКТОР ЭФФЕКТОВ — Пласт 2, слайс 2.1 (механизм) =================
    Было: один палец = один эффект = одна ось (вертикаль), связка захардкожена в FX_META.
-   Стало: СЛОТ РАСКЛАДКИ (state.fxLayout, индекс = палец) говорит, КАКОЙ эффект на пальце и чем
-   ведётся КАЖДЫЙ его параметр — ось (x/y/z) и инверсия. Дефолтная раскладка выведена из FX_META,
+   Стало: СЛОТ ЦЕПИ РОЛИ СОЛО (state.fxChains.ld, Пласт 3.3; прежде fxLayout — индекс всё так же
+   = палец) говорит, КАКОЙ эффект на пальце и чем ведётся КАЖДЫЙ его параметр — ось (x/y/z) и
+   инверсия. Дефолтная раскладка выведена из FX_META,
    поэтому в ЭТОМ слайсе поведение обязано быть НЕОТЛИЧИМЫМ: те же четыре эффекта, по одному
    параметру, ось 'y', тот же размах 70%, тот же латч.
    ⚠️ ОСИ ОТСЧИТЫВАЮТСЯ ОТ ТОЧКИ ЗАХВАТА ЩИПКА и на СЫРЫХ координатах (правило #12): рука начинает
@@ -348,7 +349,7 @@ const fxParamsOf=fxId=>{
    и читает теперь slot (подсветка столбика — слот уникален, а эффект с 2.3 может лежать на двух
    пальцах) и fxId (подпись у руки). Двух имён у одной величины больше нет. */
 function captureFx(S,slot,lm,H){
-  const sl=fxLayout[slot];
+  const sl=fxChainOf('ld')[slot];   // 'ld' — не хардкод, а ЗАПИСЬ факта: сюда приходят только из зоны 'fx', а она бывает лишь у соло (см. гейты zone). В 3.4/3.5 здесь встанет переменная роли
   if(!sl){ S.adj=null; S.tutFx=null; return; }
   const ps=fxParamsOf(sl.fxId);
   S.adj={ slot, fxId:sl.fxId,
@@ -529,7 +530,7 @@ function processHands(res){
            слайса 2.1 — «неотличимо от продакшена». */
         const A=S.adj;
         if(A){
-          const ps=fxParamsOf(A.fxId), sl=fxLayout[A.slot], np=sl?Math.min(ps.length,sl.params.length):0;
+          const ps=fxParamsOf(A.fxId), sl=fxChainOf('ld')[A.slot], np=sl?Math.min(ps.length,sl.params.length):0;   // 'ld' — запись факта: ветка живёт под S.zone==='fx', а эта зона бывает только у соло. В 3.4/3.5 — переменная роли
           const hs=emaS(S,'hs',dist(lm[0],lm[9]),0.15);   // РОВНО один вызов за кадр (потому z и не берётся в captureFx)
           if(A.p0.z==null) A.p0.z=hs;                     // точка отсчёта по глубине — первый кадр щипка, off.z там ровно 0 (как у x/y)
           const off={ x:(flipX(lm[4].x)-flipX(A.p0.x))/0.7,
@@ -838,7 +839,7 @@ function processHands(res){
     if(soloNoteHand(key,S,W)){
       const hsD=emaS(S,'hs',dist(lm[0],lm[9]),0.15);
       const vD=clamp01((REV_NEAR-hsD)/REV_RANGE);
-      for(const sl of fxLayout){
+      for(const sl of fxChainOf('ld')){   // 'ld' — запись факта: блок под гейтом soloNoteHand, то есть роль-половина этой руки заведомо соло. В 3.4/3.5 — переменная роли
         if(!sl) continue;
         let ps=null;                                   // дескрипторы слота берём ЛЕНИВО: у большинства слотов play-параметров нет вовсе
         sl.params.forEach((pa,i)=>{

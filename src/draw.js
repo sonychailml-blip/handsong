@@ -2,7 +2,7 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, fxLayout, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
+import { fx, fxChainOf, chBrightDisp, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasFx, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold, FX_MODULES } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -15,9 +15,9 @@ const FX_X0=6;
 const fxBandR=n=> n>0 ? FX_X0+(n-1)*(FX_BAR_W+FX_BAR_GAP)+FX_BAR_W : 0;   // правый край полосы из n столбиков
 /* ЕДИНЫЙ ИСТОЧНИК «какие столбики эффектов есть сейчас» — и для ОТРИСОВКИ, и для ШИРИНЫ ОТСТУПА под
    легенду. Раньше и состав, и счёт брались прямо из FX_META (константа на четыре); теперь состав
-   задаёт РАСКЛАДКА (state.fxLayout, слот = палец), а раскладка живая. Разойдись счёт с рисованием —
-   легенда наехала бы на столбики; поэтому обе стороны зовут ОДНУ функцию (тот же закон, что у сетки:
-   попадание и отрисовка от одной геометрии).
+   задаёт ЦЕПЬ РОЛИ СОЛО (state.fxChains.ld, Пласт 3.3; прежде fxLayout — слот всё так же палец), а
+   цепь живая. Разойдись счёт с рисованием — легенда наехала бы на столбики; поэтому обе стороны
+   зовут ОДНУ функцию (тот же закон, что у сетки: попадание и отрисовка от одной геометрии).
    Слот с МОДУЛЕМ (реверб) в покое даёт ОДИН столбик (первый параметр), а пока его палец ЗАЖАТ —
    РАЗВОРАЧИВАЕТСЯ по столбику на параметр (TAIL/TONE): три ручки видно тогда, когда их крутят.
    Пустой слот («нет эффекта») не даёт столбика вовсе. */
@@ -31,7 +31,7 @@ const fxActiveSlot=()=>{ for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.
 const fxParamIsPlay=la=> !!(la && la.mode==='drive' && la.hand==='play');
 const fxBarItems=()=>{
   const act=fxActiveSlot(), out=[];
-  fxLayout.forEach((sl,slot)=>{
+  fxChainOf('ld').forEach((sl,slot)=>{   // 'ld' — запись факта: столбики рисуются под гейтом roleHasFx('ld'), а fx бывает только у соло. В 3.4/3.5 — переменная роли
     const m=FX_META.find(q=>q.k===sl.fxId);
     if(m){ out.push({v:fx[sl.fxId], c:m.color, l:m.label, slot, play:fxParamIsPlay(sl.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр)
     const mod=fxModOf(sl); if(!mod) return;                                    // пустой/неизвестный слот — молча без столбика
@@ -49,10 +49,16 @@ const fxBarItems=()=>{
    столбиков НЕТ ВОВСЕ (раньше оставался одинокий REV).
    ⚠️ ОТСТУП СЧИТАЕМ ПО МАКСИМУМУ (как если бы все слоты были развёрнуты), а НЕ по нарисованному
    сейчас: иначе разворот активного слота ДВИГАЛ БЫ ЛЕГЕНДУ под рукой при каждом щипке. */
-const fxBarsMaxN=()=> fxLayout.reduce((n,sl)=>{
+const fxBarsMaxN=()=> fxChainOf('ld').reduce((n,sl)=>{
   if(FX_META.some(q=>q.k===sl.fxId)) return n+1;
   const mod=fxModOf(sl); return n+(mod?mod.params.length:0);
 },0);
+/* ⚠️ fxN ЧИТАЕТ ЦЕПЬ СОЛО ВСЕГДА — включая случай, когда bandR зовут с 'ch'/'bs'. Это НАМЕРЕННОЕ
+   МЕЖРОЛЕВОЕ чтение, и оно ОТЛИЧАЕТСЯ ПО РОДУ от прочих литералов 'ld' в этом файле (там 'ld' —
+   запись факта «здесь и так только соло»; здесь — чужая роль сознательно берёт СОЛО-число).
+   ⛔ НЕ «улучшать» это в «цепь рисуемой роли»: у аккордов и баса цепи ПУСТЫ (Пласт 3.5 их ещё не
+   строил), fxBandR(0) вернул бы 0, и легенда ступеней у этих ролей УЕХАЛА БЫ ВЛЕВО на всю ширину
+   зарезервированной полосы. Резерв у прочих ролей обязан остаться прежним — байт-в-байт. */
 const fxN=()=> fxBarsMaxN();                                // столбики раскладки (по умолчанию 3 у реверба + 3 старых = 6)
 const soloBarsN=()=> roleHasFx('ld') ? fxN() : 0;           // нет руки-эффектов → нет столбиков (REV, который жил без неё, удалён)
 const bandR=role=> role==='ld' ? fxBandR(soloBarsN()) : fxBandR(fxN());   // у прочих ролей столбиков нет — резерв на полную полосу, как было
