@@ -237,6 +237,10 @@ export const DICTS = {
     'axis.z':'Depth',
     'axis.play.z':'Depth (playing hand)',
     'panel.scale.fxCtl':'Effects constructor',
+    // выбор роли, чью цепь правим (3.4.1). Роль ВЛАДЕЕТ цепью — отсюда и подпись «цепь роли», а не «роль»
+    'fx.role':'Chain of role',
+    'fx.chain.none':'This role has no effect chain yet — only Solo does. Chords, bass and drums go to the output unprocessed.',
+    'fx.noHand':'No hand is set to Effects right now, so the finger addresses below do nothing. Parameters set to Fixed keep working.',
     'finger.index':'Index finger',
     'finger.middle':'Middle finger',
     'finger.ring':'Ring finger',
@@ -531,6 +535,10 @@ export const DICTS = {
     'axis.z':'Глубина',
     'axis.play.z':'Глубина (играющая рука)',
     'panel.scale.fxCtl':'Конструктор эффектов',
+    // выбор роли, чью цепь правим (3.4.1). Роль ВЛАДЕЕТ цепью — отсюда и подпись «цепь роли», а не «роль»
+    'fx.role':'Цепь роли',
+    'fx.chain.none':'У этой роли пока нет цепи эффектов — она есть только у соло. Аккорды, бас и ударные идут на выход без обработки.',
+    'fx.noHand':'Сейчас ни одна рука не назначена на «Эффекты», поэтому пальцевые адреса ниже не действуют. Параметры в режиме «Фиксировано» продолжают работать.',
     'finger.index':'Указательный',
     'finger.middle':'Средний',
     'finger.ring':'Безымянный',
