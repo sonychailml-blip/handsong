@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxChainOf, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxChainOf, roleXDriven, fxVolFix, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -707,7 +707,28 @@ function processHands(res){
            (соло/бас/ударные/обычные аккорды) — по всей ширине роли [rx0,rx1]. */
         const typed = S.zone==='ch'&&typedChords();
         const[zx0,zx1]= typed ? [psplit,prx1] : [prx0,prx1];
-        S.vol=0.2+0.8*clamp01((x-zx0)/(zx1-zx0));
+        /* ⛳ X — ГРОМКОСТЬ ЛИБО ЭФФЕКТ, ТРЕТЬЕГО НЕ ДАНО (Пласт 3.7.3). Величина хода СЧИТАЕТСЯ ОДНА И
+           ТА ЖЕ (xn), меняется только её АДРЕСАТ: по умолчанию это громкость (формула байт-в-байт
+           прежняя, включая сужение зоны у типизированных аккордов), а если в цепи ЭТОЙ РОЛИ есть
+           параметр с адресом play:x — ход уходит эффекту, а громкость встаёт на фиксированное значение
+           из меню. Так «одно движение — одна величина» соблюдается буквально.
+           ⚠️ РОЛЬ БЕРЁМ ИЗ S.zone — это роль ИМЕННО ЭТОЙ руки (в сплите она заморожена на захвате).
+           Поэтому отданный X у соло НЕ замораживает громкость аккордов, баса и ударных.
+           ⚠️ xn — ПОЗИЦИОННАЯ величина, как и громкость: считается из sx-координат (правила #12/#13 —
+           кадрирование и зеркало учтены там же), поэтому «вправо = больше» одинаково на обеих камерах. */
+        const xn=clamp01((x-zx0)/(zx1-zx0));
+        if(roleXDriven(S.zone)){
+          S.vol=fxVolFix[S.zone];
+          for(const eff of fxChainOf(S.zone)){
+            if(!eff) continue;
+            let ps=null;                                   // дескрипторы берём ЛЕНИВО: у большинства записей play-параметров нет
+            eff.params.forEach((pa,i)=>{
+              if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='x') return;
+              if(!ps) ps=fxParamsOf(S.zone,eff.fxId);
+              const p=ps[i]; if(p) p.set(pa.inv ? 1-xn : xn);   // инверсия ЗЕРКАЛИТ (1−v), как у глубины: величина уже абсолютная 0..1, а не смещение
+            });
+          }
+        }else S.vol=0.2+0.8*xn;
         /* Тип берётся из ЛИПКОГО выбора палитры (любой рукой, по положению), а не из положения играющей.
            Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
            ty===latchTy, и заморозка a.ty в событии лупера. Кламп: у семейств может быть
@@ -882,7 +903,11 @@ function processHands(res){
         if(!eff) continue;
         let ps=null;                                   // дескрипторы эффекта берём ЛЕНИВО: у большинства записей play-параметров нет вовсе
         eff.params.forEach((pa,i)=>{
-          if(pa.mode!=='drive' || pa.hand!=='play') return;
+          /* ⚠️ ФИЛЬТР ПО ОСИ ОБЯЗАТЕЛЕН С 3.7.3, и раньше его тут НЕ БЫЛО — потому что у играющей руки
+             адрес был РОВНО ОДИН (глубина), и проверять было нечего. Теперь их два (play:z и play:x):
+             без `axis==='z'` глубина писала бы и в параметр, отданный ГОРИЗОНТАЛИ, — два источника на одну
+             величину, то самое, чего мы избегаем правилом «один параметр — один адрес». */
+          if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return;
           if(!ps) ps=fxParamsOf(role,eff.fxId);
           const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD);
         });

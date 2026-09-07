@@ -2,7 +2,8 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx } from './state.js';
+         fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
+         roleXDriven, fxVolFix, setFxVolFix } from './state.js';
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -578,7 +579,7 @@ const FINGER_KEYS=['finger.index','finger.middle','finger.ring','finger.pinky'];
 const FX_AXES=[['y','axis.y'],['x','axis.x'],['z','axis.z']];   // порядок — вертикаль первой: она «главная» ось руки (см. довод о порядке осей в state.js)
 function fxAddrOf(pa){   // адрес параметра → значение <select>; ЕДИНСТВЕННОЕ место, где данные превращаются в строку меню
   if(pa.mode==='fixed') return 'fixed';
-  if(pa.hand==='play') return 'play:z';
+  if(pa.hand==='play') return 'play:'+(pa.axis||'z');   // у играющей руки ОСЕЙ ДВЕ (3.7.3): глубина и горизонталь. Хардкод 'play:z' здесь показывал бы X-адрес как «глубину» и молча возвращал его на Z при любой правке строки
   return 'fx:'+(pa.finger|0)+':'+(pa.axis||'y');
 }
 function buildAddrSel(pa){
@@ -590,8 +591,13 @@ function buildAddrSel(pa){
     for(const [ax,k] of FX_AXES) g.appendChild(opt('fx:'+f+':'+ax, t(k)));
     sel.appendChild(g);
   });
+  /* У ИГРАЮЩЕЙ РУКИ ТЕПЕРЬ ДВА АДРЕСА (Пласт 3.7.3): ГЛУБИНА (свободна с 3.1, когда реверб ушёл с
+     играющей руки) и ГОРИЗОНТАЛЬ — та самая, что по умолчанию ведёт ГРОМКОСТЬ. Отдать X эффекту можно,
+     и тогда громкость роли встаёт на фиксированное значение (см. поле ниже): одна ось — одна работа.
+     ⛔ Вертикали здесь нет и не будет: Y — это ВЫСОТА, единственная ось, которую отдать нельзя. */
   const gp=document.createElement('optgroup'); gp.label=t('fx.addr.play');
-  gp.appendChild(opt('play:z',t('axis.z')));                        // у играющей руки ось одна — глубина (вертикаль занята высотой, горизонталь громкостью)
+  gp.appendChild(opt('play:x',t('axis.x')));
+  gp.appendChild(opt('play:z',t('axis.z')));
   sel.appendChild(gp);
   sel.value=fxAddrOf(pa);
   return sel;
@@ -631,7 +637,7 @@ const FX_AXIS_GLYPH={y:'↕', x:'↔', z:'◆'};
 function fxAddrSummary(eff){
   return eff.params.map(pa=>{
     if(pa.mode==='fixed') return t('fx.sum.fixed');
-    if(pa.hand==='play')  return t('fx.sum.play');
+    if(pa.hand==='play')  return t(pa.axis==='x'?'fx.sum.playx':'fx.sum.play');
     return (FX_FING_ROMAN[pa.finger|0]||'?')+(FX_AXIS_GLYPH[pa.axis]||'');
   }).join(' · ');
 }
@@ -677,6 +683,39 @@ function fxShareChip(groups){
 /* Подсказка секции — абзац .phint, как у эталона A4 и «Пальцев в руке». Пересобирается вместе со
    строками (textContent='' выше), поэтому отдельного скрытия/показа не требуется. */
 function fxHint(key){ const p=document.createElement('p'); p.className='phint'; p.textContent=t(key); return p; }
+/* ═══ ЧИСЛОВОЕ ПОЛЕ СО СТУПЕНЬКАМИ «−[поле]＋» — ОДИН ОРГАН НА ВСЕ ФИКСИРОВАННЫЕ ВЕЛИЧИНЫ ═══
+   Вынесен из строки параметра в 3.7.3, когда понадобился ВТОРОЙ такой же (фиксированная громкость
+   роли). Второй экземпляр писать нельзя: у этого органа накоплена нетривиальная история поведения,
+   и копия неизбежно разошлась бы с оригиналом.
+   ⚠️ ЗДЕСЬ БЫЛ ПОЛЗУНОК (<input type=range>) — УДАЛЁН, И ПРИЧИНА ЕГО ПОЛОМКИ БЫЛА НАЗВАНА НЕВЕРНО
+   («виноват touch-action:none»). На деле ползунок стоял в ПЕРЕПОЛНЕННОЙ строке (её ломал селект режима,
+   см. .fxmode) и схлопывался в НУЛЕВУЮ ШИРИНУ, а касание по ползунку нулевой ширины читается как его
+   ЛЕВЫЙ КРАЙ, то есть 0 — обработчик честно писал этот ноль в состояние, отсюда «уехало в ноль и
+   залипло». Дело было в ШИРИНЕ. ⛔ Не гнаться за touch-action и не возвращать ползунок.
+   ⚠️ ПЕРЕРИСОВКИ ПОСЛЕ ЗАПИСИ НЕТ — намеренно: renderFxCtl уничтожил бы поле под пальцем прямо во
+   время ввода. Данные остаются источником правды, следующая перерисовка возьмёт значение из них.
+   ⚠️ ПУСТОЕ/нечисловое поле — НЕ ноль, а ЖДЁМ: иначе стирание ради набора нового числа мгновенно
+   глушило бы величину (ловушка `+''||0`, ровно она и помогла ползунку залипнуть в нуле).
+   cur() отдаёт 0..100 ИЗ ДАННЫХ; put(p100) пишет клампнутое целое туда, куда решит вызывающий. */
+function buildStepper(cur,put){
+  const seg=document.createElement('div'); seg.className='seg';
+  const dec=document.createElement('button'); dec.type='button'; dec.className='step'; dec.textContent='−';
+  const inc=document.createElement('button'); inc.type='button'; inc.className='step'; inc.textContent='＋';
+  const num=document.createElement('input'); num.type='number'; num.className='numv';
+  num.min='0'; num.max='100'; num.step='1'; num.inputMode='numeric'; num.autocomplete='off';
+  num.value=String(cur());
+  const set=pct=>{
+    const p100=Math.max(0,Math.min(100,Math.round(pct)));
+    put(p100);
+    if(num.value!==String(p100)) num.value=String(p100);   // не переписываем без нужды — иначе прыгает каретка при наборе
+  };
+  dec.onclick=()=>set(cur()-1);
+  inc.onclick=()=>set(cur()+1);
+  num.oninput=e=>{ const v=e.target.value.trim(); if(v==='')return; const n=parseInt(v,10); if(!isNaN(n)) set(n); };
+  num.onchange=()=>{ const n=parseInt(num.value,10); if(isNaN(n)) num.value=String(cur()); else set(n); };   // ушёл фокус с мусором → вернуть показ из данных
+  seg.appendChild(dec); seg.appendChild(num); seg.appendChild(inc);
+  return seg;
+}
 /* ═══ ПРАВКА СОСТАВА ЦЕПИ — ДВЕ ПОЛОВИНЫ, И ОБЕ ОБЯЗАТЕЛЬНЫ ═══
    ДАННЫЕ меняет state (fxChainAdd/fxChainRemove), ЗВУК — audio (fxSetActive). Разнесены не по вкусу:
    state до audio НЕ ДОТЯГИВАЕТСЯ (audio импортирует state, обратный импорт — цикл), поэтому сеттер
@@ -743,6 +782,27 @@ function renderFxCtl(){
      ⚠️ ПОДСКАЗКА ПРО РУКУ — ТОЛЬКО У НЕПУСТОЙ ЦЕПИ. Она говорит «пальцевые адреса НИЖЕ не действуют»,
      а при пустой цепи никаких адресов ниже нет: это был бы ответ на незаданный вопрос. */
   if(chain.length && !roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));
+  /* ═══ ФИКСИРОВАННАЯ ГРОМКОСТЬ РОЛИ — ПОЯВЛЯЕТСЯ, ТОЛЬКО КОГДА X ОТДАН ЭФФЕКТУ (Пласт 3.7.3) ═══
+     Это не настройка «на всякий случай», а ПРЯМОЕ СЛЕДСТВИЕ выбора: подписал параметр этой роли на
+     «Играющая рука → Горизонталь» — рука больше не ведёт громкость, и её надо где-то задать. Пока
+     такого адреса в цепи нет, строки нет вовсе: контрол, который ничего не делает, хуже отсутствующего.
+     ⚠️ Условие ВЫВОДИТСЯ из цепи (roleXDriven), а не хранится флагом — поэтому строка появляется и
+     исчезает сама, без отдельной синхронизации, и соврать не может.
+     ⚠️ СТОИТ ЗДЕСЬ, у начала секции, а не в строке эффекта: величина принадлежит РОЛИ, а не тому
+     параметру, который занял ось (их может быть и несколько — адрес один на многих).
+     ⚠️ Орган — ОБЩИЙ buildStepper (второго такого поля не заводим: у него накопленная история, см. там).
+     Шкала 0..100 = громкость 0..1 напрямую (это амплитуда голоса, а не нормированный параметр эффекта,
+     поэтому здесь нет ни fxNorm, ни кривой — число означает ровно то, что показывает). */
+  if(roleXDriven(fxCtlRole)){
+    const row=document.createElement('div'); row.className='prow';
+    const lab=document.createElement('label'); lab.textContent=t('fx.volFix');
+    row.appendChild(lab);
+    row.appendChild(buildStepper(
+      ()=>Math.round(fxVolFix[fxCtlRole]*100),
+      p100=>setFxVolFix(fxCtlRole,p100/100)));
+    fxCtlRows.appendChild(row);
+    fxCtlRows.appendChild(fxHint('fx.volFixHint'));
+  }
   /* ЗАСЕВ ФИКСИРОВАННЫХ ЗНАЧЕНИЙ, ЕЩЁ НЕ ЗАПОЛНЕННЫХ (v01 не задан). Тот же приём, что при добавлении
      эффекта (3.4.3), распространённый на цепи ПО УМОЛЧАНИЮ: цепь аккордов объявлена в state без
      чисел, потому что нормировка (лог-шкалы, min/max) живёт исключительно в audio и второго её
@@ -832,42 +892,11 @@ function renderFxCtl(){
         /* ФИКСИРОВАННОЕ ЗНАЧЕНИЕ: поле 0..100 = v01*100, чисто для показа. В звук уходит v01 (0..1)
            ЧЕРЕЗ ТОТ ЖЕ fxParamsOf().set, что и палец, — значит min/max/curve остаются жить только в
            setNorm/fxDenorm, второго представления диапазона не возникает, а лог-шкала реверба (секунды,
-           герцы) соблюдается сама собой.
-           ⚠️ ЗДЕСЬ БЫЛ ПОЛЗУНОК (<input type=range>) — УДАЛЁН по просьбе пользователя. И ⚠️ ПРИЧИНА ЕГО
-           ПОЛОМКИ БЫЛА НАЗВАНА НЕВЕРНО (здесь стояло «виноват touch-action:none») — исправляю запись,
-           чтобы следующий заход не гонялся за призраком: ползунок стоял в ЭТОЙ ЖЕ переполненной строке
-           (её ломал селект режима, см. .fxmode) и схлопывался в НУЛЕВУЮ ШИРИНУ, а касание по ползунку
-           нулевой ширины читается как его ЛЕВЫЙ КРАЙ, то есть 0; обработчик честно писал этот ноль в
-           состояние — вот и «уехало в ноль и залипло». Дело было в ШИРИНЕ. `touch-action:none` у
-           html,body действительно есть, но к этой поломке отношения не имел.
-           Числовое поле оставляем: оно и надёжнее (клавиатура и кнопки ширины не требуют), и его просил
-           пользователь. Форма «−[поле]＋» — та же, что у тактов лупера (.seg), поле — как у эталона A4. */
-        const seg=document.createElement('div'); seg.className='seg';
-        const dec=document.createElement('button'); dec.type='button'; dec.className='step'; dec.textContent='−';
-        const inc=document.createElement('button'); inc.type='button'; inc.className='step'; inc.textContent='＋';
-        const num=document.createElement('input'); num.type='number'; num.className='numv';
-        num.min='0'; num.max='100'; num.step='1'; num.inputMode='numeric'; num.autocomplete='off';
-        const cur=()=>Math.round((pa.v01||0)*100);   // ИСТОЧНИК — ДАННЫЕ (pa живой объект параметра в цепи), а не текст поля
-        num.value=String(cur());
-        /* ЕДИНСТВЕННАЯ точка записи: кламп → в данные → в звук ТЕМ ЖЕ путём, что у пальца → в поле.
-           ⚠️ ПЕРЕРИСОВКИ ЗДЕСЬ НЕТ — намеренно (как и у прежнего ползунка): renderFxCtl уничтожил бы
-           поле под пальцем/курсором прямо во время ввода. Данные остаются источником правды: следующая
-           перерисовка возьмёт v01 из цепи роли. НЕ «чинить» это обратно на перерисовку. */
-        const put=pct=>{
-          const p100=Math.max(0,Math.min(100,Math.round(pct)));
-          setFxParamFixed(fxCtlRole,effIdx,pi,p100/100);
-          const p=fxParamsOf(fxCtlRole,eff.fxId)[pi]; if(p) p.set(p100/100);
-          if(num.value!==String(p100)) num.value=String(p100);   // не переписываем без нужды — иначе прыгает каретка при наборе
-        };
-        dec.onclick=()=>put(cur()-1);
-        inc.onclick=()=>put(cur()+1);
-        /* Ввод с клавиатуры: ПУСТОЕ или нечисловое — НЕ трактуем как ноль, а ЖДЁМ. Иначе стирание поля
-           ради набора нового числа мгновенно глушило бы параметр (та же ловушка `+''||0`, что помогла
-           ползунку залипнуть в нуле). */
-        num.oninput=e=>{ const s=e.target.value.trim(); if(s==='')return; const n=parseInt(s,10); if(!isNaN(n)) put(n); };
-        num.onchange=()=>{ const n=parseInt(num.value,10); if(isNaN(n)) num.value=String(cur()); else put(n); };   // ушёл фокус с мусором → вернуть показ из данных
-        seg.appendChild(dec); seg.appendChild(num); seg.appendChild(inc);
-        sub.appendChild(seg);
+           герцы) соблюдается сама собой. Сам орган управления — общий buildStepper (см. выше). */
+        sub.appendChild(buildStepper(
+          ()=>Math.round((pa.v01||0)*100),                       // ИСТОЧНИК — ДАННЫЕ (pa живой объект параметра в цепи), а не текст поля
+          p100=>{ setFxParamFixed(fxCtlRole,effIdx,pi,p100/100);
+                  const p=fxParamsOf(fxCtlRole,eff.fxId)[pi]; if(p) p.set(p100/100); }));
       }else{
         /* ИНВЕРСИЯ — единственное, что осталось рядом с адресом: сам адрес (рука+палец+ось) выбран
            списком выше. Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной
