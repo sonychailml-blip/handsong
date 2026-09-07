@@ -102,8 +102,15 @@ let AC=null, master, limiter;
 /* banks — СКРАТЧ строителя банков (buildLeadBanks кладёт сюда собранный банк, buildLeadBank забирает).
    Раньше это был ПОСТОЯННЫЙ массив всех 23 банков соло-цепочки; теперь банк живёт в ГОЛОСЕ пула.
    bldHum — ConstantSource гуманизации ТОГО голоса, который сейчас строится (его цепляет mkOsc). */
-let banks=[], bldHum=null, vibGain,
-    tremGain, tremDepth, dlyWet, exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-ШИНА (expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
+let banks=[], bldHum=null, bldVib=null, vibLFO, tremLFO, dlyLine,
+    exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-ШИНА (expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
+/* ⚠️ vibGain / tremGain / tremDepth / dlyWet УДАЛЕНЫ (Пласт 3.7.1). Это были ОБЩИЕ узлы глубины на всю
+   соло-шину, и ровно поэтому эффекты были НЕ ПЕР-СЛОЙНЫМИ: последний писавший (живая рука ИЛИ любая
+   переигранная нота петли) задавал глубину всем сразу. Теперь ПРИЦЕПКА живёт В ГОЛОСЕ, а общими
+   остались только ГЕНЕРАТОРЫ (vibLFO/tremLFO) и сама ЛИНИЯ ЗАДЕРЖКИ (dlyLine) — их делить и надо:
+   один и тот же LFO, один и тот же делей-юнит, но СВОЯ глубина посыла у каждой ноты.
+   bldVib — пер-голосовой узел глубины вибрато ТОГО голоса, что сейчас строится (пара к bldHum). */
+const LEAD_OUT_G=0.22;   // сухая громкость соло-шины; ЕДИНЫЙ ИСТОЧНИК — её же компенсирует пер-голосовой посыл в делей (см. applyVoiceFx)
 /* ⚠️ revLead ЗДЕСЬ БОЛЬШЕ НЕТ (Пласт 3.5.1): узел посыла соло в реверб принадлежит теперь ЭКЗЕМПЛЯРУ
    эффекта (inst.send, см. makeReverbFx) — это тот же узел, та же роль, то же значение, но у него
    ровно один владелец. Модульная переменная означала бы «посыл может быть только один», а их теперь
@@ -171,7 +178,7 @@ const REV_A={
 function mkOsc(type,freq,dest,gainVal){
   const o=AC.createOscillator(); o.type=type; o.frequency.value=freq;
   const g=AC.createGain(); g.gain.value=gainVal;
-  o.connect(g); g.connect(dest); vibGain.connect(o.detune); if(bldHum)bldHum.connect(o.detune); exprVibPitch.connect(o.detune); o.start();   // вибрато fx (ОБЩЕЕ) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
+  o.connect(g); g.connect(dest); if(bldVib)bldVib.connect(o.detune); if(bldHum)bldHum.connect(o.detune); exprVibPitch.connect(o.detune); o.start();   // вибрато ЭТОГО ГОЛОСА (bldVib — с 3.7.1 глубина пер-голосовая, LFO общий) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
   return o;
 }
 const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
@@ -401,7 +408,7 @@ function buildKSFallback(preBus){
 function buildFMBank(preBus,{ratio,peak,sus,tau}){
   const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
   let curF=220;                                     // последняя целевая частота: attack() берёт индекс от неё (setFreq идёт ДО noteOn)
-  const car=mkOsc('sine',curF,ig,0.5);              // несущий: в общую цепочку + вибрато (vibGain внутри mkOsc)
+  const car=mkOsc('sine',curF,ig,0.5);              // несущий: в общую цепочку + вибрато (пер-голосовой bldVib цепляет mkOsc)
   const mod=AC.createOscillator(); mod.type='sine'; mod.frequency.value=curF*ratio;   // модулятор: голый, только в car.frequency
   const modGain=AC.createGain(); modGain.gain.value=curF*sus;
   mod.connect(modGain); modGain.connect(car.frequency); mod.start();
@@ -510,10 +517,14 @@ function setRevTone(lines,hz){ if(!AC||!lines.length)return;
      { id, labelKey, in, out, params:[ {key,labelKey,unit,def,min,max,curve,set} ] }
    `in` — узел, куда приходят ПОСЫЛЫ; `out` — узел, откуда эффект уходит в шину назначения.
    ⚠️ ЧЕСТНО О ГРАНИЦАХ ЭТОЙ АБСТРАКЦИИ (чтобы следующий заход не открывал это заново):
-   • Она ПОСЫЛ-ОБРАЗНАЯ. Реверб ложится точно; ДЕЛЕЙ (dly/dlyWet) тоже посыл, но его подмес живёт на
-     ВЫХОДЕ (dlyWet), а у реверба — на ВХОДАХ (revLead/revCh), потому что источников ДВА с РАЗНОЙ
-     величиной. Один узел подмеса на выходе физически не выразил бы 0.85·rev и 0.12 одновременно.
-   • ТРЕМОЛО — ВСТАВКА (exprWah→tremGain→leadOut), у неё in===out, и глагол «прицепить к шине» для неё
+   • Она ПОСЫЛ-ОБРАЗНАЯ. Реверб ложится точно; ДЕЛЕЙ тоже посыл, но его подмес ЖИЛ НА ВЫХОДЕ линии
+     (общий `dlyWet`), а у реверба — на ВХОДАХ, потому что источников ДВА с РАЗНОЙ величиной. Один узел
+     подмеса на выходе физически не выразил бы 0.85·rev и 0.12 одновременно.
+     ✅ **ЭТО РАСХОЖДЕНИЕ РАЗРЕШЕНО В ПЛАСТЕ 3.7.1 — ровно как здесь и предсказывалось** («при переезде
+     делея это придётся решить ЯВНО, а не унифицировать молча»). Подмес делея переехал НА ВХОД и стал
+     ПЕР-ГОЛОСОВЫМ (`v.dlySend` → общая линия), то есть принял ту же форму, что у реверба: величина
+     принадлежит ПРИЦЕПКЕ, а сеть общая. Оба посыла теперь описываются одним правилом.
+   • ТРЕМОЛО — ВСТАВКА (in===out), и глагол «прицепить к шине» для неё
      неверен: вставке нужна врезка в цепь. ВИБРАТО вообще без аудио-входа/выхода (LFO в .detune из mkOsc).
      ДРАЙВ — N экземпляров ПО ГОЛОСАМ до огибающей (нелинейность tanh, см. applyFx) и на шину не выносится.
      Ни одно из этого в Пласте 1 НЕ трогается и НЕ готовится — вид крепления здесь ровно один: ПОСЫЛ.
@@ -643,6 +654,27 @@ function fxInstance(role,fxId){
   if(!byRole[fxId]){ byRole[fxId]=f.make(); fxAttach(role,byRole[fxId]); }   // построили — сразу и прицепили (если шина роли уже известна)
   return byRole[fxId];
 }
+/* ⛳ ЭФФЕКТ УБРАН ИЗ ЦЕПИ → ЗАМОЛКАЕТ; ВЕРНУЛИ → СНОВА ЗВУЧИТ. Ровно та операция, которую обещал
+   комментарий выше («вместо разбора — уводим подмес в 0»), но которой НЕ СУЩЕСТВОВАЛО: снятый реверб
+   продолжал звучать со своими параметрами, потому что hushUnassignedFx умеет гасить ТОЛЬКО старые
+   скалярные (пишет state.fx[k]), а модуль ему недоступен — state до audio не дотягивается.
+   ⚠️ ГАСИМ ПРИЦЕПКУ, А НЕ СЕТЬ. Уводим В НОЛЬ ПОСЫЛ — вход в сеть закрывается, новый сигнал не идёт, а
+   УЖЕ НАБРАННЫЙ ХВОСТ ДОЗВУЧИВАЕТ и гаснет сам. Именно поэтому здесь setTargetAtTime (та же постоянная
+   0.08, что у параметра «подмес»), а не разрыв связи и не value=0: рубильник обрезал бы хвост слышно —
+   а хвост это то, ради чего реверб и берут (правило слайса 2.5 «снятый эффект замолкает» + довод 3.5.1
+   «экземпляры не разбираем»). Выход сети в мастер НЕ трогаем — им хвост и доигрывает.
+   ⚠️ p.cur НЕ ТРОГАЕМ: величина «подмеса» остаётся жить в параметре, поэтому возврат эффекта в цепь
+   восстанавливает ПРЕЖНЮЮ громкость, а не ноль. Восстановление идёт тем же приёмом, что засев везде
+   ещё с 2.6 — `setNorm(cur)`: узлы переписываются ИЗ СОХРАНЁННЫХ значений.
+   ⚠️ ПРИ ВЫКЛЮЧЕНИИ ЭКЗЕМПЛЯР НЕ СОЗДАЁМ (голый поиск, без fxInstance): строить сеть FDN ради того,
+   чтобы её тут же заглушить, — чистая растрата. Старый скалярный сюда попадёт как no-op (экземпляра у
+   него нет и не будет), и это правильно: его гасит hushUnassignedFx, каждому своё. */
+function fxSetActive(role,fxId,on){
+  if(!AC) return;
+  if(on){ const inst=fxInstance(role,fxId); if(inst) for(const p of inst.params) p.setNorm(p.cur); return; }
+  const inst=FX_INST[role] && FX_INST[role][fxId];
+  if(inst) inst.send.gain.setTargetAtTime(0, AC.currentTime, 0.08);
+}
 /* Карта глубины руки → cutoff яркости (Гц). depth 0 близко/ярко → CHORD_LP_MAX (открыт, НЕЙТРАЛЬ =
    сегодняшний звук), 1 далеко/глухо → CHORD_LP_MIN. Логарифмическая (перцептивно ровная). Единый
    источник для атаки (chordOn) и ведения (chordGlide) — раньше жила в удалённом setChordBright. */
@@ -763,18 +795,20 @@ async function initAudio(){
   revLd.out.connect(master);   // выход комнаты соло — в мастер (прежде это была строка verbOut.connect(master))
  
   /* --- СОЛО-цепочка (как в версии 2) --- */
-  const vibLFO=AC.createOscillator(); vibLFO.frequency.value=5.5;
-  vibGain=AC.createGain(); vibGain.gain.value=0;
-  vibLFO.connect(vibGain); vibLFO.start();
+  /* ГЕНЕРАТОР вибрато — ОБЩИЙ (одна частота качания на весь инструмент), а вот ГЛУБИНА с Пласта 3.7.1
+     ПЕР-ГОЛОСОВАЯ: vibLFO → v.vibDep → detune осцилляторов ЭТОГО голоса (цепляет mkOsc через bldVib).
+     Правило #3 соблюдено: осциллятор заводится ОДИН раз и живёт до конца контекста; пер-голосовыми
+     стали только ГЕЙНЫ. */
+  vibLFO=AC.createOscillator(); vibLFO.frequency.value=5.5; vibLFO.start();
   /* Гуманизация высоты — ConstantSource в detune осцилляторов; на каждой атаке свежий случайный сдвиг
      ±HUM_CENTS·bank.hum, detune не трогается пофреймовой setFreq, поэтому сдвиг держится всю ноту.
      ⚠️ ОН ПЕР-ГОЛОСОВОЙ (v.hum, см. пул соло), а НЕ общий, как был: с пулом общий узел означал бы, что
      атака второй ноты перестраивает высоту первой, ещё звучащей. Здесь его больше не создаём. */
   /* ЖИВОСТЬ (энергия → вибрато): свой LFO шиммера. exprVibPitch → detune ВСЕХ лид-осц. (mkOsc цепляет ниже),
-     глубина = энергия (пишет applyExpr, в пределах пары центов). ОТДЕЛЬНО от vibGain (вибрато fx-руки) — не
+     глубина = энергия (пишет applyExpr, в пределах пары центов). ОТДЕЛЬНО от вибрато fx-руки (с 3.7.1 — пер-голосовой vibDep) — не
      дерутся, суммируются в detune. На реальном инструменте вибрато рождается из НЕПРЕРЫВНОГО усилия, а
      идеально статичный тон звучит МЁРТВО — так «смычок» кормит теперь ЖИЗНЬ, а не громкость. Создаём ДО
-     построением голосов, чтобы mkOsc сразу цеплял exprVibPitch (как vibGain). Живьём, в запись НЕ идёт. */
+     построением голосов, чтобы mkOsc сразу цеплял exprVibPitch (как vibDep голоса). Живьём, в запись НЕ идёт. */
   const exprVibLFO=AC.createOscillator(); exprVibLFO.type='sine'; exprVibLFO.frequency.value=EXPR_A.vibHz;
   exprVibPitch=AC.createGain(); exprVibPitch.gain.value=0;   // глубина шиммера ВЫСОТЫ (центы), нейтраль 0 → detune += 0 (байт-в-байт)
   exprVibLFO.connect(exprVibPitch); exprVibLFO.start();
@@ -817,25 +851,28 @@ async function initAudio(){
   exprGain.connect(hardShaper); hardShaper.connect(exprSatHardG); exprSatHardG.connect(exprSatWetSum);
   exprSatWetSum.connect(exprSatLP); exprSatLP.connect(exprSatSum);
 
-  tremGain=AC.createGain(); tremGain.gain.value=1;
-  const tremLFO=AC.createOscillator(); tremLFO.frequency.value=4;
-  tremDepth=AC.createGain(); tremDepth.gain.value=0;
-  tremLFO.connect(tremDepth); tremDepth.connect(tremGain.gain); tremLFO.start();
+  /* ГЕНЕРАТОР тремоло — ОБЩИЙ, как и у вибрато; сама ВСТАВКА (trem + tremDep) с 3.7.1 живёт В ГОЛОСЕ,
+     после громкости и перед посылом в делей — тем же порядком, каким стояла на шине. */
+  tremLFO=AC.createOscillator(); tremLFO.frequency.value=4; tremLFO.start();
   /* ВАУ (натяжение → частота резонансного пика): высокодобротный PEAKING-биквад — резонансный пик, который
      ПРОБЕГАЕТ частоту вслед за раскрытием ладони (раскрыто = пик вверх, кулак = вниз). Громче/яснее фейзера,
      физически читаемо — рука ведёт «голос» звука. Peaking (а не чистый bandpass в разрыв: тот истончил бы
      тон) — пропускает ВЕСЬ сигнал, поднимает одну полосу. Нейтраль: подъём 0дБ → peaking-биквад ПЛОСКИЙ
      (тождество), поэтому без руки байт-в-байт. Частота/Q/подъём — EXPR_A (крутить на слух). */
   exprWah=AC.createBiquadFilter(); exprWah.type='peaking'; exprWah.frequency.value=EXPR_A.wahLo; exprWah.Q.value=EXPR_A.wahQ; exprWah.gain.value=0;
-  exprSatSum.connect(exprWah); exprWah.connect(tremGain);
- 
-  const leadOut=AC.createGain(); leadOut.gain.value=0.22;   // сушит и посылы (dly/rev идут ПОСЛЕ leadOut)
-  tremGain.connect(leadOut); leadOut.connect(master);
- 
+  const leadOut=AC.createGain(); leadOut.gain.value=LEAD_OUT_G;   // сухая громкость соло; посыл в РЕВЕРБ идёт ПОСЛЕ неё, посыл в ДЕЛЕЙ — из голоса, с той же компенсацией (см. applyVoiceFx)
+  exprSatSum.connect(exprWah); exprWah.connect(leadOut);          // тремоло из этого разрыва УШЛО В ГОЛОС (3.7.1) — вставка стала пер-голосовой
+  leadOut.connect(master);
+
+  /* ЛИНИЯ ЗАДЕРЖКИ — ОБЩАЯ (один делей-юнит на инструмент), а ПОСЫЛ в неё с 3.7.1 пер-голосовой.
+     Прежде было leadOut→dly→dlyWet→master: вход полный, а громкость эха задавал ОДИН общий dlyWet.
+     Стало: v.dlySend→dly→master, где посыл каждого голоса уже несёт и глубину, и компенсацию LEAD_OUT_G.
+     Уровень эха и затухание повторов те же: обратная связь линии (0.45) не тронута, а масштаб входа и
+     масштаб выхода эквивалентны для линейной линии. */
   const dly=AC.createDelay(1); dly.delayTime.value=0.35;
   const fb=AC.createGain(); fb.gain.value=0.45; dly.connect(fb); fb.connect(dly);
-  dlyWet=AC.createGain(); dlyWet.gain.value=0;
-  leadOut.connect(dly); dly.connect(dlyWet); dlyWet.connect(master);
+  dly.connect(master);
+  dlyLine=dly;                                             // голоса цепляют свои посылы сюда (newLeadVoice)
  
   /* ПОСЫЛ СОЛО В РЕВЕРБ. Узел принадлежит ЭКЗЕМПЛЯРУ (revLd.send) и уже соединён с его входом внутри
      фабрики — здесь остаётся ПРИЦЕПИТЬ ЕГО К ШИНЕ. Это и есть прежние две строки «создать revLead и
@@ -845,7 +882,7 @@ async function initAudio(){
   leadOut.connect(revLd.send);
   /* ПРОСТРАНСТВО (наклон ладони → ЭХО): ОТДЕЛЬНАЯ линия ДЕЛЕЯ руки-выразительности — НЕ реверб, чтобы читалось
      как ЭХО, а не как комната, которую уже даёт реверб fx-руки. Своя линия + обратная связь + посыл, ДОБАВОЧНО к
-     делею fx-руки (dly/dlyWet), чьи значения она НЕ читает и НЕ пишет. Нейтраль: посыл 0. */
+     делею fx-руки (общая линия dlyLine + пер-голосовые посылы), чьи значения она НЕ читает и НЕ пишет. Нейтраль: посыл 0. */
   const exprDlyLine=AC.createDelay(1); exprDlyLine.delayTime.value=0.28;
   const exprDlyFb=AC.createGain(); exprDlyFb.gain.value=0.4; exprDlyLine.connect(exprDlyFb); exprDlyFb.connect(exprDlyLine);
   exprDlyWet=AC.createGain(); exprDlyWet.gain.value=0;
@@ -915,28 +952,31 @@ function setLeadInstr(i){
   if(!AC)return;
   hooks.leadInstr && hooks.leadInstr(leadIdx);
 }
-/* ЭФФЕКТЫ соло — ОБЩИЕ НА ВСЕ ГОЛОСА (шина), кроме драйва. Одна идея на изменение: реверб/делей/тремоло/
-   вибрато/выразительность живут на шине, поэтому две руки делят их глубину (последняя пишет). Пер-голосовой
-   посыл в реверб — возможное продолжение, если общая глубина начнёт мешать.
-   ДРАЙВ — ИСКЛЮЧЕНИЕ, И ЭТО НЕ ПРИХОТЬ: сатурация стоит ДО огибающей (bank → shaper → env → vol), а tanh
-   нелинеен, поэтому env·tanh(x) ≠ tanh(env·x). Вынеси драйв на шину — и ОДНА нота при drv>0 (а он по
-   умолчанию 0.12, не ноль!) зазвучала бы иначе, чем сегодня. Поэтому шейпер живёт В ГОЛОСЕ, и порядок
-   узлов внутри голоса — байт-в-байт прежний. */
+/* ЭФФЕКТЫ соло — ТЕПЕРЬ ПЕР-ГОЛОСОВЫЕ (Пласт 3.7.1). Раньше здесь стояла ОБЩАЯ запись в узлы шины
+   (vibGain/tremGain/tremDepth/dlyWet) плюс РАССЫЛКА драйва во ВСЕ живые голоса циклом по lv. Это и было
+   причиной того, что эффекты не были пер-слойными: последний писавший — живая рука или ЛЮБАЯ переигранная
+   нота петли — задавал глубину сразу всем. ⛳ Заодно это та самая «шероховатость общей шины», записанная
+   ещё в 2.6 («играющая петля перетирает живые dly/vib/drv/trm»): общего писателя больше НЕТ.
+   ⚠️ ФУНКЦИЯ ОСТАЛАСЬ И ИМЯ ОСТАЛОСЬ: её зовёт recorder (ENG.leadOn/leadSet) НЕПОСРЕДСТВЕННО ПЕРЕД
+   голосовым вызовом той же ноты — и живьём, и на переигровке. Поэтому она просто КЛАДЁТ величины этой
+   ноты в pendFx, а забирает их leadOn/leadSet в СВОЙ голос. Формат события не тронут: поля
+   vib/drv/trm/dly читаются оттуда же, откуда читались.
+   ДРАЙВ по-прежнему ИСКЛЮЧЕНИЕ ПО МЕСТУ: сатурация стоит ДО огибающей (bank → shaper → env → vol), а tanh
+   нелинеен, поэтому env·tanh(x) ≠ tanh(env·x) — шейпер обязан жить В ГОЛОСЕ. Теперь по-голосовыми стали
+   и остальные три, но по ДРУГОЙ причине: не из-за нелинейности, а ради пер-слойности. */
 function applyFx(p){
-  const t=AC.currentTime;
-  vibGain.gain.setTargetAtTime(p.vib*35,t,0.05);
-  for(const v of lv){ v.satWet.gain.setTargetAtTime(p.drv,t,0.05); v.satDry.gain.setTargetAtTime(1-p.drv*0.7,t,0.05); }
-  lastFx.drv=p.drv;                                       // новый голос строится сразу с текущим драйвом
-  tremDepth.gain.setTargetAtTime(p.trm*0.45,t,0.05);
-  tremGain.gain.setTargetAtTime(1-p.trm*0.45,t,0.05);
-  dlyWet.gain.setTargetAtTime(p.dly*0.55,t,0.08);
+  pendFx.vib=p.vib; pendFx.drv=p.drv; pendFx.trm=p.trm; pendFx.dly=p.dly;
   /* ⚠️ РЕВЕРБА ЗДЕСЬ БОЛЬШЕ НЕТ (Пласт 3.1). Строка `revLead.gain.setTargetAtTime(p.rev*0.85,…)` УДАЛЕНА:
      подмес соло в реверб ведёт теперь fx-рука (параметр 'mix' модуля реверба), и это ЕДИНСТВЕННЫЙ
      писатель revLead.gain. Верни её — и играющая рука начнёт перетирать fx-руку шестьдесят раз в
      секунду, а подмес будет «дёргаться» без видимой причины.
-     Поле p.rev в полезной нагрузке ОСТАЛОСЬ (формат события не тронут, старые петли разбираются как
-     прежде) — оно просто НИКУДА не идёт. Реверб стал ЖИВЫМ, как Гц терменвокса (правило #11): запись
-     реверба вернётся в Пласте 3.2, когда формат события будут менять осознанно. */
+     Поле p.rev в полезной нагрузке ОСТАЛОСЬ (формат события не тронут) — оно просто НИКУДА не идёт.
+     ⚠️ ПОДМЕС РЕВЕРБА НЕ СТАЛ ПЕР-ГОЛОСОВЫМ В 3.7.1, И ЭТО НЕ ЗАБЫВЧИВОСТЬ. У прочих трёх величина
+     ЕСТЬ В СОБЫТИИ (vib/drv/trm/dly лежали там всегда) — её просто некуда было применить пер-нотно.
+     У реверба такой величины НЕТ: `rev` пишется нулём с Пласта 3.1 и никем не читается, а подмесом
+     ведает параметр 'mix' экземпляра (fx-рука). Пер-голосовой посыл без пер-нотного значения был бы
+     узлом, которому нечего передать. Он въезжает в 3.7.2 — ВМЕСТЕ с картой a.fx, которая и принесёт
+     ему значение ('reverb:mix'). Экземплярный посыл из 3.5.1 до тех пор не тронут. */
 }
 /* ВЫРАЗИТЕЛЬНОСТЬ → звук. gestures прогнал признаки через резонатор/пружину (вся «жизнь» там) и шлёт СГЛАЖЕННЫЕ
    каналы 0..1 + engage. Мэппинг канал→узел (глубины/диапазоны) — по EXPR_A (числа стороны звука). Через
@@ -972,32 +1012,70 @@ function applyExpr(en,ten,spr,ori,eng,tc){ if(!AC)return; const t=AC.currentTime
 const lv=[]; const leadHold={};            // голоса пула и владельцы (ключ → голос)
 let leadSum=null, ksReady=true;            // шина соло (вход эффектов) + загрузился ли KS-ворклет (для ленивой стройки)
 const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого индекса начинаются KS-инструменты (считаем, не зашиваем)
-const lastFx={drv:0};                      // последний драйв — чтобы НОВЫЙ голос строился сразу с ним, а не с нулём
-/* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks). */
-function buildLeadBank(ins, pre, hum){
-  banks.length=0; bldHum=hum;
+/* ЗНАЧЕНИЯ ЭФФЕКТОВ ТЕКУЩЕЙ НОТЫ (Пласт 3.7.1). Их кладёт applyFx — а он по построению зовётся
+   НЕПОСРЕДСТВЕННО ПЕРЕД leadOn/leadSet той же ноты, и живьём, и на переигровке (см. ENG в recorder).
+   ⛔ ЭТОТ ПОРЯДОК — КОНТРАКТ, а не совпадение: leadOn читает отсюда значения ИМЕННО СВОЕГО события.
+   Разорви его (позови leadOn без applyFx) — и голос возьмёт величины ЧУЖОЙ ноты.
+   ⚠️ ЭТО НЕ ПРЕЖНИЙ lastFx. Тот был ГЛОБАЛЬНЫМ «последним драйвом»: новый голос строился со значением,
+   которое оставил кто угодно — живая рука или нота петли. Здесь же величина принадлежит КОНКРЕТНОМУ
+   событию и живёт ровно до того, как её заберёт голос этой ноты. Формат события не тронут: поля
+   vib/drv/trm/dly лежали в полезной нагрузке всегда (просто до 3.7.1 их некуда было применить пер-нотно). */
+const pendFx={vib:0,drv:0,trm:0,dly:0};
+/* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks).
+   vib — узел глубины вибрато ЭТОГО голоса: mkOsc цепляет его в detune (пара к hum). */
+function buildLeadBank(ins, pre, hum, vib){
+  banks.length=0; bldHum=hum; bldVib=vib;
   buildLeadBanks(pre, ksReady, ins);
-  bldHum=null;
+  bldHum=null; bldVib=null;
   return banks[0];
 }
+/* ⚠️ ЧЕТЫРЕ ПЕР-ГОЛОСОВЫХ УЗЛА ПРИЦЕПКИ (Пласт 3.7.1) — vibDep · trem+tremDep · dlySend.
+   ПОРЯДОК В ГОЛОСЕ СОХРАНЯЕТ ТОПОЛОГИЮ ШИНЫ: тремоло стоит ПОСЛЕ громкости и ПЕРЕД посылом в делей —
+   ровно как на шине стояло exprWah→tremGain→leadOut→dly. Поэтому эхо по-прежнему несёт тремоло.
+   ⚠️ ЕДИНСТВЕННОЕ, ЧТО СДВИНУЛОСЬ: тремоло и точка посыла в делей переехали С ТОЙ стороны цепочки
+   ВЫРАЗИТЕЛЬНОСТИ на ЭТУ (голос идёт в leadSum → expr → вау → leadOut). При НЕЙТРАЛЬНОЙ выразительности
+   (нет руки-«смычка») вся та цепочка — ТОЖДЕСТВО (exprGain=1, влажные шейперы=0, вау при 0 дБ плоский),
+   поэтому звук БАЙТ-В-БАЙТ. Разница слышна ровно в одном случае: рука-выразительность ведёт ТЕКСТУРУ
+   (единственная нелинейность) — тогда тремоло модулирует ВХОД шейпера, а эхо не несёт его окраски.
+   ⚠️ dlySend КОМПЕНСИРУЕТ LEAD_OUT_G: прежде посыл брался ПОСЛЕ leadOut (0.22), теперь — до неё.
+   Уровень эха и затухание повторов сохраняются точно (обратная связь линии не тронута). */
 function newLeadVoice(){
   const hum=AC.createConstantSource(); hum.offset.value=0; hum.start();   // гуманизация ЭТОГО голоса
+  const vibDep=AC.createGain(); vibDep.gain.value=pendFx.vib*35;          // ГЛУБИНА вибрато этого голоса (LFO общий); в detune его цепляет mkOsc через bldVib
+  vibLFO.connect(vibDep);
   const pre=AC.createGain(); pre.gain.value=1;                            // вход банка (бывший общий preBus)
   const shaper=AC.createWaveShaper(); shaper.curve=makeSatCurve(); shaper.oversample='2x';
-  const satDry=AC.createGain(); satDry.gain.value=1-lastFx.drv*0.7;
-  const satWet=AC.createGain(); satWet.gain.value=lastFx.drv;
+  const satDry=AC.createGain(); satDry.gain.value=1-pendFx.drv*0.7;
+  const satWet=AC.createGain(); satWet.gain.value=pendFx.drv;
   const satSum=AC.createGain();
   const env=AC.createGain(); env.gain.value=0;
   const vol=AC.createGain(); vol.gain.value=0.5;
+  const trem=AC.createGain(); trem.gain.value=1-pendFx.trm*0.45;          // ВСТАВКА тремоло этого голоса: база (1−d) + качание LFO×d
+  const tremDep=AC.createGain(); tremDep.gain.value=pendFx.trm*0.45;
+  tremLFO.connect(tremDep); tremDep.connect(trem.gain);
+  const dlySend=AC.createGain(); dlySend.gain.value=pendFx.dly*0.55*LEAD_OUT_G;   // ПОСЫЛ этого голоса в ОБЩУЮ линию задержки
   pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
   satDry.connect(satSum); satWet.connect(satSum);
-  satSum.connect(env); env.connect(vol); vol.connect(leadSum);
+  satSum.connect(env); env.connect(vol); vol.connect(trem); trem.connect(leadSum);
+  trem.connect(dlySend); dlySend.connect(dlyLine);
   /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,pre,satDry,satWet,env,vol,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0};
+  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,dlySend,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0};
   lv.push(v); return v;
+}
+/* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
+   (drv 0.05 · vib*35 0.05 · trm*0.45 0.05 · dly*0.55 0.08); изменился только АДРЕСАТ: не общие узлы
+   шины, а узлы ЭТОГО голоса. Отсюда пер-слойность даром — голос, созданный событием слоя, несёт
+   величины этого слоя и ничьи больше. */
+function applyVoiceFx(v,p,t){
+  v.satWet.gain.setTargetAtTime(p.drv,t,0.05);
+  v.satDry.gain.setTargetAtTime(1-p.drv*0.7,t,0.05);
+  v.vibDep.gain.setTargetAtTime(p.vib*35,t,0.05);
+  v.tremDep.gain.setTargetAtTime(p.trm*0.45,t,0.05);
+  v.trem.gain.setTargetAtTime(1-p.trm*0.45,t,0.05);
+  v.dlySend.gain.setTargetAtTime(p.dly*0.55*LEAD_OUT_G,t,0.08);
 }
 /* Банк голоса ПОД ИНСТРУМЕНТ: строим лениво и КЭШИРУЕМ на голосе. Кэш (а не пересборка) потому, что
    осциллятор, однажды запущенный, живёт до конца контекста (правило #3) — «выбросить» банк нельзя, его
@@ -1005,7 +1083,7 @@ function newLeadVoice(){
    РЕАЛЬНО сыгранных инструментов × число РЕАЛЬНО занятых голосов (обычно 1–2 × 1–2), против 23 сегодня. */
 function leadVoiceBank(v,ins){
   let b=v.banks[ins];
-  if(!b){ b=v.banks[ins]=buildLeadBank(ins,v.pre,v.hum); b.gain.gain.value=0; }
+  if(!b){ b=v.banks[ins]=buildLeadBank(ins,v.pre,v.hum,v.vibDep); b.gain.gain.value=0; }   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
   if(v.ins!==ins){
     /* ПЕРВЫЙ банк голоса открываем МГНОВЕННО — ровно как это делал initAudio (banks[leadIdx].gain.value=1)
        ещё до первой ноты. Через 20мс-рампу гейта первая атака вышла бы смазанной, и «одна нота звучит
@@ -1042,6 +1120,7 @@ function leadRelease(v,hard){
    1-в-1 прежние: setFreq 0.02 (тот самый 20мс-глайд), vol 0.04, гуманизация 0.006, ±5% уровня, ±10% атаки. */
 function leadOn(owner,freq,vol,ins,deg,oct){
   const v=leadAlloc(owner,ins), t=AC.currentTime, b=leadVoiceBank(v,ins);
+  applyVoiceFx(v,pendFx,t);                   // эффекты ЭТОЙ ноты — в ЭТОТ голос (величины принёс applyFx строкой выше по стеку вызова; см. pendFx)
   if(freq!=null)b.setFreq(freq,t);
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
@@ -1060,6 +1139,7 @@ function leadOn(owner,freq,vol,ins,deg,oct){
 }
 function leadSet(owner,freq,vol,deg,oct){                    // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем)
   const v=leadHold[owner]; if(!v)return; const t=AC.currentTime, b=v.banks[v.ins];
+  applyVoiceFx(v,pendFx,t);                                 // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины)
   if(freq!=null&&b)b.setFreq(freq,t);
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }                  // ступень ведётся вместе с частотой — подсветка идёт за нотой
@@ -1314,5 +1394,5 @@ export {
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
-  FX_FACTORY, fxInstance,   // ЧТО существует (статика, есть до initAudio — по ней меню строит список) и ЧТО построено (живой экземпляр роли: gestures пишет параметры, draw читает величины для столбиков)
+  FX_FACTORY, fxInstance, fxSetActive,   // ЧТО существует (статика, есть до initAudio — по ней меню строит список), ЧТО построено (живой экземпляр роли: gestures пишет параметры, draw читает величины для столбиков) и ВКЛ/ВЫКЛ прицепки (ui — при снятии/возврате эффекта в цепь)
 };

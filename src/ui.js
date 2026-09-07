@@ -10,7 +10,7 @@ import { fxParamsOf } from './gestures.js';
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY } from './audio.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
@@ -677,6 +677,27 @@ function fxShareChip(groups){
 /* Подсказка секции — абзац .phint, как у эталона A4 и «Пальцев в руке». Пересобирается вместе со
    строками (textContent='' выше), поэтому отдельного скрытия/показа не требуется. */
 function fxHint(key){ const p=document.createElement('p'); p.className='phint'; p.textContent=t(key); return p; }
+/* ═══ ПРАВКА СОСТАВА ЦЕПИ — ДВЕ ПОЛОВИНЫ, И ОБЕ ОБЯЗАТЕЛЬНЫ ═══
+   ДАННЫЕ меняет state (fxChainAdd/fxChainRemove), ЗВУК — audio (fxSetActive). Разнесены не по вкусу:
+   state до audio НЕ ДОТЯГИВАЕТСЯ (audio импортирует state, обратный импорт — цикл), поэтому сеттер
+   физически не может ни зажечь, ни погасить модуль. Ровно по этой же причине ui засевает фиксированные
+   значения живыми (см. ниже) — правило одно: инварианты ДАННЫХ держит сеттер, всё, что требует УЗЛОВ,
+   делает ui как единственный, кто видит оба слоя.
+   ⛔ ПОЭТОМУ ОБЁРНУТО В ФУНКЦИИ, а не расписано по месту: ui — единственный писатель цепи, и пока правка
+   идёт ЧЕРЕЗ ЭТИ ДВЕ, забыть половину нельзя. Появится третье место правки — звать надо их же.
+   ⚠️ Старые скалярные (делей/вибрато/драйв/тремоло) гасит hushUnassignedFx ВНУТРИ сеттера (правило 2.5),
+   и fxSetActive для них — тихий no-op: экземпляра у них нет. Каждому свой механизм, дублирования нет. */
+function fxChainDrop(role,effIdx){
+  const eff=fxChainOf(role)[effIdx]; if(!eff) return;
+  const id=eff.fxId;
+  fxChainRemove(role,effIdx);      // данные (+ гашение СТАРЫХ СКАЛЯРНЫХ внутри сеттера)
+  fxSetActive(role,id,false);      // звук: модулю уводим ПОСЫЛ в 0, сеть не разбираем — хвост дозвучит
+}
+function fxChainPut(role,fxId,nParams){
+  const idx=fxChainAdd(role,fxId,nParams);
+  if(idx>=0) fxSetActive(role,fxId,true);   // ВОЗВРАТ: посыл поднимается из 0 к СОХРАНЁННОМУ значению параметра (p.cur никто не стирал)
+  return idx;
+}
 /* Имя эффекта для ЗАГОЛОВКА группы строк: у старых скалярных — из FX_META, у модулей — из реестра.
    Реестр читаем НА КАЖДУЮ ОТРИСОВКУ, а не один раз: до initAudio он пуст (узлов ещё нет), а панель
    может быть перерисована и до старта (см. довод в showScale).
@@ -752,7 +773,7 @@ function renderFxCtl(){
     del.title=t('fx.remove'); del.setAttribute('aria-label',t('fx.remove'));
     del.onclick=e=>{ e.stopPropagation();
       if(fxOpenId===eff.fxId) fxOpenId=null;         // разворачивать после удаления нечего
-      fxChainRemove(fxCtlRole,effIdx); renderFxCtl(); };
+      fxChainDrop(fxCtlRole,effIdx); renderFxCtl(); };   // ДАННЫЕ + ЗВУК одной операцией (см. fxChainDrop): снятый эффект обязан замолчать
     hd.appendChild(arw); hd.appendChild(nm); hd.appendChild(sm);
     /* ЧИП НА ЗАГОЛОВКЕ — чтобы совместность была видна БЕЗ разворачивания: иначе её пришлось бы искать,
        разворачивая эффекты по очереди, а это ровно та работа, от которой аккордеон избавлял.
@@ -896,7 +917,7 @@ function renderFxCtl(){
     sel.onchange=e=>{
       const id=e.target.value; if(!id) return;
       const n=(avail.find(a=>a[0]===id)||[,,1])[2];        // сколько параметров — знает сам модуль; у старых скалярных ровно один
-      const idx=fxChainAdd(fxCtlRole,id,n);
+      const idx=fxChainPut(fxCtlRole,id,n);   // ДАННЫЕ + ЗВУК: возвращённый эффект снова слышен (посыл поднимается из 0)
       if(idx>=0){
         /* ЗАСЕВ ФИКСИРОВАННЫХ ЖИВЫМ ЗНАЧЕНИЕМ — обязанность ui (state до audio не дотянется, обратный
            импорт был бы циклом; об этом и просит комментарий у fxChainAdd). Без него параметр, вставший
