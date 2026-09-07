@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx } from './state.js';
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxChainOf } from './state.js';
 import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS } from './config.js';
@@ -102,7 +102,7 @@ let AC=null, master, limiter;
 /* banks — СКРАТЧ строителя банков (buildLeadBanks кладёт сюда собранный банк, buildLeadBank забирает).
    Раньше это был ПОСТОЯННЫЙ массив всех 23 банков соло-цепочки; теперь банк живёт в ГОЛОСЕ пула.
    bldHum — ConstantSource гуманизации ТОГО голоса, который сейчас строится (его цепляет mkOsc). */
-let banks=[], bldHum=null, bldVib=null, vibLFO, tremLFO, dlyLine,
+let banks=[], bldHum=null, bldVib=null, vibLFO, tremLFO, dlyLine, revBus,
     exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-ШИНА (expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
 /* ⚠️ vibGain / tremGain / tremDepth / dlyWet УДАЛЕНЫ (Пласт 3.7.1). Это были ОБЩИЕ узлы глубины на всю
    соло-шину, и ровно поэтому эффекты были НЕ ПЕР-СЛОЙНЫМИ: последний писавший (живая рука ИЛИ любая
@@ -556,10 +556,19 @@ const REV_PARAMS=[
      помещается); labelKey — полное имя для МЕНЮ, через словарь.
      ⚠️ max 0.85 · curve 'lin' у подмеса — НЕ произвол: они дословно воспроизводят прежнее отображение
      `p.rev*0.85`, поэтому mix=1 звучит как прежняя полная глубина. */
+  /* ⚠️ ФЛАГ attach — РАЗДЕЛИТЕЛЬ ДВУХ РОДОВ ПАРАМЕТРА (уточнение ⛳ ПРИНЦИПА ЛУПЕРА, Пласт 3.7.2):
+     attach:true  — ПРИЦЕПОЧНЫЙ: величина МОЖЕТ отличаться ОТ НОТЫ К НОТЕ, живёт пер-голосово и ЕДЕТ В
+                    СОБЫТИИ, поэтому слой звучит со СВОИМ значением.
+     без флага     — СЕТЕВОЙ: описывает саму сеть (длина, окраска). Два слоя физически не могут иметь
+                    разную длину хвоста ВНУТРИ ОДНОЙ FDN — это состояние РОЛИ, в событие НЕ пишется.
+                    Пер-слойные сети — отдельный Пласт 3.8 со своей ценой (экземпляр на слой, потолок,
+                    удаление без обрыва хвоста). ⛔ Не помечать decay/tone как attach «для полноты»:
+                    записать их можно, а исполнить — нет, и слой зазвучал бы НЕ КАК ЗАПИСАН. */
   {key:'decay',labelKey:'fx.reverb.decay',short:'TAIL',unit:'s', def:REV_A.decay,min:0.3,max:4.0,   curve:'log'},
   {key:'tone', labelKey:'fx.reverb.tone', short:'TONE',unit:'Hz',def:REV_A.tone, min:200,max:18000, curve:'log'},
-  {key:'mix',  labelKey:'fx.reverb.mix',  short:'MIX', unit:'',  def:0.25,       min:0,  max:0.85,  curve:'lin'},
+  {key:'mix',  labelKey:'fx.reverb.mix',  short:'MIX', unit:'',  def:0.25,       min:0,  max:0.85,  curve:'lin', attach:true},
 ];
+const REV_MIX=REV_PARAMS.find(p=>p.key==='mix');   // спецификация подмеса: по ней нормированное значение события превращается в усиление посыла
 /* НОРМИРОВАНИЕ ПАРАМЕТРА: 0..1 ↔ реальная величина. Жест даёт 0..1 (смещение от точки захвата), а
    параметру нужны секунды/герцы — и ПО ЛОГ-ШКАЛЕ, иначе половина хода уходит на неслышимое: 200→400 Гц
    слышно как шаг, 17000→18000 — нет. Живёт РЯДОМ С ПАРАМЕТРОМ: одно место, где min/max/curve
@@ -589,8 +598,17 @@ function fxWrapParam(p){
 function makeReverbFx(){
   const inNode=AC.createGain();  inNode.gain.value=1;     // вход сети: сюда приходит посыл ЭТОГО экземпляра
   const outNode=AC.createGain(); outNode.gain.value=0.9;  // выход: его цепляет к мастеру тот, кто строит роль
-  const send=AC.createGain();    send.gain.value=0;       // ПОСЫЛ (подмес): шина → send → in. Стартовый 0 — как было у revLead
-  send.connect(inNode);
+  /* ДВА УЗЛА НА ВХОДЕ, И У НИХ РАЗНЫЕ РАБОТЫ (Пласт 3.7.2) — их нельзя сливать:
+       send — ВЕЛИЧИНА подмеса роли, её пишет параметр 'mix' (шина → send → gate → in). Так работают
+              АККОРДЫ (и любая роль, чей источник — одна шина).
+       gate — ВКЛЮЧЁН ЛИ эффект в цепи роли (1/0), её ведёт fxSetActive при снятии/возврате.
+     ⚠️ ЗАЧЕМ РАЗДЕЛИЛИ: у СОЛО подмес стал ПЕР-НОТНЫМ (пер-голосовой посыл несёт значение СВОЕГО
+     события), и голоса цепляются СРАЗУ В gate, минуя send. Останься гашение на send — снятый у соло
+     реверб не замолчал бы вовсе (голоса идут мимо), а положи мы пер-нотную величину в send — она
+     умножилась бы на величину руки. Один узел не может быть и величиной, и выключателем сразу. */
+  const send=AC.createGain();    send.gain.value=0;       // ПОСЫЛ (подмес) ШИНЫ роли. Стартовый 0 — как было у revLead
+  const gate=AC.createGain();    gate.gain.value=1;       // ВКЛЮЧЕНИЕ эффекта в цепи роли (пишет только fxSetActive)
+  send.connect(gate); gate.connect(inNode);
   const lines=buildFDN(inNode,outNode);                   // СНАЧАЛА сеть — она рождает линии...
   const setDecay=v=>setRevDecay(lines,v), setTone=v=>setRevTone(lines,v);
   setDecay(REV_A.decay); setTone(REV_A.tone);             // ...и ТОЛЬКО ПОТОМ параметры. ⚠️ ПОРЯДОК НЕСУЩИЙ:
@@ -610,7 +628,7 @@ function makeReverbFx(){
      Дефолт НЕнулевой намеренно: комната, которой всегда звучало приложение, обязана быть слышна из
      коробки (играющая рука её больше не ведёт — Пласт 3.1). */
   const mp=params.find(p=>p.key==='mix'); if(mp) mp.setNorm(mp.cur);
-  return { id:'reverb', labelKey:'fx.reverb', in:inNode, out:outNode, send, params };
+  return { id:'reverb', labelKey:'fx.reverb', in:inNode, out:outNode, send, gate, params };
 }
 /* ЧТО СУЩЕСТВУЕТ (статика, доступна с загрузки модуля) и ЧТО ПОСТРОЕНО (по ролям, лениво). */
 const FX_FACTORY={ reverb:{ id:'reverb', labelKey:'fx.reverb', params:REV_PARAMS, make:makeReverbFx } };
@@ -654,6 +672,27 @@ function fxInstance(role,fxId){
   if(!byRole[fxId]){ byRole[fxId]=f.make(); fxAttach(role,byRole[fxId]); }   // построили — сразу и прицепили (если шина роли уже известна)
   return byRole[fxId];
 }
+/* ═══ СНИМОК ПРИЦЕПОЧНЫХ ПАРАМЕТРОВ ЦЕПИ РОЛИ (Пласт 3.7.2) ═══
+   Отдаёт `{ 'fxId:paramKey': v01 }` — то, что уезжает в СОБЫТИЕ и делает слой самостоятельным.
+   ⚠️ КЛЮЧ — СТАБИЛЬНАЯ ПАРА `fxId:paramKey`, НИКОГДА не индекс в цепи (правило #25). Перестановка или
+   удаление эффекта не смеет переосмыслить УЖЕ ЗАПИСАННОЕ событие; индекс это сделал бы молча.
+   ⚠️ ЗНАЧЕНИЯ НОРМИРОВАННЫЕ (0..1) — те же, что у жеста, у меню и у setNorm. Секунды и герцы живут
+   ИСКЛЮЧИТЕЛЬНО в fxNorm/fxDenorm; второй модели диапазона не заводим (правило с 2.6).
+   ⚠️ ТОЛЬКО attach-параметры (см. REV_PARAMS): сетевые в событие не идут — их некому исполнить пер-слойно.
+   ⚠️ Старый скалярный (dly/vib/drv/trm) в FX_FACTORY отсутствует — у него РОВНО ОДИН параметр, и он же
+   сам себе прицепка; ключ `<id>:amt`, величина прямо из state.fx (она уже 0..1).
+   Экземпляра ещё нет (эффект в цепи, но ни разу не звучал) → в снимок не попадает: записывать нечего. */
+const FX_AMT='amt';
+function fxSnapshot(role){
+  const out={};
+  for(const eff of fxChainOf(role)){
+    const id=eff.fxId, f=FX_FACTORY[id];
+    if(!f){ if(id in fx) out[id+':'+FX_AMT]=fx[id]; continue; }
+    const inst=FX_INST[role] && FX_INST[role][id]; if(!inst) continue;
+    f.params.forEach((s,i)=>{ if(s.attach && inst.params[i]) out[id+':'+s.key]=inst.params[i].cur; });
+  }
+  return out;
+}
 /* ⛳ ЭФФЕКТ УБРАН ИЗ ЦЕПИ → ЗАМОЛКАЕТ; ВЕРНУЛИ → СНОВА ЗВУЧИТ. Ровно та операция, которую обещал
    комментарий выше («вместо разбора — уводим подмес в 0»), но которой НЕ СУЩЕСТВОВАЛО: снятый реверб
    продолжал звучать со своими параметрами, потому что hushUnassignedFx умеет гасить ТОЛЬКО старые
@@ -671,9 +710,13 @@ function fxInstance(role,fxId){
    него нет и не будет), и это правильно: его гасит hushUnassignedFx, каждому своё. */
 function fxSetActive(role,fxId,on){
   if(!AC) return;
-  if(on){ const inst=fxInstance(role,fxId); if(inst) for(const p of inst.params) p.setNorm(p.cur); return; }
-  const inst=FX_INST[role] && FX_INST[role][fxId];
-  if(inst) inst.send.gain.setTargetAtTime(0, AC.currentTime, 0.08);
+  /* ⚠️ ВЕДЁМ gate, А НЕ send (с 3.7.2). У соло голоса приходят В gate напрямую, минуя send, — гашение
+     через send оставило бы снятый реверб звучать у соло. gate стоит на входе сети и потому выключает
+     ВСЕ источники роли разом, чем бы они ни были: шиной (аккорды) или голосами (соло). */
+  const inst = on ? fxInstance(role,fxId) : (FX_INST[role] && FX_INST[role][fxId]);
+  if(!inst) return;
+  inst.gate.gain.setTargetAtTime(on?1:0, AC.currentTime, 0.08);
+  if(on) for(const p of inst.params) p.setNorm(p.cur);   // вернуть узлы из СОХРАНЁННЫХ значений (величина подмеса шины не терялась)
 }
 /* Карта глубины руки → cutoff яркости (Гц). depth 0 близко/ярко → CHORD_LP_MAX (открыт, НЕЙТРАЛЬ =
    сегодняшний звук), 1 далеко/глухо → CHORD_LP_MIN. Логарифмическая (перцептивно ровная). Единый
@@ -869,6 +912,13 @@ async function initAudio(){
      Стало: v.dlySend→dly→master, где посыл каждого голоса уже несёт и глубину, и компенсацию LEAD_OUT_G.
      Уровень эха и затухание повторов те же: обратная связь линии (0.45) не тронута, а масштаб входа и
      масштаб выхода эквивалентны для линейной линии. */
+  /* ⛔ ЛИНИЮ НА ЗАВОРОТЕ ПЕТЛИ НЕ ЧИСТИМ, И ЭТО НЕ БАГ. Хвост, набранный к концу круга, звенит над
+     началом следующего — так делей и устроен: он не знает, где у петли шов. Промывка на завороте
+     (обнуление обратной связи или пересоздание линии) дала бы СЛЫШНЫЙ ОБРЫВ на каждом повторе и заодно
+     срезала бы эхо живой ноты, взятой через границу. Тот же довод, что у 3.5.1 про хвост реверба.
+     ⚠️ НЕ ПУТАТЬ С БАГОМ, КОТОРЫЙ ЧИНИЛСЯ ФЛАГОМ fresh (см. applyVoiceFx): там ПЕРВАЯ НОТА ПОВТОРА
+     САМА уходила в делей на уровне предыдущей. Отличить на слух просто: «дозвон хвоста» — это эхо
+     ПОСЛЕДНИХ нот круга, а тот баг давал эхо САМОЙ первой ноты. */
   const dly=AC.createDelay(1); dly.delayTime.value=0.35;
   const fb=AC.createGain(); fb.gain.value=0.45; dly.connect(fb); fb.connect(dly);
   dly.connect(master);
@@ -879,7 +929,12 @@ async function initAudio(){
      соединить leadOut→revLead→verb», только узел теперь с владельцем.
      ⚠️ Стартовое значение подмеса больше НЕ вносится отсюда: экземпляр вносит его сам при постройке
      (см. makeReverbFx). Прежняя причина «узла ещё нет» исчезла вместе с модульной переменной. */
-  leadOut.connect(revLd.send);
+  /* ⚠️ СОЛО БОЛЬШЕ НЕ ШЛЁТ В РЕВЕРБ С ШИНЫ (Пласт 3.7.2). Прежде здесь стояло leadOut.connect(revLd.send):
+     ОДИН посыл на всю роль, то есть подмес НЕ МОГ отличаться от ноты к ноте, а значит и от слоя к слою.
+     Теперь его несёт КАЖДЫЙ ГОЛОС (v.revSend), а сюда кладём ЗАТВОР экземпляра — точку, куда голоса
+     цепляются и которую гасит fxSetActive при снятии реверба из цепи. Аккорды по-прежнему шлют с шины
+     через revChI.send: у них один источник, пер-нотного подмеса нет (это цель (а)/Пласт 3.8). */
+  revBus=revLd.gate;
   /* ПРОСТРАНСТВО (наклон ладони → ЭХО): ОТДЕЛЬНАЯ линия ДЕЛЕЯ руки-выразительности — НЕ реверб, чтобы читалось
      как ЭХО, а не как комната, которую уже даёт реверб fx-руки. Своя линия + обратная связь + посыл, ДОБАВОЧНО к
      делею fx-руки (общая линия dlyLine + пер-голосовые посылы), чьи значения она НЕ читает и НЕ пишет. Нейтраль: посыл 0. */
@@ -964,19 +1019,23 @@ function setLeadInstr(i){
    ДРАЙВ по-прежнему ИСКЛЮЧЕНИЕ ПО МЕСТУ: сатурация стоит ДО огибающей (bank → shaper → env → vol), а tanh
    нелинеен, поэтому env·tanh(x) ≠ tanh(env·x) — шейпер обязан жить В ГОЛОСЕ. Теперь по-голосовыми стали
    и остальные три, но по ДРУГОЙ причине: не из-за нелинейности, а ради пер-слойности. */
-function applyFx(p){
-  pendFx.vib=p.vib; pendFx.drv=p.drv; pendFx.trm=p.trm; pendFx.dly=p.dly;
-  /* ⚠️ РЕВЕРБА ЗДЕСЬ БОЛЬШЕ НЕТ (Пласт 3.1). Строка `revLead.gain.setTargetAtTime(p.rev*0.85,…)` УДАЛЕНА:
-     подмес соло в реверб ведёт теперь fx-рука (параметр 'mix' модуля реверба), и это ЕДИНСТВЕННЫЙ
-     писатель revLead.gain. Верни её — и играющая рука начнёт перетирать fx-руку шестьдесят раз в
-     секунду, а подмес будет «дёргаться» без видимой причины.
-     Поле p.rev в полезной нагрузке ОСТАЛОСЬ (формат события не тронут) — оно просто НИКУДА не идёт.
-     ⚠️ ПОДМЕС РЕВЕРБА НЕ СТАЛ ПЕР-ГОЛОСОВЫМ В 3.7.1, И ЭТО НЕ ЗАБЫВЧИВОСТЬ. У прочих трёх величина
-     ЕСТЬ В СОБЫТИИ (vib/drv/trm/dly лежали там всегда) — её просто некуда было применить пер-нотно.
-     У реверба такой величины НЕТ: `rev` пишется нулём с Пласта 3.1 и никем не читается, а подмесом
-     ведает параметр 'mix' экземпляра (fx-рука). Пер-голосовой посыл без пер-нотного значения был бы
-     узлом, которому нечего передать. Он въезжает в 3.7.2 — ВМЕСТЕ с картой a.fx, которая и принесёт
-     ему значение ('reverb:mix'). Экземплярный посыл из 3.5.1 до тех пор не тронут. */
+function applyFx(m){
+  /* ⚠️ R2 — КАРТЫ МОЖЕТ НЕ БЫТЬ, И ЭТО НЕ «НЕЙТРАЛЬ». События АРАНЖИРОВКИ (arrange.js строит нагрузку
+     руками) карты не несут вовсе. Прочти их как нули — и ВЕСЬ ДЖЕМ СТАНЕТ СУХИМ. Отсутствие карты
+     значит «звучи ТЕКУЩЕЙ цепью роли», ровно как эти события звучали до 3.7.2. */
+  const s = m || fxSnapshot('ld');
+  pendFx.vib=s['vib:'+FX_AMT]||0; pendFx.drv=s['drv:'+FX_AMT]||0;
+  pendFx.trm=s['trm:'+FX_AMT]||0; pendFx.dly=s['dly:'+FX_AMT]||0;
+  /* ПОДМЕС РЕВЕРБА — из карты, В СЫРОЕ УСИЛЕНИЕ через fxDenorm: событие несёт НОРМИРОВАННОЕ (0..1),
+     узлу нужно 0..0.85. Нет ключа (реверб не в цепи роли) → посыл 0: нота не идёт в комнату. */
+  const rv=s['reverb:mix'];
+  pendFx.rev = rv==null ? 0 : fxDenorm(REV_MIX,rv);
+  /* ⚠️ ИСТОРИЯ ПОЛЯ `rev`, чтобы его не «вернули» по ошибке. До Пласта 3.1 здесь стояла строка
+     `revLead.gain.setTargetAtTime(p.rev*0.85,…)`: подмес вела ИГРАЮЩАЯ рука, шестьдесят раз в секунду
+     перетирая fx-руку. 3.1 её убрал, а поле оставил писаться НУЛЁМ — формат тогда не трогали.
+     3.7.2 СНЯЛ поле совсем: его порог в дельта-сжатии (|0−0|>0.03) был ложью навсегда, читателей не
+     было. Смысл вернулся ключом карты 'reverb:mix' — и теперь он ПЕР-НОТНЫЙ (голос несёт величину
+     своего события), чего именованное поле дать не могло: подмес был ОДИН на всю роль. */
 }
 /* ВЫРАЗИТЕЛЬНОСТЬ → звук. gestures прогнал признаки через резонатор/пружину (вся «жизнь» там) и шлёт СГЛАЖЕННЫЕ
    каналы 0..1 + engage. Мэппинг канал→узел (глубины/диапазоны) — по EXPR_A (числа стороны звука). Через
@@ -1020,7 +1079,7 @@ const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого ин�
    которое оставил кто угодно — живая рука или нота петли. Здесь же величина принадлежит КОНКРЕТНОМУ
    событию и живёт ровно до того, как её заберёт голос этой ноты. Формат события не тронут: поля
    vib/drv/trm/dly лежали в полезной нагрузке всегда (просто до 3.7.1 их некуда было применить пер-нотно). */
-const pendFx={vib:0,drv:0,trm:0,dly:0};
+const pendFx={vib:0,drv:0,trm:0,dly:0,rev:0};   // rev — УЖЕ СЫРОЕ усиление посыла (0..0.85): денормировал applyFx, голосу считать нечего
 /* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks).
    vib — узел глубины вибрато ЭТОГО голоса: mkOsc цепляет его в detune (пара к hum). */
 function buildLeadBank(ins, pre, hum, vib){
@@ -1054,28 +1113,51 @@ function newLeadVoice(){
   const tremDep=AC.createGain(); tremDep.gain.value=pendFx.trm*0.45;
   tremLFO.connect(tremDep); tremDep.connect(trem.gain);
   const dlySend=AC.createGain(); dlySend.gain.value=pendFx.dly*0.55*LEAD_OUT_G;   // ПОСЫЛ этого голоса в ОБЩУЮ линию задержки
+  const revSend=AC.createGain(); revSend.gain.value=pendFx.rev*LEAD_OUT_G;        // ПОСЫЛ этого голоса в комнату РОЛИ (пер-нотный подмес, 3.7.2)
   pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
   satDry.connect(satSum); satWet.connect(satSum);
   satSum.connect(env); env.connect(vol); vol.connect(trem); trem.connect(leadSum);
   trem.connect(dlySend); dlySend.connect(dlyLine);
+  if(revBus) trem.connect(revSend), revSend.connect(revBus);   // revBus — ВХОДНОЙ ЗАТВОР (gate) экземпляра реверба соло: мимо send, чтобы пер-нотная величина не умножалась на величину шины
   /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,dlySend,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0};
+  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,dlySend,revSend,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0};
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
    (drv 0.05 · vib*35 0.05 · trm*0.45 0.05 · dly*0.55 0.08); изменился только АДРЕСАТ: не общие узлы
    шины, а узлы ЭТОГО голоса. Отсюда пер-слойность даром — голос, созданный событием слоя, несёт
    величины этого слоя и ничьи больше. */
-function applyVoiceFx(v,p,t){
-  v.satWet.gain.setTargetAtTime(p.drv,t,0.05);
-  v.satDry.gain.setTargetAtTime(1-p.drv*0.7,t,0.05);
-  v.vibDep.gain.setTargetAtTime(p.vib*35,t,0.05);
-  v.tremDep.gain.setTargetAtTime(p.trm*0.45,t,0.05);
-  v.trem.gain.setTargetAtTime(1-p.trm*0.45,t,0.05);
-  v.dlySend.gain.setTargetAtTime(p.dly*0.55*LEAD_OUT_G,t,0.08);
+/* ⛳ fresh — АТАКА ПРОТИВ ВЕДЕНИЯ, и это НЕСУЩЕЕ различие, а не оптимизация.
+   На АТАКЕ величина СТАВИТСЯ (cancelScheduledValues + setValueAtTime), при ВЕДЕНИИ — подъезжает
+   (setTargetAtTime с прежними постоянными). Почему так, историей вопроса:
+   ⚠️ БЫЛА ОШИБКА: и то и другое шло через setTargetAtTime. Постоянные 0.05/0.08 писались для РУЧКИ НА
+   ОБЩЕЙ ШИНЕ (её крутят плавно, скачок был бы слышен щелчком) — но с Пласта 3.7.1 это ПЕР-ГОЛОСОВЫЕ
+   величины, обязанные быть ВЕРНЫМИ УЖЕ В ПЕРЕХОДНОМ ПРОЦЕССЕ АТАКИ. А setTargetAtTime — это
+   ЭКСПОНЕНЦИАЛЬНОЕ ПРИБЛИЖЕНИЕ: в момент t величина РАВНА СТАРОЙ и лишь потом уходит к цели (через
+   20 мс от неё остаётся ещё ~78% при τ=0.08). Голоса же берутся ИЗ ПУЛА и при отпускании НЕ
+   сбрасываются — значит переиспользованный голос отдавал НАЧАЛО новой ноты в делей/реверб на уровне
+   ПРЕДЫДУЩЕЙ. Слышно это было ярче всего на завороте петли (там сходятся самый большой скачок значения
+   и возврат голоса): «первая нота повтора звучит с делеем, хотя записана сухой».
+   ⚠️ СИММЕТРИЯ ВОССТАНОВЛЕНА: newLeadVoice эти же гейны ВСЕГДА ставил присваиванием (.gain.value=…),
+   то есть СВЕЖИЙ голос был верен, а переиспользованный — нет. Расхождение и было багом.
+   ⚠️ ТОЧНО ТАК ЖЕ ДАВНО УСТРОЕНЫ АККОРДЫ: chordOn ставит яркость на атаке
+   (`v.fb.frequency.cancelScheduledValues(t); setValueAtTime(briHz,t)`), а chordGlide ведёт её
+   setTargetAtTime. Здесь мы не изобретаем приём, а приводим соло к тому, что у аккордов уже работало. */
+function applyVoiceFx(v,p,t,fresh){
+  const put=(prm,val,tc)=>{
+    if(fresh){ prm.cancelScheduledValues(t); prm.setValueAtTime(val,t); }
+    else prm.setTargetAtTime(val,t,tc);
+  };
+  put(v.satWet.gain, p.drv, 0.05);
+  put(v.satDry.gain, 1-p.drv*0.7, 0.05);
+  put(v.vibDep.gain, p.vib*35, 0.05);
+  put(v.tremDep.gain, p.trm*0.45, 0.05);
+  put(v.trem.gain, 1-p.trm*0.45, 0.05);
+  put(v.dlySend.gain, p.dly*0.55*LEAD_OUT_G, 0.08);
+  put(v.revSend.gain, p.rev*LEAD_OUT_G, 0.08);   // та же компенсация LEAD_OUT_G, что у делея: посыл берётся ДО сухой громкости шины
 }
 /* Банк голоса ПОД ИНСТРУМЕНТ: строим лениво и КЭШИРУЕМ на голосе. Кэш (а не пересборка) потому, что
    осциллятор, однажды запущенный, живёт до конца контекста (правило #3) — «выбросить» банк нельзя, его
@@ -1109,6 +1191,13 @@ function leadAlloc(owner,ins){
     if(v.owner) delete leadHold[v.owner]; leadRelease(v,true); }
   v.owner=owner; leadHold[owner]=v; return v;
 }
+/* ⛔ ПРИЦЕПКИ (dlySend/revSend/tremDep/vibDep/satWet) ЗДЕСЬ НЕ СБРАСЫВАЕМ, И ЭТО НАМЕРЕННО.
+   Соблазн понятен: «голос уходит в пул — обнулим его посылы, чтобы не утекли в следующую ноту». Но
+   отпускаемая нота ПРОДОЛЖАЕТ ЗВУЧАТЬ хвостом релиза, и хвост обязан идти в делей и реверб на СВОЁМ
+   уровне — обнули посыл здесь, и у КАЖДОЙ ноты обрежется эхо ровно в момент снятия пальца. Утечку в
+   следующую ноту закрывает не сброс на отпускании, а ПОСТАНОВКА величины НА АТАКЕ (см. applyVoiceFx,
+   флаг fresh) — то есть в правильном месте. Тот же довод, по которому 3.5.1 не разбирает экземпляры
+   эффектов: не рвать то, что ещё звучит. */
 function leadRelease(v,hard){
   const t=AC.currentTime;
   v.env.gain.cancelScheduledValues(t);
@@ -1120,7 +1209,11 @@ function leadRelease(v,hard){
    1-в-1 прежние: setFreq 0.02 (тот самый 20мс-глайд), vol 0.04, гуманизация 0.006, ±5% уровня, ±10% атаки. */
 function leadOn(owner,freq,vol,ins,deg,oct){
   const v=leadAlloc(owner,ins), t=AC.currentTime, b=leadVoiceBank(v,ins);
-  applyVoiceFx(v,pendFx,t);                   // эффекты ЭТОЙ ноты — в ЭТОТ голос (величины принёс applyFx строкой выше по стеку вызова; см. pendFx)
+  /* fresh СНИМАЕМ ДО применения эффектов и ДО гейта `if(v.on)return` ниже: этот гейт и ЕСТЬ граница
+     «атака / уже звучит», второй такой границы заводить не надо. leadOn зовётся КАЖДЫЙ КАДР зажатой
+     рукой — там fresh=false, и величины подъезжают плавно, как и должны при ведении. */
+  const fresh=!v.on;
+  applyVoiceFx(v,pendFx,t,fresh);             // эффекты ЭТОЙ ноты — в ЭТОТ голос (величины принёс applyFx строкой выше по стеку вызова; см. pendFx)
   if(freq!=null)b.setFreq(freq,t);
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
@@ -1139,7 +1232,7 @@ function leadOn(owner,freq,vol,ins,deg,oct){
 }
 function leadSet(owner,freq,vol,deg,oct){                    // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем)
   const v=leadHold[owner]; if(!v)return; const t=AC.currentTime, b=v.banks[v.ins];
-  applyVoiceFx(v,pendFx,t);                                 // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины)
+  applyVoiceFx(v,pendFx,t,false);                           // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины). fresh=false ВСЕГДА: leadSet по определению не атака
   if(freq!=null&&b)b.setFreq(freq,t);
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }                  // ступень ведётся вместе с частотой — подсветка идёт за нотой
@@ -1394,5 +1487,5 @@ export {
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
-  FX_FACTORY, fxInstance, fxSetActive,   // ЧТО существует (статика, есть до initAudio — по ней меню строит список), ЧТО построено (живой экземпляр роли: gestures пишет параметры, draw читает величины для столбиков) и ВКЛ/ВЫКЛ прицепки (ui — при снятии/возврате эффекта в цепь)
+  FX_FACTORY, fxInstance, fxSetActive, fxSnapshot,   // ЧТО существует (статика, есть до initAudio — по ней меню строит список), ЧТО построено (живой экземпляр роли: gestures пишет параметры, draw читает величины для столбиков) и ВКЛ/ВЫКЛ прицепки (ui — при снятии/возврате эффекта в цепь)
 };

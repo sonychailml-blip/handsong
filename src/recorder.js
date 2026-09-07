@@ -4,7 +4,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
-import { REC_VOL_EPS, REC_REV_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
+import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
 import { hooks } from './hooks.js';
 
 /* ================= ЗАПИСЬ И ЛУПЕР =================
@@ -97,11 +97,11 @@ const ENG={
                  замороженному ладу (полимодальность цела). */
               if(ctx)leadCancel(o);                // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
-              applyFx({rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});   // эффекты — общие (шина), кроме драйва (он в голосе, см. applyFx)
+              applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
               leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
               if(a.bend&&a.bend.length)scheduleBend(o,a.bend,base,60/loop.bpm); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос
   leadSet:(a,ctx,live,own)=>{ const o=own||ldKey(ctx,a);
-              applyFx({rev:a.rev,vib:a.vib,drv:a.drv,trm:a.trm,dly:a.dly});
+              applyFx(a.fx);
               leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct); },
   leadOff:(a,ctx,live,own)=>leadOff(own||ldKey(ctx,a)),
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
@@ -137,7 +137,17 @@ function push(fn,a){
        вместо доли 0 (слышно как пропавший сильный удар). Дожимаем руками. */
     if(lb-t<1e-6) t=0;
   }
-  events.push({t,layer:loop.layer,fn,a,sc:CUR(),sev:seventh});   // §3.4: замораживаем ладовый контекст события
+  /* ⛔ КОПИЯ КАРТЫ ЭФФЕКТОВ — R1, САМЫЙ ОПАСНЫЙ БАГ ЭТОГО ПЛАСТА, ЗАКРЫТ ЗДЕСЬ И ТОЛЬКО ЗДЕСЬ.
+     До 3.7.2 ВСЯ полезная нагрузка была примитивами, кроме двух намеренных ссылок: ty (никогда не
+     мутируется) и bend (дописывается осознанно). Карта a.fx — первый МУТИРУЕМЫЙ объект в нагрузке, а
+     push кладёт `a` ПО ССЫЛКЕ, и вызывающие копируют МЕЛКО ({...p}) — значит без этой строки один и
+     тот же объект оказался бы и в записанном событии, и в живом состоянии сравнения. Следующее
+     движение руки тихо переписало бы УЖЕ ЗАПИСАННОЕ прошлое: слой начал бы звучать не так, как его
+     сыграли. Снаружи это читается как «петля сама меняется» — и искать причину пришлось бы долго.
+     ЗАПИСАННАЯ КАРТА С ЭТОГО МОМЕНТА НЕИЗМЕНЯЕМА: её больше никто не трогает, только читает. */
+  const ev={t,layer:loop.layer,fn,a,sc:CUR(),sev:seventh};   // §3.4: замораживаем ладовый контекст события
+  if(a && a.fx) ev.a={...a, fx:{...a.fx}};
+  events.push(ev);
 }
 /* Доля внутри петли СЕЙЧАС (тот же счёт, что и push) — для dt точек бенда. */
 const curBeat=()=>((AC.currentTime-loop.t0)*loop.bpm/60)%loopBeats();
@@ -162,31 +172,47 @@ function freeSlot(){ const used=new Set([...vSlots.values()]); let v=0; while(us
    не сбивает бенд частотой).
    live==null (рука на любой ДРУГОЙ функции — ноты/удержание/эффекты) — логика БАЙТ-В-БАЙТ как раньше,
    только состояние взято по владельцу own. */
+/* ⛳ ОБОБЩЁННОЕ ДЕЛЬТА-СЖАТИЕ ПО КАРТЕ ЭФФЕКТОВ (Пласт 3.7.2) — вместо явного списка полей.
+   Прежде сравнивались ЧЕТЫРЕ ИМЕНОВАННЫХ поля (deg/oct/inst/vol/rev), а vib/drv/trm/dly, хотя и лежали
+   в нагрузке, В СРАВНЕНИЕ НЕ ВХОДИЛИ ВОВСЕ — поэтому «покрутил ручку при зажатой ноте» не писалось
+   НИЧЕГО, и эффекты в слой фактически не записывались. Теперь набор параметров ПРОИЗВОЛЕН, значит и
+   сравнение — по МНОЖЕСТВУ: другой состав ключей ИЛИ любой ключ ушёл дальше мёртвой зоны.
+   ⚠️ Порог REC_FX_EPS — в НОРМИРОВАННЫХ единицах, один на все параметры (довод — в config). */
+function fxChanged(a,b){
+  const A=a||{}, B=b||{}, ka=Object.keys(A), kb=Object.keys(B);
+  if(ka.length!==kb.length) return true;
+  for(const k of ka){ if(!(k in B) || Math.abs(A[k]-B[k])>REC_FX_EPS) return true; }
+  return false;
+}
+const fxCopy=m=> m?{...m}:m;   // в состояние сравнения кладём КОПИЮ: иначе r.fx стал бы псевдонимом живого снимка и «изменилось?» всегда было бы «нет»
 function recLeadEv(own,p,live){
   if(!recording)return;
   let r=recLead.get(own);
   if(!r){
     const v=freeSlot(); vSlots.set(own,v);
     const a={...p,v};                              // v — номер одновременной ноты в слое (пара для leadOff)
-    r={deg:p.deg,oct:p.oct,vol:p.vol,rev:p.rev,inst:p.inst,bend:null,t0:0,lastC:null,v};
+    r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:null,t0:0,lastC:null,v};
     if(live!=null){ a.bend=[]; r.bend=a.bend; r.t0=curBeat(); }
     push('leadOn',a);
     recLead.set(own,r);
     if(live!=null)pushBend(r,live);                // стартовая точка (r уже есть — опора известна)
     return;
   }
-  if(live!=null){                                  // терменвокс: пишем бенд + громкость/реверб (hold), НЕ deg/oct
+  if(live!=null){                                  // терменвокс: пишем бенд + громкость/ЭФФЕКТЫ (hold), НЕ deg/oct
     pushBend(r,live);
-    if(p.inst!==r.inst||Math.abs(p.vol-r.vol)>REC_VOL_EPS||Math.abs(p.rev-r.rev)>REC_REV_EPS){
+    /* ⚠️ БЕНД НЕ ТРОГАЕМ (R3): точка бенда дописывается в a.bend ПОСЛЕ push, по ссылке из r.bend, и
+       опора (r.deg/r.oct/r.t0/r.lastC) живёт своей жизнью. Карта эффектов добавлена РЯДОМ, ни ссылка,
+       ни пороги бенда не задеты — hold:true по-прежнему говорит переигровке «частоту не сбивать». */
+    if(p.inst!==r.inst||Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
       push('leadSet',{...p,hold:true,v:r.v});
-      r.vol=p.vol; r.rev=p.rev; r.inst=p.inst;     // deg/oct остаются на атаке
+      r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;   // deg/oct остаются на атаке
     }
     return;
   }
   if(p.deg!==r.deg||p.oct!==r.oct||p.inst!==r.inst||
-     Math.abs(p.vol-r.vol)>REC_VOL_EPS||Math.abs(p.rev-r.rev)>REC_REV_EPS){ push('leadSet',{...p,v:r.v}); }
+     Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ push('leadSet',{...p,v:r.v}); }
   else return;
-  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.rev=p.rev; r.inst=p.inst;
+  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;
 }
 function recLeadOff(own){ const r=recLead.get(own);
   if(recording&&r) push('leadOff',{v:r.v});
