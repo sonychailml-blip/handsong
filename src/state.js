@@ -323,7 +323,17 @@ export const setHandFn=(role,hand,fn)=>{ handFn[role][hand]=fn; };
 export const handSide=key=> key.slice(0,4)==='Left' ? 'L' : 'R';   // сторона руки из handedness-ключа MediaPipe
 export const handFnOf=(key,role)=> (handFn[role] && handFn[role][handSide(key)]) || null;   // у роли без записи (dr) → null; ch теперь имеет запись ('latch'/'hold')
 export const roleHasTherm=role=> !!(handFn[role] && (handFn[role].L==='therm'||handFn[role].R==='therm'));
-export const roleHasFx=role=> role==='ld' && (handFn.ld.L==='fx'||handFn.ld.R==='fx');   // fx только у соло
+/* «У РОЛИ ЕСТЬ РУКА НА ЭФФЕКТАХ» — ПО РОЛИ, а не «только соло» (слайс б.1). Прежде тут стоял
+   род role==='ld', и он тянулся с «Функций рук», где 'fx' был лишь в списке соло. Следствие,
+   замеченное в 3.5.3/3.5.4: цепи аккордов/баса/ударных могли держать ТОЛЬКО фиксированные
+   параметры — пальца, способного их вести, не существовало.
+   ⚠️ ДЛЯ 'dr' ПО-ПРЕЖНЕМУ ЛОЖЬ, и БЕЗ отдельного гейта: у ударных нет записи в handFn вовсе
+   (обе руки бьют по рядам), поэтому handFn['dr'] недоступен и вся скобка честно даёт false.
+   Заведут ударным запись — предикат заработает сам, менять его не придётся.
+   ⚠️ САМ ПО СЕБЕ ЭТОТ ПРЕДИКАТ НИЧЕГО НЕ ВКЛЮЧАЕТ: пока 'fx' не появится в HANDFN_OPTS прочих
+   ролей (слайсы б.2/б.3), выбрать эту функцию где-либо кроме соло нельзя, и предикат остаётся
+   ложным на всех ролях, кроме соло, — ровно как раньше. */
+export const roleHasFx=role=> !!(handFn[role] && (handFn[role].L==='fx'||handFn[role].R==='fx'));
 export const roleHasExpr=role=> role==='ld' && (handFn.ld.L==='expr'||handFn.ld.R==='expr');   // выразительность (первый заход — только соло)
 /* «Рука ИГРАЕТ НОТЫ» — ЕДИНЫЙ закон исключений: 'fx' (эффекты), 'loop' (лупер) и 'expr' (выразительность)
    нот не играют, всё остальное играет ('note'/'hold'/'therm', у аккордов 'latch'/'hold').
