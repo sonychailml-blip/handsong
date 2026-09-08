@@ -224,6 +224,8 @@ export const DICTS = {
     'fx.drv':'Drive',
     'fx.trm':'Tremolo',
     'fx.reverb':'Reverb',
+    'fx.bright':'Brightness',
+    'fx.bright.amt':'Amount',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Tail',
     'fx.reverb.tone':'Tone',
@@ -535,6 +537,8 @@ export const DICTS = {
     'fx.drv':'Драйв',
     'fx.trm':'Тремоло',
     'fx.reverb':'Реверб',
+    'fx.bright':'Яркость',
+    'fx.bright.amt':'Величина',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Длина',
     'fx.reverb.tone':'Окраска',

@@ -6,7 +6,7 @@ import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
-import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot } from './audio.js';
+import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri } from './audio.js';
 import { canvas } from './vision.js';
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
@@ -802,6 +802,29 @@ function processHands(res){
              же природа, что реверб у соло, с другой стороны. Высоту НЕ трогает (только тембр). Считаем ДО
              WchOn/WchSet: bri едет в событие рядом с ty (как a.rev у соло) — слой запомнит свою яркость. */
           const bd = clamp01((REV_NEAR-emaS(S,'hs',dist(lm[0],lm[9]),0.15))/REV_RANGE);
+          /* ═══ ГЛУБИНА АККОРДОВОЙ РУКИ → ПАРАМЕТРЫ ЦЕПИ АККОРДОВ (адрес play:z, цель «а») ═══
+             Форма — та же, что у горизонтали в 3.7.3: обход цепи РОЛИ, отбор ПО АДРЕСУ, инверсия
+             зеркалит (величина абсолютная 0..1, а не смещение от захвата).
+             ⛔ ПОЧЕМУ ЗДЕСЬ, А НЕ В ОБЩЕМ БЛОКЕ ГЛУБИНЫ (тот, что под soloNoteHand): он гейтится на
+             СОЛО и САМ зовёт emaS(S,'hs',…). Расширь его на аккорды — и для аккордовой руки фильтр
+             сглаживания продвинулся бы ДВАЖДЫ ЗА КАДР (здесь и там), а это ровно та ловушка, о которой
+             предупреждает captureFx. Величина уже посчитана строкой выше — переиспользуем её.
+             ⛳ Побочная выгода, и она не случайна: теперь ЛЮБОЙ параметр цепи аккордов можно посадить на
+             глубину руки — например подмес аккордового реверба, — а не только яркость. */
+          for(const eff of fxChainOf('ch')){
+            if(!eff) continue;
+            let ps=null;                                   // дескрипторы берём ЛЕНИВО: у большинства записей play-параметров нет
+            eff.params.forEach((pa,i)=>{
+              if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return;
+              if(!ps) ps=fxParamsOf('ch',eff.fxId);
+              const p=ps[i]; if(p) p.set(pa.inv ? 1-bd : bd);
+            });
+          }
+          /* ЯРКОСТЬ, КОТОРУЮ УВЕЗЁТ СОБЫТИЕ, — теперь ИЗ ПАРАМЕТРА, а не из руки. Разница видна там, где
+             её и ждут: зафиксировал величину в меню или увёл на другой адрес — рука перестаёт на неё
+             влиять, а звук и запись слушаются параметра. Нет яркости в цепи → null → сегодняшнее
+             поведение (chordOn открывает фильтр, chordGlide его не трогает). */
+          const bri = fxChordBri();
           if(S.inert){
             // стоп-щипок отработал (только защёлка): рука молчит до размыкания пальцев
           }else if(S.fresh){
@@ -811,7 +834,7 @@ function processHands(res){
                  (S.deg застыл с первого кадра), тип берётся из палитры ЗДЕСЬ, на атаке, и тоже морозится
                  (S.ty ниже). Тумблера «тот же аккорд → выкл» тут НЕТ: выключение — это размыкание пальцев
                  (endPinch зовёт WchOff). */
-              WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
+              WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bri);
               S.ty=ty;                                // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
               latchLen=ty?ty.length:0;
               setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(ty); chOwner=key;   // регистр — рядом со ступенью: подсветке нужна ПАРА (одна ступень живёт в нескольких прямоугольниках)
@@ -832,8 +855,8 @@ function processHands(res){
                 /* Переатака нужна, когда МЕНЯЕТСЯ ЧИСЛО НОТ: chordGlide ведёт только уже
                    звучащие голоса, и 4-я нота (maj7 из трезвучия) молча не зазвучала бы
                    до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
-                if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bd);
-                else WchSet('latch',S.deg,chOct,S.vol,ty,bd);          // та же плотность → глиссандо без переатаки
+                if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bri);
+                else WchSet('latch',S.deg,chOct,S.vol,ty,bri);          // та же плотность → глиссандо без переатаки
                 S.ty=ty;                              // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
                 latchLen=ty?ty.length:0;
                 setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший; регистр — компаньон ступени для подсветки
@@ -851,8 +874,8 @@ function processHands(res){
                событие лупера морозит a.ty, а слой — свой лад (sc). Корень при этом по-прежнему следует за
                рукой: заморожен ТОЛЬКО тип. */
             const dty=S.ty;
-            if(dty&&dty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,dty,bd); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
-            else WchSet('latch',S.deg,chOct,S.vol,dty,bd);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
+            if(dty&&dty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,dty,bri); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
+            else WchSet('latch',S.deg,chOct,S.vol,dty,bri);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
             setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(dty);   // тип и регистр ведём вместе со ступенью — иначе сравнение (и подсветка) протухнут
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
@@ -861,7 +884,11 @@ function processHands(res){
              событии, но столбик один — как REV у соло показывает живую руку. Пока эта рука ведёт аккорд
              (chOwner===key), обновляем показ; после отпускания (защёлка) chOwner=null → показ замирает, а
              при полном отсутствии аккорда сбрасывается ниже (latchDeg<0). НЕ баг, что слои он не отражает. */
-          if(chOwner===key) setChBrightDisp(1-bd);   // храним ЯРКОСТЬ (1=ярко); в событие едет bd (глубина, 0=нейтраль)
+          /* R1: ПОКАЗ ЧИТАЕТ ПАРАМЕТР, А НЕ РУКУ. Пока яркость была вшита в глубину, это было одно и то
+             же; теперь — нет: зафиксируй величину или уведи её на горизонталь, и столбик «ЯРК», считая
+             глубину, показывал бы одно, а звучало бы другое. Показываем ЯРКОСТЬ (1=ярко), а bri —
+             глубина (0=ярко), отсюда 1−bri; нет яркости в цепи → нейтраль. */
+          if(chOwner===key) setChBrightDisp(bri==null?1:1-bri);
         }
       }
     }
