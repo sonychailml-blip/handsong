@@ -81,6 +81,7 @@
 <!-- ================= ВЕРХНЯЯ ПАНЕЛЬ ================= -->
 <div id="bar">
   <button id="scaleBtn" data-i18n-title="bar.scaleTitle" title="Звукоряд: лад, тоника, тембры">Лад</button>
+  <button id="soundBtn" data-i18n="bar.sound" data-i18n-title="bar.soundTitle" title="Звук и управление: тембры, функции рук, эффекты">🎛 Звук</button>
   <button id="instrBtn" data-i18n-title="bar.instrTitle" title="Соло / Аккорды">🎸 Соло</button>
   <button id="instrBtnL" data-i18n-title="bar.halfLTitle" title="Левая половина: инструмент">◧ 🎹 Аккорды</button>
   <button id="instrBtnR" data-i18n-title="bar.halfRTitle" title="Правая половина: инструмент">🎸 Соло ◨</button>
@@ -186,6 +187,19 @@
     <div class="prow"><label data-i18n="panel.scale.chords">Аккорды</label>
       <div class="seg"><button id="qTriad" class="act" data-i18n="panel.scale.triads">Трезвучия</button><button id="qSev" data-i18n="panel.scale.sevenths">Септаккорды</button></div>
     </div>
+  </div>
+
+<!-- ================= ЗВУК И УПРАВЛЕНИЕ: тембры, функции рук, конструктор эффектов =================
+     ВТОРАЯ панель настроек, отрезанная от «Звукоряда». Разрез по СМЫСЛУ: «Звукоряд» отвечает на вопрос
+     КАКИЕ НОТЫ ЕСТЬ И ГДЕ ОНИ ЛЕЖАТ (строй/лад/тоника/эталон/раскладка/пальцы/трезвучия), эта — КАК ЭТО
+     ЗВУЧИТ И ЧЕМ УПРАВЛЯЮТ. Прежде всё лежало под заголовком «Звукоряд», и реверб настраивали в панели,
+     названной «Звукоряд».
+     ⚠️ РАСКЛАДКА НОТ И «ПАЛЬЦЕВ В РУКЕ» ОСТАЛИСЬ В «ЗВУКОРЯДЕ» НАМЕРЕННО: раскладка СЛЕДУЕТ ЗА ЛАДОМ
+     («По ладу» разрешается свойством самого лада, и вся геометрия — арифметика лада), поэтому её дом
+     рядом с ладом, хотя играют её пальцами.
+     ⚠️ Разметка перенесена ДОСЛОВНО: те же id, те же data-i18n, те же обработчики в ui.js. -->
+<div id="panelSound">
+    <div class="phead"><b data-i18n="panel.sound.head">Звук и управление</b><button id="panelCloseSound" data-i18n="panel.collapse">Свернуть ✕</button></div>
 
     <div class="psep" data-i18n="panel.scale.sepTimbre">Тембры</div>
     <div class="prow"><label data-i18n="panel.scale.leadInstr">Соло-инструмент</label><select id="selLead"></select></div>
@@ -199,11 +213,9 @@
     <div class="psep" id="handFnSep" data-i18n="panel.scale.handFn">Функции рук</div>
     <div id="handFnRows"></div>
 
-    <!-- КОНСТРУКТОР ЭФФЕКТОВ: какой эффект на каком ПАЛЬЦЕ у руки-эффектов. Строки строит ui.js
-         (renderFxCtl) по ЦЕПИ ВЫБРАННОЙ РОЛИ (state.fxChains, с Пласта 3.3 — прежний fxLayout);
-         первой строкой — выбор роли (3.4.1), цепь сегодня есть только у соло. Секция видна ВСЕГДА:
-         цепь звучит и без руки на «Эффектах» (об этом говорит подсказка внутри).
-         Меню пока «от пальца»; «от параметра» — Пласт 3.4.2. -->
+    <!-- КОНСТРУКТОР ЭФФЕКТОВ: цепь эффектов ВЫБРАННОЙ РОЛИ (state.fxChains), строки строит ui.js
+         (renderFxCtl); первой строкой — выбор роли. Секция видна ВСЕГДА: цепь звучит и без руки на
+         «Эффектах» (об этом говорит подсказка внутри). -->
     <div class="psep" id="fxCtlSep" data-i18n="panel.scale.fxCtl">Конструктор эффектов</div>
     <div id="fxCtlRows"></div>
   </div>

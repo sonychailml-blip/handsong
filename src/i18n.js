@@ -69,6 +69,8 @@ export const DICTS = {
     'bar.halfRTitle':'Right half: instrument',
     'bar.splitTitle':'Split screen: chords | solo on two halves',
     'bar.camTitle':'Switch camera: front / back',
+    'bar.sound':'🎛 Sound',
+    'bar.soundTitle':'Sound & control: timbres, hand functions, effects',
     'bar.loop':'⚙ Loop',
     'bar.loopTitle':'Looper panel: bars, tempo, arrangement',
     // роли (кнопка роли, свёрнутый бар — держим коротко)
@@ -119,6 +121,7 @@ export const DICTS = {
     // панель звукоряда
     'panel.collapse':'Collapse ✕',
     'panel.scale.head':'Scale',
+    'panel.sound.head':'Sound & control',
     'panel.scale.sepScale':'Scale & tonic',
     'panel.scale.tradition':'Tradition',
     'panel.scale.mode':'Scale',
@@ -294,7 +297,7 @@ export const DICTS = {
     'tutor.chRow.detail':'It works just as it did with single notes: up and down changes the chord, left and right changes the volume.',
     'tutor.chPalette.prompt':'On the left is a palette of chord types. Touch your thumb and index fingertips together there to pick one, then play on the right.',
     'tutor.chPalette.detail':'Either hand can do either thing — it\'s the place that decides, not the hand.',
-    'tutor.chHold.prompt':'You can also set a chord to stop the moment your fingers open. The options are in the scale menu, under Hand functions.',
+    'tutor.chHold.prompt':'You can also set a chord to stop the moment your fingers open. The options are in “🎛 Sound”, under Hand functions.',
     // обучение — урок «Строи и тембры»
     'tutor.tunOpen.prompt':'Open the scale menu — the button at the top showing the current scale.',
     'tutor.tunOpen.detail':'Everything about pitch lives here: which notes the instrument plays, and how they sound.',
@@ -308,7 +311,7 @@ export const DICTS = {
     'tutor.tunTimbre.detail':'Chords, bass and drums have their own instruments to choose from as well.',
     'tutor.tunFinal.prompt':'Not all music is built from twelve notes — more than seventy-five tunings live in that menu. You can also shift the whole instrument up or down by setting A to something other than 440 Hz.',
     // обучение — урок «Функции рук»
-    'tutor.hfWhere.prompt':'Open the scale menu and scroll to “Hand functions”.',
+    'tutor.hfWhere.prompt':'Open “🎛 Sound” in the top bar and find “Hand functions”.',
     'tutor.hfWhere.detail':'Each hand gets its own function, and it can differ for each role. Most instruments fix that once and forever — here you choose.',
     'tutor.hfHold.prompt':'Set the right hand to “Notes (held)”, then play and move your hand around.',
     'tutor.hfHold.detail':'The pitch stays where you took it, however far the hand travels. The volume still follows, and the note ends when your fingers open.',
@@ -396,6 +399,8 @@ export const DICTS = {
     'bar.halfRTitle':'Правая половина: инструмент',
     'bar.splitTitle':'Сплит-экран: аккорды | соло на двух половинах',
     'bar.camTitle':'Переключить камеру: фронтальная / тыловая',
+    'bar.sound':'🎛 Звук',
+    'bar.soundTitle':'Звук и управление: тембры, функции рук, эффекты',
     'bar.loop':'⚙ Луп',
     'bar.loopTitle':'Панель лупера: такты, темп, аранжировка',
     'role.ld':'🎸 Соло',
@@ -439,6 +444,7 @@ export const DICTS = {
     'transport.panicTitle':'Заглушить всё',
     'panel.collapse':'Свернуть ✕',
     'panel.scale.head':'Звукоряд',
+    'panel.sound.head':'Звук и управление',
     'panel.scale.sepScale':'Лад и тоника',
     'panel.scale.tradition':'Строй',
     'panel.scale.mode':'Лад',
@@ -598,7 +604,7 @@ export const DICTS = {
     'tutor.chRow.detail':'Работает как в соло: движение вверх-вниз меняет аккорд, влево-вправо — громкость.',
     'tutor.chPalette.prompt':'Слева — палитра типов аккорда. Соедините там кончики большого и указательного пальцев, чтобы выбрать тип, затем играйте справа.',
     'tutor.chPalette.detail':'Любой рукой можно и играть аккорд, и менять его тип — решает место, а не рука.',
-    'tutor.chHold.prompt':'Можно настроить игру так, что аккорд будет переставать звучать с размыканием пальцев. Опции доступны в меню лада, в «Функциях рук».',
+    'tutor.chHold.prompt':'Можно настроить игру так, что аккорд будет переставать звучать с размыканием пальцев. Опции доступны в «🎛 Звук», в «Функциях рук».',
     // обучение — урок «Строи и тембры»
     'tutor.tunOpen.prompt':'Откройте меню лада — кнопка вверху с названием текущего лада.',
     'tutor.tunOpen.detail':'Здесь всё про высоту звука: какие ноты играет инструмент и как они звучат.',
@@ -612,7 +618,7 @@ export const DICTS = {
     'tutor.tunTimbre.detail':'У аккордов, баса и ударных тоже свои инструменты, из которых можно выбирать.',
     'tutor.tunFinal.prompt':'Не всякая музыка строится из двенадцати нот — в этом меню более семидесяти пяти строёв. Там же можно сдвинуть весь инструмент выше или ниже, поставив ноту «ля» не на 440 Гц, а на другую частоту.',
     // обучение — урок «Функции рук»
-    'tutor.hfWhere.prompt':'Откройте меню лада и пролистайте до «Функций рук».',
+    'tutor.hfWhere.prompt':'Откройте «🎛 Звук» в верхней панели и найдите «Функции рук».',
     'tutor.hfWhere.detail':'Каждая рука получает свою функцию, и для каждой роли она может быть своей. У большинства инструментов это задано раз и навсегда — здесь выбираете вы.',
     'tutor.hfHold.prompt':'Поставьте правую руку на «Ноты (с удержанием)», сыграйте и подвигайте рукой.',
     'tutor.hfHold.detail':'Высота остаётся там, где вы её взяли, как бы далеко ни ушла рука. Громкость по-прежнему следует за рукой, а нота гаснет с размыканием пальцев.',

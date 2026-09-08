@@ -112,7 +112,7 @@ const LOOPER_STEPS=[
 ];
 
 const HANDFN_STEPS=[
-  {key:'hfWhere',  reveal:true, enter:a=>{a.panelOpened=false;}, done:a=>a.panelOpened},                              // открыть меню, найти «Функции рук»
+  {key:'hfWhere',  reveal:true, enter:a=>{a.soundPanelOpened=false;}, done:a=>a.soundPanelOpened},                    // открыть панель «Звук и управление», найти «Функции рук» (с разрезом панели секция живёт ТАМ, а не в «Звукоряде»)
   {key:'hfHold',   enter:a=>{a.hfHold=false;  a.noteFired=false;}, done:a=>a.hfHold  && a.noteFired},                 // рука на «Ноты (с удержанием)» + сыграть (нота стоит, рука двигается)
   {key:'hfTherm',  enter:a=>{a.hfTherm=false; a.noteFired=false;}, done:a=>a.hfTherm && a.noteFired},                 // та же рука на «Терменвокс» + сыграть (высота скользит, без ступеней)
   {key:'hfExpr',   enter:a=>{a.hfExpr=false; a.exprMoved=false; a.noteFired=false;}, done:a=>a.hfExpr && a.exprMoved && a.noteFired},   // ДРУГУЮ руку на «Выразительность» + играть + двигать (звук дышит)
@@ -204,7 +204,7 @@ async function freePlay(){ const ok=await starter(); closeLessons(); void ok; } 
 function freshAcc(){ return {noteFired:false, sMin:null, sMax:null, lastLdFinger:null,
   fingerChanged:false, fxMoved:false, role:'ld', chordPlayed:false,
   chordLatched:false, chDeg0:null, chChanged:false, typePicked:false,
-  panelOpened:false, lastScaleTrad:null, timbreChanged:false,
+  panelOpened:false, soundPanelOpened:false, lastScaleTrad:null, timbreChanged:false,
   hfHold:false, hfTherm:false, hfExpr:false, exprMoved:false,
   loopClosed:false, overdubbed:false, undone:false, jammed:false, loopPanelOpened:false, bassPlayed:false,
   splitTurnedOn:false, half0:false, half1:false, splitRoleChanged:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук»/«Лупер»/«Две роли» (прочие уроки их не читают — безвредны)
@@ -218,7 +218,10 @@ function apply(kind,p){
     if(acc.chDeg0==null) acc.chDeg0=d; else if(d!==acc.chDeg0) acc.chChanged=true; }
   else if(kind==='chordLatch'){ acc.chordLatched=true; }   // защёлкнутый аккорд отпущен, но звучит (шаг chLatch)
   else if(kind==='chordType'){ acc.typePicked=true; }      // выбран тип в палитре (шаг chPalette)
-  else if(kind==='panel'){ if(p.which==='scale') acc.panelOpened=true; else if(p.which==='loop') acc.loopPanelOpened=true; }   // открыта панель лада (tunOpen/hfWhere) / лупера (lpTempo)
+  /* ⚠️ ПАНЕЛЕЙ ТРИ (разрез «Звукоряда»): 'scale' — какие ноты есть (шаг tunOpen), 'sound' — тембры/
+     функции рук/эффекты (шаг hfWhere), 'loop' — лупер (шаг lpTempo). У каждой СВОЙ флаг: одним общим
+     шаг «найди Функции рук» засчитывался бы за открытие ЧУЖОЙ панели. */
+  else if(kind==='panel'){ if(p.which==='scale') acc.panelOpened=true; else if(p.which==='sound') acc.soundPanelOpened=true; else if(p.which==='loop') acc.loopPanelOpened=true; }
   else if(kind==='bass'){ acc.bassPlayed=true; }            // басовая нота (слой-по-ролям, шаг lpLayer)
   else if(kind==='loop'){                                   // события лупера (шаги урока «Лупер»)
     if(p.ev==='recStart'||p.ev==='overdubStart'||p.ev==='jam'){ acc.noteFired=false; acc.chordPlayed=false; acc.bassPlayed=false; }   // сброс: игра ЗАСЧИТЫВАЕТСЯ только ПОСЛЕ старта записи/овердаба/джема (сыграно ВО ВРЕМЯ слоя, а не до)
