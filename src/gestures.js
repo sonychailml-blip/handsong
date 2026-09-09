@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxChainOf, roleXDriven, fxVolFix, flipX, setChBrightDisp, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxChainOf, roleXDriven, fxVolFix, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -896,15 +896,11 @@ function processHands(res){
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }
-          /* Индикатор ЯРК показывает ЖИВУЮ руку (эту), НЕ переигранные слои: у каждого слоя своя яркость в
-             событии, но столбик один — как REV у соло показывает живую руку. Пока эта рука ведёт аккорд
-             (chOwner===key), обновляем показ; после отпускания (защёлка) chOwner=null → показ замирает, а
-             при полном отсутствии аккорда сбрасывается ниже (latchDeg<0). НЕ баг, что слои он не отражает. */
-          /* R1: ПОКАЗ ЧИТАЕТ ПАРАМЕТР, А НЕ РУКУ. Пока яркость была вшита в глубину, это было одно и то
-             же; теперь — нет: зафиксируй величину или уведи её на горизонталь, и столбик «ЯРК», считая
-             глубину, показывал бы одно, а звучало бы другое. Показываем ЯРКОСТЬ (1=ярко), а bri —
-             глубина (0=ярко), отсюда 1−bri; нет яркости в цепи → нейтраль. */
-          if(chOwner===key) setChBrightDisp(bri==null?1:1-bri);
+          /* ⚠️ ЗДЕСЬ ОБНОВЛЯЛСЯ ОТДЕЛЬНЫЙ ПОКАЗ ЯРКОСТИ (setChBrightDisp) — УДАЛЁН. Показывать величину
+             отсюда больше не нужно и нельзя: яркость — обычный эффект цепи, и её столбик рисует общий
+             обход, читая ЖИВОЕ значение у самого параметра (getNorm). Писать рядом второе, зеркальное
+             (1−bri) представление значило бы держать два источника одной величины. Сам звук идёт как
+             шёл — bri уезжает в WchOn/WchSet и в событие (a.bri). */
         }
       }
     }
@@ -976,7 +972,17 @@ function processHands(res){
   /* ⚠️ СБРОС ИНДИКАТОРА РЕВЕРБА УДАЛЁН вместе с самим индикатором (Пласт 3.1): гасить в 0 стало нечего.
      Подмес реверба живёт в модуле (латч, как у длины и окраски) и НЕ должен обнуляться от того, что
      рука вышла из кадра, — комната остаётся, пока её не убавят пальцем. */
-  if(latchDeg<0) setChBrightDisp(1);   // нет звучащего защёлкнутого аккорда → показ яркости в нейтраль (сам фильтр отпускать не нужно — следующая атака его перепишет)
+  /* НЕТ ЗВУЧАЩЕГО ЗАЩЁЛКНУТОГО АККОРДА → РУЛЬ ЗАЩЁЛКИ СВОБОДЕН. (Сброс показа яркости отсюда ушёл
+     вместе с самим показом: столбик BRI берёт величину у параметра и в обнулении «по факту тишины»
+     не нуждается — эффект настроен на столько, на сколько настроен.)
+     ⚠️ chOwner=null ЗДЕСЬ — слайс б.3. Обычно руль отпускает ветка зоны 'ch' (её «латч сброшен извне»)
+     или endPinch, но ОБЕ гейтятся S.zone==='ch'. Стоит переставить руку-защёлку на ЭФФЕКТЫ — и она в
+     эту зону больше не попадает: softAllOff гасит звук и ставит latchDeg=-1, а chOwner остаётся
+     показывать на руку, которая аккордов уже не берёт. Само по себе это не звенело (все читатели
+     chOwner живут в той же ветке, и следующая защёлка любой руки перезаписывала владельца), но
+     ИНВАРИАНТ «нет защёлки — нет владельца» держать дешевле, чем каждый раз доказывать безвредность.
+     Место выбрано рядом с таким же сторожем баса выше и НЕ зависит от зоны — в этом вся суть. */
+  if(latchDeg<0) chOwner=null;
   tickExpr(now,dtm);                   // «смычок»: динамика + вывод в звук раз за кадр (или плавный вывод к нейтрали, когда руки-выразительности нет)
 }
 

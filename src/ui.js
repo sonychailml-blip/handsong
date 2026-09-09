@@ -516,7 +516,7 @@ function applyInstr(){ instrBtn.textContent = instrLbl(phoneInstr);
 const HANDFN_OPTS={   // [значение, ключ-словаря] — подпись через t(k)
   ld:[['fx','handfn.fx'],['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['expr','handfn.expr'],['loop','handfn.loop']],
   bs:[['fx','handfn.fx'],['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['loop','handfn.loop']],   // 'fx' — слайс б.2: у баса РУКА СВОБОДНА по устройству (бас МОНО, bassOwner/last-pinch-wins), поэтому отдать её эффектам не стоит ни одной ноты. ⚠️ Цепь баса ПУСТА по умолчанию — пока в неё не добавят эффект в меню, вести этой руке нечего; засевать её ради красоты слайса нельзя (это была бы правка звука по умолчанию)
-  ch:[['latch','handfn.latch'],['hold','handfn.chHold'],['loop','handfn.loop']],
+  ch:[['fx','handfn.fx'],['latch','handfn.latch'],['hold','handfn.chHold'],['loop','handfn.loop']],   // 'fx' — слайс б.3: у аккордов рука СВОБОДНА (аккорды МОНО — chOwner, защёлка звучит и после размыкания), поэтому вторая рука не нужна, чтобы играть. ⚠️ ЦЕНА, и она реальна: на ладу с ПАЛИТРОЙ ТИПОВ (typedChords) рука, ушедшая на эффекты, больше не выбирает тип — палитра берётся ПО ПОЛОЖЕНИЮ, и годилась любая рука. Оставшаяся рука по-прежнему умеет и то и другое ПО ОЧЕРЕДИ (тип слева от palSplitX, потом корень справа) — это документированная одноручная модель аккордов. На ладах без палитры цена нулевая
 };
 const handFnRows=$('handFnRows'), handFnSep=$('handFnSep');
 const HAS_HANDFN=r=>r==='ld'||r==='bs'||r==='ch';   // роли с записью в handFn (у dr её нет)
