@@ -515,7 +515,7 @@ function applyInstr(){ instrBtn.textContent = instrLbl(phoneInstr);
    а командует лупером щипками пальцев (см. gestures: fireLooperCmd). Смена — setHandFn + softAllOff. */
 const HANDFN_OPTS={   // [значение, ключ-словаря] — подпись через t(k)
   ld:[['fx','handfn.fx'],['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['expr','handfn.expr'],['loop','handfn.loop']],
-  bs:[['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['loop','handfn.loop']],
+  bs:[['fx','handfn.fx'],['note','handfn.note'],['hold','handfn.hold'],['therm','handfn.therm'],['loop','handfn.loop']],   // 'fx' — слайс б.2: у баса РУКА СВОБОДНА по устройству (бас МОНО, bassOwner/last-pinch-wins), поэтому отдать её эффектам не стоит ни одной ноты. ⚠️ Цепь баса ПУСТА по умолчанию — пока в неё не добавят эффект в меню, вести этой руке нечего; засевать её ради красоты слайса нельзя (это была бы правка звука по умолчанию)
   ch:[['latch','handfn.latch'],['hold','handfn.chHold'],['loop','handfn.loop']],
 };
 const handFnRows=$('handFnRows'), handFnSep=$('handFnSep');
