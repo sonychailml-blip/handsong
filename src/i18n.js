@@ -236,6 +236,9 @@ export const DICTS = {
     'fx.reverb.decay':'Tail',
     'fx.reverb.tone':'Tone',
     'fx.reverb.mix':'Amount',
+    'fx.dly.mix':'Amount',
+    'fx.dly.time':'Time',
+    'fx.dly.fb':'Feedback',
     'fx.param.amt':'Amount',            // у старых скалярных эффектов параметр один и он же сам эффект
     // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— none —',
@@ -555,6 +558,9 @@ export const DICTS = {
     'fx.reverb.decay':'Длина',
     'fx.reverb.tone':'Окраска',
     'fx.reverb.mix':'Подмес',
+    'fx.dly.mix':'Подмес',
+    'fx.dly.time':'Время',
+    'fx.dly.fb':'Повторы',
     'fx.param.amt':'Величина',          // у старых скалярных эффектов параметр один и он же сам эффект
     // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— нет —',

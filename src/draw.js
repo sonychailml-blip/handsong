@@ -2,7 +2,7 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
+import { fx, fxIsScalar, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -66,7 +66,7 @@ const fxInstOf=(role,eff)=> fxInstance(role,eff.fxId);
    разворачивает эффект под зажатым пальцем (1 столбик → 3), и рамка, посчитанная по факту, дёргала бы
    разбор Гц в такт щипку. Максимум неподвижен. */
 const fxBarsMaxN=role=> fxChainOf(role).reduce((n,sl)=>{
-  if(FX_META.some(q=>q.k===sl.fxId)) return n+1;
+  if(fxIsScalar(sl.fxId)) return n+1;               // старый скалярный — по ЕДИНОМУ признаку (в.1), не по FX_META: делей-модуль там остался ради цвета, а столбиков у него три
   const mod=fxSpecOf(sl); return n+(mod?mod.params.length:0);   // ФАБРИКА, не экземпляр: рамка не должна зависеть от того, построен ли эффект
 },0);
 /* Габарит полосы столбиков роли — или null, когда её нет (нет руки-эффектов / пустая цепь).
@@ -96,8 +96,8 @@ const fxParamIsPlay=la=> !!(la && la.mode==='drive' && la.hand==='play');
 const fxBarItems=role=>{
   const act=fxActiveFinger(role), out=[];
   fxChainOf(role).forEach(eff=>{   // ЦЕПЬ ЭТОЙ РОЛИ (слайс б.1; прежде литерал 'ld' — «столбики бывают только у соло»). В б.1 зовут по-прежнему только с 'ld': новых столбиков слайс не рисует
-    const m=FX_META.find(q=>q.k===eff.fxId);
-    if(m){ out.push({v:fx[eff.fxId], c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр)
+    const m=FX_META.find(q=>q.k===eff.fxId);   // МЕТАДАННЫЕ ПОКАЗА (цвет, подпись) — у трёх скаляров и у делея-модуля (в.1): его столбики остались синими
+    if(fxIsScalar(eff.fxId)){ out.push({v:fx[eff.fxId], c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META
     const mod=fxInstOf(role,eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре
     /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
        связан со своим параметром в цепи (eff.params), где и лежит адрес управления.
@@ -107,7 +107,7 @@ const fxBarItems=role=>{
        разворот обязан следовать за ПАРАМЕТРОМ. На дефолтной цепи это ровно прежнее поведение. */
     const idx=(mod.params.length>1 && eff.params.some(pa=>fxParamOnFinger(pa,act))) ? mod.params.map((_,i)=>i) : [0];
     for(const i of idx){ const p=mod.params[i];
-      out.push({v:p.getNorm(), c:REV_COLOR, l:p.short, fing:eff.params[i], play:fxParamIsPlay(eff.params[i])}); }   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
+      out.push({v:p.getNorm(), c:m?m.color:REV_COLOR, l:p.short, fing:eff.params[i], play:fxParamIsPlay(eff.params[i])}); }   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
   });
   return out;
 };
@@ -797,14 +797,14 @@ function drawHandsPhone(res,W,H,playH){
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
       /* Эффект берём из ЗАХВАТА — но захват теперь ПО ПАЛЬЦУ, и на одном пальце могут сидеть параметры
-         РАЗНЫХ эффектов (Пласт 3.4.2). Подписываем ПЕРВЫЙ СТАРЫЙ СКАЛЯРНЫЙ из захваченных: только у них
-         есть и цвет, и процент в state.fx — у модулей (реверб) ни того, ни другого здесь нет, и раньше
-         подпись на таком пальце просто не рисовалась. На дефолтной цепи это ровно прежняя картинка:
+         РАЗНЫХ эффектов (Пласт 3.4.2). Подписываем ПЕРВЫЙ эффект с МЕТАДАННЫМИ ПОКАЗА (FX_META:
+         цвет и имя) — это три скаляра и, с в.1, делей-модуль, поэтому его подпись у кисти осталась. У реверба
+         метаданных нет, и на его пальце подпись по-прежнему не рисуется. На дефолтной цепи это ровно прежняя картинка:
          средний → «Делей 42%», указательный (реверб) → без подписи, как и было. */
-      if(S.pinch&&S.adj){ let meta=null;
-        for(const e of S.adj.ent){ const m=FX_META.find(q=>q.k===e.fxId); if(m){ meta=m; break; } }
+      if(S.pinch&&S.adj){ let meta=null, ent=null;
+        for(const e of S.adj.ent){ const m=FX_META.find(q=>q.k===e.fxId); if(m&&e.pIdx===0){ meta=m; ent=e; break; } }   // pIdx 0 — «величина» эффекта: у скаляра он единственный, у делея-модуля это mix (в.1); время и повторы на пальце подписью не дублируем
         if(meta){ ctx.fillStyle=meta.color; ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-          ctx.fillText(`${t(meta.fullKey)} ${Math.round(fx[meta.k]*100)}%`, S.x+14, S.y-10); } }
+          ctx.fillText(`${t(meta.fullKey)} ${Math.round(ent.get()*100)}%`, S.x+14, S.y-10); } }   // величина ЖИВАЯ, из записи захвата (в.1): у скаляра get() — тот же fx[k], у делея — cur экземпляра
       continue;
     }
     if(loopHand){                                // рука-ЛУПЕР: помечаем, чтобы не казалась «немой»; подсказку раскладки даём до щипка

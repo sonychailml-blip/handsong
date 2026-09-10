@@ -1,6 +1,6 @@
-import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
+import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxChainOf, roleXDriven, fxVolFix, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxIsScalar, fxChainOf, roleXDriven, fxVolFix, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -377,7 +377,7 @@ function endPinch(key,S){
    (см. WleadOn), поэтому «делей у аккордов» без своего store и своей проводки писал бы соло-делей.
    Портирование старых эффектов на прочие шины — не 3.5, а вопрос формата события (3.7). */
 const fxParamsOf=(role,fxId)=>{
-  if(FX_META.some(m=>m.k===fxId)) return role==='ld' ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }] : [];
+  if(fxIsScalar(fxId)) return role==='ld' ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }] : [];   // старый скалярный — по ЕДИНОМУ признаку state.fxIsScalar (в.1), не по FX_META: там делей-модуль остался ради цвета, и по ней он ушёл бы писать в несуществующее fx.dly
   const inst=fxInstance(role,fxId);
   return inst ? inst.params.map(p=>({ get:()=>p.getNorm(), set:v=>p.setNorm(v) })) : [];   // нет эффекта (или ещё нет AudioContext) → [] → цикл записи не сделает ни одного шага
 };
@@ -417,7 +417,7 @@ function captureFx(S,finger,lm,H){
     eff.params.forEach((pa,pIdx)=>{
       if(pa.mode!=='drive' || pa.hand!=='fx' || pa.finger!==finger) return;
       const p=ps[pIdx]; if(!p) return;                       // параметр, которого у эффекта нет (реестр пуст до initAudio) — молча мимо
-      ent.push({ effIdx, pIdx, fxId:eff.fxId, pa, set:p.set, base:p.get() });
+      ent.push({ effIdx, pIdx, fxId:eff.fxId, pa, set:p.set, get:p.get, base:p.get() });   // get — с в.1: ярлык у кисти читает ЖИВУЮ величину из записи захвата, а не из state.fx (делея там больше нет)
     });
   });
   if(!ent.length){ S.adj=null; S.tutFx=null; return; }

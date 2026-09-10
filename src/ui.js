@@ -4,7 +4,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          pinchFingers, setPinchFingers,
          fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
-         roleXDriven, fxVolFix, setFxVolFix } from './state.js';
+         roleXDriven, fxVolFix, setFxVolFix, fxIsScalar } from './state.js';
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -840,7 +840,7 @@ function fxTitleOf(fxId){
    КУДА ПИСАТЬ, — а здесь на «как подписать». Общего источника нет намеренно: слои разные, и тянуть
    подписи в жест-слой значило бы тащить туда i18n. */
 function fxParamKeys(fxId){
-  if(FX_META.some(m=>m.k===fxId)) return ['fx.param.amt'];
+  if(fxIsScalar(fxId)) return ['fx.param.amt'];   // старый скалярный — по ЕДИНОМУ признаку (в.1). Спроси FX_META — делей-модуль получил бы ОДИН ключ вместо трёх, и меню потеряло бы время и повторы
   const mod=FX_FACTORY[fxId];
   return mod ? mod.params.map(p=>p.labelKey) : [];
 }
@@ -1020,7 +1020,7 @@ function renderFxCtl(){
        делей посылом). Перенести их на чужую шину — это и своя проводка, и свой store, и вопрос
        формата события; всё это Пласт 3.7, не 3.5. Жест-слой их и так не отдаст чужой роли
        (fxParamsOf возвращает [] вне соло) — здесь мы просто не предлагаем того, что не заработает. */
-    if(fxCtlRole==='ld') for(const m of FX_META) if(!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);
+    if(fxCtlRole==='ld') for(const m of FX_META) if(fxIsScalar(m.k)&&!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ и предлагается ВСЕМ ролям циклом по FX_FACTORY строкой ниже; здесь его отсекает fxIsScalar, иначе у соло он встал бы в список дважды
     for(const id in FX_FACTORY) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_FACTORY[id].labelKey), FX_FACTORY[id].params.length]);
     const row=document.createElement('div'); row.className='prow';
     const sel=document.createElement('select'); sel.autocomplete='off';

@@ -7,8 +7,8 @@ export const FINGER_TIPS=[8,12,16,20];          // указ., средн., бе�
    деле, решает ЦЕПЬ РОЛИ (state.fxChains, с Пласта 3.3 — у соло это fxChains.ld, прежний fxLayout);
    здесь остались МЕТАДАННЫЕ эффекта (подпись, цвет, ключ имени), их читает draw. Менять палец эффекта
    правкой этой строки больше нельзя — только цепью. */
-export const FX_META=[                           // эффекты (только соло-канал). label — межъязыковой токен
-  {k:'dly', label:'DLY', fullKey:'fx.dly', finger:8,  color:'#4cc2ff'},   // fullKey — ключ словаря (полное имя рисует draw через t())
+export const FX_META=[                           // МЕТАДАННЫЕ ПОКАЗА эффектов (цвет, подпись, имя). ⚠️ «Старый скаляр» ли эффект, решает НЕ эта таблица, а state.fxIsScalar: с в.1 делей здесь есть, но он МОДУЛЬ. label — межъязыковой токен
+  {k:'dly', label:'DLY', fullKey:'fx.dly', finger:8,  color:'#4cc2ff'},   // fullKey — ключ словаря (полное имя рисует draw через t()). в.1: делей — МОДУЛЬ (FX_FACTORY), здесь от него остались ТОЛЬКО метаданные показа — цвет столбика и подпись у кисти
   {k:'vib', label:'VIB', fullKey:'fx.vib', finger:12, color:'#ffb84c'},
   {k:'drv', label:'DRV', fullKey:'fx.drv', finger:16, color:'#ff5d5d'},
   {k:'trm', label:'TRM', fullKey:'fx.trm', finger:20, color:'#9b7bff'},
