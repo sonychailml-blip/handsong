@@ -493,7 +493,7 @@ function processHands(res){
              handFn.ld.L='fx' ДЕРИВИРУЕТ прежний хардкод «эффекты у левой», без отдельного правила. */
           const halves=phoneHalves(W), hx=clamp(px,0,W-1), h=halves.find(q=>hx>=q.rx0&&hx<q.rx1)||halves[halves.length-1];   // клампим px ТОЛЬКО для выбора половины: щипок в поле полей целится в ближнюю половину, а не в чужую
           S.role=h.role; S.rx0=h.rx0; S.rx1=h.rx1;
-          const hLoop = (h.role==='ld'||h.role==='bs'||h.role==='ch') && handFnOf(key,h.role)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение на экране НЕважно (октавную полосу/палитру игнорируем)
+          const hLoop = handFnOf(key,h.role)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение на экране НЕважно (октавную полосу/палитру игнорируем). ⚠️ Перечень ролей (ld/bs/ch) снят в б.4: он был ИЗБЫТОЧЕН всегда — у роли без записи handFnOf давал null, и сравнение и так было ложным; теперь 'loop' есть и у ударных, и перечень только отрезал бы их
           const hExpr = h.role==='ld' && handFnOf(key,'ld')==='expr';   // рука-ВЫРАЗИТЕЛЬНОСТЬ: щипком НИЧЕГО не играет (считается пофреймово ниже); перебивает положение, как лупер
           const hsplit=palSplitX(h.rx0,h.rx1);
           const rectRole = (h.role==='ld'||h.role==='bs'||h.role==='ch') && rectGrid();
@@ -506,7 +506,7 @@ function processHands(res){
                  : hExpr ? 'expr'
                  : octBand ? 'oct'
                  : famHand ? 'chFam'
-                 : handFnOf(key,h.role)==='fx' ? 'fx'   // эффекты — ФУНКЦИЯ руки В РОЛИ ЕЁ ПОЛОВИНЫ (правило #18), больше не «только соло»: слайс б.1. Дефолт handFn.ld.L='fx' по-прежнему ДЕРИВИРУЕТ «эффекты у левой в соло-половине». У роли без записи в handFn (ударные) handFnOf даёт null — гейт честно ложен без отдельной проверки
+                 : handFnOf(key,h.role)==='fx' ? 'fx'   // эффекты — ФУНКЦИЯ руки В РОЛИ ЕЁ ПОЛОВИНЫ (правило #18), больше не «только соло»: слайс б.1. Дефолт handFn.ld.L='fx' по-прежнему ДЕРИВИРУЕТ «эффекты у левой в соло-половине». С б.4 запись есть у всех ролей (у ударных по умолчанию 'hit') — гейт честно ложен без отдельной проверки, пока руку не перевели на 'fx'
                  : h.role;
         }else{
           /* РОЛЬ И X-ДИАПАЗОН ЗАМОРАЖИВАЕМ И ЗДЕСЬ (слайс б.1). Прежде это делала ТОЛЬКО сплит-ветка,
@@ -523,7 +523,7 @@ function processHands(res){
              выбор семейства у типизированных аккордов — ПО ПОЛОЖЕНИЮ, ровно как в сплите (см. famHand
              ниже). Октавный прямоугольник — ПОЛОЖЕНИЕ важнее роли (полоса 0 → 'oct', даже если это
              fx-рука), стоит ПЕРВЫМ в тернаре. У аккордов октава живёт только в правой половине [SPLIT,W]. */
-          const sLoop = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && handFnOf(key,phoneInstr)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение НЕважно (октавную полосу/палитру игнорируем)
+          const sLoop = handFnOf(key,phoneInstr)==='loop';   // рука-ЛУПЕР: команды по пальцам, положение НЕважно (октавную полосу/палитру игнорируем). Перечень ролей снят в б.4 — см. hLoop в сплит-ветке
           const sExpr = phoneInstr==='ld' && handFnOf(key,'ld')==='expr';   // рука-ВЫРАЗИТЕЛЬНОСТЬ: щипком НИЧЕГО не играет (считается пофреймово ниже)
           const rectRole = (phoneInstr==='ld'||phoneInstr==='bs'||phoneInstr==='ch') && rectGrid();   // rect-раскладка: соло, бас И аккорды
           const octRight = !(phoneInstr==='ch'&&typedChords()) || px>=split;   // см. сплит-ветку: гейт по НАЛИЧИЮ палитры (typedChords), а не по роли
@@ -545,7 +545,7 @@ function processHands(res){
                  : phoneInstr;
         }
         S.fn = S.zone==='loop' ? 'loop'
-             : (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') ? handFnOf(key,S.zone) : null;   // функция руки: соло/бас — note/hold/therm; аккорды — latch/hold; лупер — loop; у fx/oct/chFam/ударных — null
+             : (S.zone==='ld'||S.zone==='bs'||S.zone==='ch') ? handFnOf(key,S.zone) : null;   // функция руки: соло/бас — note/hold/therm; аккорды — latch/hold; лупер — loop; у fx/oct/chFam/ударных — null (у ударных НАМЕРЕННО и после б.4: 'hit' никому из читателей S.fn не нужен — см. шапку handFn)
         // ЗАЦЕПКА ОБУЧЕНИЯ: щипок сформирован (edge) — палец(=октава)+зона+рука. По построению раз на щипок.
         tutorTap('pinch',{finger:S.oct, zone:S.zone, hand:handSide(key)});
       }

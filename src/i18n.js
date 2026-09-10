@@ -185,6 +185,7 @@ export const DICTS = {
     'handfn.loop':'Looper (control)',
     'handfn.latch':'Chords (latch)',
     'handfn.chHold':'Chords (held)',
+    'handfn.hit':'Drums (hit rows)',
     'hand.left':'Left hand',
     'hand.right':'Right hand',
     // холст: статус-строка ({name} — имя лада, локализуется на этапе B)
@@ -511,6 +512,7 @@ export const DICTS = {
     'handfn.loop':'Лупер (управление)',
     'handfn.latch':'Аккорды (защёлка)',
     'handfn.chHold':'Аккорды (с удержанием)',
+    'handfn.hit':'Удары (по рядам)',
     'hand.left':'Левая рука',
     'hand.right':'Правая рука',
     'status.centsScale':'Лад: {name} · центовый строй · {n} ступеней',
