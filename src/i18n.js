@@ -137,6 +137,11 @@ export const DICTS = {
     'panel.scale.bassInstr':'Bass instrument',
     'panel.scale.drumKit':'Drum kit',
     'panel.scale.handFn':'Hand functions',
+    'panel.scale.handActs':'Finger actions',
+    'act.none':'— effects',
+    'act.chFam':'Chord type palette',
+    'act.unavail':'{name} — not on this scale',
+    'act.hint':'What each finger of the EFFECTS hand does. By default every finger drives its effect parameters. The chord type palette can be put on any one finger — inside the palette that finger picks a type, outside it the same finger still drives its parameters.',
     // раскладка нот: прямоугольники vs узкие ряды (доступна ВСЕМ ладам — арифметика в scales.rectLayout подбирает k и повтор тоники)
     'panel.scale.rectLayout':'Note layout',
     // многопальцевый щипок: потолок нот на руку (дефолт 4)
@@ -462,6 +467,11 @@ export const DICTS = {
     'panel.scale.bassInstr':'Бас-инструмент',
     'panel.scale.drumKit':'Набор ударных',
     'panel.scale.handFn':'Функции рук',
+    'panel.scale.handActs':'Действия пальцев',
+    'act.none':'— эффекты',
+    'act.chFam':'Палитра типов аккордов',
+    'act.unavail':'{name} — нет на этом ладу',
+    'act.hint':'Что делает каждый палец руки, назначенной на «Эффекты». По умолчанию все пальцы ведут параметры эффектов. Палитру типов можно повесить на любой один палец: внутри палитры он выбирает тип, а вне её — по-прежнему ведёт свои параметры.',
     'panel.scale.rectLayout':'Раскладка нот',
     'panel.scale.pinchFingers':'Пальцев в руке',
     'panel.scale.pinchHint':'Несколько пальцев к большому — несколько нот. Камера различает два пальца увереннее, чем четыре: если безымянный или мизинец срабатывают ложно — опустите потолок.',

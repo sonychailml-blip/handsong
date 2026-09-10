@@ -3,11 +3,12 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
          fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
+         handActOf, setHandAct,
          roleXDriven, fxVolFix, setFxVolFix } from './state.js';
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
-import { fxParamsOf } from './gestures.js';
+import { fxParamsOf, ACTIONS } from './gestures.js';   // ACTIONS — реестр дискретных действий (слайс «д»): меню берёт подпись и avail() ОТТУДА ЖЕ, откуда их читает движок
 import { switchCamera } from './vision.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
@@ -183,7 +184,7 @@ const PANELS={
      (FX_FACTORY), доступной с загрузки модуля, — дыра закрыта В ИСТОЧНИКЕ.
      ⚠️ ЗОВЁМ ОБЕ СЕКЦИИ ЯВНО (Пласт 3.4.1): конструктор не принадлежит «Функциям рук», и причина
      пересборки относится к нему НАПРЯМУЮ, а не по наследству от соседа. */
-  sound:{ el:()=>panelSoundEl, btn:()=>soundBtn, tutor:'sound', open:()=>{ renderHandFn(); renderFxCtl(); } },
+  sound:{ el:()=>panelSoundEl, btn:()=>soundBtn, tutor:'sound', open:()=>{ renderHandFn(); renderHandActs(); renderFxCtl(); } },
   loop: { el:()=>panelLoopEl,  btn:()=>loopPanelBtn, tutor:'loop', open:()=>refreshMetreCtl() },   // актуализируем блокировку размера: петля могла измениться при закрытой панели
 };
 function showPanel(key,on){
@@ -364,7 +365,7 @@ export function tutorSetScale(idx){
    это РЕАЛЬНАЯ смена (иначе, если функция уже стоит, событие смены не придёт). renderHandFn перерисует
    селекты. Выбор по КОНЦУ урока НЕ сбрасываем (они только что научились выбирать — см. tutor.js финал). */
 export function tutorResetHandFn(){
-  setHandFn('ld','L','fx'); setHandFn('ld','R','note'); softAllOff(); renderHandFn();
+  setHandFn('ld','L','fx'); setHandFn('ld','R','note'); softAllOff(); renderHandFn(); renderHandActs();   // ⚠️ УРОКИ И ДЕЙСТВИЯ ПАЛЬЦЕВ: сюда рука соло возвращается на 'fx', значит секция «Действий» снова появляется. ⛔ Заведёт будущий урок аккорд-руку на 'fx' — его setup ОБЯЗАН и подписать палитру на палец, иначе шаг выбора типа станет невыполнимым (правило #24): по умолчанию рука-эффекты палитры не касается
 }
 /* Ссылки подвала: форма отзыва / поддержка. Пустой URL — прячем ссылку. Отзыв без формы → mailto с
    адресом, собранным в рантайме (не в HTML-исходнике). Зовётся один раз при загрузке модуля. */
@@ -503,7 +504,7 @@ addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const instrLbl=r=>t('role.'+r);   // подпись роли (🎸 Соло / 🎹 Аккорды / 🎚 Бас / 🥁 Ударные) — через словарь
 function applyInstr(){ instrBtn.textContent = instrLbl(phoneInstr);
-  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn();   // цвет роли; секция «Функции рук» зависит от активной роли
+  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn(); renderHandActs();   // цвет роли; секции «Функции рук» и «Действия пальцев» зависят от активной роли (набор ролей в игре сменился)
   if(hooks.tutor) hooks.tutor('role',{role:phoneInstr}); }   // ЗАЦЕПКА ОБУЧЕНИЯ (единственная из UI-слоя): смена роли — на том же канале hooks.tutor
 /* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ роли с записью (соло/бас/аккорды), что
    сейчас в игре. Строим динамически (как fillScales): single-role — одна роль; сплит — каждая ld/бас/ch-
@@ -552,6 +553,7 @@ function renderHandFn(){
          ⚠️ Исчезнет подсказка — исчезнет и причина: тогда убирать вызов ВМЕСТЕ с ней, осознанно. */
       sel.onchange=e=>{ setHandFn(role,hand,e.target.value); softAllOff();       // роли/зоны рук меняются → глушим звук (как смена инструмента)
         renderFxCtl();                                                            // ← зависимость ПО ДАННЫМ (подсказка fx.noHand читает roleHasFx), НЕ владение — см. комментарий выше
+        renderHandActs();                                                         // ← ТОЖЕ по данным: видимость «Действий пальцев» — это roleHasFx, а меняется он РОВНО здесь. Появилась/исчезла рука на эффектах — секция обязана появиться/исчезнуть в тот же миг, а не к следующему открытию панели
         if(hooks.tutor) hooks.tutor('handfn',{role, hand, fn:e.target.value}); };   // ЗАЦЕПКА ОБУЧЕНИЯ: сменили функцию руки (какая рука, какая функция) — урок «Функции рук»
       row.appendChild(lab); row.appendChild(sel); handFnRows.appendChild(row);
     }
@@ -703,6 +705,68 @@ function fxShareChip(groups){
 /* Подсказка секции — абзац .phint, как у эталона A4 и «Пальцев в руке». Пересобирается вместе со
    строками (textContent='' выше), поэтому отдельного скрытия/показа не требуется. */
 function fxHint(key){ const p=document.createElement('p'); p.className='phint'; p.textContent=t(key); return p; }
+/* ═══ ДЕЙСТВИЯ ПАЛЬЦЕВ — СЕКЦИЯ ПОД «ФУНКЦИЯМИ РУК» (слайс «д») ═══
+   ⛳ СТУПЕНЬ НИЖЕ, А НЕ ВТОРАЯ ТАКАЯ ЖЕ: «Функции рук» отвечают, ЧТО ТАКОЕ РУКА, эта — ЧТО ДЕЛАЮТ ЕЁ
+   ПАЛЬЦЫ. Оттого и соседство в панели, и порядок: сперва решают про руку, потом про пальцы.
+   ⚠️ ПОЧЕМУ НЕ В КОНСТРУКТОРЕ ЭФФЕКТОВ. Конструктор устроен ОТ ПАРАМЕТРА (эффект → параметр → адрес),
+   а у дискретного действия параметра НЕТ — строка там оказалась бы чужеродной, и её пришлось бы
+   объяснять в самом сложном экране приложения, который только-только устоялся за шесть слайсов.
+   ⚠️ ВИДНА ТОЛЬКО У РОЛЕЙ С РУКОЙ НА ЭФФЕКТАХ — и это НЕ тот гейт, что снимали в 3.4.1. Там прятали
+   ЦЕПЬ, которая звучит и без руки (гейт был ложью). Здесь прячут ПОДПИСКИ ПАЛЬЦЕВ, а назначаемые пальцы
+   существуют ровно у руки-эффектов: без неё показывать было бы нечего.
+   ⚠️ ЗАЧЕМ ЖЕ ХРАНИТЬ ПОДПИСКУ, КОГДА РУКИ НЕТ: убрал руку с эффектов и вернул — палец обязан получить
+   СВОЁ назначение обратно, а не ноль (тот же закон, по которому у параметра эффекта палец/ось переживают
+   смену режима). Поэтому секция ПРЯЧЕТСЯ, а данные живут. */
+const handActSep=$('handActSep'), handActRows=$('handActRows');
+/* Параметры цепи, которые ведёт ЭТОТ ЖЕ палец. Нужны ровно для чипа «делится»: подписка на палитру
+   пальца не отнимает (ACTIONS.chFam.exclusive===false), и человек вправе знать, с кем он его делит. */
+function actShareOn(role,finger){
+  const out=[];
+  for(const eff of fxChainOf(role)){
+    const pkeys=fxParamKeys(eff.fxId);
+    eff.params.forEach((pa,pi)=>{
+      if(pi>=pkeys.length) return;                                   // параметра без дескриптора жест не ведёт (см. fxShareMap) — и делить нечего
+      if(pa.mode==='drive' && pa.hand==='fx' && (pa.finger|0)===finger) out.push(fxTitleOf(eff.fxId)+' · '+t(pkeys[pi]));
+    });
+  }
+  return out;
+}
+function renderHandActs(){
+  if(!handActSep||!handActRows) return;
+  const roles=noteRolesInPlay().filter(roleHasFx);   // те же роли, что у «Функций рук», но лишь с рукой на эффектах
+  handActSep.style.display = handActRows.style.display = roles.length ? '' : 'none';
+  handActRows.textContent='';
+  if(!roles.length) return;
+  for(const role of roles){
+    const rl=document.createElement('div'); rl.className='handFnRole'; rl.textContent=instrLbl(role);   // тот же класс, что у «Функций рук»: секции читаются как одна лестница
+    handActRows.appendChild(rl);
+    FINGER_KEYS.forEach((fk,f)=>{
+      const row=document.createElement('div'); row.className='prow';
+      const lab=document.createElement('label'); lab.textContent=t(fk);
+      const sel=document.createElement('select'); sel.autocomplete='off';   // как в renderFxCtl/renderHandFn: не даём браузеру восстановить прежнее значение ПОВЕРХ данных
+      const opt=(v,txt)=>{ const o=document.createElement('option'); o.value=v; o.textContent=txt; return o; };
+      sel.appendChild(opt('',t('act.none')));
+      /* ⚠️ НЕДОСТУПНОЕ ДЕЙСТВИЕ ПОКАЗЫВАЕМ ОТКЛЮЧЁННЫМ И С ПРИЧИНОЙ, а не прячем (дисциплина «Раскладки
+         нот»): исчезнувший пункт читается как «такого не бывает», тогда как правда — «не на этом ладу».
+         А если он уже НАЗНАЧЕН, спрятать его значило бы ещё и соврать про текущее состояние. */
+      for(const a of Object.values(ACTIONS)){
+        const ok=a.avail(), name=t(a.labelKey);
+        const o=opt(a.id, ok?name:t('act.unavail',{name}));
+        if(!ok) o.disabled=true;
+        sel.appendChild(o);
+      }
+      const cur=handActOf(role,'fx',f)||'';
+      sel.value=cur;
+      if(sel.value!==cur) sel.appendChild(opt(cur,cur));   // назначено действие, которого нет в реестре (чужая/будущая сборка) — не теряем выбор молча
+      sel.onchange=e=>{ setHandAct(role,'fx',f,e.target.value||null); softAllOff();   // подписка меняет СМЫСЛ щипка этим пальцем — глушим звучащее, как смена функции руки или раскладки
+        renderHandActs(); };                                                          // перерисовка своя: изменился чип «делится» у этой строки
+      row.appendChild(lab); row.appendChild(sel);
+      if(cur){ const sh=actShareOn(role,f); if(sh.length) row.appendChild(fxShareChip([sh])); }
+      handActRows.appendChild(row);
+    });
+  }
+  handActRows.appendChild(fxHint('act.hint'));
+}
 /* ═══ ЧИСЛОВОЕ ПОЛЕ СО СТУПЕНЬКАМИ «−[поле]＋» — ОДИН ОРГАН НА ВСЕ ФИКСИРОВАННЫЕ ВЕЛИЧИНЫ ═══
    Вынесен из строки параметра в 3.7.3, когда понадобился ВТОРОЙ такой же (фиксированная громкость
    роли). Второй экземпляр писать нельзя: у этого органа накоплена нетривиальная история поведения,
@@ -1011,7 +1075,7 @@ function applySplitRoles(){
     b.textContent = (i===0?'◧ ':'') + instrLbl(role) + (i===1?' ◨':'');
     b.style.setProperty('--role', INSTR_COL[role]);
   });
-  renderHandFn();                             // ld/бас-половина могла появиться/исчезнуть — пересобираем секцию «Функции рук»
+  renderHandFn(); renderHandActs();           // ld/бас-половина могла появиться/исчезнуть — пересобираем «Функции рук» И «Действия пальцев» (у них ОДНА зависимость: набор ролей в игре + handFn)
 }
 /* Прокрутка роли ОДНОЙ половины: следующий инструмент в INSTR_SEQ, ПРОПУСКАЯ роль ДРУГОЙ половины.
    Так две половины никогда не совпадут → дубль-половины и моно-конфликты (два соло / два баса)

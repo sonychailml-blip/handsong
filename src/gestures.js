@@ -1,6 +1,6 @@
 import { FINGER_TIPS, FX_META, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxChainOf, roleXDriven, fxVolFix, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxChainOf, roleXDriven, fxVolFix, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -214,6 +214,39 @@ function fireLooperCmd(S,mf){
   else if(f===1) doLooper('play');
   else if(f===2) doLooper('undo');
 }
+/* ═══ ДИСКРЕТНЫЕ ДЕЙСТВИЯ ПАЛЬЦЕВ — ДЕСКРИПТОРЫ (слайс «д») ═══
+   Всё, что движок обязан знать о действии, лежит ЗДЕСЬ, а не в ветках кода: движок не должен опознавать
+   действие ПО ИМЕНИ, иначе каждое новое потянет за собой правку гейтов.
+     avail()   — осмысленно ли действие ПРЯМО СЕЙЧАС. Это и есть механизм МЯГКОЙ ДЕГРАДАЦИИ: на ладу без
+                 палитры (`typedChords` ложен) подписка НЕ СТИРАЕТСЯ, а просто не срабатывает, и палец
+                 падает в обычное ведение параметров — не повисает мёртвым. Та же дисциплина, по которой
+                 у параметра эффекта палец/ось переживают смену режима: снимать выбор человека молча нельзя.
+     region    — где должен оказаться щипок ('palette' — внутри палитры; null — где угодно).
+     exclusive — СЪЕДАЕТ ли действие палец. У палитры НЕТ (false): внутри палитры палец выбирает тип,
+                 ВНЕ её — по-прежнему ведёт свои параметры эффекта, и разводит их ПОЛОЖЕНИЕ, безо всякого
+                 дополнительного правила. У команд лупера было бы true — щипок срабатывает где угодно.
+   ⚠️ ПОРЯДОК СТАРШИНСТВА, одной строкой: сперва решает ФУНКЦИЯ РУКИ, потом ПОДПИСКА ПАЛЬЦА. Рука не на
+   эффектах ведёт себя ровно как раньше (положение + большой-указательный); рука НА эффектах делает
+   только то, что её пальцам назначено. Прежде эти два гейта разводил ПОРЯДОК В ТЕРНАРЕ — палитра стояла
+   выше эффектов и молча забирала указательный. */
+const ACTIONS={
+  chFam:{ id:'chFam', labelKey:'act.chFam', avail:()=>typedChords(), region:'palette', exclusive:false },
+};
+/* «Действие ВЗВЕДЕНО на этом пальце» — обобщённо, без упоминания конкретного действия. */
+const actArmed=(role,hand,finger,actId)=>{
+  const a=ACTIONS[actId];
+  return !!a && a.avail() && handActOf(role,hand,finger)===actId;
+};
+/* ⛳ ЕДИНСТВЕННЫЙ ИСТОЧНИК «ЭТА РУКА ВЫБИРАЕТ ТИП АККОРДА ЭТИМ ПАЛЬЦЕМ». Зовётся ДВАЖДЫ — из тернара
+   зоны (захват) и из пофреймовой перепроверки внутри зоны 'chFam'. ⛔ НЕ РАЗМНОЖАТЬ: разойдись эти два
+   ответа, и ведение оборвалось бы ПОСРЕДИ жеста (палитру можно тянуть до соседней ячейки, не разжимая
+   пальцев). Та же дисциплина, что у captureFx и пофреймового цикла в слайсе б.1.
+   ⚠️ РУКА НЕ НА ЭФФЕКТАХ → палец 0, дословно как было: это документированная ОДНОРУЧНАЯ МОДЕЛЬ аккордов
+   (одна и та же рука берёт тип слева и корень справа — по очереди, аккорд звучит и после размыкания).
+   Подписки для неё не существует: назначаемы пальцы ТОЛЬКО у руки-эффектов — тем же законом, по
+   которому handFn решает, чем рука ЯВЛЯЕТСЯ. */
+const paletteFinger=(key,role,finger)=>
+  handFnOf(key,role)==='fx' ? actArmed(role,'fx',finger,'chFam') : finger===0;
 /* Роль-половина ЭТОЙ руки СЕЙЧАС: single — глобальный phoneInstr; сплит — замороженная S.role (щипок)
    или живая половина под указательным (lm[8]). Правило #18: в сплите функция руки берётся ПО РОЛИ
    ПОЛОВИНЫ.
@@ -468,7 +501,7 @@ function processHands(res){
           /* Октавная полоса существует ТОЛЬКО когда показан не весь диапазон (hasReg). Без этого гейта
              на многопериодной сетке нижний НОТНЫЙ прямоугольник перехватывался бы как регистровый и молчал. */
           const octBand  = rectRole && rectLayout().hasReg && octRight && degRaw(Math.min(py,H-1),rectRowsFull(),H)===0;
-          const famHand  = h.role==='ch' && typedChords() && S.oct===0 && px<hsplit;   // ПОЛОЖЕНИЕ, без handRole
+          const famHand  = h.role==='ch' && typedChords() && px<hsplit && paletteFinger(key,h.role,S.oct);   // ПОЛОЖЕНИЕ + ПОДПИСКА ПАЛЬЦА (слайс «д»; прежде жёсткое S.oct===0 без всякого учёта функции руки — оттого рука-эффекты и забирала указательный). Роль — h.role, ЗАМОРОЖЕННАЯ роль половины; ⛔ не phoneInstr
           S.zone = hLoop ? 'loop'
                  : hExpr ? 'expr'
                  : octBand ? 'oct'
@@ -503,7 +536,7 @@ function processHands(res){
              размыкания). Цена та же, что в сплите: нотная рука, щипнувшая большим+указательным СЛЕВА,
              выберет тип, а не сыграет корень — но корни там и не рисуются (сетка живёт в [split,W]), а
              громкость слева мерилась минимумом, так что терять нечего. */
-          const famHand = phoneInstr==='ch' && typedChords() && S.oct===0 && px<split;   // ПОЛОЖЕНИЕ, без handRole
+          const famHand = phoneInstr==='ch' && typedChords() && px<split && paletteFinger(key,phoneInstr,S.oct);   // ПОЛОЖЕНИЕ + ПОДПИСКА ПАЛЬЦА (слайс «д»). Роль здесь глобальная ЗАКОННО: сплита нет, роль на экране одна
           S.zone = sLoop ? 'loop'
                  : sExpr ? 'expr'
                  : octBand ? 'oct'
@@ -603,12 +636,16 @@ function processHands(res){
            Ветка стоит рядом с 'fx', ДО общего блока — поэтому не считает ни ступень, ни
            громкость, не берёт chOwner и не доходит до защёлки: левая рука нот не играет.
            Два гейта, оба оставляют выбор ЛИПКИМ (ничего не трогаем):
-             1. только большой+УКАЗАТЕЛЬНЫЙ (S.oct===0) — щипок средним/безымянным/мизинцем
-                на этой руке ничего не выбирает: палец здесь смысла не несёт, а случайный
-                щипок не должен сбивать заготовленную форму;
+             1. ПАЛЕЦ ИМЕЕТ ПРАВО ВЫБИРАТЬ — paletteFinger, ТОТ ЖЕ предикат, что решал на захвате
+                (слайс «д»; прежде здесь стояло голое S.oct===0). ⛔ Второй копии правила быть не
+                должно: разойдись захват с перепроверкой — и ведение оборвалось бы посреди жеста,
+                хотя щипок не разжимали. Щипок «неуполномоченным» пальцем по-прежнему ничего не
+                выбирает: случайное касание не должно сбивать заготовленную форму;
              2. только внутри палитры (S.x < psplit) — рука, ушедшая в зону нот, молчит.
+           ⚠️ РОЛЬ БЕРЁТСЯ С S (S.role) — замороженная на захвате в ОБЕИХ ветках с б.1; ⛔ не phoneInstr:
+           при сплите он не назовёт роль щипнувшей руки.
            Ведение непрерывное, пока щипок держат: можно дотянуть до соседней ячейки. */
-        if(S.oct===0 && S.x<psplit){
+        if(paletteFinger(key,S.role,S.oct) && S.x<psplit){
           const x0=prx0+CH_PAL_PAD, x1=psplit-CH_PAL_PAD, y0=CH_PAL_HEAD_H, y1=H-CH_PAL_HEAD_H;
           const [c,r]=cellHyst(clamp(S.x,x0,x1),clamp(S.y,y0,y1),x0,x1,y0,y1,chordFams(),
                                S.pc==null?-1:S.pc, S.pr==null?-1:S.pr);
@@ -990,4 +1027,4 @@ function processHands(res){
 /* fxParamsOf экспортирован для меню конструктора (слайс 2.6.2): фиксированное значение обязано уходить
    в звук ЧЕРЕЗ ТОТ ЖЕ set, что и палец, — иначе развилка «скаляр или модуль» размножится копией в ui.
    Цикла импорта нет: gestures тянет config/state/scales/recorder/i18n/hooks/audio/vision и НИКОГДА ui. */
-export { HANDS, processHands, degRaw, fxParamsOf };
+export { HANDS, processHands, degRaw, fxParamsOf, ACTIONS };   // ACTIONS — для меню (слайс «д»): подпись действия и его avail() берутся ОТТУДА ЖЕ, откуда их читает движок, иначе меню и жест разошлись бы в том, что доступно
