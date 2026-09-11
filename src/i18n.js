@@ -228,7 +228,7 @@ export const DICTS = {
     'fx.dly':'Delay',
     'fx.vib':'Vibrato',
     'fx.drv':'Drive',
-    'fx.trm':'Tremolo',
+    'fx.trm':'Tremolo (note)',
     'fx.reverb':'Reverb',
     'fx.bright':'Brightness',
     'fx.bright.amt':'Amount',
@@ -239,6 +239,9 @@ export const DICTS = {
     'fx.dly.mix':'Amount',
     'fx.dly.time':'Time',
     'fx.dly.fb':'Feedback',
+    'fx.trmMix':'Tremolo (mix)',
+    'fx.trmMix.depth':'Depth',
+    'fx.trmMix.rate':'Rate',
     'fx.param.amt':'Amount',            // у старых скалярных эффектов параметр один и он же сам эффект
     // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— none —',
@@ -550,7 +553,7 @@ export const DICTS = {
     'fx.dly':'Делей',
     'fx.vib':'Вибрато',
     'fx.drv':'Драйв',
-    'fx.trm':'Тремоло',
+    'fx.trm':'Тремоло (нота)',
     'fx.reverb':'Реверб',
     'fx.bright':'Яркость',
     'fx.bright.amt':'Величина',
@@ -561,6 +564,9 @@ export const DICTS = {
     'fx.dly.mix':'Подмес',
     'fx.dly.time':'Время',
     'fx.dly.fb':'Повторы',
+    'fx.trmMix':'Тремоло (микс)',
+    'fx.trmMix.depth':'Глубина',
+    'fx.trmMix.rate':'Частота',
     'fx.param.amt':'Величина',          // у старых скалярных эффектов параметр один и он же сам эффект
     // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— нет —',

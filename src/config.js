@@ -11,7 +11,8 @@ export const FX_META=[                           // МЕТАДАННЫЕ ПОК�
   {k:'dly', label:'DLY', fullKey:'fx.dly', finger:8,  color:'#4cc2ff'},   // fullKey — ключ словаря (полное имя рисует draw через t()). в.1: делей — МОДУЛЬ (FX_FACTORY), здесь от него остались ТОЛЬКО метаданные показа — цвет столбика и подпись у кисти
   {k:'vib', label:'VIB', fullKey:'fx.vib', finger:12, color:'#ffb84c'},
   {k:'drv', label:'DRV', fullKey:'fx.drv', finger:16, color:'#ff5d5d'},
-  {k:'trm', label:'TRM', fullKey:'fx.trm', finger:20, color:'#9b7bff'},
+  {k:'trm', label:'TRM', fullKey:'fx.trm', finger:20, color:'#9b7bff'},   // «Тремоло (нота)» — пер-голосовое, скаляр
+  {k:'trmMix', label:'TMIX', fullKey:'fx.trmMix', color:'#d4b8ff'},       // в.2: «Тремоло (микс)» — МОДУЛЬ (FX_FACTORY); здесь только метаданные показа. Оттенок той же семьи, но светлее: родня, а не двойник
 ];
 export const REV_COLOR='#57d9a3';
 /* Акцент роли: холст красит ими сетку/ярлыки, UI — кнопку-переключатель роли.
