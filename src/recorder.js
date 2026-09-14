@@ -66,6 +66,114 @@ function beatLevel(metre,b){
 const loopChordDeg=()=>loop.on?curChordDeg:-1;       // draw: подсветить аккорд петли, когда рука его не держит
 const loopChordOct=()=>loop.on?curChordOct:0;        // его регистр — тем же путём (подсветка ищет прямоугольник по ПАРЕ deg+oct)
 const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
+
+/* ═══ ДОРОЖКИ: ЗАГЛУШЕНИЕ И СОЛО (слайс S1 «Редактора дорожек») ═══
+   ⚠️ НАСТРОЙКА КЛЮЧУЕТСЯ НА СГЕНЕРИРОВАННОМ id ДОРОЖКИ, А НЕ НА НОМЕРЕ СЛОЯ. Номер для этого НЕ
+   ГОДИТСЯ, и это не предосторожность на будущее, а три уже существующих факта:
+     (1) номера ПЕРЕИСПОЛЬЗУЮТСЯ — овердаб берёт maxLayer()+1, поэтому после ⤺ отмены следующая
+         запись получает ТОТ ЖЕ номер; ключуйся мы на номере, новая дорожка молча родилась бы
+         заглушённой (и человек искал бы пропавший звук);
+     (2) в номерах бывают ДЫРЫ — clearJam вырезает события ПО МЕТКЕ ev.jam, а не по слою, поэтому
+         «слои 0 и 2 без 1» — нормальное состояние, а не сбой;
+     (3) onUndo НЕ ПЕРЕНУМЕРОВЫВАЕТ — и не должен: номер слоя зашит в КЛЮЧИ ВЛАДЕЛЬЦЕВ ГОЛОСОВ
+         ('loop:N' / 'bassloop:N' / 'leadloop:N:v'), перенумерация оторвала бы звучащие голоса от
+         их владельцев.
+   Отсюда разделение: НОМЕР СЛОЯ — адрес ЗВУКА (ключи владельцев, события), id ДОРОЖКИ — адрес
+   НАСТРОЙКИ, связывает их одна таблица laneId.
+   ⛔ Не сливать их и ⛔ не писать id в событие: формат события слайс S1 НЕ трогает вовсе. */
+let laneSeq=0;
+const laneId=new Map();      // номер слоя → СТАБИЛЬНЫЙ id дорожки
+const laneMute=new Set();    // id заглушённых дорожек
+const laneSolo=new Set();    // id дорожек в соло
+/* ⛳ ЗАКОН ЭТОГО БЛОКА, И НА НЁМ ДЕРЖИТСЯ ВСЯ КОРРЕКТНОСТЬ ДОРОЖЕК:
+   **laneNew — ЕДИНСТВЕННЫЙ ПИСАТЕЛЬ laneId, и он ВСЕГДА выдаёт СВЕЖИЙ id, ЗАТИРАЯ прежнюю запись
+   этого номера.** Значит правильность обеспечивает РОЖДЕНИЕ слоя, а не уборка за умершим.
+   ⚠️ ПОЧЕМУ НЕ НАОБОРОТ (держать правильность на уборке) — так было, и это была мина: номера
+   ПЕРЕИСПОЛЬЗУЮТСЯ (овердаб берёт maxLayer()+1), поэтому ОДНА пропущенная уборка означала бы, что
+   свежезаписанный слой унаследовал id покойника вместе с его заглушением. Наружу это выглядит как
+   «моя новая дорожка молчит, и непонятно почему» — тихо, правдоподобно и ищется долго.
+   Теперь такого состояния не существует: что бы ни осталось в laneMute/laneSolo, НИ ОДИН номер на
+   эти id больше не отображается, поэтому они НИКОГДА НИ С ЧЕМ НЕ СОВПАДУТ.
+   ⛔ Не заводить второго писателя laneId. Появится новое место, где рождается слой, — оно обязано
+   звать laneNew; список мест — в отчёте слайса и в комментариях у самих мест. */
+function laneNew(layer){
+  const old=laneId.get(layer);
+  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); }   // ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ: без этой строки старый id просто мёртвым грузом лежал бы в множестве и ни на что не влиял — но множества росли бы всю сессию
+  laneId.set(layer,++laneSeq);
+  return laneSeq;
+}
+/* ЧТЕНИЕ id — ЧИСТОЕ: вернёт либо ДЕЙСТВУЮЩИЙ id номера (тот, что выдало последнее рождение), либо
+   undefined. ⛔ ЗАВОДИТЬ id ЗДЕСЬ НЕЛЬЗЯ, и это не стиль: «страховка», заводящая id по требованию,
+   была бы ВТОРЫМ писателем, а значит вторым источником правды о том, какое поколение номера сейчас
+   живёт. Отсутствие записи читается как «обычная слышимая дорожка» — что и верно: id, которого
+   никогда не выдавали, не может лежать ни в laneMute, ни в laneSolo. */
+const laneOf=layer=>laneId.get(layer);
+/* Уборка за слоями, у которых больше НЕТ СОБЫТИЙ (⤺ отмена слоя, снятие подложки).
+   ⚠️ ЭТО ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ (см. закон выше): пропусти мы её где-нибудь — таблица и
+   множества просто подрастут мусором, но ни одна дорожка не перепутается, потому что номер получит
+   свежий id при следующем рождении. Держим ради того, чтобы состояние не копилось за долгую сессию.
+   Пишущийся слой ЩАДИМ — он законно пуст, пока в него не сыграли (его строку уже показывает полоса). */
+function lanePrune(){
+  const live=new Set(); for(const e of events) live.add(e.layer);
+  for(const [ly,id] of laneId) if(!live.has(ly) && !(recording&&ly===loop.layer)){
+    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); }
+}
+/* ⚠️ laneSeq НАМЕРЕННО НЕ ОБНУЛЯЕТСЯ: счётчик монотонен на всю сессию. Обнуление вернуло бы в оборот
+   уже выданные номера id — а это ровно тот вид совпадения, от которого id и заводился. Стоит он
+   ничего (целое число), а класс ошибок закрывает целиком. */
+function laneReset(){ laneId.clear(); laneMute.clear(); laneSolo.clear(); }
+/* ⛳ ПРЕДИКАТ СЛЫШИМОСТИ — ОДИН НА ОБА ПУТИ ПЕРЕИГРОВКИ (scheduleLayers и fireNear).
+   СОЛО ПЕРЕБИВАЕТ ЗАГЛУШЕНИЕ: как только соло включено хоть где-то, слышны РОВНО соло-дорожки, а
+   остальные молчат независимо от своих галочек mute (и возвращаются как были, когда соло снимут). */
+/* Зовётся из планировщика (40 раз в секунду на каждое событие) и из draw — поэтому важно, что laneOf
+   ЧИСТЫЙ: ни одной записи в таблицу на горячем пути. Нет id → дорожка обычная, слышимая. */
+const laneAudible=layer=>{ const id=laneOf(layer);
+  return laneSolo.size ? (id!=null&&laneSolo.has(id)) : !(id!=null&&laneMute.has(id)); };
+/* ⛳ ГЕЙТ ЦЕЛИКОМ ВЫКЛЮЧЕН, ПОКА НИЧЕГО НЕ ЗАГЛУШЕНО И НИЧЕГО НЕ В СОЛО — и это НЕ микро-оптимизация,
+   а УСЛОВИЕ ПРИЁМКИ слайса: пока человек не тронул переключатели, пер-событийная проверка не
+   выполняется ВООБЩЕ (в цикле остаётся один уже вычисленный булев), и переигровка идёт байт-в-байт
+   как раньше. Считается ОДИН РАЗ НА ВЫЗОВ планировщика, а не на событие. */
+const laneGated=()=> laneMute.size>0 || laneSolo.size>0;
+/* Дрон — не нота, а УРОВЕНЬ (выделенные узлы, softAllOff его не трогает), поэтому «заглушить слой
+   с дроном» нельзя сделать пропуском события: droneOn уже отработал. Спрашиваем отдельно, слышен ли
+   дрон хоть на одной дорожке, и ведём общий уровень. */
+const droneAudible=()=>events.some(e=>e.fn==='drone'&&laneAudible(e.layer));
+/* Переключатели. Наружу дорожка адресуется НОМЕРОМ СЛОЯ — тем же, чем подписана её строка на полосе
+   лупера; id остаётся внутренним делом (ui не может подержать протухший id).
+   ⚠️ `?? laneNew(layer)` — НЕ «мягкое заведение id», а ЕДИНСТВЕННЫЙ БЕЗОПАСНЫЙ способ его получить,
+   когда записи нет. Он безопасен ровно потому, что ОТСУТСТВИЕ записи не может нести устаревший id:
+   вернуть что-то протухшее laneOf физически неспособен (он либо отдаёт действующий id, либо ничего).
+   Сюда мы попадаем, только если слой родился мимо всех известных мест рождения, — то есть это ещё и
+   САМОПОЧИНКА: дорожка получит id и переключатель сработает, вместо того чтобы молча ничего не делать. */
+function toggleLaneMute(layer){ const id=laneOf(layer) ?? laneNew(layer);
+  if(laneMute.has(id)) laneMute.delete(id); else laneMute.add(id);
+  laneHush(); }
+function toggleLaneSolo(layer){ const id=laneOf(layer) ?? laneNew(layer);
+  if(laneSolo.has(id)) laneSolo.delete(id); else laneSolo.add(id);
+  laneHush(); }
+/* ЧИТАТЕЛИ ДЛЯ ПОКАЗА — через тот же чистый laneOf (их зовёт draw на каждый кадр; правило #5 с
+   обратной стороны: рисование не смеет менять состояние). */
+const laneMuted =layer=>{ const id=laneOf(layer); return id!=null&&laneMute.has(id); };
+const laneSoloed=layer=>{ const id=laneOf(layer); return id!=null&&laneSolo.has(id); };
+const laneSoloOn=()=> laneSolo.size>0;
+/* ⚠️ ЗАГЛУШАТЬ НАДО НЕМЕДЛЕННО, А НЕ «СО СЛЕДУЮЩЕГО СОБЫТИЯ»: удержанный аккорд слоя звучал бы до
+   заворота (chOff у него ещё впереди). Ключи владельцев дают ТОЧНЫЙ адрес слоя, поэтому гасим ровно
+   ставшие неслышимыми слои — ТЕМ ЖЕ обходом, что и граница повтора (releaseLoopLayersAt со слоем),
+   второго обхода не заводим.
+   Зовём после КАЖДОГО переключения и проходим ВСЕ слои, а не только тронутый: включение соло делает
+   неслышимыми чужие дорожки, а снятие одного из двух соло — ту, что осталась без него.
+   Уже молчащие слои проходят вхолостую (chordOff/bassOff/leadOff выходят сразу, если владельца нет).
+   ⚠️ УДАРНЫЕ ОТМЕНИТЬ НЕЛЬЗЯ: drumHit — одноразовые осцилляторы, поэтому удары, уже запланированные
+   в окно SCHED_AHEAD (~300мс), прозвучат ПОСЛЕ заглушения. Та же принятая и ограниченная цена, что у
+   стопа петли и у отмены слоя; чинить её здесь нечем. */
+function laneHush(){
+  if(!AC) return;
+  const seen=new Set();
+  for(const e of events){ if(seen.has(e.layer)) continue; seen.add(e.layer);
+    if(!laneAudible(e.layer)) releaseLoopLayersAt(undefined,e.layer); }
+  if(droneActive()){ if(loop.on&&droneAudible()) droneOn(); else droneOff(); }   // уровень дрона — по слышимости ЕГО дорожки (уровень, а не нота: пропуском события его не заглушить)
+}
+
 /* Позиция для визуализации: фаза отсчёта / игры, доля внутри петли, всего долей. */
 function loopPos(){
   if(!loop.on||!AC)return null;
@@ -290,6 +398,7 @@ const isLayer=fn=> fn[0]==='c' || fn.slice(0,4)==='bass' || fn==='drum';
 function scheduleLayers(){
   const spb=60/loop.bpm, lb=loopBeats();
   const horizon=(AC.currentTime+SCHED_AHEAD-loop.t0)/spb;   // абс. доля на горизонте опережения
+  const gated=laneGated();                                  // ОДИН раз на вызов: пока никто не заглушён, в цикле остаётся готовый булев
   let guard=0;
   while(loop.sched<horizon-1e-9 && guard++<64){
     const rep=Math.floor(loop.sched/lb+1e-9), repEnd=(rep+1)*lb;
@@ -298,6 +407,7 @@ function scheduleLayers(){
     for(const ev of events){
       if(!isLayer(ev.fn)) continue;
       if(recording&&ev.layer===loop.layer) continue;
+      if(gated&&!laneAudible(ev.layer)) continue;           // дорожка заглушена (или молчит из-за чужого соло) — просто НЕ ПЛАНИРУЕМ её события; сами события НЕ трогаем
       if(ev.t>=lo&&ev.t<hi){
         const when=loop.t0+(rep*lb+ev.t)*spb;               // ТОЧНОЕ время события
         ENG[ev.fn](ev.a,ev,when);                           // ev несёт замороженный лад (§3.4)
@@ -310,21 +420,37 @@ function scheduleLayers(){
   }
 }
 /* Гашение СЛОЁВ петли на границе повтора, по явному времени (owner 'loop:'/'bassloop:'; живое — latch/bass —
-   гасит liveWrapRelease почти-сейчас). Читает hold СЕЙЧАС: там уже голоса уходящего повтора (chOn их создал). */
-function releaseLoopLayersAt(when){
-  for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:') chordOff(k,when);
-  for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:') bassOff(k,when);
+   гасит liveWrapRelease почти-сейчас). Читает hold СЕЙЧАС: там уже голоса уходящего повтора (chOn их создал).
+   ⛳ layer — НЕОБЯЗАТЕЛЬНЫЙ фильтр (слайс S1): задан — гасим РОВНО этот слой (заглушение дорожки),
+   не задан — ВСЕ слои петли, байт-в-байт прежнее поведение границы повтора. Обход ключей владельцев
+   остаётся ОДИН: второй такой же цикл в другом месте рано или поздно разошёлся бы с этим.
+   ⚠️ Сравниваем ХВОСТ ключа целиком ('loop:3' → '3') или хвост с двоеточием ('leadloop:3:0' → '3:'),
+   а не просто начало: иначе слой 1 забрал бы и слой 12. */
+function releaseLoopLayersAt(when,layer){
+  const own = layer==null ? null : String(layer);
+  const hit = (k,pre)=>{ if(k.slice(0,pre.length)!==pre) return false;
+    if(own==null) return true;
+    const rest=k.slice(pre.length);
+    return rest===own || rest.slice(0,own.length+1)===own+':'; };
+  for(const k of Object.keys(chordHold)) if(hit(k,'loop:')) chordOff(k,when);
+  for(const k of Object.keys(bassHold))  if(hit(k,'bassloop:')) bassOff(k,when);
   /* СОЛО-СЛОИ тоже гасим на границе — иначе нота, записанная зажатой ЧЕРЕЗ заворот (leadOn есть,
      leadOff в слое нет), звучала бы вечно. Раньше её снимал голый noteOff() на завороте, потому что
      голос был один на всех. `when` соло не принимает: лид идёт «почти сейчас» (см. isLayer), а не
      планировщиком — гасим текущим временем, ровно как гасил прежний noteOff(). */
-  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:') leadOff(k);
+  for(const k of Object.keys(leadHold))  if(hit(k,'leadloop:')) leadOff(k);
 }
-/* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем. */
+/* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
+   ⚠️ УСЛОВИЯ РАЗВЁРНУТЫ В continue-ветки (было одно длинное &&) РАДИ ЧИТАЕМОСТИ ПОСЛЕ ДОБАВЛЕНИЯ
+   ГЕЙТА ДОРОЖЕК — набор условий и их смысл не изменились. */
 function fireNear(a,b){
-  for(const ev of events)
-    if(!isLayer(ev.fn)&&ev.t>a&&ev.t<=b&&!(recording&&ev.layer===loop.layer))
-      ENG[ev.fn](ev.a,ev);
+  const gated=laneGated();                                   // как в scheduleLayers: считаем один раз на вызов
+  for(const ev of events){
+    if(isLayer(ev.fn)||ev.t<=a||ev.t>b) continue;
+    if(recording&&ev.layer===loop.layer) continue;
+    if(gated&&!laneAudible(ev.layer)) continue;              // заглушённая / молчащая из-за чужого соло дорожка
+    ENG[ev.fn](ev.a,ev);
+  }
 }
 /* Гашение ЖИВОГО на завороте — слои петли гасятся вперёд (releaseLoopLayersAt), а ЖИВОЙ аккорд НЕ трогаем.
    Живой аккорд ('latch') принадлежит РУКЕ, а не петле: удержанный или защёлкнутый, он обязан пережить
@@ -383,11 +509,16 @@ function startTransport(countIn){
    играет петля → тумблер овердаба (вкл/выкл новый слой). */
 function onRec(){
   if(!AC)return;
-  if(!loop.on){ events.length=0; loop.first=true; loop.layer=0; setRecording(true); startTransport(true);
+  /* ⛳ МЕСТО РОЖДЕНИЯ СЛОЯ №1 из трёх (см. закон у laneNew): первая запись. laneReset — песни не было,
+     значит и дорожек; laneNew выдаёт номеру 0 свежий id. */
+  if(!loop.on){ events.length=0; laneReset(); loop.first=true; loop.layer=0; laneNew(loop.layer); setRecording(true); startTransport(true);
     hooks.tutor && hooks.tutor('loop',{ev:'recStart'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: старт записи первого круга (отсчёт пошёл) — урок «Лупер»
   else if(recording){ recLeadOff(); recChOff(); setRecording(false); events.sort((x,y)=>x.t-y.t);
     hooks.tutor && hooks.tutor('loop',{ev:'overdubStop'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: овердаб остановлен (слой готов) — урок «Лупер»
-  else{ loop.layer=maxLayer()+1; setRecording(true);
+  /* ⛳ МЕСТО РОЖДЕНИЯ СЛОЯ №2: овердаб. Номер (maxLayer()+1) МОГ УЖЕ ЖИТЬ — его освободила ⤺ отмена,
+     — поэтому laneNew обязателен: он затирает запись прежнего жильца номера, и новая дорожка не
+     наследует его заглушение. Это тот самый случай, ради которого id вообще заведён. */
+  else{ loop.layer=maxLayer()+1; laneNew(loop.layer); setRecording(true);
     hooks.tutor && hooks.tutor('loop',{ev:'overdubStart'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: начат новый слой поверх петли — урок «Лупер»
 }
 /* Загрузить аранжировку (гармония+бас+ритм) как ОТДЕЛЬНЫЕ слои, замороженные в текущем
@@ -403,13 +534,15 @@ function loadArrangement(sel, jam=false){
   if(!events.length){ loop.bars=arr.bars; loop.first=false; }
   else if(arr.bars!==loop.bars)return false;           // не тот размер — тихо, как setLoopBars
   const base=events.length?maxLayer()+1:0;
-  arr.layers.forEach((evs,li)=>{ const layer=base+li;
+  /* ⛳ МЕСТО РОЖДЕНИЯ СЛОЯ №3 (и последнее): каждый слой аранжировки/подложки. Номер тем более мог
+     быть занят — снятая подложка освобождает свои номера, а следующая берёт их же. */
+  arr.layers.forEach((evs,li)=>{ const layer=base+li; laneNew(layer);
     for(const e of evs){ const ev={t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh};
       if(jam)ev.jam=true;                              // МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока (см. clearJam)
       events.push(ev); } });
   events.sort((x,y)=>x.t-y.t);
   if(!loop.on)startTransport(false);
-  if(droneActive())droneOn();                          // включаем дрон сразу (насос переподтвердит на завороте)
+  if(droneAudible())droneOn();                         // включаем дрон сразу (насос переподтвердит на завороте); ⚠️ именно AUDIBLE, а не ACTIVE: заглушённая дорожка дрона не должна зазвучать от добавления соседних слоёв
   if(jam) hooks.tutor && hooks.tutor('loop',{ev:'jam'});   // ЗАЦЕПКА ОБУЧЕНИЯ: джем реально встал (слои добавлены) — урок «Лупер»; только для джема, не для ручной аранжировки
   return true;                                         // добавили (джем-контроллер по этому знает, что вариант встал)
 }
@@ -421,6 +554,7 @@ function clearJam(){
   let removed=false;
   for(let i=events.length-1;i>=0;i--) if(events[i].jam){ events.splice(i,1); removed=true; }
   if(!removed)return;
+  lanePrune();                                         // у слоёв подложки больше нет событий → снимаем их настройки, чтобы не всплыли на следующем джеме с теми же номерами
   softAllOff(); if(!droneActive())droneOff();          // бухгалтерия как в onUndo: гасим зависшее, ушёл слой-дрон → гасим дрон
   if(!events.length)clearRec(); else hooks.loop&&hooks.loop(loop.on);   // пусто → полный сброс; остались записи игрока → петля играет дальше
 }
@@ -428,12 +562,13 @@ function onLoop(){                                     // играть/пауз�
   if(!AC)return;
   if(loop.on){ loop.on=false; clearPump(); softAllOff(); droneOff(); setRecording(false);
     hooks.rec&&hooks.rec(false); hooks.loop&&hooks.loop(false); }
-  else if(events.length){ startTransport(false); if(droneActive())droneOn(); }
+  else if(events.length){ startTransport(false); if(droneAudible())droneOn(); }   // ⚠️ AUDIBLE: снятие паузы не должно воскрешать заглушённую дорожку дрона
 }
 function onUndo(){                                      // снять последний слой (на месте — ссылка events стабильна)
   if(!events.length)return;
   const top=maxLayer();
   for(let i=events.length-1;i>=0;i--)if(events[i].layer===top)events.splice(i,1);
+  lanePrune();                                          // снятая дорожка не должна оставить своё заглушение следующей записи на том же номере
   softAllOff(); if(!droneActive())droneOff();           // сняли слой-дрон → гасим (softAllOff дрон не трогает)
   if(!events.length)clearRec(); else hooks.loop && hooks.loop(loop.on);
   hooks.tutor && hooks.tutor('loop',{ev:'undo'});       // ЗАЦЕПКА ОБУЧЕНИЯ: снят верхний слой — урок «Лупер» (дошли только при непустой петле — ранний выход выше)
@@ -454,9 +589,11 @@ function setLoopSub(n){                                 // МОЖНО менят
 }
 function setLoopBpm(v){ loop.bpm=Math.max(40,Math.min(240,+v||loop.bpm)); }   // темп петли — только пользователь
 function clearRec(){
-  clearPump(); events.length=0; loop.on=false; setRecording(false); softAllOff(); droneOff();
+  clearPump(); events.length=0; laneReset(); loop.on=false; setRecording(false); softAllOff(); droneOff();   // ✕ — песни больше нет, значит нет и дорожек: настройки уходят вместе с ними
   hooks.loop && hooks.loop(false);
 }
+/* ⚠️ panic НАМЕРЕННО НЕ ТРОГАЕТ настройки дорожек: события переживают панику, значит переживают и
+   дорожки. «■» — это «замолчи сейчас», а не «забудь, что я намикшировал». */
 function panic(){
   clearPump(); loop.on=false;
   softAllOff(); droneOff();
@@ -469,4 +606,6 @@ export {
   softAllOff, panic, inPB, recording,
   onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, setLoopSub, SUBS, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
   loadArrangement, loadJam, clearJam, loopChordDeg, loopChordOct,
+  toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
+  droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

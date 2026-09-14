@@ -201,6 +201,10 @@ export const DICTS = {
     'looper.playing':'▶ LOOP · {bars} bars · {layers} layers',
     'looper.paused':'LOOP · {bars} bars · {layers} layers · “⟳ loop” to play',
     'looper.clear':'CLEAR',
+    // холст: дорожки лупера (S1). Буквы кнопок — ОДИН символ: гнездо 21px, значок там нечитаем, подписи не влезают
+    'looper.laneMute':'M',
+    'looper.laneSolo':'S',
+    'looper.soloOn':'SOLO',
     // холст: подсказка «нет аккордов» (макам) — держим строки короткими под ширину поля
     'nochords.title':'NO CHORDS',
     'nochords.l1':'Chords aren’t built in a maqam.',
@@ -532,6 +536,9 @@ export const DICTS = {
     'looper.playing':'▶ ПЕТЛЯ · {bars} т. · слоёв {layers}',
     'looper.paused':'ПЕТЛЯ · {bars} т. · слоёв {layers} · «⟳ луп» играть',
     'looper.clear':'ОЧИСТКА',
+    'looper.laneMute':'М',    // «Молча» — кириллическая М; одна буква, как в en
+    'looper.laneSolo':'С',    // «Соло»
+    'looper.soloOn':'СОЛО',
     'nochords.title':'АККОРДОВ НЕТ',
     'nochords.l1':'В макаме аккорды не строятся.',
     'nochords.l2':'Дрон — в лупере; аккорды запишите',

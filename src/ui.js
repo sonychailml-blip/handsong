@@ -9,11 +9,16 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
 import { fxParamsOf, ACTIONS } from './gestures.js';   // ACTIONS — реестр дискретных действий (слайс «д»): меню берёт подпись и avail() ОТТУДА ЖЕ, откуда их читает движок
-import { switchCamera } from './vision.js';
+import { switchCamera, canvas as canvasEl } from './vision.js';
+/* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
+   (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
+   ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
+import { loopHit } from './draw.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
-import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam } from './recorder.js';
+import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
+         toggleLaneMute, toggleLaneSolo, droneAudible } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -289,6 +294,21 @@ addEventListener('pointerdown', e=>{ pointerDown=true;
   if(!downOnBar) revealBar();
   if(inOpenPanel(e.target)) hushStrip();          // касание ВНУТРИ открытой панели → подсказку прячем сразу (под пальцем ничего не должно быть накрыто)
 });
+/* ═══ ПЕРЕКЛЮЧАТЕЛИ ДОРОЖЕК на холстовой полосе лупера (слайс S1) ═══
+   Разделение обязанностей ровно по правилам: ГЕОМЕТРИЮ знает draw (она же рисует — правило #9),
+   СОСТОЯНИЕ держит recorder (правило #5), ui переводит тап в вызов и не считает ничего сам.
+   ⚠️ ОТДЕЛЬНЫЙ СЛУШАТЕЛЬ, а не ветка в том, что выше: тот отвечает за раскрытие бара и обязан
+   отработать при ЛЮБОМ тапе, в том числе по кнопке дорожки (бар раскрыть всё равно надо).
+   ⚠️ Гейт по e.target===холст: тап по кнопке бара, панели или транспорту — не наше дело, а их
+   элементы лежат ВЫШЕ холста по z-index, поэтому до нас такой тап и не дойдёт с этим target.
+   Игру тап не крадёт: играют с КАМЕРЫ, тач не читает никто (см. довод у авто-скрытия бара выше). */
+addEventListener('pointerdown', e=>{
+  if(e.target!==canvasEl) return;
+  const r=canvasEl.getBoundingClientRect();
+  const h=loopHit(e.clientX-r.left, e.clientY-r.top);
+  if(!h) return;
+  if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);
+});
 addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide();
   if(panelOpen() && !focusInPanel()) armStripReturn();   // палец ушёл; но если контрол панели в фокусе (пикер открыт) — НЕ возвращаем, ждём focusout
 });
@@ -419,7 +439,7 @@ function syncARef(v){ aRefInput.value=v; aRefSel.value=String(v); }   // отр�
 function applyARef(v){
   setARef(v); lastARef=v;
   softAllOff();                                    // звучащее гаснет и переиграется на новом эталоне (как смена тоники)
-  if(events.some(e=>e.fn==='drone'))droneOn();     // дрон softAllOff не трогает — переигрываем на новую опору сразу (lvl 0.18, как в аранжировке)
+  if(droneAudible())droneOn();                     // дрон softAllOff не трогает — переигрываем на новую опору сразу (lvl 0.18, как в аранжировке). ⚠️ Спрашиваем про СЛЫШИМОСТЬ, а не про наличие слоя (S1): у заглушённой дорожки дрона смена эталона не должна включать звук. Попутно ушёл дубль предиката, что жил здесь строкой
 }
 aRefSel.onchange=e=>{ const v=+e.target.value; applyARef(v); syncARef(v); };
 aRefInput.onchange=e=>{
