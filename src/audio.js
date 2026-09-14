@@ -1393,7 +1393,7 @@ function applyVoiceFx(v,p,t,fresh){
    осциллятор, однажды запущенный, живёт до конца контекста (правило #3) — «выбросить» банк нельзя, его
    можно только заглушить гейтом, ровно как делал прежний глобальный набор. Практический потолок: число
    РЕАЛЬНО сыгранных инструментов × число РЕАЛЬНО занятых голосов (обычно 1–2 × 1–2), против 23 сегодня. */
-function leadVoiceBank(v,ins){
+function leadVoiceBank(v,ins,when){
   let b=v.banks[ins];
   if(!b){ b=v.banks[ins]=buildLeadBank(ins,v.pre,v.hum,v.vibDep); b.gain.gain.value=0; }   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
   if(v.ins!==ins){
@@ -1401,7 +1401,7 @@ function leadVoiceBank(v,ins){
        ещё до первой ноты. Через 20мс-рампу гейта первая атака вышла бы смазанной, и «одна нота звучит
        как раньше» сломалось бы на самой первой. Смена банка ПОЗЖЕ — прежним кроссфейдом setLeadInstr. */
     if(v.ins<0) b.gain.gain.value=1;
-    else { const t=AC.currentTime; for(const k in v.banks) v.banks[k].gain.gain.setTargetAtTime(+k===ins?1:0,t,0.02); }
+    else { const t=when!=null?when:AC.currentTime; for(const k in v.banks) v.banks[k].gain.gain.setTargetAtTime(+k===ins?1:0,t,0.02); }   // when — явное время (слайс S2): кроссфейд банков обязан ехать в то же время, что и сама атака, иначе при офлайн-рендере он лёг бы в «сейчас», а нота — в будущее
     v.ins=ins;
   }
   return b;
@@ -1428,17 +1428,27 @@ function leadAlloc(owner,ins){
    следующую ноту закрывает не сброс на отпускании, а ПОСТАНОВКА величины НА АТАКЕ (см. applyVoiceFx,
    флаг fresh) — то есть в правильном месте. Тот же довод, по которому 3.5.1 не разбирает экземпляры
    эффектов: не рвать то, что ещё звучит. */
-function leadRelease(v,hard){
-  const t=AC.currentTime;
+function leadRelease(v,hard,when){
+  const t=when!=null?when:AC.currentTime;   // when — явное время (S2), как у cvRelease/bvRelease; живые вызовы его не передают → «сейчас», байт-в-байт
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,hard?0.02:LEAD_INSTR[v.ins<0?leadIdx:v.ins].rel);
   v.on=false; v.owner=null;
 }
 /* Атака/ведение ноты владельца. Зовётся КАЖДЫЙ КАДР зажатой рукой (как и раньше): частота и громкость
    едут всегда, а сама атака — один раз (гейт v.on, бывший noteOnFlag). Порядок и постоянные времени
-   1-в-1 прежние: setFreq 0.02 (тот самый 20мс-глайд), vol 0.04, гуманизация 0.006, ±5% уровня, ±10% атаки. */
-function leadOn(owner,freq,vol,ins,deg,oct){
-  const v=leadAlloc(owner,ins), t=AC.currentTime, b=leadVoiceBank(v,ins);
+   1-в-1 прежние: setFreq 0.02 (тот самый 20мс-глайд), vol 0.04, гуманизация 0.006, ±5% уровня, ±10% атаки.
+   ⛳ when — ЯВНОЕ ВРЕМЯ (слайс S2), последним аргументом и с умолчанием «сейчас»: ровно та же форма, что
+   у chordOn/bassOn/drumHit с правила #15. ВСЕ сегодняшние вызовы его НЕ передают, поэтому живой звук
+   байт-в-байт. Зачем он: офлайн-рендер обязан расставить ноты по будущим временам ЗАРАНЕЕ (у
+   OfflineAudioContext currentTime под JS не идёт), а линейному транспорту иначе пришлось бы держать
+   ДВА пути диспетчеризации вместо одного.
+   ⚠️ БАНКИ ТРОГАТЬ НЕ ПРИШЛОСЬ И НЕ НАДО: у них уже setFreq(f,t), strike(t,vel), cancel(t) — время у
+   них аргумент с самого начала. Часы были зашиты РОВНО в обёртках, и только они здесь и правятся.
+   ⚠️ v.tOn=t становится БУДУЩИМ временем, если передать when. Это часть модели leadAlloc (кража по
+   «самому старому»), и она по построению живёт по стенным часам — трогать её в этом слайсе ЗАПРЕЩЕНО,
+   решается она в офлайн-раскладчике. Пока when никто не передаёт, вопрос не возникает. */
+function leadOn(owner,freq,vol,ins,deg,oct,when){
+  const v=leadAlloc(owner,ins), t=when!=null?when:AC.currentTime, b=leadVoiceBank(v,ins,t);
   /* fresh СНИМАЕМ ДО применения эффектов и ДО гейта `if(v.on)return` ниже: этот гейт и ЕСТЬ граница
      «атака / уже звучит», второй такой границы заводить не надо. leadOn зовётся КАЖДЫЙ КАДР зажатой
      рукой — там fresh=false, и величины подъезжают плавно, как и должны при ведении. */
@@ -1460,8 +1470,8 @@ function leadOn(owner,freq,vol,ins,deg,oct){
   v.env.gain.setTargetAtTime(lvlJ,t,attJ);
   b.strike && b.strike(t, vol);   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
 }
-function leadSet(owner,freq,vol,deg,oct){                    // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем)
-  const v=leadHold[owner]; if(!v)return; const t=AC.currentTime, b=v.banks[v.ins];
+function leadSet(owner,freq,vol,deg,oct,when){               // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем). when — явное время (S2), по умолчанию «сейчас»
+  const v=leadHold[owner]; if(!v)return; const t=when!=null?when:AC.currentTime, b=v.banks[v.ins];
   applyVoiceFx(v,pendFx,t,false);                           // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины). fresh=false ВСЕГДА: leadSet по определению не атака
   if(freq!=null&&b)b.setFreq(freq,t);
   v.vol.gain.setTargetAtTime(vol,t,0.04);
@@ -1469,16 +1479,22 @@ function leadSet(owner,freq,vol,deg,oct){                    // ведение �
 }
 /* Отпускание: голос УХОДИТ ИЗ leadHold сразу — подсветка гаснет ровно в тот момент, когда сняли ноту,
    а хвост релиза дозвучивает (так же вело себя моно-соло: noteOff гасил и S.deg, и картинку). */
-function leadOff(owner){ const v=leadHold[owner]; if(!v)return; delete leadHold[owner]; v.deg=-1; leadRelease(v,false); }
+function leadOff(owner,when){ const v=leadHold[owner]; if(!v)return; delete leadHold[owner]; v.deg=-1; leadRelease(v,false,when); }   // when — явное время (S2); без него «сейчас», как было
+/* ⚠️ leadAllOff НАМЕРЕННО БЕЗ when: его зовут паника, очистка и смена лада — все «немедленно по
+   определению». Появится потребитель, которому нужно снять всё к БУДУЩЕМУ моменту, — добавить тогда,
+   а не на всякий случай (аргумент, который никто не передаёт, назначения не имеет). */
 function leadAllOff(){ for(const k of Object.keys(leadHold)) leadOff(k); }      // паника/смена лада: гасим ВСЕХ владельцев (как chordHold/bassHold)
 /* Глиссандо-в-луп (переигровка терменвокса): расписываем ЗАПИСАННУЮ кривую бенда на будущие
    AC-времена через ТУ ЖЕ setFreq (setTargetAtTime 0.02) — тот же 20мс-глайд, что и живьём.
    baseFreq — частота ступени по ЗАМОРОЖЕННОМУ ладу (полимодальность), c — центы поверх неё;
    абсолютных Гц не храним. dt в долях → секунды через secPerBeat.
    ⚠️ ТОЛЬКО В СВОЙ ГОЛОС: раньше кривая ехала во ВСЕ банки сразу — с пулом это гнуло бы и живую руку. */
-function scheduleBend(owner, points, baseFreq, secPerBeat){
+/* ⛳ when (S2) — ЯКОРЬ КРИВОЙ, то есть время АТАКИ ноты, от которого отсчитываются dt точек. Без него —
+   «сейчас», ровно как было. Это и есть та единственная строка, из-за которой глиссандо нельзя было
+   отрендерить офлайн: кривая ложилась от currentTime, а он в офлайн-контексте под JS не движется. */
+function scheduleBend(owner, points, baseFreq, secPerBeat, when){
   const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins]; if(!b)return;
-  const t0=AC.currentTime;
+  const t0=when!=null?when:AC.currentTime;
   for(const pt of points){
     const f=baseFreq*Math.pow(2,pt.c/1200), at=t0+pt.dt*secPerBeat;
     b.setFreq(f,at);
@@ -1487,8 +1503,8 @@ function scheduleBend(owner, points, baseFreq, secPerBeat){
 /* Снять расписанные рампы частоты (на атаке переигранной ноты, ctx): чтобы бенд предыдущей
    ноты не перетёк в следующую. Живой путь (без ctx) не зовёт — живой звук не трогаем.
    Тоже пер-голосово: отмена в чужом голосе оборвала бы чужой бенд. */
-function leadCancel(owner){ const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins];
-  if(b&&b.cancel)b.cancel(AC.currentTime); }
+function leadCancel(owner,when){ const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins];   // when — явное время (S2): отмена прошлых рамп обязана случиться В ТОТ ЖЕ момент, что и атака, иначе офлайн она сняла бы рампы, ещё не расставленные
+  if(b&&b.cancel)b.cancel(when!=null?when:AC.currentTime); }
 /* --- БАС: пул моно-голосов (один на слой). Тембр печётся НА АТАКЕ по слою (как аккорд),
    а не глобально — записанный слой сохраняет свой инструмент (§3.4, как строй/септаккорд). --- */
 function buildBassPool(dest){
@@ -1548,12 +1564,15 @@ function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; bvRele
 /* --- ДРОН: гейт dG, частота следует за тоникой (tonicFreq/2) в любом ладу (спасён из backing.js).
    tonicFreq — единый источник: у fixedKey это высота КЛЮЧА в приколоченной сетке (иначе дрон бился
    бы с ней), у прочих строёв = baseF() (байт-в-байт). Квинту 1.498 держим ~чистой — см. BACKLOG. */
-function droneOn(level=0.18){ if(!AC)return; const t=AC.currentTime;
+/* when (S2) — явное время ПОСЛЕДНИМ аргументом, по умолчанию «сейчас». Уровень стоит ПОСЛЕ него по
+   порядку исторически (level был единственным параметром), поэтому when второй: правило «when последний»
+   здесь выполняется буквально. */
+function droneOn(level=0.18,when){ if(!AC)return; const t=when!=null?when:AC.currentTime;
   dG.gain.setTargetAtTime(level,t,1.2);
   dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
   dO2.frequency.setTargetAtTime(tonicFreq()/2*1.498,t,0.3);
 }
-function droneOff(){ if(!AC)return; dG.gain.setTargetAtTime(0,AC.currentTime,0.6); }
+function droneOff(when){ if(!AC)return; dG.gain.setTargetAtTime(0,when!=null?when:AC.currentTime,0.6); }
 /* Живой селектор набора ударных: только глобальный индекс + дропдаун (удар транзиентный,
    тембр берётся на КАЖДЫЙ удар из a.kit — заморожен в событии, как бас/аккорд). */
 function setDrumKit(i){

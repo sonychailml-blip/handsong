@@ -195,33 +195,49 @@ const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer:'bass';
    ('lead:L'/'lead:R') строит gestures и передаёт явным аргументом — в событие он НЕ попадает (это
    состояние руки, а не намерение). a.v||0 — вот та самая совместимость: событие без v = нота №0. */
 const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
+/* ⛳ ЕДИНАЯ ФОРМА ВЫЗОВА: КАЖДАЯ запись ENG — это (a, ctx, opt), где opt — ОДИН И ТОТ ЖЕ ИМЕНОВАННЫЙ
+   набор `{when, live, own}`. Слайс S2 завёл эту форму, и это НЕ косметика, а снятие ловушки.
+   ⚠️ ЧТО БЫЛО: у записей была РАЗНАЯ позиционная форма — `leadOn:(a,ctx,live,own)` против
+   `chOn:(a,ctx,when)` и `bassOn:(a,ctx,when,live)`, — а диспетчер планировщика зовёт их ОДИНАКОВО:
+   `ENG[ev.fn](ev.a, ev, when)`. Пока лид шёл мимо планировщика (fireNear), это сходило с рук. Но стоило
+   бы завести лид в планировщик — и ВРЕМЯ В СЕКУНДАХ легло бы в слот ЖИВЫХ ГЕРЦ терменвокса: нота
+   зазвучала бы на абсурдной высоте или не зазвучала вовсе. Тихо, правдоподобно, ищется долго.
+   ⚠️ ПОЧЕМУ НЕ ХВАТИЛО БЫ «поставить when последним у всех». У лида кроме when есть ещё live и own,
+   поэтому третий позиционный слот У РАЗНЫХ записей всё равно значил бы разное — в каком порядке ни
+   расставляй. Ловушка позиционная ПО ПРИРОДЕ, и лечится она только снятием позиционности: у
+   дополнительных аргументов больше НЕТ номеров, есть ИМЕНА. Время может попасть в `live` теперь лишь
+   у того, кто СОБСТВЕННОРУЧНО напишет слово `live`, — то есть ошибка стала невыразимой, а не
+   несовершённой.
+   ⚠️ live (живые Гц терменвокса) остаётся ОТДЕЛЬНЫМ полем и ЖИВЫМ-ТОЛЬКО (правило #11): переигровка
+   его не передаёт никогда, частота там выводится из ступени по замороженному ладу.
+   ⛔ Добавляешь запись в ENG — держи ту же форму. Второй формы здесь быть не должно. */
 const ENG={
   /* ⚠️ setLeadInstr(a.inst) ОТСЮДА УБРАН, и это ПОЧИНКА, а не потеря: переигранный слой уводил ЖИВОЙ
      инструмент (и кнопку в панели) — слой на Ситаре молча перекрашивал руку, играющую Органом. Теперь
      тембр печётся В ГОЛОСЕ на атаке (leadOn получает inst), как это давно делают аккорды и бас. */
-  leadOn:(a,ctx,live,own)=>{ const o=own||ldKey(ctx,a);
+  leadOn:(a,ctx,{when,live,own}={})=>{ const o=own||ldKey(ctx,a);
               /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
                  Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
                  замороженному ладу (полимодальность цела). */
-              if(ctx)leadCancel(o);                // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе
+              if(ctx)leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
               applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
-              leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
-              if(a.bend&&a.bend.length)scheduleBend(o,a.bend,base,60/loop.bpm); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос
-  leadSet:(a,ctx,live,own)=>{ const o=own||ldKey(ctx,a);
+              leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,when);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              if(a.bend&&a.bend.length)scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
+  leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               applyFx(a.fx);
-              leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct); },
-  leadOff:(a,ctx,live,own)=>leadOff(own||ldKey(ctx,a)),
+              leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,when); },   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
+  leadOff:(a,ctx,{when,own}={})=>leadOff(own||ldKey(ctx,a),when),
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,when)=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
-  chSet:(a,ctx,when)=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
-  chOff:(a,ctx,when)=>chordOff(chOwnerKey(ctx),when),
-  bassOn:(a,ctx,when,live)=>bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,when),   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,when)=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
-  bassOff:(a,ctx,when)=>bassOff(bassOwnerKey(ctx),when),
-  drum:(a,ctx,when)=>drumHit(a.row,a.vol,a.kit,when),
-  drone:a=>droneOn(a.lvl),                            // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
+  chOn:(a,ctx,{when}={})=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
+  chSet:(a,ctx,{when}={})=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
+  chOff:(a,ctx,{when}={})=>chordOff(chOwnerKey(ctx),when),
+  bassOn:(a,ctx,{when,live}={})=>bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,when),   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassSet:(a,ctx,{when}={})=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
+  bassOff:(a,ctx,{when}={})=>bassOff(bassOwnerKey(ctx),when),
+  drum:(a,ctx,{when}={})=>drumHit(a.row,a.vol,a.kit,when),
+  drone:(a,ctx,{when}={})=>droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 };
 const inPB=()=>loop.on;                               // для строки статуса (draw)
 
@@ -359,15 +375,15 @@ function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — од�
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
 /* own — КЛЮЧ ВЛАДЕЛЬЦА живого голоса ('lead:L'/'lead:R', строит gestures). В событие он НЕ пишется:
    в петле нота принадлежит СЛОЮ, а не руке — там ключ соберёт ldKey из ctx.layer и a.v. */
-const WleadOn =(own,p,live)=>{ ENG.leadOn(p,null,live,own); recLeadEv(own,p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается
-const WleadOff=own=>{ ENG.leadOff(null,null,null,own); recLeadOff(own); };
+const WleadOn =(own,p,live)=>{ ENG.leadOn(p,null,{live,own}); recLeadEv(own,p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается. ⚠️ when НЕ передаём: живой путь звучит «сейчас», как всегда
+const WleadOff=own=>{ ENG.leadOff(null,null,{own}); recLeadOff(own); };
 /* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
    тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
    Так он замораживается в событии сам собой и переигрывается как сыгран. */
 const WchOn =(_o,deg,oct,vol,ins,ty,bri)=>{ const a={deg,oct,vol,inst:ins,ty,bri}; ENG.chOn(a); recChOn(a); };   // bri — живая яркость руки: в звук (ENG) И в запись (rec), как a.rev у соло
 const WchSet=(_o,deg,oct,vol,ty,bri)    =>{ const a={deg,oct,vol,ty,bri};          ENG.chSet(a); recChSet(a); };
 const WchOff=_o                 =>{ ENG.chOff(); recChOff(); };
-const WbassOn =(p,live)=>{ ENG.bassOn(p,null,undefined,live); recBassEv(p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло
+const WbassOn =(p,live)=>{ ENG.bassOn(p,null,{live}); recBassEv(p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло. ⚠️ Прежде здесь стояло (p,null,undefined,live) — дырка под when позиционно; с именованным набором её не существует
 const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
 const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDrum(a); };
 
@@ -384,9 +400,14 @@ function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; }
 /* СЛОИ (аккорд/бас/удар) идут ВПЕРЁД по явному времени; ЛИД/дрон — «почти сейчас».
    ⚠️ ПРИЧИНА У ЛИДА БОЛЬШЕ НЕ ТА, что здесь стояла. Было: «моно-соло делит один голос с живой игрой,
    пред-планировать далеко вперёд опасно». Соло больше НЕ моно — слой и рука сидят в РАЗНЫХ голосах
-   пула, драться им нечем. Лид остался «почти сейчас» лишь потому, что перевод его в планировщик — это
-   отдельная работа: у соло-функций нет аргумента when, а кривые бенда (scheduleBend) расписываются от
-   AC.currentTime. Это ЗАДЕЛ, а не ограничение: см. BACKLOG. fn[0]==='c' → аккорд;
+   пула, драться им нечем.
+   ⚠️ И ПРИЧИНА СНОВА НЕ ТА, что здесь стояла. Было: «у соло-функций нет аргумента when, а кривые бенда
+   расписываются от AC.currentTime». С слайса S2 это НЕВЕРНО: when есть у leadOn/leadSet/leadOff и у
+   scheduleBend (якорь кривой), дрон тоже его принимает. Осталась ОДНА причина, и она поведенческая:
+   перевод лида в окно опережения — слышимое изменение (нота начинает ставиться на ~300мс вперёд, а
+   гашение слоёв на границе повтора обязано поехать вместе с ней), поэтому он делается ЦЕЛИКОМ и
+   проверяется на слух в транспортном слайсе, а не протаскивается попутно. Возможность готова,
+   применение отложено СОЗНАТЕЛЬНО. fn[0]==='c' → аккорд;
    slice(0,4)==='bass' → бас; 'drum' → удар. Лид (leadOn/leadSet/leadOff) и дрон — НЕ вперёд. */
 const isLayer=fn=> fn[0]==='c' || fn.slice(0,4)==='bass' || fn==='drum';
 
@@ -410,7 +431,7 @@ function scheduleLayers(){
       if(gated&&!laneAudible(ev.layer)) continue;           // дорожка заглушена (или молчит из-за чужого соло) — просто НЕ ПЛАНИРУЕМ её события; сами события НЕ трогаем
       if(ev.t>=lo&&ev.t<hi){
         const when=loop.t0+(rep*lb+ev.t)*spb;               // ТОЧНОЕ время события
-        ENG[ev.fn](ev.a,ev,when);                           // ev несёт замороженный лад (§3.4)
+        ENG[ev.fn](ev.a,ev,{when});                         // ev несёт замороженный лад (§3.4). {when} ИМЕНОВАННО (S2): позиционный третий аргумент раньше значил у разных записей разное — см. шапку ENG
         if(ev.fn==='chOn'||ev.fn==='chSet'){ curChordDeg=ev.a.deg; curChordOct=ev.a.oct; }   // подсветка ведёт на опережение (~до окна) — косметика; регистр лежит в том же событии
         else if(ev.fn==='chOff')curChordDeg=-1;
       }
@@ -436,8 +457,12 @@ function releaseLoopLayersAt(when,layer){
   for(const k of Object.keys(bassHold))  if(hit(k,'bassloop:')) bassOff(k,when);
   /* СОЛО-СЛОИ тоже гасим на границе — иначе нота, записанная зажатой ЧЕРЕЗ заворот (leadOn есть,
      leadOff в слое нет), звучала бы вечно. Раньше её снимал голый noteOff() на завороте, потому что
-     голос был один на всех. `when` соло не принимает: лид идёт «почти сейчас» (см. isLayer), а не
-     планировщиком — гасим текущим временем, ровно как гасил прежний noteOff(). */
+     голос был один на всех.
+     ⛳ `when` СОЛО ТЕПЕРЬ ПРИНИМАЕТ (слайс S2 дал leadOff явное время) — но ЗДЕСЬ МЫ ЕГО НАМЕРЕННО НЕ
+     ПЕРЕДАЁМ. Лид по-прежнему идёт «почти сейчас» (он не в isLayer), поэтому гасить его к БУДУЩЕЙ
+     границе повтора значило бы рассинхрон: ноты ставятся по стенным часам, а снимались бы по
+     запланированным. Возможность есть, применить её — работа транспортного слайса, где перевод лида в
+     планировщик делается ЦЕЛИКОМ и проверяется на слух. Пока — дословно прежнее поведение. */
   for(const k of Object.keys(leadHold))  if(hit(k,'leadloop:')) leadOff(k);
 }
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
