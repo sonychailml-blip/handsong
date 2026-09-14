@@ -433,6 +433,73 @@ function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; }
    slice(0,4)==='bass' → бас; 'drum' → удар. Лид (leadOn/leadSet/leadOff) и дрон — НЕ вперёд. */
 const isLayer=fn=> fn[0]==='c' || fn.slice(0,4)==='bass' || fn==='drum';
 
+/* ═══ КУРСОРЫ ПЕРЕИГРОВКИ (слайс S3.2) — стоимость по ОКНУ, а не по всей песне ═══
+   Оба цикла переигровки (scheduleLayers и fireNear) обходили ВЕСЬ массив событий, а tick зовёт их
+   ОБА каждые SCHED_TICK_MS=25мс. На петле в 8 тактов это десятки событий и сорок обходов в секунду —
+   бесплатно. На песне в несколько минут это десятки ТЫСЯЧ событий, то есть миллионы чтений полей в
+   секунду на том же потоке, где крутятся MediaPipe и синтез. Курсор превращает «весь массив» в
+   «события внутри окна».
+   ⚠️ ОТСОРТИРОВАН ЛИ МАССИВ — ОТВЕТ: НЕ ЦЕЛИКОМ, И ЭТО ВАЖНО. Сортировка стоит в трёх местах
+   (закрытие первого круга, остановка овердаба, загрузка аранжировки), а push ДОПИСЫВАЕТ в конец во
+   время записи — причём t считается как `e % lb`, то есть на завороте ПАДАЕТ обратно к нулю. Значит
+   дописанный хвост не отсортирован ни внутри себя, ни относительно тела.
+   ⛳ НО ЭТОТ ХВОСТ — РОВНО ПИШУЩИЙСЯ СЛОЙ: push всегда ставит `layer: loop.layer`, а оба цикла и так
+   его пропускают (`recording && ev.layer===loop.layer`). Поэтому курсоры работают по
+   ОТСОРТИРОВАННОМУ ПРЕФИКСУ длиной cursN, а хвост вне его — и не нужен им, и не мешает.
+   ⛳ ГЛАВНОЕ СВОЙСТВО БЕЗОПАСНОСТИ: курсор только СУЖАЕТ участок, который смотрим; ЧТО именно сыграть,
+   по-прежнему решает явная проверка интервала внутри цикла. Поэтому курсор, вставший СЛИШКОМ РАНО,
+   безвреден — лишние события отсеет проверка. Не убирайте эти проверки «раз есть курсор».
+   ⚠️ ЗАВОРОТ — НЕ ОСОБЫЙ СЛУЧАЙ, а просто «позиция поехала не туда, где стоит курсор»: lo падает к
+   нулю, курсор перепривязывается двоичным поиском. В коде курсора слова «заворот» нет вовсе — и когда
+   заворот исчезнет вместе с петлёй, менять здесь будет нечего. */
+let cursN=0;                        // длина ОТСОРТИРОВАННОГО префикса events (хвост записи — за ним)
+const curSched={i:0,at:null};       // курсор scheduleLayers: i — индекс, at — доля, которой он соответствует
+const curNear ={i:0,at:null};       // курсор fireNear (своя временнáя база, см. довод у fireNear)
+/* Первый индекс в [0,cursN) с events[i].t >= t. Классический lower_bound. */
+function cursLowerBound(t){
+  let lo=0, hi=cursN;
+  while(lo<hi){ const m=(lo+hi)>>1; if(events[m].t<t) lo=m+1; else hi=m; }
+  return lo;
+}
+/* Поставить курсор на позицию x. Продолжаем с места, если он ровно там; иначе — двоичный поиск.
+   Сравнение с допуском 1e-9: соседние сегменты дают ПОБИТОВО равные значения (hi предыдущего —
+   то же выражение, что lo следующего), но допуск страхует от дрейфа после смены темпа. */
+function cursSeek(c,x){
+  /* СТРАХОВКА, О(1), на входе в оба цикла: если бы какой-то путь удалил события, забыв про
+     schedInvalidate, cursN оказался бы БОЛЬШЕ массива — и цикл прочитал бы events[i].t у undefined,
+     уронив насос звука целиком. Доказано, что таких путей нет (каждое удаление сбрасывает курсоры),
+     но цена проверки — одно сравнение на вызов, а цена ошибки — тишина во всём приложении.
+     ⛔ Это НЕ замена schedInvalidate: забытый сброс даст лишний обход, а не молчаливо верный результат. */
+  if(cursN>events.length) cursN=events.length;
+  if(c.at===null || Math.abs(c.at-x)>1e-9){ c.i=cursLowerBound(x); c.at=x; }
+  return c.i;
+}
+/* ⛔ ЕДИНСТВЕННАЯ ТОЧКА СБРОСА КУРСОРОВ — сюда обязан приходить КАЖДЫЙ путь, который делает их
+   неверными: правка состава событий (запись, аранжировка, отмена слоя, снятие подложки, очистка),
+   пересортировка, и скачок временнóй базы (старт/возобновление транспорта, смена темпа, пауза,
+   паника). Позже сюда же придут правка события и перемотка.
+   ⛔ НИКАКИХ `curSched.i=0` ПО МЕСТАМ. Разбросанные сбросы — ровно тот способ, которым такая
+   оптимизация тихо ломается: один забытый путь даёт пропущенные или удвоенные ноты, причём не сразу.
+   Здесь же заново берётся и cursN — длина отсортированного префикса: эта функция вызывается ТОЛЬКО
+   когда массив приведён в порядок (сразу после sort/уплотнения/очистки) либо когда запись ещё ничего
+   не дописала, поэтому `events.length` в этот момент и есть граница сортированного. */
+function schedInvalidate(){ cursN=events.length; curSched.at=null; curNear.at=null; }
+/* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
+   событием: каждый splice сдвигает ВЕСЬ хвост, поэтому снятие 10 000 событий из 30 000 — это сотни
+   миллионов перемещений, то есть многосекундная заморозка потока, на котором висят и распознавание, и
+   синтез. Проход с индексом записи делает ту же работу за ОДИН проход.
+   ⛔ ИДЕНТИЧНОСТЬ ССЫЛКИ `events` СВЯЩЕННА: массив объявлен стабильной ссылкой и импортируется
+   НАПРЯМУЮ в draw.js (полоса лупера читает его каждый кадр). Поэтому усечение через `.length`, а
+   НИКОГДА не `events = …` и не новый массив — иначе draw остался бы с прежним, уже мёртвым.
+   Порядок сохраняется, значит отсортированный префикс остаётся отсортированным. */
+function compactEvents(drop){
+  let w=0;
+  for(let r=0;r<events.length;r++){ const e=events[r]; if(!drop(e)) events[w++]=e; }
+  const removed=events.length-w;
+  events.length=w;                                     // ⛔ усечение, а не подмена массива
+  return removed;
+}
+
 /* 1) СЛОИ ВПЕРЁД: на каждый опрос планируем события в окне [loop.sched, горизонт) по их ТОЧНОМУ времени
    loop.t0 + абс.доля*spb, с проекцией через завороты (rep — номер повтора петли). Интервал ПОЛУОТКРЫТ
    [lo,hi): включает начало → доля 0 (сильный удар) не теряется на старте и после каждого заворота.
@@ -447,17 +514,23 @@ function scheduleLayers(){
     const rep=Math.floor(loop.sched/lb+1e-9), repEnd=(rep+1)*lb;
     const segEnd=Math.min(horizon,repEnd);
     const lo=loop.sched-rep*lb, hi=segEnd-rep*lb;           // [lo,hi) в пределах петли
-    for(const ev of events){
+    /* КУРСОР: встаём на первое событие с t>=lo (продолжая с места, если оно там же) и идём, пока t<hi.
+       Курсор двигаем по ВСЕМ событиям окна, а не только по сыгранным: он — позиция ВО ВРЕМЕНИ, а не
+       «сколько нот прозвучало». Явная проверка ev.t>=lo оставлена НАРОЧНО (см. шапку курсоров). */
+    let i=cursSeek(curSched,lo);
+    for(; i<cursN && events[i].t<hi; i++){
+      const ev=events[i];
       if(!isLayer(ev.fn)) continue;
       if(recording&&ev.layer===loop.layer) continue;
       if(gated&&!laneAudible(ev.layer)) continue;           // дорожка заглушена (или молчит из-за чужого соло) — просто НЕ ПЛАНИРУЕМ её события; сами события НЕ трогаем
-      if(ev.t>=lo&&ev.t<hi){
+      if(ev.t>=lo){
         const when=loop.t0+(rep*lb+ev.t)*spb;               // ТОЧНОЕ время события
         ENG[ev.fn](ev.a,ev,{when});                         // ev несёт замороженный лад (§3.4). {when} ИМЕНОВАННО (S2): позиционный третий аргумент раньше значил у разных записей разное — см. шапку ENG
         if(ev.fn==='chOn'||ev.fn==='chSet'){ curChordDeg=ev.a.deg; curChordOct=ev.a.oct; }   // подсветка ведёт на опережение (~до окна) — косметика; регистр лежит в том же событии
         else if(ev.fn==='chOff')curChordDeg=-1;
       }
     }
+    curSched.i=i; curSched.at=hi;                           // дошли до hi — следующий сегмент продолжит отсюда без поиска
     if(segEnd>=repEnd-1e-9) releaseLoopLayersAt(loop.t0+repEnd*spb);   // достигли границы повтора — гасим слои по явному времени
     loop.sched=segEnd;
   }
@@ -490,14 +563,27 @@ function releaseLoopLayersAt(when,layer){
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
    ⚠️ УСЛОВИЯ РАЗВЁРНУТЫ В continue-ветки (было одно длинное &&) РАДИ ЧИТАЕМОСТИ ПОСЛЕ ДОБАВЛЕНИЯ
    ГЕЙТА ДОРОЖЕК — набор условий и их смысл не изменились. */
+/* ⛳ У fireNear СВОЙ КУРСОР, а не общий со scheduleLayers — и это вынужденно, а не по вкусу. Три
+   различия, каждого хватило бы: (1) ВРЕМЕННÁЯ БАЗА другая — здесь позиция ИГРЫ (loop.pos), там
+   горизонт ОПЕРЕЖЕНИЯ, и они расходятся на SCHED_AHEAD; (2) интервал полуоткрыт С ДРУГОЙ СТОРОНЫ
+   ((a,b] против [lo,hi)); (3) на завороте fireNear зовут ДВАЖДЫ за тик, с прыжком назад к нулю.
+   Общий курсор пришлось бы гонять между двумя позициями каждый тик — то есть он перестал бы быть
+   монотонным и превратился бы в два двоичных поиска вместо нуля.
+   В СТРОЮ они держатся тем, что оба перепривязываются через ОДНУ функцию (schedInvalidate) и делят
+   ОДНУ границу отсортированного префикса cursN.
+   ⚠️ lower_bound даёт первое t>=a, а нам нужно строгое t>a — разницу снимает ОСТАВЛЕННАЯ явная
+   проверка ev.t<=a: курсор может встать на одно событие раньше, и это безвредно по построению. */
 function fireNear(a,b){
   const gated=laneGated();                                   // как в scheduleLayers: считаем один раз на вызов
-  for(const ev of events){
-    if(isLayer(ev.fn)||ev.t<=a||ev.t>b) continue;
+  let i=cursSeek(curNear,a);
+  for(; i<cursN && events[i].t<=b; i++){
+    const ev=events[i];
+    if(isLayer(ev.fn)||ev.t<=a) continue;
     if(recording&&ev.layer===loop.layer) continue;
     if(gated&&!laneAudible(ev.layer)) continue;              // заглушённая / молчащая из-за чужого соло дорожка
     ENG[ev.fn](ev.a,ev);
   }
+  curNear.i=i; curNear.at=b;                                 // следующий вызов придёт с a===b и продолжит без поиска
 }
 /* Гашение ЖИВОГО на завороте — слои петли гасятся вперёд (releaseLoopLayersAt), а ЖИВОЙ аккорд НЕ трогаем.
    Живой аккорд ('latch') принадлежит РУКЕ, а не петле: удержанный или защёлкнутый, он обязан пережить
@@ -536,7 +622,7 @@ function tick(){
   if(pos<loop.pos){                                   // заворот петли (для лид/дрон)
     fireNear(loop.pos,lb);
     liveWrapRelease();                                // гасим ЖИВОЕ к границе (слои — по явному времени)
-    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); loop.sched=e;   // первая запись только что стала слоем — планировать её с ТЕКУЩЕЙ позиции (во время записи слоёв не планировалось → без дублей)
+    if(loop.first){ loop.first=false; setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate(); loop.sched=e;   // первая запись только что стала слоем — планировать её с ТЕКУЩЕЙ позиции (во время записи слоёв не планировалось → без дублей). schedInvalidate ПОСЛЕ sort: порядок изменился, и в cursN надо взять новую границу
       hooks.tutor && hooks.tutor('loop',{ev:'loopClosed'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: первый круг замкнулся и пошёл петлёй («вернулся») — урок «Лупер»
     fireNear(-1e-9,pos);
   }else fireNear(loop.pos,pos);
@@ -546,6 +632,7 @@ function startTransport(countIn){
   clearPump();
   const spb=60/loop.bpm;
   loop.on=true; loop.pos=-1e-9; loop.sched=0;              // sched=0 → планируем слои с доли 0 (первый удар петли — по явному времени, сэмпл-точно)
+  schedInvalidate();                                       // ⛳ ГЛАВНАЯ точка сброса: временнáя база прыгнула (pos/sched/t0 переставлены). Покрывает первую запись, снятие паузы и старт от аранжировки
   loop.t0=AC.currentTime+(countIn?loop.metre*spb:0.06);   // отсчёт — ОДИН такт (loop.metre долей), при любом размере (предсказуемое правило)
   loop.clickBeat=countIn?-loop.metre:0;
   pumpTimer=setInterval(tick,SCHED_TICK_MS);
@@ -558,17 +645,17 @@ function onRec(){
   if(!AC)return;
   /* ⛳ МЕСТО РОЖДЕНИЯ СЛОЯ №1 из трёх (см. закон у laneNew): первая запись. laneReset — песни не было,
      значит и дорожек; laneNew выдаёт номеру 0 свежий id. */
-  if(!loop.on){ events.length=0; laneReset(); loop.first=true; loop.layer=0; laneNew(loop.layer); setRecording(true); startTransport(true);
+  if(!loop.on){ events.length=0; schedInvalidate(); laneReset(); loop.first=true; loop.layer=0; laneNew(loop.layer); setRecording(true); startTransport(true);
     hooks.tutor && hooks.tutor('loop',{ev:'recStart'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: старт записи первого круга (отсчёт пошёл) — урок «Лупер»
   /* ОСТАНОВКА ОВЕРДАБА. recAllOff — СТРОГО ДО setRecording(false) (см. его шапку): он и закрывает в слое
      всё, что осталось звучать под пальцами. Прежде здесь стояло `recLeadOff(); recChOff();` — соло не
      закрывалось вовсе (вызов без владельца), бас не закрывался вообще. */
-  else if(recording){ recAllOff(); setRecording(false); events.sort((x,y)=>x.t-y.t);
+  else if(recording){ recAllOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate();   // sort переставил события, а дописанный хвост стал частью отсортированного тела → новая граница cursN
     hooks.tutor && hooks.tutor('loop',{ev:'overdubStop'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: овердаб остановлен (слой готов) — урок «Лупер»
   /* ⛳ МЕСТО РОЖДЕНИЯ СЛОЯ №2: овердаб. Номер (maxLayer()+1) МОГ УЖЕ ЖИТЬ — его освободила ⤺ отмена,
      — поэтому laneNew обязателен: он затирает запись прежнего жильца номера, и новая дорожка не
      наследует его заглушение. Это тот самый случай, ради которого id вообще заведён. */
-  else{ loop.layer=maxLayer()+1; laneNew(loop.layer); setRecording(true);
+  else{ loop.layer=maxLayer()+1; laneNew(loop.layer); setRecording(true); schedInvalidate();   // массив ещё не менялся, но с этого мига push начнёт дописывать ХВОСТ — фиксируем границу cursN здесь, а не «когда-нибудь»
     hooks.tutor && hooks.tutor('loop',{ev:'overdubStart'}); }   // ЗАЦЕПКА ОБУЧЕНИЯ: начат новый слой поверх петли — урок «Лупер»
 }
 /* Загрузить аранжировку (гармония+бас+ритм) как ОТДЕЛЬНЫЕ слои, замороженные в текущем
@@ -591,6 +678,7 @@ function loadArrangement(sel, jam=false){
       if(jam)ev.jam=true;                              // МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока (см. clearJam)
       events.push(ev); } });
   events.sort((x,y)=>x.t-y.t);
+  schedInvalidate();                                   // добавили слои и пересортировали → курсоры недействительны (startTransport ниже сбросит ещё раз, если петля стояла — это дёшево и безвредно)
   if(!loop.on)startTransport(false);
   if(droneAudible())droneOn();                         // включаем дрон сразу (насос переподтвердит на завороте); ⚠️ именно AUDIBLE, а не ACTIVE: заглушённая дорожка дрона не должна зазвучать от добавления соседних слоёв
   if(jam) hooks.tutor && hooks.tutor('loop',{ev:'jam'});   // ЗАЦЕПКА ОБУЧЕНИЯ: джем реально встал (слои добавлены) — урок «Лупер»; только для джема, не для ручной аранжировки
@@ -601,23 +689,24 @@ function loadArrangement(sel, jam=false){
 const loadJam=sel=>loadArrangement(sel, true);
 function clearJam(){
   if(!events.length)return;
-  let removed=false;
-  for(let i=events.length-1;i>=0;i--) if(events[i].jam){ events.splice(i,1); removed=true; }
+  const removed=compactEvents(e=>e.jam);               // ОДИН проход вместо splice-в-цикле (см. compactEvents)
   if(!removed)return;
+  schedInvalidate();                                   // состав событий изменился → курсоры недействительны
   lanePrune();                                         // у слоёв подложки больше нет событий → снимаем их настройки, чтобы не всплыли на следующем джеме с теми же номерами
   softAllOff(); if(!droneActive())droneOff();          // бухгалтерия как в onUndo: гасим зависшее, ушёл слой-дрон → гасим дрон
   if(!events.length)clearRec(); else hooks.loop&&hooks.loop(loop.on);   // пусто → полный сброс; остались записи игрока → петля играет дальше
 }
 function onLoop(){                                     // играть/пауза петли
   if(!AC)return;
-  if(loop.on){ loop.on=false; clearPump(); softAllOff(); droneOff(); setRecording(false);
+  if(loop.on){ loop.on=false; clearPump(); softAllOff(); droneOff(); setRecording(false); schedInvalidate();   // пауза: возобновление придёт через startTransport с новой базой, курсор до тех пор недействителен
     hooks.rec&&hooks.rec(false); hooks.loop&&hooks.loop(false); }
   else if(events.length){ startTransport(false); if(droneAudible())droneOn(); }   // ⚠️ AUDIBLE: снятие паузы не должно воскрешать заглушённую дорожку дрона
 }
 function onUndo(){                                      // снять последний слой (на месте — ссылка events стабильна)
   if(!events.length)return;
   const top=maxLayer();
-  for(let i=events.length-1;i>=0;i--)if(events[i].layer===top)events.splice(i,1);
+  compactEvents(e=>e.layer===top);                      // ОДИН проход вместо splice-в-цикле (см. compactEvents)
+  schedInvalidate();                                    // состав событий изменился → курсоры недействительны
   lanePrune();                                          // снятая дорожка не должна оставить своё заглушение следующей записи на том же номере
   softAllOff(); if(!droneActive())droneOff();           // сняли слой-дрон → гасим (softAllOff дрон не трогает)
   if(!events.length)clearRec(); else hooks.loop && hooks.loop(loop.on);
@@ -637,15 +726,18 @@ const SUBS=[4,3];                                       // дробление д
 function setLoopSub(n){                                 // МОЖНО менять когда угодно: это настройка ЗАПИСИ, а не геометрия петли (в отличие от bars/metre)
   loop.sub = SUBS.includes(+n) ? +n : loop.sub;
 }
-function setLoopBpm(v){ loop.bpm=Math.max(40,Math.min(240,+v||loop.bpm)); }   // темп петли — только пользователь
+/* ⚠️ Смена темпа — СКАЧОК ВРЕМЕННÓЙ БАЗЫ: доли считаются как (now−t0)·bpm/60, поэтому при новом bpm
+   и НЕТРОНУТОМ t0 позиция в долях меняется разрывно. Курсор хранит долю, значит обязан отвязаться.
+   (Сам разрыв позиции — предсуществующее поведение, этот слайс его НЕ чинит: см. отчёт.) */
+function setLoopBpm(v){ loop.bpm=Math.max(40,Math.min(240,+v||loop.bpm)); schedInvalidate(); }   // темп петли — только пользователь
 function clearRec(){
-  clearPump(); events.length=0; laneReset(); loop.on=false; setRecording(false); softAllOff(); droneOff();   // ✕ — песни больше нет, значит нет и дорожек: настройки уходят вместе с ними
+  clearPump(); events.length=0; schedInvalidate(); laneReset(); loop.on=false; setRecording(false); softAllOff(); droneOff();   // ✕ — песни больше нет, значит нет и дорожек: настройки уходят вместе с ними
   hooks.loop && hooks.loop(false);
 }
 /* ⚠️ panic НАМЕРЕННО НЕ ТРОГАЕТ настройки дорожек: события переживают панику, значит переживают и
    дорожки. «■» — это «замолчи сейчас», а не «забудь, что я намикшировал». */
 function panic(){
-  clearPump(); loop.on=false;
+  clearPump(); loop.on=false; schedInvalidate();   // события целы, но транспорт остановлен — возобновят его с новой базой
   softAllOff(); droneOff();
   setRecording(false); hooks.loop && hooks.loop(false);
 }
