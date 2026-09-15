@@ -13,13 +13,13 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit } from './draw.js';
+import { loopHit, loopBeatAt } from './draw.js';
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
-         setRegion, regionOn, songBeats } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; область повтора (S3.4) — там же
+         setRegionOn, regionOn, braceTap, braceMove } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -160,13 +160,12 @@ function updRecBtn(){
   loopBarsV.textContent = loop.bars;
 }
 function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' : 'transport.loopPlay'); }   // текст кнопки транспорта по состоянию (для смены языка и hooks.loop)
-/* ⟳ ОБЛАСТЬ ПОВТОРА (S3.4). Состояние держит recorder, ui только переключает и отражает.
-   ⚠️ ГРАНИЦЫ ПЕРЕСЧИТЫВАЮТСЯ ПРИ КАЖДОМ ВКЛЮЧЕНИИ: помечаем ВСЮ песню на текущий момент. Записал
-   дальше при включённом повторе — область осталась прежней (и это ВИДНО на полосе), выключил и включил
-   снова — подхватила новую длину. Предсказуемо и без скрытого «само подрастает». */
+/* ⟳ ПОВТОР СКОБЫ (S3.5b). Состояние держит recorder, ui только переключает и отражает.
+   ⛳ КНОПКА БОЛЬШЕ НЕ ПЕРЕОПРЕДЕЛЯЕТ ГРАНИЦ (в S3.4 каждое включение помечало всю песню заново): границы
+   задаёт СКОБА на полосе лупера, кнопка их только включает и выключает. Выключил и включил — скоба там же. */
 const rgnBtn=$('rgnBtn');
 function updRgnBtn(){ rgnBtn.classList.toggle('on', regionOn()); }
-rgnBtn.onclick=()=>{ const on=!regionOn(); setRegion(0, songBeats(), on); updRgnBtn(); };
+rgnBtn.onclick=()=>{ setRegionOn(!regionOn()); updRgnBtn(); };
 hooks.rec       = () => { updRecBtn(); syncTutorBarPos(); };   // запись вкл/выкл → коробка лупера появляется/меняется → переставить подсказку тура
 hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); updRgnBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет), вид кнопки области И положение подсказки (коробка появилась/ушла)
 
@@ -313,13 +312,28 @@ addEventListener('pointerdown', e=>{ pointerDown=true;
    ⚠️ Гейт по e.target===холст: тап по кнопке бара, панели или транспорту — не наше дело, а их
    элементы лежат ВЫШЕ холста по z-index, поэтому до нас такой тап и не дойдёт с этим target.
    Игру тап не крадёт: играют с КАМЕРЫ, тач не читает никто (см. довод у авто-скрытия бара выше). */
+/* ⛳ СКОБА ПОВТОРА (S3.5b) — те же обязанности: где полоса скобы, знает draw (loopHit/loopBeatAt по loopView),
+   границы держит и квантует до такта recorder (braceTap/braceMove), ui только передаёт долю.
+   ТАП — рабочий путь САМ ПО СЕБЕ: ближний край едет на ближайшую линию такта. ПЕРЕТАСКИВАНИЕ — приятный
+   довесок поверх того же: взятый касанием край (braceEdge) ведём по pointermove. Если браузер отдаст жест
+   прокрутке (pointercancel), останется уже сделанный тап — ничего не сломано. */
+let braceEdge=null;   // край, взятый касанием ('from'/'to'); держим до отпускания — иначе край «перескакивал» бы на ближний на каждом шаге
 addEventListener('pointerdown', e=>{
   if(e.target!==canvasEl) return;
   const r=canvasEl.getBoundingClientRect();
   const h=loopHit(e.clientX-r.left, e.clientY-r.top);
   if(!h) return;
+  if(h.what==='brace'){ braceEdge=braceTap(h.beat); return; }   // null во время записи — тогда и тащить нечего
   if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);
 });
+addEventListener('pointermove', e=>{
+  if(braceEdge===null) return;
+  const b=loopBeatAt(e.clientX-canvasEl.getBoundingClientRect().left);
+  if(b===null){ braceEdge=null; return; }       // полоса пропала (клип/очистка) — жест кончился
+  braceMove(braceEdge,b);                        // тот же такт — recorder сам ничего не тронет
+});
+addEventListener('pointerup',    ()=>{ braceEdge=null; });
+addEventListener('pointercancel',()=>{ braceEdge=null; });
 addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide();
   if(panelOpen() && !focusInPanel()) armStripReturn();   // палец ушёл; но если контрол панели в фокусе (пикер открыт) — НЕ возвращаем, ждём focusout
 });

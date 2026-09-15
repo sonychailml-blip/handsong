@@ -8,7 +8,7 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
 import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
-         laneMuted, laneSoloed, laneSoloOn } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         laneMuted, laneSoloed, laneSoloOn, cycling } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -445,6 +445,14 @@ function drawChordReadout(x0,x1,yTop,yBot,freqs,accent){
    loopView — снимок геометрии ПОСЛЕДНЕГО нарисованного кадра полосы; null, когда полосы нет. */
 let loopView=null;
 const laneBeatX=(V,b)=> V.x0 + V.bw*((b-V.beat0)/V.span);
+/* ⛳ ОБРАТНОЕ ПРЕОБРАЗОВАНИЕ «ПИКСЕЛЬ → ДОЛЯ» (слайс S3.5b) — ЗДЕСЬ ЖЕ, из ТОГО ЖЕ снимка V и той же
+   формулы, вывернутой алгебраически: x = x0 + bw·(b−beat0)/span  ⇔  b = beat0 + span·(x−x0)/bw.
+   Поэтому laneBeatX(V, laneBeatAt(V,x)) === x (до плавающей точки) на всей линейке — палец берёт ту долю,
+   над которой нарисован.
+   ⛔ НЕ ВЫВОДИТЬ ОБРАТНОЕ ИЗ ОТДЕЛЬНО ПОСЧИТАННОЙ ГЕОМЕТРИИ (своё x0, своя ширина, «сколько тактов влезло»):
+   это ровно та вторая копия, от которой правило #9. Появится зум/прокрутка — поменяются beat0/span в V,
+   и обе функции поедут вместе. Кламп по линейке: тап чуть левее/правее неё — это край, а не «доля −3». */
+const laneBeatAt=(V,x)=> V.beat0 + V.span*(Math.max(0,Math.min(V.bw,x-V.x0))/V.bw);
 /* Ширина гнезда переключателя и зазор. Нарисованная кнопка мельче гнезда — палец толще буквы. */
 const LANE_TOG_W=21, LANE_TOG_GAP=2;
 const LANE_MUTE_COL='#e5a23c', LANE_SOLO_COL='#57d9a3';   // заглушено — янтарь (внимание), соло — тот же зелёный, что у «играет»
@@ -475,7 +483,11 @@ function drawLooper(){
      упёрся бы в правый край и встал) и длина ПОДЛОЖКИ (пустая песня — не нулевой отрезок, на нём
      видно сетку тактов и куда ляжет 🎵). */
   const posNow=info?info.pos:0;
-  const total=Math.max(songBeats(), posNow, loop.bars*loop.metre);
+  /* ⚠️ posNow — ПЕСЕННАЯ доля (loopPos, S3.5b): при повторе она не растёт за конец скобы, поэтому и
+     ширина больше не ползёт вслед за часами. loop.rgn.to — четвёртый член (S3.5b): «следующая» скоба
+     округлена вверх до такта и может быть чуть длиннее материала — без него её правый край рисовался бы
+     за линейкой. */
+  const total=Math.max(songBeats(), posNow, loop.bars*loop.metre, loop.rgn.to);
   const sw=Math.min(560,W-40), x0=(W-sw)/2;     // sw — ПОЛОСА ЦЕЛИКОМ (прежний bw): по ней считается коробка, и она не изменилась
   /* ⛳ МЕСТО ПОД ПЕРЕКЛЮЧАТЕЛИ ОТРЕЗАЕМ ОТ ЛИНЕЙКИ ВРЕМЕНИ, А НЕ ОТ КОРОБКИ, и слева его взять нельзя:
      на телефоне 380px коробка уже упирается в кромки (x0=20), а подпись слоя («L1») висит ЛЕВЕЕ неё.
@@ -489,12 +501,15 @@ function drawLooper(){
   if(recording && !rows.includes(loop.layer)) rows.push(loop.layer);   // пустой слой, что пишется прямо сейчас
   /* rowH 13 → 16: строка стала не только читаемее, но и НАЖИМАЕМЕЕ — в ней теперь живут две кнопки.
      Выше не берём: каждая дорожка — это высота на экране, а их бывает много (см. отчёт слайса). */
-  const nRow=Math.max(1,rows.length), rowH=16, headH=22, pad=7, y0=64;   // ниже заголовков зон (y≈52)
-  const gy0=y0+headH, boxH=headH+nRow*rowH+pad*2, gy1=y0+boxH-pad;
+  /* braceH — полоса СКОБЫ ПОВТОРА (S3.5b) между заголовком и строками. ОТДЕЛЬНАЯ полоса, а не тап по
+     строкам: строки уже заняты mute/solo (и скоро — выбором дорожки для записи), и «тап по времени» с
+     «тапом по дорожке» обязаны быть разными целями. */
+  const nRow=Math.max(1,rows.length), rowH=16, headH=22, braceH=16, pad=7, y0=64;   // ниже заголовков зон (y≈52)
+  const gy0=y0+headH+braceH, boxH=headH+braceH+nRow*rowH+pad*2, gy1=y0+boxH-pad;
   syncLoopTransport(true, y0+boxH+4);         // считаем из ТОГО ЖЕ boxH, что рисуем → разъехаться не могут
   /* Снимок геометрии для попадания — ОДИН объект, тот же, по которому ниже рисуем. tx0 — левый край
      первого гнезда переключателей. */
-  loopView={ x0, bw, beat0:0, span:total, gy0, rowH, rows, tx0:x1+6 };
+  loopView={ x0, bw, beat0:0, span:total, gy0, rowH, rows, tx0:x1+6, by0:y0+headH, hy0:y0 };   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
 
   ctx.fillStyle='rgba(10,10,20,.74)'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(x0-10,y0,sw+20,boxH,11); ctx.fill(); ctx.stroke();
@@ -502,8 +517,8 @@ function drawLooper(){
   /* ⛳ ОБЛАСТЬ ПОВТОРА (S3.4) — рисуем ПОД сеткой и строками, чтобы она читалась как подсветка участка,
      а не как ещё один слой поверх. Показываем ТОЛЬКО включённой: помеченный, но выключенный участок
      обещал бы повтор, которого нет. Границы — из того же преобразования, что сетка и метки. */
-  const RG=loop.rgn;
-  if(RG.on && RG.to>RG.from){
+  const RG=loop.rgn, cyc=cycling();   // cyc — тот же предикат, по которому ЗВУК решает, есть ли повтор (S3.5b; прежде здесь стояла своя копия условия)
+  if(cyc){
     const rx0=laneBeatX(loopView,RG.from), rx1=laneBeatX(loopView,RG.to);
     ctx.fillStyle='rgba(87,217,163,.10)';                       // тот же зелёный, что у «играет» — это его участок
     ctx.fillRect(rx0,gy0,Math.max(1,rx1-rx0),gy1-gy0);
@@ -522,7 +537,7 @@ function drawLooper(){
   else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
      Приписка к готовой строке, а не отдельный ключ на каждую фразу — состояний заголовка четыре. */
-  if(RG.on && RG.to>RG.from) head += ' · ' + t('looper.regionOn');   // повтор объявляем словом: одна подсветка на полосе легко теряется на пёстрой камере
+  if(cyc) head += ' · ' + t('looper.regionOn');   // повтор объявляем словом: одна подсветка на полосе легко теряется на пёстрой камере
   if(laneSoloOn()) head += ' · ' + t('looper.soloOn');
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
   ctx.fillStyle=hc; ctx.fillText(head,x0-2,y0+headH/2+1);
@@ -559,6 +574,37 @@ function drawLooper(){
     else { sc='rgba(255,255,255,.11)'; lw=0.8; }              // обычная доля
     ctx.strokeStyle=sc; ctx.lineWidth=lw;
     ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
+  }
+  /* ⛳ ПОЛОСА СКОБЫ ПОВТОРА (S3.5b). Читается честно и без легенды:
+       заливка — какие ТАКТЫ под скобой; зелёная — повтор ВКЛЮЧЁН (тот же зелёный, что «играет»),
+       серая — скоба есть, но не повторяется (она всё равно задаёт начало записи);
+       края — скобки ⌈…⌉; СПЛОШНЫЕ — скобу поставил человек, ПУНКТИР + «авто» — скоба следует за материалом;
+       надпись — номера тактов «3–5» (с единицы, включительно).
+     Риски линий тактов в полосе — цели тапа: тап едет на ближайшую линию. Прореживание то же (barStep),
+     что у сетки, — риска не обещает линию, которой на сетке нет.
+     ⛔ Все X — через laneBeatX того же loopView (правило #9); попадание — через laneBeatAt того же V. */
+  {
+    const M=loop.metre, byA=loopView.by0+2, byB=gy0-3, bh=byB-byA, tab=5;
+    ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fillRect(x0,byA,bw,bh);
+    ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1;
+    for(let b=0;b*M<=total+1e-9;b+=barStep){ const gx=laneBeatX(loopView,b*M);
+      ctx.beginPath(); ctx.moveTo(gx,byB-4); ctx.lineTo(gx,byB); ctx.stroke(); }
+    const bx0=laneBeatX(loopView,RG.from), bx1=laneBeatX(loopView,RG.to);
+    ctx.fillStyle= cyc ? 'rgba(87,217,163,.40)' : 'rgba(255,255,255,.16)';
+    ctx.fillRect(bx0,byA,Math.max(1,bx1-bx0),bh);
+    ctx.strokeStyle= cyc ? '#57d9a3' : 'rgba(255,255,255,.8)'; ctx.lineWidth= RG.user ? 2 : 1.2;
+    if(!RG.user) ctx.setLineDash([2,2]);
+    ctx.beginPath();
+    ctx.moveTo(bx0+tab,byA); ctx.lineTo(bx0,byA); ctx.lineTo(bx0,byB); ctx.lineTo(bx0+tab,byB);
+    ctx.moveTo(bx1-tab,byA); ctx.lineTo(bx1,byA); ctx.lineTo(bx1,byB); ctx.lineTo(bx1-tab,byB);
+    ctx.stroke(); ctx.setLineDash([]);
+    const a=Math.round(RG.from/M), z=Math.round(RG.to/M), nums= z-a<=1 ? String(z) : `${a+1}–${z}`;
+    ctx.font='600 9px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const room=bx1-bx0-2*tab-4;
+    let lbl= RG.user ? nums : nums+' · '+t('looper.braceAuto');
+    if(ctx.measureText(lbl).width>room) lbl=nums;               // узко — только номера; «авто» всё равно читается по пунктиру
+    if(ctx.measureText(lbl).width<=room){ ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillText(lbl,(bx0+bx1)/2,(byA+byB)/2+0.5); }
+    ctx.textAlign='left';
   }
   // строки слоёв + переключатели дорожки
   const soloOn=laneSoloOn();
@@ -600,10 +646,12 @@ function drawLooper(){
   if(info&&info.phase==='play'){
     /* ⛳ Тоже через ЕДИНОЕ преобразование. Прежде здесь стояло деление на info.total, а сетка делила на
        свой total — величины совпадали, но источников было ДВА; теперь источник один (loopView.span). */
-    const px=laneBeatX(loopView,info.pos);
+    const px=laneBeatX(loopView,info.pos), ph0=loopView.by0+2;   // S3.5b: бегунок идёт и сквозь полосу скобы — видно, где он относительно неё
+    if(cyc){ ctx.strokeStyle='rgba(10,10,20,.85)'; ctx.lineWidth=4;   // тёмная подложка ТОЛЬКО при повторе: на зелёной заливке скобы зелёный бегунок иначе тонет
+      ctx.beginPath(); ctx.moveTo(px,ph0); ctx.lineTo(px,gy1+2); ctx.stroke(); }
     ctx.strokeStyle=recording?'#e5484d':'#57d9a3'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(px,gy0-2); ctx.lineTo(px,gy1+2); ctx.stroke();
-    ctx.fillStyle=ctx.strokeStyle; ctx.beginPath(); ctx.arc(px,gy0-2,3,0,7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px,ph0); ctx.lineTo(px,gy1+2); ctx.stroke();
+    ctx.fillStyle=ctx.strokeStyle; ctx.beginPath(); ctx.arc(px,ph0,3,0,7); ctx.fill();
   }
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
@@ -1162,13 +1210,22 @@ function drawExprBar(rx0,rx1,H){
    с зазором. Палец толще буквы, а промах по соседней кнопке хуже промаха в пустоту.
    ⚠️ loopView===null, когда полосы нет (нет петли ИЛИ идёт запись клипа) — тогда и попадать не во что. */
 export function loopHit(px,py){
-  const V=loopView; if(!V||!V.rows.length) return null;
+  const V=loopView; if(!V) return null;
+  /* ⛳ ПОЛОСА СКОБЫ (S3.5b) — {what:'brace', beat}. Граница с дорожками — ТОТ ЖЕ V.gy0, от которого
+     считаются строки ниже: зона скобы кончается ровно там, где начинается строка 0, поэтому тап не может
+     попасть в обе цели. По X — от кромки коробки до гнёзд переключателей (tx0); доля — laneBeatAt того же V. */
+  if(py>=V.hy0 && py<V.gy0) return (px>=V.x0-10 && px<V.tx0) ? { what:'brace', beat:laneBeatAt(V,px) } : null;
+  if(!V.rows.length) return null;
   if(py<V.gy0 || py>=V.gy0+V.rows.length*V.rowH) return null;
   const ri=Math.floor((py-V.gy0)/V.rowH);
   const dx=px-V.tx0, step=LANE_TOG_W+LANE_TOG_GAP;
   if(dx<0 || dx>=step*2) return null;
   return { layer:V.rows[ri], what: dx<step ? 'mute' : 'solo' };
 }
+/* Доля под пикселем для ПЕРЕТАСКИВАНИЯ края скобы (S3.5b): тот же laneBeatAt по тому же снимку.
+   Вертикаль НЕ проверяем — палец, съехавший с полосы на строки, продолжает тащить взятый край.
+   null — полосы нет (и тащить нечего). */
+export function loopBeatAt(px){ const V=loopView; return V ? laneBeatAt(V,px) : null; }
 /* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).
    Экспортирована, чтобы позицию мог прочитать кто угодно, а не только draw. */
 export { drawVideoBackground, drawOverlays, loopBarBottom };
