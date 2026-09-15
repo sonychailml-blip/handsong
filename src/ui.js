@@ -19,7 +19,7 @@ import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProg
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
-         setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -323,7 +323,9 @@ addEventListener('pointerdown', e=>{
   if(e.target!==canvasEl) return;
   const r=canvasEl.getBoundingClientRect();
   const h=loopHit(e.clientX-r.left, e.clientY-r.top);
+  if(!h || h.what!=='del') laneDelCancel();                     // S3.5d: любой тап по холсту, кроме ✕, снимает взведённое удаление
   if(!h) return;
+  if(h.what==='del'){ laneDelTap(h.layer); updRecBtn(); return; } // S3.5d: первый тап взводит, второй по тому же ✕ — удаляет (подсказка ● называет вооружённую дорожку — могла уйти)
   if(h.what==='brace'){ braceEdge=braceTap(h.beat); return; }   // null во время записи — тогда и тащить нечего
   if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; } // S3.5c: вооружить/снять; подсказку ● перечитать (она называет дорожку)
   if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);

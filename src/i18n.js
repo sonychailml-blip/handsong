@@ -118,7 +118,7 @@ export const DICTS = {
     'transport.loopPause':'❚❚ pause',
     'transport.loopTitle':'Play / pause · from the end, play restarts from the top',
     'transport.regionTitle':'Repeat: cycle the bars under the brace instead of stopping at the end',
-    'transport.undoTitle':'Remove the last layer',
+    'transport.undoTitle':'Undo the last take',
     'transport.clearTitle':'Clear the loop',
     'transport.panicTitle':'Silence everything',
     // панель звукоряда
@@ -210,6 +210,8 @@ export const DICTS = {
     // холст: дорожки лупера (S1). Буквы кнопок — ОДИН символ: гнездо 21px, значок там нечитаем, подписи не влезают
     'looper.laneMute':'M',
     'looper.laneSolo':'S',
+    'looper.laneDel':'✕',                                 // S3.5d: удалить дорожку (второй тап подтверждает)
+    'looper.delConfirm':'Tap ✕ again to delete L{n}',
     'looper.soloOn':'SOLO',
     'looper.armed':'REC → L{n}',                    // S3.5c: куда пойдёт ●
     'looper.armedSilent':'REC → L{n} (not heard)',  // …в дорожку, которую сейчас не слышно (mute / чужое соло)
@@ -291,7 +293,7 @@ export const DICTS = {
     'msg.play':'▶ Play',
     'msg.pause':'⏸ Pause',
     'msg.noLayers':'No layers',
-    'msg.undo':'↶ Undo layer',
+    'msg.undo':'↶ Undo take',
     'msg.alreadyEmpty':'Already empty',
     'msg.cleared':'✕ Cleared',
     'msg.clearCancelled':'Clear cancelled',
@@ -465,7 +467,7 @@ export const DICTS = {
     'transport.loopPause':'❚❚ пауза',
     'transport.loopTitle':'Играть / пауза · с конца пуск идёт с начала',
     'transport.regionTitle':'Повтор: гонять по кругу такты под скобой, а не останавливаться в конце',
-    'transport.undoTitle':'Убрать последний слой',
+    'transport.undoTitle':'Отменить последнее взятое',
     'transport.clearTitle':'Очистить петлю',
     'transport.panicTitle':'Заглушить всё',
     'panel.collapse':'Свернуть ✕',
@@ -547,6 +549,8 @@ export const DICTS = {
     'looper.clear':'ОЧИСТКА',
     'looper.laneMute':'М',    // «Молча» — кириллическая М; одна буква, как в en
     'looper.laneSolo':'С',    // «Соло»
+    'looper.laneDel':'✕',
+    'looper.delConfirm':'Ещё раз ✕ — удалить L{n}',
     'looper.soloOn':'СОЛО',
     'looper.armed':'ЗАПИСЬ → L{n}',
     'looper.armedSilent':'ЗАПИСЬ → L{n} (не слышно)',
@@ -621,7 +625,7 @@ export const DICTS = {
     'msg.play':'▶ Пуск',
     'msg.pause':'⏸ Пауза',
     'msg.noLayers':'Нет слоёв',
-    'msg.undo':'↶ Отмена слоя',
+    'msg.undo':'↶ Отмена взятого',
     'msg.alreadyEmpty':'Уже пусто',
     'msg.cleared':'✕ Очищено',
     'msg.clearCancelled':'Очистка отменена',

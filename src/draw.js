@@ -8,7 +8,7 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
 import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
-         laneMuted, laneSoloed, laneSoloOn, cycling, armedLayer } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         laneMuted, laneSoloed, laneSoloOn, cycling, armedLayer, laneDelPendingLayer } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -455,6 +455,10 @@ const laneBeatX=(V,b)=> V.x0 + V.bw*((b-V.beat0)/V.span);
 const laneBeatAt=(V,x)=> V.beat0 + V.span*(Math.max(0,Math.min(V.bw,x-V.x0))/V.bw);
 /* Ширина гнезда переключателя и зазор. Нарисованная кнопка мельче гнезда — палец толще буквы. */
 const LANE_TOG_W=21, LANE_TOG_GAP=2;
+/* ✕ удаления (S3.5d) — третьим гнездом, но ОТСТУПЛЕН на LANE_DEL_GAP: соседство с S шириной в 2px делало бы
+   промах «хотел соло — взвёл удаление» частым. Промах всё равно не разрушает (нужен второй тап), но
+   отступ снимает большую часть ложных взводов. Зазор — мёртвая зона, тап в него не делает ничего. */
+const LANE_DEL_GAP=6, LANE_DEL_COL='#e5484d';
 const LANE_MUTE_COL='#e5a23c', LANE_SOLO_COL='#57d9a3';   // заглушено — янтарь (внимание), соло — тот же зелёный, что у «играет»
 const LANE_OFF_A=0.34;                                    // прозрачность НЕСЛЫШНОЙ строки
 /* Кнопка дорожки: буква в рамке, залитая — когда включена. Буква, а не значок: на 380px значок в
@@ -494,7 +498,7 @@ function drawLooper(){
      Поэтому кнопки идут СПРАВА внутри коробки, а линейка ровно на столько же короче.
      ⚠️ ЦЕНА ВИДИМАЯ И НАЗВАННАЯ: сетка долей, метки событий и бегунок стали уже. Но ВСЕ ТРИ одинаково —
      они считаются из ОДНОГО loopView, поэтому разъехаться не могут (правило #9). */
-  const togBand=LANE_TOG_W*2+LANE_TOG_GAP+6;    // два гнезда + зазор между ними + отступ от линейки
+  const togBand=LANE_TOG_W*3+LANE_TOG_GAP*2+LANE_DEL_GAP+6;    // три гнезда (M, S, ✕) + зазоры + отступ ✕ + отступ от линейки. На 380px линейка 290→261px
   const bw=Math.max(60,sw-togBand), x1=x0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране
   const ids=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
   const rows=ids.slice();
@@ -531,6 +535,7 @@ function drawLooper(){
      ПЕСНИ в тактах (выводимая из материала). Ветки loop.first больше нет — запись всегда «дорожка N». */
   const songBars=Math.max(1,Math.ceil(songBeats()/loop.metre));
   const armLy=armedLayer();                  // S3.5c: вооружённая дорожка (слой) или null — один раз на кадр, её читают и заголовок, и строки
+  const delLy=laneDelPendingLayer();         // S3.5d: дорожка со взведённым удалением или null
   let head, hc;
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
   else if(recording){ head=t('looper.overdub',{n:loop.layer+1}); hc='#e5484d'; }
@@ -548,6 +553,9 @@ function drawLooper(){
   }
   if(cyc) head += ' · ' + t('looper.regionOn');   // повтор объявляем словом: одна подсветка на полосе легко теряется на пёстрой камере
   if(laneSoloOn()) head += ' · ' + t('looper.soloOn');
+  /* S3.5d: ВЗВЕДЁННОЕ УДАЛЕНИЕ ЗАМЕНЯЕТ заголовок целиком, красным: это единственное, что сейчас важно, и
+     приписка к и без того длинной строке на 380px ушла бы за кромку. */
+  if(delLy!=null){ head=t('looper.delConfirm',{n:delLy+1}); hc='#ff6b6f'; }
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
   ctx.fillStyle=hc; ctx.fillText(head,x0-2,y0+headH/2+1);
 
@@ -643,6 +651,9 @@ function drawLooper(){
     }
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);
+    /* S3.5d: ✕ — залит красным, пока удаление взведено; строка при этом краснеет поверх (видно, КАКАЯ дорожка уйдёт). */
+    if(lid===delLy){ ctx.fillStyle='rgba(229,72,77,.24)'; ctx.fillRect(x0,ry+1,bw,rowH-2); }
+    laneTog(loopView.tx0+2*(LANE_TOG_W+LANE_TOG_GAP)+LANE_DEL_GAP, ry,rowH,t('looper.laneDel'),lid===delLy,LANE_DEL_COL);
   });
   /* ⛳ МЕТКИ СОБЫТИЙ — ОДНИМ ПРОХОДОМ ПО ВСЕМ СОБЫТИЯМ, а не проходом НА КАЖДУЮ СТРОКУ (S3.3).
      Было O(дорожек × событий) НА КАДР: на петле с тремя строками и парой сотен событий незаметно, на
@@ -1238,6 +1249,11 @@ export function loopHit(px,py){
   const ri=Math.floor((py-V.gy0)/V.rowH);
   const dx=px-V.tx0, step=LANE_TOG_W+LANE_TOG_GAP;
   if(dx>=0 && dx<step*2) return { layer:V.rows[ri], what: dx<step ? 'mute' : 'solo' };
+  /* S3.5d: ✕ — та же строка ri, третье гнездо за отступом LANE_DEL_GAP (отступ — мёртвая зона). Геометрия та же,
+     по которой drawLooper ставит кнопку: tx0 + 2·step + LANE_DEL_GAP. */
+  const ddx=dx-step*2-LANE_DEL_GAP;
+  if(ddx>=0 && ddx<step) return { layer:V.rows[ri], what:'del' };
+  if(dx>=0) return null;
   /* S3.5c: ТА ЖЕ СТРОКА ri, левее гнёзд — вооружить дорожку. Слева захватываем и подпись «L1» (она висит левее
      линейки): палец тянется к имени дорожки. Гнёзда M/S проверены ВЫШЕ — тап по ним не вооружает. */
   if(dx<0 && px>=V.x0-24) return { layer:V.rows[ri], what:'arm' };
