@@ -89,12 +89,16 @@ const TUNINGS_STEPS=[
 /* ШАГИ УРОКА «Лупер» — фича, что превращает игрушку в инструмент для целых пьес. Ведём в порядке реальной
    работы: записать круг → наложить слой → отмена → джем → темп/длина (правило пустой петли) → рука-лупер
    (одна фраза вперёд) → финал. События (ЗАЦЕПКА ОБУЧЕНИЯ в recorder.js — ловят И кнопки, И руку-лупер, т.к.
-   обе идут через onRec/onUndo/loadJam): 'loop' {ev:'recStart'|'loopClosed'|'overdubStart'|'overdubStop'|
+   обе идут через onRec/onUndo/loadJam): 'loop' {ev:'recStart'|'takeDone'|'overdubStart'|'overdubStop'|
    'undo'|'jam'}; 'panel' {which:'loop'} (открыта панель лупера); 'note' — как в «Основах». Чистый старт даёт
    tutorReset (clearRec). Кнопки ●/🎵/⚙ — в ВЕРХНЕМ баре (reveal:true), ⤺ отмена — в нижней полосе транспорта
    (видна при играющей петле). */
 const LOOPER_STEPS=[
-  {key:'lpRec',    reveal:true, enter:a=>{a.loopClosed=false; a.noteFired=false;}, done:a=>a.loopClosed && a.noteFired},   // ● запись: отсчёт → играть → круг «вернулся»
+  /* ⛳ ШАГ ПЕРЕНАПРАВЛЕН В СЛАЙСЕ S3.3 (правило #24). Ждал 'loopClosed' — событие ЗАВОРОТА петли;
+     заворота больше нет, и шаг стал бы непроходимым, а урок — тупиком. Ждёт 'takeDone' — явную
+     остановку записи. Смысл шага не изменился: «записал и услышал», изменился только способ закончить
+     запись (раньше круг закрывался сам, теперь её останавливают вторым нажатием ●). */
+  {key:'lpRec',    reveal:true, enter:a=>{a.takeDone=false; a.noteFired=false;}, done:a=>a.takeDone && a.noteFired},   // ● запись: отсчёт → играть → ● стоп
   /* СЛОЙ ПО РОЛЯМ — теперь это ПЕДАГОГИКА, а не обход ограничения. Прежняя причина («соло — один
      моно-голос, второй соло-слой дерётся с первым») УСТАРЕЛА: у соло свой пул с ключами-владельцами
      ('lead:L/R' живьём, 'leadloop:N:v' в слое), и соло поверх соло теперь звучит. Урок всё равно ведём
@@ -206,7 +210,7 @@ function freshAcc(){ return {noteFired:false, sMin:null, sMax:null, lastLdFinger
   chordLatched:false, chDeg0:null, chChanged:false, typePicked:false,
   panelOpened:false, soundPanelOpened:false, lastScaleTrad:null, timbreChanged:false,
   hfHold:false, hfTherm:false, hfExpr:false, exprMoved:false,
-  loopClosed:false, overdubbed:false, undone:false, jammed:false, loopPanelOpened:false, bassPlayed:false,
+  takeDone:false, overdubbed:false, undone:false, jammed:false, loopPanelOpened:false, bassPlayed:false,
   splitTurnedOn:false, half0:false, half1:false, splitRoleChanged:false}; }   // поля уроков «Аккорды»/«Строи»/«Функции рук»/«Лупер»/«Две роли» (прочие уроки их не читают — безвредны)
 /* Накопитель обновляем ГЕНЕРИЧНО по каждому событию — предикаты done остаются ЧИСТЫМИ (только читают). */
 function apply(kind,p){
@@ -225,7 +229,7 @@ function apply(kind,p){
   else if(kind==='bass'){ acc.bassPlayed=true; }            // басовая нота (слой-по-ролям, шаг lpLayer)
   else if(kind==='loop'){                                   // события лупера (шаги урока «Лупер»)
     if(p.ev==='recStart'||p.ev==='overdubStart'||p.ev==='jam'){ acc.noteFired=false; acc.chordPlayed=false; acc.bassPlayed=false; }   // сброс: игра ЗАСЧИТЫВАЕТСЯ только ПОСЛЕ старта записи/овердаба/джема (сыграно ВО ВРЕМЯ слоя, а не до)
-    else if(p.ev==='loopClosed') acc.loopClosed=true;
+    else if(p.ev==='takeDone') acc.takeDone=true;   // S3.3: «взятое стало дорожкой» (явная остановка записи) вместо прежнего заворота петли
     else if(p.ev==='overdubStop') acc.overdubbed=true;
     else if(p.ev==='undo') acc.undone=true;
     if(p.ev==='jam') acc.jammed=true; }

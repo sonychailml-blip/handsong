@@ -7,8 +7,8 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
-import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel,
-         laneMuted, laneSoloed, laneSoloOn } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага
+import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
+         laneMuted, laneSoloed, laneSoloOn } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -463,7 +463,19 @@ function laneTog(x,ry,rowH,lbl,on,col){
 function drawLooper(){
   if(!loop.on && !events.length){ syncLoopTransport(false,0); loopView=null; return; }   // нет петли — полоса прячется (и попадать не во что)
   const W=canvas.width, info=loopPos();
-  const bars=loop.bars, total=bars*loop.metre;   // переменный размер; бегунок ниже делит на info.total (тот же loopBeats) → сетка и бегунок заперты вместе
+  /* ⛳ ЛИНЕЙНЫЙ ТАЙМЛАЙН (S3.3). Раньше полоса показывала ОДИН круг петли: total = такты×размер, и
+     всё — сетка, метки, бегунок — делилось на эту фиксированную длину.
+     Теперь показываем ВСЮ ПЕСНЮ ЦЕЛИКОМ: выбранное отображение — «вписать всё» (fit), без прокрутки и
+     зума. Это честный минимум для слайса: масштаб ОДИН, управлять им нечем, и он не врёт — видно
+     ровно столько, сколько записано.
+     ⚠️ Окно РАСТЁТ по мере записи, поэтому при длинной песне метки густеют. Прокрутка и зум придут с
+     таймлайном редактора; преобразование доля↔пиксель для них уже есть (S1, loopView/laneBeatX) и
+     менять его не придётся — поменяется только span и beat0.
+     span берём как максимум из трёх: длина песни, ТЕКУЩАЯ позиция (иначе во время записи бегунок
+     упёрся бы в правый край и встал) и длина ПОДЛОЖКИ (пустая песня — не нулевой отрезок, на нём
+     видно сетку тактов и куда ляжет 🎵). */
+  const posNow=info?info.pos:0;
+  const total=Math.max(songBeats(), posNow, loop.bars*loop.metre);
   const sw=Math.min(560,W-40), x0=(W-sw)/2;     // sw — ПОЛОСА ЦЕЛИКОМ (прежний bw): по ней считается коробка, и она не изменилась
   /* ⛳ МЕСТО ПОД ПЕРЕКЛЮЧАТЕЛИ ОТРЕЗАЕМ ОТ ЛИНЕЙКИ ВРЕМЕНИ, А НЕ ОТ КОРОБКИ, и слева его взять нельзя:
      на телефоне 380px коробка уже упирается в кромки (x0=20), а подпись слоя («L1») висит ЛЕВЕЕ неё.
@@ -488,11 +500,14 @@ function drawLooper(){
   ctx.beginPath(); ctx.roundRect(x0-10,y0,sw+20,boxH,11); ctx.fill(); ctx.stroke();
 
   // заголовок — режим
+  /* ⛳ ЗАГОЛОВОК ПЕРЕСОБРАН ПОД ЛИНЕЙНУЮ МОДЕЛЬ (S3.3): вместо «круг N тактов» — ДОРОЖКИ и ДЛИНА
+     ПЕСНИ в тактах (выводимая из материала). Ветки loop.first больше нет — запись всегда «дорожка N». */
+  const songBars=Math.max(1,Math.ceil(songBeats()/loop.metre));
   let head, hc;
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
-  else if(recording){ head=loop.first?t('looper.recFirst',{n:bars}):t('looper.overdub',{n:loop.layer+1}); hc='#e5484d'; }
-  else if(loop.on){ head=t('looper.playing',{bars, layers:ids.length}); hc='#57d9a3'; }
-  else { head=t('looper.paused',{bars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
+  else if(recording){ head=t('looper.overdub',{n:loop.layer+1}); hc='#e5484d'; }
+  else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:ids.length}); hc='#57d9a3'; }
+  else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
      Приписка к готовой строке, а не отдельный ключ на каждую фразу — состояний заголовка четыре. */
   if(laneSoloOn()) head += ' · ' + t('looper.soloOn');
@@ -502,7 +517,14 @@ function drawLooper(){
   /* ДРОБЛЕНИЕ ДОЛИ — тонкие короткие штрихи, и ТОЛЬКО когда сетка не шестнадцатая (loop.sub!==4):
      играющий должен ВИДЕТЬ ту сетку, к которой его квантуют (иначе триольная квантизация — сюрприз).
      При sub=4 (умолчание) не рисуем ничего → вид 4/4 байт-в-байт. Рисуем ДО долевых линий: те поверх. */
-  if(loop.sub!==4){
+  /* ⛳ ПЛОТНОСТЬ СЕТКИ ТЕПЕРЬ ПЕРЕМЕННАЯ (S3.3). В петле долей было 8–32, и рисовать их все было
+     даром. У песни на пять минут их СОТНИ: сплошная заливка вместо сетки и бессмысленная работа
+     каждый кадр. Поэтому мелкое рисуем, только пока оно РАЗЛИЧИМО: доли — от 6px между ними,
+     дробление доли — от 4px. Такты рисуем всегда (это скелет), но если и они гуще 3px — прореживаем
+     кратно, чтобы линии не слились в кашу. */
+  const pxPerBeat=bw/Math.max(1e-9,total);
+  const barStep=Math.max(1,Math.ceil(3/(pxPerBeat*loop.metre)));   // рисовать каждый barStep-й такт
+  if(loop.sub!==4 && pxPerBeat/loop.sub>=4){
     ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=0.8;
     const sy0=gy0+(gy1-gy0)*0.35;                  // короче долевых — читается как «мельче», не спорит с ними
     for(let b=0;b<total;b++) for(let k=1;k<loop.sub;k++){
@@ -511,40 +533,56 @@ function drawLooper(){
     }
   }
   // сетка долей и тактов
+  const showBeats=pxPerBeat>=6;
   for(let b=0;b<=total;b++){
-    const gx=laneBeatX(loopView,b), bib=b%loop.metre, lvl=beatLevel(loop.metre,bib);   // видно 3+2+2, а не N одинаковых чёрточек; X — через ЕДИНОЕ преобразование, как метки и бегунок
+    const bib=b%loop.metre;
+    if(bib===0){ if((b/loop.metre)%barStep) continue; }        // прореживание тактов на длинной песне
+    else if(!showBeats) continue;                             // доли не различимы — не рисуем вовсе
+    const gx=laneBeatX(loopView,b), lvl=beatLevel(loop.metre,bib);   // видно 3+2+2, а не N одинаковых чёрточек; X — через ЕДИНОЕ преобразование, как метки и бегунок
     let sc,lw;
-    if(bib===0){ sc='rgba(255,255,255,.34)'; lw=1.4; }        // начало такта — как было (4/4 байт-в-байт)
+    if(bib===0){ sc='rgba(255,255,255,.34)'; lw=1.4; }        // начало такта
     else if(lvl===1){ sc='rgba(255,255,255,.24)'; lw=1.1; }   // голова группы
     else if(lvl===-1){ sc='rgba(140,180,255,.20)'; lw=1.0; }  // khali — холодный тусклый штрих («пустая» голова)
-    else { sc='rgba(255,255,255,.11)'; lw=0.8; }              // обычная доля — как было
+    else { sc='rgba(255,255,255,.11)'; lw=0.8; }              // обычная доля
     ctx.strokeStyle=sc; ctx.lineWidth=lw;
     ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
   }
-  // строки слоёв + метки событий + переключатели дорожки
+  // строки слоёв + переключатели дорожки
   const soloOn=laneSoloOn();
+  const rowOf=new Map();                                 // номер слоя → индекс строки (для ОДНОГО прохода по событиям, см. ниже)
   rows.forEach((lid,ri)=>{
+    rowOf.set(lid,ri);
     const ry=gy0+ri*rowH, mid=ry+rowH/2, live=recording&&lid===loop.layer;
     const muted=laneMuted(lid), soloed=laneSoloed(lid);
     /* ПРИГЛУШАЕМ ПО СЛЫШИМОСТИ, А НЕ ПО ГАЛОЧКЕ MUTE: при включённом соло молчат ВСЕ, кроме соло-дорожек,
        и это ровно то, что человек должен видеть. Показывай мы только mute — «включил соло на одной»
        выглядело бы как «ничего не изменилось», хотя замолчало почти всё. Тот же предикат, что и в звуке. */
     const off = soloOn ? !soloed : muted;
-    ctx.globalAlpha = off ? LANE_OFF_A : 1;              // одна альфа на ВСЮ строку: фон, подпись и метки гаснут вместе
+    ctx.globalAlpha = off ? LANE_OFF_A : 1;              // одна альфа на ВСЮ строку: фон и подпись гаснут вместе
     ctx.fillStyle=live?'rgba(229,72,77,.16)':'rgba(255,255,255,.04)';
     ctx.fillRect(x0,ry+1,bw,rowH-2);
     ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='10px system-ui'; ctx.textAlign='right';
     ctx.fillText('L'+(lid+1),x0-4,mid);
-    for(const e of events){ if(e.layer!==lid) continue;
-      if(e.fn==='leadOff'||e.fn==='chOff') continue;
-      const ex=laneBeatX(loopView,e.t), ch=e.fn[0]==='c';   // ⛳ через ЕДИНОЕ преобразование — то же, по которому идёт попадание
-      ctx.fillStyle=ch?'#b18cff':'#ff9e2c';
-      ctx.beginPath(); ctx.roundRect(ex-1.5,ry+3,3.5,rowH-6,1.5); ctx.fill();
-    }
     ctx.globalAlpha=1;                                   // кнопки рисуем В ПОЛНУЮ СИЛУ: это орган управления, он обязан читаться и на погашенной строке
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);
   });
+  /* ⛳ МЕТКИ СОБЫТИЙ — ОДНИМ ПРОХОДОМ ПО ВСЕМ СОБЫТИЯМ, а не проходом НА КАЖДУЮ СТРОКУ (S3.3).
+     Было O(дорожек × событий) НА КАДР: на петле с тремя строками и парой сотен событий незаметно, на
+     песне в несколько минут с двумя десятками дорожек — десятки миллионов чтений в секунду, и полоса
+     съедала бы кадр, ради которого весь S3.2 и делался. Стало O(событий): строку находим по карте.
+     Альфу дорожки применяем поштучно — строки рисуются раньше, общий globalAlpha уже снят. */
+  const laneAlpha=new Map();
+  for(const lid of rows) laneAlpha.set(lid, (soloOn ? !laneSoloed(lid) : laneMuted(lid)) ? LANE_OFF_A : 1);
+  for(const e of events){
+    if(e.fn==='leadOff'||e.fn==='chOff') continue;
+    const ri=rowOf.get(e.layer); if(ri===undefined) continue;
+    const ex=laneBeatX(loopView,e.t), ry=gy0+ri*rowH;    // ⛳ через ЕДИНОЕ преобразование — то же, по которому идёт попадание
+    ctx.globalAlpha=laneAlpha.get(e.layer);
+    ctx.fillStyle=e.fn[0]==='c'?'#b18cff':'#ff9e2c';
+    ctx.beginPath(); ctx.roundRect(ex-1.5,ry+3,3.5,rowH-6,1.5); ctx.fill();
+  }
+  ctx.globalAlpha=1;
   // бегунок позиции
   if(info&&info.phase==='play'){
     /* ⛳ Тоже через ЕДИНОЕ преобразование. Прежде здесь стояло деление на info.total, а сетка делила на

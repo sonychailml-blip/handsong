@@ -192,8 +192,10 @@ let latchLen=0;   // сколько нот звучит у 'latch': по нем�
    молчат. Здесь только логика; кнопки транспорта в UI работают как прежде (это ЕЩЁ один вход). */
 function looperMsgSet(text,ok){ setLooperMsg({text, until:performance.now()+LOOPER_MSG_MS, ok}); }
 function doLooper(cmd){
-  if(cmd==='rec'){                                        // всегда возможно: пусто→запись, играет→наложение, пишет→стоп
-    onRec(); looperMsgSet(recording ? t(loop.first?'msg.recording':'msg.overdub') : t('msg.recStop'), true);
+  if(cmd==='rec'){                                        // всегда возможно: не пишет→новая дорожка, пишет→стоп
+    /* ⛳ S3.3: развилка «первый круг / наложение» исчезла вместе с loop.first — в линейном рекордере ●
+       всегда начинает НОВУЮ ДОРОЖКУ, и различать нечего. Номер дорожки показывает полоса лупера. */
+    onRec(); looperMsgSet(t(recording ? 'msg.recording' : 'msg.recStop'), true);
   }else if(cmd==='play'){
     if(!loop.on && !events.length){ looperMsgSet(t('msg.noLoop'), false); return; }   // нечего играть
     onLoop(); looperMsgSet(t(loop.on?'msg.play':'msg.pause'), true);

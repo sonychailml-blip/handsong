@@ -127,6 +127,8 @@ function refreshProgAvail(){                  // прогрессии — тол
    времена всех событий — как длина). Плюс фильтруем ритмы: доступны лишь ГОДНЫЕ паттерны (свой размер +
    сошедшаяся сетка) — годность считает rhythmFits в arrange.js, ЕДИНЫМ выражением для всех мест
    (этот фильтр, подгон джема, цикл «только ударные», сама генерация); раньше копий было три. */
+/* ⚠️ S3.3: блокируется ТОЛЬКО размер. Контрол тактов больше не «длина петли», а ДЛИНА ПОДЛОЖКИ
+   (см. setLoopBars) — он ничего записанного не переосмысляет и доступен всегда. */
 function refreshMetreCtl(){
   loopMetre.value = loop.metre;
   loopMetre.disabled = !!(events.length || loop.on);
@@ -144,13 +146,14 @@ hooks.drumKit   = v  => selDrumKit.value = v;
    а не текстом. Подробности («круг N т.» / «слой K») и так пишет холстовая полоса
    лупера (drawLooper); текст в кнопке был бы вторым, худшим экземпляром той же
    информации. Смысл иконки раскрывает подсказка (title) — по наведению/долгому тапу. */
+/* ⛳ S3.3: ветка «первый круг» УБРАНА вместе с loop.first — в линейном рекордере ● всегда начинает
+   НОВУЮ ДОРОЖКУ, различать нечего. Класс 'first' больше не ставится (CSS-правило для него, если оно
+   есть, просто перестаёт срабатывать — удалять его отдельно не требуется). */
 function updRecBtn(){
   recBtn.classList.toggle('on', recording);                     // идёт запись (любая)
-  recBtn.classList.toggle('first', recording && loop.first);    // первый круг ≠ наложение
-  recBtn.classList.toggle('armed', !recording && loop.on);      // петля играет: тап добавит слой
+  recBtn.classList.toggle('armed', !recording && loop.on);      // песня играет: тап добавит дорожку
   recBtn.title = recording
-    ? (loop.first ? t('rec.title.recFirst')
-                  : t('rec.title.overdub',{n:loop.layer+1}))
+    ? t('rec.title.overdub',{n:loop.layer+1})
     : (loop.on ? t('rec.title.armed')
                : t('rec.title.idle'));
   loopBarsV.textContent = loop.bars;
