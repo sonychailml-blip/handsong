@@ -87,12 +87,13 @@ const TUNINGS_STEPS=[
    → УДЕРЖАНИЕ → ТЕРМЕНВОКС (не клавиатура!) → ВЫРАЗИТЕЛЬНОСТЬ (звук дышит) → рука-ЛУПЕР (одна фраза вперёд,
    к уроку «Лупер») → финал. Функции соло берутся с role==='ld'; гейтов нет. */
 /* ШАГИ УРОКА «Лупер» — фича, что превращает игрушку в инструмент для целых пьес. Ведём в порядке реальной
-   работы: записать круг → наложить слой → отмена → джем → темп/длина (правило пустой петли) → рука-лупер
+   работы: записать дорожку → наложить вторую другой ролью → отмена взятого → джем → темп/размер (правило
+   пустой песни) → рука-лупер
    (одна фраза вперёд) → финал. События (ЗАЦЕПКА ОБУЧЕНИЯ в recorder.js — ловят И кнопки, И руку-лупер, т.к.
    обе идут через onRec/onUndo/loadJam): 'loop' {ev:'recStart'|'takeDone'|'overdubStart'|'overdubStop'|
    'undo'|'jam'}; 'panel' {which:'loop'} (открыта панель лупера); 'note' — как в «Основах». Чистый старт даёт
    tutorReset (clearRec). Кнопки ●/🎵/⚙ — в ВЕРХНЕМ баре (reveal:true), ⤺ отмена — в нижней полосе транспорта
-   (видна при играющей петле). */
+   (видна, пока идёт транспорт или в песне есть события). */
 const LOOPER_STEPS=[
   /* ⛳ ШАГ ПЕРЕНАПРАВЛЕН В СЛАЙСЕ S3.3 (правило #24). Ждал 'loopClosed' — событие ЗАВОРОТА петли;
      заворота больше нет, и шаг стал бы непроходимым, а урок — тупиком. Ждёт 'takeDone' — явную
@@ -107,10 +108,10 @@ const LOOPER_STEPS=[
      сбрасываются на старте овердаба — засчитываем игру ВО ВРЕМЯ слоя). */
   {key:'lpLayer',  reveal:true, enter:a=>{a.overdubbed=false; a.chordPlayed=false; a.bassPlayed=false;},
                    done:a=>(a.role==='ch'||a.role==='bs') && a.overdubbed && (a.chordPlayed||a.bassPlayed)},   // сменить роль (Аккорды/Бас) + ● слой + сыграть → две роли звучат вместе
-  {key:'lpUndo',   enter:a=>{a.undone=false;}, done:a=>a.undone},                                                          // ⤺ снять верхний слой
+  {key:'lpUndo',   enter:a=>{a.undone=false;}, done:a=>a.undone},                                                          // ⤺ отменить последнее взятое (здесь это вся дорожка, записанная на шаге lpLayer)
   {key:'lpJam',    reveal:true, enter:a=>{ tutorClearLoop(); a.jammed=false; a.noteFired=false; a.chordPlayed=false; a.bassPlayed=false; },
-                   done:a=>a.jammed && (a.noteFired||a.chordPlayed||a.bassPlayed)},   // enter чистит петлю → джем встаёт на пустую (любой размер/лад); 🎵 + игра поверх В ЛЮБОЙ роли (после lpLayer роль ch/bs, не только соло)
-  {key:'lpTempo',  reveal:true, enter:a=>{a.loopPanelOpened=false;}, done:a=>a.loopPanelOpened},                           // ⚙ панель: темп/длина/размер; длину и размер меняют только на ПУСТОЙ петле
+                   done:a=>a.jammed && (a.noteFired||a.chordPlayed||a.bassPlayed)},   // enter чистит песню → джем встаёт на пустую (любой размер/лад); 🎵 + игра поверх В ЛЮБОЙ роли (после lpLayer роль ch/bs, не только соло)
+  {key:'lpTempo',  reveal:true, enter:a=>{a.loopPanelOpened=false;}, done:a=>a.loopPanelOpened},                           // ⚙ панель: темп/длина подложки/размер; размер меняют только на ПУСТОЙ песне (длину подложки — когда угодно)
   {key:'lpHand'},                                                                                                          // рука-лупер: одна фраза назад к «Функциям рук» (действия нет)
   {key:'lpFinal',  final:true},
 ];

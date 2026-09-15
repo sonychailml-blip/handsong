@@ -92,7 +92,7 @@
   <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)">🎙</button>
   <button id="jamBtn" title="Подложка: джем целиком или только ударные — тап откроет выбор">🎵 Подложка</button>
   <button id="loopPanelBtn" data-i18n="bar.loop" data-i18n-title="bar.loopTitle" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
-  <button id="recBtn" title="Запись: тап — отсчёт такта, затем круг">●</button>
+  <button id="recBtn" title="Запись: тап — отсчёт такта, затем игра">●</button>
 </div>
 
 <!-- Тост камеры: короткое сообщение при отказе переключения (нет второй камеры / нет доступа).
@@ -107,16 +107,17 @@
   <button id="backingDrums" data-i18n="backing.drums">🥁 Только ударные</button>
 </div>
 
-<!-- Транспорт лупера: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера
-     (drawLooper). Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что
-     высота холстовой коробки растёт со слоями. Видна только когда есть петля. -->
+<!-- Транспорт: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера (drawLooper).
+     Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что высота холстовой коробки
+     растёт с числом дорожек. Видна, пока идёт транспорт или в песне есть события. -->
 <div id="loopTransport">
   <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Играть / пауза">▶ играть</button>
-  <!-- ⟳ ОБЛАСТЬ ПОВТОРА (S3.4): помечает всю песню и гоняет её по кругу. Подобласть («от такта до
-       такта») придёт с таймлайном редактора, где её будет видно и можно будет тащить. -->
+  <!-- ⟳ ПОВТОР СКОБЫ (S3.5b): только ВКЛЮЧАЕТ и ВЫКЛЮЧАЕТ повтор. Какие такты повторяются, задаёт СКОБА на
+       полосе лупера — её края ставят тапом или перетаскиванием, с точностью до такта; её же начало — место,
+       откуда начинается запись. Кнопка границ не переопределяет. -->
   <button id="rgnBtn" data-i18n-title="transport.regionTitle" title="Повторять такты под скобой">⟳</button>
-  <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Убрать последний слой">⤺</button>
-  <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить петлю">✕</button>
+  <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Отменить последний дубль">⤺</button>
+  <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить всю песню">✕</button>
   <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
 </div>
  
@@ -232,8 +233,8 @@
 <!-- ================= ЛУПЕР: время и слои (оверлей на месте «Звукоряда») ================= -->
 <div id="panelLoop">
     <div class="phead"><b data-i18n="panel.loop.head">Лупер</b><button id="panelCloseLoop" data-i18n="panel.collapse">Свернуть ✕</button></div>
-    <div class="psep" data-i18n="panel.loop.sepLoop">Петля (лупер)</div>
-    <div class="prow"><label data-i18n="panel.loop.length">Длина (такты)</label>
+    <div class="psep" data-i18n="panel.loop.sepLoop">Песня</div>
+    <div class="prow"><label data-i18n="panel.loop.length">Длина подложки (такты)</label>
       <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
     </div>
     <div class="prow"><label data-i18n="panel.loop.metre">Размер (долей)</label>
@@ -251,13 +252,13 @@
     <div class="prow"><label data-i18n="panel.loop.sub">Дробление доли</label>
       <div class="seg"><button id="sub4" class="act" data-i18n="panel.loop.sub4">4 · 16-е</button><button id="sub3" data-i18n="panel.loop.sub3">3 · триоли</button></div>
     </div>
-    <p class="phint" data-i18n="panel.loop.hint">Длину и размер меняют только на пустой петле.</p>
+    <p class="phint" data-i18n="panel.loop.hint">Размер меняют только на пустой песне. Длина подложки и дробление доли меняются когда угодно — они влияют лишь на следующую подложку и на сетку квантизации живых ударов.</p>
 
-    <div class="psep" data-i18n="panel.loop.sepArr">Аранжировка (слои)</div>
+    <div class="psep" data-i18n="panel.loop.sepArr">Аранжировка (дорожки)</div>
     <div class="prow"><label data-i18n="panel.loop.harmony">Гармония</label><select id="selProg"></select></div>
     <div class="prow"><label data-i18n="panel.loop.rhythm">Ритм</label><select id="selRhythm"></select></div>
     <div class="prow"><label data-i18n="panel.loop.bassMode">Бас-партия</label><select id="selBassMode"></select></div>
-    <div class="prow"><label></label><button id="addArrBtn" data-i18n="panel.loop.addLayers">＋ Добавить слои</button></div>
+    <div class="prow"><label></label><button id="addArrBtn" data-i18n="panel.loop.addLayers">＋ Добавить дорожки</button></div>
 </div>
  
 <!-- ================= МИНИ-УЧЕБНИК ================= -->

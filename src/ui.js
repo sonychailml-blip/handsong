@@ -1350,7 +1350,7 @@ function applyBacking(){
   jamBtn.title = on ? t(drums?'backing.title.drums':'backing.title.jam',{name:nm, i:backingStep, n})
                     : t('backing.title.off');
 }
-/* Подгоняем ритм варианта под ТЕКУЩИЙ размер петли: негодный паттерн buildArrangement всё равно
+/* Подгоняем ритм варианта под ТЕКУЩИЙ размер песни: негодный паттерн buildArrangement всё равно
    пропустит (джем остался бы без ударных) → берём первый ГОДНЫЙ, иначе без ударных (-1). На 4/4 ничего
    не меняется (ритмы джема уже beats:4) — байт-в-байт. */
 function fitRhythm(sel){
@@ -1362,7 +1362,7 @@ function backingTo(step, vars){
   clearJam();                                     // снять ПРОШЛЫЕ слои подложки (записи игрока целы — они без метки jam)
   if(step>0){
     const sel=fitRhythm(vars[step-1]);            // подписываем ФАКТИЧЕСКИ поставленное: fitRhythm мог подменить паттерн под размер
-    if(!loadJam(sel)){                            // не встало (петля игрока другой длины) — честно сообщаем, цикл → выкл
+    if(!loadJam(sel)){                            // не встало: loadArrangement вернул false (нет AudioContext или сборка не дала ни одного слоя; проверки длины с S3.3 нет) — честно сообщаем, цикл → выкл
       showCamMsg(t('jam.sizeMismatch')); backingStep=0; backingSel=null; applyBacking(); return;
     }
     backingSel=sel;
