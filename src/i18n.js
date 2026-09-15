@@ -111,6 +111,7 @@ export const DICTS = {
        'rec.title.recFirst' УДАЛЁН вместе с веткой первого круга (loop.first). */
     'rec.title.overdub':'Recording track {n} — tap to stop',
     'rec.title.armed':'Playing — tap to record a new track',
+    'rec.title.into':'Tap to record into track {n}',   // S3.5c: дорожка вооружена
     'rec.title.idle':'Record: tap for a one-bar count-in, then play',
     // транспорт лупера
     'transport.loopPlay':'▶ play',
@@ -210,6 +211,8 @@ export const DICTS = {
     'looper.laneMute':'M',
     'looper.laneSolo':'S',
     'looper.soloOn':'SOLO',
+    'looper.armed':'REC → L{n}',                    // S3.5c: куда пойдёт ●
+    'looper.armedSilent':'REC → L{n} (not heard)',  // …в дорожку, которую сейчас не слышно (mute / чужое соло)
     // холст: подсказка «нет аккордов» (макам) — держим строки короткими под ширину поля
     'nochords.title':'NO CHORDS',
     'nochords.l1':'Chords aren’t built in a maqam.',
@@ -456,6 +459,7 @@ export const DICTS = {
     'jam.sizeMismatch':'Подложка: петля другой длины — очистите её (✕)',
     'rec.title.overdub':'Пишется дорожка {n} — тап остановит',
     'rec.title.armed':'Играет — тап начнёт новую дорожку',
+    'rec.title.into':'Тап — запись в дорожку {n}',
     'rec.title.idle':'Запись: тап — отсчёт такта, затем игра',
     'transport.loopPlay':'▶ играть',
     'transport.loopPause':'❚❚ пауза',
@@ -544,6 +548,8 @@ export const DICTS = {
     'looper.laneMute':'М',    // «Молча» — кириллическая М; одна буква, как в en
     'looper.laneSolo':'С',    // «Соло»
     'looper.soloOn':'СОЛО',
+    'looper.armed':'ЗАПИСЬ → L{n}',
+    'looper.armedSilent':'ЗАПИСЬ → L{n} (не слышно)',
     'nochords.title':'АККОРДОВ НЕТ',
     'nochords.l1':'В макаме аккорды не строятся.',
     'nochords.l2':'Дрон — в лупере; аккорды запишите',

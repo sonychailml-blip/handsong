@@ -70,6 +70,13 @@ const vSlots=new Map();      // ключ владельца → номер од�
 let vBase=0;                 // первый номер v, свободный от УЖЕ ЛЕЖАЩИХ в целевом слое нот (S3.5a) — ставит onRec на старте взятого, см. layerSlotTop; ПОДНИМАЕТСЯ на каждом шве прохода (S3.5a-fix, см. recFoldRoll)
 let vTop=0;                  // первый номер ВЫШЕ всех, что выданы за это взятое (S3.5a-fix): до него поднимается vBase на шве
 let recLastT=-Infinity;      // последняя ПЕСЕННАЯ доля, которую видел путь записи соло (S3.5a-fix): время пошло НАЗАД относительно неё → был шов прохода
+let takeK=0;                 // суффикс владельца аккорда/баса для ЭТОГО взятого (S3.5c, см. chOwnerKey); 0 — без суффикса
+/* ⛳ СОБЫТИЯ ЭТОГО ВЗЯТОГО (S3.5c). Переигровка пропускала ВЕСЬ пишущийся слой («его слышно живьём»).
+   Пока слой был всегда новым, это было одно и то же. При записи В СУЩЕСТВУЮЩУЮ дорожку — нет: её старый
+   материал замолчал бы на всё время записи, и дописывать пришлось бы вслепую. Пропускаем теперь ровно то,
+   что звучит живьём, — события этого взятого. WeakSet: в событие ничего не пишем (формат цел), а память
+   уходит сама. Для взятого в новую дорожку множество = весь слой, то есть ровно прежнее поведение. */
+let takeEv=new WeakSet();
 let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГИСТР аккорда, что играет петля сейчас (для подсветки, §Q5). Регистр нужен с многопериодной сеткой: одна ступень живёт в нескольких прямоугольниках, без него подсветка всегда падала бы в нижний
 /* ⛳ ДЛИНА ПЕСНИ — ВЫВОДИМАЯ, а не заданная: это позиция последнего события. Раньше длину задавал
    человек (loop.bars, 1..8), потому что от неё зависел заворот; заворота нет, и задавать нечего —
@@ -240,6 +247,12 @@ const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
    НАСТРОЙКИ, связывает их одна таблица laneId.
    ⛔ Не сливать их и ⛔ не писать id в событие: формат события слайс S1 НЕ трогает вовсе. */
 let laneSeq=0;
+/* ⛳ ВООРУЖЁННАЯ ДОРОЖКА (слайс S3.5c) — id ДОРОЖКИ или null, а НЕ номер слоя. Номер переиспользуется
+   (отмена освобождает его, следующая запись берёт тот же), и вооружение по номеру молча перешло бы на
+   РОДИВШУЮСЯ на его месте чужую дорожку. id монотонен и не выдаётся дважды, поэтому устаревший id может
+   только «никуда не указывать» — и все места, где id умирает (laneNew поверх, lanePrune, laneReset),
+   снимают вооружение явно. null — ● создаёт новую дорожку, как всегда. */
+let armLane=null;
 const laneId=new Map();      // номер слоя → СТАБИЛЬНЫЙ id дорожки
 const laneMute=new Set();    // id заглушённых дорожек
 const laneSolo=new Set();    // id дорожек в соло
@@ -256,7 +269,7 @@ const laneSolo=new Set();    // id дорожек в соло
    звать laneNew; список мест — в отчёте слайса и в комментариях у самих мест. */
 function laneNew(layer){
   const old=laneId.get(layer);
-  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); }   // ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ: без этой строки старый id просто мёртвым грузом лежал бы в множестве и ни на что не влиял — но множества росли бы всю сессию
+  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); if(armLane===old) armLane=null; }   // ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ: без этой строки старый id просто мёртвым грузом лежал бы в множестве и ни на что не влиял — но множества росли бы всю сессию. Вооружение (S3.5c) — снимаем: его дорожки больше нет
   laneId.set(layer,++laneSeq);
   return laneSeq;
 }
@@ -274,12 +287,24 @@ const laneOf=layer=>laneId.get(layer);
 function lanePrune(){
   const live=new Set(); for(const e of events) live.add(e.layer);
   for(const [ly,id] of laneId) if(!live.has(ly) && !(recording&&ly===loop.layer)){
-    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); }
+    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); if(armLane===id) armLane=null; }   // S3.5c: снятая дорожка (⤺, снятие подложки) снимает и вооружение — ● дальше создаст новую, а не пишет в пустоту
 }
 /* ⚠️ laneSeq НАМЕРЕННО НЕ ОБНУЛЯЕТСЯ: счётчик монотонен на всю сессию. Обнуление вернуло бы в оборот
    уже выданные номера id — а это ровно тот вид совпадения, от которого id и заводился. Стоит он
    ничего (целое число), а класс ошибок закрывает целиком. */
-function laneReset(){ laneId.clear(); laneMute.clear(); laneSolo.clear(); }
+function laneReset(){ laneId.clear(); laneMute.clear(); laneSolo.clear(); armLane=null; }
+/* Слой вооружённой дорожки или null. ЧИСТОЕ чтение (его зовёт draw каждый кадр): обход таблицы дорожек —
+   O(дорожек), не событий. id, не найденный в таблице, читается как «не вооружено». */
+function laneLayerOf(id){ if(id==null) return null; for(const [ly,i] of laneId) if(i===id) return ly; return null; }
+const armedLayer=()=>laneLayerOf(armLane);
+/* Тап по строке дорожки вне гнёзд M/S: вооружить её / снять вооружение повторным тапом.
+   ⛔ ВО ВРЕМЯ ЗАПИСИ НЕ МЕНЯЕТСЯ: пишущаяся дорожка уже выбрана, и метка «вооружена» на ДРУГОЙ строке в
+   это время врала бы, куда идёт запись. `?? laneNew` — та же самопочинка, что у toggleLaneMute. */
+function toggleArm(layer){
+  if(recording) return;
+  const id=laneOf(layer) ?? laneNew(layer);
+  armLane = armLane===id ? null : id;
+}
 /* ⛳ ПРЕДИКАТ СЛЫШИМОСТИ — ОДИН НА ОБА ПУТИ ПЕРЕИГРОВКИ (scheduleLayers и fireNear).
    СОЛО ПЕРЕБИВАЕТ ЗАГЛУШЕНИЕ: как только соло включено хоть где-то, слышны РОВНО соло-дорожки, а
    остальные молчат независимо от своих галочек mute (и возвращаются как были, когда соло снимут). */
@@ -362,8 +387,16 @@ function loopPos(){
    сами страхуют ступень вне лада (модуло+октава), так что частота не улетает в NaN.
    Владелец голосов ПО СЛОЮ (ctx=событие переигровки): аккорд — 'loop:'+layer / живой
    'latch'; бас — 'bassloop:'+layer / живой 'bass'. Так слой не крадёт голос у живого. */
-const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer:'latch';
-const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer:'bass';
+/* ⛳ СУФФИКС ВЗЯТОГО (a.k, слайс S3.5c). У аккорда и баса ОДИН владелец на слой — «последний побеждает»
+   было их задуманным поведением, пока каждое взятое рождало НОВЫЙ слой. Запись В СУЩЕСТВУЮЩУЮ дорожку
+   это ломает: аккорды нового взятого и старые аккорды той же дорожки легли бы на ОДИН владелец, и на
+   переигровке chOn нового гасил бы старый, а chOff старого — новый. «Слияние» на деле стало бы заменой.
+   Поэтому взятое, влитое в дорожку, где уже есть аккорды/бас, получает свой k ≥ 1, и его владелец —
+   'loop:N:k'. Событие без k — это k=0, ключ БЕЗ суффикса: старые записи и каждое взятое в новую дорожку
+   дают те же ключи, что и раньше. Обходы по префиксу (releaseLoopLayersAt: хвост 'N' или 'N:…') суффикс
+   уже понимают — так устроены ключи соло 'leadloop:N:v'. */
+const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer+(ctx.a&&ctx.a.k?':'+ctx.a.k:''):'latch';
+const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer+(ctx.a&&ctx.a.k?':'+ctx.a.k:''):'bass';
 /* Ключ владельца СОЛО-голоса на ПЕРЕИГРОВКЕ: слой + номер одновременной ноты (a.v). Живой ключ
    ('lead:L'/'lead:R') строит gestures и передаёт явным аргументом — в событие он НЕ попадает (это
    состояние руки, а не намерение). a.v||0 — вот та самая совместимость: событие без v = нота №0. */
@@ -466,7 +499,8 @@ function push(fn,a,at){
      ЗАПИСАННАЯ КАРТА С ЭТОГО МОМЕНТА НЕИЗМЕНЯЕМА: её больше никто не трогает, только читает. */
   const ev={t,layer:loop.layer,fn,a,sc:CUR(),sev:seventh};   // §3.4: замораживаем ладовый контекст события
   if(a && a.fx) ev.a={...a, fx:{...a.fx}};
-  events.push(ev);
+  if(takeK && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:takeK};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
+  events.push(ev); takeEv.add(ev);
   if(t>songLen){ songLen=t; braceFollowGrow(); }      // длина песни растёт по одному событию (полный пересчёт — только в schedInvalidate); «следующая» скоба — вместе с ней, O(1)
 }
 /* АБСОЛЮТНАЯ доля СЕЙЧАС (тот же счёт, что и push) — для dt точек бенда.
@@ -509,6 +543,14 @@ function layerSlotTop(layer){
   let top=0;
   for(const e of events) if(e.layer===layer && e.fn.slice(0,4)==='lead'){ const v=(e.a&&e.a.v)||0; if(v+1>top) top=v+1; }
   return top;
+}
+/* S3.5c: суффикс взятого для аккорда/баса — выше всех k, уже лежащих в слое у аккордов/баса; 0, если их там
+   нет вовсе (тогда и сталкиваться не с чем, и ключи остаются прежними). Тот же довод о цене, что выше:
+   один обход на нажатие ●. */
+function layerTakeTop(layer){
+  let top=-1;
+  for(const e of events) if(e.layer===layer && (e.fn[0]==='c'||e.fn[0]==='b')){ const k=(e.a&&e.a.k)||0; if(k>top) top=k; }
+  return top+1;
 }
 /* live!=null ⟺ соло-рука назначена на ТЕРМЕНВОКС (функция руки 'therm' — gestures шлёт S.hz только
    оттуда). Тогда высоту несёт БЕНД: deg/oct ЗАМОРОЖЕНЫ на атаке (не сравниваем и не обновляем — у c
@@ -791,7 +833,7 @@ function scheduleLayers(){
     for(; i<cursN && events[i].t<hi; i++){
       const ev=events[i];
       if(!isLayer(ev.fn)) continue;
-      if(recording&&ev.layer===loop.layer) continue;
+      if(recording&&takeEv.has(ev)) continue;               // S3.5c: пропускаем то, что звучит ЖИВЬЁМ (события этого взятого), а не весь слой — старый материал вооружённой дорожки должен звучать
       if(gated&&!laneAudible(ev.layer)) continue;           // дорожка заглушена (или молчит из-за чужого соло) — просто НЕ ПЛАНИРУЕМ её события; сами события НЕ трогаем
       if(ev.t>=lo){
         const when=loop.t0+(ev.t+off)*spb;                  // ТОЧНОЕ время: песенная доля события + сдвиг прохода
@@ -886,13 +928,13 @@ function chaseFor(x){
   if(x<=1e-9) return list;                                   // вход с начала песни — догонять нечего, и обход не делаем вовсе
   if(cursN>events.length) cursN=events.length;               // та же страховка, что в cursSeek
   const lb=cursLowerBound(x), st=new Map();
-  for(let i=0;i<lb;i++){ const ev=events[i], role=chaseRole(ev.fn); if(!role) continue;
+  for(let i=0;i<lb;i++){ const ev=events[i], role=chaseRole(ev.fn); if(!role || (recording&&takeEv.has(ev))) continue;   // S3.5c: события взятого звучат живьём — не догоняем (тот же пропуск, что в переигровке)
     const k=chaseKey(role,ev), kind=chaseKind(ev.fn);
     if(kind==='n') st.set(k,{role,on:ev,set:null});
     else if(kind==='t'){ const s=st.get(k); if(s) s.set=ev; }
     else if(kind==='f') st.delete(k);
   }
-  for(let i=lb;i<cursN && events[i].t<=x+1e-9;i++){ const ev=events[i], role=chaseRole(ev.fn); if(!role) continue;
+  for(let i=lb;i<cursN && events[i].t<=x+1e-9;i++){ const ev=events[i], role=chaseRole(ev.fn); if(!role || (recording&&takeEv.has(ev))) continue;
     const kind=chaseKind(ev.fn); if(kind==='n'||kind==='f') st.delete(chaseKey(role,ev)); }   // своё вкл/выкл ровно на входе — проход сыграет сам
   for(const s of st.values()) list.push(s);
   return list;
@@ -905,7 +947,9 @@ function chasePlay(x,when,lead){
   for(const s of list){
     if((s.role==='ld')!==lead) continue;
     const ly=s.on.layer;
-    if(recording&&ly===loop.layer) continue;                  // пишущаяся дорожка звучит живьём — как в обоих циклах переигровки
+    /* S3.5c: пропуска «весь пишущийся слой» здесь БОЛЬШЕ НЕТ — он заглушил бы старые аккорды/бас вооружённой
+       дорожки на входе. Живое (события взятого) отсеяно ещё при построении (chaseFor), тем же правилом, что
+       в переигровке. */
     if(gated&&!laneAudible(ly)) continue;                     // заглушённая / молчащая из-за чужого соло — догнанной ноты у неё быть не должно
     const hold=!!(s.set&&s.set.a.hold);                       // терменвокс: ведение с hold несёт ЖИВУЮ ступень, а высоту — бенд от ступени АТАКИ
     const a={...s.on.a, ...(s.set?s.set.a:null)};
@@ -945,7 +989,7 @@ function fireNear(a,b){
   for(; i<cursN && events[i].t<=b; i++){
     const ev=events[i];
     if(isLayer(ev.fn)||ev.t<=a) continue;
-    if(recording&&ev.layer===loop.layer) continue;
+    if(recording&&takeEv.has(ev)) continue;                    // S3.5c: как в scheduleLayers — только события этого взятого
     if(gated&&!laneAudible(ev.layer)) continue;              // заглушённая / молчащая из-за чужого соло дорожка
     ENG[ev.fn](ev.a,ev);
   }
@@ -1087,14 +1131,22 @@ function onRec(){
      ⛳ МЕСТО РОЖДЕНИЯ ДОРОЖКИ (см. закон у laneNew): пустая песня → дорожка 0 и сброс настроек дорожек;
      иначе → maxLayer()+1. Номер МОГ УЖЕ ЖИТЬ (его освободила ⤺ отмена), поэтому laneNew обязателен. */
   const fresh=!events.length;
-  if(fresh){ laneReset(); loop.layer=0; } else loop.layer=maxLayer()+1;
-  laneNew(loop.layer);
+  /* ⛳ S3.5c: ВООРУЖЕНА живая дорожка → пишем В НЕЁ (слияние: её события остаются, новые дописываются рядом).
+     laneNew здесь НЕ зовём: он выдал бы свежий id — дорожка потеряла бы свои mute/solo и само вооружение.
+     Не вооружена (или id больше никуда не указывает) → новая дорожка, байт-в-байт как раньше. */
+  const armLy= fresh ? null : armedLayer();
+  if(armLy!=null) loop.layer=armLy;
+  else {
+    if(fresh){ laneReset(); loop.layer=0; } else loop.layer=maxLayer()+1;
+    laneNew(loop.layer);
+  }
   /* ⛳ S3.5a: номера соло-нот этого взятого — ВЫШЕ уже лежащих в целевом слое (см. freeSlot). СТРОГО ДО
      setRecording(true): push пишет только при recording, значит ни одна нота не успеет взять старую базу.
      Сегодня слой здесь всегда свежий → vBase=0. Сброс в recLeadReset НЕ нужен и был бы ОШИБКОЙ: база —
      свойство взятого (что лежало в слое ДО него), а не открытых нот; паника/граница повтора посреди
      взятого не меняют того, что лежало раньше. */
   vBase=layerSlotTop(loop.layer);
+  takeK=layerTakeTop(loop.layer); takeEv=new WeakSet();   // S3.5c: суффикс аккорда/баса взятого и множество его событий — оба заново на каждое взятое
   vTop=vBase; recLastT=-Infinity;          // S3.5a-fix: взятое начинается без выданных номеров и без виденного времени — первый шов распознаётся по первому возврату времени
   setRecording(true); schedInvalidate();   // массив ещё не менялся, но с этого мига push начнёт дописывать ХВОСТ — фиксируем границу cursN здесь, а не «когда-нибудь»
   /* Транспорт стоял → поднимаем его С ОТСЧЁТОМ, от НАЧАЛА СКОБЫ (S3.5b). Нетронутая скоба начинается с 0 —
@@ -1236,11 +1288,26 @@ function clearRec(){
   hooks.loop && hooks.loop(false);
 }
 /* ⚠️ panic НАМЕРЕННО НЕ ТРОГАЕТ настройки дорожек: события переживают панику, значит переживают и
-   дорожки. «■» — это «замолчи сейчас», а не «забудь, что я намикшировал». */
+   дорожки. «■» — это «замолчи сейчас», а не «забудь, что я намикшировал».
+   ⛳ ТРИ ОСТАНОВКИ — ОДНО ПРАВИЛО (S3.5c):
+     ⏸ ПАУЗА  — ДЕРЖИТ позицию (onLoop): в этом весь её смысл.
+     ■ ПАНИКА — СБРАСЫВАЕТ: всё глушит, бегунок — на НАЧАЛО СКОБЫ; следующий ▶ играет материал скобы с начала.
+                Песню, скобу, mute/solo и вооружение — сохраняет: она глушит и перематывает, а не забывает.
+     ✕ ОЧИСТКА — всё в ноль, скоба включительно (clearRec).
+   Раньше паника позицию не трогала — ▶ продолжал с места, где её нажали, то есть вела себя как пауза.
+   ⛔ ПАНИКА НЕ ПИШЕТ СОБЫТИЙ, НИКОГДА: открытые ноты взятого остаются без выключений (см. отчёт слайса).
+   ⚠️ СОРТИРОВКА — НЕ ЗАПИСЬ, но она обязательна при записи: schedInvalidate объявляет весь массив
+   отсортированным префиксом, а дописанный хвост взятого не отсортирован. Прежде паника во время записи
+   этого не делала — курсоры потом бинарным поиском шли по несортированному и теряли события.
+   КУРСОРЫ и КЭШ ДОГОНЯЛКИ производны от точки входа — их сбрасывает schedInvalidate здесь, а следующий
+   запуск (startTransport с доли начала скобы) ставит их заново и догоняет аккорды/бас оттуда. */
 function panic(){
+  if(recording) events.sort((x,y)=>x.t-y.t);
   clearPump(); loop.on=false; schedInvalidate();   // события целы, но транспорт остановлен — возобновят его с новой базой
   softAllOff(); droneOff();
-  setRecording(false); hooks.loop && hooks.loop(false);
+  setRecording(false);
+  loop.pos=loop.rgn.from;                          // S3.5c: на начало скобы (rgn уже приведён к материалу schedInvalidate выше); onLoop стартует ровно отсюда
+  hooks.loop && hooks.loop(false);
 }
 
 /* Экспорт: `recording` через export-клаузу — живая связка (её читает draw). */
@@ -1251,6 +1318,6 @@ export {
   songBeats, seekTo,   // S3.3: длина песни в долях (её читает полоса лупера, чтобы вписать таймлайн) и перемотка (пока по ней ездит только «пуск с конца → с начала»)
   setRegionOn, regionOn, cycling, braceTap, braceMove,   // S3.5b: ⟳ только вкл/выкл повтора; скобу двигает тап/перетаскивание (ui), границы и user draw читает из loop.rgn
   loadArrangement, loadJam, clearJam, loopChordDeg, loopChordOct,
-  toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
+  toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, toggleArm, armedLayer,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

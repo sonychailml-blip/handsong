@@ -8,7 +8,7 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
 import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
-         laneMuted, laneSoloed, laneSoloOn, cycling } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         laneMuted, laneSoloed, laneSoloOn, cycling, armedLayer } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -530,6 +530,7 @@ function drawLooper(){
   /* ⛳ ЗАГОЛОВОК ПЕРЕСОБРАН ПОД ЛИНЕЙНУЮ МОДЕЛЬ (S3.3): вместо «круг N тактов» — ДОРОЖКИ и ДЛИНА
      ПЕСНИ в тактах (выводимая из материала). Ветки loop.first больше нет — запись всегда «дорожка N». */
   const songBars=Math.max(1,Math.ceil(songBeats()/loop.metre));
+  const armLy=armedLayer();                  // S3.5c: вооружённая дорожка (слой) или null — один раз на кадр, её читают и заголовок, и строки
   let head, hc;
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
   else if(recording){ head=t('looper.overdub',{n:loop.layer+1}); hc='#e5484d'; }
@@ -537,6 +538,14 @@ function drawLooper(){
   else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
      Приписка к готовой строке, а не отдельный ключ на каждую фразу — состояний заголовка четыре. */
+  /* S3.5c: КУДА ПОЙДЁТ ● — словом в заголовке, рядом с красной рамкой строки. «(не слышно)» — если дорожка
+     заглушена или молчит из-за чужого соло: запись в неё разрешена (панч-ин), но человек обязан знать, что
+     после ● свою запись он не услышит, пока не снимет заглушение. Во время записи заголовок и так
+     называет дорожку («● ЗАПИСЬ · дорожка N»). */
+  if(!recording && armLy!=null){
+    const heard = laneSoloOn() ? laneSoloed(armLy) : !laneMuted(armLy);
+    head += ' · ' + t(heard ? 'looper.armed' : 'looper.armedSilent', {n:armLy+1});
+  }
   if(cyc) head += ' · ' + t('looper.regionOn');   // повтор объявляем словом: одна подсветка на полосе легко теряется на пёстрой камере
   if(laneSoloOn()) head += ' · ' + t('looper.soloOn');
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
@@ -623,6 +632,15 @@ function drawLooper(){
     ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='10px system-ui'; ctx.textAlign='right';
     ctx.fillText('L'+(lid+1),x0-4,mid);
     ctx.globalAlpha=1;                                   // кнопки рисуем В ПОЛНУЮ СИЛУ: это орган управления, он обязан читаться и на погашенной строке
+    /* ⛳ ВООРУЖЁННАЯ ДОРОЖКА (S3.5c) — красная рамка во всю строку, красная точка записи в её начале и красная
+       подпись, В ПОЛНУЮ СИЛУ даже на заглушённой строке: «куда я сейчас запишу» читается с одного взгляда
+       на 380px, где слева от линейки места под значок нет (подпись L1 и так упирается в кромку).
+       Во время записи рамку не рисуем: пишущуюся строку уже выделяет красная заливка (live). */
+    if(!recording && lid===armLy){
+      ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,bw-2,rowH-3);
+      ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x0+8,mid,3.5,0,7); ctx.fill();
+      ctx.fillStyle='#ff6b6f'; ctx.font='600 10px system-ui'; ctx.textAlign='right'; ctx.fillText('L'+(lid+1),x0-4,mid);
+    }
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);
   });
@@ -1219,8 +1237,11 @@ export function loopHit(px,py){
   if(py<V.gy0 || py>=V.gy0+V.rows.length*V.rowH) return null;
   const ri=Math.floor((py-V.gy0)/V.rowH);
   const dx=px-V.tx0, step=LANE_TOG_W+LANE_TOG_GAP;
-  if(dx<0 || dx>=step*2) return null;
-  return { layer:V.rows[ri], what: dx<step ? 'mute' : 'solo' };
+  if(dx>=0 && dx<step*2) return { layer:V.rows[ri], what: dx<step ? 'mute' : 'solo' };
+  /* S3.5c: ТА ЖЕ СТРОКА ri, левее гнёзд — вооружить дорожку. Слева захватываем и подпись «L1» (она висит левее
+     линейки): палец тянется к имени дорожки. Гнёзда M/S проверены ВЫШЕ — тап по ним не вооружает. */
+  if(dx<0 && px>=V.x0-24) return { layer:V.rows[ri], what:'arm' };
+  return null;
 }
 /* Доля под пикселем для ПЕРЕТАСКИВАНИЯ края скобы (S3.5b): тот же laneBeatAt по тому же снимку.
    Вертикаль НЕ проверяем — палец, съехавший с полосы на строки, продолжает тащить взятый край.

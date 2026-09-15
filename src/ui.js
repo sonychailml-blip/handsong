@@ -19,7 +19,7 @@ import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProg
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
-         setRegionOn, regionOn, braceTap, braceMove } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -155,6 +155,7 @@ function updRecBtn(){
   recBtn.classList.toggle('armed', !recording && loop.on);      // песня играет: тап добавит дорожку
   recBtn.title = recording
     ? t('rec.title.overdub',{n:loop.layer+1})
+    : armedLayer()!=null ? t('rec.title.into',{n:armedLayer()+1})   // S3.5c: вооружена дорожка — ● пишет в неё, а не в новую
     : (loop.on ? t('rec.title.armed')
                : t('rec.title.idle'));
   loopBarsV.textContent = loop.bars;
@@ -324,6 +325,7 @@ addEventListener('pointerdown', e=>{
   const h=loopHit(e.clientX-r.left, e.clientY-r.top);
   if(!h) return;
   if(h.what==='brace'){ braceEdge=braceTap(h.beat); return; }   // null во время записи — тогда и тащить нечего
+  if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; } // S3.5c: вооружить/снять; подсказку ● перечитать (она называет дорожку)
   if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);
 });
 addEventListener('pointermove', e=>{
