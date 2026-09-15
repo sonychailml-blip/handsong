@@ -116,6 +116,7 @@ export const DICTS = {
     'transport.loopPlay':'▶ play',
     'transport.loopPause':'❚❚ pause',
     'transport.loopTitle':'Play / pause · from the end, play restarts from the top',
+    'transport.regionTitle':'Repeat: cycle the song instead of stopping at the end',
     'transport.undoTitle':'Remove the last layer',
     'transport.clearTitle':'Clear the loop',
     'transport.panicTitle':'Silence everything',
@@ -202,6 +203,7 @@ export const DICTS = {
     'looper.overdub':'● RECORDING · track {n}',
     'looper.playing':'▶ PLAYING · {bars} bars · {layers} tracks',
     'looper.paused':'SONG · {bars} bars · {layers} tracks · “▶ play” to start',
+    'looper.regionOn':'REPEAT',
     'looper.clear':'CLEAR',
     // холст: дорожки лупера (S1). Буквы кнопок — ОДИН символ: гнездо 21px, значок там нечитаем, подписи не влезают
     'looper.laneMute':'M',
@@ -457,6 +459,7 @@ export const DICTS = {
     'transport.loopPlay':'▶ играть',
     'transport.loopPause':'❚❚ пауза',
     'transport.loopTitle':'Играть / пауза · с конца пуск идёт с начала',
+    'transport.regionTitle':'Повтор: гонять песню по кругу, а не останавливаться в конце',
     'transport.undoTitle':'Убрать последний слой',
     'transport.clearTitle':'Очистить петлю',
     'transport.panicTitle':'Заглушить всё',
@@ -534,6 +537,7 @@ export const DICTS = {
     'looper.overdub':'● ЗАПИСЬ · дорожка {n}',
     'looper.playing':'▶ ИГРАЕТ · {bars} т. · дорожек {layers}',
     'looper.paused':'ПЕСНЯ · {bars} т. · дорожек {layers} · «▶ играть»',
+    'looper.regionOn':'ПОВТОР',
     'looper.clear':'ОЧИСТКА',
     'looper.laneMute':'М',    // «Молча» — кириллическая М; одна буква, как в en
     'looper.laneSolo':'С',    // «Соло»

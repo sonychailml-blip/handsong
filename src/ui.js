@@ -18,7 +18,8 @@ import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
-         toggleLaneMute, toggleLaneSolo, droneAudible } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель
+         toggleLaneMute, toggleLaneSolo, droneAudible,
+         setRegion, regionOn, songBeats } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; область повтора (S3.4) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -158,9 +159,16 @@ function updRecBtn(){
                : t('rec.title.idle'));
   loopBarsV.textContent = loop.bars;
 }
-function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' : 'transport.loopPlay'); }   // текст кнопки лупа по состоянию (для смены языка и hooks.loop)
+function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' : 'transport.loopPlay'); }   // текст кнопки транспорта по состоянию (для смены языка и hooks.loop)
+/* ⟳ ОБЛАСТЬ ПОВТОРА (S3.4). Состояние держит recorder, ui только переключает и отражает.
+   ⚠️ ГРАНИЦЫ ПЕРЕСЧИТЫВАЮТСЯ ПРИ КАЖДОМ ВКЛЮЧЕНИИ: помечаем ВСЮ песню на текущий момент. Записал
+   дальше при включённом повторе — область осталась прежней (и это ВИДНО на полосе), выключил и включил
+   снова — подхватила новую длину. Предсказуемо и без скрытого «само подрастает». */
+const rgnBtn=$('rgnBtn');
+function updRgnBtn(){ rgnBtn.classList.toggle('on', regionOn()); }
+rgnBtn.onclick=()=>{ const on=!regionOn(); setRegion(0, songBeats(), on); updRgnBtn(); };
 hooks.rec       = () => { updRecBtn(); syncTutorBarPos(); };   // запись вкл/выкл → коробка лупера появляется/меняется → переставить подсказку тура
-hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет) И положение подсказки (коробка появилась/ушла)
+hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); updRgnBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет), вид кнопки области И положение подсказки (коробка появилась/ушла)
 
 /* ТРИ ПАНЕЛИ (звукоряд · звук и управление · лупер) — все оверлеи на ОДНОМ месте (сверху), поэтому
    открытой может быть РОВНО ОДНА. Лупер РАНЬШЕ жил снизу, чтобы холстовая сетка тактов оставалась

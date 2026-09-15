@@ -499,6 +499,18 @@ function drawLooper(){
   ctx.fillStyle='rgba(10,10,20,.74)'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(x0-10,y0,sw+20,boxH,11); ctx.fill(); ctx.stroke();
 
+  /* ⛳ ОБЛАСТЬ ПОВТОРА (S3.4) — рисуем ПОД сеткой и строками, чтобы она читалась как подсветка участка,
+     а не как ещё один слой поверх. Показываем ТОЛЬКО включённой: помеченный, но выключенный участок
+     обещал бы повтор, которого нет. Границы — из того же преобразования, что сетка и метки. */
+  const RG=loop.rgn;
+  if(RG.on && RG.to>RG.from){
+    const rx0=laneBeatX(loopView,RG.from), rx1=laneBeatX(loopView,RG.to);
+    ctx.fillStyle='rgba(87,217,163,.10)';                       // тот же зелёный, что у «играет» — это его участок
+    ctx.fillRect(rx0,gy0,Math.max(1,rx1-rx0),gy1-gy0);
+    ctx.strokeStyle='rgba(87,217,163,.55)'; ctx.lineWidth=1.5;  // скобки по краям: видно, ГДЕ шов
+    ctx.beginPath(); ctx.moveTo(rx0,gy0); ctx.lineTo(rx0,gy1); ctx.moveTo(rx1,gy0); ctx.lineTo(rx1,gy1); ctx.stroke();
+  }
+
   // заголовок — режим
   /* ⛳ ЗАГОЛОВОК ПЕРЕСОБРАН ПОД ЛИНЕЙНУЮ МОДЕЛЬ (S3.3): вместо «круг N тактов» — ДОРОЖКИ и ДЛИНА
      ПЕСНИ в тактах (выводимая из материала). Ветки loop.first больше нет — запись всегда «дорожка N». */
@@ -510,6 +522,7 @@ function drawLooper(){
   else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
      Приписка к готовой строке, а не отдельный ключ на каждую фразу — состояний заголовка четыре. */
+  if(RG.on && RG.to>RG.from) head += ' · ' + t('looper.regionOn');   // повтор объявляем словом: одна подсветка на полосе легко теряется на пёстрой камере
   if(laneSoloOn()) head += ' · ' + t('looper.soloOn');
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
   ctx.fillStyle=hc; ctx.fillText(head,x0-2,y0+headH/2+1);

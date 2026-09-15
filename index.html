@@ -111,7 +111,10 @@
      (drawLooper). Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что
      высота холстовой коробки растёт со слоями. Видна только когда есть петля. -->
 <div id="loopTransport">
-  <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Петля: играть / пауза">⟳ луп</button>
+  <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Играть / пауза">▶ играть</button>
+  <!-- ⟳ ОБЛАСТЬ ПОВТОРА (S3.4): помечает всю песню и гоняет её по кругу. Подобласть («от такта до
+       такта») придёт с таймлайном редактора, где её будет видно и можно будет тащить. -->
+  <button id="rgnBtn" data-i18n-title="transport.regionTitle" title="Повторять песню по кругу">⟳</button>
   <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Убрать последний слой">⤺</button>
   <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить петлю">✕</button>
   <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
