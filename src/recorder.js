@@ -517,8 +517,112 @@ function editMoveHit(ev,t,row){
 function editDeleteHit(ev){
   if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
   if(!compactEvents(e=>e===ev)) return false;
-  editPush({ kind:'del', ev });                            // держим САМ объект — и ↶, и ↷ возвращают/убирают ровно его
+  editPush({ kind:'del', evs:[ev] });                      // держим САМИ объекты — и ↶, и ↷ возвращают/убирают ровно их
   editCommit(); return true;
+}
+/* ═══ БАС: ПРАВКА ПО СЕГМЕНТАМ (слайс S5.5) ═══
+   ⛳ ПОЧЕМУ НЕ «НОТА». У баса ОДИН владелец голоса на дорожку, и смена высоты — это ВЕДЕНИЕ (bassSet),
+   а не новая нота: бас-линия, сыгранная одним непрерывным движением, — это ОДНА нота songNotes на
+   много высот. Редактировать её как одну — значит показать многоминутную полосу на одной высоте.
+   Единица правки здесь — СЕГМЕНТ: событие, которое ЗАДАЁТ высоту («вкл» или ведение со сменой ступени),
+   и промежуток до следующей такой смены. Вывод сегментов — songSegs, рядом с songNotes.
+   ⛔ ПОРЯДОК ВНУТРИ КЛЮЧА ВЛАДЕЛЬЦА — вот чем бас опаснее удара (у того ключа нет вовсе). Все события
+   одной бас-ноты И все ноты того же k делят ключ 'bassloop:N[:k]', а движок требует, чтобы время внутри
+   ключа не шло назад: переставь ведение за соседа — и на переигровке ноты поменяются местами, а «выкл»
+   закроет чужую. Поэтому перенос ЗАЖИМАЕТСЯ между соседями ПО ТОМУ ЖЕ КЛЮЧУ (editKeyGap), а вставка
+   вообще берёт СВЕЖИЙ k — у новой ноты собственный владелец, и столкнуться ей не с кем by construction. */
+const EDIT_GAP=1e-4;                                        // зазор у границы соседа: «строго между», а не «вплотную»
+/* Соседи события ПО ЕГО ЖЕ КЛЮЧУ ВЛАДЕЛЬЦА: ближайшее время слева и справа. O(n) на правку, не на кадр. */
+function editKeyGap(ev){
+  const role=chaseRole(ev.fn); if(!role) return {lo:0,hi:Infinity};
+  const k=chaseKey(role,ev);
+  let lo=0, hi=Infinity;
+  for(const e of events){
+    if(e===ev||e.layer!==ev.layer) continue;
+    if(chaseRole(e.fn)!==role||chaseKey(role,e)!==k) continue;
+    if(e.t<=ev.t){ if(e.t>lo) lo=e.t; } else if(e.t<hi) hi=e.t;
+  }
+  return {lo,hi};
+}
+/* Перенос СЕГМЕНТА: во времени и/или по высоте. Высота — НОВАЯ нагрузка (deg/oct), всё прочее едет с
+   объектом: ⛔ ev.sc НЕ ТРОГАЕМ НИКОГДА — событие остаётся в СВОЁМ ладу (правило #7), иначе правка в
+   хроматике молча переписала бы партчевскую ноту на полутона. */
+function editMoveSeg(ev,t,deg,oct){
+  if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
+  if(chaseRole(ev.fn)!=='bs') return false;
+  const g=editKeyGap(ev);
+  const nt=Math.max(0, Math.min(Math.max(t,g.lo+EDIT_GAP), g.hi-EDIT_GAP));   // строго между соседями по ключу
+  const from={t:ev.t, a:ev.a}, to={t:nt, a:{...ev.a, deg, oct}};
+  editPush({ kind:'move', ev, from, to });
+  ev.t=to.t; ev.a=to.a;
+  editCommit(); return true;
+}
+/* Удаление сегмента. ДВА СЛУЧАЯ, и разница музыкальная, а не техническая:
+     ВЕДЕНИЕ в середине — убираем ОДНО событие: предыдущая высота просто ТЯНЕТСЯ через него дальше. Это
+       ровно то, что делает движок (bassSet нет — голос ведётся прежним), и ровно то, чего ждёт ухо.
+     «ВКЛ» (начало ноты) — убираем ВСЮ ноту (все её события). Оставить ведения без «вкл» нельзя: движок
+       их не слышит (bassSet без голоса выходит молча), и в песне остался бы невидимый мусор-сирота. */
+function editDeleteSeg(ev){
+  if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
+  if(chaseRole(ev.fn)!=='bs') return false;
+  const seg=songSegs().byEv.get(ev);
+  const evs = (seg&&seg.first&&seg.note) ? seg.note.evs.slice() : [ev];
+  const drop=new Set(evs);
+  if(!compactEvents(e=>drop.has(e))) return false;
+  editPush({ kind:'del', evs });
+  editCommit(); return true;
+}
+/* ═══ ДЛИНА СЕГМЕНТА (S5.6) ═══
+   ⛳ ЧТО ИМЕННО ДВИГАЕТ ИЗМЕНЕНИЕ ДЛИНЫ — зависит от того, ЧЕМ сегмент кончается, и обе развилки честные:
+     ПОСЛЕДНИЙ сегмент ноты кончается «выкл» → двигаем «выкл»: это и есть ДЛИНА НОТЫ, нота звучит дольше.
+     СЕРЕДИНА глиссандо кончается СЛЕДУЮЩЕЙ СМЕНОЙ ВЫСОТЫ → двигаем ГРАНИЦУ: этот сегмент удлиняется,
+       следующий на столько же укорачивается, ОБЩАЯ длина ноты не меняется. Иначе и быть не может —
+       у ведения нет собственного конца, его конец это начало соседа.
+     ОТКРЫТЫЙ сегмент (нота без «выкл» — так лежит подложка) endEv не имеет: тянуть нечего, отказ.
+   ⛔ ПОРЯДОК ВНУТРИ КЛЮЧА — ТОТ ЖЕ СТРАЖ, ЧТО У ПЕРЕНОСА: двигаем событие во времени, значит зажимаем его
+   между соседями по ключу тем же editKeyGap. Второго правила не заводим.
+   ⚠️ НУЛЕВОЙ И ОТРИЦАТЕЛЬНОЙ ДЛИНЫ НЕ БЫВАЕТ: конец не ближе EDIT_MIN_LEN к началу, иначе отказ. */
+const EDIT_MIN_LEN=1/32;                                    // минимальная длина ноты в долях: короче — это уже не нота, а щелчок
+function editResizeSeg(ev,t){
+  if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
+  if(chaseRole(ev.fn)!=='bs') return false;
+  const seg=songSegs().byEv.get(ev); if(!seg||!seg.endEv) return false;   // открытый сегмент / конец чужой ноты — двигать нечего
+  const end=seg.endEv, g=editKeyGap(end);
+  const lo=Math.max(seg.start+EDIT_MIN_LEN, g.lo+EDIT_GAP);
+  const nt=Math.min(Math.max(t,lo), g.hi-EDIT_GAP);
+  if(!(nt>seg.start+EDIT_GAP)) return false;                // места нет вовсе — молча отказываем, а не рожаем нулевую ноту
+  const from={t:end.t, a:end.a}, to={t:nt, a:end.a};        // нагрузку не трогаем: меняется ТОЛЬКО время конца
+  editPush({ kind:'move', ev:end, from, to });
+  end.t=to.t;
+  editCommit(); return true;
+}
+/* Вставка бас-ноты: пара «вкл»+«выкл» со СВЕЖИМ k (свой владелец — см. довод о порядке выше).
+   ⛳ ОТКУДА ПОЛЯ: тембр — ТОЛЬКО с «вкл» соседней ноты (у ведения он записан, но звук его не читает —
+   тембр печётся на атаке; брать его с ведения значит списывать у того, кто им не распоряжается);
+   громкость — с ближайшего бас-события; ЛАД И СЕПТАККОРД — с ПОКАЗАННОЙ ГРУППЫ (их передаёт редактор),
+   ⛔ а не CUR(): нота обязана родиться в том ладу, в котором нарисована ось. Пустая дорожка группы не
+   имеет — тогда вызывающий честно передаёт живой лад. */
+function editInsertBass(t,deg,oct,sc,sev,len){
+  if(!editGuard()) return false;
+  const layer=editLayer();
+  let on=null, near=null, bd=Infinity;
+  for(const e of events){
+    if(e.layer!==layer||chaseRole(e.fn)!=='bs') continue;
+    const d=Math.abs(e.t-t);
+    if(d<bd){ bd=d; near=e; }
+    if(e.fn==='bassOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
+  }
+  const inst = on&&on.a.inst!=null ? on.a.inst : bassIdx;
+  const vol  = near&&near.a.vol!=null ? near.a.vol : EDIT_DEF_VOL;
+  const k=layerTakeTop(layer);                               // свой ключ владельца: пересечься с существующим басом нечем
+  if(!editTake) editTake=++takeSeq;
+  const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
+  const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
+  const evOn =mk('bassOn', {deg,oct,vol,inst}, t0);
+  const evOff=mk('bassOff',{}, t1);
+  events.push(evOn,evOff);
+  editPush({ kind:'ins', evs:[evOn,evOff] });
+  editCommit(); return evOn;
 }
 function editInsertHit(t,row){
   if(!editGuard()) return false;
@@ -528,16 +632,19 @@ function editInsertHit(t,row){
   if(!editTake) editTake=++takeSeq;
   const ev={ t:Math.max(0,t), layer, fn:'drum', a:{row, vol:d.vol, kit:d.kit}, sc:CUR(), sev:seventh, tk:editTake };
   events.push(ev);
-  editPush({ kind:'ins', ev });
+  editPush({ kind:'ins', evs:[ev] });
   editCommit(); return ev;
 }
 /* ОДИН ход истории в ЛЮБУЮ сторону. undo=true — назад, false — вперёд. Перенос переставляет время и
    нагрузку на нужное состояние; удаление и вставка — зеркальны друг другу и возят ТОТ ЖЕ объект события
    (никаких копий: за объект держатся выделение и спаривание нот). */
 function editApply(u,undo){
-  if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; }
-  else if(u.kind==='del'){ if(undo) events.push(u.ev); else compactEvents(e=>e===u.ev); }
-  else                   { if(undo) compactEvents(e=>e===u.ev); else events.push(u.ev); }   // 'ins'
+  if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; return; }
+  /* S5.5: удаление/вставка возят НАБОР событий (бас-нота — это «вкл»+«выкл», а то и её ведения), но
+     механизм тот же и объекты ТЕ ЖЕ. Набор из одного — прежний случай удара, байт-в-байт. */
+  const back=new Set(u.evs);
+  if((u.kind==='del')===undo) events.push(...u.evs);
+  else compactEvents(e=>back.has(e));
 }
 /* ↶ — снять последнюю правку (и положить её в будущее, чтобы ↷ мог вернуть). */
 function editUndo(){
@@ -1376,6 +1483,48 @@ function songNotes(){
   notesView=Object.freeze({ notes:Object.freeze(notes), levels:Object.freeze(levels), orphans:Object.freeze(orphans), other:Object.freeze(other), prefix:N });
   return notesView;
 }
+/* ═══ СЕГМЕНТЫ: ВЫСОТА ДЕРЖИТСЯ ДО СЛЕДУЮЩЕЙ СМЕНЫ (слайс S5.5) ═══
+   ⚠️ ЗАЧЕМ ОТДЕЛЬНО ОТ songNotes, а не вместо неё. songNotes группирует ЖИЗНЬ ГОЛОСА — и это верно для
+   звука: одна бас-нота = один голос от «вкл» до «выкл». Но у баса и соло смена высоты внутри ноты — это
+   ВЕДЕНИЕ, поэтому бас-линия, сыгранная одним движением, — ОДНА нота на десяток высот. Нарисуй её как
+   ноту — получишь одну полосу через всю песню на высоте ПЕРВОЙ ступени, а остальные высоты исчезнут.
+   СЕГМЕНТ — то, что музыкант и называет нотой: событие, ЗАДАЮЩЕЕ высоту, и промежуток до следующей смены.
+   ⛳ ГРАНИЦА — ТОЛЬКО СМЕНА ВЫСОТЫ. Ведения, меняющие лишь громкость или эффекты, границами НЕ являются:
+   они внутри сегмента (иначе одна нота с крещендо рассыпалась бы на десяток «нот» одной высоты).
+   ⛳ У КАЖДОГО СЕГМЕНТА СВОЙ ЛАД — тот, что заморожен в ЕГО событии (sc/sev). Это не формальность: ось
+   рисуется в ладу показанной группы, и сегмент обязан знать свой собственный.
+   ⛳ ИНВАЛИДАЦИЯ — ЧУЖАЯ: мемо на ИДЕНТИЧНОСТЬ объекта songNotes(). Тот пересобирается только в
+   schedInvalidate, значит второй точки сброса здесь нет (правило #28) — как и у кэша ролла в draw.
+   byEv — обратный указатель «событие → его сегмент»: правке нужно знать, сегмент ли это начала ноты. */
+let segView=null;
+function songSegs(){
+  const V=songNotes();
+  if(segView&&segView.view===V) return segView;
+  const segs=[], byEv=new Map();
+  for(const n of V.notes){
+    if(n.role!=='bs'&&n.role!=='ld'&&n.role!=='ch') continue;
+    let cur=null;
+    for(const ev of n.evs){
+      const kind=chaseKind(ev.fn);
+      if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }   // «выкл» закрывает последний сегмент
+      const a=ev.a||{};
+      const pitchChanged = !cur || a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&a.ty!==cur.ty);
+      if(kind==='n'||pitchChanged){
+        if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
+        cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
+              first:ev===n.head, start:ev.t, end:null, endBy:'open',
+              deg:a.deg, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:a.inst, vol:a.vol };
+        segs.push(cur); byEv.set(ev,cur);
+      }else byEv.set(ev,cur);                                                  // ведение громкости/эффектов — ВНУТРИ сегмента
+    }
+    /* Нота закрылась «вкл» СОСЕДНЕЙ ноты — хвостовой сегмент кончается там же, но endEv НЕ ставим: то
+       событие принадлежит ДРУГОЙ ноте, и тянуть за него длину этой значило бы двигать чужое начало. */
+    if(cur&&cur.end==null&&n.end!=null){ cur.end=n.end; cur.endBy=n.endBy; }
+  }
+  segs.sort((a,b)=>a.start-b.start);
+  segView={ view:V, segs, byEv };
+  return segView;
+}
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
    ⚠️ УСЛОВИЯ РАЗВЁРНУТЫ В continue-ветки (было одно длинное &&) РАДИ ЧИТАЕМОСТИ ПОСЛЕ ДОБАВЛЕНИЯ
    ГЕЙТА ДОРОЖЕК — набор условий и их смысл не изменились. */
@@ -1774,5 +1923,6 @@ export {
   songNotes,      // S4.0: события, собранные в НОТЫ (только чтение) — по ним рисует пиано-ролл
   editOpen, editClose, editIsOpen, editLayer, editSetLayer,   // S5.0: редактор дорожки — ОДИН флаг на все отказы; наружу отдаём НОМЕР СЛОЯ, id остаётся здесь (правило #27)
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
+  songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

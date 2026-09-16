@@ -5,7 +5,9 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          roleXDriven, fxVolFix, setFxVolFix, fxIsScalar,
-         rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, rollDrag, setRollDrag, rollIns, setRollIns } from './state.js';   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
+         rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, rollDrag, setRollDrag, rollIns, setRollIns,
+         rollRole, setRollRole, rollRow0, setRollRow0, rollScale, setRollScale,
+         seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -14,7 +16,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat } from './draw.js';   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch } from './draw.js';   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
@@ -22,7 +24,8 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, songNotes, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
-         editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen } from './recorder.js';   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
+         editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg } from './recorder.js';   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -357,8 +360,10 @@ addEventListener('pointercancel',()=>{ braceEdge=null; });
 const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTabsEl=$('rollTabs'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
-      rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome');
-const ROLL_ROLES=['dr','ld','ch','bs'];          // порядок вкладок: та, что правится сегодня, — первой
+      rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
+      rollScaleBtn=$('rollScale');
+const ROLL_ROLES=['dr','bs','ld','ch'];          // порядок вкладок: те, что правятся сегодня, — первыми
+const ROLL_EDITABLE=['dr','bs'];                 // S5.5: бас — первая ВЫСОТНАЯ роль; соло и аккорды ждут своих слайсов
 const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
 const rollTotal=()=>Math.max(songBeats(), loop.metre*loop.bars);   // пустая песня — тоже поле: показываем окно подложки
 function setRollWinClamped(b0,span){
@@ -380,12 +385,36 @@ function applyRollBar(){
   rollTabsEl.textContent='';
   for(const r of ROLL_ROLES){
     const b=document.createElement('button');
-    b.className='tab'+(r==='dr'?' act':'');
+    const on=ROLL_EDITABLE.includes(r);
+    b.className='tab'+(r===rollRole?' act':'');
     b.textContent=`${t('role.'+r)} · ${cnt[r]}`;
-    if(r!=='dr'){ b.disabled=true; b.title=t('roll.tabLater'); }
+    if(!on){ b.disabled=true; b.title=t('roll.tabLater'); }
+    else b.onclick=()=>{ if(r===rollRole) return;
+      /* СМЕНА РОЛИ — смена ОСИ Y целиком: выделение, призрак и вертикальная прокрутка относятся к прежней
+         оси и обязаны уйти. История правок НЕ чистится: она про дорожку, а не про роль. */
+      setRollRole(r); setRollSel(null); setRollDrag(null); setRollScale(0); setRollRow0(rollDefaultRow0(r));
+      applyRollBar(); };
     rollTabsEl.appendChild(b);
   }
+  /* ЧИП ЛАДА — ТОЛЬКО когда ладов в дорожке больше одного (обычный случай — один, и машинерии на экране
+     быть не должно). Имя лада резолвим через L(): оно локализуется, но группируемся мы по ССЫЛКЕ. */
+  const gs=rollScaleGroups();
+  rollScaleBtn.hidden = gs.length<2;
+  if(gs.length>1){
+    const i=Math.min(rollScale,gs.length-1), g=gs[i];
+    rollScaleBtn.textContent=`${L(g.sc.name)} ${i+1}/${gs.length}`;
+    rollScaleBtn.onclick=()=>{ setRollScale((i+1)%gs.length); setRollSel(null); setRollDrag(null); applyRollBar(); };
+  }
   updRollBtns();   // S5.1: сменилась дорожка — заново решить, что доступно (подложка только читается, история пуста)
+}
+/* Нижний видимый ряд по умолчанию: у баса ставим окно на РЕГИСТР, где он и играет (bassOctReg), — иначе
+   открытая роль показывала бы пустой верх лада. Ударным прокрутка не нужна вовсе. */
+function rollDefaultRow0(role){
+  if(role==='dr') return 0;
+  const g=rollGeom(), sc=(rollScaleGroups()[0]||{}).sc||CUR();
+  const dpo=sc.iv.length+1, reg=Math.max(0,Math.min(3,rectOctReg(role)));
+  const rows=g&&g.pitched?g.rows:8;
+  return Math.max(0, Math.min(reg*dpo, 4*dpo-rows));
 }
 function openRoll(){
   /* Причины отказов называем словами, но САМ отказ держит recorder (editOpen): он — единственный,
@@ -397,6 +426,7 @@ function openRoll(){
   if(!editOpen(arm!=null?arm:ls[0])){ showCamMsg(t('roll.refusedRec')); return; }   // ВООРУЖЁННАЯ дорожка, иначе первая
   setRollOpen(true); setRollSel(null);
   setRollDrag(null); setRollIns(false);            // S5.1: сессия начинается без призрака и с ВЫКЛЮЧЕННОЙ вставкой — режим, переживший закрытие, однажды родил бы удар «сам собой»
+  setRollRole('dr'); setRollScale(0); setRollRow0(0);   // S5.5: открываемся на ударных — роль, пережившая закрытие, показала бы чужую ось
   setRollWinClamped(0, loop.metre*8);              // стартовое окно — восемь тактов от начала песни
   barEl.classList.remove('on'); rollBar.classList.add('on'); loopTpEl.classList.add('roll');
   applyRollBar(); updRecBtn();
@@ -415,7 +445,7 @@ rollCloseBtn.onclick=closeRoll;
 rollTrackBtn.onclick=()=>{
   const ls=trackLayers(); if(ls.length<2) return;
   const i=ls.indexOf(editLayer());
-  if(editSetLayer(ls[(i+1)%ls.length])){ setRollSel(null); applyRollBar(); }
+  if(editSetLayer(ls[(i+1)%ls.length])){ setRollSel(null); setRollDrag(null); setRollScale(0); applyRollBar(); }   // S5.5: у новой дорожки свои лады — номер группы от прежней бессмыслен
 };
 const rollZoomBy=k=>{ const g=rollGeom(); if(!g) return; const c=g.beat0+g.span/2, s=g.span*k; setRollWinClamped(c-s/2,s); };
 rollZoomInBtn.onclick =()=>rollZoomBy(1/1.6);
@@ -445,7 +475,10 @@ const rollRefuseRO=()=>{ if(editBackingOpen()){ showCamMsg(t('roll.readOnly')); 
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRollBtns(); };
 rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
   if(!rollSel){ showCamMsg(t('roll.needSel')); return; }
-  if(editDeleteHit(rollSel)) setRollSel(null);
+  /* ⛳ УДАЛЕНИЕ ВЕДЁТ РОЛЬ: у ударных это одиночное событие, у баса — СЕГМЕНТ (ведение в середине уходит
+     одно, и прежняя высота тянется дальше; «вкл» уносит всю ноту — см. editDeleteSeg). */
+  const ok = rollRole==='dr' ? editDeleteHit(rollSel) : editDeleteSeg(rollSel);
+  if(ok) setRollSel(null);
   updRollBtns(); };
 rollUndoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editUndo()) setRollSel(null); updRollBtns(); };
 rollRedoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editRedo()) setRollSel(null); updRollBtns(); };   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
@@ -472,14 +505,22 @@ function rollDown(e){
     if(h&&h.what==='ruler'){ seekTo(h.beat); return; }
     /* Палец лёг НА УДАР → берём его: dt — смещение точки касания от самого удара, чтобы он не прыгал
        под пальцем. Подложку двигать нельзя — там тап только выделяет. */
-    if(h&&h.what==='hit'&&!editBackingOpen()){
+    /* Палец лёг НА НОТУ (удар или сегмент баса) → берём её. dt — смещение точки касания от начала ноты,
+       чтобы она не прыгала под пальцем; len — длина сегмента, её держит призрак. */
+    if(h&&(h.what==='hit'||h.what==='seg')&&!editBackingOpen()){
+      const isSeg=h.what==='seg';
+      const row = isSeg ? h.row : (h.ev.a.row|0);
       setRollSel(h.ev);
-      rollGrab={ ev:h.ev, dt:h.beat-h.ev.t, row:h.ev.a.row|0, x:p.x, y:p.y };
-      setRollDrag({ ev:h.ev, t:h.ev.t, row:h.ev.a.row|0 });
+      /* ⛳ КРАЙ = ДЛИНА, СЕРЕДИНА = ПЕРЕНОС (S5.6). Какой это жест, решает ТОТ ЖЕ hit-test, что нарисовал
+         блок (h.edge), — второй геометрии «где тут край» в ui не заводим. */
+      rollGrab={ ev:h.ev, seg:isSeg?h.seg:null, mode:(isSeg&&h.edge)?'len':'move',
+                 dt:h.beat-h.ev.t, row, x:p.x, y:p.y,
+                 len: isSeg ? ((h.seg.end==null?h.beat+1:h.seg.end)-h.seg.start) : 0 };
+      setRollDrag({ ev:h.ev, t:h.ev.t, row, len:rollGrab.len });
       updRollBtns(); return;
     }
-    setRollSel(h&&h.what==='hit'?h.ev:null); updRollBtns();
-    rollPan={ atBeat:g.beat0+g.span*((p.x-g.x0)/g.bw), x:p.x, y:p.y };
+    setRollSel(h&&(h.what==='hit'||h.what==='seg')?h.ev:null); updRollBtns();
+    rollPan={ atBeat:g.beat0+g.span*((p.x-g.x0)/g.bw), x:p.x, y:p.y, y0:p.y, row0:g.row0 };
   }
   else if(rollPts.size===2){ rollPan=null; rollGrab=null; setRollDrag(null);   // второй палец → это зум, а не перенос: призрак снимаем, событие не тронуто
     const [a,b]=[...rollPts.values()], mid=(a.x+b.x)/2;
@@ -500,18 +541,30 @@ function rollMove(e){
      Писать на каждом движении значило бы пересобирать ноты всей песни десятки раз в секунду. */
   if(rollGrab){
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
+    /* ДЛИНА: ведём ТОЛЬКО правый край — начало и ряд стоят. Призрак показывает будущую длину той же
+       парой (t, len), которой рисуется настоящий сегмент. */
+    if(rollGrab.mode==='len'){
+      const s=rollGrab.seg;
+      const end=rollSnapBeat(g.beat0+g.span*((p.x-g.x0)/g.bw), rollSnap());
+      setRollDrag({ ev:rollGrab.ev, t:s.start, row:rollGrab.row, len:Math.max(1/32,end-s.start) });
+      return;
+    }
     const raw=g.beat0+g.span*((p.x-g.x0)/g.bw)-rollGrab.dt;
     const h=rollHit(p.x,p.y);
     /* ⚠️ РЯД БЕРЁМ ТОЛЬКО У СЕТКИ. С S5.2 rollHit отвечает ещё и ЛИНЕЙКОЙ ({what:'ruler'}), а у неё ряда
        нет вовсе: палец, уехавший при переносе вверх за сетку, записал бы row:undefined — удар, который
        не звучит и не рисуется. Вне сетки (линейка, промах) ряд остаётся прежним. */
-    if(h&&(h.what==='hit'||h.what==='grid')) rollGrab.row=h.row;
-    setRollDrag({ ev:rollGrab.ev, t:rollSnapBeat(raw, rollSnap()), row:rollGrab.row });   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
+    if(h&&(h.what==='hit'||h.what==='grid'||h.what==='seg')) rollGrab.row=h.row;
+    setRollDrag({ ev:rollGrab.ev, t:rollSnapBeat(raw, rollSnap()), row:rollGrab.row, len:rollGrab.len });   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
     return;
   }
   if(rollPan){
     if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true;   // порог: дрожание пальца — всё ещё тап
     setRollWinClamped(rollPan.atBeat-g.span*((p.x-g.x0)/g.bw), g.span);
+    /* ВЕРТИКАЛЬНАЯ ПРОКРУТКА (S5.5) — тем же пальцем: у ладовой роли рядов больше, чем влезает. Считаем в
+       РЯДАХ по высоте ряда из снимка, поэтому сетка едет ровно за пальцем. У ударных rowH таков, что
+       total===rows, и клампы в draw/здесь оставляют row0 нулём — прокрутки просто нет. */
+    if(g.pitched) setRollRow0(Math.max(0, Math.min(g.total-g.rows, rollPan.row0 + Math.round((p.y-rollPan.y0)/g.rowH))));
   }
 }
 function rollUp(e){
@@ -526,7 +579,22 @@ function rollUp(e){
     /* ⚠️ ВРЕМЯ СРАВНИВАЕМ С ДОПУСКОМ, а не по равенству: шаг привязки бывает троичным (1/3, 1/6 при
        loop.sub=3), и снапнутая доля не обязана совпасть с хранимой ПОБИТОВО. Точное сравнение записывало бы
        «правку», которая ничего не двигает, — а на экране это выглядит как «нажал ↶, и ничего не произошло». */
-    if(gd && (Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0))) editMoveHit(rollGrab.ev, gd.t, gd.row);
+    if(gd){
+      if(rollGrab.mode==='len'){
+        /* Длина — это ВРЕМЯ КОНЦА сегмента; какое событие его несёт и куда его можно двигать, решает
+           recorder (editResizeSeg: тот же страж порядка по ключу, что и у переноса). */
+        const s=rollGrab.seg, ne=s.start+gd.len;
+        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9) editResizeSeg(s.ev, ne);
+      }
+      else if(rollGrab.seg){
+        /* БАС: переносим СЕГМЕНТ — его время и/или высоту. Ряд расшифровываем ТОЙ ЖЕ формулой, что рисует
+           ряды (rollRowPitch по ладу ОСИ), а лад события не трогаем вовсе — правка в чужом ладу не смеет
+           переписать ноту на живой (правило #7). */
+        const g2=rollGeom(), pit=rollRowPitch(gd.row, g2&&g2.sc);
+        const s=rollGrab.seg;
+        if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct) editMoveSeg(s.ev, gd.t, pit.deg, pit.oct);
+      }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
+    }
     setRollDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
   }
   if(!rollMoved&&rollPan){
@@ -536,8 +604,22 @@ function rollUp(e){
     if(rollIns && h && h.what==='grid'){
       /* S5.2: вставка по тому же правилу, что и перенос. Квантизация выключена → удар встаёт РОВНО туда,
          где тапнули (сетки нет — и выдумывать её нечем); включена → на ближайшую линию квантизации. */
-      if(!rollRefuseRO()){ const ev=editInsertHit(rollSnapBeat(h.beat, rollSnap()), h.row); if(ev) setRollSel(ev); }
-    }else setRollSel(h&&h.what==='hit'?h.ev:null);
+      if(!rollRefuseRO()){
+        const tt=rollSnapBeat(h.beat, rollSnap());
+        let ev;
+        if(rollRole==='dr') ev=editInsertHit(tt, h.row);
+        else{
+          /* ⛳ ЛАД ВСТАВЛЕННОЙ НОТЫ — ЛАД ПОКАЗАННОЙ ОСИ, а не живой: нота рождается там, где её нарисовали.
+             Пустая роль группы не имеет — тогда честно берём живой лад (новый материал в текущем строе). */
+          const g2=rollGeom(), gs=rollScaleGroups(), G=gs[Math.min(rollScale,Math.max(0,gs.length-1))];
+          const sc=(G&&G.sc)||CUR(), sev=G?G.sev:seventh;   // есть группа — её замороженный септаккорд; роль пуста — живой (новый материал в текущем строе)
+          const pit=rollRowPitch(h.row, sc);
+          const s=rollSnap(), len=s.free?1:Math.max(s.step,1);
+          ev=editInsertBass(tt, pit.deg, pit.oct, sc, sev, len);
+        }
+        if(ev) setRollSel(ev);
+      }
+    }else setRollSel(h&&(h.what==='hit'||h.what==='seg')?h.ev:null);
     updRollBtns();
   }
   rollPan=null;

@@ -577,5 +577,14 @@ export const setRollSel=v=>{ rollSel=v||null; };
 export let rollDrag=null, rollIns=false;
 export const setRollDrag=v=>{ rollDrag=v||null; };
 export const setRollIns=v=>{ rollIns=!!v; };
+/* ВЫСОТНЫЕ РОЛИ (S5.5). rollRole — какая роль показана ('dr'|'bs'|…): у каждой своя ось Y, поэтому
+   одновременно показывается РОВНО ОДНА. rollRow0 — НИЖНИЙ видимый ряд (вертикальная прокрутка): у
+   ударных рядов шесть и они влезают всегда, у лада из 43 ступеней × 4 регистра — 176, и без прокрутки
+   до них не добраться. rollScale — НОМЕР ГРУППЫ ЛАДОВ дорожки (дорожка может держать события, замороженные
+   в РАЗНЫХ ладах; две ступенные оси честно не нарисовать, поэтому одна — ось, прочие — призраки). */
+export let rollRole='dr', rollRow0=0, rollScale=0;
+export const setRollRole=v=>{ rollRole=v; };
+export const setRollRow0=v=>{ rollRow0=Math.max(0,v|0); };
+export const setRollScale=v=>{ rollScale=Math.max(0,v|0); };
 export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };

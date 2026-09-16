@@ -1,16 +1,16 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns } from './state.js';   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
+         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic } from './state.js';   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
-         songNotes, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -464,8 +464,13 @@ const laneBeatAt=(V,x)=> V.beat0 + V.span*(Math.max(0,Math.min(V.bw,x-V.x0))/V.b
    Ряд 0 — ВНИЗУ: так же пронумерованы ряды ударных (DRUM_NAMES, индекс 0 = низ) и так же считает
    игровое поле (degRaw). Поэтому z=rows-1-r, а не r.
    rollRowY даёт ВЕРХ ряда, rollRowAt — обратная: rollRowAt(V, rollRowY(V,r)+ε) === r на всей сетке. */
-const rollRowY =(V,r)=> V.gy0 + (V.rows-1-r)*V.rowH;
-const rollRowAt=(V,y)=> V.rows-1-Math.floor((y-V.gy0)/V.rowH);
+/* ⛳ S5.5: ряд отсчитывается от НИЖНЕГО ВИДИМОГО (V.row0) — это вертикальная прокрутка. У ударных рядов
+   шесть, они влезают всегда и row0===0, поэтому выражение вырождается в прежнее БАЙТ-В-БАЙТ. У ладов же
+   рядов бывает под две сотни (43 ступени × 4 регистра), и без прокрутки до верхних не добраться.
+   ⛔ Прокрутка живёт В СНИМКЕ, а не отдельной переменной у рисования: попадание обязано считать её тем же
+   числом, что и рисование (правило #9). */
+const rollRowY =(V,r)=> V.gy0 + (V.rows-1-(r-(V.row0||0)))*V.rowH;
+const rollRowAt=(V,y)=> (V.row0||0) + V.rows-1-Math.floor((y-V.gy0)/V.rowH);
 /* Ширина гнезда переключателя и зазор. Нарисованная кнопка мельче гнезда — палец толще буквы. */
 const LANE_TOG_W=21, LANE_TOG_GAP=2;
 /* ✕ удаления (S3.5d) — третьим гнездом, но ОТСТУПЛЕН на LANE_DEL_GAP: соседство с S шириной в 2px делало бы
@@ -737,8 +742,19 @@ function drawVideoBackground(){
    Кадр = O(log n + видимые удары + 6 рядов + линии сетки). */
 const ROLL_BAR_H=46, ROLL_TP_H=44;      // высоты HTML-панели редактора и транспортной полосы под ней
 const ROLL_RULER_H=16;                  // полоса ЛИНЕЙКИ (S5.2): тап по ней = перемотка; своя цель, как полоса скобы у лупера
-const ROLL_LBL_W=58;                    // колонка имён рядов слева
+const ROLL_LBL_W=58;                    // МИНИМУМ колонки подписей слева (ударным её и хватает); ладовой роли ширину считает rollGutterW
+const ROLL_PITCH_ROW_H=18;              // МИНИМАЛЬНАЯ высота ряда ладовой роли: ниже — не прочитать; при этом ряды прокручиваются
+/* ⛳ ПОТОЛОК ВЫСОТЫ РЯДА (S5.6). Когда ряды ВЛЕЗАЮТ, они растягиваются на всю высоту — иначе пентатоника
+   (24 ряда) оставляла бы пол-экрана пустым. Но расти бесконечно нельзя: ряд выше ~30px читается уже не
+   как строка сетки, а как плита, и глаз теряет соседние ступени. 30 ещё и заметно выше пальца (24px),
+   поэтому попадание от потолка не страдает. */
+const ROLL_PITCH_ROW_MAX=30;
 const ROLL_HIT_PX=12;                   // допуск попадания по времени: палец толще удара
+/* ⛳ ЗОНА ИЗМЕНЕНИЯ ДЛИНЫ (S5.6) — правый край блока. ⚠️ Она ОТНИМАЕТ площадь у переноса, поэтому:
+   (1) ширина зоны — не больше 40% блока, чтобы середина всегда оставалась «взять и двигать»;
+   (2) у блока уже ROLL_EDGE_MIN_W зоны НЕТ ВОВСЕ — на узкой ноте палец не различит край и середину,
+       и молчаливая подмена жеста была бы хуже отсутствия жеста (узкую ноту сперва растяните зумом). */
+const ROLL_EDGE_PX=16, ROLL_EDGE_MIN_W=34;
 let rollView=null;
 let rollCache={view:null,layer:null,hits:null};
 /* Удары ОТКРЫТОЙ дорожки, по времени. Пересобираются, только когда сменился вид нот (schedInvalidate)
@@ -748,6 +764,58 @@ function rollHits(){
   if(rollCache.view!==V||rollCache.layer!==ly)
     rollCache={ view:V, layer:ly, hits: ly==null?[] : V.notes.filter(n=>n.role==='dr'&&n.layer===ly).map(n=>n.head) };
   return rollCache.hits;
+}
+/* ═══ ВЫСОТНЫЕ РОЛИ: ГРУППЫ ЛАДОВ И РЯДЫ (S5.5) ═══
+   ⛳ ГРУППИРУЕМ ПО ССЫЛКЕ НА ЛАД (правило #25: имя — не идентификатор; два разных лада могут называться
+   одинаково после локализации, а один и тот же объект — это один и тот же лад).
+   Дорожка МОЖЕТ держать события в разных ладах: смена лада во время записи ничем не закрыта (ui зовёт
+   setScaleIdx+softAllOff, запись продолжается), и слияние взятых кладёт их рядом. Две ступенные оси
+   честно не нарисовать — поэтому одна группа даёт ОСЬ, прочие показываются призраками.
+   Мемо — на идентичность вида сегментов (он же мемо на songNotes), чтобы не пересобирать на кадр. */
+let segCache={view:null,layer:null,role:null,groups:null};
+function rollGroups(){
+  const SV=songSegs(), ly=rollTrackLayer(), role=rollRole;
+  if(segCache.view!==SV||segCache.layer!==ly||segCache.role!==role){
+    const groups=[];
+    if(ly!=null&&role!=='dr') for(const s of SV.segs){
+      if(s.layer!==ly||s.role!==role) continue;
+      let g=groups.find(q=>q.sc===s.sc);                    // ССЫЛКА, не имя
+      if(!g){ g={sc:s.sc, sev:s.sev, segs:[]}; groups.push(g); }
+      g.segs.push(s);
+    }
+    segCache={view:SV, layer:ly, role, groups};
+  }
+  return segCache.groups;
+}
+/* Ряды высотной оси: ступени × регистры. ⛳ СТУПЕНЕЙ — IVX(s).length, то есть iv.length+1: список
+   ЗАМЫКАЕТСЯ ДУБЛЕМ ТОНИКИ сверху. Значит верхний ряд регистра и нижний ряд следующего — ОДНА И ТА ЖЕ
+   ВЫСОТА, и это не ошибка: запись хранит СЫГРАННУЮ пару (deg,oct), а сыграть можно и так, и так
+   (rectSlotOf опирается на то же). Поэтому ролл кладёт ОБА ряда и НЕ переписывает ни одного события —
+   дубль лишь помечен тусклее, чтобы человек понимал, почему две строки звучат одинаково. */
+const rollDegPerOct=s=>IVX(s).length;
+const rollRowOf=(deg,oct,s)=> (oct|0)*rollDegPerOct(s) + (deg|0);
+const rollRowsTotal=s=> REG_N*rollDegPerOct(s);
+/* ⛳ ШИРИНА КОЛОНКИ ПОДПИСЕЙ — ИЗМЕРЯЕТСЯ, А НЕ УГАДЫВАЕТСЯ (S5.6, починка обрезки слева).
+   ⚠️ ПРИЧИНА ОБРЕЗКИ БЫЛА ИМЕННО ЗДЕСЬ: колонка была КОНСТАНТОЙ (58px), а подписи бывают любой длины —
+   «Са · Чхандовати» у 22-шрути в разы шире, чем «Т» или «12». Подпись рисуется ВПРАВО-выключенной от
+   края сетки, поэтому всё, что не влезло, уезжало за левый край экрана.
+   ⛳ ПОЧЕМУ ЭТО ЧИНИТ И ПОПАДАНИЕ ТОЖЕ: ширина идёт в x0 СНИМКА, а из снимка считают и рисование, и
+   laneBeatAt (правило #9). Подвинулась колонка — подвинулась сетка, и палец берёт ту же ноту, что видит.
+   ⛳ ПОЧЕМУ ДЕРЖИТ ЛЮБУЮ ПОДПИСЬ: (1) меряем РЕАЛЬНЫЕ строки лада (все ступени периода + самый широкий
+   суффикс регистра), а не образец; (2) потолок 42% холста — даже абсурдная подпись не съест сетку;
+   (3) на потолке текст КЛИПУЕТСЯ по колонке, поэтому «не влезло» выглядит как обрезанный хвост в своей
+   колонке, а не как буквы поверх нот.
+   Кэш — на (лад, тоника): имена нот зависят от ЖИВОЙ тоники, поэтому она в ключе. */
+let lblCache={sc:null,tonic:-1,w:ROLL_LBL_W};
+function rollGutterW(sc){
+  if(lblCache.sc===sc&&lblCache.tonic===tonic) return lblCache.w;
+  const dpo=rollDegPerOct(sc), prev=ctx.font;
+  ctx.font='11px system-ui';
+  let w=0;
+  for(let d=0;d<dpo;d++) w=Math.max(w, ctx.measureText(noteLbl(d,sc)+(d===0?' IV':'')).width);
+  ctx.font=prev;
+  lblCache={ sc, tonic, w:Math.max(ROLL_LBL_W, Math.ceil(w)+14) };   // +14: зазор до сетки и запас на округление
+  return lblCache.w;
 }
 const rollLower=(hits,t)=>{ let lo=0,hi=hits.length; while(lo<hi){ const m=(lo+hi)>>1; if(hits[m].t<t) lo=m+1; else hi=m; } return lo; };
 /* ⛳ ПРИВЯЗКА ИДЁТ ЗА КВАНТИЗАЦИЕЙ ЗАПИСИ (S5.2 — ОТМЕНА РЕШЕНИЯ S5.1).
@@ -794,20 +862,48 @@ function drawRoll(){
   const ly=rollTrackLayer();
   /* ry0 — верх ЛИНЕЙКИ (S5.2). Сетка начинается там же, где и раньше (ry0+ROLL_RULER_H === прежний gy0),
      поэтому поле нот не сдвинулось ни на пиксель: линейка заняла тот отступ, что и так пустовал. */
-  const x0=ROLL_LBL_W, x1=W-12, ry0=ROLL_BAR_H+ROLL_TP_H+2, gy0=ry0+ROLL_RULER_H, gy1=H-26;
-  const rows=DRUM_ROWS, rowH=(gy1-gy0)/rows;
-  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows };
+  const x1=W-12, ry0=ROLL_BAR_H+ROLL_TP_H+2, gy0=ry0+ROLL_RULER_H, gy1=H-26;
+  /* ⛳ ГЕОМЕТРИЯ РЯДОВ РАЗНАЯ У РОЛЕЙ, И ЭТО ЕДИНСТВЕННОЕ ИХ РАЗЛИЧИЕ В СНИМКЕ. Ударные: шесть рядов во
+     всю высоту, row0=0 — ровно как было. Ладовые роли: ряд фиксированной высоты, видно столько, сколько
+     влезло, остальное — прокруткой (row0). */
+  const grp=rollGroups(), G=grp&&grp.length?grp[Math.min(rollScale,grp.length-1)]:null;
+  const axSc = G ? G.sc : CUR();                       // лад ОСИ: показанной группы, иначе живой (пустая роль)
+  const pitched = rollRole!=='dr';
+  const x0 = pitched ? Math.min(rollGutterW(axSc), Math.floor(W*0.42)) : ROLL_LBL_W;   // S5.6: колонка подписей — по МЕРКЕ, с потолком
+  const total = pitched ? rollRowsTotal(axSc) : DRUM_ROWS;
+  /* ⛳ ПОДГОНКА ПО ВЫСОТЕ (S5.6): ВЛЕЗАЮТ ВСЕ РЯДЫ — растягиваем их на всю высоту (до потолка), не
+     влезают — оставляем минимальную высоту и прокручиваем, как было. Правило ДЕТЕРМИНИРОВАНО (число
+     рядов × высота поля), поэтому на границе «влезает/не влезает» ничего не мигает: одно и то же поле
+     всегда даёт один и тот же ответ, а при повороте экрана он просто пересчитывается на следующем кадре.
+     ⛔ УДАРНЫЕ НЕ ЗАТРОНУТЫ: у них высота и раньше была «поле / 6», то есть ровно подгонка. */
+  const fitH=(gy1-gy0)/Math.max(1,total);
+  const rowH = pitched ? (fitH>=ROLL_PITCH_ROW_H ? Math.min(fitH,ROLL_PITCH_ROW_MAX) : ROLL_PITCH_ROW_H)
+                       : (gy1-gy0)/DRUM_ROWS;
+  const rows = pitched ? Math.max(1,Math.min(total,Math.floor((gy1-gy0)/rowH))) : DRUM_ROWS;
+  const row0 = pitched ? Math.max(0,Math.min(rollRow0,Math.max(0,total-rows))) : 0;
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, pitched };
   const V=rollView, pxB=V.bw/V.span, M=loop.metre;
-  // ---- ряды: чередующаяся заливка + имя ряда слева (то же имя, что у игрового поля — L(DRUM_NAMES)) ----
+  const DPO = pitched ? rollDegPerOct(axSc) : 0;
+  // ---- ряды: чередующаяся заливка + подпись слева (ударные — имя ряда, лад — НОТА В ЛАДУ ОСИ) ----
   ctx.textBaseline='middle'; ctx.textAlign='right'; ctx.font='11px system-ui';
-  for(let r=0;r<rows;r++){
-    const y=rollRowY(V,r);
-    ctx.fillStyle = r%2 ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.015)';
+  for(let i=0;i<rows;i++){
+    const r=row0+i, y=rollRowY(V,r);
+    const dup = pitched && (r%DPO)===DPO-1;            // верхний ряд регистра — ДУБЛЬ тоники следующего: та же высота
+    ctx.fillStyle = (pitched ? (r%DPO===0) : r%2) ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.015)';   // тоника регистра выделена заливкой — по ней читается октава
     ctx.fillRect(V.x0,y,V.bw,V.rowH);
     ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(V.x0,y); ctx.lineTo(V.x0+V.bw,y); ctx.stroke();
-    ctx.fillStyle='rgba(255,255,255,.62)';
-    ctx.fillText(L(DRUM_NAMES[r])||'', V.x0-6, y+V.rowH/2);
+    ctx.fillStyle= dup ? 'rgba(255,255,255,.3)' : 'rgba(255,255,255,.62)';
+    /* ⛳ ПОДПИСЬ — В ЛАДУ ОСИ, а не в живом: ради этого и заводился параметр у noteLbl (S5.4). Тоника
+       ЖИВАЯ — высоту переигровка тоже берёт от живой тоники, и подпись обязана идти за ней.
+       ⛳ КЛИП ПО КОЛОНКЕ (S5.6): ширину мы измерили, но у неё есть потолок — и на потолке хвост обязан
+       обрезаться В КОЛОНКЕ, а не лезть на сетку или за край экрана. */
+    if(V.rowH>=11){
+      ctx.save(); ctx.beginPath(); ctx.rect(0,y,V.x0-4,V.rowH); ctx.clip();
+      ctx.fillText(pitched ? `${noteLbl(r%DPO,axSc)}${(r%DPO===0)?' '+(OCT_ROMAN[(r/DPO)|0]||''):''}`
+                           : (L(DRUM_NAMES[r])||''), V.x0-6, y+V.rowH/2);
+      ctx.restore();
+    }
   }
   // ---- скоба повтора: только ПОКАЗ (правка скобы живёт на полосе лупера) ----
   if(regionOn()){
@@ -867,7 +963,7 @@ function drawRoll(){
     if(bib===0 && pxB*M>=30){ ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillText(String((b/M|0)+1), gx+3, gy0-8); }   // номер такта — с единицы, как в подписи скобы
   }
   // ---- удары: только попавшие в окно (двоичный поиск по началу) ----
-  const hits=rollHits(), blkW=rollBlockPx(V);   // ширина блока — ОДНА на отрисовку, призрак и попадание
+  const hits=pitched?[]:rollHits(), blkW=rollBlockPx(V);   // ширина блока — ОДНА на отрисовку, призрак и попадание
   for(let i=rollLower(hits,V.beat0); i<hits.length && hits[i].t<=V.beat0+V.span; i++){
     const ev=hits[i], r=ev.a.row|0; if(r<0||r>=rows) continue;
     const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
@@ -877,15 +973,48 @@ function drawRoll(){
     ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();                          // S5.2: блок НАЧИНАЕТСЯ на доле и растёт вправо — нота «на раз» лежит ВНУТРИ такта, а не верхом на его линии
     if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke(); }
   }
+  /* ---- СЕГМЕНТЫ ЛАДОВОЙ РОЛИ (S5.5): у каждого своя ДЛИНА (от смены высоты до следующей), поэтому блок
+     рисуется от start до end — в отличие от удара, у которого длительности нет вовсе. Открытый сегмент
+     (нота без «выкл» — так лежит подложка) тянем до правого края окна: выдумывать ему конец нельзя.
+     ⛳ ПРИЗРАКИ ЧУЖИХ ЛАДОВ — тусклые и НЕ ПОПАДАЕМЫЕ: их ступени измерены не той осью, что нарисована,
+     поэтому показать их можно только как «здесь что-то есть», а трогать — лишь переключив ось. ---- */
+  if(pitched){
+    const col=INSTR_COL[rollRole]||'#3ad29f', wEnd=V.beat0+V.span;
+    for(const g of grp){
+      const ghost = g!==G;
+      for(const s of g.segs){
+        const en = s.end==null ? wEnd : s.end;
+        if(en<V.beat0||s.start>wEnd) continue;
+        const r = ghost ? -1 : rollRowOf(s.deg,s.oct,axSc);
+        if(!ghost && (r<row0||r>=row0+rows)) continue;
+        const x=laneBeatX(V,Math.max(s.start,V.beat0)), x2=laneBeatX(V,Math.min(en,wEnd));
+        const w=Math.max(3,x2-x);
+        if(ghost){   // призрак: тонкая полоска у нижней кромки — место и время видно, высота честно не показана
+          ctx.fillStyle='rgba(255,255,255,.10)';
+          ctx.fillRect(x,gy1-4,w,3); continue;
+        }
+        const yT=rollRowY(V,r), h=V.rowH*0.7, y=yT+(V.rowH-h)/2;
+        const vol=Math.max(0,Math.min(1,s.vol==null?1:s.vol)), sel=s.ev===rollSel;
+        ctx.fillStyle = sel ? '#fff' : hexA(col, 0.35+0.55*vol);
+        ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();
+        if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
+          /* РУЧКА ДЛИНЫ — только у ВЫДЕЛЕННОГО и только там, где тянуть есть за что (есть endEv и блок
+             шире порога). Показываем на выделенном, а не на всех: иначе каждая нота обрастала бы засечкой. */
+          if(s.endEv && w>=ROLL_EDGE_MIN_W){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }
+      }
+    }
+  }
   /* ---- ПРИЗРАК ПЕРЕТАСКИВАНИЯ (S5.1): пока палец ведёт, СОБЫТИЕ НЕ ТРОНУТО. Пунктир показывает, куда
      удар встанет после отпускания — по тем же laneBeatX/rollRowY, что и настоящие удары, поэтому
      обещание призрака и результат правки совпадают по построению. ---- */
   if(rollDrag&&rollDrag.ev){
     const gr=rollDrag.row|0;
-    if(gr>=0&&gr<rows){
-      const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*0.62, gy=rollRowY(V,gr)+(V.rowH-gh)/2;
+    if(gr>=row0&&gr<row0+rows){
+      const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*(pitched?0.7:0.62), gy=rollRowY(V,gr)+(V.rowH-gh)/2;
+      /* Призрак ладовой роли держит ДЛИНУ сегмента (rollDrag.len), у удара длины нет — там блок привязки. */
+      const gw = pitched ? Math.max(3, laneBeatX(V,rollDrag.t+(rollDrag.len||1))-gx) : blkW;
       ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
-      ctx.beginPath(); ctx.roundRect(gx,gy,blkW,gh,3); ctx.stroke(); ctx.setLineDash([]);   // призрак — ТОТ ЖЕ блок, что и настоящий удар
+      ctx.beginPath(); ctx.roundRect(gx,gy,gw,gh,3); ctx.stroke(); ctx.setLineDash([]);   // призрак — ТОТ ЖЕ блок, что и настоящая нота
     }
   }
   /* ---- БЕГУНОК: теперь виден И НА ОСТАНОВЛЕННОМ транспорте (S5.2). Без этого перемотка была бы слепой:
@@ -906,9 +1035,10 @@ function drawRoll(){
   ctx.lineWidth= rollIns ? 2 : 1;
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
-  if(ly==null||!hits.length){
+  const emptyRole = pitched ? !grp.length : !hits.length;
+  if(ly==null||emptyRole){
     ctx.fillStyle='rgba(255,255,255,.55)';
-    ctx.fillText(t(ly==null?'roll.noTrack':'roll.empty'), V.x0+V.bw/2, (gy0+gy1)/2);
+    ctx.fillText(t(ly==null?'roll.noTrack':(pitched?'roll.emptyRole':'roll.empty')), V.x0+V.bw/2, (gy0+gy1)/2);
   }
   ctx.fillStyle='rgba(255,255,255,.34)'; ctx.font='10px system-ui';
   ctx.fillText(t('roll.hint'), V.x0+V.bw/2, gy1+14);
@@ -925,7 +1055,30 @@ export function rollHit(px,py){
   const beat=laneBeatAt(V,px);
   if(py>=V.ry0 && py<V.gy0) return { what:'ruler', beat };   // S5.2: ЛИНЕЙКА — своя цель; её низ = верх сетки, пересечься они не могут
   const r=rollRowAt(V,py);
-  if(r<0||r>=V.rows) return null;
+  const row0=V.row0||0;
+  if(r<row0||r>=row0+V.rows) return null;
+  /* S5.5: у ладовой роли попадание идёт по СЕГМЕНТАМ (у них есть длина), у ударных — по блоку привязки.
+     Призраки чужих ладов НЕ ловим: их ступень измерена не этой осью, трогать её можно лишь переключив ось. */
+  if(V.pitched){
+    const SV=songSegs(), ly=rollTrackLayer(), tol=ROLL_HIT_PX*V.span/V.bw;
+    let best=null, bd=Infinity;
+    for(const s of SV.segs){
+      if(s.layer!==ly||s.role!==rollRole||s.sc!==V.sc) continue;
+      if(rollRowOf(s.deg,s.oct,V.sc)!==r) continue;
+      const en = s.end==null ? V.beat0+V.span : s.end;
+      const d = beat<s.start ? s.start-beat : beat>en ? beat-en : 0;
+      if(d<bd){ bd=d; best=s; }
+    }
+    if(!(best&&bd<=tol)) return { what:'grid', row:r, beat };
+    /* ⛳ КРАЙ ИЛИ СЕРЕДИНА (S5.6) — решаем ЗДЕСЬ, из той же геометрии, что нарисована: зона края не шире
+       40% блока и не шире ROLL_EDGE_PX, у узких блоков её нет вовсе, и нет её у сегментов без endEv
+       (открытый сегмент или конец, принадлежащий чужой ноте, — тянуть нечего). */
+    const en = best.end==null ? null : best.end;
+    const wpx = en==null ? Infinity : (en-best.start)*V.bw/V.span;
+    const zoneB = (best.endEv && en!=null && wpx>=ROLL_EDGE_MIN_W)
+                ? Math.min(ROLL_EDGE_PX, wpx*0.4)*V.span/V.bw : 0;
+    return { what:'seg', seg:best, ev:best.ev, row:r, beat, edge: zoneB>0 && beat>=en-zoneB };
+  }
   /* S5.2: попадание считаем по ВСЕМУ нарисованному блоку [t, t+блок], а не по расстоянию до доли, —
      иначе палец, положенный на видимый хвост блока, промахивался бы мимо него. Допуск ROLL_HIT_PX
      остаётся и добавляется с обеих сторон: он и ловит блоки уже пальца на общем плане. */
@@ -940,7 +1093,14 @@ export function rollHit(px,py){
 }
 /* Габариты окна для ЖЕСТА прокрутки/зума: ui якорит по НИМ, а пишет через сеттеры state — поэтому
    палец, рисунок и попадание читают одно и то же число (следующий кадр строит снимок из него же). */
-export function rollGeom(){ const V=rollView; return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span } : null; }
+export function rollGeom(){ const V=rollView;
+  return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, rows:V.rows, row0:V.row0||0, total:V.total||V.rows, pitched:!!V.pitched, sc:V.sc } : null; }
+/* Группы ладов открытой дорожки — их читает панель (чип лада) и вставка (какой лад заморозить).
+   Отдаём КОПИЮ списка ссылок, а не внутренний кэш: ui не должен уметь его портить. */
+export function rollScaleGroups(){ return rollGroups().map(g=>({ sc:g.sc, sev:g.sev, n:g.segs.length })); }
+/* Ряд ↔ высота ДЛЯ ВСТАВКИ И ПЕРЕНОСА: ui знает ряд под пальцем, а расшифровать его в (ступень,регистр)
+   обязана та же формула, по которой ряды нарисованы. */
+export function rollRowPitch(r,s){ const d=rollDegPerOct(s||CUR()); return { deg:((r%d)+d)%d, oct:Math.floor(r/d) }; }
 /* ⛳ ЕДИНСТВЕННАЯ РАЗВИЛКА «ИГРА ИЛИ РЕДАКТОР». Закрыт редактор — ветка та же, что была всегда. */
 function drawOverlays(res){ if(rollOpen){ drawRoll(); return; } drawPhone(res); }
 

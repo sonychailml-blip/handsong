@@ -136,6 +136,9 @@
   <button id="rollClose" data-i18n-title="roll.closeTitle" title="Закрыть редактор">✕</button>
   <button id="rollTrack" data-i18n-title="roll.trackTitle" title="Сменить дорожку">L1</button>
   <span id="rollTabs"></span>
+  <!-- Чип ЛАДА (S5.5): виден ТОЛЬКО когда в дорожке события в разных ладах — иначе машинерия зря
+       занимала бы место в панели. Тап переключает, в каком ладу нарисована ось высот. -->
+  <button id="rollScale" data-i18n-title="roll.scaleTitle" title="Лад оси" hidden></button>
   <!-- ПРАВКА (S5.1): вставка — ЯВНЫЙ режим, иначе прокрутка, кончившаяся тапом, молча рождала бы удар.
        ↶ снимает ОДНУ правку и живёт только здесь; ⤺ (целое взятое) на время редактора с экрана убран. -->
   <button id="rollIns" data-i18n-title="roll.insertTitle" title="Режим вставки">✚</button>
