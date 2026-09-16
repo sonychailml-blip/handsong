@@ -161,7 +161,11 @@
   #rollSnap{flex:0 0 auto; font-size:var(--fs-hint); color:var(--dim); padding:0 2px; white-space:nowrap;}
   /* Пока редактор открыт, транспорт оставляет ОДНУ кнопку ▶ (прослушивание). ⤺ ✕ ⟳ ■ меняли бы песню
      под открытым редактором — вплоть до сноса самой открытой дорожки. */
-  #loopTransport.roll>button:not(#loopBtn){display:none;}
+  #loopTransport.roll>button:not(#loopBtn):not(#rollHome){display:none;}
+  /* ⏮ — часть ТРАНСПОРТА РЕДАКТОРА (S5.3): в обычной полосе её нет вовсе, появляется только с .roll,
+     рядом с ▶. Так «в начало» и «играть» стоят вместе, а закрытый редактор видит прежнюю полосу. */
+  #loopTransport>#rollHome{display:none;}
+  #loopTransport.roll>#rollHome{display:block;}
 
   /* Тост камеры: всплывает под верхней панелью при отказе переключения; сам гаснет (класс .on
      снимает JS по таймеру). Не мешает игре — pointer-events:none, показывается только с .on. */

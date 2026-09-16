@@ -436,15 +436,15 @@ function editOpen(layer){
   if(!AC||recording||activeKind()||layer==null) return false;
   const id=laneOf(layer) ?? laneNew(layer);
   if(loop.on) onLoop(); else softAllOff();
-  editLane=id; editHist=[]; editTake=0;   // S5.1: сессия правки начинается с чистой историей
+  editLane=id; editHist=[]; editFuture=[]; editTake=0;   // S5.1/S5.3: сессия правки начинается с чистыми историей И будущим
   return true;
 }
-function editClose(){ editLane=null; editHist=[]; editTake=0; }
+function editClose(){ editLane=null; editHist=[]; editFuture=[]; editTake=0; }
 /* Сменить открытую дорожку, не закрывая редактор (чип дорожки в панели). Звук уже заглушён открытием. */
 function editSetLayer(layer){
   if(editLane==null||layer==null) return false;
   const id=laneOf(layer); if(id==null) return false;
-  editLane=id; editHist=[]; editTake=0;   // S5.1: история — про ТУ дорожку, что на экране; отмена «вслепую» на другой дорожке была бы враньём
+  editLane=id; editHist=[]; editFuture=[]; editTake=0;   // S5.1/S5.3: история И будущее — про ТУ дорожку, что на экране; отмена/возврат «вслепую» на другой были бы враньём
   return true;
 }
 /* ═══ ПРАВКА УДАРОВ И ОТМЕНА ПРАВОК (слайс S5.1) ═══
@@ -468,8 +468,20 @@ function editSetLayer(layer){
    памяти: ВНЕ редактора песню меняют запись, ⤺, ✕ и подложка, и обратный ход, сохранённый «на потом»,
    однажды указал бы на событие, которого в песне уже нет. Закрыл редактор — история закрыта вместе с ним. */
 const EDIT_DEF_VOL=0.8;                 // громкость вставленного удара, когда в дорожке спросить не у кого
-let editHist=[], editTake=0;            // обратные ходы сессии; номер взятого для ВСТАВОК этой сессии
+/* ⛳ ИСТОРИЯ ДВУНАПРАВЛЕННАЯ (S5.3). ⚠️ РЕДО — НЕ ЗЕРКАЛО ОТМЕНЫ, и запись не симметрична: отмене хватало
+   ОБРАТНОГО хода, а возврату нужен ПРЯМОЙ. Поэтому запись переноса несёт ОБА состояния (from/to), а
+   удаление и вставка симметричны сами по себе — там хватает ССЫЛКИ НА СОБЫТИЕ, и в обе стороны едет ОДИН
+   И ТОТ ЖЕ объект (это несущее: и спаривание нот, и выделение держатся за сам объект, а не за копию).
+   ⛔ ОБРЫВ БУДУЩЕГО. Отменил три правки, сделал НОВУЮ — отменённое больше недостижимо: оно описывает песню,
+   которой уже нет. Не выбрось мы его здесь, ↷ применил бы старый ход к изменившемуся материалу, и это НЕ
+   упало бы с ошибкой — просто удар появился бы там, куда его никто не ставил. Поэтому ЕДИНСТВЕННЫЙ писатель
+   истории — editPush, и он же чистит будущее: забыть про обрыв невозможно, потому что мимо него не пройти.
+   Будущее живёт ровно столько же, сколько история (открытие/закрытие/смена дорожки) — по той же причине:
+   ссылка на событие, пережившая сессию, однажды указала бы в пустоту. */
+let editHist=[], editFuture=[], editTake=0;   // сделанное · отменённое (ждёт ↷) · номер взятого для ВСТАВОК сессии
 const editCanUndo=()=>editHist.length>0;
+const editCanRedo=()=>editFuture.length>0;
+const editPush=u=>{ editHist.push(u); editFuture.length=0; };   // НОВАЯ правка обрывает ветку отменённого
 /* Дорожка ПОДЛОЖКИ (🎵): её события помечены ev.jam, и clearJam снимает их ЦЕЛИКОМ. Правка внутри такой
    дорожки пережила бы снятие подложки осиротевшим обрывком — поэтому подложка в S5.1 ТОЛЬКО ЧИТАЕТСЯ.
    ⚠️ Аранжировка из ⚙-панели метки НЕ несёт (известное расхождение, см. отчёт) и потому правится как
@@ -497,14 +509,15 @@ function editDrumDefaults(layer,t){
 }
 function editMoveHit(ev,t,row){
   if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
-  editHist.push({ kind:'move', ev, t:ev.t, a:ev.a });     // обратный ход помнит ПРЕЖНИЕ время и нагрузку целиком
-  ev.t=Math.max(0,t); ev.a={...ev.a, row};
+  const from={t:ev.t, a:ev.a}, to={t:Math.max(0,t), a:{...ev.a, row}};   // ОБА состояния: from для ↶, to для ↷
+  editPush({ kind:'move', ev, from, to });
+  ev.t=to.t; ev.a=to.a;
   editCommit(); return true;
 }
 function editDeleteHit(ev){
   if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
   if(!compactEvents(e=>e===ev)) return false;
-  editHist.push({ kind:'del', ev });                       // держим САМ объект — вернуть можно ровно его
+  editPush({ kind:'del', ev });                            // держим САМ объект — и ↶, и ↷ возвращают/убирают ровно его
   editCommit(); return true;
 }
 function editInsertHit(t,row){
@@ -515,17 +528,28 @@ function editInsertHit(t,row){
   if(!editTake) editTake=++takeSeq;
   const ev={ t:Math.max(0,t), layer, fn:'drum', a:{row, vol:d.vol, kit:d.kit}, sc:CUR(), sev:seventh, tk:editTake };
   events.push(ev);
-  editHist.push({ kind:'ins', ev });
+  editPush({ kind:'ins', ev });
   editCommit(); return ev;
 }
-/* ↶ — снять ПОСЛЕДНЮЮ правку. Обратные ходы точные: перенос возвращает прежние время и нагрузку, удаление
-   возвращает ТОТ ЖЕ объект, вставка его убирает. */
+/* ОДИН ход истории в ЛЮБУЮ сторону. undo=true — назад, false — вперёд. Перенос переставляет время и
+   нагрузку на нужное состояние; удаление и вставка — зеркальны друг другу и возят ТОТ ЖЕ объект события
+   (никаких копий: за объект держатся выделение и спаривание нот). */
+function editApply(u,undo){
+  if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; }
+  else if(u.kind==='del'){ if(undo) events.push(u.ev); else compactEvents(e=>e===u.ev); }
+  else                   { if(undo) compactEvents(e=>e===u.ev); else events.push(u.ev); }   // 'ins'
+}
+/* ↶ — снять последнюю правку (и положить её в будущее, чтобы ↷ мог вернуть). */
 function editUndo(){
   if(!editGuard()||!editHist.length) return false;
-  const u=editHist.pop();
-  if(u.kind==='move'){ u.ev.t=u.t; u.ev.a=u.a; }
-  else if(u.kind==='del'){ events.push(u.ev); }
-  else compactEvents(e=>e===u.ev);
+  const u=editHist.pop(); editApply(u,true); editFuture.push(u);
+  editCommit(); return u.kind;
+}
+/* ↷ — вернуть отменённое. ⛔ Мимо editPush — И ЭТО ВЕРНО: возврат не создаёт новой ветки, он идёт ПО ТОЙ
+   ЖЕ, и чистить будущее здесь было бы ошибкой (стёрло бы остаток очереди ↷). Ветку рвёт только НОВАЯ правка. */
+function editRedo(){
+  if(!editGuard()||!editFuture.length) return false;
+  const u=editFuture.pop(); editApply(u,false); editHist.push(u);
   editCommit(); return u.kind;
 }
 
@@ -1749,6 +1773,6 @@ export {
   toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, toggleArm, armedLayer, laneDelTap, laneDelCancel, laneDelPendingLayer,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
   songNotes,      // S4.0: события, собранные в НОТЫ (только чтение) — по ним рисует пиано-ролл
   editOpen, editClose, editIsOpen, editLayer, editSetLayer,   // S5.0: редактор дорожки — ОДИН флаг на все отказы; наружу отдаём НОМЕР СЛОЯ, id остаётся здесь (правило #27)
-  editMoveHit, editDeleteHit, editInsertHit, editUndo, editCanUndo, editBackingOpen,   // S5.1: правка ударов и отмена ПРАВОК (не путать с ⤺ — та снимает взятое)
+  editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

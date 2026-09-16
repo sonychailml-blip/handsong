@@ -111,6 +111,10 @@
      Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что высота холстовой коробки
      растёт с числом дорожек. Видна, пока идёт транспорт или в песне есть события. -->
 <div id="loopTransport">
+  <!-- ⏮ (S5.3) ЖИВЁТ ЗДЕСЬ, РЯДОМ С ▶: «откуда играть» и «играть» — одна мысль, и читаться они должны как
+       один транспорт. В покое кнопка СКРЫТА (CSS) и появляется только у открытого редактора (.roll), где
+       полоса и так оставляет одну ▶, — поэтому вид транспорта с закрытым редактором не меняется ничем. -->
+  <button id="rollHome" data-i18n-title="roll.homeTitle" title="Бегунок в начало">⏮</button>
   <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Играть / пауза">▶ играть</button>
   <!-- ⟳ ПОВТОР СКОБЫ (S3.5b): только ВКЛЮЧАЕТ и ВЫКЛЮЧАЕТ повтор. Какие такты повторяются, задаёт СКОБА на
        полосе лупера — её края ставят тапом или перетаскиванием, с точностью до такта; её же начало — место,
@@ -134,11 +138,12 @@
   <span id="rollTabs"></span>
   <!-- ПРАВКА (S5.1): вставка — ЯВНЫЙ режим, иначе прокрутка, кончившаяся тапом, молча рождала бы удар.
        ↶ снимает ОДНУ правку и живёт только здесь; ⤺ (целое взятое) на время редактора с экрана убран. -->
-  <!-- ⏮ бегунок в начало (S5.2): тап по ЛИНЕЙКЕ ставит его куда угодно, эта кнопка — в ноль. -->
-  <button id="rollHome" data-i18n-title="roll.homeTitle" title="Бегунок в начало">⏮</button>
   <button id="rollIns" data-i18n-title="roll.insertTitle" title="Режим вставки">✚</button>
   <button id="rollDel" data-i18n-title="roll.delTitle" title="Удалить выбранный удар">🗑</button>
+  <!-- ↶/↷ — отмена и ВОЗВРАТ ПРАВКИ (S5.3). Обе гаснут, когда делать нечего: мёртвая кнопка должна
+       выглядеть мёртвой, а не молча не работать. -->
   <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку">↶</button>
+  <button id="rollRedo" data-i18n-title="roll.redoTitle" title="Вернуть правку">↷</button>
   <span id="rollSnap"></span>
   <button id="rollZoomOut" data-i18n-title="roll.zoomOutTitle" title="Отдалить">−</button>
   <button id="rollZoomIn" data-i18n-title="roll.zoomInTitle" title="Приблизить">+</button>

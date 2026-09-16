@@ -22,7 +22,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, songNotes, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
-         editMoveHit, editDeleteHit, editInsertHit, editUndo, editCanUndo, editBackingOpen } from './recorder.js';   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen } from './recorder.js';   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -357,7 +357,7 @@ addEventListener('pointercancel',()=>{ braceEdge=null; });
 const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTabsEl=$('rollTabs'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
-      rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome');
+      rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome');
 const ROLL_ROLES=['dr','ld','ch','bs'];          // порядок вкладок: та, что правится сегодня, — первой
 const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
 const rollTotal=()=>Math.max(songBeats(), loop.metre*loop.bars);   // пустая песня — тоже поле: показываем окно подложки
@@ -433,6 +433,7 @@ function updRollBtns(){
   rollInsBtn.classList.toggle('act', rollIns); rollInsBtn.disabled=ro;
   rollDelBtn.disabled  = ro || !rollSel;
   rollUndoBtn.disabled = ro || !editCanUndo();
+  rollRedoBtn.disabled = ro || !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
   const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
   const hid = !s.free && !s.drawn;
   rollSnapEl.textContent='⌗ '+lbl+(hid?' '+t('roll.snapHidden'):'');
@@ -447,6 +448,7 @@ rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
   if(editDeleteHit(rollSel)) setRollSel(null);
   updRollBtns(); };
 rollUndoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editUndo()) setRollSel(null); updRollBtns(); };
+rollRedoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editRedo()) setRollSel(null); updRollBtns(); };   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
 /* ⏮ — бегунок в начало. ТОТ ЖЕ seekTo, что и тап по линейке: перемотка одна на все входы (она сама решает,
    идёт ли транспорт, гасит голоса дорожек и сбрасывает курсоры). Второго пути перемотки не заводим. */
 rollHomeBtn.onclick=()=>seekTo(0);
