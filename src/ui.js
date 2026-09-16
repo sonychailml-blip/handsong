@@ -2,9 +2,9 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
+         fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
-         roleXDriven, fxVolFix, setFxVolFix, fxIsScalar,
+         chainXDriven, fxVolFix, setFxVolFix, fxIsScalar,
          rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, rollDrag, setRollDrag, rollIns, setRollIns,
          rollRole, setRollRole, rollRow0, setRollRow0, rollScale, setRollScale,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
@@ -983,6 +983,15 @@ const fxCtlSep=$('fxCtlSep'), fxCtlRows=$('fxCtlRows');
    непустая сегодня ровно одна — соло. */
 let fxCtlRole='ld';
 const FX_ROLE_SEQ=['ld','ch','bs','dr'];   // порядок ролей в выпадающем списке — тот же, что у INSTR_SEQ (кнопка роли)
+/* ⛳ ЦЕЛЬ ПРАВКИ — ЦЕПЬ, И АДРЕСУЕТСЯ ОНА КЛЮЧОМ (слайс O-0). fxCtlRole — это ВЫБОР В СПИСКЕ, то есть
+   состояние самого меню; ключ цепи из него ВЫВОДИТСЯ здесь, и дальше все операции с цепью идут по ключу.
+   ⚠️ ФУНКЦИЯ, А НЕ КОНСТАНТА: обработчики строк создаются при отрисовке и живут до следующей, а читать
+   выбор они обязаны ЖИВЫМ — ровно так они читали fxCtlRole до этой правки.
+   ⚠️ РОЛЬ ИЗ МЕНЮ НЕ ИСЧЕЗЛА, и это не недоделка: три величины рядом принадлежат РОЛИ, а не цепи —
+   подпись пункта (t('role.'+r)), наличие руки-эффектов (roleHasFx) и фиксированная громкость (fxVolFix).
+   Когда в список добавятся цепи ТЕМБРОВ, развилка «что именно выбрано» ляжет ИМЕННО СЮДА, в состояние
+   меню, а не в API цепей — они ключ уже принимают. */
+const fxCtlChain=()=>chainKeyOf(fxCtlRole);
 /* КАКОЙ ЭФФЕКТ РАЗВЁРНУТ — тоже состояние МЕНЮ (аккордеон, Пласт 3.4.3), рядом с fxCtlRole и по тем же
    доводам: gestures/draw о нём знать не должны.
    ⚠️ ХРАНИМ fxId, А НЕ ИНДЕКС. Индекс поехал бы при каждом «убрать»: удалил первый эффект — развёрнутым
@@ -1069,9 +1078,9 @@ function fxHint(key){ const p=document.createElement('p'); p.className='phint'; 
 const handActSep=$('handActSep'), handActRows=$('handActRows');
 /* Параметры цепи, которые ведёт ЭТОТ ЖЕ палец. Нужны ровно для чипа «делится»: подписка на палитру
    пальца не отнимает (ACTIONS.chFam.exclusive===false), и человек вправе знать, с кем он его делит. */
-function actShareOn(role,finger){
+function actShareOn(key,finger){
   const out=[];
-  for(const eff of fxChainOf(role)){
+  for(const eff of fxChainOf(key)){
     const pkeys=fxParamKeys(eff.fxId);
     eff.params.forEach((pa,pi)=>{
       if(pi>=pkeys.length) return;                                   // параметра без дескриптора жест не ведёт (см. fxShareMap) — и делить нечего
@@ -1110,7 +1119,7 @@ function renderHandActs(){
       sel.onchange=e=>{ setHandAct(role,'fx',f,e.target.value||null); softAllOff();   // подписка меняет СМЫСЛ щипка этим пальцем — глушим звучащее, как смена функции руки или раскладки
         renderHandActs(); };                                                          // перерисовка своя: изменился чип «делится» у этой строки
       row.appendChild(lab); row.appendChild(sel);
-      if(cur){ const sh=actShareOn(role,f); if(sh.length) row.appendChild(fxShareChip([sh])); }
+      if(cur){ const sh=actShareOn(chainKeyOf(role),f); if(sh.length) row.appendChild(fxShareChip([sh])); }   // O-0: делят ПАРАМЕТРЫ ЦЕПИ — значит спрашиваем по ключу цепи этой роли
       handActRows.appendChild(row);
     });
   }
@@ -1159,15 +1168,15 @@ function buildStepper(cur,put){
    идёт ЧЕРЕЗ ЭТИ ДВЕ, забыть половину нельзя. Появится третье место правки — звать надо их же.
    ⚠️ Старые скалярные (делей/вибрато/драйв/тремоло) гасит hushUnassignedFx ВНУТРИ сеттера (правило 2.5),
    и fxSetActive для них — тихий no-op: экземпляра у них нет. Каждому свой механизм, дублирования нет. */
-function fxChainDrop(role,effIdx){
-  const eff=fxChainOf(role)[effIdx]; if(!eff) return;
+function fxChainDrop(key,effIdx){
+  const eff=fxChainOf(key)[effIdx]; if(!eff) return;
   const id=eff.fxId;
-  fxChainRemove(role,effIdx);      // данные (+ гашение СТАРЫХ СКАЛЯРНЫХ внутри сеттера)
-  fxSetActive(role,id,false);      // звук: модулю уводим ПОСЫЛ в 0, сеть не разбираем — хвост дозвучит
+  fxChainRemove(key,effIdx);      // данные (+ гашение СТАРЫХ СКАЛЯРНЫХ внутри сеттера)
+  fxSetActive(key,id,false);      // звук: модулю уводим ПОСЫЛ в 0, сеть не разбираем — хвост дозвучит
 }
-function fxChainPut(role,fxId,nParams){
-  const idx=fxChainAdd(role,fxId,nParams);
-  if(idx>=0) fxSetActive(role,fxId,true);   // ВОЗВРАТ: посыл поднимается из 0 к СОХРАНЁННОМУ значению параметра (p.cur никто не стирал)
+function fxChainPut(key,fxId,nParams){
+  const idx=fxChainAdd(key,fxId,nParams);
+  if(idx>=0) fxSetActive(key,fxId,true);   // ВОЗВРАТ: посыл поднимается из 0 к СОХРАНЁННОМУ значению параметра (p.cur никто не стирал)
   return idx;
 }
 /* Имя эффекта для ЗАГОЛОВКА группы строк: у старых скалярных — из FX_META, у модулей — из реестра.
@@ -1206,7 +1215,7 @@ function renderFxCtl(){
     sel.onchange=e=>{ fxCtlRole=e.target.value; renderFxCtl(); };
     row.appendChild(lab); row.appendChild(sel); fxCtlRows.appendChild(row);
   }
-  const chain=fxChainOf(fxCtlRole);
+  const chain=fxChainOf(fxCtlChain());
   /* ⚠️ ВЕТКА «У ЭТОЙ РОЛИ НЕТ ЦЕПИ» УДАЛЕНА (Пласты 3.5.3/3.5.4), и это не упрощение, а следствие: цепь
      теперь МОЖЕТ БЫТЬ У ЛЮБОЙ из четырёх ролей — обработка появилась на всех шинах. Объяснение
      «аккорды, бас и ударные идут на выход без обработки» стало ЛОЖЬЮ, а ложная подсказка хуже
@@ -1219,14 +1228,14 @@ function renderFxCtl(){
      Это не настройка «на всякий случай», а ПРЯМОЕ СЛЕДСТВИЕ выбора: подписал параметр этой роли на
      «Играющая рука → Горизонталь» — рука больше не ведёт громкость, и её надо где-то задать. Пока
      такого адреса в цепи нет, строки нет вовсе: контрол, который ничего не делает, хуже отсутствующего.
-     ⚠️ Условие ВЫВОДИТСЯ из цепи (roleXDriven), а не хранится флагом — поэтому строка появляется и
+     ⚠️ Условие ВЫВОДИТСЯ из цепи (chainXDriven), а не хранится флагом — поэтому строка появляется и
      исчезает сама, без отдельной синхронизации, и соврать не может.
      ⚠️ СТОИТ ЗДЕСЬ, у начала секции, а не в строке эффекта: величина принадлежит РОЛИ, а не тому
      параметру, который занял ось (их может быть и несколько — адрес один на многих).
      ⚠️ Орган — ОБЩИЙ buildStepper (второго такого поля не заводим: у него накопленная история, см. там).
      Шкала 0..100 = громкость 0..1 напрямую (это амплитуда голоса, а не нормированный параметр эффекта,
      поэтому здесь нет ни fxNorm, ни кривой — число означает ровно то, что показывает). */
-  if(roleXDriven(fxCtlRole)){
+  if(chainXDriven(fxCtlChain())){
     const row=document.createElement('div'); row.className='prow';
     const lab=document.createElement('label'); lab.textContent=t('fx.volFix');
     row.appendChild(lab);
@@ -1243,9 +1252,9 @@ function renderFxCtl(){
      ⚠️ ДО initAudio дескрипторов нет: ps[pi] пуст, засев просто не случится, и параметр останется
      незаполненным до следующей отрисовки. Это безвредно — панель открывается только после старта. */
   chain.forEach((eff,ei)=>{
-    const ps=fxParamsOf(fxCtlRole,eff.fxId);
+    const ps=fxParamsOf(fxCtlChain(),eff.fxId);
     eff.params.forEach((pa,pi)=>{
-      if(pa.mode==='fixed' && pa.v01==null && ps[pi]) setFxParamFixed(fxCtlRole,ei,pi,ps[pi].get());
+      if(pa.mode==='fixed' && pa.v01==null && ps[pi]) setFxParamFixed(fxCtlChain(),ei,pi,ps[pi].get());
     });
   });
   const share=fxShareMap(chain);   // выводим ОДИН раз на отрисовку: карту читают и заголовки, и строки параметров
@@ -1266,7 +1275,7 @@ function renderFxCtl(){
     del.title=t('fx.remove'); del.setAttribute('aria-label',t('fx.remove'));
     del.onclick=e=>{ e.stopPropagation();
       if(fxOpenId===eff.fxId) fxOpenId=null;         // разворачивать после удаления нечего
-      fxChainDrop(fxCtlRole,effIdx); renderFxCtl(); };   // ДАННЫЕ + ЗВУК одной операцией (см. fxChainDrop): снятый эффект обязан замолчать
+      fxChainDrop(fxCtlChain(),effIdx); renderFxCtl(); };   // ДАННЫЕ + ЗВУК одной операцией (см. fxChainDrop): снятый эффект обязан замолчать
     hd.appendChild(arw); hd.appendChild(nm); hd.appendChild(sm);
     /* ЧИП НА ЗАГОЛОВКЕ — чтобы совместность была видна БЕЗ разворачивания: иначе её пришлось бы искать,
        разворачивая эффекты по очереди, а это ровно та работа, от которой аккордеон избавлял.
@@ -1296,20 +1305,20 @@ function renderFxCtl(){
       /* АДРЕС — ОДИН список вместо прежней пары «режим + ось» (см. довод у buildAddrSel). */
       const ad=buildAddrSel(pa);
       ad.onchange=e=>{
-        const val=e.target.value, ps=fxParamsOf(fxCtlRole,eff.fxId), p=ps[pi];
+        const val=e.target.value, ps=fxParamsOf(fxCtlChain(),eff.fxId), p=ps[pi];
         if(val==='fixed'){
           /* ⚠️ ЗАСЕВ ПРИ ПЕРЕХОДЕ В «ФИКСИРОВАНО» — обязателен (об этом просил комментарий в state 2.6.1):
              берём ТЕКУЩЕЕ ЖИВОЕ значение параметра и делаем его фиксированным. Без засева ручка прыгнула бы
              в ноль, то есть «зафиксировать как есть» звучало бы как «выключить». */
-          if(p){ const v01=p.get(); setFxParamMode(fxCtlRole,effIdx,pi,'fixed'); setFxParamFixed(fxCtlRole,effIdx,pi,v01); p.set(v01); }
-          else setFxParamMode(fxCtlRole,effIdx,pi,'fixed');
+          if(p){ const v01=p.get(); setFxParamMode(fxCtlChain(),effIdx,pi,'fixed'); setFxParamFixed(fxCtlChain(),effIdx,pi,v01); p.set(v01); }
+          else setFxParamMode(fxCtlChain(),effIdx,pi,'fixed');
         }else{
           /* АДРЕС РАЗБИРАЕМ ЗДЕСЬ, и только здесь: в данные уезжают отдельные поля hand/finger/axis,
              строка «рука:палец:ось» живёт исключительно в меню. Обратно в 'drive' — палец продолжит
              С ЭТОГО ЖЕ значения (захват берёт базу из живого), латч цел. */
           const [hnd,a,b]=val.split(':');
-          if(hnd==='play') setFxParamAddr(fxCtlRole,effIdx,pi,{hand:'play', axis:a, inv:pa.inv});
-          else             setFxParamAddr(fxCtlRole,effIdx,pi,{hand:'fx', finger:+a, axis:b, inv:pa.inv});
+          if(hnd==='play') setFxParamAddr(fxCtlChain(),effIdx,pi,{hand:'play', axis:a, inv:pa.inv});
+          else             setFxParamAddr(fxCtlChain(),effIdx,pi,{hand:'fx', finger:+a, axis:b, inv:pa.inv});
         }
         renderFxCtl();   // смена адреса ДИСКРЕТНА: перерисовать можно и нужно (набор контролов другой)
       };
@@ -1328,8 +1337,8 @@ function renderFxCtl(){
            герцы) соблюдается сама собой. Сам орган управления — общий buildStepper (см. выше). */
         sub.appendChild(buildStepper(
           ()=>Math.round((pa.v01||0)*100),                       // ИСТОЧНИК — ДАННЫЕ (pa живой объект параметра в цепи), а не текст поля
-          p100=>{ setFxParamFixed(fxCtlRole,effIdx,pi,p100/100);
-                  const p=fxParamsOf(fxCtlRole,eff.fxId)[pi]; if(p) p.set(p100/100); }));
+          p100=>{ setFxParamFixed(fxCtlChain(),effIdx,pi,p100/100);
+                  const p=fxParamsOf(fxCtlChain(),eff.fxId)[pi]; if(p) p.set(p100/100); }));
       }else{
         /* ИНВЕРСИЯ — единственное, что осталось рядом с адресом: сам адрес (рука+палец+ось) выбран
            списком выше. Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной
@@ -1341,7 +1350,7 @@ function renderFxCtl(){
            отражает цепь роли, а не собственный DOM. hand/finger/axis берём из ЖИВОГО параметра: галочка
            меняет только inv, адрес трогать не должна. */
         inv.onchange=()=>{
-          setFxParamAddr(fxCtlRole,effIdx,pi,{hand:pa.hand, finger:pa.hand==='fx'?pa.finger:null, axis:pa.axis, inv:inv.checked});
+          setFxParamAddr(fxCtlChain(),effIdx,pi,{hand:pa.hand, finger:pa.hand==='fx'?pa.finger:null, axis:pa.axis, inv:inv.checked});
           renderFxCtl();
         };
         sub.appendChild(invWrap);
@@ -1367,7 +1376,7 @@ function renderFxCtl(){
        делей посылом). Перенести их на чужую шину — это и своя проводка, и свой store, и вопрос
        формата события; всё это Пласт 3.7, не 3.5. Жест-слой их и так не отдаст чужой роли
        (fxParamsOf возвращает [] вне соло) — здесь мы просто не предлагаем того, что не заработает. */
-    if(fxCtlRole==='ld') for(const m of FX_META) if(fxIsScalar(m.k)&&!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ и предлагается ВСЕМ ролям циклом по FX_FACTORY строкой ниже; здесь его отсекает fxIsScalar, иначе у соло он встал бы в список дважды
+    if(fxCtlChain()===CHAIN_SOLO) for(const m of FX_META) if(fxIsScalar(m.k)&&!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ и предлагается ВСЕМ ролям циклом по FX_FACTORY строкой ниже; здесь его отсекает fxIsScalar, иначе у соло он встал бы в список дважды
     for(const id in FX_FACTORY) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_FACTORY[id].labelKey), FX_FACTORY[id].params.length]);
     const row=document.createElement('div'); row.className='prow';
     const sel=document.createElement('select'); sel.autocomplete='off';
@@ -1379,14 +1388,14 @@ function renderFxCtl(){
     sel.onchange=e=>{
       const id=e.target.value; if(!id) return;
       const n=(avail.find(a=>a[0]===id)||[,,1])[2];        // сколько параметров — знает сам модуль; у старых скалярных ровно один
-      const idx=fxChainPut(fxCtlRole,id,n);   // ДАННЫЕ + ЗВУК: возвращённый эффект снова слышен (посыл поднимается из 0)
+      const idx=fxChainPut(fxCtlChain(),id,n);   // ДАННЫЕ + ЗВУК: возвращённый эффект снова слышен (посыл поднимается из 0)
       if(idx>=0){
         /* ЗАСЕВ ФИКСИРОВАННЫХ ЖИВЫМ ЗНАЧЕНИЕМ — обязанность ui (state до audio не дотянется, обратный
            импорт был бы циклом; об этом и просит комментарий у fxChainAdd). Без него параметр, вставший
            фиксированным из-за нехватки пальцев, ПОКАЗЫВАЛ бы 0 при живом узле на другом значении —
            меню бы врало. Для старого скалярного это тот же ноль (его погасило удаление) — сходится. */
-        const ps=fxParamsOf(fxCtlRole,id), eff=fxChainOf(fxCtlRole)[idx];
-        eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlRole,idx,pi,ps[pi].get()); });
+        const ps=fxParamsOf(fxCtlChain(),id), eff=fxChainOf(fxCtlChain())[idx];
+        eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlChain(),idx,pi,ps[pi].get()); });
         fxOpenId=id;   // разворачиваем добавленное: у него может не быть пальца (все заняты), и это надо увидеть сразу, а не искать
       }
       renderFxCtl();

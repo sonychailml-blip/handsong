@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxChainOf } from './state.js';
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxChainOf, chainKeyOf, CHAIN_SOLO } from './state.js';
 import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS } from './config.js';
@@ -640,10 +640,10 @@ function makeReverbFx(){
    потребовала бы готовить КАЖДЫЙ источник; шинный эффект не требует ничего.
    УСТРОЙСТВО — дословно реверб (makeReverbFx): send (величина подмеса ШИНЫ роли) → gate (включён ли
    эффект в цепи) → линия задержки ⟲ обратная связь → out → мастер. Экземпляры и так ключуются парой
-   (роль, эффект) — FX_INST[role][fxId], — поэтому у КАЖДОЙ роли свой делей со своей линией сам собой, и
+   (владелец, эффект) — FX_INST[key][fxId] (с O-0 ключ, прежде роль), — поэтому у КАЖДОГО свой делей со своей линией сам собой, и
    отдельного store на роль не нужно. Ровно поэтому state.fx для делея УПРАЗДНЁН.
    ⚠️ ДВЕ ПРИЦЕПКИ, КАК У РЕВЕРБА:
-     шина роли → send   — аккорды, бас, ударные (и любой будущий источник): fxRoleBus/fxAttach, без новой
+     шина роли → send   — аккорды, бас, ударные (и любой будущий источник): fxChainBus/fxAttach, без новой
                           механики;
      голос соло → gate  — пер-голосовой dlySend (Пласт 3.7.1), МИМО send: величина ПЕР-НОТНАЯ, едет в
                           событии ноты картой a.fx (ключ 'dly:mix'), поэтому слой соло звучит со СВОИМ
@@ -812,13 +812,19 @@ const FX_FACTORY={
    ДРАЙВЕР ГЛУБИНЫ — то есть лишь при адресе play:z. Поставь человек яркость на ФИКСИРОВАННОЕ значение
    или на горизонталь, и экземпляра бы не существовало: меню показывало бы величину, а звучала бы
    нейтраль. Голосовой экземпляр не строит ни одного узла, так что создавать его здесь ничего не стоит. */
-function fxChordBri(){
-  if(!fxChainOf('ch').some(e=>e&&e.fxId==='bright')) return null;   // яркости нет в цепи → «не задана» (см. довод выше), а не 0
-  const inst=fxInstance('ch','bright');
+/* ⚠️ КЛЮЧ ЦЕПИ — АРГУМЕНТОМ (слайс O-0). Прежде здесь стоял литерал 'ch' дважды. Яркость читает ГОЛОС
+   аккорда, и какой цепи он принадлежит, знает ЗОВУЩИЙ (gestures — из зоны щипнувшей руки), а не эта
+   функция: когда цепь переедет к тембру, менять придётся вызов, а не тело. */
+function fxChordBri(key){
+  if(!fxChainOf(key).some(e=>e&&e.fxId==='bright')) return null;   // яркости нет в цепи → «не задана» (см. довод выше), а не 0
+  const inst=fxInstance(key,'bright');
   return inst ? 1-inst.params[0].cur : null;
 }
+/* ⚠️ РЕЕСТР КЛЮЧУЕТСЯ КЛЮЧОМ ВЛАДЕЛЬЦА ЦЕПИ (слайс O-0), а не ролью: FX_INST[chainKey][fxId]. Сегодня
+   ключей ровно четыре и все ролевые, поэтому реестр устроен как был; когда рядом встанут цепи тембра,
+   их экземпляры лягут СЮДА ЖЕ, не столкнувшись с ролевыми — за это и отвечает вид в значении ключа. */
 const FX_INST={};
-/* ЖИВОЙ ЭКЗЕМПЛЯР ЭФФЕКТА РОЛИ — строится ПРИ ПЕРВОМ ОБРАЩЕНИИ и КЭШИРУЕТСЯ.
+/* ЖИВОЙ ЭКЗЕМПЛЯР ЭФФЕКТА ВЛАДЕЛЬЦА — строится ПРИ ПЕРВОМ ОБРАЩЕНИИ и КЭШИРУЕТСЯ.
    ⚠️ ЭКЗЕМПЛЯРЫ НЕ РАЗБИРАЕМ, когда эффект убирают из цепи, — вместо этого ui/жест уводят подмес в 0.
    Две причины, и обе несущие: (1) снос узлов посреди хвоста ОБРЕЗАЛ БЫ ЕГО СЛЫШНО, а хвост — это и
    есть то, за чем идут к ревербу; (2) у FDN НЕТ осцилляторов (только задержки, фильтры и гейны),
@@ -844,43 +850,46 @@ const FX_INST={};
      'insert' — ВСТАВКА: встаёт В сухой ход роли, ЗАМЕНЯЯ связь «хвост → мастер» на «хвост → вставка → мастер»
                 (тремоло «микс»). Посылом её цеплять нельзя — см. шапку makeTremMixFx.
    ДВЕ ТОЧКИ НА РОЛЬ, у них разные работы:
-     FX_ROLE_BUS  — откуда берут ПОСЫЛЫ. У соло её НЕТ: его посылы пер-голосовые (revBus/dlyBus).
-     FX_ROLE_TAIL — ХВОСТ сухого хода: узел, чья связь с мастером принимает вставки. У аккордов/баса/ударных
+     FX_CHAIN_BUS  — откуда берут ПОСЫЛЫ. У соло её НЕТ: его посылы пер-голосовые (revBus/dlyBus).
+     FX_CHAIN_TAIL — ХВОСТ сухого хода: узел, чья связь с мастером принимает вставки. У аккордов/баса/ударных
                     это их шина, у соло — leadOut. После каждой вставки хвостом становится её выход, и
                     следующая встанет ЗА ней. ⚠️ Порядок вставок = порядок их ПОСТРОЕНИЯ, не порядок в
                     цепи меню. Пока вставка одна (тремоло), это неразличимо; придёт вторая (фильтр,
                     кабинет) — порядок обязан пойти за цепью, и врезку тогда придётся перестраивать.
    ⚠️ ПОСЫЛЫ СТОЯТ ДО ВСТАВОК на ВСЕХ ролях: у соло иначе физически нельзя (посылы в голосе), остальные —
    ради одного закона. Отсюда хвосты реверба и делея не качаются тремоло «микс». */
-const FX_ROLE_BUS={};
-const FX_ROLE_TAIL={};
-function fxAttach(role,inst){
+/* ⚠️ ОБЕ ТОЧКИ КЛЮЧУЮТСЯ КЛЮЧОМ ВЛАДЕЛЬЦА ЦЕПИ (O-0), не ролью. Имена сменились вместе со смыслом:
+   «у роли есть шина» — утверждение, которое перестанет быть верным, а «у цепи есть точка прицепки» —
+   останется, чьей бы цепь ни была. */
+const FX_CHAIN_BUS={};
+const FX_CHAIN_TAIL={};
+function fxAttach(key,inst){
   if(!inst||inst.wired||inst.kind==='voice') return;   // ⛔ У ГОЛОСОВОГО ЭФФЕКТА УЗЛОВ НЕТ: bus.connect(inst.send) с undefined упал бы ТУТ ЖЕ. Цеплять нечего — величину читает сам голос на атаке
   if(inst.kind==='insert'){
-    const tail=FX_ROLE_TAIL[role]; if(!tail) return;
+    const tail=FX_CHAIN_TAIL[key]; if(!tail) return;
     tail.disconnect(master); tail.connect(inst.in); inst.out.connect(master);   // ЗАМЕНА сухой связи; disconnect(master) снимает ТОЛЬКО её, посылы с хвоста остаются
-    FX_ROLE_TAIL[role]=inst.out;
+    FX_CHAIN_TAIL[key]=inst.out;
   }else{
-    const bus=FX_ROLE_BUS[role]; if(!bus) return;
+    const bus=FX_CHAIN_BUS[key]; if(!bus) return;
     bus.connect(inst.send); inst.out.connect(master);   // та же форма, что у соло и аккордов: шина → посыл → сеть → мастер (сухой ход шины не трогаем)
   }
   inst.wired=true;
 }
-function fxAttachAll(role){ const byRole=FX_INST[role]; if(!byRole) return; for(const id in byRole) fxAttach(role,byRole[id]); }
-/* Запомнить шину роли и прицепить к ней всё, что для этой роли уже построено. Порядок вызова
+function fxAttachAll(key){ const byKey=FX_INST[key]; if(!byKey) return; for(const id in byKey) fxAttach(key,byKey[id]); }
+/* Запомнить шину ВЛАДЕЛЬЦА и прицепить к ней всё, что для него уже построено. Порядок вызова
    (шина раньше экземпляра или наоборот) значения не имеет — это и есть смысл двух половин.
-   ⚠️ Зовётся ОДИН раз на роль, до любой вставки: хвост ставится на саму шину, и её связь с мастером
+   ⚠️ Зовётся ОДИН раз на владельца, до любой вставки: хвост ставится на саму шину, и её связь с мастером
    (initAudio) к этому моменту обязана существовать — её и снимет первая вставка. */
-function fxRoleBus(role,node){ FX_ROLE_BUS[role]=node; FX_ROLE_TAIL[role]=node; fxAttachAll(role); }
+function fxChainBus(key,node){ FX_CHAIN_BUS[key]=node; FX_CHAIN_TAIL[key]=node; fxAttachAll(key); }
 /* Только ХВОСТ, без шины посылов — для соло (в.2): вставкам нужно место в сухом ходе, а посылов шины у
    соло нет и заводить их нельзя (пер-нотные посылы уже в голосе; второй посыл удвоил бы эффект). */
-function fxRoleOut(role,node){ FX_ROLE_TAIL[role]=node; fxAttachAll(role); }
-function fxInstance(role,fxId){
+function fxChainTail(key,node){ FX_CHAIN_TAIL[key]=node; fxAttachAll(key); }
+function fxInstance(key,fxId){
   if(!AC) return null;                       // до initAudio узлов нет — меню при этом работает, оно читает ФАБРИКУ
   const f=FX_FACTORY[fxId]; if(!f) return null;
-  const byRole=FX_INST[role]||(FX_INST[role]={});
-  if(!byRole[fxId]){ byRole[fxId]=f.make(); fxAttach(role,byRole[fxId]); }   // построили — сразу и прицепили (если шина роли уже известна)
-  return byRole[fxId];
+  const byKey=FX_INST[key]||(FX_INST[key]={});
+  if(!byKey[fxId]){ byKey[fxId]=f.make(); fxAttach(key,byKey[fxId]); }   // построили — сразу и прицепили (если шина владельца уже известна)
+  return byKey[fxId];
 }
 /* ═══ СНИМОК ПРИЦЕПОЧНЫХ ПАРАМЕТРОВ ЦЕПИ РОЛИ (Пласт 3.7.2) ═══
    Отдаёт `{ 'fxId:paramKey': v01 }` — то, что уезжает в СОБЫТИЕ и делает слой самостоятельным.
@@ -893,12 +902,12 @@ function fxInstance(role,fxId){
    сам себе прицепка; ключ `<id>:amt`, величина прямо из state.fx (она уже 0..1).
    Экземпляра ещё нет (эффект в цепи, но ни разу не звучал) → в снимок не попадает: записывать нечего. */
 const FX_AMT='amt';
-function fxSnapshot(role){
+function fxSnapshot(key){
   const out={};
-  for(const eff of fxChainOf(role)){
+  for(const eff of fxChainOf(key)){
     const id=eff.fxId, f=FX_FACTORY[id];
     if(!f){ if(id in fx) out[id+':'+FX_AMT]=fx[id]; continue; }
-    const inst=FX_INST[role] && FX_INST[role][id]; if(!inst) continue;
+    const inst=FX_INST[key] && FX_INST[key][id]; if(!inst) continue;
     f.params.forEach((s,i)=>{ if(s.attach && inst.params[i]) out[id+':'+s.key]=inst.params[i].cur; });
   }
   return out;
@@ -918,12 +927,12 @@ function fxSnapshot(role){
    ⚠️ ПРИ ВЫКЛЮЧЕНИИ ЭКЗЕМПЛЯР НЕ СОЗДАЁМ (голый поиск, без fxInstance): строить сеть FDN ради того,
    чтобы её тут же заглушить, — чистая растрата. Старый скалярный сюда попадёт как no-op (экземпляра у
    него нет и не будет), и это правильно: его гасит hushUnassignedFx, каждому своё. */
-function fxSetActive(role,fxId,on){
+function fxSetActive(key,fxId,on){
   if(!AC) return;
   /* ⚠️ ВЕДЁМ gate, А НЕ send (с 3.7.2). У соло голоса приходят В gate напрямую, минуя send, — гашение
      через send оставило бы снятый реверб звучать у соло. gate стоит на входе сети и потому выключает
      ВСЕ источники роли разом, чем бы они ни были: шиной (аккорды) или голосами (соло). */
-  const inst = on ? fxInstance(role,fxId) : (FX_INST[role] && FX_INST[role][fxId]);
+  const inst = on ? fxInstance(key,fxId) : (FX_INST[key] && FX_INST[key][fxId]);
   if(!inst) return;
   /* ⛔ У ГОЛОСОВОГО ЭФФЕКТА НЕТ gate, И ГАСИТЬ ЕГО НЕ НУЖНО: его величину читают ИЗ ЦЕПИ (см.
      fxChordBri), а снятый эффект из цепи уже пропал — чтение вернёт null, то есть нейтраль, само собой.
@@ -1052,7 +1061,7 @@ async function initAudio(){
      цепи соло ПО УМОЛЧАНИЮ (значит понадобится всё равно), и порядок постройки узлов обязан остаться
      прежним — сеть строится до соло-цепочки, к моменту прицепки посыла ниже она уже есть.
      Роли БЕЗ записей в цепи (бас, ударные) не строят ничего: fxInstance ленив, пустая цепь бесплатна. */
-  const revLd=fxInstance('ld','reverb');
+  const revLd=fxInstance(CHAIN_SOLO,'reverb');
   revLd.out.connect(master);   // выход комнаты соло — в мастер (прежде это была строка verbOut.connect(master))
  
   /* --- СОЛО-цепочка (как в версии 2) --- */
@@ -1124,7 +1133,7 @@ async function initAudio(){
   const leadOut=AC.createGain(); leadOut.gain.value=LEAD_OUT_G;   // сухая громкость соло; посыл в РЕВЕРБ идёт ПОСЛЕ неё, посыл в ДЕЛЕЙ — из голоса, с той же компенсацией (см. applyVoiceFx)
   exprSatSum.connect(exprWah); exprWah.connect(leadOut);          // тремоло из этого разрыва УШЛО В ГОЛОС (3.7.1) — вставка стала пер-голосовой
   leadOut.connect(master);
-  fxRoleOut('ld',leadOut);   // в.2: у соло есть место для ВСТАВОК (на связи leadOut→мастер), но НЕТ шины посылов — его посылы пер-голосовые. Пока в цепи соло нет вставок, граф не тронут вовсе
+  fxChainTail(CHAIN_SOLO,leadOut);   // в.2: у соло есть место для ВСТАВОК (на связи leadOut→мастер), но НЕТ шины посылов — его посылы пер-голосовые. Пока в цепи соло нет вставок, граф не тронут вовсе
 
   /* ЛИНИЯ ЗАДЕРЖКИ — ОБЩАЯ (один делей-юнит на инструмент), а ПОСЫЛ в неё с 3.7.1 пер-голосовой.
      Прежде было leadOut→dly→dlyWet→master: вход полный, а громкость эха задавал ОДИН общий dlyWet.
@@ -1144,7 +1153,7 @@ async function initAudio(){
      send, см. шапку makeDelayFx. Соло к шине НЕ регистрируется: его прицепка пер-голосовая, как у реверба.
      ⚠️ ЭКЗЕМПЛЯР ОБЯЗАН СУЩЕСТВОВАТЬ ДО ПЕРВОЙ НОТЫ: снимок цепи (fxSnapshot) пропускает эффект без
      экземпляра — не построй его здесь, и первые ноты ушли бы в событие и в звук СУХИМИ. */
-  const dlyLd=fxInstance('ld','dly');
+  const dlyLd=fxInstance(CHAIN_SOLO,'dly');
   dlyLd.out.connect(master);
   dlyBus=dlyLd.gate;                                       // голоса цепляют свои посылы сюда (newLeadVoice)
  
@@ -1186,27 +1195,32 @@ async function initAudio(){
      замену общего реверба на два одинаковых НЕСЛЫШНОЙ — сеть линейна, и сумма двух одинаковых сетей
      равна одной. Разойдись константы — довод рухнет, и хвост изменится. */
   const CH_REV_SEND=0.12;                       // историческое значение revCh: величина ПРИЦЕПКИ аккордов, а не свойство комнаты (потому и не в REV_A)
-  const revChI=fxInstance('ch','reverb');
+  /* ⛳ ГРАНИЦА РОЛЕВОГО И КЛЮЧЕВОГО МИРОВ (слайс O-0), и она проходит ЗДЕСЬ, при постройке графа.
+     Шины строятся под роли — chordBus ЕСТЬ шина аккордов, — поэтому владельца цепи надо НАЗВАТЬ, и он
+     называется единственным законным способом: литералом роли, отданным РЕЗОЛВЕРУ. Ключом ни одна из
+     этих строк не распоряжается, и ниже по течению (fxAttach/fxInstance/fxSnapshot/жест/меню) роли уже
+     нет вовсе. Когда цепь переедет к тембру, правка — ровно в этих вызовах chainKeyOf, по одной строке. */
+  const revChI=fxInstance(chainKeyOf('ch'),'reverb');
   { const mp=revChI.params.find(p=>p.key==='mix'); if(mp) mp.setNorm(fxNorm(mp,CH_REV_SEND)); }
   /* ⚠️ АККОРДЫ ТЕПЕРЬ РЕГИСТРИРУЮТ ШИНУ, как бас и ударные (слайс в.1). Прежде здесь стояла явная строка
      chordBus.connect(revChI.send); revChI.out.connect(master) — и кроме реверба к аккордам не мог
-     прицепиться НИ ОДИН шинный эффект. fxRoleBus делает для уже построенного реверба РОВНО те же два
+     прицепиться НИ ОДИН шинный эффект. fxChainBus делает для уже построенного реверба РОВНО те же два
      соединения (fxAttach: bus→send, out→master), так что звук аккордов бит-в-бит прежний, а делей, добавленный
      в меню, прицепится сам. ⛔ Явную строку НЕ возвращать: реверб прицепится дважды. */
-  fxRoleBus('ch',chordBus);
+  fxChainBus(chainKeyOf('ch'),chordBus);
   buildChordPool(chordBus);
  
   /* --- БАС: пул моно-голосов (слой + живой), общая шина в master --- */
   bassBus=AC.createGain(); bassBus.gain.value=0.28; bassBus.connect(master);
   /* ЦЕПЬ ЭФФЕКТОВ РОЛИ БАСА (Пласт 3.5.3) — только РЕГИСТРИРУЕМ шину. Цепь баса пуста по умолчанию,
      поэтому СЕЙЧАС не строится и не цепляется НИЧЕГО: бас идёт в мастер сухим, байт-в-байт как всегда.
-     Первый добавленный в меню эффект построит свой экземпляр и прицепится сам (см. fxRoleBus/fxAttach). */
-  fxRoleBus('bs',bassBus);
+     Первый добавленный в меню эффект построит свой экземпляр и прицепится сам (см. fxChainBus/fxAttach). */
+  fxChainBus(chainKeyOf('bs'),bassBus);
   buildBassPool(bassBus);
 
   /* --- УДАРНЫЕ: своя шина в master (сухая; своя цепь эффектов — с Пласта 3.5.4, по тому же закону) --- */
   drumBus=AC.createGain(); drumBus.gain.value=0.20; drumBus.connect(master);
-  fxRoleBus('dr',drumBus);   // как у баса: пустая цепь → ничего не построено, ударные сухие до первого добавленного эффекта
+  fxChainBus(chainKeyOf('dr'),drumBus);   // как у баса: пустая цепь → ничего не построено, ударные сухие до первого добавленного эффекта
 
   /* --- ДРОН: расстроенная пара пил через медленный НЧ-фильтр, на тонике (шина в master) ---
      ⛔ ДРОН НЕ РЕГИСТРИРУЕТСЯ КАК РОЛЬ, и это осознанно, а не пропуск. Роль — то, ЧЕМ ИГРАЮТ (соло,
@@ -1253,7 +1267,7 @@ function applyFx(m){
   /* ⚠️ R2 — КАРТЫ МОЖЕТ НЕ БЫТЬ, И ЭТО НЕ «НЕЙТРАЛЬ». События АРАНЖИРОВКИ (arrange.js строит нагрузку
      руками) карты не несут вовсе. Прочти их как нули — и ВЕСЬ ДЖЕМ СТАНЕТ СУХИМ. Отсутствие карты
      значит «звучи ТЕКУЩЕЙ цепью роли», ровно как эти события звучали до 3.7.2. */
-  const s = m || fxSnapshot('ld');
+  const s = m || fxSnapshot(CHAIN_SOLO);   // O-0: цепь соло — ИМЕНОВАННОЙ константой (см. CHAIN_SOLO в state): здесь она названа потому, что pendFx и есть соло-путь
   pendFx.vib=s['vib:'+FX_AMT]||0; pendFx.drv=s['drv:'+FX_AMT]||0;
   pendFx.trm=s['trm:'+FX_AMT]||0;   // «Тремоло (нота)» — скаляр, ключ 'trm:amt' не менялся и после в.2. «Тремоло (микс)» в карту не пишется вовсе: его глубина не прицепочная (см. makeTremMixFx)
   /* ДЕЛЕЙ — МОДУЛЬ с в.1: ключ 'dly:mix' (прежде 'dly:amt' старого скалярного, по форме как 'reverb:mix').

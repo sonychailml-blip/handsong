@@ -1,6 +1,6 @@
 import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxIsScalar, fxChainOf, roleXDriven, fxVolFix, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
+import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, chainXDriven, fxVolFix, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers } from './state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
@@ -349,7 +349,7 @@ function endPinch(key,S){
 }
 /* ================= КОНСТРУКТОР ЭФФЕКТОВ — Пласт 2, слайс 2.1 (механизм) =================
    Было: один палец = один эффект = одна ось (вертикаль), связка захардкожена в FX_META.
-   Стало: СЛОТ ЦЕПИ РОЛИ СОЛО (state.fxChains.ld, Пласт 3.3; прежде fxLayout — индекс всё так же
+   Стало: СЛОТ ЦЕПИ СОЛО (state.fxChains по ключу CHAIN_SOLO, Пласт 3.3/O-0; прежде fxLayout — индекс всё так же
    = палец) говорит, КАКОЙ эффект на пальце и чем ведётся КАЖДЫЙ его параметр — ось (x/y/z) и
    инверсия. Дефолтная раскладка выведена из FX_META,
    поэтому в ЭТОМ слайсе поведение обязано быть НЕОТЛИЧИМЫМ: те же четыре эффекта, по одному
@@ -379,9 +379,9 @@ function endPinch(key,S){
    перестраховка, а ЗАЩЁЛКА: их величины живут в ОДНОМ глобальном state.fx и едут в соло-событие ноты
    (см. WleadOn), поэтому «делей у аккордов» без своего store и своей проводки писал бы соло-делей.
    Портирование старых эффектов на прочие шины — не 3.5, а вопрос формата события (3.7). */
-const fxParamsOf=(role,fxId)=>{
-  if(fxIsScalar(fxId)) return role==='ld' ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }] : [];   // старый скалярный — по ЕДИНОМУ признаку state.fxIsScalar (в.1), не по FX_META: там делей-модуль остался ради цвета, и по ней он ушёл бы писать в несуществующее fx.dly
-  const inst=fxInstance(role,fxId);
+const fxParamsOf=(key,fxId)=>{
+  if(fxIsScalar(fxId)) return key===CHAIN_SOLO ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }] : [];   // старый скалярный — по ЕДИНОМУ признаку state.fxIsScalar (в.1), не по FX_META: там делей-модуль остался ради цвета, и по ней он ушёл бы писать в несуществующее fx.dly. O-0: «это цепь соло?» — сравнение с ИМЕНОВАННЫМ ключом (см. CHAIN_SOLO), не с ролью
+  const inst=fxInstance(key,fxId);
   return inst ? inst.params.map(p=>({ get:()=>p.getNorm(), set:v=>p.setNorm(v) })) : [];   // нет эффекта (или ещё нет AudioContext) → [] → цикл записи не сделает ни одного шага
 };
 /* ЗАХВАТ ПО ПАЛЬЦУ (Пласт 3.4.2): морозим точку отсчёта по ТРЁМ осям и стартовые значения ВСЕХ
@@ -412,11 +412,11 @@ function captureFx(S,finger,lm,H){
      игра и отрисовка обязаны читать ОДНУ величину, иначе палец крутит не ту цепь, что нарисована.
      ⚠️ ПОФРЕЙМОВЫЙ ЦИКЛ РОЛИ НЕ ЗНАЕТ И ЗНАТЬ НЕ ДОЛЖЕН: он идёт по ЗАХВАЧЕННЫМ записям, у каждой
      свой сеттер (p.set) — роль уже «вшита» в замыкание. Потому б.1 его не трогает вовсе. */
-  const role=S.role;
-  const chain=fxChainOf(role);
+  const ck=chainKeyOf(S.role);   // O-0: РОЛЬ (заморожена на захвате) → КЛЮЧ ВЛАДЕЛЬЦА ЦЕПИ. Дальше по коду роли нет — только ключ
+  const chain=fxChainOf(ck);
   const ent=[];
   chain.forEach((eff,effIdx)=>{
-    const ps=fxParamsOf(role,eff.fxId);
+    const ps=fxParamsOf(ck,eff.fxId);
     eff.params.forEach((pa,pIdx)=>{
       if(pa.mode!=='drive' || pa.hand!=='fx' || pa.finger!==finger) return;
       const p=ps[pIdx]; if(!p) return;                       // параметр, которого у эффекта нет (реестр пуст до initAudio) — молча мимо
@@ -773,14 +773,18 @@ function processHands(res){
            ⚠️ xn — ПОЗИЦИОННАЯ величина, как и громкость: считается из sx-координат (правила #12/#13 —
            кадрирование и зеркало учтены там же), поэтому «вправо = больше» одинаково на обеих камерах. */
         const xn=clamp01((x-zx0)/(zx1-zx0));
-        if(roleXDriven(S.zone)){
+        /* ⚠️ ДВА РАЗНЫХ АДРЕСА В ОДНОМ УСЛОВИИ (O-0): цепь спрашиваем по КЛЮЧУ ВЛАДЕЛЬЦА, а громкость
+           берём по РОЛИ (fxVolFix живёт по ролям — это громкость голоса, а не свойство цепи). Сводить
+           их в один аргумент нельзя: с переездом цепей к тембру они разойдутся окончательно. */
+        const zk=chainKeyOf(S.zone);
+        if(chainXDriven(zk)){
           S.vol=fxVolFix[S.zone];
-          for(const eff of fxChainOf(S.zone)){
+          for(const eff of fxChainOf(zk)){
             if(!eff) continue;
             let ps=null;                                   // дескрипторы берём ЛЕНИВО: у большинства записей play-параметров нет
             eff.params.forEach((pa,i)=>{
               if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='x') return;
-              if(!ps) ps=fxParamsOf(S.zone,eff.fxId);
+              if(!ps) ps=fxParamsOf(zk,eff.fxId);
               const p=ps[i]; if(p) p.set(pa.inv ? 1-xn : xn);   // инверсия ЗЕРКАЛИТ (1−v), как у глубины: величина уже абсолютная 0..1, а не смещение
             });
           }
@@ -825,7 +829,7 @@ function processHands(res){
                нагрузке ЛЕЖАЛИ, но в СРАВНЕНИЕ не входили, поэтому в слой не попадали; теперь они едут
                картой и сравниваются по множеству. Карта СТРОИТСЯ ОДИН РАЗ НА КАДР (снимок цепи роли —
                величина общая для всех рук и пальцев), а не на каждый вызов: копию для записи делает push. */
-            const fxSnap=fxSnapshot('ld');
+            const fxSnap=fxSnapshot(zk);   // O-0: цепь ЭТОЙ зоны по ключу (в этой ветке зона — соло); литерала роли здесь больше нет
             for(const f of act){
               const n=S.fing[f]; if(!n)continue;
               WleadOn(noteKey(f),{deg:n.deg,oct:n.oct,vol:S.vol,   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца
@@ -867,12 +871,12 @@ function processHands(res){
              предупреждает captureFx. Величина уже посчитана строкой выше — переиспользуем её.
              ⛳ Побочная выгода, и она не случайна: теперь ЛЮБОЙ параметр цепи аккордов можно посадить на
              глубину руки — например подмес аккордового реверба, — а не только яркость. */
-          for(const eff of fxChainOf('ch')){
+          for(const eff of fxChainOf(zk)){   // O-0: цепь ЭТОЙ зоны по ключу (в этой ветке зона — аккорды); прежде литерал 'ch' дважды
             if(!eff) continue;
             let ps=null;                                   // дескрипторы берём ЛЕНИВО: у большинства записей play-параметров нет
             eff.params.forEach((pa,i)=>{
               if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return;
-              if(!ps) ps=fxParamsOf('ch',eff.fxId);
+              if(!ps) ps=fxParamsOf(zk,eff.fxId);
               const p=ps[i]; if(p) p.set(pa.inv ? 1-bd : bd);
             });
           }
@@ -880,7 +884,7 @@ function processHands(res){
              её и ждут: зафиксировал величину в меню или увёл на другой адрес — рука перестаёт на неё
              влиять, а звук и запись слушаются параметра. Нет яркости в цепи → null → сегодняшнее
              поведение (chordOn открывает фильтр, chordGlide его не трогает). */
-          const bri = fxChordBri();
+          const bri = fxChordBri(zk);   // O-0: чью яркость — решает ЗОВУЩИЙ (ключ цепи этой зоны), а не сама функция
           if(S.inert){
             // стоп-щипок отработал (только защёлка): рука молчит до размыкания пальцев
           }else if(S.fresh){
@@ -977,8 +981,8 @@ function processHands(res){
          цепи и отбирал параметры ПО АДРЕСУ (hand==='play'), а не по слоту-пальцу. Пальцевая ветка
          только теперь пришла к той же форме. Пальца здесь нет по существу: у играющей руки адрес один
          — ГЛУБИНА. */
-      const role='ld';   // одно имя на оба чтения (цепь + дескрипторы), как в captureFx: блок под гейтом soloNoteHand, то есть роль-половина этой руки заведомо соло
-      for(const eff of fxChainOf(role)){
+      const ck=CHAIN_SOLO;   // одно имя на оба чтения (цепь + дескрипторы), как в captureFx: блок под гейтом soloNoteHand, то есть роль-половина этой руки заведомо соло. O-0: имя — КЛЮЧ ЦЕПИ соло, а не роль
+      for(const eff of fxChainOf(ck)){
         if(!eff) continue;
         let ps=null;                                   // дескрипторы эффекта берём ЛЕНИВО: у большинства записей play-параметров нет вовсе
         eff.params.forEach((pa,i)=>{
@@ -987,7 +991,7 @@ function processHands(res){
              без `axis==='z'` глубина писала бы и в параметр, отданный ГОРИЗОНТАЛИ, — два источника на одну
              величину, то самое, чего мы избегаем правилом «один параметр — один адрес». */
           if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return;
-          if(!ps) ps=fxParamsOf(role,eff.fxId);
+          if(!ps) ps=fxParamsOf(ck,eff.fxId);
           const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD);
         });
       }

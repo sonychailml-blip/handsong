@@ -2,7 +2,7 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, fxIsScalar, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
+import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic } from './state.js';   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
@@ -34,7 +34,7 @@ const FX_STEP=FX_BAR_W+FX_BAR_GAP;                // шаг гнезда
 const fxBarsY=H=>({ y0:H-40-FX_BAR_MAX, y1:H-40 });   // вертикаль столбика: выше строки статуса. ОДИН источник — им пользуются и отрисовка, и обход препятствий ниже
 /* ЕДИНЫЙ ИСТОЧНИК «какие столбики эффектов есть сейчас» — и для ОТРИСОВКИ, и для ШИРИНЫ ОТСТУПА под
    легенду. Раньше и состав, и счёт брались прямо из FX_META (константа на четыре); теперь состав
-   задаёт ЦЕПЬ РОЛИ СОЛО (state.fxChains.ld, Пласт 3.3; прежде fxLayout — слот всё так же палец), а
+   задаёт ЦЕПЬ СОЛО (state.fxChains по ключу CHAIN_SOLO, Пласт 3.3/O-0; прежде fxLayout — слот всё так же палец), а
    цепь живая. Разойдись счёт с рисованием — легенда наехала бы на столбики; поэтому обе стороны
    зовут ОДНУ функцию (тот же закон, что у сетки: попадание и отрисовка от одной геометрии).
    Слот с МОДУЛЕМ (реверб) в покое даёт ОДИН столбик (первый параметр), а пока его палец ЗАЖАТ —
@@ -47,10 +47,10 @@ const fxBarsY=H=>({ y0:H-40-FX_BAR_MAX, y1:H-40 });   // вертикаль ст
        того, построен ли он уже, и легенда прыгала бы при первом обращении к эффекту.
      fxInstOf — ЖИВЫЕ ВЕЛИЧИНЫ (getNorm) и короткие подписи столбиков. Их знает только ЭКЗЕМПЛЯР:
        у фабрики значений нет и быть не может, она описывает вид, а не звучащий узел.
-   ⚠️ ОБА ТЕПЕРЬ БЕРУТ РОЛЬ (слайс б.1), и у fxInstOf это НЕ косметика: экземпляры живут ПО РОЛЯМ
-   (FX_INST[role][fxId], Пласт 3.5.1), поэтому литерал 'ld' в нём означал бы «рисуя цепь чужой роли,
+   ⚠️ fxInstOf БЕРЁТ ВЛАДЕЛЬЦА (слайс б.1 — роль, с O-0 — КЛЮЧ), и это НЕ косметика: экземпляры живут
+   ПО ВЛАДЕЛЬЦАМ (FX_INST[key][fxId], Пласт 3.5.1), поэтому литерал 'ld' в нём означал бы «рисуя чужую цепь,
    показывай ЖИВЫЕ ВЕЛИЧИНЫ СОЛО». Столбики выглядели бы правдоподобно и врали бы — тем тише, чем
-   ближе цепи по составу. fxSpecOf роль не берёт по-прежнему: фабрика одна на все роли, она описывает
+   ближе цепи по составу. fxSpecOf владельца не берёт по-прежнему: фабрика одна на всех, она описывает
    ВИД эффекта, а не звучащий узел.
    ⚠️ Экземпляр соло строится в initAudio ЯВНО, поэтому к первому кадру он уже есть; у прочих ролей
    fxInstance создаёт по требованию, а до AudioContext честно отдаёт пусто (ветка !mod ниже). */
@@ -58,7 +58,7 @@ const fxBarsY=H=>({ y0:H-40-FX_BAR_MAX, y1:H-40 });   // вертикаль ст
    в обход общего пути — на этот вопрос отвечает САМ обход цепи в fxBarItems, тем, что рисует запись
    или не находит её. Предикат существовал ровно для одного исключения, а исключения не стало. */
 const fxSpecOf=eff=> FX_FACTORY[eff.fxId];
-const fxInstOf=(role,eff)=> fxInstance(role,eff.fxId);
+const fxInstOf=(key,eff)=> fxInstance(key,eff.fxId);   // O-0: экземпляр берём у ВЛАДЕЛЬЦА ЦЕПИ (ключ), а не у роли — довод тот же, что был про литерал 'ld' выше
 /* ⚠️ СКОЛЬКО СТОЛБИКОВ РОЛЬ МОЖЕТ ЗАНЯТЬ — ПО ФАБРИКЕ И ПО МАКСИМУМУ, а не по нарисованному сейчас.
    Это ВОСКРЕШЁННЫЙ счётчик (в б.2 он умер вместе с левым резервом), и воскрешён СОЗНАТЕЛЬНО, но для
    ДРУГОГО дела — поэтому ⛔ ЭТО НЕ ВОЗВРАТ ПРАВИЛА R-1, и путать их нельзя:
@@ -68,14 +68,14 @@ const fxInstOf=(role,eff)=> fxInstance(role,eff.fxId);
    ПО МАКСИМУМУ (фабрика), а не по факту, — по той же причине, что и у покойного резерва: аккордеон
    разворачивает эффект под зажатым пальцем (1 столбик → 3), и рамка, посчитанная по факту, дёргала бы
    разбор Гц в такт щипку. Максимум неподвижен. */
-const fxBarsMaxN=role=> fxChainOf(role).reduce((n,sl)=>{
+const fxBarsMaxN=key=> fxChainOf(key).reduce((n,sl)=>{
   if(fxIsScalar(sl.fxId)) return n+1;               // старый скалярный — по ЕДИНОМУ признаку (в.1), не по FX_META: делей-модуль там остался ради цвета, а столбиков у него три
   const mod=fxSpecOf(sl); return n+(mod?mod.params.length:0);   // ФАБРИКА, не экземпляр: рамка не должна зависеть от того, построен ли эффект
 },0);
 /* Габарит полосы столбиков роли — или null, когда её нет (нет руки-эффектов / пустая цепь).
    xL — левая кромка САМОГО ЛЕВОГО возможного столбика; вертикаль включает подпись над столбиком. */
-const fxBarsBox=(role,rx1,H)=>{
-  const n = fxBarsMaxN(role);                     // ПО ЦЕПИ, не по руке: столбики есть у всякой непустой цепи (см. drawFxBars), значит и рамка вокруг них
+const fxBarsBox=(key,rx1,H)=>{
+  const n = fxBarsMaxN(key);                      // ПО ЦЕПИ, не по руке: столбики есть у всякой непустой цепи (см. drawFxBars), значит и рамка вокруг них
   if(!n) return null;
   const {y0,y1}=fxBarsY(H);
   return { xL: rx1-FX_EDGE-FX_STEP*n, y0: y0-16, y1 };   // -16 — строка подписи (11px по базовой линии y0-5)
@@ -96,12 +96,16 @@ const fxParamOnFinger=(pa,f)=> !!(pa && f!=null && pa.mode==='drive' && pa.hand=
    управления живёт там), а НЕ из дескриптора модуля: модуль знает про свои секунды и герцы, но не про
    то, чья рука его крутит. */
 const fxParamIsPlay=la=> !!(la && la.mode==='drive' && la.hand==='play');
-const fxBarItems=role=>{
+/* ⚠️ ДВА АРГУМЕНТА, И ЭТО НЕ ИЗБЫТОЧНОСТЬ (O-0). role — про РУКУ: какой палец зажат у fx-руки ЭТОЙ
+   РОЛИ (fxActiveFinger сравнивает замороженную S.role), то есть вопрос экранно-ролевой. key — про
+   ЦЕПЬ: чьи записи перечислять и чьи экземпляры читать. Сегодня одно выводится из другого, завтра
+   (цепь у тембра) — нет, и слить их в один аргумент значило бы спрятать этот разрыв. */
+const fxBarItems=(role,key)=>{
   const act=fxActiveFinger(role), out=[];
-  fxChainOf(role).forEach(eff=>{   // ЦЕПЬ ЭТОЙ РОЛИ (слайс б.1; прежде литерал 'ld' — «столбики бывают только у соло»). С б.2 зовут для ЛЮБОЙ роли (drawFxBars — у правой кромки каждой роли/половины)
+  fxChainOf(key).forEach(eff=>{   // ЦЕПЬ ЭТОЙ РОЛИ (слайс б.1; прежде литерал 'ld' — «столбики бывают только у соло»). С б.2 зовут для ЛЮБОЙ роли (drawFxBars — у правой кромки каждой роли/половины)
     const m=FX_META.find(q=>q.k===eff.fxId);   // МЕТАДАННЫЕ ПОКАЗА (цвет, подпись) — у трёх скаляров и у делея-модуля (в.1): его столбики остались синими
     if(fxIsScalar(eff.fxId)){ out.push({v:fx[eff.fxId], c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META
-    const mod=fxInstOf(role,eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре
+    const mod=fxInstOf(key,eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре
     /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
        связан со своим параметром в цепи (eff.params), где и лежит адрес управления.
        РАЗВОРОТ (Пласт 3.4.2): разворачивается эффект, У КОТОРОГО ХОТЬ ОДИН параметр сидит на зажатом
@@ -1250,7 +1254,7 @@ function drawRole(instr,rx0,rx1,playH){
          сокращений (fitReadout) резала бы цифры там, где мешать некому.
          ⚠️ Прыжка «под рукой» это не даёт: ширина меняется при смене ПОЛОСЫ, то есть при взятии другого
          аккорда, а не по ходу звучания одного. */
-      const box=fxBarsBox('ch',rx1,playH);
+      const box=fxBarsBox(chainKeyOf(instr),rx1,playH);   // O-0: цепь ЭТОЙ роли (ветка под instr==='ch'), а не литерал
       const rdX1=(yT,yB)=> (box && yB>box.y0 && yT<box.y1) ? box.xL-8 : rx1;
       if(rectGrid()&&actSlot>=0){                            // полоса = прямоуг.(floor(слот/k)) + октавная, если она есть; по СТУПЕНИ её не найти (см. подсветку выше)
         const RL=rectLayout(), [yTop,yBot]=rectBandY(Math.floor(actSlot/RL.k)+RL.regBands,playH,RL.bands);
@@ -1570,8 +1574,8 @@ function drawChordPalette(x0,x1,H){
    ⚠️ Стоявшая здесь фраза «нет руки-эффектов — нет и столбиков вообще» БОЛЬШЕ НЕ ВЕРНА: с цели (б) столбики
    рисуют ЦЕПЬ роли БЕЗ гейта по руке (drawFxBars/fxBarItems ниже) — эффект звучит и без пальца на нём
    (фиксированные значения, адреса играющей руки), значит и показывать его есть что. */
-function drawFxBars(role,rx1,H){                   // rx1 — ПРАВАЯ кромка роли (слайс б.2; было rx0 — левая). Зовётся для ЛЮБОЙ роли: пустой items = ничего не рисуем
-  const items = fxBarItems(role);                 // БЕЗ гейта по руке: столбик показывает состояние ЭФФЕКТА, а эффект звучит и без пальца на нём (фиксированные параметры). Пустая цепь → пустой список → ничего не рисуется
+function drawFxBars(role,rx1,H){                   // rx1 — ПРАВАЯ кромка роли (слайс б.2; было rx0 — левая). Зовётся для ЛЮБОЙ роли: пустой items = ничего не рисуем. role остаётся РОЛЬЮ: это адрес ЭКРАННОГО МЕСТА и руки, а ключ цепи выводится здесь же (O-0)
+  const items = fxBarItems(role,chainKeyOf(role));   // БЕЗ гейта по руке: столбик показывает состояние ЭФФЕКТА, а эффект звучит и без пальца на нём (фиксированные параметры). Пустая цепь → пустой список → ничего не рисуется
   const {y0,y1}=fxBarsY(H);                       // низ справа: выше строки статуса, ниже коробки лупера (та вверху по центру). Числа те же, но теперь ОДНИ на отрисовку и на габарит fxBarsBox
   ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
   items.forEach((it,i)=>{
