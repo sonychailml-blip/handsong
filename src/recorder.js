@@ -1,7 +1,7 @@
 import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, leadOff, leadAllOff, leadHold,
          metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff,
-         fxCaptureChain, fxCaptureWalk } from './audio.js';
+         fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreFixed } from './audio.js';
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
@@ -388,6 +388,100 @@ function takeCapSample(p){
       rec.lane.push({t:p, key, fx:fxId, p:pKey, v});
     });
   }
+}
+/* ═══ ПЕРЕИГРОВКА АВТОМАТИЗАЦИИ (слайс O-3) ═══
+   ⛳ ЗАКОН, РАДИ КОТОРОГО ВСЯ ДУГА: ДОРОЖКА ЗВУЧИТ ТЕМ, С ЧЕМ ЕЁ СЫГРАЛИ. Крутить ручку после записи
+   можно сколько угодно — на уже записанное это не влияет. У каждой величины ровно ОДИН хозяин: РУКА,
+   пока транспорт стоит, и ЗАПИСЬ, пока он играет. Третьего («тронул — перехватил») нет намеренно:
+   правка записанной автоматизации — дело РЕДАКТОРА (полоса под нотами), а не случайного касания.
+   ⛳ ФОРМА — ТА ЖЕ, ЧТО У ДОГОНЯЛКИ (chaseFor/chasePlay), и это не совпадение, а переиспользование:
+   «сверни отсортированный префикс ДО доли x в состояние, затем примени его». Догонялка так поднимает
+   зажатые ноты при входе в песню не с начала; здесь тем же движением поднимаются величины эффектов.
+   Второй механики входа не заводим.
+   ⛔ НЕ ВО ВРЕМЯ ЗАПИСИ. Гони мы дорожку в параметры при работающем ●, захват тут же снял бы эти самые
+   величины как «сыгранные рукой» — автоматизация писала бы сама себя по кругу. Пока идёт запись, хозяин
+   один: рука.
+   ⚠️ ЭТО БУХГАЛТЕРИЯ И ЗВУК ПАРАМЕТРОВ, НО НЕ СОБЫТИЯ (правило #28): своя сортировка, свой курсор, ни
+   одного касания cursN/curSched/curNear/schedInvalidate. И не расписание (правило #15): ни одного
+   голосового вызова, ни одной постановки в окно опережения. */
+/* ПЛОСКАЯ ЛЕНТА ВСЕХ ВЗЯТЫХ, отсортированная по (доля, номер взятого). Снимок старта взятого входит в
+   неё как точки на доле ПЕРВОГО СОБЫТИЯ этого взятого — только там он и вступает в силу.
+   ⛳ ПОЧЕМУ ОДНА ЛЕНТА НА ВСЕХ, А НЕ «ГЛАВНОЕ ВЗЯТОЕ НА ВЛАДЕЛЬЦА»: у владельца ОДНА цепь и ОДНА сеть,
+   а взятых на него может быть много (правило «цепь принадлежит владельцу, а не дорожке»). Две басовые
+   дорожки с разным ревербом ОДНОВРЕМЕННО не звучат — это предел, который снимет только ЗАМОРОЗКА, когда
+   у дорожки появятся свои экземпляры. До неё выбран самый нестранный из возможных законов: ПОБЕЖДАЕТ
+   ПОСЛЕДНЯЯ ПО ВРЕМЕНИ ЗАПИСАННАЯ ТОЧКА — то есть та автоматизация, которая в этом месте песни была
+   написана позже всех. Ничья по доле разрешается номером взятого: новее — сильнее.
+   ⚠️ ОТБОР ПО ВЛАДЕЛЬЦУ: взятое правит цепью ТОЛЬКО тех ролей, которые в нём реально играли (evRole по
+   его событиям). Иначе барабанное взятое, чей снимок тоже содержит цепь баса, перебивало бы басовую
+   автоматизацию соседней дорожки — чужим значением, снятым мимоходом. */
+let fxPlayList=null, fxPlayI=0, fxPlayAt=-1, fxPlaySig='';
+const fxPlayVals=new Map(), fxPlayOrd=new Map();     // свёрнутое состояние: адрес → последняя победившая точка; ключ владельца → состав
+/* ПОДПИСЬ ЛЕНТЫ: по ней решаем, не устарела ли она. Входит всё, что меняет ЛЕНТУ или ПОБЕДИТЕЛЯ в ней:
+   состав событий (от них доли старта и роли взятых), состав захвата, длина дорожек и ЗАГЛУШЕНИЕ
+   (заглушённая дорожка своей автоматикой не правит, значит смена mute/solo меняет исход свёртки).
+   ⚠️ Множества mute/solo крошечные — склейка на тике дешевле отдельной точки инвалидации, а главное
+   не требует помнить о ней в четырёх местах, где эти множества правятся. */
+const fxPlaySignature=()=>{ let n=0; for(const r of takeFx.values()) n+=r.lane.length;
+  return events.length+'|'+takeFx.size+'|'+n+'|'+[...laneMute].join(',')+'/'+[...laneSolo].join(','); };
+function fxPlayBuild(){
+  const list=[];
+  /* Метаданные взятого выводим ОДНИМ проходом по событиям: доля первого события (когда снимок вступает
+     в силу), слой (для слышимости) и ключи владельцев, которыми это взятое вправе править. */
+  const meta=new Map();
+  for(const e of events){ const tk=e.tk||0; let m=meta.get(tk);
+    if(!m) meta.set(tk, m={t0:e.t, layer:e.layer, keys:new Set()});
+    if(e.t<m.t0) m.t0=e.t;
+    const r=evRole(e.fn); if(r) m.keys.add(chainKeyOf(r));
+  }
+  for(const [tk,rec] of takeFx){
+    const m=meta.get(tk); if(!m||!m.keys.size) continue;          // взятое без событий (пишется прямо сейчас) или без ролей с цепью — пропускаем
+    for(const key of m.keys){
+      const ch=rec.chains[key]; if(!ch) continue;
+      list.push({t:m.t0, tk, layer:m.layer, key, fx:FX_CHAIN, ids:ch.map(e=>e.fxId)});   // СОСТАВ на старте взятого
+      for(const eff of ch){
+        const names=fxParamKeysOf(eff.fxId);                      // снимок хранит величины массивом — имена берём у реестра эффектов
+        eff.params.forEach((v,i)=>{ if(v!=null && names[i]!=null)
+          list.push({t:m.t0, tk, layer:m.layer, key, fx:eff.fxId, p:names[i], v}); });
+      }
+    }
+    for(const ent of rec.lane){
+      if(!m.keys.has(ent.key)) continue;
+      list.push({t:ent.t, tk, layer:m.layer, key:ent.key, fx:ent.fx, p:ent.p, v:ent.v, ids:ent.ids});
+    }
+  }
+  list.sort((a,b)=> a.t-b.t || a.tk-b.tk);
+  fxPlayList=list; fxPlayReset();
+  fxPlaySig=fxPlaySignature();
+}
+function fxPlayReset(){ fxPlayI=0; fxPlayAt=-1; fxPlayVals.clear(); fxPlayOrd.clear(); }
+/* Свернуть ленту ДО доли x и применить. ВПЕРЁД — курсором, сворачивая только НОВЫЕ точки (цена тика не
+   зависит от длины песни, тот же довод, что у курсоров планировщика в S3.2). НАЗАД (перемотка, заворот
+   скобы) — свёртка с нуля: ровно так и входит в песню догонялка, второй механики не заводим. */
+function fxPlayDrive(x){
+  if(fxPlaySig!==fxPlaySignature()) fxPlayBuild();
+  if(!fxPlayList||!fxPlayList.length) return;
+  if(x<fxPlayAt) fxPlayReset();                                  // время пошло назад — префикс сворачиваем заново
+  fxPlayAt=x;
+  const gated=laneGated();
+  while(fxPlayI<fxPlayList.length && fxPlayList[fxPlayI].t<=x+1e-9){
+    const e=fxPlayList[fxPlayI++];
+    if(gated && !laneAudible(e.layer)) continue;                 // заглушённая дорожка своей автоматикой не правит
+    if(e.fx===FX_CHAIN) fxPlayOrd.set(e.key, e.ids);             // ПОСЛЕДНЯЯ точка по адресу и побеждает — просто перезаписываем
+    else fxPlayVals.set(e.key+'|'+e.fx+'|'+e.p, e);
+  }
+  for(const [key,ids] of fxPlayOrd) fxPlayPath(key, ids);        // СОСТАВ — ПЕРВЫМ: величины поедут уже в верную цепь. fxPlayPath молча выходит, если состав тот же
+  for(const e of fxPlayVals.values()) fxPlaySet(e.key, e.fx, e.p, e.v);   // fxPlaySet молча выходит, если величина уже там
+}
+/* Транспорт встал — вернуть живую цепь. ⛳ ВЕЛИЧИНЫ ОСТАВЛЯЕМ ТАМ, ГДЕ ИХ ОСТАВИЛА ЗАПИСЬ, и это выбор:
+   ручки — это ручки, они стоят там, где стоят, их видно (столбики и меню читают те же p.cur) и их можно
+   двигать. Возврат «как было до ▶» потребовал бы второй копии всех величин и ещё одного провала на
+   остановке, а главное — ничего бы не защитил: записанное всё равно неприкосновенно.
+   ⚠️ СОСТАВ — НАОБОРОТ, ВОЗВРАЩАЕМ ВСЕГДА: это не величина, а ЧУЖАЯ раскладка, и оставить человека с
+   составом чужой записи значило бы отобрать у него его собственную цепь. */
+function fxPlayStop(){
+  fxPlayReset();
+  for(const {key} of chainOwners()){ fxPlayPath(key,null); fxRestoreFixed(key); }   // состав — человеку обратно; фиксированные величины — в согласие с меню (см. fxRestoreFixed)
 }
 /* УБОРКА — тем же законом, что у дорожек: запись взятого, чьих событий больше НЕТ, снимается.
    ⚠️ ЭТО ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ (как и у lanePrune): осиротевшая запись никому не мешает, но копилась
@@ -1753,6 +1847,11 @@ function tick(){
        • ПЛАНИРОВАНИЕ УЖЕ ОТРАБОТАЛО (schedClicks/scheduleLayers в начале тика) — обход идёт ПОСЛЕ него и
          окна опережения не задевает (правило #15). */
   takeCapSample(p);
+  /* ⛳ O-3: и ВЕДЁМ ЗАПИСАННУЮ АВТОМАТИЗАЦИЮ — из того же сердца, по той же ПЕСЕННОЙ доле и после того же
+     отсчёта, что и захват. ⛔ ТОЛЬКО НЕ ВО ВРЕМЯ ЗАПИСИ: иначе захват (строкой выше) снял бы наши же
+     величины как «сыгранные рукой», и автоматизация писала бы сама себя. Хозяин величины ровно один:
+     пока пишем — рука, пока играем — запись. */
+  if(!recording) fxPlayDrive(p);
   /* КОНЕЦ ПЕСНИ. Во время записи НЕ останавливаемся: игрок как раз дописывает материал за прежним
      концом. ⛔ И ПРИ ВКЛЮЧЁННОЙ ОБЛАСТИ не останавливаемся никогда — она затем и включена, чтобы
      играть по кругу; иначе транспорт вставал бы на первом же достижении конца песни. */
@@ -1762,7 +1861,7 @@ function tick(){
    в этот момент может держать ноту — инструмент не обязан замолкать оттого, что кончилась запись.
    Гасим ровно голоса ДОРОЖЕК (у событий аранжировки нет выключений — см. releaseLoopLayersAt) и дрон. */
 function stopAtEnd(){
-  loop.on=false; clearPump();
+  loop.on=false; clearPump(); fxPlayStop();   // O-3: транспорт встал — состав цепи снова человеческий
   releaseLoopLayersAt();
   droneOff();
   schedInvalidate();
@@ -1927,7 +2026,7 @@ function onLoop(){
        ровно так же, как на остановке записи. ⛔ СТРОГО ДО setRecording(false) и ДО softAllOff:
        первый гасит запись, второй ВЫБРАСЫВАЕТ состояние открытых нот, не записав их. */
     recAllOff();
-    loop.on=false; clearPump(); softAllOff(); droneOff(); setRecording(false);
+    loop.on=false; clearPump(); fxPlayStop(); softAllOff(); droneOff(); setRecording(false);   // O-3: fxPlayStop рядом с clearPump — где встал транспорт, там кончилась и власть записи над ручками
     events.sort((x,y)=>x.t-y.t); schedInvalidate();    // могли дописать выключения → порядок восстановить, курсоры сбросить
     hooks.rec&&hooks.rec(false); hooks.loop&&hooks.loop(false);
   }
@@ -2015,7 +2114,7 @@ function setLoopBpm(v){
   loop.bpm=nb; schedInvalidate();
 }
 function clearRec(){
-  clearPump(); loop.on=false; events.length=0; loop.rgn.user=false; rgnApply(0,loop.metre,false); schedInvalidate(); laneReset(); setRecording(false); softAllOff(); droneOff();   // S3.5b: loop.on=false ПЕРЕД rgnApply — остановленному транспорту перепривязывать нечего; скоба — снова «следует», повтор выключен (user — не часть временнóй карты, поэтому пишется напрямую)   // ✕ — песни больше нет, значит нет ни дорожек, ни области повтора: помеченный участок пустой песни был бы ложью на экране
+  clearPump(); loop.on=false; fxPlayStop(); events.length=0; loop.rgn.user=false; rgnApply(0,loop.metre,false); schedInvalidate(); laneReset(); setRecording(false); softAllOff(); droneOff();   // S3.5b: loop.on=false ПЕРЕД rgnApply — остановленному транспорту перепривязывать нечего; скоба — снова «следует», повтор выключен (user — не часть временнóй карты, поэтому пишется напрямую)   // ✕ — песни больше нет, значит нет ни дорожек, ни области повтора: помеченный участок пустой песни был бы ложью на экране
   hooks.loop && hooks.loop(false);
 }
 /* ⚠️ panic НАМЕРЕННО НЕ ТРОГАЕТ настройки дорожек: события переживают панику, значит переживают и
@@ -2049,7 +2148,7 @@ function clearRec(){
    и паника стирала её целиком. Вне записи паника дословно прежняя. */
 function panic(){
   if(recording) recStop();                         // (1) ТОТ ЖЕ путь, что ●, без зацепок обучения
-  clearPump(); loop.on=false; schedInvalidate();   // (2) события целы, транспорт остановлен — возобновят его с новой базой
+  clearPump(); loop.on=false; fxPlayStop(); schedInvalidate();   // (2) события целы, транспорт остановлен — возобновят его с новой базой; O-3: и живая цепь возвращается человеку
   softAllOff(); droneOff();                        // (3)
   setRecording(false);
   loop.pos=loop.rgn.from;                          // (4) S3.5c: на начало скобы (rgn уже приведён к материалу schedInvalidate выше); onLoop стартует ровно отсюда

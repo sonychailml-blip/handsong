@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxChainOf, chainKeyOf, CHAIN_SOLO } from './state.js';
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO } from './state.js';
 import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS } from './config.js';
@@ -897,6 +897,85 @@ function fxUnlink(key){ const L=FX_CHAIN_LINKS[key]; if(!L) return;
 /* ЭФФЕКТ УЧАСТВУЕТ В СИГНАЛЬНОМ ПУТИ, только если у него ЕСТЬ КОНЦЫ. Один предикат на все места —
    так «голосовой» эффект (яркость) отсеивается сам собой, без перечисления родов. */
 const fxInPath=inst=> !!(inst && inst.in && inst.out);
+/* ═══ ПУТЬ ПЕРЕИГРОВКИ (слайс O-3) ═══
+   ⛳ ЧЬИМ СОСТАВОМ ЗВУЧИТ ЦЕПЬ, ПОКА ИДЁТ ВОСПРОИЗВЕДЕНИЕ. Запись помнит не только ВЕЛИЧИНЫ, но и
+   СОСТАВ с ПОРЯДКОМ (O-2), а порядок с O-1 слышен. Гони мы записанные величины через ЖИВУЮ цепь — вышли
+   бы верные числа в неверной цепи: не тот порядок, лишний эффект, недостающий эффект.
+   ⛔ ЖИВУЮ ЦЕПЬ (state.fxChains) ПРИ ЭТОМ НЕ ТРОГАЕМ ВОВСЕ. Переигровка — это ЗВУЧАНИЕ, а не правка
+   настроек: перепиши она цепь человека, его раскладка по пальцам и его состав пропали бы после первого
+   же ▶. Поэтому здесь ОТДЕЛЬНЫЙ список id, который читает fxPathOf ВМЕСТО цепи, пока он задан. Снял
+   (null) — цепь снова своя, и ничего восстанавливать не надо: её никто не менял.
+   ⚠️ ЗАТВОРЫ ВЕДЁМ ЗДЕСЬ ЖЕ. Эффект, снятый человеком из цепи, остаётся в графе с затвором 0 (хвост
+   дозвучивает, 3.5.1). Если запись его ИСПОЛЬЗОВАЛА, путь его включает — значит затвор надо открыть, иначе
+   величины поедут в заглушённую сеть и не прозвучат. И наоборот: то, что в пути переигровки не участвует,
+   закрываем — но именно ЗАТВОРОМ, а не разрывом, чтобы хвост дозвучил (тот же закон, что у fxSetActive). */
+const FX_PLAY_PATH={};
+const fxIdsOfChain=key=>fxChainOf(key).map(e=>e.fxId);
+/* Затвор экземпляра без создания: у голосового его нет, у вставки «выключено» — это тождество, а не ноль
+   (иначе заглушили бы всю роль). Одна форма на оба вида, ровно как в fxSetActive. */
+function fxGate(key,fxId,on){
+  const inst=FX_INST[key] && FX_INST[key][fxId]; if(!inst||!AC) return;
+  if(inst.kind==='voice') return;
+  if(inst.kind==='insert'){ inst.setActive(on); if(on) for(const pp of inst.params) pp.setNorm(pp.cur); return; }
+  inst.gate.gain.setTargetAtTime(on?1:0, AC.currentTime, 0.08);
+  if(on) for(const pp of inst.params) pp.setNorm(pp.cur);
+}
+/* ids — состав переигровки, null — вернуть живую цепь. Возвращает true, если путь ДЕЙСТВИТЕЛЬНО сменился
+   (вызывающий по этому знает, была ли пересборка, то есть был ли провал). */
+function fxPlayPath(key,ids){
+  const was=FX_PLAY_PATH[key]||null;
+  /* ⚠️ СРАВНИВАЕМ СПИСКИ, А НЕ СТРОКИ: «нет пути» (null) и «пустой путь» ([]) — РАЗНЫЕ состояния
+     (живая цепь против пустой цепи записи), и склейка в строку их бы слила. */
+  const same = (!was&&!ids) || (!!was&&!!ids&&was.length===ids.length&&was.every((x,i)=>x===ids[i]));
+  if(same) return false;
+  const before=new Set(was||fxIdsOfChain(key));
+  if(ids) FX_PLAY_PATH[key]=ids.slice(); else delete FX_PLAY_PATH[key];
+  const after=new Set(FX_PLAY_PATH[key]||fxIdsOfChain(key));
+  for(const id of after) if(!before.has(id)) fxGate(key,id,true);    // запись им пользовалась — открыть
+  for(const id of before) if(!after.has(id)) fxGate(key,id,false);   // в новом составе его нет — закрыть, хвост дозвучит
+  fxRespliceSmooth(key);
+  return true;
+}
+/* УСТАНОВИТЬ ВЕЛИЧИНУ ПАРАМЕТРА ПО ИМЕНИ — вход переигровки автоматизации.
+   ⛳ ИДЁМ ЧЕРЕЗ setNorm ЭФФЕКТА, А НЕ В УЗЕЛ НАПРЯМУЮ, и это два свойства разом:
+     • СГЛАЖИВАНИЕ. У каждого сеттера своя постоянная времени (0.05 у длины/окраски, 0.08 у подмеса) —
+       то есть РАМПА к новому значению получается сама собой, и второй модели сглаживания не заводится.
+     • ЧЕСТНАЯ КАРТИНКА. setNorm пишет p.cur, а его читают И столбики на холсте, И меню. Показ поэтому
+       ДВИЖЕТСЯ ВМЕСТЕ СО ЗВУКОМ сам, без единой строки в слое показа.
+   ⚠️ Старые скаляры (драйв/вибрато/тремоло-нота) живут в state.fx и дескриптора не имеют — пишем их
+   store напрямую, тем же ключом '<id>:amt', каким их пишет захват.
+   ⚠️ Экземпляр берём СОЗДАЮЩИЙ — по тому же доводу, что у захвата: величина может прийти на эффект,
+   который в этой сессии ещё не звучал. */
+/* ⛳ ВЕРНУТЬ ФИКСИРОВАННЫЕ ВЕЛИЧИНЫ ИЗ МЕНЮ — после остановки транспорта.
+   ⚠️ ПОЧЕМУ ИМЕННО ФИКСИРОВАННЫЕ, а не «всё подряд». Величины, которые ведёт РУКА (палец или глубина),
+   после остановки честно остаются там, где их оставила запись: их ВИДНО (столбики читают те же p.cur) и
+   рука тут же может их двинуть. А «фиксированный» параметр по определению значит «столько, сколько
+   набрано В МЕНЮ» — и если оставить его на величине чужой записи, меню показывало бы одно число, а
+   звучало бы другое, причём ИСПРАВИТЬ это человек смог бы только перенабрав то же самое. Это не
+   «восстановление состояния», а приведение звука в согласие с тем, что написано на экране. */
+function fxRestoreFixed(key){
+  if(!AC) return;
+  for(const eff of fxChainOf(key)){
+    const inst=FX_INST[key] && FX_INST[key][eff.fxId]; if(!inst) continue;
+    eff.params.forEach((pa,i)=>{ const pp=inst.params[i];
+      if(pp && pa && pa.mode==='fixed' && pa.v01!=null) pp.setNorm(pa.v01); });
+  }
+}
+/* ИМЕНА ПАРАМЕТРОВ ЭФФЕКТА, В ПОРЯДКЕ ОБЪЯВЛЕНИЯ — чтобы снимок цепи (он хранит ТОЛЬКО величины, массивом)
+   можно было разложить обратно в пары «имя → величина». Живёт здесь, потому что реестр эффектов — здесь;
+   запись хранит величины без имён намеренно (короче и не дублирует спецификацию). */
+function fxParamKeysOf(fxId){
+  const f=FX_FACTORY[fxId];
+  return f ? f.params.map(sp=>sp.key) : [FX_AMT];   // старый скаляр: ровно один параметр, и он же сам эффект
+}
+function fxPlaySet(key,fxId,pKey,v){
+  if(!AC) return;
+  if(fxIsScalar(fxId)){ if(pKey===FX_AMT) fx[fxId]=v; return; }
+  const inst=fxInstance(key,fxId); if(!inst) return;
+  const pp=inst.params.find(q=>q.key===pKey); if(!pp) return;
+  if(Math.abs(pp.cur-v)<1e-6) return;   // уже там: не переармируем setTargetAtTime сорок раз в секунду на неподвижной величине
+  pp.setNorm(v);
+}
 /* ⛳ ПОРЯДОК ПУТИ: сперва то, что В ЦЕПИ — В ПОРЯДКЕ ЦЕПИ; затем построенное, но ИЗ ЦЕПИ СНЯТОЕ.
    ⚠️ СНЯТЫЕ ОСТАЮТСЯ В ПУТИ НАМЕРЕННО, и это то самое «хвост ДОЗВУЧИВАЕТ, а не обрывается»: выкинь мы
    их из пути, разрыв связи срезал бы уже звучащий хвост НАЧИСТО. Они безвредны: fxSetActive увёл их
@@ -905,8 +984,9 @@ const fxInPath=inst=> !!(inst && inst.in && inst.out);
 function fxPathOf(key){
   const byKey=FX_INST[key]; if(!byKey) return [];
   const path=[], seen=new Set();
-  for(const eff of fxChainOf(key)){ const inst=byKey[eff.fxId];
-    if(fxInPath(inst) && !seen.has(eff.fxId)){ path.push(inst); seen.add(eff.fxId); } }
+  const ids=FX_PLAY_PATH[key]||fxIdsOfChain(key);   // O-3: пока задан путь переигровки — звучит ОН, а не живая цепь
+  for(const id of ids){ const inst=byKey[id];
+    if(fxInPath(inst) && !seen.has(id)){ path.push(inst); seen.add(id); } }
   for(const id in byKey){ if(!seen.has(id) && fxInPath(byKey[id])) path.push(byKey[id]); }
   return path;
 }
@@ -1894,5 +1974,6 @@ export {
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
-  FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,   // O-2: два обхода ДЛЯ ЗАХВАТА — состав цепи на старте взятого и живые величины на каждом ударе сердца   // ЧТО существует (статика, есть до initAudio — по ней меню строит список), ЧТО построено (живой экземпляр роли: gestures пишет параметры, draw читает величины для столбиков) и ВКЛ/ВЫКЛ прицепки (ui — при снятии/возврате эффекта в цепь)
+  FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
+  fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreFixed,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат фиксированных из меню   // O-2: два обхода ДЛЯ ЗАХВАТА — состав цепи на старте взятого и живые величины на каждом ударе сердца   // ЧТО существует (статика, есть до initAudio — по ней меню строит список), ЧТО построено (живой экземпляр роли: gestures пишет параметры, draw читает величины для столбиков) и ВКЛ/ВЫКЛ прицепки (ui — при снятии/возврате эффекта в цепь)
 };
