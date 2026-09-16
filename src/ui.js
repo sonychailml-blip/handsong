@@ -2,7 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
-         fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
+         fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          chainXDriven, fxVolFix, setFxVolFix, fxIsScalar,
          rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, rollDrag, setRollDrag, rollIns, setRollIns,
@@ -19,7 +19,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch } from './draw.js';   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -1172,11 +1172,19 @@ function fxChainDrop(key,effIdx){
   const eff=fxChainOf(key)[effIdx]; if(!eff) return;
   const id=eff.fxId;
   fxChainRemove(key,effIdx);      // данные (+ гашение СТАРЫХ СКАЛЯРНЫХ внутри сеттера)
-  fxSetActive(key,id,false);      // звук: модулю уводим ПОСЫЛ в 0, сеть не разбираем — хвост дозвучит
+  fxSetActive(key,id,false);      // звук: уводим ВЛАЖНУЮ ДОЛЮ в 0, сеть не разбираем — хвост дозвучит
+  /* O-1: ТРЕТЬЯ половина — ПУТЬ. Снятый эффект остаётся в графе (иначе разрыв связи срезал бы звучащий
+     хвост), но уезжает в конец пути, где он чистое тождество; живые сдвигаются на его место. */
+  fxChainResplice(key);
 }
 function fxChainPut(key,fxId,nParams){
   const idx=fxChainAdd(key,fxId,nParams);
-  if(idx>=0) fxSetActive(key,fxId,true);   // ВОЗВРАТ: посыл поднимается из 0 к СОХРАНЁННОМУ значению параметра (p.cur никто не стирал)
+  if(idx>=0){
+    fxSetActive(key,fxId,true);   // ВОЗВРАТ: влажная доля поднимается из 0 к СОХРАНЁННОМУ значению параметра (p.cur никто не стирал)
+    /* O-1: и ПЕРЕСБОРКА ПУТИ. Первое добавление её сделает само (fxInstance строит и пересобирает), но
+       ВОЗВРАТ ранее снятого — нет: экземпляр уже есть, а место в порядке цепи у него новое. */
+    fxChainResplice(key);
+  }
   return idx;
 }
 /* Имя эффекта для ЗАГОЛОВКА группы строк: у старых скалярных — из FX_META, у модулей — из реестра.
@@ -1258,7 +1266,36 @@ function renderFxCtl(){
     });
   });
   const share=fxShareMap(chain);   // выводим ОДИН раз на отрисовку: карту читают и заголовки, и строки параметров
-  chain.forEach((eff,effIdx)=>{
+  /* ═══ ДВЕ ЗОНЫ СПИСКА (слайс O-1) ═══
+     ⛳ ЗАЧЕМ. Список ВСЕГДА держал ДВА разных рода вещей, и до сих пор это было невидимо: драйв и вибрато
+     делаются ВНУТРИ ГОЛОСА (шейпер до огибающей; LFO в detune), а реверб, делей и тремоло обрабатывают
+     УЖЕ СЛОЖЕННЫЙ звук. Пока порядок был неслышен, разница ничего не стоила. Стала слышна — и человек,
+     увидев стрелки перестановки, попробовал бы утащить драйв ПОД делей. Это невозможно не по решению, а
+     по устройству: голос звучит раньше суммы всегда.
+     ⛳ ПОКАЗЫВАЕМ НЕВОЗМОЖНОСТЬ, А НЕ ЗАПРЕЩАЕМ МОЛЧА: две подписанные группы, и стрелки есть только во
+     второй. Отсутствие стрелки объяснено одной строкой подсказки — это намёк, а не трактат.
+     ⚠️ ГРУППИРУЕТ ТОЛЬКО ПОКАЗ. Данные остаются ОДНИМ плоским массивом в порядке звука (правило
+     «никакого второго списка», см. fxChainMove): зона выводится из рода эффекта, индексы остаются
+     настоящими индексами массива. */
+  const zoneOf=fxId=>{ if(fxIsScalar(fxId)) return 'voice';      // старый скалярный (драйв/вибрато/тремоло-нота) — всегда в голосе
+    const m=FX_FACTORY[fxId]; return (m&&m.kind==='voice')||!m ? 'voice' : 'bus'; };   // неизвестную запись считаем голосовой: у неё нет узлов, в путь она не войдёт
+  const rows=chain.map((eff,effIdx)=>({eff,effIdx,zone:zoneOf(eff.fxId)}));
+  const busRows=rows.filter(r=>r.zone==='bus');                  // порядок ЗВУКА — тот же, что в массиве
+  const ordered=[...rows.filter(r=>r.zone==='voice'), ...busRows];   // показываем «в ноте» первым: так читается путь сигнала сверху вниз
+  let lastZone=null;
+  ordered.forEach(({eff,effIdx,zone})=>{
+    if(zone!==lastZone){                                         // ЗАГОЛОВОК ЗОНЫ — тем же классом, что у групп «Функций рук»: панель читается одной лестницей
+      lastZone=zone;
+      const zl=document.createElement('div'); zl.className='handFnRole';
+      zl.textContent=t(zone==='voice'?'fx.zone.voice':'fx.zone.bus');
+      fxCtlRows.appendChild(zl);
+      fxCtlRows.appendChild(fxHint(zone==='voice'?'fx.zone.voiceHint':'fx.zone.busHint'));
+    }
+    /* СОСЕД ПО ЗОНЕ — цель переноса. Берём индекс СЛЕДУЮЩЕЙ/ПРЕДЫДУЩЕЙ записи ТОЙ ЖЕ зоны в массиве:
+       так голосовая запись, случайно лежащая между двумя сигнальными, остаётся на месте. */
+    const bi=busRows.findIndex(r=>r.effIdx===effIdx);
+    const upTo   = zone==='bus'&&bi>0                  ? busRows[bi-1].effIdx : null;
+    const downTo = zone==='bus'&&bi>=0&&bi<busRows.length-1 ? busRows[bi+1].effIdx : null;
     /* ЗАГОЛОВОК ЭФФЕКТА — строка аккордеона: [▸/▾][имя][сводка адресов][✕].
        Свёрнутый заголовок обязан быть САМОДОСТАТОЧНЫМ (см. fxAddrSummary): иначе аккордеон не «убирает
        лишнее», а ПРЯЧЕТ нужное, и человек разворачивает всё подряд, лишь бы узнать, что где. */
@@ -1286,6 +1323,24 @@ function renderFxCtl(){
       for(const pa of eff.params){ const k=fxAddrKey(pa); if(!k||seen.has(k)) continue; seen.add(k);
         const g=share.get(k); if(g&&g.length>1) gs.push(g); }
       if(gs.length) hd.appendChild(fxShareChip(gs));
+    }
+    /* ▲▼ — ПЕРЕСТАНОВКА, только во второй зоне. Стоят ПЕРЕД ✕: «подвинуть» — операция обратимая и частая,
+       «убрать» — край строки, как было. Клик не разворачивает эффект (stopPropagation, как у ✕).
+       ⚠️ Крайняя запись получает ОТКЛЮЧЁННУЮ кнопку, а не отсутствующую: исчезающий орган сдвигал бы
+       соседние на каждый шаг, и попасть пальцем стало бы лотереей (та же дисциплина, что у «Раскладки нот»). */
+    if(zone==='bus'&&busRows.length>1){
+      const mk=(txt,key,to)=>{
+        const b=document.createElement('button'); b.type='button'; b.className='fxmv'; b.textContent=txt;
+        b.title=t(key); b.setAttribute('aria-label',t(key));
+        b.disabled = to==null;
+        b.onclick=e=>{ e.stopPropagation();
+          if(to==null) return;
+          if(fxChainMove(fxCtlChain(),effIdx,to)) fxChainResplice(fxCtlChain());   // ДАННЫЕ + ЗВУК, как у добавления/снятия: порядок в массиве и порядок в графе обязаны совпасть
+          renderFxCtl(); };
+        return b;
+      };
+      hd.appendChild(mk('▲','fx.moveUp',upTo));
+      hd.appendChild(mk('▼','fx.moveDown',downTo));
     }
     hd.appendChild(del);   // ✕ всегда ПОСЛЕДНИЙ: край строки — предсказуемое место для «убрать», что бы ни выросло левее
     hd.onclick=()=>fxToggleOpen(eff.fxId);

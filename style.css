@@ -367,6 +367,13 @@
   .fxhead .fxdel{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:2px 6px;
     color:#8a90a8; font-size:var(--fs-ctl); line-height:1; border-radius:var(--r-sm);}
   .fxhead .fxdel:hover{color:#d9534f; background:rgba(217,83,79,.10);}
+  /* ▲▼ — перестановка в последовательной цепи (слайс O-1). Тот же рост и та же зона нажатия, что у ✕:
+     кнопки стоят в одном ряду, и разнобой читался бы как разная важность. Отключённая (крайняя запись)
+     НЕ исчезает, а гаснет — иначе соседние органы прыгали бы при каждом шаге. */
+  .fxhead .fxmv{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:2px 5px;
+    color:#8a90a8; font-size:var(--fs-hint); line-height:1; border-radius:var(--r-sm);}
+  .fxhead .fxmv:hover:not(:disabled){color:#3a4060; background:rgba(20,24,50,.06);}
+  .fxhead .fxmv:disabled{opacity:.25; cursor:default;}
   /* Чип «×N» — ОДИН АДРЕС ВЕДЁТ НЕСКОЛЬКО ПАРАМЕТРОВ (Пласт 3.4.4). Маркер, а не предупреждение:
      совместность ЗАДУМАНА, поэтому тон нейтрально-акцентный, а не красный (красный читался бы как
      ошибка, которую надо чинить, — и человек «чинил» бы то, что нарочно настроил).

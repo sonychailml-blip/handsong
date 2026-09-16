@@ -302,6 +302,13 @@ export const DICTS = {
     'fx.add':'+ Add effect',
     'fx.addAll':'All effects are in the chain',
     'fx.remove':'Remove from chain',
+    // O-1: перестановка в последовательной цепи + две зоны списка (что живёт в ноте / что обрабатывает сумму)
+    'fx.moveUp':'Earlier in the chain',
+    'fx.moveDown':'Later in the chain',
+    'fx.zone.voice':'In the note',
+    'fx.zone.bus':'Summed sound',
+    'fx.zone.voiceHint':'Made inside each voice, always before the mix — order does not apply.',
+    'fx.zone.busHint':'Applied to all voices together, in this order. The first one feeds the next.',
     'fx.share.title':'Move together:',   // подсказка чипа «×N»: один адрес ведёт несколько параметров (3.4.4)
     'axis.x':'Horizontal',
     'axis.y':'Vertical',
@@ -662,6 +669,13 @@ export const DICTS = {
     'fx.add':'+ Добавить эффект',
     'fx.addAll':'Все эффекты уже в цепи',
     'fx.remove':'Убрать из цепи',
+    // O-1: перестановка в последовательной цепи + две зоны списка (что живёт в ноте / что обрабатывает сумму)
+    'fx.moveUp':'Раньше в цепи',
+    'fx.moveDown':'Позже в цепи',
+    'fx.zone.voice':'В ноте',
+    'fx.zone.bus':'Общий звук',
+    'fx.zone.voiceHint':'Делается внутри голоса, всегда до суммы — порядок тут ни при чём.',
+    'fx.zone.busHint':'Обрабатывает все голоса вместе, в этом порядке. Первый подаёт сигнал следующему.',
     'fx.share.title':'Едут вместе:',     // подсказка чипа «×N»: один адрес ведёт несколько параметров (3.4.4)
     'axis.x':'Горизонталь',
     'axis.y':'Вертикаль',
