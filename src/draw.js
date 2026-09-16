@@ -733,6 +733,7 @@ function drawVideoBackground(){
    вида, не по длине массива), а рисуются только попавшие в окно — двоичный поиск + проход по видимым.
    Кадр = O(log n + видимые удары + 6 рядов + линии сетки). */
 const ROLL_BAR_H=46, ROLL_TP_H=44;      // высоты HTML-панели редактора и транспортной полосы под ней
+const ROLL_RULER_H=16;                  // полоса ЛИНЕЙКИ (S5.2): тап по ней = перемотка; своя цель, как полоса скобы у лупера
 const ROLL_LBL_W=58;                    // колонка имён рядов слева
 const ROLL_HIT_PX=12;                   // допуск попадания по времени: палец толще удара
 let rollView=null;
@@ -746,24 +747,37 @@ function rollHits(){
   return rollCache.hits;
 }
 const rollLower=(hits,t)=>{ let lo=0,hi=hits.length; while(lo<hi){ const m=(lo+hi)>>1; if(hits[m].t<t) lo=m+1; else hi=m; } return lo; };
-/* ⛳ ПРИВЯЗКА (S5.1) — ОТ ПЛОТНОСТИ ПИКСЕЛЕЙ, А НЕ ОТ ЖИВОЙ КВАНТИЗАЦИИ ЗАПИСИ. У скобы шаг — ТАКТ, потому
-   что на полосе лупера такт это пара пикселей и точнее обещать было бы ложью. Здесь пикселей на долю много,
-   поэтому обещаем мельче: лестница идёт от такта до 1/8 (или до триолей, если запись делит долю на три —
-   loop.sub), и берётся САМАЯ МЕЛКАЯ ступень, что ещё шире порога.
-   ДВА ПОРОГА, и разница осмысленная: ПЕРЕТАСКИВАНИЕ рисует призрак — видно, куда встанет удар, поэтому
-   хватает 10px; ТАП ВСЛЕПУЮ до касания не показывает ничего, поэтому 24px — ширина подушечки пальца.
-   ⛔ Не привязываться к gridFor/loop.quant: это сетка ЗАПИСИ ЖИВОЙ ИГРЫ. Редактор ставит удар туда, куда
-   показал человек, а сетку он ВИДИТ на экране — вторая, невидимая, была бы сюрпризом. */
-const ROLL_SNAP_DRAG_PX=10, ROLL_SNAP_TAP_PX=24;
-const rollLadder=()=> loop.sub===3 ? [loop.metre,1,1/2,1/3,1/6] : [loop.metre,1,1/2,1/4,1/8];
-function rollStepFor(minPx){
-  const V=rollView; if(!V) return 1;
-  const pxB=V.bw/V.span, lad=rollLadder();
-  for(let i=lad.length-1;i>=0;i--) if(lad[i]*pxB>=minPx) return lad[i];
-  return lad[0];                       // даже такт уже мельче порога (вся песня в экране) — крупнее лестницы нет
+/* ⛳ ПРИВЯЗКА ИДЁТ ЗА КВАНТИЗАЦИЕЙ ЗАПИСИ (S5.2 — ОТМЕНА РЕШЕНИЯ S5.1).
+   ⚠️ В S5.1 шаг выбирала ПЛОТНОСТЬ ПИКСЕЛЕЙ, и это было неверно: человек уже сказал, как он думает о
+   времени, — тумблером «Квантизация» в панели лупера. Редактор обязан слушать ЕГО, а не масштаб.
+     КВАНТИЗАЦИЯ ВЫКЛ → привязки НЕТ ВОВСЕ: удар встаёт ровно туда, где отпустили. Человек отказался от
+       сетки — навязывать её в редакторе значит спорить с явным выбором.
+     КВАНТИЗАЦИЯ ВКЛ → шаг РОВНО тот, которым пишется живой удар: gridFor('drum') = 1/loop.sub
+       (16-е или ТРИОЛИ). Правка садится туда же, куда села бы игра, — двух правд о времени не бывает.
+   ⛳ ПЛОТНОСТЬ ПИКСЕЛЕЙ ОСТАЁТСЯ, НО ТОЛЬКО КАК ПОТОЛОК ВИДИМОСТИ: линии ближе ROLL_GRID_MIN_PX сливаются,
+   и рисовать их нечестно. Если шаг привязки мельче рисуемого, ролл НЕ меняет шаг втихую — он говорит об
+   этом в панели (см. roll.snapHidden): палец, тянущий к невидимой сетке, иначе выглядит как «нота прыгает
+   сама». */
+const ROLL_GRID_MIN_PX=3;
+export function rollSnap(){
+  const V=rollView, pxB=V?V.bw/V.span:0;
+  const step=1/(loop.sub||4);                       // ТА ЖЕ сетка, что у записи ударов (gridFor('drum'))
+  return { free:!loop.quant, step, drawn:pxB*step>=ROLL_GRID_MIN_PX };
 }
-export const rollSnap=()=>({ drag:rollStepFor(ROLL_SNAP_DRAG_PX), tap:rollStepFor(ROLL_SNAP_TAP_PX) });
-export const rollSnapBeat=(beat,step)=> Math.max(0, Math.round(beat/step)*step);
+export const rollSnapBeat=(beat,s)=> s.free ? Math.max(0,beat) : Math.max(0, Math.round(beat/s.step)*s.step);
+/* ⛳ ШИРИНА БЛОКА УДАРА — ОДИН ИСТОЧНИК ДЛЯ РИСОВАНИЯ И ПОПАДАНИЯ (правило #9).
+   Удар — событие без длительности, но рисовать его РИСКОЙ НА ДОЛЕ нельзя: на линии такта риска сидит
+   ВЕРХОМ на границе, половиной в прошлом такте, — а нота «на раз» звучит ВНУТРИ такта. Поэтому блок
+   начинается НА своей доле и растёт ВПРАВО, как нота в любом секвенсоре.
+   Ширина — КЛЕТКА привязки (шаг квантизации в пикселях): блок читается как «вот эта клетка». Без
+   квантизации клетки нет вовсе — берём скромную постоянную ширину, чтобы блок оставался видимым.
+   Пол 6px — иначе на общем плане удар исчезает; потолок 36px — иначе на крупном плане одна шестнадцатая
+   разрастается в плиту во весь ряд. */
+function rollBlockPx(V){
+  const pxB=V.bw/V.span, s=rollSnap();
+  return Math.max(6, Math.min(36, s.free ? 10 : s.step*pxB));
+}
+const rollBlockBeats=V=> rollBlockPx(V)*V.span/V.bw;
 function drawRoll(){
   const W=canvas.width, H=canvas.height;
   /* Полосы лупера на экране нет → и попадать в неё нечем: снимаем её геометрию, как это делает запись
@@ -775,9 +789,11 @@ function drawRoll(){
   syncLoopTransport(true, ROLL_BAR_H+4);
   ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,W,H);       // камеру не рисуем — фон честно непрозрачный
   const ly=rollTrackLayer();
-  const x0=ROLL_LBL_W, x1=W-12, gy0=ROLL_BAR_H+ROLL_TP_H+18, gy1=H-26;
+  /* ry0 — верх ЛИНЕЙКИ (S5.2). Сетка начинается там же, где и раньше (ry0+ROLL_RULER_H === прежний gy0),
+     поэтому поле нот не сдвинулось ни на пиксель: линейка заняла тот отступ, что и так пустовал. */
+  const x0=ROLL_LBL_W, x1=W-12, ry0=ROLL_BAR_H+ROLL_TP_H+2, gy0=ry0+ROLL_RULER_H, gy1=H-26;
   const rows=DRUM_ROWS, rowH=(gy1-gy0)/rows;
-  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), gy0, rowH, rows };
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows };
   const V=rollView, pxB=V.bw/V.span, M=loop.metre;
   // ---- ряды: чередующаяся заливка + имя ряда слева (то же имя, что у игрового поля — L(DRUM_NAMES)) ----
   ctx.textBaseline='middle'; ctx.textAlign='right'; ctx.font='11px system-ui';
@@ -796,6 +812,24 @@ function drawRoll(){
     if(bx1>bx0){ ctx.fillStyle='rgba(87,217,163,.10)'; ctx.fillRect(bx0,gy0,bx1-bx0,gy1-gy0);
       ctx.strokeStyle='rgba(87,217,163,.5)'; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(bx0,gy0); ctx.lineTo(bx0,gy1); ctx.moveTo(bx1,gy0); ctx.lineTo(bx1,gy1); ctx.stroke(); }
+  }
+  /* ---- ЛИНЕЙКА (S5.2): ОТДЕЛЬНАЯ полоса под перемотку. Ровно тот же приём, что у полосы скобы на полосе
+     лупера: её низ — это gy0, то есть верх сетки, поэтому один тап физически не может попасть и в линейку,
+     и в ноту. Сетка уже занята выбором и вставкой — третьему смыслу там места нет. ---- */
+  ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fillRect(V.x0,V.ry0,V.bw,gy0-V.ry0);
+  ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(V.x0,gy0); ctx.lineTo(V.x0+V.bw,gy0); ctx.stroke();
+  /* ---- ПОДСЕТКА КВАНТИЗАЦИИ (S5.2): рисуем РОВНО ТО, к чему привязывается палец, и только пока линии
+     различимы. Тоньше и тусклее долей — иерархия «такт › доля › подсетка» читается без легенды. ---- */
+  const snap=rollSnap();
+  if(!snap.free && snap.drawn){
+    ctx.strokeStyle='rgba(255,255,255,.055)'; ctx.lineWidth=0.7;
+    const s0=Math.ceil(V.beat0/snap.step)*snap.step;
+    for(let b=s0;b<=V.beat0+V.span;b+=snap.step){
+      if(Math.abs(b-Math.round(b))<1e-9) continue;          // доля/такт — их рисует блок ниже, своим весом
+      const gx=laneBeatX(V,b); if(gx<V.x0-1||gx>V.x0+V.bw+1) continue;
+      ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
+    }
   }
   /* ---- сетка тактов и долей: ТЕ ЖЕ акценты, что у полосы лупера (beatLevel), и то же прореживание.
      Доли рисуем, пока они РАЗЛИЧИМЫ; такты — всегда, но реже, если их гуще 26px. ---- */
@@ -818,15 +852,15 @@ function drawRoll(){
     if(bib===0 && pxB*M>=30){ ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillText(String((b/M|0)+1), gx+3, gy0-8); }   // номер такта — с единицы, как в подписи скобы
   }
   // ---- удары: только попавшие в окно (двоичный поиск по началу) ----
-  const hits=rollHits();
+  const hits=rollHits(), blkW=rollBlockPx(V);   // ширина блока — ОДНА на отрисовку, призрак и попадание
   for(let i=rollLower(hits,V.beat0); i<hits.length && hits[i].t<=V.beat0+V.span; i++){
     const ev=hits[i], r=ev.a.row|0; if(r<0||r>=rows) continue;
     const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
-    const w=Math.max(7,Math.min(20,pxB*0.22)), vol=Math.max(0,Math.min(1,ev.a.vol==null?1:ev.a.vol));
+    const w=blkW, vol=Math.max(0,Math.min(1,ev.a.vol==null?1:ev.a.vol));
     const sel = ev===rollSel;
     ctx.fillStyle = sel ? '#fff' : hexA(INSTR_COL.dr||'#ff9e2c', 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
-    ctx.beginPath(); ctx.roundRect(x-w/2,y,w,h,3); ctx.fill();
-    if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-w/2-2,y-2,w+4,h+4,4); ctx.stroke(); }
+    ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();                          // S5.2: блок НАЧИНАЕТСЯ на доле и растёт вправо — нота «на раз» лежит ВНУТРИ такта, а не верхом на его линии
+    if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke(); }
   }
   /* ---- ПРИЗРАК ПЕРЕТАСКИВАНИЯ (S5.1): пока палец ведёт, СОБЫТИЕ НЕ ТРОНУТО. Пунктир показывает, куда
      удар встанет после отпускания — по тем же laneBeatX/rollRowY, что и настоящие удары, поэтому
@@ -835,18 +869,22 @@ function drawRoll(){
     const gr=rollDrag.row|0;
     if(gr>=0&&gr<rows){
       const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*0.62, gy=rollRowY(V,gr)+(V.rowH-gh)/2;
-      const gw=Math.max(7,Math.min(20,pxB*0.22));
       ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
-      ctx.beginPath(); ctx.roundRect(gx-gw/2,gy,gw,gh,3); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.roundRect(gx,gy,blkW,gh,3); ctx.stroke(); ctx.setLineDash([]);   // призрак — ТОТ ЖЕ блок, что и настоящий удар
     }
   }
-  // ---- бегунок (транспорт разрешён: прослушивание) ----
+  /* ---- БЕГУНОК: теперь виден И НА ОСТАНОВЛЕННОМ транспорте (S5.2). Без этого перемотка была бы слепой:
+     тапнул по линейке — и не видно, куда встал. Играет — яркий, стоит — приглушённый; доля берётся из
+     того же loop.pos, с которого ▶ продолжит (onLoop). Треугольник-ручка сидит в линейке. ---- */
   const info=loopPos();
-  if(info&&info.phase==='play'&&info.pos>=V.beat0&&info.pos<=V.beat0+V.span){
-    const px=laneBeatX(V,info.pos);
-    ctx.strokeStyle='#57d9a3'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(px,gy0-6); ctx.lineTo(px,gy1); ctx.stroke();
-    ctx.fillStyle='#57d9a3'; ctx.beginPath(); ctx.arc(px,gy0-6,3,0,7); ctx.fill();
+  const playing=!!(info&&info.phase==='play');
+  const phBeat= playing ? info.pos : Math.max(0,loop.pos);
+  if(phBeat>=V.beat0&&phBeat<=V.beat0+V.span){
+    const px=laneBeatX(V,phBeat), col= playing ? '#57d9a3' : 'rgba(87,217,163,.55)';
+    ctx.strokeStyle=col; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(px,V.ry0); ctx.lineTo(px,gy1); ctx.stroke();
+    ctx.fillStyle=col;
+    ctx.beginPath(); ctx.moveTo(px-5,V.ry0); ctx.lineTo(px+5,V.ry0); ctx.lineTo(px,V.ry0+7); ctx.closePath(); ctx.fill();
   }
   // ---- рамка поля и подсказка/пустота ----
   ctx.strokeStyle= rollIns ? hexA(INSTR_COL.dr,.75) : 'rgba(255,255,255,.14)';   // режим вставки виден и на холсте, а не только по кнопке: тап здесь СОЗДАЁТ удар
@@ -869,15 +907,21 @@ function drawRoll(){
 export function rollHit(px,py){
   const V=rollView; if(!V) return null;
   if(px<V.x0-8||px>V.x0+V.bw+8) return null;
-  const beat=laneBeatAt(V,px), r=rollRowAt(V,py);
+  const beat=laneBeatAt(V,px);
+  if(py>=V.ry0 && py<V.gy0) return { what:'ruler', beat };   // S5.2: ЛИНЕЙКА — своя цель; её низ = верх сетки, пересечься они не могут
+  const r=rollRowAt(V,py);
   if(r<0||r>=V.rows) return null;
-  const hits=rollHits(), tol=ROLL_HIT_PX*V.span/V.bw;
+  /* S5.2: попадание считаем по ВСЕМУ нарисованному блоку [t, t+блок], а не по расстоянию до доли, —
+     иначе палец, положенный на видимый хвост блока, промахивался бы мимо него. Допуск ROLL_HIT_PX
+     остаётся и добавляется с обеих сторон: он и ловит блоки уже пальца на общем плане. */
+  const hits=rollHits(), tol=ROLL_HIT_PX*V.span/V.bw, blk=rollBlockBeats(V);
   let best=null, bd=Infinity;
-  for(let i=rollLower(hits,beat-tol); i<hits.length && hits[i].t<=beat+tol; i++){
+  for(let i=rollLower(hits,beat-blk-tol); i<hits.length && hits[i].t<=beat+tol; i++){
     const ev=hits[i]; if((ev.a.row|0)!==r) continue;
-    const d=Math.abs(ev.t-beat); if(d<bd){ bd=d; best=ev; }
+    const d = beat<ev.t ? ev.t-beat : beat>ev.t+blk ? beat-(ev.t+blk) : 0;   // 0 — палец ВНУТРИ блока
+    if(d<bd){ bd=d; best=ev; }
   }
-  return best ? { what:'hit', ev:best, row:r, beat } : { what:'grid', row:r, beat };
+  return best&&bd<=tol ? { what:'hit', ev:best, row:r, beat } : { what:'grid', row:r, beat };
 }
 /* Габариты окна для ЖЕСТА прокрутки/зума: ui якорит по НИМ, а пишет через сеттеры state — поэтому
    палец, рисунок и попадание читают одно и то же число (следующий кадр строит снимок из него же). */

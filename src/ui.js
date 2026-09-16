@@ -21,7 +21,7 @@ import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_I
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
-         songBeats, songNotes, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
+         songBeats, songNotes, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editCanUndo, editBackingOpen } from './recorder.js';   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
@@ -357,7 +357,7 @@ addEventListener('pointercancel',()=>{ braceEdge=null; });
 const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTabsEl=$('rollTabs'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
-      rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollSnapEl=$('rollSnap');
+      rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome');
 const ROLL_ROLES=['dr','ld','ch','bs'];          // порядок вкладок: та, что правится сегодня, — первой
 const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
 const rollTotal=()=>Math.max(songBeats(), loop.metre*loop.bars);   // пустая песня — тоже поле: показываем окно подложки
@@ -424,16 +424,19 @@ rollZoomOutBtn.onclick=()=>rollZoomBy(1.6);
    updRollBtns — ДЕШЁВЫЙ обновлятор (вкладки не пересобирает): его зовут после выделения, правки и смены
    масштаба. Подпись сетки читает ТУ ЖЕ rollSnap, по которой привязывается палец, — обещание и результат
    не могут разойтись. */
-const rollSnapLbl=step=> step>=loop.metre ? t('roll.snapBar') : step>=1 ? String(step) : '1/'+Math.round(1/step);
+/* Подпись привязки (S5.2): она НЕ выбирает шаг, а ОТЧИТЫВАЕТСЯ о нём — шаг задан «Квантизацией» в панели
+   лупера. Отдельно называем случай, когда сетка мельче, чем её можно нарисовать: иначе палец тянет к
+   линиям, которых не видно, и это читается как «нота прыгает сама». */
 function updRollBtns(){
   if(!rollOpen) return;
   const ro=editBackingOpen();
   rollInsBtn.classList.toggle('act', rollIns); rollInsBtn.disabled=ro;
   rollDelBtn.disabled  = ro || !rollSel;
   rollUndoBtn.disabled = ro || !editCanUndo();
-  const s=rollSnap();
-  rollSnapEl.textContent='⌗ '+rollSnapLbl(s.drag);
-  rollSnapEl.title=t('roll.snapTitle',{ d:rollSnapLbl(s.drag), i:rollSnapLbl(s.tap) });
+  const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
+  const hid = !s.free && !s.drawn;
+  rollSnapEl.textContent='⌗ '+lbl+(hid?' '+t('roll.snapHidden'):'');
+  rollSnapEl.title=t('roll.snapTitle',{ s:lbl });
 }
 /* Подложка — только чтение, и отказ ГОВОРИТ ПОЧЕМУ (молчащая кнопка читается как поломка). Сам отказ
    продублирован в recorder (editGuard): кнопка — вежливость, инвариант — там. */
@@ -444,6 +447,9 @@ rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
   if(editDeleteHit(rollSel)) setRollSel(null);
   updRollBtns(); };
 rollUndoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editUndo()) setRollSel(null); updRollBtns(); };
+/* ⏮ — бегунок в начало. ТОТ ЖЕ seekTo, что и тап по линейке: перемотка одна на все входы (она сама решает,
+   идёт ли транспорт, гасит голоса дорожек и сбрасывает курсоры). Второго пути перемотки не заводим. */
+rollHomeBtn.onclick=()=>seekTo(0);
 /* ЖЕСТ: один палец — прокрутка, два — зум, тап без движения — выбор.
    ⛳ ЯКОРЬ: доля под пальцем (под серединой между пальцами) остаётся на месте — считаем её по ТЕКУЩЕМУ
    снимку (rollGeom) и пишем через сеттеры. Следующий кадр строит снимок из этих же чисел, поэтому
@@ -456,6 +462,12 @@ function rollDown(e){
   if(rollPts.size===1){
     rollMoved=false;
     const h=rollHit(p.x,p.y);
+    /* ⛳ ЛИНЕЙКА (S5.2): тап = ПЕРЕМОТКА, и только тап. ⛔ Перетаскивание бегунка НЕ делаем: оно обещало бы
+       скрабинг (звук под пальцем), а это отдельная работа; вдобавок при идущем транспорте каждый seekTo
+       перезапускает насос — тянущийся палец давал бы череду перезапусков и заикание. Полуинтерактивной
+       ручки не заводим: тап честно делает ровно то, что обещает. Ни выбора, ни вставки здесь нет — полоса
+       своя (её низ = верх сетки), поэтому один тап не может значить двух вещей. */
+    if(h&&h.what==='ruler'){ seekTo(h.beat); return; }
     /* Палец лёг НА УДАР → берём его: dt — смещение точки касания от самого удара, чтобы он не прыгал
        под пальцем. Подложку двигать нельзя — там тап только выделяет. */
     if(h&&h.what==='hit'&&!editBackingOpen()){
@@ -488,8 +500,11 @@ function rollMove(e){
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
     const raw=g.beat0+g.span*((p.x-g.x0)/g.bw)-rollGrab.dt;
     const h=rollHit(p.x,p.y);
-    if(h) rollGrab.row=h.row;                                   // палец ушёл за верх/низ сетки — ряд оставляем прежний
-    setRollDrag({ ev:rollGrab.ev, t:rollSnapBeat(raw, rollSnap().drag), row:rollGrab.row });
+    /* ⚠️ РЯД БЕРЁМ ТОЛЬКО У СЕТКИ. С S5.2 rollHit отвечает ещё и ЛИНЕЙКОЙ ({what:'ruler'}), а у неё ряда
+       нет вовсе: палец, уехавший при переносе вверх за сетку, записал бы row:undefined — удар, который
+       не звучит и не рисуется. Вне сетки (линейка, промах) ряд остаётся прежним. */
+    if(h&&(h.what==='hit'||h.what==='grid')) rollGrab.row=h.row;
+    setRollDrag({ ev:rollGrab.ev, t:rollSnapBeat(raw, rollSnap()), row:rollGrab.row });   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
     return;
   }
   if(rollPan){
@@ -517,7 +532,9 @@ function rollUp(e){
     /* ВСТАВКА — только в явном режиме и только по ПУСТОЙ клетке. Без режима тап по пустому месту просто
        снимает выделение (прокрутка, кончившаяся тапом, ничего не создаёт). */
     if(rollIns && h && h.what==='grid'){
-      if(!rollRefuseRO()){ const ev=editInsertHit(rollSnapBeat(h.beat, rollSnap().tap), h.row); if(ev) setRollSel(ev); }
+      /* S5.2: вставка по тому же правилу, что и перенос. Квантизация выключена → удар встаёт РОВНО туда,
+         где тапнули (сетки нет — и выдумывать её нечем); включена → на ближайшую линию квантизации. */
+      if(!rollRefuseRO()){ const ev=editInsertHit(rollSnapBeat(h.beat, rollSnap()), h.row); if(ev) setRollSel(ev); }
     }else setRollSel(h&&h.what==='hit'?h.ev:null);
     updRollBtns();
   }
