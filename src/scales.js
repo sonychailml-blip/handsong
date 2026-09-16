@@ -306,7 +306,11 @@ export const scalesOfTrad=id=>SCALES.map((s,i)=>({i,s})).filter(x=>x.s.trad===id
 export const tradOfScale=i=>SCALES[i].trad;
 
 export const CUR=()=>SCALES[scaleIdx];
-export const IVX=()=>CUR().iv.concat([CUR().edo]);          // + верхняя тоника
+/* ⛳ s — ЗАМОРОЖЕННЫЙ ЛАД СОБЫТИЯ (слайс S5.4). Тот же приём, что у leadFreq/chordSteps: параметр
+   с умолчанием из живого состояния. Без аргумента — ровно прежнее поведение, байт-в-байт.
+   ⚠️ ВНУТРИ подписей звать голый IVX() НЕЛЬЗЯ: параметр стал бы враньём, которое всплывает только на
+   необычных строях (у 19/31-TET и Партча длина ivx другая — подпись молча съехала бы на чужую ступень). */
+export const IVX=(s=CUR())=>s.iv.concat([s.edo]);           // + верхняя тоника
 /* ЕДИНСТВЕННЫЙ источник опорной частоты — ЖИВАЯ настройка aRef (эталон A4, Гц; 380–480, по умолч. 440,
    лежит в state рядом с тоникой). База тоники baseF() И якорь C фиксированных строёв cFix() читают ЕЁ
    ЖЕ через одну деривацию a3()=aRef/2 (A3). Копий 440/220 в коде высоты быть НЕ должно: сменил эталон
@@ -803,7 +807,10 @@ export const CHORD_FAM_SETS={
    типизации откатываются на 12-TET, чтобы вызывающий никогда не получил undefined. */
 export const chordFams=(s=CUR())=>CHORD_FAM_SETS[s.typedChords]||CHORD_FAM_SETS.chrom12;
 /* Имя корня для подписи типизированного аккорда (тип дописывает вызывающий). */
-export const rootName=deg=>{ const s=CUR(), n=s.iv.length, d=((deg%n)+n)%n;
+/* ⚠️ ТОНИКА ОСТАЁТСЯ ЖИВОЙ, И ЭТО НЕ НЕДОСМОТР (общее правило всех подписей ниже). В событии заморожен
+   ЛАД (правило #7), а тоника — глобальная и живая: высоту переигровка тоже берёт от живой тоники
+   (baseF/fixedSlot). Замороженная в подписи тоника разошлась бы с тем, что звучит. */
+export const rootName=(deg,s=CUR())=>{ const n=s.iv.length, d=((deg%n)+n)%n;
   return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
 
 /* ================= ТЕОРИЯ: СТУПЕНИ, АККОРДЫ, ИМЕНА =================
@@ -918,13 +925,13 @@ export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
-export function stepName(st){ const s=CUR();
+export function stepName(st,s=CUR()){
   if (s.edo===12) return NOTE_NAMES[(((tonic+st)%12)+12)%12];
   if (s.edo===24) return name24(tonic*2+st);
   return 'ст'+(((st%s.edo)+s.edo)%s.edo);
 }
-export function rowLabel(deg){ const s=CUR(), ivx=IVX();
-  if (s.edo===12||s.edo===24) return stepName(ivx[deg]);
+export function rowLabel(deg,s=CUR()){ const ivx=IVX(s);
+  if (s.edo===12||s.edo===24) return stepName(ivx[deg],s);
   const st=ivx[deg]%s.edo; return st===0?'Т':String(st);
 }
 /* Центы для экранной подсказки. У лада с s.cents — РЕАЛЬНЫЕ центы ступени (визуальная
@@ -932,11 +939,11 @@ export function rowLabel(deg){ const s=CUR(), ivx=IVX();
    считают по-прежнему от номинального равного шага. На высоту не влияет.
    fixedKey: интервал над КЛЮЧОМ = cents[tonic+deg] − cents[tonic] (зависит от тональности —
    у Веркмайстера терция читает 390¢ в C и 408¢ в F#, тот самый урок). При тонике C — как было. */
-export const centsOf=deg=>{ const s=CUR();
+export const centsOf=(deg,s=CUR())=>{
   if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round((s.cents[slot]+1200*carry-s.cents[tonic])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет; целые прятали бы точность
   if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
   const pc=1200*Math.log2(periodOf(s));   // центы ПЕРИОДА: октава 1200 (P=2, байт-в-байт), тритава ≈1901.955 (BP) — честный шаг ~146.3¢
-  return Math.round(IVX()[deg]*pc/s.edo)%pc; };
+  return Math.round(IVX(s)[deg]*pc/s.edo)%pc; };
 
 /* ===== Индийская классика: свары (саргам) + ПОДЛИННЫЕ имена 22 шрути (по РЕАЛЬНЫМ центам) =====
    ДВЕ таблицы, обе по центам сетки → грид и раги смотрят на ОДНИ И ТЕ ЖЕ центы, подписи не разъедутся.
@@ -966,7 +973,7 @@ const SHRUTI_OF={0:{default:'Chandovati',ru:'Чхандовати'},90:{default:
    сетки (свойство swaraFull) добавляем имя шрути «свара · имя» (различает комма-пары); у РАГ — только
    свара (раги поют/называют сварами: Са Ре Га Ма Па Дха Ни). Зовётся лишь для swaraNames-ладов, где все
    центы — члены сетки; фолбэк на порядковый — страховка. Точные центы всегда рядом (centsOf). */
-export const swaraLbl=deg=>{ const s=CUR(), cx=(s.cents||[]).concat([1200]), c=cx[deg%cx.length]%1200;
+export const swaraLbl=(deg,s=CUR())=>{ const cx=(s.cents||[]).concat([1200]), c=cx[deg%cx.length]%1200;
   const sw=SWARA_OF[c]; if(!sw)return String(deg+1);
   return s.swaraFull ? `${L(sw)} · ${L(SHRUTI_OF[c])}` : L(sw); };
  
@@ -978,19 +985,25 @@ export function qual(t,f){                         // качество трез�
 }
 export const SEV={'|11':'maj7','|10':'7','m|10':'m7','m|11':'m(maj7)','°|9':'°7','°|10':'ø',
            '+|11':'+(maj7)','+|10':'+7','♭5|10':'7♭5','sus4|10':'7sus4','sus2|10':'7sus2'};
-export function chordLabel(deg){
-  const s=CUR(), n=s.iv.length, d=deg%n;
+/* sev — СЕПТАККОРД, тоже параметром (S5.4): он заморожен в событии (ev.sev) ровно как лад, поэтому
+   подпись аккорда дорожки обязана читать ЕГО, а не живой тумблер панели. */
+export function chordLabel(deg,s=CUR(),sev=seventh){
+  const n=s.iv.length, d=deg%n;
   if (!isTert(s)){
     return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
   }
-  const st=chordSteps(deg), r=st[0];
+  const st=chordSteps(deg,s,sev), r=st[0];
   if (s.edo===12){
     const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
     let q=qual(st[1]-r, st[2]-r);
     if (q==null) return root+'?';
-    if (seventh){ const sv=st[3]-r; q=SEV[q+'|'+sv] ?? (q+'⁷'); }
+    if (sev){ const sv=st[3]-r; q=SEV[q+'|'+sv] ?? (q+'⁷'); }
     return root+q;
   }
-  return ROMAN[d]+(seventh?'⁷':'');         // макам: римская ступень
+  return ROMAN[d]+(sev?'⁷':'');         // макам: римская ступень
 }
-export const chordNotesStr=deg=>chordSteps(deg).map(stepName).join('·');
+/* ⛔ СТРЕЛКА, А НЕ `.map(stepName)` — И ЭТО НЕ КОСМЕТИКА. Array.map передаёт колбэку (значение, ИНДЕКС,
+   массив), поэтому с новым вторым параметром индекс молча приехал бы на место ЛАДА: ошибки бы не было,
+   а строка нот стала бы считаться по «ладу» 0,1,2… Точечная передача функции с умолчаниями запрещена
+   везде, где колбэку дают больше одного аргумента. */
+export const chordNotesStr=(deg,s=CUR(),sev=seventh)=>chordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');
