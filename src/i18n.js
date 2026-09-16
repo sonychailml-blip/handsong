@@ -139,6 +139,10 @@ export const DICTS = {
     'roll.refusedEmpty':'Record something first',
     'roll.recBlocked':'Close the editor to record',
     'roll.hint':'drag a note — move · its right edge — length · empty space — scroll · two fingers — zoom · ruler — playhead',
+    // O-2: что у дорожки ЗАХВАЧЕНО для будущего рендера (зародыш «заморожено с …»).
+    // {roles} — роли САМОЙ дорожки: их может быть несколько, и тогда список эффектов слитый — подпись об этом и говорит
+    'roll.cap':'captured — {roles}: {fx} · {n} automation points',
+    'roll.capNone':'captured — {roles}: no effects',
     'roll.homeTitle':'Playhead to the start',
     'roll.snapFree':'free',
     'roll.snapHidden':'(grid too fine to draw)',
@@ -523,6 +527,10 @@ export const DICTS = {
     'roll.refusedEmpty':'Сначала запишите что-нибудь',
     'roll.recBlocked':'Закройте редактор, чтобы записывать',
     'roll.hint':'тянуть ноту — перенос · её правый край — длина · пустое место — прокрутка · два пальца — зум · линейка — бегунок',
+    // O-2: что у дорожки ЗАХВАЧЕНО для будущего рендера (зародыш «заморожено с …»).
+    // {roles} — роли САМОЙ дорожки: их может быть несколько, и тогда список эффектов слитый — подпись об этом и говорит
+    'roll.cap':'захвачено — {roles}: {fx} · точек автоматизации: {n}',
+    'roll.capNone':'захвачено — {roles}: без эффектов',
     'roll.homeTitle':'Бегунок в начало',
     'roll.snapFree':'свободно',
     'roll.snapHidden':'(сетка мельче пикселя)',

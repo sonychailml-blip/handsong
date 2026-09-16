@@ -16,7 +16,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch } from './draw.js';   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf } from './draw.js';   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice } from './audio.js';
@@ -1192,11 +1192,11 @@ function fxChainPut(key,fxId,nParams){
    может быть перерисована и до старта (см. довод в showScale).
    ⚠️ ПРЕЖНЕГО «списка эффекта на строке пальца» больше нет (снят в 3.4.2, когда строка стала
    ПАРАМЕТРОМ). Состав цепи правится иначе — «+ Добавить эффект» в подвале секции и ✕ в заголовке
-   (Пласт 3.4.3); имя эффекта здесь — только подпись заголовка. */
-function fxTitleOf(fxId){
-  const m=FX_META.find(q=>q.k===fxId); if(m) return t(m.fullKey);
-  const mod=FX_FACTORY[fxId]; return mod ? t(mod.labelKey) : fxId;
-}
+   (Пласт 3.4.3); имя эффекта здесь — только подпись заголовка.
+   ⛳ САМА ФУНКЦИЯ ПЕРЕЕХАЛА В draw и ИМПОРТИРУЕТСЯ отсюда: её понадобился ВТОРОЙ читатель — подвал
+   редактора («что у дорожки захвачено»). Две копии разошлись бы там, где сверить их труднее всего, —
+   в двух разных экранах; а живёт она в draw потому, что ui импортирует draw, и обратный импорт был бы
+   циклом. Поведение не менялось ни на символ. */
 /* Подписи ПАРАМЕТРОВ. У СТАРЫХ скалярных параметр ОДИН и он же и есть сам эффект — подписываем
    нейтрально («Величина»): имя эффекта уже стоит заголовком выше, повторять его — шум.
    У МОДУЛЯ берём labelKey каждого параметра. Неизвестный эффект параметров не имеет — строк нет.
