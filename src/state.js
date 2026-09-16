@@ -570,5 +570,12 @@ export let rollSel=null;            // ВЫДЕЛЕННОЕ событие (сс
 export const setRollOpen=v=>{ rollOpen=!!v; };
 export const setRollWin=(b0,span)=>{ rollBeat0=b0; rollSpan=span; };
 export const setRollSel=v=>{ rollSel=v||null; };
+/* ПРАВКА (S5.1). rollDrag — ПРЕДПРОСМОТР перетаскивания {ev,t,row}: пока палец ведёт, СОБЫТИЕ НЕ
+   ТРОГАЕМ (иначе каждое движение пальца пересобирало бы ноты всей песни), рисуем призрак по этим
+   числам, а настоящую правку делаем ОДИН раз на отпускании. rollIns — режим вставки (явный, чтобы
+   прокрутка, кончившаяся тапом, не рождала удар). */
+export let rollDrag=null, rollIns=false;
+export const setRollDrag=v=>{ rollDrag=v||null; };
+export const setRollIns=v=>{ rollIns=!!v; };
 export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };

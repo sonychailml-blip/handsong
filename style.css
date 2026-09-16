@@ -154,6 +154,11 @@
   #rollTabs{display:flex; gap:6px; flex:0 0 auto;}
   #rollBar .tab{opacity:.45;}                      /* роль без правки — видна, но приглушена (счёт нот всё равно полезен) */
   #rollBar .tab.act{opacity:1; border-color:var(--accent); color:var(--accent);}
+  /* Режим вставки — та же «включённая» раскраска, что у 🔄/⛶/🎵 в баре: оранжевая рамка и текст. */
+  #rollBar button.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #rollBar button:disabled{opacity:.4;}
+  /* Текущая сетка привязки — подпись, а не кнопка: её не нажимают, она объясняет, куда встанет палец. */
+  #rollSnap{flex:0 0 auto; font-size:var(--fs-hint); color:var(--dim); padding:0 2px; white-space:nowrap;}
   /* Пока редактор открыт, транспорт оставляет ОДНУ кнопку ▶ (прослушивание). ⤺ ✕ ⟳ ■ меняли бы песню
      под открытым редактором — вплоть до сноса самой открытой дорожки. */
   #loopTransport.roll>button:not(#loopBtn){display:none;}

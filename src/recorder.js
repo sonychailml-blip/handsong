@@ -436,15 +436,97 @@ function editOpen(layer){
   if(!AC||recording||activeKind()||layer==null) return false;
   const id=laneOf(layer) ?? laneNew(layer);
   if(loop.on) onLoop(); else softAllOff();
-  editLane=id;
+  editLane=id; editHist=[]; editTake=0;   // S5.1: сессия правки начинается с чистой историей
   return true;
 }
-function editClose(){ editLane=null; }
+function editClose(){ editLane=null; editHist=[]; editTake=0; }
 /* Сменить открытую дорожку, не закрывая редактор (чип дорожки в панели). Звук уже заглушён открытием. */
 function editSetLayer(layer){
   if(editLane==null||layer==null) return false;
   const id=laneOf(layer); if(id==null) return false;
-  editLane=id; return true;
+  editLane=id; editHist=[]; editTake=0;   // S5.1: история — про ТУ дорожку, что на экране; отмена «вслепую» на другой дорожке была бы враньём
+  return true;
+}
+/* ═══ ПРАВКА УДАРОВ И ОТМЕНА ПРАВОК (слайс S5.1) ═══
+   ⛳ ТРЕТЬЕ МЕСТО РОЖДЕНИЯ СОБЫТИЙ (после push и loadArrangement) — и обязано соблюдать ровно то же:
+   абсолютное время, tk на КАЖДОМ событии, ОДИН schedInvalidate на правку с сортировкой ПЕРЕД ним
+   (правило #28), удаление — только через compactEvents (массив events — стабильная ссылка, её читает draw).
+   ⛔ push СЮДА НЕ ГОДИТСЯ, и это не лень: он берёт время у часов AudioContext, квантует живой сеткой и
+   пишет только при recording. У правки время приходит от ПАЛЬЦА, а не от часов.
+   ⛳ ПОЧЕМУ ПЕРЕНОС УДАРА НЕ МОЖЕТ НАРУШИТЬ ПОРЯДОК, который стережёт S4.3: тот порядок обязателен ВНУТРИ
+   КЛЮЧА ВЛАДЕЛЬЦА — там, где «вкл» и «выкл» обязаны идти по очереди. У удара владельца нет вовсе
+   (chaseRole('drum') → null), пары нет, ENG.drum сам себе начало и конец — «раньше своего вкл» лечь
+   физически нечему. Остаётся ОДНО требование — отсортированность массива, и её держит editCommit.
+   ⚠️ СОБЫТИЕ ПРАВИМ, НЕ ПЕРЕСОЗДАВАЯ. Объект события — РУЧКА: за него держатся выделение, история отмены и
+   спаривание нот (songNotes.head). Поэтому t меняем на месте, а нагрузку кладём НОВЫМ объектом — прежний
+   уходит в историю ЦЕЛИКОМ. Так обратный ход не может растерять поля: sc/sev/tk/jam едут вместе с объектом,
+   а не переписываются по одному (у удара sc/sev мертвы — ENG.drum контекста не читает, — но формат события
+   один на все роли, и ломать его здесь нечем).
+   ⛳ ОТМЕНА ПРАВОК — СВОЯ, И ЭТО НЕ ВТОРОЕ ⤺. ⤺ снимает ВЗЯТОЕ (целый дубль записи), ↶ — ОДНУ правку.
+   Спутать их нажатием нельзя: пока редактор открыт, ⤺ с экрана убран (S5.0), а ↶ живёт только в редакторе.
+   ⛳ ИСТОРИЯ ЖИВЁТ РОВНО СЕССИЮ ПРАВКИ (чистят открытие, закрытие и смена дорожки). Причина не в экономии
+   памяти: ВНЕ редактора песню меняют запись, ⤺, ✕ и подложка, и обратный ход, сохранённый «на потом»,
+   однажды указал бы на событие, которого в песне уже нет. Закрыл редактор — история закрыта вместе с ним. */
+const EDIT_DEF_VOL=0.8;                 // громкость вставленного удара, когда в дорожке спросить не у кого
+let editHist=[], editTake=0;            // обратные ходы сессии; номер взятого для ВСТАВОК этой сессии
+const editCanUndo=()=>editHist.length>0;
+/* Дорожка ПОДЛОЖКИ (🎵): её события помечены ev.jam, и clearJam снимает их ЦЕЛИКОМ. Правка внутри такой
+   дорожки пережила бы снятие подложки осиротевшим обрывком — поэтому подложка в S5.1 ТОЛЬКО ЧИТАЕТСЯ.
+   ⚠️ Аранжировка из ⚙-панели метки НЕ несёт (известное расхождение, см. отчёт) и потому правится как
+   обычная запись — это честно: clearJam её и не тронет. */
+const laneIsBacking=layer=> layer!=null && events.some(e=>e.layer===layer&&e.jam);
+const editBackingOpen=()=>laneIsBacking(editLayer());
+/* ЕДИНЫЙ ВХОД ВСЕХ ПРАВОК: редактор открыт, дорожка жива и не подложка, транспорт ОСТАНОВЛЕН.
+   ⚠️ ПАУЗУ СТАВИМ ЗДЕСЬ, А НЕ В ui: правка при идущем транспорте легла бы под уже запланированные в окно
+   опережения события и под звучащие голоса. onLoop — обычная пауза, а следующий ▶ поднимет состояние
+   обычной догонялкой (chasePlay в startTransport) — уже с учётом правки. */
+function editGuard(){
+  if(!AC||!editIsOpen()||editLayer()==null) return false;
+  if(editBackingOpen()) return false;
+  if(loop.on) onLoop();
+  return true;
+}
+function editCommit(){ events.sort((x,y)=>x.t-y.t); schedInvalidate(); }   // ОДИН раз на правку: сортировка ДО сброса — он объявляет массив отсортированным (правило #28)
+/* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
+   кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
+function editDrumDefaults(layer,t){
+  let best=null,bd=Infinity;
+  for(const e of events) if(e.layer===layer&&e.fn==='drum'){ const d=Math.abs(e.t-t); if(d<bd){ bd=d; best=e; } }
+  return { kit: best&&best.a.kit!=null ? best.a.kit : drumKitIdx,
+           vol: best&&best.a.vol!=null ? best.a.vol : EDIT_DEF_VOL };
+}
+function editMoveHit(ev,t,row){
+  if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
+  editHist.push({ kind:'move', ev, t:ev.t, a:ev.a });     // обратный ход помнит ПРЕЖНИЕ время и нагрузку целиком
+  ev.t=Math.max(0,t); ev.a={...ev.a, row};
+  editCommit(); return true;
+}
+function editDeleteHit(ev){
+  if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
+  if(!compactEvents(e=>e===ev)) return false;
+  editHist.push({ kind:'del', ev });                       // держим САМ объект — вернуть можно ровно его
+  editCommit(); return true;
+}
+function editInsertHit(t,row){
+  if(!editGuard()) return false;
+  const layer=editLayer(), d=editDrumDefaults(layer,t);
+  /* ⛳ ОДНО ВЗЯТОЕ НА СЕССИЮ ПРАВКИ, а не на удар: ⤺ снаружи снимает «последнее взятое», и сессия правки —
+     ближайший аналог дубля записи. Иначе десять вставок требовали бы десяти ⤺. */
+  if(!editTake) editTake=++takeSeq;
+  const ev={ t:Math.max(0,t), layer, fn:'drum', a:{row, vol:d.vol, kit:d.kit}, sc:CUR(), sev:seventh, tk:editTake };
+  events.push(ev);
+  editHist.push({ kind:'ins', ev });
+  editCommit(); return ev;
+}
+/* ↶ — снять ПОСЛЕДНЮЮ правку. Обратные ходы точные: перенос возвращает прежние время и нагрузку, удаление
+   возвращает ТОТ ЖЕ объект, вставка его убирает. */
+function editUndo(){
+  if(!editGuard()||!editHist.length) return false;
+  const u=editHist.pop();
+  if(u.kind==='move'){ u.ev.t=u.t; u.ev.a=u.a; }
+  else if(u.kind==='del'){ events.push(u.ev); }
+  else compactEvents(e=>e===u.ev);
+  editCommit(); return u.kind;
 }
 
 /* Позиция для визуализации: фаза отсчёта / игры, ПЕСЕННАЯ доля, длина песни в долях.
@@ -1667,5 +1749,6 @@ export {
   toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, toggleArm, armedLayer, laneDelTap, laneDelCancel, laneDelPendingLayer,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
   songNotes,      // S4.0: события, собранные в НОТЫ (только чтение) — по ним рисует пиано-ролл
   editOpen, editClose, editIsOpen, editLayer, editSetLayer,   // S5.0: редактор дорожки — ОДИН флаг на все отказы; наружу отдаём НОМЕР СЛОЯ, id остаётся здесь (правило #27)
+  editMoveHit, editDeleteHit, editInsertHit, editUndo, editCanUndo, editBackingOpen,   // S5.1: правка ударов и отмена ПРАВОК (не путать с ⤺ — та снимает взятое)
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

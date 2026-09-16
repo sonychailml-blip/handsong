@@ -3,7 +3,7 @@ import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртв�
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel } from './state.js';   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
+         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns } from './state.js';   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -746,6 +746,24 @@ function rollHits(){
   return rollCache.hits;
 }
 const rollLower=(hits,t)=>{ let lo=0,hi=hits.length; while(lo<hi){ const m=(lo+hi)>>1; if(hits[m].t<t) lo=m+1; else hi=m; } return lo; };
+/* ⛳ ПРИВЯЗКА (S5.1) — ОТ ПЛОТНОСТИ ПИКСЕЛЕЙ, А НЕ ОТ ЖИВОЙ КВАНТИЗАЦИИ ЗАПИСИ. У скобы шаг — ТАКТ, потому
+   что на полосе лупера такт это пара пикселей и точнее обещать было бы ложью. Здесь пикселей на долю много,
+   поэтому обещаем мельче: лестница идёт от такта до 1/8 (или до триолей, если запись делит долю на три —
+   loop.sub), и берётся САМАЯ МЕЛКАЯ ступень, что ещё шире порога.
+   ДВА ПОРОГА, и разница осмысленная: ПЕРЕТАСКИВАНИЕ рисует призрак — видно, куда встанет удар, поэтому
+   хватает 10px; ТАП ВСЛЕПУЮ до касания не показывает ничего, поэтому 24px — ширина подушечки пальца.
+   ⛔ Не привязываться к gridFor/loop.quant: это сетка ЗАПИСИ ЖИВОЙ ИГРЫ. Редактор ставит удар туда, куда
+   показал человек, а сетку он ВИДИТ на экране — вторая, невидимая, была бы сюрпризом. */
+const ROLL_SNAP_DRAG_PX=10, ROLL_SNAP_TAP_PX=24;
+const rollLadder=()=> loop.sub===3 ? [loop.metre,1,1/2,1/3,1/6] : [loop.metre,1,1/2,1/4,1/8];
+function rollStepFor(minPx){
+  const V=rollView; if(!V) return 1;
+  const pxB=V.bw/V.span, lad=rollLadder();
+  for(let i=lad.length-1;i>=0;i--) if(lad[i]*pxB>=minPx) return lad[i];
+  return lad[0];                       // даже такт уже мельче порога (вся песня в экране) — крупнее лестницы нет
+}
+export const rollSnap=()=>({ drag:rollStepFor(ROLL_SNAP_DRAG_PX), tap:rollStepFor(ROLL_SNAP_TAP_PX) });
+export const rollSnapBeat=(beat,step)=> Math.max(0, Math.round(beat/step)*step);
 function drawRoll(){
   const W=canvas.width, H=canvas.height;
   /* Полосы лупера на экране нет → и попадать в неё нечем: снимаем её геометрию, как это делает запись
@@ -810,6 +828,18 @@ function drawRoll(){
     ctx.beginPath(); ctx.roundRect(x-w/2,y,w,h,3); ctx.fill();
     if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-w/2-2,y-2,w+4,h+4,4); ctx.stroke(); }
   }
+  /* ---- ПРИЗРАК ПЕРЕТАСКИВАНИЯ (S5.1): пока палец ведёт, СОБЫТИЕ НЕ ТРОНУТО. Пунктир показывает, куда
+     удар встанет после отпускания — по тем же laneBeatX/rollRowY, что и настоящие удары, поэтому
+     обещание призрака и результат правки совпадают по построению. ---- */
+  if(rollDrag&&rollDrag.ev){
+    const gr=rollDrag.row|0;
+    if(gr>=0&&gr<rows){
+      const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*0.62, gy=rollRowY(V,gr)+(V.rowH-gh)/2;
+      const gw=Math.max(7,Math.min(20,pxB*0.22));
+      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.roundRect(gx-gw/2,gy,gw,gh,3); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
   // ---- бегунок (транспорт разрешён: прослушивание) ----
   const info=loopPos();
   if(info&&info.phase==='play'&&info.pos>=V.beat0&&info.pos<=V.beat0+V.span){
@@ -819,7 +849,8 @@ function drawRoll(){
     ctx.fillStyle='#57d9a3'; ctx.beginPath(); ctx.arc(px,gy0-6,3,0,7); ctx.fill();
   }
   // ---- рамка поля и подсказка/пустота ----
-  ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
+  ctx.strokeStyle= rollIns ? hexA(INSTR_COL.dr,.75) : 'rgba(255,255,255,.14)';   // режим вставки виден и на холсте, а не только по кнопке: тап здесь СОЗДАЁТ удар
+  ctx.lineWidth= rollIns ? 2 : 1;
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
   if(ly==null||!hits.length){
