@@ -2,13 +2,15 @@ import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
-import { fx, fxIsScalar, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide } from './state.js';
+import { fx, fxIsScalar, fxChainOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
+         rollOpen, rollBeat0, rollSpan, rollSel } from './state.js';   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
-import { DRUM_NAMES, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
+import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
-         laneMuted, laneSoloed, laneSoloOn, cycling, armedLayer, laneDelPendingLayer } from './recorder.js';   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
+         songNotes, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -453,6 +455,14 @@ const laneBeatX=(V,b)=> V.x0 + V.bw*((b-V.beat0)/V.span);
    это ровно та вторая копия, от которой правило #9. Появится зум/прокрутка — поменяются beat0/span в V,
    и обе функции поедут вместе. Кламп по линейке: тап чуть левее/правее неё — это край, а не «доля −3». */
 const laneBeatAt=(V,x)=> V.beat0 + V.span*(Math.max(0,Math.min(V.bw,x-V.x0))/V.bw);
+/* ⛳ ВЫСОТНАЯ ПАРА К ВРЕМЕННÓЙ (пиано-ролл, S5.0) — ЗДЕСЬ ЖЕ и выведена ТАК ЖЕ, из того же снимка V.
+   У полосы лупера высоты не было (строка = дорожка, её считал сам drawLooper), у ролла она несущая:
+   ряд — это ЗВУК (ударный ряд, дальше будет ступень), и палец обязан брать тот ряд, который видит.
+   Ряд 0 — ВНИЗУ: так же пронумерованы ряды ударных (DRUM_NAMES, индекс 0 = низ) и так же считает
+   игровое поле (degRaw). Поэтому z=rows-1-r, а не r.
+   rollRowY даёт ВЕРХ ряда, rollRowAt — обратная: rollRowAt(V, rollRowY(V,r)+ε) === r на всей сетке. */
+const rollRowY =(V,r)=> V.gy0 + (V.rows-1-r)*V.rowH;
+const rollRowAt=(V,y)=> V.rows-1-Math.floor((y-V.gy0)/V.rowH);
 /* Ширина гнезда переключателя и зазор. Нарисованная кнопка мельче гнезда — палец толще буквы. */
 const LANE_TOG_W=21, LANE_TOG_GAP=2;
 /* ✕ удаления (S3.5d) — третьим гнездом, но ОТСТУПЛЕН на LANE_DEL_GAP: соседство с S шириной в 2px делало бы
@@ -708,7 +718,141 @@ function drawVideoBackground(){
   }
   ctx.fillStyle='rgba(7,7,13,.5)'; ctx.fillRect(0,0,W,H);
 }
-function drawOverlays(res){ drawPhone(res); }
+/* ================= РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (слайс S5.0) =================
+   ЧТО ЭТО. Полноэкранная сетка ВРЕМЯ × РЯД для ОДНОЙ дорожки. В этом слайсе — только УДАРНЫЕ и только
+   ЧТЕНИЕ: показать, прокрутить, приблизить, выбрать. Ни одно событие здесь не меняется.
+   ⛳ СНИМОК ГЕОМЕТРИИ — СВОЙ (rollView), А НЕ ПЕРЕКРОЕННЫЙ loopView, и это решение, а не лень:
+   полоса лупера рисует ДОРОЖКИ против времени, ролл — РЯДЫ ОДНОЙ дорожки против времени. Это разные
+   оси Y при одной оси X. Одновременно они не видны НИКОГДА (ролл занимает весь экран и рисуется
+   вместо игрового поля), поэтому у каждой поверхности по-прежнему РОВНО ОДИН снимок — правило #9 цело.
+   ⛳ ОБЕ ОСИ И ПОПАДАНИЕ ЧИТАЮТ ОДИН ОБЪЕКТ: время — laneBeatX/laneBeatAt (те самые, без изменений),
+   ряд — rollRowY/rollRowAt рядом с ними. rollHit берёт ТОТ ЖЕ rollView, что нарисован последним кадром.
+   ⛳ ЦЕНА КАДРА. Полоса лупера обходит ВСЕ события каждый кадр — ролл так не может (пять минут музыки
+   это десятки тысяч). Здесь: songNotes() отдаёт готовый кэш (перестраивается только в schedInvalidate),
+   удары дорожки отбираются ОДИН раз на смену вида/дорожки (rollCache — memo по ИДЕНТИЧНОСТИ объекта
+   вида, не по длине массива), а рисуются только попавшие в окно — двоичный поиск + проход по видимым.
+   Кадр = O(log n + видимые удары + 6 рядов + линии сетки). */
+const ROLL_BAR_H=46, ROLL_TP_H=44;      // высоты HTML-панели редактора и транспортной полосы под ней
+const ROLL_LBL_W=58;                    // колонка имён рядов слева
+const ROLL_HIT_PX=12;                   // допуск попадания по времени: палец толще удара
+let rollView=null;
+let rollCache={view:null,layer:null,hits:null};
+/* Удары ОТКРЫТОЙ дорожки, по времени. Пересобираются, только когда сменился вид нот (schedInvalidate)
+   или дорожка — то есть не каждый кадр. Порядок наследуется от событий: они отсортированы. */
+function rollHits(){
+  const V=songNotes(), ly=rollTrackLayer();
+  if(rollCache.view!==V||rollCache.layer!==ly)
+    rollCache={ view:V, layer:ly, hits: ly==null?[] : V.notes.filter(n=>n.role==='dr'&&n.layer===ly).map(n=>n.head) };
+  return rollCache.hits;
+}
+const rollLower=(hits,t)=>{ let lo=0,hi=hits.length; while(lo<hi){ const m=(lo+hi)>>1; if(hits[m].t<t) lo=m+1; else hi=m; } return lo; };
+function drawRoll(){
+  const W=canvas.width, H=canvas.height;
+  /* Полосы лупера на экране нет → и попадать в неё нечем: снимаем её геометрию, как это делает запись
+     клипа (иначе тап пришёлся бы по НЕВИДИМОЙ кнопке дорожки). */
+  loopView=null;
+  if(statusEl.textContent) statusEl.textContent='';     // строка статуса игрового поля к роллу отношения не имеет
+  /* ⛳ ПОЗИЦИЮ ТРАНСПОРТА ПО-ПРЕЖНЕМУ ВЛАДЕЕТ DRAW, тем же syncLoopTransport — только теперь полоса
+     швартуется под панелью редактора, а не под коробкой лупера. Один владелец, одна функция. */
+  syncLoopTransport(true, ROLL_BAR_H+4);
+  ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,W,H);       // камеру не рисуем — фон честно непрозрачный
+  const ly=rollTrackLayer();
+  const x0=ROLL_LBL_W, x1=W-12, gy0=ROLL_BAR_H+ROLL_TP_H+18, gy1=H-26;
+  const rows=DRUM_ROWS, rowH=(gy1-gy0)/rows;
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), gy0, rowH, rows };
+  const V=rollView, pxB=V.bw/V.span, M=loop.metre;
+  // ---- ряды: чередующаяся заливка + имя ряда слева (то же имя, что у игрового поля — L(DRUM_NAMES)) ----
+  ctx.textBaseline='middle'; ctx.textAlign='right'; ctx.font='11px system-ui';
+  for(let r=0;r<rows;r++){
+    const y=rollRowY(V,r);
+    ctx.fillStyle = r%2 ? 'rgba(255,255,255,.035)' : 'rgba(255,255,255,.015)';
+    ctx.fillRect(V.x0,y,V.bw,V.rowH);
+    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(V.x0,y); ctx.lineTo(V.x0+V.bw,y); ctx.stroke();
+    ctx.fillStyle='rgba(255,255,255,.62)';
+    ctx.fillText(L(DRUM_NAMES[r])||'', V.x0-6, y+V.rowH/2);
+  }
+  // ---- скоба повтора: только ПОКАЗ (правка скобы живёт на полосе лупера) ----
+  if(regionOn()){
+    const R=loop.rgn, bx0=laneBeatX(V,Math.max(R.from,V.beat0)), bx1=laneBeatX(V,Math.min(R.to,V.beat0+V.span));
+    if(bx1>bx0){ ctx.fillStyle='rgba(87,217,163,.10)'; ctx.fillRect(bx0,gy0,bx1-bx0,gy1-gy0);
+      ctx.strokeStyle='rgba(87,217,163,.5)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(bx0,gy0); ctx.lineTo(bx0,gy1); ctx.moveTo(bx1,gy0); ctx.lineTo(bx1,gy1); ctx.stroke(); }
+  }
+  /* ---- сетка тактов и долей: ТЕ ЖЕ акценты, что у полосы лупера (beatLevel), и то же прореживание.
+     Доли рисуем, пока они РАЗЛИЧИМЫ; такты — всегда, но реже, если их гуще 26px. ---- */
+  const barStep=Math.max(1,Math.ceil(26/Math.max(1e-6,pxB*M))), showBeats=pxB>=7;
+  const bFrom=Math.max(0,Math.floor(V.beat0)), bTo=Math.ceil(V.beat0+V.span);
+  ctx.textAlign='left'; ctx.font='10px system-ui';
+  for(let b=bFrom;b<=bTo;b++){
+    const bib=((b%M)+M)%M;
+    if(bib===0){ if(((b/M)|0)%barStep) continue; }
+    else if(!showBeats) continue;
+    const gx=laneBeatX(V,b); if(gx<V.x0-1||gx>V.x0+V.bw+1) continue;
+    const lvl=beatLevel(M,bib);
+    let sc,lw;
+    if(bib===0){ sc='rgba(255,255,255,.34)'; lw=1.4; }
+    else if(lvl===1){ sc='rgba(255,255,255,.22)'; lw=1.1; }
+    else if(lvl===-1){ sc='rgba(140,180,255,.20)'; lw=1.0; }
+    else { sc='rgba(255,255,255,.10)'; lw=0.8; }
+    ctx.strokeStyle=sc; ctx.lineWidth=lw;
+    ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
+    if(bib===0 && pxB*M>=30){ ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillText(String((b/M|0)+1), gx+3, gy0-8); }   // номер такта — с единицы, как в подписи скобы
+  }
+  // ---- удары: только попавшие в окно (двоичный поиск по началу) ----
+  const hits=rollHits();
+  for(let i=rollLower(hits,V.beat0); i<hits.length && hits[i].t<=V.beat0+V.span; i++){
+    const ev=hits[i], r=ev.a.row|0; if(r<0||r>=rows) continue;
+    const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
+    const w=Math.max(7,Math.min(20,pxB*0.22)), vol=Math.max(0,Math.min(1,ev.a.vol==null?1:ev.a.vol));
+    const sel = ev===rollSel;
+    ctx.fillStyle = sel ? '#fff' : hexA(INSTR_COL.dr||'#ff9e2c', 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
+    ctx.beginPath(); ctx.roundRect(x-w/2,y,w,h,3); ctx.fill();
+    if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-w/2-2,y-2,w+4,h+4,4); ctx.stroke(); }
+  }
+  // ---- бегунок (транспорт разрешён: прослушивание) ----
+  const info=loopPos();
+  if(info&&info.phase==='play'&&info.pos>=V.beat0&&info.pos<=V.beat0+V.span){
+    const px=laneBeatX(V,info.pos);
+    ctx.strokeStyle='#57d9a3'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(px,gy0-6); ctx.lineTo(px,gy1); ctx.stroke();
+    ctx.fillStyle='#57d9a3'; ctx.beginPath(); ctx.arc(px,gy0-6,3,0,7); ctx.fill();
+  }
+  // ---- рамка поля и подсказка/пустота ----
+  ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
+  ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
+  ctx.textAlign='center'; ctx.font='12px system-ui';
+  if(ly==null||!hits.length){
+    ctx.fillStyle='rgba(255,255,255,.55)';
+    ctx.fillText(t(ly==null?'roll.noTrack':'roll.empty'), V.x0+V.bw/2, (gy0+gy1)/2);
+  }
+  ctx.fillStyle='rgba(255,255,255,.34)'; ctx.font='10px system-ui';
+  ctx.fillText(t('roll.hint'), V.x0+V.bw/2, gy1+14);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+}
+/* ПОПАДАНИЕ — ИЗ ТОГО ЖЕ rollView, что нарисован (правило #9). Возвращает удар под пальцем
+   ({what:'hit', ev}) либо клетку ({what:'grid', row, beat}) — вторая в S5.0 ничего не делает и
+   существует затем, чтобы вставка в следующем слайсе не заводила ВТОРУЮ геометрию попадания.
+   ⚠️ Допуск по времени — в ПИКСЕЛЯХ (ROLL_HIT_PX), переведённых в доли текущего масштаба: на любом
+   зуме палец берёт то, что видит, а не «долю ± константа». */
+export function rollHit(px,py){
+  const V=rollView; if(!V) return null;
+  if(px<V.x0-8||px>V.x0+V.bw+8) return null;
+  const beat=laneBeatAt(V,px), r=rollRowAt(V,py);
+  if(r<0||r>=V.rows) return null;
+  const hits=rollHits(), tol=ROLL_HIT_PX*V.span/V.bw;
+  let best=null, bd=Infinity;
+  for(let i=rollLower(hits,beat-tol); i<hits.length && hits[i].t<=beat+tol; i++){
+    const ev=hits[i]; if((ev.a.row|0)!==r) continue;
+    const d=Math.abs(ev.t-beat); if(d<bd){ bd=d; best=ev; }
+  }
+  return best ? { what:'hit', ev:best, row:r, beat } : { what:'grid', row:r, beat };
+}
+/* Габариты окна для ЖЕСТА прокрутки/зума: ui якорит по НИМ, а пишет через сеттеры state — поэтому
+   палец, рисунок и попадание читают одно и то же число (следующий кадр строит снимок из него же). */
+export function rollGeom(){ const V=rollView; return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span } : null; }
+/* ⛳ ЕДИНСТВЕННАЯ РАЗВИЛКА «ИГРА ИЛИ РЕДАКТОР». Закрыт редактор — ветка та же, что была всегда. */
+function drawOverlays(res){ if(rollOpen){ drawRoll(); return; } drawPhone(res); }
 
 /* Лад без лестницы аккордов (макам): поле остаётся НА МЕСТЕ, приглушается, и вместо
    лестницы объясняет, куда делись аккорды и где взять гармонию. Занимает весь X-диапазон

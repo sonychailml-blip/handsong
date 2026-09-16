@@ -6,6 +6,7 @@ import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
 import { hooks } from './hooks.js';
+import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
 
 /* ================= ЗАПИСЬ И ЛИНЕЙНЫЙ ТРАНСПОРТ =================
    ⛳ ЗДЕСЬ ПРОИЗОШЛА СМЕНА МОДЕЛИ (слайс S3.3). Раньше приложение было ЛУПЕРОМ: время события
@@ -409,6 +410,41 @@ function laneHush(){
   for(const e of events){ if(seen.has(e.layer)) continue; seen.add(e.layer);
     if(!laneAudible(e.layer)) releaseLoopLayersAt(undefined,e.layer); }
   if(droneActive()){ if(loop.on&&droneAudible()) droneOn(); else droneOff(); }   // уровень дрона — по слышимости ЕГО дорожки (уровень, а не нота: пропуском события его не заглушить)
+}
+
+/* ═══ РЕДАКТОР ДОРОЖКИ: ОДИН ФЛАГ — ВСЕ ОТКАЗЫ (слайс S5.0) ═══
+   ⛳ ФЛАГ ЖИВЁТ ЗДЕСЬ, А НЕ В ui, И ЭТО НЕСУЩЕЕ. «Редактор открыт» — условие, при котором ЗАПИСЬ
+   невозможна, а запись держит recorder. Спрячь флаг в ui — и каждый новый вход (кнопка ●, рука-лупер,
+   будущая педаль, урок) обязан был бы ВСПОМНИТЬ про отказ. Здесь про него не помнит никто: onRec
+   спрашивает один раз, и этого хватает всем настоящим и будущим путям.
+   ⛔ АДРЕС ДОРОЖКИ — id, А НЕ НОМЕР СЛОЯ (правило #27): номера переиспользуются (⤺ освобождает, следующая
+   запись берёт тот же), и редактор, открытый «на слое 2», после отмены смотрел бы на ЧУЖУЮ дорожку с тем
+   же номером. id не выдаётся дважды, поэтому протухший id может только «никуда не указывать» — тогда
+   editLayer() отдаёт null, и редактор честно говорит «дорожки больше нет».
+   `laneOf(layer) ?? laneNew(layer)` — та же самопочинка, что у toggleLaneMute/toggleArm, и безопасна по
+   той же причине: ОТСУТСТВИЕ записи не может нести устаревший id, затирать нечего.
+   ⚠️ ОТКРЫТИЕ ГЛУШИТ ЗВУК, И ДВУМЯ РАЗНЫМИ ПУТЯМИ — оба уже существуют, новых не заводим:
+     транспорт ИДЁТ → onLoop() — обычная ПАУЗА: она закрывает открытые ноты в записи (recAllOff) и гасит;
+     транспорт СТОИТ → softAllOff() — иначе ЗАЩЁЛКНУТЫЙ аккорд звенел бы дальше: пальцы разомкнуты,
+       watchdog жестов его не снимает (endPinch в защёлке аккорд не гасит — см. gestures).
+   ⛔ Запись и запись клипа — отказ. Открывать редактор поверх них значит редактировать то, что прямо
+   сейчас меняется под руками (запись) или снимать в файл служебный экран (клип). */
+let editLane=null;                                   // id ДОРОЖКИ, открытой в редакторе (не номер слоя!), или null
+const editIsOpen=()=>editLane!=null;
+const editLayer=()=>laneLayerOf(editLane);           // НОМЕР СЛОЯ открытой дорожки или null, если её больше нет
+function editOpen(layer){
+  if(!AC||recording||activeKind()||layer==null) return false;
+  const id=laneOf(layer) ?? laneNew(layer);
+  if(loop.on) onLoop(); else softAllOff();
+  editLane=id;
+  return true;
+}
+function editClose(){ editLane=null; }
+/* Сменить открытую дорожку, не закрывая редактор (чип дорожки в панели). Звук уже заглушён открытием. */
+function editSetLayer(layer){
+  if(editLane==null||layer==null) return false;
+  const id=laneOf(layer); if(id==null) return false;
+  editLane=id; return true;
 }
 
 /* Позиция для визуализации: фаза отсчёта / игры, ПЕСЕННАЯ доля, длина песни в долях.
@@ -1382,6 +1418,7 @@ function seekTo(beat){
 function recStop(){ recAllOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate(); }   // sort переставил события, а дописанный хвост стал частью отсортированного тела → новая граница cursN
 function onRec(){
   if(!AC)return;
+  if(editIsOpen())return;   // S5.0: редактор открыт — записывать некуда и незачем (жесты заглушены). ОДИН отказ на все входы: кнопка ●, рука-лупер и всё, что появится позже
   /* ⛳ ОСТАНОВКА — ТЕПЕРЬ ЕДИНСТВЕННЫЙ СПОСОБ ЗАКОНЧИТЬ ЗАПИСЬ (прежде первая запись закрывалась САМА,
      по завершении круга). recAllOff — СТРОГО ДО setRecording(false) (см. его шапку): он закрывает в
      дорожке всё, что осталось звучать под пальцами. */
@@ -1628,6 +1665,7 @@ export {
   setRegionOn, regionOn, cycling, braceTap, braceMove,   // S3.5b: ⟳ только вкл/выкл повтора; скобу двигает тап/перетаскивание (ui), границы и user draw читает из loop.rgn
   loadArrangement, loadJam, clearJam, loopChordDeg, loopChordOct,
   toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, toggleArm, armedLayer, laneDelTap, laneDelCancel, laneDelPendingLayer,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
-  songNotes,      // S4.0: события, собранные в НОТЫ (только чтение; сегодня не зовёт никто — фундамент пиано-ролла)
+  songNotes,      // S4.0: события, собранные в НОТЫ (только чтение) — по ним рисует пиано-ролл
+  editOpen, editClose, editIsOpen, editLayer, editSetLayer,   // S5.0: редактор дорожки — ОДИН флаг на все отказы; наружу отдаём НОМЕР СЛОЯ, id остаётся здесь (правило #27)
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

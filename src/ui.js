@@ -4,7 +4,8 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          pinchFingers, setPinchFingers,
          fxChainOf, fxChainAdd, fxChainRemove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
-         roleXDriven, fxVolFix, setFxVolFix, fxIsScalar } from './state.js';
+         roleXDriven, fxVolFix, setFxVolFix, fxIsScalar,
+         rollOpen, setRollOpen, setRollWin, setRollSel } from './state.js';   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -13,13 +14,14 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt } from './draw.js';
+import { loopHit, loopBeatAt, rollHit, rollGeom } from './draw.js';   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive } from './audio.js';
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
-         setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel } from './recorder.js';   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
+         songBeats, songNotes, editOpen, editClose, editIsOpen, editLayer, editSetLayer } from './recorder.js';   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -151,9 +153,12 @@ hooks.drumKit   = v  => selDrumKit.value = v;
    НОВУЮ ДОРОЖКУ, различать нечего. Класс 'first' больше не ставится (CSS-правило для него, если оно
    есть, просто перестаёт срабатывать — удалять его отдельно не требуется). */
 function updRecBtn(){
+  recBtn.disabled = editIsOpen();                               // S5.0: пока редактор открыт, ● отказывает. САМ отказ — в recorder.onRec (один на все входы), здесь только вид кнопки
   recBtn.classList.toggle('on', recording);                     // идёт запись (любая)
   recBtn.classList.toggle('armed', !recording && loop.on);      // песня играет: тап добавит дорожку
-  recBtn.title = recording
+  recBtn.title = editIsOpen()
+    ? t('roll.recBlocked')
+    : recording
     ? t('rec.title.overdub',{n:loop.layer+1})
     : armedLayer()!=null ? t('rec.title.into',{n:armedLayer()+1})   // S3.5c: вооружена дорожка — ● пишет в неё, а не в новую
     : (loop.on ? t('rec.title.armed')
@@ -321,6 +326,7 @@ addEventListener('pointerdown', e=>{ pointerDown=true;
 let braceEdge=null;   // край, взятый касанием ('from'/'to'); держим до отпускания — иначе край «перескакивал» бы на ближний на каждом шаге
 addEventListener('pointerdown', e=>{
   if(e.target!==canvasEl) return;
+  if(rollOpen){ rollDown(e); return; }        // S5.0: открыт редактор — холст принадлежит ему (полосы лупера на экране нет, loopHit и так вернул бы null)
   const r=canvasEl.getBoundingClientRect();
   const h=loopHit(e.clientX-r.left, e.clientY-r.top);
   if(!h || h.what!=='del') laneDelCancel();                     // S3.5d: любой тап по холсту, кроме ✕, снимает взведённое удаление
@@ -338,6 +344,127 @@ addEventListener('pointermove', e=>{
 });
 addEventListener('pointerup',    ()=>{ braceEdge=null; });
 addEventListener('pointercancel',()=>{ braceEdge=null; });
+
+/* ═══ РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (слайс S5.0) ═══
+   Обязанности — те же, что у полосы лупера, и ровно по тем же правилам: ГЕОМЕТРИЮ знает draw
+   (rollHit/rollGeom — по снимку, который он сам и нарисовал, правило #9), ОТКАЗЫ и открытую дорожку
+   держит recorder (editOpen/editLayer, правило #5), ui переводит жест в вызов и НИЧЕГО не считает сам.
+   ⛳ КЛАМПЫ ОКНА ЖИВУТ ЗДЕСЬ, и это не случайность: пределы зависят от длины песни и размера такта, а их
+   знает ui (он и так импортирует loop/songBeats). В state их дублировать нечем и незачем.
+   ⛔ ПОКА РЕДАКТОР ОТКРЫТ: верхняя панель скрыта (она про игру), транспорт оставляет одну ▶ (класс .roll)
+   — ⤺/✕/⟳/■ меняли бы песню под открытым редактором, вплоть до сноса самой открытой дорожки. */
+const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
+      rollTrackBtn=$('rollTrack'), rollTabsEl=$('rollTabs'),
+      rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport');
+const ROLL_ROLES=['dr','ld','ch','bs'];          // порядок вкладок: та, что правится сегодня, — первой
+const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+const rollTotal=()=>Math.max(songBeats(), loop.metre*loop.bars);   // пустая песня — тоже поле: показываем окно подложки
+function setRollWinClamped(b0,span){
+  const M=loop.metre, total=rollTotal();
+  const s=Math.max(M/2, Math.min(span, Math.max(M*4, total+M)));   // от полутакта до всей песни с запасом в такт
+  setRollWin(Math.max(0, Math.min(b0, Math.max(0, total+M-s))), s);
+}
+/* Панель редактора: дорожка и вкладки ролей со СЧЁТОМ НОТ. Счёт берём из того же songNotes, по которому
+   рисует ролл, — иначе вкладка обещала бы ноты, которых на сетке нет. Правятся пока только ударные;
+   прочие вкладки видны (счёт полезен) и выключены с причиной в title. */
+function applyRollBar(){
+  if(!rollOpen) return;
+  const ly=editLayer();
+  rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1});
+  rollTrackBtn.disabled = trackLayers().length<2;
+  const V=songNotes(), cnt={ld:0,ch:0,bs:0,dr:0};
+  if(ly!=null) for(const n of V.notes) if(n.layer===ly && cnt[n.role]!=null) cnt[n.role]++;
+  rollTabsEl.textContent='';
+  for(const r of ROLL_ROLES){
+    const b=document.createElement('button');
+    b.className='tab'+(r==='dr'?' act':'');
+    b.textContent=`${t('role.'+r)} · ${cnt[r]}`;
+    if(r!=='dr'){ b.disabled=true; b.title=t('roll.tabLater'); }
+    rollTabsEl.appendChild(b);
+  }
+}
+function openRoll(){
+  /* Причины отказов называем словами, но САМ отказ держит recorder (editOpen): он — единственный,
+     кто знает про запись и клип, и он же откажет любому будущему входу, не знающему про редактор. */
+  if(recording){ showCamMsg(t('roll.refusedRec')); return; }
+  if(activeKind()){ showCamMsg(t('roll.refusedClip')); return; }
+  const ls=trackLayers(); if(!ls.length){ showCamMsg(t('roll.refusedEmpty')); return; }
+  const arm=armedLayer();
+  if(!editOpen(arm!=null?arm:ls[0])){ showCamMsg(t('roll.refusedRec')); return; }   // ВООРУЖЁННАЯ дорожка, иначе первая
+  setRollOpen(true); setRollSel(null);
+  setRollWinClamped(0, loop.metre*8);              // стартовое окно — восемь тактов от начала песни
+  barEl.classList.remove('on'); rollBar.classList.add('on'); loopTpEl.classList.add('roll');
+  applyRollBar(); updRecBtn();
+}
+function closeRoll(){
+  if(!rollOpen) return;
+  editClose(); setRollOpen(false); setRollSel(null);
+  rollBar.classList.remove('on'); loopTpEl.classList.remove('roll');
+  barEl.classList.add('on'); revealBar();          // игровое поле возвращается ровно таким, каким было: роль/лад/сплит/тембр никто не трогал
+  updRecBtn();
+}
+rollBtn.onclick=openRoll;
+rollCloseBtn.onclick=closeRoll;
+/* Чип дорожки: следующая по кругу. Адресуем НОМЕРОМ СЛОЯ, но держит редактор её id (правило #27) —
+   поэтому дорожка, исчезнувшая под редактором, даёт editLayer()===null, и ролл честно скажет об этом. */
+rollTrackBtn.onclick=()=>{
+  const ls=trackLayers(); if(ls.length<2) return;
+  const i=ls.indexOf(editLayer());
+  if(editSetLayer(ls[(i+1)%ls.length])){ setRollSel(null); applyRollBar(); }
+};
+const rollZoomBy=k=>{ const g=rollGeom(); if(!g) return; const c=g.beat0+g.span/2, s=g.span*k; setRollWinClamped(c-s/2,s); };
+rollZoomInBtn.onclick =()=>rollZoomBy(1/1.6);
+rollZoomOutBtn.onclick=()=>rollZoomBy(1.6);
+/* ЖЕСТ: один палец — прокрутка, два — зум, тап без движения — выбор.
+   ⛳ ЯКОРЬ: доля под пальцем (под серединой между пальцами) остаётся на месте — считаем её по ТЕКУЩЕМУ
+   снимку (rollGeom) и пишем через сеттеры. Следующий кадр строит снимок из этих же чисел, поэтому
+   картинка и попадание не могут разъехаться ни на одном кадре. */
+const rollPts=new Map(); let rollPan=null, rollZoomBase=null, rollMoved=false;
+const rollXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+function rollDown(e){
+  const p=rollXY(e); rollPts.set(e.pointerId,p);
+  const g=rollGeom(); if(!g) return;
+  if(rollPts.size===1){ rollMoved=false; rollPan={ atBeat:g.beat0+g.span*((p.x-g.x0)/g.bw), x:p.x, y:p.y }; }
+  else if(rollPts.size===2){ rollPan=null;
+    const [a,b]=[...rollPts.values()], mid=(a.x+b.x)/2;
+    rollZoomBase={ dist:Math.max(1,Math.abs(a.x-b.x)), span:g.span, midBeat:g.beat0+g.span*((mid-g.x0)/g.bw) };
+  }
+}
+function rollMove(e){
+  if(!rollPts.has(e.pointerId)) return;
+  const p=rollXY(e); rollPts.set(e.pointerId,p);
+  const g=rollGeom(); if(!g) return;
+  if(rollPts.size>=2&&rollZoomBase){
+    const [a,b]=[...rollPts.values()], d=Math.max(1,Math.abs(a.x-b.x)), mid=(a.x+b.x)/2;
+    const span=rollZoomBase.span*rollZoomBase.dist/d;                     // развели пальцы — окно уже
+    setRollWinClamped(rollZoomBase.midBeat-span*((mid-g.x0)/g.bw), span);
+    rollMoved=true; return;
+  }
+  if(rollPan){
+    if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true;   // порог: дрожание пальца — всё ещё тап
+    setRollWinClamped(rollPan.atBeat-g.span*((p.x-g.x0)/g.bw), g.span);
+  }
+}
+function rollUp(e){
+  if(!rollPts.has(e.pointerId)) return;
+  rollPts.delete(e.pointerId);
+  if(rollPts.size<2) rollZoomBase=null;
+  if(rollPts.size) return;                                                // второй палец ещё на стекле — жест не кончился
+  if(!rollMoved&&rollPan){ const h=rollHit(rollPan.x,rollPan.y); setRollSel(h&&h.what==='hit'?h.ev:null); }   // S5.0: выделение и НИЧЕГО больше
+  rollPan=null;
+}
+addEventListener('pointermove',  e=>{ if(rollOpen) rollMove(e); });
+addEventListener('pointerup',    e=>{ if(rollOpen) rollUp(e); });
+addEventListener('pointercancel',e=>{ if(rollOpen) rollUp(e); });
+/* Десктоп: колесо — прокрутка, с Ctrl/⌘ — зум ПОД КУРСОРОМ (тот же якорь, что у двух пальцев). */
+addEventListener('wheel', e=>{
+  if(!rollOpen) return;
+  const g=rollGeom(); if(!g) return;
+  e.preventDefault();
+  const f=((e.clientX-canvasEl.getBoundingClientRect().left)-g.x0)/g.bw;
+  if(e.ctrlKey||e.metaKey){ const span=g.span*Math.exp(e.deltaY*0.002); setRollWinClamped(g.beat0+g.span*f-span*f, span); }
+  else setRollWinClamped(g.beat0+(e.deltaX||e.deltaY)*g.span/g.bw, g.span);
+}, {passive:false});
 addEventListener('pointerup',   ()=>{ pointerDown=false; downOnBar=false; armBarHide();
   if(panelOpen() && !focusInPanel()) armStripReturn();   // палец ушёл; но если контрол панели в фокусе (пикер открыт) — НЕ возвращаем, ждём focusout
 });
@@ -1438,6 +1565,7 @@ applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHan
    Холст не трогаем — он перерисуется сам следующим кадром (t()/L() читаются на кадр). */
 onLangChange(()=>{
   buildStartLinks();
+  applyRollBar();      // S5.0: чип дорожки и вкладки ролей строит JS (числа меняются) — переподписываем, как прочие собранные подписи
   // Меню строя/лада: имена теперь локализуются (этап B). Переподписываем традиции НА МЕСТЕ (сохраняя
   // выбор по value=id) и пересобираем список ладов текущей традиции, возвращая выбранный лад (value=индекс).
   [...selTradition.options].forEach(o=>{ const tr=TRADITIONS.find(x=>x.id===o.value); if(tr)o.textContent=L(tr.name); });

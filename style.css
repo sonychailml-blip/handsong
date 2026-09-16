@@ -141,6 +141,23 @@
   #loopTransport button{padding:7px 10px; font-size:var(--fs-label);}
   @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:var(--fs-hint);} }
 
+  /* ---- РЕДАКТОР ДОРОЖКИ: ПАНЕЛЬ ПИАНО-РОЛЛА (S5.0) ----
+     Держит только то, у чего нет временнóй геометрии (закрыть · дорожка · роли · зум); сетка — на холсте.
+     z-index 12: выше холста (—) и транспорта (11), ниже панелей (14/15).
+     Узкий экран: строка ПРОКРУЧИВАЕТСЯ по горизонтали, как #bar, — контролы не сжимаются ниже пальца. */
+  #rollBar{position:fixed; top:0; left:0; right:0; z-index:12; display:none;
+    gap:6px; padding:6px 8px; align-items:center; overflow-x:auto; scrollbar-width:none;
+    background:rgba(10,10,20,.92); border-bottom:1px solid rgba(255,255,255,.14);}
+  #rollBar::-webkit-scrollbar{display:none;}
+  #rollBar.on{display:flex;}
+  #rollBar button{padding:9px 11px; font-size:var(--fs-label); min-width:40px;}
+  #rollTabs{display:flex; gap:6px; flex:0 0 auto;}
+  #rollBar .tab{opacity:.45;}                      /* роль без правки — видна, но приглушена (счёт нот всё равно полезен) */
+  #rollBar .tab.act{opacity:1; border-color:var(--accent); color:var(--accent);}
+  /* Пока редактор открыт, транспорт оставляет ОДНУ кнопку ▶ (прослушивание). ⤺ ✕ ⟳ ■ меняли бы песню
+     под открытым редактором — вплоть до сноса самой открытой дорожки. */
+  #loopTransport.roll>button:not(#loopBtn){display:none;}
+
   /* Тост камеры: всплывает под верхней панелью при отказе переключения; сам гаснет (класс .on
      снимает JS по таймеру). Не мешает игре — pointer-events:none, показывается только с .on. */
   #camMsg{position:fixed; top:52px; left:0; right:0; z-index:20; text-align:center;

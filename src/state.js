@@ -555,5 +555,20 @@ export const setChordOctReg=v=>{ chordOctReg=v; };
    роль передаём явно. Читают резолвер gestures (запись в октавной полосе + чтение при игре) и
    draw (подпись октавы) — каждый передаёт роль, которую и так знает (S.zone/instr). Нигде больше
    нет тернара 'ch'/'bs'. Вызовы — только в рантайме (TDZ ок). */
+/* ═══ ВИД РЕДАКТОРА ДОРОЖКИ (пиано-ролл, слайс S5.0) ═══
+   ЭТО ВИД, А НЕ МУЗЫКА: какой кусок песни показан и что выделено. САМА ДОРОЖКА (её id) живёт в
+   recorder — там же, где отказы (editOpen): «открыт ли редактор» обязано быть ОДНИМ фактом, иначе ● и
+   редактор однажды разойдутся во мнении. Здесь только окно и выделение.
+   Пишем ТОЛЬКО сеттерами (правило #6): окно правит ui (жест), читает draw (снимок геометрии) — и оба
+   видят одно и то же число в одном кадре.
+   ⚠️ КЛАМПА ЗДЕСЬ НЕТ НАМЕРЕННО: пределы зависят от длины песни и размера такта, а их знает ui (он и
+   так импортирует loop/songBeats). Второй копии этих знаний в state не заводим. */
+export let rollOpen=false;          // редактор открыт: draw рисует ролл вместо игрового поля, main глушит жесты
+export let rollBeat0=0;             // доля у ЛЕВОГО края сетки
+export let rollSpan=16;             // сколько долей видно
+export let rollSel=null;            // ВЫДЕЛЕННОЕ событие (ссылка на сам объект события) или null. S5.0 только подсвечивает — правки нет
+export const setRollOpen=v=>{ rollOpen=!!v; };
+export const setRollWin=(b0,span)=>{ rollBeat0=b0; rollSpan=span; };
+export const setRollSel=v=>{ rollSel=v||null; };
 export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };

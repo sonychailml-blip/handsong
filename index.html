@@ -119,6 +119,21 @@
   <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Отменить последний дубль">⤺</button>
   <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить всю песню">✕</button>
   <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
+  <!-- ✎ РЕДАКТОР ДОРОЖКИ (пиано-ролл, S5.0): открывает ВООРУЖЁННУЮ дорожку, иначе первую. Отказ — при
+       записи и при записи клипа; ● отказывает, пока редактор открыт. Все отказы держит recorder (editOpen). -->
+  <button id="rollBtn" data-i18n-title="transport.editTitle" title="Редактор дорожки">✎</button>
+</div>
+
+<!-- ================= РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (S5.0) =================
+     ПАНЕЛЬ — то, у чего НЕТ временнóй геометрии: закрыть, дорожка, роли, зум. Сама сетка живёт на
+     ХОЛСТЕ, потому что у неё геометрия (правило #9: попадание и рисование из одного снимка).
+     Подписи и вкладки ставит ui.js — числа дорожек и нот меняются, в разметке их держать нечем. -->
+<div id="rollBar">
+  <button id="rollClose" data-i18n-title="roll.closeTitle" title="Закрыть редактор">✕</button>
+  <button id="rollTrack" data-i18n-title="roll.trackTitle" title="Сменить дорожку">L1</button>
+  <span id="rollTabs"></span>
+  <button id="rollZoomOut" data-i18n-title="roll.zoomOutTitle" title="Отдалить">−</button>
+  <button id="rollZoomIn" data-i18n-title="roll.zoomInTitle" title="Приблизить">+</button>
 </div>
  
 <!-- ================= ОБУЧЕНИЕ (тур) =================
