@@ -6,11 +6,11 @@ import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchD
          rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic } from './state.js';   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
-import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance } from './audio.js';   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
+import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
-         songNotes, songSegs, captureInfoOf, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, captureInfoOf, fxIsDriven, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -104,7 +104,7 @@ const fxBarItems=(role,key)=>{
   const act=fxActiveFinger(role), out=[];
   fxChainOf(key).forEach(eff=>{   // ЦЕПЬ ЭТОЙ РОЛИ (слайс б.1; прежде литерал 'ld' — «столбики бывают только у соло»). С б.2 зовут для ЛЮБОЙ роли (drawFxBars — у правой кромки каждой роли/половины)
     const m=FX_META.find(q=>q.k===eff.fxId);   // МЕТАДАННЫЕ ПОКАЗА (цвет, подпись) — у трёх скаляров и у делея-модуля (в.1): его столбики остались синими
-    if(fxIsScalar(eff.fxId)){ out.push({v:fx[eff.fxId], c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0])}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META
+    if(fxIsScalar(eff.fxId)){ out.push({v:fxAimGet(key,eff.fxId,FX_AMT,fx[eff.fxId]), c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0]), drv:fxIsDriven(key,eff.fxId,FX_AMT)}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META. O-3.1: величина — ПРИЦЕЛ руки, drv — правит ли этим адресом запись
     const mod=fxInstOf(key,eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре
     /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
        связан со своим параметром в цепи (eff.params), где и лежит адрес управления.
@@ -114,7 +114,8 @@ const fxBarItems=(role,key)=>{
        разворот обязан следовать за ПАРАМЕТРОМ. На дефолтной цепи это ровно прежнее поведение. */
     const idx=(mod.params.length>1 && eff.params.some(pa=>fxParamOnFinger(pa,act))) ? mod.params.map((_,i)=>i) : [0];
     for(const i of idx){ const p=mod.params[i];
-      out.push({v:p.getNorm(), c:m?m.color:REV_COLOR, l:p.short, fing:eff.params[i], play:fxParamIsPlay(eff.params[i])}); }   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
+      out.push({v:fxAimGet(key,eff.fxId,p.key,p.cur), c:m?m.color:REV_COLOR, l:p.short, fing:eff.params[i],
+                play:fxParamIsPlay(eff.params[i]), drv:fxIsDriven(key,eff.fxId,p.key)}); }   // O-3.1: v — ПРИЦЕЛ руки (что поставил палец), drv — ведёт ли этот адрес запись. Признак ПО ПАРАМЕТРУ: у одного эффекта подмес может быть записан, а длина — нет   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
   });
   return out;
 };
@@ -1649,8 +1650,23 @@ function drawFxBars(role,rx1,H){                   // rx1 — ПРАВАЯ кр�
       if(S.pinch&&S.zone==='fx'&&S.adj&&S.role===role&&fxParamOnFinger(it.fing,S.adj.finger))actv=true; }
     ctx.fillStyle='rgba(255,255,255,.09)'; ctx.fillRect(x,y0,FX_BAR_W,FX_BAR_MAX);      // трек
     const fh=FX_BAR_MAX*Math.max(0,Math.min(1,it.v));
-    ctx.fillStyle=it.c; ctx.globalAlpha=actv?0.95:0.5;
-    ctx.fillRect(x,y1-fh,FX_BAR_W,fh); ctx.globalAlpha=1;                                // заполнение снизу вверх
+    /* ⛳ ПОМЕТКА «ЭТИМ ПАРАМЕТРОМ ПРАВИТ ЗАПИСЬ» (O-3.1) — ПУСТОТЕЛЫЙ столбик вместо залитого.
+       Зачем вообще метить: столбик показывает ПРИЦЕЛ руки, и без пометки человек двинул бы палец,
+       услышал бы, что ничего не изменилось, и прочёл это как поломку. Пометка отвечает заранее.
+       Почему ПУСТОТЕЛЫЙ, а не цвет и не мигание: «не подключено» читается мгновенно и на 380px, это
+       СОСТОЯНИЕ, а не тревога, и он не спорит ни с подсветкой активного пальца (сплошная рамка, actv),
+       ни с меткой играющей руки (точка слева) — обе остаются на своих местах и значат прежнее.
+       ⚠️ ВТОРОЙ ПРИЗНАК — ПРИГЛУШЁННАЯ ПОДПИСЬ, и он несущий, а не украшение: при величине около нуля
+       заливки нет вовсе, и «пустотелый» отличить не от чего. Подпись же нарисована ВСЕГДА, при любом
+       значении, — значит метка не исчезает там, где она нужнее всего.
+       ⛔ ТОЧКУ СПРАВА НЕ СТАВИТЬ, хотя она и напрашивалась парой к левой: шаг столбика 25px, ширина 10,
+       то есть правый зазор — 15px, и точка на +5 встала бы в 5px от ТОЧКИ ИГРАЮЩЕЙ РУКИ соседнего
+       столбика (та сидит на −5 от него). Две одинаковые точки в 5px друг от друга не различить, и
+       словарь меток превратился бы в кашу ровно там, где должен был объяснять. */
+    ctx.globalAlpha=actv?0.95:0.5;
+    if(it.drv){ ctx.strokeStyle=it.c; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y1-fh+0.5,FX_BAR_W-1,Math.max(1,fh-1)); }
+    else { ctx.fillStyle=it.c; ctx.fillRect(x,y1-fh,FX_BAR_W,fh); }                       // заполнение снизу вверх
+    ctx.globalAlpha=1;
     if(actv){ ctx.strokeStyle=it.c; ctx.lineWidth=1.5; ctx.strokeRect(x-1.5,y0-1.5,FX_BAR_W+3,FX_BAR_MAX+3); }
     /* МЕТКА «ведёт ИГРАЮЩАЯ рука» (Пласт 3.2): точка в ЗАЗОРЕ слева от столбика. Зазор уже есть
        (FX_BAR_GAP=15), поэтому метка НИЧЕГО не двигает — ни столбиков, ни отступа легенды. Точка стоит
@@ -1659,7 +1675,7 @@ function drawFxBars(role,rx1,H){                   // rx1 — ПРАВАЯ кр�
        заливка трека меняется с величиной — метка обязана читаться при ЛЮБОМ значении, включая 0 и 100%. */
     if(it.play){ ctx.fillStyle=it.c; ctx.globalAlpha=0.9;
       ctx.beginPath(); ctx.arc(x-5, y0+5, 2.5, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
-    ctx.fillStyle=actv?it.c:'rgba(255,255,255,.5)';
+    ctx.fillStyle = actv ? it.c : (it.drv ? 'rgba(255,255,255,.26)' : 'rgba(255,255,255,.5)');   // ведёт запись → подпись приглушена (см. довод о метке выше): видно при ЛЮБОЙ величине, в том числе нулевой
     ctx.fillText(it.l,x+FX_BAR_W/2,y0-5);
   });
 }

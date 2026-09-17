@@ -6,7 +6,7 @@ import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
-import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri } from './audio.js';
+import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
 import { canvas } from './vision.js';
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
@@ -379,10 +379,21 @@ function endPinch(key,S){
    перестраховка, а ЗАЩЁЛКА: их величины живут в ОДНОМ глобальном state.fx и едут в соло-событие ноты
    (см. WleadOn), поэтому «делей у аккордов» без своего store и своей проводки писал бы соло-делей.
    Портирование старых эффектов на прочие шины — не 3.5, а вопрос формата события (3.7). */
+/* ⛳ O-3.1: ЭТО — ЕДИНСТВЕННЫЙ ВХОД РУКИ, и потому ровно здесь пишется ПРИЦЕЛ (fxAimSet). Через него
+   ходят и жест, и меню конструктора (ui импортирует эту же функцию) — второго входа нет, значит прицел
+   не может отстать от руки.
+   ⚠️ И ЧИТАЕТ РУКА ТОЖЕ ПРИЦЕЛ, а не живую величину: относительный сдвиг щипка обязан продолжиться с
+   того места, где рука ОСТАВИЛА параметр. Читай он живое — во время воспроизведения запись увела бы
+   величину, и первый кадр щипка дал бы скачок на её значение.
+   ⛔ УПРАВЛЕНИЕ ЭТИМ НЕ ВОЗВРАЩАЕТСЯ: set по-прежнему пишет и в звук (setNorm), но пока играет транспорт,
+   следующий же удар сердца перекроет его записанной величиной (fxPlayDrive). Меняется ПОКАЗАННОЕ, а не
+   то, кто распоряжается звуком. */
 const fxParamsOf=(key,fxId)=>{
-  if(fxIsScalar(fxId)) return key===CHAIN_SOLO ? [{ get:()=>fx[fxId], set:v=>{ fx[fxId]=v; } }] : [];   // старый скалярный — по ЕДИНОМУ признаку state.fxIsScalar (в.1), не по FX_META: там делей-модуль остался ради цвета, и по ней он ушёл бы писать в несуществующее fx.dly. O-0: «это цепь соло?» — сравнение с ИМЕНОВАННЫМ ключом (см. CHAIN_SOLO), не с ролью
+  if(fxIsScalar(fxId)) return key===CHAIN_SOLO ? [{ get:()=>fxAimGet(key,fxId,FX_AMT,fx[fxId]),
+                                                    set:v=>{ fxAimSet(key,fxId,FX_AMT,v); fx[fxId]=v; } }] : [];   // старый скалярный — по ЕДИНОМУ признаку state.fxIsScalar (в.1), не по FX_META: там делей-модуль остался ради цвета, и по ней он ушёл бы писать в несуществующее fx.dly. O-0: «это цепь соло?» — сравнение с ИМЕНОВАННЫМ ключом (см. CHAIN_SOLO), не с ролью
   const inst=fxInstance(key,fxId);
-  return inst ? inst.params.map(p=>({ get:()=>p.getNorm(), set:v=>p.setNorm(v) })) : [];   // нет эффекта (или ещё нет AudioContext) → [] → цикл записи не сделает ни одного шага
+  return inst ? inst.params.map(p=>({ get:()=>fxAimGet(key,fxId,p.key,p.cur),
+                                      set:v=>{ fxAimSet(key,fxId,p.key,v); p.setNorm(v); } })) : [];   // нет эффекта (или ещё нет AudioContext) → [] → цикл записи не сделает ни одного шага
 };
 /* ЗАХВАТ ПО ПАЛЬЦУ (Пласт 3.4.2): морозим точку отсчёта по ТРЁМ осям и стартовые значения ВСЕХ
    параметров, ПОДПИСАННЫХ НА ЭТОТ ПАЛЕЦ, — по ВСЕЙ цепи, у скольких бы эффектов они ни лежали.

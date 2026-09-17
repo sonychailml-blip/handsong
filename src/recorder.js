@@ -1,7 +1,7 @@
 import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, leadOff, leadAllOff, leadHold,
          metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff,
-         fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreFixed } from './audio.js';
+         fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim } from './audio.js';
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
@@ -473,6 +473,17 @@ function fxPlayDrive(x){
   for(const [key,ids] of fxPlayOrd) fxPlayPath(key, ids);        // СОСТАВ — ПЕРВЫМ: величины поедут уже в верную цепь. fxPlayPath молча выходит, если состав тот же
   for(const e of fxPlayVals.values()) fxPlaySet(e.key, e.fx, e.p, e.v);   // fxPlaySet молча выходит, если величина уже там
 }
+/* ⛳ ПРАВИТ ЛИ ЭТИМ АДРЕСОМ СЕЙЧАС ЗАПИСЬ — для показа (столбики). Ответ ПО ПАРАМЕТРУ, а не по эффекту и
+   не по роли: в цепи, где запись вела подмес и не трогала длину, помечен обязан быть ровно один столбик.
+   ⚠️ Правда одна и та же для звука и для показа: ключи fxPlayVals — это РОВНО те адреса, которые тик
+   сейчас ведёт (их же он и применяет строкой ниже в fxPlayDrive). Второго списка «что помечено» нет.
+   Транспорт стоит → свёрнутое состояние очищено (fxPlayReset) → не правит никто, и пометок нет. */
+const fxIsDriven=(key,fxId,pKey)=> loop.on && !recording && fxPlayVals.has(key+'|'+fxId+'|'+pKey);
+/* ⚠️ `!recording` ОБЯЗАТЕЛЕН, и это не перестраховка. Свёрнутое состояние живёт между тиками, а во время
+   записи fxPlayDrive не зовётся вовсе (правило O-3: пока пишем — хозяин рука). Нажми человек ● посреди
+   воспроизведения — состояние осталось бы от последнего кадра, и столбики продолжали бы помечать чужим
+   то, чем в этот миг распоряжается ТОЛЬКО его рука. Пометка обязана исчезнуть ровно тогда, когда
+   исчезает власть записи. */
 /* Транспорт встал — вернуть живую цепь. ⛳ ВЕЛИЧИНЫ ОСТАВЛЯЕМ ТАМ, ГДЕ ИХ ОСТАВИЛА ЗАПИСЬ, и это выбор:
    ручки — это ручки, они стоят там, где стоят, их видно (столбики и меню читают те же p.cur) и их можно
    двигать. Возврат «как было до ▶» потребовал бы второй копии всех величин и ещё одного провала на
@@ -481,7 +492,7 @@ function fxPlayDrive(x){
    составом чужой записи значило бы отобрать у него его собственную цепь. */
 function fxPlayStop(){
   fxPlayReset();
-  for(const {key} of chainOwners()){ fxPlayPath(key,null); fxRestoreFixed(key); }   // состав — человеку обратно; фиксированные величины — в согласие с меню (см. fxRestoreFixed)
+  for(const {key} of chainOwners()){ fxPlayPath(key,null); fxRestoreAim(key); }   // состав — человеку обратно; звук — к ПРИЦЕЛУ руки, чтобы столбик и звук сошлись в тот же миг (см. fxRestoreAim)
 }
 /* УБОРКА — тем же законом, что у дорожек: запись взятого, чьих событий больше НЕТ, снимается.
    ⚠️ ЭТО ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ (как и у lanePrune): осиротевшая запись никому не мешает, но копилась
@@ -2168,6 +2179,7 @@ export {
   editOpen, editClose, editIsOpen, editLayer, editSetLayer,   // S5.0: редактор дорожки — ОДИН флаг на все отказы; наружу отдаём НОМЕР СЛОЯ, id остаётся здесь (правило #27)
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
+  fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };
