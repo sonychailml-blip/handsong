@@ -17,7 +17,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf, rollAutV, rollAutSnapV } from './draw.js';   // O-4: величина полосы по экранному Y и её привязка — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf, rollAutSnapV, rollAutDrive } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds } from './audio.js';
@@ -442,6 +442,7 @@ function openRoll(){
 function closeRoll(){
   if(!rollOpen) return;
   editClose(); setRollOpen(false); setRollSel(null); setRollDrag(null); setRollIns(false);   // S5.1: история правок умирает вместе с сессией (editClose), режим вставки и призрак — тоже
+  setRollAut(null); setRollAutSel(null); setRollAutDrag(null);   // ⛳ и ПОЛОСА снимается здесь же: выбранная точка держит ссылку в ленту захвата, а дорожку могут удалить, пока редактор закрыт
   rollBar.classList.remove('on'); loopTpEl.classList.remove('roll');
   barEl.classList.add('on'); revealBar();          // игровое поле возвращается ровно таким, каким было: роль/лад/сплит/тембр никто не трогал
   updRecBtn();
@@ -472,6 +473,10 @@ function updRollBtns(){
   const ro=editBackingOpen();
   rollInsBtn.classList.toggle('act', rollIns); rollInsBtn.disabled=ro;
   rollDelBtn.disabled  = ro || !(rollSel||rollAutSel);   // O-4: 🗑 удаляет ВЫБРАННОЕ — ноту или точку автоматизации; у человека одна кнопка «удалить»
+  /* ⛳ И КОРЗИНА ГОВОРИТ, ЧТО ИМЕННО УБЕРЁТ. Одна кнопка на два поля — честно (у человека одно «удалить»),
+     но молча она читается как «удалить удар», и точку автоматизации убрать ОТСЮДА никто не догадается.
+     Подпись идёт за выделением; приоритет тот же, что у самого удаления (точка перебивает ноту). */
+  rollDelBtn.title = t(rollAutSel ? 'aut.ptDelTitle' : 'roll.delTitle');
   rollUndoBtn.disabled = ro || !editCanUndo();
   rollRedoBtn.disabled = ro || !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
   const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
@@ -568,13 +573,18 @@ if(rollAutEl){
 
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRollBtns(); };
 rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
+  /* ⛳ O-4: ОДНА КНОПКА «УДАЛИТЬ» НА ОБА ПОЛЯ, и ПОРЯДОК ВЕТВЕЙ И ЕСТЬ ПРИОРИТЕТ. Второй корзины не
+     заводим: у человека одна «удалить», и она обязана снимать выбранное — что бы это ни было.
+     ⚠️ ЗДЕСЬ БЫЛ БАГ, И ОН ПОУЧИТЕЛЕН: первой строкой стоял страж `if(!rollSel)` от времён, когда
+     выделение было одно — нотное. Ветка точки автоматизации лежала НИЖЕ него и была недостижима: выбрать
+     точку можно только тапом по полосе, а он снимает выделение ноты, так что страж срабатывал всегда.
+     Кнопка при этом выглядела живой (её ДОСТУПНОСТЬ про полосу знала) и отказывала нотной фразой —
+     классическая рассинхронизация «кто включает» и «кто выполняет». Страж теперь ОДИН на два поля и
+     стоит ПОСЛЕДНИМ, а не первым. */
+  if(rollAutSel){ if(autDeletePoint(rollAutSel)) setRollAutSel(null); updRollBtns(); return; }
   if(!rollSel){ showCamMsg(t('roll.needSel')); return; }
   /* ⛳ УДАЛЕНИЕ ВЕДЁТ РОЛЬ: у ударных это одиночное событие, у баса — СЕГМЕНТ (ведение в середине уходит
      одно, и прежняя высота тянется дальше; «вкл» уносит всю ноту — см. editDeleteSeg). */
-  /* ⛳ O-4: ОДНА КНОПКА «УДАЛИТЬ» НА ОБА ПОЛЯ. Что выбрано, то и снимается: точка автоматизации имеет
-     приоритет, потому что выбрать её можно только тапом ПО ПОЛОСЕ — то есть человек смотрел именно туда.
-     Второй корзины не заводим: у человека одна «удалить», и она обязана снимать последнее выбранное. */
-  if(rollAutSel){ if(autDeletePoint(rollAutSel)) setRollAutSel(null); updRollBtns(); return; }
   const ok = rollRole==='dr' ? editDeleteHit(rollSel) : editDeleteSeg(rollSel);
   if(ok) setRollSel(null);
   updRollBtns(); };
@@ -587,6 +597,13 @@ rollHomeBtn.onclick=()=>seekTo(0);
    ⛳ ЯКОРЬ: доля под пальцем (под серединой между пальцами) остаётся на месте — считаем её по ТЕКУЩЕМУ
    снимку (rollGeom) и пишем через сеттеры. Следующий кадр строит снимок из этих же чисел, поэтому
    картинка и попадание не могут разъехаться ни на одном кадре. */
+/* ⛳ ВЫДЕЛЕНИЕ В РЕДАКТОРЕ ОДНО, ХОТЯ ПОЛЕЙ ДВА. Держать его в двух переменных законно (у ноты и у точки
+   автоматизации разная природа), но ВЫБРАННЫМ может быть ровно одно — иначе «удалить» перестаёт значить
+   что-то определённое. Прежде связь была ОДНОСТОРОННЕЙ: тап по полосе снимал выделение ноты, а тап по
+   ноте оставлял выбранную точку висеть, и корзина (у которой точка в приоритете) убрала бы НЕ ТО, на что
+   человек смотрит. Теперь взаимное исключение — в одном месте, а не в семи местах жеста. */
+const selNote =ev => { setRollSel(ev||null);  setRollAutSel(null); };
+const selAutPt=rec=> { setRollAutSel(rec||null); setRollSel(null); };
 const rollPts=new Map(); let rollPan=null, rollZoomBase=null, rollMoved=false, rollGrab=null;   // rollGrab — взятый пальцем удар (перетаскивание); пока он есть, поле НЕ прокручивается
 const rollXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
 function rollDown(e){
@@ -601,16 +618,20 @@ function rollDown(e){
        ручки не заводим: тап честно делает ровно то, что обещает. Ни выбора, ни вставки здесь нет — полоса
        своя (её низ = верх сетки), поэтому один тап не может значить двух вещей. */
     if(h&&h.what==='ruler'){ seekTo(h.beat); return; }
-    /* ⛳ O-4: ПОЛОСА АВТОМАТИЗАЦИИ. Палец на ТОЧКЕ — берём её (перенос по времени И по величине);
-       палец на пустом месте полосы — это не прокрутка поля и не вставка ноты: полоса своя, и
+    /* ⛳ O-4: ПОЛОСА АВТОМАТИЗАЦИИ. Палец на ТОЧКЕ — берём её (ось жеста решит, время это или величина:
+       см. rollAutDrive); палец на пустом месте полосы — это не прокрутка поля и не вставка ноты: полоса своя, и
        прокручивать по вертикали в ней нечего. Тап по пустому в режиме вставки родит точку (на отпускании,
        как и у нот), тап без режима — снимет выделение. */
     if(h&&(h.what==='autpt'||h.what==='autgrid')){
       if(h.what==='autpt'&&!editBackingOpen()){
-        setRollAutSel(h.rec); setRollSel(null);
-        rollGrab={ aut:h.rec, dt:h.beat-h.rec.pt.t, x:p.x, y:p.y };
-        setRollAutDrag({ t:h.rec.pt.t, v:h.rec.pt.v });
-      }else{ setRollAutSel(null); }
+        selAutPt(h.rec);
+        /* t0/v0 — ИСХОДНЫЕ время и величина точки: ось жеста замораживает одну из них, а величина
+           вдобавок ведётся ОТНОСИТЕЛЬНО v0 (см. rollAutDrive). axis/fine — память жеста, её пишет
+           draw: там геометрия, и второй копии порогов в ui быть не должно. */
+        rollGrab={ aut:h.rec, dt:h.beat-h.rec.pt.t, x:p.x, y:p.y,
+                   t0:h.rec.pt.t, v0:h.rec.pt.v, axis:null, fine:null };
+        setRollAutDrag({ t:h.rec.pt.t, v:h.rec.pt.v, axis:null, fine:false });
+      }else{ selAutPt(null); }                                 // тап по пустому месту полосы — выбранного больше нет ни в одном поле
       rollPan={ aut:true, x:p.x, y:p.y, atBeat:0, row0:0 };   // помечаем жест как «в полосе»: горизонтальная прокрутка поля отсюда НЕ идёт
       updRollBtns(); return;
     }
@@ -621,7 +642,7 @@ function rollDown(e){
     if(h&&(h.what==='hit'||h.what==='seg')&&!editBackingOpen()){
       const isSeg=h.what==='seg';
       const row = isSeg ? h.row : (h.ev.a.row|0);
-      setRollSel(h.ev);
+      selNote(h.ev);
       /* ⛳ КРАЙ = ДЛИНА, СЕРЕДИНА = ПЕРЕНОС (S5.6). Какой это жест, решает ТОТ ЖЕ hit-test, что нарисовал
          блок (h.edge), — второй геометрии «где тут край» в ui не заводим. */
       rollGrab={ ev:h.ev, seg:isSeg?h.seg:null, mode:(isSeg&&h.edge)?'len':'move',
@@ -630,7 +651,7 @@ function rollDown(e){
       setRollDrag({ ev:h.ev, t:h.ev.t, row, len:rollGrab.len });
       updRollBtns(); return;
     }
-    setRollSel(h&&(h.what==='hit'||h.what==='seg')?h.ev:null); updRollBtns();
+    selNote(h&&(h.what==='hit'||h.what==='seg')?h.ev:null); updRollBtns();
     rollPan={ atBeat:g.beat0+g.span*((p.x-g.x0)/g.bw), x:p.x, y:p.y, y0:p.y, row0:g.row0 };
   }
   else if(rollPts.size===2){ rollPan=null; rollGrab=null; setRollDrag(null); setRollAutDrag(null);   // второй палец → это зум, а не перенос: призраки снимаем (и ноты, и точки автоматизации), событие не тронуто
@@ -652,11 +673,21 @@ function rollMove(e){
      Писать на каждом движении значило бы пересобирать ноты всей песни десятки раз в секунду. */
   if(rollGrab&&rollGrab.aut){
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
-    /* ВРЕМЯ — по той же привязке, что у нот (квантизация или её отсутствие); ВЕЛИЧИНА — по своей,
-       десятыми (rollAutSnapV): у оси значения квантизации нет и быть не может, а круглый шаг — то, чего
-       от полосы и ждут. Обе привязки живут в draw, рядом со своей геометрией. */
+    /* ⛳ ОДИН ЖЕСТ — ОДНА ОСЬ. rollAutDrive решает, что правится (время или величина), и отдаёт величину
+       с учётом ЗОНЫ ТОЧНОСТИ. Замороженная ось отдаёт ИСХОДНОЕ значение, поэтому «перенёс во времени» не
+       смещает величину на полделения, а «уточнил величину» не таскает точку по такту. Отход в сторону
+       значит РОВНО ОДНО за жест: при оси 't' — время, при оси 'v' — тонкость; решается это один раз, на
+       первых 6 пикселях, и до отпускания не меняется.
+       ⛳ ВРЕМЯ ТОЧКИ — СВОБОДНОЕ, БЕЗ КВАНТИЗАЦИИ, И ЭТО ЗАКОН ЭТОГО ПОЛЯ, А НЕ НАСТРОЙКА. Полоса
+       унаследовала было нотное правило (квантизация вкл ⇒ привязка), но у ноты и у точки разная природа:
+       НОТА обязана лечь на долю, иначе рассыпается ритм, а кривая эффекта долям не принадлежит вовсе —
+       реверс может начать расти где угодно, и в этом весь смысл ведения ручкой. Привязку к сетке тут
+       нечем оправдать, поэтому её здесь просто нет — ни режимом, ни настройкой (см. отчёт).
+       ⛔ НОТЫ НЕ ТРОГАЕМ: ветка переноса ноты ниже по-прежнему зовёт rollSnapBeat(rollSnap()). */
+    const d=rollAutDrive(rollGrab,p.x,p.y);
     const raw=g.beat0+g.span*((p.x-g.x0)/g.bw)-rollGrab.dt;
-    setRollAutDrag({ t:Math.max(0,rollSnapBeat(raw, rollSnap())), v:rollAutSnapV(rollAutV(p.y)) });
+    setRollAutDrag({ t: d.axis==='t' ? Math.max(0,raw) : rollGrab.t0,
+                     v: d.v, axis:d.axis, fine:d.fine });
     return;
   }
   if(rollGrab){
@@ -731,10 +762,14 @@ function rollUp(e){
     /* ВСТАВКА ТОЧКИ — как у нот: ТОЛЬКО в явном режиме и только по ПУСТОМУ месту полосы. Тап без режима
        снимает выделение. Так прокрутка, кончившаяся тапом, ничего не создаёт. */
     if(rollIns && h && h.what==='autgrid' && rollAut && ly!=null && !rollRefuseRO()){
+      /* Вставка — по ТОМУ ЖЕ закону, что и перенос: точка ложится ТУДА, КУДА ПОСТАВИЛИ, без привязки ко
+         времени. Иначе одно и то же поле жило бы по двум правилам — свободный перенос и квантованная
+         вставка, — и человек не смог бы сказать, где точка окажется. Величина привязывается к десятой:
+         у ВЕЛИЧИНЫ круглый шаг осмыслен (0..100), у времени — нет. */
       const pt=autAddPoint(ly, rollAut.key, rollAut.fx, rollAut.p,
-                           rollSnapBeat(h.beat, rollSnap()), rollAutSnapV(h.v));
+                           Math.max(0,h.beat), rollAutSnapV(h.v));
       if(pt){ const D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p);
-              setRollAutSel(D.pts.find(r=>r.pt===pt)||null); }
+              selAutPt(D.pts.find(r=>r.pt===pt)||null); }
     }
     updRollBtns(); rollPan=null; return;
   }
@@ -758,9 +793,9 @@ function rollUp(e){
           const s=rollSnap(), len=s.free?1:Math.max(s.step,1);
           ev=editInsertBass(tt, pit.deg, pit.oct, sc, sev, len);
         }
-        if(ev) setRollSel(ev);
+        if(ev) selNote(ev);
       }
-    }else setRollSel(h&&(h.what==='hit'||h.what==='seg')?h.ev:null);
+    }else selNote(h&&(h.what==='hit'||h.what==='seg')?h.ev:null);
     updRollBtns();
   }
   rollPan=null;
