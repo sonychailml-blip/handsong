@@ -996,6 +996,25 @@ function fxParamKeysOf(fxId){
   const f=FX_FACTORY[fxId];
   return f ? f.params.map(sp=>sp.key) : [FX_AMT];   // старый скаляр: ровно один параметр, и он же сам эффект
 }
+/* ОПИСАНИЕ ПАРАМЕТРОВ ДЛЯ МЕНЮ ПОЛОСЫ АВТОМАТИЗАЦИИ (O-4): ключ + подпись. Отдаём СПЕЦИФИКАЦИЮ, а не
+   экземпляр: полосу можно открыть на дорожке, чей эффект в этой сессии ещё ни разу не звучал. */
+function fxParamMetaOf(fxId){
+  const f=FX_FACTORY[fxId];
+  return f ? f.params.map(sp=>({key:sp.key, labelKey:sp.labelKey, short:sp.short}))
+           : [{key:FX_AMT, labelKey:'fx.param.amt', short:fxId.toUpperCase()}];
+}
+/* ЗНАЧЕНИЯ ПО УМОЛЧАНИЮ (нормированные) — ими наполняется снимок цепи, когда эффект добавили В РЕДАКТОРЕ
+   и сыграно с ним ничего не было. Берём из СПЕЦИФИКАЦИИ тем же fxNorm, что и fxWrapParam: второй модели
+   диапазона не заводим (правило с 2.6). */
+function fxDefaultsOf(fxId){
+  const f=FX_FACTORY[fxId];
+  if(!f) return [0];                                  // старый скаляр: его нейтраль — ноль (см. FX_NEUTRAL в state)
+  return f.params.map(sp=>Math.max(0,Math.min(1,fxNorm(sp,sp.def))));
+}
+/* ЧТО МОЖНО ДОБАВИТЬ В ЦЕПЬ ДОРОЖКИ ИЗ РЕДАКТОРА: только СИГНАЛЬНЫЕ эффекты (у которых есть концы), то
+   есть те, что реально встанут в путь переигровки. Голосовой (яркость аккордов) в путь не входит вовсе,
+   а старые скаляры живут в соло-голосе и пер-дорожечными быть не могут — им здесь не место. */
+const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!=='voice');
 function fxPlaySet(key,fxId,pKey,v){
   if(!AC) return;
   if(fxIsScalar(fxId)){ if(pKey===FX_AMT) fx[fxId]=v; return; }
@@ -2004,5 +2023,6 @@ export {
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
+  fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел
 };

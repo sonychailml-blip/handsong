@@ -1,7 +1,8 @@
 import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, leadOff, leadAllOff, leadHold,
          metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff,
-         fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim } from './audio.js';
+         fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
+         fxParamMetaOf, fxDefaultsOf } from './audio.js';
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
@@ -112,6 +113,15 @@ let takeSeq=0, curTake=0;
    переигровки, ни отсортированного префикса, ни единственной точки сброса (правило #28). Тронет —
    станет источником событий и унаследует все их законы разом. */
 const takeFx=new Map();
+/* ⛳ ВЕРСИЯ ЗАХВАТА — ЕДИНСТВЕННАЯ ИМЕНОВАННАЯ ТОЧКА ЕГО ПРОТУХАНИЯ (слайс O-4).
+   ⚠️ ЗАЧЕМ ОНА ПОНАДОБИЛАСЬ. Подпись ленты переигровки (fxPlaySignature) считала ДЛИНЫ: число событий,
+   число взятых, число точек. Пока захват только РОС, этого хватало. Редактор же двигает точку — время и
+   величина меняются, а длины все до одной остаются прежними: лента не пересобралась бы, и правка не
+   зазвучала бы, причём МОЛЧА. Поэтому всякая правка захвата поднимает счётчик, а подпись его читает.
+   ⛔ ЭТО НЕ schedInvalidate И РЯДОМ С НИМ НЕ СТОИТ: захват — не события (правило #28), у него своя
+   лента, свой курсор и вот эта своя точка сброса. Смешаешь — захват станет источником событий. */
+let takeFxVer=0;
+const takeFxTouch=()=>{ takeFxVer++; };
 /* Последнее ЗАПИСАННОЕ значение по адресу «ключ|эффект|параметр» — опора прореживания. Живёт ровно
    столько, сколько идёт взятое: на старте засевается снимком, поэтому дорожка держит только ДЕЛЬТЫ. */
 let takeFxLast=null;
@@ -423,7 +433,7 @@ const fxPlayVals=new Map(), fxPlayOrd=new Map();     // свёрнутое со�
    ⚠️ Множества mute/solo крошечные — склейка на тике дешевле отдельной точки инвалидации, а главное
    не требует помнить о ней в четырёх местах, где эти множества правятся. */
 const fxPlaySignature=()=>{ let n=0; for(const r of takeFx.values()) n+=r.lane.length;
-  return events.length+'|'+takeFx.size+'|'+n+'|'+[...laneMute].join(',')+'/'+[...laneSolo].join(','); };
+  return events.length+'|'+takeFx.size+'|'+n+'|'+takeFxVer+'|'+[...laneMute].join(',')+'/'+[...laneSolo].join(','); };   // takeFxVer — правки редактора: длины при них не меняются (см. его шапку)
 function fxPlayBuild(){
   const list=[];
   /* Метаданные взятого выводим ОДНИМ проходом по событиям: доля первого события (когда снимок вступает
@@ -738,7 +748,7 @@ function editGuard(){
   if(loop.on) onLoop();
   return true;
 }
-function editCommit(){ events.sort((x,y)=>x.t-y.t); schedInvalidate(); }   // ОДИН раз на правку: сортировка ДО сброса — он объявляет массив отсортированным (правило #28)
+function editCommit(){ events.sort((x,y)=>x.t-y.t); schedInvalidate(); takeFxTouch(); }   // ОДИН раз на правку: сортировка ДО сброса — он объявляет массив отсортированным (правило #28). O-4: takeFxTouch — от времён СОБЫТИЙ зависит доля старта взятого, то есть база полосы автоматизации и лента переигровки; двигать ноту, не освежив их, значило бы показывать и играть прежнюю базу
 /* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
    кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
 function editDrumDefaults(layer,t){
@@ -875,11 +885,190 @@ function editInsertHit(t,row){
   editPush({ kind:'ins', evs:[ev] });
   editCommit(); return ev;
 }
+/* ═══ ПОЛОСА АВТОМАТИЗАЦИИ: ЧТЕНИЕ И ПРАВКА (слайс O-4) ═══
+   ⛳ ЧТО ЗДЕСЬ ЗА ЕДИНИЦА. Полоса показывает ОДИН АДРЕС — (владелец цепи, эффект, параметр) — на ВСЕЙ
+   дорожке, как его видит переигровка: точки всех взятых дорожки, слитые по времени. Это не «вид на одно
+   взятое»: звучит-то именно слитая лента (fxPlayBuild), и показывать другое значило бы рисовать не то,
+   что слышно.
+   ⛳ КАКОМУ ВЗЯТОМУ ПРИНАДЛЕЖИТ ПРАВКА (ответ на «а если взятых два»):
+     ПЕРЕТАСКИВАНИЕ правит ТУ САМУЮ точку, за которую взялись, — она лежит в СВОЁМ взятом и там остаётся.
+     НОВАЯ точка ложится в ПОСЛЕДНЕЕ взятое дорожки (высший tk). Это не произвол: переигровка разрешает
+     спор «последняя по времени, при равенстве — старшая по номеру взятого», поэтому точка в последнем
+     взятом ПОБЕЖДАЕТ в любой момент, который она покрывает. То есть «добавил точку — она и слышна».
+   ⚠️ СНИМОК СТАРТА — НЕ ТОЧКА. Уровень до первой точки задаёт снимок цепи взятого; он рисуется полкой, но
+   ручки у него нет: двигать «состояние на старте» как точку значило бы править не автоматизацию, а сам
+   снимок. Нужна точка раньше всех — её добавляют обычным способом, тапом в режиме вставки. */
+const AUT_EPS=1e-9;
+/* Взятые ДОРОЖКИ, от старшего к младшему, и их доли старта — одним проходом по событиям.
+   Ролями отбираем те же, что и сводка захвата (captureInfoOf): дорожка правит цепями ТОЛЬКО тех ролей,
+   которые в ней играли. */
+function autTakesOf(layer){
+  const m=new Map();
+  for(const e of events) if(e.layer===layer){
+    const tk=e.tk||0; let x=m.get(tk);
+    if(!x) m.set(tk, x={tk, t0:e.t, keys:new Set()});
+    if(e.t<x.t0) x.t0=e.t;
+    const r=evRole(e.fn); if(r) x.keys.add(chainKeyOf(r));
+  }
+  return [...m.values()].sort((a,b)=>b.tk-a.tk);      // старший первым: «последнее взятое» — это [0]
+}
+/* ВСЕ АДРЕСА, которые полоса может показать у этой дорожки: параметры эффектов её захваченных цепей.
+   Порядок — порядок ЦЕПИ (он слышен с O-1). Состав берём у ПОСЛЕДНЕГО взятого владельца: оно и правит. */
+function autAddrs(layer){
+  const out=[];
+  for(const T of autTakesOf(layer).slice().reverse()){
+    const rec=takeFx.get(T.tk); if(!rec) continue;
+    for(const key of T.keys){ const ch=rec.chains[key]; if(!ch) continue;
+      for(const eff of ch) for(const meta of fxParamMetaOf(eff.fxId)){
+        const i=out.findIndex(o=>o.key===key&&o.fx===eff.fxId&&o.p===meta.key);
+        if(i>=0) out.splice(i,1);                     // тот же адрес у более старшего взятого — порядок берём у него
+        out.push({key, fx:eff.fxId, p:meta.key, labelKey:meta.labelKey, short:meta.short});
+      } }
+  }
+  return out;
+}
+/* ТОЧКИ ОДНОГО АДРЕСА ПО ВСЕЙ ДОРОЖКЕ + УРОВЕНЬ ДО ПЕРВОЙ ТОЧКИ.
+   base — величина из снимка САМОГО РАННЕГО взятого, которое этим адресом правит; ею рисуется полка слева.
+   pts — записи дорожки (их и правит редактор) по времени; при равном времени старше тот, у кого больше
+   tk, — тот же закон, что у переигровки. */
+/* ⚠️ МЕМО НА ОДНУ ЗАПИСЬ, И ОНО ОБЯЗАТЕЛЬНО: autPoints зовёт ОТРИСОВКА, то есть 60 раз в секунду, а
+   внутри — полный обход событий (autTakesOf) и всех дорожек захвата. На пятиминутной песне это десятки
+   тысяч шагов НА КАДР. Ключ мемо — адрес плюс takeFxVer: версия поднимается КАЖДОЙ правкой захвата И
+   каждой правкой нот (editCommit), то есть ровно тогда, когда ответ мог измениться. Одной записи хватает:
+   полоса показывает РОВНО ОДИН адрес зараз (см. rollAut). */
+let autMemoK='', autMemoV=null;
+function autPoints(layer,key,fxId,pKey){
+  const mk=layer+'|'+key+'|'+fxId+'|'+pKey+'|'+takeFxVer;
+  if(autMemoK===mk && autMemoV) return autMemoV;
+  const r=autPointsCalc(layer,key,fxId,pKey);
+  autMemoK=mk; autMemoV=r; return r;
+}
+function autPointsCalc(layer,key,fxId,pKey){
+  const takes=autTakesOf(layer);
+  let base=null, baseT=Infinity;
+  const pts=[];
+  for(const T of takes){
+    const rec=takeFx.get(T.tk); if(!rec||!T.keys.has(key)) continue;
+    const ch=rec.chains[key];
+    if(ch && T.t0<=baseT){ const eff=ch.find(e=>e.fxId===fxId);
+      if(eff){ const names=fxParamKeysOf(fxId), i=names.indexOf(pKey);
+        if(i>=0 && eff.params[i]!=null){ base=eff.params[i]; baseT=T.t0; } } }
+    for(const ent of rec.lane) if(ent.key===key&&ent.fx===fxId&&ent.p===pKey)
+      pts.push({pt:ent, tk:T.tk, lane:rec.lane});
+  }
+  pts.sort((a,b)=> a.pt.t-b.pt.t || a.tk-b.tk);
+  return { base, baseT: baseT===Infinity?0:baseT, pts };
+}
+/* ⛳ ОБЩИЙ ХВОСТ ВСЕХ ПРАВОК ПОЛОСЫ. editCommit сортирует СОБЫТИЯ и сбрасывает курсоры — здесь этого не
+   нужно и НЕЛЬЗЯ: захват не события (правило #28). Нужно ровно одно — поднять версию захвата, чтобы
+   лента переигровки пересобралась и правка зазвучала на следующем ▶. */
+const autCommit=()=>{ takeFxTouch(); };
+/* ⛳ ЗАХВАТ У ДОРОЖКИ, КОТОРАЯ ЕГО НЕ ИМЕЕТ (всё, записанное до этой дуги, подложки, вставки редактора).
+   ⚠️ СОЗДАЁМ ЕГО ИЗ ЖИВОЙ ЦЕПИ — и это осознанный ответ, а не побочный эффект. Вариант «пустая цепь плюс
+   то, что добавили» оставил бы старую дорожку БЕЗ того звука, с которым она только что игралась: она шла
+   за живой цепью, и снять её оттуда молча значило бы отнять у неё эффекты. Снимок живой цепи оставляет её
+   звучать ровно так, как в этот миг, — и с этого мига она ПРИКОЛОЧЕНА: дальше ручки её не трогают, как и
+   всякую записанную дорожку. Это и есть цена, названная заранее.
+   ⚠️ Снимок делает ТА ЖЕ takeCapStart, что и на ● — одна дорога, а не вторая её копия. Опору прореживания
+   она засевает только своему взятому (tk===curTake), а здесь это не так, поэтому идущая запись цела. */
+function autEnsure(layer,key){
+  const takes=autTakesOf(layer); if(!takes.length) return null;
+  const T=takes.find(x=>x.keys.has(key)) || takes[0];
+  if(!takeFx.has(T.tk)) takeCapStart(T.tk);
+  return takeFx.get(T.tk)||null;
+}
+/* Перенос точки: время и величина. Обе зажаты — время не отрицательное, величина в 0..1. */
+function autMovePoint(pt,t,v){
+  if(!editGuard()||!pt) return false;
+  const to={t:Math.max(0,t), v:Math.max(0,Math.min(1,v))};
+  if(Math.abs(to.t-pt.t)<AUT_EPS && Math.abs(to.v-pt.v)<1e-6) return false;   // не сдвинулось — не правка (иначе ↶ «ничего не делает»)
+  editPush({ kind:'autmove', pt, from:{t:pt.t,v:pt.v}, to });
+  pt.t=to.t; pt.v=to.v;
+  autCommit(); return true;
+}
+function autDeletePoint(rec){
+  if(!editGuard()||!rec||!rec.lane) return false;
+  const i=rec.lane.indexOf(rec.pt); if(i<0) return false;
+  rec.lane.splice(i,1);
+  editPush({ kind:'autdel', pt:rec.pt, lane:rec.lane });
+  autCommit(); return true;
+}
+/* Новая точка — в ПОСЛЕДНЕЕ взятое дорожки (см. шапку: оно и побеждает). */
+function autAddPoint(layer,key,fxId,pKey,t,v){
+  if(!editGuard()) return null;
+  const rec=autEnsure(layer,key); if(!rec) return null;
+  const pt={ t:Math.max(0,t), key, fx:fxId, p:pKey, v:Math.max(0,Math.min(1,v)) };
+  rec.lane.push(pt);
+  editPush({ kind:'autins', pt, lane:rec.lane });
+  autCommit(); return pt;
+}
+/* ═══ ЧАСТЬ 2: ЦЕПЬ САМОЙ ДОРОЖКИ ═══
+   ⛳ ГДЕ ЖИВЁТ ЭФФЕКТ, ДОБАВЛЕННЫЙ В РЕДАКТОРЕ: в СНИМКЕ ЦЕПИ ВЗЯТОГО (rec.chains[key]) — то есть в
+   ЗАХВАТЕ ДОРОЖКИ, и больше нигде. ⛔ Живая цепь (state.fxChains) не трогается ни на символ: она —
+   инструмент рук, и переписать её значило бы отнять у человека раскладку по пальцам (тот же закон, по
+   которому переигровка подменяет ПУТЬ, а не цепь, — см. fxPlayPath).
+   Переигровка подхватит это сама: fxPlayBuild кладёт снимок в ленту записью состава (FX_CHAIN), а
+   fxPlayDrive превращает её в путь. Ни одной новой строки в звуковом пути не понадобилось. */
+function autChainOf(layer,key){
+  const T=autTakesOf(layer).find(x=>x.keys.has(key)); if(!T) return [];
+  const rec=takeFx.get(T.tk); if(!rec) return [];
+  const ch=rec.chains[key]; return ch?ch.map(e=>e.fxId):[];
+}
+function autChainAdd(layer,key,fxId){
+  if(!editGuard()||!fxId) return false;
+  const rec=autEnsure(layer,key); if(!rec) return false;
+  const ch=rec.chains[key]||(rec.chains[key]=[]);
+  if(ch.some(e=>e.fxId===fxId)) return false;                       // тот же инвариант, что у живой цепи: одна запись на эффект
+  const ent={ fxId, params:fxDefaultsOf(fxId) };
+  ch.push(ent);
+  editPush({ kind:'autfxins', ent, ch });
+  autCommit(); return true;
+}
+function autChainRemove(layer,key,fxId){
+  if(!editGuard()) return false;
+  const rec=autEnsure(layer,key); if(!rec) return false;
+  const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId); if(i<0) return false;
+  const ent=ch[i]; ch.splice(i,1);
+  editPush({ kind:'autfxdel', ent, ch, at:i });
+  autCommit(); return true;
+}
+/* Перестановка — тем же переносом splice, что и у живой цепи (fxChainMove): порядок слышен, значит его
+   надо уметь менять; вторая модель порядка не заводится. dir: −1 раньше, +1 позже. */
+function autChainMove(layer,key,fxId,dir){
+  if(!editGuard()) return false;
+  const rec=autEnsure(layer,key); if(!rec) return false;
+  const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId), j=i+(dir<0?-1:1);
+  if(i<0||j<0||j>=ch.length) return false;
+  const [e]=ch.splice(i,1); ch.splice(j,0,e);
+  editPush({ kind:'autfxmove', ch, from:i, to:j });
+  autCommit(); return true;
+}
 /* ОДИН ход истории в ЛЮБУЮ сторону. undo=true — назад, false — вперёд. Перенос переставляет время и
    нагрузку на нужное состояние; удаление и вставка — зеркальны друг другу и возят ТОТ ЖЕ объект события
    (никаких копий: за объект держатся выделение и спаривание нот). */
 function editApply(u,undo){
   if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; return; }
+  /* ⛳ ПРАВКИ ПОЛОСЫ АВТОМАТИЗАЦИИ (O-4) — В ТОЙ ЖЕ ИСТОРИИ, что и ноты, и по той же форме: ход возит
+     ТОТ ЖЕ объект (точку или запись цепи), а не копию. Разной у них только цель: там массив событий,
+     здесь массив дорожки автоматизации или снимок цепи взятого.
+     ⛔ ВТОРОЙ ИСТОРИИ НЕ ЗАВОДИМ: ↶ у человека одна, и она обязана снимать последнее сделанное, чем бы
+     оно ни было. Отсюда же и общий хвост — takeFxTouch, чтобы снятая правка перестала звучать. */
+  if(u.kind==='autmove'){ const s= undo?u.from:u.to; u.pt.t=s.t; u.pt.v=s.v; takeFxTouch(); return; }
+  if(u.kind==='autins'||u.kind==='autdel'){
+    const add=(u.kind==='autdel')===undo;
+    if(add){ if(u.lane.indexOf(u.pt)<0) u.lane.push(u.pt); }
+    else { const i=u.lane.indexOf(u.pt); if(i>=0) u.lane.splice(i,1); }
+    takeFxTouch(); return;
+  }
+  if(u.kind==='autfxins'||u.kind==='autfxdel'){
+    const add=(u.kind==='autfxdel')===undo;
+    if(add){ if(u.ch.indexOf(u.ent)<0) u.ch.splice(u.at==null?u.ch.length:Math.min(u.at,u.ch.length),0,u.ent); }
+    else { const i=u.ch.indexOf(u.ent); if(i>=0) u.ch.splice(i,1); }
+    takeFxTouch(); return;
+  }
+  if(u.kind==='autfxmove'){ const from=undo?u.to:u.from, to=undo?u.from:u.to;
+    if(from>=0&&from<u.ch.length){ const [e]=u.ch.splice(from,1); u.ch.splice(to,0,e); }
+    takeFxTouch(); return; }
   /* S5.5: удаление/вставка возят НАБОР событий (бас-нота — это «вкл»+«выкл», а то и её ведения), но
      механизм тот же и объекты ТЕ ЖЕ. Набор из одного — прежний случай удара, байт-в-байт. */
   const back=new Set(u.evs);
@@ -2180,6 +2369,8 @@ export {
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
+  autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
+  autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

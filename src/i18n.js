@@ -141,6 +141,13 @@ export const DICTS = {
     'roll.hint':'drag a note — move · its right edge — length · empty space — scroll · two fingers — zoom · ruler — playhead',
     // O-2: что у дорожки ЗАХВАЧЕНО для будущего рендера (зародыш «заморожено с …»).
     // {roles} — роли САМОЙ дорожки: их может быть несколько, и тогда список эффектов слитый — подпись об этом и говорит
+    // O-4: ПОЛОСА АВТОМАТИЗАЦИИ редактора — выбор параметра и правка цепи САМОЙ дорожки
+    'aut.none':'— automation off —',
+    'aut.pick':'pick a parameter to see its automation',
+    'aut.pickTitle':'Automation lane: which parameter to show',
+    'aut.add':'+ effect for this track',
+    'aut.addTitle':'Add an effect to this track only — your own chain is not touched',
+    'aut.rmTitle':'Remove this effect from the track',
     'roll.cap':'captured — {roles}: {fx} · {n} automation points',
     'roll.capNone':'captured — {roles}: no effects',
     'roll.homeTitle':'Playhead to the start',
@@ -529,6 +536,13 @@ export const DICTS = {
     'roll.hint':'тянуть ноту — перенос · её правый край — длина · пустое место — прокрутка · два пальца — зум · линейка — бегунок',
     // O-2: что у дорожки ЗАХВАЧЕНО для будущего рендера (зародыш «заморожено с …»).
     // {roles} — роли САМОЙ дорожки: их может быть несколько, и тогда список эффектов слитый — подпись об этом и говорит
+    // O-4: ПОЛОСА АВТОМАТИЗАЦИИ редактора — выбор параметра и правка цепи САМОЙ дорожки
+    'aut.none':'— без автоматизации —',
+    'aut.pick':'выберите параметр — покажу его автоматизацию',
+    'aut.pickTitle':'Полоса автоматизации: какой параметр показать',
+    'aut.add':'+ эффект этой дорожке',
+    'aut.addTitle':'Добавить эффект ТОЛЬКО этой дорожке — ваша собственная цепь не тронута',
+    'aut.rmTitle':'Убрать эффект у дорожки',
     'roll.cap':'захвачено — {roles}: {fx} · точек автоматизации: {n}',
     'roll.capNone':'захвачено — {roles}: без эффектов',
     'roll.homeTitle':'Бегунок в начало',

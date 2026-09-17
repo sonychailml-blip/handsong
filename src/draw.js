@@ -3,14 +3,15 @@ import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртв�
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic } from './state.js';   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
+         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic,
+         rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
-         songNotes, songSegs, captureInfoOf, fxIsDriven, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -880,6 +881,101 @@ function rollBlockPx(V){
   return Math.max(6, Math.min(36, s.free ? 10 : s.step*pxB));
 }
 const rollBlockBeats=V=> rollBlockPx(V)*V.span/V.bw;
+/* ═══ ПОЛОСА АВТОМАТИЗАЦИИ (слайс O-4) ═══
+   ⛳ ВРЕМЕННÁЯ ОСЬ — ТА ЖЕ, ЧТО У СЕТКИ НОТ, И ЭТО НЕ «СОГЛАСОВАНО», А ОДНА И ТА ЖЕ ВЕЛИЧИНА: полоса
+   берёт x0/bw/beat0/span из ТОГО ЖЕ снимка rollView, который нарисовал ноты (правило #9). Второй
+   геометрии времени в редакторе нет и быть не должно — иначе зум, прокрутка и бегунок разъехались бы
+   между двумя полями, причём незаметно.
+   ⛳ ВЫСОТА ПОЛОСЫ — ДОЛЯ СВОБОДНОГО ПОЛЯ, а не константа: «не полэкрана, но и не щель». Потолок держит
+   её скромной на большом экране, пол — читаемой на маленьком, доля — соразмерной в альбомной ориентации.
+   Сетка отдаёт ровно эту высоту плюс зазор; её ряды пересчитываются той же подгонкой, что и всегда. */
+const ROLL_AUT_MAX=92, ROLL_AUT_MIN=56, ROLL_AUT_PART=0.30, ROLL_AUT_GAP=4;
+const rollAutH=field=> Math.round(Math.max(ROLL_AUT_MIN, Math.min(ROLL_AUT_MAX, field*ROLL_AUT_PART)));
+/* ⛳ ВЕРТИКАЛЬНАЯ ПРИВЯЗКА — ДЕСЯТЫЕ (шаг 0.1), И ОНА ВИДНА. У величины нет «квантизации» в настройках:
+   квантизация — про время и про доли такта, а ось значения к тактам отношения не имеет. Но и СВОБОДНАЯ
+   ось плоха: пальцем на 70px не поставить «ровно половину», а именно круглые величины человек и хочет.
+   Поэтому шаг 0.1 (десять делений — столько же, сколько у шкалы 0..100 в меню) и ЛИНИИ через каждую
+   десятую, как у времени свои линии тактов. ⚠️ Точное значение всегда достижимо: тонкая правка — это
+   поле в меню, а полоса — жест, и ей круглый шаг ЧЕСТНЕЕ мнимой точности в один пиксель. */
+const AUT_STEP=0.1;
+const autSnapV=v=> Math.max(0,Math.min(1, Math.round(v/AUT_STEP)*AUT_STEP));
+const autY=(V,v)=> V.aut.y1-(V.aut.y1-V.aut.y0)*Math.max(0,Math.min(1,v));
+const autVAt=(V,py)=> Math.max(0,Math.min(1,(V.aut.y1-py)/Math.max(1,V.aut.y1-V.aut.y0)));
+/* ⛳ ЧТО РИСУЕМ МЕЖДУ ТОЧКАМИ — СТУПЕНЬКУ, А НЕ НАКЛОННУЮ ПРЯМУЮ, и это не стиль, а ЧЕСТНОСТЬ.
+   Соблазн велик: соединить точки диагоналями, как рисуют огибающие в любой DAW. Но переигровка устроена
+   иначе — fxPlayDrive СВОРАЧИВАЕТ ленту и применяет ПОСЛЕДНЮЮ точку, встреченную до текущей доли. То есть
+   величина ДЕРЖИТСЯ на значении точки, пока не придёт следующая, и лишь тогда переезжает — быстро, за
+   постоянную времени своего сеттера (0.05–0.08 с). Диагональ обещала бы ИНТЕРПОЛЯЦИЮ, которой нет: на
+   длинном промежутке между двумя точками человек читал бы плавный подъём, а слышал бы полку и скачок.
+   ⚠️ СГЛАЖИВАНИЕ СЕТТЕРА НЕ РИСУЕМ ТОЖЕ: на масштабе такта оно короче пикселя, а рисовать невидимое —
+   значит загромождать. Ступенька говорит правду о главном: ГДЕ точки и КАКАЯ величина держится между ними.
+   ⛳ И ПОТОМУ ЖЕ ЧАСТЫЙ СВИП ВЫГЛЯДИТ ПЛАВНЫМ: при записи точка ложится каждые 25 мс, ступеньки становятся
+   уже пикселя и сливаются в наклон — ровно так, как это и звучит. */
+function drawAutLane(V,ly){
+  const A=V.aut; if(!A) return;
+  const addr=rollAut;
+  ctx.fillStyle='rgba(255,255,255,.028)'; ctx.fillRect(V.x0,A.y0,V.bw,A.y1-A.y0);
+  // ---- горизонтали десятых + подписи 0/100 у левого края ----
+  ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1;
+  for(let k=0;k<=10;k++){ const y=autY(V,k/10);
+    ctx.beginPath(); ctx.moveTo(V.x0,y); ctx.lineTo(V.x0+V.bw,y); ctx.stroke(); }
+  ctx.strokeStyle='rgba(255,255,255,.16)';
+  ctx.beginPath(); ctx.moveTo(V.x0,A.y0); ctx.lineTo(V.x0+V.bw,A.y0); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(V.x0,A.y1); ctx.lineTo(V.x0+V.bw,A.y1); ctx.stroke();
+  ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.font='9px system-ui'; ctx.fillStyle='rgba(255,255,255,.4)';
+  ctx.fillText('100', V.x0-6, A.y0+5); ctx.fillText('0', V.x0-6, A.y1-5);
+  if(!addr||ly==null){
+    ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.45)';
+    ctx.fillText(t('aut.pick'), V.x0+V.bw/2, (A.y0+A.y1)/2);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; return;
+  }
+  const D=autPoints(ly,addr.key,addr.fx,addr.p);
+  const col=AUT_COL;
+  /* ⛳ ОТСЕКАЕМ ПО ОКНУ, как и ноты: полоса после долгого кручения ручкой держит тысячи точек, а на экране
+     их сотня. Двоичным поиском находим первую видимую и идём до правого края — цена кадра зависит от
+     ВИДИМОГО, а не от длины песни (тот же закон, что у rollLower у ударов). Соседей слева и справа берём
+     по одной штуке сверх окна, иначе линия обрывалась бы на кромке вместо того, чтобы уходить за неё. */
+  const P=D.pts, xL=V.beat0, xR=V.beat0+V.span;
+  let lo=0, hi=P.length;
+  while(lo<hi){ const mid=(lo+hi)>>1; if(P[mid].pt.t<xL) lo=mid+1; else hi=mid; }
+  const from=Math.max(0,lo-1);
+  let to=from; while(to<P.length && P[to].pt.t<=xR) to++;
+  if(to<P.length) to++;
+  // ---- линия ----
+  const drag=rollAutDrag;
+  const vOf=r=> (drag&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.v : r.pt.v;
+  const tOf=r=> (drag&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.t : r.pt.t;
+  ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath();
+  let started=false, lastY=null;
+  if(D.base!=null){ lastY=autY(V,D.base); ctx.moveTo(V.x0,lastY); started=true; }   // ПОЛКА слева: величина из снимка старта взятого — до первой точки величина именно такая
+  for(let i=from;i<to;i++){
+    const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
+    if(!started){ ctx.moveTo(x,y); started=true; }
+    else { ctx.lineTo(x,lastY); ctx.lineTo(x,y); }   // ДЕРЖИМ прежнюю величину до самой точки, затем переезд: ровно то, что делает fxPlayDrive
+    lastY=y;
+  }
+  if(started&&lastY!=null) ctx.lineTo(V.x0+V.bw,lastY);
+  ctx.stroke();
+  // ---- точки ----
+  for(let i=from;i<to;i++){
+    const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
+    if(x<V.x0-6||x>V.x0+V.bw+6) continue;
+    const sel=rollAutSel&&rollAutSel.pt===r.pt;
+    ctx.fillStyle= sel?'#fff':col;
+    ctx.beginPath(); ctx.arc(x,y,sel?4.5:3.2,0,Math.PI*2); ctx.fill();
+    if(sel){ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke(); }
+  }
+  // ---- подпись адреса и величина выбранной точки ----
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.font='10px system-ui';
+  ctx.fillStyle=hexA(col,.85);
+  const nm=fxTitleOf(addr.fx)+' · '+t(addr.labelKey||'');
+  ctx.fillText(nm, V.x0+4, A.y0+12);
+  if(rollAutSel){ const v=drag?drag.v:rollAutSel.pt.v;
+    ctx.textAlign='right'; ctx.fillStyle='#fff';
+    ctx.fillText(Math.round(v*100)+'', V.x0+V.bw-4, A.y0+12); }
+  ctx.textAlign='left';
+}
+const AUT_COL='#7ee0b6';   // тон полосы: родня бегунку (он тоже про ВРЕМЯ и тоже поверх поля), но не спорит с ролями
 function drawRoll(){
   const W=canvas.width, H=canvas.height;
   /* Полосы лупера на экране нет → и попадать в неё нечем: снимаем её геометрию, как это делает запись
@@ -893,7 +989,13 @@ function drawRoll(){
   const ly=rollTrackLayer();
   /* ry0 — верх ЛИНЕЙКИ (S5.2). Сетка начинается там же, где и раньше (ry0+ROLL_RULER_H === прежний gy0),
      поэтому поле нот не сдвинулось ни на пиксель: линейка заняла тот отступ, что и так пустовал. */
-  const x1=W-12, ry0=ROLL_BAR_H+ROLL_TP_H+2, gy0=ry0+ROLL_RULER_H, gy1=H-ROLL_FOOT_H;   // низ сетки = верх подвала: одна величина на обе стороны, разъехаться нечему
+  /* ⛳ O-4: ПОЛОСА АВТОМАТИЗАЦИИ ОТКУСЫВАЕТ ОТ СЕТКИ, и обе меры считаются ЗДЕСЬ, из одного поля. Сетка
+     отдаёт высоту полосы плюс зазор; её ряды пересчитает та же подгонка (fitH ниже), поэтому на телефоне
+     и в альбоме всё раскладывается само, без второго набора правил. Полоса закрыта — всё как было. */
+  const x1=W-12, ry0=ROLL_BAR_H+ROLL_TP_H+2, gy0=ry0+ROLL_RULER_H, foot=H-ROLL_FOOT_H;
+  const autH = rollAut ? rollAutH(Math.max(1,foot-gy0)) : 0;
+  const aut  = autH ? { y0:foot-autH, y1:foot } : null;
+  const gy1  = autH ? aut.y0-ROLL_AUT_GAP : foot;   // низ сетки = верх полосы (или подвала): одна величина на обе стороны, разъехаться нечему
   /* ⛳ ГЕОМЕТРИЯ РЯДОВ РАЗНАЯ У РОЛЕЙ, И ЭТО ЕДИНСТВЕННОЕ ИХ РАЗЛИЧИЕ В СНИМКЕ. Ударные: шесть рядов во
      всю высоту, row0=0 — ровно как было. Ладовые роли: ряд фиксированной высоты, видно столько, сколько
      влезло, остальное — прокруткой (row0). */
@@ -912,7 +1014,7 @@ function drawRoll(){
                        : (gy1-gy0)/DRUM_ROWS;
   const rows = pitched ? Math.max(1,Math.min(total,Math.floor((gy1-gy0)/rowH))) : DRUM_ROWS;
   const row0 = pitched ? Math.max(0,Math.min(rollRow0,Math.max(0,total-rows))) : 0;
-  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, pitched };
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, pitched, aut };   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
   const V=rollView, pxB=V.bw/V.span, M=loop.metre;
   const DPO = pitched ? rollDegPerOct(axSc) : 0;
   // ---- ряды: чередующаяся заливка + подпись слева (ударные — имя ряда, лад — НОТА В ЛАДУ ОСИ) ----
@@ -1048,6 +1150,9 @@ function drawRoll(){
       ctx.beginPath(); ctx.roundRect(gx,gy,gw,gh,3); ctx.stroke(); ctx.setLineDash([]);   // призрак — ТОТ ЖЕ блок, что и настоящая нота
     }
   }
+  /* ⛳ O-4: ПОЛОСА — ДО БЕГУНКА. Она своё поле и заливает свой фон; нарисуй мы её после, фон лёг бы
+     поверх бегунка ровно на её высоте, и линия времени разорвалась бы посреди экрана. */
+  if(V.aut) drawAutLane(V,ly);
   /* ---- БЕГУНОК: теперь виден И НА ОСТАНОВЛЕННОМ транспорте (S5.2). Без этого перемотка была бы слепой:
      тапнул по линейке — и не видно, куда встал. Играет — яркий, стоит — приглушённый; доля берётся из
      того же loop.pos, с которого ▶ продолжит (onLoop). Треугольник-ручка сидит в линейке. ---- */
@@ -1057,7 +1162,7 @@ function drawRoll(){
   if(phBeat>=V.beat0&&phBeat<=V.beat0+V.span){
     const px=laneBeatX(V,phBeat), col= playing ? '#57d9a3' : 'rgba(87,217,163,.55)';
     ctx.strokeStyle=col; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(px,V.ry0); ctx.lineTo(px,gy1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px,V.ry0); ctx.lineTo(px, V.aut?V.aut.y1:gy1); ctx.stroke();   // O-4: сквозь ОБА поля — время у них одно, и линия обязана это показывать
     ctx.fillStyle=col;
     ctx.beginPath(); ctx.moveTo(px-5,V.ry0); ctx.lineTo(px+5,V.ry0); ctx.lineTo(px,V.ry0+7); ctx.closePath(); ctx.fill();
   }
@@ -1109,6 +1214,22 @@ export function rollHit(px,py){
   if(px<V.x0-8||px>V.x0+V.bw+8) return null;
   const beat=laneBeatAt(V,px);
   if(py>=V.ry0 && py<V.gy0) return { what:'ruler', beat };   // S5.2: ЛИНЕЙКА — своя цель; её низ = верх сетки, пересечься они не могут
+  /* ⛳ O-4: ПОЛОСА АВТОМАТИЗАЦИИ — своя цель, по ТОМУ ЖЕ снимку (V.aut), что её нарисовал. Её верх ниже
+     низа сетки на зазор, поэтому перепутать поля нельзя: одна точка экрана принадлежит ровно одному.
+     Отдаём и ВЗЯТУЮ ТОЧКУ (если палец на ней), и голое место — вставке нужно второе, переносу первое. */
+  if(V.aut && py>=V.aut.y0-4 && py<=V.aut.y1+4){
+    const v=autVAt(V,py), ly=rollTrackLayer();
+    if(!rollAut||ly==null) return { what:'autgrid', beat, v };
+    const D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p);
+    const tolX=ROLL_HIT_PX, tolY=ROLL_HIT_PX;
+    let best=null, bd=Infinity;
+    for(const r of D.pts){
+      const dx=laneBeatX(V,r.pt.t)-px, dy=autY(V,r.pt.v)-py, d=Math.hypot(dx,dy);
+      if(d<bd){ bd=d; best=r; }
+    }
+    if(best && bd<=Math.max(tolX,tolY)) return { what:'autpt', rec:best, beat, v };
+    return { what:'autgrid', beat, v };
+  }
   const r=rollRowAt(V,py);
   const row0=V.row0||0;
   if(r<row0||r>=row0+V.rows) return null;
@@ -1149,7 +1270,12 @@ export function rollHit(px,py){
 /* Габариты окна для ЖЕСТА прокрутки/зума: ui якорит по НИМ, а пишет через сеттеры state — поэтому
    палец, рисунок и попадание читают одно и то же число (следующий кадр строит снимок из него же). */
 export function rollGeom(){ const V=rollView;
-  return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, rows:V.rows, row0:V.row0||0, total:V.total||V.rows, pitched:!!V.pitched, sc:V.sc } : null; }
+  return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, rows:V.rows, row0:V.row0||0, total:V.total||V.rows, pitched:!!V.pitched, sc:V.sc, aut:V.aut||null } : null; }
+/* Величина полосы по экранному Y и обратно — ИЗ ТОГО ЖЕ снимка. Нужны ui: призрак переноса живёт там, а
+   геометрия — здесь, и второй её копии в ui быть не должно (правило #9). Привязку к десятым кладём сюда
+   же: она часть ЭТОЙ оси, а не отдельная настройка. */
+export function rollAutV(py){ const V=rollView; return V&&V.aut ? autVAt(V,py) : 0; }
+export const rollAutSnapV=v=>autSnapV(v);
 /* Группы ладов открытой дорожки — их читает панель (чип лада) и вставка (какой лад заморозить).
    Отдаём КОПИЮ списка ссылок, а не внутренний кэш: ui не должен уметь его портить. */
 export function rollScaleGroups(){ return rollGroups().map(g=>({ sc:g.sc, sev:g.sev, n:g.segs.length })); }

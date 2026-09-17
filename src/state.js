@@ -652,5 +652,18 @@ export let rollRole='dr', rollRow0=0, rollScale=0;
 export const setRollRole=v=>{ rollRole=v; };
 export const setRollRow0=v=>{ rollRow0=Math.max(0,v|0); };
 export const setRollScale=v=>{ rollScale=Math.max(0,v|0); };
+/* ═══ ПОЛОСА АВТОМАТИЗАЦИИ РЕДАКТОРА (слайс O-4) — ЧИСТОЕ СОСТОЯНИЕ ПОКАЗА ═══
+   rollAut — КАКОЙ АДРЕС показан: {key,fx,p} или null (полоса закрыта). Одна полоса и один адрес зараз:
+     ось Y у величины своя, и две величины на одной оси честно не нарисовать — тот же довод, по которому
+     ролл показывает РОВНО ОДНУ роль.
+   rollAutSel — ВЫБРАННАЯ точка, записью {pt,tk,lane} из autPoints: держим САМ объект точки, а не индекс.
+     Индекс поехал бы при первой же правке соседа — ровно та ловушка, от которой rollSel держит событие.
+   rollAutDrag — ПРИЗРАК перетаскивания {t,v}: пока палец ведёт, правится он, а запись — один раз на
+     отпускании. Тот же закон, что у нот: писать на каждом движении значило бы пересобирать ленту
+     переигровки десятки раз в секунду. */
+export let rollAut=null, rollAutSel=null, rollAutDrag=null;
+export const setRollAut=v=>{ rollAut=v||null; };
+export const setRollAutSel=v=>{ rollAutSel=v||null; };
+export const setRollAutDrag=v=>{ rollAutDrag=v||null; };
 export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };

@@ -148,6 +148,15 @@
   <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку">↶</button>
   <button id="rollRedo" data-i18n-title="roll.redoTitle" title="Вернуть правку">↷</button>
   <span id="rollSnap"></span>
+  <!-- ПОЛОСА АВТОМАТИЗАЦИИ (O-4): ОДИН селект — он же ВЫКЛЮЧАТЕЛЬ полосы (первый пункт «— нет —»)
+       и он же ВЫБОР ПАРАМЕТРА. Отдельной кнопки-тумблера не заводим: «полоса открыта, но неизвестно
+       что показывает» — состояние без смысла. Рядом — правка ЦЕПИ САМОЙ ДОРОЖКИ (часть 2): добавить,
+       убрать и подвинуть выбранный эффект. ⛔ Это НЕ живая цепь рук: см. autChainAdd в recorder. -->
+  <select id="rollAutSel" data-i18n-title="aut.pickTitle" title="Полоса автоматизации"></select>
+  <select id="rollFxAdd" data-i18n-title="aut.addTitle" title="Добавить эффект дорожке"></select>
+  <button id="rollFxUp" data-i18n-title="fx.moveUp" title="Раньше в цепи">▲</button>
+  <button id="rollFxDn" data-i18n-title="fx.moveDown" title="Позже в цепи">▼</button>
+  <button id="rollFxDel" data-i18n-title="aut.rmTitle" title="Убрать эффект у дорожки">⊘</button>
   <button id="rollZoomOut" data-i18n-title="roll.zoomOutTitle" title="Отдалить">−</button>
   <button id="rollZoomIn" data-i18n-title="roll.zoomInTitle" title="Приблизить">+</button>
 </div>
