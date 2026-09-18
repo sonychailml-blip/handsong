@@ -125,7 +125,33 @@ let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + 
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
 const bv=[]; const bassHold={}; let bassBus;             // пул баса (моно-голос на слой)
 let drumBus;                                             // шина ударных
- 
+
+/* ═══ ИСТОЧНИК СЛУЧАЙНОСТИ — ОДНА ТОЧКА ПОДМЕНЫ (слайс F1 дуги «ЗАМОРОЗКА») ═══
+   ⛳ ЗАЧЕМ. Движок ВАРЬИРУЕТ КАЖДУЮ АТАКУ: гуманизация высоты, −0..5% уровня, ±10% времени атаки —
+   у аккорда, у соло и (время атаки) у баса, плюс буфер шума, набиваемый заново на каждый контекст.
+   Живьём это и есть жизнь инструмента. Но ЗАМОРОЗКА — режим воспроизведения: дорожку размораживают,
+   правят и морозят снова, и два рендера БЕЗ ЕДИНОЙ ПРАВКИ обязаны дать один и тот же буфер, иначе
+   человек слышит «оно само поменялось». Подменяемый источник закрывает это одной строкой.
+   ⛳ УМОЛЧАНИЕ — ПЛАТФОРМЕННЫЙ Math.random, ПОЭТОМУ ЖИВОЙ ПУТЬ БАЙТ-В-БАЙТ ПРЕЖНИЙ. Это правка
+   движка, а не смена его поведения: `rnd` подменяет ТОЛЬКО тот, кто позвал setRnd, а зовёт его
+   единственный вызывающий — render.js, и зовёт он его у СВОЕЙ копии модуля ('./audio.js?render').
+   ⛔ Math.random ГЛОБАЛЬНО НЕ ПАТЧИТЬ. Соблазн («одна строка вместо восьми») смертелен: обе копии
+   движка делят один глобальный объект, и посев для рендера сделал бы ДЕТЕРМИНИРОВАННОЙ ЖИВУЮ ИГРУ —
+   гуманизация исчезла бы, инструмент зазвучал бы машинно, и услышали бы это сразу. Зонд рендера это
+   специально проверяет (см. render.js, поле liveRandomIntact).
+   ⚠️ ПРАВИЛО #11 НЕ ТРОНУТО: гуманизация по-прежнему НЕ ПОПАДАЕТ В СОБЫТИЕ. Семя — не событие, оно
+   не едет в полезной нагрузке, не сериализуется вместе с ней и живёт в записи ЗАМОРОЖЕННОЙ ДОРОЖКИ
+   (а сегодня, до неё, — только у зонда). Переигровка петли, как и прежде, даёт свежую вариацию.
+   ⛔ НЕ ПРИНОСИТЬ СЮДА ВОРКЛЕТ: восьмое место случайности — шум возбуждения щипка в ks-worklet.js,
+   и оно в ДРУГОМ JS-МИРЕ (AudioWorkletGlobalScope). Ни `rnd`, ни какая угодно подмена с главного
+   потока туда не дотянется; семя пришлось бы передавать в processorOptions при постройке узла. В
+   слайсе F1 оно ОСОЗНАННО ОСТАВЛЕНО НЕПОСЕЯННЫМ (щипок — короткий всплеск шума внутри струны), но
+   зонд обязан об этом СКАЗАТЬ, а не умолчать. */
+let rnd=Math.random;
+/* Подменить источник (офлайн-рендер) или вернуть платформенный (fn пуст). Экспортируется, но у ЖИВОЙ
+   копии модуля вызывающих нет и быть не должно. */
+function setRnd(fn){ rnd = fn || Math.random; }
+
 function makeSatCurve(k=4,n=1024){ const c=new Float32Array(n);
   for(let i=0;i<n;i++){const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x);} return c; }
 /* ЖЁСТКАЯ кривая искажения — ДРУГОЙ ХАРАКТЕР, не «больше того же»: резкий клип (k высокий) + заострение
@@ -1250,7 +1276,7 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
   chordHold[owner]=freqs.map(fr=>{
     const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
-    const hc=(Math.random()*2-1)*HUM_CENTS*(ins.hj||0);   // гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0
+    const hc=(rnd()*2-1)*HUM_CENTS*(ins.hj||0);   // гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0   // F1: rnd — подменяемый источник (умолчание Math.random, живьём байт-в-байт)
     v.o1.detune.setValueAtTime(-ins.det/2+hc,t); v.o2.detune.setValueAtTime(ins.det+hc,t);
     v.g1.gain.setValueAtTime(ins.m1,t); v.g2.gain.setValueAtTime(ins.m2,t);
     const fo=ins.fo||1, ft=ins.ft||0.02, fv=ins.fv||0;    // огибающая фильтра f + скорость→яркость (пол=lp: тихая нота не глохнет)
@@ -1258,9 +1284,9 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     v.f.frequency.setTargetAtTime(ins.lp*(1+fv*vol),t,ft);
     v.fb.frequency.cancelScheduledValues(t); v.fb.frequency.setValueAtTime(briHz,t);   // яркость на АТАКЕ: голос ещё поднимает громкость с 0 → скачка cutoff не слышно
     v.o1.frequency.setValueAtTime(fr,t); v.o2.frequency.setValueAtTime(fr*ins.ratio,t);
-    v.lvl=ins.lvl*(0.25+0.75*vol)*(1-Math.random()*0.05);   // −0..5% уровня — снять машинную ровность
+    v.lvl=ins.lvl*(0.25+0.75*vol)*(1-rnd()*0.05);   // −0..5% уровня — снять машинную ровность
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
-    v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+Math.random()*0.2));   // ±10% времени атаки
+    v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
     return v;
   });
 }
@@ -1502,7 +1528,12 @@ async function initAudio(mkCtx){
   dO1.start(); dO2.start();
  
   noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
-  { const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1; }
+  /* ⛳ БУФЕР ШУМА — ГЕНЕРИРУЕМ, А НЕ ХРАНИМ. Он набивается ЗДЕСЬ, то есть ВНУТРИ initAudio, поэтому
+     посев `rnd` ДО офлайн-инициализации покрывает его даром: ни капать буфер в запись, ни таскать
+     176 КБ float'ов на каждый рендер не нужно. ⚠️ Порядок несущий — setRnd обязан быть позван РАНЬШЕ
+     initAudio (см. render.js), иначе шум разойдётся между рендерами, а его читает КАЖДЫЙ ударный с
+     шумовой составляющей (снейр/клэп/хэт/крэш) — то есть почти вся ритм-секция. */
+  { const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++)d[i]=rnd()*2-1; }
 }
 /* ⚠️ СМЕНА ИНСТРУМЕНТА БОЛЬШЕ НЕ «ПЕРЕЛИВАЕТ» ЗВУЧАЩУЮ НОТУ. Раньше здесь был кроссфейд гейтов всех 23
    банков: удержанная нота меняла тембр под пальцами. Теперь тембр ПЕЧЁТСЯ НА АТАКЕ в голосе (по a.inst),
@@ -1764,9 +1795,9 @@ function leadOn(owner,freq,vol,ins,deg,oct,when){
      событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
      0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
   const hum = b.hum==null?1:b.hum;
-  v.hum.offset.setTargetAtTime((Math.random()*2-1)*HUM_CENTS*hum, t, 0.006);
-  const lvlJ = 1 - Math.random()*0.05;                       // −0..5% уровня
-  const attJ = LEAD_INSTR[ins].att*(0.9+Math.random()*0.2);   // ±10% времени атаки
+  v.hum.offset.setTargetAtTime((rnd()*2-1)*HUM_CENTS*hum, t, 0.006);
+  const lvlJ = 1 - rnd()*0.05;                       // −0..5% уровня
+  const attJ = LEAD_INSTR[ins].att*(0.9+rnd()*0.2);   // ±10% времени атаки
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(lvlJ,t,attJ);
   b.strike && b.strike(t, vol);   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
@@ -1849,7 +1880,7 @@ function bassOn(owner,freq,vol,ins,when){
     const fo=v.ins.fo||1, ft=v.ins.ft||0.03, fv=v.ins.fv||0;   // огибающая фильтра + скорость→яркость на АТАКЕ (не в пофреймовом пути → не сбивается); высоту баса НЕ дёргаем (низ = гулкие биения)
     v.lp.frequency.cancelScheduledValues(t); v.lp.frequency.setValueAtTime(v.ins.lp*fo,t);
     v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*vol),t,ft);
-    v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+Math.random()*0.2));   // ±10% времени атаки
+    v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
   }
   v.tOn=t;
   v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);
@@ -2041,5 +2072,6 @@ export {
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел
+  setRnd,    // F1: ПОДМЕНИТЬ ИСТОЧНИК СЛУЧАЙНОСТИ В ЭТОЙ КОПИИ МОДУЛЯ. ⛔ У ЖИВОЙ копии вызывающих нет и не должно быть — зовёт его только render.js и только у своей ('./audio.js?render…'). Экспортирован потому, что иначе до офлайн-копии не дотянуться; глобальный патч Math.random убил бы гуманизацию ЖИВОЙ игры (довод целиком — у самого rnd)
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
 };
