@@ -271,6 +271,36 @@ const matMix=eng=>{ SRC.chord(eng,0.05); SRC.lead(eng,0.10); SRC.bass(eng,0.15);
    гарантированно из них, и число банков знать не нужно. */
 const matKS=eng=>eng.leadOn('probe',220,0.9,eng.LEAD_INSTR.length-1,0,0,0.05);
 
+/* ═══ ⛳ МАТЕРИАЛ СЛАЙСА F2 — ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ ═══
+   ЧТО ДОКАЗЫВАЕМ: за ОДИН синхронный проход расписываются N перекрывающихся нот, и звучат они в N
+   РАЗНЫХ голосах. Без раскладчика все они достались бы нулевому голосу — один осциллятор,
+   перестроенный N раз, и тишина на месте остальных.
+   ⛳ ЧИСЛА ВЗЯТЫ ВЫШЕ ЖИВЫХ ПОТОЛКОВ НАМЕРЕННО: соло 16 > LEAD_POOL_N(12), бас 6 > BASS_POOL_N(4),
+   аккорды 10×3=30 голосов > CHORD_POOL_N(24). Живой раскладчик на этих числах ОБЯЗАН красть;
+   офлайновый обязан вырастить пул и не потерять ни одной ноты.
+   ⚠️ Ноты НЕ отпускаем: так они гарантированно перекрываются весь рендер, и владельцы остаются в
+   leadHold/bassHold/chordHold — оттуда зонд и считает РАЗНЫЕ голоса.
+   ⚠️ ГРОМКОСТЬ НИЗКАЯ (0.12) не для красоты: шестнадцать нот разом не должны загнать мастер-лимитер
+   (порог −6 дБ = 0.501), иначе сравнение энергии ниже мерило бы компрессию, а не полифонию. */
+const POLY_N=16, POLY_BASS=6, POLY_CH=10, POLY_SEC=0.4, POLY_VOL=0.12;
+const semi=(f,i)=>f*Math.pow(2,i/12);
+/* Только соло — для проверки ЗВУКА (энергия N нот против одной). */
+const matPoly=eng=>{ for(let i=0;i<POLY_N;i++) eng.leadOn('p'+i,semi(220,i),POLY_VOL,LD_SUB,0,0,0.05); };
+const matMono=eng=>{ eng.leadOn('p0',semi(220,0),POLY_VOL,LD_SUB,0,0,0.05); };
+/* Все три пула — для подсчёта РАЗНЫХ голосов. */
+const matPolyAll=eng=>{
+  matPoly(eng);
+  for(let i=0;i<POLY_BASS;i++) eng.bassOn('b'+i,semi(55,i),POLY_VOL,0,0.05);
+  for(let i=0;i<POLY_CH;i++) eng.chordOn('c'+i,[semi(220,i),semi(277.18,i),semi(329.63,i)],POLY_VOL,CH_INS,0,0.05);
+};
+/* СКОЛЬКО РАЗНЫХ ГОЛОСОВ держат владельцы. ⚠️ chordHold[owner] — МАССИВ голосов (по ноте аккорда),
+   leadHold/bassHold — один голос: обе формы разбираем здесь, чтобы считать объекты, а не ключи. */
+function distinctVoices(hold){
+  const s=new Set();
+  for(const k in hold){ const v=hold[k]; if(Array.isArray(v)) v.forEach(x=>s.add(x)); else if(v) s.add(v); }
+  return s.size;
+}
+
 /* ⛳ ОПЫТ 1: УВЕСТИ ПОДМЕС ЦЕПИ ВЛАДЕЛЬЦА В НОЛЬ.
    Идём ПО СОСТАВУ ЦЕПИ (fxChainOf) и трогаем только те записи, у которых есть настоящий экземпляр с
    параметром «подмес».
@@ -336,6 +366,11 @@ async function renderOnce(seed, material, seconds, opts){
      (последние строки), поэтому семя, поставленное раньше, покрывает его даром. Поставь мы семя после,
      шум разошёлся бы между рендерами, а его читает почти вся ритм-секция, и факт 5 развалился бы. */
   eng.setRnd(mulberry32(seed));
+  /* ⛳ F2 — ОФЛАЙН-РАСКЛАДЧИК, ПО ЗАПРОСУ. Пока включаем его ТОЛЬКО там, где он и проверяется: прежние
+     факты (посев, опыты 1–2) меряются на живом раскладчике, чтобы их величины остались сравнимы с уже
+     записанными. ⚠️ F3, который пойдёт по настоящим событиям, включит его на ВСЕХ рендерах — иначе
+     тысячи нот схлопнутся в один голос (довод целиком — у setOffline в audio.js). */
+  if(o.offline) eng.setOffline(true);
   /* ⛳ ЧАСТОТА ДИСКРЕТИЗАЦИИ ПРИКОЛОЧЕНА К ЖИВОЙ (F0) — иначе ks-worklet, считающий длину линии из
      sampleRate, перестроился бы на центы, а буфер при воспроизведении пересэмплировался. */
   const ctx=new OfflineCtor(2, frames, rate);
@@ -383,6 +418,13 @@ const diffStr=d=> d.same ? 'совпали'
 /* ⛔ «СОВПАЛИ» ПРИ НУЛЕВОМ ПИКЕ НИЧЕГО НЕ ЗНАЧИТ — это «две тишины сошлись». Пик проверяем у КАЖДОГО
    источника, а не только у общего материала: иначе немой источник молча выдавал бы себя за пройденный. */
 const audStr=p=> p>0 ? 'пик '+(+p.toFixed(5)) : '⛔ НЕМОЙ (пик 0) — вывод недействителен';
+/* СРЕДНЕКВАДРАТИЧНОЕ — для F2. ⛳ Именно ОНО, а не пик: N некогерентных нот складываются ПО МОЩНОСТИ,
+   поэтому rms(N нот)/rms(одной) ≈ √N. Схлопнись все N в один голос — отношение упало бы к 1, потому
+   что звучала бы ровно одна нота той же громкости. Пик такого различия не показал бы. */
+function rmsOf(b){ let s=0,n=0;
+  for(let c=0;c<b.numberOfChannels;c++){ const d=b.getChannelData(c);
+    for(let i=0;i<d.length;i++){ s+=d[i]*d[i]; n++; } }
+  return n?Math.sqrt(s/n):0; }
 
 /* МЕМО. Зонд делает 19 полных постановок движка. Это раз на загрузку страницы, не больше; он
    диагностический и запускается руками.
@@ -403,7 +445,7 @@ function probe(){
 
 async function run(){
   const R={ ok:false, worklet:{live:null, offline:null}, fx:{}, buffer:{}, det:{}, seed:{}, ks:{},
-            bySource:null, mix0:null, wk:null, liveRandomIntact:null, timing:null, notes:[], error:null };
+            bySource:null, mix0:null, wk:null, poly:{}, liveRandomIntact:null, timing:null, notes:[], error:null };
   try{
     if(!(window.OfflineAudioContext||window.webkitOfflineAudioContext))
       throw new Error('OfflineAudioContext в этом браузере отсутствует');
@@ -522,6 +564,42 @@ async function run(){
     if(!R.worklet.offline)
       R.notes.push('⚠️ KS: ворклет офлайн не загружен, звучал ЗАПАСНОЙ субтрактивный щипок — этот пункт про Карплюса ничего не доказывает.');
 
+    /* ═══ ⛳ ФАКТ 8 (F2): ОФЛАЙН-РАСКЛАДЧИК — N ПЕРЕКРЫВАЮЩИХСЯ НОТ ДАЮТ N РАЗНЫХ ГОЛОСОВ ═══
+       Три рендера: «много» (для счёта голосов и энергии), «одна нота» (эталон энергии) и «много, но
+       ЖИВЫМ раскладчиком» — последний нужен, чтобы отказ было видно СВОИМИ ГЛАЗАМИ: живьём потолок 12
+       и кража, поэтому 16 нот дают меньше 16 голосов.
+       ⛳ ПРОВЕРЯЕМ И БУХГАЛТЕРИЮ, И ЗВУК. Счёт голосов берём из leadHold/bassHold/chordHold — это
+       реестр САМОГО ДВИЖКА, а не наша параллельная запись. Звук — отношение rms(16 нот)/rms(1 ноты):
+       у некогерентных нот мощности складываются, поэтому ждём ≈√16=4; схлопнись всё в один голос,
+       отношение упало бы к 1. */
+    const pOn =await renderOnce(SEED_A, matPolyAll, POLY_SEC, {offline:true});
+    const pOne=await renderOnce(SEED_A, matMono,    POLY_SEC, {offline:true});
+    const pPol=await renderOnce(SEED_A, matPoly,    POLY_SEC, {offline:true});
+    const pOff=await renderOnce(SEED_A, matPolyAll, POLY_SEC);              // тот же материал ЖИВЫМ раскладчиком — для контраста
+    const rOne=rmsOf(pOne.buf), rPol=rmsOf(pPol.buf);
+    R.poly={
+      lead:   distinctVoices(pOn.eng.leadHold),  leadWant:POLY_N,
+      bass:   distinctVoices(pOn.eng.bassHold),  bassWant:POLY_BASS,
+      chord:  distinctVoices(pOn.eng.chordHold), chordWant:POLY_CH*3,
+      leadLive:distinctVoices(pOff.eng.leadHold),                            // столько же, но живым раскладчиком
+      rms1:+(rOne.toFixed(6)), rmsN:+(rPol.toFixed(6)),
+      gain: rOne>0 ? +((rPol/rOne).toFixed(2)) : null, gainWant:+Math.sqrt(POLY_N).toFixed(2),
+      audible: rPol>0
+    };
+    R.poly.voicesOk = R.poly.lead===POLY_N && R.poly.bass===POLY_BASS && R.poly.chord===POLY_CH*3;
+    /* ⚠️ ПОРОГ 0.75·√N, А НЕ РАВЕНСТВО: ноты не идеально некогерентны (общие обертоны), плюс мастер
+       чуть поджимает. Отличить надо не «4.0 от 3.9», а ПОЛИФОНИЮ ОТ ОДНОГО ГОЛОСА — то есть ~4 от ~1,
+       и порог посередине этого разрыва с большим запасом. */
+    R.poly.audioOk = R.poly.gain!=null && R.poly.gain >= 0.75*Math.sqrt(POLY_N);
+    if(!R.poly.voicesOk)
+      R.notes.push('⛔ F2: офлайн-раскладчик НЕ выдал по голосу на ноту (соло '+R.poly.lead+'/'+POLY_N
+                   +', бас '+R.poly.bass+'/'+POLY_BASS+', аккорды '+R.poly.chord+'/'+POLY_CH*3+').');
+    if(!R.poly.audioOk)
+      R.notes.push('⛔ F2: голоса посчитались, но ЗВУКА в буфере нет — отношение rms '+R.poly.gain
+                   +' вместо ожидаемых ≈'+R.poly.gainWant+'. Ноты выдали разные голоса и всё равно не зазвучали.');
+    if(R.poly.leadLive>=POLY_N)
+      R.notes.push('⚠️ F2: ЖИВОЙ раскладчик тоже выдал '+R.poly.leadLive+' голосов на '+POLY_N+' нот — значит потолок пула не достигнут и контраст ничего не показывает.');
+
     /* ═══ ФАКТ 7 (F1): ЖИВАЯ СЛУЧАЙНОСТЬ ЦЕЛА ═══ */
     const r=[Math.random(),Math.random(),Math.random(),Math.random()];
     R.liveRandomIntact = !(r[0]===r[1] && r[1]===r[2] && r[2]===r[3]);
@@ -537,7 +615,8 @@ async function run(){
 
     R.ok = R.fx.ownContext && R.buffer.length===m1.frames && R.buffer.rateMatchesLive && peakMix>0
            && dMix.same && R.seed.sameSeedIdentical && R.seed.otherSeedDiffers && R.seed.audible
-           && R.liveRandomIntact;
+           && R.liveRandomIntact
+           && R.poly.voicesOk && R.poly.audioOk;   // F2
   }catch(e){
     R.error=(e&&e.message)?e.message:String(e);
     R.notes.push('⛔ ЗОНД УПАЛ: '+R.error);
@@ -592,6 +671,18 @@ function print(R){
       console.log('      ⚠️ что теряется без ворклета: семь KS-тембров (индексы 16..22 — Струна/Ситар/Уд/'
                   +'Кото/Сантур/Гитара/Пиццикато) заменяются субтрактивным щипком buildKSFallback');
     }
+  }
+  if(R.poly&&R.poly.leadWant){
+    console.log('  ⛳ ФАКТ 8 (F2) — ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ:');
+    console.log('      РАЗНЫХ голосов за один синхронный проход: соло '+R.poly.lead+'/'+R.poly.leadWant
+                +'  ·  бас '+R.poly.bass+'/'+R.poly.bassWant+'  ·  аккорды '+R.poly.chord+'/'+R.poly.chordWant
+                +'   → '+y(R.poly.voicesOk));
+    console.log('      для контраста, ЖИВОЙ раскладчик на том же материале: соло '+R.poly.leadLive
+                +'/'+R.poly.leadWant+' (потолок пула и кража — так и должно быть живьём)');
+    console.log('      ЗВУК: rms('+R.poly.leadWant+' нот)/rms(1 ноты) = '+R.poly.gain
+                +'   (ждём ≈'+R.poly.gainWant+' = √N; схлопнись всё в один голос — было бы ≈1)   → '+y(R.poly.audioOk));
+    console.log('      ⛳ офлайн НЕ КРАДЁТ: пул растёт по требованию, поэтому замороженная дорожка может');
+    console.log('        зазвучать ПОЛНЕЕ живого исполнения — это правильно, живьём терялось из-за железа');
   }
   console.log('  7. ЖИВАЯ СЛУЧАЙНОСТЬ ЦЕЛА: '+y(R.liveRandomIntact)+'   (Math.random не подменён глобально)');
   if(R.timing){

@@ -152,6 +152,56 @@ let rnd=Math.random;
    копии модуля вызывающих нет и быть не должно. */
 function setRnd(fn){ rnd = fn || Math.random; }
 
+/* ═══ ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ — слайс F2 дуги «ЗАМОРОЗКА» ═══
+   ⛳ ЧТО ЛОМАЕТСЯ БЕЗ НЕГО, И ЭТО НЕ ДЕГРАДАЦИЯ, А ПОЛНЫЙ ОТКАЗ. Выдача голосов (leadAlloc/cvAlloc/
+   bvAlloc) — автомат ПО СТЕННЫМ ЧАСАМ: «свободен ли голос ПРЯМО СЕЙЧАС». Офлайн-рендер расставляет
+   тысячи нот ЗА ОДИН СИНХРОННЫЙ ПРОХОД, и каждое отпускание освобождает голос НЕМЕДЛЕННО — ещё до
+   того, как расписана вторая нота. К моменту второй ноты пул выглядит пустым, и она берёт тот же
+   нулевой голос. Итог: один осциллятор, перестроенный тысячу раз, и тишина на месте всех остальных
+   нот. Бьёт одинаково по соло, аккордам и басу.
+   ⚠️ ЭТО МЕСТО БЫЛО НАЗВАНО ЗАРАНЕЕ — см. шапку leadOn: «v.tOn становится БУДУЩИМ временем, если
+   передать when… она по построению живёт по стенным часам — трогать её в этом слайсе ЗАПРЕЩЕНО,
+   решается она в ОФЛАЙН-РАСКЛАДЧИКЕ». Вот он.
+
+   ⛳ ЗАКОН ОФЛАЙНА: ГОЛОС ЗАНЯТ НЕ «ПОКА ЕГО НЕ ОТПУСТИЛИ», А ПОКА ОН ЗВУЧИТ.
+   Каждый голос несёт `freeAt` — момент, РАНЬШЕ которого его переиспользовать нельзя. Атака ставит
+   Infinity (занят до отпускания), отпускание — `t + rel·RELEASE_TAILS`.
+   ⚠️ RELEASE_TAILS=7, И ЭТО НЕ КРУГЛОЕ ЧИСЛО ДЛЯ УДОБСТВА. Релиз — это setTargetAtTime, то есть
+   ЭКСПОНЕНЦИАЛЬНОЕ ПРИБЛИЖЕНИЕ: нуля он не достигает никогда, и «дождаться конца» буквально
+   невозможно. Берём тот же порог, которым в этом же файле меряется конец хвоста реверба — СПАД НА
+   60 дБ (RT60, см. REV_A.decay): e^−k = 0.001 ⇒ k = ln 1000 ≈ 6.91, округляем до 7. Остаток −60 дБ
+   лежит ниже всего, что слышно на фоне новой атаки в том же голосе.
+   ⚠️ ЦЕНА НАЗВАНА: у «Пада тёплого» rel = 2.5 с, значит голос числится занятым 17.5 с после снятия
+   пальца. Офлайн это платится ТОЛЬКО числом голосов (узлы, не время) — дедлайна у рендера нет.
+
+   ⛳ КРАЖУ ОФЛАЙН НЕ ПЕРЕИЗОБРЕТАЕМ, А ОТМЕНЯЕМ. Потолки пула (LEAD_POOL_N/KS, CHORD_POOL_N,
+   BASS_POOL_N) стоят потому, что столько тянет ТЕЛЕФОН на 60 кадрах в секунду. У рендера дедлайна
+   нет, поэтому пул РАСТЁТ ПО ТРЕБОВАНИЮ: нет свободного к моменту t — заводим ещё один. Число
+   голосов само сходится к РЕАЛЬНОЙ одновременности дорожки, и красть становится не у кого.
+   ⛳ И ЭТО ВАЖНО МУЗЫКАЛЬНО, А НЕ ТОЛЬКО ТЕХНИЧЕСКИ: кража офлайн МОЛЧА ВЫБРОСИЛА БЫ НОТЫ, которые
+   человек действительно сыграл. Замороженная дорожка обязана сохранить ВСЁ — и она законно может
+   зазвучать ПОЛНЕЕ, чем звучало живьём, если живьём пул переполнялся. ⛔ Это правильно, а не баг:
+   живьём терялось из-за железа, а не по замыслу.
+   ⚠️ ПРЕДВЫЧИСЛЯТЬ ДЛИНЫ НОТ ОТДЕЛЬНЫМ ПРОХОДОМ НЕ ПОНАДОБИЛОСЬ, и это сознательно: рост по
+   требованию даёт ТО ЖЕ число голосов (максимум одновременности), не зная будущего. ⛔ Поэтому здесь
+   НЕТ и не должно появиться второй формулы спаривания leadOn↔leadOff: единственная живёт в
+   songNotes (recorder.js), и когда F3 пойдёт по настоящим событиям, пары он возьмёт ТАМ.
+
+   ⛳ ПРАВИЛО #3 ЦЕЛО: `freeAt` — ЧИСТАЯ БУХГАЛТЕРИЯ. Ни один осциллятор здесь не останавливается и не
+   разбирается; голос по-прежнему только гасится гейтом и живёт до конца контекста. «Занят, пока не
+   отзвучал» — это про то, кому его ВЫДАВАТЬ, а не про то, что с ним делают.
+   ⛳ ПРАВИЛО #15 — ОПОРА ВСЕГО: явное время у leadOn/leadSet/leadOff/leadCancel/scheduleBend,
+   chordOn/chordGlide/chordOff, bassOn/bassSet/bassOff, drumHit, droneOn/droneOff. ⚠️ НИ ОДНОЙ новой
+   сигнатуры этот слайс не потребовал — всё уже принимает `when` со слайса S2.
+   ⛔ ЖИВОЙ ПУТЬ НЕ ТРОНУТ: при offline=false каждая ветка ниже — прежняя, дословно (та же кража с
+   предпочтением отпущенных, то же сродство к голосу с уже построенным банком, тот же 20мс-глайд при
+   смене ноты под пальцем). Флаг ставит только render.js и только у СВОЕЙ копии модуля. */
+let offline=false;
+const RELEASE_TAILS=7;                 // сколько постоянных времени релиза считать «ещё звучит» (−60 дБ, см. довод выше)
+function setOffline(v){ offline=!!v; }
+/* Момент, с которого голос снова свободен: живьём поле не читается вовсе. */
+const freeAfter=(t,tc)=> t + tc*RELEASE_TAILS;
+
 function makeSatCurve(k=4,n=1024){ const c=new Float32Array(n);
   for(let i=0;i<n;i++){const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x);} return c; }
 /* ЖЁСТКАЯ кривая искажения — ДРУГОЙ ХАРАКТЕР, не «больше того же»: резкий клип (k высокий) + заострение
@@ -1238,29 +1288,43 @@ const briToHz=bri=>{ const d=Math.max(0,Math.min(1,bri||0)); return CHORD_LP_MAX
    тогда дралась бы с запланированной рампой атаки (в окне ft), и тембр навсегда сцепился бы с
    выразительностью. БУДУЩЕЙ СЕССИИ: не «упрощать» f и fb в один фильтр. Порядок o1/o2 → f (атака) → fb
    (яркость) → g (гейт громкости) → dest. */
+/* ОДИН аккордовый голос. ⚠️ Вынесен из тела цикла БЕЗ единой правки порядка создания узлов — это
+   тот же код, просто названный: офлайн-раскладчику (F2) нужно уметь завести ОДИН голос сверх пула,
+   когда все заняты. Живьём поведение прежнее: buildChordPool зовёт его CHORD_POOL_N раз. */
+function newChordVoice(dest){
+  const o1=AC.createOscillator(), o2=AC.createOscillator();
+  const g1=AC.createGain(), g2=AC.createGain();
+  const f=AC.createBiquadFilter(), fb=AC.createBiquadFilter(), g=AC.createGain();
+  o1.type='sawtooth'; o2.type='sawtooth';
+  f.type='lowpass'; f.frequency.value=1500;                 // f — огибающая атаки (тембр)
+  fb.type='lowpass'; fb.frequency.value=CHORD_LP_MAX;       // fb — непрерывная яркость (выразительность); дефолт открыт → нейтраль
+  g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
+  o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(dest);
+  o1.start(); o2.start();
+  const v={o1,o2,g1,g2,f,fb,g,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  cv.push(v); return v;
+}
 function buildChordPool(dest, n=CHORD_POOL_N){
-  for(let i=0;i<n;i++){
-    const o1=AC.createOscillator(), o2=AC.createOscillator();
-    const g1=AC.createGain(), g2=AC.createGain();
-    const f=AC.createBiquadFilter(), fb=AC.createBiquadFilter(), g=AC.createGain();
-    o1.type='sawtooth'; o2.type='sawtooth';
-    f.type='lowpass'; f.frequency.value=1500;                 // f — огибающая атаки (тембр)
-    fb.type='lowpass'; fb.frequency.value=CHORD_LP_MAX;       // fb — непрерывная яркость (выразительность); дефолт открыт → нейтраль
-    g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
-    o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(dest);
-    o1.start(); o2.start();
-    cv.push({o1,o2,g1,g2,f,fb,g,owner:null,ins:null,tOn:0,lvl:0});
-  }
+  for(let i=0;i<n;i++) newChordVoice(dest);
 }
 /* when — ЯВНОЕ время планирования (опережение лупера). По умолчанию AC.currentTime → живые вызовы
    БАЙТ-В-БАЙТ. Все внутренние setValueAtTime/setTargetAtTime идут на t=when, поэтому голос стартует
    ровно тогда, когда надо, а не «когда добежал кадр». */
 function cvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
+  const tc=hard?0.02:(v.ins?v.ins.rel:0.3);
   v.g.gain.cancelScheduledValues(t);
-  v.g.gain.setTargetAtTime(0,t,hard?0.02:(v.ins?v.ins.rel:0.3));
+  v.g.gain.setTargetAtTime(0,t,tc);
   v.owner=null;
+  if(offline) v.freeAt=freeAfter(t,tc);   // F2: голос звучит хвостом ещё tc·RELEASE_TAILS — раньше не выдавать
 }
-function cvAlloc(when){ let v=cv.find(v=>!v.owner);
+function cvAlloc(when){
+  /* F2 — ОФЛАЙН: свободен тот, чей хвост уже отзвучал К МОМЕНТУ t, а не «сейчас». Нет такого — заводим
+     новый голос: офлайн не крадёт, иначе аккорды молча теряли бы ноты (довод — у setOffline). */
+  if(offline){ const t=when!=null?when:AC.currentTime;
+    let v=cv.find(x=>x.freeAt<=t);
+    if(!v) v=newChordVoice(chordBus);
+    v.freeAt=Infinity; return v; }
+  let v=cv.find(v=>!v.owner);
   if(!v){ v=cv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; cvRelease(v,true,when);   // кража: снять голос со старого владельца на ТО ЖЕ время
     if(o&&chordHold[o]){ const a=chordHold[o].filter(x=>x!==v); a.length?chordHold[o]=a:delete chordHold[o]; } }
   return v;
@@ -1684,7 +1748,7 @@ function newLeadVoice(){
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0};
+  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
@@ -1744,8 +1808,15 @@ const leadCap=ins=> ins>=LEAD_KS_FROM ? LEAD_POOL_KS : LEAD_POOL_N;   // KS до
    каждой атаке) → любой свободный → новый (лениво, пока не упёрлись в потолок) → КРАЖА.
    Красть начинаем с ОТПУЩЕННЫХ голосов (у них лишь хвост), и только потом с зажатых: у мелодии
    оборванная нота слышна куда сильнее, чем у аккорда (там cvAlloc просто берёт самый старый). */
-function leadAlloc(owner,ins){
-  if(leadHold[owner])return leadHold[owner];
+function leadAlloc(owner,ins,when){
+  if(leadHold[owner])return leadHold[owner];   // свой голос — ведение ноты, не переаллокация (одинаково живьём и офлайн)
+  /* F2 — ОФЛАЙН: занятость по ЗВУЧАНИЮ (freeAt), потолка нет, кражи нет. Сродство к голосу с уже
+     построенным банком СОХРАНЕНО — оно экономит стройку банка и на звук не влияет.
+     ⚠️ `when` живьём не передаётся и не читается: ветка ниже — прежняя, дословно. */
+  if(offline){ const t=when!=null?when:AC.currentTime;
+    let v=lv.find(x=>x.freeAt<=t&&x.banks[ins]) || lv.find(x=>x.freeAt<=t);
+    if(!v) v=newLeadVoice();
+    v.owner=owner; v.freeAt=Infinity; leadHold[owner]=v; return v; }
   const cap=leadCap(ins);
   let v=lv.find(x=>!x.owner&&x.banks[ins]) || lv.find(x=>!x.owner);
   if(!v&&lv.length<cap) v=newLeadVoice();
@@ -1762,9 +1833,11 @@ function leadAlloc(owner,ins){
    то, что ещё звучит. ⚠️ O-1: dlySend/revSend из этого списка ушли вместе с самими узлами. */
 function leadRelease(v,hard,when){
   const t=when!=null?when:AC.currentTime;   // when — явное время (S2), как у cvRelease/bvRelease; живые вызовы его не передают → «сейчас», байт-в-байт
+  const tc=hard?0.02:LEAD_INSTR[v.ins<0?leadIdx:v.ins].rel;
   v.env.gain.cancelScheduledValues(t);
-  v.env.gain.setTargetAtTime(0,t,hard?0.02:LEAD_INSTR[v.ins<0?leadIdx:v.ins].rel);
+  v.env.gain.setTargetAtTime(0,t,tc);
   v.on=false; v.owner=null;
+  if(offline) v.freeAt=freeAfter(t,tc);   // F2: хвост релиза ещё звучит — голос занят до tc·RELEASE_TAILS
 }
 /* Атака/ведение ноты владельца. Зовётся КАЖДЫЙ КАДР зажатой рукой (как и раньше): частота и громкость
    едут всегда, а сама атака — один раз (гейт v.on, бывший noteOnFlag). Порядок и постоянные времени
@@ -1780,7 +1853,11 @@ function leadRelease(v,hard,when){
    «самому старому»), и она по построению живёт по стенным часам — трогать её в этом слайсе ЗАПРЕЩЕНО,
    решается она в офлайн-раскладчике. Пока when никто не передаёт, вопрос не возникает. */
 function leadOn(owner,freq,vol,ins,deg,oct,when){
-  const v=leadAlloc(owner,ins), t=when!=null?when:AC.currentTime, b=leadVoiceBank(v,ins,t);
+  /* ⚠️ `when` уходит в leadAlloc ТРЕТЬИМ аргументом, а порядок вычислений НЕ ТРОНУТ: живьём when
+     равен undefined, ветка offline не берётся, и AC.currentTime по-прежнему читается ПОСЛЕ выдачи
+     голоса — переставь мы это местами, живой путь перестал бы быть байт-в-байт (чтение часов могло
+     бы попасть в другой квант рендера). */
+  const v=leadAlloc(owner,ins,when), t=when!=null?when:AC.currentTime, b=leadVoiceBank(v,ins,t);
   /* fresh СНИМАЕМ ДО применения эффектов и ДО гейта `if(v.on)return` ниже: этот гейт и ЕСТЬ граница
      «атака / уже звучит», второй такой границы заводить не надо. leadOn зовётся КАЖДЫЙ КАДР зажатой
      рукой — там fresh=false, и величины подъезжают плавно, как и должны при ведении. */
@@ -1839,8 +1916,8 @@ function leadCancel(owner,when){ const v=leadHold[owner]; if(!v)return; const b=
   if(b&&b.cancel)b.cancel(when!=null?when:AC.currentTime); }
 /* --- БАС: пул моно-голосов (один на слой). Тембр печётся НА АТАКЕ по слою (как аккорд),
    а не глобально — записанный слой сохраняет свой инструмент (§3.4, как строй/септаккорд). --- */
-function buildBassPool(dest){
-  for(let i=0;i<BASS_POOL_N;i++){
+function buildBassPool(dest, n=BASS_POOL_N){   // n — только для F2 (дорастить пул офлайн на один голос); живьём вызов прежний, без аргумента
+  for(let i=0;i<n;i++){
     const o1=AC.createOscillator(), o2=AC.createOscillator();
     const g1=AC.createGain(), g2=AC.createGain();
     const lp=AC.createBiquadFilter(), env=AC.createGain(), vol=AC.createGain();
@@ -1852,15 +1929,29 @@ function buildBassPool(dest){
     env.gain.value=0; vol.gain.value=0.5;
     o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
     o1.start(); o2.start();
-    bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false});
+    bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false,freeAt:0});   // freeAt — только для offline (F2); живьём не читается
   }
 }
+/* ОДИН басовый голос сверх пула — нужен ТОЛЬКО офлайн-раскладчику (F2), когда все заняты своими
+   хвостами. ⚠️ Зовёт тот же buildBassPool с n=1, чтобы не заводить второй копии проводки: порядок
+   создания узлов обязан совпадать с пуловым, иначе два одинаковых по смыслу голоса звучали бы разно. */
+const newBassVoice=dest=>{ buildBassPool(dest,1); return bv[bv.length-1]; };
 function bvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
+  const tc=hard?0.02:(v.ins?v.ins.rel:0.2);
   v.env.gain.cancelScheduledValues(t);
-  v.env.gain.setTargetAtTime(0,t,hard?0.02:(v.ins?v.ins.rel:0.2));
+  v.env.gain.setTargetAtTime(0,t,tc);
   v.owner=null; v.on=false;
+  if(offline) v.freeAt=freeAfter(t,tc);   // F2: хвост релиза ещё звучит — голос занят до tc·RELEASE_TAILS
 }
-function bvAlloc(when){ let v=bv.find(v=>!v.owner);
+function bvAlloc(when){
+  /* F2 — ОФЛАЙН: занятость по ЗВУЧАНИЮ, рост по требованию, кражи нет (довод — у setOffline).
+     ⚠️ Бас живьём МОНО НА СЛОЙ, и офлайн это не меняется: владельцев по-прежнему различает ключ
+     ('bass', 'bassloop:N'), просто каждому достаётся свой голос вместо отобранного у соседа. */
+  if(offline){ const t=when!=null?when:AC.currentTime;
+    let v=bv.find(x=>x.freeAt<=t);
+    if(!v) v=newBassVoice(bassBus);
+    v.freeAt=Infinity; return v; }
+  let v=bv.find(v=>!v.owner);
   if(!v){ v=bv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; bvRelease(v,true,when);   // кража: снять голос со старого владельца
     if(o&&bassHold[o]===v)delete bassHold[o]; }
   return v;
@@ -2072,6 +2163,7 @@ export {
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел
+  setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно
   setRnd,    // F1: ПОДМЕНИТЬ ИСТОЧНИК СЛУЧАЙНОСТИ В ЭТОЙ КОПИИ МОДУЛЯ. ⛔ У ЖИВОЙ копии вызывающих нет и не должно быть — зовёт его только render.js и только у своей ('./audio.js?render…'). Экспортирован потому, что иначе до офлайн-копии не дотянуться; глобальный патч Math.random убил бы гуманизацию ЖИВОЙ игры (довод целиком — у самого rnd)
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
 };
