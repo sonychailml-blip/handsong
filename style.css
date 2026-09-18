@@ -156,6 +156,11 @@
   #rollBar .tab.act{opacity:1; border-color:var(--accent); color:var(--accent);}
   /* Режим вставки — та же «включённая» раскраска, что у 🔄/⛶/🎵 в баре: оранжевая рамка и текст. */
   #rollBar button.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  /* ЗАМОРОЗКА (F5): .act — свежая (играет буфер), .warn — УСТАРЕЛА (правили после заморозки; звучит
+     своими событиями). Оранжевый отличается от акцентного и в оттенках серого — светлее его. */
+  #rollBar button.warn{border-color:#f5a524; color:#f5a524; font-weight:600;}
+  #rollFrzState{font-size:11px; opacity:.75; white-space:nowrap;}
+  #rollFrzState.warn{color:#f5a524; opacity:1;}
   #rollBar button:disabled{opacity:.4;}
   /* Текущая сетка привязки — подпись, а не кнопка: её не нажимают, она объясняет, куда встанет палец. */
   #rollSnap{flex:0 0 auto; font-size:var(--fs-hint); color:var(--dim); padding:0 2px; white-space:nowrap;}

@@ -28,7 +28,8 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,
-         autChainOf, autChainAdd, autChainRemove, autChainMove, captureInfoOf } from './recorder.js';   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         autChainOf, autChainAdd, autChainRemove, autChainMove, captureInfoOf,
+         freezeState, unfreezeLayer, freezePinCaptures } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -364,7 +365,7 @@ const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTabsEl=$('rollTabs'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
-      rollScaleBtn=$('rollScale');
+      rollScaleBtn=$('rollScale'), rollFrzBtn=$('rollFrz'), rollFrzStateEl=$('rollFrzState');   // F5: заморозка — в баре РЕДАКТОРА (на строке полосы лупера её ставить некуда: там уже три кнопки в 16 px)
 const ROLL_ROLES=['dr','bs','ld','ch'];          // порядок вкладок: те, что правятся сегодня, — первыми
 const ROLL_EDITABLE=['dr','bs'];                 // S5.5: бас — первая ВЫСОТНАЯ роль; соло и аккорды ждут своих слайсов
 const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
@@ -479,6 +480,17 @@ function updRollBtns(){
   rollDelBtn.title = t(rollAutSel ? 'aut.ptDelTitle' : 'roll.delTitle');
   rollUndoBtn.disabled = ro || !editCanUndo();
   rollRedoBtn.disabled = ro || !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
+  /* ⛳ ЗАМОРОЗКА (F5). Три состояния, различимые с одного взгляда: ❄ синяя — свежая, ❄ оранжевая —
+     устарела (правили после заморозки; звучит СВОИМИ СОБЫТИЯМИ), серая — не заморожена.
+     ⛔ Правка НЕ ЗАПРЕЩЕНА: человек затем и правит, чтобы переморозить. Поэтому кнопка при устаревании
+     не блокируется, а меняет подпись на «Переморозить». */
+  const fst=frzBusy?'busy':freezeState(editLayer());
+  rollFrzBtn.disabled = frzBusy;   // ⛳ ПОДЛОЖКУ МОРОЗИТЬ МОЖНО: `ro` запрещает ПРАВКУ, а заморозка ничего не правит — это режим воспроизведения
+  rollFrzBtn.classList.toggle('act',  fst==='fresh');
+  rollFrzBtn.classList.toggle('warn', fst==='stale');
+  rollFrzBtn.title = t(fst==='none'?'frz.freeze':fst==='stale'?'frz.refreeze':'frz.unfreeze');
+  rollFrzStateEl.textContent = fst==='fresh'?'❄ '+t('frz.frozen') : fst==='stale'?'❄ '+t('frz.stale') : '';
+  rollFrzStateEl.className = fst==='stale'?'warn':'';
   const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
   const hid = !s.free && !s.drawn;
   rollSnapEl.textContent='⌗ '+lbl+(hid?' '+t('roll.snapHidden'):'');
@@ -589,7 +601,40 @@ rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
   if(ok) setRollSel(null);
   updRollBtns(); };
 rollUndoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editUndo()){ setRollSel(null); setRollAutSel(null); } renderAutCtl(); updRollBtns(); };   // O-4: ход мог создать или снять точку — выделение и список адресов перестраиваем
-rollRedoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editRedo()){ setRollSel(null); setRollAutSel(null); } renderAutCtl(); updRollBtns(); };   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
+rollRedoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editRedo()){ setRollSel(null); setRollAutSel(null); } renderAutCtl(); updRollBtns(); };
+/* ═══════════ ⛳ ЗАМОРОЗКА ДОРОЖКИ (F5) ═══════════
+   ⛳ ОДНА КНОПКА НА ТРИ ДЕЙСТВИЯ, ПО СОСТОЯНИЮ: не заморожена → заморозить; устарела → ПЕРЕМОРОЗИТЬ;
+   свежая → разморозить. Так у человека одна ❄, а не три кнопки, из которых две всегда мертвы.
+   ⛳ РЕНДЕРНЫЙ МОДУЛЬ ТЯНЕМ ЛЕНИВО, ПРЯМО ЗДЕСЬ. Он поднимает ВТОРУЮ КОПИЮ ДВИЖКА (десятки узлов), и
+   платить за неё должен только тот, кто нажал ❄. ⛔ Статическим импортом его тянуть нельзя: он попал
+   бы в стартовую загрузку всем, включая тех, кто заморозкой не пользуется.
+   ⚠️ ЖДАТЬ ПРИДЁТСЯ ПО-НАСТОЯЩЕМУ (около 1.5× реального времени на плотной дорожке), поэтому:
+     • прогресс НАСТОЯЩИЙ там, где браузер даёт suspend у офлайн-контекста, и ЧЕСТНО НЕОПРЕДЕЛЁННЫЙ,
+       где не даёт. ⛔ Выдуманных процентов не показываем;
+     • кнопка на время рендера ВЫКЛЮЧЕНА, а всё остальное приложение работает как обычно — можно
+       играть, можно закрыть редактор. ⚠️ ОТМЕНИТЬ РЕНДЕР НЕЛЬЗЯ: у startRendering нет прерывания, и
+       перестань мы ждать промис, процессор всё равно доработает до конца. Кнопки «отмена» поэтому НЕТ —
+       она была бы враньём; повторное нажатие ❄ во время ожидания просто отклоняется с этой надписью. */
+let frzBusy=false, frzNoticeShown=false;
+async function onFreeze(){
+  /* ⛔ БЕЗ rollRefuseRO: заморозка — НЕ ПРАВКА. Подложка read-only для редактирования, но её буфер
+     ничем не хуже любого другого, а снимется он вместе с ней (clearJam → lanePrune → freezeDrop). */
+  if(frzBusy){ showCamMsg(t('frz.noCancel')); return; }
+  const ly=editLayer(); if(ly==null) return;
+  if(freezeState(ly)==='fresh'){ unfreezeLayer(ly); showCamMsg(t('frz.dropped')); updRollBtns(); return; }
+  /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ. Дорожка со вставленными в редакторе нотами шла ЗА ЖИВОЙ ЦЕПЬЮ; заморозка
+     ПРИКАЛАЧИВАЕТ её к цепи в том виде, как та стоит сейчас. Звук не меняется, но живые ручки до неё
+     больше не дотянутся — до сих пор это происходило МОЛЧА. Говорим один раз за сессию. */
+  if(freezePinCaptures(ly) && !frzNoticeShown){ frzNoticeShown=true; showCamMsg(t('frz.pinned')); }
+  frzBusy=true; updRollBtns(); showCamMsg(t('frz.working'));
+  try{
+    const R=await import('./render.js');
+    await R.freeze(ly, { onProgress:p=>{ showCamMsg(p==null?t('frz.working'):t('frz.workingPct',{pct:Math.round(p*100)})); } });
+    showCamMsg(t('frz.done'));
+  }catch(e){ showCamMsg(t('frz.failed',{msg:(e&&e.message)?e.message:String(e)})); }
+  finally{ frzBusy=false; updRollBtns(); }
+}
+rollFrzBtn.onclick=onFreeze;   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
 /* ⏮ — бегунок в начало. ТОТ ЖЕ seekTo, что и тап по линейке: перемотка одна на все входы (она сама решает,
    идёт ли транспорт, гасит голоса дорожек и сбрасывает курсоры). Второго пути перемотки не заводим. */
 rollHomeBtn.onclick=()=>seekTo(0);

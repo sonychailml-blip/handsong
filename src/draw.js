@@ -10,7 +10,7 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
-         laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
+         laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
          songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
@@ -672,6 +672,22 @@ function drawLooper(){
       ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,bw-2,rowH-3);
       ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x0+8,mid,3.5,0,7); ctx.fill();
       ctx.fillStyle='#ff6b6f'; ctx.font='600 10px system-ui'; ctx.textAlign='right'; ctx.fillText('L'+(lid+1),x0-4,mid);
+    }
+    /* ⛳ ИНДИКАТОР ЗАМОРОЗКИ (F5) — ТОЛЬКО ЗНАЧОК, без кнопки: на строке уже три органа управления и
+       подпись в шестнадцати пикселях, четвёртый под палец не попал бы. Сама кнопка живёт в баре
+       РЕДАКТОРА. ⛳ Геометрия — ИЗ ТОГО ЖЕ СНИМКА loopView (правило #9): значок садится на левый край
+       дорожки, где для него есть место, и едет вместе со строкой.
+       ТРИ СОСТОЯНИЯ, РАЗЛИЧИМЫЕ С ОДНОГО ВЗГЛЯДА НА 380px: голубая ❄ — свежая (играет буфер);
+       оранжевая ❄ с точкой — УСТАРЕЛА (правили после заморозки, играет СВОИ СОБЫТИЯ); ничего — не
+       заморожена. Цвет несёт смысл сам, подпись рядом не нужна — её место занято. */
+    const fzs=freezeState(lid);
+    if(fzs!=='none'){
+      const fresh=fzs==='fresh';
+      ctx.fillStyle = fresh?'#4cc2ff':'#f5a524';
+      ctx.font='600 11px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillText('❄', x0+3, mid);
+      if(!fresh){ ctx.beginPath(); ctx.arc(x0+14,ry+5,2,0,7); ctx.fill(); }   // точка «устарело»: отличает и в оттенках серого
+      ctx.textBaseline='alphabetic';
     }
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);

@@ -927,7 +927,7 @@ async function renderTrack(layer, opt){
     if(open.drone) eng.droneOff(endSec);
 
     const tRnd0=now();
-    const buf=await ctx.startRendering();
+    const buf=await renderWithProgress(ctx, o.onProgress);
     const tRnd1=now();
 
     out={ layer, buf, startSec:PRE_SEC, endSec, tailSec,
@@ -941,6 +941,40 @@ async function renderTrack(layer, opt){
   }
   printTrack(out);
   return out;
+}
+
+/* ⛳ РЕНДЕР С ЧЕСТНЫМ ПРОГРЕССОМ (F5).
+   ⚠️ ЖДАТЬ ПРИДЁТСЯ ПО-НАСТОЯЩЕМУ: плотная соло-дорожка мерилась около 1.5× реального времени, то есть
+   пять минут музыки — больше трёх минут ожидания, а на телефоне хуже. Молчать столько нельзя.
+   ⛳ ЧЕМ МЕРИМ: `OfflineAudioContext.suspend(t)` останавливает рендер на заданной СЕКУНДЕ БУФЕРА и
+   отдаёт управление; `resume()` продолжает. Расставив N остановок, получаем НАСТОЯЩУЮ долю — не
+   выдуманную. ⛔ ФАЛЬШИВЫХ ПРОЦЕНТОВ НЕ РИСУЕМ НИКОГДА.
+   ⚠️ ПОДДЕРЖКА НЕРОВНАЯ (в части браузеров suspend у офлайн-контекста нет или бросает). Тогда
+   ДЕГРАДИРУЕМ ЧЕСТНО: сообщаем прогресс null — «идёт, доля неизвестна», — и вызывающий показывает
+   НЕОПРЕДЕЛЁННОЕ ожидание, а не полоску, которой неоткуда взяться.
+   ⛔ ОТМЕНИТЬ ЭТО НЕЛЬЗЯ, И ПРИТВОРЯТЬСЯ НЕ БУДЕМ: у startRendering нет прерывания. Даже перестав
+   ждать промис, мы не вернём процессор — работа доедет до конца. Поэтому кнопки «отмена» здесь нет:
+   она была бы враньём. */
+const PROG_STEPS=20;
+async function renderWithProgress(ctx, onProgress){
+  const total=ctx.length/ctx.sampleRate;
+  if(typeof onProgress!=='function' || typeof ctx.suspend!=='function'){
+    if(typeof onProgress==='function') onProgress(null);   // честно: «идёт, доля неизвестна»
+    return ctx.startRendering();
+  }
+  let armed=0;
+  try{
+    for(let i=1;i<PROG_STEPS;i++){
+      const at=total*i/PROG_STEPS;
+      ctx.suspend(at).then(()=>{ onProgress(i/PROG_STEPS); ctx.resume(); });
+      armed++;
+    }
+  }catch(e){ /* suspend есть, но не принял — дальше просто без долей */ }
+  if(!armed) onProgress(null);
+  const p=ctx.startRendering();
+  const buf=await p;
+  onProgress(1);
+  return buf;
 }
 
 /* ОТЧЁТ РЕНДЕРА ДОРОЖКИ. Правило #5 цело: console — не DOM.
@@ -989,4 +1023,42 @@ function maxRel(eng, evs){
   return m;
 }
 
-export { probe, renderTrack };
+/* ═══════════ ⛳ ЗАМОРОЗКА ИЗ КОНСОЛИ (слайс F4) ═══════════
+   ⛳ ЗАМОРОЗКА — РЕЖИМ ВОСПРОИЗВЕДЕНИЯ, А НЕ ПРЕОБРАЗОВАНИЕ: события НИКОГДА не выбрасываются, и
+   размораживается дорожка мгновенно и без потерь. Кнопки в этом слайсе нет — вызывают руками:
+
+       const R = await import(new URL('src/render.js', location.href).href);
+       await R.freeze(1);        // отрендерить дорожку L1 и заморозить
+       R.frozen();               // что заморожено
+       R.unfreeze(1);            // разморозить — дорожка снова играет СВОИ СОБЫТИЯ
+
+   ⚠️ ЧТО БУДЕТ, ЕСЛИ ПРАВИТЬ СОБЫТИЯ ЗАМОРОЖЕННОЙ ДОРОЖКИ. Обнаружения устаревания в этом слайсе
+   НЕТ (оно — следующий). Поэтому сегодня: буфер продолжает играть СТАРЫЙ звук, а события уже новые.
+   ⛔ Ни упасть, ни замолчать это не может — буфер ни от чего не зависит; расходится только смысл.
+   Удалили дорожку или отменили взятое до её исчезновения — буфер уходит вместе с ней (`lanePrune`),
+   потому что реестр ключуется ID ДОРОЖКИ. Разморозьте и заморозьте заново, чтобы услышать правку. */
+async function freeze(layer, opt){
+  const r=await renderTrack(layer, opt);
+  const ok=REC.freezeSet(layer, r);
+  /* eslint-disable no-console */
+  console.log(ok ? '  ❄ дорожка L'+layer+' ЗАМОРОЖЕНА: транспорт играет буфер вместо её событий'
+                 : '  ⛔ не удалось зарегистрировать заморозку (нет движка?)');
+  /* eslint-enable no-console */
+  return r;
+}
+const unfreeze=layer=>{ const ok=REC.unfreezeLayer(layer);
+  /* eslint-disable no-console */
+  console.log(ok ? '  ☀ дорожка L'+layer+' РАЗМОРОЖЕНА: снова играет свои события'
+                 : '  — дорожка L'+layer+' и не была заморожена');
+  /* eslint-enable no-console */
+  return ok; };
+const frozen=()=>{ const ls=REC.frozenLayers();
+  /* eslint-disable no-console */
+  if(!ls.length) console.log('  — заморожённых дорожек нет');
+  else for(const l of ls){ const i=REC.frozenInfo(l);
+    console.log('  ❄ L'+l+': '+i.seconds+' с (музыка до '+i.endSec+' с, хвост '+i.tailSec
+                +' с) · живых источников '+i.nodes+' · тоника '+i.pinned.tonic+' · A4 '+i.pinned.aRef+' · темп '+i.pinned.bpm); }
+  /* eslint-enable no-console */
+  return ls; };
+
+export { probe, renderTrack, freeze, unfreeze, frozen };
