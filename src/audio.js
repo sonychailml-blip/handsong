@@ -580,14 +580,14 @@ function buildFDN(inNode,outNode){
    доверять слову «фильтр». Мастер-лимитер — ПОСЛЕДНИЙ РУБЕЖ (он ту аварию и поймал), НЕ гарантия схемы.
    ⚠️ ЛИНИИ ПРИХОДЯТ АРГУМЕНТОМ (не из модульной переменной): сеттер принадлежит ЭКЗЕМПЛЯРУ эффекта.
    Кламп здесь — ЕДИНСТВЕННАЯ власть над диапазоном; min/max в дескрипторе параметра лишь СОВЕТ для UI. */
-function setRevDecay(lines,sec){ if(!AC||!lines.length)return;
-  const t=AC.currentTime, rt=Math.max(0.05,sec);
+function setRevDecay(lines,sec,when){ if(!AC||!lines.length)return;
+  const t=when!=null?when:AC.currentTime, rt=Math.max(0.05,sec);
   for(const L of lines){ const g=Math.min(REV_A.gMax, Math.pow(10,-3*L.time/rt));
     L.fb.gain.setTargetAtTime(g,t,0.05); } }
 /* ОКРАСКА ХВОСТА: cutoff демпфирующих ФНЧ во ВСЕХ петлях. Живой параметр — в отличие от IR, где тембр
    хвоста был запечён в буфер и менялся только пересборкой буфера. Линии — аргументом, см. выше. */
-function setRevTone(lines,hz){ if(!AC||!lines.length)return;
-  const t=AC.currentTime, f=Math.max(200,Math.min(18000,hz));
+function setRevTone(lines,hz,when){ if(!AC||!lines.length)return;
+  const t=when!=null?when:AC.currentTime, f=Math.max(200,Math.min(18000,hz));
   for(const L of lines) L.lp.frequency.setTargetAtTime(f,t,0.05); }
 /* ================= МОДУЛЬ ЭФФЕКТА — ПЛАСТ 1: абстракция + ТОЛЬКО реверб =================
    Модуль эффекта — то немногое, что ОБЩЕЕ у эффектов и НЕ зависит от их внутренностей:
@@ -664,7 +664,11 @@ function fxWrapParam(p){
   const c01=x=>Math.max(0,Math.min(1,x));
   p.cur=c01(fxNorm(p,p.def));
   p.getNorm=()=>p.cur;
-  p.setNorm=x=>{ p.cur=c01(x); p.set(fxDenorm(p,p.cur)); };
+  /* ⛳ when — ЯВНОЕ ВРЕМЯ (слайс F3), по умолчанию «сейчас»: та же форма, что у голосовых функций с
+     правила #15. Живьём его никто не передаёт, поэтому поведение прежнее дословно; офлайн-рендеру оно
+     нужно, чтобы ЗАПИСАННАЯ автоматика легла в ТЕ доли, в которых её крутили, а не вся в нулевую
+     секунду (у OfflineAudioContext currentTime под JS не движется). */
+  p.setNorm=(x,when)=>{ p.cur=c01(x); p.set(fxDenorm(p,p.cur),when); };
 }
 /* ЭКЗЕМПЛЯР РЕВЕРБА. Строится ПО ОДНОМУ НА РОЛЬ (см. fxInstance ниже) — оттого и «фабрика», а не
    синглтон: у каждой роли своя комната со своей длиной и окраской, иначе две роли, назвавшие один
@@ -704,14 +708,14 @@ function makeReverbFx(){
   const gate=AC.createGain();    gate.gain.value=1;       // ВКЛЮЧЕНИЕ эффекта в цепи (пишет только fxSetActive)
   fxIn.connect(send); send.connect(gate); gate.connect(inNode);   // O-1: влажная ветвь берётся ОТ ВХОДА МОДУЛЯ, а не от шины роли снаружи
   const lines=buildFDN(inNode,outNode);                   // СНАЧАЛА сеть — она рождает линии...
-  const setDecay=v=>setRevDecay(lines,v), setTone=v=>setRevTone(lines,v);
+  const setDecay=(v,w)=>setRevDecay(lines,v,w), setTone=(v,w)=>setRevTone(lines,v,w);
   setDecay(REV_A.decay); setTone(REV_A.tone);             // ...и ТОЛЬКО ПОТОМ параметры. ⚠️ ПОРЯДОК НЕСУЩИЙ:
   /* сеттеры молча выходят на пустых линиях (guard !lines.length), поэтому вызов ДО buildFDN не упал бы, а
      оставил бы обратные связи в нуле — реверба не стало бы ВООБЩЕ, без единой ошибки в консоли. */
   /* ⚠️ ЕДИНСТВЕННЫЙ ПИСАТЕЛЬ send.gain — вот этот сеттер, и свойство «ровно один писатель» (заведено в
      Пласте 3.1, чтобы играющая рука не перетирала fx-руку 60 раз в секунду) теперь держится НА КАЖДЫЙ
      ЭКЗЕМПЛЯР: узел создан здесь, наружу отдаётся только для connect, и больше его никто не пишет. */
-  const setMix=v=>{ send.gain.setTargetAtTime(v, AC.currentTime, 0.08); };
+  const setMix=(v,w)=>{ send.gain.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.08); };
   const SET={decay:setDecay, tone:setTone, mix:setMix};
   const params=REV_PARAMS.map(s=>({...s, set:SET[s.key]}));   // статика из спецификации + СВОЙ сеттер экземпляра
   for(const p of params) fxWrapParam(p);
@@ -779,9 +783,9 @@ function makeDelayFx(){
   fxIn.connect(dry); dry.connect(fxOut); out.connect(fxOut);
   fxIn.connect(send); send.connect(gate); gate.connect(line); line.connect(fb); fb.connect(line); line.connect(out);
   const SET={
-    mix: v=>{ send.gain.setTargetAtTime(v*DLY_A.send, AC.currentTime, 0.08); },   // та же постоянная, что у пер-голосового посыла (applyVoiceFx)
-    time:v=>{ line.delayTime.setTargetAtTime(v, AC.currentTime, 0.05); },          // плавно: скачок времени задержки слышен щелчком, а подъезд — как «плывущая лента»
-    fb:  v=>{ fb.gain.setTargetAtTime(v, AC.currentTime, 0.05); },
+    mix: (v,w)=>{ send.gain.setTargetAtTime(v*DLY_A.send, w!=null?w:AC.currentTime, 0.08); },   // та же постоянная, что у пер-голосового посыла (applyVoiceFx)
+    time:(v,w)=>{ line.delayTime.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.05); },          // плавно: скачок времени задержки слышен щелчком, а подъезд — как «плывущая лента»
+    fb:  (v,w)=>{ fb.gain.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.05); },
   };
   const params=DLY_PARAMS.map(s=>({...s, set:SET[s.key]}));
   for(const p of params) fxWrapParam(p);
@@ -841,11 +845,11 @@ function makeTremMixFx(){
   let depthV=0, active=true;
   /* Глубина и выключатель сходятся в ОДНОЙ формуле, поэтому «снят» и «глубина 0» — одно и то же тождество,
      и возврат в цепь восстанавливает ПРЕЖНЮЮ глубину, а не ноль (depthV не трогается). */
-  const applyDepth=()=>{ const d=(active?depthV:0)*TRMIX_A.depth, t=AC.currentTime;
+  const applyDepth=(when)=>{ const d=(active?depthV:0)*TRMIX_A.depth, t=when!=null?when:AC.currentTime;
     amp.gain.setTargetAtTime(1-d,t,0.05); dep.gain.setTargetAtTime(d,t,0.05); };
   const SET={
-    depth:v=>{ depthV=v; applyDepth(); },
-    rate: v=>{ lfo.frequency.setTargetAtTime(v,AC.currentTime,0.05); },
+    depth:(v,w)=>{ depthV=v; applyDepth(w); },
+    rate: (v,w)=>{ lfo.frequency.setTargetAtTime(v,w!=null?w:AC.currentTime,0.05); },
   };
   const params=TRMIX_PARAMS.map(s=>({...s, set:SET[s.key]}));
   for(const p of params) fxWrapParam(p);
@@ -1091,13 +1095,43 @@ function fxDefaultsOf(fxId){
    есть те, что реально встанут в путь переигровки. Голосовой (яркость аккордов) в путь не входит вовсе,
    а старые скаляры живут в соло-голосе и пер-дорожечными быть не могут — им здесь не место. */
 const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!=='voice');
-function fxPlaySet(key,fxId,pKey,v){
+/* ⛳ when (F3) — ЯВНОЕ время, по умолчанию «сейчас». Живой тик его не передаёт (поведение прежнее);
+   офлайн-рендер передаёт долю точки автоматизации, переведённую в секунды.
+   ⛔ СКАЛЯР ОФЛАЙН СЮДА НЕ ПОПАДАЕТ И НЕ ДОЛЖЕН: ветка ниже пишет `fx[fxId]` — ОБЩИЙ store state.js,
+   один на живую копию и на копию рендера. Рендер обязан отсеивать скаляры САМ (он это и делает) и
+   доносить их до голоса пер-нотно через `a.fx` события, как делает ENG.leadOn. */
+function fxPlaySet(key,fxId,pKey,v,when){
   if(!AC) return;
   if(fxIsScalar(fxId)){ if(pKey===FX_AMT) fx[fxId]=v; return; }
   const inst=fxInstance(key,fxId); if(!inst) return;
   const pp=inst.params.find(q=>q.key===pKey); if(!pp) return;
-  if(Math.abs(pp.cur-v)<1e-6) return;   // уже там: не переармируем setTargetAtTime сорок раз в секунду на неподвижной величине
-  pp.setNorm(v);
+  if(when==null && Math.abs(pp.cur-v)<1e-6) return;   // уже там: не переармируем setTargetAtTime сорок раз в секунду на неподвижной величине. ⚠️ При ЯВНОМ времени пропуск запрещён: та же величина в ДРУГОЙ момент — это другое событие расписания
+  pp.setNorm(v,when);
+}
+/* ⛳ РАЗНОРМИРОВКА ПО СПЕЦИФИКАЦИИ ЭФФЕКТА (F3): 0..1 → секунды/герцы/доля.
+   Зачем: рендеру надо посчитать ДЛИНУ ХВОСТА по ЗАХВАЧЕННОЙ цепи (длина реверба, время и повторы
+   делея), а снимок хранит величины НОРМИРОВАННЫМИ — и считать хвост надо ДО постройки графа, чтобы
+   сразу завести контекст нужной длины. Берём спецификацию из FX_FACTORY, экземпляр не нужен.
+   ⛔ Разнормировка живёт ИСКЛЮЧИТЕЛЬНО в fxDenorm (правило с 2.6) — второй копии шкалы заводить
+   нельзя, поэтому наружу отдаём готовое число, а не min/max/curve. */
+function fxDenormOf(fxId,pKey,v01){
+  const f=FX_FACTORY[fxId]; if(!f) return null;
+  const sp=f.params.find(q=>q.key===pKey); if(!sp) return null;
+  return fxDenorm(sp, Math.max(0,Math.min(1,v01)));
+}
+/* ⛳ ОФЛАЙН: СНЯТЬ ЛИМИТЕР С ПУТИ РЕНДЕРА (F3).
+   ⛔ ПОЧЕМУ НЕ createRecordingTap: тот НАМЕРЕННО стоит ПОСЛЕ лимитера — он пишет «то, что слышно».
+   У заморозки случай ПРОТИВОПОЛОЖНЫЙ: дорожка, отрендеренная в одиночку, была бы сжата в одиночку, а
+   потом сжата ВТОРОЙ раз уже в сумме микса; и наоборот, ей досталось бы не то подавление, которое
+   создают соседние дорожки. Поэтому рендер снимается с МАСТЕРА, до лимитера.
+   ⛳ ПРАВИЛО #4 ЦЕЛО: «лимитер остаётся» — про ЖИВОЙ выход, и он там стоит. Здесь речь о копии движка,
+   которая в колонки не играет вовсе. ⛔ Гейт `offline` не для красоты: без него эта функция могла бы
+   снять лимитер с живого мастера. */
+function offlineTapMaster(){
+  if(!AC||!offline||!master||!limiter) return false;
+  try{ master.disconnect(limiter); }catch(e){}
+  master.connect(AC.destination);
+  return true;
 }
 /* ⛳ ПОРЯДОК ПУТИ: сперва то, что В ЦЕПИ — В ПОРЯДКЕ ЦЕПИ; затем построенное, но ИЗ ЦЕПИ СНЯТОЕ.
    ⚠️ СНЯТЫЕ ОСТАЮТСЯ В ПУТИ НАМЕРЕННО, и это то самое «хвост ДОЗВУЧИВАЕТ, а не обрывается»: выкинь мы
@@ -1140,6 +1174,13 @@ const FX_DIP_T={};
 function fxRespliceSmooth(key){
   const out=FX_CHAIN_OUT[key];
   if(!AC||!out){ fxResplice(key); return; }                // нечего гасить (ещё не построено) — собираем молча
+  /* ⛔ ОФЛАЙН — ТОЛЬКО ПРЯМАЯ ПЕРЕСБОРКА (F3). «Мягкая» доделывает работу в setTimeout, то есть по
+     СТЕННЫМ ЧАСАМ, а офлайн-контекст идёт по своим и к моменту срабатывания может быть уже отрендерен;
+     рампу она при этом кладёт на currentTime=0, то есть В САМОЕ НАЧАЛО БУФЕРА. Гасить там нечего и
+     некому: рендер собирает граф ДО того, как пойдёт хоть один сэмпл, поэтому провал не нужен вовсе.
+     ⚠️ Без этой ветки любой эффект, построенный ЛЕНИВО уже после регистрации концов (снимок цепи с
+     эффектом, которого в живой цепи нет), вносил бы в рендер стенные часы. */
+  if(offline){ fxResplice(key); return; }
   if(FX_DIP_T[key]) return;                                // провал уже идёт — его пересборка подхватит и эту правку
   const t=AC.currentTime;
   out.gain.cancelScheduledValues(t);
@@ -1386,6 +1427,34 @@ function chordOff(owner,when){ const vs=chordHold[owner]; if(!vs)return;
    (startRendering одноразов), значит F3 обязан добавить сюда явную очистку этих таблиц. */
 async function initAudio(mkCtx){
   AC = mkCtx ? mkCtx() : new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+  /* ⛳ СБРОС МОДУЛЬНЫХ ТАБЛИЦ (слайс F3, долг с F0) — ЧТОБЫ ОДНУ КОПИЮ МОДУЛЯ МОЖНО БЫЛО
+     ИНИЦИАЛИЗИРОВАТЬ НЕСКОЛЬКО РАЗ, КАЖДЫЙ РАЗ ПРОТИВ СВЕЖЕГО КОНТЕКСТА.
+     ⚠️ ЗАЧЕМ. У OfflineAudioContext startRendering ОДНОРАЗОВ, значит каждому рендеру нужен свой
+     контекст. Без этого сброса второй initAudio на той же копии: (1) НАКОПИЛ бы ещё CHORD_POOL_N
+     голосов в cv (buildChordPool ПУШИТ), (2) вернул бы из FX_INST экземпляры эффектов, чьи узлы
+     принадлежат УЖЕ МЁРТВОМУ контексту, — и первая же пересборка пути упала бы на connect между
+     контекстами. Обходной путь «своя копия модуля на каждый рендер» утекал ЦЕЛЫМ разобранным
+     движком на каждую заморозку: модульная запись не выгружается никогда.
+     ⛳ ЖИВЬЁ ЭТО NO-OP, И ЭТО ПРОВЕРЯЕМО: initAudio на живом пути зовётся РОВНО ОДИН раз (main.js
+     под флагом `started`, demo.js под `if(!AC)`), поэтому к этой строке все таблицы ещё пусты —
+     сбрасывать нечего, и ни одно значение не меняется.
+     ⛔ ЭТО НЕ РАЗБОРКА УЗЛОВ И НЕ НАРУШЕНИЕ ПРАВИЛА #3: мы не останавливаем ни одного осциллятора.
+     Старый контекст со всем своим графом просто становится недостижимым и уходит сборщику целиком —
+     правило #3 про то, что внутри ЖИВОГО контекста узлы не выключают, а не про жизнь контекста.
+     ⚠️ lv/leadHold объявлены НИЖЕ по файлу — к моменту ВЫЗОВА функции модуль вычислен целиком, TDZ
+     не наступает (тем же приёмом здесь уже читается leadSum). */
+  cv.length=0; bv.length=0; lv.length=0; banks.length=0;
+  for(const k in chordHold) delete chordHold[k];
+  for(const k in bassHold)  delete bassHold[k];
+  for(const k in leadHold)  delete leadHold[k];
+  for(const k in FX_INST)        delete FX_INST[k];
+  for(const k in FX_CHAIN_HEAD)  delete FX_CHAIN_HEAD[k];
+  for(const k in FX_CHAIN_OUT)   delete FX_CHAIN_OUT[k];
+  for(const k in FX_CHAIN_LINKS) delete FX_CHAIN_LINKS[k];
+  for(const k in FX_PLAY_PATH)   delete FX_PLAY_PATH[k];
+  for(const k in FX_DIP_T){ if(FX_DIP_T[k]) clearTimeout(FX_DIP_T[k]); delete FX_DIP_T[k]; }   // ждущая пересборка старого контекста нам не нужна и сработать не должна
+  FX_AIM.clear();
+  bldHum=null; bldVib=null;
   /* KS-ворклет грузим В НАЧАЛЕ (по-прежнему внутри клика — правило #1 цело), ДО buildLeadBanks,
      чтобы banks[] строился синхронно и не разъехался с LEAD_INSTR. Провал загрузки — не падаем:
      ставим запасные субтрактивные щипки в слоты Струна/Ситар. Путь — от корня страницы (не ES-import). */
@@ -2163,6 +2232,7 @@ export {
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел
+  fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
   setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно
   setRnd,    // F1: ПОДМЕНИТЬ ИСТОЧНИК СЛУЧАЙНОСТИ В ЭТОЙ КОПИИ МОДУЛЯ. ⛔ У ЖИВОЙ копии вызывающих нет и не должно быть — зовёт его только render.js и только у своей ('./audio.js?render…'). Экспортирован потому, что иначе до офлайн-копии не дотянуться; глобальный патч Math.random убил бы гуманизацию ЖИВОЙ игры (довод целиком — у самого rnd)
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js

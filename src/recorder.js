@@ -7,6 +7,7 @@ import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, setLatchDeg, setLatchTy, 
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
+import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
 import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
 
@@ -434,7 +435,13 @@ const fxPlayVals=new Map(), fxPlayOrd=new Map();     // свёрнутое со�
    не требует помнить о ней в четырёх местах, где эти множества правятся. */
 const fxPlaySignature=()=>{ let n=0; for(const r of takeFx.values()) n+=r.lane.length;
   return events.length+'|'+takeFx.size+'|'+n+'|'+takeFxVer+'|'+[...laneMute].join(',')+'/'+[...laneSolo].join(','); };   // takeFxVer — правки редактора: длины при них не меняются (см. его шапку)
-function fxPlayBuild(){
+/* ⛳ СЛИЯНИЕ ЛЕНТЫ — ЧИСТАЯ ФУНКЦИЯ (выделена в F3). Ничего не мутирует и ни на что не подписана:
+   строит и ОТДАЁТ отсортированный список точек. ⛔ ВТОРОГО СЛИЯНИЯ БЫТЬ НЕ ДОЛЖНО — здесь и только
+   здесь живёт закон «побеждает последняя по времени точка, при равенстве старшее взятое, и взятое
+   правит ТОЛЬКО ролями, которые в нём играли». Разойдись рендер с этим законом — замороженная
+   дорожка зазвучала бы иначе, чем её играет транспорт, а это единственное, чего не простят.
+   Потребителей двое: живая переигровка (fxPlayBuild ниже) и офлайн-рендер (F3). */
+function fxLaneMerge(){
   const list=[];
   /* Метаданные взятого выводим ОДНИМ проходом по событиям: доля первого события (когда снимок вступает
      в силу), слой (для слышимости) и ключи владельцев, которыми это взятое вправе править. */
@@ -461,7 +468,10 @@ function fxPlayBuild(){
     }
   }
   list.sort((a,b)=> a.t-b.t || a.tk-b.tk);
-  fxPlayList=list; fxPlayReset();
+  return list;
+}
+function fxPlayBuild(){
+  fxPlayList=fxLaneMerge(); fxPlayReset();
   fxPlaySig=fxPlaySignature();
 }
 function fxPlayReset(){ fxPlayI=0; fxPlayAt=-1; fxPlayVals.clear(); fxPlayOrd.clear(); }
@@ -1156,7 +1166,15 @@ const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
    ⚠️ live (живые Гц терменвокса) остаётся ОТДЕЛЬНЫМ полем и ЖИВЫМ-ТОЛЬКО (правило #11): переигровка
    его не передаёт никогда, частота там выводится из ступени по замороженному ладу.
    ⛔ Добавляешь запись в ENG — держи ту же форму. Второй формы здесь быть не должно. */
-const ENG={
+/* ⛳ ТАБЛИЦА ДИСПЕТЧЕРИЗАЦИИ — ТЕПЕРЬ ФАБРИКА (слайс F3), А НЕ ЛИТЕРАЛ.
+   Причина одна: офлайн-рендер обязан звать ТЕ ЖЕ отображения «событие → вызов движка», но у ДРУГОЙ
+   копии движка (своей, против своего контекста). Второй такой таблицы писать нельзя — она бы
+   разошлась с этой, и замороженная дорожка зазвучала бы иначе, чем её играет транспорт. Поэтому
+   таблица параметризована модулем звука: живая — makeENG(AUD), рендерная — makeENG(своя копия).
+   ⚠️ ТЕЛА ЗАПИСЕЙ НЕ ТРОНУТЫ — добавлен только префикс A. у функций звука. Ключи владельцев
+   (ldKey/chOwnerKey/bassOwnerKey), замороженный лад и loop.bpm остаются здешними: они про ЗАПИСЬ,
+   а не про движок, и у обеих копий обязаны быть одни и те же. */
+const makeENG=A=>({
   /* ⚠️ setLeadInstr(a.inst) ОТСЮДА УБРАН, и это ПОЧИНКА, а не потеря: переигранный слой уводил ЖИВОЙ
      инструмент (и кнопку в панели) — слой на Ситаре молча перекрашивал руку, играющую Органом. Теперь
      тембр печётся В ГОЛОСЕ на атаке (leadOn получает inst), как это давно делают аккорды и бас. */
@@ -1164,26 +1182,27 @@ const ENG={
               /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
                  Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
                  замороженному ладу (полимодальность цела). */
-              if(ctx)leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
+              if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
-              applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
-              leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,when);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
-              if(a.bend&&a.bend.length)scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
+              A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
+              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,when);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
-              applyFx(a.fx);
-              leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,when); },   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
-  leadOff:(a,ctx,{when,own}={})=>leadOff(own||ldKey(ctx,a),when),
+              A.applyFx(a.fx);
+              A.leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,when); },   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
+  leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),when),
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,{when}={})=>chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
-  chSet:(a,ctx,{when}={})=>chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
-  chOff:(a,ctx,{when}={})=>chordOff(chOwnerKey(ctx),when),
-  bassOn:(a,ctx,{when,live}={})=>bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,when),   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,{when}={})=>bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
-  bassOff:(a,ctx,{when}={})=>bassOff(bassOwnerKey(ctx),when),
-  drum:(a,ctx,{when}={})=>drumHit(a.row,a.vol,a.kit,when),
-  drone:(a,ctx,{when}={})=>droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
-};
+  chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
+  chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
+  chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
+  bassOn:(a,ctx,{when,live}={})=>A.bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,when),   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,when),
+  bassOff:(a,ctx,{when}={})=>A.bassOff(bassOwnerKey(ctx),when),
+  drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,when),
+  drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
+});
+const ENG=makeENG(AUD);   // ЖИВАЯ таблица — против живой копии движка. Поведение прежнее дословно
 const inPB=()=>loop.on;                               // для строки статуса (draw)
 
 /* Сетка квантизации в долях: аккорды — доля, бас — восьмая, соло — не квантуется.
@@ -2376,5 +2395,6 @@ export {
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
+  makeENG, fxLaneMerge, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey,   // F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не писать) · роль события (чья это цепь эффектов)
   droneAudible,   // «есть ли СЛЫШИМЫЙ слой-дрон» — ui переигрывает дрон на смену тоники и обязан спрашивать про слышимость, а не про наличие
 };

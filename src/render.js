@@ -183,7 +183,14 @@
    потеря гуманизации, от которой весь слайс и защищается. Посев идёт только у офлайн-копии, у неё
    свой setRnd (см. renderOnce). */
 import { AC as LIVE_AC, ksReady as liveKsReady } from './audio.js';
-import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
+import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
+/* ⛳ F3 — ИМЕНОВАННЫЕ ПРОСТРАНСТВА. `REC` даёт рендеру ровно то, что уже написано и проверено:
+   таблицу диспетчеризации, слияние ленты и формулы ключей владельца. `ST` нужен, чтобы ПРИКОЛОТИТЬ
+   живое состояние на время рендера и вернуть его обратно.
+   ⛔ ЦИКЛА НЕТ: recorder тянет audio/state/scales/arrange/config/hooks/clip и НИКОГДА render;
+   render не импортирует никто вовсе. */
+import * as REC from './recorder.js';
+import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
 
 /* ⚠️ КОПИЯ НА КАЖДЫЙ РЕНДЕР — И ЭТО КОСТЫЛЬ ЗОНДА, А НЕ УСТРОЙСТВО РЕНДЕРА.
    ⛳ Почему пришлось: startRendering у OfflineAudioContext ОДНОРАЗОВ, значит каждому рендеру нужен
@@ -194,8 +201,16 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';   // соста�
    ⛔ НАСТОЯЩИЙ РЕНДЕР ТАК ДЕЛАТЬ НЕ БУДЕТ: уникальный спецификатор на каждую заморозку означал бы
    утечку ЦЕЛОГО разобранного движка на каждое нажатие ❄ — модульная запись не выгружается никогда.
    Здесь это терпимо ровно потому, что зонд запускается руками и МЕМОИЗИРОВАН ЦЕЛИКОМ. */
-let COPY=0;
-const nextSpec=()=>'./audio.js?render='+(++COPY);
+/* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
+   спецификатор ('?render=1', '?render=2', …), потому что повторный initAudio на одной копии накапливал
+   голоса пула и возвращал экземпляры эффектов из уже мёртвого контекста. Слайс F3 добавил в initAudio
+   явный СБРОС модульных таблиц (см. его шапку в audio.js), поэтому одну копию можно поднимать заново
+   сколько угодно — а значит НИЧЕГО НЕ УТЕКАЕТ: модульная запись не выгружается никогда, и заводить её
+   на каждую заморозку было бы утечкой целого разобранного движка.
+   ⚠️ Спецификатор ПОСТОЯНЕН, обещание мемоизировано: параллельные вызовы получат одну и ту же копию. */
+const ENG_SPEC='./audio.js?render';
+let ENGP=null;
+const engine=()=>ENGP||(ENGP=import(ENG_SPEC));
 
 const MIX_SEC=1.0;      // общий материал: длиннее, чтобы успели вступить хвосты цепей
 const SRC_SEC=0.3;      // одиночный источник — короче, их много (но ДЛИННЕЕ прихода влажного сигнала, см. REV_WET_SEC)
@@ -360,7 +375,7 @@ async function renderOnce(seed, material, seconds, opts){
   const frames=Math.max(1,Math.round(rate*seconds));
   const OfflineCtor=window.OfflineAudioContext||window.webkitOfflineAudioContext;
   const t0=now();
-  const eng=await import(nextSpec());
+  const eng=await engine();
   const t1=now();
   /* ⛳ ПОСЕВ — СТРОГО ДО initAudio, И ЭТОТ ПОРЯДОК НЕСУЩИЙ. Буфер шума набивается ВНУТРИ initAudio
      (последние строки), поэтому семя, поставленное раньше, покрывает его даром. Поставь мы семя после,
@@ -370,7 +385,9 @@ async function renderOnce(seed, material, seconds, opts){
      факты (посев, опыты 1–2) меряются на живом раскладчике, чтобы их величины остались сравнимы с уже
      записанными. ⚠️ F3, который пойдёт по настоящим событиям, включит его на ВСЕХ рендерах — иначе
      тысячи нот схлопнутся в один голос (довод целиком — у setOffline в audio.js). */
-  if(o.offline) eng.setOffline(true);
+  /* ⚠️ СТАВИМ ВСЕГДА, А НЕ ТОЛЬКО ПРИ true: копия движка одна на сессию, и флаг в ней ЖИВЁТ между
+     рендерами. Забудь мы сбросить — следующий рендер молча унаследовал бы чужой раскладчик. */
+  eng.setOffline(!!o.offline);
   /* ⛳ ЧАСТОТА ДИСКРЕТИЗАЦИИ ПРИКОЛОЧЕНА К ЖИВОЙ (F0) — иначе ks-worklet, считающий длину линии из
      sampleRate, перестроился бы на центы, а буфер при воспроизведении пересэмплировался. */
   const ctx=new OfflineCtor(2, frames, rate);
@@ -607,7 +624,7 @@ async function run(){
       R.notes.push('⛔ ЖИВАЯ СЛУЧАЙНОСТЬ ПОДМЕНЕНА: Math.random отдаёт одно и то же. Гуманизация живой игры УБИТА — немедленно откатить.');
 
     /* ═══ ВРЕМЯ ПО ЧАСТЯМ ═══ */
-    R.timing={ renders:TIME.n, copies:COPY, audioSec:+(TIME.audioSec.toFixed(2)),
+    R.timing={ renders:TIME.n, copies:(ENGP?1:0), audioSec:+(TIME.audioSec.toFixed(2)),
                importMs:Math.round(TIME.importMs), initMs:Math.round(TIME.initMs),
                renderMs:Math.round(TIME.renderMs),
                totalMs:Math.round(TIME.importMs+TIME.initMs+TIME.renderMs),
@@ -698,4 +715,278 @@ function print(R){
   /* eslint-enable no-console */
 }
 
-export { probe };
+
+/* =====================================================================
+   ⛳ СЛАЙС F3 — РЕНДЕР ОДНОЙ НАСТОЯЩЕЙ ДОРОЖКИ В АУДИОБУФЕР
+   ---------------------------------------------------------------------
+   Первый слайс дуги, результат которого можно ПОСЛУШАТЬ. Транспорта,
+   экрана и самой заморозки здесь по-прежнему нет: буфер возвращается в
+   консоль, и всё.
+
+   ⛳ ЧТО ЗДЕСЬ ПЕРЕИСПОЛЬЗОВАНО, А НЕ НАПИСАНО ЗАНОВО — это главное:
+     • ТАБЛИЦА ДИСПЕТЧЕРИЗАЦИИ `makeENG(A)` (recorder) — та же, что играет
+       транспорт, только против НАШЕЙ копии движка. Ключи владельцев,
+       замороженный лад, бенды — всё оттуда;
+     • СЛИЯНИЕ ЛЕНТЫ `fxLaneMerge()` (recorder) — тот же закон «побеждает
+       последняя точка, при равенстве старшее взятое, взятое правит только
+       ролями, которые в нём играли». ⛔ Второго слияния писать нельзя:
+       разойдись рендер с переигровкой — замороженная дорожка зазвучала бы
+       не так, как её играет ▶, и это единственное, чего не простят;
+     • `songNotes` НЕ ТРОГАЕМ и не дублируем: спаривание нот живёт там,
+       нам оно не нужно (раскладчик F2 растит пул по требованию).
+   ⚠️ ЕДИНСТВЕННОЕ НАМЕРЕННОЕ ОТЛИЧИЕ ОТ ПЕРЕИГРОВКИ: живая свёртка
+   пропускает ЗАГЛУШЁННЫЕ дорожки (`laneAudible`), а рендер — НЕ ДОЛЖЕН.
+   Морозят то, ЧЕМ ДОРОЖКА ЯВЛЯЕТСЯ, а не то, что сейчас пропускает микшер.
+
+   ⛔ КАЖДОЕ СОБЫТИЕ ПОЛУЧАЕТ ЯВНОЕ ВРЕМЯ — СОЛО И ДРОН ТОЖЕ. Живьём эти
+   два идут «почти сейчас» через `fireNear`, БЕЗ `when`. Здесь такого пути
+   нет вовсе: в офлайн-контексте currentTime под JS не движется, поэтому
+   «сейчас» означало бы «всё в нулевую секунду».
+   ⛳ ЭТО НЕ ТО СЛЫШИМОЕ ИЗМЕНЕНИЕ, ОТ КОТОРОГО ПРЕДОСТЕРЕГАЮТ ДОКУМЕНТЫ.
+   Предостережение — про перевод ЖИВОГО соло в окно опережения планировщика
+   (нота начала бы ставиться на ~300 мс вперёд, и гашение слоёв на шве
+   обязано было бы поехать вместе с ней). Офлайн-драйвер — ДРУГОЙ
+   ВЫЗЫВАЮЩИЙ: он не трогает ни `fireNear`, ни `scheduleLayers`, ни
+   `loop.*`, ни курсоры. ⛔ Живой путь диспетчеризации остаётся как есть.
+
+   ⛳ ПРАВИЛА, КОТОРЫХ ЭТОТ КОД КАСАЕТСЯ:
+     #7  — у каждого события СВОЙ замороженный лад: `ctx` = само событие,
+           поэтому ENG считает частоту по `ev.sc`. ⛔ Ни одной перезаморозки
+           к живому ладу здесь нет и быть не должно;
+     #15 — раскладка РАЗОВАЯ и вся вперёд: ни окна опережения, ни насоса,
+           ни единой общей с живым планировщиком изменяемой переменной;
+     #28 — события ТОЛЬКО ЧИТАЮТСЯ. Фильтр и сортировка идут по КОПИИ
+           массива; ни курсоры, ни schedInvalidate не трогаются.
+   ===================================================================== */
+
+const PRE_SEC=0.5;        // «разгон» перед первой нотой: цепь ставится на t=0, а её сеттеры едут setTargetAtTime с τ до 0.08 с — 0.5 с хватает всем, чтобы осесть ДО первого звука
+const TAIL_MIN=0.25;      // пол хвоста: даже сухая дорожка без эффектов должна дожить свой релиз
+const TAIL_MAX=30;        // потолок хвоста — страховка от абсурдной длины, а не оценка. Пробивается только «падом на 2.5 с» в очень длинной цепи; если пробило, в отчёте это видно
+const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же мера конца хвоста, что у RT60 реверба и у RELEASE_TAILS раскладчика
+
+/* ⛳ ПИН ЖИВОГО СОСТОЯНИЯ. Движок читает его ПРЯМО ПРИ ПОСТРОЙКЕ (дрон берёт высоту из tonicFreq()
+   в initAudio) и при раскладке (leadFreq/bassFreq/chordFreqs читают baseF() → tonic и aRef).
+   ⛔ ИМЕННО НА ЭТОМ ЗОНД ОБМАНЫВАЛ НАС ТРИ ЗАХОДА, поэтому пин стоит ДО офлайн-initAudio, а не после.
+   ⚠️ ЧТО ПИНИМ И ЗАЧЕМ КАЖДОЕ:
+     tonic, aRef — из них считается КАЖДАЯ частота дорожки (лад заморожен в событии, а тоника нет:
+                   записанный слой ТРАНСПОНИРУЕТСЯ за живой тоникой — это осознанное поведение);
+     scaleIdx    — CUR() читается ENG только когда у события нет `sc`; таких не бывает, но пусть будет
+                   определённым;
+     seventh     — тот же случай: `ctx.sev` есть всегда, живое значение — запасной путь;
+     leadIdx/bassIdx/chIdx — ЗАПАСНЫЕ ТЕМБРЫ для событий без `a.inst` (см. ниже про три случая);
+     loop.bpm    — секунда на долю; её же читает scheduleBend внутри ENG.
+   ⚠️ ВОССТАНАВЛИВАЕМ В `finally`: рендер не смеет оставить приложение с чужой тоникой, даже если упал.
+   ⛳ Пин — ЭТО И ЗАПИСЬ: те же числа уходят в результат, поэтому повторный рендер той же дорожки можно
+   будет сделать теми же (это понадобится заморозке, чтобы «переморозить без правок» звучало так же). */
+function pinLive(st, rec, want){
+  const prev={ tonic:st.tonic, aRef:st.aRef, scaleIdx:st.scaleIdx, seventh:st.seventh,
+               leadIdx:st.leadIdx, bassIdx:st.bassIdx, chIdx:st.chIdx, bpm:rec.loop.bpm };
+  /* ⚠️ ТЕМП НЕ ПОДМЕНЯЕМ, ТОЛЬКО ЗАПИСЫВАЕМ. Секунду на долю считаем мы, но `scheduleBend` внутри ENG
+     берёт `60/loop.bpm` у ЖИВОГО транспорта — подставь мы сюда другое число, кривая бенда разъехалась
+     бы с нотой молча. Темп принадлежит транспорту; рендер его фиксирует в отчёте, а не меняет. */
+  const use={...prev, ...(want||{}), bpm:rec.loop.bpm};
+  st.setTonic(use.tonic); st.setARef(use.aRef); st.setScaleIdx(use.scaleIdx); st.setSeventh(use.seventh);
+  st.setLeadIdx(use.leadIdx); st.setBassIdx(use.bassIdx); st.setChIdx(use.chIdx);
+  return {prev, use};
+}
+function unpinLive(st, prev){
+  st.setTonic(prev.tonic); st.setARef(prev.aRef); st.setScaleIdx(prev.scaleIdx); st.setSeventh(prev.seventh);
+  st.setLeadIdx(prev.leadIdx); st.setBassIdx(prev.bassIdx); st.setChIdx(prev.chIdx);
+}
+
+/* ⛳ ТРИ СЛУЧАЯ ЗАПАСНОГО ТЕМБРА — НАЙДЕНЫ В ТАБЛИЦЕ ДИСПЕТЧЕРИЗАЦИИ, И ТРЕТИЙ УБИВАЕТ РЕНДЕР.
+     соло   — `a.inst===undefined ? leadIdx : a.inst` — падает на ЖИВОЙ индекс (он у нас приколочен);
+     бас    — `bassOn` внутри делает `ins ?? bassIdx` — тоже живой индекс (приколочен);
+     аккорд — `chordOn` делает `CHORD_INSTR[insIdx]` БЕЗ ЗАПАСНОГО ВАРИАНТА: при undefined это
+              `ins.t1` на undefined, то есть TypeError ПОСРЕДИ РЕНДЕРА. ⛔ Песня при этом играет
+              нормально (живьём такие события больше не рождаются — их producer починен в S3.5e), а
+              рендер умирал бы на старом материале.
+   ⚠️ ЧИНИМ В ДРАЙВЕРЕ, А НЕ В ДВИЖКЕ: подставляем тембр в КОПИЮ полезной нагрузки. Событие не
+   мутируется (правило #28), живой `chordOn` не трогается — его поведение ничьё больше. */
+const patchInst=(ev, st)=>{
+  const a=ev.a;
+  if(a && a.inst===undefined && (ev.fn==='chOn')) return {...a, inst:st.chIdx};
+  return a;
+};
+
+/* ⛳ ДЛИНА ХВОСТА — ПО ЗАХВАЧЕННОЙ ЦЕПИ, А НЕ НА ГЛАЗ. Спрашиваем у ПОСТРОЕННЫХ экземпляров их
+   величины в СОБСТВЕННЫХ единицах (audio.fxParamCur разнормирует единственной существующей шкалой):
+     реверб — `decay` это RT60, то есть уже «спад на 60 дБ» — берём как есть;
+     делей  — время повтора × сколько повторов до −60 дБ: ln(1000)/ln(1/fb);
+     голоса — самый длинный релиз использованных тембров × ln(1000) (та же мера).
+   ⚠️ Хвост считается ПОСЛЕ применения снимка цепи: иначе мерили бы дефолты, а не то, с чем играли. */
+function tailOf(eng, keys, startVals, insRel){
+  const get=(key,fx,pk)=>{ const p=startVals.get(key+'|'+fx+'|'+pk);
+    return p ? eng.fxDenormOf(fx,pk,p.v) : null; };
+  let tail=TAIL_MIN;
+  for(const key of keys){
+    const dec=get(key,'reverb','decay');
+    if(dec!=null) tail=Math.max(tail,dec);                                   // decay это и есть RT60 — уже «−60 дБ»
+    const dt=get(key,'dly','time'), fb=get(key,'dly','fb');
+    if(dt!=null&&fb!=null&&fb>0&&fb<1) tail=Math.max(tail, dt*(DB60/Math.log(1/fb)));
+  }
+  return Math.min(TAIL_MAX, tail + insRel*DB60);
+}
+
+/* ═══════════ САМ РЕНДЕР ═══════════
+   layer — НОМЕР СЛОЯ дорожки (не id: id — это идентичность для человека, а звук адресуется слоем).
+   Возвращает { buf, startSec, endSec, tailSec, pinned, … } — начало/конец/хвост нужны заморозке,
+   чтобы поставить буфер в транспорт, а `pinned` — чтобы переморозить теми же числами. */
+async function renderTrack(layer, opt){
+  const o=opt||{};
+  if(!LIVE_AC) throw new Error('живой AudioContext ещё не создан — нажмите «▶ Играть»');
+  const OfflineCtor=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  if(!OfflineCtor) throw new Error('OfflineAudioContext в этом браузере отсутствует');
+
+  /* ⛔ ЧИТАЕМ, НЕ ПИШЕМ (правило #28): filter отдаёт НОВЫЙ массив, сортируем ЕГО. Ни `events`, ни
+     курсоры, ни schedInvalidate не задеты. Стабильность порядка при равных долях обеспечиваем
+     индексом: две ноты на одной доле обязаны лечь в том же порядке, что и в записи. */
+  const src=REC.events;
+  const evs=src.map((e,i)=>({e,i})).filter(x=>x.e.layer===layer)
+               .sort((a,b)=> (a.e.t-b.e.t) || (a.i-b.i)).map(x=>x.e);
+  if(!evs.length) throw new Error('дорожка '+layer+' пуста');
+
+  const t0Beat=evs[0].t, tEndBeat=evs[evs.length-1].t;
+  const pin=pinLive(ST, REC, o.pin);
+  const spb=60/pin.use.bpm;
+  const songSec=(tEndBeat-t0Beat)*spb;
+  const beatAt=b=>PRE_SEC+(b-t0Beat)*spb;
+
+  const tImp0=now();
+  const eng=await engine();
+  const tImp1=now();
+  let out=null;
+  try{
+    /* ⛳ ЛЕНТА — ОДНИМ ЗАИМСТВОВАННЫМ СЛИЯНИЕМ (см. шапку). Фильтруем ТОЛЬКО по времени и виду точки;
+       ⚠️ по слышимости НЕ фильтруем — в этом и состоит единственное отличие от переигровки. */
+    const lane=REC.fxLaneMerge();
+    /* ⚠️ ЛЕНТА ОБЩАЯ ДЛЯ ВСЕЙ ПЕСНИ, И ЭТО НЕ НЕДОСМОТР. Взятое ЧУЖОЙ дорожки, игравшее ту же роль,
+       правит той же цепью — ровно так же, как на переигровке (предел «одна сеть на владельца»,
+       Known limits №1–2). Рендер обязан совпадать с ▶, поэтому мы это НЕ фильтруем по слою. Снимет
+       ограничение только своя цепь на дорожку — это уже не F3. */
+    const keys=new Set(); for(const e of evs){ const r=REC.evRole(e.fn); if(r) keys.add(chainKeyOf(r)); }
+
+    /* СНИМОК ЦЕПИ НА СТАРТЕ: последняя точка каждого адреса на доле ≤ t0Beat. Состав — оттуда же.
+       ⚠️ СКАЛЯРЫ (драйв/вибрато/тремоло-нота) ПРОПУСКАЕМ НАМЕРЕННО: fxPlaySet пишет их в ОБЩИЙ
+       state.fx, один на живую копию и на нашу. Соло-нота несёт их в своём `a.fx`, и ENG.leadOn их
+       оттуда и берёт — пер-нотно, как задумано. */
+    const startVals=new Map(), startOrd=new Map(), later=[];
+    for(const p of lane){
+      if(!keys.has(p.key)) continue;
+      if(p.fx===REC.FX_CHAIN){ if(p.t<=t0Beat+1e-9) startOrd.set(p.key,p.ids); continue; }
+      if(ST.fxIsScalar(p.fx)) continue;
+      if(p.t<=t0Beat+1e-9) startVals.set(p.key+'|'+p.fx+'|'+p.p, p); else later.push(p);
+    }
+
+    /* ⛳ ХВОСТ СЧИТАЕМ ДО ПОСТРОЙКИ ГРАФА — по ЗАХВАЧЕННОЙ цепи, а не по живой и не на глаз. Иначе
+       пришлось бы заводить контекст «с запасом» и рендерить десятки секунд тишины, а заодно врать в
+       замере времени. Разнормировку даёт движок (fxDenormOf) — второй копии шкалы мы не заводим. */
+    const rate=LIVE_AC.sampleRate;
+    const insRel=maxRel(eng,evs);
+    const tailSec=tailOf(eng, keys, startVals, insRel);
+    const frames=Math.max(1,Math.round(rate*(PRE_SEC+songSec+tailSec)));
+    const ctx=new OfflineCtor(2, frames, rate);
+
+    eng.setRnd(mulberry32(o.seed==null?SEED_A:o.seed));
+    eng.setOffline(true);                       // ⛳ F2: занятость по звучанию, рост пула, БЕЗ кражи
+    const tIni0=now();
+    await eng.initAudio(()=>ctx);               // ⚠️ ПОСЛЕ пина: дрон берёт высоту здесь
+    const tIni1=now();
+    eng.offlineTapMaster();                     // ⛔ снимаем с МАСТЕРА, до лимитера (довод — у самой функции)
+
+    /* СОСТАВ и СНИМОК — на нулевой секунде, до разгона. */
+    for(const [key,ids] of startOrd) eng.fxPlayPath(key, ids);
+    for(const p of startVals.values()) eng.fxPlaySet(p.key, p.fx, p.p, p.v, 0);
+
+    /* ═══ РАСКЛАДКА: КАЖДОМУ СОБЫТИЮ — ЯВНОЕ ВРЕМЯ ═══ */
+    const ENG=REC.makeENG(eng);
+    const open={lead:new Set(), ch:new Set(), bs:new Set()};
+    let li=0;
+    for(const ev of evs){
+      const when=beatAt(ev.t);
+      /* Точки автоматизации, чья доля НАСТУПИЛА, — перед событием: величина обязана стоять к атаке. */
+      while(li<later.length && later[li].t<=ev.t+1e-9){ const p=later[li++]; eng.fxPlaySet(p.key,p.fx,p.p,p.v,beatAt(p.t)); }
+      const a=patchInst(ev, ST);
+      const fn=ENG[ev.fn]; if(!fn) continue;
+      fn(a, ev, {when});
+      trackOpen(open, ev, a);
+    }
+    /* Оставшиеся точки — после последнего события, но до конца хвоста. */
+    while(li<later.length){ const p=later[li++]; eng.fxPlaySet(p.key,p.fx,p.p,p.v,beatAt(p.t)); }
+
+    /* ⛳ ЗАКРЫВАЕМ ВСЁ, ЧТО ОСТАЛОСЬ ОТКРЫТЫМ — И ЭТО НЕ ПЕРЕСТРАХОВКА.
+       ⚠️ СОБЫТИЯ ПОДЛОЖКИ НЕ НЕСУТ ВЫКЛЮЧЕНИЙ ВОВСЕ (`buildArrangement` кладёт chOn/bassOn без пары);
+       живьём их гасит транспорт — на конце песни (`stopAtEnd` → `releaseLoopLayersAt`) или на шве
+       повтора. Офлайн гасить некому, и последний аккорд подложки звенел бы НА ПОЛНОЙ ГРОМКОСТИ до
+       конца буфера. Это выглядело бы поломкой рендера, а на деле — отсутствующая пара.
+       Тем же движением закрываются и «повисшие» ноты игрока (их не бывает с S4.1, но пусть). */
+    const endSec=beatAt(tEndBeat);
+    for(const own of open.lead) eng.leadOff(own, endSec);
+    for(const own of open.ch)   eng.chordOff(own, endSec);
+    for(const own of open.bs)   eng.bassOff(own, endSec);
+    if(open.drone) eng.droneOff(endSec);
+
+    const tRnd0=now();
+    const buf=await ctx.startRendering();
+    const tRnd1=now();
+
+    out={ layer, buf, startSec:PRE_SEC, endSec, tailSec,
+          songSec:+songSec.toFixed(3), totalSec:+buf.duration.toFixed(3),
+          events:evs.length, keys:[...keys], pinned:pin.use,
+          peak:+peakOf(buf).toFixed(5), rms:+rmsOf(buf).toFixed(6),
+          ms:{ importMs:Math.round(tImp1-tImp0), initMs:Math.round(tIni1-tIni0), renderMs:Math.round(tRnd1-tRnd0) },
+          xRealtime: (tRnd1-tRnd0)>0 ? +((buf.duration*1000/(tRnd1-tRnd0)).toFixed(1)) : null };
+  } finally {
+    unpinLive(ST, pin.prev);   // ⛔ ВСЕГДА: приложение не смеет остаться с чужой тоникой, даже если рендер упал
+  }
+  printTrack(out);
+  return out;
+}
+
+/* ОТЧЁТ РЕНДЕРА ДОРОЖКИ. Правило #5 цело: console — не DOM.
+   ⛳ ГЛАВНОЕ ЧИСЛО ЗДЕСЬ — «сам рендер = N× реального времени» и пересчёт на пять минут: план прямо
+   требует ИЗМЕРИТЬ стоимость заморозки, а не оценить её. */
+function printTrack(r){
+  /* eslint-disable no-console */
+  console.log('%c[render F3] дорожка L'+r.layer+' отрендерена','font-weight:bold');
+  console.log('  событий '+r.events+'  ·  цепи ['+r.keys.join(', ')+']');
+  console.log('  буфер: '+r.buf.length+' сэмплов ('+r.totalSec+' с), '+r.buf.sampleRate+' Гц, каналов '
+              +r.buf.numberOfChannels+'  ·  пик '+r.peak+'  ·  rms '+r.rms);
+  console.log('  раскладка: разгон '+r.startSec+' с · музыка до '+(+r.endSec.toFixed(3))+' с · хвост '
+              +(+r.tailSec.toFixed(2))+' с (посчитан по ЗАХВАЧЕННОЙ цепи, не на глаз)');
+  console.log('  приколочено: тоника '+r.pinned.tonic+' · A4 '+r.pinned.aRef+' · лад #'+r.pinned.scaleIdx
+              +' · темп '+r.pinned.bpm+' · запасные тембры соло/бас/аккорд '
+              +r.pinned.leadIdx+'/'+r.pinned.bassIdx+'/'+r.pinned.chIdx);
+  console.log('  время: импорт '+r.ms.importMs+' мс · initAudio '+r.ms.initMs+' мс · САМ РЕНДЕР '
+              +r.ms.renderMs+' мс   →   '+r.xRealtime+'× реального времени');
+  if(r.xRealtime) console.log('  ⛳ то есть пять минут музыки стоили бы ~'+Math.round(300/r.xRealtime)
+              +' с рендера (плюс однократные импорт+initAudio выше)');
+  if(r.peak<=0) console.log('  ⛔ БУФЕР ПУСТ (пик 0) — дорожка разложена, но до destination ничего не дошло.');
+  /* eslint-enable no-console */
+}
+
+/* Какие владельцы остались с открытым голосом. ⚠️ Ключи считаем ТОЙ ЖЕ таблицей, что их и открыла, —
+   через сам ENG нельзя (он не возвращает ключ), поэтому повторяем ровно формулу recorder'а для
+   ВЛАДЕЛЬЦА СЛОЯ. ⛳ Это не второе спаривание нот: мы не ищем пару «вкл↔выкл», а лишь помним, что
+   осталось незакрытым к концу раскладки. */
+function trackOpen(open, ev, a){
+  if(ev.fn==='leadOn')       open.lead.add(REC.ldKey(ev,a));
+  else if(ev.fn==='leadOff') open.lead.delete(REC.ldKey(ev,a));
+  else if(ev.fn==='chOn')    open.ch.add(REC.chOwnerKey(ev));
+  else if(ev.fn==='chOff')   open.ch.delete(REC.chOwnerKey(ev));
+  else if(ev.fn==='bassOn')  open.bs.add(REC.bassOwnerKey(ev));
+  else if(ev.fn==='bassOff') open.bs.delete(REC.bassOwnerKey(ev));
+  else if(ev.fn==='drone')   open.drone=true;
+}
+/* Самый длинный релиз среди тембров, реально использованных дорожкой (для длины хвоста). */
+function maxRel(eng, evs){
+  let m=0;
+  for(const ev of evs){ const a=ev.a; if(!a) continue;
+    if(ev.fn==='leadOn' && eng.LEAD_INSTR[a.inst]) m=Math.max(m,eng.LEAD_INSTR[a.inst].rel||0);
+    else if(ev.fn==='chOn' && eng.CHORD_INSTR[a.inst]) m=Math.max(m,eng.CHORD_INSTR[a.inst].rel||0);
+    else if(ev.fn==='bassOn' && eng.BASS_INSTR[a.inst]) m=Math.max(m,eng.BASS_INSTR[a.inst].rel||0);
+  }
+  return m;
+}
+
+export { probe, renderTrack };
