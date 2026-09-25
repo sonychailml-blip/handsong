@@ -649,6 +649,10 @@ export const setRollIns=v=>{ rollIns=!!v; };
    до них не добраться. rollScale — НОМЕР ГРУППЫ ЛАДОВ дорожки (дорожка может держать события, замороженные
    в РАЗНЫХ ладах; две ступенные оси честно не нарисовать, поэтому одна — ось, прочие — призраки). */
 export let rollRole='dr', rollRow0=0, rollScale=0;
+/* КАКИЕ РОЛИ РОЛЛ УМЕЕТ ПРАВИТЬ СЕГОДНЯ. Жил в ui; переехал сюда, потому что теперь его читают ДВОЕ — ui
+   (вкладки) и draw (поле: у неправимой роли вместо сетки одна строка, и попадание по сетке молчит).
+   Два списка разошлись бы при первом же новом слайсе — соло или аккордов. */
+export const ROLL_EDITABLE=['dr','bs'];
 export const setRollRole=v=>{ rollRole=v; };
 export const setRollRow0=v=>{ rollRow0=Math.max(0,v|0); };
 export const setRollScale=v=>{ rollScale=Math.max(0,v|0); };

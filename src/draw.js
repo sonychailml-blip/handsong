@@ -3,7 +3,7 @@ import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртв�
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic,
+         rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic, ROLL_EDITABLE,
          rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
@@ -1088,7 +1088,12 @@ function drawRoll(){
      влезло, остальное — прокруткой (row0). */
   const grp=rollGroups(), G=grp&&grp.length?grp[Math.min(rollScale,grp.length-1)]:null;
   const axSc = G ? G.sc : CUR();                       // лад ОСИ: показанной группы, иначе живой (пустая роль)
-  const pitched = rollRole!=='dr';
+  /* ⛳ НЕПРАВИМАЯ РОЛЬ (соло, аккорды — ждут своих слайсов): вместо сетки ОДНА СТРОКА, почему. Рядов и нот
+     не рисуем — нарисованная нота, которую нельзя тронуть, читалась бы как поломка, — а попадание по полю
+     молчит (rollHit), иначе вставка ушла бы в ветку БАСА и положила басовую ноту на дорожку соло.
+     ⚠️ Линейка, бегунок и ПОЛОСА АВТОМАТИЗАЦИИ остаются: эффекты дорожки правятся и у такой роли. */
+  const noEdit = ly!=null && !ROLL_EDITABLE.includes(rollRole);
+  const pitched = rollRole!=='dr' && !noEdit;
   const x0 = pitched ? Math.min(rollGutterW(axSc), Math.floor(W*0.42)) : ROLL_LBL_W;   // S5.6: колонка подписей — по МЕРКЕ, с потолком
   const total = pitched ? rollRowsTotal(axSc) : DRUM_ROWS;
   /* ⛳ ПОДГОНКА ПО ВЫСОТЕ (S5.6): ВЛЕЗАЮТ ВСЕ РЯДЫ — растягиваем их на всю высоту (до потолка), не
@@ -1101,12 +1106,12 @@ function drawRoll(){
                        : (gy1-gy0)/DRUM_ROWS;
   const rows = pitched ? Math.max(1,Math.min(total,Math.floor((gy1-gy0)/rowH))) : DRUM_ROWS;
   const row0 = pitched ? Math.max(0,Math.min(rollRow0,Math.max(0,total-rows))) : 0;
-  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, pitched, aut };   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, pitched, aut, noEdit };   // noEdit — поле нот не отвечает на палец (см. выше)   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
   const V=rollView, pxB=V.bw/V.span, M=loop.metre;
   const DPO = pitched ? rollDegPerOct(axSc) : 0;
   // ---- ряды: чередующаяся заливка + подпись слева (ударные — имя ряда, лад — НОТА В ЛАДУ ОСИ) ----
   ctx.textBaseline='middle'; ctx.textAlign='right'; ctx.font='11px system-ui';
-  for(let i=0;i<rows;i++){
+  for(let i=0; !noEdit && i<rows; i++){
     const r=row0+i, y=rollRowY(V,r);
     const dup = pitched && (r%DPO)===DPO-1;            // верхний ряд регистра — ДУБЛЬ тоники следующего: та же высота
     ctx.fillStyle = (pitched ? (r%DPO===0) : r%2) ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.015)';   // тоника регистра выделена заливкой — по ней читается октава
@@ -1183,7 +1188,7 @@ function drawRoll(){
     if(bib===0 && pxB*M>=30){ ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillText(String((b/M|0)+1), gx+3, gy0-8); }   // номер такта — с единицы, как в подписи скобы
   }
   // ---- удары: только попавшие в окно (двоичный поиск по началу) ----
-  const hits=pitched?[]:rollHits(), blkW=rollBlockPx(V);   // ширина блока — ОДНА на отрисовку, призрак и попадание
+  const hits=(pitched||noEdit)?[]:rollHits(), blkW=rollBlockPx(V);   // noEdit: pitched там ложно, и без этой оговорки на поле соло легли бы УДАРЫ дорожки   // ширина блока — ОДНА на отрисовку, призрак и попадание
   for(let i=rollLower(hits,V.beat0); i<hits.length && hits[i].t<=V.beat0+V.span; i++){
     const ev=hits[i], r=ev.a.row|0; if(r<0||r>=rows) continue;
     const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
@@ -1259,9 +1264,10 @@ function drawRoll(){
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
   const emptyRole = pitched ? !grp.length : !hits.length;
-  if(ly==null||emptyRole){
+  if(ly==null||noEdit||emptyRole){
     ctx.fillStyle='rgba(255,255,255,.55)';
-    ctx.fillText(t(ly==null?'roll.noTrack':(pitched?'roll.emptyRole':'roll.empty')), V.x0+V.bw/2, (gy0+gy1)/2);
+    ctx.fillText(ly==null ? t('roll.noTrack') : noEdit ? t('roll.roleLater',{role:t('role.'+rollRole)})
+                 : t(pitched?'roll.emptyRole':'roll.empty'), V.x0+V.bw/2, (gy0+gy1)/2);
   }
   /* ⛔ ПРИВЯЗКУ ЗАДАЁМ ЯВНО, А НЕ НАСЛЕДУЕМ. Отсюда и родился баг: textBaseline ставился на 'middle' у
      подписей рядов ~170 строк выше, и одно и то же число y значило здесь не то, что читалось при чтении
@@ -1317,6 +1323,7 @@ export function rollHit(px,py){
     if(best && bd<=Math.max(tolX,tolY)) return { what:'autpt', rec:best, beat, v };
     return { what:'autgrid', beat, v };
   }
+  if(V.noEdit) return null;                            // неправимая роль: поле нот НЕ цель — ни выбора, ни вставки (линейка и полоса выше — живы)
   const r=rollRowAt(V,py);
   const row0=V.row0||0;
   if(r<row0||r>=row0+V.rows) return null;
