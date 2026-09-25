@@ -721,6 +721,9 @@ const frzLayer=layer=> freezeState(layer)==='fresh';
 /* А ЭТО — «есть ли буфер вообще», для показа и для уборки: устаревший буфер никуда не делся, его
    просто не слушают. Не путать с предыдущим. */
 const frzHas=layer=>{ const f=frzOf(layer); return !!f&&!f.drop; };   // A2b: уходящая на шве — уже не заморожена
+/* Буфер СЕЙЧАС владеет дорожкой (взведён) — даже если дорожка уже устарела и ждёт шва выхода. A2c: догонялка
+   такую пропускает — передачу сделает frzLeave. В самом frzLeave armedRep сброшен ДО его догонялки. */
+const frzBufOwns=layer=>{ const f=frzOf(layer); return !!(f&&f.armedRep!=null); };
 
 /* ЗАВЕСТИ/СНЯТЬ. ⛳ Зовёт их render.js — с F5 из кнопки ❄ редактора (ui.onFreeze), а также из консоли. */
 /* ⛳ ПОДПИСЬ СВЕЖЕСТИ (F5) — «изменилось ли хоть что-то, из чего рендер собирал буфер».
@@ -1986,14 +1989,53 @@ const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDr
    следующего «вкл». Теперь устаревшую дорожку передаёт событиям планировщик (догонялка на шве), а свежая
    просто играет дальше (прежде она ещё и перезапускалась с горизонта — дыра до ~300 мс на каждое
    переключение роли). */
+/* ⛳ НА ИДУЩЕМ ТРАНСПОРТЕ ГОЛОСА ДОРОЖЕК НЕ ГАСНУТ, А ПЕРЕДАЮТСЯ (A2c). Прежде softAllOff гасил ВСЕХ владельцев, и
+   удержанный бас или защёлкнутый аккорд ДОРОЖКИ (одно «вкл» и цепочка ведений) молчал до своего следующего «вкл» —
+   на каждой смене тоники, лада, A4. Так было всегда у незамороженных дорожек; после шва выхода (A2b) — и у
+   устаревших замороженных, отчего пачка изменений A4 (числовое поле шлёт change на КАЖДЫЙ шаг стрелки) гасила
+   дорожку, которую первый шаг только что передал событиям. Теперь: ЖИВЫЕ владельцы — как всегда, сейчас;
+   владельцы дорожек — trackResplice (шов на горизонте, та же догонялка). Стоим — всё дословно по-старому. */
 function softAllOff(){ if(!AC)return;
   if(!loop.on) frzStopAll();                        // F4: аварийная остановка НИЧЕГО не знала о буферах — теперь знает. A2b-fix: только на СТОЯЩЕМ транспорте (довод выше)
   if(recording) recAllOff();                        // S4.1: закрыть в записи то, что сейчас заглушим
-  leadAllOff();                                     // все владельцы соло: 'lead:L/R' + 'leadloop:N:v' (раньше был один noteOff — соло было моно)
-  Object.keys(chordHold).forEach(k=>chordOff(k));   // все владельцы аккордов: 'latch' + 'loop:N'
-  Object.keys(bassHold).forEach(k=>bassOff(k));     // все владельцы баса: 'bass' + 'bassloop:N'
+  if(loop.on){
+    /* ЖИВЫЕ — сейчас, как всегда: руки соло ('lead:*'), живой аккорд ('latch' — правило #20 о шве повтора, а
+       softAllOff гасил его всегда и гасит дальше), живой бас ('bass'). Дорожки — передаёт trackResplice. */
+    for(const k of Object.keys(leadHold))  if(!isTrackOwner(k)) leadOff(k);
+    for(const k of Object.keys(chordHold)) if(!isTrackOwner(k)) chordOff(k);
+    for(const k of Object.keys(bassHold))  if(!isTrackOwner(k)) bassOff(k);
+    trackResplice();
+  }else{
+    leadAllOff();                                   // все владельцы соло: 'lead:L/R' + 'leadloop:N:v' (раньше был один noteOff — соло было моно)
+    Object.keys(chordHold).forEach(k=>chordOff(k)); // все владельцы аккордов: 'latch' + 'loop:N'
+    Object.keys(bassHold).forEach(k=>bassOff(k));   // все владельцы баса: 'bass' + 'bassloop:N'
+  }
   setLatchDeg(-1); setLatchTy(null);              // тип гасим вместе со ступенью: иначе после паники/очистки
   recDrop(); }                                    // следующий щипок той же ступени прочёлся бы как «тот же аккорд»; состояние записи — в ноль (при записи оно уже закрыто выше)
+/* Владелец голоса ДОРОЖКИ — по префиксу ключа (те же, что у chOwnerKey/bassOwnerKey/ldKey и releaseLoopLayersAt). */
+const isTrackOwner=k=> k.slice(0,5)==='loop:' || k.slice(0,9)==='bassloop:' || k.slice(0,9)==='leadloop:';
+const trackOwnerLayer=k=> parseInt(k.slice(k.indexOf(':')+1),10);   // 'loop:3:2' → 3, 'leadloop:12:0' → 12
+/* ⛳ ПЕРЕДАТЬ ДОРОЖКИ НА ГОРИЗОНТЕ — ТОТ ЖЕ ШОВ, ЧТО frzLeave, ТОЛЬКО ДЛЯ ВСЕХ ДОРОЖЕК, ИГРАЮЩИХ СОБЫТИЯМИ.
+   Шов T — горизонт уже запланированного (loop.sched): всё до него поставлено, после — поставит обычный проход.
+   Голоса дорожек гасим ПО ВРЕМЕНИ T (релиз отменяет и атаки, уже поставленные в окно после T), а догонялка
+   (chasePlay — та же, что у входа в песню и у шва заморозки) поднимает удержанное к доле шва — в НОВОЙ высоте:
+   частоту выводит ENG из живой тоники/A4, лад — свой замороженный (правило #7).
+   ⚠️ СНЯТАЯ ДОРОЖКА (⤺/подложка на ходу: её событий больше нет) гасится СЕЙЧАС, а не на шве — догонять её
+   нечем, а уже поставленные в окно атаки иначе прозвучали бы у удалённой ноты.
+   ⚠️ Замороженные: свежую догонялка пропускает (играет буфер), ещё взведённую устаревшую — тоже (её передаст
+   frzLeave, см. frzBufOwns в chasePlay); устаревшую и уже переданную — передаёт как любую.
+   ⚠️ Во время записи: recAllOff (выше) уже закрыл открытое в дубле, а события пишущегося взятого chaseFor
+   пропускает — дубль этим не задет. */
+function trackResplice(){
+  const spb=60/loop.bpm, m=loop.sched, T=loop.t0+m*spb, lo=songAt(m);
+  const alive=new Set(); for(const e of events) alive.add(e.layer);
+  const at=k=> alive.has(trackOwnerLayer(k)) ? T : undefined;          // живая дорожка — на шве; снятая — сейчас
+  for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:')     chordOff(k, at(k));
+  for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:') bassOff(k, at(k));
+  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:') leadOff(k, at(k));
+  chasePlay(lo, T, false);                          // аккорды и бас — по времени шва, до событий следующего отрезка
+  chasePlay(lo, T, true);                           // соло — по явному времени шва, как при пуске
+}
 function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
 
 /* --- Транспорт петли --- */
@@ -2280,7 +2322,7 @@ function chasePlay(x,when,lead,only){
        дорожки на входе. Живое (события взятого) отсеяно ещё при построении (chaseFor), тем же правилом, что
        в переигровке. */
     if(gated&&!laneAudible(ly)) continue;                     // заглушённая / молчащая из-за чужого соло — догнанной ноты у неё быть не должно
-    if(frzLayer(ly)) continue;                                // F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам
+    if(frzLayer(ly)||frzBufOwns(ly)) continue;                // F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам. A2c: и УСТАРЕВШЕЙ, чей буфер ещё звучит (взведён), — её передаст событиям frzLeave на своём шве; догони мы её здесь, голос открылся бы дважды
     const hold=!!(s.set&&s.set.a.hold);                       // терменвокс: ведение с hold несёт ЖИВУЮ ступень, а высоту — бенд от ступени АТАКИ
     const a={...s.on.a, ...(s.set?s.set.a:null)};
     const ctx=(s.set&&!hold)?s.set:s.on;
