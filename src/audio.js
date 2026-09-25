@@ -2080,12 +2080,15 @@ function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; bvRele
 /* when (S2) — явное время ПОСЛЕДНИМ аргументом, по умолчанию «сейчас». Уровень стоит ПОСЛЕ него по
    порядку исторически (level был единственным параметром), поэтому when второй: правило «when последний»
    здесь выполняется буквально. */
-function droneOn(level=0.18,when){ if(!AC)return; const t=when!=null?when:AC.currentTime;
-  dG.gain.setTargetAtTime(level,t,1.2);
+/* tc (A2b) — постоянная времени уровня; по умолчанию прежние 1.2 с (вход) и 0.6 с (выход), байт-в-байт.
+   Короткую передаёт ТОЛЬКО шов заморозки: там живой дрон подменяет дрон буфера в одно мгновение, и
+   секундный наплыв читался бы провалом. */
+function droneOn(level=0.18,when,tc=1.2){ if(!AC)return; const t=when!=null?when:AC.currentTime;
+  dG.gain.setTargetAtTime(level,t,tc);
   dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
   dO2.frequency.setTargetAtTime(tonicFreq()/2*1.498,t,0.3);
 }
-function droneOff(when){ if(!AC)return; dG.gain.setTargetAtTime(0,when!=null?when:AC.currentTime,0.6); }
+function droneOff(when,tc=0.6){ if(!AC)return; dG.gain.setTargetAtTime(0,when!=null?when:AC.currentTime,tc); }
 /* Живой селектор набора ударных: только глобальный индекс + дропдаун (удар транзиентный,
    тембр берётся на КАЖДЫЙ удар из a.kit — заморожен в событии, как бас/аккорд). */
 function setDrumKit(i){

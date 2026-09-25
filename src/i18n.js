@@ -145,7 +145,7 @@ export const DICTS = {
     /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ, а не постоянная надпись: см. freezePinCaptures. */
     'frz.pinned':'This track had notes added in the editor. Their effects are now fixed as they sound right now — the live controls no longer reach them.',
     'roll.tabLater':'Editing this role comes later',
-    'roll.roleLater':'{role} notes can’t be edited in the roll yet',
+    'roll.roleLater':'{role} notes can’t be edited in the roll yet — freezing (❄) works',
     'roll.scaleTitle':'This track holds events in several scales · tap to switch the axis',
     'roll.ghosts':'{n} in another scale',
     'roll.emptyRole':'Nothing of this role in this track',
@@ -557,7 +557,7 @@ export const DICTS = {
     'frz.noCancel':'Начатый рендер не остановить — дождитесь конца',
     'frz.pinned':'В этой дорожке есть ноты, добавленные в редакторе. Их эффекты теперь закреплены такими, как звучат сейчас, — живые ручки до них больше не дотянутся.',
     'roll.tabLater':'Правка этой роли — позже',
-    'roll.roleLater':'{role}: ноты этой роли в ролле пока не правятся',
+    'roll.roleLater':'{role}: ноты этой роли в ролле пока не правятся — заморозка (❄) работает',
     'roll.scaleTitle':'В дорожке события в нескольких ладах · тап переключает ось',
     'roll.ghosts':'{n} в другом ладу',
     'roll.emptyRole':'В этой дорожке нет этой роли',
