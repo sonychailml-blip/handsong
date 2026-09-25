@@ -792,16 +792,27 @@ function freezeSig(layer){
      Сегодня таких событий почти не бывает, и безусловное включение делало одно: смена живого тембра в
      панели старила ВСЕ замороженные дорожки — та же болезнь, что у takeFxVer. Тоника, A4 и темп
      входят ВСЕГДА: они меняют звук любой дорожки. */
-  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false;
+  /* ⛳ T0: ТЕМБРЫ САМОЙ ДОРОЖКИ — в подписи. Тембр живёт в «вкл» ноты (соло/аккорд/бас — `a.inst`) и в каждом
+     ударе (`a.kit`); свёртка по порядку событий ловит и смену тембра, и перестановку «какая нота каким».
+     Прежде тембра в подписи не было вовсе: будущая замена тембра у замороженной дорожки оставила бы её
+     играть СТАРЫЙ звук свежим буфером — если бы путь замены забыл поднять версию правок.
+     ⚠️ УРОК A2 СОБЛЮДЁН: в свёртку идут только данные СОБЫТИЙ дорожки, живые индексы — никогда (они входят
+     лишь запасными значениями, и лишь когда событие без тембра их читает, см. выше). Переключатель тембра
+     в панели замороженную дорожку не старит.
+     ⚠️ Мемо подписи сбрасывается по глобальному ключу (число событий, поколение, takeFxVer, приколоченное):
+     замена тембра обязана пройти через editCommit — он поднимает takeFxVer, как и любая правка редактора. */
+  const tmix=(h,tag,x)=>(Math.imul(h,31)+tag*64+((x==null?-1:x)|0)+1)|0;   // индексы < 63 (тембров соло 23, наборов 5)
+  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false, tim=0;
   for(const e of events) if(e.layer===layer){
     n++; sum+=e.t; if(first===null||e.t<first) first=e.t; if(last===null||e.t>last) last=e.t;
     if(!e.sc) noSc=true;
-    const a=e.a; if(a){ if(e.fn==='leadOn'&&a.inst===undefined) ld=true;
-                        else if(e.fn==='chOn'&&a.inst===undefined) ch=true;
-                        else if(e.fn==='bassOn'&&a.inst==null) bs=true; } }
+    const a=e.a; if(a){ if(e.fn==='leadOn'){ tim=tmix(tim,1,a.inst); if(a.inst===undefined) ld=true; }
+                        else if(e.fn==='chOn'){ tim=tmix(tim,2,a.inst); if(a.inst===undefined) ch=true; }
+                        else if(e.fn==='bassOn'){ tim=tmix(tim,3,a.inst); if(a.inst==null) bs=true; }
+                        else if(e.fn==='drum') tim=tmix(tim,4,a.kit); } }
   const id=laneOf(layer), ver=id==null?0:(laneEditVer.get(id)||0);
   const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+tonic+','+aRef+','+loop.bpm
-         +'|'+(noSc?scaleIdx+','+(seventh?1:0):'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-');
+         +'|'+(noSc?scaleIdx+','+(seventh?1:0):'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim;
   frzSigMemo.set(layer, v);
   return v;
 }
@@ -1790,17 +1801,25 @@ function recLeadEv(own,p,live){
     /* ⚠️ БЕНД НЕ ТРОГАЕМ (R3): точка бенда дописывается в a.bend ПОСЛЕ push, по ссылке из r.bend, и
        опора (r.deg/r.oct/r.t0/r.lastC) живёт своей жизнью. Карта эффектов добавлена РЯДОМ, ни ссылка,
        ни пороги бенда не задеты — hold:true по-прежнему говорит переигровке «частоту не сбивать». */
-    if(p.inst!==r.inst||Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
-      if(!push('leadSet',{...p,hold:true,v:r.v})) return;   // S4.1: не легло — сравнение остаётся со старым
-      r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;   // deg/oct остаются на атаке
+    if(Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
+      if(!push('leadSet',{...noInst(p),hold:true,v:r.v})) return;   // S4.1: не легло — сравнение остаётся со старым. T0: тембр в ведение не пишем (см. noInst)
+      r.vol=p.vol; r.fx=fxCopy(p.fx);                 // deg/oct остаются на атаке; тембр — тоже (T0)
     }
     return;
   }
-  if(p.deg!==r.deg||p.oct!==r.oct||p.inst!==r.inst||
-     Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('leadSet',{...p,v:r.v})) return; }   // S4.1: не легло — состояние прежнее
+  if(p.deg!==r.deg||p.oct!==r.oct||
+     Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('leadSet',{...noInst(p),v:r.v})) return; }   // S4.1: не легло — состояние прежнее. T0: смена ЖИВОГО тембра посреди ноты больше не повод писать ведение
   else return;
-  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;
+  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx);
 }
+/* ⛳ T0 (дуга «одна роль на дорожку»): ТЕМБР ЖИВЁТ ТОЛЬКО В «ВКЛ» НОТЫ. Звук читает его ровно на атаке — он
+   печётся в голосе, и ведение (ENG.leadSet/bassSet) его не передаёт вовсе. А догонялка склеивает нагрузку
+   {...вкл.a, ...ведение.a} — и тембр из ведения ПЕРЕБИВАЛ тембр атаки: нота, переключённая по живому
+   тембру посреди звучания, после перемотки в неё поднималась тембром, которым её никогда не играли. Отсюда
+   два правила записи: ведение соло и баса тембр НЕ несёт, и смена ЖИВОГО тембра при зажатой ноте — не
+   повод писать ведение (звучит-то прежний). У аккорда так было всегда: chSet тембра не несёт.
+   ⛔ Поле УБИРАЕТСЯ, ни одно не добавляется (правило #11 цело). */
+const noInst=p=>{ if(!p||!('inst' in p)) return p; const {inst, ...rest}=p; return rest; };
 function recLeadOff(own){ recFoldRoll();          // S3.5a-fix: шов ПЕРВЫМ — нота прошлого прохода закрывается на его КОНЦЕ, а не свёрнутым «сейчас» (иначе leadOff лёг бы раньше своего leadOn и нота повисла бы)
   const r=recLead.get(own);
   if(recording&&r) push('leadOff',{v:r.v});
@@ -1916,9 +1935,9 @@ function recBassEv(p){                                  // бас прорежи
   recFoldRoll();                                          // S3.5d-fix: шов прохода ПЕРВЫМ, как у соло — открытая бас-нота прошлого прохода закрывается на ЕГО конце, и ниже откроется новая
   const q=recBass?recBass.q:loop.quant;                   // S4.3: правило квантизации — от «вкл» ноты (см. шапку у recChOn)
   if(!recBass){ if(!push('bassOn',{...p},null,null,q)) return; }     // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
-  else if(p.deg!==recBass.deg||p.oct!==recBass.oct||p.inst!==recBass.inst||Math.abs(p.vol-recBass.vol)>REC_VOL_EPS){ if(!push('bassSet',{...p},null,null,q)) return; }
+  else if(p.deg!==recBass.deg||p.oct!==recBass.oct||Math.abs(p.vol-recBass.vol)>REC_VOL_EPS){ if(!push('bassSet',{...noInst(p)},null,null,q)) return; }   // T0: тембр — только в «вкл» (см. noInst); смена живого тембра посреди ноты — не повод для ведения
   else return;
-  recBass={deg:p.deg,oct:p.oct,vol:p.vol,inst:p.inst,q};
+  recBass={deg:p.deg,oct:p.oct,vol:p.vol,inst:recBass?recBass.inst:p.inst,q};   // T0: тембр ноты — тембр её атаки
 }
 function recBassOff(){ recFoldRoll();                   // S3.5d-fix: как recLeadOff — иначе bassOff лёг бы свёрнутым «сейчас», раньше своего bassOn
   if(recording&&recBass){ push('bassOff',{},null,null,recBass.q); recBass=null; } }
@@ -2324,7 +2343,7 @@ function chasePlay(x,when,lead,only){
     if(gated&&!laneAudible(ly)) continue;                     // заглушённая / молчащая из-за чужого соло — догнанной ноты у неё быть не должно
     if(frzLayer(ly)||frzBufOwns(ly)) continue;                // F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам. A2c: и УСТАРЕВШЕЙ, чей буфер ещё звучит (взведён), — её передаст событиям frzLeave на своём шве; догони мы её здесь, голос открылся бы дважды
     const hold=!!(s.set&&s.set.a.hold);                       // терменвокс: ведение с hold несёт ЖИВУЮ ступень, а высоту — бенд от ступени АТАКИ
-    const a={...s.on.a, ...(s.set?s.set.a:null)};
+    const a={...s.on.a, ...(s.set?noInst(s.set.a):null)};    // T0: тембр — ВСЕГДА от атаки (он печётся в голосе на «вкл»); ведение его больше не пишет, а у записанного раньше — перебивать не должно
     const ctx=(s.set&&!hold)?s.set:s.on;
     if(s.role==='ch'){ ENG.chOn(a,ctx,{when}); curChordDeg=a.deg; curChordOct=a.oct; }
     else if(s.role==='bs') ENG.bassOn(a,ctx,{when});
@@ -2439,7 +2458,7 @@ function songSegs(){
         if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
         cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
               first:ev===n.head, start:ev.t, end:null, endBy:'open',
-              deg:a.deg, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:a.inst, vol:a.vol };
+              deg:a.deg, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
         segs.push(cur); byEv.set(ev,cur);
       }else byEv.set(ev,cur);                                                  // ведение громкости/эффектов — ВНУТРИ сегмента
     }
