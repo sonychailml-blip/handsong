@@ -662,8 +662,8 @@ async function onFreeze(){
   frzBusy=true; updRollBtns(); showCamMsg(t('frz.working'));
   try{
     const R=await import('./render.js');
-    await R.freeze(ly, { onProgress:p=>{ showCamMsg(p==null?t('frz.working'):t('frz.workingPct',{pct:Math.round(p*100)})); } });
-    showCamMsg(t('frz.done'));
+    const r=await R.freeze(ly, { onProgress:p=>{ showCamMsg(p==null?t('frz.working'):t('frz.workingPct',{pct:Math.round(p*100)})); } });
+    showCamMsg(t(r&&r.installed ? 'frz.done' : 'frz.refused'));   // A2: буфер мог быть ОТВЕРГНУТ билетом (дорожка изменилась за время рендера) — «заморожена» тогда была бы неправдой
   }catch(e){ showCamMsg(t('frz.failed',{msg:(e&&e.message)?e.message:String(e)})); }
   finally{ frzBusy=false; updRollBtns(); }
 }

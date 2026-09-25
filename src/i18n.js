@@ -140,6 +140,7 @@ export const DICTS = {
     'frz.done':'Track frozen',
     'frz.failed':'Could not freeze: {msg}',
     'frz.dropped':'Unfrozen — playing its events again',
+    'frz.refused':'Not frozen: the track changed while it was rendering. It keeps playing its events.',
     'frz.noCancel':'Rendering cannot be stopped once started — please wait',
     /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ, а не постоянная надпись: см. freezePinCaptures. */
     'frz.pinned':'This track had notes added in the editor. Their effects are now fixed as they sound right now — the live controls no longer reach them.',
@@ -552,6 +553,7 @@ export const DICTS = {
     'frz.done':'Дорожка заморожена',
     'frz.failed':'Не удалось заморозить: {msg}',
     'frz.dropped':'Разморожена — снова играет свои события',
+    'frz.refused':'Не заморожена: дорожка изменилась, пока шёл рендер. Играет свои события.',
     'frz.noCancel':'Начатый рендер не остановить — дождитесь конца',
     'frz.pinned':'В этой дорожке есть ноты, добавленные в редакторе. Их эффекты теперь закреплены такими, как звучат сейчас, — живые ручки до них больше не дотянутся.',
     'roll.tabLater':'Правка этой роли — позже',
