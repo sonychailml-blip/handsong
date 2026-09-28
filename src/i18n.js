@@ -110,6 +110,7 @@ export const DICTS = {
     /* S3.3: приложение стало ЛИНЕЙНЫМ рекордером — «круг»/«петля» в подписях больше не правда.
        'rec.title.recFirst' УДАЛЁН вместе с веткой первого круга (loop.first). */
     'rec.title.overdub':'Recording track {n} — tap to stop',
+    'rec.title.overdubMany':'Recording tracks {list} — tap to stop',   // T2: одно взятое пишет несколько дорожек (по одной на роль)
     'rec.title.armed':'Playing — tap to record a new track',
     'rec.title.into':'Tap to record into track {n}',   // S3.5c: дорожка вооружена
     'rec.title.idle':'Record: tap for a one-bar count-in, then play',
@@ -262,6 +263,7 @@ export const DICTS = {
     /* S3.3: 'looper.recFirst' УДАЛЁН (ветки первого круга нет). Остальные трое говорят о ДОРОЖКАХ и
        длине ПЕСНИ, а не о петле. */
     'looper.overdub':'● RECORDING · track {n}',
+    'looper.overdubMany':'● RECORDING · tracks {list}',
     'looper.playing':'▶ PLAYING · {bars} bars · {layers} tracks',
     'looper.paused':'SONG · {bars} bars · {layers} tracks · “▶ play” to start',
     'looper.regionOn':'REPEAT',
@@ -527,6 +529,7 @@ export const DICTS = {
     'backing.drumsNone':'Для размера {metre} паттернов пока нет',
     'jam.sizeMismatch':'Подложка не встала',
     'rec.title.overdub':'Пишется дорожка {n} — тап остановит',
+    'rec.title.overdubMany':'Пишутся дорожки {list} — тап остановит',
     'rec.title.armed':'Играет — тап начнёт новую дорожку',
     'rec.title.into':'Тап — запись в дорожку {n}',
     'rec.title.idle':'Запись: тап — отсчёт такта, затем игра',
@@ -664,6 +667,7 @@ export const DICTS = {
     'status.loopPrefix':'▶ песня · {bpm} BPM · ',
     'looper.count':'ОТСЧЁТ  {n}',
     'looper.overdub':'● ЗАПИСЬ · дорожка {n}',
+    'looper.overdubMany':'● ЗАПИСЬ · дорожки {list}',
     'looper.playing':'▶ ИГРАЕТ · {bars} т. · дорожек {layers}',
     'looper.paused':'ПЕСНЯ · {bars} т. · дорожек {layers} · «▶ играть»',
     'looper.regionOn':'ПОВТОР',

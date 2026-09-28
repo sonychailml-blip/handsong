@@ -526,7 +526,7 @@ function drawLooper(){
   const bw=Math.max(60,sw-togBand), x1=x0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране
   const ids=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
   const rows=ids.slice();
-  if(recording) for(const ly of recLayers()) if(!rows.includes(ly)) rows.push(ly);   // пустой слой, что пишется прямо сейчас. T1: слои ВЗЯТОГО (в T1 один — ровно прежний loop.layer)
+  if(recording) for(const ly of recLayers()) if(!rows.includes(ly)) rows.push(ly);   // пустой слой, что пишется прямо сейчас. T1/T2: ВСЕ слои взятого (по дорожке на роль; без смены роли — один, ровно прежний)
   /* rowH 13 → 16: строка стала не только читаемее, но и НАЖИМАЕМЕЕ — в ней теперь живут две кнопки.
      Выше не берём: каждая дорожка — это высота на экране, а их бывает много (см. отчёт слайса). */
   /* braceH — полоса СКОБЫ ПОВТОРА (S3.5b) между заголовком и строками. ОТДЕЛЬНАЯ полоса, а не тап по
@@ -562,7 +562,7 @@ function drawLooper(){
   const delLy=laneDelPendingLayer();         // S3.5d: дорожка со взведённым удалением или null
   let head, hc;
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
-  else if(recording){ head=t('looper.overdub',{n:recLayers()[0]+1});   /* T1: первый (и в T1 единственный) слой взятого */ hc='#e5484d'; }
+  else if(recording){ { const rl=recLayers().slice().sort((x,y)=>x-y); head= rl.length>1 ? t('looper.overdubMany',{list:rl.map(l=>l+1).join(', ')}) : t('looper.overdub',{n:rl[0]+1}); }   /* T2: взятое пишет по дорожке на роль — называем ВСЕ; одна — прежняя строка */ hc='#e5484d'; }
   else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:ids.length}); hc='#57d9a3'; }
   else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.

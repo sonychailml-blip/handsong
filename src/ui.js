@@ -167,7 +167,8 @@ function updRecBtn(){
   recBtn.title = editIsOpen()
     ? t('roll.recBlocked')
     : recording
-    ? t('rec.title.overdub',{n:recLayers()[0]+1})   // T1: слой взятого (в T1 он один — прежний loop.layer)
+    ? (recLayers().length>1 ? t('rec.title.overdubMany',{list:recLayers().slice().sort((x,y)=>x-y).map(l=>l+1).join(', ')})
+                            : t('rec.title.overdub',{n:recLayers()[0]+1}))   // T2: дорожек взятого может быть несколько (по одной на роль)
     : armedLayer()!=null ? t('rec.title.into',{n:armedLayer()+1})   // S3.5c: вооружена дорожка — ● пишет в неё, а не в новую
     : (loop.on ? t('rec.title.armed')
                : t('rec.title.idle'));
