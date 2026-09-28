@@ -9,7 +9,7 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
-import { recording, inPB, loop, events, loopPos, loopChordDeg, loopChordOct, beatLevel, songBeats,
+import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
          songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
@@ -526,7 +526,7 @@ function drawLooper(){
   const bw=Math.max(60,sw-togBand), x1=x0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране
   const ids=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
   const rows=ids.slice();
-  if(recording && !rows.includes(loop.layer)) rows.push(loop.layer);   // пустой слой, что пишется прямо сейчас
+  if(recording) for(const ly of recLayers()) if(!rows.includes(ly)) rows.push(ly);   // пустой слой, что пишется прямо сейчас. T1: слои ВЗЯТОГО (в T1 один — ровно прежний loop.layer)
   /* rowH 13 → 16: строка стала не только читаемее, но и НАЖИМАЕМЕЕ — в ней теперь живут две кнопки.
      Выше не берём: каждая дорожка — это высота на экране, а их бывает много (см. отчёт слайса). */
   /* braceH — полоса СКОБЫ ПОВТОРА (S3.5b) между заголовком и строками. ОТДЕЛЬНАЯ полоса, а не тап по
@@ -562,7 +562,7 @@ function drawLooper(){
   const delLy=laneDelPendingLayer();         // S3.5d: дорожка со взведённым удалением или null
   let head, hc;
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
-  else if(recording){ head=t('looper.overdub',{n:loop.layer+1}); hc='#e5484d'; }
+  else if(recording){ head=t('looper.overdub',{n:recLayers()[0]+1});   /* T1: первый (и в T1 единственный) слой взятого */ hc='#e5484d'; }
   else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:ids.length}); hc='#57d9a3'; }
   else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
@@ -652,7 +652,7 @@ function drawLooper(){
   const rowOf=new Map();                                 // номер слоя → индекс строки (для ОДНОГО прохода по событиям, см. ниже)
   rows.forEach((lid,ri)=>{
     rowOf.set(lid,ri);
-    const ry=gy0+ri*rowH, mid=ry+rowH/2, live=recording&&lid===loop.layer;
+    const ry=gy0+ri*rowH, mid=ry+rowH/2, live=isRecLayer(lid);   /* T1: строка пишущегося слоя взятого (isRecLayer сама проверяет recording) */
     const muted=laneMuted(lid), soloed=laneSoloed(lid);
     /* ПРИГЛУШАЕМ ПО СЛЫШИМОСТИ, А НЕ ПО ГАЛОЧКЕ MUTE: при включённом соло молчат ВСЕ, кроме соло-дорожек,
        и это ровно то, что человек должен видеть. Показывай мы только mute — «включил соло на одной»

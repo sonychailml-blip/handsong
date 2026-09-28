@@ -72,12 +72,36 @@ let recCh=null, recBass=null, pumpTimer=null;
    ступени) лежит ПО ССЫЛКЕ в событии leadOn и копится только у терменвокса (гейт live!=null). */
 const recLead=new Map();     // ключ владельца ('lead:L'/'lead:R') → состояние открытой ноты
 const vSlots=new Map();      // ключ владельца → номер одновременной ноты v в СЛОЕ (для пары leadOn/leadOff на переигровке)
-let vBase=0;                 // первый номер v, свободный от УЖЕ ЛЕЖАЩИХ в целевом слое нот (S3.5a) — ставит onRec на старте взятого, см. layerSlotTop; ПОДНИМАЕТСЯ на каждом шве прохода (S3.5a-fix, см. recFoldRoll)
-let vTop=0;                  // первый номер ВЫШЕ всех, что выданы за это взятое (S3.5a-fix): до него поднимается vBase на шве
-let recLastT=-Infinity;      // последняя ПЕСЕННАЯ доля, которую видел путь записи соло (S3.5a-fix): время пошло НАЗАД относительно неё → был шов прохода
-let recHiT=-Infinity;        // S4.3: наибольшее t, записанное с последнего шва (или с ●). На НАСТОЯЩЕМ шве оно ≤ rgn.to всегда; больше — значит был ПРЫЖОК из-за конца скобы (см. recFoldRoll)
-let chLastT=-Infinity, bsLastT=-Infinity;   // S4.3: t последнего записанного события ЖИВОГО ключа аккорда / баса — ниже него push не пишет (см. страж в push). Ключ рождается на ● и на шве — там и сброс
-let takeK=0;                 // суффикс владельца аккорда/баса для ЭТОГО взятого (S3.5c, см. chOwnerKey); 0 — без суффикса. S3.5e: ПОДНИМАЕТСЯ на каждом шве прохода (recFoldRoll) — проходы одного взятого не делят владельца
+/* ⛳ СОСТОЯНИЕ ВЗЯТОГО — ПО СЛОЮ (слайс T1 дуги «одна роль на дорожку»). Прежде это были ОДИНОЧНЫЕ величины
+   (vBase, vTop, takeK, chLastT, bsLastT): взятое писало ровно в один слой, loop.layer. Следующий слайс (T2)
+   даст одному взятому писать в НЕСКОЛЬКО дорожек, а у каждой свои лежащие номера и свои ключи владельцев —
+   поэтому здесь каждая из них стала полем записи слоя. ⛔ T1 не рождает НИЧЕГО: слой во взятом один, и
+   ВСЕ события байт-в-байт прежние — ровно затем форма данных и маршрут разнесены по разным слайсам.
+   Поля записи — прежние величины, прежний смысл:
+     vBase   — первый номер v, свободный от УЖЕ ЛЕЖАЩИХ в слое соло-нот (S3.5a, см. layerSlotTop); поднимается на
+               каждом шве прохода (S3.5a-fix);
+     vTop    — первый номер ВЫШЕ всех, что выданы за это взятое в этот слой: до него поднимается vBase на шве;
+     k       — суффикс владельца аккорда/баса (S3.5c, см. chOwnerKey); 0 — без суффикса; +1 на каждом шве (S3.5e);
+     chLastT, bsLastT — t последнего записанного события ЖИВОГО ключа аккорда / баса (S4.3, страж в push).
+   ⚠️ КЛЮЧИ КАРТЫ И ЕСТЬ «СЛОИ ВЗЯТОГО»: отдельного множества не заводим — одно место, нечему расходиться.
+   Карта не чистится на остановке — её читатели все стоят за `recording`; чистит её старт следующего взятого. */
+const takeSt=new Map();      // слой → {vBase, vTop, k, chLastT, bsLastT}
+/* Вписать слой во взятое: номера и суффикс — ВЫШЕ всего, что в слое уже лежит (тот же обход, что и прежде на ●). */
+function takeJoin(layer){
+  const vb=layerSlotTop(layer);
+  const S={ vBase:vb, vTop:vb, k:layerTakeTop(layer), chLastT:-Infinity, bsLastT:-Infinity };
+  takeSt.set(layer,S); return S;
+}
+/* Запись слоя взятого. ⚠️ Страховка, а не путь: в T1 слой вписывается на ● и отсутствовать не может. */
+const ts=layer=> takeSt.get(layer) || takeJoin(layer);
+/* КУДА ЛОЖИТСЯ НОВАЯ НОТА ВЗЯТОГО. В T1 — единственный слой взятого (loop.layer, выставляет onRec). ⛳ Здесь
+   T2 поставит маршрут по роли; ведения и «выкл» сюда не ходят никогда — они идут в слой СВОЕЙ ноты. */
+const takeTarget=()=>loop.layer;
+/* Слои взятого — для полосы и стражей (прежде все они читали одиночный loop.layer). */
+const recLayers=()=>[...takeSt.keys()];
+const isRecLayer=layer=> recording && takeSt.has(layer);
+let recLastT=-Infinity;      // последняя ПЕСЕННАЯ доля, которую видел путь записи соло (S3.5a-fix): время пошло НАЗАД относительно неё → был шов прохода. ⚠️ ОДНА на взятое, не по слою: это время записи, а оно у всех слоёв общее
+let recHiT=-Infinity;        // S4.3: наибольшее t, записанное с последнего шва (или с ●). На НАСТОЯЩЕМ шве оно ≤ rgn.to всегда; больше — значит был ПРЫЖОК из-за конца скобы (см. recFoldRoll). Одна на взятое — по той же причине
 /* ⛳ НОМЕР ВЗЯТОГО — ev.tk (слайс S3.5d).
    ЗАЧЕМ ПОЛЕ В СОБЫТИИ. ⤺ обязан снимать ПОСЛЕДНЕЕ ВЗЯТОЕ, а не слой с наибольшим номером: взятое, влитое
    в старую дорожку, лежит в её слое рядом со старым материалом, и отличить его можно только по метке на
@@ -562,7 +586,7 @@ function captureInfoOf(layer){
 function lanePrune(){
   takePrune();   // O-2: захват взятого уходит вместе с его событиями — одной строкой, чтобы унаследовать всех вызывающих
   const live=new Set(); for(const e of events) live.add(e.layer);
-  for(const [ly,id] of laneId) if(!live.has(ly) && !(recording&&ly===loop.layer)){
+  for(const [ly,id] of laneId) if(!live.has(ly) && !isRecLayer(ly)){   // T1: пишущиеся слои взятого щадим (прежде — один loop.layer)
     laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); laneEditVer.delete(id); if(armLane===id) armLane=null; if(delPend&&delPend.id===id) delPend=null;
     freezeDrop(id); }   // S3.5c: снятая дорожка (⤺, снятие подложки) снимает и вооружение — ● дальше создаст новую, а не пишет в пустоту   // F4: и БУФЕР уходит вместе с ней — иначе он остался бы звучать за дорожку, которой больше нет
 }
@@ -594,7 +618,7 @@ function toggleArm(layer){
    «что удалю», однажды человек удалил бы дорожку, думая о записи. Два смысла — две цели. */
 const DEL_CONFIRM_MS=3000;
 function laneDelTap(layer){
-  if(!AC || (recording&&layer===loop.layer)){ delPend=null; return false; }   // в пишущуюся дорожку push продолжает писать — удалить её посреди взятого значило бы тут же воскресить
+  if(!AC || isRecLayer(layer)){ delPend=null; return false; }   // T1: любой слой взятого (прежде — loop.layer)   // в пишущуюся дорожку push продолжает писать — удалить её посреди взятого значило бы тут же воскресить
   const id=laneOf(layer) ?? laneNew(layer), now=performance.now();
   if(delPend && delPend.id===id && now<delPend.until){ delPend=null; return deleteLane(layer); }
   delPend={id, until:now+DEL_CONFIRM_MS};
@@ -612,7 +636,7 @@ function laneDelPendingLayer(){ if(!delPend || performance.now()>=delPend.until)
    schedInvalidate; строку, mute/solo, вооружение и взвод — lanePrune; дрон — laneHush (уровень по слышимости
    ОСТАВШИХСЯ дорожек: ушёл последний слой-дрон — дрон гаснет). */
 function deleteLane(layer){
-  if(!AC || (recording&&layer===loop.layer)) return false;
+  if(!AC || isRecLayer(layer)) return false;   // T1: любой слой взятого (прежде — loop.layer)
   releaseLoopLayersAt(undefined,layer);
   if(recording) events.sort((x,y)=>x.t-y.t);   // хвост взятого — в отсортированный префикс ДО schedInvalidate (см. setRegionOn)
   if(!compactEvents(e=>e.layer===layer)) return false;
@@ -1623,7 +1647,7 @@ const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?1/(l
    fz — {sc,sev}: ЗАМОРОЖЕННЫЙ ладовый контекст вместо текущего (S3.5e, то же место). Вписанное на шве «вкл»
    обязано нести лад САМОГО аккорда — тот, с которым легло его последнее событие, — а не тот, что сейчас
    выбран в панели. Без at и fz — байт-в-байт как было. */
-function push(fn,a,at,fz,q){   // → true, если событие ЛЕГЛО в массив (S4.1: открывающие пути записи ставят состояние только по true). q — ЗАМОРОЖЕННОЕ на ноте решение квантизации (S4.3); не задано — текущее loop.quant
+function push(fn,a,at,fz,q,ly=takeTarget()){   // ly (T1) — слой события ЯВНО: новая нота — takeTarget(), ведение и «выкл» — слой СВОЕЙ ноты (r.layer / recCh.layer / recBass.layer). Умолчание — страховка: все вызовы передают слой сами. // → true, если событие ЛЕГЛО в массив (S4.1: открывающие пути записи ставят состояние только по true). q — ЗАМОРОЖЕННОЕ на ноте решение квантизации (S4.3); не задано — текущее loop.quant
   if(!AC)return false;
   /* ⛳ ЗАПИСЬ ИДЁТ В ПЕСЕННОЙ ДОЛЕ, то есть СВЁРНУТОЙ в область (S3.4). Отсюда и ответ на вопрос «что
      делает ● при включённом повторе»: НАКОПЛЕНИЕ В ОБЛАСТЬ — каждый следующий проход дописывает
@@ -1681,7 +1705,8 @@ function push(fn,a,at,fz,q){   // → true, если событие ЛЕГЛО �
      rgn.to, шов пишет «выкл» на rgn.to (≥ всего прохода) и рождает новый ключ (сброс в recFoldRoll). Соло и удары не касается:
      соло не квантуется (время ключа монотонно само), у удара нет пары. */
   const cb= fn[0]==='c' ? 1 : fn[0]==='b' ? 2 : 0;
-  if(cb===1 && t<chLastT) t=chLastT; else if(cb===2 && t<bsLastT) t=bsLastT;
+  const S=ts(ly);                                     // T1: страж ключа и суффикс — ЭТОГО слоя (ключ владельца несёт номер слоя, значит и они по слою)
+  if(cb===1 && t<S.chLastT) t=S.chLastT; else if(cb===2 && t<S.bsLastT) t=S.bsLastT;
   /* ⛔ КОПИЯ КАРТЫ ЭФФЕКТОВ — R1, САМЫЙ ОПАСНЫЙ БАГ ЭТОГО ПЛАСТА, ЗАКРЫТ ЗДЕСЬ И ТОЛЬКО ЗДЕСЬ.
      До 3.7.2 ВСЯ полезная нагрузка была примитивами, кроме двух намеренных ссылок: ty (никогда не
      мутируется) и bend (дописывается осознанно). Карта a.fx — первый МУТИРУЕМЫЙ объект в нагрузке, а
@@ -1690,11 +1715,11 @@ function push(fn,a,at,fz,q){   // → true, если событие ЛЕГЛО �
      движение руки тихо переписало бы УЖЕ ЗАПИСАННОЕ прошлое: слой начал бы звучать не так, как его
      сыграли. Снаружи это читается как «петля сама меняется» — и искать причину пришлось бы долго.
      ЗАПИСАННАЯ КАРТА С ЭТОГО МОМЕНТА НЕИЗМЕНЯЕМА: её больше никто не трогает, только читает. */
-  const ev={t,layer:loop.layer,fn,a,sc:fz?fz.sc:CUR(),sev:fz?fz.sev:seventh,tk:curTake};   // §3.4: замораживаем ладовый контекст события (fz — уже замороженный, S3.5e); tk — номер взятого (S3.5d)
+  const ev={t,layer:ly,fn,a,sc:fz?fz.sc:CUR(),sev:fz?fz.sev:seventh,tk:curTake};   // §3.4: замораживаем ладовый контекст события (fz — уже замороженный, S3.5e); tk — номер взятого (S3.5d)
   if(a && a.fx) ev.a={...a, fx:{...a.fx}};
-  if(takeK && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:takeK};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
+  if(S.k && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:S.k};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
   events.push(ev);
-  if(cb===1) chLastT=t; else if(cb===2) bsLastT=t;    // S4.3: страж ключа
+  if(cb===1) S.chLastT=t; else if(cb===2) S.bsLastT=t;   // S4.3: страж ключа (T1: по слою)
   if(t>recHiT) recHiT=t;                               // S4.3: высшая записанная доля участка (отличает шов от прыжка)
   if(t>songLen){ songLen=t; braceFollowGrow(); }      // длина песни растёт по одному событию (полный пересчёт — только в schedInvalidate); «следующая» скоба — вместе с ней, O(1)
   return true;
@@ -1727,7 +1752,11 @@ function pushBend(r,live){
    ⚠️ ВНУТРИ взятого номера по-прежнему ПЕРЕИСПОЛЬЗУЮТСЯ (свободный от открытых) — это держит их малыми;
    монотонный счётчик «номер на ноту» тоже был бы верен (leadAlloc ищет голос по ключу лишь пока нота
    зажата), но плодил бы тысячи ключей без нужды. */
-function freeSlot(){ const used=new Set([...vSlots.values()]); let v=vBase; while(used.has(v))v++; return v; }
+/* T1: номера — ПО СЛОЮ. Заняты только номера открытых нот ТОГО ЖЕ слоя (владелец 'leadloop:N:v' несёт номер
+   слоя, так что у разных слоёв v не сталкиваются), база — vBase этого слоя. Пока слой во взятом один, у
+   каждой открытой ноты он и есть — множество занятых то же, что было, номера те же. */
+function freeSlot(layer){ const used=new Set(); for(const [o,v] of vSlots){ const r=recLead.get(o); if(!r||r.layer===layer) used.add(v); }
+  let v=ts(layer).vBase; while(used.has(v))v++; return v; }
 /* Первый номер v ВЫШЕ всех соло-нот, уже лежащих в слое layer (0 — соло-нот нет). Событие без v — это
    нота №0 (совместимость ldKey), поэтому считаем его как 0, и слой со старой записью даст 1.
    ⛳ ОБХОД O(n) — ОДИН РАЗ НА ВЗЯТОЕ, на нажатии ●, а НЕ на ноту и НЕ в push: слайс S3.2 затем и был,
@@ -1786,14 +1815,15 @@ function recLeadEv(own,p,live){
   recFoldRoll();                                   // S3.5a-fix: СНАЧАЛА шов (если время свернулось) — иначе ниже нашлась бы запись ноты ПРОШЛОГО прохода или выдался бы номер от старой базы
   let r=recLead.get(own);
   if(!r){
-    const v=freeSlot();
+    const ly=takeTarget();                         // T1: слой новой ноты; её ведения и «выкл» пойдут в r.layer
+    const v=freeSlot(ly);
     const a={...p,v};                              // v — номер одновременной ноты в слое (пара для leadOff)
     const t0= live!=null ? curBeat() : 0;          // опора бенда — ДО push, как и прежде (то же мгновение, что у самой ноты)
     if(live!=null) a.bend=[];
-    if(!push('leadOn',a)) return;                  // S4.1: отсчёт — нота не открыта: ни номера, ни состояния (иначе её ведения и «выкл» легли бы сиротами)
+    if(!push('leadOn',a,null,null,undefined,ly)) return;   // S4.1: отсчёт — нота не открыта: ни номера, ни состояния (иначе её ведения и «выкл» легли бы сиротами)
     vSlots.set(own,v);
-    if(v+1>vTop) vTop=v+1;                         // высшая выданная за взятое — до неё поднимется база на шве
-    r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:live!=null?a.bend:null,t0,lastC:null,v};   // r.bend — ТОТ ЖЕ массив, что в событии (push копирует a мелко)
+    const S=ts(ly); if(v+1>S.vTop) S.vTop=v+1;      // высшая выданная за взятое В ЭТОТ СЛОЙ — до неё поднимется база на шве
+    r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:live!=null?a.bend:null,t0,lastC:null,v,layer:ly};   // layer (T1) — слой ноты: туда же её ведения и «выкл»   // r.bend — ТОТ ЖЕ массив, что в событии (push копирует a мелко)
     recLead.set(own,r);
     if(live!=null)pushBend(r,live);                // стартовая точка (r уже есть — опора известна)
     return;
@@ -1804,13 +1834,13 @@ function recLeadEv(own,p,live){
        опора (r.deg/r.oct/r.t0/r.lastC) живёт своей жизнью. Карта эффектов добавлена РЯДОМ, ни ссылка,
        ни пороги бенда не задеты — hold:true по-прежнему говорит переигровке «частоту не сбивать». */
     if(p.inst!==r.inst||Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
-      if(!push('leadSet',{...p,hold:true,v:r.v})) return;   // S4.1: не легло — сравнение остаётся со старым. T0-fix: тембр В ведении соло — нота переливается живьём (см. noInst)
+      if(!push('leadSet',{...p,hold:true,v:r.v},null,null,undefined,r.layer)) return;   // S4.1: не легло — сравнение остаётся со старым. T0-fix: тембр В ведении соло — нота переливается живьём (см. noInst)
       r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;   // deg/oct остаются на атаке
     }
     return;
   }
   if(p.deg!==r.deg||p.oct!==r.oct||p.inst!==r.inst||
-     Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('leadSet',{...p,v:r.v})) return; }   // S4.1: не легло — состояние прежнее. T0-fix: смена живого тембра посреди ноты — ЗАПИСЫВАЕТСЯ (соло её слышно)
+     Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('leadSet',{...p,v:r.v},null,null,undefined,r.layer)) return; }   // S4.1: не легло — состояние прежнее. T0-fix: смена живого тембра посреди ноты — ЗАПИСЫВАЕТСЯ (соло её слышно)
   else return;
   r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;
 }
@@ -1828,7 +1858,7 @@ function recLeadEv(own,p,live){
 const noInst=p=>{ if(!p||!('inst' in p)) return p; const {inst, ...rest}=p; return rest; };
 function recLeadOff(own){ recFoldRoll();          // S3.5a-fix: шов ПЕРВЫМ — нота прошлого прохода закрывается на его КОНЦЕ, а не свёрнутым «сейчас» (иначе leadOff лёг бы раньше своего leadOn и нота повисла бы)
   const r=recLead.get(own);
-  if(recording&&r) push('leadOff',{v:r.v});
+  if(recording&&r) push('leadOff',{v:r.v},null,null,undefined,r.layer);
   recLead.delete(own); vSlots.delete(own); }
 function recLeadReset(){ recLead.clear(); vSlots.clear(); }   // паника/очистка: открытых нот больше нет (шов прохода во время записи идёт через recFoldRoll)
 /* ═══ ШОВ ПРОХОДА ОБЛАСТИ ВО ВРЕМЯ ЗАПИСИ (слайс S3.5a-fix) ═══
@@ -1863,15 +1893,15 @@ function recFoldRoll(){
        которую запись реально видела или записала: она ≥ каждого события открытых нот (recHiT ловит и округление вперёд). */
     const end=Math.max(recLastT,recHiT);
     const at = cycling() && end<=loop.rgn.to+1e-9 ? loop.rgn.to : end;
-    for(const r of recLead.values()) push('leadOff',{v:r.v},at);
+    for(const r of recLead.values()) push('leadOff',{v:r.v},at,null,undefined,r.layer);   // T1: «выкл» — в слой своей ноты
     recLead.clear(); vSlots.clear();
-    vBase=Math.max(vBase,vTop);
+    for(const S of takeSt.values()) S.vBase=Math.max(S.vBase,S.vTop);   // T1: база поднимается В КАЖДОМ слое взятого (слой один — ровно прежнее)
     /* S3.5d-fix: БАС — ТОТ ЖЕ ДЕФЕКТ, ТА ЖЕ ПОЧИНКА. Прежде на шве liveWrapRelease просто обнулял recBass: бас-нота,
        удержанная через шов, оставалась в слое с bassOn без bassOff — висла на переигровке и воскресала
        догонялкой на каждом следующем входе. Теперь — настоящий bassOff на конце прохода; зажатая рука
        переатакует со следующего кадра (живой голос liveWrapRelease уже погасил) и откроет новую ноту.
        Слотов у баса нет — его проходы разводит суффикс владельца takeK, который поднимается ниже. */
-    if(recBass){ push('bassOff',{},at); recBass=null; }
+    if(recBass){ push('bassOff',{},at,null,undefined,recBass.layer); recBass=null; }
     /* ⛳ S3.5e: ЗАЩЁЛКНУТЫЙ (или удерживаемый) АККОРД — последний случай незакрытой ноты. Состояние записи аккорда
        шов переживало: его ведения и итоговое «выкл» ложились СВЁРНУТЫМ временем РАНЬШЕ его «вкл», и с выключенным
        повтором он звенел до конца песни, а догонялка поднимала его на каждом следующем входе.
@@ -1887,12 +1917,12 @@ function recFoldRoll(){
        голоса, от которой соло разводит vBase. takeK стартует выше всех k, лежавших в слое (layerTakeTop), и дальше
        только растёт, поэтому номер не повторится. */
     const ch=recCh;
-    if(ch) push('chOff',{},at);
-    recHiT=-Infinity; chLastT=-Infinity; bsLastT=-Infinity;   // S4.3: «выкл» старого ключа записаны — дальше новый участок и новые ключи (takeK ниже)
-    takeK=takeK+1;
+    if(ch) push('chOff',{},at,null,undefined,ch.layer);
+    recHiT=-Infinity;                                          // S4.3: «выкл» старого ключа записаны — дальше новый участок и новые ключи (k ниже)
+    for(const S of takeSt.values()){ S.chLastT=-Infinity; S.bsLastT=-Infinity; S.k=S.k+1; }   // T1: стражи и суффикс — в КАЖДОМ слое взятого; порядок прежний: «выкл» уже записаны СТАРЫМ k
     if(ch) ch.q=loop.quant;                                    // S4.3: вписанное «вкл» — новая нота в данных, она берёт ТЕКУЩЕЕ правило (как бас, что переатакует после шва). Безопасно для порядка: rgn.from — линия такта, лежит на любой сетке
     if(ch) push('chOn',{deg:ch.deg,oct:ch.oct,vol:ch.vol,inst:ch.inst,ty:ch.ty,bri:ch.bri},
-                cycling() ? loop.rgn.from : now, {sc:ch.sc, sev:ch.sev});   // та же нагрузка, что у настоящего chOn (WchOn): deg/oct/vol/inst/ty/bri; лад и септаккорд — замороженные самого аккорда
+                cycling() ? loop.rgn.from : now, {sc:ch.sc, sev:ch.sev}, undefined, ch.layer);   // T1: вписанное «вкл» — в слой того же аккорда, НОВЫМ k   // та же нагрузка, что у настоящего chOn (WchOn): deg/oct/vol/inst/ty/bri; лад и септаккорд — замороженные самого аккорда
   }
   recLastT=now;
 }
@@ -1924,30 +1954,35 @@ function recFoldRoll(){
    берёт текущее, см. recFoldRoll), ровно когда бас, переатакуя, тоже его берёт. */
 function recChOn(a){ if(!recording)return; recFoldRoll();
   const q=recCh?recCh.q:loop.quant;                                  // S4.3: смена звучащего — правило прежнее; из тишины — текущее
-  const inst=a.inst??chIdx; if(!push('chOn',{...a,inst},null,null,q)) return;   // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
-  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh}; }
+  /* T1: новый аккорд — в слой взятого (takeTarget). ⚠️ Открытый прежний аккорд закрывает это «вкл» ТОЛЬКО
+     потому, что у них общий ключ владельца, то есть общий слой. Когда в T2/T3 новое «вкл» сможет уйти в
+     ДРУГОЙ слой, прежний аккорд придётся закрыть явно — иначе он останется открытым в своей дорожке. */
+  const ly=takeTarget();
+  const inst=a.inst??chIdx; if(!push('chOn',{...a,inst},null,null,q,ly)) return;   // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
+  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:ly}; }
 function recChSet(a){
   if(!recording)return;
   recFoldRoll();
-  let inst, q;
-  if(!recCh){ inst=chIdx; q=loop.quant; if(!push('chOn',{...a,inst},null,null,q)) return; }   // S4.1: зажатая через старт защёлка/удержание откроется первым кадром после отсчёта — этой же веткой
-  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS||Math.abs((a.bri||0)-(recCh.bri||0))>REC_REV_EPS){ inst=recCh.inst; q=recCh.q; if(!push('chSet',{...a},null,null,q)) return; }
+  let inst, q, ly;
+  if(!recCh){ inst=chIdx; q=loop.quant; ly=takeTarget(); if(!push('chOn',{...a,inst},null,null,q,ly)) return; }   // S4.1: зажатая через старт защёлка/удержание откроется первым кадром после отсчёта — этой же веткой
+  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS||Math.abs((a.bri||0)-(recCh.bri||0))>REC_REV_EPS){ inst=recCh.inst; q=recCh.q; ly=recCh.layer; if(!push('chSet',{...a},null,null,q,ly)) return; }
   else return;
-  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh};
+  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:ly};   // layer (T1) — слой аккорда: туда же его ведения, «выкл» и вписанное на шве «вкл»
 }
-function recChOff(){ recFoldRoll(); if(recording&&recCh){ push('chOff',{},null,null,recCh.q); recCh=null; } }   // шов первым: «выкл» открытого в новом проходе аккорда ложится в новый проход, а не свёрнутым временем в старый
+function recChOff(){ recFoldRoll(); if(recording&&recCh){ push('chOff',{},null,null,recCh.q,recCh.layer); recCh=null; } }   // шов первым: «выкл» открытого в новом проходе аккорда ложится в новый проход, а не свёрнутым временем в старый
 function recBassEv(p){                                  // бас прореживается как соло
   if(!recording)return;
   recFoldRoll();                                          // S3.5d-fix: шов прохода ПЕРВЫМ, как у соло — открытая бас-нота прошлого прохода закрывается на ЕГО конце, и ниже откроется новая
   const q=recBass?recBass.q:loop.quant;                   // S4.3: правило квантизации — от «вкл» ноты (см. шапку у recChOn)
-  if(!recBass){ if(!push('bassOn',{...p},null,null,q)) return; }     // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
-  else if(p.deg!==recBass.deg||p.oct!==recBass.oct||Math.abs(p.vol-recBass.vol)>REC_VOL_EPS){ if(!push('bassSet',{...noInst(p)},null,null,q)) return; }   // T0: тембр — только в «вкл» (см. noInst); смена живого тембра посреди ноты — не повод для ведения
+  const ly= recBass ? recBass.layer : takeTarget();       // T1: новая нота — в слой взятого; ведение — в слой своей ноты
+  if(!recBass){ if(!push('bassOn',{...p},null,null,q,ly)) return; }     // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
+  else if(p.deg!==recBass.deg||p.oct!==recBass.oct||Math.abs(p.vol-recBass.vol)>REC_VOL_EPS){ if(!push('bassSet',{...noInst(p)},null,null,q,ly)) return; }   // T0: тембр — только в «вкл» (см. noInst); смена живого тембра посреди ноты — не повод для ведения
   else return;
-  recBass={deg:p.deg,oct:p.oct,vol:p.vol,inst:recBass?recBass.inst:p.inst,q};   // T0: тембр ноты — тембр её атаки
+  recBass={deg:p.deg,oct:p.oct,vol:p.vol,inst:recBass?recBass.inst:p.inst,q,layer:ly};   // T0: тембр ноты — тембр её атаки. T1: layer — слой ноты
 }
 function recBassOff(){ recFoldRoll();                   // S3.5d-fix: как recLeadOff — иначе bassOff лёг бы свёрнутым «сейчас», раньше своего bassOn
-  if(recording&&recBass){ push('bassOff',{},null,null,recBass.q); recBass=null; } }
-function recDrum(a){ if(recording)push('drum',{...a}); }   // удар — одиночное событие
+  if(recording&&recBass){ push('bassOff',{},null,null,recBass.q,recBass.layer); recBass=null; } }
+function recDrum(a){ if(recording)push('drum',{...a},null,null,undefined,takeTarget()); }   // удар — одиночное событие
 /* ⛳ ЗАКРЫТЬ В ЗАПИСИ ВСЁ, ЧТО ОСТАЛОСЬ ОТКРЫТЫМ (слайс S3.1). Зовётся при ОСТАНОВКЕ ОВЕРДАБА, когда
    человек жмёт «●», не отпустив пальцы: каждая звучащая нота обязана получить в слой своё «выключение»,
    иначе слой записан незавершённым.
@@ -2684,10 +2719,10 @@ function onRec(){
      Сегодня слой здесь всегда свежий → vBase=0. Сброс в recLeadReset НЕ нужен и был бы ОШИБКОЙ: база —
      свойство взятого (что лежало в слое ДО него), а не открытых нот; паника/граница повтора посреди
      взятого не меняют того, что лежало раньше. */
-  vBase=layerSlotTop(loop.layer);
-  takeK=layerTakeTop(loop.layer); curTake=++takeSeq;   // S3.5c: суффикс аккорда/баса взятого; S3.5d: номер взятого (tk всех его событий)
+  takeSt.clear(); takeJoin(loop.layer);   // T1: слой взятого вписан — его vBase/vTop, k и стражи (прежде одиночные vBase/takeK/…); СТРОГО ДО setRecording(true), как и было
+  curTake=++takeSeq;   // S3.5c: суффикс аккорда/баса взятого; S3.5d: номер взятого (tk всех его событий)
   takeCapStart(curTake);   // O-2: снимок цепей на старте взятого. СТРОГО ПОСЛЕ выдачи curTake и ДО setRecording(true): дорожка автоматизации пишет только при recording и опирается на уже засеянную опору
-  vTop=vBase; recLastT=-Infinity; recHiT=-Infinity; chLastT=-Infinity; bsLastT=-Infinity;   // S4.3: участок и живые ключи рождаются заново вместе со взятым. S3.5a-fix: взятое начинается без выданных номеров и без виденного времени — первый шов распознаётся по первому возврату времени
+  recLastT=-Infinity; recHiT=-Infinity;   // vTop/chLastT/bsLastT — теперь в записи слоя, их выставил takeJoin   // S4.3: участок и живые ключи рождаются заново вместе со взятым. S3.5a-fix: взятое начинается без выданных номеров и без виденного времени — первый шов распознаётся по первому возврату времени
   setRecording(true); schedInvalidate();   // массив ещё не менялся, но с этого мига push начнёт дописывать ХВОСТ — фиксируем границу cursN здесь, а не «когда-нибудь»
   /* Транспорт стоял → поднимаем его С ОТСЧЁТОМ, от НАЧАЛА СКОБЫ (S3.5b). Нетронутая скоба начинается с 0 —
      запись идёт с начала песни, это заданное умолчание. ⚠️ СМЕНА ПОВЕДЕНИЯ, НАЗВАННАЯ: прежде запись
@@ -2909,6 +2944,7 @@ export {
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   makeENG, fxLaneMerge, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey,   // F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не писать) · роль события (чья это цепь эффектов)
   frzGlobalKey,   // A1 (автозаморозка): дешёвый ГЛОБАЛЬНЫЙ сигнал «могла смениться подпись хоть одной дорожки» — для наблюдателя A3/A4. Чистое чтение; сегодня вызывающих нет
+  recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен
   freezeSet, unfreezeLayer, frozenLayers, frozenInfo, freezeState, frzHas, freezePinCaptures,   // F4/F5: ЗАМОРОЗКА как РЕЖИМ ВОСПРОИЗВЕДЕНИЯ; freezeState — 'none'|'fresh'|'stale' для показа (звук гатится тем же предикатом внутри)
   frzLayer,   // F4: ЗАМОРОЗКА как РЕЖИМ ВОСПРОИЗВЕДЕНИЯ. События не выбрасываются: пока буфер есть, транспорт играет ЕГО вместо событий дорожки. Зовут пока только из консоли (render.js), кнопки в этом слайсе нет

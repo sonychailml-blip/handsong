@@ -29,7 +29,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, captureInfoOf,
-         freezeState, unfreezeLayer, freezePinCaptures } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -167,7 +167,7 @@ function updRecBtn(){
   recBtn.title = editIsOpen()
     ? t('roll.recBlocked')
     : recording
-    ? t('rec.title.overdub',{n:loop.layer+1})
+    ? t('rec.title.overdub',{n:recLayers()[0]+1})   // T1: слой взятого (в T1 он один — прежний loop.layer)
     : armedLayer()!=null ? t('rec.title.into',{n:armedLayer()+1})   // S3.5c: вооружена дорожка — ● пишет в неё, а не в новую
     : (loop.on ? t('rec.title.armed')
                : t('rec.title.idle'));
