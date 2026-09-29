@@ -21,7 +21,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf, rollAutSnapV, rollAutDrive } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, timbresOf } from './audio.js';   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf } from './audio.js';   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -558,8 +558,11 @@ function renderAutCtl(){
   rollFxAddEl.textContent='';
   const head=document.createElement('option'); head.value=''; head.textContent=t('aut.add');
   rollFxAddEl.appendChild(head);
+  /* ⛳ V4b: И ГОЛОСОВЫЕ — те, что объявлены для роли дорожки (fxVoiceIdsFor): Скольжение баса/соло, яркость аккордов,
+     скаляры соло. Их величина живёт В НОТАХ, поэтому в путь они не встают: добавленный открывает полосу, где правка
+     переписывает ноты (recorder, pnView/pnMove). Сначала голосовые — как «в ноте» стоит первой в панели. */
   if(hasChain){ const have=new Set(chain);
-    for(const id of fxAddableIds()) if(!have.has(id)){
+    for(const id of [...fxVoiceIdsFor(laneRoleOf(ly)), ...fxAddableIds()]) if(!have.has(id)){
       const o=document.createElement('option'); o.value=id; o.textContent=fxTitleOf(id); rollFxAddEl.appendChild(o); } }
   rollFxAddEl.value='';
   rollFxAddEl.disabled = !hasChain || editBackingOpen();
@@ -818,7 +821,8 @@ function rollUp(e){
        на каждом движении пересобирать ленту переигровки нельзя). autMovePoint сам откажет, если точка
        не сдвинулась, — «правка», которая ничего не двигает, засорила бы историю отмены. */
     const d=rollAutDrag;
-    if(d) autMovePoint(rollGrab.aut.pt, d.t, d.v);
+    if(d){ const r=autMovePoint(rollGrab.aut.pt, d.t, d.v);
+      if(r&&r!==true) selAutPt(r); }   // V4b: точка «в ноте» — вид пересобран из нот, выделяем ту, что вернул recorder (там величина и вступила)
     setRollAutDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
   }
   if(rollGrab){

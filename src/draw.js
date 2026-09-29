@@ -1035,22 +1035,35 @@ function drawAutLane(V,ly){
   const drag=rollAutDrag;
   const vOf=r=> (drag&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.v : r.pt.v;
   const tOf=r=> (drag&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.t : r.pt.t;
-  ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath();
+  ctx.lineWidth=2;
+  const path=new Path2D();   // V4b: путь строим ОДИН раз — у адреса «в ноте» он штрихуется дважды (приглушённо везде, ярко там, где звучат ноты)
   let started=false, lastY=null;
-  if(D.base!=null){ lastY=autY(V,D.base); ctx.moveTo(V.x0,lastY); started=true; }   // ПОЛКА слева: величина из снимка старта взятого — до первой точки величина именно такая
+  if(D.base!=null){ lastY=autY(V,D.base); path.moveTo(V.x0,lastY); started=true; }   // ПОЛКА слева: величина из снимка старта взятого — до первой точки величина именно такая (у адреса «в ноте» — уровень «не задано»)
   for(let i=from;i<to;i++){
     const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
-    if(!started){ ctx.moveTo(x,y); started=true; }
-    else { ctx.lineTo(x,lastY); ctx.lineTo(x,y); }   // ДЕРЖИМ прежнюю величину до самой точки, затем переезд: ровно то, что делает fxPlayDrive
+    if(!started){ path.moveTo(x,y); started=true; }
+    else { path.lineTo(x,lastY); path.lineTo(x,y); }   // ДЕРЖИМ прежнюю величину до самой точки, затем переезд: ровно то, что делает fxPlayDrive (у «в ноте» — каждая нота держит величину своего события)
     lastY=y;
   }
-  if(started&&lastY!=null) ctx.lineTo(V.x0+V.bw,lastY);
-  ctx.stroke();
+  if(started&&lastY!=null) path.lineTo(V.x0+V.bw,lastY);
+  /* ⛳ V4b: У АДРЕСА «В НОТЕ» ПАУЗЫ ЧЕСТНЫ. Величину несут ноты, и там, где у дорожки не звучит ни одна (D.spans — интервалы
+     нот из songNotes), линия держит уровень лишь как «что возьмёт следующая нота»: сама по себе она там не звучит ни на чём.
+     Поэтому рисуем её приглушённой всюду, а поверх — полной яркости ТОЛЬКО внутри нот (обрезкой по их интервалам). */
+  if(D.per&&D.spans){
+    ctx.strokeStyle=hexA(col,.3); ctx.stroke(path);
+    ctx.save(); ctx.beginPath();
+    for(const [a,b] of D.spans){
+      const xa=Math.max(V.x0, laneBeatX(V,a)), xb=Math.min(V.x0+V.bw, b===Infinity ? V.x0+V.bw : laneBeatX(V,b));
+      if(xb>=xa) ctx.rect(xa, A.y0-4, Math.max(1,xb-xa), A.y1-A.y0+8);
+    }
+    ctx.clip(); ctx.strokeStyle=col; ctx.stroke(path); ctx.restore();
+  }else{ ctx.strokeStyle=col; ctx.stroke(path); }
   // ---- точки ----
   for(let i=from;i<to;i++){
     const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
     if(x<V.x0-6||x>V.x0+V.bw+6) continue;
     const sel=rollAutSel&&rollAutSel.pt===r.pt;
+    if(r.pt.unset&&!sel){ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,3.2,0,Math.PI*2); ctx.stroke(); continue; }   // V4b: «не задано» (нота играет сегодняшнее умолчание) — полым кружком, как полая планка «ведёт не рука»
     ctx.fillStyle= sel?'#fff':col;
     ctx.beginPath(); ctx.arc(x,y,sel?4.5:3.2,0,Math.PI*2); ctx.fill();
     if(sel){ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke(); }

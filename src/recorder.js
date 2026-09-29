@@ -2,7 +2,8 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          metroClick, chordOn, chordGlide, chordOff, chordHold,
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff,
          fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
-         fxParamMetaOf, fxDefaultsOf, makeFrozenBus } from './audio.js';   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
+         fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
+         fxIsPerNote, fxNoteField } from './audio.js';   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
@@ -556,12 +557,21 @@ function fxLaneMerge(){
       list.push({t:m.t0, tk, layer:m.layer, key, fx:FX_CHAIN, ids:ch.map(e=>e.fxId)});   // СОСТАВ на старте взятого
       for(const eff of ch){
         const names=fxParamKeysOf(eff.fxId);                      // снимок хранит величины массивом — имена берём у реестра эффектов
-        eff.params.forEach((v,i)=>{ if(v!=null && names[i]!=null)
+        eff.params.forEach((v,i)=>{ if(v!=null && names[i]!=null && !fxIsPerNote(eff.fxId,names[i]))   // V4b: параметр «в ноте» ведёт НОТА, не лента (см. ниже)
           list.push({t:m.t0, tk, layer:m.layer, key, fx:eff.fxId, p:names[i], v}); });
       }
     }
+    /* ⛳ V4b: ТОЧКИ ПАРАМЕТРОВ «В НОТЕ» В ЛЕНТУ НЕ ИДУТ — НИ ПЕРЕИГРОВКЕ, НИ РЕНДЕРУ. Их величину записанная нота несёт САМА
+       (карта a.fx или своё поле — fxIsPerNote), и её же читают переигровка и заморозка. Лента здесь была бы ВТОРЫМ источником:
+       гнала бы живой экземпляр по снятым точкам, а те после правки в редакторе расходятся с нотами — рука, играющая поверх
+       ▶, получала бы величину, которой ни одна записанная нота уже не несёт, и столбик помечался бы «ведёт запись», хотя запись
+       ведёт свои ноты, а не экземпляр. Теперь у величины «в ноте» хозяева разведены чисто: у ЗАПИСАННОЙ ноты — её событие, у
+       ЖИВОЙ — рука, и так всё время, а не «рука до ▶, запись после». ⛔ ЗАХВАТ ПРИ ЭТОМ НЕ МЕНЯЛСЯ: точки по-прежнему пишутся
+       (правило #29 — объявлено, значит захвачено), их просто не читает никто из звука. Здесь — ЕДИНСТВЕННОЕ слияние, поэтому
+       живое и рендер расходиться не могут. */
     for(const ent of rec.lane){
       if(!m.keys.has(ent.key)) continue;
+      if(ent.fx!==FX_CHAIN && fxIsPerNote(ent.fx,ent.p)) continue;   // V4b: см. выше
       list.push({t:ent.t, tk, layer:m.layer, key:ent.key, fx:ent.fx, p:ent.p, v:ent.v, ids:ent.ids});
     }
   }
@@ -1625,9 +1635,125 @@ function autAddrs(layer){
    тысяч шагов НА КАДР. Ключ мемо — адрес плюс takeFxVer: версия поднимается КАЖДОЙ правкой захвата И
    каждой правкой нот (editCommit), то есть ровно тогда, когда ответ мог измениться. Одной записи хватает:
    полоса показывает РОВНО ОДИН адрес зараз (см. rollAut). */
+/* ═══ V4b: ПАРАМЕТР «В НОТЕ» НА ПОЛОСЕ — ВИД И ПРАВКА ИЗ САМИХ НОТ ═══
+   ⛳ ОДИН ИСТОЧНИК ПРАВДЫ. Величину параметра «в ноте» (fxIsPerNote: прицепочный модуля — Скольжение, яркость аккордов — и
+   старые скаляры соло vib/drv/trm) переигровка и заморозка читают из СОБЫТИЯ НОТЫ. Значит и полоса обязана показывать и
+   править ИМЕННО ЕГО: прежде она рисовала точки захвата, их правка не меняла ни одной ноты — видно одно, звучит другое.
+   Точки захвата для этих адресов больше никто не читает (fxLaneMerge их пропускает); захват при этом не тронут.
+   ⛳ ЧТО ТАКОЕ «ТОЧКА». Несут величину «вкл» и ведения ноты (pnCarrier) — каждое своё значение, по времени. Подряд идущие
+   события с ОДНОЙ величиной — один ОТРЕЗОК; точка — его первое событие. Ступенька между точками — ровно то, что звучит:
+   каждая нота берёт величину своего события, и до следующего события величина та же.
+   ⛳ ПРАВКА — ЭТО ПЕРЕПИСАТЬ СОБЫТИЯ, которые она покрывает: сдвиг точки по величине — все события её отрезка; по времени —
+   граница отрезка (сдвиг раньше отдаёт его величину событиям между новой и старой границей, позже — возвращает прежнюю
+   величину тем его событиям, что остались левее); удаление — события отрезка берут величину предыдущего (у первого — «не
+   задано»); новая точка на доле t — события от t до следующей границы. Точка МЕЖДУ нотами покрывает первые события ПОСЛЕ
+   неё; точка ПОСРЕДИ зажатой ноты — её ведения после t и всё, что дальше, но не её «вкл»: голос взял величину на атаке,
+   нового события посреди ноты правка не рождает (названный предел). Полоса после правки перестраивается из нот — точка
+   встаёт туда, где величина действительно вступила, а не туда, куда ткнули.
+   ⛳ ПРАВКА — ОДНА ЗАПИСЬ ИСТОРИИ И ОДИН СБРОС: ходы 'move' (нагрузка — НОВЫМ объектом, время и замороженный лад
+   нетронуты — правило #7) собирает editBatch (правило #28); editCommit поднимает версию правки дорожки — замороженная
+   устаревает.
+   ⛳ «НЕ ЗАДАНО» — ОТСУТСТВИЕ величины в событии: нота играет СЕГОДНЯШНЕЕ умолчание роли (у Скольжения — 20/12 мс, у яркости —
+   открытый фильтр, у скаляров — ноль). Рисуется на уровне умолчания (fxDefaultsOf — та же шкала, что у меню); ведущий
+   отрезок «не задано» — полка без ручки, как снимок старта у ленты. */
+const pnCarrier=fn=> fn==='leadOn'||fn==='leadSet'||fn==='bassOn'||fn==='bassSet'||fn==='chOn'||fn==='chSet';
+const pnSame=(x,y)=> (x==null&&y==null) || (x!=null&&y!=null&&Math.abs(x-y)<1e-6);
+/* Величина в событии (0..1) либо null — «не задано». Где лежит — по объявлению (fxNoteField): своё поле или карта a.fx. */
+function pnGet(a,fxId,pKey){
+  const nf=fxNoteField(fxId,pKey);
+  if(nf){ const x=a&&a[nf.key]; return x==null ? null : (nf.inv?1-x:x); }
+  const m=a&&a.fx, x=m?m[fxId+':'+pKey]:undefined; return x==null ? null : x;
+}
+/* НОВАЯ нагрузка с этой величиной (v=null — снять). Карта — тоже новым объектом: записанная карта неизменяема (см. push).
+   ⚠️ БАС: опустевшая карта снимается ЦЕЛИКОМ — отсутствие карты у баса и есть «не задано», событие снова байт-в-байт как без
+   Скольжения. СОЛО: карта остаётся всегда — у соло её ОТСУТСТВИЕ значит «звучи живой цепью» (правило R2 в applyFx). */
+function pnWith(ev,fxId,pKey,v){
+  const a=ev.a||{}, nf=fxNoteField(fxId,pKey), b={...a};
+  if(nf){ if(v==null) delete b[nf.key]; else b[nf.key]= nf.inv?1-v:v; return b; }
+  const k=fxId+':'+pKey, m={...(a.fx||{})};
+  if(v==null) delete m[k]; else m[k]=v;
+  if(Object.keys(m).length || ev.fn[0]==='l') b.fx=m; else delete b.fx;
+  return b;
+}
+/* Умолчание адреса в 0..1 — уровень «не задано» на полосе. Та же шкала, что у меню и захвата (fxDefaultsOf, с defBy владельца). */
+const pnDef=(key,fxId,pKey)=>{ const i=fxParamKeysOf(fxId).indexOf(pKey), d=fxDefaultsOf(fxId,key); return i>=0&&d[i]!=null ? d[i] : 0; };
+/* ОТРЕЗКИ: события дорожки, несущие величину, по времени (массив отсортирован — редактор открыт только вне записи). */
+function pnRuns(layer,fxId,pKey){
+  const runs=[]; let cur=null;
+  for(const e of events){ if(e.layer!==layer||!pnCarrier(e.fn)) continue;
+    const v=pnGet(e.a,fxId,pKey);
+    if(!cur||!pnSame(v,cur.v)) runs.push(cur={t:e.t, v, evs:[]});
+    cur.evs.push(e); }
+  return runs;
+}
+/* ВИД ДЛЯ ПОЛОСЫ — в той же форме, что у ленты ({base, baseT, pts}), плюс per (адрес «в ноте») и spans — где у дорожки ЗВУЧАТ
+   ноты: вне их величина не звучит ни на чём, и draw рисует там линию приглушённой (ноты берём из songNotes — единственного
+   спаривания «вкл»/«выкл», правило редактора). */
+function pnView(layer,key,fxId,pKey){
+  const d=pnDef(key,fxId,pKey), pts=[];
+  pnRuns(layer,fxId,pKey).forEach((r,i)=>{ if(i===0&&r.v==null) return;   // ведущее «не задано» — полка (base), ручки нет
+    pts.push({ per:true, pt:{ t:r.t, v:r.v==null?d:r.v, unset:r.v==null, pn:{layer,key,fx:fxId,p:pKey} } }); });
+  const sp=[];
+  for(const n of songNotes().notes) if(n.layer===layer&&n.role!=='dr') sp.push([n.start, n.end==null?Infinity:n.end]);
+  sp.sort((a,b)=>a[0]-b[0]);
+  const spans=[]; for(const s of sp){ const L=spans[spans.length-1]; if(L&&s[0]<=L[1]) L[1]=Math.max(L[1],s[1]); else spans.push([s[0],s[1]]); }
+  return { base:d, baseT:0, pts, per:true, spans };
+}
+/* Переписать величину у событий (цель — функция события) → ходы 'move'. Событие, у которого величина уже та, — не ход. */
+function pnMoves(evs,fxId,pKey,vOf){
+  const list=[];
+  for(const e of evs){ const v=vOf(e); if(pnSame(pnGet(e.a,fxId,pKey),v)) continue;
+    list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:pnWith(e,fxId,pKey,v)} }); }
+  return list;
+}
+/* Отрезок точки — по её доле и величине (объекты точек пересобираются после каждой правки, держаться за них нельзя). */
+function pnLocate(runs,pt){
+  return runs.findIndex(r=> Math.abs(r.t-pt.t)<AUT_EPS && pnSame(r.v, pt.unset?null:pt.v));
+}
+/* Точка вида, которую выделить после правки: первая на доле ≥ t (там величина и вступила). Объект — ИЗ мемо autPoints, поэтому
+   ui находит его в D.pts простым сравнением. */
+function pnPick(P,t){ const D=autPoints(P.layer,P.key,P.fx,P.p); return D.pts.find(r=>r.pt.t>=t-AUT_EPS) || null; }
+function pnMove(pt,t,v){
+  if(!editGuard()) return false;
+  const P=pt.pn, runs=pnRuns(P.layer,P.fx,P.p), i=pnLocate(runs,pt); if(i<0) return false;
+  const R=runs[i], prev= i>0 ? runs[i-1].v : null;
+  let list, at;
+  if(Math.abs(t-pt.t)>AUT_EPS){                                    // ВРЕМЯ: двигаем границу отрезка
+    const b=Math.max(0,t); at=b;
+    if(b<R.t) list=pnMoves(events.filter(e=>e.layer===P.layer&&pnCarrier(e.fn)&&e.t>=b-AUT_EPS&&e.t<R.t-AUT_EPS), P.fx,P.p, ()=>R.v);
+    else      list=pnMoves(R.evs.filter(e=>e.t<b-AUT_EPS), P.fx,P.p, ()=>prev);
+  }else{                                                           // ВЕЛИЧИНА: весь отрезок
+    at=R.t; list=pnMoves(R.evs, P.fx,P.p, ()=>Math.max(0,Math.min(1,v)));
+  }
+  if(!editBatch(list)) return false;                               // пусто — не правка (↶ не должен «ничего не делать»)
+  return pnPick(P,at) || true;
+}
+function pnDelete(pt){
+  if(!editGuard()) return false;
+  const P=pt.pn, runs=pnRuns(P.layer,P.fx,P.p), i=pnLocate(runs,pt); if(i<0) return false;
+  const prev= i>0 ? runs[i-1].v : null;                            // у первой точки — «не задано»
+  return editBatch(pnMoves(runs[i].evs, P.fx,P.p, ()=>prev));
+}
+function pnAdd(layer,key,fxId,pKey,t,v){
+  if(!editGuard()) return null;
+  const runs=pnRuns(layer,fxId,pKey); let j=-1;
+  for(let i=0;i<runs.length;i++){ if(runs[i].t<=t+AUT_EPS) j=i; else break; }
+  if(j<0 && runs.length && runs[0].v==null) j=0;                   // до первой ноты, а впереди ведущее «не задано» — его события и покрываем
+  if(j<0) return null;                                             // до первой ТОЧКИ событий нет — покрывать нечего
+  const list=pnMoves(runs[j].evs.filter(e=>e.t>=t-AUT_EPS), fxId,pKey, ()=>Math.max(0,Math.min(1,v)));
+  if(!editBatch(list)) return null;                                // между t и следующей границей нот нет — точке негде звучать
+  const r=pnPick({layer,key,fx:fxId,p:pKey},t); return r?r.pt:null;
+}
+/* Снять величину адреса со ВСЕХ нот дорожки — ходами 'move' (для снятия голосового эффекта с дорожки, autChainRemove). */
+function pnStripMoves(layer,fxId){
+  const list=[];
+  for(const pk of fxParamKeysOf(fxId)) if(fxIsPerNote(fxId,pk))
+    list.push(...pnMoves(events.filter(e=>e.layer===layer&&pnCarrier(e.fn)), fxId,pk, ()=>null));
+  return list;
+}
 let autMemoK='', autMemoV=null;
 function autPoints(layer,key,fxId,pKey){
-  const mk=layer+'|'+key+'|'+fxId+'|'+pKey+'|'+takeFxVer;
+  const mk=layer+'|'+key+'|'+fxId+'|'+pKey+'|'+takeFxVer+'|'+evGen;   // V4b: + evGen (поднимает КАЖДЫЙ schedInvalidate): вид «в ноте» строится из СОБЫТИЙ, а takeFxVer поднимают только правки редактора — новое взятое в ту же дорожку оставило бы мемо прежним
   if(autMemoK===mk && autMemoV) return autMemoV;
   const r=autPointsCalc(layer,key,fxId,pKey);
   autMemoK=mk; autMemoV=r; return r;
@@ -1638,6 +1764,7 @@ function autPointsCalc(layer,key,fxId,pKey){
   /* ⚠️ Адрес ЧУЖОЙ цепи — пусто. Адреса приходят из autAddrs и несут ключ цепи дорожки, так что это страж,
      а не развилка: без него адрес не той цепи вытащил бы точки соседней дорожки из общего взятого сплита. */
   if(key!==laneChainKey(layer)) return { base, baseT:0, pts };
+  if(fxIsPerNote(fxId,pKey)) return pnView(layer,key,fxId,pKey);   // V4b: параметр «в ноте» — вид из самих нот, не из точек захвата
   for(const T of autTakesOf(layer)){
     const rec=takeFx.get(T.tk); if(!rec) continue;
     const ch=rec.chains[key];
@@ -1675,6 +1802,7 @@ function autEnsure(layer){
 }
 /* Перенос точки: время и величина. Обе зажаты — время не отрицательное, величина в 0..1. */
 function autMovePoint(pt,t,v){
+  if(pt&&pt.pn) return pnMove(pt,t,v);   // V4b: точка «в ноте» — переписываем НОТЫ; отдаём точку, которую выделить (объекты вида пересобраны)
   if(!editGuard()||!pt) return false;
   const to={t:Math.max(0,t), v:Math.max(0,Math.min(1,v))};
   if(Math.abs(to.t-pt.t)<AUT_EPS && Math.abs(to.v-pt.v)<1e-6) return false;   // не сдвинулось — не правка (иначе ↶ «ничего не делает»)
@@ -1683,6 +1811,7 @@ function autMovePoint(pt,t,v){
   autCommit(); return true;
 }
 function autDeletePoint(rec){
+  if(rec&&rec.pt&&rec.pt.pn) return pnDelete(rec.pt);   // V4b: см. pnDelete
   if(!editGuard()||!rec||!rec.lane) return false;
   const i=rec.lane.indexOf(rec.pt); if(i<0) return false;
   rec.lane.splice(i,1);
@@ -1694,6 +1823,7 @@ function autDeletePoint(rec){
 function autAddPoint(layer,fxId,pKey,t,v){
   if(!editGuard()) return null;
   const key=laneChainKey(layer); if(!key) return null;
+  if(fxIsPerNote(fxId,pKey)) return pnAdd(layer,key,fxId,pKey,Math.max(0,t),v);   // V4b: захват не нужен — правится нота
   const rec=autEnsure(layer); if(!rec) return null;
   const pt={ t:Math.max(0,t), key, fx:fxId, p:pKey, v:Math.max(0,Math.min(1,v)) };
   rec.lane.push(pt);
@@ -1732,6 +1862,11 @@ function autChainRemove(layer,fxId){
   const key=laneChainKey(layer); if(!key) return false;
   const rec=autEnsure(layer); if(!rec) return false;
   const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId); if(i<0) return false;
+  /* ⛳ V4b: ГОЛОСОВОЙ ЭФФЕКТ ЖИВЁТ В НОТАХ, и снять его с дорожки — значит снять его величины с нот: иначе полоса пропала бы, а
+     ноты звучали бы по-прежнему со Скольжением («убрал — а слышно»). Снятие из цепи и очистка нот — ОДНА запись истории,
+     один сброс (editBatch, правило #28): ↶ вернёт и эффект, и величины. Шинный — как было. */
+  const strip=pnStripMoves(layer,fxId);
+  if(strip.length) return editBatch([{ kind:'autfxdel', ent:ch[i], ch, at:i }, ...strip]);
   const ent=ch[i]; ch.splice(i,1);
   editPush({ kind:'autfxdel', ent, ch, at:i });
   autCommit(); return true;
