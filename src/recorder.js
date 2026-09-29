@@ -63,7 +63,13 @@ const events=[];                                     // стабильная с�
    нужна неподвижная опора. Двинь t0 — и окно опережения поехало бы под ним. */
 const loop={ on:false, bars:2, metre:BEATS_PER_BAR, sub:4, bpm:84, t0:0, pos:-1e-9, sched:0, layer:0, clickBeat:0, quant:true, rgn:{on:false,from:0,to:0,user:false}, lead:0, cnt:false };   // rgn.user — скобу ПОСТАВИЛ человек (иначе следует за материалом, S3.5b); lead — МОНОТОННАЯ доля, с которой транспорт реально играет (до неё — отсчёт/разгон: ни звука лида, ни записи); cnt — был ли при запуске отсчёт (для щелчков и надписи)   // metre — долей в такте; sub — ДРОБЛЕНИЕ доли для квантизации ударных (4 = 16-е, 3 = триоли); pos — сыгранная ПЕСЕННАЯ доля (лид/дрон, почти-сейчас); sched — МОНОТОННАЯ доля, до которой СЛОИ (аккорд/бас/удар) уже запланированы вперёд; t0 — время AC для монотонной доли 0
 const droneActive=()=>events.some(e=>e.fn==='drone');   // жив ли слой-дрон (для гашения при снятии/стопе)
-let recCh=null, recBass=null, pumpTimer=null;
+let recCh=null, pumpTimer=null;
+/* ⛳ P2: СОСТОЯНИЕ ЗАПИСИ БАСА — ПО ВЛАДЕЛЬЦУ, зеркало recLead (ниже). Прежде это была ОДНА открытая бас-нота на взятое
+   (recBass=null|{…}): бас был моно, и «владелец» у него был один — последний щипок. Теперь на каждого владельца своя
+   запись {deg,oct,vol,inst,q,layer,v}; v — номер одновременной бас-ноты в слое (bassSlot), он же хвост ключа владельца
+   на переигровке (bassOwnerKey). ⛔ Пока рука баса одна ('bass', gestures не тронуты — это P3), в карте не больше одной
+   записи, v всегда 0 и в событие НЕ пишется — события байт-в-байт прежние. Ведущий (моно) режим — ровно этот случай. */
+const recBass=new Map();     // ключ владельца баса ('bass'; с P3 — и ключи пальцев) → состояние открытой бас-ноты
 /* ⚠️ СОСТОЯНИЕ ЗАПИСИ СОЛО — ПО ВЛАДЕЛЬЦУ, а не одно на всех. Раньше это были ОДИНОЧНЫЕ recLead /
    recLeadBend / noteStartBeat / bendLastC («та самая единственная открытая нота»), и с моно-соло так и
    было. С полифонией две руки, пишущие ОДНОВРЕМЕННО, слились бы в один поток leadOn/leadSet: сравнение
@@ -82,14 +88,16 @@ const vSlots=new Map();      // ключ владельца → номер од�
                каждом шве прохода (S3.5a-fix);
      vTop    — первый номер ВЫШЕ всех, что выданы за это взятое в этот слой: до него поднимается vBase на шве;
      k       — суффикс владельца аккорда/баса (S3.5c, см. chOwnerKey); 0 — без суффикса; +1 на каждом шве (S3.5e);
-     chLastT, bsLastT — t последнего записанного события ЖИВОГО ключа аккорда / баса (S4.3, страж в push).
+     chLastT — t последнего записанного события ЖИВОГО ключа аккорда (S4.3, страж в push);
+     bsLast  — то же для баса, но ПО НОМЕРУ НОТЫ v (P2: Map v → t; прежде одно bsLastT). Ключ владельца бас-ноты —
+               слой + k + v, и при нескольких владельцах у каждого своя очередь; при одном — ровно прежнее.
    ⚠️ КЛЮЧИ КАРТЫ И ЕСТЬ «СЛОИ ВЗЯТОГО»: отдельного множества не заводим — одно место, нечему расходиться.
    Карта не чистится на остановке — её читатели все стоят за `recording`; чистит её старт следующего взятого. */
-const takeSt=new Map();      // слой → {vBase, vTop, k, chLastT, bsLastT}
+const takeSt=new Map();      // слой → {vBase, vTop, k, chLastT, bsLast}
 /* Вписать слой во взятое: номера и суффикс — ВЫШЕ всего, что в слое уже лежит (тот же обход, что и прежде на ●). */
 function takeJoin(layer){
   const vb=layerSlotTop(layer);
-  const S={ vBase:vb, vTop:vb, k:layerTakeTop(layer), chLastT:-Infinity, bsLastT:-Infinity };
+  const S={ vBase:vb, vTop:vb, k:layerTakeTop(layer), chLastT:-Infinity, bsLast:new Map() };
   takeSt.set(layer,S); return S;
 }
 /* Запись слоя взятого. ⚠️ Страховка, а не путь: слой вписывают ТОЛЬКО onRec (на ●) и takeMint (на рождении посреди
@@ -1368,16 +1376,20 @@ function detachPlan(seg){
   const n=seg.note, E=seg.ev, X=seg.endEv;
   if(seg.end==null) return null;
   const kK=(E.a&&E.a.k)||0, k2=layerTakeTop(n.layer);
+  /* P2: НОМЕР НОТЫ v — часть ключа владельца (bassOwnerKey). Все события одной ноты несут один v, поэтому новый «выкл»
+     левой части и «выкл» отделённой ноты обязаны нести его тоже: иначе «выкл» ушёл бы под ДРУГОЙ ключ и не закрыл свою
+     ноту. Пока v всегда 0 (живой бас один), поля нет — нагрузки те же, что до P2. */
+  const vN=(E.a&&E.a.v)||0, withV=vN?{v:vN}:null;
   const inst=((n.head&&n.head.a)||{}).inst, withInst=inst!==undefined?{inst}:null;
   const ops=[], items=[];
-  if(!seg.first) ops.push({ kind:'ins', evs:[{ t:seg.start, layer:n.layer, fn:'bassOff', a:(kK?{k:kK}:{}), sc:E.sc, sev:E.sev, tk:E.tk }] });
+  if(!seg.first) ops.push({ kind:'ins', evs:[{ t:seg.start, layer:n.layer, fn:'bassOff', a:{...(kK?{k:kK}:null), ...withV}, sc:E.sc, sev:E.sev, tk:E.tk }] });
   for(const e of segEvs(seg)){
     const on = e===E;
     items.push({ orig:e, fn: on?'bassOn':e.fn, t:e.t, a:{...e.a, ...(on&&e.fn!=='bassOn'?withInst:null), k:k2} });
   }
   if(X && chaseKind(X.fn)==='f') items.push({ orig:X, fn:'bassOff', t:X.t, a:{...X.a, k:k2} });
   else {
-    items.push({ orig:null, proto:E, fn:'bassOff', t:seg.end, a:{k:k2} });
+    items.push({ orig:null, proto:E, fn:'bassOff', t:seg.end, a:{k:k2, ...withV} });
     if(X) ops.push({ kind:'del', evs:[X] },
                    { kind:'ins', evs:[{ t:X.t, layer:X.layer, fn:'bassOn', a:{...X.a, ...withInst}, sc:X.sc, sev:X.sev, tk:X.tk }] });
   }
@@ -1832,7 +1844,13 @@ function loopPos(){
    дорожку; следующие проходы того же взятого при крутящейся скобе уже идут с k ≥ 1. Обходы по префиксу
    (releaseLoopLayersAt: хвост 'N' или 'N:…') суффикс понимают — так устроены ключи соло 'leadloop:N:v'. */
 const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer+(ctx.a&&ctx.a.k?':'+ctx.a.k:''):'latch';
-const bassOwnerKey=ctx=> ctx?'bassloop:'+ctx.layer+(ctx.a&&ctx.a.k?':'+ctx.a.k:''):'bass';
+/* P2: БАС — ЕЩЁ И НОМЕР НОТЫ v (одновременные бас-ноты одного взятого, зеркало 'leadloop:N:v'). Хвост ':k:v' — только при
+   v≠0, и тогда k пишется всегда (даже 0), чтобы 'N:k' и 'N:k:v' не путались. ⛔ При v=0 ключ БАЙТ-В-БАЙТ прежний — так
+   звучит весь бас, записанный до P2, и весь бас одного владельца. Префиксное сравнение дорожки (releaseLoopLayersAt:
+   хвост 'N' или 'N:…') с обеими формами работает. */
+const bassOwnerKey=ctx=>{ if(!ctx) return 'bass';
+  const k=(ctx.a&&ctx.a.k)||0, v=(ctx.a&&ctx.a.v)||0;
+  return 'bassloop:'+ctx.layer+(v ? ':'+k+':'+v : (k ? ':'+k : '')); };
 /* Ключ владельца СОЛО-голоса на ПЕРЕИГРОВКЕ: слой + номер одновременной ноты (a.v). Живой ключ
    ('lead:L'/'lead:R') строит gestures и передаёт явным аргументом — в событие он НЕ попадает (это
    состояние руки, а не намерение). a.v||0 — вот та самая совместимость: событие без v = нота №0. */
@@ -1883,9 +1901,9 @@ const makeENG=A=>({
   chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
   chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
   chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
-  bassOn:(a,ctx,{when,live}={})=>A.bassOn(bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,when),   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,when),   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
   bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,when),
-  bassOff:(a,ctx,{when}={})=>A.bassOff(bassOwnerKey(ctx),when),
+  bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
   drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,when),
   drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 });
@@ -1974,7 +1992,8 @@ function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: в�
      рождение дорожки не останется пустым. Ниже этой строки отказов нет. */
   if(ly===undefined) ly=takeRoute(noteSource(fn,a));   // ключ — ИСТОЧНИК ноты (сегодня роль; см. noteSource)
   const S=ts(ly);                                     // T1: страж ключа и суффикс — ЭТОГО слоя (ключ владельца несёт номер слоя, значит и они по слою)
-  if(cb===1 && t<S.chLastT) t=S.chLastT; else if(cb===2 && t<S.bsLastT) t=S.bsLastT;
+  const bv= cb===2 ? ((a&&a.v)||0) : 0;               // P2: очередь баса — ПО НОМЕРУ НОТЫ v (ключ владельца = слой+k+v); у одного владельца v=0 — ровно прежний страж
+  if(cb===1 && t<S.chLastT) t=S.chLastT; else if(cb===2){ const lt=S.bsLast.get(bv); if(lt!=null && t<lt) t=lt; }
   /* ⛔ КОПИЯ КАРТЫ ЭФФЕКТОВ — R1, САМЫЙ ОПАСНЫЙ БАГ ЭТОГО ПЛАСТА, ЗАКРЫТ ЗДЕСЬ И ТОЛЬКО ЗДЕСЬ.
      До 3.7.2 ВСЯ полезная нагрузка была примитивами, кроме двух намеренных ссылок: ty (никогда не
      мутируется) и bend (дописывается осознанно). Карта a.fx — первый МУТИРУЕМЫЙ объект в нагрузке, а
@@ -1987,7 +2006,7 @@ function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: в�
   if(a && a.fx) ev.a={...a, fx:{...a.fx}};
   if(S.k && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:S.k};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
   events.push(ev);
-  if(cb===1) S.chLastT=t; else if(cb===2) S.bsLastT=t;   // S4.3: страж ключа (T1: по слою)
+  if(cb===1) S.chLastT=t; else if(cb===2) S.bsLast.set(bv,t);   // S4.3: страж ключа (T1: по слою; P2: у баса — по номеру ноты)
   if(t>recHiT) recHiT=t;                               // S4.3: высшая записанная доля участка (отличает шов от прыжка)
   if(t>songLen){ songLen=t; braceFollowGrow(); }      // длина песни растёт по одному событию (полный пересчёт — только в schedInvalidate); «следующая» скоба — вместе с ней, O(1)
   pushLy=ly;                                           // T2: куда легло — «вкл» узнаёт так свою дорожку
@@ -2024,8 +2043,10 @@ function pushBend(r,live){
 /* T1: номера — ПО СЛОЮ. Заняты только номера открытых нот ТОГО ЖЕ слоя (владелец 'leadloop:N:v' несёт номер
    слоя, так что у разных слоёв v не сталкиваются), база — vBase этого слоя. Пока слой во взятом один, у
    каждой открытой ноты он и есть — множество занятых то же, что было, номера те же. */
+/* P2: правило «наименьший свободный номер от базы» — ОДНО на соло и бас (bassSlot); прежде жило только здесь, строкой ниже. */
+function lowestFree(used,base){ let v=base; while(used.has(v))v++; return v; }
 function freeSlot(layer){ const used=new Set(); for(const [o,v] of vSlots){ const r=recLead.get(o); if(!r||r.layer===layer) used.add(v); }
-  let v=ts(layer).vBase; while(used.has(v))v++; return v; }
+  return lowestFree(used, ts(layer).vBase); }
 /* Первый номер v ВЫШЕ всех соло-нот, уже лежащих в слое layer (0 — соло-нот нет). Событие без v — это
    нота №0 (совместимость ldKey), поэтому считаем его как 0, и слой со старой записью даст 1.
    ⛳ ОБХОД O(n) — ОДИН РАЗ НА ВЗЯТОЕ, на нажатии ●, а НЕ на ноту и НЕ в push: слайс S3.2 затем и был,
@@ -2191,8 +2212,10 @@ function recFoldRoll(){
        удержанная через шов, оставалась в слое с bassOn без bassOff — висла на переигровке и воскресала
        догонялкой на каждом следующем входе. Теперь — настоящий bassOff на конце прохода; зажатая рука
        переатакует со следующего кадра (живой голос liveWrapRelease уже погасил) и откроет новую ноту.
-       Слотов у баса нет — его проходы разводит суффикс владельца takeK, который поднимается ниже. */
-    if(recBass){ push('bassOff',{},at,null,undefined,recBass.layer); recBass=null; }
+       Проходы баса разводит суффикс владельца k, который поднимается ниже; номера нот v (P2) внутри прохода
+       разводят одновременные ноты — со следующего прохода они снова считаются с нуля (ключ уже другой, k+1). */
+    for(const r of recBass.values()) push('bassOff',bassA(null,r.v),at,null,undefined,r.layer);   // P2: КАЖДАЯ открытая бас-нота — в слой своей ноты, со своим номером (при одном владельце — ровно прежний «выкл»)
+    recBass.clear();
     /* ⛳ S3.5e: ЗАЩЁЛКНУТЫЙ (или удерживаемый) АККОРД — последний случай незакрытой ноты. Состояние записи аккорда
        шов переживало: его ведения и итоговое «выкл» ложились СВЁРНУТЫМ временем РАНЬШЕ его «вкл», и с выключенным
        повтором он звенел до конца песни, а догонялка поднимала его на каждом следующем входе.
@@ -2210,7 +2233,7 @@ function recFoldRoll(){
     const ch=recCh;
     if(ch) push('chOff',{},at,null,undefined,ch.layer);
     recHiT=-Infinity;                                          // S4.3: «выкл» старого ключа записаны — дальше новый участок и новые ключи (k ниже)
-    for(const S of takeSt.values()){ S.chLastT=-Infinity; S.bsLastT=-Infinity; S.k=S.k+1; }   // T1: стражи и суффикс — в КАЖДОМ слое взятого; порядок прежний: «выкл» уже записаны СТАРЫМ k
+    for(const S of takeSt.values()){ S.chLastT=-Infinity; S.bsLast.clear(); S.k=S.k+1; }   // T1: стражи и суффикс — в КАЖДОМ слое взятого; порядок прежний: «выкл» уже записаны СТАРЫМ k
     if(ch) ch.q=loop.quant;                                    // S4.3: вписанное «вкл» — новая нота в данных, она берёт ТЕКУЩЕЕ правило (как бас, что переатакует после шва). Безопасно для порядка: rgn.from — линия такта, лежит на любой сетке
     if(ch) push('chOn',{deg:ch.deg,oct:ch.oct,vol:ch.vol,inst:ch.inst,ty:ch.ty,bri:ch.bri},
                 cycling() ? loop.rgn.from : now, {sc:ch.sc, sev:ch.sev}, undefined, ch.layer);   // T1: вписанное «вкл» — в слой того же аккорда, НОВЫМ k   // та же нагрузка, что у настоящего chOn (WchOn): deg/oct/vol/inst/ty/bri; лад и септаккорд — замороженные самого аккорда
@@ -2265,18 +2288,34 @@ function recChSet(a){
   recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:ly};   // layer (T1) — слой аккорда: туда же его ведения, «выкл» и вписанное на шве «вкл»
 }
 function recChOff(){ recFoldRoll(); if(recording&&recCh){ push('chOff',{},null,null,recCh.q,recCh.layer); recCh=null; } }   // шов первым: «выкл» открытого в новом проходе аккорда ложится в новый проход, а не свёрнутым временем в старый
-function recBassEv(p){                                  // бас прореживается как соло
+/* ⛳ P2: НОМЕР ОДНОВРЕМЕННОЙ БАС-НОТЫ В СЛОЕ — тем же правилом, что у соло (lowestFree): наименьший, не занятый ОТКРЫТОЙ
+   бас-нотой того же слоя. База — 0, а не vBase соло: у баса взятые и проходы уже разводит суффикс k (layerTakeTop, +1 на
+   шве), так что с лежащими в слое нотами новый номер не столкнётся никогда. Один владелец → всегда 0. */
+function bassSlot(layer){ const used=new Set(); for(const r of recBass.values()) if(r.layer===layer) used.add(r.v); return lowestFree(used,0); }
+/* Нагрузка бас-события с номером ноты — ТОЛЬКО когда он не ноль. ⛔ Это несущее: при одном владельце v=0, и событие
+   обязано остаться байт-в-байт прежним (у записанного до P2 баса поля v нет вовсе; ключ владельца без него тот же). */
+const bassA=(p,v)=> v ? {...(p||{}), v} : (p?{...p}:{});
+function recBassEv(own,p){                              // бас прореживается как соло
   if(!recording)return;
   recFoldRoll();                                          // S3.5d-fix: шов прохода ПЕРВЫМ, как у соло — открытая бас-нота прошлого прохода закрывается на ЕГО конце, и ниже откроется новая
-  const q=recBass?recBass.q:loop.quant;                   // S4.3: правило квантизации — от «вкл» ноты (см. шапку у recChOn)
-  let ly= recBass ? recBass.layer : undefined;            // T1/T2: ведение — в слой своей ноты; новая нота — по роли (push)
-  if(!recBass){ if(!push('bassOn',{...p},null,null,q,undefined)) return; ly=pushLy; }     // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
-  else if(p.deg!==recBass.deg||p.oct!==recBass.oct||Math.abs(p.vol-recBass.vol)>REC_VOL_EPS){ if(!push('bassSet',{...noInst(p)},null,null,q,ly)) return; }   // T0: тембр — только в «вкл» (см. noInst); смена живого тембра посреди ноты — не повод для ведения
+  const r=recBass.get(own);
+  if(!r){
+    /* Открыть — «вкл» маршрутом по источнику (T2/T3). Номер v нужен ДО push (он в нагрузке), слой выбирает push: смотрим,
+       куда ляжет (takePeek — тот же ключ, что спросит push), как это делает соло (recLeadOpen). */
+    const q=loop.quant;                                   // S4.3: правило квантизации — от «вкл» ноты (см. шапку у recChOn)
+    const pk=takePeek(noteSource('bassOn',p)), v= pk==null ? 0 : bassSlot(pk);
+    if(!push('bassOn',bassA(p,v),null,null,q,undefined)) return;   // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
+    recBass.set(own,{deg:p.deg,oct:p.oct,vol:p.vol,inst:p.inst,q,layer:pushLy,v});   // T0: тембр ноты — тембр её атаки. T1: layer — слой ноты
+    return;
+  }
+  if(p.deg!==r.deg||p.oct!==r.oct||Math.abs(p.vol-r.vol)>REC_VOL_EPS){ if(!push('bassSet',bassA(noInst(p),r.v),null,null,r.q,r.layer)) return; }   // T0: тембр — только в «вкл» (см. noInst); смена живого тембра посреди ноты — не повод для ведения (бас держит тембр атаки до отпускания)
   else return;
-  recBass={deg:p.deg,oct:p.oct,vol:p.vol,inst:recBass?recBass.inst:p.inst,q,layer:ly};   // T0: тембр ноты — тембр её атаки. T1: layer — слой ноты
+  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol;                  // тембр, правило и слой — от «вкл», не трогаем
 }
-function recBassOff(){ recFoldRoll();                   // S3.5d-fix: как recLeadOff — иначе bassOff лёг бы свёрнутым «сейчас», раньше своего bassOn
-  if(recording&&recBass){ push('bassOff',{},null,null,recBass.q,recBass.layer); recBass=null; } }
+function recBassOff(own){ recFoldRoll();                // S3.5d-fix: как recLeadOff — иначе bassOff лёг бы свёрнутым «сейчас», раньше своего bassOn
+  const r=recBass.get(own);
+  if(recording&&r) push('bassOff',bassA(null,r.v),null,null,r.q,r.layer);
+  recBass.delete(own); }
 function recDrum(a){ if(recording)push('drum',{...a},null,null,undefined,undefined); }   // T2: слой — по роли (push)   // удар — одиночное событие
 /* ⛳ ЗАКРЫТЬ В ЗАПИСИ ВСЁ, ЧТО ОСТАЛОСЬ ОТКРЫТЫМ (слайс S3.1). Зовётся при ОСТАНОВКЕ ОВЕРДАБА, когда
    человек жмёт «●», не отпустив пальцы: каждая звучащая нота обязана получить в слой своё «выключение»,
@@ -2298,11 +2337,11 @@ function recDrum(a){ if(recording)push('drum',{...a},null,null,undefined,undefin
 function recAllOff(){
   for(const own of [...recLead.keys()]) recLeadOff(own);   // соло — ПО КАЖДОМУ владельцу ('lead:L'/'lead:R' и их пальцевые ключи)
   recChOff();                                              // аккорд, в т.ч. ЗАЩЁЛКНУТЫЙ: он звучит и с разомкнутыми пальцами, recCh при этом не сброшен
-  recBassOff();                                            // бас — моно, одна открытая нота максимум
+  for(const own of [...recBass.keys()]) recBassOff(own);   // P2: бас — тоже ПО КАЖДОМУ владельцу (пока он один — 'bass'); ключи копируем: recBassOff удаляет в цикле
 }
 /* ВЫБРОСИТЬ состояние записи БЕЗ «выкл» (S4.1). Нужен ровно там, где закрывать НЕЧЕГО: «вкл» открытых нот уже нет в песне
    (⤺ снял само текущее взятое). Закрыть их там — значит написать сирот. Везде, где «вкл» в песне есть, — recAllOff. */
-function recDrop(){ recLeadReset(); recCh=null; recBass=null; }
+function recDrop(){ recLeadReset(); recCh=null; recBass.clear(); }
 
 /* Обёртки W*: живой звук СРАЗУ + запись (если вооружено). Переигровка (насос)
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
@@ -2348,8 +2387,10 @@ function recLatchOpen(){
   if(!push('chOn',a,at,null,loop.quant,undefined)) return;   // слой — маршрутом по источнику; явное время — без квантизации и без отказа отсчёта (мы уже после него)
   recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst:a.inst,q:loop.quant,sc:CUR(),sev:seventh,layer:pushLy};
 }
-const WbassOn =(p,live)=>{ ENG.bassOn(p,null,{live}); recBassEv(p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло. ⚠️ Прежде здесь стояло (p,null,undefined,live) — дырка под when позиционно; с именованным набором её не существует
-const WbassOff=()=>{ ENG.bassOff(); recBassOff(); };
+/* P2: own — КЛЮЧ ВЛАДЕЛЬЦА живой бас-ноты, как у WleadOn/WleadOff. ПОСЛЕДНИМ и с умолчанием 'bass': gestures зовёт
+   прежней формой (P2 рук не трогает), живой бас по-прежнему ОДИН владелец — ведущий режим. В событие ключ не пишется. */
+const WbassOn =(p,live,own='bass')=>{ ENG.bassOn(p,null,{live,own}); recBassEv(own,p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло (правило #11). ⚠️ Прежде здесь стояло (p,null,undefined,live) — дырка под when позиционно; с именованным набором её не существует
+const WbassOff=(own='bass')=>{ ENG.bassOff(null,null,{own}); recBassOff(own); };
 const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDrum(a); };
 
 /* ⛳ softAllOff — ЕДИНСТВЕННАЯ ТОЧКА «ЗАГЛУШИТЬ ВСЁ», И ТЕПЕРЬ ОНА ЖЕ ЗАКРЫВАЕТ ЗАПИСЬ (слайс S4.1).
@@ -2884,11 +2925,15 @@ function fireNear(a,b,rep=0){                                  // rep (A2b) — 
    раньше тика, шов уже обработан, и вызов здесь ничего не трогает — открытая нота нового прохода
    ОСТАЁТСЯ открытой (сброс здесь сделал бы её сиротой; поэтому recLeadReset — только вне записи).
    ⚠️ БАС ПЛАТИТ ПО-ПРЕЖНЕМУ: recBass=null без bassOff — удержанный через шов бас оставляет bassOn без
-   пары. Вне этого слайса. */
+   пары. Вне этого слайса.
+   ⛳ P2: живой бас гасим ПО ВСЕМ ЖИВЫМ ВЛАДЕЛЬЦАМ ('bass' и 'bass:…' — ключи, которые руки получат в P3), а не одним
+   литералом 'bass': иначе с появлением второго живого владельца его нота пережила бы шов. Ключи дорожек
+   ('bassloop:…') не трогаем — у них своя граница (releaseLoopLayersAt). Сегодня живой владелец один — прежнее поведение. */
+const isLiveBassOwner=k=> k==='bass' || k.slice(0,5)==='bass:';
 function liveWrapRelease(){ if(!AC)return;
   for(const k of Object.keys(leadHold)) if(k.slice(0,5)==='lead:') leadOff(k);
-  bassOff('bass');
-  if(recording) recFoldRoll(); else { recLeadReset(); recBass=null; }   // S3.5d-fix: при записи бас закрывает recFoldRoll (как соло); голое обнуление здесь осиротило бы бас-ноту, уже открытую в НОВОМ проходе, если кадр жестов успел раньше тика
+  for(const k of Object.keys(bassHold)) if(isLiveBassOwner(k)) bassOff(k);
+  if(recording) recFoldRoll(); else { recLeadReset(); recBass.clear(); }   // S3.5d-fix: при записи бас закрывает recFoldRoll (как соло); голое обнуление здесь осиротило бы бас-ноту, уже открытую в НОВОМ проходе, если кадр жестов успел раньше тика
 }
 function schedClicks(){                                // щелчки метронома с опережением по AC-часам
   const spb=60/loop.bpm, ahead=AC.currentTime+SCHED_AHEAD;
@@ -3052,7 +3097,7 @@ function onRec(){
   // T1: слой взятого вписан — его vBase/vTop, k и стражи (прежде одиночные vBase/takeK/…); СТРОГО ДО setRecording(true), как и было
   curTake=++takeSeq;   // S3.5c: суффикс аккорда/баса взятого; S3.5d: номер взятого (tk всех его событий)
   takeCapStart(curTake);   // O-2: снимок цепей на старте взятого. СТРОГО ПОСЛЕ выдачи curTake и ДО setRecording(true): дорожка автоматизации пишет только при recording и опирается на уже засеянную опору
-  recLastT=-Infinity; recHiT=-Infinity;   // vTop/chLastT/bsLastT — теперь в записи слоя, их выставил takeJoin   // S4.3: участок и живые ключи рождаются заново вместе со взятым. S3.5a-fix: взятое начинается без выданных номеров и без виденного времени — первый шов распознаётся по первому возврату времени
+  recLastT=-Infinity; recHiT=-Infinity;   // vTop/chLastT/bsLast — теперь в записи слоя, их выставил takeJoin   // S4.3: участок и живые ключи рождаются заново вместе со взятым. S3.5a-fix: взятое начинается без выданных номеров и без виденного времени — первый шов распознаётся по первому возврату времени
   setRecording(true); schedInvalidate();   // массив ещё не менялся, но с этого мига push начнёт дописывать ХВОСТ — фиксируем границу cursN здесь, а не «когда-нибудь»
   /* Транспорт стоял → поднимаем его С ОТСЧЁТОМ, от НАЧАЛА СКОБЫ (S3.5b). Нетронутая скоба начинается с 0 —
      запись идёт с начала песни, это заданное умолчание. ⚠️ СМЕНА ПОВЕДЕНИЯ, НАЗВАННАЯ: прежде запись
