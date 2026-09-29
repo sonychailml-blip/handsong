@@ -12,6 +12,7 @@ export const FX_META=[                           // МЕТАДАННЫЕ ПОК�
   {k:'vib', label:'VIB', fullKey:'fx.vib', finger:12, color:'#ffb84c'},
   {k:'drv', label:'DRV', fullKey:'fx.drv', finger:16, color:'#ff5d5d'},
   {k:'trm', label:'TRM', fullKey:'fx.trm', finger:20, color:'#9b7bff'},   // «Тремоло (нота)» — пер-голосовое, скаляр
+  {k:'glide', label:'GLD', fullKey:'fx.glide', color:'#ff7fc8'},          // V4: «Скольжение» — голосовой МОДУЛЬ (FX_FACTORY); здесь только цвет столбика и подпись у кисти. Без записи столбик взял бы зелёный тон реверба (REV_COLOR) и читался бы как комната
   {k:'trmMix', label:'TMIX', fullKey:'fx.trmMix', color:'#d4b8ff'},       // в.2: «Тремоло (микс)» — МОДУЛЬ (FX_FACTORY); здесь только метаданные показа. Оттенок той же семьи, но светлее: родня, а не двойник
 ];
 export const REV_COLOR='#57d9a3';

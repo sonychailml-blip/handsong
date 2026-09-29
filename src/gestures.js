@@ -6,7 +6,7 @@ import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
-import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
+import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT, FX_GLIDE_KEY } from './audio.js';   // FX_GLIDE_KEY — V4: ключ Скольжения в карте ноты (терменвокс его в запись не несёт, см. noteFx)   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
 import { canvas } from './vision.js';
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
@@ -863,8 +863,17 @@ function processHands(res){
            разбирается с холостыми пальцами: нот у руки несколько, и «замолчать» — это разность множеств (ниже). ВЕДУЩИЙ
            (бас по умолчанию), аккорды и ударные одноголосые на руку — у них холостой палец идёт веткой `else if(idle)`.
            Нагрузка ноты — ПО РОЛИ и прежним порядком полей (запись кладёт её копией: события байт-в-байт прежние):
-           соло {deg,oct,vol,fx,inst}, бас {deg,oct,vol,inst} (у баса карты эффектов пока нет — это V4). */
-        const notePayload=(deg,oct,fxSnap)=> S.zone==='ld' ? {deg,oct,vol:S.vol,fx:fxSnap,inst:leadIdx} : {deg,oct,vol:S.vol,inst:bassIdx};
+           соло {deg,oct,vol,fx,inst}, бас {deg,oct,vol,inst} — и {…,fx} ТОЛЬКО при прицепочном параметре в цепи баса (V4, ниже). */
+        /* ⛳ V4: БАС НЕСЁТ КАРТУ ЭФФЕКТОВ ТОЛЬКО ТОГДА, КОГДА В ЕГО ЦЕПИ ЕСТЬ ПРИЦЕПОЧНЫЙ ПАРАМЕТР (сегодня — Скольжение): снимок
+           непуст ⇔ такой параметр есть. Иначе поле не пишется вовсе — нагрузка и события баса БАЙТ-В-БАЙТ прежние. Поле встаёт
+           ПОСЛЕДНИМ, за inst, чтобы прежний порядок полей не сдвинулся. Отсутствие карты значит «не задано» (см. ENG.bassOn). */
+        /* ⛔ V4, КОНТРАКТ V1 — И В ЗАПИСИ: нота ТЕРМЕНВОКСА Скольжения в карте не несёт. Живьём ENG ей его и так не передаёт
+           (live!=null), а записанный терменвокс-бас хранит БЛИЖАЙШИЕ СТУПЕНИ обычными ведениями высоты — с величиной в карте
+           переигровка сгладила бы эти ступени долгим портаменто, и записанное зазвучало бы не как сыгранное. Без неё ступени
+           идут умолчанием, ровно как до V4. Прочие ключи карты не трогаем. */
+        const noteFx=m=> thereminOn && m && m[FX_GLIDE_KEY]!=null ? (({[FX_GLIDE_KEY]:_g, ...rest})=>rest)(m) : m;
+        const notePayload=(deg,oct,fxSnap)=> S.zone==='ld' ? {deg,oct,vol:S.vol,fx:fxSnap,inst:leadIdx}
+          : (fxSnap&&Object.keys(fxSnap).length ? {deg,oct,vol:S.vol,inst:bassIdx,fx:fxSnap} : {deg,oct,vol:S.vol,inst:bassIdx});
         /* ЗАЦЕПКИ ОБУЧЕНИЯ — ПО РОЛИ (не по режиму): нота соло — 'note' (уроки «Основы»…), бас — 'bass' (урок «Лупер»: слой
            ДРУГОЙ ролью поверх соло; урок «Две роли»: half — половина сплита). Шлём, когда сменилась ступень. */
         const tutNote=deg=>{ const half=splitOn?(S.rx0>0?1:0):null;
@@ -893,7 +902,7 @@ function processHands(res){
                нагрузке ЛЕЖАЛИ, но в СРАВНЕНИЕ не входили, поэтому в слой не попадали; теперь они едут
                картой и сравниваются по множеству. Карта СТРОИТСЯ ОДИН РАЗ НА КАДР (снимок цепи роли —
                величина общая для всех рук и пальцев), а не на каждый вызов: копию для записи делает push. */
-            const fxSnap = S.zone==='ld' ? fxSnapshot(zk) : null;   // O-0: цепь ЭТОЙ зоны по ключу. Карта эффектов — только у соло (у баса её в нагрузке нет — V4)
+            const fxSnap = noteFx(fxSnapshot(zk));   // O-0: цепь ЭТОЙ зоны по ключу. V4: и у баса — пустой снимок в нагрузку не попадёт (notePayload); у терменвокса без Скольжения (noteFx)
             for(const f of act){
               const n=S.fing[f]; if(!n)continue;
               wOn(S.zone, noteKey(f), notePayload(n.deg,n.oct,fxSnap), thereminOn?S.hz:null);   // ступень+октава, не частота: запись = намерение; в rect-раскладке октава пришла из СЛОТА (rectNoteAt), в узких рядах — от пальца. Последний арг — ЖИВОЙ override Гц (терменвокс), в запись не идёт (правило #11)
@@ -907,7 +916,7 @@ function processHands(res){
           if(leadZone(S.zone)&&monoOwner[S.zone]===key) wOff(S.zone,monoKey(S.zone));   // холостой палец владельца — голос роли молчит (передачи нет: рука всё ещё держит щипок)
         }else if(leadZone(S.zone)){                         // ВЕДУЩИЙ режим: один голос роли, звучит рука-владелец (последний щипок)
           if(monoOwner[S.zone]===key){
-            const fxSnap = S.zone==='ld' ? fxSnapshot(zk) : null;
+            const fxSnap = noteFx(fxSnapshot(zk));   // V4: и у баса (см. notePayload); у терменвокса без Скольжения (noteFx)
             wOn(S.zone, monoKey(S.zone), notePayload(S.deg,S.regOct,fxSnap), thereminOn?S.hz:null);   // rect — октава из СЛОТА (rectNoteAt); последний арг — живой override Гц (терменвокс), в запись НЕ идёт (правило #11)
             tutNote(S.deg);   // тот же вызов, что дал звук
           }

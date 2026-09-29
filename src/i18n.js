@@ -318,6 +318,8 @@ export const DICTS = {
     'fx.reverb':'Reverb',
     'fx.bright':'Brightness',
     'fx.bright.amt':'Amount',
+    'fx.glide':'Glide',
+    'fx.glide.time':'Glide time',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Tail',
     'fx.reverb.tone':'Tone',
@@ -342,8 +344,11 @@ export const DICTS = {
     'fx.volFix':'Fixed volume',
     'fx.volFixHint':'The playing hand’s horizontal now drives an effect, so it no longer sets volume for this role — set the level here.',
     'fx.sum.fixed':'fixed',
-    'fx.add':'+ Add effect',
+    'fx.add':'+ Add to the summed sound',
     'fx.addAll':'All effects are in the chain',
+    // V4: второй список «добавить» — голосовые эффекты («в ноте»), только объявленные для роли
+    'fx.addVoice':'+ Add to the note',
+    'fx.addVoiceAll':'Everything for the note is in the chain',
     'fx.remove':'Remove from chain',
     // O-1: перестановка в последовательной цепи + две зоны списка (что живёт в ноте / что обрабатывает сумму)
     'fx.moveUp':'Earlier in the chain',
@@ -722,6 +727,8 @@ export const DICTS = {
     'fx.reverb':'Реверб',
     'fx.bright':'Яркость',
     'fx.bright.amt':'Величина',
+    'fx.glide':'Скольжение',
+    'fx.glide.time':'Время скольжения',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Длина',
     'fx.reverb.tone':'Окраска',
@@ -746,8 +753,10 @@ export const DICTS = {
     'fx.volFix':'Громкость (фикс.)',
     'fx.volFixHint':'Горизонталь играющей руки отдана эффекту, поэтому громкость этой роли ею больше не ведётся — задайте уровень здесь.',
     'fx.sum.fixed':'фикс.',
-    'fx.add':'+ Добавить эффект',
+    'fx.add':'+ Добавить в общий звук',
     'fx.addAll':'Все эффекты уже в цепи',
+    'fx.addVoice':'+ Добавить в ноту',
+    'fx.addVoiceAll':'Всё для ноты уже в цепи',
     'fx.remove':'Убрать из цепи',
     // O-1: перестановка в последовательной цепи + две зоны списка (что живёт в ноте / что обрабатывает сумму)
     'fx.moveUp':'Раньше в цепи',

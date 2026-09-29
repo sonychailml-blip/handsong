@@ -1500,6 +1500,43 @@ function fxParamKeys(fxId){
   const mod=FX_FACTORY[fxId];
   return mod ? mod.params.map(p=>p.labelKey) : [];
 }
+/* «+ ДОБАВИТЬ ЭФФЕКТ» — подвал секции (Пласт 3.4.3). ⚠️ Он ЗАКРЫВАЕТ ДЫРУ, а не добавляет удобство:
+   3.4.2 снял выбор эффекта на строке пальца (строка стала параметром), и до этой операции состав цепи
+   был неправим вовсе — тремоло, не назначенное по умолчанию, оказалось недостижимым.
+   ОДИН СЕЛЕКТ, А НЕ КНОПКА+ДИАЛОГ: первый пункт — приглашение, остальные — доступные эффекты; выбор
+   СРАЗУ добавляет. Список строит вызывающий и ВЫЧИТАЕТ уже стоящие в цепи (сеттер инвариант тоже проверяет —
+   два рубежа, потому что цена нарушения молчаливая: два дескриптора на один store).
+   ВСЁ ЗАНЯТО — не прячем строку, а ГАСИМ С ПРИЧИНОЙ: исчезнувший контрол человек объяснить не может
+   (то же правило, что у «Раскладки нот»). V4: вынесено в функцию — списков стало два (по зонам), закон один.
+   avail — [[id, подпись, число параметров]]; headKey/allKey — приглашение и причина «всё уже в цепи». */
+function fxAddRow(avail,headKey,allKey){
+  const row=document.createElement('div'); row.className='prow';
+  const sel=document.createElement('select'); sel.autocomplete='off';
+  const head=document.createElement('option'); head.value='';
+  head.textContent = avail.length ? t(headKey) : t(allKey);
+  sel.appendChild(head);
+  for(const [id,label] of avail){ const o=document.createElement('option'); o.value=id; o.textContent=label; sel.appendChild(o); }
+  sel.value=''; sel.disabled=!avail.length;
+  sel.onchange=e=>{
+    const id=e.target.value; if(!id) return;
+    const n=(avail.find(a=>a[0]===id)||[,,1])[2];        // сколько параметров — знает сам модуль; у старых скалярных ровно один
+    const idx=fxChainPut(fxCtlChain(),id,n);   // ДАННЫЕ + ЗВУК: возвращённый эффект снова слышен (посыл поднимается из 0)
+    if(idx>=0){
+      /* ЗАСЕВ ФИКСИРОВАННЫХ ЖИВЫМ ЗНАЧЕНИЕМ — обязанность ui (state до audio не дотянется, обратный
+         импорт был бы циклом; об этом и просит комментарий у fxChainAdd). Без него параметр, вставший
+         фиксированным из-за нехватки пальцев, ПОКАЗЫВАЛ бы 0 при живом узле на другом значении —
+         меню бы врало. Для старого скалярного это тот же ноль (его погасило удаление) — сходится.
+         V4: у Скольжения живое значение — умолчание ЭТОЙ роли (fxInstance досеял defBy), поэтому и фиксированное
+         встаёт на сегодняшние 20/12 мс, а не на ноль. */
+      const ps=fxParamsOf(fxCtlChain(),id), eff=fxChainOf(fxCtlChain())[idx];
+      eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlChain(),idx,pi,ps[pi].get()); });
+      fxOpenId=id;   // разворачиваем добавленное: у него может не быть пальца (все заняты), и это надо увидеть сразу, а не искать
+    }
+    renderFxCtl();
+  };
+  row.appendChild(sel);
+  return row;
+}
 function renderFxCtl(){
   if(!fxCtlSep||!fxCtlRows) return;
   fxCtlSep.style.display = fxCtlRows.style.display = '';   // секция видна ВСЕГДА (см. шапку: гейт roleHasFx снят вместе с его дырой)
@@ -1705,49 +1742,29 @@ function renderFxCtl(){
       fxCtlRows.appendChild(sub);
     });
   });
-  /* «+ ДОБАВИТЬ ЭФФЕКТ» — подвал секции (Пласт 3.4.3). ⚠️ Он ЗАКРЫВАЕТ ДЫРУ, а не добавляет удобство:
-     3.4.2 снял выбор эффекта на строке пальца (строка стала параметром), и до этой операции состав цепи
-     был неправим вовсе — тремоло, не назначенное по умолчанию, оказалось недостижимым.
-     ОДИН СЕЛЕКТ, А НЕ КНОПКА+ДИАЛОГ: первый пункт — приглашение, остальные — доступные эффекты; выбор
-     СРАЗУ добавляет. Список строим из FX_META + FX_FACTORY и ВЫЧИТАЕМ уже стоящие в цепи — инвариант
-     «одна запись на fxId» человек тогда не может нарушить даже случайно (сеттер его тоже проверяет —
-     два рубежа, потому что цена нарушения молчаливая: два дескриптора на один store).
-     ⚠️ Реестр модулей читаем ЗДЕСЬ ЖЕ, на каждую отрисовку: до initAudio он пуст (см. довод в showScale).
-     ВСЁ ЗАНЯТО — не прячем строку, а ГАСИМ С ПРИЧИНОЙ: исчезнувший контрол человек объяснить не может
-     (то же правило, что у «Раскладки нот»). */
+  /* «+ ДОБАВИТЬ» — подвал секции; сам селект и его законы — fxAddRow (выше). Списки строим из FX_META + FX_FACTORY
+     ЗДЕСЬ ЖЕ, на каждую отрисовку: до initAudio реестр экземпляров пуст (см. довод в showScale). */
   {
-    const avail=[];
+    /* ⛳ V4: ДВА СПИСКА «ДОБАВИТЬ» — ПО ЗОНАМ, как и сам список выше. Прежде список был один и перечислял ВСЮ фабрику:
+       яркость аккордов (голосовой модуль) предлагалась соло, басу и ударным, где её не читает ни один голос, — эффект
+       вставал в цепь, рисовал столбик и молчал. Голосовой модуль делает что-то только в голосе СВОЕЙ роли, поэтому
+       «в ноту» предлагаем ровно то, что роль объявила (FX_FACTORY[id].roles), а «в общий звук» — всё шинное: шина
+       принимает любой сигнал. Роли без единого голосового кандидата (ударные) строки «в ноту» не получают вовсе. */
+    const voiceAll=[], busAvail=[];
     /* ⚠️ СТАРЫЕ СКАЛЯРНЫЕ (FX_META) — ТОЛЬКО СОЛО, и это не осторожность, а устройство: их величины
        живут в ОДНОМ глобальном state.fx и едут в СОЛО-событие ноты, а сами они вкручены в соло-путь
        четырьмя разными способами (драйв в голосе до огибающей, вибрато в detune, тремоло вставкой,
        делей посылом). Перенести их на чужую шину — это и своя проводка, и свой store, и вопрос
        формата события; всё это Пласт 3.7, не 3.5. Жест-слой их и так не отдаст чужой роли
-       (fxParamsOf возвращает [] вне соло) — здесь мы просто не предлагаем того, что не заработает. */
-    if(fxCtlChain()===CHAIN_SOLO) for(const m of FX_META) if(fxIsScalar(m.k)&&!chain.some(e=>e.fxId===m.k)) avail.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ и предлагается ВСЕМ ролям циклом по FX_FACTORY строкой ниже; здесь его отсекает fxIsScalar, иначе у соло он встал бы в список дважды
-    for(const id in FX_FACTORY) if(!chain.some(e=>e.fxId===id)) avail.push([id, t(FX_FACTORY[id].labelKey), FX_FACTORY[id].params.length]);
-    const row=document.createElement('div'); row.className='prow';
-    const sel=document.createElement('select'); sel.autocomplete='off';
-    const head=document.createElement('option'); head.value='';
-    head.textContent = avail.length ? t('fx.add') : t('fx.addAll');
-    sel.appendChild(head);
-    for(const [id,label] of avail){ const o=document.createElement('option'); o.value=id; o.textContent=label; sel.appendChild(o); }
-    sel.value=''; sel.disabled=!avail.length;
-    sel.onchange=e=>{
-      const id=e.target.value; if(!id) return;
-      const n=(avail.find(a=>a[0]===id)||[,,1])[2];        // сколько параметров — знает сам модуль; у старых скалярных ровно один
-      const idx=fxChainPut(fxCtlChain(),id,n);   // ДАННЫЕ + ЗВУК: возвращённый эффект снова слышен (посыл поднимается из 0)
-      if(idx>=0){
-        /* ЗАСЕВ ФИКСИРОВАННЫХ ЖИВЫМ ЗНАЧЕНИЕМ — обязанность ui (state до audio не дотянется, обратный
-           импорт был бы циклом; об этом и просит комментарий у fxChainAdd). Без него параметр, вставший
-           фиксированным из-за нехватки пальцев, ПОКАЗЫВАЛ бы 0 при живом узле на другом значении —
-           меню бы врало. Для старого скалярного это тот же ноль (его погасило удаление) — сходится. */
-        const ps=fxParamsOf(fxCtlChain(),id), eff=fxChainOf(fxCtlChain())[idx];
-        eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlChain(),idx,pi,ps[pi].get()); });
-        fxOpenId=id;   // разворачиваем добавленное: у него может не быть пальца (все заняты), и это надо увидеть сразу, а не искать
-      }
-      renderFxCtl();
-    };
-    row.appendChild(sel); fxCtlRows.appendChild(row);
+       (fxParamsOf возвращает [] вне соло) — здесь мы просто не предлагаем того, что не заработает.
+       V4: они живут В ГОЛОСЕ — поэтому их место в списке «в ноту». */
+    if(fxCtlChain()===CHAIN_SOLO) for(const m of FX_META) if(fxIsScalar(m.k)) voiceAll.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ (шинный); здесь его отсекает fxIsScalar
+    for(const id in FX_FACTORY){ const f=FX_FACTORY[id], it=[id, t(f.labelKey), f.params.length];
+      if(f.kind==='voice'){ if((f.roles||[]).includes(fxCtlRole)) voiceAll.push(it); }   // голосовой — только объявленным ролям
+      else if(!chain.some(e=>e.fxId===id)) busAvail.push(it); }
+    const voiceAvail=voiceAll.filter(it=>!chain.some(e=>e.fxId===it[0]));   // вычитаем стоящие: инвариант «одна запись на fxId» нарушить нельзя даже случайно
+    if(voiceAll.length) fxCtlRows.appendChild(fxAddRow(voiceAvail,'fx.addVoice','fx.addVoiceAll'));
+    fxCtlRows.appendChild(fxAddRow(busAvail,'fx.add','fx.addAll'));
   }
 }
 /* ПЕРВИЧНАЯ ОТРИСОВКА — та же причина и тот же приём, что у renderRectCtl/renderPinchCtl выше: пока
