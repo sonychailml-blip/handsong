@@ -827,20 +827,22 @@ function rollUp(e){
        «правку», которая ничего не двигает, — а на экране это выглядит как «нажал ↶, и ничего не произошло». */
     if(gd){
       if(rollGrab.mode==='len'){
-        /* Длина — это ВРЕМЯ КОНЦА сегмента; какое событие его несёт и куда его можно двигать, решает
-           recorder (editResizeSeg: тот же страж порядка по ключу, что и у переноса). */
+        /* Длина — это ВРЕМЯ КОНЦА сегмента; какое событие его несёт и что при этом отделяется, решает
+           recorder (editResizeSeg). ⛳ E2: ВЫДЕЛЯЕМ ТО, ЧТО ВЕРНУЛ recorder — у отделённого сегмента «вкл» это НОВЫЙ
+           объект события, а прежнее выделение указывало бы на событие, которого в песне больше нет. */
         const s=rollGrab.seg, ne=s.start+gd.len;
-        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9) editResizeSeg(s.ev, ne);
+        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9){ const r=editResizeSeg(s.ev, ne); if(r&&r!==true) selNote(r); }
       }
       else if(rollGrab.seg){
         /* БАС: переносим СЕГМЕНТ — его время и/или высоту. Ряд расшифровываем ТОЙ ЖЕ формулой, что рисует
            ряды (rollRowPitch по ладу ОСИ), а лад события не трогаем вовсе — правка в чужом ладу не смеет
            переписать ноту на живой (правило #7).
-           ⛳ E1: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту, сдвинутую во времени, — ЦЕЛИКОМ
-           (ровно то, что показал призрак), сегмент глиссандо — пока по-прежнему своей границей (это E2). */
+           ⛳ E1/E2: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту во времени — ЦЕЛИКОМ, сегмент
+           глиссандо во времени — ОТДЕЛЯЕТ и везёт один, смену одной высоты — всем событиям сегмента, глиссандо цело.
+           Выделяем то, что он вернул (у отделённого — новое «вкл», см. длину выше). */
         const g2=rollGeom(), pit=rollRowPitch(gd.row, g2&&g2.sc);
         const s=rollGrab.seg;
-        if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct) editMoveSeg(s.ev, gd.t, pit.deg, pit.oct);
+        if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct){ const r=editMoveSeg(s.ev, gd.t, pit.deg, pit.oct); if(r&&r!==true) selNote(r); }
       }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
     }
     setRollDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
