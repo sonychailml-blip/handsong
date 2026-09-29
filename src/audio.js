@@ -136,7 +136,7 @@ let chordBus;                                           // аккорды (Z-я�
    править. Имя revCh в комментариях ниже сохранено как ИСТОРИЧЕСКОЕ. */
 let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
-const bv=[]; const bassHold={}; let bassBus;             // пул баса (моно-голос на слой)
+const bv=[]; const bassHold={}; let bassBus;             // пул баса: голоса по ключам владельцев (голос на ключ), ленивый до BASS_POOL_N (P1)
 let drumBus;                                             // шина ударных
 
 /* ═══ ИСТОЧНИК СЛУЧАЙНОСТИ — ОДНА ТОЧКА ПОДМЕНЫ (слайс F1 дуги «ЗАМОРОЗКА») ═══
@@ -1663,7 +1663,8 @@ async function initAudio(mkCtx){
      поэтому СЕЙЧАС не строится и не цепляется НИЧЕГО: бас идёт в мастер сухим, байт-в-байт как всегда.
      Первый добавленный в меню эффект построит свой экземпляр и встанет в путь сам (см. fxInstance/fxResplice). */
   fxChainIO(chainKeyOf('bs'),bassBus);
-  buildBassPool(bassBus);
+  /* P1: пул баса ЛЕНИВЫЙ — голоса строит bvAlloc по мере надобности (newBassVoice), как соло. Прежде здесь строились
+     BASS_POOL_N голосов сразу. bv при этом пуст (сброс таблиц выше), и офлайн-копия растит его так же, с нуля. */
 
   /* --- УДАРНЫЕ: своя шина в master (сухая; своя цепь эффектов — с Пласта 3.5.4, по тому же закону) --- */
   drumBus=AC.createGain(); drumBus.gain.value=0.20;   // O-1: в мастер ведёт хвост цепи (fxChainIO), а не прямая связь
@@ -2032,9 +2033,17 @@ function scheduleBend(owner, points, baseFreq, secPerBeat, when){
    Тоже пер-голосово: отмена в чужом голосе оборвала бы чужой бенд. */
 function leadCancel(owner,when){ const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins];   // when — явное время (S2): отмена прошлых рамп обязана случиться В ТОТ ЖЕ момент, что и атака, иначе офлайн она сняла бы рампы, ещё не расставленные
   if(b&&b.cancel)b.cancel(when!=null?when:AC.currentTime); }
-/* --- БАС: пул моно-голосов (один на слой). Тембр печётся НА АТАКЕ по слою (как аккорд),
-   а не глобально — записанный слой сохраняет свой инструмент (§3.4, как строй/септаккорд). --- */
-function buildBassPool(dest, n=BASS_POOL_N){   // n — только для F2 (дорастить пул офлайн на один голос); живьём вызов прежний, без аргумента
+/* --- БАС: пул голосов С КЛЮЧАМИ ВЛАДЕЛЬЦЕВ (bassHold[owner]), как у соло. Тембр печётся НА АТАКЕ по голосу (как
+   аккорд), а не глобально — записанный слой сохраняет свой инструмент (§3.4, как строй/септаккорд).
+   ⛳ P1: ПУЛ ЛЕНИВЫЙ, КАК У СОЛО. Прежде initAudio строил BASS_POOL_N=4 голоса СРАЗУ — по голосу на дорожку, — и
+   пятая звучащая бас-дорожка крала голос у первой (особенно больно сразу после смены тоники: все замороженные
+   дорожки разом уходят на события, то есть в живой пул). Теперь голос строится, когда он впервые нужен, до
+   потолка BASS_POOL_N (поднят до потолка соло). ⛔ Правило #3 цело: построенный голос не останавливается и не
+   разбирается никогда — только гасится гейтом env, ровно как прежние четыре.
+   ⚠️ ЖИВОЙ бас по-прежнему ОДИН владелец ('bass', последний щипок) — это P3. Здесь меняется только ПУЛ.
+   ⛔ Код ЗЕРКАЛИТ соло (leadAlloc/newLeadVoice), а не сливается с ним: голос баса — свой (две пилы и фильтр), и
+   слияние ждёт формата тембра (HANDOFF, «БАС И СОЛО — ОДИН ИНСТРУМЕНТ»). --- */
+function buildBassPool(dest, n){   // n голосов разом; зовёт ТОЛЬКО newBassVoice (по одному) — живой и офлайн-пул ленивые (P1)
   for(let i=0;i<n;i++){
     const o1=AC.createOscillator(), o2=AC.createOscillator();
     const g1=AC.createGain(), g2=AC.createGain();
@@ -2047,12 +2056,14 @@ function buildBassPool(dest, n=BASS_POOL_N){   // n — только для F2 (
     env.gain.value=0; vol.gain.value=0.5;
     o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
     o1.start(); o2.start();
-    bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false,freeAt:0});   // freeAt — только для offline (F2); живьём не читается
+    /* deg/oct — КАКУЮ НОТУ голос держит (P1, зеркало соло-голоса): звуку не нужны, их прочтёт ПОДСВЕТКА (P3, правило
+       #26) — из реестра движка, а не из состояния руки. Пишет их ТОТ ЖЕ вызов, что звучит (bassOn/bassSet), гасит bassOff. */
+    bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
   }
 }
-/* ОДИН басовый голос сверх пула — нужен ТОЛЬКО офлайн-раскладчику (F2), когда все заняты своими
-   хвостами. ⚠️ Зовёт тот же buildBassPool с n=1, чтобы не заводить второй копии проводки: порядок
-   создания узлов обязан совпадать с пуловым, иначе два одинаковых по смыслу голоса звучали бы разно. */
+/* ОДИН новый басовый голос. ⛳ P1: единственная дверь роста пула — И ЖИВОГО (до потолка BASS_POOL_N), И офлайн-
+   раскладчика F2 (без потолка). ⚠️ Зовёт тот же buildBassPool с n=1, чтобы не заводить второй копии проводки:
+   порядок создания узлов обязан быть одинаков у всех голосов, иначе два одинаковых по смыслу голоса звучали бы разно. */
 const newBassVoice=dest=>{ buildBassPool(dest,1); return bv[bv.length-1]; };
 function bvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   const tc=hard?0.02:(v.ins?v.ins.rel:0.2);
@@ -2063,14 +2074,24 @@ function bvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
 }
 function bvAlloc(when){
   /* F2 — ОФЛАЙН: занятость по ЗВУЧАНИЮ, рост по требованию, кражи нет (довод — у setOffline).
-     ⚠️ Бас живьём МОНО НА СЛОЙ, и офлайн это не меняется: владельцев по-прежнему различает ключ
-     ('bass', 'bassloop:N'), просто каждому достаётся свой голос вместо отобранного у соседа. */
+     Владельцев различает ключ ('bass', 'bassloop:N[:k]') — голос на ключ, и офлайн каждому достаётся свой голос вместо
+     отобранного у соседа. ⛳ P1 этой ветки НЕ ТРОГАЛ: она и прежде росла с того, что было, — теперь растёт с нуля
+     (живой пул ленив), и число голосов по-прежнему сходится к реальной одновременности дорожки. */
   if(offline){ const t=when!=null?when:AC.currentTime;
     let v=bv.find(x=>x.freeAt<=t);
     if(!v) v=newBassVoice(bassBus);
     v.freeAt=Infinity; return v; }
+  /* ⛳ P1 — ПОРЯДОК ВЫДАЧИ, ЗЕРКАЛО leadAlloc: свободный (отпущенный или ни разу не звучавший) → новый, пока не упёрлись
+     в потолок → КРАЖА, и красть начинаем с ОТПУЩЕННЫХ (у них лишь хвост), только потом с зажатых.
+     ⚠️ Честно о том, что меняется: отпущенный голос (bvRelease снимает owner и on РАЗОМ) и прежде находился первым —
+     строкой find(!owner); кража случалась только когда держат ВСЕ. Фильтр «сперва отпущенные» в ветке кражи —
+     зеркальная страховка, как у соло. Настоящая перемена — потолок: он поднят, и голоса до него растут лениво.
+     ⚠️ tOn у баса обновляет КАЖДЫЙ вызов bassOn (не только атака, как у соло) — поэтому зажатая живая нота, которую
+     рука ведёт каждый кадр, всегда «самая свежая» и кражей не выбирается. Не трогаем: это поведение живого баса. */
   let v=bv.find(v=>!v.owner);
-  if(!v){ v=bv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; bvRelease(v,true,when);   // кража: снять голос со старого владельца
+  if(!v&&bv.length<BASS_POOL_N) v=newBassVoice(bassBus);
+  if(!v){ const free=bv.filter(x=>!x.on); v=(free.length?free:bv).reduce((a,b)=>a.tOn<b.tOn?a:b);
+    const o=v.owner; v.deg=-1; bvRelease(v,true,when);   // кража: снять голос со старого владельца (и его ноту с подсветки — новый владелец запишет свою)
     if(o&&bassHold[o]===v)delete bassHold[o]; }
   return v;
 }
@@ -2080,9 +2101,13 @@ function setBassInstr(i){
   setBassIdx(((i%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length);
   hooks.bassInstr && hooks.bassInstr(bassIdx);
 }
-function bassOn(owner,freq,vol,ins,when){
+/* deg/oct (P1) — ЧТО звучит, для подсветки из реестра движка (как у leadOn); звуку не нужны — частота уже посчитана.
+   ⛔ when — ПОСЛЕДНИМ (правило #15): у bassOn есть прямые позиционные вызовы (зонд render.js), и время, съехавшее
+   в слот ступени, тихо сыграло бы ноту «сейчас». Поэтому новые поля встали ПЕРЕД when, а вызовы поправлены. */
+function bassOn(owner,freq,vol,ins,deg,oct,when){
   if(!AC)return; const t=when!=null?when:AC.currentTime;
   let v=bassHold[owner]; if(!v){ v=bvAlloc(when); v.owner=owner; bassHold[owner]=v; }
+  if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // пишем КАЖДЫЙ вызов: ведение живой руки (новая ступень под пальцем) отражается сразу
   if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
     v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
     v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t);
@@ -2095,12 +2120,13 @@ function bassOn(owner,freq,vol,ins,when){
   v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер
 }
-function bassSet(owner,freq,vol,when){
+function bassSet(owner,freq,vol,deg,oct,when){   // deg/oct (P1) — ступень едет вместе с частотой, как у leadSet; when — последним
   if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=when!=null?when:AC.currentTime;
+  if(deg!=null){ v.deg=deg; v.oct=oct||0; }
   v.o1.frequency.setTargetAtTime(freq,t,0.03); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.03);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень
 }
-function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; bvRelease(v,false,when); delete bassHold[owner]; }
+function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; v.deg=-1; bvRelease(v,false,when); delete bassHold[owner]; }   // P1: как leadOff — подсветка гаснет в миг снятия, хвост релиза дозвучивает
 
 /* --- ДРОН: гейт dG, частота следует за тоникой (tonicFreq/2) в любом ладу (спасён из backing.js).
    tonicFreq — единый источник: у fixedKey это высота КЛЮЧА в приколоченной сетке (иначе дрон бился
