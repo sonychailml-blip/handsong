@@ -2,6 +2,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
+         voiceMode, setVoiceMode,   // V3: режим голоса соло/баса — пара кнопок под тембром роли
          fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          chainXDriven, fxVolFix, setFxVolFix, fxIsScalar,
@@ -12,7 +13,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
-import { fxParamsOf, ACTIONS } from './gestures.js';   // ACTIONS — реестр дискретных действий (слайс «д»): меню берёт подпись и avail() ОТТУДА ЖЕ, откуда их читает движок
+import { fxParamsOf, ACTIONS, voiceModeReset } from './gestures.js';   // ACTIONS — реестр дискретных действий (слайс «д»): меню берёт подпись и avail() ОТТУДА ЖЕ, откуда их читает движок
 import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
@@ -956,6 +957,10 @@ export function tutorReset(){   // урок учит SINGLE-ROLE соло: га�
   /* РАСКЛАДКА — тоже назад в дефолт ('auto', по ладу): уроки учат «Y выбирает РЯД ноты», и урок,
      начатый на ладу, оставленном в прямоугольниках, учил бы не тому, что на экране (правило #24). */
   setRectPref('auto'); renderRectCtl();
+  /* РЕЖИМЫ ГОЛОСА (V3) — тоже в умолчания: урок, начатый с соло в «Ведущем», не дал бы второй руке своей ноты, а шаги
+     уроков писаны под полифоническое соло и ведущий бас (правило #24). softAllOff уже был выше; состояние рук чистим. */
+  for(const [r,m] of [['ld','poly'],['bs','lead']]){ setVoiceMode(r,m); voiceModeReset(r); }
+  applyVoiceMode();
   applySplit(); applyInstr();
 }
 /* Сброс петли и ПОДЛОЖКИ для урока (та же связка, что у кнопки ✕): очистить записанное и вернуть кнопку
@@ -1091,6 +1096,27 @@ selLead.onchange=e=>{ setLeadInstr(+e.target.value);
   if(hooks.tutor) hooks.tutor('timbre',{slot:'lead'}); };   // ЗАЦЕПКА ОБУЧЕНИЯ: сменили СОЛО-тембр — урок «Строи и тембры»
 selChord.onchange=e=>setChIdx(+e.target.value);
 selBass.onchange=e=>setBassInstr(+e.target.value);
+/* ⛳ РЕЖИМ ГОЛОСА (V3): ПОЛИФОНИЧЕСКИЙ / ВЕДУЩИЙ — у соло и у баса, у каждой роли свой (state.voiceMode). В сплите
+   каждая половина следует режиму СВОЕЙ роли даром: жесты спрашивают режим по зоне руки, а зона — роль половины.
+   Смена гасит звучащее тем же путём, что прочие настройки панели (softAllOff): при записи он СНАЧАЛА закрывает в
+   дубле всё открытое, так что взятое остаётся цельным. Затем voiceModeReset приводит состояние рук роли к новому
+   режиму — зажатая рука со следующего кадра звучит уже по нему (как после смены лада или триад).
+   ⚠️ СМЕНА РЕЖИМА ПОСРЕДИ ДУБЛЯ НОВОЙ ДОРОЖКИ НЕ РОЖДАЕТ: источник звука (recorder.noteSource) — роль + тембр, а режим —
+   способ ИГРАТЬ этим источником (как удержание или терменвокс у функции руки), не сам источник. Обе формы ложатся в
+   одну дорожку без противоречия: ведущий — одна нота с ведениями высоты, полифонический — ноты с разными a.v, и
+   переигровка, догонялка и редактор уже ключуют по владельцу. Когда режим уедет в ТЕМБР (формат тембра), тембр с
+   другим режимом станет другим источником — и дорожка разделится сама, без правки здесь. */
+function applyVoiceMode(){
+  for(const [r,p,l] of [['ld','vmLdPoly','vmLdLead'],['bs','vmBsPoly','vmBsLead']]){
+    const lead=voiceMode[r]==='lead'; $(p).classList.toggle('act',!lead); $(l).classList.toggle('act',lead); }
+}
+function pickVoiceMode(role,m){
+  if(voiceMode[role]===m) return;              // повторный тап по выбранному — не гасим звучащее попусту
+  setVoiceMode(role,m); softAllOff(); voiceModeReset(role); applyVoiceMode();
+}
+$('vmLdPoly').onclick=()=>pickVoiceMode('ld','poly'); $('vmLdLead').onclick=()=>pickVoiceMode('ld','lead');
+$('vmBsPoly').onclick=()=>pickVoiceMode('bs','poly'); $('vmBsLead').onclick=()=>pickVoiceMode('bs','lead');
+applyVoiceMode();
 qOn.onclick =()=>{ setLoopQuant(true);  qOn.classList.add('act');  qOff.classList.remove('act'); };
 qOff.onclick=()=>{ setLoopQuant(false); qOff.classList.add('act'); qOn.classList.remove('act'); };
 /* ДРОБЛЕНИЕ ДОЛИ — сетка квантизации ЖИВЫХ ударов: 4 = шестнадцатые (умолчание, как было), 3 = триоли

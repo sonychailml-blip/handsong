@@ -255,9 +255,18 @@
     <div class="phead"><b data-i18n="panel.sound.head">Звук и управление</b><button id="panelCloseSound" data-i18n="panel.collapse">Свернуть ✕</button></div>
 
     <div class="psep" data-i18n="panel.scale.sepTimbre">Тембры</div>
+    <!-- РЕЖИМ ГОЛОСА (V3) — строкой ПОД тембром своей роли: это свойство мелодического инструмента (в долгую — данные
+         тембра), поэтому живёт рядом с ним. Только у соло и баса: аккорды и ударные хранят другие виды нот. Обработчики —
+         ui.js (pickVoiceMode); подсветку выбранной кнопки ставит applyVoiceMode. -->
     <div class="prow"><label data-i18n="panel.scale.leadInstr">Соло-инструмент</label><select id="selLead"></select></div>
+    <div class="prow"><label data-i18n="panel.sound.leadVoice">Голос соло</label>
+      <div class="seg"><button id="vmLdPoly" class="act" data-i18n="voice.poly" data-i18n-title="voice.poly.title">Полифония</button><button id="vmLdLead" data-i18n="voice.lead" data-i18n-title="voice.lead.title">Ведущий</button></div>
+    </div>
     <div class="prow"><label data-i18n="panel.scale.chordInstr">Аккорд-инструмент</label><select id="selChord"></select></div>
     <div class="prow"><label data-i18n="panel.scale.bassInstr">Бас-инструмент</label><select id="selBass"></select></div>
+    <div class="prow"><label data-i18n="panel.sound.bassVoice">Голос баса</label>
+      <div class="seg"><button id="vmBsPoly" data-i18n="voice.poly" data-i18n-title="voice.poly.title">Полифония</button><button id="vmBsLead" class="act" data-i18n="voice.lead" data-i18n-title="voice.lead.title">Ведущий</button></div>
+    </div>
     <div class="prow"><label data-i18n="panel.scale.drumKit">Набор ударных</label><select id="selDrumKit"></select></div>
 
     <!-- ФУНКЦИИ РУК (заменяет ⇄ и тумблер терменвокса): по выпадающему на руку для каждой ноте-роли
