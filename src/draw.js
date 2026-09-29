@@ -7,7 +7,7 @@ import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchD
          rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
-import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
+import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
@@ -378,11 +378,14 @@ function latchChordFreqs(){                        // частоты звуча�
    терменвокс — нота у руки одна) либо 'lead:L:<палец>' (многопальцевый). Гц считаем leadFreq(deg,oct) —
    ТОЙ ЖЕ функцией, что дала частоту звуку (recorder.ENG.leadOn), поэтому число не может разойтись.
    Сортируем по высоте: список читается снизу вверх, как сама сетка. */
-function handLeadNotes(key){
-  const pre='lead:'+handSide(key), out=[];
-  for(const k in leadHold){
+/* ⛳ V2: для ЛЮБОЙ мелодической роли в ПОЛИФОНИЧЕСКОМ режиме — у баса ключи 'bass:L[:палец]' в bassHold, Гц — bassFreq,
+   той же функцией, что дала частоту звуку (ENG.bassOn). В ВЕДУЩЕМ режиме ключ роли один и руке не принадлежит ('bass',
+   у соло 'lead:M') — список пуст, и ярлык идёт прежней однонотной веткой (так бас выглядел всегда). */
+function handLeadNotes(key,role='ld'){
+  const bs=role==='bs', pre=(bs?'bass:':'lead:')+handSide(key), hold=bs?bassHold:leadHold, fq=bs?bassFreq:leadFreq, out=[];
+  for(const k in hold){
     if(k!==pre && k.slice(0,pre.length+1)!==pre+':')continue;
-    const v=leadHold[k]; if(v.deg>=0) out.push({deg:v.deg,oct:v.oct,f:leadFreq(v.deg,v.oct)});
+    const v=hold[k]; if(v.deg>=0) out.push({deg:v.deg,oct:v.oct,f:fq(v.deg,v.oct)});
   }
   return out.sort((a,b)=>a.f-b.f);
 }
@@ -1478,8 +1481,11 @@ function drawRole(instr,rx0,rx1,playH){
      вопрос «что делают ТВОИ РУКИ»; занятая петля зажгла бы половину сетки и перестала бы что-либо
      значить. У аккордов иначе (там подсвечивается и аккорд петли) — но у аккорда он ОДИН, а соло-слоёв
      может быть сколько угодно.
-     БАС ЗДЕСЬ НАМЕРЕННО ИДЁТ СТАРЫМ ПУТЁМ — он ещё МОНО (свой пул bassHold, один голос на слой), и
-     сводить его с соло в одну ветку нельзя, пока это так. */
+     ⛳ V2: БАС — ТЕМ ЖЕ ПУТЁМ, из РЕЕСТРА ЗВУЧАЩИХ ГОЛОСОВ (bassHold; ступень и регистр пишет в голос bassOn — P1),
+     живые ключи 'bass' (ведущий режим: один голос роли) и 'bass:<рука>[:палец]' (полифонический). Прежде бас светился
+     из HANDS — из НАМЕРЕНИЯ последней в обходе руки, и при двух руках в ведущем режиме это могла быть не та, что
+     звучит (голос у последнего щипка, а обход HANDS идёт в порядке появления рук). Теперь горит то, что ЗВУЧИТ
+     (правило #26). Слои петли ('bassloop:…') не светим — тот же довод, что у соло. */
   let act=-1, actOct=0;                       // ОДНА нота — только для разбора Гц аккорда (у аккорда она и правда одна)
   const notes=[];                             // ВСЕ звучащие ноты роли: [{deg,oct}]
   if(instr==='ch'){                                          // рука в приоритете, иначе аккорд петли (§Q5)
@@ -1489,8 +1495,10 @@ function drawRole(instr,rx0,rx1,playH){
   }else if(instr==='ld'){
     for(const k in leadHold){ if(k.slice(0,5)!=='lead:')continue;   // только ЖИВЫЕ руки; 'leadloop:N:v' — слои петли, их не светим
       const v=leadHold[k]; if(v.deg>=0){ notes.push({deg:v.deg,oct:v.oct}); if(act<0){ act=v.deg; actOct=v.oct; } } }
-  }else for(const k in HANDS){ const S=HANDS[k]; if(S.pinch&&S.deg>=0&&S.zone==='bs'){ act=S.deg; actOct=S.regOct; } }   // БАС: моно, последняя рука — как было
-  if(instr==='bs'&&act>=0) notes.push({deg:act,oct:actOct});
+  }else if(instr==='bs'){
+    for(const k in bassHold){ if(k!=='bass'&&k.slice(0,5)!=='bass:')continue;   // только ЖИВЫЕ владельцы баса (V2)
+      const v=bassHold[k]; if(v.deg>=0){ notes.push({deg:v.deg,oct:v.oct}); if(act<0){ act=v.deg; actOct=v.oct; } } }
+  }
   /* Ступени и слоты — ОДНИМ проходом по нотам: слоты нужны rect-сетке, ступени — узким рядам.
      Слот вне показанного окна (rectSlotOf → −1) просто не попадает в множество: подсвечивать негде. */
   const hlBase=rectBase(rectOctReg(instr)), actDegs=new Set(), actSlots=new Set();
@@ -1737,10 +1745,11 @@ function drawHandsPhone(res,W,H,playH){
         /* НЕСКОЛЬКО НОТ ОДНОЙ РУКИ (многопальцевый щипок): показываем ВСЕ, как это давно делает разбор
            аккорда, — иначе ярлык называл бы одну ноту из четырёх и врал бы о том, что слышно. Заголовок:
            имена (это и есть аккорд «одним взглядом») + регистр + громкость; ниже — по сегменту на ноту с
-           Гц и центами, упакованные с деградацией (см. fitLeadNotes). Только СОЛО: у баса нота одна.
+           Гц и центами, упакованные с деградацией (см. fitLeadNotes). V2: соло И бас — у кого из них ПОЛИФОНИЧЕСКИЙ
+           режим; в ведущем нота у роли одна, и handLeadNotes честно отдаёт пусто.
            ⚠️ ОДНА НОТА ИДЁТ ПРЕЖНЕЙ ВЕТКОЙ — две строки слово в слово, как было (гарантия «одна нота
            выглядит как раньше»); ветка ниже включается ровно с ДВУХ. */
-        const many = instr==='ld' ? handLeadNotes(k) : [];
+        const many = handLeadNotes(k,instr);
         if(many.length>1){
           ctx.font='12px system-ui';                                   // тем же шрифтом packSegs и меряет
           const lines=fitLeadNotes(many,Math.min(300,W*0.6),3);

@@ -1890,12 +1890,12 @@ const makeENG=A=>({
               if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
               A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
-              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,undefined,when,a.tie);   // V1: слот glide пуст (скольжение не передаёт никто — V4); время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,undefined,a.tie,when);   // V1: слот glide пуст (скольжение не передаёт никто — V4); время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
               if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               A.applyFx(a.fx);
               A.leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,undefined,when); },   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
-  leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),when,a&&a.tie),   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
+  leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),a&&a.tie,when),   // V2: tie ПЕРЕД when (правило #15)   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
   chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
@@ -2460,7 +2460,7 @@ function trackResplice(){
   const at=k=> alive.has(trackOwnerLayer(k)) ? T : undefined;          // живая дорожка — на шве; снятая — сейчас
   for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:')     chordOff(k, at(k));
   for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:') bassOff(k, at(k));
-  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:') leadOff(k, at(k));
+  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:') leadOff(k, undefined, at(k));   // V2: слот tie пуст — время в слоте when
   chasePlay(lo, T, false);                          // аккорды и бас — по времени шва, до событий следующего отрезка
   chasePlay(lo, T, true);                           // соло — по явному времени шва, как при пуске
 }
