@@ -562,7 +562,8 @@ function drawLooper(){
   const delLy=laneDelPendingLayer();         // S3.5d: дорожка со взведённым удалением или null
   let head, hc;
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
-  else if(recording){ { const rl=recLayers().slice().sort((x,y)=>x-y); head= rl.length>1 ? t('looper.overdubMany',{list:rl.map(l=>l+1).join(', ')}) : t('looper.overdub',{n:rl[0]+1}); }   /* T2: взятое пишет по дорожке на роль — называем ВСЕ; одна — прежняя строка */ hc='#e5484d'; }
+  else if(recording){ { const rl=recLayers().slice().sort((x,y)=>x-y); head= rl.length>1 ? t('looper.overdubMany',{list:rl.map(l=>l+1).join(', ')}) : t('looper.overdub',{n:rl[0]+1});
+    if(armLy!=null && rl.some(l=>l!==armLy)) head+=' · '+t('looper.armedOwn',{n:armLy+1}); }   /* T3: вооружённая осталась красной, а ноты ушли в новую строку — называем это словами: она берёт только СВОЙ звук (роль и тембр) */   /* T2: взятое пишет по дорожке на роль — называем ВСЕ; одна — прежняя строка */ hc='#e5484d'; }
   else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:ids.length}); hc='#57d9a3'; }
   else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.

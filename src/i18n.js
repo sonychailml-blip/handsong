@@ -264,6 +264,7 @@ export const DICTS = {
        длине ПЕСНИ, а не о петле. */
     'looper.overdub':'● RECORDING · track {n}',
     'looper.overdubMany':'● RECORDING · tracks {list}',
+    'looper.armedOwn':'L{n} takes only its own sound',   // T3: вооружённая дорожка принимает только свою роль и тембр; остальное — в новые дорожки
     'looper.playing':'▶ PLAYING · {bars} bars · {layers} tracks',
     'looper.paused':'SONG · {bars} bars · {layers} tracks · “▶ play” to start',
     'looper.regionOn':'REPEAT',
@@ -668,6 +669,7 @@ export const DICTS = {
     'looper.count':'ОТСЧЁТ  {n}',
     'looper.overdub':'● ЗАПИСЬ · дорожка {n}',
     'looper.overdubMany':'● ЗАПИСЬ · дорожки {list}',
+    'looper.armedOwn':'L{n} берёт только свой звук',
     'looper.playing':'▶ ИГРАЕТ · {bars} т. · дорожек {layers}',
     'looper.paused':'ПЕСНЯ · {bars} т. · дорожек {layers} · «▶ играть»',
     'looper.regionOn':'ПОВТОР',

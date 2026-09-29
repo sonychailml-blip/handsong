@@ -114,10 +114,18 @@ const ts=layer=> takeSt.get(layer) || takeJoin(layer);
    и больше ничего о них не знают (ключ непрозрачен, как ключ владельца цепи — см. state.chainKeyOf).
    Зовут её ровно на «вкл» ноты и на ударе — в push (takeRoute) и у соло до push (takePeek), с ТЕМИ ЖЕ fn и a,
    поэтому оба ответа совпадают. Ведения и «выкл» маршрут не проходят. null — не нота источника (дрон). */
-const noteSource=(fn,a)=> evRole(fn);
+/* ⛳ T3: ИСТОЧНИК = РОЛЬ + ТЕМБР (у ударных — набор). Тембр читается из «вкл» ноты (a.inst) и из удара (a.kit) —
+   ровно тех событий, что маршрут и видит. Тембра нет (старое событие) — '-', то есть свой отдельный источник. */
+const noteSource=(fn,a)=>{ const r=evRole(fn); if(!r) return null;
+  const x = r==='dr' ? (a&&a.kit) : (a&&a.inst);
+  return r+':'+(x==null?'-':x); };
 /* Источник дорожки — по её первому «вкл»/удару. Дорожка одного источника по построению (с T2), поэтому первый и
    есть её; null — ни одной ноты (например, слой дрона). */
-function laneSourceOf(layer){ for(const e of events) if(e.layer===layer){ const k=noteSource(e.fn,e.a); if(k) return k; } return null; }
+/* ⚠️ T3: ТОЛЬКО «вкл» и удары. Ведения тембра не несут (у аккорда и баса его в них нет вовсе), и ключ по ведению
+   вышел бы «роль:-». Это ЕДИНСТВЕННАЯ правка вне noteSource, которой потребовал T3, и она — изъян формы T2:
+   laneSourceOf спрашивал ключ у ЛЮБОГО события, а ключ осмыслен только у начала ноты. */
+const isNoteStart=fn=> fn==='leadOn'||fn==='chOn'||fn==='bassOn'||fn==='drum';
+function laneSourceOf(layer){ for(const e of events) if(e.layer===layer&&isNoteStart(e.fn)){ const k=noteSource(e.fn,e.a); if(k) return k; } return null; }
 const takeSrc=new Map();     // слой взятого → ключ его источника (noteSource). Нет записи — дорожка ● ещё ничья
 /* ⛳ СЛЕДУЮЩИЙ СВОБОДНЫЙ НОМЕР СЛОЯ — ОДИН НА ВСЕ МЕСТА РОЖДЕНИЯ ПОСРЕДИ ПЕСНИ (T2). `maxLayer()+1` видит
    только слои, в которых уже ЕСТЬ события, а дорожка взятого до первой ноты пуста: две дорожки, рождённые
@@ -1665,12 +1673,12 @@ const makeENG=A=>({
               if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
               A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
-              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,when);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,when,a.tie);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
               if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               A.applyFx(a.fx);
               A.leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,when); },   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
-  leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),when),
+  leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),when,a&&a.tie),   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
   chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
@@ -1876,22 +1884,21 @@ function recLeadEv(own,p,live){
   if(!recording)return;
   recFoldRoll();                                   // S3.5a-fix: СНАЧАЛА шов (если время свернулось) — иначе ниже нашлась бы запись ноты ПРОШЛОГО прохода или выдался бы номер от старой базы
   let r=recLead.get(own);
-  if(!r){
-    /* T2: номер v нужен ДО push (он в нагрузке), а слой выбирает push. Смотрим, куда ляжет (takePeek, без
-       действия): туда же push и положит — между двумя строками ничего не меняется. Родится новая дорожка —
-       там пусто, номер 0 (ровно то, что дал бы freeSlot свежего слоя). */
-    const pk=takePeek(noteSource('leadOn',p));    // тот же ключ, что спросит push: push получит {...p, v, bend} — поля ИСТОЧНИКА (роль, в T3 — тембр p.inst) те же
-    const v= pk==null ? 0 : freeSlot(pk);
-    const a={...p,v};                              // v — номер одновременной ноты в слое (пара для leadOff)
-    const t0= live!=null ? curBeat() : 0;          // опора бенда — ДО push, как и прежде (то же мгновение, что у самой ноты)
-    if(live!=null) a.bend=[];
-    if(!push('leadOn',a,null,null,undefined,undefined)) return;   // T2: слой — по роли (push). S4.1: отсчёт — нота не открыта: ни номера, ни состояния (иначе её ведения и «выкл» легли бы сиротами)
-    const ly=pushLy;                               // T2: дорожка, в которую нота легла; её ведения и «выкл» пойдут туда же
-    vSlots.set(own,v);
-    const S=ts(ly); if(v+1>S.vTop) S.vTop=v+1;      // высшая выданная за взятое В ЭТОТ СЛОЙ — до неё поднимется база на шве
-    r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:live!=null?a.bend:null,t0,lastC:null,v,layer:ly};   // layer (T1) — слой ноты: туда же её ведения и «выкл»   // r.bend — ТОТ ЖЕ массив, что в событии (push копирует a мелко)
-    recLead.set(own,r);
-    if(live!=null)pushBend(r,live);                // стартовая точка (r уже есть — опора известна)
+  if(!r){ recLeadOpen(own,p,live,false); return; }
+  /* ⛳ T3: СМЕНА ТЕМБРА ПОСРЕДИ НОТЫ СОЛО — ЗАКРЫТЬ В СТАРОЙ ДОРОЖКЕ, ПРОДОЛЖИТЬ В НОВОЙ. Соло переливается ЖИВЬЁМ
+     (кроссфейд банков голоса, 20 мс), а в дорожке ОДИН тембр — значит слышанное пишется как та же форма, что у
+     смены роли и шва повтора: «выкл» в дорожке прежнего тембра, «вкл» — в дорожке нового, в тот же миг.
+     Обе ноты помечены tie: переигровка делает из них не «отпустил и ударил заново», а тот же 20-мс переход —
+     прежний голос уходит быстрым релизом, новый входит без атаки и без удара (audio.leadOn/leadOff).
+     ⛳ ВЕДЕНИЕ С НОВЫМ ТЕМБРОМ (T0-fix) ЭТИМ ЗАМЕНЕНО: открытая нота больше никогда не расходится с тембром
+     своего «вкл», поэтому ведение тембр не меняет, и дважды смена не пишется.
+     ⛳ ТЕРМЕНВОКС: продолжение — новая нота со СВЕЖЕЙ кривой бенда от ближайшей ступени в миг смены. Прежний предел
+     («смена посреди бенда не переигрывается: кривая расписана в банк атаки») снят: смены посреди ноты больше нет.
+     Надёжность: p.inst — живой тембр КАЖДОГО кадра зажатой руки, r.inst — тембр «вкл» ноты; расхождение и есть смена. */
+  if(p.inst!==r.inst){
+    push('leadOff',{v:r.v,tie:true},null,null,undefined,r.layer);
+    recLead.delete(own); vSlots.delete(own);
+    recLeadOpen(own,p,live,true);
     return;
   }
   if(live!=null){                                  // терменвокс: пишем бенд + громкость/ЭФФЕКТЫ (hold), НЕ deg/oct
@@ -1899,16 +1906,35 @@ function recLeadEv(own,p,live){
     /* ⚠️ БЕНД НЕ ТРОГАЕМ (R3): точка бенда дописывается в a.bend ПОСЛЕ push, по ссылке из r.bend, и
        опора (r.deg/r.oct/r.t0/r.lastC) живёт своей жизнью. Карта эффектов добавлена РЯДОМ, ни ссылка,
        ни пороги бенда не задеты — hold:true по-прежнему говорит переигровке «частоту не сбивать». */
-    if(p.inst!==r.inst||Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
+    if(Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
       if(!push('leadSet',{...p,hold:true,v:r.v},null,null,undefined,r.layer)) return;   // S4.1: не легло — сравнение остаётся со старым. T0-fix: тембр В ведении соло — нота переливается живьём (см. noInst)
-      r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;   // deg/oct остаются на атаке
+      r.vol=p.vol; r.fx=fxCopy(p.fx);                 // deg/oct остаются на атаке
     }
     return;
   }
-  if(p.deg!==r.deg||p.oct!==r.oct||p.inst!==r.inst||
+  if(p.deg!==r.deg||p.oct!==r.oct||
      Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('leadSet',{...p,v:r.v},null,null,undefined,r.layer)) return; }   // S4.1: не легло — состояние прежнее. T0-fix: смена живого тембра посреди ноты — ЗАПИСЫВАЕТСЯ (соло её слышно)
   else return;
-  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx); r.inst=p.inst;
+  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx);
+}
+/* Открыть ноту соло в записи — её «вкл» маршрутом по источнику (T2/T3). tie — продолжение после смены тембра. */
+function recLeadOpen(own,p,live,tie){
+    /* T2: номер v нужен ДО push (он в нагрузке), а слой выбирает push. Смотрим, куда ляжет (takePeek, без
+       действия): туда же push и положит — между двумя строками ничего не меняется. Родится новая дорожка —
+       там пусто, номер 0 (ровно то, что дал бы freeSlot свежего слоя). */
+    const pk=takePeek(noteSource('leadOn',p));    // тот же ключ, что спросит push: push получит {...p, v, bend} — поля ИСТОЧНИКА (роль, в T3 — тембр p.inst) те же
+    const v= pk==null ? 0 : freeSlot(pk);
+    const a={...p,v};                              // v — номер одновременной ноты в слое (пара для leadOff)
+    if(tie) a.tie=true;                            // T3: продолжение ноты после смены тембра — связка, а не новая атака (см. recLeadEv)
+    const t0= live!=null ? curBeat() : 0;          // опора бенда — ДО push, как и прежде (то же мгновение, что у самой ноты)
+    if(live!=null) a.bend=[];
+    if(!push('leadOn',a,null,null,undefined,undefined)) return;   // T2: слой — по роли (push). S4.1: отсчёт — нота не открыта: ни номера, ни состояния (иначе её ведения и «выкл» легли бы сиротами)
+    const ly=pushLy;                               // T2: дорожка, в которую нота легла; её ведения и «выкл» пойдут туда же
+    vSlots.set(own,v);
+    const S=ts(ly); if(v+1>S.vTop) S.vTop=v+1;      // высшая выданная за взятое В ЭТОТ СЛОЙ — до неё поднимется база на шве
+    const r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:live!=null?a.bend:null,t0,lastC:null,v,layer:ly};   // layer (T1) — слой ноты: туда же её ведения и «выкл»   // r.bend — ТОТ ЖЕ массив, что в событии (push копирует a мелко)
+    recLead.set(own,r);
+    if(live!=null)pushBend(r,live);                // стартовая точка (r уже есть — опора известна)
 }
 /* ⛳ ТЕМБР В ВЕДЕНИИ — ПО РОЛИ, И ЗАПИСЬ ИДЁТ ЗА ЗВУКОМ (T0, исправленный). Что делает ЖИВАЯ нота при смене
    тембра, пока она звучит, — проверено по коду, а не предположено:
