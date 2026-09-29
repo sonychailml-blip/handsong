@@ -1246,9 +1246,12 @@ const editBackingOpen=()=>laneIsBacking(editLayer());
    ⚠️ ПАУЗУ СТАВИМ ЗДЕСЬ, А НЕ В ui: правка при идущем транспорте легла бы под уже запланированные в окно
    опережения события и под звучащие голоса. onLoop — обычная пауза, а следующий ▶ поднимет состояние
    обычной догонялкой (chasePlay в startTransport) — уже с учётом правки. */
-function editGuard(){
+/* ⛳ T5: backingOk — ЕДИНСТВЕННОЕ послабление: ЗАМЕНА ТЕМБРА подложке разрешена (решение пользователя №2).
+   Она переписывает тембр у всех событий дорожки и не рождает обрывков — clearJam снимает их все, ev.jam
+   цел. Ноты подложки по-прежнему только читаются: все прочие правки зовут editGuard() без флага. */
+function editGuard(backingOk){
   if(!AC||!editIsOpen()||editLayer()==null) return false;
-  if(editBackingOpen()) return false;
+  if(!backingOk && editBackingOpen()) return false;
   if(loop.on) onLoop();
   return true;
 }
@@ -1388,6 +1391,41 @@ function editInsertHit(t,row){
   events.push(ev);
   editPush({ kind:'ins', evs:[ev] });
   editCommit(); return ev;
+}
+/* ═══ ЗАМЕНА ТЕМБРА ДОРОЖКИ (слайс T5) ═══
+   ⛳ ПОСЛЕ ЗАПИСИ ЭТО ЕДИНСТВЕННЫЙ ПУТЬ сменить тембр дорожки (вооружение живой тембр не переключает — T3).
+   Замена — ВНУТРИ РОЛИ: роли хранят разные виды нот (ряд / ступень+тип / одна нота), поэтому поле одно
+   на роль — у ударных набор (`a.kit`), у прочих тембр (`a.inst`). Роль дорожки от замены не меняется, а
+   значит не меняется и её ЦЕПЬ (ключ — по роли, T4): эффекты и записанная автоматика остаются дорожке —
+   записанная автоматика И ЕСТЬ исполнение (решение пользователя №1).
+   ЧТО ПЕРЕПИСЫВАЕТСЯ — ровно то, что тембр НЕСЁТ: каждое начало ноты («вкл», удар) и ведение соло, если в
+   нём тембр есть (смена посреди ноты из материала до T3 — переигровка его играет, T0-fix). Ведения аккорда
+   и баса тембра не несут никогда. Дрон — ни то, ни другое: у слоя дрона роли нет, выбора ему не дают.
+   ⚠️ НАГРУЗКА — НОВЫМ ОБЪЕКТОМ, как у переноса: прежний уходит в историю целиком, и обратный ход не может
+   растерять поля (tie, v, k, fx, bend, bri…). Время и замороженный лад (sc/sev, правило #7) не трогаются.
+   ⛳ ОДНА ЗАПИСЬ ИСТОРИИ на всю замену: один тап — один ↶ — один ↷ (kind:'timbre', список {ev,from,to}).
+   ⛳ ОБЫЧНЫЙ editCommit: версия правок дорожки растёт, а свёртка тембров в подписи свежести (T0) меняется
+   сама — замороженная дорожка УСТАРЕВАЕТ и играет событиями уже в новом тембре. Курсоры — как у любой
+   правки (#28), сортировка ничего не переставит: времена те же. */
+function laneTimbreOf(layer){
+  if(layer==null) return null;
+  for(const e of events) if(e.layer===layer&&isNoteStart(e.fn)&&e.a){ const x= e.fn==='drum' ? e.a.kit : e.a.inst; if(x!=null) return x; }
+  return null;
+}
+function editSetTimbre(id){
+  if(id==null||!editGuard(true)) return false;             // true — подложке тоже можно (см. editGuard)
+  const layer=editLayer(), role=laneRoleOf(layer); if(!role) return false;
+  const f= role==='dr' ? 'kit' : 'inst', ch=[];
+  for(const e of events){
+    if(e.layer!==layer||!e.a) continue;
+    if(!(isNoteStart(e.fn) || (e.fn==='leadSet'&&e.a.inst!=null))) continue;
+    if(e.a[f]===id) continue;
+    const from=e.a, to={...e.a, [f]:id};
+    ch.push({ev:e, from, to}); e.a=to;
+  }
+  if(!ch.length) return false;                              // уже этот тембр — не правка (иначе ↶ «ничего не делает»)
+  editPush({ kind:'timbre', ch });
+  editCommit(); return true;
 }
 /* ═══ ПОЛОСА АВТОМАТИЗАЦИИ: ЧТЕНИЕ И ПРАВКА (слайс O-4) ═══
    ⛳ ЧТО ЗДЕСЬ ЗА ЕДИНИЦА. Полоса показывает ОДИН АДРЕС — (владелец цепи, эффект, параметр) — на ВСЕЙ
@@ -1569,6 +1607,7 @@ function autChainMove(layer,fxId,dir){
    (никаких копий: за объект держатся выделение и спаривание нот). */
 function editApply(u,undo){
   if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; return; }
+  if(u.kind==='timbre'){ for(const c of u.ch) c.ev.a = undo?c.from:c.to; return; }   // T5: вся замена — одним ходом, нагрузки те же объекты
   /* ⛳ ПРАВКИ ПОЛОСЫ АВТОМАТИЗАЦИИ (O-4) — В ТОЙ ЖЕ ИСТОРИИ, что и ноты, и по той же форме: ход возит
      ТОТ ЖЕ объект (точку или запись цепи), а не копию. Разной у них только цель: там массив событий,
      здесь массив дорожки автоматизации или снимок цепи взятого.
@@ -1597,16 +1636,20 @@ function editApply(u,undo){
   else compactEvents(e=>back.has(e));
 }
 /* ↶ — снять последнюю правку (и положить её в будущее, чтобы ↷ мог вернуть). */
+/* T5: ход ЗАМЕНЫ ТЕМБРА снимается и на подложке — ровно тем же послаблением, каким был сделан. Прочих ходов
+   на подложке не бывает (их правки отказывают), так что отмена ей не открывает ничего сверх замены. */
 function editUndo(){
-  if(!editGuard()||!editHist.length) return false;
-  const u=editHist.pop(); editApply(u,true); editFuture.push(u);
+  const u=editHist[editHist.length-1];
+  if(!u||!editGuard(u.kind==='timbre')) return false;
+  editHist.pop(); editApply(u,true); editFuture.push(u);
   editCommit(); return u.kind;
 }
 /* ↷ — вернуть отменённое. ⛔ Мимо editPush — И ЭТО ВЕРНО: возврат не создаёт новой ветки, он идёт ПО ТОЙ
    ЖЕ, и чистить будущее здесь было бы ошибкой (стёрло бы остаток очереди ↷). Ветку рвёт только НОВАЯ правка. */
 function editRedo(){
-  if(!editGuard()||!editFuture.length) return false;
-  const u=editFuture.pop(); editApply(u,false); editHist.push(u);
+  const u=editFuture[editFuture.length-1];
+  if(!u||!editGuard(u.kind==='timbre')) return false;
+  editFuture.pop(); editApply(u,false); editHist.push(u);
   editCommit(); return u.kind;
 }
 
@@ -3093,6 +3136,7 @@ export {
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
+  laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
   laneRoleOf,      // T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   makeENG, fxLaneMerge, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey,   // F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не писать) · роль события (чья это цепь эффектов)

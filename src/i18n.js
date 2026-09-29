@@ -126,6 +126,8 @@ export const DICTS = {
     // редактор дорожки — пиано-ролл (S5.0)
     'roll.closeTitle':'Close the editor',
     'roll.trackTitle':'Switch track',
+    // T5: замена тембра дорожки — внутри роли, эффекты дорожки не трогает
+    'roll.timbreTitle':'Timbre of this track — replaces it on every note; the track keeps its effects',
     'roll.track':'L{n}',
     'roll.zoomInTitle':'Zoom in',
     'roll.zoomOutTitle':'Zoom out',
@@ -544,6 +546,7 @@ export const DICTS = {
     'transport.editTitle':'Редактор дорожки: пиано-ролл',
     'roll.closeTitle':'Закрыть редактор',
     'roll.trackTitle':'Сменить дорожку',
+    'roll.timbreTitle':'Тембр этой дорожки — меняется на всех нотах; эффекты дорожки остаются',
     'roll.track':'L{n}',
     'roll.zoomInTitle':'Приблизить',
     'roll.zoomOutTitle':'Отдалить',

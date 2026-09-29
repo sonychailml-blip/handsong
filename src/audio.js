@@ -92,6 +92,19 @@ const DRUM_ROWS=DRUM_NAMES.length;
 /* Наборы ударных: тембр рядов. Стандарт — синтезированный кит; Дарбука — дум/тек
    (спасены из удалённого backing.js). Селектор той же формы, что LEAD_INSTR и др. */
 const DRUM_KITS=[{label:{en:'Standard',ru:'Стандарт'}},{label:{default:'Darbuka',ru:'Дарбука'}},{label:{default:'Tabla',ru:'Табла'}},{label:{default:'Gamelan',ru:'Гамелан'}},{label:{default:'Taiko',ru:'Тайко'}}];
+/* ⛳ ТЕМБРЫ РОЛИ — ОДНА ФУНКЦИЯ, через которую выбор тембра ДОРОЖКИ (редактор, слайс T5) узнаёт, что можно
+   поставить: [{id, name}] для 'ld'|'ch'|'bs'|'dr' (у ударных — наборы). id — то, что лежит в событии
+   (a.inst / a.kit) и сравнивается на равенство; name — подпись в форме L() (строка, {default,ru} или
+   объект языков), разрешает её показ.
+   ⛳ КОНСТРУКТОР ТЕМБРОВ ИДЁТ: тембры пользователя будут жить на устройстве. Тогда меняется ЭТА функция —
+   допишет свои записи со стабильным id, — а выбор в редакторе не тронется. Сегодня id = индекс встроенного
+   списка. ⛔ Читать встроенные списки мимо неё для ВЫБОРА тембра дорожки нельзя: тембр пользователя в такой
+   список не попадёт никогда.
+   ⚠️ Не единственный читатель списков ПО ПОЗИЦИИ: сам движок (банки соло, CHORD_INSTR[i], BASS_INSTR[i],
+   kit в drumHit), селекторы живых тембров в панели, запасы рендера и свёртка подписи свежести — все
+   держат индекс. Им стабильный id понадобится отдельно (см. HANDOFF, «хранение тембров»). */
+const TIMBRE_LISTS={ ld:()=>LEAD_INSTR, ch:()=>CHORD_INSTR, bs:()=>BASS_INSTR, dr:()=>DRUM_KITS };
+const timbresOf=role=>{ const g=TIMBRE_LISTS[role]; return g ? g().map((x,i)=>({ id:i, name:x.label })) : []; };
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter;
@@ -2267,6 +2280,7 @@ export {
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
+  timbresOf,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить

@@ -20,7 +20,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf, rollAutSnapV, rollAutDrive } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds } from './audio.js';
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, timbresOf } from './audio.js';   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -28,7 +28,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,
-         autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf,   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
+         autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
@@ -363,7 +363,7 @@ addEventListener('pointercancel',()=>{ braceEdge=null; });
    ⛔ ПОКА РЕДАКТОР ОТКРЫТ: верхняя панель скрыта (она про игру), транспорт оставляет одну ▶ (класс .roll)
    — ⤺/✕/⟳/■ меняли бы песню под открытым редактором, вплоть до сноса самой открытой дорожки. */
 const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
-      rollTrackBtn=$('rollTrack'),
+      rollTrackBtn=$('rollTrack'), rollTimbreEl=$('rollTimbre'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
       rollScaleBtn=$('rollScale'), rollFrzBtn=$('rollFrz'), rollFrzStateEl=$('rollFrzState');   // F5: заморозка — в баре РЕДАКТОРА (на строке полосы лупера её ставить некуда: там уже три кнопки в 16 px)
@@ -395,6 +395,7 @@ function applyRollBar(){
   const ly=editLayer();
   rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1});
   rollTrackBtn.disabled = trackLayers().length<2;
+  renderTimbreCtl();
   /* ЧИП ЛАДА — ТОЛЬКО когда ладов в дорожке больше одного (обычный случай — один, и машинерии на экране
      быть не должно). Имя лада резолвим через L(): оно локализуется, но группируемся мы по ССЫЛКЕ. */
   const gs=rollScaleGroups();
@@ -419,6 +420,29 @@ function rollDefaultRow0(role){
   const rows=g&&g.pitched?g.rows:8;
   return Math.max(0, Math.min(reg*dpo, 4*dpo-rows));
 }
+/* ═══ ТЕМБР ДОРОЖКИ (T5) ═══
+   ⛳ ПУНКТЫ — ТОЛЬКО ИЗ audio.timbresOf(роль): встроенные сегодня, тембры пользователя потом. Встроенные
+   списки здесь НЕ читаются — иначе тембр из конструктора в этот выбор не попал бы никогда.
+   Роль и тембр спрашиваем у recorder (по СОБЫТИЯМ), а не у rollRole: у опустевшей дорожки ось ещё помнит
+   роль, но переписывать там нечего — выбор тогда скрыт. Скрыт он и у слоя дрона (роли нет, тембра нет).
+   Подложке выбор ОТКРЫТ (её ноты читаются, но тембр менять можно — решение пользователя №2).
+   Перестраивается там, где тембр мог смениться: applyRollBar (открытие/дорожка/язык) и ↶/↷/🗑/вставка. */
+function renderTimbreCtl(){
+  if(!rollTimbreEl) return;
+  const ly=editLayer(), role= ly==null?null:laneRoleOf(ly);
+  rollTimbreEl.hidden = !role;
+  rollTimbreEl.textContent='';
+  if(!role) return;
+  for(const x of timbresOf(role)){
+    const o=document.createElement('option'); o.value=String(x.id); o.textContent=L(x.name); rollTimbreEl.appendChild(o); }
+  const cur=laneTimbreOf(ly);
+  rollTimbreEl.value = cur==null ? '' : String(cur);
+}
+if(rollTimbreEl) rollTimbreEl.onchange=e=>{
+  const x=timbresOf(laneRoleOf(editLayer())).find(q=>String(q.id)===e.target.value);   // id берём ИЗ СПИСКА, а не разбором строки: у тембра пользователя id не обязан быть числом
+  if(x && editSetTimbre(x.id)){ renderAutCtl(); updRollBtns(); }
+  renderTimbreCtl();                                   // отказ (редактор закрыт, тот же тембр) — выбор возвращается к правде
+};
 function openRoll(){
   /* Причины отказов называем словами, но САМ отказ держит recorder (editOpen): он — единственный,
      кто знает про запись и клип, и он же откажет любому будущему входу, не знающему про редактор. */
@@ -473,8 +497,8 @@ function updRollBtns(){
      но молча она читается как «удалить удар», и точку автоматизации убрать ОТСЮДА никто не догадается.
      Подпись идёт за выделением; приоритет тот же, что у самого удаления (точка перебивает ноту). */
   rollDelBtn.title = t(rollAutSel ? 'aut.ptDelTitle' : 'roll.delTitle');
-  rollUndoBtn.disabled = ro || !editCanUndo();
-  rollRedoBtn.disabled = ro || !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
+  rollUndoBtn.disabled = !editCanUndo();   // T5: без `ro` — на подложке в истории бывает замена тембра, и её отмена законна (прочих ходов там нет: их правки отказывают)
+  rollRedoBtn.disabled = !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
   /* ⛳ ЗАМОРОЗКА (F5). Три состояния, различимые с одного взгляда: ❄ синяя — свежая, ❄ оранжевая —
      устарела (правили после заморозки; звучит СВОИМИ СОБЫТИЯМИ), серая — не заморожена.
      ⛔ Правка НЕ ЗАПРЕЩЕНА: человек затем и правит, чтобы переморозить. Поэтому кнопка при устаревании
@@ -576,7 +600,8 @@ if(rollAutEl){
 }
 
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRollBtns(); };
-rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
+/* 🗑 и ⌫ — ОДИН путь (T5): клавиша зовёт ровно эту функцию, второй копии развилки «нота или точка» нет. */
+function rollDeleteSel(){ if(rollRefuseRO()) return;
   /* ⛳ O-4: ОДНА КНОПКА «УДАЛИТЬ» НА ОБА ПОЛЯ, и ПОРЯДОК ВЕТВЕЙ И ЕСТЬ ПРИОРИТЕТ. Второй корзины не
      заводим: у человека одна «удалить», и она обязана снимать выбранное — что бы это ни было.
      ⚠️ ЗДЕСЬ БЫЛ БАГ, И ОН ПОУЧИТЕЛЕН: первой строкой стоял страж `if(!rollSel)` от времён, когда
@@ -591,9 +616,30 @@ rollDelBtn.onclick =()=>{ if(rollRefuseRO()) return;
      одно, и прежняя высота тянется дальше; «вкл» уносит всю ноту — см. editDeleteSeg). */
   const ok = rollRole==='dr' ? editDeleteHit(rollSel) : editDeleteSeg(rollSel);
   if(ok) setRollSel(null);
-  updRollBtns(); };
-rollUndoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editUndo()){ setRollSel(null); setRollAutSel(null); } renderAutCtl(); updRollBtns(); };   // O-4: ход мог создать или снять точку — выделение и список адресов перестраиваем
-rollRedoBtn.onclick=()=>{ if(rollRefuseRO()) return; if(editRedo()){ setRollSel(null); setRollAutSel(null); } renderAutCtl(); updRollBtns(); };
+  renderTimbreCtl();   // T5: снята последняя нота — у дорожки больше нет тембра, выбор скрывается
+  updRollBtns(); }
+rollDelBtn.onclick=rollDeleteSel;
+/* ↶/↷ — БЕЗ rollRefuseRO (T5): на подложке в истории бывает только замена тембра, и снять её должно быть
+   можно. Что именно отменяется на подложке, решает recorder (editUndo/editRedo пускают там лишь ход
+   'timbre'); кнопки гаснут по пустой истории, а не по «подложке». */
+rollUndoBtn.onclick=()=>{ if(editUndo()){ setRollSel(null); setRollAutSel(null); } renderTimbreCtl(); renderAutCtl(); updRollBtns(); };   // O-4: ход мог создать или снять точку — выделение и список адресов перестраиваем. T5: и тембр — ход мог его вернуть
+rollRedoBtn.onclick=()=>{ if(editRedo()){ setRollSel(null); setRollAutSel(null); } renderTimbreCtl(); renderAutCtl(); updRollBtns(); };
+/* ⌫ / Delete — удалить ВЫБРАННОЕ (ноту или точку автоматизации) тем же путём, что 🗑 (T5).
+   ⛔ НЕ ПОКА ПЕЧАТАЮТ: в поле ввода (темп, A4 и любое текстовое/числовое) Backspace — это правка ТЕКСТА, и
+   удалить ноту из-под набора цифр было бы худшим сюрпризом. Страж — по полю, где стоит фокус, а не по
+   списку известных полей: новое поле защищено сразу. Выпадающий список полем ввода не считается.
+   Повтор при удержании не удаляет второй раз (e.repeat), модификаторы отдаём браузеру. Доступность — та же,
+   что у кнопки: погашенная 🗑 значит и ⌫ молчит. */
+const TYPING_INPUT=new Set(['','text','number','search','email','url','tel','password']);
+const isTypingField=el=>!!el && (el.isContentEditable || el.tagName==='TEXTAREA'
+  || (el.tagName==='INPUT' && TYPING_INPUT.has((el.getAttribute('type')||'').toLowerCase())));
+addEventListener('keydown', e=>{
+  if(!rollOpen || (e.key!=='Backspace' && e.key!=='Delete')) return;
+  if(e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  if(isTypingField(e.target) || isTypingField(document.activeElement)) return;
+  e.preventDefault();                                  // Backspace вне поля не должен уводить браузер «назад»
+  if(!rollDelBtn.disabled) rollDeleteSel();
+});
 /* ═══════════ ⛳ ЗАМОРОЗКА ДОРОЖКИ (F5) ═══════════
    ⛳ ОДНА КНОПКА НА ТРИ ДЕЙСТВИЯ, ПО СОСТОЯНИЮ: не заморожена → заморозить; устарела → ПЕРЕМОРОЗИТЬ;
    свежая → разморозить. Так у человека одна ❄, а не три кнопки, из которых две всегда мертвы.
@@ -833,7 +879,7 @@ function rollUp(e){
           const s=rollSnap(), len=s.free?1:Math.max(s.step,1);
           ev=editInsertBass(tt, pit.deg, pit.oct, sc, sev, len);
         }
-        if(ev) selNote(ev);
+        if(ev){ selNote(ev); renderTimbreCtl(); }   // T5: вставка в опустевшую дорожку возвращает ей тембр — и выбор
       }
     }else selNote(h&&(h.what==='hit'||h.what==='seg')?h.ev:null);
     updRollBtns();
