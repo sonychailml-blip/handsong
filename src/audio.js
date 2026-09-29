@@ -285,6 +285,14 @@ const fstrike=(lp,base,open,tc,fv)=>(t,vel)=>{
   lp.frequency.cancelScheduledValues(t);
   lp.frequency.setValueAtTime(base*open,t);
   lp.frequency.setTargetAtTime(base*(1+fv*vel),t,tc); };
+/* ⛳ V1 (режимы голоса): ВРЕМЯ СКОЛЬЖЕНИЯ ВЫСОТЫ — АРГУМЕНТ setFreq(f,tc,t) у КАЖДОГО банка, по умолчанию сегодняшние
+   20 мс (undefined в слоте tc → умолчание). ⛔ Время t — ПОСЛЕДНИМ (правило #15): все три вызова (leadOn, leadSet,
+   scheduleBend) передают его третьим; старая форма (f,t) у вызывающего положила бы время в слот tc. Прежде 0.02 было вписано в каждое замыкание. ⛔ Скольжение в смысле «портаменто» идёт ТОЛЬКО на легато-переезде
+   уже звучащего голоса (leadOn/leadSet его и передают); КАДРЫ ТЕРМЕНВОКСА, ТОЧКИ БЕНДА (scheduleBend) и СВЕЖАЯ АТАКА
+   идут умолчанием — у терменвокса и бенда 20 мс это СГЛАЖИВАНИЕ СЛЕЖЕНИЯ, а не портаменто, а свежая атака не смеет
+   въезжать с высоты прежней ноты переиспользованного голоса. У FM-банков вместе с несущей едут модулятор и индекс —
+   одним tc, иначе на скольжении поплыло бы отношение частот (тембр). */
+const LEAD_GLIDE_TC=0.02;
 /* --- Соло-банки: 4 тембра из версии 2 сохранены 1-в-1, добавлены Флейта и 8-бит. ksOk — загрузился
    ли KS-ворклет: если да, хвост списка (Струна/Ситар) строим физ.-моделью, иначе — запасными
    субтрактивными щипками, чтобы banks[] не разъехался с LEAD_INSTR по индексам. --- */
@@ -305,13 +313,13 @@ function buildLeadBanks(preBus, ksOk, only){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const oscs=[]; for(const sp of [-12,-6,0,6,12]){
       const o=mkOsc('sawtooth',220,ig,0.17); o.detune.value=sp; oscs.push(o); }
-    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,tc)),
                 cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t))});
   }
   if(sel(i++)){ // Орган (аддитивный)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const parts=[[1,.42],[2,.22],[3,.14],[4,.09]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
-    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,tc)),
                 cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый (hum=0): собственная расстройка замаскировала бы биения строёв
   }
   if(sel(i++)){ // Пад
@@ -319,7 +327,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2100; lp.connect(ig);
     const oscs=[]; for(const dt of [-7,0,7]){
       const o=mkOsc('triangle',220,lp,0.34); o.detune.value=dt; oscs.push(o); }
-    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,tc)),
                 cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t)),
                 strike:fstrike(lp,2100,1.5,0.35,0.8), hum:0});   // мягкая огибающая фильтра + скорость→яркость; hum=0 — чистая высота для строёв
   }
@@ -329,10 +337,10 @@ function buildLeadBanks(preBus, ksOk, only){
     const mod=AC.createOscillator(); mod.type='sine'; mod.frequency.value=220*3.507;
     const mg=AC.createGain(); mg.gain.value=220*1.6;
     mod.connect(mg); mg.connect(car.frequency); mod.start();
-    banks.push({gain:ig,setFreq:(f,t)=>{
-      car.frequency.setTargetAtTime(f,t,0.02);
-      mod.frequency.setTargetAtTime(f*3.507,t,0.02);
-      mg.gain.setTargetAtTime(f*1.6,t,0.02); },
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{
+      car.frequency.setTargetAtTime(f,t,tc);
+      mod.frequency.setTargetAtTime(f*3.507,t,tc);
+      mg.gain.setTargetAtTime(f*1.6,t,tc); },
       cancel:t=>{ car.frequency.cancelScheduledValues(t);
         mod.frequency.cancelScheduledValues(t); mg.gain.cancelScheduledValues(t); }});
   }
@@ -340,14 +348,14 @@ function buildLeadBanks(preBus, ksOk, only){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o1=mkOsc('triangle',220,ig,0.35);
     const o2=mkOsc('sine',220,ig,0.22); o2.detune.value=4;
-    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02);
-      o2.frequency.setTargetAtTime(f,t,0.02);},
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{o1.frequency.setTargetAtTime(f,t,tc);
+      o2.frequency.setTargetAtTime(f,t,tc);},
       cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);}});
   }
   if(sel(i++)){ // 8-бит: чистый прямоугольник
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o=mkOsc('square',220,ig,0.28);
-    banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>o.frequency.setTargetAtTime(f,t,tc),
                 cancel:t=>o.frequency.cancelScheduledValues(t)});
   }
   /* Два FM-банка на общем buildFMBank. Порядок push совпадает с хвостом LEAD_INSTR (индексы 6,7).
@@ -367,7 +375,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1400; lp.connect(ig);
     const oscs=[]; for(const dt of [-8,8]){ const o=mkOsc('sawtooth',220,lp,0.30); o.detune.value=dt; oscs.push(o); }
-    banks.push({gain:ig,setFreq:(f,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,0.02)),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>oscs.forEach(o=>o.frequency.setTargetAtTime(f,t,tc)),
                 cancel:t=>oscs.forEach(o=>o.frequency.cancelScheduledValues(t)),
                 strike:fstrike(lp,1400,1.5,0.4,0.8), hum:0});   // пад: плавная огибающая фильтра; hum=0 — чистая высота для строёв
   }
@@ -376,7 +384,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3200; lp.connect(ig);
     const o1=mkOsc('triangle',220,lp,0.30); o1.detune.value=-5;
     const o2=mkOsc('sine',220,lp,0.24);     o2.detune.value=6;
-    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f,t,0.02);},
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{o1.frequency.setTargetAtTime(f,t,tc); o2.frequency.setTargetAtTime(f,t,tc);},
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
                 strike:fstrike(lp,3200,1.4,0.35,0.7), hum:0});   // пад: чуть ярче, тоже чистый для строёв
   }
@@ -385,7 +393,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1200; lp.connect(ig);
     const o1=mkOsc('sawtooth',220,lp,0.28); o1.detune.value=-4;
     const o2=mkOsc('triangle',220,lp,0.22); o2.detune.value=4;
-    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f,t,0.02);},
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{o1.frequency.setTargetAtTime(f,t,tc); o2.frequency.setTargetAtTime(f,t,tc);},
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
                 strike:fstrike(lp,1200,3.0,0.12,1.5)});   // щипок: яркое открытие фильтра, быстро закрывается; hum по умолчанию (1)
   }
@@ -393,7 +401,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2600; lp.connect(ig);
     const o=mkOsc('sawtooth',220,lp,0.26);
-    banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>o.frequency.setTargetAtTime(f,t,tc),
                 cancel:t=>o.frequency.cancelScheduledValues(t),
                 strike:fstrike(lp,2600,3.5,0.08,1.5)});   // щипок ярче/суше — резче открытие и закрытие фильтра
   }
@@ -402,7 +410,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const o1=mkOsc('sine',220,ig,0.34);
     const o2=mkOsc('sine',440,ig,0.05);   // тихая октава — лёгкий призвук вместо шума
-    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f*2,t,0.02);},
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{o1.frequency.setTargetAtTime(f,t,tc); o2.frequency.setTargetAtTime(f*2,t,tc);},
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);}});
   }
   if(sel(i++)){ // Тростевой: язычковый — прямоугольник+пила через РЕЗОНАНСНЫЙ НЧ (Q даёт формантный призвук)
@@ -410,20 +418,20 @@ function buildLeadBanks(preBus, ksOk, only){
     const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2200; lp.Q.value=6; lp.connect(ig);
     const o1=mkOsc('square',220,lp,0.18);
     const o2=mkOsc('sawtooth',220,lp,0.14); o2.detune.value=5;
-    banks.push({gain:ig,setFreq:(f,t)=>{o1.frequency.setTargetAtTime(f,t,0.02); o2.frequency.setTargetAtTime(f,t,0.02);},
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{o1.frequency.setTargetAtTime(f,t,tc); o2.frequency.setTargetAtTime(f,t,tc);},
                 cancel:t=>{o1.frequency.cancelScheduledValues(t); o2.frequency.cancelScheduledValues(t);},
                 strike:fstrike(lp,2200,2.0,0.15,1.2)});   // тростевой: умеренное движение резонансного фильтра — язычковое «оживление»
   }
   if(sel(i++)){ // Орган полный: драубары — гармоники 1,2,3,4,6 (октавы+квинты), плоская огибающая, БЕЗ расстройки
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);   // det=0 → тон сам не бьётся: лучший тембр для суждения о темперациях
     const parts=[[1,.34],[2,.26],[3,.20],[4,.14],[6,.08]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
-    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,tc)),
                 cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый — лучший тембр для суждения о строях
   }
   if(sel(i++)){ // Орган мягкий: меньше верхних гармоник, чуть скруглённая атака (att в LEAD_INSTR)
     const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
     const parts=[[1,.44],[2,.20],[3,.10]].map(([h,g])=>({h,o:mkOsc('sine',220*h,ig,g)}));
-    banks.push({gain:ig,setFreq:(f,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,0.02)),
+    banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>parts.forEach(p=>p.o.frequency.setTargetAtTime(f*p.h,t,tc)),
                 cancel:t=>parts.forEach(p=>p.o.frequency.cancelScheduledValues(t)), hum:0});   // орган чистый — без собственной расстройки
   }
   KS_BANKS.forEach(o=>{ if(sel(i++)){ if(ksOk)buildKSBank(preBus,o); else buildKSFallback(preBus); } });   // Струна, Ситар, Уд, Кото, Сантур, Гитара, Пиццикато (индексы 16..22); ворклет не загрузился — запасной щипок держит индекс
@@ -469,7 +477,7 @@ function buildKSBank(preBus, opts){
   const retune=()=>{ if(!symp)return; const b=baseF(), t=AC.currentTime;   // следуют за тоникой (как дрон)
     symp.forEach(x=>x.bp.frequency.setTargetAtTime(b*x.r,t,0.05)); };
   banks.push({gain:ig,
-    setFreq:(f,t)=>freqP.setTargetAtTime(f,t,0.02),
+    setFreq:(f,tc=LEAD_GLIDE_TC,t)=>freqP.setTargetAtTime(f,t,tc),
     cancel:t=>freqP.cancelScheduledValues(t),
     strike:(t,vel)=>{ retune(); const v=Math.max(0.05,Math.min(1,vel==null?0.6:vel));
       pluckP.cancelScheduledValues(t); pluckP.setValueAtTime(v,t); pluckP.setValueAtTime(0,t+0.005); },   // импульс: фронт=щипок, спад — чтобы следующая нота дала новый фронт
@@ -480,7 +488,7 @@ function buildKSFallback(preBus){
   const ig=AC.createGain(); ig.gain.value=0;
   const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; lp.connect(ig); ig.connect(preBus);
   const o=mkOsc('sawtooth',220,lp,0.26);
-  banks.push({gain:ig,setFreq:(f,t)=>o.frequency.setTargetAtTime(f,t,0.02),
+  banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>o.frequency.setTargetAtTime(f,t,tc),
               cancel:t=>o.frequency.cancelScheduledValues(t), strike:fstrike(lp,1800,3.0,0.1,1.4)});
 }
 /* --- FM-голос: АЛЬТЕРНАТИВНЫЙ способ построить банк, рядом с субтрактивным (не вместо него).
@@ -503,10 +511,10 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
   const modGain=AC.createGain(); modGain.gain.value=curF*sus;
   mod.connect(modGain); modGain.connect(car.frequency); mod.start();
   banks.push({gain:ig,
-    setFreq:(f,t)=>{ curF=f;                        // несущий, модулятор (f*ratio) и индекс (f*sus) — тем же setTargetAtTime, что и все банки (бенд/глиссандо/терменвокс тянут ВЕСЬ спектр)
-      car.frequency.setTargetAtTime(f,t,0.02);
-      mod.frequency.setTargetAtTime(f*ratio,t,0.02);
-      modGain.gain.setTargetAtTime(f*sus,t,0.02); },
+    setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{ curF=f;                        // несущий, модулятор (f*ratio) и индекс (f*sus) — тем же setTargetAtTime, что и все банки (бенд/глиссандо/терменвокс тянут ВЕСЬ спектр)
+      car.frequency.setTargetAtTime(f,t,tc);
+      mod.frequency.setTargetAtTime(f*ratio,t,tc);
+      modGain.gain.setTargetAtTime(f*sus,t,tc); },
     cancel:t=>{ car.frequency.cancelScheduledValues(t);
       mod.frequency.cancelScheduledValues(t); modGain.gain.cancelScheduledValues(t); },
     strike:(t,vel)=>{ modGain.gain.cancelScheduledValues(t);   // огибающая ИНДЕКСА (не фильтра): пинок вверх, затем спад; vel не используем — у FM нет фильтра
@@ -1962,7 +1970,15 @@ function leadRelease(v,hard,when){
    переход: огибающая входит с τ 20 мс (как гейт банка в leadVoiceBank), без разброса времени атаки и без удара
    (strike). В паре с ней прежняя нота уходит быстрым релизом (leadOff с tie). Без tie — всё дословно по-старому.
    ⚠️ Последним аргументом, ПОСЛЕ when: у leadOn один вызывающий (ENG), а у leadOff есть прямые (owner, when). */
-function leadOn(owner,freq,vol,ins,deg,oct,when,tie){
+/* glide (V1, режимы голоса) — ВРЕМЯ СКОЛЬЖЕНИЯ (τ, с) для ЛЕГАТО-ПЕРЕЕЗДА высоты уже ЗВУЧАЩЕГО голоса. Нет — сегодняшние
+   20 мс (LEAD_GLIDE_TC), байт-в-байт. ⛔ На СВЕЖЕЙ атаке не применяется никогда: голос из пула помнит частоту ПРЕЖНЕЙ ноты,
+   и долгое скольжение въезжало бы в новую ноту с чужой высоты. ⛔ Вызывающий НЕ передаёт его для кадров терменвокса (live)
+   — там 20 мс это сглаживание слежения, а не портаменто; точки бенда идут своим путём (scheduleBend) и его не видят.
+   ⛔ ПЕРЕД when (правило #15 — время последним; прецедент P1: новые поля встают перед временем, а позиционные вызовы
+   правятся). Прямые позиционные вызовы leadOn — зонд render.js (четыре) и ENG; все поправлены: у них в слоте glide
+   стоит null/undefined, время осталось в слоте when. ⚠️ tie (T3) по-прежнему ПОСЛЕ when — это прежнее, не V1,
+   исключение из правила (см. отчёт V1); переставлять его здесь не стали. */
+function leadOn(owner,freq,vol,ins,deg,oct,glide,when,tie){
   /* ⚠️ `when` уходит в leadAlloc ТРЕТЬИМ аргументом, а порядок вычислений НЕ ТРОНУТ: живьём when
      равен undefined, ветка offline не берётся, и AC.currentTime по-прежнему читается ПОСЛЕ выдачи
      голоса — переставь мы это местами, живой путь перестал бы быть байт-в-байт (чтение часов могло
@@ -1973,7 +1989,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,when,tie){
      рукой — там fresh=false, и величины подъезжают плавно, как и должны при ведении. */
   const fresh=!v.on;
   applyVoiceFx(v,pendFx,t,fresh);             // эффекты ЭТОЙ ноты — в ЭТОТ голос (величины принёс applyFx строкой выше по стеку вызова; см. pendFx)
-  if(freq!=null)b.setFreq(freq,t);
+  if(freq!=null)b.setFreq(freq,(fresh||glide==null)?undefined:glide,t);   // null тоже «нет»: умолчание параметра ловит только undefined, а null дал бы τ=0 — скачок   // V1: скольжение — только легато-переезд звучащего голоса; свежая атака — умолчание банка (20 мс), как было. Время — последним (правило #15)
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
   if(v.on)return;
@@ -1996,12 +2012,14 @@ function leadOn(owner,freq,vol,ins,deg,oct,when,tie){
    ⚠️ ТОЛЬКО ПРИ ЧАСТОТЕ (freq!=null). Ведение терменвокса (hold, freq==null) частоты не несёт, а кривая
    бенда расписана в БАНК АТАКИ (scheduleBend) — новый банк звучал бы на чужой высоте. Там смены нет:
    названный предел. */
-function leadSet(owner,freq,vol,deg,oct,ins,when){           // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем). when — явное время (S2), по умолчанию «сейчас»; последним, как у всех
+/* glide (V1) — как у leadOn: время скольжения переезда высоты; ведение ВСЕГДА легато (голос уже звучит). Нет — 20 мс.
+   Ведение терменвокса (hold, freq==null) частоты не несёт — скольжению там применяться не к чему. Перед when — довод у leadOn. */
+function leadSet(owner,freq,vol,deg,oct,ins,glide,when){           // ведение без атаки (leadSet из лупера; freq==null — идёт бенд, частоту не сбиваем). when — явное время (S2), по умолчанию «сейчас»
   const v=leadHold[owner]; if(!v)return; const t=when!=null?when:AC.currentTime;
   if(ins!=null && freq!=null && ins!==v.ins) leadVoiceBank(v,ins,t);
   const b=v.banks[v.ins];
   applyVoiceFx(v,pendFx,t,false);                           // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины). fresh=false ВСЕГДА: leadSet по определению не атака
-  if(freq!=null&&b)b.setFreq(freq,t);
+  if(freq!=null&&b)b.setFreq(freq,glide==null?undefined:glide,t);   // V1: glide не задан (undefined ИЛИ null) — умолчание банка (20 мс), как было
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }                  // ступень ведётся вместе с частотой — подсветка идёт за нотой
 }
@@ -2025,7 +2043,7 @@ function scheduleBend(owner, points, baseFreq, secPerBeat, when){
   const t0=when!=null?when:AC.currentTime;
   for(const pt of points){
     const f=baseFreq*Math.pow(2,pt.c/1200), at=t0+pt.dt*secPerBeat;
-    b.setFreq(f,at);
+    b.setFreq(f,undefined,at);   // V1: точки бенда — умолчание банка (20 мс сглаживания), НЕ время скольжения; undefined занимает слот tc, чтобы время осталось последним и не попало в tc
   }
 }
 /* Снять расписанные рампы частоты (на атаке переигранной ноты, ctx): чтобы бенд предыдущей
@@ -2104,10 +2122,20 @@ function setBassInstr(i){
 /* deg/oct (P1) — ЧТО звучит, для подсветки из реестра движка (как у leadOn); звуку не нужны — частота уже посчитана.
    ⛔ when — ПОСЛЕДНИМ (правило #15): у bassOn есть прямые позиционные вызовы (зонд render.js), и время, съехавшее
    в слот ступени, тихо сыграло бы ноту «сейчас». Поэтому новые поля встали ПЕРЕД when, а вызовы поправлены. */
-function bassOn(owner,freq,vol,ins,deg,oct,when){
+/* ⛳ V1: ВРЕМЯ СКОЛЬЖЕНИЯ БАСА — одна константа на живой путь (bassOn) И на переигранную смену высоты (bassSet).
+   ⚠️ ПРЕЖДЕ ИХ БЫЛО ДВЕ: живой бас (рука зовёт bassOn каждый кадр) скользил за τ 12 мс, а переигранное ведение bassSet —
+   за τ 30 мс. Записанная бас-линия на переигровке скользила В ДВА С ЛИШНИМ РАЗА МЕДЛЕННЕЕ, чем её сыграли, — запись
+   расходилась со звуком. Теперь обе — 12 мс, то есть переигровка звучит, как игра. Громкость (0.03 живьём / 0.05 в
+   ведении) — не скольжение, её не трогаем. */
+const BASS_GLIDE_TC=0.012;
+/* glide (V1) — время скольжения ЛЕГАТО-переезда уже ЗВУЧАЩЕГО голоса; нет — BASS_GLIDE_TC. Свежая атака — всегда умолчание:
+   голос пула помнит прежнюю ноту, и въезд с её высоты был бы чужим скольжением. Вызывающий НЕ передаёт его для кадров
+   терменвокса (live). ПЕРЕД when (правило #15, прецедент P1); позиционные вызовы — зонд render.js и ENG — поправлены. */
+function bassOn(owner,freq,vol,ins,deg,oct,glide,when){
   if(!AC)return; const t=when!=null?when:AC.currentTime;
   let v=bassHold[owner]; if(!v){ v=bvAlloc(when); v.owner=owner; bassHold[owner]=v; }
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // пишем КАЖДЫЙ вызов: ведение живой руки (новая ступень под пальцем) отражается сразу
+  const gtc = (v.on && glide!=null) ? glide : BASS_GLIDE_TC;   // V1: легато — «звучал ДО этого вызова» (атака ниже переставит v.on)
   if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
     v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
     v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t);
@@ -2117,13 +2145,15 @@ function bassOn(owner,freq,vol,ins,deg,oct,when){
     v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
   }
   v.tOn=t;
-  v.o1.frequency.setTargetAtTime(freq,t,0.012); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.012);
+  v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер
 }
-function bassSet(owner,freq,vol,deg,oct,when){   // deg/oct (P1) — ступень едет вместе с частотой, как у leadSet; when — последним
+/* glide (V1) — как у bassOn; ведение всегда легато. Нет — BASS_GLIDE_TC (⛳ прежде здесь стояло 0.03 — см. BASS_GLIDE_TC). */
+function bassSet(owner,freq,vol,deg,oct,glide,when){   // deg/oct (P1) — ступень едет вместе с частотой, как у leadSet; glide (V1) — перед when
   if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=when!=null?when:AC.currentTime;
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }
-  v.o1.frequency.setTargetAtTime(freq,t,0.03); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,0.03);
+  const gtc = glide!=null ? glide : BASS_GLIDE_TC;
+  v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень
 }
 function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; v.deg=-1; bvRelease(v,false,when); delete bassHold[owner]; }   // P1: как leadOff — подсветка гаснет в миг снятия, хвост релиза дозвучивает

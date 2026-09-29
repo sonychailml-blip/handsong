@@ -259,8 +259,8 @@ const LD_SUB=0;   // SuperSaw: субтрактивный, hum не задан �
    добавляет. Полную проверку буфера дал бы только доступ к самому noiseBuf, а он не экспортирован. */
 const SRC={
   chord:(eng,at)=>eng.chordOn('probe',[220,277.18,329.63],0.8,CH_INS,0,at),
-  lead: (eng,at)=>eng.leadOn('probe',440,0.8,LD_SUB,0,0,at),
-  bass: (eng,at)=>eng.bassOn('probe',110,0.8,0,null,null,at),   // P1: у bassOn перед when встали deg/oct (подсветка) — время обязано остаться в слоте when (правило #15)
+  lead: (eng,at)=>eng.leadOn('probe',440,0.8,LD_SUB,0,0,null,at),   // V1: перед when встал glide — null (умолчание), время осталось в слоте when (правило #15)
+  bass: (eng,at)=>eng.bassOn('probe',110,0.8,0,null,null,null,at),   // P1: у bassOn перед when встали deg/oct (подсветка) — время обязано остаться в слоте when (правило #15)
   noise:(eng,at)=>{ eng.drumHit(5,0.9,0,at);        // КРЭШ первым: 0.7 с шума — это и есть охват буфера
                     eng.drumHit(2,0.9,0,at+0.05);   // хлопок и хэт — громкие транзиенты поверх
                     eng.drumHit(3,0.8,0,at+0.15); },
@@ -275,7 +275,7 @@ const matMix=eng=>{ SRC.chord(eng,0.05); SRC.lead(eng,0.10); SRC.bass(eng,0.15);
 /* МАТЕРИАЛ «ВОРКЛЕТ»: одна щипковая нота на KS-банке. Индекс — ПОСЛЕДНИЙ в LEAD_INSTR: KS-инструменты
    это ХВОСТ списка (см. LEAD_KS_FROM в audio.js, он считается, а не зашивается), поэтому последний
    гарантированно из них, и число банков знать не нужно. */
-const matKS=eng=>eng.leadOn('probe',220,0.9,eng.LEAD_INSTR.length-1,0,0,0.05);
+const matKS=eng=>eng.leadOn('probe',220,0.9,eng.LEAD_INSTR.length-1,0,0,null,0.05);   // V1: glide перед when
 
 /* ═══ ⛳ МАТЕРИАЛ СЛАЙСА F2 — ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ ═══
    ЧТО ДОКАЗЫВАЕМ: за ОДИН синхронный проход расписываются N перекрывающихся нот, и звучат они в N
@@ -291,12 +291,12 @@ const matKS=eng=>eng.leadOn('probe',220,0.9,eng.LEAD_INSTR.length-1,0,0,0.05);
 const POLY_N=16, POLY_BASS=14, POLY_CH=10, POLY_SEC=0.4, POLY_VOL=0.12;
 const semi=(f,i)=>f*Math.pow(2,i/12);
 /* Только соло — для проверки ЗВУКА (энергия N нот против одной). */
-const matPoly=eng=>{ for(let i=0;i<POLY_N;i++) eng.leadOn('p'+i,semi(220,i),POLY_VOL,LD_SUB,0,0,0.05); };
-const matMono=eng=>{ eng.leadOn('p0',semi(220,0),POLY_VOL,LD_SUB,0,0,0.05); };
+const matPoly=eng=>{ for(let i=0;i<POLY_N;i++) eng.leadOn('p'+i,semi(220,i),POLY_VOL,LD_SUB,0,0,null,0.05); };
+const matMono=eng=>{ eng.leadOn('p0',semi(220,0),POLY_VOL,LD_SUB,0,0,null,0.05); };
 /* Все три пула — для подсчёта РАЗНЫХ голосов. */
 const matPolyAll=eng=>{
   matPoly(eng);
-  for(let i=0;i<POLY_BASS;i++) eng.bassOn('b'+i,semi(55,i),POLY_VOL,0,null,null,0.05);   // P1: deg/oct перед when
+  for(let i=0;i<POLY_BASS;i++) eng.bassOn('b'+i,semi(55,i),POLY_VOL,0,null,null,null,0.05);   // P1: deg/oct перед when
   for(let i=0;i<POLY_CH;i++) eng.chordOn('c'+i,[semi(220,i),semi(277.18,i),semi(329.63,i)],POLY_VOL,CH_INS,0,0.05);
 };
 /* СКОЛЬКО РАЗНЫХ ГОЛОСОВ держат владельцы. ⚠️ chordHold[owner] — МАССИВ голосов (по ноте аккорда),

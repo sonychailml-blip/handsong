@@ -1890,19 +1890,19 @@ const makeENG=A=>({
               if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
               const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
               A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль
-              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,when,a.tie);   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,undefined,when,a.tie);   // V1: слот glide пуст (скольжение не передаёт никто — V4); время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
               if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               A.applyFx(a.fx);
-              A.leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,when); },   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
+              A.leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,undefined,when); },   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
   leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),when,a&&a.tie),   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
   chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
   chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
   chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
-  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,when),   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,when),
+  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,undefined,when),   // V1: слот glide пуст   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,undefined,when),   // V1: слот glide пуст — переигранное ведение баса берёт BASS_GLIDE_TC, ту же, что живой бас
   bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
   drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,when),
   drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
