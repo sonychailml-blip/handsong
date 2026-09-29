@@ -792,7 +792,7 @@ function rollMove(e){
        нет вовсе: палец, уехавший при переносе вверх за сетку, записал бы row:undefined — удар, который
        не звучит и не рисуется. Вне сетки (линейка, промах) ряд остаётся прежним. */
     if(h&&(h.what==='hit'||h.what==='grid'||h.what==='seg')) rollGrab.row=h.row;
-    setRollDrag({ ev:rollGrab.ev, t:rollSnapBeat(raw, rollSnap()), row:rollGrab.row, len:rollGrab.len });   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
+    setRollDrag({ ev:rollGrab.ev, t:Math.max(0,rollSnapBeat(raw, rollSnap())), row:rollGrab.row, len:rollGrab.len });   // E1: призрак не левее начала песни — правка туда не положит (editMoveHit/editMoveNote жмут к 0), и обещание обязано совпасть с результатом   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
     return;
   }
   if(rollPan&&rollPan.aut){ if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true; return; }   // O-4: палец ведёт по ПОЛОСЕ — поле нот не трогаем (у полосы своя работа)
@@ -835,7 +835,9 @@ function rollUp(e){
       else if(rollGrab.seg){
         /* БАС: переносим СЕГМЕНТ — его время и/или высоту. Ряд расшифровываем ТОЙ ЖЕ формулой, что рисует
            ряды (rollRowPitch по ладу ОСИ), а лад события не трогаем вовсе — правка в чужом ладу не смеет
-           переписать ноту на живой (правило #7). */
+           переписать ноту на живой (правило #7).
+           ⛳ E1: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту, сдвинутую во времени, — ЦЕЛИКОМ
+           (ровно то, что показал призрак), сегмент глиссандо — пока по-прежнему своей границей (это E2). */
         const g2=rollGeom(), pit=rollRowPitch(gd.row, g2&&g2.sc);
         const s=rollGrab.seg;
         if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct) editMoveSeg(s.ev, gd.t, pit.deg, pit.oct);

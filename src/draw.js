@@ -485,6 +485,10 @@ const LANE_TOG_W=21, LANE_TOG_GAP=2;
 const LANE_DEL_GAP=6, LANE_DEL_COL='#e5484d';
 const LANE_MUTE_COL='#e5a23c', LANE_SOLO_COL='#57d9a3';   // заглушено — янтарь (внимание), соло — тот же зелёный, что у «играет»
 const LANE_OFF_A=0.34;                                    // прозрачность НЕСЛЫШНОЙ строки
+/* ЗНАЧОК ЗАМОРОЗКИ НА СТРОКЕ (F5, место — E0): отступ от x0 строки. На вооружённой строке первые ~12px занимает
+   красная точка (центр x0+8, радиус 3.5), поэтому значок встаёт за ней. FRZ_STALE_DX — точка «устарело»
+   относительно значка (прежние x0+14 при значке на x0+3), чтобы она ехала вместе с ним. */
+const FRZ_MARK_X=3, FRZ_MARK_ARMED_X=14, FRZ_STALE_DX=11;
 /* Кнопка дорожки: буква в рамке, залитая — когда включена. Буква, а не значок: на 380px значок в
    21px нечитаем, а места под подпись нет. Буквы локализованы (M/S ↔ М/С) — см. словари. */
 function laneTog(x,ry,rowH,lbl,on,col){
@@ -669,7 +673,8 @@ function drawLooper(){
        подпись, В ПОЛНУЮ СИЛУ даже на заглушённой строке: «куда я сейчас запишу» читается с одного взгляда
        на 380px, где слева от линейки места под значок нет (подпись L1 и так упирается в кромку).
        Во время записи рамку не рисуем: пишущуюся строку уже выделяет красная заливка (live). */
-    if(!recording && lid===armLy){
+    const armed = !recording && lid===armLy;             // E0: тот же предикат решает и рамку, и место значка заморозки ниже
+    if(armed){
       ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,bw-2,rowH-3);
       ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x0+8,mid,3.5,0,7); ctx.fill();
       ctx.fillStyle='#ff6b6f'; ctx.font='600 10px system-ui'; ctx.textAlign='right'; ctx.fillText('L'+(lid+1),x0-4,mid);
@@ -680,14 +685,17 @@ function drawLooper(){
        дорожки, где для него есть место, и едет вместе со строкой.
        ТРИ СОСТОЯНИЯ, РАЗЛИЧИМЫЕ С ОДНОГО ВЗГЛЯДА НА 380px: голубая ❄ — свежая (играет буфер);
        оранжевая ❄ с точкой — УСТАРЕЛА (правили после заморозки, играет СВОИ СОБЫТИЯ); ничего — не
-       заморожена. Цвет несёт смысл сам, подпись рядом не нужна — её место занято. */
+       заморожена. Цвет несёт смысл сам, подпись рядом не нужна — её место занято.
+       ⛳ E0: НА ВООРУЖЁННОЙ СТРОКЕ ЗНАЧОК ВСТАЁТ ЗА КРАСНОЙ ТОЧКОЙ, а не на неё. Прежде оба садились в одно место
+       (точка x0+4.5…x0+11.5, ❄ от x0+3), и ❄ закрывал точку «сюда пишу». Сдвиг — от ТОГО ЖЕ x0 снимка строки
+       (правило #9), точка «устарело» едет вместе со значком на прежнем расстоянии от него. */
     const fzs=freezeState(lid);
     if(fzs!=='none'){
-      const fresh=fzs==='fresh';
+      const fresh=fzs==='fresh', fx = x0 + (armed ? FRZ_MARK_ARMED_X : FRZ_MARK_X);
       ctx.fillStyle = fresh?'#4cc2ff':'#f5a524';
       ctx.font='600 11px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText('❄', x0+3, mid);
-      if(!fresh){ ctx.beginPath(); ctx.arc(x0+14,ry+5,2,0,7); ctx.fill(); }   // точка «устарело»: отличает и в оттенках серого
+      ctx.fillText('❄', fx, mid);
+      if(!fresh){ ctx.beginPath(); ctx.arc(fx+FRZ_STALE_DX,ry+5,2,0,7); ctx.fill(); }   // точка «устарело»: отличает и в оттенках серого
       ctx.textBaseline='alphabetic';
     }
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
