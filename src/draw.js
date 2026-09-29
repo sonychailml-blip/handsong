@@ -820,7 +820,9 @@ function rollHits(){
    Дорожка МОЖЕТ держать события в разных ладах: смена лада во время записи ничем не закрыта (ui зовёт
    setScaleIdx+softAllOff, запись продолжается), и слияние взятых кладёт их рядом. Две ступенные оси
    честно не нарисовать — поэтому одна группа даёт ОСЬ, прочие показываются призраками.
-   Мемо — на идентичность вида сегментов (он же мемо на songNotes), чтобы не пересобирать на кадр. */
+   Мемо — на идентичность вида сегментов (он же мемо на songNotes), чтобы не пересобирать на кадр.
+   ⚠️ T4: отбор `s.role!==role` на дорожке одной роли не отсекает ничего — он оставлен как СТРАЖ ОСИ
+   (сегмент мерится осью той роли, которая нарисована), а не как выбор: выбирать больше не из чего. */
 let segCache={view:null,layer:null,role:null,groups:null};
 function rollGroups(){
   const SV=songSegs(), ly=rollTrackLayer(), role=rollRole;
@@ -1092,9 +1094,13 @@ function drawRoll(){
   /* ⛳ НЕПРАВИМАЯ РОЛЬ (соло, аккорды — ждут своих слайсов): вместо сетки ОДНА СТРОКА, почему. Рядов и нот
      не рисуем — нарисованная нота, которую нельзя тронуть, читалась бы как поломка, — а попадание по полю
      молчит (rollHit), иначе вставка ушла бы в ветку БАСА и положила басовую ноту на дорожку соло.
-     ⚠️ Линейка, бегунок и ПОЛОСА АВТОМАТИЗАЦИИ остаются: эффекты дорожки правятся и у такой роли. */
-  const noEdit = ly!=null && !ROLL_EDITABLE.includes(rollRole);
-  const pitched = rollRole!=='dr' && !noEdit;
+     ⚠️ Линейка, бегунок и ПОЛОСА АВТОМАТИЗАЦИИ остаются: эффекты дорожки правятся и у такой роли.
+     ⛳ T4: ДОРОЖКА БЕЗ РОЛИ (rollRole===null — нот не было с самого открытия: слой дрона, опустевшая
+     вооружённая) — туда же: оси нет, поле не цель, одна строка «нот нет». Прежде такая дорожка открывалась
+     на УДАРНЫХ — роли, которой у неё никогда не было. */
+  const noRole = ly!=null && rollRole==null;
+  const noEdit = ly!=null && (noRole || !ROLL_EDITABLE.includes(rollRole));
+  const pitched = rollRole!=null && rollRole!=='dr' && !noEdit;   // T4: роли нет — оси высот нет (даже если дорожка исчезла, ly==null)
   const x0 = pitched ? Math.min(rollGutterW(axSc), Math.floor(W*0.42)) : ROLL_LBL_W;   // S5.6: колонка подписей — по МЕРКЕ, с потолком
   const total = pitched ? rollRowsTotal(axSc) : DRUM_ROWS;
   /* ⛳ ПОДГОНКА ПО ВЫСОТЕ (S5.6): ВЛЕЗАЮТ ВСЕ РЯДЫ — растягиваем их на всю высоту (до потолка), не
@@ -1264,11 +1270,13 @@ function drawRoll(){
   ctx.lineWidth= rollIns ? 2 : 1;
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
-  const emptyRole = pitched ? !grp.length : !hits.length;
-  if(ly==null||noEdit||emptyRole){
+  /* T4: «пусто» значит одно — в ДОРОЖКЕ не осталось нот (роль у неё одна, «нет этой роли» больше не бывает). */
+  const emptyTrack = noRole || (pitched ? !grp.length : !hits.length);
+  if(ly==null||noEdit||emptyTrack){
     ctx.fillStyle='rgba(255,255,255,.55)';
-    ctx.fillText(ly==null ? t('roll.noTrack') : noEdit ? t('roll.roleLater',{role:t('role.'+rollRole)})
-                 : t(pitched?'roll.emptyRole':'roll.empty'), V.x0+V.bw/2, (gy0+gy1)/2);
+    ctx.fillText(ly==null ? t('roll.noTrack') : noRole ? t('roll.emptyTrack')
+                 : noEdit ? t('roll.roleLater',{role:t('role.'+rollRole)})
+                 : t('roll.emptyTrack'), V.x0+V.bw/2, (gy0+gy1)/2);
   }
   /* ⛔ ПРИВЯЗКУ ЗАДАЁМ ЯВНО, А НЕ НАСЛЕДУЕМ. Отсюда и родился баг: textBaseline ставился на 'middle' у
      подписей рядов ~170 строк выше, и одно и то же число y значило здесь не то, что читалось при чтении
@@ -1282,17 +1290,15 @@ function drawRoll(){
      сказать человеку, ЧЕМ вплавлен звук. Потому и стоит у края поля, а не поверх нот.
      ⛳ СТРОКА ГОВОРИТ ПРО ОТКРЫТУЮ ДОРОЖКУ, А НЕ ПРО ПРИЛОЖЕНИЕ. Прежде она объединяла цепи ВСЕХ
      владельцев, и басовая дорожка рекламировала делей соло и яркость аккордов — то есть врала о том
-     единственном, о чём её спрашивают. Отбор по ролям делает captureInfoOf (см. его шапку).
-     ⚠️ РОЛИ НАЗЫВАЕМ ПОИМЁННО. Дорожка НЕ типизирована ролью и законно держит несколько сразу — значит
-     список эффектов в ней СЛИТЫЙ, и честнее всего сказать, чей он: «бас · ударные: …». Заодно снимается
-     нужда в счётчике («2 роли») и в русских формах множественного числа. */
+     единственном, о чём её спрашивают. Отбор по цепи дорожки делает captureInfoOf (см. его шапку).
+     ⛳ T4: РОЛЬ ОДНА — она и названа («бас: …»). Слитого списка нескольких ролей больше не бывает. */
   {
     const cap=captureInfoOf(ly);
     if(cap){
-      const rn=cap.roles.map(r=>t('role.'+r)).join(' · ');
+      const rn=t('role.'+cap.role);
       const nm=cap.fx.map(fxTitleOf).join(' · ');   // ⛳ ТА ЖЕ резолюция имени, что в меню эффектов (см. fxTitleOf выше): старые скаляры больше не выводятся сырым id
       ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,.28)';
-      ctx.fillText(cap.fx.length ? t('roll.cap',{roles:rn,fx:nm,n:cap.pts}) : t('roll.capNone',{roles:rn}),
+      ctx.fillText(cap.fx.length ? t('roll.cap',{role:rn,fx:nm,n:cap.pts}) : t('roll.capNone',{role:rn}),
                    V.x0, gy1+ROLL_FOOT_STEP*2);
     }
   }

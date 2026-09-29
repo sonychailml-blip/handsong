@@ -142,7 +142,7 @@
   @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:var(--fs-hint);} }
 
   /* ---- РЕДАКТОР ДОРОЖКИ: ПАНЕЛЬ ПИАНО-РОЛЛА (S5.0) ----
-     Держит только то, у чего нет временнóй геометрии (закрыть · дорожка · роли · зум); сетка — на холсте.
+     Держит только то, у чего нет временнóй геометрии (закрыть · дорожка · зум; вкладок ролей с T4 нет); сетка — на холсте.
      z-index 12: выше холста (—) и транспорта (11), ниже панелей (14/15).
      Узкий экран: строка ПРОКРУЧИВАЕТСЯ по горизонтали, как #bar, — контролы не сжимаются ниже пальца. */
   #rollBar{position:fixed; top:0; left:0; right:0; z-index:12; display:none;
@@ -151,9 +151,6 @@
   #rollBar::-webkit-scrollbar{display:none;}
   #rollBar.on{display:flex;}
   #rollBar button{padding:9px 11px; font-size:var(--fs-label); min-width:40px;}
-  #rollTabs{display:flex; gap:6px; flex:0 0 auto;}
-  #rollBar .tab{opacity:.45;}                      /* роль без правки — видна, но приглушена (счёт нот всё равно полезен) */
-  #rollBar .tab.act{opacity:1; border-color:var(--accent); color:var(--accent);}
   /* Режим вставки — та же «включённая» раскраска, что у 🔄/⛶/🎵 в баре: оранжевая рамка и текст. */
   #rollBar button.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
   /* ЗАМОРОЗКА (F5): .act — свежая (играет буфер), .warn — УСТАРЕЛА (правили после заморозки; звучит

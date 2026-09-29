@@ -619,35 +619,41 @@ function takeReset(){ takeFx.clear(); takeFxLast=null; takeFxOrder=null; }   // 
    Дрон остаётся без роли НАМЕРЕННО: он фон, в конструкторе не выбирается и цепи не имеет (см. довод
    у регистрации ролей в initAudio). */
 const evRole=fn=> fn==='drum' ? 'dr' : chaseRole(fn);
+/* ⛳ РОЛЬ ДОРОЖКИ (T4). С T2 в дорожке РОВНО ОДНА роль (маршрут по источнику), поэтому роль первого же её
+   события с ролью — это роль всей дорожки; вторую искать незачем, её там нет по построению.
+   null — у дорожки нет ни одной ноты: опустела правками или это слой дрона (дрон — уровень, а не нота, и
+   роли не даёт — см. evRole). ⛔ Роль НЕ выдумывается: вызывающий обязан показать «нот нет», а не ось
+   чужой роли. O(событий) — зовут её на открытии редактора и в правках цепи, не на кадр. */
+function laneRoleOf(layer){
+  if(layer==null) return null;
+  for(const e of events) if(e.layer===layer){ const r=evRole(e.fn); if(r) return r; }
+  return null;
+}
+/* ОДНА ЦЕПЬ ДОРОЖКИ — ключ владельца её роли. Выбора «в чью цепь» больше нет (его держали вкладки
+   редактора, пока дорожка могла нести несколько ролей): у дорожки ровно одна роль, значит одна цепь. */
+const laneChainKey=layer=>{ const r=laneRoleOf(layer); return r ? chainKeyOf(r) : null; };
 /* ЧТО ЗАХВАЧЕНО У ДОРОЖКИ — для показа в редакторе (единственный сегодняшний читатель). Отдаёт СВОДКУ,
    а не сам реестр: наружу не должно утекать то, что пока никто не исполняет.
-   ⛳ ОТБОР ПО РОЛЯМ САМОЙ ДОРОЖКИ — ГЛАВНОЕ ЗДЕСЬ, и это правка ошибки, а не украшение. Первая редакция
-   объединяла цепи ВСЕХ владельцев, потому что реестр взятого хранит их все; басовая дорожка от этого
-   показывала делей СОЛО и яркость АККОРДОВ — то есть отвечала не на тот вопрос, который ей задали.
-   Берём роли ИЗ СОБЫТИЙ дорожки и смотрим только их цепи и только их точки автоматизации.
-   ⚠️ ДОРОЖКА НЕ ТИПИЗИРОВАНА РОЛЬЮ и законно держит несколько сразу (сменить роль посреди взятого —
-   обычный жест). Тогда список эффектов — СЛИТЫЙ, и сводка отдаёт РОЛИ отдельным полем, чтобы показ мог
-   честно сказать, чей он. Порядок ролей — по первому появлению в песне: устойчив и не требует таблицы.
+   ⛳ ОТБОР ПО ЦЕПИ САМОЙ ДОРОЖКИ — ГЛАВНОЕ ЗДЕСЬ, и это правка ошибки, а не украшение. Реестр взятого
+   хранит цепи ВСЕХ владельцев (сплит пишет две роли в одно взятое, и они ложатся в РАЗНЫЕ дорожки);
+   без отбора басовая дорожка показывала бы делей СОЛО и яркость АККОРДОВ. С T4 отбор — по ОДНОЙ цепи:
+   роль у дорожки одна (laneRoleOf).
    ⚠️ ИМЕНА ЭФФЕКТОВ СОБИРАЕМ И ИЗ СНИМКА, И ИЗ ДОРОЖКИ. Снимок — это состав НА СТАРТЕ взятого; эффект,
    добавленный ПОСРЕДИ него, живёт только в дорожке (записью состава и своими величинами). Без второго
    источника «добавил реверб во время записи» читалось бы как «ничего не захвачено» — при непустом счёте
    точек, то есть противоречиво.
-   ⚠️ null, А НЕ ПУСТАЯ СВОДКА, когда дорожки нет или у неё нет ролей с цепями (слой одного дрона):
+   ⚠️ null, А НЕ ПУСТАЯ СВОДКА, когда дорожки нет или у неё нет роли (опустевшая дорожка, слой дрона):
    показывать «захвачено: ничего» там, где вопрос неприменим, — шум. */
 function captureInfoOf(layer){
-  if(layer==null) return null;
-  const tks=new Set(), roles=new Set(), keys=new Set();
-  for(const e of events) if(e.layer===layer){
-    tks.add(e.tk||0);
-    const r=evRole(e.fn); if(r){ roles.add(r); keys.add(chainKeyOf(r)); }
-  }
-  if(!tks.size||!roles.size) return null;
+  const role=laneRoleOf(layer); if(!role) return null;
+  const key=chainKeyOf(role), tks=new Set();
+  for(const e of events) if(e.layer===layer) tks.add(e.tk||0);
   const ids=new Set(); let pts=0;
   for(const tk of tks){ const r=takeFx.get(tk); if(!r) continue;
-    for(const key of keys){ const ch=r.chains[key]; if(ch) for(const e of ch) ids.add(e.fxId); }
-    for(const ent of r.lane){ if(!keys.has(ent.key)) continue; pts++; if(ent.fx!==FX_CHAIN) ids.add(ent.fx); }   // FX_CHAIN — служебная запись состава, у неё нет имени и показывать её нечем
+    const ch=r.chains[key]; if(ch) for(const e of ch) ids.add(e.fxId);
+    for(const ent of r.lane){ if(ent.key!==key) continue; pts++; if(ent.fx!==FX_CHAIN) ids.add(ent.fx); }   // FX_CHAIN — служебная запись состава, у неё нет имени и показывать её нечем
   }
-  return { takes:tks.size, roles:[...roles], fx:[...ids], pts };
+  return { takes:tks.size, role, fx:[...ids], pts };
 }
 function lanePrune(){
   takePrune();   // O-2: захват взятого уходит вместе с его событиями — одной строкой, чтобы унаследовать всех вызывающих
@@ -1398,30 +1404,31 @@ function editInsertHit(t,row){
    снимок. Нужна точка раньше всех — её добавляют обычным способом, тапом в режиме вставки. */
 const AUT_EPS=1e-9;
 /* Взятые ДОРОЖКИ, от старшего к младшему, и их доли старта — одним проходом по событиям.
-   Ролями отбираем те же, что и сводка захвата (captureInfoOf): дорожка правит цепями ТОЛЬКО тех ролей,
-   которые в ней играли. */
+   ⛳ T4: ролей по взятым больше НЕ собираем. Прежде каждое взятое несло набор ключей своих ролей в этой
+   дорожке, потому что дорожка могла держать несколько; теперь роль у дорожки одна, и каждое её взятое
+   играло именно её — цепь одна на всю дорожку (laneChainKey). ⚠️ Одно ВЗЯТОЕ по-прежнему может нести
+   несколько ролей (сплит) — но они лежат в РАЗНЫХ дорожках, и чужую цепь отсекает ключ точки (ent.key). */
 function autTakesOf(layer){
   const m=new Map();
   for(const e of events) if(e.layer===layer){
     const tk=e.tk||0; let x=m.get(tk);
-    if(!x) m.set(tk, x={tk, t0:e.t, keys:new Set()});
+    if(!x) m.set(tk, x={tk, t0:e.t});
     if(e.t<x.t0) x.t0=e.t;
-    const r=evRole(e.fn); if(r) x.keys.add(chainKeyOf(r));
   }
   return [...m.values()].sort((a,b)=>b.tk-a.tk);      // старший первым: «последнее взятое» — это [0]
 }
-/* ВСЕ АДРЕСА, которые полоса может показать у этой дорожки: параметры эффектов её захваченных цепей.
-   Порядок — порядок ЦЕПИ (он слышен с O-1). Состав берём у ПОСЛЕДНЕГО взятого владельца: оно и правит. */
+/* ВСЕ АДРЕСА, которые полоса может показать у этой дорожки: параметры эффектов её ОДНОЙ цепи.
+   Порядок — порядок ЦЕПИ (он слышен с O-1). Состав берём у ПОСЛЕДНЕГО взятого: оно и правит. */
 function autAddrs(layer){
-  const out=[];
+  const out=[], key=laneChainKey(layer); if(!key) return out;
   for(const T of autTakesOf(layer).slice().reverse()){
     const rec=takeFx.get(T.tk); if(!rec) continue;
-    for(const key of T.keys){ const ch=rec.chains[key]; if(!ch) continue;
-      for(const eff of ch) for(const meta of fxParamMetaOf(eff.fxId)){
-        const i=out.findIndex(o=>o.key===key&&o.fx===eff.fxId&&o.p===meta.key);
-        if(i>=0) out.splice(i,1);                     // тот же адрес у более старшего взятого — порядок берём у него
-        out.push({key, fx:eff.fxId, p:meta.key, labelKey:meta.labelKey, short:meta.short});
-      } }
+    const ch=rec.chains[key]; if(!ch) continue;
+    for(const eff of ch) for(const meta of fxParamMetaOf(eff.fxId)){
+      const i=out.findIndex(o=>o.fx===eff.fxId&&o.p===meta.key);
+      if(i>=0) out.splice(i,1);                       // тот же адрес у более старшего взятого — порядок берём у него
+      out.push({key, fx:eff.fxId, p:meta.key, labelKey:meta.labelKey, short:meta.short});
+    }
   }
   return out;
 }
@@ -1442,11 +1449,13 @@ function autPoints(layer,key,fxId,pKey){
   autMemoK=mk; autMemoV=r; return r;
 }
 function autPointsCalc(layer,key,fxId,pKey){
-  const takes=autTakesOf(layer);
   let base=null, baseT=Infinity;
   const pts=[];
-  for(const T of takes){
-    const rec=takeFx.get(T.tk); if(!rec||!T.keys.has(key)) continue;
+  /* ⚠️ Адрес ЧУЖОЙ цепи — пусто. Адреса приходят из autAddrs и несут ключ цепи дорожки, так что это страж,
+     а не развилка: без него адрес не той цепи вытащил бы точки соседней дорожки из общего взятого сплита. */
+  if(key!==laneChainKey(layer)) return { base, baseT:0, pts };
+  for(const T of autTakesOf(layer)){
+    const rec=takeFx.get(T.tk); if(!rec) continue;
     const ch=rec.chains[key];
     if(ch && T.t0<=baseT){ const eff=ch.find(e=>e.fxId===fxId);
       if(eff){ const names=fxParamKeysOf(fxId), i=names.indexOf(pKey);
@@ -1473,9 +1482,10 @@ const autCommit=()=>{ takeFxTouch(); laneEditTouch(); };   // A2: см. laneEdit
    всякую записанную дорожку. Это и есть цена, названная заранее.
    ⚠️ Снимок делает ТА ЖЕ takeCapStart, что и на ● — одна дорога, а не вторая её копия. Опору прореживания
    она засевает только своему взятому (tk===curTake), а здесь это не так, поэтому идущая запись цела. */
-function autEnsure(layer,key){
+/* ⛳ T4: взятое — ПОСЛЕДНЕЕ дорожки, без выбора по роли: каждое её взятое играло её одну роль. */
+function autEnsure(layer){
   const takes=autTakesOf(layer); if(!takes.length) return null;
-  const T=takes.find(x=>x.keys.has(key)) || takes[0];
+  const T=takes[0];
   if(!takeFx.has(T.tk)) takeCapStart(T.tk);
   return takeFx.get(T.tk)||null;
 }
@@ -1495,10 +1505,12 @@ function autDeletePoint(rec){
   editPush({ kind:'autdel', pt:rec.pt, lane:rec.lane });
   autCommit(); return true;
 }
-/* Новая точка — в ПОСЛЕДНЕЕ взятое дорожки (см. шапку: оно и побеждает). */
-function autAddPoint(layer,key,fxId,pKey,t,v){
+/* Новая точка — в ПОСЛЕДНЕЕ взятое дорожки (см. шапку: оно и побеждает), в ЦЕПЬ ДОРОЖКИ (T4: ключ не
+   передаётся — у дорожки одна цепь, выбирать её вызывающему нечем). */
+function autAddPoint(layer,fxId,pKey,t,v){
   if(!editGuard()) return null;
-  const rec=autEnsure(layer,key); if(!rec) return null;
+  const key=laneChainKey(layer); if(!key) return null;
+  const rec=autEnsure(layer); if(!rec) return null;
   const pt={ t:Math.max(0,t), key, fx:fxId, p:pKey, v:Math.max(0,Math.min(1,v)) };
   rec.lane.push(pt);
   editPush({ kind:'autins', pt, lane:rec.lane });
@@ -1510,15 +1522,20 @@ function autAddPoint(layer,key,fxId,pKey,t,v){
    инструмент рук, и переписать её значило бы отнять у человека раскладку по пальцам (тот же закон, по
    которому переигровка подменяет ПУТЬ, а не цепь, — см. fxPlayPath).
    Переигровка подхватит это сама: fxPlayBuild кладёт снимок в ленту записью состава (FX_CHAIN), а
-   fxPlayDrive превращает её в путь. Ни одной новой строки в звуковом пути не понадобилось. */
-function autChainOf(layer,key){
-  const T=autTakesOf(layer).find(x=>x.keys.has(key)); if(!T) return [];
+   fxPlayDrive превращает её в путь. Ни одной новой строки в звуковом пути не понадобилось.
+   ⛳ T4: ЦЕПЬ — ОДНА, ЦЕПЬ ДОРОЖКИ. Ключ владельца функции берут сами (laneChainKey), а не у вызывающего:
+   прежде ui выбирал «в чью цепь» по вкладке роли, и на дорожке двух ролей полоса могла показывать одну
+   цепь, а ▲ двигать другую. Роль у дорожки одна — и выбора, который можно сделать неверно, больше нет. */
+function autChainOf(layer){
+  const key=laneChainKey(layer); if(!key) return [];
+  const T=autTakesOf(layer)[0]; if(!T) return [];
   const rec=takeFx.get(T.tk); if(!rec) return [];
   const ch=rec.chains[key]; return ch?ch.map(e=>e.fxId):[];
 }
-function autChainAdd(layer,key,fxId){
+function autChainAdd(layer,fxId){
   if(!editGuard()||!fxId) return false;
-  const rec=autEnsure(layer,key); if(!rec) return false;
+  const key=laneChainKey(layer); if(!key) return false;
+  const rec=autEnsure(layer); if(!rec) return false;
   const ch=rec.chains[key]||(rec.chains[key]=[]);
   if(ch.some(e=>e.fxId===fxId)) return false;                       // тот же инвариант, что у живой цепи: одна запись на эффект
   const ent={ fxId, params:fxDefaultsOf(fxId) };
@@ -1526,9 +1543,10 @@ function autChainAdd(layer,key,fxId){
   editPush({ kind:'autfxins', ent, ch });
   autCommit(); return true;
 }
-function autChainRemove(layer,key,fxId){
+function autChainRemove(layer,fxId){
   if(!editGuard()) return false;
-  const rec=autEnsure(layer,key); if(!rec) return false;
+  const key=laneChainKey(layer); if(!key) return false;
+  const rec=autEnsure(layer); if(!rec) return false;
   const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId); if(i<0) return false;
   const ent=ch[i]; ch.splice(i,1);
   editPush({ kind:'autfxdel', ent, ch, at:i });
@@ -1536,9 +1554,10 @@ function autChainRemove(layer,key,fxId){
 }
 /* Перестановка — тем же переносом splice, что и у живой цепи (fxChainMove): порядок слышен, значит его
    надо уметь менять; вторая модель порядка не заводится. dir: −1 раньше, +1 позже. */
-function autChainMove(layer,key,fxId,dir){
+function autChainMove(layer,fxId,dir){
   if(!editGuard()) return false;
-  const rec=autEnsure(layer,key); if(!rec) return false;
+  const key=laneChainKey(layer); if(!key) return false;
+  const rec=autEnsure(layer); if(!rec) return false;
   const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId), j=i+(dir<0?-1:1);
   if(i<0||j<0||j>=ch.length) return false;
   const [e]=ch.splice(i,1); ch.splice(j,0,e);
@@ -3074,6 +3093,7 @@ export {
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
+  laneRoleOf,      // T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   makeENG, fxLaneMerge, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey,   // F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не писать) · роль события (чья это цепь эффектов)
   frzGlobalKey,   // A1 (автозаморозка): дешёвый ГЛОБАЛЬНЫЙ сигнал «могла смениться подпись хоть одной дорожки» — для наблюдателя A3/A4. Чистое чтение; сегодня вызывающих нет

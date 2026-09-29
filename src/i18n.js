@@ -143,14 +143,14 @@ export const DICTS = {
     'frz.dropped':'Unfrozen — playing its events again',
     'frz.refused':'Not frozen: the track changed while it was rendering. It keeps playing its events.',
     'frz.noCancel':'Rendering cannot be stopped once started — please wait',
+    'frz.empty':'Nothing to freeze — this track has no notes',
     /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ, а не постоянная надпись: см. freezePinCaptures. */
     'frz.pinned':'This track had notes added in the editor. Their effects are now fixed as they sound right now — the live controls no longer reach them.',
-    'roll.tabLater':'Editing this role comes later',
     'roll.roleLater':'{role} notes can’t be edited in the roll yet — freezing (❄) works',
     'roll.scaleTitle':'This track holds events in several scales · tap to switch the axis',
     'roll.ghosts':'{n} in another scale',
-    'roll.emptyRole':'Nothing of this role in this track',
-    'roll.empty':'No drums in this track',
+    // T4: одна строка вместо «нет этой роли» / «нет ударных» — роль у дорожки одна, пусто значит «нот не осталось»
+    'roll.emptyTrack':'No notes in this track',
     'roll.noTrack':'This track is gone',
     'roll.refusedRec':'Stop recording first',
     'roll.refusedClip':'Stop the clip recording first',
@@ -158,7 +158,7 @@ export const DICTS = {
     'roll.recBlocked':'Close the editor to record',
     'roll.hint':'drag a note — move · its right edge — length · empty space — scroll · two fingers — zoom · ruler — playhead',
     // O-2: что у дорожки ЗАХВАЧЕНО для будущего рендера (зародыш «заморожено с …»).
-    // {roles} — роли САМОЙ дорожки: их может быть несколько, и тогда список эффектов слитый — подпись об этом и говорит
+    // {role} — роль САМОЙ дорожки (одна с T2; до T4 здесь был список ролей и слитый перечень эффектов)
     // O-4: ПОЛОСА АВТОМАТИЗАЦИИ редактора — выбор параметра и правка цепи САМОЙ дорожки
     'aut.none':'— automation off —',
     'aut.pick':'pick a parameter to see its automation',
@@ -169,8 +169,8 @@ export const DICTS = {
     'aut.fine':'fine',
     'aut.selHint':'drag a point aside — single units · 🗑 — delete it',
     'aut.ptDelTitle':'Delete the selected automation point',
-    'roll.cap':'captured — {roles}: {fx} · {n} automation points',
-    'roll.capNone':'captured — {roles}: no effects',
+    'roll.cap':'captured — {role}: {fx} · {n} automation points',
+    'roll.capNone':'captured — {role}: no effects',
     'roll.homeTitle':'Playhead to the start',
     'roll.snapFree':'free',
     'roll.snapHidden':'(grid too fine to draw)',
@@ -559,13 +559,12 @@ export const DICTS = {
     'frz.dropped':'Разморожена — снова играет свои события',
     'frz.refused':'Не заморожена: дорожка изменилась, пока шёл рендер. Играет свои события.',
     'frz.noCancel':'Начатый рендер не остановить — дождитесь конца',
+    'frz.empty':'Замораживать нечего — в дорожке нет нот',
     'frz.pinned':'В этой дорожке есть ноты, добавленные в редакторе. Их эффекты теперь закреплены такими, как звучат сейчас, — живые ручки до них больше не дотянутся.',
-    'roll.tabLater':'Правка этой роли — позже',
     'roll.roleLater':'{role}: ноты этой роли в ролле пока не правятся — заморозка (❄) работает',
     'roll.scaleTitle':'В дорожке события в нескольких ладах · тап переключает ось',
     'roll.ghosts':'{n} в другом ладу',
-    'roll.emptyRole':'В этой дорожке нет этой роли',
-    'roll.empty':'В этой дорожке нет ударных',
+    'roll.emptyTrack':'В этой дорожке нет нот',
     'roll.noTrack':'Этой дорожки больше нет',
     'roll.refusedRec':'Сначала остановите запись',
     'roll.refusedClip':'Сначала остановите запись клипа',
@@ -573,7 +572,7 @@ export const DICTS = {
     'roll.recBlocked':'Закройте редактор, чтобы записывать',
     'roll.hint':'тянуть ноту — перенос · её правый край — длина · пустое место — прокрутка · два пальца — зум · линейка — бегунок',
     // O-2: что у дорожки ЗАХВАЧЕНО для будущего рендера (зародыш «заморожено с …»).
-    // {roles} — роли САМОЙ дорожки: их может быть несколько, и тогда список эффектов слитый — подпись об этом и говорит
+    // {role} — роль САМОЙ дорожки (одна с T2; до T4 здесь был список ролей и слитый перечень эффектов)
     // O-4: ПОЛОСА АВТОМАТИЗАЦИИ редактора — выбор параметра и правка цепи САМОЙ дорожки
     'aut.none':'— без автоматизации —',
     'aut.pick':'выберите параметр — покажу его автоматизацию',
@@ -584,8 +583,8 @@ export const DICTS = {
     'aut.fine':'точно',
     'aut.selHint':'отвести палец в сторону — единицы · 🗑 — убрать точку',
     'aut.ptDelTitle':'Удалить выбранную точку автоматизации',
-    'roll.cap':'захвачено — {roles}: {fx} · точек автоматизации: {n}',
-    'roll.capNone':'захвачено — {roles}: без эффектов',
+    'roll.cap':'захвачено — {role}: {fx} · точек автоматизации: {n}',
+    'roll.capNone':'захвачено — {role}: без эффектов',
     'roll.homeTitle':'Бегунок в начало',
     'roll.snapFree':'свободно',
     'roll.snapHidden':'(сетка мельче пикселя)',

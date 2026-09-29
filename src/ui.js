@@ -6,7 +6,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          handActOf, setHandAct,
          chainXDriven, fxVolFix, setFxVolFix, fxIsScalar,
          rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, rollDrag, setRollDrag, rollIns, setRollIns,
-         rollRole, setRollRole, rollRow0, setRollRow0, rollScale, setRollScale, ROLL_EDITABLE,
+         rollRole, setRollRole, rollRow0, setRollRow0, rollScale, setRollScale,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
@@ -24,11 +24,11 @@ import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_I
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
-         songBeats, songNotes, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
+         songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,
-         autChainOf, autChainAdd, autChainRemove, autChainMove, captureInfoOf,
+         autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf,   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
@@ -363,31 +363,20 @@ addEventListener('pointercancel',()=>{ braceEdge=null; });
    ⛔ ПОКА РЕДАКТОР ОТКРЫТ: верхняя панель скрыта (она про игру), транспорт оставляет одну ▶ (класс .roll)
    — ⤺/✕/⟳/■ меняли бы песню под открытым редактором, вплоть до сноса самой открытой дорожки. */
 const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
-      rollTrackBtn=$('rollTrack'), rollTabsEl=$('rollTabs'),
+      rollTrackBtn=$('rollTrack'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
       rollScaleBtn=$('rollScale'), rollFrzBtn=$('rollFrz'), rollFrzStateEl=$('rollFrzState');   // F5: заморозка — в баре РЕДАКТОРА (на строке полосы лупера её ставить некуда: там уже три кнопки в 16 px)
-const ROLL_ROLES=['dr','bs','ld','ch'];          // порядок вкладок: те, что правятся сегодня, — первыми. ROLL_EDITABLE — в state (его читает и draw)
-/* ⛳ РОЛИ ДОРОЖКИ — ИЗ ЕЁ СОБЫТИЙ, со СЧЁТОМ НОТ. Считаем по тому же songNotes, по которому рисует ролл:
-   иначе вкладка обещала бы ноты, которых на сетке нет. Дрон — уровень, а не нота, и роли не даёт. */
-function rollRoleCounts(ly){
-  const cnt={ld:0,ch:0,bs:0,dr:0};
-  if(ly!=null) for(const n of songNotes().notes) if(n.layer===ly && cnt[n.role]!=null) cnt[n.role]++;
-  return cnt;
-}
-/* ⛳ РОЛЬ ОТКРЫТОЙ ДОРОЖКИ ВЫБИРАЕТСЯ САМА — та, у которой НОТ БОЛЬШЕ ВСЕГО. Дорожка не типизирована ролью
-   и законно держит несколько, но обычно одна из них — «её» партия, и открывать её надо на ней: прежде
-   редактор всегда открывался на ударных, и басовая дорожка встречала человека пустой сеткой.
-   Ничья — по порядку ROLL_ROLES (правимые первыми). Нот нет вовсе — ударные, как было. */
-function rollPickRole(ly){
-  const cnt=rollRoleCounts(ly); let best=null;
-  for(const r of ROLL_ROLES) if(cnt[r]>0 && (best==null||cnt[r]>cnt[best])) best=r;
-  return best||'dr';
-}
-/* СМЕНА РОЛИ — смена ОСИ Y целиком: выделение, призрак и вертикальная прокрутка относятся к прежней
-   оси и обязаны уйти. История правок НЕ чистится: она про дорожку, а не про роль.
-   ⚠️ setRollRole — ПЕРВЫМ: rollDefaultRow0 спрашивает группы ладов, а их draw отбирает по роли. */
-function rollSelectRole(r){
+/* ⛳ РОЛЬ РЕДАКТОРА — РОЛЬ ДОРОЖКИ (T4). Вкладок ролей больше нет: с T2 в дорожке ровно одна роль, и
+   селектор с одним вариантом был бы шумом. Роль читаем у recorder (laneRoleOf — из событий дорожки) РОВНО
+   в двух местах: на открытии редактора и на смене дорожки. Между ними она не перечитывается — дорожку
+   можно опустошить правками, и ось обязана остаться прежней, чтобы ✚ и ↶ работали там же (см. state).
+   null — нот нет с самого открытия (слой дрона, опустевшая вооружённая дорожка): ролл скажет «нот нет».
+   ⛔ Выдумывать роль нельзя — прежде такая дорожка открывалась на ударных, которых в ней не было никогда.
+   Смена роли — смена ОСИ Y целиком: выделение, призрак и вертикальная прокрутка относятся к прежней оси и
+   обязаны уйти. ⚠️ setRollRole — ПЕРВЫМ: rollDefaultRow0 спрашивает группы ладов, а их draw отбирает по роли. */
+function rollEnterTrack(){
+  const r=laneRoleOf(editLayer());
   setRollRole(r); setRollSel(null); setRollDrag(null); setRollScale(0); setRollRow0(rollDefaultRow0(r));
 }
 const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
@@ -398,30 +387,14 @@ function setRollWinClamped(b0,span){
   setRollWin(Math.max(0, Math.min(b0, Math.max(0, total+M-s))), s);
   updRollBtns();          // шаг привязки зависит от МАСШТАБА — подпись обязана ехать вместе с ним
 }
-/* Панель редактора: дорожка и вкладки ролей со СЧЁТОМ НОТ.
-   ⛳ ВКЛАДКИ — ТОЛЬКО ДЛЯ РОЛЕЙ, КОТОРЫЕ В ДОРОЖКЕ ЕСТЬ. Прежде их было всегда четыре, и чип дорожки с
-   вкладками ролей читались как ДВА независимых выбора: взял «ударные» на дорожке без ударных — и пусто.
-   Роль одна — вкладок нет вовсе: выбирать не из чего, роль уже выбрана сама (rollPickRole).
-   ⚠️ ПОКАЗАННАЯ РОЛЬ ВХОДИТ В НАБОР ВСЕГДА, даже с нулём нот: правкой можно убрать последний удар, и
-   без этого её вкладка исчезла бы из-под пальца, а на пустой сетке человек остался бы без выхода (↶ жив).
-   Неправимая роль (соло, аккорды) теперь ВЫБИРАЕМА: вместо сетки ролл говорит одну строку, почему её
-   нельзя править (см. drawRoll), — выключенная вкладка тут ничего бы не объяснила. */
+/* Панель редактора: дорожка. ⛳ T4: вкладок ролей нет — роль у дорожки одна и выбрана её событиями
+   (rollEnterTrack). Вкладки и раньше прятались на дорожке одной роли, то есть с T2 не показывались вовсе;
+   теперь их нет и в коде. Роль на экране называют подписи рядов, строка «пока не правится» и сводка захвата. */
 function applyRollBar(){
   if(!rollOpen) return;
   const ly=editLayer();
   rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1});
   rollTrackBtn.disabled = trackLayers().length<2;
-  const cnt=rollRoleCounts(ly);
-  const shown=ROLL_ROLES.filter(r=>cnt[r]>0 || r===rollRole);
-  rollTabsEl.textContent='';
-  if(shown.length>1) for(const r of shown){
-    const b=document.createElement('button');
-    b.className='tab'+(r===rollRole?' act':'');
-    b.textContent=`${t('role.'+r)} · ${cnt[r]}`;
-    if(!ROLL_EDITABLE.includes(r)) b.title=t('roll.tabLater');
-    b.onclick=()=>{ if(r===rollRole) return; rollSelectRole(r); applyRollBar(); };
-    rollTabsEl.appendChild(b);
-  }
   /* ЧИП ЛАДА — ТОЛЬКО когда ладов в дорожке больше одного (обычный случай — один, и машинерии на экране
      быть не должно). Имя лада резолвим через L(): оно локализуется, но группируемся мы по ССЫЛКЕ. */
   const gs=rollScaleGroups();
@@ -431,7 +404,7 @@ function applyRollBar(){
     rollScaleBtn.textContent=`${L(g.sc.name)} ${i+1}/${gs.length}`;
     rollScaleBtn.onclick=()=>{ setRollScale((i+1)%gs.length); setRollSel(null); setRollDrag(null); applyRollBar(); };
   }
-  /* ⚠️ АДРЕС ПОЛОСЫ ЗДЕСЬ НЕ СБРАСЫВАЕМ: applyRollBar зовут и смена РОЛИ, и смена ЛАДА оси, и смена ЯЗЫКА,
+  /* ⚠️ АДРЕС ПОЛОСЫ ЗДЕСЬ НЕ СБРАСЫВАЕМ: applyRollBar зовут и правки, и смена ЛАДА оси, и смена ЯЗЫКА,
      а полоса принадлежит ДОРОЖКЕ и переживает всё это. Сброс стоит там, где меняется дорожка (см. ниже
      rollTrackBtn и editOpen). Список адресов перестраиваем всегда — он зависит от захвата, а тот мог
      измениться правкой. */
@@ -440,7 +413,7 @@ function applyRollBar(){
 /* Нижний видимый ряд по умолчанию: у баса ставим окно на РЕГИСТР, где он и играет (bassOctReg), — иначе
    открытая роль показывала бы пустой верх лада. Ударным прокрутка не нужна вовсе. */
 function rollDefaultRow0(role){
-  if(role==='dr') return 0;
+  if(role==null||role==='dr') return 0;   // T4: null — дорожка без нот, оси нет и прокручивать нечего
   const g=rollGeom(), sc=(rollScaleGroups()[0]||{}).sc||CUR();
   const dpo=sc.iv.length+1, reg=Math.max(0,Math.min(3,rectOctReg(role)));
   const rows=g&&g.pitched?g.rows:8;
@@ -456,7 +429,7 @@ function openRoll(){
   if(!editOpen(arm!=null?arm:ls[0])){ showCamMsg(t('roll.refusedRec')); return; }   // ВООРУЖЁННАЯ дорожка, иначе первая
   setRollOpen(true); setRollSel(null);
   setRollDrag(null); setRollIns(false);            // S5.1: сессия начинается без призрака и с ВЫКЛЮЧЕННОЙ вставкой — режим, переживший закрытие, однажды родил бы удар «сам собой»
-  rollSelectRole(rollPickRole(editLayer()));      // ⛳ роль — САМА, по нотам дорожки (прежде всегда ударные). Роль, пережившая закрытие, показала бы чужую ось — поэтому выбираем заново на каждом открытии
+  rollEnterTrack();                                // ⛳ T4: роль — РОЛЬ ДОРОЖКИ (одна). Роль, пережившая закрытие, показала бы чужую ось — поэтому читаем заново на каждом открытии
   setRollWinClamped(0, loop.metre*8);              // стартовое окно — восемь тактов от начала песни
   barEl.classList.remove('on'); rollBar.classList.add('on'); loopTpEl.classList.add('roll');
   setRollAut(null); setRollAutSel(null); setRollAutDrag(null);   // O-4: редактор открывается с ЗАКРЫТОЙ полосой — адрес прошлой сессии к этой дорожке отношения не имеет
@@ -477,7 +450,7 @@ rollCloseBtn.onclick=closeRoll;
 rollTrackBtn.onclick=()=>{
   const ls=trackLayers(); if(ls.length<2) return;
   const i=ls.indexOf(editLayer());
-  if(editSetLayer(ls[(i+1)%ls.length])){ rollSelectRole(rollPickRole(editLayer()));   // ⛳ сменилась дорожка — сменилась и её роль: оставить прежнюю значило бы снова показать пустую сетку
+  if(editSetLayer(ls[(i+1)%ls.length])){ rollEnterTrack();   // ⛳ сменилась дорожка — сменилась и её роль: оставить прежнюю значило бы показать чужую ось
     setRollAut(null); setRollAutSel(null); setRollAutDrag(null);   // O-4: адрес принадлежал ПРЕЖНЕЙ дорожке — на новой его может не быть вовсе
     applyRollBar(); }   // S5.5: у новой дорожки свои лады — номер группы от прежней бессмыслен
 };
@@ -485,7 +458,7 @@ const rollZoomBy=k=>{ const g=rollGeom(); if(!g) return; const c=g.beat0+g.span/
 rollZoomInBtn.onclick =()=>rollZoomBy(1/1.6);
 rollZoomOutBtn.onclick=()=>rollZoomBy(1.6);
 /* ═══ ПРАВКА (S5.1): кнопки, подпись сетки, отказ подложке ═══
-   updRollBtns — ДЕШЁВЫЙ обновлятор (вкладки не пересобирает): его зовут после выделения, правки и смены
+   updRollBtns — ДЕШЁВЫЙ обновлятор (панель и списки не пересобирает): его зовут после выделения, правки и смены
    масштаба. Подпись сетки читает ТУ ЖЕ rollSnap, по которой привязывается палец, — обещание и результат
    не могут разойтись. */
 /* Подпись привязки (S5.2): она НЕ выбирает шаг, а ОТЧИТЫВАЕТСЯ о нём — шаг задан «Квантизацией» в панели
@@ -525,9 +498,12 @@ const rollRefuseRO=()=>{ if(editBackingOpen()){ showCamMsg(t('roll.readOnly')); 
    ⛳ ОДИН СЕЛЕКТ ВМЕСТО «ТУМБЛЕР + ВЫБОР»: первый пункт «— нет —» закрывает полосу, остальные её
    открывают на своём адресе. Состояния «полоса открыта, но непонятно что показывает» не существует, и
    в тесной панели редактора это ещё и одна строка вместо двух.
-   ⚠️ СПИСОК — ТОЛЬКО ЦЕПИ ЭТОЙ ДОРОЖКИ. autAddrs отбирает адреса по РОЛЯМ её событий — тем же отбором,
+   ⚠️ СПИСОК — ТОЛЬКО ЦЕПЬ ЭТОЙ ДОРОЖКИ. autAddrs отбирает адреса по цепи её роли — тем же отбором,
    которым сводка захвата (captureInfoOf) перестала рекламировать басовой дорожке делей соло. Второго
-   правила «чьё это» не заводим. */
+   правила «чьё это» не заводим.
+   ⛳ T4: ЦЕПЬ У ДОРОЖКИ ОДНА, И ВЫБИРАТЬ ЕЁ ЗДЕСЬ НЕЧЕМ. Прежде ui решал «в чью цепь» (autOwnerKey: цепь
+   вкладки, иначе первая по порядку), а ▲▼🗑 шли за ключом показанного адреса — два выбора, которые на
+   дорожке двух ролей могли разойтись. Теперь ключ не передаётся вовсе: recorder берёт цепь дорожки сам. */
 const rollAutEl=$('rollAutSel'), rollFxAddEl=$('rollFxAdd'),
       rollFxUpEl=$('rollFxUp'), rollFxDnEl=$('rollFxDn'), rollFxDelEl=$('rollFxDel');
 const autAddrKey=a=>a?a.key+'|'+a.fx+'|'+a.p:'';
@@ -549,41 +525,24 @@ function renderAutCtl(){
   rollAutEl.value = addrs.some(a=>autAddrKey(a)===cur) ? cur : '';
   if(!rollAutEl.value && rollAut){ setRollAut(null); setRollAutSel(null); }   // показанный адрес исчез (убрали эффект) — полоса честно закрывается
   /* ⛳ «ДОБАВИТЬ ЭФФЕКТ ДОРОЖКЕ» — вычитаем уже стоящие, ровно как это делает панель живой цепи.
-     ⛔ Владелец — роль, в которой дорожка ИГРАЛА. Их может быть несколько (дорожка не типизирована
-     ролью); пишем в цепь ПОКАЗАННОЙ роли (вкладка — она и есть выбор «в чью цепь»), а если её в дорожке
-     нет — в цепь первой по порядку появления (см. autOwnerKey). */
-  const key=autOwnerKey(ly);
+     Цепь — ЦЕПЬ ДОРОЖКИ (её одной роли). Цепи нет, если у дорожки нет роли — не осталось нот или это слой
+     дрона: тогда меню честно выключено. ⚠️ Спрашиваем recorder (по событиям), а НЕ rollRole: у дорожки,
+     опустошённой правками, ось ещё помнит роль, но взятых, в чей захват писать, уже нет. */
+  const hasChain = ly!=null && laneRoleOf(ly)!=null;
+  const chain = hasChain ? autChainOf(ly) : [];
   rollFxAddEl.textContent='';
   const head=document.createElement('option'); head.value=''; head.textContent=t('aut.add');
   rollFxAddEl.appendChild(head);
-  if(key){ const have=new Set(autChainOf(ly,key));
+  if(hasChain){ const have=new Set(chain);
     for(const id of fxAddableIds()) if(!have.has(id)){
       const o=document.createElement('option'); o.value=id; o.textContent=fxTitleOf(id); rollFxAddEl.appendChild(o); } }
   rollFxAddEl.value='';
-  const ro = ly==null || editBackingOpen() || !key;
-  rollFxAddEl.disabled=ro;
-  /* ▲▼🗑 — по цепи ПОКАЗАННОГО адреса (та же, которую правят их обработчики ниже): доступность и
-     исполнение обязаны смотреть в одну цепь, иначе кнопка «живая» над одной, а двигает другую. */
-  const mk= rollAut ? rollAut.key : null, mro = ly==null || editBackingOpen() || !mk;
-  const chain= mk?autChainOf(ly,mk):[], i= rollAut?chain.indexOf(rollAut.fx):-1;
+  rollFxAddEl.disabled = !hasChain || editBackingOpen();
+  /* ▲▼🗑 — над ПОКАЗАННЫМ эффектом в той же одной цепи, которую правят их обработчики ниже. */
+  const mro = !hasChain || editBackingOpen() || !rollAut, i= rollAut?chain.indexOf(rollAut.fx):-1;
   rollFxUpEl.disabled  = mro||i<0||i===0;
   rollFxDnEl.disabled  = mro||i<0||i>=chain.length-1;
   rollFxDelEl.disabled = mro||i<0;
-}
-/* Владелец цепи, в которую редактор ДОБАВЛЯЕТ эффект у этой дорожки. Выводится из её событий — второго
-   источника «чья это цепь» в редакторе нет.
-   ⛳ ПОКАЗАННАЯ РОЛЬ — ПЕРВОЙ. Роль теперь выбирается сама (по числу нот), и «добавить» в цепь ДРУГОЙ роли,
-   чем та, что на экране, было бы тем самым расхождением двух выборов, которое вкладки и лечат. Роли в
-   дорожке нет (пустая показанная) — прежнее правило: первый владелец по порядку. На дорожке одной роли
-   ответ тот же, что и раньше. */
-function autOwnerKey(ly){
-  if(ly==null) return null;
-  const cap0=captureInfoOf(ly);
-  if(cap0 && cap0.roles.includes(rollRole)) return chainKeyOf(rollRole);
-  const a=autAddrs(ly)[0];
-  if(a) return a.key;
-  const cap=captureInfoOf(ly);                                   // цепь пуста (сухая дорожка) — владельца берём у ролей самой дорожки
-  return cap&&cap.roles&&cap.roles.length ? chainKeyOf(cap.roles[0]) : null;
 }
 if(rollAutEl){
   rollAutEl.onchange=e=>{
@@ -593,27 +552,26 @@ if(rollAutEl){
     renderAutCtl(); updRollBtns();
   };
   rollFxAddEl.onchange=e=>{
-    const id=e.target.value, ly=editLayer(), key=autOwnerKey(ly);
+    const id=e.target.value, ly=editLayer();
     e.target.value='';
-    if(!id||ly==null||!key) return;
+    if(!id||ly==null) return;
     if(rollRefuseRO()) return;
-    if(autChainAdd(ly,key,id)){
-      const a=autAddrs(ly).find(x=>x.fx===id&&x.key===key);      // открываем полосу на ПЕРВОМ параметре добавленного: иначе «добавил и не видно». ⚠️ и того же ВЛАДЕЛЬЦА: тот же эффект может стоять в цепи другой роли дорожки
+    if(autChainAdd(ly,id)){
+      const a=autAddrs(ly).find(x=>x.fx===id);      // открываем полосу на ПЕРВОМ параметре добавленного: иначе «добавил и не видно»
       if(a){ setRollAut(a); setRollAutSel(null); }
     }
     renderAutCtl(); updRollBtns();
   };
-  /* ⛳ ▲▼🗑 ПРАВЯТ ЦЕПЬ ПОКАЗАННОГО АДРЕСА (rollAut.key), а не «владельца дорожки». Прежде здесь стоял
-     autOwnerKey, и на дорожке двух ролей полоса могла показывать реверб аккордов, а ▲ двигать реверб соло —
-     кнопка действовала не на то, что видно. На дорожке одной роли ключи совпадают, как и раньше. */
-  const fxMove=d=>{ const ly=editLayer(), key=rollAut&&rollAut.key;
-    if(ly==null||!key||!rollAut||rollRefuseRO()) return;
-    autChainMove(ly,key,rollAut.fx,d); renderAutCtl(); updRollBtns(); };
+  /* ▲▼🗑 правят ПОКАЗАННЫЙ эффект в цепи дорожки — она одна (T4), так что «видно одну, двигаем другую»
+     больше не случается по построению. */
+  const fxMove=d=>{ const ly=editLayer();
+    if(ly==null||!rollAut||rollRefuseRO()) return;
+    autChainMove(ly,rollAut.fx,d); renderAutCtl(); updRollBtns(); };
   rollFxUpEl.onclick=()=>fxMove(-1);
   rollFxDnEl.onclick=()=>fxMove(1);
-  rollFxDelEl.onclick=()=>{ const ly=editLayer(), key=rollAut&&rollAut.key;
-    if(ly==null||!key||!rollAut||rollRefuseRO()) return;
-    autChainRemove(ly,key,rollAut.fx);
+  rollFxDelEl.onclick=()=>{ const ly=editLayer();
+    if(ly==null||!rollAut||rollRefuseRO()) return;
+    autChainRemove(ly,rollAut.fx);
     setRollAut(null); setRollAutSel(null); renderAutCtl(); updRollBtns(); };
 }
 
@@ -656,6 +614,9 @@ async function onFreeze(){
   if(frzBusy){ showCamMsg(t('frz.noCancel')); return; }
   const ly=editLayer(); if(ly==null) return;
   if(freezeState(ly)==='fresh'){ unfreezeLayer(ly); showCamMsg(t('frz.dropped')); updRollBtns(); return; }
+  /* T4: дорожка, опустошённая правками, — морозить нечего. Рендер отказал бы сам, но исключением с
+     внутренним текстом; говорим это словами интерфейса. */
+  if(!events.some(e=>e.layer===ly)){ showCamMsg(t('frz.empty')); return; }
   /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ. Дорожка со вставленными в редакторе нотами шла ЗА ЖИВОЙ ЦЕПЬЮ; заморозка
      ПРИКАЛАЧИВАЕТ её к цепи в том виде, как та стоит сейчас. Звук не меняется, но живые ручки до неё
      больше не дотянутся — до сих пор это происходило МОЛЧА. Говорим один раз за сессию. */
@@ -845,7 +806,7 @@ function rollUp(e){
          времени. Иначе одно и то же поле жило бы по двум правилам — свободный перенос и квантованная
          вставка, — и человек не смог бы сказать, где точка окажется. Величина привязывается к десятой:
          у ВЕЛИЧИНЫ круглый шаг осмыслен (0..100), у времени — нет. */
-      const pt=autAddPoint(ly, rollAut.key, rollAut.fx, rollAut.p,
+      const pt=autAddPoint(ly, rollAut.fx, rollAut.p,
                            Math.max(0,h.beat), rollAutSnapV(h.v));
       if(pt){ const D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p);
               selAutPt(D.pts.find(r=>r.pt===pt)||null); }
@@ -865,7 +826,7 @@ function rollUp(e){
         if(rollRole==='dr') ev=editInsertHit(tt, h.row);
         else{
           /* ⛳ ЛАД ВСТАВЛЕННОЙ НОТЫ — ЛАД ПОКАЗАННОЙ ОСИ, а не живой: нота рождается там, где её нарисовали.
-             Пустая роль группы не имеет — тогда честно берём живой лад (новый материал в текущем строе). */
+             Опустевшая дорожка групп не имеет — тогда честно берём живой лад (новый материал в текущем строе). */
           const g2=rollGeom(), gs=rollScaleGroups(), G=gs[Math.min(rollScale,Math.max(0,gs.length-1))];
           const sc=(G&&G.sc)||CUR(), sev=G?G.sev:seventh;   // есть группа — её замороженный септаккорд; роль пуста — живой (новый материал в текущем строе)
           const pit=rollRowPitch(h.row, sc);
@@ -2055,7 +2016,7 @@ applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHan
    Холст не трогаем — он перерисуется сам следующим кадром (t()/L() читаются на кадр). */
 onLangChange(()=>{
   buildStartLinks();
-  applyRollBar();      // S5.0: чип дорожки и вкладки ролей строит JS (числа меняются) — переподписываем, как прочие собранные подписи
+  applyRollBar();      // S5.0: чип дорожки, чип лада и списки полосы строит JS (числа меняются) — переподписываем, как прочие собранные подписи
   // Меню строя/лада: имена теперь локализуются (этап B). Переподписываем традиции НА МЕСТЕ (сохраняя
   // выбор по value=id) и пересобираем список ладов текущей традиции, возвращая выбранный лад (value=индекс).
   [...selTradition.options].forEach(o=>{ const tr=TRADITIONS.find(x=>x.id===o.value); if(tr)o.textContent=L(tr.name); });
