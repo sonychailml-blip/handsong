@@ -1063,7 +1063,11 @@ function fxGate(key,fxId,on){
   const inst=FX_INST[key] && FX_INST[key][fxId]; if(!inst||!AC) return;
   if(inst.kind==='voice') return;
   if(inst.kind==='insert'){ inst.setActive(on); if(on) for(const pp of inst.params) pp.setNorm(pp.cur); return; }
-  inst.gate.gain.setTargetAtTime(on?1:0, AC.currentTime, 0.08);
+  /* ОФЛАЙН — СРАЗУ, без рампы: путь рендера ставится на t=0, до первого сэмпла, и плавности там беречь нечего. Рампа τ 0.08 к
+     первой ноте (PRE_SEC 0.5 с) оставила бы затвор на ~−54 дБ, а не на нуле: «отсутствующий эффект» обязан быть ТИШИНОЙ. */
+  const t=AC.currentTime;
+  if(offline){ inst.gate.gain.cancelScheduledValues(t); inst.gate.gain.setValueAtTime(on?1:0,t); }
+  else inst.gate.gain.setTargetAtTime(on?1:0, t, 0.08);
   if(on) for(const pp of inst.params) pp.setNorm(pp.cur);
 }
 /* ids — состав переигровки, null — вернуть живую цепь. Возвращает true, если путь ДЕЙСТВИТЕЛЬНО сменился
@@ -1078,7 +1082,15 @@ function fxPlayPath(key,ids){
   if(ids) FX_PLAY_PATH[key]=ids.slice(); else delete FX_PLAY_PATH[key];
   const after=new Set(FX_PLAY_PATH[key]||fxIdsOfChain(key));
   for(const id of after) if(!before.has(id)) fxGate(key,id,true);    // запись им пользовалась — открыть
-  for(const id of before) if(!after.has(id)) fxGate(key,id,false);   // в новом составе его нет — закрыть, хвост дозвучит
+  /* ⛳ ЗАКРЫТЬ — ВСЁ ПОСТРОЕННОЕ, ЧЕГО НЕТ В НОВОМ СОСТАВЕ, а не только «было в прежнем и пропало».
+     ⚠️ БАГ, КОТОРЫЙ ЭТО ЧИНИТ: замороженная дорожка звучала С ЭФФЕКТАМИ, КОТОРЫХ ПРИ ЕЁ ЗАПИСИ НЕ БЫЛО. Прежде здесь стоял
+     цикл по `before` — а `before` у копии рендера это ЖИВАЯ цепь (state общий на обе копии движка). initAudio строит реверб и
+     делей соло и реверб аккордов СРАЗУ, с открытым затвором; живьём снятый эффект закрывает fxSetActive, а в свежей копии их не
+     закрывал никто. Эффект, которого нет НИ в захвате, НИ в живой цепи, в `before` не попадал — и звучал в рендере на
+     умолчаниях (fxPathOf ставит в путь ВСЁ построенное). Скрыто было потому, что в цепи по умолчанию оба эффекта есть.
+     Теперь закон — «после вызова открыт ровно состав `after`», и он не зависит от того, чем была живая цепь. Живьём ничего
+     не меняется: построенное вне цепи и так уже закрыто (fxSetActive), повторное закрытие — то же значение. */
+  for(const id in (FX_INST[key]||{})) if(!after.has(id)) fxGate(key,id,false);   // в новом составе его нет — закрыть, хвост дозвучит
   fxRespliceSmooth(key);
   return true;
 }
