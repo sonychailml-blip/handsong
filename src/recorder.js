@@ -4,7 +4,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
-import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
+import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
@@ -1619,10 +1619,15 @@ function autTakesOf(layer){
    Порядок — порядок ЦЕПИ (он слышен с O-1). Состав берём у ПОСЛЕДНЕГО взятого: оно и правит. */
 function autAddrs(layer){
   const out=[], key=laneChainKey(layer); if(!key) return out;
+  /* ⛳ VOL-3: ГРОМКОСТЬ — ПЕРВОЙ, У КАЖДОЙ ДОРОЖКИ С РОЛЬЮ, и не из снимка захвата. Громкость есть у КАЖДОЙ ноты (поле a.vol),
+     значит её полоса есть у каждой дорожки — в том числе у той, что захвата не имеет (вставленные в редакторе ноты). Вид и
+     правка — из самих нот (autPoints → pnView), как у любого параметра «в ноте». Ниже, в обходе снимков, запись громкости
+     пропускается (fxPerm), чтобы адрес не встал второй раз. */
+  for(const meta of fxParamMetaOf(FX_VOL)) out.push({key, fx:FX_VOL, p:meta.key, labelKey:meta.labelKey, short:meta.short});
   for(const T of autTakesOf(layer).slice().reverse()){
     const rec=takeFx.get(T.tk); if(!rec) continue;
     const ch=rec.chains[key]; if(!ch) continue;
-    for(const eff of ch) if(!fxPerm(eff.fxId)) for(const meta of fxParamMetaOf(eff.fxId)){   // VOL-0: громкости на полосе пока нет — её полоса («в ноте», из нот) приходит в VOL-3
+    for(const eff of ch) if(!fxPerm(eff.fxId)) for(const meta of fxParamMetaOf(eff.fxId)){   // громкость уже стоит первой (выше); прочие — в порядке цепи
       const i=out.findIndex(o=>o.fx===eff.fxId&&o.p===meta.key);
       if(i>=0) out.splice(i,1);                       // тот же адрес у более старшего взятого — порядок берём у него
       out.push({key, fx:eff.fxId, p:meta.key, labelKey:meta.labelKey, short:meta.short});
@@ -1684,7 +1689,7 @@ function pnGet(ev,fxId,pKey){
    Скольжения. СОЛО: карта остаётся всегда — у соло её ОТСУТСТВИЕ значит «звучи живой цепью» (правило R2 в applyFx). */
 function pnWith(ev,fxId,pKey,v){
   const a=ev.a||{}, nf=fxNoteField(fxId,pKey,evRole(ev.fn)), b={...a};
-  if(nf){ if(v==null) delete b[nf.key]; else b[nf.key]= nf.inv?1-v:v; return b; }
+  if(nf){ if(v==null){ if(!nf.required) delete b[nf.key]; } else b[nf.key]= nf.inv?1-v:v; return b; }   // VOL-3: ОБЯЗАТЕЛЬНОЕ поле (громкость) не снимается никогда — второй рубеж после pnMoves
   const k=fxId+':'+pKey, m={...(a.fx||{})};
   if(v==null) delete m[k]; else m[k]=v;
   if(Object.keys(m).length || ev.fn[0]==='l') b.fx=m; else delete b.fx;
@@ -1705,8 +1710,11 @@ function pnRuns(layer,fxId,pKey){
    ноты: вне их величина не звучит ни на чём, и draw рисует там линию приглушённой (ноты берём из songNotes — единственного
    спаривания «вкл»/«выкл», правило редактора). */
 function pnView(layer,key,fxId,pKey){
-  const d=pnDef(key,fxId,pKey), pts=[];
-  pnRuns(layer,fxId,pKey).forEach((r,i)=>{ if(i===0&&r.v==null) return;   // ведущее «не задано» — полка (base), ручки нет
+  const pts=[], runs=pnRuns(layer,fxId,pKey);
+  /* VOL-3: у ОБЯЗАТЕЛЬНОГО поля (громкость) «не задано» нет — полка слева до первой точки стоит на величине ПЕРВОЙ ноты, а не на
+     уровне умолчания: ей там просто не на чем звучать (линия приглушена — там нет нот), и уровень умолчания ничего бы не значил. */
+  const d = pnReq(fxId,pKey,laneRoleOf(layer)) && runs.length && runs[0].v!=null ? runs[0].v : pnDef(key,fxId,pKey);
+  runs.forEach((r,i)=>{ if(i===0&&r.v==null) return;   // ведущее «не задано» — полка (base), ручки нет
     pts.push({ per:true, pt:{ t:r.t, v:r.v==null?d:r.v, unset:r.v==null, pn:{layer,key,fx:fxId,p:pKey} } }); });
   /* У УДАРНЫХ «пауз» в этом смысле нет: удар — миг, его величина звучит в миг удара, и приглушать линию между ударами значило
      бы приглушить её всю. Поэтому для дорожки ударных spans не отдаём — линия рисуется целиком. */
@@ -1717,10 +1725,23 @@ function pnView(layer,key,fxId,pKey){
   const spans=[]; for(const s of sp){ const L=spans[spans.length-1]; if(L&&s[0]<=L[1]) L[1]=Math.max(L[1],s[1]); else spans.push([s[0],s[1]]); }
   return { base:d, baseT:0, pts, per:true, spans };
 }
+/* ═══ ⛔ ИНВАРИАНТ VOL-3: ГРОМКОСТЬ У НОТЫ НЕ СНИМАЕТСЯ НИКОГДА ═══
+   Параметр с ОБЯЗАТЕЛЬНЫМ полем в событии (объявление note.required — сегодня только громкость, поле a.vol) не бывает «не задан»:
+   нота без громкости дала бы движку undefined, то есть NaN в гейне, а в лучшем случае — тишину по случайности. Держится ТРЕМЯ
+   рубежами, все здесь, где живут пер-нотные правки полосы:
+     1. pnMoves (ниже) — ЕДИНСТВЕННЫЙ производитель пер-нотных ходов — пропускает ход «снять величину» у обязательного поля;
+     2. pnWith не удаляет обязательное поле, даже если его попросят (второй рубеж);
+     3. операции полосы подставляют НАСТОЯЩУЮ величину вместо «не задано»: удаление ПЕРВОЙ точки отдаёт её отрезку величину
+        СЛЕДУЮЩЕГО (а не «не задано»); единственный отрезок удалить нельзя; сдвиг первой точки ПОЗЖЕ отказывает (левее неё
+        нет величины, которую отдать). Снять громкость с дорожки (autChainRemove) и переставить её (autChainMove) нельзя —
+        она постоянная (fxPerm).
+   ⚠️ Это НЕ запрет на тишину: громкость 0 — законная величина, её можно поставить точкой. Запрет — на ОТСУТСТВИЕ величины. */
+const pnReq=(fxId,pKey,role)=>{ const nf=fxNoteField(fxId,pKey,role); return !!(nf&&nf.required); };
 /* Переписать величину у событий (цель — функция события) → ходы 'move'. Событие, у которого величина уже та, — не ход. */
 function pnMoves(evs,fxId,pKey,vOf){
   const list=[];
   for(const e of evs){ const v=vOf(e); if(pnSame(pnGet(e,fxId,pKey),v)) continue;
+    if(v==null && pnReq(fxId,pKey,evRole(e.fn))) continue;           // VOL-3: обязательное поле «снять» нельзя — ход не рождается (см. инвариант выше)
     list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:pnWith(e,fxId,pKey,v)} }); }
   return list;
 }
@@ -1739,7 +1760,10 @@ function pnMove(pt,t,v){
   if(Math.abs(t-pt.t)>AUT_EPS){                                    // ВРЕМЯ: двигаем границу отрезка
     const b=Math.max(0,t); at=b;
     if(b<R.t) list=pnMoves(events.filter(e=>e.layer===P.layer&&pnCarrier(e.fn)&&e.t>=b-AUT_EPS&&e.t<R.t-AUT_EPS), P.fx,P.p, ()=>R.v);
-    else      list=pnMoves(R.evs.filter(e=>e.t<b-AUT_EPS), P.fx,P.p, ()=>prev);
+    else{
+      if(prev==null && pnReq(P.fx,P.p,laneRoleOf(P.layer))) return false;   // VOL-3: первая точка громкости ПОЗЖЕ — левее неё нет величины, которую отдать; «не задано» громкости не бывает
+      list=pnMoves(R.evs.filter(e=>e.t<b-AUT_EPS), P.fx,P.p, ()=>prev);
+    }
   }else{                                                           // ВЕЛИЧИНА: весь отрезок
     at=R.t; list=pnMoves(R.evs, P.fx,P.p, ()=>Math.max(0,Math.min(1,v)));
   }
@@ -1749,7 +1773,13 @@ function pnMove(pt,t,v){
 function pnDelete(pt){
   if(!editGuard()) return false;
   const P=pt.pn, runs=pnRuns(P.layer,P.fx,P.p), i=pnLocate(runs,pt); if(i<0) return false;
-  const prev= i>0 ? runs[i-1].v : null;                            // у первой точки — «не задано»
+  let prev= i>0 ? runs[i-1].v : null;                              // у первой точки — «не задано»
+  /* VOL-3: у ОБЯЗАТЕЛЬНОГО поля (громкость) «не задано» не бывает — первая точка отдаёт своему отрезку величину СЛЕДУЮЩЕГО
+     (точка как бы уходит, и следующая величина начинается раньше); единственный отрезок удалить нечем заменить — отказ. */
+  if(prev==null && pnReq(P.fx,P.p,laneRoleOf(P.layer))){
+    if(i+1>=runs.length) return false;
+    prev=runs[i+1].v;
+  }
   return editBatch(pnMoves(runs[i].evs, P.fx,P.p, ()=>prev));
 }
 function pnAdd(layer,key,fxId,pKey,t,v){
