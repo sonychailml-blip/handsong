@@ -183,6 +183,10 @@
    потеря гуманизации, от которой весь слайс и защищается. Посев идёт только у офлайн-копии, у неё
    свой setRnd (см. renderOnce). */
 import { AC as LIVE_AC, ksReady as liveKsReady } from './audio.js';
+/* ⚠️ ОТЛАДКА НА СЛУХ (aud/live): ЖИВОЙ движок целиком, но берём из него только то, что уже служит транспорту — шину
+   замороженной дорожки (makeFrozenBus: прослушивание идёт тем же путём, каким звучит заморозка) и таблицу ENG для
+   сравнения «те же ноты живым движком». ⛔ setRnd и setDbg живой копии отсюда не зовутся никогда. */
+import * as LIVE from './audio.js';
 import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
 /* ⛳ F3 — ИМЕНОВАННЫЕ ПРОСТРАНСТВА. `REC` даёт рендеру ровно то, что уже написано и проверено:
    таблицу диспетчеризации, слияние ленты и формулы ключей владельца. `ST` нужен, чтобы ПРИКОЛОТИТЬ
@@ -753,7 +757,7 @@ function print(R){
 const PRE_SEC=0.5;        // «разгон» перед первой нотой: цепь ставится на t=0, а её сеттеры едут setTargetAtTime с τ до 0.08 с — 0.5 с хватает всем, чтобы осесть ДО первого звука
 const TAIL_MIN=0.25;      // пол хвоста: даже сухая дорожка без эффектов должна дожить свой релиз
 const TAIL_MAX=30;        // потолок хвоста — страховка от абсурдной длины, а не оценка. Пробивается только «падом на 2.5 с» в очень длинной цепи; если пробило, в отчёте это видно
-const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же мера конца хвоста, что у RT60 реверба и у RELEASE_TAILS раскладчика
+const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же мера конца хвоста, что у RT60 реверба (у раскладчика её больше нет: голос свободен с мига отпускания, см. audio.freeAfter)
 
 /* ⛳ ПИН ЖИВОГО СОСТОЯНИЯ. Движок читает его ПРЯМО ПРИ ПОСТРОЙКЕ (дрон берёт высоту из tonicFreq()
    в initAudio) и при раскладке (leadFreq/bassFreq/chordFreqs читают baseF() → tonic и aRef).
@@ -893,6 +897,10 @@ async function renderTrack(layer, opt){
 
     eng.setRnd(mulberry32(o.seed==null?SEED_A:o.seed));
     eng.setOffline(true);                       // ⛳ F2: занятость по звучанию, рост пула, БЕЗ кражи
+    /* ОТЛАДКА НА СЛУХ (aud): переключатели копии ставим на КАЖДЫЙ рендер — без o.dbg это СБРОС в «всё выключено», поэтому
+       заморозка после прослушивания звучит ровно как прежде (копия движка одна на сессию, и флаг иначе пережил бы рендер).
+       ДО initAudio: переключатель, влияющий на постройку голосов, обязан её застать (пул аккордов строится в самом initAudio). */
+    eng.setDbg(o.dbg||null);
     const tIni0=now();
     await eng.initAudio(()=>ctx);               // ⚠️ ПОСЛЕ пина: дрон берёт высоту здесь
     const tIni1=now();
@@ -902,6 +910,10 @@ async function renderTrack(layer, opt){
        этого. Соло и (с P1) бас — ленивые, с нуля: у них рост и есть размер. */
     const pool0=eng.poolSizes();
     eng.offlineTapMaster();                     // ⛔ снимаем с МАСТЕРА, до лимитера (довод — у самой функции)
+    /* ОТЛАДКА НА СЛУХ (aud), гипотеза C: стадия выразительности — в ЖИВУЮ нейтраль (тот вызов, что даёт живой tickExpr без руки:
+       engage=0, постоянная 5 мс — осядет задолго до PRE_SEC) либо ОБОЙДЕНА целиком. */
+    if(o.dbg && o.dbg.expr==='neutral') eng.applyExpr(0,0,0,0,0,0.005);
+    else if(o.dbg && o.dbg.expr==='bypass') eng.dbgExprBypass();
 
     /* СОСТАВ и СНИМОК — на нулевой секунде, до разгона. */
     for(const [key,ids] of startOrd) eng.fxPlayPath(key, ids);
@@ -974,7 +986,7 @@ async function renderTrack(layer, opt){
   } finally {
     unpinLive(ST, pin.prev, pin.use);   // ⛔ ВСЕГДА: приложение не смеет остаться с чужой тоникой, даже если рендер упал. A2: и не смеет вернуть СТАРУЮ, если человек сменил её за время рендера (см. unpinLive)
   }
-  printTrack(out);
+  if(!o.quiet) printTrack(out);   // aud печатает свою одну строку вместо отчёта
   return out;
 }
 
@@ -1126,4 +1138,103 @@ const frozen=()=>{ const ls=REC.frozenLayers();
   /* eslint-enable no-console */
   return ls; };
 
-export { probe, renderTrack, freeze, unfreeze, frozen };
+/* ═══════════ ⛳ ОТЛАДКА НА СЛУХ: aud / live / stop ═══════════
+   ⛳ ЗАЧЕМ ОН ЕСТЬ И ПОЧЕМУ ОСТАЁТСЯ. Замороженная дорожка звучала не как её события (крутящийся «фазер» на SuperSaw; у
+   других тембров первая нота ПОДЪЕЗЖАЛА к высоте без атаки). ДВЕ догадки по чтению кода (лишние эффекты в копии
+   движка; хвосты под следующей нотой) были исправлены — и дефект остался. Нашло его УХО с этим инструментом: отрендерить
+   дорожку и СРАЗУ послушать, НИЧЕГО не замораживая, меняя в копии движка РОВНО ОДНО, и сравнить с теми же нотами через
+   ЖИВОЙ движок. Два переключателя убрали каждый свой дефект — «частота свежей атаки сразу» (подъезд) и «разбросанные
+   фазы свежего голоса» (фазер), — и оба стали ПОВЕДЕНИЕМ движка (audio: leadOn/bassOn и voiceStart), а их переключатели
+   сняты. ⛳ СЛЕДУЮЩИЙ «ЗАМОРОЖЕННОЕ ЗВУЧИТ НЕ ТАК» — начинать ОТСЮДА, а не с чтения кода.
+       const R = await import(new URL('src/render.js', location.href).href);
+       await R.aud(1)                       // рендер как у заморозки, без изменений (должен повторить дефект, если он есть)
+       await R.aud(1,{expr:'neutral'})      // C1: выразительность — живая нейтраль
+       await R.aud(1,{expr:'bypass'})       // C2: выразительность обойдена
+       await R.aud(1,{noHum:true})          // гуманизация высоты выкл
+       await R.aud(1,{mono:true})           // моно-сумма на выходе
+       R.live(1)                            // те же ноты ЖИВЫМ движком
+       R.stop()
+   Новую гипотезу добавлять так же: переключатель в DBG копии движка (audio.setDbg), выключенный по умолчанию и меняющий
+   ровно одно, плюс строка в audDesc — чтобы каждый рендер назвал, что изменено.
+   ⛔ НИЧЕГО В ПРИЛОЖЕНИИ НЕ МЕНЯЕТСЯ: реестр заморозки не трогается (freezeSet не зовётся), события только читаются,
+   переключатели живут в КОПИИ движка и сбрасываются следующим же рендером (renderTrack ставит setDbg всегда).
+   ⚠️ СЕМЯ — ТО ЖЕ, ЧТО У ЗАМОРОЗКИ ЭТОЙ ДОРОЖКИ (seedOfLane): aud(1) без опций — это ровно её буфер. */
+let AUD=null;           // что сейчас играет: { src, bus } у aud, { timer, open, keys, restore } у live
+const audDesc=o=>{ const p=[];
+  if(o.instant||o.phase) p.push('(instant/phase больше не переключатели — это поведение движка)');
+  if(o.expr==='neutral') p.push('C1: выразительность — живая нейтраль');
+  if(o.expr==='bypass') p.push('C2: выразительность ОБОЙДЕНА');
+  if(o.noHum) p.push('гуманизация высоты ВЫКЛ');
+  if(o.mono) p.push('МОНО-сумма на выходе');
+  return p.length ? p.join(' · ') : 'НИЧЕГО (буфер ровно как у заморозки)'; };
+async function aud(layer, opts){
+  const o=opts||{};
+  if(!LIVE_AC) throw new Error('живой AudioContext ещё не создан — нажмите «▶ Играть»');
+  stop();
+  const tk=REC.freezeTicket(layer); if(!tk) throw new Error('нет дорожки '+layer);   // только ради id → семя (у записанной дорожки id уже есть; подпись лишь читается)
+  const seed=o.seed!=null?o.seed:seedOfLane(tk.id);
+  const r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null } });
+  (await engine()).setDbg(null);   // буфер уже готов — переключатели копии сразу в «выкл», чтобы их не унаследовал зонд или что угодно, что поднимет копию без renderTrack
+  /* ИГРАЕМ ТЕМ ЖЕ ПУТЁМ, ЧТО ЗАМОРОЗКА: живая шина замороженной дорожки → живой мастер → лимитер. Моно — даунмикс ДО неё. */
+  const bus=LIVE.makeFrozenBus(); if(!bus) throw new Error('живого движка нет');
+  let head=bus;
+  if(o.mono){ const m=LIVE_AC.createGain(); m.channelCount=1; m.channelCountMode='explicit'; m.channelInterpretation='speakers'; m.connect(bus); head=m; }
+  const src=LIVE_AC.createBufferSource(); src.buffer=r.buf; src.connect(head); src.start();
+  const me={src,bus}; AUD=me;
+  src.onended=()=>{ try{ bus.disconnect(); }catch(e){} if(AUD===me) AUD=null; };
+  /* eslint-disable no-console */
+  console.log('%c[aud] L'+layer+' — изменено: '+audDesc(o),'font-weight:bold');
+  /* eslint-enable no-console */
+  return r;
+}
+/* ТЕ ЖЕ НОТЫ ЖИВЫМ ДВИЖКОМ. ⚠️ Не раскладкой «всё сразу» (живой распределитель спрашивает «свободен ли голос СЕЙЧАС», и
+   синхронная раскладка свалила бы все ноты в один голос — ровно беда, от которой придуман офлайн-распределитель), а своим
+   маленьким насосом: события уходят в движок за ~0.1 с до своего времени, с явным when — как у планировщика транспорта.
+   Цепь — ЗАХВАЧЕННАЯ на старте дорожки (fxPlayPath/fxPlaySet, как у ▶), по окончании возвращается к руке (как у стопа).
+   ⚠️ Автоматизация ПОСЛЕ старта дорожки здесь не ведётся, моно-суммы нет — для сравнения на дорожке без эффектов не нужно.
+   ⛔ Транспорт должен стоять: ключи владельцев ('leadloop:N:v' и т.п.) те же, что у переигровки. */
+function live(layer){
+  if(!LIVE_AC) throw new Error('живой AudioContext ещё не создан — нажмите «▶ Играть»');
+  if(REC.loop.on||REC.recording){ console.log('  ⛔ остановите транспорт — live играет теми же владельцами голосов, что и ▶'); return false; }   // eslint-disable-line no-console
+  stop();
+  const evs=REC.events.map((e,i)=>({e,i})).filter(x=>x.e.layer===layer).sort((a,b)=>(a.e.t-b.e.t)||(a.i-b.i)).map(x=>x.e);
+  if(!evs.length) throw new Error('дорожка '+layer+' пуста');
+  const ENG=REC.makeENG(LIVE);
+  const spb=60/REC.loop.bpm, t0=evs[0].t, T0=LIVE_AC.currentTime+0.3;
+  const keys=new Set(); for(const e of evs){ const r=REC.evRole(e.fn); if(r) keys.add(chainKeyOf(r)); }
+  for(const p of REC.fxLaneMerge()){ if(!keys.has(p.key)||p.t>t0+1e-9) continue;
+    if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(p.key,p.ids); else if(!ST.fxIsScalar(p.fx)) LIVE.fxPlaySet(p.key,p.fx,p.p,p.v); }
+  const open={lead:new Set(), ch:new Set(), bs:new Set()};
+  const me={ open, keys, timer:null, endT:T0+(evs[evs.length-1].t-t0)*spb };
+  let i=0;
+  const pump=()=>{
+    const hz=LIVE_AC.currentTime+0.1;
+    while(i<evs.length){ const ev=evs[i], when=T0+(ev.t-t0)*spb; if(when>hz) break; i++;
+      const fn=ENG[ev.fn]; if(!fn) continue;
+      const a=patchInst(ev, ST); fn(a, ev, {when}); trackOpen(open, ev, a); }
+    if(i>=evs.length){ clearInterval(me.timer); me.timer=null;
+      liveClose(me, me.endT);
+      setTimeout(()=>{ if(AUD===me){ liveRestore(me); AUD=null; } }, Math.max(0,(me.endT-LIVE_AC.currentTime)*1000)+3000); }   // хвосты доиграют — потом цепь обратно к руке
+  };
+  me.timer=setInterval(pump,25); AUD=me; pump();
+  console.log('%c[live] L'+layer+' — те же ноты ЖИВЫМ движком (цепь — захваченная на старте дорожки)','font-weight:bold');   // eslint-disable-line no-console
+  return true;
+}
+function liveClose(me, at){
+  for(const own of me.open.lead) LIVE.leadOff(own, undefined, at);
+  for(const own of me.open.ch)   LIVE.chordOff(own, at);
+  for(const own of me.open.bs)   LIVE.bassOff(own, at);
+  if(me.open.drone) LIVE.droneOff(at);
+  me.open.lead.clear(); me.open.ch.clear(); me.open.bs.clear(); me.open.drone=false;
+}
+function liveRestore(me){ for(const key of me.keys){ LIVE.fxPlayPath(key,null); LIVE.fxRestoreAim(key); } }
+/* СТОП того, что играет из aud/live. Живые голоса live снимаем «сейчас», цепь возвращаем руке. */
+function stop(){
+  const me=AUD; AUD=null; if(!me) return;
+  if(me.src){ try{ me.src.stop(); }catch(e){} try{ me.bus.disconnect(); }catch(e){} return; }
+  if(me.timer){ clearInterval(me.timer); me.timer=null; }
+  liveClose(me, LIVE_AC.currentTime);
+  liveRestore(me);
+}
+
+export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop };

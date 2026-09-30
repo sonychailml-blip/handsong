@@ -178,14 +178,11 @@ function setRnd(fn){ rnd = fn || Math.random; }
 
    ⛳ ЗАКОН ОФЛАЙНА: ГОЛОС ЗАНЯТ НЕ «ПОКА ЕГО НЕ ОТПУСТИЛИ», А ПОКА ОН ЗВУЧИТ.
    Каждый голос несёт `freeAt` — момент, РАНЬШЕ которого его переиспользовать нельзя. Атака ставит
-   Infinity (занят до отпускания), отпускание — `t + rel·RELEASE_TAILS`.
-   ⚠️ RELEASE_TAILS=7, И ЭТО НЕ КРУГЛОЕ ЧИСЛО ДЛЯ УДОБСТВА. Релиз — это setTargetAtTime, то есть
-   ЭКСПОНЕНЦИАЛЬНОЕ ПРИБЛИЖЕНИЕ: нуля он не достигает никогда, и «дождаться конца» буквально
-   невозможно. Берём тот же порог, которым в этом же файле меряется конец хвоста реверба — СПАД НА
-   60 дБ (RT60, см. REV_A.decay): e^−k = 0.001 ⇒ k = ln 1000 ≈ 6.91, округляем до 7. Остаток −60 дБ
-   лежит ниже всего, что слышно на фоне новой атаки в том же голосе.
-   ⚠️ ЦЕНА НАЗВАНА: у «Пада тёплого» rel = 2.5 с, значит голос числится занятым 17.5 с после снятия
-   пальца. Офлайн это платится ТОЛЬКО числом голосов (узлы, не время) — дедлайна у рендера нет.
+   Infinity (занят до отпускания), отпускание — МИГ ОТПУСКАНИЯ (freeAfter).
+   ⚠️ ИСПРАВЛЕНО: здесь стояло `t + rel·RELEASE_TAILS` (7 постоянных, «пока хвост не отзвучал») — и замороженная
+   дорожка звучала НЕ как события: живьём отпущенный голос берёт следующая нота и снимает его хвост, офлайн хвост
+   звенел под следующей нотой целиком, а разная гуманизация двух голосов давала биения — «фазер». Довод и цена — у
+   freeAfter. Правило «занят, ПОКА ЗВУЧИТ» верно ровно до мига отпускания: дальше живой инструмент голос отдаёт.
 
    ⛳ КРАЖУ ОФЛАЙН НЕ ПЕРЕИЗОБРЕТАЕМ, А ОТМЕНЯЕМ. Потолки пула (LEAD_POOL_N/KS, CHORD_POOL_N,
    BASS_POOL_N) стоят потому, что столько тянет ТЕЛЕФОН на 60 кадрах в секунду. У рендера дедлайна
@@ -210,10 +207,18 @@ function setRnd(fn){ rnd = fn || Math.random; }
    предпочтением отпущенных, то же сродство к голосу с уже построенным банком, тот же 20мс-глайд при
    смене ноты под пальцем). Флаг ставит только render.js и только у СВОЕЙ копии модуля. */
 let offline=false;
-const RELEASE_TAILS=7;                 // сколько постоянных времени релиза считать «ещё звучит» (−60 дБ, см. довод выше)
 function setOffline(v){ offline=!!v; }
-/* Момент, с которого голос снова свободен: живьём поле не читается вовсе. */
-const freeAfter=(t,tc)=> t + tc*RELEASE_TAILS;
+/* ⛳ МОМЕНТ, С КОТОРОГО ГОЛОС СНОВА СВОБОДЕН — МИГ ОТПУСКАНИЯ, КАК ЖИВЬЁМ (исправлено; живьём поле не читается вовсе).
+   ⚠️ БЫЛО `t + tc·RELEASE_TAILS` (7 постоянных релиза, «пока хвост не отзвучал») — И ЗАМОРОЖЕННАЯ ДОРОЖКА ЗВУЧАЛА ФАЗЕРОМ.
+   Живьём отпущенный голос свободен СРАЗУ (owner=null) и идёт ПЕРВЫМ кандидатом следующей ноте (leadAlloc/cvAlloc/bvAlloc:
+   find(!owner)): новая атака на нём снимает хвост прежней ноты (cancelScheduledValues). Офлайн тот же голос держался
+   занятым до конца хвоста, следующая нота брала НОВЫЙ голос, и хвост прежней звенел ПОД ней целиком. У каждого голоса своя
+   гуманизация (±HUM_CENTS), поэтому хвост и новая нота той же высоты расходились на несколько центов и медленно БИЛИСЬ —
+   крутящаяся «фазерная» окраска, с эффектами и без. Буфер обязан звучать как события, а не «полнее».
+   ⛳ F2 ЦЕЛ В ГЛАВНОМ: ставим freeAt=Infinity на атаке и миг отпускания на релизе — нота, начатая РАНЬШЕ этого мига
+   (перекрытие), голос не получит, то есть «всё в голос 0» не вернётся; ПОТОЛКА И КРАЖИ ЗВУЧАЩЕЙ НОТЫ ОФЛАЙН ПО-ПРЕЖНЕМУ НЕТ.
+   Изменилось только одно: отпущенный голос отдаётся так же, как живьём, — вместе с обрывом его хвоста. */
+const freeAfter=(t)=> t;
 
 function makeSatCurve(k=4,n=1024){ const c=new Float32Array(n);
   for(let i=0;i<n;i++){const x=i/(n-1)*2-1; c[i]=Math.tanh(k*x);} return c; }
@@ -265,10 +270,59 @@ const REV_A={
   diff:[0.0077,0.0109,0.0143], diffG:0.62,   // ТРИ входных аллпаса-диффузора (с) и их коэффициент
   lines:[0.0297,0.0371,0.0411,0.0437],       // ЧЕТЫРЕ линии сети (с); длины взаимно непериодичны
 };
+/* ═══ ОТЛАДКА НА СЛУХ — ПЕРЕКЛЮЧАТЕЛИ ТОЛЬКО ДЛЯ КОПИИ РЕНДЕРА (render.aud) ═══
+   ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно: setDbg зовёт ТОЛЬКО render.js и только у своей копии, и
+   renderTrack ставит его на КАЖДЫЙ рендер (без опций — всё выключено, то есть заморозка звучит как прежде).
+   Каждый переключатель меняет РОВНО ОДНО, чтобы по ушам было видно, что именно убирает дефект:
+     noHum — гуманизация высоты ×0 (случайное число всё равно берётся: поток случайности не сдвигается,
+             значит уровень и время атаки остаются теми же).
+   ⛳ ИСТОРИЯ, И ПОЧЕМУ ИНСТРУМЕНТ ОСТАЁТСЯ: здесь жили ещё два переключателя — «частота свежей атаки сразу» (A) и
+   «разбросанные фазы свежего голоса» (B). Две догадки по чтению кода не подтвердились; ухо с этим инструментом нашло
+   обе настоящие причины «фазера» и «подъезда» замороженной дорожки, и A и B стали ПОВЕДЕНИЕМ (см. voiceStart и leadOn/
+   bassOn). Инструмент — render.aud / render.live / render.stop (довод и строки консоли — в render.js и CLAUDE.md). */
+const DBG={ noHum:false };
+function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
+/* ═══ ⛳ ФАЗЫ СВЕЖЕГО ГОЛОСА — РАЗБРОСАНЫ СТАРТОМ, КАК У ДАВНО ИДУЩЕГО (B, подтверждено на слух) ═══
+   ⚠️ ДЕФЕКТ: осцилляторы голоса стартовали ОДНОВРЕМЕННО, то есть В ОДНОЙ ФАЗЕ. У SuperSaw пять пил, расстроенных почти
+   равным шагом (−12/−6/0/+6/+12 центов), и из общей фазы они раз за разом снова СХОДЯТСЯ — ровный периодический
+   «пролёт», который ухо читает как ФАЗЕР. Живой голос строится один раз и потом идёт всю сессию (крохотная
+   неравномерность шага в герцах за минуты рассыпает фазы), а в рендере ВСЕ голоса строятся на нулевой секунде — и
+   замороженная дорожка «фазерила» постоянно.
+   ⛳ ЛЕЧЕНИЕ — РАЗНЫЙ МИГ СТАРТА, тот самый способ, которым отладочный переключатель подтвердил причину на слух: первый
+   осциллятор голоса стартует сразу, остальные — каждый со своей задержкой МЕНЬШЕ ОДНОГО ПЕРИОДА частоты, на которой он
+   построен (1/f). Разный старт — это разная фаза, а ФОРМА ВОЛНЫ У КАЖДОГО — ВСТРОЕННАЯ, НЕТРОНУТАЯ.
+   ⛔ РЕШЕНИЕ ПОЛЬЗОВАТЕЛЯ: тембры не трогаем ради заморозки — никаких своих волн вместо встроенных (была попытка с
+   повёрнутой PeriodicWave — снята). Параметры звука остаются прежними.
+   ⛳ РЕНДЕР — ТОЧНО: голоса строятся во время раскладки, когда офлайн-часы стоят на нуле, а первая нота лежит не раньше
+   PRE_SEC (0.5 с). Все осцилляторы голоса успевают стартовать ЗАДОЛГО ДО неё, идут на частоте постройки и к атаке имеют
+   равномерно разбросанные фазы; сама атака не тронута. Задержки — из rnd(), то есть ОТ СЕМЕНИ рендера (setRnd):
+   перезаморозка повторяет те же фазы.
+   ⚠️ ЖИВЬЁМ — ЧЕСТНО И НЕ ТОЧНО: живой голос строится В МИГ своей первой ноты, запустить его в прошлом нельзя. Поэтому на
+   ПЕРВОЙ ноте нового голоса (один раз за сессию на голос — дальше голос переиспользуется и идёт непрерывно) остальные
+   осцилляторы вступают в пределах одного периода частоты постройки: у соло ≤4.5 мс (220 Гц), у модулятора FM — ≤1.3 мс, у
+   аккордов и баса ≤2.3 мс (440 Гц, частота узла по умолчанию). Первый звучит с атаки, огибающая в эти миллисекунды ещё
+   нарастает (у SuperSaw атака 12 мс) — вступление остальных тонет в ней. И фаза там разбрасывается на частоте НОТЫ, а не
+   постройки: нота выше частоты постройки получает разброс ≥ целого периода (как в рендере), нота ниже — частичный.
+   Случайность живьём — Math.random, как у всей гуманизации.
+   ⛔ Правило #3 цело: старт ОДИН, при постройке голоса; ничего не останавливается и не пересоздаётся.
+   ⚠️ Слышно это там, где у голоса ТРИ и больше расстроенных осциллятора (SuperSaw — 5, Пад — 3): у двух начальная фаза
+   лишь сдвигает момент пика биений. Разброс ставится всем голосам единообразно — он дешёвый и ничего не портит. */
+let voiceFirstOsc=true;
+const voiceBuild=()=>{ voiceFirstOsc=true; };   // зовётся В НАЧАЛЕ постройки каждого голоса/банка: следующий осциллятор — первый
+function voiceStart(o){
+  const d = voiceFirstOsc ? 0 : rnd()/Math.max(1,o.frequency.value);   // меньше одного периода частоты постройки
+  voiceFirstOsc=false;
+  o.start(AC.currentTime+d);
+}
+/* ОБХОД СТАДИИ ВЫРАЗИТЕЛЬНОСТИ — сумма голосов соло идёт прямо в голову цепи (leadOut), мимо шиммера/шейперов/вау.
+   Концы кладёт initAudio каждой постройкой. Зовёт ТОЛЬКО render.aud на своей копии. */
+let dbgExprIO=null;
+function dbgExprBypass(){ if(!dbgExprIO) return false; const {leadSum:s, exprGain:g, leadOut:o}=dbgExprIO;
+  try{ s.disconnect(g); }catch(e){} s.connect(o); return true; }
 function mkOsc(type,freq,dest,gainVal){
   const o=AC.createOscillator(); o.type=type; o.frequency.value=freq;
   const g=AC.createGain(); g.gain.value=gainVal;
-  o.connect(g); g.connect(dest); if(bldVib)bldVib.connect(o.detune); if(bldHum)bldHum.connect(o.detune); exprVibPitch.connect(o.detune); o.start();   // вибрато ЭТОГО ГОЛОСА (bldVib — с 3.7.1 глубина пер-голосовая, LFO общий) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
+  o.connect(g); g.connect(dest); if(bldVib)bldVib.connect(o.detune); if(bldHum)bldHum.connect(o.detune); exprVibPitch.connect(o.detune); voiceStart(o);   // B: старт со СВОЕЙ фазой (см. voiceStart); форма — встроенная   // вибрато ЭТОГО ГОЛОСА (bldVib — с 3.7.1 глубина пер-голосовая, LFO общий) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
   return o;
 }
 const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
@@ -340,7 +394,7 @@ function buildLeadBanks(preBus, ksOk, only){
     const car=mkOsc('sine',220,ig,0.5);
     const mod=AC.createOscillator(); mod.type='sine'; mod.frequency.value=220*3.507;
     const mg=AC.createGain(); mg.gain.value=220*1.6;
-    mod.connect(mg); mg.connect(car.frequency); mod.start();
+    mod.connect(mg); mg.connect(car.frequency); voiceStart(mod);   // B: модулятор — тоже своей фазой относительно несущего (см. voiceStart)
     banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{
       car.frequency.setTargetAtTime(f,t,tc);
       mod.frequency.setTargetAtTime(f*3.507,t,tc);
@@ -513,7 +567,7 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
   const car=mkOsc('sine',curF,ig,0.5);              // несущий: в общую цепочку + вибрато (пер-голосовой bldVib цепляет mkOsc)
   const mod=AC.createOscillator(); mod.type='sine'; mod.frequency.value=curF*ratio;   // модулятор: голый, только в car.frequency
   const modGain=AC.createGain(); modGain.gain.value=curF*sus;
-  mod.connect(modGain); modGain.connect(car.frequency); mod.start();
+  mod.connect(modGain); modGain.connect(car.frequency); voiceStart(mod);   // B: модулятор — своей фазой относительно несущего (см. voiceStart)
   banks.push({gain:ig,
     setFreq:(f,tc=LEAD_GLIDE_TC,t)=>{ curF=f;                        // несущий, модулятор (f*ratio) и индекс (f*sus) — тем же setTargetAtTime, что и все банки (бенд/глиссандо/терменвокс тянут ВЕСЬ спектр)
       car.frequency.setTargetAtTime(f,t,tc);
@@ -1240,6 +1294,10 @@ function makeFrozenBus(){
 function offlineTapMaster(){
   if(!AC||!offline||!master||!limiter) return false;
   try{ master.disconnect(limiter); }catch(e){}
+  /* ⛳ И ГРОМКОСТЬ МАСТЕРА — ЕДИНИЦА. Буфер приходит в живой микс через makeFrozenBus → ЖИВОЙ master (×0.8) — ровно туда же,
+     куда приходит сумма ролей у дорожки, играющей событиями. Оставь мы 0.8 и здесь, замороженная дорожка прошла бы мастер
+     ДВАЖДЫ (×0.64) и звучала бы на ~1.9 дБ тише самой себя. Меняем только копию движка (гейт offline выше). */
+  master.gain.value=1;
   master.connect(AC.destination);
   return true;
 }
@@ -1446,6 +1504,7 @@ const briToHz=bri=>{ const d=Math.max(0,Math.min(1,bri||0)); return CHORD_LP_MAX
    тот же код, просто названный: офлайн-раскладчику (F2) нужно уметь завести ОДИН голос сверх пула,
    когда все заняты. Живьём поведение прежнее: buildChordPool зовёт его CHORD_POOL_N раз. */
 function newChordVoice(dest){
+  voiceBuild();                                               // B: новый голос — его первый осциллятор стартует сразу, второй со своей фазой (см. voiceStart)
   const o1=AC.createOscillator(), o2=AC.createOscillator();
   const g1=AC.createGain(), g2=AC.createGain();
   const f=AC.createBiquadFilter(), fb=AC.createBiquadFilter(), g=AC.createGain();
@@ -1454,7 +1513,7 @@ function newChordVoice(dest){
   fb.type='lowpass'; fb.frequency.value=CHORD_LP_MAX;       // fb — непрерывная яркость (выразительность); дефолт открыт → нейтраль
   g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
   o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(dest);
-  o1.start(); o2.start();
+  voiceStart(o1); voiceStart(o2);   // B: фазы разбросаны стартом (см. voiceStart)
   const v={o1,o2,g1,g2,f,fb,g,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   cv.push(v); return v;
 }
@@ -1469,7 +1528,7 @@ function cvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   v.g.gain.cancelScheduledValues(t);
   v.g.gain.setTargetAtTime(0,t,tc);
   v.owner=null;
-  if(offline) v.freeAt=freeAfter(t,tc);   // F2: голос звучит хвостом ещё tc·RELEASE_TAILS — раньше не выдавать
+  if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter): следующий аккорд снимет хвост, а не зазвучит поверх него
 }
 function cvAlloc(when){
   /* F2 — ОФЛАЙН: свободен тот, чей хвост уже отзвучал К МОМЕНТУ t, а не «сейчас». Нет такого — заводим
@@ -1494,7 +1553,7 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
   chordHold[owner]=freqs.map(fr=>{
     const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
-    const hc=(rnd()*2-1)*HUM_CENTS*(ins.hj||0);   // гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0   // F1: rnd — подменяемый источник (умолчание Math.random, живьём байт-в-байт)
+    const hc=(rnd()*2-1)*HUM_CENTS*(ins.hj||0)*(DBG.noHum?0:1);   // (DBG.noHum — отладка на слух; число берётся всё равно) гуманизация высоты на голос (свежая, не хранится); одинаковый сдвиг обоих осц → интервал det цел; у органа/падов hj=0   // F1: rnd — подменяемый источник (умолчание Math.random, живьём байт-в-байт)
     v.o1.detune.setValueAtTime(-ins.det/2+hc,t); v.o2.detune.setValueAtTime(ins.det+hc,t);
     v.g1.gain.setValueAtTime(ins.m1,t); v.g2.gain.setValueAtTime(ins.m2,t);
     const fo=ins.fo||1, ft=ins.ft||0.02, fv=ins.fv||0;    // огибающая фильтра f + скорость→яркость (пол=lp: тихая нота не глохнет)
@@ -1675,6 +1734,7 @@ async function initAudio(mkCtx){
   exprWah=AC.createBiquadFilter(); exprWah.type='peaking'; exprWah.frequency.value=EXPR_A.wahLo; exprWah.Q.value=EXPR_A.wahQ; exprWah.gain.value=0;
   const leadOut=AC.createGain(); leadOut.gain.value=LEAD_OUT_G;   // сухая громкость соло; с O-1 это ГОЛОВА цепи соло — вся обработка стоит после неё
   exprSatSum.connect(exprWah); exprWah.connect(leadOut);          // тремоло из этого разрыва УШЛО В ГОЛОС (3.7.1) — вставка стала пер-голосовой
+  dbgExprIO={ leadSum, exprGain, leadOut };                        // отладка на слух: концы стадии выразительности — чтобы копия рендера могла её ОБОЙТИ (dbgExprBypass). Живьём никто не читает
 
   /* ⛳ O-1: ДЕЛЕЙ СОЛО СТОИТ В ЦЕПИ, А НЕ НА ПОСЫЛЕ. Прежде было три поколения одной идеи: leadOut→dly→
      dlyWet→master (общий подмес на выходе), затем v.dlySend→dly→master (пер-нотный посыл в обход шины).
@@ -1877,9 +1937,10 @@ function applyExpr(en,ten,spr,ori,eng,tc){ if(!AC)return; const t=AC.currentTime
 const lv=[]; const leadHold={};            // голоса пула и владельцы (ключ → голос)
 /* ⛳ РАЗМЕРЫ ПУЛОВ — ЧИСТОЕ ЧТЕНИЕ ДЛЯ ОТЧЁТА (слайс A0 дуги «АВТОЗАМОРОЗКА»), и ни для чего больше.
    ⚠️ ЗАЧЕМ ИМЕННО ЭТО ЧИСЛО. Офлайн-раскладчик НЕ КРАДЁТ и РАСТИТ пул по требованию (см. setOffline):
-   голос занят до freeAt = t + rel·RELEASE_TAILS, то есть тёплый пад (rel 2.5 с) держит его ≈17 с. Значит
-   плотная аккордовая дорожка заводит голоса СОТНЯМИ, каждый со своими узлами и осцилляторами, — и это
-   ГЛАВНАЯ переменная стоимости раскладки, той самой синхронной работы, что блокирует главный поток.
+   голос занят до мига отпускания (freeAt). ⚠️ Прежде — ещё 7 постоянных релиза сверху, и тёплый пад держал голос ≈17 с,
+   отчего плотная аккордовая дорожка заводила голоса СОТНЯМИ; с исправлением (см. freeAfter) пул сходится к настоящей
+   одновременности нот, как живьём. Число голосов — всё равно ГЛАВНАЯ переменная стоимости раскладки, той самой
+   синхронной работы, что блокирует главный поток.
    Отчёт рендера обязан её НАЗВАТЬ, а не оценить на глаз.
    ⛔ Отдаём ЧИСЛА, а не сами массивы: наружу не должно утекать то, что можно нечаянно изменить.
    ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — спрашивает только render.js у своей. */
@@ -1899,6 +1960,7 @@ const pendFx={vib:0,drv:0,trm:0};   // O-1: dly/rev сняты вместе с �
    vib — узел глубины вибрато ЭТОГО голоса: mkOsc цепляет его в detune (пара к hum). */
 function buildLeadBank(ins, pre, hum, vib){
   banks.length=0; bldHum=hum; bldVib=vib;
+  voiceBuild();                                    // B: новый банк голоса — первый осциллятор стартует сразу, остальные со своими фазами (см. voiceStart)
   buildLeadBanks(pre, ksReady, ins);
   bldHum=null; bldVib=null;
   return banks[0];
@@ -2035,7 +2097,7 @@ function leadRelease(v,hard,when){
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,tc);
   v.on=false; v.owner=null;
-  if(offline) v.freeAt=freeAfter(t,tc);   // F2: хвост релиза ещё звучит — голос занят до tc·RELEASE_TAILS
+  if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter)
 }
 /* Атака/ведение ноты владельца. Зовётся КАЖДЫЙ КАДР зажатой рукой (как и раньше): частота и громкость
    едут всегда, а сама атака — один раз (гейт v.on, бывший noteOnFlag). Порядок и постоянные времени
@@ -2074,7 +2136,14 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      рукой — там fresh=false, и величины подъезжают плавно, как и должны при ведении. */
   const fresh=!v.on;
   applyVoiceFx(v,pendFx,t,fresh);             // эффекты ЭТОЙ ноты — в ЭТОТ голос (величины принёс applyFx строкой выше по стеку вызова; см. pendFx)
-  if(freq!=null)b.setFreq(freq,(fresh||glide==null)?undefined:glide,t);   // null тоже «нет»: умолчание параметра ловит только undefined, а null дал бы τ=0 — скачок   // V1: скольжение — только легато-переезд звучащего голоса; свежая атака — умолчание банка (20 мс), как было. Время — последним (правило #15)
+  /* ⛳ A (подтверждено на слух): СВЕЖАЯ АТАКА ВСТАЁТ НА СВОЮ ВЫСОТУ — постоянная 0, то есть СКАЧОК (по спецификации
+     setTargetAtTime с нулевой постоянной сразу даёт цель). Прежде свежая атака шла УМОЛЧАНИЕМ банка (20 мс) — и голос
+     ПОДЪЕЗЖАЛ: новый — от частоты постройки (220 Гц), переиспользованный — от прежней ноты. Это «подъезд без атаки» у
+     первой ноты замороженной дорожки (в рендере каждая дорожка начинается на СВЕЖЕМ голосе) и еле слышный — живьём.
+     Контракт V1 это и обещал («свежая атака не въезжает»), но без аргумента glide умолчание банка всё равно скользило.
+     Скольжение — ТОЛЬКО легато звучащего голоса (не fresh): там glide, а без него — прежнее умолчание. Кадры терменвокса
+     после атаки и точки бенда (scheduleBend) сюда не относятся и не тронуты. */
+  if(freq!=null)b.setFreq(freq, fresh ? 0 : (glide==null?undefined:glide), t);   // null тоже «нет»: умолчание параметра ловит только undefined, а null дал бы τ=0 — скачок   // V1: скольжение — только легато-переезд звучащего голоса; свежая атака — умолчание банка (20 мс), как было. Время — последним (правило #15)
   v.vol.gain.setTargetAtTime(vol,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
   if(v.on)return;
@@ -2083,7 +2152,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
      0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
   const hum = b.hum==null?1:b.hum;
-  v.hum.offset.setTargetAtTime((rnd()*2-1)*HUM_CENTS*hum, t, 0.006);
+  v.hum.offset.setTargetAtTime((rnd()*2-1)*HUM_CENTS*hum*(DBG.noHum?0:1), t, 0.006);   // DBG.noHum — отладка на слух (число из потока берётся всё равно)
   const lvlJ = 1 - rnd()*0.05;                       // −0..5% уровня
   const attJ = LEAD_INSTR[ins].att*(0.9+rnd()*0.2);   // ±10% времени атаки
   v.env.gain.cancelScheduledValues(t);
@@ -2148,6 +2217,7 @@ function leadCancel(owner,when){ const v=leadHold[owner]; if(!v)return; const b=
    слияние ждёт формата тембра (HANDOFF, «БАС И СОЛО — ОДИН ИНСТРУМЕНТ»). --- */
 function buildBassPool(dest, n){   // n голосов разом; зовёт ТОЛЬКО newBassVoice (по одному) — живой и офлайн-пул ленивые (P1)
   for(let i=0;i<n;i++){
+    voiceBuild();                                   // B: новый голос (см. voiceStart)
     const o1=AC.createOscillator(), o2=AC.createOscillator();
     const g1=AC.createGain(), g2=AC.createGain();
     const lp=AC.createBiquadFilter(), env=AC.createGain(), vol=AC.createGain();
@@ -2158,7 +2228,7 @@ function buildBassPool(dest, n){   // n голосов разом; зовёт Т
     g1.gain.value=.5; g2.gain.value=.5;
     env.gain.value=0; vol.gain.value=0.5;
     o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
-    o1.start(); o2.start();
+    voiceStart(o1); voiceStart(o2);   // B: фазы разбросаны стартом (см. voiceStart)
     /* deg/oct — КАКУЮ НОТУ голос держит (P1, зеркало соло-голоса): звуку не нужны, их прочтёт ПОДСВЕТКА (P3, правило
        #26) — из реестра движка, а не из состояния руки. Пишет их ТОТ ЖЕ вызов, что звучит (bassOn/bassSet), гасит bassOff. */
     bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
@@ -2173,7 +2243,7 @@ function bvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,tc);
   v.owner=null; v.on=false;
-  if(offline) v.freeAt=freeAfter(t,tc);   // F2: хвост релиза ещё звучит — голос занят до tc·RELEASE_TAILS
+  if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter)
 }
 function bvAlloc(when){
   /* F2 — ОФЛАЙН: занятость по ЗВУЧАНИЮ, рост по требованию, кражи нет (довод — у setOffline).
@@ -2220,7 +2290,7 @@ function bassOn(owner,freq,vol,ins,deg,oct,glide,when){
   if(!AC)return; const t=when!=null?when:AC.currentTime;
   let v=bassHold[owner]; if(!v){ v=bvAlloc(when); v.owner=owner; bassHold[owner]=v; }
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // пишем КАЖДЫЙ вызов: ведение живой руки (новая ступень под пальцем) отражается сразу
-  const gtc = (v.on && glide!=null) ? glide : BASS_GLIDE_TC;   // V1: легато — «звучал ДО этого вызова» (атака ниже переставит v.on)
+  const gtc = !v.on ? 0 : (glide!=null?glide:BASS_GLIDE_TC);   // ⛳ A: СВЕЖАЯ АТАКА — постоянная 0, скачок на свою высоту (довод — у leadOn); прежде шла BASS_GLIDE_TC и подъезжала от прежней ноты / от 440 Гц нового голоса. Легато звучащего голоса — glide или BASS_GLIDE_TC, как было. «Звучал ДО этого вызова» (атака ниже переставит v.on)
   if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
     v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
     v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t);
@@ -2428,6 +2498,7 @@ export {
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел
   makeFrozenBus,   // F4: шина ЗАМОРОЖЕННОЙ дорожки — свой гейн прямо в мастер (цепь уже вплавлена в буфер, второй раз её накладывать нельзя); им же делается приглушение/соло
+  setDbg, dbgExprBypass,   // ОТЛАДКА НА СЛУХ (render.aud): переключатели и обход выразительности — ⛔ только у копии рендера, живьём вызывающих нет
   fxGlideOf, FX_GLIDE_KEY,   // V4: скольжение ноты из её карты эффектов (секунды) или undefined — «не задано». Читает ENG (обе копии движка — живая и рендерная — через makeENG)
   fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки
