@@ -1,12 +1,12 @@
 import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, chainXDriven, fxVolFix, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
+import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, chainXDriven, fxVolFix, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
-import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT, FX_GLIDE_KEY } from './audio.js';   // FX_GLIDE_KEY — V4: ключ Скольжения в карте ноты (терменвокс его в запись не несёт, см. noteFx)   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
+import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT, FX_GLIDE_KEY, fxHandRange } from './audio.js';   // fxHandRange — VOL-1: ход руки по громкости из её объявления   // FX_GLIDE_KEY — V4: ключ Скольжения в карте ноты (терменвокс его в запись не несёт, см. noteFx)   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
 import { canvas } from './vision.js';
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
@@ -313,6 +313,35 @@ function handHalfRole(key,S,W){
 function noteHandRole(key,S,W){
   const r=handHalfRole(key,S,W);
   return (r==='ld'||r==='bs'||r==='dr') && playsNotes(handFnOf(key,r)) ? r : null;
+}
+/* ═══ ГРОМКОСТЬ НОТЫ — ЧЕРЕЗ ПАРАМЕТР «ГРОМКОСТЬ» (слайс VOL-1 плана «громкость как параметр») ═══
+   Один резолвер НА РУКУ вместо прежней развилки «0.2+0.8·xn либо fxVolFix». Невидим: для тех же жестов отдаёт то же
+   число ДО ПОСЛЕДНЕГО БИТА.
+   ⛳ ПО ВЕЛИЧИНЕ ЭТОЙ РУКИ: xn — позиция ИМЕННО этой руки в её замороженном диапазоне; результат уходит в S.vol руки и
+   дальше в её ноты. ⛔ В общий параметр роли (экземпляр модуля, p.cur) громкость НЕ пишется: он один на роль, и две руки
+   одной роли, которые сегодня держат СВОИ громкости, начали бы драться за одно число (побеждала бы последняя за кадр).
+   Поэтому захват громкости держит только снимок взятого (умолчание модуля) и НИ ОДНОЙ точки ленты; читать это некому —
+   переигровка пропускает пер-нотное (fxLaneMerge), снимок ноты — поле со своим местом (fxSnapshot), голос берёт a.vol.
+   ⛳ ВЕТКИ, по порядку:
+     1. ИСКЛЮЧИТЕЛЬНОСТЬ, ДОСЛОВНО СЕГОДНЯШНЯЯ: отдан X чему-то кроме громкости (chainXDriven, запись громкости он не
+        считает) → фиксированная громкость роли fxVolFix. Правило «параметры на одной оси едут вместе» — VOL-2.
+     2. Громкость ЗАФИКСИРОВАНА в своей записи → её v01 (шкала сырая: v01 === a.vol). Сегодня недостижимо (строки в
+        панели нет до VOL-2) — ветка стоит, чтобы резолвер отвечал за ВСЕ режимы записи, а не за один.
+     3. Иначе — ХОД РУКИ ПО ГОРИЗОНТАЛИ: lo+(hi−lo)·v, [lo,hi] = объявленный handRange громкости ([0.2,1]). Адреса
+        «палец» и «глубина» у громкости до VOL-2/VOL-4 недостижимы и идут этой же веткой — то есть ровно сегодняшним
+        поведением, а не выдуманным.
+   ⛳ ПОБИТНОЕ СОВПАДЕНИЕ С 0.2+0.8·xn — ДОКАЗАНО, а не «на глаз». hi−lo = 1−0.2 в IEEE-754 double: 0.2 = 0x1999999999999A·2⁻⁵⁵,
+   1 = 0x80000000000000·2⁻⁵⁵, разность = 0x66666666666666·2⁻⁵⁵ точно; результат лежит в [0.5,1), где шаг сетки 2⁻⁵³, то есть
+   4 единицы 2⁻⁵⁵, а 0x…66 mod 4 = 2 — РОВНО ПОСЕРЕДИНЕ между 0x19999999999999·2⁻⁵³ и 0x1999999999999A·2⁻⁵³; округление
+   к чётному даёт 0x…9A·2⁻⁵³ — это и есть double литерала 0.8. Значит hi−lo === 0.8, и дальше выражение то же самое
+   (умножение на xn, затем сложение с тем же 0.2, в том же порядке): результат совпадает до бита. inv=false даёт v = xn
+   без единой операции. ⚠️ Сменится handRange — доказательство надо повторить (это и сделает VOL-2, где ход станет [0,1]). */
+function noteVolOf(zk,role,xn,xGiven){
+  if(xGiven) return fxVolFix[role];                                   // 1. X отдан эффекту — как сегодня
+  const eff=fxChainOf(zk).find(e=>e&&e.fxId===FX_VOL), pa=eff&&eff.params[0];
+  if(pa && pa.mode==='fixed' && pa.v01!=null) return pa.v01;          // 2. громкость зафиксирована в своей записи
+  const [lo,hi]=fxHandRange(FX_VOL,'amt'), v = pa&&pa.inv ? 1-xn : xn;
+  return lo+(hi-lo)*v;                                                 // 3. ход руки: при [0.2,1] — побитно 0.2+0.8·xn (см. выше)
 }
 /* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
    (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
@@ -823,7 +852,8 @@ function processHands(res){
            (соло/бас/ударные/обычные аккорды) — по всей ширине роли [rx0,rx1]. */
         const typed = S.zone==='ch'&&typedChords();
         const[zx0,zx1]= typed ? [psplit,prx1] : [prx0,prx1];
-        /* ⛳ X — ГРОМКОСТЬ ЛИБО ЭФФЕКТ, ТРЕТЬЕГО НЕ ДАНО (Пласт 3.7.3). Величина хода СЧИТАЕТСЯ ОДНА И
+        /* ⛳ X — ГРОМКОСТЬ ЛИБО ЭФФЕКТ, ТРЕТЬЕГО НЕ ДАНО (Пласт 3.7.3; с VOL-1 громкость считает резолвер noteVolOf, до VOL-2
+           — с той же исключительностью). Величина хода СЧИТАЕТСЯ ОДНА И
            ТА ЖЕ (xn), меняется только её АДРЕСАТ: по умолчанию это громкость (формула байт-в-байт
            прежняя, включая сужение зоны у типизированных аккордов), а если в цепи ЭТОЙ РОЛИ есть
            параметр с адресом play:x — ход уходит эффекту, а громкость встаёт на фиксированное значение
@@ -837,10 +867,11 @@ function processHands(res){
            берём по РОЛИ (fxVolFix живёт по ролям — это громкость голоса, а не свойство цепи). Сводить
            их в один аргумент нельзя: с переездом цепей к тембру они разойдутся окончательно. */
         const zk=chainKeyOf(S.zone);
-        if(chainXDriven(zk)){
-          S.vol=fxVolFix[S.zone];
+        const xGiven=chainXDriven(zk);                    // X отдан чему-то КРОМЕ громкости (запись громкости предикат не считает — VOL-0)
+        S.vol=noteVolOf(zk,S.zone,xn,xGiven);             // VOL-1: громкость ЭТОЙ руки — через параметр «Громкость» (резолвер и доказательство побитного совпадения — у noteVolOf)
+        if(xGiven){
           for(const eff of fxChainOf(zk)){
-            if(!eff) continue;
+            if(!eff||eff.fxId===FX_VOL) continue;         // VOL-1: громкость — своим путём (резолвер выше) и в общий параметр роли НЕ пишется: там она дралась бы между руками, а при отданном X она фиксирована
             let ps=null;                                   // дескрипторы берём ЛЕНИВО: у большинства записей play-параметров нет
             eff.params.forEach((pa,i)=>{
               if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='x') return;
@@ -848,7 +879,7 @@ function processHands(res){
               const p=ps[i]; if(p) p.set(pa.inv ? 1-xn : xn);   // инверсия ЗЕРКАЛИТ (1−v), как у глубины: величина уже абсолютная 0..1, а не смещение
             });
           }
-        }else S.vol=0.2+0.8*xn;
+        }   // VOL-1: прежняя ветка «иначе S.vol=0.2+0.8*xn» ушла в резолвер noteVolOf (ветка 3, побитно та же величина)
         /* Тип берётся из ЛИПКОГО выбора палитры (любой рукой, по положению), а не из положения играющей.
            Ссылка на элемент таблицы CHORD_FAM_SETS — от этого зависят и сравнение
            ty===latchTy, и заморозка a.ty в событии лупера. Кламп: у семейств может быть
