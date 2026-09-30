@@ -836,6 +836,28 @@ function tailOf(eng, keys, startVals, insRel){
   return Math.min(TAIL_MAX, tail + insRel*DB60);
 }
 
+/* ⛳ ОДИН ПОРЯДОК ПРОВОДКИ НА ВСЕ СОСТАВЫ ДОРОЖКИ. Провода рендера кладутся один раз, а состав менялся посреди взятого, —
+   значит нужен порядок, в котором КАЖДЫЙ записанный состав звучит верно при «лишних» закрытых (они — тождество).
+   Составы идут по времени; новый эффект встаёт СРАЗУ ПОСЛЕ своего предшественника в том составе, где он появился (нет
+   предшественника в проводке — перед ближайшим последователем; нет и его — в конец). Так ДОБАВЛЕНИЕ и УДАЛЕНИЕ
+   воспроизводятся ТОЧНО: [делей] → [реверб, делей] проводится как реверб→делей, и на старте закрытый реверб — тождество.
+   ⚠️ ПЕРЕСТАНОВКА — НЕТ, И ЭТО НАЗВАННЫЙ ПРЕДЕЛ, а не подделка: если два эффекта, уже бывшие в проводке, в новом составе
+   стоят в обратном порядке, остаётся ПРЕЖНИЙ (ранний побеждает). Затворы и величины после перестановки верны, неверен
+   лишь порядок этих двух: например «делей в реверб» вместо «реверб в делей». conflict=true — рендер скажет об этом в отчёте. */
+function mergeOrders(seq){
+  const L=[]; let conflict=false;
+  for(const ids of seq){
+    let last=-1;
+    for(const id of ids){ const i=L.indexOf(id); if(i<0) continue; if(i<last) conflict=true; else last=i; }
+    ids.forEach((id,k)=>{ if(L.includes(id)) return;
+      let pos=-1;
+      for(let j=k-1;j>=0&&pos<0;j--){ const i=L.indexOf(ids[j]); if(i>=0) pos=i+1; }
+      for(let j=k+1;j<ids.length&&pos<0;j++){ const i=L.indexOf(ids[j]); if(i>=0) pos=i; }
+      L.splice(pos<0?L.length:pos,0,id); });
+  }
+  return { order:L, conflict };
+}
+
 /* ═══════════ САМ РЕНДЕР ═══════════
    layer — НОМЕР СЛОЯ дорожки (не id: id — это идентичность для человека, а звук адресуется слоем).
    Возвращает { buf, startSec, endSec, tailSec, pinned, … } — начало/конец/хвост нужны заморозке,
@@ -878,12 +900,27 @@ async function renderTrack(layer, opt){
        ⚠️ СКАЛЯРЫ (драйв/вибрато/тремоло-нота) ПРОПУСКАЕМ НАМЕРЕННО: fxPlaySet пишет их в ОБЩИЙ
        state.fx, один на живую копию и на нашу. Соло-нота несёт их в своём `a.fx`, и ENG.leadOn их
        оттуда и берёт — пер-нотно, как задумано. */
-    const startVals=new Map(), startOrd=new Map(), later=[];
+    /* ⛳ СОСТАВ ПОСЛЕ СТАРТА ТОЖЕ БЕРЁМ (прежде пропускался — эффект, снятый посреди взятого, звучал до конца, а добавленный
+       звучал с начала на умолчаниях). Точка состава идёт в `later` вместе с точками величин — в ТОМ ЖЕ порядке ленты, где
+       захват кладёт состав ПЕРЕД величинами той же доли (takeCapSample); ords — те же составы, по ключу, для проводки. */
+    const startVals=new Map(), startOrd=new Map(), later=[], ords=new Map();
     for(const p of lane){
       if(!keys.has(p.key)) continue;
-      if(p.fx===REC.FX_CHAIN){ if(p.t<=t0Beat+1e-9) startOrd.set(p.key,p.ids); continue; }
+      if(p.fx===REC.FX_CHAIN){
+        if(p.t<=t0Beat+1e-9) startOrd.set(p.key,p.ids);
+        else { later.push(p); if(!ords.has(p.key)) ords.set(p.key,[]); ords.get(p.key).push(p.ids); }
+        continue; }
       if(ST.fxIsScalar(p.fx)) continue;
       if(p.t<=t0Beat+1e-9) startVals.set(p.key+'|'+p.fx+'|'+p.p, p); else later.push(p);
+    }
+    /* ПЛАН ПРОВОДКИ по ключу: общий порядок (mergeOrders) и что открыто на старте. Ключ без единого состава (взятое без
+       захвата) — ПУСТАЯ цепь, а не живая: ⛔ живую цепь рендер не читает нигде (заморозка до рендера прикалывает захват —
+       freezePinCaptures, — так что у замороженной дорожки состав есть всегда). */
+    const plan=new Map(); let reordered=false;
+    for(const key of keys){
+      const start=startOrd.get(key)||[];
+      const m=mergeOrders([start, ...(ords.get(key)||[])]); if(m.conflict) reordered=true;
+      plan.set(key,{ order:m.order, start });
     }
 
     /* ⛳ ХВОСТ СЧИТАЕМ ДО ПОСТРОЙКИ ГРАФА — по ЗАХВАЧЕННОЙ цепи, а не по живой и не на глаз. Иначе
@@ -891,7 +928,12 @@ async function renderTrack(layer, opt){
        замере времени. Разнормировку даёт движок (fxDenormOf) — второй копии шкалы мы не заводим. */
     const rate=LIVE_AC.sampleRate;
     const insRel=maxRel(eng,evs);
-    const tailSec=tailOf(eng, keys, startVals, insRel);
+    /* Хвост — по НАИБОЛЬШЕЙ величине каждого адреса за всю дорожку, а не только на старте: реверб, добавленный или удлинённый
+       посреди взятого, обязан успеть дозвучать. Шкалы длины, времени и повторов монотонны, значит большее v01 — больший хвост. */
+    const tailVals=new Map(startVals);
+    for(const p of later){ if(p.fx===REC.FX_CHAIN) continue;
+      const a=p.key+'|'+p.fx+'|'+p.p, q=tailVals.get(a); if(!q||p.v>q.v) tailVals.set(a,p); }
+    const tailSec=tailOf(eng, keys, tailVals, insRel);
     const frames=Math.max(1,Math.round(rate*(PRE_SEC+songSec+tailSec)));
     const ctx=new OfflineCtor(2, frames, rate);
 
@@ -915,9 +957,29 @@ async function renderTrack(layer, opt){
     if(o.dbg && o.dbg.expr==='neutral') eng.applyExpr(0,0,0,0,0,0.005);
     else if(o.dbg && o.dbg.expr==='bypass') eng.dbgExprBypass();
 
-    /* СОСТАВ и СНИМОК — на нулевой секунде, до разгона. */
-    for(const [key,ids] of startOrd) eng.fxPlayPath(key, ids);
+    /* СОСТАВ и СНИМОК — на нулевой секунде, до разгона.
+       ⛳ СНАЧАЛА СТРОИМ ВСЕ ЭФФЕКТЫ, КОГДА-ЛИБО БЫВШИЕ В ЦЕПИ ДОРОЖКИ, ПОТОМ ПРОВОДИМ ИХ ОДИН РАЗ (fxRenderPath): открыт — стартовый
+       состав, прочие закрыты и тождественны до своей доли. Каждый ключ копии получает СВОЙ путь (у ролей не из этой дорожки —
+       пустой), поэтому fxPathOf копии живую цепь не читает ни для одного владельца. */
+    for(const [key,pl] of plan) for(const id of pl.order) eng.fxInstance(key,id);   // у старых скаляров и голосовых экземпляра без узлов — безвредно
+    for(const key of new Set([...ST.chainOwners().map(o=>o.key), ...plan.keys()])){
+      const pl=plan.get(key); eng.fxRenderPath(key, pl?pl.order:[], pl?pl.start:[]); }
     for(const p of startVals.values()) eng.fxPlaySet(p.key, p.fx, p.p, p.v, 0);
+    /* ⛳ ДОБАВЛЕННЫЙ ПОСРЕДИ ВЗЯТОГО — ЗВУЧИТ С ЗАПИСАННЫМИ ВЕЛИЧИНАМИ С ПЕРВОЙ ЖЕ ДОЛИ. Захват кладёт в ленту все его
+       параметры на доле добавления (прежней величины у адреса нет — takeCapSample пишет её сразу). Ставим эти ПЕРВЫЕ
+       величины ещё на нулевой секунде: эффект закрыт, звука нет, зато к открытию он уже стоит на них, а не подъезжает от
+       умолчаний сеттерами (τ 0.05–0.08). Дальше его точки идут своим чередом, каждая в свою долю. */
+    const openNow=new Map(); for(const [key,pl] of plan) openNow.set(key,new Set(pl.start));
+    { const seeded=new Set();
+      for(const p of later){ if(p.fx===REC.FX_CHAIN||openNow.get(p.key).has(p.fx)) continue;
+        const a=p.key+'|'+p.fx+'|'+p.p; if(seeded.has(a)||startVals.has(a)) continue;
+        seeded.add(a); eng.fxPlaySet(p.key, p.fx, p.p, p.v, 0); } }
+    /* Точка после старта: СОСТАВ — затворы тех, кто вошёл или вышел, В ЕЁ ДОЛЮ (мгновенно — fxGateAt); ВЕЛИЧИНА — как было. */
+    const applyLater=p=>{ const when=beatAt(p.t);
+      if(p.fx===REC.FX_CHAIN){ const cur=openNow.get(p.key), nxt=new Set(p.ids);
+        for(const id of plan.get(p.key).order){ const now=nxt.has(id); if(cur.has(id)!==now) eng.fxGateAt(p.key,id,now,when); }
+        openNow.set(p.key,nxt); return; }
+      eng.fxPlaySet(p.key,p.fx,p.p,p.v,when); };
 
     /* ═══ РАСКЛАДКА: КАЖДОМУ СОБЫТИЮ — ЯВНОЕ ВРЕМЯ ═══ */
     const ENG=REC.makeENG(eng);
@@ -926,14 +988,14 @@ async function renderTrack(layer, opt){
     for(const ev of evs){
       const when=beatAt(ev.t);
       /* Точки автоматизации, чья доля НАСТУПИЛА, — перед событием: величина обязана стоять к атаке. */
-      while(li<later.length && later[li].t<=ev.t+1e-9){ const p=later[li++]; eng.fxPlaySet(p.key,p.fx,p.p,p.v,beatAt(p.t)); }
+      while(li<later.length && later[li].t<=ev.t+1e-9) applyLater(later[li++]);
       const a=patchInst(ev, ST);
       const fn=ENG[ev.fn]; if(!fn) continue;
       fn(a, ev, {when});
       trackOpen(open, ev, a);
     }
     /* Оставшиеся точки — после последнего события, но до конца хвоста. */
-    while(li<later.length){ const p=later[li++]; eng.fxPlaySet(p.key,p.fx,p.p,p.v,beatAt(p.t)); }
+    while(li<later.length) applyLater(later[li++]);
 
     /* ⛳ ЗАКРЫВАЕМ ВСЁ, ЧТО ОСТАЛОСЬ ОТКРЫТЫМ — И ЭТО НЕ ПЕРЕСТРАХОВКА.
        ⚠️ СОБЫТИЯ ПОДЛОЖКИ НЕ НЕСУТ ВЫКЛЮЧЕНИЙ ВОВСЕ (`buildArrangement` кладёт chOn/bassOn без пары);
@@ -976,6 +1038,7 @@ async function renderTrack(layer, opt){
     out={ layer, buf, startSec:PRE_SEC, endSec, tailSec,
           songSec:+songSec.toFixed(3), totalSec:+buf.duration.toFixed(3),
           events:evs.length, keys:[...keys], pinned:pin.use, voices:pool,
+          reordered,   // ⚠️ состав ПЕРЕСТАВЛЯЛСЯ посреди дорожки — рендер держит прежний порядок (см. mergeOrders)
           peak:+peakOf(buf).toFixed(5), rms:+rmsOf(buf).toFixed(6),
           /* layoutMs — с десятой долей, а не целым: на ударной дорожке раскладка может уложиться в
              единицы миллисекунд, и округление до целого съело бы половину ответа. Остальные три
@@ -1061,6 +1124,7 @@ function printTrack(r){
   if(r.xRealtime) console.log('  ⛳ то есть пять минут музыки стоили бы ~'+Math.round(300/r.xRealtime)
               +' с рендера (плюс однократные импорт+initAudio выше)');
   if(r.peak<=0) console.log('  ⛔ БУФЕР ПУСТ (пик 0) — дорожка разложена, но до destination ничего не дошло.');
+  if(r.reordered) console.log('  ⚠️ ПОРЯДОК ЭФФЕКТОВ МЕНЯЛСЯ ПОСРЕДИ ДОРОЖКИ: провода рендера кладутся один раз, поэтому после перестановки звучит ПРЕЖНИЙ порядок (добавления, снятия и величины — в свои доли, верно).');
   /* eslint-enable no-console */
 }
 
@@ -1108,6 +1172,7 @@ function maxRel(eng, evs){
    гуманизацию, а перезаморозка той же дорожки даёт то же исполнение. Явное opt.seed по-прежнему главнее. */
 const seedOfLane=id=>(SEED_A ^ Math.imul((id|0)+1, 0x9E3779B1))>>>0;   // +1 — чтобы id 0 не дал ровно SEED_A (семя зонда)
 async function freeze(layer, opt){
+  REC.freezePinCaptures(layer);   // как ❄ в редакторе (ui.onFreeze): у взятого без захвата — снимок сейчас; рендер живую цепь не читает, поэтому захват нужен ВСЕГДА. Повторный вызов ничего не делает
   const tk=REC.freezeTicket(layer);
   if(!tk) throw new Error('нет дорожки '+layer);
   const o={...(opt||{})}; if(o.seed==null) o.seed=seedOfLane(tk.id);
@@ -1191,7 +1256,9 @@ async function aud(layer, opts){
    синхронная раскладка свалила бы все ноты в один голос — ровно беда, от которой придуман офлайн-распределитель), а своим
    маленьким насосом: события уходят в движок за ~0.1 с до своего времени, с явным when — как у планировщика транспорта.
    Цепь — ЗАХВАЧЕННАЯ на старте дорожки (fxPlayPath/fxPlaySet, как у ▶), по окончании возвращается к руке (как у стопа).
-   ⚠️ Автоматизация ПОСЛЕ старта дорожки здесь не ведётся, моно-суммы нет — для сравнения на дорожке без эффектов не нужно.
+   ⛳ И ДАЛЬШЕ ЕЁ ВЕДЁТ, КАК ТРАНСПОРТ: точки ленты после старта — состав (fxPlayPath) и величины (fxPlaySet) — ставятся
+   «сейчас», когда их доля наступила, ровно как fxPlayDrive на тике. Только так live — эталон для составов, менявшихся
+   посреди взятого (рендер ставит их в записанные доли: fxRenderPath/fxGateAt). Моно-суммы нет.
    ⛔ Транспорт должен стоять: ключи владельцев ('leadloop:N:v' и т.п.) те же, что у переигровки. */
 function live(layer){
   if(!LIVE_AC) throw new Error('живой AudioContext ещё не создан — нажмите «▶ Играть»');
@@ -1204,15 +1271,18 @@ function live(layer){
   const keys=new Set(); for(const e of evs){ const r=REC.evRole(e.fn); if(r) keys.add(chainKeyOf(r)); }
   for(const p of REC.fxLaneMerge()){ if(!keys.has(p.key)||p.t>t0+1e-9) continue;
     if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(p.key,p.ids); else if(!ST.fxIsScalar(p.fx)) LIVE.fxPlaySet(p.key,p.fx,p.p,p.v); }
+  const lanePts=REC.fxLaneMerge().filter(p=>keys.has(p.key) && p.t>t0+1e-9 && (p.fx===REC.FX_CHAIN||!ST.fxIsScalar(p.fx)));   // после старта: состав и величины (скаляры — пер-нотные, их несут ноты)
   const open={lead:new Set(), ch:new Set(), bs:new Set()};
   const me={ open, keys, timer:null, endT:T0+(evs[evs.length-1].t-t0)*spb };
-  let i=0;
+  let i=0, li=0;
   const pump=()=>{
-    const hz=LIVE_AC.currentTime+0.1;
+    const now=LIVE_AC.currentTime, hz=now+0.1;
+    while(li<lanePts.length){ const p=lanePts[li]; if(T0+(p.t-t0)*spb>now) break; li++;   // как fxPlayDrive: наступила доля — ставим сейчас
+      if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(p.key,p.ids); else LIVE.fxPlaySet(p.key,p.fx,p.p,p.v); }
     while(i<evs.length){ const ev=evs[i], when=T0+(ev.t-t0)*spb; if(when>hz) break; i++;
       const fn=ENG[ev.fn]; if(!fn) continue;
       const a=patchInst(ev, ST); fn(a, ev, {when}); trackOpen(open, ev, a); }
-    if(i>=evs.length){ clearInterval(me.timer); me.timer=null;
+    if(i>=evs.length && li>=lanePts.length){ clearInterval(me.timer); me.timer=null;
       liveClose(me, me.endT);
       setTimeout(()=>{ if(AUD===me){ liveRestore(me); AUD=null; } }, Math.max(0,(me.endT-LIVE_AC.currentTime)*1000)+3000); }   // хвосты доиграют — потом цепь обратно к руке
   };
