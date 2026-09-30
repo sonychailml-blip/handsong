@@ -28,7 +28,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,
-         autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint,
+         autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
@@ -498,6 +498,11 @@ function updRollBtns(){
      но молча она читается как «удалить удар», и точку автоматизации убрать ОТСЮДА никто не догадается.
      Подпись идёт за выделением; приоритет тот же, что у самого удаления (точка перебивает ноту). */
   rollDelBtn.title = t(rollAutSel ? 'aut.ptDelTitle' : 'roll.delTitle');
+  if(rollShapeEl){ const st=autShapeState();   // гладкая автоматизация: кнопка видна, пока открыта полоса; жива — у точки, в которую есть откуда въехать
+    rollShapeEl.hidden = !rollAut;
+    rollShapeEl.disabled = ro || !st || !st.ok;
+    rollShapeEl.textContent = st&&st.s ? '╱' : '⌐';
+    rollShapeEl.classList.toggle('act', !!(st&&st.s)); }
   rollUndoBtn.disabled = !editCanUndo();   // T5: без `ro` — на подложке в истории бывает замена тембра, и её отмена законна (прочих ходов там нет: их правки отказывают)
   rollRedoBtn.disabled = !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
   /* ⛳ ЗАМОРОЗКА (F5). Три состояния, различимые с одного взгляда: ❄ синяя — свежая, ❄ оранжевая —
@@ -530,7 +535,7 @@ const rollRefuseRO=()=>{ if(editBackingOpen()){ showCamMsg(t('roll.readOnly')); 
    вкладки, иначе первая по порядку), а ▲▼🗑 шли за ключом показанного адреса — два выбора, которые на
    дорожке двух ролей могли разойтись. Теперь ключ не передаётся вовсе: recorder берёт цепь дорожки сам. */
 const rollAutEl=$('rollAutSel'), rollFxAddEl=$('rollFxAdd'),
-      rollFxUpEl=$('rollFxUp'), rollFxDnEl=$('rollFxDn'), rollFxDelEl=$('rollFxDel');
+      rollFxUpEl=$('rollFxUp'), rollFxDnEl=$('rollFxDn'), rollFxDelEl=$('rollFxDel'), rollShapeEl=$('rollShape');
 const autAddrKey=a=>a?a.key+'|'+a.fx+'|'+a.p:'';
 function renderAutCtl(){
   if(!rollAutEl||!rollFxAddEl||!rollFxUpEl||!rollFxDnEl||!rollFxDelEl) return;   // органы приходят из разметки парой — проверяем все, чтобы половина не осталась неинициализированной
@@ -602,6 +607,34 @@ if(rollAutEl){
     autChainRemove(ly,rollAut.fx);
     setRollAut(null); setRollAutSel(null); renderAutCtl(); updRollBtns(); };
 }
+/* ═══ ФОРМА ОТРЕЗКА (гладкая автоматизация) ═══
+   ⛳ КНОПКА, А НЕ ЖЕСТ НА ПОЛОСЕ, и это решение о пальце: тап по полосе уже значит «выбрать точку» / «вставить» (✚) / «снять
+   выбор», а движение — «перенести» (одна ось на жест). Любой новый жест там (двойной тап, долгий тап по отрезку) спорил бы с
+   ними и попадал бы под толстый палец в тесной полосе. Кнопка в баре большая, стоит в группе полосы и действует на то, что уже
+   выбрано, — как 🗑.
+   Что она меняет: как величина ВХОДИТ в выбранную точку (от предыдущей). Значок — ТЕКУЩАЯ форма: ╱ плавно, ⌐ ступенькой.
+   Тап — сменить и назвать новую форму словами (тост): значок в 14 px — не объяснение.
+   Состояние спрашиваем у вида полосы (autPoints, мемо): у первой точки и у «не задано» формы нет — ехать не от чего. */
+function autShapeState(){
+  if(!rollAut||!rollAutSel) return null;
+  const ly=editLayer(); if(ly==null) return null;
+  const D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p), i=D.pts.findIndex(r=>r.pt===rollAutSel.pt);
+  const ok = i>0 && !rollAutSel.pt.unset && !D.pts[i-1].pt.unset;
+  return { ok, s: ok && rollAutSel.pt.sh==='s' };   // точка ленты, ставшая первой после переноса, форму хранит, но звучит ступенькой (от полки не едут) — значок обязан сказать то, что звучит
+}
+if(rollShapeEl) rollShapeEl.onclick=()=>{
+  if(!rollAutSel||rollRefuseRO()) return;
+  const st=autShapeState();
+  if(!st||!st.ok){ showCamMsg(t('aut.shapeNo')); return; }
+  const r=autShapePoint(rollAutSel);
+  if(!r){ showCamMsg(t('aut.shapeNo')); updRollBtns(); return; }
+  /* Выделение — заново: у точки «в ноте» вид пересобран из нот (recorder отдал новую), у точки ленты пересобрана обёртка вида
+     (сама точка — тот же объект, по нему и находим). */
+  if(r!==true) selAutPt(r);
+  else { const ly=editLayer(), D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p); selAutPt(D.pts.find(x=>x.pt===rollAutSel.pt)||null); }
+  showCamMsg(t(rollAutSel&&rollAutSel.pt.sh==='s' ? 'aut.shapeSmooth' : 'aut.shapeStep'));
+  updRollBtns();
+};
 
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRollBtns(); };
 /* 🗑 и ⌫ — ОДИН путь (T5): клавиша зовёт ровно эту функцию, второй копии развилки «нота или точка» нет. */

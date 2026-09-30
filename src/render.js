@@ -195,6 +195,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
    render с F5 импортирует только ui — ЛЕНИВО (onFreeze), а зонд по-прежнему зовут из консоли. */
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
+import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
    спецификатор ('?render=1', '?render=2', …), потому что повторный initAudio на одной копии накапливал
@@ -889,7 +890,10 @@ async function renderTrack(layer, opt){
   try{
     /* ⛳ ЛЕНТА — ОДНИМ ЗАИМСТВОВАННЫМ СЛИЯНИЕМ (см. шапку). Фильтруем ТОЛЬКО по времени и виду точки;
        ⚠️ по слышимости НЕ фильтруем — в этом и состоит единственное отличие от переигровки. */
-    const lane=REC.fxLaneMerge();
+    /* ⛳ ГЛАДКАЯ АВТОМАТИЗАЦИЯ: плавный отрезок развёрнут в точки шагом живого тика (25 мс в долях по приколоченному темпу) — ТЕМ
+       ЖЕ законом прямой (fxLaneAt), что считает fxPlayDrive на тике, и через тот же сеттер с его τ. Поэтому заморозка едет по
+       тем же ступенькам, что ▶, а не глаже и не грубее. Ступенчатые отрезки развёртка не трогает — лента прежняя дословно. */
+    const lane=REC.fxLaneExpand(REC.fxLaneMerge(), SCHED_TICK_MS/1000/spb);
     /* ⚠️ ЛЕНТА ОБЩАЯ ДЛЯ ВСЕЙ ПЕСНИ, И ЭТО НЕ НЕДОСМОТР. Взятое ЧУЖОЙ дорожки, игравшее ту же роль,
        правит той же цепью — ровно так же, как на переигровке (предел «одна сеть на владельца»,
        Known limits №1–2). Рендер обязан совпадать с ▶, поэтому мы это НЕ фильтруем по слою. Снимет
@@ -1269,9 +1273,10 @@ function live(layer){
   const ENG=REC.makeENG(LIVE);
   const spb=60/REC.loop.bpm, t0=evs[0].t, T0=LIVE_AC.currentTime+0.3;
   const keys=new Set(); for(const e of evs){ const r=REC.evRole(e.fn); if(r) keys.add(chainKeyOf(r)); }
-  for(const p of REC.fxLaneMerge()){ if(!keys.has(p.key)||p.t>t0+1e-9) continue;
+  const laneAll=REC.fxLaneExpand(REC.fxLaneMerge(), SCHED_TICK_MS/1000/spb);   // гладкая автоматизация: плавные отрезки — шагом тика, как у ▶ и у рендера
+  for(const p of laneAll){ if(!keys.has(p.key)||p.t>t0+1e-9) continue;
     if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(p.key,p.ids); else if(!ST.fxIsScalar(p.fx)) LIVE.fxPlaySet(p.key,p.fx,p.p,p.v); }
-  const lanePts=REC.fxLaneMerge().filter(p=>keys.has(p.key) && p.t>t0+1e-9 && (p.fx===REC.FX_CHAIN||!ST.fxIsScalar(p.fx)));   // после старта: состав и величины (скаляры — пер-нотные, их несут ноты)
+  const lanePts=laneAll.filter(p=>keys.has(p.key) && p.t>t0+1e-9 && (p.fx===REC.FX_CHAIN||!ST.fxIsScalar(p.fx)));   // после старта: состав и величины (скаляры — пер-нотные, их несут ноты)
   const open={lead:new Set(), ch:new Set(), bs:new Set()};
   const me={ open, keys, timer:null, endT:T0+(evs[evs.length-1].t-t0)*spb };
   let i=0, li=0;
