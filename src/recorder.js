@@ -670,7 +670,7 @@ function captureInfoOf(layer){
   const ids=new Set(); let pts=0;
   for(const tk of tks){ const r=takeFx.get(tk); if(!r) continue;
     const ch=r.chains[key]; if(ch) for(const e of ch) if(!fxPerm(e.fxId)) ids.add(e.fxId);   // VOL-0: громкость в сводке не называем (она у дорожки есть всегда и в этом слайсе невидима)
-    for(const ent of r.lane){ if(ent.key!==key||fxPerm(ent.fx)) continue; pts++; if(ent.fx!==FX_CHAIN) ids.add(ent.fx); }   // FX_CHAIN — служебная запись состава, у неё нет имени и показывать её нечем. VOL-0: точки громкости (если X был отдан эффекту, их пишет захват) в счёт не идут — иначе число в сводке выросло бы
+    for(const ent of r.lane){ if(ent.key!==key||fxPerm(ent.fx)) continue; pts++; if(ent.fx!==FX_CHAIN) ids.add(ent.fx); }   // FX_CHAIN — служебная запись состава, у неё нет имени и показывать её нечем. VOL-0/VOL-2: точки громкости (они бывают, когда громкость на пальце руки-эффектов — тогда захват пишет её общий p.cur; на горизонтали её p.cur не движется) в счёт не идут — громкость «в ноте», переигровка их не читает, и сводка их не называет
   }
   return { takes:tks.size, role, fx:[...ids], pts };
 }

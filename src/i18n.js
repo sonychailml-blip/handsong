@@ -320,6 +320,10 @@ export const DICTS = {
     'fx.bright.amt':'Amount',
     'fx.glide':'Glide',
     'fx.glide.time':'Glide time',
+    // VOL-2: «Громкость» — постоянная строка первой в зоне «в ноте» у каждой роли
+    'fx.vol':'Volume',
+    'fx.vol.amt':'Level',
+    'fx.vol.hint':'How loud each note is played. On the playing hand’s Horizontal (left–right), every hand keeps its own volume, and another parameter placed there moves together with it; on a finger of the effects hand, all hands of this role share it. A latched chord with open fingers does not follow a finger change. To free the Horizontal, move the volume elsewhere or set it Fixed.',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Tail',
     'fx.reverb.tone':'Tone',
@@ -340,9 +344,7 @@ export const DICTS = {
     // свёрнутый заголовок эффекта + правка состава цепи (3.4.3). Пальцы в сводке — римские I–IV
     // (ими приложение обозначает палец везде), оси — стрелки: и то, и другое перевода не требует.
     'fx.sum.play':'depth',
-    'fx.sum.playx':'horiz.',           // сводка: адрес «играющая рука → горизонталь» (та ось, что иначе ведёт громкость)
-    'fx.volFix':'Fixed volume',
-    'fx.volFixHint':'The playing hand’s horizontal now drives an effect, so it no longer sets volume for this role — set the level here.',
+    'fx.sum.playx':'horiz.',           // сводка: адрес «играющая рука → горизонталь» (по умолчанию там громкость; VOL-2 — ось общая). fx.volFix/fx.volFixHint удалены в VOL-2
     'fx.sum.fixed':'fixed',
     'fx.add':'+ Add to the summed sound',
     'fx.addAll':'All effects are in the chain',
@@ -729,6 +731,10 @@ export const DICTS = {
     'fx.bright.amt':'Величина',
     'fx.glide':'Скольжение',
     'fx.glide.time':'Время скольжения',
+    // VOL-2: «Громкость» — постоянная строка первой в зоне «в ноте» у каждой роли
+    'fx.vol':'Громкость',
+    'fx.vol.amt':'Уровень',
+    'fx.vol.hint':'Насколько громко звучит каждая нота. На «Горизонтали» (влево–вправо) играющей руки у каждой руки своя громкость, а поставленный туда же параметр едет вместе с ней; на пальце руки-эффектов она одна на все руки этой роли. Защёлкнутый аккорд с разомкнутыми пальцами смену с пальца не подхватывает. Чтобы освободить «Горизонталь», унесите громкость на другой адрес или поставьте «Фиксировано».',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Длина',
     'fx.reverb.tone':'Окраска',
@@ -749,9 +755,7 @@ export const DICTS = {
     // свёрнутый заголовок эффекта + правка состава цепи (3.4.3). Пальцы в сводке — римские I–IV
     // (ими приложение обозначает палец везде), оси — стрелки: и то, и другое перевода не требует.
     'fx.sum.play':'глубина',
-    'fx.sum.playx':'гориз.',           // сводка: адрес «играющая рука → горизонталь» (та ось, что иначе ведёт громкость)
-    'fx.volFix':'Громкость (фикс.)',
-    'fx.volFixHint':'Горизонталь играющей руки отдана эффекту, поэтому громкость этой роли ею больше не ведётся — задайте уровень здесь.',
+    'fx.sum.playx':'гориз.',           // сводка: адрес «играющая рука → горизонталь» (по умолчанию там громкость; VOL-2 — ось общая). fx.volFix/fx.volFixHint удалены в VOL-2
     'fx.sum.fixed':'фикс.',
     'fx.add':'+ Добавить в общий звук',
     'fx.addAll':'Все эффекты уже в цепи',
