@@ -264,10 +264,10 @@ const LD_SUB=0;   // SuperSaw: субтрактивный, hum не задан �
 const SRC={
   chord:(eng,at)=>eng.chordOn('probe',[220,277.18,329.63],0.8,CH_INS,0,at),
   lead: (eng,at)=>eng.leadOn('probe',440,0.8,LD_SUB,0,0,null,null,at),   // V1: перед when встал glide — null (умолчание), время осталось в слоте when (правило #15)
-  bass: (eng,at)=>eng.bassOn('probe',110,0.8,0,null,null,null,at),   // P1: у bassOn перед when встали deg/oct (подсветка) — время обязано остаться в слоте when (правило #15)
-  noise:(eng,at)=>{ eng.drumHit(5,0.9,0,at);        // КРЭШ первым: 0.7 с шума — это и есть охват буфера
-                    eng.drumHit(2,0.9,0,at+0.05);   // хлопок и хэт — громкие транзиенты поверх
-                    eng.drumHit(3,0.8,0,at+0.15); },
+  bass: (eng,at)=>eng.bassOn('probe',110,0.8,0,null,null,null,undefined,at),   // + слот яркости перед when   // P1: у bassOn перед when встали deg/oct (подсветка) — время обязано остаться в слоте when (правило #15)
+  noise:(eng,at)=>{ eng.drumHit(5,0.9,0,undefined,at);        // КРЭШ первым: 0.7 с шума — это и есть охват буфера
+                    eng.drumHit(2,0.9,0,undefined,at+0.05);   // хлопок и хэт — громкие транзиенты поверх
+                    eng.drumHit(3,0.8,0,undefined,at+0.15); },   // слот яркости перед when пуст
 };
 const SRC_LBL={chord:'аккорд', lead:'соло', bass:'бас', noise:'шум (удары)'};
 const SRC_AT ={chord:0.05, lead:0.05, bass:0.05, noise:0};   // шум — с нуля: крэшу нужны все 0.7 с внутри рендера
@@ -300,7 +300,7 @@ const matMono=eng=>{ eng.leadOn('p0',semi(220,0),POLY_VOL,LD_SUB,0,0,null,null,0
 /* Все три пула — для подсчёта РАЗНЫХ голосов. */
 const matPolyAll=eng=>{
   matPoly(eng);
-  for(let i=0;i<POLY_BASS;i++) eng.bassOn('b'+i,semi(55,i),POLY_VOL,0,null,null,null,0.05);   // P1: deg/oct перед when
+  for(let i=0;i<POLY_BASS;i++) eng.bassOn('b'+i,semi(55,i),POLY_VOL,0,null,null,null,undefined,0.05);   // P1: deg/oct перед when
   for(let i=0;i<POLY_CH;i++) eng.chordOn('c'+i,[semi(220,i),semi(277.18,i),semi(329.63,i)],POLY_VOL,CH_INS,0,0.05);
 };
 /* СКОЛЬКО РАЗНЫХ ГОЛОСОВ держат владельцы. ⚠️ chordHold[owner] — МАССИВ голосов (по ноте аккорда),

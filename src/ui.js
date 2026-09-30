@@ -561,7 +561,7 @@ function renderAutCtl(){
   /* ⛳ V4b: И ГОЛОСОВЫЕ — те, что объявлены для роли дорожки (fxVoiceIdsFor): Скольжение баса/соло, яркость аккордов,
      скаляры соло. Их величина живёт В НОТАХ, поэтому в путь они не встают: добавленный открывает полосу, где правка
      переписывает ноты (recorder, pnView/pnMove). Сначала голосовые — как «в ноте» стоит первой в панели. */
-  if(hasChain){ const have=new Set(chain);
+  if(hasChain){ const have=new Set([...chain, ...autAddrs(ly).map(a=>a.fx)]);   // и эффекты, добавленные ПОСРЕДИ взятого (их полоса теперь перечисляет): предложи их снова — «добавить» положило бы их в снимок старта, и они зазвучали бы с начала
     for(const id of [...fxVoiceIdsFor(laneRoleOf(ly)), ...fxAddableIds()]) if(!have.has(id)){
       const o=document.createElement('option'); o.value=id; o.textContent=fxTitleOf(id); rollFxAddEl.appendChild(o); } }
   rollFxAddEl.value='';

@@ -962,10 +962,63 @@ function makeTremMixFx(){
 /* ⛳ V4b: note — ГДЕ ЭТА ВЕЛИЧИНА ЛЕЖИТ В СОБЫТИИ НОТЫ, если не в карте a.fx. Яркость едет своим полем a.bri, и оно — ГЛУБИНА
    (0 ярко .. 1 глухо, см. fxChordBri), то есть параметр, прочитанный с другого конца: inv. Объявлено здесь, а не выписано
    редактором, чтобы полоса автоматизации читала и переписывала ноту ПО ОБЪЯВЛЕНИЮ (fxNoteField) — как и всё прочее. */
+/* ⛳ ЯРКОСТЬ ДЛЯ ВСЕХ РОЛЕЙ: у АККОРДОВ величина едет полем a.bri (так было всегда — правило #19, прежние записи), у соло,
+   баса и ударных — в карте a.fx, как у Скольжения. Поэтому note ограничен ролью: roles:['ch'] (fxNoteField). */
 const BRIGHT_PARAMS=[
   {key:'amt', labelKey:'fx.bright.amt', short:'BRI', unit:'Hz',
-   def:CHORD_LP_MAX, min:CHORD_LP_MIN, max:CHORD_LP_MAX, curve:'log', attach:true, note:{key:'bri', inv:true}},
+   def:CHORD_LP_MAX, min:CHORD_LP_MIN, max:CHORD_LP_MAX, curve:'log', attach:true, note:{key:'bri', inv:true, roles:['ch']}},
 ];
+/* ═══ ⛳ ЯРКОСТЬ В ГОЛОСЕ СОЛО, БАСА И В УДАРЕ — «СТУПЕНЬ ЯРКОСТИ», ПРОЗРАЧНАЯ, ПОКА НЕ ЗАДАНА ═══
+   ЧТО ДВИГАЕТ ЯРКОСТЬ. У аккорда — его второй фильтр fb (правило #19, не тронут). Соло, бас и удар такого не имеют, а
+   их собственные фильтры (огибающая атаки у субтрактивных банков, lp баса, фильтры ударов) — это ТЕМБР, и трогать их
+   нельзя (решение пользователя: тембры не меняются). Поэтому у голоса соло и баса появляется своя ступень ПОСЛЕ всего
+   голоса (соло — после тремоло, перед суммой; бас — после громкости, перед шиной), одна на ВСЕ пути синтеза — субтрактивный,
+   FM, орган, Карплюс–Стронг: она фильтрует уже готовый звук голоса, какой бы банк его ни сделал. Удар строит свои узлы
+   каждый раз — ему фильтр ставится в самом ударе и ТОЛЬКО когда величина задана (drumHit).
+   ⛳ ПРОЗРАЧНОСТЬ, КОГДА НЕ ЗАДАНА, — ТОЧНАЯ, А НЕ «НА СЛУХ»: прежняя связь голоса с суммой (trem→leadSum, vol→шина) НЕ
+   ТРОНУТА, а ступень добавляет к ней ДВЕ ветви — фильтр×w и сам сигнал×(−w): выход = x + w·(LP(x) − x). Не задана → w=0,
+   обе ветви дают РОВНО ноль (y·0 = 0, а x + 0 = x в IEEE точно, в любом порядке сложения) — ни окраски, ни уровня, ни
+   фазы: у суммы те же ненулевые слагаемые, что и прежде. Задана → w=1, выход = LP(x). Полностью открытая (v=1) — тоже
+   w=0: ступень выходит из пути целиком, так что только что добавленная и нетронутая яркость не меняет ничего.
+   ⛳ ОДИН СМЫСЛ НА ВСЕ РОЛИ: 0 — темнее всего, что роль разумно может (срез чуть выше области её основных тонов), 1 —
+   открыто (срез выше всего её содержимого); между ними — одна и та же логарифмическая кривая. Диапазон — ПО РОЛИ (у
+   аккордов — прежний CHORD_LP_MIN..MAX, он и задан спецификацией): у баса вся энергия ниже ~1.5 кГц (его собственный lp
+   420–1300 Гц), и срез 700 Гц…18 кГц почти ничего бы с ним не делал — ползунок был бы мёртвым на 90% хода.
+   ⛳ ЧИТАЕТСЯ НА АТАКЕ И ВЕДЁТСЯ, ПОКА НОТА ЗВУЧИТ (как у аккордов: атака ставит, ведение подъезжает) — у соло и баса каждое
+   их ведение несёт свою величину (карта события), так что полоса автоматизации V4b правит именно то, что звучит. Удар —
+   только в миг удара (у него нет ведений). */
+const BRI_HZ={ ld:[700,18000], bs:[100,4000], dr:[300,18000] };   // [темнее всего, открыто], Гц — числа стороны звука (у аккордов — CHORD_LP_MIN/MAX)
+const BRI_OPEN=1-1e-6;                                            // v ≥ этого — «открыто»: ступень выходит из пути (w=0)
+const briHzOf=(role,v)=>{ const r=BRI_HZ[role]||BRI_HZ.ld; return r[0]*Math.pow(r[1]/r[0], Math.max(0,Math.min(1,v))); };
+/* Величина яркости ноты/удара из её карты (0..1) либо undefined — «не задана»: звук как сегодня. */
+const fxBriOf=m=>{ const v=m&&m['bright:amt']; return v==null ? undefined : v; };
+/* Ступень строится ВМЕСТЕ с голосом и живёт до конца контекста (правило #3: ничего не запускается и не останавливается —
+   в ней нет источников). src — выход голоса, dest — куда он и так подключён (эта связь остаётся как была). */
+function makeBriStage(src,dest){
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=BRI_HZ.ld[1];
+  const wet=AC.createGain(); wet.gain.value=0;
+  const neg=AC.createGain(); neg.gain.value=0;
+  src.connect(lp); lp.connect(wet); wet.connect(dest);
+  src.connect(neg); neg.connect(dest);
+  return { lp, wet, neg, w:0 };
+}
+/* Поставить яркость голоса: на АТАКЕ (fresh) — точно в миг t; при ВЕДЕНИИ — подъездом. Переключение «в пути / вне пути»
+   (w) — только когда оно правда сменилось; при ведении — подъездом τ 10 мс и ТОЧНЫМ значением через 0.2 с (экспонента
+   нуля не достигает, а «не задано» обязано быть ровно нулём). cancelScheduledValues снимает недошедший прежний переход. */
+function briStage(st,role,bri,t,fresh){
+  const w = (bri!=null && bri<BRI_OPEN) ? 1 : 0;
+  if(fresh || st.w!==w){
+    for(const [p,x] of [[st.wet.gain,w],[st.neg.gain,-w]]){
+      p.cancelScheduledValues(t);
+      if(fresh) p.setValueAtTime(x,t);
+      else { p.setTargetAtTime(x,t,0.01); p.setValueAtTime(x,t+0.2); }
+    }
+    st.w=w;
+  }
+  if(w){ const hz=briHzOf(role,bri);
+    if(fresh){ st.lp.frequency.cancelScheduledValues(t); st.lp.frequency.setValueAtTime(hz,t); }
+    else st.lp.frequency.setTargetAtTime(hz,t,0.05); }
+}
 /* Экземпляр яркости: ни одного узла. set пустой — величину забирает голос на атаке (chordOn), а всё,
    что нужно снаружи, уже несёт p.cur через fxWrapParam. */
 function makeBrightFx(){
@@ -1012,7 +1065,7 @@ function fxGlideOf(m){ const v=m&&m[FX_GLIDE_KEY]; return v==null ? undefined : 
    предлагалась соло, басу и ударным, где её не читает никто. */
 const FX_FACTORY={
   reverb:{ id:'reverb', labelKey:'fx.reverb', kind:'bus',   params:REV_PARAMS,    make:makeReverbFx },
-  bright:{ id:'bright', labelKey:'fx.bright', kind:'voice', params:BRIGHT_PARAMS, make:makeBrightFx, roles:['ch'] },
+  bright:{ id:'bright', labelKey:'fx.bright', kind:'voice', params:BRIGHT_PARAMS, make:makeBrightFx, roles:['ch','ld','bs','dr'] },   // яркость — ВСЕМ ролям: у аккордов фильтр fb голоса, у прочих — ступень яркости (makeBriStage / удар)
   glide: { id:'glide',  labelKey:'fx.glide',  kind:'voice', params:GLIDE_PARAMS,  make:makeGlideFx,  roles:['ld','bs'] },   // V4: мелодические роли
   dly:   { id:'dly',    labelKey:'fx.dly',    kind:'bus',   params:DLY_PARAMS,    make:makeDelayFx },
   trmMix:{ id:'trmMix', labelKey:'fx.trmMix', kind:'insert',params:TRMIX_PARAMS,  make:makeTremMixFx },   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
@@ -1273,7 +1326,8 @@ const fxIsPerNote=(fxId,pKey)=>{
 };
 /* Где величина лежит в событии: {key, inv} — своё поле (яркость: a.bri, прочитанная с другого конца), либо null — в карте a.fx
    под ключом 'fxId:pKey'. Из объявления параметра (поле note), второго знания о форме события здесь нет. */
-const fxNoteField=(fxId,pKey)=>{ const f=FX_FACTORY[fxId], sp=f&&f.params.find(q=>q.key===pKey); return (sp&&sp.note)||null; };
+const fxNoteField=(fxId,pKey,role)=>{ const f=FX_FACTORY[fxId], sp=f&&f.params.find(q=>q.key===pKey), n=sp&&sp.note;
+  return n && (!n.roles || n.roles.includes(role)) ? n : null; };   // role — роль события: своё поле объявлено лишь для некоторых ролей (яркость: a.bri только у аккордов)
 /* ⛳ when (F3) — ЯВНОЕ время, по умолчанию «сейчас». Живой тик его не передаёт (поведение прежнее);
    офлайн-рендер передаёт долю точки автоматизации, переведённую в секунды.
    ⛔ СКАЛЯР ОФЛАЙН СЮДА НЕ ПОПАДАЕТ И НЕ ДОЛЖЕН: ветка ниже пишет `fx[fxId]` — ОБЩИЙ store state.js,
@@ -1898,6 +1952,7 @@ function applyFx(m){
      значит «звучи ТЕКУЩЕЙ цепью роли», ровно как эти события звучали до 3.7.2. */
   const s = m || fxSnapshot(CHAIN_SOLO);   // O-0: цепь соло — ИМЕНОВАННОЙ константой (см. CHAIN_SOLO в state): здесь она названа потому, что pendFx и есть соло-путь
   pendFx.vib=s['vib:'+FX_AMT]||0; pendFx.drv=s['drv:'+FX_AMT]||0;
+  { const b=fxBriOf(s); pendFx.bri = b==null ? null : b; }   // ЯРКОСТЬ ноты — из той же карты; нет в карте → «не задана», звук как сегодня (правило соло для карты целиком — R2 выше — не меняется)
   pendFx.trm=s['trm:'+FX_AMT]||0;   // «Тремоло (нота)» — скаляр, ключ 'trm:amt' не менялся и после в.2. «Тремоло (микс)» в карту не пишется вовсе: его глубина не прицепочная (см. makeTremMixFx)
   /* ⛳ V4: СКОЛЬЖЕНИЕ ЭТОЙ НОТЫ — ВОЗВРАЩАЕМ, а не кладём в pendFx: оно не свойство голоса (узла под него нет), а
      АРГУМЕНТ вызова leadOn/leadSet (V1), и передаёт его ENG — он же знает, живой ли это кадр терменвокса (тогда не
@@ -1982,7 +2037,7 @@ const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого ин�
    которое оставил кто угодно — живая рука или нота петли. Здесь же величина принадлежит КОНКРЕТНОМУ
    событию и живёт ровно до того, как её заберёт голос этой ноты. Формат события не тронут: поля
    vib/drv/trm/dly лежали в полезной нагрузке всегда (просто до 3.7.1 их некуда было применить пер-нотно). */
-const pendFx={vib:0,drv:0,trm:0};   // O-1: dly/rev сняты вместе с пер-нотными посылами — исполнять их в голосе больше нечем (см. applyFx)
+const pendFx={vib:0,drv:0,trm:0,bri:null};   // bri — яркость ноты (0..1) или null «не задана» (см. applyFx/briStage)   // O-1: dly/rev сняты вместе с пер-нотными посылами — исполнять их в голосе больше нечем (см. applyFx)
 /* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks).
    vib — узел глубины вибрато ЭТОГО голоса: mkOsc цепляет его в detune (пара к hum). */
 function buildLeadBank(ins, pre, hum, vib){
@@ -2031,11 +2086,12 @@ function newLeadVoice(){
   pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
   satDry.connect(satSum); satWet.connect(satSum);
   satSum.connect(env); env.connect(vol); vol.connect(trem); trem.connect(leadSum);   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё
+  const bri=makeBriStage(trem,leadSum);   // ЯРКОСТЬ: две ветви рядом с прежней связью trem→leadSum (она не тронута), без величины — ровно ноль (см. makeBriStage)
   /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,bri,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
@@ -2068,6 +2124,7 @@ function applyVoiceFx(v,p,t,fresh){
   put(v.vibDep.gain, p.vib*35, 0.05);
   put(v.tremDep.gain, p.trm*0.45, 0.05);
   put(v.trem.gain, 1-p.trm*0.45, 0.05);
+  briStage(v.bri, 'ld', p.bri, t, fresh);   // ЯРКОСТЬ: на атаке — точно, при ведении — подъездом; нет величины — ступень вне пути (ровно ноль)
   /* ⛳ O-1: строк посыла в делей и реверб здесь БОЛЬШЕ НЕТ. Осталось ровно то, что живёт НИЖЕ границы
      суммы и потому пер-нотно по природе: драйв (нелинейность до огибающей), вибрато (сдвиг высоты) и
      пер-голосовое тремоло. Реверб и делей теперь обрабатывают СУММУ — у них своё место в цепи. */
@@ -2256,9 +2313,10 @@ function buildBassPool(dest, n){   // n голосов разом; зовёт Т
     env.gain.value=0; vol.gain.value=0.5;
     o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
     voiceStart(o1); voiceStart(o2);   // B: фазы разбросаны стартом (см. voiceStart)
+    const bri=makeBriStage(vol,dest);   // ЯРКОСТЬ: рядом с прежней связью vol→шина (не тронута), без величины — ровно ноль (см. makeBriStage). lp голоса — ТЕМБР (огибающая атаки), его не трогаем
     /* deg/oct — КАКУЮ НОТУ голос держит (P1, зеркало соло-голоса): звуку не нужны, их прочтёт ПОДСВЕТКА (P3, правило
        #26) — из реестра движка, а не из состояния руки. Пишет их ТОТ ЖЕ вызов, что звучит (bassOn/bassSet), гасит bassOff. */
-    bv.push({o1,o2,g1,g2,lp,env,vol,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
+    bv.push({o1,o2,g1,g2,lp,env,vol,bri,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
   }
 }
 /* ОДИН новый басовый голос. ⛳ P1: единственная дверь роста пула — И ЖИВОГО (до потолка BASS_POOL_N), И офлайн-
@@ -2313,10 +2371,13 @@ function setBassInstr(i){
 /* glide (V1) — время скольжения ЛЕГАТО-переезда уже ЗВУЧАЩЕГО голоса; нет — BASS_GLIDE_TC. Свежая атака — всегда умолчание:
    голос пула помнит прежнюю ноту, и въезд с её высоты был бы чужим скольжением. Вызывающий НЕ передаёт его для кадров
    терменвокса (live). ПЕРЕД when (правило #15, прецедент P1); позиционные вызовы — зонд render.js и ENG — поправлены. */
-function bassOn(owner,freq,vol,ins,deg,oct,glide,when){
+/* bri — яркость ноты (0..1) или undefined «не задана» (звук как сегодня); ПЕРЕД when (правило #15), позиционные вызовы — ENG и
+   зонд render.js — поправлены. */
+function bassOn(owner,freq,vol,ins,deg,oct,glide,bri,when){
   if(!AC)return; const t=when!=null?when:AC.currentTime;
   let v=bassHold[owner]; if(!v){ v=bvAlloc(when); v.owner=owner; bassHold[owner]=v; }
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // пишем КАЖДЫЙ вызов: ведение живой руки (новая ступень под пальцем) отражается сразу
+  briStage(v.bri, 'bs', bri, t, !v.on);       // ЯРКОСТЬ: атака (голос не звучал) — точно, ведение — подъездом
   const gtc = !v.on ? 0 : (glide!=null?glide:BASS_GLIDE_TC);   // ⛳ A: СВЕЖАЯ АТАКА — постоянная 0, скачок на свою высоту (довод — у leadOn); прежде шла BASS_GLIDE_TC и подъезжала от прежней ноты / от 440 Гц нового голоса. Легато звучащего голоса — glide или BASS_GLIDE_TC, как было. «Звучал ДО этого вызова» (атака ниже переставит v.on)
   if(!v.on){                                   // атака: печём тембр слоя, гейт вверх (идемпотентно при удержании)
     v.ins=BASS_INSTR[(((ins??bassIdx)%BASS_INSTR.length)+BASS_INSTR.length)%BASS_INSTR.length];
@@ -2331,9 +2392,10 @@ function bassOn(owner,freq,vol,ins,deg,oct,glide,when){
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер
 }
 /* glide (V1) — как у bassOn; ведение всегда легато. Нет — BASS_GLIDE_TC (⛳ прежде здесь стояло 0.03 — см. BASS_GLIDE_TC). */
-function bassSet(owner,freq,vol,deg,oct,glide,when){   // deg/oct (P1) — ступень едет вместе с частотой, как у leadSet; glide (V1) — перед when
+function bassSet(owner,freq,vol,deg,oct,glide,bri,when){   // deg/oct (P1) — ступень едет вместе с частотой, как у leadSet; glide (V1), bri — перед when
   if(!AC)return; const v=bassHold[owner]; if(!v||!v.ins)return; const t=when!=null?when:AC.currentTime;
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }
+  briStage(v.bri, 'bs', bri, t, false);       // ЯРКОСТЬ ведения — своя величина события
   const gtc = glide!=null ? glide : BASS_GLIDE_TC;
   v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
   v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень
@@ -2368,13 +2430,13 @@ function dNoise(t,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.lo
 function dDum(t,v,f0=130,f1=52,d=0.18){ const o=AC.createOscillator(),g=AC.createGain();
   o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.08);
   g.gain.setValueAtTime(0.9*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
-  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+d+0.05); }
+  o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+d+0.05); }
 function dTek(t,v,hp=4500,f=950){ const s=dNoise(t,0.05),bf=AC.createBiquadFilter(),g=AC.createGain();
   bf.type='highpass'; bf.frequency.value=hp; g.gain.setValueAtTime(0.3*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.035);
-  s.connect(bf); bf.connect(g); g.connect(drumBus);
+  s.connect(bf); bf.connect(g); g.connect(hitBus);
   const o=AC.createOscillator(),og=AC.createGain(); o.type='sine'; o.frequency.value=f;
   og.gain.setValueAtTime(0.12*v,t); og.gain.exponentialRampToValueAtTime(0.001,t+0.03);
-  o.connect(og); og.connect(drumBus); o.start(t); o.stop(t+0.05); }
+  o.connect(og); og.connect(hitBus); o.start(t); o.stop(t+0.05); }
 function darbukaHit(i,v,t){                       // 6 рядов → дарбука-голоса
   if(i===0)dDum(t,v);                             // Дум (низ)
   else if(i===1)dTek(t,v);                        // Тек
@@ -2383,7 +2445,7 @@ function darbukaHit(i,v,t){                       // 6 рядов → дарбу
   else if(i===4)dDum(t,v,180,80,0.14);            // Дум высокий
   else{ const s=dNoise(t,0.5),f=AC.createBiquadFilter(),g=AC.createGain();   // открытый край
     f.type='highpass'; f.frequency.value=5000; g.gain.setValueAtTime(0.28*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.5);
-    s.connect(f); f.connect(g); g.connect(drumBus); }
+    s.connect(f); f.connect(g); g.connect(hitBus); }
 }
 /* --- ТАБЛА (индийская). Подпись: баян (басовая мембрана) с сильным НИСХОДЯЩИМ бендом высоты —
    именно он делает возможным аккомпанемент для раг. Даян (высокий) — ясная высота с лёгким
@@ -2391,13 +2453,13 @@ function darbukaHit(i,v,t){                       // 6 рядов → дарбу
 function tabBaya(t,v,f0=185,f1=70,d=0.35){ const o=AC.createOscillator(),g=AC.createGain();
   o.type='sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.14);   // бенд вниз — подпись
   g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
-  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+d+0.05); }
-function tabNa(t,v,f=520,d=0.22){ const g=AC.createGain(); g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d); g.connect(drumBus);
+  o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+d+0.05); }
+function tabNa(t,v,f=520,d=0.22){ const g=AC.createGain(); g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d); g.connect(hitBus);
   [[1,.6],[2.4,.22],[3.8,.12]].forEach(([r,a])=>{ const o=AC.createOscillator(); o.type='sine'; o.frequency.value=f*r;   // тоновый + ингармонический призвук
     const og=AC.createGain(); og.gain.value=a; o.connect(og); og.connect(g); o.start(t); o.stop(t+d+0.02); }); }
 function tabTick(t,v){ const s=dNoise(t,0.04),f=AC.createBiquadFilter(),g=AC.createGain();   // сухой высокий тычок (тете)
   f.type='bandpass'; f.frequency.value=3200; f.Q.value=2; g.gain.setValueAtTime(0.5*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.03);
-  s.connect(f); f.connect(g); g.connect(drumBus); }
+  s.connect(f); f.connect(g); g.connect(hitBus); }
 function tablaHit(i,v,t){                          // 6 рядов → голоса таблы (low/accent/high как у всех китов)
   if(i===0)tabBaya(t,v);                           // Ге/дха — баян с бендом (низ)
   else if(i===1)tabNa(t,v,520);                    // На — звонкий даян (акцент)
@@ -2416,7 +2478,7 @@ function gmlFM(t,v,f,ratio,idx,d){ const car=AC.createOscillator(),cg=AC.createG
   mg.gain.setValueAtTime(f*idx,t); mg.gain.exponentialRampToValueAtTime(f*idx*0.1+0.001,t+d*0.4);   // огибающая индекса → металлический «пинг»
   mod.connect(mg); mg.connect(car.frequency);
   cg.gain.setValueAtTime(v,t); cg.gain.exponentialRampToValueAtTime(0.001,t+d);
-  car.connect(cg); cg.connect(drumBus); car.start(t); mod.start(t); car.stop(t+d+0.05); mod.stop(t+d+0.05); }
+  car.connect(cg); cg.connect(hitBus); car.start(t); mod.start(t); car.stop(t+d+0.05); mod.stop(t+d+0.05); }
 function gamelanHit(i,v,t){
   if(i===0)gmlFM(t,v,82,1.47,6,1.8);               // гонг агенг — глубокий, ДЛИННЫЙ, ингармонический (низ)
   else if(i===1)gmlFM(t,v*0.9,300,2.76,4,0.7);     // кенонг — средний металлический (акцент)
@@ -2430,17 +2492,17 @@ function gamelanHit(i,v,t){
 function taikoDrum(t,v,f0=95,f1=55,d=0.42){ const o=AC.createOscillator(),g=AC.createGain();
   o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.10);
   g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+d);
-  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+d+0.05);
+  o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+d+0.05);
   const s=dNoise(t,0.06),nf=AC.createBiquadFilter(),ng=AC.createGain();   // тело кожи
   nf.type='lowpass'; nf.frequency.value=1200; ng.gain.setValueAtTime(0.25*v,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.08);
-  s.connect(nf); nf.connect(ng); ng.connect(drumBus); }
+  s.connect(nf); nf.connect(ng); ng.connect(hitBus); }
 function taikoKa(t,v){ const o=AC.createOscillator(),g=AC.createGain();   // ка — сухой деревянный щелчок обода
   o.type='square'; o.frequency.setValueAtTime(1200,t); o.frequency.exponentialRampToValueAtTime(600,t+0.02);
   g.gain.setValueAtTime(0.4*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.04);
-  o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.06);
+  o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+0.06);
   const s=dNoise(t,0.03),f=AC.createBiquadFilter(),ng=AC.createGain();
   f.type='highpass'; f.frequency.value=4000; ng.gain.setValueAtTime(0.25*v,t); ng.gain.exponentialRampToValueAtTime(0.001,t+0.025);
-  s.connect(f); f.connect(ng); ng.connect(drumBus); }
+  s.connect(f); f.connect(ng); ng.connect(hitBus); }
 function taikoHit(i,v,t){
   if(i===0)taikoDrum(t,v);                          // о-дайко — большой глубокий (низ)
   else if(i===1)taikoDrum(t,v*0.9,150,85,0.28);     // средний удар (акцент)
@@ -2449,8 +2511,20 @@ function taikoHit(i,v,t){
   else if(i===4)taikoDrum(t,v*0.85,120,70,0.3);     // средний
   else taikoKa(t,v*1.1);                             // яркий обод
 }
-function drumHit(i,vol=1,kit=0,when){
-  if(!AC)return; const t=when!=null?when:AC.currentTime, v=0.3+0.7*vol;   // when — опережение лупера; удар — одноразовый источник, стартует в t (все под-голоса уже берут t)
+/* ⛳ КУДА ИДЁТ УДАР — hitBus. Обычно это сама шина ударных (drumBus), ровно как прежде. Задана ЯРКОСТЬ — удар идёт через
+   свой фильтр, построенный в этом же ударе (удар и так строит свои узлы каждый раз — исключение правила #3 для ударов).
+   Не задана — фильтра нет ВОВСЕ, связи те же, что были: удар звучит бит-в-бит как сегодня. Все под-голоса кита пишут в
+   hitBus синхронно внутри drumHit, поэтому одной переменной на модуль достаточно. */
+let hitBus=null;
+/* bri — яркость удара (0..1) или undefined «не задана»; ПЕРЕД when (правило #15), позиционные вызовы (ENG, зонд) поправлены. */
+function drumHit(i,vol=1,kit=0,bri,when){
+  if(!AC)return; const t=when!=null?when:AC.currentTime;
+  hitBus=drumBus;
+  if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(drumBus); hitBus=f; }
+  try{ drumVoice(i,vol,kit,t); } finally{ hitBus=drumBus; }
+}
+function drumVoice(i,vol,kit,t){
+  const v=0.3+0.7*vol;   // удар — одноразовый источник, стартует в t (все под-голоса уже берут t)
   if(kit===1) return darbukaHit(i,v,t);
   if(kit===2) return tablaHit(i,v,t);
   if(kit===3) return gamelanHit(i,v,t);
@@ -2458,27 +2532,27 @@ function drumHit(i,vol=1,kit=0,when){
   if(i===0){ const o=AC.createOscillator(),g=AC.createGain();     // Кик
     o.frequency.setValueAtTime(165,t); o.frequency.exponentialRampToValueAtTime(48,t+0.09);
     g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.22);
-    o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.28); }
+    o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+0.28); }
   else if(i===1){ const s=dNoise(t,0.2),f=AC.createBiquadFilter(),g=AC.createGain();  // Снейр
     f.type='highpass'; f.frequency.value=1400; g.gain.setValueAtTime(0.5*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.17);
-    s.connect(f); f.connect(g); g.connect(drumBus);
+    s.connect(f); f.connect(g); g.connect(hitBus);
     const o=AC.createOscillator(),og=AC.createGain(); o.type='triangle'; o.frequency.value=185;
     og.gain.setValueAtTime(0.3*v,t); og.gain.exponentialRampToValueAtTime(0.001,t+0.09);
-    o.connect(og); og.connect(drumBus); o.start(t); o.stop(t+0.11); }
+    o.connect(og); og.connect(hitBus); o.start(t); o.stop(t+0.11); }
   else if(i===2){ const s=dNoise(t,0.14),f=AC.createBiquadFilter(),g=AC.createGain();  // Клэп
     f.type='bandpass'; f.frequency.value=1600; f.Q.value=1.2;
     g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.55*v,t+0.004); g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
-    s.connect(f); f.connect(g); g.connect(drumBus); }
+    s.connect(f); f.connect(g); g.connect(hitBus); }
   else if(i===3){ const s=dNoise(t,0.06),f=AC.createBiquadFilter(),g=AC.createGain();  // Хэт закр.
     f.type='highpass'; f.frequency.value=8200; g.gain.setValueAtTime(0.32*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05);
-    s.connect(f); f.connect(g); g.connect(drumBus); }
+    s.connect(f); f.connect(g); g.connect(hitBus); }
   else if(i===4){ const o=AC.createOscillator(),g=AC.createGain();  // Том
     o.frequency.setValueAtTime(230,t); o.frequency.exponentialRampToValueAtTime(92,t+0.18);
     g.gain.setValueAtTime(0.6*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.25);
-    o.connect(g); g.connect(drumBus); o.start(t); o.stop(t+0.3); }
+    o.connect(g); g.connect(hitBus); o.start(t); o.stop(t+0.3); }
   else{ const s=dNoise(t,0.7),f=AC.createBiquadFilter(),g=AC.createGain();  // Крэш
     f.type='highpass'; f.frequency.value=6000; g.gain.setValueAtTime(0.3*v,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.7);
-    s.connect(f); f.connect(g); g.connect(drumBus); }
+    s.connect(f); f.connect(g); g.connect(hitBus); }
 }
 
 /* Метроном лупера: короткий щелчок точно по часам AC (отсчёт и сетка овердаба).
@@ -2527,6 +2601,7 @@ export {
   makeFrozenBus,   // F4: шина ЗАМОРОЖЕННОЙ дорожки — свой гейн прямо в мастер (цепь уже вплавлена в буфер, второй раз её накладывать нельзя); им же делается приглушение/соло
   fxRenderPath, fxGateAt,   // РЕНДЕР: проводка всех бывших в цепи эффектов разом + затворы в ЗАПИСАННЫЕ доли (состав, менявшийся посреди взятого). ⛔ Живьём вызывающих нет
   setDbg, dbgExprBypass,   // ОТЛАДКА НА СЛУХ (render.aud): переключатели и обход выразительности — ⛔ только у копии рендера, живьём вызывающих нет
+  fxBriOf,   // ЯРКОСТЬ соло/баса/удара из карты события (0..1) или undefined «не задана». Читает ENG (обе копии движка)
   fxGlideOf, FX_GLIDE_KEY,   // V4: скольжение ноты из её карты эффектов (секунды) или undefined — «не задано». Читает ENG (обе копии движка — живая и рендерная — через makeENG)
   fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки

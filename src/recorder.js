@@ -1624,6 +1624,16 @@ function autAddrs(layer){
       out.push({key, fx:eff.fxId, p:meta.key, labelKey:meta.labelKey, short:meta.short});
     }
   }
+  /* ⛳ И ЭФФЕКТЫ, ДОБАВЛЕННЫЕ ПОСРЕДИ ВЗЯТОГО. Снимок цепи — это состав НА СТАРТЕ; эффект, добавленный по ходу, живёт в ленте
+     записью состава (FX_CHAIN, поле ids) и своими величинами с той доли. Переигровка и заморозка его слышат, а полоса его не
+     перечисляла — пока его не добавляли дорожке руками. Теперь его адреса стоят В КОНЦЕ списка, в порядке появления; их
+     точки полоса берёт из ленты как обычно (autPointsCalc), а до первой точки полки нет — эффекта тогда и не было. */
+  for(const T of autTakesOf(layer).slice().reverse()){
+    const rec=takeFx.get(T.tk); if(!rec) continue;
+    for(const ent of rec.lane){ if(ent.key!==key||ent.fx!==FX_CHAIN||!ent.ids) continue;
+      for(const id of ent.ids){ if(out.some(o=>o.fx===id)) continue;
+        for(const meta of fxParamMetaOf(id)) out.push({key, fx:id, p:meta.key, labelKey:meta.labelKey, short:meta.short}); } }
+  }
   return out;
 }
 /* ТОЧКИ ОДНОГО АДРЕСА ПО ВСЕЙ ДОРОЖКЕ + УРОВЕНЬ ДО ПЕРВОЙ ТОЧКИ.
@@ -1656,11 +1666,12 @@ function autAddrs(layer){
    ⛳ «НЕ ЗАДАНО» — ОТСУТСТВИЕ величины в событии: нота играет СЕГОДНЯШНЕЕ умолчание роли (у Скольжения — 20/12 мс, у яркости —
    открытый фильтр, у скаляров — ноль). Рисуется на уровне умолчания (fxDefaultsOf — та же шкала, что у меню); ведущий
    отрезок «не задано» — полка без ручки, как снимок старта у ленты. */
-const pnCarrier=fn=> fn==='leadOn'||fn==='leadSet'||fn==='bassOn'||fn==='bassSet'||fn==='chOn'||fn==='chSet';
+const pnCarrier=fn=> fn==='leadOn'||fn==='leadSet'||fn==='bassOn'||fn==='bassSet'||fn==='chOn'||fn==='chSet'||fn==='drum';   // удар несёт свою карту (яркость ударных), как «вкл» ноты
 const pnSame=(x,y)=> (x==null&&y==null) || (x!=null&&y!=null&&Math.abs(x-y)<1e-6);
-/* Величина в событии (0..1) либо null — «не задано». Где лежит — по объявлению (fxNoteField): своё поле или карта a.fx. */
-function pnGet(a,fxId,pKey){
-  const nf=fxNoteField(fxId,pKey);
+/* Величина в событии (0..1) либо null — «не задано». Где лежит — по объявлению (fxNoteField) И РОЛИ события: своё поле или
+   карта a.fx (яркость — поле a.bri у аккордов, карта у соло/баса/ударных). */
+function pnGet(ev,fxId,pKey){
+  const a=ev.a, nf=fxNoteField(fxId,pKey,evRole(ev.fn));
   if(nf){ const x=a&&a[nf.key]; return x==null ? null : (nf.inv?1-x:x); }
   const m=a&&a.fx, x=m?m[fxId+':'+pKey]:undefined; return x==null ? null : x;
 }
@@ -1668,7 +1679,7 @@ function pnGet(a,fxId,pKey){
    ⚠️ БАС: опустевшая карта снимается ЦЕЛИКОМ — отсутствие карты у баса и есть «не задано», событие снова байт-в-байт как без
    Скольжения. СОЛО: карта остаётся всегда — у соло её ОТСУТСТВИЕ значит «звучи живой цепью» (правило R2 в applyFx). */
 function pnWith(ev,fxId,pKey,v){
-  const a=ev.a||{}, nf=fxNoteField(fxId,pKey), b={...a};
+  const a=ev.a||{}, nf=fxNoteField(fxId,pKey,evRole(ev.fn)), b={...a};
   if(nf){ if(v==null) delete b[nf.key]; else b[nf.key]= nf.inv?1-v:v; return b; }
   const k=fxId+':'+pKey, m={...(a.fx||{})};
   if(v==null) delete m[k]; else m[k]=v;
@@ -1681,7 +1692,7 @@ const pnDef=(key,fxId,pKey)=>{ const i=fxParamKeysOf(fxId).indexOf(pKey), d=fxDe
 function pnRuns(layer,fxId,pKey){
   const runs=[]; let cur=null;
   for(const e of events){ if(e.layer!==layer||!pnCarrier(e.fn)) continue;
-    const v=pnGet(e.a,fxId,pKey);
+    const v=pnGet(e,fxId,pKey);
     if(!cur||!pnSame(v,cur.v)) runs.push(cur={t:e.t, v, evs:[]});
     cur.evs.push(e); }
   return runs;
@@ -1693,6 +1704,9 @@ function pnView(layer,key,fxId,pKey){
   const d=pnDef(key,fxId,pKey), pts=[];
   pnRuns(layer,fxId,pKey).forEach((r,i)=>{ if(i===0&&r.v==null) return;   // ведущее «не задано» — полка (base), ручки нет
     pts.push({ per:true, pt:{ t:r.t, v:r.v==null?d:r.v, unset:r.v==null, pn:{layer,key,fx:fxId,p:pKey} } }); });
+  /* У УДАРНЫХ «пауз» в этом смысле нет: удар — миг, его величина звучит в миг удара, и приглушать линию между ударами значило
+     бы приглушить её всю. Поэтому для дорожки ударных spans не отдаём — линия рисуется целиком. */
+  if(laneRoleOf(layer)==='dr') return { base:d, baseT:0, pts, per:true, spans:null };
   const sp=[];
   for(const n of songNotes().notes) if(n.layer===layer&&n.role!=='dr') sp.push([n.start, n.end==null?Infinity:n.end]);
   sp.sort((a,b)=>a[0]-b[0]);
@@ -1702,7 +1716,7 @@ function pnView(layer,key,fxId,pKey){
 /* Переписать величину у событий (цель — функция события) → ходы 'move'. Событие, у которого величина уже та, — не ход. */
 function pnMoves(evs,fxId,pKey,vOf){
   const list=[];
-  for(const e of evs){ const v=vOf(e); if(pnSame(pnGet(e.a,fxId,pKey),v)) continue;
+  for(const e of evs){ const v=vOf(e); if(pnSame(pnGet(e,fxId,pKey),v)) continue;
     list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:pnWith(e,fxId,pKey,v)} }); }
   return list;
 }
@@ -2043,10 +2057,10 @@ const makeENG=A=>({
      записанного без Скольжения, у подложки (arrange строит нагрузку сам) и у нот, вставленных в редакторе. Правило соло
      «нет карты → текущая цепь» здесь заставило бы басовую линию подложки скользить так, как сейчас стоит рука, — ровно
      довод яркости аккордов (fxChordBri). Кадр терменвокса (live) скольжения не получает — контракт V1. */
-  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,live!=null?undefined:A.fxGlideOf(a.fx),when),   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,A.fxGlideOf(a.fx),when),   // V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
+  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
   bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
-  drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,when),
+  drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,A.fxBriOf(a.fx),when),   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
   drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 });
 const ENG=makeENG(AUD);   // ЖИВАЯ таблица — против живой копии движка. Поведение прежнее дословно
@@ -2537,7 +2551,7 @@ function recLatchOpen(){
    прежней формой (P2 рук не трогает), живой бас по-прежнему ОДИН владелец — ведущий режим. В событие ключ не пишется. */
 const WbassOn =(p,live,own='bass')=>{ ENG.bassOn(p,null,{live,own}); recBassEv(own,p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло (правило #11). ⚠️ Прежде здесь стояло (p,null,undefined,live) — дырка под when позиционно; с именованным набором её не существует
 const WbassOff=(own='bass')=>{ ENG.bassOff(null,null,{own}); recBassOff(own); };
-const WdrumHit=(row,vol)=>{ const a={row,vol,kit:drumKitIdx}; ENG.drum(a); recDrum(a); };
+const WdrumHit=(row,vol,fx)=>{ const a={row,vol,kit:drumKitIdx}; if(fx&&Object.keys(fx).length) a.fx=fx; ENG.drum(a); recDrum(a); };   // fx — карта эффектов удара: ТОЛЬКО когда цепь ударных её даёт (как у баса); иначе поля нет, удар байт-в-байт прежний
 
 /* ⛳ softAllOff — ЕДИНСТВЕННАЯ ТОЧКА «ЗАГЛУШИТЬ ВСЁ», И ТЕПЕРЬ ОНА ЖЕ ЗАКРЫВАЕТ ЗАПИСЬ (слайс S4.1).
    БЫЛО: последняя строка обнуляла состояние записи БЕЗ «выкл». Звук гас здесь же, а нота в дорожке оставалась открытой и
