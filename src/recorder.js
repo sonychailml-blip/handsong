@@ -7,7 +7,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
-import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR } from './config.js';
+import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
 import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
@@ -1240,7 +1240,9 @@ function editSetLayer(layer){
    ⛳ ИСТОРИЯ ЖИВЁТ РОВНО СЕССИЮ ПРАВКИ (чистят открытие, закрытие и смена дорожки). Причина не в экономии
    памяти: ВНЕ редактора песню меняют запись, ⤺, ✕ и подложка, и обратный ход, сохранённый «на потом»,
    однажды указал бы на событие, которого в песне уже нет. Закрыл редактор — история закрыта вместе с ним. */
-const EDIT_DEF_VOL=0.8;                 // громкость вставленного удара, когда в дорожке спросить не у кого
+/* Громкость вставленной в редакторе ноты, когда в дорожке спросить не у кого: прежние 0.8, пересчитанные в новую шкалу
+   (VOL-2b, config.volFromOld) — чтобы вставка звучала так же громко, как до стандартизации (удар и бас: √0.86 ≈ 0.927). */
+const editDefVol=role=>volFromOld(role,0.8);
 /* ⛳ ИСТОРИЯ ДВУНАПРАВЛЕННАЯ (S5.3). ⚠️ РЕДО — НЕ ЗЕРКАЛО ОТМЕНЫ, и запись не симметрична: отмене хватало
    ОБРАТНОГО хода, а возврату нужен ПРЯМОЙ. Поэтому запись переноса несёт ОБА состояния (from/to), а
    удаление и вставка симметричны сами по себе — там хватает ССЫЛКИ НА СОБЫТИЕ, и в обе стороны едет ОДИН
@@ -1297,7 +1299,7 @@ function editDrumDefaults(layer,t){
   let best=null,bd=Infinity;
   for(const e of events) if(e.layer===layer&&e.fn==='drum'){ const d=Math.abs(e.t-t); if(d<bd){ bd=d; best=e; } }
   return { kit: best&&best.a.kit!=null ? best.a.kit : drumKitIdx,
-           vol: best&&best.a.vol!=null ? best.a.vol : EDIT_DEF_VOL };
+           vol: best&&best.a.vol!=null ? best.a.vol : editDefVol('dr') };
 }
 function editMoveHit(ev,t,row){
   if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
@@ -1528,7 +1530,7 @@ function editInsertBass(t,deg,oct,sc,sev,len){
     if(e.fn==='bassOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
   }
   const inst = on&&on.a.inst!=null ? on.a.inst : bassIdx;
-  const vol  = near&&near.a.vol!=null ? near.a.vol : EDIT_DEF_VOL;
+  const vol  = near&&near.a.vol!=null ? near.a.vol : editDefVol('bs');
   const k=layerTakeTop(layer);                               // свой ключ владельца: пересечься с существующим басом нечем
   if(!editTake) editTake=++takeSeq;
   const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);

@@ -1,4 +1,5 @@
 /* Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния). */
+import { volFromOld } from './config.js';   // VOL-2b: громкости подложек написаны в ПРЕЖНЕЙ шкале — пересчёт в новую (config — лист, состояния в нём нет)
 
 /* ================= АРАНЖИРОВКА: гармония + ритм + бас как СЛОИ лупера =================
    Пользователь сам выбирает по одному из трёх списков — сочетание осмысленно, потому что
@@ -184,6 +185,12 @@ export const BASS_MODES=[
   {id:'pedal', name:{en:'Pedal (tonic)', ru:'Педаль (тоника)'}},
 ];
 
+/* ⛳ ГРОМКОСТИ ПОДЛОЖКИ — В ПРЕЖНЕЙ ШКАЛЕ, И ЭТО НАМЕРЕННО (VOL-2b). Числа ниже и клетки ритмов написаны под прежнюю карту
+   движка (доля амплитуды = пол + (1 − пол)·v, пол: аккорды 0.25, бас и удар 0.3). С VOL-2b громкость звучит по одной
+   кривой v², и те же числа зазвучали бы тише. Поэтому КАЖДАЯ громкость подложки проходит volFromOld(роль, v) = √(пол +
+   (1 − пол)·v) — ровно в том месте, где рождается событие (ниже): аккорды 0.55 → ≈0.814, бас 0.6 → ≈0.849, удар c →
+   √(0.3+0.7·c) (0.18 → ≈0.653, 0.9 → ≈0.964). Таблицы ритмов не переписаны: узоры остаются такими, как их написали, а
+   пересчёт — одна функция. Звук подложки прежний с точностью до округления double (≈1e−16 относительных). */
 const CHORD_VOL=0.55, BASS_VOL=0.6;
 
 /* Чистая генерация: sel={prog, rhythm, bass}, ctx={chIdx, bassIdx, drumKitIdx, metre, bars}.
@@ -207,15 +214,15 @@ export function buildArrangement(sel, ctx){
     // Гармония: дрон — один событие-маркер (выделенные узлы dO1/dO2/dG); иначе аккорд на такт
     if(h.drone) layers.push([{ t:0, fn:'drone', a:{lvl:0.18} }]);
     else layers.push(degs.map((deg,bar)=>({ t:bar*metre, fn:'chOn',
-      a:{deg, oct:0, vol:CHORD_VOL, inst:chIdx} })));
+      a:{deg, oct:0, vol:volFromOld('ch',CHORD_VOL), inst:chIdx} })));   // VOL-2b: прежняя шкала → новая (см. CHORD_VOL)
 
     // Бас (корни берём из degs — у дрона это тоника)
     const bass=BASS_MODES.find(b=>b.id===sel.bass);
     if(bass&&bass.id==='roots')
       layers.push(degs.map((deg,bar)=>({ t:bar*metre, fn:'bassOn',
-        a:{deg, oct:0, vol:BASS_VOL, inst:bassIdx} })));
+        a:{deg, oct:0, vol:volFromOld('bs',BASS_VOL), inst:bassIdx} })));   // VOL-2b: прежняя шкала → новая
     else if(bass&&bass.id==='pedal')
-      layers.push([{ t:0, fn:'bassOn', a:{deg:0, oct:0, vol:BASS_VOL, inst:bassIdx} }]);   // тоника на весь круг
+      layers.push([{ t:0, fn:'bassOn', a:{deg:0, oct:0, vol:volFromOld('bs',BASS_VOL), inst:bassIdx} }]);   // тоника на весь круг. VOL-2b: прежняя шкала → новая
   }
 
   // Ритм: только ГОДНЫЙ паттерн — своего размера и с сошедшейся сеткой (rhythmFits), иначе пропускаем.
@@ -225,7 +232,7 @@ export function buildArrangement(sel, ctx){
     const drums=[];
     for(let bar=0;bar<bars;bar++) rhythm.grid.forEach((cell,st)=>{ if(!cell)return;
       for(const row in cell) drums.push({ t:bar*metre+st*stepBeat, fn:'drum',
-        a:{row:+row, vol:cell[row], kit:drumKitIdx} }); });
+        a:{row:+row, vol:volFromOld('dr',cell[row]), kit:drumKitIdx} }); });   // VOL-2b: клетка ритма — прежняя шкала → новая
     if(drums.length) layers.push(drums);
   }
   return { bars, layers };

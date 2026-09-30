@@ -1,7 +1,7 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
 import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
-import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS } from './config.js';
+import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld } from './config.js';   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
@@ -1059,26 +1059,31 @@ function makeGlideFx(){
    громкости; записанное и так несёт её в каждой ноте. Поэтому величина живёт в ПРЕЖНЕМ поле события a.vol (note.key) —
    формат события не меняется ни на байт.
    ⛳ ПОЛЯ ОБЪЯВЛЕНИЯ:
-     • шкала — СЫРАЯ 0..1, линейная (min 0, max 1): v01 === a.vol. Не 0.2..1 — подложки кладут громкость НИЖЕ пола руки
-       (клетки ударов до 0.18, arrange.js), и шкала с полом их бы не выразила;
-     • def 0.8 — тот же уровень, что был у отдельного fxVolFix (удалён в VOL-2); им засевается «Фиксировано» у нетронутой громкости;
+     • шкала — СЫРАЯ 0..1, линейная (min 0, max 1): v01 === a.vol, в меню 0…100. Число громкости, а не амплитуда: в звук
+       его переводит одна кривая config.volAmp (v², VOL-2b);
+     • def/defBy — УМОЛЧАНИЕ ПО РОЛИ (VOL-2b): число, звучащее под новой кривой РОВНО как прежние 0.8 этой роли
+       (volFromOld: соло √0.8≈0.894, аккорды √0.85≈0.922, бас и удар √0.86≈0.927; в меню 89/92/93). Прежде было одно
+       0.8 — тот же уровень, что у удалённого в VOL-2 fxVolFix; под v² оно дало бы на 1–2 дБ тише прежнего. Им засевается
+       «Фиксировано» у нетронутой громкости, и с него стартует громкость, впервые поставленная на палец;
      • attach + note:{key:'vol', required:true} без roles — величина «в ноте», в своём поле у ВСЕХ ролей, и она
        ОБЯЗАТЕЛЬНА: нота без громкости дала бы движку undefined, то есть NaN в гейне. Правку полосой, которая это
        соблюдает, делает VOL-3; здесь — объявление;
-     • handRange [0.2,1] — ход РУКИ по этому параметру: левый край даёт 0.2, как сегодня (0.2+0.8·xn). ⚠️ ВРЕМЕННО:
-       решение пользователя — в VOL-2b ход станет полным (0..1, левый край = тишина) вместе со стандартизацией
-       громкости у всех ролей. С VOL-1 его читает gestures.noteVolOf (через fxHandRange ниже).
+     • handRange — СНЯТ в VOL-2b (решение пользователя): ход руки по громкости ПОЛНЫЙ, 0..1 — у горизонтали и у пальца,
+       левый край = 0 = тишина у каждой роли. В VOL-0…VOL-2 здесь стояло [0.2,1] (прежние 0.2+0.8·xn). Механизм
+       (fxHandRange, умолчание [0,1]) остался — объявить ход сможет любой будущий параметр.
      • perm — ПОСТОЯННАЯ запись: сеется первой в каждую цепь (state.fxChains), не убирается и не переставляется. В VOL-0/
        VOL-1 не показывалась нигде; с VOL-2 — строка «Громкость» в панели (без ✕), столбик — только на пальце; в списках
        «добавить», на полосе и в сводке захвата её по-прежнему нет (fxPerm ниже).
    ⛔ УЗЛОВ НЕТ (как у Скольжения): правило #3 не задето — ничего не строится и не запускается.
-   ⛔ ГРОМКОСТЬ СЧИТАЮТ gestures, НА РУКУ: в VOL-0 — прежней формулой, с VOL-1 — резолвером noteVolOf по этой записи
-   (адрес, ход руки handRange, фиксированное v01) с побитно той же величиной; в общий параметр роли (p.cur) жест её не пишет. По правилу #29 он
+   ⛔ ЧИСЛО ГРОМКОСТИ СЧИТАЮТ gestures, НА РУКУ (резолвер noteVolOf по этой записи: адрес, фиксированное v01, общий p.cur на
+   пальце); в общий параметр роли (p.cur) горизонталь её не пишет. В ЗВУК число переводит ОДНА кривая config.volAmp (v²) —
+   в chordOn/chordGlide, leadOn/leadSet, bassOn/bassSet и drumVoice (VOL-2b). По правилу #29 модуль
    захватывается (fxCaptureChain/fxCaptureWalk обходят inst.params), но ничто со звуком его не читает: переигровка
    пропускает пер-нотное (fxLaneMerge), снимок ноты пропускает поле со своим местом (fxSnapshot), голос берёт a.vol. */
 const VOL_PARAMS=[
-  {key:'amt', labelKey:'fx.vol.amt', short:'VOL', unit:'', def:0.8, min:0, max:1, curve:'lin', attach:true,
-   note:{key:'vol', required:true}, handRange:[0.2,1]},
+  {key:'amt', labelKey:'fx.vol.amt', short:'VOL', unit:'', def:volFromOld('ld',0.8),
+   defBy:{ ld:volFromOld('ld',0.8), ch:volFromOld('ch',0.8), bs:volFromOld('bs',0.8), dr:volFromOld('dr',0.8) },
+   min:0, max:1, curve:'lin', attach:true, note:{key:'vol', required:true}},
 ];
 function makeVolFx(){
   const params=VOL_PARAMS.map(sp=>({...sp, set:()=>{}}));   // узлов нет: set пуст, величину держит p.cur (как у Скольжения)
@@ -1112,8 +1117,8 @@ const FX_FACTORY={
    столбик — только на пальце (draw.fxBarHidden). Предикат по-прежнему держит: списки «добавить», редактор и сводку захвата. */
 const fxPerm=id=> !!(FX_FACTORY[id] && FX_FACTORY[id].perm);
 /* ХОД РУКИ ПО ПАРАМЕТРУ — [lo, hi] из объявления (поле handRange), иначе полный [0, 1]. Читается по СПЕЦИФИКАЦИИ, а не
-   по экземпляру: жесту нужен ход и тогда, когда экземпляр ещё не построен. VOL-1: читает только громкость (её ход
-   [0.2, 1] воспроизводит сегодняшние 0.2+0.8·xn); полный ход у всех — решение пользователя для VOL-2. */
+   по экземпляру: жесту нужен ход и тогда, когда экземпляр ещё не построен. Читает громкость (gestures.noteVolOf); с VOL-2b
+   её ход полный — поле снято, и функция отдаёт [0,1] (в VOL-1/VOL-2 было [0.2,1] — прежние 0.2+0.8·xn). */
 const fxHandRange=(fxId,pKey)=>{ const f=FX_FACTORY[fxId], sp=f&&f.params.find(q=>q.key===pKey);
   return (sp&&sp.handRange) || [0,1]; };
 /* ЯРКОСТЬ АККОРДОВ, КАК ЕЁ ЧИТАЕТ ГОЛОС. Отдаёт величину в форме, которую ждёт chordOn/chordGlide —
@@ -1696,11 +1701,12 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     v.o1.detune.setValueAtTime(-ins.det/2+hc,t); v.o2.detune.setValueAtTime(ins.det+hc,t);
     v.g1.gain.setValueAtTime(ins.m1,t); v.g2.gain.setValueAtTime(ins.m2,t);
     const fo=ins.fo||1, ft=ins.ft||0.02, fv=ins.fv||0;    // огибающая фильтра f + скорость→яркость (пол=lp: тихая нота не глохнет)
+    const a=volAmp(vol);                                  // VOL-2b: ОДНА кривая громкости (config.volAmp) — амплитуда v²; прежде ins.lvl·(0.25+0.75·vol), 0 не был тишиной
     v.f.frequency.cancelScheduledValues(t); v.f.frequency.setValueAtTime(ins.lp*fo,t);
-    v.f.frequency.setTargetAtTime(ins.lp*(1+fv*vol),t,ft);
+    v.f.frequency.setTargetAtTime(ins.lp*(1+fv*volVel('ch',a)),t,ft);   // скорость удара — прежнее число, выраженное через амплитуду (volVel): тише прежнего пола 25% — база фильтра
     v.fb.frequency.cancelScheduledValues(t); v.fb.frequency.setValueAtTime(briHz,t);   // яркость на АТАКЕ: голос ещё поднимает громкость с 0 → скачка cutoff не слышно
     v.o1.frequency.setValueAtTime(fr,t); v.o2.frequency.setValueAtTime(fr*ins.ratio,t);
-    v.lvl=ins.lvl*(0.25+0.75*vol)*(1-rnd()*0.05);   // −0..5% уровня — снять машинную ровность
+    v.lvl=ins.lvl*a*(1-rnd()*0.05);   // −0..5% уровня — снять машинную ровность. VOL-2b: a = v² (на v=1 — ровно прежний ins.lvl·1)
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
     v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
     return v;
@@ -1713,7 +1719,7 @@ function chordGlide(owner,freqs,vol,bri,when){    // смена аккорда �
     v.o1.frequency.setTargetAtTime(fr,t,0.035);
     v.o2.frequency.setTargetAtTime(fr*v.ins.ratio,t,0.035);
     if(briHz!=null)v.fb.frequency.setTargetAtTime(briHz,t,0.05);   // яркость ведём setTargetAtTime → без щелчка; f (атака) не трогаем — расцеплены
-    const L=v.ins.lvl*(0.25+0.75*vol);
+    const L=v.ins.lvl*volAmp(vol);   // VOL-2b: та же кривая, что на атаке
     if(Math.abs(L-v.lvl)>0.003){ v.lvl=L; v.g.gain.setTargetAtTime(L,t,0.05); }
   });
 }
@@ -2287,7 +2293,8 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      Скольжение — ТОЛЬКО легато звучащего голоса (не fresh): там glide, а без него — прежнее умолчание. Кадры терменвокса
      после атаки и точки бенда (scheduleBend) сюда не относятся и не тронуты. */
   if(freq!=null)b.setFreq(freq, fresh ? 0 : (glide==null?undefined:glide), t);   // null тоже «нет»: умолчание параметра ловит только undefined, а null дал бы τ=0 — скачок   // V1: скольжение — только легато-переезд звучащего голоса; свежая атака — умолчание банка (20 мс), как было. Время — последним (правило #15)
-  v.vol.gain.setTargetAtTime(vol,t,0.04);
+  const a=volAmp(vol);                        // VOL-2b: ОДНА кривая громкости — амплитуда v² (прежде у соло линейная: гейн = vol)
+  v.vol.gain.setTargetAtTime(a,t,0.04);
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
   if(v.on)return;
   v.on=true; v.tOn=t;
@@ -2300,7 +2307,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
   const attJ = LEAD_INSTR[ins].att*(0.9+rnd()*0.2);   // ±10% времени атаки
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(lvlJ,t,tie?0.02:attJ);  // T3: связка — вход за τ 20 мс, как кроссфейд банков живьём
-  if(!tie) b.strike && b.strike(t, vol);             // T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
+  if(!tie) b.strike && b.strike(t, volVel('ld',a));  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
 }
 /* ins (T0-fix) — тембр ВЕДЕНИЯ: смена ЖИВОГО тембра соло посреди ноты ПЕРЕЛИВАЕТ звучащую ноту (живой путь
    зовёт leadOn каждый кадр, и leadVoiceBank делает кроссфейд банков голоса за 20 мс). Запись пишет это
@@ -2317,7 +2324,7 @@ function leadSet(owner,freq,vol,deg,oct,ins,glide,when){           // веден
   const b=v.banks[v.ins];
   applyVoiceFx(v,pendFx,t,false);                           // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины). fresh=false ВСЕГДА: leadSet по определению не атака
   if(freq!=null&&b)b.setFreq(freq,glide==null?undefined:glide,t);   // V1: glide не задан (undefined ИЛИ null) — умолчание банка (20 мс), как было
-  v.vol.gain.setTargetAtTime(vol,t,0.04);
+  v.vol.gain.setTargetAtTime(volAmp(vol),t,0.04);   // VOL-2b: та же кривая, что на атаке
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }                  // ступень ведётся вместе с частотой — подсветка идёт за нотой
 }
 /* Отпускание: голос УХОДИТ ИЗ leadHold сразу — подсветка гаснет ровно в тот момент, когда сняли ноту,
@@ -2445,12 +2452,12 @@ function bassOn(owner,freq,vol,ins,deg,oct,glide,bri,when){
     v.o1.type=v.ins.t1; v.o2.type=v.ins.t2; v.o2.detune.setValueAtTime(v.ins.det,t);
     const fo=v.ins.fo||1, ft=v.ins.ft||0.03, fv=v.ins.fv||0;   // огибающая фильтра + скорость→яркость на АТАКЕ (не в пофреймовом пути → не сбивается); высоту баса НЕ дёргаем (низ = гулкие биения)
     v.lp.frequency.cancelScheduledValues(t); v.lp.frequency.setValueAtTime(v.ins.lp*fo,t);
-    v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*vol),t,ft);
+    v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*volVel('bs',volAmp(vol))),t,ft);   // VOL-2b: скорость удара — прежнее число через амплитуду (volVel): тише прежнего пола 30% — база фильтра
     v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
   }
   v.tOn=t;
   v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
-  v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер
+  v.vol.gain.setTargetAtTime(v.ins.lvl*volAmp(vol),t,0.03);   // lvl — как у аккордов, чтобы бас не жёг лимитер. VOL-2b: одна кривая v² (прежде 0.3+0.7·vol — ноль не был тишиной)
 }
 /* glide (V1) — как у bassOn; ведение всегда легато. Нет — BASS_GLIDE_TC (⛳ прежде здесь стояло 0.03 — см. BASS_GLIDE_TC). */
 function bassSet(owner,freq,vol,deg,oct,glide,bri,when){   // deg/oct (P1) — ступень едет вместе с частотой, как у leadSet; glide (V1), bri — перед when
@@ -2459,7 +2466,7 @@ function bassSet(owner,freq,vol,deg,oct,glide,bri,when){   // deg/oct (P1) — �
   briStage(v.bri, 'bs', bri, t, false);       // ЯРКОСТЬ ведения — своя величина события
   const gtc = glide!=null ? glide : BASS_GLIDE_TC;
   v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
-  v.vol.gain.setTargetAtTime(v.ins.lvl*(0.3+0.7*vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень
+  v.vol.gain.setTargetAtTime(v.ins.lvl*volAmp(vol),t,0.05);   // тот же lvl, иначе глиссандо вернуло бы уровень. VOL-2b: та же кривая
 }
 function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; v.deg=-1; bvRelease(v,false,when); delete bassHold[owner]; }   // P1: как leadOff — подсветка гаснет в миг снятия, хвост релиза дозвучивает
 
@@ -2580,12 +2587,18 @@ let hitBus=null;
 /* bri — яркость удара (0..1) или undefined «не задана»; ПЕРЕД when (правило #15), позиционные вызовы (ENG, зонд) поправлены. */
 function drumHit(i,vol=1,kit=0,bri,when){
   if(!AC)return; const t=when!=null?when:AC.currentTime;
+  /* VOL-2b: громкость 0 — ТОЧНАЯ тишина: удар не строится вовсе (ни источника, ни фильтра яркости). Иначе огибающие ударов —
+     setValueAtTime(пик)+exponentialRamp до 0.001 — начинались бы с нуля, а экспоненциальный ход из нуля по спецификации
+     стоит на нуле и прыгает к 0.001 в конце: тихий щелчок вместо тишины. ⚠️ Названный край: у очень тихого удара под-голос
+     с пиком ниже 0.001 (самый тихий множитель — 0.12·v², то есть громкость ниже ~9) идёт ВВЕРХ к 0.001 — это −60 дБ,
+     неслышно. Прежняя карта такого не знала: её пол давал пики не ниже ~0.036. */
+  if(!(volAmp(vol)>0)) return;
   hitBus=drumBus;
   if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(drumBus); hitBus=f; }
   try{ drumVoice(i,vol,kit,t); } finally{ hitBus=drumBus; }
 }
 function drumVoice(i,vol,kit,t){
-  const v=0.3+0.7*vol;   // удар — одноразовый источник, стартует в t (все под-голоса уже берут t)
+  const v=volAmp(vol);   // удар — одноразовый источник, стартует в t (все под-голоса уже берут t). VOL-2b: одна кривая v² (прежде 0.3+0.7·vol — ноль не был тишиной); скорости удара у ударных нет, только пик
   if(kit===1) return darbukaHit(i,v,t);
   if(kit===2) return tablaHit(i,v,t);
   if(kit===3) return gamelanHit(i,v,t);
@@ -2657,7 +2670,7 @@ export {
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxPerm,   // VOL-0: постоянная запись цепи (громкость) — единый предикат «не показывать и не предлагать»
-  fxHandRange,   // VOL-1: ход руки по параметру из объявления (громкость — [0.2, 1])
+  fxHandRange,   // VOL-1: ход руки по параметру из объявления (с VOL-2b у громкости — полный [0, 1])
   fxIsPerNote, fxNoteField, fxVoiceIdsFor,   // V4b: параметр «в ноте» и где он лежит в событии (полоса правит НОТЫ); голосовые эффекты, которые можно добавить дорожке роли
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел

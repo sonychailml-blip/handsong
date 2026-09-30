@@ -399,7 +399,7 @@ export const DICTS = {
     'tutor.step3.prompt':'Now touch the tip of your thumb to a fingertip other than the index.',
     'tutor.step3.detail':'Index, middle, ring, little — each finger plays a higher octave. Same hand, same movement, different range.',
     'tutor.step4.prompt':'Now the left hand: touch your thumb to a fingertip and move up and down.',
-    'tutor.step4.detail':'Each finger is a different effect — reverb, delay, vibrato and more, shown as bars at the left edge. The finger chooses the effect, the height sets how much.',
+    'tutor.step4.detail':'Each finger is a different effect — reverb, delay, vibrato and more, shown as bars at the right edge. The finger chooses the effect, the height sets how much.',   // столбики — у ПРАВОЙ кромки роли со слайса б.2 (текст исправлен в VOL-2b)
     'tutor.final.prompt':'That\'s the core: notes, pitch, octaves, and effects on the sound.',
     // обучение — урок «Аккорды»
     'tutor.chSwitch.prompt':'Tap the "Solo" button at the top to switch to Chords, then touch your fingertips together to play one.',
@@ -805,7 +805,7 @@ export const DICTS = {
     'tutor.step3.prompt':'Теперь коснитесь кончиком большого пальца кончика другого пальца, не указательного.',
     'tutor.step3.detail':'Указательный, средний, безымянный, мизинец — каждый палец играет октавой выше. Та же рука, то же движение, другой регистр.',
     'tutor.step4.prompt':'Теперь левая рука: коснитесь большим пальцем кончика и ведите вверх-вниз.',
-    'tutor.step4.detail':'Каждый палец — свой эффект: реверб, делей, вибрато и другие, они видны столбиками у левого края. Палец выбирает эффект, высота задаёт величину.',
+    'tutor.step4.detail':'Каждый палец — свой эффект: реверб, делей, вибрато и другие, они видны столбиками у правого края. Палец выбирает эффект, высота задаёт величину.',   // у ПРАВОЙ кромки со слайса б.2 (исправлено в VOL-2b)
     'tutor.final.prompt':'Это основа: ноты, высота, октавы и эффекты на звуке.',
     // обучение — урок «Аккорды»
     'tutor.chSwitch.prompt':'Нажмите кнопку «Соло» вверху, чтобы переключиться на «Аккорды», и сведите кончики пальцев — заиграет аккорд.',
