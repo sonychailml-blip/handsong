@@ -327,7 +327,7 @@ export const DICTS = {
     // VOL-2: «Громкость» — постоянная строка первой в зоне «в ноте» у каждой роли
     'fx.vol':'Volume',
     'fx.vol.amt':'Level',
-    'fx.vol.hint':'How loud each note is played. On the playing hand’s Horizontal (left–right), every hand keeps its own volume, and another parameter placed there moves together with it; on a finger of the effects hand, all hands of this role share it. A latched chord with open fingers does not follow a finger change. To free the Horizontal, move the volume elsewhere or set it Fixed.',
+    'fx.vol.hint':'How loud each note is played. On the playing hand’s Horizontal (left–right), every hand keeps its own volume, and another parameter placed there moves together with it. On the playing hand’s Depth, too, every hand keeps its own volume: nearer to the camera is quieter, farther is louder (Invert flips it), and anything else on Depth moves with it. On a finger of the effects hand, all hands of this role share it. A latched chord with open fingers follows neither a finger change nor depth. To free the Horizontal, move the volume elsewhere or set it Fixed.',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Tail',
     'fx.reverb.tone':'Tone',
@@ -742,7 +742,7 @@ export const DICTS = {
     // VOL-2: «Громкость» — постоянная строка первой в зоне «в ноте» у каждой роли
     'fx.vol':'Громкость',
     'fx.vol.amt':'Уровень',
-    'fx.vol.hint':'Насколько громко звучит каждая нота. На «Горизонтали» (влево–вправо) играющей руки у каждой руки своя громкость, а поставленный туда же параметр едет вместе с ней; на пальце руки-эффектов она одна на все руки этой роли. Защёлкнутый аккорд с разомкнутыми пальцами смену с пальца не подхватывает. Чтобы освободить «Горизонталь», унесите громкость на другой адрес или поставьте «Фиксировано».',
+    'fx.vol.hint':'Насколько громко звучит каждая нота. На «Горизонтали» (влево–вправо) играющей руки у каждой руки своя громкость, а поставленный туда же параметр едет вместе с ней. На «Глубине» играющей руки громкость тоже у каждой руки своя: ближе к камере — тише, дальше — громче («Инверсия» переворачивает), и всё, что стоит на глубине, едет вместе с ней. На пальце руки-эффектов она одна на все руки этой роли. Защёлкнутый аккорд с разомкнутыми пальцами не подхватывает ни смену с пальца, ни глубину. Чтобы освободить «Горизонталь», унесите громкость на другой адрес или поставьте «Фиксировано».',
     // Подписи ПАРАМЕТРОВ — короткие: они стоят подстрокой под уже подписанным эффектом, повторять его имя незачем.
     'fx.reverb.decay':'Длина',
     'fx.reverb.tone':'Окраска',

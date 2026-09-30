@@ -1279,7 +1279,7 @@ const FINGER_KEYS=['finger.index','finger.middle','finger.ring','finger.pinky'];
    ФОРМА ЗНАЧЕНИЯ: 'fixed' | 'play:z' | 'fx:<палец>:<ось>'. Разбирается ровно в одном месте (ниже, в
    обработчике), в данные уезжают отдельные поля hand/finger/axis — строка живёт только в меню.
    ГРУППЫ (<optgroup>) несут пальцы: нативный список остаётся компактным на любом экране, потому что
-   рисует его ОС. Сегодня 1+4×3+2 = 15 пунктов (у громкости — 14: глубины ей до VOL-4 не предлагаем); после двойного щипка (Пласт 3.6) станет вдвое больше
+   рисует его ОС. Сегодня 1+4×3+2 = 15 пунктов (у громкости тоже, с VOL-4); после двойного щипка (Пласт 3.6) станет вдвое больше
    пальцевых групп — форма это выдержит без перестройки.
    ⚠️ Смешение адресов в ОДНОМ эффекте — это и есть разделение эффекта между руками: у реверба можно
    оставить длину и окраску на пальце, а подмес отдать глубине играющей. */
@@ -1289,7 +1289,7 @@ function fxAddrOf(pa){   // адрес параметра → значение <
   if(pa.hand==='play') return 'play:'+(pa.axis||'z');   // у играющей руки ОСЕЙ ДВЕ (3.7.3): глубина и горизонталь. Хардкод 'play:z' здесь показывал бы X-адрес как «глубину» и молча возвращал его на Z при любой правке строки
   return 'fx:'+(pa.finger|0)+':'+(pa.axis||'y');
 }
-function buildAddrSel(pa,noZ){   // noZ — VOL-2: у громкости глубины нет (адрес «глубина → громкость» — VOL-4, ему нужен общий расчёт глубины на руку)
+function buildAddrSel(pa){   // VOL-4: у громкости глубина ЕСТЬ (прежний флаг noZ снят) — gestures считают глубину руки одним шагом за кадр (мемо depthOf)
   const sel=document.createElement('select'); sel.autocomplete='off';
   const opt=(v,txt)=>{ const o=document.createElement('option'); o.value=v; o.textContent=txt; return o; };
   sel.appendChild(opt('fixed',t('fx.mode.fixed')));                 // «Фиксировано» — адрес особого рода: руки нет вовсе
@@ -1305,7 +1305,7 @@ function buildAddrSel(pa,noZ){   // noZ — VOL-2: у громкости глу�
      ⛔ Вертикали здесь нет и не будет: Y — это ВЫСОТА, единственная ось, которую отдать нельзя. */
   const gp=document.createElement('optgroup'); gp.label=t('fx.addr.play');
   gp.appendChild(opt('play:x',t('axis.x')));
-  if(!noZ) gp.appendChild(opt('play:z',t('axis.z')));
+  gp.appendChild(opt('play:z',t('axis.z')));
   sel.appendChild(gp);
   sel.value=fxAddrOf(pa);
   return sel;
@@ -1723,7 +1723,7 @@ function renderFxCtl(){
       const sub=document.createElement('div'); sub.className='prow fxsub'; sub.style.paddingLeft='14px'; sub.style.margin='4px 0';
       const plab=document.createElement('label'); plab.textContent=t(lk); plab.style.flex='0 0 114px';
       /* АДРЕС — ОДИН список вместо прежней пары «режим + ось» (см. довод у buildAddrSel). */
-      const ad=buildAddrSel(pa, eff.fxId===FX_VOL);   // VOL-2: громкости — без глубины (VOL-4)
+      const ad=buildAddrSel(pa);   // VOL-4: громкости — тот же список, что у всех, с глубиной
       ad.onchange=e=>{
         const val=e.target.value, ps=fxParamsOf(fxCtlChain(),eff.fxId), p=ps[pi];
         if(val==='fixed'){
