@@ -3,7 +3,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          bassOn, bassSet, bassOff, bassHold, drumHit, droneOn, droneOff,
          fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
-         fxIsPerNote, fxNoteField } from './audio.js';   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
+         fxIsPerNote, fxNoteField, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf } from './state.js';   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
@@ -669,8 +669,8 @@ function captureInfoOf(layer){
   for(const e of events) if(e.layer===layer) tks.add(e.tk||0);
   const ids=new Set(); let pts=0;
   for(const tk of tks){ const r=takeFx.get(tk); if(!r) continue;
-    const ch=r.chains[key]; if(ch) for(const e of ch) ids.add(e.fxId);
-    for(const ent of r.lane){ if(ent.key!==key) continue; pts++; if(ent.fx!==FX_CHAIN) ids.add(ent.fx); }   // FX_CHAIN — служебная запись состава, у неё нет имени и показывать её нечем
+    const ch=r.chains[key]; if(ch) for(const e of ch) if(!fxPerm(e.fxId)) ids.add(e.fxId);   // VOL-0: громкость в сводке не называем (она у дорожки есть всегда и в этом слайсе невидима)
+    for(const ent of r.lane){ if(ent.key!==key||fxPerm(ent.fx)) continue; pts++; if(ent.fx!==FX_CHAIN) ids.add(ent.fx); }   // FX_CHAIN — служебная запись состава, у неё нет имени и показывать её нечем. VOL-0: точки громкости (если X был отдан эффекту, их пишет захват) в счёт не идут — иначе число в сводке выросло бы
   }
   return { takes:tks.size, role, fx:[...ids], pts };
 }
@@ -1620,7 +1620,7 @@ function autAddrs(layer){
   for(const T of autTakesOf(layer).slice().reverse()){
     const rec=takeFx.get(T.tk); if(!rec) continue;
     const ch=rec.chains[key]; if(!ch) continue;
-    for(const eff of ch) for(const meta of fxParamMetaOf(eff.fxId)){
+    for(const eff of ch) if(!fxPerm(eff.fxId)) for(const meta of fxParamMetaOf(eff.fxId)){   // VOL-0: громкости на полосе пока нет — её полоса («в ноте», из нот) приходит в VOL-3
       const i=out.findIndex(o=>o.fx===eff.fxId&&o.p===meta.key);
       if(i>=0) out.splice(i,1);                       // тот же адрес у более старшего взятого — порядок берём у него
       out.push({key, fx:eff.fxId, p:meta.key, labelKey:meta.labelKey, short:meta.short});
@@ -1633,7 +1633,7 @@ function autAddrs(layer){
   for(const T of autTakesOf(layer).slice().reverse()){
     const rec=takeFx.get(T.tk); if(!rec) continue;
     for(const ent of rec.lane){ if(ent.key!==key||ent.fx!==FX_CHAIN||!ent.ids) continue;
-      for(const id of ent.ids){ if(out.some(o=>o.fx===id)) continue;
+      for(const id of ent.ids){ if(fxPerm(id)||out.some(o=>o.fx===id)) continue;   // VOL-0: громкость есть в каждом составе — «добавленной посреди взятого» она не бывает
         for(const meta of fxParamMetaOf(id)) out.push({key, fx:id, p:meta.key, labelKey:meta.labelKey, short:meta.short}); } }
   }
   return out;
@@ -1860,7 +1860,9 @@ function autChainOf(layer){
   const key=laneChainKey(layer); if(!key) return [];
   const T=autTakesOf(layer)[0]; if(!T) return [];
   const rec=takeFx.get(T.tk); if(!rec) return [];
-  const ch=rec.chains[key]; return ch?ch.map(e=>e.fxId):[];
+  /* VOL-0: БЕЗ постоянной записи (громкость). Этот список читает ТОЛЬКО ui редактора — и ради индексов ▲▼: громкость стоит в
+     снимке первой, и без фильтра у первого показанного эффекта ожила бы стрелка ▲ (двигать его «выше громкости»). */
+  const ch=rec.chains[key]; return ch?ch.filter(e=>!fxPerm(e.fxId)).map(e=>e.fxId):[];
 }
 function autChainAdd(layer,fxId){
   if(!editGuard()||!fxId) return false;
@@ -1877,7 +1879,7 @@ function autChainRemove(layer,fxId){
   if(!editGuard()) return false;
   const key=laneChainKey(layer); if(!key) return false;
   const rec=autEnsure(layer); if(!rec) return false;
-  const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId); if(i<0) return false;
+  const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId); if(i<0||fxPerm(fxId)) return false;   // VOL-0: постоянную запись не снимают (громкость есть у ноты всегда)
   /* ⛳ V4b: ГОЛОСОВОЙ ЭФФЕКТ ЖИВЁТ В НОТАХ, и снять его с дорожки — значит снять его величины с нот: иначе полоса пропала бы, а
      ноты звучали бы по-прежнему со Скольжением («убрал — а слышно»). Снятие из цепи и очистка нот — ОДНА запись истории,
      один сброс (editBatch, правило #28): ↶ вернёт и эффект, и величины. Шинный — как было. */
@@ -1895,6 +1897,7 @@ function autChainMove(layer,fxId,dir){
   const rec=autEnsure(layer); if(!rec) return false;
   const ch=rec.chains[key]||[]; const i=ch.findIndex(e=>e.fxId===fxId), j=i+(dir<0?-1:1);
   if(i<0||j<0||j>=ch.length) return false;
+  if(fxPerm(fxId)||fxPerm(ch[j].fxId)) return false;   // VOL-0: постоянная запись не переставляется и соседом для переноса не служит (её место в снимке — первое)
   const [e]=ch.splice(i,1); ch.splice(j,0,e);
   editPush({ kind:'autfxmove', ch, from:i, to:j });
   autCommit(); return true;

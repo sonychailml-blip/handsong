@@ -7,7 +7,7 @@ import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchD
          rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
-import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT } from './audio.js';   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
+import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) столбика не рисует   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
@@ -70,7 +70,8 @@ const fxInstOf=(key,eff)=> fxInstance(key,eff.fxId);   // O-0: экземпля�
    разворачивает эффект под зажатым пальцем (1 столбик → 3), и рамка, посчитанная по факту, дёргала бы
    разбор Гц в такт щипку. Максимум неподвижен. */
 const fxBarsMaxN=key=> fxChainOf(key).reduce((n,sl)=>{
-  if(fxIsScalar(sl.fxId)) return n+1;               // старый скалярный — по ЕДИНОМУ признаку (в.1), не по FX_META: делей-модуль там остался ради цвета, а столбиков у него три
+  if(fxPerm(sl.fxId)) return n;                     // VOL-0: громкость столбика не рисует (fxBarItems) — значит и места в рамке не занимает; иначе разбор Гц аккорда сдвинулся бы на гнездо
+  if(fxIsScalar(sl.fxId)) return n+1;              // старый скалярный — по ЕДИНОМУ признаку (в.1), не по FX_META: делей-модуль там остался ради цвета, а столбиков у него три
   const mod=fxSpecOf(sl); return n+(mod?mod.params.length:0);   // ФАБРИКА, не экземпляр: рамка не должна зависеть от того, построен ли эффект
 },0);
 /* Габарит полосы столбиков роли — или null, когда её нет (нет руки-эффектов / пустая цепь).
@@ -104,6 +105,7 @@ const fxParamIsPlay=la=> !!(la && la.mode==='drive' && la.hand==='play');
 const fxBarItems=(role,key)=>{
   const act=fxActiveFinger(role), out=[];
   fxChainOf(key).forEach(eff=>{   // ЦЕПЬ ЭТОЙ РОЛИ (слайс б.1; прежде литерал 'ld' — «столбики бывают только у соло»). С б.2 зовут для ЛЮБОЙ роли (drawFxBars — у правой кромки каждой роли/половины)
+    if(fxPerm(eff.fxId)) return;                   // VOL-0: громкость — постоянная запись цепи, в этом слайсе невидимая (тот же фильтр — в fxBarsMaxN выше: рисунок и габарит считают одно)
     const m=FX_META.find(q=>q.k===eff.fxId);   // МЕТАДАННЫЕ ПОКАЗА (цвет, подпись) — у трёх скаляров и у делея-модуля (в.1): его столбики остались синими
     if(fxIsScalar(eff.fxId)){ out.push({v:fxAimGet(key,eff.fxId,FX_AMT,fx[eff.fxId]), c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0]), drv:fxIsDriven(key,eff.fxId,FX_AMT)}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META. O-3.1: величина — ПРИЦЕЛ руки, drv — правит ли этим адресом запись
     const mod=fxInstOf(key,eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре

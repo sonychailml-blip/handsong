@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO } from './state.js';
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
 import { baseF, tonicFreq } from './scales.js';
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS } from './config.js';
@@ -1053,6 +1053,36 @@ function makeGlideFx(){
   for(const p of params) fxWrapParam(p);
   return { id:'glide', labelKey:'fx.glide', kind:'voice', params };
 }
+/* ═══ ГРОМКОСТЬ — ГОЛОСОВОЙ МОДУЛЬ ВСЕХ РОЛЕЙ (слайс VOL-0, план «громкость как параметр») ═══
+   ⛳ ГРОМКОСТЬ ОСТАЁТСЯ ПЕР-НОТНОЙ (вывод плана): это не только уровень, но и СКОРОСТЬ УДАРА на атаке, которая лепит тембр
+   (strike соло-банков, цель фильтра f аккорда), — шинный гейн после суммы её не повторит; две руки одной роли держат СВОИ
+   громкости; записанное и так несёт её в каждой ноте. Поэтому величина живёт в ПРЕЖНЕМ поле события a.vol (note.key) —
+   формат события не меняется ни на байт.
+   ⛳ ПОЛЯ ОБЪЯВЛЕНИЯ:
+     • шкала — СЫРАЯ 0..1, линейная (min 0, max 1): v01 === a.vol. Не 0.2..1 — подложки кладут громкость НИЖЕ пола руки
+       (клетки ударов до 0.18, arrange.js), и шкала с полом их бы не выразила;
+     • def 0.8 — тот же уровень, что у fxVolFix сегодня;
+     • attach + note:{key:'vol', required:true} без roles — величина «в ноте», в своём поле у ВСЕХ ролей, и она
+       ОБЯЗАТЕЛЬНА: нота без громкости дала бы движку undefined, то есть NaN в гейне. Правку полосой, которая это
+       соблюдает, делает VOL-3; здесь — объявление;
+     • handRange [0.2,1] — ход РУКИ по этому параметру: левый край даёт 0.2, как сегодня (0.2+0.8·xn). ⚠️ ВРЕМЕННО:
+       решение пользователя — в VOL-2 ход станет полным (0..1, левый край = тишина) вместе со стандартизацией
+       громкости у всех ролей. В VOL-0 это поле не читает никто.
+     • perm — ПОСТОЯННАЯ запись: сеется первой в каждую цепь (state.fxChains), не убирается, не переставляется и в
+       VOL-0 не показывается НИГДЕ (fxPerm ниже — один предикат на все места показа).
+   ⛔ УЗЛОВ НЕТ (как у Скольжения): правило #3 не задето — ничего не строится и не запускается.
+   ⛔ В VOL-0 ГРОМКОСТЬ ПО-ПРЕЖНЕМУ СЧИТАЮТ gestures (0.2+0.8·xn или fxVolFix) — модуль лишь ОБЪЯВЛЕН. По правилу #29 он
+   захватывается (fxCaptureChain/fxCaptureWalk обходят inst.params), но ничто со звуком его не читает: переигровка
+   пропускает пер-нотное (fxLaneMerge), снимок ноты пропускает поле со своим местом (fxSnapshot), голос берёт a.vol. */
+const VOL_PARAMS=[
+  {key:'amt', labelKey:'fx.vol.amt', short:'VOL', unit:'', def:0.8, min:0, max:1, curve:'lin', attach:true,
+   note:{key:'vol', required:true}, handRange:[0.2,1]},
+];
+function makeVolFx(){
+  const params=VOL_PARAMS.map(sp=>({...sp, set:()=>{}}));   // узлов нет: set пуст, величину держит p.cur (как у Скольжения)
+  for(const p of params) fxWrapParam(p);
+  return { id:FX_VOL, labelKey:'fx.vol', kind:'voice', params };
+}
 /* Умолчание параметра ДЛЯ ВЛАДЕЛЬЦА ЦЕПИ: defBy — объявленная таблица «роль → величина»; ключ сравниваем на РАВЕНСТВО
    (ключ непрозрачен, O-0). Нет таблицы или роли в ней — общий def, то есть для всех прежних эффектов ничего не меняется. */
 function fxDefFor(sp,key){ if(sp.defBy&&key!=null) for(const r in sp.defBy) if(chainKeyOf(r)===key) return sp.defBy[r]; return sp.def; }
@@ -1064,12 +1094,19 @@ function fxGlideOf(m){ const v=m&&m[FX_GLIDE_KEY]; return v==null ? undefined : 
    принимают любой сигнал и поля не имеют. ⚠️ Прежде общий список «+ Добавить» перечислял ВСЮ фабрику, и яркость аккордов
    предлагалась соло, басу и ударным, где её не читает никто. */
 const FX_FACTORY={
+  [FX_VOL]:{ id:FX_VOL, labelKey:'fx.vol', kind:'voice', params:VOL_PARAMS, make:makeVolFx, roles:['ld','ch','bs','dr'], perm:true },   // VOL-0: ГРОМКОСТЬ — постоянная голосовая запись каждой цепи (см. VOL_PARAMS). Первой: так читается «в ноте» сверху вниз
   reverb:{ id:'reverb', labelKey:'fx.reverb', kind:'bus',   params:REV_PARAMS,    make:makeReverbFx },
   bright:{ id:'bright', labelKey:'fx.bright', kind:'voice', params:BRIGHT_PARAMS, make:makeBrightFx, roles:['ch','ld','bs','dr'] },   // яркость — ВСЕМ ролям: у аккордов фильтр fb голоса, у прочих — ступень яркости (makeBriStage / удар)
   glide: { id:'glide',  labelKey:'fx.glide',  kind:'voice', params:GLIDE_PARAMS,  make:makeGlideFx,  roles:['ld','bs'] },   // V4: мелодические роли
   dly:   { id:'dly',    labelKey:'fx.dly',    kind:'bus',   params:DLY_PARAMS,    make:makeDelayFx },
   trmMix:{ id:'trmMix', labelKey:'fx.trmMix', kind:'insert',params:TRMIX_PARAMS,  make:makeTremMixFx },   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
 };
+/* ⛳ ПОСТОЯННАЯ ЗАПИСЬ ЦЕПИ (VOL-0) — ОДИН предикат на все места, где запись цепи ПОКАЗЫВАЮТ или ПРЕДЛАГАЮТ: столбики и их
+   габарит (draw), панель — строки, подсказка, карта общих адресов, списки «добавить» (ui), голосовой список дорожки
+   (fxVoiceIdsFor), адреса полосы, цепь дорожки в редакторе и сводка захвата (recorder). Размножить проверку по месту
+   значило бы однажды забыть одно из них — и громкость всплыла бы там, где её не ждут. Звук и запись фильтр НЕ
+   трогают: захват по-прежнему идёт по объявлениям (правило #29). */
+const fxPerm=id=> !!(FX_FACTORY[id] && FX_FACTORY[id].perm);
 /* ЯРКОСТЬ АККОРДОВ, КАК ЕЁ ЧИТАЕТ ГОЛОС. Отдаёт величину в форме, которую ждёт chordOn/chordGlide —
    ГЛУБИНУ (0 ярко .. 1 глухо), потому что briToHz принимает именно её; параметр же хранит ЯРКОСТЬ,
    отсюда 1−cur.
@@ -1313,7 +1350,7 @@ const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!==
    редакторе такой эффект не встаёт в путь, а открывает полосу, правка которой переписывает ноты дорожки. */
 const fxVoiceIdsFor=role=>{
   const out = role==='ld' ? Object.keys(fx).filter(id=>fxIsScalar(id)) : [];
-  for(const id in FX_FACTORY){ const f=FX_FACTORY[id]; if(f.kind==='voice' && (f.roles||[]).includes(role)) out.push(id); }
+  for(const id in FX_FACTORY){ const f=FX_FACTORY[id]; if(f.kind==='voice' && !f.perm && (f.roles||[]).includes(role)) out.push(id); }   // VOL-0: постоянную запись (громкость) добавлять нечего — она у дорожки есть всегда
   return out;
 };
 /* ⛳ V4b: ПАРАМЕТР «В НОТЕ» — ЕГО ВЕЛИЧИНУ НЕСЁТ САМО СОБЫТИЕ НОТЫ, а не лента. Решается ОБЪЯВЛЕНИЕМ, без списка: прицепочный
@@ -1496,7 +1533,12 @@ function fxSnapshot(key){
     const id=eff.fxId, f=FX_FACTORY[id];
     if(!f){ if(id in fx) out[id+':'+FX_AMT]=fx[id]; continue; }
     const inst=FX_INST[key] && FX_INST[key][id]; if(!inst) continue;
-    f.params.forEach((s,i)=>{ if(s.attach && inst.params[i]) out[id+':'+s.key]=inst.params[i].cur; });
+    /* ⛔ VOL-0: ПАРАМЕТР СО СВОИМ ПОЛЕМ В СОБЫТИИ У ВСЕХ РОЛЕЙ (note без roles — громкость, поле a.vol) В КАРТУ НЕ ИДЁТ.
+       Он и так едет в ноте своим полем, и его кладёт туда сам жест; в карте он был бы вторым представлением одной
+       величины. Хуже того — видимым: у каждой соло-ноты в a.fx появился бы новый ключ, а бас-нота, чья карта пишется
+       лишь при НЕПУСТОМ снимке, получила бы карту всегда — события перестали бы быть байт-в-байт прежними. Поле с
+       ограничением по ролям (яркость: a.bri только у аккордов) не трогаем — у прочих ролей она живёт в карте, как было. */
+    f.params.forEach((s,i)=>{ if(s.attach && inst.params[i] && !(s.note && !s.note.roles)) out[id+':'+s.key]=inst.params[i].cur; });
   }
   return out;
 }
@@ -2605,6 +2647,7 @@ export {
   timbresOf,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
+  fxPerm,   // VOL-0: постоянная запись цепи (громкость) — единый предикат «не показывать и не предлагать»
   fxIsPerNote, fxNoteField, fxVoiceIdsFor,   // V4b: параметр «в ноте» и где он лежит в событии (полоса правит НОТЫ); голосовые эффекты, которые можно добавить дорожке роли
   fxParamMetaOf, fxDefaultsOf, fxAddableIds,   // O-4: полоса автоматизации — подписи параметров, дефолты для эффекта, добавленного в редакторе, и что вообще можно добавить
   fxAimSet, fxAimGet, FX_AMT,   // O-3.1: ПРИЦЕЛ РУКИ — пишет ТОЛЬКО рука (через fxParamsOf), читают столбики. FX_AMT — имя единственного параметра старых скаляров: одно на запись, показ и прицел

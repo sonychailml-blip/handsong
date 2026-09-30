@@ -21,7 +21,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf, rollAutSnapV, rollAutDrive } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf } from './audio.js';   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, droneAudible,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -1558,6 +1558,12 @@ function renderFxCtl(){
     row.appendChild(lab); row.appendChild(sel); fxCtlRows.appendChild(row);
   }
   const chain=fxChainOf(fxCtlChain());
+  /* ⛳ VOL-0: ПОКАЗЫВАЕМ ЦЕПЬ БЕЗ ПОСТОЯННОЙ ЗАПИСИ (громкость). ⚠️ Индексы остаются НАСТОЯЩИМИ индексами массива chain —
+     строки ниже строятся из chain с effIdx и лишь потом фильтруются, а засев фиксированных идёт по chain целиком (у
+     громкости адрес play:x, засевать там нечего). shown — только для того, что СЧИТАЕТ или ПОКАЗЫВАЕТ: подсказка про
+     руку, карта общих адресов. Без фильтра у баса и ударных (их цепь по умолчанию пуста) появилась бы подсказка «адреса
+     ниже не действуют» при пустом списке, а у эффекта на горизонтали — чип «×2» с невидимой громкостью. */
+  const shown=chain.filter(e=>!fxPerm(e.fxId));
   /* ⚠️ ВЕТКА «У ЭТОЙ РОЛИ НЕТ ЦЕПИ» УДАЛЕНА (Пласты 3.5.3/3.5.4), и это не упрощение, а следствие: цепь
      теперь МОЖЕТ БЫТЬ У ЛЮБОЙ из четырёх ролей — обработка появилась на всех шинах. Объяснение
      «аккорды, бас и ударные идут на выход без обработки» стало ЛОЖЬЮ, а ложная подсказка хуже
@@ -1565,7 +1571,7 @@ function renderFxCtl(){
      подвале сам говорит, что делать. Гейта здесь больше нет НИ ОДНОГО — все роли равны.
      ⚠️ ПОДСКАЗКА ПРО РУКУ — ТОЛЬКО У НЕПУСТОЙ ЦЕПИ. Она говорит «пальцевые адреса НИЖЕ не действуют»,
      а при пустой цепи никаких адресов ниже нет: это был бы ответ на незаданный вопрос. */
-  if(chain.length && !roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));
+  if(shown.length && !roleHasFx(fxCtlRole)) fxCtlRows.appendChild(fxHint('fx.noHand'));   // VOL-0: по ПОКАЗАННОЙ цепи (см. shown)
   /* ═══ ФИКСИРОВАННАЯ ГРОМКОСТЬ РОЛИ — ПОЯВЛЯЕТСЯ, ТОЛЬКО КОГДА X ОТДАН ЭФФЕКТУ (Пласт 3.7.3) ═══
      Это не настройка «на всякий случай», а ПРЯМОЕ СЛЕДСТВИЕ выбора: подписал параметр этой роли на
      «Играющая рука → Горизонталь» — рука больше не ведёт громкость, и её надо где-то задать. Пока
@@ -1599,7 +1605,7 @@ function renderFxCtl(){
       if(pa.mode==='fixed' && pa.v01==null && ps[pi]) setFxParamFixed(fxCtlChain(),ei,pi,ps[pi].get());
     });
   });
-  const share=fxShareMap(chain);   // выводим ОДИН раз на отрисовку: карту читают и заголовки, и строки параметров
+  const share=fxShareMap(shown);   // выводим ОДИН раз на отрисовку: карту читают и заголовки, и строки параметров. VOL-0: по показанной цепи — громкость в «×N» не считается
   /* ═══ ДВЕ ЗОНЫ СПИСКА (слайс O-1) ═══
      ⛳ ЗАЧЕМ. Список ВСЕГДА держал ДВА разных рода вещей, и до сих пор это было невидимо: драйв и вибрато
      делаются ВНУТРИ ГОЛОСА (шейпер до огибающей; LFO в detune), а реверб, делей и тремоло обрабатывают
@@ -1613,7 +1619,7 @@ function renderFxCtl(){
      настоящими индексами массива. */
   const zoneOf=fxId=>{ if(fxIsScalar(fxId)) return 'voice';      // старый скалярный (драйв/вибрато/тремоло-нота) — всегда в голосе
     const m=FX_FACTORY[fxId]; return (m&&m.kind==='voice')||!m ? 'voice' : 'bus'; };   // неизвестную запись считаем голосовой: у неё нет узлов, в путь она не войдёт
-  const rows=chain.map((eff,effIdx)=>({eff,effIdx,zone:zoneOf(eff.fxId)}));
+  const rows=chain.map((eff,effIdx)=>({eff,effIdx,zone:zoneOf(eff.fxId)})).filter(r=>!fxPerm(r.eff.fxId));   // VOL-0: громкость строки не получает; effIdx — настоящий индекс, фильтр ПОСЛЕ нумерации
   const busRows=rows.filter(r=>r.zone==='bus');                  // порядок ЗВУКА — тот же, что в массиве
   const ordered=[...rows.filter(r=>r.zone==='voice'), ...busRows];   // показываем «в ноте» первым: так читается путь сигнала сверху вниз
   let lastZone=null;
@@ -1766,6 +1772,7 @@ function renderFxCtl(){
        V4: они живут В ГОЛОСЕ — поэтому их место в списке «в ноту». */
     if(fxCtlChain()===CHAIN_SOLO) for(const m of FX_META) if(fxIsScalar(m.k)) voiceAll.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ (шинный); здесь его отсекает fxIsScalar
     for(const id in FX_FACTORY){ const f=FX_FACTORY[id], it=[id, t(f.labelKey), f.params.length];
+      if(f.perm) continue;                                       // VOL-0: постоянную запись (громкость) не предлагаем — она в цепи всегда
       if(f.kind==='voice'){ if((f.roles||[]).includes(fxCtlRole)) voiceAll.push(it); }   // голосовой — только объявленным ролям
       else if(!chain.some(e=>e.fxId===id)) busAvail.push(it); }
     const voiceAvail=voiceAll.filter(it=>!chain.some(e=>e.fxId===it[0]));   // вычитаем стоящие: инвариант «одна запись на fxId» нарушить нельзя даже случайно
