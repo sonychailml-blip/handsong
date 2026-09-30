@@ -1370,6 +1370,9 @@ function editDeleteHit(ev){
    одной бас-ноты И все ноты того же k делят ключ 'bassloop:N[:k]', а движок требует, чтобы время внутри
    ключа не шло назад: переставь ведение за соседа — и на переигровке ноты поменяются местами, а «выкл»
    закроет чужую.
+   ⛳ S0 (правка соло и аккордов): функции ниже больше не басовые — роль берут из таблицы EDIT_ROLE (чуть ниже), и та же
+   машинерия отделения служит соло и аккордам. Правимыми их делают слайсы S2/S4 (state.ROLL_EDITABLE); до того сюда приходит
+   только бас. Слово «бас» в доводах ниже — это история того, для кого их писали; закон тот же у всех трёх ролей.
    ⛳ E2: ЗАКОН НЕЗАВИСИМОСТИ. Прежде порядок стерегли ЗАЖИМОМ — событие нельзя было увести за соседа по ключу, —
    и именно зажим делал ноты ЗАВИСИМЫМИ: перенос сегмента глиссандо двигал общую с соседом границу, длина
    середины отнималась у следующего, удаление середины давало прежней высоте тянуться дальше. Пользователь это
@@ -1378,15 +1381,43 @@ function editDeleteHit(ev){
    не с кем — зажим не нужен вовсе. Перекрытие двух бас-нот переигровка уже умеет: ключ различает голоса. */
 const EDIT_GAP=1e-4;                                        // зазор у границы: «вплотную» с равным t порядок решила бы сортировка, а не мы
 const EDIT_MIN_LEN=1/32;                                    // минимальная длина ноты в долях: короче — это уже не нота, а щелчок
+/* ═══ ТАБЛИЦА РОЛЕЙ ПРАВКИ (слайс S0 правки соло и аккордов) ═══
+   ⛳ ОДНА МОДЕЛЬ ПРАВКИ НА ТРИ ЛАДОВЫЕ РОЛИ. Отделение сегмента, перенос ноты целиком, длина и удаление (E1/E2) строились для
+   баса, но в них нет ничего басового, кроме ТРЁХ вещей, — их и держит эта таблица, а функции ниже читают её вместо литералов:
+     on / off — какие события начинают и кончают ноту роли;
+     fresh(слой) — СВЕЖАЯ идентичность ноты (часть ключа владельца, которой в слое ещё нет): у баса и аккордов — суффикс взятого k
+       ('bassloop:N:k[:v]', 'loop:N:k'; layerTakeTop — выше всех k слоя), у соло — номер ноты v ('leadloop:N:v'; layerSlotTop —
+       выше всех номеров слоя). ⚠️ У ключа соло суффикса k НЕТ ВОВСЕ — свежий k соло ничего бы не развёл (и layerTakeTop на
+       дорожке соло всегда 0);
+     keep(a) — поля ключа, которые нота ОСТАВЛЯЕТ себе при свежей идентичности: у баса это номер ноты v (P2: ключ 'bassloop:N:k:v'
+       различает одновременные бас-ноты и при новом k); у аккорда и соло — ничего (у соло v и есть свежая идентичность);
+     oldOff(a) — что несёт «выкл», закрывающий ноту под ПРЕЖНИМ ключом (по нагрузке определяющего события): бас — k и v, только
+       ненулевые (байт-в-байт прежний E2); аккорд — k, только ненулевой; соло — v ВСЕГДА, как пишет запись (recLeadOff).
+   ⛔ ВСТАВКА СЮДА НЕ ВХОДИТ: у каждой роли свои поля новой ноты (тембр, карта, тип) — это слайсы S2/S4.
+   ⚠️ S0 НЕВИДИМ: список правимых ролей (state.ROLL_EDITABLE) не тронут — соло и аккорды таблица знает, но редактор к ним не
+   пускает; у баса каждая функция ниже даёт ТЕ ЖЕ события, что и прежде (сверено построчно — см. отчёт слайса). */
+const EDIT_ROLE={
+  bs:{ on:'bassOn', off:'bassOff', fresh:ly=>({k:layerTakeTop(ly)}),
+       keep:a=>{ const v=(a&&a.v)||0; return v?{v}:null; },
+       oldOff:a=>{ const k=(a&&a.k)||0, v=(a&&a.v)||0; return {...(k?{k}:null), ...(v?{v}:null)}; } },
+  ch:{ on:'chOn', off:'chOff', fresh:ly=>({k:layerTakeTop(ly)}),
+       keep:()=>null,
+       oldOff:a=>{ const k=(a&&a.k)||0; return k?{k}:{}; } },
+  ld:{ on:'leadOn', off:'leadOff', fresh:ly=>({v:layerSlotTop(ly)}),
+       keep:()=>null,
+       oldOff:a=>({v:(a&&a.v)||0}) },
+};
+const editRoleOf=fn=>EDIT_ROLE[chaseRole(fn)]||null;       // null — удар, дрон, сирота без роли: правкам сегмента не подлежит
 /* События ОДНОГО сегмента, по времени: определяющее («вкл» или смена высоты) и ведения громкости внутри.
    Берём тем же обратным указателем byEv, которым songSegs их и собрал: «выкл» туда не входит (он кончает
    сегмент, а не принадлежит ему), определяющее событие следующего сегмента — тоже. */
 function segEvs(seg){ const SV=songSegs(); return seg.note.evs.filter(e=>SV.byEv.get(e)===seg); }
-/* Есть ли на отрезке [a,b] (с зазором) событие ДРУГОЙ ноты того же ключа владельца. O(n) на правку, не на кадр. */
+/* Есть ли на отрезке [a,b] (с зазором) событие ДРУГОЙ ноты того же ключа владельца. O(n) на правку, не на кадр.
+   S0: роль — у самой ноты (n.role), ключ — тем же chaseKey, что у движка и songNotes; у баса проверка дословно прежняя. */
 function keyClash(n,a,b){
   const own=new Set(n.evs);
   for(const e of events){
-    if(own.has(e)||e.layer!==n.layer||chaseRole(e.fn)!=='bs'||chaseKey('bs',e)!==n.key) continue;
+    if(own.has(e)||e.layer!==n.layer||chaseRole(e.fn)!==n.role||chaseKey(n.role,e)!==n.key) continue;
     if(e.t>=a-EDIT_GAP && e.t<=b+EDIT_GAP) return true;
   }
   return false;
@@ -1403,11 +1434,12 @@ function keyClash(n,a,b){
    правкой. Высота — всем событиям, которые её несут («выкл» высоты не несёт).
    ⛳ ЧУЖАЯ НОТА ТОГО ЖЕ КЛЮЧА на новом месте — нота берёт СВЕЖИЙ k (см. шапку): зажим снова разошёлся бы с призраком. */
 function editMoveNote(n,t,deg,oct){
+  const R=EDIT_ROLE[n.role]; if(!R) return false;
   const d=Math.max(0,t)-n.start;
-  const k= keyClash(n, n.start+d, n.end+d) ? layerTakeTop(n.layer) : null;   // ≥1: в слое есть хотя бы эта бас-нота
+  const fr= keyClash(n, n.start+d, n.end+d) ? R.fresh(n.layer) : null;   // S0: свежая идентичность ПО РОЛИ (бас/аккорд — {k} ≥1: в слое есть хотя бы эта нота; соло — {v} выше всех номеров слоя)
   const list=n.evs.map(e=>{
-    const pitch = e.fn!=='bassOff';
-    const a = (pitch||k!=null) ? {...e.a, ...(pitch?{deg,oct}:null), ...(k!=null?{k}:null)} : e.a;   // нагрузка — НОВЫМ объектом (как у переноса); sc/sev/tk едут с самим событием (правило #7)
+    const pitch = chaseKind(e.fn)!=='f';                     // S0: «выкл» высоты не несёт — у любой роли (у баса прежнее e.fn!=='bassOff')
+    const a = (pitch||fr) ? {...e.a, ...(pitch?{deg,oct}:null), ...fr} : e.a;   // нагрузка — НОВЫМ объектом (как у переноса); sc/sev/tk едут с самим событием (правило #7). Порядок полей прежний: {…, deg, oct, k}
     return { kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+d, a} };
   });
   return editBatch(list) ? n.head : false;
@@ -1430,27 +1462,30 @@ function editMoveNote(n,t,deg,oct){
    одной высоты глиссандо сохраняет (решение пользователя).
    ⛔ Новые события — в ТОМ ЖЕ взятом (tk), в том же слое (правило #27) и в СВОЁМ замороженном ладу (sc/sev
    копируются с события, чьё место они занимают, — правило #7): ⤺ снаружи снимет их вместе с дублем.
-   null — отделять нечего или некуда (открытый сегмент без конца — так лежит подложка, а её не правят). */
+   null — отделять нечего или некуда (открытый сегмент без конца — так лежит подложка, а её не правят).
+   ⛳ S0: РОЛЬ — ИЗ ТАБЛИЦЫ EDIT_ROLE (вид событий, свежая идентичность, «выкл» под прежним ключом). «Под свежим k» выше — это у
+   баса и аккордов; у соло свежая идентичность — номер ноты v (см. таблицу). У баса нагрузки и порядок их полей — прежние. */
 function detachPlan(seg){
-  const n=seg.note, E=seg.ev, X=seg.endEv;
-  if(seg.end==null) return null;
-  const kK=(E.a&&E.a.k)||0, k2=layerTakeTop(n.layer);
-  /* P2: НОМЕР НОТЫ v — часть ключа владельца (bassOwnerKey). Все события одной ноты несут один v, поэтому новый «выкл»
+  const n=seg.note, E=seg.ev, X=seg.endEv, R=EDIT_ROLE[n.role];
+  if(seg.end==null||!R) return null;
+  const fr=R.fresh(n.layer);                                  // свежая идентичность отделённой ноты: бас/аккорд {k}, соло {v}
+  /* P2: НОМЕР НОТЫ v — часть ключа владельца баса (bassOwnerKey). Все события одной ноты несут один v, поэтому новый «выкл»
      левой части и «выкл» отделённой ноты обязаны нести его тоже: иначе «выкл» ушёл бы под ДРУГОЙ ключ и не закрыл свою
-     ноту. При v=0 (ведущий режим, один владелец) поля нет — нагрузки те же, что до P2; у полифонического баса v бывает ≠0. */
-  const vN=(E.a&&E.a.v)||0, withV=vN?{v:vN}:null;
-  const inst=((n.head&&n.head.a)||{}).inst, withInst=inst!==undefined?{inst}:null;
+     ноту. При v=0 (ведущий режим, один владелец) поля нет — нагрузки те же, что до P2; у полифонического баса v бывает ≠0.
+     S0: это и есть R.keep (бас) и R.oldOff (у баса — {k?, v?}); у соло «выкл» прежнего ключа несёт свой v всегда (как запись). */
+  const keep=R.keep(E.a);
+  const inst=((n.head&&n.head.a)||{}).inst, withInst=inst!==undefined?{inst}:null;   // тембр НАЧАЛА ноты: ведения баса и аккорда тембра не несут (T0); у соло ведение несёт тот же тембр, что «вкл» (с T3 открытая нота тембр не меняет)
   const ops=[], items=[];
-  if(!seg.first) ops.push({ kind:'ins', evs:[{ t:seg.start, layer:n.layer, fn:'bassOff', a:{...(kK?{k:kK}:null), ...withV}, sc:E.sc, sev:E.sev, tk:E.tk }] });
+  if(!seg.first) ops.push({ kind:'ins', evs:[{ t:seg.start, layer:n.layer, fn:R.off, a:R.oldOff(E.a), sc:E.sc, sev:E.sev, tk:E.tk }] });
   for(const e of segEvs(seg)){
     const on = e===E;
-    items.push({ orig:e, fn: on?'bassOn':e.fn, t:e.t, a:{...e.a, ...(on&&e.fn!=='bassOn'?withInst:null), k:k2} });
+    items.push({ orig:e, fn: on?R.on:e.fn, t:e.t, a:{...e.a, ...(on&&e.fn!==R.on?withInst:null), ...fr} });
   }
-  if(X && chaseKind(X.fn)==='f') items.push({ orig:X, fn:'bassOff', t:X.t, a:{...X.a, k:k2} });
+  if(X && chaseKind(X.fn)==='f') items.push({ orig:X, fn:R.off, t:X.t, a:{...X.a, ...fr} });
   else {
-    items.push({ orig:null, proto:E, fn:'bassOff', t:seg.end, a:{k:k2, ...withV} });
+    items.push({ orig:null, proto:E, fn:R.off, t:seg.end, a:{...fr, ...keep} });
     if(X) ops.push({ kind:'del', evs:[X] },
-                   { kind:'ins', evs:[{ t:X.t, layer:X.layer, fn:'bassOn', a:{...X.a, ...withInst}, sc:X.sc, sev:X.sev, tk:X.tk }] });
+                   { kind:'ins', evs:[{ t:X.t, layer:X.layer, fn:R.on, a:{...X.a, ...withInst}, sc:X.sc, sev:X.sev, tk:X.tk }] });
   }
   return { ops, items };
 }
@@ -1465,11 +1500,11 @@ function commitDetach(P,keep){
     if(!keep||it.drop){ if(it.orig) del.push(it.orig); continue; }
     if(it.orig && it.orig.fn===it.fn){
       list.push({ kind:'move', ev:it.orig, from:{t:it.orig.t, a:it.orig.a}, to:{t:it.t, a:it.a} });
-      if(it.fn==='bassOn') head=it.orig;
+      if(chaseKind(it.fn)==='n') head=it.orig;              // S0: «вкл» отделённой ноты — у любой роли (у баса прежнее it.fn==='bassOn': в плане бывают только события своей роли)
     }else{
       if(it.orig) del.push(it.orig);
       const p=it.orig||it.proto, ev={ t:it.t, layer:p.layer, fn:it.fn, a:it.a, sc:p.sc, sev:p.sev, tk:p.tk };
-      ins.push(ev); if(it.fn==='bassOn') head=ev;
+      ins.push(ev); if(chaseKind(it.fn)==='n') head=ev;
     }
   }
   if(del.length) list.push({ kind:'del', evs:del });
@@ -1490,7 +1525,7 @@ function commitDetach(P,keep){
    → событие, которое редактор выделит после правки (у отделённой — её новое «вкл»), или false. */
 function editMoveSeg(ev,t,deg,oct){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(chaseRole(ev.fn)!=='bs') return false;
+  if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); до S2/S4 редактор пускает сюда только бас (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
   const nt=Math.max(0,t);
   if(Math.abs(nt-ev.t)<=1e-9){
@@ -1500,7 +1535,7 @@ function editMoveSeg(ev,t,deg,oct){
   if(seg.first && seg.endEv && chaseKind(seg.endEv.fn)==='f') return editMoveNote(seg.note,nt,deg,oct);
   const P=detachPlan(seg); if(!P) return false;
   const d=nt-P.items[0].t;                                   // items[0] — определяющее событие (события сегмента идут по времени)
-  for(const it of P.items){ it.t+=d; if(it.fn!=='bassOff') it.a={...it.a, deg, oct}; }
+  for(const it of P.items){ it.t+=d; if(chaseKind(it.fn)!=='f') it.a={...it.a, deg, oct}; }   // S0: «выкл» высоты не несёт — у любой роли
   return commitDetach(P,true);
 }
 /* Удаление сегмента.
@@ -1510,7 +1545,7 @@ function editMoveSeg(ev,t,deg,oct){
        место удалённой, а удаление НАЧАЛА глиссандо уносило ВСЮ ноту — обе вещи задевали соседей. */
 function editDeleteSeg(ev){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(chaseRole(ev.fn)!=='bs') return false;
+  if(!editRoleOf(ev.fn)) return false;                       // S0: см. editMoveSeg
   const seg=songSegs().byEv.get(ev);
   const whole = !seg || (seg.first && !(seg.endEv && chaseKind(seg.endEv.fn)!=='f'));   // нет сегмента (сирота) / одиночная / начало ноты без смены высоты за ним
   if(!whole){ const P=detachPlan(seg); if(P) return commitDetach(P,false); }
@@ -1534,19 +1569,19 @@ function editDeleteSeg(ev){
    → определяющее событие сегмента (его выделит редактор; у отделённого — его новое «вкл») или false. */
 function editResizeSeg(ev,t){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(chaseRole(ev.fn)!=='bs') return false;
+  const R=editRoleOf(ev.fn); if(!R) return false;            // S0: см. editMoveSeg
   const seg=songSegs().byEv.get(ev); if(!seg||!seg.endEv||seg.end==null) return false;
   const X=seg.endEv;
   if(chaseKind(X.fn)==='f'){
     const n=seg.note, T=Math.max(t, seg.start+EDIT_MIN_LEN);
     if(Math.abs(T-X.t)<=1e-9) return false;
     const drop=segEvs(seg).filter(e=>e!==seg.ev && e.t>=T-EDIT_GAP);
-    const k= (T>X.t && keyClash(n, X.t, T)) ? layerTakeTop(n.layer) : null;
+    const fr= (T>X.t && keyClash(n, X.t, T)) ? R.fresh(n.layer) : null;   // S0: свежая идентичность по роли (у баса — прежний {k})
     const list=[];
     for(const e of n.evs){
       if(drop.includes(e)) continue;
-      if(e!==X && k==null) continue;
-      list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t: e===X?T:e.t, a: k!=null?{...e.a, k}:e.a} });
+      if(e!==X && !fr) continue;
+      list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t: e===X?T:e.t, a: fr?{...e.a, ...fr}:e.a} });
     }
     if(drop.length) list.push({ kind:'del', evs:drop });
     return editBatch(list) ? seg.ev : false;
@@ -1889,7 +1924,7 @@ function pnPlan(layer,fxId,pKey,want){
     if(!src) return null;
     const fn=setFn[n.role];
     let a={...src.a}; delete a.tie; delete a.bend; delete a.sh; delete a.gen;
-    if(n.role==='ld'){ const th=src.a.hold || (n.head.a.bend&&n.head.a.bend.length); if(th) a.hold=true; else delete a.hold; }
+    if(n.role==='ld'){ const th=src.a.hold || ldTherm(n); if(th) a.hold=true; else delete a.hold; }   // S0: тот же тест терменвокса, что у songSegs (ldTherm) — истинность прежняя
     else delete a.inst;                                              // ведения баса и аккорда тембра не несут (T0)
     const ss=src.a.sh||{}, ns=(nxt&&nxt.a.sh)||{}, sh={};
     for(const k of new Set([...Object.keys(ss),...Object.keys(ns)])){ if(k===mk) continue;
@@ -3276,6 +3311,10 @@ function songNotes(){
    ⛳ ИНВАЛИДАЦИЯ — ЧУЖАЯ: мемо на ИДЕНТИЧНОСТЬ объекта songNotes(). Тот пересобирается только в
    schedInvalidate, значит второй точки сброса здесь нет (правило #28) — как и у кэша ролла в draw.
    byEv — обратный указатель «событие → его сегмент»: правке нужно знать, сегмент ли это начала ноты. */
+/* ⛳ НОТА ТЕРМЕНВОКСА СОЛО — у её «вкл» есть кривая бенда (recLeadOpen кладёт a.bend=[] и сразу стартовую точку). ОДИН тест на
+   весь рекордер: его же берёт перестройка «в ноте» (pnPlan — порождённому ведению hold:true только у такой ноты), и проход
+   сегментов (songSegs — такая нота одним сегментом). Разойдись они — полоса считала бы ноту терменвоксом, а ролл резал бы её. */
+const ldTherm=n=> n.role==='ld' && !!(n.head && n.head.a && n.head.a.bend && n.head.a.bend.length);
 let segView=null;
 function songSegs(){
   const V=songNotes();
@@ -3283,12 +3322,19 @@ function songSegs(){
   const segs=[], byEv=new Map();
   for(const n of V.notes){
     if(n.role!=='bs'&&n.role!=='ld'&&n.role!=='ch') continue;
+    /* ⛳ S0: НОТА ТЕРМЕНВОКСА — ОДИН СЕГМЕНТ. Её высоту несёт кривая бенда от ступени АТАКИ, а ведения с hold:true пишут
+       ЖИВУЮ ближайшую ступень (recLeadEv: {...p, hold:true}) — звук её не читает (ENG.leadSet: hold → частоты нет), читает только
+       подсветка. Сравни проход их ступени — одна согнутая нота рассыпалась бы на ложные «ноты» по ближайшим ступеням, и правка
+       любой из них резала бы глиссандо, которого на этих границах нет. Поэтому внутри такой ноты смен высоты не бывает, а ведение
+       hold сменой высоты не считается НИКОГДА (подстраховка: hold пишется только терменвоксом). У баса и аккордов — как было. */
+    const therm=ldTherm(n);
     let cur=null;
     for(const ev of n.evs){
       const kind=chaseKind(ev.fn);
       if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }   // «выкл» закрывает последний сегмент
       const a=ev.a||{};
-      const pitchChanged = !cur || a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&a.ty!==cur.ty);
+      const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
+                           (a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&a.ty!==cur.ty)));
       if(kind==='n'||pitchChanged){
         if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
         cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,

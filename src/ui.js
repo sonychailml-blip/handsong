@@ -649,8 +649,9 @@ function rollDeleteSel(){ if(rollRefuseRO()) return;
      стоит ПОСЛЕДНИМ, а не первым. */
   if(rollAutSel){ if(autDeletePoint(rollAutSel)) setRollAutSel(null); updRollBtns(); return; }
   if(!rollSel){ showCamMsg(t('roll.needSel')); return; }
-  /* ⛳ УДАЛЕНИЕ ВЕДЁТ РОЛЬ: у ударных это одиночное событие, у баса — СЕГМЕНТ (ведение в середине уходит
-     одно, и прежняя высота тянется дальше; «вкл» уносит всю ноту — см. editDeleteSeg). */
+  /* ⛳ УДАЛЕНИЕ ВЕДЁТ РОЛЬ: у ударных это одиночное событие, у баса — СЕГМЕНТ. С независимых нот (E2) сегмент
+     посреди глиссандо ОТДЕЛЯЕТСЯ и уходит один — на его месте ТИШИНА, соседи целы (прежняя высота через него больше
+     НЕ тянется); одиночная нота уходит целиком — см. editDeleteSeg. */
   const ok = rollRole==='dr' ? editDeleteHit(rollSel) : editDeleteSeg(rollSel);
   if(ok) setRollSel(null);
   renderTimbreCtl();   // T5: снята последняя нота — у дорожки больше нет тембра, выбор скрывается
