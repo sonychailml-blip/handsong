@@ -318,13 +318,26 @@ export const IVX=(s=CUR())=>s.iv.concat([s.edo]);           // + верхняя 
    остался на 440 — «расстроенный инструмент»). aRef — импорт-биндинг, обе функции пересчитываются сами. */
 const a3=()=>aRef/2;                                        // A3 из живого эталона A4 — единственная деривация опоры
 export const baseF=()=>a3()*Math.pow(2,(tonic-9)/12);       // частота тоники (C=130.81 Гц при A4=440)
-/* Якорь C для fixedKey-строёв: сетка приколочена к C. ТА ЖЕ опора a3(), тоника=C (индекс 0) — от
-   выбранной тоники НЕ зависит (у fixedKey тоника — КЛЮЧ-индекс в сетку, не множитель). */
-const cFix=()=>a3()*Math.pow(2,(0-9)/12);                   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
+/* ═══ «СТРОЙ ОТ» — ЯКОРЬ ФИКСИРОВАННОЙ СЕТКИ (слайс P1 дуги «СТРОЙ ОТ», HANDOFF) ═══
+   Фиксированный строй (fixedKey) — это инструмент, который НАСТРОЙЩИК настроил от одной ноты (якоря), а МУЗЫКАНТ играет
+   в любой тональности (тоника). Две независимые вещи — и в арифметике высоты они теперь названы порознь:
+     anchorOf(s) — нота, ОТ КОТОРОЙ настроена сетка (класс высоты 0..11, 0 = C);
+     cFix(s)     — ВЫСОТА якоря: его равномерная высота от единого эталона A4 (a3 ← aRef, правило #17) — обобщение прежнего
+                   «C3 = 130.81 Гц при A4=440»; если якорь ВЫШЕ тоники, он берётся октавой ниже, чтобы тоника звучала в том же
+                   регистре, что и у подвижных ладов (около baseF), а не прыгала на октаву;
+     keyOf(s)    — СДВИГ КЛЮЧА: тоника минус якорь (0..11) — место тоники в сетке. Его читают fixedSlot и прочие ветки fixedKey.
+   ⛳ P1 НЕВИДИМ: anchorOf всегда отдаёт C (0) — так настроены все шесть исторических строёв, и так было в коде. Тогда
+   cFix = a3·2^((0−9−0)/12) — ТО ЖЕ выражение, что прежнее a3·2^((0−9)/12) (−9−0 и 0−9 — одно и то же целое −9, деление на 12 —
+   то же число с плавающей точкой), а keyOf = tonic−0+0 = tonic (целое, точно). Значит каждая формула ниже — побайтно прежняя.
+   Выбор якоря (и «следует за тоникой») — слайс P3; тогда якорь = тоника даёт keyOf=0 и cFix = baseF(): ровно подвижный путь.
+   ⚠️ Сетка fixedKey — 12 нот (cents.length===12 у всех шести): якорь и ключ — индексы в ЭТИ 12 полутонов. */
+const anchorOf=s=>0;                                        // P1: все фиксированные строи — от C (историческая практика); выбор — P3
+const keyOf=s=>{ const A=anchorOf(s); return tonic-A+(A>tonic?12:0); };
+const cFix=(s=CUR())=>{ const A=anchorOf(s); return a3()*Math.pow(2,(A-9-(A>tonic?12:0))/12); };   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
 /* Частота ТОНИКИ/КЛЮЧА для дрона и родственного: у fixedKey — ФИКСИРОВАННАЯ высота ключа
-   (cFix·2^(cents[tonic]/1200)), иначе дрон бился бы с приколоченной сеткой; у прочих — baseF()
-   (подвижная тоника). Опора та же (cFix←a3←aRef) — не разъедется. */
-export const tonicFreq=(s=CUR())=> s.fixedKey ? cFix()*Math.pow(2,s.cents[tonic]/1200) : baseF();
+   (cFix·2^(cents[ключ]/1200)), иначе дрон бился бы с приколоченной сеткой; у прочих — baseF()
+   (подвижная тоника). Опора та же (cFix←a3←aRef) — не разъедется. P1: ключ — keyOf (при якоре C это tonic). */
+export const tonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
 /* ПЕРИОД лада (интервал эквивалентности) — по умолчанию ОКТАВА (2). Неоктавный строй задаёт
    своё (Болен–Пирс period:3 — тритава). Заменяет зашитую двойку в формуле высоты: и регистр
    P^oct, и равный шаг P^(шаг/edo). Дефолт 2 ⇒ ВСЕ прежние лады байт-в-байт. */
@@ -862,16 +875,16 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
    на АБСОЛЮТНОЙ позиции сетки (tonic+шаг): slot — нота в октаве, carry — перенос октавы (напр. квинта
    от B уходит в следующую октаву). Якорь cFix (та же опора aRef). o — регистр (палец), carry
    складывается с ним. При тонике C (0) — байт-в-байт прежняя cents-ветка. */
-function fixedSlot(s,step){ const L=s.cents.length, abs=tonic+step; return {slot:((abs%L)+L)%L, carry:Math.floor(abs/L)}; }
+function fixedSlot(s,step){ const L=s.cents.length, abs=keyOf(s)+step; return {slot:((abs%L)+L)%L, carry:Math.floor(abs/L)}; }
 export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
-  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix()*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
   const cx=s.cents?s.cents.concat([1200]):null;
   const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);   // равный шаг — в ПЕРИОДЕ лада (P^(шаг/edo)); cents-ветка октавная (2/1200), её не трогаем
   return baseF()*Math.pow(P,o)*r; }                             // регистр — на ПЕРИОД (BP: тритава 3^oct); P=2 у прочих — байт-в-байт
 export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s); // бас на 2 октавы ниже соло (baseF/4 — константа-пол, не период)
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
-  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix()/4*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)/4*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
   const cx=s.cents?s.cents.concat([1200]):null;
   const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);
   return baseF()/4*Math.pow(P,o)*r; }
@@ -899,8 +912,9 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
        Пифагор/подвижный Натуральный) идут прежним путём ниже, байт-в-байт. off=0 даёт корень 1-в-1.
        fixedKey: индекс включает ТОНИКУ (КЛЮЧ) — корень и голоса из АБСОЛЮТНОЙ позиции сетки
        (tonic+deg+off), поэтому окраска аккорда зависит от тональности (C-мажор мягок, F#-мажор резок);
-       якорь cFix (та же опора). При тонике C (0) — байт-в-байт прежняя формула. */
-    const L=s.cents.length, key=s.fixedKey?tonic:0, anchor=s.fixedKey?cFix():baseF();
+       якорь cFix (та же опора). При тонике C (0) — байт-в-байт прежняя формула. P1: ключ — keyOf(s), якорь — cFix(s) (при якоре C —
+       ровно прежние tonic и высота C). */
+    const L=s.cents.length, key=s.fixedKey?keyOf(s):0, anchor=s.fixedKey?cFix(s):baseF();
     const d=key+((deg%L)+L)%L, o=oct+Math.floor(deg/L);
     return ty.map(off=>{ const g=d+off, gi=((g%L)+L)%L, carry=Math.floor(g/L);
       return { f: anchor/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[gi]/1200), iv:off }; });
@@ -917,7 +931,7 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
        s.fixedKey, НЕ на s.cents: подвижный Натуральный (nat, без fixedKey) остаётся байт-в-байт. */
     const n=s.iv.length, d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
     let rootF;
-    if(s.fixedKey){ const {slot,carry}=fixedSlot(s,d); rootF=cFix()/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+    if(s.fixedKey){ const {slot,carry}=fixedSlot(s,d); rootF=cFix(s)/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
     else rootF=baseF()/2*Math.pow(2,o)*Math.pow(2,s.cents[d]/1200);   // подвижный Натуральный: корень из cents-оверлея над живой тоникой, как было
     return ty.map(ra=>({ f:rootF*ra, iv:ra }));
   }
@@ -956,7 +970,7 @@ export function rowLabel(deg,s=CUR()){ const ivx=IVX(s);
    fixedKey: интервал над КЛЮЧОМ = cents[tonic+deg] − cents[tonic] (зависит от тональности —
    у Веркмайстера терция читает 390¢ в C и 408¢ в F#, тот самый урок). При тонике C — как было. */
 export const centsOf=(deg,s=CUR())=>{
-  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round((s.cents[slot]+1200*carry-s.cents[tonic])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет; целые прятали бы точность
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round((s.cents[slot]+1200*carry-s.cents[keyOf(s)])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет; целые прятали бы точность
   if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
   const pc=1200*Math.log2(periodOf(s));   // центы ПЕРИОДА: октава 1200 (P=2, байт-в-байт), тритава ≈1901.955 (BP) — честный шаг ~146.3¢
   return Math.round(IVX(s)[deg]*pc/s.edo)%pc; };

@@ -51,7 +51,7 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       backingMenu=$('backingMenu'), backingJam=$('backingJam'), backingDrums=$('backingDrums'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
       sub4=$('sub4'), sub3=$('sub3'),
-      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'),
+      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'), tunedFromNote=$('tunedFromNote'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
       bpmEl=$('bpm'), bpmV=$('bpmV'),
@@ -63,7 +63,11 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
    Имя тоники берём из NOTE_NAMES — тем же списком подписан <select id="selTonic">,
    чтобы подписи не разъехались. Читает живые связки scaleIdx/tonic, поэтому зовётся
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
-function updScaleBtn(){ scaleBtn.textContent=`${L(SCALES[scaleIdx].name)} · ${NOTE_NAMES[tonic]}`; }
+function updScaleBtn(){ scaleBtn.textContent=`${L(SCALES[scaleIdx].name)} · ${NOTE_NAMES[tonic]}`;
+  /* P0 «СТРОЙ ОТ»: у фиксированного исторического строя (fixedKey — СВОЙСТВО лада, не имя: правило #25) под тоникой строка
+     «Настроен от C (историческая практика)». Здесь, потому что updScaleBtn зовут после КАЖДОЙ смены лада (меню лада, меню строя,
+     уроки) — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам. */
+  tunedFromNote.hidden=!SCALES[scaleIdx].fixedKey; }
 
 /* Меню лада заполняем ладами ОДНОЙ традиции. value у <option> — абсолютный индекс в
    SCALES (он же scaleIdx), а не позиция в отфильтрованном списке: иначе selScale.onchange
