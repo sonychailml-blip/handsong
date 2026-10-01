@@ -1,3 +1,22 @@
+/* ⛔ ЗАВИСИМОСТИ ЭТОГО МОДУЛЯ — ЧИТАТЬ ПЕРЕД ЛЮБЫМ ПЕРЕИМЕНОВАНИЕМ В recorder / audio / state.
+   Модуль грузится ЛЕНИВО (ui.onFreeze на ❄, консоль: probe/aud/live), и всё, что он берёт через пространства имён
+   (REC.x, LIVE.x, ST.x, eng.x), проверяется лишь В МИГ ВЫЗОВА: пропавший экспорт не валит загрузку приложения, а
+   падает на ❄ словами «REC.x is not a function». Так и случилось: гладкая автоматизация дописала имя посреди строки экспорта
+   recorder, и три ключа владельцев ушли в комментарий — заморозка соло/аккордов/баса молча сломалась до первого нажатия.
+   Переименовал или убрал что-то из списка ниже — поправь здесь и в коде модуля.
+     recorder (REC.*): makeENG, fxLaneMerge, fxLaneExpand, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey (ключи
+       владельцев — trackOpen; формулы ТОЛЬКО в recorder, копии здесь не заводить), events, loop, recording,
+       freezePinCaptures, freezeTicket, freezeSet, unfreezeLayer, frozenLayers, frozenInfo.
+     живой audio (LIVE.* и именованный импорт): AC, ksReady, makeFrozenBus, fxPlayPath, fxPlaySet, fxRestoreAim,
+       leadOff, chordOff, bassOff, droneOff.
+     копия движка ('./audio.js?render', eng.*): initAudio, setRnd, setOffline, setDbg, dbgExprBypass, offlineTapMaster,
+       poolSizes, ksReady, applyExpr, leadOn, leadOff, leadHold, chordOn, chordOff, chordHold, bassOn, bassOff, bassHold,
+       drumHit, droneOff, fxInstance, fxPlaySet, fxRenderPath, fxGateAt, fxDenormOf, FX_FACTORY, LEAD_INSTR, CHORD_INSTR,
+       BASS_INSTR (плюс всё, что makeENG зовёт у переданной копии).
+     state (ST.* и именованный импорт): chainOwners, fxIsScalar, CHAIN_SOLO, chainKeyOf, fxChainOf.
+     config: SCHED_TICK_MS.
+     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop.
+   ===================================================================== */
 /* =====================================================================
    КОНТЕКСТ РЕНДЕРА — слайсы F0 (контекст) и F1 (посеянная случайность)
    дуги «ЗАМОРОЗКА»
@@ -1176,7 +1195,7 @@ function maxRel(eng, evs){
    гуманизацию, а перезаморозка той же дорожки даёт то же исполнение. Явное opt.seed по-прежнему главнее. */
 const seedOfLane=id=>(SEED_A ^ Math.imul((id|0)+1, 0x9E3779B1))>>>0;   // +1 — чтобы id 0 не дал ровно SEED_A (семя зонда)
 async function freeze(layer, opt){
-  REC.freezePinCaptures(layer);   // как ❄ в редакторе (ui.onFreeze): у взятого без захвата — снимок сейчас; рендер живую цепь не читает, поэтому захват нужен ВСЕГДА. Повторный вызов ничего не делает
+  REC.freezePinCaptures(layer);   // как ❄ в редакторе (ui.onFreeze): у ДОРОЖКИ без захвата вовсе — снимок сейчас (одному, самому раннему взятому; S1); рендер живую цепь не читает, поэтому цепь у дорожки нужна ВСЕГДА. Взятое без захвата внутри захваченной дорожки играет её цепью (fxLaneMerge) и не прикалывается. Повторный вызов ничего не делает
   const tk=REC.freezeTicket(layer);
   if(!tk) throw new Error('нет дорожки '+layer);
   const o={...(opt||{})}; if(o.seed==null) o.seed=seedOfLane(tk.id);
