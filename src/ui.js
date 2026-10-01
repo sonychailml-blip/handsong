@@ -620,7 +620,7 @@ function autShapeState(){
   const ly=editLayer(); if(ly==null) return null;
   const D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p), i=D.pts.findIndex(r=>r.pt===rollAutSel.pt);
   const ok = i>0 && !rollAutSel.pt.unset && !D.pts[i-1].pt.unset;
-  return { ok, s: ok && rollAutSel.pt.sh==='s' };   // точка ленты, ставшая первой после переноса, форму хранит, но звучит ступенькой (от полки не едут) — значок обязан сказать то, что звучит
+  return { ok, s: ok && !!D.pts[i].smooth };   // форма — из вида (тот же закон, что у звука: у записанной точки — выведенная). Точка ленты, ставшая первой после переноса, форму хранит, но звучит ступенькой (от полки не едут) — значок обязан сказать то, что звучит
 }
 if(rollShapeEl) rollShapeEl.onclick=()=>{
   if(!rollAutSel||rollRefuseRO()) return;
@@ -632,7 +632,7 @@ if(rollShapeEl) rollShapeEl.onclick=()=>{
      (сама точка — тот же объект, по нему и находим). */
   if(r!==true) selAutPt(r);
   else { const ly=editLayer(), D=autPoints(ly,rollAut.key,rollAut.fx,rollAut.p); selAutPt(D.pts.find(x=>x.pt===rollAutSel.pt)||null); }
-  showCamMsg(t(rollAutSel&&rollAutSel.pt.sh==='s' ? 'aut.shapeSmooth' : 'aut.shapeStep'));
+  showCamMsg(t(rollAutSel&&rollAutSel.smooth ? 'aut.shapeSmooth' : 'aut.shapeStep'));   // выделение выше — запись СВЕЖЕГО вида: её smooth и есть новая форма
   updRollBtns();
 };
 

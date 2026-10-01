@@ -7,7 +7,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
 import { buildArrangement } from './arrange.js';
-import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
+import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, AUT_MOVE_GAP_S, AUT_SLOW_GAP_S, AUT_SLOW_JUMP, REC_FINE_EPS, REC_REST_S, REC_HIST_N } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
 import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
@@ -462,13 +462,61 @@ function takeCapStart(tk){
     rec.kinds[key]=kind;
     rec.chains[key]=fxCaptureChain(key);
     if(mine){
-      fxCaptureWalk(key,(fxId,pKey,v)=>{ takeFxLast.set(key+'|'+fxId+'|'+pKey, v); });   // засев: то же множество адресов, что пишет дорожка
+      fxCaptureWalk(key,(fxId,pKey,v)=>{ takeFxLast.set(key+'|'+fxId+'|'+pKey, fineNew(v,-Infinity)); });   // засев: то же множество адресов, что пишет дорожка. Тонкая запись: опора — величина снимка, «записана» — до начала взятого (−∞), поэтому первый уход ляжет с точкой удержания: полка снимка держится до мига, где рука ушла
       takeFxOrder.set(key,chainOrderOf(key));                                            // засев состава: снимок выше и есть его исходное значение
     }
   }
   takeFx.set(tk,rec);
 }
 const chainOrderOf=key=>fxChainOf(key).map(e=>e.fxId).join(',');
+/* ═══ ТОНКАЯ ЗАПИСЬ — ОДИН АВТОМАТ НА ШИНУ И НА ВЕЛИЧИНЫ «В НОТЕ» (слайс «запись отражает плавность руки») ═══
+   ⛳ ЗАПИСЬ ХРАНИТ ДВИЖЕНИЕ РУКИ, А НЕ АРТЕФАКТЫ ВЫБОРКИ. Прежде точка писалась, лишь когда величина ушла на 0.03, а выборка шла на
+   тике/кадре — к записи она уходила ещё дальше: плавная рука ложилась ступенями по 3–5 единиц. Теперь:
+     ПОКОЙ — пишем НИЧЕГО; помним последние выборки (hist). Уход распознаётся по старому порогу (REC_FX_EPS = 0.03): ниже него —
+       дрожание распознавания, и неподвижная рука потока точек не даёт (довод и числа — config, REC_FINE_EPS).
+     УХОД — дописываем его ИЗ ПАМЯТИ: находим последнюю выборку, ещё стоявшую у прежней величины (в пределах REC_FINE_EPS), кладём
+       там ТОЧКУ УДЕРЖАНИЯ с ПРЕЖНЕЙ величиной (пауза дольше AUT_MOVE_GAP_S — иначе паузы и не было), а дальше — каждую единицу пути.
+       Удержание — это и есть «величина стояла, а потом двинулась»: закон формы (autSmoothOf) видит короткий промежуток от
+       удержания до первой точки движения, и прямая начинается ТАМ, где ушла рука, а не за всю паузу до неё.
+     ДВИЖЕНИЕ — пишем каждую единицу (REC_FINE_EPS). Покой снова — когда рука не продвинулась на REC_FX_EPS за REC_REST_S.
+   x — что угодно, для чего дано расстояние dist: число у шины, нагрузка ноты у «в ноте» (pnDist). Отдаёт выборки к записи ПО
+   ВРЕМЕНИ ({t,x}); состояние обновлено так, будто все они записаны (запись с явной долей не отказывает). Время пошло НАЗАД (шов
+   скобы) — память покоя сбрасывается: выборки прошлого прохода к новому не относятся. */
+function fineNew(x,t){ return { lastX:x, lastT:t, moving:false, refX:x, refT:t, hist:[] }; }
+function fineReset(st,x,t){ st.lastX=x; st.lastT=t; st.refX=x; st.refT=t; st.hist=[]; }   // записали сами (смена высоты) — опора с нуля, режим прежний
+const fineSec=b=>b*60/loop.bpm;
+function fineStep(st,x,t,dist){
+  const out=[];
+  const tl= st.hist.length ? st.hist[st.hist.length-1].t : st.lastT;
+  if(t<tl-1e-9){ st.hist=[]; st.moving=false; st.refX=st.lastX; st.refT=t; st.lastT=-Infinity; }   // шов: память — с нуля; величина прежняя (она и звучит), а «когда записана» — неизвестно в этом проходе
+  const H=st.hist;
+  if(st.moving){
+    if(dist(x,st.lastX)>REC_FINE_EPS){ out.push({t,x}); st.lastX=x; st.lastT=t; }
+    if(dist(x,st.refX)>REC_FX_EPS){ st.refX=x; st.refT=t; }
+    else if(fineSec(t-st.refT)>REC_REST_S){ st.moving=false; st.hist=[]; }
+    return out;
+  }
+  if(dist(x,st.lastX)<=REC_FX_EPS){ H.push({t,x}); if(H.length>REC_HIST_N) H.shift(); return out; }   // покой: дрожание и медленный дрейф — в память
+  let i=H.length-1; while(i>=0 && dist(H[i].x,st.lastX)>REC_FINE_EPS) i--;   // последняя выборка ещё у прежней величины — там рука и ушла
+  if(i>=0 && fineSec(H[i].t-st.lastT)>AUT_MOVE_GAP_S) out.push({t:H[i].t, x:st.lastX});   // УДЕРЖАНИЕ: прежняя величина ТОЧНО, на миг ухода
+  let w=st.lastX, wT=st.lastT;
+  for(let j=i+1;j<H.length;j++) if(dist(H[j].x,w)>REC_FINE_EPS){ out.push(H[j]); w=H[j].x; wT=H[j].t; }
+  if(dist(x,w)>REC_FINE_EPS){ out.push({t,x}); w=x; wT=t; }
+  st.lastX=w; st.lastT=wT; st.moving=true; st.refX=x; st.refT=t; st.hist=[];
+  return out;
+}
+const fineAbs=(a,b)=>Math.abs(a-b);
+/* РАССТОЯНИЕ МЕЖДУ НАГРУЗКАМИ НОТЫ — по величинам «в ноте», которые запись сравнивала и прежде: громкость, яркость аккорда, каждый
+   ключ карты эффектов (другой состав карты — бесконечность: пишется сразу). Высоту не сравнивает: смена высоты пишется сама. */
+function pnDist(a,b){
+  if(!a||!b) return Infinity;
+  let d=Math.max(Math.abs((a.vol||0)-(b.vol||0)), Math.abs((a.bri||0)-(b.bri||0)));
+  const A=a.fx||{}, B=b.fx||{}, ka=Object.keys(A);
+  if(ka.length!==Object.keys(B).length) return Infinity;
+  for(const k of ka){ if(!(k in B)) return Infinity; d=Math.max(d,Math.abs(A[k]-B[k])); }
+  return d;
+}
+const pnSnap=p=> !p ? p : p.fx ? {...p, fx:{...p.fx}} : {...p};   // в память и в опору — КОПИЯ (как fxCopy у r.fx): живой снимок руки не должен стать псевдонимом записанного
 /* УДАР СЕРДЦА — обход живых величин и запись ИЗМЕНИВШИХСЯ. Зовётся из tick, ПОСЛЕ отсчёта и в ПЕСЕННОЙ
    доле (оба свойства даёт место вызова, см. tick).
    ⛳ ПОЧЕМУ ИЗ СЕРДЦА, А НЕ ИЗ ЖЕСТ-ЦИКЛА — в этом весь смысл формы. Сердце бьёт независимо от того,
@@ -493,10 +541,12 @@ function takeCapSample(p){
       rec.lane.push({t:p, key, fx:FX_CHAIN, p:'order', v:0, ids:ord?ord.split(','):[]});
     }
     fxCaptureWalk(key,(fxId,pKey,v)=>{
-      const a=key+'|'+fxId+'|'+pKey, prev=takeFxLast.get(a);
-      if(prev!=null && Math.abs(v-prev)<=REC_FX_EPS) return;
-      takeFxLast.set(a,v);
-      rec.lane.push({t:p, key, fx:fxId, p:pKey, v});
+      const a=key+'|'+fxId+'|'+pKey, st=takeFxLast.get(a);
+      if(!st){ takeFxLast.set(a, fineNew(v,p)); rec.lane.push({t:p, key, fx:fxId, p:pKey, v}); return; }   // адрес, которого не было в снимке (эффект добавлен посреди взятого), — первая величина сразу, как прежде
+      /* ТОНКАЯ ЗАПИСЬ (см. fineStep): в покое — ничего; уход — дописан с мига, где рука ушла (с точкой удержания); в движении — каждая
+         единица. ⚠️ Дописанные точки лежат РАНЬШЕ уже лежащих в ленте точек ДРУГИХ адресов — лента взятого больше не упорядочена по
+         времени добавления. Её читают только через сортировку (fxLaneMerge, autPointsCalc) и счёт (captureInfoOf), так что это безвредно. */
+      for(const s of fineStep(st,v,p,fineAbs)) rec.lane.push({t:s.t, key, fx:fxId, p:pKey, v:s.x});
     });
   }
 }
@@ -613,17 +663,38 @@ function fxLaneMerge(){
   return list;
 }
 /* ═══ ГЛАДКАЯ АВТОМАТИЗАЦИЯ ШИННЫХ ПАРАМЕТРОВ — ОДИН ЗАКОН ИНТЕРПОЛЯЦИИ ═══
-   ⛳ ФОРМА ЖИВЁТ НА ТОЧКЕ И ОПИСЫВАЕТ ОТРЕЗОК, КОТОРЫЙ В НЕЁ ВХОДИТ (поле sh точки ленты). 's' — плавно, по прямой в НОРМИРОВАННОЙ
-   шкале 0..1 — той самой, в которой полоса рисует (у лог-параметров это ровный ход на слух, как и у ручки). Поля нет — СТУПЕНЬКА,
-   как было: всё записанное до этого слайса и всё, что пишет рука, звучит прежним образом бит в бит.
-   ⛳ ПОЧЕМУ ЗАПИСАННОЕ ОСТАЁТСЯ СТУПЕНЬКОЙ, А НЕ СТАНОВИТСЯ ПЛАВНЫМ. Захват кладёт точку каждые 25 мс, когда рука ДВИГАЛАСЬ, и
-   молчит, пока она стоит (REC_FX_EPS). Внутри движения разница двух форм — меньше порога за 25 мс, то есть неслышна (подъезд
-   сеттера τ 50–80 мс длиннее шага). А после паузы плавная форма была бы НЕПРАВДОЙ: она повела бы величину через всю паузу к
-   первой точке нового движения — то есть начала бы двигать ручку раньше, чем её тронула рука. Ступенька здесь и есть правда.
+   ⛳ ФОРМА ЖИВЁТ НА ТОЧКЕ И ОПИСЫВАЕТ ОТРЕЗОК, КОТОРЫЙ В НЕЁ ВХОДИТ (поле sh точки ленты). ТРИ значения:
+     's' — ПЛАВНО (поставил человек), по прямой в НОРМИРОВАННОЙ шкале 0..1 — той самой, в которой полоса рисует (у лог-параметров
+           это ровный ход на слух, как и у ручки);
+     'h' — СТУПЕНЬКОЙ (поставил человек: точка после полки, кнопка ⌐, правленая точка, застывшая в ступеньке);
+     нет поля — ЗАПИСАННАЯ точка: форму ВЫВОДИТ закон движения (autSmoothOf ниже) — плавно внутри движения руки, ступенькой после
+           паузы. Всё, что пишет захват, приходит без поля, поэтому закон действует и на записанное ДО этого слайса.
+   ⛳ ПОЧЕМУ ВЫВОДИМ, А НЕ ХРАНИМ. Хранить форму при записи — значит дописывать в захват то, что из него и так следует (промежуток и
+   скачок между точками), и разделить записанное на «до» и «после» слайса. Вывод — одна чистая функция от двух точек и темпа; её
+   зовут ВСЕ: переигровка (fxPlayDrive на тике), рендер заморозки и ухо-проба (fxLaneExpand) и рисунок полосы (autPointsCalc
+   кладёт её ответ в вид, draw его только читает). Разойтись рисунку и звуку нечем. Темп входит потому, что промежуток мерится в
+   СЕКУНДАХ (тик захвата — 25 мс реального времени); подпись свежести заморозки темп уже содержит.
+   ⛳ ПОЧЕМУ НЕ «ВСЁ ЗАПИСАННОЕ ПЛАВНО». После паузы плавная форма повела бы величину через всю паузу к первой точке нового движения —
+   ручка «двигалась бы» раньше руки. Поэтому длинный промежуток с решительным скачком остаётся ступенькой (числа и довод — config,
+   AUT_MOVE_GAP_S / AUT_SLOW_GAP_S / AUT_SLOW_JUMP).
    ⛳ ОТ ТОЧКИ СНИМКА (snap) ПЛАВНЫЙ ОТРЕЗОК НЕ НАЧИНАЕТСЯ: снимок — состояние цепи на старте взятого, а не точка с ручкой; полоса
    рисует его полкой, и прямая от начала взятого к первой точке была бы подъёмом, которого там никто не ставил.
+   ⛳ ПЕРЕКЛЮЧАТЕЛЬ ДЛЯ УХА (autRecSmoothOn): выключен — записанные точки снова ступеньки, как до слайса, везде сразу (▶, полоса,
+   рендер, R.live). Ставит его только ухо-проба (render.recSteps / aud({recSteps})); в интерфейсе его нет.
    Живая переигровка зовёт это на каждом тике (fxPlayDrive), рендер и ухо-проба — через fxLaneExpand. Второй формулы нет. */
-const fxLaneSmooth=e=>{ const n=e&&e.nx; return !!(n && n.sh==='s' && !e.snap && n.t>e.t+1e-9); };
+let autRecSmoothOn=true;
+const setAutRecSmooth=on=>{ autRecSmoothOn=!!on; takeFxTouch(); };   // takeFxTouch — переигровка пересоберёт ленту, полоса — вид (мемо autPoints)
+/* ЗАКОН ДВИЖЕНИЯ — чистый: промежуток в секундах и скачок в 0..1. Его же берёт ухо-проба рендера для величин «в ноте». */
+const autGapSmooth=(dtSec,dv)=> dtSec>1e-9 && (dtSec<=AUT_MOVE_GAP_S+1e-9 || (dtSec<=AUT_SLOW_GAP_S+1e-9 && Math.abs(dv)<=AUT_SLOW_JUMP+1e-9));
+/* ФОРМА ОТРЕЗКА prev→pt: форма человека главнее; нет её — закон движения (если переключатель не снят). prev — точка, не снимок. */
+function autSmoothOf(prev,pt){
+  if(!prev||!pt) return false;
+  if(pt.sh==='s') return true;
+  if(pt.sh) return false;                                         // 'h' — ступенька, поставленная человеком
+  if(!autRecSmoothOn) return false;
+  return autGapSmooth((pt.t-prev.t)*60/loop.bpm, pt.v-prev.v);
+}
+const fxLaneSmooth=e=>{ const n=e&&e.nx; return !!(n && !e.snap && n.t>e.t+1e-9 && autSmoothOf(e,n)); };
 function fxLaneAt(e,x){
   if(!fxLaneSmooth(e)) return e.v;
   const n=e.nx, u=(x-e.t)/(n.t-e.t);
@@ -1837,17 +1908,30 @@ function pnMarks(a,mk,sh,gen){
    Точка — событие, с которого величина МЕНЯЕТСЯ; события внутри плавного отрезка ('r') точками не бывают. Метка 's' делает точкой
    и событие с прежней величиной — это плоский кусок перед подъёмом (pnPlan ставит её ровно для этого случая).
    leadUnset — перед первой точкой есть события БЕЗ величины (ведущее «не задано»): туда можно поставить точку (pnAdd). */
+/* ⛳ g0 (слайс «запись отражает плавность руки») — доля ПОСЛЕДНЕГО события предыдущего отрезка с той же величиной (события «внутри
+   плавного» 'r' не в счёт). Это миг, до которого величина ТОЧНО стояла: у записанного движения после паузы там лежит ведение
+   УДЕРЖАНИЯ (fineStep), и плавный вход в точку начинается ОТТУДА, а не от начала отрезка — иначе прямая ползла бы через всю паузу.
+   Закон формы и рисунок берут промежуток от g0. У поставленного рукой 's' внутри отрезка события перестроены по прямой ('r'), так
+   что g0 там совпадает с долей предыдущей точки — и форма человека едет от точки, как и прежде.
+   sh: 's' / 'h' — форма человека; нет — записанная точка (форму выводит закон движения). */
 function pnPoints(layer,fxId,pKey){
-  const mk=pnMk(fxId,pKey), pts=[]; let cur=null;
+  const mk=pnMk(fxId,pKey), pts=[]; let cur=null, end=null;
   pts.leadUnset=false;
   for(const e of events){ if(e.layer!==layer||!pnCarrier(e.fn)) continue;
     const v=pnGet(e,fxId,pKey), s=pnShOf(e,mk);
-    if(!cur){ cur={t:e.t, v, sh:undefined, ev:e}; if(v!=null) pts.push(cur); else pts.leadUnset=true; continue; }
+    if(!cur){ cur={t:e.t, v, sh:undefined, ev:e}; end=e.t; if(v!=null) pts.push(cur); else pts.leadUnset=true; continue; }
     if(s==='r') continue;
-    if(pnSame(v,cur.v) && !(s==='s' && e.t>cur.t+AUT_EPS)) continue;
-    cur={t:e.t, v, sh: s==='s'?'s':undefined, ev:e}; pts.push(cur);
+    if(pnSame(v,cur.v) && !(s==='s' && e.t>cur.t+AUT_EPS)){ end=e.t; continue; }
+    cur={t:e.t, v, sh: (s==='s'||s==='h')?s:undefined, ev:e, g0:end}; pts.push(cur); end=e.t;
   }
   return pts;
+}
+/* ФОРМА ОТРЕЗКА, ВХОДЯЩЕГО В ТОЧКУ i, — тем же законом, что у шины (autSmoothOf), промежуток — от g0. 's'/'h' — форма человека. */
+function pnEffSh(P,i){
+  const p=P[i]; if(!p) return undefined;
+  if(p.sh) return p.sh;
+  if(i<=0||p.v==null||P[i-1].v==null) return 'h';
+  return autSmoothOf({t:(p.g0??P[i-1].t), v:P[i-1].v}, p) ? 's' : 'h';
 }
 /* ВИД ДЛЯ ПОЛОСЫ — в той же форме, что у ленты ({base, baseT, pts}), плюс per (адрес «в ноте») и spans — где у дорожки ЗВУЧАТ
    ноты: вне их величина не звучит ни на чём, и draw рисует там линию приглушённой (ноты берём из songNotes — единственного
@@ -1857,8 +1941,17 @@ function pnView(layer,key,fxId,pKey){
   /* VOL-3: у ОБЯЗАТЕЛЬНОГО поля (громкость) «не задано» нет — полка слева до первой точки стоит на величине ПЕРВОЙ ноты, а не на
      уровне умолчания: ей там просто не на чем звучать (линия приглушена — там нет нот), и уровень умолчания ничего бы не значил. */
   const d = pnReq(fxId,pKey,laneRoleOf(layer)) && P.length && P[0].v!=null ? P[0].v : pnDef(key,fxId,pKey);
-  for(const r of P)   // ведущее «не задано» точкой не бывает (pnPoints) — это полка (base), ручки нет
-    pts.push({ per:true, pt:{ t:r.t, v:r.v==null?d:r.v, unset:r.v==null, sh:r.sh, pn:{layer,key,fx:fxId,p:pKey} } });   // sh — форма входящего отрезка: draw ведёт к точке прямую
+  /* ⛳ smooth — ТОТ ЖЕ закон, что у шины и у переигровки (pnEffSh → autSmoothOf): draw ведёт прямую, ui показывает ╱/⌐. g0 — откуда
+     прямая начинается у ЗАПИСАННОЙ точки (после паузы — от ведения удержания, см. pnPoints); у формы человека — от предыдущей точки.
+     ⛳ ЗВУК ТУТ ЖЕ: величина «в ноте» звучит из событий, и записанное движение лежит в них КАЖДОЙ единицей (тонкая запись, fineStep) —
+     ровно та плотность, с какой редактор кладёт ведения рампы поставленному рукой плавному отрезку (AUT_RAMP_EPS = 0.01). Голос
+     ведёт каждую ступень своей τ 40–50 мс — плавный отрезок записанного звучит так же, как нарисованный рукой, без добавленных
+     событий. */
+  P.forEach((r,i)=>{   // ведущее «не задано» точкой не бывает (pnPoints) — это полка (base), ручки нет
+    const sh=pnEffSh(P,i), smooth= sh==='s' && i>0 && r.v!=null && P[i-1].v!=null;   // от «не задано» ехать не от чего — как и прежде
+    pts.push({ per:true, smooth, g0: smooth && !r.sh && r.g0!=null ? r.g0 : null,
+               pt:{ t:r.t, v:r.v==null?d:r.v, unset:r.v==null, sh:r.sh, pn:{layer,key,fx:fxId,p:pKey} } });   // sh — форма человека ('s'/'h') или нет (записанная)
+  });
   /* У УДАРНЫХ «пауз» в этом смысле нет: удар — миг, его величина звучит в миг удара, и приглушать линию между ударами значило
      бы приглушить её всю. Поэтому для дорожки ударных spans не отдаём — линия рисуется целиком. */
   if(laneRoleOf(layer)==='dr') return { base:d, baseT:0, pts, per:true, spans:null };
@@ -1920,7 +2013,7 @@ function pnPlan(layer,fxId,pKey,want){
   for(let i=0;i<P.length;i++){ const p=P[i], pr=Q[Q.length-1], nx=P[i+1];
     if(!pr && !req && p.v==null) continue;                          // «не задано» первой точкой — то же, что ведущее «не задано»
     if(pr && pnSame(p.v,pr.v)){ if(nx && nx.sh==='s' && p.v!=null && nx.v!=null) p.sh='s'; else { if(p.me&&Q.length) Q[Q.length-1].me=true; continue; } }
-    if(p.sh==='s' && !(pr && pr.v!=null && p.v!=null)) p.sh=undefined;
+    if(p.sh==='s' && !(pr && pr.v!=null && p.v!=null)) p.sh='h';   // ехать не от чего — СТУПЕНЬКА ЧЕЛОВЕКА, а не «нет формы» (иначе её начал бы выводить закон движения записанного)
     Q.push(p);
   }
   P=Q;
@@ -2015,18 +2108,32 @@ function pnPick(P,t){ const D=autPoints(P.layer,P.key,P.fx,P.p); return D.pts.fi
 /* ПЕРЕНОС ТОЧКИ. Величина — у точки (её отрезок до следующей); время — зажато между соседями: дотянул до соседа — перенесённая
    его ЗАМЕНЯЕТ (прежде перенос «перетирал» всех, через кого проехал; с формами отрезков это давало бы непредсказуемые прямые).
    Форма точки едет вместе с ней. */
+/* ⛳ ПРАВЛЕНАЯ ТОЧКА ДЕРЖИТ ТУ ФОРМУ, ЧТО БЫЛА ВИДНА (тот же закон, что у шины, autFreeze): записанная точка без своей формы получает
+   выведенную ('s'/'h') — у правленой и у соседа справа. flat — только для САМОЙ правленой точки: если её выведенный плавный вход
+   начинался ПОСЛЕ удержания (g0 позже предыдущей точки), форма человека поехала бы от предыдущей ТОЧКИ — через всю паузу; поэтому
+   перед ней кладётся плоская точка на g0 с прежней величиной (pnPlan такую держит: «плоский кусок перед плавным подъёмом»). Соседу
+   справа плоской точки не даём — её величина была бы величиной правленой точки, а та сейчас меняется; там форма остаётся выводимой. */
+function pnFreeze(want,P,j,flat){
+  const p=P[j]; if(!p||p.sh||!want[j]) return;
+  const sh=pnEffSh(P,j), late= sh==='s' && p.g0!=null && j>0 && p.g0>P[j-1].t+AUT_EPS;
+  if(late && !flat) return;
+  want[j].sh=sh;
+  if(late) want.splice(j,0,{ t:p.g0, v:P[j-1].v });
+}
 function pnMove(pt,t,v){
   if(!editGuard()) return false;
   const A=pt.pn, P=pnPoints(A.layer,A.fx,A.p), i=pnLocate(P,pt); if(i<0) return false;
   const want=pnWant(P); want[i].me=true;
-  if(Math.abs(t-pt.t)>AUT_EPS){                                    // ВРЕМЯ
-    const lo= i>0 ? P[i-1].t : 0, hi= i+1<P.length ? P[i+1].t : Infinity;
+  pnFreeze(want,P,i+1,false); pnFreeze(want,P,i,true);             // сосед справа ПЕРВЫМ: его заморозка индексов не сдвигает, а плоская точка правленой — сдвигает
+  const k=want.findIndex(w=>w.me);
+  if(Math.abs(t-pt.t)>AUT_EPS){                                    // ВРЕМЯ — соседи по списку ЖЕЛАНИЙ (с плоской точкой, если она легла)
+    const lo= k>0 ? want[k-1].t : 0, hi= k+1<want.length ? want[k+1].t : Infinity;
     const b=Math.max(lo,Math.min(hi,Math.max(0,t)));
-    if(i===0 && b>P[0].t && pnReq(A.fx,A.p,laneRoleOf(A.layer))) return false;   // VOL-3: первая точка громкости ПОЗЖЕ — левее неё величина та же (ведущая = первая), правка ничего бы не сдвинула, кроме лишнего якоря
-    want[i].t=b;
-    if(i>0 && Math.abs(b-lo)<AUT_EPS) want.splice(i-1,1);
-    else if(i+1<P.length && Math.abs(b-hi)<AUT_EPS) want.splice(i+1,1);
-  }else want[i].v=Math.max(0,Math.min(1,v));                       // ВЕЛИЧИНА
+    if(k===0 && b>want[0].t && pnReq(A.fx,A.p,laneRoleOf(A.layer))) return false;   // VOL-3: первая точка громкости ПОЗЖЕ — левее неё величина та же (ведущая = первая), правка ничего бы не сдвинула, кроме лишнего якоря
+    want[k].t=b;
+    if(k>0 && Math.abs(b-lo)<AUT_EPS) want.splice(k-1,1);
+    else if(k+1<want.length && Math.abs(b-hi)<AUT_EPS) want.splice(k+1,1);
+  }else want[k].v=Math.max(0,Math.min(1,v));                       // ВЕЛИЧИНА
   const R=pnPlan(A.layer,A.fx,A.p,want);
   if(!R||!editBatch(R.list)) return false;                         // пусто — не правка (↶ не должен «ничего не делать»)
   return pnPick(A,pnAt(R,pt.t)) || true;
@@ -2036,7 +2143,9 @@ function pnMove(pt,t,v){
 function pnDelete(pt){
   if(!editGuard()) return false;
   const A=pt.pn, P=pnPoints(A.layer,A.fx,A.p), i=pnLocate(P,pt); if(i<0) return false;
-  const want=pnWant(P); want.splice(i,1);
+  const want=pnWant(P);
+  pnFreeze(want,P,i+1,false);                                      // сосед справа теперь въезжает от предыдущей — его видимая форма застывает (без плоской точки, см. pnFreeze)
+  want.splice(i,1);
   const R=pnPlan(A.layer,A.fx,A.p,want);
   return !!R && editBatch(R.list);
 }
@@ -2049,8 +2158,9 @@ function pnAdd(layer,key,fxId,pKey,t,v){
   for(let i=0;i<P.length;i++){ if(P[i].t<=t+AUT_EPS) j=i; else break; }
   if(j<0 && !P.leadUnset) return null;                             // до первой ТОЧКИ нот без величины нет — покрывать нечего
   const want=pnWant(P), x=Math.max(0,Math.min(1,v));
-  if(j>=0 && Math.abs(P[j].t-t)<AUT_EPS){ want[j].v=x; want[j].me=true; }
-  else want.splice(j+1,0,{ t, v:x, sh: j>=0&&P[j].v!=null ? 's' : undefined, me:true });
+  pnFreeze(want,P,j+1,false);                                      // сосед справа теперь въезжает от новой точки — его видимая форма застывает (индексов не сдвигает)
+  if(j>=0 && Math.abs(P[j].t-t)<AUT_EPS){ want[j].me=true; pnFreeze(want,P,j,true); want[want.findIndex(w=>w.me)].v=x; }   // на доле точки — правка её величины, как перенос по величине
+  else want.splice(j+1,0,{ t, v:x, sh: j>=0&&P[j].v!=null ? 's' : 'h', me:true });   // форма поставленной точки — ВСЕГДА человеческая: без неё её форму начал бы выводить закон движения
   const R=pnPlan(layer,fxId,pKey,want);
   if(!R||!editBatch(R.list)) return null;                          // между t и следующей нотой нет — точке негде звучать
   const r=pnPick({layer,key,fx:fxId,p:pKey},pnAt(R,t)); return r?r.pt:null;
@@ -2060,7 +2170,7 @@ function pnShape(pt){
   if(!editGuard()) return false;
   const A=pt.pn, P=pnPoints(A.layer,A.fx,A.p), i=pnLocate(P,pt); if(i<=0) return false;
   if(P[i].v==null || P[i-1].v==null) return false;
-  const want=pnWant(P); want[i].sh= P[i].sh==='s' ? undefined : 's'; want[i].me=true;
+  const want=pnWant(P); want[i].sh= pnEffSh(P,i)==='s' ? 'h' : 's'; want[i].me=true;   // переключаем ВИДИМУЮ форму (у записанной — выведенную) и делаем её формой человека
   const R=pnPlan(A.layer,A.fx,A.p,want);
   if(!R||!editBatch(R.list)) return false;
   return pnPick(A,pnAt(R,pt.t)) || true;
@@ -2077,7 +2187,7 @@ function pnStripMoves(layer,fxId){
 }
 let autMemoK='', autMemoV=null;
 function autPoints(layer,key,fxId,pKey){
-  const mk=layer+'|'+key+'|'+fxId+'|'+pKey+'|'+takeFxVer+'|'+evGen;   // V4b: + evGen (поднимает КАЖДЫЙ schedInvalidate): вид «в ноте» строится из СОБЫТИЙ, а takeFxVer поднимают только правки редактора — новое взятое в ту же дорожку оставило бы мемо прежним
+  const mk=layer+'|'+key+'|'+fxId+'|'+pKey+'|'+takeFxVer+'|'+evGen+'|'+loop.bpm;   // + loop.bpm: форма записанной точки выводится по промежутку в СЕКУНДАХ (autSmoothOf). Переключатель уха поднимает takeFxVer сам. V4b: + evGen (поднимает КАЖДЫЙ schedInvalidate): вид «в ноте» строится из СОБЫТИЙ, а takeFxVer поднимают только правки редактора — новое взятое в ту же дорожку оставило бы мемо прежним
   if(autMemoK===mk && autMemoV) return autMemoV;
   const r=autPointsCalc(layer,key,fxId,pKey);
   autMemoK=mk; autMemoV=r; return r;
@@ -2099,6 +2209,11 @@ function autPointsCalc(layer,key,fxId,pKey){
       pts.push({pt:ent, tk:T.tk, lane:rec.lane});
   }
   pts.sort((a,b)=> a.pt.t-b.pt.t || a.tk-b.tk);
+  /* ФОРМА КАЖДОГО ОТРЕЗКА — ТЕМ ЖЕ законом, что у переигровки (autSmoothOf): draw рисует прямую, где smooth, и ступеньку, где нет;
+     кнопка ╱/⌐ показывает то же. Первая точка входит с полки снимка — плавно оттуда не едут ни звук, ни рисунок.
+     ⚠️ Предшественник здесь — точка ЭТОЙ дорожки; у переигровки — точка того же адреса во всей песне (одна цепь на роль). Если
+     другая дорожка той же роли пишет тот же адрес вперемешку, звук и рисунок могут разойтись — тот же давний предел, что у полки. */
+  for(let i=0;i<pts.length;i++) pts[i].smooth = i>0 && autSmoothOf(pts[i-1].pt, pts[i].pt);
   return { base, baseT: baseT===Infinity?0:baseT, pts };
 }
 /* ⛳ ОБЩИЙ ХВОСТ ВСЕХ ПРАВОК ПОЛОСЫ. editCommit сортирует СОБЫТИЯ и сбрасывает курсоры — здесь этого не
@@ -2144,23 +2259,34 @@ function autBatch(list){
   editPush(list.length===1 ? list[0] : { kind:'batch', list });
   autCommit(); return true;
 }
+/* ⛳ ПРАВЛЕНАЯ ТОЧКА ДЕРЖИТ ТУ ФОРМУ, ЧТО БЫЛА ВИДНА (слайс «плавная внутри движения»). Форма записанной точки ВЫВОДИТСЯ из
+   промежутка и скачка до соседки (autSmoothOf) — сдвинь одну точку, и выведенная форма её отрезка и отрезка СЛЕДУЮЩЕЙ точки могла
+   бы молча перевернуться (тронул точку — а ступенька через одну стала прямой). Поэтому правка точки (перенос, удаление, вставка
+   перед ней) сперва ЗАМОРАЖИВАЕТ выведенную форму у двух отрезков, которых она касается, — входящего в правленую точку и
+   входящего в следующую, — делая их обычными формами человека ('s' или 'h'). Остальные записанные отрезки по-прежнему выводятся.
+   Ход 'autshape' — в той же записи истории: ↶ вернёт и точку, и «форма выводится». */
+function autFreeze(D,j){
+  const r=D&&D.pts[j]; if(!r||r.per||r.pt.sh) return null;       // у «в ноте» и у точки с формой человека — нечего замораживать
+  return { kind:'autshape', pt:r.pt, from:undefined, to: r.smooth?'s':'h' };
+}
 /* Перенос точки: время и величина. Обе зажаты — время не отрицательное, величина в 0..1. */
 function autMovePoint(pt,t,v){
   if(pt&&pt.pn) return pnMove(pt,t,v);   // V4b: точка «в ноте» — переписываем НОТЫ; отдаём точку, которую выделить (объекты вида пересобраны)
   if(!editGuard()||!pt) return false;
   const to={t:Math.max(0,t), v:Math.max(0,Math.min(1,v))};
   if(Math.abs(to.t-pt.t)<AUT_EPS && Math.abs(to.v-pt.v)<1e-6) return false;   // не сдвинулось — не правка (иначе ↶ «ничего не делает»)
-  editPush({ kind:'autmove', pt, from:{t:pt.t,v:pt.v}, to });
-  pt.t=to.t; pt.v=to.v;
-  autCommit(); return true;
+  const D=autPoints(editLayer(), pt.key, pt.fx, pt.p), i=D.pts.findIndex(r=>r.pt===pt);
+  const list=i<0 ? [] : [autFreeze(D,i), autFreeze(D,i+1)].filter(Boolean);
+  list.push({ kind:'autmove', pt, from:{t:pt.t,v:pt.v}, to });
+  return autBatch(list);
 }
 function autDeletePoint(rec){
   if(rec&&rec.pt&&rec.pt.pn) return pnDelete(rec.pt);   // V4b: см. pnDelete
   if(!editGuard()||!rec||!rec.lane) return false;
-  const i=rec.lane.indexOf(rec.pt); if(i<0) return false;
-  rec.lane.splice(i,1);
-  editPush({ kind:'autdel', pt:rec.pt, lane:rec.lane });
-  autCommit(); return true;
+  if(rec.lane.indexOf(rec.pt)<0) return false;
+  const pt=rec.pt, D=autPoints(editLayer(), pt.key, pt.fx, pt.p), i=D.pts.findIndex(r=>r.pt===pt);
+  const fz=i<0 ? null : autFreeze(D,i+1);                         // следующая точка теперь въезжает от предыдущей — её видимая форма застывает
+  return autBatch([...(fz?[fz]:[]), { kind:'autdel', pt, lane:rec.lane }]);
 }
 /* Новая точка — в СТАРШЕЕ ЗАХВАЧЕННОЕ взятое дорожки (см. шапку O-4: при равной доле побеждает старший номер), в ЦЕПЬ ДОРОЖКИ
    (T4: ключ не передаётся — у дорожки одна цепь, выбирать её вызывающему нечем). ⚠️ S1: именно ЗАХВАЧЕННОЕ — редакторское
@@ -2172,12 +2298,15 @@ function autAddPoint(layer,fxId,pKey,t,v){
   /* ⛳ ПОСТАВЛЕННАЯ РУКОЙ ТОЧКА — ПЛАВНАЯ (гладкая автоматизация), если перед ней есть ТОЧКА, от которой плавно ехать. Полка
      снимка точкой не считается (см. fxLaneSmooth): первая точка на полке встаёт ступенькой — иначе одна точка на такте 8 тянула
      бы подъём от самого начала взятого. Смотрим до autCaps: снимок, заведённый им, точек не прибавляет. */
-  const before=autPoints(layer,key,fxId,pKey).pts.some(r=>r.pt.t<=t+AUT_EPS);
+  const D=autPoints(layer,key,fxId,pKey);
+  const before=D.pts.some(r=>r.pt.t<=t+AUT_EPS);
+  const fz=autFreeze(D, D.pts.findIndex(r=>r.pt.t>t+AUT_EPS));     // следующая точка теперь въезжает от новой — её видимая форма застывает (до autCaps: вид тот, что на экране)
   const {caps,ops}=autCaps(layer,true); if(!caps.length) return null;
   const rec=caps[0].rec;                                          // старшее захваченное
-  const pt={ t:Math.max(0,t), key, fx:fxId, p:pKey, v:Math.max(0,Math.min(1,v)) };
-  if(before) pt.sh='s';
-  return autBatch([...ops, { kind:'autins', pt, lane:rec.lane }]) ? pt : null;   // точку кладёт editApply (как ↷) — сюда же, первым, ход заведённого захвата
+  /* Форма поставленной точки — ВСЕГДА человеческая: 's' от точки, 'h' после полки. Без поля она стала бы «записанной», и её форму
+     начал бы выводить закон движения (а появись перед ней точка позже — форма сменилась бы сама). */
+  const pt={ t:Math.max(0,t), key, fx:fxId, p:pKey, v:Math.max(0,Math.min(1,v)), sh: before?'s':'h' };
+  return autBatch([...ops, ...(fz?[fz]:[]), { kind:'autins', pt, lane:rec.lane }]) ? pt : null;   // точку кладёт editApply (как ↷) — сюда же, первым, ход заведённого захвата
 }
 /* ⛳ ФОРМА ОТРЕЗКА, ВХОДЯЩЕГО В ВЫБРАННУЮ ТОЧКУ: плавно ↔ ступенькой (гладкая автоматизация). Одна запись истории.
    Отказ, когда перед точкой нет точки (полка снимка / «не задано» / первая) — плавно ехать там не от чего; ui говорит это словами.
@@ -2189,12 +2318,10 @@ function autShapePoint(rec){
   const D=autPoints(editLayer(), pt.key, pt.fx, pt.p);           // полоса показывает ОТКРЫТУЮ дорожку — её вид и спрашиваем
   const i=D.pts.findIndex(r=>r.pt===pt);
   if(i<=0) return false;                                          // первая точка адреса — слева только полка снимка
-  const from=pt.sh, to= pt.sh==='s' ? undefined : 's';
-  editPush({ kind:'autshape', pt, from, to });
-  autShapeSet(pt,to);
-  autCommit(); return true;
+  const from=pt.sh, to= D.pts[i].smooth ? 'h' : 's';               // переключаем ВИДИМУЮ форму (у записанной — выведенную) и делаем её формой человека
+  return autBatch([{ kind:'autshape', pt, from, to }]);
 }
-const autShapeSet=(pt,sh)=>{ if(sh) pt.sh=sh; else delete pt.sh; };   // ПОЛЯ НЕТ — ступенька: у точки ленты «нет формы» и «ступенька» — одно и то же, как у всего записанного
+const autShapeSet=(pt,sh)=>{ if(sh) pt.sh=sh; else delete pt.sh; };   // ПОЛЯ НЕТ — форму выводит закон движения (записанная точка); 's'/'h' — форма человека
 /* ═══ ЧАСТЬ 2: ЦЕПЬ САМОЙ ДОРОЖКИ ═══
    ⛳ ГДЕ ЖИВЁТ ЭФФЕКТ, ДОБАВЛЕННЫЙ В РЕДАКТОРЕ: в СНИМКЕ ЦЕПИ ВЗЯТОГО (rec.chains[key]) — то есть в
    ЗАХВАТЕ ДОРОЖКИ, и больше нигде. ⛔ Живая цепь (state.fxChains) не трогается ни на символ: она —
@@ -2617,6 +2744,8 @@ function layerTakeTop(layer){
    НИЧЕГО, и эффекты в слой фактически не записывались. Теперь набор параметров ПРОИЗВОЛЕН, значит и
    сравнение — по МНОЖЕСТВУ: другой состав ключей ИЛИ любой ключ ушёл дальше мёртвой зоны.
    ⚠️ Порог REC_FX_EPS — в НОРМИРОВАННЫХ единицах, один на все параметры (довод — в config). */
+/* ⚠️ С тонкой записи («запись отражает плавность руки») НЕ ЗОВЁТСЯ: сравнение величин «в ноте» живёт в pnDist внутри общего автомата
+   fineStep (тот же закон «состав ключей или любой ключ»), а порог ухода из покоя — тот же REC_FX_EPS. Оставлена ради ссылок в доводах. */
 function fxChanged(a,b){
   const A=a||{}, B=b||{}, ka=Object.keys(A), kb=Object.keys(B);
   if(ka.length!==kb.length) return true;
@@ -2664,16 +2793,22 @@ function recLeadEv(own,p,live){
     /* ⚠️ БЕНД НЕ ТРОГАЕМ (R3): точка бенда дописывается в a.bend ПОСЛЕ push, по ссылке из r.bend, и
        опора (r.deg/r.oct/r.t0/r.lastC) живёт своей жизнью. Карта эффектов добавлена РЯДОМ, ни ссылка,
        ни пороги бенда не задеты — hold:true по-прежнему говорит переигровке «частоту не сбивать». */
-    if(Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){
-      if(!push('leadSet',{...p,hold:true,v:r.v},null,null,undefined,r.layer)) return;   // S4.1: не легло — сравнение остаётся со старым. T0-fix: тембр В ведении соло — нота переливается живьём (см. noInst)
-      r.vol=p.vol; r.fx=fxCopy(p.fx);                 // deg/oct остаются на атаке
-    }
+    /* ⛳ ТОНКАЯ ЗАПИСЬ (fineStep): громкость и карта — каждая единица, пока рука движется; уход из покоя — с мига, где рука ушла.
+       Каждое ведение — с ЯВНОЙ долей своей выборки (уход дописывается из памяти); с явной долей push не отказывает. T0-fix: тембр
+       В ведении соло — нота переливается живьём (см. noInst). deg/oct остаются на атаке. */
+    for(const s of fineStep(r.fine, pnSnap(p), curBeat(), pnDist)) push('leadSet',{...s.x,hold:true,v:r.v},s.t,null,undefined,r.layer);
+    r.vol=r.fine.lastX.vol; r.fx=fxCopy(r.fine.lastX.fx);
     return;
   }
-  if(p.deg!==r.deg||p.oct!==r.oct||
-     Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('leadSet',{...p,v:r.v},null,null,undefined,r.layer)) return; }   // S4.1: не легло — состояние прежнее. T0-fix: смена живого тембра посреди ноты — ЗАПИСЫВАЕТСЯ (соло её слышно)
-  else return;
-  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx);
+  /* СМЕНА ВЫСОТЫ — сразу, как прежде (T0-fix: смена живого тембра посреди ноты — ЗАПИСЫВАЕТСЯ, соло её слышно); тонкая запись
+     начинает опору заново от неё. Громкость и карта — тонкой записью (см. ветку терменвокса выше). */
+  if(p.deg!==r.deg||p.oct!==r.oct){
+    if(!push('leadSet',{...p,v:r.v},null,null,undefined,r.layer)) return;   // S4.1: не легло — состояние прежнее
+    r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx); fineReset(r.fine,pnSnap(p),curBeat());
+    return;
+  }
+  for(const s of fineStep(r.fine, pnSnap(p), curBeat(), pnDist)) push('leadSet',{...s.x,v:r.v},s.t,null,undefined,r.layer);
+  r.vol=r.fine.lastX.vol; r.fx=fxCopy(r.fine.lastX.fx);
 }
 /* Открыть ноту соло в записи — её «вкл» маршрутом по источнику (T2/T3). tie — продолжение после смены тембра. */
 function recLeadOpen(own,p,live,tie){
@@ -2690,7 +2825,7 @@ function recLeadOpen(own,p,live,tie){
     const ly=pushLy;                               // T2: дорожка, в которую нота легла; её ведения и «выкл» пойдут туда же
     vSlots.set(own,v);
     const S=ts(ly); if(v+1>S.vTop) S.vTop=v+1;      // высшая выданная за взятое В ЭТОТ СЛОЙ — до неё поднимется база на шве
-    const r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:live!=null?a.bend:null,t0,lastC:null,v,layer:ly};   // layer (T1) — слой ноты: туда же её ведения и «выкл»   // r.bend — ТОТ ЖЕ массив, что в событии (push копирует a мелко)
+    const r={deg:p.deg,oct:p.oct,vol:p.vol,fx:fxCopy(p.fx),inst:p.inst,bend:live!=null?a.bend:null,t0,lastC:null,v,layer:ly,fine:fineNew(pnSnap(p),curBeat())};   // layer (T1) — слой ноты: туда же её ведения и «выкл»   // r.bend — ТОТ ЖЕ массив, что в событии (push копирует a мелко)   // fine — тонкая запись величин «в ноте» (fineStep)
     recLead.set(own,r);
     if(live!=null)pushBend(r,live);                // стартовая точка (r уже есть — опора известна)
 }
@@ -2815,15 +2950,32 @@ function recChOn(a){ if(!recording)return; recFoldRoll();
      ⚠️ В T2 такого почти не бывает: роль аккордов во взятом одна, и её дорожка одна. Пути сюда откроет T3
      (маршрут по тембру); закрываем уже сейчас, чтобы T3 это не забыл. */
   if(recCh && recCh.layer!==ly) push('chOff',{},null,null,recCh.q,recCh.layer);
-  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:ly}; }
+  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:ly,fine:fineNew(chA(a),curBeat())}; }   // fine — тонкая запись громкости и яркости (fineStep)
+/* Нагрузка ВЕДЕНИЯ аккорда из состояния записи — ровно поля chSet (WchSet): тембра нет, служебного (q, sc, слой) — тоже. Нужна тонкой
+   записи как опора: её точка удержания пишется этой нагрузкой. */
+const chA=r=>({deg:r.deg,oct:r.oct,vol:r.vol,ty:r.ty,bri:r.bri});
 function recChSet(a){
   if(!recording)return;
   recFoldRoll();
-  let inst, q, ly;
-  if(!recCh){ inst=chIdx; q=loop.quant; if(!push('chOn',{...a,inst},null,null,q,undefined)) return; ly=pushLy; }   // T2: слой — по роли   // S4.1: зажатая через старт защёлка/удержание откроется первым кадром после отсчёта — этой же веткой
-  else if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty||Math.abs(a.vol-recCh.vol)>REC_VOL_EPS||Math.abs((a.bri||0)-(recCh.bri||0))>REC_REV_EPS){ inst=recCh.inst; q=recCh.q; ly=recCh.layer; if(!push('chSet',{...a},null,null,q,ly)) return; }
-  else return;
-  recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:ly};   // layer (T1) — слой аккорда: туда же его ведения, «выкл» и вписанное на шве «вкл»
+  if(!recCh){                                                       // S4.1: зажатая через старт защёлка/удержание откроется первым кадром после отсчёта — этой же веткой
+    const inst=chIdx, q=loop.quant; if(!push('chOn',{...a,inst},null,null,q,undefined)) return;   // T2: слой — по роли
+    recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst,q,sc:CUR(),sev:seventh,layer:pushLy,fine:fineNew(chA(a),curBeat())};   // layer (T1) — слой аккорда: туда же его ведения, «выкл» и вписанное на шве «вкл»
+    return;
+  }
+  /* СМЕНА АККОРДА (ступень, регистр, тип) — сразу и по правилу квантизации ноты, как прежде; тонкая запись начинает опору заново. */
+  const fine=recCh.fine||(recCh.fine=fineNew(chA(recCh),curBeat()));   // опора есть не у всех путей открытия (защёлка, открытая на старте записи, — recLatchOpen)
+  if(a.deg!==recCh.deg||a.oct!==recCh.oct||a.ty!==recCh.ty){
+    if(!push('chSet',{...a},null,null,recCh.q,recCh.layer)) return;
+    fineReset(fine,chA(a),curBeat());
+    recCh={deg:a.deg,oct:a.oct,vol:a.vol,ty:a.ty,bri:a.bri,inst:recCh.inst,q:recCh.q,sc:CUR(),sev:seventh,layer:recCh.layer,fine};
+    return;
+  }
+  /* ⛳ ГРОМКОСТЬ И ЯРКОСТЬ — ТОНКОЙ ЗАПИСЬЮ (fineStep), с явной долей каждой выборки, то есть БЕЗ квантизации. ⚠️ Меняет прежнее: при
+     включённой квантизации ведение одной громкости/яркости ложилось на долю — плавный свелл аккорда записывался ступенями по доле
+     (довод — у recBassEv). Смена аккорда по-прежнему квантуется; порядок внутри ключа держит страж push (chLastT). */
+  const out=fineStep(fine, chA(a), curBeat(), pnDist); if(!out.length) return;
+  for(const s of out) push('chSet',{...s.x},s.t,null,recCh.q,recCh.layer);
+  recCh={...recCh, vol:fine.lastX.vol, bri:fine.lastX.bri, sc:CUR(), sev:seventh};   // состояние — по последней ЗАПИСАННОЙ величине (её и впишет шов: recFoldRoll)
 }
 function recChOff(){ recFoldRoll(); if(recording&&recCh){ push('chOff',{},null,null,recCh.q,recCh.layer); recCh=null; } }   // шов первым: «выкл» открытого в новом проходе аккорда ложится в новый проход, а не свёрнутым временем в старый
 /* ⛳ P2: НОМЕР ОДНОВРЕМЕННОЙ БАС-НОТЫ В СЛОЕ — тем же правилом, что у соло (lowestFree): наименьший, не занятый ОТКРЫТОЙ
@@ -2843,16 +2995,26 @@ function recBassEv(own,p){                              // бас прорежи
     const q=loop.quant;                                   // S4.3: правило квантизации — от «вкл» ноты (см. шапку у recChOn)
     const pk=takePeek(noteSource('bassOn',p)), v= pk==null ? 0 : bassSlot(pk);
     if(!push('bassOn',bassA(p,v),null,null,q,undefined)) return;   // S4.1: не легло (отсчёт) — состояния не ставим, см. шапку у recLeadEv
-    recBass.set(own,{deg:p.deg,oct:p.oct,vol:p.vol,inst:p.inst,q,layer:pushLy,v,fx:fxCopy(p.fx)});   // T0: тембр ноты — тембр её атаки. T1: layer — слой ноты. V4: карта эффектов — КОПИЕЙ, как у соло (fxCopy: иначе сравнение шло бы с живым снимком)
+    recBass.set(own,{deg:p.deg,oct:p.oct,vol:p.vol,inst:p.inst,q,layer:pushLy,v,fx:fxCopy(p.fx),fine:fineNew(pnSnap(p),curBeat())});   // T0: тембр ноты — тембр её атаки. T1: layer — слой ноты. V4: карта эффектов — КОПИЕЙ, как у соло (fxCopy: иначе сравнение шло бы с живым снимком). fine — тонкая запись (fineStep)
     return;
   }
   /* V4: и СМЕНА КАРТЫ ЭФФЕКТОВ — тем же сравнением, что у соло (fxChanged: состав ключей или любой ключ дальше REC_FX_EPS).
      Карты нет ни у живой ноты, ни у записи (в цепи баса нет прицепочного параметра — так по умолчанию) → fxChanged({},{})
      = ложь, и события байт-в-байт прежние. Есть — палец, ведущий Скольжение посреди ноты, пишет ведение, и следующий
      переезд на переигровке идёт уже с новой величиной. */
-  if(p.deg!==r.deg||p.oct!==r.oct||Math.abs(p.vol-r.vol)>REC_VOL_EPS||fxChanged(p.fx,r.fx)){ if(!push('bassSet',bassA(noInst(p),r.v),null,null,r.q,r.layer)) return; }   // T0: тембр — только в «вкл» (см. noInst); смена живого тембра посреди ноты — не повод для ведения (бас держит тембр атаки до отпускания)
-  else return;
-  r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx);   // тембр, правило и слой — от «вкл», не трогаем
+  /* СМЕНА ВЫСОТЫ — сразу и по правилу квантизации ноты (r.q), как прежде. T0: тембр — только в «вкл» (см. noInst); смена живого
+     тембра посреди ноты — не повод для ведения (бас держит тембр атаки до отпускания). */
+  if(p.deg!==r.deg||p.oct!==r.oct){
+    if(!push('bassSet',bassA(noInst(p),r.v),null,null,r.q,r.layer)) return;
+    r.deg=p.deg; r.oct=p.oct; r.vol=p.vol; r.fx=fxCopy(p.fx); fineReset(r.fine,pnSnap(p),curBeat());   // тембр, правило и слой — от «вкл», не трогаем
+    return;
+  }
+  /* ⛳ ГРОМКОСТЬ И КАРТА — ТОНКОЙ ЗАПИСЬЮ (fineStep), каждое ведение с ЯВНОЙ долей своей выборки, то есть БЕЗ квантизации. ⚠️ Это
+     меняет прежнее: ведение одной громкости шло по правилу ноты и при включённой квантизации ложилось на сетку ½ доли — плавный
+     свелл баса записывался ступенями сетки. Квантизация — про то, КОГДА БЕРУТ НОТУ, а не про то, как движется рука; смена высоты
+     по-прежнему квантуется. Порядок внутри ключа держит страж push (bsLast): ведение не ляжет раньше «вкл» своей ноты. */
+  for(const s of fineStep(r.fine, pnSnap(p), curBeat(), pnDist)) push('bassSet',bassA(noInst(s.x),r.v),s.t,null,r.q,r.layer);
+  r.vol=r.fine.lastX.vol; r.fx=fxCopy(r.fine.lastX.fx);
 }
 function recBassOff(own){ recFoldRoll();                // S3.5d-fix: как recLeadOff — иначе bassOff лёг бы свёрнутым «сейчас», раньше своего bassOn
   const r=recBass.get(own);
@@ -3886,6 +4048,8 @@ export {
      списке — ОТДЕЛЬНЫМИ строками или блоком над именами, не в хвосте строки, куда допишут следующее имя. */
   makeENG, fxLaneMerge, fxLaneExpand, evRole, FX_CHAIN,
   ldKey, chOwnerKey, bassOwnerKey,
+  /* Записанная автоматизация «плавная внутри движения»: переключатель для уха (render.recSteps / aud({recSteps})). В интерфейсе его нет. */
+  setAutRecSmooth,
   frzGlobalKey,   // A1 (автозаморозка): дешёвый ГЛОБАЛЬНЫЙ сигнал «могла смениться подпись хоть одной дорожки» — для наблюдателя A3/A4. Чистое чтение; сегодня вызывающих нет
   recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен

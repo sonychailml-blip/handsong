@@ -6,7 +6,8 @@
    Переименовал или убрал что-то из списка ниже — поправь здесь и в коде модуля.
      recorder (REC.*): makeENG, fxLaneMerge, fxLaneExpand, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey (ключи
        владельцев — trackOpen; формулы ТОЛЬКО в recorder, копии здесь не заводить), events, loop, recording,
-       freezePinCaptures, freezeTicket, freezeSet, unfreezeLayer, frozenLayers, frozenInfo.
+       freezePinCaptures, freezeTicket, freezeSet, unfreezeLayer, frozenLayers, frozenInfo,
+       setAutRecSmooth (ухо-проба записанной автоматизации: recSteps, aud({recSteps})).
      живой audio (LIVE.* и именованный импорт): AC, ksReady, makeFrozenBus, fxPlayPath, fxPlaySet, fxRestoreAim,
        leadOff, chordOff, bassOff, droneOff.
      копия движка ('./audio.js?render', eng.*): initAudio, setRnd, setOffline, setDbg, dbgExprBypass, offlineTapMaster,
@@ -15,7 +16,7 @@
        BASS_INSTR (плюс всё, что makeENG зовёт у переданной копии).
      state (ST.* и именованный импорт): chainOwners, fxIsScalar, CHAIN_SOLO, chainKeyOf, fxChainOf.
      config: SCHED_TICK_MS.
-     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop.
+     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps.
    ===================================================================== */
 /* =====================================================================
    КОНТЕКСТ РЕНДЕРА — слайсы F0 (контекст) и F1 (посеянная случайность)
@@ -1240,6 +1241,8 @@ const frozen=()=>{ const ls=REC.frozenLayers();
        await R.aud(1,{expr:'bypass'})       // C2: выразительность обойдена
        await R.aud(1,{noHum:true})          // гуманизация высоты выкл
        await R.aud(1,{mono:true})           // моно-сумма на выходе
+       await R.aud(1,{recSteps:true})       // записанная автоматизация шины СТУПЕНЬКАМИ (как до слайса «плавная внутри движения»)
+       R.recSteps(true) / R.recSteps(false) // записанная автоматизация ступеньками / законом движения — во ВСЁМ приложении (▶, полоса)
        R.live(1)                            // те же ноты ЖИВЫМ движком
        R.stop()
    Новую гипотезу добавлять так же: переключатель в DBG копии движка (audio.setDbg), выключенный по умолчанию и меняющий
@@ -1254,14 +1257,36 @@ const audDesc=o=>{ const p=[];
   if(o.expr==='bypass') p.push('C2: выразительность ОБОЙДЕНА');
   if(o.noHum) p.push('гуманизация высоты ВЫКЛ');
   if(o.mono) p.push('МОНО-сумма на выходе');
+  if(o.recSteps) p.push('записанная автоматизация шины — СТУПЕНЬКАМИ, как до слайса «плавная внутри движения»');
+  if(o.noteSmooth) p.push('(noteSmooth больше не опыт: величины «в ноте» пишутся тонко и закон движения у них в приложении)');
+  if(recStepsOn && !o.recSteps) p.push('⚠️ включён R.recSteps(true): записанная автоматизация везде ступеньками');
   return p.length ? p.join(' · ') : 'НИЧЕГО (буфер ровно как у заморозки)'; };
+/* ⛳ ЗАПИСАННАЯ АВТОМАТИЗАЦИЯ: СТУПЕНЬКИ ИЛИ ЗАКОН ДВИЖЕНИЯ — ВО ВСЁМ ПРИЛОЖЕНИИ (слайс «плавная внутри движения»). recSteps(true) —
+   записанные точки шины снова ступеньки, как до слайса: ▶, полоса редактора, R.live, R.aud и ❄ — все сразу (переключатель живёт в
+   recorder, закон один). recSteps(false) — закон движения (умолчание). ⚠️ Уже ЗАМОРОЖЕННАЯ дорожка играет свой буфер — сравнивать
+   на незамороженной или через R.aud. Для одного рендера без смены всего приложения — aud(n,{recSteps:true}).
+   ⚠️ У величин «в ноте» (громкость, яркость, вибрато, драйв) переключатель меняет ТОЛЬКО РИСУНОК полосы: их звук — сами события, и
+   с тонкой записью они лежат каждой единицей (как ведения рампы у нарисованного рукой) — переключать в звуке там нечего. */
+let recStepsOn=false;
+function recSteps(on){
+  recStepsOn = on!==false;
+  REC.setAutRecSmooth(!recStepsOn);
+  /* eslint-disable-next-line no-console */
+  console.log('%c[recSteps] записанная автоматизация шины — '+(recStepsOn?'СТУПЕНЬКАМИ (как до слайса)':'ЗАКОНОМ ДВИЖЕНИЯ: плавно внутри движения, ступенька после паузы'),'font-weight:bold');
+  return recStepsOn;
+}
 async function aud(layer, opts){
   const o=opts||{};
   if(!LIVE_AC) throw new Error('живой AudioContext ещё не создан — нажмите «▶ Играть»');
   stop();
   const tk=REC.freezeTicket(layer); if(!tk) throw new Error('нет дорожки '+layer);   // только ради id → семя (у записанной дорожки id уже есть; подпись лишь читается)
   const seed=o.seed!=null?o.seed:seedOfLane(tk.id);
-  const r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null } });
+  /* recSteps — ТОЛЬКО на этот рендер: закон записанной ленты меняется в recorder (он у рендера и ▶ общий) и тут же
+     возвращается к тому, что стоит во всём приложении (recStepsOn), даже если рендер упал. */
+  if(o.recSteps) REC.setAutRecSmooth(false);
+  let r;
+  try{ r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null } }); }
+  finally{ if(o.recSteps) REC.setAutRecSmooth(!recStepsOn); }
   (await engine()).setDbg(null);   // буфер уже готов — переключатели копии сразу в «выкл», чтобы их не унаследовал зонд или что угодно, что поднимет копию без renderTrack
   /* ИГРАЕМ ТЕМ ЖЕ ПУТЁМ, ЧТО ЗАМОРОЗКА: живая шина замороженной дорожки → живой мастер → лимитер. Моно — даунмикс ДО неё. */
   const bus=LIVE.makeFrozenBus(); if(!bus) throw new Error('живого движка нет');
@@ -1331,4 +1356,4 @@ function stop(){
   liveRestore(me);
 }
 
-export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop };
+export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps };
