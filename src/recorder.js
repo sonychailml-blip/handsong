@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { leadFreq, chordFreqs, bassFreq, CUR, typedChords, chordFams } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда
+import { leadFreq, chordFreqs, chordNotes, bassFreq, CUR, typedChords, chordFams } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1697,6 +1697,66 @@ function editDeleteSeg(ev){
   if(!compactEvents(e=>drop.has(e))) return false;
   editPush({ kind:'del', evs });
   editCommit(); return true;
+}
+/* ═══ U2: РАСПАД АККОРДА — ПРАВКА ОДНОЙ ЕГО НОТЫ ═══
+   ⛳ ЗАКОН (решение пользователя, план «АККОРД КАК НОТЫ»): правка ОДНОЙ ноты аккорда РАСПУСКАЕТ его на ОДНОНОТНЫЕ аккорды, и
+   правка применяется к одной из них. В U2 правка одна — УДАЛЕНИЕ ноты (перенос и длина одной ноты — U3/U4).
+   ⛳ ЧТО ПИШЕТСЯ. Сперва — ТО ЖЕ ОТДЕЛЕНИЕ, что у переноса и удаления сегмента (detachPlan, E2): сегмент посреди ведения
+   (аккорды, сменённые одной защёлкой) становится отдельной нотой; одиночный аккорд (сегмент-начало со своим «выкл») берётся как
+   есть — отделять его не от чего. Затем отделённая нота РАЗМНОЖАЕТСЯ: на каждую оставшуюся ноту аккорда — своя копия ВСЕХ её
+   событий («вкл», ведения громкости и яркости внутри, «выкл»), каждая
+     • с ТЕМ ЖЕ корнем и регистром (a.deg/a.oct) и ТЕМ ЖЕ замороженным ладом (sc/sev едут с событием — правило #7);
+     • с ОДНОЭЛЕМЕНТНЫМ ТИПОМ a.ty = [интервал этой ноты] — интервал ровно тот, что вернула scales.chordNotes (iv — в мере ветки
+       цены: целые полутоны у сетки и ступенчатых наборов, отношение у чистых); ⚠️ это НОВЫЙ массив, а не ссылка в наборе
+       семейств (правило #7 — тип в событии теперь бывает и данными вне палитры; сравнение — tyEq, по значению);
+     • со СВОИМ свежим суффиксом взятого k (k0, k0+1, … — выше всех k слоя, layerTakeTop), то есть со своим владельцем
+       'loop:N:k': у каждой ноты свой голос, ничья с ничьей не путается;
+     • громкость, яркость, тембр («вкл»), отметки автоматизации (sh/gen) — КОПИИ полей исходных событий, ничего не выдумано.
+   Удаляемая нота просто не получает копии. Первая оставшаяся нота едет на ИСХОДНЫХ объектах событий (ход 'move'), прочие —
+   новыми объектами в том же взятом (tk) и слое (правило #27). Всё — ОДНА составная правка (commitDetach → editBatch): один ↶
+   возвращает аккорд в точности (те же объекты, те же нагрузки), одна запись истории.
+   ⛳ ПОЧЕМУ ЗВУК ОСТАВШИХСЯ НОТ НЕ МЕНЯЕТСЯ (доказательство — по движку, audio.chordOn/chordGlide/chordOff):
+     • ВЫСОТА: chordFreqs(deg,oct,sc,sev,[iv_i]) — та же ветка chordNotes с тем же корнем (корень не зависит от типа ни в одной из
+       четырёх ветвей), нота = корень·iv_i (или ступень корень+iv_i сетки / шаг r0+iv_i) — ровно частота ноты i исходного аккорда;
+     • УРОВЕНЬ: голос аккорда получает ins.lvl·volAmp(vol)·(1−rnd·0.05) — от ЧИСЛА нот уровень не зависит (нормировки на число
+       голосов в chordOn нет), значит одна нота звучит так же, как в составе;
+     • ФИЛЬТРЫ: f (атака) ставится из тембра и громкости, fb (яркость) — из a.bri; оба — пер-голосовые и от состава не зависят
+       (правило #19 не тронуто);
+     • ВЕДЕНИЕ: chordGlide сопоставляет голос i частоте i; у однонотного аккорда голос 0 — частоте 0, то есть той же ноте;
+     • ШИНА: все владельцы 'loop:N:*' слоя идут в одну chordBus → одна цепь эффектов дорожки;
+     • ГОЛОСОВ не больше, чем было (N−1 из N): живой пул 24 крадёт не раньше прежнего.
+     Различается лишь гуманизация (−0..5% уровня, ±10% атаки, центы) — она СВЕЖАЯ на каждой атаке и не записывается (правило
+     #11), то есть различалась и между двумя переигровками одного аккорда.
+   ⚠️ ЦЕНА ПЛАТИТСЯ ЗДЕСЬ (та же, что у E2, и только у сегмента ВНУТРИ ведения): там, где аккорд плавно сменялся из соседнего и
+   плавно перетекал в следующий, теперь «выкл» и новая атака — края сегмента РЕ-АРТИКУЛИРУЮТСЯ (detachPlan). Одиночный аккорд
+   распадается без цены: ноты атакуют и отпускаются ровно там, где и прежде.
+   null — распускать нечего или некуда (открытый сегмент — так лежит подложка, её не правят). */
+function dissolvePlan(seg,N,drop){
+  const n=seg.note, X=seg.endEv;
+  const alone = seg.first && X && chaseKind(X.fn)==='f';      // одиночный аккорд: отделять не от чего — берём все его события как есть
+  const P = alone ? { ops:[], items:n.evs.map(e=>({ orig:e, fn:e.fn, t:e.t, a:e.a })) } : detachPlan(seg);
+  if(!P) return null;
+  const k0=layerTakeTop(n.layer), items=[];
+  N.map((x,i)=>i).filter(i=>i!==drop).forEach((i,j)=>{
+    const ty=[N[i].iv], k=k0+j;                               // свой тип из одной ноты и свой владелец 'loop:N:k'
+    for(const it of P.items){
+      const a={...it.a, ...(chaseKind(it.fn)!=='f'?{ty}:null), k};   // «выкл» типа не несёт — у него только ключ
+      items.push(j===0 ? {...it, a} : { orig:null, proto:it.orig||it.proto, fn:it.fn, t:it.t, a });
+    }
+  });
+  return { ops:P.ops, items };
+}
+/* Удалить ОДНУ ноту аккорда (idx — её номер в scales.chordNotes сегмента, тот же, что у блока на экране): аккорд распадается
+   на однонотные, удаляемая уходит (см. dissolvePlan). Аккорд из одной ноты — это удаление сегмента целиком, как прежде.
+   → true или false. */
+function editDeleteChordNote(ev,idx){
+  if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
+  const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
+  const N=chordNotes(seg.deg,seg.oct,seg.sc,seg.sev,seg.ty);
+  if(!(idx>=0&&idx<N.length)) return false;
+  if(N.length<2) return editDeleteSeg(ev);
+  const P=dissolvePlan(seg,N,idx); if(!P) return false;
+  return !!commitDetach(P,true);
 }
 /* ═══ ДЛИНА СЕГМЕНТА (S5.6; E2) ═══
    ⛳ ЧТО ДВИГАЕТ ИЗМЕНЕНИЕ ДЛИНЫ — по тому, ЧЕМ сегмент кончается:
@@ -4118,6 +4178,8 @@ export {
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   editInsertChord,
+  /* U2: удалить ОДНУ ноту аккорда — аккорд распадается на однонотные (dissolvePlan) */
+  editDeleteChordNote,
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен

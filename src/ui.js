@@ -6,7 +6,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
          fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          fxIsScalar, FX_VOL, fxVolReset,   // VOL-2: запись громкости цепи (строка панели) и её сброс на горизонталь для уроков; chainXDriven/fxVolFix/setFxVolFix удалены
-         rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, rollDrag, setRollDrag, rollIns, setRollIns,
+         rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
          rollRole, setRollRole, rollRow0, setRollRow0, rollScale, setRollScale,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
@@ -27,7 +27,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
-         editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord,
+         editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
@@ -658,7 +658,11 @@ function rollDeleteSel(){ if(rollRefuseRO()) return;
   /* ⛳ УДАЛЕНИЕ ВЕДЁТ РОЛЬ: у ударных это одиночное событие, у баса — СЕГМЕНТ. С независимых нот (E2) сегмент
      посреди глиссандо ОТДЕЛЯЕТСЯ и уходит один — на его месте ТИШИНА, соседи целы (прежняя высота через него больше
      НЕ тянется); одиночная нота уходит целиком — см. editDeleteSeg. */
-  const ok = rollRole==='dr' ? editDeleteHit(rollSel) : editDeleteSeg(rollSel);   // S2: у ладовых ролей (бас, аккорды; соло — S4) удаление одно — по СЕГМЕНТУ, роль разбирает recorder (EDIT_ROLE)
+  /* ⛳ U2: УДАЛЕНИЕ — ПО УРОВНЮ ВЫДЕЛЕНИЯ. Выделена одна нота аккорда — аккорд распадается на однонотные и эта нота уходит
+     (editDeleteChordNote, одна запись истории); выделен весь аккорд — уходит весь, как прежде. ⌫ зовёт эту же функцию. */
+  const ok = rollRole==='dr' ? editDeleteHit(rollSel)
+           : (rollRole==='ch' && rollSelNote!=null) ? editDeleteChordNote(rollSel, rollSelNote)
+           : editDeleteSeg(rollSel);   // S2: у ладовых ролей (бас, аккорды; соло — S4) удаление одно — по СЕГМЕНТУ, роль разбирает recorder (EDIT_ROLE)
   if(ok) setRollSel(null);
   renderTimbreCtl();   // T5: снята последняя нота — у дорожки больше нет тембра, выбор скрывается
   updRollBtns(); }
@@ -734,6 +738,7 @@ rollHomeBtn.onclick=()=>seekTo(0);
    человек смотрит. Теперь взаимное исключение — в одном месте, а не в семи местах жеста. */
 const selNote =ev => { setRollSel(ev||null);  setRollAutSel(null); };
 const selAutPt=rec=> { setRollAutSel(rec||null); setRollSel(null); };
+let rollNoteHintShown=false;   // U2: подсказка «тапни ещё раз — одна нота» показана в этой сессии
 const rollPts=new Map(); let rollPan=null, rollZoomBase=null, rollMoved=false, rollGrab=null;   // rollGrab — взятый пальцем удар (перетаскивание); пока он есть, поле НЕ прокручивается
 const rollXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
 function rollDown(e){
@@ -772,6 +777,16 @@ function rollDown(e){
     if(h&&(h.what==='hit'||h.what==='seg')&&!editBackingOpen()){
       const isSeg=h.what==='seg';
       const row = isSeg ? h.row : (h.ev.a.row|0);
+      /* ⛳ U2: ДВА УРОВНЯ ВЫДЕЛЕНИЯ У АККОРДА. Первый тап по аккорду — выделен ВЕСЬ аккорд; второй тап (без движения) по одной из его
+         нот — выделена ЭТА нота (номер — h.note, тот же порядок, что у блоков); тап по пустому снимает всё (ниже, selNote(null)). У
+         аккорда из одной ноты, у баса и ударов уровень один. ПЕРЕТАСКИВАНИЕ ДЕЙСТВУЕТ НА ВЫДЕЛЕННОЕ: весь аккорд тянется как в U1; одну
+         ноту переносить и тянуть за край пока нельзя (U3/U4) — такой жест инертен и на отпускании говорит об этом словами. */
+      const chordNote = isSeg && h.n>1 && h.ev===rollSel;
+      if(chordNote && rollSelNote!=null){
+        rollGrab={ ev:h.ev, seg:h.seg, mode:'note', note:h.note, x:p.x, y:p.y };
+        updRollBtns(); return;
+      }
+      if(isSeg && h.n>1 && h.ev!==rollSel && !rollNoteHintShown){ rollNoteHintShown=true; showCamMsg(t('roll.tapAgainNote')); }   // подсказка — один раз за сессию
       selNote(h.ev);
       /* ⛳ КРАЙ = ДЛИНА, СЕРЕДИНА = ПЕРЕНОС (S5.6). Какой это жест, решает ТОТ ЖЕ hit-test, что нарисовал
          блок (h.edge), — второй геометрии «где тут край» в ui не заводим. */
@@ -780,7 +795,8 @@ function rollDown(e){
          ряд терции. У баса и удара grabRow = rootRow = row — перенос прежний. */
       rollGrab={ ev:h.ev, seg:isSeg?h.seg:null, mode:(isSeg&&h.edge)?'len':'move',
                  dt:h.beat-h.ev.t, row, grabRow:row, rootRow:(isSeg&&h.rootRow!=null)?h.rootRow:row, x:p.x, y:p.y,
-                 len: isSeg ? ((h.seg.end==null?h.beat+1:h.seg.end)-h.seg.start) : 0 };
+                 len: isSeg ? ((h.seg.end==null?h.beat+1:h.seg.end)-h.seg.start) : 0,
+                 tapNote: chordNote ? h.note : null };   // U2: тап без движения по ноте УЖЕ выделенного аккорда → выделить эту ноту (на отпускании)
       setRollDrag({ ev:h.ev, t:h.ev.t, row, grabRow:row, len:rollGrab.len });
       updRollBtns(); return;
     }
@@ -826,6 +842,7 @@ function rollMove(e){
   }
   if(rollGrab){
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
+    if(rollGrab.mode==='note') return;                                   // U2: выделена одна нота аккорда — призрака нет, правки на отпускании не будет
     /* ДЛИНА: ведём ТОЛЬКО правый край — начало и ряд стоят. Призрак показывает будущую длину той же
        парой (t, len), которой рисуется настоящий сегмент. */
     if(rollGrab.mode==='len'){
@@ -869,6 +886,12 @@ function rollUp(e){
       if(r&&r!==true) selAutPt(r); }   // V4b: точка «в ноте» — вид пересобран из нот, выделяем ту, что вернул recorder (там величина и вступила)
     setRollAutDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
   }
+  if(rollGrab&&rollGrab.mode==='note'){
+    /* U2: жест по ноте, когда выделена ОДНА нота аккорда. Тап — выделить ту ноту, по которой он пришёлся (в том же аккорде);
+       движение — отказ словами: перенос одной ноты — слайс U3, её длина — U4. */
+    if(!rollMoved) setRollSelNote(rollGrab.note); else showCamMsg(t('roll.noteMoveLater'));
+    setRollDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
+  }
   if(rollGrab){
     const gd=rollGrab && rollDrag;
     /* ⚠️ ВРЕМЯ СРАВНИВАЕМ С ДОПУСКОМ, а не по равенству: шаг привязки бывает троичным (1/3, 1/6 при
@@ -894,6 +917,7 @@ function rollUp(e){
         if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct){ const r=editMoveSeg(s.ev, gd.t, pit.deg, pit.oct); if(r&&r!==true) selNote(r); }
       }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
     }
+    if(!rollMoved && rollGrab.tapNote!=null && rollSel===rollGrab.ev) setRollSelNote(rollGrab.tapNote);   // U2: второй тап по аккорду — уровень ОДНОЙ ноты
     setRollDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
   }
   if(!rollMoved&&rollPan&&rollPan.aut){

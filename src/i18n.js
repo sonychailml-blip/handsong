@@ -188,6 +188,8 @@ export const DICTS = {
     'roll.snapTitle':'Snap {s} for notes · follows “Quantize” in the loop panel · automation points always move freely',
     'roll.readOnly':'Backing track — read-only',
     'roll.needSel':'Select a note or an automation point first',
+    'roll.tapAgainNote':'Tap a note of the chord again to edit just that note',
+    'roll.noteMoveLater':'One note of a chord cannot be moved yet — tap an empty spot, then drag the whole chord',
     // панель звукоряда
     'panel.collapse':'Collapse ✕',
     'panel.scale.head':'Scale',
@@ -620,6 +622,8 @@ export const DICTS = {
     'roll.snapTitle':'Привязка {s} для нот · следует «Квантизации» в панели лупера · точки автоматизации двигаются свободно',
     'roll.readOnly':'Дорожка подложки — только чтение',
     'roll.needSel':'Сначала выберите ноту или точку автоматизации',
+    'roll.tapAgainNote':'Коснитесь ноты аккорда ещё раз, чтобы править только её',
+    'roll.noteMoveLater':'Одну ноту аккорда пока нельзя переносить — коснитесь пустого места и тяните весь аккорд',
     'panel.collapse':'Свернуть ✕',
     'panel.scale.head':'Звукоряд',
     'panel.sound.head':'Звук и управление',
