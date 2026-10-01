@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { leadFreq, chordFreqs, bassFreq, CUR } from './scales.js';
+import { leadFreq, chordFreqs, bassFreq, CUR, typedChords, chordFams } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1514,8 +1514,8 @@ function editDeleteHit(ev){
    ключа не шло назад: переставь ведение за соседа — и на переигровке ноты поменяются местами, а «выкл»
    закроет чужую.
    ⛳ S0 (правка соло и аккордов): функции ниже больше не басовые — роль берут из таблицы EDIT_ROLE (чуть ниже), и та же
-   машинерия отделения служит соло и аккордам. Правимыми их делают слайсы S2/S4 (state.ROLL_EDITABLE); до того сюда приходит
-   только бас. Слово «бас» в доводах ниже — это история того, для кого их писали; закон тот же у всех трёх ролей.
+   машинерия отделения служит соло и аккордам. С S2 правимы и аккорды (state.ROLL_EDITABLE); соло — слайсом S4, до него сюда приходят
+   бас и аккорды. Слово «бас» в доводах ниже — это история того, для кого их писали; закон тот же у всех трёх ролей.
    ⛳ E2: ЗАКОН НЕЗАВИСИМОСТИ. Прежде порядок стерегли ЗАЖИМОМ — событие нельзя было увести за соседа по ключу, —
    и именно зажим делал ноты ЗАВИСИМЫМИ: перенос сегмента глиссандо двигал общую с соседом границу, длина
    середины отнималась у следующего, удаление середины давало прежней высоте тянуться дальше. Пользователь это
@@ -1537,7 +1537,7 @@ const EDIT_MIN_LEN=1/32;                                    // минималь�
      oldOff(a) — что несёт «выкл», закрывающий ноту под ПРЕЖНИМ ключом (по нагрузке определяющего события): бас — k и v, только
        ненулевые (байт-в-байт прежний E2); аккорд — k, только ненулевой; соло — v ВСЕГДА, как пишет запись (recLeadOff).
    ⛔ ВСТАВКА СЮДА НЕ ВХОДИТ: у каждой роли свои поля новой ноты (тембр, карта, тип) — это слайсы S2/S4.
-   ⚠️ S0 НЕВИДИМ: список правимых ролей (state.ROLL_EDITABLE) не тронут — соло и аккорды таблица знает, но редактор к ним не
+   ⚠️ S0 был НЕВИДИМ (список правимых ролей не тронут); S2 открыл аккорды, соло — S4: таблица его знает, но редактор к нему не
    пускает; у баса каждая функция ниже даёт ТЕ ЖЕ события, что и прежде (сверено построчно — см. отчёт слайса). */
 const EDIT_ROLE={
   bs:{ on:'bassOn', off:'bassOff', fresh:ly=>({k:layerTakeTop(ly)}),
@@ -1668,7 +1668,7 @@ function commitDetach(P,keep){
    → событие, которое редактор выделит после правки (у отделённой — её новое «вкл»), или false. */
 function editMoveSeg(ev,t,deg,oct){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); до S2/S4 редактор пускает сюда только бас (ROLL_EDITABLE)
+  if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); с S2 редактор пускает сюда бас и аккорды, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
   const nt=Math.max(0,t);
   if(Math.abs(nt-ev.t)<=1e-9){
@@ -1760,6 +1760,49 @@ function editInsertBass(t,deg,oct,sc,sev,len){
   const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
   const evOn =mk('bassOn', {deg,oct,vol,inst}, t0);
   const evOff=mk('bassOff',{}, t1);
+  events.push(evOn,evOff);
+  editPush({ kind:'ins', evs:[evOn,evOff] });
+  editCommit(); return evOn;
+}
+/* ═══ ВСТАВКА АККОРДА (слайс S2 правки соло и аккордов) — пара «вкл»+«выкл» со СВЕЖИМ k, как у баса ═══
+   ⛳ ТИП (решение пользователя): тип ВЫДЕЛЕННОГО аккорда (sel — событие, которое было выделено в редакторе), иначе БЛИЖАЙШЕГО аккорда
+   дорожки в ТОЙ ЖЕ группе лада (тип — ССЫЛКА в наборе семейств лада, a.ty; из чужого лада он не годится), иначе — null у
+   нетипизированного лада (качество выводит ступень и септаккорд) или ПЕРВЫЙ тип палитры у типизированного.
+   ТЕМБР — с «вкл» ближайшего аккорда (тембр печётся на атаке; ведение аккорда тембра не несёт), иначе живой chIdx. ГРОМКОСТЬ — с
+   ближайшего события аккорда, иначе editDefVol('ch') (правило #30: у ноты громкость есть всегда). ЯРКОСТИ НЕТ: отсутствие a.bri —
+   «не задана», фильтр открывается на атаке (правило аккордов). ЛАД И СЕПТАККОРД — показанной группы (их передаёт редактор; правило #7).
+   ⛔ Живая защёлка ('latch') не трогается ничем: это события дорожки, её владелец — 'loop:N:k' (правило #20). */
+function editChordTypeFor(layer,t,sc,sel){
+  if(sel && sel.layer===layer && chaseRole(sel.fn)==='ch' && sel.sc===sc && sel.a && 'ty' in sel.a) return sel.a.ty??null;
+  let best=null, bd=Infinity;
+  for(const e of events){
+    if(e.layer!==layer||e.sc!==sc||(e.fn!=='chOn'&&e.fn!=='chSet')||!e.a) continue;
+    const d=Math.abs(e.t-t); if(d<bd){ bd=d; best=e; }
+  }
+  if(best) return best.a.ty??null;
+  if(!typedChords(sc)) return null;
+  const F=chordFams(sc), f0=F&&F[0], ty0=f0&&f0.types&&f0.types[0];
+  return ty0 ? ty0.iv : null;
+}
+function editInsertChord(t,deg,oct,sc,sev,len,sel){
+  if(!editGuard()) return false;
+  const layer=editLayer();
+  let on=null, near=null, bd=Infinity;
+  for(const e of events){
+    if(e.layer!==layer||chaseRole(e.fn)!=='ch'||e.fn==='chOff') continue;
+    const d=Math.abs(e.t-t);
+    if(d<bd){ bd=d; near=e; }
+    if(e.fn==='chOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
+  }
+  const inst = on&&on.a.inst!=null ? on.a.inst : chIdx;
+  const vol  = near&&near.a.vol!=null ? near.a.vol : editDefVol('ch');
+  const ty   = editChordTypeFor(layer,t,sc,sel);
+  const k=layerTakeTop(layer);                               // свой ключ владельца 'loop:N:k': пересечься с аккордами дорожки нечем
+  if(!editTake) editTake=++takeSeq;
+  const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
+  const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
+  const evOn =mk('chOn', {deg,oct,vol,inst,ty}, t0);
+  const evOff=mk('chOff',{}, t1);
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
   editCommit(); return evOn;
@@ -4070,6 +4113,7 @@ export {
   editOpen, editClose, editIsOpen, editLayer, editSetLayer,   // S5.0: редактор дорожки — ОДИН флаг на все отказы; наружу отдаём НОМЕР СЛОЯ, id остаётся здесь (правило #27)
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
+  editInsertChord,
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен

@@ -677,8 +677,8 @@ export const setRollIns=v=>{ rollIns=!!v; };
 export let rollRole=null, rollRow0=0, rollScale=0;
 /* КАКИЕ РОЛИ РОЛЛ УМЕЕТ ПРАВИТЬ СЕГОДНЯ. Читает draw (поле: у неправимой роли вместо сетки одна строка, и
    попадание по сетке молчит). Живёт здесь, а не в draw, чтобы новый слайс — соло или аккорды — правил
-   ОДНУ строку там, где лежат прочие величины редактора. */
-export const ROLL_EDITABLE=['dr','bs'];
+   ОДНУ строку там, где лежат прочие величины редактора. S2 (правка соло и аккордов): + аккорды; соло — S4. */
+export const ROLL_EDITABLE=['dr','bs','ch'];
 export const setRollRole=v=>{ rollRole=v; };
 export const setRollRow0=v=>{ rollRow0=Math.max(0,v|0); };
 export const setRollScale=v=>{ rollScale=Math.max(0,v|0); };
