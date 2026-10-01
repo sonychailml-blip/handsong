@@ -875,7 +875,20 @@ export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=
   const cx=s.cents?s.cents.concat([1200]):null;
   const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);
   return baseF()/4*Math.pow(P,o)*r; }
-export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
+/* ⛳ НОТЫ АККОРДА — ОДИН ИСТОЧНИК (слайс U1 «аккорд как ноты»). chordNotes отдаёт каждую звучащую ноту: f — частоту, iv — её интервал
+   в той же записи, в какой его читает ветка цены (полутоновое смещение / отношение / шаг лада от корня). chordFreqs — ровно её частоты,
+   и движок (ENG.chOn/chSet) играет их, а редактор показывает ноты аккорда этой же функцией: второй копии правил построения нет.
+   ⚠️ АРИФМЕТИКА НЕ ТРОНУТА: в каждой ветке частота считается тем же выражением, что и прежде, — меняется лишь то, что рядом с ней
+   кладётся интервал. Звук побитно прежний. */
+export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ return chordNotes(deg,oct,s,sev,ty).map(n=>n.f); }
+/* Частота РЯДА (ступень, регистр) в регистре аккордов — частота КОРНЯ аккорда на этом ряду, по той же цене, что у chordNotes: у
+   типизированного лада — с первым интервалом его наборов (корень: 0 у полутоновых и шаговых, 1 у отношений — все типы начинаются с
+   корня), у нетипизированного — нота 0 стопки (тоже корень). По ней редактор ставит ноты аккорда на ряд или между рядами. */
+export function chordRowFreq(deg,oct, s=CUR(), sev=seventh){
+  const F=s.typedChords?chordFams(s):null, ty0=F&&F[0]&&F[0].types&&F[0].types[0]&&F[0].types[0].iv;
+  return chordNotes(deg,oct,s,sev, ty0?[ty0[0]]:null)[0].f;
+}
+export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
   if (s.cents && ty && s.gridChords){
     /* ФИКСИРОВАННЫЙ cents-строй (Натуральный клавесин): ноты аккорда берутся ИЗ СЕТКИ, а не строятся
        чистым отношением от корня. ty здесь — ЦЕЛЫЕ ПОЛУТОНОВЫЕ СМЕЩЕНИЯ (как chrom12), а не ratio:
@@ -890,7 +903,7 @@ export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
     const L=s.cents.length, key=s.fixedKey?tonic:0, anchor=s.fixedKey?cFix():baseF();
     const d=key+((deg%L)+L)%L, o=oct+Math.floor(deg/L);
     return ty.map(off=>{ const g=d+off, gi=((g%L)+L)%L, carry=Math.floor(g/L);
-      return anchor/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[gi]/1200); });
+      return { f: anchor/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[gi]/1200), iv:off }; });
   }
   if (s.cents && ty){
     /* Cents-строй + типизированный аккорд (Партч): интервалы — ЧИСТЫЕ ОТНОШЕНИЯ от корня, не
@@ -906,7 +919,7 @@ export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
     let rootF;
     if(s.fixedKey){ const {slot,carry}=fixedSlot(s,d); rootF=cFix()/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
     else rootF=baseF()/2*Math.pow(2,o)*Math.pow(2,s.cents[d]/1200);   // подвижный Натуральный: корень из cents-оверлея над живой тоникой, как было
-    return ty.map(ra=>rootF*ra);
+    return ty.map(ra=>({ f:rootF*ra, iv:ra }));
   }
   const P=periodOf(s);
   if (P!==2 && ty){
@@ -918,10 +931,13 @@ export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
        period нет → P===2 → сюда не входят; nonoct-лад без ty (не должно быть) уходит вниз. */
     const n=s.iv.length, d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
     const rootF=baseF()/2*Math.pow(P,o)*Math.pow(P,s.iv[d]/s.edo);
-    return ty.map(ra=>rootF*ra);
+    return ty.map(ra=>({ f:rootF*ra, iv:ra }));
   }
   // равная ветка: регистр и шаг — в ПЕРИОДЕ лада (P=2 у всех аккордовых ладов ⇒ байт-в-байт)
-  return chordSteps(deg,s,sev,ty).map(st=> baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo)); }
+  /* iv — шаг ноты ОТ КОРНЯ (у типизированного — сам интервал типа; у стопки терций / пауэр-аккорда — разность с шагом корня, тем же
+     выражением корня, что у chordSteps): с ним аккорд из одной ноты [iv] сыграет ровно эту частоту (типизированная ветка chordSteps). */
+  const n=s.iv.length, r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+  return chordSteps(deg,s,sev,ty).map(st=>({ f: baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo), iv: st-r0 })); }
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль

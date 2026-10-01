@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordNotes, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl } from './scales.js';
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollDrag, rollIns, rollRole, rollRow0, rollScale, tonic, ROLL_EDITABLE,
@@ -881,23 +881,45 @@ function rollGroups(){
    ВЫСОТА, и это не ошибка: запись хранит СЫГРАННУЮ пару (deg,oct), а сыграть можно и так, и так
    (rectSlotOf опирается на то же). Поэтому ролл кладёт ОБА ряда и НЕ переписывает ни одного события —
    дубль лишь помечен тусклее, чтобы человек понимал, почему две строки звучат одинаково. */
-/* ИМЯ АККОРДА БЛОКА (S2 правки соло и аккордов) — из ДАННЫХ сегмента, в ЕГО замороженном ладу (правило #7):
-     типизированный лад — тип лежит ССЫЛКОЙ (a.ty) в наборе семейств ЭТОГО лада (chordFams(sc)); ищем по ссылке, имя — подпись корня
-       (noteLbl, та же, что у ряда) плюс подпись типа; у мажорного трезвучия ('M') — один корень. Перенос на другую ступень тип не
-       меняет: он хранится и транспонируется;
-     нетипизированный — chordLabel(ступень, лад, ЗАМОРОЖЕННЫЙ септаккорд): типа нет вовсе, качество выводит ступень, поэтому аккорд,
-       перенесённый на ступень выше в мажоре, сам становится, например, из C — Dm. Так говорят данные — так и показываем.
-   Тоника — живая, как у всех подписей ролла (высоту переигровка тоже берёт от живой тоники). */
-function rollChordName(s){
-  const sc=s.sc; if(!sc) return '';
-  if(typedChords(sc)){
-    const root=noteLbl(s.deg, sc);
-    if(s.ty) for(const f of chordFams(sc)) for(const ty of f.types) if(ty.iv===s.ty){
-      const lb=L(ty.label)||''; if(!lb||lb==='M') return root;
-      return root + (/\d$/.test(root) ? '·' : '') + lb; }
-    return root;
-  }
-  return chordLabel(s.deg, sc, s.sev);
+/* ═══ АККОРД КАК НОТЫ (слайс U1) — РЯДЫ НОТ СЕГМЕНТА ═══
+   ⛳ НОТЫ — ТОЙ ЖЕ ФУНКЦИЕЙ, КОТОРОЙ ИХ ИГРАЕТ ДВИЖОК: scales.chordNotes (из неё же chordFreqs, а его зовут ENG.chOn/chSet). Своих
+   правил построения аккорда у ролла нет — блок стоит там, где звучит нота.
+   ⛳ НА РЯДУ ИЛИ МЕЖДУ РЯДАМИ. Ряд оси — ступень × регистр; его частота в регистре аккордов — scales.chordRowFreq (корень аккорда на
+   этом ряду, той же ценой). Нота в пределах ROLL_ON_ROW_CENTS цента от ряда стоит НА нём (у дубля тоники — на тонике следующего
+   регистра, а не на тусклом дубле); иначе — МЕЖДУ рядами, по логарифму частоты, то есть на своей НАСТОЯЩЕЙ высоте. Так бывает у чистых
+   отношений (Пифагор, Натуральный, Партч, Болен–Пирс: терция — корень × 5/4, а не ступень лада) и у пауэр-аккорда пентатоники (квинта
+   вне лада): редактор показывает чистую терцию НИЖЕ темперированного ряда — чего не покажет обычный редактор.
+   Корень — ВСЕГДА на ряду своей записанной пары (ступень, регистр): так он стоял и до U1, и перенос/попадание по нему прежние.
+   Каждый сегмент — в СВОЁМ замороженном ладу (правило #7); на оси рисуется группа своего лада, поэтому лад оси и лад сегмента одни.
+   ⛳ РЯДЫ СВЕРХУ: расширения (13-я ≈ 1¾ октавы над корнем) уходят выше верхнего регистра — у дорожки аккордов ROLL_CH_EXTRA_REG
+   регистров рядов сверх обычных. Подписи у них — имена нот, без римской цифры регистра (их четыре). */
+const ROLL_ON_ROW_CENTS=1, ROLL_CH_EXTRA_REG=2;
+let chRowCache={ key:null, F:null };
+function chRowFreqs(sc,sev,total){
+  const key=sc; if(chRowCache.key===key && chRowCache.base===baseF() && chRowCache.tonic===tonic && chRowCache.F.length>=total) return chRowCache.F;   // частоты рядов зависят от лада, живой тоники и A4 (baseF), у fixedKey — от тоники-ключа
+  const dpo=rollDegPerOct(sc), F=new Array(total);
+  for(let r=0;r<total;r++) F[r]=chordRowFreq(r%dpo, Math.floor(r/dpo), sc, sev);
+  chRowCache={ key, base:baseF(), tonic, F };
+  return F;
+}
+function chRowOfFreq(f,F,dpo){
+  const ct=(a,b)=>1200*Math.log2(a/b), n=F.length;
+  if(!(f>0)||!n) return -1;
+  let lo=-1, hi=n-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m]<=f*(1+1e-12)) lo=m; else hi=m-1; }   // последний ряд, чья частота ≤ f (у дубля тоники и тоники следующего регистра частота одна — берётся тоника регистра)
+  const skipDup=r=> (r%dpo===dpo-1 && r+1<n && Math.abs(ct(F[r+1],F[r]))<1e-6) ? r+1 : r;
+  if(lo>=0 && Math.abs(ct(f,F[lo]))<ROLL_ON_ROW_CENTS) return skipDup(lo);
+  if(lo+1<n && Math.abs(ct(f,F[lo+1]))<ROLL_ON_ROW_CENTS) return skipDup(lo+1);
+  if(lo<0) return F[0]>0 ? Math.log(f/F[0])/Math.log(F[1]/F[0]) : -1;   // ниже первого ряда (за краем оси)
+  if(lo+1>=n) return n;                                                  // выше последнего — за краем
+  return lo + Math.log(f/F[lo])/Math.log(F[lo+1]/F[lo]);                 // между рядами — по высоте
+}
+/* Ряды нот сегмента на оси лада axSc (длина оси total): у баса — один ряд корня; у аккорда — корень на своём ряду и каждая прочая нота
+   на ряду или между рядами. ОДНА функция для рисунка, попадания и призрака перетаскивания (правило #9). */
+function rollSegRows(s,axSc,total){
+  const r0=rollRowOf(s.deg,s.oct,axSc);
+  if(s.role!=='ch') return [r0];
+  const N=chordNotes(s.deg,s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(axSc,s.sev,total), dpo=rollDegPerOct(axSc);
+  return N.map((n,i)=> i===0 ? r0 : chRowOfFreq(n.f,F,dpo));
 }
 const rollDegPerOct=s=>IVX(s).length;
 const rollRowOf=(deg,oct,s)=> (oct|0)*rollDegPerOct(s) + (deg|0);
@@ -1186,7 +1208,7 @@ function drawRoll(){
   const noEdit = ly!=null && (noRole || !ROLL_EDITABLE.includes(rollRole));
   const pitched = rollRole!=null && rollRole!=='dr' && !noEdit;   // T4: роли нет — оси высот нет (даже если дорожка исчезла, ly==null)
   const x0 = pitched ? Math.min(rollGutterW(axSc), Math.floor(W*0.42)) : ROLL_LBL_W;   // S5.6: колонка подписей — по МЕРКЕ, с потолком
-  const total = pitched ? rollRowsTotal(axSc) : DRUM_ROWS;
+  const total = pitched ? rollRowsTotal(axSc) + (rollRole==='ch' ? ROLL_CH_EXTRA_REG*rollDegPerOct(axSc) : 0) : DRUM_ROWS;   // U1: у аккордов — ряды сверху под расширения (см. rollSegRows)
   /* ⛳ ПОДГОНКА ПО ВЫСОТЕ (S5.6): ВЛЕЗАЮТ ВСЕ РЯДЫ — растягиваем их на всю высоту (до потолка), не
      влезают — оставляем минимальную высоту и прокручиваем, как было. Правило ДЕТЕРМИНИРОВАНО (число
      рядов × высота поля), поэтому на границе «влезает/не влезает» ничего не мигает: одно и то же поле
@@ -1301,28 +1323,26 @@ function drawRoll(){
       for(const s of g.segs){
         const en = s.end==null ? wEnd : s.end;
         if(en<V.beat0||s.start>wEnd) continue;
-        const r = ghost ? -1 : rollRowOf(s.deg,s.oct,axSc);
-        if(!ghost && (r<row0||r>=row0+rows)) continue;
         const x=laneBeatX(V,Math.max(s.start,V.beat0)), x2=laneBeatX(V,Math.min(en,wEnd));
         const w=Math.max(3,x2-x);
         if(ghost){   // призрак: тонкая полоска у нижней кромки — место и время видно, высота честно не показана
           ctx.fillStyle='rgba(255,255,255,.10)';
           ctx.fillRect(x,gy1-4,w,3); continue;
         }
-        const yT=rollRowY(V,r), h=V.rowH*0.7, y=yT+(V.rowH-h)/2;
-        const vol=Math.max(0,Math.min(1,s.vol==null?1:s.vol)), sel=s.ev===rollSel;
-        ctx.fillStyle = sel ? '#fff' : hexA(col, 0.35+0.55*vol);
-        ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();
-        if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
-          /* РУЧКА ДЛИНЫ — только у ВЫДЕЛЕННОГО и только там, где тянуть есть за что (есть endEv и блок
-             шире порога). Показываем на выделенном, а не на всех: иначе каждая нота обрастала бы засечкой. */
-          if(s.endEv && w>=ROLL_EDGE_MIN_W){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }
-        /* S2: АККОРД — ИМЯ НА БЛОКЕ (ряд — только корень, качество видно здесь). Пишем, лишь когда влезает целиком: обрезанное имя
-           («Cm» вместо «Cm7») соврало бы о звучании. */
-        if(s.role==='ch' && h>=9){ const nm=rollChordName(s);
-          if(nm){ ctx.save(); ctx.font='10px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-            if(ctx.measureText(nm).width<=w-8){ ctx.fillStyle= sel ? 'rgba(0,0,0,.8)' : 'rgba(255,255,255,.92)'; ctx.fillText(nm, x+3, y+h/2); }
-            ctx.restore(); } }
+        /* U1: БЛОК НА КАЖДУЮ ЗВУЧАЩУЮ НОТУ (у баса — одна, у аккорда — все его ноты; на ряду или между рядами — rollSegRows). Имя
+           аккорда на блоке снято решением пользователя: ноты видны сами. Выделение и ручка длины — у ВСЕХ нот выделенного аккорда:
+           выделен аккорд ЦЕЛИКОМ (выбор отдельной ноты — U2). */
+        const h=V.rowH*0.7, vol=Math.max(0,Math.min(1,s.vol==null?1:s.vol)), sel=s.ev===rollSel;
+        for(const r of rollSegRows(s,axSc,V.total)){
+          if(r<row0-0.5||r>row0+rows-0.5) continue;                    // за краем видимых рядов (и не залезать на линейку)
+          const y=rollRowY(V,r)+(V.rowH-h)/2;
+          ctx.fillStyle = sel ? '#fff' : hexA(col, 0.35+0.55*vol);
+          ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();
+          if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
+            /* РУЧКА ДЛИНЫ — только у ВЫДЕЛЕННОГО и только там, где тянуть есть за что (есть endEv и блок
+               шире порога). Показываем на выделенном, а не на всех: иначе каждая нота обрастала бы засечкой. */
+            if(s.endEv && w>=ROLL_EDGE_MIN_W){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }
+        }
       }
     }
   }
@@ -1330,14 +1350,21 @@ function drawRoll(){
      удар встанет после отпускания — по тем же laneBeatX/rollRowY, что и настоящие удары, поэтому
      обещание призрака и результат правки совпадают по построению. ---- */
   if(rollDrag&&rollDrag.ev){
-    const gr=rollDrag.row|0;
-    if(gr>=row0&&gr<row0+rows){
-      const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*(pitched?0.7:0.62), gy=rollRowY(V,gr)+(V.rowH-gh)/2;
-      /* Призрак ладовой роли держит ДЛИНУ сегмента (rollDrag.len), у удара длины нет — там блок привязки. */
-      const gw = pitched ? Math.max(3, laneBeatX(V,rollDrag.t+(rollDrag.len||1))-gx) : blkW;
-      ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
-      ctx.beginPath(); ctx.roundRect(gx,gy,gw,gh,3); ctx.stroke(); ctx.setLineDash([]);   // призрак — ТОТ ЖЕ блок, что и настоящая нота
+    /* U1: у АККОРДА призрак — ВСЕ его ноты, сдвинутые на столько рядов, на сколько палец увёл взятую ноту (rollDrag.row − grabRow):
+       ровно так ui и перенесёт корень. У баса и удара — один блок, как было (grabRow там равен ряду, сдвиг — сам ряд). */
+    const gseg = pitched ? songSegs().byEv.get(rollDrag.ev) : null;
+    const chordGhost = gseg && gseg.role==='ch' && gseg.ev===rollDrag.ev && rollDrag.grabRow!=null;
+    const ghostRows = chordGhost ? rollSegRows(gseg,axSc,V.total).map(r=>r+((rollDrag.row|0)-rollDrag.grabRow)) : [rollDrag.row|0];
+    const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*(pitched?0.7:0.62);
+    /* Призрак ладовой роли держит ДЛИНУ сегмента (rollDrag.len), у удара длины нет — там блок привязки. */
+    const gw = pitched ? Math.max(3, laneBeatX(V,rollDrag.t+(rollDrag.len||1))-gx) : blkW;
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+    for(const gr of ghostRows){
+      if(chordGhost ? (gr<row0-0.5||gr>row0+rows-0.5) : !(gr>=row0&&gr<row0+rows)) continue;
+      const gy=rollRowY(V,gr)+(V.rowH-gh)/2;
+      ctx.beginPath(); ctx.roundRect(gx,gy,gw,gh,3); ctx.stroke();   // призрак — ТОТ ЖЕ блок, что и настоящая нота
     }
+    ctx.setLineDash([]);
   }
   /* ⛳ O-4: ПОЛОСА — ДО БЕГУНКА. Она своё поле и заливает свой фон; нарисуй мы её после, фон лёг бы
      поверх бегунка ровно на её высоте, и линия времени разорвалась бы посреди экрана. */
@@ -1427,14 +1454,22 @@ export function rollHit(px,py){
   /* S5.5: у ладовой роли попадание идёт по СЕГМЕНТАМ (у них есть длина), у ударных — по блоку привязки.
      Призраки чужих ладов НЕ ловим: их ступень измерена не этой осью, трогать её можно лишь переключив ось. */
   if(V.pitched){
+    /* U1: палец ловит ЛЮБУЮ ноту сегмента — у аккорда их несколько, и бывают они МЕЖДУ рядами (rollSegRows — та же функция, что
+       нарисовала блоки, правило #9). Ряд пальца — дробный (центр ряда = целое), нота поймана, если она ближе полуряда. Пойманная нота
+       выделяет ВЕСЬ аккорд (h.ev — его определяющее событие); rootRow — ряд корня: ui переносит корень на столько рядов, на сколько
+       палец ушёл от ряда, где взялся (row). У баса нота одна, rootRow = row — всё как было. */
     const SV=songSegs(), ly=rollTrackLayer(), tol=ROLL_HIT_PX*V.span/V.bw;
-    let best=null, bd=Infinity;
+    const rp=row0+V.rows-1-((py-V.gy0)/V.rowH-0.5);
+    let best=null, bd=Infinity, bdr=Infinity, bRoot=null;
     for(const s of SV.segs){
       if(s.layer!==ly||s.role!==rollRole||s.sc!==V.sc) continue;
-      if(rollRowOf(s.deg,s.oct,V.sc)!==r) continue;
       const en = s.end==null ? V.beat0+V.span : s.end;
       const d = beat<s.start ? s.start-beat : beat>en ? beat-en : 0;
-      if(d<bd){ bd=d; best=s; }
+      if(d>tol) continue;
+      const rows=rollSegRows(s,V.sc,V.total);
+      let dr=Infinity; for(const rr of rows){ const x=Math.abs(rr-rp); if(x<dr) dr=x; }
+      if(dr>0.5) continue;
+      if(d<bd || (d===bd && dr<bdr)){ bd=d; bdr=dr; best=s; bRoot=rows[0]; }
     }
     if(!(best&&bd<=tol)) return { what:'grid', row:r, beat };
     /* ⛳ КРАЙ ИЛИ СЕРЕДИНА (S5.6) — решаем ЗДЕСЬ, из той же геометрии, что нарисована: зона края не шире
@@ -1444,7 +1479,7 @@ export function rollHit(px,py){
     const wpx = en==null ? Infinity : (en-best.start)*V.bw/V.span;
     const zoneB = (best.endEv && en!=null && wpx>=ROLL_EDGE_MIN_W)
                 ? Math.min(ROLL_EDGE_PX, wpx*0.4)*V.span/V.bw : 0;
-    return { what:'seg', seg:best, ev:best.ev, row:r, beat, edge: zoneB>0 && beat>=en-zoneB };
+    return { what:'seg', seg:best, ev:best.ev, row:r, rootRow:bRoot, beat, edge: zoneB>0 && beat>=en-zoneB };
   }
   /* S5.2: попадание считаем по ВСЕМУ нарисованному блоку [t, t+блок], а не по расстоянию до доли, —
      иначе палец, положенный на видимый хвост блока, промахивался бы мимо него. Допуск ROLL_HIT_PX

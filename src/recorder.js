@@ -3640,6 +3640,10 @@ function songNotes(){
    весь рекордер: его же берёт перестройка «в ноте» (pnPlan — порождённому ведению hold:true только у такой ноты), и проход
    сегментов (songSegs — такая нота одним сегментом). Разойдись они — полоса считала бы ноту терменвоксом, а ролл резал бы её. */
 const ldTherm=n=> n.role==='ld' && !!(n.head && n.head.a && n.head.a.bend && n.head.a.bend.length);
+/* ТИП АККОРДА — ПО ЗНАЧЕНИЮ (слайс U1). Записанный аккорд несёт ссылку в CHORD_FAM_SETS, и у одной записи одна ссылка — для него
+   «то же значение» и «та же ссылка» совпадают, ничего не меняется. Распавшаяся нота (U2) несёт ЛИТЕРАЛ интервала ([iv]) — свой массив у
+   каждого события; сравнение по ссылке резало бы её на ложные сегменты на каждом ведении. null — нетипизированный аккорд. */
+const tyEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));
 let segView=null;
 function songSegs(){
   const V=songNotes();
@@ -3659,7 +3663,7 @@ function songSegs(){
       if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }   // «выкл» закрывает последний сегмент
       const a=ev.a||{};
       const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
-                           (a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&a.ty!==cur.ty)));
+                           (a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));   // U1: тип — ПО ЗНАЧЕНИЮ (tyEq)
       if(kind==='n'||pitchChanged){
         if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
         cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,

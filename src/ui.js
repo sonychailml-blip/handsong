@@ -775,10 +775,13 @@ function rollDown(e){
       selNote(h.ev);
       /* ⛳ КРАЙ = ДЛИНА, СЕРЕДИНА = ПЕРЕНОС (S5.6). Какой это жест, решает ТОТ ЖЕ hit-test, что нарисовал
          блок (h.edge), — второй геометрии «где тут край» в ui не заводим. */
+      /* U1: grabRow — ряд, где палец ВЗЯЛСЯ (у аккорда это любая его нота), rootRow — ряд корня. На отпускании корень уходит на
+         (ряд пальца − grabRow) рядов: взял аккорд за терцию и поднял на ряд — весь аккорд поднялся на ряд, а не корень прыгнул на
+         ряд терции. У баса и удара grabRow = rootRow = row — перенос прежний. */
       rollGrab={ ev:h.ev, seg:isSeg?h.seg:null, mode:(isSeg&&h.edge)?'len':'move',
-                 dt:h.beat-h.ev.t, row, x:p.x, y:p.y,
+                 dt:h.beat-h.ev.t, row, grabRow:row, rootRow:(isSeg&&h.rootRow!=null)?h.rootRow:row, x:p.x, y:p.y,
                  len: isSeg ? ((h.seg.end==null?h.beat+1:h.seg.end)-h.seg.start) : 0 };
-      setRollDrag({ ev:h.ev, t:h.ev.t, row, len:rollGrab.len });
+      setRollDrag({ ev:h.ev, t:h.ev.t, row, grabRow:row, len:rollGrab.len });
       updRollBtns(); return;
     }
     const selBefore=rollSel;                                   // S2: выделение ДО тапа — по нему вставка аккорда берёт тип (тап по пустому снимает выделение уже здесь, на нажатии)
@@ -828,7 +831,7 @@ function rollMove(e){
     if(rollGrab.mode==='len'){
       const s=rollGrab.seg;
       const end=rollSnapBeat(g.beat0+g.span*((p.x-g.x0)/g.bw), rollSnap());
-      setRollDrag({ ev:rollGrab.ev, t:s.start, row:rollGrab.row, len:Math.max(1/32,end-s.start) });
+      setRollDrag({ ev:rollGrab.ev, t:s.start, row:rollGrab.row, grabRow:rollGrab.grabRow, len:Math.max(1/32,end-s.start) });
       return;
     }
     const raw=g.beat0+g.span*((p.x-g.x0)/g.bw)-rollGrab.dt;
@@ -837,7 +840,7 @@ function rollMove(e){
        нет вовсе: палец, уехавший при переносе вверх за сетку, записал бы row:undefined — удар, который
        не звучит и не рисуется. Вне сетки (линейка, промах) ряд остаётся прежним. */
     if(h&&(h.what==='hit'||h.what==='grid'||h.what==='seg')) rollGrab.row=h.row;
-    setRollDrag({ ev:rollGrab.ev, t:Math.max(0,rollSnapBeat(raw, rollSnap())), row:rollGrab.row, len:rollGrab.len });   // E1: призрак не левее начала песни — правка туда не положит (editMoveHit/editMoveNote жмут к 0), и обещание обязано совпасть с результатом   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
+    setRollDrag({ ev:rollGrab.ev, t:Math.max(0,rollSnapBeat(raw, rollSnap())), row:rollGrab.row, grabRow:rollGrab.grabRow, len:rollGrab.len });   // E1: призрак не левее начала песни — правка туда не положит (editMoveHit/editMoveNote жмут к 0), и обещание обязано совпасть с результатом   // S5.2: привязка — по КВАНТИЗАЦИИ (или её нет вовсе)
     return;
   }
   if(rollPan&&rollPan.aut){ if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true; return; }   // O-4: палец ведёт по ПОЛОСЕ — поле нот не трогаем (у полосы своя работа)
@@ -886,7 +889,7 @@ function rollUp(e){
            ⛳ E1/E2: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту во времени — ЦЕЛИКОМ, сегмент
            глиссандо во времени — ОТДЕЛЯЕТ и везёт один, смену одной высоты — всем событиям сегмента, глиссандо цело.
            Выделяем то, что он вернул (у отделённого — новое «вкл», см. длину выше). */
-        const g2=rollGeom(), pit=rollRowPitch(gd.row, g2&&g2.sc);
+        const g2=rollGeom(), pit=rollRowPitch(rollGrab.rootRow+(gd.row-rollGrab.grabRow), g2&&g2.sc);   // U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было)
         const s=rollGrab.seg;
         if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct){ const r=editMoveSeg(s.ev, gd.t, pit.deg, pit.oct); if(r&&r!==true) selNote(r); }
       }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
