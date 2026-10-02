@@ -21,9 +21,9 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, fxTitleOf, rollAutSnapV, rollAutDrive } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneOn, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
-         toggleLaneMute, toggleLaneSolo, droneAudible,
+         toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
@@ -1124,7 +1124,7 @@ export function tutorClearLoop(){ clearRec(); resetJamDisplay(); }
    на нём аккорды и, вероятно, захочет продолжить играть (см. tutor.js exit). */
 export function tutorSetScale(idx){
   const trad=tradOfScale(idx);
-  setScaleIdx(idx); softAllOff();
+  setScaleIdx(idx); softAllOff(); droneRetune();
   if(selTradition){ selTradition.value=trad; fillScales(trad); }
   selScale.value=idx;
   updScaleBtn(); refreshProgAvail(); renderRectCtl();
@@ -1166,19 +1166,19 @@ selTradition.onchange=e=>{
   const first=scalesOfTrad(e.target.value)[0];
   if(!first)return;
   selScale.value=first.i;
-  setScaleIdx(first.i); softAllOff(); updScaleBtn(); refreshProgAvail(); renderRectCtl();
+  setScaleIdx(first.i); softAllOff(); droneRetune(); updScaleBtn(); refreshProgAvail(); renderRectCtl();
   if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: смена строя тоже меняет лад (первый в традиции) — тот же сигнал урока «Строи»
 };
 selScale.onchange=e=>{
-  setScaleIdx(+e.target.value); softAllOff();
+  setScaleIdx(+e.target.value); softAllOff(); droneRetune();   // дрон следует за ЛАДОМ (вторая струна — ступень лада), а softAllOff его не трогает
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
   if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); updScaleBtn(); };   // 3/3: смена тоники
+selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); droneRetune(); updScaleBtn(); };   // 3/3: смена тоники
 /* P3 «СТРОЙ ОТ»: ТОТ ЖЕ ШОВ, ЧТО У ТОНИКИ — живые ноты гаснут и переатакуют (рука соло/баса — на следующем кадре), защёлка
    замолкает, играющие дорожки пересращиваются (softAllOff при идущем транспорте → trackResplice) и звучат со СВОИМ якорем:
    их sc — вид лада (строй, лад, якорь; T2), записанный в момент игры. Записанное этот выбор не перестраивает (правило #7). */
-selTunedFrom.onchange=e=>{ const v=e.target.value; setTunedFrom(v==='T'?'T':+v); softAllOff(); updScaleBtn(); };
+selTunedFrom.onchange=e=>{ const v=e.target.value; setTunedFrom(v==='T'?'T':+v); softAllOff(); droneRetune(); updScaleBtn(); };
 /* ЭТАЛОН A4 — единый источник высоты (двигает ВСЕ строи, подвижные и фиксированные, вместе).
    Два ввода: пресеты-подсказки (учат: 415 барочный … 444 оркестровый) и свободное число, КЛАМП 380–480;
    невалид/пусто → откат к последнему валидному, высота НИКОГДА не ломается. Смена ре-настраивает как
@@ -1191,7 +1191,7 @@ function syncARef(v){ aRefInput.value=v; aRefSel.value=String(v); }   // отр�
 function applyARef(v){
   setARef(v); lastARef=v;
   softAllOff();                                    // звучащее гаснет и переиграется на новом эталоне (как смена тоники)
-  if(droneAudible())droneOn();                     // дрон softAllOff не трогает — переигрываем на новую опору сразу (lvl 0.18, как в аранжировке). ⚠️ Спрашиваем про СЛЫШИМОСТЬ, а не про наличие слоя (S1): у заглушённой дорожки дрона смена эталона не должна включать звук. Попутно ушёл дубль предиката, что жил здесь строкой
+  droneRetune();                                   // дрон softAllOff не трогает — перестраиваем ВЫСОТЫ на новую опору сразу (слайс «дрон и центы»). ⛔ Уровень не трогаем: прежний droneOn здесь поднимал гейт дрона и на СТОЯЩЕМ транспорте (droneAudible не спрашивал, идёт ли он) — дрон начинал звучать при смене A4 без ▶
 }
 aRefSel.onchange=e=>{ const v=+e.target.value; applyARef(v); syncARef(v); };
 aRefInput.onchange=e=>{

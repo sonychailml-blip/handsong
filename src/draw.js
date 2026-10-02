@@ -1601,13 +1601,13 @@ function drawStatus(){
   const s=CUR();
   /* Цент-лады (гамелан/Парч/темперации/индийские) НЕ равномерны: печатать «N-TET» и мнимый шаг
      1200/edo было бы враньём (шрути неравны, минимум 22¢; edo — лишь номинал). Показываем ЧЕСТНО:
-     «центовый строй · N ступеней» + реальные центы. Нецентовые лады — строка байт-в-байт как была. */
+     «центовый строй · N ступеней» + реальные центы. Нецентовые лады — прежняя строка; шаг — целыми центами в ПЕРИОДЕ (слайс «дрон и центы»). */
   let st;
   if(s.cents){
     st=t('status.centsScale',{name:L(s.name), n:s.iv.length});   // имя лада резолвим через L() (объект {en,ru}/{default,ru}); центы не печатаем целиком
   }else{
     st=t('status.edoScale',{name:L(s.name), edo:s.edo, steps:s.iv.join('-')});
-    if(s.edo!==12)st+=t('status.step',{c:(1200/s.edo).toFixed(1)});
+    if(s.edo!==12)st+=t('status.step',{c:Math.round(1200*Math.log2(periodOf(s))/s.edo)});   // слайс «дрон и центы»: ЦЕЛЫЕ центы (одно правило) и шаг в ПЕРИОДЕ — прежде 1200/edo врал у неоктавных (Болен–Пирс «92.3c» вместо 146)
   }
   if(recording)st=t('status.recPrefix')+st;
   else if(inPB())st=t('status.loopPrefix',{bpm:loop.bpm})+st;

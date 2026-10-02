@@ -1,5 +1,5 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
-import { baseF, tonicFreq } from './scales.js';
+import { baseF, tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld } from './config.js';   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
  
@@ -1975,7 +1975,7 @@ async function initAudio(mkCtx){
      значит и цепь ему некому править. Остаётся сухим — намеренно. */
   backBus=AC.createGain(); backBus.gain.value=0.28; backBus.connect(master);
   dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=tonicFreq()/2;         // tonicFreq: у fixedKey — ФИКСИРОВАННАЯ высота ключа (не бьётся с сеткой); у прочих = baseF()
-  dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=tonicFreq()/2*1.498;   // квинту 1.498 пока оставляем ~чистой (не грид-квинта строя) — помечено в BACKLOG
+  dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=droneSecondHz();       // вторая струна — СОБСТВЕННАЯ высота строя (квинта лада, иначе кварта/септима/период; scales.droneDegree), а не ×1.498. Уровень, тембр и фильтр — прежние
   const dLP=AC.createBiquadFilter(); dLP.type='lowpass'; dLP.frequency.value=520;
   const dLFO=AC.createOscillator(); dLFO.frequency.value=0.06;
   const dLFOg=AC.createGain(); dLFOg.gain.value=260;
@@ -2477,7 +2477,10 @@ function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; v.deg=
 
 /* --- ДРОН: гейт dG, частота следует за тоникой (tonicFreq/2) в любом ладу (спасён из backing.js).
    tonicFreq — единый источник: у fixedKey это высота КЛЮЧА в приколоченной сетке (иначе дрон бился
-   бы с ней), у прочих строёв = baseF() (байт-в-байт). Квинту 1.498 держим ~чистой — см. BACKLOG. */
+   бы с ней), у прочих строёв = baseF() (байт-в-байт).
+   ⛳ ВТОРАЯ СТРУНА (слайс «дрон и центы», решение пользователя «как было бы в живом исполнении»): прежде — постоянная ×1.498 у ВСЕХ
+   строёв; теперь — scales.droneSecondHz: СОБСТВЕННАЯ высота строя, и она следует за ЛАДОМ (квинта лада, иначе кварта, иначе септима,
+   иначе тоника периодом выше; у Болена–Пирса — выбор R.droneBP). Корень, уровень, тембр (две пилы), фильтр и LFO — ПРЕЖНИЕ. */
 /* when (S2) — явное время ПОСЛЕДНИМ аргументом, по умолчанию «сейчас». Уровень стоит ПОСЛЕ него по
    порядку исторически (level был единственным параметром), поэтому when второй: правило «when последний»
    здесь выполняется буквально. */
@@ -2487,7 +2490,14 @@ function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; v.deg=
 function droneOn(level=0.18,when,tc=1.2){ if(!AC)return; const t=when!=null?when:AC.currentTime;
   dG.gain.setTargetAtTime(level,t,tc);
   dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
-  dO2.frequency.setTargetAtTime(tonicFreq()/2*1.498,t,0.3);
+  dO2.frequency.setTargetAtTime(droneSecondHz(),t,0.3);
+}
+/* ПЕРЕСТРОЙКА ДРОНА БЕЗ УРОВНЯ (слайс «дрон и центы»): тоника, лад, «строй от» и A4 меняют его высоты, а дрон живёт ВНЕ softAllOff —
+   поэтому ui зовёт это на каждую такую смену. ⛔ Гейт dG не трогаем: стоящий транспорт с заглушённым дроном молчит и дальше (прежде на
+   смену A4 звался droneOn, и он поднимал уровень даже на стоящем транспорте). Та же постоянная 0.3 с, что у droneOn. */
+function droneRetune(when){ if(!AC||!dO1)return; const t=when!=null?when:AC.currentTime;
+  dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
+  dO2.frequency.setTargetAtTime(droneSecondHz(),t,0.3);
 }
 function droneOff(when,tc=0.6){ if(!AC)return; dG.gain.setTargetAtTime(0,when!=null?when:AC.currentTime,tc); }
 /* Живой селектор набора ударных: только глобальный индекс + дропдаун (удар транзиентный,
@@ -2669,7 +2679,7 @@ export {
   initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,
-  setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff,
+  setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff, droneRetune,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
   timbresOf,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,

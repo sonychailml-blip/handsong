@@ -2,7 +2,7 @@
    Никто его не импортирует: модуль грузится только руками из консоли браузера, при открытом приложении:
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
-     (по отдельности: P.checkData(), P.checkPitch(), P.checkView())
+     (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
    Импорт по ТОМУ ЖЕ адресу, что у приложения ('./scales.js' без строки запроса), — значит проба видит ТЕ ЖЕ объекты ладов, что и
    приложение, а не вторую копию модуля.
    ⛳ ЗАЧЕМ (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ», метод доказательства): каждый слайс модели, который НЕ ДОЛЖЕН менять звук,
@@ -17,7 +17,7 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
@@ -106,7 +106,18 @@ export function checkData(){
 const A4_SET=[415, 440, 466.16];   // барочный, стандарт и некруглый — прогон и так в десятки миллионов сравнений (несколько секунд)
 const PRINT_MAX=200, KEEP_MAX=10000;
 const NEW={ lead:leadFreq, bass:bassFreq, chord:chordNotes, tonic:tonicFreq, cents:centsOf };
-const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotes, tonic:legacyTonicFreq, cents:legacyCentsOf };
+/* ⛳ ПОКАЗ ЦЕНТОВ С СЛАЙСА «ДРОН И ЦЕНТЫ» — ОДНО ПРАВИЛО: ЦЕЛЫЕ ЦЕНТЫ, точное значение округляется ОДИН раз. Ожидание:
+     равные строи и подвижные таблицы — Math.round(прежнего показа): прежний показ там и есть точное значение (у равных — уже целое;
+       у неоктавных верхняя тоника давала 0.045 → 0);
+     фиксированные строи — Math.round(ТОЧНОГО), а не прежних десятых: двойное округление (десятые, потом целые) в 17 из 936 случаев
+       даёт на единицу больше (мезотон: 579.47 → 579.5 → 580 вместо 579). Точное значение считает здесь НЕЗАВИСИМЫЙ оракул по данным
+       лада (прежняя формула fixedKey без умножения на 10): якорь из «строй от» вида, ключ = тоника − якорь.
+   Частоты — по-прежнему строгим === с прежними телами. */
+const fixedExact=(d,v)=>{ const A= v.tunedFrom==='T' ? tonic : (v.tunedFrom==null ? 0 : v.tunedFrom), key=tonic-A+(A>tonic?12:0);
+  const C=v.cents, L=C.length, abs=key+d, slot=((abs%L)+L)%L, carry=Math.floor(abs/L);
+  return C[slot]+1200*carry-C[key]; };
+const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotes, tonic:legacyTonicFreq,
+            cents:(d,v)=> v.fixedKey ? Math.round(fixedExact(d,v)) : Math.round(legacyCentsOf(d,v)) };
 const allViews=()=>{ const out=[];
   for(const s of SCALES){ if(s.tunable){ out.push([s,'T']); for(let pc=0;pc<12;pc++) out.push([s,pc]); } else out.push([s,'T']); }
   return out; };
@@ -146,10 +157,10 @@ function sweep(stage, what, A, B, pick){
   if(nBad){ bad.slice(0,PRINT_MAX).forEach(m=>console.warn(`[scaleprobe ${stage}] `+m)); if(nBad>PRINT_MAX) console.warn(`[scaleprobe ${stage}] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`); }
   return { cases, mismatches:bad, total:nBad, ms };
 }
-/* ═══ T1: НОВАЯ ФУНКЦИЯ ВЫСОТЫ ПРОТИВ ПРЕЖНИХ ТЕЛ (обе — на одном и том же виде) ═══ */
+/* ═══ T1: НОВАЯ ФУНКЦИЯ ВЫСОТЫ ПРОТИВ ПРЕЖНИХ ТЕЛ (обе — на одном и том же виде); центы — против целого округления точного (см. OLD) ═══ */
 export function checkPitch(){
   const r=sweep('T1',['new','old'],NEW,OLD,(s,tf)=>{ const v=scaleView(s,tf); return [v,v]; });
-  if(!r.total) console.log('[scaleprobe T1] every frequency and every cents readout is bit-identical to the old functions');
+  if(!r.total) console.log('[scaleprobe T1] every frequency is bit-identical to the old functions, and every cents readout is the whole-cent rounding of the exact value');
   return r;
 }
 /* ═══ T2: ВИД (строй, лад, якорь) ═══
@@ -182,4 +193,14 @@ export function checkView(){
   const r=sweep('T2',['view','scale'],NEW,NEW,(s,tf)=>[scaleView(s,tf), s.tunable ? {...s, tunedFrom:tf} : s]);
   if(!bad.length && !r.total) console.log('[scaleprobe T2] views are stable and every pitch through a view is bit-identical to the scale itself');
   return { checks, identity:bad, cases:r.cases, ms:r.ms, total:bad.length+r.total, mismatches:bad.concat(r.mismatches) };
+}
+
+/* ═══ ДРОН (слайс «дрон и центы») — КАКУЮ СТУПЕНЬ берёт вторая струна у каждого лада (справка, не проверка) ═══
+   Печатает таблицу: лад, ступень, почему (fifth / fourth / seventh / cons / period) и её точные центы над корнем — при ТЕКУЩЕЙ тонике
+   (у фиксированных строёв от неё зависит ключ: Пифагор от C в ключе F# берёт кварту — его квинта там волк). Звук не трогает. */
+export function drone(){
+  const rows=[];
+  for(const [s,tf] of allViews()){ const v=scaleView(s,tf), d=droneDegree(v);
+    rows.push({ mode:s.id+(s.tunable?`[from ${tf}]`:''), degree:d.deg, why:d.why, cents:Math.round(d.cents*100)/100 }); }
+  console.table(rows); return rows;
 }

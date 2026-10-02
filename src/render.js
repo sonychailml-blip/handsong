@@ -16,7 +16,7 @@
        BASS_INSTR (плюс всё, что makeENG зовёт у переданной копии).
      state (ST.* и именованный импорт): chainOwners, fxIsScalar, CHAIN_SOLO, chainKeyOf, fxChainOf.
      config: SCHED_TICK_MS.
-     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps.
+     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps, droneBP.
    ===================================================================== */
 /* =====================================================================
    КОНТЕКСТ РЕНДЕРА — слайсы F0 (контекст) и F1 (посеянная случайность)
@@ -215,6 +215,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
    render с F5 импортирует только ui — ЛЕНИВО (onFreeze), а зонд по-прежнему зовут из консоли. */
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
+import { setDroneNonOct, droneNonOct, droneDegree, CUR } from './scales.js';   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -899,7 +900,9 @@ async function renderTrack(layer, opt){
                .sort((a,b)=> (a.e.t-b.e.t) || (a.i-b.i)).map(x=>x.e);
   if(!evs.length) throw new Error('дорожка '+layer+' пуста');
 
-  const t0Beat=evs[0].t, tEndBeat=evs[evs.length-1].t;
+  /* Конец дорожки — последнее событие, НО у слоя подложки — все её такты (REC.laneLenOf): события подложки не несут выключений, и без
+     этого замороженный дрон (одно событие на доле 0) звучал бы одним хвостом, а у прогрессии последний аккорд закрывался бы на своей же доле. */
+  const t0Beat=evs[0].t, tEndBeat=Math.max(evs[evs.length-1].t, REC.laneLenOf(layer));
   const pin=pinLive(ST, REC, o.pin);
   const spb=60/pin.use.bpm;
   const songSec=(tEndBeat-t0Beat)*spb;
@@ -1244,6 +1247,7 @@ const frozen=()=>{ const ls=REC.frozenLayers();
        await R.aud(1,{noHum:true})          // гуманизация высоты выкл
        await R.aud(1,{mono:true})           // моно-сумма на выходе
        await R.aud(1,{recSteps:true})       // записанная автоматизация шины СТУПЕНЬКАМИ (как до слайса «плавная внутри движения»)
+       R.droneBP('period') / R.droneBP('cons') // дрон Болена–Пирса: тоника + тритава (умолчание) / ступень 5:3 (878¢) — живой дрон, сразу
        R.recSteps(true) / R.recSteps(false) // записанная автоматизация ступеньками / законом движения — во ВСЁМ приложении (▶, полоса)
        R.live(1)                            // те же ноты ЖИВЫМ движком
        R.stop()
@@ -1269,6 +1273,20 @@ const audDesc=o=>{ const p=[];
    на незамороженной или через R.aud. Для одного рендера без смены всего приложения — aud(n,{recSteps:true}).
    ⚠️ У величин «в ноте» (громкость, яркость, вибрато, драйв) переключатель меняет ТОЛЬКО РИСУНОК полосы: их звук — сами события, и
    с тонкой записью они лежат каждой единицей (как ведения рампы у нарисованного рукой) — переключать в звуке там нечего. */
+/* ⛳ ДРОН БОЛЕНА–ПИРСА — ВЫБОР НА СЛУХ (слайс «дрон и центы», решение пользователя). У Б–П нет квинты (ближайшая ступень на 29.6¢ мимо
+   3/2), и вторая струна дрона — одна из двух: 'period' — тоника и ТРИТАВА (3:1, собственная чистая эквивалентность строя; УМОЛЧАНИЕ) или
+   'cons' — ступень, ближайшая к 5:3 (6 шагов, 877.6¢; характерный консонанс Б–П). Переключает ВСЁ приложение (scales.setDroneNonOct) и
+   сразу перестраивает живой дрон без смены уровня (audio.droneRetune). Включите лад Болена–Пирса и дрон (подложка «Дрон»), затем
+   переключайте. Замороженная дорожка с дроном от переключения устаревает (выбор — в подписи заморозки) и играет событиями. */
+function droneBP(v){
+  setDroneNonOct(v); LIVE.droneRetune();
+  const s=CUR(), d=droneDegree(s), bp=s.tuning==='bp13';
+  const choice= droneNonOct()==='cons' ? 'the 5:3 degree (6 steps, 878¢)' : 'the tritave (tonic one period up, 3:1)';
+  console.log('%c[droneBP] Bohlen–Pierce drone: '+choice+'. This switch affects ONLY Bohlen–Pierce (the one built-in tuning with no near fifth).','color:#57d9a3;font-weight:bold');
+  if(bp) console.log('[droneBP] current scale IS Bohlen–Pierce — the drone now sounds degree '+d.deg+' ('+Math.round(d.cents)+'¢ above the tonic). Start the "Drone" backing to hear it.');
+  else console.log('[droneBP] ⚠️ the current scale ('+s.id+') is NOT Bohlen–Pierce, so its drone does not change (it uses its '+d.why+', '+Math.round(d.cents)+'¢). Select Bohlen–Pierce in the scale menu to hear the switch.');
+  return droneNonOct();
+}
 let recStepsOn=false;
 function recSteps(on){
   recStepsOn = on!==false;
@@ -1358,4 +1376,4 @@ function stop(){
   liveRestore(me);
 }
 
-export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps };
+export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP };
