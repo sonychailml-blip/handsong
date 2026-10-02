@@ -3,6 +3,7 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkTi()        // T4a: у КАЖДОГО события текущей песни индекс в строе (a.ti) равен переводу его ступени — запускать после записи/правки/подложки
    Импорт по ТОМУ ЖЕ адресу, что у приложения ('./scales.js' без строки запроса), — значит проба видит ТЕ ЖЕ объекты ладов, что и
    приложение, а не вторую копию модуля.
    ⛳ ЗАЧЕМ (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ», метод доказательства): каждый слайс модели, который НЕ ДОЛЖЕН менять звук,
@@ -21,6 +22,7 @@ import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
+import { events, eventTuningIndex } from './recorder.js';   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -203,4 +205,22 @@ export function drone(){
   for(const [s,tf] of allViews()){ const v=scaleView(s,tf), d=droneDegree(v);
     rows.push({ mode:s.id+(s.tunable?`[from ${tf}]`:''), degree:d.deg, why:d.why, cents:Math.round(d.cents*100)/100 }); }
   console.table(rows); return rows;
+}
+
+/* ═══ T4a: ИНДЕКС В СТРОЕ У СОБЫТИЙ ТЕКУЩЕЙ ПЕСНИ ═══
+   Обходит ВСЕ события песни (записанные, подложки, правленые) и сверяет a.ti с переводом ступени (recorder.eventTuningIndex → scales.
+   tuningIndexOf, закон своей роли). Печатает КАЖДОЕ расхождение со входами (дорожка, доля, вид, ступень, регистр, хранимое и ожидаемое) и
+   сводку по ролям. Ничего не меняет. Ноль — когда каждый путь записи прошёл через воронку (push, loadArrangement, editCommit). */
+export function checkTi(){
+  const bad=[], byRole={ld:0,bs:0,ch:0}; let n=0;
+  for(const e of events){
+    const want=eventTuningIndex(e); if(want===undefined) continue;
+    n++; const r=e.fn[0]==='l'?'ld':e.fn[0]==='b'?'bs':'ch'; byRole[r]++;
+    if(e.a.ti!==want) bad.push(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc&&e.sc.id}: degree ${e.a.deg} reg ${e.a.oct} — stored ti ${e.a.ti}, expected ${want}`);
+  }
+  console.log(`[scaleprobe T4a] pitched events ${n} (solo ${byRole.ld}, bass ${byRole.bs}, chords ${byRole.ch}) · mismatches ${bad.length}`);
+  if(bad.length) bad.forEach(m=>console.warn('[scaleprobe T4a] '+m));
+  else if(n) console.log('[scaleprobe T4a] every pitched event carries the tuning index of its degree');
+  else console.log('[scaleprobe T4a] the song has no pitched events yet — record, load a backing or edit, then run again');
+  return { events:n, byRole, mismatches:bad };
 }

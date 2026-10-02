@@ -991,6 +991,17 @@ const tSize=T=>T.equal!=null ? T.equal : T.cents.length;     // сколько �
 const modeAnchor=s=> s.fixedKey ? { A:cFix(s), z:0, key:keyOf(s) } : { A:baseF(), z:s.root, key:0 };
 /* Индекс строя ступени i ∈ [0..n] (i = n — верхняя тоника, дубль: корень периодом выше — то, что IVX дописывает как edo). */
 const degK=(s,i,T)=> i<s.sel.length ? s.sel[i] : s.root+tSize(T);
+/* ⛳ T4a: ИНДЕКС В СТРОЕ — ОДНА ФУНКЦИЯ ПЕРЕВОДА «ступень лада → индекс строя» для записи в событие (поле a.ti). Ступень оборачивается
+   ЗАКОНОМ СВОЕЙ РОЛИ, как в цене: мелодия и бас — по n+1 (длина IVX, как leadFreq/bassFreq), аккорд — по n (как chordNotes); переполнение —
+   целым периодом строя в индекс (регистр остаётся в a.oct). Для ступеней 0..n оба закона дают одно и то же (дубль тоники n → root+размер
+   строя). ⚠️ КЛЮЧ (сдвиг тоники у фиксированных строёв) в индекс НЕ входит: тоника живая (правило #7 морозит вид, не тонику), цена
+   прибавляет ключ сама. undefined — у вида нет выборки (не должно быть — проба T0). */
+export function tuningIndexOf(deg, s=CUR(), chord=false){
+  if(!s||!s.sel) return undefined;
+  const T=TUNINGS[s.tuning], n=s.iv.length, len= chord ? n : n+1;
+  const i=((deg%len)+len)%len, c=Math.floor(deg/len);
+  return degK(s,i,T)+tSize(T)*c;
+}
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
 export function leadFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);

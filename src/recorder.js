@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { leadFreq, chordFreqs, chordNotes, chordUnit, bassFreq, CUR, typedChords, chordFams, droneNonOct } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { leadFreq, chordFreqs, chordNotes, chordUnit, bassFreq, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1495,7 +1495,9 @@ function editGuard(backingOk){
   if(loop.on) onLoop();
   return true;
 }
-function editCommit(){ events.sort((x,y)=>x.t-y.t); schedInvalidate(); takeFxTouch(); laneEditTouch(); }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка, а не все замороженные   // ОДИН раз на правку: сортировка ДО сброса — он объявляет массив отсортированным (правило #28). O-4: takeFxTouch — от времён СОБЫТИЙ зависит доля старта взятого, то есть база полосы автоматизации и лента переигровки; двигать ноту, не освежив их, значило бы показывать и играть прежнюю базу
+function editCommit(){ tiRestamp(); events.sort((x,y)=>x.t-y.t); schedInvalidate(); takeFxTouch(); laneEditTouch(); }
+/* T4a: правка, сменившая ступень, несёт старый индекс (новая нагрузка — разворот старой) — пересчитываем на месте; у неизменных совпадает. */
+function tiRestamp(){ for(const e of events){ const ti=eventTuningIndex(e); if(ti!==undefined && e.a.ti!==ti) e.a.ti=ti; } }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка, а не все замороженные   // ОДИН раз на правку: сортировка ДО сброса — он объявляет массив отсортированным (правило #28). O-4: takeFxTouch — от времён СОБЫТИЙ зависит доля старта взятого, то есть база полосы автоматизации и лента переигровки; двигать ноту, не освежив их, значило бы показывать и играть прежнюю базу
 /* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
    кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
 function editDrumDefaults(layer,t){
@@ -2812,6 +2814,39 @@ const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?1/(l
    fz — {sc,sev}: ЗАМОРОЖЕННЫЙ ладовый контекст вместо текущего (S3.5e, то же место). Вписанное на шве «вкл»
    обязано нести лад САМОГО аккорда — тот, с которым легло его последнее событие, — а не тот, что сейчас
    выбран в панели. Без at и fz — байт-в-байт как было. */
+/* ═══ T4a УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ: ИНДЕКС В СТРОЕ (a.ti) РЯДОМ СО СТУПЕНЬЮ ═══
+   ⛳ ЗАЧЕМ: нота будет хранить ВЫСОТУ СТРОЯ, а не ступень лада (T4b читает, T4c снимает ступень). В T4a индекс только ПИШЕТСЯ; ИСТИНА —
+   по-прежнему ступень (a.deg): звук, показ, правка, подпись заморозки и все сравнения читают ступень, как прежде.
+   ⛳ ЧТО ЗНАЧИТ: у соло и баса — индекс высоты ноты в строе замороженного вида события (ev.sc; регистр — по-прежнему a.oct); у аккорда —
+   индекс КОРНЯ (тоны аккорда строятся от него типом/септаккордом, как прежде — в T4a о них ничего не меняется). У ударов и дрона
+   высоты нет — поля нет. Ключ (тоника у фиксированных строёв) в индекс не входит: тоника живая. Перевод — ОДНА функция
+   scales.tuningIndexOf (закон оборачивания своей роли).
+   ⛳ КТО ПИШЕТ — ТРИ ВОРОНКИ, через которые проходит КАЖДОЕ событие с высотой (сверено: все events.push и все присваивания ev.a):
+     push           — вся живая запись (соло, терменвокс, бас, аккорд, защёлка на старте записи, переоткрытие аккорда на шве повтора);
+     loadArrangement — подложки и аранжировки;
+     editCommit     — КАЖДАЯ правка редактора (перенос, длина, вставка, отделение, распад, однонотные правки, полоса «в ноте», замена
+                      тембра) и ↶/↷ — все они кончаются editCommit. Правка, менявшая ступень, кладёт новую нагрузку разворотом старой —
+                      со СТАРЫМ индексом; editCommit пересчитывает его на месте (нагрузки правок — свежие объекты; у ↶/↷ они уже верны).
+   ⛳ СТРАЖ (tiAudit в schedInvalidate, TI_AUDIT): обходит все события и сверяет индекс с переводом ступени; каждое РАЗНОЕ расхождение
+   (роль × причина × лад) печатается ОДИН раз — путь записи, забывший воронку, виден сразу, а консоль не тонет.
+   ⚠️ ИНДЕКС НЕ ВХОДИТ НИ В ПОДПИСЬ ЗАМОРОЗКИ (freezeSig читает доли, тембры, версию правок), НИ В ОДНО СРАВНЕНИЕ ПО ЗНАЧЕНИЮ (songSegs
+   сравнивает ступень/регистр/тип; нагрузки целиком нигде не сравниваются и не перебираются) — замороженные дорожки от него не стареют. */
+const TI_FN=new Set(['leadOn','leadSet','bassOn','bassSet','chOn','chSet']);
+function eventTuningIndex(ev){
+  const a=ev&&ev.a;
+  if(!a || typeof a.deg!=='number' || !TI_FN.has(ev.fn) || !ev.sc) return undefined;
+  return tuningIndexOf(a.deg, ev.sc, ev.fn[0]==='c');
+}
+const TI_AUDIT=true;            // страж разработки (T4a–T4c); снимается вместе со ступенью в T4c
+const tiSeen=new Set();
+function tiAudit(){
+  if(!TI_AUDIT) return;
+  for(const e of events){ const ti=eventTuningIndex(e); if(ti===undefined) continue;
+    if(e.a.ti===ti) continue;
+    const why = e.a.ti===undefined ? 'missing' : 'differs', key=e.fn+'|'+why+'|'+(e.sc&&e.sc.id);
+    if(tiSeen.has(key)) continue; tiSeen.add(key);
+    console.warn('[T4a ti] '+e.fn+' in '+(e.sc&&e.sc.id)+': tuning index '+why+' (stored '+e.a.ti+', degree '+e.a.deg+' converts to '+ti+') — a write path bypassed the stamping funnels'); }
+}
 function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: ведение и «выкл» передают слой СВОЕЙ ноты (r.layer / recCh.layer / recBass.layer); «вкл» и удар передают undefined — тогда слой выбирает МАРШРУТ ПО РОЛИ (takeRoute), и только ПОСЛЕ отказа отсчёта. Куда легло — pushLy. // → true, если событие ЛЕГЛО в массив (S4.1: открывающие пути записи ставят состояние только по true). q — ЗАМОРОЖЕННОЕ на ноте решение квантизации (S4.3); не задано — текущее loop.quant
   if(!AC)return false;
   /* ⛳ ЗАПИСЬ ИДЁТ В ПЕСЕННОЙ ДОЛЕ, то есть СВЁРНУТОЙ в область (S3.4). Отсюда и ответ на вопрос «что
@@ -2887,6 +2922,7 @@ function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: в�
   const ev={t,layer:ly,fn,a,sc:fz?fz.sc:CUR(),sev:fz?fz.sev:seventh,tk:curTake};   // §3.4: замораживаем ладовый контекст события (fz — уже замороженный, S3.5e); tk — номер взятого (S3.5d)
   if(a && a.fx) ev.a={...a, fx:{...a.fx}};
   if(S.k && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:S.k};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
+  { const ti=eventTuningIndex(ev); if(ti!==undefined) ev.a={...ev.a, ti}; }   // T4a: индекс в строе — НОВОЙ нагрузкой (вызывающий мог отдать свой объект; ссылка на кривую бенда a.bend сохраняется)
   events.push(ev);
   if(cb===1) S.chLastT=t; else if(cb===2) S.bsLast.set(bv,t);   // S4.3: страж ключа (T1: по слою; P2: у баса — по номеру ноты)
   if(t>recHiT) recHiT=t;                               // S4.3: высшая записанная доля участка (отличает шов от прыжка)
@@ -3470,7 +3506,7 @@ function cursSeek(c,x){
    меняющем состав событий (правило #28) — второго списка мест не заводим. Запись (push) его не зовёт,
    но она меняет длину на каждом событии. */
 let evGen=0;
-function schedInvalidate(){ evGen++; cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); }   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
+function schedInvalidate(){ evGen++; cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); tiAudit(); }   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
 /* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
    событием: каждый splice сдвигает ВЕСЬ хвост, поэтому снятие 10 000 событий из 30 000 — это сотни
    миллионов перемещений, то есть многосекундная заморозка потока, на котором висят и распознавание, и
@@ -4072,6 +4108,7 @@ function loadArrangement(sel, jam=false){
   arr.layers.forEach((evs,li)=>{ const layer=base+li; laneLen.set(laneNew(layer), arr.bars*loop.metre); const tk=++takeSeq;   // длина материала слоя — все такты подложки (см. laneLen)   // S3.5d: каждый слой подложки — своё взятое → ⤺ снимает их по одному, сначала ритм (как прежде)
     takeCapStart(tk);   // O-2: у слоя подложки тоже своё взятое — значит и свой снимок цепей. Дорожки автоматизации у него не будет (его никто не играл руками), и это верно: у него нет движения, только настройки
     for(const e of evs){ const ev={t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh, tk};
+      { const ti=eventTuningIndex(ev); if(ti!==undefined) ev.a={...ev.a, ti}; }   // T4a: индекс в строе у ступени подложки
       if(jam)ev.jam=true;                              // МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока (см. clearJam)
       events.push(ev); } });
   events.sort((x,y)=>x.t-y.t);
@@ -4266,7 +4303,7 @@ export {
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
-  laneRoleOf, laneLenOf,   // laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
+  laneRoleOf, laneLenOf, eventTuningIndex,   // eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   /* F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не
      писать) · роль события (чья это цепь эффектов) · fxLaneExpand — плавные отрезки ленты, развёрнутые в точки шагом тика (рендер и
