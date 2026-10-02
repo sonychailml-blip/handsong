@@ -795,13 +795,13 @@ const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же ме
    ⛳ Пин — ЭТО И ЗАПИСЬ: те же числа уходят в результат, поэтому повторный рендер той же дорожки можно
    будет сделать теми же (это понадобится заморозке, чтобы «переморозить без правок» звучало так же). */
 function pinLive(st, rec, want){
-  const prev={ tonic:st.tonic, aRef:st.aRef, scaleIdx:st.scaleIdx, seventh:st.seventh,
+  const prev={ tonic:st.tonic, aRef:st.aRef, scaleIdx:st.scaleIdx, tunedFrom:st.tunedFrom, seventh:st.seventh,   // tunedFrom (P3 «строй от») — часть CUR(), как scaleIdx
                leadIdx:st.leadIdx, bassIdx:st.bassIdx, chIdx:st.chIdx, bpm:rec.loop.bpm };
   /* ⚠️ ТЕМП НЕ ПОДМЕНЯЕМ, ТОЛЬКО ЗАПИСЫВАЕМ. Секунду на долю считаем мы, но `scheduleBend` внутри ENG
      берёт `60/loop.bpm` у ЖИВОГО транспорта — подставь мы сюда другое число, кривая бенда разъехалась
      бы с нотой молча. Темп принадлежит транспорту; рендер его фиксирует в отчёте, а не меняет. */
   const use={...prev, ...(want||{}), bpm:rec.loop.bpm};
-  st.setTonic(use.tonic); st.setARef(use.aRef); st.setScaleIdx(use.scaleIdx); st.setSeventh(use.seventh);
+  st.setTonic(use.tonic); st.setARef(use.aRef); st.setScaleIdx(use.scaleIdx); st.setTunedFrom(use.tunedFrom); st.setSeventh(use.seventh);
   st.setLeadIdx(use.leadIdx); st.setBassIdx(use.bassIdx); st.setChIdx(use.chIdx);
   return {prev, use};
 }
@@ -817,6 +817,7 @@ function unpinLive(st, prev, use){
   if(st.tonic===u.tonic)       st.setTonic(prev.tonic);
   if(st.aRef===u.aRef)         st.setARef(prev.aRef);
   if(st.scaleIdx===u.scaleIdx) st.setScaleIdx(prev.scaleIdx);
+  if(st.tunedFrom===u.tunedFrom) st.setTunedFrom(prev.tunedFrom);
   if(st.seventh===u.seventh)   st.setSeventh(prev.seventh);
   if(st.leadIdx===u.leadIdx)   st.setLeadIdx(prev.leadIdx);
   if(st.bassIdx===u.bassIdx)   st.setBassIdx(prev.bassIdx);

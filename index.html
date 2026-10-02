@@ -216,8 +216,11 @@
     <div class="prow"><label data-i18n="panel.scale.mode">Лад</label><select id="selScale"></select></div>
     <div class="prow"><label data-i18n="panel.scale.tonic">Тоника</label><select id="selTonic"></select></div>
     <!-- «Строй от» (слайс P0): фиксированные исторические строи (свойство лада fixedKey) настроены от C — строка это ГОВОРИТ.
-         Только показ, не выбор; видимость ставит ui.updScaleBtn по свойству лада (правило #25: не по имени). -->
+         Только показ, не выбор; видимость ставит ui.updScaleBtn по свойству лада (правило #25: не по имени).
+         P3: у лада с выбором (tunable — Пифагор) вместо строки — РЯД ВЫБОРА #tunedFromRow и подсказка, меняющаяся по состоянию. -->
     <p class="phint" id="tunedFromNote" data-i18n="panel.scale.tunedFromC" hidden>Настроен от C (историческая практика)</p>
+    <div class="prow" id="tunedFromRow" style="display:none"><label data-i18n="panel.scale.tunedFrom">Строй от</label><select id="selTunedFrom"></select></div>
+    <p class="phint" id="tunedFromHint" hidden></p>
     <!-- Опорная частота (эталон A4): пресеты-подсказки + свободный ввод, клампится 380–480 в ui.js.
          Единый источник высоты — двигает ВСЕ строи вместе (подвижные и фиксированные). -->
     <div class="prow" id="aRefRow"><label data-i18n="panel.scale.aref">Эталон A4</label>

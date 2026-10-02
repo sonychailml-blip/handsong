@@ -1,4 +1,4 @@
-import { scaleIdx, tonic, setScaleIdx, setTonic, setSeventh, setChIdx,
+import { scaleIdx, tonic, setScaleIdx, setTonic, tunedFrom, setTunedFrom, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
@@ -51,7 +51,7 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       backingMenu=$('backingMenu'), backingJam=$('backingJam'), backingDrums=$('backingDrums'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
       sub4=$('sub4'), sub3=$('sub3'),
-      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'), tunedFromNote=$('tunedFromNote'),
+      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'), tunedFromNote=$('tunedFromNote'), tunedFromRow=$('tunedFromRow'), selTunedFrom=$('selTunedFrom'), tunedFromHint=$('tunedFromHint'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
       bpmEl=$('bpm'), bpmV=$('bpmV'),
@@ -63,11 +63,30 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
    Имя тоники берём из NOTE_NAMES — тем же списком подписан <select id="selTonic">,
    чтобы подписи не разъехались. Читает живые связки scaleIdx/tonic, поэтому зовётся
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
-function updScaleBtn(){ scaleBtn.textContent=`${L(SCALES[scaleIdx].name)} · ${NOTE_NAMES[tonic]}`;
+function updScaleBtn(){ const s=SCALES[scaleIdx], fixedFrom = s.tunable && tunedFrom!=='T';
+  scaleBtn.textContent=`${L(s.name)} · ${NOTE_NAMES[tonic]}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '');   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
   /* P0 «СТРОЙ ОТ»: у фиксированного исторического строя (fixedKey — СВОЙСТВО лада, не имя: правило #25) под тоникой строка
      «Настроен от C (историческая практика)». Здесь, потому что updScaleBtn зовут после КАЖДОЙ смены лада (меню лада, меню строя,
-     уроки) — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам. */
-  tunedFromNote.hidden=!SCALES[scaleIdx].fixedKey; }
+     уроки), тоники и языка — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам.
+     P3: у лада с выбором (tunable — Пифагор) вместо строки — ряд выбора (renderTunedFrom). */
+  tunedFromNote.hidden = !s.fixedKey || !!s.tunable;
+  renderTunedFrom(s); }
+/* ⛳ P3 «СТРОЙ ОТ» — РЯД ВЫБОРА под тоникой, только у лада со свойством tunable (сегодня Пифагор). Первый пункт — «тоника (следует
+   за ней)», умолчание; затем 12 нот. Подсказка под рядом говорит, что значит текущее состояние. Пункты строятся заново при каждом
+   вызове (язык мог смениться) — дёшево: 13 пунктов. Видимость ряда — через style.display: у .prow свой display:flex, и атрибут
+   hidden его не перебил бы. */
+function renderTunedFrom(s){
+  const on=!!s.tunable;
+  tunedFromRow.style.display = on ? '' : 'none';
+  tunedFromHint.hidden = !on;
+  if(!on) return;
+  selTunedFrom.textContent='';
+  const add=(v,txt)=>{ const o=document.createElement('option'); o.value=v; o.textContent=txt; selTunedFrom.appendChild(o); };
+  add('T', t('panel.scale.tunedFollow'));
+  NOTE_NAMES.forEach((n,i)=>add(String(i), n));
+  selTunedFrom.value = String(tunedFrom);
+  tunedFromHint.textContent = tunedFrom==='T' ? t('panel.scale.tunedFollowHint') : t('panel.scale.tunedFixedHint',{n:NOTE_NAMES[tunedFrom]});
+}
 
 /* Меню лада заполняем ладами ОДНОЙ традиции. value у <option> — абсолютный индекс в
    SCALES (он же scaleIdx), а не позиция в отфильтрованном списке: иначе selScale.onchange
@@ -1111,6 +1130,10 @@ selScale.onchange=e=>{
   if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
 selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); updScaleBtn(); };   // 3/3: смена тоники
+/* P3 «СТРОЙ ОТ»: ТОТ ЖЕ ШОВ, ЧТО У ТОНИКИ — живые ноты гаснут и переатакуют (рука соло/баса — на следующем кадре), защёлка
+   замолкает, играющие дорожки пересращиваются (softAllOff при идущем транспорте → trackResplice) и звучат со СВОИМ якорем:
+   их sc — вариант лада, записанный в момент игры. Записанное этот выбор не перестраивает (правило #7). */
+selTunedFrom.onchange=e=>{ const v=e.target.value; setTunedFrom(v==='T'?'T':+v); softAllOff(); updScaleBtn(); };
 /* ЭТАЛОН A4 — единый источник высоты (двигает ВСЕ строи, подвижные и фиксированные, вместе).
    Два ввода: пресеты-подсказки (учат: 415 барочный … 444 оркестровый) и свободное число, КЛАМП 380–480;
    невалид/пусто → откат к последнему валидному, высота НИКОГДА не ломается. Смена ре-настраивает как
