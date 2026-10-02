@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { leadFreq, chordFreqs, chordNotes, bassFreq, CUR, typedChords, chordFams } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты)
+import { leadFreq, chordFreqs, chordNotes, chordUnit, bassFreq, CUR, typedChords, chordFams } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1580,13 +1580,14 @@ function keyClash(n,a,b){
    Такую ноту переносим ЦЕЛИКОМ — «вкл», её ведения громкости и «выкл» на одну и ту же дельту, одной составной
    правкой. Высота — всем событиям, которые её несут («выкл» высоты не несёт).
    ⛳ ЧУЖАЯ НОТА ТОГО ЖЕ КЛЮЧА на новом месте — нота берёт СВЕЖИЙ k (см. шапку): зажим снова разошёлся бы с призраком. */
-function editMoveNote(n,t,deg,oct){
+function editMoveNote(n,t,deg,oct,ty){
   const R=EDIT_ROLE[n.role]; if(!R) return false;
+  const pt = ty ? {deg,oct,ty} : {deg,oct};                  // U4: ty — однонотный аккорд в КАНОНИЧЕСКОЙ форме ряда (chordUnit); без него — прежние {deg,oct}
   const d=Math.max(0,t)-n.start;
   const fr= keyClash(n, n.start+d, n.end+d) ? R.fresh(n.layer) : null;   // S0: свежая идентичность ПО РОЛИ (бас/аккорд — {k} ≥1: в слое есть хотя бы эта нота; соло — {v} выше всех номеров слоя)
   const list=n.evs.map(e=>{
     const pitch = chaseKind(e.fn)!=='f';                     // S0: «выкл» высоты не несёт — у любой роли (у баса прежнее e.fn!=='bassOff')
-    const a = (pitch||fr) ? {...e.a, ...(pitch?{deg,oct}:null), ...fr} : e.a;   // нагрузка — НОВЫМ объектом (как у переноса); sc/sev/tk едут с самим событием (правило #7). Порядок полей прежний: {…, deg, oct, k}
+    const a = (pitch||fr) ? {...e.a, ...(pitch?pt:null), ...fr} : e.a;   // нагрузка — НОВЫМ объектом (как у переноса); sc/sev/tk едут с самим событием (правило #7). Порядок полей прежний: {…, deg, oct, k}
     return { kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+d, a} };
   });
   return editBatch(list) ? n.head : false;
@@ -1641,23 +1642,25 @@ function detachPlan(seg){
    новым объектом (вид события в ходе 'move' не хранится); keep=false или it.drop — событие уходит.
    → «вкл» отделённой ноты (его выделит редактор; это НОВЫЙ объект, если «вкл» родилось из смены высоты),
    true для удаления, false при отказе. */
+/* U3: у РАСПАДА «вкл» в плане несколько (по одному на ноту), и выделить редактору надо не последний, а ту ноту, которую правили, —
+   её «вкл» помечен it.sel; без пометки (отделение E2, удаление U2) — прежнее правило: последнее «вкл» плана. */
 function commitDetach(P,keep){
-  const list=P.ops.slice(), del=[], ins=[]; let head=null;
+  const list=P.ops.slice(), del=[], ins=[]; let head=null, pick=null;
   for(const it of P.items){
     if(!keep||it.drop){ if(it.orig) del.push(it.orig); continue; }
     if(it.orig && it.orig.fn===it.fn){
       list.push({ kind:'move', ev:it.orig, from:{t:it.orig.t, a:it.orig.a}, to:{t:it.t, a:it.a} });
-      if(chaseKind(it.fn)==='n') head=it.orig;              // S0: «вкл» отделённой ноты — у любой роли (у баса прежнее it.fn==='bassOn': в плане бывают только события своей роли)
+      if(chaseKind(it.fn)==='n'){ head=it.orig; if(it.sel) pick=it.orig; }   // S0: «вкл» отделённой ноты — у любой роли (у баса прежнее it.fn==='bassOn': в плане бывают только события своей роли)
     }else{
       if(it.orig) del.push(it.orig);
       const p=it.orig||it.proto, ev={ t:it.t, layer:p.layer, fn:it.fn, a:it.a, sc:p.sc, sev:p.sev, tk:p.tk };
-      ins.push(ev); if(chaseKind(it.fn)==='n') head=ev;
+      ins.push(ev); if(chaseKind(it.fn)==='n'){ head=ev; if(it.sel) pick=ev; }
     }
   }
   if(del.length) list.push({ kind:'del', evs:del });
   if(ins.length) list.push({ kind:'ins', evs:ins });
   if(!editBatch(list)) return false;
-  return keep ? head : true;
+  return keep ? (pick||head) : true;
 }
 /* Перенос СЕГМЕНТА: во времени и/или по высоте. Высота — НОВАЯ нагрузка (deg/oct), всё прочее едет с
    объектом: ⛔ ev.sc НЕ ТРОГАЕМ НИКОГДА — событие остаётся в СВОЁМ ладу (правило #7), иначе правка в
@@ -1670,19 +1673,22 @@ function commitDetach(P,keep){
      ОДИНОЧНАЯ НОТА во времени — целиком (E1, editMoveNote).
      СЕГМЕНТ ГЛИССАНДО во времени — ОТДЕЛЯЕТСЯ и едет один (E2): все его события на одну дельту, соседи на месте.
    → событие, которое редактор выделит после правки (у отделённой — её новое «вкл»), или false. */
-function editMoveSeg(ev,t,deg,oct){
+/* U4: ty (необязателен) — тип, который ложится вместе со ступенью и регистром на каждое событие, несущее высоту: так однонотный аккорд
+   переносится на ряд в КАНОНИЧЕСКОЙ форме (chordUnit) и звучит ровно высоту ряда. Без ty — прежний перенос, тип не трогается. */
+function editMoveSeg(ev,t,deg,oct,ty){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
+  const pt = ty ? {deg,oct,ty} : {deg,oct};
   if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); с S2 редактор пускает сюда бас и аккорды, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
   const nt=Math.max(0,t);
   if(Math.abs(nt-ev.t)<=1e-9){
-    const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, deg, oct}} }));
+    const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
     return editBatch(list) ? ev : false;
   }
-  if(seg.first && seg.endEv && chaseKind(seg.endEv.fn)==='f') return editMoveNote(seg.note,nt,deg,oct);
+  if(seg.first && seg.endEv && chaseKind(seg.endEv.fn)==='f') return editMoveNote(seg.note,nt,deg,oct,ty);
   const P=detachPlan(seg); if(!P) return false;
   const d=nt-P.items[0].t;                                   // items[0] — определяющее событие (события сегмента идут по времени)
-  for(const it of P.items){ it.t+=d; if(chaseKind(it.fn)!=='f') it.a={...it.a, deg, oct}; }   // S0: «выкл» высоты не несёт — у любой роли
+  for(const it of P.items){ it.t+=d; if(chaseKind(it.fn)!=='f') it.a={...it.a, ...pt}; }   // S0: «выкл» высоты не несёт — у любой роли
   return commitDetach(P,true);
 }
 /* Удаление сегмента.
@@ -1704,7 +1710,7 @@ function editDeleteSeg(ev){
 }
 /* ═══ U2: РАСПАД АККОРДА — ПРАВКА ОДНОЙ ЕГО НОТЫ ═══
    ⛳ ЗАКОН (решение пользователя, план «АККОРД КАК НОТЫ»): правка ОДНОЙ ноты аккорда РАСПУСКАЕТ его на ОДНОНОТНЫЕ аккорды, и
-   правка применяется к одной из них. В U2 правка одна — УДАЛЕНИЕ ноты (перенос и длина одной ноты — U3/U4).
+   правка применяется к одной из них. U2 — УДАЛЕНИЕ ноты, U3 — её перенос во времени и длина, U4 — по высоте (chordNoteEdit ниже).
    ⛳ ЧТО ПИШЕТСЯ. Сперва — ТО ЖЕ ОТДЕЛЕНИЕ, что у переноса и удаления сегмента (detachPlan, E2): сегмент посреди ведения
    (аккорды, сменённые одной защёлкой) становится отдельной нотой; одиночный аккорд (сегмент-начало со своим «выкл») берётся как
    есть — отделять его не от чего. Затем отделённая нота РАЗМНОЖАЕТСЯ: на каждую оставшуюся ноту аккорда — своя копия ВСЕХ её
@@ -1745,7 +1751,7 @@ function dissolvePlan(seg,N,drop){
     const ty=[N[i].iv], k=k0+j;                               // свой тип из одной ноты и свой владелец 'loop:N:k'
     for(const it of P.items){
       const a={...it.a, ...(chaseKind(it.fn)!=='f'?{ty}:null), k};   // «выкл» типа не несёт — у него только ключ
-      items.push(j===0 ? {...it, a} : { orig:null, proto:it.orig||it.proto, fn:it.fn, t:it.t, a });
+      items.push({ ...(j===0 ? {...it, a} : { orig:null, proto:it.orig||it.proto, fn:it.fn, t:it.t, a }), note:i });   // U3: note — номер ноты в chordNotes, чья это копия (по нему перенос и длина находят СВОЮ однонотную)
     }
   });
   return { ops:P.ops, items };
@@ -1761,6 +1767,60 @@ function editDeleteChordNote(ev,idx){
   if(N.length<2) return editDeleteSeg(ev);
   const P=dissolvePlan(seg,N,idx); if(!P) return false;
   return !!commitDetach(P,true);
+}
+/* ═══ U3: ПЕРЕНОС ВО ВРЕМЕНИ И ДЛИНА ОДНОЙ НОТЫ АККОРДА ═══
+   ⛳ ТОТ ЖЕ РАСПАД, ЧТО У УДАЛЕНИЯ (U2), — без второй модели: dissolvePlan(seg, N, -1) распускает сегмент на однонотные аккорды, НИ
+   ОДНОЙ не снимая (каждая звучит ровно как в составе — доказательство в шапке распада), а затем правка трогает ТОЛЬКО копию выбранной
+   ноты (it.note === idx): перенос сдвигает ВСЕ её события («вкл», ведения громкости/яркости внутри, «выкл») на одну дельту; длина
+   двигает её «выкл» и снимает её же ведения за новым концом (как editResizeSeg). Прочие копии стоят где стояли.
+   ⛳ СТОЛКНУТЬСЯ НЕ С ЧЕМ: у каждой копии свой свежий k выше всех k слоя (dissolvePlan), значит ни перенос, ни удлинение не заходят на
+   чужой ключ — зажим и «свежий k по столкновению» (E1) здесь не нужны. Перекрытие с соседним аккордом — два голоса, как у E2.
+   ⚠️ ЦЕНА — та же, что у распада: сегмент внутри ведения сперва ОТДЕЛЯЕТСЯ (detachPlan), и его края ре-артикулируются.
+   Всё — ОДНА составная правка (commitDetach → editBatch): один ↶ возвращает аккорд в точности.
+   Высота одной ноты — U4 (editMoveChordNote с deg/oct, ниже). Аккорд из одной ноты — обычный сегмент: editMoveSeg / editResizeSeg.
+   → «вкл» правленой однонотной (её выделит редактор) или false. */
+function chordNoteEdit(ev,idx,fn){
+  if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
+  const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
+  const N=chordNotes(seg.deg,seg.oct,seg.sc,seg.sev,seg.ty);
+  if(!(idx>=0&&idx<N.length)) return false;
+  if(N.length<2) return fn(seg,null);
+  const P=dissolvePlan(seg,N,-1); if(!P) return false;
+  const mine=P.items.filter(it=>it.note===idx);               // копия выбранной ноты: «вкл» первым, свой «выкл» последним (события сегмента идут по времени)
+  if(!mine.length||fn(seg,mine)===false) return false;
+  for(const it of mine) if(chaseKind(it.fn)==='n') it.sel=true;
+  return commitDetach(P,true);
+}
+/* ⛳ U4: ПЕРЕНОС ОДНОЙ НОТЫ ПО ВЫСОТЕ — тот же распад, затем копия выбранной ноты получает КАНОНИЧЕСКУЮ ФОРМУ РЯДА: ступень и регистр
+   ряда (deg/oct — ui расшифровывает ряд rollRowPitch по ладу оси) и однонотный тип scales.chordUnit(лад сегмента) — единицу корня, то
+   есть аккорд из одного корня. Нота звучит ровно высоту ряда, прочитанную из СОБСТВЕННЫХ ступеней лада, — согласно принципу
+   «аккорды из своих ступеней» (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ»): нота вне ряда (чистое отношение между ступенями), перенесённая
+   на ряд, ПРИЛИПАЕТ к нему. Лад события не трогаем (правило #7): форма считается в его же sc.
+   deg==null — высота не меняется (только время, U3). Время и высота вместе — ОДНА правка. Высота на все события копии, несущие
+   высоту («вкл» и ведения внутри); «выкл» её не несёт.
+   Аккорд из одной ноты (сам — нота): обычный перенос сегмента, но с той же канонической формой (editMoveSeg с ty) — иначе его
+   прежний однонотный тип [iv] от прежнего корня увёл бы ноту мимо ряда, к которому её тянули (у нетипизированного лада корень
+   идёт по ступеням, а интервал — в шагах). */
+function editMoveChordNote(ev,idx,t,deg,oct){
+  const pitch = deg!=null && oct!=null;
+  return chordNoteEdit(ev,idx,(seg,mine)=>{
+    if(!mine) return pitch ? editMoveSeg(seg.ev,t,deg,oct,chordUnit(seg.sc)) : editMoveSeg(seg.ev,t,seg.deg,seg.oct);
+    const d=Math.max(0,t)-mine[0].t;
+    if(Math.abs(d)<=1e-9 && !pitch) return false;
+    const ty=pitch ? chordUnit(seg.sc) : null;
+    for(const it of mine){ it.t+=d; if(pitch && chaseKind(it.fn)!=='f') it.a={...it.a, deg, oct, ty}; }
+  });
+}
+function editResizeChordNote(ev,idx,t){
+  return chordNoteEdit(ev,idx,(seg,mine)=>{
+    if(!mine) return editResizeSeg(seg.ev,t);
+    const on=mine[0], off=mine[mine.length-1];
+    if(chaseKind(off.fn)!=='f') return false;
+    const T=Math.max(t, on.t+EDIT_MIN_LEN);
+    if(Math.abs(T-off.t)<=1e-9) return false;
+    off.t=T;
+    for(const it of mine) if(it!==on && it!==off && it.t>=T-EDIT_GAP) it.drop=true;   // ведения этой ноты за новым концом — после «выкл» они сироты
+  });
 }
 /* ═══ ДЛИНА СЕГМЕНТА (S5.6; E2) ═══
    ⛳ ЧТО ДВИГАЕТ ИЗМЕНЕНИЕ ДЛИНЫ — по тому, ЧЕМ сегмент кончается:
@@ -4182,8 +4242,7 @@ export {
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   editInsertChord,
-  /* U2: удалить ОДНУ ноту аккорда — аккорд распадается на однонотные (dissolvePlan) */
-  editDeleteChordNote,
+  editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен

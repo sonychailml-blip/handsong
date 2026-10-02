@@ -27,7 +27,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
-         editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote,
+         editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
@@ -764,6 +764,10 @@ const selAutPt=rec=> { setRollAutSel(rec||null); setRollSel(null); };
 let rollNoteHintShown=false;   // U2: подсказка «тапни ещё раз — одна нота» показана в этой сессии
 const rollPts=new Map(); let rollPan=null, rollZoomBase=null, rollMoved=false, rollGrab=null;   // rollGrab — взятый пальцем удар (перетаскивание); пока он есть, поле НЕ прокручивается
 const rollXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+/* ⛳ U4: ЦЕЛЕВОЙ РЯД одной ноты аккорда, или null — высота прежняя. Ряд под пальцем считается, только если палец ПОКИНУЛ ряд, где взялся
+   (иначе дрожь на границе двух рядов меняла бы высоту). Нота НА ряду, вернувшаяся на свой ряд, — null (тот же звук, распад был бы правкой
+   без слышимого смысла); нота ВНЕ ряда — прилипает к любому ряду, куда её довели, включая ближайший к ней. */
+const rollNoteTarget=G=> !G.left ? null : (!G.off && G.row===G.nrow) ? null : G.row;
 function rollDown(e){
   const p=rollXY(e); rollPts.set(e.pointerId,p);
   const g=rollGeom(); if(!g) return;
@@ -802,11 +806,26 @@ function rollDown(e){
       const row = isSeg ? h.row : (h.ev.a.row|0);
       /* ⛳ U2: ДВА УРОВНЯ ВЫДЕЛЕНИЯ У АККОРДА. Первый тап по аккорду — выделен ВЕСЬ аккорд; второй тап (без движения) по одной из его
          нот — выделена ЭТА нота (номер — h.note, тот же порядок, что у блоков); тап по пустому снимает всё (ниже, selNote(null)). У
-         аккорда из одной ноты, у баса и ударов уровень один. ПЕРЕТАСКИВАНИЕ ДЕЙСТВУЕТ НА ВЫДЕЛЕННОЕ: весь аккорд тянется как в U1; одну
-         ноту переносить и тянуть за край пока нельзя (U3/U4) — такой жест инертен и на отпускании говорит об этом словами. */
+         аккорда из одной ноты, у баса и ударов уровень один. ПЕРЕТАСКИВАНИЕ ДЕЙСТВУЕТ НА ВЫДЕЛЕННОЕ: весь аккорд тянется как в U1.
+         ⛳ U3: выделена одна нота — палец берёт ноту ПОД СОБОЙ (того же аккорда; тап без движения её же и выделит): середина — перенос ВО
+         ВРЕМЕНИ ('note'), край — ДЛИНА ('nlen'). Край действует только у ВЫДЕЛЕННОЙ ноты: ручка нарисована только у неё (draw). Высоту
+         одной ноты — U4 (ниже). Распад аккорда и правку делает recorder (editMoveChordNote/editResizeChordNote).
+         ⛳ U4: тот же жест ведёт и ПО ВЫСОТЕ: ряд под пальцем, если палец ПОКИНУЛ ряд, где взялся (left), — целевой ряд (prow), и нота
+         ляжет на него в канонической форме ряда; время и высота вместе — одна правка. Нота ВНЕ ряда, утащенная на ряд (в том числе
+         вернувшаяся на ряд, где её взяли), ПРИЛИПАЕТ к нему; отпущенная, не покидая своего ряда, — остаётся как была, правки нет.
+         Нота НА ряду, вернувшаяся на свой ряд, высоты не меняет (иначе распад без слышимой правки).
+         ⛳ АККОРД ИЗ ОДНОЙ НОТЫ (single — после распада или вставки) идёт ЭТИМ ЖЕ путём: он и есть нота. Прежний путь «весь аккорд»
+         двигал его корень по рядам при прежнем интервале [iv] — у нетипизированного лада корень шагает по ступеням, а интервал в шагах
+         строя, и нота уезжала мимо ряда, который показывал призрак (правило #9). */
       const chordNote = isSeg && h.n>1 && h.ev===rollSel;
-      if(chordNote && rollSelNote!=null){
-        rollGrab={ ev:h.ev, seg:h.seg, mode:'note', note:h.note, x:p.x, y:p.y };
+      const single = isSeg && h.seg.role==='ch' && h.n===1;
+      if((chordNote && rollSelNote!=null) || single){
+        if(single) selNote(h.ev);
+        const len=(h.seg.end==null?h.beat+1:h.seg.end)-h.seg.start;
+        rollGrab={ ev:h.ev, seg:h.seg, mode:(h.edge&&(single||h.note===rollSelNote))?'nlen':'note', note:h.note, single,
+                   dt:h.beat-h.seg.start, x:p.x, y:p.y, len, grabRow:h.row, row:h.row, left:false,
+                   nrow:Math.round(h.nr), off:!!h.off };   // nrow/off — ряд ноты и «вне ряда ли»: по ним решается, меняется ли высота
+        setRollDrag({ ev:h.ev, t:h.seg.start, note:h.note, len, prow:null });   // U3: призрак ОДНОЙ ноты (draw рисует по note только её блок)
         updRollBtns(); return;
       }
       if(isSeg && h.n>1 && h.ev!==rollSel && !rollNoteHintShown){ rollNoteHintShown=true; showCamMsg(t('roll.tapAgainNote')); }   // подсказка — один раз за сессию
@@ -865,7 +884,20 @@ function rollMove(e){
   }
   if(rollGrab){
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
-    if(rollGrab.mode==='note') return;                                   // U2: выделена одна нота аккорда — призрака нет, правки на отпускании не будет
+    /* U3: ОДНА нота аккорда: перенос (начало под пальцем, как у сегмента) или длина (правый край). U4: перенос ведёт и РЯД — тот же
+       rollHit, что у сегмента (ряд только у сетки; линейка и промах ряд не меняют). */
+    if(rollGrab.mode==='note'||rollGrab.mode==='nlen'){
+      const s=rollGrab.seg, b=g.beat0+g.span*((p.x-g.x0)/g.bw);
+      if(rollGrab.mode==='nlen'){ const end=rollSnapBeat(b, rollSnap());
+        setRollDrag({ ev:rollGrab.ev, t:s.start, note:rollGrab.note, len:Math.max(1/32,end-s.start), prow:null }); }
+      else{
+        const h=rollHit(p.x,p.y);
+        if(h&&(h.what==='grid'||h.what==='seg')){ rollGrab.row=h.row; if(h.row!==rollGrab.grabRow) rollGrab.left=true; }
+        setRollDrag({ ev:rollGrab.ev, t:Math.max(0,rollSnapBeat(b-rollGrab.dt, rollSnap())), note:rollGrab.note, len:rollGrab.len,
+                      prow: rollNoteTarget(rollGrab) });
+      }
+      return;
+    }
     /* ДЛИНА: ведём ТОЛЬКО правый край — начало и ряд стоят. Призрак показывает будущую длину той же
        парой (t, len), которой рисуется настоящий сегмент. */
     if(rollGrab.mode==='len'){
@@ -909,10 +941,23 @@ function rollUp(e){
       if(r&&r!==true) selAutPt(r); }   // V4b: точка «в ноте» — вид пересобран из нот, выделяем ту, что вернул recorder (там величина и вступила)
     setRollAutDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
   }
-  if(rollGrab&&rollGrab.mode==='note'){
-    /* U2: жест по ноте, когда выделена ОДНА нота аккорда. Тап — выделить ту ноту, по которой он пришёлся (в том же аккорде);
-       движение — отказ словами: перенос одной ноты — слайс U3, её длина — U4. */
-    if(!rollMoved) setRollSelNote(rollGrab.note); else showCamMsg(t('roll.noteMoveLater'));
+  if(rollGrab&&(rollGrab.mode==='note'||rollGrab.mode==='nlen')){
+    /* U2: жест по ноте, когда выделена ОДНА нота аккорда. Тап — выделить ту ноту, по которой он пришёлся (в том же аккорде; у аккорда из
+       одной ноты уровня ноты нет — он уже выделен целиком).
+       U3/U4: движение — перенос этой ноты во времени и/или на ряд (prow — тот же целевой ряд, что показал призрак; ряд расшифровывается
+       ТОЙ ЖЕ rollRowPitch по ладу оси, что рисует ряды) или её длина; аккорд распадается (recorder), выделяется правленая однонотная —
+       recorder отдаёт её «вкл» (новый объект, если нота не первая). Ничего не сдвинулось — правки нет, история не трогается. */
+    const gd=rollDrag, s=rollGrab.seg;
+    if(!rollMoved){ if(!rollGrab.single) setRollSelNote(rollGrab.note); }
+    else if(gd){
+      let r=false;
+      if(rollGrab.mode==='nlen'){ const ne=s.start+gd.len; if(s.end!=null&&Math.abs(ne-s.end)>1e-9) r=editResizeChordNote(s.ev, rollGrab.note, ne); }
+      else{
+        const g2=rollGeom(), pit= gd.prow!=null ? rollRowPitch(gd.prow, g2&&g2.sc) : null;
+        if(Math.abs(gd.t-s.start)>1e-9 || pit) r=editMoveChordNote(s.ev, rollGrab.note, gd.t, pit&&pit.deg, pit&&pit.oct);
+      }
+      if(r&&r!==true) selNote(r);
+    }
     setRollDrag(null); rollGrab=null; rollPan=null; updRollBtns(); return;
   }
   if(rollGrab){

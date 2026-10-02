@@ -1386,8 +1386,8 @@ function drawRoll(){
            аккорда на блоке снято решением пользователя: ноты видны сами. Выделение и ручка длины — у ВСЕХ нот выделенного аккорда:
            выделен аккорд ЦЕЛИКОМ (выбор отдельной ноты — U2). */
         /* ⛳ U2: ДВА УРОВНЯ ВЫДЕЛЕНИЯ. rollSel — весь аккорд (все ноты белые, как в U1); rollSelNote — ОДНА нота (белая только она,
-           прочие ноты этого аккорда — в своём цвете с тонким белым контуром: видно, из какого аккорда нота). Ручка длины — только у
-           ВСЕГО аккорда: длина одной ноты — слайс U4.
+           прочие ноты этого аккорда — в своём цвете с тонким белым контуром: видно, из какого аккорда нота). Ручка длины — у всего
+           аккорда и (U3) у одной выделенной ноты: её длина правится отдельно, аккорд при этом распадается.
            ⛳ U2: НОТА ВНЕ РЯДА (dev ≠ null — между ступенями лада) видна безошибочно, двумя знаками, спокойно: блок СВЕТЛЕЕ (заливка
            приглушена) и обведён контуром цвета роли; на блоке — отступление в центах от ближайшей ступени ЭТОГО лада («−22»), если
            влезает, иначе — рядом с блоком, когда он выделен (rollDevLbl). Мера — лад, не равномерная темперация (chRowOfFreq). */
@@ -1402,7 +1402,7 @@ function drawRoll(){
           if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
             /* РУЧКА ДЛИНЫ — только у ВЫДЕЛЕННОГО и только там, где тянуть есть за что (есть endEv и блок
                шире порога). Показываем на выделенном, а не на всех: иначе каждая нота обрастала бы засечкой. */
-            if(!one && s.endEv && w>=ROLL_EDGE_MIN_W){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }
+            if(s.endEv && w>=ROLL_EDGE_MIN_W){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }   // U3: и у ОДНОЙ выделенной ноты — её длина правится отдельно (sel истинно только у неё)
           else if(one){ ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(x-1.5,y-1.5,w+3,h+3,4); ctx.stroke(); }
           if(off) rollDevLbl(x,y,w,h,nt.dev,sel);
         });
@@ -1415,9 +1415,14 @@ function drawRoll(){
   if(rollDrag&&rollDrag.ev){
     /* U1: у АККОРДА призрак — ВСЕ его ноты, сдвинутые на столько рядов, на сколько палец увёл взятую ноту (rollDrag.row − grabRow):
        ровно так ui и перенесёт корень. У баса и удара — один блок, как было (grabRow там равен ряду, сдвиг — сам ряд). */
+    /* U3: rollDrag.note — тянут ОДНУ ноту аккорда (перенос во времени или длина): призрак — только её блок, на её же ряду (или между
+       рядами — та же rollSegNotes, что нарисовала блок). U4: rollDrag.prow — ЦЕЛЕВОЙ ряд при переносе по высоте (null — высота прежняя):
+       призрак стоит ровно на нём — туда нота и ляжет в канонической форме ряда. */
     const gseg = pitched ? songSegs().byEv.get(rollDrag.ev) : null;
-    const chordGhost = gseg && gseg.role==='ch' && gseg.ev===rollDrag.ev && rollDrag.grabRow!=null;
-    const ghostRows = chordGhost ? rollSegRows(gseg,axSc,V.total).map(r=>r+((rollDrag.row|0)-rollDrag.grabRow)) : [rollDrag.row|0];
+    const oneGhost = gseg && gseg.role==='ch' && gseg.ev===rollDrag.ev && rollDrag.note!=null;
+    const chordGhost = gseg && gseg.role==='ch' && gseg.ev===rollDrag.ev && (rollDrag.grabRow!=null || oneGhost);
+    const ghostRows = oneGhost ? (rollDrag.prow!=null ? [rollDrag.prow] : rollSegNotes(gseg,axSc,V.total).filter((nt,i)=>i===rollDrag.note).map(nt=>nt.r))
+                    : chordGhost ? rollSegRows(gseg,axSc,V.total).map(r=>r+((rollDrag.row|0)-rollDrag.grabRow)) : [rollDrag.row|0];
     const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*(pitched?0.7:0.62);
     /* Призрак ладовой роли держит ДЛИНУ сегмента (rollDrag.len), у удара длины нет — там блок привязки. */
     const gw = pitched ? Math.max(3, laneBeatX(V,rollDrag.t+(rollDrag.len||1))-gx) : blkW;
@@ -1524,19 +1529,19 @@ export function rollHit(px,py){
        U2: кроме того отдаётся НОМЕР пойманной ноты (note) и число нот (n) — по ним ui ставит второй уровень выделения (одна нота). */
     const SV=songSegs(), ly=rollTrackLayer(), tol=ROLL_HIT_PX*V.span/V.bw;
     const rp=row0+V.rows-1-((py-V.gy0)/V.rowH-0.5);
-    let best=null, bd=Infinity, bdr=Infinity, bRoot=null, bNote=0, bN=1;
+    let best=null, bd=Infinity, bdr=Infinity, bRoot=null, bNote=0, bN=1, bNr=null, bOff=false;
     for(const s of SV.segs){
       if(s.layer!==ly||s.role!==rollRole||s.sc!==V.sc) continue;
       const en = s.end==null ? V.beat0+V.span : s.end;
       const d = beat<s.start ? s.start-beat : beat>en ? beat-en : 0;
       if(d>tol) continue;
-      const rows=rollSegRows(s,V.sc,V.total);
+      const ns=rollSegNotes(s,V.sc,V.total), rows=ns.map(x=>x.r);   // U4: и отступление (dev) — нота ВНЕ ряда ли (по ней ui решает, прилипать ли)
       let dr=Infinity, ni=0; rows.forEach((rr,i)=>{ const x=Math.abs(rr-rp); if(x<dr){ dr=x; ni=i; } });
       if(dr>0.5) continue;
       /* U2: rootRow — ряд ПАРЫ корня (ступень, регистр), а не ряд ноты 0: у однонотного аккорда (распад) нота 0 — не корень.
          note — номер пойманной ноты (порядок scales.chordNotes = порядок блоков), n — сколько нот у аккорда: по ним ui решает
          второй уровень выделения. */
-      if(d<bd || (d===bd && dr<bdr)){ bd=d; bdr=dr; best=s; bRoot=rollRowOf(s.deg,s.oct,V.sc); bNote=ni; bN=rows.length; }
+      if(d<bd || (d===bd && dr<bdr)){ bd=d; bdr=dr; best=s; bRoot=rollRowOf(s.deg,s.oct,V.sc); bNote=ni; bN=rows.length; bNr=rows[ni]; bOff=ns[ni].dev!=null; }
     }
     if(!(best&&bd<=tol)) return { what:'grid', row:r, beat };
     /* ⛳ КРАЙ ИЛИ СЕРЕДИНА (S5.6) — решаем ЗДЕСЬ, из той же геометрии, что нарисована: зона края не шире
@@ -1546,7 +1551,7 @@ export function rollHit(px,py){
     const wpx = en==null ? Infinity : (en-best.start)*V.bw/V.span;
     const zoneB = (best.endEv && en!=null && wpx>=ROLL_EDGE_MIN_W)
                 ? Math.min(ROLL_EDGE_PX, wpx*0.4)*V.span/V.bw : 0;
-    return { what:'seg', seg:best, ev:best.ev, row:r, rootRow:bRoot, note:bNote, n:bN, beat, edge: zoneB>0 && beat>=en-zoneB };
+    return { what:'seg', seg:best, ev:best.ev, row:r, rootRow:bRoot, note:bNote, n:bN, nr:bNr, off:bOff, beat, edge: zoneB>0 && beat>=en-zoneB };   // U4: nr — ряд пойманной ноты (дробный, если она между рядами), off — она вне ряда
   }
   /* S5.2: попадание считаем по ВСЕМУ нарисованному блоку [t, t+блок], а не по расстоянию до доли, —
      иначе палец, положенный на видимый хвост блока, промахивался бы мимо него. Допуск ROLL_HIT_PX
