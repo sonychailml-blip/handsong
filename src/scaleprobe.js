@@ -1,20 +1,29 @@
 /* ⛳ ПРОБА УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ — консольный инструмент (как ухо-проба render.js: R.aud/R.live), НЕ часть приложения.
    Никто его не импортирует: модуль грузится только руками из консоли браузера, при открытом приложении:
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
-     P.check()
+     P.check()          // T0 (данные) + T1 (частоты и центы) — сводка и каждое несовпадение
    Импорт по ТОМУ ЖЕ адресу, что у приложения ('./scales.js' без строки запроса), — значит проба видит ТЕ ЖЕ объекты ладов, что и
    приложение, а не вторую копию модуля.
    ⛳ ЗАЧЕМ (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ», метод доказательства): каждый слайс модели, который НЕ ДОЛЖЕН менять звук,
    принимается ТОЛЬКО при НУЛЕ несовпадений. Сравнение — строгим ===, без допусков: допуск спрятал бы ровно то, что проба ловит.
-   T0 (сейчас): записи строёв и ладов — данные. Проверяется, что выборка каждого лада, ВЫВЕДЕННАЯ из его же чисел (scales.modeDerive),
-   даёт КАЖДОЙ ступени (и верхней тонике) те же центы, что сегодня, а у равных строёв — те же шаги и тот же показ центов (centsOf).
-   T1: проба вырастет до сравнения ЧАСТОТ — старая и новая функции высоты рядом, по всем ладам, ролям, ступеням, регистрам, тоникам,
-   эталонам A4 и якорям, плюс показ центов.
-   ⛔ Ничего не меняет: только читает SCALES/TUNINGS и печатает в консоль. Не сохраняет, не играет звук. */
-import { SCALES, TUNINGS, centsOf } from './scales.js';
+   T0: записи строёв и ладов — данные. Проверяется, что выборка каждого лада, ВЫВЕДЕННАЯ из его же чисел (scales.modeDerive),
+   даёт КАЖДОЙ ступени (и верхней тонике) те же центы, что сегодня, а у равных строёв — те же шаги и тот же показ центов.
+   T1: ЧАСТОТЫ. Новая функция высоты (scales.pitchHz под leadFreq/bassFreq/chordNotes/tonicFreq/centsOf) против ПРЕЖНИХ тел
+   (scales.legacy*) — по всем ладам (у Пифагора — каждый «строй от»), ролям (соло, бас, аккорды всех типов, дрон), ступеням, регистрам,
+   всем 12 тоникам и нескольким эталонам A4, плюс показ центов. Сравнение === (у аккордов — каждая нота: частота И интервал).
+   ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
+   перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
+   голоса частоту сами не перечитывают — их не задевает. */
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit,
+         leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
+         legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
+import { tonic, aRef, setTonic, setARef } from './state.js';
+
+/* ⛳ ВСЁ: данные (T0), затем частоты и центы (T1). → { data, pitch } — оба с полем mismatches. */
+export function check(){ const data=checkData(), pitch=checkPitch(); return { data, pitch }; }
 
 /* T0: строи, лады и выведенные выборки. → { tunings, modes, checks, mismatches:[строки] } и печать сводки. */
-export function check(){
+export function checkData(){
   const bad=[]; let checks=0;
   const ok=(cond,msg)=>{ checks++; if(!cond) bad.push(msg); return cond; };
   // ---- строи ----
@@ -59,7 +68,7 @@ export function check(){
         const want = i<n ? s.iv[i] : s.edo;
         ok(k===want, `${tag}: degree ${i} → tuning step ${k}, today step ${want}`);
         const cts=Math.round(k*pc/E)%pc;
-        ok(cts===centsOf(i,s), `${tag}: degree ${i} cents readout ${cts} from the tuning, ${centsOf(i,s)} today`);
+        ok(cts===legacyCentsOf(i,s), `${tag}: degree ${i} cents readout ${cts} from the tuning, ${legacyCentsOf(i,s)} today`);   // «сегодня» — прежнее тело (с T1 centsOf уже новая)
       }
     }else{
       /* ТАБЛИЦА: центы ступени из строя = T[k mod N] + период·⌊k/N⌋ − T[root] — обязаны быть ТЕМ ЖЕ числом, что центы ступени лада
@@ -80,4 +89,54 @@ export function check(){
   else console.log('[scaleprobe T0] every degree of every mode reproduces today\'s cents exactly');
   if(parented.length){ console.log('[scaleprobe T0] modes that select from a larger tuning (or start off its index 0):'); console.table(parented); }
   return { tunings:tids.length, modes:SCALES.length, checks, mismatches:bad };
+}
+
+/* ═══ T1: НОВАЯ ФУНКЦИЯ ВЫСОТЫ ПРОТИВ ПРЕЖНИХ ТЕЛ ═══
+   Пространство: каждый лад SCALES (tunable — ещё 13 вариантов «строй от»: 'T' и 0..11) × 12 тоник × A4_SET ×
+     соло и бас: ступень 0..2n+1 (дубль и оборачивание в следующий период) × регистр 0..3;
+     аккорды: ступень 0..n+1 × регистр 0..3 × тип: без типа (септаккорд выкл/вкл), единица корня (chordUnit), каждый тип набора лада
+       (chordFams — у нетипизированного лада это запасной chrom12: так проверяются и однонотные/распавшиеся типы в шагах);
+     дрон: tonicFreq; показ центов: ступень 0..n.
+   Каждое несовпадение — строка со всеми входами. Печатаем первые PRINT_MAX, в ответе держим до KEEP_MAX. */
+const A4_SET=[415, 440, 466.16];   // барочный, стандарт и некруглый — прогон и так в десятки миллионов сравнений (несколько секунд)
+const PRINT_MAX=200, KEEP_MAX=10000;
+export function checkPitch(){
+  const t0=performance.now(), keepT=tonic, keepA=aRef;
+  const bad=[]; let cases=0, nBad=0;
+  const miss=msg=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(msg); };
+  const eq=(a,b)=>a===b;
+  try{
+    const views=[];
+    for(const s of SCALES){ if(s.tunable){ views.push(scaleView(s,'T')); for(let pc=0;pc<12;pc++) views.push(scaleView(s,pc)); } else views.push(s); }
+    for(const v of views){
+      const n=v.iv.length, id=v.id+(v.tunedFrom!=null?`[from ${v.tunedFrom}]`:'');
+      const tys=[[null,false],[null,true],[chordUnit(v),false]];
+      for(const f of chordFams(v)) for(const ty of f.types) tys.push([ty.iv,false]);
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const A4 of A4_SET){ setARef(A4);
+          const at=`${id} tonic ${tn} A4 ${A4}`;
+          cases++; { const a=tonicFreq(v), b=legacyTonicFreq(v); if(!eq(a,b)) miss(`${at} drone: new ${a} old ${b}`); }
+          for(let d=0;d<=n;d++){ cases++; const a=centsOf(d,v), b=legacyCentsOf(d,v); if(!eq(a,b)) miss(`${at} cents deg ${d}: new ${a} old ${b}`); }
+          for(let o=0;o<4;o++){
+            for(let d=0;d<=2*n+1;d++){
+              cases++; { const a=leadFreq(d,o,v), b=legacyLeadFreq(d,o,v); if(!eq(a,b)) miss(`${at} melody deg ${d} reg ${o}: new ${a} old ${b}`); }
+              cases++; { const a=bassFreq(d,o,v), b=legacyBassFreq(d,o,v); if(!eq(a,b)) miss(`${at} bass deg ${d} reg ${o}: new ${a} old ${b}`); }
+            }
+            for(let d=0;d<=n+1;d++) for(const [ty,sev] of tys){
+              const A=chordNotes(d,o,v,sev,ty), B=legacyChordNotes(d,o,v,sev,ty);
+              const tag=()=>`${at} chord deg ${d} reg ${o} type ${ty?'['+ty.join(',')+']':'none'}${sev?' 7th':''}`;
+              if(A.length!==B.length){ cases++; miss(`${tag()}: ${A.length} notes new, ${B.length} old`); continue; }
+              for(let i=0;i<A.length;i++){ cases++;
+                if(!eq(A[i].f,B[i].f)||!eq(A[i].iv,B[i].iv)) miss(`${tag()} note ${i}: new ${A[i].f} (iv ${A[i].iv}) old ${B[i].f} (iv ${B[i].iv})`); }
+            }
+          }
+        }
+      }
+    }
+  } finally { setTonic(keepT); setARef(keepA); }
+  const ms=Math.round(performance.now()-t0);
+  console.log(`[scaleprobe T1] cases ${cases} · mismatches ${nBad} · ${ms} ms (frequencies: melody, bass, every chord note, drone; cents readout)`);
+  if(nBad){ bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T1] '+m)); if(nBad>PRINT_MAX) console.warn(`[scaleprobe T1] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`); }
+  else console.log('[scaleprobe T1] every frequency and every cents readout is bit-identical to the old functions');
+  return { cases, mismatches:bad, total:nBad, ms };
 }

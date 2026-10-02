@@ -438,7 +438,9 @@ const cFix=(s=CUR())=>{ const A=anchorOf(s); return a3()*Math.pow(2,(A-9-(A>toni
 /* Частота ТОНИКИ/КЛЮЧА для дрона и родственного: у fixedKey — ФИКСИРОВАННАЯ высота ключа
    (cFix·2^(cents[ключ]/1200)), иначе дрон бился бы с приколоченной сеткой; у прочих — baseF()
    (подвижная тоника). Опора та же (cFix←a3←aRef) — не разъедется. P1: ключ — keyOf (при якоре C это tonic). */
-export const tonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
+/* T1: высота ТОНИКИ — та же функция высоты (pitchHz ниже), индекс строя — корень лада (+ ключ у фиксированных). Подвижные: A·P^0·ρ(z)
+   = A·1·1 — ровно baseF(); фиксированные: cFix·2^0·2^(c[ключ]/1200) — ровно прежнее. Прежнее тело — legacyTonicFreq (только для пробы). */
+export const tonicFreq=(s=CUR())=>{ const T=TUNINGS[s.tuning], a=modeAnchor(s); return pitchHz(T,a.A,a.z,a.key+s.sel[0],0); };
 /* ПЕРИОД лада (интервал эквивалентности) — по умолчанию ОКТАВА (2). Неоктавный строй задаёт
    своё (Болен–Пирс period:3 — тритава). Заменяет зашитую двойку в формуле высоты: и регистр
    P^oct, и равный шаг P^(шаг/edo). Дефолт 2 ⇒ ВСЕ прежние лады байт-в-байт. */
@@ -925,6 +927,8 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
   }
   return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз/хроматика — пауэр-аккорд как раньше
 }
+/* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
+   legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */
 /* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
    с переносом октавы — сохраняет контур, не роняет частоту в NaN. При ступени внутри лада
    это тождество (i=deg, o=oct). CLAUDE.md: тихого NaN быть не должно. */
@@ -939,18 +943,41 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
    от B уходит в следующую октаву). Якорь cFix (та же опора aRef). o — регистр (палец), carry
    складывается с ним. При тонике C (0) — байт-в-байт прежняя cents-ветка. */
 function fixedSlot(s,step){ const L=s.cents.length, abs=keyOf(s)+step; return {slot:((abs%L)+L)%L, carry:Math.floor(abs/L)}; }
-export function leadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
+/* ═══ ОДНА ФУНКЦИЯ ВЫСОТЫ (слайс T1 универсальной модели строя, HANDOFF «ПЛАН „УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ“») ═══
+   hz = A · P^R · ρ(k). T — строй (TUNINGS), A — частота высоты строя z (ЯКОРЬ), уже поделённая для роли В СЕГОДНЯШНЕМ ПОРЯДКЕ
+   (baseF()/4 у баса, /2 у аккордов, cFix у фиксированных строёв), k — индекс в строе, R — регистр.
+     • РАВНЫЙ строй (форма генератора): ρ(k) = P^((k−z)/E), k НЕ приводится — шаг аккорда через период, как в прежней равной ветке;
+     • ТАБЛИЦА: ρ(k) = 2^((c[k mod N] − c[z])/1200) (центы — всегда двоичные), перенос ⌊k/N⌋ уходит в регистр: P^(R+перенос).
+   ⛳ ПОБИТНО ПРЕЖНЕЕ: порядок умножений и вид каждого выражения взяты из прежних ветвей (их копии — legacy* ниже; читает ТОЛЬКО проба
+   src/scaleprobe.js). По семействам:
+     равные строи: A·P^o·P^(шаг/edo) — то же выражение (k − 0 === k);
+     центовые подвижные: c[k] − c[0] = c[k] − 0 — точно; ДУБЛЬ ТОНИКИ прежде звучал ·2^(1200/1200)=·2 в регистре o, теперь — переносом:
+       ·2^(o+1)·2^0 — оба точное умножение на степень двойки, результат один и тот же;
+     фиксированные (fixedKey) и сетка аккордов: та же форма cFix·2^(o+перенос)·2^(c/1200), k = ключ + шаг лада;
+     раги на сетке 22 шрути — те же литералы центов; Баранг (z = 1, Пелог) — вычитания целых (258−120=138 …) точны.
+   ⛔ Это довод, а не доказательство. Доказательство — проба: слайс принят ТОЛЬКО при нуле несовпадений (=== по всем ладам, ролям,
+   ступеням, регистрам, тоникам, эталонам A4 и якорям). Порядок операций здесь НЕЛЬЗЯ «упрощать»: (A·x)·y ≠ A·(x·y) в плавающей точке. */
+export function pitchHz(T,A,z,k,R){
+  if(T.equal!=null) return A*Math.pow(T.period,R)*Math.pow(T.period,(k-z)/T.equal);
+  const C=T.cents, N=C.length, idx=((k%N)+N)%N, carry=Math.floor(k/N);
+  return A*Math.pow(T.period,R+carry)*Math.pow(2,(C[idx]-C[z])/1200);
+}
+const tSize=T=>T.equal!=null ? T.equal : T.cents.length;     // сколько высот в периоде строя
+/* ЯКОРЬ ЛАДА — две величины модели (A — частота, z — индекс строя, звучащий на ней) и КЛЮЧ (сдвиг ступеней лада внутри строя).
+     фиксированный строй (fixedKey): индекс 0 строя — на ЯКОРЕ (cFix: «строй от» — C у пяти исторических, выбор у Пифагора), тоника
+       выбирает КЛЮЧ (keyOf). «Строй от» = тоника (P3) даёт key 0 и cFix — то же выражение, что baseF: подвижный путь;
+     подвижный: на тонике (baseF) звучит КОРЕНЬ лада (root — 0 у всех, кроме Баранга: Пелог, индекс 1), ключа нет.
+   ⚠️ До T2 якорь собирается на каждый вызов из тех же cFix/keyOf/baseF, что читали прежние ветви; замороженный вид — T2. */
+const modeAnchor=s=> s.fixedKey ? { A:cFix(s), z:0, key:keyOf(s) } : { A:baseF(), z:s.root, key:0 };
+/* Индекс строя ступени i ∈ [0..n] (i = n — верхняя тоника, дубль: корень периодом выше — то, что IVX дописывает как edo). */
+const degK=(s,i,T)=> i<s.sel.length ? s.sel[i] : s.root+tSize(T);
+/* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
+export function leadFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
-  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
-  const cx=s.cents?s.cents.concat([1200]):null;
-  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);   // равный шаг — в ПЕРИОДЕ лада (P^(шаг/edo)); cents-ветка октавная (2/1200), её не трогаем
-  return baseF()*Math.pow(P,o)*r; }                             // регистр — на ПЕРИОД (BP: тритава 3^oct); P=2 у прочих — байт-в-байт
-export function bassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s); // бас на 2 октавы ниже соло (baseF/4 — константа-пол, не период)
+  return pitchHz(T,a.A,a.z,a.key+degK(s,i,T),o); }
+export function bassFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);   // бас на 2 октавы ниже соло (A/4 — константа-пол, не период)
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
-  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)/4*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
-  const cx=s.cents?s.cents.concat([1200]):null;
-  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);
-  return baseF()/4*Math.pow(P,o)*r; }
+  return pitchHz(T,a.A/4,a.z,a.key+degK(s,i,T),o); }
 /* ⛳ НОТЫ АККОРДА — ОДИН ИСТОЧНИК (слайс U1 «аккорд как ноты»). chordNotes отдаёт каждую звучащую ноту: f — частоту, iv — её интервал
    в той же записи, в какой его читает ветка цены (полутоновое смещение / отношение / шаг лада от корня). chordFreqs — ровно её частоты,
    и движок (ENG.chOn/chSet) играет их, а редактор показывает ноты аккорда этой же функцией: второй копии правил построения нет.
@@ -979,6 +1006,81 @@ export function chordRowFreq(deg,oct, s=CUR(), sev=seventh){
   return chordNotes(deg,oct,s,sev, chordUnit(s))[0].f;
 }
 export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
+  /* T1: ВОРОТА ВЕТВЕЙ И ИХ ПОРЯДОК — ПРЕЖНИЕ (правила аккордов станут данными в T6); меняется только то, ЧЕМ считается высота: каждая
+     ветвь зовёт одну функцию высоты (pitchHz). Доводы ветвей — в legacyChordNotes ниже (прежнее тело, только для пробы). */
+  const T=TUNINGS[s.tuning], n=s.iv.length;
+  if (s.cents && ty && s.gridChords){
+    /* СЕТКА: ноты аккорда — высоты строя (ключ + ступень корня + целое смещение), перенос периода — в регистр. */
+    const a=modeAnchor(s), d=((deg%n)+n)%n, o=oct+Math.floor(deg/n), K=a.key+s.sel[d];
+    return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,K+off,o), iv:off }));
+  }
+  if (s.cents && ty){
+    /* ТОНЫ-ОТНОШЕНИЯ (Партч, подвижный Натуральный): корень — высота строя, нота — корень × отношение, как прежде. Эти тоны лежат
+       ВНЕ строя; держим их явно, пока пользователь не решит каждый случай на слух (T7). */
+    const a=modeAnchor(s), d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
+    const rootF=pitchHz(T,a.A/2,a.z,a.key+s.sel[d],o);
+    return ty.map(ra=>({ f:rootF*ra, iv:ra }));
+  }
+  const P=periodOf(s);
+  if (P!==2 && ty){
+    /* Болен–Пирс: корень — равный шаг в ПЕРИОДЕ (тритава), нота — корень × отношение (тоны-отношения, как выше). */
+    const a=modeAnchor(s), d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
+    const rootF=pitchHz(T,a.A/2,a.z,a.key+s.sel[d],o);
+    return ty.map(ra=>({ f:rootF*ra, iv:ra }));
+  }
+  /* РАВНАЯ ветка: шаги chordSteps — уже индексы равного строя (неприведённые), регистр oct — прежний.
+     ⚠️ Нетипизированный аккорд на ЦЕНТОВОМ ладу (ty нет) попадает сюда и прежде ценился НОМИНАЛЬНЫМИ равными шагами (edo лада), а
+     не своей таблицей. Из интерфейса это недостижимо (прогрессии — только у 7-ступенных ладов с аккордами, а все такие центовые лады
+     noChords; живая игра на типизированных ладах всегда несёт тип), но ради побитной верности цена та же: номинальный равный строй
+     { period, equal: edo }. Правила аккордов как данные — T6; там этот путь исчезнет. */
+  const r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+  const TE= T.equal!=null ? T : { period:P, equal:s.edo };
+  return chordSteps(deg,s,sev,ty).map(st=>({ f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 })); }
+ 
+export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
+  return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
+export function stepName(st,s=CUR()){
+  if (s.edo===12) return NOTE_NAMES[(((tonic+st)%12)+12)%12];
+  if (s.edo===24) return name24(tonic*2+st);
+  return 'ст'+(((st%s.edo)+s.edo)%s.edo);
+}
+export function rowLabel(deg,s=CUR()){ const ivx=IVX(s);
+  if (s.edo===12||s.edo===24) return stepName(ivx[deg],s);
+  const st=ivx[deg]%s.edo; return st===0?'Т':String(st);
+}
+/* Центы для экранной подсказки. У лада с s.cents — РЕАЛЬНЫЕ центы ступени (визуальная
+   правда: play-tag показывает 231, а не 240), гейт на s.cents, поэтому прочие лады
+   считают по-прежнему от номинального равного шага. На высоту не влияет.
+   fixedKey: интервал над КЛЮЧОМ = cents[tonic+deg] − cents[tonic] (зависит от тональности —
+   у Веркмайстера терция читает 390¢ в C и 408¢ в F#, тот самый урок). При тонике C — как было. */
+export const centsOf=(deg,s=CUR())=>{
+  /* T1: по ЗАПИСИ строя (центы ступени — разность высот строя), ТРИ прежних округления сохранены нарочно — показ побитно прежний.
+     ⛳ Решение пользователя (записано при T1): ОДНО правило — целые центы везде; строится отдельным слайсом «дрон и центы» после T2.
+     Вызывающие передают ступень 0..n; за пределами — оборачивание по n+1 (прежде у равных было NaN, у таблиц — оборачивание). */
+  const T=TUNINGS[s.tuning], len=s.iv.length+1, K=degK(s,((deg%len)+len)%len,T);
+  if(s.fixedKey){ const key=keyOf(s), k=key+K, C=T.cents, N=C.length, idx=((k%N)+N)%N, carry=Math.floor(k/N);
+    return Math.round((C[idx]+1200*carry-C[key])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет
+  if(T.equal==null){ const C=T.cents, N=C.length, idx=((K%N)+N)%N, carry=Math.floor(K/N);
+    return (C[idx]+1200*carry-C[s.root])%1200; }             // сырые центы таблицы над корнем лада (раги, гамелан, Партч)
+  const pc=1200*Math.log2(T.period);   // центы ПЕРИОДА: октава 1200, тритава ≈1901.955 (BP)
+  return Math.round(K*pc/T.equal)%pc; };
+/* ═══ LEGACY (слайс T1) — ПРЕЖНИЕ тела функций высоты, СЛОВО В СЛОВО, под другими именами. ═══
+   ⛔ Их читает ТОЛЬКО проба src/scaleprobe.js (сравнение === с новыми). В приложении их не зовёт никто — и звать нельзя: высота
+   приложения — одна функция pitchHz. Удаляются отдельным слайсом после того, как проба покажет ноль и ухо подтвердит. */
+export const legacyTonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
+export function legacyLeadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
+  const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+  const cx=s.cents?s.cents.concat([1200]):null;
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);   // равный шаг — в ПЕРИОДЕ лада (P^(шаг/edo)); cents-ветка октавная (2/1200), её не трогаем
+  return baseF()*Math.pow(P,o)*r; }                             // регистр — на ПЕРИОД (BP: тритава 3^oct); P=2 у прочих — байт-в-байт
+export function legacyBassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s); // бас на 2 октавы ниже соло (baseF/4 — константа-пол, не период)
+  const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)/4*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+  const cx=s.cents?s.cents.concat([1200]):null;
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);
+  return baseF()/4*Math.pow(P,o)*r; }
+export function legacyChordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
   if (s.cents && ty && s.gridChords){
     /* ФИКСИРОВАННЫЙ cents-строй (Натуральный клавесин): ноты аккорда берутся ИЗ СЕТКИ, а не строятся
        чистым отношением от корня. ty здесь — ЦЕЛЫЕ ПОЛУТОНОВЫЕ СМЕЩЕНИЯ (как chrom12), а не ratio:
@@ -1030,28 +1132,12 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
      выражением корня, что у chordSteps): с ним аккорд из одной ноты [iv] сыграет ровно эту частоту (типизированная ветка chordSteps). */
   const n=s.iv.length, r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
   return chordSteps(deg,s,sev,ty).map(st=>({ f: baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo), iv: st-r0 })); }
- 
-export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
-  return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
-export function stepName(st,s=CUR()){
-  if (s.edo===12) return NOTE_NAMES[(((tonic+st)%12)+12)%12];
-  if (s.edo===24) return name24(tonic*2+st);
-  return 'ст'+(((st%s.edo)+s.edo)%s.edo);
-}
-export function rowLabel(deg,s=CUR()){ const ivx=IVX(s);
-  if (s.edo===12||s.edo===24) return stepName(ivx[deg],s);
-  const st=ivx[deg]%s.edo; return st===0?'Т':String(st);
-}
-/* Центы для экранной подсказки. У лада с s.cents — РЕАЛЬНЫЕ центы ступени (визуальная
-   правда: play-tag показывает 231, а не 240), гейт на s.cents, поэтому прочие лады
-   считают по-прежнему от номинального равного шага. На высоту не влияет.
-   fixedKey: интервал над КЛЮЧОМ = cents[tonic+deg] − cents[tonic] (зависит от тональности —
-   у Веркмайстера терция читает 390¢ в C и 408¢ в F#, тот самый урок). При тонике C — как было. */
-export const centsOf=(deg,s=CUR())=>{
+export const legacyCentsOf=(deg,s=CUR())=>{
   if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round((s.cents[slot]+1200*carry-s.cents[keyOf(s)])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет; целые прятали бы точность
   if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
   const pc=1200*Math.log2(periodOf(s));   // центы ПЕРИОДА: октава 1200 (P=2, байт-в-байт), тритава ≈1901.955 (BP) — честный шаг ~146.3¢
   return Math.round(IVX(s)[deg]*pc/s.edo)%pc; };
+
 
 /* ===== Индийская классика: свары (саргам) + ПОДЛИННЫЕ имена 22 шрути (по РЕАЛЬНЫМ центам) =====
    ДВЕ таблицы, обе по центам сетки → грид и раги смотрят на ОДНИ И ТЕ ЖЕ центы, подписи не разъедутся.
