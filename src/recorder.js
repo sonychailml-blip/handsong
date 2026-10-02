@@ -1068,7 +1068,7 @@ const frzBufOwns=layer=>{ const f=frzOf(layer); return !!(f&&f.armedRep!=null); 
 /* P3 «строй от»: tunedFrom — в приколоченном, как scaleIdx: он входит в CUR() — запасной лад события без sc (сегодня таких нет).
    ⛳ В ПОДПИСЬ ДОРОЖКИ он попадает ТОЛЬКО через эту запасную ветку (noSc в freezeSig): у события есть sc — вариант лада со своим
    якорем, и смена выбора его звук не меняет; значит замороженная дорожка от передвижения выбора НЕ стареет (мемо подписи лишь
-   пересчитается к той же строке). */
+   пересчитается к той же строке). ⛳ T2: пара scaleIdx + tunedFrom — ровно КЛЮЧ ВИДА (строй, лад, якорь), который отдаёт CUR(). */
 const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx].join(',');
 const frzGlobalKey=()=>events.length+'|'+evGen+'|'+takeFxVer+'|'+frzPinned();
 const frzSigMemo=new Map(); let frzSigG=null;
