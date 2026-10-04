@@ -1002,6 +1002,44 @@ export function tuningIndexOf(deg, s=CUR(), chord=false){
   const i=((deg%len)+len)%len, c=Math.floor(deg/len);
   return degK(s,i,T)+tSize(T)*c;
 }
+/* ═══ T4b1: ЦЕНА ПО ИНДЕКСУ В СТРОЕ (a.ti) — ЗВУК ЧИТАЕТ ИНДЕКС ═══
+   Индекс a.ti (T4a) — сдвиг высоты в строе вида, регистр — a.oct. Функция высоты хочет (индекс k без переноса, регистр R): из a.ti их
+   получаем РАСЩЕПЛЕНИЕМ, подобранным так, чтобы аргументы pitchHz были РОВНО теми, что даёт ступень (доказательство — проба
+   P.checkSound(): каждое событие песни и прогон по всем видам, ступеням 0..n, регистрам, тоникам, A4 и якорям, ===).
+     • РАВНЫЙ строй: индекс НЕ приводится внутри периода (k = ti, верхняя тоника — root+E, как IVX); перенос — только сверх периода;
+     • ТАБЛИЦА: pitchHz сам переносит ⌊k/N⌋ в регистр — расщепление то же, результат тот же;
+     • ФИКСИРОВАННЫЙ строй: ЯКОРЬ и КЛЮЧ — живые (modeAnchor: cFix и keyOf от живой тоники), в индекс не входят — прибавляются здесь,
+       как в цене по ступени.
+   ⚠️ ГРАНИЦА: индекс не различает «дубль тоники в регистре r» и «корень в регистре r+1» (у ступени это n и n+1 — оба дают root+E).
+   Ступень вне 0..n НЕ пишет ни один путь (жесты, прямоугольники, терменвокс, ряды редактора, подложки — все в 0..n), поэтому у мелодии
+   расщепление выбирает ДУБЛЬ; у строя с периодом-степенью двойки обе записи равны побитно, у Болена–Пирса и Карлос ступень n+1 дала бы
+   последний бит иначе — она недостижима. У аккорда корень лежит в [root, root+E) (тон «дубль» у аккорда — корень регистром выше),
+   и расщепление однозначно при ЛЮБОЙ ступени. */
+function melodySplit(ti,oct,s,T){ const E=tSize(T), top=s.root+E;
+  if(ti>=s.root && ti<=top) return [ti,oct];
+  const c = ti>top ? Math.ceil((ti-top)/E) : Math.floor((ti-s.root)/E);
+  return [ti-E*c, oct+c]; }
+export function leadFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAnchor(s), [k,R]=melodySplit(ti,oct,s,T);
+  return pitchHz(T,a.A,a.z,a.key+k,R); }
+export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAnchor(s), [k,R]=melodySplit(ti,oct,s,T);
+  return pitchHz(T,a.A/4,a.z,a.key+k,R); }
+/* Аккорд по индексу КОРНЯ. ⛳ ПЕРЕЕХАЛИ (цена побитно та же, что по ступени): сетка фиксированных строёв, корень чистых отношений
+   (Партч, подвижный Натуральный), корень Болена–Пирса, типизированный аккорд равного строя (палитры chrom12/edo19/edo31 и однонотные
+   типы распада/U4 у любого равного лада — тоны = корень + смещения в шагах строя, тот же неприведённый шаг и тот же регистр).
+   ⛔ ОСТАЛИСЬ НА СТУПЕНИ (ty нет): терцовая стопка (ступени i, i+2, i+4 — их даёт ЛАД, индекс строя без лада их не знает), пауэр-аккорд и
+   округлённые отношения 19/31-TET (правила chordSteps по tag) и номинально-равная цена нетипизированного аккорда центового лада —
+   это «правила аккордов как данные», T6. ti===undefined — тоже по ступени (событие без индекса; вызывающий отмечает это). */
+export function chordNotesAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){
+  if(ti===undefined || !ty) return chordNotes(deg,oct,s,sev,ty);
+  const T=TUNINGS[s.tuning], E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
+  if (s.cents && s.gridChords){ const a=modeAnchor(s);
+    return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
+  if (s.cents || periodOf(s)!==2){ const a=modeAnchor(s), rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);
+    return ty.map(ra=>({ f:rootF*ra, iv:ra })); }
+  if (T.equal==null) return chordNotes(deg,oct,s,sev,ty);
+  return ty.map(iv=>({ f: pitchHz(T,baseF()/2,0,ti+iv,oct), iv }));   // равная ветка, типизированный путь chordSteps: шаг корня (= ti, неприведённый) + интервал, регистр oct
+}
+export function chordFreqsAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(deg,ti,oct,s,sev,ty).map(n=>n.f); }
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
 export function leadFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);

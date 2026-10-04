@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { leadFreq, chordFreqs, chordNotes, chordUnit, bassFreq, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { leadFreq, chordNotes, chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -2756,6 +2756,21 @@ const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
    ⚠️ ТЕЛА ЗАПИСЕЙ НЕ ТРОНУТЫ — добавлен только префикс A. у функций звука. Ключи владельцев
    (ldKey/chOwnerKey/bassOwnerKey), замороженный лад и loop.bpm остаются здешними: они про ЗАПИСЬ,
    а не про движок, и у обеих копий обязаны быть одни и те же. */
+/* ═══ T4b1: ЗВУК ЧИТАЕТ ИНДЕКС В СТРОЕ ═══
+   Таблица ниже цены соло и баса берёт из a.ti (scales.leadFreqTi/bassFreqTi — та же функция высоты, побитно та же цена; проба
+   P.checkSound), аккорда — через chordFreqsAt (из индекса — там, где это побитно то же, иначе по ступени: см. её шапку).
+   ⛳ ОТКУДА ИНДЕКС: у события — a.ti (T4a, три воронки записи). ЖИВОЙ вызов (W*, ctx==null) несёт нагрузку жестов — у неё индекса нет:
+   переводим ступень той же функцией T4a (tuningIndexOf, живой вид CUR) — это не запасной путь, а сама цена живой ноты.
+   ⚠️ ЗАПАСНОЙ ПУТЬ — только у ЗАПИСАННОГО события без a.ti (после T4a их быть не должно): индекс из ступени, и ОДНО предупреждение на каждый
+   разный случай (вид события × лад). Уходит в T4c вместе со ступенью. */
+const tiFallSeen=new Set();
+function evTi(a,ctx,chord){
+  if(typeof a.ti==='number') return a.ti;
+  const sc=ctx?ctx.sc:CUR();
+  if(ctx){ const key=(ctx.fn||'?')+'|'+(sc&&sc.id); if(!tiFallSeen.has(key)){ tiFallSeen.add(key);
+    console.warn('[T4b1 ti] replayed '+(ctx.fn||'event')+' in '+(sc&&sc.id)+' has no a.ti — priced from its degree (a write path bypassed T4a)'); } }
+  return tuningIndexOf(a.deg, sc, chord);
+}
 const makeENG=A=>({
   /* ⚠️ setLeadInstr(a.inst) ОТСЮДА УБРАН, и это ПОЧИНКА, а не потеря: переигранный слой уводил ЖИВОЙ
      инструмент (и кнопку в панели) — слой на Ситаре молча перекрашивал руку, играющую Органом. Теперь
@@ -2765,7 +2780,7 @@ const makeENG=A=>({
                  Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
                  замороженному ладу (полимодальность цела). */
               if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
-              const base=leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR());
+              const base=leadFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR());   // T4b1: цена — из индекса в строе
               const gl=A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль. V4: заодно отдаёт СКОЛЬЖЕНИЕ ноты (или undefined — не задано)
               /* ⛔ V4, КОНТРАКТ V1: живой кадр ТЕРМЕНВОКСА (live!=null) скольжения НЕ получает — его 20 мс это сглаживание слежения, а не
                  портаменто; руке с долгим Скольжением высота отставала бы от руки. Свежую атаку отсекает сам движок (fresh → умолчание). */
@@ -2773,20 +2788,20 @@ const makeENG=A=>({
               if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               const gl=A.applyFx(a.fx);   // V4: скольжение ведения — из ЕГО карты (карта ведения несёт величину на миг ведения: сдвинул палец посреди ноты — следующий переезд уже с новой)
-              A.leadSet(o,(a.hold?null:leadFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,gl,when); },   // ведение терменвокса (hold) частоты не несёт — скольжению там применяться не к чему   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
+              A.leadSet(o,(a.hold?null:leadFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,gl,when); },   // T4b1: цена — из индекса в строе   // ведение терменвокса (hold) частоты не несёт — скольжению там применяться не к чему   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
   leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),a&&a.tie,when),   // V2: tie ПЕРЕД when (правило #15)   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
-  chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqs(a.deg,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
+  chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqsAt(a.deg,a.ty?evTi(a,ctx,true):undefined,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // T4b1: типизированный — из индекса корня; без типа — по ступени (терции/пауэр — T6)   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
+  chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqsAt(a.deg,a.ty?evTi(a,ctx,true):undefined,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
   chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
   /* ⛳ V4: СКОЛЬЖЕНИЕ БАСА — ИЗ КАРТЫ СОБЫТИЯ, И ОТСУТСТВИЕ КАРТЫ ЗНАЧИТ «НЕ ЗАДАНО» (умолчание движка BASS_GLIDE_TC), а НЕ
      «возьми живую цепь». Карту бас несёт ТОЛЬКО при прицепочном параметре в цепи баса (gestures), поэтому ей нет у всего
      записанного без Скольжения, у подложки (arrange строит нагрузку сам) и у нот, вставленных в редакторе. Правило соло
      «нет карты → текущая цепь» здесь заставило бы басовую линию подложки скользить так, как сейчас стоит рука, — ровно
      довод яркости аккордов (fxChordBri). Кадр терменвокса (live) скольжения не получает — контракт V1. */
-  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreq(a.deg,a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
+  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
   bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
   drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,A.fxBriOf(a.fx),when),   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
   drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)

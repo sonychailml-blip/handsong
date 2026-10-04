@@ -3,6 +3,7 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkSound()     // T4b1: цена ПО ИНДЕКСУ В СТРОЕ (a.ti) против цены по ступени — каждое событие песни и прогон по всем видам
      P.checkTi()        // T4a: у КАЖДОГО события текущей песни индекс в строе (a.ti) равен переводу его ступени — запускать после записи/правки/подложки
    Импорт по ТОМУ ЖЕ адресу, что у приложения ('./scales.js' без строки запроса), — значит проба видит ТЕ ЖЕ объекты ладов, что и
    приложение, а не вторую копию модуля.
@@ -18,7 +19,7 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
@@ -123,7 +124,8 @@ const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotes, to
 const allViews=()=>{ const out=[];
   for(const s of SCALES){ if(s.tunable){ out.push([s,'T']); for(let pc=0;pc<12;pc++) out.push([s,pc]); } else out.push([s,'T']); }
   return out; };
-function sweep(stage, what, A, B, pick){
+function sweep(stage, what, A, B, pick, opt={}){
+  const melMax=opt.melMax||(n=>2*n+1), chMax=opt.chMax||(n=>n+1);   // T4b1: прогон по индексу в строе — ступени, которые путь записи может положить (0..n)
   const t0=performance.now(), keepT=tonic, keepA=aRef;
   const bad=[]; let cases=0, nBad=0;
   const miss=msg=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(msg); };
@@ -138,11 +140,11 @@ function sweep(stage, what, A, B, pick){
           cases++; { const a=A.tonic(va), b=B.tonic(vb); if(a!==b) miss(`${at} drone: ${what[0]} ${a} ${what[1]} ${b}`); }
           for(let d=0;d<=n;d++){ cases++; const a=A.cents(d,va), b=B.cents(d,vb); if(a!==b) miss(`${at} cents deg ${d}: ${what[0]} ${a} ${what[1]} ${b}`); }
           for(let o=0;o<4;o++){
-            for(let d=0;d<=2*n+1;d++){
+            for(let d=0;d<=melMax(n);d++){
               cases++; { const a=A.lead(d,o,va), b=B.lead(d,o,vb); if(a!==b) miss(`${at} melody deg ${d} reg ${o}: ${what[0]} ${a} ${what[1]} ${b}`); }
               cases++; { const a=A.bass(d,o,va), b=B.bass(d,o,vb); if(a!==b) miss(`${at} bass deg ${d} reg ${o}: ${what[0]} ${a} ${what[1]} ${b}`); }
             }
-            for(let d=0;d<=n+1;d++) for(const [ty,sev] of tys){
+            for(let d=0;d<=chMax(n);d++) for(const [ty,sev] of tys){
               const X=A.chord(d,o,va,sev,ty), Y=B.chord(d,o,vb,sev,ty);
               const tag=()=>`${at} chord deg ${d} reg ${o} type ${ty?'['+ty.join(',')+']':'none'}${sev?' 7th':''}`;
               if(X.length!==Y.length){ cases++; miss(`${tag()}: ${X.length} notes ${what[0]}, ${Y.length} ${what[1]}`); continue; }
@@ -223,4 +225,32 @@ export function checkTi(){
   else if(n) console.log('[scaleprobe T4a] every pitched event carries the tuning index of its degree');
   else console.log('[scaleprobe T4a] the song has no pitched events yet — record, load a backing or edit, then run again');
   return { events:n, byRole, mismatches:bad };
+}
+
+/* ═══ T4b1: ЗВУК ЧИТАЕТ ИНДЕКС В СТРОЕ ═══
+   1) КАЖДОЕ СОБЫТИЕ ТЕКУЩЕЙ ПЕСНИ: цена из a.ti (leadFreqTi/bassFreqTi/chordNotesAt — то, чем играет таблица ENG) против цены по ступени
+      (leadFreq/bassFreq/chordNotes) — ===; у аккорда каждая нота (частота и интервал). Событие без a.ti — расхождение.
+   2) ПРОГОН: каждый вид × тоники × A4 × регистры × ступени 0..n (столько и пишут пути записи) × все типы — ступень → индекс функцией T4a
+      (tuningIndexOf), цена из индекса против ПРЕЖНЕЙ цены (legacy*) — ===. Тоника и показ центов — как в T1.
+   Принимается ТОЛЬКО при нуле в обеих частях. */
+export function checkSound(){
+  const bad=[]; let n=0;
+  for(const e of events){
+    const a=e.a; if(!a || typeof a.deg!=='number' || !e.sc) continue;
+    const r=e.fn[0]==='l'?'ld':e.fn[0]==='b'?'bs':e.fn[0]==='c'?'ch':null; if(!r || !/On$|Set$/.test(e.fn)) continue;
+    n++; const at=`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}, degree ${a.deg} reg ${a.oct}`;
+    if(typeof a.ti!=='number'){ bad.push(`${at}: no a.ti`); continue; }
+    if(r==='ld'){ const x=leadFreqTi(a.ti,a.oct,e.sc), y=leadFreq(a.deg,a.oct,e.sc); if(x!==y) bad.push(`${at}: from ti ${x}, from degree ${y}`); }
+    else if(r==='bs'){ const x=bassFreqTi(a.ti,a.oct,e.sc), y=bassFreq(a.deg,a.oct,e.sc); if(x!==y) bad.push(`${at}: from ti ${x}, from degree ${y}`); }
+    else{ const X=chordNotesAt(a.deg,a.ti,a.oct,e.sc,e.sev,a.ty), Y=chordNotes(a.deg,a.oct,e.sc,e.sev,a.ty);
+      if(X.length!==Y.length) bad.push(`${at}: ${X.length} notes from ti, ${Y.length} from degree`);
+      else for(let i=0;i<X.length;i++) if(X[i].f!==Y[i].f||X[i].iv!==Y[i].iv) bad.push(`${at} note ${i}: from ti ${X[i].f} (iv ${X[i].iv}), from degree ${Y[i].f} (iv ${Y[i].iv})`); }
+  }
+  console.log(`[scaleprobe T4b1] song events ${n} · mismatches ${bad.length} (price from a.ti vs price from the degree)`);
+  bad.forEach(m=>console.warn('[scaleprobe T4b1] '+m));
+  const TI={ lead:(d,o,v)=>leadFreqTi(tuningIndexOf(d,v,false),o,v), bass:(d,o,v)=>bassFreqTi(tuningIndexOf(d,v,false),o,v),
+             chord:(d,o,v,sev,ty)=>chordNotesAt(d,tuningIndexOf(d,v,true),o,v,sev,ty), tonic:tonicFreq, cents:centsOf };
+  const r=sweep('T4b1',['from ti','old'],TI,OLD,(s,tf)=>{ const v=scaleView(s,tf); return [v,v]; }, { melMax:n=>n, chMax:n=>n });
+  if(!bad.length && !r.total) console.log('[scaleprobe T4b1] every song event and every sweep case prices identically from the tuning index');
+  return { events:n, eventMismatches:bad, sweep:r };
 }
