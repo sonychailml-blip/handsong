@@ -3,6 +3,7 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkLogic()     // T4b2: ЛОГИКА РЕКОРДЕРА по индексу — сегменты всей песни и нагрузки догонялки на каждой границе событий против прежних
      P.checkSound()     // T4b1: цена ПО ИНДЕКСУ В СТРОЕ (a.ti) против цены по ступени — каждое событие песни и прогон по всем видам
      P.checkTi()        // T4a: у КАЖДОГО события текущей песни индекс в строе (a.ti) равен переводу его ступени — запускать после записи/правки/подложки
    Импорт по ТОМУ ЖЕ адресу, что у приложения ('./scales.js' без строки запроса), — значит проба видит ТЕ ЖЕ объекты ладов, что и
@@ -23,7 +24,7 @@ import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIn
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
-import { events, eventTuningIndex } from './recorder.js';   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
+import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote } from './recorder.js';   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -253,4 +254,49 @@ export function checkSound(){
   const r=sweep('T4b1',['from ti','old'],TI,OLD,(s,tf)=>{ const v=scaleView(s,tf); return [v,v]; }, { melMax:n=>n, chMax:n=>n });
   if(!bad.length && !r.total) console.log('[scaleprobe T4b1] every song event and every sweep case prices identically from the tuning index');
   return { events:n, eventMismatches:bad, sweep:r };
+}
+
+/* ═══ T4b2: ЛОГИКА РЕКОРДЕРА ЧИТАЕТ ИНДЕКС В СТРОЕ ═══
+   1) СЕГМЕНТЫ ВСЕЙ ПЕСНИ: songSegs (смена высоты — по паре индекс×регистр) против legacySongSegs (по ступени) — границы, события начала и
+      конца, ключи, ступени, регистры, типы (по значению), лады, тембры, громкости и обратный указатель «событие → сегмент».
+   2) ДОГОНЯЛКА на КАЖДОЙ границе событий песни: для каждого владельца, открытого к доле x, нагрузка chaseNote против legacyChaseNote —
+      ступень, регистр, тип, бенд, громкость, тембр, контекст — и ЦЕНА, которой её сыграет ENG: из индекса (новая) против цены по ступени
+      (прежняя). Ловит, в частности, дефект T4b1 у удержанной ноты терменвокса.
+   Печатает каждое расхождение. Принимается ТОЛЬКО при нуле. Ничего не меняет (кэш догонялки по доле переписывается — это только кэш). */
+const tyEqP=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));
+const bendEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((p,i)=>p.dt===b[i].dt && p.c===b[i].c));
+export function checkLogic(){
+  const bad=[];
+  // ---- 1) сегменты ----
+  const S=songSegs(), L=legacySongSegs(), F=['role','layer','key','tk','note','ev','endEv','first','start','end','endBy','deg','oct','sc','sev','inst','vol'];
+  if(S.segs.length!==L.segs.length) bad.push(`segments: ${S.segs.length} new, ${L.segs.length} legacy`);
+  const nSeg=Math.min(S.segs.length,L.segs.length);
+  for(let i=0;i<nSeg;i++){ const a=S.segs[i], b=L.segs[i], at=`segment ${i} (L${a.layer+1} ${a.role} beat ${Math.round(a.start*1000)/1000})`;
+    for(const f of F) if(a[f]!==b[f]) bad.push(`${at}: ${f} new ${a[f]} legacy ${b[f]}`);
+    if(!tyEqP(a.ty,b.ty)) bad.push(`${at}: chord type differs`); }
+  const idxS=new Map(S.segs.map((g,i)=>[g,i])), idxL=new Map(L.segs.map((g,i)=>[g,i]));
+  if(S.byEv.size!==L.byEv.size) bad.push(`event→segment map: ${S.byEv.size} new, ${L.byEv.size} legacy`);
+  for(const [ev,g] of S.byEv){ const h=L.byEv.get(ev); if(idxS.get(g)!==idxL.get(h)) bad.push(`event ${ev.fn} at beat ${ev.t} maps to segment ${idxS.get(g)} new, ${idxL.get(h)} legacy`); }
+  // ---- 2) догонялка ----
+  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q); let nChase=0;
+  for(const x of X){
+    for(const s of chaseFor(x)){
+      nChase++; const N=chaseNote(s,x), O=legacyChaseNote(s,x), at=`chase at beat ${Math.round(x*1000)/1000}: L${s.on.layer+1} ${s.role} (${s.on.fn} at ${s.on.t})`;
+      if(N.ctx!==O.ctx) bad.push(`${at}: context differs`);
+      for(const f of ['deg','oct','vol','inst','hold']) if(N.a[f]!==O.a[f]) bad.push(`${at}: ${f} new ${N.a[f]} legacy ${O.a[f]}`);
+      if(!tyEqP(N.a.ty,O.a.ty)) bad.push(`${at}: chord type differs`);
+      if(!bendEq(N.a.bend,O.a.bend)) bad.push(`${at}: bend curve differs`);
+      const sc=N.ctx.sc, tiN= typeof N.a.ti==='number' ? N.a.ti : tuningIndexOf(N.a.deg,sc,s.role==='ch');
+      if(s.role==='ld'){ const x1=leadFreqTi(tiN,N.a.oct,sc), y1=leadFreq(O.a.deg,O.a.oct,O.ctx.sc); if(x1!==y1) bad.push(`${at}: price from ti ${x1}, legacy from degree ${y1}`); }
+      else if(s.role==='bs'){ const x1=bassFreqTi(tiN,N.a.oct,sc), y1=bassFreq(O.a.deg,O.a.oct,O.ctx.sc); if(x1!==y1) bad.push(`${at}: price from ti ${x1}, legacy from degree ${y1}`); }
+      else{ const A=chordNotesAt(N.a.deg,N.a.ty?tiN:undefined,N.a.oct,sc,N.ctx.sev,N.a.ty), B=chordNotes(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,O.a.ty);
+        if(A.length!==B.length) bad.push(`${at}: ${A.length} chord notes new, ${B.length} legacy`);
+        else for(let i=0;i<A.length;i++) if(A[i].f!==B[i].f) bad.push(`${at} note ${i}: price from ti ${A[i].f}, legacy from degree ${B[i].f}`); }
+    }
+  }
+  console.log(`[scaleprobe T4b2] song events ${events.length} · segments ${S.segs.length} · chase checks ${nChase} at ${X.length} beats · differences ${bad.length}`);
+  bad.forEach(m=>console.warn('[scaleprobe T4b2] '+m));
+  if(!bad.length && events.length) console.log('[scaleprobe T4b2] segments and chased notes are identical when read from the tuning index');
+  else if(!events.length) console.log('[scaleprobe T4b2] the song is empty — record, load a backing or edit, then run again');
+  return { events:events.length, segments:S.segs.length, chase:nChase, differences:bad };
 }

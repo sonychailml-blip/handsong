@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { leadFreq, chordNotes, chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1775,7 +1775,7 @@ function dissolvePlan(seg,N,drop){
 function editDeleteChordNote(ev,idx){
   if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
-  const N=chordNotes(seg.deg,seg.oct,seg.sc,seg.sev,seg.ty);
+  const N=chordNotesAt(seg.deg,seg.ti,seg.oct,seg.sc,seg.sev,seg.ty);   // T4b2: ноты — по индексу корня (типизированный), иначе по ступени — те же интервалы, что играет ENG (проба T4b1)
   if(!(idx>=0&&idx<N.length)) return false;
   if(N.length<2) return editDeleteSeg(ev);
   const P=dissolvePlan(seg,N,idx); if(!P) return false;
@@ -1795,7 +1795,7 @@ function editDeleteChordNote(ev,idx){
 function chordNoteEdit(ev,idx,fn){
   if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
-  const N=chordNotes(seg.deg,seg.oct,seg.sc,seg.sev,seg.ty);
+  const N=chordNotesAt(seg.deg,seg.ti,seg.oct,seg.sc,seg.sev,seg.ty);   // T4b2: см. editDeleteChordNote
   if(!(idx>=0&&idx<N.length)) return false;
   if(N.length<2) return fn(seg,null);
   const P=dissolvePlan(seg,N,-1); if(!P) return false;
@@ -2957,7 +2957,7 @@ const curBeat=()=>songAt(Math.max((AC.currentTime-loop.t0)*loop.bpm/60, loop.lea
    Опора и порог — В ЗАПИСИ ВЛАДЕЛЬЦА (r), поэтому две гнущие руки не путают друг другу отсчёт. */
 function pushBend(r,live){
   if(!r||!r.bend||live==null)return;
-  const c=1200*Math.log2(live/leadFreq(r.deg,r.oct,CUR()));
+  const c=1200*Math.log2(live/leadFreqTi(tuningIndexOf(r.deg,CUR(),false),r.oct,CUR()));   // T4b2: опора бенда — ТА ЖЕ цена, от которой его играет переигровка (ENG.leadOn: leadFreqTi). r.deg — живая ступень жеста (0..n): перевод T4a, побитно та же частота (проба T4b1)
   if(r.lastC!=null&&Math.abs(c-r.lastC)<=BEND_EPS_CENTS)return;
   r.bend.push({dt:Math.max(0,curBeat()-r.t0),c});
   r.lastC=c;
@@ -3712,6 +3712,28 @@ function chaseFor(x){
 /* only (A2b) — НЕОБЯЗАТЕЛЬНЫЙ номер слоя: догнать ТОЛЬКО эту дорожку. Шов выхода из заморозки — это вход в
    середину песни для одной дорожки, и догонялка та же самая; сворачивание (chaseFor) при этом общее и
    кэшированное по доле, так что десять дорожек на одном шве стоят одну свёртку. */
+/* ⛳ T4b2: НАГРУЗКА ДОГНАННОЙ НОТЫ — ОДНА ЧИСТАЯ ФУНКЦИЯ (её же сверяет проба P.checkLogic с прежней сборкой legacyChaseNote).
+   Склейка {...вкл.a, ...ведение.a} и контекст — прежние. ⛳ ПОЧИНКА ДЕФЕКТА T4b1 (найден при T4b2): у НОТЫ ТЕРМЕНВОКСА ведения с hold
+   несут ЖИВУЮ ближайшую ступень, и T4a поставил им её индекс; склейка возвращала ступень и регистр АТАКИ, но индекс оставляла от
+   ведения — а звук с T4b1 считает высоту ПО ИНДЕКСУ: вход посреди удержанной ноты терменвокса звучал бы от чужой опоры (бенд — от
+   неверной ступени). Теперь индекс берётся у атаки вместе со ступенью и регистром. */
+function chaseNote(s,x){
+  const hold=!!(s.set&&s.set.a.hold);                       // терменвокс: ведение с hold несёт ЖИВУЮ ступень, а высоту — бенд от ступени АТАКИ
+  const a={...s.on.a, ...(s.set?(s.role==='ld'?s.set.a:noInst(s.set.a)):null)};   // T0-fix: у СОЛО тембр — от последнего ведения (нота переливается живьём, в точке входа звучал он); у баса — от атаки (он печётся на «вкл», ведение его не несёт); у аккорда в chSet тембра нет вовсе
+  const ctx=(s.set&&!hold)?s.set:s.on;
+  if(s.role==='ld'){
+    if(hold){ a.deg=s.on.a.deg; a.oct=s.on.a.oct; a.ti=s.on.a.ti; }   // T4b2: и ИНДЕКС атаки (см. шапку)
+    /* Кривая бенда — от момента атаки; догоняем её ОСТАТОК: значение на входе становится точкой dt=0,
+       дальнейшие точки сдвигаются на прошедшее. Без этого глиссандо начиналось бы заново с атаки. */
+    const B=s.on.a.bend;
+    if(B&&B.length){ const off=x-s.on.t; let k=-1;
+      for(let j=0;j<B.length&&B[j].dt<=off;j++) k=j;
+      const nb= k>=0 ? [{dt:0,c:B[k].c}] : [];
+      for(let j=k+1;j<B.length;j++) nb.push({dt:B[j].dt-off,c:B[j].c});
+      a.bend=nb; }
+  }
+  return {a,ctx};
+}
 function chasePlay(x,when,lead,only){
   const list=chaseFor(x); if(!list.length) return;
   const gated=laneGated();
@@ -3724,21 +3746,10 @@ function chasePlay(x,when,lead,only){
        в переигровке. */
     if(gated&&!laneAudible(ly)) continue;                     // заглушённая / молчащая из-за чужого соло — догнанной ноты у неё быть не должно
     if(frzLayer(ly)||frzBufOwns(ly)) continue;                // F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам. A2c: и УСТАРЕВШЕЙ, чей буфер ещё звучит (взведён), — её передаст событиям frzLeave на своём шве; догони мы её здесь, голос открылся бы дважды
-    const hold=!!(s.set&&s.set.a.hold);                       // терменвокс: ведение с hold несёт ЖИВУЮ ступень, а высоту — бенд от ступени АТАКИ
-    const a={...s.on.a, ...(s.set?(s.role==='ld'?s.set.a:noInst(s.set.a)):null)};   // T0-fix: у СОЛО тембр — от последнего ведения (нота переливается живьём, в точке входа звучал он); у баса — от атаки (он печётся на «вкл», ведение его не несёт); у аккорда в chSet тембра нет вовсе
-    const ctx=(s.set&&!hold)?s.set:s.on;
+    const {a,ctx}=chaseNote(s,x);
     if(s.role==='ch'){ ENG.chOn(a,ctx,{when}); curChordDeg=a.deg; curChordOct=a.oct; }
     else if(s.role==='bs') ENG.bassOn(a,ctx,{when});
     else {
-      if(hold){ a.deg=s.on.a.deg; a.oct=s.on.a.oct; }
-      /* Кривая бенда — от момента атаки; догоняем её ОСТАТОК: значение на входе становится точкой dt=0,
-         дальнейшие точки сдвигаются на прошедшее. Без этого глиссандо начиналось бы заново с атаки. */
-      const B=s.on.a.bend;
-      if(B&&B.length){ const off=x-s.on.t; let k=-1;
-        for(let j=0;j<B.length&&B[j].dt<=off;j++) k=j;
-        const nb= k>=0 ? [{dt:0,c:B[k].c}] : [];
-        for(let j=k+1;j<B.length;j++) nb.push({dt:B[j].dt-off,c:B[j].c});
-        a.bend=nb; }
       ENG.leadOff(a,ctx,{when});                              // хвост прошлого прохода в том же владельце (событие у конца скобы) — снять, чтобы догнанная нота встала СВЕЖЕЙ атакой, а не глиссандо из чужой
       ENG.leadOn(a,ctx,{when});
     }
@@ -3832,6 +3843,8 @@ const ldTherm=n=> n.role==='ld' && !!(n.head && n.head.a && n.head.a.bend && n.h
    каждого события; сравнение по ссылке резало бы её на ложные сегменты на каждом ведении. null — нетипизированный аккорд. */
 const tyEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));
 let segView=null;
+/* T4b2: индекс в строе ХРАНИМОГО события; у события без a.ti (после T4a таких нет) — перевод его ступени (тот же, что ставит T4a). */
+const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : eventTuningIndex(ev); };
 function songSegs(){
   const V=songNotes();
   if(segView&&segView.view===V) return segView;
@@ -3849,13 +3862,18 @@ function songSegs(){
       const kind=chaseKind(ev.fn);
       if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }   // «выкл» закрывает последний сегмент
       const a=ev.a||{};
+      /* ⛳ T4b2: СМЕНА ВЫСОТЫ — по ХРАНИМОЙ ПАРЕ (индекс в строе a.ti, регистр a.oct), у аккорда ещё тип по значению; ⛔ НЕ по абсолютной
+         высоте: дубль тоники вверху регистра r и корень регистра r+1 звучат одинаково, но это РАЗНЫЕ записанные пары, и редактор держит
+         их разными нотами (как держал по ступени). В пределах одного вида пара (ti, oct) взаимно однозначна с (ступень, регистр) — ответ
+         прежний; доказательство — проба P.checkLogic (сегменты всей песни против legacySongSegs). */
+      const ti=storedTi(ev);
       const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
-                           (a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));   // U1: тип — ПО ЗНАЧЕНИЮ (tyEq)
+                           (ti!==cur.ti || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));   // U1: тип — ПО ЗНАЧЕНИЮ (tyEq)
       if(kind==='n'||pitchChanged){
         if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
         cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
               first:ev===n.head, start:ev.t, end:null, endBy:'open',
-              deg:a.deg, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
+              deg:a.deg, ti, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T4b2: ti — индекс в строе сегмента (deg остаётся: его читают ряды и рисование редактора до T4b3)   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
         segs.push(cur); byEv.set(ev,cur);
       }else byEv.set(ev,cur);                                                  // ведение громкости/эффектов — ВНУТРИ сегмента
     }
@@ -3866,6 +3884,49 @@ function songSegs(){
   segs.sort((a,b)=>a.start-b.start);
   segView={ view:V, segs, byEv };
   return segView;
+}
+/* ═══ LEGACY (T4b2) — ПРЕЖНЯЯ ЛОГИКА ПО СТУПЕНИ, ТОЛЬКО ДЛЯ ПРОБЫ (P.checkLogic). В приложении их не зовёт никто; уходят в T4c. ═══ */
+/* Сегменты всей песни, как считались до T4b2 (смена высоты — по ступени), без мемо — тот же проход, что songSegs. */
+function legacySongSegs(){
+  const V=songNotes(), segs=[], byEv=new Map();
+  for(const n of V.notes){
+    if(n.role!=='bs'&&n.role!=='ld'&&n.role!=='ch') continue;
+    const therm=ldTherm(n);
+    let cur=null;
+    for(const ev of n.evs){
+      const kind=chaseKind(ev.fn);
+      if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }
+      const a=ev.a||{};
+      const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
+                           (a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));
+      if(kind==='n'||pitchChanged){
+        if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }
+        cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
+              first:ev===n.head, start:ev.t, end:null, endBy:'open',
+              deg:a.deg, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };
+        segs.push(cur); byEv.set(ev,cur);
+      }else byEv.set(ev,cur);
+    }
+    if(cur&&cur.end==null&&n.end!=null){ cur.end=n.end; cur.endBy=n.endBy; }
+  }
+  segs.sort((a,b)=>a.start-b.start);
+  return { segs, byEv };
+}
+/* Нагрузка догнанной ноты, как собиралась до T4b2 (у ноты терменвокса индекс оставался от ведения — см. chaseNote). */
+function legacyChaseNote(s,x){
+  const hold=!!(s.set&&s.set.a.hold);
+  const a={...s.on.a, ...(s.set?(s.role==='ld'?s.set.a:noInst(s.set.a)):null)};
+  const ctx=(s.set&&!hold)?s.set:s.on;
+  if(s.role==='ld'){
+    if(hold){ a.deg=s.on.a.deg; a.oct=s.on.a.oct; }
+    const B=s.on.a.bend;
+    if(B&&B.length){ const off=x-s.on.t; let k=-1;
+      for(let j=0;j<B.length&&B[j].dt<=off;j++) k=j;
+      const nb= k>=0 ? [{dt:0,c:B[k].c}] : [];
+      for(let j=k+1;j<B.length;j++) nb.push({dt:B[j].dt-off,c:B[j].c});
+      a.bend=nb; }
+  }
+  return {a,ctx};
 }
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
    ⚠️ УСЛОВИЯ РАЗВЁРНУТЫ В continue-ветки (было одно длинное &&) РАДИ ЧИТАЕМОСТИ ПОСЛЕ ДОБАВЛЕНИЯ
@@ -4318,7 +4379,7 @@ export {
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
-  laneRoleOf, laneLenOf, eventTuningIndex,   // eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
+  laneRoleOf, laneLenOf, eventTuningIndex, chaseFor, chaseNote, legacyChaseNote, legacySongSegs,   // chaseFor/chaseNote и legacy* (T4b2) — для пробы P.checkLogic; legacy уходят в T4c. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   /* F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не
      писать) · роль события (чья это цепь эффектов) · fxLaneExpand — плавные отрезки ленты, развёрнутые в точки шагом тика (рендер и
