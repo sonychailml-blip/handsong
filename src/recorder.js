@@ -3873,7 +3873,7 @@ function songSegs(){
         if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
         cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
               first:ev===n.head, start:ev.t, end:null, endBy:'open',
-              deg:a.deg, ti, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T4b2: ti — индекс в строе сегмента (deg остаётся: его читают ряды и рисование редактора до T4b3)   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
+              deg:a.deg, ti, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T4b2: ti — индекс в строе сегмента; с T4b3 по нему ряды и рисование редактора (deg читают правка — расшифровка ряда до T5 — и нетипизированный аккорд до T6)   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
         segs.push(cur); byEv.set(ev,cur);
       }else byEv.set(ev,cur);                                                  // ведение громкости/эффектов — ВНУТРИ сегмента
     }

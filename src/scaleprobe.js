@@ -3,6 +3,7 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkRows()      // T4b3: РЯДЫ РЕДАКТОРА по индексу — блоки, попадание, призрак, выделение каждого сегмента песни в осях «Все» и «Лад» + прогон
      P.checkLogic()     // T4b2: ЛОГИКА РЕКОРДЕРА по индексу — сегменты всей песни и нагрузки догонялки на каждой границе событий против прежних
      P.checkSound()     // T4b1: цена ПО ИНДЕКСУ В СТРОЕ (a.ti) против цены по ступени — каждое событие песни и прогон по всем видам
      P.checkTi()        // T4a: у КАЖДОГО события текущей песни индекс в строе (a.ti) равен переводу его ступени — запускать после записи/правки/подложки
@@ -20,10 +21,11 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
+import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
 import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote } from './recorder.js';   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
@@ -299,4 +301,100 @@ export function checkLogic(){
   if(!bad.length && events.length) console.log('[scaleprobe T4b2] segments and chased notes are identical when read from the tuning index');
   else if(!events.length) console.log('[scaleprobe T4b2] the song is empty — record, load a backing or edit, then run again');
   return { events:events.length, segments:S.segs.length, chase:nChase, differences:bad };
+}
+
+/* ═══ T4b3: РЯДЫ И РИСОВАНИЕ РЕДАКТОРА ЧИТАЮТ ИНДЕКС В СТРОЕ ═══
+   Работает БЕЗ открытого редактора: ось строится для каждого вида (draw.rollRowsProbe.axis), обе оси — «Все» и «Лад».
+   1) ПЕСНЯ: каждый сегмент каждой дорожки (соло, бас, аккорды), сгруппированный, как группирует редактор (дорожка, роль, ССЫЛКА на вид):
+      • высота оси аккордов (rollChordTotal — сколько рядов) — путь индекса против прежнего;
+      • РЯД КОРНЯ (он же ряд блока баса/соло и rootRow попадания) и КАЖДАЯ нота блока — ряд и отступление в центах (по нему блок
+        рисуется «вне ряда», им же решается выделение-контур) — путь индекса против прежнего;
+      • ПОПАДАНИЕ: палец на ряду каждой ноты, на ряду корня и в ±0.3/±0.49 ряда от них — какую ноту берёт (номер) и на каком расстоянии;
+      • ПРИЗРАК переноса целого аккорда: для КАЖДОГО яркого ряда оси — ноты сегмента, поставленного туда (путь индекса: с индексом, который
+        поставит правка; прежний: только ступень и регистр);
+      • выделение одной ноты и её призрак берут ряды из того же списка нот — сверены выше.
+      Полоса «в ноте» (громкость, яркость …) строится из величин и времени нот — ни ступени, ни ряда не читает; сверять там нечего.
+   2) ПРОГОН: каждый вид × обе оси × регистры 0..3 × ступени 0..n — ряд из ступени (rowOf) против ряда из индекса (rowOfTi от tuningIndexOf
+      по закону мелодии/баса и по закону аккорда); и ряды нот аккорда (корень и каждая нота) для каждого типа лада, без типа (септаккорд
+      выкл/вкл) и единицы корня — путь индекса против прежнего.
+   Кэш частот рядов аккордов сбрасывается перед каждым расчётом, который его заполняет (RP.reset), — оба пути считаются при одном его
+   состоянии. Сравнение ===. Принимается ТОЛЬКО при нуле. Ничего не меняет. */
+export function checkRows(){
+  const bad=[]; let nBad=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const cmpNotes=(at,N,O)=>{
+    if(N.length!==O.length){ miss(`${at}: ${N.length} blocks new, ${O.length} legacy`); return; }
+    for(let i=0;i<N.length;i++) if(N[i].r!==O[i].r||N[i].dev!==O[i].dev) miss(`${at} note ${i}: row ${N[i].r} dev ${N[i].dev} new, row ${O[i].r} dev ${O[i].dev} legacy`);
+  };
+  const VIEWS=[['all',true],['mode',false]];
+  // ---- 1) песня ----
+  const S=songSegs(), groups=[];
+  for(const g of S.segs){
+    if(g.role!=='ld'&&g.role!=='bs'&&g.role!=='ch') continue;
+    let G=groups.find(q=>q.layer===g.layer&&q.role===g.role&&q.sc===g.sc);   // ССЫЛКА на вид, не имя — как rollGroups
+    if(!G){ G={ layer:g.layer, role:g.role, sc:g.sc, segs:[] }; groups.push(G); }
+    G.segs.push(g);
+  }
+  let nSeg=0, nBlk=0, nHit=0, nGhost=0;
+  for(const G of groups) for(const [vn,all] of VIEWS){
+    const ax=RP.axis(G.sc,all), tag=`L${G.layer+1} ${G.role} in ${G.sc&&G.sc.id} [${vn}]`;
+    let total=REG_N*ax.rpp;
+    if(G.role==='ch'){
+      RP.reset(); const tN=RP.total(G,ax,RP.notes,RP.root);
+      RP.reset(); const tL=RP.total(G,ax,RP.legacyNotes,RP.legacyRoot);
+      if(tN!==tL) miss(`${tag}: chord axis has ${tN} rows new, ${tL} legacy`);
+      total=tL;
+    }
+    RP.reset();
+    for(const g of G.segs){
+      nSeg++; const at=`${tag} segment at beat ${Math.round(g.start*1000)/1000} (degree ${g.deg} ti ${g.ti} reg ${g.oct})`;
+      const rN=RP.root(g,ax), rL=RP.legacyRoot(g,ax);
+      if(rN!==rL) miss(`${at}: root row ${rN} new, ${rL} legacy`);
+      const N=RP.notes(g,ax,total), O=RP.legacyNotes(g,ax,total); nBlk+=O.length;
+      cmpNotes(at,N,O);
+      if(N.length===O.length){
+        const probes=[rL]; for(const x of O) probes.push(x.r);
+        for(const r0 of probes) for(const d of [0,-0.3,0.3,-0.49,0.49]){
+          nHit++; const pN=RP.pick(N,r0+d), pL=RP.pick(O,r0+d);
+          if(pN.ni!==pL.ni||pN.dr!==pL.dr) miss(`${at}: finger at row ${r0+d} takes note ${pN.ni} (distance ${pN.dr}) new, note ${pL.ni} (${pL.dr}) legacy`);
+        }
+      }
+      if(g.role==='ch') for(let r=0;r<total;r++){
+        const pit=ax.pitchOf(r); if(!pit) continue;
+        nGhost++; cmpNotes(`${at} ghost on row ${r}`, RP.notes(RP.ghost(g,pit),ax,total), RP.legacyNotes(RP.legacyGhost(g,pit),ax,total));
+      }
+    }
+  }
+  console.log(`[scaleprobe T4b3] song: segments ${nSeg} × 2 views · blocks ${nBlk} · hit-tests ${nHit} · ghost placements ${nGhost} · differences ${nBad}`);
+  const songBad=nBad;
+  // ---- 2) прогон по видам ----
+  let nRow=0, nTone=0;
+  for(const [sc0,tf] of allViews()){
+    const v=scaleView(sc0,tf), n=v.iv.length, id=v.id+(v.tunable?`[from ${tf}]`:'');
+    const tys=[[null,false],[null,true],[chordUnit(v),false]];
+    for(const f of chordFams(v)) for(const ty of f.types) tys.push([ty.iv,false]);
+    for(const [vn,all] of VIEWS){
+      const ax=RP.axis(v,all), total=2*REG_N*ax.rpp;
+      RP.reset();
+      for(let o=0;o<4;o++) for(let d=0;d<=n;d++){
+        const want=ax.rowOf(d,o), at=`${id} [${vn}] degree ${d} reg ${o}`;
+        nRow++; { const got=ax.rowOfTi(tuningIndexOf(d,v,false),o); if(got!==want) miss(`${at}: melody/bass row from ti ${got}, from degree ${want}`); }
+        nRow++; { const got=ax.rowOfTi(tuningIndexOf(d,v,true),o); if(got!==want) miss(`${at}: chord-root row from ti ${got}, from degree ${want}`); }
+        for(const [ty,sev] of tys){
+          const g={ role:'ch', deg:d, oct:o, ti:tuningIndexOf(d,v,true), sc:v, sev, ty };
+          nTone++; const rN=RP.root(g,ax), rL=RP.legacyRoot(g,ax);
+          const tt=`${at} chord ${ty?'['+ty.join(',')+']':'none'}${sev?' 7th':''}`;
+          if(rN!==rL) miss(`${tt}: root row ${rN} new, ${rL} legacy`);
+          cmpNotes(tt, RP.notes(g,ax,total), RP.legacyNotes(g,ax,total));
+        }
+      }
+    }
+  }
+  console.log(`[scaleprobe T4b3] sweep: rows ${nRow} · chord placements ${nTone} (every view, both views of the axis, registers 0..3, degrees 0..n) · differences ${nBad-songBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4b3] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe T4b3] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`);
+  if(!nBad && nSeg) console.log('[scaleprobe T4b3] every row, block, hit-test and ghost is identical when read from the tuning index');
+  else if(!nSeg) console.log('[scaleprobe T4b3] the song has no pitched segments — record, load a backing or edit, then run again (the sweep above still ran)');
+  RP.reset();
+  return { segments:nSeg, blocks:nBlk, hits:nHit, ghosts:nGhost, rows:nRow, chords:nTone, total:nBad, differences:bad };
 }

@@ -1029,15 +1029,25 @@ export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAn
    ⛔ ОСТАЛИСЬ НА СТУПЕНИ (ty нет): терцовая стопка (ступени i, i+2, i+4 — их даёт ЛАД, индекс строя без лада их не знает), пауэр-аккорд и
    округлённые отношения 19/31-TET (правила chordSteps по tag) и номинально-равная цена нетипизированного аккорда центового лада —
    это «правила аккордов как данные», T6. ti===undefined — тоже по ступени (событие без индекса; вызывающий отмечает это). */
+/* T4b3: ВОРОТА «аккорд читает индекс корня» — ОДНИ на цену (chordNotesAt) и на ряды редактора (draw: ряд корня и ноты аккорда берутся из
+   индекса ровно там, где из него звучат). Ложь — путь ступени: нет индекса, нет типа (стопка терций, пауэр-аккорд — T6) или строй без ветки
+   по индексу (таблица без центов лада — таких ладов нет). */
+export function chordReadsTi(ti, s=CUR(), ty=null){
+  return ti!==undefined && !!ty && (!!s.cents || periodOf(s)!==2 || TUNINGS[s.tuning].equal!=null);
+}
 export function chordNotesAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){
-  if(ti===undefined || !ty) return chordNotes(deg,oct,s,sev,ty);
+  if(!chordReadsTi(ti,s,ty)) return chordNotes(deg,oct,s,sev,ty);
   const T=TUNINGS[s.tuning], E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
   if (s.cents && s.gridChords){ const a=modeAnchor(s);
     return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
   if (s.cents || periodOf(s)!==2){ const a=modeAnchor(s), rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);
     return ty.map(ra=>({ f:rootF*ra, iv:ra })); }
-  if (T.equal==null) return chordNotes(deg,oct,s,sev,ty);
   return ty.map(iv=>({ f: pitchHz(T,baseF()/2,0,ti+iv,oct), iv }));   // равная ветка, типизированный путь chordSteps: шаг корня (= ti, неприведённый) + интервал, регистр oct
+}
+/* T4b3: частота РЯДА корня из индекса — chordRowFreq по индексу (та же единица корня chordUnit, та же цена chordNotesAt). Проба T4b1
+   (прогон с типом chordUnit) — она побитно равна chordRowFreq по ступени. Зовёт редактор у аккорда, читающего индекс (chordReadsTi). */
+export function chordRowFreqAt(deg,ti,oct, s=CUR(), sev=seventh){
+  return chordNotesAt(deg,ti,oct,s,sev, chordUnit(s))[0].f;
 }
 export function chordFreqsAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(deg,ti,oct,s,sev,ty).map(n=>n.f); }
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
