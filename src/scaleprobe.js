@@ -3,6 +3,8 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkHl()        // T4b4: ПОДСВЕТКА переигранной и догнанной ноты по индексу — прогон по видам, события песни, догонялка; высоты вне лада
+     P.checkRowFix()    // T4b4-1: нижний ряд по умолчанию в обеих осях и ряды нот аккорда при холодном и прогретом кэше (видимая правка)
      P.checkRows()      // T4b3: РЯДЫ РЕДАКТОРА по индексу — блоки, попадание, призрак, выделение каждого сегмента песни в осях «Все» и «Лад» + прогон
      P.checkLogic()     // T4b2: ЛОГИКА РЕКОРДЕРА по индексу — сегменты всей песни и нагрузки догонялки на каждой границе событий против прежних
      P.checkSound()     // T4b1: цена ПО ИНДЕКСУ В СТРОЕ (a.ti) против цены по ступени — каждое событие песни и прогон по всем видам
@@ -21,12 +23,12 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
 import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote } from './recorder.js';   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
+import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -397,4 +399,94 @@ export function checkRows(){
   else if(!nSeg) console.log('[scaleprobe T4b3] the song has no pitched segments — record, load a backing or edit, then run again (the sweep above still ran)');
   RP.reset();
   return { segments:nSeg, blocks:nBlk, hits:nHit, ghosts:nGhost, rows:nRow, chords:nTone, total:nBad, differences:bad };
+}
+
+/* ═══ T4b4-1: ДВЕ ПРАВКИ РЯДОВ РЕДАКТОРА (ВИДИМЫЕ) ═══
+   1) НИЖНИЙ РЯД ПО УМОЛЧАНИЮ (draw.rollDefaultRow0For): каждый вид × обе оси × регистр 0..3 × несколько высот окна — ряд корня регистра
+      reg·rpp ВИДЕН в окне [row0, row0+rows); у оси «Лад» row0 равен прежней формуле (iv.length+1 рядов на регистр); у оси «Все» печатается,
+      во скольких случаях прежняя формула открыла бы не тот регистр (это и есть правка).
+   2) РЯДЫ НОТ АККОРДА НЕ ЗАВИСЯТ ОТ ИСТОРИИ КЭША: каждый вид × обе оси × ступень 0..n × регистр 0..3 × каждый тип лада, без типа и
+      единица корня — ряды и отступления нот при ХОЛОДНОМ кэше против прогретого ДРУГИМ вызывающим (ось втрое длиннее), ===. */
+export function checkRowFix(){
+  const bad=[]; let nBad=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const VIEWS=[['all',true],['mode',false]];
+  let nDef=0, nOld=0, nCache=0;
+  for(const [sc0,tf] of allViews()){
+    const v=scaleView(sc0,tf), n=v.iv.length, id=v.id+(v.tunable?`[from ${tf}]`:'');
+    const tys=[[null,false],[null,true],[chordUnit(v),false]];
+    for(const f of chordFams(v)) for(const ty of f.types) tys.push([ty.iv,false]);
+    for(const [vn,all] of VIEWS){
+      const ax=RP.axis(v,all), rpp=ax.rpp, T=REG_N*rpp;
+      // ---- 1) нижний ряд по умолчанию ----
+      for(let reg=0; reg<REG_N; reg++) for(const rows of [1,5,8,rpp,2*rpp,T,T+3]){
+        nDef++; const r0=RP.defRow0(v,reg,rows,ax), at=`${id} [${vn}] register ${reg} window ${rows} rows`;
+        if(!(r0>=0 && reg*rpp>=r0 && reg*rpp<r0+rows)) miss(`${at}: bottom row ${r0} does not show register ${reg} (its root row ${reg*rpp})`);
+        const old=Math.max(0, Math.min(reg*(n+1), 4*(n+1)-rows));
+        if(!all||rpp===n+1){ if(r0!==old) miss(`${at}: bottom row ${r0}, the old formula gives ${old} (they must agree where rows per register = degrees + 1)`); }
+        else if(!(old>=0 && reg*rpp>=old && reg*rpp<old+rows)) nOld++;
+      }
+      // ---- 2) кэш частот рядов ----
+      const segs=[];
+      for(let o=0;o<REG_N;o++) for(let d=0;d<=n;d++) for(const [ty,sev] of tys) segs.push({ role:'ch', deg:d, oct:o, ti:tuningIndexOf(d,v,true), sc:v, sev, ty });
+      RP.reset(); const cold=segs.map(g=>RP.notes(g,ax,T));
+      RP.reset(); RP.notes(segs[0],ax,3*T);                    // прогрев ДРУГИМ вызывающим: таблица втрое длиннее оси
+      for(let i=0;i<segs.length;i++){ nCache++; const g=segs[i], W=RP.notes(g,ax,T), C=cold[i];
+        const at=`${id} [${vn}] chord degree ${g.deg} reg ${g.oct} ${g.ty?'['+g.ty.join(',')+']':'none'}${g.sev?' 7th':''}`;
+        if(W.length!==C.length){ miss(`${at}: ${W.length} notes warm, ${C.length} cold`); continue; }
+        for(let k=0;k<W.length;k++) if(W[k].r!==C[k].r||W[k].dev!==C[k].dev) miss(`${at} note ${k}: row ${W[k].r} dev ${W[k].dev} with a warm cache, row ${C[k].r} dev ${C[k].dev} cold`); }
+    }
+  }
+  RP.reset();
+  console.log(`[scaleprobe T4b4-1] default bottom row: ${nDef} cases (in "All", the old formula would have opened the wrong register in ${nOld}) · chord rows cold vs warm cache: ${nCache} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4b4-1] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe T4b4-1] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`);
+  if(!nBad) console.log('[scaleprobe T4b4-1] the roll opens on the live register in both views, and chord rows no longer depend on cache history');
+  return { defaults:nDef, oldWrong:nOld, cache:nCache, total:nBad, differences:bad };
+}
+
+/* ═══ T4b4: ПОДСВЕТКА ЧИТАЕТ ИНДЕКС В СТРОЕ ═══
+   Без рук и без редактора. Место подсветки переигранной/догнанной ноты — recorder.hlOf (индекс → обратная выборка лада) против прежнего
+   legacyHlOf (ступень и регистр события), сравнение ===:
+   1) ПРОГОН: каждый вид × закон аккорда и закон мелодии/баса × ступень 0..n × регистр 0..3;
+   2) ВЫСОТЫ ВНЕ ЛАДА: у видов, чей лад меньше строя, — каждая высота строя без ступени лада, в регистрах 0..3 и через перенос периода —
+      обязана дать «нет места» (null), не бросив;
+   3) КАЖДОЕ событие песни (соло, бас, аккорды — «вкл» и «ведение»);
+   4) ДОГОНЯЛКА на каждой границе событий: нагрузка chaseNote против legacyChaseNote.
+   Живые подсветки (ступень жеста в реестрах leadHold/bassHold, защёлка latchDeg, ярлыки рук) не менялись — сравнивать там нечего. */
+export function checkHl(){
+  const bad=[]; let nBad=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const same=(N,O)=> !!N && !!O && N.deg===O.deg && N.oct===O.oct;
+  const show=p=> p ? `${p.deg}/${p.oct}` : 'none';
+  let nSweep=0, nOut=0;
+  for(const [sc0,tf] of allViews()){
+    const v=scaleView(sc0,tf), n=v.iv.length, id=v.id+(v.tunable?`[from ${tf}]`:'');
+    for(const chord of [true,false]) for(let o=0;o<REG_N;o++) for(let d=0;d<=n;d++){
+      nSweep++; const a={ deg:d, oct:o, ti:tuningIndexOf(d,v,chord) }, N=hlOf(a,v), O=legacyHlOf(a);
+      if(!same(N,O)) miss(`${id} ${chord?'chord':'melody'} degree ${d} reg ${o}: from ti ${show(N)}, legacy ${show(O)}`);
+    }
+    const T=TUNINGS[v.tuning], E=T.equal!=null?T.equal:T.cents.length, inMode=new Set(v.sel.map(k=>k-v.root));
+    if(v.sel.length<E) for(let j=0;j<E;j++){ if(inMode.has(j)) continue;
+      for(let o=0;o<REG_N;o++) for(const c of [0,1,-1]){ nOut++;
+        let p; try{ p=modeSlotOfTi(v.root+j+E*c,o,v); }catch(e){ miss(`${id} pitch ${j} reg ${o}: threw ${e&&e.message}`); continue; }
+        if(p!==null) miss(`${id} out-of-mode pitch ${j} (+${c} period) reg ${o}: gave a slot ${show(p)}`); } }
+  }
+  let nEv=0;
+  for(const e of events){
+    const a=e.a; if(!a || typeof a.deg!=='number' || !e.sc || !/^(lead|bass|ch)(On|Set)$/.test(e.fn)) continue;
+    nEv++; const N=hlOf(a,e.sc), O=legacyHlOf(a);
+    if(!same(N,O)) miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}: from ti ${show(N)}, legacy ${show(O)} (ti ${a.ti})`);
+  }
+  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q); let nChase=0;
+  for(const x of X) for(const sct of chaseFor(x)){
+    nChase++; const Nn=chaseNote(sct,x), Oo=legacyChaseNote(sct,x), N=hlOf(Nn.a,Nn.ctx.sc), O=legacyHlOf(Oo.a);
+    if(!same(N,O)) miss(`chase at beat ${Math.round(x*1000)/1000}: L${sct.on.layer+1} ${sct.role}: from ti ${show(N)}, legacy ${show(O)}`);
+  }
+  console.log(`[scaleprobe T4b4] sweep ${nSweep} · out-of-mode pitches ${nOut} (no slot, none threw) · song events ${nEv} · chase checks ${nChase} at ${X.length} beats · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4b4] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe T4b4] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`);
+  if(!nBad && nEv) console.log('[scaleprobe T4b4] every replayed and chased highlight is identical when read from the tuning index');
+  else if(!nEv) console.log('[scaleprobe T4b4] the song has no pitched events — record, load a backing or edit, then run again (the sweep above still ran)');
+  return { sweep:nSweep, outOfMode:nOut, events:nEv, chase:nChase, total:nBad, differences:bad };
 }

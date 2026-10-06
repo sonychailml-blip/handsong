@@ -1049,6 +1049,24 @@ export function chordNotesAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){
 export function chordRowFreqAt(deg,ti,oct, s=CUR(), sev=seventh){
   return chordNotesAt(deg,ti,oct,s,sev, chordUnit(s))[0].f;
 }
+/* ⛳ T4b4: ОБРАТНАЯ ВЫБОРКА ЛАДА — индекс в строе (a.ti) и регистр → МЕСТО В ЛАДУ { deg, oct } для ПОДСВЕТКИ, или null — этой высоты
+   в ладу нет. Обращает tuningIndexOf тем же законом расщепления, что ряд редактора (draw: rowOfTi) и мелодия в цене (melodySplit):
+   сдвиг над корнем j = ti − root, вне [0, E] — приведение целым периодом с переносом в регистр; j = E — ДУБЛЬ тоники наверху регистра
+   (ступень n того же регистра: так её пишут и мелодия, и аккорд), j = 0 — корень регистра. Для ступеней 0..n (их только и пишут пути
+   записи) это ровно та же пара (ступень, регистр), что лежит в событии — проба P.checkHl. Высота вне лада (её до T5 не пишет никто) —
+   null: подсвечивать нечего, ничего не бросает. Таблица «сдвиг → ступень» — одна на вид (виды стабильны, T2), разбор — арифметика. */
+const SEL_INV=new WeakMap();
+export function modeSlotOfTi(ti, oct, s=CUR()){
+  if(typeof ti!=='number' || !s || !s.sel) return null;
+  let m=SEL_INV.get(s);
+  if(!m){ const T=TUNINGS[s.tuning], n=s.iv.length; m={ E:tSize(T), root:s.root, j:new Map() };
+    for(let d=0; d<=n; d++) m.j.set(degK(s,d,T)-s.root, d);
+    SEL_INV.set(s,m); }
+  let j=ti-m.root, c=0;
+  if(j<0 || j>m.E){ c = j>m.E ? Math.ceil((j-m.E)/m.E) : Math.floor(j/m.E); j-=m.E*c; }
+  const d=m.j.get(j); if(d===undefined) return null;
+  return { deg:d, oct: c ? oct+c : oct };
+}
 export function chordFreqsAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(deg,ti,oct,s,sev,ty).map(n=>n.f); }
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
 export function leadFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);

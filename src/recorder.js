@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -234,6 +234,17 @@ let takeFxLast=null;
 let takeFxOrder=null;
 const FX_CHAIN='#chain';   // ⚠️ ЗАРЕЗЕРВИРОВАННЫЙ id записи состава. Решётка не может встретиться в настоящем fxId (те — идентификаторы), поэтому столкнуться не с чем
 let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГИСТР аккорда, что играет петля сейчас (для подсветки, §Q5). Регистр нужен с многопериодной сеткой: одна ступень живёт в нескольких прямоугольниках, без него подсветка всегда падала бы в нижний
+/* ⛳ T4b4: МЕСТО ПОДСВЕТКИ ПЕРЕИГРАННОЙ/ДОГНАННОЙ НОТЫ — ИЗ ИНДЕКСА В СТРОЕ (a.ti) и регистра, обратной выборкой лада (scales.
+   modeSlotOfTi) в ЛАДУ СОБЫТИЯ (sc — его замороженный вид). { deg, oct } или null — высоты нет в ладу (до T5 такой ноты нет): тогда
+   подсветки нет, и ничего не бросает. Событие без индекса — по ступени (запасной путь, уходит в T4c). Для ступеней 0..n ответ —
+   ровно пара события (проба P.checkHl). Зовётся на СОБЫТИЕ аккорда (планировщик, догонялка), не на кадр: кадр читает два числа. */
+function hlOf(a,sc){
+  if(typeof a.ti==='number') return modeSlotOfTi(a.ti, a.oct, sc);
+  return { deg:a.deg, oct:a.oct };
+}
+/* LEGACY (T4b4) — прежнее место подсветки ПО СТУПЕНИ, слово в слово. ⛔ Читает ТОЛЬКО проба (P.checkHl); уходит в T4c. */
+const legacyHlOf=a=>({ deg:a.deg, oct:a.oct });
+const setLoopChordHl=(a,sc)=>{ const p=hlOf(a,sc); curChordDeg= p ? p.deg : -1; curChordOct= p ? p.oct : 0; };
 /* ⛳ ДЛИНА ПЕСНИ — ВЫВОДИМАЯ, а не заданная: это позиция последнего события. Раньше длину задавал
    человек (loop.bars, 1..8), потому что от неё зависел заворот; заворота нет, и задавать нечего —
    песня ровно такая, сколько в неё записали.
@@ -3588,7 +3599,7 @@ function scheduleLayers(){
       if(ev.t>=lo){
         const when=loop.t0+(ev.t+off)*spb;                  // ТОЧНОЕ время: песенная доля события + сдвиг прохода
         ENG[ev.fn](ev.a,ev,{when});                         // ev несёт замороженный лад (§3.4). {when} ИМЕНОВАННО (S2): позиционный третий аргумент раньше значил у разных записей разное — см. шапку ENG
-        if(ev.fn==='chOn'||ev.fn==='chSet'){ curChordDeg=ev.a.deg; curChordOct=ev.a.oct; }   // подсветка ведёт на опережение (~до окна) — косметика; регистр лежит в том же событии
+        if(ev.fn==='chOn'||ev.fn==='chSet') setLoopChordHl(ev.a,ev.sc);   // T4b4: место — из индекса в строе (hlOf). Подсветка ведёт на опережение (~до окна) — косметика; регистр лежит в том же событии
         else if(ev.fn==='chOff')curChordDeg=-1;
       }
     }
@@ -3747,7 +3758,7 @@ function chasePlay(x,when,lead,only){
     if(gated&&!laneAudible(ly)) continue;                     // заглушённая / молчащая из-за чужого соло — догнанной ноты у неё быть не должно
     if(frzLayer(ly)||frzBufOwns(ly)) continue;                // F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам. A2c: и УСТАРЕВШЕЙ, чей буфер ещё звучит (взведён), — её передаст событиям frzLeave на своём шве; догони мы её здесь, голос открылся бы дважды
     const {a,ctx}=chaseNote(s,x);
-    if(s.role==='ch'){ ENG.chOn(a,ctx,{when}); curChordDeg=a.deg; curChordOct=a.oct; }
+    if(s.role==='ch'){ ENG.chOn(a,ctx,{when}); setLoopChordHl(a,ctx.sc); }   // T4b4: подсветка — из индекса (hlOf)
     else if(s.role==='bs') ENG.bassOn(a,ctx,{when});
     else {
       ENG.leadOff(a,ctx,{when});                              // хвост прошлого прохода в том же владельце (событие у конца скобы) — снять, чтобы догнанная нота встала СВЕЖЕЙ атакой, а не глиссандо из чужой
@@ -4379,6 +4390,7 @@ export {
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
+  hlOf, legacyHlOf,   // T4b4: место подсветки переигранной ноты из индекса и прежнее по ступени — для пробы P.checkHl; legacy уходит в T4c
   laneRoleOf, laneLenOf, eventTuningIndex, chaseFor, chaseNote, legacyChaseNote, legacySongSegs,   // chaseFor/chaseNote и legacy* (T4b2) — для пробы P.checkLogic; legacy уходят в T4c. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   /* F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не

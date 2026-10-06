@@ -913,8 +913,12 @@ function chRowFreqs(ax,sev,total){
    пауэр-аккорда пентатоники ложится на приглушённый ряд, без «−100». У оси «Лад» ряды — ступени лада (прежний вид в точности), и там
    «между рядами» по-прежнему значит «вне ступеней лада». Мера — всегда сам строй/лад, ⛔ никогда не равномерная темперация. Знак:
    «+» — нота выше ряда, «−» — ниже. null — нота на ряду (в пределах ROLL_ON_ROW_CENTS) или вне таблицы. */
-function chRowOfFreq(f,F,dpo){
-  const ct=(a,b)=>1200*Math.log2(a/b), n=F.length;
+/* ⛳ T4b4-1: ДЛИНА ОСИ — АРГУМЕНТ (n = total), а не длина таблицы. Кэш chRowFreqs отдаёт таблицу ДЛИНОЙ НЕ МЕНЬШЕ total — какой её
+   заполнил прежний вызывающий (рост оси в rollChordTotal просит больше), и у верхней кромки ответ зависел от ИСТОРИИ кэша: нота выше
+   последнего ряда получала то «за краем» (r = n), то дробный ряд по лишним строкам таблицы. Теперь читаются только ряды [0, total) —
+   их значения от истории не зависят (ряд r — функция оси, тоники и A4), — и ответ один при холодном и прогретом кэше (проба P.checkRowFix). */
+function chRowOfFreq(f,F,dpo,total){
+  const ct=(a,b)=>1200*Math.log2(a/b), n=Math.min(total,F.length);
   if(!(f>0)||!n) return { r:-1, dev:null };
   let lo=-1, hi=n-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m]<=f*(1+1e-12)) lo=m; else hi=m-1; }   // последний ряд, чья частота ≤ f (у дубля тоники и тоники следующего регистра частота одна — берётся тоника регистра)
   const skipDup=r=> (r%dpo===dpo-1 && r+1<n && Math.abs(ct(F[r+1],F[r]))<1e-6) ? r+1 : r;
@@ -952,7 +956,7 @@ function rollSegNotes(s,ax,total){
   const N= byTi ? chordNotesAt(s.deg,s.ti,s.oct,s.sc,s.sev,s.ty) : chordNotes(s.deg,s.oct,s.sc,s.sev,s.ty);
   const F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;
   const fr= byTi ? chordRowFreqAt(s.deg,s.ti,s.oct,s.sc,s.sev) : chordRowFreq(s.deg,s.oct,s.sc,s.sev);
-  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo));
+  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
 }
 const rollSegRows=(s,ax,total)=>rollSegNotes(s,ax,total).map(x=>x.r);
 /* T4b3: СЕГМЕНТ-ПРИЗРАК переноса аккорда на ряд pit — ТА ЖЕ пара, что окажется в песне после правки: ступень и регистр ряда (расшифровка
@@ -969,7 +973,7 @@ function legacyRollSegNotes(s,ax,total){
   if(s.role!=='ch') return [{ r:r0, dev:null }];
   const N=chordNotes(s.deg,s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;
   const fr=chordRowFreq(s.deg,s.oct,s.sc,s.sev);
-  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo));
+  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
 }
 const legacyRollGhostSeg=(s,pit)=>({ ...s, deg:pit.deg, oct:pit.oct });
 /* ⛳ СКОЛЬКО РЯДОВ У ОСИ АККОРДОВ (U2) — ПО САМОЙ ДОРОЖКЕ, чтобы ни одна нота не упала за край (правило #9: число в снимке, его
@@ -1713,16 +1717,23 @@ export function rollAxisHasDim(){
   const grp=rollGroups(), G=grp&&grp.length?grp[Math.min(rollScale,grp.length-1)]:null;
   return axisHasDim(G?G.sc:CUR());
 }
+/* ⛳ T4b4-1: НИЖНИЙ ВИДИМЫЙ РЯД ПО УМОЛЧАНИЮ — окно на РЕГИСТР reg (липкий регистр роли), из РЯДОВ НА РЕГИСТР ОСИ (ax.rpp), а не из
+   iv.length+1: у оси «Все» рядов в регистре больше (вся высота строя), и прежняя формула открывала ролл не на том регистре (с T3).
+   Ось — та же, что нарисует кадр (rollAxis вида и текущий «Все/Лад»). Окно не уходит выше верха обычной оси (REG_N регистров). */
+export function rollDefaultRow0For(sc, reg, rows, ax=rollAxis(sc)){
+  const dpo=ax.rpp, r=Math.max(0,Math.min(REG_N-1,reg|0));
+  return Math.max(0, Math.min(r*dpo, REG_N*dpo-rows));
+}
 /* T3: ближайший ЯРКИЙ ряд (ступень лада) к ряду r оси снимка — правка, вставка и призрак прилипают к нему до T5. */
 export function rollSnapRow(r){ const V=rollView; return (V&&V.axis) ? V.axis.snap(r) : r; }
 /* T3: ЦЕЛЕВОЙ РЯД КОРНЯ при переносе целого сегмента: ряд корня + сдвиг пальца (ряд пальца − ряд, где взялся), прилипший к яркому ряду.
    ОДНА формула на призрак (draw) и на правку (ui) — правило #9. У баса ряд корня = ряд, где взялся, — целевой ряд = ряд пальца. */
 export function rollDragTargetRow(d){ return rollSnapRow(d.rootRow+((d.row|0)-d.grabRow)); }
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (scaleprobe P.checkRows, T4b3): пути рядов редактора — новый (по индексу) и прежний (legacy, по ступени) — без
-   открытого редактора. reset — сброс кэша частот рядов аккордов перед каждым расчётом, чтобы оба пути считались при ОДНОМ его состоянии
-   (длина таблицы частот зависит от того, кто спросил раньше). Уходит вместе с legacy в T4c. */
+   открытого редактора. reset — сброс кэша частот рядов аккордов (с T4b4-1 ответ от истории кэша не зависит — проба это и проверяет:
+   холодный кэш против прогретого). defRow0 — нижний видимый ряд по умолчанию (T4b4-1). Legacy уходят в T4c. */
 export const rollRowsProbe={ axis:rollAxis, root:rollSegRoot, notes:rollSegNotes, total:chordTotalWith, pick:rollSegPick, ghost:rollGhostSeg,
-  legacyRoot:legacyRollSegRoot, legacyNotes:legacyRollSegNotes, legacyGhost:legacyRollGhostSeg,
+  legacyRoot:legacyRollSegRoot, legacyNotes:legacyRollSegNotes, legacyGhost:legacyRollGhostSeg, defRow0:rollDefaultRow0For,
   reset:()=>{ chRowCache={ key:null, F:null }; } };
 /* ⛳ ЕДИНСТВЕННАЯ РАЗВИЛКА «ИГРА ИЛИ РЕДАКТОР». Закрыт редактор — ветка та же, что была всегда. */
 function drawOverlays(res){ if(rollOpen){ drawRoll(); return; } drawPhone(res); }
