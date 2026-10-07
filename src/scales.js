@@ -76,89 +76,98 @@ const TBL={
   vallotti:[0,94.13,196.09,298.04,392.18,501.96,592.18,698.04,796.09,894.13,1000,1090.22],
   kirnberger3:[0,90.22,193.16,294.13,386.31,498.04,590.22,696.58,792.18,889.74,996.09,1088.27],
 };
+/* ⛳ T6a: chordRule — ПРАВИЛО НЕТИПИЗИРОВАННОГО АККОРДА ЛАДА, ДАННЫМИ (как id и tuning в T0). Каким будет аккорд, когда тип ему не задан:
+     {kind:'tertian'} — стопка терций по выборке лада (через ступень: i, i+2, i+4, +6 у септаккорда); диатоника, этнические и симметричные,
+                        макамы (у тех аккордов нет — noChords — и правило 'none' важнее);
+     {kind:'power'}   — корень + квинта строя + период (пентатоники, блюз);
+     {kind:'ratios', triad, seventh} — интервалы ОТНОШЕНИЯМИ, округлёнными к шагу строя (19/31-TET; сюда переехали прежние поля chord/chord7);
+     {kind:'palette'} — у лада ПАЛИТРА (typedChords) и своего нетипизированного правила нет: аккорд без типа здесь не пишется ни одним путём;
+     {kind:'none'}    — аккордов нет (noChords).
+   ⚠️ В T6a это ТОЛЬКО ДАННЫЕ: цену и подписи по-прежнему решают chordSteps/chordLabel по tag (T6b/T6c переведут их на правило). Каждое
+   значение обязано совпасть с сегодняшним выбором по tag — проба P.checkRules. Правило едет в вид лада (scaleView копирует поля). */
 export const SCALES=[
- {id:'major', tuning:'edo12', name:{en:'Major (Ionian)', ru:'Мажор (ионийский)'},            trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,9,11], tag:'dia'},
- {id:'natural-minor', tuning:'edo12', name:{en:'Natural minor (Aeolian)', ru:'Минор натуральный (эолийский)'},trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,8,10], tag:'dia'},
- {id:'harmonic-minor', tuning:'edo12', name:{en:'Harmonic minor', ru:'Гармонический минор'},          trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,8,11], tag:'dia'},
- {id:'melodic-minor', tuning:'edo12', name:{en:'Melodic minor', ru:'Мелодический минор'},           trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,9,11], tag:'dia'},
- {id:'dorian', tuning:'edo12', name:{en:'Dorian', ru:'Дорийский'},                    trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,3,5,7,9,10], tag:'dia'},
- {id:'phrygian', tuning:'edo12', name:{en:'Phrygian', ru:'Фригийский'},                   trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,1,3,5,7,8,10], tag:'dia'},
- {id:'lydian', tuning:'edo12', name:{en:'Lydian', ru:'Лидийский'},                    trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,4,6,7,9,11], tag:'dia'},
- {id:'mixolydian', tuning:'edo12', name:{en:'Mixolydian', ru:'Миксолидийский'},               trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,4,5,7,9,10], tag:'dia'},
- {id:'locrian', tuning:'edo12', name:{en:'Locrian', ru:'Локрийский'},                   trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,1,3,5,6,8,10], tag:'dia'},
- {id:'hungarian-minor', tuning:'edo12', name:{en:'Hungarian minor', ru:'Венгерский минор'},             trad:'common', grp:GRP.ethnic, grpKey:'ethnic',         edo:12, iv:[0,2,3,6,7,8,11], tag:'ethnic'},
- {id:'major-penta', tuning:'edo12', name:{en:'Major pentatonic', ru:'Мажорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
- {id:'minor-penta', tuning:'edo12', name:{en:'Minor pentatonic', ru:'Минорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
- {id:'blues', tuning:'edo12', name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'},                  trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
- {id:'chromatic', tuning:'edo12', name:{en:'Chromatic (12 notes)', ru:'Хроматика (12 нот)'},           trad:'common', grp:GRP.chromatic, grpKey:'chromatic',                   edo:12, iv:range(12),        tag:'chrom', typedChords:'chrom12'},
- {id:'maqam-rast', tuning:'edo24', name:{en:'Maqam Rast (quarter-tones)', ru:'Макам Раст (¼-тоны)'},          trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam', noChords:true},
- {id:'maqam-bayati', tuning:'edo24', name:{en:'Maqam Bayati (quarter-tones)', ru:'Макам Баяти (¼-тоны)'},         trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam', noChords:true},
- {id:'edo19-full', tuning:'edo19', name:{en:'19-TET — full tuning', ru:'19-TET — весь строй'},          trad:'exp', grp:'',                   edo:19, iv:range(19),        tag:'edo',
-   chord:[1, 6/5, 3/2], chord7:[1, 6/5, 3/2, 9/5], typedChords:'edo19', rectGrid:true},   // мин.терция 5ш (+0.2¢), кв.11, мал.7 16ш (−7¢)
- {id:'edo31-full', tuning:'edo31', name:{en:'31-TET — full tuning', ru:'31-TET — весь строй'},          trad:'exp', grp:'',                   edo:31, iv:range(31),        tag:'edo',
-   chord:[1, 5/4, 3/2], chord7:[1, 5/4, 3/2, 7/4], typedChords:'edo31', rectGrid:true},   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
+ {id:'major', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Major (Ionian)', ru:'Мажор (ионийский)'},            trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,9,11], tag:'dia'},
+ {id:'natural-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Natural minor (Aeolian)', ru:'Минор натуральный (эолийский)'},trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,8,10], tag:'dia'},
+ {id:'harmonic-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Harmonic minor', ru:'Гармонический минор'},          trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,8,11], tag:'dia'},
+ {id:'melodic-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Melodic minor', ru:'Мелодический минор'},           trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,9,11], tag:'dia'},
+ {id:'dorian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Dorian', ru:'Дорийский'},                    trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,3,5,7,9,10], tag:'dia'},
+ {id:'phrygian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Phrygian', ru:'Фригийский'},                   trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,1,3,5,7,8,10], tag:'dia'},
+ {id:'lydian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Lydian', ru:'Лидийский'},                    trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,4,6,7,9,11], tag:'dia'},
+ {id:'mixolydian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Mixolydian', ru:'Миксолидийский'},               trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,4,5,7,9,10], tag:'dia'},
+ {id:'locrian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Locrian', ru:'Локрийский'},                   trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,1,3,5,6,8,10], tag:'dia'},
+ {id:'hungarian-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Hungarian minor', ru:'Венгерский минор'},             trad:'common', grp:GRP.ethnic, grpKey:'ethnic',         edo:12, iv:[0,2,3,6,7,8,11], tag:'ethnic'},
+ {id:'major-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Major pentatonic', ru:'Мажорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
+ {id:'minor-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Minor pentatonic', ru:'Минорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
+ {id:'blues', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'},                  trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
+ {id:'chromatic', tuning:'edo12', chordRule:{kind:'palette'}, name:{en:'Chromatic (12 notes)', ru:'Хроматика (12 нот)'},           trad:'common', grp:GRP.chromatic, grpKey:'chromatic',                   edo:12, iv:range(12),        tag:'chrom', typedChords:'chrom12'},
+ {id:'maqam-rast', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Rast (quarter-tones)', ru:'Макам Раст (¼-тоны)'},          trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam', noChords:true},
+ {id:'maqam-bayati', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Bayati (quarter-tones)', ru:'Макам Баяти (¼-тоны)'},         trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam', noChords:true},
+ {id:'edo19-full', tuning:'edo19', chordRule:{kind:'ratios', triad:[1, 6/5, 3/2], seventh:[1, 6/5, 3/2, 9/5]}, name:{en:'19-TET — full tuning', ru:'19-TET — весь строй'},          trad:'exp', grp:'',                   edo:19, iv:range(19),        tag:'edo',
+   typedChords:'edo19', rectGrid:true},   // мин.терция 5ш (+0.2¢), кв.11, мал.7 16ш (−7¢)
+ {id:'edo31-full', tuning:'edo31', chordRule:{kind:'ratios', triad:[1, 5/4, 3/2], seventh:[1, 5/4, 3/2, 7/4]}, name:{en:'31-TET — full tuning', ru:'31-TET — весь строй'},          trad:'exp', grp:'',                   edo:31, iv:range(31),        tag:'edo',
+   typedChords:'edo31', rectGrid:true},   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
  /* Хиджаз: джинс Хиджаз (0-1-4-5 полутонов, характерная увеличенная секунда 2→8
     в четвертях) + джинс Нахаванд сверху. Четвертитонов НЕ содержит — отсюда имя без
     пометки «¼-тоны», хотя традиция та же, 24-TET. Добавлен В КОНЕЦ: индексы не поехали. */
- {id:'maqam-hijaz', tuning:'edo24', name:{default:'Maqam Hijaz', ru:'Макам Хиджаз'}   /* арабская романизация Hijaz; турецкая — Hicaz (строй тут арабский, 24-TET) */,                 trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,2,8,10,14,16,20], tag:'maqam', noChords:true},
+ {id:'maqam-hijaz', tuning:'edo24', chordRule:{kind:'none'}, name:{default:'Maqam Hijaz', ru:'Макам Хиджаз'}   /* арабская романизация Hijaz; турецкая — Hicaz (строй тут арабский, 24-TET) */,                 trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,2,8,10,14,16,20], tag:'maqam', noChords:true},
  /* Мажоры с пониженной VI — пара к гармоническому/мелодическому минору: ♭VI даёт
     увеличенное трезвучие на VI ступени (qual: 4+8 → «+»), ради него их и берут.
     Добавлены В КОНЕЦ (индексы не поехали), а в меню встают внутрь группы «Диатоника»
     к минорам — порядок в выпадашке задаёт fillScales группировкой по grp, не массивом. */
- {id:'harmonic-major', tuning:'edo12', name:{en:'Harmonic major', ru:'Гармонический мажор'},          trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,8,11], tag:'dia'},
- {id:'melodic-major', tuning:'edo12', name:{en:'Melodic major', ru:'Мелодический мажор'},           trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,8,10], tag:'dia'},
+ {id:'harmonic-major', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Harmonic major', ru:'Гармонический мажор'},          trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,8,11], tag:'dia'},
+ {id:'melodic-major', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Melodic major', ru:'Мелодический мажор'},           trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,8,10], tag:'dia'},
  /* Симметричные и экзотические 12-TET лады. tag:'ethnic' → аккорды наслоением терций по
     индексу (isTert), спец-ветки НЕ нужны: целотоновая сама даёт увеличенные трезвучия,
     октатоники — уменьшённые (°/°7). Плотные лады (Мессиан-3, Прометеев) на части
     ступеней дают «?» в подписи аккорда — это косметика, звучит и пишется верно.
     Добавлены В КОНЕЦ (индексы 21..28 не поехали), в меню — две новые группы grp. */
- {id:'whole-tone', tuning:'edo12', name:{en:'Whole-tone', ru:'Целотоновая'},              trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,2,4,6,8,10],        tag:'ethnic'},
- {id:'octatonic-wh', tuning:'edo12', name:{en:'Octatonic (whole-half)', ru:'Октатоника (тон-полутон)'}, trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,2,3,5,6,8,9,11],    tag:'ethnic'},
- {id:'octatonic-hw', tuning:'edo12', name:{en:'Octatonic (half-whole)', ru:'Октатоника (полутон-тон)'}, trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,1,3,4,6,7,9,10],    tag:'ethnic'},
- {id:'messiaen-3', tuning:'edo12', name:{en:'Messiaen mode 3', ru:'Мессиан, мод 3'},           trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,2,3,4,6,7,8,10,11], tag:'ethnic'},
- {id:'phrygian-dominant', tuning:'edo12', name:{en:'Phrygian dominant', ru:'Фригийский доминантный'},   trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,1,4,5,7,8,10],      tag:'ethnic'},
- {id:'double-harmonic', tuning:'edo12', name:{en:'Double harmonic', ru:'Двойной гармонический'},    trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,1,4,5,7,8,11],      tag:'ethnic'},
- {id:'enigmatic', tuning:'edo12', name:{en:'Enigmatic (Verdi)', ru:'Энигматическая (Верди)'},   trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,1,4,6,8,10,11],     tag:'ethnic'},
- {id:'prometheus', tuning:'edo12', name:{en:'Prometheus (Scriabin)', ru:'Прометеевский (Скрябин)'},  trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,2,4,6,9,10],        tag:'ethnic'},
+ {id:'whole-tone', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Whole-tone', ru:'Целотоновая'},              trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,2,4,6,8,10],        tag:'ethnic'},
+ {id:'octatonic-wh', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Octatonic (whole-half)', ru:'Октатоника (тон-полутон)'}, trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,2,3,5,6,8,9,11],    tag:'ethnic'},
+ {id:'octatonic-hw', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Octatonic (half-whole)', ru:'Октатоника (полутон-тон)'}, trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,1,3,4,6,7,9,10],    tag:'ethnic'},
+ {id:'messiaen-3', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Messiaen mode 3', ru:'Мессиан, мод 3'},           trad:'common', grp:GRP.symmetric, grpKey:'symmetric', edo:12, iv:[0,2,3,4,6,7,8,10,11], tag:'ethnic'},
+ {id:'phrygian-dominant', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Phrygian dominant', ru:'Фригийский доминантный'},   trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,1,4,5,7,8,10],      tag:'ethnic'},
+ {id:'double-harmonic', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Double harmonic', ru:'Двойной гармонический'},    trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,1,4,5,7,8,11],      tag:'ethnic'},
+ {id:'enigmatic', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Enigmatic (Verdi)', ru:'Энигматическая (Верди)'},   trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,1,4,6,8,10,11],     tag:'ethnic'},
+ {id:'prometheus', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Prometheus (Scriabin)', ru:'Прометеевский (Скрябин)'},  trad:'common', grp:GRP.exotic, grpKey:'exotic', edo:12, iv:[0,2,4,6,9,10],        tag:'ethnic'},
  /* Мировые пентатоники. tag:'penta' → аккорды пауэр (корень+квинта+октава, ветка
     chordSteps без isTert), спец-веток НЕ нужно; на 5-6 нотах терции дают кашу, потому
     пауэр. Ни у одной нет noChords. Блюзовая мажорная берёт СУЩЕСТВУЮЩУЮ группу
     'Пентатоника / блюз' (строка 1-в-1 как у Мажорной/Минорной/Блюза) — в меню встаёт
     внутрь неё, а не отдельной группой. Добавлены В КОНЕЦ (индексы 29..35 не поехали). */
- {id:'egyptian', tuning:'edo12', name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'},   trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,5,7,10], tag:'penta'},
- {id:'man-gong', tuning:'edo12', name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}   /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */,    trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,3,5,8,10], tag:'penta'},
- {id:'ritusen', tuning:'edo12', name:{default:'Ritusen', ru:'Ритусэн'}   /* Ritusen — написание из сводов ладов (пентатоника 1-2-4-5-6, блюзовая мажорная; связывают с рагой Дурга); от японского лада рицу (律) — тоже компиляционное имя */,                 trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,2,5,7,9],  tag:'penta'},
- {id:'hungarian-penta', tuning:'edo12', name:{en:'Hungarian pentatonic', ru:'Венгерская пентатоника'},  trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,3,5,6,9],  tag:'penta'},
- {id:'scriabin-penta', tuning:'edo12', name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,4,7,10], tag:'penta'},
- {id:'kumoi-western', tuning:'edo12', name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'},            trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
- {id:'major-blues', tuning:'edo12', name:{en:'Major blues', ru:'Блюзовая мажорная'},       trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues',  edo:12, iv:[0,2,3,4,7,9], tag:'penta'},
+ {id:'egyptian', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'},   trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,5,7,10], tag:'penta'},
+ {id:'man-gong', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}   /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */,    trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,3,5,8,10], tag:'penta'},
+ {id:'ritusen', tuning:'edo12', chordRule:{kind:'power'}, name:{default:'Ritusen', ru:'Ритусэн'}   /* Ritusen — написание из сводов ладов (пентатоника 1-2-4-5-6, блюзовая мажорная; связывают с рагой Дурга); от японского лада рицу (律) — тоже компиляционное имя */,                 trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,2,5,7,9],  tag:'penta'},
+ {id:'hungarian-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Hungarian pentatonic', ru:'Венгерская пентатоника'},  trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,3,5,6,9],  tag:'penta'},
+ {id:'scriabin-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,4,7,10], tag:'penta'},
+ {id:'kumoi-western', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'},            trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
+ {id:'major-blues', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Major blues', ru:'Блюзовая мажорная'},       trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues',  edo:12, iv:[0,2,3,4,7,9], tag:'penta'},
  /* Макамы (24-TET). trad:'mideast', tag:'maqam', noChords:true — как у Раст/Баяти/Хиджаз:
     аккордов нет (роль «Аккорды» показывает подсказку, гейт supportsChords). Все десять
     (три прежних + семь новых) сведены в одну подгруппу grp:GRP.maqamat, grpKey:'maqamat' — строка 1-в-1,
     иначе бакеты бы разъехались. Добавлены В КОНЕЦ (индексы 36..42 не поехали). */
- {id:'maqam-saba', tuning:'edo24', name:{default:'Maqam Saba', ru:'Макам Саба'},                              trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,3,6,8,14,16,20],  tag:'maqam', noChords:true},
- {id:'maqam-sikah', tuning:'edo24', name:{default:'Maqam Sikah', ru:'Макам Сикях'}   /* арабская Sikah; турецко-персидская — Segah */,                             trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,3,7,11,14,17,21], tag:'maqam', noChords:true},
- {id:'maqam-nahawand', tuning:'edo24', name:{en:'Maqam Nahawand (tuned like natural minor)', ru:'Макам Нахаванд (строй как у натур. минора)'}, trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,6,10,14,16,20], tag:'maqam', noChords:true},
- {id:'maqam-kurd', tuning:'edo24', name:{en:'Maqam Kurd (tuned like Phrygian)', ru:'Макам Курд (строй как у фригийского)'},     trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,2,6,10,14,16,20], tag:'maqam', noChords:true},
- {id:'maqam-ajam', tuning:'edo24', name:{en:'Maqam Ajam (tuned like major)', ru:'Макам Аджам (строй как у мажора)'},         trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,8,10,14,18,22], tag:'maqam', noChords:true},
- {id:'maqam-nikriz', tuning:'edo24', name:{default:'Maqam Nikriz', ru:'Макам Никриз'},                            trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,6,12,14,18,20], tag:'maqam', noChords:true},
- {id:'maqam-nawa-athar', tuning:'edo24', name:{default:'Maqam Nawa Athar', ru:'Макам Нава Атар'}   /* встречается и слитно — Nawathar */,                          trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,6,12,14,16,22], tag:'maqam', noChords:true},
+ {id:'maqam-saba', tuning:'edo24', chordRule:{kind:'none'}, name:{default:'Maqam Saba', ru:'Макам Саба'},                              trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,3,6,8,14,16,20],  tag:'maqam', noChords:true},
+ {id:'maqam-sikah', tuning:'edo24', chordRule:{kind:'none'}, name:{default:'Maqam Sikah', ru:'Макам Сикях'}   /* арабская Sikah; турецко-персидская — Segah */,                             trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,3,7,11,14,17,21], tag:'maqam', noChords:true},
+ {id:'maqam-nahawand', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Nahawand (tuned like natural minor)', ru:'Макам Нахаванд (строй как у натур. минора)'}, trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,6,10,14,16,20], tag:'maqam', noChords:true},
+ {id:'maqam-kurd', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Kurd (tuned like Phrygian)', ru:'Макам Курд (строй как у фригийского)'},     trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,2,6,10,14,16,20], tag:'maqam', noChords:true},
+ {id:'maqam-ajam', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Ajam (tuned like major)', ru:'Макам Аджам (строй как у мажора)'},         trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,8,10,14,18,22], tag:'maqam', noChords:true},
+ {id:'maqam-nikriz', tuning:'edo24', chordRule:{kind:'none'}, name:{default:'Maqam Nikriz', ru:'Макам Никриз'},                            trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,6,12,14,18,20], tag:'maqam', noChords:true},
+ {id:'maqam-nawa-athar', tuning:'edo24', chordRule:{kind:'none'}, name:{default:'Maqam Nawa Athar', ru:'Макам Нава Атар'}   /* встречается и слитно — Nawathar */,                          trad:'mideast', grp:GRP.maqamat, grpKey:'maqamat', edo:24, iv:[0,4,6,12,14,16,22], tag:'maqam', noChords:true},
  /* Мировые строи — НЕравномерные лады через поле cents (центы каждой ступени от тоники,
     length===iv.length). Высоту берёт leadFreq/bassFreq из cents, структуру (число ступеней,
     сетка, ряды) — из edo/iv. Слендро: приближение яванского гамелана, шаги неравные
     (2-я ступень 231¢, не 240¢ равной пентатоники). noChords: терции гамелану чужды. */
- {id:'slendro', tuning:'slendro', name:{en:'Slendro (Javanese gamelan, approx.)', ru:'Слендро (яван. гамелан, приближение)'}, trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:[0,1,2,3,4],
+ {id:'slendro', tuning:'slendro', chordRule:{kind:'none'}, name:{en:'Slendro (Javanese gamelan, approx.)', ru:'Слендро (яван. гамелан, приближение)'}, trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:[0,1,2,3,4],
     cents:TBL.slendro, tag:'penta', noChords:true},
- {id:'pelog', tuning:'pelog', name:{en:'Pelog (Javanese gamelan, approx.)', ru:'Пелог (яван. гамелан, приближение)'}, trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:7,
+ {id:'pelog', tuning:'pelog', chordRule:{kind:'none'}, name:{en:'Pelog (Javanese gamelan, approx.)', ru:'Пелог (яван. гамелан, приближение)'}, trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:7,
     iv:[0,1,2,3,4,5,6], cents:TBL.pelog, tag:'penta', noChords:true},
  /* Японские пентатоники (12-TET). tag:'penta' → пауэр-аккорды (ветка chordSteps без isTert).
     Ин намеренно совпадает по iv с 'Кумои (зап.)' из мировых пентатоник — это разные лады
     по имени/группе, общий iv безвреден (state по scaleIdx, луп по ссылке на sc).
     Добавлены В КОНЕЦ (индексы 45..48 не поехали), в меню — новая группа grp 'Японские'. */
- {id:'hirajoshi', tuning:'edo12', name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
- {id:'kumoi-japanese', tuning:'edo12', name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
- {id:'in-insen', tuning:'edo12', name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
- {id:'iwato', tuning:'edo12', name:{default:'Iwato', ru:'Ивато'},                              trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,6,10], tag:'penta'},
+ {id:'hirajoshi', tuning:'edo12', chordRule:{kind:'power'}, name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
+ {id:'kumoi-japanese', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
+ {id:'in-insen', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
+ {id:'iwato', tuning:'edo12', chordRule:{kind:'power'}, name:{default:'Iwato', ru:'Ивато'},                              trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,6,10], tag:'penta'},
  /* Партч (Harry Partch, «Genesis of a Music») — 43-тоновая ЧИСТАЯ ИНТОНАЦИЯ (11-предельный
     тональный ромб). Центы посчитаны из канонических отношений (ниже); 2 знака сохраняют JI
     точно (в отличие от целочисленных приближений гамелана). Октава = 2/1 (тождество Партча),
@@ -169,7 +178,7 @@ export const SCALES=[
     Отношения: 1/1 81/80 33/32 21/20 16/15 12/11 11/10 10/9 9/8 8/7 7/6 32/27 6/5 11/9 5/4
     14/11 9/7 21/16 4/3 27/20 11/8 7/5 10/7 16/11 40/27 3/2 32/21 14/9 11/7 8/5 18/11 5/3
     27/16 12/7 7/4 16/9 9/5 20/11 11/6 15/8 40/21 64/33 160/81. Добавлен В КОНЕЦ (индекс 49). */
- {id:'partch-43', tuning:'partch43', name:{en:'Partch (43 tones, just intonation)', ru:'Партч (43 тона, чистая интонация)'}, trad:'exp', grp:'', edo:43, iv:range(43),
+ {id:'partch-43', tuning:'partch43', chordRule:{kind:'palette'}, name:{en:'Partch (43 tones, just intonation)', ru:'Партч (43 тона, чистая интонация)'}, trad:'exp', grp:'', edo:43, iv:range(43),
     cents:TBL.partch43,
     tag:'ji', typedChords:'partch', rectGrid:true},
  /* Болен–Пирс — НЕОКТАВНЫЙ строй: период не октава (2:1), а ТРИТАВА (3:1). 13 РАВНЫХ шагов
@@ -180,7 +189,7 @@ export const SCALES=[
     шаги edo, а ЧИСТЫЕ ОТНОШЕНИЯ; chordFreqs через period-ветку (P!==2 && ty) берёт корень
     равным шагом (P^(iv/edo)) и множит на ratio напрямую. Строй Карлос — позже. НЕ rect: (13+1)=14
     не делится на 4, rectGrid нельзя. tag:'bp' — инертен у всех читателей (не 'edo'/'penta'/терции). Индекс 50. */
- {id:'bohlen-pierce', tuning:'bp13', name:{en:'Bohlen–Pierce (13 equal, tritave)', ru:'Болен–Пирс (13 равных, тритава)'}, trad:'exp', grp:'', edo:13, iv:range(13),
+ {id:'bohlen-pierce', tuning:'bp13', chordRule:{kind:'palette'}, name:{en:'Bohlen–Pierce (13 equal, tritave)', ru:'Болен–Пирс (13 равных, тритава)'}, trad:'exp', grp:'', edo:13, iv:range(13),
     period:3, tag:'bp', typedChords:'bp'},
  /* Строи Уэнди Карлос — НЕОКТАВНЫЕ: у них НЕТ интервала эквивалентности вовсе. Карлос вывела их,
     поделив чистую КВИНТУ 3:2 на РАВНЫЕ части (alpha=9, beta=11, gamma=20) — не октаву. Моделируем
@@ -192,9 +201,9 @@ export const SCALES=[
     у alpha 9 и beta 11 не делится. Прямоугольники им НЕДОСТУПНЫ, и это не выбор данных, а арифметика
     (у beta 11+1=12 делится СЛУЧАЙНО — период-гейт и не пускает её через закрытую форму). tag:'carlos' — инертен у всех
     читателей tag (как 'bp': не 'dia'/'ethnic'/'maqam'/'edo'). Индексы 51/52/53. */
- {id:'carlos-alpha', tuning:'carlos-alpha', name:{en:'Carlos Alpha (9 steps of the fifth)', ru:'Карлос альфа (9 шагов квинты)'},  trad:'exp', grp:'', edo:9,  iv:range(9),  period:3/2, tag:'carlos', noChords:true},
- {id:'carlos-beta', tuning:'carlos-beta', name:{en:'Carlos Beta (11 steps of the fifth)', ru:'Карлос бета (11 шагов квинты)'},  trad:'exp', grp:'', edo:11, iv:range(11), period:3/2, tag:'carlos', noChords:true},
- {id:'carlos-gamma', tuning:'carlos-gamma', name:{en:'Carlos Gamma (20 steps of the fifth)', ru:'Карлос гамма (20 шагов квинты)'}, trad:'exp', grp:'', edo:20, iv:range(20), period:3/2, tag:'carlos', noChords:true, rectGrid:true},
+ {id:'carlos-alpha', tuning:'carlos-alpha', chordRule:{kind:'none'}, name:{en:'Carlos Alpha (9 steps of the fifth)', ru:'Карлос альфа (9 шагов квинты)'},  trad:'exp', grp:'', edo:9,  iv:range(9),  period:3/2, tag:'carlos', noChords:true},
+ {id:'carlos-beta', tuning:'carlos-beta', chordRule:{kind:'none'}, name:{en:'Carlos Beta (11 steps of the fifth)', ru:'Карлос бета (11 шагов квинты)'},  trad:'exp', grp:'', edo:11, iv:range(11), period:3/2, tag:'carlos', noChords:true},
+ {id:'carlos-gamma', tuning:'carlos-gamma', chordRule:{kind:'none'}, name:{en:'Carlos Gamma (20 steps of the fifth)', ru:'Карлос гамма (20 шагов квинты)'}, trad:'exp', grp:'', edo:20, iv:range(20), period:3/2, tag:'carlos', noChords:true, rectGrid:true},
  /* Патеты пелога — 5-нотные ЛАДЫ, выбранные из 7-нотного пелога (те же cents-ступени, что у
     «Пелог» выше): Лима и Нем берут ступени 1-2-3-5-6, Баранг — 2-3-5-6-7 (нормирован от своей
     тоники, −120¢). Центы — ПРИБЛИЖЕНИЕ (у яванского гамелана нет эталона — та же оговорка, что
@@ -202,9 +211,9 @@ export const SCALES=[
     и Нем — ОДНИ И ТЕ ЖЕ ноты (обе на 1-2-3-5-6); различаются функцией/тоникой в традиции, не
     строем — держим двумя именованными записями НАРОЧНО (как две Кумои / Ин), это НЕ дубликат-баг.
     Баранг (2-3-5-6-7) — по-настоящему другой набор. Индексы 54/55/56, добавлены В КОНЕЦ. */
- {id:'pelog-lima', tuning:'pelog', name:{en:'Pelog patet Lima (Javanese, approx.)', ru:'Пелог патет лима (яван., прибл.)'},   trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:range(5), cents:[0,120,258,675,785], tag:'penta', noChords:true},
- {id:'pelog-nem', tuning:'pelog', name:{en:'Pelog patet Nem (Javanese, approx.)', ru:'Пелог патет нем (яван., прибл.)'},    trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:range(5), cents:[0,120,258,675,785], tag:'penta', noChords:true},
- {id:'pelog-barang', tuning:'pelog', name:{en:'Pelog patet Barang (Javanese, approx.)', ru:'Пелог патет баранг (яван., прибл.)'}, trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:range(5), cents:[0,138,555,665,823], tag:'penta', noChords:true},
+ {id:'pelog-lima', tuning:'pelog', chordRule:{kind:'none'}, name:{en:'Pelog patet Lima (Javanese, approx.)', ru:'Пелог патет лима (яван., прибл.)'},   trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:range(5), cents:[0,120,258,675,785], tag:'penta', noChords:true},
+ {id:'pelog-nem', tuning:'pelog', chordRule:{kind:'none'}, name:{en:'Pelog patet Nem (Javanese, approx.)', ru:'Пелог патет нем (яван., прибл.)'},    trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:range(5), cents:[0,120,258,675,785], tag:'penta', noChords:true},
+ {id:'pelog-barang', tuning:'pelog', chordRule:{kind:'none'}, name:{en:'Pelog patet Barang (Javanese, approx.)', ru:'Пелог патет баранг (яван., прибл.)'}, trad:'easia', grp:GRP.gamelan, grpKey:'gamelan', edo:5, iv:range(5), cents:[0,138,555,665,823], tag:'penta', noChords:true},
  /* Пифагоров строй — 12 нот из цепочки ЧИСТЫХ квинт 3/2 (показатели −5..+6), свёрнутых в октаву.
     Квинты по построению ПРАКТИЧЕСКИ ЧИСТЫЕ (701.96¢), но большая терция 81/64 = 407.82¢ — ОСТРАЯ,
     на 22¢ выше чистой 5/4 (386.31¢): отсюда средневековое письмо параллельными квинтами и позднейшая
@@ -222,7 +231,7 @@ export const SCALES=[
     СТРОИ ОДНИХ И ТЕХ ЖЕ 12 НОТ (темперация ≠ лад), а НЕ утверждение, будто макам/гамелан «менее
     историчны» — те живут в своих секциях. Сюда же Натуральный/мезотон/велл-темперации, по времени сверху
     вниз. tag:'penta' — инертный (как у Слендро/Пелог: не 'dia'/'ethnic'/'maqam'/'edo'). Индекс 57, В КОНЕЦ. */
- {id:'pythagorean', tuning:'pythagorean12', name:{en:'Pythagorean tuning (pure fifths)', ru:'Пифагоров строй (чистые квинты)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'pythagorean', tuning:'pythagorean12', chordRule:{kind:'palette'}, name:{en:'Pythagorean tuning (pure fifths)', ru:'Пифагоров строй (чистые квинты)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.pythagorean12, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true, tunable:true},
  /* Натуральный строй, ПОДВИЖНЫЙ (хор/струнные) — 5-предельная ЧИСТАЯ ИНТОНАЦИЯ: интервалы суть простые
     целочисленные отношения прямо из обертонового ряда (16/15, 9/8, 6/5, 5/4, 4/3, 45/32, 3/2, 8/5, 5/3,
@@ -233,7 +242,7 @@ export const SCALES=[
     что подстраивает каждый аккорд на лету («подвижная» чистая интонация). Пара к ФИКСИРОВАННОМУ ниже
     (клавесин): те же 12 нот, но там аккорды берутся из ЗАСТЫВШЕЙ сетки → волк. Контрапара к Пифагорову.
     tag:'penta' — инертный. Индекс 58. */
- {id:'ji-adaptive', tuning:'ji12', name:{en:'Just intonation (adaptive, choir)', ru:'Натуральный строй (подвижный, хор)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'ji-adaptive', tuning:'ji12', chordRule:{kind:'palette'}, name:{en:'Just intonation (adaptive, choir)', ru:'Натуральный строй (подвижный, хор)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.ji12, tag:'penta', typedChords:'nat'},
  /* Натуральный строй, ФИКСИРОВАННЫЙ (клавесин/орган) — ТЕ ЖЕ 12 нот (cents 1-в-1 с подвижным выше),
     настроенные ОДИН РАЗ от тоники. Но аккорды берут ноты ИЗ ЗАСТЫВШЕЙ СЕТКИ (typedChords:'natfix' —
@@ -242,7 +251,7 @@ export const SCALES=[
     корнях (мажор 0,1,3,5,7,8), ВОЛК на других (квинта −21.5¢ на 2,10 и +19.5¢ на 6; терции ±41¢) — ровно
     ПОЧЕМУ и придумали темперации. Разметки «волк» в UI НЕТ намеренно: учит ухо, не подпись. Пара к
     подвижному выше — переключи на ОДНОМ аккорде и услышь разницу. tag:'penta' — инертный. Индекс 59, В КОНЕЦ. */
- {id:'ji-fixed', tuning:'ji12', name:{en:'Just intonation (fixed, harpsichord)', ru:'Натуральный строй (фиксированный, клавесин)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'ji-fixed', tuning:'ji12', chordRule:{kind:'palette'}, name:{en:'Just intonation (fixed, harpsichord)', ru:'Натуральный строй (фиксированный, клавесин)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.ji12, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true},
  /* Мезотон 1/4 коммы (Аарон, 1523) — ИСТОРИЧЕСКИЙ КОМПРОМИСС. Каждая квинта СУЖЕНА на 1/4 синтонической
     коммы до 696.58¢ (чистая 701.96¢), чтобы четыре квинты минус две октавы дали ЧИСТУЮ большую терцию
@@ -254,7 +263,7 @@ export const SCALES=[
     клавиатура: аккорды берут ноты ИЗ СЕТКИ (grid-ветка chordFreqs), как фиксированный Натуральный; пере-
     страивать каждый аккорд чистым от корня НЕЛЬЗЯ (это стёрло бы весь смысл — вышел бы Натуральный). Разметки
     «волк» в UI НЕТ намеренно — учит ухо. tag:'penta' — инертный. Индекс 60, В КОНЕЦ. */
- {id:'meantone-quarter', tuning:'meantone-quarter', name:{en:'Quarter-comma meantone (harpsichord)', ru:'Мезотон 1/4 коммы (клавесин)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'meantone-quarter', tuning:'meantone-quarter', chordRule:{kind:'palette'}, name:{en:'Quarter-comma meantone (harpsichord)', ru:'Мезотон 1/4 коммы (клавесин)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.meantone, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true},
 
  /* ================= ИНДИЙСКАЯ КЛАССИКА (традиция 'indian') =================
@@ -273,7 +282,7 @@ export const SCALES=[
     ЧЕСТНОСТЬ (как «приближение» у гамелана): мы моделируем ТОЛЬКО звукоряд — КАКИЕ свары. Рага —
     БОЛЬШЕ звукоряда: у неё путь вверх/вниз (ароха/авароха, часто РАЗНЫЕ), опорные ноты (вади/самвади),
     характерные фразы (пакад) и время суток — НИЧЕГО из этого мы не моделируем. Индексы 61..71, В КОНЕЦ. */
- {id:'shruti-22', tuning:'shruti22', name:{en:'22 shruti (full grid)', ru:'22 шрути (полная сетка)'}, trad:'india', grp:GRP.fullGrid, grpKey:'fullGrid', edo:22, iv:range(22),
+ {id:'shruti-22', tuning:'shruti22', chordRule:{kind:'none'}, name:{en:'22 shruti (full grid)', ru:'22 шрути (полная сетка)'}, trad:'india', grp:GRP.fullGrid, grpKey:'fullGrid', edo:22, iv:range(22),
     cents:TBL.shruti22,
     tag:'penta', noChords:true, swaraNames:true, swaraFull:true},   // swaraNames → саргам; swaraFull → «свара · имя-шрути» (грид различает комма-пары именем, раги — только сварой)
 
@@ -281,19 +290,19 @@ export const SCALES=[
     чистой интонации: комал-Ре Бхайрава (90 — малый шрути), тивра-Ма Йамана (590 — острая ув.кварта),
     чистые терции 386 и пифагоровы 408, чистая квинта везде 702. Только звукоряд — путь/опоры/фразы
     НЕ моделируются (см. блок выше). swaraNames:true → ряды подписаны сварами (Са/Ре/Га/Ма/Па/Дха/Ни). */
- {id:'raga-bhairav', tuning:'shruti22', name:{default:'Bhairav', ru:'Бхайрав'}   /* хиндустани: короткая форма Bhairav; встречается и Bhairava */,  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,386,498,702,792,1088],  tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-yaman', tuning:'shruti22', name:{default:'Yaman', ru:'Йаман'},    trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,408,590,702,906,1110], tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-bhairav', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Bhairav', ru:'Бхайрав'}   /* хиндустани: короткая форма Bhairav; встречается и Bhairava */,  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,386,498,702,792,1088],  tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-yaman', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Yaman', ru:'Йаман'},    trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,408,590,702,906,1110], tag:'penta', noChords:true, swaraNames:true},
  /* Кафи и Мальхар несут ОДИН И ТОТ ЖЕ звукоряд [0,204,316,498,702,906,1018] — различаются движением/
     опорами/фразами (которых мы не моделируем), а не нотами. НЕ баг-дубль, а осознанно (как две Кумои,
     как пелог лима/нем). */
- {id:'raga-kafi', tuning:'shruti22', name:{default:'Kafi', ru:'Кафи'},     trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,316,498,702,906,1018], tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-bhairavi', tuning:'shruti22', name:{default:'Bhairavi', ru:'Бхайрави'}, trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,294,498,702,792,996],   tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-todi', tuning:'shruti22', name:{default:'Todi', ru:'Тоди'},     trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,294,590,702,792,1088],  tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-khamaj', tuning:'shruti22', name:{default:'Khamaj', ru:'Кхамадж'},  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,408,498,702,906,1018], tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-asavari', tuning:'shruti22', name:{default:'Asavari', ru:'Асавари'},  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,294,498,702,792,996],  tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-malhar', tuning:'shruti22', name:{default:'Malhar', ru:'Мальхар'},  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,316,498,702,906,1018], tag:'penta', noChords:true, swaraNames:true},   // тот же звукоряд, что Кафи (см. коммент выше)
- {id:'raga-purvi', tuning:'shruti22', name:{default:'Purvi', ru:'Пурви'},    trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,386,590,702,792,1088],  tag:'penta', noChords:true, swaraNames:true},
- {id:'raga-bilawal', tuning:'shruti22', name:{default:'Bilawal', ru:'Билавал'}   /* [0,204,386,498,702,884,1088] = натуральный мажор (JI) = тхат БИЛАВАЛ, один из 10 родительских ладов хиндустани. Раньше ошибочно значился «Мармари» (не существующая рага) */,  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,386,498,702,884,1088],  tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-kafi', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Kafi', ru:'Кафи'},     trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,316,498,702,906,1018], tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-bhairavi', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Bhairavi', ru:'Бхайрави'}, trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,294,498,702,792,996],   tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-todi', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Todi', ru:'Тоди'},     trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,294,590,702,792,1088],  tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-khamaj', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Khamaj', ru:'Кхамадж'},  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,408,498,702,906,1018], tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-asavari', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Asavari', ru:'Асавари'},  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,294,498,702,792,996],  tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-malhar', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Malhar', ru:'Мальхар'},  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,316,498,702,906,1018], tag:'penta', noChords:true, swaraNames:true},   // тот же звукоряд, что Кафи (см. коммент выше)
+ {id:'raga-purvi', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Purvi', ru:'Пурви'},    trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,90,386,590,702,792,1088],  tag:'penta', noChords:true, swaraNames:true},
+ {id:'raga-bilawal', tuning:'shruti22', chordRule:{kind:'none'}, name:{default:'Bilawal', ru:'Билавал'}   /* [0,204,386,498,702,884,1088] = натуральный мажор (JI) = тхат БИЛАВАЛ, один из 10 родительских ладов хиндустани. Раньше ошибочно значился «Мармари» (не существующая рага) */,  trad:'india', grp:GRP.ragas, grpKey:'ragas', edo:7, iv:range(7), cents:[0,204,386,498,702,884,1088],  tag:'penta', noChords:true, swaraNames:true},
 
  /* ================= ВЕЛЛ-ТЕМПЕРАЦИИ («хорошо темперированные» строи) =================
     НЕДОСТАЮЩЕЕ ЗВЕНО между мезотоном и 12-TET. Мезотон давал играть в ~8 тональностях и ВЫЛ в
@@ -310,16 +319,16 @@ export const SCALES=[
     Индексы 72..74, В КОНЕЦ (ничего не сдвигается — раги 61..71 на местах). */
  /* Веркмайстер III (1691) — 4 квинты по 1/4 пифагоровой коммы (C–G, G–D, D–A, B–F#). Терция от
     тоники 390.2¢ (почти чистая), в дальних тональностях до 407.8¢ (пифагорова); разброс ~17.6¢. */
- {id:'werckmeister-3', tuning:'werckmeister3', name:{default:'Werckmeister III (1691)', ru:'Веркмайстер III (1691)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'werckmeister-3', tuning:'werckmeister3', chordRule:{kind:'palette'}, name:{default:'Werckmeister III (1691)', ru:'Веркмайстер III (1691)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.werckmeister3, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true},
  /* Валлотти (1754) — 6 квинт по 1/6 коммы (F–C–G–D–A–E–B), мягче распределено. Терция 392.2¢,
     разброс ~15.6¢ — самый РОВНЫЙ из трёх (ближе всего к 12-TET по равномерности, но характер ещё есть). */
- {id:'vallotti', tuning:'vallotti', name:{default:'Vallotti (1754)', ru:'Валлотти (1754)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'vallotti', tuning:'vallotti', chordRule:{kind:'palette'}, name:{default:'Vallotti (1754)', ru:'Валлотти (1754)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.vallotti, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true},
  /* Кирнбергер III (1779) — 4 квинты по 1/4 СИНТОНИЧЕСКОЙ коммы (C–G–D–A–E) + одна сужена на схизму.
     Терция от тоники ЧИСТАЯ 386.31¢, но разброс самый большой (~21.5¢): чистота ближних тональностей
     куплена резкостью дальних. */
- {id:'kirnberger-3', tuning:'kirnberger3', name:{default:'Kirnberger III (1779)', ru:'Кирнбергер III (1779)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+ {id:'kirnberger-3', tuning:'kirnberger3', chordRule:{kind:'palette'}, name:{default:'Kirnberger III (1779)', ru:'Кирнбергер III (1779)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.kirnberger3, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true},
 ];
 /* ⛳ СТРОИ — ДАННЫЕ (слайс T0 универсальной модели строя, HANDOFF «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ»). СТРОЙ — все высоты инструмента:
@@ -932,7 +941,8 @@ const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближ
 /* КОНТЕКСТНАЯ ЛОГИКА АККОРДОВ:
    · 7-ступенчатые лады (диатоника, венгерский, макамы) — наслоение терций:
      индексы i, i+2, i+4 (+ i+6 для септаккордов), % длины массива с переносом октавы;
-   · пентатоника / блюз / хроматика — терции дают кашу → пауэр-аккорды (I + V + октава);
+   · пентатоника / блюз — терции дают кашу → пауэр-аккорды (I + V + октава); хроматика сюда не доходит: у неё палитра (typedChords), и
+     живой аккорд всегда несёт тип (правило T6a — 'palette');
    · 19/31-TET — квинту ищем математически: round(N·log2(3/2)) шагов ≈ 700 центов,
      получаются открытые микротональные аккорды без диссонирующих кластеров. */
 /* s (лад) и sev (септаккорд?) — параметры со значениями по умолчанию из живого состояния:
@@ -951,10 +961,10 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
   if (s.tag==='edo'){
     /* Мезотоника (19/31-TET): аккорд строим ПО ИНТЕРВАЛУ, не по индексу.
        Отношения заданы на ладе (chord/chord7); 31-TET септаккорд = 4:5:6:7. */
-    const rs=sev?s.chord7:s.chord;
+    const rs=sev?s.chordRule.seventh:s.chordRule.triad;   // T6a: отношения переехали в правило аккордов лада (те же массивы)
     return rs.map(ra=>r+stepFor(s.edo,ra));
   }
-  return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз/хроматика — пауэр-аккорд как раньше
+  return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз — пауэр-аккорд как раньше (хроматика с палитрой сюда не доходит)
 }
 /* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
    legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */

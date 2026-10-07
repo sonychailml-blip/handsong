@@ -3,6 +3,8 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkRules()     // T6a: правило аккордов лада (chordRule) = сегодняшний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
+     P.checkScroll()    // T6a-2: прокрутка редактора через «Все/Лад» (та же высота) и чип лада (тот же регистр) — по каждому виду
      P.tracks()         // МАРШРУТ ПО СТРОЮ: каждая дорожка песни — роль, тембр, вид строя (и сколько видов в ней: больше одного быть не должно)
      P.checkHl()        // T4b4: ПОДСВЕТКА переигранной и догнанной ноты по индексу — прогон по видам, события песни, догонялка; высоты вне лада
      P.checkRowFix()    // T4b4-1: нижний ряд по умолчанию в обеих осях и ряды нот аккорда при холодном и прогретом кэше (видимая правка)
@@ -24,12 +26,12 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
 import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
+import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -510,4 +512,104 @@ export function tracks(){
   if(mixed.length) mixed.forEach(x=>console.warn(`[scaleprobe tracks] ${x.track} holds ${x.view.split(' + ').length} tuning views: ${x.view} (recorded before routing by tuning)`));
   else console.log(`[scaleprobe tracks] ${rows.length} tracks, each with one tuning view at most`);
   return rows;
+}
+
+/* ═══ T6a: ПРАВИЛО АККОРДОВ ЛАДА — ДАННЫЕ (chordRule) ═══
+   1) у каждого из 75 ладов правило есть, его вид — один из пяти, и он РАВЕН сегодняшнему выбору по tag (тот же порядок, что chordSteps:
+      noChords → none; isTert → tertian; tag 'edo' → ratios; есть палитра → palette; иначе power); полей chord/chord7 больше нет;
+   2) перенос отношений 19/31-TET: массивы правила — прежние числа, и chordSteps (нетипизированный путь) даёт те же шаги, что прежняя
+      формула от прежних литералов, — каждая ступень 0..n, триада и септаккорд (===);
+   3) ДАННЫМИ ДОКАЗАНО, что смена определения у нетипизированных аккордов центового лада (T6b) недостижима: каждый лад с аккордами и без
+      палитры стоит на РАВНОМ строе, и правило ratios — тоже только на равном;
+   4) вид лада несёт то же правило (scaleView копирует поля);
+   5) песня: каждый хранимый аккорд без типа — в виде, чьё правило строит аккорды (tertian/power/ratios); защитные проверки вида
+      (recorder.viewAudit — тот же предикат, что пишет в консоль) не находят ни ноты через два вида, ни дорожки с двумя видами.
+   Ничего не меняет и не играет. */
+export function checkRules(){
+  const bad=[]; const miss=m=>bad.push(m);
+  const KINDS=new Set(['tertian','power','ratios','palette','none']);
+  const OLD={ 'edo19-full':{ triad:[1,6/5,3/2], seventh:[1,6/5,3/2,9/5] }, 'edo31-full':{ triad:[1,5/4,3/2], seventh:[1,5/4,3/2,7/4] } };   // прежние литералы chord/chord7
+  const same=(a,b)=> !!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]);
+  const byKind={}; let nSteps=0;
+  for(const s of SCALES){
+    const R=s.chordRule, id=s.id;
+    if(!R || !KINDS.has(R.kind)){ miss(`${id}: no chordRule, or an unknown kind`); continue; }
+    byKind[R.kind]=(byKind[R.kind]||0)+1;
+    const want= s.noChords ? 'none' : isTert(s) ? 'tertian' : s.tag==='edo' ? 'ratios' : s.typedChords ? 'palette' : 'power';
+    if(R.kind!==want) miss(`${id}: rule ${R.kind}, today's choice by tag ${want}`);
+    if('chord' in s || 'chord7' in s) miss(`${id}: still carries chord/chord7 beside its rule`);
+    const T=TUNINGS[s.tuning];
+    if(R.kind==='ratios'){
+      const o=OLD[id];
+      if(!o) miss(`${id}: a ratios rule on a mode that had no chord ratios`);
+      else{
+        if(!same(R.triad,o.triad)||!same(R.seventh,o.seventh)) miss(`${id}: moved ratios differ from the old chord/chord7`);
+        const n=s.iv.length;
+        for(const sev of [false,true]) for(let d=0; d<=n; d++){ nSteps++;
+          const r0=s.iv[d%n]+s.edo*Math.floor(d/n), w=(sev?o.seventh:o.triad).map(ra=>r0+Math.round(s.edo*Math.log2(ra))), g=chordSteps(d,s,sev,null);
+          if(!same(g,w)) miss(`${id} degree ${d}${sev?' 7th':''}: steps ${g} now, ${w} from the old literals`); }
+      }
+      if(T.equal==null) miss(`${id}: a ratios rule on a table tuning`);
+    }
+    if(!s.noChords && !s.typedChords && T.equal==null) miss(`${id}: chords without a palette on a TABLE tuning — an untyped chord here would change definition in T6b`);
+    if(R.kind==='palette' && !s.typedChords) miss(`${id}: palette rule without a palette`);
+  }
+  let nViews=0;
+  for(const [s0,tf] of allViews()){ nViews++; const v=scaleView(s0,tf); if(v.chordRule!==s0.chordRule) miss(`${s0.id}: the view carries another chordRule object`); }
+  let nUntyped=0;
+  for(const e of events){
+    if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty) continue;
+    nUntyped++; const k=e.sc&&e.sc.chordRule&&e.sc.chordRule.kind;
+    if(k!=='tertian'&&k!=='power'&&k!=='ratios') miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000}: an untyped chord in ${e.sc&&e.sc.id}, whose rule is ${k}`);
+  }
+  const A=viewAudit();
+  A.notes.forEach(n=>miss(`L${n.layer+1} note at beat ${Math.round(n.start*1000)/1000} spans two tuning views`));
+  A.tracks.forEach(ly=>miss(`L${ly+1} holds more than one tuning view`));
+  console.log(`[scaleprobe T6a] modes ${SCALES.length} (${Object.entries(byKind).map(([k,n])=>k+' '+n).join(', ')}) · views ${nViews} · moved-ratio steps ${nSteps} · song: untyped chords ${nUntyped}, events ${events.length} · differences ${bad.length}`);
+  bad.forEach(m=>console.warn('[scaleprobe T6a] '+m));
+  if(!bad.length) console.log('[scaleprobe T6a] every chord rule matches today\'s choice, untyped chords live only on equal tunings, and the view checks find nothing in the song');
+  return { byKind, views:nViews, steps:nSteps, untyped:nUntyped, differences:bad };
+}
+
+/* ═══ T6a-2: ПРОКРУТКА РЕДАКТОРА ЧЕРЕЗ ПЕРЕКЛЮЧЕНИЕ ОСИ (видимая правка) ═══
+   1) «Все» ↔ «Лад» (один вид): каждый вид с приглушёнными рядами × оба направления × высоты окна × каждое положение окна — высота
+      якоря (средний видимый ряд, приглушённый — прилипший к ступени) после перевода (draw.rollRow0Across) стоит на ТОМ ЖЕ месте лада
+      (та же пара ступень/регистр) и ВИДНА в окне после зажима; печатается, у скольких якорей высота точная, у скольких — соседняя ступень;
+   2) чип лада (другой вид): каждый вид против следующего, обе оси — регистр якоря после перевода виден в окне.
+   Работает без редактора. Ничего не меняет. */
+export function checkScroll(){
+  const bad=[]; let nBad=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const views=allViews().map(([s0,tf])=>scaleView(s0,tf));
+  let nP=0, nExact=0, nR=0;
+  for(const v of views) for(const [f0,f1] of [[true,false],[false,true]]){
+    const a0=RP.axis(v,f0), a1=RP.axis(v,f1); if(a0===a1) continue;   // приглушённых рядов нет — кнопки нет
+    const T0=REG_N*a0.rpp, T1=REG_N*a1.rpp;
+    for(const rows of [5,8,13,20]){ if(rows>T0) continue;
+      for(let row0=0; row0<=T0-rows; row0++){
+        nP++; const r0c=Math.min(RP.across(a0,a1,row0,rows,'pitch'), Math.max(0,T1-rows));
+        const mid=row0+Math.floor(rows/2), sn=a0.snap(mid), pt=a0.pitchOf(sn), nr=a1.rowOf(pt.deg,pt.oct), back=a1.pitchOf(nr);
+        if(sn===mid) nExact++;
+        const at=`${v.id}${v.tunable?'@'+v.tunedFrom:''} ${f0?'All→Mode':'Mode→All'} window ${rows} at row ${row0}`;
+        if(!(nr>=r0c && nr<r0c+rows)) miss(`${at}: the anchor (degree ${pt.deg} reg ${pt.oct}) is at row ${nr}, outside the new window ${r0c}..${r0c+rows-1}`);
+        if(!back||back.deg!==pt.deg||back.oct!==pt.oct) miss(`${at}: row ${nr} is not degree ${pt.deg} reg ${pt.oct} in the new axis`);
+      }
+    }
+  }
+  for(let i=0;i<views.length;i++){ const va=views[i], vb=views[(i+1)%views.length];
+    for(const all of [true,false]){ const a0=RP.axis(va,all), a1=RP.axis(vb,all), T0=REG_N*a0.rpp, T1=REG_N*a1.rpp;
+      for(const rows of [5,8,13]){ if(rows>T0) continue;
+        for(let row0=0; row0<=T0-rows; row0++){
+          nR++; const r0c=Math.min(RP.across(a0,a1,row0,rows,'reg'), Math.max(0,T1-rows));
+          const R=Math.floor((row0+Math.floor(rows/2))/a0.rpp), lo=R*a1.rpp, hi=lo+a1.rpp-1;
+          if(!(hi>=r0c && lo<r0c+rows)) miss(`${va.id} → ${vb.id} ${all?'All':'Mode'} window ${rows} at row ${row0}: register ${R} (rows ${lo}..${hi}) is not in the new window ${r0c}..${r0c+rows-1}`);
+        }
+      }
+    }
+  }
+  console.log(`[scaleprobe T6a-2] All/Mode switches ${nP} (anchor pitch exact in ${nExact}, snapped to the nearest degree in ${nP-nExact}) · scale-chip switches ${nR} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T6a-2] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe T6a-2] …and ${nBad-PRINT_MAX} more`);
+  if(!nBad) console.log('[scaleprobe T6a-2] every switch keeps the anchor pitch (All/Mode) or its register (scale chip) in view');
+  return { toggles:nP, exact:nExact, chips:nR, total:nBad, differences:bad };
 }

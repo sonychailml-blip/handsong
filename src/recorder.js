@@ -1902,6 +1902,7 @@ function editResizeSeg(ev,t){
 function editInsertBass(t,deg,oct,sc,sev,len){
   if(!editGuard()) return false;
   const layer=editLayer();
+  trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
   let on=null, near=null, bd=Infinity;
   for(const e of events){
     if(e.layer!==layer||chaseRole(e.fn)!=='bs') continue;
@@ -1944,6 +1945,7 @@ function editChordTypeFor(layer,t,sc,sel){
 function editInsertChord(t,deg,oct,sc,sev,len,sel){
   if(!editGuard()) return false;
   const layer=editLayer();
+  trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
   let on=null, near=null, bd=Infinity;
   for(const e of events){
     if(e.layer!==layer||chaseRole(e.fn)!=='ch'||e.fn==='chOff') continue;
@@ -3862,6 +3864,28 @@ const ldTherm=n=> n.role==='ld' && !!(n.head && n.head.a && n.head.a.bend && n.h
    каждого события; сравнение по ссылке резало бы её на ложные сегменты на каждом ведении. null — нетипизированный аккорд. */
 const tyEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));
 let segView=null;
+/* ⛳ T6a — ЗАЩИТНЫЕ ПРОВЕРКИ ВИДА. Маршрут по строю (ключ источника — роль + тембр + вид) делает дорожку и ноту ОДНОГО вида для всего
+   нового материала, поэтому страховки плана T6 («новый сегмент, если вид события другой»; «проверка вида в функциях правки») стали
+   ПРОВЕРКАМИ: каждая пишет в консоль ОДИН раз за сессию на свой вид нарушения и НИЧЕГО не меняет в поведении. Сработать они могут только
+   на материале, записанном до маршрута по строю (ничего не сохраняется — после перезагрузки такого нет). Те же предикаты отдаёт
+   viewAudit — их сверяет проба P.checkRules на загруженной песне. */
+const VIEW_WARNED=new Set();
+function viewWarn(kind,msg){ if(VIEW_WARNED.has(kind)) return; VIEW_WARNED.add(kind); console.warn('[recorder] '+msg); }
+const noteSpansViews=n=>{ const h=n.head&&n.head.sc; return !!h && n.evs.some(e=>e.sc&&e.sc!==h); };
+/* Виды высотных событий дорожки (у ударов вида нет: высоты нет). */
+function layerViews(layer){ const S=new Set(); for(const e of events) if(e.layer===layer&&e.sc&&e.fn!=='drum') S.add(e.sc); return S; }
+function viewAudit(){
+  const notes=[], tracks=[];
+  for(const n of songNotes().notes) if(n.role!=='dr'&&noteSpansViews(n)) notes.push(n);
+  for(const ly of new Set(events.map(e=>e.layer))) if(layerViews(ly).size>1) tracks.push(ly);
+  return { notes, tracks };
+}
+/* Правка расшифровала ряд в ВИДЕ ОСИ sc — у правимого сегмента вид обязан быть тот же (попадание ловит только группу оси). */
+function editViewCheck(ev,sc){ const g=songSegs().byEv.get(ev);
+  if(g&&sc&&g.sc!==sc) viewWarn('edit',`an edit decoded a row in another tuning view than its note's (L${g.layer+1})`); }
+/* Вставка в дорожку пишет вид оси — в дорожке с нотами он обязан быть её видом. */
+function trackViewCheck(layer,sc){ const V=layerViews(layer);
+  if(sc&&V.size&&!V.has(sc)) viewWarn('insert',`an insert wrote a tuning view the track L${layer+1} does not hold`); }
 /* T4b2: индекс в строе ХРАНИМОГО события; у события без a.ti (после T4a таких нет) — перевод его ступени (тот же, что ставит T4a). */
 const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : eventTuningIndex(ev); };
 function songSegs(){
@@ -3876,6 +3900,7 @@ function songSegs(){
        любой из них резала бы глиссандо, которого на этих границах нет. Поэтому внутри такой ноты смен высоты не бывает, а ведение
        hold сменой высоты не считается НИКОГДА (подстраховка: hold пишется только терменвоксом). У баса и аккордов — как было. */
     const therm=ldTherm(n);
+    if(noteSpansViews(n)) viewWarn('note',`a note of L${n.layer+1} spans two tuning views (recorded before routing by tuning)`);   // T6a: проверка, поведение не меняет
     let cur=null;
     for(const ev of n.evs){
       const kind=chaseKind(ev.fn);
@@ -4162,7 +4187,7 @@ function onRec(){
      свойство взятого (что лежало в слое ДО него), а не открытых нот; паника/граница повтора посреди
      взятого не меняют того, что лежало раньше. */
   takeSt.clear(); takeSrc.clear(); takeJoin(loop.layer);
-  if(armLy!=null){ const k=laneSourceOf(armLy); if(k) takeSrc.set(armLy,k); }   // T2: вооружённая принимает ТОЛЬКО свой источник (сегодня — роль); прочие роли родят новые дорожки. Рождённая на ● — без роли, её займёт первое легшее «вкл»
+  if(armLy!=null){ const k=laneSourceOf(armLy); if(k) takeSrc.set(armLy,k); }   // T2: вооружённая принимает ТОЛЬКО свой источник (роль + тембр + вид строя — noteSource; прежде здесь стояло «сегодня — роль); прочие роли родят новые дорожки. Рождённая на ● — без роли, её займёт первое легшее «вкл»
   // T1: слой взятого вписан — его vBase/vTop, k и стражи (прежде одиночные vBase/takeK/…); СТРОГО ДО setRecording(true), как и было
   curTake=++takeSeq;   // S3.5c: суффикс аккорда/баса взятого; S3.5d: номер взятого (tk всех его событий)
   takeCapStart(curTake);   // O-2: снимок цепей на старте взятого. СТРОГО ПОСЛЕ выдачи curTake и ДО setRecording(true): дорожка автоматизации пишет только при recording и опирается на уже засеянную опору
@@ -4398,6 +4423,7 @@ export {
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
+  viewAudit, editViewCheck,   // T6a: защитные проверки вида — сводка для пробы P.checkRules и проверка правки (ui зовёт у расшифровки ряда)
   hlOf, legacyHlOf,   // T4b4: место подсветки переигранной ноты из индекса и прежнее по ступени — для пробы P.checkHl; legacy уходит в T4c
   laneRoleOf, laneLenOf, eventTuningIndex, chaseFor, chaseNote, legacyChaseNote, legacySongSegs,   // chaseFor/chaseNote и legacy* (T4b2) — для пробы P.checkLogic; legacy уходят в T4c. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять

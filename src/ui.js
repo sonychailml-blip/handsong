@@ -18,7 +18,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, rollSnapRow, rollDragTargetRow, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, rollSnapRow, rollDragTargetRow, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -30,7 +30,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
-         freezeState, unfreezeLayer, freezePinCaptures, recLayers } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -427,7 +427,9 @@ function applyRollBar(){
   if(gs.length>1){
     const i=Math.min(rollScale,gs.length-1), g=gs[i];
     rollScaleBtn.textContent=`${L(g.sc.name)} ${i+1}/${gs.length}`;
-    rollScaleBtn.onclick=()=>{ setRollScale((i+1)%gs.length); setRollSel(null); setRollDrag(null); applyRollBar(); };
+    rollScaleBtn.onclick=()=>{ const g0=rollGeom(), ax0=rollAxisNow(); setRollScale((i+1)%gs.length);   // T6a-2: прокрутка — тот же РЕГИСТР (у другого лада высоты не сравниваем)
+      if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows, 'reg'));
+      setRollSel(null); setRollDrag(null); applyRollBar(); };
   }
   /* T3: КНОПКА «ВСЕ / ЛАД» — только когда у лада оси есть высоты строя вне лада (rollAxisHasDim); подпись — ТЕКУЩИЙ вид. */
   rollRowsBtn.hidden = !rollAxisHasDim();
@@ -670,7 +672,9 @@ if(rollShapeEl) rollShapeEl.onclick=()=>{
 
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRollBtns(); };
 /* T3: «Все» ↔ «Лад». Меняется только ПОКАЗ (ось), не песня: выделение и правки не трогаются; прокрутка row0 зажимается снимком сама. */
-rollRowsBtn.onclick=()=>{ setRollRowsAll(!rollRowsAll); setRollDrag(null); applyRollBar(); };
+rollRowsBtn.onclick=()=>{ const g0=rollGeom(), ax0=rollAxisNow(); setRollRowsAll(!rollRowsAll);   // T6a-2: прокрутка — та же ВЫСОТА в той же точке окна (прежде row0 ехал числом и окно уезжало в другой регистр)
+  if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows, 'pitch'));
+  setRollDrag(null); applyRollBar(); };
 /* T3: ОДНОРАЗОВОЕ ИЗВЕСТИЕ — правка или вставка пришлась на приглушённый ряд (высота строя вне лада) и прилипла к ближайшей ступени
    лада. Призрак показывает это и так (он перескакивает приглушённые ряды); слово — чтобы прилипание не читалось поломкой. Раз за сессию. */
 let rollDimHintShown=false;
@@ -963,6 +967,7 @@ function rollUp(e){
       if(rollGrab.mode==='nlen'){ const ne=s.start+gd.len; if(s.end!=null&&Math.abs(ne-s.end)>1e-9) r=editResizeChordNote(s.ev, rollGrab.note, ne); }
       else{
         const g2=rollGeom(), pit= gd.prow!=null ? rollRowPitch(gd.prow, g2&&g2.sc) : null;
+        if(pit) editViewCheck(s.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)
         { const raw=rollNoteTarget(rollGrab); if(raw!=null && raw!==gd.prow) rollDimHint(); }   // T3: целевой ряд был приглушённым — объясняем один раз
         if(Math.abs(gd.t-s.start)>1e-9 || pit) r=editMoveChordNote(s.ev, rollGrab.note, gd.t, pit&&pit.deg, pit&&pit.oct);
       }
@@ -990,7 +995,8 @@ function rollUp(e){
            ⛳ E1/E2: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту во времени — ЦЕЛИКОМ, сегмент
            глиссандо во времени — ОТДЕЛЯЕТ и везёт один, смену одной высоты — всем событиям сегмента, глиссандо цело.
            Выделяем то, что он вернул (у отделённого — новое «вкл», см. длину выше). */
-        const g2=rollGeom(), tr=rollDragTargetRow(gd), pit=rollRowPitch(tr, g2&&g2.sc);   // T3: ряд корня + сдвиг пальца, прилипший к ЯРКОМУ ряду — та же функция, что у призрака
+        const g2=rollGeom(), tr=rollDragTargetRow(gd), pit=rollRowPitch(tr, g2&&g2.sc);
+        editViewCheck(rollGrab.seg.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)   // T3: ряд корня + сдвиг пальца, прилипший к ЯРКОМУ ряду — та же функция, что у призрака
         if(tr!==gd.rootRow+((gd.row|0)-gd.grabRow)) rollDimHint();   // U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было)
         const s=rollGrab.seg;
         if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct){ const r=editMoveSeg(s.ev, gd.t, pit.deg, pit.oct); if(r&&r!==true) selNote(r); }
