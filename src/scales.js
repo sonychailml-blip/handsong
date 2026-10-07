@@ -453,6 +453,15 @@ export function scaleView(s, tf=tunedFrom){
   }
   return v;
 }
+/* ⛳ ТОЖДЕСТВО ВИДА СТРОКОЙ (маршрут по строю): «id лада» + у лада с выбором якоря «@строй от». Это РОВНО ключ памяти scaleView
+   (лад base + tf у tunable, '' у прочих), а id ладов уникальны (T0, проба checkData) — значит строки равны ⇔ это ОДИН И ТОТ ЖЕ объект
+   вида. Тоники в строке нет: тональность — не источник звука (смена тоники посреди песни нормальна). Голый лад без вида (демо
+   стартового экрана; в события не попадает) у tunable даёт «@bare» — отдельно от любого вида. */
+export function viewIdOf(v){
+  if(!v) return '-';
+  const b=v.mode||v;
+  return b.id + (b.tunable ? '@'+(v.tunedFrom===undefined ? 'bare' : v.tunedFrom) : '');
+}
 const keyOf=s=>{ const A=anchorOf(s); return tonic-A+(A>tonic?12:0); };
 const cFix=(s=CUR())=>{ const A=anchorOf(s); return a3()*Math.pow(2,(A-9-(A>tonic?12:0))/12); };   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
 /* Частота ТОНИКИ/КЛЮЧА для дрона и родственного: у fixedKey — ФИКСИРОВАННАЯ высота ключа

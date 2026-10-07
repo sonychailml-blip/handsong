@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -108,7 +108,7 @@ const ts=layer=> takeSt.get(layer) || takeJoin(layer);
 /* ═══ ⛳ МАРШРУТ ПО РОЛИ (слайс T2): В ДОРОЖКЕ РОВНО ОДНА РОЛЬ ═══
    Смена роли посреди дубля начинает НОВУЮ дорожку; другая роль в вооружённую дорожку — тоже новая; сплит
    пишет две роли разом — значит две дорожки рождаются вместе. Одно ● — одно ⤺: все они несут tk взятого.
-   takeSrc (ниже): слой взятого → ключ его ИСТОЧНИКА (noteSource; сегодня — роль). Кто в ней:
+   takeSrc (ниже): слой взятого → ключ его ИСТОЧНИКА (noteSource; роль + тембр + вид строя). Кто в ней:
      • ВООРУЖЁННАЯ дорожка — со своим источником (по её событиям, laneSourceOf) с самого ●;
      • дорожка, рождённая на ● (как и прежде: onRec, loop.layer), — НИЧЬЯ, пока в неё не ЛЯЖЕТ первое «вкл»:
        чей источник первым сыграл, того она и есть. Поэтому запись одним источником без смены — ровно прежняя
@@ -126,16 +126,24 @@ const ts=layer=> takeSt.get(layer) || takeJoin(layer);
    поэтому оба ответа совпадают. Ведения и «выкл» маршрут не проходят. null — не нота источника (дрон). */
 /* ⛳ T3: ИСТОЧНИК = РОЛЬ + ТЕМБР (у ударных — набор). Тембр читается из «вкл» ноты (a.inst) и из удара (a.kit) —
    ровно тех событий, что маршрут и видит. Тембра нет (старое событие) — '-', то есть свой отдельный источник. */
-const noteSource=(fn,a)=>{ const r=evRole(fn); if(!r) return null;
+/* ⛳ МАРШРУТ ПО СТРОЮ (решение пользователя): ОДНА ДОРОЖКА = ОДИН ИСТОЧНИК ЗВУКА = роль + тембр + ВИД СТРОЯ (лад и якорь «строй
+   от»). У соло, баса и аккордов к ключу дописано тождество вида (scales.viewIdOf — строка, равная ровно тогда, когда это один объект
+   вида), у ударных — нет: высоты у них нет. Тоника в ключ НЕ входит — смена тональности посреди песни нормальна.
+   sc — замороженный вид события, которым push его и пометит (у шва повтора — вид аккорда, fz.sc; у прочих — живой CUR()).
+   ⚠️ ВИД ЖИВЁТ НА СОБЫТИИ (ev.sc), А НЕ В НАГРУЗКЕ a — поэтому ключ получил третий аргумент: прежняя форма (fn, a) не могла выразить
+   строй вовсе. Это изъян формы T2/T3 (ключ описан над нагрузкой, а часть источника — у события), и он стоил двух правок ВНЕ этой
+   функции: push передаёт вид, который сам запишет, laneSourceOf — вид события. takePeek соло и баса зовут без sc — умолчание CUR()
+   и есть то, что запишет их push (fz у них нет). */
+const noteSource=(fn,a,sc=CUR())=>{ const r=evRole(fn); if(!r) return null;
   const x = r==='dr' ? (a&&a.kit) : (a&&a.inst);
-  return r+':'+(x==null?'-':x); };
+  return r+':'+(x==null?'-':x) + (r==='dr' ? '' : '|'+viewIdOf(sc)); };
 /* Источник дорожки — по её первому «вкл»/удару. Дорожка одного источника по построению (с T2), поэтому первый и
    есть её; null — ни одной ноты (например, слой дрона). */
 /* ⚠️ T3: ТОЛЬКО «вкл» и удары. Ведения тембра не несут (у аккорда и баса его в них нет вовсе), и ключ по ведению
    вышел бы «роль:-». Это ЕДИНСТВЕННАЯ правка вне noteSource, которой потребовал T3, и она — изъян формы T2:
    laneSourceOf спрашивал ключ у ЛЮБОГО события, а ключ осмыслен только у начала ноты. */
 const isNoteStart=fn=> fn==='leadOn'||fn==='chOn'||fn==='bassOn'||fn==='drum';
-function laneSourceOf(layer){ for(const e of events) if(e.layer===layer&&isNoteStart(e.fn)){ const k=noteSource(e.fn,e.a); if(k) return k; } return null; }
+function laneSourceOf(layer){ for(const e of events) if(e.layer===layer&&isNoteStart(e.fn)){ const k=noteSource(e.fn,e.a,e.sc); if(k) return k; } return null; }   // маршрут по строю: вид — СОБЫТИЯ
 const takeSrc=new Map();     // слой взятого → ключ его источника (noteSource). Нет записи — дорожка ● ещё ничья
 /* ⛳ СЛЕДУЮЩИЙ СВОБОДНЫЙ НОМЕР СЛОЯ — ОДИН НА ВСЕ МЕСТА РОЖДЕНИЯ ПОСРЕДИ ПЕСНИ (T2). `maxLayer()+1` видит
    только слои, в которых уже ЕСТЬ события, а дорожка взятого до первой ноты пуста: две дорожки, рождённые
@@ -2933,7 +2941,7 @@ function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: в�
   const cb= fn[0]==='c' ? 1 : fn[0]==='b' ? 2 : 0;
   /* ⛳ T2: МАРШРУТ — ЗДЕСЬ, А НЕ У ВЫЗЫВАЮЩЕГО: отказ отсчёта (выше) уже случился, событие точно ляжет, значит
      рождение дорожки не останется пустым. Ниже этой строки отказов нет. */
-  if(ly===undefined) ly=takeRoute(noteSource(fn,a));   // ключ — ИСТОЧНИК ноты (сегодня роль; см. noteSource)
+  if(ly===undefined) ly=takeRoute(noteSource(fn,a,fz?fz.sc:CUR()));   // ключ — ИСТОЧНИК ноты (роль + тембр + вид строя; см. noteSource). Вид — тот же, что событие получит строкой ниже
   const S=ts(ly);                                     // T1: страж ключа и суффикс — ЭТОГО слоя (ключ владельца несёт номер слоя, значит и они по слою)
   const bv= cb===2 ? ((a&&a.v)||0) : 0;               // P2: очередь баса — ПО НОМЕРУ НОТЫ v (ключ владельца = слой+k+v); у одного владельца v=0 — ровно прежний страж
   if(cb===1 && t<S.chLastT) t=S.chLastT; else if(cb===2){ const lt=S.bsLast.get(bv); if(lt!=null && t<lt) t=lt; }

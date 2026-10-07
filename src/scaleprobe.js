@@ -3,6 +3,7 @@
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.tracks()         // МАРШРУТ ПО СТРОЮ: каждая дорожка песни — роль, тембр, вид строя (и сколько видов в ней: больше одного быть не должно)
      P.checkHl()        // T4b4: ПОДСВЕТКА переигранной и догнанной ноты по индексу — прогон по видам, события песни, догонялка; высоты вне лада
      P.checkRowFix()    // T4b4-1: нижний ряд по умолчанию в обеих осях и ряды нот аккорда при холодном и прогретом кэше (видимая правка)
      P.checkRows()      // T4b3: РЯДЫ РЕДАКТОРА по индексу — блоки, попадание, призрак, выделение каждого сегмента песни в осях «Все» и «Лад» + прогон
@@ -23,12 +24,12 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef } from './state.js';
 import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
+import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -489,4 +490,24 @@ export function checkHl(){
   if(!nBad && nEv) console.log('[scaleprobe T4b4] every replayed and chased highlight is identical when read from the tuning index');
   else if(!nEv) console.log('[scaleprobe T4b4] the song has no pitched events — record, load a backing or edit, then run again (the sweep above still ran)');
   return { sweep:nSweep, outOfMode:nOut, events:nEv, chase:nChase, total:nBad, differences:bad };
+}
+
+/* ═══ МАРШРУТ ПО СТРОЮ — ЧТО ЛЕЖИТ В КАЖДОЙ ДОРОЖКЕ (справка, не проверка; ничего не меняет) ═══
+   Строка на дорожку: L-номер, роль (laneRoleOf), тембр (laneTimbreOf — индекс тембра роли / набора ударных), вид(ы) строя её высотных
+   событий (scales.viewIdOf — тот же, что в ключе маршрута), число событий и подложка ли. Видов больше одного — предупреждение: так могла
+   лечь только запись, сделанная ДО маршрута по строю (ничего не сохраняется — после перезагрузки таких нет). */
+export function tracks(){
+  const L=new Map();
+  for(const e of events){
+    let r=L.get(e.layer); if(!r){ r={ views:new Set(), n:0, jam:false }; L.set(e.layer,r); }
+    r.n++; if(e.jam) r.jam=true;
+    if(e.sc && e.fn!=='drum' && e.fn!=='drone') r.views.add(viewIdOf(e.sc));
+  }
+  const rows=[...L.keys()].sort((a,b)=>a-b).map(ly=>{ const r=L.get(ly);
+    return { track:'L'+(ly+1), role:laneRoleOf(ly)||'-', timbre:laneTimbreOf(ly)??'-', view:[...r.views].join(' + ')||'-', events:r.n, backing:r.jam }; });
+  console.table(rows);
+  const mixed=rows.filter(x=>x.view.includes(' + '));
+  if(mixed.length) mixed.forEach(x=>console.warn(`[scaleprobe tracks] ${x.track} holds ${x.view.split(' + ').length} tuning views: ${x.view} (recorded before routing by tuning)`));
+  else console.log(`[scaleprobe tracks] ${rows.length} tracks, each with one tuning view at most`);
+  return rows;
 }
