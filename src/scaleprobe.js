@@ -1,6 +1,9 @@
 /* ⛳ ПРОБА УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ — консольный инструмент (как ухо-проба render.js: R.aud/R.live), НЕ часть приложения.
    Никто его не импортирует: модуль грузится только руками из консоли браузера, при открытом приложении:
      const P = await import(new URL('src/scaleprobe.js', location.href).href);
+     P.all()            // ВСЁ РАЗОМ: каждая проба по порядку, ОДНА сводная таблица (проба, случаи, материал песни, расхождения, время) и вердикт;
+                        //   песенные проверки НЕ засчитываются на пустой или бедной песне — «song: not enough material» и чего не хватает
+     await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
      P.checkRules()     // T6a: правило аккордов лада (chordRule) = сегодняшний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
@@ -29,9 +32,11 @@
 import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
-import { tonic, aRef, setTonic, setARef } from './state.js';
+import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
+import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit,
+         seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, loadJam, braceTap, setRegionOn,
+         onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -612,4 +617,162 @@ export function checkScroll(){
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe T6a-2] …and ${nBad-PRINT_MAX} more`);
   if(!nBad) console.log('[scaleprobe T6a-2] every switch keeps the anchor pitch (All/Mode) or its register (scale chip) in view');
   return { toggles:nP, exact:nExact, chips:nR, total:nBad, differences:bad };
+}
+
+/* ═══ МАТЕРИАЛ ПЕСНИ — ДОСТАТОЧНО ЛИ ЕГО, ЧТОБЫ ПЕСЕННЫЕ ПРОВЕРКИ ЧТО-ТО ДОКАЗЫВАЛИ ═══
+   Дважды проба «прошла» на пустой песне: ноль расхождений из нуля случаев. Здесь — перечень того, без чего песенная часть проб
+   ничего не проверяет: четыре роли; строи трёх семейств (равный, таблица, фиксированный ключ) и не меньше двух видов; аккорды трёх
+   видов (стопка без типа по правилу лада, пауэр-аккорд, типизированный); удержанная нота терменвокса (бенд — путь догонялки, T4b2);
+   распавшийся аккорд (однонотный тип — U2/U3/U4); подложка (ev.jam). → { ok, missing:[строки], counts } */
+export function material(){
+  const c={ ld:0, bs:0, ch:0, dr:0, equal:0, table:0, fixedKey:0, theremin:0, dissolved:0, backing:0, tertian:0, power:0, typed:0 }, views=new Set();
+  for(const e of events){
+    const a=e.a||{}, fn=e.fn;
+    if(e.jam) c.backing++;
+    const r= fn==='drum' ? 'dr' : fn.startsWith('lead') ? 'ld' : fn.startsWith('bass') ? 'bs' : fn.startsWith('ch') ? 'ch' : null;
+    if(r) c[r]++;
+    if(!r || r==='dr' || !e.sc) continue;
+    views.add(viewIdOf(e.sc));
+    if(TUNINGS[e.sc.tuning].equal!=null) c.equal++; else c.table++;
+    if(e.sc.fixedKey) c.fixedKey++;
+    if(fn==='leadOn' && a.bend && a.bend.length) c.theremin++;
+    if(fn==='chOn'){
+      if(Array.isArray(a.ty) && a.ty.length===1) c.dissolved++;
+      else if(a.ty) c.typed++;
+      else { const k=e.sc.chordRule&&e.sc.chordRule.kind; if(k==='power') c.power++; else if(k==='tertian') c.tertian++; }
+    }
+  }
+  c.views=views.size;
+  const NEED=[['ld','a solo note'],['bs','a bass note'],['ch','a chord'],['dr','a drum hit'],['equal','an equal-tuning scale'],['table','a table tuning (raga, Partch, a temperament)'],
+              ['fixedKey','a fixed-key scale (a historical temperament)'],['tertian','an untyped tertian chord'],['power','a power chord (pentatonic)'],['typed','a typed chord (palette)'],
+              ['theremin','a held theremin note with a bend'],['dissolved','a dissolved chord (one-note type)'],['backing','a backing']];
+  const missing=NEED.filter(([k])=>!c[k]).map(([,w])=>w);
+  if(c.views<2) missing.push('a second tuning view');
+  return { ok:!missing.length, missing, counts:c };
+}
+
+/* ═══ P.all — ВСЕ ПРОБЫ ОДНОЙ КОМАНДОЙ ═══
+   Каждая проба по порядку; её подробный вывод ПРИГЛУШЁН (console.log/warn/table/info на время прогона — ⚠️ одноразовые предупреждения
+   приложения, попавшие в это время, тоже не напечатаются), если не P.all({verbose:true}). Итог — ОДНА таблица: проба, случаи, материал песни
+   (сколько песенных единиц она прошла), расхождения, время; под таблицей — первые расхождения каждой ненулевой строки. Песенные строки не
+   засчитываются, если песне не хватает материала (material) — тогда вердикт «song: not enough material» и перечень недостающего. */
+const ALL_RUNS=[
+  ['T0 data',            ()=>checkData(),   r=>({ cases:r.checks, diff:r.mismatches.length, list:r.mismatches })],
+  ['T1 pitch',           ()=>checkPitch(),  r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
+  ['T2 view',            ()=>checkView(),   r=>({ cases:r.checks+r.cases, diff:r.total, list:r.mismatches })],
+  ['T4a tuning index',   ()=>checkTi(),     r=>({ cases:r.events, song:r.events, diff:r.mismatches.length, list:r.mismatches })],
+  ['T4b1 sound',         ()=>checkSound(),  r=>({ cases:r.events+r.sweep.cases, song:r.events, diff:r.eventMismatches.length+r.sweep.total, list:r.eventMismatches.concat(r.sweep.mismatches) })],
+  ['T4b2 recorder logic',()=>checkLogic(),  r=>({ cases:r.segments+r.chase, song:r.segments, diff:r.differences.length, list:r.differences })],
+  ['T4b3 editor rows',   ()=>checkRows(),   r=>({ cases:r.blocks+r.hits+r.ghosts+r.rows+r.chords, song:r.segments, diff:r.total, list:r.differences })],
+  ['T4b4-1 row fixes',   ()=>checkRowFix(), r=>({ cases:r.defaults+r.cache, diff:r.total, list:r.differences })],
+  ['T4b4 highlights',    ()=>checkHl(),     r=>({ cases:r.sweep+r.outOfMode+r.events+r.chase, song:r.events, diff:r.total, list:r.differences })],
+  ['T6a chord rules',    ()=>checkRules(),  r=>({ cases:r.views+r.steps+r.untyped, song:r.untyped, diff:r.differences.length, list:r.differences })],
+  ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles+r.chips, diff:r.total, list:r.differences })],
+  ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
+];
+export function all(opt={}){
+  const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
+  const rows=[], lists=[];
+  for(const [name,run,read] of ALL_RUNS){
+    const t0=performance.now(); let row;
+    if(!opt.verbose){ console.log=console.warn=console.table=console.info=mute; }
+    try{ const x=read(run()); row={ check:name, cases:x.cases, song:x.song==null?'—':x.song, differences:x.diff }; if(x.diff) lists.push([name,x.list||[]]); }
+    catch(err){ row={ check:name, cases:'—', song:'—', differences:'ERROR' }; lists.push([name,[String(err&&err.stack||err)]]); }
+    finally{ Object.assign(console,keep); }
+    row.ms=Math.round(performance.now()-t0); rows.push(row);
+  }
+  const M=material();
+  for(const r of rows) if(r.song!=='—') r.status = !M.ok ? 'song: not enough material' : r.differences===0 ? 'pass' : 'FAIL';
+                         else r.status = r.differences===0 ? 'pass' : 'FAIL';
+  console.table(rows);
+  for(const [name,list] of lists){ console.warn(`[scaleprobe all] ${name}: first differences`); list.slice(0,opt.show||5).forEach(m=>console.warn('   '+m)); }
+  const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
+  if(!M.ok) console.warn(`[scaleprobe all] song: not enough material — missing ${M.missing.join('; ')} (run await P.seed({replace:true}) for a complete test song)`);
+  console.log(`[scaleprobe all] ${nDiff===0&&M.ok ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views)`);
+  return { pass:nDiff===0&&M.ok, rows, material:M };
+}
+
+/* ═══ P.seed — ДЕТЕРМИНИРОВАННАЯ ТЕСТОВАЯ ПЕСНЯ ═══
+   ⛔ ЗАМЕНЯЕТ ТЕКУЩУЮ ПЕСНЮ. На непустой песне без {replace:true} — отказ (живой дубль не должен пропасть от опечатки: ничего не
+   сохраняется, но потерянный дубль — всё равно потеря). Пишет ТОЛЬКО через воронки рекордера: сценарные взятые — recorder.seedTake
+   (push: маршрут, номер взятого, ключи, вид, индекс в строе), правки — функции редактора (editCommit), подложка — loadJam
+   (loadArrangement). Руками ни одного события не пишется. Что строится (размер 4, у каждой части свои такты):
+     доли  0–16  мажор: соло (мелодия + удержанная нота терменвокса с бендом), бас с глиссандо, аккорды стопкой по правилу лада (прогрессия
+                 одним «вкл» и ведениями + отдельный аккорд) — три дорожки рождает ОДНО взятое (маршрут по роли);
+     доли 16–32  бас в раге Яман (таблица 22 шрути);
+     доли 32–48  аккорды в Партче (типизированные отношения палитры);
+     доли 48–64  Пифагор «строй от C» (фиксированный ключ): аккорды палитры и бас;
+     доли 64–80  пентатоника: пауэр-аккорды;
+   затем РЕДАКТОР: отдельный мажорный аккорд РАСПАДАЕТСЯ (удалена средняя нота), у первого аккорда Партча одна нота сдвинута во времени и
+   по высоте; затем ПОДЛОЖКА (джем I–vi–ii–V в мажоре, бас по корням, ударные), СКОБА повтора [такт 3, конец − 2 такта] пользователем,
+   пауза транспорта и ЗАМОРОЗКА дорожки баса в раге (если рендер доступен из консоли). Живые лад, «строй от» и септаккорд возвращаются. */
+const SID=id=>{ const i=SCALES.findIndex(x=>x.id===id); if(i<0) throw new Error('no scale '+id); return i; };   // id — стабильный идентификатор (T0), не имя (правило #25)
+export async function seed(opt={}){
+  console.log('[scaleprobe seed] P.seed REPLACES the current song with a test song (nothing is saved).');
+  if(editIsOpen()){ console.warn('[scaleprobe seed] the track editor is open — close it first.'); return null; }
+  if(events.length && !opt.replace){ console.warn(`[scaleprobe seed] the song has ${events.length} events — refusing. Run await P.seed({replace:true}) to replace it.`); return null; }
+  const keep={ sc:scaleIdx, tf:tunedFrom, sev:seventh };
+  const built=[]; const say=m=>{ built.push(m); console.log('[scaleprobe seed] '+m); };
+  try{
+    clearRec(); setLoopMetre(4); setSeventh(false);
+    let nid=0; const S=[];
+    const on =(fn,a,t)=>{ const id=++nid; S.push({fn,a,t,id}); return id; };
+    const at =(id,fn,a,t)=>S.push({fn,a,t,id});
+    const take=(label,scaleId,tf)=>{ setScaleIdx(SID(scaleId)); if(tf!==undefined) setTunedFrom(tf);
+      const r=seedTake(S.splice(0)); if(!r) throw new Error('seedTake refused — start the app (▶ Play) and stop the transport first');
+      say(`${label}: take ${r.take}, ${r.events} events → tracks ${r.layers.map(l=>'L'+(l+1)).join(', ')}`); return r; };
+    // ---- 1) мажор: соло, терменвокс, бас, аккорды ----
+    const solo=(t,d,len)=>{ const id=on('leadOn',{deg:d,oct:1,vol:.8,inst:0},t); at(id,'leadOff',{v:0},t+len); };
+    [[0,0],[1,2],[2,4],[3,5]].forEach(([t,d])=>solo(t,d,0.9));
+    { const id=on('leadOn',{deg:2,oct:1,vol:.8,inst:0,bend:[{dt:0,c:0},{dt:1,c:70},{dt:2,c:-50},{dt:3,c:0}]},4);
+      at(id,'leadSet',{deg:3,oct:1,vol:.8,hold:true,v:0},5); at(id,'leadSet',{deg:1,oct:1,vol:.7,hold:true,v:0},6); at(id,'leadOff',{v:0},7.5); }
+    [[8,4],[9,3],[10,2],[11,0]].forEach(([t,d])=>solo(t,d,0.9));
+    { const id=on('bassOn',{deg:0,oct:1,vol:.8,inst:0},0); at(id,'bassSet',{deg:3,oct:1,vol:.8},4); at(id,'bassSet',{deg:4,oct:1,vol:.7},8); at(id,'bassOff',{},12);
+      const id2=on('bassOn',{deg:0,oct:1,vol:.8,inst:0},12); at(id2,'bassOff',{},16); }
+    { const id=on('chOn',{deg:0,oct:1,vol:.8,inst:0,ty:null},0); at(id,'chSet',{deg:3,oct:1,vol:.8,ty:null},4); at(id,'chSet',{deg:4,oct:1,vol:.8,ty:null},8);
+      at(id,'chOff',{},12);   // «выкл» ПЕРЕД «вкл» следующего аккорда на ту же долю — тот же ключ владельца
+      const id2=on('chOn',{deg:5,oct:1,vol:.8,inst:0,ty:null},12); at(id2,'chOff',{},16); }
+    take('major: solo, theremin, bass, chords','major');
+    // ---- 2) бас в раге ----
+    { const id=on('bassOn',{deg:0,oct:1,vol:.8,inst:0},16); at(id,'bassSet',{deg:2,oct:1,vol:.8},20); at(id,'bassSet',{deg:4,oct:1,vol:.8},24); at(id,'bassSet',{deg:1,oct:1,vol:.8},28); at(id,'bassOff',{},32); }
+    take('raga Yaman: bass','raga-yaman');
+    // ---- 3) Партч: типизированные аккорды ----
+    { const v=scaleView(SCALES[SID('partch-43')],'T'), F=chordFams(v), ty=(f,k)=>{ const fam=F[f]||F[0]; return (fam.types[k]||fam.types[0]).iv; };
+      [[32,0,0,0],[36,11,1,0],[40,18,0,1],[44,25,2,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:ty(f,k)},t); at(id,'chOff',{},t+4); }); }
+    take('Partch: typed chords','partch-43');
+    // ---- 4) Пифагор «строй от C»: аккорды палитры и бас ----
+    { const v=scaleView(SCALES[SID('pythagorean')],0), F=chordFams(v), ty=(f,k)=>{ const fam=F[f]||F[0]; return (fam.types[k]||fam.types[0]).iv; };
+      [[48,0,0,0],[52,5,0,0],[56,7,0,1],[60,0,1,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:ty(f,k)},t); at(id,'chOff',{},t+4); });
+      const id=on('bassOn',{deg:0,oct:1,vol:.8,inst:0},48); at(id,'bassSet',{deg:5,oct:1,vol:.8},52); at(id,'bassSet',{deg:7,oct:1,vol:.8},56); at(id,'bassOff',{},64); }
+    take('Pythagorean tuned from C: palette chords, bass','pythagorean',0);
+    // ---- 5) пентатоника: пауэр-аккорды ----
+    [[64,0],[68,1],[72,3],[76,4]].forEach(([t,d])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:null},t); at(id,'chOff',{},t+4); });
+    take('major pentatonic: power chords','major-penta');
+    // ---- 6) редактор: распад аккорда и перенос одной ноты ----
+    const segOf=(id,start)=>songSegs().segs.find(g=>g.role==='ch'&&g.sc.id===id&&g.start===start&&g.first&&!g.ev.jam);
+    const g1=segOf('major',12);
+    if(g1 && editOpen(g1.layer) && editDeleteChordNote(g1.ev,1)) say(`editor: the major chord at beat 12 (L${g1.layer+1}) dissolved — its middle note deleted`);
+    else say('editor: dissolve FAILED');
+    const g2=segOf('partch-43',32);
+    if(g2 && editSetLayer(g2.layer) && editMoveChordNote(g2.ev,1,32.5,g2.deg+1,g2.oct)) say(`editor: one note of the first Partch chord (L${g2.layer+1}) moved half a beat later and one row up`);
+    else say('editor: chord-note move FAILED');
+    editClose();
+    // ---- 7) подложка, скоба, пауза ----
+    setScaleIdx(SID('major'));
+    if(loadJam({prog:2, rhythm:0, bass:'roots'})) say('backing: jam I–vi–ii–V in major (chords, root bass, drums) from beat 0'); else say('backing FAILED');
+    const L=songBeats(), Mt=loop.metre;
+    braceTap(2*Mt); braceTap(L-2*Mt); setRegionOn(true);
+    say(`repeat brace: beats ${loop.rgn.from}–${loop.rgn.to} (set by the user), repeat on`);
+    if(loop.on) onLoop();   // подложка подняла транспорт — пауза: проверки и заморозка идут на остановленном
+    // ---- 8) заморозка дорожки баса в раге ----
+    const gr=songSegs().segs.find(g=>g.role==='bs'&&g.sc.id==='raga-yaman');
+    if(gr){ try{ const R=await import('./render.js'); const r=await R.freeze(gr.layer); say(r&&r.installed ? `freeze: L${gr.layer+1} (bass in the raga) frozen` : `freeze: L${gr.layer+1} rendered but not installed (${r&&r.refused})`); }
+            catch(err){ say('freeze: not available from the console ('+(err&&err.message)+')'); } }
+  } finally {
+    setScaleIdx(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev);
+  }
+  tracks();
+  const M=material();
+  console.log(`[scaleprobe seed] built ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. Now run P.all().`);
+  return { built, events:events.length, material:M };
 }

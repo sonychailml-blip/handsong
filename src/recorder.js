@@ -4362,6 +4362,34 @@ function setLoopBpm(v){
   }
   loop.bpm=nb; schedInvalidate();
 }
+/* ⛳ СЦЕНАРНОЕ ВЗЯТОЕ — ЗАСЕВ ТЕСТОВОЙ ПЕСНИ ДЛЯ ПРОБЫ (scaleprobe P.seed). НЕ часть игры: из интерфейса его не зовёт никто.
+   Пишет ТОЛЬКО через push — ту же воронку, что живая запись: маршрут по источнику (роль + тембр + вид строя; новые дорожки рождает
+   takeMint → laneNew — правило #27), номер взятого tk, ключи k, вид события (sc/sev — живые CUR()/seventh на момент вызова), индекс в
+   строе a.ti. Отличие от живой записи ровно одно: время ЯВНОЕ (at), поэтому нет ни отсчёта, ни квантизации, ни часов — тот же путь, каким
+   уже пишет защёлка на старте записи (recLatchOpen). Начало взятого — как у onRec без вооружения (дорожка на ●, снимок цепей
+   takeCapStart), конец — как recStop без recAllOff (открытых нот у сценария нет: каждую он закрывает сам). Синхронно: ни кадр, ни тик
+   между шагами не вклиниваются.
+   steps: [{fn, a, t, id}] — id связывает «вкл» ноты с её ведениями и «выкл»: они идут в слой СВОЕЙ ноты (как r.layer у живой записи),
+   а «вкл» и удар — маршрутом. → { take, events, layers } или null (нет движка, идёт запись или транспорт, открыт редактор). */
+function seedTake(steps){
+  if(!AC || recording || loop.on || editIsOpen()) return null;
+  const fresh=!events.length;
+  if(fresh){ laneReset(); loop.layer=0; } else loop.layer=nextFreeLayer();
+  laneNew(loop.layer);
+  takeSt.clear(); takeSrc.clear(); takeJoin(loop.layer);
+  curTake=++takeSeq; takeCapStart(curTake);
+  recLastT=-Infinity; recHiT=-Infinity;
+  setRecording(true);
+  const lyOf=new Map(); let n=0;
+  try{
+    for(const st of steps){
+      const ly = (st.id!=null && lyOf.has(st.id)) ? lyOf.get(st.id) : undefined;
+      if(!push(st.fn, st.a, st.t, null, false, ly)) continue;
+      n++; if(ly===undefined && st.id!=null) lyOf.set(st.id, pushLy);
+    }
+  } finally { setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate(); }
+  return { take:curTake, events:n, layers:[...new Set(lyOf.values())] };
+}
 function clearRec(){
   clearPump(); loop.on=false; fxPlayStop(); events.length=0; loop.rgn.user=false; rgnApply(0,loop.metre,false); schedInvalidate(); laneReset(); setRecording(false); softAllOff(); droneOff();   // S3.5b: loop.on=false ПЕРЕД rgnApply — остановленному транспорту перепривязывать нечего; скоба — снова «следует», повтор выключен (user — не часть временнóй карты, поэтому пишется напрямую)   // ✕ — песни больше нет, значит нет ни дорожек, ни области повтора: помеченный участок пустой песни был бы ложью на экране
   hooks.loop && hooks.loop(false);
@@ -4423,6 +4451,7 @@ export {
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
   autChainOf, autChainAdd, autChainRemove, autChainMove,   // O-4 часть 2: цепь САМОЙ ДОРОЖКИ (живая цепь не трогается — см. шапку). ⚠️ fxAddableIds отсюда НЕ реэкспортируем: меню берёт его прямо у audio, где он и объявлен
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
+  seedTake,   // засев тестовой песни через push (scaleprobe P.seed) — не часть игры
   viewAudit, editViewCheck,   // T6a: защитные проверки вида — сводка для пробы P.checkRules и проверка правки (ui зовёт у расшифровки ряда)
   hlOf, legacyHlOf,   // T4b4: место подсветки переигранной ноты из индекса и прежнее по ступени — для пробы P.checkHl; legacy уходит в T4c
   laneRoleOf, laneLenOf, eventTuningIndex, chaseFor, chaseNote, legacyChaseNote, legacySongSegs,   // chaseFor/chaseNote и legacy* (T4b2) — для пробы P.checkLogic; legacy уходят в T4c. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
