@@ -1944,6 +1944,7 @@ function editChordTypeFor(layer,t,sc,sel){
 }
 function editInsertChord(t,deg,oct,sc,sev,len,sel){
   if(!editGuard()) return false;
+  if(sc && sc.chordRule && sc.chordRule.kind==='none') return false;   // ⛳ T6b: в ладу без аккордов (правило 'none') аккорда нет — не вставляем беззвучный
   const layer=editLayer();
   trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
   let on=null, near=null, bd=Infinity;
@@ -2813,8 +2814,8 @@ const makeENG=A=>({
   leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),a&&a.tie,when),   // V2: tie ПЕРЕД when (правило #15)   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqsAt(a.deg,a.ty?evTi(a,ctx,true):undefined,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // T4b1: типизированный — из индекса корня; без типа — по ступени (терции/пауэр — T6)   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
-  chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqsAt(a.deg,a.ty?evTi(a,ctx,true):undefined,a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
+  chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqsAt(a.deg,evTi(a,ctx,true),a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // T4b1: типизированный — из индекса корня; без типа — по ступени (терции/пауэр — T6)   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
+  chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqsAt(a.deg,evTi(a,ctx,true),a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
   chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
   /* ⛳ V4: СКОЛЬЖЕНИЕ БАСА — ИЗ КАРТЫ СОБЫТИЯ, И ОТСУТСТВИЕ КАРТЫ ЗНАЧИТ «НЕ ЗАДАНО» (умолчание движка BASS_GLIDE_TC), а НЕ
      «возьми живую цепь». Карту бас несёт ТОЛЬКО при прицепочном параметре в цепи баса (gestures), поэтому ей нет у всего

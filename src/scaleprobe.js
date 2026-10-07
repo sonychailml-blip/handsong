@@ -6,6 +6,7 @@
      await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkUntyped()   // T6b: нетипизированные аккорды — цена по правилу лада от индекса корня против прежней по ступени и tag; песня, догонялка, ряды, распад
      P.checkLabels()    // T6c: подписи аккорда (chordLabel, chordNotesStr) по правилу лада против прежних по tag — каждый вид × ступень × септаккорд × 12 тоник
      P.checkRules()     // T6a: правило аккордов лада (chordRule) = сегодняшний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
      P.checkScroll()    // T6a-2: прокрутка редактора через «Все/Лад» (та же высота) и чип лада (тот же регистр) — по каждому виду
@@ -30,7 +31,7 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps, chordLabel, chordNotesStr, legacyChordLabel, legacyChordNotesStr,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps, chordLabel, chordNotesStr, legacyChordLabel, legacyChordNotesStr, chordReadsTi,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
@@ -159,6 +160,7 @@ function sweep(stage, what, A, B, pick, opt={}){
               cases++; { const a=A.bass(d,o,va), b=B.bass(d,o,vb); if(a!==b) miss(`${at} bass deg ${d} reg ${o}: ${what[0]} ${a} ${what[1]} ${b}`); }
             }
             for(let d=0;d<=chMax(n);d++) for(const [ty,sev] of tys){
+              if(!ty && va.chordRule && va.chordRule.kind==='none') continue;   // T6b: «аккорда нет» — смена определения, её проверяет P.checkUntyped
               const X=A.chord(d,o,va,sev,ty), Y=B.chord(d,o,vb,sev,ty);
               const tag=()=>`${at} chord deg ${d} reg ${o} type ${ty?'['+ty.join(',')+']':'none'}${sev?' 7th':''}`;
               if(X.length!==Y.length){ cases++; miss(`${tag()}: ${X.length} notes ${what[0]}, ${Y.length} ${what[1]}`); continue; }
@@ -392,6 +394,7 @@ export function checkRows(){
         nRow++; { const got=ax.rowOfTi(tuningIndexOf(d,v,false),o); if(got!==want) miss(`${at}: melody/bass row from ti ${got}, from degree ${want}`); }
         nRow++; { const got=ax.rowOfTi(tuningIndexOf(d,v,true),o); if(got!==want) miss(`${at}: chord-root row from ti ${got}, from degree ${want}`); }
         for(const [ty,sev] of tys){
+          if(!ty && v.chordRule && v.chordRule.kind==='none') continue;   // T6b: «аккорда нет» — проверяет P.checkUntyped
           const g={ role:'ch', deg:d, oct:o, ti:tuningIndexOf(d,v,true), sc:v, sev, ty };
           nTone++; const rN=RP.root(g,ax), rL=RP.legacyRoot(g,ax);
           const tt=`${at} chord ${ty?'['+ty.join(',')+']':'none'}${sev?' 7th':''}`;
@@ -667,6 +670,7 @@ const ALL_RUNS=[
   ['T4b3 editor rows',   ()=>checkRows(),   r=>({ cases:r.blocks+r.hits+r.ghosts+r.rows+r.chords, song:r.segments, diff:r.total, list:r.differences })],
   ['T4b4-1 row fixes',   ()=>checkRowFix(), r=>({ cases:r.defaults+r.cache, diff:r.total, list:r.differences })],
   ['T4b4 highlights',    ()=>checkHl(),     r=>({ cases:r.sweep+r.outOfMode+r.events+r.chase, song:r.events, diff:r.total, list:r.differences })],
+  ['T6b untyped chords', ()=>checkUntyped(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
   ['T6c chord labels',   ()=>checkLabels(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T6a chord rules',    ()=>checkRules(),  r=>({ cases:r.views+r.steps+r.untyped, song:r.untyped, diff:r.differences.length, list:r.differences })],
   ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles+r.chips, diff:r.total, list:r.differences })],
@@ -808,4 +812,64 @@ export function checkLabels(){
   if(hidden) console.log(`[scaleprobe T6c] information: ${hidden} strings differ on modes whose chord labels are never shown (${[...hiddenIds].join(', ')})`);
   if(!bad.length) console.log('[scaleprobe T6c] every shown chord label and note list reads the same from the chord rule');
   return { cases, hidden, hiddenModes:[...hiddenIds], total:bad.length, mismatches:bad };
+}
+
+/* ═══ T6b: НЕТИПИЗИРОВАННЫЕ АККОРДЫ — ЦЕНА ПО ПРАВИЛУ ЛАДА ОТ ИНДЕКСА КОРНЯ ═══
+   Сравнение === (частота И интервал каждой ноты) с ПРЕЖНЕЙ ценой — legacyChordNotes (по ступени и tag):
+   1) ПРОГОН: каждый вид, где правило строит нетипизированный аккорд (tertian/power/ratios), и — для полноты — лады с палитрой (их
+      нетипизированный аккорд недостижим, цена прежняя) × 12 тоник × A4_SET × регистры 0..3 × ступени 0..n × септаккорд выкл/вкл:
+      chordNotes (по ступени, теперь правилом) и chordNotesAt (по индексу корня через обратную выборку — то, чем играет ENG);
+   2) 'none': у каждого вида без аккордов нетипизированный аккорд — НОЛЬ нот, подпись — пустая (смена определения, названная);
+   3) данные: каждый лад с аккордами без палитры — на равном строе (иначе цена номинально-равной была бы ложью — недостижимо);
+   4) ПЕСНЯ: каждое нетипизированное «вкл»/ведение аккорда — цена ENG (chordNotesAt из a.ti) против прежней; догонялка на каждой границе
+      событий (нагрузка chaseNote, цена из индекса) против прежней по legacyChaseNote; интервалы распада (chordNotesAt сегмента — ими
+      dissolvePlan пишет однонотные типы) против прежних; ряды редактора и призрак сверяет P.checkRows (его прежний путь — тоже прежняя цена). */
+export function checkUntyped(){
+  const bad=[]; let cases=0, song=0, none=0, nPal=0;
+  const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
+  const cmp=(at,X,Y)=>{ cases++;
+    if(X.length!==Y.length){ miss(`${at}: ${X.length} notes now, ${Y.length} before`); return; }
+    for(let i=0;i<X.length;i++) if(X[i].f!==Y[i].f||X[i].iv!==Y[i].iv) miss(`${at} note ${i}: ${X[i].f} (iv ${X[i].iv}) now, ${Y[i].f} (iv ${Y[i].iv}) before`); };
+  const keepT=tonic, keepA=aRef;
+  try{
+    for(const [s0,tf] of allViews()){
+      const v=scaleView(s0,tf), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, id=v.id+(v.tunable?`[from ${tf}]`:'');
+      if(k==='none'){ for(let d=0;d<=n;d++) for(const sev of [false,true]){ none++;
+          if(chordNotes(d,0,v,sev,null).length) miss(`${id} degree ${d}: a chordless mode still prices an untyped chord`);
+          if(chordLabel(d,v,sev)!==''||chordNotesStr(d,v,sev)!=='') miss(`${id} degree ${d}: a chordless mode still names an untyped chord`); }
+        continue; }
+      if(k==='palette') nPal++;
+      const T=TUNINGS[v.tuning];
+      if(k!=='palette' && T.equal==null) miss(`${id}: an untyped chord rule on a TABLE tuning — its nominal-equal price would be a lie`);
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const A4 of A4_SET){ setARef(A4);
+          for(let o=0;o<4;o++) for(let d=0;d<=n;d++) for(const sev of [false,true]){
+            const at=`${id} tonic ${tn} A4 ${A4} degree ${d} reg ${o}${sev?' 7th':''}`, L=legacyChordNotes(d,o,v,sev,null);
+            cmp(at+' (by degree)', chordNotes(d,o,v,sev,null), L);
+            cmp(at+' (from ti)', chordNotesAt(d,tuningIndexOf(d,v,true),o,v,sev,null), L);
+          }
+        }
+      }
+    }
+  } finally { setTonic(keepT); setARef(keepA); }
+  // ---- песня ----
+  for(const e of events){
+    if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty || !e.sc) continue;
+    song++; const a=e.a;
+    cmp(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}`, chordNotesAt(a.deg,a.ti,a.oct,e.sc,e.sev,null), legacyChordNotes(a.deg,a.oct,e.sc,e.sev,null));
+  }
+  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q);
+  for(const x of X) for(const sct of chaseFor(x)){
+    if(sct.role!=='ch') continue; const N=chaseNote(sct,x), O=legacyChaseNote(sct,x); if(N.a.ty) continue;
+    song++; cmp(`chase at beat ${Math.round(x*1000)/1000} L${sct.on.layer+1}`, chordNotesAt(N.a.deg,N.a.ti,N.a.oct,N.ctx.sc,N.ctx.sev,null), legacyChordNotes(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,null));
+  }
+  for(const g of songSegs().segs){
+    if(g.role!=='ch' || g.ty) continue;
+    song++; cmp(`dissolve intervals of the chord at beat ${Math.round(g.start*1000)/1000} L${g.layer+1}`, chordNotesAt(g.deg,g.ti,g.oct,g.sc,g.sev,null), legacyChordNotes(g.deg,g.oct,g.sc,g.sev,null));
+    if(!chordReadsTi(g.ti,g.sc,g.ty)) miss(`segment at beat ${g.start} L${g.layer+1}: an untyped chord that does not read its index`);
+  }
+  console.log(`[scaleprobe T6b] cases ${cases} (sweep + song) · song items ${song} (chords, chase, dissolve) · chordless modes checked ${none} · palette views ${nPal} (unreachable, priced as before) · differences ${bad.length}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T6b] '+m));
+  if(!bad.length) console.log('[scaleprobe T6b] every untyped chord prices identically from its chord rule and its root index; chordless modes build no chord');
+  return { cases, song, none, palette:nPal, total:bad.length, mismatches:bad };
 }

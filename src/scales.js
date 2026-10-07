@@ -971,7 +971,7 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
      tertian — стопка через ступень лада (i, i+2, i+4, +6 у септаккорда), перенос периода — в шаг;
      ratios  — отношения правила (triad/seventh), округлённые к шагу строя (stepFor);
      power   — корень + квинта строя (fifthStep) + период.
-   ⚠️ palette и none — у таких ладов нетипизированного аккорда нет (палитра всегда даёт тип; noChords аккордов не строит), подпись не
+   ⛳ T6b: none — ЯВНО ПУСТО («аккорда нет»): цена — ноль нот, подпись — пустая строка. ⚠️ palette и none — у таких ладов нетипизированного аккорда нет (палитра всегда даёт тип; noChords аккордов не строит), подпись не
    рисуется (draw: палитра пишет корень, noChords — объяснение). Функция всё равно ТОТАЛЬНА — форма пауэр-аккорда, как у chordSteps для
    всех таких ладов, КРОМЕ макамов: у них tag 'maqam' давал стопку. Разница — только у макамов и только там, где её никто не видит и
    не слышит (noChords); проба P.checkLabels считает её отдельно как «не показывается». */
@@ -981,9 +981,10 @@ export function ruleChordSteps(deg, s=CUR(), sev=seventh){
     const ks=sev?[0,2,4,6]:[0,2,4];
     return ks.map(q=>{const j=deg+q; return s.iv[j%n]+s.edo*Math.floor(j/n);});
   }
+  if (k==='none') return [];   // ⛳ T6b: 'none' — ЯВНО «аккорда нет» (noChords), а не тихий откат к пауэр-аккорду
   const r=s.iv[deg%n]+s.edo*Math.floor(deg/n);
   if (k==='ratios'){ const rs=sev?R.seventh:R.triad; return rs.map(ra=>r+stepFor(s.edo,ra)); }
-  return [r, r+fifthStep(s.edo), r+s.edo];
+  return [r, r+fifthStep(s.edo), r+s.edo];   // power — и palette: у лада с палитрой нетипизированного аккорда не пишет ни один путь; цена прежняя (форма пауэр-аккорда)
 }
 /* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
    legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */
@@ -1071,10 +1072,28 @@ export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAn
    индекса ровно там, где из него звучат). Ложь — путь ступени: нет индекса, нет типа (стопка терций, пауэр-аккорд — T6) или строй без ветки
    по индексу (таблица без центов лада — таких ладов нет). */
 export function chordReadsTi(ti, s=CUR(), ty=null){
-  return ti!==undefined && !!ty && (!!s.cents || periodOf(s)!==2 || TUNINGS[s.tuning].equal!=null);
+  if(ti===undefined) return false;
+  if(!ty){ const k=s.chordRule&&s.chordRule.kind; return k==='tertian'||k==='power'||k==='ratios'; }   // ⛳ T6b: нетипизированный — по правилу лада от места корня в ладу
+  return !!s.cents || periodOf(s)!==2 || TUNINGS[s.tuning].equal!=null;
+}
+/* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ АККОРД — ЦЕНА ПО ПРАВИЛУ ЛАДА (ruleChordSteps) от СТУПЕНИ КОРНЯ deg в регистре oct. Шаги правила — индексы
+   НОМИНАЛЬНОГО равного строя лада (s.iv + перенос периода), регистр — oct; цена — то же выражение, что прежняя равная ветка chordNotes
+   (pitchHz(TE, baseF()/2, 0, шаг, oct)), поэтому побитно прежняя на каждом ладу, где правило строит аккорд (проба P.checkUntyped).
+   ⚠️ НАЗВАННЫЙ СЛУЧАЙ: у лада на ТАБЛИЦЕ строя цена по-прежнему номинально-равная (TE), а не по таблице. Нетипизированного аккорда на
+   таком ладу не пишет ни один путь: каждый лад с аккордами без палитры стоит на равном строе (доказательство данными — P.checkRules).
+   Переход на цену по таблице — смена определения, недостижимая сегодня; решается, когда появится такой лад (лад пользователя). */
+function untypedNotes(deg,oct,s,sev){
+  const T=TUNINGS[s.tuning], n=s.iv.length, P=periodOf(s);
+  const r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+  const TE= T.equal!=null ? T : { period:P, equal:s.edo };
+  return ruleChordSteps(deg,s,sev).map(st=>({ f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 }));
 }
 export function chordNotesAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){
   if(!chordReadsTi(ti,s,ty)) return chordNotes(deg,oct,s,sev,ty);
+  /* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ — место корня в ладу из ИНДЕКСА (обратная выборка modeSlotOfTi, в виде события): для ступеней 0..n
+     это ровно записанная пара (ступень, регистр) — проба T4b4, — и правило строит от неё. Корня в ладу нет (высота вне лада — до T5 её не
+     пишет никто; T5 делает такой аккорд типизированным) — по записанной ступени, как прежде (уходит в T4c). */
+  if(!ty){ const p=modeSlotOfTi(ti,oct,s); return p ? untypedNotes(p.deg,p.oct,s,sev) : chordNotes(deg,oct,s,sev,null); }
   const T=TUNINGS[s.tuning], E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
   if (s.cents && s.gridChords){ const a=modeAnchor(s);
     return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
@@ -1167,7 +1186,8 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
      ⚠️ Нетипизированный аккорд на ЦЕНТОВОМ ладу (ty нет) попадает сюда и прежде ценился НОМИНАЛЬНЫМИ равными шагами (edo лада), а
      не своей таблицей. Из интерфейса это недостижимо (прогрессии — только у 7-ступенных ладов с аккордами, а все такие центовые лады
      noChords; живая игра на типизированных ладах всегда несёт тип), но ради побитной верности цена та же: номинальный равный строй
-     { period, equal: edo }. Правила аккордов как данные — T6; там этот путь исчезнет. */
+     { period, equal: edo }. С T6b нетипизированный аккорд считает untypedNotes по правилу лада — той же номинально-равной ценой (случай назван у неё). */
+  if(!ty) return untypedNotes(deg,oct,s,sev);   // ⛳ T6b: без типа — по правилу лада (тот же расчёт; 'none' — ноль нот)
   const r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
   const TE= T.equal!=null ? T : { period:P, equal:s.edo };
   return chordSteps(deg,s,sev,ty).map(st=>({ f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 })); }
@@ -1411,6 +1431,7 @@ export const SEV={'|11':'maj7','|10':'7','m|10':'m7','m|11':'m(maj7)','°|9':'°
    нетипизированные аккордовые лады) — проба P.checkLabels; прежнее тело — legacyChordLabel (только для пробы). */
 export function chordLabel(deg,s=CUR(),sev=seventh){
   const n=s.iv.length, d=deg%n;
+  if (s.chordRule && s.chordRule.kind==='none') return '';   // ⛳ T6b: аккорда нет — и имени нет (chordNotesStr даёт '' сам: ноль нот)
   if (!(s.chordRule && s.chordRule.kind==='tertian')){
     return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
   }
