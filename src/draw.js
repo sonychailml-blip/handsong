@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordNotes, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, chordReadsTi, tuningIndexOf, legacyChordNotes } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordNotes, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, chordReadsTi, tuningIndexOf, legacyChordNotesRef } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollScale, rollRowsAll, tonic, ROLL_EDITABLE,
@@ -972,7 +972,7 @@ function legacyRollSegRoot(s,ax){ return ax.rowOf(s.deg,s.oct); }
 function legacyRollSegNotes(s,ax,total){
   const r0=ax.rowOf(s.deg,s.oct);
   if(s.role!=='ch') return [{ r:r0, dev:null }];
-  const N=legacyChordNotes(s.deg,s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;   // T6b: ноты — ПРЕЖНЕЙ ценой (по ступени и tag) — сравнение рядов покрывает и T6b
+  const N=legacyChordNotesRef(s.deg,s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;   // «стопка»: у лада stack опора — прежняя арифметика стопки. T6b: ноты — ПРЕЖНЕЙ ценой (по ступени и tag) — сравнение рядов покрывает и T6b
   const fr=chordRowFreq(s.deg,s.oct,s.sc,s.sev);
   return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
 }

@@ -79,7 +79,11 @@ const TBL={
 /* ⛳ T6a: chordRule — ПРАВИЛО НЕТИПИЗИРОВАННОГО АККОРДА ЛАДА, ДАННЫМИ (как id и tuning в T0). Каким будет аккорд, когда тип ему не задан:
      {kind:'tertian'} — стопка терций по выборке лада (через ступень: i, i+2, i+4, +6 у септаккорда); диатоника, этнические и симметричные,
                         макамы (у тех аккордов нет — noChords — и правило 'none' важнее);
-     {kind:'power'}   — корень + квинта строя + период (пентатоники, блюз);
+     {kind:'stack'}   — СТОПКА ЧЕРЕЗ СТУПЕНЬ ЛАДА, как tertian (i, i+2, i+4, +6 у септаккорда), но в 5–6-ступенных ладах — пентатоники,
+                        блюз, японские (решение пользователя, записано при T6b): каждый тон аккорда — внутри лада. Отдельный вид, а не tertian,
+                        потому что такая стопка — не всегда терции (C–E–A, D–G–C…), и подпись у неё своя (stackLabel);
+     {kind:'power'}   — корень + квинта строя + период; у ладов данных его больше нет (с «стопки»), живёт как прежний вид для
+                        консольного сравнения на слух (R.powerOld) и как форма недостижимого аккорда без типа у ладов с палитрой;
      {kind:'ratios', triad, seventh} — интервалы ОТНОШЕНИЯМИ, округлёнными к шагу строя (19/31-TET; сюда переехали прежние поля chord/chord7);
      {kind:'palette'} — у лада ПАЛИТРА (typedChords) и своего нетипизированного правила нет: аккорд без типа здесь не пишется ни одним путём;
      {kind:'none'}    — аккордов нет (noChords).
@@ -96,9 +100,9 @@ export const SCALES=[
  {id:'mixolydian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Mixolydian', ru:'Миксолидийский'},               trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,4,5,7,9,10], tag:'dia'},
  {id:'locrian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Locrian', ru:'Локрийский'},                   trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,1,3,5,6,8,10], tag:'dia'},
  {id:'hungarian-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Hungarian minor', ru:'Венгерский минор'},             trad:'common', grp:GRP.ethnic, grpKey:'ethnic',         edo:12, iv:[0,2,3,6,7,8,11], tag:'ethnic'},
- {id:'major-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Major pentatonic', ru:'Мажорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
- {id:'minor-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Minor pentatonic', ru:'Минорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
- {id:'blues', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'},                  trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
+ {id:'major-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Major pentatonic', ru:'Мажорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
+ {id:'minor-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Minor pentatonic', ru:'Минорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
+ {id:'blues', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'},                  trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
  {id:'chromatic', tuning:'edo12', chordRule:{kind:'palette'}, name:{en:'Chromatic (12 notes)', ru:'Хроматика (12 нот)'},           trad:'common', grp:GRP.chromatic, grpKey:'chromatic',                   edo:12, iv:range(12),        tag:'chrom', typedChords:'chrom12'},
  {id:'maqam-rast', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Rast (quarter-tones)', ru:'Макам Раст (¼-тоны)'},          trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam', noChords:true},
  {id:'maqam-bayati', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Bayati (quarter-tones)', ru:'Макам Баяти (¼-тоны)'},         trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam', noChords:true},
@@ -134,13 +138,13 @@ export const SCALES=[
     пауэр. Ни у одной нет noChords. Блюзовая мажорная берёт СУЩЕСТВУЮЩУЮ группу
     'Пентатоника / блюз' (строка 1-в-1 как у Мажорной/Минорной/Блюза) — в меню встаёт
     внутрь неё, а не отдельной группой. Добавлены В КОНЕЦ (индексы 29..35 не поехали). */
- {id:'egyptian', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'},   trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,5,7,10], tag:'penta'},
- {id:'man-gong', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}   /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */,    trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,3,5,8,10], tag:'penta'},
- {id:'ritusen', tuning:'edo12', chordRule:{kind:'power'}, name:{default:'Ritusen', ru:'Ритусэн'}   /* Ritusen — написание из сводов ладов (пентатоника 1-2-4-5-6, блюзовая мажорная; связывают с рагой Дурга); от японского лада рицу (律) — тоже компиляционное имя */,                 trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,2,5,7,9],  tag:'penta'},
- {id:'hungarian-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Hungarian pentatonic', ru:'Венгерская пентатоника'},  trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,3,5,6,9],  tag:'penta'},
- {id:'scriabin-penta', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,4,7,10], tag:'penta'},
- {id:'kumoi-western', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'},            trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
- {id:'major-blues', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Major blues', ru:'Блюзовая мажорная'},       trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues',  edo:12, iv:[0,2,3,4,7,9], tag:'penta'},
+ {id:'egyptian', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'},   trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,5,7,10], tag:'penta'},
+ {id:'man-gong', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}   /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */,    trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,3,5,8,10], tag:'penta'},
+ {id:'ritusen', tuning:'edo12', chordRule:{kind:'stack'}, name:{default:'Ritusen', ru:'Ритусэн'}   /* Ritusen — написание из сводов ладов (пентатоника 1-2-4-5-6, блюзовая мажорная; связывают с рагой Дурга); от японского лада рицу (律) — тоже компиляционное имя */,                 trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,2,5,7,9],  tag:'penta'},
+ {id:'hungarian-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Hungarian pentatonic', ru:'Венгерская пентатоника'},  trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,3,5,6,9],  tag:'penta'},
+ {id:'scriabin-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,4,7,10], tag:'penta'},
+ {id:'kumoi-western', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'},            trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
+ {id:'major-blues', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Major blues', ru:'Блюзовая мажорная'},       trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues',  edo:12, iv:[0,2,3,4,7,9], tag:'penta'},
  /* Макамы (24-TET). trad:'mideast', tag:'maqam', noChords:true — как у Раст/Баяти/Хиджаз:
     аккордов нет (роль «Аккорды» показывает подсказку, гейт supportsChords). Все десять
     (три прежних + семь новых) сведены в одну подгруппу grp:GRP.maqamat, grpKey:'maqamat' — строка 1-в-1,
@@ -164,10 +168,10 @@ export const SCALES=[
     Ин намеренно совпадает по iv с 'Кумои (зап.)' из мировых пентатоник — это разные лады
     по имени/группе, общий iv безвреден (state по scaleIdx, луп по ссылке на sc).
     Добавлены В КОНЕЦ (индексы 45..48 не поехали), в меню — новая группа grp 'Японские'. */
- {id:'hirajoshi', tuning:'edo12', chordRule:{kind:'power'}, name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
- {id:'kumoi-japanese', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
- {id:'in-insen', tuning:'edo12', chordRule:{kind:'power'}, name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
- {id:'iwato', tuning:'edo12', chordRule:{kind:'power'}, name:{default:'Iwato', ru:'Ивато'},                              trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,6,10], tag:'penta'},
+ {id:'hirajoshi', tuning:'edo12', chordRule:{kind:'stack'}, name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
+ {id:'kumoi-japanese', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
+ {id:'in-insen', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
+ {id:'iwato', tuning:'edo12', chordRule:{kind:'stack'}, name:{default:'Iwato', ru:'Ивато'},                              trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,6,10], tag:'penta'},
  /* Партч (Harry Partch, «Genesis of a Music») — 43-тоновая ЧИСТАЯ ИНТОНАЦИЯ (11-предельный
     тональный ромб). Центы посчитаны из канонических отношений (ниже); 2 знака сохраняют JI
     точно (в отличие от целочисленных приближений гамелана). Октава = 2/1 (тождество Партча),
@@ -975,9 +979,15 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
    рисуется (draw: палитра пишет корень, noChords — объяснение). Функция всё равно ТОТАЛЬНА — форма пауэр-аккорда, как у chordSteps для
    всех таких ладов, КРОМЕ макамов: у них tag 'maqam' давал стопку. Разница — только у макамов и только там, где её никто не видит и
    не слышит (noChords); проба P.checkLabels считает её отдельно как «не показывается». */
+/* ⛳ ВРЕМЕННЫЙ ПЕРЕКЛЮЧАТЕЛЬ ДЛЯ СРАВНЕНИЯ НА СЛУХ (R.powerOld): правило stack звучит прежним пауэр-аккордом. Уходит после
+   сравнения пользователем. Его читают ruleChordSteps, chordLabel, опора пробы и подпись заморозки (recorder.freezeSig) — флип старит
+   замороженные дорожки, где есть аккорд без типа в ладу stack. */
+let stackAsPower=false;
+export const stackPower=()=>stackAsPower;
+export function setStackAsPower(v){ stackAsPower=!!v; }
 export function ruleChordSteps(deg, s=CUR(), sev=seventh){
   const n=s.iv.length, R=s.chordRule, k=R&&R.kind;
-  if (k==='tertian'){
+  if (k==='tertian' || (k==='stack' && !stackAsPower)){   // stack — та же стопка через ступень лада
     const ks=sev?[0,2,4,6]:[0,2,4];
     return ks.map(q=>{const j=deg+q; return s.iv[j%n]+s.edo*Math.floor(j/n);});
   }
@@ -1073,7 +1083,7 @@ export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAn
    по индексу (таблица без центов лада — таких ладов нет). */
 export function chordReadsTi(ti, s=CUR(), ty=null){
   if(ti===undefined) return false;
-  if(!ty){ const k=s.chordRule&&s.chordRule.kind; return k==='tertian'||k==='power'||k==='ratios'; }   // ⛳ T6b: нетипизированный — по правилу лада от места корня в ладу
+  if(!ty){ const k=s.chordRule&&s.chordRule.kind; return k==='tertian'||k==='stack'||k==='power'||k==='ratios'; }   // ⛳ T6b: нетипизированный — по правилу лада от места корня в ладу
   return !!s.cents || periodOf(s)!==2 || TUNINGS[s.tuning].equal!=null;
 }
 /* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ АККОРД — ЦЕНА ПО ПРАВИЛУ ЛАДА (ruleChordSteps) от СТУПЕНИ КОРНЯ deg в регистре oct. Шаги правила — индексы
@@ -1309,6 +1319,17 @@ export function legacyChordLabel(deg,s=CUR(),sev=seventh){
   return ROMAN[d]+(sev?'⁷':'');         // макам: римская ступень
 }
 export const legacyChordNotesStr=(deg,s=CUR(),sev=seventh)=>chordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');
+/* LEGACY-ОПОРА (слайс «стопка»): прежняя цена (legacyChordNotes), а у аккорда без типа в ладу stack — та же прежняя арифметика
+   СТОПКИ ЧЕРЕЗ СТУПЕНЬ, что у терцовых ладов (копия вида с tag 'dia': chordSteps стопкой). При R.powerOld — прежний пауэр-аккорд, как и
+   новый путь. ⛔ Читают ТОЛЬКО проба и прежний путь рядов редактора (draw.legacyRollSegNotes); уходит в T4c. */
+const STACK_REF=new WeakMap();
+export function legacyChordNotesRef(deg,oct, s=CUR(), sev=seventh, ty=null){
+  if (!ty && s.chordRule && s.chordRule.kind==='stack' && !stackAsPower){
+    let r=STACK_REF.get(s); if(!r){ r={...s, tag:'dia'}; STACK_REF.set(s,r); }
+    return legacyChordNotes(deg,oct,r,sev,null);
+  }
+  return legacyChordNotes(deg,oct,s,sev,ty);
+}
 export const legacyTonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
 export function legacyLeadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
@@ -1429,9 +1450,27 @@ export const SEV={'|11':'maj7','|10':'7','m|10':'m7','m|11':'m(maj7)','°|9':'°
 /* ⛳ T6c: ПОДПИСЬ АККОРДА ЧИТАЕТ ПРАВИЛО ЛАДА (chordRule), а не tag: «стопка ли» — rule.kind==='tertian', ноты — ruleChordSteps (тот же
    источник, из которого в T6b будет считаться цена). Строки — побитно прежние на каждом ладу, где подпись ВИДНА (правило tertian/power:
    нетипизированные аккордовые лады) — проба P.checkLabels; прежнее тело — legacyChordLabel (только для пробы). */
+/* ⛳ ПОДПИСЬ СТОПКИ (правило stack): стопка через ступень пяти-/шестиступенного лада — не всегда терции, поэтому имя ищется по
+   НАБОРУ ВЫСОТ: сперва от баса, потом от каждого тона по порядку — знакомое трезвучие (мажор, минор, °, +, sus2, sus4) или
+   четырёхзвучие (maj7, 7, m7, ø, °7, 6, m6, add9, madd9, 7sus4); корень не в басу — через косую черту («Am/C», «C/G»). Не нашлось — НОТЫ
+   через тире («C–E–A–D»). Имена нот — как у прочих подписей (живая тоника, NOTE_NAMES); лад не 12-ступенный — ноты строя (stepName). */
+const STACK_Q3={'4,7':'','3,7':'m','3,6':'°','4,8':'+','2,7':'sus2','5,7':'sus4'};
+const STACK_Q4={'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,6,10':'ø','3,6,9':'°7','4,7,9':'6','3,7,9':'m6','2,4,7':'add9','2,3,7':'madd9','5,7,10':'7sus4','4,8,11':'+(maj7)'};
+function stackLabel(st, s){
+  if (s.edo!==12) return st.map(x=>stepName(x,s)).join('–');
+  const pc=x=>((x%12)+12)%12, nm=x=>NOTE_NAMES[pc(tonic+x)];
+  const order=[]; for(const x of st){ const p=pc(x); if(!order.includes(p)) order.push(p); }
+  const Q= order.length===3 ? STACK_Q3 : order.length===4 ? STACK_Q4 : null;
+  if (Q) for(const r of order){
+    const rel=order.filter(p=>p!==r).map(p=>pc(p-r)).sort((a,b)=>a-b).join(','), q=Q[rel];
+    if (q!==undefined) return nm(r)+q+(r!==order[0] ? '/'+nm(order[0]) : '');
+  }
+  return st.map(nm).join('–');
+}
 export function chordLabel(deg,s=CUR(),sev=seventh){
   const n=s.iv.length, d=deg%n;
-  if (s.chordRule && s.chordRule.kind==='none') return '';   // ⛳ T6b: аккорда нет — и имени нет (chordNotesStr даёт '' сам: ноль нот)
+  if (s.chordRule && s.chordRule.kind==='none') return '';
+  if (s.chordRule && s.chordRule.kind==='stack' && !stackAsPower) return stackLabel(ruleChordSteps(deg,s,sev), s);   // ⛳ стопка — по набору высот   // ⛳ T6b: аккорда нет — и имени нет (chordNotesStr даёт '' сам: ноль нот)
   if (!(s.chordRule && s.chordRule.kind==='tertian')){
     return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
   }

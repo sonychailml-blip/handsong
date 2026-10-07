@@ -108,6 +108,13 @@ async function startApp(){
     return false;
   }
 }
+/* ⛳ ПРОБА ПО ФЛАГУ АДРЕСА: ?probe в адресе страницы — модуль пробы (src/scaleprobe.js) и консоль уха (src/render.js) грузятся сразу и
+   кладутся в window.P и window.R, чтобы в консоли хватало `await P.all()` / `R.powerOld(true)` без строки импорта. Без флага не меняется
+   ничего: модули не грузятся. Адрес тот же, что у приложения, — это те же экземпляры модулей, а не копии. */
+if(new URLSearchParams(location.search).has('probe')){
+  import('./scaleprobe.js').then(m=>{ window.P=m; console.log('[probe] window.P ready — await P.seed({replace:true}), P.all()'); }).catch(e=>console.warn('[probe] scaleprobe failed to load', e));
+  import('./render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));
+}
 wireStarter(startApp);                                                       // урок/«Свободная игра» поднимают приложение этим (правило #1: старт зовётся в клике выбора)
 $('startBtn').onclick=()=>{ startApp(); };                                   // «Играть» — как прежде
 $('learnBtn').onclick=()=>{ openLessons(); };                                // «Обучение» — открыть список уроков (приложение поднимет уже выбор урока/«Свободная игра»)

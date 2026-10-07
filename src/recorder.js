@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, stackPower } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1098,7 +1098,7 @@ const frzBufOwns=layer=>{ const f=frzOf(layer); return !!(f&&f.armedRep!=null); 
    ⛳ В ПОДПИСЬ ДОРОЖКИ он попадает ТОЛЬКО через эту запасную ветку (noSc в freezeSig): у события есть sc — вариант лада со своим
    якорем, и смена выбора его звук не меняет; значит замороженная дорожка от передвижения выбора НЕ стареет (мемо подписи лишь
    пересчитается к той же строке). ⛳ T2: пара scaleIdx + tunedFrom — ровно КЛЮЧ ВИДА (строй, лад, якорь), который отдаёт CUR(). */
-const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct()].join(',');   // droneNonOct — выбор второй струны дрона Болена–Пирса (R.droneBP): меняет звук дрона
+const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct(),stackPower()?1:0].join(',');   // stackPower — временный переключатель R.powerOld: сбрасывает мемо подписей   // droneNonOct — выбор второй струны дрона Болена–Пирса (R.droneBP): меняет звук дрона
 const frzGlobalKey=()=>events.length+'|'+evGen+'|'+takeFxVer+'|'+frzPinned();
 const frzSigMemo=new Map(); let frzSigG=null;
 /* ⛳ ВЕРСИЯ ПРАВОК ДОРОЖКИ (A2) — по ID, не по номеру (правило #27). Поднимается там же, где takeFxTouch
@@ -1133,9 +1133,10 @@ function freezeSig(layer){
      ⚠️ Мемо подписи сбрасывается по глобальному ключу (число событий, поколение, takeFxVer, приколоченное):
      замена тембра обязана пройти через editCommit — он поднимает takeFxVer, как и любая правка редактора. */
   const tmix=(h,tag,x)=>(Math.imul(h,31)+tag*64+((x==null?-1:x)|0)+1)|0;   // индексы < 63 (тембров соло 23, наборов 5). ⚠️ ВЕРНО ТОЛЬКО ДЛЯ ВСТРОЕННЫХ ИНДЕКСОВ: id упакован малым целым (|0), и строковый id (стабильные id тембров, BACKLOG §7.4) свернётся в 0 — два разных тембра подпишутся одинаково. ПЕРЕПИСАТЬ вместе со стабильными id
-  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false, tim=0;
+  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false, tim=0, stk=false;
   for(const e of events) if(e.layer===layer){
     n++; sum+=e.t; if(first===null||e.t<first) first=e.t; if(last===null||e.t>last) last=e.t;
+    if((e.fn==='chOn'||e.fn==='chSet') && e.a && !e.a.ty && e.sc && e.sc.chordRule && e.sc.chordRule.kind==='stack') stk=true;   // аккорд-стопка: его звук зависит от R.powerOld
     if(!e.sc) noSc=true;
     if(e.fn==='drone') noSc=true;   // слайс «дрон и центы»: дрон читает ЖИВОЙ лад (вторая струна — ступень лада, scales.droneDegree), а не sc события — значит смена лада/«строй от» меняет его звук, и замороженная дорожка с дроном обязана устареть
     const a=e.a; if(a){ if(e.fn==='leadOn'){ tim=tmix(tim,1,a.inst); if(a.inst===undefined) ld=true; }
@@ -1145,7 +1146,7 @@ function freezeSig(layer){
                         else if(e.fn==='drum') tim=tmix(tim,4,a.kit); } }
   const id=laneOf(layer), ver=id==null?0:(laneEditVer.get(id)||0);
   const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+tonic+','+aRef+','+loop.bpm
-         +'|'+(noSc?scaleIdx+','+tunedFrom+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim;
+         +'|'+(noSc?scaleIdx+','+tunedFrom+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim+(stk?'|p'+(stackPower()?1:0):'');   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
   frzSigMemo.set(layer, v);
   return v;
 }

@@ -6,6 +6,8 @@
      await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkStack()     // «стопка»: у ладов stack каждый тон аккорда — внутри лада; подписи вменяемы (таблица до-мажорной пентатоники и блюза);
+                        //   R.powerOld возвращает прежний пауэр-аккорд и старит подпись заморозки дорожек со стопками
      P.checkUntyped()   // T6b: нетипизированные аккорды — цена по правилу лада от индекса корня против прежней по ступени и tag; песня, догонялка, ряды, распад
      P.checkLabels()    // T6c: подписи аккорда (chordLabel, chordNotesStr) по правилу лада против прежних по tag — каждый вид × ступень × септаккорд × 12 тоник
      P.checkRules()     // T6a: правило аккордов лада (chordRule) = сегодняшний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
@@ -33,10 +35,10 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps, chordLabel, chordNotesStr, legacyChordLabel, legacyChordNotesStr, chordReadsTi,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
-         legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
+         legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf, legacyChordNotesRef, setStackAsPower, stackPower, ruleChordSteps } from './scales.js';
 import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit,
+import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit, freezeTicket,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
@@ -134,7 +136,7 @@ const NEW={ lead:leadFreq, bass:bassFreq, chord:chordNotes, tonic:tonicFreq, cen
 const fixedExact=(d,v)=>{ const A= v.tunedFrom==='T' ? tonic : (v.tunedFrom==null ? 0 : v.tunedFrom), key=tonic-A+(A>tonic?12:0);
   const C=v.cents, L=C.length, abs=key+d, slot=((abs%L)+L)%L, carry=Math.floor(abs/L);
   return C[slot]+1200*carry-C[key]; };
-const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotes, tonic:legacyTonicFreq,
+const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotesRef, tonic:legacyTonicFreq,   // «стопка»: у лада stack опора — прежняя арифметика стопки (scales.legacyChordNotesRef)
             cents:(d,v)=> v.fixedKey ? Math.round(fixedExact(d,v)) : Math.round(legacyCentsOf(d,v)) };
 const allViews=()=>{ const out=[];
   for(const s of SCALES){ if(s.tunable){ out.push([s,'T']); for(let pc=0;pc<12;pc++) out.push([s,pc]); } else out.push([s,'T']); }
@@ -536,7 +538,7 @@ export function tracks(){
    Ничего не меняет и не играет. */
 export function checkRules(){
   const bad=[]; const miss=m=>bad.push(m);
-  const KINDS=new Set(['tertian','power','ratios','palette','none']);
+  const KINDS=new Set(['tertian','stack','power','ratios','palette','none']);
   const OLD={ 'edo19-full':{ triad:[1,6/5,3/2], seventh:[1,6/5,3/2,9/5] }, 'edo31-full':{ triad:[1,5/4,3/2], seventh:[1,5/4,3/2,7/4] } };   // прежние литералы chord/chord7
   const same=(a,b)=> !!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]);
   const byKind={}; let nSteps=0;
@@ -544,7 +546,7 @@ export function checkRules(){
     const R=s.chordRule, id=s.id;
     if(!R || !KINDS.has(R.kind)){ miss(`${id}: no chordRule, or an unknown kind`); continue; }
     byKind[R.kind]=(byKind[R.kind]||0)+1;
-    const want= s.noChords ? 'none' : isTert(s) ? 'tertian' : s.tag==='edo' ? 'ratios' : s.typedChords ? 'palette' : 'power';
+    const want= s.noChords ? 'none' : isTert(s) ? 'tertian' : s.tag==='edo' ? 'ratios' : s.typedChords ? 'palette' : 'stack';   // «стопка»: прежний выбор по tag «пауэр» — теперь stack (решение пользователя)
     if(R.kind!==want) miss(`${id}: rule ${R.kind}, today's choice by tag ${want}`);
     if('chord' in s || 'chord7' in s) miss(`${id}: still carries chord/chord7 beside its rule`);
     const T=TUNINGS[s.tuning];
@@ -569,7 +571,7 @@ export function checkRules(){
   for(const e of events){
     if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty) continue;
     nUntyped++; const k=e.sc&&e.sc.chordRule&&e.sc.chordRule.kind;
-    if(k!=='tertian'&&k!=='power'&&k!=='ratios') miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000}: an untyped chord in ${e.sc&&e.sc.id}, whose rule is ${k}`);
+    if(k!=='tertian'&&k!=='stack'&&k!=='ratios') miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000}: an untyped chord in ${e.sc&&e.sc.id}, whose rule is ${k}`);
   }
   const A=viewAudit();
   A.notes.forEach(n=>miss(`L${n.layer+1} note at beat ${Math.round(n.start*1000)/1000} spans two tuning views`));
@@ -629,7 +631,7 @@ export function checkScroll(){
    видов (стопка без типа по правилу лада, пауэр-аккорд, типизированный); удержанная нота терменвокса (бенд — путь догонялки, T4b2);
    распавшийся аккорд (однонотный тип — U2/U3/U4); подложка (ev.jam). → { ok, missing:[строки], counts } */
 export function material(){
-  const c={ ld:0, bs:0, ch:0, dr:0, equal:0, table:0, fixedKey:0, theremin:0, dissolved:0, backing:0, tertian:0, power:0, typed:0 }, views=new Set();
+  const c={ ld:0, bs:0, ch:0, dr:0, equal:0, table:0, fixedKey:0, theremin:0, dissolved:0, backing:0, tertian:0, stack:0, typed:0 }, views=new Set();
   for(const e of events){
     const a=e.a||{}, fn=e.fn;
     if(e.jam) c.backing++;
@@ -643,12 +645,12 @@ export function material(){
     if(fn==='chOn'){
       if(Array.isArray(a.ty) && a.ty.length===1) c.dissolved++;
       else if(a.ty) c.typed++;
-      else { const k=e.sc.chordRule&&e.sc.chordRule.kind; if(k==='power') c.power++; else if(k==='tertian') c.tertian++; }
+      else { const k=e.sc.chordRule&&e.sc.chordRule.kind; if(k==='stack') c.stack++; else if(k==='tertian') c.tertian++; }
     }
   }
   c.views=views.size;
   const NEED=[['ld','a solo note'],['bs','a bass note'],['ch','a chord'],['dr','a drum hit'],['equal','an equal-tuning scale'],['table','a table tuning (raga, Partch, a temperament)'],
-              ['fixedKey','a fixed-key scale (a historical temperament)'],['tertian','an untyped tertian chord'],['power','a power chord (pentatonic)'],['typed','a typed chord (palette)'],
+              ['fixedKey','a fixed-key scale (a historical temperament)'],['tertian','an untyped tertian chord'],['stack','a stacked chord (pentatonic: every other mode degree)'],['typed','a typed chord (palette)'],
               ['theremin','a held theremin note with a bend'],['dissolved','a dissolved chord (one-note type)'],['backing','a backing']];
   const missing=NEED.filter(([k])=>!c[k]).map(([,w])=>w);
   if(c.views<2) missing.push('a second tuning view');
@@ -671,6 +673,7 @@ const ALL_RUNS=[
   ['T4b4-1 row fixes',   ()=>checkRowFix(), r=>({ cases:r.defaults+r.cache, diff:r.total, list:r.differences })],
   ['T4b4 highlights',    ()=>checkHl(),     r=>({ cases:r.sweep+r.outOfMode+r.events+r.chase, song:r.events, diff:r.total, list:r.differences })],
   ['T6b untyped chords', ()=>checkUntyped(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
+  ['stacked chords',     ()=>checkStack(),   r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
   ['T6c chord labels',   ()=>checkLabels(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T6a chord rules',    ()=>checkRules(),  r=>({ cases:r.views+r.steps+r.untyped, song:r.untyped, diff:r.differences.length, list:r.differences })],
   ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles+r.chips, diff:r.total, list:r.differences })],
@@ -708,7 +711,7 @@ export function all(opt={}){
      доли 16–32  бас в раге Яман (таблица 22 шрути);
      доли 32–48  аккорды в Партче (типизированные отношения палитры);
      доли 48–64  Пифагор «строй от C» (фиксированный ключ): аккорды палитры и бас;
-     доли 64–80  пентатоника: пауэр-аккорды;
+     доли 64–80  пентатоника: аккорды-стопки (через ступень лада);
    затем РЕДАКТОР: отдельный мажорный аккорд РАСПАДАЕТСЯ (удалена средняя нота), у первого аккорда Партча одна нота сдвинута во времени и
    по высоте; затем ПОДЛОЖКА (джем I–vi–ii–V в мажоре, бас по корням, ударные), СКОБА повтора [такт 3, конец − 2 такта] пользователем,
    пауза транспорта и ЗАМОРОЗКА дорожки баса в раге (если рендер доступен из консоли). Живые лад, «строй от» и септаккорд возвращаются. */
@@ -751,9 +754,9 @@ export async function seed(opt={}){
       [[48,0,0,0],[52,5,0,0],[56,7,0,1],[60,0,1,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:ty(f,k)},t); at(id,'chOff',{},t+4); });
       const id=on('bassOn',{deg:0,oct:1,vol:.8,inst:0},48); at(id,'bassSet',{deg:5,oct:1,vol:.8},52); at(id,'bassSet',{deg:7,oct:1,vol:.8},56); at(id,'bassOff',{},64); }
     take('Pythagorean tuned from C: palette chords, bass','pythagorean',0);
-    // ---- 5) пентатоника: пауэр-аккорды ----
+    // ---- 5) пентатоника: аккорды-стопки ----
     [[64,0],[68,1],[72,3],[76,4]].forEach(([t,d])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:null},t); at(id,'chOff',{},t+4); });
-    take('major pentatonic: power chords','major-penta');
+    take('major pentatonic: stacked chords','major-penta');
     // ---- 6) редактор: распад аккорда и перенос одной ноты ----
     const segOf=(id,start)=>songSegs().segs.find(g=>g.role==='ch'&&g.sc.id===id&&g.start===start&&g.first&&!g.ev.jam);
     const g1=segOf('major',12);
@@ -793,11 +796,13 @@ export function checkLabels(){
   const bad=[]; let cases=0, hidden=0; const hiddenIds=new Set(); const keepT=tonic;
   try{
     for(const [s0,tf] of allViews()){
-      const v=scaleView(s0,tf), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, shown= k==='tertian'||k==='power';
+      const v=scaleView(s0,tf), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, shown= k==='tertian'||k==='stack';
+      const vRef= k==='stack' ? {...v, tag:'dia'} : v;   // «стопка»: ноты стопки сверяются с прежней арифметикой стопки
       const id=v.id+(v.tunable?`[from ${tf}]`:'');
       for(let tn=0;tn<12;tn++){ setTonic(tn);
         for(const sev of [false,true]) for(let d=0;d<=n;d++){
-          for(const [what,A,B] of [['label',chordLabel(d,v,sev),legacyChordLabel(d,v,sev)],['notes',chordNotesStr(d,v,sev),legacyChordNotesStr(d,v,sev)]]){
+          for(const [what,A,B] of (k==='stack' ? [['notes',chordNotesStr(d,v,sev),legacyChordNotesStr(d,vRef,sev)]]   // у стопки НОВАЯ подпись — её проверяет P.checkStack
+                                                : [['label',chordLabel(d,v,sev),legacyChordLabel(d,v,sev)],['notes',chordNotesStr(d,v,sev),legacyChordNotesStr(d,v,sev)]])){
             if(shown) cases++;
             if(A===B) continue;
             if(shown) bad.push(`${id} tonic ${tn} degree ${d}${sev?' 7th':''} ${what}: rule "${A}", by tag "${B}"`);
@@ -815,7 +820,7 @@ export function checkLabels(){
 }
 
 /* ═══ T6b: НЕТИПИЗИРОВАННЫЕ АККОРДЫ — ЦЕНА ПО ПРАВИЛУ ЛАДА ОТ ИНДЕКСА КОРНЯ ═══
-   Сравнение === (частота И интервал каждой ноты) с ПРЕЖНЕЙ ценой — legacyChordNotes (по ступени и tag):
+   Сравнение === (частота И интервал каждой ноты) с ПРЕЖНЕЙ ценой — legacyChordNotesRef (по ступени и tag; у лада stack — прежняя арифметика стопки):
    1) ПРОГОН: каждый вид, где правило строит нетипизированный аккорд (tertian/power/ratios), и — для полноты — лады с палитрой (их
       нетипизированный аккорд недостижим, цена прежняя) × 12 тоник × A4_SET × регистры 0..3 × ступени 0..n × септаккорд выкл/вкл:
       chordNotes (по ступени, теперь правилом) и chordNotesAt (по индексу корня через обратную выборку — то, чем играет ENG);
@@ -844,7 +849,7 @@ export function checkUntyped(){
       for(let tn=0;tn<12;tn++){ setTonic(tn);
         for(const A4 of A4_SET){ setARef(A4);
           for(let o=0;o<4;o++) for(let d=0;d<=n;d++) for(const sev of [false,true]){
-            const at=`${id} tonic ${tn} A4 ${A4} degree ${d} reg ${o}${sev?' 7th':''}`, L=legacyChordNotes(d,o,v,sev,null);
+            const at=`${id} tonic ${tn} A4 ${A4} degree ${d} reg ${o}${sev?' 7th':''}`, L=legacyChordNotesRef(d,o,v,sev,null);
             cmp(at+' (by degree)', chordNotes(d,o,v,sev,null), L);
             cmp(at+' (from ti)', chordNotesAt(d,tuningIndexOf(d,v,true),o,v,sev,null), L);
           }
@@ -856,20 +861,69 @@ export function checkUntyped(){
   for(const e of events){
     if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty || !e.sc) continue;
     song++; const a=e.a;
-    cmp(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}`, chordNotesAt(a.deg,a.ti,a.oct,e.sc,e.sev,null), legacyChordNotes(a.deg,a.oct,e.sc,e.sev,null));
+    cmp(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}`, chordNotesAt(a.deg,a.ti,a.oct,e.sc,e.sev,null), legacyChordNotesRef(a.deg,a.oct,e.sc,e.sev,null));
   }
   const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q);
   for(const x of X) for(const sct of chaseFor(x)){
     if(sct.role!=='ch') continue; const N=chaseNote(sct,x), O=legacyChaseNote(sct,x); if(N.a.ty) continue;
-    song++; cmp(`chase at beat ${Math.round(x*1000)/1000} L${sct.on.layer+1}`, chordNotesAt(N.a.deg,N.a.ti,N.a.oct,N.ctx.sc,N.ctx.sev,null), legacyChordNotes(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,null));
+    song++; cmp(`chase at beat ${Math.round(x*1000)/1000} L${sct.on.layer+1}`, chordNotesAt(N.a.deg,N.a.ti,N.a.oct,N.ctx.sc,N.ctx.sev,null), legacyChordNotesRef(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,null));
   }
   for(const g of songSegs().segs){
     if(g.role!=='ch' || g.ty) continue;
-    song++; cmp(`dissolve intervals of the chord at beat ${Math.round(g.start*1000)/1000} L${g.layer+1}`, chordNotesAt(g.deg,g.ti,g.oct,g.sc,g.sev,null), legacyChordNotes(g.deg,g.oct,g.sc,g.sev,null));
+    song++; cmp(`dissolve intervals of the chord at beat ${Math.round(g.start*1000)/1000} L${g.layer+1}`, chordNotesAt(g.deg,g.ti,g.oct,g.sc,g.sev,null), legacyChordNotesRef(g.deg,g.oct,g.sc,g.sev,null));
     if(!chordReadsTi(g.ti,g.sc,g.ty)) miss(`segment at beat ${g.start} L${g.layer+1}: an untyped chord that does not read its index`);
   }
   console.log(`[scaleprobe T6b] cases ${cases} (sweep + song) · song items ${song} (chords, chase, dissolve) · chordless modes checked ${none} · palette views ${nPal} (unreachable, priced as before) · differences ${bad.length}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T6b] '+m));
   if(!bad.length) console.log('[scaleprobe T6b] every untyped chord prices identically from its chord rule and its root index; chordless modes build no chord');
   return { cases, song, none, palette:nPal, total:bad.length, mismatches:bad };
+}
+
+/* ═══ «СТОПКА»: ПРАВИЛО stack — АККОРД ЧЕРЕЗ СТУПЕНЬ ЛАДА В ПЕНТАТОНИКАХ, БЛЮЗЕ И ЯПОНСКИХ ЛАДАХ ═══
+   1) ВНУТРИ ЛАДА: каждый вид с правилом stack × ступень 0..n × регистр 0..3 × септаккорд выкл/вкл — каждый шаг аккорда (ruleChordSteps,
+      по нему и цена) приводится по модулю строя к ступени ЛАДА; ни один тон не вне лада;
+   2) ПОДПИСЬ: у каждой такой ступени подпись непуста и без «?»/«undefined»; таблица подписей до-мажорной пентатоники и блюза (тоника C)
+      печатается — та, что в отчёте;
+   3) ПЕРЕКЛЮЧАТЕЛЬ R.powerOld: включённый — цена стопочных ладов РАВНА прежнему пауэр-аккорду (legacyChordNotes, ===); подпись
+      заморозки каждой дорожки с аккордом-стопкой МЕНЯЕТСЯ при флипе, а без стопок — нет. Выключается в finally.
+   Ничего не играет (флип звучащих голосов не трогает; транспорт не нужен). */
+export function checkStack(){
+  const bad=[]; let cases=0, song=0;
+  const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
+  const keepT=tonic, keepP=stackPower(), views=[];
+  for(const [s0,tf] of allViews()){ const v=scaleView(s0,tf); if(v.chordRule&&v.chordRule.kind==='stack') views.push(v); }
+  try{
+    setStackAsPower(false);
+    for(const v of views){ const n=v.iv.length, E=v.edo, inMode=new Set(v.iv.map(x=>((x%E)+E)%E));
+      for(const sev of [false,true]) for(let d=0;d<=n;d++){
+        const st=ruleChordSteps(d,v,sev); cases++;
+        for(const x of st) if(!inMode.has(((x%E)+E)%E)) miss(`${v.id} degree ${d}${sev?' 7th':''}: step ${x} is outside the mode`);
+        for(let tn=0;tn<12;tn++){ setTonic(tn); const L=chordLabel(d,v,sev); cases++;
+          if(!L || /\?|undefined/.test(L)) miss(`${v.id} tonic ${tn} degree ${d}${sev?' 7th':''}: label "${L}"`); }
+      }
+    }
+    setTonic(0);
+    for(const id of ['major-penta','blues']){ const v=views.find(x=>x.id===id); if(!v) continue; const rows=[];
+      for(let d=0;d<=v.iv.length;d++) rows.push({ mode:id, degree:d, label:chordLabel(d,v,false), notes:chordNotesStr(d,v,false), label7:chordLabel(d,v,true), notes7:chordNotesStr(d,v,true) });
+      console.table(rows); }
+    // ---- переключатель ----
+    setStackAsPower(true);
+    for(const v of views) for(let o=0;o<4;o++) for(let d=0;d<=v.iv.length;d++) for(const sev of [false,true]){
+      cases++; const X=chordNotes(d,o,v,sev,null), Y=legacyChordNotes(d,o,v,sev,null);
+      if(X.length!==Y.length || X.some((x,i)=>x.f!==Y[i].f||x.iv!==Y[i].iv)) miss(`${v.id} degree ${d} reg ${o}${sev?' 7th':''}: R.powerOld(true) does not give the old power chord`);
+    }
+    setStackAsPower(false);
+    const layers=[...new Set(events.map(e=>e.layer))];
+    for(const ly of layers){
+      const has=events.some(e=>e.layer===ly && (e.fn==='chOn'||e.fn==='chSet') && e.a && !e.a.ty && e.sc && e.sc.chordRule && e.sc.chordRule.kind==='stack');
+      const a=freezeTicket(ly).sig; setStackAsPower(true); const b=freezeTicket(ly).sig; setStackAsPower(false);
+      song++;
+      if(has && a===b) miss(`L${ly+1}: holds stacked chords, but its freeze signature does not change when R.powerOld flips`);
+      if(!has && a!==b) miss(`L${ly+1}: holds no stacked chord, but its freeze signature changes when R.powerOld flips`);
+    }
+  } finally { setStackAsPower(keepP); setTonic(keepT); }
+  console.log(`[scaleprobe stack] stack modes ${views.length} · cases ${cases} (tones inside the mode, labels, the R.powerOld switch) · tracks checked for freeze staleness ${song} · differences ${bad.length}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe stack] '+m));
+  if(!bad.length) console.log('[scaleprobe stack] every stacked chord stays inside its mode, labels read, and R.powerOld restores the old chord and stales exactly the tracks that hold stacks');
+  return { modes:views.length, cases, song, total:bad.length, mismatches:bad };
 }

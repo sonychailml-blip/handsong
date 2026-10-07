@@ -215,7 +215,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
    render с F5 импортирует только ui — ЛЕНИВО (onFreeze), а зонд по-прежнему зовут из консоли. */
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
-import { setDroneNonOct, droneNonOct, droneDegree, CUR } from './scales.js';   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
+import { setDroneNonOct, droneNonOct, droneDegree, CUR, setStackAsPower, stackPower } from './scales.js';   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -1126,7 +1126,7 @@ async function renderWithProgress(ctx, onProgress){
    время по часам, — но складывать его с раскладкой нельзя. */
 function printTrack(r){
   /* eslint-disable no-console */
-  console.log('%c[render F3] дорожка L'+r.layer+' отрендерена','font-weight:bold');
+  console.log('%c[render F3] дорожка L'+(r.layer+1)+' отрендерена','font-weight:bold');
   console.log('  событий '+r.events+'  ·  цепи ['+r.keys.join(', ')+']');
   console.log('  буфер: '+r.buf.length+' сэмплов ('+r.totalSec+' с), '+r.buf.sampleRate+' Гц, каналов '
               +r.buf.numberOfChannels+'  ·  пик '+r.peak+'  ·  rms '+r.rms);
@@ -1210,7 +1210,7 @@ async function freeze(layer, opt){
   r.installed = res===true;
   r.refused = res===true ? null : res;
   /* eslint-disable no-console */
-  console.log(res===true ? '  ❄ дорожка L'+layer+' ЗАМОРОЖЕНА: транспорт играет буфер вместо её событий'
+  console.log(res===true ? '  ❄ дорожка L'+(layer+1)+' ЗАМОРОЖЕНА: транспорт играет буфер вместо её событий'
     : res==='lane' ? '  ⛔ буфер ОТВЕРГНУТ: за время рендера номер слоя '+layer+' перешёл к другой дорожке (или её нет)'
     : res==='sig'  ? '  ⛔ буфер ОТВЕРГНУТ: дорожка изменилась за время рендера (правка, дубль, тоника/A4/темп) — играет свои события'
     :                '  ⛔ не удалось зарегистрировать заморозку (нет движка?)');
@@ -1219,15 +1219,15 @@ async function freeze(layer, opt){
 }
 const unfreeze=layer=>{ const ok=REC.unfreezeLayer(layer);
   /* eslint-disable no-console */
-  console.log(ok ? '  ☀ дорожка L'+layer+' РАЗМОРОЖЕНА: снова играет свои события'
-                 : '  — дорожка L'+layer+' и не была заморожена');
+  console.log(ok ? '  ☀ дорожка L'+(layer+1)+' РАЗМОРОЖЕНА: снова играет свои события'
+                 : '  — дорожка L'+(layer+1)+' и не была заморожена');
   /* eslint-enable no-console */
   return ok; };
 const frozen=()=>{ const ls=REC.frozenLayers();
   /* eslint-disable no-console */
   if(!ls.length) console.log('  — заморожённых дорожек нет');
   else for(const l of ls){ const i=REC.frozenInfo(l);
-    console.log('  ❄ L'+l+': '+i.seconds+' с (музыка до '+i.endSec+' с, хвост '+i.tailSec
+    console.log('  ❄ L'+(l+1)+': '+i.seconds+' с (музыка до '+i.endSec+' с, хвост '+i.tailSec
                 +' с) · живых источников '+i.nodes+' · тоника '+i.pinned.tonic+' · A4 '+i.pinned.aRef+' · темп '+i.pinned.bpm); }
   /* eslint-enable no-console */
   return ls; };
@@ -1316,7 +1316,7 @@ async function aud(layer, opts){
   const me={src,bus}; AUD=me;
   src.onended=()=>{ try{ bus.disconnect(); }catch(e){} if(AUD===me) AUD=null; };
   /* eslint-disable no-console */
-  console.log('%c[aud] L'+layer+' — изменено: '+audDesc(o),'font-weight:bold');
+  console.log('%c[aud] L'+(layer+1)+' — изменено: '+audDesc(o),'font-weight:bold');
   /* eslint-enable no-console */
   return r;
 }
@@ -1356,7 +1356,7 @@ function live(layer){
       setTimeout(()=>{ if(AUD===me){ liveRestore(me); AUD=null; } }, Math.max(0,(me.endT-LIVE_AC.currentTime)*1000)+3000); }   // хвосты доиграют — потом цепь обратно к руке
   };
   me.timer=setInterval(pump,25); AUD=me; pump();
-  console.log('%c[live] L'+layer+' — те же ноты ЖИВЫМ движком (цепь — захваченная на старте дорожки)','font-weight:bold');   // eslint-disable-line no-console
+  console.log('%c[live] L'+(layer+1)+' — те же ноты ЖИВЫМ движком (цепь — захваченная на старте дорожки)','font-weight:bold');   // eslint-disable-line no-console
   return true;
 }
 function liveClose(me, at){
@@ -1376,4 +1376,16 @@ function stop(){
   liveRestore(me);
 }
 
-export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP };
+/* ⛳ ВРЕМЕННЫЙ ПЕРЕКЛЮЧАТЕЛЬ «ПРЕЖНИЙ ПАУЭР-АККОРД» (слайс «стопка»): R.powerOld(true) — лады пентатоник, блюза и японские снова играют
+   корень + квинту строя + октаву, R.powerOld(false) — стопку через ступень лада. Нужен ОДИН РАЗ — сравнить на слух; после сравнения
+   пользователем уходит вместе с stackPower в scales. Флип старит замороженные дорожки, где есть аккорд без типа в таком ладу (подпись
+   заморозки), иначе буфер играл бы прежний аккорд против нового живого звука; звучащие сейчас голоса меняются со следующего события. */
+function powerOld(on){
+  setStackAsPower(on);
+  /* eslint-disable no-console */
+  console.log(stackPower() ? '  ↺ лады пентатоник, блюза и японские: ПРЕЖНИЙ пауэр-аккорд (корень + квинта + октава)'
+                           : '  ↻ лады пентатоник, блюза и японские: СТОПКА через ступень лада (каждый тон — внутри лада)');
+  /* eslint-enable no-console */
+  return stackPower();
+}
+export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP, powerOld };
