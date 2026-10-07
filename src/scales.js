@@ -83,7 +83,7 @@ const TBL={
      {kind:'ratios', triad, seventh} — интервалы ОТНОШЕНИЯМИ, округлёнными к шагу строя (19/31-TET; сюда переехали прежние поля chord/chord7);
      {kind:'palette'} — у лада ПАЛИТРА (typedChords) и своего нетипизированного правила нет: аккорд без типа здесь не пишется ни одним путём;
      {kind:'none'}    — аккордов нет (noChords).
-   ⚠️ В T6a это ТОЛЬКО ДАННЫЕ: цену и подписи по-прежнему решают chordSteps/chordLabel по tag (T6b/T6c переведут их на правило). Каждое
+   ⚠️ С T6c ПОДПИСИ (chordLabel, chordNotesStr) читают правило (ruleChordSteps); ЦЕНУ по-прежнему решает chordSteps по tag (T6b). Каждое
    значение обязано совпасть с сегодняшним выбором по tag — проба P.checkRules. Правило едет в вид лада (scaleView копирует поля). */
 export const SCALES=[
  {id:'major', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Major (Ionian)', ru:'Мажор (ионийский)'},            trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,9,11], tag:'dia'},
@@ -966,6 +966,25 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
   }
   return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз — пауэр-аккорд как раньше (хроматика с палитрой сюда не доходит)
 }
+/* ⛳ T6c: ШАГИ НЕТИПИЗИРОВАННОГО АККОРДА — ПО ПРАВИЛУ ЛАДА (chordRule, данные T6a), ОДНА функция для подписей (с T6c) и для цены (T6b).
+   Ветви — РОВНО ветви chordSteps без типа, выбранные не по tag, а по rule.kind:
+     tertian — стопка через ступень лада (i, i+2, i+4, +6 у септаккорда), перенос периода — в шаг;
+     ratios  — отношения правила (triad/seventh), округлённые к шагу строя (stepFor);
+     power   — корень + квинта строя (fifthStep) + период.
+   ⚠️ palette и none — у таких ладов нетипизированного аккорда нет (палитра всегда даёт тип; noChords аккордов не строит), подпись не
+   рисуется (draw: палитра пишет корень, noChords — объяснение). Функция всё равно ТОТАЛЬНА — форма пауэр-аккорда, как у chordSteps для
+   всех таких ладов, КРОМЕ макамов: у них tag 'maqam' давал стопку. Разница — только у макамов и только там, где её никто не видит и
+   не слышит (noChords); проба P.checkLabels считает её отдельно как «не показывается». */
+export function ruleChordSteps(deg, s=CUR(), sev=seventh){
+  const n=s.iv.length, R=s.chordRule, k=R&&R.kind;
+  if (k==='tertian'){
+    const ks=sev?[0,2,4,6]:[0,2,4];
+    return ks.map(q=>{const j=deg+q; return s.iv[j%n]+s.edo*Math.floor(j/n);});
+  }
+  const r=s.iv[deg%n]+s.edo*Math.floor(deg/n);
+  if (k==='ratios'){ const rs=sev?R.seventh:R.triad; return rs.map(ra=>r+stepFor(s.edo,ra)); }
+  return [r, r+fifthStep(s.edo), r+s.edo];
+}
 /* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
    legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */
 /* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
@@ -1253,6 +1272,23 @@ export function chordPitchHz(j,oct, s=CUR()){
 /* ═══ LEGACY (слайс T1) — ПРЕЖНИЕ тела функций высоты, СЛОВО В СЛОВО, под другими именами. ═══
    ⛔ Их читает ТОЛЬКО проба src/scaleprobe.js (сравнение === с новыми). В приложении их не зовёт никто — и звать нельзя: высота
    приложения — одна функция pitchHz. Удаляются отдельным слайсом после того, как проба покажет ноль и ухо подтвердит. */
+/* LEGACY (T6c) — прежние подписи аккорда ПО TAG, слово в слово. ⛔ Читает ТОЛЬКО проба (P.checkLabels); уходят в T4c. */
+export function legacyChordLabel(deg,s=CUR(),sev=seventh){
+  const n=s.iv.length, d=deg%n;
+  if (!isTert(s)){
+    return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
+  }
+  const st=chordSteps(deg,s,sev), r=st[0];
+  if (s.edo===12){
+    const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
+    let q=qual(st[1]-r, st[2]-r);
+    if (q==null) return root+'?';
+    if (sev){ const sv=st[3]-r; q=SEV[q+'|'+sv] ?? (q+'⁷'); }
+    return root+q;
+  }
+  return ROMAN[d]+(sev?'⁷':'');         // макам: римская ступень
+}
+export const legacyChordNotesStr=(deg,s=CUR(),sev=seventh)=>chordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');
 export const legacyTonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
 export function legacyLeadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
@@ -1370,12 +1406,15 @@ export const SEV={'|11':'maj7','|10':'7','m|10':'m7','m|11':'m(maj7)','°|9':'°
            '+|11':'+(maj7)','+|10':'+7','♭5|10':'7♭5','sus4|10':'7sus4','sus2|10':'7sus2'};
 /* sev — СЕПТАККОРД, тоже параметром (S5.4): он заморожен в событии (ev.sev) ровно как лад, поэтому
    подпись аккорда дорожки обязана читать ЕГО, а не живой тумблер панели. */
+/* ⛳ T6c: ПОДПИСЬ АККОРДА ЧИТАЕТ ПРАВИЛО ЛАДА (chordRule), а не tag: «стопка ли» — rule.kind==='tertian', ноты — ruleChordSteps (тот же
+   источник, из которого в T6b будет считаться цена). Строки — побитно прежние на каждом ладу, где подпись ВИДНА (правило tertian/power:
+   нетипизированные аккордовые лады) — проба P.checkLabels; прежнее тело — legacyChordLabel (только для пробы). */
 export function chordLabel(deg,s=CUR(),sev=seventh){
   const n=s.iv.length, d=deg%n;
-  if (!isTert(s)){
+  if (!(s.chordRule && s.chordRule.kind==='tertian')){
     return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
   }
-  const st=chordSteps(deg,s,sev), r=st[0];
+  const st=ruleChordSteps(deg,s,sev), r=st[0];
   if (s.edo===12){
     const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
     let q=qual(st[1]-r, st[2]-r);
@@ -1389,4 +1428,4 @@ export function chordLabel(deg,s=CUR(),sev=seventh){
    массив), поэтому с новым вторым параметром индекс молча приехал бы на место ЛАДА: ошибки бы не было,
    а строка нот стала бы считаться по «ладу» 0,1,2… Точечная передача функции с умолчаниями запрещена
    везде, где колбэку дают больше одного аргумента. */
-export const chordNotesStr=(deg,s=CUR(),sev=seventh)=>chordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');
+export const chordNotesStr=(deg,s=CUR(),sev=seventh)=>ruleChordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');   // T6c: ноты — по правилу лада (ruleChordSteps)

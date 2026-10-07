@@ -6,6 +6,7 @@
      await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkLabels()    // T6c: подписи аккорда (chordLabel, chordNotesStr) по правилу лада против прежних по tag — каждый вид × ступень × септаккорд × 12 тоник
      P.checkRules()     // T6a: правило аккордов лада (chordRule) = сегодняшний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
      P.checkScroll()    // T6a-2: прокрутка редактора через «Все/Лад» (та же высота) и чип лада (тот же регистр) — по каждому виду
      P.tracks()         // МАРШРУТ ПО СТРОЮ: каждая дорожка песни — роль, тембр, вид строя (и сколько видов в ней: больше одного быть не должно)
@@ -29,7 +30,7 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps, chordLabel, chordNotesStr, legacyChordLabel, legacyChordNotesStr,
          leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf } from './scales.js';
 import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
@@ -666,6 +667,7 @@ const ALL_RUNS=[
   ['T4b3 editor rows',   ()=>checkRows(),   r=>({ cases:r.blocks+r.hits+r.ghosts+r.rows+r.chords, song:r.segments, diff:r.total, list:r.differences })],
   ['T4b4-1 row fixes',   ()=>checkRowFix(), r=>({ cases:r.defaults+r.cache, diff:r.total, list:r.differences })],
   ['T4b4 highlights',    ()=>checkHl(),     r=>({ cases:r.sweep+r.outOfMode+r.events+r.chase, song:r.events, diff:r.total, list:r.differences })],
+  ['T6c chord labels',   ()=>checkLabels(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T6a chord rules',    ()=>checkRules(),  r=>({ cases:r.views+r.steps+r.untyped, song:r.untyped, diff:r.differences.length, list:r.differences })],
   ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles+r.chips, diff:r.total, list:r.differences })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
@@ -775,4 +777,35 @@ export async function seed(opt={}){
   const M=material();
   console.log(`[scaleprobe seed] built ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. Now run P.all().`);
   return { built, events:events.length, material:M };
+}
+
+/* ═══ T6c: ПОДПИСИ АККОРДА ЧИТАЮТ ПРАВИЛО ЛАДА ═══
+   Каждый вид (у Пифагора — каждый «строй от») × ступень 0..n × септаккорд выкл/вкл × 12 тоник: chordLabel и chordNotesStr (по правилу,
+   ruleChordSteps) против legacyChordLabel и legacyChordNotesStr (по tag) — строки, ===. Тоника и «строй от» переставляются сеттерами и
+   возвращаются в finally (подпись читает живую тонику). Расхождение на ладу, где подпись ПОКАЗЫВАЕТСЯ (правило tertian/power — у прочих
+   draw её не рисует: палитра пишет корень, noChords — объяснение), — ошибка; на прочих — считается отдельно как «не показывается» (по
+   построению это только макамы: их tag давал стопку, правило 'none' — форма пауэр-аккорда) и печатается сведением. */
+export function checkLabels(){
+  const bad=[]; let cases=0, hidden=0; const hiddenIds=new Set(); const keepT=tonic;
+  try{
+    for(const [s0,tf] of allViews()){
+      const v=scaleView(s0,tf), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, shown= k==='tertian'||k==='power';
+      const id=v.id+(v.tunable?`[from ${tf}]`:'');
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const sev of [false,true]) for(let d=0;d<=n;d++){
+          for(const [what,A,B] of [['label',chordLabel(d,v,sev),legacyChordLabel(d,v,sev)],['notes',chordNotesStr(d,v,sev),legacyChordNotesStr(d,v,sev)]]){
+            if(shown) cases++;
+            if(A===B) continue;
+            if(shown) bad.push(`${id} tonic ${tn} degree ${d}${sev?' 7th':''} ${what}: rule "${A}", by tag "${B}"`);
+            else { hidden++; hiddenIds.add(v.id); }
+          }
+        }
+      }
+    }
+  } finally { setTonic(keepT); }
+  console.log(`[scaleprobe T6c] label cases ${cases} (modes whose chord labels are shown) · differences ${bad.length}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T6c] '+m));
+  if(hidden) console.log(`[scaleprobe T6c] information: ${hidden} strings differ on modes whose chord labels are never shown (${[...hiddenIds].join(', ')})`);
+  if(!bad.length) console.log('[scaleprobe T6c] every shown chord label and note list reads the same from the chord rule');
+  return { cases, hidden, hiddenModes:[...hiddenIds], total:bad.length, mismatches:bad };
 }
