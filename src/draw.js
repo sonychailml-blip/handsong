@@ -1,8 +1,8 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
-import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
+import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
          rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
@@ -2197,6 +2197,11 @@ function drawChordPalette(x0,x1,H){
   const px0=x0+CH_PAL_PAD, px1=x1-CH_PAL_PAD, py0=CH_PAL_HEAD_H, py1=H-CH_PAL_HEAD_H;
   const selC=Math.min(chordFam,nC-1), selF=FS[selC]||FS[0];
   const selR=Math.min(chordVar,selF.types.length-1);
+  /* ⛳ T7: ТИПЫ, КОТОРЫХ НА КОРНЕ ПОД РУКОЙ НЕТ В СТРОЕ, — СЕРЫЕ (Партч: тон вне 43 высот; прочим строям всё доступно — chordTypeFits
+     отвечает «да»). Корень — тот, на который аккордовая рука щипнула последней (state.chFitDeg, пишет gestures); ещё не щипала — серых
+     нет. Выбрать серый тип можно (он пригодится на другом корне), но на этом корне аккорд не зазвучит — внизу сказано почему. */
+  const sc=CUR(), fti= chFitDeg>=0 ? tuningIndexOf(chFitDeg,sc,true) : null;
+  const fits=t=> fti==null || chordTypeFits(t.iv, fti, sc);
 
   ctx.fillStyle='rgba(10,10,20,.30)'; ctx.fillRect(x0,0,x1-x0,H);   // палитра чуть темнее поля нот
   ctx.textBaseline='middle';
@@ -2210,7 +2215,8 @@ function drawChordPalette(x0,x1,H){
       const [cy0,cy1]=palRowY(r,py0,py1,nR);
       const bx=cx0+CH_PAL_GAP/2, by=cy0+CH_PAL_GAP/2;      // зазор съедается ВНУТРИ клетки: попадание идёт по полной
       const bw=(cx1-cx0)-CH_PAL_GAP, bh=(cy1-cy0)-CH_PAL_GAP;
-      const on = c===selC && r===selR;
+      const on = c===selC && r===selR, ok=fits(fam.types[r]);
+      ctx.globalAlpha = ok ? 1 : 0.38;                     // T7: серый — типа нет в строе на этом корне
       ctx.fillStyle = on ? hexA(INSTR_COL.ch,.32) : 'rgba(255,255,255,.05)';
       ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,5); ctx.fill();
       ctx.strokeStyle = on ? INSTR_COL.ch : 'rgba(255,255,255,.12)';
@@ -2221,14 +2227,15 @@ function drawChordPalette(x0,x1,H){
       ctx.fillStyle = on ? '#fff' : 'rgba(255,255,255,.72)';
       const lines=wrapLabel(L(fam.types[r].label)||'—', bw-6), cy=(by+by+bh)/2;
       lines.forEach((L,i)=>ctx.fillText(L, bx+bw/2, cy+(i-(lines.length-1)/2)*11));
+      ctx.globalAlpha=1;
     }
   }
   /* Полное имя выбранного типа — одной строкой снизу, где есть вся ширина палитры.
      full есть только там, где короткий тег непонятен (31-TET). */
-  const t=selF.types[selR], fullNm=t&&(L(t.full)||L(t.label));
+  const tp=selF.types[selR], fullNm=tp&&(L(tp.full)||L(tp.label)), unfit=tp&&!fits(tp);   // tp, не t: t — функция перевода
   if(fullNm){
-    ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle=hexA(INSTR_COL.ch,.9);
-    ctx.fillText(fullNm, (x0+x1)/2, H-CH_PAL_HEAD_H/2);
+    ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle= unfit ? 'rgba(255,190,120,.95)' : hexA(INSTR_COL.ch,.9);
+    ctx.fillText(unfit ? L(tp.label)+' — '+t('pal.unfit') : fullNm, (x0+x1)/2, H-CH_PAL_HEAD_H/2);   // T7: выбранный тип недоступен на этом корне — говорим почему
   }
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }

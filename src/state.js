@@ -13,6 +13,11 @@ export let aRef=440;
    ⛔ ЧИТАЕТ ЕГО ТОЛЬКО scales.scaleView (то есть CUR()): записанные события хранят ВИД (строй, лад, якорь; T2) со своим якорем (sc), и смена
    этого поля их не перестраивает (правило #7). Прочие фиксированные строи настроены от C всегда — их это поле не касается. */
 export let tunedFrom='T';
+/* ⛳ T7b: РЕЖИМ АККОРДОВ ПО ЛАДАМ — { id лада → id режима } (у лада с chordModes; нет записи — умолчание, первый режим). Читает ТОЛЬКО
+   scales.chordModeOf/scaleView (вид — значит и CUR()), как tunedFrom. chordModeVer растёт на каждой смене — дешёвый ключ «режимы
+   сменились» для мемо подписей заморозки (recorder.frzPinned). Объект заменяется целиком, никогда не мутирует. */
+export let chordModeSel={};
+export let chordModeVer=0;
 export let seventh=false, leadIdx=0, chIdx=0, bassIdx=0, drumKitIdx=0;
 /* ⚠️ state.fx — store СТАРЫХ СКАЛЯРНЫХ эффектов соло. С в.1 ДЕЛЕЯ ЗДЕСЬ НЕТ: он стал шинным модулем
    (FX_FACTORY 'dly'), и его величина живёт в ЭКЗЕМПЛЯРЕ роли (p.cur), а экземпляры и так по ролям — второй
@@ -372,6 +377,10 @@ export const fxChainMove=(key,from,to)=>{
    Пишет gestures (setExprDisp) по ведущей руке-выразительности, читает индикатор «ВЫР» в draw. 0 =
    покой (смычок стоит), 1 = поёт. Дефолт 0. Сам звук — выделенные узлы выразительности (audio.js). */
 export let exprDisp=0;
+/* ⛳ T7: КОРЕНЬ АККОРДОВОЙ РУКИ ДЛЯ ПАЛИТРЫ — ступень лада, на которую рука щипнула последней (-1 — ещё нет). Пишет gestures (аккордовая
+   ветка, под щипком), читает draw: палитра серит типы, которых на этом корне нет в строе (Партч — только из 43 высот, chordTypeFits). Только
+   показ: звук и запись его не читают. */
+export let chFitDeg=-1;
 /* Отображение ШИРИНЫ/раскрытости смычка (0 кулак/узко .. 1 раскрыто/широко) — НЕ отдельная полоса (не
    превращаем экран в панель приборов), а ТОН точек руки-выразительности в draw. Пишет gestures (setExprBrightDisp). */
 export let exprBrightDisp=0;
@@ -601,13 +610,16 @@ export const setScaleIdx=v=>{ scaleIdx=v; };
 export const setTonic=v=>{ tonic=v; };
 export const setARef=v=>{ aRef=v; };             // v уже проверен/клампнут в UI (380–480); высота пересчитается сама
 export const setTunedFrom=v=>{ tunedFrom = v==='T' ? 'T' : ((((v|0)%12)+12)%12); };   // P3: 'T' или класс высоты 0..11
+export const setChordMode=(id,m)=>{ chordModeSel={...chordModeSel, [id]:m}; chordModeVer++; };   // T7b: режим аккордов лада id
+export const setChordModeSel=obj=>{ chordModeSel={...(obj||{})}; chordModeVer++; };   // T7b: весь выбор разом (пин рендера, сброс к умолчаниям)
 
 export const setSeventh=v=>{ seventh=v; };
 export const setLeadIdx=v=>{ leadIdx=v; };
 export const setChIdx=v=>{ chIdx=v; };
 export const setBassIdx=v=>{ bassIdx=v; };
 export const setDrumKitIdx=v=>{ drumKitIdx=v; };
-export const setExprDisp=v=>{ exprDisp=v; };           // показ энергии/живости руки-выразительности (сам звук — вибрато-шиммер в audio)
+export const setExprDisp=v=>{ exprDisp=v; };
+export const setChFitDeg=v=>{ chFitDeg=v; };   // T7: корень аккордовой руки для серых типов палитры (только показ)           // показ энергии/живости руки-выразительности (сам звук — вибрато-шиммер в audio)
 export const setExprBrightDisp=v=>{ exprBrightDisp=v; };   // показ раскрытости (вау) — тон точек руки (сам звук — вау-пик)
 export const setLooperMsg=v=>{ looperMsg=v; };         // подтверждение команды рукой-лупером (draw гасит по looperMsg.until)
 export const setLooperClear=v=>{ looperClear=v; };     // остаток мс отсчёта очистки (мизинец); -1 = нет

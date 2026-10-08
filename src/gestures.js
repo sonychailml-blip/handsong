@@ -1,7 +1,7 @@
 import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
-import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz } from './scales.js';
+import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
+import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordTypeFits, tuningIndexOf, CUR } from './scales.js';   // T7: chordTypeFits — тип аккорда целиком в строе на этом корне (Партч)
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
@@ -1020,8 +1020,16 @@ function processHands(res){
              влиять, а звук и запись слушаются параметра. Нет яркости в цепи → null → сегодняшнее
              поведение (chordOn открывает фильтр, chordGlide его не трогает). */
           const bri = fxChordBri(zk);   // O-0: чью яркость — решает ЗОВУЩИЙ (ключ цепи этой зоны), а не сама функция
+          /* ⛳ T7: ТИП НА ЭТОМ КОРНЕ — ЦЕЛИКОМ В СТРОЕ? (Партч: каждый тон — одна из 43 высот; прочим строям — всегда да.) Нет — аккорд на
+             этом корне НЕ ЗВУЧИТ: свежий щипок не атакует, ведущаяся защёлка не уезжает на этот корень (держит прежний). ⛔ Никакой
+             подмены ближайшими высотами — это была бы ложная отональность. Палитра серит недоступные типы для корня под рукой
+             (chFitDeg) и называет причину. */
+          const fitOn=(t,d)=> !t || chordTypeFits(t, tuningIndexOf(d,CUR(),true), CUR());
+          setChFitDeg(S.deg);
           if(S.inert){
             // стоп-щипок отработал (только защёлка): рука молчит до размыкания пальцев
+          }else if(S.fresh && !fitOn(ty,S.deg)){
+            S.fresh=false;                        // T7: типа нет в строе на этом корне — щипок ничего не атакует (причину показывает палитра)
           }else if(S.fresh){
             S.fresh=false;                        // решение принимается один раз за щипок
             if(hold){
@@ -1069,9 +1077,10 @@ function processHands(res){
                событие лупера морозит a.ty, а слой — свой лад (sc). Корень при этом по-прежнему следует за
                рукой: заморожен ТОЛЬКО тип. */
             const dty=S.ty;
-            if(dty&&dty.length!==latchLen){ WchOn('latch',S.deg,chOct,S.vol,chIdx,dty,bri); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
-            else WchSet('latch',S.deg,chOct,S.vol,dty,bri);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
-            setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(dty);   // тип и регистр ведём вместе со ступенью — иначе сравнение (и подсветка) протухнут
+            const fd= fitOn(dty,S.deg), rd= fd ? S.deg : latchDeg, ro= fd ? chOct : latchOct;   // T7: на корень, где типа нет в строе, защёлка не уезжает — держит прежний корень (громкость и яркость ведутся)
+            if(dty&&dty.length!==latchLen){ WchOn('latch',rd,ro,S.vol,chIdx,dty,bri); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
+            else WchSet('latch',rd,ro,S.vol,dty,bri);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
+            setLatchDeg(rd); setLatchOct(ro); setLatchTy(dty);   // тип и регистр ведём вместе со ступенью — иначе сравнение (и подсветка) протухнут
           }else if(chOwner===key){
             chOwner=null;                         // латч сброшен извне (тоника/лад/паника) — отпускаем руль
           }

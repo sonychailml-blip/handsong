@@ -1,4 +1,4 @@
-import { scaleIdx, tonic, seventh, aRef, rectPref, tunedFrom } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR)
+import { scaleIdx, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
 import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для свар/шрути в swaraLbl (имена ладов/групп резолвят L() на стороне рисующих)
 
 export const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -89,6 +89,26 @@ const TBL={
      {kind:'none'}    — аккордов нет (noChords).
    ⚠️ С T6c ПОДПИСИ (chordLabel, chordNotesStr) читают правило (ruleChordSteps); ЦЕНУ по-прежнему решает chordSteps по tag (T6b). Каждое
    значение обязано совпасть с сегодняшним выбором по tag — проба P.checkRules. Правило едет в вид лада (scaleView копирует поля). */
+/* ═══ ⛳ T7b — РЕЖИМЫ АККОРДОВ ЛАДА (решение пользователя: «надо дать выбор — режим, где доступно всё, как раньше, и режим, как сейчас,
+   верный живому инструменту; иначе мы заранее сужаем музыкальные возможности людей») ═══
+   ПРИНЦИП: не сужать возможности — когда теория ограничивает, ограничение предлагается РЕЖИМОМ, а не правилом.
+   Режим — ДАННЫЕ: { id, nameKey, hintKey (словарь en+ru), over } — over ложится ПОВЕРХ полей лада в его ВИДЕ (scaleView). Поэтому режим
+   МОРОЗИТСЯ В ВИДЕ (правило #7, как «строй от»): каждое событие держит sc — вид со своим режимом — и звучит, как записано, при любом
+   положении переключателя; смена режима — смена вида, и запись уходит в НОВУЮ дорожку (маршрут по строю, как смена лада или «строй от»).
+   Первый режим списка — УМОЛЧАНИЕ. Читатели ничего не знают о режимах: они читают поля вида (chordBuild, typedChords, chordRule).
+     free / instrument — Партч и Болен–Пирс: «Свободно» (ПО УМОЛЧАНИЮ) — любой тип на любом корне чистыми отношениями, РОВНО как до T7
+       (chordBuild 'adaptive': ворота chordTypeFits открыты, у Б–П — прежний набор 'bp' с аккордами на 11 и ветка периода); «Как на
+       инструменте» — T7: Партч только из 43 высот (chordBuild 'tuning'), Б–П — из шагов строя без 11 (набор 'bpsteps').
+     stack / power — 14 ладов пентатоник, блюза и японских: «Стопкой» (по умолчанию — стопка через ступень лада, каждый тон в ладу) и
+       «Пауэр-аккорд» (прежнее правило: корень, квинта строя, октава — квинта бывает вне лада). */
+const CM={
+  free:   {id:'free',       nameKey:'cm.free',       hintKey:'cm.free.hint',         over:{chordBuild:'adaptive'}},
+  instr:  {id:'instrument', nameKey:'cm.instrument', hintKey:'cm.instrument.hint',   over:{chordBuild:'tuning'}},
+  instrBP:{id:'instrument', nameKey:'cm.instrument', hintKey:'cm.instrumentBP.hint', over:{chordBuild:'tuning', typedChords:'bpsteps'}},
+  stack:  {id:'stack',      nameKey:'cm.stack',      hintKey:'cm.stack.hint',        over:{}},
+  power:  {id:'power',      nameKey:'cm.power',      hintKey:'cm.power.hint',        over:{chordRule:{kind:'power'}}},   // один объект правила на все 14 ладов (виды стабильны)
+};
+const CM_PARTCH=[CM.free,CM.instr], CM_BP=[CM.free,CM.instrBP], CM_STACK=[CM.stack,CM.power];
 export const SCALES=[
  {id:'major', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Major (Ionian)', ru:'Мажор (ионийский)'},            trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,4,5,7,9,11], tag:'dia'},
  {id:'natural-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Natural minor (Aeolian)', ru:'Минор натуральный (эолийский)'},trad:'common', grp:GRP.diatonic, grpKey:'diatonic',          edo:12, iv:[0,2,3,5,7,8,10], tag:'dia'},
@@ -100,9 +120,9 @@ export const SCALES=[
  {id:'mixolydian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Mixolydian', ru:'Миксолидийский'},               trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,2,4,5,7,9,10], tag:'dia'},
  {id:'locrian', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Locrian', ru:'Локрийский'},                   trad:'common', grp:GRP.modes, grpKey:'modes',        edo:12, iv:[0,1,3,5,6,8,10], tag:'dia'},
  {id:'hungarian-minor', tuning:'edo12', chordRule:{kind:'tertian'}, name:{en:'Hungarian minor', ru:'Венгерский минор'},             trad:'common', grp:GRP.ethnic, grpKey:'ethnic',         edo:12, iv:[0,2,3,6,7,8,11], tag:'ethnic'},
- {id:'major-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Major pentatonic', ru:'Мажорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
- {id:'minor-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Minor pentatonic', ru:'Минорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
- {id:'blues', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'},                  trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
+ {id:'major-penta', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Major pentatonic', ru:'Мажорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,2,4,7,9],      tag:'penta'},
+ {id:'minor-penta', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Minor pentatonic', ru:'Минорная пентатоника'},         trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,7,10],     tag:'penta'},
+ {id:'blues', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'},                  trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues', edo:12, iv:[0,3,5,6,7,10],   tag:'blues'},
  {id:'chromatic', tuning:'edo12', chordRule:{kind:'palette'}, name:{en:'Chromatic (12 notes)', ru:'Хроматика (12 нот)'},           trad:'common', grp:GRP.chromatic, grpKey:'chromatic',                   edo:12, iv:range(12),        tag:'chrom', typedChords:'chrom12'},
  {id:'maqam-rast', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Rast (quarter-tones)', ru:'Макам Раст (¼-тоны)'},          trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,4,7,10,14,18,21], tag:'maqam', noChords:true},
  {id:'maqam-bayati', tuning:'edo24', chordRule:{kind:'none'}, name:{en:'Maqam Bayati (quarter-tones)', ru:'Макам Баяти (¼-тоны)'},         trad:'mideast',  grp:GRP.maqamat, grpKey:'maqamat',             edo:24, iv:[0,3,6,10,14,16,20], tag:'maqam', noChords:true},
@@ -138,13 +158,13 @@ export const SCALES=[
     пауэр. Ни у одной нет noChords. Блюзовая мажорная берёт СУЩЕСТВУЮЩУЮ группу
     'Пентатоника / блюз' (строка 1-в-1 как у Мажорной/Минорной/Блюза) — в меню встаёт
     внутрь неё, а не отдельной группой. Добавлены В КОНЕЦ (индексы 29..35 не поехали). */
- {id:'egyptian', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'},   trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,5,7,10], tag:'penta'},
- {id:'man-gong', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}   /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */,    trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,3,5,8,10], tag:'penta'},
- {id:'ritusen', tuning:'edo12', chordRule:{kind:'stack'}, name:{default:'Ritusen', ru:'Ритусэн'}   /* Ritusen — написание из сводов ладов (пентатоника 1-2-4-5-6, блюзовая мажорная; связывают с рагой Дурга); от японского лада рицу (律) — тоже компиляционное имя */,                 trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,2,5,7,9],  tag:'penta'},
- {id:'hungarian-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Hungarian pentatonic', ru:'Венгерская пентатоника'},  trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,3,5,6,9],  tag:'penta'},
- {id:'scriabin-penta', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,4,7,10], tag:'penta'},
- {id:'kumoi-western', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'},            trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
- {id:'major-blues', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Major blues', ru:'Блюзовая мажорная'},       trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues',  edo:12, iv:[0,2,3,4,7,9], tag:'penta'},
+ {id:'egyptian', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'},   trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,5,7,10], tag:'penta'},
+ {id:'man-gong', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}   /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */,    trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,3,5,8,10], tag:'penta'},
+ {id:'ritusen', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{default:'Ritusen', ru:'Ритусэн'}   /* Ritusen — написание из сводов ладов (пентатоника 1-2-4-5-6, блюзовая мажорная; связывают с рагой Дурга); от японского лада рицу (律) — тоже компиляционное имя */,                 trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,2,5,7,9],  tag:'penta'},
+ {id:'hungarian-penta', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Hungarian pentatonic', ru:'Венгерская пентатоника'},  trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,3,5,6,9],  tag:'penta'},
+ {id:'scriabin-penta', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, trad:'common', grp:GRP.worldPenta, grpKey:'worldPenta', edo:12, iv:[0,2,4,7,10], tag:'penta'},
+ {id:'kumoi-western', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'},            trad:'easia', grp:GRP.fareastPenta, grpKey:'fareastPenta', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
+ {id:'major-blues', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Major blues', ru:'Блюзовая мажорная'},       trad:'common', grp:GRP.pentaBlues, grpKey:'pentaBlues',  edo:12, iv:[0,2,3,4,7,9], tag:'penta'},
  /* Макамы (24-TET). trad:'mideast', tag:'maqam', noChords:true — как у Раст/Баяти/Хиджаз:
     аккордов нет (роль «Аккорды» показывает подсказку, гейт supportsChords). Все десять
     (три прежних + семь новых) сведены в одну подгруппу grp:GRP.maqamat, grpKey:'maqamat' — строка 1-в-1,
@@ -168,10 +188,10 @@ export const SCALES=[
     Ин намеренно совпадает по iv с 'Кумои (зап.)' из мировых пентатоник — это разные лады
     по имени/группе, общий iv безвреден (state по scaleIdx, луп по ссылке на sc).
     Добавлены В КОНЕЦ (индексы 45..48 не поехали), в меню — новая группа grp 'Японские'. */
- {id:'hirajoshi', tuning:'edo12', chordRule:{kind:'stack'}, name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
- {id:'kumoi-japanese', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
- {id:'in-insen', tuning:'edo12', chordRule:{kind:'stack'}, name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
- {id:'iwato', tuning:'edo12', chordRule:{kind:'stack'}, name:{default:'Iwato', ru:'Ивато'},                              trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,6,10], tag:'penta'},
+ {id:'hirajoshi', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
+ {id:'kumoi-japanese', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
+ {id:'in-insen', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,7,8],  tag:'penta'},
+ {id:'iwato', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{default:'Iwato', ru:'Ивато'},                              trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,1,5,6,10], tag:'penta'},
  /* Партч (Harry Partch, «Genesis of a Music») — 43-тоновая ЧИСТАЯ ИНТОНАЦИЯ (11-предельный
     тональный ромб). Центы посчитаны из канонических отношений (ниже); 2 знака сохраняют JI
     точно (в отличие от целочисленных приближений гамелана). Октава = 2/1 (тождество Партча),
@@ -179,22 +199,29 @@ export const SCALES=[
     ЧИСТЫХ ОТНОШЕНИЙ (11-предел, палитра О/У/Станд./Sus-11) — chordFreqs через cents-ветку
     множит корень на ratio напрямую, минуя 2^(шаг/edo). rectGrid: 43+1=44, 44/4=11 прямоугольников
     (кратность 4 держится). tag:'ji' — не 'edo'/'penta': шаговых аккордов не строит, как равный EDO не читается.
+    ⛳ T7b: это — режим «КАК НА ИНСТРУМЕНТЕ»; по умолчанию режим «СВОБОДНО» — любой тип на любом корне, как до T7 (chordModes).
+    ⛳ T7 (решение пользователя, по теории): аккорд Партча — ТОЛЬКО ИЗ ЕГО 43 ВЫСОТ. На каждом корне предлагаются лишь типы, у которых
+    КАЖДЫЙ тон (корень × отношение, приведённое в октаву) — одна из 43 (точные отношения — TUNINGS.partch43.ratios, проверка —
+    chordTypeFits); прочие на этом корне недоступны (серые в палитре, с причиной), и ⛔ НИКОГДА не подменяются ближайшими высотами —
+    это была бы ложная отональность. Полная палитра — только на 1/1; на 21/20, 11/10, 14/11, 11/7 — ни одного типа. Цена прежняя.
     Отношения: 1/1 81/80 33/32 21/20 16/15 12/11 11/10 10/9 9/8 8/7 7/6 32/27 6/5 11/9 5/4
     14/11 9/7 21/16 4/3 27/20 11/8 7/5 10/7 16/11 40/27 3/2 32/21 14/9 11/7 8/5 18/11 5/3
     27/16 12/7 7/4 16/9 9/5 20/11 11/6 15/8 40/21 64/33 160/81. Добавлен В КОНЕЦ (индекс 49). */
  {id:'partch-43', tuning:'partch43', chordRule:{kind:'palette'}, name:{en:'Partch (43 tones, just intonation)', ru:'Партч (43 тона, чистая интонация)'}, trad:'exp', grp:'', edo:43, iv:range(43),
     cents:TBL.partch43,
-    tag:'ji', typedChords:'partch', rectGrid:true},
+    tag:'ji', typedChords:'partch', rectGrid:true, chordModes:CM_PARTCH},   // T7b: «Свободно» (умолч., как до T7) / «Как на инструменте» (T7)
  /* Болен–Пирс — НЕОКТАВНЫЙ строй: период не октава (2:1), а ТРИТАВА (3:1). 13 РАВНЫХ шагов
     3^(1/13) ≈ 146.3¢, полная тритава = 1901.955¢. РАВНОМЕРНЫЙ внутри периода (как 19/31-TET
     внутри октавы) — НЕ cents-лад: свойство period:3 заменяет зашитую октаву в формуле высоты
     (periodOf: leadFreq/bassFreq берут P^oct и P^(шаг/edo)). Регистр (палец, 0..3) сдвигает на
     ТРИТАВУ. typedChords:'bp': аккорды подгруппы 3.5.7 (палитра Мажор/Минор/Характерные) — не
     шаги edo, а ЧИСТЫЕ ОТНОШЕНИЯ; chordFreqs через period-ветку (P!==2 && ty) берёт корень
-    равным шагом (P^(iv/edo)) и множит на ratio напрямую. Строй Карлос — позже. НЕ rect: (13+1)=14
+    равным шагом (P^(iv/edo)) и множит на ratio напрямую. ⛳ T7b: так — в режиме «СВОБОДНО» (умолчание, набор 'bp'); в режиме «КАК НА ИНСТРУМЕНТЕ» (T7) аккорды —
+    ИЗ ШАГОВ СТРОЯ, как играют равный Болен–Пирс (набор 'bpsteps' — целые шаги, равная ветка цены; 3:5:7 = 0·6·10 шагов, в 4–7¢ от
+    отношений), аккорды с 11 сняты — вне теории BP (3, 5 и 7). Строй Карлос — позже. НЕ rect: (13+1)=14
     не делится на 4, rectGrid нельзя. tag:'bp' — инертен у всех читателей (не 'edo'/'penta'/терции). Индекс 50. */
  {id:'bohlen-pierce', tuning:'bp13', chordRule:{kind:'palette'}, name:{en:'Bohlen–Pierce (13 equal, tritave)', ru:'Болен–Пирс (13 равных, тритава)'}, trad:'exp', grp:'', edo:13, iv:range(13),
-    period:3, tag:'bp', typedChords:'bp'},
+    period:3, tag:'bp', typedChords:'bp', chordModes:CM_BP},   // T7b: «Свободно» — набор 'bp' отношениями, как до T7; «Как на инструменте» — 'bpsteps' (T7)
  /* Строи Уэнди Карлос — НЕОКТАВНЫЕ: у них НЕТ интервала эквивалентности вовсе. Карлос вывела их,
     поделив чистую КВИНТУ 3:2 на РАВНЫЕ части (alpha=9, beta=11, gamma=20) — не октаву. Моделируем
     period:3/2 (квинта-генератор) + edo=число делений + РАВНЫЕ шаги (period^(iv/edo), НЕ cents-лад):
@@ -245,17 +272,22 @@ export const SCALES=[
     (chordFreqs·cents-ветка root·ratio), поэтому пуст волка НЕТ ни на одном корне — модель хора/квартета,
     что подстраивает каждый аккорд на лету («подвижная» чистая интонация). Пара к ФИКСИРОВАННОМУ ниже
     (клавесин): те же 12 нот, но там аккорды берутся из ЗАСТЫВШЕЙ сетки → волк. Контрапара к Пифагорову.
+    ⛳ T7 (решение пользователя, по теории): это АДАПТИВНАЯ чистая интонация — так поют хор и струнный квартет: высоты сдвигаются, чтобы
+    КАЖДЫЙ аккорд был чистым, поэтому тон аккорда может лечь МИМО 12 высот (на синтоническую комму) — и редактор честно показывает его
+    между рядами с отступлением в центах: это сдвинутая высота хора, а не ошибка. Свойство chordBuild:'adaptive' — единственный такой лад.
+    Клавишная версия того же строя — «фиксированный» ниже (аккорды из сетки, с волком). Имя говорит это: «как поёт хор».
     tag:'penta' — инертный. Индекс 58. */
- {id:'ji-adaptive', tuning:'ji12', chordRule:{kind:'palette'}, name:{en:'Just intonation (adaptive, choir)', ru:'Натуральный строй (подвижный, хор)'}, trad:'europe', grp:'', edo:12, iv:range(12),
-    cents:TBL.ji12, tag:'penta', typedChords:'nat'},
+ {id:'ji-adaptive', tuning:'ji12', chordRule:{kind:'palette'}, name:{en:'Just intonation — adaptive (as a choir sings)', ru:'Натуральный строй — подвижный (как поёт хор)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+    cents:TBL.ji12, tag:'penta', typedChords:'nat', chordBuild:'adaptive'},
  /* Натуральный строй, ФИКСИРОВАННЫЙ (клавесин/орган) — ТЕ ЖЕ 12 нот (cents 1-в-1 с подвижным выше),
     настроенные ОДИН РАЗ от тоники. Но аккорды берут ноты ИЗ ЗАСТЫВШЕЙ СЕТКИ (typedChords:'natfix' —
     ЦЕЛЫЕ полутоновые смещения; gridChords:true гонит chordFreqs в grid-ветку, читающую ступень корень+off
     из cents-сетки). Оттого интервалы МЕЖДУ нотами сетки — какие даст фиксированный строй: чистые на одних
     корнях (мажор 0,1,3,5,7,8), ВОЛК на других (квинта −21.5¢ на 2,10 и +19.5¢ на 6; терции ±41¢) — ровно
     ПОЧЕМУ и придумали темперации. Разметки «волк» в UI НЕТ намеренно: учит ухо, не подпись. Пара к
-    подвижному выше — переключи на ОДНОМ аккорде и услышь разницу. tag:'penta' — инертный. Индекс 59, В КОНЕЦ. */
- {id:'ji-fixed', tuning:'ji12', chordRule:{kind:'palette'}, name:{en:'Just intonation (fixed, harpsichord)', ru:'Натуральный строй (фиксированный, клавесин)'}, trad:'europe', grp:'', edo:12, iv:range(12),
+    подвижному выше — переключи на ОДНОМ аккорде и услышь разницу. ⛳ T7: это КЛАВИШНАЯ версия строя (аккорды ИЗ СТРОЯ, как на
+    инструменте с неподвижными клавишами) — имя говорит «как на клавишных». tag:'penta' — инертный. Индекс 59, В КОНЕЦ. */
+ {id:'ji-fixed', tuning:'ji12', chordRule:{kind:'palette'}, name:{en:'Just intonation — fixed (as on a keyboard)', ru:'Натуральный строй — фиксированный (как на клавишных)'}, trad:'europe', grp:'', edo:12, iv:range(12),
     cents:TBL.ji12, tag:'penta', typedChords:'natfix', gridChords:true, fixedKey:true},
  /* Мезотон 1/4 коммы (Аарон, 1523) — ИСТОРИЧЕСКИЙ КОМПРОМИСС. Каждая квинта СУЖЕНА на 1/4 синтонической
     коммы до 696.58¢ (чистая 701.96¢), чтобы четыре квинты минус две октавы дали ЧИСТУЮ большую терцию
@@ -346,6 +378,13 @@ export const SCALES=[
    ⚠️ Натуральный подвижный и фиксированный — ОДИН строй ji12 (те же 12 высот): различаются они не строем, а ЯКОРЕМ (подвижный
    строится от тоники, фиксированный — от C) и аккордами (чистые отношения / сетка). Так и задумано моделью: строй — только высоты.
    ⚠️ T0 НЕВИДИМ: эти записи и поля sel/root читает ТОЛЬКО проба (src/scaleprobe.js); цена, события, редактор их не видят (T1+). */
+/* ⛳ T7: ТОЧНЫЕ ОТНОШЕНИЯ СТРОЯ — данными, рядом с центами (первая часть пункта (а) готовности к Scala; пока — только у Партча, которому
+   они нужны для правила «аккорд Партча — только из его 43 высот»). Строка дробей в порядке таблицы центов (центы — те же отношения,
+   округлённые до сотых, отсюда ≤ 0.005¢ разницы). Цену они НЕ меняют — её по-прежнему считают центы (корень) и отношение типа. */
+const RATIOS={
+  partch43:'1/1 81/80 33/32 21/20 16/15 12/11 11/10 10/9 9/8 8/7 7/6 32/27 6/5 11/9 5/4 14/11 9/7 21/16 4/3 27/20 11/8 7/5 10/7 16/11 40/27 3/2 32/21 14/9 11/7 8/5 18/11 5/3 27/16 12/7 7/4 16/9 9/5 20/11 11/6 15/8 40/21 64/33 160/81'
+    .split(' ').map(x=>x.split('/').map(Number)),
+};
 export const TUNINGS={
   'edo12':{id:'edo12', period:2, equal:12},
   'edo19':{id:'edo19', period:2, equal:19},
@@ -357,7 +396,7 @@ export const TUNINGS={
   'carlos-gamma':{id:'carlos-gamma', period:3/2, equal:20},
   'slendro':{id:'slendro', period:2, cents:TBL.slendro},
   'pelog':{id:'pelog', period:2, cents:TBL.pelog},             // родитель патетов Лима/Нем/Баранг
-  'partch43':{id:'partch43', period:2, cents:TBL.partch43},
+  'partch43':{id:'partch43', period:2, cents:TBL.partch43, ratios:RATIOS.partch43},   // T7: точные отношения — по ним решается «тон аккорда — одна из 43 высот»
   'shruti22':{id:'shruti22', period:2, cents:TBL.shruti22},    // родитель десяти раг
   'ji12':{id:'ji12', period:2, cents:TBL.ji12},
   'pythagorean12':{id:'pythagorean12', period:2, cents:TBL.pythagorean12},
@@ -452,14 +491,22 @@ const anchorOf=s=> s.tunedFrom==='T' ? tonic : (s.tunedFrom==null ? 0 : s.tunedF
    Ничего не мутирует ни лады, ни виды; вид от вида — тот же вид (берём его mode). */
 const SCALE_VIEWS=new WeakMap();
 const anchorPolicy=s=> s.tunable ? 'choice' : s.fixedKey ? 'C' : 'tonic';
-export function scaleView(s, tf=tunedFrom){
+/* ⛳ T7b: РЕЖИМ АККОРДОВ ЛАДА — выбранный (state.chordModeSel по id лада) или умолчание (первый в списке); undefined — у лада режимов нет. */
+export function chordModeOf(s){
+  const b=s&&(s.mode||s), ms=b&&b.chordModes; if(!ms) return undefined;
+  const m=chordModeSel[b.id]; return ms.some(x=>x.id===m) ? m : ms[0].id;
+}
+export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s)){
   if(!s) return s;
-  const base=s.mode||s, key=base.tunable ? tf : '';           // у лада без выбора якорь один — и ключ один
+  const base=s.mode||s, ms=base.chordModes;
+  const cmv= ms ? (ms.some(x=>x.id===cm) ? cm : ms[0].id) : undefined;   // T7b: режим аккордов — второй ключ вида (как якорь); неизвестный — умолчание
+  const key=(base.tunable ? tf : '')+'|'+(cmv||'');           // у лада без выбора якорь один, без режимов — режим один: ключ один
   let m=SCALE_VIEWS.get(base); if(!m){ m=new Map(); SCALE_VIEWS.set(base,m); }
   let v=m.get(key);
   if(!v){
     const policy=anchorPolicy(base);
     v= base.tunable ? {...base, tunedFrom:tf} : {...base};    // tunedFrom — только у tunable: anchorOf у прочих читает «поля нет» (C), как прежде
+    if(ms){ Object.assign(v, ms.find(x=>x.id===cmv).over); v.chordMode=cmv; }   // ⛳ T7b: поля режима ПОВЕРХ полей лада — читатели видят обычные поля (chordBuild/typedChords/chordRule)
     v.mode=base; v.tuningRec=TUNINGS[base.tuning];
     v.anchor={ policy, from: policy==='choice' ? tf : policy==='C' ? 0 : 'T' };
     m.set(key,v);
@@ -473,7 +520,8 @@ export function scaleView(s, tf=tunedFrom){
 export function viewIdOf(v){
   if(!v) return '-';
   const b=v.mode||v;
-  return b.id + (b.tunable ? '@'+(v.tunedFrom===undefined ? 'bare' : v.tunedFrom) : '');
+  return b.id + (b.tunable ? '@'+(v.tunedFrom===undefined ? 'bare' : v.tunedFrom) : '')
+              + (b.chordModes ? '#'+(v.chordMode===undefined ? 'bare' : v.chordMode) : '');   // ⛳ T7b: и режим аккордов — второй ключ вида
 }
 export const keyOf=s=>{ const A=anchorOf(s); return tonic-A+(A>tonic?12:0); };
 export const cFix=(s=CUR())=>{ const A=anchorOf(s); return a3()*Math.pow(2,(A-9-(A>tonic?12:0))/12); };   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
@@ -814,7 +862,7 @@ export const CHORD_FAM_SETS={
     на ratio напрямую (см. period-ветку в chordFreqs). Метки честны по BP — отношение, а не «Cmaj».
     iv с 1 (унисон-корень). Три колонки по 5: Мажор (отональ. вокруг 3:5:7) / Минор (вокруг 5:7:9) /
     Характерные (нечётные терции 9/7·7/5 и симметричные стопки). Отношения — обычные JS-числа. */
- bp:[
+ bp:[   // ⛳ T7b: ПРЕЖНИЙ набор (до T7) СЛОВО В СЛОВО — режим «Свободно» (умолчание); проба сверяет его с копией из прежнего кода
   {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
     {label:'3:5:7',     full:{en:'Major triad · 3:5:7 (885/1467¢)', ru:'Мажорная триада · 3:5:7 (885/1467¢)'}, iv:[1,5/3,7/3]},
     {label:'3:5:7:9',   full:{en:'Tetrad · 3:5:7:9 (top = tritave)', ru:'Тетрада · 3:5:7:9 (верх = тритава)'},  iv:[1,5/3,7/3,3]},
@@ -835,6 +883,32 @@ export const CHORD_FAM_SETS={
     {label:'15/7',  full:{en:'Upper · 3:5:15/7 (885/1319¢)', ru:'Верхняя · 3:5:15/7 (885/1319¢)'},        iv:[1,5/3,15/7]},
     {label:'25/9',  full:{en:'Stack of 5/3 · 9:15:25 (symmetric)', ru:'Стопка 5/3 · 9:15:25 (симметр.)'},       iv:[1,5/3,25/9]},
     {label:'49/25', full:{en:'Stack of 7/5 · 25:35:49 (symmetric)', ru:'Стопка 7/5 · 25:35:49 (симметр.)'},      iv:[1,7/5,49/25]},
+  ]},
+ ],
+ /* ── Болен–Пирс, режим «КАК НА ИНСТРУМЕНТЕ» (T7b; был набором 'bp' в T7). ⛳ T7 (решение пользователя, по теории): аккорды — ИЗ ШАГОВ СТРОЯ, как играют равный BP:
+    интервалы — ЦЕЛЫЕ ШАГИ (1 шаг = 1901.955/13 ≈ 146.30¢), равная ветка цены (как chrom12/edo19/edo31: шаг корня + шаг типа, без
+    приведения — тритава = 13). Прежде — чистые отношения подгруппы 3.5.7 от корня (period-ветка). Каждый шаг — ближайший к
+    отношению (round(13·log₃ r)); отступление от отношения — в подписи. Аккорды с 11 (3:5:7:9:11, 5:7:9:11, 7:9:11) СНЯТЫ: 11 — вне
+    теории BP (3, 5 и 7), и в 13-равном строе он лежит в 48–55¢ от любой ступени. Метки — по-прежнему отношения (имя аккорда), полное
+    имя — шаги и центы. Колонки разной длины (4/3/5) — палитра это держит. */
+ bpsteps:[   // T7b: набор T7 — режим «Как на инструменте» (вид подставляет typedChords:'bpsteps')
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
+    {label:'3:5:7',   full:{en:'Major triad · 3:5:7 = steps 0·6·10 (878/1463¢; −6.5/−3.8 from pure)', ru:'Мажорная триада · 3:5:7 = шаги 0·6·10 (878/1463¢; −6.5/−3.8 от чистых)'}, iv:[0,6,10]},
+    {label:'3:5:7:9', full:{en:'Tetrad · 3:5:7:9 = steps 0·6·10·13 (top = tritave, exact)', ru:'Тетрада · 3:5:7:9 = шаги 0·6·10·13 (верх = тритава, точно)'},  iv:[0,6,10,13]},
+    {label:'3:5',     full:{en:'Dyad · 3:5 = 6 steps (878¢; −6.5)', ru:'Диада · 3:5 = 6 шагов (878¢; −6.5)'},                  iv:[0,6]},
+    {label:'3:7',     full:{en:'Dyad · 3:7 = 10 steps (1463¢; −3.8)', ru:'Диада · 3:7 = 10 шагов (1463¢; −3.8)'},                 iv:[0,10]},
+  ]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[
+    {label:'5:7:9',   full:{en:'Minor triad · 5:7:9 = steps 0·4·7 (585/1024¢; +2.7/+6.5 from pure)', ru:'Минорная триада · 5:7:9 = шаги 0·4·7 (585/1024¢; +2.7/+6.5 от чистых)'}, iv:[0,4,7]},
+    {label:'5:7',     full:{en:'Dyad · 5:7 = 4 steps (585¢; septimal tritone, +2.7)', ru:'Диада · 5:7 = 4 шага (585¢; септим. тритон, +2.7)'},  iv:[0,4]},
+    {label:'5:9',     full:{en:'Dyad · 5:9 = 7 steps (1024¢; +6.5)', ru:'Диада · 5:9 = 7 шагов (1024¢; +6.5)'},                 iv:[0,7]},
+  ]},
+  {id:'char', name:{en:'Characteristic', ru:'Характерные'}, finger:2, types:[
+    {label:'9/7',   full:{en:'Supermajor third 9/7 + 7/3 = steps 0·3·10 (439/1463¢; +3.8/−3.8)', ru:'Супермажор. терция 9/7 + 7/3 = шаги 0·3·10 (439/1463¢; +3.8/−3.8)'}, iv:[0,3,10]},
+    {label:'7/5',   full:{en:'Septimal tritone 7/5 + 7/3 = steps 0·4·10 (585/1463¢; +2.7/−3.8)', ru:'Септим. тритон 7/5 + 7/3 = шаги 0·4·10 (585/1463¢; +2.7/−3.8)'},     iv:[0,4,10]},
+    {label:'15/7',  full:{en:'Upper · 3:5:15/7 = steps 0·6·9 (878/1317¢; −6.5/−2.7)', ru:'Верхняя · 3:5:15/7 = шаги 0·6·9 (878/1317¢; −6.5/−2.7)'},        iv:[0,6,9]},
+    {label:'25/9',  full:{en:'Stack of 5/3 · 9:15:25 = steps 0·6·12 (878/1756¢; −6.5/−13.1)', ru:'Стопка 5/3 · 9:15:25 = шаги 0·6·12 (878/1756¢; −6.5/−13.1)'},       iv:[0,6,12]},
+    {label:'49/25', full:{en:'Stack of 7/5 · 25:35:49 = steps 0·4·8 (585/1170¢; +2.7/+5.4)', ru:'Стопка 7/5 · 25:35:49 = шаги 0·4·8 (585/1170¢; +2.7/+5.4)'},      iv:[0,4,8]},
   ]},
  ],
  /* ── (набор 'pyth' — чистые пифагоровы ОТНОШЕНИЯ — УДАЛЁН в P2 дуги «СТРОЙ ОТ»: аккорды Пифагора теперь из собственных нот
@@ -1076,7 +1150,7 @@ export function chordNotesAt(ti,oct, s=CUR(), sev=seventh, ty=null){
   const T=TUNINGS[s.tuning], E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
   if (s.cents && s.gridChords){ const a=modeAnchor(s);
     return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
-  if (s.cents || periodOf(s)!==2){ const a=modeAnchor(s), rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);
+  if (s.cents || (periodOf(s)!==2 && chordBuildOf(s)==='adaptive')){ const a=modeAnchor(s), rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);   // T7: неоктавный строй «из строя» (Болен–Пирс) — равной веткой ниже, шагами
     return ty.map(ra=>({ f:rootF*ra, iv:ra })); }
   return ty.map(iv=>({ f: pitchHz(T,baseF()/2,0,ti+iv,oct), iv }));   // равная ветка, типизированный путь chordSteps: шаг корня (= ti, неприведённый) + интервал, регистр oct
 }
@@ -1130,7 +1204,33 @@ export function chordFreqs(deg,oct, s=CUR(), sev=seventh, ty=null){ return chord
    «единица по воротам» и «нота 0 нетипизированной стопки» совпадают у всех ладов. Новый вид цены — новая строка ЗДЕСЬ, рядом с веткой. */
 export function chordUnit(s=CUR()){
   if(s.cents) return s.gridChords ? [0] : [1];
-  return periodOf(s)!==2 ? [1] : [0];
+  return periodOf(s)!==2 && chordBuildOf(s)==='adaptive' ? [1] : [0];   // T7: Болен–Пирс теперь — равная ветка (шаги), единица корня [0]
+}
+/* ⛳ T7: КАК СТРОЯТСЯ АККОРДЫ СТРОЯ — свойство для конструктора (решение пользователя): 'adaptive' — чистыми отношениями от корня,
+   высоты сдвигаются под каждый аккорд, как поёт хор (тон может лечь мимо строя); 'tuning' — ИЗ ВЫСОТ СТРОЯ, как на инструменте.
+   Встроенные — по своей теории: адаптивен только подвижный Натуральный; прочие — из строя (Партч — отношениями, но ТОЛЬКО теми, что
+   ложатся на его 43 высоты: chordTypeFits; Болен–Пирс — шагами). Строй пользователя выберет сам. Нет поля — 'tuning'. */
+export function chordBuildOf(s){ return (s&&s.chordBuild)||'tuning'; }   // function — всплывает: её читают ворота цены, а те могут позвать при загрузке модуля
+/* ⛳ T7: ЛЕЖИТ ЛИ ТИП АККОРДА ЦЕЛИКОМ В СТРОЕ на корне с индексом ti. Вопрос имеет смысл только у строя «из строя» с набором ОТНОШЕНИЙ и
+   точными отношениями в данных (сегодня — Партч): каждый тон, корень × отношение, приведённый в октаву, обязан быть одной из высот
+   (точное сравнение дробей). Прочим — всегда истина: шаговые наборы и сетки берут тоны из строя по построению, адаптивный строй
+   сдвигает высоты намеренно. ty — массив отношений типа. Ответ запоминается на (тип, строй): таблица корней. */
+const FIT_MEMO=new WeakMap();
+const gcd=(a,b)=>{ while(b){ [a,b]=[b,a%b]; } return a; };
+function ratioOf(x){ for(let q=1;q<=4096;q++){ const p=Math.round(x*q); if(p/q===x) return [p,q]; } return null; }   // дробь, чьё JS-значение — ровно x (наборы пишут 5/4, 36/11 …)
+function octRed(n,d){ const g=gcd(n,d); n/=g; d/=g; while(n>=2*d){ if(n%2===0) n/=2; else d*=2; } while(n<d){ if(d%2===0) d/=2; else n*=2; } const h=gcd(n,d); return (n/h)+'/'+(d/h); }
+export function chordTypeFits(ty, ti, s=CUR()){
+  if(!ty || !s || s.gridChords || chordBuildOf(s)!=='tuning') return true;
+  const T=TUNINGS[s.tuning], RT=T&&T.ratios; if(!RT || !s.cents) return true;
+  let m=FIT_MEMO.get(ty); if(!m){ m=new Map(); FIT_MEMO.set(ty,m); }
+  let row=m.get(T);
+  if(!row){
+    const set=new Set(RT.map(([n,d])=>octRed(n,d))), tones=ty.map(ratioOf);
+    row=RT.map(([rn,rd])=>tones.every(t=> !!t && set.has(octRed(rn*t[0], rd*t[1]))));
+    m.set(T,row);
+  }
+  const N=RT.length, k=((ti%N)+N)%N;
+  return typeof ti==='number' ? !!row[k] : true;
 }
 /* Частота РЯДА (ступень, регистр) в регистре аккордов — частота КОРНЯ аккорда на этом ряду, по той же цене, что у chordNotes: аккорд из
    ЕДИНИЦЫ КОРНЯ (chordUnit — у типизированного лада это первый интервал любого его типа: все типы начинаются с корня; у нетипизированного
@@ -1155,7 +1255,7 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
     return ty.map(ra=>({ f:rootF*ra, iv:ra }));
   }
   const P=periodOf(s);
-  if (P!==2 && ty){
+  if (P!==2 && ty && chordBuildOf(s)==='adaptive'){   // ⛳ T7: только АДАПТИВНЫЙ неоктавный строй строит аккорд отношениями; Болен–Пирс («из строя») — шагами, равной веткой ниже (встроенных адаптивных неоктавных нет)
     /* Болен–Пирс: корень — равный шаг в ПЕРИОДЕ (тритава), нота — корень × отношение (тоны-отношения, как выше). */
     const a=modeAnchor(s), d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
     const rootF=pitchHz(T,a.A/2,a.z,a.key+s.sel[d],o);

@@ -1,4 +1,4 @@
-import { scaleIdx, tonic, setScaleIdx, setTonic, tunedFrom, setTunedFrom, setSeventh, setChIdx,
+import { scaleIdx, tonic, setScaleIdx, setTonic, tunedFrom, setTunedFrom, setChordMode, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
@@ -20,14 +20,14 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault } from './scales.js';
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf } from './scales.js';   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
-         editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
+         songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
@@ -64,13 +64,32 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
    чтобы подписи не разъехались. Читает живые связки scaleIdx/tonic, поэтому зовётся
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
 function updScaleBtn(){ const s=SCALES[scaleIdx], fixedFrom = s.tunable && tunedFrom!=='T';
-  scaleBtn.textContent=`${L(s.name)} · ${NOTE_NAMES[tonic]}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '');   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
+  const cm=chordModeOf(s), cmNotDef = s.chordModes && cm!==s.chordModes[0].id;   // T7b: режим аккордов не по умолчанию — виден на кнопке, как закреплённый «строй от»
+  scaleBtn.textContent=`${L(s.name)} · ${NOTE_NAMES[tonic]}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '')
+    +(cmNotDef ? ' · '+t(s.chordModes.find(x=>x.id===cm).nameKey) : '');   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
   /* P0 «СТРОЙ ОТ»: у фиксированного исторического строя (fixedKey — СВОЙСТВО лада, не имя: правило #25) под тоникой строка
      «Настроен от C (историческая практика)». Здесь, потому что updScaleBtn зовут после КАЖДОЙ смены лада (меню лада, меню строя,
      уроки), тоники и языка — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам.
      P3: у лада с выбором (tunable — Пифагор) вместо строки — ряд выбора (renderTunedFrom). */
   tunedFromNote.hidden = !s.fixedKey || !!s.tunable;
-  renderTunedFrom(s); renderSevCtl(); }
+  renderTunedFrom(s); renderChordMode(s); renderSevCtl(); }
+/* ⛳ T7b: РЕЖИМ АККОРДОВ — две кнопки под пальцем (тот же .seg, что у режима голоса) и строка подсказки, только у лада со свойством
+   chordModes (где режимы различаются). Смена — шов тоники/«строй от»: setChordMode + softAllOff (при записи сперва закрывает открытые ноты:
+   ни одна нота не тянется через два вида) + updScaleBtn. Режим — часть ВИДА (scaleView), поэтому записанное звучит, как записано, а новая
+   запись уходит в новую дорожку. Кнопки строятся заново при каждом вызове (язык мог смениться) — их две. */
+function renderChordMode(s){
+  const chordModeRow=$('chordModeRow'), chordModeSeg=$('chordModeSeg'), chordModeHint=$('chordModeHint');   // ищем здесь: updScaleBtn зовут и при загрузке модуля, раньше любой константы ниже по файлу
+  const ms=s.chordModes;
+  chordModeRow.style.display = ms ? '' : 'none'; chordModeHint.hidden=!ms;
+  if(!ms) return;
+  const cur=chordModeOf(s); chordModeSeg.textContent='';
+  for(const m of ms){
+    const b=document.createElement('button'); b.textContent=t(m.nameKey); b.title=t(m.hintKey); if(m.id===cur) b.className='act';
+    b.onclick=()=>{ if(m.id===chordModeOf(s)) return; setChordMode(s.id, m.id); softAllOff(); updScaleBtn(); };
+    chordModeSeg.appendChild(b);
+  }
+  chordModeHint.textContent=t(ms.find(x=>x.id===cur).hintKey);
+}
 /* ⛳ СЕПТАККОРД, КОТОРЫЙ НИЧЕГО НЕ ДОБАВЛЯЕТ (при T4c-1): один общий тест лада — scales.seventhAddsNote (стопка через ступень замыкается
    раньше четвёртой разной ноты — шестиступенные блюз, мажорный блюз, целотонный, прометеев; у лада пользователя — тем же тестом). Тогда
    кнопка «Септаккорды» выключена и строка под ней говорит почему. ⚠️ ВЫБОР НЕ ПЕРЕЗАПИСЫВАЕМ (как у раскладки): включённый септаккорд
@@ -991,7 +1010,8 @@ function rollUp(e){
            ⛳ E1/E2: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту во времени — ЦЕЛИКОМ, сегмент
            глиссандо во времени — ОТДЕЛЯЕТ и везёт один, смену одной высоты — всем событиям сегмента, глиссандо цело.
            Выделяем то, что он вернул (у отделённого — новое «вкл», см. длину выше). */
-        const g2=rollGeom(), s=rollGrab.seg, pit=rollDragTarget(gd,s).pit;   // ⛳ T5: ряд корня + сдвиг пальца, БЕЗ прилипания (приглушённый ряд — тоже цель); палец не ушёл с ряда — высота прежняя. Та же функция, что у призрака
+        const g2=rollGeom(), s=rollGrab.seg, pit=rollDragTarget(gd,s).pit;
+        if(pit && s.role==='ch' && s.ty && !chordTypeFits(s.ty, pit.ti, s.sc)) showCamMsg(t('roll.unfit'));   // ⛳ T7: перенос откажет (recorder) — говорим почему   // ⛳ T5: ряд корня + сдвиг пальца, БЕЗ прилипания (приглушённый ряд — тоже цель); палец не ушёл с ряда — высота прежняя. Та же функция, что у призрака
         editViewCheck(rollGrab.seg.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)
         /* U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было). ⛳ T5: целый
            нетипизированный аккорд на высоту вне лада сохраняет форму — тип ставит recorder (editMoveSeg → chordMoveTy, вариант (а)). */
@@ -1039,6 +1059,8 @@ function rollUp(e){
              (индекс в строе × регистр) и у аккорда. ⛳ U5: у аккордов тап кладёт ОДНУ ноту, а при выделенном ДО тапа ЦЕЛОМ аккорде — его
              форму от тронутого корня; тип, тембр и громкость решает recorder.editInsertChord. Соло правимым станет в S4. */
           const ins=ROLL_INSERT[rollRole];
+          { const sg=rollRole==='ch'&&rollPan.selBefore ? songSegs().byEv.get(rollPan.selBefore) : null;   // ⛳ T7: форма выделенного аккорда, которой на этом корне нет в строе, — вставка откажет (recorder); говорим почему
+            if(pit && sg && sg.ty && sg.sc===sc && !chordTypeFits(sg.ty, pit.ti, sc)) showCamMsg(t('roll.unfit')); }
           ev= (ins&&pit) ? ins(tt, pit.ti, pit.oct, sc, sev, len, rollPan.selBefore) : false;   // T4c-1: высота — индексом
         }
         if(ev){ selNote(ev); renderTimbreCtl(); }   // T5: вставка в опустевшую дорожку возвращает ей тембр — и выбор

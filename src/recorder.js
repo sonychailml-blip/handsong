@@ -4,8 +4,8 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
-import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, TUNINGS, periodOf } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
+import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, TUNINGS, periodOf, chordTypeFits } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1093,7 +1093,7 @@ const frzBufOwns=layer=>{ const f=frzOf(layer); return !!(f&&f.armedRep!=null); 
    ⛳ В ПОДПИСЬ ДОРОЖКИ он попадает ТОЛЬКО через эту запасную ветку (noSc в freezeSig): у события есть sc — вариант лада со своим
    якорем, и смена выбора его звук не меняет; значит замороженная дорожка от передвижения выбора НЕ стареет (мемо подписи лишь
    пересчитается к той же строке). ⛳ T2: пара scaleIdx + tunedFrom — ровно КЛЮЧ ВИДА (строй, лад, якорь), который отдаёт CUR(). */
-const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct()].join(',');   // T4c-2: флаг временного R.powerOld снят вместе с ним
+const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,chordModeVer,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct()].join(',');   // T4c-2: флаг временного R.powerOld снят вместе с ним
 const frzGlobalKey=()=>events.length+'|'+evGen+'|'+takeFxVer+'|'+frzPinned();
 const frzSigMemo=new Map(); let frzSigG=null;
 /* ⛳ ВЕРСИЯ ПРАВОК ДОРОЖКИ (A2) — по ID, не по номеру (правило #27). Поднимается там же, где takeFxTouch
@@ -1140,7 +1140,7 @@ function freezeSig(layer){
                         else if(e.fn==='drum') tim=tmix(tim,4,a.kit); } }
   const id=laneOf(layer), ver=id==null?0:(laneEditVer.get(id)||0);
   const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+tonic+','+aRef+','+loop.bpm
-         +'|'+(noSc?scaleIdx+','+tunedFrom+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim;   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
+         +'|'+(noSc?scaleIdx+','+tunedFrom+','+chordModeVer+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim;   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
   frzSigMemo.set(layer, v);
   return v;
 }
@@ -1745,6 +1745,7 @@ function editMoveSeg(ev,t,ti,oct,ty){
   if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); с S2 редактор пускает сюда бас и аккорды, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
   if(ty===undefined){ const ct=chordMoveTy(seg,ti,oct); if(ct===null) return false; ty=ct; }   // ⛳ T5 (а): целый нетипизированный аккорд на высоту вне лада — с формой
+  if(seg.role==='ch' && !chordTypeFits(ty!==undefined ? ty : seg.ty, ti, seg.sc)) return false;   // ⛳ T7: тип, которого на новом корне нет в строе (Партч — вне 43 высот), туда не переносится (ui называет причину)
   const pt=slotPt(ti,oct,ty); if(!pt) return false;          // T5: любая высота строя (яркий или приглушённый ряд)
   const nt=Math.max(0,t);
   if(Math.abs(nt-ev.t)<=1e-9){
@@ -2009,6 +2010,7 @@ function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота ко
     inst = on&&on.a.inst!=null ? on.a.inst : chIdx;
     vol  = near ? near.a.vol : null;
   }
+  if(ty && !chordTypeFits(ty, ti, sc)) return false;        // ⛳ T7: форма, которой на этом корне нет в строе (Партч — вне 43 высот), не вставляется (ui называет причину)
   if(inst==null) inst=chIdx;
   if(vol==null) vol=editDefVol('ch');                        // правило #30
   const k=layerTakeTop(layer);                               // свой ключ владельца 'loop:N:k': пересечься с аккордами дорожки нечем

@@ -45,8 +45,9 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix } from './scales.js';   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
-import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS } from './scales.js';   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
+import { L } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
@@ -135,8 +136,92 @@ function legacyChordNotesRef(deg,oct, s=CUR(), sev=seventh, ty=null){
     let r=STACK_REF.get(s); if(!r){ r={...s, tag:'dia'}; STACK_REF.set(s,r); }
     return legacyChordNotes(deg,oct,r,sev,null);
   }
+  /* ⛳ T7 — СМЕНА ОПРЕДЕЛЕНИЯ, РЕШЁННАЯ ПОЛЬЗОВАТЕЛЕМ (по теории): у Болена–Пирса аккорды — ИЗ ШАГОВ СТРОЯ (набор 'bp' — целые шаги), а не
+     чистыми отношениями. Прежняя period-ветка legacyChordNotes приняла бы шаги за отношения; опора для строя «из строя» с периодом ≠ 2 —
+     последняя строка legacyChordNotes (равная ветка), то же выражение слово в слово. Адаптивный неоктавный строй (встроенных нет)
+     по-прежнему шёл бы period-веткой. */
+  if (ty && periodOf(s)!==2 && chordBuildOf(s)!=='adaptive'){
+    const n=s.iv.length, P=periodOf(s), r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+    return legacyChordSteps(deg,s,sev,ty).map(st=>({ f: baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo), iv: st-r0 }));
+  }
   return legacyChordNotes(deg,oct,s,sev,ty);
 }
+/* ═══ ⛳ T7b — ЗАМОРОЖЕННЫЕ ОПОРЫ ДО T7 (из прежнего кода, `git show` коммита до T7 — scales.js, только чтение; СЛОВО В СЛОВО) ═══
+   Режим «Свободно» обязан звучать РОВНО как до T7. Здесь — то, чем это сверяется: наборы Партча и Болена–Пирса, как они стояли до T7
+   (у Б–П — с тремя аккордами на 11), и ветка цены, по которой оба тогда звучали (scales.chordNotesAt: `s.cents || periodOf(s)!==2` —
+   корень pitchHz от якоря, нота = корень × отношение; ступенный путь scales.chordNotes — та же форма от s.sel[d]), и единица корня
+   (scales.chordUnit). Якорь подвижного лада подставлен литералом — тело modeAnchor для !fixedKey: { A:baseF(), z:s.root, key:0 }
+   (оба лада подвижные). ⛔ Эталон: его не правят вслед за приложением. */
+const PRE_T7_SETS={
+ partch:[
+  {id:'oton', name:{en:'O (otonal)', ru:'О (обертон.)'}, finger:0, types:[
+    {label:'O',    full:{en:'Otonal triad · 4:5:6', ru:'Отональ. триада · 4:5:6'},         iv:[1,5/4,3/2]},
+    {label:'O7',   full:{en:'Otonal tetrad · 4:5:6:7', ru:'Отональ. тетрада · 4:5:6:7'},      iv:[1,5/4,3/2,7/4]},
+    {label:'O9',   full:{en:'Otonal pentad · 4:5:6:7:9', ru:'Отональ. пентада · 4:5:6:7:9'},    iv:[1,5/4,3/2,7/4,9/4]},
+    {label:'O11',  full:{en:'Otonal hexad · 4:5:6:7:9:11', ru:'Отональ. гексада · 4:5:6:7:9:11'}, iv:[1,5/4,3/2,7/4,9/4,11/4]},
+    {label:{en:'O no5', ru:'О-б5'}, full:{en:'Otonal, no fifth · 4:5:7', ru:'Отональ. без квинты · 4:5:7'},     iv:[1,5/4,7/4]},
+    {label:{en:'O9n', ru:'О9нч'}, full:{en:'Otonal with ninth · 8:9:10:12', ru:'Отональ. с ноной · 8:9:10:12'},    iv:[1,9/8,5/4,3/2]},
+  ]},
+  {id:'uton', name:{en:'U (utonal)', ru:'У (унтертон.)'}, finger:1, types:[
+    {label:'U',    full:{en:'Utonal triad · 10:12:15', ru:'Утональ. триада · 10:12:15'},      iv:[1,6/5,3/2]},
+    {label:'U7',   full:{en:'Utonal tetrad · 1/(4:5:6:7)', ru:'Утональ. тетрада · 1/(4:5:6:7)'},  iv:[1,6/5,3/2,12/7]},
+    {label:'U9',   full:{en:'Utonal pentad', ru:'Утональ. пентада'},                iv:[1,6/5,3/2,12/7,9/4]},
+    {label:'U11',  full:{en:'Utonal hexad', ru:'Утональ. гексада'},                iv:[1,6/5,3/2,12/7,9/4,36/11]},
+    {label:{en:'U no5', ru:'У-б5'}, full:{en:'Utonal, no fifth · 5:6:8', ru:'Утональ. без квинты · 5:6:8'},     iv:[1,6/5,8/5]},
+    {label:{en:'U add9', ru:'Удоб9'},full:{en:'Utonal with ninth · 9:10:12', ru:'Утональ. с ноной · 9:10:12'},      iv:[1,10/9,6/5,3/2]},
+  ]},
+  {id:'sept', name:{en:'Sharp 7/11', ru:'Диез 7/11'}, finger:2, types:[
+    {label:{en:'subm', ru:'субм'}, full:{en:'Subminor · 7/6 (267c)', ru:'Субминор · 7/6 (267c)'},          iv:[1,7/6,3/2]},
+    {label:{en:'supM', ru:'супМ'}, full:{en:'Supermajor · 9/7 (435c)', ru:'Супермажор · 9/7 (435c)'},        iv:[1,9/7,3/2]},
+    {label:{en:'neut', ru:'нейтр'},full:{en:'Neutral · 11/9 (347c)', ru:'Нейтральное · 11/9 (347c)'},      iv:[1,11/9,3/2]},
+    {label:{en:'undec', ru:'ундец'},full:{en:'Undecimal · 11/8 (551c)', ru:'Ундецимальное · 11/8 (551c)'},    iv:[1,11/8,3/2]},
+    {label:{en:'trit7', ru:'трит7'},full:{en:'Septimal tritone · 7/5 (583c)', ru:'Септим. тритон · 7/5 (583c)'},    iv:[1,7/5,3/2]},
+    {label:{en:'harm', ru:'гарм'}, full:{en:'Harmonic segment · 8:10:11:12', ru:'Обертоновый срез · 8:10:11:12'},  iv:[1,5/4,11/8,3/2]},
+  ]},
+  {id:'std', name:{en:'Standard', ru:'Станд.'}, finger:3, types:[
+    {label:'M',    full:{en:'Pure major · 4:5:6', ru:'Мажор чистый · 4:5:6'},            iv:[1,5/4,3/2]},
+    {label:'m',    full:{en:'Pure minor · 10:12:15', ru:'Минор чистый · 10:12:15'},         iv:[1,6/5,3/2]},
+    {label:'7',    full:{en:'Dominant 7th · 4:5:6:7', ru:'Домин.7 · 4:5:6:7'},               iv:[1,5/4,3/2,7/4]},
+    {label:'maj7', full:{en:'Pure maj7 · 15/8', ru:'Maj7 чистый · 15/8'},              iv:[1,5/4,3/2,15/8]},
+    {label:'sus4', full:'Sus4 · 4/3',                      iv:[1,4/3,3/2]},
+    {label:{en:'quart', ru:'кварт'},full:{en:'Quartal chord · 9:12:16', ru:'Квартаккорд · 9:12:16'},           iv:[1,4/3,16/9]},
+  ]},
+ ],
+ bp:[
+  {id:'maj', name:{en:'Major', ru:'Мажор'}, finger:0, types:[
+    {label:'3:5:7',     full:{en:'Major triad · 3:5:7 (885/1467¢)', ru:'Мажорная триада · 3:5:7 (885/1467¢)'}, iv:[1,5/3,7/3]},
+    {label:'3:5:7:9',   full:{en:'Tetrad · 3:5:7:9 (top = tritave)', ru:'Тетрада · 3:5:7:9 (верх = тритава)'},  iv:[1,5/3,7/3,3]},
+    {label:'3:5:7:9:11',full:{en:'Pentad · 3:5:7:9:11', ru:'Пентада · 3:5:7:9:11'},                iv:[1,5/3,7/3,3,11/3]},
+    {label:'3:5',       full:{en:'Dyad · 3:5 (885¢)', ru:'Диада · 3:5 (885¢)'},                  iv:[1,5/3]},
+    {label:'3:7',       full:{en:'Dyad · 3:7 (1467¢)', ru:'Диада · 3:7 (1467¢)'},                 iv:[1,7/3]},
+  ]},
+  {id:'min', name:{en:'Minor', ru:'Минор'}, finger:1, types:[
+    {label:'5:7:9',    full:{en:'Minor triad · 5:7:9 (583/1018¢)', ru:'Минорная триада · 5:7:9 (583/1018¢)'}, iv:[1,7/5,9/5]},
+    {label:'5:7:9:11', full:{en:'Tetrad · 5:7:9:11', ru:'Тетрада · 5:7:9:11'},                  iv:[1,7/5,9/5,11/5]},
+    {label:'7:9:11',   full:{en:'Triad · 7:9:11 (435/782¢)', ru:'Триада · 7:9:11 (435/782¢)'},          iv:[1,9/7,11/7]},
+    {label:'5:7',      full:{en:'Dyad · 5:7 (583¢, septimal tritone)', ru:'Диада · 5:7 (583¢, септим. тритон)'},  iv:[1,7/5]},
+    {label:'5:9',      full:{en:'Dyad · 5:9 (1018¢)', ru:'Диада · 5:9 (1018¢)'},                 iv:[1,9/5]},
+  ]},
+  {id:'char', name:{en:'Characteristic', ru:'Характерные'}, finger:2, types:[
+    {label:'9/7',   full:{en:'Supermajor third · 9/7 (435¢) + 7/3', ru:'Супермажор. терция · 9/7 (435¢) + 7/3'}, iv:[1,9/7,7/3]},
+    {label:'7/5',   full:{en:'Septimal tritone · 7/5 (583¢) + 7/3', ru:'Септим. тритон · 7/5 (583¢) + 7/3'},     iv:[1,7/5,7/3]},
+    {label:'15/7',  full:{en:'Upper · 3:5:15/7 (885/1319¢)', ru:'Верхняя · 3:5:15/7 (885/1319¢)'},        iv:[1,5/3,15/7]},
+    {label:'25/9',  full:{en:'Stack of 5/3 · 9:15:25 (symmetric)', ru:'Стопка 5/3 · 9:15:25 (симметр.)'},       iv:[1,5/3,25/9]},
+    {label:'49/25', full:{en:'Stack of 7/5 · 25:35:49 (symmetric)', ru:'Стопка 7/5 · 25:35:49 (симметр.)'},      iv:[1,7/5,49/25]},
+  ]},
+ ],
+};
+function preT7ChordNotesAt(ti,oct,s,ty){
+  const T=TUNINGS[s.tuning], E=T.equal!=null ? T.equal : T.cents.length, c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
+  const a={ A:baseF(), z:s.root, key:0 }, rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);
+  return ty.map(ra=>({ f:rootF*ra, iv:ra }));
+}
+function preT7ChordNotes(deg,oct,s,ty){
+  const T=TUNINGS[s.tuning], n=s.iv.length, a={ A:baseF(), z:s.root, key:0 }, d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
+  const rootF=pitchHz(T,a.A/2,a.z,a.key+s.sel[d],o);
+  return ty.map(ra=>({ f:rootF*ra, iv:ra }));
+}
+const preT7ChordUnit=s=>{ if(s.cents) return s.gridChords ? [0] : [1]; return periodOf(s)!==2 ? [1] : [0]; };
 const legacyTonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
 function legacyLeadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
@@ -619,7 +704,7 @@ export function checkRules(){
   for(const e of events){
     if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty) continue;
     nUntyped++; const k=e.sc&&e.sc.chordRule&&e.sc.chordRule.kind;
-    if(k!=='tertian'&&k!=='stack'&&k!=='ratios') miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000}: an untyped chord in ${e.sc&&e.sc.id}, whose rule is ${k}`);
+    if(k!=='tertian'&&k!=='stack'&&k!=='ratios'&&k!=='power') miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000}: an untyped chord in ${e.sc&&e.sc.id}, whose rule is ${k}`);
   }
   const A=viewAudit();
   A.notes.forEach(n=>miss(`L${n.layer+1} note at beat ${Math.round(n.start*1000)/1000} spans two tuning views`));
@@ -715,6 +800,8 @@ const ALL_RUNS=[
   ['T6c chord labels',   ()=>checkLabels(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T6a chord rules',    ()=>checkRules(),  r=>({ cases:r.views+r.steps+r.untyped, song:r.untyped, diff:r.differences.length, list:r.differences })],
   ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles, diff:r.total, list:r.differences })],
+  ['T7 chords in their tuning',()=>checkPure(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['T7b chord modes',    ()=>checkModes(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -722,7 +809,9 @@ const ALL_RUNS=[
 ];
 export function all(opt={}){
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
-  const rows=[], lists=[];
+  const rows=[], lists=[], keepCM=chordModeSel;
+  setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
+  try{
   for(const [name,run,read] of ALL_RUNS){
     const t0=performance.now(); let row;
     if(!opt.verbose){ console.log=console.warn=console.table=console.info=mute; }
@@ -731,6 +820,7 @@ export function all(opt={}){
     finally{ Object.assign(console,keep); }
     row.ms=Math.round(performance.now()-t0); rows.push(row);
   }
+  } finally { setChordModeSel(keepCM); }
   const M=material();
   for(const r of rows) if(r.song!=='—') r.status = !M.ok ? 'song: not enough material' : r.differences===0 ? 'pass' : 'FAIL';
                          else r.status = r.differences===0 ? 'pass' : 'FAIL';
@@ -868,7 +958,9 @@ export function checkSeed(){
       const used=new Set();
       for(const st of g.steps){
         cases++; const at=`${at0}${typeof st.a.deg==='number'?` degree ${st.a.deg} reg ${st.a.oct}`:''}`, sid=st.sid||take.scaleId, ign=st.ign?new Set(st.ign):null;
-        const diffOf=ev=>[ ...(ev.sc && ev.sc.id!==sid ? [`${at}: stored in ${ev.sc.id}, the script intended ${sid}`] : []), ...writeDiff(at,ev,st.a,ign) ];
+        const diffOf=ev=>[ ...(ev.sc && ev.sc.id!==sid ? [`${at}: stored in ${ev.sc.id}, the script intended ${sid}`] : []),
+                           ...(take.cm!==undefined && ev.sc && ev.sc.chordMode!==take.cm ? [`${at}: chord mode ${ev.sc.chordMode}, the script intended ${take.cm}`] : []),   // T7b
+                           ...writeDiff(at,ev,st.a,ign) ];
         let pick=null, pd=null;
         for(const c of cand){ if(used.has(c)) continue; const d=diffOf(c); if(!d.length){ pick=c; pd=d; break; } if(!pick){ pick=c; pd=d; } }
         if(!pick){ miss(`${at}: no stored event`); continue; }
@@ -920,17 +1012,17 @@ export async function seed(opt={}){
   console.log('[scaleprobe seed] P.seed REPLACES the current song with a test song (nothing is saved).');
   if(editIsOpen()){ console.warn('[scaleprobe seed] the track editor is open — close it first.'); return null; }
   if(events.length && !opt.replace){ console.warn(`[scaleprobe seed] the song has ${events.length} events — refusing. Run await P.seed({replace:true}) to replace it.`); return null; }
-  const keep={ sc:scaleIdx, tf:tunedFrom, sev:seventh };
+  const keep={ sc:scaleIdx, tf:tunedFrom, sev:seventh, cm:chordModeSel };   // T7b: и выбор режимов аккордов
   const built=[]; const say=m=>{ built.push(m); console.log('[scaleprobe seed] '+m); };
   try{
     SEED_REC={ kind:'seed', takes:[], edited:[['major',12],['partch-43',32],['major',8],['major-penta',76],['major',12,'bass']], freeze:null };   // задуманное — для P.checkSeed (ноты, которые сценарий правит в редакторе ниже; T5 — три правки на высоты вне лада)
-    clearRec(); setLoopMetre(4); setSeventh(false);
+    clearRec(); setLoopMetre(4); setSeventh(false); setChordModeSel({});   // T7b: режимы аккордов — с умолчаний; каждое взятое ставит свой
     let nid=0; const S=[];
     const on =(fn,a,t)=>{ const id=++nid; S.push({fn,a,t,id}); return id; };
     const at =(id,fn,a,t)=>S.push({fn,a,t,id});
-    const take=(label,scaleId,tf)=>{ setScaleIdx(SID(scaleId)); if(tf!==undefined) setTunedFrom(tf);
+    const take=(label,scaleId,tf,cm)=>{ setScaleIdx(SID(scaleId)); if(tf!==undefined) setTunedFrom(tf); if(cm!==undefined) setChordMode(scaleId,cm);   // T7b: режим аккордов взятого
       const steps=S.splice(0), r=seedTake(steps); if(!r) throw new Error('seedTake refused — start the app (▶ Play) and stop the transport first');
-      SEED_REC.takes.push({ label, take:r.take, scaleId, tf, steps:steps.map(st=>({ fn:st.fn, t:st.t, a:{...st.a} })) });
+      SEED_REC.takes.push({ label, take:r.take, scaleId, tf, cm:chordModeOf(SCALES[SID(scaleId)]), steps:steps.map(st=>({ fn:st.fn, t:st.t, a:{...st.a} })) });
       say(`${label}: take ${r.take}, ${r.events} events → tracks ${r.layers.map(l=>'L'+(l+1)).join(', ')}`); return r; };
     // ---- 1) мажор: соло, терменвокс, бас, аккорды ----
     const solo=(t,d,len)=>{ const id=on('leadOn',{deg:d,oct:1,vol:.8,inst:0},t); at(id,'leadOff',{v:0},t+len); };
@@ -948,8 +1040,10 @@ export async function seed(opt={}){
     { const id=on('bassOn',{deg:0,oct:1,vol:.8,inst:0},16); at(id,'bassSet',{deg:2,oct:1,vol:.8},20); at(id,'bassSet',{deg:4,oct:1,vol:.8},24); at(id,'bassSet',{deg:1,oct:1,vol:.8},28); at(id,'bassOff',{},32); }
     take('raga Yaman: bass','raga-yaman');
     // ---- 3) Партч: типизированные аккорды ----
+    /* T7: каждый засеянный аккорд Партча ЦЕЛИКОМ в 43 высотах (живая игра другого не даёт): О на 1/1, У на 5/4 (прежде — на 32/27, где
+       У выходит из строя: 32/27·6/5 = 64/45), О7 на 4/3, субминор на 3/2. */
     { const v=scaleView(SCALES[SID('partch-43')],'T'), F=chordFams(v), ty=(f,k)=>{ const fam=F[f]||F[0]; return (fam.types[k]||fam.types[0]).iv; };
-      [[32,0,0,0],[36,11,1,0],[40,18,0,1],[44,25,2,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:ty(f,k)},t); at(id,'chOff',{},t+4); }); }
+      [[32,0,0,0],[36,14,1,0],[40,18,0,1],[44,25,2,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:ty(f,k)},t); at(id,'chOff',{},t+4); }); }
     take('Partch: typed chords','partch-43');
     // ---- 4) Пифагор «строй от C»: аккорды палитры и бас ----
     { const v=scaleView(SCALES[SID('pythagorean')],0), F=chordFams(v), ty=(f,k)=>{ const fam=F[f]||F[0]; return (fam.types[k]||fam.types[0]).iv; };
@@ -958,7 +1052,20 @@ export async function seed(opt={}){
     take('Pythagorean tuned from C: palette chords, bass','pythagorean',0);
     // ---- 5) пентатоника: аккорды-стопки ----
     [[64,0],[68,1],[72,3],[76,4]].forEach(([t,d])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:null},t); at(id,'chOff',{},t+4); });
-    take('major pentatonic: stacked chords','major-penta');
+    take('major pentatonic: stacked chords','major-penta','T','stack');
+    // ---- 5b) T7b: режимы аккордов — оба режима у Партча, Болена–Пирса и пентатоники ----
+    const tyOf=(id,cm,f,k)=>{ const F=chordFams(scaleView(SCALES[SID(id)],'T',cm)), fam=F[f]||F[0]; return (fam.types[k]||fam.types[0]).iv; };
+    [[80,0,0,0],[84,9,2,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('bohlen-pierce','free',f,k)},t); at(id,'chOff',{},t+4); });
+    { const id=on('chOn',{deg:3,oct:1,vol:.8,inst:0,ty:tyOf('bohlen-pierce','free',0,2)},88); at(id,'chOff',{},92); }   // пентада 3:5:7:9:11 — аккорд на 11, вернувшийся в «Свободно»
+    take('Bohlen–Pierce, Free: pure ratios, an 11-chord','bohlen-pierce','T','free');
+    [[92,0,0,0],[96,4,1,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('bohlen-pierce','instrument',f,k)},t); at(id,'chOff',{},t+4); });
+    take('Bohlen–Pierce, As on the instrument: steps','bohlen-pierce','T','instrument');
+    [[100,11,1,0],[104,0,0,3]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('partch-43','free',f,k)},t); at(id,'chOff',{},t+4); });   // У на 32/27 — в «Свободно» доступен (тон 64/45 вне 43)
+    take('Partch, Free: a chord outside the 43','partch-43','T','free');
+    [[108,0,0,3],[112,18,0,1]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('partch-43','instrument',f,k)},t); at(id,'chOff',{},t+4); });   // O11 на 1/1, O7 на 4/3 — целиком в 43
+    take('Partch, As on the instrument','partch-43','T','instrument');
+    [[116,0],[120,3]].forEach(([t,d])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:null},t); at(id,'chOff',{},t+4); });
+    take('major pentatonic: power chords','major-penta','T','power');
     // ---- 6) редактор: распад аккорда и перенос одной ноты ----
     const segOf=(id,start)=>songSegs().segs.find(g=>g.role==='ch'&&g.sc.id===id&&g.start===start&&g.first&&!g.ev.jam);
     const g1=segOf('major',12);
@@ -1017,7 +1124,7 @@ export async function seed(opt={}){
             say(r&&r.installed ? `freeze: L${gr.layer+1} (bass in the raga) frozen` : `freeze: L${gr.layer+1} rendered but not installed (${r&&r.refused})`); }
             catch(err){ say('freeze: not available from the console ('+(err&&err.message)+')'); } }
   } finally {
-    setScaleIdx(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev);
+    setScaleIdx(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev); setChordModeSel(keep.cm);
   }
   tracks();
   const M=material();
@@ -1030,6 +1137,7 @@ export async function seed(opt={}){
    Записанное задуманное (шаги взятых) становится записью для P.checkSeed: P.all после загрузки сверяет ПЬЕСУ, а не тестовую песню. */
 export async function song(name='triphop', opt={}){
   const S=await import('./songs.js');
+  if(!editIsOpen()) setChordModeSel({});   // T7b: пьеса написана в режимах аккордов по умолчанию (как тоника и лад, выбор остаётся у пьесы)
   const r=await S.loadSong(name, opt);
   if(!r) return null;
   SEED_REC={ kind:'song', name:r.name, takes:r.takes, edited:[], freeze:null };
@@ -1312,6 +1420,159 @@ export function checkSong(){
   if(!nBad && nEv) console.log('[scaleprobe song] no event carries a degree; every pitch is in its tuning; every price, segment, chased note, editor row and dissolve is well-formed and matches the frozen references (out-of-mode ones — the whole-tuning reference)');
   else if(!nEv) console.log('[scaleprobe song] the song has no pitched events — run await P.seed({replace:true}) first');
   return { events:nEv, outOfMode:nOut, segments:nSeg, chase:nChase, rows:nRow, dissolves:nDiss, total:nBad, differences:bad };
+}
+
+/* ═══ T7b: РЕЖИМЫ АККОРДОВ ═══
+   1) «СВОБОДНО» = ДО T7, ПОБИТНО (Партч и Болен–Пирс): набор вида — ровно прежний (PRE_T7_SETS, JSON), у Б–П с тремя аккордами на 11;
+      единица корня — прежняя; ворота chordTypeFits открыты на каждом корне; КАЖДАЯ нота каждого прежнего типа на каждом корне (индекс
+      0..размер строя) × регистры 0..3 × 12 тоник × три A4 — chordNotesAt === прежней ветке (preT7ChordNotesAt), f и iv; ступенный путь
+      chordNotes и частота ряда корня chordRowFreq — так же против preT7ChordNotes.
+   2) «КАК НА ИНСТРУМЕНТЕ» = T7: у Б–П набор — CHORD_FAM_SETS.bpsteps (ссылка); у Партча на 1/1 все 24, на 9/8 — 8 типов.
+   3) «ПАУЭР-АККОРД» (14 ладов стопки): нетипизированный аккорд (chordNotes и chordNotesAt по индексу) === прежнему пауэр-аккорду
+      (legacyChordNotes по tag — тело до «стопки»), подписи chordLabel === legacyChordLabel, по ступеням 0..n, регистрам 0..3, 12 тоникам,
+      септаккорд выкл/вкл; «Стопкой» — прежнее правило (вид без поправок).
+   4) ВИД: режим — второй ключ памяти (тот же объект на ту же пару), id вида различает режимы, CUR() следует выбору (переставляется и
+      возвращается в finally).
+   5) ПЕСНЯ: каждый аккорд звучит, как записан, ПРИ ЛЮБОМ положении переключателя — цена каждого события (evHz) до и после того, как
+      режим каждого лада переставлен на другой, === (цена читает вид события, не живой выбор); у события лада с режимами вид несёт режим. */
+export function checkModes(){
+  const bad=[]; let nBad=0, cases=0, song=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const keepT=tonic, keepA=aRef, keepCM=chordModeSel, keepSc=scaleIdx;
+  const json=x=>JSON.stringify(x);
+  try{
+    // 1) «Свободно» против прежнего кода
+    for(const id of ['partch-43','bohlen-pierce']){
+      const s0=SCALES.find(x=>x.id===id); if(!s0){ miss(`no mode ${id}`); continue; }
+      const v=scaleView(s0,'T','free'), key=v.typedChords, PRE=PRE_T7_SETS[key];
+      cases++; if(json(chordFams(v))!==json(PRE)) miss(`${id} Free: the chord set differs from the pre-T7 set '${key}'`);
+      cases++; if(json(chordUnit(v))!==json(preT7ChordUnit(v))) miss(`${id} Free: chordUnit ${json(chordUnit(v))}, pre-T7 ${json(preT7ChordUnit(v))}`);
+      const T=TUNINGS[v.tuning], E=T.equal!=null?T.equal:T.cents.length, n=v.iv.length, types=PRE.flatMap(f=>f.types.map(x=>x.iv));
+      for(const ty of types) for(let ti=0; ti<=E; ti++){ cases++; if(!chordTypeFits(ty,ti,v)) miss(`${id} Free: type [${ty}] refused on root ${ti}`); }
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const A4 of A4_SET){ setARef(A4);
+          for(let o=0;o<4;o++){
+            for(const ty of types){
+              for(let ti=0; ti<=E; ti++){ cases++;
+                const X=chordNotesAt(ti,o,v,false,ty), Y=preT7ChordNotesAt(ti,o,v,ty);
+                if(X.length!==Y.length || X.some((x,i)=>x.f!==Y[i].f || x.iv!==Y[i].iv)) miss(`${id} Free tonic ${tn} A4 ${A4} root ${ti} reg ${o} [${ty}]: ${X.map(x=>x.f)} now, ${Y.map(x=>x.f)} pre-T7`); }
+              for(let d=0; d<=n; d++){ cases++;
+                const X=chordNotes(d,o,v,false,ty), Y=preT7ChordNotes(d,o,v,ty);
+                if(X.length!==Y.length || X.some((x,i)=>x.f!==Y[i].f || x.iv!==Y[i].iv)) miss(`${id} Free tonic ${tn} A4 ${A4} degree ${d} reg ${o} [${ty}] (degree path): ${X.map(x=>x.f)} now, ${Y.map(x=>x.f)} pre-T7`); }
+            }
+            for(let d=0; d<=n; d++){ cases++; const a=chordRowFreq(d,o,v,false), b=preT7ChordNotes(d,o,v,preT7ChordUnit(v))[0].f;
+              if(a!==b) miss(`${id} Free tonic ${tn} A4 ${A4} row ${d} reg ${o}: row pitch ${a}, pre-T7 ${b}`); }
+          }
+        }
+      }
+    }
+    setTonic(keepT); setARef(keepA);
+    // 2) «Как на инструменте» = T7
+    { const bp=SCALES.find(x=>x.id==='bohlen-pierce'), vi=scaleView(bp,'T','instrument');
+      cases++; if(chordFams(vi)!==CHORD_FAM_SETS.bpsteps) miss('bohlen-pierce As on the instrument: the chord set is not bpsteps');
+      const pa=SCALES.find(x=>x.id==='partch-43'), vp=scaleView(pa,'T','instrument'), all=chordFams(vp).flatMap(f=>f.types);
+      const nOn=ti=>all.filter(x=>chordTypeFits(x.iv,ti,vp)).length;
+      cases+=2; if(nOn(0)!==24) miss(`partch As on the instrument: ${nOn(0)} types on 1/1, 24 expected`); if(nOn(8)!==8) miss(`partch As on the instrument: ${nOn(8)} types on 9/8, 8 expected`); }
+    // 3) пауэр-аккорд у ладов стопки
+    for(const s0 of SCALES){ if(!s0.chordModes || !s0.chordModes.some(x=>x.id==='power')) continue;
+      const vp=scaleView(s0,'T','power'), vs=scaleView(s0,'T','stack'), n=vp.iv.length;
+      cases+=2; if(vp.chordRule.kind!=='power') miss(`${s0.id} power: rule ${vp.chordRule.kind}`); if(vs.chordRule!==s0.chordRule) miss(`${s0.id} stack: the view carries another rule`);
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const sev of [false,true]) for(let o=0;o<4;o++) for(let d=0; d<=n; d++){
+          const ref=legacyChordNotes(d,o,vp,sev,null), X=chordNotes(d,o,vp,sev,null), Y= d<n ? chordNotesAt(tuningIndexOf(d,vp,true),o,vp,sev,null) : ref;   // по индексу — корни 0..n−1 (дубль тоники по индексу — корень регистра выше: другая, но равная высота; её сверяют T6b)
+          cases+=2;
+          if(X.length!==ref.length || X.some((x,i)=>x.f!==ref[i].f || x.iv!==ref[i].iv)) miss(`${s0.id} power tonic ${tn} degree ${d} reg ${o}${sev?' 7th':''}: ${X.map(x=>x.f)}, old power chord ${ref.map(x=>x.f)}`);
+          if(Y.length!==ref.length || Y.some((x,i)=>x.f!==ref[i].f)) miss(`${s0.id} power (by index) tonic ${tn} degree ${d} reg ${o}${sev?' 7th':''}: ${Y.map(x=>x.f)}, old ${ref.map(x=>x.f)}`);
+          if(o===0){ cases++; const a=chordLabel(d,vp,sev), b=legacyChordLabel(d,vp,sev); if(a!==b) miss(`${s0.id} power tonic ${tn} degree ${d}${sev?' 7th':''}: label "${a}", old "${b}"`); }
+        }
+      }
+    }
+    setTonic(keepT);
+    // 4) вид
+    for(const s0 of SCALES){ if(!s0.chordModes) continue;
+      const ids=new Set();
+      for(const m of s0.chordModes){ cases+=2; const a=scaleView(s0,'T',m.id), b=scaleView(s0,'T',m.id);
+        if(a!==b) miss(`${s0.id} ${m.id}: two view objects for one mode`); if(a.chordMode!==m.id) miss(`${s0.id} ${m.id}: the view carries mode ${a.chordMode}`);
+        ids.add(viewIdOf(a)); }
+      cases++; if(ids.size!==s0.chordModes.length) miss(`${s0.id}: view ids do not tell the chord modes apart`);
+    }
+    { const s0=SCALES.find(x=>x.id==='partch-43'), i=SCALES.indexOf(s0); setScaleIdx(i);
+      for(const m of s0.chordModes){ cases++; setChordMode(s0.id,m.id); if(CUR()!==scaleView(s0,tunedFrom,m.id)) miss(`CUR() does not follow the chord mode ${m.id}`); }
+      setChordModeSel(keepCM); setScaleIdx(keepSc); }
+    // 5) песня
+    const chords=events.filter(e=>(e.fn==='chOn'||e.fn==='chSet') && e.a && e.sc);
+    const before=chords.map(e=>evHz(e.a,e,'ch'));
+    const flip={}; for(const s0 of SCALES) if(s0.chordModes){ const cur=chordModeOf(s0), other=s0.chordModes.find(x=>x.id!==cur); flip[s0.id]=other.id; }
+    setChordModeSel(flip);
+    chords.forEach((e,i)=>{ song++; cases++; const h=evHz(e.a,e,'ch'), b=before[i];
+      if(h.length!==b.length || h.some((f,j)=>f!==b[j])) miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn}: sounds ${h} after the switch, ${b} as recorded`);
+      const m=e.sc.mode||e.sc; if(m.chordModes && !e.sc.chordMode) miss(`L${e.layer+1} beat ${e.t}: the event's view carries no chord mode`); });
+  } finally { setTonic(keepT); setARef(keepA); setChordModeSel(keepCM); setScaleIdx(keepSc); }
+  console.log(`[scaleprobe T7b] cases ${cases} (Free vs pre-T7 code, As on the instrument = T7, power = the old power chord, views, song chords ${song}) · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T7b] '+m));
+  if(!nBad) console.log('[scaleprobe T7b] Free is bit-identical to the pre-T7 code (sets, every note, rows); As on the instrument is T7; power is the old power chord; every recorded chord sounds as recorded whatever the switch says');
+  return { cases, song, total:nBad, differences:bad };
+}
+
+/* ═══ T7: АККОРДЫ В СВОЁМ СТРОЕ — ПРОГОН (без песни) ═══
+   1) КАЖДЫЙ вид с типизированными аккордами × каждый корень лада (регистр 1) × каждый тип набора: тип, ПРЕДЛАГАЕМЫЙ на этом корне
+      (scales.chordTypeFits — ворота палитры, жеста и правки), звучит ТОЛЬКО высотами строя: каждый тон цены (chordNotesAt — ей играет ENG)
+      в пределах 1¢ (порог «на ряду» редактора) от высоты строя в регистре аккордов (scales.chordPitchHz) — кроме АДАПТИВНОГО строя
+      (подвижный Натуральный: высоты хора сдвигаются намеренно; его тоны вне строя считаются и печатаются, не ошибка).
+   2) ПАРТЧ: проверка по ЦЕНТАМ, независимая от точных дробей ворот: предложенный тип — каждый тон в 0.02¢ от одной из 43 высот (центы
+      таблицы округлены до сотых: корень и тон — по 0.005¢, вместе до 0.010¢; отказанные — от 3.2¢); НЕ предложенный — хотя бы один тон дальше 1¢ от любой (ворота не отсекают чистый аккорд); на 1/1 —
+      вся палитра (24 типа). Печатается, сколько типов на каждом корне.
+   (T7b: каждый вид — в КАЖДОМ своём режиме аккордов; «Свободно» адаптивен — его тоны мимо строя только считаются.)
+   3) БОЛЕН–ПИРС («Как на инструменте»): каждый тип — целые шаги (ни одного отношения), ни одного аккорда с 11; на каждом корне 0..13 и регистрах 0..2 каждая
+      нота РАВНА (===) высоте строя pitchHz(bp13, baseF()/2, 0, корень+шаг, регистр) — тону строя, а не отношению.
+   Тоника и A4 — живые (цена от них зависит одинаково с обеих сторон). Ничего не меняет. */
+export function checkPure(){
+  const bad=[]; let nBad=0, cases=0, adaptOff=0, unfit=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const seen=new Set(), perRoot=[];
+  for(const [s0,tf] of allViews()) for(const cm of (s0.chordModes ? s0.chordModes.map(x=>x.id) : [undefined])){   // T7b: каждый режим аккордов
+    const v=scaleView(s0,tf,cm); if(!v.typedChords || !v.sel) continue;
+    const T=TUNINGS[v.tuning], E=T.equal!=null?T.equal:T.cents.length, pc=1200*Math.log2(periodOf(v)), id=v.id+(v.tunable?'@'+tf:'')+(cm?'#'+cm:'');
+    const P0=chordPitchHz(0,0,v), ref=[]; for(let j=0;j<E;j++) ref.push(((1200*Math.log2(chordPitchHz(j,0,v)/P0))%pc+pc)%pc);
+    const dist=f=>{ const c=((1200*Math.log2(f/P0))%pc+pc)%pc; let d=Infinity; for(const r of ref){ const x=Math.abs(c-r); d=Math.min(d,x,pc-x); } return d; };
+    const adaptive=chordBuildOf(v)==='adaptive', partch=v.tuning==='partch43' && !adaptive;   // T7b: правила Партча — в режиме «Как на инструменте»; «Свободно» — адаптивный (тоны мимо строя считаются)
+    for(let d=0; d<v.iv.length; d++){
+      const ti=tuningIndexOf(d,v,true); let nFit=0;
+      for(const fam of chordFams(v)) for(const tp of fam.types){
+        cases++; const fit=chordTypeFits(tp.iv,ti,v), N=chordNotesAt(ti,1,v,false,tp.iv), lb=`${id} root ${d} type ${L(tp.label)}`;
+        if(!N.length){ miss(`${lb}: no notes`); continue; }
+        const far=N.map(n=>dist(n.f)), worst=Math.max(...far);
+        if(fit){ nFit++;
+          if(adaptive){ if(worst>=1) adaptOff++; }
+          else if(worst>=(partch?0.02:1)) miss(`${lb}: offered, yet a tone lies ${worst.toFixed(4)}¢ from the tuning`);
+        }else{ unfit++;
+          if(!partch) miss(`${lb}: refused on a tuning whose chords are built from the tuning by construction`);
+          else if(worst<1) miss(`${lb}: refused, yet every tone is within 1¢ of the 43 pitches (${worst.toFixed(4)}¢)`);
+        }
+      }
+      if(partch && !seen.has(d)){ seen.add(d); perRoot.push({ root:d, offered:nFit }); }
+      if(partch && d===0 && nFit!==24) miss(`${id}: on 1/1 only ${nFit} of 24 types are offered`);
+    }
+  }
+  // ---- Болен–Пирс
+  const bp=SCALES.find(x=>x.tuning==='bp13'), vb=bp&&scaleView(bp,'T','instrument');   // T7b: шаги строя — режим «Как на инструменте»
+  if(!vb) miss('no Bohlen–Pierce mode');
+  else{ const T=TUNINGS.bp13;
+    for(const fam of chordFams(vb)) for(const tp of fam.types){
+      const lb=`bohlen-pierce type ${L(tp.label)}`;
+      cases++; if(!tp.iv.every(Number.isInteger)) miss(`${lb}: ${tp.iv} is not a set of whole steps`);
+      if(/(^|[:/])11([:/]|$)/.test(L(tp.label))) miss(`${lb}: a chord with 11 is still offered`);
+      for(let ti=0; ti<=13; ti++) for(let o=0;o<3;o++){ cases++;
+        const N=chordNotesAt(ti,o,vb,false,tp.iv);
+        N.forEach((n,i)=>{ const w=pitchHz(T,baseF()/2,0,ti+tp.iv[i],o); if(n.f!==w) miss(`${lb} root ${ti} reg ${o} note ${i}: ${n.f}, the tuning pitch is ${w}`); });
+      }
+    }
+  }
+  console.log(`[scaleprobe T7] cases ${cases} · refused on a Partch root ${unfit} · adaptive Natural chords with a tone off the tuning ${adaptOff} (a choir's shifted pitch, not an error) · differences ${nBad}`);
+  if(perRoot.length) console.log('[scaleprobe T7] Partch — types offered per root (of 24): '+perRoot.map(x=>`${x.root}:${x.offered}`).join(' '));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T7] '+m));
+  if(!nBad) console.log('[scaleprobe T7] every chord offered sounds only pitches of its tuning (adaptive Natural excepted, by design); Partch offers only its 43 pitches; Bohlen–Pierce chords are its own steps, no 11');
+  return { cases, unfit, adaptOff, perRoot, total:nBad, differences:bad };
 }
 
 /* ═══ T5: ВЫСОТЫ ВНЕ ЛАДА — ПРОГОН (без песни) ═══

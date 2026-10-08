@@ -223,6 +223,10 @@
     <p class="phint" id="tunedFromNote" data-i18n="panel.scale.tunedFromC" hidden>Настроен от C (историческая практика)</p>
     <div class="prow" id="tunedFromRow" style="display:none"><label data-i18n="panel.scale.tunedFrom">Строй от</label><select id="selTunedFrom"></select></div>
     <p class="phint" id="tunedFromHint" hidden></p>
+    <!-- T7b: РЕЖИМ АККОРДОВ — только у ладов, где два режима различаются (свойство chordModes): Партч и Болен–Пирс («Свободно» /
+         «Как на инструменте»), пентатоники, блюз и японские («Стопкой» / «Пауэр-аккорд»). Кнопки и подсказку строит ui.renderChordMode. -->
+    <div class="prow" id="chordModeRow" style="display:none"><label data-i18n="panel.scale.chordMode">Аккорды</label><div class="seg" id="chordModeSeg"></div></div>
+    <p class="phint" id="chordModeHint" hidden></p>
     <!-- Опорная частота (эталон A4): пресеты-подсказки + свободный ввод, клампится 380–480 в ui.js.
          Единый источник высоты — двигает ВСЕ строи вместе (подвижные и фиксированные). -->
     <div class="prow" id="aRefRow"><label data-i18n="panel.scale.aref">Эталон A4</label>
