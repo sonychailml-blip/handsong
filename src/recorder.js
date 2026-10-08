@@ -244,12 +244,9 @@ const FX_CHAIN='#chain';   // ⚠️ ЗАРЕЗЕРВИРОВАННЫЙ id за�
 let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГИСТР аккорда, что играет петля сейчас (для подсветки, §Q5). Регистр нужен с многопериодной сеткой: одна ступень живёт в нескольких прямоугольниках, без него подсветка всегда падала бы в нижний
 /* ⛳ T4b4: МЕСТО ПОДСВЕТКИ ПЕРЕИГРАННОЙ/ДОГНАННОЙ НОТЫ — ИЗ ИНДЕКСА В СТРОЕ (a.ti) и регистра, обратной выборкой лада (scales.
    modeSlotOfTi) в ЛАДУ СОБЫТИЯ (sc — его замороженный вид). { deg, oct } или null — высоты нет в ладу (до T5 такой ноты нет): тогда
-   подсветки нет, и ничего не бросает. Событие без индекса — по ступени (запасной путь, уходит в T4c). Для ступеней 0..n ответ —
-   ровно пара события (проба P.checkHl). Зовётся на СОБЫТИЕ аккорда (планировщик, догонялка), не на кадр: кадр читает два числа. */
-function hlOf(a,sc){
-  if(typeof a.ti==='number') return modeSlotOfTi(a.ti, a.oct, sc);
-  return { deg:a.deg, oct:a.oct };
-}
+   подсветки нет, и ничего не бросает. ⛳ T4c-1: событие без индекса — подсветки нет (ступень больше не читается; запасной путь снят).
+   Для ступеней 0..n ответ — ровно пара события (проба P.checkHl). Зовётся на СОБЫТИЕ аккорда (планировщик, догонялка), не на кадр. */
+function hlOf(a,sc){ return modeSlotOfTi(a.ti, a.oct, sc); }   // modeSlotOfTi сам отвечает null на нечисловой индекс
 /* LEGACY (T4b4) — прежнее место подсветки ПО СТУПЕНИ, слово в слово. ⛔ Читает ТОЛЬКО проба (P.checkHl); уходит в T4c. */
 const legacyHlOf=a=>({ deg:a.deg, oct:a.oct });
 const setLoopChordHl=(a,sc)=>{ const p=hlOf(a,sc); curChordDeg= p ? p.deg : -1; curChordOct= p ? p.oct : 0; };
@@ -1436,6 +1433,20 @@ function editOpen(layer){
   return true;
 }
 function editClose(){ editLane=null; editHist=[]; editFuture=[]; editTake=0; }
+/* ⛳ T4c-1, ТОЛЬКО ДЛЯ ПРОБЫ (P.checkStrip): выполнить fn над ДРУГИМ списком событий — содержимое массива events подменяется НА МЕСТЕ
+   (ссылка священна — правило #28), schedInvalidate перестраивает курсоры, ноты, сегменты, кэш догонялки и длину песни; в finally всё
+   возвращается тем же путём. Синхронно: ни кадр, ни тик сердца не встрянут между подменой и возвратом. Отказ — пока идёт запись, играет
+   транспорт или открыт редактор (его история держит ссылки на события). → { ok:true, value } или { ok:false, why }. */
+function probeWithEvents(list,fn){
+  if(recording) return { ok:false, why:'recording' };
+  if(loop.on) return { ok:false, why:'the transport is playing' };
+  if(editLane!=null) return { ok:false, why:'the track editor is open' };
+  const keep=events.slice();
+  events.length=0; for(const e of list) events.push(e);
+  schedInvalidate();
+  try{ return { ok:true, value:fn() }; }
+  finally{ events.length=0; for(const e of keep) events.push(e); schedInvalidate(); }
+}
 /* Сменить открытую дорожку, не закрывая редактор (чип дорожки в панели). Звук уже заглушён открытием. */
 function editSetLayer(layer){
   if(editLane==null||layer==null) return false;
@@ -1613,9 +1624,12 @@ function keyClash(n,a,b){
    Такую ноту переносим ЦЕЛИКОМ — «вкл», её ведения громкости и «выкл» на одну и ту же дельту, одной составной
    правкой. Высота — всем событиям, которые её несут («выкл» высоты не несёт).
    ⛳ ЧУЖАЯ НОТА ТОГО ЖЕ КЛЮЧА на новом месте — нота берёт СВЕЖИЙ k (см. шапку): зажим снова разошёлся бы с призраком. */
-function editMoveNote(n,t,deg,oct,ty){
-  const R=EDIT_ROLE[n.role]; if(!R) return false;
-  const pt = ty ? {deg,oct,ty} : {deg,oct};                  // U4: ty — однонотный аккорд в КАНОНИЧЕСКОЙ форме ряда (chordUnit); без него — прежние {deg,oct}
+/* ⛳ T4c-1: ПРАВКА ПОЛУЧАЕТ ВЫСОТУ ИНДЕКСОМ В СТРОЕ (ti) и регистром — так её отдаёт ряд редактора (draw: ось → {ti, oct}). Ступень лада
+   ПИШЕТСЯ по-прежнему (писатели пишут, не читая её: T4c-2 перестанет), её даёт перевод индекса в лад события — обратная выборка;
+   индекс ставит воронка editCommit (tiRestamp). Высоты нет в ладу (ряд вне лада — до T5 ui к таким не тянет) — null: правки нет. */
+function slotPt(ti,oct,sc,ty){ const p=modeSlotOfTi(ti,oct,sc); return p ? (ty ? {deg:p.deg,oct:p.oct,ty} : {deg:p.deg,oct:p.oct}) : null; }
+function editMoveNote(n,t,pt){
+  const R=EDIT_ROLE[n.role]; if(!R||!pt) return false;                  // U4: ty — однонотный аккорд в КАНОНИЧЕСКОЙ форме ряда (chordUnit); без него — прежние {deg,oct}
   const d=Math.max(0,t)-n.start;
   const fr= keyClash(n, n.start+d, n.end+d) ? R.fresh(n.layer) : null;   // S0: свежая идентичность ПО РОЛИ (бас/аккорд — {k} ≥1: в слое есть хотя бы эта нота; соло — {v} выше всех номеров слоя)
   const list=n.evs.map(e=>{
@@ -1708,9 +1722,9 @@ function commitDetach(P,keep){
    → событие, которое редактор выделит после правки (у отделённой — её новое «вкл»), или false. */
 /* U4: ty (необязателен) — тип, который ложится вместе со ступенью и регистром на каждое событие, несущее высоту: так однонотный аккорд
    переносится на ряд в КАНОНИЧЕСКОЙ форме (chordUnit) и звучит ровно высоту ряда. Без ty — прежний перенос, тип не трогается. */
-function editMoveSeg(ev,t,deg,oct,ty){
+function editMoveSeg(ev,t,ti,oct,ty){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  const pt = ty ? {deg,oct,ty} : {deg,oct};
+  const pt=slotPt(ti,oct,ev.sc,ty); if(!pt) return false;   // T4c-1: высота — индексом; ступень для записи — переводом в лад события
   if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); с S2 редактор пускает сюда бас и аккорды, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
   const nt=Math.max(0,t);
@@ -1718,7 +1732,7 @@ function editMoveSeg(ev,t,deg,oct,ty){
     const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
     return editBatch(list) ? ev : false;
   }
-  if(seg.first && seg.endEv && chaseKind(seg.endEv.fn)==='f') return editMoveNote(seg.note,nt,deg,oct,ty);
+  if(seg.first && seg.endEv && chaseKind(seg.endEv.fn)==='f') return editMoveNote(seg.note,nt,pt);
   const P=detachPlan(seg); if(!P) return false;
   const d=nt-P.items[0].t;                                   // items[0] — определяющее событие (события сегмента идут по времени)
   for(const it of P.items){ it.t+=d; if(chaseKind(it.fn)!=='f') it.a={...it.a, ...pt}; }   // S0: «выкл» высоты не несёт — у любой роли
@@ -1789,13 +1803,16 @@ function dissolvePlan(seg,N,drop){
   });
   return { ops:P.ops, items };
 }
+/* ⛳ T4c-1: НОТЫ АККОРДА СЕГМЕНТА — ОДНА функция для распада (удаление одной ноты), правки одной ноты и пробы P.checkStrip: из индекса
+   корня, регистра, типа и замороженного вида сегмента (ступени у сегмента больше нет). Интервалы iv — то, что ложится в однонотные типы. */
+function segChordNotes(seg){ return chordNotesAt(seg.ti,seg.oct,seg.sc,seg.sev,seg.ty); }
 /* Удалить ОДНУ ноту аккорда (idx — её номер в scales.chordNotes сегмента, тот же, что у блока на экране): аккорд распадается
    на однонотные, удаляемая уходит (см. dissolvePlan). Аккорд из одной ноты — это удаление сегмента целиком, как прежде.
    → true или false. */
 function editDeleteChordNote(ev,idx){
   if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
-  const N=chordNotesAt(seg.deg,seg.ti,seg.oct,seg.sc,seg.sev,seg.ty);   // T4b2: ноты — по индексу корня (типизированный), иначе по ступени — те же интервалы, что играет ENG (проба T4b1)
+  const N=segChordNotes(seg);   // T4b2: ноты — по индексу корня (типизированный), иначе по ступени — те же интервалы, что играет ENG (проба T4b1)
   if(!(idx>=0&&idx<N.length)) return false;
   if(N.length<2) return editDeleteSeg(ev);
   const P=dissolvePlan(seg,N,idx); if(!P) return false;
@@ -1815,7 +1832,7 @@ function editDeleteChordNote(ev,idx){
 function chordNoteEdit(ev,idx,fn){
   if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
-  const N=chordNotesAt(seg.deg,seg.ti,seg.oct,seg.sc,seg.sev,seg.ty);   // T4b2: см. editDeleteChordNote
+  const N=segChordNotes(seg);   // T4b2: см. editDeleteChordNote (T4c-1: без ступени)
   if(!(idx>=0&&idx<N.length)) return false;
   if(N.length<2) return fn(seg,null);
   const P=dissolvePlan(seg,N,-1); if(!P) return false;
@@ -1835,14 +1852,16 @@ function chordNoteEdit(ev,idx,fn){
    Аккорд из одной ноты (сам — нота): обычный перенос сегмента, но с той же канонической формой (editMoveSeg с ty) — иначе его
    прежний однонотный тип [iv] от прежнего корня увёл бы ноту мимо ряда, к которому её тянули (у нетипизированного лада корень
    идёт по ступеням, а интервал — в шагах). */
-function editMoveChordNote(ev,idx,t,deg,oct){
-  const pitch = deg!=null && oct!=null;
+/* ⛳ T4c-1: высота приходит ИНДЕКСОМ (ti, oct — ряд оси); ступень для записи — переводом в лад сегмента (slotPt). */
+function editMoveChordNote(ev,idx,t,ti,oct){
+  const pitch = ti!=null && oct!=null;
   return chordNoteEdit(ev,idx,(seg,mine)=>{
-    if(!mine) return pitch ? editMoveSeg(seg.ev,t,deg,oct,chordUnit(seg.sc)) : editMoveSeg(seg.ev,t,seg.deg,seg.oct);
+    if(!mine) return pitch ? editMoveSeg(seg.ev,t,ti,oct,chordUnit(seg.sc)) : editMoveSeg(seg.ev,t,seg.ti,seg.oct);
     const d=Math.max(0,t)-mine[0].t;
     if(Math.abs(d)<=1e-9 && !pitch) return false;
-    const ty=pitch ? chordUnit(seg.sc) : null;
-    for(const it of mine){ it.t+=d; if(pitch && chaseKind(it.fn)!=='f') it.a={...it.a, deg, oct, ty}; }
+    const pt=pitch ? slotPt(ti,oct,seg.sc,chordUnit(seg.sc)) : null;
+    if(pitch && !pt) return false;
+    for(const it of mine){ it.t+=d; if(pt && chaseKind(it.fn)!=='f') it.a={...it.a, ...pt}; }
   });
 }
 function editResizeChordNote(ev,idx,t){
@@ -1900,8 +1919,9 @@ function editResizeSeg(ev,t){
    громкость — с ближайшего бас-события; ЛАД И СЕПТАККОРД — с ПОКАЗАННОЙ ГРУППЫ (их передаёт редактор),
    ⛔ а не CUR(): нота обязана родиться в том ладу, в котором нарисована ось. Пустая дорожка группы не
    имеет — тогда вызывающий честно передаёт живой лад. */
-function editInsertBass(t,deg,oct,sc,sev,len){
+function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — индексом (ряд оси); ступень для записи — переводом в лад группы
   if(!editGuard()) return false;
+  const p=modeSlotOfTi(ti,oct,sc); if(!p) return false;
   const layer=editLayer();
   trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
   let on=null, near=null, bd=Infinity;
@@ -1917,7 +1937,7 @@ function editInsertBass(t,deg,oct,sc,sev,len){
   if(!editTake) editTake=++takeSeq;
   const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
   const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
-  const evOn =mk('bassOn', {deg,oct,vol,inst}, t0);
+  const evOn =mk('bassOn', {deg:p.deg,oct:p.oct,vol,inst}, t0);
   const evOff=mk('bassOff',{}, t1);
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
@@ -1943,8 +1963,9 @@ function editChordTypeFor(layer,t,sc,sel){
   const F=chordFams(sc), f0=F&&F[0], ty0=f0&&f0.types&&f0.types[0];
   return ty0 ? ty0.iv : null;
 }
-function editInsertChord(t,deg,oct,sc,sev,len,sel){
+function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота корня — индексом (ряд оси); ступень для записи — переводом
   if(!editGuard()) return false;
+  const p=modeSlotOfTi(ti,oct,sc); if(!p) return false;
   if(sc && sc.chordRule && sc.chordRule.kind==='none') return false;   // ⛳ T6b: в ладу без аккордов (правило 'none') аккорда нет — не вставляем беззвучный
   const layer=editLayer();
   trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
@@ -1962,7 +1983,7 @@ function editInsertChord(t,deg,oct,sc,sev,len,sel){
   if(!editTake) editTake=++takeSeq;
   const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
   const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
-  const evOn =mk('chOn', {deg,oct,vol,inst,ty}, t0);
+  const evOn =mk('chOn', {deg:p.deg,oct:p.oct,vol,inst,ty}, t0);
   const evOff=mk('chOff',{}, t1);
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
@@ -2784,16 +2805,35 @@ const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
    P.checkSound), аккорда — через chordFreqsAt (из индекса — там, где это побитно то же, иначе по ступени: см. её шапку).
    ⛳ ОТКУДА ИНДЕКС: у события — a.ti (T4a, три воронки записи). ЖИВОЙ вызов (W*, ctx==null) несёт нагрузку жестов — у неё индекса нет:
    переводим ступень той же функцией T4a (tuningIndexOf, живой вид CUR) — это не запасной путь, а сама цена живой ноты.
-   ⚠️ ЗАПАСНОЙ ПУТЬ — только у ЗАПИСАННОГО события без a.ti (после T4a их быть не должно): индекс из ступени, и ОДНО предупреждение на каждый
-   разный случай (вид события × лад). Уходит в T4c вместе со ступенью. */
+   ⛳ T4c-1: ЗАПАСНОГО ПУТИ ПО СТУПЕНИ БОЛЬШЕ НЕТ. ЗАПИСАННОЕ событие без a.ti (после T4a их быть не должно — tiAudit) не звучит: индекс
+   undefined, цена — не число, и таблица ниже атаку ПРОПУСКАЕТ (ОДНО предупреждение на каждый разный случай: вид события × лад). Ступень
+   записанного события звук не читает — доказательство P.checkStrip (клону песни стирают a.deg). Живой вызов (ctx==null) — нагрузка жестов,
+   её ступень лада и есть вход (жесты по-прежнему дают ступени лада). */
 const tiFallSeen=new Set();
 function evTi(a,ctx,chord){
   if(typeof a.ti==='number') return a.ti;
-  const sc=ctx?ctx.sc:CUR();
-  if(ctx){ const key=(ctx.fn||'?')+'|'+(sc&&sc.id); if(!tiFallSeen.has(key)){ tiFallSeen.add(key);
-    console.warn('[T4b1 ti] replayed '+(ctx.fn||'event')+' in '+(sc&&sc.id)+' has no a.ti — priced from its degree (a write path bypassed T4a)'); } }
-  return tuningIndexOf(a.deg, sc, chord);
+  if(!ctx) return tuningIndexOf(a.deg, CUR(), chord);         // живая нагрузка жестов: ступень лада → индекс (это сама цена живой ноты)
+  const sc=ctx.sc, key=(ctx.fn||'?')+'|'+(sc&&sc.id);
+  if(!tiFallSeen.has(key)){ tiFallSeen.add(key);
+    console.warn('[T4c ti] replayed '+(ctx.fn||'event')+' in '+(sc&&sc.id)+' has no a.ti — not played (a write path bypassed T4a)'); }
+  return undefined;
 }
+/* ⛳ T4c-1: ЦЕНА СОБЫТИЯ ДЛЯ ЗВУКА — ОДНА ЧИСТАЯ ФУНКЦИЯ на роль (соло 'ld', бас 'bs' — частота; аккорд 'ch' — частоты нот). Её зовут
+   таблица ENG и проба P.checkStrip — второй формулы нет. Читает a.ti, a.oct, a.ty и вид/септаккорд контекста; ступень — только у ЖИВОЙ
+   нагрузки (evTi). Нет цены (нет индекса, высоты нет в ладу) — соло/бас NaN, аккорд — пустой список: таблица атаку пропускает. */
+function evHz(a,ctx,role){
+  const sc=ctx?ctx.sc:CUR(), ti=evTi(a,ctx,role==='ch');
+  if(role==='ld') return leadFreqTi(ti,a.oct,sc);
+  if(role==='bs') return bassFreqTi(ti,a.oct,sc);
+  return chordFreqsAt(ti,a.oct,sc,ctx?ctx.sev:seventh,a.ty);
+}
+/* ⛳ T4c-1: МЕСТО ГОЛОСА В РЕЕСТРЕ (leadHold/bassHold: deg/oct — для подсветки). Живой вызов — ступень жеста, как была (подсвечивает
+   только живые ключи, правило #26); переигранный — место индекса в ладу события (обратная выборка), а не записанная ступень. */
+function evReg(a,ctx){
+  if(!ctx) return { deg:a.deg, oct:a.oct };
+  return modeSlotOfTi(evTi(a,ctx,false), a.oct, ctx.sc) || { deg:undefined, oct:a.oct };
+}
+const okHz=f=>typeof f==='number' && Number.isFinite(f);
 const makeENG=A=>({
   /* ⚠️ setLeadInstr(a.inst) ОТСЮДА УБРАН, и это ПОЧИНКА, а не потеря: переигранный слой уводил ЖИВОЙ
      инструмент (и кнопку в панели) — слой на Ситаре молча перекрашивал руку, играющую Органом. Теперь
@@ -2802,29 +2842,31 @@ const makeENG=A=>({
               /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
                  Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
                  замороженному ладу (полимодальность цела). */
+              const base=evHz(a,ctx,'ld');           // T4c-1: цена — из индекса в строе (одна функция с пробой)
+              if(live==null && !okHz(base)) return;  // T4c-1: нет индекса — ноты нет (предупреждение уже в evTi)
               if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
-              const base=leadFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR());   // T4b1: цена — из индекса в строе
               const gl=A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль. V4: заодно отдаёт СКОЛЬЖЕНИЕ ноты (или undefined — не задано)
               /* ⛔ V4, КОНТРАКТ V1: живой кадр ТЕРМЕНВОКСА (live!=null) скольжения НЕ получает — его 20 мс это сглаживание слежения, а не
                  портаменто; руке с долгим Скольжением высота отставала бы от руки. Свежую атаку отсекает сам движок (fresh → умолчание). */
-              A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,a.deg,a.oct,live!=null?undefined:gl,a.tie,when);   // время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
+              const g=evReg(a,ctx); A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,g.deg,g.oct,live!=null?undefined:gl,a.tie,when);   // время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
               if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,when); },   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               const gl=A.applyFx(a.fx);   // V4: скольжение ведения — из ЕГО карты (карта ведения несёт величину на миг ведения: сдвинул палец посреди ноты — следующий переезд уже с новой)
-              A.leadSet(o,(a.hold?null:leadFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR())),a.vol,a.deg,a.oct,a.inst,gl,when); },   // T4b1: цена — из индекса в строе   // ведение терменвокса (hold) частоты не несёт — скольжению там применяться не к чему   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
+              const f=a.hold?null:evHz(a,ctx,'ld'); if(f!==null && !okHz(f)) return;   // T4c-1: нет индекса — ведения нет
+              const g=evReg(a,ctx); A.leadSet(o,f,a.vol,g.deg,g.oct,a.inst,gl,when); },   // T4b1: цена — из индекса в строе   // ведение терменвокса (hold) частоты не несёт — скольжению там применяться не к чему   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
   leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),a&&a.tie,when),   // V2: tie ПЕРЕД when (правило #15)   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
      → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,{when}={})=>A.chordOn(chOwnerKey(ctx),chordFreqsAt(a.deg,evTi(a,ctx,true),a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.inst,a.bri,when),   // T4b1: типизированный — из индекса корня; без типа — по ступени (терции/пауэр — T6)   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
-  chSet:(a,ctx,{when}={})=>A.chordGlide(chOwnerKey(ctx),chordFreqsAt(a.deg,evTi(a,ctx,true),a.oct,ctx?ctx.sc:CUR(),ctx?ctx.sev:seventh,a.ty),a.vol,a.bri,when),
+  chOn:(a,ctx,{when}={})=>{ const F=evHz(a,ctx,'ch'); if(F.length) A.chordOn(chOwnerKey(ctx),F,a.vol,a.inst,a.bri,when); },   // T4c-1: цена — из индекса корня (evHz); нот нет — атаки нет   // T4b1: типизированный — из индекса корня; без типа — по ступени (терции/пауэр — T6)   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
+  chSet:(a,ctx,{when}={})=>{ const F=evHz(a,ctx,'ch'); if(F.length) A.chordGlide(chOwnerKey(ctx),F,a.vol,a.bri,when); },
   chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
   /* ⛳ V4: СКОЛЬЖЕНИЕ БАСА — ИЗ КАРТЫ СОБЫТИЯ, И ОТСУТСТВИЕ КАРТЫ ЗНАЧИТ «НЕ ЗАДАНО» (умолчание движка BASS_GLIDE_TC), а НЕ
      «возьми живую цепь». Карту бас несёт ТОЛЬКО при прицепочном параметре в цепи баса (gestures), поэтому ей нет у всего
      записанного без Скольжения, у подложки (arrange строит нагрузку сам) и у нот, вставленных в редакторе. Правило соло
      «нет карты → текущая цепь» здесь заставило бы басовую линию подложки скользить так, как сейчас стоит рука, — ровно
      довод яркости аккордов (fxChordBri). Кадр терменвокса (live) скольжения не получает — контракт V1. */
-  bassOn:(a,ctx,{when,live,own}={})=>A.bassOn(own||bassOwnerKey(ctx),(live!=null?live:bassFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR())),a.vol,a.inst,a.deg,a.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,{when}={})=>A.bassSet(bassOwnerKey(ctx),bassFreqTi(evTi(a,ctx,false),a.oct,ctx?ctx.sc:CUR()),a.vol,a.deg,a.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when),   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
+  bassOn:(a,ctx,{when,live,own}={})=>{ const f=live!=null?live:evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassOn(own||bassOwnerKey(ctx),f,a.vol,a.inst,g.deg,g.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
+  bassSet:(a,ctx,{when}={})=>{ const f=evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassSet(bassOwnerKey(ctx),f,a.vol,g.deg,g.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
   bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
   drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,A.fxBriOf(a.fx),when),   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
   drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
@@ -3745,7 +3787,7 @@ function chaseNote(s,x){
   const a={...s.on.a, ...(s.set?(s.role==='ld'?s.set.a:noInst(s.set.a)):null)};   // T0-fix: у СОЛО тембр — от последнего ведения (нота переливается живьём, в точке входа звучал он); у баса — от атаки (он печётся на «вкл», ведение его не несёт); у аккорда в chSet тембра нет вовсе
   const ctx=(s.set&&!hold)?s.set:s.on;
   if(s.role==='ld'){
-    if(hold){ a.deg=s.on.a.deg; a.oct=s.on.a.oct; a.ti=s.on.a.ti; }   // T4b2: и ИНДЕКС атаки (см. шапку)
+    if(hold){ delete a.deg; a.oct=s.on.a.oct; a.ti=s.on.a.ti; }   // T4b2: ИНДЕКС и регистр атаки (см. шапку). ⛳ T4c-1: ступень не копируется (её не читает никто) — живую ступень ведения снимаем, чтобы не лежала чужая
     /* Кривая бенда — от момента атаки; догоняем её ОСТАТОК: значение на входе становится точкой dt=0,
        дальнейшие точки сдвигаются на прошедшее. Без этого глиссандо начиналось бы заново с атаки. */
     const B=s.on.a.bend;
@@ -3888,8 +3930,8 @@ function editViewCheck(ev,sc){ const g=songSegs().byEv.get(ev);
 /* Вставка в дорожку пишет вид оси — в дорожке с нотами он обязан быть её видом. */
 function trackViewCheck(layer,sc){ const V=layerViews(layer);
   if(sc&&V.size&&!V.has(sc)) viewWarn('insert',`an insert wrote a tuning view the track L${layer+1} does not hold`); }
-/* T4b2: индекс в строе ХРАНИМОГО события; у события без a.ti (после T4a таких нет) — перевод его ступени (тот же, что ставит T4a). */
-const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : eventTuningIndex(ev); };
+/* T4b2: индекс в строе ХРАНИМОГО события (T4c-1: только a.ti; у события без него — undefined, ступень не читается). */
+const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : undefined; };   // ⛳ T4c-1: перевода ступени больше нет — нет индекса, нет высоты
 function songSegs(){
   const V=songNotes();
   if(segView&&segView.view===V) return segView;
@@ -3919,7 +3961,7 @@ function songSegs(){
         if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
         cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
               first:ev===n.head, start:ev.t, end:null, endBy:'open',
-              deg:a.deg, ti, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T4b2: ti — индекс в строе сегмента; с T4b3 по нему ряды и рисование редактора (deg читают правка — расшифровка ряда до T5 — и нетипизированный аккорд до T6)   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
+              ti, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T4b2: ti — индекс в строе сегмента; с T4b3 по нему ряды и рисование редактора (deg читают правка — расшифровка ряда до T5 — и нетипизированный аккорд до T6)   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
         segs.push(cur); byEv.set(ev,cur);
       }else byEv.set(ev,cur);                                                  // ведение громкости/эффектов — ВНУТРИ сегмента
     }
@@ -4455,6 +4497,7 @@ export {
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
   seedTake,   // засев тестовой песни через push (scaleprobe P.seed) — не часть игры
   viewAudit, editViewCheck,   // T6a: защитные проверки вида — сводка для пробы P.checkRules и проверка правки (ui зовёт у расшифровки ряда)
+  evHz, evReg, segChordNotes, probeWithEvents,   // T4c-1: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
   hlOf, legacyHlOf,   // T4b4: место подсветки переигранной ноты из индекса и прежнее по ступени — для пробы P.checkHl; legacy уходит в T4c
   laneRoleOf, laneLenOf, eventTuningIndex, chaseFor, chaseNote, legacyChaseNote, legacySongSegs,   // chaseFor/chaseNote и legacy* (T4b2) — для пробы P.checkLogic; legacy уходят в T4c. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять

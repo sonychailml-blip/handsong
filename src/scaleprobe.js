@@ -6,6 +6,8 @@
      await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
+     P.checkStrip()     // T4c-1: клону песни стирают ступень (a.deg) у каждого события — цены, место в реестре голосов, сегменты, догонялка на
+                        //   каждой доле, ряды/попадания/призраки редактора (обе оси), интервалы распада и подсветка совпадают с оригиналом (===)
      P.checkStack()     // «стопка»: у ладов stack каждый тон аккорда — внутри лада; подписи вменяемы (таблица до-мажорной пентатоники и блюза);
                         //   R.powerOld возвращает прежний пауэр-аккорд и старит подпись заморозки дорожек со стопками
      P.checkUntyped()   // T6b: нетипизированные аккорды — цена по правилу лада от индекса корня против прежней по ступени и tag; песня, догонялка, ряды, распад
@@ -38,7 +40,7 @@ import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIn
          legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf, legacyChordNotesRef, setStackAsPower, stackPower, ruleChordSteps } from './scales.js';
 import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit, freezeTicket,
+import { events, eventTuningIndex, evHz, evReg, segChordNotes, probeWithEvents, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit, freezeTicket,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
 
@@ -260,14 +262,14 @@ export function checkSound(){
     if(typeof a.ti!=='number'){ bad.push(`${at}: no a.ti`); continue; }
     if(r==='ld'){ const x=leadFreqTi(a.ti,a.oct,e.sc), y=leadFreq(a.deg,a.oct,e.sc); if(x!==y) bad.push(`${at}: from ti ${x}, from degree ${y}`); }
     else if(r==='bs'){ const x=bassFreqTi(a.ti,a.oct,e.sc), y=bassFreq(a.deg,a.oct,e.sc); if(x!==y) bad.push(`${at}: from ti ${x}, from degree ${y}`); }
-    else{ const X=chordNotesAt(a.deg,a.ti,a.oct,e.sc,e.sev,a.ty), Y=chordNotes(a.deg,a.oct,e.sc,e.sev,a.ty);
+    else{ const X=chordNotesAt(a.ti,a.oct,e.sc,e.sev,a.ty), Y=chordNotes(a.deg,a.oct,e.sc,e.sev,a.ty);   // T4c-1: цена — без ступени; опора — по записанной ступени
       if(X.length!==Y.length) bad.push(`${at}: ${X.length} notes from ti, ${Y.length} from degree`);
       else for(let i=0;i<X.length;i++) if(X[i].f!==Y[i].f||X[i].iv!==Y[i].iv) bad.push(`${at} note ${i}: from ti ${X[i].f} (iv ${X[i].iv}), from degree ${Y[i].f} (iv ${Y[i].iv})`); }
   }
   console.log(`[scaleprobe T4b1] song events ${n} · mismatches ${bad.length} (price from a.ti vs price from the degree)`);
   bad.forEach(m=>console.warn('[scaleprobe T4b1] '+m));
   const TI={ lead:(d,o,v)=>leadFreqTi(tuningIndexOf(d,v,false),o,v), bass:(d,o,v)=>bassFreqTi(tuningIndexOf(d,v,false),o,v),
-             chord:(d,o,v,sev,ty)=>chordNotesAt(d,tuningIndexOf(d,v,true),o,v,sev,ty), tonic:tonicFreq, cents:centsOf };
+             chord:(d,o,v,sev,ty)=>chordNotesAt(tuningIndexOf(d,v,true),o,v,sev,ty), tonic:tonicFreq, cents:centsOf };
   const r=sweep('T4b1',['from ti','old'],TI,OLD,(s,tf)=>{ const v=scaleView(s,tf); return [v,v]; }, { melMax:n=>n, chMax:n=>n });
   if(!bad.length && !r.total) console.log('[scaleprobe T4b1] every song event and every sweep case prices identically from the tuning index');
   return { events:n, eventMismatches:bad, sweep:r };
@@ -285,11 +287,12 @@ const bendEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((p,i
 export function checkLogic(){
   const bad=[];
   // ---- 1) сегменты ----
-  const S=songSegs(), L=legacySongSegs(), F=['role','layer','key','tk','note','ev','endEv','first','start','end','endBy','deg','oct','sc','sev','inst','vol'];
+  const S=songSegs(), L=legacySongSegs(), F=['role','layer','key','tk','note','ev','endEv','first','start','end','endBy','oct','sc','sev','inst','vol'];   // T4c-1: 'deg' у сегмента больше нет — ниже ti против перевода прежней ступени
   if(S.segs.length!==L.segs.length) bad.push(`segments: ${S.segs.length} new, ${L.segs.length} legacy`);
   const nSeg=Math.min(S.segs.length,L.segs.length);
   for(let i=0;i<nSeg;i++){ const a=S.segs[i], b=L.segs[i], at=`segment ${i} (L${a.layer+1} ${a.role} beat ${Math.round(a.start*1000)/1000})`;
     for(const f of F) if(a[f]!==b[f]) bad.push(`${at}: ${f} new ${a[f]} legacy ${b[f]}`);
+    { const tl=tuningIndexOf(b.deg,b.sc,b.role==='ch'); if(a.ti!==tl) bad.push(`${at}: ti new ${a.ti}, legacy degree ${b.deg} converts to ${tl}`); }
     if(!tyEqP(a.ty,b.ty)) bad.push(`${at}: chord type differs`); }
   const idxS=new Map(S.segs.map((g,i)=>[g,i])), idxL=new Map(L.segs.map((g,i)=>[g,i]));
   if(S.byEv.size!==L.byEv.size) bad.push(`event→segment map: ${S.byEv.size} new, ${L.byEv.size} legacy`);
@@ -300,13 +303,14 @@ export function checkLogic(){
     for(const s of chaseFor(x)){
       nChase++; const N=chaseNote(s,x), O=legacyChaseNote(s,x), at=`chase at beat ${Math.round(x*1000)/1000}: L${s.on.layer+1} ${s.role} (${s.on.fn} at ${s.on.t})`;
       if(N.ctx!==O.ctx) bad.push(`${at}: context differs`);
-      for(const f of ['deg','oct','vol','inst','hold']) if(N.a[f]!==O.a[f]) bad.push(`${at}: ${f} new ${N.a[f]} legacy ${O.a[f]}`);
+      for(const f of ['oct','vol','inst','hold']) if(N.a[f]!==O.a[f]) bad.push(`${at}: ${f} new ${N.a[f]} legacy ${O.a[f]}`);
+      { const tl=tuningIndexOf(O.a.deg,O.ctx.sc,s.role==='ch'); if(N.a.ti!==tl) bad.push(`${at}: ti new ${N.a.ti}, legacy degree ${O.a.deg} converts to ${tl}`); }   // T4c-1: ступень догнанной нотой больше не несётся (у терменвокса снята)
       if(!tyEqP(N.a.ty,O.a.ty)) bad.push(`${at}: chord type differs`);
       if(!bendEq(N.a.bend,O.a.bend)) bad.push(`${at}: bend curve differs`);
-      const sc=N.ctx.sc, tiN= typeof N.a.ti==='number' ? N.a.ti : tuningIndexOf(N.a.deg,sc,s.role==='ch');
+      const sc=N.ctx.sc, tiN=N.a.ti;   // T4c-1: только индекс
       if(s.role==='ld'){ const x1=leadFreqTi(tiN,N.a.oct,sc), y1=leadFreq(O.a.deg,O.a.oct,O.ctx.sc); if(x1!==y1) bad.push(`${at}: price from ti ${x1}, legacy from degree ${y1}`); }
       else if(s.role==='bs'){ const x1=bassFreqTi(tiN,N.a.oct,sc), y1=bassFreq(O.a.deg,O.a.oct,O.ctx.sc); if(x1!==y1) bad.push(`${at}: price from ti ${x1}, legacy from degree ${y1}`); }
-      else{ const A=chordNotesAt(N.a.deg,N.a.ty?tiN:undefined,N.a.oct,sc,N.ctx.sev,N.a.ty), B=chordNotes(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,O.a.ty);
+      else{ const A=chordNotesAt(tiN,N.a.oct,sc,N.ctx.sev,N.a.ty), B=chordNotes(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,O.a.ty);
         if(A.length!==B.length) bad.push(`${at}: ${A.length} chord notes new, ${B.length} legacy`);
         else for(let i=0;i<A.length;i++) if(A[i].f!==B[i].f) bad.push(`${at} note ${i}: price from ti ${A[i].f}, legacy from degree ${B[i].f}`); }
     }
@@ -362,7 +366,7 @@ export function checkRows(){
     }
     RP.reset();
     for(const g of G.segs){
-      nSeg++; const at=`${tag} segment at beat ${Math.round(g.start*1000)/1000} (degree ${g.deg} ti ${g.ti} reg ${g.oct})`;
+      nSeg++; const at=`${tag} segment at beat ${Math.round(g.start*1000)/1000} (ti ${g.ti} reg ${g.oct})`;
       const rN=RP.root(g,ax), rL=RP.legacyRoot(g,ax);
       if(rN!==rL) miss(`${at}: root row ${rN} new, ${rL} legacy`);
       const N=RP.notes(g,ax,total), O=RP.legacyNotes(g,ax,total); nBlk+=O.length;
@@ -599,11 +603,11 @@ export function checkScroll(){
     for(const rows of [5,8,13,20]){ if(rows>T0) continue;
       for(let row0=0; row0<=T0-rows; row0++){
         nP++; const r0c=Math.min(RP.across(a0,a1,row0,rows,'pitch'), Math.max(0,T1-rows));
-        const mid=row0+Math.floor(rows/2), sn=a0.snap(mid), pt=a0.pitchOf(sn), nr=a1.rowOf(pt.deg,pt.oct), back=a1.pitchOf(nr);
+        const mid=row0+Math.floor(rows/2), sn=a0.snap(mid), pt=a0.pitchOf(sn), nr=a1.rowOfTi(pt.ti,pt.oct), back=a1.pitchOf(nr);   // T4c-1: ряд отдаёт {ti, oct}
         if(sn===mid) nExact++;
         const at=`${v.id}${v.tunable?'@'+v.tunedFrom:''} ${f0?'All→Mode':'Mode→All'} window ${rows} at row ${row0}`;
-        if(!(nr>=r0c && nr<r0c+rows)) miss(`${at}: the anchor (degree ${pt.deg} reg ${pt.oct}) is at row ${nr}, outside the new window ${r0c}..${r0c+rows-1}`);
-        if(!back||back.deg!==pt.deg||back.oct!==pt.oct) miss(`${at}: row ${nr} is not degree ${pt.deg} reg ${pt.oct} in the new axis`);
+        if(!(nr>=r0c && nr<r0c+rows)) miss(`${at}: the anchor (ti ${pt.ti} reg ${pt.oct}) is at row ${nr}, outside the new window ${r0c}..${r0c+rows-1}`);
+        if(!back||back.ti!==pt.ti||back.oct!==pt.oct) miss(`${at}: row ${nr} is not ti ${pt.ti} reg ${pt.oct} in the new axis`);
       }
     }
   }
@@ -672,6 +676,7 @@ const ALL_RUNS=[
   ['T4b3 editor rows',   ()=>checkRows(),   r=>({ cases:r.blocks+r.hits+r.ghosts+r.rows+r.chords, song:r.segments, diff:r.total, list:r.differences })],
   ['T4b4-1 row fixes',   ()=>checkRowFix(), r=>({ cases:r.defaults+r.cache, diff:r.total, list:r.differences })],
   ['T4b4 highlights',    ()=>checkHl(),     r=>({ cases:r.sweep+r.outOfMode+r.events+r.chase, song:r.events, diff:r.total, list:r.differences })],
+  ['T4c-1 degree stripped',()=>checkStrip(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.mismatches })],
   ['T6b untyped chords', ()=>checkUntyped(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
   ['stacked chords',     ()=>checkStack(),   r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
   ['T6c chord labels',   ()=>checkLabels(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
@@ -763,7 +768,7 @@ export async function seed(opt={}){
     if(g1 && editOpen(g1.layer) && editDeleteChordNote(g1.ev,1)) say(`editor: the major chord at beat 12 (L${g1.layer+1}) dissolved — its middle note deleted`);
     else say('editor: dissolve FAILED');
     const g2=segOf('partch-43',32);
-    if(g2 && editSetLayer(g2.layer) && editMoveChordNote(g2.ev,1,32.5,g2.deg+1,g2.oct)) say(`editor: one note of the first Partch chord (L${g2.layer+1}) moved half a beat later and one row up`);
+    if(g2 && editSetLayer(g2.layer) && editMoveChordNote(g2.ev,1,32.5,tuningIndexOf(modeSlotOfTi(g2.ti,g2.oct,g2.sc).deg+1,g2.sc,true),g2.oct)) say(`editor: one note of the first Partch chord (L${g2.layer+1}) moved half a beat later and one row up`);
     else say('editor: chord-note move FAILED');
     editClose();
     // ---- 7) подложка, скоба, пауза ----
@@ -851,7 +856,7 @@ export function checkUntyped(){
           for(let o=0;o<4;o++) for(let d=0;d<=n;d++) for(const sev of [false,true]){
             const at=`${id} tonic ${tn} A4 ${A4} degree ${d} reg ${o}${sev?' 7th':''}`, L=legacyChordNotesRef(d,o,v,sev,null);
             cmp(at+' (by degree)', chordNotes(d,o,v,sev,null), L);
-            cmp(at+' (from ti)', chordNotesAt(d,tuningIndexOf(d,v,true),o,v,sev,null), L);
+            cmp(at+' (from ti)', chordNotesAt(tuningIndexOf(d,v,true),o,v,sev,null), L);
           }
         }
       }
@@ -861,16 +866,16 @@ export function checkUntyped(){
   for(const e of events){
     if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty || !e.sc) continue;
     song++; const a=e.a;
-    cmp(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}`, chordNotesAt(a.deg,a.ti,a.oct,e.sc,e.sev,null), legacyChordNotesRef(a.deg,a.oct,e.sc,e.sev,null));
+    cmp(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}`, chordNotesAt(a.ti,a.oct,e.sc,e.sev,null), legacyChordNotesRef(a.deg,a.oct,e.sc,e.sev,null));
   }
   const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q);
   for(const x of X) for(const sct of chaseFor(x)){
     if(sct.role!=='ch') continue; const N=chaseNote(sct,x), O=legacyChaseNote(sct,x); if(N.a.ty) continue;
-    song++; cmp(`chase at beat ${Math.round(x*1000)/1000} L${sct.on.layer+1}`, chordNotesAt(N.a.deg,N.a.ti,N.a.oct,N.ctx.sc,N.ctx.sev,null), legacyChordNotesRef(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,null));
+    song++; cmp(`chase at beat ${Math.round(x*1000)/1000} L${sct.on.layer+1}`, chordNotesAt(N.a.ti,N.a.oct,N.ctx.sc,N.ctx.sev,null), legacyChordNotesRef(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,null));
   }
   for(const g of songSegs().segs){
     if(g.role!=='ch' || g.ty) continue;
-    song++; cmp(`dissolve intervals of the chord at beat ${Math.round(g.start*1000)/1000} L${g.layer+1}`, chordNotesAt(g.deg,g.ti,g.oct,g.sc,g.sev,null), legacyChordNotesRef(g.deg,g.oct,g.sc,g.sev,null));
+    song++; cmp(`dissolve intervals of the chord at beat ${Math.round(g.start*1000)/1000} L${g.layer+1}`, segChordNotes(g), legacyChordNotesRef(g.ev.a.deg,g.oct,g.sc,g.sev,null));   // T4c-1: ноты распада — та же функция, что у редактора; опора — по записанной ступени события
     if(!chordReadsTi(g.ti,g.sc,g.ty)) miss(`segment at beat ${g.start} L${g.layer+1}: an untyped chord that does not read its index`);
   }
   console.log(`[scaleprobe T6b] cases ${cases} (sweep + song) · song items ${song} (chords, chase, dissolve) · chordless modes checked ${none} · palette views ${nPal} (unreachable, priced as before) · differences ${bad.length}`);
@@ -926,4 +931,89 @@ export function checkStack(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe stack] '+m));
   if(!bad.length) console.log('[scaleprobe stack] every stacked chord stays inside its mode, labels read, and R.powerOld restores the old chord and stales exactly the tracks that hold stacks');
   return { modes:views.length, cases, song, total:bad.length, mismatches:bad };
+}
+
+/* ═══ T4c-1: СТУПЕНЬ ЗАПИСАНА, НО НЕ ЧИТАЕТСЯ — ДОКАЗАТЕЛЬСТВО СТИРАНИЕМ ═══
+   Клон песни: каждое событие — копия, у нагрузки СТЁРТО поле deg. Оба списка (оригинал и клон) по очереди подставляются в recorder через
+   probeWithEvents (содержимое events подменяется на месте, schedInvalidate перестраивает ноты, сегменты, кэш догонялки; в finally песня
+   возвращается), и над каждым считаются ВСЕ производные пути — те же функции, что зовёт приложение:
+     • ЦЕНА каждого «вкл»/ведения соло, баса и аккорда — recorder.evHz (её зовёт таблица ENG: живой звук, переигровка, догонялка, рендер);
+       место голоса в реестре (evReg — leadHold/bassHold) и подсветка аккорда (hlOf);
+     • СЕГМЕНТЫ (songSegs): границы, события начала и конца (по номеру события), ключ, взятое, индекс, регистр, тип, вид, тембр, громкость,
+       и обратный указатель «событие → сегмент»;
+     • ДОГОНЯЛКА на КАЖДОЙ доле, где лежит событие: состав владельцев (вкл, ведение, контекст), нагрузка chaseNote целиком (кроме поля deg —
+       его стёрли) и её цена, реестр и подсветка;
+     • РЕДАКТОР, обе оси («Все» и «Лад»), сегменты сгруппированы как в редакторе: высота оси аккордов, ряд корня, каждая нота (ряд и
+       отступление), попадание пальца на ряду корня, каждой ноты и в ±0.3/±0.49 от них, ПРИЗРАК целого аккорда на каждом ярком ряду;
+     • РАСПАД: ноты аккорда сегмента (segChordNotes — частоты и интервалы, которые ложатся в однонотные типы).
+   Сравнение — ===, по номеру события (клон идёт в том же порядке); ссылки на вид сравниваются как ссылки. Принимается ТОЛЬКО при нуле.
+   Отказ — пока идёт запись, играет транспорт или открыт редактор (сказано словами, засчитывается как расхождение). */
+export function checkStrip(){
+  const bad=[]; const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
+  const REF=new Map(); const ref=o=>{ if(o==null||typeof o!=='object') return o; if(!REF.has(o)) REF.set(o,'#ref'+REF.size); return REF.get(o); };
+  const orig=events.slice(); let had=0;
+  const clone=orig.map(e=>{ if(!e.a||!('deg' in e.a)) return {...e}; had++; const a={...e.a}; delete a.deg; return {...e, a}; });
+  if(clone.some(e=>e.a&&'deg' in e.a)) miss('the clone still holds a degree');
+  const ROLE={ l:'ld', b:'bs', c:'ch' }, VIEWS=[['all',true],['mode',false]];
+  const plainOut=a=>{ const o={...a}; delete o.deg;
+    for(const k of Object.keys(o)) if(o[k]&&typeof o[k]==='object'&&!Array.isArray(o[k])&&Object.getPrototypeOf(o[k])!==Object.prototype) o[k]=ref(o[k]);
+    return o; };
+  const run=()=>{
+    const IX=new Map(events.map((e,i)=>[e,i])), ix=e=> e==null ? null : (IX.has(e) ? IX.get(e) : 'foreign');
+    const out={ price:[], segs:[], byEv:[], chase:[], rows:[], diss:[] };
+    // ---- цены, реестр голосов, подсветка ----
+    events.forEach((e,i)=>{ const r=ROLE[e.fn[0]]; if(!r||!/On$|Set$/.test(e.fn)||!e.a) return;
+      out.price.push({ i, hz:evHz(e.a,e,r), reg: r==='ch' ? hlOf(e.a,e.sc) : evReg(e.a,e) }); });
+    // ---- сегменты ----
+    const S=songSegs(), SI=new Map(S.segs.map((g,i)=>[g,i]));
+    for(const g of S.segs) out.segs.push({ role:g.role, layer:g.layer, key:g.key, tk:g.tk, ev:ix(g.ev), endEv:ix(g.endEv), first:g.first, start:g.start, end:g.end,
+      endBy:g.endBy, ti:g.ti, oct:g.oct, ty:g.ty, sc:ref(g.sc), sev:g.sev, inst:g.inst, vol:g.vol, deg:g.deg });
+    for(const [ev,g] of S.byEv) out.byEv.push([ix(ev), SI.get(g)]);
+    out.byEv.sort((p,q)=>p[0]-q[0]);
+    // ---- догонялка на каждой доле события ----
+    const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q);
+    for(const x of X) for(const sct of chaseFor(x)){ const N=chaseNote(sct,x);
+      out.chase.push({ x, role:sct.role, on:ix(sct.on), set:ix(sct.set), ctx:ix(N.ctx), a:plainOut(N.a), hz:evHz(N.a,N.ctx,sct.role),
+        reg: sct.role==='ch' ? hlOf(N.a,N.ctx.sc) : evReg(N.a,N.ctx) }); }
+    // ---- редактор: группы как у редактора (дорожка, роль, ССЫЛКА на вид), обе оси ----
+    const groups=[];
+    for(const g of S.segs){ if(g.role!=='ld'&&g.role!=='bs'&&g.role!=='ch') continue;
+      let G=groups.find(q=>q.layer===g.layer&&q.role===g.role&&q.sc===g.sc); if(!G){ G={ layer:g.layer, role:g.role, sc:g.sc, segs:[] }; groups.push(G); } G.segs.push(g); }
+    for(const G of groups) for(const [vn,all] of VIEWS){
+      const ax=RP.axis(G.sc,all); let total=REG_N*ax.rpp;
+      if(G.role==='ch'){ RP.reset(); total=RP.total(G,ax,RP.notes,RP.root); }
+      RP.reset();
+      const rec={ group:`L${G.layer+1} ${G.role} ${G.sc&&G.sc.id} [${vn}]`, total, segs:[] };
+      for(const g of G.segs){ const root=RP.root(g,ax), notes=RP.notes(g,ax,total), hits=[], ghosts=[];
+        for(const r0 of [root, ...notes.map(n=>n.r)]) for(const d of [0,-0.3,0.3,-0.49,0.49]) hits.push(RP.pick(notes,r0+d));
+        if(g.role==='ch') for(let r=0;r<total;r++){ const pit=ax.pitchOf(r); if(pit) ghosts.push([r, RP.notes(RP.ghost(g,pit),ax,total)]); }
+        rec.segs.push({ seg:SI.get(g), root, notes, hits, ghosts }); }
+      out.rows.push(rec);
+    }
+    // ---- распад: ноты аккорда сегмента ----
+    for(const g of S.segs) if(g.role==='ch') out.diss.push({ seg:SI.get(g), notes:segChordNotes(g) });
+    return out;
+  };
+  const A=probeWithEvents(orig,run);
+  const B= A.ok ? probeWithEvents(clone,run) : A;
+  if(!A.ok||!B.ok){ miss(`refused: ${(A.ok?B:A).why} — stop it and run again`);
+    console.warn('[scaleprobe T4c-1] '+bad[0]); return { cases:0, stripped:had, total:bad.length, mismatches:bad }; }
+  let cases=0;
+  const show=v=> v&&typeof v==='object' ? JSON.stringify(v) : String(v);
+  const diff=(x,y,path)=>{
+    if(x===y){ cases++; return; }
+    if(Array.isArray(x)&&Array.isArray(y)){ if(x.length!==y.length){ miss(`${path}: length ${x.length} original, ${y.length} stripped`); return; } x.forEach((v,i)=>diff(v,y[i],`${path}[${i}]`)); return; }
+    if(x&&y&&typeof x==='object'&&typeof y==='object'&&Object.getPrototypeOf(x)===Object.prototype&&Object.getPrototypeOf(y)===Object.prototype){
+      for(const k of new Set([...Object.keys(x),...Object.keys(y)])) diff(x[k],y[k],`${path}.${k}`); return; }
+    miss(`${path}: original ${show(x)}, stripped ${show(y)}`);
+  };
+  const O=A.value, C=B.value;
+  for(const k of ['price','segs','byEv','chase','rows','diss']) diff(O[k],C[k],k);
+  for(const g of O.segs) if(g.deg!==undefined) miss(`segment of L${g.layer+1} at beat ${g.start}: carries a degree`);
+  const n={ price:O.price.length, segs:O.segs.length, chase:O.chase.length, rows:O.rows.reduce((s,r)=>s+r.segs.length,0), diss:O.diss.length };
+  console.log(`[scaleprobe T4c-1] events ${orig.length} (degree stripped from ${had}) · prices ${n.price} · segments ${n.segs} · chased notes ${n.chase} · editor segment×view ${n.rows} · dissolves ${n.diss} · compared values ${cases} · differences ${bad.length}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4c-1] '+m));
+  if(!had){ console.log('[scaleprobe T4c-1] no event carries a degree — load a song (P.seed) and run again'); bad.push('no event carries a degree'); }
+  else if(!bad.length) console.log('[scaleprobe T4c-1] with the degree deleted from every event, every derived path gives identical results — nothing reads the stored degree');
+  return { cases, stripped:had, prices:n.price, segments:n.segs, chase:n.chase, rows:n.rows, dissolves:n.diss, total:bad.length, mismatches:bad };
 }

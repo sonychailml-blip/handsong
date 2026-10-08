@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordNotes, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, chordReadsTi, tuningIndexOf, legacyChordNotesRef } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, modeSlotOfTi, legacyChordNotesRef } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollScale, rollRowsAll, tonic, ROLL_EDITABLE,
@@ -943,40 +943,42 @@ function chRowOfFreq(f,F,dpo,total){
    типизированного аккорда ряд корня, его ноты (chordNotesAt — то, чем играет ENG) и частота ряда корня (chordRowFreqAt — по ней корень
    узнаётся среди нот) — из индекса. ⛔ Нетипизированный аккорд (стопка терций, пауэр-аккорд, округлённые отношения — их строит ЛАД по
    ступени) — целиком по ступени до T6.
+   ⛳ T4c-1: СТУПЕНИ СЕГМЕНТ БОЛЬШЕ НЕ НЕСЁТ (recorder.songSegs) — ряд и ноты ТОЛЬКО из индекса; у аккорда без ветки по индексу (правила
+   palette/none) chordNotesAt сам берёт место корня обратной выборкой. Индекса нет или его нет на оси — ряда нет (NaN: блок не рисуется,
+   попадания нет); ниже — прежний текст о запасном пути, теперь снятом.
    Запасной путь по ступени — у сегмента без индекса (после T4a их нет) и у индекса, которого нет на оси (у оси «Лад» — высота вне лада:
    до T5 её не пишет никто); уходит в T4c. Новых выделений памяти нет: ряд — арифметика оси, списки нот — те же, что у пути ступени. */
-const segReadsTi=s=> s.role==='ch' ? chordReadsTi(s.ti,s.sc,s.ty) : typeof s.ti==='number';
 function rollSegRoot(s,ax){
-  if(segReadsTi(s)){ const r=ax.rowOfTi(s.ti,s.oct); if(r!==undefined) return r; }
-  return ax.rowOf(s.deg,s.oct);
+  const r=ax.rowOfTi(s.ti,s.oct); return r===undefined ? NaN : r;   // T4c-1: только индекс
 }
 function rollSegNotes(s,ax,total){
   const r0=rollSegRoot(s,ax);
   if(s.role!=='ch') return [{ r:r0, dev:null }];
-  const byTi=segReadsTi(s);
-  const N= byTi ? chordNotesAt(s.deg,s.ti,s.oct,s.sc,s.sev,s.ty) : chordNotes(s.deg,s.oct,s.sc,s.sev,s.ty);
+  const N=chordNotesAt(s.ti,s.oct,s.sc,s.sev,s.ty);   // T4c-1: ноты — то, чем играет ENG (evHz), из индекса корня
   const F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;
-  const fr= byTi ? chordRowFreqAt(s.deg,s.ti,s.oct,s.sc,s.sev) : chordRowFreq(s.deg,s.oct,s.sc,s.sev);
+  const fr=chordRowFreqAt(s.ti,s.oct,s.sc,s.sev);
   return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
 }
 const rollSegRows=(s,ax,total)=>rollSegNotes(s,ax,total).map(x=>x.r);
 /* T4b3: СЕГМЕНТ-ПРИЗРАК переноса аккорда на ряд pit — ТА ЖЕ пара, что окажется в песне после правки: ступень и регистр ряда (расшифровка
    ряда в ступень остаётся до T5) и индекс, который поставит коммит правки (recorder.tiRestamp → tuningIndexOf по закону роли). ⚠️ Без
    индекса призрак прочёл бы ПРЕЖНИЙ индекс сегмента и стоял бы на старом месте — ошибка ПРОИЗВОДНОГО пути (урок T4b2). */
-const rollGhostSeg=(s,pit)=>({ ...s, deg:pit.deg, oct:pit.oct, ti:tuningIndexOf(pit.deg,s.sc,s.role==='ch') });
+const rollGhostSeg=(s,pit)=>({ ...s, ti:pit.ti, oct:pit.oct });   // ⛳ T4c-1: ряд оси отдаёт сам индекс (pitchOf → {ti, oct}) — ровно то, что поставит коммит правки
 /* Какую ноту сегмента берёт палец на дробном ряду rp: ближайшую (первая при равенстве) — { ni, dr }. Одна функция на попадание и пробу. */
 function rollSegPick(ns,rp){ let dr=Infinity, ni=0; ns.forEach((x,i)=>{ const d=Math.abs(x.r-rp); if(d<dr){ dr=d; ni=i; } }); return { ni, dr }; }
 /* ═══ LEGACY (T4b3) — прежние ряд, ноты и призрак сегмента ПО СТУПЕНИ, слово в слово. ⛔ Их читает ТОЛЬКО проба (scaleprobe
-   P.checkRows) — сравнение с путём индекса; в редакторе их не зовёт никто. Уходят в T4c вместе со ступенью. */
-function legacyRollSegRoot(s,ax){ return ax.rowOf(s.deg,s.oct); }
+   P.checkRows) — сравнение с путём индекса; в редакторе их не зовёт никто. Уходят в T4c вместе со ступенью.
+   ⛳ T4c-1: у сегмента ступени больше нет — legacy берёт её у ОПРЕДЕЛЯЮЩЕГО события (s.ev.a.deg, записанной; legDeg) — копия для пробы. */
+const legDeg=s=> s.deg!==undefined ? s.deg : (s.ev&&s.ev.a ? s.ev.a.deg : undefined);
+function legacyRollSegRoot(s,ax){ return ax.rowOf(legDeg(s),s.oct); }
 function legacyRollSegNotes(s,ax,total){
-  const r0=ax.rowOf(s.deg,s.oct);
+  const r0=ax.rowOf(legDeg(s),s.oct);
   if(s.role!=='ch') return [{ r:r0, dev:null }];
-  const N=legacyChordNotesRef(s.deg,s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;   // «стопка»: у лада stack опора — прежняя арифметика стопки. T6b: ноты — ПРЕЖНЕЙ ценой (по ступени и tag) — сравнение рядов покрывает и T6b
-  const fr=chordRowFreq(s.deg,s.oct,s.sc,s.sev);
+  const N=legacyChordNotesRef(legDeg(s),s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;   // «стопка»: у лада stack опора — прежняя арифметика стопки. T6b: ноты — ПРЕЖНЕЙ ценой (по ступени и tag) — сравнение рядов покрывает и T6b
+  const fr=chordRowFreq(legDeg(s),s.oct,s.sc,s.sev);
   return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
 }
-const legacyRollGhostSeg=(s,pit)=>({ ...s, deg:pit.deg, oct:pit.oct });
+const legacyRollGhostSeg=(s,pit)=>{ const p=modeSlotOfTi(pit.ti,pit.oct,s.sc); return { ...s, deg:p?p.deg:undefined, oct:p?p.oct:pit.oct }; };   // T4c-1: ряд отдаёт индекс — прежняя пара (ступень, регистр) из него
 /* ⛳ СКОЛЬКО РЯДОВ У ОСИ АККОРДОВ (U2) — ПО САМОЙ ДОРОЖКЕ, чтобы ни одна нота не упала за край (правило #9: число в снимке, его
    читают и рисунок, и попадание, и прокрутка).
      • НИЗ — ряд 0, и ниже ни одна нота аккорда не звучит ПО ПОСТРОЕНИЮ: корень стоит на ряду своей пары (регистр ≥ 0), а каждый тип
@@ -1035,7 +1037,7 @@ function rollDevLbl(x,y,w,h,dev,sel){
    и его же читают попадание, призрак перетаскивания, частоты рядов аккордов, высота оси, колонка подписей и ui (правило #9 — один
    снимок): кто бы ни спросил «какой это ряд», ответ один.
    Форма: { sc, all, hasDim, rpp — рядов на регистр, ents[i] — { deg (ступень лада или −1), j (сдвиг в строе, у оси «Все»), bright, dup },
-            rowOf(deg,oct) → ряд, rowOfTi(ti,oct) → ряд или undefined (T4b3), ent(r), pitchOf(r) → {deg,oct} или null (приглушённый),
+            rowOf(deg,oct) → ряд, rowOfTi(ti,oct) → ряд или undefined (T4b3), ent(r), pitchOf(r) → {ti,oct} (T4c-1; прежде {deg,oct}) или null (приглушённый),
             snap(r) → ближайший ЯРКИЙ ряд }.
    ⛳ T4b3: РЯД ИЗ ИНДЕКСА В СТРОЕ (rowOfTi) — рядом с рядом из ступени. Индекс ti (a.ti) — номер высоты строя вида; КЛЮЧ фиксированных
    строёв в нём не лежит (тоника живая) — и в оси его нет: ряды отсчитаны от корня лада, имена несёт живая тоника. Перевод:
@@ -1077,7 +1079,12 @@ function rollAxis(sc, all=rollRowsAll){
       if(j<0 || j>E){ const c = j>E ? Math.ceil((j-E)/E) : Math.floor(j/E); j-=E*c; R+=c; }
       const i=jRow[j]; return i===undefined ? undefined : R*rpp+i; },
     ent:at,
-    pitchOf:r=>{ const e=at(r); return e.deg>=0 ? { deg:e.deg, oct:Math.floor(r/rpp) } : null; },
+    /* ⛳ T4c-1: РЯД → ВЫСОТА ИНДЕКСОМ В СТРОЕ { ti, oct } (не ступенью): ti = корень лада + сдвиг ряда в строе (j оси «Все»; у оси «Лад» —
+       сдвиг ступени, дубль — E). Приглушённый ряд — null, как прежде (правка прилипает к яркому: snap); ступень для записи правка
+       получает сама переводом индекса в лад события (recorder.slotPt). */
+    pitchOf:r=>{ const e=at(r); if(!(e.deg>=0) || !E) return null;
+      const j= e.j!=null ? e.j : (e.deg<n ? sc.sel[e.deg] : root+E)-root;
+      return { ti:root+j, oct:Math.floor(r/rpp) }; },
     snap:r=>{ if(at(r).bright) return r;
       for(let k=1;k<rpp;k++){ if(r-k>=0 && at(r-k).bright) return r-k; if(at(r+k).bright) return r+k; }   // ничья — к НИЖНЕМУ (детерминированно)
       return r; } };
@@ -1734,7 +1741,7 @@ export function rollAxisNow(){
 /* ⛳ T6a-2: ПРОКРУТКА ЧЕРЕЗ ПЕРЕКЛЮЧЕНИЕ ОСИ — держим то, на что смотрел человек. Якорь — СРЕДНИЙ видимый ряд окна (row0 + ⌊rows/2⌋);
    новое окно ставится так, чтобы якорь остался на ТОМ ЖЕ месте окна (смещение off сохраняется; зажим в [0, total−rows] делает снимок).
      how='pitch' — «Все» ↔ «Лад» (ОДИН вид, меняются только ряды): якорь — ВЫСОТА. Приглушённый ряд прилипает к ближайшей ступени лада
-       (snap — та же функция, что у правки), и ряд этой ступени в новой оси — rowOf той же пары (ступень, регистр). Из «Лад» в «Все» высота
+       (snap — та же функция, что у правки), и ряд этой ступени в новой оси — rowOfTi той же пары (индекс, регистр; T4c-1). Из «Лад» в «Все» высота
        точная; из «Все» в «Лад» у приглушённого якоря — соседняя ступень (на ряд рядом).
      how='reg'   — чип лада (ДРУГОЙ вид, высоты разных ладов не сравниваем — индекс осмыслен только в своём виде): якорь — РЕГИСТР и доля
        внутри него.
@@ -1742,7 +1749,7 @@ export function rollAxisNow(){
 export function rollRow0Across(ax0,ax1,row0,rows,how){
   const mid=row0+Math.floor(rows/2), off=mid-row0;
   let nr;
-  if(how==='pitch'){ const pt=ax0.pitchOf(ax0.snap(mid)); nr = pt ? ax1.rowOf(pt.deg,pt.oct) : mid; }
+  if(how==='pitch'){ const pt=ax0.pitchOf(ax0.snap(mid)), r1=pt ? ax1.rowOfTi(pt.ti,pt.oct) : undefined; nr = r1!==undefined ? r1 : mid; }   // T4c-1: та же высота — индексом (один вид)
   else{ const R=Math.floor(mid/ax0.rpp), f=(mid-R*ax0.rpp)/ax0.rpp; nr=R*ax1.rpp+Math.min(ax1.rpp-1,Math.round(f*ax1.rpp)); }
   return Math.max(0, nr-off);
 }

@@ -8,7 +8,11 @@
         КОММЕНТАРИЯМИ — ловушка, однажды потерявшая заморозку: комментарий `//` посреди многострочного списка `export { … }` молча
         выключал имена до конца строки, а лениво грузимый модуль падал на импорте без единого слова;
      3) СПИСОК ЭКСПОРТА: каждое имя в `export { … }` объявлено в модуле (переименованное поле состояния — вторая прошлая регрессия);
-     4) ДИНАМИЧЕСКИЙ ИМПОРТ строкой-литералом: целевой файл существует (строка запроса `?…` отбрасывается).
+     4) ДИНАМИЧЕСКИЙ ИМПОРТ строкой-литералом: целевой файл существует (строка запроса `?…` отбрасывается);
+     5) ЧИСЛО АРГУМЕНТОВ (добавлено после T4c-1): вызов функции, объявленной `function имя(…)` в этом модуле или импортированной из
+        другого, передаёт НЕ БОЛЬШЕ аргументов, чем у неё параметров (rest `...` — без предела). Ловит ровно тот дефект, что пропустил
+        T4c-1: сигнатура потеряла аргумент, а позиционный вызов (в пробе) остался прежним — лишний аргумент сдвигал все прочие. Меньше
+        аргументов — не ошибка (умолчания). Методы (`x.имя(`), стрелочные функции и имена, объявленные в модуле дважды, не проверяются.
    Что сообщается как СВЕДЕНИЕ (не ошибка): экспорты, которых никто не импортирует статически (у модулей, грузимых динамически или
    целиком как пространство имён, не считаются), и импорты, которые модуль больше не упоминает.
    Разбор — лексический: строки, шаблоны (с вложенными ${…}), регулярные выражения и комментарии различаются; полного парсера JS здесь нет,
@@ -130,6 +134,34 @@ for(const f of files){ const m=mods[f];
   for(const spec of m.dyn){ const t=target(f,spec); if(t==null) continue;
     if(!existsSync(join(SRC,t))) fails.push(`${f}: dynamic import '${spec}' — file ${t} does not exist`); else wholeNS.add(t); }
 }
+// 5) число аргументов: параметры каждой `function имя(…)` (по тексту без строк и комментариев), затем каждый вызов по имени
+const splitTop=t=>{ const out=[]; let depth=0, start=0;
+  for(let i=0;i<=t.length;i++){ const c=t[i];
+    if(c==='('||c==='['||c==='{') depth++; else if(c===')'||c===']'||c==='}') depth--;
+    if((c===','&&depth===0)||i===t.length){ out.push(t.slice(start,i)); start=i+1; } }
+  return out.map(x=>x.trim()).filter(x=>x!==''); };   // пустой хвост после висячей запятой — не аргумент
+const closeParen=(t,open)=>{ let depth=0; for(let i=open;i<t.length;i++){ const c=t[i]; if(c==='('||c==='['||c==='{') depth++; else if(c===')'||c===']'||c==='}'){ depth--; if(depth===0) return i; } } return -1; };
+const arity={};   // файл → имя → число параметров (Infinity при rest); null — объявлено в модуле дважды, не проверяем
+for(const f of files){ const m=mods[f], A={};
+  for(const x of m.bare.matchAll(/\bfunction\s*\*?\s+([A-Za-z_$][\w$]*)\s*\(/g)){
+    const o=x.index+x[0].length-1, e=closeParen(m.bare,o); if(e<0) continue;
+    const ps=splitTop(m.bare.slice(o+1,e)), n= ps.some(p=>p.startsWith('...')) ? Infinity : ps.length;
+    A[x[1]] = (x[1] in A) ? null : n; }
+  arity[f]=A; }
+let nCalls=0;
+for(const f of files){ const m=mods[f], bind={};
+  for(const [nm,n] of Object.entries(arity[f])) if(n!=null) bind[nm]={ n, from:f, name:nm };
+  for(const im of m.imports){ const t=target(f,im.spec); if(t==null||!mods[t]) continue;
+    (im.locals||[]).forEach((l,i)=>{ const ex=im.names[i], n=arity[t][ex]; if(n!=null && !(l in arity[f])) bind[l]={ n, from:t, name:ex }; }); }
+  for(const [l,b] of Object.entries(bind)){
+    const re=new RegExp('(?<![\\w$.])'+l.replace(/\$/g,'\\$')+'\\s*\\(','g');
+    for(const x of m.bare.matchAll(re)){
+      const before=m.bare.slice(Math.max(0,x.index-12),x.index); if(/function\s*\*?\s*$/.test(before)) continue;   // само объявление
+      const o=x.index+x[0].length-1, e=closeParen(m.bare,o); if(e<0) continue;
+      const args=splitTop(m.bare.slice(o+1,e)).length; nCalls++;
+      if(args>b.n){ const line=m.bare.slice(0,x.index).split('\n').length;
+        fails.push(`${f}:${line}: calls ${l}() with ${args} arguments; ${b.from} declares ${b.name}() with ${b.n} parameters`); } } }
+}
 // сведения: неиспользуемые экспорты и импорты
 for(const f of files){ const m=mods[f];
   const imported=files.some(g=>mods[g].imports.some(im=>target(g,im.spec)===f));
@@ -143,4 +175,4 @@ console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})
 for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(16)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }
-console.log('\nPASSED: syntax, static imports, export lists and dynamic import targets are consistent.');
+console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets and argument counts (${nCalls} calls of declared functions) are consistent.`);

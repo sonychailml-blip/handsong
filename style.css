@@ -333,6 +333,7 @@
   /* Выбранный сегмент — оранжевая заливка var(--accent)=#ff9e2c, ТЁМНЫЙ текст #1a1206 (исходная пара;
      белый на #ff9e2c был бы ≈2.1:1 — нечитаемо, поэтому текст тёмный). */
   .seg button.act{background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:600;}
+  .seg button:disabled{opacity:.4; cursor:default;}   /* септаккорд, который в этом ладу ничего не добавляет (ui.renderSevCtl) */
   .phead{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
   .phead b{font-size:var(--fs-head); color:#1e2233;}
   .psep{border-top:1px solid rgba(20,24,50,.12); margin:14px 0 4px; padding-top:6px;

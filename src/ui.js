@@ -20,7 +20,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, rollSnapRow, rollDragTargetRow, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, rectDefault } from './scales.js';
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
@@ -51,7 +51,7 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
       backingMenu=$('backingMenu'), backingJam=$('backingJam'), backingDrums=$('backingDrums'),
       loopMinus=$('loopMinus'), loopPlus=$('loopPlus'), loopBarsV=$('loopBarsV'), loopMetre=$('loopMetre'),
       sub4=$('sub4'), sub3=$('sub3'),
-      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'), tunedFromNote=$('tunedFromNote'), tunedFromRow=$('tunedFromRow'), selTunedFrom=$('selTunedFrom'), tunedFromHint=$('tunedFromHint'),
+      selTradition=$('selTradition'), selScale=$('selScale'), selTonic=$('selTonic'), tunedFromNote=$('tunedFromNote'), tunedFromRow=$('tunedFromRow'), selTunedFrom=$('selTunedFrom'), tunedFromHint=$('tunedFromHint'), sevHint=$('sevHint'),
       selLead=$('selLead'), selChord=$('selChord'), selBass=$('selBass'),
       qOn=$('qOn'), qOff=$('qOff'),
       bpmEl=$('bpm'), bpmV=$('bpmV'),
@@ -70,7 +70,13 @@ function updScaleBtn(){ const s=SCALES[scaleIdx], fixedFrom = s.tunable && tuned
      уроки), тоники и языка — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам.
      P3: у лада с выбором (tunable — Пифагор) вместо строки — ряд выбора (renderTunedFrom). */
   tunedFromNote.hidden = !s.fixedKey || !!s.tunable;
-  renderTunedFrom(s); }
+  renderTunedFrom(s); renderSevCtl(); }
+/* ⛳ СЕПТАККОРД, КОТОРЫЙ НИЧЕГО НЕ ДОБАВЛЯЕТ (при T4c-1): один общий тест лада — scales.seventhAddsNote (стопка через ступень замыкается
+   раньше четвёртой разной ноты — шестиступенные блюз, мажорный блюз, целотонный, прометеев; у лада пользователя — тем же тестом). Тогда
+   кнопка «Септаккорды» выключена и строка под ней говорит почему. ⚠️ ВЫБОР НЕ ПЕРЕЗАПИСЫВАЕМ (как у раскладки): включённый септаккорд
+   остаётся включённым и вернётся на следующем ладу; звук не меняется — здесь он, как и прежде, лишь удваивает корень октавой выше,
+   а «Трезвучия» нажимаются как всегда. Здесь, потому что updScaleBtn зовут после каждой смены лада, тоники, строя и языка. */
+function renderSevCtl(){ const ok=seventhAddsNote(CUR()); $('qSev').disabled=!ok; sevHint.hidden=ok; }
 /* ⛳ P3 «СТРОЙ ОТ» — РЯД ВЫБОРА под тоникой, только у лада со свойством tunable (сегодня Пифагор). Первый пункт — «тоника (следует
    за ней)», умолчание; затем 12 нот. Подсказка под рядом говорит, что значит текущее состояние. Пункты строятся заново при каждом
    вызове (язык мог смениться) — дёшево: 13 пунктов. Видимость ряда — через style.display: у .prow свой display:flex, и атрибут
@@ -554,9 +560,10 @@ function updRollBtns(){
 const rollRefuseRO=()=>{ if(editBackingOpen()){ showCamMsg(t('roll.readOnly')); return true; } return false; };
 /* ВСТАВКА В ЛАДОВУЮ ДОРОЖКУ — ПО РОЛИ (S2). Сигнатура одна: (доля, ступень, регистр, лад и септаккорд оси, длина, выделенное до тапа);
    бас последний аргумент не читает. Ударные вставляются своей веткой (ряд, а не ступень). Соло — S4. */
+/* ⛳ T4c-1: высота — ИНДЕКСОМ В СТРОЕ и регистром (ряд оси: rollRowPitch → {ti, oct}); ступень для записи считает recorder. */
 const ROLL_INSERT={
-  bs:(t,deg,oct,sc,sev,len)=>editInsertBass(t,deg,oct,sc,sev,len),
-  ch:(t,deg,oct,sc,sev,len,sel)=>editInsertChord(t,deg,oct,sc,sev,len,sel),
+  bs:(t,ti,oct,sc,sev,len)=>editInsertBass(t,ti,oct,sc,sev,len),
+  ch:(t,ti,oct,sc,sev,len,sel)=>editInsertChord(t,ti,oct,sc,sev,len,sel),
 };
 /* ═══ ПОЛОСА АВТОМАТИЗАЦИИ: ОРГАНЫ УПРАВЛЕНИЯ (слайс O-4) ═══
    ⛳ ОДИН СЕЛЕКТ ВМЕСТО «ТУМБЛЕР + ВЫБОР»: первый пункт «— нет —» закрывает полосу, остальные её
@@ -969,7 +976,7 @@ function rollUp(e){
         const g2=rollGeom(), pit= gd.prow!=null ? rollRowPitch(gd.prow, g2&&g2.sc) : null;
         if(pit) editViewCheck(s.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)
         { const raw=rollNoteTarget(rollGrab); if(raw!=null && raw!==gd.prow) rollDimHint(); }   // T3: целевой ряд был приглушённым — объясняем один раз
-        if(Math.abs(gd.t-s.start)>1e-9 || pit) r=editMoveChordNote(s.ev, rollGrab.note, gd.t, pit&&pit.deg, pit&&pit.oct);
+        if(Math.abs(gd.t-s.start)>1e-9 || pit) r=editMoveChordNote(s.ev, rollGrab.note, gd.t, pit&&pit.ti, pit&&pit.oct);   // T4c-1: высота — индексом
       }
       if(r&&r!==true) selNote(r);
     }
@@ -999,7 +1006,7 @@ function rollUp(e){
         editViewCheck(rollGrab.seg.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)   // T3: ряд корня + сдвиг пальца, прилипший к ЯРКОМУ ряду — та же функция, что у призрака
         if(tr!==gd.rootRow+((gd.row|0)-gd.grabRow)) rollDimHint();   // U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было)
         const s=rollGrab.seg;
-        if(Math.abs(gd.t-s.ev.t)>1e-9 || pit.deg!==s.deg || pit.oct!==s.oct){ const r=editMoveSeg(s.ev, gd.t, pit.deg, pit.oct); if(r&&r!==true) selNote(r); }
+        if(pit && (Math.abs(gd.t-s.ev.t)>1e-9 || pit.ti!==s.ti || pit.oct!==s.oct)){ const r=editMoveSeg(s.ev, gd.t, pit.ti, pit.oct); if(r&&r!==true) selNote(r); }   // T4c-1: сравнение и перенос — по паре (индекс, регистр)
       }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
     }
     if(!rollMoved && rollGrab.tapNote!=null && rollSel===rollGrab.ev) setRollSelNote(rollGrab.tapNote);   // U2: второй тап по аккорду — уровень ОДНОЙ ноты
@@ -1044,7 +1051,7 @@ function rollUp(e){
              (ступень × регистр) и у аккорда; тип, тембр и громкость аккорд выбирает сам (recorder.editInsertChord) — по
              выделенному ДО тапа аккорду, иначе по ближайшему. Соло правимым станет в S4. */
           const ins=ROLL_INSERT[rollRole];
-          ev= ins ? ins(tt, pit.deg, pit.oct, sc, sev, len, rollPan.selBefore) : false;
+          ev= (ins&&pit) ? ins(tt, pit.ti, pit.oct, sc, sev, len, rollPan.selBefore) : false;   // T4c-1: высота — индексом
         }
         if(ev){ selNote(ev); renderTimbreCtl(); }   // T5: вставка в опустевшую дорожку возвращает ей тембр — и выбор
       }

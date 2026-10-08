@@ -985,6 +985,21 @@ export function chordSteps(deg, s=CUR(), sev=seventh, ty=null){
 let stackAsPower=false;
 export const stackPower=()=>stackAsPower;
 export function setStackAsPower(v){ stackAsPower=!!v; }
+/* ⛳ СЕПТАККОРД, КОТОРЫЙ НИЧЕГО НЕ ДОБАВЛЯЕТ (видимый слайс при T4c-1). Стопка через ступень лада (правила tertian и stack) с
+   септаккордом берёт четвёртый шаг i+6. В ладу из n ступеней он приходится на класс высоты, который аккорд уже держит, если i+6 ≡ i,
+   i+2 или i+4 (mod n) — то есть при n ∈ {1,2,3,4,6}: круг через ступень замыкается раньше четвёртой разной ноты, и «септаккорд» лишь
+   удваивает корень октавой выше. ОДИН общий тест — по самому ладу (s.iv по модулю edo), без имени и без особого случая, поэтому верен и
+   для лада пользователя: true — хотя бы на одной ступени четвёртый шаг даёт НОВЫЙ класс высоты. Прочие правила (ratios — свои списки
+   триады и септаккорда; palette — тип из палитры; none) этот тест не касается: true, контрол как прежде. Звук НЕ меняется — тест решает
+   только, доступна ли кнопка (ui.renderSevCtl). Встроенные лады, где он ложен: блюз, мажорный блюз (stack), целотонный, прометеев
+   (tertian) — все шестиступенные; пяти-, семи-, восьми- и девятиступенные его сохраняют. */
+export function seventhAddsNote(s=CUR()){
+  const k=s.chordRule&&s.chordRule.kind;
+  if(k!=='tertian' && k!=='stack') return true;
+  const n=s.iv.length, E=s.edo, pc=j=>((s.iv[j%n]%E)+E)%E;
+  for(let d=0; d<n; d++){ const x=pc(d+6); if(x!==pc(d) && x!==pc(d+2) && x!==pc(d+4)) return true; }
+  return false;
+}
 export function ruleChordSteps(deg, s=CUR(), sev=seventh){
   const n=s.iv.length, R=s.chordRule, k=R&&R.kind;
   if (k==='tertian' || (k==='stack' && !stackAsPower)){   // stack — та же стопка через ступень лада
@@ -1077,7 +1092,7 @@ export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAn
    типы распада/U4 у любого равного лада — тоны = корень + смещения в шагах строя, тот же неприведённый шаг и тот же регистр).
    ⛔ ОСТАЛИСЬ НА СТУПЕНИ (ty нет): терцовая стопка (ступени i, i+2, i+4 — их даёт ЛАД, индекс строя без лада их не знает), пауэр-аккорд и
    округлённые отношения 19/31-TET (правила chordSteps по tag) и номинально-равная цена нетипизированного аккорда центового лада —
-   это «правила аккордов как данные», T6. ti===undefined — тоже по ступени (событие без индекса; вызывающий отмечает это). */
+   это «правила аккордов как данные», T6. ti===undefined — с T4c-1 ноль нот (ступени в аргументах больше нет; см. chordNotesAt). */
 /* T4b3: ВОРОТА «аккорд читает индекс корня» — ОДНИ на цену (chordNotesAt) и на ряды редактора (draw: ряд корня и ноты аккорда берутся из
    индекса ровно там, где из него звучат). Ложь — путь ступени: нет индекса, нет типа (стопка терций, пауэр-аккорд — T6) или строй без ветки
    по индексу (таблица без центов лада — таких ладов нет). */
@@ -1098,12 +1113,15 @@ function untypedNotes(deg,oct,s,sev){
   const TE= T.equal!=null ? T : { period:P, equal:s.edo };
   return ruleChordSteps(deg,s,sev).map(st=>({ f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 }));
 }
-export function chordNotesAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){
-  if(!chordReadsTi(ti,s,ty)) return chordNotes(deg,oct,s,sev,ty);
-  /* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ — место корня в ладу из ИНДЕКСА (обратная выборка modeSlotOfTi, в виде события): для ступеней 0..n
-     это ровно записанная пара (ступень, регистр) — проба T4b4, — и правило строит от неё. Корня в ладу нет (высота вне лада — до T5 её не
-     пишет никто; T5 делает такой аккорд типизированным) — по записанной ступени, как прежде (уходит в T4c). */
-  if(!ty){ const p=modeSlotOfTi(ti,oct,s); return p ? untypedNotes(p.deg,p.oct,s,sev) : chordNotes(deg,oct,s,sev,null); }
+/* ⛳ T4c-1: ЦЕНА АККОРДА — ТОЛЬКО ИЗ ИНДЕКСА КОРНЯ (ti) И РЕГИСТРА; ступени в аргументах больше нет. Где цена прежде шла по ступени
+   (аккорд без индекса, правило без ветки по индексу — palette/none у нетипизированного, строй без ветки по индексу у типизированного),
+   место корня в ладу берётся ОБРАТНОЙ ВЫБОРКОЙ (modeSlotOfTi) — для ступеней 0..n это ровно записанная пара (ступень, регистр), проба
+   T4b4, — и цена считается прежней функцией по ступени. Индекса нет, или его высоты нет в ладу (до T5 её не пишет никто) — ноль нот:
+   аккорда нет, ничего не бросает. Доказательство, что ступень больше не нужна, — проба P.checkStrip (событиям клона стирают a.deg). */
+export function chordNotesAt(ti,oct, s=CUR(), sev=seventh, ty=null){
+  if(!chordReadsTi(ti,s,ty)){ const p=modeSlotOfTi(ti,oct,s); return p ? chordNotes(p.deg,p.oct,s,sev,ty) : []; }
+  /* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ — место корня в ладу из ИНДЕКСА (обратная выборка modeSlotOfTi, в виде события), правило строит от него. */
+  if(!ty){ const p=modeSlotOfTi(ti,oct,s); return p ? untypedNotes(p.deg,p.oct,s,sev) : []; }
   const T=TUNINGS[s.tuning], E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
   if (s.cents && s.gridChords){ const a=modeAnchor(s);
     return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
@@ -1113,8 +1131,8 @@ export function chordNotesAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){
 }
 /* T4b3: частота РЯДА корня из индекса — chordRowFreq по индексу (та же единица корня chordUnit, та же цена chordNotesAt). Проба T4b1
    (прогон с типом chordUnit) — она побитно равна chordRowFreq по ступени. Зовёт редактор у аккорда, читающего индекс (chordReadsTi). */
-export function chordRowFreqAt(deg,ti,oct, s=CUR(), sev=seventh){
-  return chordNotesAt(deg,ti,oct,s,sev, chordUnit(s))[0].f;
+export function chordRowFreqAt(ti,oct, s=CUR(), sev=seventh){   // T4c-1: без ступени; высоты нет в ладу — NaN (ряда нет)
+  const N=chordNotesAt(ti,oct,s,sev, chordUnit(s)); return N.length ? N[0].f : NaN;
 }
 /* ⛳ T4b4: ОБРАТНАЯ ВЫБОРКА ЛАДА — индекс в строе (a.ti) и регистр → МЕСТО В ЛАДУ { deg, oct } для ПОДСВЕТКИ, или null — этой высоты
    в ладу нет. Обращает tuningIndexOf тем же законом расщепления, что ряд редактора (draw: rowOfTi) и мелодия в цене (melodySplit):
@@ -1134,7 +1152,7 @@ export function modeSlotOfTi(ti, oct, s=CUR()){
   const d=m.j.get(j); if(d===undefined) return null;
   return { deg:d, oct: c ? oct+c : oct };
 }
-export function chordFreqsAt(deg,ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(deg,ti,oct,s,sev,ty).map(n=>n.f); }
+export function chordFreqsAt(ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(ti,oct,s,sev,ty).map(n=>n.f); }   // T4c-1: без ступени
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
 export function leadFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);

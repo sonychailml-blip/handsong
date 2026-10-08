@@ -253,6 +253,9 @@
     <div class="prow"><label data-i18n="panel.scale.chords">Аккорды</label>
       <div class="seg"><button id="qTriad" class="act" data-i18n="panel.scale.triads">Трезвучия</button><button id="qSev" data-i18n="panel.scale.sevenths">Септаккорды</button></div>
     </div>
+    <!-- Септаккорд, который ничего не добавляет: в ладу, где стопка через ступень замыкается раньше четвёртой ноты (шестиступенные
+         блюз, целотонный…), кнопка «Септаккорды» выключена, и эта строка говорит почему. Видимость ведёт ui.js (renderSevCtl). -->
+    <p class="phint" id="sevHint" data-i18n="panel.scale.sevNoNote" hidden>В этом ладу септаккорд лишь удвоил бы корень октавой выше — четвёртой ноты нет.</p>
   </div>
 
 <!-- ================= ЗВУК И УПРАВЛЕНИЕ: тембры, функции рук, конструктор эффектов =================
