@@ -460,6 +460,7 @@ The install button follows **real capability, not the user-agent string**: Chrom
 
 ## Standing working rules (apply to every slice — prompts no longer repeat them)
 
+- **What a new session reads.** Start with `HANDOFF.md` **Part I** (≈200 lines: state, open decisions, the work order, limits, lessons) and this file. Open `HANDOFF.md` Part II, `BACKLOG.md` or long code files **only for what the slice needs** — search by name (`grep`) rather than reading top to bottom. The project's current state, open decisions and work order live in HANDOFF Part I only; this file holds the code model and the rules.
 - **Never** run the app, a dev server, a build, a browser, headless Chrome or tests, and **never** a git command; never commit. Verifying the app is the user's job, in the browser.
 - **Node — STATIC CHECKS ONLY** (approved by the user): `node tools/check-static.mjs` (syntax of every module via `node --check`, every static import name against the target's exports read with comments STRIPPED, every name in an export list declared, every literal dynamic import target present, and — since the T4c-1 fix — no call to a `function name(…)` declared in or imported into the module passes MORE arguments than it has parameters; unused exports/imports are information) and `node --check` on changed files. ⛔ Never execute application code in node. **Every slice report states that the static checks passed** (or what failed).
 - **Read `src/` before changing anything**; re-verify every line number — never rely on memory or on a previous session's numbers.
