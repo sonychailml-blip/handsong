@@ -4,12 +4,13 @@
      P.all()            // ВСЁ РАЗОМ: каждая проба по порядку, ОДНА сводная таблица (проба, случаи, материал песни, расхождения, время) и вердикт;
                         //   песенные проверки НЕ засчитываются на пустой или бедной песне — «song: not enough material» и чего не хватает
      await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
+     await P.song('triphop', {replace:true})   // ДЕМО-ПЬЕСА (src/songs.js): тем же образцом, что P.seed; ЗАМЕНЯЕТ песню. P.all после неё — тоже PASS
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
      P.checkWrite()     // ЗАПИСЬ ГЛАЗАМИ ЖЕСТА: известные нагрузки (роль × вид строя × регистр × ступень) через НАСТОЯЩИЕ воронки (взятое в
                         //   песочнице и подложка) — каждое поле и цена против истины из СТУПЕНИ ЖЕСТА
-     P.checkSeed()      // каждая нота P.seed — как задумана (ступень, регистр, тембр, громкость, тип, бенд)
-     P.checkFrozen()    // замороженный бас в раге (P.seed): пик, rms и длина буфера против ожидаемых — «внезапно тихо» = расхождение
+     P.checkSeed()      // каждая нота P.seed (или P.song) — как задумана (ступень, регистр, тембр, громкость, тип, бенд)
+     P.checkFrozen()    // замороженный бас в раге (P.seed): пик, rms и длина буфера против ожидаемых — «внезапно тихо» = расхождение; у P.song — неприменимо
      P.checkSong()      // T4c-2: ЦЕЛОСТНОСТЬ ПЕСНИ БЕЗ СТУПЕНИ — ни одно событие не несёт ступени; цены, сегменты, догонялка на каждой доле, ряды
                         //   редактора (ряд ↔ индекс, призрак на своём ряду) и распад — правильной формы и равны замороженным опорам
      P.checkStack()     // «стопка»: у ладов stack каждый тон аккорда — внутри лада; подписи вменяемы (таблица до-мажорной пентатоники и блюза)
@@ -729,8 +730,9 @@ export function all(opt={}){
   for(const r of rows) if(r.song!=='—') r.status = !M.ok ? 'song: not enough material' : r.differences===0 ? 'pass' : 'FAIL';
                          else r.status = r.differences===0 ? 'pass' : 'FAIL';
   console.table(rows);
-  { const F=SEED_REC&&SEED_REC.freeze, E=SEED_FROZEN_EXPECT;
-    console.log(F ? `[scaleprobe all] frozen seed bass L${F.layer+1}: peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`
+  if(SEED_REC && SEED_REC.kind==='song') console.log(`[scaleprobe all] frozen seed bass: not applicable — the loaded song is P.song('${SEED_REC.name}')`);
+  else { const F=SEED_REC&&SEED_REC.freeze, E=SEED_FROZEN_EXPECT;
+    console.log(F ?`[scaleprobe all] frozen seed bass L${F.layer+1}: peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`
                   : '[scaleprobe all] frozen seed bass: none in this session (run await P.seed({replace:true}))'); }
   for(const [name,list] of lists){ console.warn(`[scaleprobe all] ${name}: first differences`); list.slice(0,opt.show||5).forEach(m=>console.warn('   '+m)); }
   const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
@@ -765,18 +767,24 @@ export function all(opt={}){
      P.checkFrozen() — пик, rms и длина буфера замороженного баса в раге (P.seed) против ожидаемых; буфер, внезапно ставший тихим, — расхождение.
    ⚠️ Песочница продвигает счётчики дорожек и взятых (они монотонны): у дорожек, рождённых ПОСЛЕ P.checkWrite, другой номер, а значит и
    другое семя заморозки. Существующие дорожки не затронуты. */
-let SEED_REC=null;   // заполняет P.seed: { takes:[{label, take, scaleId, tf, steps:[{fn,t,a}]}], edited:[[scaleId, t]], freeze:{…} }
-const SEED_FROZEN_EXPECT={ peak:0.08527, rms:0.054304, samples:650886, floor:0.9 };   // замороженный бас в раге: значения до регрессии (отчёт пользователя)
+/* Запись сценарной песни: kind 'seed' — P.seed, 'song' — P.song (демо-пьеса, src/songs.js; шаги несут sid — id лада шага, ign — поля,
+   которые потом правит полоса редактора, skip — шаг, который редактор распустил). Пишет последний из двух: песня одна. */
+let SEED_REC=null;   // { kind, name?, takes:[{label, take, scaleId, tf, steps:[{fn,t,a,sid?,ign?,skip?}]}], edited:[[scaleId, t]], freeze:{…}|null }
+/* Замороженный бас в раге: значения, ЗАМЕРЕННЫЕ ПОСЛЕ починки «пара голоса в фазе» (voiceStartPair, отчёт пользователя). Прежние
+   0.08527/0.054304 сами были частично погашенной выборкой фазы (две одинаковые волны со случайным сдвигом), а не честным эталоном. */
+const SEED_FROZEN_EXPECT={ peak:0.08686, rms:0.055319, samples:650886, floor:0.9 };
 const ROLE_OF={ l:'ld', b:'bs', c:'ch' };
 const sameVal=(x,y)=> x===y || (x&&y&&typeof x==='object'&&typeof y==='object' ? JSON.stringify(x)===JSON.stringify(y) : false);
-/* Одна сверка: сохранённое событие ev против нагрузки жеста g (со ступенью). → массив строк расхождений. */
-function writeDiff(at, ev, g){
+/* Одна сверка: сохранённое событие ev против нагрузки жеста g (со ступенью). ign — поля, которые не сравниваются (их потом переписала
+   полоса редактора, P.song). → массив строк расхождений. */
+function writeDiff(at, ev, g, ign){
   const out=[], a=ev.a||{}, role=ROLE_OF[ev.fn[0]], pitched= role && /On$|Set$/.test(ev.fn) && typeof g.deg==='number';
+  const skip=k=> !!ign && ign.has(k);
   if('deg' in a) out.push(`${at}: the stored event carries a degree`);
-  for(const k of Object.keys(g)){ if(k==='deg') continue;
+  for(const k of Object.keys(g)){ if(k==='deg'||skip(k)) continue;
     if(!(k in a)) out.push(`${at}: field ${k} lost (gesture ${JSON.stringify(g[k])})`);
     else if(!sameVal(a[k],g[k])) out.push(`${at}: field ${k} stored ${JSON.stringify(a[k])}, gesture ${JSON.stringify(g[k])}`); }
-  for(const k of Object.keys(a)) if(!(k in g) && k!=='ti' && k!=='k') out.push(`${at}: unexpected field ${k} = ${JSON.stringify(a[k])}`);
+  for(const k of Object.keys(a)) if(!(k in g) && k!=='ti' && k!=='k' && !skip(k)) out.push(`${at}: unexpected field ${k} = ${JSON.stringify(a[k])}`);
   if(g.fx && a.fx===g.fx) out.push(`${at}: the effect map is the gesture's own object, not a copy`);
   if(pitched){
     if(!Number.isInteger(a.ti)) out.push(`${at}: no tuning index`);
@@ -832,27 +840,46 @@ export function checkWrite(){
   if(!nBad) console.log('[scaleprobe write] every field survives both funnels, no degree is stored, and every price equals the frozen reference from the gesture degree');
   return { views:nView, cases, total:nBad, differences:bad };
 }
-/* Задуманное P.seed против песни. */
+/* Задуманное P.seed (или P.song) против песни.
+   Шаги взятого группируются по (функция, доля): событий с тем же номером взятого, функцией и долей обязано быть РОВНО столько, сколько
+   шагов (порождённые полосой редактора — a.gen — не в счёт; группа с распущенным редактором шагом счёт не сверяет), и каждый шаг
+   находит СВОЁ событие без расхождений. У P.seed группы по одному шагу — это прежняя проверка «ровно одно событие» дословно; у
+   P.song на одной доле бывает несколько ударов разных рядов. */
 export function checkSeed(){
   const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   if(!SEED_REC){ miss('no seed record in this session — run await P.seed({replace:true})'); return { cases, total:nBad, differences:bad }; }
-  const edited=(take,st)=> st.fn.startsWith('ch') && SEED_REC.edited.some(([id,t0])=>take.scaleId===id && (st.t===t0||st.t===t0+4));
-  for(const take of SEED_REC.takes) for(const st of take.steps){
-    if(edited(take,st)) continue;
-    cases++; const at=`seed · ${take.label} · ${st.fn} at beat ${st.t}${typeof st.a.deg==='number'?` degree ${st.a.deg} reg ${st.a.oct}`:''}`;
-    const m=events.filter(e=>e.tk===take.take && e.fn===st.fn && Math.abs(e.t-st.t)<1e-9);
-    if(m.length!==1){ miss(`${at}: ${m.length} stored events (expected exactly one)`); continue; }
-    const ev=m[0];
-    if(ev.sc && ev.sc.id!==take.scaleId) miss(`${at}: stored in ${ev.sc.id}, the seed intended ${take.scaleId}`);
-    for(const d of writeDiff(at,ev,st.a)) miss(d);
+  const R=SEED_REC, what= R.kind==='song' ? `song ${R.name}` : 'seed';
+  const edited=(take,st)=> !!st.skip || (st.fn.startsWith('ch') && (R.edited||[]).some(([id,t0])=>take.scaleId===id && (st.t===t0||st.t===t0+4)));
+  for(const take of R.takes){
+    const G=new Map();
+    for(const st of take.steps){ const k=st.fn+'@'+st.t; let g=G.get(k); if(!g) G.set(k, g={ fn:st.fn, t:st.t, steps:[], edited:false });
+      if(edited(take,st)) g.edited=true; else g.steps.push(st); }
+    for(const g of G.values()){
+      const cand=events.filter(e=>e.tk===take.take && e.fn===g.fn && Math.abs(e.t-g.t)<1e-9 && !(e.a&&e.a.gen));
+      const at0=`${what} · ${take.label} · ${g.fn} at beat ${g.t}`;
+      if(!g.edited && cand.length!==g.steps.length) miss(`${at0}: ${cand.length} stored events (the script wrote ${g.steps.length})`);
+      const used=new Set();
+      for(const st of g.steps){
+        cases++; const at=`${at0}${typeof st.a.deg==='number'?` degree ${st.a.deg} reg ${st.a.oct}`:''}`, sid=st.sid||take.scaleId, ign=st.ign?new Set(st.ign):null;
+        const diffOf=ev=>[ ...(ev.sc && ev.sc.id!==sid ? [`${at}: stored in ${ev.sc.id}, the script intended ${sid}`] : []), ...writeDiff(at,ev,st.a,ign) ];
+        let pick=null, pd=null;
+        for(const c of cand){ if(used.has(c)) continue; const d=diffOf(c); if(!d.length){ pick=c; pd=d; break; } if(!pick){ pick=c; pd=d; } }
+        if(!pick){ miss(`${at}: no stored event`); continue; }
+        used.add(pick); for(const d of pd) miss(d);
+      }
+    }
   }
-  console.log(`[scaleprobe seed-check] seeded notes ${cases} · differences ${nBad}`);
+  console.log(`[scaleprobe seed-check] ${what}: scripted notes ${cases} · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe seed-check] '+m));
   if(!nBad) console.log('[scaleprobe seed-check] every seeded note is stored as intended — timbre, volume, register, type, bend — and sounds its intended degree');
   return { cases, total:nBad, differences:bad };
 }
 /* Уровень замороженного баса в раге (P.seed) против ожидаемого. */
 export function checkFrozen(){
+  if(SEED_REC && SEED_REC.kind==='song'){   // P.song: баса в раге нет — проверять нечего; демо-пьеса ничего не замораживает (её голосов хватает живым пулам)
+    console.log(`[scaleprobe frozen] the loaded song is P.song('${SEED_REC.name}') — the seed's frozen raga bass is not in it; nothing to check`);
+    return { cases:0, total:0, differences:[], got:null };
+  }
   const bad=[]; const E=SEED_FROZEN_EXPECT, F=SEED_REC&&SEED_REC.freeze;
   if(!F){ bad.push('no frozen seed track in this session — run await P.seed({replace:true}) (the freeze needs ▶ Play started)'); return { cases:0, total:1, differences:bad, got:null }; }
   if(!F.installed) bad.push(`the seed's freeze of L${F.layer+1} was not installed (${F.refused})`);
@@ -871,7 +898,7 @@ export async function seed(opt={}){
   const keep={ sc:scaleIdx, tf:tunedFrom, sev:seventh };
   const built=[]; const say=m=>{ built.push(m); console.log('[scaleprobe seed] '+m); };
   try{
-    SEED_REC={ takes:[], edited:[['major',12],['partch-43',32]], freeze:null };   // задуманное — для P.checkSeed (два аккорда сценарий правит в редакторе ниже)
+    SEED_REC={ kind:'seed', takes:[], edited:[['major',12],['partch-43',32]], freeze:null };   // задуманное — для P.checkSeed (два аккорда сценарий правит в редакторе ниже)
     clearRec(); setLoopMetre(4); setSeventh(false);
     let nid=0; const S=[];
     const on =(fn,a,t)=>{ const id=++nid; S.push({fn,a,t,id}); return id; };
@@ -936,6 +963,19 @@ export async function seed(opt={}){
   const M=material();
   console.log(`[scaleprobe seed] built ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. Now run P.all().`);
   return { built, events:events.length, material:M };
+}
+/* ═══ P.song — ДЕМО-ПЬЕСА ИЗ src/songs.js ═══
+   Тот же образец, что P.seed (воронки рекордера, функции редактора, подложка), но музыка, а не набор случаев. Модуль грузится
+   лениво — приложение его не знает. Отказы (непустая песня без {replace:true}, запись, игра транспорта, открытый редактор) — в нём.
+   Записанное задуманное (шаги взятых) становится записью для P.checkSeed: P.all после загрузки сверяет ПЬЕСУ, а не тестовую песню. */
+export async function song(name='triphop', opt={}){
+  const S=await import('./songs.js');
+  const r=await S.loadSong(name, opt);
+  if(!r) return null;
+  SEED_REC={ kind:'song', name:r.name, takes:r.takes, edited:[], freeze:null };
+  const M=material();
+  console.log(`[scaleprobe song] «${r.name}»: ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. P.all() checks it.`);
+  return { name:r.name, events:events.length, material:M };
 }
 
 /* ═══ T6c: ПОДПИСИ АККОРДА ЧИТАЮТ ПРАВИЛО ЛАДА ═══

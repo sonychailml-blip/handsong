@@ -4347,8 +4347,11 @@ function setLoopBpm(v){
    уже пишет защёлка на старте записи (recLatchOpen). Начало взятого — как у onRec без вооружения (дорожка на ●, снимок цепей
    takeCapStart), конец — как recStop без recAllOff (открытых нот у сценария нет: каждую он закрывает сам). Синхронно: ни кадр, ни тик
    между шагами не вклиниваются.
-   steps: [{fn, a, t, id}] — id связывает «вкл» ноты с её ведениями и «выкл»: они идут в слой СВОЕЙ ноты (как r.layer у живой записи),
-   а «вкл» и удар — маршрутом. → { take, events, layers } или null (нет движка, идёт запись или транспорт, открыт редактор). */
+   steps: [{fn, a, t, id, fz}] — id связывает «вкл» ноты с её ведениями и «выкл»: они идут в слой СВОЕЙ ноты (как r.layer у живой записи),
+   а «вкл» и удар — маршрутом. → { take, events, layers } или null (нет движка, идёт запись или транспорт, открыт редактор).
+   fz — необязательный ЗАМОРОЖЕННЫЙ контекст шага {sc, sev} (вид строя и септаккорд), тот же аргумент push, что у шва аккорда (S3.5e):
+   демо-песня (songs.js) пишет одним взятым роль, чьи дорожки стоят в РАЗНЫХ видах (аккорды минора, пентатоники и натурального строя),
+   а маршрут по строю (noteSource) разводит их по дорожкам сам. Без fz — живой CUR()/seventh, как было. */
 function seedTake(steps){
   if(!AC || recording || loop.on || editIsOpen()) return null;
   const fresh=!events.length;
@@ -4362,7 +4365,7 @@ function seedTake(steps){
   try{
     for(const st of steps){
       const ly = (st.id!=null && lyOf.has(st.id)) ? lyOf.get(st.id) : undefined;
-      if(!push(st.fn, st.a, st.t, null, false, ly)) continue;
+      if(!push(st.fn, st.a, st.t, st.fz||null, false, ly)) continue;
       n++; if(ly===undefined && st.id!=null) lyOf.set(st.id, pushLy);
     }
   } finally { setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate(); }
