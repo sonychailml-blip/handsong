@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
@@ -1044,7 +1044,7 @@ function rollDevLbl(x,y,w,h,dev,sel){
    БЛИЖАЙШЕЙ ступени. Рисунок показывает её тем же знаком, что тон вне ряда (светлее, контур цвета роли, «+100»), — никогда не молча
    пропадает; попадание её ловит (дробный ряд). Цена соседей — leadFreqTi того же вида: отношение частот у мелодии, баса и аккорда одно. */
 const tunSize=T=>T.equal!=null ? T.equal : T.cents.length;
-const tunOf=sc=>sc&&(sc.tuningRec||TUNINGS[sc.tuning]);
+const tunOf=sc=>sc&&tuningOf(sc);   // F1: одна функция «строй вида» (scales.tuningOf)
 const axisHasDim=sc=>{ const T=tunOf(sc); return !!(T&&sc.sel&&sc.sel.length<tunSize(T)); };
 const AXIS_CACHE=new WeakMap();
 function rollAxis(sc, all=rollRowsAll){

@@ -22,13 +22,13 @@ import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLo
    при этом с привычными аккордами. Урок «Аккорды» стартует на ней, иначе шаг палитры молча выпал бы
    на дефолтной минорной пентатонике. МАЖОР рассмотрен и ОТВЕРГНУТ: палитры у него НЕТ — его аккорды
    строятся ПО СТУПЕНИ (диатоника), не типом из набора. Ищем индекс, а не хардкодим (append-only массив). */
-const CHROMATIC_IDX=SCALES.findIndex(s=>s.typedChords==='chrom12');
+const CHROMATIC_ID=(SCALES.find(s=>s.typedChords==='chrom12')||{}).id;   // F1: id, найденный по СВОЙСТВУ (как и прежде индекс)
 /* Мажор (ионийский) — «нормальный» лад С АККОРДАМИ. Урок «Лупер» стартует на нём, иначе после «Строёв»
    (которые нарочно оставляют человека на Пелоге — бесаккордовом) шаг наложения аккордов молчал бы. Ищем
    по определяющим интервалам (edo:12, iv=[0,2,4,5,7,9,11]) — уникальны (у мод/миноров iv другой), append-
    only массив не сломает. МАЖОР, а не Хроматика: «Лупер» про запись/наслаивание, и обычный мажор звучит
    музыкой (мелодия+аккорды), тогда как все 12 нот хроматики — «возврат к нормальному» после экзотики Пелога. */
-const MAJOR_IDX=SCALES.findIndex(s=>s.edo===12 && String(s.iv)==='0,2,4,5,7,9,11');
+const MAJOR_ID=(SCALES.find(s=>s.edo===12 && String(s.iv)==='0,2,4,5,7,9,11')||{}).id;   // F1: id
 
 const TIMEOUT=15000;    // мс до подробной подсказки
 const SEEN_FRESH=1500;  // мс: heartbeat свежее этого = рука в кадре
@@ -154,14 +154,14 @@ const SPLIT_STEPS=[
 const LESSONS=[
   {id:'basics',  titleKey:'lesson.basics.title',  descKey:'lesson.basics.desc',  steps:BASICS_STEPS, next:'chords'},
   {id:'chords',  titleKey:'lesson.chords.title',  descKey:'lesson.chords.desc',  steps:CHORDS_STEPS, next:'tunings',
-   setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); }},   // старт на Хроматике — шаг палитры появляется у всех (объявлено в chSwitch.prompt)
+   setup:()=>{ if(CHROMATIC_ID) tutorSetScale(CHROMATIC_ID); }},   // старт на Хроматике — шаг палитры появляется у всех (объявлено в chSwitch.prompt)
   {id:'tunings', titleKey:'lesson.tunings.title', descKey:'lesson.tunings.desc', steps:TUNINGS_STEPS, next:'looper'},   // цепочка: «Аккорды»→сюда→«Лупер»
   {id:'looper',  titleKey:'lesson.looper.title',  descKey:'lesson.looper.desc',  steps:LOOPER_STEPS, next:'handfn',
-   setup:()=>{ if(MAJOR_IDX>=0) tutorSetScale(MAJOR_IDX); }},   // на Мажор (с аккордами): «Строи» оставляют на Пелоге, а шаг наложения просит роль «Аккорды» — объявлено в lpRec.prompt. Чистая петля/роль — из tutorReset
+   setup:()=>{ if(MAJOR_ID) tutorSetScale(MAJOR_ID); }},   // на Мажор (с аккордами): «Строи» оставляют на Пелоге, а шаг наложения просит роль «Аккорды» — объявлено в lpRec.prompt. Чистая петля/роль — из tutorReset
   {id:'handfn',  titleKey:'lesson.handfn.title',  descKey:'lesson.handfn.desc',  steps:HANDFN_STEPS, next:'split',
    setup:tutorResetHandFn},   // старт с известной базы (левая=эффекты, правая=ноты); ведёт дальше к «Двум ролям»
   {id:'split',   titleKey:'lesson.split.title',   descKey:'lesson.split.desc',   steps:SPLIT_STEPS,   // ПОСЛЕДНИЙ урок цепочки (без next → финал «Готово — играть»)
-   setup:()=>{ if(CHROMATIC_IDX>=0) tutorSetScale(CHROMATIC_IDX); tutorSplitInit(); }},   // ПОРЯДОК ВАЖЕН: Хроматика СНАЧАЛА (аккорды доступны), потом пара половин соло|аккорды; сплит выключен из tutorReset
+   setup:()=>{ if(CHROMATIC_ID) tutorSetScale(CHROMATIC_ID); tutorSplitInit(); }},   // ПОРЯДОК ВАЖЕН: Хроматика СНАЧАЛА (аккорды доступны), потом пара половин соло|аккорды; сплит выключен из tutorReset
 ];
 const lessonKey=id=>'handsong.lesson.'+id;
 const lessonDone=id=>store.get(lessonKey(id))==='1';

@@ -787,8 +787,8 @@ const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же ме
    ⚠️ ЧТО ПИНИМ И ЗАЧЕМ КАЖДОЕ:
      tonic, aRef — из них считается КАЖДАЯ частота дорожки (лад заморожен в событии, а тоника нет:
                    записанный слой ТРАНСПОНИРУЕТСЯ за живой тоникой — это осознанное поведение);
-     scaleIdx    — CUR() читается ENG только когда у события нет `sc`; таких не бывает, но пусть будет
-                   определённым; ⛳ T2: scaleIdx + tunedFrom — ровно КЛЮЧ ВИДА (лад, якорь), который отдаёт CUR(): приколоты
+     scaleId     — CUR() читается ENG только когда у события нет `sc`; таких не бывает, но пусть будет
+                   определённым (F1: id лада, был индекс scaleIdx); ⛳ T2: лад + tunedFrom — ровно КЛЮЧ ВИДА (лад, якорь), который отдаёт CUR(): приколоты
                    они — приколот и вид (тот же объект, scales.scaleView запоминает его на эту пару);
      seventh     — тот же случай: `ctx.sev` есть всегда, живое значение — запасной путь;
      leadIdx/bassIdx/chIdx — ЗАПАСНЫЕ ТЕМБРЫ для событий без `a.inst` (см. ниже про три случая);
@@ -797,13 +797,13 @@ const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же ме
    ⛳ Пин — ЭТО И ЗАПИСЬ: те же числа уходят в результат, поэтому повторный рендер той же дорожки можно
    будет сделать теми же (это понадобится заморозке, чтобы «переморозить без правок» звучало так же). */
 function pinLive(st, rec, want){
-  const prev={ tonic:st.tonic, aRef:st.aRef, scaleIdx:st.scaleIdx, tunedFrom:st.tunedFrom, chordModeSel:st.chordModeSel, seventh:st.seventh,   // tunedFrom (P3 «строй от») и режимы аккордов (T7b) — части CUR(), как scaleIdx
+  const prev={ tonic:st.tonic, aRef:st.aRef, scaleId:st.scaleId, tunedFrom:st.tunedFrom, chordModeSel:st.chordModeSel, seventh:st.seventh,   // tunedFrom (P3 «строй от») и режимы аккордов (T7b) — части CUR(), как scaleIdx
                leadIdx:st.leadIdx, bassIdx:st.bassIdx, chIdx:st.chIdx, bpm:rec.loop.bpm };
   /* ⚠️ ТЕМП НЕ ПОДМЕНЯЕМ, ТОЛЬКО ЗАПИСЫВАЕМ. Секунду на долю считаем мы, но `scheduleBend` внутри ENG
      берёт `60/loop.bpm` у ЖИВОГО транспорта — подставь мы сюда другое число, кривая бенда разъехалась
      бы с нотой молча. Темп принадлежит транспорту; рендер его фиксирует в отчёте, а не меняет. */
   const use={...prev, ...(want||{}), bpm:rec.loop.bpm};
-  st.setTonic(use.tonic); st.setARef(use.aRef); st.setScaleIdx(use.scaleIdx); st.setTunedFrom(use.tunedFrom); if(st.chordModeSel!==use.chordModeSel) st.setChordModeSel(use.chordModeSel); st.setSeventh(use.seventh);
+  st.setTonic(use.tonic); st.setARef(use.aRef); st.setScaleId(use.scaleId); st.setTunedFrom(use.tunedFrom); if(st.chordModeSel!==use.chordModeSel) st.setChordModeSel(use.chordModeSel); st.setSeventh(use.seventh);
   st.setLeadIdx(use.leadIdx); st.setBassIdx(use.bassIdx); st.setChIdx(use.chIdx);
   return {prev, use};
 }
@@ -818,7 +818,7 @@ function unpinLive(st, prev, use){
   const u=use||prev;
   if(st.tonic===u.tonic)       st.setTonic(prev.tonic);
   if(st.aRef===u.aRef)         st.setARef(prev.aRef);
-  if(st.scaleIdx===u.scaleIdx) st.setScaleIdx(prev.scaleIdx);
+  if(st.scaleId===u.scaleId) st.setScaleId(prev.scaleId);
   if(st.tunedFrom===u.tunedFrom) st.setTunedFrom(prev.tunedFrom);
   if(st.chordModeSel===u.chordModeSel && u.chordModeSel!==prev.chordModeSel) st.setChordModeSel(prev.chordModeSel);   // T7b: тот же объект — не тронули; сегодня use===prev, и это пустой шаг
   if(st.seventh===u.seventh)   st.setSeventh(prev.seventh);
@@ -1136,7 +1136,7 @@ function printTrack(r){
      читались бы как ошибка. */
   console.log('  границы буфера: разгон '+r.startSec+' с · музыка до '+(+r.endSec.toFixed(3))+' с · хвост '
               +(+r.tailSec.toFixed(2))+' с (посчитан по ЗАХВАЧЕННОЙ цепи, не на глаз)');
-  console.log('  приколочено: тоника '+r.pinned.tonic+' · A4 '+r.pinned.aRef+' · лад #'+r.pinned.scaleIdx
+  console.log('  приколочено: тоника '+r.pinned.tonic+' · A4 '+r.pinned.aRef+' · лад '+r.pinned.scaleId
               +' · темп '+r.pinned.bpm+' · запасные тембры соло/бас/аккорд '
               +r.pinned.leadIdx+'/'+r.pinned.bassIdx+'/'+r.pinned.chIdx);
   console.log('  время: импорт '+r.ms.importMs+' мс · initAudio '+r.ms.initMs+' мс (по часам, внутри await ворклета) · '

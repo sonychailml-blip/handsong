@@ -1,4 +1,4 @@
-import { scaleIdx, tonic, setScaleIdx, setTonic, tunedFrom, setTunedFrom, setChordMode, setSeventh, setChIdx,
+import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChordMode, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
@@ -20,7 +20,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, menuOf } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
@@ -61,9 +61,9 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
  
 /* Кнопка-индикатор звукоряда (шаг 2 MENU-PLAN): «лад · тоника», единственный вход в меню.
    Имя тоники берём из NOTE_NAMES — тем же списком подписан <select id="selTonic">,
-   чтобы подписи не разъехались. Читает живые связки scaleIdx/tonic, поэтому зовётся
+   чтобы подписи не разъехались. Читает живые связки scaleId/tonic, поэтому зовётся
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
-function updScaleBtn(){ const s=SCALES[scaleIdx], fixedFrom = s.tunable && tunedFrom!=='T';
+function updScaleBtn(){ const s=CUR().mode, fixedFrom = s.tunable && tunedFrom!=='T';
   const cm=chordModeOf(s), cmNotDef = s.chordModes && cm!==s.chordModes[0].id;   // T7b: режим аккордов не по умолчанию — виден на кнопке, как закреплённый «строй от»
   scaleBtn.textContent=`${L(s.name)} · ${NOTE_NAMES[tonic]}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '')
     +(cmNotDef ? ' · '+t(s.chordModes.find(x=>x.id===cm).nameKey) : '');   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
@@ -114,14 +114,14 @@ function renderTunedFrom(s){
 }
 
 /* Меню лада заполняем ладами ОДНОЙ традиции. value у <option> — абсолютный индекс в
-   SCALES (он же scaleIdx), а не позиция в отфильтрованном списке: иначе selScale.onchange
+   SCALES (F1: id лада), а не позиция в отфильтрованном списке: иначе selScale.onchange
    выставил бы не тот лад. Подгруппы (grp) рисуем, только если они заданы.
    ГРУППИРОВКА ПО КЛЮЧУ (grp), А НЕ ПО СОСЕДСТВУ В МАССИВЕ. Это разные вещи, и разница
    видна ровно тогда, когда лад дописан В КОНЕЦ SCALES (а правило требует дописывать
    только туда): раньше сравнивался лишь ПРЕДЫДУЩИЙ grp, поэтому «Диатоника» в конце
    массива открывала ВТОРУЮ группу «Диатоника» внизу списка. Теперь лады раскладываются
    по корзинам: порядок КОРЗИН — по первому появлению, порядок ВНУТРИ корзины — по
-   массиву. Позиция в меню и позиция в SCALES развязаны, scaleIdx при этом не трогается.
+   массиву. Позиция в меню и позиция в SCALES развязаны, лад адресуется id (F1).
    Пустой grp — не корзина: такие лады идут голыми <option> прямо в selScale
    (Хроматика/Арабская/Микротональная так и рисуются). */
 /* КЛЮЧ КОРЗИНЫ (grpKey) — СТАБИЛЬНЫЙ идентификатор подгруппы, ОТДЕЛЬНЫЙ от показываемой подписи. До
@@ -137,15 +137,15 @@ function fillScales(tradId){
     const parent = g.key ? selScale.appendChild(Object.assign(document.createElement('optgroup'),{label:g.label}))
                          : selScale;            // '' → без optgroup, прямо в список
     for(const {i,s} of g.items){
-      const o=document.createElement('option'); o.value=i; o.textContent=L(s.name); parent.appendChild(o);
+      const o=document.createElement('option'); o.value=s.id; o.textContent=L(s.name); parent.appendChild(o);   // F1: значение — id лада
     }
   }
 }
 function buildUI(){
   TRADITIONS.forEach(tr=>{ const o=document.createElement('option'); o.value=tr.id; o.textContent=L(tr.name); selTradition.appendChild(o); });
-  selTradition.value=tradOfScale(scaleIdx);      // традицию берём из активного лада, а не из умолчания
+  selTradition.value=tradOfScale(scaleId);       // традицию берём из активного лада, а не из умолчания
   fillScales(selTradition.value);
-  selScale.value=scaleIdx;
+  selScale.value=scaleId;
   NOTE_NAMES.forEach((n,i)=>{
     const o=document.createElement('option'); o.value=i; o.textContent=n; selTonic.appendChild(o);
   });
@@ -1150,11 +1150,11 @@ export function tutorClearLoop(){ clearRec(); resetJamDisplay(); }
    путём, что selScale.onchange, плюс синхроним выпадашки традиции/лада, чтобы панель показывала выбранный
    лад (не «украли настройку молча»). Лад по окончании урока НЕ восстанавливаем — человек только что учил
    на нём аккорды и, вероятно, захочет продолжить играть (см. tutor.js exit). */
-export function tutorSetScale(idx){
-  const trad=tradOfScale(idx);
-  setScaleIdx(idx); softAllOff(); droneRetune();
+export function tutorSetScale(id){   // F1: id лада (было — позиция в SCALES)
+  const trad=tradOfScale(id); if(!trad) return;
+  setScaleId(id); softAllOff(); droneRetune();
   if(selTradition){ selTradition.value=trad; fillScales(trad); }
-  selScale.value=idx;
+  selScale.value=id;
   updScaleBtn(); refreshProgAvail(); renderRectCtl();
 }
 /* Урок «Функции рук» стартует с ИЗВЕСТНОЙ базы соло: левая=эффекты, правая=ноты (дефолт handFn.ld) —
@@ -1193,14 +1193,14 @@ selTradition.onchange=e=>{
   fillScales(e.target.value);
   const first=scalesOfTrad(e.target.value)[0];
   if(!first)return;
-  selScale.value=first.i;
-  setScaleIdx(first.i); softAllOff(); droneRetune(); updScaleBtn(); refreshProgAvail(); renderRectCtl();
-  if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: смена строя тоже меняет лад (первый в традиции) — тот же сигнал урока «Строи»
+  selScale.value=first.s.id;
+  setScaleId(first.s.id); softAllOff(); droneRetune(); updScaleBtn(); refreshProgAvail(); renderRectCtl();
+  if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: смена строя тоже меняет лад (первый в традиции) — тот же сигнал урока «Строи»
 };
 selScale.onchange=e=>{
-  setScaleIdx(+e.target.value); softAllOff(); droneRetune();   // дрон следует за ЛАДОМ (вторая струна — ступень лада), а softAllOff его не трогает
+  setScaleId(e.target.value); softAllOff(); droneRetune();   // F1: значение опции — id лада   // дрон следует за ЛАДОМ (вторая струна — ступень лада), а softAllOff его не трогает
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
-  if(hooks.tutor) hooks.tutor('scale',{idx:scaleIdx, trad:tradOfScale(scaleIdx)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
+  if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
 selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); droneRetune(); updScaleBtn(); };   // 3/3: смена тоники
 /* P3 «СТРОЙ ОТ»: ТОТ ЖЕ ШОВ, ЧТО У ТОНИКИ — живые ноты гаснут и переатакуют (рука соло/баса — на следующем кадре), защёлка
@@ -2293,9 +2293,9 @@ onLangChange(()=>{
   buildStartLinks();
   applyRollBar();      // S5.0: чип дорожки, чип лада и списки полосы строит JS (числа меняются) — переподписываем, как прочие собранные подписи
   // Меню строя/лада: имена теперь локализуются (этап B). Переподписываем традиции НА МЕСТЕ (сохраняя
-  // выбор по value=id) и пересобираем список ладов текущей традиции, возвращая выбранный лад (value=индекс).
+  // выбор по value=id) и пересобираем список ладов текущей традиции, возвращая выбранный лад (value=id лада, F1).
   [...selTradition.options].forEach(o=>{ const tr=TRADITIONS.find(x=>x.id===o.value); if(tr)o.textContent=L(tr.name); });
-  fillScales(selTradition.value); selScale.value=scaleIdx;
+  fillScales(selTradition.value); selScale.value=scaleId;
   // Тембры/аранжировка (этап B, часть 2): переподписываем НА МЕСТЕ по индексу (порядок опций = порядок массива).
   [...selLead.options].forEach((o,i)=>o.textContent=L(LEAD_INSTR[i].label));
   [...selChord.options].forEach((o,i)=>o.textContent=L(CHORD_INSTR[i].label));

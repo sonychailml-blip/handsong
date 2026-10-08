@@ -1,4 +1,4 @@
-import { scaleIdx, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
+import { scaleId, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
 import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для свар/шрути в swaraLbl (имена ладов/групп резолвят L() на стороне рисующих)
 
 export const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -55,9 +55,9 @@ export const GRP={
    iv — ступени лада в этих шагах; у центового лада (cents) edo и iv — лишь НОМИНАЛЬНАЯ структура (число ступеней, ряды), а высоту
    ступени задают центы. tag — семейство (для аккордов), trad — традиция (меню строя), grp — подгруппа внутри традиции (пусто = без
    подзаголовка). T0: id — СТАБИЛЬНЫЙ идентификатор лада, tuning — id его строя (TUNINGS, ниже SCALES); sel/root выводятся при загрузке.
-   ПОРЯДОК МАССИВА НЕ МЕНЯТЬ и новые лады добавлять В КОНЕЦ: индекс — это scaleIdx (state; демо — SCENES[].idx), а порядок
-   внутри корзины меню — порядок массива (menuOf). Меню фильтрует по trad, а не по порядку. ⚠️ sameDegrees вызывающих не имеет
-   (адресация по id — слайс F1 «строи файлами» её снимет). */
+   ⛳ F1 «строи файлами»: лад АДРЕСУЕТСЯ СТАБИЛЬНЫМ id (state.scaleId, scaleById; меню, уроки, демо, пины заморозки и рендера) — позиция
+   в массиве больше нигде не адрес. Порядок массива остаётся порядком внутри корзины меню (menuOf) и индексом i в снимке F0, поэтому новые
+   лады — по-прежнему В КОНЕЦ. Меню фильтрует по trad, а не по порядку. */
 /* ⛳ ТАБЛИЦЫ СТРОЁВ (слайс T0 универсальной модели строя, HANDOFF «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ») — высоты НЕРАВНЫХ строёв
    в центах над нулевой высотой строя, ОДНИМ литералом на строй. Их читают и запись строя в TUNINGS (ниже SCALES), и лады,
    которые САМИ ЕСТЬ этот строй целиком (cents:TBL.x): числа те же, что стояли в ладу литералом, — высота не изменилась ни на бит.
@@ -188,7 +188,7 @@ export const SCALES=[
     iv:[0,1,2,3,4,5,6], cents:TBL.pelog, tag:'penta', noChords:true},
  /* Японские пентатоники (12-TET). tag:'penta' → пауэр-аккорды (ветка chordSteps без isTert).
     Ин намеренно совпадает по iv с 'Кумои (зап.)' из мировых пентатоник — это разные лады
-    по имени/группе, общий iv безвреден (state по scaleIdx, луп по ссылке на sc).
+    по имени/группе, общий iv безвреден (state по id лада, луп по ссылке на sc).
     Добавлены В КОНЕЦ (индексы 45..48 не поехали), в меню — новая группа grp 'Японские'. */
  {id:'hirajoshi', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{default:'Hirajoshi', ru:'Хирадзёси'},                          trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,8],  tag:'penta'},
  {id:'kumoi-japanese', tuning:'edo12', chordRule:{kind:'stack'}, chordModes:CM_STACK, name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'},                        trad:'easia', grp:GRP.japanese, grpKey:'japanese', edo:12, iv:[0,2,3,7,9],  tag:'penta'},
@@ -257,8 +257,8 @@ export const SCALES=[
     Нота, попавшая на волчью квинту, звучит так, как её даёт инструмент, — без особого случая (как у фиксированного Натурального и
     мезотона). Прежний набор чистых отношений 'pyth' удалён (P2): кроме этого лада им не пользовался никто.
     ⛳ P3: tunable:true — у этого лада есть выбор «СТРОЙ ОТ» (нота, от которой строится цепочка квинт; по умолчанию СЛЕДУЕТ
-    ЗА ТОНИКОЙ — state.tunedFrom), и живой лад приходит ВИДОМ на свой якорь (scaleView ниже; с T2 — у каждого лада). Сам объект SCALES[57] без варианта
-    — настроен ОТ C (anchorOf → 0): на нём строит свою сцену демо стартового экрана. Натуральный (чистые терции, но фальшивые
+    ЗА ТОНИКОЙ — state.tunedFrom), и живой лад приходит ВИДОМ на свой якорь (scaleView ниже; с T2 — у каждого лада). Сам объект лада без варианта
+    — настроен ОТ C (anchorOf → 0); демо стартового экрана с F1 берёт вид «строй от» C — тот же звук. Натуральный (чистые терции, но фальшивые
     квинты) — контрапара. trad:'europe' (секция
     «Европа историческая», grp:'' — плоский хронологический список, а не подгруппа): секция ПРО РАЗНЫЕ
     СТРОИ ОДНИХ И ТЕХ ЖЕ 12 НОТ (темперация ≠ лад), а НЕ утверждение, будто макам/гамелан «менее
@@ -433,9 +433,12 @@ const modeDerive=s=>{
   return null;
 };
 for(const s of SCALES){ const m=modeDerive(s); s.sel=m?m.sel:null; s.root=m?m.root:null; }
+/* ⛳ F1: ЛАД ПО id — единственный способ найти лад (state.scaleId, меню, уроки, демо). Неизвестный id — null; CUR() тогда берёт первый лад. */
+const SCALE_BY_ID=new Map(SCALES.map(s=>[s.id,s]));
+export const scaleById=id=>SCALE_BY_ID.get(id)||null;
 
 /* Лады традиции — в порядке массива; отдаём вместе с АБСОЛЮТНЫМ индексом,
-   потому что value у <option> обязан остаться scaleIdx. */
+   (F1: value у <option> — id лада; i — позиция, её читает только снимок F0.) */
 export const scalesOfTrad=id=>SCALES.map((s,i)=>({i,s})).filter(x=>x.s.trad===id);
 /* ⛳ F0 «строи файлами»: МЕНЮ ЛАДОВ ТРАДИЦИИ — ЧИСТАЯ функция (без DOM): её рисует ui.fillScales, её же снимает проба P.dumpScales —
    «меню, как его строит приложение». Перенесено из ui.fillScales слово в слово (поведение прежнее):
@@ -453,11 +456,11 @@ export function menuOf(tradId){
   });
   return order.map(k=>({ key:k, label:labels.get(k), items:buckets.get(k) }));
 }
-export const tradOfScale=i=>SCALES[i].trad;
+export const tradOfScale=id=>{ const s=scaleById(id); return s ? s.trad : null; };   // F1: по id лада (было — по позиции)
 
 /* ⛳ T2: живой лад — ВИД (строй, лад, якорь; scaleView ниже) на текущий лад и якорь — у КАЖДОГО лада (P3 делал вариант только у
    tunable). Событие морозит sc:CUR() — значит морозит вид целиком: строй, лад и якорь (правило #7). */
-export const CUR=()=>scaleView(SCALES[scaleIdx]);
+export const CUR=()=>scaleView(scaleById(scaleId)||SCALES[0]);   // F1: по id (живой лад — state.scaleId)
 /* ⛳ s — ЗАМОРОЖЕННЫЙ ЛАД СОБЫТИЯ (слайс S5.4). Тот же приём, что у leadFreq/chordSteps: параметр
    с умолчанием из живого состояния. Без аргумента — ровно прежнее поведение, байт-в-байт.
    ⚠️ ВНУТРИ подписей звать голый IVX() НЕЛЬЗЯ: параметр стал бы враньём, которое всплывает только на
@@ -487,8 +490,7 @@ export const baseF=()=>a3()*Math.pow(2,(tonic-9)/12);       // частота т
    ⚠️ Сетка fixedKey — 12 нот (cents.length===12 у всех шести): якорь и ключ — индексы в ЭТИ 12 полутонов. */
 /* P3: якорь берётся из ЛАДА (поле варианта tunedFrom), а НЕ из живого state — поэтому записанное событие, чей sc — вариант со своим
    якорем, звучит со СВОИМ якорем, как бы ни двигали выбор. 'T' — следует за тоникой (якорь = тоника: keyOf=0, cFix=baseF — подвижный
-   путь); число — закреплённая нота; поля нет (пять прочих фиксированных строёв и сам объект SCALES[57], на котором строит сцену
-   демо) — C, историческая практика. */
+   путь); число — закреплённая нота; поля нет (пять прочих фиксированных строёв и голый объект лада; демо с F1 — вид от C) — C, историческая практика. */
 const anchorOf=s=> s.tunedFrom==='T' ? tonic : (s.tunedFrom==null ? 0 : s.tunedFrom);
 /* ⛳ ВИД — (СТРОЙ, ЛАД, ЯКОРЬ) ОДНИМ ОБЪЕКТОМ (слайс T2 универсальной модели строя; обобщает вариант лада на якорь из P3).
    CUR() отдаёт ВИД, и каждое событие, которое и так хранит sc: CUR(), морозит теперь ВИД целиком (правило #7) — без нового поля события.
@@ -548,7 +550,7 @@ export const cFix=(s=CUR())=>{ const A=anchorOf(s); return a3()*Math.pow(2,(A-9-
    (подвижная тоника). Опора та же (cFix←a3←aRef) — не разъедется. P1: ключ — keyOf (при якоре C это tonic). */
 /* T1: высота ТОНИКИ — та же функция высоты (pitchHz ниже), индекс строя — корень лада (+ ключ у фиксированных). Подвижные: A·P^0·ρ(z)
    = A·1·1 — ровно baseF(); фиксированные: cFix·2^0·2^(c[ключ]/1200) — ровно прежнее. Прежнее тело — legacyTonicFreq (с T4c-2 — в пробе; только для пробы). */
-export const tonicFreq=(s=CUR())=>{ const T=TUNINGS[s.tuning], a=modeAnchor(s); return pitchHz(T,a.A,a.z,a.key+s.sel[0],0); };
+export const tonicFreq=(s=CUR())=>{ const T=tuningOf(s), a=modeAnchor(s); return pitchHz(T,a.A,a.z,a.key+s.sel[0],0); };
 /* ПЕРИОД лада (интервал эквивалентности) — по умолчанию ОКТАВА (2). Неоктавный строй задаёт
    своё (Болен–Пирс period:3 — тритава). Заменяет зашитую двойку в формуле высоты: и регистр
    P^oct, и равный шаг P^(шаг/edo). Дефолт 2 ⇒ ВСЕ прежние лады байт-в-байт. */
@@ -559,7 +561,6 @@ export const periodOf=(s=CUR())=>s.period||2;
 export const regWord=(s=CUR())=>{ const P=periodOf(s); return P===2?t('reg.oct'):P===3?t('reg.tritave'):t('reg.reg'); };
 /* Совместимость ладов для §3.7 (перенос фразы в другой строй возможен лишь при равном
    числе ступеней: 7→7 да, 7→5 нет). UI-уровень — принимает индексы, не хранимые данные. */
-export const sameDegrees=(a,b)=>SCALES[a].iv.length===SCALES[b].iv.length;
 /* Прогрессии (II–V–I и т.п.) — римские ступени, осмысленны лишь в 7-ступенчатом ладу;
    в пентатонике(5)/блюзе(6)/хроматике(12)/range(19|31) «V» не к чему привязать. */
 export const supportsProgressions=(s=CUR())=>s.iv.length===7;
@@ -1089,6 +1090,10 @@ export function pitchHz(T,A,z,k,R){
   return A*Math.pow(T.period,R+carry)*Math.pow(2,(C[idx]-C[z])/1200);
 }
 const tSize=T=>T.equal!=null ? T.equal : T.cents.length;     // сколько высот в периоде строя
+/* ⛳ F1 «строи файлами»: СТРОЙ ЛАДА — ИЗ ЕГО ВИДА (tuningRec: запись строя, которую вид взял при рождении), а не поиском по id в реестре
+   TUNINGS. Событие держит вид (правило #7) — значит и свой строй: удаление или замена установленного строя в реестре записанное не
+   изменит. Голый объект лада (демо до F1, опоры пробы) записи не несёт — ему отвечает реестр по id. function — всплывает. */
+export function tuningOf(s){ return (s && s.tuningRec) || TUNINGS[s.tuning]; }
 /* ЯКОРЬ ЛАДА — две величины модели (A — частота, z — индекс строя, звучащий на ней) и КЛЮЧ (сдвиг ступеней лада внутри строя).
      фиксированный строй (fixedKey): индекс 0 строя — на ЯКОРЕ (cFix: «строй от» — C у пяти исторических, выбор у Пифагора), тоника
        выбирает КЛЮЧ (keyOf). «Строй от» = тоника (P3) даёт key 0 и cFix — то же выражение, что baseF: подвижный путь;
@@ -1104,7 +1109,7 @@ const degK=(s,i,T)=> i<s.sel.length ? s.sel[i] : s.root+tSize(T);
    прибавляет ключ сама. undefined — у вида нет выборки (не должно быть — проба T0). */
 export function tuningIndexOf(deg, s=CUR(), chord=false){
   if(!s||!s.sel) return undefined;
-  const T=TUNINGS[s.tuning], n=s.iv.length, len= chord ? n : n+1;
+  const T=tuningOf(s), n=s.iv.length, len= chord ? n : n+1;
   const i=((deg%len)+len)%len, c=Math.floor(deg/len);
   return degK(s,i,T)+tSize(T)*c;
 }
@@ -1125,9 +1130,9 @@ function melodySplit(ti,oct,s,T){ const E=tSize(T), top=s.root+E;
   if(ti>=s.root && ti<=top) return [ti,oct];
   const c = ti>top ? Math.ceil((ti-top)/E) : Math.floor((ti-s.root)/E);
   return [ti-E*c, oct+c]; }
-export function leadFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAnchor(s), [k,R]=melodySplit(ti,oct,s,T);
+export function leadFreqTi(ti,oct, s=CUR()){ const T=tuningOf(s), a=modeAnchor(s), [k,R]=melodySplit(ti,oct,s,T);
   return pitchHz(T,a.A,a.z,a.key+k,R); }
-export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAnchor(s), [k,R]=melodySplit(ti,oct,s,T);
+export function bassFreqTi(ti,oct, s=CUR()){ const T=tuningOf(s), a=modeAnchor(s), [k,R]=melodySplit(ti,oct,s,T);
   return pitchHz(T,a.A/4,a.z,a.key+k,R); }
 /* Аккорд по индексу КОРНЯ. ⛳ ПЕРЕЕХАЛИ (цена побитно та же, что по ступени): сетка фиксированных строёв, корень чистых отношений
    (Партч, подвижный Натуральный), корень Болена–Пирса, типизированный аккорд равного строя (палитры chrom12/edo19/edo31 и однонотные
@@ -1141,7 +1146,7 @@ export function bassFreqTi(ti,oct, s=CUR()){ const T=TUNINGS[s.tuning], a=modeAn
 export function chordReadsTi(ti, s=CUR(), ty=null){
   if(ti===undefined) return false;
   if(!ty){ const k=s.chordRule&&s.chordRule.kind; return k==='tertian'||k==='stack'||k==='power'||k==='ratios'; }   // ⛳ T6b: нетипизированный — по правилу лада от места корня в ладу
-  return !!s.cents || periodOf(s)!==2 || TUNINGS[s.tuning].equal!=null;
+  return !!s.cents || periodOf(s)!==2 || tuningOf(s).equal!=null;
 }
 /* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ АККОРД — ЦЕНА ПО ПРАВИЛУ ЛАДА (ruleChordSteps) от СТУПЕНИ КОРНЯ deg в регистре oct. Шаги правила — индексы
    НОМИНАЛЬНОГО равного строя лада (s.iv + перенос периода), регистр — oct; цена — то же выражение, что прежняя равная ветка chordNotes
@@ -1150,7 +1155,7 @@ export function chordReadsTi(ti, s=CUR(), ty=null){
    таком ладу не пишет ни один путь: каждый лад с аккордами без палитры стоит на равном строе (доказательство данными — P.checkRules).
    Переход на цену по таблице — смена определения, недостижимая сегодня; решается, когда появится такой лад (лад пользователя). */
 function untypedNotes(deg,oct,s,sev){
-  const T=TUNINGS[s.tuning], n=s.iv.length, P=periodOf(s);
+  const T=tuningOf(s), n=s.iv.length, P=periodOf(s);
   const r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
   const TE= T.equal!=null ? T : { period:P, equal:s.edo };
   return ruleChordSteps(deg,s,sev).map(st=>({ f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 }));
@@ -1165,7 +1170,7 @@ export function chordNotesAt(ti,oct, s=CUR(), sev=seventh, ty=null){
   if(!chordReadsTi(ti,s,ty)){ const p=modeSlotOfTi(ti,oct,s); return p ? chordNotes(p.deg,p.oct,s,sev,ty) : []; }
   /* ⛳ T6b: НЕТИПИЗИРОВАННЫЙ — место корня в ладу из ИНДЕКСА (обратная выборка modeSlotOfTi, в виде события), правило строит от него. */
   if(!ty){ const p=modeSlotOfTi(ti,oct,s); return p ? untypedNotes(p.deg,p.oct,s,sev) : []; }
-  const T=TUNINGS[s.tuning], E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
+  const T=tuningOf(s), E=tSize(T), c=Math.floor((ti-s.root)/E), K=ti-E*c, R=oct+c;
   if (s.cents && s.gridChords){ const a=modeAnchor(s);
     return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
   if (s.cents || (periodOf(s)!==2 && chordBuildOf(s)==='adaptive')){ const a=modeAnchor(s), rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);   // T7: неоктавный строй «из строя» (Болен–Пирс) — равной веткой ниже, шагами
@@ -1187,7 +1192,7 @@ const SEL_INV=new WeakMap();
 export function modeSlotOfTi(ti, oct, s=CUR()){
   if(typeof ti!=='number' || !s || !s.sel) return null;
   let m=SEL_INV.get(s);
-  if(!m){ const T=TUNINGS[s.tuning], n=s.iv.length; m={ E:tSize(T), root:s.root, j:new Map() };
+  if(!m){ const T=tuningOf(s), n=s.iv.length; m={ E:tSize(T), root:s.root, j:new Map() };
     for(let d=0; d<=n; d++) m.j.set(degK(s,d,T)-s.root, d);
     SEL_INV.set(s,m); }
   let j=ti-m.root, c=0;
@@ -1197,10 +1202,10 @@ export function modeSlotOfTi(ti, oct, s=CUR()){
 }
 export function chordFreqsAt(ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(ti,oct,s,sev,ty).map(n=>n.f); }   // T4c-1: без ступени
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
-export function leadFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);
+export function leadFreq(deg,oct, s=CUR()){ const T=tuningOf(s), len=s.iv.length+1, a=modeAnchor(s);
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
   return pitchHz(T,a.A,a.z,a.key+degK(s,i,T),o); }
-export function bassFreq(deg,oct, s=CUR()){ const T=TUNINGS[s.tuning], len=s.iv.length+1, a=modeAnchor(s);   // бас на 2 октавы ниже соло (A/4 — константа-пол, не период)
+export function bassFreq(deg,oct, s=CUR()){ const T=tuningOf(s), len=s.iv.length+1, a=modeAnchor(s);   // бас на 2 октавы ниже соло (A/4 — константа-пол, не период)
   const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
   return pitchHz(T,a.A/4,a.z,a.key+degK(s,i,T),o); }
 /* ⛳ НОТЫ АККОРДА — ОДИН ИСТОЧНИК (слайс U1 «аккорд как ноты»). chordNotes отдаёт каждую звучащую ноту: f — частоту, iv — её интервал
@@ -1239,7 +1244,7 @@ function ratioOf(x){ for(let q=1;q<=4096;q++){ const p=Math.round(x*q); if(p/q==
 function octRed(n,d){ const g=gcd(n,d); n/=g; d/=g; while(n>=2*d){ if(n%2===0) n/=2; else d*=2; } while(n<d){ if(d%2===0) d/=2; else n*=2; } const h=gcd(n,d); return (n/h)+'/'+(d/h); }
 export function chordTypeFits(ty, ti, s=CUR()){
   if(!ty || !s || s.gridChords || chordBuildOf(s)!=='tuning') return true;
-  const T=TUNINGS[s.tuning], RT=T&&T.ratios; if(!RT || !s.cents) return true;
+  const T=tuningOf(s), RT=T&&T.ratios; if(!RT || !s.cents) return true;
   let m=FIT_MEMO.get(ty); if(!m){ m=new Map(); FIT_MEMO.set(ty,m); }
   let row=m.get(T);
   if(!row){
@@ -1259,7 +1264,7 @@ export function chordRowFreq(deg,oct, s=CUR(), sev=seventh){
 export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
   /* T1: ВОРОТА ВЕТВЕЙ И ИХ ПОРЯДОК — ПРЕЖНИЕ (правила аккордов станут данными в T6); меняется только то, ЧЕМ считается высота: каждая
      ветвь зовёт одну функцию высоты (pitchHz). Доводы ветвей — в legacyChordNotes (прежнее тело; с T4c-2 — в пробе, «замороженные опоры»). */
-  const T=TUNINGS[s.tuning], n=s.iv.length;
+  const T=tuningOf(s), n=s.iv.length;
   if (s.cents && ty && s.gridChords){
     /* СЕТКА: ноты аккорда — высоты строя (ключ + ступень корня + целое смещение), перенос периода — в регистр. */
     const a=modeAnchor(s), d=((deg%n)+n)%n, o=oct+Math.floor(deg/n), K=a.key+s.sel[d];
@@ -1313,7 +1318,7 @@ export const centsOf=(deg,s=CUR())=>{
      округление (десятые, потом целые) у 17 из 936 случаев фиксированных строёв дало бы на единицу больше (мезотон: тритон 579.47¢ →
      579.5 → 580 вместо 579). Свёртка в период — прежняя у каждого вида (у фиксированных верхняя тоника читает 1200, у прочих 0).
      Вызывающие передают ступень 0..n; за пределами — оборачивание по n+1 (прежде у равных было NaN, у таблиц — оборачивание). */
-  const T=TUNINGS[s.tuning], len=s.iv.length+1, K=degK(s,((deg%len)+len)%len,T);
+  const T=tuningOf(s), len=s.iv.length+1, K=degK(s,((deg%len)+len)%len,T);
   if(s.fixedKey){ const key=keyOf(s), k=key+K, C=T.cents, N=C.length, idx=((k%N)+N)%N, carry=Math.floor(k/N);
     return Math.round(C[idx]+1200*carry-C[key]); }            // урок фиксированного строя (390 против 408) виден и в целых центах
   if(T.equal==null){ const C=T.cents, N=C.length, idx=((K%N)+N)%N, carry=Math.floor(K/N);
@@ -1354,7 +1359,7 @@ export const droneNonOct=()=>DRONE_NONOCT;
 export const setDroneNonOct=v=>{ DRONE_NONOCT = v==='period' ? 'period' : 'cons'; };   // неизвестное значение → умолчание ('cons')
 /* Точные центы ступени d (0..n) над корнем лада — из строя (у фиксированного — над КЛЮЧОМ, как показ центов). */
 export function degCentsExact(d, s=CUR()){
-  const T=TUNINGS[s.tuning], K=degK(s,d,T);
+  const T=tuningOf(s), K=degK(s,d,T);
   if(T.equal!=null) return (K-s.root)*1200*Math.log2(T.period)/T.equal;
   const key=s.fixedKey?keyOf(s):0, C=T.cents, N=C.length;
   const at=k=>C[((k%N)+N)%N]+1200*Math.floor(k/N);
@@ -1367,7 +1372,7 @@ export function droneDegree(s=CUR()){
   const near=c=>{ let best=null, bd=Infinity; for(const [d,x] of cs){ const e=Math.abs(x-c); if(e<bd){ bd=e; best=d; } } return bd<=DRONE_TOL ? best : null; };
   const pick=(d,why)=>({ deg:d, why, cents:degCentsExact(d,s) });
   let d=near(DRONE_FIFTH); if(d!=null) return pick(d,'fifth');
-  if(TUNINGS[s.tuning].period===2){
+  if(tuningOf(s).period===2){
     d=near(DRONE_OCT_FALLBACK[0]); if(d!=null) return pick(d,'fourth');
     for(const c of DRONE_OCT_FALLBACK.slice(1)){ d=near(c); if(d!=null) return pick(d,'seventh'); }
   }else if(DRONE_NONOCT==='cons'){ d=near(DRONE_CONS); if(d!=null) return pick(d,'cons'); }
@@ -1375,7 +1380,7 @@ export function droneDegree(s=CUR()){
 }
 /* Частота второй струны дрона — та же функция высоты, в регистре корня дрона (A/2, как tonicFreq()/2). */
 export function droneSecondHz(s=CUR()){
-  const T=TUNINGS[s.tuning], a=modeAnchor(s), d=droneDegree(s).deg;
+  const T=tuningOf(s), a=modeAnchor(s), d=droneDegree(s).deg;
   return pitchHz(T, a.A/2, a.z, a.key+degK(s,d,T), 0);
 }
 /* ⛳ T3: ВЫСОТА ПРОИЗВОЛЬНОЙ ВЫСОТЫ СТРОЯ В РЕГИСТРЕ АККОРДОВ — для приглушённых рядов редактора (высоты строя вне лада). j — сдвиг в
@@ -1383,7 +1388,7 @@ export function droneSecondHz(s=CUR()){
    ряд вне лада звучал бы ровно этой высотой — по ней редактор ставит ноты аккорда на такой ряд (квинта пауэр-аккорда пентатоники).
    ⚠️ Никто этим не ИГРАЕТ (звук нот — по-прежнему chordNotes); только показ. */
 export function chordPitchHz(j,oct, s=CUR()){
-  const T=TUNINGS[s.tuning], a=modeAnchor(s);
+  const T=tuningOf(s), a=modeAnchor(s);
   return pitchHz(T, a.A/2, a.z, a.key+s.root+j, oct);
 }
 /* ⛳ T4c-2: ПРЕЖНИЕ ТЕЛА ФУНКЦИЙ ВЫСОТЫ И ПОДПИСЕЙ (legacy*, chordSteps по tag, fixedSlot) ПЕРЕЕХАЛИ В ПРОБУ (src/scaleprobe.js,

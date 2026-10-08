@@ -7,8 +7,8 @@
    НЕ трогаем. Камера НЕ запрашивается — только звук по клику.
 
    СОСТОЯНИЕ ПРИЛОЖЕНИЯ НЕ ТРОГАЕТСЯ: высоту берём leadFreq/bassFreq/chordFreqs(…,
-   ЯВНЫЙ лад) — лад сцены передаём объектом, setScaleIdx/setTonic НЕ зовём. Живой
-   scaleIdx/tonic после демо те же (explicit-scale route, не save/restore).
+   ЯВНЫЙ лад) — лад сцены передаём объектом, setScaleId/setTonic НЕ зовём. Живой
+   scaleId/tonic после демо те же (explicit-scale route, не save/restore).
 
    ЗВУК — СВОИ мини-голоса демо (не пул движка): все узлы планируются по часам AC
    (без дрейфа) и полностью гасятся на стопе. Движок не трогаем совсем — его chOn/
@@ -27,8 +27,8 @@
    следующую сцену; у sparse-сцен без дрона хвост даёт удлинённая последняя нота мелодии. Всё по AC. */
 
 import { AC, initAudio } from './audio.js';
-import { SCALES, leadFreq, bassFreq, chordFreqs, supportsChords } from './scales.js';
-import { L } from './i18n.js';
+import { scaleById, scaleView, leadFreq, bassFreq, chordFreqs, supportsChords } from './scales.js';   // F1: сцены по id, лад — видом
+import { L, t } from './i18n.js';   // t — F1: подписи сцен из словаря
 
 const $ = id => document.getElementById(id);
 
@@ -58,18 +58,18 @@ const LEVELS={
   thin:  {bass:false, drums:false, harmony:true },
 };
 
-/* Сцены: idx — СТАБИЛЬНЫЙ индекс лада в SCALES (массив append-only, индексы не двигаются), строка-
-   культура, длительность (с), уровень плотности, цвет-тинт фона. РАНЬШЕ сцену сопоставляли с ладом ПО
+/* Сцены: id — СТАБИЛЬНЫЙ id лада (F1 «строи файлами»; прежде — индекс в SCALES), culture — КЛЮЧ СЛОВАРЯ подписи (F1; прежде — строка
+   только по-русски), длительность (с), уровень плотности, цвет-тинт фона. РАНЬШЕ сцену сопоставляли с ладом ПО
    ИМЕНИ (SCALES.find по s.name) — но имена интернационализируются, и совпадение по имени сломалось бы;
-   индекс от языка не зависит. Имя лада на экране берём из самого лада (SCALES[idx].name), не дублируем.
+   id от языка не зависит. Имя лада на экране берём из самого лада (L(scale.name)), не дублируем.
    Комментарий рядом — какой это лад (для читаемости, НЕ для сопоставления). */
 const SCENES=[
-  {idx:0,  culture:'как ваше фортепиано',  dur:4, level:'sparse', tint:'#ff9e2c'},   // Мажор (ионийский)
-  {idx:57, culture:'средневековая Европа', dur:4, level:'sparse', tint:'#b18cff'},   // Пифагоров строй (чистые квинты)
-  {idx:18, culture:'Ближний Восток',       dur:5, level:'full',   tint:'#57d9a3'},   // Макам Хиджаз
-  {idx:62, culture:'Индия',                dur:5, level:'full',   tint:'#e5484d'},   // Бхайрав
-  {idx:44, culture:'Ява',                  dur:5, level:'full',   tint:'#4db3ff'},   // Пелог (яван. гамелан, приближение)
-  {idx:50, culture:'строй без октавы',     dur:5, level:'thin',   tint:'#ff5ca8'},   // Болен–Пирс (13 равных, тритава)
+  {id:'major',         culture:'demo.scene.piano',     dur:4, level:'sparse', tint:'#ff9e2c'},   // Мажор (ионийский)
+  {id:'pythagorean',   culture:'demo.scene.medieval',  dur:4, level:'sparse', tint:'#b18cff'},   // Пифагоров строй (чистые квинты) — от C, как прежде (вид «строй от» C)
+  {id:'maqam-hijaz',   culture:'demo.scene.mideast',   dur:5, level:'full',   tint:'#57d9a3'},   // Макам Хиджаз
+  {id:'raga-bhairav',  culture:'demo.scene.india',     dur:5, level:'full',   tint:'#e5484d'},   // Бхайрав
+  {id:'pelog',         culture:'demo.scene.java',      dur:5, level:'full',   tint:'#4db3ff'},   // Пелог (яван. гамелан, приближение)
+  {id:'bohlen-pierce', culture:'demo.scene.nonoctave', dur:5, level:'thin',   tint:'#ff5ca8'},   // Болен–Пирс (13 равных, тритава)
 ];
 
 let running=false, voices=[], timers=[], pitchBus=null, pitchLP=null, drumBus=null, noiseBuf=null;
@@ -154,7 +154,7 @@ function dNoise(at,dur){ const s=AC.createBufferSource(); s.buffer=noiseBuf; s.l
 function showScene(sc, idx, n){
   $('demoScene').textContent=(idx+1)+' / '+n;
   $('demoName').textContent=sc.scale?L(sc.scale.name):'';   // имя из самого лада, локализуем через L()
-  $('demoCulture').textContent=sc.culture;
+  $('demoCulture').textContent=t(sc.culture);   // F1: подпись сцены — из словаря (прежде только по-русски)
   $('demoOv').style.background=
     'radial-gradient(circle at 50% 38%, '+sc.tint+'38, rgba(7,7,13,.96) 70%)';
 }
@@ -178,8 +178,11 @@ function stopDemo(){
 
 async function runDemo(){
   if(running) return;
-  const scenes=SCENES.map(sc=>({...sc, scale:SCALES[sc.idx]}))
-                     .filter(sc=>sc.scale);         // индекс вне массива — пропускаем сцену (без падения)
+  /* ⛳ F1: сцена по id; лад — ВИДОМ (как всё в приложении), в режиме аккордов по умолчанию; у лада с выбором «строй от» (Пифагор) —
+     от C, как звучал голый объект (его якорь — C). Звук побитно прежний: у видов те же поля, аккорд демо без типа (режимы его не меняют). */
+  const scenes=SCENES.map(sc=>{ const s0=scaleById(sc.id);
+      return {...sc, scale: s0 ? scaleView(s0, s0.tunable ? 0 : 'T', s0.chordModes ? s0.chordModes[0].id : undefined) : null}; })
+                     .filter(sc=>sc.scale);         // неизвестный id — пропускаем сцену (без падения)
   if(!scenes.length) return;
   $('demoBtn').disabled=true; $('startBtn').disabled=true;
   try{
