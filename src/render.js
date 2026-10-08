@@ -215,7 +215,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
    render с F5 импортирует только ui — ЛЕНИВО (onFreeze), а зонд по-прежнему зовут из консоли. */
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
-import { setDroneNonOct, droneNonOct, droneDegree, CUR, setStackAsPower, stackPower } from './scales.js';   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
+import { setDroneNonOct, droneNonOct, droneDegree, CUR } from './scales.js';   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -1376,16 +1376,5 @@ function stop(){
   liveRestore(me);
 }
 
-/* ⛳ ВРЕМЕННЫЙ ПЕРЕКЛЮЧАТЕЛЬ «ПРЕЖНИЙ ПАУЭР-АККОРД» (слайс «стопка»): R.powerOld(true) — лады пентатоник, блюза и японские снова играют
-   корень + квинту строя + октаву, R.powerOld(false) — стопку через ступень лада. Нужен ОДИН РАЗ — сравнить на слух; после сравнения
-   пользователем уходит вместе с stackPower в scales. Флип старит замороженные дорожки, где есть аккорд без типа в таком ладу (подпись
-   заморозки), иначе буфер играл бы прежний аккорд против нового живого звука; звучащие сейчас голоса меняются со следующего события. */
-function powerOld(on){
-  setStackAsPower(on);
-  /* eslint-disable no-console */
-  console.log(stackPower() ? '  ↺ лады пентатоник, блюза и японские: ПРЕЖНИЙ пауэр-аккорд (корень + квинта + октава)'
-                           : '  ↻ лады пентатоник, блюза и японские: СТОПКА через ступень лада (каждый тон — внутри лада)');
-  /* eslint-enable no-console */
-  return stackPower();
-}
-export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP, powerOld };
+/* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
+export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP };

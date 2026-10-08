@@ -6,21 +6,25 @@
      await P.seed({replace:true})   // ТЕСТОВАЯ ПЕСНЯ: детерминированная, через воронки рекордера (push, редактор, подложка); ЗАМЕНЯЕТ песню
      P.check()          // T0 (данные) + T1 (частоты и центы) + T2 (вид) — сводка и каждое несовпадение
      (по отдельности: P.checkData(), P.checkPitch(), P.checkView(); справка о дроне — P.drone())
-     P.checkStrip()     // T4c-1: клону песни стирают ступень (a.deg) у каждого события — цены, место в реестре голосов, сегменты, догонялка на
-                        //   каждой доле, ряды/попадания/призраки редактора (обе оси), интервалы распада и подсветка совпадают с оригиналом (===)
-     P.checkStack()     // «стопка»: у ладов stack каждый тон аккорда — внутри лада; подписи вменяемы (таблица до-мажорной пентатоники и блюза);
-                        //   R.powerOld возвращает прежний пауэр-аккорд и старит подпись заморозки дорожек со стопками
-     P.checkUntyped()   // T6b: нетипизированные аккорды — цена по правилу лада от индекса корня против прежней по ступени и tag; песня, догонялка, ряды, распад
-     P.checkLabels()    // T6c: подписи аккорда (chordLabel, chordNotesStr) по правилу лада против прежних по tag — каждый вид × ступень × септаккорд × 12 тоник
-     P.checkRules()     // T6a: правило аккордов лада (chordRule) = сегодняшний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
-     P.checkScroll()    // T6a-2: прокрутка редактора через «Все/Лад» (та же высота) и чип лада (тот же регистр) — по каждому виду
+     P.checkWrite()     // ЗАПИСЬ ГЛАЗАМИ ЖЕСТА: известные нагрузки (роль × вид строя × регистр × ступень) через НАСТОЯЩИЕ воронки (взятое в
+                        //   песочнице и подложка) — каждое поле и цена против истины из СТУПЕНИ ЖЕСТА
+     P.checkSeed()      // каждая нота P.seed — как задумана (ступень, регистр, тембр, громкость, тип, бенд)
+     P.checkFrozen()    // замороженный бас в раге (P.seed): пик, rms и длина буфера против ожидаемых — «внезапно тихо» = расхождение
+     P.checkSong()      // T4c-2: ЦЕЛОСТНОСТЬ ПЕСНИ БЕЗ СТУПЕНИ — ни одно событие не несёт ступени; цены, сегменты, догонялка на каждой доле, ряды
+                        //   редактора (ряд ↔ индекс, призрак на своём ряду) и распад — правильной формы и равны замороженным опорам
+     P.checkStack()     // «стопка»: у ладов stack каждый тон аккорда — внутри лада; подписи вменяемы (таблица до-мажорной пентатоники и блюза)
+     P.checkUntyped()   // T6b: нетипизированные аккорды — прогон: цена по правилу лада (по ступени и от индекса корня) против замороженной опоры
+     P.checkLabels()    // T6c: подписи аккорда (chordLabel, chordNotesStr) по правилу лада против замороженных по tag — вид × ступень × септаккорд × 12 тоник
+     P.checkRules()     // T6a: правило аккордов лада (chordRule) = прежний выбор по tag; нетипизированные аккорды — только на равных строях; проверки вида молчат на песне
+     P.checkScroll()    // T6a-2: прокрутка редактора через «Все/Лад» — та же высота в окне, по каждому виду
      P.tracks()         // МАРШРУТ ПО СТРОЮ: каждая дорожка песни — роль, тембр, вид строя (и сколько видов в ней: больше одного быть не должно)
-     P.checkHl()        // T4b4: ПОДСВЕТКА переигранной и догнанной ноты по индексу — прогон по видам, события песни, догонялка; высоты вне лада
-     P.checkRowFix()    // T4b4-1: нижний ряд по умолчанию в обеих осях и ряды нот аккорда при холодном и прогретом кэше (видимая правка)
-     P.checkRows()      // T4b3: РЯДЫ РЕДАКТОРА по индексу — блоки, попадание, призрак, выделение каждого сегмента песни в осях «Все» и «Лад» + прогон
-     P.checkLogic()     // T4b2: ЛОГИКА РЕКОРДЕРА по индексу — сегменты всей песни и нагрузки догонялки на каждой границе событий против прежних
-     P.checkSound()     // T4b1: цена ПО ИНДЕКСУ В СТРОЕ (a.ti) против цены по ступени — каждое событие песни и прогон по всем видам
-     P.checkTi()        // T4a: у КАЖДОГО события текущей песни индекс в строе (a.ti) равен переводу его ступени — запускать после записи/правки/подложки
+     P.checkHl()        // T4b4: ПОДСВЕТКА по индексу — прогон по видам (место из индекса = ступень и регистр, из которых он сделан); высоты вне лада
+     P.checkRowFix()    // T4b4-1: нижний ряд по умолчанию в обеих осях и ряды нот аккорда при холодном и прогретом кэше
+     P.checkRows()      // T4b3: РЯДЫ РЕДАКТОРА по индексу против замороженных рядов по ступени — прогон по видам, обе оси
+     P.checkSound()     // T4b1: цена ПО ИНДЕКСУ В СТРОЕ против замороженных опор — прогон по всем видам
+   ⛳ T4c-2: ПЕСЕННЫЕ ПРОБЫ, СВЕРЯВШИЕ СО ХРАНИМОЙ СТУПЕНЬЮ (T4a checkTi, T4b2 checkLogic, T4c-1 checkStrip, песенные части T4b1/T4b3/T4b4/T6b),
+   сняты — ступени в событиях больше нет; их защиту несёт P.checkSong. Прежние тела функций (их «опоры») переехали сюда — раздел
+   «ЗАМОРОЖЕННЫЕ ОПОРЫ» ниже; в приложении прежнего кода нет.
    Импорт по ТОМУ ЖЕ адресу, что у приложения ('./scales.js' без строки запроса), — значит проба видит ТЕ ЖЕ объекты ладов, что и
    приложение, а не вторую копию модуля.
    ⛳ ЗАЧЕМ (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ», метод доказательства): каждый слайс модели, который НЕ ДОЛЖЕН менять звук,
@@ -35,14 +39,182 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordSteps, chordLabel, chordNotesStr, legacyChordLabel, legacyChordNotesStr, chordReadsTi,
-         leadFreq, bassFreq, chordNotes, tonicFreq, centsOf,
-         legacyLeadFreq, legacyBassFreq, legacyChordNotes, legacyTonicFreq, legacyCentsOf, legacyChordNotesRef, setStackAsPower, stackPower, ruleChordSteps } from './scales.js';
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordLabel, chordNotesStr,
+         leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix } from './scales.js';   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh } from './state.js';   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
-import { rollRowsProbe as RP } from './draw.js';   // T4b3: пути рядов редактора — по индексу и прежний по ступени (legacy), без открытого редактора
-import { events, eventTuningIndex, evHz, evReg, segChordNotes, probeWithEvents, songSegs, legacySongSegs, chaseFor, chaseNote, legacyChaseNote, hlOf, legacyHlOf, laneRoleOf, laneTimbreOf, viewAudit, freezeTicket,
+import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, loadJam, braceTap, setRegionOn,
-         onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4b4: место подсветки — из индекса и прежнее по ступени   // T4b2: сегменты и догонялка — новые против прежних (legacy*)   // T4a: сверка индекса в строе у событий ТЕКУЩЕЙ песни (тот же экземпляр модуля, что у приложения)
+         onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+
+/* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   ⛳ ЗАМОРОЖЕННЫЕ ОПОРЫ (T4c-2) — ПРЕЖНИЕ ТЕЛА ФУНКЦИЙ ВЫСОТЫ, АККОРДОВ, ПОДПИСЕЙ И РЯДОВ, СЛОВО В СЛОВО.
+   Жили в приложении (scales.legacy*, scales.chordSteps по tag, scales.fixedSlot, draw.legacyRollSeg*) и читались ТОЛЬКО пробой; в T4c-2
+   переехали СЮДА, чтобы в приложении прежнего кода не осталось, а защита прогонов — осталась. ⛔ Это ЭТАЛОН, а не код приложения: их не
+   правят вслед за приложением — новая цена обязана совпасть с ними (===), или расхождение должно быть названо и решено пользователем.
+   Читают живую тонику и A4 (как и прежде), якорь и ключ — через scales.keyOf/cFix (одна опора A4, правило #17).
+   Изменено при переезде ровно три вещи: снят `export`, chordSteps переименована в legacyChordSteps (имя в приложении свободно), и в опоре
+   стопки снято условие временного R.powerOld (переключатель удалён — стопка насовсем).
+   ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближайший к чистому интервалу ratio (копия scales.stepFor — часть эталона)
+/* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
+   legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */
+/* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
+   с переносом октавы — сохраняет контур, не роняет частоту в NaN. При ступени внутри лада
+   это тождество (i=deg, o=oct). CLAUDE.md: тихого NaN быть не должно. */
+/* cx — ОВЕРЛЕЙ ЦЕНТОВ: если у лада есть s.cents (неравномерный строй), высоту ступени
+   в пределах октавы задаёт он (2^(центы/1200)), а не равный шаг edo. ivx остаётся
+   СТРУКТУРНЫМ (число ступеней, перенос октавы, оборачивание i) — период по-прежнему
+   октава, регистр Math.pow(2,o) не трогаем. cents.length===iv.length, поэтому дописанные
+   верхушки (edo→структура, 1200→центы) дают cx и ivx одинаковой длины. Нет s.cents —
+   выражение байт-в-байт прежнее. */
+/* fixedKey: сетка приколочена к ЯКОРЮ (anchorOf: C у пяти исторических темпераций, у Пифагора — его «строй от», P3), ТОНИКА =
+   КЛЮЧ (индекс в сетку, не множитель). Ступень i звучит на АБСОЛЮТНОЙ позиции сетки (keyOf+шаг; при якоре C — tonic+шаг): slot — нота в октаве, carry — перенос октавы (напр. квинта
+   от B уходит в следующую октаву). Якорь cFix (та же опора aRef). o — регистр (палец), carry
+   складывается с ним. При тонике C (0) — байт-в-байт прежняя cents-ветка. */
+function fixedSlot(s,step){ const L=s.cents.length, abs=keyOf(s)+step; return {slot:((abs%L)+L)%L, carry:Math.floor(abs/L)}; }
+/* КОНТЕКСТНАЯ ЛОГИКА АККОРДОВ:
+   · 7-ступенчатые лады (диатоника, венгерский, макамы) — наслоение терций:
+     индексы i, i+2, i+4 (+ i+6 для септаккордов), % длины массива с переносом октавы;
+   · пентатоника / блюз — терции дают кашу → пауэр-аккорды (I + V + октава); хроматика сюда не доходит: у неё палитра (typedChords), и
+     живой аккорд всегда несёт тип (правило T6a — 'palette');
+   · 19/31-TET — квинту ищем математически: round(N·log2(3/2)) шагов ≈ 700 центов,
+     получаются открытые микротональные аккорды без диссонирующих кластеров. */
+/* s (лад) и sev (септаккорд?) — параметры со значениями по умолчанию из живого состояния:
+   петля передаёт СВОЙ замороженный лад/септаккорд (§3.4), живой ввод — берёт текущие. */
+function legacyChordSteps(deg, s=CUR(), sev=seventh, ty=null){
+  const n=s.iv.length;
+  if (ty){                                   // типизированный аккорд: интервалы от корня, лад не диктует
+    const r=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+    return ty.map(iv=>r+iv);
+  }
+  if (isTert(s)){
+    const ks=sev?[0,2,4,6]:[0,2,4];
+    return ks.map(k=>{const j=deg+k; return s.iv[j%n]+s.edo*Math.floor(j/n);});
+  }
+  const r=s.iv[deg%n]+s.edo*Math.floor(deg/n);
+  if (s.tag==='edo'){
+    /* Мезотоника (19/31-TET): аккорд строим ПО ИНТЕРВАЛУ, не по индексу.
+       Отношения заданы на ладе (chord/chord7); 31-TET септаккорд = 4:5:6:7. */
+    const rs=sev?s.chordRule.seventh:s.chordRule.triad;   // T6a: отношения переехали в правило аккордов лада (те же массивы)
+    return rs.map(ra=>r+stepFor(s.edo,ra));
+  }
+  return [r, r+fifthStep(s.edo), r+s.edo];   // пентатоника/блюз — пауэр-аккорд как раньше (хроматика с палитрой сюда не доходит)
+}
+/* ═══ LEGACY (слайс T1) — ПРЕЖНИЕ тела функций высоты, СЛОВО В СЛОВО, под другими именами. ═══
+   ⛔ Их читает ТОЛЬКО проба src/scaleprobe.js (сравнение === с новыми). В приложении их не зовёт никто — и звать нельзя: высота
+   приложения — одна функция pitchHz. Удаляются отдельным слайсом после того, как проба покажет ноль и ухо подтвердит. */
+/* LEGACY (T6c) — прежние подписи аккорда ПО TAG, слово в слово. ⛔ Читает ТОЛЬКО проба (P.checkLabels); уходят в T4c. */
+function legacyChordLabel(deg,s=CUR(),sev=seventh){
+  const n=s.iv.length, d=deg%n;
+  if (!isTert(s)){
+    return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
+  }
+  const st=legacyChordSteps(deg,s,sev), r=st[0];
+  if (s.edo===12){
+    const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
+    let q=qual(st[1]-r, st[2]-r);
+    if (q==null) return root+'?';
+    if (sev){ const sv=st[3]-r; q=SEV[q+'|'+sv] ?? (q+'⁷'); }
+    return root+q;
+  }
+  return ROMAN[d]+(sev?'⁷':'');         // макам: римская ступень
+}
+const legacyChordNotesStr=(deg,s=CUR(),sev=seventh)=>legacyChordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');
+/* LEGACY-ОПОРА (слайс «стопка»): прежняя цена (legacyChordNotes), а у аккорда без типа в ладу stack — та же прежняя арифметика
+   СТОПКИ ЧЕРЕЗ СТУПЕНЬ, что у терцовых ладов (копия вида с tag 'dia': chordSteps стопкой). При R.powerOld — прежний пауэр-аккорд, как и
+   новый путь. ⛔ Читают ТОЛЬКО проба и прежний путь рядов редактора (draw.legacyRollSegNotes); уходит в T4c. */
+const STACK_REF=new WeakMap();
+function legacyChordNotesRef(deg,oct, s=CUR(), sev=seventh, ty=null){
+  if (!ty && s.chordRule && s.chordRule.kind==='stack'){
+    let r=STACK_REF.get(s); if(!r){ r={...s, tag:'dia'}; STACK_REF.set(s,r); }
+    return legacyChordNotes(deg,oct,r,sev,null);
+  }
+  return legacyChordNotes(deg,oct,s,sev,ty);
+}
+const legacyTonicFreq=(s=CUR())=> s.fixedKey ? cFix(s)*Math.pow(2,s.cents[keyOf(s)]/1200) : baseF();
+function legacyLeadFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s);
+  const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+  const cx=s.cents?s.cents.concat([1200]):null;
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);   // равный шаг — в ПЕРИОДЕ лада (P^(шаг/edo)); cents-ветка октавная (2/1200), её не трогаем
+  return baseF()*Math.pow(P,o)*r; }                             // регистр — на ПЕРИОД (BP: тритава 3^oct); P=2 у прочих — байт-в-байт
+function legacyBassFreq(deg,oct, s=CUR()){ const ivx=s.iv.concat([s.edo]), len=ivx.length, P=periodOf(s); // бас на 2 октавы ниже соло (baseF/4 — константа-пол, не период)
+  const i=((deg%len)+len)%len, o=oct+Math.floor(deg/len);
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,ivx[i]); return cFix(s)/4*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+  const cx=s.cents?s.cents.concat([1200]):null;
+  const r=cx?Math.pow(2,cx[i]/1200):Math.pow(P,ivx[i]/s.edo);
+  return baseF()/4*Math.pow(P,o)*r; }
+function legacyChordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база аккордов на октаву ниже соло
+  if (s.cents && ty && s.gridChords){
+    /* ФИКСИРОВАННЫЙ cents-строй (Натуральный клавесин): ноты аккорда берутся ИЗ СЕТКИ, а не строятся
+       чистым отношением от корня. ty здесь — ЦЕЛЫЕ ПОЛУТОНОВЫЕ СМЕЩЕНИЯ (как chrom12), а не ratio:
+       нота = ступень (корень+off) из cents-сетки, с переносом октавы для off≥12 (add9=14, 13=21).
+       Отсюда часть аккордов ЧИСТЫЕ (корни 0,1,3,5,7,8 у мажора), а часть — ВОЛК (квинта −21.5¢ на
+       корнях 2,10; терции +41¢ на 4,9,11): ровно проблема фиксированной чистой интонации, ради которой
+       и придумали темперации. Гейт СТОИТ ПЕРВЫМ — до pure-ratio ветки; без gridChords лады (Партч/
+       подвижный Натуральный) идут прежним путём ниже, байт-в-байт; Пифагор с P2 дуги «СТРОЙ ОТ» — ЗДЕСЬ, из своей сетки. off=0 даёт корень 1-в-1.
+       fixedKey: индекс включает ТОНИКУ (КЛЮЧ) — корень и голоса из АБСОЛЮТНОЙ позиции сетки
+       (tonic+deg+off), поэтому окраска аккорда зависит от тональности (C-мажор мягок, F#-мажор резок);
+       якорь cFix (та же опора). При тонике C (0) — байт-в-байт прежняя формула. P1: ключ — keyOf(s), якорь — cFix(s) (при якоре C —
+       ровно прежние tonic и высота C). P3: у Пифагора якорь — его «строй от» (вариант лада, scaleView): «следует за тоникой» даёт
+       keyOf=0 и cFix=baseF() — аккорды каждой тональности одинаковы; закреплённый якорь даёт краски тональностей. */
+    const L=s.cents.length, key=s.fixedKey?keyOf(s):0, anchor=s.fixedKey?cFix(s):baseF();
+    const d=key+((deg%L)+L)%L, o=oct+Math.floor(deg/L);
+    return ty.map(off=>{ const g=d+off, gi=((g%L)+L)%L, carry=Math.floor(g/L);
+      return { f: anchor/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[gi]/1200), iv:off }; });
+  }
+  if (s.cents && ty){
+    /* Cents-строй + типизированный аккорд (Партч): интервалы — ЧИСТЫЕ ОТНОШЕНИЯ от корня, не
+       шаги edo. Корень = высота ступени из cents-оверлея (как в leadFreq), аккордовая нота =
+       корень * ratio НАПРЯМУЮ — без 2^(шаг/edo), который на 43 неравных ступенях врёт. Расширения
+       выше октавы (ratio>2, напр. 36/11) множатся как есть — аутентичный Партч. Ветка только для
+       cents-лада С типизацией (Партч, подвижный Натуральный); прочие лады без s.cents ниже.
+       ⚠️ Ветка fixedKey внутри (корень на фиксированной сетке, аккорд чистыми отношениями над ним) служила ПИФАГОРУ до P2 дуги
+       «СТРОЙ ОТ»; с P2 его аккорды — из собственной сетки (ветка выше), и сегодня fixedKey-лада с отношениями нет — ветка
+       дремлет, оставлена ради формулы корня (через keyOf/cFix). Гейт на s.fixedKey, НЕ на s.cents: подвижный Натуральный
+       (nat, без fixedKey) остаётся байт-в-байт. */
+    const n=s.iv.length, d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
+    let rootF;
+    if(s.fixedKey){ const {slot,carry}=fixedSlot(s,d); rootF=cFix(s)/2*Math.pow(2,o+carry)*Math.pow(2,s.cents[slot]/1200); }
+    else rootF=baseF()/2*Math.pow(2,o)*Math.pow(2,s.cents[d]/1200);   // подвижный Натуральный: корень из cents-оверлея над живой тоникой, как было
+    return ty.map(ra=>({ f:rootF*ra, iv:ra }));
+  }
+  const P=periodOf(s);
+  if (P!==2 && ty){
+    /* Неоктавный ПЕРИОД-равный лад + типизированный аккорд (Болен–Пирс): корень — равным шагом
+       В ПЕРИОДЕ (P^(iv/edo), как leadFreq), аккордовая нота = корень*ratio НАПРЯМУЮ — интервалы
+       подгруппы 3.5.7 суть ЧИСТЫЕ ОТНОШЕНИЯ, а не шаги edo (chordSteps их бы принял за шаги —
+       мимо строя). Регистр — на ПЕРИОД: P^o = тритава (не 2^o). ratio>P (тетрада 3:5:7:9 → 3)
+       множится как есть — ровно тритавой выше, аутентично BP. Ветка ДРЕМЛЕТ у всех прежних ладов:
+       period нет → P===2 → сюда не входят; nonoct-лад без ty (не должно быть) уходит вниз. */
+    const n=s.iv.length, d=((deg%n)+n)%n, o=oct+Math.floor(deg/n);
+    const rootF=baseF()/2*Math.pow(P,o)*Math.pow(P,s.iv[d]/s.edo);
+    return ty.map(ra=>({ f:rootF*ra, iv:ra }));
+  }
+  // равная ветка: регистр и шаг — в ПЕРИОДЕ лада (P=2 у всех аккордовых ладов ⇒ байт-в-байт)
+  /* iv — шаг ноты ОТ КОРНЯ (у типизированного — сам интервал типа; у стопки терций / пауэр-аккорда — разность с шагом корня, тем же
+     выражением корня, что у chordSteps): с ним аккорд из одной ноты [iv] сыграет ровно эту частоту (типизированная ветка chordSteps). */
+  const n=s.iv.length, r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
+  return legacyChordSteps(deg,s,sev,ty).map(st=>({ f: baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo), iv: st-r0 })); }
+const legacyCentsOf=(deg,s=CUR())=>{
+  if(s.fixedKey){ const {slot,carry}=fixedSlot(s,deg); return Math.round((s.cents[slot]+1200*carry-s.cents[keyOf(s)])*10)/10; }   // ДЕСЯТЫЕ: разница 386.3 vs 407.8 — и есть предмет; целые прятали бы точность
+  if(s.cents){ const cx=s.cents.concat([1200]); return cx[deg%cx.length]%1200; }
+  const pc=1200*Math.log2(periodOf(s));   // центы ПЕРИОДА: октава 1200 (P=2, байт-в-байт), тритава ≈1901.955 (BP) — честный шаг ~146.3¢
+  return Math.round(IVX(s)[deg]*pc/s.edo)%pc; };
+
+/* Прежние РЯД и НОТЫ сегмента редактора ПО СТУПЕНИ (были draw.legacyRollSegRoot/legacyRollSegNotes, T4b3). Синтетический сегмент прогона
+   несёт ступень сам (s.deg); частоты рядов оси, место частоты среди них и допуск «на ряду» — те же функции и число, что у рисунка
+   (draw.rollRowsProbe: rowFreqs/rowOfFreq/onRowCents). Призрак по ступени не нужен: его сверяла только песенная часть, снятая в T4c-2. */
+function refRollSegRoot(s,ax){ return ax.rowOf(s.deg,s.oct); }
+function refRollSegNotes(s,ax,total){
+  const r0=ax.rowOf(s.deg,s.oct);
+  if(s.role!=='ch') return [{ r:r0, dev:null }];
+  const N=legacyChordNotesRef(s.deg,s.oct,s.sc,s.sev,s.ty), F=RP.rowFreqs(ax,s.sev,total), dpo=ax.rpp;
+  const fr=chordRowFreq(s.deg,s.oct,s.sc,s.sev);
+  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<RP.onRowCents ? { r:r0, dev:null } : RP.rowOfFreq(n.f,F,dpo,total));
+}
 
 /* ⛳ ВСЁ: данные (T0), частоты и центы (T1), вид (T2). → { data, pitch, view } — у каждого поле mismatches. */
 export function check(){ const data=checkData(), pitch=checkPitch(), view=checkView(); return { data, pitch, view }; }
@@ -229,101 +401,21 @@ export function drone(){
   console.table(rows); return rows;
 }
 
-/* ═══ T4a: ИНДЕКС В СТРОЕ У СОБЫТИЙ ТЕКУЩЕЙ ПЕСНИ ═══
-   Обходит ВСЕ события песни (записанные, подложки, правленые) и сверяет a.ti с переводом ступени (recorder.eventTuningIndex → scales.
-   tuningIndexOf, закон своей роли). Печатает КАЖДОЕ расхождение со входами (дорожка, доля, вид, ступень, регистр, хранимое и ожидаемое) и
-   сводку по ролям. Ничего не меняет. Ноль — когда каждый путь записи прошёл через воронку (push, loadArrangement, editCommit). */
-export function checkTi(){
-  const bad=[], byRole={ld:0,bs:0,ch:0}; let n=0;
-  for(const e of events){
-    const want=eventTuningIndex(e); if(want===undefined) continue;
-    n++; const r=e.fn[0]==='l'?'ld':e.fn[0]==='b'?'bs':'ch'; byRole[r]++;
-    if(e.a.ti!==want) bad.push(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc&&e.sc.id}: degree ${e.a.deg} reg ${e.a.oct} — stored ti ${e.a.ti}, expected ${want}`);
-  }
-  console.log(`[scaleprobe T4a] pitched events ${n} (solo ${byRole.ld}, bass ${byRole.bs}, chords ${byRole.ch}) · mismatches ${bad.length}`);
-  if(bad.length) bad.forEach(m=>console.warn('[scaleprobe T4a] '+m));
-  else if(n) console.log('[scaleprobe T4a] every pitched event carries the tuning index of its degree');
-  else console.log('[scaleprobe T4a] the song has no pitched events yet — record, load a backing or edit, then run again');
-  return { events:n, byRole, mismatches:bad };
-}
-
-/* ═══ T4b1: ЗВУК ЧИТАЕТ ИНДЕКС В СТРОЕ ═══
-   1) КАЖДОЕ СОБЫТИЕ ТЕКУЩЕЙ ПЕСНИ: цена из a.ti (leadFreqTi/bassFreqTi/chordNotesAt — то, чем играет таблица ENG) против цены по ступени
-      (leadFreq/bassFreq/chordNotes) — ===; у аккорда каждая нота (частота и интервал). Событие без a.ti — расхождение.
-   2) ПРОГОН: каждый вид × тоники × A4 × регистры × ступени 0..n (столько и пишут пути записи) × все типы — ступень → индекс функцией T4a
-      (tuningIndexOf), цена из индекса против ПРЕЖНЕЙ цены (legacy*) — ===. Тоника и показ центов — как в T1.
-   Принимается ТОЛЬКО при нуле в обеих частях. */
+/* ═══ T4b1: ЗВУК ЧИТАЕТ ИНДЕКС В СТРОЕ — ПРОГОН ═══
+   Каждый вид × тоники × A4 × регистры × ступени 0..n (столько и пишут пути записи) × все типы — ступень → индекс функцией записи
+   (tuningIndexOf), цена из индекса против ЗАМОРОЖЕННОЙ опоры (прежняя цена по ступени) — ===. Тоника и показ центов — как в T1.
+   ⛳ T4c-2: песенная часть (цена из a.ti против цены по хранимой ступени) снята вместе со ступенью — её защиту несёт P.checkSong. */
 export function checkSound(){
-  const bad=[]; let n=0;
-  for(const e of events){
-    const a=e.a; if(!a || typeof a.deg!=='number' || !e.sc) continue;
-    const r=e.fn[0]==='l'?'ld':e.fn[0]==='b'?'bs':e.fn[0]==='c'?'ch':null; if(!r || !/On$|Set$/.test(e.fn)) continue;
-    n++; const at=`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}, degree ${a.deg} reg ${a.oct}`;
-    if(typeof a.ti!=='number'){ bad.push(`${at}: no a.ti`); continue; }
-    if(r==='ld'){ const x=leadFreqTi(a.ti,a.oct,e.sc), y=leadFreq(a.deg,a.oct,e.sc); if(x!==y) bad.push(`${at}: from ti ${x}, from degree ${y}`); }
-    else if(r==='bs'){ const x=bassFreqTi(a.ti,a.oct,e.sc), y=bassFreq(a.deg,a.oct,e.sc); if(x!==y) bad.push(`${at}: from ti ${x}, from degree ${y}`); }
-    else{ const X=chordNotesAt(a.ti,a.oct,e.sc,e.sev,a.ty), Y=chordNotes(a.deg,a.oct,e.sc,e.sev,a.ty);   // T4c-1: цена — без ступени; опора — по записанной ступени
-      if(X.length!==Y.length) bad.push(`${at}: ${X.length} notes from ti, ${Y.length} from degree`);
-      else for(let i=0;i<X.length;i++) if(X[i].f!==Y[i].f||X[i].iv!==Y[i].iv) bad.push(`${at} note ${i}: from ti ${X[i].f} (iv ${X[i].iv}), from degree ${Y[i].f} (iv ${Y[i].iv})`); }
-  }
-  console.log(`[scaleprobe T4b1] song events ${n} · mismatches ${bad.length} (price from a.ti vs price from the degree)`);
-  bad.forEach(m=>console.warn('[scaleprobe T4b1] '+m));
   const TI={ lead:(d,o,v)=>leadFreqTi(tuningIndexOf(d,v,false),o,v), bass:(d,o,v)=>bassFreqTi(tuningIndexOf(d,v,false),o,v),
              chord:(d,o,v,sev,ty)=>chordNotesAt(tuningIndexOf(d,v,true),o,v,sev,ty), tonic:tonicFreq, cents:centsOf };
   const r=sweep('T4b1',['from ti','old'],TI,OLD,(s,tf)=>{ const v=scaleView(s,tf); return [v,v]; }, { melMax:n=>n, chMax:n=>n });
-  if(!bad.length && !r.total) console.log('[scaleprobe T4b1] every song event and every sweep case prices identically from the tuning index');
-  return { events:n, eventMismatches:bad, sweep:r };
-}
-
-/* ═══ T4b2: ЛОГИКА РЕКОРДЕРА ЧИТАЕТ ИНДЕКС В СТРОЕ ═══
-   1) СЕГМЕНТЫ ВСЕЙ ПЕСНИ: songSegs (смена высоты — по паре индекс×регистр) против legacySongSegs (по ступени) — границы, события начала и
-      конца, ключи, ступени, регистры, типы (по значению), лады, тембры, громкости и обратный указатель «событие → сегмент».
-   2) ДОГОНЯЛКА на КАЖДОЙ границе событий песни: для каждого владельца, открытого к доле x, нагрузка chaseNote против legacyChaseNote —
-      ступень, регистр, тип, бенд, громкость, тембр, контекст — и ЦЕНА, которой её сыграет ENG: из индекса (новая) против цены по ступени
-      (прежняя). Ловит, в частности, дефект T4b1 у удержанной ноты терменвокса.
-   Печатает каждое расхождение. Принимается ТОЛЬКО при нуле. Ничего не меняет (кэш догонялки по доле переписывается — это только кэш). */
-const tyEqP=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));
-const bendEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((p,i)=>p.dt===b[i].dt && p.c===b[i].c));
-export function checkLogic(){
-  const bad=[];
-  // ---- 1) сегменты ----
-  const S=songSegs(), L=legacySongSegs(), F=['role','layer','key','tk','note','ev','endEv','first','start','end','endBy','oct','sc','sev','inst','vol'];   // T4c-1: 'deg' у сегмента больше нет — ниже ti против перевода прежней ступени
-  if(S.segs.length!==L.segs.length) bad.push(`segments: ${S.segs.length} new, ${L.segs.length} legacy`);
-  const nSeg=Math.min(S.segs.length,L.segs.length);
-  for(let i=0;i<nSeg;i++){ const a=S.segs[i], b=L.segs[i], at=`segment ${i} (L${a.layer+1} ${a.role} beat ${Math.round(a.start*1000)/1000})`;
-    for(const f of F) if(a[f]!==b[f]) bad.push(`${at}: ${f} new ${a[f]} legacy ${b[f]}`);
-    { const tl=tuningIndexOf(b.deg,b.sc,b.role==='ch'); if(a.ti!==tl) bad.push(`${at}: ti new ${a.ti}, legacy degree ${b.deg} converts to ${tl}`); }
-    if(!tyEqP(a.ty,b.ty)) bad.push(`${at}: chord type differs`); }
-  const idxS=new Map(S.segs.map((g,i)=>[g,i])), idxL=new Map(L.segs.map((g,i)=>[g,i]));
-  if(S.byEv.size!==L.byEv.size) bad.push(`event→segment map: ${S.byEv.size} new, ${L.byEv.size} legacy`);
-  for(const [ev,g] of S.byEv){ const h=L.byEv.get(ev); if(idxS.get(g)!==idxL.get(h)) bad.push(`event ${ev.fn} at beat ${ev.t} maps to segment ${idxS.get(g)} new, ${idxL.get(h)} legacy`); }
-  // ---- 2) догонялка ----
-  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q); let nChase=0;
-  for(const x of X){
-    for(const s of chaseFor(x)){
-      nChase++; const N=chaseNote(s,x), O=legacyChaseNote(s,x), at=`chase at beat ${Math.round(x*1000)/1000}: L${s.on.layer+1} ${s.role} (${s.on.fn} at ${s.on.t})`;
-      if(N.ctx!==O.ctx) bad.push(`${at}: context differs`);
-      for(const f of ['oct','vol','inst','hold']) if(N.a[f]!==O.a[f]) bad.push(`${at}: ${f} new ${N.a[f]} legacy ${O.a[f]}`);
-      { const tl=tuningIndexOf(O.a.deg,O.ctx.sc,s.role==='ch'); if(N.a.ti!==tl) bad.push(`${at}: ti new ${N.a.ti}, legacy degree ${O.a.deg} converts to ${tl}`); }   // T4c-1: ступень догнанной нотой больше не несётся (у терменвокса снята)
-      if(!tyEqP(N.a.ty,O.a.ty)) bad.push(`${at}: chord type differs`);
-      if(!bendEq(N.a.bend,O.a.bend)) bad.push(`${at}: bend curve differs`);
-      const sc=N.ctx.sc, tiN=N.a.ti;   // T4c-1: только индекс
-      if(s.role==='ld'){ const x1=leadFreqTi(tiN,N.a.oct,sc), y1=leadFreq(O.a.deg,O.a.oct,O.ctx.sc); if(x1!==y1) bad.push(`${at}: price from ti ${x1}, legacy from degree ${y1}`); }
-      else if(s.role==='bs'){ const x1=bassFreqTi(tiN,N.a.oct,sc), y1=bassFreq(O.a.deg,O.a.oct,O.ctx.sc); if(x1!==y1) bad.push(`${at}: price from ti ${x1}, legacy from degree ${y1}`); }
-      else{ const A=chordNotesAt(tiN,N.a.oct,sc,N.ctx.sev,N.a.ty), B=chordNotes(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,O.a.ty);
-        if(A.length!==B.length) bad.push(`${at}: ${A.length} chord notes new, ${B.length} legacy`);
-        else for(let i=0;i<A.length;i++) if(A[i].f!==B[i].f) bad.push(`${at} note ${i}: price from ti ${A[i].f}, legacy from degree ${B[i].f}`); }
-    }
-  }
-  console.log(`[scaleprobe T4b2] song events ${events.length} · segments ${S.segs.length} · chase checks ${nChase} at ${X.length} beats · differences ${bad.length}`);
-  bad.forEach(m=>console.warn('[scaleprobe T4b2] '+m));
-  if(!bad.length && events.length) console.log('[scaleprobe T4b2] segments and chased notes are identical when read from the tuning index');
-  else if(!events.length) console.log('[scaleprobe T4b2] the song is empty — record, load a backing or edit, then run again');
-  return { events:events.length, segments:S.segs.length, chase:nChase, differences:bad };
+  if(!r.total) console.log('[scaleprobe T4b1] every sweep case prices identically from the tuning index');
+  return { sweep:r };
 }
 
 /* ═══ T4b3: РЯДЫ И РИСОВАНИЕ РЕДАКТОРА ЧИТАЮТ ИНДЕКС В СТРОЕ ═══
    Работает БЕЗ открытого редактора: ось строится для каждого вида (draw.rollRowsProbe.axis), обе оси — «Все» и «Лад».
+   ⛳ T4c-2: ПЕСЕННАЯ ЧАСТЬ (ниже — п. 1) СНЯТА: прежний путь читал хранимую ступень, её нет; её защиту несёт P.checkSong. Был:
    1) ПЕСНЯ: каждый сегмент каждой дорожки (соло, бас, аккорды), сгруппированный, как группирует редактор (дорожка, роль, ССЫЛКА на вид):
       • высота оси аккордов (rollChordTotal — сколько рядов) — путь индекса против прежнего;
       • РЯД КОРНЯ (он же ряд блока баса/соло и rootRow попадания) и КАЖДАЯ нота блока — ряд и отступление в центах (по нему блок
@@ -346,46 +438,7 @@ export function checkRows(){
     for(let i=0;i<N.length;i++) if(N[i].r!==O[i].r||N[i].dev!==O[i].dev) miss(`${at} note ${i}: row ${N[i].r} dev ${N[i].dev} new, row ${O[i].r} dev ${O[i].dev} legacy`);
   };
   const VIEWS=[['all',true],['mode',false]];
-  // ---- 1) песня ----
-  const S=songSegs(), groups=[];
-  for(const g of S.segs){
-    if(g.role!=='ld'&&g.role!=='bs'&&g.role!=='ch') continue;
-    let G=groups.find(q=>q.layer===g.layer&&q.role===g.role&&q.sc===g.sc);   // ССЫЛКА на вид, не имя — как rollGroups
-    if(!G){ G={ layer:g.layer, role:g.role, sc:g.sc, segs:[] }; groups.push(G); }
-    G.segs.push(g);
-  }
-  let nSeg=0, nBlk=0, nHit=0, nGhost=0;
-  for(const G of groups) for(const [vn,all] of VIEWS){
-    const ax=RP.axis(G.sc,all), tag=`L${G.layer+1} ${G.role} in ${G.sc&&G.sc.id} [${vn}]`;
-    let total=REG_N*ax.rpp;
-    if(G.role==='ch'){
-      RP.reset(); const tN=RP.total(G,ax,RP.notes,RP.root);
-      RP.reset(); const tL=RP.total(G,ax,RP.legacyNotes,RP.legacyRoot);
-      if(tN!==tL) miss(`${tag}: chord axis has ${tN} rows new, ${tL} legacy`);
-      total=tL;
-    }
-    RP.reset();
-    for(const g of G.segs){
-      nSeg++; const at=`${tag} segment at beat ${Math.round(g.start*1000)/1000} (ti ${g.ti} reg ${g.oct})`;
-      const rN=RP.root(g,ax), rL=RP.legacyRoot(g,ax);
-      if(rN!==rL) miss(`${at}: root row ${rN} new, ${rL} legacy`);
-      const N=RP.notes(g,ax,total), O=RP.legacyNotes(g,ax,total); nBlk+=O.length;
-      cmpNotes(at,N,O);
-      if(N.length===O.length){
-        const probes=[rL]; for(const x of O) probes.push(x.r);
-        for(const r0 of probes) for(const d of [0,-0.3,0.3,-0.49,0.49]){
-          nHit++; const pN=RP.pick(N,r0+d), pL=RP.pick(O,r0+d);
-          if(pN.ni!==pL.ni||pN.dr!==pL.dr) miss(`${at}: finger at row ${r0+d} takes note ${pN.ni} (distance ${pN.dr}) new, note ${pL.ni} (${pL.dr}) legacy`);
-        }
-      }
-      if(g.role==='ch') for(let r=0;r<total;r++){
-        const pit=ax.pitchOf(r); if(!pit) continue;
-        nGhost++; cmpNotes(`${at} ghost on row ${r}`, RP.notes(RP.ghost(g,pit),ax,total), RP.legacyNotes(RP.legacyGhost(g,pit),ax,total));
-      }
-    }
-  }
-  console.log(`[scaleprobe T4b3] song: segments ${nSeg} × 2 views · blocks ${nBlk} · hit-tests ${nHit} · ghost placements ${nGhost} · differences ${nBad}`);
-  const songBad=nBad;
+  const songBad=0;
   // ---- 2) прогон по видам ----
   let nRow=0, nTone=0;
   for(const [sc0,tf] of allViews()){
@@ -402,10 +455,10 @@ export function checkRows(){
         for(const [ty,sev] of tys){
           if(!ty && v.chordRule && v.chordRule.kind==='none') continue;   // T6b: «аккорда нет» — проверяет P.checkUntyped
           const g={ role:'ch', deg:d, oct:o, ti:tuningIndexOf(d,v,true), sc:v, sev, ty };
-          nTone++; const rN=RP.root(g,ax), rL=RP.legacyRoot(g,ax);
+          nTone++; const rN=RP.root(g,ax), rL=refRollSegRoot(g,ax);
           const tt=`${at} chord ${ty?'['+ty.join(',')+']':'none'}${sev?' 7th':''}`;
           if(rN!==rL) miss(`${tt}: root row ${rN} new, ${rL} legacy`);
-          cmpNotes(tt, RP.notes(g,ax,total), RP.legacyNotes(g,ax,total));
+          cmpNotes(tt, RP.notes(g,ax,total), refRollSegNotes(g,ax,total));
         }
       }
     }
@@ -413,10 +466,9 @@ export function checkRows(){
   console.log(`[scaleprobe T4b3] sweep: rows ${nRow} · chord placements ${nTone} (every view, both views of the axis, registers 0..3, degrees 0..n) · differences ${nBad-songBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4b3] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe T4b3] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`);
-  if(!nBad && nSeg) console.log('[scaleprobe T4b3] every row, block, hit-test and ghost is identical when read from the tuning index');
-  else if(!nSeg) console.log('[scaleprobe T4b3] the song has no pitched segments — record, load a backing or edit, then run again (the sweep above still ran)');
+  if(!nBad) console.log('[scaleprobe T4b3] every row and chord placement is identical when read from the tuning index');
   RP.reset();
-  return { segments:nSeg, blocks:nBlk, hits:nHit, ghosts:nGhost, rows:nRow, chords:nTone, total:nBad, differences:bad };
+  return { rows:nRow, chords:nTone, total:nBad, differences:bad };
 }
 
 /* ═══ T4b4-1: ДВЕ ПРАВКИ РЯДОВ РЕДАКТОРА (ВИДИМЫЕ) ═══
@@ -469,8 +521,8 @@ export function checkRowFix(){
    1) ПРОГОН: каждый вид × закон аккорда и закон мелодии/баса × ступень 0..n × регистр 0..3;
    2) ВЫСОТЫ ВНЕ ЛАДА: у видов, чей лад меньше строя, — каждая высота строя без ступени лада, в регистрах 0..3 и через перенос периода —
       обязана дать «нет места» (null), не бросив;
-   3) КАЖДОЕ событие песни (соло, бас, аккорды — «вкл» и «ведение»);
-   4) ДОГОНЯЛКА на каждой границе событий: нагрузка chaseNote против legacyChaseNote.
+   ⛳ T4c-2: песенные части (3 — события песни, 4 — догонялка) сравнивали с ХРАНИМОЙ ступенью — сняты; их защиту несёт P.checkSong.
+   Опора прогона — сама пара (ступень, регистр), из которой сделан индекс (прежний legacyHlOf возвращал ровно её).
    Живые подсветки (ступень жеста в реестрах leadHold/bassHold, защёлка latchDeg, ярлыки рук) не менялись — сравнивать там нечего. */
 export function checkHl(){
   const bad=[]; let nBad=0;
@@ -481,7 +533,7 @@ export function checkHl(){
   for(const [sc0,tf] of allViews()){
     const v=scaleView(sc0,tf), n=v.iv.length, id=v.id+(v.tunable?`[from ${tf}]`:'');
     for(const chord of [true,false]) for(let o=0;o<REG_N;o++) for(let d=0;d<=n;d++){
-      nSweep++; const a={ deg:d, oct:o, ti:tuningIndexOf(d,v,chord) }, N=hlOf(a,v), O=legacyHlOf(a);
+      nSweep++; const a={ deg:d, oct:o, ti:tuningIndexOf(d,v,chord) }, N=hlOf(a,v), O={ deg:d, oct:o };
       if(!same(N,O)) miss(`${id} ${chord?'chord':'melody'} degree ${d} reg ${o}: from ti ${show(N)}, legacy ${show(O)}`);
     }
     const T=TUNINGS[v.tuning], E=T.equal!=null?T.equal:T.cents.length, inMode=new Set(v.sel.map(k=>k-v.root));
@@ -490,23 +542,11 @@ export function checkHl(){
         let p; try{ p=modeSlotOfTi(v.root+j+E*c,o,v); }catch(e){ miss(`${id} pitch ${j} reg ${o}: threw ${e&&e.message}`); continue; }
         if(p!==null) miss(`${id} out-of-mode pitch ${j} (+${c} period) reg ${o}: gave a slot ${show(p)}`); } }
   }
-  let nEv=0;
-  for(const e of events){
-    const a=e.a; if(!a || typeof a.deg!=='number' || !e.sc || !/^(lead|bass|ch)(On|Set)$/.test(e.fn)) continue;
-    nEv++; const N=hlOf(a,e.sc), O=legacyHlOf(a);
-    if(!same(N,O)) miss(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}: from ti ${show(N)}, legacy ${show(O)} (ti ${a.ti})`);
-  }
-  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q); let nChase=0;
-  for(const x of X) for(const sct of chaseFor(x)){
-    nChase++; const Nn=chaseNote(sct,x), Oo=legacyChaseNote(sct,x), N=hlOf(Nn.a,Nn.ctx.sc), O=legacyHlOf(Oo.a);
-    if(!same(N,O)) miss(`chase at beat ${Math.round(x*1000)/1000}: L${sct.on.layer+1} ${sct.role}: from ti ${show(N)}, legacy ${show(O)}`);
-  }
-  console.log(`[scaleprobe T4b4] sweep ${nSweep} · out-of-mode pitches ${nOut} (no slot, none threw) · song events ${nEv} · chase checks ${nChase} at ${X.length} beats · differences ${nBad}`);
+  console.log(`[scaleprobe T4b4] sweep ${nSweep} · out-of-mode pitches ${nOut} (no slot, none threw) · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4b4] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe T4b4] …and ${nBad-PRINT_MAX} more (first ${Math.min(nBad,KEEP_MAX)} are in the returned object)`);
-  if(!nBad && nEv) console.log('[scaleprobe T4b4] every replayed and chased highlight is identical when read from the tuning index');
-  else if(!nEv) console.log('[scaleprobe T4b4] the song has no pitched events — record, load a backing or edit, then run again (the sweep above still ran)');
-  return { sweep:nSweep, outOfMode:nOut, events:nEv, chase:nChase, total:nBad, differences:bad };
+  if(!nBad) console.log('[scaleprobe T4b4] every highlight read from the tuning index lands on the degree and register it was made from');
+  return { sweep:nSweep, outOfMode:nOut, total:nBad, differences:bad };
 }
 
 /* ═══ МАРШРУТ ПО СТРОЮ — ЧТО ЛЕЖИТ В КАЖДОЙ ДОРОЖКЕ (справка, не проверка; ничего не меняет) ═══
@@ -532,7 +572,7 @@ export function tracks(){
 /* ═══ T6a: ПРАВИЛО АККОРДОВ ЛАДА — ДАННЫЕ (chordRule) ═══
    1) у каждого из 75 ладов правило есть, его вид — один из пяти, и он РАВЕН сегодняшнему выбору по tag (тот же порядок, что chordSteps:
       noChords → none; isTert → tertian; tag 'edo' → ratios; есть палитра → palette; иначе power); полей chord/chord7 больше нет;
-   2) перенос отношений 19/31-TET: массивы правила — прежние числа, и chordSteps (нетипизированный путь) даёт те же шаги, что прежняя
+   2) перенос отношений 19/31-TET: массивы правила — прежние числа, и ruleChordSteps (путь приложения, T4c-2) даёт те же шаги, что прежняя
       формула от прежних литералов, — каждая ступень 0..n, триада и септаккорд (===);
    3) ДАННЫМИ ДОКАЗАНО, что смена определения у нетипизированных аккордов центового лада (T6b) недостижима: каждый лад с аккордами и без
       палитры стоит на РАВНОМ строе, и правило ratios — тоже только на равном;
@@ -561,7 +601,7 @@ export function checkRules(){
         if(!same(R.triad,o.triad)||!same(R.seventh,o.seventh)) miss(`${id}: moved ratios differ from the old chord/chord7`);
         const n=s.iv.length;
         for(const sev of [false,true]) for(let d=0; d<=n; d++){ nSteps++;
-          const r0=s.iv[d%n]+s.edo*Math.floor(d/n), w=(sev?o.seventh:o.triad).map(ra=>r0+Math.round(s.edo*Math.log2(ra))), g=chordSteps(d,s,sev,null);
+          const r0=s.iv[d%n]+s.edo*Math.floor(d/n), w=(sev?o.seventh:o.triad).map(ra=>r0+Math.round(s.edo*Math.log2(ra))), g=ruleChordSteps(d,s,sev);   // T4c-2: путь приложения (chordSteps по tag ушла в опоры пробы)
           if(!same(g,w)) miss(`${id} degree ${d}${sev?' 7th':''}: steps ${g} now, ${w} from the old literals`); }
       }
       if(T.equal==null) miss(`${id}: a ratios rule on a table tuning`);
@@ -590,19 +630,19 @@ export function checkRules(){
    1) «Все» ↔ «Лад» (один вид): каждый вид с приглушёнными рядами × оба направления × высоты окна × каждое положение окна — высота
       якоря (средний видимый ряд, приглушённый — прилипший к ступени) после перевода (draw.rollRow0Across) стоит на ТОМ ЖЕ месте лада
       (та же пара ступень/регистр) и ВИДНА в окне после зажима; печатается, у скольких якорей высота точная, у скольких — соседняя ступень;
-   2) чип лада (другой вид): каждый вид против следующего, обе оси — регистр якоря после перевода виден в окне.
+   (п. 2 — чип лада, другой вид — снят в T4c-2 вместе с чипом: у дорожки один вид строя.)
    Работает без редактора. Ничего не меняет. */
 export function checkScroll(){
   const bad=[]; let nBad=0;
   const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const views=allViews().map(([s0,tf])=>scaleView(s0,tf));
-  let nP=0, nExact=0, nR=0;
+  let nP=0, nExact=0;
   for(const v of views) for(const [f0,f1] of [[true,false],[false,true]]){
     const a0=RP.axis(v,f0), a1=RP.axis(v,f1); if(a0===a1) continue;   // приглушённых рядов нет — кнопки нет
     const T0=REG_N*a0.rpp, T1=REG_N*a1.rpp;
     for(const rows of [5,8,13,20]){ if(rows>T0) continue;
       for(let row0=0; row0<=T0-rows; row0++){
-        nP++; const r0c=Math.min(RP.across(a0,a1,row0,rows,'pitch'), Math.max(0,T1-rows));
+        nP++; const r0c=Math.min(RP.across(a0,a1,row0,rows), Math.max(0,T1-rows));
         const mid=row0+Math.floor(rows/2), sn=a0.snap(mid), pt=a0.pitchOf(sn), nr=a1.rowOfTi(pt.ti,pt.oct), back=a1.pitchOf(nr);   // T4c-1: ряд отдаёт {ti, oct}
         if(sn===mid) nExact++;
         const at=`${v.id}${v.tunable?'@'+v.tunedFrom:''} ${f0?'All→Mode':'Mode→All'} window ${rows} at row ${row0}`;
@@ -611,22 +651,11 @@ export function checkScroll(){
       }
     }
   }
-  for(let i=0;i<views.length;i++){ const va=views[i], vb=views[(i+1)%views.length];
-    for(const all of [true,false]){ const a0=RP.axis(va,all), a1=RP.axis(vb,all), T0=REG_N*a0.rpp, T1=REG_N*a1.rpp;
-      for(const rows of [5,8,13]){ if(rows>T0) continue;
-        for(let row0=0; row0<=T0-rows; row0++){
-          nR++; const r0c=Math.min(RP.across(a0,a1,row0,rows,'reg'), Math.max(0,T1-rows));
-          const R=Math.floor((row0+Math.floor(rows/2))/a0.rpp), lo=R*a1.rpp, hi=lo+a1.rpp-1;
-          if(!(hi>=r0c && lo<r0c+rows)) miss(`${va.id} → ${vb.id} ${all?'All':'Mode'} window ${rows} at row ${row0}: register ${R} (rows ${lo}..${hi}) is not in the new window ${r0c}..${r0c+rows-1}`);
-        }
-      }
-    }
-  }
-  console.log(`[scaleprobe T6a-2] All/Mode switches ${nP} (anchor pitch exact in ${nExact}, snapped to the nearest degree in ${nP-nExact}) · scale-chip switches ${nR} · differences ${nBad}`);
+  console.log(`[scaleprobe T6a-2] All/Mode switches ${nP} (anchor pitch exact in ${nExact}, snapped to the nearest degree in ${nP-nExact}) · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T6a-2] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe T6a-2] …and ${nBad-PRINT_MAX} more`);
-  if(!nBad) console.log('[scaleprobe T6a-2] every switch keeps the anchor pitch (All/Mode) or its register (scale chip) in view');
-  return { toggles:nP, exact:nExact, chips:nR, total:nBad, differences:bad };
+  if(!nBad) console.log('[scaleprobe T6a-2] every All/Mode switch keeps the anchor pitch in view');
+  return { toggles:nP, exact:nExact, total:nBad, differences:bad };
 }
 
 /* ═══ МАТЕРИАЛ ПЕСНИ — ДОСТАТОЧНО ЛИ ЕГО, ЧТОБЫ ПЕСЕННЫЕ ПРОВЕРКИ ЧТО-ТО ДОКАЗЫВАЛИ ═══
@@ -670,18 +699,19 @@ const ALL_RUNS=[
   ['T0 data',            ()=>checkData(),   r=>({ cases:r.checks, diff:r.mismatches.length, list:r.mismatches })],
   ['T1 pitch',           ()=>checkPitch(),  r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T2 view',            ()=>checkView(),   r=>({ cases:r.checks+r.cases, diff:r.total, list:r.mismatches })],
-  ['T4a tuning index',   ()=>checkTi(),     r=>({ cases:r.events, song:r.events, diff:r.mismatches.length, list:r.mismatches })],
-  ['T4b1 sound',         ()=>checkSound(),  r=>({ cases:r.events+r.sweep.cases, song:r.events, diff:r.eventMismatches.length+r.sweep.total, list:r.eventMismatches.concat(r.sweep.mismatches) })],
-  ['T4b2 recorder logic',()=>checkLogic(),  r=>({ cases:r.segments+r.chase, song:r.segments, diff:r.differences.length, list:r.differences })],
-  ['T4b3 editor rows',   ()=>checkRows(),   r=>({ cases:r.blocks+r.hits+r.ghosts+r.rows+r.chords, song:r.segments, diff:r.total, list:r.differences })],
+  ['T4b1 sound (sweep)', ()=>checkSound(),  r=>({ cases:r.sweep.cases, diff:r.sweep.total, list:r.sweep.mismatches })],
+  ['T4b3 editor rows (sweep)',()=>checkRows(), r=>({ cases:r.rows+r.chords, diff:r.total, list:r.differences })],
   ['T4b4-1 row fixes',   ()=>checkRowFix(), r=>({ cases:r.defaults+r.cache, diff:r.total, list:r.differences })],
-  ['T4b4 highlights',    ()=>checkHl(),     r=>({ cases:r.sweep+r.outOfMode+r.events+r.chase, song:r.events, diff:r.total, list:r.differences })],
-  ['T4c-1 degree stripped',()=>checkStrip(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.mismatches })],
-  ['T6b untyped chords', ()=>checkUntyped(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
-  ['stacked chords',     ()=>checkStack(),   r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.mismatches })],
+  ['T4b4 highlights (sweep)',()=>checkHl(),  r=>({ cases:r.sweep+r.outOfMode, diff:r.total, list:r.differences })],
+  ['T4c-2 song integrity',()=>checkSong(),  r=>({ cases:r.events+r.segments+r.chase+r.rows+r.dissolves, song:r.events, diff:r.total, list:r.differences })],
+  ['T6b untyped chords (sweep)',()=>checkUntyped(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
+  ['stacked chords',     ()=>checkStack(),   r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T6c chord labels',   ()=>checkLabels(), r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['T6a chord rules',    ()=>checkRules(),  r=>({ cases:r.views+r.steps+r.untyped, song:r.untyped, diff:r.differences.length, list:r.differences })],
-  ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles+r.chips, diff:r.total, list:r.differences })],
+  ['T6a-2 scroll',       ()=>checkScroll(), r=>({ cases:r.toggles, diff:r.total, list:r.differences })],
+  ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
+  ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
+  ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
 ];
 export function all(opt={}){
@@ -699,6 +729,9 @@ export function all(opt={}){
   for(const r of rows) if(r.song!=='—') r.status = !M.ok ? 'song: not enough material' : r.differences===0 ? 'pass' : 'FAIL';
                          else r.status = r.differences===0 ? 'pass' : 'FAIL';
   console.table(rows);
+  { const F=SEED_REC&&SEED_REC.freeze, E=SEED_FROZEN_EXPECT;
+    console.log(F ? `[scaleprobe all] frozen seed bass L${F.layer+1}: peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`
+                  : '[scaleprobe all] frozen seed bass: none in this session (run await P.seed({replace:true}))'); }
   for(const [name,list] of lists){ console.warn(`[scaleprobe all] ${name}: first differences`); list.slice(0,opt.show||5).forEach(m=>console.warn('   '+m)); }
   const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
   if(!M.ok) console.warn(`[scaleprobe all] song: not enough material — missing ${M.missing.join('; ')} (run await P.seed({replace:true}) for a complete test song)`);
@@ -720,6 +753,116 @@ export function all(opt={}){
    затем РЕДАКТОР: отдельный мажорный аккорд РАСПАДАЕТСЯ (удалена средняя нота), у первого аккорда Партча одна нота сдвинута во времени и
    по высоте; затем ПОДЛОЖКА (джем I–vi–ii–V в мажоре, бас по корням, ударные), СКОБА повтора [такт 3, конец − 2 такта] пользователем,
    пауза транспорта и ЗАМОРОЗКА дорожки баса в раге (если рендер доступен из консоли). Живые лад, «строй от» и септаккорд возвращаются. */
+/* ═══ ЗАПИСЬ ГЛАЗАМИ ЖЕСТА — СЛЕПЫЕ ПЯТНА ПРОБЫ, ЗАКРЫТЫЕ ПОСЛЕ «ТИХОГО БАСА» (после T4c-2) ═══
+   Песенные строки сверяли сохранённое с самим собой (индекс → цена), а не с тем, что ДАЛ ЖЕСТ: потеряй воронка поле — тембр, громкость,
+   регистр — ни одна строка не заметила бы. Три строки ниже сверяют с ИСТИНОЙ СНАРУЖИ сохранённого:
+     P.checkWrite()  — известные нагрузки жеста (каждая роль, вид строя, регистр, ступень) через НАСТОЯЩИЕ воронки — взятое в песочнице
+                       (recorder.probeTake → seedTake → push) и воронку подложки (recorder.backingEvent); КАЖДОЕ поле сохранённого события
+                       против нагрузки (ступени нет, индекс есть, остальное — то же, карта эффектов — копией), цена ENG (evHz) против
+                       ЗАМОРОЖЕННОЙ опоры, посчитанной из СТУПЕНИ ЖЕСТА (не из сохранённого индекса);
+     P.checkSeed()   — P.seed записывает задуманное (ступень, регистр, тембр, громкость, тип, бенд каждой ноты сценария); каждое событие
+                       песни сверяется с задуманным так же (кроме двух аккордов, которые сценарий потом правит в редакторе);
+     P.checkFrozen() — пик, rms и длина буфера замороженного баса в раге (P.seed) против ожидаемых; буфер, внезапно ставший тихим, — расхождение.
+   ⚠️ Песочница продвигает счётчики дорожек и взятых (они монотонны): у дорожек, рождённых ПОСЛЕ P.checkWrite, другой номер, а значит и
+   другое семя заморозки. Существующие дорожки не затронуты. */
+let SEED_REC=null;   // заполняет P.seed: { takes:[{label, take, scaleId, tf, steps:[{fn,t,a}]}], edited:[[scaleId, t]], freeze:{…} }
+const SEED_FROZEN_EXPECT={ peak:0.08527, rms:0.054304, samples:650886, floor:0.9 };   // замороженный бас в раге: значения до регрессии (отчёт пользователя)
+const ROLE_OF={ l:'ld', b:'bs', c:'ch' };
+const sameVal=(x,y)=> x===y || (x&&y&&typeof x==='object'&&typeof y==='object' ? JSON.stringify(x)===JSON.stringify(y) : false);
+/* Одна сверка: сохранённое событие ev против нагрузки жеста g (со ступенью). → массив строк расхождений. */
+function writeDiff(at, ev, g){
+  const out=[], a=ev.a||{}, role=ROLE_OF[ev.fn[0]], pitched= role && /On$|Set$/.test(ev.fn) && typeof g.deg==='number';
+  if('deg' in a) out.push(`${at}: the stored event carries a degree`);
+  for(const k of Object.keys(g)){ if(k==='deg') continue;
+    if(!(k in a)) out.push(`${at}: field ${k} lost (gesture ${JSON.stringify(g[k])})`);
+    else if(!sameVal(a[k],g[k])) out.push(`${at}: field ${k} stored ${JSON.stringify(a[k])}, gesture ${JSON.stringify(g[k])}`); }
+  for(const k of Object.keys(a)) if(!(k in g) && k!=='ti' && k!=='k') out.push(`${at}: unexpected field ${k} = ${JSON.stringify(a[k])}`);
+  if(g.fx && a.fx===g.fx) out.push(`${at}: the effect map is the gesture's own object, not a copy`);
+  if(pitched){
+    if(!Number.isInteger(a.ti)) out.push(`${at}: no tuning index`);
+    const hz=evHz(a,ev,role), v=ev.sc;
+    if(role==='ch'){ const ref=legacyChordNotesRef(g.deg,g.oct,v,ev.sev,g.ty??null).map(n=>n.f);
+      if(hz.length!==ref.length || hz.some((f,i)=>f!==ref[i])) out.push(`${at}: chord price ${hz.join(' ')}, from the gesture degree ${ref.join(' ')}`); }
+    else{ const ref= role==='ld' ? legacyLeadFreq(g.deg,g.oct,v) : legacyBassFreq(g.deg,g.oct,v);
+      if(hz!==ref) out.push(`${at}: price ${hz}, from the gesture degree ${ref}`); }
+  }
+  return out;
+}
+const VIEWS_W=()=>{ const by=f=>SCALES.find(f);
+  return [['major',SCALES.findIndex(s=>s.id==='major'),'T'], ['raga (table + selection)',SCALES.findIndex(s=>s.id==='raga-yaman'),'T'],
+          ['pelog Barang (root offset)',SCALES.indexOf(by(s=>s.root>0)),'T'], ['Partch (table, ratio chords)',SCALES.findIndex(s=>s.id==='partch-43'),'T'],
+          ['Pythagorean from C (fixed key)',SCALES.findIndex(s=>s.id==='pythagorean'),0], ['Pythagorean from the tonic',SCALES.findIndex(s=>s.id==='pythagorean'),'T'],
+          ['Werckmeister (fixed key)',SCALES.findIndex(s=>s.id&&s.id.startsWith('werck')),'T'], ['Bohlen–Pierce (non-octave)',SCALES.indexOf(by(s=>s.tuning==='bp13')),'T'],
+          ['19-TET',SCALES.indexOf(by(s=>s.tuning==='edo19')),'T'], ['major pentatonic (stack)',SCALES.findIndex(s=>s.id==='major-penta'),'T']].filter(x=>x[1]>=0); };
+export function checkWrite(){
+  const bad=[]; let nBad=0, cases=0, nView=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const keep={ sc:scaleIdx, tf:tunedFrom, sev:seventh };
+  try{
+    for(const [name,idx,tf] of VIEWS_W()){
+      setScaleIdx(idx); setTunedFrom(tf); nView++;
+      const v=CUR(), n=v.iv.length, k=v.chordRule&&v.chordRule.kind;
+      const F=chordFams(v), ty0= v.typedChords&&F[0]&&F[0].types[0] ? F[0].types[0].iv : null;
+      const steps=[]; let t=0; const add=(fn,a)=>{ steps.push({fn,a,t}); t+=0.125; };
+      for(let o=0;o<4;o++) for(let d=0;d<=n;d++){
+        add('leadOn',{deg:d,oct:o,vol:0.73,inst:3,fx:{'bright:amt':0.37,'glide:time':0.2},v:d%3});
+        add('bassOn',{deg:d,oct:o,vol:0.61,inst:2,fx:{'glide:time':0.42},v:d%2});
+        if(k!=='none') add('chOn',{deg:d,oct:o,vol:0.55,inst:1,ty:ty0,bri:0.3});
+      }
+      add('leadOn',{deg:Math.min(2,n),oct:1,vol:0.8,inst:0,bend:[{dt:0,c:0},{dt:1,c:40}],tie:true,v:3});
+      add('leadSet',{deg:Math.min(1,n),oct:1,vol:0.7,hold:true,v:3});
+      add('bassSet',{deg:Math.min(3,n),oct:2,vol:0.5,v:1});
+      if(k!=='none') add('chSet',{deg:Math.min(4,n),oct:2,vol:0.5,ty:ty0,bri:0.6});
+      const R=probeTake(steps);
+      if(!R.ok){ miss(`${name}: the sandboxed take was refused — ${R.why}`); break; }
+      const byT=new Map(); for(const e of R.events) byT.set(e.fn+'@'+e.t, e);
+      for(const st of steps){ cases++; const at=`push · ${name} · ${st.fn} degree ${st.a.deg} reg ${st.a.oct}`, ev=byT.get(st.fn+'@'+st.t);
+        if(!ev){ miss(`${at}: no stored event`); continue; }
+        if(ev.sc!==v) miss(`${at}: stored in another view (${ev.sc&&ev.sc.id})`);
+        for(const m of writeDiff(at,ev,st.a)) miss(m); }
+      // воронка подложки
+      const B=[{fn:'bassOn',a:{deg:Math.min(1,n),oct:1,vol:0.6,inst:4}},{fn:'drum',a:{row:2,vol:0.7,kit:3}},{fn:'drone',a:{lvl:0.4}}];
+      if(k!=='none') B.push({fn:'chOn',a:{deg:Math.min(2,n),oct:1,vol:0.55,inst:2,ty:ty0}});
+      B.forEach((b,i)=>{ cases++; const at=`backing · ${name} · ${b.fn}`, ev=backingEvent({t:i,fn:b.fn,a:{...b.a}},999,0,true);
+        if(!ev.jam||ev.sc!==v||ev.layer!==999) miss(`${at}: jam flag, view or layer wrong`);
+        for(const m of writeDiff(at,ev,b.a)) miss(m); });
+    }
+  } finally { setScaleIdx(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev); }
+  console.log(`[scaleprobe write] views ${nView} · gesture and backing payloads ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe write] '+m));
+  if(!nBad) console.log('[scaleprobe write] every field survives both funnels, no degree is stored, and every price equals the frozen reference from the gesture degree');
+  return { views:nView, cases, total:nBad, differences:bad };
+}
+/* Задуманное P.seed против песни. */
+export function checkSeed(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  if(!SEED_REC){ miss('no seed record in this session — run await P.seed({replace:true})'); return { cases, total:nBad, differences:bad }; }
+  const edited=(take,st)=> st.fn.startsWith('ch') && SEED_REC.edited.some(([id,t0])=>take.scaleId===id && (st.t===t0||st.t===t0+4));
+  for(const take of SEED_REC.takes) for(const st of take.steps){
+    if(edited(take,st)) continue;
+    cases++; const at=`seed · ${take.label} · ${st.fn} at beat ${st.t}${typeof st.a.deg==='number'?` degree ${st.a.deg} reg ${st.a.oct}`:''}`;
+    const m=events.filter(e=>e.tk===take.take && e.fn===st.fn && Math.abs(e.t-st.t)<1e-9);
+    if(m.length!==1){ miss(`${at}: ${m.length} stored events (expected exactly one)`); continue; }
+    const ev=m[0];
+    if(ev.sc && ev.sc.id!==take.scaleId) miss(`${at}: stored in ${ev.sc.id}, the seed intended ${take.scaleId}`);
+    for(const d of writeDiff(at,ev,st.a)) miss(d);
+  }
+  console.log(`[scaleprobe seed-check] seeded notes ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe seed-check] '+m));
+  if(!nBad) console.log('[scaleprobe seed-check] every seeded note is stored as intended — timbre, volume, register, type, bend — and sounds its intended degree');
+  return { cases, total:nBad, differences:bad };
+}
+/* Уровень замороженного баса в раге (P.seed) против ожидаемого. */
+export function checkFrozen(){
+  const bad=[]; const E=SEED_FROZEN_EXPECT, F=SEED_REC&&SEED_REC.freeze;
+  if(!F){ bad.push('no frozen seed track in this session — run await P.seed({replace:true}) (the freeze needs ▶ Play started)'); return { cases:0, total:1, differences:bad, got:null }; }
+  if(!F.installed) bad.push(`the seed's freeze of L${F.layer+1} was not installed (${F.refused})`);
+  if(F.samples!==E.samples) bad.push(`buffer ${F.samples} samples, expected ${E.samples}`);
+  if(!(F.peak>=E.peak*E.floor)) bad.push(`peak ${F.peak} is below ${Math.round(E.floor*100)}% of the expected ${E.peak} — the frozen bass went quiet`);
+  if(!(F.rms>=E.rms*E.floor)) bad.push(`rms ${F.rms} is below ${Math.round(E.floor*100)}% of the expected ${E.rms} — the frozen bass went quiet`);
+  console.log(`[scaleprobe frozen] L${F.layer+1} (bass in the raga): peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`);
+  bad.forEach(m=>console.warn('[scaleprobe frozen] '+m));
+  return { cases:3, total:bad.length, differences:bad, got:F };
+}
 const SID=id=>{ const i=SCALES.findIndex(x=>x.id===id); if(i<0) throw new Error('no scale '+id); return i; };   // id — стабильный идентификатор (T0), не имя (правило #25)
 export async function seed(opt={}){
   console.log('[scaleprobe seed] P.seed REPLACES the current song with a test song (nothing is saved).');
@@ -728,12 +871,14 @@ export async function seed(opt={}){
   const keep={ sc:scaleIdx, tf:tunedFrom, sev:seventh };
   const built=[]; const say=m=>{ built.push(m); console.log('[scaleprobe seed] '+m); };
   try{
+    SEED_REC={ takes:[], edited:[['major',12],['partch-43',32]], freeze:null };   // задуманное — для P.checkSeed (два аккорда сценарий правит в редакторе ниже)
     clearRec(); setLoopMetre(4); setSeventh(false);
     let nid=0; const S=[];
     const on =(fn,a,t)=>{ const id=++nid; S.push({fn,a,t,id}); return id; };
     const at =(id,fn,a,t)=>S.push({fn,a,t,id});
     const take=(label,scaleId,tf)=>{ setScaleIdx(SID(scaleId)); if(tf!==undefined) setTunedFrom(tf);
-      const r=seedTake(S.splice(0)); if(!r) throw new Error('seedTake refused — start the app (▶ Play) and stop the transport first');
+      const steps=S.splice(0), r=seedTake(steps); if(!r) throw new Error('seedTake refused — start the app (▶ Play) and stop the transport first');
+      SEED_REC.takes.push({ label, take:r.take, scaleId, tf, steps:steps.map(st=>({ fn:st.fn, t:st.t, a:{...st.a} })) });
       say(`${label}: take ${r.take}, ${r.events} events → tracks ${r.layers.map(l=>'L'+(l+1)).join(', ')}`); return r; };
     // ---- 1) мажор: соло, терменвокс, бас, аккорды ----
     const solo=(t,d,len)=>{ const id=on('leadOn',{deg:d,oct:1,vol:.8,inst:0},t); at(id,'leadOff',{v:0},t+len); };
@@ -780,7 +925,9 @@ export async function seed(opt={}){
     if(loop.on) onLoop();   // подложка подняла транспорт — пауза: проверки и заморозка идут на остановленном
     // ---- 8) заморозка дорожки баса в раге ----
     const gr=songSegs().segs.find(g=>g.role==='bs'&&g.sc.id==='raga-yaman');
-    if(gr){ try{ const R=await import('./render.js'); const r=await R.freeze(gr.layer); say(r&&r.installed ? `freeze: L${gr.layer+1} (bass in the raga) frozen` : `freeze: L${gr.layer+1} rendered but not installed (${r&&r.refused})`); }
+    if(gr){ try{ const R=await import('./render.js'); const r=await R.freeze(gr.layer);
+            SEED_REC.freeze={ layer:gr.layer, peak:r&&r.peak, rms:r&&r.rms, samples:r&&r.buf&&r.buf.length, installed:!!(r&&r.installed), refused:r&&r.refused };
+            say(r&&r.installed ? `freeze: L${gr.layer+1} (bass in the raga) frozen` : `freeze: L${gr.layer+1} rendered but not installed (${r&&r.refused})`); }
             catch(err){ say('freeze: not available from the console ('+(err&&err.message)+')'); } }
   } finally {
     setScaleIdx(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev);
@@ -831,11 +978,12 @@ export function checkLabels(){
       chordNotes (по ступени, теперь правилом) и chordNotesAt (по индексу корня через обратную выборку — то, чем играет ENG);
    2) 'none': у каждого вида без аккордов нетипизированный аккорд — НОЛЬ нот, подпись — пустая (смена определения, названная);
    3) данные: каждый лад с аккордами без палитры — на равном строе (иначе цена номинально-равной была бы ложью — недостижимо);
+   ⛳ T4c-2: п. 4 (песня — сверка с ХРАНИМОЙ ступенью) снят; его защиту несёт P.checkSong. Был:
    4) ПЕСНЯ: каждое нетипизированное «вкл»/ведение аккорда — цена ENG (chordNotesAt из a.ti) против прежней; догонялка на каждой границе
       событий (нагрузка chaseNote, цена из индекса) против прежней по legacyChaseNote; интервалы распада (chordNotesAt сегмента — ими
       dissolvePlan пишет однонотные типы) против прежних; ряды редактора и призрак сверяет P.checkRows (его прежний путь — тоже прежняя цена). */
 export function checkUntyped(){
-  const bad=[]; let cases=0, song=0, none=0, nPal=0;
+  const bad=[]; let cases=0, none=0, nPal=0;
   const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
   const cmp=(at,X,Y)=>{ cases++;
     if(X.length!==Y.length){ miss(`${at}: ${X.length} notes now, ${Y.length} before`); return; }
@@ -862,26 +1010,10 @@ export function checkUntyped(){
       }
     }
   } finally { setTonic(keepT); setARef(keepA); }
-  // ---- песня ----
-  for(const e of events){
-    if((e.fn!=='chOn'&&e.fn!=='chSet') || !e.a || e.a.ty || !e.sc) continue;
-    song++; const a=e.a;
-    cmp(`L${e.layer+1} beat ${Math.round(e.t*1000)/1000} ${e.fn} in ${e.sc.id}`, chordNotesAt(a.ti,a.oct,e.sc,e.sev,null), legacyChordNotesRef(a.deg,a.oct,e.sc,e.sev,null));
-  }
-  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q);
-  for(const x of X) for(const sct of chaseFor(x)){
-    if(sct.role!=='ch') continue; const N=chaseNote(sct,x), O=legacyChaseNote(sct,x); if(N.a.ty) continue;
-    song++; cmp(`chase at beat ${Math.round(x*1000)/1000} L${sct.on.layer+1}`, chordNotesAt(N.a.ti,N.a.oct,N.ctx.sc,N.ctx.sev,null), legacyChordNotesRef(O.a.deg,O.a.oct,O.ctx.sc,O.ctx.sev,null));
-  }
-  for(const g of songSegs().segs){
-    if(g.role!=='ch' || g.ty) continue;
-    song++; cmp(`dissolve intervals of the chord at beat ${Math.round(g.start*1000)/1000} L${g.layer+1}`, segChordNotes(g), legacyChordNotesRef(g.ev.a.deg,g.oct,g.sc,g.sev,null));   // T4c-1: ноты распада — та же функция, что у редактора; опора — по записанной ступени события
-    if(!chordReadsTi(g.ti,g.sc,g.ty)) miss(`segment at beat ${g.start} L${g.layer+1}: an untyped chord that does not read its index`);
-  }
-  console.log(`[scaleprobe T6b] cases ${cases} (sweep + song) · song items ${song} (chords, chase, dissolve) · chordless modes checked ${none} · palette views ${nPal} (unreachable, priced as before) · differences ${bad.length}`);
+  console.log(`[scaleprobe T6b] cases ${cases} (sweep) · chordless modes checked ${none} · palette views ${nPal} (unreachable, priced as before) · differences ${bad.length}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T6b] '+m));
   if(!bad.length) console.log('[scaleprobe T6b] every untyped chord prices identically from its chord rule and its root index; chordless modes build no chord');
-  return { cases, song, none, palette:nPal, total:bad.length, mismatches:bad };
+  return { cases, none, palette:nPal, total:bad.length, mismatches:bad };
 }
 
 /* ═══ «СТОПКА»: ПРАВИЛО stack — АККОРД ЧЕРЕЗ СТУПЕНЬ ЛАДА В ПЕНТАТОНИКАХ, БЛЮЗЕ И ЯПОНСКИХ ЛАДАХ ═══
@@ -889,16 +1021,14 @@ export function checkUntyped(){
       по нему и цена) приводится по модулю строя к ступени ЛАДА; ни один тон не вне лада;
    2) ПОДПИСЬ: у каждой такой ступени подпись непуста и без «?»/«undefined»; таблица подписей до-мажорной пентатоники и блюза (тоника C)
       печатается — та, что в отчёте;
-   3) ПЕРЕКЛЮЧАТЕЛЬ R.powerOld: включённый — цена стопочных ладов РАВНА прежнему пауэр-аккорду (legacyChordNotes, ===); подпись
-      заморозки каждой дорожки с аккордом-стопкой МЕНЯЕТСЯ при флипе, а без стопок — нет. Выключается в finally.
-   Ничего не играет (флип звучащих голосов не трогает; транспорт не нужен). */
+   ⛳ T4c-2: п. 3 (временный переключатель R.powerOld и старение замороженных дорожек при его флипе) снят вместе с переключателем —
+   стопка заменяет пауэр-аккорд насовсем (решение пользователя). Ничего не играет. */
 export function checkStack(){
-  const bad=[]; let cases=0, song=0;
+  const bad=[]; let cases=0;
   const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
-  const keepT=tonic, keepP=stackPower(), views=[];
+  const keepT=tonic, views=[];
   for(const [s0,tf] of allViews()){ const v=scaleView(s0,tf); if(v.chordRule&&v.chordRule.kind==='stack') views.push(v); }
   try{
-    setStackAsPower(false);
     for(const v of views){ const n=v.iv.length, E=v.edo, inMode=new Set(v.iv.map(x=>((x%E)+E)%E));
       for(const sev of [false,true]) for(let d=0;d<=n;d++){
         const st=ruleChordSteps(d,v,sev); cases++;
@@ -911,109 +1041,120 @@ export function checkStack(){
     for(const id of ['major-penta','blues']){ const v=views.find(x=>x.id===id); if(!v) continue; const rows=[];
       for(let d=0;d<=v.iv.length;d++) rows.push({ mode:id, degree:d, label:chordLabel(d,v,false), notes:chordNotesStr(d,v,false), label7:chordLabel(d,v,true), notes7:chordNotesStr(d,v,true) });
       console.table(rows); }
-    // ---- переключатель ----
-    setStackAsPower(true);
-    for(const v of views) for(let o=0;o<4;o++) for(let d=0;d<=v.iv.length;d++) for(const sev of [false,true]){
-      cases++; const X=chordNotes(d,o,v,sev,null), Y=legacyChordNotes(d,o,v,sev,null);
-      if(X.length!==Y.length || X.some((x,i)=>x.f!==Y[i].f||x.iv!==Y[i].iv)) miss(`${v.id} degree ${d} reg ${o}${sev?' 7th':''}: R.powerOld(true) does not give the old power chord`);
-    }
-    setStackAsPower(false);
-    const layers=[...new Set(events.map(e=>e.layer))];
-    for(const ly of layers){
-      const has=events.some(e=>e.layer===ly && (e.fn==='chOn'||e.fn==='chSet') && e.a && !e.a.ty && e.sc && e.sc.chordRule && e.sc.chordRule.kind==='stack');
-      const a=freezeTicket(ly).sig; setStackAsPower(true); const b=freezeTicket(ly).sig; setStackAsPower(false);
-      song++;
-      if(has && a===b) miss(`L${ly+1}: holds stacked chords, but its freeze signature does not change when R.powerOld flips`);
-      if(!has && a!==b) miss(`L${ly+1}: holds no stacked chord, but its freeze signature changes when R.powerOld flips`);
-    }
-  } finally { setStackAsPower(keepP); setTonic(keepT); }
-  console.log(`[scaleprobe stack] stack modes ${views.length} · cases ${cases} (tones inside the mode, labels, the R.powerOld switch) · tracks checked for freeze staleness ${song} · differences ${bad.length}`);
+  } finally { setTonic(keepT); }
+  console.log(`[scaleprobe stack] stack modes ${views.length} · cases ${cases} (tones inside the mode, labels) · differences ${bad.length}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe stack] '+m));
-  if(!bad.length) console.log('[scaleprobe stack] every stacked chord stays inside its mode, labels read, and R.powerOld restores the old chord and stales exactly the tracks that hold stacks');
-  return { modes:views.length, cases, song, total:bad.length, mismatches:bad };
+  if(!bad.length) console.log('[scaleprobe stack] every stacked chord stays inside its mode, and every label reads');
+  return { modes:views.length, cases, total:bad.length, mismatches:bad };
 }
 
-/* ═══ T4c-1: СТУПЕНЬ ЗАПИСАНА, НО НЕ ЧИТАЕТСЯ — ДОКАЗАТЕЛЬСТВО СТИРАНИЕМ ═══
-   Клон песни: каждое событие — копия, у нагрузки СТЁРТО поле deg. Оба списка (оригинал и клон) по очереди подставляются в recorder через
-   probeWithEvents (содержимое events подменяется на месте, schedInvalidate перестраивает ноты, сегменты, кэш догонялки; в finally песня
-   возвращается), и над каждым считаются ВСЕ производные пути — те же функции, что зовёт приложение:
-     • ЦЕНА каждого «вкл»/ведения соло, баса и аккорда — recorder.evHz (её зовёт таблица ENG: живой звук, переигровка, догонялка, рендер);
-       место голоса в реестре (evReg — leadHold/bassHold) и подсветка аккорда (hlOf);
-     • СЕГМЕНТЫ (songSegs): границы, события начала и конца (по номеру события), ключ, взятое, индекс, регистр, тип, вид, тембр, громкость,
-       и обратный указатель «событие → сегмент»;
-     • ДОГОНЯЛКА на КАЖДОЙ доле, где лежит событие: состав владельцев (вкл, ведение, контекст), нагрузка chaseNote целиком (кроме поля deg —
-       его стёрли) и её цена, реестр и подсветка;
-     • РЕДАКТОР, обе оси («Все» и «Лад»), сегменты сгруппированы как в редакторе: высота оси аккордов, ряд корня, каждая нота (ряд и
-       отступление), попадание пальца на ряду корня, каждой ноты и в ±0.3/±0.49 от них, ПРИЗРАК целого аккорда на каждом ярком ряду;
-     • РАСПАД: ноты аккорда сегмента (segChordNotes — частоты и интервалы, которые ложатся в однонотные типы).
-   Сравнение — ===, по номеру события (клон идёт в том же порядке); ссылки на вид сравниваются как ссылки. Принимается ТОЛЬКО при нуле.
-   Отказ — пока идёт запись, играет транспорт или открыт редактор (сказано словами, засчитывается как расхождение). */
-export function checkStrip(){
-  const bad=[]; const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
-  const REF=new Map(); const ref=o=>{ if(o==null||typeof o!=='object') return o; if(!REF.has(o)) REF.set(o,'#ref'+REF.size); return REF.get(o); };
-  const orig=events.slice(); let had=0;
-  const clone=orig.map(e=>{ if(!e.a||!('deg' in e.a)) return {...e}; had++; const a={...e.a}; delete a.deg; return {...e, a}; });
-  if(clone.some(e=>e.a&&'deg' in e.a)) miss('the clone still holds a degree');
+/* ═══ T4c-2: ЦЕЛОСТНОСТЬ ПЕСНИ БЕЗ СТУПЕНИ — ЗАМЕНА ПЕСЕННЫХ ПРОБ, СВЕРЯВШИХ СО СТУПЕНЬЮ (T4a, T4b1, T4b2, T4b3, T4b4, T6b, T4c-1) ═══
+   Хранимой ступени больше нет — сверять с ней нечего. Вместо этого каждая производная дорожка песни проверяется на ПРАВИЛЬНУЮ ФОРМУ и
+   на ЦЕНУ ПРОТИВ ЗАМОРОЖЕННЫХ ОПОР (прежние тела функций по ступени — раздел выше), куда ступень приходит ОБРАТНОЙ ВЫБОРКОЙ ИЗ ИНДЕКСА
+   (scales.modeSlotOfTi — та же функция, что у подсветки), а не из события. Сравнение ===:
+     1) СОБЫТИЯ: ни одно событие не несёт ступени лада (поле deg); у каждого «вкл»/ведения соло, баса и аккорда — целые индекс в строе и
+        регистр, и высота ЕСТЬ в ладу события (до T5 пути записи кладут только высоты лада); цена ENG (recorder.evHz) — конечная, положительная
+        и РАВНА прежней цене по ступени этого места; место в реестре голосов (evReg) и подсветка аккорда (hlOf) переводятся назад в тот же
+        индекс (tuningIndexOf — закон своей роли);
+     2) СЕГМЕНТЫ (songSegs): роль, целые индекс и регистр, равные хранимым у определяющего события, тот же вид, время начала = время события,
+        конец не раньше начала, события начала и конца — из песни, указатель «событие → сегмент» покрывает каждое «вкл»/ведение;
+     3) ДОГОНЯЛКА на КАЖДОЙ доле, где лежит событие: нагрузка без ступени, целые индекс и регистр, контекст — событие песни, цена конечная и
+        равна прежней по ступени места (у удержанного терменвокса — место АТАКИ);
+     4) РЕДАКТОР, обе оси («Все» и «Лад»), сегменты сгруппированы как в редакторе: ряд корня — целое; ряд → высота (pitchOf) возвращает ТОТ ЖЕ
+        индекс и регистр (вставка и перенос пишут ровно это); призрак сегмента на его собственном ряду — те же блоки, что сам сегмент;
+     5) РАСПАД: ноты аккорда сегмента (segChordNotes) непусты и конечны, и однонотный аккорд с интервалом каждой ноты звучит ровно её частотой
+        (U2/U3 — оставшиеся ноты после распада звучат как прежде).
+   Работает на загруженной песне, без редактора и рук; ничего не меняет (кэш догонялки и рядов — только кэш). */
+export function checkSong(){
+  const bad=[]; let nBad=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const ROLE={ l:'ld', b:'bs', c:'ch' }, VIEWS=[['all',true],['mode',false]];
-  const plainOut=a=>{ const o={...a}; delete o.deg;
-    for(const k of Object.keys(o)) if(o[k]&&typeof o[k]==='object'&&!Array.isArray(o[k])&&Object.getPrototypeOf(o[k])!==Object.prototype) o[k]=ref(o[k]);
-    return o; };
-  const run=()=>{
-    const IX=new Map(events.map((e,i)=>[e,i])), ix=e=> e==null ? null : (IX.has(e) ? IX.get(e) : 'foreign');
-    const out={ price:[], segs:[], byEv:[], chase:[], rows:[], diss:[] };
-    // ---- цены, реестр голосов, подсветка ----
-    events.forEach((e,i)=>{ const r=ROLE[e.fn[0]]; if(!r||!/On$|Set$/.test(e.fn)||!e.a) return;
-      out.price.push({ i, hz:evHz(e.a,e,r), reg: r==='ch' ? hlOf(e.a,e.sc) : evReg(e.a,e) }); });
-    // ---- сегменты ----
-    const S=songSegs(), SI=new Map(S.segs.map((g,i)=>[g,i]));
-    for(const g of S.segs) out.segs.push({ role:g.role, layer:g.layer, key:g.key, tk:g.tk, ev:ix(g.ev), endEv:ix(g.endEv), first:g.first, start:g.start, end:g.end,
-      endBy:g.endBy, ti:g.ti, oct:g.oct, ty:g.ty, sc:ref(g.sc), sev:g.sev, inst:g.inst, vol:g.vol, deg:g.deg });
-    for(const [ev,g] of S.byEv) out.byEv.push([ix(ev), SI.get(g)]);
-    out.byEv.sort((p,q)=>p[0]-q[0]);
-    // ---- догонялка на каждой доле события ----
-    const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q);
-    for(const x of X) for(const sct of chaseFor(x)){ const N=chaseNote(sct,x);
-      out.chase.push({ x, role:sct.role, on:ix(sct.on), set:ix(sct.set), ctx:ix(N.ctx), a:plainOut(N.a), hz:evHz(N.a,N.ctx,sct.role),
-        reg: sct.role==='ch' ? hlOf(N.a,N.ctx.sc) : evReg(N.a,N.ctx) }); }
-    // ---- редактор: группы как у редактора (дорожка, роль, ССЫЛКА на вид), обе оси ----
-    const groups=[];
-    for(const g of S.segs){ if(g.role!=='ld'&&g.role!=='bs'&&g.role!=='ch') continue;
-      let G=groups.find(q=>q.layer===g.layer&&q.role===g.role&&q.sc===g.sc); if(!G){ G={ layer:g.layer, role:g.role, sc:g.sc, segs:[] }; groups.push(G); } G.segs.push(g); }
-    for(const G of groups) for(const [vn,all] of VIEWS){
-      const ax=RP.axis(G.sc,all); let total=REG_N*ax.rpp;
-      if(G.role==='ch'){ RP.reset(); total=RP.total(G,ax,RP.notes,RP.root); }
-      RP.reset();
-      const rec={ group:`L${G.layer+1} ${G.role} ${G.sc&&G.sc.id} [${vn}]`, total, segs:[] };
-      for(const g of G.segs){ const root=RP.root(g,ax), notes=RP.notes(g,ax,total), hits=[], ghosts=[];
-        for(const r0 of [root, ...notes.map(n=>n.r)]) for(const d of [0,-0.3,0.3,-0.49,0.49]) hits.push(RP.pick(notes,r0+d));
-        if(g.role==='ch') for(let r=0;r<total;r++){ const pit=ax.pitchOf(r); if(pit) ghosts.push([r, RP.notes(RP.ghost(g,pit),ax,total)]); }
-        rec.segs.push({ seg:SI.get(g), root, notes, hits, ghosts }); }
-      out.rows.push(rec);
+  const isInt=Number.isInteger, fin=f=>typeof f==='number' && Number.isFinite(f) && f>0;
+  const beat=t=>Math.round(t*1000)/1000;
+  const sameNotes=(X,Y)=> X.length===Y.length && X.every((x,i)=>x.f===Y[i].f && x.iv===Y[i].iv);
+  /* цена против прежней по ступени места (ступень — обратной выборкой из индекса) */
+  const priceCheck=(at,a,ctx,role)=>{
+    const p=modeSlotOfTi(a.ti,a.oct,ctx.sc); if(!p){ miss(`${at}: ti ${a.ti} reg ${a.oct} is not a pitch of its mode ${ctx.sc&&ctx.sc.id}`); return null; }
+    const hz=evHz(a,ctx,role);
+    if(role==='ch'){
+      const ref=legacyChordNotesRef(p.deg,p.oct,ctx.sc,ctx.sev,a.ty), X=chordNotesAt(a.ti,a.oct,ctx.sc,ctx.sev,a.ty);
+      if(!hz.length || !hz.every(fin)) miss(`${at}: chord price ${JSON.stringify(hz)} is empty or not finite`);
+      else if(!sameNotes(X,ref) || hz.some((f,i)=>f!==ref[i].f)) miss(`${at}: chord notes ${X.map(n=>n.f).join(' ')} differ from the frozen reference ${ref.map(n=>n.f).join(' ')} (degree ${p.deg} reg ${p.oct})`);
+    }else{
+      const ref= role==='ld' ? legacyLeadFreq(p.deg,p.oct,ctx.sc) : legacyBassFreq(p.deg,p.oct,ctx.sc);
+      if(!fin(hz)) miss(`${at}: price ${hz} is not a finite positive number`);
+      else if(hz!==ref) miss(`${at}: price ${hz} differs from the frozen reference ${ref} (degree ${p.deg} reg ${p.oct})`);
     }
-    // ---- распад: ноты аккорда сегмента ----
-    for(const g of S.segs) if(g.role==='ch') out.diss.push({ seg:SI.get(g), notes:segChordNotes(g) });
-    return out;
+    return p;
   };
-  const A=probeWithEvents(orig,run);
-  const B= A.ok ? probeWithEvents(clone,run) : A;
-  if(!A.ok||!B.ok){ miss(`refused: ${(A.ok?B:A).why} — stop it and run again`);
-    console.warn('[scaleprobe T4c-1] '+bad[0]); return { cases:0, stripped:had, total:bad.length, mismatches:bad }; }
-  let cases=0;
-  const show=v=> v&&typeof v==='object' ? JSON.stringify(v) : String(v);
-  const diff=(x,y,path)=>{
-    if(x===y){ cases++; return; }
-    if(Array.isArray(x)&&Array.isArray(y)){ if(x.length!==y.length){ miss(`${path}: length ${x.length} original, ${y.length} stripped`); return; } x.forEach((v,i)=>diff(v,y[i],`${path}[${i}]`)); return; }
-    if(x&&y&&typeof x==='object'&&typeof y==='object'&&Object.getPrototypeOf(x)===Object.prototype&&Object.getPrototypeOf(y)===Object.prototype){
-      for(const k of new Set([...Object.keys(x),...Object.keys(y)])) diff(x[k],y[k],`${path}.${k}`); return; }
-    miss(`${path}: original ${show(x)}, stripped ${show(y)}`);
-  };
-  const O=A.value, C=B.value;
-  for(const k of ['price','segs','byEv','chase','rows','diss']) diff(O[k],C[k],k);
-  for(const g of O.segs) if(g.deg!==undefined) miss(`segment of L${g.layer+1} at beat ${g.start}: carries a degree`);
-  const n={ price:O.price.length, segs:O.segs.length, chase:O.chase.length, rows:O.rows.reduce((s,r)=>s+r.segs.length,0), diss:O.diss.length };
-  console.log(`[scaleprobe T4c-1] events ${orig.length} (degree stripped from ${had}) · prices ${n.price} · segments ${n.segs} · chased notes ${n.chase} · editor segment×view ${n.rows} · dissolves ${n.diss} · compared values ${cases} · differences ${bad.length}`);
-  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe T4c-1] '+m));
-  if(!had){ console.log('[scaleprobe T4c-1] no event carries a degree — load a song (P.seed) and run again'); bad.push('no event carries a degree'); }
-  else if(!bad.length) console.log('[scaleprobe T4c-1] with the degree deleted from every event, every derived path gives identical results — nothing reads the stored degree');
-  return { cases, stripped:had, prices:n.price, segments:n.segs, chase:n.chase, rows:n.rows, dissolves:n.diss, total:bad.length, mismatches:bad };
+  // ---- 1) события ----
+  const EV=new Set(events); let nEv=0, nDeg=0;
+  for(const e of events){
+    const at=`L${e.layer+1} beat ${beat(e.t)} ${e.fn}`;
+    if(e.a && 'deg' in e.a){ nDeg++; miss(`${at}: carries a mode degree (${e.a.deg})`); }
+    const r=ROLE[e.fn[0]]; if(!r || !/On$|Set$/.test(e.fn) || !e.a) continue;
+    nEv++; const a=e.a;
+    if(!isInt(a.ti) || !isInt(a.oct)){ miss(`${at}: tuning index ${a.ti} / register ${a.oct} missing or not whole`); continue; }
+    if(!e.sc){ miss(`${at}: no frozen view`); continue; }
+    const p=priceCheck(`${at} in ${e.sc.id}`,a,e,r); if(!p) continue;
+    const back= r==='ch' ? hlOf(a,e.sc) : evReg(a,e);
+    if(!back || tuningIndexOf(back.deg,e.sc,r==='ch')!==a.ti || back.oct!==a.oct) miss(`${at}: ${r==='ch'?'highlight':'voice register'} ${back&&back.deg}/${back&&back.oct} does not convert back to ti ${a.ti} reg ${a.oct}`);
+  }
+  // ---- 2) сегменты ----
+  const S=songSegs(); let nSeg=0;
+  for(const g of S.segs){ nSeg++;
+    const at=`segment L${g.layer+1} ${g.role} beat ${beat(g.start)}`, a=g.ev&&g.ev.a||{};
+    if(g.role!=='ld'&&g.role!=='bs'&&g.role!=='ch') miss(`${at}: role ${g.role}`);
+    if('deg' in g) miss(`${at}: carries a degree`);
+    if(!isInt(g.ti)||!isInt(g.oct)||g.ti!==a.ti||g.oct!==(a.oct|0)) miss(`${at}: ti/register ${g.ti}/${g.oct}, its event stores ${a.ti}/${a.oct}`);
+    if(!EV.has(g.ev)) miss(`${at}: its defining event is not in the song`);
+    if(g.endEv && !EV.has(g.endEv)) miss(`${at}: its ending event is not in the song`);
+    if(g.sc!==g.ev.sc) miss(`${at}: another view than its event`);
+    if(g.start!==g.ev.t) miss(`${at}: starts at ${g.start}, its event at ${g.ev.t}`);
+    if(g.end!=null && g.end<g.start) miss(`${at}: ends at ${g.end}, before it starts`);
+    if(S.byEv.get(g.ev)!==g) miss(`${at}: the event→segment map does not lead back to it`);
+  }
+  for(const e of events){ const r=ROLE[e.fn[0]]; if(!r || !/On$|Set$/.test(e.fn)) continue; if(!S.byEv.has(e)) miss(`L${e.layer+1} beat ${beat(e.t)} ${e.fn}: belongs to no segment`); }
+  // ---- 3) догонялка ----
+  const X=[...new Set(events.map(e=>e.t))].sort((p,q)=>p-q); let nChase=0;
+  for(const x of X) for(const sct of chaseFor(x)){ nChase++;
+    const N=chaseNote(sct,x), at=`chase at beat ${beat(x)}: L${sct.on.layer+1} ${sct.role}`;
+    if('deg' in N.a) miss(`${at}: the payload carries a degree`);
+    if(!EV.has(N.ctx)) miss(`${at}: its context is not an event of the song`);
+    if(!isInt(N.a.ti)||!isInt(N.a.oct)){ miss(`${at}: ti/register ${N.a.ti}/${N.a.oct}`); continue; }
+    if(sct.role==='ld' && sct.set && sct.set.a.hold && N.a.ti!==sct.on.a.ti) miss(`${at}: a held theremin note took ti ${N.a.ti}, its attack's is ${sct.on.a.ti}`);
+    priceCheck(at,N.a,N.ctx,sct.role);
+  }
+  // ---- 4) редактор: ряд ↔ высота, призрак на своём ряду ----
+  const groups=[];
+  for(const g of S.segs){ if(g.role!=='ld'&&g.role!=='bs'&&g.role!=='ch') continue;
+    let G=groups.find(q=>q.layer===g.layer&&q.role===g.role&&q.sc===g.sc); if(!G){ G={ layer:g.layer, role:g.role, sc:g.sc, segs:[] }; groups.push(G); } G.segs.push(g); }
+  let nRow=0;
+  for(const G of groups) for(const [vn,all] of VIEWS){
+    const ax=RP.axis(G.sc,all); let total=REG_N*ax.rpp;
+    if(G.role==='ch'){ RP.reset(); total=RP.total(G,ax,RP.notes,RP.root); }
+    RP.reset();
+    for(const g of G.segs){ nRow++;
+      const at=`L${G.layer+1} ${G.role} [${vn}] segment beat ${beat(g.start)} (ti ${g.ti} reg ${g.oct})`, r=RP.root(g,ax);
+      if(!isInt(r)){ miss(`${at}: root row ${r}`); continue; }
+      const pit=ax.pitchOf(r);
+      if(!pit || pit.ti!==g.ti || pit.oct!==g.oct){ miss(`${at}: row ${r} decodes to ${pit?pit.ti+'/'+pit.oct:'nothing'}`); continue; }
+      if(g.role==='ch'){ const A=RP.notes(g,ax,total), B=RP.notes(RP.ghost(g,pit),ax,total);
+        if(A.length!==B.length || A.some((n,i)=>n.r!==B[i].r||n.dev!==B[i].dev)) miss(`${at}: the ghost on its own row differs from the block`); }
+    }
+  }
+  RP.reset();
+  // ---- 5) распад ----
+  let nDiss=0;
+  for(const g of S.segs){ if(g.role!=='ch') continue; nDiss++;
+    const at=`dissolve of the chord at beat ${beat(g.start)} L${g.layer+1}`, N=segChordNotes(g);
+    if(!N.length || !N.every(n=>fin(n.f))){ miss(`${at}: notes ${JSON.stringify(N)}`); continue; }
+    N.forEach((n,i)=>{ const one=chordNotesAt(g.ti,g.oct,g.sc,g.sev,[n.iv]);
+      if(one.length!==1 || one[0].f!==n.f) miss(`${at} note ${i}: a one-note copy sounds ${one[0]&&one[0].f}, the note ${n.f}`); });
+  }
+  console.log(`[scaleprobe song] events ${events.length} (pitched ${nEv}, carrying a degree ${nDeg}) · segments ${nSeg} · chased notes ${nChase} at ${X.length} beats · editor segment×view ${nRow} · dissolves ${nDiss} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe song] '+m));
+  if(!nBad && nEv) console.log('[scaleprobe song] no event carries a degree; every price, segment, chased note, editor row and dissolve is well-formed and matches the frozen references');
+  else if(!nEv) console.log('[scaleprobe song] the song has no pitched events — run await P.seed({replace:true}) first');
+  return { events:nEv, segments:nSeg, chase:nChase, rows:nRow, dissolves:nDiss, total:nBad, differences:bad };
 }

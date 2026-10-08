@@ -7,7 +7,7 @@ import { scaleIdx, tonic, setScaleIdx, setTonic, tunedFrom, setTunedFrom, setSev
          handActOf, setHandAct,
          fxIsScalar, FX_VOL, fxVolReset,   // VOL-2: запись громкости цепи (строка панели) и её сброс на горизонталь для уроков; chainXDriven/fxVolFix/setFxVolFix удалены
          rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
-         rollRole, setRollRole, rollRow0, setRollRow0, rollScale, setRollScale, rollRowsAll, setRollRowsAll,
+         rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
@@ -18,7 +18,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollScaleGroups, rollRowPitch, rollSnapRow, rollDragTargetRow, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollSnapRow, rollDragTargetRow, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -396,7 +396,7 @@ const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTimbreEl=$('rollTimbre'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
-      rollScaleBtn=$('rollScale'), rollRowsBtn=$('rollRows'), rollFrzBtn=$('rollFrz'), rollFrzStateEl=$('rollFrzState');   // F5: заморозка — в баре РЕДАКТОРА (на строке полосы лупера её ставить некуда: там уже три кнопки в 16 px)
+      rollRowsBtn=$('rollRows'), rollFrzBtn=$('rollFrz'), rollFrzStateEl=$('rollFrzState');   // F5: заморозка — в баре РЕДАКТОРА (на строке полосы лупера её ставить некуда: там уже три кнопки в 16 px)
 /* ⛳ РОЛЬ РЕДАКТОРА — РОЛЬ ДОРОЖКИ (T4). Вкладок ролей больше нет: с T2 в дорожке ровно одна роль, и
    селектор с одним вариантом был бы шумом. Роль читаем у recorder (laneRoleOf — из событий дорожки) РОВНО
    в двух местах: на открытии редактора и на смене дорожки. Между ними она не перечитывается — дорожку
@@ -407,7 +407,7 @@ const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
    обязаны уйти. ⚠️ setRollRole — ПЕРВЫМ: rollDefaultRow0 спрашивает группы ладов, а их draw отбирает по роли. */
 function rollEnterTrack(){
   const r=laneRoleOf(editLayer());
-  setRollRole(r); setRollSel(null); setRollDrag(null); setRollScale(0); setRollRow0(rollDefaultRow0(r));
+  setRollRole(r); setRollSel(null); setRollDrag(null); setRollRow0(rollDefaultRow0(r));
 }
 const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
 const rollTotal=()=>Math.max(songBeats(), loop.metre*loop.bars);   // пустая песня — тоже поле: показываем окно подложки
@@ -426,17 +426,7 @@ function applyRollBar(){
   rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1});
   rollTrackBtn.disabled = trackLayers().length<2;
   renderTimbreCtl();
-  /* ЧИП ЛАДА — ТОЛЬКО когда ладов в дорожке больше одного (обычный случай — один, и машинерии на экране
-     быть не должно). Имя лада резолвим через L(): оно локализуется, но группируемся мы по ССЫЛКЕ. */
-  const gs=rollScaleGroups();
-  rollScaleBtn.hidden = gs.length<2;
-  if(gs.length>1){
-    const i=Math.min(rollScale,gs.length-1), g=gs[i];
-    rollScaleBtn.textContent=`${L(g.sc.name)} ${i+1}/${gs.length}`;
-    rollScaleBtn.onclick=()=>{ const g0=rollGeom(), ax0=rollAxisNow(); setRollScale((i+1)%gs.length);   // T6a-2: прокрутка — тот же РЕГИСТР (у другого лада высоты не сравниваем)
-      if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows, 'reg'));
-      setRollSel(null); setRollDrag(null); applyRollBar(); };
-  }
+  /* (Чип лада #rollScale снят в T4c-2: у дорожки один вид строя — маршрут по строю, см. draw.rollGroup.) */
   /* T3: КНОПКА «ВСЕ / ЛАД» — только когда у лада оси есть высоты строя вне лада (rollAxisHasDim); подпись — ТЕКУЩИЙ вид. */
   rollRowsBtn.hidden = !rollAxisHasDim();
   rollRowsBtn.textContent = t(rollRowsAll ? 'roll.rowsAll' : 'roll.rowsMode');
@@ -451,7 +441,7 @@ function applyRollBar(){
    открытая роль показывала бы пустой верх лада. Ударным прокрутка не нужна вовсе. */
 function rollDefaultRow0(role){
   if(role==null||role==='dr') return 0;   // T4: null — дорожка без нот, оси нет и прокручивать нечего
-  const g=rollGeom(), sc=(rollScaleGroups()[0]||{}).sc||CUR();
+  const g=rollGeom(), tv=rollTrackView(), sc=(tv&&tv.sc)||CUR();
   const rows=g&&g.pitched?g.rows:8;
   return rollDefaultRow0For(sc, rectOctReg(role), rows);   // T4b4-1: рядов на регистр — у ОСИ (у «Все» их больше, чем ступеней лада)
 }
@@ -680,7 +670,7 @@ if(rollShapeEl) rollShapeEl.onclick=()=>{
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRollBtns(); };
 /* T3: «Все» ↔ «Лад». Меняется только ПОКАЗ (ось), не песня: выделение и правки не трогаются; прокрутка row0 зажимается снимком сама. */
 rollRowsBtn.onclick=()=>{ const g0=rollGeom(), ax0=rollAxisNow(); setRollRowsAll(!rollRowsAll);   // T6a-2: прокрутка — та же ВЫСОТА в той же точке окна (прежде row0 ехал числом и окно уезжало в другой регистр)
-  if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows, 'pitch'));
+  if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows));
   setRollDrag(null); applyRollBar(); };
 /* T3: ОДНОРАЗОВОЕ ИЗВЕСТИЕ — правка или вставка пришлась на приглушённый ряд (высота строя вне лада) и прилипла к ближайшей ступени
    лада. Призрак показывает это и так (он перескакивает приглушённые ряды); слово — чтобы прилипание не читалось поломкой. Раз за сессию. */
@@ -1041,8 +1031,8 @@ function rollUp(e){
         if(rollRole==='dr') ev=editInsertHit(tt, h.row);
         else{
           /* ⛳ ЛАД ВСТАВЛЕННОЙ НОТЫ — ЛАД ПОКАЗАННОЙ ОСИ, а не живой: нота рождается там, где её нарисовали.
-             Опустевшая дорожка групп не имеет — тогда честно берём живой лад (новый материал в текущем строе). */
-          const g2=rollGeom(), gs=rollScaleGroups(), G=gs[Math.min(rollScale,Math.max(0,gs.length-1))];
+             Опустевшая дорожка вида не имеет — тогда честно берём живой лад (новый материал в текущем строе). T4c-2: вид у дорожки один. */
+          const g2=rollGeom(), G=rollTrackView();
           const sc=(G&&G.sc)||CUR(), sev=G?G.sev:seventh;   // есть группа — её замороженный септаккорд; роль пуста — живой (новый материал в текущем строе)
           const sr=rollSnapRow(h.row), pit=rollRowPitch(sr, sc);   // T3: тап по приглушённому ряду — нота встаёт на ближайшую ступень лада (правка на приглушённом — T5)
           if(sr!==h.row) rollDimHint();

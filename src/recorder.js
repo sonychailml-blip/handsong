@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, stackPower } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -247,8 +247,6 @@ let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГ
    подсветки нет, и ничего не бросает. ⛳ T4c-1: событие без индекса — подсветки нет (ступень больше не читается; запасной путь снят).
    Для ступеней 0..n ответ — ровно пара события (проба P.checkHl). Зовётся на СОБЫТИЕ аккорда (планировщик, догонялка), не на кадр. */
 function hlOf(a,sc){ return modeSlotOfTi(a.ti, a.oct, sc); }   // modeSlotOfTi сам отвечает null на нечисловой индекс
-/* LEGACY (T4b4) — прежнее место подсветки ПО СТУПЕНИ, слово в слово. ⛔ Читает ТОЛЬКО проба (P.checkHl); уходит в T4c. */
-const legacyHlOf=a=>({ deg:a.deg, oct:a.oct });
 const setLoopChordHl=(a,sc)=>{ const p=hlOf(a,sc); curChordDeg= p ? p.deg : -1; curChordOct= p ? p.oct : 0; };
 /* ⛳ ДЛИНА ПЕСНИ — ВЫВОДИМАЯ, а не заданная: это позиция последнего события. Раньше длину задавал
    человек (loop.bars, 1..8), потому что от неё зависел заворот; заворота нет, и задавать нечего —
@@ -1095,7 +1093,7 @@ const frzBufOwns=layer=>{ const f=frzOf(layer); return !!(f&&f.armedRep!=null); 
    ⛳ В ПОДПИСЬ ДОРОЖКИ он попадает ТОЛЬКО через эту запасную ветку (noSc в freezeSig): у события есть sc — вариант лада со своим
    якорем, и смена выбора его звук не меняет; значит замороженная дорожка от передвижения выбора НЕ стареет (мемо подписи лишь
    пересчитается к той же строке). ⛳ T2: пара scaleIdx + tunedFrom — ровно КЛЮЧ ВИДА (строй, лад, якорь), который отдаёт CUR(). */
-const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct(),stackPower()?1:0].join(',');   // stackPower — временный переключатель R.powerOld: сбрасывает мемо подписей   // droneNonOct — выбор второй струны дрона Болена–Пирса (R.droneBP): меняет звук дрона
+const frzPinned=()=>[tonic,aRef,scaleIdx,tunedFrom,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct()].join(',');   // T4c-2: флаг временного R.powerOld снят вместе с ним
 const frzGlobalKey=()=>events.length+'|'+evGen+'|'+takeFxVer+'|'+frzPinned();
 const frzSigMemo=new Map(); let frzSigG=null;
 /* ⛳ ВЕРСИЯ ПРАВОК ДОРОЖКИ (A2) — по ID, не по номеру (правило #27). Поднимается там же, где takeFxTouch
@@ -1130,10 +1128,9 @@ function freezeSig(layer){
      ⚠️ Мемо подписи сбрасывается по глобальному ключу (число событий, поколение, takeFxVer, приколоченное):
      замена тембра обязана пройти через editCommit — он поднимает takeFxVer, как и любая правка редактора. */
   const tmix=(h,tag,x)=>(Math.imul(h,31)+tag*64+((x==null?-1:x)|0)+1)|0;   // индексы < 63 (тембров соло 23, наборов 5). ⚠️ ВЕРНО ТОЛЬКО ДЛЯ ВСТРОЕННЫХ ИНДЕКСОВ: id упакован малым целым (|0), и строковый id (стабильные id тембров, BACKLOG §7.4) свернётся в 0 — два разных тембра подпишутся одинаково. ПЕРЕПИСАТЬ вместе со стабильными id
-  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false, tim=0, stk=false;
+  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false, tim=0;
   for(const e of events) if(e.layer===layer){
     n++; sum+=e.t; if(first===null||e.t<first) first=e.t; if(last===null||e.t>last) last=e.t;
-    if((e.fn==='chOn'||e.fn==='chSet') && e.a && !e.a.ty && e.sc && e.sc.chordRule && e.sc.chordRule.kind==='stack') stk=true;   // аккорд-стопка: его звук зависит от R.powerOld
     if(!e.sc) noSc=true;
     if(e.fn==='drone') noSc=true;   // слайс «дрон и центы»: дрон читает ЖИВОЙ лад (вторая струна — ступень лада, scales.droneDegree), а не sc события — значит смена лада/«строй от» меняет его звук, и замороженная дорожка с дроном обязана устареть
     const a=e.a; if(a){ if(e.fn==='leadOn'){ tim=tmix(tim,1,a.inst); if(a.inst===undefined) ld=true; }
@@ -1143,7 +1140,7 @@ function freezeSig(layer){
                         else if(e.fn==='drum') tim=tmix(tim,4,a.kit); } }
   const id=laneOf(layer), ver=id==null?0:(laneEditVer.get(id)||0);
   const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+tonic+','+aRef+','+loop.bpm
-         +'|'+(noSc?scaleIdx+','+tunedFrom+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim+(stk?'|p'+(stackPower()?1:0):'');   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
+         +'|'+(noSc?scaleIdx+','+tunedFrom+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim;   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
   frzSigMemo.set(layer, v);
   return v;
 }
@@ -1433,19 +1430,25 @@ function editOpen(layer){
   return true;
 }
 function editClose(){ editLane=null; editHist=[]; editFuture=[]; editTake=0; }
-/* ⛳ T4c-1, ТОЛЬКО ДЛЯ ПРОБЫ (P.checkStrip): выполнить fn над ДРУГИМ списком событий — содержимое массива events подменяется НА МЕСТЕ
-   (ссылка священна — правило #28), schedInvalidate перестраивает курсоры, ноты, сегменты, кэш догонялки и длину песни; в finally всё
-   возвращается тем же путём. Синхронно: ни кадр, ни тик сердца не встрянут между подменой и возвратом. Отказ — пока идёт запись, играет
-   транспорт или открыт редактор (его история держит ссылки на события). → { ok:true, value } или { ok:false, why }. */
-function probeWithEvents(list,fn){
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkWrite): ВЗЯТОЕ В ПЕСОЧНИЦЕ — шаги сценария проходят НАСТОЯЩУЮ воронку записи (seedTake → push: маршрут,
+   ключи, копия карты эффектов, перевод ступени в индекс), получившиеся события отдаются копиями, а песня возвращается как была: события
+   (содержимое массива — на месте, правило #28), дорожки без событий снимаются (lanePrune — с ними и захват взятого), состояние взятого
+   очищается. Счётчики laneSeq/takeSeq остаются продвинутыми (они монотонны по замыслу): у дорожек, рождённых ПОСЛЕ, другой номер
+   (и другое семя заморозки) — существующих это не касается. Отказ — запись, игра транспорта, открытый редактор, звук не запущен. */
+function probeTake(steps){
+  if(!AC) return { ok:false, why:'audio is not started (press ▶ Play)' };
   if(recording) return { ok:false, why:'recording' };
   if(loop.on) return { ok:false, why:'the transport is playing' };
   if(editLane!=null) return { ok:false, why:'the track editor is open' };
-  const keep=events.slice();
-  events.length=0; for(const e of list) events.push(e);
-  schedInvalidate();
-  try{ return { ok:true, value:fn() }; }
-  finally{ events.length=0; for(const e of keep) events.push(e); schedInvalidate(); }
+  const keep=events.slice(), had=new Set(keep), keepLayer=loop.layer, keepTake=curTake;
+  let out=null;
+  try{ const r=seedTake(steps); if(r) out=events.filter(e=>!had.has(e)).map(e=>({...e, a:e.a&&{...e.a}})); }
+  finally{
+    events.length=0; for(const e of keep) events.push(e);
+    takeSt.clear(); takeSrc.clear(); loop.layer=keepLayer; curTake=keepTake;
+    schedInvalidate(); lanePrune();
+  }
+  return out ? { ok:true, events:out } : { ok:false, why:'the recorder refused the take' };
 }
 /* Сменить открытую дорожку, не закрывая редактор (чип дорожки в панели). Звук уже заглушён открытием. */
 function editSetLayer(layer){
@@ -1526,9 +1529,7 @@ function editGuard(backingOk){
   if(loop.on) onLoop();
   return true;
 }
-function editCommit(){ tiRestamp(); events.sort((x,y)=>x.t-y.t); schedInvalidate(); takeFxTouch(); laneEditTouch(); }
-/* T4a: правка, сменившая ступень, несёт старый индекс (новая нагрузка — разворот старой) — пересчитываем на месте; у неизменных совпадает. */
-function tiRestamp(){ for(const e of events){ const ti=eventTuningIndex(e); if(ti!==undefined && e.a.ti!==ti) e.a.ti=ti; } }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка, а не все замороженные   // ОДИН раз на правку: сортировка ДО сброса — он объявляет массив отсортированным (правило #28). O-4: takeFxTouch — от времён СОБЫТИЙ зависит доля старта взятого, то есть база полосы автоматизации и лента переигровки; двигать ноту, не освежив их, значило бы показывать и играть прежнюю базу
+function editCommit(){ events.sort((x,y)=>x.t-y.t); schedInvalidate(); takeFxTouch(); laneEditTouch(); }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка. T4c-2: индекс правка пишет сама (пересчёта по ступени нет — ступени нет)
 /* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
    кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
 function editDrumDefaults(layer,t){
@@ -1626,8 +1627,8 @@ function keyClash(n,a,b){
    ⛳ ЧУЖАЯ НОТА ТОГО ЖЕ КЛЮЧА на новом месте — нота берёт СВЕЖИЙ k (см. шапку): зажим снова разошёлся бы с призраком. */
 /* ⛳ T4c-1: ПРАВКА ПОЛУЧАЕТ ВЫСОТУ ИНДЕКСОМ В СТРОЕ (ti) и регистром — так её отдаёт ряд редактора (draw: ось → {ti, oct}). Ступень лада
    ПИШЕТСЯ по-прежнему (писатели пишут, не читая её: T4c-2 перестанет), её даёт перевод индекса в лад события — обратная выборка;
-   индекс ставит воронка editCommit (tiRestamp). Высоты нет в ладу (ряд вне лада — до T5 ui к таким не тянет) — null: правки нет. */
-function slotPt(ti,oct,sc,ty){ const p=modeSlotOfTi(ti,oct,sc); return p ? (ty ? {deg:p.deg,oct:p.oct,ty} : {deg:p.deg,oct:p.oct}) : null; }
+   (T4c-2: правка пишет индекс сам — ступени в событии больше нет). Высоты нет в ладу (ряд вне лада — до T5 ui к таким не тянет) — null: правки нет. */
+function slotPt(ti,oct,sc,ty){ return modeSlotOfTi(ti,oct,sc) ? (ty ? {ti,oct,ty} : {ti,oct}) : null; }   // T4c-2: пишет ИНДЕКС и регистр; высоты нет в ладу — правки нет (до T5)
 function editMoveNote(n,t,pt){
   const R=EDIT_ROLE[n.role]; if(!R||!pt) return false;                  // U4: ty — однонотный аккорд в КАНОНИЧЕСКОЙ форме ряда (chordUnit); без него — прежние {deg,oct}
   const d=Math.max(0,t)-n.start;
@@ -1937,7 +1938,7 @@ function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — ин�
   if(!editTake) editTake=++takeSeq;
   const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
   const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
-  const evOn =mk('bassOn', {deg:p.deg,oct:p.oct,vol,inst}, t0);
+  const evOn =mk('bassOn', {ti,oct,vol,inst}, t0);   // T4c-2: индекс и регистр, ступени нет
   const evOff=mk('bassOff',{}, t1);
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
@@ -1983,7 +1984,7 @@ function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота ко
   if(!editTake) editTake=++takeSeq;
   const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
   const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
-  const evOn =mk('chOn', {deg:p.deg,oct:p.oct,vol,inst,ty}, t0);
+  const evOn =mk('chOn', {ti,oct,vol,inst,ty}, t0);   // T4c-2: индекс корня и регистр, ступени нет
   const evOff=mk('chOff',{}, t1);
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
@@ -2805,19 +2806,9 @@ const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
    P.checkSound), аккорда — через chordFreqsAt (из индекса — там, где это побитно то же, иначе по ступени: см. её шапку).
    ⛳ ОТКУДА ИНДЕКС: у события — a.ti (T4a, три воронки записи). ЖИВОЙ вызов (W*, ctx==null) несёт нагрузку жестов — у неё индекса нет:
    переводим ступень той же функцией T4a (tuningIndexOf, живой вид CUR) — это не запасной путь, а сама цена живой ноты.
-   ⛳ T4c-1: ЗАПАСНОГО ПУТИ ПО СТУПЕНИ БОЛЬШЕ НЕТ. ЗАПИСАННОЕ событие без a.ti (после T4a их быть не должно — tiAudit) не звучит: индекс
-   undefined, цена — не число, и таблица ниже атаку ПРОПУСКАЕТ (ОДНО предупреждение на каждый разный случай: вид события × лад). Ступень
-   записанного события звук не читает — доказательство P.checkStrip (клону песни стирают a.deg). Живой вызов (ctx==null) — нагрузка жестов,
-   её ступень лада и есть вход (жесты по-прежнему дают ступени лада). */
-const tiFallSeen=new Set();
-function evTi(a,ctx,chord){
-  if(typeof a.ti==='number') return a.ti;
-  if(!ctx) return tuningIndexOf(a.deg, CUR(), chord);         // живая нагрузка жестов: ступень лада → индекс (это сама цена живой ноты)
-  const sc=ctx.sc, key=(ctx.fn||'?')+'|'+(sc&&sc.id);
-  if(!tiFallSeen.has(key)){ tiFallSeen.add(key);
-    console.warn('[T4c ti] replayed '+(ctx.fn||'event')+' in '+(sc&&sc.id)+' has no a.ti — not played (a write path bypassed T4a)'); }
-  return undefined;
-}
+   ⛳ T4c-2: у ЗАПИСАННОГО события — только a.ti (ступени в событии нет); у ЖИВОЙ нагрузки жестов (ctx==null) — её ступень лада,
+   переведённая той же функцией записи: это вход жестов, а не запасной путь. Без индекса цена — не число, и таблица ниже атаку пропускает. */
+function evTi(a,ctx,chord){ return ctx ? a.ti : tuningIndexOf(a.deg, CUR(), chord); }
 /* ⛳ T4c-1: ЦЕНА СОБЫТИЯ ДЛЯ ЗВУКА — ОДНА ЧИСТАЯ ФУНКЦИЯ на роль (соло 'ld', бас 'bs' — частота; аккорд 'ch' — частоты нот). Её зовут
    таблица ENG и проба P.checkStrip — второй формулы нет. Читает a.ti, a.oct, a.ty и вид/септаккорд контекста; ступень — только у ЖИВОЙ
    нагрузки (evTi). Нет цены (нет индекса, высоты нет в ладу) — соло/бас NaN, аккорд — пустой список: таблица атаку пропускает. */
@@ -2843,7 +2834,7 @@ const makeENG=A=>({
                  Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
                  замороженному ладу (полимодальность цела). */
               const base=evHz(a,ctx,'ld');           // T4c-1: цена — из индекса в строе (одна функция с пробой)
-              if(live==null && !okHz(base)) return;  // T4c-1: нет индекса — ноты нет (предупреждение уже в evTi)
+              if(live==null && !okHz(base)) return;  // T4c-1: нет индекса — ноты нет
               if(ctx)A.leadCancel(o,when);           // атака переигранной ноты: снять рампы прошлого бенда (не перетечёт) — ТОЛЬКО в своём голосе и В ТО ЖЕ ВРЕМЯ, что и атака
               const gl=A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль. V4: заодно отдаёт СКОЛЬЖЕНИЕ ноты (или undefined — не задано)
               /* ⛔ V4, КОНТРАКТ V1: живой кадр ТЕРМЕНВОКСА (live!=null) скольжения НЕ получает — его 20 мс это сглаживание слежения, а не
@@ -2894,38 +2885,18 @@ const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?1/(l
    fz — {sc,sev}: ЗАМОРОЖЕННЫЙ ладовый контекст вместо текущего (S3.5e, то же место). Вписанное на шве «вкл»
    обязано нести лад САМОГО аккорда — тот, с которым легло его последнее событие, — а не тот, что сейчас
    выбран в панели. Без at и fz — байт-в-байт как было. */
-/* ═══ T4a УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ: ИНДЕКС В СТРОЕ (a.ti) РЯДОМ СО СТУПЕНЬЮ ═══
-   ⛳ ЗАЧЕМ: нота будет хранить ВЫСОТУ СТРОЯ, а не ступень лада (T4b читает, T4c снимает ступень). В T4a индекс только ПИШЕТСЯ; ИСТИНА —
-   по-прежнему ступень (a.deg): звук, показ, правка, подпись заморозки и все сравнения читают ступень, как прежде.
-   ⛳ ЧТО ЗНАЧИТ: у соло и баса — индекс высоты ноты в строе замороженного вида события (ev.sc; регистр — по-прежнему a.oct); у аккорда —
-   индекс КОРНЯ (тоны аккорда строятся от него типом/септаккордом, как прежде — в T4a о них ничего не меняется). У ударов и дрона
-   высоты нет — поля нет. Ключ (тоника у фиксированных строёв) в индекс не входит: тоника живая. Перевод — ОДНА функция
-   scales.tuningIndexOf (закон оборачивания своей роли).
-   ⛳ КТО ПИШЕТ — ТРИ ВОРОНКИ, через которые проходит КАЖДОЕ событие с высотой (сверено: все events.push и все присваивания ev.a):
-     push           — вся живая запись (соло, терменвокс, бас, аккорд, защёлка на старте записи, переоткрытие аккорда на шве повтора);
-     loadArrangement — подложки и аранжировки;
-     editCommit     — КАЖДАЯ правка редактора (перенос, длина, вставка, отделение, распад, однонотные правки, полоса «в ноте», замена
-                      тембра) и ↶/↷ — все они кончаются editCommit. Правка, менявшая ступень, кладёт новую нагрузку разворотом старой —
-                      со СТАРЫМ индексом; editCommit пересчитывает его на месте (нагрузки правок — свежие объекты; у ↶/↷ они уже верны).
-   ⛳ СТРАЖ (tiAudit в schedInvalidate, TI_AUDIT): обходит все события и сверяет индекс с переводом ступени; каждое РАЗНОЕ расхождение
-   (роль × причина × лад) печатается ОДИН раз — путь записи, забывший воронку, виден сразу, а консоль не тонет.
-   ⚠️ ИНДЕКС НЕ ВХОДИТ НИ В ПОДПИСЬ ЗАМОРОЗКИ (freezeSig читает доли, тембры, версию правок), НИ В ОДНО СРАВНЕНИЕ ПО ЗНАЧЕНИЮ (songSegs
-   сравнивает ступень/регистр/тип; нагрузки целиком нигде не сравниваются и не перебираются) — замороженные дорожки от него не стареют. */
+/* ═══ T4c-2: СОБЫТИЕ ХРАНИТ ВЫСОТУ ИНДЕКСОМ В СТРОЕ (a.ti) И РЕГИСТРОМ (a.oct) — СТУПЕНИ ЛАДА В НЁМ НЕТ ═══
+   Жесты по-прежнему дают СТУПЕНЬ ЛАДА (живая нагрузка W*), подложки — тоже (arrange.js строит ступени). На входе в песню она
+   ПЕРЕВОДИТСЯ в индекс строя замороженного вида события (scales.tuningIndexOf, закон своей роли: мелодия и бас — по n+1, аккорд — по n;
+   ключ тоники в индекс не входит — тоника живая) и НЕ СОХРАНЯЕТСЯ. Воронок записи с высотой две: push (вся живая запись) и
+   loadArrangement (подложки); правки редактора пишут индекс сами (ряд оси отдаёт его — draw pitchOf → {ti, oct}). Удары и дрон высоты
+   не несут. Прежний страж tiAudit и пересчёт tiRestamp сняты: сверять индекс не с чем. Каждое событие с высотой несёт индекс и регистр —
+   это проверяет песенная строка пробы (P.checkSong). */
 const TI_FN=new Set(['leadOn','leadSet','bassOn','bassSet','chOn','chSet']);
-function eventTuningIndex(ev){
-  const a=ev&&ev.a;
-  if(!a || typeof a.deg!=='number' || !TI_FN.has(ev.fn) || !ev.sc) return undefined;
-  return tuningIndexOf(a.deg, ev.sc, ev.fn[0]==='c');
-}
-const TI_AUDIT=true;            // страж разработки (T4a–T4c); снимается вместе со ступенью в T4c
-const tiSeen=new Set();
-function tiAudit(){
-  if(!TI_AUDIT) return;
-  for(const e of events){ const ti=eventTuningIndex(e); if(ti===undefined) continue;
-    if(e.a.ti===ti) continue;
-    const why = e.a.ti===undefined ? 'missing' : 'differs', key=e.fn+'|'+why+'|'+(e.sc&&e.sc.id);
-    if(tiSeen.has(key)) continue; tiSeen.add(key);
-    console.warn('[T4a ti] '+e.fn+' in '+(e.sc&&e.sc.id)+': tuning index '+why+' (stored '+e.a.ti+', degree '+e.a.deg+' converts to '+ti+') — a write path bypassed the stamping funnels'); }
+function storeTi(fn,a,sc){
+  if(!a || !('deg' in a)) return a;
+  const { deg, ...rest }=a;
+  return (TI_FN.has(fn) && typeof deg==='number' && sc) ? { ...rest, ti:tuningIndexOf(deg, sc, fn[0]==='c') } : rest;
 }
 function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: ведение и «выкл» передают слой СВОЕЙ ноты (r.layer / recCh.layer / recBass.layer); «вкл» и удар передают undefined — тогда слой выбирает МАРШРУТ ПО РОЛИ (takeRoute), и только ПОСЛЕ отказа отсчёта. Куда легло — pushLy. // → true, если событие ЛЕГЛО в массив (S4.1: открывающие пути записи ставят состояние только по true). q — ЗАМОРОЖЕННОЕ на ноте решение квантизации (S4.3); не задано — текущее loop.quant
   if(!AC)return false;
@@ -3002,7 +2973,7 @@ function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: в�
   const ev={t,layer:ly,fn,a,sc:fz?fz.sc:CUR(),sev:fz?fz.sev:seventh,tk:curTake};   // §3.4: замораживаем ладовый контекст события (fz — уже замороженный, S3.5e); tk — номер взятого (S3.5d)
   if(a && a.fx) ev.a={...a, fx:{...a.fx}};
   if(S.k && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:S.k};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
-  { const ti=eventTuningIndex(ev); if(ti!==undefined) ev.a={...ev.a, ti}; }   // T4a: индекс в строе — НОВОЙ нагрузкой (вызывающий мог отдать свой объект; ссылка на кривую бенда a.bend сохраняется)
+  ev.a=storeTi(fn,ev.a,ev.sc);   // T4c-2: ступень жеста → индекс в строе вида события, ступень не хранится (новой нагрузкой) (вызывающий мог отдать свой объект; ссылка на кривую бенда a.bend сохраняется)
   events.push(ev);
   if(cb===1) S.chLastT=t; else if(cb===2) S.bsLast.set(bv,t);   // S4.3: страж ключа (T1: по слою; P2: у баса — по номеру ноты)
   if(t>recHiT) recHiT=t;                               // S4.3: высшая записанная доля участка (отличает шов от прыжка)
@@ -3586,7 +3557,7 @@ function cursSeek(c,x){
    меняющем состав событий (правило #28) — второго списка мест не заводим. Запись (push) его не зовёт,
    но она меняет длину на каждом событии. */
 let evGen=0;
-function schedInvalidate(){ evGen++; cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); tiAudit(); }   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
+function schedInvalidate(){ evGen++; cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); }   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
 /* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
    событием: каждый splice сдвигает ВЕСЬ хвост, поэтому снятие 10 000 событий из 30 000 — это сотни
    миллионов перемещений, то есть многосекундная заморозка потока, на котором висят и распознавание, и
@@ -3787,7 +3758,7 @@ function chaseNote(s,x){
   const a={...s.on.a, ...(s.set?(s.role==='ld'?s.set.a:noInst(s.set.a)):null)};   // T0-fix: у СОЛО тембр — от последнего ведения (нота переливается живьём, в точке входа звучал он); у баса — от атаки (он печётся на «вкл», ведение его не несёт); у аккорда в chSet тембра нет вовсе
   const ctx=(s.set&&!hold)?s.set:s.on;
   if(s.role==='ld'){
-    if(hold){ delete a.deg; a.oct=s.on.a.oct; a.ti=s.on.a.ti; }   // T4b2: ИНДЕКС и регистр атаки (см. шапку). ⛳ T4c-1: ступень не копируется (её не читает никто) — живую ступень ведения снимаем, чтобы не лежала чужая
+    if(hold){ a.oct=s.on.a.oct; a.ti=s.on.a.ti; }   // T4b2: ИНДЕКС и регистр атаки (см. шапку). ⛳ T4c-1: ступень не копируется (её не читает никто) — живую ступень ведения снимаем, чтобы не лежала чужая
     /* Кривая бенда — от момента атаки; догоняем её ОСТАТОК: значение на входе становится точкой dt=0,
        дальнейшие точки сдвигаются на прошедшее. Без этого глиссандо начиналось бы заново с атаки. */
     const B=s.on.a.bend;
@@ -3931,7 +3902,7 @@ function editViewCheck(ev,sc){ const g=songSegs().byEv.get(ev);
 function trackViewCheck(layer,sc){ const V=layerViews(layer);
   if(sc&&V.size&&!V.has(sc)) viewWarn('insert',`an insert wrote a tuning view the track L${layer+1} does not hold`); }
 /* T4b2: индекс в строе ХРАНИМОГО события (T4c-1: только a.ti; у события без него — undefined, ступень не читается). */
-const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : undefined; };   // ⛳ T4c-1: перевода ступени больше нет — нет индекса, нет высоты
+const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : undefined; };   // T4c-2: ступени в событии нет вовсе   // ⛳ T4c-1: перевода ступени больше нет — нет индекса, нет высоты
 function songSegs(){
   const V=songNotes();
   if(segView&&segView.view===V) return segView;
@@ -3953,7 +3924,7 @@ function songSegs(){
       /* ⛳ T4b2: СМЕНА ВЫСОТЫ — по ХРАНИМОЙ ПАРЕ (индекс в строе a.ti, регистр a.oct), у аккорда ещё тип по значению; ⛔ НЕ по абсолютной
          высоте: дубль тоники вверху регистра r и корень регистра r+1 звучат одинаково, но это РАЗНЫЕ записанные пары, и редактор держит
          их разными нотами (как держал по ступени). В пределах одного вида пара (ti, oct) взаимно однозначна с (ступень, регистр) — ответ
-         прежний; доказательство — проба P.checkLogic (сегменты всей песни против legacySongSegs). */
+         прежний; доказательство было пробой P.checkLogic (против прежних сегментов по ступени) — снята в T4c-2 вместе со ступенью. */
       const ti=storedTi(ev);
       const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
                            (ti!==cur.ti || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));   // U1: тип — ПО ЗНАЧЕНИЮ (tyEq)
@@ -3972,49 +3943,6 @@ function songSegs(){
   segs.sort((a,b)=>a.start-b.start);
   segView={ view:V, segs, byEv };
   return segView;
-}
-/* ═══ LEGACY (T4b2) — ПРЕЖНЯЯ ЛОГИКА ПО СТУПЕНИ, ТОЛЬКО ДЛЯ ПРОБЫ (P.checkLogic). В приложении их не зовёт никто; уходят в T4c. ═══ */
-/* Сегменты всей песни, как считались до T4b2 (смена высоты — по ступени), без мемо — тот же проход, что songSegs. */
-function legacySongSegs(){
-  const V=songNotes(), segs=[], byEv=new Map();
-  for(const n of V.notes){
-    if(n.role!=='bs'&&n.role!=='ld'&&n.role!=='ch') continue;
-    const therm=ldTherm(n);
-    let cur=null;
-    for(const ev of n.evs){
-      const kind=chaseKind(ev.fn);
-      if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }
-      const a=ev.a||{};
-      const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
-                           (a.deg!==cur.deg || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));
-      if(kind==='n'||pitchChanged){
-        if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }
-        cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
-              first:ev===n.head, start:ev.t, end:null, endBy:'open',
-              deg:a.deg, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };
-        segs.push(cur); byEv.set(ev,cur);
-      }else byEv.set(ev,cur);
-    }
-    if(cur&&cur.end==null&&n.end!=null){ cur.end=n.end; cur.endBy=n.endBy; }
-  }
-  segs.sort((a,b)=>a.start-b.start);
-  return { segs, byEv };
-}
-/* Нагрузка догнанной ноты, как собиралась до T4b2 (у ноты терменвокса индекс оставался от ведения — см. chaseNote). */
-function legacyChaseNote(s,x){
-  const hold=!!(s.set&&s.set.a.hold);
-  const a={...s.on.a, ...(s.set?(s.role==='ld'?s.set.a:noInst(s.set.a)):null)};
-  const ctx=(s.set&&!hold)?s.set:s.on;
-  if(s.role==='ld'){
-    if(hold){ a.deg=s.on.a.deg; a.oct=s.on.a.oct; }
-    const B=s.on.a.bend;
-    if(B&&B.length){ const off=x-s.on.t; let k=-1;
-      for(let j=0;j<B.length&&B[j].dt<=off;j++) k=j;
-      const nb= k>=0 ? [{dt:0,c:B[k].c}] : [];
-      for(let j=k+1;j<B.length;j++) nb.push({dt:B[j].dt-off,c:B[j].c});
-      a.bend=nb; }
-  }
-  return {a,ctx};
 }
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
    ⚠️ УСЛОВИЯ РАЗВЁРНУТЫ В continue-ветки (было одно длинное &&) РАДИ ЧИТАЕМОСТИ ПОСЛЕ ДОБАВЛЕНИЯ
@@ -4271,10 +4199,7 @@ function loadArrangement(sel, jam=false){
      быть занят — снятая подложка освобождает свои номера, а следующая берёт их же. */
   arr.layers.forEach((evs,li)=>{ const layer=base+li; laneLen.set(laneNew(layer), arr.bars*loop.metre); const tk=++takeSeq;   // длина материала слоя — все такты подложки (см. laneLen)   // S3.5d: каждый слой подложки — своё взятое → ⤺ снимает их по одному, сначала ритм (как прежде)
     takeCapStart(tk);   // O-2: у слоя подложки тоже своё взятое — значит и свой снимок цепей. Дорожки автоматизации у него не будет (его никто не играл руками), и это верно: у него нет движения, только настройки
-    for(const e of evs){ const ev={t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh, tk};
-      { const ti=eventTuningIndex(ev); if(ti!==undefined) ev.a={...ev.a, ti}; }   // T4a: индекс в строе у ступени подложки
-      if(jam)ev.jam=true;                              // МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока (см. clearJam)
-      events.push(ev); } });
+    for(const e of evs) events.push(backingEvent(e, layer, tk, jam)); });
   events.sort((x,y)=>x.t-y.t);
   schedInvalidate();                                   // добавили слои и пересортировали → курсоры недействительны (startTransport ниже сбросит ещё раз, если транспорт стоял — это дёшево и безвредно)
   /* ⛳ ПОДЛОЖКА КРУТИТСЯ САМА — КАК ДО S3.3 (починка при слайсе «дрон и центы»). До S3.3 подложка на пустой петле задавала длину петли
@@ -4292,6 +4217,15 @@ function loadArrangement(sel, jam=false){
 /* Джем — та же аранжировка-shortcut, но её слои ПОМЕЧЕНЫ (e.jam). loadJam кладёт помеченные,
    clearJam снимает РОВНО их. Записи игрока (push никогда не ставит jam) неуязвимы по построению. */
 const loadJam=sel=>loadArrangement(sel, true);
+/* ⛳ ВОРОНКА ПОДЛОЖКИ — ОДНО СОБЫТИЕ (вынесено из loadArrangement, чтобы проба P.checkWrite кормила ту же функцию, что и приложение).
+   Вид и септаккорд — живые (подложка ложится в текущем ладу), ступень → индекс в строе вида (storeTi), ступень не хранится (T4c-2);
+   прочие поля нагрузки — как их дал arrange.js. jam — МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока. */
+function backingEvent(e, layer, tk, jam){
+  const ev={t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh, tk};
+  ev.a=storeTi(ev.fn,ev.a,ev.sc);
+  if(jam) ev.jam=true;
+  return ev;
+}
 function clearJam(){
   if(!events.length)return;
   const removed=compactEvents(e=>e.jam);               // ОДИН проход вместо splice-в-цикле (см. compactEvents)
@@ -4497,9 +4431,9 @@ export {
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
   seedTake,   // засев тестовой песни через push (scaleprobe P.seed) — не часть игры
   viewAudit, editViewCheck,   // T6a: защитные проверки вида — сводка для пробы P.checkRules и проверка правки (ui зовёт у расшифровки ряда)
-  evHz, evReg, segChordNotes, probeWithEvents,   // T4c-1: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
-  hlOf, legacyHlOf,   // T4b4: место подсветки переигранной ноты из индекса и прежнее по ступени — для пробы P.checkHl; legacy уходит в T4c
-  laneRoleOf, laneLenOf, eventTuningIndex, chaseFor, chaseNote, legacyChaseNote, legacySongSegs,   // chaseFor/chaseNote и legacy* (T4b2) — для пробы P.checkLogic; legacy уходят в T4c. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
+  evHz, evReg, segChordNotes, probeTake, backingEvent,   // T4c-1/T4c-2: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
+  hlOf,   // T4b4: место подсветки переигранной ноты из индекса (прежнее по ступени снято в T4c-2) — для пробы P.checkHl; legacy уходит в T4c
+  laneRoleOf, laneLenOf, chaseFor, chaseNote,   // chaseFor/chaseNote — для песенной строки пробы (P.checkSong); legacy* сняты в T4c-2. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять
   /* F3 — ОФЛАЙН-РЕНДЕР: та же таблица диспетчеризации против ЧУЖОЙ копии движка · то же слияние ленты автоматизации (⛔ второго не
      писать) · роль события (чья это цепь эффектов) · fxLaneExpand — плавные отрезки ленты, развёрнутые в точки шагом тика (рендер и

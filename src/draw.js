@@ -1,9 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, modeSlotOfTi, legacyChordNotesRef } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollScale, rollRowsAll, tonic, ROLL_EDITABLE,
+         rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
          rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
@@ -852,29 +852,27 @@ function rollHits(){
     rollCache={ view:V, layer:ly, hits: ly==null?[] : V.notes.filter(n=>n.role==='dr'&&n.layer===ly).map(n=>n.head) };
   return rollCache.hits;
 }
-/* ═══ ВЫСОТНЫЕ РОЛИ: ГРУППЫ ЛАДОВ И РЯДЫ (S5.5) ═══
-   ⛳ ГРУППИРУЕМ ПО ССЫЛКЕ НА ЛАД (правило #25: имя — не идентификатор; два разных лада могут называться
-   одинаково после локализации, а один и тот же объект — это один и тот же лад).
-   Дорожка МОЖЕТ держать события в разных ладах: смена лада во время записи ничем не закрыта (ui зовёт
-   setScaleIdx+softAllOff, запись продолжается), и слияние взятых кладёт их рядом. Две ступенные оси
-   честно не нарисовать — поэтому одна группа даёт ОСЬ, прочие показываются призраками.
+/* ═══ ВЫСОТНАЯ ДОРОЖКА: ЕЁ ВИД СТРОЯ И ЕЁ СЕГМЕНТЫ (S5.5; с T4c-2 — ОДНА группа) ═══
+   ⛳ T4c-2: дорожка держит ОДИН вид строя — маршрут по строю (noteSource: роль + тембр + вид) рождает новую дорожку на смене лада,
+   строя или «строй от», а вооружённая дорожка принимает только свой источник. Поэтому прежние ГРУППЫ ЛАДОВ (ось — одна группа,
+   прочие — призраки, чип #rollScale для переключения) сняты: группа одна — вид дорожки и её сегменты этой роли. Сегменты ДРУГОГО вида
+   (их не пишет ни один путь; recorder.viewAudit/viewWarn сообщают, если такое появится) не рисуются и не попадаемы — их ступени
+   мерились бы чужой осью. Вид выбирается ПО ССЫЛКЕ (правило #25), первым сегментом дорожки.
    Мемо — на идентичность вида сегментов (он же мемо на songNotes), чтобы не пересобирать на кадр.
-   ⚠️ T4: отбор `s.role!==role` на дорожке одной роли не отсекает ничего — он оставлен как СТРАЖ ОСИ
-   (сегмент мерится осью той роли, которая нарисована), а не как выбор: выбирать больше не из чего. */
-let segCache={view:null,layer:null,role:null,groups:null};
-function rollGroups(){
+   ⚠️ T4: отбор `s.role!==role` на дорожке одной роли не отсекает ничего — он оставлен как СТРАЖ ОСИ. */
+let segCache={view:null,layer:null,role:null,group:null};
+function rollGroup(){
   const SV=songSegs(), ly=rollTrackLayer(), role=rollRole;
   if(segCache.view!==SV||segCache.layer!==ly||segCache.role!==role){
-    const groups=[];
+    let g=null;
     if(ly!=null&&role!=='dr') for(const s of SV.segs){
       if(s.layer!==ly||s.role!==role) continue;
-      let g=groups.find(q=>q.sc===s.sc);                    // ССЫЛКА, не имя
-      if(!g){ g={sc:s.sc, sev:s.sev, segs:[]}; groups.push(g); }
-      g.segs.push(s);
+      if(!g) g={sc:s.sc, sev:s.sev, segs:[]};
+      if(s.sc===g.sc) g.segs.push(s);                        // ССЫЛКА, не имя; чужой вид — не на этой оси
     }
-    segCache={view:SV, layer:ly, role, groups};
+    segCache={view:SV, layer:ly, role, group:g};
   }
-  return segCache.groups;
+  return segCache.group;
 }
 /* Ряды высотной оси: ступени × регистры (с T3 это ось «Лад»; ось «Все» — высоты СТРОЯ × регистры, см. rollAxis ниже — и тот же
    закон дубля тоники наверху регистра). ⛳ СТУПЕНЕЙ — IVX(s).length, то есть iv.length+1: список
@@ -966,19 +964,6 @@ const rollSegRows=(s,ax,total)=>rollSegNotes(s,ax,total).map(x=>x.r);
 const rollGhostSeg=(s,pit)=>({ ...s, ti:pit.ti, oct:pit.oct });   // ⛳ T4c-1: ряд оси отдаёт сам индекс (pitchOf → {ti, oct}) — ровно то, что поставит коммит правки
 /* Какую ноту сегмента берёт палец на дробном ряду rp: ближайшую (первая при равенстве) — { ni, dr }. Одна функция на попадание и пробу. */
 function rollSegPick(ns,rp){ let dr=Infinity, ni=0; ns.forEach((x,i)=>{ const d=Math.abs(x.r-rp); if(d<dr){ dr=d; ni=i; } }); return { ni, dr }; }
-/* ═══ LEGACY (T4b3) — прежние ряд, ноты и призрак сегмента ПО СТУПЕНИ, слово в слово. ⛔ Их читает ТОЛЬКО проба (scaleprobe
-   P.checkRows) — сравнение с путём индекса; в редакторе их не зовёт никто. Уходят в T4c вместе со ступенью.
-   ⛳ T4c-1: у сегмента ступени больше нет — legacy берёт её у ОПРЕДЕЛЯЮЩЕГО события (s.ev.a.deg, записанной; legDeg) — копия для пробы. */
-const legDeg=s=> s.deg!==undefined ? s.deg : (s.ev&&s.ev.a ? s.ev.a.deg : undefined);
-function legacyRollSegRoot(s,ax){ return ax.rowOf(legDeg(s),s.oct); }
-function legacyRollSegNotes(s,ax,total){
-  const r0=ax.rowOf(legDeg(s),s.oct);
-  if(s.role!=='ch') return [{ r:r0, dev:null }];
-  const N=legacyChordNotesRef(legDeg(s),s.oct,s.sc,s.sev,s.ty), F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;   // «стопка»: у лада stack опора — прежняя арифметика стопки. T6b: ноты — ПРЕЖНЕЙ ценой (по ступени и tag) — сравнение рядов покрывает и T6b
-  const fr=chordRowFreq(legDeg(s),s.oct,s.sc,s.sev);
-  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
-}
-const legacyRollGhostSeg=(s,pit)=>{ const p=modeSlotOfTi(pit.ti,pit.oct,s.sc); return { ...s, deg:p?p.deg:undefined, oct:p?p.oct:pit.oct }; };   // T4c-1: ряд отдаёт индекс — прежняя пара (ступень, регистр) из него
 /* ⛳ СКОЛЬКО РЯДОВ У ОСИ АККОРДОВ (U2) — ПО САМОЙ ДОРОЖКЕ, чтобы ни одна нота не упала за край (правило #9: число в снимке, его
    читают и рисунок, и попадание, и прокрутка).
      • НИЗ — ряд 0, и ниже ни одна нота аккорда не звучит ПО ПОСТРОЕНИЮ: корень стоит на ряду своей пары (регистр ≥ 0), а каждый тип
@@ -987,7 +972,7 @@ const legacyRollGhostSeg=(s,pit)=>{ const p=modeSlotOfTi(pit.ti,pit.oct,s.sc); r
      • ВЕРХ — самая высокая звучащая нота дорожки (по scales.chordNotes — тем, чем играет движок), и ещё ЗАПАС ПЕРЕТАСКИВАНИЯ: самый
        широкий аккорд дорожки, поставленный на самый верхний ряд корня (base−1), — чтобы и призрак не уходил за край.
      • Ось не короче обычной (REG_N регистров): в ней лежат все ряды, на которые можно поставить корень (вставка, перенос).
-   Мемо — на идентичность сегментов показанной группы (тот же мемо songSegs → rollGroups) + лад + тоника + A4: от тоники и A4 зависят
+   Мемо — на идентичность сегментов показанной группы (тот же мемо songSegs → rollGroup) + лад + тоника + A4: от тоники и A4 зависят
    частоты рядов и нот (у fixedKey — ключ), а от них — дробные ряды. Таблица частот растёт, пока самая высокая нота в неё не влезет. */
 let rollTopCache={ segs:null };
 function rollChordTotal(G,ax){
@@ -1376,8 +1361,8 @@ function drawRoll(){
   /* ⛳ ГЕОМЕТРИЯ РЯДОВ РАЗНАЯ У РОЛЕЙ, И ЭТО ЕДИНСТВЕННОЕ ИХ РАЗЛИЧИЕ В СНИМКЕ. Ударные: шесть рядов во
      всю высоту, row0=0 — ровно как было. Ладовые роли: ряд фиксированной высоты, видно столько, сколько
      влезло, остальное — прокруткой (row0). */
-  const grp=rollGroups(), G=grp&&grp.length?grp[Math.min(rollScale,grp.length-1)]:null;
-  const axSc = G ? G.sc : CUR();                       // лад ОСИ: показанной группы, иначе живой (пустая роль)
+  const G=rollGroup();
+  const axSc = G ? G.sc : CUR();                       // лад ОСИ: вид дорожки, иначе живой (пустая роль)
   /* ⛳ НЕПРАВИМАЯ РОЛЬ (с S2 — только соло, ждёт S4): вместо сетки ОДНА СТРОКА, почему. Рядов и нот
      не рисуем — нарисованная нота, которую нельзя тронуть, читалась бы как поломка, — а попадание по полю
      молчит (rollHit), иначе вставка ушла бы мимо роли (вставка ведётся по роли — ui.ROLL_INSERT — и соло там пока нет).
@@ -1497,21 +1482,15 @@ function drawRoll(){
   /* ---- СЕГМЕНТЫ ЛАДОВОЙ РОЛИ (S5.5): у каждого своя ДЛИНА (от смены высоты до следующей), поэтому блок
      рисуется от start до end — в отличие от удара, у которого длительности нет вовсе. Открытый сегмент
      (нота без «выкл» — так лежит подложка) тянем до правого края окна: выдумывать ему конец нельзя.
-     ⛳ ПРИЗРАКИ ЧУЖИХ ЛАДОВ — тусклые и НЕ ПОПАДАЕМЫЕ: их ступени измерены не той осью, что нарисована,
-     поэтому показать их можно только как «здесь что-то есть», а трогать — лишь переключив ось. ---- */
+     ⛳ T4c-2: призраков чужих ладов больше нет — у дорожки один вид (см. rollGroup). ---- */
   if(pitched){
     const col=INSTR_COL[rollRole]||'#3ad29f', wEnd=V.beat0+V.span;
-    for(const g of grp){
-      const ghost = g!==G;
+    for(const g of (G?[G]:[])){
       for(const s of g.segs){
         const en = s.end==null ? wEnd : s.end;
         if(en<V.beat0||s.start>wEnd) continue;
         const x=laneBeatX(V,Math.max(s.start,V.beat0)), x2=laneBeatX(V,Math.min(en,wEnd));
         const w=Math.max(3,x2-x);
-        if(ghost){   // призрак: тонкая полоска у нижней кромки — место и время видно, высота честно не показана
-          ctx.fillStyle='rgba(255,255,255,.10)';
-          ctx.fillRect(x,gy1-4,w,3); continue;
-        }
         /* U1: БЛОК НА КАЖДУЮ ЗВУЧАЩУЮ НОТУ (у баса — одна, у аккорда — все его ноты; на ряду или между рядами — rollSegRows). Имя
            аккорда на блоке снято решением пользователя: ноты видны сами. Выделение и ручка длины — у ВСЕХ нот выделенного аккорда:
            выделен аккорд ЦЕЛИКОМ (выбор отдельной ноты — U2). */
@@ -1594,7 +1573,7 @@ function drawRoll(){
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
   /* T4: «пусто» значит одно — в ДОРОЖКЕ не осталось нот (роль у неё одна, «нет этой роли» больше не бывает). */
-  const emptyTrack = noRole || (pitched ? !grp.length : !hits.length);
+  const emptyTrack = noRole || (pitched ? !G : !hits.length);
   if(ly==null||noEdit||emptyTrack){
     ctx.fillStyle='rgba(255,255,255,.55)';
     ctx.fillText(ly==null ? t('roll.noTrack') : noRole ? t('roll.emptyTrack')
@@ -1710,9 +1689,9 @@ export function rollGeom(){ const V=rollView;
    готовой из rollHit); перенос идёт через rollAutDrive, у которого свой шаг. Второй копии шага в ui нет
    (правило #9): он часть ЭТОЙ оси, а не отдельная настройка. */
 export const rollAutSnapV=v=>autSnapV(v);
-/* Группы ладов открытой дорожки — их читает панель (чип лада) и вставка (какой лад заморозить).
-   Отдаём КОПИЮ списка ссылок, а не внутренний кэш: ui не должен уметь его портить. */
-export function rollScaleGroups(){ return rollGroups().map(g=>({ sc:g.sc, sev:g.sev, n:g.segs.length })); }
+/* Вид строя открытой дорожки — его читает вставка (в каком виде родится нота). T4c-2: группа одна (rollGroup); null — у дорожки
+   нет нот этой роли (тогда вставка честно берёт живой вид). Отдаём КОПИЮ полей, а не внутренний кэш. */
+export function rollTrackView(){ const G=rollGroup(); return G ? { sc:G.sc, sev:G.sev } : null; }
 /* Ряд ↔ высота ДЛЯ ВСТАВКИ И ПЕРЕНОСА: ui знает ряд под пальцем, а расшифровать его в (ступень,регистр)
    обязана та же формула, по которой ряды нарисованы. T3: та же ОСЬ (снимок rollView, если лад тот же); приглушённый ряд ступени не
    имеет — отдаём null, и ui сперва прилипает к яркому (rollSnapRow). */
@@ -1722,7 +1701,7 @@ export function rollRowPitch(r,s){ return axisFor(s).pitchOf(r); }
    (показанная группа или живой лад), роль — ладовая и правимая: тот же расчёт, что в drawRoll, не по снимку прошлого кадра. */
 export function rollAxisHasDim(){
   if(rollRole==null||rollRole==='dr'||!ROLL_EDITABLE.includes(rollRole)) return false;
-  const grp=rollGroups(), G=grp&&grp.length?grp[Math.min(rollScale,grp.length-1)]:null;
+  const G=rollGroup();
   return axisHasDim(G?G.sc:CUR());
 }
 /* ⛳ T4b4-1: НИЖНИЙ ВИДИМЫЙ РЯД ПО УМОЛЧАНИЮ — окно на РЕГИСТР reg (липкий регистр роли), из РЯДОВ НА РЕГИСТР ОСИ (ax.rpp), а не из
@@ -1735,7 +1714,7 @@ export function rollDefaultRow0For(sc, reg, rows, ax=rollAxis(sc)){
 /* ⛳ T6a-2: ОСЬ, КОТОРУЮ НАРИСУЕТ СЛЕДУЮЩИЙ КАДР, — тем же выбором группы и тем же «Все/Лад», что drawRoll (по живому состоянию, а не
    по снимку прошлого кадра). ui спрашивает её ДО и ПОСЛЕ переключения, чтобы перевести прокрутку. */
 export function rollAxisNow(){
-  const grp=rollGroups(), G=grp&&grp.length?grp[Math.min(rollScale,grp.length-1)]:null;
+  const G=rollGroup();
   return rollAxis(G?G.sc:CUR());
 }
 /* ⛳ T6a-2: ПРОКРУТКА ЧЕРЕЗ ПЕРЕКЛЮЧЕНИЕ ОСИ — держим то, на что смотрел человек. Якорь — СРЕДНИЙ видимый ряд окна (row0 + ⌊rows/2⌋);
@@ -1743,14 +1722,12 @@ export function rollAxisNow(){
      how='pitch' — «Все» ↔ «Лад» (ОДИН вид, меняются только ряды): якорь — ВЫСОТА. Приглушённый ряд прилипает к ближайшей ступени лада
        (snap — та же функция, что у правки), и ряд этой ступени в новой оси — rowOfTi той же пары (индекс, регистр; T4c-1). Из «Лад» в «Все» высота
        точная; из «Все» в «Лад» у приглушённого якоря — соседняя ступень (на ряд рядом).
-     how='reg'   — чип лада (ДРУГОЙ вид, высоты разных ладов не сравниваем — индекс осмыслен только в своём виде): якорь — РЕГИСТР и доля
+     how='reg'   — (снят в T4c-2 вместе с чипом лада) чип лада (ДРУГОЙ вид, высоты разных ладов не сравниваем — индекс осмыслен только в своём виде): якорь — РЕГИСТР и доля
        внутри него.
    Прежде row0 переносился как число, и в оси с другим числом рядов на регистр окно уезжало в другой регистр. */
-export function rollRow0Across(ax0,ax1,row0,rows,how){
+export function rollRow0Across(ax0,ax1,row0,rows){   // T4c-2: только «Все» ↔ «Лад» (how='pitch'); ветка чипа лада снята вместе с ним
   const mid=row0+Math.floor(rows/2), off=mid-row0;
-  let nr;
-  if(how==='pitch'){ const pt=ax0.pitchOf(ax0.snap(mid)), r1=pt ? ax1.rowOfTi(pt.ti,pt.oct) : undefined; nr = r1!==undefined ? r1 : mid; }   // T4c-1: та же высота — индексом (один вид)
-  else{ const R=Math.floor(mid/ax0.rpp), f=(mid-R*ax0.rpp)/ax0.rpp; nr=R*ax1.rpp+Math.min(ax1.rpp-1,Math.round(f*ax1.rpp)); }
+  const pt=ax0.pitchOf(ax0.snap(mid)), r1=pt ? ax1.rowOfTi(pt.ti,pt.oct) : undefined, nr = r1!==undefined ? r1 : mid;   // T4c-1: та же высота — индексом (один вид)
   return Math.max(0, nr-off);
 }
 /* T3: ближайший ЯРКИЙ ряд (ступень лада) к ряду r оси снимка — правка, вставка и призрак прилипают к нему до T5. */
@@ -1758,11 +1735,12 @@ export function rollSnapRow(r){ const V=rollView; return (V&&V.axis) ? V.axis.sn
 /* T3: ЦЕЛЕВОЙ РЯД КОРНЯ при переносе целого сегмента: ряд корня + сдвиг пальца (ряд пальца − ряд, где взялся), прилипший к яркому ряду.
    ОДНА формула на призрак (draw) и на правку (ui) — правило #9. У баса ряд корня = ряд, где взялся, — целевой ряд = ряд пальца. */
 export function rollDragTargetRow(d){ return rollSnapRow(d.rootRow+((d.row|0)-d.grabRow)); }
-/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (scaleprobe P.checkRows, T4b3): пути рядов редактора — новый (по индексу) и прежний (legacy, по ступени) — без
-   открытого редактора. reset — сброс кэша частот рядов аккордов (с T4b4-1 ответ от истории кэша не зависит — проба это и проверяет:
-   холодный кэш против прогретого). defRow0 — нижний видимый ряд по умолчанию (T4b4-1). Legacy уходят в T4c. */
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (scaleprobe): пути рядов редактора без открытого редактора. reset — сброс кэша частот рядов аккордов (с T4b4-1
+   ответ от истории кэша не зависит — проба это и проверяет). defRow0 — нижний видимый ряд по умолчанию (T4b4-1).
+   ⛳ T4c-2: прежние ряды по ступени ушли в пробу (её «замороженные опоры»); им нужны частоты рядов оси (rowFreqs), место частоты среди
+   них (rowOfFreq) и допуск «на ряду» (onRowCents) — ТЕ ЖЕ функции и число, что у рисунка, отдаются здесь. */
 export const rollRowsProbe={ axis:rollAxis, root:rollSegRoot, notes:rollSegNotes, total:chordTotalWith, pick:rollSegPick, ghost:rollGhostSeg,
-  legacyRoot:legacyRollSegRoot, legacyNotes:legacyRollSegNotes, legacyGhost:legacyRollGhostSeg, defRow0:rollDefaultRow0For, across:rollRow0Across,
+  defRow0:rollDefaultRow0For, across:rollRow0Across, rowFreqs:chRowFreqs, rowOfFreq:chRowOfFreq, onRowCents:ROLL_ON_ROW_CENTS,
   reset:()=>{ chRowCache={ key:null, F:null }; } };
 /* ⛳ ЕДИНСТВЕННАЯ РАЗВИЛКА «ИГРА ИЛИ РЕДАКТОР». Закрыт редактор — ветка та же, что была всегда. */
 function drawOverlays(res){ if(rollOpen){ drawRoll(); return; } drawPhone(res); }
