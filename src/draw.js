@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
@@ -11,7 +11,7 @@ import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxIns
 
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
-         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer, chordMoveTy } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -945,23 +945,23 @@ function chRowOfFreq(f,F,dpo,total){
    palette/none) chordNotesAt сам берёт место корня обратной выборкой. Индекса нет или его нет на оси — ряда нет (NaN: блок не рисуется,
    попадания нет); ниже — прежний текст о запасном пути, теперь снятом.
    Запасной путь по ступени — у сегмента без индекса (после T4a их нет) и у индекса, которого нет на оси (у оси «Лад» — высота вне лада:
-   до T5 её не пишет никто); уходит в T4c. Новых выделений памяти нет: ряд — арифметика оси, списки нот — те же, что у пути ступени. */
-function rollSegRoot(s,ax){
-  const r=ax.rowOfTi(s.ti,s.oct); return r===undefined ? NaN : r;   // T4c-1: только индекс
-}
+   с T5 — дробный ряд между ступенями, ax.placeTi); снят в T4c. Новых выделений памяти нет: ряд — арифметика оси, списки нот — те же, что у пути ступени. */
+/* ⛳ T5: у оси «Лад» нота ВНЕ лада — дробный ряд между ступенями (ax.placeTi) с отступлением dev; корень аккорда вне лада несёт тот же
+   знак, что тон вне ряда. У оси «Все» каждая высота строя — свой целый ряд, dev корня — null, как прежде. */
+function rollSegRoot(s,ax){ return ax.placeTi(s.ti,s.oct).r; }   // T4c-1: только индекс; T5: вне лада у оси «Лад» — между рядами
 function rollSegNotes(s,ax,total){
-  const r0=rollSegRoot(s,ax);
-  if(s.role!=='ch') return [{ r:r0, dev:null }];
+  const P0=ax.placeTi(s.ti,s.oct), r0=P0.r;
+  if(s.role!=='ch') return [{ r:r0, dev:P0.dev }];
   const N=chordNotesAt(s.ti,s.oct,s.sc,s.sev,s.ty);   // T4c-1: ноты — то, чем играет ENG (evHz), из индекса корня
   const F=chRowFreqs(ax,s.sev,total), dpo=ax.rpp;
   const fr=chordRowFreqAt(s.ti,s.oct,s.sc,s.sev);
-  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:null } : chRowOfFreq(n.f,F,dpo,total));
+  return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:P0.dev } : chRowOfFreq(n.f,F,dpo,total));
 }
 const rollSegRows=(s,ax,total)=>rollSegNotes(s,ax,total).map(x=>x.r);
-/* T4b3: СЕГМЕНТ-ПРИЗРАК переноса аккорда на ряд pit — ТА ЖЕ пара, что окажется в песне после правки: ступень и регистр ряда (расшифровка
-   ряда в ступень остаётся до T5) и индекс, который поставит коммит правки (recorder.tiRestamp → tuningIndexOf по закону роли). ⚠️ Без
+/* T4b3: СЕГМЕНТ-ПРИЗРАК переноса аккорда на ряд pit — ТА ЖЕ пара, что окажется в песне после правки: индекс и регистр ряда (T4c-1; с T5 —
+   и приглушённого) и тип, который поставит правка (T5, вариант (а): recorder.chordMoveTy). ⚠️ Без
    индекса призрак прочёл бы ПРЕЖНИЙ индекс сегмента и стоял бы на старом месте — ошибка ПРОИЗВОДНОГО пути (урок T4b2). */
-const rollGhostSeg=(s,pit)=>({ ...s, ti:pit.ti, oct:pit.oct });   // ⛳ T4c-1: ряд оси отдаёт сам индекс (pitchOf → {ti, oct}) — ровно то, что поставит коммит правки
+const rollGhostSeg=(s,pit)=>{ const ty=chordMoveTy(s,pit.ti,pit.oct); return ty===undefined ? { ...s, ti:pit.ti, oct:pit.oct } : { ...s, ti:pit.ti, oct:pit.oct, ty:ty||undefined }; };   // T5 (а): целый нетипизированный аккорд на высоту вне лада — с формой (ТА ЖЕ функция, что у правки); null — правка откажет, призрак пуст   // ⛳ T4c-1: ряд оси отдаёт сам индекс (pitchOf → {ti, oct}) — ровно то, что поставит коммит правки
 /* Какую ноту сегмента берёт палец на дробном ряду rp: ближайшую (первая при равенстве) — { ni, dr }. Одна функция на попадание и пробу. */
 function rollSegPick(ns,rp){ let dr=Infinity, ni=0; ns.forEach((x,i)=>{ const d=Math.abs(x.r-rp); if(d<dr){ dr=d; ni=i; } }); return { ni, dr }; }
 /* ⛳ СКОЛЬКО РЯДОВ У ОСИ АККОРДОВ (U2) — ПО САМОЙ ДОРОЖКЕ, чтобы ни одна нота не упала за край (правило #9: число в снимке, его
@@ -1022,20 +1022,27 @@ function rollDevLbl(x,y,w,h,dev,sel){
    и его же читают попадание, призрак перетаскивания, частоты рядов аккордов, высота оси, колонка подписей и ui (правило #9 — один
    снимок): кто бы ни спросил «какой это ряд», ответ один.
    Форма: { sc, all, hasDim, rpp — рядов на регистр, ents[i] — { deg (ступень лада или −1), j (сдвиг в строе, у оси «Все»), bright, dup },
-            rowOf(deg,oct) → ряд, rowOfTi(ti,oct) → ряд или undefined (T4b3), ent(r), pitchOf(r) → {ti,oct} (T4c-1; прежде {deg,oct}) или null (приглушённый),
-            snap(r) → ближайший ЯРКИЙ ряд }.
+            rowOf(deg,oct) → ряд, rowOfTi(ti,oct) → ряд или undefined (T4b3), ent(r), pitchOf(r) → {ti,oct} (T4c-1; прежде {deg,oct}; с T5 —
+            и у приглушённого ряда), placeTi(ti,oct) → {r, dev} (T5: место ноты на оси, у оси «Лад» — и вне лада, между рядами),
+            snap(r) → ближайший ЯРКИЙ ряд (с T5 — только вставка и прокрутка через «Все/Лад») }.
    ⛳ T4b3: РЯД ИЗ ИНДЕКСА В СТРОЕ (rowOfTi) — рядом с рядом из ступени. Индекс ti (a.ti) — номер высоты строя вида; КЛЮЧ фиксированных
    строёв в нём не лежит (тоника живая) — и в оси его нет: ряды отсчитаны от корня лада, имена несёт живая тоника. Перевод:
      1) сдвиг над корнем лада j = ti − root и регистр R = oct; вне [0, E] (E — высот строя в периоде) сдвиг приводится целым периодом, а
         перенос уходит в регистр — тем же законом, что расщепление мелодии в цене (scales.melodySplit): j = E — ДУБЛЬ тоники наверху
         регистра R (так его пишут и мелодия, и аккорд: ступень n → индекс корень+E), j = 0 — корень регистра R;
      2) ряд внутри регистра: у оси «Все» — сам j (ряд оси И ЕСТЬ высота строя: равный строй — шаг, таблица — номер высоты в таблице, у
-        Баранга отсчёт от его корня 1); у оси «Лад» — номер ступени, чья высота j (ступени лада — яркие ряды; j вне лада — undefined: до T5
-        такой ноты нет, и сегмент читает ступень);
+        Баранга отсчёт от его корня 1); у оси «Лад» — номер ступени, чья высота j (ступени лада — яркие ряды; j вне лада — undefined: с T5
+        такую ноту кладёт между рядами placeTi);
      3) ряд = R·rpp + ряд внутри регистра — та же формула, что у rowOf.
    Для ступеней 0..n (их только и пишут пути записи) rowOfTi(tuningIndexOf(d), o) === rowOf(d, o) в обеих осях — проба P.checkRows.
-   ⚠️ T3 — ТОЛЬКО ПОКАЗ: нота живёт на ступени лада (T4), поэтому правки, вставка и призрак прилипают к ЯРКОМУ ряду (snap); писать на
-   приглушённый — T5. У оси «Лад» все ряды яркие, snap — тождество, rowOf/pitchOf — ровно прежние rollRowOf/rollRowPitch. */
+   ⛳ T5: ПРИГЛУШЁННЫЙ РЯД — ТАКАЯ ЖЕ ЦЕЛЬ ПРАВКИ, КАК ЯРКИЙ. pitchOf расшифровывает любой целый ряд оси в {ti, oct} (у оси «Все» —
+   корень лада + сдвиг ряда j, яркий он или нет), и перенос ноты баса, одной ноты аккорда и целого аккорда кладёт высоту строя вне лада.
+   Прилипание к яркому (snap) осталось у ВСТАВКИ (её правила — U5) и у прокрутки через «Все/Лад». У оси «Лад» все ряды яркие, snap —
+   тождество, rowOf/pitchOf — ровно прежние rollRowOf/rollRowPitch.
+   ⛳ T5: НОТА ВНЕ ЛАДА НА ОСИ «ЛАД» (там приглушённых рядов нет) — placeTi кладёт её МЕЖДУ соседними ступенями лада, на её настоящей
+   высоте (по логарифму частоты — тот же закон, что у тона-отношения между рядами, chRowOfFreq), с отступлением dev в центах от
+   БЛИЖАЙШЕЙ ступени. Рисунок показывает её тем же знаком, что тон вне ряда (светлее, контур цвета роли, «+100»), — никогда не молча
+   пропадает; попадание её ловит (дробный ряд). Цена соседей — leadFreqTi того же вида: отношение частот у мелодии, баса и аккорда одно. */
 const tunSize=T=>T.equal!=null ? T.equal : T.cents.length;
 const tunOf=sc=>sc&&(sc.tuningRec||TUNINGS[sc.tuning]);
 const axisHasDim=sc=>{ const T=tunOf(sc); return !!(T&&sc.sel&&sc.sel.length<tunSize(T)); };
@@ -1057,7 +1064,7 @@ function rollAxis(sc, all=rollRowsAll){
   const TT=tunOf(sc), E=TT&&sc.sel ? tunSize(TT) : 0, root=sc.root|0, jRow=[];
   if(E){ if(useAll) for(let j=0;j<=E;j++) jRow[j]=j;
          else for(let d=0; d<=n; d++) jRow[(d<n ? sc.sel[d] : root+E)-root]=d; }
-  const ax={ sc, all:useAll, hasDim:axisHasDim(sc), rpp, ents,
+  const ax={ sc, all:useAll, hasDim:axisHasDim(sc), rpp, ents,   // placeTi читает ax.rowOfTi — объект называет себя сам
     rowOf:(deg,oct)=>(oct|0)*rpp + (degRow[deg|0] ?? (deg|0)),
     rowOfTi:(ti,oct)=>{ if(!E || typeof ti!=='number') return undefined;
       let j=ti-root, R=oct|0;
@@ -1067,9 +1074,18 @@ function rollAxis(sc, all=rollRowsAll){
     /* ⛳ T4c-1: РЯД → ВЫСОТА ИНДЕКСОМ В СТРОЕ { ti, oct } (не ступенью): ti = корень лада + сдвиг ряда в строе (j оси «Все»; у оси «Лад» —
        сдвиг ступени, дубль — E). Приглушённый ряд — null, как прежде (правка прилипает к яркому: snap); ступень для записи правка
        получает сама переводом индекса в лад события (recorder.slotPt). */
-    pitchOf:r=>{ const e=at(r); if(!(e.deg>=0) || !E) return null;
+    pitchOf:r=>{ if(!E || !Number.isInteger(r)) return null; const e=at(r);   // T5: и приглушённый ряд (у него j оси «Все»); дробный ряд (нота вне лада на оси «Лад») — не цель
       const j= e.j!=null ? e.j : (e.deg<n ? sc.sel[e.deg] : root+E)-root;
       return { ti:root+j, oct:Math.floor(r/rpp) }; },
+    placeTi:(ti,oct)=>{ const r0=ax.rowOfTi(ti,oct); if(r0!==undefined) return { r:r0, dev:null };
+      if(!E || typeof ti!=='number') return { r:NaN, dev:null };
+      let j=ti-root, R=oct|0;
+      if(j<0 || j>E){ const c = j>E ? Math.ceil((j-E)/E) : Math.floor(j/E); j-=E*c; R+=c; }
+      let lo=-1, hi=-1; for(let q=0;q<=E;q++){ if(jRow[q]===undefined) continue; if(q<j) lo=q; else if(q>j){ hi=q; break; } }   // соседние ступени лада: сдвиг 0 — корень, E — дубль, j строго между
+      if(lo<0 || hi<0) return { r:NaN, dev:null };
+      const f=leadFreqTi(root+j,R,sc), fl=leadFreqTi(root+lo,R,sc), fh=leadFreqTi(root+hi,R,sc), rl=R*rpp+jRow[lo];
+      const dl=1200*Math.log2(f/fl), du=1200*Math.log2(f/fh);   // dl > 0, du < 0
+      return { r: rl + (jRow[hi]-jRow[lo])*Math.log(f/fl)/Math.log(fh/fl), dev: Math.abs(du)<dl ? du : dl }; },
     snap:r=>{ if(at(r).bright) return r;
       for(let k=1;k<rpp;k++){ if(r-k>=0 && at(r-k).bright) return r-k; if(at(r+k).bright) return r+k; }   // ничья — к НИЖНЕМУ (детерминированно)
       return r; } };
@@ -1527,8 +1543,8 @@ function drawRoll(){
     /* U3: rollDrag.note — тянут ОДНУ ноту аккорда (перенос во времени или длина): призрак — только её блок, на её же ряду (или между
        рядами — та же rollSegNotes, что нарисовала блок). U4: rollDrag.prow — ЦЕЛЕВОЙ ряд при переносе по высоте (null — высота прежняя):
        призрак стоит ровно на нём — туда нота и ляжет в канонической форме ряда. */
-    /* ⛳ T3: ПРИЗРАК ЦЕЛОГО ПЕРЕНОСА — ТАМ, КУДА ЛЯЖЕТ РЕЗУЛЬТАТ. Целевой ряд корня — rollDragTargetRow (ряд корня + сдвиг пальца,
-       прилипший к ЯРКОМУ ряду) — ТА ЖЕ функция, по которой ui кладёт правку (правило #9). У аккорда призрак — ноты аккорда, построенного
+    /* ⛳ T3: ПРИЗРАК ЦЕЛОГО ПЕРЕНОСА — ТАМ, КУДА ЛЯЖЕТ РЕЗУЛЬТАТ. Цель — rollDragTarget (ряд корня + сдвиг пальца; с T5 без прилипания
+       к яркому ряду, и высота прежняя, пока палец не ушёл с ряда) — ТА ЖЕ функция, по которой ui кладёт правку (правило #9). У аккорда призрак — ноты аккорда, построенного
        на этом корне (rollSegNotes того же сегмента с новой ступенью/регистром): прежде ноты сдвигались на число рядов, и у тонов вне
        ряда (тоны-отношения) или после прилипания к яркому ряду призрак разошёлся бы с результатом. У баса — сам целевой ряд. */
     const gseg = pitched ? songSegs().byEv.get(rollDrag.ev) : null;
@@ -1537,8 +1553,8 @@ function drawRoll(){
     let ghostRows;
     if(oneGhost) ghostRows = rollDrag.prow!=null ? [rollDrag.prow] : rollSegNotes(gseg,AX,V.total).filter((nt,i)=>i===rollDrag.note).map(nt=>nt.r);
     else if(pitched && rollDrag.rootRow!=null){
-      const tr=rollDragTargetRow(rollDrag), pit=AX.pitchOf(tr);
-      ghostRows = (chordGhost && pit) ? rollSegRows(rollGhostSeg(gseg,pit), AX, V.total) : [tr];   // T4b3: призрак — с индексом, который поставит правка
+      const T=rollDragTarget(rollDrag,gseg), pit=T.pit;   // T5: та же цель, что у правки (ui), — приглушённый ряд тоже
+      ghostRows = (gseg && pit) ? rollSegRows(rollGhostSeg(gseg,pit), AX, V.total) : [T.row];   // T5: и у баса — место ноты той же rollSegNotes (у оси «Лад» нота вне лада, перенесённая только во времени, стоит между рядами)   // T4b3: призрак — с индексом, который поставит правка
     }else ghostRows=[rollDrag.row|0];
     const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*(pitched?0.7:0.62);
     /* Призрак ладовой роли держит ДЛИНУ сегмента (rollDrag.len), у удара длины нет — там блок привязки. */
@@ -1693,8 +1709,8 @@ export const rollAutSnapV=v=>autSnapV(v);
    нет нот этой роли (тогда вставка честно берёт живой вид). Отдаём КОПИЮ полей, а не внутренний кэш. */
 export function rollTrackView(){ const G=rollGroup(); return G ? { sc:G.sc, sev:G.sev } : null; }
 /* Ряд ↔ высота ДЛЯ ВСТАВКИ И ПЕРЕНОСА: ui знает ряд под пальцем, а расшифровать его в (ступень,регистр)
-   обязана та же формула, по которой ряды нарисованы. T3: та же ОСЬ (снимок rollView, если лад тот же); приглушённый ряд ступени не
-   имеет — отдаём null, и ui сперва прилипает к яркому (rollSnapRow). */
+   обязана та же формула, по которой ряды нарисованы. T3: та же ОСЬ (снимок rollView, если лад тот же). ⛳ T5: приглушённый ряд — тоже
+   высота строя ({ti, oct}); null — только у дробного ряда. Вставка по-прежнему сперва прилипает к яркому (rollSnapRow, до U5). */
 const axisFor=s=>{ const V=rollView, sc=s||CUR(); return (V&&V.axis&&V.axis.sc===sc) ? V.axis : rollAxis(sc); };
 export function rollRowPitch(r,s){ return axisFor(s).pitchOf(r); }
 /* T3: есть ли у ОСИ открытой дорожки высоты строя вне лада — ui показывает кнопку «Все / Лад» только тогда. Лад — тот же, что у оси
@@ -1730,11 +1746,18 @@ export function rollRow0Across(ax0,ax1,row0,rows){   // T4c-2: только «В
   const pt=ax0.pitchOf(ax0.snap(mid)), r1=pt ? ax1.rowOfTi(pt.ti,pt.oct) : undefined, nr = r1!==undefined ? r1 : mid;   // T4c-1: та же высота — индексом (один вид)
   return Math.max(0, nr-off);
 }
-/* T3: ближайший ЯРКИЙ ряд (ступень лада) к ряду r оси снимка — правка, вставка и призрак прилипают к нему до T5. */
+/* T3: ближайший ЯРКИЙ ряд (ступень лада) к ряду r оси снимка. ⛳ T5: прилипает к нему только ВСТАВКА (её правила — U5); перенос — нет. */
 export function rollSnapRow(r){ const V=rollView; return (V&&V.axis) ? V.axis.snap(r) : r; }
-/* T3: ЦЕЛЕВОЙ РЯД КОРНЯ при переносе целого сегмента: ряд корня + сдвиг пальца (ряд пальца − ряд, где взялся), прилипший к яркому ряду.
-   ОДНА формула на призрак (draw) и на правку (ui) — правило #9. У баса ряд корня = ряд, где взялся, — целевой ряд = ряд пальца. */
-export function rollDragTargetRow(d){ return rollSnapRow(d.rootRow+((d.row|0)-d.grabRow)); }
+/* ⛳ ЦЕЛЬ ПЕРЕНОСА ЦЕЛОГО СЕГМЕНТА → { row, pit }: ряд корня + сдвиг пальца (ряд пальца − ряд, где взялся) и высота этого ряда.
+   ОДНА функция на призрак (draw) и на правку (ui) — правило #9. У баса ряд корня = ряд, где взялся, — целевой ряд = ряд пальца.
+   ⛳ T5: БЕЗ ПРИЛИПАНИЯ — приглушённый ряд такая же цель, как яркий (прежде — rollSnapRow). Палец не ушёл с ряда — высота ПРЕЖНЯЯ
+   (пара сегмента, не расшифровка ряда): у оси «Лад» нота вне лада стоит между рядами (дробный ряд), и перенос во времени не смеет
+   уронить её на ступень. Ушёл — ряд округляется до целого (у целого ряда корня это ровно прежняя формула). */
+export function rollDragTarget(d,seg){
+  if((d.row|0)===d.grabRow) return { row:d.rootRow, pit: seg ? { ti:seg.ti, oct:seg.oct } : null };
+  const row=Math.round(d.rootRow+((d.row|0)-d.grabRow)), V=rollView;
+  return { row, pit: (V&&V.axis) ? V.axis.pitchOf(row) : null };
+}
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (scaleprobe): пути рядов редактора без открытого редактора. reset — сброс кэша частот рядов аккордов (с T4b4-1
    ответ от истории кэша не зависит — проба это и проверяет). defRow0 — нижний видимый ряд по умолчанию (T4b4-1).
    ⛳ T4c-2: прежние ряды по ступени ушли в пробу (её «замороженные опоры»); им нужны частоты рядов оси (rowFreqs), место частоты среди

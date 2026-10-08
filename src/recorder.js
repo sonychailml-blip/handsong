@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, TUNINGS, periodOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -243,7 +243,7 @@ let takeFxOrder=null;
 const FX_CHAIN='#chain';   // ⚠️ ЗАРЕЗЕРВИРОВАННЫЙ id записи состава. Решётка не может встретиться в настоящем fxId (те — идентификаторы), поэтому столкнуться не с чем
 let curChordDeg=-1, curChordOct=0;                   // ступень И РЕГИСТР аккорда, что играет петля сейчас (для подсветки, §Q5). Регистр нужен с многопериодной сеткой: одна ступень живёт в нескольких прямоугольниках, без него подсветка всегда падала бы в нижний
 /* ⛳ T4b4: МЕСТО ПОДСВЕТКИ ПЕРЕИГРАННОЙ/ДОГНАННОЙ НОТЫ — ИЗ ИНДЕКСА В СТРОЕ (a.ti) и регистра, обратной выборкой лада (scales.
-   modeSlotOfTi) в ЛАДУ СОБЫТИЯ (sc — его замороженный вид). { deg, oct } или null — высоты нет в ладу (до T5 такой ноты нет): тогда
+   modeSlotOfTi) в ЛАДУ СОБЫТИЯ (sc — его замороженный вид). { deg, oct } или null — высоты нет в ладу (с T5 — нота, которую редактор поставил на приглушённый ряд): тогда
    подсветки нет, и ничего не бросает. ⛳ T4c-1: событие без индекса — подсветки нет (ступень больше не читается; запасной путь снят).
    Для ступеней 0..n ответ — ровно пара события (проба P.checkHl). Зовётся на СОБЫТИЕ аккорда (планировщик, догонялка), не на кадр. */
 function hlOf(a,sc){ return modeSlotOfTi(a.ti, a.oct, sc); }   // modeSlotOfTi сам отвечает null на нечисловой индекс
@@ -1625,10 +1625,27 @@ function keyClash(n,a,b){
    Такую ноту переносим ЦЕЛИКОМ — «вкл», её ведения громкости и «выкл» на одну и ту же дельту, одной составной
    правкой. Высота — всем событиям, которые её несут («выкл» высоты не несёт).
    ⛳ ЧУЖАЯ НОТА ТОГО ЖЕ КЛЮЧА на новом месте — нота берёт СВЕЖИЙ k (см. шапку): зажим снова разошёлся бы с призраком. */
-/* ⛳ T4c-1: ПРАВКА ПОЛУЧАЕТ ВЫСОТУ ИНДЕКСОМ В СТРОЕ (ti) и регистром — так её отдаёт ряд редактора (draw: ось → {ti, oct}). Ступень лада
-   ПИШЕТСЯ по-прежнему (писатели пишут, не читая её: T4c-2 перестанет), её даёт перевод индекса в лад события — обратная выборка;
-   (T4c-2: правка пишет индекс сам — ступени в событии больше нет). Высоты нет в ладу (ряд вне лада — до T5 ui к таким не тянет) — null: правки нет. */
-function slotPt(ti,oct,sc,ty){ return modeSlotOfTi(ti,oct,sc) ? (ty ? {ti,oct,ty} : {ti,oct}) : null; }   // T4c-2: пишет ИНДЕКС и регистр; высоты нет в ладу — правки нет (до T5)
+/* ⛳ T4c-1: ПРАВКА ПОЛУЧАЕТ ВЫСОТУ ИНДЕКСОМ В СТРОЕ (ti) и регистром — так её отдаёт ряд редактора (draw: ось → {ti, oct}).
+   ⛳ T5: ЛЮБАЯ ВЫСОТА СТРОЯ — ЯРКИЙ ряд или приглушённый. Два слоя (решение пользователя): строй даёт высоты, лад их подсвечивает;
+   правка может выйти из лада, живая игра руками — нет. Нота вне лада — просто другой индекс строя: поля альтерации нет, ступени
+   в событии нет (T4c-2), поэтому писать нечего, кроме самой пары. Прежде (до T5) высота вне лада давала null — правки не было.
+   Отказ — только у нецелого индекса или регистра (такого ряд не отдаёт). */
+function slotPt(ti,oct,ty){ return (Number.isInteger(ti)&&Number.isInteger(oct)) ? (ty ? {ti,oct,ty} : {ti,oct}) : null; }   // T5: без вида — проверять в ладу больше нечего
+/* ⛳ T5, ВАРИАНТ (а) (решение пользователя): ЦЕЛЫЙ НЕТИПИЗИРОВАННЫЙ аккорд, перенесённый на высоту ВНЕ лада (приглушённый ряд),
+   СОХРАНЯЕТ ФОРМУ — становится типизированным со своими НЫНЕШНИМИ интервалами (iv нот segChordNotes — шаги строя от корня, то, что он
+   звучит сейчас). «Терции через ступень лада» от корня вне лада не определены; форма — определена. Вернувшись на яркий ряд, он ОСТАЁТСЯ
+   типизированным (как перенесённые ноты U4): тип в событии — данные, а не ссылка в палитру (правило #7, сравнение — tyEq).
+   → undefined — тип не трогать (не аккорд; уже типизирован — переносится жёстко, как прежде; корень в ладу — правило лада, как прежде);
+     массив интервалов — писать его; null — отказ: форма в шагах строя неотличима от формы по правилу только на РАВНОМ октавном строе,
+     чей шаг — шаг лада (цена нетипизированного — номинально-равная, типизированного — в шагах строя). Сегодня каждый лад с правилом
+     аккордов стоит на таком строе (P.checkRules), так что отказ недостижим; он — страж для лада пользователя.
+   ОДНА функция на правку (editMoveSeg) и на призрак переноса (draw.rollGhostSeg) — правило #9. */
+function chordMoveTy(seg,ti,oct){
+  if(!seg||seg.role!=='ch'||seg.ty||modeSlotOfTi(ti,oct,seg.sc)) return undefined;
+  const sc=seg.sc, T=sc&&TUNINGS[sc.tuning];
+  if(!T || sc.cents || periodOf(sc)!==2 || T.equal!==sc.edo) return null;
+  const N=segChordNotes(seg); return N.length ? N.map(n=>n.iv) : null;
+}
 function editMoveNote(n,t,pt){
   const R=EDIT_ROLE[n.role]; if(!R||!pt) return false;                  // U4: ty — однонотный аккорд в КАНОНИЧЕСКОЙ форме ряда (chordUnit); без него — прежние {deg,oct}
   const d=Math.max(0,t)-n.start;
@@ -1725,9 +1742,10 @@ function commitDetach(P,keep){
    переносится на ряд в КАНОНИЧЕСКОЙ форме (chordUnit) и звучит ровно высоту ряда. Без ty — прежний перенос, тип не трогается. */
 function editMoveSeg(ev,t,ti,oct,ty){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  const pt=slotPt(ti,oct,ev.sc,ty); if(!pt) return false;   // T4c-1: высота — индексом; ступень для записи — переводом в лад события
   if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); с S2 редактор пускает сюда бас и аккорды, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
+  if(ty===undefined){ const ct=chordMoveTy(seg,ti,oct); if(ct===null) return false; ty=ct; }   // ⛳ T5 (а): целый нетипизированный аккорд на высоту вне лада — с формой
+  const pt=slotPt(ti,oct,ty); if(!pt) return false;          // T5: любая высота строя (яркий или приглушённый ряд)
   const nt=Math.max(0,t);
   if(Math.abs(nt-ev.t)<=1e-9){
     const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
@@ -1845,7 +1863,7 @@ function chordNoteEdit(ev,idx,fn){
 /* ⛳ U4: ПЕРЕНОС ОДНОЙ НОТЫ ПО ВЫСОТЕ — тот же распад, затем копия выбранной ноты получает КАНОНИЧЕСКУЮ ФОРМУ РЯДА: ступень и регистр
    ряда (deg/oct — ui расшифровывает ряд rollRowPitch по ладу оси) и однонотный тип scales.chordUnit(лад сегмента) — единицу корня, то
    есть аккорд из одного корня. Нота звучит ровно высоту ряда — ступени лада, то есть высоты СТРОЯ (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ»:
-   ноты строятся из высот строя, лад — подсветка; ряд вне лада — приглушённый, правка на нём — T5, а пока ui прилипает к ярким): нота
+   ноты строятся из высот строя, лад — подсветка; ряд вне лада — приглушённый; с T5 нота встаёт и на него — та же каноническая форма, высота строя вне лада): нота
    вне ряда (чистое отношение между высотами строя), перенесённая
    на ряд, ПРИЛИПАЕТ к нему. Лад события не трогаем (правило #7): форма считается в его же sc.
    deg==null — высота не меняется (только время, U3). Время и высота вместе — ОДНА правка. Высота на все события копии, несущие
@@ -1853,14 +1871,14 @@ function chordNoteEdit(ev,idx,fn){
    Аккорд из одной ноты (сам — нота): обычный перенос сегмента, но с той же канонической формой (editMoveSeg с ty) — иначе его
    прежний однонотный тип [iv] от прежнего корня увёл бы ноту мимо ряда, к которому её тянули (у нетипизированного лада корень
    идёт по ступеням, а интервал — в шагах). */
-/* ⛳ T4c-1: высота приходит ИНДЕКСОМ (ti, oct — ряд оси); ступень для записи — переводом в лад сегмента (slotPt). */
+/* ⛳ T4c-1: высота приходит ИНДЕКСОМ (ti, oct — ряд оси). ⛳ T5: ряд — любой, яркий или приглушённый (slotPt). */
 function editMoveChordNote(ev,idx,t,ti,oct){
   const pitch = ti!=null && oct!=null;
   return chordNoteEdit(ev,idx,(seg,mine)=>{
     if(!mine) return pitch ? editMoveSeg(seg.ev,t,ti,oct,chordUnit(seg.sc)) : editMoveSeg(seg.ev,t,seg.ti,seg.oct);
     const d=Math.max(0,t)-mine[0].t;
     if(Math.abs(d)<=1e-9 && !pitch) return false;
-    const pt=pitch ? slotPt(ti,oct,seg.sc,chordUnit(seg.sc)) : null;
+    const pt=pitch ? slotPt(ti,oct,chordUnit(seg.sc)) : null;   // T5: любая высота строя — однонотный аккорд в канонической форме ряда
     if(pitch && !pt) return false;
     for(const it of mine){ it.t+=d; if(pt && chaseKind(it.fn)!=='f') it.a={...it.a, ...pt}; }
   });
@@ -4427,6 +4445,7 @@ export {
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   editInsertChord,
+  chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки

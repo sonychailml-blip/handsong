@@ -18,7 +18,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollSnapRow, rollDragTargetRow, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollSnapRow, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -672,10 +672,11 @@ rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRo
 rollRowsBtn.onclick=()=>{ const g0=rollGeom(), ax0=rollAxisNow(); setRollRowsAll(!rollRowsAll);   // T6a-2: прокрутка — та же ВЫСОТА в той же точке окна (прежде row0 ехал числом и окно уезжало в другой регистр)
   if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows));
   setRollDrag(null); applyRollBar(); };
-/* T3: ОДНОРАЗОВОЕ ИЗВЕСТИЕ — правка или вставка пришлась на приглушённый ряд (высота строя вне лада) и прилипла к ближайшей ступени
-   лада. Призрак показывает это и так (он перескакивает приглушённые ряды); слово — чтобы прилипание не читалось поломкой. Раз за сессию. */
+/* T3: ОДНОРАЗОВОЕ ИЗВЕСТИЕ — ВСТАВКА пришлась на приглушённый ряд (высота строя вне лада) и прилипла к ближайшей ступени лада; слово —
+   чтобы прилипание не читалось поломкой. Раз за сессию. ⛳ T5: ПЕРЕНОС больше не прилипает (нота встаёт на любой ряд строя), поэтому
+   известие осталось только у вставки (её правила — U5) и говорит, как поставить ноту на приглушённый ряд — перетащить. */
 let rollDimHintShown=false;
-const rollDimHint=()=>{ if(!rollDimHintShown){ rollDimHintShown=true; showCamMsg(t('roll.dimSnap')); } };
+const rollDimHint=()=>{ if(!rollDimHintShown){ rollDimHintShown=true; showCamMsg(t('roll.dimInsert')); } };
 /* 🗑 и ⌫ — ОДИН путь (T5): клавиша зовёт ровно эту функцию, второй копии развилки «нота или точка» нет. */
 function rollDeleteSel(){ if(rollRefuseRO()) return;
   /* ⛳ O-4: ОДНА КНОПКА «УДАЛИТЬ» НА ОБА ПОЛЯ, и ПОРЯДОК ВЕТВЕЙ И ЕСТЬ ПРИОРИТЕТ. Второй корзины не
@@ -777,7 +778,7 @@ const rollXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX
 /* ⛳ U4: ЦЕЛЕВОЙ РЯД одной ноты аккорда, или null — высота прежняя. Ряд под пальцем считается, только если палец ПОКИНУЛ ряд, где взялся
    (иначе дрожь на границе двух рядов меняла бы высоту). Нота НА ряду, вернувшаяся на свой ряд, — null (тот же звук, распад был бы правкой
    без слышимого смысла); нота ВНЕ ряда — прилипает к любому ряду, куда её довели, включая ближайший к ней. */
-const rollNoteTarget=G=> !G.left ? null : (!G.off && G.row===G.nrow) ? null : G.row;
+const rollNoteTarget=G=> !G.left ? null : (!G.off && G.row===G.nrow) ? null : G.row;   // T5: ряд под пальцем — любой, яркий или приглушённый
 function rollDown(e){
   const p=rollXY(e); rollPts.set(e.pointerId,p);
   const g=rollGeom(); if(!g) return;
@@ -845,11 +846,13 @@ function rollDown(e){
       /* U1: grabRow — ряд, где палец ВЗЯЛСЯ (у аккорда это любая его нота), rootRow — ряд корня. На отпускании корень уходит на
          (ряд пальца − grabRow) рядов: взял аккорд за терцию и поднял на ряд — весь аккорд поднялся на ряд, а не корень прыгнул на
          ряд терции. У баса и удара grabRow = rootRow = row — перенос прежний. */
+      /* ⛳ T5: у БАСА rootRow — ряд пальца (как прежде: ряд корня и был им): у оси «Лад» нота вне лада стоит МЕЖДУ рядами (дробный ряд
+         корня), а цель переноса баса — ряд под пальцем. У аккорда — ряд корня (дробный — округлит rollDragTarget). */
       rollGrab={ ev:h.ev, seg:isSeg?h.seg:null, mode:(isSeg&&h.edge)?'len':'move',
-                 dt:h.beat-h.ev.t, row, grabRow:row, rootRow:(isSeg&&h.rootRow!=null)?h.rootRow:row, x:p.x, y:p.y,
+                 dt:h.beat-h.ev.t, row, grabRow:row, rootRow:(isSeg&&h.seg.role==='ch'&&h.rootRow!=null)?h.rootRow:row, x:p.x, y:p.y,
                  len: isSeg ? ((h.seg.end==null?h.beat+1:h.seg.end)-h.seg.start) : 0,
                  tapNote: chordNote ? h.note : null };   // U2: тап без движения по ноте УЖЕ выделенного аккорда → выделить эту ноту (на отпускании)
-      setRollDrag({ ev:h.ev, t:h.ev.t, row, grabRow:row, rootRow:rollGrab.rootRow, len:rollGrab.len });   // T3: rootRow — призрак считает целевой ряд корня ТОЙ ЖЕ rollDragTargetRow, что и правка
+      setRollDrag({ ev:h.ev, t:h.ev.t, row, grabRow:row, rootRow:rollGrab.rootRow, len:rollGrab.len });   // T3: rootRow — призрак считает цель ТОЙ ЖЕ rollDragTarget, что и правка
       updRollBtns(); return;
     }
     const selBefore=rollSel;                                   // S2: выделение ДО тапа — по нему вставка аккорда берёт тип (тап по пустому снимает выделение уже здесь, на нажатии)
@@ -904,7 +907,7 @@ function rollMove(e){
         const h=rollHit(p.x,p.y);
         if(h&&(h.what==='grid'||h.what==='seg')){ rollGrab.row=h.row; if(h.row!==rollGrab.grabRow) rollGrab.left=true; }
         setRollDrag({ ev:rollGrab.ev, t:Math.max(0,rollSnapBeat(b-rollGrab.dt, rollSnap())), note:rollGrab.note, len:rollGrab.len,
-                      prow: (pr=>pr==null?null:rollSnapRow(pr))(rollNoteTarget(rollGrab)) });   // T3: на приглушённый ряд — пока нельзя (T5): прилипает к ближайшей ступени лада, призрак стоит там же
+                      prow: rollNoteTarget(rollGrab) });   // ⛳ T5: и на приглушённый ряд — без прилипания; призрак стоит там, куда ляжет нота
       }
       return;
     }
@@ -965,7 +968,6 @@ function rollUp(e){
       else{
         const g2=rollGeom(), pit= gd.prow!=null ? rollRowPitch(gd.prow, g2&&g2.sc) : null;
         if(pit) editViewCheck(s.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)
-        { const raw=rollNoteTarget(rollGrab); if(raw!=null && raw!==gd.prow) rollDimHint(); }   // T3: целевой ряд был приглушённым — объясняем один раз
         if(Math.abs(gd.t-s.start)>1e-9 || pit) r=editMoveChordNote(s.ev, rollGrab.note, gd.t, pit&&pit.ti, pit&&pit.oct);   // T4c-1: высота — индексом
       }
       if(r&&r!==true) selNote(r);
@@ -992,10 +994,10 @@ function rollUp(e){
            ⛳ E1/E2: ЧТО ИМЕННО ДВИГАТЬ, решает recorder (editMoveSeg): одиночную ноту во времени — ЦЕЛИКОМ, сегмент
            глиссандо во времени — ОТДЕЛЯЕТ и везёт один, смену одной высоты — всем событиям сегмента, глиссандо цело.
            Выделяем то, что он вернул (у отделённого — новое «вкл», см. длину выше). */
-        const g2=rollGeom(), tr=rollDragTargetRow(gd), pit=rollRowPitch(tr, g2&&g2.sc);
-        editViewCheck(rollGrab.seg.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)   // T3: ряд корня + сдвиг пальца, прилипший к ЯРКОМУ ряду — та же функция, что у призрака
-        if(tr!==gd.rootRow+((gd.row|0)-gd.grabRow)) rollDimHint();   // U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было)
-        const s=rollGrab.seg;
+        const g2=rollGeom(), s=rollGrab.seg, pit=rollDragTarget(gd,s).pit;   // ⛳ T5: ряд корня + сдвиг пальца, БЕЗ прилипания (приглушённый ряд — тоже цель); палец не ушёл с ряда — высота прежняя. Та же функция, что у призрака
+        editViewCheck(rollGrab.seg.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)
+        /* U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было). ⛳ T5: целый
+           нетипизированный аккорд на высоту вне лада сохраняет форму — тип ставит recorder (editMoveSeg → chordMoveTy, вариант (а)). */
         if(pit && (Math.abs(gd.t-s.ev.t)>1e-9 || pit.ti!==s.ti || pit.oct!==s.oct)){ const r=editMoveSeg(s.ev, gd.t, pit.ti, pit.oct); if(r&&r!==true) selNote(r); }   // T4c-1: сравнение и перенос — по паре (индекс, регистр)
       }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
     }
@@ -1034,7 +1036,7 @@ function rollUp(e){
              Опустевшая дорожка вида не имеет — тогда честно берём живой лад (новый материал в текущем строе). T4c-2: вид у дорожки один. */
           const g2=rollGeom(), G=rollTrackView();
           const sc=(G&&G.sc)||CUR(), sev=G?G.sev:seventh;   // есть группа — её замороженный септаккорд; роль пуста — живой (новый материал в текущем строе)
-          const sr=rollSnapRow(h.row), pit=rollRowPitch(sr, sc);   // T3: тап по приглушённому ряду — нота встаёт на ближайшую ступень лада (правка на приглушённом — T5)
+          const sr=rollSnapRow(h.row), pit=rollRowPitch(sr, sc);   // T3: тап по приглушённому ряду — нота встаёт на ближайшую ступень лада. ⛳ T5 это НЕ снял: вставка — U5 (её правила для аккорда вне лада не решены); перенос на приглушённый ряд — уже можно
           if(sr!==h.row) rollDimHint();
           const s=rollSnap(), len=s.free?1:Math.max(s.step,1);
           /* ⛳ ВСТАВКА — ПО РОЛИ ДОРОЖКИ (S2), а не развилкой «ударные или бас»: у каждой роли свои поля новой ноты. Ряд — КОРЕНЬ
