@@ -20,7 +20,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf } from './scales.js';   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, menuOf } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
@@ -130,20 +130,13 @@ function renderTunedFrom(s){
    (поле лада, если задано), а подпись — L(grp). Пока grpKey нет и grp — строка: ключ = сама строка,
    подпись = та же строка (L строку пропускает) → бакетинг и подписи байт-в-байт как сегодня.
    Этап B: добавить каждому ладу grpKey + перевести grp в объект — бакетинг останется стабильным. */
-const grpKeyOf   = s => s.grpKey != null ? s.grpKey : (s.grp != null ? L(s.grp) : '');
-const grpLabelOf = s => s.grp != null ? L(s.grp) : '';
+/* ⛳ F0: корзины (ключ, подпись, порядок) считает scales.menuOf — чистая функция, перенесённая отсюда слово в слово; здесь — только DOM. */
 function fillScales(tradId){
   selScale.textContent='';
-  const order=[], buckets=new Map(), labels=new Map();   // order — ключ в порядке первого появления
-  scalesOfTrad(tradId).forEach(({i,s})=>{
-    const k=grpKeyOf(s);
-    if(!buckets.has(k)){ buckets.set(k,[]); order.push(k); labels.set(k, grpLabelOf(s)); }
-    buckets.get(k).push({i,s});                 // внутри корзины — порядок массива
-  });
-  for(const k of order){
-    const parent = k ? selScale.appendChild(Object.assign(document.createElement('optgroup'),{label:labels.get(k)}))
-                     : selScale;                // '' → без optgroup, прямо в список
-    for(const {i,s} of buckets.get(k)){
+  for(const g of menuOf(tradId)){
+    const parent = g.key ? selScale.appendChild(Object.assign(document.createElement('optgroup'),{label:g.label}))
+                         : selScale;            // '' → без optgroup, прямо в список
+    for(const {i,s} of g.items){
       const o=document.createElement('option'); o.value=i; o.textContent=L(s.name); parent.appendChild(o);
     }
   }

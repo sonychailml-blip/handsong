@@ -14,6 +14,9 @@
      P.checkSong()      // T4c-2: ЦЕЛОСТНОСТЬ ПЕСНИ БЕЗ СТУПЕНИ — ни одно событие не несёт ступени; цены, сегменты, догонялка на каждой доле, ряды
                         //   редактора (ряд ↔ индекс, призрак на своём ряду) и распад — правильной формы и равны замороженным опорам;
                         //   T5: высота — В СТРОЕ (не обязательно в ладу); вне лада — опора по ЦЕЛОМУ строю, подсветки нет, на оси «Лад» — между рядами
+     P.dumpScales()     // F0 «строи файлами»: КАНОНИЧЕСКИЙ СНИМОК всего, что относится к ладам (данные, меню, дрон, подписи) — скачивается
+                        //   файлом scales.before.json; положить его в tools/ (снимается на коде ДО переезда)
+     await P.checkFiles() // F0: живой реестр против tools/scales.before.json, поле за полем ===; нет файла — «снимка ещё нет»
      P.checkOut()       // T5: ВЫСОТЫ ВНЕ ЛАДА — прогон: каждая приглушённая высота каждого вида × регистр — цена соло/баса, однонотный аккорд и
                         //   вариант (а) (целый аккорд с формой) против опоры по целому строю; ряды обеих осей
      P.checkStack()     // «стопка»: у ладов stack каждый тон аккорда — внутри лада; подписи вменяемы (таблица до-мажорной пентатоники и блюза)
@@ -45,9 +48,9 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS } from './scales.js';   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS, TRADITIONS, GRP, menuOf, regWord, rootName, range, droneNonOct } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleIdx, tunedFrom, seventh, setScaleIdx, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
-import { L } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure
+import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
@@ -805,9 +808,10 @@ const ALL_RUNS=[
   ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
 ];
-export function all(opt={}){
+export async function all(opt={}){   // F0: async — строка снимка читает tools/scales.before.json (fetch); звать await P.all()
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
   const rows=[], lists=[], keepCM=chordModeSel;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
@@ -815,7 +819,8 @@ export function all(opt={}){
   for(const [name,run,read] of ALL_RUNS){
     const t0=performance.now(); let row;
     if(!opt.verbose){ console.log=console.warn=console.table=console.info=mute; }
-    try{ const x=read(run()); row={ check:name, cases:x.cases, song:x.song==null?'—':x.song, differences:x.diff }; if(x.diff) lists.push([name,x.list||[]]); }
+    try{ let res=run(); if(res && typeof res.then==='function') res=await res;   // F0: проба может быть асинхронной (P.checkFiles)
+         const x=read(res); row={ check:name, cases:x.cases, song:x.song==null?'—':x.song, differences:x.diff, note:x.status }; if(x.diff) lists.push([name,x.list||[]]); }
     catch(err){ row={ check:name, cases:'—', song:'—', differences:'ERROR' }; lists.push([name,[String(err&&err.stack||err)]]); }
     finally{ Object.assign(console,keep); }
     row.ms=Math.round(performance.now()-t0); rows.push(row);
@@ -823,15 +828,17 @@ export function all(opt={}){
   } finally { setChordModeSel(keepCM); }
   const M=material();
   for(const r of rows) if(r.song!=='—') r.status = !M.ok ? 'song: not enough material' : r.differences===0 ? 'pass' : 'FAIL';
-                         else r.status = r.differences===0 ? 'pass' : 'FAIL';
+                         else r.status = r.differences===0 ? (r.note||'pass') : 'FAIL';   // F0: «снимка ещё нет» — не провал, но и не pass
+  for(const r of rows) delete r.note;
   console.table(rows);
   if(SEED_REC && SEED_REC.kind==='song') console.log(`[scaleprobe all] frozen seed bass: not applicable — the loaded song is P.song('${SEED_REC.name}')`);
   else { const F=SEED_REC&&SEED_REC.freeze, E=SEED_FROZEN_EXPECT;
     console.log(F ?`[scaleprobe all] frozen seed bass L${F.layer+1}: peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`
                   : '[scaleprobe all] frozen seed bass: none in this session (run await P.seed({replace:true}))'); }
   for(const [name,list] of lists){ console.warn(`[scaleprobe all] ${name}: first differences`); list.slice(0,opt.show||5).forEach(m=>console.warn('   '+m)); }
-  const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
+  const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0), noSnap=rows.some(r=>r.status==='no snapshot yet');
   if(!M.ok) console.warn(`[scaleprobe all] song: not enough material — missing ${M.missing.join('; ')} (run await P.seed({replace:true}) for a complete test song)`);
+  if(noSnap) console.log('[scaleprobe all] scale-data snapshot: no tools/scales.before.json yet — P.dumpScales() makes it (F0 «tunings as files»)');
   console.log(`[scaleprobe all] ${nDiff===0&&M.ok ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views)`);
   return { pass:nDiff===0&&M.ok, rows, material:M };
 }
@@ -1627,4 +1634,115 @@ export function checkOut(){
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe T5] …and ${nBad-PRINT_MAX} more`);
   if(!nBad) console.log('[scaleprobe T5] every pitch outside the mode prices as its tuning pitch, sits on its row (All) or between its neighbours (Mode), and a whole chord moved there keeps its shape');
   return { views:nViews, cases, tol, total:nBad, differences:bad };
+}
+
+/* ═══ F0 «СТРОИ И ЛАДЫ ФАЙЛАМИ»: КАНОНИЧЕСКИЙ СНИМОК — ДОКАЗАТЕЛЬСТВО ПЕРЕЕЗДА ═══
+   Переезд (F1–F5) обязан оставить каждый встроенный лад ПОБИТНО тем же — по звуку и по показу. Снимок фиксирует ВСЁ, что относится к
+   ладам, на коде ДО переезда; после каждого слайса P.checkFiles сверяет живой реестр с ним поле за полем, ===. Те же данные при том же
+   коде цены — тот же звук; прочие пробы (T0…T7b) сверяют цену и ряды на тех данных, что загружены.
+   ЧТО В СНИМКЕ (канонический JSON: ключи отсортированы, числа — как печатает JavaScript (кратчайшая запись, читается назад тем же
+   double), нечисловые — метками '#NaN'/'#+Inf'/'#undefined'):
+     modes      — каждый лад SCALES по порядку: ВСЕ его поля (вместе с выведенными sel/root, режимами аккордов, правилом), плюс индекс i;
+     tunings    — TUNINGS целиком (центы, равные в форме генератора, точные отношения);
+     palettes   — CHORD_FAM_SETS целиком (имена, подписи и интервалы типов на всех языках — объекты L как есть);
+     traditions — TRADITIONS; groups — GRP;
+     menu       — по каждому языку: традиции по порядку, их корзины (ключ, подпись) и лады (индекс, id, имя) — scales.menuOf, которым рисует
+                  меню ui.fillScales;
+     chordModes — по каждому языку: у каждого лада с режимами — id, имя и подсказка каждого режима (как их показывает панель);
+     droneNonOct — выбор второй струны дрона у неоктавных строёв (ухо пользователя; влияет на ступень дрона);
+     views      — каждый ВИД (лад × «строй от» у tunable × режим аккордов): id вида, якорь, режим, поля, которые режим подставляет; и по
+                  каждой из 12 тоник — ступень второй струны дрона (droneDegree: ступень, причина, центы), показ центов каждой ступени
+                  (centsOf), и по каждому языку: подпись каждой ступени (draw.noteLbl), подпись каждого ряда регистра обеих осей редактора
+                  (draw.axisLbl: «Все» и «Лад»), подпись и ноты аккорда на каждой ступени с септаккордом и без (chordLabel, chordNotesStr —
+                  у ладов с аккордами), имя корня палитры (rootName — у ладов с палитрой), слово регистра (regWord).
+   meta (дата, формат) в сверку не входит. Ничего не меняет: тоника переставляется сеттером и возвращается в finally, язык — withLang
+   (без записи выбора и без перерисовки), виды — те же запомненные объекты, что берёт приложение. */
+const SNAP_FILE='tools/scales.before.json';
+function canon(x){
+  if(typeof x==='number') return Number.isFinite(x) ? x : Number.isNaN(x) ? '#NaN' : (x>0 ? '#+Inf' : '#-Inf');
+  if(x===undefined) return '#undefined';
+  if(x===null || typeof x!=='object') return x;
+  if(Array.isArray(x)) return x.map(canon);
+  const o={}; for(const k of Object.keys(x).sort()) o[k]=canon(x[k]); return o;
+}
+function snapViews(){ const out=[];
+  for(const s0 of SCALES){
+    const tfs = s0.tunable ? ['T', ...range(12)] : ['T'], cms = s0.chordModes ? s0.chordModes.map(m=>m.id) : [undefined];
+    for(const tf of tfs) for(const cm of cms) out.push({ s0, tf, cm, v:scaleView(s0,tf,cm) });
+  }
+  return out;
+}
+function buildSnapshot(){
+  const LGS=['en','ru'], keepT=tonic;
+  const snap={ meta:{ format:'handsong/scales-snapshot', version:1, made:new Date().toISOString(), file:SNAP_FILE } };
+  snap.modes=SCALES.map((s0,i)=>({ i, fields:canon(s0) }));
+  snap.tunings=canon(TUNINGS); snap.palettes=canon(CHORD_FAM_SETS); snap.traditions=canon(TRADITIONS); snap.groups=canon(GRP);
+  snap.droneNonOct=droneNonOct();
+  snap.menu={}; snap.chordModes={};
+  for(const lg of LGS) withLang(lg,()=>{
+    snap.menu[lg]=TRADITIONS.map(tr=>({ id:tr.id, name:L(tr.name),
+      groups:menuOf(tr.id).map(g=>({ key:g.key, label:g.label, scales:g.items.map(({i,s})=>({ i, id:s.id, name:L(s.name) })) })) }));
+    snap.chordModes[lg]=SCALES.filter(x=>x.chordModes).map(x=>({ id:x.id, modes:x.chordModes.map(m=>({ id:m.id, name:t(m.nameKey), hint:t(m.hintKey) })) }));
+  });
+  snap.views=[];
+  try{
+    for(const {s0,tf,cm,v} of snapViews()){
+      const n=v.iv.length, chords=!v.noChords && !(v.chordRule && v.chordRule.kind==='none'), axA=RP.axis(v,true), axM=RP.axis(v,false);
+      const rec={ id:viewIdOf(v), mode:s0.id, tf, cm:cm??null, anchor:canon(v.anchor), chordMode:v.chordMode??null,
+                  over:canon({ chordBuild:v.chordBuild, typedChords:v.typedChords, chordRule:v.chordRule }), byTonic:[] };
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        const T={ drone:canon(droneDegree(v)), cents:range(n+1).map(d=>canon(centsOf(d,v))), lang:{} };
+        for(const lg of LGS) withLang(lg,()=>{
+          const L1={ notes:range(n+1).map(d=>RP.noteLbl(d,v)),
+                     axisAll:range(axA.rpp).map(r=>RP.axisLbl(axA,r)), axisMode:range(axM.rpp).map(r=>RP.axisLbl(axM,r)),
+                     periodWord:regWord(v) };
+          if(chords){ L1.chord=range(n+1).map(d=>chordLabel(d,v,false)); L1.chord7=range(n+1).map(d=>chordLabel(d,v,true));
+                      L1.chordNotes=range(n+1).map(d=>chordNotesStr(d,v,false)); L1.chordNotes7=range(n+1).map(d=>chordNotesStr(d,v,true)); }
+          if(v.typedChords) L1.root=range(n+1).map(d=>rootName(d,v));
+          T.lang[lg]=L1;
+        });
+        rec.byTonic.push(T);
+      }
+      snap.views.push(rec);
+    }
+  } finally { setTonic(keepT); }
+  return snap;
+}
+/* P.dumpScales() — снимок и СКАЧИВАНИЕ файла scales.before.json (положить в tools/ — его читает P.checkFiles). → сам снимок. */
+export function dumpScales(){
+  const snap=buildSnapshot(), text=JSON.stringify(snap);
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type:'application/json'})); a.download='scales.before.json';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  console.log(`[scaleprobe files] snapshot: ${snap.modes.length} modes, ${Object.keys(snap.tunings).length} tunings, ${Object.keys(snap.palettes).length} palettes, ${snap.views.length} views × 12 tonics × 2 languages · ${(text.length/1024).toFixed(0)} KB — downloaded as scales.before.json; put it into tools/`);
+  return snap;
+}
+/* P.checkFiles() — живой реестр против tools/scales.before.json, поле за полем (===), без meta. Файла нет — { noSnap:true }: P.all
+   показывает «снимка ещё нет» (не провал и не pass). Каждое расхождение — путь и обе величины. */
+export async function checkFiles(){
+  let file;
+  try{ const r=await fetch(new URL(SNAP_FILE, location.href), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
+  catch(e){ console.log(`[scaleprobe files] no snapshot yet (${SNAP_FILE}: ${e&&e.message}) — run P.dumpScales() on the unchanged code and put the file into tools/`);
+            return { cases:0, total:0, differences:[], noSnap:true }; }
+  const live=JSON.parse(JSON.stringify(buildSnapshot()));   // та же сериализация, что у файла: сравниваем одно с одним
+  const bad=[]; let nBad=0, cases=0;
+  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const show=x=>{ const j=JSON.stringify(x); return j===undefined ? 'nothing' : j.length>120 ? j.slice(0,117)+'…' : j; };
+  const walk=(a,b,path)=>{
+    if(a!==null && b!==null && typeof a==='object' && typeof b==='object'){
+      if(Array.isArray(a)!==Array.isArray(b)){ miss(`${path}: array vs object`); return; }
+      if(Array.isArray(a)){ if(a.length!==b.length) miss(`${path}: length ${b.length} now, ${a.length} in the snapshot`);
+        for(let i=0;i<Math.min(a.length,b.length);i++) walk(a[i],b[i],path+'['+i+']'); return; }
+      for(const k of new Set([...Object.keys(a),...Object.keys(b)])){
+        if(!(k in a)) miss(`${path}.${k}: new now (${show(b[k])})`); else if(!(k in b)) miss(`${path}.${k}: gone now (snapshot ${show(a[k])})`); else walk(a[k],b[k],path+'.'+k); }
+      return;
+    }
+    cases++; if(a!==b) miss(`${path}: ${show(b)} now, ${show(a)} in the snapshot`);
+  };
+  for(const k of new Set([...Object.keys(file),...Object.keys(live)])){ if(k==='meta') continue;
+    if(!(k in file)) miss(`${k}: new now`); else if(!(k in live)) miss(`${k}: gone now`); else walk(file[k],live[k],k); }
+  console.log(`[scaleprobe files] snapshot ${file.meta&&file.meta.made} · values compared ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe files] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe files] …and ${nBad-PRINT_MAX} more`);
+  if(!nBad) console.log('[scaleprobe files] every mode, tuning, palette, menu entry, drone degree and label equals the snapshot');
+  return { cases, total:nBad, differences:bad };
 }

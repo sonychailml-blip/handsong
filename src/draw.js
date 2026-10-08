@@ -1762,7 +1762,8 @@ export function rollDragTarget(d,seg){
    ответ от истории кэша не зависит — проба это и проверяет). defRow0 — нижний видимый ряд по умолчанию (T4b4-1).
    ⛳ T4c-2: прежние ряды по ступени ушли в пробу (её «замороженные опоры»); им нужны частоты рядов оси (rowFreqs), место частоты среди
    них (rowOfFreq) и допуск «на ряду» (onRowCents) — ТЕ ЖЕ функции и число, что у рисунка, отдаются здесь. */
-export const rollRowsProbe={ axis:rollAxis, root:rollSegRoot, notes:rollSegNotes, total:chordTotalWith, pick:rollSegPick, ghost:rollGhostSeg,
+export const rollRowsProbe={ noteLbl, axisLbl,   // F0: подписи ступени и ряда оси — для снимка P.dumpScales
+  axis:rollAxis, root:rollSegRoot, notes:rollSegNotes, total:chordTotalWith, pick:rollSegPick, ghost:rollGhostSeg,
   defRow0:rollDefaultRow0For, across:rollRow0Across, rowFreqs:chRowFreqs, rowOfFreq:chRowOfFreq, onRowCents:ROLL_ON_ROW_CENTS,
   reset:()=>{ chRowCache={ key:null, F:null }; } };
 /* ⛳ ЕДИНСТВЕННАЯ РАЗВИЛКА «ИГРА ИЛИ РЕДАКТОР». Закрыт редактор — ветка та же, что была всегда. */

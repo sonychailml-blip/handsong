@@ -995,6 +995,13 @@ export function applyI18n(root = document){
 
 /* Сменить язык БЕЗ перезагрузки: валидируем, сохраняем, перерисовываем разметку, уведомляем подписчиков.
    Холст ничего не требует — draw читает t()/L() каждый кадр, следующий кадр уже локализован. */
+/* ⛳ F0 «строи файлами»: ТОЛЬКО ДЛЯ ПРОБЫ (P.dumpScales) — выполнить fn с языком code, НЕ записывая выбор в хранилище и НЕ оповещая
+   подписчиков (никакой перерисовки): t() и L() читают живую связку lang, её и подменяем на время вызова; возврат — в finally. */
+export function withLang(code, fn){
+  if(!LANGS.includes(code)) return fn();
+  const keep=lang; lang=code;
+  try{ return fn(); } finally { lang=keep; }
+}
 export function setLang(code){
   if(!LANGS.includes(code)) return;
   lang = code; store.set(LS_KEY, code);
