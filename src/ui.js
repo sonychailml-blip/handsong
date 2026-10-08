@@ -18,7 +18,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollSnapRow, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, CUR, seventhAddsNote, rectDefault } from './scales.js';
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -672,11 +672,8 @@ rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); updRo
 rollRowsBtn.onclick=()=>{ const g0=rollGeom(), ax0=rollAxisNow(); setRollRowsAll(!rollRowsAll);   // T6a-2: прокрутка — та же ВЫСОТА в той же точке окна (прежде row0 ехал числом и окно уезжало в другой регистр)
   if(g0&&g0.pitched) setRollRow0(rollRow0Across(ax0, rollAxisNow(), g0.row0, g0.rows));
   setRollDrag(null); applyRollBar(); };
-/* T3: ОДНОРАЗОВОЕ ИЗВЕСТИЕ — ВСТАВКА пришлась на приглушённый ряд (высота строя вне лада) и прилипла к ближайшей ступени лада; слово —
-   чтобы прилипание не читалось поломкой. Раз за сессию. ⛳ T5: ПЕРЕНОС больше не прилипает (нота встаёт на любой ряд строя), поэтому
-   известие осталось только у вставки (её правила — U5) и говорит, как поставить ноту на приглушённый ряд — перетащить. */
-let rollDimHintShown=false;
-const rollDimHint=()=>{ if(!rollDimHintShown){ rollDimHintShown=true; showCamMsg(t('roll.dimInsert')); } };
+/* (T3–T5: одноразовое известие о прилипании к ступени лада — снято в U5 вместе с самим прилипанием: и перенос, и вставка встают на
+   любой ряд строя, объяснять больше нечего.) */
 /* 🗑 и ⌫ — ОДИН путь (T5): клавиша зовёт ровно эту функцию, второй копии развилки «нота или точка» нет. */
 function rollDeleteSel(){ if(rollRefuseRO()) return;
   /* ⛳ O-4: ОДНА КНОПКА «УДАЛИТЬ» НА ОБА ПОЛЯ, и ПОРЯДОК ВЕТВЕЙ И ЕСТЬ ПРИОРИТЕТ. Второй корзины не
@@ -855,7 +852,7 @@ function rollDown(e){
       setRollDrag({ ev:h.ev, t:h.ev.t, row, grabRow:row, rootRow:rollGrab.rootRow, len:rollGrab.len });   // T3: rootRow — призрак считает цель ТОЙ ЖЕ rollDragTarget, что и правка
       updRollBtns(); return;
     }
-    const selBefore=rollSel;                                   // S2: выделение ДО тапа — по нему вставка аккорда берёт тип (тап по пустому снимает выделение уже здесь, на нажатии)
+    const selBefore= rollSel && rollSelNote==null ? rollSel : null;   // ⛳ U5: ЦЕЛЫЙ аккорд, выделенный ДО тапа, — его форму вставит тап (тап по пустому снимает выделение уже здесь, на нажатии); выделена одна нота — вставка одной ноты
     selNote(h&&(h.what==='hit'||h.what==='seg')?h.ev:null); updRollBtns();
     rollPan={ atBeat:g.beat0+g.span*((p.x-g.x0)/g.bw), x:p.x, y:p.y, y0:p.y, row0:g.row0, selBefore };
   }
@@ -1036,12 +1033,11 @@ function rollUp(e){
              Опустевшая дорожка вида не имеет — тогда честно берём живой лад (новый материал в текущем строе). T4c-2: вид у дорожки один. */
           const g2=rollGeom(), G=rollTrackView();
           const sc=(G&&G.sc)||CUR(), sev=G?G.sev:seventh;   // есть группа — её замороженный септаккорд; роль пуста — живой (новый материал в текущем строе)
-          const sr=rollSnapRow(h.row), pit=rollRowPitch(sr, sc);   // T3: тап по приглушённому ряду — нота встаёт на ближайшую ступень лада. ⛳ T5 это НЕ снял: вставка — U5 (её правила для аккорда вне лада не решены); перенос на приглушённый ряд — уже можно
-          if(sr!==h.row) rollDimHint();
+          const pit=rollRowPitch(h.row, sc);   // ⛳ U5: ЛЮБОЙ ряд строя, яркий или приглушённый, — без прилипания (прежде — rollSnapRow к ступени лада)
           const s=rollSnap(), len=s.free?1:Math.max(s.step,1);
           /* ⛳ ВСТАВКА — ПО РОЛИ ДОРОЖКИ (S2), а не развилкой «ударные или бас»: у каждой роли свои поля новой ноты. Ряд — КОРЕНЬ
-             (ступень × регистр) и у аккорда; тип, тембр и громкость аккорд выбирает сам (recorder.editInsertChord) — по
-             выделенному ДО тапа аккорду, иначе по ближайшему. Соло правимым станет в S4. */
+             (индекс в строе × регистр) и у аккорда. ⛳ U5: у аккордов тап кладёт ОДНУ ноту, а при выделенном ДО тапа ЦЕЛОМ аккорде — его
+             форму от тронутого корня; тип, тембр и громкость решает recorder.editInsertChord. Соло правимым станет в S4. */
           const ins=ROLL_INSERT[rollRole];
           ev= (ins&&pit) ? ins(tt, pit.ti, pit.oct, sc, sev, len, rollPan.selBefore) : false;   // T4c-1: высота — индексом
         }

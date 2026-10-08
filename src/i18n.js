@@ -191,7 +191,6 @@ export const DICTS = {
     'roll.rowsAll':'All',
     'roll.rowsMode':'Mode',
     'roll.rowsTitle':'Rows: every pitch of the tuning (All — pitches of the mode bright, the rest dimmed) or only the pitches of the mode (Mode)',
-    'roll.dimInsert':'Dimmed rows are pitches outside the mode — for now a tap inserts on the nearest mode row; drag a note to put it on a dimmed row',
     // панель звукоряда
     'panel.collapse':'Collapse ✕',
     'panel.scale.head':'Scale',
@@ -634,7 +633,6 @@ export const DICTS = {
     'roll.rowsAll':'Все',
     'roll.rowsMode':'Лад',
     'roll.rowsTitle':'Ряды: все высоты строя («Все» — высоты лада яркие, прочие приглушены) или только лада («Лад»)',
-    'roll.dimInsert':'Приглушённые ряды — высоты вне лада; пока вставка тапом встаёт на ближайшую ступень лада — перетащите ноту, чтобы поставить её на приглушённый ряд',
     'panel.collapse':'Свернуть ✕',
     'panel.scale.head':'Звукоряд',
     'panel.sound.head':'Звук и управление',

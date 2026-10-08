@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleIdx, tunedFrom, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/scaleIdx — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, typedChords, chordFams, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, TUNINGS, periodOf } from './scales.js';   // typedChords/chordFams — S2: тип вставленного аккорда. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, TUNINGS, periodOf } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1935,19 +1935,22 @@ function editResizeSeg(ev,t){
 /* Вставка бас-ноты: пара «вкл»+«выкл» со СВЕЖИМ k (свой владелец — см. довод о порядке выше).
    ⛳ ОТКУДА ПОЛЯ: тембр — ТОЛЬКО с «вкл» соседней ноты (у ведения он записан, но звук его не читает —
    тембр печётся на атаке; брать его с ведения значит списывать у того, кто им не распоряжается);
-   громкость — с ближайшего бас-события; ЛАД И СЕПТАККОРД — с ПОКАЗАННОЙ ГРУППЫ (их передаёт редактор),
+   громкость — с ближайшего бас-события, НЕСУЩЕГО громкость (U5: прежде ближайшим мог оказаться «выкл» без громкости — и вставка молча
+   брала умолчание); ЛАД И СЕПТАККОРД — с ПОКАЗАННОЙ ГРУППЫ (их передаёт редактор),
    ⛔ а не CUR(): нота обязана родиться в том ладу, в котором нарисована ось. Пустая дорожка группы не
-   имеет — тогда вызывающий честно передаёт живой лад. */
-function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — индексом (ряд оси); ступень для записи — переводом в лад группы
+   имеет — тогда вызывающий честно передаёт живой лад.
+   ⛳ U5: ВЫСОТА — ЛЮБАЯ ВЫСОТА СТРОЯ, яркий ряд или приглушённый (как перенос с T5): пишется пара ряда (ti, oct) как есть. Отказ — только
+   у нецелого индекса или регистра (такого ряд не отдаёт). */
+function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — индексом (ряд оси); U5: и вне лада
   if(!editGuard()) return false;
-  const p=modeSlotOfTi(ti,oct,sc); if(!p) return false;
+  if(!Number.isInteger(ti)||!Number.isInteger(oct)) return false;   // U5: прежде — отказ, если высоты нет в ладу
   const layer=editLayer();
   trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
   let on=null, near=null, bd=Infinity;
   for(const e of events){
     if(e.layer!==layer||chaseRole(e.fn)!=='bs') continue;
     const d=Math.abs(e.t-t);
-    if(d<bd){ bd=d; near=e; }
+    if(d<bd && e.a && e.a.vol!=null){ bd=d; near=e; }
     if(e.fn==='bassOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
   }
   const inst = on&&on.a.inst!=null ? on.a.inst : bassIdx;
@@ -1962,47 +1965,57 @@ function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — ин�
   editPush({ kind:'ins', evs:[evOn,evOff] });
   editCommit(); return evOn;
 }
-/* ═══ ВСТАВКА АККОРДА (слайс S2 правки соло и аккордов) — пара «вкл»+«выкл» со СВЕЖИМ k, как у баса ═══
-   ⛳ ТИП (решение пользователя): тип ВЫДЕЛЕННОГО аккорда (sel — событие, которое было выделено в редакторе), иначе БЛИЖАЙШЕГО аккорда
-   дорожки в ТОЙ ЖЕ группе лада (тип — ССЫЛКА в наборе семейств лада, a.ty; из чужого лада он не годится), иначе — null у
-   нетипизированного лада (качество выводит ступень и септаккорд) или ПЕРВЫЙ тип палитры у типизированного.
-   ТЕМБР — с «вкл» ближайшего аккорда (тембр печётся на атаке; ведение аккорда тембра не несёт), иначе живой chIdx. ГРОМКОСТЬ — с
-   ближайшего события аккорда, иначе editDefVol('ch') (правило #30: у ноты громкость есть всегда). ЯРКОСТИ НЕТ: отсутствие a.bri —
-   «не задана», фильтр открывается на атаке (правило аккордов). ЛАД И СЕПТАККОРД — показанной группы (их передаёт редактор; правило #7).
+/* ═══ ВСТАВКА В ДОРОЖКУ АККОРДОВ (S2; ⛳ U5 — правила пользователя) — пара «вкл»+«выкл» со СВЕЖИМ k, как у баса ═══
+   ⛳ ЧТО ВСТАВЛЯЕТ ТАП (решения пользователя, U5):
+     • НИЧЕГО НЕ ВЫДЕЛЕНО (или выделена ОДНА нота аккорда) → ОДНА НОТА: аккорд из одной ноты на тронутом ряду — любом, яркий он или
+       приглушённый; тип — единица корня scales.chordUnit(вид) (каноническая форма ноты на ряду, как у переноса одной ноты U4): нота
+       звучит ровно высоту ряда. Прежнее правило S2 «тип ближайшего аккорда, иначе первый тип палитры» СНЯТО.
+     • выделен ЦЕЛЫЙ аккорд (sel — его определяющее событие; что выделение целое, решает ui: уровень одной ноты сюда не передаётся) →
+       ЕГО ФОРМА от тронутого корня: типизированный — ТОТ ЖЕ тип, жёстко; нетипизированный на ЯРКОМ корне — нетипизированный, по правилу
+       лада (качество следует ступени, как у переноса); нетипизированный на ПРИГЛУШЁННОМ корне — правило там аккорда не строит, поэтому
+       — типизированный с НЫНЕШНИМИ интервалами выделенного (вариант (а) T5, та же функция chordMoveTy); её отказ (null — недостижим
+       сегодня) — отказ вставки. Септаккорд (sev) — выделенного аккорда: форма нетипизированного от него зависит.
+   ⛳ ВСТАВКА НИЧЕГО НЕ РАСПУСКАЕТ: новая пара — свой ключ владельца 'loop:N:k' со свежим k, соседние аккорды не тронуты.
+   ⛳ ОТКУДА ПОЛЯ: с выделенным аккордом — ТЕМБР (тембр его ноты, seg.inst), ГРОМКОСТЬ (его определяющего события) и ЯРКОСТЬ (только
+   если она у него задана) — копия этого аккорда; без выделения — тембр с «вкл» ближайшего аккорда дорожки (тембр печётся на атаке),
+   иначе живой chIdx; громкость с ближайшего события аккорда, несущего её, иначе editDefVol('ch'); яркости нет (отсутствие a.bri —
+   «не задана», фильтр открывается на атаке). Правило #30: громкость у вставленной ноты есть ВСЕГДА. ЛАД — показанной группы (их передаёт
+   редактор; правило #7); выделенный аккорд обязан быть в том же виде и в той же дорожке, иначе он не форма (вставка — одна нота).
+   В ладу без аккордов (правило 'none') аккорда нет — отказ, как прежде (T6b).
    ⛔ Живая защёлка ('latch') не трогается ничем: это события дорожки, её владелец — 'loop:N:k' (правило #20). */
-function editChordTypeFor(layer,t,sc,sel){
-  if(sel && sel.layer===layer && chaseRole(sel.fn)==='ch' && sel.sc===sc && sel.a && 'ty' in sel.a) return sel.a.ty??null;
-  let best=null, bd=Infinity;
-  for(const e of events){
-    if(e.layer!==layer||e.sc!==sc||(e.fn!=='chOn'&&e.fn!=='chSet')||!e.a) continue;
-    const d=Math.abs(e.t-t); if(d<bd){ bd=d; best=e; }
-  }
-  if(best) return best.a.ty??null;
-  if(!typedChords(sc)) return null;
-  const F=chordFams(sc), f0=F&&F[0], ty0=f0&&f0.types&&f0.types[0];
-  return ty0 ? ty0.iv : null;
-}
-function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота корня — индексом (ряд оси); ступень для записи — переводом
+function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота корня — индексом (ряд оси); U5: и вне лада; sel — ЦЕЛЫЙ выделенный аккорд или null
   if(!editGuard()) return false;
-  const p=modeSlotOfTi(ti,oct,sc); if(!p) return false;
+  if(!Number.isInteger(ti)||!Number.isInteger(oct)) return false;   // U5: прежде — отказ, если высоты нет в ладу
   if(sc && sc.chordRule && sc.chordRule.kind==='none') return false;   // ⛳ T6b: в ладу без аккордов (правило 'none') аккорда нет — не вставляем беззвучный
   const layer=editLayer();
   trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
-  let on=null, near=null, bd=Infinity;
-  for(const e of events){
-    if(e.layer!==layer||chaseRole(e.fn)!=='ch'||e.fn==='chOff') continue;
-    const d=Math.abs(e.t-t);
-    if(d<bd){ bd=d; near=e; }
-    if(e.fn==='chOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
+  const S= sel && sel.layer===layer && chaseRole(sel.fn)==='ch' && sel.sc===sc ? songSegs().byEv.get(sel) : null;
+  const shape= S && S.ev===sel ? S : null;                   // форма — только у определяющего события сегмента того же вида и дорожки
+  let ty, inst, vol, bri, sv=sev;
+  if(shape){
+    if(shape.ty) ty=shape.ty;                                // типизированный — жёстко (тип — данные; сравнение по значению, правило #7)
+    else if(modeSlotOfTi(ti,oct,sc)) ty=null;                // нетипизированный на ярком корне — правило лада
+    else { ty=chordMoveTy(shape,ti,oct); if(!ty) return false; }   // на приглушённом — с нынешними интервалами (вариант (а))
+    sv=shape.sev; inst=shape.inst; vol=shape.vol; bri=shape.ev.a.bri;
+  }else{
+    ty=chordUnit(sc);                                        // одна нота: единица корня — нота звучит высоту ряда
+    let on=null, near=null, bd=Infinity;
+    for(const e of events){
+      if(e.layer!==layer||chaseRole(e.fn)!=='ch'||e.fn==='chOff') continue;
+      const d=Math.abs(e.t-t);
+      if(d<bd && e.a && e.a.vol!=null){ bd=d; near=e; }
+      if(e.fn==='chOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
+    }
+    inst = on&&on.a.inst!=null ? on.a.inst : chIdx;
+    vol  = near ? near.a.vol : null;
   }
-  const inst = on&&on.a.inst!=null ? on.a.inst : chIdx;
-  const vol  = near&&near.a.vol!=null ? near.a.vol : editDefVol('ch');
-  const ty   = editChordTypeFor(layer,t,sc,sel);
+  if(inst==null) inst=chIdx;
+  if(vol==null) vol=editDefVol('ch');                        // правило #30
   const k=layerTakeTop(layer);                               // свой ключ владельца 'loop:N:k': пересечься с аккордами дорожки нечем
   if(!editTake) editTake=++takeSeq;
   const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
-  const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
-  const evOn =mk('chOn', {ti,oct,vol,inst,ty}, t0);   // T4c-2: индекс корня и регистр, ступени нет
+  const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev:sv, tk:editTake });
+  const evOn =mk('chOn', bri!=null ? {ti,oct,vol,inst,ty,bri} : {ti,oct,vol,inst,ty}, t0);   // T4c-2: индекс корня и регистр, ступени нет
   const evOff=mk('chOff',{}, t1);
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
