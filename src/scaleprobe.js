@@ -16,6 +16,8 @@
                         //   T5: высота — В СТРОЕ (не обязательно в ладу); вне лада — опора по ЦЕЛОМУ строю, подсветки нет, на оси «Лад» — между рядами
      P.dumpScales()     // F0 «строи файлами»: КАНОНИЧЕСКИЙ СНИМОК всего, что относится к ладам (данные, меню, дрон, подписи) — скачивается
                         //   файлом scales.before.json; положить его в tools/ (снимается на коде ДО переезда)
+     P.checkBehaviour() // F4: ПОВЕДЕНИЕ ДАННЫМИ — дрон (оба положения ухо-переключателя), прогрессии, ритм джема, строка статуса —
+                        //   против замороженного кода до F4: каждый вид × 12 тоник (статус — en/ru)
      P.checkNames()     // F3: ИМЕНА ДАННЫМИ — подписи по схеме строя/лада против ЗАМОРОЖЕННЫХ подписей до F3: каждый вид × ступень ×
                         //   12 тоник × en/ru (ступень, ряд, шаг, корень, аккорд и его ноты, слово периода) + ряды обеих осей редактора
      await P.checkFiles() // F0: живой реестр против tools/scales.before.json, поле за полем ===; нет файла — «снимка ещё нет»
@@ -49,9 +51,9 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordLabel, chordNotesStr,
+import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24 } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
@@ -69,6 +71,10 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
    стопки снято условие временного R.powerOld (переключатель удалён — стопка насовсем).
    ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════ */
 const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближайший к чистому интервалу ratio (копия scales.stepFor — часть эталона)
+/* ⛳ F4: isTert ПЕРЕЕХАЛ СЮДА из scales.js слово в слово — в приложении у него не осталось читателя; живёт им только эталон (стопка терций
+   по tag). Как функция он НЕ равен правилу аккордов лада: макамы — tag 'maqam' (isTert истинно), а правило 'none' (аккордов нет); на путях,
+   которые доходят до него (лады с аккордами), ответы совпадают. */
+const isTert=s=>s.tag==='dia'||s.tag==='ethnic'||s.tag==='maqam';
 /* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
    legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */
 /* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
@@ -230,6 +236,36 @@ function preF3TunPitchLbl(sc,j){
 function preF3AxisLbl(ax,r){
   const e=ax.ent(r), base = e.deg>=0 ? preF3NoteLbl(e.deg,ax.sc) : preF3TunPitchLbl(ax.sc,e.j);
   return (((r%ax.rpp)+ax.rpp)%ax.rpp)===0 ? base+' '+(OCT_ROMAN[(r/ax.rpp)|0]||'') : base;
+}
+/* ═══ ⛳ F4 — ЗАМОРОЖЕННЫЕ ОПОРЫ ПОВЕДЕНИЯ (код ДО F4, СЛОВО В СЛОВО) ═══
+   До F4 решали строение лада: дрон неоктавного строя — константа 5/3 при переключателе 'cons'; прогрессии — семь ступеней; ритм джема
+   бесаккордового лада — 24 шага (ui.jamVariants: CUR().edo===24); строка статуса — s.cents и s.edo!==12 (draw.drawStatus). Читает только
+   P.checkBehaviour. */
+const preF4_C_OF=r=>1200*Math.log2(r);
+const preF4_FIFTH=preF4_C_OF(3/2), preF4_OCT_FALLBACK=[preF4_C_OF(4/3), preF4_C_OF(15/8), preF4_C_OF(9/5), preF4_C_OF(16/9)], preF4_CONS=preF4_C_OF(5/3);
+function preF4DroneDegree(s=CUR()){
+  const n=s.iv.length, cs=[];
+  for(let d=1; d<=n; d++) cs.push([d, degCentsExact(d,s)]);
+  const near=c=>{ let best=null, bd=Infinity; for(const [d,x] of cs){ const e=Math.abs(x-c); if(e<bd){ bd=e; best=d; } } return bd<=DRONE_TOL ? best : null; };
+  const pick=(d,why)=>({ deg:d, why, cents:degCentsExact(d,s) });
+  let d=near(preF4_FIFTH); if(d!=null) return pick(d,'fifth');
+  if(tuningOf(s).period===2){
+    d=near(preF4_OCT_FALLBACK[0]); if(d!=null) return pick(d,'fourth');
+    for(const c of preF4_OCT_FALLBACK.slice(1)){ d=near(c); if(d!=null) return pick(d,'seventh'); }
+  }else if(droneNonOct()==='cons'){ d=near(preF4_CONS); if(d!=null) return pick(d,'cons'); }
+  return pick(n,'period');
+}
+const preF4Progressions=(s=CUR())=>s.iv.length===7;
+const preF4Maqsum=(s=CUR())=>s.edo===24;
+function preF4Status(s=CUR()){
+  let st;
+  if(s.cents){
+    st=t('status.centsScale',{name:L(s.name), n:s.iv.length});
+  }else{
+    st=t('status.edoScale',{name:L(s.name), edo:s.edo, steps:s.iv.join('-')});
+    if(s.edo!==12)st+=t('status.step',{c:Math.round(1200*Math.log2(periodOf(s))/s.edo)});
+  }
+  return st;
 }
 /* ═══ ⛳ T7b — ЗАМОРОЖЕННЫЕ ОПОРЫ ДО T7 (из прежнего кода, `git show` коммита до T7 — scales.js, только чтение; СЛОВО В СЛОВО) ═══
    Режим «Свободно» обязан звучать РОВНО как до T7. Здесь — то, чем это сверяется: наборы Партча и Болена–Пирса, как они стояли до T7
@@ -901,6 +937,7 @@ const ALL_RUNS=[
   ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F3 naming as data', ()=>checkNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
@@ -1911,5 +1948,29 @@ export function checkNames(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe names] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe names] …and ${nBad-PRINT_MAX} more`);
   if(!nBad) console.log('[scaleprobe names] every label read from the naming schemes equals the pre-F3 label');
+  return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F4 — P.checkBehaviour(): ПОВЕДЕНИЕ ДАННЫМИ ПРОТИВ ЗАМОРОЖЕННОГО КОДА ДО F4 ═══
+   Каждый вид (как у снимка F0): прогрессии и ритм джема (ritm maqsum ⇔ 24 шага); строка статуса на en и ru; и × 12 тоник × ОБА положения
+   ухо-переключателя дрона ('cons', 'period') — ступень второй струны дрона целиком (ступень, причина, центы), ===. Тонику и переключатель
+   возвращает finally. */
+export function checkBehaviour(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const keepT=tonic, keepD=droneNonOct();
+  const eq=(what,a,b)=>{ cases++; const A=JSON.stringify(canon(a)), B=JSON.stringify(canon(b)); if(A!==B) miss(`${what}: ${A} now, ${B} before F4`); };
+  try{
+    for(const {v} of snapViews()){ const id=viewIdOf(v);
+      eq(`${id} progressions`, supportsProgressions(v), preF4Progressions(v));
+      eq(`${id} maqsum backing`, backingRhythmOf(v)==='maqsum', preF4Maqsum(v));
+      for(const lg of ['en','ru']) withLang(lg,()=>eq(`${id} ${lg} status`, tuningStatus(v), preF4Status(v)));
+      for(const sw of ['cons','period']){ setDroneNonOct(sw);
+        for(let tn=0;tn<12;tn++){ setTonic(tn); eq(`${id} drone [${sw}] tonic ${tn}`, droneDegree(v), preF4DroneDegree(v)); } }
+    }
+  } finally { setTonic(keepT); setDroneNonOct(keepD); }
+  console.log(`[scaleprobe behaviour] ${snapViews().length} views · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe behaviour] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe behaviour] …and ${nBad-PRINT_MAX} more`);
+  if(!nBad) console.log('[scaleprobe behaviour] drone, progressions, backing rhythm and status line read from data equal the pre-F4 code');
   return { cases, total:nBad, differences:bad };
 }

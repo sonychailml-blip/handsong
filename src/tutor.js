@@ -15,7 +15,7 @@
    вместе с жестами. draw.js НЕ трогаем: подсказка — DOM-полоса (кнопки должны тапаться), сетка видна. */
 import { hooks } from './hooks.js';
 import { t, onLangChange, store, DICTS } from './i18n.js';   // DICTS — базовый en-словарь: по нему проверяем, ЕСТЬ ли у шага деталь (иначе t() вернул бы сам ключ)
-import { SCALES, supportsChords, typedChords } from './scales.js';
+import { SCALES, scaleById, supportsChords, typedChords } from './scales.js';
 import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop, canSplit, tutorSplitInit, tutorSyncBar } from './ui.js';
 
 /* Хроматика (12-TET) — единственный лад с ПОЛНОЙ палитрой типов аккордов (typedChords:'chrom12'),
@@ -28,7 +28,7 @@ const CHROMATIC_ID=(SCALES.find(s=>s.typedChords==='chrom12')||{}).id;   // F1: 
    по определяющим интервалам (edo:12, iv=[0,2,4,5,7,9,11]) — уникальны (у мод/миноров iv другой), append-
    only массив не сломает. МАЖОР, а не Хроматика: «Лупер» про запись/наслаивание, и обычный мажор звучит
    музыкой (мелодия+аккорды), тогда как все 12 нот хроматики — «возврат к нормальному» после экзотики Пелога. */
-const MAJOR_ID=(SCALES.find(s=>s.edo===12 && String(s.iv)==='0,2,4,5,7,9,11')||{}).id;   // F1: id
+const MAJOR_ID=(scaleById('major')||{}).id;   // F4: по стабильному id (F1) — прежде искали по строению (edo 12 + ступени мажора)
 
 const TIMEOUT=15000;    // мс до подробной подсказки
 const SEEN_FRESH=1500;  // мс: heartbeat свежее этого = рука в кадре

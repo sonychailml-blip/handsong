@@ -25,7 +25,7 @@ export const range=n=>Array.from({length:n},(_,i)=>i);
      chordModes — набор режимов по id (один объект режима на весь набор: «Пауэр» — один объект правила на все 14 ладов, виды стабильны);
      grp / grpKey — подпись группы (тот же объект, что GRP[ключ]) и её ключ; у лада без группы grp = '' и grpKey нет;
      trad, name, id, tuning, chordRule — как в записи.
-   ⛳ В ДАННЫХ ЯВНО (вывести нельзя): compat.tag — семейство лада (его читают только замороженные опоры пробы и isTert; 'penta' стоит и у
+   ⛳ В ДАННЫХ ЯВНО (вывести нельзя): compat.tag — семейство лада (с F4 его читают ТОЛЬКО замороженные опоры пробы, вместе с isTert; 'penta' стоит и у
    пентатоник, и у раг); degrees и root — сама выборка; меню (традиция, группа) и порядок (manifest = порядок меню и индекс i снимка F0).
    ⛳ ДРОБИ СТРОКАМИ: ratioNum('5/4') — то же деление двух целых, что делал литерал JS 5/4, — тот же double; целое без дроби — Number.
    У строя ratios (пары [числитель, знаменатель]) собираются ТОЛЬКО при chordFit:'ratios' (сегодня — Партч): у прочих таблиц отношения —
@@ -212,8 +212,13 @@ export const periodOf=(s=CUR())=>s.period||2;
    схема без слова периода (запасной «рег.»). */
 const NAMING_NONE={ T:null, pitch:'ordinal', deg:'ordinal', names:null, detail:false, word:null };
 const NM_MEMO=new WeakMap();
+/* Лад вида (F3/F4): у вида — .mode, у копии лада без .mode (проба) — лад по id, иначе сам объект. Записи v1: лада — SRC лада,
+   строй — SRC записи tuningOf (вид). Одно разрешение на имена (F3) и поведение (F4). */
+const modeObjOf=s=>(s && s.mode) || (s && SCALE_BY_ID.get(s.id)) || s;
+const modeRecOf=s=>SRC.get(modeObjOf(s));
+const tuningRecOf=s=>SRC.get(tuningOf(s));
 export function namingOf(s=CUR()){
-  const m=(s && s.mode) || (s && SCALE_BY_ID.get(s.id)) || s, T=tuningOf(s);
+  const m=modeObjOf(s), T=tuningOf(s);
   let r=NM_MEMO.get(m); if(r && r.T===T) return r;
   const tf=SRC.get(T), mf=SRC.get(m); if(!tf || !tf.naming) return NAMING_NONE;
   const tn=tf.naming, mn=(mf && mf.naming) || {};
@@ -229,8 +234,24 @@ export const regWordFull=(s=CUR())=>{ const w=namingOf(s).word; return w && w.fu
 /* Совместимость ладов для §3.7 (перенос фразы в другой строй возможен лишь при равном
    числе ступеней: 7→7 да, 7→5 нет). UI-уровень — принимает индексы, не хранимые данные. */
 /* Прогрессии (II–V–I и т.п.) — римские ступени, осмысленны лишь в 7-ступенчатом ладу;
-   в пентатонике(5)/блюзе(6)/хроматике(12)/range(19|31) «V» не к чему привязать. */
-export const supportsProgressions=(s=CUR())=>s.iv.length===7;
+   в пентатонике(5)/блюзе(6)/хроматике(12)/range(19|31) «V» не к чему привязать.
+   ⛳ F4: ПОЛЕ ЛАДА progressions (true|false) — его слово, если задано; нет поля — прежнее правило «семь ступеней» (ни один встроенный
+   лад поля не несёт, так что всё как было). Лад пользователя с семью ступенями, где II–V–I не к месту, скажет false; иной — true. */
+export const supportsProgressions=(s=CUR())=>{ const mf=modeRecOf(s);
+  return mf && typeof mf.progressions==='boolean' ? mf.progressions : s.iv.length===7; };
+/* ⛳ F4: РИТМ ДЖЕМА у лада без аккордов — поле лада backing.rhythm (id ритма; сегодня 'maqsum' у десяти макамов). Нет поля — null
+   (джем без ударных). До F4 решало «24 шага» (ui.jamVariants: CUR().edo===24). */
+export const backingRhythmOf=(s=CUR())=>{ const mf=modeRecOf(s); return (mf && mf.backing && mf.backing.rhythm) || null; };
+/* ⛳ F4: СТРОКА СТАТУСА — описание строя из его записи (describe): kind 'equal' — «N-TET · ступени: …» (N — шагов в периоде строя,
+   ступени — шаги лада), step — и шаг в центах периода (целыми); kind 'table' — «центовый строй · n ступеней» (n — ступеней лада):
+   у таблицы нет равного шага, печатать «N-TET» было бы враньём. До F4 решали s.cents и s.edo!==12 (draw.drawStatus). Нет записи —
+   как таблица. Префиксы записи/лупера ставит draw. */
+export function tuningStatus(s=CUR()){
+  const T=tuningOf(s), tf=tuningRecOf(s), d=(tf && tf.describe) || {kind:'table'};
+  if(d.kind!=='equal') return t('status.centsScale',{name:L(s.name), n:s.iv.length});
+  const st=t('status.edoScale',{name:L(s.name), edo:T.equal, steps:s.iv.join('-')});
+  return d.step ? st+t('status.step',{c:Math.round(1200*Math.log2(T.period)/T.equal)}) : st;
+}
 /* Лестницы аккордов нет (арабская традиция: музыка монофонична, трезвучий не строит,
    часть ступеней даёт двойной четвертьтон — муть). Свойство лада, а не строковый tag:
    переживёт перегруппировку ладов по традициям. Гейт ТОЛЬКО живого ввода — переигровка
@@ -389,7 +410,8 @@ export const rootName=(deg,s=CUR())=>{ const n=s.iv.length, d=((deg%n)+n)%n;   /
      фиксированный:  f = f_якоря · 2^(регистр+перенос) · 2^(центы[ключ+шаг] / 1200) (fixedKey, ниже).
    Для 12-TET шаг = полутон (100 центов), для 24-TET = четвертьтон (50 центов),
    для 19-TET = 63.2 цента, для 31-TET = 38.7 цента. */
-export const isTert=s=>s.tag==='dia'||s.tag==='ethnic'||s.tag==='maqam';
+/* ⛳ F4: isTert («стопка терций по tag dia/ethnic/maqam») УШЁЛ В ПРОБУ — в приложении у него не осталось читателя (цену и подписи с T6
+   решает правило аккордов лада), а замороженные опоры пробы им живут. */
 export const fifthStep=edo=>Math.round(edo*Math.log2(1.5)); // шаг, ближайший к чистой квинте 702c
 const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближайший к чистому интервалу ratio
  
@@ -697,8 +719,9 @@ export const centsOf=(deg,s=CUR())=>{
           само, частного случая нет);
        2) только у ОКТАВНЫХ строёв (кварта и септима — понятия октавы): кварта 4/3 (498.045¢), затем септима — 15/8 (1088.3¢, большая
           «Ни»), 9/5 (1017.6¢), 16/9 (996.1¢) (малые);
-       3) у НЕОКТАВНОГО строя без квинты (Болен–Пирс) — выбор DRONE_NONOCT: 'cons' (УМОЛЧАНИЕ, выбор пользователя на слух при T3) —
-          ступень, ближайшая к 5/3 (884.4¢; у Б–П 6 шагов = 877.6¢), или 'period' — тоника ПЕРИОДОМ выше (тритава 3:1);
+       3) у НЕОКТАВНОГО строя без квинты — цель из ДАННЫХ СТРОЯ (F4: drone.withoutFifth; Болен–Пирс — '5/3', выбор пользователя на
+          слух при T3): ступень, ближайшая к ней (у Б–П 6 шагов = 877.6¢ против 884.4¢), если ухо-переключатель DRONE_NONOCT стоит на
+          'cons' (умолчание); 'period' — цель не берётся, тоника ПЕРИОДОМ выше (тритава 3:1). До F4 цель 5/3 была константой кода;
        4) не нашлось ничего — тоника периодом выше (верхняя тоника: она есть в любом ладу).
    ⛳ ДОПУСК 17¢ — ОБОСНОВАН ДАННЫМИ (проверено по таблицам всех встроенных строёв во всех ключах): он принимает КАЖДУЮ квинту, которую
      строй считает квинтой (худшие — слендро +15.0¢, 19-TET −7.2¢, хорошие темперации до −5.9¢, мезотон −5.4¢), и ОТВЕРГАЕТ волков
@@ -713,8 +736,8 @@ export const centsOf=(deg,s=CUR())=>{
      у мелодии в этом ладу, — дрон не бьётся с нотами лада. */
 export const DRONE_TOL=17;   // ¢ — см. довод выше: между слендро (+15.0, квинта) и волком Натурального (+19.6, не квинта)
 const C_OF=r=>1200*Math.log2(r);
-const DRONE_FIFTH=C_OF(3/2), DRONE_OCT_FALLBACK=[C_OF(4/3), C_OF(15/8), C_OF(9/5), C_OF(16/9)], DRONE_CONS=C_OF(5/3);
-let DRONE_NONOCT='cons';   // T3: решение пользователя на слух — ступень 5:3 Болена–Пирса (878¢); 'period' — тритава, слышна через R.droneBP('period')
+const DRONE_FIFTH=C_OF(3/2), DRONE_OCT_FALLBACK=[C_OF(4/3), C_OF(15/8), C_OF(9/5), C_OF(16/9)];
+let DRONE_NONOCT='cons';   // ухо-переключатель (R.droneBP): 'cons' — цель строя из данных (F4: drone.withoutFifth; Б–П — 5:3, решение пользователя при T3); 'period' — тритава
 export const droneNonOct=()=>DRONE_NONOCT;
 export const setDroneNonOct=v=>{ DRONE_NONOCT = v==='period' ? 'period' : 'cons'; };   // неизвестное значение → умолчание ('cons')
 /* Точные центы ступени d (0..n) над корнем лада — из строя (у фиксированного — над КЛЮЧОМ, как показ центов). */
@@ -735,7 +758,8 @@ export function droneDegree(s=CUR()){
   if(tuningOf(s).period===2){
     d=near(DRONE_OCT_FALLBACK[0]); if(d!=null) return pick(d,'fourth');
     for(const c of DRONE_OCT_FALLBACK.slice(1)){ d=near(c); if(d!=null) return pick(d,'seventh'); }
-  }else if(DRONE_NONOCT==='cons'){ d=near(DRONE_CONS); if(d!=null) return pick(d,'cons'); }
+  }else if(DRONE_NONOCT==='cons'){ const tf=tuningRecOf(s), w=tf && tf.drone && tf.drone.withoutFifth;   // F4: цель — данные строя
+    if(w!=null){ d=near(C_OF(ratioNum(w))); if(d!=null) return pick(d,'cons'); } }
   return pick(n,'period');
 }
 /* Частота второй струны дрона — та же функция высоты, в регистре корня дрона (A/2, как tonicFreq()/2). */

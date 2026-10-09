@@ -17,6 +17,11 @@
                 выборка), root, anchor: {policy: 'tonic' | 'fixed' (note: якорь) | 'choice'}, chords: {rule, palette?, grid?, build?, modes?},
                 layout?: {rect}, naming?: {scheme?, detail?} (F3: схема имён СТУПЕНЕЙ, если не схема строя; detail — показывать вторую
                 часть имени списка), compat: {tag}};
+     у строя с F4 ещё describe: {kind: 'equal' | 'table', step?} — что пишет строка статуса (равный: «N-TET · ступени», step — и шаг в
+                центах; таблица: «центовый строй · n ступеней») и drone?: {withoutFifth: дробь} — цель второй струны дрона у НЕОКТАВНОГО
+                строя, в котором нет квинты (Болен–Пирс: '5/3'; нет поля — тоника периодом выше);
+     у лада с F4 ещё progressions?: true|false (прогрессии II–V–I; нет поля — правило «семь ступеней») и backing?: {rhythm} (ритм джема
+                для лада без аккордов: 'maqsum' у макамов; нет поля — без ударных);
      у строя с F3 ещё naming: {scheme: 'notes12'|'notes24'|'ordinal'|'list', names?: [{name, detail?}] — у list, по высоте} и
                 periodWord: {short, full?} — слово периода (строка — ключ словаря, объект — имя en/ru); читает scales.namingOf.
    ⚠️ compat.tag — поле, которое ВЫВЕСТИ НЕЛЬЗЯ (семейство лада: 'penta' стоит и у пентатоник, и у раг, и у патетов): его читают только
@@ -107,21 +112,21 @@ export const SCALE_DATA={
    центами (центы — те же отношения, округлённые до сотых, отсюда ≤ 0.005¢ разницы) — ещё у ji12, pythagorean12 и shruti22, как теория:
    приложение их пока не читает. Цену они НЕ меняют — её по-прежнему считают центы (корень) и отношение типа. */
   tunings:{
-    edo12:{ format:'handsong/tuning', version:1, id:'edo12', period:'2/1', pitches:{equal:12}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
-    edo19:{ format:'handsong/tuning', version:1, id:'edo19', period:'2/1', pitches:{equal:19}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
-    edo24:{ format:'handsong/tuning', version:1, id:'edo24', period:'2/1', pitches:{equal:24}, naming:{scheme:'notes24'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
-    edo31:{ format:'handsong/tuning', version:1, id:'edo31', period:'2/1', pitches:{equal:31}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
-    bp13:{ format:'handsong/tuning', version:1, id:'bp13', period:'3/1', pitches:{equal:13}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.tritave'} },   // Болен–Пирс: 13 равных шагов ТРИТАВЫ
-    'carlos-alpha':{ format:'handsong/tuning', version:1, id:'carlos-alpha', period:'3/2', pitches:{equal:9}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'} },   // Карлос: равные доли чистой КВИНТЫ (генератор, не эквивалентность)
-    'carlos-beta':{ format:'handsong/tuning', version:1, id:'carlos-beta', period:'3/2', pitches:{equal:11}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'} },
-    'carlos-gamma':{ format:'handsong/tuning', version:1, id:'carlos-gamma', period:'3/2', pitches:{equal:20}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'} },
+    edo12:{ format:'handsong/tuning', version:1, id:'edo12', period:'2/1', pitches:{equal:12}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'equal'} },
+    edo19:{ format:'handsong/tuning', version:1, id:'edo19', period:'2/1', pitches:{equal:19}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'equal', step:true} },
+    edo24:{ format:'handsong/tuning', version:1, id:'edo24', period:'2/1', pitches:{equal:24}, naming:{scheme:'notes24'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'equal', step:true} },
+    edo31:{ format:'handsong/tuning', version:1, id:'edo31', period:'2/1', pitches:{equal:31}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'equal', step:true} },
+    bp13:{ format:'handsong/tuning', version:1, id:'bp13', period:'3/1', pitches:{equal:13}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.tritave'}, describe:{kind:'equal', step:true}, drone:{withoutFifth:'5/3'} },   // Болен–Пирс: 13 равных шагов ТРИТАВЫ
+    'carlos-alpha':{ format:'handsong/tuning', version:1, id:'carlos-alpha', period:'3/2', pitches:{equal:9}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'}, describe:{kind:'equal', step:true} },   // Карлос: равные доли чистой КВИНТЫ (генератор, не эквивалентность)
+    'carlos-beta':{ format:'handsong/tuning', version:1, id:'carlos-beta', period:'3/2', pitches:{equal:11}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'}, describe:{kind:'equal', step:true} },
+    'carlos-gamma':{ format:'handsong/tuning', version:1, id:'carlos-gamma', period:'3/2', pitches:{equal:20}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'}, describe:{kind:'equal', step:true} },
     slendro:{ format:'handsong/tuning', version:1, id:'slendro', period:'2/1', pitches:{list:[
       {cents:0}, {cents:231}, {cents:474}, {cents:717}, {cents:955}
-    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     pelog:{ format:'handsong/tuning', version:1, id:'pelog', period:'2/1', pitches:{list:[   // родитель патетов Лима/Нем/Баранг
       {cents:0}, {cents:120}, {cents:258}, {cents:539}, {cents:675}, {cents:785},
       {cents:943}
-    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     partch43:{ format:'handsong/tuning', version:1, id:'partch43', period:'2/1', pitches:{list:[   // T7: точные отношения — по ним решается «тон аккорда — одна из 43 высот»
       {cents:0, ratio:'1/1'}, {cents:21.51, ratio:'81/80'}, {cents:53.27, ratio:'33/32'}, {cents:84.47, ratio:'21/20'}, {cents:111.73, ratio:'16/15'}, {cents:150.64, ratio:'12/11'},
       {cents:165.0, ratio:'11/10'}, {cents:182.4, ratio:'10/9'}, {cents:203.91, ratio:'9/8'}, {cents:231.17, ratio:'8/7'}, {cents:266.87, ratio:'7/6'}, {cents:294.13, ratio:'32/27'},
@@ -131,7 +136,7 @@ export const SCALE_DATA={
       {cents:852.59, ratio:'18/11'}, {cents:884.36, ratio:'5/3'}, {cents:905.87, ratio:'27/16'}, {cents:933.13, ratio:'12/7'}, {cents:968.83, ratio:'7/4'}, {cents:996.09, ratio:'16/9'},
       {cents:1017.6, ratio:'9/5'}, {cents:1035.0, ratio:'20/11'}, {cents:1049.36, ratio:'11/6'}, {cents:1088.27, ratio:'15/8'}, {cents:1115.53, ratio:'40/21'}, {cents:1146.73, ratio:'64/33'},
       {cents:1178.49, ratio:'160/81'}
-    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, chordFit:'ratios' },
+    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'}, chordFit:'ratios' },
     shruti22:{ format:'handsong/tuning', version:1, id:'shruti22', period:'2/1', pitches:{list:[   // родитель десяти раг
       {cents:0, ratio:'1/1'}, {cents:90, ratio:'256/243'}, {cents:112, ratio:'16/15'}, {cents:182, ratio:'10/9'}, {cents:204, ratio:'9/8'}, {cents:294, ratio:'32/27'},
       {cents:316, ratio:'6/5'}, {cents:386, ratio:'5/4'}, {cents:408, ratio:'81/64'}, {cents:498, ratio:'4/3'}, {cents:520, ratio:'27/20'}, {cents:590, ratio:'45/32'},
@@ -178,31 +183,31 @@ export const SCALE_DATA={
         {name:{default:'Ni♭',ru:'Ни♭'}, detail:{default:'Tivra',ru:'Тивра'}},   // 1018¢ (20)
         {name:{default:'Ni',ru:'Ни'}, detail:{default:'Kumudvati',ru:'Кумудвати'}},   // 1088¢ (21)
         {name:{default:'Ni',ru:'Ни'}, detail:{default:'Manda',ru:'Манда'}},   // 1110¢ (22)
-      ]}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+      ]}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     ji12:{ format:'handsong/tuning', version:1, id:'ji12', period:'2/1', pitches:{list:[
       {cents:0, ratio:'1/1'}, {cents:111.73, ratio:'16/15'}, {cents:203.91, ratio:'9/8'}, {cents:315.64, ratio:'6/5'}, {cents:386.31, ratio:'5/4'}, {cents:498.04, ratio:'4/3'},
       {cents:590.22, ratio:'45/32'}, {cents:701.96, ratio:'3/2'}, {cents:813.69, ratio:'8/5'}, {cents:884.36, ratio:'5/3'}, {cents:1017.6, ratio:'9/5'}, {cents:1088.27, ratio:'15/8'}
-    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     pythagorean12:{ format:'handsong/tuning', version:1, id:'pythagorean12', period:'2/1', pitches:{list:[
       {cents:0, ratio:'1/1'}, {cents:90.22, ratio:'256/243'}, {cents:203.91, ratio:'9/8'}, {cents:294.13, ratio:'32/27'}, {cents:407.82, ratio:'81/64'}, {cents:498.04, ratio:'4/3'},
       {cents:611.73, ratio:'729/512'}, {cents:701.96, ratio:'3/2'}, {cents:792.18, ratio:'128/81'}, {cents:905.87, ratio:'27/16'}, {cents:996.09, ratio:'16/9'}, {cents:1109.78, ratio:'243/128'}
-    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     'meantone-quarter':{ format:'handsong/tuning', version:1, id:'meantone-quarter', period:'2/1', pitches:{list:[
       {cents:0}, {cents:76.05}, {cents:193.16}, {cents:310.26}, {cents:386.31}, {cents:503.42},
       {cents:579.47}, {cents:696.58}, {cents:772.63}, {cents:889.74}, {cents:1006.84}, {cents:1082.89}
-    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     werckmeister3:{ format:'handsong/tuning', version:1, id:'werckmeister3', period:'2/1', pitches:{list:[
       {cents:0}, {cents:90.22}, {cents:192.18}, {cents:294.13}, {cents:390.22}, {cents:498.04},
       {cents:588.27}, {cents:696.09}, {cents:792.18}, {cents:888.27}, {cents:996.09}, {cents:1092.18}
-    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     vallotti:{ format:'handsong/tuning', version:1, id:'vallotti', period:'2/1', pitches:{list:[
       {cents:0}, {cents:94.13}, {cents:196.09}, {cents:298.04}, {cents:392.18}, {cents:501.96},
       {cents:592.18}, {cents:698.04}, {cents:796.09}, {cents:894.13}, {cents:1000}, {cents:1090.22}
-    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
     kirnberger3:{ format:'handsong/tuning', version:1, id:'kirnberger3', period:'2/1', pitches:{list:[
       {cents:0}, {cents:90.22}, {cents:193.16}, {cents:294.13}, {cents:386.31}, {cents:498.04},
       {cents:590.22}, {cents:696.58}, {cents:792.18}, {cents:889.74}, {cents:996.09}, {cents:1088.27}
-    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, describe:{kind:'table'} },
   },
 
   /* НАБОРЫ СЕМЕЙСТВ ПО ЛАДАМ. Интервалы — В ШАГАХ СВОЕГО СТРОЯ от корня; для 12-TET шаг
@@ -575,15 +580,15 @@ export const SCALE_DATA={
     'minor-penta':{ format:'handsong/mode', version:1, id:'minor-penta', tuning:'edo12', name:{en:'Minor pentatonic', ru:'Минорная пентатоника'}, menu:{tradition:'common', group:'pentaBlues'}, degrees:[0,3,5,7,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
     blues:{ format:'handsong/mode', version:1, id:'blues', tuning:'edo12', name:{en:'Blues (with ♭5)', ru:'Блюз (с ♭5)'}, menu:{tradition:'common', group:'pentaBlues'}, degrees:[0,3,5,6,7,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'blues'} },
     chromatic:{ format:'handsong/mode', version:1, id:'chromatic', tuning:'edo12', name:{en:'Chromatic (12 notes)', ru:'Хроматика (12 нот)'}, menu:{tradition:'common', group:'chromatic'}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'palette'}, palette:'chrom12'}, compat:{tag:'chrom'} },
-    'maqam-rast':{ format:'handsong/mode', version:1, id:'maqam-rast', tuning:'edo24', name:{en:'Maqam Rast (quarter-tones)', ru:'Макам Раст (¼-тоны)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,7,10,14,18,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
-    'maqam-bayati':{ format:'handsong/mode', version:1, id:'maqam-bayati', tuning:'edo24', name:{en:'Maqam Bayati (quarter-tones)', ru:'Макам Баяти (¼-тоны)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,6,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
+    'maqam-rast':{ format:'handsong/mode', version:1, id:'maqam-rast', tuning:'edo24', name:{en:'Maqam Rast (quarter-tones)', ru:'Макам Раст (¼-тоны)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,7,10,14,18,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
+    'maqam-bayati':{ format:'handsong/mode', version:1, id:'maqam-bayati', tuning:'edo24', name:{en:'Maqam Bayati (quarter-tones)', ru:'Макам Баяти (¼-тоны)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,6,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
     'edo19-full':{ format:'handsong/mode', version:1, id:'edo19-full', tuning:'edo19', name:{en:'19-TET — full tuning', ru:'19-TET — весь строй'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'ratios', triad:['1','6/5','3/2'], seventh:['1','6/5','3/2','9/5']}, palette:'edo19'}, layout:{rect:true}, compat:{tag:'edo'} },   // мин.терция 5ш (+0.2¢), кв.11, мал.7 16ш (−7¢)
     'edo31-full':{ format:'handsong/mode', version:1, id:'edo31-full', tuning:'edo31', name:{en:'31-TET — full tuning', ru:'31-TET — весь строй'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'ratios', triad:['1','5/4','3/2'], seventh:['1','5/4','3/2','7/4']}, palette:'edo31'}, layout:{rect:true}, compat:{tag:'edo'} },   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
     /* Хиджаз: джинс Хиджаз (0-1-4-5 полутонов, характерная увеличенная секунда 2→8
     в четвертях) + джинс Нахаванд сверху. Четвертитонов НЕ содержит — отсюда имя без
     пометки «¼-тоны», хотя традиция та же, 24-TET. Стоит в конце манифеста (индекс не сдвинул прочих). */
     /* арабская романизация Hijaz; турецкая — Hicaz (строй тут арабский, 24-TET) */
-    'maqam-hijaz':{ format:'handsong/mode', version:1, id:'maqam-hijaz', tuning:'edo24', name:{default:'Maqam Hijaz', ru:'Макам Хиджаз'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,2,8,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
+    'maqam-hijaz':{ format:'handsong/mode', version:1, id:'maqam-hijaz', tuning:'edo24', name:{default:'Maqam Hijaz', ru:'Макам Хиджаз'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,2,8,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
     /* Мажоры с пониженной VI — пара к гармоническому/мелодическому минору: ♭VI даёт
     увеличенное трезвучие на VI ступени (qual: 4+8 → «+»), ради него их и берут.
     Стоят в конце манифеста, а в меню встают внутрь группы «Диатоника»
@@ -621,15 +626,15 @@ export const SCALE_DATA={
     аккордов нет (роль «Аккорды» показывает подсказку, гейт supportsChords). Все десять
     (три прежних + семь новых) сведены в одну группу 'maqamat' — один ключ,
     иначе корзины бы разъехались. Индексы 36..42 (конец манифеста). */
-    'maqam-saba':{ format:'handsong/mode', version:1, id:'maqam-saba', tuning:'edo24', name:{default:'Maqam Saba', ru:'Макам Саба'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,6,8,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
+    'maqam-saba':{ format:'handsong/mode', version:1, id:'maqam-saba', tuning:'edo24', name:{default:'Maqam Saba', ru:'Макам Саба'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,6,8,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
     /* арабская Sikah; турецко-персидская — Segah */
-    'maqam-sikah':{ format:'handsong/mode', version:1, id:'maqam-sikah', tuning:'edo24', name:{default:'Maqam Sikah', ru:'Макам Сикях'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,7,11,14,17,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
-    'maqam-nahawand':{ format:'handsong/mode', version:1, id:'maqam-nahawand', tuning:'edo24', name:{en:'Maqam Nahawand (tuned like natural minor)', ru:'Макам Нахаванд (строй как у натур. минора)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
-    'maqam-kurd':{ format:'handsong/mode', version:1, id:'maqam-kurd', tuning:'edo24', name:{en:'Maqam Kurd (tuned like Phrygian)', ru:'Макам Курд (строй как у фригийского)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,2,6,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
-    'maqam-ajam':{ format:'handsong/mode', version:1, id:'maqam-ajam', tuning:'edo24', name:{en:'Maqam Ajam (tuned like major)', ru:'Макам Аджам (строй как у мажора)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,8,10,14,18,22], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
-    'maqam-nikriz':{ format:'handsong/mode', version:1, id:'maqam-nikriz', tuning:'edo24', name:{default:'Maqam Nikriz', ru:'Макам Никриз'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,12,14,18,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
+    'maqam-sikah':{ format:'handsong/mode', version:1, id:'maqam-sikah', tuning:'edo24', name:{default:'Maqam Sikah', ru:'Макам Сикях'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,7,11,14,17,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
+    'maqam-nahawand':{ format:'handsong/mode', version:1, id:'maqam-nahawand', tuning:'edo24', name:{en:'Maqam Nahawand (tuned like natural minor)', ru:'Макам Нахаванд (строй как у натур. минора)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
+    'maqam-kurd':{ format:'handsong/mode', version:1, id:'maqam-kurd', tuning:'edo24', name:{en:'Maqam Kurd (tuned like Phrygian)', ru:'Макам Курд (строй как у фригийского)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,2,6,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
+    'maqam-ajam':{ format:'handsong/mode', version:1, id:'maqam-ajam', tuning:'edo24', name:{en:'Maqam Ajam (tuned like major)', ru:'Макам Аджам (строй как у мажора)'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,8,10,14,18,22], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
+    'maqam-nikriz':{ format:'handsong/mode', version:1, id:'maqam-nikriz', tuning:'edo24', name:{default:'Maqam Nikriz', ru:'Макам Никриз'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,12,14,18,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
     /* встречается и слитно — Nawathar */
-    'maqam-nawa-athar':{ format:'handsong/mode', version:1, id:'maqam-nawa-athar', tuning:'edo24', name:{default:'Maqam Nawa Athar', ru:'Макам Нава Атар'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,12,14,16,22], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
+    'maqam-nawa-athar':{ format:'handsong/mode', version:1, id:'maqam-nawa-athar', tuning:'edo24', name:{default:'Maqam Nawa Athar', ru:'Макам Нава Атар'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,12,14,16,22], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, backing:{rhythm:'maqsum'}, compat:{tag:'maqam'} },
     /* Мировые строи — НЕравномерные: табличный строй (pitches.list, центы каждой высоты), лад выбирает
     его высоты (degrees). Высоту считает одна функция высоты по строю, структуру (число ступеней,
     сетка, ряды) — номинальные edo/iv объекта лада. Слендро: приближение яванского гамелана, шаги неравные

@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, tuningStatus, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
@@ -1784,16 +1784,9 @@ function drawNoChordsHint(x0,x1,yTop,yBot){
 /* Статус-строка (учебный слой). */
 function drawStatus(){
   const s=CUR();
-  /* Цент-лады (гамелан/Парч/темперации/индийские) НЕ равномерны: печатать «N-TET» и мнимый шаг
-     1200/edo было бы враньём (шрути неравны, минимум 22¢; edo — лишь номинал). Показываем ЧЕСТНО:
-     «центовый строй · N ступеней» + реальные центы. Нецентовые лады — прежняя строка; шаг — целыми центами в ПЕРИОДЕ (слайс «дрон и центы»). */
-  let st;
-  if(s.cents){
-    st=t('status.centsScale',{name:L(s.name), n:s.iv.length});   // имя лада резолвим через L() (объект {en,ru}/{default,ru}); центы не печатаем целиком
-  }else{
-    st=t('status.edoScale',{name:L(s.name), edo:s.edo, steps:s.iv.join('-')});
-    if(s.edo!==12)st+=t('status.step',{c:Math.round(1200*Math.log2(periodOf(s))/s.edo)});   // слайс «дрон и центы»: ЦЕЛЫЕ центы (одно правило) и шаг в ПЕРИОДЕ — прежде 1200/edo врал у неоктавных (Болен–Пирс «92.3c» вместо 146)
-  }
+  /* Табличные строи (гамелан/Парч/темперации/индийские) НЕ равномерны: печатать «N-TET» и мнимый шаг было бы враньём. ⛳ F4: что
+     писать, решает ЗАПИСЬ СТРОЯ (describe: 'equal' / 'table', step) — scales.tuningStatus; прежде — ветки по s.cents и s.edo!==12. */
+  let st=tuningStatus(s);
   if(recording)st=t('status.recPrefix')+st;
   else if(inPB())st=t('status.loopPrefix',{bpm:loop.bpm})+st;
   statusEl.textContent=st;
