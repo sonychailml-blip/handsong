@@ -1,5 +1,5 @@
 import { scaleId, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
-import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для свар/шрути в swaraLbl (имена ладов/групп резолвят L() на стороне рисующих)
+import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для имён списка строя (listName, F3) и слова периода строя пользователя (имена ладов/групп резолвят L() на стороне рисующих)
 import { SCALE_DATA } from './scaledata.js';   // F2: все строи, лады, палитры и меню — данными формы v1; сборщик ниже
 
 export const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -19,7 +19,9 @@ export const range=n=>Array.from({length:n},(_,i)=>i);
      period — период строя, только когда он не октава (у октавного лада поля нет, как было);
      noChords — правило аккордов 'none';   typedChords / gridChords / chordBuild — из chords.palette / grid / build;
      fixedKey — якорь не «от тоники» ('fixed' или 'choice');   tunable — якорь 'choice' (выбор «строй от» — только Пифагор);
-     rectGrid — layout.rect;   swaraNames / swaraFull — naming.swara / naming.full (схемы имён данными — F3);
+     rectGrid — layout.rect;   swaraNames — ступени лада называет СПИСОК строя (naming.scheme 'list' строя, лад его не переопределил);
+     swaraFull — лад показывает и вторую часть имени (naming.detail); ⚠️ с F3 оба флага — ТОЛЬКО совместимость формы (снимок F0):
+     подписи их не читают, они читают схему (namingOf ниже);
      chordModes — набор режимов по id (один объект режима на весь набор: «Пауэр» — один объект правила на все 14 ладов, виды стабильны);
      grp / grpKey — подпись группы (тот же объект, что GRP[ключ]) и её ключ; у лада без группы grp = '' и grpKey нет;
      trad, name, id, tuning, chordRule — как в записи.
@@ -27,8 +29,13 @@ export const range=n=>Array.from({length:n},(_,i)=>i);
    пентатоник, и у раг); degrees и root — сама выборка; меню (традиция, группа) и порядок (manifest = порядок меню и индекс i снимка F0).
    ⛳ ДРОБИ СТРОКАМИ: ratioNum('5/4') — то же деление двух целых, что делал литерал JS 5/4, — тот же double; целое без дроби — Number.
    У строя ratios (пары [числитель, знаменатель]) собираются ТОЛЬКО при chordFit:'ratios' (сегодня — Партч): у прочих таблиц отношения —
-   теория в данных, приложение их пока не читает (снимок F0 записан без них). */
+   теория в данных, приложение их пока не читает (снимок F0 записан без них).
+   ⛳ F3 — ИМЕНА ДАННЫМИ. Схема имён (naming) и слово периода (periodWord) — в записи СТРОЯ, переопределение схемы ступеней — в записи
+   ЛАДА; в объекты приложения они НЕ кладутся (их форма — та, что записана снимком F0), а читаются через SRC: объект приложения (запись
+   TUNINGS, лад SCALES) → его запись формы v1. Ключ — сам ОБЪЕКТ, не id: вид держит свой tuningRec, и имена приходят оттуда же, откуда
+   цена (правило F1 «строй — через вид»). */
 const D=SCALE_DATA;
+const SRC=new WeakMap();   // F3: объект приложения → его запись v1 (строй → D.tunings[id], лад → D.modes[id])
 const ratioNum=r=> typeof r==='number' ? r : (([a,b])=> b===undefined ? Number(a) : Number(a)/Number(b))(String(r).split('/'));
 export const TRADITIONS=D.menu.traditions.map(x=>({id:x.id, name:x.name}));
 export const GRP={...D.menu.groups};
@@ -36,7 +43,7 @@ export const TUNINGS={};
 for(const id of D.manifest.tunings){ const x=D.tunings[id], r={id:x.id, period:ratioNum(x.period)};
   if(x.pitches.equal!=null) r.equal=x.pitches.equal;
   else { r.cents=x.pitches.list.map(p=>p.cents); if(x.chordFit==='ratios') r.ratios=x.pitches.list.map(p=>p.ratio.split('/').map(Number)); }
-  TUNINGS[id]=r; }
+  TUNINGS[id]=r; SRC.set(r,x); }
 export const CHORD_FAM_SETS={};
 for(const id of D.manifest.palettes){ const x=D.palettes[id], cv= x.kind==='ratios' ? ratioNum : (v=>v);
   CHORD_FAM_SETS[id]=x.families.map(f=>({...f, types:f.types.map(ty=>({...ty, iv:ty.iv.map(cv)}))})); }
@@ -61,9 +68,10 @@ export const SCALES=D.manifest.modes.map(id=>{ const m=D.modes[id], T=TUNINGS[m.
   if(m.anchor.policy!=='tonic') s.fixedKey=true;
   if(m.anchor.policy==='choice') s.tunable=true;
   if(m.layout && m.layout.rect) s.rectGrid=true;
-  if(m.naming && m.naming.swara) s.swaraNames=true;
-  if(m.naming && m.naming.full) s.swaraFull=true;
+  if(((m.naming && m.naming.scheme) || D.tunings[m.tuning].naming.scheme)==='list') s.swaraNames=true;   // F3: совместимость формы — см. выше
+  if(m.naming && m.naming.detail) s.swaraFull=true;
   s.sel=sel; s.root=m.root;
+  SRC.set(s,m);
   return s; });
 /* ⛳ F1: ЛАД ПО id — единственный способ найти лад (state.scaleId, меню, уроки, демо). Неизвестный id — null; CUR() тогда берёт первый лад. */
 const SCALE_BY_ID=new Map(SCALES.map(s=>[s.id,s]));
@@ -187,10 +195,37 @@ export const tonicFreq=(s=CUR())=>{ const T=tuningOf(s), a=modeAnchor(s); return
    своё (Болен–Пирс period:3 — тритава). Заменяет зашитую двойку в формуле высоты: и регистр
    P^oct, и равный шаг P^(шаг/edo). Дефолт 2 ⇒ ВСЕ прежние лады байт-в-байт. */
 export const periodOf=(s=CUR())=>s.period||2;
-/* Слово-РЕГИСТР для ярлыков: у октавного лада (period 2) — «окт», у тритавного (Болен–Пирс,
-   period 3) — «тритава», иначе нейтральное «рег.» (будущие неоктавные, напр. Карлос). Зависит
-   ТОЛЬКО слово; римская цифра OCT_ROMAN[oct] та же. Дефолт 2 ⇒ все прежние лады «окт» байт-в-байт. */
-export const regWord=(s=CUR())=>{ const P=periodOf(s); return P===2?t('reg.oct'):P===3?t('reg.tritave'):t('reg.reg'); };
+/* ═══ ⛳ F3 — ИМЕНА СТУПЕНЕЙ ДАННЫМИ: СХЕМА ИМЁН (план «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══
+   У СТРОЯ — схема имён его высот (naming.scheme) и слово периода (periodWord); у ЛАДА — необязательное переопределение схемы, которой
+   называются ЕГО СТУПЕНИ (naming.scheme), и показ второй части имени списка (naming.detail). Схемы:
+     notes12 — имена 12 нот от живой тоники (NOTE_NAMES; шаг лада = полутон: 12-равный и 12-нотные таблицы);
+     notes24 — имена четвертитонов от живой тоники (name24);
+     ordinal — номера: ступень — «Т» на тонике, иначе её номер с 1; шаг — «ст»+шаг (ноты аккорда, корень); приглушённый ряд — «(k)»;
+     list    — имя у каждой высоты строя (names[k] = {name, detail}; полное — «name · detail»): сетка 22 шрути (свара · шрути).
+   ДВЕ СХЕМЫ У ВИДА: pitch — схема СТРОЯ, ею называются высоты и шаги (ноты аккорда, корень палитры, подпись аккорда, приглушённые ряды
+   редактора); deg — схема СТУПЕНЕЙ (сетка, ярлыки руки, ряды-ступени редактора): переопределение лада, иначе — схема строя. Сегодня
+   они расходятся у одного лада — подвижного Натурального (строй ji12 — notes12, ступени — ordinal: его высоты сдвигаются под аккорд,
+   имя ноты соврало бы), а ноты его аккордов и корни палитры называются именами нот, как и до F3.
+   ⛔ Подписи НЕ ветвятся по edo, периоду, центам, swaraNames, fixedKey — только по схеме. Таблица качеств 12-тоновых аккордов (qual, SEV,
+   STACK_Q*) — теория музыки, а не данные лада: остаётся кодом и включается схемой notes12.
+   Лад вида — его .mode (у копии лада без .mode, как в пробе, — лад по id); строй — tuningOf (вид, правило F1). Записи нет — порядковая
+   схема без слова периода (запасной «рег.»). */
+const NAMING_NONE={ T:null, pitch:'ordinal', deg:'ordinal', names:null, detail:false, word:null };
+const NM_MEMO=new WeakMap();
+export function namingOf(s=CUR()){
+  const m=(s && s.mode) || (s && SCALE_BY_ID.get(s.id)) || s, T=tuningOf(s);
+  let r=NM_MEMO.get(m); if(r && r.T===T) return r;
+  const tf=SRC.get(T), mf=SRC.get(m); if(!tf || !tf.naming) return NAMING_NONE;
+  const tn=tf.naming, mn=(mf && mf.naming) || {};
+  r={ T, pitch:tn.scheme, deg:mn.scheme||tn.scheme, names:tn.names||null, detail:!!mn.detail, word:tf.periodWord||null };
+  NM_MEMO.set(m,r); return r;
+}
+/* Слово ПЕРИОДА для ярлыков (F3: данные строя — periodWord): short — «окт» / «тритава» / «рег.», full — полное («ОКТАВА»); нет full —
+   short заглавными. Строка — ключ словаря интерфейса (встроенные строи), объект — имя L() (строй пользователя, en/ru). Римская цифра
+   регистра OCT_ROMAN[oct] — общая. */
+const wordOf=w=> typeof w==='string' ? t(w) : L(w);
+export const regWord=(s=CUR())=>{ const w=namingOf(s).word; return w ? wordOf(w.short) : t('reg.reg'); };
+export const regWordFull=(s=CUR())=>{ const w=namingOf(s).word; return w && w.full ? wordOf(w.full) : regWord(s).toUpperCase(); };
 /* Совместимость ладов для §3.7 (перенос фразы в другой строй возможен лишь при равном
    числе ступеней: 7→7 да, 7→5 нет). UI-уровень — принимает индексы, не хранимые данные. */
 /* Прогрессии (II–V–I и т.п.) — римские ступени, осмысленны лишь в 7-ступенчатом ладу;
@@ -344,8 +379,8 @@ export const chordFams=(s=CUR())=>CHORD_FAM_SETS[s.typedChords]||CHORD_FAM_SETS.
 /* ⚠️ ТОНИКА ОСТАЁТСЯ ЖИВОЙ, И ЭТО НЕ НЕДОСМОТР (общее правило всех подписей ниже). В событии заморожен
    ЛАД (правило #7), а тоника — глобальная и живая: высоту переигровка тоже берёт от живой тоники
    (baseF/fixedSlot). Замороженная в подписи тоника разошлась бы с тем, что звучит. */
-export const rootName=(deg,s=CUR())=>{ const n=s.iv.length, d=((deg%n)+n)%n;
-  return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
+export const rootName=(deg,s=CUR())=>{ const n=s.iv.length, d=((deg%n)+n)%n;   // F3: по схеме строя (было s.edo===12)
+  return namingOf(s).pitch==='notes12' ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
 
 /* ================= ТЕОРИЯ: СТУПЕНИ, АККОРДЫ, ИМЕНА =================
    ФОРМУЛЫ ВЫСОТЫ СЕГОДНЯ (их сведёт в одну функция высоты T1 универсальной модели строя):
@@ -619,13 +654,15 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
-export function stepName(st,s=CUR()){
-  if (s.edo===12) return NOTE_NAMES[(((tonic+st)%12)+12)%12];
-  if (s.edo===24) return name24(tonic*2+st);
+/* Имя ШАГА лада st (шаги — в единицах edo лада) по схеме строя (F3: было по s.edo 12/24). */
+export function stepName(st,s=CUR()){ const p=namingOf(s).pitch;
+  if (p==='notes12') return NOTE_NAMES[(((tonic+st)%12)+12)%12];
+  if (p==='notes24') return name24(tonic*2+st);
   return 'ст'+(((st%s.edo)+s.edo)%s.edo);
 }
-export function rowLabel(deg,s=CUR()){ const ivx=IVX(s);
-  if (s.edo===12||s.edo===24) return stepName(ivx[deg],s);
+/* Имя РЯДА ступени deg: у схем нот — имя шага (stepName), иначе — номер шага, «Т» на тонике (F3: было по s.edo 12/24). */
+export function rowLabel(deg,s=CUR()){ const ivx=IVX(s), p=namingOf(s).pitch;
+  if (p==='notes12'||p==='notes24') return stepName(ivx[deg],s);
   const st=ivx[deg]%s.edo; return st===0?'Т':String(st);
 }
 /* Центы для экранной подсказки. У лада с s.cents — РЕАЛЬНЫЕ центы ступени (визуальная
@@ -718,40 +755,19 @@ export function chordPitchHz(j,oct, s=CUR()){
    раздел «ЗАМОРОЖЕННЫЕ ОПОРЫ») — слово в слово; в приложении прежнего кода нет. Им нужны keyOf/cFix — они экспортированы ниже по файлу. */
 
 
-/* ===== Индийская классика: свары (саргам) + ПОДЛИННЫЕ имена 22 шрути (по РЕАЛЬНЫМ центам) =====
-   ДВЕ таблицы, обе по центам сетки → грид и раги смотрят на ОДНИ И ТЕ ЖЕ центы, подписи не разъедутся.
-   SWARA_OF — свара по области высоты (Са/Ре/Га/Ма/Па/Дха/Ни; ♭ комаль, ♯ тивра-Ма). Са и Па — ачала
-   (неподвижны). Комма-ПАРЫ (90/112, 386/408, …) раньше различали НАШИМ штрихом ′ — это ВЫДУМКА. Теперь
-   различаем ПОДЛИННЫМ ИМЕНЕМ ШРУТИ (у традиции они есть) — SHRUTI_OF, по одному на каждую из 22 позиций.
-   КОНВЕНЦИЯ (источники расходятся — фиксируем выбор): КЛАССИЧЕСКАЯ, Сангита-Ратнакара (Шарнгадева, XIII в.).
-   Шрути — это ПОДХОД к сваре; сама нота звучит на ПОСЛЕДНЕЙ шрути своей группы (размеры 4-3-2-4-4-3-2 = 22):
-   Са=Чхандовати (4-я), Ре=Ратика (7-я), Га=Кродха (9-я), Ма=Марджани (13-я), Па=Алапини (17-я),
-   Дха=Рамья (20-я), Ни=Кшобхини (22-я). Поэтому тоника — «Са · Чхандовати», НЕ «Са · Тивра» («тивра» =
-   острый, на тонике бессмысленно; Тивра/Кумудвати/Манда — подход СНИЗУ к Са, т.е. верх октавы 1018/1088/1110).
-   Свары-носители тут — древней Са-грамы (Ре 10/9, Га 32/27, Дха 5/3, Ни 16/9 ≈ кафи-тхат), поэтому
-   Кродха/Кшобхини садятся в то, что СОВРЕМЕННО зовётся комаль (SWARA_OF — область высоты современная, НЕ
-   меняем; имя шрути — классическое). АЛЬТЕРНАТИВА (НЕ берём): современная позиционная имя[i]↔цент[i],
-   Са=Тивра(1)/Па=Кшити(14) — частая в онлайн-таблицах, но поздняя упрощёнка. Источники: Сангита-Ратнакара
-   (sreenivasaraos.com), kaminimusic.com (позиционная, для сверки). */
-/* Свары — транслит {default:латиница, ru:кириллица}: имена собственные, не переводятся (Sa Re Ga Ma Pa Dha Ni). */
-const SWARA_OF={0:{default:'Sa',ru:'Са'},90:{default:'Re♭',ru:'Ре♭'},112:{default:'Re♭',ru:'Ре♭'},182:{default:'Re',ru:'Ре'},204:{default:'Re',ru:'Ре'},294:{default:'Ga♭',ru:'Га♭'},316:{default:'Ga♭',ru:'Га♭'},386:{default:'Ga',ru:'Га'},408:{default:'Ga',ru:'Га'},
-  498:{default:'Ma',ru:'Ма'},520:{default:'Ma',ru:'Ма'},590:{default:'Ma♯',ru:'Ма♯'},612:{default:'Ma♯',ru:'Ма♯'},702:{default:'Pa',ru:'Па'},792:{default:'Dha♭',ru:'Дха♭'},814:{default:'Dha♭',ru:'Дха♭'},884:{default:'Dha',ru:'Дха'},906:{default:'Dha',ru:'Дха'},
-  996:{default:'Ni♭',ru:'Ни♭'},1018:{default:'Ni♭',ru:'Ни♭'},1088:{default:'Ni',ru:'Ни'},1110:{default:'Ni',ru:'Ни'}};
-/* Имена 22 шрути — транслит {default:латиница, ru:кириллица}: санскритские имена собственные. */
-const SHRUTI_OF={0:{default:'Chandovati',ru:'Чхандовати'},90:{default:'Dayavati',ru:'Дайавати'},112:{default:'Ranjani',ru:'Ранджани'},182:{default:'Ratika',ru:'Ратика'},204:{default:'Raudri',ru:'Раудри'},294:{default:'Krodha',ru:'Кродха'},
-  316:{default:'Vajrika',ru:'Ваджрика'},386:{default:'Prasarini',ru:'Прасарини'},408:{default:'Priti',ru:'Прити'},498:{default:'Marjani',ru:'Марджани'},520:{default:'Kshiti',ru:'Кшити'},590:{default:'Rakta',ru:'Ракта'},612:{default:'Sandipani',ru:'Сандипани'},
-  702:{default:'Alapini',ru:'Алапини'},792:{default:'Madanti',ru:'Маданти'},814:{default:'Rohini',ru:'Рохини'},884:{default:'Ramya',ru:'Рамья'},906:{default:'Ugra',ru:'Угра'},996:{default:'Kshobhini',ru:'Кшобхини'},1018:{default:'Tivra',ru:'Тивра'},
-  1088:{default:'Kumudvati',ru:'Кумудвати'},1110:{default:'Manda',ru:'Манда'}};
-/* Подпись ступени deg: РЕАЛЬНЫЕ центы (как centsOf, с дописанной октавой 1200→0→Са) → свара. У полной
-   сетки (свойство swaraFull) добавляем имя шрути «свара · имя» (различает комма-пары); у РАГ — только
-   свара (раги поют/называют сварами: Са Ре Га Ма Па Дха Ни). Зовётся лишь для swaraNames-ладов, где все
-   центы — члены сетки; фолбэк на порядковый — страховка. Точные центы всегда рядом (centsOf). */
-export const swaraLbl=(deg,s=CUR())=>{ const cx=(s.cents||[]).concat([1200]), c=cx[deg%cx.length]%1200;
-  return swaraOfCents(c, !!s.swaraFull) ?? String(deg+1); };
-/* T3: имя высоты сетки шрути по ЕЁ ЦЕНТАМ — для приглушённых рядов редактора (шрути вне раги). full — «свара · шрути» (различает
-   комма-пары), иначе только свара. Нет такой высоты в таблицах — null (вызывающий ставит свой запасной ярлык). */
-export function swaraOfCents(c, full){ const sw=SWARA_OF[c]; if(!sw) return null;
-  return full ? `${L(sw)} · ${L(SHRUTI_OF[c])}` : L(sw); }
+/* ⛳ F3 — СХЕМА list: имена из СПИСКА СТРОЯ (сетка 22 шрути: свара · шрути — список и его комментарий в scaledata.js). До F3 —
+   таблицы SWARA_OF/SHRUTI_OF по ЦЕНТАМ над тоникой лада (swaraLbl, swaraOfCents); теперь имя — у ВЫСОТЫ строя, по её номеру. Совпадают,
+   потому что все лады списочного строя стоят на его высоте 0 (root 0): центы над тоникой лада = центы высоты строя.
+   listName — имя высоты k (номер в строе, приводится в период); full — «name · detail» (различает комма-пары: «Ре♭ · Дайавати» и
+   «Ре♭ · Ранджани»). Нет списка или записи — null (вызывающий ставит запасной ярлык). */
+export function listName(s,k,full){ const A=namingOf(s).names; if(!A || !A.length) return null;
+  const e=A[((k%A.length)+A.length)%A.length]; if(!e) return null;
+  return full && e.detail ? `${L(e.name)} · ${L(e.detail)}` : L(e.name); }
+/* Подпись СТУПЕНИ deg по списку: имя высоты, на которой стоит ступень (верхняя тоника, deg = n, — высота тоники sel[0]); полное —
+   если лад просит (naming.detail: сетка 22 шрути), иначе только name (раги называют сварами: Са Ре Га Ма Па Дха Ни). Точные центы
+   всегда рядом (centsOf). Запасной — номер ступени. */
+export const listLbl=(deg,s=CUR())=>{ const n=s.sel.length, i=deg%(n+1), k= i<n ? s.sel[i] : s.sel[0];
+  return listName(s,k,namingOf(s).detail) ?? String(deg+1); };
  
 export function qual(t,f){                         // качество трезвучия по интервалам (полутона)
   if(t===4&&f===7)return''; if(t===3&&f===7)return'm';
@@ -769,11 +785,12 @@ export const SEV={'|11':'maj7','|10':'7','m|10':'m7','m|11':'m(maj7)','°|9':'°
 /* ⛳ ПОДПИСЬ СТОПКИ (правило stack): стопка через ступень пяти-/шестиступенного лада — не всегда терции, поэтому имя ищется по
    НАБОРУ ВЫСОТ: сперва от баса, потом от каждого тона по порядку — знакомое трезвучие (мажор, минор, °, +, sus2, sus4) или
    четырёхзвучие (maj7, 7, m7, ø, °7, 6, m6, add9, madd9, 7sus4); корень не в басу — через косую черту («Am/C», «C/G»). Не нашлось — НОТЫ
-   через тире («C–E–A–D»). Имена нот — как у прочих подписей (живая тоника, NOTE_NAMES); лад не 12-ступенный — ноты строя (stepName). */
+   через тире («C–E–A–D»). Имена нот — как у прочих подписей (живая тоника, NOTE_NAMES); схема строя не notes12 — ноты по stepName
+   (F3: было по s.edo!==12). */
 const STACK_Q3={'4,7':'','3,7':'m','3,6':'°','4,8':'+','2,7':'sus2','5,7':'sus4'};
 const STACK_Q4={'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,6,10':'ø','3,6,9':'°7','4,7,9':'6','3,7,9':'m6','2,4,7':'add9','2,3,7':'madd9','5,7,10':'7sus4','4,8,11':'+(maj7)'};
 function stackLabel(st, s){
-  if (s.edo!==12) return st.map(x=>stepName(x,s)).join('–');
+  if (namingOf(s).pitch!=='notes12') return st.map(x=>stepName(x,s)).join('–');
   const pc=x=>((x%12)+12)%12, nm=x=>NOTE_NAMES[pc(tonic+x)];
   const order=[]; for(const x of st){ const p=pc(x); if(!order.includes(p)) order.push(p); }
   const Q= order.length===3 ? STACK_Q3 : order.length===4 ? STACK_Q4 : null;
@@ -784,14 +801,14 @@ function stackLabel(st, s){
   return st.map(nm).join('–');
 }
 export function chordLabel(deg,s=CUR(),sev=seventh){
-  const n=s.iv.length, d=deg%n;
+  const n=s.iv.length, d=deg%n, p12=namingOf(s).pitch==='notes12';   // F3: имена — по схеме строя (было s.edo===12, дважды)
   if (s.chordRule && s.chordRule.kind==='none') return '';
   if (s.chordRule && s.chordRule.kind==='stack') return stackLabel(ruleChordSteps(deg,s,sev), s);   // ⛳ стопка — по набору высот   // ⛳ T6b: аккорда нет — и имени нет (chordNotesStr даёт '' сам: ноль нот)
   if (!(s.chordRule && s.chordRule.kind==='tertian')){
-    return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
+    return p12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
   }
   const st=ruleChordSteps(deg,s,sev), r=st[0];
-  if (s.edo===12){
+  if (p12){
     const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
     let q=qual(st[1]-r, st[2]-r);
     if (q==null) return root+'?';

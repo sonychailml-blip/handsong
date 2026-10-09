@@ -16,6 +16,8 @@
                         //   T5: высота — В СТРОЕ (не обязательно в ладу); вне лада — опора по ЦЕЛОМУ строю, подсветки нет, на оси «Лад» — между рядами
      P.dumpScales()     // F0 «строи файлами»: КАНОНИЧЕСКИЙ СНИМОК всего, что относится к ладам (данные, меню, дрон, подписи) — скачивается
                         //   файлом scales.before.json; положить его в tools/ (снимается на коде ДО переезда)
+     P.checkNames()     // F3: ИМЕНА ДАННЫМИ — подписи по схеме строя/лада против ЗАМОРОЖЕННЫХ подписей до F3: каждый вид × ступень ×
+                        //   12 тоник × en/ru (ступень, ряд, шаг, корень, аккорд и его ноты, слово периода) + ряды обеих осей редактора
      await P.checkFiles() // F0: живой реестр против tools/scales.before.json, поле за полем ===; нет файла — «снимка ещё нет»
      P.checkTypes()     // тип аккорда — в сборке своего вида (отношения / шаги), ни одной ноты на 0 Гц: каждый вид каждого режима и вся песня
      P.checkOut()       // T5: ВЫСОТЫ ВНЕ ЛАДА — прогон: каждая приглушённая высота каждого вида × регистр — цена соло/баса, однонотный аккорд и
@@ -49,7 +51,7 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, isTert, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24 } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
@@ -130,7 +132,7 @@ function legacyChordLabel(deg,s=CUR(),sev=seventh){
   }
   return ROMAN[d]+(sev?'⁷':'');         // макам: римская ступень
 }
-const legacyChordNotesStr=(deg,s=CUR(),sev=seventh)=>legacyChordSteps(deg,s,sev).map(st=>stepName(st,s)).join('·');
+const legacyChordNotesStr=(deg,s=CUR(),sev=seventh)=>legacyChordSteps(deg,s,sev).map(st=>preF3StepName(st,s)).join('·');   // F3: имя шага — замороженное (опора целиком замороженная)
 /* LEGACY-ОПОРА (слайс «стопка»): прежняя цена (legacyChordNotes), а у аккорда без типа в ладу stack — та же прежняя арифметика
    СТОПКИ ЧЕРЕЗ СТУПЕНЬ, что у терцовых ладов (копия вида с tag 'dia': chordSteps стопкой). При R.powerOld — прежний пауэр-аккорд, как и
    новый путь. ⛔ Читают ТОЛЬКО проба и прежний путь рядов редактора (draw.legacyRollSegNotes); уходит в T4c. */
@@ -149,6 +151,85 @@ function legacyChordNotesRef(deg,oct, s=CUR(), sev=seventh, ty=null){
     return legacyChordSteps(deg,s,sev,ty).map(st=>({ f: baseF()/2*Math.pow(P,oct)*Math.pow(P,st/s.edo), iv: st-r0 }));
   }
   return legacyChordNotes(deg,oct,s,sev,ty);
+}
+/* ═══ ⛳ F3 — ЗАМОРОЖЕННЫЕ ОПОРЫ ИМЁН (подписи ДО F3, СЛОВО В СЛОВО) ═══
+   До F3 подписи ветвились по свойствам лада (edo 12/24, период, cents, swaraNames, swaraFull, fixedKey); с F3 они читают СХЕМУ ИМЁН из
+   данных строя и лада (scales.namingOf). Прежние тела — здесь, под префиксом preF3: scales.stepName/rowLabel/rootName/regWord/chordLabel/
+   stackLabel/chordNotesStr/swaraLbl/swaraOfCents (с таблицами SWARA_OF/SHRUTI_OF и STACK_Q*), draw.noteLbl/tunPitchLbl/axisLbl и полное
+   слово периода (draw: periodOf()===2 ? 'reg.octaveFull' : regWord().toUpperCase()). Изменено при переезде: снят export, добавлен префикс,
+   внутренние вызовы ведут на замороженные же копии; name24 и NOTE_NAMES — общие (F3 их не менял). ⛔ ЭТАЛОН — не правится вслед за
+   приложением; читает только P.checkNames (и опора T6c — preF3StepName). */
+const preF3_SWARA_OF={0:{default:'Sa',ru:'Са'},90:{default:'Re♭',ru:'Ре♭'},112:{default:'Re♭',ru:'Ре♭'},182:{default:'Re',ru:'Ре'},204:{default:'Re',ru:'Ре'},294:{default:'Ga♭',ru:'Га♭'},316:{default:'Ga♭',ru:'Га♭'},386:{default:'Ga',ru:'Га'},408:{default:'Ga',ru:'Га'},
+  498:{default:'Ma',ru:'Ма'},520:{default:'Ma',ru:'Ма'},590:{default:'Ma♯',ru:'Ма♯'},612:{default:'Ma♯',ru:'Ма♯'},702:{default:'Pa',ru:'Па'},792:{default:'Dha♭',ru:'Дха♭'},814:{default:'Dha♭',ru:'Дха♭'},884:{default:'Dha',ru:'Дха'},906:{default:'Dha',ru:'Дха'},
+  996:{default:'Ni♭',ru:'Ни♭'},1018:{default:'Ni♭',ru:'Ни♭'},1088:{default:'Ni',ru:'Ни'},1110:{default:'Ni',ru:'Ни'}};
+const preF3_SHRUTI_OF={0:{default:'Chandovati',ru:'Чхандовати'},90:{default:'Dayavati',ru:'Дайавати'},112:{default:'Ranjani',ru:'Ранджани'},182:{default:'Ratika',ru:'Ратика'},204:{default:'Raudri',ru:'Раудри'},294:{default:'Krodha',ru:'Кродха'},
+  316:{default:'Vajrika',ru:'Ваджрика'},386:{default:'Prasarini',ru:'Прасарини'},408:{default:'Priti',ru:'Прити'},498:{default:'Marjani',ru:'Марджани'},520:{default:'Kshiti',ru:'Кшити'},590:{default:'Rakta',ru:'Ракта'},612:{default:'Sandipani',ru:'Сандипани'},
+  702:{default:'Alapini',ru:'Алапини'},792:{default:'Madanti',ru:'Маданти'},814:{default:'Rohini',ru:'Рохини'},884:{default:'Ramya',ru:'Рамья'},906:{default:'Ugra',ru:'Угра'},996:{default:'Kshobhini',ru:'Кшобхини'},1018:{default:'Tivra',ru:'Тивра'},
+  1088:{default:'Kumudvati',ru:'Кумудвати'},1110:{default:'Manda',ru:'Манда'}};
+const preF3RegWord=(s=CUR())=>{ const P=periodOf(s); return P===2?t('reg.oct'):P===3?t('reg.tritave'):t('reg.reg'); };
+const preF3RegWordFull=(s=CUR())=>periodOf(s)===2?t('reg.octaveFull'):preF3RegWord(s).toUpperCase();
+const preF3RootName=(deg,s=CUR())=>{ const n=s.iv.length, d=((deg%n)+n)%n;
+  return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
+function preF3StepName(st,s=CUR()){
+  if (s.edo===12) return NOTE_NAMES[(((tonic+st)%12)+12)%12];
+  if (s.edo===24) return name24(tonic*2+st);
+  return 'ст'+(((st%s.edo)+s.edo)%s.edo);
+}
+function preF3RowLabel(deg,s=CUR()){ const ivx=IVX(s);
+  if (s.edo===12||s.edo===24) return preF3StepName(ivx[deg],s);
+  const st=ivx[deg]%s.edo; return st===0?'Т':String(st);
+}
+const preF3SwaraLbl=(deg,s=CUR())=>{ const cx=(s.cents||[]).concat([1200]), c=cx[deg%cx.length]%1200;
+  return preF3SwaraOfCents(c, !!s.swaraFull) ?? String(deg+1); };
+function preF3SwaraOfCents(c, full){ const sw=preF3_SWARA_OF[c]; if(!sw) return null;
+  return full ? `${L(sw)} · ${L(preF3_SHRUTI_OF[c])}` : L(sw); }
+const preF3_STACK_Q3={'4,7':'','3,7':'m','3,6':'°','4,8':'+','2,7':'sus2','5,7':'sus4'};
+const preF3_STACK_Q4={'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,6,10':'ø','3,6,9':'°7','4,7,9':'6','3,7,9':'m6','2,4,7':'add9','2,3,7':'madd9','5,7,10':'7sus4','4,8,11':'+(maj7)'};
+function preF3StackLabel(st, s){
+  if (s.edo!==12) return st.map(x=>preF3StepName(x,s)).join('–');
+  const pc=x=>((x%12)+12)%12, nm=x=>NOTE_NAMES[pc(tonic+x)];
+  const order=[]; for(const x of st){ const p=pc(x); if(!order.includes(p)) order.push(p); }
+  const Q= order.length===3 ? preF3_STACK_Q3 : order.length===4 ? preF3_STACK_Q4 : null;
+  if (Q) for(const r of order){
+    const rel=order.filter(p=>p!==r).map(p=>pc(p-r)).sort((a,b)=>a-b).join(','), q=Q[rel];
+    if (q!==undefined) return nm(r)+q+(r!==order[0] ? '/'+nm(order[0]) : '');
+  }
+  return st.map(nm).join('–');
+}
+function preF3ChordLabel(deg,s=CUR(),sev=seventh){
+  const n=s.iv.length, d=deg%n;
+  if (s.chordRule && s.chordRule.kind==='none') return '';
+  if (s.chordRule && s.chordRule.kind==='stack') return preF3StackLabel(ruleChordSteps(deg,s,sev), s);
+  if (!(s.chordRule && s.chordRule.kind==='tertian')){
+    return s.edo===12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
+  }
+  const st=ruleChordSteps(deg,s,sev), r=st[0];
+  if (s.edo===12){
+    const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
+    let q=qual(st[1]-r, st[2]-r);
+    if (q==null) return root+'?';
+    if (sev){ const sv=st[3]-r; q=SEV[q+'|'+sv] ?? (q+'⁷'); }
+    return root+q;
+  }
+  return ROMAN[d]+(sev?'⁷':'');
+}
+const preF3ChordNotesStr=(deg,s=CUR(),sev=seventh)=>ruleChordSteps(deg,s,sev).map(st=>preF3StepName(st,s)).join('·');
+const preF3NoteLbl = (deg,s=CUR()) =>
+  s.swaraNames ? preF3SwaraLbl(deg,s)
+    : s.fixedKey ? preF3RowLabel(deg,s)
+    : (periodOf(s)!==2 || s.cents || (s.edo!==12 && s.edo!==24))
+    ? (IVX(s)[deg]%s.edo===0 ? 'Т' : String(deg+1))
+    : preF3RowLabel(deg,s);
+const preF3TunSize=T=>T.equal!=null ? T.equal : T.cents.length;
+function preF3TunPitchLbl(sc,j){
+  const T=sc&&tuningOf(sc), N=preF3TunSize(T), k=sc.root+j;
+  if(T.equal!=null && T.period===2 && (T.equal===12||T.equal===24)) return preF3StepName(j,sc);
+  if(sc.swaraNames && T.cents){ const c=(T.cents[k%N]+1200*Math.floor(k/N)-T.cents[sc.root])%1200; const nm=preF3SwaraOfCents(c,true); if(nm) return nm; }
+  return '('+(((k%N)+N)%N+1)+')';
+}
+function preF3AxisLbl(ax,r){
+  const e=ax.ent(r), base = e.deg>=0 ? preF3NoteLbl(e.deg,ax.sc) : preF3TunPitchLbl(ax.sc,e.j);
+  return (((r%ax.rpp)+ax.rpp)%ax.rpp)===0 ? base+' '+(OCT_ROMAN[(r/ax.rpp)|0]||'') : base;
 }
 /* ═══ ⛳ T7b — ЗАМОРОЖЕННЫЕ ОПОРЫ ДО T7 (из прежнего кода, `git show` коммита до T7 — scales.js, только чтение; СЛОВО В СЛОВО) ═══
    Режим «Свободно» обязан звучать РОВНО как до T7. Здесь — то, чем это сверяется: наборы Партча и Болена–Пирса, как они стояли до T7
@@ -820,6 +901,7 @@ const ALL_RUNS=[
   ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F3 naming as data', ()=>checkNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
 ];
@@ -1794,5 +1876,40 @@ export async function checkFiles(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe files] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe files] …and ${nBad-PRINT_MAX} more`);
   if(!nBad) console.log('[scaleprobe files] every mode, tuning, palette, menu entry, drone degree and label equals the snapshot');
+  return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F3 — P.checkNames(): ИМЕНА ДАННЫМИ ПРОТИВ ЗАМОРОЖЕННЫХ ПОДПИСЕЙ ДО F3 ═══
+   Каждый вид (лад × «строй от» у tunable × режим аккордов — те же виды, что у снимка F0) × 12 тоник × en/ru, строгое ===:
+     слово периода (короткое и полное), каждая ступень 0..n — подпись ступени (draw.noteLbl), имя ряда (rowLabel), корень палитры
+     (rootName), аккорд и его ноты с септаккордом и без (chordLabel, chordNotesStr — у ладов с аккордами, как в снимке), каждый шаг
+     −edo..2·edo−1 (stepName); и каждый ряд ВСЕХ регистров обеих осей редактора «Все» и «Лад» (draw.axisLbl — у приглушённых рядов
+     это имя высоты строя). Опоры — preF3* выше. Тонику переставляет сеттер и возвращает finally; язык — withLang. */
+export function checkNames(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const keepT=tonic;
+  try{
+    for(const {v} of snapViews()){
+      const n=v.iv.length, id=viewIdOf(v), chords=!v.noChords && !(v.chordRule && v.chordRule.kind==='none');
+      const axes=[['All',RP.axis(v,true)],['Mode',RP.axis(v,false)]];
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const lg of ['en','ru']) withLang(lg,()=>{
+          const eq=(what,a,b)=>{ cases++; if(a!==b) miss(`${id} tonic ${tn} ${lg} · ${what}: "${a}" now, "${b}" before F3`); };
+          eq('period word', regWord(v), preF3RegWord(v)); eq('period word (full)', regWordFull(v), preF3RegWordFull(v));
+          for(let d=0;d<=n;d++){
+            eq(`degree ${d}`, RP.noteLbl(d,v), preF3NoteLbl(d,v)); eq(`row ${d}`, rowLabel(d,v), preF3RowLabel(d,v)); eq(`root ${d}`, rootName(d,v), preF3RootName(d,v));
+            if(chords) for(const sev of [false,true]){ const w=sev?' 7th':'';
+              eq(`chord ${d}${w}`, chordLabel(d,v,sev), preF3ChordLabel(d,v,sev)); eq(`chord notes ${d}${w}`, chordNotesStr(d,v,sev), preF3ChordNotesStr(d,v,sev)); }
+          }
+          for(let st=-v.edo; st<2*v.edo; st++) eq(`step ${st}`, stepName(st,v), preF3StepName(st,v));
+          for(const [nm,ax] of axes) for(let r=0;r<ax.rpp*REG_N;r++) eq(`${nm} axis row ${r}`, RP.axisLbl(ax,r), preF3AxisLbl(ax,r));
+        });
+      }
+    }
+  } finally { setTonic(keepT); }
+  console.log(`[scaleprobe names] ${snapViews().length} views × 12 tonics × 2 languages · labels compared ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe names] '+m));
+  if(nBad>PRINT_MAX) console.warn(`[scaleprobe names] …and ${nBad-PRINT_MAX} more`);
+  if(!nBad) console.log('[scaleprobe names] every label read from the naming schemes equals the pre-F3 label');
   return { cases, total:nBad, differences:bad };
 }

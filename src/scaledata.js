@@ -15,7 +15,10 @@
                 режимов аккордов, на который ссылается лад; первый — умолчание; set ложится поверх полей лада в его виде;
      mode     — {format:'handsong/mode', version, id, tuning, name, menu: {tradition, group ('' — без группы)}, degrees (индексы строя —
                 выборка), root, anchor: {policy: 'tonic' | 'fixed' (note: якорь) | 'choice'}, chords: {rule, palette?, grid?, build?, modes?},
-                layout?: {rect}, naming?: {swara, full} (как сегодня — схемы имён придут в F3), compat: {tag}}.
+                layout?: {rect}, naming?: {scheme?, detail?} (F3: схема имён СТУПЕНЕЙ, если не схема строя; detail — показывать вторую
+                часть имени списка), compat: {tag}};
+     у строя с F3 ещё naming: {scheme: 'notes12'|'notes24'|'ordinal'|'list', names?: [{name, detail?}] — у list, по высоте} и
+                periodWord: {short, full?} — слово периода (строка — ключ словаря, объект — имя en/ru); читает scales.namingOf.
    ⚠️ compat.tag — поле, которое ВЫВЕСТИ НЕЛЬЗЯ (семейство лада: 'penta' стоит и у пентатоник, и у раг, и у патетов): его читают только
    замороженные опоры пробы и isTert; уйдёт, когда уйдут они. Всё прочее у лада выводится (см. сборщик в scales.js).
    ⛔ Дроби (period, ratios правил, отношения палитр и строёв) — СТРОКАМИ; сборщик делит их тем же действием, что прежний литерал JS (5/4 —
@@ -56,8 +59,8 @@ export const SCALE_DATA={
      exp     — «Эксперименты»: равные EDO (19/31), Партч, Болен–Пирс, Карлос — честное имя для нарочно странного.
    ПРАВИЛО РАЗМЕЩЕНИЯ (для будущих ладов): новый лад идёт в секцию по его КУЛЬТУРЕ или ЗВУКОВОМУ
    характеру. НЕ заводить общий «прочее»-бакет — именно он и сделал «Мировые» бесполезными; если новая
-   традиция не влезает, добавить ей СВОЮ географическую секцию. Порядок ГРУПП внутри секции fillScales
-   берёт по ПЕРВОМУ появлению в SCALES (массив НЕ трогаем), порядок СЕКЦИЙ — из этого списка. */
+   традиция не влезает, добавить ей СВОЮ географическую секцию. Порядок ГРУПП внутри секции menuOf
+   берёт по ПЕРВОМУ появлению лада в manifest.modes, порядок СЕКЦИЙ — из этого списка. */
   menu:{ format:'handsong/menu', version:1,
     traditions:[
       {id:'common', name:{en:'Familiar', ru:'Привычное'}},
@@ -67,9 +70,9 @@ export const SCALE_DATA={
       {id:'europe', name:{en:'Historical Europe', ru:'Европа историческая'}},
       {id:'exp', name:{en:'Experiments', ru:'Эксперименты'}},
     ],
-    /* ЛОКАЛИЗУЕМЫЕ ПОДПИСИ ПОДГРУПП (grp). Лад ссылается: grp:GRP.diatonic + стабильный grpKey (по нему
-   fillScales раскладывает корзины — не зависит от языка; L(GRP.x) даёт подпись). Один ярлык — один
-   объект, без повторения литерала на каждом ладе. */
+    /* ЛОКАЛИЗУЕМЫЕ ПОДПИСИ ПОДГРУПП. Лад ссылается КЛЮЧОМ (menu.group: 'diatonic'; '' — без группы); сборщик кладёт в
+   объект лада подпись grp (этот объект) и стабильный grpKey — по ключу menuOf раскладывает корзины (не зависит от языка), L(подпись)
+   даёт текст. Один ярлык — один объект на все лады группы. */
     groups:{
       diatonic:{en:'Diatonic', ru:'Диатоника'},
       modes:{en:'Modes', ru:'Лады (моды)'},
@@ -88,35 +91,37 @@ export const SCALE_DATA={
     } },
 
   /* ⛳ СТРОИ — ДАННЫЕ (слайс T0 универсальной модели строя, HANDOFF «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ»). СТРОЙ — все высоты инструмента:
-   ПЕРИОД повторения и высоты внутри него. ЛАД — выбор из строя (ниже, поля sel/root у каждого лада SCALES).
+   ПЕРИОД повторения и высоты внутри него. ЛАД — выбор из строя (ниже: degrees — индексы строя, root — у каждого лада).
      • РАВНЫЙ строй держит ФОРМУ ГЕНЕРАТОРА — число шагов equal и период (шаг k звучит period^(k/equal)), а НЕ развёрнутый список
        центов: ровно это выражение и стоит в сегодняшней равной ветке (P^(шаг/edo)), поэтому общая функция высоты (T1) останется
        побитно прежней. Шаг k бывает и ≥ equal (аккорд через период) — переноса для равного строя не нужно;
-     • ТАБЛИЧНЫЙ строй — центы над нулевой высотой строя в пределах периода (TBL выше), период — октава (все центовые строи октавные).
+     • ТАБЛИЧНЫЙ строй — список высот pitches.list: центы над нулевой высотой строя в пределах периода (цена), у части — точное
+       отношение (теория); период — октава (все табличные строи октавные).
    ⛳ id — СТАБИЛЬНЫЙ идентификатор (правило #25: отображаемое имя — не идентификатор): его запишет сохранение, его прочтёт импорт.
-   Имён у записей пока нет — строй нигде не показывается; имена придут вместе с конструктором.
+   Имени строя у записей пока нет — строй нигде не показывается (придёт с конструктором); имена его ВЫСОТ — с F3 схема naming.
    ⚠️ Натуральный подвижный и фиксированный — ОДИН строй ji12 (те же 12 высот): различаются они не строем, а ЯКОРЕМ (подвижный
    строится от тоники, фиксированный — от C) и аккордами (чистые отношения / сетка). Так и задумано моделью: строй — только высоты.
-   ⚠️ T0 НЕВИДИМ: эти записи и поля sel/root читает ТОЛЬКО проба (src/scaleprobe.js); цена, события, редактор их не видят (T1+). */
+   С T1 цену считает одна функция высоты по записи строя и выборке лада; с T4 события хранят индекс в строе; с F2 выборка — ДАННЫЕ лада. */
   /* ⛳ T7: ТОЧНЫЕ ОТНОШЕНИЯ СТРОЯ — данными, рядом с центами (первая часть пункта (а) готовности к Scala; пока — только у Партча, которому
-   они нужны для правила «аккорд Партча — только из его 43 высот»). Строка дробей в порядке таблицы центов (центы — те же отношения,
-   округлённые до сотых, отсюда ≤ 0.005¢ разницы). Цену они НЕ меняют — её по-прежнему считают центы (корень) и отношение типа. */
+   они нужны для правила «аккорд Партча — только из его 43 высот»; chordFit:'ratios'). С F2 отношение стоит у каждой высоты рядом с её
+   центами (центы — те же отношения, округлённые до сотых, отсюда ≤ 0.005¢ разницы) — ещё у ji12, pythagorean12 и shruti22, как теория:
+   приложение их пока не читает. Цену они НЕ меняют — её по-прежнему считают центы (корень) и отношение типа. */
   tunings:{
-    edo12:{ format:'handsong/tuning', version:1, id:'edo12', period:'2/1', pitches:{equal:12} },
-    edo19:{ format:'handsong/tuning', version:1, id:'edo19', period:'2/1', pitches:{equal:19} },
-    edo24:{ format:'handsong/tuning', version:1, id:'edo24', period:'2/1', pitches:{equal:24} },
-    edo31:{ format:'handsong/tuning', version:1, id:'edo31', period:'2/1', pitches:{equal:31} },
-    bp13:{ format:'handsong/tuning', version:1, id:'bp13', period:'3/1', pitches:{equal:13} },   // Болен–Пирс: 13 равных шагов ТРИТАВЫ
-    'carlos-alpha':{ format:'handsong/tuning', version:1, id:'carlos-alpha', period:'3/2', pitches:{equal:9} },   // Карлос: равные доли чистой КВИНТЫ (генератор, не эквивалентность)
-    'carlos-beta':{ format:'handsong/tuning', version:1, id:'carlos-beta', period:'3/2', pitches:{equal:11} },
-    'carlos-gamma':{ format:'handsong/tuning', version:1, id:'carlos-gamma', period:'3/2', pitches:{equal:20} },
+    edo12:{ format:'handsong/tuning', version:1, id:'edo12', period:'2/1', pitches:{equal:12}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    edo19:{ format:'handsong/tuning', version:1, id:'edo19', period:'2/1', pitches:{equal:19}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    edo24:{ format:'handsong/tuning', version:1, id:'edo24', period:'2/1', pitches:{equal:24}, naming:{scheme:'notes24'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    edo31:{ format:'handsong/tuning', version:1, id:'edo31', period:'2/1', pitches:{equal:31}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
+    bp13:{ format:'handsong/tuning', version:1, id:'bp13', period:'3/1', pitches:{equal:13}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.tritave'} },   // Болен–Пирс: 13 равных шагов ТРИТАВЫ
+    'carlos-alpha':{ format:'handsong/tuning', version:1, id:'carlos-alpha', period:'3/2', pitches:{equal:9}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'} },   // Карлос: равные доли чистой КВИНТЫ (генератор, не эквивалентность)
+    'carlos-beta':{ format:'handsong/tuning', version:1, id:'carlos-beta', period:'3/2', pitches:{equal:11}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'} },
+    'carlos-gamma':{ format:'handsong/tuning', version:1, id:'carlos-gamma', period:'3/2', pitches:{equal:20}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.reg'} },
     slendro:{ format:'handsong/tuning', version:1, id:'slendro', period:'2/1', pitches:{list:[
       {cents:0}, {cents:231}, {cents:474}, {cents:717}, {cents:955}
-    ]} },
+    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     pelog:{ format:'handsong/tuning', version:1, id:'pelog', period:'2/1', pitches:{list:[   // родитель патетов Лима/Нем/Баранг
       {cents:0}, {cents:120}, {cents:258}, {cents:539}, {cents:675}, {cents:785},
       {cents:943}
-    ]} },
+    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     partch43:{ format:'handsong/tuning', version:1, id:'partch43', period:'2/1', pitches:{list:[   // T7: точные отношения — по ним решается «тон аккорда — одна из 43 высот»
       {cents:0, ratio:'1/1'}, {cents:21.51, ratio:'81/80'}, {cents:53.27, ratio:'33/32'}, {cents:84.47, ratio:'21/20'}, {cents:111.73, ratio:'16/15'}, {cents:150.64, ratio:'12/11'},
       {cents:165.0, ratio:'11/10'}, {cents:182.4, ratio:'10/9'}, {cents:203.91, ratio:'9/8'}, {cents:231.17, ratio:'8/7'}, {cents:266.87, ratio:'7/6'}, {cents:294.13, ratio:'32/27'},
@@ -126,41 +131,82 @@ export const SCALE_DATA={
       {cents:852.59, ratio:'18/11'}, {cents:884.36, ratio:'5/3'}, {cents:905.87, ratio:'27/16'}, {cents:933.13, ratio:'12/7'}, {cents:968.83, ratio:'7/4'}, {cents:996.09, ratio:'16/9'},
       {cents:1017.6, ratio:'9/5'}, {cents:1035.0, ratio:'20/11'}, {cents:1049.36, ratio:'11/6'}, {cents:1088.27, ratio:'15/8'}, {cents:1115.53, ratio:'40/21'}, {cents:1146.73, ratio:'64/33'},
       {cents:1178.49, ratio:'160/81'}
-    ]}, chordFit:'ratios' },
+    ]}, naming:{scheme:'ordinal'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'}, chordFit:'ratios' },
     shruti22:{ format:'handsong/tuning', version:1, id:'shruti22', period:'2/1', pitches:{list:[   // родитель десяти раг
       {cents:0, ratio:'1/1'}, {cents:90, ratio:'256/243'}, {cents:112, ratio:'16/15'}, {cents:182, ratio:'10/9'}, {cents:204, ratio:'9/8'}, {cents:294, ratio:'32/27'},
       {cents:316, ratio:'6/5'}, {cents:386, ratio:'5/4'}, {cents:408, ratio:'81/64'}, {cents:498, ratio:'4/3'}, {cents:520, ratio:'27/20'}, {cents:590, ratio:'45/32'},
       {cents:612, ratio:'729/512'}, {cents:702, ratio:'3/2'}, {cents:792, ratio:'128/81'}, {cents:814, ratio:'8/5'}, {cents:884, ratio:'5/3'}, {cents:906, ratio:'27/16'},
       {cents:996, ratio:'16/9'}, {cents:1018, ratio:'9/5'}, {cents:1088, ratio:'15/8'}, {cents:1110, ratio:'243/128'}
-    ]} },
+    ]},
+      /* ===== Индийская классика: свары (саргам) + ПОДЛИННЫЕ имена 22 шрути — СПИСОК ИМЁН СТРОЯ (F3; до F3 — таблицы SWARA_OF/SHRUTI_OF
+         по центам в scales.js) =====
+         Имена — у КАЖДОЙ ВЫСОТЫ СТРОЯ, по её номеру (порядок списка = порядок высот выше), поэтому сетка и раги называют ОДНИ И ТЕ ЖЕ высоты
+         одними и теми же именами — подписи не разъедутся. name — свара, detail — имя шрути.
+         name (свара) — по области высоты (Са/Ре/Га/Ма/Па/Дха/Ни; ♭ комаль, ♯ тивра-Ма). Са и Па — ачала
+         (неподвижны). Комма-ПАРЫ (90/112, 386/408, …) раньше различали НАШИМ штрихом ′ — это ВЫДУМКА. Теперь
+         различаем ПОДЛИННЫМ ИМЕНЕМ ШРУТИ (у традиции они есть) — detail, по одному на каждую из 22 позиций.
+         КОНВЕНЦИЯ (источники расходятся — фиксируем выбор): КЛАССИЧЕСКАЯ, Сангита-Ратнакара (Шарнгадева, XIII в.).
+         Шрути — это ПОДХОД к сваре; сама нота звучит на ПОСЛЕДНЕЙ шрути своей группы (размеры 4-3-2-4-4-3-2 = 22):
+         Са=Чхандовати (4-я), Ре=Ратика (7-я), Га=Кродха (9-я), Ма=Марджани (13-я), Па=Алапини (17-я),
+         Дха=Рамья (20-я), Ни=Кшобхини (22-я). Поэтому тоника — «Са · Чхандовати», НЕ «Са · Тивра» («тивра» =
+         острый, на тонике бессмысленно; Тивра/Кумудвати/Манда — подход СНИЗУ к Са, т.е. верх октавы 1018/1088/1110).
+         Свары-носители тут — древней Са-грамы (Ре 10/9, Га 32/27, Дха 5/3, Ни 16/9 ≈ кафи-тхат), поэтому
+         Кродха/Кшобхини садятся в то, что СОВРЕМЕННО зовётся комаль (свара — область высоты современная, НЕ
+         меняем; имя шрути — классическое). АЛЬТЕРНАТИВА (НЕ берём): современная позиционная имя[i]↔цент[i],
+         Са=Тивра(1)/Па=Кшити(14) — частая в онлайн-таблицах, но поздняя упрощёнка. Источники: Сангита-Ратнакара
+         (sreenivasaraos.com), kaminimusic.com (позиционная, для сверки). */
+      naming:{scheme:'list', names:[
+        {name:{default:'Sa',ru:'Са'}, detail:{default:'Chandovati',ru:'Чхандовати'}},   // 0¢ (1)
+        {name:{default:'Re♭',ru:'Ре♭'}, detail:{default:'Dayavati',ru:'Дайавати'}},   // 90¢ (2)
+        {name:{default:'Re♭',ru:'Ре♭'}, detail:{default:'Ranjani',ru:'Ранджани'}},   // 112¢ (3)
+        {name:{default:'Re',ru:'Ре'}, detail:{default:'Ratika',ru:'Ратика'}},   // 182¢ (4)
+        {name:{default:'Re',ru:'Ре'}, detail:{default:'Raudri',ru:'Раудри'}},   // 204¢ (5)
+        {name:{default:'Ga♭',ru:'Га♭'}, detail:{default:'Krodha',ru:'Кродха'}},   // 294¢ (6)
+        {name:{default:'Ga♭',ru:'Га♭'}, detail:{default:'Vajrika',ru:'Ваджрика'}},   // 316¢ (7)
+        {name:{default:'Ga',ru:'Га'}, detail:{default:'Prasarini',ru:'Прасарини'}},   // 386¢ (8)
+        {name:{default:'Ga',ru:'Га'}, detail:{default:'Priti',ru:'Прити'}},   // 408¢ (9)
+        {name:{default:'Ma',ru:'Ма'}, detail:{default:'Marjani',ru:'Марджани'}},   // 498¢ (10)
+        {name:{default:'Ma',ru:'Ма'}, detail:{default:'Kshiti',ru:'Кшити'}},   // 520¢ (11)
+        {name:{default:'Ma♯',ru:'Ма♯'}, detail:{default:'Rakta',ru:'Ракта'}},   // 590¢ (12)
+        {name:{default:'Ma♯',ru:'Ма♯'}, detail:{default:'Sandipani',ru:'Сандипани'}},   // 612¢ (13)
+        {name:{default:'Pa',ru:'Па'}, detail:{default:'Alapini',ru:'Алапини'}},   // 702¢ (14)
+        {name:{default:'Dha♭',ru:'Дха♭'}, detail:{default:'Madanti',ru:'Маданти'}},   // 792¢ (15)
+        {name:{default:'Dha♭',ru:'Дха♭'}, detail:{default:'Rohini',ru:'Рохини'}},   // 814¢ (16)
+        {name:{default:'Dha',ru:'Дха'}, detail:{default:'Ramya',ru:'Рамья'}},   // 884¢ (17)
+        {name:{default:'Dha',ru:'Дха'}, detail:{default:'Ugra',ru:'Угра'}},   // 906¢ (18)
+        {name:{default:'Ni♭',ru:'Ни♭'}, detail:{default:'Kshobhini',ru:'Кшобхини'}},   // 996¢ (19)
+        {name:{default:'Ni♭',ru:'Ни♭'}, detail:{default:'Tivra',ru:'Тивра'}},   // 1018¢ (20)
+        {name:{default:'Ni',ru:'Ни'}, detail:{default:'Kumudvati',ru:'Кумудвати'}},   // 1088¢ (21)
+        {name:{default:'Ni',ru:'Ни'}, detail:{default:'Manda',ru:'Манда'}},   // 1110¢ (22)
+      ]}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     ji12:{ format:'handsong/tuning', version:1, id:'ji12', period:'2/1', pitches:{list:[
       {cents:0, ratio:'1/1'}, {cents:111.73, ratio:'16/15'}, {cents:203.91, ratio:'9/8'}, {cents:315.64, ratio:'6/5'}, {cents:386.31, ratio:'5/4'}, {cents:498.04, ratio:'4/3'},
       {cents:590.22, ratio:'45/32'}, {cents:701.96, ratio:'3/2'}, {cents:813.69, ratio:'8/5'}, {cents:884.36, ratio:'5/3'}, {cents:1017.6, ratio:'9/5'}, {cents:1088.27, ratio:'15/8'}
-    ]} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     pythagorean12:{ format:'handsong/tuning', version:1, id:'pythagorean12', period:'2/1', pitches:{list:[
       {cents:0, ratio:'1/1'}, {cents:90.22, ratio:'256/243'}, {cents:203.91, ratio:'9/8'}, {cents:294.13, ratio:'32/27'}, {cents:407.82, ratio:'81/64'}, {cents:498.04, ratio:'4/3'},
       {cents:611.73, ratio:'729/512'}, {cents:701.96, ratio:'3/2'}, {cents:792.18, ratio:'128/81'}, {cents:905.87, ratio:'27/16'}, {cents:996.09, ratio:'16/9'}, {cents:1109.78, ratio:'243/128'}
-    ]} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     'meantone-quarter':{ format:'handsong/tuning', version:1, id:'meantone-quarter', period:'2/1', pitches:{list:[
       {cents:0}, {cents:76.05}, {cents:193.16}, {cents:310.26}, {cents:386.31}, {cents:503.42},
       {cents:579.47}, {cents:696.58}, {cents:772.63}, {cents:889.74}, {cents:1006.84}, {cents:1082.89}
-    ]} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     werckmeister3:{ format:'handsong/tuning', version:1, id:'werckmeister3', period:'2/1', pitches:{list:[
       {cents:0}, {cents:90.22}, {cents:192.18}, {cents:294.13}, {cents:390.22}, {cents:498.04},
       {cents:588.27}, {cents:696.09}, {cents:792.18}, {cents:888.27}, {cents:996.09}, {cents:1092.18}
-    ]} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     vallotti:{ format:'handsong/tuning', version:1, id:'vallotti', period:'2/1', pitches:{list:[
       {cents:0}, {cents:94.13}, {cents:196.09}, {cents:298.04}, {cents:392.18}, {cents:501.96},
       {cents:592.18}, {cents:698.04}, {cents:796.09}, {cents:894.13}, {cents:1000}, {cents:1090.22}
-    ]} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
     kirnberger3:{ format:'handsong/tuning', version:1, id:'kirnberger3', period:'2/1', pitches:{list:[
       {cents:0}, {cents:90.22}, {cents:193.16}, {cents:294.13}, {cents:386.31}, {cents:498.04},
       {cents:590.22}, {cents:696.58}, {cents:792.18}, {cents:889.74}, {cents:996.09}, {cents:1088.27}
-    ]} },
+    ]}, naming:{scheme:'notes12'}, periodWord:{short:'reg.oct', full:'reg.octaveFull'} },
   },
 
   /* НАБОРЫ СЕМЕЙСТВ ПО ЛАДАМ. Интервалы — В ШАГАХ СВОЕГО СТРОЯ от корня; для 12-TET шаг
-   это полутон, для 31-TET — 38.7 цента. Ветка `if(ty)` в chordSteps складывает шаги
+   это полутон, для 31-TET — 38.7 цента. Типизированная ветка chordNotes складывает шаги
    с шагами и от edo не зависит — один механизм на оба набора, разная только таблица.
    ⚠️ Набор нельзя ставить ладу с ДРУГИМ edo: 12-тоновые [0,4,7] на 31-TET дадут
    4/31 вместо терции — молча и мимо строя. Ключ привязан к ладу, лад знает свой edo.
@@ -482,13 +528,14 @@ export const SCALE_DATA={
                         недостижимого аккорда без типа у ладов с палитрой;
      {kind:'ratios', triad, seventh} — интервалы ОТНОШЕНИЯМИ, округлёнными к шагу строя (19/31-TET; сюда переехали прежние поля chord/chord7);
      {kind:'palette'} — у лада ПАЛИТРА (typedChords) и своего нетипизированного правила нет: аккорд без типа здесь не пишется ни одним путём;
-     {kind:'none'}    — аккордов нет (noChords).
-   ⚠️ С T6c ПОДПИСИ (chordLabel, chordNotesStr) читают правило (ruleChordSteps); ЦЕНУ по-прежнему решает chordSteps по tag (T6b). Каждое
-   значение обязано совпасть с сегодняшним выбором по tag — проба P.checkRules. Правило едет в вид лада (scaleView копирует поля). */
+     {kind:'none'}    — аккордов нет (сборщик ставит объекту лада noChords).
+   ⚠️ С T6b ЦЕНУ, с T6c ПОДПИСИ (chordLabel, chordNotesStr) решает правило (ruleChordSteps); прежний выбор по tag — опора пробы
+   (P.checkRules). Правило едет в вид лада (scaleView копирует поля). */
   /* ═══ ⛳ T7b — РЕЖИМЫ АККОРДОВ ЛАДА (решение пользователя: «надо дать выбор — режим, где доступно всё, как раньше, и режим, как сейчас,
    верный живому инструменту; иначе мы заранее сужаем музыкальные возможности людей») ═══
    ПРИНЦИП: не сужать возможности — когда теория ограничивает, ограничение предлагается РЕЖИМОМ, а не правилом.
-   Режим — ДАННЫЕ: { id, nameKey, hintKey (словарь en+ru), over } — over ложится ПОВЕРХ полей лада в его ВИДЕ (scaleView). Поэтому режим
+   Режим — ДАННЫЕ: { id, nameKey, hintKey (словарь en+ru), set: {build?, palette?, rule?} } — сборщик кладёт set в over объекта режима
+   (chordBuild / typedChords / chordRule), и over ложится ПОВЕРХ полей лада в его ВИДЕ (scaleView); лад ссылается на набор chords.modes. Поэтому режим
    МОРОЗИТСЯ В ВИДЕ (правило #7, как «строй от»): каждое событие держит sc — вид со своим режимом — и звучит, как записано, при любом
    положении переключателя; смена режима — смена вида, и запись уходит в НОВУЮ дорожку (маршрут по строю, как смена лада или «строй от»).
    Первый режим списка — УМОЛЧАНИЕ. Читатели ничего не знают о режимах: они читают поля вида (chordBuild, typedChords, chordRule).
@@ -503,21 +550,16 @@ export const SCALE_DATA={
     stackPower:{ format:'handsong/chordmodes', version:1, id:'stackPower', modes:[ {id:'stack', nameKey:'cm.stack', hintKey:'cm.stack.hint', set:{}}, {id:'power', nameKey:'cm.power', hintKey:'cm.power.hint', set:{rule:{kind:'power'}}} ] },
   },
 
-  /* Каждый лад: edo — на сколько равных шагов делится ПЕРИОД (октава, если нет period; у Болена–Пирса — тритава, у Карлос — квинта),
-   iv — ступени лада в этих шагах; у центового лада (cents) edo и iv — лишь НОМИНАЛЬНАЯ структура (число ступеней, ряды), а высоту
-   ступени задают центы. tag — семейство (для аккордов), trad — традиция (меню строя), grp — подгруппа внутри традиции (пусто = без
-   подзаголовка). T0: id — СТАБИЛЬНЫЙ идентификатор лада, tuning — id его строя (TUNINGS, ниже SCALES); sel/root выводятся при загрузке.
-   ⛳ F1 «строи файлами»: лад АДРЕСУЕТСЯ СТАБИЛЬНЫМ id (state.scaleId, scaleById; меню, уроки, демо, пины заморозки и рендера) — позиция
-   в массиве больше нигде не адрес. Порядок массива остаётся порядком внутри корзины меню (menuOf) и индексом i в снимке F0, поэтому новые
-   лады — по-прежнему В КОНЕЦ. Меню фильтрует по trad, а не по порядку. */
-  /* ⛳ ТАБЛИЦЫ СТРОЁВ (слайс T0 универсальной модели строя, HANDOFF «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ») — высоты НЕРАВНЫХ строёв
-   в центах над нулевой высотой строя, ОДНИМ литералом на строй. Их читают и запись строя в TUNINGS (ниже SCALES), и лады,
-   которые САМИ ЕСТЬ этот строй целиком (cents:TBL.x): числа те же, что стояли в ладу литералом, — высота не изменилась ни на бит.
-   Лады-ВЫБОРКИ (раги, патеты) держат свои центы как прежде; их выборка в строе-родителе ВЫВОДИТСЯ из этих чисел (modeDerive). */
-  /* ⛳ F2 «СТРОИ ФАЙЛАМИ»: НАПРАВЛЕНИЕ ВЫВОДА ПЕРЕВЁРНУТО. До F2 лад держал edo/iv/центы, а выборку sel/root выводил modeDerive; теперь
-   ДАННЫЕ — выборка (degrees — индексы строя) и root, а edo, iv, центы, period, noChords и флаги ВЫВОДИТ сборщик scales.js (комментарий над
-   ним перечисляет, что и как). Комментарии ниже перенесены из scales.js как были: где они говорят «edo/iv/cents лада» или «sel/root
-   выводятся» — это описание объектов ПРИЛОЖЕНИЯ, которые сборщик строит ровно такими, как прежде. */
+  /* ЛАД — ВЫБОРКА ИЗ СТРОЯ: tuning (id строя), degrees — индексы строя, на которых стоят ступени, по порядку (индекс ≥ числа высот —
+   та же высота периодом выше), root — индекс, на котором стоит ступень 0 (0 у всех, кроме патета Баранг: 1). anchor — от чего строится
+   (тоника / приколоченная нота / выбор «строй от»), chords — правило, палитра, сетка, сборка, набор режимов, menu — традиция и группа,
+   layout.rect — открываться прямоугольниками, naming — переопределение схемы имён ступеней (F3), compat.tag — семейство (см. шапку).
+   ⛳ С F2 направление вывода обратное прежнему: данные — выборка, а edo, iv, центы ступеней, period, noChords и флаги ВЫВОДИТ сборщик
+   scales.js (комментарий над ним перечисляет, что и как). Лады, которые ЕСТЬ свой строй целиком, выбирают все его высоты; раги и патеты —
+   часть (центы ступени = центы высоты строя минус центы корня). Ниже в комментариях лада «edo/iv/центы лада» — поля ОБЪЕКТА приложения,
+   которые сборщик строит из этих данных.
+   ⛳ F1: лад АДРЕСУЕТСЯ СТАБИЛЬНЫМ id (state.scaleId, scaleById; меню, уроки, демо, пины заморозки и рендера). Порядок manifest.modes —
+   порядок внутри корзины меню (menuOf) и индекс i в снимке F0, поэтому новые лады — В КОНЕЦ манифеста. Меню фильтрует по традиции. */
   modes:{
     major:{ format:'handsong/mode', version:1, id:'major', tuning:'edo12', name:{en:'Major (Ionian)', ru:'Мажор (ионийский)'}, menu:{tradition:'common', group:'diatonic'}, degrees:[0,2,4,5,7,9,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'dia'} },
     'natural-minor':{ format:'handsong/mode', version:1, id:'natural-minor', tuning:'edo12', name:{en:'Natural minor (Aeolian)', ru:'Минор натуральный (эолийский)'}, menu:{tradition:'common', group:'diatonic'}, degrees:[0,2,3,5,7,8,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'dia'} },
@@ -539,20 +581,20 @@ export const SCALE_DATA={
     'edo31-full':{ format:'handsong/mode', version:1, id:'edo31-full', tuning:'edo31', name:{en:'31-TET — full tuning', ru:'31-TET — весь строй'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'ratios', triad:['1','5/4','3/2'], seventh:['1','5/4','3/2','7/4']}, palette:'edo31'}, layout:{rect:true}, compat:{tag:'edo'} },   // маж.терция 10ш (+0.8¢), кв.18, нат.7 25ш (−1.1¢) = 4:5:6:7
     /* Хиджаз: джинс Хиджаз (0-1-4-5 полутонов, характерная увеличенная секунда 2→8
     в четвертях) + джинс Нахаванд сверху. Четвертитонов НЕ содержит — отсюда имя без
-    пометки «¼-тоны», хотя традиция та же, 24-TET. Добавлен В КОНЕЦ: индексы не поехали. */
+    пометки «¼-тоны», хотя традиция та же, 24-TET. Стоит в конце манифеста (индекс не сдвинул прочих). */
     /* арабская романизация Hijaz; турецкая — Hicaz (строй тут арабский, 24-TET) */
     'maqam-hijaz':{ format:'handsong/mode', version:1, id:'maqam-hijaz', tuning:'edo24', name:{default:'Maqam Hijaz', ru:'Макам Хиджаз'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,2,8,10,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
     /* Мажоры с пониженной VI — пара к гармоническому/мелодическому минору: ♭VI даёт
     увеличенное трезвучие на VI ступени (qual: 4+8 → «+»), ради него их и берут.
-    Добавлены В КОНЕЦ (индексы не поехали), а в меню встают внутрь группы «Диатоника»
-    к минорам — порядок в выпадашке задаёт fillScales группировкой по grp, не массивом. */
+    Стоят в конце манифеста, а в меню встают внутрь группы «Диатоника»
+    к минорам — порядок в выпадашке задаёт menuOf группировкой по группе, не манифестом. */
     'harmonic-major':{ format:'handsong/mode', version:1, id:'harmonic-major', tuning:'edo12', name:{en:'Harmonic major', ru:'Гармонический мажор'}, menu:{tradition:'common', group:'diatonic'}, degrees:[0,2,4,5,7,8,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'dia'} },
     'melodic-major':{ format:'handsong/mode', version:1, id:'melodic-major', tuning:'edo12', name:{en:'Melodic major', ru:'Мелодический мажор'}, menu:{tradition:'common', group:'diatonic'}, degrees:[0,2,4,5,7,8,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'dia'} },
-    /* Симметричные и экзотические 12-TET лады. tag:'ethnic' → аккорды наслоением терций по
-    индексу (isTert), спец-ветки НЕ нужны: целотоновая сама даёт увеличенные трезвучия,
+    /* Симметричные и экзотические 12-TET лады. Правило 'tertian' → аккорды наслоением терций по
+    индексу, спец-ветки НЕ нужны: целотоновая сама даёт увеличенные трезвучия,
     октатоники — уменьшённые (°/°7). Плотные лады (Мессиан-3, Прометеев) на части
     ступеней дают «?» в подписи аккорда — это косметика, звучит и пишется верно.
-    Добавлены В КОНЕЦ (индексы 21..28 не поехали), в меню — две новые группы grp. */
+    Индексы 21..28 (конец манифеста), в меню — две свои группы. */
     'whole-tone':{ format:'handsong/mode', version:1, id:'whole-tone', tuning:'edo12', name:{en:'Whole-tone', ru:'Целотоновая'}, menu:{tradition:'common', group:'symmetric'}, degrees:[0,2,4,6,8,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'ethnic'} },
     'octatonic-wh':{ format:'handsong/mode', version:1, id:'octatonic-wh', tuning:'edo12', name:{en:'Octatonic (whole-half)', ru:'Октатоника (тон-полутон)'}, menu:{tradition:'common', group:'symmetric'}, degrees:[0,2,3,5,6,8,9,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'ethnic'} },
     'octatonic-hw':{ format:'handsong/mode', version:1, id:'octatonic-hw', tuning:'edo12', name:{en:'Octatonic (half-whole)', ru:'Октатоника (полутон-тон)'}, menu:{tradition:'common', group:'symmetric'}, degrees:[0,1,3,4,6,7,9,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'ethnic'} },
@@ -561,11 +603,11 @@ export const SCALE_DATA={
     'double-harmonic':{ format:'handsong/mode', version:1, id:'double-harmonic', tuning:'edo12', name:{en:'Double harmonic', ru:'Двойной гармонический'}, menu:{tradition:'common', group:'exotic'}, degrees:[0,1,4,5,7,8,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'ethnic'} },
     enigmatic:{ format:'handsong/mode', version:1, id:'enigmatic', tuning:'edo12', name:{en:'Enigmatic (Verdi)', ru:'Энигматическая (Верди)'}, menu:{tradition:'common', group:'exotic'}, degrees:[0,1,4,6,8,10,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'ethnic'} },
     prometheus:{ format:'handsong/mode', version:1, id:'prometheus', tuning:'edo12', name:{en:'Prometheus (Scriabin)', ru:'Прометеевский (Скрябин)'}, menu:{tradition:'common', group:'exotic'}, degrees:[0,2,4,6,9,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'tertian'}}, compat:{tag:'ethnic'} },
-    /* Мировые пентатоники. tag:'penta' → аккорды пауэр (корень+квинта+октава, ветка
-    chordSteps без isTert), спец-веток НЕ нужно; на 5-6 нотах терции дают кашу, потому
-    пауэр. Ни у одной нет noChords. Блюзовая мажорная берёт СУЩЕСТВУЮЩУЮ группу
+    /* Мировые пентатоники. Правило 'stack' (стопка через ступень лада; режимом аккордов «Пауэр-аккорд» —
+    прежний корень+квинта+октава), спец-веток НЕ нужно; на 5-6 нотах терции дают кашу, потому
+    не терции. Аккорды есть у всех. Блюзовая мажорная берёт СУЩЕСТВУЮЩУЮ группу
     'Пентатоника / блюз' (строка 1-в-1 как у Мажорной/Минорной/Блюза) — в меню встаёт
-    внутрь неё, а не отдельной группой. Добавлены В КОНЕЦ (индексы 29..35 не поехали). */
+    внутрь неё, а не отдельной группой. Индексы 29..35 (конец манифеста). */
     egyptian:{ format:'handsong/mode', version:1, id:'egyptian', tuning:'edo12', name:{en:'Egyptian (suspended)', ru:'Египетская (суспенд.)'}, menu:{tradition:'common', group:'worldPenta'}, degrees:[0,2,5,7,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
     /* «Man Gong» — имя из ЗАПАДНЫХ сводов ладов, приписываемое китайской музыке (пентатоника 1-♭3-4-♭6-♭7, она же блюзовая минорная). КАНОНИЧЕСКИЕ китайские лады зовутся Gong/Shang/Jue/Zhi/Yu — честная оговорка, как с именами шрути */
     'man-gong':{ format:'handsong/mode', version:1, id:'man-gong', tuning:'edo12', name:{en:'Man Gong (Chinese)', ru:'Ман гонг (китайская)'}, menu:{tradition:'easia', group:'fareastPenta'}, degrees:[0,3,5,8,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
@@ -575,10 +617,10 @@ export const SCALE_DATA={
     'scriabin-penta':{ format:'handsong/mode', version:1, id:'scriabin-penta', tuning:'edo12', name:{en:'Scriabin pentatonic', ru:'Скрябинская пентатоника'}, menu:{tradition:'common', group:'worldPenta'}, degrees:[0,2,4,7,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
     'kumoi-western':{ format:'handsong/mode', version:1, id:'kumoi-western', tuning:'edo12', name:{en:'Kumoi (Western)', ru:'Кумои (зап.)'}, menu:{tradition:'easia', group:'fareastPenta'}, degrees:[0,1,5,7,8], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
     'major-blues':{ format:'handsong/mode', version:1, id:'major-blues', tuning:'edo12', name:{en:'Major blues', ru:'Блюзовая мажорная'}, menu:{tradition:'common', group:'pentaBlues'}, degrees:[0,2,3,4,7,9], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
-    /* Макамы (24-TET). trad:'mideast', tag:'maqam', noChords:true — как у Раст/Баяти/Хиджаз:
+    /* Макамы (24-TET). Традиция 'mideast', compat.tag 'maqam', правило аккордов 'none' — как у Раст/Баяти/Хиджаз:
     аккордов нет (роль «Аккорды» показывает подсказку, гейт supportsChords). Все десять
-    (три прежних + семь новых) сведены в одну подгруппу grp:GRP.maqamat, grpKey:'maqamat' — строка 1-в-1,
-    иначе бакеты бы разъехались. Добавлены В КОНЕЦ (индексы 36..42 не поехали). */
+    (три прежних + семь новых) сведены в одну группу 'maqamat' — один ключ,
+    иначе корзины бы разъехались. Индексы 36..42 (конец манифеста). */
     'maqam-saba':{ format:'handsong/mode', version:1, id:'maqam-saba', tuning:'edo24', name:{default:'Maqam Saba', ru:'Макам Саба'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,6,8,14,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
     /* арабская Sikah; турецко-персидская — Segah */
     'maqam-sikah':{ format:'handsong/mode', version:1, id:'maqam-sikah', tuning:'edo24', name:{default:'Maqam Sikah', ru:'Макам Сикях'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,3,7,11,14,17,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
@@ -588,16 +630,16 @@ export const SCALE_DATA={
     'maqam-nikriz':{ format:'handsong/mode', version:1, id:'maqam-nikriz', tuning:'edo24', name:{default:'Maqam Nikriz', ru:'Макам Никриз'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,12,14,18,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
     /* встречается и слитно — Nawathar */
     'maqam-nawa-athar':{ format:'handsong/mode', version:1, id:'maqam-nawa-athar', tuning:'edo24', name:{default:'Maqam Nawa Athar', ru:'Макам Нава Атар'}, menu:{tradition:'mideast', group:'maqamat'}, degrees:[0,4,6,12,14,16,22], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'maqam'} },
-    /* Мировые строи — НЕравномерные лады через поле cents (центы каждой ступени от тоники,
-    length===iv.length). Высоту берёт leadFreq/bassFreq из cents, структуру (число ступеней,
-    сетка, ряды) — из edo/iv. Слендро: приближение яванского гамелана, шаги неравные
-    (2-я ступень 231¢, не 240¢ равной пентатоники). noChords: терции гамелану чужды. */
+    /* Мировые строи — НЕравномерные: табличный строй (pitches.list, центы каждой высоты), лад выбирает
+    его высоты (degrees). Высоту считает одна функция высоты по строю, структуру (число ступеней,
+    сетка, ряды) — номинальные edo/iv объекта лада. Слендро: приближение яванского гамелана, шаги неравные
+    (2-я ступень 231¢, не 240¢ равной пентатоники). Аккордов нет (правило 'none'): терции гамелану чужды. */
     slendro:{ format:'handsong/mode', version:1, id:'slendro', tuning:'slendro', name:{en:'Slendro (Javanese gamelan, approx.)', ru:'Слендро (яван. гамелан, приближение)'}, menu:{tradition:'easia', group:'gamelan'}, degrees:[0,1,2,3,4], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
     pelog:{ format:'handsong/mode', version:1, id:'pelog', tuning:'pelog', name:{en:'Pelog (Javanese gamelan, approx.)', ru:'Пелог (яван. гамелан, приближение)'}, menu:{tradition:'easia', group:'gamelan'}, degrees:[0,1,2,3,4,5,6], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
-    /* Японские пентатоники (12-TET). tag:'penta' → пауэр-аккорды (ветка chordSteps без isTert).
+    /* Японские пентатоники (12-TET). Правило 'stack' (режимом — пауэр-аккорд), как у мировых пентатоник.
     Ин намеренно совпадает по iv с 'Кумои (зап.)' из мировых пентатоник — это разные лады
-    по имени/группе, общий iv безвреден (state по id лада, луп по ссылке на sc).
-    Добавлены В КОНЕЦ (индексы 45..48 не поехали), в меню — новая группа grp 'Японские'. */
+    по имени/группе, общие ступени безвредны (state по id лада, дорожка по ссылке на вид).
+    Индексы 45..48 (конец манифеста), в меню — своя группа 'japanese'. */
     hirajoshi:{ format:'handsong/mode', version:1, id:'hirajoshi', tuning:'edo12', name:{default:'Hirajoshi', ru:'Хирадзёси'}, menu:{tradition:'easia', group:'japanese'}, degrees:[0,2,3,7,8], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
     'kumoi-japanese':{ format:'handsong/mode', version:1, id:'kumoi-japanese', tuning:'edo12', name:{en:'Kumoi (Japanese)', ru:'Кумои (яп.)'}, menu:{tradition:'easia', group:'japanese'}, degrees:[0,2,3,7,9], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
     'in-insen':{ format:'handsong/mode', version:1, id:'in-insen', tuning:'edo12', name:{en:'In (Insen; same as Kumoi Western)', ru:'Ин (Инсэн; совпадает с Кумои зап.)'}, menu:{tradition:'easia', group:'japanese'}, degrees:[0,1,5,7,8], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'stack'}, modes:'stackPower'}, compat:{tag:'penta'} },
@@ -605,39 +647,39 @@ export const SCALE_DATA={
     /* Партч (Harry Partch, «Genesis of a Music») — 43-тоновая ЧИСТАЯ ИНТОНАЦИЯ (11-предельный
     тональный ромб). Центы посчитаны из канонических отношений (ниже); 2 знака сохраняют JI
     точно (в отличие от целочисленных приближений гамелана). Октава = 2/1 (тождество Партча),
-    регистр 2^oct не трогаем — строй ОКТАВО-повторяющийся. typedChords:'partch': аккорды из
+    регистр 2^oct не трогаем — строй ОКТАВО-повторяющийся. палитра 'partch' (chords.palette): аккорды из
     ЧИСТЫХ ОТНОШЕНИЙ (11-предел, палитра О/У/Станд./Sus-11) — chordFreqs через cents-ветку
-    множит корень на ratio напрямую, минуя 2^(шаг/edo). rectGrid: 43+1=44, 44/4=11 прямоугольников
-    (кратность 4 держится). tag:'ji' — не 'edo'/'penta': шаговых аккордов не строит, как равный EDO не читается.
+    множит корень на ratio напрямую, минуя 2^(шаг/edo). layout.rect: 43+1=44, 44/4=11 прямоугольников
+    (кратность 4 держится). compat.tag 'ji' — не 'edo'/'penta': шаговых аккордов не строит, как равный EDO не читается.
     ⛳ T7b: это — режим «КАК НА ИНСТРУМЕНТЕ»; по умолчанию режим «СВОБОДНО» — любой тип на любом корне, как до T7 (chordModes).
     ⛳ T7 (решение пользователя, по теории): аккорд Партча — ТОЛЬКО ИЗ ЕГО 43 ВЫСОТ. На каждом корне предлагаются лишь типы, у которых
-    КАЖДЫЙ тон (корень × отношение, приведённое в октаву) — одна из 43 (точные отношения — TUNINGS.partch43.ratios, проверка —
+    КАЖДЫЙ тон (корень × отношение, приведённое в октаву) — одна из 43 (точные отношения — ratio у высот строя partch43, проверка —
     chordTypeFits); прочие на этом корне недоступны (серые в палитре, с причиной), и ⛔ НИКОГДА не подменяются ближайшими высотами —
     это была бы ложная отональность. Полная палитра — только на 1/1; на 21/20, 11/10, 14/11, 11/7 — ни одного типа. Цена прежняя.
-    Отношения: 1/1 81/80 33/32 21/20 16/15 12/11 11/10 10/9 9/8 8/7 7/6 32/27 6/5 11/9 5/4
+    Отношения (они же — ratio у высот строя partch43): 1/1 81/80 33/32 21/20 16/15 12/11 11/10 10/9 9/8 8/7 7/6 32/27 6/5 11/9 5/4
     14/11 9/7 21/16 4/3 27/20 11/8 7/5 10/7 16/11 40/27 3/2 32/21 14/9 11/7 8/5 18/11 5/3
     27/16 12/7 7/4 16/9 9/5 20/11 11/6 15/8 40/21 64/33 160/81. Добавлен В КОНЕЦ (индекс 49). */
     'partch-43':{ format:'handsong/mode', version:1, id:'partch-43', tuning:'partch43', name:{en:'Partch (43 tones, just intonation)', ru:'Партч (43 тона, чистая интонация)'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'palette'}, palette:'partch', modes:'freeInstrument'}, layout:{rect:true}, compat:{tag:'ji'} },   // T7b: «Свободно» (умолч., как до T7) / «Как на инструменте» (T7)
     /* Болен–Пирс — НЕОКТАВНЫЙ строй: период не октава (2:1), а ТРИТАВА (3:1). 13 РАВНЫХ шагов
     3^(1/13) ≈ 146.3¢, полная тритава = 1901.955¢. РАВНОМЕРНЫЙ внутри периода (как 19/31-TET
-    внутри октавы) — НЕ cents-лад: свойство period:3 заменяет зашитую октаву в формуле высоты
+    внутри октавы) — НЕ табличный: период строя '3/1' заменяет зашитую октаву в формуле высоты
     (periodOf: leadFreq/bassFreq берут P^oct и P^(шаг/edo)). Регистр (палец, 0..3) сдвигает на
-    ТРИТАВУ. typedChords:'bp': аккорды подгруппы 3.5.7 (палитра Мажор/Минор/Характерные) — не
+    ТРИТАВУ. Палитра 'bp': аккорды подгруппы 3.5.7 (палитра Мажор/Минор/Характерные) — не
     шаги edo, а ЧИСТЫЕ ОТНОШЕНИЯ; chordFreqs через period-ветку (P!==2 && ty) берёт корень
     равным шагом (P^(iv/edo)) и множит на ratio напрямую. ⛳ T7b: так — в режиме «СВОБОДНО» (умолчание, набор 'bp'); в режиме «КАК НА ИНСТРУМЕНТЕ» (T7) аккорды —
     ИЗ ШАГОВ СТРОЯ, как играют равный Болен–Пирс (набор 'bpsteps' — целые шаги, равная ветка цены; 3:5:7 = 0·6·10 шагов, в 4–7¢ от
     отношений), аккорды с 11 сняты — вне теории BP (3, 5 и 7). Строй Карлос — позже. НЕ rect: (13+1)=14
-    не делится на 4, rectGrid нельзя. tag:'bp' — инертен у всех читателей (не 'edo'/'penta'/терции). Индекс 50. */
+    не делится на 4, layout.rect нельзя. compat.tag 'bp' — инертен у всех читателей (не 'edo'/'penta'/терции). Индекс 50. */
     'bohlen-pierce':{ format:'handsong/mode', version:1, id:'bohlen-pierce', tuning:'bp13', name:{en:'Bohlen–Pierce (13 equal, tritave)', ru:'Болен–Пирс (13 равных, тритава)'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'palette'}, palette:'bp', modes:'freeInstrumentBP'}, compat:{tag:'bp'} },   // T7b: «Свободно» — набор 'bp' отношениями, как до T7; «Как на инструменте» — 'bpsteps' (T7)
     /* Строи Уэнди Карлос — НЕОКТАВНЫЕ: у них НЕТ интервала эквивалентности вовсе. Карлос вывела их,
     поделив чистую КВИНТУ 3:2 на РАВНЫЕ части (alpha=9, beta=11, gamma=20) — не октаву. Моделируем
-    period:3/2 (квинта-генератор) + edo=число делений + РАВНЫЕ шаги (period^(iv/edo), НЕ cents-лад):
+    строй с периодом '3/2' (квинта-генератор) и equal = число делений — РАВНЫЕ шаги (period^(шаг/equal), НЕ таблица):
     деление чистой квинты воспроизводит опубликованный шаг Карлос до <0.02¢ (alpha 77.995 vs 78.0,
     beta 63.814 vs 63.8, gamma 35.098 vs 35.1) — неслышимо. Регистр (палец) сдвигает на КВИНТУ (P^oct).
-    noChords (стадия 1): аккорды Карлос — позже. НЕ rect: у неоктавного лада ЗАКРЫТАЯ форма (+1,
+    Аккордов нет (правило 'none', стадия 1): аккорды Карлос — позже. НЕ rect: у неоктавного лада ЗАКРЫТАЯ форма (+1,
     верхняя тоника) не предлагается по построению (см. rectPad), а открытая требует iv.length%4===0 —
     у alpha 9 и beta 11 не делится. Прямоугольники им НЕДОСТУПНЫ, и это не выбор данных, а арифметика
-    (у beta 11+1=12 делится СЛУЧАЙНО — период-гейт и не пускает её через закрытую форму). tag:'carlos' — инертен у всех
+    (у beta 11+1=12 делится СЛУЧАЙНО — период-гейт и не пускает её через закрытую форму). compat.tag 'carlos' — инертен у всех
     читателей tag (как 'bp': не 'dia'/'ethnic'/'maqam'/'edo'). Индексы 51/52/53. */
     'carlos-alpha':{ format:'handsong/mode', version:1, id:'carlos-alpha', tuning:'carlos-alpha', name:{en:'Carlos Alpha (9 steps of the fifth)', ru:'Карлос альфа (9 шагов квинты)'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'carlos'} },
     'carlos-beta':{ format:'handsong/mode', version:1, id:'carlos-beta', tuning:'carlos-beta', name:{en:'Carlos Beta (11 steps of the fifth)', ru:'Карлос бета (11 шагов квинты)'}, menu:{tradition:'exp', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'carlos'} },
@@ -645,10 +687,10 @@ export const SCALE_DATA={
     /* Патеты пелога — 5-нотные ЛАДЫ, выбранные из 7-нотного пелога (те же cents-ступени, что у
     «Пелог» выше): Лима и Нем берут ступени 1-2-3-5-6, Баранг — 2-3-5-6-7 (нормирован от своей
     тоники, −120¢). Центы — ПРИБЛИЖЕНИЕ (у яванского гамелана нет эталона — та же оговорка, что
-    у Слендро/Пелог); октаву 2:1 дописывает механизм; noChords (гамелан монофоничен). ВАЖНО: Лима
+    у Слендро/Пелог); октаву 2:1 дописывает механизм; аккордов нет (гамелан монофоничен). ВАЖНО: Лима
     и Нем — ОДНИ И ТЕ ЖЕ ноты (обе на 1-2-3-5-6); различаются функцией/тоникой в традиции, не
     строем — держим двумя именованными записями НАРОЧНО (как две Кумои / Ин), это НЕ дубликат-баг.
-    Баранг (2-3-5-6-7) — по-настоящему другой набор. Индексы 54/55/56, добавлены В КОНЕЦ. */
+    Баранг (2-3-5-6-7) — по-настоящему другой набор. Индексы 54/55/56. */
     'pelog-lima':{ format:'handsong/mode', version:1, id:'pelog-lima', tuning:'pelog', name:{en:'Pelog patet Lima (Javanese, approx.)', ru:'Пелог патет лима (яван., прибл.)'}, menu:{tradition:'easia', group:'gamelan'}, degrees:[0,1,2,4,5], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
     'pelog-nem':{ format:'handsong/mode', version:1, id:'pelog-nem', tuning:'pelog', name:{en:'Pelog patet Nem (Javanese, approx.)', ru:'Пелог патет нем (яван., прибл.)'}, menu:{tradition:'easia', group:'gamelan'}, degrees:[0,1,2,4,5], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
     'pelog-barang':{ format:'handsong/mode', version:1, id:'pelog-barang', tuning:'pelog', name:{en:'Pelog patet Barang (Javanese, approx.)', ru:'Пелог патет баранг (яван., прибл.)'}, menu:{tradition:'easia', group:'gamelan'}, degrees:[1,2,4,5,6], root:1, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
@@ -657,41 +699,42 @@ export const SCALE_DATA={
     на 22¢ выше чистой 5/4 (386.31¢): отсюда средневековое письмо параллельными квинтами и позднейшая
     нужда в темперациях. Cents-механизм даёт точную высоту (2^(центы/1200)); октаву 2:1 дописывает
     сам механизм. ⛳ P2 дуги «СТРОЙ ОТ» (решение пользователя: «Пифагоров строй должен звучать как Пифагоров строй; аккордов
-    из других строёв в нём быть не должно»): аккорды — ИЗ СОБСТВЕННЫХ НОТ ИНСТРУМЕНТА, как у прочих темпераций: typedChords:'natfix'
-    (те же 24 типа, целые полутоновые смещения) + gridChords:true — chordNotes берёт корень и КАЖДЫЙ тон аккорда из сетки строя.
+    из других строёв в нём быть не должно»): аккорды — ИЗ СОБСТВЕННЫХ НОТ ИНСТРУМЕНТА, как у прочих темпераций: палитра 'natfix'
+    (те же 24 типа, целые полутоновые смещения) + chords.grid — chordNotes берёт корень и КАЖДЫЙ тон аккорда из сетки строя.
     Нота, попавшая на волчью квинту, звучит так, как её даёт инструмент, — без особого случая (как у фиксированного Натурального и
     мезотона). Прежний набор чистых отношений 'pyth' удалён (P2): кроме этого лада им не пользовался никто.
-    ⛳ P3: tunable:true — у этого лада есть выбор «СТРОЙ ОТ» (нота, от которой строится цепочка квинт; по умолчанию СЛЕДУЕТ
+    ⛳ P3: anchor 'choice' — у этого лада есть выбор «СТРОЙ ОТ» (нота, от которой строится цепочка квинт; по умолчанию СЛЕДУЕТ
     ЗА ТОНИКОЙ — state.tunedFrom), и живой лад приходит ВИДОМ на свой якорь (scaleView ниже; с T2 — у каждого лада). Сам объект лада без варианта
     — настроен ОТ C (anchorOf → 0); демо стартового экрана с F1 берёт вид «строй от» C — тот же звук. Натуральный (чистые терции, но фальшивые
-    квинты) — контрапара. trad:'europe' (секция
-    «Европа историческая», grp:'' — плоский хронологический список, а не подгруппа): секция ПРО РАЗНЫЕ
+    квинты) — контрапара. традиция 'europe' (секция
+    «Европа историческая», без группы — плоский хронологический список): секция ПРО РАЗНЫЕ
     СТРОИ ОДНИХ И ТЕХ ЖЕ 12 НОТ (темперация ≠ лад), а НЕ утверждение, будто макам/гамелан «менее
     историчны» — те живут в своих секциях. Сюда же Натуральный/мезотон/велл-темперации, по времени сверху
-    вниз. tag:'penta' — инертный (как у Слендро/Пелог: не 'dia'/'ethnic'/'maqam'/'edo'). Индекс 57, В КОНЕЦ. */
+    вниз. compat.tag 'penta' — инертный (как у Слендро/Пелог: не 'dia'/'ethnic'/'maqam'/'edo'). Индекс 57. */
     pythagorean:{ format:'handsong/mode', version:1, id:'pythagorean', tuning:'pythagorean12', name:{en:'Pythagorean tuning (pure fifths)', ru:'Пифагоров строй (чистые квинты)'}, menu:{tradition:'europe', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'choice'}, chords:{rule:{kind:'palette'}, palette:'natfix', grid:true}, compat:{tag:'penta'} },
     /* Натуральный строй, ПОДВИЖНЫЙ (хор/струнные) — 5-предельная ЧИСТАЯ ИНТОНАЦИЯ: интервалы суть простые
     целочисленные отношения прямо из обертонового ряда (16/15, 9/8, 6/5, 5/4, 4/3, 45/32, 3/2, 8/5, 5/3,
     9/5, 15/8). Большая терция 5/4 = 386.31¢ — ЧИСТАЯ (замок 4:5:6, без биения), в отличие от резкой
     пифагоровой 81/64 = 407.82¢: обе терции расходятся на СИНТОНИЧЕСКУЮ КОММУ (21.5¢), а квинты одинаковы
-    (обе чистые 3/2). typedChords:'nat' — КАЖДЫЙ аккорд строится ЧИСТЫМ отношением ОТ СВОЕГО КОРНЯ
+    (обе чистые 3/2). палитра 'nat' — КАЖДЫЙ аккорд строится ЧИСТЫМ отношением ОТ СВОЕГО КОРНЯ
     (chordFreqs·cents-ветка root·ratio), поэтому пуст волка НЕТ ни на одном корне — модель хора/квартета,
     что подстраивает каждый аккорд на лету («подвижная» чистая интонация). Пара к ФИКСИРОВАННОМУ ниже
     (клавесин): те же 12 нот, но там аккорды берутся из ЗАСТЫВШЕЙ сетки → волк. Контрапара к Пифагорову.
     ⛳ T7 (решение пользователя, по теории): это АДАПТИВНАЯ чистая интонация — так поют хор и струнный квартет: высоты сдвигаются, чтобы
     КАЖДЫЙ аккорд был чистым, поэтому тон аккорда может лечь МИМО 12 высот (на синтоническую комму) — и редактор честно показывает его
-    между рядами с отступлением в центах: это сдвинутая высота хора, а не ошибка. Свойство chordBuild:'adaptive' — единственный такой лад.
+    между рядами с отступлением в центах: это сдвинутая высота хора, а не ошибка. chords.build 'adaptive' — единственный такой лад.
     Клавишная версия того же строя — «фиксированный» ниже (аккорды из сетки, с волком). Имя говорит это: «как поёт хор».
-    tag:'penta' — инертный. Индекс 58. */
-    'ji-adaptive':{ format:'handsong/mode', version:1, id:'ji-adaptive', tuning:'ji12', name:{en:'Just intonation — adaptive (as a choir sings)', ru:'Натуральный строй — подвижный (как поёт хор)'}, menu:{tradition:'europe', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'palette'}, palette:'nat', build:'adaptive'}, compat:{tag:'penta'} },
+    Ступени называются ПОРЯДКОВЫМИ (naming.scheme 'ordinal', F3): высоты сдвигаются под аккорд, имя ноты соврало бы;
+    ноты аккордов и корни палитры — именами нот (схема строя ji12 — notes12). compat.tag 'penta' — инертный. Индекс 58. */
+    'ji-adaptive':{ format:'handsong/mode', version:1, id:'ji-adaptive', tuning:'ji12', name:{en:'Just intonation — adaptive (as a choir sings)', ru:'Натуральный строй — подвижный (как поёт хор)'}, menu:{tradition:'europe', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'palette'}, palette:'nat', build:'adaptive'}, naming:{scheme:'ordinal'}, compat:{tag:'penta'} },
     /* Натуральный строй, ФИКСИРОВАННЫЙ (клавесин/орган) — ТЕ ЖЕ 12 нот (cents 1-в-1 с подвижным выше),
-    настроенные ОДИН РАЗ от тоники. Но аккорды берут ноты ИЗ ЗАСТЫВШЕЙ СЕТКИ (typedChords:'natfix' —
-    ЦЕЛЫЕ полутоновые смещения; gridChords:true гонит chordFreqs в grid-ветку, читающую ступень корень+off
+    настроенные ОДИН РАЗ от тоники. Но аккорды берут ноты ИЗ ЗАСТЫВШЕЙ СЕТКИ (палитра 'natfix' —
+    ЦЕЛЫЕ полутоновые смещения; chords.grid гонит chordFreqs в grid-ветку, читающую ступень корень+off
     из cents-сетки). Оттого интервалы МЕЖДУ нотами сетки — какие даст фиксированный строй: чистые на одних
     корнях (мажор 0,1,3,5,7,8), ВОЛК на других (квинта −21.5¢ на 2,10 и +19.5¢ на 6; терции ±41¢) — ровно
     ПОЧЕМУ и придумали темперации. Разметки «волк» в UI НЕТ намеренно: учит ухо, не подпись. Пара к
     подвижному выше — переключи на ОДНОМ аккорде и услышь разницу. ⛳ T7: это КЛАВИШНАЯ версия строя (аккорды ИЗ СТРОЯ, как на
-    инструменте с неподвижными клавишами) — имя говорит «как на клавишных». tag:'penta' — инертный. Индекс 59, В КОНЕЦ. */
+    инструменте с неподвижными клавишами) — имя говорит «как на клавишных». compat.tag 'penta' — инертный. Индекс 59. */
     'ji-fixed':{ format:'handsong/mode', version:1, id:'ji-fixed', tuning:'ji12', name:{en:'Just intonation — fixed (as on a keyboard)', ru:'Натуральный строй — фиксированный (как на клавишных)'}, menu:{tradition:'europe', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'fixed', note:0}, chords:{rule:{kind:'palette'}, palette:'natfix', grid:true}, compat:{tag:'penta'} },
     /* Мезотон 1/4 коммы (Аарон, 1523) — ИСТОРИЧЕСКИЙ КОМПРОМИСС. Каждая квинта СУЖЕНА на 1/4 синтонической
     коммы до 696.58¢ (чистая 701.96¢), чтобы четыре квинты минус две октавы дали ЧИСТУЮ большую терцию
@@ -699,10 +742,10 @@ export const SCALE_DATA={
     И терции мимо на ±41¢ на многих корнях), мезотон СОБИРАЕТ всю ошибку в ОДНУ волк-квинту (G#–Eb ≈ 737.6¢,
     ~36¢ шире чистой), оставляя терции чистыми, а квинты ровными на ~8 ходовых тональностях. Это и есть
     компромисс: пожертвовать одной тональностью, чтобы запели остальные. Замыкает линию Пифагор →
-    Натуральный → Мезотон → 12-TET (Хроматика). typedChords:'natfix', gridChords:true — ФИКСИРОВАННАЯ
+    Натуральный → Мезотон → 12-TET (Хроматика). Палитра 'natfix' + chords.grid — ФИКСИРОВАННАЯ
     клавиатура: аккорды берут ноты ИЗ СЕТКИ (grid-ветка chordFreqs), как фиксированный Натуральный; пере-
     страивать каждый аккорд чистым от корня НЕЛЬЗЯ (это стёрло бы весь смысл — вышел бы Натуральный). Разметки
-    «волк» в UI НЕТ намеренно — учит ухо. tag:'penta' — инертный. Индекс 60, В КОНЕЦ. */
+    «волк» в UI НЕТ намеренно — учит ухо. compat.tag 'penta' — инертный. Индекс 60. */
     'meantone-quarter':{ format:'handsong/mode', version:1, id:'meantone-quarter', tuning:'meantone-quarter', name:{en:'Quarter-comma meantone (harpsichord)', ru:'Мезотон 1/4 коммы (клавесин)'}, menu:{tradition:'europe', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'fixed', note:0}, chords:{rule:{kind:'palette'}, palette:'natfix', grid:true}, compat:{tag:'penta'} },
     /* ================= ИНДИЙСКАЯ КЛАССИКА (традиция 'indian') =================
     22 ШРУТИ — микротональная сетка ЧИСТОЙ ИНТОНАЦИИ (не равные шаги!). Позиции выводятся из
@@ -710,36 +753,37 @@ export const SCALE_DATA={
     комма. Поэтому в сетке есть комма-ПАРЫ: 386 (чистая терция 5/4) против 408 (пифагорова терция
     81/64), 90 против 112, 590 против 612, 996 против 1018 и т.д. Раги ВЫБИРАЮТ свои ноты (свары) ИЗ
     этой сетки — именно комма-выбор придаёт рагам их разный характер. Механизм тот же, что у гамелана/
-    Парча: cents:[...], 2^(центы/1200); ЯДРО НЕ МЕНЯЕТСЯ. Октавные (period нет). noChords: индийская
+    Парча: табличный строй, 2^(центы/1200); ЯДРО НЕ МЕНЯЕТСЯ. Октавные. Аккордов нет (правило 'none'): индийская
     классика МЕЛОДИЧНА — аккордов в ней нет, это ОСОЗНАННЫЙ выбор модели, не ограничение (роль
-    «Аккорды» покажет подсказку). rectGrid (=ДЕФОЛТ раскладки) НЕ ставим: у СЕТКИ 22 шрути он и
+    «Аккорды» покажет подсказку). layout.rect (=ДЕФОЛТ раскладки) НЕ ставим: у СЕТКИ 22 шрути он и
     невозможен (22+1=23 и 22 — ни то ни другое не делится на 4: единственный случай, который
     прямоугольники не спасают), а 7-нотным РАГАМ он доступен (7+1=8 → 2 прямоугольника), но по
     умолчанию они открываются узкими рядами — 7 рядов попадаются нормально; человек включит сам.
-    tag:'penta' — инертный ярлык, как у прочих цент-ладов.
+    compat.tag 'penta' — инертный ярлык, как у прочих табличных ладов. Имена ступеней — из списка строя shruti22 (F3): у сетки
+    полные «свара · шрути» (naming.detail), у раг — свары.
     ЧЕСТНОСТЬ (как «приближение» у гамелана): мы моделируем ТОЛЬКО звукоряд — КАКИЕ свары. Рага —
     БОЛЬШЕ звукоряда: у неё путь вверх/вниз (ароха/авароха, часто РАЗНЫЕ), опорные ноты (вади/самвади),
-    характерные фразы (пакад) и время суток — НИЧЕГО из этого мы не моделируем. Индексы 61..71, В КОНЕЦ. */
-    'shruti-22':{ format:'handsong/mode', version:1, id:'shruti-22', tuning:'shruti22', name:{en:'22 shruti (full grid)', ru:'22 шрути (полная сетка)'}, menu:{tradition:'india', group:'fullGrid'}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true, full:true}, compat:{tag:'penta'} },   // swaraNames → саргам; swaraFull → «свара · имя-шрути» (грид различает комма-пары именем, раги — только сварой)
+    характерные фразы (пакад) и время суток — НИЧЕГО из этого мы не моделируем. Индексы 61..71. */
+    'shruti-22':{ format:'handsong/mode', version:1, id:'shruti-22', tuning:'shruti22', name:{en:'22 shruti (full grid)', ru:'22 шрути (полная сетка)'}, menu:{tradition:'india', group:'fullGrid'}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{detail:true}, compat:{tag:'penta'} },   // F3: имена — список строя shruti22; naming.detail → «свара · имя-шрути» (сетка различает комма-пары именем, раги — только сварой)
     /* 10 известных раг — 7 свар, ВЫБРАННЫХ из сетки 22 шрути (каждое значение — член сетки). Витрины
     чистой интонации: комал-Ре Бхайрава (90 — малый шрути), тивра-Ма Йамана (590 — острая ув.кварта),
     чистые терции 386 и пифагоровы 408, чистая квинта везде 702. Только звукоряд — путь/опоры/фразы
-    НЕ моделируются (см. блок выше). swaraNames:true → ряды подписаны сварами (Са/Ре/Га/Ма/Па/Дха/Ни). */
+    НЕ моделируются (см. блок выше). Ряды подписаны сварами (Са/Ре/Га/Ма/Па/Дха/Ни) — по списку строя shruti22 (схема list, F3). */
     /* хиндустани: короткая форма Bhairav; встречается и Bhairava */
-    'raga-bhairav':{ format:'handsong/mode', version:1, id:'raga-bhairav', tuning:'shruti22', name:{default:'Bhairav', ru:'Бхайрав'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,7,9,13,14,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
-    'raga-yaman':{ format:'handsong/mode', version:1, id:'raga-yaman', tuning:'shruti22', name:{default:'Yaman', ru:'Йаман'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,8,11,13,17,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
+    'raga-bhairav':{ format:'handsong/mode', version:1, id:'raga-bhairav', tuning:'shruti22', name:{default:'Bhairav', ru:'Бхайрав'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,7,9,13,14,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
+    'raga-yaman':{ format:'handsong/mode', version:1, id:'raga-yaman', tuning:'shruti22', name:{default:'Yaman', ru:'Йаман'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,8,11,13,17,21], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
     /* Кафи и Мальхар несут ОДИН И ТОТ ЖЕ звукоряд [0,204,316,498,702,906,1018] — различаются движением/
     опорами/фразами (которых мы не моделируем), а не нотами. НЕ баг-дубль, а осознанно (как две Кумои,
     как пелог лима/нем). */
-    'raga-kafi':{ format:'handsong/mode', version:1, id:'raga-kafi', tuning:'shruti22', name:{default:'Kafi', ru:'Кафи'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,6,9,13,17,19], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
-    'raga-bhairavi':{ format:'handsong/mode', version:1, id:'raga-bhairavi', tuning:'shruti22', name:{default:'Bhairavi', ru:'Бхайрави'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,5,9,13,14,18], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
-    'raga-todi':{ format:'handsong/mode', version:1, id:'raga-todi', tuning:'shruti22', name:{default:'Todi', ru:'Тоди'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,5,11,13,14,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
-    'raga-khamaj':{ format:'handsong/mode', version:1, id:'raga-khamaj', tuning:'shruti22', name:{default:'Khamaj', ru:'Кхамадж'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,8,9,13,17,19], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
-    'raga-asavari':{ format:'handsong/mode', version:1, id:'raga-asavari', tuning:'shruti22', name:{default:'Asavari', ru:'Асавари'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,5,9,13,14,18], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
-    'raga-malhar':{ format:'handsong/mode', version:1, id:'raga-malhar', tuning:'shruti22', name:{default:'Malhar', ru:'Мальхар'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,6,9,13,17,19], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },   // тот же звукоряд, что Кафи (см. коммент выше)
-    'raga-purvi':{ format:'handsong/mode', version:1, id:'raga-purvi', tuning:'shruti22', name:{default:'Purvi', ru:'Пурви'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,7,11,13,14,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
+    'raga-kafi':{ format:'handsong/mode', version:1, id:'raga-kafi', tuning:'shruti22', name:{default:'Kafi', ru:'Кафи'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,6,9,13,17,19], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
+    'raga-bhairavi':{ format:'handsong/mode', version:1, id:'raga-bhairavi', tuning:'shruti22', name:{default:'Bhairavi', ru:'Бхайрави'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,5,9,13,14,18], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
+    'raga-todi':{ format:'handsong/mode', version:1, id:'raga-todi', tuning:'shruti22', name:{default:'Todi', ru:'Тоди'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,5,11,13,14,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
+    'raga-khamaj':{ format:'handsong/mode', version:1, id:'raga-khamaj', tuning:'shruti22', name:{default:'Khamaj', ru:'Кхамадж'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,8,9,13,17,19], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
+    'raga-asavari':{ format:'handsong/mode', version:1, id:'raga-asavari', tuning:'shruti22', name:{default:'Asavari', ru:'Асавари'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,5,9,13,14,18], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
+    'raga-malhar':{ format:'handsong/mode', version:1, id:'raga-malhar', tuning:'shruti22', name:{default:'Malhar', ru:'Мальхар'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,6,9,13,17,19], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },   // тот же звукоряд, что Кафи (см. коммент выше)
+    'raga-purvi':{ format:'handsong/mode', version:1, id:'raga-purvi', tuning:'shruti22', name:{default:'Purvi', ru:'Пурви'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,1,7,11,13,14,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
     /* [0,204,386,498,702,884,1088] = натуральный мажор (JI) = тхат БИЛАВАЛ, один из 10 родительских ладов хиндустани. Раньше ошибочно значился «Мармари» (не существующая рага) */
-    'raga-bilawal':{ format:'handsong/mode', version:1, id:'raga-bilawal', tuning:'shruti22', name:{default:'Bilawal', ru:'Билавал'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,7,9,13,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, naming:{swara:true}, compat:{tag:'penta'} },
+    'raga-bilawal':{ format:'handsong/mode', version:1, id:'raga-bilawal', tuning:'shruti22', name:{default:'Bilawal', ru:'Билавал'}, menu:{tradition:'india', group:'ragas'}, degrees:[0,4,7,9,13,16,20], root:0, anchor:{policy:'tonic'}, chords:{rule:{kind:'none'}}, compat:{tag:'penta'} },
     /* ================= ВЕЛЛ-ТЕМПЕРАЦИИ («хорошо темперированные» строи) =================
     НЕДОСТАЮЩЕЕ ЗВЕНО между мезотоном и 12-TET. Мезотон давал играть в ~8 тональностях и ВЫЛ в
     остальных (вся ошибка собрана в одну волк-квинту). Велл-темперации распределяют пифагорову
@@ -748,11 +792,11 @@ export const SCALE_DATA={
     12-TET позже стёр характер начисто (все терции ровно 400¢, разброс 0). Именно это Бах показал,
     написав прелюдии во всех 24 тональностях. Строятся цепью квинт от C: часть квинт СУЖЕНА, сумма
     сужений = пифагорова комма (цепь замыкается). Как мезотон/фикс-Натуральный — ФИКСИРОВАННАЯ
-    клавиатура: typedChords:'natfix' + gridChords:true, аккорды берут ноты ИЗ СЕТКИ (grid-ветка
+    клавиатура: палитра 'natfix' + chords.grid, аккорды берут ноты ИЗ СЕТКИ (grid-ветка
     chordFreqs), строить чистыми от корня НЕЛЬЗЯ — стёрло бы весь смысл неравномерности.
     ⚠️ СМЕНА ТОНИКИ в меню меняет ОКРАСКУ (в отличие от 12-TET, где все тональности звучат
-    одинаково): тоника переносит начало отсчёта по НЕРАВНОМЕРНОЙ сетке. tag:'penta' — инертный.
-    Индексы 72..74, В КОНЕЦ (ничего не сдвигается — раги 61..71 на местах). */
+    одинаково): тоника переносит начало отсчёта по НЕРАВНОМЕРНОЙ сетке. compat.tag 'penta' — инертный.
+    Индексы 72..74 (конец манифеста). */
     /* Веркмайстер III (1691) — 4 квинты по 1/4 пифагоровой коммы (C–G, G–D, D–A, B–F#). Терция от
     тоники 390.2¢ (почти чистая), в дальних тональностях до 407.8¢ (пифагорова); разброс ~17.6¢. */
     'werckmeister-3':{ format:'handsong/mode', version:1, id:'werckmeister-3', tuning:'werckmeister3', name:{default:'Werckmeister III (1691)', ru:'Веркмайстер III (1691)'}, menu:{tradition:'europe', group:''}, degrees:[0,1,2,3,4,5,6,7,8,9,10,11], root:0, anchor:{policy:'fixed', note:0}, chords:{rule:{kind:'palette'}, palette:'natfix', grid:true}, compat:{tag:'penta'} },

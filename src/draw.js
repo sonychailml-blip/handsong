@@ -1,6 +1,6 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, swaraLbl, TUNINGS, stepName, swaraOfCents, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
@@ -202,16 +202,13 @@ function drawGrid(zx0,zx1,accent,labelOf,activeDegs,gridH=canvas.height,labelX=z
    прямоугольники стояли на четырёх ладах, каждому из которых порядковый и был нужен. Как только
    мажор можно положить в прямоугольники, две функции начали бы врать друг про друга: одна и та же
    нота читалась бы «C» в рядах и «2» в прямоугольниках. Слито в одну.
-   Ветки (порядок важен):
-   (1) свары (индийские) — саргам;
-   (2) fixedKey — сетка приколочена к C, имена нот СНОВА правдивы (rowLabel даёт NOTE_NAMES по КЛЮЧУ);
-   (3) ПОРЯДКОВЫЙ Т,2,3,4… — трём родам ладов: НЕОКТАВНЫМ (period≠2: номер шага врал бы off-by-one),
-       CENTS-ладам (их ноты не на 12-TET высотах: пифагоров D#=611.73¢ — имена C/C#/D врали бы) и
-       ладам, у которых edo НЕ 12/24 (19/31-TET): у них rowLabel печатает НОМЕР ШАГА (Т,1,2…), а он
-       на единицу расходится с легендой пальцев I–IV — «5-я нота» звалась бы «4». Тонику ловим
-       СТРУКТУРНО (IVX[deg]%edo===0, как зелёная линия в drawGrid), а не через centsOf===0: у
-       неоктавного периода центы сверху не округляются в ровный ноль;
-   (4) иначе — реальные имена нот (12-TET, макамы 24-TET).
+   ⛳ F3: ВЕТВИТСЯ ПО СХЕМЕ СТУПЕНЕЙ (scales.namingOf(s).deg — данные строя, переопределимые ладом), а не по свойствам лада.
+   До F3 ветки были (1) swaraNames → свары; (2) fixedKey → rowLabel; (3) period≠2 / cents / edo∉{12,24} → порядковый; (4) иначе rowLabel.
+   Схемы дают ровно то же: list — сетка 22 шрути и раги; notes12 — 12-равный и шесть фиксированных таблиц (rowLabel → имена нот по
+   ключу); notes24 — макамы; ordinal — 19/31-TET, Болен–Пирс, Карлос, гамелан, Партч и подвижный Натуральный (его лад переопределяет
+   схему строя ji12). Порядковый (почему он, а не номер шага: номер шага на единицу расходится с легендой пальцев I–IV — «5-я нота»
+   звалась бы «4»): тонику ловим СТРУКТУРНО (IVX[deg]%edo===0, как зелёная линия в drawGrid), а не через centsOf===0: у неоктавного
+   периода центы сверху не округляются в ровный ноль.
    БАЙТ-В-БАЙТ у всех четырёх сегодняшних rect-ладов: 19/31-TET (edo∉{12,24} → порядковый),
    Партч (cents → порядковый), гамма (period≠2 → порядковый) — ровно то, что давал rectNoteLbl;
    структурная проверка тоники совпадает с прежней centsOf===0 и на нижней, и на верхней тонике.
@@ -221,12 +218,10 @@ function drawGrid(zx0,zx1,accent,labelOf,activeDegs,gridH=canvas.height,labelX=z
 /* s — ЗАМОРОЖЕННЫЙ лад события (S5.4), с умолчанием из живого: подпись остаётся ОДНОЙ функцией на все
    раскладки (правило #26), просто теперь умеет назвать ступень в ЧУЖОМ ладу — том, в котором её сыграли.
    Все внутренние вызовы получают ТОТ ЖЕ s: иначе «раги» читались бы по хроматике и наоборот. */
-const noteLbl = (deg,s=CUR()) =>
-  s.swaraNames ? swaraLbl(deg,s)
-    : s.fixedKey ? rowLabel(deg,s)
-    : (periodOf(s)!==2 || s.cents || (s.edo!==12 && s.edo!==24))
-    ? (IVX(s)[deg]%s.edo===0 ? 'Т' : String(deg+1))
-    : rowLabel(deg,s);
+const noteLbl = (deg,s=CUR()) => { const d=namingOf(s).deg;   // F3: схема ступеней
+  return d==='list' ? listLbl(deg,s)
+    : d==='ordinal' ? (IVX(s)[deg]%s.edo===0 ? 'Т' : String(deg+1))
+    : rowLabel(deg,s); };
 /* Сетка ПРЯМОУГОЛЬНИКОВ (соло/бас/аккорды). Прямоугольник выбирается по Y, нота/корень внутри —
    ПАЛЬЦЕМ, а НЕ горизонталью: X — громкость. Поэтому ноты показываем КОМПАКТНОЙ ЛЕГЕНДОЙ по пальцам
    (I/II/… → нота), а не колонками. Активный палец подсвечен, активный прямоугольник подтонирован.
@@ -307,7 +302,7 @@ function drawRectOctBand(x0,w,lx,yTop,h,role){
   const oc=rectLayout().octaves, nSel=rectBaseMax()+1, rows=FINGER_TIPS.length+1;   // строк всегда 5 (шапка+4 пальца) — стопка не скачет от лада к ладу
   const eh=Math.min(18,(h-6)/rows), sy=yTop+(h-eh*rows)/2, reg=rectBase(rectOctReg(role));
   ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.font='700 12px system-ui'; ctx.fillStyle=hexA('#4cc2ff',.9);
-  ctx.fillText(periodOf()===2?t('reg.octaveFull'):regWord().toUpperCase(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.)
+  ctx.fillText(regWordFull(), lx, sy+eh/2);   // слово-регистр по периоду (октава→ОКТАВА; период≠2 → ТРИТАВА/РЕГ.)
   for(let n=0;n<FINGER_TIPS.length;n++){
     const ey=sy+(n+1)*eh+eh/2;
     if(n>=nSel){ ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.22)'; ctx.fillText(`${OCT_ROMAN[n]}  —`, lx, ey); continue; }   // база вне допустимой — палец холостой
@@ -1092,14 +1087,17 @@ function rollAxis(sc, all=rollRowsAll){
   m[key]=ax; return ax;
 }
 /* ⛳ ИМЯ РЯДА — ОДНА ФУНКЦИЯ НАЗВАНИЙ (правило #26). Ряд со ступенью лада называет noteLbl — ровно как прежде (у оси «Лад» ничего не
-   изменилось). Приглушённый ряд — высота строя без ступени лада — называется по СХЕМЕ ИМЁН СТРОЯ: 12- и 24-тоновый равный — имена нот /
-   четвертитонов от тоники (stepName — той же функцией, что ступени 12/24-ладов); сетка шрути — «свара · шрути» (полное имя различает
-   комма-пары; раги своими ступенями называют только свару); иначе — НОМЕР высоты в строе в скобках («(4)» — четвёртая высота пелога:
-   так на Яве и называют звуки пелога), чтобы не спутать с порядковыми номерами ступеней лада. Номер регистра — у первого ряда регистра. */
+   изменилось). Приглушённый ряд — высота строя без ступени лада — называется по СХЕМЕ ИМЁН СТРОЯ (F3: scales.namingOf(sc).pitch —
+   данные строя; до F3 — ветки по equal/period/swaraNames): notes12/notes24 — имена нот / четвертитонов от тоники (stepName — той же
+   функцией, что ступени этих ладов); list — полное имя из списка строя («свара · шрути» различает комма-пары; раги своими ступенями
+   называют только свару); иначе — НОМЕР высоты в строе в скобках («(4)» — четвёртая высота пелога: так на Яве и называют звуки
+   пелога), чтобы не спутать с порядковыми номерами ступеней лада. Номер регистра — у первого ряда регистра.
+   ⚠️ notes12 у 12-нотных ТАБЛИЦ (Пифагор, Натуральные, мезотон, велл-темперации) называет приглушённый ряд именем ноты, а до F3 — «(k)»;
+   сегодня недостижимо: все их лады — весь строй, приглушённых рядов у них нет. */
 function tunPitchLbl(sc,j){
-  const T=tunOf(sc), N=tunSize(T), k=sc.root+j;
-  if(T.equal!=null && T.period===2 && (T.equal===12||T.equal===24)) return stepName(j,sc);
-  if(sc.swaraNames && T.cents){ const c=(T.cents[k%N]+1200*Math.floor(k/N)-T.cents[sc.root])%1200; const nm=swaraOfCents(c,true); if(nm) return nm; }
+  const T=tunOf(sc), N=tunSize(T), k=sc.root+j, p=namingOf(sc).pitch;
+  if(p==='notes12'||p==='notes24') return stepName(j,sc);
+  if(p==='list'){ const nm=listName(sc,k,true); if(nm) return nm; }
   return '('+(((k%N)+N)%N+1)+')';
 }
 function axisLbl(ax,r){
@@ -2149,7 +2147,7 @@ function drawHandsPhone(res,W,H,playH){
         const [yTop,yBot]=rectBandY(band,playH,RL.bands), hx0=(instr==='ch'&&typedChords())?split:rx0;   // правее палитры — только когда палитра ЕСТЬ (typedChords), иначе поле роли целиком
         ctx.strokeStyle=hexA(accent,.4); ctx.lineWidth=1.5; ctx.strokeRect(hx0,yTop,rx1-hx0,yBot-yTop);
         let lbl;
-        if(RL.hasReg&&band===0) lbl=`${periodOf()===2?t('reg.octaveFull'):regWord().toUpperCase()} · ${t('tag.octHint',{r:OCT_ROMAN[hbase]})}`;   // роль=instr
+        if(RL.hasReg&&band===0) lbl=`${regWordFull()} · ${t('tag.octHint',{r:OCT_ROMAN[hbase]})}`;   // роль=instr
         /* Подписи нот — ТЕ ЖЕ, что в легенде прямоугольника: типизированные аккорды — корень,
            нетипизированные — имя аккорда (как в их рядах), соло/бас — noteLbl. Их RL.k, а не всегда 4. */
         else{ const r=band-RL.regBands, hlbl = instr==='ch' ? (typedChords()?rootName:chordLabel) : noteLbl;
