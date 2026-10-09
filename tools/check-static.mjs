@@ -12,7 +12,10 @@
      5) ЧИСЛО АРГУМЕНТОВ (добавлено после T4c-1): вызов функции, объявленной `function имя(…)` в этом модуле или импортированной из
         другого, передаёт НЕ БОЛЬШЕ аргументов, чем у неё параметров (rest `...` — без предела). Ловит ровно тот дефект, что пропустил
         T4c-1: сигнатура потеряла аргумент, а позиционный вызов (в пробе) остался прежним — лишний аргумент сдвигал все прочие. Меньше
-        аргументов — не ошибка (умолчания). Методы (`x.имя(`), стрелочные функции и имена, объявленные в модуле дважды, не проверяются.
+        аргументов — не ошибка (умолчания). Методы (`x.имя(`), стрелочные функции и имена, объявленные в модуле дважды, не проверяются;
+     6) ЗАТЕНЁННЫЙ ИМПОРТ, КОТОРЫЙ ВЫЗЫВАЮТ (добавлено после F6b): импортированное имя объявлено локально (const/let/var, function,
+        class, параметр) и в области этого объявления вызывается — зовётся локальное, а не импорт («is not a function» на старте).
+        Затенение без вызова — сведение.
    Что сообщается как СВЕДЕНИЕ (не ошибка): экспорты, которых никто не импортирует статически (у модулей, грузимых динамически или
    целиком как пространство имён, не считаются), и импорты, которые модуль больше не упоминает.
    Разбор — лексический: строки, шаблоны (с вложенными ${…}), регулярные выражения и комментарии различаются; полного парсера JS здесь нет,
@@ -162,6 +165,36 @@ for(const f of files){ const m=mods[f], bind={};
       if(args>b.n){ const line=m.bare.slice(0,x.index).split('\n').length;
         fails.push(`${f}:${line}: calls ${l}() with ${args} arguments; ${b.from} declares ${b.name}() with ${b.n} parameters`); } } }
 }
+// 6) ЗАТЕНЁННЫЙ ИМПОРТ (добавлено после F6b): имя, импортированное модулем, объявлено в нём же ещё раз — const/let/var (в любой области),
+//    function/class или параметр функции либо стрелки. Внутри той области имя значит ЛОКАЛЬНОЕ, и вызов «импорта» зовёт не то: F6b
+//    импортировал функцию chordModeHint, а в renderChordMode жила const chordModeHint (элемент подсказки) — «is not a function» на старте.
+//    Лексически: объявления — из текста без строк и комментариев; параметры стрелки — по скобкам перед «=>» (или одно имя).
+//    ⚠️ ОШИБКА — только когда затенённое имя ВЫЗЫВАЕТСЯ (имя( …) в области затеняющего объявления: ровно дефект F6b. Затенение без
+//    вызова — сведение (стиль кода — однобуквенные локальные t, L рядом с импортом i18n t()/L(); безвредно, пока их не зовут).
+//    Область: const/let/var и function/class-имя — до конца объемлющего блока; параметр функции — её тело; параметр стрелки — тело {…}
+//    или выражение до конца объявления. Приближение лексическое, без полного разбора областей.
+const lineAt=(t,i)=>t.slice(0,i).split('\n').length;
+const paramNames=t=>splitTop(t).map(p=>p.replace(/^\.\.\./,'').split('=')[0].trim()).filter(p=>ID.test(p));
+const blockEnd=(t,i)=>{ let d=0; for(let k=i;k<t.length;k++){ if(t[k]==='{') d++; else if(t[k]==='}'){ d--; if(d<0) return k; } } return t.length; };
+const bodyAfter=(t,i)=>{ let k=i; while(k<t.length&&/\s/.test(t[k])) k++; if(t[k]==='{'){ const e=blockEnd(t,k+1); return [k,e]; } return [k, k+declText(t,k).length]; };
+let nShadow=0; const shadowInfo=new Map();
+for(const f of files){ const m=mods[f], b=m.bare, own=[];   // [имя, начало области, конец области, строка объявления]
+  for(const x of b.matchAll(/\b(?:const|let|var)\s+/g)) for(const nm of declaratorNames(declText(b,x.index+x[0].length))) own.push([nm,x.index,blockEnd(b,x.index),x.index]);
+  for(const x of b.matchAll(/\b(?:function\s*\*?|class)\s+([A-Za-z_$][\w$]*)/g)) own.push([x[1],x.index,blockEnd(b,x.index),x.index]);
+  for(const x of b.matchAll(/\bfunction\s*\*?\s*[A-Za-z_$]?[\w$]*\s*\(/g)){ const o=x.index+x[0].length-1, e=closeParen(b,o); if(e<0) continue;
+    const [s0,s1]=bodyAfter(b,e+1); for(const p of paramNames(b.slice(o+1,e))) own.push([p,s0,s1,x.index]); }
+  for(const x of b.matchAll(/=>/g)){ let j=x.index-1; while(j>=0&&/\s/.test(b[j])) j--; const [s0,s1]=bodyAfter(b,x.index+2);
+    if(b[j]===')'){ let d=0, k=j; for(;k>=0;k--){ if(b[k]===')') d++; else if(b[k]==='('){ d--; if(d===0) break; } }
+      if(k>=0) for(const p of paramNames(b.slice(k+1,j))) own.push([p,s0,s1,k]); }
+    else { let k=j; while(k>=0&&/[\w$]/.test(b[k])) k--; const nm=b.slice(k+1,j+1); if(ID.test(nm)) own.push([nm,s0,s1,k+1]); } }
+  const imp=new Set(); for(const im of m.imports) for(const l of (im.locals||[])) imp.add(l);
+  for(const [nm,s0,s1,at] of own){ nShadow++; if(!imp.has(nm)) continue;
+    const call=new RegExp('(?<![\\w$.])'+nm.replace(/\$/g,'\\$')+'\\s*\\(','g'), body=b.slice(s0,s1); let hit=null;
+    for(const c of body.matchAll(call)){ const before=body.slice(Math.max(0,c.index-12),c.index); if(/function\s*\*?\s*$/.test(before)) continue; hit=c; break; }
+    if(hit) fails.push(`${f}:${lineAt(b,s0+hit.index)}: calls '${nm}()' where a local '${nm}' (declared at line ${lineAt(b,at)}) hides the imported ${nm} — rename the local`);
+    else shadowInfo.set(`${f}:${nm}`, (shadowInfo.get(`${f}:${nm}`)||0)+1); }
+}
+if(shadowInfo.size) infos.push(`imported names also declared locally, never called there (harmless; style): ${[...shadowInfo].map(([k,n])=>`${k}×${n}`).join(', ')}`);
 // сведения: неиспользуемые экспорты и импорты
 for(const f of files){ const m=mods[f];
   const imported=files.some(g=>mods[g].imports.some(im=>target(g,im.spec)===f));
@@ -175,4 +208,4 @@ console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})
 for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(16)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }
-console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets and argument counts (${nCalls} calls of declared functions) are consistent.`);
+console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions) and shadowed imports (${nShadow} local declarations) are consistent.`);

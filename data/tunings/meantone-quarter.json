@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "meantone-quarter",
+  "name": {"en": "Quarter-comma meantone", "ru": "Мезотон 1/4 коммы"},
   "period": "2/1",
   "pitches": {
     "list": [

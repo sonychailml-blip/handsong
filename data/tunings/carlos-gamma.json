@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "carlos-gamma",
+  "name": {"en": "Carlos Gamma (20 equal steps of the fifth)", "ru": "Карлос гамма (20 равных шагов квинты)"},
   "period": "3/2",
   "pitches": {"equal": 20},
   "naming": {"scheme": "ordinal"},

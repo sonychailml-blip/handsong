@@ -8,6 +8,7 @@
      await U.remove('u.…')               // снять (не снимется, пока от него зависят другие записи — их назовут)
      await U.exportFile('u.…')           // скачать файл <id>.json
      U.example() / U.brokenExample()     // примеры записей (второй — нарочно сломанный лад: ссылается на несуществующий строй)
+     await U.installChordModesExample()  // F6b: свой набор из ТРЁХ режимов аккордов со своими именами и лад (мажор на 12-равном) с ним
      await U.storeUnchecked(obj)         // ТОЛЬКО ДЛЯ ПРОВЕРКИ ЗАГРУЗЧИКА: положить в хранилище БЕЗ проверки — после перезагрузки загрузчик
                                          //   его пропустит и стартовая карточка скажет об этом
    ⛳ УСТАНОВКА И УДАЛЕНИЕ ДЕЙСТВУЮТ СРАЗУ (и сохраняются для следующего старта): запись проверяется ТЕМ ЖЕ валидатором, что файлы data/,
@@ -28,6 +29,8 @@ const uuid=()=> (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID()
   : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{ const r=Math.random()*16|0; return (c==='x'?r:(r&3|8)).toString(16); });
 const sectOf=kind=>KINDS.find(k=>k[0]===kind)[1];
 const nameOf=rec=> rec && rec.name ? L(rec.name) : (rec && rec.id) || '?';
+/* F6b: имя строя по id — из живого набора (встроенного или своего); нет — сам id. */
+const tuningName=id=>{ const x=scaleData().tunings[id]; return x && x.name ? L(x.name) : id; };
 
 export async function install(input){
   let rec;
@@ -47,13 +50,14 @@ export async function install(input){
   await userPut(kind, rec.id, rec);
   const r=registerRecord(kind, rec);
   if(!r.ok){ await userDel(kind, rec.id); return fail(`could not register ${kind} "${rec.id}": ${r.why}`); }
-  const where= kind==='mode' ? ` — in the scale menu: ${(D.menu.traditions.find(t=>t.id===rec.menu.tradition)||{}).id} › ${rec.menu.group||'(no group)'}, after the built-ins` : '';
+  const where= kind==='mode' ? ` — on the tuning "${tuningName(rec.tuning)}"; in the scale menu: ${L((D.menu.traditions.find(t=>t.id===rec.menu.tradition)||{}).name||rec.menu.tradition)} › ${rec.menu.group ? L(D.menu.groups[rec.menu.group]) : '(no group)'}, after the built-ins`
+    : kind==='chordmodes' ? ` — ${rec.modes.length} chord mode(s): ${rec.modes.map(m=>m.name ? L(m.name) : m.id).join(' / ')}` : '';
   say(`${holder ? 'replaced' : 'installed'} your ${kind} "${nameOf(rec)}" (${rec.id}) — in effect now and stored (${backend})${where}`);
   return { ok:true, kind, id:rec.id, replaced:!!holder };
 }
 export async function list(){
   const all=await userAll(), D=scaleData();
-  const rows=all.map(e=>({ kind:e.kind, id:e.id, name:nameOf(e.rec), installed:e.at, active:!!D[sectOf(e.kind)][e.id] }));
+  const rows=all.map(e=>({ kind:e.kind, name:nameOf(e.rec), tuning: e.kind==='mode' ? tuningName(e.rec.tuning) : '', id:e.id, installed:e.at, active:!!D[sectOf(e.kind)][e.id] }));   // F6b: имя строя, а не id
   if(rows.length) console.table(rows); else say('no user files');
   say(`stored in: ${backend}${backend==='store' ? ' (IndexedDB unavailable — localStorage, or page memory only)' : ''}`);
   return rows;
@@ -84,7 +88,7 @@ export async function storeUnchecked(obj){
 const EX_T='u.5e1d1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b', EX_M='u.5e1d1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2c';
 export function example(){
   const nm=(en,ru)=>({en,ru});
-  const tuning={ format:'handsong/tuning', version:1, id:EX_T, period:'2/1',
+  const tuning={ format:'handsong/tuning', version:1, id:EX_T, name:nm('Ptolemy\'s just major (my file)','Чистый мажор Птолемея (мой файл)'), period:'2/1',
     pitches:{ list:[ {cents:0, ratio:'1/1'}, {cents:203.91, ratio:'9/8'}, {cents:386.31, ratio:'5/4'}, {cents:498.04, ratio:'4/3'},
                      {cents:701.96, ratio:'3/2'}, {cents:884.36, ratio:'5/3'}, {cents:1088.27, ratio:'15/8'} ] },
     naming:{ scheme:'list', names:[ {name:nm('Do','До')}, {name:nm('Re','Ре')}, {name:nm('Mi','Ми')}, {name:nm('Fa','Фа')}, {name:nm('Sol','Соль')}, {name:nm('La','Ля')}, {name:nm('Ti','Си')} ] },
@@ -99,4 +103,21 @@ export function brokenExample(){
   const { mode }=example();
   return { ...mode, id:'u.0badf11e-0000-4000-8000-000000000001', tuning:'u.0badf11e-0000-4000-8000-00000000dead', name:{en:'Broken on purpose', ru:'Нарочно сломан'} };
 }
+/* ⛳ F6b — ПРИМЕР СВОЕГО НАБОРА РЕЖИМОВ АККОРДОВ: три режима со СВОИМИ именами и подсказками ({en, ru}), переопределения — из того же
+   белого списка (build, palette, rule): «Терции» — без переопределений (правило лада, стопка терций), «Палитра» — palette 'chrom12'
+   (типы аккордов из палитры хроматики), «Пауэр» — rule power (корень, квинта, октава). Лад — мажор на встроенном 12-равном строе со
+   ссылкой на этот набор, в «Привычное» без группы (в конце). */
+const EX_CM='u.5e1d1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2d', EX_CMM='u.5e1d1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2e';
+export function chordModesExample(){
+  const nm=(en,ru)=>({en,ru});
+  const set={ format:'handsong/chordmodes', version:1, id:EX_CM, modes:[
+    { id:'thirds',  name:nm('Thirds','Терции'),   hint:nm('Chords stacked in thirds of the mode','Аккорды — стопка терций лада'), set:{} },
+    { id:'palette', name:nm('Palette','Палитра'), hint:nm('Any chord type from the chromatic palette','Любой тип аккорда из палитры хроматики'), set:{ palette:'chrom12' } },
+    { id:'power',   name:nm('Power','Пауэр'),     hint:nm('Root, fifth and octave','Корень, квинта и октава'), set:{ rule:{kind:'power'} } } ] };
+  const mode={ format:'handsong/mode', version:1, id:EX_CMM, tuning:'edo12', name:nm('Major with three chord modes (my file)','Мажор с тремя режимами аккордов (мой файл)'),
+    menu:{tradition:'common', group:''}, degrees:[0,2,4,5,7,9,11], root:0, anchor:{policy:'tonic'},
+    chords:{ rule:{kind:'tertian'}, modes:EX_CM } };
+  return { set, mode };
+}
+export async function installChordModesExample(){ const E=chordModesExample(); const a=await install(E.set); if(!a.ok) return a; return install(E.mode); }
 export async function installExample(){ const E=example(); const a=await install(E.tuning); if(!a.ok) return a; return install(E.mode); }

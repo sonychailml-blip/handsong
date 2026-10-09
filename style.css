@@ -326,6 +326,8 @@
   .val{flex:0 0 44px; font-size:var(--fs-label); color:#1e2233; text-align:right;}
   .seg{display:flex; gap:6px;}
   .seg button{flex:1;}
+  #chordModeSeg{flex-wrap:wrap;}   /* F6b: режимов аккордов в наборе бывает до 8 — ряд переносится, кнопки под палец */
+  #chordModeSeg button{flex:1 1 30%; min-width:6.5em;}   /* двум кнопкам — та же поровну ширина, что у .seg (flex:1); с третьей и дальше ряд переносится */
   /* Кнопки внутри панелей — светлая второстепенная тема (как #learnBtn), КРОМЕ активных (.act):
      у активных оранжевый акцент var(--accent) — читается как «выбрано» и на светлом. */
   #panelScale button:not(.act),#panelSound button:not(.act),#panelLoop button:not(.act){background:#eef1f8; color:#2a2f45;

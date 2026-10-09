@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "pelog",
+  "name": {"en": "Pelog (Javanese gamelan, approx.)", "ru": "Пелог (яванский гамелан, прибл.)"},
   "period": "2/1",
   "pitches": {
     "list": [

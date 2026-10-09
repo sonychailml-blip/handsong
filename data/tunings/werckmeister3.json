@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "werckmeister3",
+  "name": {"default": "Werckmeister III", "ru": "Веркмайстер III"},
   "period": "2/1",
   "pitches": {
     "list": [

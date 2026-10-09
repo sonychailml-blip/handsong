@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "edo19",
+  "name": {"en": "19-tone equal temperament", "ru": "19-тоновая равномерная темперация"},
   "period": "2/1",
   "pitches": {"equal": 19},
   "naming": {"scheme": "ordinal"},

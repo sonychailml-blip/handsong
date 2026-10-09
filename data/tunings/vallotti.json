@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "vallotti",
+  "name": {"default": "Vallotti", "ru": "Валлотти"},
   "period": "2/1",
   "pitches": {
     "list": [

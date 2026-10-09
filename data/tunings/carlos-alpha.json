@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "carlos-alpha",
+  "name": {"en": "Carlos Alpha (9 equal steps of the fifth)", "ru": "Карлос альфа (9 равных шагов квинты)"},
   "period": "3/2",
   "pitches": {"equal": 9},
   "naming": {"scheme": "ordinal"},

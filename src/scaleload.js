@@ -33,6 +33,7 @@ const isStr=x=>typeof x==='string' && x.length>0;
 const isInt=x=>Number.isInteger(x);
 const isNum=x=>typeof x==='number' && Number.isFinite(x);
 const RATIO=/^[1-9]\d*(\/[1-9]\d*)?$/;
+export const CM_MAX=8;   // F6b: режимов аккордов в наборе — не больше: панель держит их кнопками под палец (переносятся рядами), больше — уже меню, не переключатель
 const ratioVal=r=>{ const [a,b]=r.split('/'); return b===undefined ? Number(a) : Number(a)/Number(b); };
 const isRatio=x=>typeof x==='string' && RATIO.test(x);
 const isLName=x=>isStr(x) || (isObj(x) && Object.keys(x).length>0 && Object.values(x).every(isStr));   // имя: строка или {en, ru, default…}
@@ -59,7 +60,9 @@ function checkMenu(x){
   need(isObj(x.groups) && Object.values(x.groups).every(isLName),'groups must map keys to names');
 }
 function checkTuning(x,id){
-  head(x,F.tuning,id); keysOnly(x,['format','version','id','period','pitches','chordFit','naming','periodWord','describe','drone'],'tuning');
+  head(x,F.tuning,id); keysOnly(x,['format','version','id','name','period','pitches','chordFit','naming','periodWord','describe','drone'],'tuning');
+  if(x.name!==undefined) need(isLName(x.name),'name must be a name: a string or {en, ru, …}');   // F6b: имя строя (у встроенных — есть у всех)
+  if(USER_ID.test(String(x.id))) need(x.name!==undefined,'a user tuning needs a name ({en, ru})');
   need(isRatio(x.period) && ratioVal(x.period)>1,'period must be a ratio above 1, e.g. "2/1"');
   const P=x.pitches; need(isObj(P),'pitches missing'); keysOnly(P,['equal','list'],'pitches');
   need((P.equal!=null)!==(P.list!=null),'pitches: exactly one of equal or list');
@@ -104,10 +107,15 @@ function checkPalette(x,id){
 }
 function checkChordModes(x,id,pal){
   head(x,F.chordmodes,id); keysOnly(x,['format','version','id','modes'],'chordmodes');
-  need(Array.isArray(x.modes) && x.modes.length>0,'modes must be a non-empty list');
+  need(Array.isArray(x.modes) && x.modes.length>0 && x.modes.length<=CM_MAX,`modes must be a list of 1..${CM_MAX} chord modes`);
   const seen=new Set();
-  for(const m of x.modes){ need(isObj(m) && isStr(m.id) && isStr(m.nameKey) && isStr(m.hintKey) && isObj(m.set),'a chord mode needs id, nameKey, hintKey and set');
-    keysOnly(m,['id','nameKey','hintKey','set'],`chord mode ${m.id}`); need(!seen.has(m.id),`chord mode "${m.id}" twice`); seen.add(m.id);
+  for(const m of x.modes){ need(isObj(m) && isStr(m.id) && isObj(m.set),'a chord mode needs id and set');
+    keysOnly(m,['id','nameKey','hintKey','name','hint','set'],`chord mode ${m.id}`); need(!seen.has(m.id),`chord mode "${m.id}" twice`); seen.add(m.id);
+    // F6b: имя и подсказка — КЛЮЧ СЛОВАРЯ (nameKey/hintKey, встроенные) ИЛИ своё имя {en, ru} (name/hint, файл пользователя) — ровно одно из пары
+    need((m.nameKey!==undefined)!==(m.name!==undefined),`chord mode ${m.id}: give exactly one of nameKey (dictionary key) or name ({en, ru})`);
+    need((m.hintKey!==undefined)!==(m.hint!==undefined),`chord mode ${m.id}: give exactly one of hintKey (dictionary key) or hint ({en, ru})`);
+    need(m.nameKey===undefined ? isLName(m.name) : isStr(m.nameKey),`chord mode ${m.id}: name must be a string key or {en, ru}`);
+    need(m.hintKey===undefined ? isLName(m.hint) : isStr(m.hintKey),`chord mode ${m.id}: hint must be a string key or {en, ru}`);
     keysOnly(m.set,['build','palette','rule'],`chord mode ${m.id}: set (only build, palette, rule)`);
     if(m.set.build!==undefined) need(['adaptive','tuning'].includes(m.set.build),`chord mode ${m.id}: build must be adaptive or tuning`);
     if(m.set.palette!==undefined) need(pal[m.set.palette],`chord mode ${m.id}: palette "${m.set.palette}" not loaded`);
@@ -125,7 +133,7 @@ function checkMode(x,id,ctx){
   need(isInt(x.root) && d.includes(x.root),'root must be one of the degrees');
   need(d.every(k=>k>=x.root && k<x.root+N),`degrees must lie within one period above the root (tuning has ${N} pitches)`);
   need(isObj(x.anchor) && ['tonic','fixed','choice'].includes(x.anchor.policy),'anchor.policy must be tonic, fixed or choice'); keysOnly(x.anchor,['policy','note'],'anchor');
-  if(x.anchor.policy==='fixed') need(isInt(x.anchor.note) && x.anchor.note>=0 && x.anchor.note<12,'anchor.note must be 0..11');
+  if(x.anchor.policy==='fixed') need(x.anchor.note===0,'anchor.note: only 0 (C) is supported for a fixed anchor today');   // F6b: иное нота молча строилась бы от C — честнее отказ
   const C=x.chords; need(isObj(C),'chords missing'); keysOnly(C,['rule','palette','grid','build','modes'],'chords'); checkRule(C.rule,'chords');
   if(C.palette!==undefined) need(ctx.palettes[C.palette],`palette "${C.palette}" not loaded`);
   if(C.grid!==undefined) need(C.grid===true,'chords.grid can only be true');
@@ -169,7 +177,7 @@ const fileList=man=>[...man.tunings.map(i=>`tunings/${i}.json`), ...man.palettes
 async function readJSON(rel){ const r=await fetch(new URL(rel,BASE),{cache:'no-cache'}); if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }
 
 /* ---- аварийная пара: 12-равный строй и хроматика (с её палитрой) — копия записей edo12, chromatic, chrom12 из data/ ---- */
-const EMERGENCY={"manifest":{"format":"handsong/manifest","version":1,"start":"chromatic","tunings":["edo12"],"modes":["chromatic"],"palettes":["chrom12"],"chordModeSets":[]},"menu":{"format":"handsong/menu","version":1,"traditions":[{"id":"common","name":{"en":"Familiar","ru":"Привычное"}}],"groups":{"chromatic":{"en":"Chromatic","ru":"Хроматика"}}},"tunings":{"edo12":{"format":"handsong/tuning","version":1,"id":"edo12","period":"2/1","pitches":{"equal":12},"naming":{"scheme":"notes12"},"periodWord":{"short":"reg.oct","full":"reg.octaveFull"},"describe":{"kind":"equal"}}},"palettes":{"chrom12":{"format":"handsong/palette","version":1,"id":"chrom12","kind":"steps","families":[{"id":"maj","name":{"en":"Major","ru":"Мажор"},"finger":0,"types":[{"label":"M","iv":[0,4,7]},{"label":"maj7","iv":[0,4,7,11]},{"label":"7","iv":[0,4,7,10]},{"label":"6","iv":[0,4,7,9]},{"label":"add9","iv":[0,4,7,14]},{"label":"7#9","iv":[0,4,7,10,15]}]},{"id":"min","name":{"en":"Minor","ru":"Минор"},"finger":1,"types":[{"label":"m","iv":[0,3,7]},{"label":"m7","iv":[0,3,7,10]},{"label":"m6","iv":[0,3,7,9]},{"label":"mM7","iv":[0,3,7,11]},{"label":"m9","iv":[0,3,7,10,14]},{"label":"madd9","iv":[0,3,7,14]}]},{"id":"dim","name":{"en":"Dim./Aug.","ru":"Ум./Ув."},"finger":2,"types":[{"label":"dim","iv":[0,3,6]},{"label":"m7b5","iv":[0,3,6,10]},{"label":"dim7","iv":[0,3,6,9]},{"label":"aug","iv":[0,4,8]},{"label":"aug7","iv":[0,4,8,10]},{"label":"augM7","iv":[0,4,8,11]}]},{"id":"sus","name":{"en":"Sus & extended","ru":"Sus и расшир."},"finger":3,"types":[{"label":"sus2","iv":[0,2,7]},{"label":"sus4","iv":[0,5,7]},{"label":"7sus4","iv":[0,5,7,10]},{"label":"6/9","iv":[0,4,7,9,14]},{"label":"maj9","iv":[0,4,7,11,14]},{"label":"13","iv":[0,4,7,10,21]}]}]}},"chordModeSets":{},"modes":{"chromatic":{"format":"handsong/mode","version":1,"id":"chromatic","tuning":"edo12","name":{"en":"Chromatic (12 notes)","ru":"Хроматика (12 нот)"},"menu":{"tradition":"common","group":"chromatic"},"degrees":[0,1,2,3,4,5,6,7,8,9,10,11],"root":0,"anchor":{"policy":"tonic"},"chords":{"rule":{"kind":"palette"},"palette":"chrom12"}}}};
+const EMERGENCY={"manifest":{"format":"handsong/manifest","version":1,"start":"chromatic","tunings":["edo12"],"modes":["chromatic"],"palettes":["chrom12"],"chordModeSets":[]},"menu":{"format":"handsong/menu","version":1,"traditions":[{"id":"common","name":{"en":"Familiar","ru":"Привычное"}}],"groups":{"chromatic":{"en":"Chromatic","ru":"Хроматика"}}},"tunings":{"edo12":{"format":"handsong/tuning","version":1,"id":"edo12","name":{"en":"12-tone equal temperament","ru":"12-тоновая равномерная темперация"},"period":"2/1","pitches":{"equal":12},"naming":{"scheme":"notes12"},"periodWord":{"short":"reg.oct","full":"reg.octaveFull"},"describe":{"kind":"equal"}}},"palettes":{"chrom12":{"format":"handsong/palette","version":1,"id":"chrom12","kind":"steps","families":[{"id":"maj","name":{"en":"Major","ru":"Мажор"},"finger":0,"types":[{"label":"M","iv":[0,4,7]},{"label":"maj7","iv":[0,4,7,11]},{"label":"7","iv":[0,4,7,10]},{"label":"6","iv":[0,4,7,9]},{"label":"add9","iv":[0,4,7,14]},{"label":"7#9","iv":[0,4,7,10,15]}]},{"id":"min","name":{"en":"Minor","ru":"Минор"},"finger":1,"types":[{"label":"m","iv":[0,3,7]},{"label":"m7","iv":[0,3,7,10]},{"label":"m6","iv":[0,3,7,9]},{"label":"mM7","iv":[0,3,7,11]},{"label":"m9","iv":[0,3,7,10,14]},{"label":"madd9","iv":[0,3,7,14]}]},{"id":"dim","name":{"en":"Dim./Aug.","ru":"Ум./Ув."},"finger":2,"types":[{"label":"dim","iv":[0,3,6]},{"label":"m7b5","iv":[0,3,6,10]},{"label":"dim7","iv":[0,3,6,9]},{"label":"aug","iv":[0,4,8]},{"label":"aug7","iv":[0,4,8,10]},{"label":"augM7","iv":[0,4,8,11]}]},{"id":"sus","name":{"en":"Sus & extended","ru":"Sus и расшир."},"finger":3,"types":[{"label":"sus2","iv":[0,2,7]},{"label":"sus4","iv":[0,5,7]},{"label":"7sus4","iv":[0,5,7,10]},{"label":"6/9","iv":[0,4,7,9,14]},{"label":"maj9","iv":[0,4,7,11,14]},{"label":"13","iv":[0,4,7,10,21]}]}]}},"chordModeSets":{},"modes":{"chromatic":{"format":"handsong/mode","version":1,"id":"chromatic","tuning":"edo12","name":{"en":"Chromatic (12 notes)","ru":"Хроматика (12 нот)"},"menu":{"tradition":"common","group":"chromatic"},"degrees":[0,1,2,3,4,5,6,7,8,9,10,11],"root":0,"anchor":{"policy":"tonic"},"chords":{"rule":{"kind":"palette"},"palette":"chrom12"}}}};
 
 function emergency(problems, why){
   console.warn(`[scales] scale data could not be loaded (${why}) — starting with the emergency pair: 12-equal and chromatic`);

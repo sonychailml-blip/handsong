@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "edo12",
+  "name": {"en": "12-tone equal temperament", "ru": "12-тоновая равномерная темперация"},
   "period": "2/1",
   "pitches": {"equal": 12},
   "naming": {"scheme": "notes12"},

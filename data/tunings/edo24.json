@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "edo24",
+  "name": {"en": "24-tone equal temperament (quarter tones)", "ru": "24-тоновая равномерная темперация (четвертитоны)"},
   "period": "2/1",
   "pitches": {"equal": 24},
   "naming": {"scheme": "notes24"},

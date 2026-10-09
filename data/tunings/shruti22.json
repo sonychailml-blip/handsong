@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "shruti22",
+  "name": {"en": "22 shruti", "ru": "22 шрути"},
   "period": "2/1",
   "pitches": {
     "list": [

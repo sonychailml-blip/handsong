@@ -47,7 +47,7 @@ export const TRADITIONS=D.menu.traditions.map(x=>({id:x.id, name:x.name}));
 export const GRP={...D.menu.groups};
 /* F6: сборка — по функции на вид записи (buildTuning/buildPalette/buildChordModeSet/buildMode): ТЕ ЖЕ строки, что были циклами, —
    их зовёт и старт, и установка файла пользователя на ходу (registerRecord ниже). */
-const buildTuning=x=>{ const r={id:x.id, period:ratioNum(x.period)};
+const buildTuning=x=>{ const r={id:x.id, period:ratioNum(x.period)}; if(x.name!==undefined) r.name=x.name;   // F6b: имя строя (L())
   if(x.pitches.equal!=null) r.equal=x.pitches.equal;
   else { r.cents=x.pitches.list.map(p=>p.cents); if(x.chordFit==='ratios') r.ratios=x.pitches.list.map(p=>p.ratio.split('/').map(Number)); }
   SRC.set(r,x); return r; };
@@ -61,7 +61,13 @@ const ruleOf=r=>{ const o={}; for(const k in r) o[k]= (k==='triad'||k==='seventh
 const CM_FIELD={build:'chordBuild', palette:'typedChords', rule:'chordRule'};   // поле режима в файле → поле вида
 const buildChordModeSet=x=>x.modes.map(m=>{ const over={};
   for(const k in m.set) over[CM_FIELD[k]]= k==='rule' ? ruleOf(m.set[k]) : m.set[k];
-  return {id:m.id, nameKey:m.nameKey, hintKey:m.hintKey, over}; });
+  const o={id:m.id};   // F6b: имя и подсказка — ключ словаря (встроенные: nameKey/hintKey, форма как была) или своё имя (name/hint, {en, ru})
+  if(m.nameKey!==undefined) o.nameKey=m.nameKey; else o.name=m.name;
+  if(m.hintKey!==undefined) o.hintKey=m.hintKey; else o.hint=m.hint;
+  o.over=over; return o; });
+/* ⛳ F6b: ИМЯ И ПОДСКАЗКА РЕЖИМА АККОРДОВ — одно чтение на панель, кнопку лада и снимок: свои имена ({en, ru}) — L(), ключ словаря — t(). */
+export const chordModeName=m=> m.name!==undefined ? L(m.name) : t(m.nameKey);
+export const chordModeHint=m=> m.hint!==undefined ? L(m.hint) : t(m.hintKey);
 const CHORD_MODE_SETS={};
 for(const id of D.manifest.chordModeSets) CHORD_MODE_SETS[id]=buildChordModeSet(D.chordModeSets[id]);
 /* ⛳ F6: строй лада ЗАКРЕПЛЁН ЗА ОБЪЕКТОМ ЛАДА при сборке (а не ищется в реестре по id): вид, рождённый когда угодно — даже после

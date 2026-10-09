@@ -18,6 +18,8 @@
                         //   файлом scales.before.json; положить его в tools/ (снимается на коде ДО переезда)
      P.checkUserDelete() // F6: УДАЛЕНИЕ ФАЙЛА ПОЛЬЗОВАТЕЛЯ НЕ ЛОМАЕТ ЗАПИСАННОЕ — лад пользователя ставится, в нём пишется взятое (песочница
                         //   probeTake), лад и строй удаляются — цена, ряды и подписи записанного === до удаления (нужен ▶ Play)
+     P.checkUserChordModes() // F6b: СВОЙ НАБОР РЕЖИМОВ АККОРДОВ — три режима со своими именами: имена (и кнопки панели), цена каждого режима
+                        //   по его переопределениям, записанные аккорды держат свой режим при переключении (правило T7b; нужен ▶ Play)
      await P.renewSnapshot() // F5b: пересъёмка снимка — ТОЛЬКО если все расхождения P.checkFiles — объявленное изменение (уход tag)
      P.checkBehaviour() // F4: ПОВЕДЕНИЕ ДАННЫМИ — дрон (оба положения ухо-переключателя), прогрессии, ритм джема, строка статуса —
                         //   против замороженного кода до F4: каждый вид × 12 тоник (статус — en/ru)
@@ -56,10 +58,11 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
-import { checkRecord } from './scaleload.js';   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
-import { example as userExample } from './userfiles.js';   // F6: пример файла пользователя — материал пробы удаления
+import { checkRecord } from './scaleload.js';
+import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
+import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
@@ -971,6 +974,7 @@ const ALL_RUNS=[
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F6b user chord modes',()=>checkUserChordModes(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F6 user files: deletion keeps recordings',()=>checkUserDelete(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F3 naming as data', ()=>checkNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
@@ -1886,7 +1890,7 @@ function buildSnapshot(){
     snap.menu[lg]=TRADITIONS.map(tr=>({ id:tr.id, name:L(tr.name),
       groups:menuOf(tr.id).map(g=>({ key:g.key, label:g.label, scales:g.items.filter(({s})=>!isUserId(s.id)).map(({i,s})=>({ i, id:s.id, name:L(s.name) })) }))
         .filter(g=>g.scales.length) }));   // F6: только встроенные (группа из одних ладов пользователя — не в снимке)
-    snap.chordModes[lg]=SCALES.filter(x=>x.chordModes).map(x=>({ id:x.id, modes:x.chordModes.map(m=>({ id:m.id, name:t(m.nameKey), hint:t(m.hintKey) })) }));
+    snap.chordModes[lg]=SCALES.filter(x=>x.chordModes).map(x=>({ id:x.id, modes:x.chordModes.map(m=>({ id:m.id, name:chordModeName(m), hint:chordModeHint(m) })) }));   // F6b: ключ словаря или своё имя — одно чтение
   });
   snap.views=[];
   try{
@@ -2020,8 +2024,17 @@ export function checkBehaviour(){
    объявил. allowed — список разрешённых групп сводки P.checkFiles (путь поля с [*] и вид расхождения); по умолчанию — изменение F5b:
    поле tag ушло из записи каждого лада (modes[*].fields.tag · gone), и таких расхождений ровно столько, сколько ладов. Всё иначе —
    отказ с причиной, ничего не скачивается. Иначе — P.dumpScales(): новый scales.before.json скачивается, его кладут в tools/ вместо старого. */
-const F5B_ALLOWED=[{ field:'modes[*].fields.tag', kind:'gone', count:()=>SCALES.length }];
-export async function renewSnapshot(allowed=F5B_ALLOWED){
+/* ⛳ ОБЪЯВЛЕННЫЕ ИЗМЕНЕНИЯ СНИМКА — по слайсу. field — путь поля сводки P.checkFiles; '*' — ОДНО звено пути (ключ объекта: id строя,
+   лада…); count — сколько расхождений обязано найтись по ВСЕМ подходящим группам вместе. F5b: поле tag ушло из каждого лада. F6b: у
+   каждого встроенного строя появилось имя (tunings.<id>.name — новое поле). Без аргумента renewSnapshot берёт ПОСЛЕДНЕЕ объявленное. */
+export const SNAPSHOT_CHANGES={
+  f5b:[{ field:'modes[*].fields.tag', kind:'gone', count:()=>SCALES.length }],
+  f6b:[{ field:'tunings.*.name', kind:'new', count:()=>Object.keys(TUNINGS).length }],
+};
+const reEsc=q=>q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const fieldRe=f=>new RegExp('^'+f.split('[*]').map(p=>p.split('*').map(reEsc).join('[^.\\[\\]]+')).join('\\[\\*\\]')+'$');   // '*' — одно звено; '[*]' — номер в сводке, как есть
+export async function renewSnapshot(arg=SNAPSHOT_CHANGES.f6b){
+  const allowed=Array.isArray(arg) ? arg : (arg && arg.allowed) || SNAPSHOT_CHANGES.f6b;   // F6b: P.renewSnapshot({allowed: …}) или список
   const keep={ log:console.log, warn:console.warn, table:console.table }; let r;
   console.log=console.warn=console.table=()=>{};
   try{ r=await checkFiles(); } finally { Object.assign(console,keep); }
@@ -2029,8 +2042,9 @@ export async function renewSnapshot(allowed=F5B_ALLOWED){
   if(r.noSnap){ say('no snapshot in tools/ to renew — nothing done'); return { renewed:false, why:'no snapshot' }; }
   if(!r.total){ say('the live data already equal the snapshot — nothing to renew'); return { renewed:false, why:'no differences' }; }
   console.table(r.summary);
-  const odd=r.summary.filter(g=>!allowed.some(a=>a.field===g.field && a.kind===g.kind));
-  const short=allowed.filter(a=>{ const g=r.summary.find(x=>x.field===a.field && x.kind===a.kind); return !g || (a.count && g.count!==a.count()); });
+  const fits=(a,g)=>a.kind===g.kind && (a.field===g.field || fieldRe(a.field).test(g.field));   // F6b: '*' — одно звено пути
+  const odd=r.summary.filter(g=>!allowed.some(a=>fits(a,g)));
+  const short=allowed.filter(a=>{ const n=r.summary.filter(g=>fits(a,g)).reduce((x,g)=>x+g.count,0); return !n || (a.count && n!==a.count()); });
   if(odd.length || short.length){
     say(`REFUSED — the differences are not exactly the declared change: ${odd.map(g=>`${g.field} · ${g.kind} ×${g.count}`).join('; ')||'—'}`
        +(short.length ? ` · expected but not matched: ${short.map(a=>`${a.field} · ${a.kind}${a.count?' ×'+a.count():''}`).join('; ')}` : ''));
@@ -2098,5 +2112,72 @@ export function checkUserDelete(){
   } finally { if(reg) drop(); else { try{ drop(); }catch(e){} } setScaleId(keepSc); }
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe user] '+m));
   if(!nBad) console.log('[scaleprobe user] every recorded note sounds and shows exactly as before the user files were deleted');
+  return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F6b — P.checkUserChordModes(): СВОЙ НАБОР РЕЖИМОВ АККОРДОВ ═══
+   Материал — userfiles.chordModesExample под id пробы: набор из ТРЁХ режимов со своими именами {en, ru} («Терции» без переопределений,
+   «Палитра» — palette chrom12, «Пауэр» — rule power) и мажор на встроенном 12-равном с ним. Проверка (запись — та же checkRecord,
+   установка — registerRecord без хранилища и меню): (1) имена и подсказки режимов на обоих языках — свои; если есть панель — после
+   перестройки (hooks.scales) в #chordModeSeg ровно три кнопки с этими именами; (2) ЦЕНА каждого режима — как велят его переопределения:
+   «Терции» === встроенный мажор (те же ступени, правило tertian), «Палитра» — каждый тип палитры chrom12 на каждом корне === встроенная
+   хроматика, «Пауэр» === встроенная мажорная пентатоника в режиме «Пауэр-аккорд» (на общих корнях); и «Пауэр» хоть раз отличается от
+   «Терций» (переопределение действует); (3) ЗАПИСАННОЕ ДЕРЖИТ СВОЙ РЕЖИМ (T7b): в каждом режиме пишется взятое (песочница probeTake), затем
+   режим лада переключается — цена каждого записанного аккорда и режим его вида не меняются. Регистры 1..2, септаккорд без и с.
+   finally — записи пробы снимаются, живой лад и выбор режимов возвращаются. Нужен ▶ Play (песочница). */
+const CM_S='u.f6b0f6b0-0000-4000-8000-00000000000c', CM_M='u.f6b0f6b0-0000-4000-8000-00000000000d';
+export function checkUserChordModes(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const D=scaleData(), E=userCmExample(), keepSc=scaleId, keepCM={...chordModeSel};
+  const set={...E.set, id:CM_S}, mode={...E.mode, id:CM_M, chords:{...E.mode.chords, modes:CM_S}, name:{en:'Probe: user chord modes',ru:'Проба: свои режимы аккордов'}};
+  const drop=()=>{ if(D.modes[CM_M]) unregisterRecord('mode',CM_M,false); if(D.chordModeSets[CM_S]) unregisterRecord('chordmodes',CM_S,false); };
+  const sig=n=>JSON.stringify(n.map(x=>[x.f,x.iv]));
+  const panelBtns=()=>{ const el=typeof document!=='undefined' && document.getElementById('chordModeSeg'); return el ? [...el.querySelectorAll('button')].map(b=>b.textContent) : null; };
+  try{
+    drop();
+    for(const [k,r] of [['chordmodes',set],['mode',mode]]){ cases++; const w=checkRecord(k,r,D);
+      if(w){ miss(`the example user ${k} fails the validator: ${w}`); return { cases, total:nBad, differences:bad }; }
+      registerRecord(k,r,false); }
+    const m0=scaleById(CM_M), ids=E.set.modes.map(x=>x.id); cases++;
+    if(!m0 || !m0.chordModes || m0.chordModes.length!==3) miss('the user mode does not carry its three chord modes');
+    // (1) имена — свои, на обоих языках; кнопки панели
+    for(const lg of ['en','ru']) withLang(lg,()=>{ E.set.modes.forEach((x,i)=>{ const rm=m0.chordModes[i]; cases+=2;
+      if(chordModeName(rm)!==x.name[lg]) miss(`${lg}: chord mode ${x.id} is named "${chordModeName(rm)}", not "${x.name[lg]}"`);
+      if(chordModeHint(rm)!==x.hint[lg]) miss(`${lg}: chord mode ${x.id} hint "${chordModeHint(rm)}", not "${x.hint[lg]}"`); }); });
+    if(panelBtns() && hooks.scales){ setScaleId(CM_M); hooks.scales({}); const B=panelBtns(); cases++;
+      const want=E.set.modes.map(x=>L(x.name));
+      if(JSON.stringify(B)!==JSON.stringify(want)) miss(`the panel shows ${JSON.stringify(B)}, expected ${JSON.stringify(want)}`);
+      setScaleId(keepSc); hooks.scales({}); }
+    // (2) цена каждого режима — по его переопределениям
+    const V=Object.fromEntries(ids.map(id=>[id, scaleView(m0,'T',id)]));
+    const major=scaleView(scaleById('major'),'T'), chrom=scaleView(scaleById('chromatic'),'T'), penta=scaleView(scaleById('major-penta'),'T','power');
+    cases+=3; if(V.palette.typedChords!=='chrom12') miss('mode "palette" does not take the chrom12 palette'); if(V.thirds.typedChords!==undefined) miss('mode "thirds" carries a palette');
+    if(!(V.power.chordRule && V.power.chordRule.kind==='power')) miss('mode "power" does not take the power rule');
+    let differs=false;
+    for(const oct of [1,2]) for(const sev of [false,true]){
+      for(const ti of m0.sel){ cases++; const a=sig(chordNotesAt(ti,oct,V.thirds,sev,null)), b=sig(chordNotesAt(ti,oct,major,sev,null));
+        if(a!==b) miss(`thirds ti ${ti} reg ${oct}${sev?' 7th':''}: ${a} vs built-in major ${b}`);
+        for(const f of chordFams(V.palette)) for(const ty of f.types){ cases++; const x=sig(chordNotesAt(ti,oct,V.palette,sev,ty.iv)), y=sig(chordNotesAt(ti,oct,chrom,sev,ty.iv));
+          if(x!==y) miss(`palette ti ${ti} reg ${oct} ${L(ty.label)}: ${x} vs built-in chromatic ${y}`); } }
+      for(const ti of penta.sel){ cases++; const a=sig(chordNotesAt(ti,oct,V.power,sev,null)), b=sig(chordNotesAt(ti,oct,penta,sev,null));
+        if(a!==b) miss(`power ti ${ti} reg ${oct}${sev?' 7th':''}: ${a} vs built-in pentatonic power ${b}`);
+        if(a!==sig(chordNotesAt(ti,oct,V.thirds,sev,null))) differs=true; } }
+    cases++; if(!differs) miss('mode "power" prices exactly like "thirds" — its override has no effect');
+    // (3) записанное держит свой режим
+    const rec=[];
+    for(const id of ids){ setChordMode(CM_M,id); setScaleId(CM_M); const v=CUR(); cases++;
+      if(v!==V[id]) miss(`chord mode ${id}: the live view is not the mode's view`);
+      const ty0=chordFams(v)[0].types[0].iv, steps=[]; let t=0;
+      for(const d of [0,1,3,4]) steps.push({fn:'chOn', a:{deg:d,oct:1,vol:0.6,inst:1,ty: id==='palette' ? ty0 : null}, t:(t+=0.5)});
+      const R=probeTake(steps); cases++;
+      if(!R.ok){ miss(`chord mode ${id}: the sandboxed take was refused — ${R.why}`); return { cases, total:nBad, differences:bad }; }
+      for(const ev of R.events) if(ev.fn==='chOn') rec.push({ ev, cm:id, price:sig(chordNotesAt(ev.a.ti,ev.a.oct,ev.sc,ev.sev,ev.a.ty)) }); }
+    for(const id of ids){ setChordMode(CM_M,id);
+      for(const r of rec){ cases+=2; if(r.ev.sc.chordMode!==r.cm) miss(`a chord recorded in "${r.cm}" now holds the view of "${r.ev.sc.chordMode}"`);
+        const p=sig(chordNotesAt(r.ev.a.ti,r.ev.a.oct,r.ev.sc,r.ev.sev,r.ev.a.ty)); if(p!==r.price) miss(`switching to "${id}" changed a chord recorded in "${r.cm}": ${p} vs ${r.price}`); } }
+    console.log(`[scaleprobe chord modes] a user set of ${ids.length} chord modes (${E.set.modes.map(x=>x.name.en).join(' / ')}) · cases ${cases} · differences ${nBad}`);
+  } finally { setScaleId(keepSc); setChordModeSel(keepCM); try{ drop(); }catch(e){} }
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe chord modes] '+m));
+  if(!nBad) console.log('[scaleprobe chord modes] own names, three buttons, each mode prices as its overrides say, recorded chords keep their mode');
   return { cases, total:nBad, differences:bad };
 }

@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "kirnberger3",
+  "name": {"default": "Kirnberger III", "ru": "Кирнбергер III"},
   "period": "2/1",
   "pitches": {
     "list": [

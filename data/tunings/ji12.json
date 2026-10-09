@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "ji12",
+  "name": {"en": "5-limit just intonation (12 notes)", "ru": "Натуральный строй, 5-предел (12 нот)"},
   "period": "2/1",
   "pitches": {
     "list": [

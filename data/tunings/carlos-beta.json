@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "carlos-beta",
+  "name": {"en": "Carlos Beta (11 equal steps of the fifth)", "ru": "Карлос бета (11 равных шагов квинты)"},
   "period": "3/2",
   "pitches": {"equal": 11},
   "naming": {"scheme": "ordinal"},

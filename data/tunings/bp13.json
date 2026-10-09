@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "bp13",
+  "name": {"en": "Bohlen–Pierce (13 equal steps of the tritave)", "ru": "Болен–Пирс (13 равных шагов тритавы)"},
   "period": "3/1",
   "pitches": {"equal": 13},
   "naming": {"scheme": "ordinal"},

@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "edo31",
+  "name": {"en": "31-tone equal temperament", "ru": "31-тоновая равномерная темперация"},
   "period": "2/1",
   "pitches": {"equal": 31},
   "naming": {"scheme": "ordinal"},

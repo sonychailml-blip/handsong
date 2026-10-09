@@ -2,6 +2,7 @@
   "format": "handsong/tuning",
   "version": 1,
   "id": "partch43",
+  "name": {"en": "Partch 43-tone just intonation", "ru": "43 тона Партча (чистый строй)"},
   "period": "2/1",
   "pitches": {
     "list": [

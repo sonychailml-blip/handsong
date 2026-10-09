@@ -20,7 +20,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
 import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
+import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
@@ -66,7 +66,7 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
 function updScaleBtn(){ const s=CUR().mode, fixedFrom = s.tunable && tunedFrom!=='T';
   const cm=chordModeOf(s), cmNotDef = s.chordModes && cm!==s.chordModes[0].id;   // T7b: режим аккордов не по умолчанию — виден на кнопке, как закреплённый «строй от»
   scaleBtn.textContent=`${L(s.name)} · ${NOTE_NAMES[tonic]}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '')
-    +(cmNotDef ? ' · '+t(s.chordModes.find(x=>x.id===cm).nameKey) : '');   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
+    +(cmNotDef ? ' · '+chordModeName(s.chordModes.find(x=>x.id===cm)) : '');   // F6b: ключ словаря или своё имя   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
   /* P0 «СТРОЙ ОТ»: у фиксированного исторического строя (fixedKey — СВОЙСТВО лада, не имя: правило #25) под тоникой строка
      «Настроен от C (историческая практика)». Здесь, потому что updScaleBtn зовут после КАЖДОЙ смены лада (меню лада, меню строя,
      уроки), тоники и языка — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам.
@@ -76,19 +76,23 @@ function updScaleBtn(){ const s=CUR().mode, fixedFrom = s.tunable && tunedFrom!=
 /* ⛳ T7b: РЕЖИМ АККОРДОВ — две кнопки под пальцем (тот же .seg, что у режима голоса) и строка подсказки, только у лада со свойством
    chordModes (где режимы различаются). Смена — шов тоники/«строй от»: setChordMode + softAllOff (при записи сперва закрывает открытые ноты:
    ни одна нота не тянется через два вида) + updScaleBtn. Режим — часть ВИДА (scaleView), поэтому записанное звучит, как записано, а новая
-   запись уходит в новую дорожку. Кнопки строятся заново при каждом вызове (язык мог смениться) — их две. */
+   запись уходит в новую дорожку. Кнопки строятся заново при каждом вызове (язык мог смениться). ⛳ F6b: КНОПОК СТОЛЬКО, СКОЛЬКО РЕЖИМОВ В
+   НАБОРЕ ЛАДА (до scaleload.CM_MAX = 8), имена — ключ словаря или своё имя набора ({en, ru}: chordModeName/chordModeHint); ряд переносится
+   (#chordModeSeg — flex-wrap), кнопки под палец. ⛳ ПРИНЦИП (решение пользователя): КАЖДЫЙ переключатель панели звукоряда появляется из
+   ДАННЫХ ЛАДА, не из кода, — так его может объявить и строй пользователя; сегодня так устроены режимы аккордов (chords.modes) и «строй от»
+   (anchor.policy 'choice' → tunable → renderTunedFrom). */
 function renderChordMode(s){
-  const chordModeRow=$('chordModeRow'), chordModeSeg=$('chordModeSeg'), chordModeHint=$('chordModeHint');   // ищем здесь: updScaleBtn зовут и при загрузке модуля, раньше любой константы ниже по файлу
+  const chordModeRow=$('chordModeRow'), chordModeSeg=$('chordModeSeg'), cmHintEl=$('chordModeHint');   // ⛔ НЕ chordModeHint: так зовётся импорт (подсказка режима, F6b) — локальное имя его затеняло, и кнопки падали «is not a function». Ищем здесь: updScaleBtn зовут и при загрузке модуля, раньше любой константы ниже по файлу
   const ms=s.chordModes;
-  chordModeRow.style.display = ms ? '' : 'none'; chordModeHint.hidden=!ms;
+  chordModeRow.style.display = ms ? '' : 'none'; cmHintEl.hidden=!ms;
   if(!ms) return;
   const cur=chordModeOf(s); chordModeSeg.textContent='';
   for(const m of ms){
-    const b=document.createElement('button'); b.textContent=t(m.nameKey); b.title=t(m.hintKey); if(m.id===cur) b.className='act';
+    const b=document.createElement('button'); b.textContent=chordModeName(m); b.title=chordModeHint(m); if(m.id===cur) b.className='act';
     b.onclick=()=>{ if(m.id===chordModeOf(s)) return; setChordMode(s.id, m.id); softAllOff(); updScaleBtn(); };
     chordModeSeg.appendChild(b);
   }
-  chordModeHint.textContent=t(ms.find(x=>x.id===cur).hintKey);
+  cmHintEl.textContent=chordModeHint(ms.find(x=>x.id===cur));
 }
 /* ⛳ СЕПТАККОРД, КОТОРЫЙ НИЧЕГО НЕ ДОБАВЛЯЕТ (при T4c-1): один общий тест лада — scales.seventhAddsNote (стопка через ступень замыкается
    раньше четвёртой разной ноты — шестиступенные блюз, мажорный блюз, целотонный, прометеев; у лада пользователя — тем же тестом). Тогда
