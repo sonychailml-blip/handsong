@@ -11,6 +11,5 @@
   "chords": {
     "rule": {"kind": "none"}
   },
-  "backing": {"rhythm": "maqsum"},
-  "compat": {"tag": "maqam"}
+  "backing": {"rhythm": "maqsum"}
 }

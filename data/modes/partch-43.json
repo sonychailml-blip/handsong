@@ -13,6 +13,5 @@
     "palette": "partch",
     "modes": "freeInstrument"
   },
-  "layout": {"rect": true},
-  "compat": {"tag": "ji"}
+  "layout": {"rect": true}
 }

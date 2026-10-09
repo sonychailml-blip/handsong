@@ -16,6 +16,7 @@
                         //   T5: высота — В СТРОЕ (не обязательно в ладу); вне лада — опора по ЦЕЛОМУ строю, подсветки нет, на оси «Лад» — между рядами
      P.dumpScales()     // F0 «строи файлами»: КАНОНИЧЕСКИЙ СНИМОК всего, что относится к ладам (данные, меню, дрон, подписи) — скачивается
                         //   файлом scales.before.json; положить его в tools/ (снимается на коде ДО переезда)
+     await P.renewSnapshot() // F5b: пересъёмка снимка — ТОЛЬКО если все расхождения P.checkFiles — объявленное изменение (уход tag)
      P.checkBehaviour() // F4: ПОВЕДЕНИЕ ДАННЫМИ — дрон (оба положения ухо-переключателя), прогрессии, ритм джема, строка статуса —
                         //   против замороженного кода до F4: каждый вид × 12 тоник (статус — en/ru)
      P.checkNames()     // F3: ИМЕНА ДАННЫМИ — подписи по схеме строя/лада против ЗАМОРОЖЕННЫХ подписей до F3: каждый вид × ступень ×
@@ -74,7 +75,27 @@ const stepFor=(edo,ratio)=>Math.round(edo*Math.log2(ratio)); // шаг, ближ
 /* ⛳ F4: isTert ПЕРЕЕХАЛ СЮДА из scales.js слово в слово — в приложении у него не осталось читателя; живёт им только эталон (стопка терций
    по tag). Как функция он НЕ равен правилу аккордов лада: макамы — tag 'maqam' (isTert истинно), а правило 'none' (аккордов нет); на путях,
    которые доходят до него (лады с аккордами), ответы совпадают. */
-const isTert=s=>s.tag==='dia'||s.tag==='ethnic'||s.tag==='maqam';
+/* ⛳ F5b: ТЕГИ ЛАДОВ (прежнее поле данных compat.tag — семейство лада: dia / ethnic / maqam / penta / blues / chrom / edo / ji / bp / carlos) —
+   ПЕРЕЕХАЛИ СЮДА, к замороженным опорам, которые одни их и читают (isTert, legacyChordSteps, legacyChordLabel, выбор правила в
+   P.checkRules). Ключ — id лада; значения — ровно те, что стояли в файлах data/modes/ до F5b. tagOf: у копии с собственным tag (опора
+   «стопки» {...лад, tag:'dia'}) — её tag, иначе — по id. */
+const TAG_OF={
+  'major':'dia', 'natural-minor':'dia', 'harmonic-minor':'dia', 'melodic-minor':'dia', 'dorian':'dia', 'phrygian':'dia',
+  'lydian':'dia', 'mixolydian':'dia', 'locrian':'dia', 'hungarian-minor':'ethnic', 'major-penta':'penta', 'minor-penta':'penta',
+  'blues':'blues', 'chromatic':'chrom', 'maqam-rast':'maqam', 'maqam-bayati':'maqam', 'edo19-full':'edo', 'edo31-full':'edo',
+  'maqam-hijaz':'maqam', 'harmonic-major':'dia', 'melodic-major':'dia', 'whole-tone':'ethnic', 'octatonic-wh':'ethnic', 'octatonic-hw':'ethnic',
+  'messiaen-3':'ethnic', 'phrygian-dominant':'ethnic', 'double-harmonic':'ethnic', 'enigmatic':'ethnic', 'prometheus':'ethnic', 'egyptian':'penta',
+  'man-gong':'penta', 'ritusen':'penta', 'hungarian-penta':'penta', 'scriabin-penta':'penta', 'kumoi-western':'penta', 'major-blues':'penta',
+  'maqam-saba':'maqam', 'maqam-sikah':'maqam', 'maqam-nahawand':'maqam', 'maqam-kurd':'maqam', 'maqam-ajam':'maqam', 'maqam-nikriz':'maqam',
+  'maqam-nawa-athar':'maqam', 'slendro':'penta', 'pelog':'penta', 'hirajoshi':'penta', 'kumoi-japanese':'penta', 'in-insen':'penta',
+  'iwato':'penta', 'partch-43':'ji', 'bohlen-pierce':'bp', 'carlos-alpha':'carlos', 'carlos-beta':'carlos', 'carlos-gamma':'carlos',
+  'pelog-lima':'penta', 'pelog-nem':'penta', 'pelog-barang':'penta', 'pythagorean':'penta', 'ji-adaptive':'penta', 'ji-fixed':'penta',
+  'meantone-quarter':'penta', 'shruti-22':'penta', 'raga-bhairav':'penta', 'raga-yaman':'penta', 'raga-kafi':'penta', 'raga-bhairavi':'penta',
+  'raga-todi':'penta', 'raga-khamaj':'penta', 'raga-asavari':'penta', 'raga-malhar':'penta', 'raga-purvi':'penta', 'raga-bilawal':'penta',
+  'werckmeister-3':'penta', 'vallotti':'penta', 'kirnberger-3':'penta',
+};
+const tagOf=s=> s.tag!==undefined ? s.tag : TAG_OF[s.id];
+const isTert=s=>{ const g=tagOf(s); return g==='dia'||g==='ethnic'||g==='maqam'; };   // F5b: тег — из таблицы пробы (было s.tag)
 /* ⚠️ T1: три комментария ниже и fixedSlot описывают ПРЕЖНИЕ ветви высоты — сегодня это legacyLeadFreq/legacyBassFreq/legacyChordNotes/
    legacyCentsOf (только для пробы); оборачивание ступени и перенос в регистр новая функция повторяет тем же законом. */
 /* Модуло-страховка: ступень вне лада (перенос фразы в лад покороче, §3.7) заворачивается
@@ -111,7 +132,7 @@ function legacyChordSteps(deg, s=CUR(), sev=seventh, ty=null){
     return ks.map(k=>{const j=deg+k; return s.iv[j%n]+s.edo*Math.floor(j/n);});
   }
   const r=s.iv[deg%n]+s.edo*Math.floor(deg/n);
-  if (s.tag==='edo'){
+  if (tagOf(s)==='edo'){   // F5b: тег — из таблицы пробы
     /* Мезотоника (19/31-TET): аккорд строим ПО ИНТЕРВАЛУ, не по индексу.
        Отношения заданы на ладе (chord/chord7); 31-TET септаккорд = 4:5:6:7. */
     const rs=sev?s.chordRule.seventh:s.chordRule.triad;   // T6a: отношения переехали в правило аккордов лада (те же массивы)
@@ -810,7 +831,7 @@ export function checkRules(){
     const R=s.chordRule, id=s.id;
     if(!R || !KINDS.has(R.kind)){ miss(`${id}: no chordRule, or an unknown kind`); continue; }
     byKind[R.kind]=(byKind[R.kind]||0)+1;
-    const want= s.noChords ? 'none' : isTert(s) ? 'tertian' : s.tag==='edo' ? 'ratios' : s.typedChords ? 'palette' : 'stack';   // «стопка»: прежний выбор по tag «пауэр» — теперь stack (решение пользователя)
+    const want= s.noChords ? 'none' : isTert(s) ? 'tertian' : tagOf(s)==='edo' ? 'ratios' : s.typedChords ? 'palette' : 'stack';   // «стопка»: прежний выбор по tag «пауэр» — теперь stack (решение пользователя)
     if(R.kind!==want) miss(`${id}: rule ${R.kind}, today's choice by tag ${want}`);
     if('chord' in s || 'chord7' in s) miss(`${id}: still carries chord/chord7 beside its rule`);
     const T=TUNINGS[s.tuning];
@@ -1894,26 +1915,30 @@ export async function checkFiles(){
             return { cases:0, total:0, differences:[], noSnap:true }; }
   const live=JSON.parse(JSON.stringify(buildSnapshot()));   // та же сериализация, что у файла: сравниваем одно с одним
   const bad=[]; let nBad=0, cases=0;
-  const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const groups=new Map();   // F5b: СВОДКА по пути поля (номера в [] → [*]) и виду расхождения — видно с одного взгляда, ЧТО разошлось
+  const miss=(m,path,kind)=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m);
+    const key=(path||'?').replace(/\[\d+\]/g,'[*]')+' · '+(kind||'value'); groups.set(key,(groups.get(key)||0)+1); };
   const show=x=>{ const j=JSON.stringify(x); return j===undefined ? 'nothing' : j.length>120 ? j.slice(0,117)+'…' : j; };
   const walk=(a,b,path)=>{
     if(a!==null && b!==null && typeof a==='object' && typeof b==='object'){
-      if(Array.isArray(a)!==Array.isArray(b)){ miss(`${path}: array vs object`); return; }
-      if(Array.isArray(a)){ if(a.length!==b.length) miss(`${path}: length ${b.length} now, ${a.length} in the snapshot`);
+      if(Array.isArray(a)!==Array.isArray(b)){ miss(`${path}: array vs object`,path,'type'); return; }
+      if(Array.isArray(a)){ if(a.length!==b.length) miss(`${path}: length ${b.length} now, ${a.length} in the snapshot`,path,'length');
         for(let i=0;i<Math.min(a.length,b.length);i++) walk(a[i],b[i],path+'['+i+']'); return; }
       for(const k of new Set([...Object.keys(a),...Object.keys(b)])){
-        if(!(k in a)) miss(`${path}.${k}: new now (${show(b[k])})`); else if(!(k in b)) miss(`${path}.${k}: gone now (snapshot ${show(a[k])})`); else walk(a[k],b[k],path+'.'+k); }
+        if(!(k in a)) miss(`${path}.${k}: new now (${show(b[k])})`,path+'.'+k,'new'); else if(!(k in b)) miss(`${path}.${k}: gone now (snapshot ${show(a[k])})`,path+'.'+k,'gone'); else walk(a[k],b[k],path+'.'+k); }
       return;
     }
-    cases++; if(a!==b) miss(`${path}: ${show(b)} now, ${show(a)} in the snapshot`);
+    cases++; if(a!==b) miss(`${path}: ${show(b)} now, ${show(a)} in the snapshot`,path,'value');
   };
   for(const k of new Set([...Object.keys(file),...Object.keys(live)])){ if(k==='meta') continue;
-    if(!(k in file)) miss(`${k}: new now`); else if(!(k in live)) miss(`${k}: gone now`); else walk(file[k],live[k],k); }
+    if(!(k in file)) miss(`${k}: new now`,k,'new'); else if(!(k in live)) miss(`${k}: gone now`,k,'gone'); else walk(file[k],live[k],k); }
   console.log(`[scaleprobe files] snapshot ${file.meta&&file.meta.made} · values compared ${cases} · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe files] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe files] …and ${nBad-PRINT_MAX} more`);
   if(!nBad) console.log('[scaleprobe files] every mode, tuning, palette, menu entry, drone degree and label equals the snapshot');
-  return { cases, total:nBad, differences:bad };
+  const summary=[...groups].map(([k,n])=>{ const i=k.lastIndexOf(' · '); return { field:k.slice(0,i), kind:k.slice(i+3), count:n }; });
+  if(nBad){ console.log('[scaleprobe files] differences grouped by field path:'); console.table(summary); }
+  return { cases, total:nBad, differences:bad, summary, made:file.meta&&file.meta.made };
 }
 
 /* ═══ ⛳ F3 — P.checkNames(): ИМЕНА ДАННЫМИ ПРОТИВ ЗАМОРОЖЕННЫХ ПОДПИСЕЙ ДО F3 ═══
@@ -1973,4 +1998,31 @@ export function checkBehaviour(){
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe behaviour] …and ${nBad-PRINT_MAX} more`);
   if(!nBad) console.log('[scaleprobe behaviour] drone, progressions, backing rhythm and status line read from data equal the pre-F4 code');
   return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F5b — P.renewSnapshot(): ПЕРЕСНЯТЬ СНИМОК ТОЛЬКО ПОСЛЕ ДОКАЗАННОГО РАСХОЖДЕНИЯ ═══
+   Снимок F0 — доказательство переезда; переснимать его можно лишь тогда, когда сверка с ним показывает РОВНО то изменение, которое слайс
+   объявил. allowed — список разрешённых групп сводки P.checkFiles (путь поля с [*] и вид расхождения); по умолчанию — изменение F5b:
+   поле tag ушло из записи каждого лада (modes[*].fields.tag · gone), и таких расхождений ровно столько, сколько ладов. Всё иначе —
+   отказ с причиной, ничего не скачивается. Иначе — P.dumpScales(): новый scales.before.json скачивается, его кладут в tools/ вместо старого. */
+const F5B_ALLOWED=[{ field:'modes[*].fields.tag', kind:'gone', count:()=>SCALES.length }];
+export async function renewSnapshot(allowed=F5B_ALLOWED){
+  const keep={ log:console.log, warn:console.warn, table:console.table }; let r;
+  console.log=console.warn=console.table=()=>{};
+  try{ r=await checkFiles(); } finally { Object.assign(console,keep); }
+  const say=m=>console.log('%c[scaleprobe renew] '+m,'color:#57d9a3;font-weight:bold');
+  if(r.noSnap){ say('no snapshot in tools/ to renew — nothing done'); return { renewed:false, why:'no snapshot' }; }
+  if(!r.total){ say('the live data already equal the snapshot — nothing to renew'); return { renewed:false, why:'no differences' }; }
+  console.table(r.summary);
+  const odd=r.summary.filter(g=>!allowed.some(a=>a.field===g.field && a.kind===g.kind));
+  const short=allowed.filter(a=>{ const g=r.summary.find(x=>x.field===a.field && x.kind===a.kind); return !g || (a.count && g.count!==a.count()); });
+  if(odd.length || short.length){
+    say(`REFUSED — the differences are not exactly the declared change: ${odd.map(g=>`${g.field} · ${g.kind} ×${g.count}`).join('; ')||'—'}`
+       +(short.length ? ` · expected but not matched: ${short.map(a=>`${a.field} · ${a.kind}${a.count?' ×'+a.count():''}`).join('; ')}` : ''));
+    return { renewed:false, why:'unexpected differences', summary:r.summary };
+  }
+  say(`every one of the ${r.total} differences is the declared change (${allowed.map(a=>`${a.field} · ${a.kind}`).join('; ')}) — taking a new snapshot (old one made ${r.made})`);
+  const snap=dumpScales();
+  say('scales.before.json downloaded — move it into tools/ (replacing the old file), reload, and await P.checkFiles() must read zero');
+  return { renewed:true, replaced:r.made, made:snap.meta.made, summary:r.summary };
 }

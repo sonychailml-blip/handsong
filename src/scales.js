@@ -26,8 +26,8 @@ export const range=n=>Array.from({length:n},(_,i)=>i);
      chordModes — набор режимов по id (один объект режима на весь набор: «Пауэр» — один объект правила на все 14 ладов, виды стабильны);
      grp / grpKey — подпись группы (тот же объект, что GRP[ключ]) и её ключ; у лада без группы grp = '' и grpKey нет;
      trad, name, id, tuning, chordRule — как в записи.
-   ⛳ В ДАННЫХ ЯВНО (вывести нельзя): compat.tag — семейство лада (с F4 его читают ТОЛЬКО замороженные опоры пробы, вместе с isTert; 'penta' стоит и у
-   пентатоник, и у раг); degrees и root — сама выборка; меню (традиция, группа) и порядок (manifest = порядок меню и индекс i снимка F0).
+   ⛳ В ДАННЫХ ЯВНО: degrees и root — сама выборка; (compat.tag — семейство лада по-старому — снят в F5b: его читали только замороженные
+   опоры пробы, и таблица тегов теперь живёт там, TAG_OF); меню (традиция, группа) и порядок (manifest = порядок меню и индекс i снимка F0).
    ⛳ ДРОБИ СТРОКАМИ: ratioNum('5/4') — то же деление двух целых, что делал литерал JS 5/4, — тот же double; целое без дроби — Number.
    У строя ratios (пары [числитель, знаменатель]) собираются ТОЛЬКО при chordFit:'ratios' (сегодня — Партч): у прочих таблиц отношения —
    теория в данных, приложение их пока не читает (снимок F0 записан без них).
@@ -64,7 +64,6 @@ export const SCALES=D.manifest.modes.map(id=>{ const m=D.modes[id], T=TUNINGS[m.
   if(m.menu.group==='') s.grp=''; else { s.grp=GRP[m.menu.group]; s.grpKey=m.menu.group; }
   if(T.equal!=null){ s.edo=T.equal; s.iv=sel.slice(); }
   else { const C=T.cents, N=C.length; s.edo=n; s.iv=range(n); s.cents=sel.map(k=>C[k%N]+1200*Math.floor(k/N)-C[m.root]); }
-  s.tag=m.compat.tag;
   if(T.period!==2) s.period=T.period;
   if(ch.rule.kind==='none') s.noChords=true;
   if(ch.palette) s.typedChords=ch.palette;

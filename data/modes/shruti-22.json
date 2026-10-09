@@ -11,6 +11,5 @@
   "chords": {
     "rule": {"kind": "none"}
   },
-  "naming": {"detail": true},
-  "compat": {"tag": "penta"}
+  "naming": {"detail": true}
 }

@@ -11,6 +11,5 @@
   "chords": {
     "rule": {"kind": "stack"},
     "modes": "stackPower"
-  },
-  "compat": {"tag": "penta"}
+  }
 }

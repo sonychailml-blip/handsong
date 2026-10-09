@@ -10,6 +10,5 @@
   "anchor": {"policy": "tonic"},
   "chords": {
     "rule": {"kind": "tertian"}
-  },
-  "compat": {"tag": "ethnic"}
+  }
 }

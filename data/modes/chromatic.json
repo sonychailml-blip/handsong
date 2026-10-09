@@ -11,6 +11,5 @@
   "chords": {
     "rule": {"kind": "palette"},
     "palette": "chrom12"
-  },
-  "compat": {"tag": "chrom"}
+  }
 }

@@ -11,6 +11,5 @@
   "chords": {
     "rule": {"kind": "none"}
   },
-  "layout": {"rect": true},
-  "compat": {"tag": "carlos"}
+  "layout": {"rect": true}
 }

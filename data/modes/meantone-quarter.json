@@ -12,6 +12,5 @@
     "rule": {"kind": "palette"},
     "palette": "natfix",
     "grid": true
-  },
-  "compat": {"tag": "penta"}
+  }
 }

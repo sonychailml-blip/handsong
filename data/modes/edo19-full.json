@@ -16,6 +16,5 @@
     },
     "palette": "edo19"
   },
-  "layout": {"rect": true},
-  "compat": {"tag": "edo"}
+  "layout": {"rect": true}
 }

@@ -13,6 +13,5 @@
     "palette": "nat",
     "build": "adaptive"
   },
-  "naming": {"scheme": "ordinal"},
-  "compat": {"tag": "penta"}
+  "naming": {"scheme": "ordinal"}
 }
