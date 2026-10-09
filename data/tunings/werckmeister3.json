@@ -1,0 +1,25 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "werckmeister3",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0},
+      {"cents": 90.22},
+      {"cents": 192.18},
+      {"cents": 294.13},
+      {"cents": 390.22},
+      {"cents": 498.04},
+      {"cents": 588.27},
+      {"cents": 696.09},
+      {"cents": 792.18},
+      {"cents": 888.27},
+      {"cents": 996.09},
+      {"cents": 1092.18}
+    ]
+  },
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

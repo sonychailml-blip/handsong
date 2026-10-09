@@ -1,0 +1,18 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "slendro",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0},
+      {"cents": 231},
+      {"cents": 474},
+      {"cents": 717},
+      {"cents": 955}
+    ]
+  },
+  "naming": {"scheme": "ordinal"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

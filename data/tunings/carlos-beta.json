@@ -1,0 +1,10 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "carlos-beta",
+  "period": "3/2",
+  "pitches": {"equal": 11},
+  "naming": {"scheme": "ordinal"},
+  "periodWord": {"short": "reg.reg"},
+  "describe": {"kind": "equal", "step": true}
+}

@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "pelog-nem",
+  "tuning": "pelog",
+  "name": {"en": "Pelog patet Nem (Javanese, approx.)", "ru": "Пелог патет нем (яван., прибл.)"},
+  "menu": {"tradition": "easia", "group": "gamelan"},
+  "degrees": [0, 1, 2, 4, 5],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

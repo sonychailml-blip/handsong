@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-kafi",
+  "tuning": "shruti22",
+  "name": {"default": "Kafi", "ru": "Кафи"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 4, 6, 9, 13, 17, 19],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "hungarian-minor",
+  "tuning": "edo12",
+  "name": {"en": "Hungarian minor", "ru": "Венгерский минор"},
+  "menu": {"tradition": "common", "group": "ethnic"},
+  "degrees": [0, 2, 3, 6, 7, 8, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

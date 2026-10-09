@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "dorian",
+  "tuning": "edo12",
+  "name": {"en": "Dorian", "ru": "Дорийский"},
+  "menu": {"tradition": "common", "group": "modes"},
+  "degrees": [0, 2, 3, 5, 7, 9, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "dia"}
+}

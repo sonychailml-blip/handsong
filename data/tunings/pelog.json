@@ -1,0 +1,20 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "pelog",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0},
+      {"cents": 120},
+      {"cents": 258},
+      {"cents": 539},
+      {"cents": 675},
+      {"cents": 785},
+      {"cents": 943}
+    ]
+  },
+  "naming": {"scheme": "ordinal"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

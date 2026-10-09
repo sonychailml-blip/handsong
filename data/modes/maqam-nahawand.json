@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "maqam-nahawand",
+  "tuning": "edo24",
+  "name": {"en": "Maqam Nahawand (tuned like natural minor)", "ru": "Макам Нахаванд (строй как у натур. минора)"},
+  "menu": {"tradition": "mideast", "group": "maqamat"},
+  "degrees": [0, 4, 6, 10, 14, 16, 20],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "backing": {"rhythm": "maqsum"},
+  "compat": {"tag": "maqam"}
+}

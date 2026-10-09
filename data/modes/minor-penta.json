@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "minor-penta",
+  "tuning": "edo12",
+  "name": {"en": "Minor pentatonic", "ru": "Минорная пентатоника"},
+  "menu": {"tradition": "common", "group": "pentaBlues"},
+  "degrees": [0, 3, 5, 7, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

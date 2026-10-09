@@ -1,0 +1,21 @@
+{
+  "format": "handsong/chordmodes",
+  "version": 1,
+  "id": "stackPower",
+  "modes": [
+    {
+      "id": "stack",
+      "nameKey": "cm.stack",
+      "hintKey": "cm.stack.hint",
+      "set": {}
+    },
+    {
+      "id": "power",
+      "nameKey": "cm.power",
+      "hintKey": "cm.power.hint",
+      "set": {
+        "rule": {"kind": "power"}
+      }
+    }
+  ]
+}

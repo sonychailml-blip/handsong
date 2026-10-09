@@ -1,0 +1,10 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "edo19",
+  "period": "2/1",
+  "pitches": {"equal": 19},
+  "naming": {"scheme": "ordinal"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "equal", "step": true}
+}

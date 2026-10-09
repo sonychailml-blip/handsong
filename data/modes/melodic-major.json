@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "melodic-major",
+  "tuning": "edo12",
+  "name": {"en": "Melodic major", "ru": "Мелодический мажор"},
+  "menu": {"tradition": "common", "group": "diatonic"},
+  "degrees": [0, 2, 4, 5, 7, 8, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "dia"}
+}

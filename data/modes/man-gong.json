@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "man-gong",
+  "tuning": "edo12",
+  "name": {"en": "Man Gong (Chinese)", "ru": "Ман гонг (китайская)"},
+  "menu": {"tradition": "easia", "group": "fareastPenta"},
+  "degrees": [0, 3, 5, 8, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "lydian",
+  "tuning": "edo12",
+  "name": {"en": "Lydian", "ru": "Лидийский"},
+  "menu": {"tradition": "common", "group": "modes"},
+  "degrees": [0, 2, 4, 6, 7, 9, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "dia"}
+}

@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-asavari",
+  "tuning": "shruti22",
+  "name": {"default": "Asavari", "ru": "Асавари"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 4, 5, 9, 13, 14, 18],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

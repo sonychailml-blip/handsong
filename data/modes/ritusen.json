@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "ritusen",
+  "tuning": "edo12",
+  "name": {"default": "Ritusen", "ru": "Ритусэн"},
+  "menu": {"tradition": "easia", "group": "fareastPenta"},
+  "degrees": [0, 2, 5, 7, 9],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

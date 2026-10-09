@@ -1,0 +1,132 @@
+{
+  "format": "handsong/palette",
+  "version": 1,
+  "id": "chrom12",
+  "kind": "steps",
+  "families": [
+    {
+      "id": "maj",
+      "name": {"en": "Major", "ru": "Мажор"},
+      "finger": 0,
+      "types": [
+        {
+          "label": "M",
+          "iv": [0, 4, 7]
+        },
+        {
+          "label": "maj7",
+          "iv": [0, 4, 7, 11]
+        },
+        {
+          "label": "7",
+          "iv": [0, 4, 7, 10]
+        },
+        {
+          "label": "6",
+          "iv": [0, 4, 7, 9]
+        },
+        {
+          "label": "add9",
+          "iv": [0, 4, 7, 14]
+        },
+        {
+          "label": "7#9",
+          "iv": [0, 4, 7, 10, 15]
+        }
+      ]
+    },
+    {
+      "id": "min",
+      "name": {"en": "Minor", "ru": "Минор"},
+      "finger": 1,
+      "types": [
+        {
+          "label": "m",
+          "iv": [0, 3, 7]
+        },
+        {
+          "label": "m7",
+          "iv": [0, 3, 7, 10]
+        },
+        {
+          "label": "m6",
+          "iv": [0, 3, 7, 9]
+        },
+        {
+          "label": "mM7",
+          "iv": [0, 3, 7, 11]
+        },
+        {
+          "label": "m9",
+          "iv": [0, 3, 7, 10, 14]
+        },
+        {
+          "label": "madd9",
+          "iv": [0, 3, 7, 14]
+        }
+      ]
+    },
+    {
+      "id": "dim",
+      "name": {"en": "Dim./Aug.", "ru": "Ум./Ув."},
+      "finger": 2,
+      "types": [
+        {
+          "label": "dim",
+          "iv": [0, 3, 6]
+        },
+        {
+          "label": "m7b5",
+          "iv": [0, 3, 6, 10]
+        },
+        {
+          "label": "dim7",
+          "iv": [0, 3, 6, 9]
+        },
+        {
+          "label": "aug",
+          "iv": [0, 4, 8]
+        },
+        {
+          "label": "aug7",
+          "iv": [0, 4, 8, 10]
+        },
+        {
+          "label": "augM7",
+          "iv": [0, 4, 8, 11]
+        }
+      ]
+    },
+    {
+      "id": "sus",
+      "name": {"en": "Sus & extended", "ru": "Sus и расшир."},
+      "finger": 3,
+      "types": [
+        {
+          "label": "sus2",
+          "iv": [0, 2, 7]
+        },
+        {
+          "label": "sus4",
+          "iv": [0, 5, 7]
+        },
+        {
+          "label": "7sus4",
+          "iv": [0, 5, 7, 10]
+        },
+        {
+          "label": "6/9",
+          "iv": [0, 4, 7, 9, 14]
+        },
+        {
+          "label": "maj9",
+          "iv": [0, 4, 7, 11, 14]
+        },
+        {
+          "label": "13",
+          "iv": [0, 4, 7, 10, 21]
+        }
+      ]
+    }
+  ]
+}

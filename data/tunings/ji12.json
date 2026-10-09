@@ -1,0 +1,25 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "ji12",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0, "ratio": "1/1"},
+      {"cents": 111.73, "ratio": "16/15"},
+      {"cents": 203.91, "ratio": "9/8"},
+      {"cents": 315.64, "ratio": "6/5"},
+      {"cents": 386.31, "ratio": "5/4"},
+      {"cents": 498.04, "ratio": "4/3"},
+      {"cents": 590.22, "ratio": "45/32"},
+      {"cents": 701.96, "ratio": "3/2"},
+      {"cents": 813.69, "ratio": "8/5"},
+      {"cents": 884.36, "ratio": "5/3"},
+      {"cents": 1017.6, "ratio": "9/5"},
+      {"cents": 1088.27, "ratio": "15/8"}
+    ]
+  },
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

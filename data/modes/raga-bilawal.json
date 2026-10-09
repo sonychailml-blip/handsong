@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-bilawal",
+  "tuning": "shruti22",
+  "name": {"default": "Bilawal", "ru": "Билавал"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 4, 7, 9, 13, 16, 20],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

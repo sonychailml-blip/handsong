@@ -1,0 +1,25 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "meantone-quarter",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0},
+      {"cents": 76.05},
+      {"cents": 193.16},
+      {"cents": 310.26},
+      {"cents": 386.31},
+      {"cents": 503.42},
+      {"cents": 579.47},
+      {"cents": 696.58},
+      {"cents": 772.63},
+      {"cents": 889.74},
+      {"cents": 1006.84},
+      {"cents": 1082.89}
+    ]
+  },
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

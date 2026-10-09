@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "egyptian",
+  "tuning": "edo12",
+  "name": {"en": "Egyptian (suspended)", "ru": "Египетская (суспенд.)"},
+  "menu": {"tradition": "common", "group": "worldPenta"},
+  "degrees": [0, 2, 5, 7, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

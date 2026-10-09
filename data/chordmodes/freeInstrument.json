@@ -1,0 +1,19 @@
+{
+  "format": "handsong/chordmodes",
+  "version": 1,
+  "id": "freeInstrument",
+  "modes": [
+    {
+      "id": "free",
+      "nameKey": "cm.free",
+      "hintKey": "cm.free.hint",
+      "set": {"build": "adaptive"}
+    },
+    {
+      "id": "instrument",
+      "nameKey": "cm.instrument",
+      "hintKey": "cm.instrument.hint",
+      "set": {"build": "tuning"}
+    }
+  ]
+}

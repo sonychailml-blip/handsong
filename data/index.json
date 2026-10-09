@@ -1,0 +1,9 @@
+{
+  "format": "handsong/manifest",
+  "version": 1,
+  "start": "minor-penta",
+  "tunings": ["edo12", "edo19", "edo24", "edo31", "bp13", "carlos-alpha", "carlos-beta", "carlos-gamma", "slendro", "pelog", "partch43", "shruti22", "ji12", "pythagorean12", "meantone-quarter", "werckmeister3", "vallotti", "kirnberger3"],
+  "palettes": ["chrom12", "edo31", "edo19", "partch", "bp", "bpsteps", "nat", "natfix"],
+  "chordModeSets": ["freeInstrument", "freeInstrumentBP", "stackPower"],
+  "modes": ["major", "natural-minor", "harmonic-minor", "melodic-minor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "hungarian-minor", "major-penta", "minor-penta", "blues", "chromatic", "maqam-rast", "maqam-bayati", "edo19-full", "edo31-full", "maqam-hijaz", "harmonic-major", "melodic-major", "whole-tone", "octatonic-wh", "octatonic-hw", "messiaen-3", "phrygian-dominant", "double-harmonic", "enigmatic", "prometheus", "egyptian", "man-gong", "ritusen", "hungarian-penta", "scriabin-penta", "kumoi-western", "major-blues", "maqam-saba", "maqam-sikah", "maqam-nahawand", "maqam-kurd", "maqam-ajam", "maqam-nikriz", "maqam-nawa-athar", "slendro", "pelog", "hirajoshi", "kumoi-japanese", "in-insen", "iwato", "partch-43", "bohlen-pierce", "carlos-alpha", "carlos-beta", "carlos-gamma", "pelog-lima", "pelog-nem", "pelog-barang", "pythagorean", "ji-adaptive", "ji-fixed", "meantone-quarter", "shruti-22", "raga-bhairav", "raga-yaman", "raga-kafi", "raga-bhairavi", "raga-todi", "raga-khamaj", "raga-asavari", "raga-malhar", "raga-purvi", "raga-bilawal", "werckmeister-3", "vallotti", "kirnberger-3"]
+}

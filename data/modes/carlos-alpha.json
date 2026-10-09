@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "carlos-alpha",
+  "tuning": "carlos-alpha",
+  "name": {"en": "Carlos Alpha (9 steps of the fifth)", "ru": "Карлос альфа (9 шагов квинты)"},
+  "menu": {"tradition": "exp", "group": ""},
+  "degrees": [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "carlos"}
+}

@@ -1,0 +1,11 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "bp13",
+  "period": "3/1",
+  "pitches": {"equal": 13},
+  "naming": {"scheme": "ordinal"},
+  "periodWord": {"short": "reg.tritave"},
+  "describe": {"kind": "equal", "step": true},
+  "drone": {"withoutFifth": "5/3"}
+}

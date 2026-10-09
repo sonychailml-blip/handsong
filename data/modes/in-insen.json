@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "in-insen",
+  "tuning": "edo12",
+  "name": {"en": "In (Insen; same as Kumoi Western)", "ru": "Ин (Инсэн; совпадает с Кумои зап.)"},
+  "menu": {"tradition": "easia", "group": "japanese"},
+  "degrees": [0, 1, 5, 7, 8],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

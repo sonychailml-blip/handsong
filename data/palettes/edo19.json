@@ -1,0 +1,156 @@
+{
+  "format": "handsong/palette",
+  "version": 1,
+  "id": "edo19",
+  "kind": "steps",
+  "families": [
+    {
+      "id": "maj",
+      "name": {"en": "Major", "ru": "Мажор"},
+      "finger": 0,
+      "types": [
+        {
+          "label": {"en": "maj", "ru": "маж"},
+          "full": {"en": "Major", "ru": "Мажор"},
+          "iv": [0, 6, 11]
+        },
+        {
+          "label": "maj7",
+          "full": "Maj7",
+          "iv": [0, 6, 11, 17]
+        },
+        {
+          "label": {"en": "dom7", "ru": "дом7"},
+          "full": {"en": "Dominant 7th", "ru": "Домин.7"},
+          "iv": [0, 6, 11, 16]
+        },
+        {
+          "label": "6",
+          "full": {"en": "Major 6 · 5/3", "ru": "Мажор 6 · 5/3"},
+          "iv": [0, 6, 11, 14]
+        },
+        {
+          "label": "add9",
+          "full": {"en": "Add9 (over the oct.)", "ru": "Add9 (через окт.)"},
+          "iv": [0, 6, 11, 22]
+        },
+        {
+          "label": "6/9",
+          "full": {"en": "Major 6/9", "ru": "Мажор 6/9"},
+          "iv": [0, 6, 11, 14, 22]
+        }
+      ]
+    },
+    {
+      "id": "min",
+      "name": {"en": "Minor", "ru": "Минор"},
+      "finger": 1,
+      "types": [
+        {
+          "label": {"en": "min", "ru": "мин"},
+          "full": {"en": "Pure minor · 6/5", "ru": "Минор чистый · 6/5"},
+          "iv": [0, 5, 11]
+        },
+        {
+          "label": {"en": "min7", "ru": "мин7"},
+          "full": {"en": "Minor 7", "ru": "Минор 7"},
+          "iv": [0, 5, 11, 16]
+        },
+        {
+          "label": {"en": "min6", "ru": "мин6"},
+          "full": {"en": "Minor 6 · 5/3", "ru": "Минор 6 · 5/3"},
+          "iv": [0, 5, 11, 14]
+        },
+        {
+          "label": {"en": "minM7", "ru": "минМ7"},
+          "full": {"en": "Minor-major 7", "ru": "Мин-мажор 7"},
+          "iv": [0, 5, 11, 17]
+        },
+        {
+          "label": {"en": "min9", "ru": "мин9"},
+          "full": {"en": "Minor 9", "ru": "Минор 9"},
+          "iv": [0, 5, 11, 16, 22]
+        },
+        {
+          "label": {"en": "minadd9", "ru": "минadd9"},
+          "full": {"en": "Minor add9", "ru": "Минор add9"},
+          "iv": [0, 5, 11, 22]
+        }
+      ]
+    },
+    {
+      "id": "dim",
+      "name": {"en": "Dim./Aug.", "ru": "Ум./Ув."},
+      "finger": 2,
+      "types": [
+        {
+          "label": "dim",
+          "full": {"en": "Diminished", "ru": "Уменьшённое"},
+          "iv": [0, 5, 10]
+        },
+        {
+          "label": "m7b5",
+          "full": {"en": "Half-diminished", "ru": "Полууменьшённое"},
+          "iv": [0, 5, 10, 16]
+        },
+        {
+          "label": "dim7",
+          "full": {"en": "Diminished 7th", "ru": "Ум. септаккорд"},
+          "iv": [0, 5, 10, 15]
+        },
+        {
+          "label": "aug",
+          "full": {"en": "Augmented", "ru": "Увеличенное"},
+          "iv": [0, 6, 12]
+        },
+        {
+          "label": "aug7",
+          "full": {"en": "Augmented 7", "ru": "Увелич. 7"},
+          "iv": [0, 6, 12, 16]
+        },
+        {
+          "label": "augM7",
+          "full": {"en": "Augmented-major 7", "ru": "Увелич.-мажор 7"},
+          "iv": [0, 6, 12, 17]
+        }
+      ]
+    },
+    {
+      "id": "sus",
+      "name": {"en": "Sus & extended", "ru": "Sus и расшир."},
+      "finger": 3,
+      "types": [
+        {
+          "label": "sus2",
+          "full": "Sus2",
+          "iv": [0, 3, 11]
+        },
+        {
+          "label": "sus4",
+          "full": "Sus4 · 4/3",
+          "iv": [0, 8, 11]
+        },
+        {
+          "label": "7sus4",
+          "full": "7sus4",
+          "iv": [0, 8, 11, 16]
+        },
+        {
+          "label": "9sus4",
+          "full": {"en": "9sus4 (over the oct.)", "ru": "9sus4 (через окт.)"},
+          "iv": [0, 8, 11, 22]
+        },
+        {
+          "label": "sus2/7",
+          "full": "Sus2 + 7",
+          "iv": [0, 3, 11, 16]
+        },
+        {
+          "label": {"en": "quart", "ru": "кварт"},
+          "full": {"en": "Quartal chord", "ru": "Квартаккорд"},
+          "iv": [0, 8, 16]
+        }
+      ]
+    }
+  ]
+}

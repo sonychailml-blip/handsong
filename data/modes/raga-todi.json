@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-todi",
+  "tuning": "shruti22",
+  "name": {"default": "Todi", "ru": "Тоди"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 1, 5, 11, 13, 14, 20],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "major-blues",
+  "tuning": "edo12",
+  "name": {"en": "Major blues", "ru": "Блюзовая мажорная"},
+  "menu": {"tradition": "common", "group": "pentaBlues"},
+  "degrees": [0, 2, 3, 4, 7, 9],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

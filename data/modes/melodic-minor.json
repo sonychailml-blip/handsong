@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "melodic-minor",
+  "tuning": "edo12",
+  "name": {"en": "Melodic minor", "ru": "Мелодический минор"},
+  "menu": {"tradition": "common", "group": "diatonic"},
+  "degrees": [0, 2, 3, 5, 7, 9, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "dia"}
+}

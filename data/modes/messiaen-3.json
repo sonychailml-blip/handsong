@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "messiaen-3",
+  "tuning": "edo12",
+  "name": {"en": "Messiaen mode 3", "ru": "Мессиан, мод 3"},
+  "menu": {"tradition": "common", "group": "symmetric"},
+  "degrees": [0, 2, 3, 4, 6, 7, 8, 10, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

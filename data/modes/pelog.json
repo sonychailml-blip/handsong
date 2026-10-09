@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "pelog",
+  "tuning": "pelog",
+  "name": {"en": "Pelog (Javanese gamelan, approx.)", "ru": "Пелог (яван. гамелан, приближение)"},
+  "menu": {"tradition": "easia", "group": "gamelan"},
+  "degrees": [0, 1, 2, 3, 4, 5, 6],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

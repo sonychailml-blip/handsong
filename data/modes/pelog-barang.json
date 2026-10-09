@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "pelog-barang",
+  "tuning": "pelog",
+  "name": {"en": "Pelog patet Barang (Javanese, approx.)", "ru": "Пелог патет баранг (яван., прибл.)"},
+  "menu": {"tradition": "easia", "group": "gamelan"},
+  "degrees": [1, 2, 4, 5, 6],
+  "root": 1,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

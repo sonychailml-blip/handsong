@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "phrygian-dominant",
+  "tuning": "edo12",
+  "name": {"en": "Phrygian dominant", "ru": "Фригийский доминантный"},
+  "menu": {"tradition": "common", "group": "exotic"},
+  "degrees": [0, 1, 4, 5, 7, 8, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

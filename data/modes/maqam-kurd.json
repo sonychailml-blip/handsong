@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "maqam-kurd",
+  "tuning": "edo24",
+  "name": {"en": "Maqam Kurd (tuned like Phrygian)", "ru": "Макам Курд (строй как у фригийского)"},
+  "menu": {"tradition": "mideast", "group": "maqamat"},
+  "degrees": [0, 2, 6, 10, 14, 16, 20],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "backing": {"rhythm": "maqsum"},
+  "compat": {"tag": "maqam"}
+}

@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "carlos-beta",
+  "tuning": "carlos-beta",
+  "name": {"en": "Carlos Beta (11 steps of the fifth)", "ru": "Карлос бета (11 шагов квинты)"},
+  "menu": {"tradition": "exp", "group": ""},
+  "degrees": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "carlos"}
+}

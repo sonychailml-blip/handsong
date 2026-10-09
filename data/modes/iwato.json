@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "iwato",
+  "tuning": "edo12",
+  "name": {"default": "Iwato", "ru": "Ивато"},
+  "menu": {"tradition": "easia", "group": "japanese"},
+  "degrees": [0, 1, 5, 6, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

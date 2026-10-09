@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "whole-tone",
+  "tuning": "edo12",
+  "name": {"en": "Whole-tone", "ru": "Целотоновая"},
+  "menu": {"tradition": "common", "group": "symmetric"},
+  "degrees": [0, 2, 4, 6, 8, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

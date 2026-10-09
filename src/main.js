@@ -7,6 +7,7 @@ import { $, revealBar } from './ui.js';          // side-effect: строит м
 import './demo.js';                              // side-effect: демо «путешествие по строям» (без камеры). Его КНОПКИ на старте БОЛЬШЕ НЕТ — demo.js вешает обработчик защитно (if(db)), сам код жив и ждёт переезда внутрь обучения
 import { openLessons, wireStarter } from './tutor.js';   // обучение: «Обучение» открывает список уроков; выбор урока сам поднимает приложение через startApp
 import { t } from './i18n.js';
+import { loadReport } from './scales.js';   // F5: итог загрузки файлов данных ладов — известие на стартовой карточке
 import { rollOpen } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем
 
 /* =====================================================================
@@ -86,6 +87,10 @@ function loop(){
    AudioContext создаётся строго по клику пользователя — иначе браузеры блокируют автовоспроизведение.
    ОДИН путь старта startApp() у «Играть» И «Обучение»: оба зовут его ВНУТРИ клика (правило жеста цело —
    initAudio создаёт AC в синхронной части клика ещё до первого await). «Обучение» = тот же старт + тур. */
+/* F5: файлы данных ладов: пропущенные — общее известие на стартовой карточке (строка #loadmsg; по строке на файл — в консоли,
+   scaleload.js); ничего не загрузилось — известие об аварийной паре. Нажатие «Играть» пишет в ту же строку ход запуска. */
+if(loadReport.emergency || loadReport.problems.length){ const el=$('loadmsg');
+  if(el) el.textContent = loadReport.emergency ? t('data.emergency') : t('data.skipped',{n:loadReport.problems.length}); }
 let started=false;
 async function startApp(){
   if(started) return true;

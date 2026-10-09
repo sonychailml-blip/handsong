@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-bhairav",
+  "tuning": "shruti22",
+  "name": {"default": "Bhairav", "ru": "Бхайрав"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 1, 7, 9, 13, 14, 20],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

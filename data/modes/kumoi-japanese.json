@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "kumoi-japanese",
+  "tuning": "edo12",
+  "name": {"en": "Kumoi (Japanese)", "ru": "Кумои (яп.)"},
+  "menu": {"tradition": "easia", "group": "japanese"},
+  "degrees": [0, 2, 3, 7, 9],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

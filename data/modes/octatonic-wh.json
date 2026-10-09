@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "octatonic-wh",
+  "tuning": "edo12",
+  "name": {"en": "Octatonic (whole-half)", "ru": "Октатоника (тон-полутон)"},
+  "menu": {"tradition": "common", "group": "symmetric"},
+  "degrees": [0, 2, 3, 5, 6, 8, 9, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

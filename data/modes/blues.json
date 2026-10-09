@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "blues",
+  "tuning": "edo12",
+  "name": {"en": "Blues (with ♭5)", "ru": "Блюз (с ♭5)"},
+  "menu": {"tradition": "common", "group": "pentaBlues"},
+  "degrees": [0, 3, 5, 6, 7, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "blues"}
+}

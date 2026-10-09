@@ -1,0 +1,46 @@
+{
+  "format": "handsong/menu",
+  "version": 1,
+  "traditions": [
+    {
+      "id": "common",
+      "name": {"en": "Familiar", "ru": "Привычное"}
+    },
+    {
+      "id": "mideast",
+      "name": {"en": "Middle East", "ru": "Ближний Восток"}
+    },
+    {
+      "id": "india",
+      "name": {"en": "India", "ru": "Индия"}
+    },
+    {
+      "id": "easia",
+      "name": {"en": "Java & the Far East", "ru": "Ява и Дальний Восток"}
+    },
+    {
+      "id": "europe",
+      "name": {"en": "Historical Europe", "ru": "Европа историческая"}
+    },
+    {
+      "id": "exp",
+      "name": {"en": "Experiments", "ru": "Эксперименты"}
+    }
+  ],
+  "groups": {
+    "diatonic": {"en": "Diatonic", "ru": "Диатоника"},
+    "modes": {"en": "Modes", "ru": "Лады (моды)"},
+    "ethnic": {"en": "Ethnic", "ru": "Этнические"},
+    "pentaBlues": {"en": "Pentatonic / blues", "ru": "Пентатоника / блюз"},
+    "chromatic": {"en": "Chromatic", "ru": "Хроматика"},
+    "symmetric": {"en": "Symmetric", "ru": "Симметричные"},
+    "exotic": {"en": "Exotic", "ru": "Экзотические"},
+    "worldPenta": {"en": "World pentatonics", "ru": "Мировые пентатоники"},
+    "maqamat": {"en": "Maqamat", "ru": "Макамы"},
+    "fullGrid": {"en": "Full grid", "ru": "Полная сетка"},
+    "ragas": {"en": "Ragas", "ru": "Раги"},
+    "fareastPenta": {"en": "Far East pentatonics", "ru": "Пентатоники Дальнего Востока"},
+    "gamelan": {"en": "Javanese gamelan", "ru": "Яванский гамелан"},
+    "japanese": {"en": "Japanese", "ru": "Японские"}
+  }
+}

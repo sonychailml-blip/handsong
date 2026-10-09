@@ -1,0 +1,25 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "vallotti",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0},
+      {"cents": 94.13},
+      {"cents": 196.09},
+      {"cents": 298.04},
+      {"cents": 392.18},
+      {"cents": 501.96},
+      {"cents": 592.18},
+      {"cents": 698.04},
+      {"cents": 796.09},
+      {"cents": 894.13},
+      {"cents": 1000},
+      {"cents": 1090.22}
+    ]
+  },
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

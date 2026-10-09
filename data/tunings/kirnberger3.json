@@ -1,0 +1,25 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "kirnberger3",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0},
+      {"cents": 90.22},
+      {"cents": 193.16},
+      {"cents": 294.13},
+      {"cents": 386.31},
+      {"cents": 498.04},
+      {"cents": 590.22},
+      {"cents": 696.58},
+      {"cents": 792.18},
+      {"cents": 889.74},
+      {"cents": 996.09},
+      {"cents": 1088.27}
+    ]
+  },
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

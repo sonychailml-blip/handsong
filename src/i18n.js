@@ -38,6 +38,8 @@ export const DICTS = {
     // приложение / стартовая карточка
     'app.title':'Handsong — gesture synth & interactive tunings tutorial',
     'start.tag':'A gesture synth: play with your hands in front of the camera.',
+    'data.skipped':'{n} scale data file(s) could not be read and were left out — see the console.',
+    'data.emergency':'Scale data could not be loaded — only 12-equal and chromatic are available. See the console.',
     'start.play':'▶ Play',
     'start.learn':'Learn',
     'start.learnTitle':'Interactive lessons — learn by playing',
@@ -517,6 +519,8 @@ export const DICTS = {
   ru: {
     'app.title':'Handsong — жестовый синтезатор и интерактивный учебник ладов',
     'start.tag':'Жестовый синтезатор: играйте руками перед камерой.',
+    'data.skipped':'Файлов данных ладов не прочитано и пропущено: {n} — подробности в консоли.',
+    'data.emergency':'Данные ладов не загрузились — доступны только 12-равный строй и хроматика. Подробности в консоли.',
     'start.play':'▶ Играть',
     'start.learn':'Обучение',
     'start.learnTitle':'Интерактивное обучение — учимся, играя',

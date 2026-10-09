@@ -1,0 +1,25 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "pythagorean12",
+  "period": "2/1",
+  "pitches": {
+    "list": [
+      {"cents": 0, "ratio": "1/1"},
+      {"cents": 90.22, "ratio": "256/243"},
+      {"cents": 203.91, "ratio": "9/8"},
+      {"cents": 294.13, "ratio": "32/27"},
+      {"cents": 407.82, "ratio": "81/64"},
+      {"cents": 498.04, "ratio": "4/3"},
+      {"cents": 611.73, "ratio": "729/512"},
+      {"cents": 701.96, "ratio": "3/2"},
+      {"cents": 792.18, "ratio": "128/81"},
+      {"cents": 905.87, "ratio": "27/16"},
+      {"cents": 996.09, "ratio": "16/9"},
+      {"cents": 1109.78, "ratio": "243/128"}
+    ]
+  },
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "table"}
+}

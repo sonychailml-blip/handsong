@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-yaman",
+  "tuning": "shruti22",
+  "name": {"default": "Yaman", "ru": "Йаман"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 4, 8, 11, 13, 17, 21],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

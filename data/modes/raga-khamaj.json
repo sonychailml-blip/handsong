@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "raga-khamaj",
+  "tuning": "shruti22",
+  "name": {"default": "Khamaj", "ru": "Кхамадж"},
+  "menu": {"tradition": "india", "group": "ragas"},
+  "degrees": [0, 4, 8, 9, 13, 17, 19],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "none"}
+  },
+  "compat": {"tag": "penta"}
+}

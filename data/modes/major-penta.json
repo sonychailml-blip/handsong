@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "major-penta",
+  "tuning": "edo12",
+  "name": {"en": "Major pentatonic", "ru": "Мажорная пентатоника"},
+  "menu": {"tradition": "common", "group": "pentaBlues"},
+  "degrees": [0, 2, 4, 7, 9],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

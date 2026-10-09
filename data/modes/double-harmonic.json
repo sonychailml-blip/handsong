@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "double-harmonic",
+  "tuning": "edo12",
+  "name": {"en": "Double harmonic", "ru": "Двойной гармонический"},
+  "menu": {"tradition": "common", "group": "exotic"},
+  "degrees": [0, 1, 4, 5, 7, 8, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

@@ -1,0 +1,156 @@
+{
+  "format": "handsong/palette",
+  "version": 1,
+  "id": "edo31",
+  "kind": "steps",
+  "families": [
+    {
+      "id": "maj",
+      "name": {"en": "Major", "ru": "Мажор"},
+      "finger": 0,
+      "types": [
+        {
+          "label": {"en": "maj", "ru": "маж"},
+          "full": {"en": "Pure major", "ru": "Мажор чистый"},
+          "iv": [0, 10, 18]
+        },
+        {
+          "label": "maj7",
+          "full": "Maj7",
+          "iv": [0, 10, 18, 28]
+        },
+        {
+          "label": {"en": "dom7", "ru": "дом7"},
+          "full": {"en": "Dominant 7th · 4:5:6:7", "ru": "Домин.7 · 4:5:6:7"},
+          "iv": [0, 10, 18, 25]
+        },
+        {
+          "label": {"en": "super", "ru": "супер"},
+          "full": {"en": "Supermajor · 9/7", "ru": "Супермажор · 9/7"},
+          "iv": [0, 11, 18]
+        },
+        {
+          "label": "6",
+          "full": {"en": "Major 6", "ru": "Мажор 6"},
+          "iv": [0, 10, 18, 23]
+        },
+        {
+          "label": "add9",
+          "full": {"en": "Add9 (over the octave)", "ru": "Add9 (через октаву)"},
+          "iv": [0, 10, 18, 36]
+        }
+      ]
+    },
+    {
+      "id": "min",
+      "name": {"en": "Minor", "ru": "Минор"},
+      "finger": 1,
+      "types": [
+        {
+          "label": {"en": "min", "ru": "мин"},
+          "full": {"en": "Pure minor", "ru": "Минор чистый"},
+          "iv": [0, 8, 18]
+        },
+        {
+          "label": {"en": "min7", "ru": "мин7"},
+          "full": {"en": "Minor 7", "ru": "Минор 7"},
+          "iv": [0, 8, 18, 26]
+        },
+        {
+          "label": {"en": "submin", "ru": "субмин"},
+          "full": {"en": "Subminor · 7/6", "ru": "Субминор · 7/6"},
+          "iv": [0, 7, 18]
+        },
+        {
+          "label": {"en": "min6", "ru": "мин6"},
+          "full": {"en": "Minor 6", "ru": "Минор 6"},
+          "iv": [0, 8, 18, 23]
+        },
+        {
+          "label": {"en": "minM7", "ru": "минМ7"},
+          "full": {"en": "Minor-major 7", "ru": "Мин-мажор 7"},
+          "iv": [0, 8, 18, 28]
+        },
+        {
+          "label": {"en": "subm7", "ru": "субм7"},
+          "full": {"en": "Subminor 7", "ru": "Субминор 7"},
+          "iv": [0, 7, 18, 25]
+        }
+      ]
+    },
+    {
+      "id": "neu",
+      "name": {"en": "Neutral/Dim.", "ru": "Нейтр./Ум."},
+      "finger": 2,
+      "types": [
+        {
+          "label": {"en": "neut", "ru": "нейтр"},
+          "full": {"en": "Neutral · 11/9", "ru": "Нейтральное · 11/9"},
+          "iv": [0, 9, 18]
+        },
+        {
+          "label": {"en": "neut7", "ru": "нейтр7"},
+          "full": {"en": "Neutral 7", "ru": "Нейтральное 7"},
+          "iv": [0, 9, 18, 26]
+        },
+        {
+          "label": "dim",
+          "full": {"en": "Diminished", "ru": "Уменьшённое"},
+          "iv": [0, 8, 15]
+        },
+        {
+          "label": "m7b5",
+          "full": {"en": "Half-diminished", "ru": "Полууменьшённое"},
+          "iv": [0, 8, 15, 26]
+        },
+        {
+          "label": "dim7",
+          "full": {"en": "Diminished 7th", "ru": "Ум. септаккорд"},
+          "iv": [0, 8, 15, 23]
+        },
+        {
+          "label": {"en": "neut♮7", "ru": "нейтр♮7"},
+          "full": {"en": "Neutral + natural 7 · 7/4", "ru": "Нейтр. + нат.7 · 7/4"},
+          "iv": [0, 9, 18, 25]
+        }
+      ]
+    },
+    {
+      "id": "sus",
+      "name": "Sus",
+      "finger": 3,
+      "types": [
+        {
+          "label": "sus2",
+          "full": "Sus2 · 9/8",
+          "iv": [0, 5, 18]
+        },
+        {
+          "label": "sus4",
+          "full": "Sus4 · 4/3",
+          "iv": [0, 13, 18]
+        },
+        {
+          "label": "7sus4",
+          "full": "7sus4",
+          "iv": [0, 13, 18, 25]
+        },
+        {
+          "label": "9sus4",
+          "full": {"en": "9sus4 (over the oct.)", "ru": "9sus4 (через окт.)"},
+          "iv": [0, 13, 18, 36]
+        },
+        {
+          "label": "sus2/7",
+          "full": {"en": "Sus2 + natural 7", "ru": "Sus2 + нат.7"},
+          "iv": [0, 5, 18, 25]
+        },
+        {
+          "label": {"en": "quart", "ru": "кварт"},
+          "full": {"en": "Quartal chord", "ru": "Квартаккорд"},
+          "iv": [0, 13, 25]
+        }
+      ]
+    }
+  ]
+}

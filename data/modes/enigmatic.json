@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "enigmatic",
+  "tuning": "edo12",
+  "name": {"en": "Enigmatic (Verdi)", "ru": "Энигматическая (Верди)"},
+  "menu": {"tradition": "common", "group": "exotic"},
+  "degrees": [0, 1, 4, 6, 8, 10, 11],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

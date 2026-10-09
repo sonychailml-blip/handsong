@@ -1,0 +1,18 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "partch-43",
+  "tuning": "partch43",
+  "name": {"en": "Partch (43 tones, just intonation)", "ru": "Партч (43 тона, чистая интонация)"},
+  "menu": {"tradition": "exp", "group": ""},
+  "degrees": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "palette"},
+    "palette": "partch",
+    "modes": "freeInstrument"
+  },
+  "layout": {"rect": true},
+  "compat": {"tag": "ji"}
+}

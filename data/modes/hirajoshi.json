@@ -1,0 +1,16 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "hirajoshi",
+  "tuning": "edo12",
+  "name": {"default": "Hirajoshi", "ru": "Хирадзёси"},
+  "menu": {"tradition": "easia", "group": "japanese"},
+  "degrees": [0, 2, 3, 7, 8],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "stack"},
+    "modes": "stackPower"
+  },
+  "compat": {"tag": "penta"}
+}

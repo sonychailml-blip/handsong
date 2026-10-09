@@ -1,0 +1,15 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "prometheus",
+  "tuning": "edo12",
+  "name": {"en": "Prometheus (Scriabin)", "ru": "Прометеевский (Скрябин)"},
+  "menu": {"tradition": "common", "group": "exotic"},
+  "degrees": [0, 2, 4, 6, 9, 10],
+  "root": 0,
+  "anchor": {"policy": "tonic"},
+  "chords": {
+    "rule": {"kind": "tertian"}
+  },
+  "compat": {"tag": "ethnic"}
+}

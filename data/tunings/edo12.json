@@ -1,0 +1,10 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "edo12",
+  "period": "2/1",
+  "pitches": {"equal": 12},
+  "naming": {"scheme": "notes12"},
+  "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
+  "describe": {"kind": "equal"}
+}

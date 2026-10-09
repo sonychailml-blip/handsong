@@ -1,0 +1,10 @@
+{
+  "format": "handsong/tuning",
+  "version": 1,
+  "id": "carlos-gamma",
+  "period": "3/2",
+  "pitches": {"equal": 20},
+  "naming": {"scheme": "ordinal"},
+  "periodWord": {"short": "reg.reg"},
+  "describe": {"kind": "equal", "step": true}
+}
