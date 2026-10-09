@@ -89,8 +89,9 @@ function loop(){
    initAudio создаёт AC в синхронной части клика ещё до первого await). «Обучение» = тот же старт + тур. */
 /* F5: файлы данных ладов: пропущенные — общее известие на стартовой карточке (строка #loadmsg; по строке на файл — в консоли,
    scaleload.js); ничего не загрузилось — известие об аварийной паре. Нажатие «Играть» пишет в ту же строку ход запуска. */
-if(loadReport.emergency || loadReport.problems.length){ const el=$('loadmsg');
-  if(el) el.textContent = loadReport.emergency ? t('data.emergency') : t('data.skipped',{n:loadReport.problems.length}); }
+if(loadReport.emergency || loadReport.problems.length){ const el=$('loadmsg'), nU=loadReport.problems.filter(p=>p.user).length, nB=loadReport.problems.length-nU;
+  if(el) el.textContent = loadReport.emergency ? t('data.emergency')
+    : [nB ? t('data.skipped',{n:nB}) : '', nU ? t('data.userSkipped',{n:nU}) : ''].filter(Boolean).join(' '); }   // F6: файлы пользователя — отдельной фразой
 let started=false;
 async function startApp(){
   if(started) return true;
@@ -119,6 +120,7 @@ async function startApp(){
 if(new URLSearchParams(location.search).has('probe')){
   import('./scaleprobe.js').then(m=>{ window.P=m; console.log('[probe] window.P ready — await P.seed({replace:true}), P.all()'); }).catch(e=>console.warn('[probe] scaleprobe failed to load', e));
   import('./render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));
+  import('./userfiles.js').then(m=>{ window.U=m; }).catch(e=>console.warn('[probe] userfiles failed to load', e));   // F6: файлы пользователя из консоли
 }
 wireStarter(startApp);                                                       // урок/«Свободная игра» поднимают приложение этим (правило #1: старт зовётся в клике выбора)
 $('startBtn').onclick=()=>{ startApp(); };                                   // «Играть» — как прежде

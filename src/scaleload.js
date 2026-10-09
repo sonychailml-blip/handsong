@@ -14,12 +14,18 @@
    лады пропущенного строя (палитры, набора) пропускаются с ним. Стартовый лад не загрузился — берётся первый годный.
    ⛳ ПРИЛОЖЕНИЕ ЗАПУСКАЕТСЯ ВСЕГДА: не читается манифест или меню, или не осталось ни одного лада — АВАРИЙНАЯ ПАРА (12-равный строй и
    хроматика, с её палитрой) из данных ниже, через ТУ ЖЕ проверку.
-   ⛔ Нижний слой: DOM не трогает (известие показывает main по loadReport). Ничего из приложения не импортирует — цикла нет.
+   ⛳ F6 — ФАЙЛЫ ПОЛЬЗОВАТЕЛЯ (userstore.js: IndexedDB, иначе store) грузятся ПОСЛЕ встроенных (и после аварийной пары, если до неё
+   дошло) ТОЙ ЖЕ проверкой, в том же порядке зависимостей — строи, палитры, наборы режимов, лады; ссылаться можно и на встроенные, и на
+   свои. id файла пользователя — в своём пространстве: «u.<uuid>» (USER_ID); иное id или id, уже занятое (встроенным или другим файлом
+   пользователя иного вида), — отказ. Сломанный файл пользователя пропускается со строкой в консоли и в общем известии и НИКОГДА не
+   останавливает встроенные. checkRecord — та же проверка для установки из консоли (userfiles.js) против ЖИВОГО набора.
+   ⛔ Нижний слой: DOM не трогает (известие показывает main по loadReport). Из приложения импортирует только userstore — цикла нет.
    ⚠️ Сервис-воркер (sw.js) по-прежнему ничего не кэширует: файлы данных приходят из сети при каждом запуске (запрос с cache:'no-cache' —
    условный, неизменный файл отвечает 304). Офлайн приложение не работает и без этого (MediaPipe — с CDN). */
+import { userAll } from './userstore.js';   // F6: файлы пользователя
 const BASE=new URL('../data/', import.meta.url);
 const F={ manifest:'handsong/manifest', menu:'handsong/menu', tuning:'handsong/tuning', mode:'handsong/mode', palette:'handsong/palette', chordmodes:'handsong/chordmodes' };
-export const loadReport={ ms:0, files:0, problems:[], emergency:false };   // итог загрузки — читают main (известие) и консоль
+export const loadReport={ ms:0, files:0, problems:[], emergency:false, user:0 };   // user — сколько файлов пользователя принято (F6)   // итог загрузки — читают main (известие) и консоль
 
 /* ---- проверки ---- */
 const isObj=x=>x!==null && typeof x==='object' && !Array.isArray(x);
@@ -177,24 +183,62 @@ function emergency(problems, why){
   return D;
 }
 
-export async function loadScaleData(){
-  const t0=performance.now(), problems=[];
+async function loadBuiltins(problems){
   let man, menu;
   try{ man=await readJSON('index.json'); checkManifest(man); }
-  catch(e){ problems.push({file:'index.json', why:e.message||String(e)}); return finish(emergency(problems,'index.json: '+(e.message||e)), t0, 0); }
+  catch(e){ problems.push({file:'index.json', why:e.message||String(e)}); return { D:emergency(problems,'index.json: '+(e.message||e)), n:0 }; }
   const files=['menu.json', ...fileList(man)];
   const res=await Promise.allSettled(files.map(readJSON));
   const got={}; files.forEach((f,i)=>{ got[f]= res[i].status==='fulfilled' ? {val:res[i].value} : {err:(res[i].reason && res[i].reason.message) || 'not read'}; });
   try{ menu=got['menu.json'].val; if(got['menu.json'].err) throw new Error(got['menu.json'].err); checkMenu(menu); }
-  catch(e){ problems.push({file:'menu.json', why:e.message||String(e)}); return finish(emergency(problems,'menu.json: '+(e.message||e)), t0, files.length+1); }
+  catch(e){ problems.push({file:'menu.json', why:e.message||String(e)}); return { D:emergency(problems,'menu.json: '+(e.message||e)), n:files.length+1 }; }
   const D=assemble(man, menu, got, problems);
-  if(!D.manifest.modes.length) return finish(emergency(problems,'no mode could be loaded'), t0, files.length+1);
+  if(!D.manifest.modes.length) return { D:emergency(problems,'no mode could be loaded'), n:files.length+1 };
+  return { D, n:files.length+1 };
+}
+export async function loadScaleData(){
+  const t0=performance.now(), problems=[];
+  const { D, n }=await loadBuiltins(problems);
+  loadReport.user=await addUserFiles(D, problems);   // F6: после встроенных; ошибки — только пропуски, встроенным не мешают
   loadReport.problems=problems;
-  return finish(D, t0, files.length+1);
+  return finish(D, t0, n);
+}
+
+/* ═══ F6 — ФАЙЛЫ ПОЛЬЗОВАТЕЛЯ ═══ */
+export const USER_ID=/^u\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const KINDS=[['tuning','tunings','tunings'],['palette','palettes','palettes'],['chordmodes','chordModeSets','chordModeSets'],['mode','modes','modes']];   // вид → раздел набора, список манифеста — в порядке зависимостей
+const FORMAT_KIND={ [F.tuning]:'tuning', [F.palette]:'palette', [F.chordmodes]:'chordmodes', [F.mode]:'mode' };
+export const kindOfRecord=rec=> rec && FORMAT_KIND[rec.format] || null;
+const sectOf=kind=>KINDS.find(k=>k[0]===kind)[1];
+/* Кто уже держит id (любой вид) — для единственности. → вид или null. */
+export function idHolder(D,id){ for(const [kind,sect] of KINDS) if(D[sect][id]) return kind; return null; }
+/* ⛳ Та же проверка, что у файлов data/, для ОДНОЙ записи против набора D (живого или собираемого). → null или причина словами. */
+export function checkRecord(kind, rec, D){
+  try{
+    const ctx={ tunings:D.tunings, palettes:D.palettes, chordModeSets:D.chordModeSets, menu:D.menu, trads:new Set(D.menu.traditions.map(t=>t.id)) };
+    if(kind==='tuning') checkTuning(rec, rec && rec.id);
+    else if(kind==='palette') checkPalette(rec, rec && rec.id);
+    else if(kind==='chordmodes') checkChordModes(rec, rec && rec.id, D.palettes);
+    else if(kind==='mode') checkMode(rec, rec && rec.id, ctx);
+    else return 'unknown kind of file (format must be handsong/tuning, handsong/mode, handsong/palette or handsong/chordmodes)';
+    return null;
+  }catch(e){ return e instanceof Bad ? e.message : String(e && e.message || e); }
+}
+async function addUserFiles(D, problems){
+  const all=await userAll(); let ok=0;
+  const skip=(e,why)=>{ problems.push({file:`user ${e.kind} ${e.id}`, why, user:true}); console.warn(`[scales] skipped user file ${e.kind} "${e.id}" — ${why}`); };
+  for(const [kind,sect,list] of KINDS) for(const e of all){ if(e.kind!==kind) continue;
+    if(!USER_ID.test(String(e.id))){ skip(e,'a user file id must be u.<uuid>'); continue; }
+    if(kindOfRecord(e.rec)!==kind || e.rec.id!==e.id){ skip(e,'the stored record does not match its kind or id'); continue; }
+    const h=idHolder(D,e.id); if(h){ skip(e,`the id is already used by a ${h}`); continue; }
+    const why=checkRecord(kind, e.rec, D); if(why){ skip(e,why); continue; }
+    D[sect][e.id]=e.rec; D.manifest[list].push(e.id); ok++;
+  }
+  return ok;
 }
 function finish(D, t0, n){
   loadReport.ms=Math.round(performance.now()-t0); loadReport.files=n;
   console.log(`[scales] ${D.manifest.modes.length} modes, ${D.manifest.tunings.length} tunings from ${n} files in ${loadReport.ms} ms`
-    +(loadReport.problems.length ? ` · ${loadReport.problems.length} skipped` : '')+(loadReport.emergency ? ' · EMERGENCY PAIR' : ''));
+    +(loadReport.user ? ` · ${loadReport.user} user file(s)` : '')+(loadReport.problems.length ? ` · ${loadReport.problems.length} skipped` : '')+(loadReport.emergency ? ' · EMERGENCY PAIR' : ''));
   return D;
 }

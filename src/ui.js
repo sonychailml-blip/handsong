@@ -1197,6 +1197,15 @@ selTradition.onchange=e=>{
   setScaleId(first.s.id); softAllOff(); droneRetune(); updScaleBtn(); refreshProgAvail(); renderRectCtl();
   if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: смена строя тоже меняет лад (первый в традиции) — тот же сигнал урока «Строи»
 };
+/* ⛳ F6: РЕЕСТР ЛАДОВ ИЗМЕНИЛСЯ (файл пользователя установлен или удалён из консоли — userfiles.js). Меню традиции перестраивается;
+   если живой лад сменился (удалили живой — стал стартовый; заменили живой — новая сборка того же id), — ТОТ ЖЕ шов, что у выбора лада:
+   звучащее гаснет и переатакует, дрон следует за ладом. */
+hooks.scales=({switched}={})=>{
+  if(switched){ softAllOff(); droneRetune(); }
+  const trad=tradOfScale(scaleId); if(trad && selTradition.value!==trad) selTradition.value=trad;
+  fillScales(selTradition.value); selScale.value=scaleId;
+  updScaleBtn(); refreshProgAvail(); renderRectCtl();
+};
 selScale.onchange=e=>{
   setScaleId(e.target.value); softAllOff(); droneRetune();   // F1: значение опции — id лада   // дрон следует за ЛАДОМ (вторая струна — ступень лада), а softAllOff его не трогает
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)

@@ -16,6 +16,8 @@
                         //   T5: высота — В СТРОЕ (не обязательно в ладу); вне лада — опора по ЦЕЛОМУ строю, подсветки нет, на оси «Лад» — между рядами
      P.dumpScales()     // F0 «строи файлами»: КАНОНИЧЕСКИЙ СНИМОК всего, что относится к ладам (данные, меню, дрон, подписи) — скачивается
                         //   файлом scales.before.json; положить его в tools/ (снимается на коде ДО переезда)
+     P.checkUserDelete() // F6: УДАЛЕНИЕ ФАЙЛА ПОЛЬЗОВАТЕЛЯ НЕ ЛОМАЕТ ЗАПИСАННОЕ — лад пользователя ставится, в нём пишется взятое (песочница
+                        //   probeTake), лад и строй удаляются — цена, ряды и подписи записанного === до удаления (нужен ▶ Play)
      await P.renewSnapshot() // F5b: пересъёмка снимка — ТОЛЬКО если все расхождения P.checkFiles — объявленное изменение (уход tag)
      P.checkBehaviour() // F4: ПОВЕДЕНИЕ ДАННЫМИ — дрон (оба положения ухо-переключателя), прогрессии, ритм джема, строка статуса —
                         //   против замороженного кода до F4: каждый вид × 12 тоник (статус — en/ru)
@@ -52,15 +54,25 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES, TUNINGS, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
+import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
+import { checkRecord } from './scaleload.js';   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
+import { example as userExample } from './userfiles.js';   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+/* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
+   замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
+   при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
+const isUserId=id=>String(id).startsWith('u.');
+const SCALES=SCALES_ALL.filter(s=>!isUserId(s.id));
+const TUNINGS=Object.fromEntries(Object.entries(TUNINGS_ALL).filter(([k])=>!isUserId(k)));
+const CHORD_FAM_SETS=Object.fromEntries(Object.entries(CFS_ALL).filter(([k])=>!isUserId(k)));
+const userCount=()=>SCALES_ALL.filter(s=>isUserId(s.id)).length+Object.keys(TUNINGS_ALL).filter(isUserId).length+Object.keys(CFS_ALL).filter(isUserId).length;
 
 /* ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
    ⛳ ЗАМОРОЖЕННЫЕ ОПОРЫ (T4c-2) — ПРЕЖНИЕ ТЕЛА ФУНКЦИЙ ВЫСОТЫ, АККОРДОВ, ПОДПИСЕЙ И РЯДОВ, СЛОВО В СЛОВО.
@@ -959,6 +971,7 @@ const ALL_RUNS=[
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F6 user files: deletion keeps recordings',()=>checkUserDelete(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F3 naming as data', ()=>checkNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
@@ -1871,7 +1884,8 @@ function buildSnapshot(){
   snap.menu={}; snap.chordModes={};
   for(const lg of LGS) withLang(lg,()=>{
     snap.menu[lg]=TRADITIONS.map(tr=>({ id:tr.id, name:L(tr.name),
-      groups:menuOf(tr.id).map(g=>({ key:g.key, label:g.label, scales:g.items.map(({i,s})=>({ i, id:s.id, name:L(s.name) })) })) }));
+      groups:menuOf(tr.id).map(g=>({ key:g.key, label:g.label, scales:g.items.filter(({s})=>!isUserId(s.id)).map(({i,s})=>({ i, id:s.id, name:L(s.name) })) }))
+        .filter(g=>g.scales.length) }));   // F6: только встроенные (группа из одних ладов пользователя — не в снимке)
     snap.chordModes[lg]=SCALES.filter(x=>x.chordModes).map(x=>({ id:x.id, modes:x.chordModes.map(m=>({ id:m.id, name:t(m.nameKey), hint:t(m.hintKey) })) }));
   });
   snap.views=[];
@@ -1932,6 +1946,7 @@ export async function checkFiles(){
   };
   for(const k of new Set([...Object.keys(file),...Object.keys(live)])){ if(k==='meta') continue;
     if(!(k in file)) miss(`${k}: new now`,k,'new'); else if(!(k in live)) miss(`${k}: gone now`,k,'gone'); else walk(file[k],live[k],k); }
+  { const u=userCount(); console.log(`[scaleprobe files] covers the BUILT-IN data only (data/ and the emergency pair)${u ? ` — ${u} user record(s) installed, not compared` : ''}`); }
   console.log(`[scaleprobe files] snapshot ${file.meta&&file.meta.made} · values compared ${cases} · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe files] '+m));
   if(nBad>PRINT_MAX) console.warn(`[scaleprobe files] …and ${nBad-PRINT_MAX} more`);
@@ -2025,4 +2040,63 @@ export async function renewSnapshot(allowed=F5B_ALLOWED){
   const snap=dumpScales();
   say('scales.before.json downloaded — move it into tools/ (replacing the old file), reload, and await P.checkFiles() must read zero');
   return { renewed:true, replaced:r.made, made:snap.meta.made, summary:r.summary };
+}
+
+/* ═══ ⛳ F6 — P.checkUserDelete(): УДАЛЕНИЕ ФАЙЛА ПОЛЬЗОВАТЕЛЯ НЕ ЛОМАЕТ ЗАПИСАННОЕ ═══
+   Материал — пример файлов пользователя (userfiles.example: свой табличный строй с именами-списком и словом периода en/ru, лад на нём с
+   палитрой 'nat') под id пробы. Порядок: та же проверка записи (checkRecord), установка ТЕМ ЖЕ кодом, что консоль (registerRecord — без
+   записи в хранилище и без перестройки меню), лад становится живым, взятое пишется НАСТОЯЩЕЙ воронкой в песочнице (probeTake: соло, бас,
+   аккорды палитры на каждой ступени, два регистра; песня не меняется); затем снимается «отпечаток» записанного — цена каждого события
+   (evHz; у аккорда — каждая нота: частота и интервал), его место и подпись на ОБЕИХ осях редактора, и по виду — подписи ступеней,
+   слово периода, строка статуса, дрон, id вида, строй вида; живой лад возвращается, ЛАД И СТРОЙ УДАЛЯЮТСЯ (unregisterRecord), удаление
+   проверяется (нет в реестрах, в наборе, в меню), и отпечаток снимается снова — обязан совпасть строка в строку. Нужен ▶ Play (песочница —
+   как у P.checkWrite). finally снимает записи пробы при любом исходе. */
+const UD_T='u.f6f6f6f6-0000-4000-8000-00000000000a', UD_M='u.f6f6f6f6-0000-4000-8000-00000000000b';
+export function checkUserDelete(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const keepSc=scaleId; let reg=false;
+  const D=scaleData(), E=userExample();
+  const t0={...E.tuning, id:UD_T}, m0={...E.mode, id:UD_M, tuning:UD_T, name:{en:'Probe: user mode',ru:'Проба: лад пользователя'}};
+  const drop=()=>{ if(D.modes[UD_M]) unregisterRecord('mode',UD_M,false); if(D.tunings[UD_T]) unregisterRecord('tuning',UD_T,false); };
+  const roleOf=fn=> fn.startsWith('lead') ? 'ld' : fn.startsWith('bass') ? 'bs' : fn.startsWith('ch') ? 'ch' : null;
+  const fingerprint=evs=>{ const out=[], views=new Set();
+    for(const ev of evs){ const role=roleOf(ev.fn); if(!role || ev.a.ti==null) continue; views.add(ev.sc);
+      const price= role==='ch' ? chordNotesAt(ev.a.ti,ev.a.oct,ev.sc,ev.sev,ev.a.ty).map(n=>[n.f,n.iv]) : evHz(ev.a,ev,role);
+      const axes=[true,false].map(all=>{ const ax=RP.axis(ev.sc,all), p=ax.placeTi(ev.a.ti,ev.a.oct);
+        return { r:p.r, dev:p.dev, lbl: Number.isInteger(p.r) ? RP.axisLbl(ax,p.r) : null }; });
+      out.push({ fn:ev.fn, t:ev.t, ti:ev.a.ti, oct:ev.a.oct, price, axes }); }
+    for(const v of views){ const n=v.iv.length;
+      out.push({ view:viewIdOf(v), tuning:tuningOf(v)===v.tuningRec, notes:range(n+1).map(d=>RP.noteLbl(d,v)), roots:range(n+1).map(d=>rootName(d,v)),
+                 word:regWord(v), wordFull:regWordFull(v), status:tuningStatus(v), drone:canon(droneDegree(v)), cents:range(n+1).map(d=>centsOf(d,v)) }); }
+    return out; };
+  try{
+    drop();
+    for(const [k,r] of [['tuning',t0],['mode',m0]]){ cases++; const w= k==='mode' && !D.tunings[UD_T] ? 'tuning not registered' : checkRecord(k,r,D);
+      if(w){ miss(`the example user ${k} fails the validator: ${w}`); return { cases, total:nBad, differences:bad }; }
+      if(k==='tuning'){ registerRecord('tuning',t0,false); reg=true; } else registerRecord('mode',m0,false); }
+    setScaleId(UD_M); const v=CUR(); cases++;
+    if(!v || v.mode!==scaleById(UD_M)) miss('the user mode did not become the live view');
+    const F=chordFams(v), tys=F.slice(0,2).map(f=>f.types[0].iv);
+    const steps=[]; let t=0; const add=(fn,a)=>{ steps.push({fn,a,t}); t+=0.25; };
+    for(const o of [1,2]) for(let d=0;d<=v.iv.length;d++){
+      add('leadOn',{deg:d,oct:o,vol:0.7,inst:3,v:d%2}); add('bassOn',{deg:d,oct:o,vol:0.6,inst:2}); add('chOn',{deg:d,oct:o,vol:0.55,inst:1,ty:tys[d%tys.length]}); }
+    const R=probeTake(steps); cases++;
+    if(!R.ok){ miss(`the sandboxed take was refused — ${R.why}`); return { cases, total:nBad, differences:bad }; }
+    const evs=R.events; cases++; if(!evs.some(e=>e.sc===v)) miss('no recorded event holds the user view');
+    const before=fingerprint(evs);
+    setScaleId(keepSc);                                     // живой лад — прежний, ПЕРЕД удалением (удаление не должно его переключать)
+    const a=unregisterRecord('mode',UD_M,false), b=unregisterRecord('tuning',UD_T,false); reg=false;
+    for(const [w,ok] of [['the mode was removed',a.ok],['the tuning was removed',b.ok],['scaleById no longer finds the mode',scaleById(UD_M)===null],
+                         ['the registry has no tuning',!TUNINGS_ALL[UD_T]],['the data set has neither',!D.modes[UD_M]&&!D.tunings[UD_T]],
+                         ['the menu has no user mode',!menuOf('exp').some(g=>g.items.some(({s})=>s.id===UD_M))],['the mode left SCALES',!SCALES_ALL.some(s=>s.id===UD_M)]]){
+      cases++; if(!ok) miss(`deletion: ${w} — failed`); }
+    const after=fingerprint(evs);
+    cases++; if(before.length!==after.length) miss(`fingerprint length ${after.length} after deletion, ${before.length} before`);
+    for(let i=0;i<Math.min(before.length,after.length);i++){ cases++; const A=JSON.stringify(after[i]), B=JSON.stringify(before[i]);
+      if(A!==B) miss(`after deletion: ${A.slice(0,160)} — before: ${B.slice(0,160)}`); }
+    console.log(`[scaleprobe user] recorded ${evs.length} events in a user mode, deleted the mode and its tuning · items compared ${before.length} · differences ${nBad}`);
+  } finally { if(reg) drop(); else { try{ drop(); }catch(e){} } setScaleId(keepSc); }
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe user] '+m));
+  if(!nBad) console.log('[scaleprobe user] every recorded note sounds and shows exactly as before the user files were deleted');
+  return { cases, total:nBad, differences:bad };
 }

@@ -1,6 +1,7 @@
 import { scaleId, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel, setScaleId } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
 import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для имён списка строя (listName, F3) и слова периода строя пользователя (имена ладов/групп резолвят L() на стороне рисующих)
-import { loadScaleData, loadReport } from './scaleload.js';   // F5: данные ладов — ФАЙЛЫ data/ (форма v1), загрузчик с проверкой; сборщик ниже
+import { loadScaleData, loadReport } from './scaleload.js';
+import { hooks } from './hooks.js';   // F6: hooks.scales — реестр ладов изменился (установка/удаление файла пользователя) → ui перестраивает меню   // F5: данные ладов — ФАЙЛЫ data/ (форма v1), загрузчик с проверкой; сборщик ниже
 export { loadReport };   // F5: итог загрузки (пропущенные файлы, аварийная пара) — известие на стартовой карточке (main)
 
 export const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -44,21 +45,29 @@ const SRC=new WeakMap();   // F3: объект приложения → его �
 const ratioNum=r=> typeof r==='number' ? r : (([a,b])=> b===undefined ? Number(a) : Number(a)/Number(b))(String(r).split('/'));
 export const TRADITIONS=D.menu.traditions.map(x=>({id:x.id, name:x.name}));
 export const GRP={...D.menu.groups};
-export const TUNINGS={};
-for(const id of D.manifest.tunings){ const x=D.tunings[id], r={id:x.id, period:ratioNum(x.period)};
+/* F6: сборка — по функции на вид записи (buildTuning/buildPalette/buildChordModeSet/buildMode): ТЕ ЖЕ строки, что были циклами, —
+   их зовёт и старт, и установка файла пользователя на ходу (registerRecord ниже). */
+const buildTuning=x=>{ const r={id:x.id, period:ratioNum(x.period)};
   if(x.pitches.equal!=null) r.equal=x.pitches.equal;
   else { r.cents=x.pitches.list.map(p=>p.cents); if(x.chordFit==='ratios') r.ratios=x.pitches.list.map(p=>p.ratio.split('/').map(Number)); }
-  TUNINGS[id]=r; SRC.set(r,x); }
+  SRC.set(r,x); return r; };
+export const TUNINGS={};
+for(const id of D.manifest.tunings) TUNINGS[id]=buildTuning(D.tunings[id]);
+const buildPalette=x=>{ const cv= x.kind==='ratios' ? ratioNum : (v=>v);
+  return x.families.map(f=>({...f, types:f.types.map(ty=>({...ty, iv:ty.iv.map(cv)}))})); };
 export const CHORD_FAM_SETS={};
-for(const id of D.manifest.palettes){ const x=D.palettes[id], cv= x.kind==='ratios' ? ratioNum : (v=>v);
-  CHORD_FAM_SETS[id]=x.families.map(f=>({...f, types:f.types.map(ty=>({...ty, iv:ty.iv.map(cv)}))})); }
+for(const id of D.manifest.palettes) CHORD_FAM_SETS[id]=buildPalette(D.palettes[id]);
 const ruleOf=r=>{ const o={}; for(const k in r) o[k]= (k==='triad'||k==='seventh') ? r[k].map(ratioNum) : r[k]; return o; };
 const CM_FIELD={build:'chordBuild', palette:'typedChords', rule:'chordRule'};   // поле режима в файле → поле вида
-const CHORD_MODE_SETS={};
-for(const id of D.manifest.chordModeSets) CHORD_MODE_SETS[id]=D.chordModeSets[id].modes.map(m=>{ const over={};
+const buildChordModeSet=x=>x.modes.map(m=>{ const over={};
   for(const k in m.set) over[CM_FIELD[k]]= k==='rule' ? ruleOf(m.set[k]) : m.set[k];
   return {id:m.id, nameKey:m.nameKey, hintKey:m.hintKey, over}; });
-export const SCALES=D.manifest.modes.map(id=>{ const m=D.modes[id], T=TUNINGS[m.tuning], ch=m.chords, sel=m.degrees.slice(), n=sel.length;
+const CHORD_MODE_SETS={};
+for(const id of D.manifest.chordModeSets) CHORD_MODE_SETS[id]=buildChordModeSet(D.chordModeSets[id]);
+/* ⛳ F6: строй лада ЗАКРЕПЛЁН ЗА ОБЪЕКТОМ ЛАДА при сборке (а не ищется в реестре по id): вид, рождённый когда угодно — даже после
+   удаления строя из реестра, — берёт тот же объект строя (scaleView, tuningOf). Так удаление файла не ломает записанное. */
+const TUNING_OF_MODE=new WeakMap();
+function buildMode(m){ const T=TUNINGS[m.tuning], ch=m.chords, sel=m.degrees.slice(), n=sel.length;
   const s={id:m.id, tuning:m.tuning, chordRule:ruleOf(ch.rule), name:m.name, trad:m.menu.tradition};
   if(ch.modes) s.chordModes=CHORD_MODE_SETS[ch.modes];
   if(m.menu.group==='') s.grp=''; else { s.grp=GRP[m.menu.group]; s.grpKey=m.menu.group; }
@@ -75,12 +84,57 @@ export const SCALES=D.manifest.modes.map(id=>{ const m=D.modes[id], T=TUNINGS[m.
   if(((m.naming && m.naming.scheme) || D.tunings[m.tuning].naming.scheme)==='list') s.swaraNames=true;   // F3: совместимость формы — см. выше
   if(m.naming && m.naming.detail) s.swaraFull=true;
   s.sel=sel; s.root=m.root;
-  SRC.set(s,m);
-  return s; });
+  SRC.set(s,m); TUNING_OF_MODE.set(s,T);
+  return s; }
+export const SCALES=D.manifest.modes.map(id=>buildMode(D.modes[id]));
 /* ⛳ F1: ЛАД ПО id — единственный способ найти лад (state.scaleId, меню, уроки, демо). Неизвестный id — null; CUR() тогда берёт первый лад. */
 const SCALE_BY_ID=new Map(SCALES.map(s=>[s.id,s]));
 export const scaleById=id=>SCALE_BY_ID.get(id)||null;
 setScaleId(D.manifest.start);   // F5: стартовый лад — из манифеста (загрузчик уже заменил незагрузившийся первым годным)
+/* ═══ ⛳ F6 — РЕЕСТР МЕНЯЕТСЯ НА ХОДУ: УСТАНОВКА И УДАЛЕНИЕ ФАЙЛА ПОЛЬЗОВАТЕЛЯ ═══
+   Задний конец консоли userfiles.js (и будущего конструктора). Запись ПРОВЕРЯЕТ вызывающий (scaleload.checkRecord против scaleData());
+   здесь — только сборка тем же кодом, что на старте, и учёт в наборе D и реестрах (TUNINGS, CHORD_FAM_SETS, наборы режимов, SCALES и
+   SCALE_BY_ID — объекты те же, что держат все модули: SCALES меняется НА МЕСТЕ). Лад пользователя встаёт в КОНЕЦ SCALES — в меню он
+   в своей традиции и группе после встроенных (menuOf — порядок массива). Удаление снимает запись из реестров и набора — ⛔ НО НЕ ИЗ
+   ВИДОВ: каждое записанное событие держит свой вид, вид — свой лад (.mode) и свой строй (tuningRec), запись v1 — в SRC (WeakMap по
+   объекту): записанное звучит и показывается как прежде (проба P.checkUserDelete). Удаляемое, от которого зависят другие записи
+   (строй — лады; палитра — лады и наборы; набор — лады), не удаляется: dependentsOf называет их. Удалили ЖИВОЙ лад — живым становится
+   стартовый. notify — позвать hooks.scales (ui перестраивает меню); проба зовёт без него. */
+export const scaleData=()=>D;
+const SECT_OF={ tuning:'tunings', palette:'palettes', chordmodes:'chordModeSets', mode:'modes' };
+export function dependentsOf(kind,id){
+  const out=[];
+  for(const mid of D.manifest.modes){ const m=D.modes[mid], ch=m.chords||{};
+    if(kind==='tuning' && m.tuning===id) out.push('mode '+mid);
+    if(kind==='palette' && ch.palette===id) out.push('mode '+mid);
+    if(kind==='chordmodes' && ch.modes===id) out.push('mode '+mid); }
+  if(kind==='palette') for(const cid of D.manifest.chordModeSets) if(D.chordModeSets[cid].modes.some(x=>x.set && x.set.palette===id)) out.push('chord modes '+cid);
+  return out;
+}
+export function unregisterRecord(kind,id,notify=true){
+  const sect=SECT_OF[kind]; if(!sect || !D[sect][id]) return { ok:false, why:'not installed' };
+  const dep=dependentsOf(kind,id); if(dep.length) return { ok:false, why:'still used by '+dep.join(', ') };
+  delete D[sect][id]; const L0=D.manifest[sect], at=L0.indexOf(id); if(at>=0) L0.splice(at,1);
+  let index=-1, switched=false;
+  if(kind==='tuning') delete TUNINGS[id];
+  else if(kind==='palette') delete CHORD_FAM_SETS[id];
+  else if(kind==='chordmodes') delete CHORD_MODE_SETS[id];
+  else { const s=SCALE_BY_ID.get(id); index=SCALES.indexOf(s); if(index>=0) SCALES.splice(index,1); SCALE_BY_ID.delete(id);
+    if(scaleId===id){ setScaleId(SCALE_BY_ID.has(D.manifest.start) ? D.manifest.start : SCALES[0].id); switched=true; } }
+  if(notify && hooks.scales) hooks.scales({ op:'remove', kind, id, switched });
+  return { ok:true, index, switched };
+}
+export function registerRecord(kind,rec,notify=true){
+  const sect=SECT_OF[kind], id=rec.id, wasLive= kind==='mode' && scaleId===id; let index=-1;
+  if(D[sect][id]){ const r=unregisterRecord(kind,id,false); if(!r.ok) return r; index=r.index; }   // замена — на прежнее место
+  D[sect][id]=rec; D.manifest[sect].push(id);
+  if(kind==='tuning') TUNINGS[id]=buildTuning(rec);
+  else if(kind==='palette') CHORD_FAM_SETS[id]=buildPalette(rec);
+  else if(kind==='chordmodes') CHORD_MODE_SETS[id]=buildChordModeSet(rec);
+  else { const s=buildMode(rec); if(index>=0) SCALES.splice(index,0,s); else SCALES.push(s); SCALE_BY_ID.set(id,s); if(wasLive) setScaleId(id); }   // заменённый живой лад остаётся живым (новая сборка)
+  if(notify && hooks.scales) hooks.scales({ op:'add', kind, id, switched:wasLive });
+  return { ok:true };
+}
 
 /* Лады традиции — в порядке массива; отдаём вместе с АБСОЛЮТНЫМ индексом,
    (F1: value у <option> — id лада; i — позиция, её читает только снимок F0.) */
@@ -172,7 +226,7 @@ export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s)){
     const policy=anchorPolicy(base);
     v= base.tunable ? {...base, tunedFrom:tf} : {...base};    // tunedFrom — только у tunable: anchorOf у прочих читает «поля нет» (C), как прежде
     if(ms){ Object.assign(v, ms.find(x=>x.id===cmv).over); v.chordMode=cmv; }   // ⛳ T7b: поля режима ПОВЕРХ полей лада — читатели видят обычные поля (chordBuild/typedChords/chordRule)
-    v.mode=base; v.tuningRec=TUNINGS[base.tuning];
+    v.mode=base; v.tuningRec=TUNING_OF_MODE.get(base) || TUNINGS[base.tuning];   // F6: строй, закреплённый за ладом при сборке
     v.anchor={ policy, from: policy==='choice' ? tf : policy==='C' ? 0 : 'T' };
     m.set(key,v);
   }
@@ -478,7 +532,7 @@ const tSize=T=>T.equal!=null ? T.equal : T.cents.length;     // сколько �
 /* ⛳ F1 «строи файлами»: СТРОЙ ЛАДА — ИЗ ЕГО ВИДА (tuningRec: запись строя, которую вид взял при рождении), а не поиском по id в реестре
    TUNINGS. Событие держит вид (правило #7) — значит и свой строй: удаление или замена установленного строя в реестре записанное не
    изменит. Голый объект лада (демо до F1, опоры пробы) записи не несёт — ему отвечает реестр по id. function — всплывает. */
-export function tuningOf(s){ return (s && s.tuningRec) || TUNINGS[s.tuning]; }
+export function tuningOf(s){ return (s && s.tuningRec) || (s && TUNING_OF_MODE.get(s)) || TUNINGS[s.tuning]; }   // F6: у голого лада — его закреплённый строй
 /* ЯКОРЬ ЛАДА — две величины модели (A — частота, z — индекс строя, звучащий на ней) и КЛЮЧ (сдвиг ступеней лада внутри строя).
      фиксированный строй (fixedKey): индекс 0 строя — на ЯКОРЕ (cFix: «строй от» — C у пяти исторических, выбор у Пифагора), тоника
        выбирает КЛЮЧ (keyOf). «Строй от» = тоника (P3) даёт key 0 и cFix — то же выражение, что baseF: подвижный путь;
