@@ -1,7 +1,7 @@
 import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
          CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
-import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordTypeFits, tuningIndexOf, CUR } from './scales.js';   // T7: chordTypeFits — тип аккорда целиком в строе на этом корне (Партч)
+import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordAtRoot, tuningIndexOf, CUR } from './scales.js';   // T7: chordTypeFits — тип аккорда целиком в строе на этом корне (Партч)
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
          onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
@@ -1020,17 +1020,20 @@ function processHands(res){
              влиять, а звук и запись слушаются параметра. Нет яркости в цепи → null → сегодняшнее
              поведение (chordOn открывает фильтр, chordGlide его не трогает). */
           const bri = fxChordBri(zk);   // O-0: чью яркость — решает ЗОВУЩИЙ (ключ цепи этой зоны), а не сама функция
-          /* ⛳ T7: ТИП НА ЭТОМ КОРНЕ — ЦЕЛИКОМ В СТРОЕ? (Партч: каждый тон — одна из 43 высот; прочим строям — всегда да.) Нет — аккорд на
-             этом корне НЕ ЗВУЧИТ: свежий щипок не атакует, ведущаяся защёлка не уезжает на этот корень (держит прежний). ⛔ Никакой
-             подмены ближайшими высотами — это была бы ложная отональность. Палитра серит недоступные типы для корня под рукой
-             (chFitDeg) и называет причину. */
-          const fitOn=(t,d)=> !t || chordTypeFits(t, tuningIndexOf(d,CUR(),true), CUR());
-          setChFitDeg(S.deg);
+          /* ⛳ T7 → F8: ТИП НА ЭТОМ КОРНЕ — ЦЕЛИКОМ В СТРОЕ? (общий тест вида chordTypeFits: сегодня ограничивает Партч «Как на инструменте» —
+             каждый тон одна из 43 высот; строй пользователя с отношениями и сборкой «из строя» — так же, без частного случая.) Нет —
+             ⛳ F8 (решение пользователя): ЗВУЧИТ ОДИН КОРЕНЬ — каноническая однонотная форма вида (chordUnit: корень и есть высота строя),
+             и в запись идёт ровно он (однонотный аккорд). Тишина читалась поломкой инструмента; ближайший подходящий тип подменил бы
+             качество аккорда; подмена тонов ближайшими высотами — ложная отональность. Ярлык руки говорит почему (S.rootOnly → draw);
+             палитра по-прежнему серит недоступные типы для корня под рукой (chFitDeg). ВЫБРАННЫЙ тип не теряется: щипок морозит его (S.ty),
+             и ведущаяся защёлка, вернувшись на корень, где он есть, снова звучит им. */
+          const effTy=(t,d)=> chordAtRoot(t, tuningIndexOf(d,CUR(),true), CUR());   // F8: что ЗВУЧИТ на этом корне — выбранный тип или один корень (scales.chordAtRoot — одно правило с пробой)
+          const sameTy=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));   // однонотная форма — новый массив: по значению
+          setChFitDeg(S.deg); S.rootOnly=false;   // F8: «один корень» ставят ветки ниже — для ярлыка руки
           if(S.inert){
             // стоп-щипок отработал (только защёлка): рука молчит до размыкания пальцев
-          }else if(S.fresh && !fitOn(ty,S.deg)){
-            S.fresh=false;                        // T7: типа нет в строе на этом корне — щипок ничего не атакует (причину показывает палитра)
           }else if(S.fresh){
+            const sel=ty; ty=effTy(sel,S.deg); S.rootOnly= ty!==sel;   // F8: дальше атака идёт звучащей формой; S.ty ниже морозит ВЫБРАННУЮ (sel)
             S.fresh=false;                        // решение принимается один раз за щипок
             if(hold){
               /* УДЕРЖАНИЕ: каждый щипок — НОВАЯ атака; корень/октава уже заморожены гейтом holdOn выше
@@ -1038,7 +1041,7 @@ function processHands(res){
                  (S.ty ниже). Тумблера «тот же аккорд → выкл» тут НЕТ: выключение — это размыкание пальцев
                  (endPinch зовёт WchOff). */
               WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bri);
-              S.ty=ty;                                // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
+              S.ty=sel;                               // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже); F8 — выбранного, звучит ty
               latchLen=ty?ty.length:0;
               setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(ty); chOwner=key;   // регистр — рядом со ступенью: подсветке нужна ПАРА (одна ступень живёт в нескольких прямоугольниках)
               tutorTap('chord',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, удержание); half — половина сплита (урок «Две роли»)
@@ -1051,7 +1054,7 @@ function processHands(res){
                  аккорд однозначно. Теперь одна и та же ступень есть в нескольких прямоугольниках, и
                  без регистра «до» из нижнего блока и «до» из верхнего читались бы как ОДИН аккорд:
                  второй щипок ГЛУШИЛ бы первый вместо перехода октавой выше. */
-              const same = latchDeg>=0 && S.deg===latchDeg && S.regOct===latchOct && (!typedChords() || ty===latchTy);
+              const same = latchDeg>=0 && S.deg===latchDeg && S.regOct===latchOct && (!typedChords() || sameTy(ty,latchTy));   // F8: по значению (однонотная форма)
               if(same){
                 WchOff('latch'); setLatchDeg(-1); setLatchTy(null); chOwner=null; S.inert=true;   // тот же аккорд → выключаем, рука инертна
               }else{
@@ -1060,7 +1063,7 @@ function processHands(res){
                    до следующей атаки (BACKLOG §4 — секторы делают этот баг достижимым). */
                 if(latchDeg<0||(ty&&ty.length!==latchLen))WchOn('latch',S.deg,chOct,S.vol,chIdx,ty,bri);
                 else WchSet('latch',S.deg,chOct,S.vol,ty,bri);          // та же плотность → глиссандо без переатаки
-                S.ty=ty;                              // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже)
+                S.ty=sel;                             // ЗАМОРОЗКА ТИПА на атаке (см. ведение ниже); F8 — выбранного, звучит ty
                 latchLen=ty?ty.length:0;
                 setLatchDeg(S.deg); setLatchOct(chOct); setLatchTy(ty); chOwner=key;      // рулит последний щипнувший; регистр — компаньон ступени для подсветки
                 tutorTap('chord',{deg:S.deg, half:splitOn?(S.rx0>0?1:0):null});   // ЗАЦЕПКА ОБУЧЕНИЯ: аккорд зазвучал (свежая атака, защёлка); half — половина сплита (урок «Две роли»)
@@ -1076,9 +1079,11 @@ function processHands(res){
                числе нот была бы ещё и переатака). Новый тип вступает в силу со СЛЕДУЮЩЕЙ атаки — ровно как
                событие лупера морозит a.ty, а слой — свой лад (sc). Корень при этом по-прежнему следует за
                рукой: заморожен ТОЛЬКО тип. */
-            const dty=S.ty;
-            const fd= fitOn(dty,S.deg), rd= fd ? S.deg : latchDeg, ro= fd ? chOct : latchOct;   // T7: на корень, где типа нет в строе, защёлка не уезжает — держит прежний корень (громкость и яркость ведутся)
-            if(dty&&dty.length!==latchLen){ WchOn('latch',rd,ro,S.vol,chIdx,dty,bri); latchLen=dty.length; }   // подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
+            /* F8: на корень, где выбранного типа нет в строе, защёлка УЕЗЖАЕТ, как на любой корень, и звучит ОДНИМ КОРНЕМ (как щипок);
+               вернулась на корень, где тип есть, — снова тип. Смена числа нот — переатака (ветка ниже), и запись закрывает прежний аккорд и
+               открывает новый (recChOn): записанное = прозвучавшее. До F8 защёлка держала прежний корень. */
+            const dty=effTy(S.ty,S.deg), rd=S.deg, ro=chOct; S.rootOnly= dty!==S.ty;
+            if(dty&&dty.length!==latchLen){ WchOn('latch',rd,ro,S.vol,chIdx,dty,bri); latchLen=dty.length; }   // смена числа нот (в т.ч. F8: тип ↔ один корень); подстраховка: latchLen мог переписать щипок ДРУГОЙ руки
             else WchSet('latch',rd,ro,S.vol,dty,bri);   // ведение: Y=корень (rect) или ступень, X=громкость, Z=яркость
             setLatchDeg(rd); setLatchOct(ro); setLatchTy(dty);   // тип и регистр ведём вместе со ступенью — иначе сравнение (и подсветка) протухнут
           }else if(chOwner===key){

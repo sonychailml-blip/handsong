@@ -711,6 +711,10 @@ const FIT_MEMO=new WeakMap();
 const gcd=(a,b)=>{ while(b){ [a,b]=[b,a%b]; } return a; };
 function ratioOf(x){ for(let q=1;q<=4096;q++){ const p=Math.round(x*q); if(p/q===x) return [p,q]; } return null; }   // дробь, чьё JS-значение — ровно x (наборы пишут 5/4, 36/11 …)
 function octRed(n,d){ const g=gcd(n,d); n/=g; d/=g; while(n>=2*d){ if(n%2===0) n/=2; else d*=2; } while(n<d){ if(d%2===0) d/=2; else n*=2; } const h=gcd(n,d); return (n/h)+'/'+(d/h); }
+/* ⛳ F8 — ЧТО ЗВУЧИТ НА КОРНЕ (решение пользователя): выбранный тип, если он на этом корне целиком в строе (chordTypeFits — общий тест
+   вида), иначе ОДИН КОРЕНЬ — каноническая однонотная форма вида (chordUnit: её цена — сам корень, высота строя). Одна функция на живую
+   игру (gestures: щипок и ведущаяся защёлка) и на сценарий пробы (P.seed) — правило одно, частного случая для Партча нет. */
+export function chordAtRoot(ty, ti, s=CUR()){ return (!ty || chordTypeFits(ty,ti,s)) ? ty : chordUnit(s); }
 export function chordTypeFits(ty, ti, s=CUR()){
   if(!ty || !s || s.gridChords || chordBuildOf(s)!=='tuning') return true;
   const T=tuningOf(s), RT=T&&T.ratios; if(!RT || !s.cents) return true;

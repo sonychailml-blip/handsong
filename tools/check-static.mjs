@@ -16,6 +16,13 @@
      6) ЗАТЕНЁННЫЙ ИМПОРТ, КОТОРЫЙ ВЫЗЫВАЮТ (добавлено после F6b): импортированное имя объявлено локально (const/let/var, function,
         class, параметр) и в области этого объявления вызывается — зовётся локальное, а не импорт («is not a function» на старте).
         Затенение без вызова — сведение.
+     7) НЕОБЪЯВЛЕННОЕ ИМЯ (добавлено после F7, F8): имя, которое модуль ЧИТАЕТ или ЗОВЁТ, но нигде в нём не объявляет (const/let/var,
+        function, class, параметр функции или стрелки, catch, импорт) и которого нет в списке известных глобальных (GLOBALS ниже —
+        JavaScript и браузер, плюс область AudioWorklet). Ловит дефект, пропущенный в F7: проба звала namingOf, не импортировав её, —
+        ReferenceError только в том ряду, который до неё доходит. ⚠️ Мешок имён на МОДУЛЬ, без областей: имя, объявленное где-то в
+        модуле, считается объявленным везде (ловится «нигде не объявлено и не импортировано» — ровно класс F7; «объявлено в соседней
+        функции» — нет). Свойства (после «.»), ключи объектных литералов и шаблонов, имена методов, метки и сами импорт/экспорт-списки
+        ссылками не считаются.
    Что сообщается как СВЕДЕНИЕ (не ошибка): экспорты, которых никто не импортирует статически (у модулей, грузимых динамически или
    целиком как пространство имён, не считаются), и импорты, которые модуль больше не упоминает.
    Разбор — лексический: строки, шаблоны (с вложенными ${…}), регулярные выражения и комментарии различаются; полного парсера JS здесь нет,
@@ -195,6 +202,51 @@ for(const f of files){ const m=mods[f], b=m.bare, own=[];   // [имя, нача
     else shadowInfo.set(`${f}:${nm}`, (shadowInfo.get(`${f}:${nm}`)||0)+1); }
 }
 if(shadowInfo.size) infos.push(`imported names also declared locally, never called there (harmless; style): ${[...shadowInfo].map(([k,n])=>`${k}×${n}`).join(', ')}`);
+// 7) НЕОБЪЯВЛЕННОЕ ИМЯ (добавлено после F7, F8) — см. шапку. GLOBALS: известные глобальные имена. ⛳ Список ведётся РУКАМИ здесь и только
+//    здесь: новый API браузера в коде даст ошибку «… is not declared» — его добавляют сюда (это и есть проверка, что имя — не опечатка
+//    и не забытый импорт). Слова языка — в RESERVED.
+const RESERVED=new Set(('break case catch class const continue debugger default delete do else export extends finally for function if import in '+
+  'instanceof let new return super switch this throw try typeof var void while with yield async await of get set static from as '+
+  'true false null undefined NaN Infinity arguments').split(' '));
+const GLOBALS=new Set((
+  /* JavaScript */ 'Math JSON Object Array Number String Boolean Symbol BigInt Map Set WeakMap WeakSet WeakRef Promise Proxy Reflect Intl Date RegExp '+
+  'Error TypeError RangeError SyntaxError ReferenceError AggregateError ArrayBuffer SharedArrayBuffer DataView Float32Array Float64Array Int8Array '+
+  'Int16Array Int32Array Uint8Array Uint8ClampedArray Uint16Array Uint32Array parseInt parseFloat isNaN isFinite encodeURIComponent '+
+  'decodeURIComponent encodeURI decodeURI globalThis queueMicrotask structuredClone console setTimeout clearTimeout setInterval clearInterval '+
+  /* браузер */ 'window self document navigator location history screen performance localStorage sessionStorage indexedDB IDBKeyRange crypto '+
+  'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event '+
+  'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
+  'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream AudioContext OfflineAudioContext webkitAudioContext '+
+  'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener '+
+  /* область AudioWorklet (ks-worklet.js) */ 'AudioWorkletProcessor registerProcessor sampleRate currentTime currentFrame'
+).split(/\s+/).filter(Boolean));
+const undeclared=new Set();   // «файл:строка: имя» — одно сообщение на строку
+for(const f of files){ const m=mods[f]; let b=m.bare;
+  // импорт- и экспорт-списки — не ссылки (их имена проверяют 2) и 3))
+  b=b.replace(/\bimport\s+[^'"();]*?\s*from\s*(['"])[^'"]*\1/g, x=>x.replace(/[^\n]/g,' ')).replace(/\bexport\s*\{[^}]*\}(\s*from\s*(['"])[^'"]*\2)?/g, x=>x.replace(/[^\n]/g,' '));
+  const bag=new Set(m.declared);   // const/let/var, function, class, импорты (собраны выше)
+  const idsIn=t=>{ for(const x of t.replace(/\.\.\./g,'   ').matchAll(/(?<![\w$.])[A-Za-z_$][\w$]*/g)) bag.add(x[0]); };   // «...rest» — имя   // шаблон деструктуризации / список параметров — с запасом
+  const matchClose=(t,o)=>{ let d=0; for(let k=o;k<t.length;k++){ const c=t[k]; if(c==='('||c==='['||c==='{') d++; else if(c===')'||c===']'||c==='}'){ d--; if(d===0) return k; } } return t.length; };
+  for(const x of b.matchAll(/\b(?:const|let|var)\b\s*(?=[\w$[{])/g)){ const o=x.index+x[0].length;   // и «const[a,b]» без пробела
+    if(b[o]==='{'||b[o]==='[') idsIn(b.slice(o,matchClose(b,o)+1)); else { const w=b.slice(o).match(/^[A-Za-z_$][\w$]*/); if(w) bag.add(w[0]); } }
+  for(const x of b.matchAll(/\b(?:function\s*\*?\s*[A-Za-z_$]?[\w$]*|catch)\s*\(/g)){ const o=x.index+x[0].length-1; idsIn(b.slice(o,closeParen(b,o)+1)); }
+  for(const x of b.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/g)){ if(RESERVED.has(x[1])) continue;   // метод класса/объекта: имя(…){ — его параметры
+    const o=x.index+x[0].length-1, e=closeParen(b,o); let r=e+1; while(r<b.length&&/\s/.test(b[r])) r++; if(b[r]==='{') idsIn(b.slice(o,e+1)); }
+  for(const x of b.matchAll(/=>/g)){ let j=x.index-1; while(j>=0&&/\s/.test(b[j])) j--;
+    if(b[j]===')'){ let d=0, k=j; for(;k>=0;k--){ if(b[k]===')') d++; else if(b[k]==='('){ d--; if(d===0) break; } } if(k>=0) idsIn(b.slice(k,j+1)); }
+    else { let k=j; while(k>=0&&/[\w$]/.test(b[k])) k--; bag.add(b.slice(k+1,j+1)); } }
+  for(const x of b.matchAll(/(?<![\w$])[A-Za-z_$][\w$]*/g)){ const nm=x[0], i=x.index;
+    if(bag.has(nm)||RESERVED.has(nm)||GLOBALS.has(nm)) continue;
+    let p=i-1; while(p>=0&&/\s/.test(b[p])) p--; const prev=b[p];
+    if(prev==='.' && b[p-1]!=='.') continue;   // свойство (но «...имя» — ссылка)
+    const before=b.slice(Math.max(0,p-9),p+1); if(/\b(?:break|continue)$/.test(before)) continue;   // метка
+    let q=i+nm.length; while(q<b.length&&/\s/.test(b[q])) q++;
+    if(b[q]===':' && (p<0||'{,;}'.includes(prev))) continue;   // ключ объекта / метка
+    if(b[q]==='('){ const e=closeParen(b,q); let r=e+1; while(r<b.length&&/\s/.test(b[r])) r++;
+      if(b[r]==='{' && (p<0||'{},;'.includes(prev)||/\b(?:get|set|static|async)$/.test(before))) continue; }   // имя метода
+    undeclared.add(`${f}:${lineAt(b,i)}: '${nm}' is not declared, imported or a known global — a missing import or a typo`); }
+}
+fails.push(...undeclared);
 // сведения: неиспользуемые экспорты и импорты
 for(const f of files){ const m=mods[f];
   const imported=files.some(g=>mods[g].imports.some(im=>target(g,im.spec)===f));
@@ -208,4 +260,4 @@ console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})
 for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(16)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }
-console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions) and shadowed imports (${nShadow} local declarations) are consistent.`);
+console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations) and undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals) are consistent.`);

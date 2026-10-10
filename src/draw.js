@@ -2120,6 +2120,11 @@ function drawHandsPhone(res,W,H,playH){
         const FS=chordFams(), fam=FS[Math.min(chordFam,FS.length-1)]||FS[0];
         const ty=fam.types[Math.min(chordVar,fam.types.length-1)];
         const oShow=S.regOct;   // регистр посчитала игра (из слота либо от пальца) — второй путь врал бы на многопериодной сетке
+        if(S.rootOnly){   // ⛳ F8: выбранного типа на этом корне нет в строе — звучит ОДИН КОРЕНЬ; ярлык говорит почему (тип — замороженный щипком, S.ty)
+          const sel=(S.ty && FS.flatMap(f=>f.types).find(x=>x.iv===S.ty)) || ty;
+          drawTag(S.x,S.y,[rootName(S.deg)+' · '+t('tag.rootOnly'), t('tag.typeNotOnRoot',{type:L(sel.label)||''}),
+            `${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
+        }else
         drawTag(S.x,S.y,[rootName(S.deg)+' '+(L(ty.label)||''),   // у ярлыка есть ширина — пишем полное имя типа
           L(ty.full)||L(fam.name),`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
       }else{

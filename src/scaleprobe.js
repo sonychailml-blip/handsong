@@ -20,6 +20,8 @@
                         //   probeTake), лад и строй удаляются — цена, ряды и подписи записанного === до удаления (нужен ▶ Play)
      P.checkUserChordModes() // F6b: СВОЙ НАБОР РЕЖИМОВ АККОРДОВ — три режима со своими именами: имена (и кнопки панели), цена каждого режима
                         //   по его переопределениям, записанные аккорды держат свой режим при переключении (правило T7b; нужен ▶ Play)
+     P.checkRootAlone() // F8: ЩИПОК НА КОРНЕ, ГДЕ ТИПА НЕТ В СТРОЕ — ЗВУЧИТ ОДИН КОРЕНЬ: правило по каждому виду, типу и корню; засеянный щипок
+                        //   в Партче «Как на инструменте» хранит однонотный аккорд на высоте корня, тот же в «Свободно» — целый тип
      P.checkBare()      // F7-починка: ГОЛЫЙ ЛАД = ВИД ЕГО РЕЖИМА ПО УМОЛЧАНИЮ — поля аккордов, цены и подписи (у каждого лада с режимами)
      P.checkMerge()     // F7: ДВА НАТУРАЛЬНЫХ → ОДИН: каждая предустановка слитого лада против ЗАМОРОЖЕННОЙ записи прежнего лада — каждая цена (===)
                         //   и каждая подпись; псевдонимы ведут на предустановку
@@ -61,7 +63,7 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf } from './scales.js';   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
@@ -980,6 +982,7 @@ const ALL_RUNS=[
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['bare mode = default chord mode',()=>checkBare(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F7 Just intonation merge',()=>checkMerge(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F6b user chord modes',()=>checkUserChordModes(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -1239,14 +1242,19 @@ export async function seed(opt={}){
     take('major pentatonic: stacked chords','major-penta','T','stack');
     // ---- 5b) T7b: режимы аккордов — оба режима у Партча, Болена–Пирса и пентатоники ----
     const tyOf=(id,cm,f,k)=>{ const F=chordFams(scaleView(scaleById(SID(id)),'T',cm)), fam=F[f]||F[0]; return (fam.types[k]||fam.types[0]).iv; };
+    /* F8: «ЩИПОК» СЦЕНАРИЯ — тип, выбранный в палитре (первая ячейка, О), на корне d проходит ту же функцию, что живая игра (scales.chordAtRoot):
+       звучит и пишется то, что она вернула. */
+    const seedPinch=(id,cm,d)=>{ const v=scaleView(scaleById(SID(id)),'T',cm); return chordAtRoot(tyOf(id,cm,0,0), tuningIndexOf(d,v,true), v); };
     [[80,0,0,0],[84,9,2,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('bohlen-pierce','free',f,k)},t); at(id,'chOff',{},t+4); });
     { const id=on('chOn',{deg:3,oct:1,vol:.8,inst:0,ty:tyOf('bohlen-pierce','free',0,2)},88); at(id,'chOff',{},92); }   // пентада 3:5:7:9:11 — аккорд на 11, вернувшийся в «Свободно»
     take('Bohlen–Pierce, Free: pure ratios, an 11-chord','bohlen-pierce','T','free');
     [[92,0,0,0],[96,4,1,0]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('bohlen-pierce','instrument',f,k)},t); at(id,'chOff',{},t+4); });
     take('Bohlen–Pierce, As on the instrument: steps','bohlen-pierce','T','instrument');
     [[100,11,1,0],[104,0,0,3]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('partch-43','free',f,k)},t); at(id,'chOff',{},t+4); });   // У на 32/27 — в «Свободно» доступен (тон 64/45 вне 43)
+    { const id=on('chOn',{deg:3,oct:1,vol:.8,inst:0,ty:seedPinch('partch-43','free',3)},124); at(id,'chOff',{},128); }   // F8: тот же щипок, что ниже в «Как на инструменте», — в «Свободно» звучит ЦЕЛЫЙ тип
     take('Partch, Free: a chord outside the 43','partch-43','T','free');
     [[108,0,0,3],[112,18,0,1]].forEach(([t,d,f,k])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:tyOf('partch-43','instrument',f,k)},t); at(id,'chOff',{},t+4); });   // O11 на 1/1, O7 на 4/3 — целиком в 43
+    { const id=on('chOn',{deg:3,oct:1,vol:.8,inst:0,ty:seedPinch('partch-43','instrument',3)},116); at(id,'chOff',{},120); }   // ⛳ F8: щипок с типом О на 21/20 (там ни один тип не ложится) — звучит ОДИН КОРЕНЬ
     take('Partch, As on the instrument','partch-43','T','instrument');
     [[116,0],[120,3]].forEach(([t,d])=>{ const id=on('chOn',{deg:d,oct:1,vol:.8,inst:0,ty:null},t); at(id,'chOff',{},t+4); });
     take('major pentatonic: power chords','major-penta','T','power');
@@ -2312,4 +2320,40 @@ export function checkBare(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe bare] '+m));
   if(!nBad) console.log('[scaleprobe bare] every mode with chord modes prices and labels on its own exactly as its default chord mode');
   return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F8 — P.checkRootAlone(): НА КОРНЕ, ГДЕ ВЫБРАННОГО ТИПА НЕТ В СТРОЕ, ЗВУЧИТ ОДИН КОРЕНЬ ═══
+   (1) ПРАВИЛО по всему пространству: каждый вид (лад × «строй от» × режим аккордов) с палитрой, каждый тип палитры, каждый корень
+   (индекс 0..размер строя): scales.chordAtRoot = тип, если chordTypeFits, иначе ровно однонотная форма вида (chordUnit) — по значению; и
+   однонотная форма сама всегда «ложится». Ограничение — только у видов, где тест что-то отвергает (сегодня Партч «Как на инструменте»).
+   (2) ЗАПИСЬ (нужна песня P.seed): засеянный щипок в Партче «Как на инструменте» (доля 116, тип О на 21/20) — однонотный аккорд в форме вида,
+   его единственная нота — на высоте корня (chordPitchHz — высота строя в регистре аккордов, независимо от chordUnit); тот же щипок в
+   «Свободно» (доля 124) — целый тип О, три ноты. */
+export function checkRootAlone(){
+  const bad=[]; let nBad=0, cases=0, song=0, restricted=0, alone=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const J=x=>JSON.stringify(x);
+  for(const [s0,tf] of allViews()) for(const cm of (s0.chordModes ? s0.chordModes.map(m=>m.id) : [undefined])){
+    const v=scaleView(s0,tf,cm); if(!v.typedChords) continue;
+    const T=tuningOf(v), N=T.equal!=null ? T.equal : T.cents.length, unit=chordUnit(v); let cut=0;
+    cases++; if(!chordTypeFits(unit,0,v)) miss(`${viewIdOf(v)}: the one-note form itself does not fit`);
+    for(const f of chordFams(v)) for(const ty of f.types) for(let ti=0;ti<=N;ti++){ cases++;
+      const fit=chordTypeFits(ty.iv,ti,v), got=chordAtRoot(ty.iv,ti,v), want= fit ? ty.iv : unit;
+      if(J(got)!==J(want)) miss(`${viewIdOf(v)} type ${L(ty.label)} root ${ti}: ${J(got)}, expected ${J(want)}`);
+      if(!fit){ cut++; alone++; } }
+    if(cut) restricted++;
+  }
+  const evAt=(cm,t)=>events.find(e=>e.fn==='chOn' && e.t===t && e.sc && e.sc.id==='partch-43' && e.sc.chordMode===cm && !e.jam);
+  const ei=evAt('instrument',116), ef=evAt('free',124);
+  if(!ei || !ef) miss('the seeded F8 pinches are not in the song — run await P.seed({replace:true})');
+  else{ song=2; cases+=4;
+    const ni=chordNotesAt(ei.a.ti,ei.a.oct,ei.sc,ei.sev,ei.a.ty), root=chordPitchHz(ei.a.ti-ei.sc.root,ei.a.oct,ei.sc);
+    if(J(ei.a.ty)!==J(chordUnit(ei.sc))) miss(`As on the instrument, beat 116: stored type ${J(ei.a.ty)}, expected the one-note form ${J(chordUnit(ei.sc))}`);
+    if(ni.length!==1 || ni[0].f!==root) miss(`As on the instrument, beat 116: sounds ${J(ni.map(x=>x.f))}, expected the root alone at ${root} Hz`);
+    const nf=chordNotesAt(ef.a.ti,ef.a.oct,ef.sc,ef.sev,ef.a.ty), O=chordFams(ef.sc)[0].types[0].iv;
+    if(J(ef.a.ty)!==J(O)) miss(`Free, beat 124: stored type ${J(ef.a.ty)}, expected the whole type ${J(O)}`);
+    if(nf.length!==O.length) miss(`Free, beat 124: sounds ${nf.length} notes, expected ${O.length}`); }
+  console.log(`[scaleprobe F8] views with a palette checked · views that restrict ${restricted} · root-alone cases ${alone} · seeded pinches ${song} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe F8] '+m));
+  if(!nBad) console.log('[scaleprobe F8] a type that does not fit sounds the root alone, by the one rule, and is stored as a one-note chord; Free sounds the whole type');
+  return { cases, song, total:nBad, differences:bad };
 }
