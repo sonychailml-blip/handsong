@@ -7,7 +7,8 @@ comment belongs to; «before» — the comment stood before that record (or fiel
 
 Since F5 these files are read at start-up by `src/scaleload.js`, which validates every file (see its header) and skips a broken one.
 Where an old comment below says «пока это JS-модуль», «TBL», «SCALES» or «scaledata.js», it describes the data before F5; the records
-are the same (F5b removed one field: `compat.tag` — the tags now live in the probe, `src/scaleprobe.js` `TAG_OF`; comments below that
+are the same; F7 merged the two Natural modes — the notes under `modes/ji-adaptive.json` and `modes/ji-fixed.json` below describe
+the two presets of `modes/just-intonation.json` (F5b removed one field: `compat.tag` — the tags now live in the probe, `src/scaleprobe.js` `TAG_OF`; comments below that
 mention `tag` describe the data before that). To add a mode: a file `modes/<id>.json` in the v1 shape and its id at the END of `modes` in `index.json`.
 
 ## Format (head of src/scaledata.js)

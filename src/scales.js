@@ -1,4 +1,4 @@
-import { scaleId, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel, setScaleId } from './state.js';   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
+import { scaleId, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel, setScaleId, setTunedFrom, setChordMode } from './state.js';   // F7: setTunedFrom/setChordMode — предустановка псевдонима (applyScaleId)   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
 import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для имён списка строя (listName, F3) и слова периода строя пользователя (имена ладов/групп резолвят L() на стороне рисующих)
 import { loadScaleData, loadReport } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6: hooks.scales — реестр ладов изменился (установка/удаление файла пользователя) → ui перестраивает меню   // F5: данные ладов — ФАЙЛЫ data/ (форма v1), загрузчик с проверкой; сборщик ниже
@@ -58,7 +58,7 @@ const buildPalette=x=>{ const cv= x.kind==='ratios' ? ratioNum : (v=>v);
 export const CHORD_FAM_SETS={};
 for(const id of D.manifest.palettes) CHORD_FAM_SETS[id]=buildPalette(D.palettes[id]);
 const ruleOf=r=>{ const o={}; for(const k in r) o[k]= (k==='triad'||k==='seventh') ? r[k].map(ratioNum) : r[k]; return o; };
-const CM_FIELD={build:'chordBuild', palette:'typedChords', rule:'chordRule'};   // поле режима в файле → поле вида
+const CM_FIELD={build:'chordBuild', palette:'typedChords', rule:'chordRule', grid:'gridChords', naming:'degNaming'};   // поле режима в файле → поле вида; F7: grid — аккорды из сетки, naming — схема имён ступеней (namingOf)
 const buildChordModeSet=x=>x.modes.map(m=>{ const over={};
   for(const k in m.set) over[CM_FIELD[k]]= k==='rule' ? ruleOf(m.set[k]) : m.set[k];
   const o={id:m.id};   // F6b: имя и подсказка — ключ словаря (встроенные: nameKey/hintKey, форма как была) или своё имя (name/hint, {en, ru})
@@ -95,7 +95,26 @@ function buildMode(m){ const T=TUNINGS[m.tuning], ch=m.chords, sel=m.degrees.sli
 export const SCALES=D.manifest.modes.map(id=>buildMode(D.modes[id]));
 /* ⛳ F1: ЛАД ПО id — единственный способ найти лад (state.scaleId, меню, уроки, демо). Неизвестный id — null; CUR() тогда берёт первый лад. */
 const SCALE_BY_ID=new Map(SCALES.map(s=>[s.id,s]));
-export const scaleById=id=>SCALE_BY_ID.get(id)||null;
+export const scaleById=id=>SCALE_BY_ID.get(id) || (ALIAS.has(id) ? SCALE_BY_ID.get(ALIAS.get(id).id) : null) || null;   // F7: и по псевдониму (ALIAS — ниже; читается при вызове)
+/* ⛳ F7 — ПСЕВДОНИМЫ ЛАДОВ: прежний id ведёт на лад с ПРЕДУСТАНОВКОЙ («строй от», режим аккордов). Живут в файле лада (поле aliases:
+   [{id, tunedFrom?, chordMode?}], проверка формы — scaleload); здесь — карта id → {id лада, предустановка}. 'ji-adaptive' и 'ji-fixed'
+   (до F7 — два лада) ведут на 'just-intonation' с «следует за тоникой + Свободно» и «от C + Как на инструменте». Занятый id (лад или
+   другой псевдоним) — не принимается (строка в консоли). scaleById(псевдоним) → лад; viewOfId(псевдоним) → ВИД предустановки (то, во
+   что откроется сохранённое событие со старым id); applyScaleId(псевдоним) — живой лад с его предустановкой. */
+const ALIAS=new Map();
+function addAliases(m){ for(const a of (m.aliases||[])){
+  if(SCALE_BY_ID.has(a.id) || ALIAS.has(a.id)){ console.warn(`[scales] alias "${a.id}" of mode "${m.id}" is already taken — ignored`); continue; }
+  ALIAS.set(a.id, { id:m.id, tunedFrom:a.tunedFrom, chordMode:a.chordMode }); } }
+function dropAliases(id){ for(const [k,a] of [...ALIAS]) if(a.id===id) ALIAS.delete(k); }
+for(const id of D.manifest.modes) addAliases(D.modes[id]);
+export const resolveScaleId=id=> SCALE_BY_ID.has(id) ? { id } : ALIAS.has(id) ? { ...ALIAS.get(id) } : null;
+export function viewOfId(id){ const r=resolveScaleId(id); if(!r) return null; const m=SCALE_BY_ID.get(r.id);
+  return scaleView(m, r.tunedFrom!==undefined ? r.tunedFrom : tunedFrom, r.chordMode!==undefined ? r.chordMode : chordModeOf(m)); }
+export function applyScaleId(id){ const r=resolveScaleId(id); if(!r) return null;
+  setScaleId(r.id); if(r.tunedFrom!==undefined) setTunedFrom(r.tunedFrom); if(r.chordMode!==undefined) setChordMode(r.id, r.chordMode);
+  return r.id; }
+/* ⛳ F7: ПОДСКАЗКА ВЫБОРА «СТРОЙ ОТ» — ключи словаря из данных лада (anchor.followHint/fixedHint), иначе общие (Пифагор — как было). */
+export const anchorHints=s=>{ const a=(modeRecOf(s)||{}).anchor||{}; return { follow:a.followHint||'panel.scale.tunedFollowHint', fixed:a.fixedHint||'panel.scale.tunedFixedHint' }; };
 setScaleId(D.manifest.start);   // F5: стартовый лад — из манифеста (загрузчик уже заменил незагрузившийся первым годным)
 /* ═══ ⛳ F6 — РЕЕСТР МЕНЯЕТСЯ НА ХОДУ: УСТАНОВКА И УДАЛЕНИЕ ФАЙЛА ПОЛЬЗОВАТЕЛЯ ═══
    Задний конец консоли userfiles.js (и будущего конструктора). Запись ПРОВЕРЯЕТ вызывающий (scaleload.checkRecord против scaleData());
@@ -125,7 +144,7 @@ export function unregisterRecord(kind,id,notify=true){
   if(kind==='tuning') delete TUNINGS[id];
   else if(kind==='palette') delete CHORD_FAM_SETS[id];
   else if(kind==='chordmodes') delete CHORD_MODE_SETS[id];
-  else { const s=SCALE_BY_ID.get(id); index=SCALES.indexOf(s); if(index>=0) SCALES.splice(index,1); SCALE_BY_ID.delete(id);
+  else { const s=SCALE_BY_ID.get(id); index=SCALES.indexOf(s); if(index>=0) SCALES.splice(index,1); SCALE_BY_ID.delete(id); dropAliases(id);
     if(scaleId===id){ setScaleId(SCALE_BY_ID.has(D.manifest.start) ? D.manifest.start : SCALES[0].id); switched=true; } }
   if(notify && hooks.scales) hooks.scales({ op:'remove', kind, id, switched });
   return { ok:true, index, switched };
@@ -137,7 +156,7 @@ export function registerRecord(kind,rec,notify=true){
   if(kind==='tuning') TUNINGS[id]=buildTuning(rec);
   else if(kind==='palette') CHORD_FAM_SETS[id]=buildPalette(rec);
   else if(kind==='chordmodes') CHORD_MODE_SETS[id]=buildChordModeSet(rec);
-  else { const s=buildMode(rec); if(index>=0) SCALES.splice(index,0,s); else SCALES.push(s); SCALE_BY_ID.set(id,s); if(wasLive) setScaleId(id); }   // заменённый живой лад остаётся живым (новая сборка)
+  else { const s=buildMode(rec); if(index>=0) SCALES.splice(index,0,s); else SCALES.push(s); SCALE_BY_ID.set(id,s); addAliases(rec); if(wasLive) setScaleId(id); }   // заменённый живой лад остаётся живым (новая сборка)
   if(notify && hooks.scales) hooks.scales({ op:'add', kind, id, switched:wasLive });
   return { ok:true };
 }
@@ -284,12 +303,17 @@ const modeRecOf=s=>SRC.get(modeObjOf(s));
 const tuningRecOf=s=>SRC.get(tuningOf(s));
 export function namingOf(s=CUR()){
   const m=modeObjOf(s), T=tuningOf(s);
-  let r=NM_MEMO.get(m); if(r && r.T===T) return r;
+  let r=NM_MEMO.get(m); if(r && r.T===T) return withDeg(r,s);
   const tf=SRC.get(T), mf=SRC.get(m); if(!tf || !tf.naming) return NAMING_NONE;
   const tn=tf.naming, mn=(mf && mf.naming) || {};
   r={ T, pitch:tn.scheme, deg:mn.scheme||tn.scheme, names:tn.names||null, detail:!!mn.detail, word:tf.periodWord||null };
-  NM_MEMO.set(m,r); return r;
+  NM_MEMO.set(m,r); return withDeg(r,s);
 }
+/* ⛳ F7: СХЕМА СТУПЕНЕЙ ОТ РЕЖИМА АККОРДОВ — поле вида degNaming (переопределение naming режима, scaleView кладёт его поверх полей лада)
+   важнее схемы лада и строя: у Натурального «Свободно» (аккорды адаптивно — высоты сдвигаются, имя ноты соврало бы) ступени —
+   порядковые, «Как на инструменте» — имена нот строя. Вариант памяти — на (лад, схема). */
+function withDeg(r,s){ const dn=s && s.degNaming; if(!dn || dn===r.deg) return r;
+  const k='deg:'+dn; return r[k] || (r[k]={...r, deg:dn}); }
 /* Слово ПЕРИОДА для ярлыков (F3: данные строя — periodWord): short — «окт» / «тритава» / «рег.», full — полное («ОКТАВА»); нет full —
    short заглавными. Строка — ключ словаря интерфейса (встроенные строи), объект — имя L() (строй пользователя, en/ru). Римская цифра
    регистра OCT_ROMAN[oct] — общая. */
@@ -767,7 +791,10 @@ export const centsOf=(deg,s=CUR())=>{
      Вызывающие передают ступень 0..n; за пределами — оборачивание по n+1 (прежде у равных было NaN, у таблиц — оборачивание). */
   const T=tuningOf(s), len=s.iv.length+1, K=degK(s,((deg%len)+len)%len,T);
   if(s.fixedKey){ const key=keyOf(s), k=key+K, C=T.cents, N=C.length, idx=((k%N)+N)%N, carry=Math.floor(k/N);
-    return Math.round(C[idx]+1200*carry-C[key]); }            // урок фиксированного строя (390 против 408) виден и в целых центах
+    /* ⛳ F7: ступени, названные НОМЕРОМ (схема ordinal — Натуральный в «Свободно»), читают центы в периоде, как каждая нумерованная
+       таблица (верхняя тоника — 0); названные НОТОЙ — над ключом до октавы (верхняя — 1200), как прежде у фиксированных. */
+    const c=C[idx]+1200*carry-C[key];
+    return Math.round(namingOf(s).deg==='ordinal' ? c%1200 : c); }            // урок фиксированного строя (390 против 408) виден и в целых центах
   if(T.equal==null){ const C=T.cents, N=C.length, idx=((K%N)+N)%N, carry=Math.floor(K/N);
     return Math.round((C[idx]+1200*carry-C[s.root])%1200); }  // центы таблицы над корнем лада (раги, гамелан, Партч) — целыми
   const pc=1200*Math.log2(T.period);   // центы ПЕРИОДА: октава 1200, тритава ≈1901.955 (BP)

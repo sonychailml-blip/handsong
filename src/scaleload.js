@@ -116,13 +116,15 @@ function checkChordModes(x,id,pal){
     need((m.hintKey!==undefined)!==(m.hint!==undefined),`chord mode ${m.id}: give exactly one of hintKey (dictionary key) or hint ({en, ru})`);
     need(m.nameKey===undefined ? isLName(m.name) : isStr(m.nameKey),`chord mode ${m.id}: name must be a string key or {en, ru}`);
     need(m.hintKey===undefined ? isLName(m.hint) : isStr(m.hintKey),`chord mode ${m.id}: hint must be a string key or {en, ru}`);
-    keysOnly(m.set,['build','palette','rule'],`chord mode ${m.id}: set (only build, palette, rule)`);
+    keysOnly(m.set,['build','palette','rule','grid','naming'],`chord mode ${m.id}: set (only build, palette, rule, grid, naming)`);   // F7: grid (аккорды из сетки) и naming (схема имён ступеней) — тоже свойства режима
+    if(m.set.grid!==undefined) need(m.set.grid===true,`chord mode ${m.id}: grid can only be true`);
+    if(m.set.naming!==undefined) need(['notes12','notes24','ordinal','list'].includes(m.set.naming),`chord mode ${m.id}: naming must be notes12, notes24, ordinal or list`);
     if(m.set.build!==undefined) need(['adaptive','tuning'].includes(m.set.build),`chord mode ${m.id}: build must be adaptive or tuning`);
     if(m.set.palette!==undefined) need(pal[m.set.palette],`chord mode ${m.id}: palette "${m.set.palette}" not loaded`);
     if(m.set.rule!==undefined) checkRule(m.set.rule,`chord mode ${m.id}`); }
 }
 function checkMode(x,id,ctx){
-  head(x,F.mode,id); keysOnly(x,['format','version','id','tuning','name','menu','degrees','root','anchor','chords','layout','naming','progressions','backing'],'mode');   // F5b: compat (tag) снят — тег живёт в пробе
+  head(x,F.mode,id); keysOnly(x,['format','version','id','tuning','name','menu','degrees','root','anchor','chords','layout','naming','progressions','backing','aliases'],'mode');   // F7: aliases   // F5b: compat (tag) снят — тег живёт в пробе
   const T=ctx.tunings[x.tuning]; need(isStr(x.tuning) && T,`its tuning "${x.tuning}" is not loaded`);
   need(isLName(x.name),'name missing');
   need(isObj(x.menu) && ctx.trads.has(x.menu.tradition),`menu.tradition "${x.menu && x.menu.tradition}" unknown`); keysOnly(x.menu,['tradition','group'],'menu');
@@ -132,7 +134,8 @@ function checkMode(x,id,ctx){
   need(d.every((k,i)=>i===0 || k>d[i-1]),'degrees must rise');
   need(isInt(x.root) && d.includes(x.root),'root must be one of the degrees');
   need(d.every(k=>k>=x.root && k<x.root+N),`degrees must lie within one period above the root (tuning has ${N} pitches)`);
-  need(isObj(x.anchor) && ['tonic','fixed','choice'].includes(x.anchor.policy),'anchor.policy must be tonic, fixed or choice'); keysOnly(x.anchor,['policy','note'],'anchor');
+  need(isObj(x.anchor) && ['tonic','fixed','choice'].includes(x.anchor.policy),'anchor.policy must be tonic, fixed or choice'); keysOnly(x.anchor,['policy','note','followHint','fixedHint'],'anchor');
+  for(const k of ['followHint','fixedHint']) if(x.anchor[k]!==undefined){ need(x.anchor.policy==='choice',`anchor.${k} belongs only to policy "choice"`); need(isStr(x.anchor[k]),`anchor.${k} must be a dictionary key`); }   // F7: подсказка выбора «строй от» — у лада своя
   if(x.anchor.policy==='fixed') need(x.anchor.note===0,'anchor.note: only 0 (C) is supported for a fixed anchor today');   // F6b: иное нота молча строилась бы от C — честнее отказ
   const C=x.chords; need(isObj(C),'chords missing'); keysOnly(C,['rule','palette','grid','build','modes'],'chords'); checkRule(C.rule,'chords');
   if(C.palette!==undefined) need(ctx.palettes[C.palette],`palette "${C.palette}" not loaded`);
@@ -140,10 +143,23 @@ function checkMode(x,id,ctx){
   if(C.build!==undefined) need(['adaptive','tuning'].includes(C.build),'chords.build must be adaptive or tuning');
   if(C.modes!==undefined) need(ctx.chordModeSets[C.modes],`chord modes "${C.modes}" not loaded`);
   const table=T.pitches.list!=null, cms=C.modes ? ctx.chordModeSets[C.modes].modes : [{id:'', set:{}}];
-  for(const m of cms){ const pal=m.set.palette ?? C.palette, build=m.set.build ?? C.build; if(pal===undefined) continue;
+  for(const m of cms){ const pal=m.set.palette ?? C.palette, build=m.set.build ?? C.build, grid=m.set.grid ?? C.grid; if(pal===undefined) continue;
     const kind=ctx.palettes[pal].kind, w=m.id ? ` (chord mode ${m.id})` : '';
-    if(kind==='ratios') need(table || build==='adaptive',`palette "${pal}" holds ratios: needs a table tuning or chords built adaptively${w}`);
-    else need(!table || C.grid===true,`palette "${pal}" holds steps: needs an equal tuning or chords.grid${w}`); }
+    if(kind==='ratios') need((table && grid!==true) || (!table && build==='adaptive' && ratioVal(T.period)!==2),`palette "${pal}" holds ratios: needs a table tuning without grid, or a non-octave equal tuning with chords built adaptively${w}`);   // F7: на октавном равном строе отношения цена прочла бы как шаги
+    else need(!table || grid===true,`palette "${pal}" holds steps: needs an equal tuning or grid${w}`); }
+  /* ⛳ F7-починка: ПЕРВЫЙ режим набора — УМОЛЧАНИЕ, и голый лад обязан ему РАВНЯТЬСЯ: каждое поле, которое режим по умолчанию ставит,
+     у самого лада уже такое же (по действующему значению: нет build — 'tuning', нет grid — без сетки, нет своей схемы имён — схема строя).
+     Иначе голый объект лада (демо, опоры пробы, всякий, кто возьмёт лад без вида) цен и подписей своего умолчания не даёт — ловушка, в
+     которую демо стартового экрана попадал до T7b; так было у Партча и Болена–Пирса (умолчание «Свободно» ставит adaptive, лад — нет). */
+  if(C.modes!==undefined){ const d=ctx.chordModeSets[C.modes].modes[0].set, eff={
+      build: C.build ?? 'tuning', palette: C.palette, rule: JSON.stringify(C.rule), grid: C.grid===true, naming: (x.naming && x.naming.scheme) || T.naming.scheme };
+    const got={ build:d.build, palette:d.palette, rule: d.rule===undefined ? undefined : JSON.stringify(d.rule), grid: d.grid===true, naming:d.naming };
+    for(const k of Object.keys(d)) need(got[k]===eff[k],`the default chord mode (the first of "${C.modes}") sets ${k}=${JSON.stringify(d[k])}, but the mode itself has ${JSON.stringify(k==='rule'?C.rule:eff[k])} — a mode must equal its default chord mode`); }
+  if(x.aliases!==undefined){ need(Array.isArray(x.aliases),'aliases must be a list');   // F7: прежние id, ведущие на этот лад с предустановкой
+    const cmIds=C.modes ? ctx.chordModeSets[C.modes].modes.map(z=>z.id) : [];
+    for(const a of x.aliases){ need(isObj(a) && isStr(a.id) && a.id!==x.id,'an alias needs its own id'); keysOnly(a,['id','tunedFrom','chordMode'],`alias ${a.id}`);
+      if(a.tunedFrom!==undefined) need(x.anchor.policy==='choice' && (a.tunedFrom==='T' || (isInt(a.tunedFrom) && a.tunedFrom>=0 && a.tunedFrom<12)),`alias ${a.id}: tunedFrom must be "T" or 0..11, on a mode with anchor "choice"`);
+      if(a.chordMode!==undefined) need(cmIds.includes(a.chordMode),`alias ${a.id}: chord mode "${a.chordMode}" is not in the mode's set`); } }
   if(x.layout!==undefined){ need(isObj(x.layout) && typeof x.layout.rect==='boolean','layout.rect must be true or false'); keysOnly(x.layout,['rect'],'layout'); }
   if(x.naming!==undefined){ need(isObj(x.naming),'naming must be an object'); keysOnly(x.naming,['scheme','detail'],'naming');
     if(x.naming.scheme!==undefined) need(['notes12','notes24','ordinal','list'].includes(x.naming.scheme),'naming.scheme unknown');

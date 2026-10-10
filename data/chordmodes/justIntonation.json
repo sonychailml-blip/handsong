@@ -1,0 +1,19 @@
+{
+  "format": "handsong/chordmodes",
+  "version": 1,
+  "id": "justIntonation",
+  "modes": [
+    {
+      "id": "free",
+      "nameKey": "cm.free",
+      "hintKey": "cm.ji.free.hint",
+      "set": {"build": "adaptive", "palette": "nat", "naming": "ordinal"}
+    },
+    {
+      "id": "instrument",
+      "nameKey": "cm.instrument",
+      "hintKey": "cm.ji.instrument.hint",
+      "set": {"build": "tuning", "palette": "natfix", "grid": true, "naming": "notes12"}
+    }
+  ]
+}

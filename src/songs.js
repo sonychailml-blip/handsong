@@ -21,7 +21,7 @@
    ЧЕРЕЗ ЭЛЕМЕНТЫ ПАНЕЛИ (их же обработчики — панель не расходится с состоянием) и ОСТАЮТСЯ: тональность пьесы — живая (правило #7 —
    лад заморожен в событии, тоника — нет), дрон берёт живой лад. Септаккорд — у каждого события свой (fz.sev), живой не трогается.
    ⚠️ DOM здесь трогается (элементы панели) — модуль консольный, не нижний слой (правило #5 — про audio/arrange/recorder). */
-import { scaleById, scaleView, chordFams, chordNotesAt, viewIdOf, periodOf } from './scales.js';   // F1: лад по id
+import { scaleById, scaleView, chordFams, chordNotesAt, viewIdOf, periodOf, viewOfId } from './scales.js';   // F1: лад по id
 import { tonic, aRef, setTonic, setARef } from './state.js';
 import { events, loop, recording, seedTake, clearRec, setLoopMetre, setLoopBpm, editOpen, editClose, editIsOpen,
          editResizeChordNote, editResizeSeg, autChainOf, autChainAdd, autChainRemove, autAddPoint, autShapePoint,
@@ -36,7 +36,7 @@ export const songNames=()=>Object.keys(SONGS);
 
 /* ═══ ОБЩЕЕ ═══ */
 const SID=id=>{ if(!scaleById(id)) throw new Error('no scale '+id); return id; };   // id — стабильный (T0), не имя (правило #25); F1: им и адресуем
-const VIEW=id=>scaleView(scaleById(SID(id)));
+const VIEW=id=>viewOfId(SID(id));   // F7: по id или ПСЕВДОНИМУ — 'ji-adaptive' открывает Натуральный строй с предустановкой «следует за тоникой + Свободно»
 const B=(bar,x=0)=>(bar-1)*4+x;                       // песенная доля: такт (с 1) и доля в такте (размер 4)
 /* Величина параметра в ЕГО единицах → 0..1 по объявлению модуля (min/max/curve) — та же шкала, что у полосы и захвата. */
 function n01(fxId,pKey,val){

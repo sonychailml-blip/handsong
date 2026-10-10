@@ -20,6 +20,9 @@
                         //   probeTake), лад и строй удаляются — цена, ряды и подписи записанного === до удаления (нужен ▶ Play)
      P.checkUserChordModes() // F6b: СВОЙ НАБОР РЕЖИМОВ АККОРДОВ — три режима со своими именами: имена (и кнопки панели), цена каждого режима
                         //   по его переопределениям, записанные аккорды держат свой режим при переключении (правило T7b; нужен ▶ Play)
+     P.checkBare()      // F7-починка: ГОЛЫЙ ЛАД = ВИД ЕГО РЕЖИМА ПО УМОЛЧАНИЮ — поля аккордов, цены и подписи (у каждого лада с режимами)
+     P.checkMerge()     // F7: ДВА НАТУРАЛЬНЫХ → ОДИН: каждая предустановка слитого лада против ЗАМОРОЖЕННОЙ записи прежнего лада — каждая цена (===)
+                        //   и каждая подпись; псевдонимы ведут на предустановку
      await P.renewSnapshot() // F5b: пересъёмка снимка — ТОЛЬКО если все расхождения P.checkFiles — объявленное изменение (уход tag)
      P.checkBehaviour() // F4: ПОВЕДЕНИЕ ДАННЫМИ — дрон (оба положения ухо-переключателя), прогрессии, ритм джема, строка статуса —
                         //   против замороженного кода до F4: каждый вид × 12 тоник (статус — en/ru)
@@ -58,7 +61,7 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint } from './scales.js';   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf } from './scales.js';   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
@@ -104,7 +107,7 @@ const TAG_OF={
   'maqam-saba':'maqam', 'maqam-sikah':'maqam', 'maqam-nahawand':'maqam', 'maqam-kurd':'maqam', 'maqam-ajam':'maqam', 'maqam-nikriz':'maqam',
   'maqam-nawa-athar':'maqam', 'slendro':'penta', 'pelog':'penta', 'hirajoshi':'penta', 'kumoi-japanese':'penta', 'in-insen':'penta',
   'iwato':'penta', 'partch-43':'ji', 'bohlen-pierce':'bp', 'carlos-alpha':'carlos', 'carlos-beta':'carlos', 'carlos-gamma':'carlos',
-  'pelog-lima':'penta', 'pelog-nem':'penta', 'pelog-barang':'penta', 'pythagorean':'penta', 'ji-adaptive':'penta', 'ji-fixed':'penta',
+  'pelog-lima':'penta', 'pelog-nem':'penta', 'pelog-barang':'penta', 'pythagorean':'penta', 'ji-adaptive':'penta', 'ji-fixed':'penta', 'just-intonation':'penta',   // F7: слитый Натуральный — тот же тег, что у обоих прежних
   'meantone-quarter':'penta', 'shruti-22':'penta', 'raga-bhairav':'penta', 'raga-yaman':'penta', 'raga-kafi':'penta', 'raga-bhairavi':'penta',
   'raga-todi':'penta', 'raga-khamaj':'penta', 'raga-asavari':'penta', 'raga-malhar':'penta', 'raga-purvi':'penta', 'raga-bilawal':'penta',
   'werckmeister-3':'penta', 'vallotti':'penta', 'kirnberger-3':'penta',
@@ -557,7 +560,10 @@ const fixedExact=(d,v)=>{ const A= v.tunedFrom==='T' ? tonic : (v.tunedFrom==nul
   const C=v.cents, L=C.length, abs=key+d, slot=((abs%L)+L)%L, carry=Math.floor(abs/L);
   return C[slot]+1200*carry-C[key]; };
 const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotesRef, tonic:legacyTonicFreq,   // «стопка»: у лада stack опора — прежняя арифметика стопки (scales.legacyChordNotesRef)
-            cents:(d,v)=> v.fixedKey ? Math.round(fixedExact(d,v)) : Math.round(legacyCentsOf(d,v)) };
+            cents:(d,v)=> v.fixedKey ? fixedCents(d,v) : Math.round(legacyCentsOf(d,v)) };
+/* ⛳ F7: у фиксированного вида, чьи ступени режим аккордов называет ПОРЯДКОВЫМИ (Натуральный в «Свободно», degNaming), показ центов — в
+   периоде (верхняя тоника 0), как у каждой нумерованной таблицы; прочие ступени лежат ниже 1200, поэтому опора — прежняя по модулю 1200. */
+function fixedCents(d,v){ const r=Math.round(fixedExact(d,v)); return v.degNaming==='ordinal' ? r%1200 : r; }
 const allViews=()=>{ const out=[];
   for(const s of SCALES){ if(s.tunable){ out.push([s,'T']); for(let pc=0;pc<12;pc++) out.push([s,pc]); } else out.push([s,'T']); }
   return out; };
@@ -974,6 +980,8 @@ const ALL_RUNS=[
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['bare mode = default chord mode',()=>checkBare(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['F7 Just intonation merge',()=>checkMerge(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F6b user chord modes',()=>checkUserChordModes(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F6 user files: deletion keeps recordings',()=>checkUserDelete(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F3 naming as data', ()=>checkNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -1924,6 +1932,16 @@ export function dumpScales(){
   console.log(`[scaleprobe files] snapshot: ${snap.modes.length} modes, ${Object.keys(snap.tunings).length} tunings, ${Object.keys(snap.palettes).length} palettes, ${snap.views.length} views × 12 tonics × 2 languages · ${(text.length/1024).toFixed(0)} KB — downloaded as scales.before.json; put it into tools/`);
   return snap;
 }
+/* ⛳ F7: СВЕРКА ПО id, А НЕ ПО МЕСТУ. Лады, виды и списки режимов аккордов сравниваются ПО СВОЕМУ id (лад — без номера i: место в массиве
+   не тождество, правило #25; удаление одного лада иначе показало бы расхождение у каждого лада после него). Порядок проверяет меню — его
+   списки остаются ПОЗИЦИОННЫМИ (без номера i, по той же причине), так что перестановка ладов видна. Форма файла снимка не меняется:
+   оба снимка перекладываются здесь одинаково. */
+function keyedSnap(x){ const o={...x};
+  if(Array.isArray(o.modes)) o.modes=Object.fromEntries(o.modes.map(r=>[r.fields && r.fields.id, r.fields]));
+  if(Array.isArray(o.views)) o.views=Object.fromEntries(o.views.map(v=>[v.id, v]));
+  if(o.chordModes) o.chordModes=Object.fromEntries(Object.entries(o.chordModes).map(([lg,a])=>[lg, Object.fromEntries((a||[]).map(z=>[z.id, z.modes]))]));
+  if(o.menu) o.menu=Object.fromEntries(Object.entries(o.menu).map(([lg,trs])=>[lg, (trs||[]).map(tr=>({ ...tr, groups:(tr.groups||[]).map(g=>({ ...g, scales:(g.scales||[]).map(({id,name})=>({id,name})) })) }))]));
+  return o; }
 /* P.checkFiles() — живой реестр против tools/scales.before.json, поле за полем (===), без meta. Файла нет — { noSnap:true }: P.all
    показывает «снимка ещё нет» (не провал и не pass). Каждое расхождение — путь и обе величины. */
 export async function checkFiles(){
@@ -1931,7 +1949,8 @@ export async function checkFiles(){
   try{ const r=await fetch(new URL(SNAP_FILE, location.href), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
   catch(e){ console.log(`[scaleprobe files] no snapshot yet (${SNAP_FILE}: ${e&&e.message}) — run P.dumpScales() on the unchanged code and put the file into tools/`);
             return { cases:0, total:0, differences:[], noSnap:true }; }
-  const live=JSON.parse(JSON.stringify(buildSnapshot()));   // та же сериализация, что у файла: сравниваем одно с одним
+  file=keyedSnap(file);
+  const live=keyedSnap(JSON.parse(JSON.stringify(buildSnapshot())));   // та же сериализация, что у файла: сравниваем одно с одним; F7 — по id
   const bad=[]; let nBad=0, cases=0;
   const groups=new Map();   // F5b: СВОДКА по пути поля (номера в [] → [*]) и виду расхождения — видно с одного взгляда, ЧТО разошлось
   const miss=(m,path,kind)=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m);
@@ -1973,17 +1992,22 @@ export function checkNames(){
     for(const {v} of snapViews()){
       const n=v.iv.length, id=viewIdOf(v), chords=!v.noChords && !(v.chordRule && v.chordRule.kind==='none');
       const axes=[['All',RP.axis(v,true)],['Mode',RP.axis(v,false)]];
+      /* ⛳ F7: опоры F3 не знают схемы ступеней ОТ РЕЖИМА АККОРДОВ (degNaming появилась в F7): вид, чьи ступени режим называет
+         порядковыми (Натуральный в «Свободно»), сверяется с замороженным порядковым правилом — тем же видом без fixedKey (опора F3 даёт
+         порядковые у табличного лада без fixedKey: ровно прежний подвижный Натуральный). Иных схем режимы встроенных не задают. */
+      const vr= v.degNaming==='ordinal' ? {...v, fixedKey:false} : v;
+      const axR=ax=> vr===v ? ax : {...ax, sc:vr};
       for(let tn=0;tn<12;tn++){ setTonic(tn);
         for(const lg of ['en','ru']) withLang(lg,()=>{
           const eq=(what,a,b)=>{ cases++; if(a!==b) miss(`${id} tonic ${tn} ${lg} · ${what}: "${a}" now, "${b}" before F3`); };
           eq('period word', regWord(v), preF3RegWord(v)); eq('period word (full)', regWordFull(v), preF3RegWordFull(v));
           for(let d=0;d<=n;d++){
-            eq(`degree ${d}`, RP.noteLbl(d,v), preF3NoteLbl(d,v)); eq(`row ${d}`, rowLabel(d,v), preF3RowLabel(d,v)); eq(`root ${d}`, rootName(d,v), preF3RootName(d,v));
+            eq(`degree ${d}`, RP.noteLbl(d,v), preF3NoteLbl(d,vr)); eq(`row ${d}`, rowLabel(d,v), preF3RowLabel(d,v)); eq(`root ${d}`, rootName(d,v), preF3RootName(d,v));
             if(chords) for(const sev of [false,true]){ const w=sev?' 7th':'';
               eq(`chord ${d}${w}`, chordLabel(d,v,sev), preF3ChordLabel(d,v,sev)); eq(`chord notes ${d}${w}`, chordNotesStr(d,v,sev), preF3ChordNotesStr(d,v,sev)); }
           }
           for(let st=-v.edo; st<2*v.edo; st++) eq(`step ${st}`, stepName(st,v), preF3StepName(st,v));
-          for(const [nm,ax] of axes) for(let r=0;r<ax.rpp*REG_N;r++) eq(`${nm} axis row ${r}`, RP.axisLbl(ax,r), preF3AxisLbl(ax,r));
+          for(const [nm,ax] of axes) for(let r=0;r<ax.rpp*REG_N;r++) eq(`${nm} axis row ${r}`, RP.axisLbl(ax,r), preF3AxisLbl(axR(ax),r));
         });
       }
     }
@@ -2028,13 +2052,29 @@ export function checkBehaviour(){
    лада…); count — сколько расхождений обязано найтись по ВСЕМ подходящим группам вместе. F5b: поле tag ушло из каждого лада. F6b: у
    каждого встроенного строя появилось имя (tunings.<id>.name — новое поле). Без аргумента renewSnapshot берёт ПОСЛЕДНЕЕ объявленное. */
 export const SNAPSHOT_CHANGES={
-  f5b:[{ field:'modes[*].fields.tag', kind:'gone', count:()=>SCALES.length }],
+  f5b:[{ field:'modes.*.tag', kind:'gone', count:()=>SCALES.length }],   // (с F7 сверка по id — путь записан в нынешней форме)
   f6b:[{ field:'tunings.*.name', kind:'new', count:()=>Object.keys(TUNINGS).length }],
+  /* F7: два Натуральных слиты в один лад 'just-intonation' (13 «строй от» × 2 режима аккордов = 26 видов); в меню «Европа историческая»
+     вместо двух строк — одна: из 7 строк группы стало 6, со второй по шестую строки сдвинулись (5 id и 5 имён на язык) и длина. */
+  f7:[{ field:'modes.ji-adaptive', kind:'gone', count:()=>1 }, { field:'modes.ji-fixed', kind:'gone', count:()=>1 },
+      { field:'modes.just-intonation', kind:'new', count:()=>1 },
+      { field:'views.ji-adaptive', kind:'gone', count:()=>1 }, { field:'views.ji-fixed', kind:'gone', count:()=>1 },
+      { field:'views.just-intonation@*', kind:'new', count:()=>26 },
+      { field:'chordModes.*.just-intonation', kind:'new', count:()=>2 },
+      { field:'menu.*[*].groups[*].scales', kind:'length', count:()=>2 },
+      { field:'menu.*[*].groups[*].scales[*].id', kind:'value', count:()=>10 },
+      { field:'menu.*[*].groups[*].scales[*].name', kind:'value', count:()=>10 }],
+  /* F7-починка: голый лад РАВЕН своему режиму аккордов по умолчанию — у Партча и Болена–Пирса прибавилось chordBuild 'adaptive' (умолчание
+     «Свободно»), у Натурального — палитра 'nat' и chordBuild 'adaptive' (его «Свободно»), а его «Как на инструменте» переопределяет и имена
+     ступеней (degNaming 'notes12' — у самого лада теперь порядковые). */
+  f7b:[{ field:'modes.partch-43.chordBuild', kind:'new', count:()=>1 }, { field:'modes.bohlen-pierce.chordBuild', kind:'new', count:()=>1 },
+       { field:'modes.just-intonation.typedChords', kind:'new', count:()=>1 }, { field:'modes.just-intonation.chordBuild', kind:'new', count:()=>1 },
+       { field:'modes.just-intonation.chordModes[*].over.degNaming', kind:'new', count:()=>1 }],
 };
 const reEsc=q=>q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const fieldRe=f=>new RegExp('^'+f.split('[*]').map(p=>p.split('*').map(reEsc).join('[^.\\[\\]]+')).join('\\[\\*\\]')+'$');   // '*' — одно звено; '[*]' — номер в сводке, как есть
-export async function renewSnapshot(arg=SNAPSHOT_CHANGES.f6b){
-  const allowed=Array.isArray(arg) ? arg : (arg && arg.allowed) || SNAPSHOT_CHANGES.f6b;   // F6b: P.renewSnapshot({allowed: …}) или список
+export async function renewSnapshot(arg=SNAPSHOT_CHANGES.f7b){
+  const allowed=Array.isArray(arg) ? arg : (arg && arg.allowed) || SNAPSHOT_CHANGES.f7b;   // F6b: P.renewSnapshot({allowed: …}) или список
   const keep={ log:console.log, warn:console.warn, table:console.table }; let r;
   console.log=console.warn=console.table=()=>{};
   try{ r=await checkFiles(); } finally { Object.assign(console,keep); }
@@ -2179,5 +2219,97 @@ export function checkUserChordModes(){
   } finally { setScaleId(keepSc); setChordModeSel(keepCM); try{ drop(); }catch(e){} }
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe chord modes] '+m));
   if(!nBad) console.log('[scaleprobe chord modes] own names, three buttons, each mode prices as its overrides say, recorded chords keep their mode');
+  return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F7 — P.checkMerge(): ДВА НАТУРАЛЬНЫХ → ОДИН ЛАД С «СТРОЙ ОТ» И РЕЖИМОМ АККОРДОВ ═══
+   ЗАМОРОЖЕННЫЕ ОПОРЫ — записи прежних ладов 'ji-adaptive' и 'ji-fixed' ровно такими, какими их строил сборщик (объекты приложения, из
+   снимка tools/scales.before.json до F7). Предустановки слитого лада 'just-intonation': «следует за тоникой + Свободно» против прежнего
+   подвижного, «от C + Как на инструменте» против прежнего фиксированного. ЦЕНЫ (===): высота тоники, дрон, единица корня, набор палитры;
+   × 12 тоник × A4 415 / 440 / 466.16 × регистры 0..3: соло и бас по ступени (0..12) и по индексу в строе (0..12), каждая нота каждого
+   типа палитры (с септаккордом и без) по ступени и по индексу корня (0..11). ПОДПИСИ (на обоих языках, × 12 тоник): ступень, ряд, корень,
+   аккорд и его ноты (± септаккорд), центы ступени, слово периода (оба), строка статуса, обе оси редактора (каждый ряд каждого регистра) —
+   новые функции на виде предустановки против ЗАМОРОЖЕННЫХ подписей (preF3… и preF4Status) на прежнем виде. ПСЕВДОНИМЫ: прежние id ведут
+   на слитый лад и открывают вид своей предустановки. Тоника, A4, лад, «строй от» и выбор режимов возвращаются в finally. */
+const PRE_F7_MODES={"ji-adaptive":{"cents":[0,111.73,203.91,315.64,386.31,498.04,590.22,701.96,813.69,884.36,1017.6,1088.27],"chordBuild":"adaptive","chordRule":{"kind":"palette"},"edo":12,"grp":"","id":"ji-adaptive","iv":[0,1,2,3,4,5,6,7,8,9,10,11],"name":{"en":"Just intonation — adaptive (as a choir sings)","ru":"Натуральный строй — подвижный (как поёт хор)"},"root":0,"sel":[0,1,2,3,4,5,6,7,8,9,10,11],"trad":"europe","tuning":"ji12","typedChords":"nat"},"ji-fixed":{"cents":[0,111.73,203.91,315.64,386.31,498.04,590.22,701.96,813.69,884.36,1017.6,1088.27],"chordRule":{"kind":"palette"},"edo":12,"fixedKey":true,"gridChords":true,"grp":"","id":"ji-fixed","iv":[0,1,2,3,4,5,6,7,8,9,10,11],"name":{"en":"Just intonation — fixed (as on a keyboard)","ru":"Натуральный строй — фиксированный (как на клавишных)"},"root":0,"sel":[0,1,2,3,4,5,6,7,8,9,10,11],"trad":"europe","tuning":"ji12","typedChords":"natfix"}};
+const PRE_F7_OBJ={};   // объекты прежних ладов — по одному на сеанс (виды памятятся по объекту)
+const preF7=id=>PRE_F7_OBJ[id] || (PRE_F7_OBJ[id]=JSON.parse(JSON.stringify(PRE_F7_MODES[id])));
+export function checkMerge(){
+  const bad=[]; let nBad=0, cases=0, nP=0, nL=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const M=scaleById('just-intonation');
+  if(!M){ miss('no mode just-intonation'); return { cases, total:nBad, differences:bad }; }
+  const keep={ t:tonic, a:aRef, sc:scaleId, tf:tunedFrom, cm:{...chordModeSel} };
+  const J=x=>JSON.stringify(canon(x));
+  const eqP=(what,a,b)=>{ cases++; nP++; if(typeof a==='number' ? a!==b : J(a)!==J(b)) miss(`${what}: ${typeof a==='number'?a:J(a).slice(0,140)} now, ${typeof b==='number'?b:J(b).slice(0,140)} before`); };
+  const eqL=(what,a,b)=>{ cases++; nL++; if(a!==b) miss(`${what}: "${a}" now, "${b}" before`); };
+  const presets=[['follows the tonic + Free','ji-adaptive','T','free'], ['tuned from C + As on the instrument','ji-fixed',0,'instrument']];
+  try{
+    for(const [name,oldId,tf,cm] of presets){
+      const nv=scaleView(M,tf,cm), ov=scaleView(preF7(oldId),'T');
+      const types=chordFams(ov).flatMap(f=>f.types.map(x=>x.iv));
+      eqP(`${name}: palette`, chordFams(nv), chordFams(ov)); eqP(`${name}: root unit`, chordUnit(nv), chordUnit(ov));
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        for(const A of [415,440,466.16]){ setARef(A); const w=`${name} · tonic ${tn} · A4 ${A}`;
+          eqP(`${w} · tonic Hz`, tonicFreq(nv), tonicFreq(ov)); eqP(`${w} · drone`, droneDegree(nv), droneDegree(ov));
+          for(let o=0;o<4;o++){
+            for(let d=0;d<=12;d++){ eqP(`${w} · lead deg ${d} reg ${o}`, leadFreq(d,o,nv), leadFreq(d,o,ov)); eqP(`${w} · bass deg ${d} reg ${o}`, bassFreq(d,o,nv), bassFreq(d,o,ov));
+              eqP(`${w} · lead ti ${d} reg ${o}`, leadFreqTi(d,o,nv), leadFreqTi(d,o,ov)); eqP(`${w} · bass ti ${d} reg ${o}`, bassFreqTi(d,o,nv), bassFreqTi(d,o,ov)); }
+            for(const sev of [false,true]) for(const ty of types) for(let d=0;d<12;d++){ const tw=`${w} · chord [${ty}]${sev?' 7th':''} reg ${o}`;
+              eqP(`${tw} deg ${d}`, chordNotes(d,o,nv,sev,ty).map(x=>[x.f,x.iv]), chordNotes(d,o,ov,sev,ty).map(x=>[x.f,x.iv]));
+              eqP(`${tw} ti ${d}`, chordNotesAt(d,o,nv,sev,ty).map(x=>[x.f,x.iv]), chordNotesAt(d,o,ov,sev,ty).map(x=>[x.f,x.iv])); } } }
+        setARef(440);
+        for(const lg of ['en','ru']) withLang(lg,()=>{ const w=`${name} · tonic ${tn} · ${lg}`;
+          for(let d=0;d<=12;d++){ eqL(`${w} · degree ${d}`, RP.noteLbl(d,nv), preF3NoteLbl(d,ov)); eqL(`${w} · row ${d}`, rowLabel(d,nv), preF3RowLabel(d,ov));
+            eqL(`${w} · root ${d}`, rootName(d,nv), preF3RootName(d,ov)); eqL(`${w} · cents ${d}`, String(centsOf(d,nv)), String(centsOf(d,ov)));
+            for(const sev of [false,true]){ eqL(`${w} · chord ${d}${sev?' 7th':''}`, chordLabel(d,nv,sev), preF3ChordLabel(d,ov,sev)); eqL(`${w} · chord notes ${d}${sev?' 7th':''}`, chordNotesStr(d,nv,sev), preF3ChordNotesStr(d,ov,sev)); } }
+          eqL(`${w} · period word`, regWord(nv), preF3RegWord(ov)); eqL(`${w} · period word (full)`, regWordFull(nv), preF3RegWordFull(ov)); eqL(`${w} · status`, tuningStatus(nv), preF4Status({...ov, name:nv.name}));   // F7-починка: имя лада — объявленное изменение; в опору подставлено новое имя, вся прочая строка сверяется как есть
+          for(const all of [true,false]){ const aN=RP.axis(nv,all), aO=RP.axis(ov,all); eqL(`${w} · axis ${all?'All':'Mode'} rows per register`, String(aN.rpp), String(aO.rpp));
+            for(let r=0;r<aO.rpp*REG_N;r++) eqL(`${w} · axis ${all?'All':'Mode'} row ${r}`, RP.axisLbl(aN,r), preF3AxisLbl(aO,r)); } });
+      }
+      // псевдоним
+      cases+=4; const R=resolveScaleId(oldId);
+      if(!R || R.id!=='just-intonation' || R.tunedFrom!==tf || R.chordMode!==cm) miss(`alias ${oldId} resolves to ${JSON.stringify(R)}`);
+      if(scaleById(oldId)!==M) miss(`scaleById('${oldId}') is not the merged mode`);
+      if(viewOfId(oldId)!==nv) miss(`viewOfId('${oldId}') is not the view of its preset`);
+      applyScaleId(oldId); if(CUR()!==nv) miss(`applyScaleId('${oldId}') does not make its preset live`);
+    }
+    cases+=2; if(SCALES_ALL.some(x=>x.id==='ji-adaptive'||x.id==='ji-fixed')) miss('an old Natural mode is still a mode of its own');
+    const eu=menuOf('europe').flatMap(g=>g.items.map(({s})=>s.id)); if(eu.filter(id=>id==='just-intonation').length!==1) miss(`Historical Europe lists: ${eu.join(', ')}`);
+    console.log(`[scaleprobe F7] 2 presets × 12 tonics × 3 A4 · prices ${nP} · labels ${nL} · differences ${nBad}`);
+  } finally { setTonic(keep.t); setARef(keep.a); setScaleId(keep.sc); setTunedFrom(keep.tf); setChordModeSel(keep.cm); }
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe F7] '+m));
+  if(!nBad) console.log('[scaleprobe F7] both presets of Just intonation price and label exactly as the two old modes; the old ids open their presets');
+  return { cases, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ F7-починка — P.checkBare(): ГОЛЫЙ ОБЪЕКТ ЛАДА РАВЕН ВИДУ ЕГО РЕЖИМА АККОРДОВ ПО УМОЛЧАНИЮ ═══
+   У каждого лада с режимами аккордов: голый объект (без вида — так его берут демо, опоры пробы и всякий, кто читает лад напрямую) против
+   вида с ПЕРВЫМ режимом набора (у лада с «строй от» — от C: голый объект настроен от C). Поля аккордов (сборка, палитра, правило, сетка,
+   схема имён ступеней), и × 12 тоник × регистры 0..3: соло и бас по каждой ступени, каждая нота аккорда — каждого типа палитры и без
+   типа, с септаккордом и без; подписи ступеней и центы. Сверка ===. Тоника возвращается в finally. */
+export function checkBare(){
+  const bad=[]; let nBad=0, cases=0, nModes=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const J=x=>JSON.stringify(x), keepT=tonic;
+  try{
+    for(const s of SCALES){ if(!s.chordModes) continue; nModes++;
+      const cm=s.chordModes[0].id, v=scaleView(s, s.tunable ? 0 : 'T', cm), w=`${s.id} (default «${cm}»)`;
+      for(const [f,a,b] of [['chord build',chordBuildOf(s),chordBuildOf(v)],['palette',s.typedChords,v.typedChords],['rule',J(s.chordRule),J(v.chordRule)],
+                            ['grid',!!s.gridChords,!!v.gridChords]]){ cases++; if(a!==b) miss(`${w}: ${f} — bare ${a}, default view ${b}`); }
+      const types=chordFams(v).map(fm=>fm.types.map(x=>x.iv)).flat(), n=s.iv.length;
+      for(let tn=0;tn<12;tn++){ setTonic(tn);
+        cases++; if(namingOf(s).deg!==namingOf(v).deg) miss(`${w}: degrees named ${namingOf(s).deg} bare, ${namingOf(v).deg} by the default view`);
+        for(let d=0;d<=n;d++){ cases+=2; if(RP.noteLbl(d,s)!==RP.noteLbl(d,v)) miss(`${w} tonic ${tn}: degree ${d} label "${RP.noteLbl(d,s)}" bare, "${RP.noteLbl(d,v)}" default`);
+          if(centsOf(d,s)!==centsOf(d,v)) miss(`${w} tonic ${tn}: degree ${d} cents ${centsOf(d,s)} bare, ${centsOf(d,v)} default`); }
+        for(let o=0;o<4;o++) for(let d=0;d<=n;d++){ cases+=2;
+          if(leadFreq(d,o,s)!==leadFreq(d,o,v)) miss(`${w} tonic ${tn}: lead degree ${d} reg ${o}`);
+          if(bassFreq(d,o,s)!==bassFreq(d,o,v)) miss(`${w} tonic ${tn}: bass degree ${d} reg ${o}`);
+          if(d<n) for(const sev of [false,true]) for(const ty of [null,...types]){ cases++;
+            const A=J(chordNotes(d,o,s,sev,ty).map(x=>[x.f,x.iv])), B=J(chordNotes(d,o,v,sev,ty).map(x=>[x.f,x.iv]));
+            if(A!==B) miss(`${w} tonic ${tn}: chord ${ty?'['+ty+']':'untyped'}${sev?' 7th':''} degree ${d} reg ${o} — bare ${A.slice(0,90)}, default ${B.slice(0,90)}`); } } }
+    }
+  } finally { setTonic(keepT); }
+  console.log(`[scaleprobe bare] modes with chord modes ${nModes} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe bare] '+m));
+  if(!nBad) console.log('[scaleprobe bare] every mode with chord modes prices and labels on its own exactly as its default chord mode');
   return { cases, total:nBad, differences:bad };
 }

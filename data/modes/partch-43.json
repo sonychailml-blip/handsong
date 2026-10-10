@@ -11,6 +11,7 @@
   "chords": {
     "rule": {"kind": "palette"},
     "palette": "partch",
+    "build": "adaptive",
     "modes": "freeInstrument"
   },
   "layout": {"rect": true}

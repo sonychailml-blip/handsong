@@ -1,0 +1,22 @@
+{
+  "format": "handsong/mode",
+  "version": 1,
+  "id": "just-intonation",
+  "tuning": "ji12",
+  "name": {"en": "Just intonation (5-limit)", "ru": "Натуральный строй (5-предел)"},
+  "menu": {"tradition": "europe", "group": ""},
+  "degrees": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+  "root": 0,
+  "anchor": {"policy": "choice", "followHint": "panel.scale.tunedFollowHintJI"},
+  "chords": {
+    "rule": {"kind": "palette"},
+    "palette": "nat",
+    "build": "adaptive",
+    "modes": "justIntonation"
+  },
+  "naming": {"scheme": "ordinal"},
+  "aliases": [
+    {"id": "ji-adaptive", "tunedFrom": "T", "chordMode": "free"},
+    {"id": "ji-fixed", "tunedFrom": 0, "chordMode": "instrument"}
+  ]
+}

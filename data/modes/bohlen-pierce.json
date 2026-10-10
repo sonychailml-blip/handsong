@@ -11,6 +11,7 @@
   "chords": {
     "rule": {"kind": "palette"},
     "palette": "bp",
+    "build": "adaptive",
     "modes": "freeInstrumentBP"
   }
 }
