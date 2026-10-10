@@ -72,7 +72,8 @@ import { L, t, withLang } from './i18n.js';   // T7: подписи типов �
 import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
-         onLoop, loop, songBeats, setLoopMetre } from './recorder.js';   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         onLoop, loop, songBeats, setLoopMetre,
+         songNotes, editResizeSeg, editDeleteSeg, editInsertLead, soloEditBlock, editUndo, editRedo, freezeState, recording } from './recorder.js';   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -980,6 +981,7 @@ const ALL_RUNS=[
   ['T7b chord modes',    ()=>checkModes(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
+  ['S4 solo editing',    ()=>checkSoloEdit(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1168,6 +1170,10 @@ export function checkSeed(){
     if('deg' in a) miss(`${at}: carries a degree`);
     if(!(typeof a.vol==='number' && a.vol>=0 && a.vol<=1)) miss(`${at}: volume ${a.vol} (rule #30)`);
     if(typeof a.inst!=='number') miss(`${at}: timbre ${a.inst}`);
+    if('inst' in I && a.inst!==I.inst) miss(`${at}: timbre ${a.inst}, intended ${I.inst}`);   // S4: тембр — ближайшей ноты
+    if('vol' in I && a.vol!==I.vol) miss(`${at}: volume ${a.vol}, intended ${I.vol}`);       // S4: громкость — ближайшего события с громкостью
+    if('fx' in I && JSON.stringify(a.fx??null)!==JSON.stringify(I.fx??null)) miss(`${at}: effect map ${JSON.stringify(a.fx??null)}, intended ${JSON.stringify(I.fx??null)} (a copy of the neighbour's, absence included)`);   // S4: решение пользователя 1
+    if(I.plain && (a.bend || a.tie || a.hold)) miss(`${at}: an inserted solo note carries ${a.bend?'a bend':a.tie?'a tie':'hold'}`);   // S4: вставленная нота — обычная
     if('ty' in I && JSON.stringify(a.ty??null)!==JSON.stringify(I.ty??null)) miss(`${at}: type ${JSON.stringify(a.ty)}, intended ${JSON.stringify(I.ty)}`);
     if(I.out!=null && !modeSlotOfTi(a.ti,a.oct,ev.sc)!==I.out) miss(`${at}: ${I.out?'should be outside':'should be inside'} its mode`);
     if(I.cents){ const N=chordNotesAt(a.ti,a.oct,ev.sc,ev.sev,a.ty), c=centsShape(N);
@@ -1194,6 +1200,133 @@ export function checkFrozen(){
   bad.forEach(m=>console.warn('[scaleprobe frozen] '+m));
   return { cases:3, total:bad.length, differences:bad, got:F };
 }
+/* ═══ S4: ПРАВКА СОЛО — P.checkSoloEdit ═══
+   Соло правится ТОЙ ЖЕ машинерией, что бас (бас и соло — один инструмент). Проба держит три вещи, все — на загруженной песне:
+     1) ИНВАРИАНТЫ ПЕСНИ: сирот нет (ведение или «выкл» без своей ноты); каждая нота соло кончается СВОИМ «выкл» (пары «вкл/выкл» сходятся);
+        у каждого высотного «вкл»/ведения есть громкость (правило #30); каждая половина ПАРЫ СВЯЗКИ («выкл» с tie / «вкл» с tie) имеет
+        партнёра — противоположное событие того же взятого на той же доле в ДРУГОЙ дорожке; точки кривой бенда лежат внутри своей ноты.
+     2) ОТКАЗЫ (recorder.soloEditBlock — тот же предикат, что у функций правки и ui): длина терменвокса — 'roll.thereminLen'; время и
+        удаление края пары связки — 'roll.tieEdge'; перенос, высота и удаление терменвокса — без отказа.
+     3) КРУГ «ПРАВКА → ↶ → ↷ → ↶»: после ↶ события песни ПОБИТНО прежние (те же объекты; доля, слой, функция, взятое, вид, септаккорд и
+        нагрузка — по значению), после ↷ — побитно как после правки; правки: перенос одиночной ноты, её длина, высота и удаление; отделение
+        и удаление сегмента ведущей линии; высота «вкл» пары связки; перенос с транспонированием терменвокса (кривая та же); вставка.
+        Отказанная правка песню не трогает. Редактор открывается и закрывается самой пробой; песня после неё — та же.
+   У P.seed материал обязателен (его нет — расхождение); у демо-пьесы (P.song) отсутствующий случай лишь называется.
+   ⚠️ Круг правит только НЕЗАМОРОЖЕННЫЕ дорожки: правка поднимает версию правок дорожки, и замороженная устарела бы. */
+export function checkSoloEdit(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const isSeed=!!(SEED_REC&&SEED_REC.kind==='seed'), absent=[];
+  const lack=what=>{ if(isSeed) miss(`the seed lacks ${what}`); else absent.push(what); };
+  const beat=t=>Math.round(t*1000)/1000;
+  // ---- 1) инварианты песни ----
+  const V=songNotes();
+  cases++; if(V.orphans.length){ const o=V.orphans[0]; miss(`${V.orphans.length} orphan events (a change or release without its note) — first L${o.layer+1} beat ${beat(o.t)} ${o.fn}`); }
+  for(const n of V.notes){ if(n.role!=='ld') continue; cases++; song++;
+    const at=`L${n.layer+1} solo note at beat ${beat(n.start)}`;
+    if(n.endBy!=='off') miss(`${at}: ends by '${n.endBy}', not by its own note-off`);
+    const B=n.head.a&&n.head.a.bend;
+    if(B&&B.length&&n.end!=null){ const top=Math.max(...B.map(p=>p.dt)); if(top>n.end-n.start+1e-9) miss(`${at}: its bend reaches ${beat(top)} beats, beyond the note's length ${beat(n.end-n.start)}`); }
+  }
+  for(const e of events){ if(!/^(lead|bass|ch)/.test(e.fn) || !/On$|Set$/.test(e.fn)) continue; cases++;
+    if(!(e.a && typeof e.a.vol==='number')) miss(`L${e.layer+1} beat ${beat(e.t)} ${e.fn}: no volume (rule #30)`); }
+  const ties=events.filter(e=>e.fn.startsWith('lead')&&e.a&&e.a.tie); let nPairs=0;
+  for(const e of ties){ cases++;
+    const want= e.fn==='leadOff' ? 'leadOn' : e.fn==='leadOn' ? 'leadOff' : null, at=`L${e.layer+1} beat ${beat(e.t)} ${e.fn} with a tie`;
+    if(!want){ miss(`${at}: only a note-on or a note-off may carry a tie`); continue; }
+    const p=ties.filter(x=>x.fn===want && x.tk===e.tk && x.layer!==e.layer && Math.abs(x.t-e.t)<1e-9);
+    if(!p.length) miss(`${at}: no partner (a ${want} with a tie in the same take, at the same beat, in another track)`);
+    else if(e.fn==='leadOff') nPairs++;
+  }
+  if(!nPairs) lack('a linked pair (a solo note continued across a timbre switch)');
+  // ---- P.seed: терменвокс после правки — там, куда его перенесли, с той же кривой ----
+  if(isSeed){ cases++; const T=SEED_REC.solo&&SEED_REC.solo.therm;
+    if(!T) miss('the solo section of the seed did not run (no record of its theremin edit)');
+    else { const h=events.find(e=>e.fn==='leadOn'&&Math.abs(e.t-T.t)<1e-9&&e.a&&e.a.bend&&e.a.bend.length);
+      if(!h) miss(`the seed's theremin note is not at beat ${T.t}`);
+      else { if(h.a.ti!==T.ti||h.a.oct!==T.oct) miss(`the seed's theremin note: ti/reg ${h.a.ti}/${h.a.oct}, intended ${T.ti}/${T.oct}`);
+             if(JSON.stringify(h.a.bend)!==JSON.stringify(T.bend)) miss(`the seed's theremin note: the move changed its bend to ${JSON.stringify(h.a.bend)} (intended ${JSON.stringify(T.bend)})`); } } }
+  // ---- 2) отказы ----
+  const segs=()=>songSegs().segs.filter(g=>g.role==='ld' && !g.ev.jam && freezeState(g.layer)==='none');
+  const isTherm=g=>!!(g.note.head.a&&g.note.head.a.bend&&g.note.head.a.bend.length);
+  const offTie=g=>!!(g.endEv && g.endEv.fn==='leadOff' && g.endEv.a && g.endEv.a.tie);
+  const headTie=g=>!!(g.first && g.note.head.a && g.note.head.a.tie);
+  const single=g=>!!(g.first && g.endEv && g.endEv.fn==='leadOff');
+  const plain=g=>single(g) && !isTherm(g) && !offTie(g) && !headTie(g);
+  const find=(what,pred)=>{ const g=segs().find(pred); if(!g) lack(what); return g||null; };
+  for(const g of segs()){
+    const tie=headTie(g)||offTie(g);
+    const want=[ ['len', isTherm(g) ? 'roll.thereminLen' : offTie(g) ? 'roll.tieEdge' : null], ['time', tie ? 'roll.tieEdge' : null], ['del', tie ? 'roll.tieEdge' : null] ];
+    for(const [op,w] of want){ cases++; const got=soloEditBlock(g.ev,op);
+      if(got!==w) miss(`L${g.layer+1} solo segment at beat ${beat(g.start)}${isTherm(g)?' (theremin)':''}${tie?' (tie edge)':''}: '${op}' refusal ${got}, expected ${w}`); }
+  }
+  // ---- 3) круг правки ----
+  if(editIsOpen()) miss('the track editor is open — close it: the round trip opens it itself');
+  else if(recording) miss('recording — stop it first');
+  else {
+    const snap=()=>new Map(events.map(e=>[e,[e.t,e.layer,e.fn,e.tk,e.sc,e.sev,!!e.jam,JSON.stringify(e.a)]]));
+    const FIELD=['t','layer','fn','tk','sc','sev','jam','a'];
+    const same=(A,B)=>{ if(A.size!==B.size) return `${A.size} events instead of ${B.size}`;
+      for(const [e,x] of B){ const y=A.get(e); if(!y) return `the ${x[2]} at beat ${beat(x[0])} is gone`;
+        for(let i=0;i<x.length;i++) if(x[i]!==y[i]) return `the ${x[2]} at beat ${beat(x[0])} differs (field ${FIELD[i]})`; }
+      return null; };
+    const open=ly=> editIsOpen() ? editSetLayer(ly) : editOpen(ly);
+    const rt=(label,g,op)=>{ if(!g) return; cases++;
+      if(!open(g.layer)){ miss(`${label}: the editor would not open L${g.layer+1}`); return; }
+      const S0=snap(), r=op(g);
+      if(!r){ miss(`${label}: the edit was refused`); return; }
+      const S1=snap(); let d;
+      if(!same(S1,S0)) miss(`${label}: the edit changed nothing`);
+      if(r.check && (d=r.check())) miss(`${label}: ${d}`);
+      if(!editUndo()){ miss(`${label}: undo refused`); return; }
+      if((d=same(snap(),S0))) miss(`${label}: undo does not restore the song — ${d}`);
+      if(!editRedo()){ miss(`${label}: redo refused`); return; }
+      if((d=same(snap(),S1))) miss(`${label}: redo does not repeat the edit — ${d}`);
+      if(!editUndo()){ miss(`${label}: the second undo refused`); return; }
+      if((d=same(snap(),S0))) miss(`${label}: the second undo does not restore the song — ${d}`);
+    };
+    const refuse=(label,g,op)=>{ if(!g) return; cases++;
+      if(!open(g.layer)){ miss(`${label}: the editor would not open L${g.layer+1}`); return; }
+      const S0=snap(), r=op(g);
+      if(r){ miss(`${label}: the edit was accepted — it must be refused`); editUndo(); return; }
+      const d=same(snap(),S0); if(d) miss(`${label}: refused, yet the song changed — ${d}`);
+    };
+    /* Цель каждой правки ищется ЗАНОВО (find после ↶ — та же песня, тот же ответ): объекты сегментов пересобираются после каждой правки. */
+    try{
+      const P1=()=>find('a plain solo note (its own note-off, no bend, no tie)',plain);
+      rt('move a solo note half a beat later',P1(),g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
+      rt('lengthen a solo note',P1(),g=>editResizeSeg(g.ev,g.end+0.5));
+      rt('shorten a solo note',P1(),g=>editResizeSeg(g.ev,g.start+(g.end-g.start)/2));
+      rt('change the pitch of a solo note',P1(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
+      rt('delete a solo note',P1(),g=>editDeleteSeg(g.ev));
+      rt('insert a solo note',P1(),g=>{ const ev=editInsertLead(g.start+0.25,g.ti+2,g.oct,g.sc,g.sev,1);
+        return ev && { check:()=> (ev.a.bend||ev.a.tie||ev.a.hold) ? 'the inserted note carries a bend, a tie or hold' : typeof ev.a.vol!=='number' ? 'the inserted note has no volume' : null }; });
+      const M=()=>find('a middle segment of a lead-mode line (a pitch change on each side)',g=>!g.first && g.endEv && g.endEv.fn==='leadSet');
+      rt('move a middle segment of a lead line (it detaches)',M(),g=>editMoveSeg(g.ev,g.ev.t+0.25,g.ti,g.oct));
+      rt('lengthen a middle segment of a lead line (it detaches)',M(),g=>editResizeSeg(g.ev,g.end+0.25));
+      rt('delete a middle segment of a lead line (silence in its place)',M(),g=>editDeleteSeg(g.ev));
+      rt('change the pitch of a middle segment (the glide is kept)',M(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
+      const TH=()=>find('a single theremin note with a bend',g=>single(g)&&isTherm(g)&&!offTie(g)&&!headTie(g));
+      rt('move and transpose a theremin note (its bend keeps its shape)',TH(),g=>{ const B=JSON.stringify(g.note.head.a.bend), ev=editMoveSeg(g.ev,g.ev.t+0.5,g.ti+1,g.oct);
+        return ev && { check:()=> JSON.stringify(ev.a.bend)!==B ? `the bend changed: ${JSON.stringify(ev.a.bend)} (was ${B})` : ev.a.ti!==g.ti+1 ? `ti ${ev.a.ti}, intended ${g.ti+1}` : null }; });
+      rt('delete a theremin note',TH(),g=>editDeleteSeg(g.ev));
+      refuse('change the length of a theremin note',TH(),g=>editResizeSeg(g.ev,g.end+0.5));
+      const HT=()=>find('a solo note continuing another track (a tie on its note-on)',g=>headTie(g)&&single(g)&&!offTie(g));
+      rt('change the pitch of a tied note-on',HT(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
+      refuse('move a tied note-on in time',HT(),g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
+      refuse('delete a tied note-on',HT(),g=>editDeleteSeg(g.ev));
+      const OT=()=>find('a solo note continued in another track (a tie on its note-off)',g=>offTie(g)&&g.first&&!headTie(g));
+      refuse('lengthen a note whose note-off is tied',OT(),g=>editResizeSeg(g.ev,g.end+0.5));
+      refuse('move a note whose note-off is tied',OT(),g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
+      refuse('delete a note whose note-off is tied',OT(),g=>editDeleteSeg(g.ev));
+      rt('change the pitch of a note whose note-off is tied',OT(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
+    } finally { if(editIsOpen()) editClose(); }
+  }
+  console.log(`[scaleprobe solo-edit] solo notes ${song} · cases ${cases} · linked pairs ${nPairs} · differences ${nBad}`);
+  if(absent.length) console.log('[scaleprobe solo-edit] not in this song (not checked): '+[...new Set(absent)].join('; '));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe solo-edit] '+m));
+  if(!nBad) console.log('[scaleprobe solo-edit] no orphans; every solo note ends by its own note-off; every pitched event has a volume; every linked half has its partner; every bend lies within its note; the refusals are exactly the theremin length and the tie edges; every edit round-trips bit for bit');
+  return { cases, song, total:nBad, differences:bad };
+}
 const SID=id=>{ if(!scaleById(id)) throw new Error('no scale '+id); return id; };   // F1: адрес — сам id   // id — стабильный идентификатор (T0), не имя (правило #25)
 export async function seed(opt={}){
   console.log('[scaleprobe seed] P.seed REPLACES the current song with a test song (nothing is saved).');
@@ -1205,11 +1338,11 @@ export async function seed(opt={}){
     SEED_REC={ kind:'seed', takes:[], edited:[['major',12],['partch-43',32],['major',8],['major-penta',76],['major',12,'bass']], freeze:null };   // задуманное — для P.checkSeed (ноты, которые сценарий правит в редакторе ниже; T5 — три правки на высоты вне лада)
     clearRec(); setLoopMetre(4); setSeventh(false); setChordModeSel({});   // T7b: режимы аккордов — с умолчаний; каждое взятое ставит свой
     let nid=0; const S=[];
-    const on =(fn,a,t)=>{ const id=++nid; S.push({fn,a,t,id}); return id; };
-    const at =(id,fn,a,t)=>S.push({fn,a,t,id});
+    const on =(fn,a,t,skip)=>{ const id=++nid; S.push({fn,a,t,id,...(skip?{skip:true}:null)}); return id; };   // skip (S4) — шаг, который сценарий потом правит в редакторе: P.checkSeed его не сверяет
+    const at =(id,fn,a,t,skip)=>S.push({fn,a,t,id,...(skip?{skip:true}:null)});
     const take=(label,scaleId,tf,cm)=>{ setScaleId(SID(scaleId)); if(tf!==undefined) setTunedFrom(tf); if(cm!==undefined) setChordMode(scaleId,cm);   // T7b: режим аккордов взятого
       const steps=S.splice(0), r=seedTake(steps); if(!r) throw new Error('seedTake refused — start the app (▶ Play) and stop the transport first');
-      SEED_REC.takes.push({ label, take:r.take, scaleId, tf, cm:chordModeOf(scaleById(SID(scaleId))), steps:steps.map(st=>({ fn:st.fn, t:st.t, a:{...st.a} })) });
+      SEED_REC.takes.push({ label, take:r.take, scaleId, tf, cm:chordModeOf(scaleById(SID(scaleId))), steps:steps.map(st=>({ fn:st.fn, t:st.t, a:{...st.a}, ...(st.skip?{skip:true}:null) })) });
       say(`${label}: take ${r.take}, ${r.events} events → tracks ${r.layers.map(l=>'L'+(l+1)).join(', ')}`); return r; };
     // ---- 1) мажор: соло, терменвокс, бас, аккорды ----
     const solo=(t,d,len)=>{ const id=on('leadOn',{deg:d,oct:1,vol:.8,inst:0},t); at(id,'leadOff',{v:0},t+len); };
@@ -1315,6 +1448,43 @@ export async function seed(opt={}){
             SEED_REC.freeze={ layer:gr.layer, peak:r&&r.peak, rms:r&&r.rms, samples:r&&r.buf&&r.buf.length, installed:!!(r&&r.installed), refused:r&&r.refused };
             say(r&&r.installed ? `freeze: L${gr.layer+1} (bass in the raga) frozen` : `freeze: L${gr.layer+1} rendered but not installed (${r&&r.refused})`); }
             catch(err){ say('freeze: not available from the console ('+(err&&err.message)+')'); } }
+    // ---- 9) S4: СОЛО ДЛЯ РЕДАКТОРА — ведущая линия, полифония, карта эффектов, терменвокс, пара связки; правки редактора над ними ----
+    /* ⛳ ПОСЛЕ ЗАМОРОЗКИ И В КОНЦЕ ПЕСНИ (доли 132–151): прежние взятые, их дорожки (id дорожки → семя заморозки баса в раге), скоба и
+       буфер не меняются — строка «frozen seed bass» и все прежние песенные случаи остаются теми же; новые лишь добавляются.
+       Одно взятое: соло тембра 0 ложится в одну новую дорожку, продолжение пары связки (тембр 1) — во вторую (маршрут по тембру, T3). */
+    setScaleId(SID('major'));
+    { const id=on('leadOn',{deg:0,oct:1,vol:.8,inst:0,v:0},132);                  // ведущая линия: ОДНА нота (v 0) на пять высот
+      at(id,'leadSet',{deg:2,oct:1,vol:.8,v:0},133,true); at(id,'leadSet',{deg:4,oct:1,vol:.8,v:0},134,true);   // их правит отделение сегмента (ниже)
+      at(id,'leadSet',{deg:3,oct:1,vol:.8,v:0},135); at(id,'leadSet',{deg:1,oct:1,vol:.7,v:0},136); at(id,'leadOff',{v:0},137); }
+    { const a=on('leadOn',{deg:4,oct:1,vol:.8,inst:0,v:0},138), b=on('leadOn',{deg:6,oct:1,vol:.75,inst:0,v:1},139);   // полифония: две ноты внахлёст
+      at(a,'leadOff',{v:0},140); at(b,'leadOff',{v:1},141); }
+    { const id=on('leadOn',{deg:2,oct:1,vol:.8,inst:0,fx:{'vib:amt':0.3,'drv:amt':0.2},v:0},142); at(id,'leadOff',{v:0},143); }   // нота с картой эффектов
+    { const id=on('leadOn',{deg:1,oct:1,vol:.8,inst:0,bend:[{dt:0,c:0},{dt:1,c:60},{dt:2,c:-40}],v:0},144,true);   // терменвокс (его переносит и транспонирует редактор)
+      at(id,'leadSet',{deg:2,oct:1,vol:.8,hold:true,v:0},145,true); at(id,'leadSet',{deg:0,oct:1,vol:.7,hold:true,v:0},146,true); at(id,'leadOff',{v:0},147,true); }
+    { const a=on('leadOn',{deg:3,oct:1,vol:.8,inst:0,v:0},148); at(a,'leadOff',{v:0,tie:true},149);   // ПАРА СВЯЗКИ: смена тембра посреди ноты (T3)
+      const b=on('leadOn',{deg:3,oct:1,vol:.8,inst:1,tie:true,v:0},149); at(b,'leadOff',{v:0},150); }
+    take('major: solo for the editor (S4)','major');
+    const ldSeg=t0=>songSegs().segs.find(g=>g.role==='ld'&&Math.abs(g.start-t0)<1e-9);
+    const e1=ldSeg(133);
+    if(e1 && editOpen(e1.layer) && editMoveSeg(e1.ev,133.5,e1.ti,e1.oct)) say(`editor S4: the second pitch of the solo line (L${e1.layer+1}) moved half a beat later — it detaches into its own note`);
+    else say('editor S4: solo line segment move FAILED');
+    const th=ldSeg(144), th2=th ? tuningIndexOf(2,th.sc,false) : null;
+    if(th && editSetLayer(th.layer) && editMoveSeg(th.ev,144.5,th2,th.oct)){
+      SEED_REC.solo={ therm:{ t:144.5, ti:th2, oct:th.oct, bend:[{dt:0,c:0},{dt:1,c:60},{dt:2,c:-40}] } };
+      say(`editor S4: the theremin note (L${th.layer+1}) moved half a beat later and one degree up — its bend unchanged`); }
+    else say('editor S4: theremin move FAILED');
+    const fxn=ldSeg(142), tp=ldSeg(149);
+    if(fxn && editSetLayer(fxn.layer)){ const ti=tuningIndexOf(5,fxn.sc,false);
+      if(editInsertLead(142.5,ti,1,fxn.sc,fxn.sev,0.5)){ insRec('solo note copying its neighbour’s effect map','leadOn',fxn.layer,142.5,ti,1,{ inst:0, vol:.8, fx:{'vib:amt':0.3,'drv:amt':0.2}, plain:true });
+        say(`editor S4: a solo note inserted at beat 142.5 (L${fxn.layer+1}) — it copies its neighbour's effect map`); }
+      else say('editor S4: solo insert (with a map) FAILED'); }
+    else say('editor S4: solo insert (with a map) FAILED (no note with a map)');
+    if(tp && editSetLayer(tp.layer)){ const ti=tuningIndexOf(4,tp.sc,false);
+      if(editInsertLead(151,ti,1,tp.sc,tp.sev,1)){ insRec('solo note whose neighbour has no map','leadOn',tp.layer,151,ti,1,{ inst:1, vol:.8, fx:null, plain:true });
+        say(`editor S4: a solo note inserted at beat 151 (L${tp.layer+1}, the tie partner's track) — no map, as its neighbour`); }
+      else say('editor S4: solo insert (no map) FAILED'); }
+    else say('editor S4: solo insert (no map) FAILED (no tie partner)');
+    editClose();
   } finally {
     setScaleId(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev); setChordModeSel(keep.cm);
   }

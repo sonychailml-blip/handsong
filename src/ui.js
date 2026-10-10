@@ -28,6 +28,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
+         editInsertLead, soloEditBlock,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
@@ -566,12 +567,16 @@ function updRollBtns(){
    продублирован в recorder (editGuard): кнопка — вежливость, инвариант — там. */
 const rollRefuseRO=()=>{ if(editBackingOpen()){ showCamMsg(t('roll.readOnly')); return true; } return false; };
 /* ВСТАВКА В ЛАДОВУЮ ДОРОЖКУ — ПО РОЛИ (S2). Сигнатура одна: (доля, ступень, регистр, лад и септаккорд оси, длина, выделенное до тапа);
-   бас последний аргумент не читает. Ударные вставляются своей веткой (ряд, а не ступень). Соло — S4. */
+   бас и соло последний аргумент не читают. Ударные вставляются своей веткой (ряд, а не ступень). Соло — с S4 (зеркало баса). */
 /* ⛳ T4c-1: высота — ИНДЕКСОМ В СТРОЕ и регистром (ряд оси: rollRowPitch → {ti, oct}); ступень для записи считает recorder. */
 const ROLL_INSERT={
   bs:(t,ti,oct,sc,sev,len)=>editInsertBass(t,ti,oct,sc,sev,len),
   ch:(t,ti,oct,sc,sev,len,sel)=>editInsertChord(t,ti,oct,sc,sev,len,sel),
+  ld:(t,ti,oct,sc,sev,len)=>editInsertLead(t,ti,oct,sc,sev,len),
 };
+/* ⛳ S4: ОТКАЗ ПРАВКИ СОЛО ГОВОРИТ ПОЧЕМУ (длина терменвокса — до S5, край пары связки — до S6). Условие — ОДНО, в recorder
+   (soloEditBlock), и правка там же откажет — здесь только слова. → true, если правку откажут (сообщение уже показано). */
+const rollSoloRefuse=(ev,op)=>{ const why=soloEditBlock(ev,op); if(why){ showCamMsg(t(why)); return true; } return false; };
 /* ═══ ПОЛОСА АВТОМАТИЗАЦИИ: ОРГАНЫ УПРАВЛЕНИЯ (слайс O-4) ═══
    ⛳ ОДИН СЕЛЕКТ ВМЕСТО «ТУМБЛЕР + ВЫБОР»: первый пункт «— нет —» закрывает полосу, остальные её
    открывают на своём адресе. Состояния «полоса открыта, но непонятно что показывает» не существует, и
@@ -708,9 +713,10 @@ function rollDeleteSel(){ if(rollRefuseRO()) return;
      НЕ тянется); одиночная нота уходит целиком — см. editDeleteSeg. */
   /* ⛳ U2: УДАЛЕНИЕ — ПО УРОВНЮ ВЫДЕЛЕНИЯ. Выделена одна нота аккорда — аккорд распадается на однонотные и эта нота уходит
      (editDeleteChordNote, одна запись истории); выделен весь аккорд — уходит весь, как прежде. ⌫ зовёт эту же функцию. */
+  if(rollSoloRefuse(rollSel,'del')){ updRollBtns(); return; }   // ⛳ S4: край пары связки — до S6, говорим почему (у прочих ролей предикат молчит)
   const ok = rollRole==='dr' ? editDeleteHit(rollSel)
            : (rollRole==='ch' && rollSelNote!=null) ? editDeleteChordNote(rollSel, rollSelNote)
-           : editDeleteSeg(rollSel);   // S2: у ладовых ролей (бас, аккорды; соло — S4) удаление одно — по СЕГМЕНТУ, роль разбирает recorder (EDIT_ROLE)
+           : editDeleteSeg(rollSel);   // S2/S4: у ладовых ролей (бас, аккорды, соло) удаление одно — по СЕГМЕНТУ, роль разбирает recorder (EDIT_ROLE)
   if(ok) setRollSel(null);
   renderTimbreCtl();   // T5: снята последняя нота — у дорожки больше нет тембра, выбор скрывается
   updRollBtns(); }
@@ -999,7 +1005,7 @@ function rollUp(e){
            recorder (editResizeSeg). ⛳ E2: ВЫДЕЛЯЕМ ТО, ЧТО ВЕРНУЛ recorder — у отделённого сегмента «вкл» это НОВЫЙ
            объект события, а прежнее выделение указывало бы на событие, которого в песне больше нет. */
         const s=rollGrab.seg, ne=s.start+gd.len;
-        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9){ const r=editResizeSeg(s.ev, ne); if(r&&r!==true) selNote(r); }
+        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9 && !rollSoloRefuse(s.ev,'len')){ const r=editResizeSeg(s.ev, ne); if(r&&r!==true) selNote(r); }   // S4: длина терменвокса / «выкл» края связки — отказ словами
       }
       else if(rollGrab.seg){
         /* БАС: переносим СЕГМЕНТ — его время и/или высоту. Ряд расшифровываем ТОЙ ЖЕ формулой, что рисует
@@ -1013,7 +1019,8 @@ function rollUp(e){
         editViewCheck(rollGrab.seg.ev, g2&&g2.sc);   // T6a: проверка вида (пишет в консоль, поведение не меняет)
         /* U1: КОРЕНЬ — на столько рядов, на сколько ушёл палец (у баса rootRow = grabRow: ряд под пальцем, как было). ⛳ T5: целый
            нетипизированный аккорд на высоту вне лада сохраняет форму — тип ставит recorder (editMoveSeg → chordMoveTy, вариант (а)). */
-        if(pit && (Math.abs(gd.t-s.ev.t)>1e-9 || pit.ti!==s.ti || pit.oct!==s.oct)){ const r=editMoveSeg(s.ev, gd.t, pit.ti, pit.oct); if(r&&r!==true) selNote(r); }   // T4c-1: сравнение и перенос — по паре (индекс, регистр)
+        const moved=Math.abs(gd.t-s.ev.t)>1e-9;
+        if(pit && (moved || pit.ti!==s.ti || pit.oct!==s.oct) && !(moved && rollSoloRefuse(s.ev,'time'))){ const r=editMoveSeg(s.ev, gd.t, pit.ti, pit.oct); if(r&&r!==true) selNote(r); }   // T4c-1: сравнение и перенос — по паре (индекс, регистр). S4: край пары связки во времени — отказ словами (смена одной высоты — можно)
       }else if(Math.abs(gd.t-rollGrab.ev.t)>1e-9 || gd.row!==(rollGrab.ev.a.row|0)) editMoveHit(rollGrab.ev, gd.t, gd.row);
     }
     if(!rollMoved && rollGrab.tapNote!=null && rollSel===rollGrab.ev) setRollSelNote(rollGrab.tapNote);   // U2: второй тап по аккорду — уровень ОДНОЙ ноты
@@ -1055,7 +1062,7 @@ function rollUp(e){
           const s=rollSnap(), len=s.free?1:Math.max(s.step,1);
           /* ⛳ ВСТАВКА — ПО РОЛИ ДОРОЖКИ (S2), а не развилкой «ударные или бас»: у каждой роли свои поля новой ноты. Ряд — КОРЕНЬ
              (индекс в строе × регистр) и у аккорда. ⛳ U5: у аккордов тап кладёт ОДНУ ноту, а при выделенном ДО тапа ЦЕЛОМ аккорде — его
-             форму от тронутого корня; тип, тембр и громкость решает recorder.editInsertChord. Соло правимым станет в S4. */
+             форму от тронутого корня; тип, тембр и громкость решает recorder.editInsertChord. Соло (S4) — editInsertLead, зеркало баса. */
           const ins=ROLL_INSERT[rollRole];
           { const sg=rollRole==='ch'&&rollPan.selBefore ? songSegs().byEv.get(rollPan.selBefore) : null;   // ⛳ T7: форма выделенного аккорда, которой на этом корне нет в строе, — вставка откажет (recorder); говорим почему
             if(pit && sg && sg.ty && sg.sc===sc && !chordTypeFits(sg.ty, pit.ti, sc)) showCamMsg(t('roll.unfit')); }

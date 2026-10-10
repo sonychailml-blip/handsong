@@ -1563,8 +1563,8 @@ function editDeleteHit(ev){
    ключа не шло назад: переставь ведение за соседа — и на переигровке ноты поменяются местами, а «выкл»
    закроет чужую.
    ⛳ S0 (правка соло и аккордов): функции ниже больше не басовые — роль берут из таблицы EDIT_ROLE (чуть ниже), и та же
-   машинерия отделения служит соло и аккордам. С S2 правимы и аккорды (state.ROLL_EDITABLE); соло — слайсом S4, до него сюда приходят
-   бас и аккорды. Слово «бас» в доводах ниже — это история того, для кого их писали; закон тот же у всех трёх ролей.
+   машинерия отделения служит соло и аккордам. С S2 правимы и аккорды (state.ROLL_EDITABLE), с S4 — соло (бас и соло — ОДИН
+   инструмент: та же правка). Слово «бас» в доводах ниже — это история того, для кого их писали; закон тот же у всех трёх ролей.
    ⛳ E2: ЗАКОН НЕЗАВИСИМОСТИ. Прежде порядок стерегли ЗАЖИМОМ — событие нельзя было увести за соседа по ключу, —
    и именно зажим делал ноты ЗАВИСИМЫМИ: перенос сегмента глиссандо двигал общую с соседом границу, длина
    середины отнималась у следующего, удаление середины давало прежней высоте тянуться дальше. Пользователь это
@@ -1586,8 +1586,8 @@ const EDIT_MIN_LEN=1/32;                                    // минималь�
      oldOff(a) — что несёт «выкл», закрывающий ноту под ПРЕЖНИМ ключом (по нагрузке определяющего события): бас — k и v, только
        ненулевые (байт-в-байт прежний E2); аккорд — k, только ненулевой; соло — v ВСЕГДА, как пишет запись (recLeadOff).
    ⛔ ВСТАВКА СЮДА НЕ ВХОДИТ: у каждой роли свои поля новой ноты (тембр, карта, тип) — это слайсы S2/S4.
-   ⚠️ S0 был НЕВИДИМ (список правимых ролей не тронут); S2 открыл аккорды, соло — S4: таблица его знает, но редактор к нему не
-   пускает; у баса каждая функция ниже даёт ТЕ ЖЕ события, что и прежде (сверено построчно — см. отчёт слайса). */
+   ⚠️ S0 был НЕВИДИМ (список правимых ролей не тронут); S2 открыл аккорды, S4 — соло (со своими двумя отказами — soloEditBlock ниже);
+   у баса каждая функция ниже даёт ТЕ ЖЕ события, что и прежде (сверено построчно — см. отчёт слайса). */
 const EDIT_ROLE={
   bs:{ on:'bassOn', off:'bassOff', fresh:ly=>({k:layerTakeTop(ly)}),
        keep:a=>{ const v=(a&&a.v)||0; return v?{v}:null; },
@@ -1600,6 +1600,29 @@ const EDIT_ROLE={
        oldOff:a=>({v:(a&&a.v)||0}) },
 };
 const editRoleOf=fn=>EDIT_ROLE[chaseRole(fn)]||null;       // null — удар, дрон, сирота без роли: правкам сегмента не подлежит
+/* ═══ S4: ДВА ОТКАЗА ПРАВКИ СОЛО — ОДИН ПРЕДИКАТ ═══
+   Соло правится ТОЙ ЖЕ машинерией, что бас (бас и соло — один инструмент). Отказывают ровно две правки, и каждая — до своего слайса:
+     • ДЛИНА НОТЫ ТЕРМЕНВОКСА (до S5). Перенос «выкл» оставил бы точки кривой бенда ПОСЛЕ отпускания: scheduleBend расписывает в голос
+       ВСЕ точки, а audio.leadCancel зовётся ДО выдачи голоса и чистит только голос того же владельца — чужая нота, взявшая этот голос,
+       перестроилась бы по мёртвой кривой. Перенос целиком, смена высоты и удаление терменвокса верны по построению: события едут все
+       вместе, dt точек бенда — от атаки, центы — от ступени атаки (контур переносится и транспонируется сам).
+     • КРАЙ ПАРЫ СВЯЗКИ (до S6) — «вкл» с a.tie (нота продолжает ноту другой дорожки после смены тембра, T3) или «выкл» с a.tie (её
+       продолжает нота другой дорожки). Правка, меняющая ВРЕМЯ такого края или снимающая его, оставила бы ноту, входящую без атаки из
+       ничего, или обрубок с быстрым релизом посреди звука. Смена ОДНОЙ высоты край не трогает — разрешена.
+   op: 'time' — перенос во времени (editMoveSeg с другой долей: одиночная нота целиком или отделение — время меняют события самого
+   сегмента: «вкл», если сегмент — начало ноты, и «выкл», если он последний), 'del' — удаление (то же множество краёв), 'len' — длина
+   (двигается только «выкл», и только когда сегмент кончается СВОИМ «выкл»; граница глиссандо отделяет сегмент, не трогая краёв).
+   → ключ словаря с причиной ('roll.thereminLen' | 'roll.tieEdge') или null. ⛔ ОДИН ИСТОЧНИК: его зовут и функции правки (инвариант),
+   и ui (сказать почему) — второй копии условия в ui нет. Только чтение. */
+function soloEditBlock(ev,op){
+  const seg=ev ? songSegs().byEv.get(ev) : null;
+  if(!seg||seg.role!=='ld') return null;
+  if(op==='len' && ldTherm(seg.note)) return 'roll.thereminLen';
+  const X=seg.endEv, h=seg.note.head;
+  const offTie = !!(X && chaseKind(X.fn)==='f' && X.a && X.a.tie);
+  const headTie = !!(seg.first && h && h.a && h.a.tie);
+  return (op==='len' ? offTie : (headTie||offTie)) ? 'roll.tieEdge' : null;
+}
 /* События ОДНОГО сегмента, по времени: определяющее («вкл» или смена высоты) и ведения громкости внутри.
    Берём тем же обратным указателем byEv, которым songSegs их и собрал: «выкл» туда не входит (он кончает
    сегмент, а не принадлежит ему), определяющее событие следующего сегмента — тоже. */
@@ -1742,12 +1765,13 @@ function commitDetach(P,keep){
    переносится на ряд в КАНОНИЧЕСКОЙ форме (chordUnit) и звучит ровно высоту ряда. Без ty — прежний перенос, тип не трогается. */
 function editMoveSeg(ev,t,ti,oct,ty){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); с S2 редактор пускает сюда бас и аккорды, соло — с S4 (ROLL_EDITABLE)
+  if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); редактор пускает сюда бас и аккорды с S2, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
   if(ty===undefined){ const ct=chordMoveTy(seg,ti,oct); if(ct===null) return false; ty=ct; }   // ⛳ T5 (а): целый нетипизированный аккорд на высоту вне лада — с формой
   if(seg.role==='ch' && !chordTypeFits(ty!==undefined ? ty : seg.ty, ti, seg.sc)) return false;   // ⛳ T7: тип, которого на новом корне нет в строе (Партч — вне 43 высот), туда не переносится (ui называет причину)
   const pt=slotPt(ti,oct,ty); if(!pt) return false;          // T5: любая высота строя (яркий или приглушённый ряд)
   const nt=Math.max(0,t);
+  if(Math.abs(nt-ev.t)>1e-9 && soloEditBlock(ev,'time')) return false;   // ⛳ S4: край пары связки во времени — до S6 (ui называет причину); смена одной высоты разрешена
   if(Math.abs(nt-ev.t)<=1e-9){
     const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
     return editBatch(list) ? ev : false;
@@ -1766,6 +1790,7 @@ function editMoveSeg(ev,t,ti,oct,ty){
 function editDeleteSeg(ev){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
   if(!editRoleOf(ev.fn)) return false;                       // S0: см. editMoveSeg
+  if(soloEditBlock(ev,'del')) return false;                  // ⛳ S4: снять край пары связки — до S6 (ui называет причину)
   const seg=songSegs().byEv.get(ev);
   const whole = !seg || (seg.first && !(seg.endEv && chaseKind(seg.endEv.fn)!=='f'));   // нет сегмента (сирота) / одиночная / начало ноты без смены высоты за ним
   if(!whole){ const P=detachPlan(seg); if(P) return commitDetach(P,false); }
@@ -1910,6 +1935,7 @@ function editResizeChordNote(ev,idx,t){
 function editResizeSeg(ev,t){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
   const R=editRoleOf(ev.fn); if(!R) return false;            // S0: см. editMoveSeg
+  if(soloEditBlock(ev,'len')) return false;                  // ⛳ S4: длина терменвокса — до S5, «выкл» края пары связки — до S6 (ui называет причину)
   const seg=songSegs().byEv.get(ev); if(!seg||!seg.endEv||seg.end==null) return false;
   const X=seg.endEv;
   if(chaseKind(X.fn)==='f'){
@@ -1962,6 +1988,46 @@ function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — ин�
   const mk=(fn,a,tt)=>({ t:tt, layer, fn, a:(k?{...a,k}:a), sc, sev, tk:editTake });
   const evOn =mk('bassOn', {ti,oct,vol,inst}, t0);   // T4c-2: индекс и регистр, ступени нет
   const evOff=mk('bassOff',{}, t1);
+  events.push(evOn,evOff);
+  editPush({ kind:'ins', evs:[evOn,evOff] });
+  editCommit(); return evOn;
+}
+/* ═══ ВСТАВКА НОТЫ СОЛО (S4) — ЗЕРКАЛО editInsertBass: бас и соло — один инструмент ═══
+   Пара «вкл»+«выкл» со СВЕЖИМ номером ноты v (layerSlotTop — выше всех номеров слоя): у ключа соло 'leadloop:N:v' суффикса k нет,
+   свежая идентичность — v (EDIT_ROLE.ld.fresh); пересечься с нотами дорожки ей нечем.
+   ⛳ ОТКУДА ПОЛЯ (решения пользователя по плану S4–S7):
+     • ВЫСОТА — пара тронутого ряда (ti, oct), любого, яркого или приглушённого (как у баса с U5); лад и септаккорд — оси (их передаёт
+       редактор), ⛔ не CUR() (правило #7);
+     • ТЕМБР — с «вкл» БЛИЖАЙШЕЙ ноты соло дорожки, иначе живой leadIdx;
+     • ГРОМКОСТЬ — с ближайшего события соло, НЕСУЩЕГО её, иначе editDefVol('ld') (правило #30: громкость есть всегда);
+     • КАРТА ЭФФЕКТОВ — с ближайшего события соло, несущего ноту («вкл» или ведение; «выкл» ноты не несёт), КОПИЕЙ И КАК ЕСТЬ, ВКЛЮЧАЯ ЕЁ
+       ОТСУТСТВИЕ (решение 1): нота звучит, как соседи. ⚠️ У соло отсутствие карты значит «звучи ЖИВОЙ цепью» (audio.applyFx, R2), а
+       пустая карта {} — драйв 0 (умолчание 0.12): поэтому карту НЕ выдумываем — ни {}, ни снимок, когда у соседа её нет. В ПУСТОЙ
+       дорожке (соседей нет вовсе) — снимок живой цепи соло (fxSnapshot), ровно то, что записала бы сыгранная сейчас нота;
+     • БЕНДА, СВЯЗКИ И hold НЕТ НИКОГДА: вставленная нота — обычная нота, не терменвокс и не продолжение чужой.
+   Отказ — только у нецелого индекса или регистра (такого ряд не отдаёт). */
+function editInsertLead(t,ti,oct,sc,sev,len){
+  if(!editGuard()) return false;
+  if(!Number.isInteger(ti)||!Number.isInteger(oct)) return false;
+  const layer=editLayer();
+  trackViewCheck(layer,sc);   // T6a: проверка вида, поведение не меняет
+  let on=null, near=null, nfx=null, bd=Infinity, bf=Infinity;
+  for(const e of events){
+    if(e.layer!==layer||chaseRole(e.fn)!=='ld') continue;
+    const d=Math.abs(e.t-t);
+    if(d<bd && e.a && e.a.vol!=null){ bd=d; near=e; }
+    if(e.fn!=='leadOff' && d<bf){ bf=d; nfx=e; }              // ближайшее событие, несущее ноту, — его карта (или её отсутствие)
+    if(e.fn==='leadOn' && (!on||d<Math.abs(on.t-t))) on=e;
+  }
+  const inst = on&&on.a.inst!=null ? on.a.inst : leadIdx;
+  const vol  = near&&near.a.vol!=null ? near.a.vol : editDefVol('ld');
+  const fx   = nfx ? (nfx.a&&nfx.a.fx ? {...nfx.a.fx} : null) : AUD.fxSnapshot(chainKeyOf('ld'));   // копия соседа как есть; пустая дорожка — снимок живой цепи
+  const v=layerSlotTop(layer);
+  if(!editTake) editTake=++takeSeq;
+  const t0=Math.max(0,t), t1=t0+Math.max(EDIT_GAP*2,len||1);
+  const mk=(fn,a,tt)=>({ t:tt, layer, fn, a, sc, sev, tk:editTake });
+  const evOn =mk('leadOn', fx ? {ti,oct,vol,fx,inst,v} : {ti,oct,vol,inst,v}, t0);   // поля — в порядке записанного «вкл» соло ({...жест, v}), ступени нет
+  const evOff=mk('leadOff',{v}, t1);                          // «выкл» соло несёт свой v всегда (как recLeadOff)
   events.push(evOn,evOff);
   editPush({ kind:'ins', evs:[evOn,evOff] });
   editCommit(); return evOn;
@@ -4460,6 +4526,7 @@ export {
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   editInsertChord,
+  editInsertLead, soloEditBlock,   // S4: вставка ноты соло (зеркало editInsertBass) и ОДИН предикат двух отказов правки соло — ui называет по нему причину
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
