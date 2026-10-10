@@ -936,6 +936,7 @@ function deleteLane(layer){
   if(!AC || isRecLayer(layer)) return false;   // T1: любой слой взятого (прежде — loop.layer)
   releaseLoopLayersAt(undefined,layer);
   if(recording) events.sort((x,y)=>x.t-y.t);   // хвост взятого — в отсортированный префикс ДО schedInvalidate (см. setRegionOn)
+  untieAcross(layer);                           // ⛳ S6: выжившие половины пар связки этой дорожки — обычные ноты (своя атака); их замороженные буферы устаревают
   if(!compactEvents(e=>e.layer===layer)) return false;
   schedInvalidate(); lanePrune();
   curChordDeg=-1;                               // подсветка аккорда петли могла принадлежать снятой дорожке; следующий chOn выставит заново
@@ -1107,6 +1108,8 @@ const frzSigMemo=new Map(); let frzSigG=null;
    осознанный компромисс, что уже записан про чужие СОБЫТИЯ (см. шапку подписи выше). */
 const laneEditVer=new Map();                 // id дорожки → число правок
 const laneEditTouch=()=>{ if(editLane!=null) laneEditVer.set(editLane,(laneEditVer.get(editLane)||0)+1); };
+const laneVerBump=id=>{ laneEditVer.set(id,(laneEditVer.get(id)||0)+1); };   // S6: версия правок ЛЮБОЙ дорожки по id — партнёр пары связки (ход 'lanetouch', удаление строки)
+const laneEditVerOf=layer=>{ const id=laneOf(layer); return id==null ? 0 : (laneEditVer.get(id)||0); };   // S6: чтение для пробы
 function freezeSig(layer){
   const P=frzPinned();
   const g=events.length+'|'+evGen+'|'+takeFxVer+'|'+P;          // = frzGlobalKey(), но P уже посчитан. takeFxVer здесь ОСТАЁТСЯ: это ключ МЕМО («могла ли смениться хоть одна подпись»), а не сама подпись
@@ -1506,6 +1509,7 @@ const editPush=u=>{ editHist.push(u); editFuture.length=0; };   // НОВАЯ п
    Вызывающий уже прошёл editGuard. */
 function editBatch(list){
   if(!list||!list.length) return false;
+  list=tieUntiePass(list);                                     // ⛳ S6: правка края пары связки развязывает ОБЕ половины — той же записью истории
   for(const u of list) editApply(u,false);
   editPush(list.length===1 ? list[0] : { kind:'batch', list });   // один ход — сам ход, без обёртки: в истории та же запись, что дала бы прежняя одиночная правка
   editCommit(); return true;
@@ -1586,7 +1590,7 @@ const EDIT_MIN_LEN=1/32;                                    // минималь�
      oldOff(a) — что несёт «выкл», закрывающий ноту под ПРЕЖНИМ ключом (по нагрузке определяющего события): бас — k и v, только
        ненулевые (байт-в-байт прежний E2); аккорд — k, только ненулевой; соло — v ВСЕГДА, как пишет запись (recLeadOff).
    ⛔ ВСТАВКА СЮДА НЕ ВХОДИТ: у каждой роли свои поля новой ноты (тембр, карта, тип) — это слайсы S2/S4.
-   ⚠️ S0 был НЕВИДИМ (список правимых ролей не тронут); S2 открыл аккорды, S4 — соло (со своими двумя отказами — soloEditBlock ниже);
+   ⚠️ S0 был НЕВИДИМ (список правимых ролей не тронут); S2 открыл аккорды, S4 — соло (его отказы сняты к S6 — см. «ПАРЫ СВЯЗКИ» ниже);
    у баса каждая функция ниже даёт ТЕ ЖЕ события, что и прежде (сверено построчно — см. отчёт слайса). */
 const EDIT_ROLE={
   bs:{ on:'bassOn', off:'bassOff', fresh:ly=>({k:layerTakeTop(ly)}),
@@ -1600,7 +1604,11 @@ const EDIT_ROLE={
        oldOff:a=>({v:(a&&a.v)||0}) },
 };
 const editRoleOf=fn=>EDIT_ROLE[chaseRole(fn)]||null;       // null — удар, дрон, сирота без роли: правкам сегмента не подлежит
-/* ═══ S4: ОТКАЗ ПРАВКИ СОЛО — ОДИН ПРЕДИКАТ (с S5 отказ ОДИН) ═══
+/* ═══ S4: ОТКАЗ ПРАВКИ СОЛО — ОДИН ПРЕДИКАТ (с S5 отказ ОДИН; ⛳ С S6 ОТКАЗОВ НЕТ — ПРЕДИКАТ СНЯТ) ═══
+   ⛳ S6: край пары связки больше не отказывается — правка, двигающая или снимающая его, РАЗВЯЗЫВАЕТ обе половины (tieUntiePass в
+   editBatch). Предикат, всегда отвечающий «нет», — мёртвый код и ложное обещание крючка: общее правило теперь живёт в editBatch, через
+   который идёт каждая правка нот, и нового отказа сюда не добавить, не обойдя его. Текст ниже — история S4/S5. */
+/* (история)
    Соло правится ТОЙ ЖЕ машинерией, что бас (бас и соло — один инструмент). В S4 отказывали две правки, каждая — до своего слайса:
      • (СНЯТ в S5) ДЛИНА НОТЫ ТЕРМЕНВОКСА. Перенос «выкл» оставлял бы точки кривой бенда ПОСЛЕ отпускания. С S5 укорочение ОБРЕЗАЕТ кривую
        (bendTrim, editResizeSeg), а голос, выданный новому владельцу, начинается без расписанной кривой (audio.leadAlloc → leadOn). Перенос
@@ -1614,13 +1622,65 @@ const editRoleOf=fn=>EDIT_ROLE[chaseRole(fn)]||null;       // null — удар,
    (двигается только «выкл», и только когда сегмент кончается СВОИМ «выкл»; граница глиссандо отделяет сегмент, не трогая краёв).
    → ключ словаря с причиной ('roll.tieEdge') или null. ⛔ ОДИН ИСТОЧНИК: его зовут и функции правки (инвариант),
    и ui (сказать почему) — второй копии условия в ui нет. Только чтение. */
-function soloEditBlock(ev,op){
-  const seg=ev ? songSegs().byEv.get(ev) : null;
-  if(!seg||seg.role!=='ld') return null;
-  const X=seg.endEv, h=seg.note.head;
-  const offTie = !!(X && chaseKind(X.fn)==='f' && X.a && X.a.tie);
-  const headTie = !!(seg.first && h && h.a && h.a.tie);
-  return (op==='len' ? offTie : (headTie||offTie)) ? 'roll.tieEdge' : null;
+/* ═══ S6: ПАРЫ СВЯЗКИ — НАЙТИ ПАРТНЁРА, РАЗВЯЗАТЬ ОБЕ ПОЛОВИНЫ ═══
+   ПАРА (T3): нота соло, продолженная через смену тембра, — «выкл» с a.tie в дорожке прежнего тембра и «вкл» с a.tie в дорожке нового, в ОДНУ
+   долю, в ОДНОМ взятом. Переигровка делает из пары 20-мс переход (быстрый релиз + вход без атаки и удара). Правка, СДВИГАЮЩАЯ общий край во
+   времени или СНИМАЮЩАЯ его (перенос ноты, длина, удаление, перенос целиком — на любом пути: editMoveNote, отделение, editResizeSeg,
+   editDeleteSeg), оставила бы обрубок с быстрым релизом или ноту, входящую без атаки из ничего. РЕШЕНИЕ ПОЛЬЗОВАТЕЛЯ: такая правка МОЛЧА
+   снимает tie с ОБЕИХ половин той же записью истории — дальше это две обычные ноты (своя атака, свой релиз). Смена одной высоты время края не
+   трогает — связка остаётся.
+   ⛳ ПАРТНЁР: противоположное событие соло («вкл» ↔ «выкл») с a.tie, того же взятого (tk), на ТОЙ ЖЕ доле, в ДРУГОЙ дорожке. Кандидатов
+   больше одного — когда при смене тембра звучало НЕСКОЛЬКО нот (две руки, несколько пальцев): каждая даёт свою пару, все в одну долю и
+   одну пару дорожек. Тогда сверяется ВЫСОТА — пара (ti, oct) ноты на краю (у «выкл» — сегмент, который он кончает; у «вкл» — его сегмент).
+   Не различает её только УНИСОН двух нот (или терменвокс: продолжение начинается с ближайшей ступени, а не со ступени атаки) — тогда
+   развязываются ВСЕ кандидаты (названо: лишняя развязка лишь даёт соседней паре свою атаку; оставить связанной чужую — хуже).
+   → массив партнёров (пустой — не край пары). Только чтение. */
+const noTie=a=>{ if(!a||!('tie' in a)) return a; const {tie, ...rest}=a; return rest; };
+function tiePitch(ev){
+  const S=songSegs();
+  const g= ev.fn==='leadOn' ? S.byEv.get(ev) : S.segs.find(s=>s.endEv===ev);
+  return g ? { ti:g.ti, oct:g.oct } : null;
+}
+function tiePartners(ev){
+  const a=ev&&ev.a; if(!a||!a.tie) return [];
+  const want= ev.fn==='leadOff' ? 'leadOn' : ev.fn==='leadOn' ? 'leadOff' : null; if(!want) return [];
+  const C=events.filter(e=>e!==ev && e.fn===want && e.a && e.a.tie && e.tk===ev.tk && e.layer!==ev.layer && Math.abs(e.t-ev.t)<1e-9);
+  if(C.length<2) return C;
+  const p=tiePitch(ev); if(!p) return C;
+  const M=C.filter(e=>{ const q=tiePitch(e); return !!q && q.ti===p.ti && q.oct===p.oct; });
+  return M.length ? M : C;
+}
+/* ПРОХОД РАЗВЯЗКИ — внутри editBatch, то есть у КАЖДОЙ правки нот (список ходов ещё не применён: события в прежнем состоянии).
+   Край пары, чьё время меняет ход 'move' (to.t ≠ from.t), теряет tie в своём же ходе (новая нагрузка to.a); край, уходящий ходом 'del',
+   уходит со своей нагрузкой (↶ вернёт её с tie). Каждому партнёру — ход 'move' без смены времени с нагрузкой без tie (НОВЫЙ объект: ↶ вернёт
+   прежний побитно) и ход 'lanetouch' его дорожки: freezeSig tie не сворачивает, а версия правок дорожки (laneEditVer) — сворачивает, и
+   editCommit поднимает её только у ПРАВЛЕНОЙ дорожки. Ход 'lanetouch' поднимает версию партнёра и вперёд, и назад — замороженный партнёр
+   устаревает на правке, на ↶ и на ↷. Нет краёв пары — список прежний, тем же объектом (байт-в-байт прежние правки). */
+function tieUntiePass(list){
+  const moved=[], gone=[], inList=new Set();
+  for(const u of list){
+    if(u.kind==='move'){ inList.add(u.ev); if(u.from&&u.from.a&&u.from.a.tie && Math.abs(u.to.t-u.from.t)>1e-9) moved.push(u); }
+    else if(u.kind==='del'||u.kind==='ins') for(const e of u.evs){ inList.add(e); if(u.kind==='del'&&e.a&&e.a.tie) gone.push(e); }
+  }
+  if(!moved.length&&!gone.length) return list;
+  const extra=[], ids=new Set(), done=new Set();
+  for(const e of [...moved.map(u=>u.ev), ...gone])
+    for(const p of tiePartners(e)){ if(done.has(p)||inList.has(p)) continue; done.add(p);
+      extra.push({ kind:'move', ev:p, from:{t:p.t, a:p.a}, to:{t:p.t, a:noTie(p.a)} });
+      const id=laneOf(p.layer); if(id!=null) ids.add(id); }
+  for(const u of moved) u.to={ t:u.to.t, a:noTie(u.to.a) };   // свой tie — в своём же ходе (to — объект плана, не события)
+  for(const id of ids) extra.push({ kind:'lanetouch', id });
+  return [...list, ...extra];
+}
+/* Удаление СТРОКИ дорожки (✕): выжившие половины её пар развязываются (решение пользователя). ⚠️ Удаление строки НЕ ОТМЕНЯЕТСЯ (S3.5d) —
+   развязка идёт тем же необратимым шагом: нагрузка партнёра заменяется новым объектом без tie, версия правок его дорожки поднимается
+   (замороженный партнёр устаревает). → сколько партнёров развязано. */
+function untieAcross(layer){
+  const ids=new Set(); let n=0;
+  for(const e of events){ if(e.layer!==layer||!e.a||!e.a.tie) continue;
+    for(const p of tiePartners(e)){ if(p.layer===layer||!p.a.tie) continue; p.a=noTie(p.a); n++; const id=laneOf(p.layer); if(id!=null) ids.add(id); } }
+  for(const id of ids) laneVerBump(id);
+  return n;
 }
 /* События ОДНОГО сегмента, по времени: определяющее («вкл» или смена высоты) и ведения громкости внутри.
    Берём тем же обратным указателем byEv, которым songSegs их и собрал: «выкл» туда не входит (он кончает
@@ -1770,7 +1830,6 @@ function editMoveSeg(ev,t,ti,oct,ty){
   if(seg.role==='ch' && !chordTypeFits(ty!==undefined ? ty : seg.ty, ti, seg.sc)) return false;   // ⛳ T7: тип, которого на новом корне нет в строе (Партч — вне 43 высот), туда не переносится (ui называет причину)
   const pt=slotPt(ti,oct,ty); if(!pt) return false;          // T5: любая высота строя (яркий или приглушённый ряд)
   const nt=Math.max(0,t);
-  if(Math.abs(nt-ev.t)>1e-9 && soloEditBlock(ev,'time')) return false;   // ⛳ S4: край пары связки во времени — до S6 (ui называет причину); смена одной высоты разрешена
   if(Math.abs(nt-ev.t)<=1e-9){
     const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
     return editBatch(list) ? ev : false;
@@ -1789,15 +1848,12 @@ function editMoveSeg(ev,t,ti,oct,ty){
 function editDeleteSeg(ev){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
   if(!editRoleOf(ev.fn)) return false;                       // S0: см. editMoveSeg
-  if(soloEditBlock(ev,'del')) return false;                  // ⛳ S4: снять край пары связки — до S6 (ui называет причину)
   const seg=songSegs().byEv.get(ev);
   const whole = !seg || (seg.first && !(seg.endEv && chaseKind(seg.endEv.fn)!=='f'));   // нет сегмента (сирота) / одиночная / начало ноты без смены высоты за ним
   if(!whole){ const P=detachPlan(seg); if(P) return commitDetach(P,false); }
   const evs = (seg&&seg.first&&seg.note) ? seg.note.evs.slice() : [ev];
-  const drop=new Set(evs);
-  if(!compactEvents(e=>drop.has(e))) return false;
-  editPush({ kind:'del', evs });
-  editCommit(); return true;
+  if(!evs.some(e=>events.includes(e))) return false;         // прежний отказ compactEvents (удалять нечего)
+  return editBatch([{ kind:'del', evs }]);                   // S6: через editBatch — проход развязки видит удаляемый край пары. Один ход — та же запись истории, что прежде (editPush без обёртки)
 }
 /* ═══ U2: РАСПАД АККОРДА — ПРАВКА ОДНОЙ ЕГО НОТЫ ═══
    ⛳ ЗАКОН (решение пользователя, план «АККОРД КАК НОТЫ»): правка ОДНОЙ ноты аккорда РАСПУСКАЕТ его на ОДНОНОТНЫЕ аккорды, и
@@ -1946,7 +2002,7 @@ function bendTrim(B,L){
 function editResizeSeg(ev,t){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
   const R=editRoleOf(ev.fn); if(!R) return false;            // S0: см. editMoveSeg
-  if(soloEditBlock(ev,'len')) return false;                  // ⛳ S4: «выкл» края пары связки — до S6 (ui называет причину). S5: длина терменвокса разрешена — кривая обрезается ниже (bendTrim)
+  // S4–S6: отказов соло нет (край пары связки с S6 развязывается — tieUntiePass в editBatch); длина терменвокса обрезает кривую ниже (bendTrim, S5)
   const seg=songSegs().byEv.get(ev); if(!seg||!seg.endEv||seg.end==null) return false;
   const X=seg.endEv;
   if(chaseKind(X.fn)==='f'){
@@ -2784,6 +2840,7 @@ function autChainMove(layer,fxId,dir){
 function editApply(u,undo){
   if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; return; }
   if(u.kind==='timbre'){ for(const c of u.ch) c.ev.a = undo?c.from:c.to; return; }   // T5: вся замена — одним ходом, нагрузки те же объекты
+  if(u.kind==='lanetouch'){ laneVerBump(u.id); return; }   // ⛳ S6: версия правок ДРУГОЙ дорожки (партнёра пары связки) — поднимается В ОБЕ стороны: и ↶, и ↷ меняют её события, её замороженный буфер обязан устареть снова
   if(u.kind==='batch'){ const L=u.list;                                            // E1: составная правка — вперёд по порядку, назад в обратном (см. editBatch)
     if(undo) for(let i=L.length-1;i>=0;i--) editApply(L[i],true); else for(const s of L) editApply(s,false);
     return; }
@@ -4542,7 +4599,8 @@ export {
   editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,   // S5.1/S5.3: правка ударов, отмена и ВОЗВРАТ ПРАВОК (не путать с ⤺ — та снимает взятое)
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   editInsertChord,
-  editInsertLead, soloEditBlock,   // S4: вставка ноты соло (зеркало editInsertBass) и ОДИН предикат двух отказов правки соло — ui называет по нему причину
+  editInsertLead,   // S4: вставка ноты соло (зеркало editInsertBass)
+  tiePartners, laneEditVerOf,   // S6: партнёр пары связки и версия правок дорожки — для пробы P.checkSoloEdit (soloEditBlock снят: отказов нет)
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое

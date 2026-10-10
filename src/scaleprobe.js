@@ -73,7 +73,8 @@ import { rollRowsProbe as RP } from './draw.js';   // пути рядов ред
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
-         songNotes, editResizeSeg, editDeleteSeg, editInsertLead, soloEditBlock, editUndo, editRedo, freezeState, recording } from './recorder.js';   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         songNotes, editResizeSeg, editDeleteSeg, editInsertLead, editUndo, editRedo, freezeState, recording,
+         tiePartners, laneEditVerOf, freezeTicket, laneDelTap } from './recorder.js';   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -1205,14 +1206,20 @@ export function checkFrozen(){
      1) ИНВАРИАНТЫ ПЕСНИ: сирот нет (ведение или «выкл» без своей ноты); каждая нота соло кончается СВОИМ «выкл» (пары «вкл/выкл» сходятся);
         у каждого высотного «вкл»/ведения есть громкость (правило #30); каждая половина ПАРЫ СВЯЗКИ («выкл» с tie / «вкл» с tie) имеет
         партнёра — противоположное событие того же взятого на той же доле в ДРУГОЙ дорожке; точки кривой бенда лежат внутри своей ноты.
-     2) ОТКАЗЫ (recorder.soloEditBlock — тот же предикат, что у функций правки и ui): время и удаление края пары связки — 'roll.tieEdge';
-        перенос, высота, удаление и (с S5) ДЛИНА терменвокса — без отказа.
+     2) ⛳ S6: ПАРТНЁР ПАРЫ СВЯЗКИ — recorder.tiePartners (то, чем развязывает правка) находит у каждой половины ровно ту, что видит
+        инвариант 1. (S4–S5 здесь сверялись отказы soloEditBlock; с S6 отказов нет — предикат снят.)
      3) КРУГ «ПРАВКА → ↶ → ↷ → ↶»: после ↶ события песни ПОБИТНО прежние (те же объекты; доля, слой, функция, взятое, вид, септаккорд и
         нагрузка — по значению), после ↷ — побитно как после правки; правки: перенос одиночной ноты, её длина, высота и удаление; отделение
         и удаление сегмента ведущей линии; высота «вкл» пары связки; перенос с транспонированием терменвокса (кривая та же); вставка.
         Отказанная правка песню не трогает. Редактор открывается и закрывается самой пробой; песня после неё — та же.
         ⛳ S5: ДЛИНА ТЕРМЕНВОКСА — укорочение (кривая обрезана: точки ≤ новой длины прежние и по порядку, последняя — на новом конце со
         значением кривой там; прежний массив НЕ тронут) и удлинение (кривая — тот же массив); ↶ возвращает кривую побитно (круг).
+        ⛳ S6: КРАЙ ПАРЫ СВЯЗКИ — перенос ноты с привязанным «выкл», её укорочение, удаление каждой половины, перенос «вкл»: после правки
+        tie нет НИ у правленого края, НИ у партнёра; версия правок дорожки партнёра растёт (и подпись его заморозки меняется — замороженный
+        партнёр устарел) на правке, на ↶ и на ↷; ↶ возвращает пару побитно. Смена одной высоты и длина ноты с привязанным «вкл» (двигается
+        её собственный «выкл») связку ХРАНЯТ. Удаление СТРОКИ дорожки (необратимо) — на ВРЕМЕННОЙ паре, записанной самой пробой в конец
+        песни (recorder.seedTake), в обе стороны: выжившая половина развязана, её версия выросла, подпись сменилась; затем обе временные
+        дорожки удаляются, и песня — побитно прежняя (продвинутые счётчики дорожек и взятых — монотонны по замыслу).
      4) ⛳ S5: ГОЛОС ПОСЛЕ ИЗОГНУТОЙ НОТЫ НАЧИНАЕТ БЕЗ ЕЁ КРИВОЙ — на ЗВУКЕ, офлайн-рендером (render.reuseCheck): высота второй ноты на
         том же голосе — её собственная, а контроль (своя кривая) мерой виден. Поэтому проба асинхронна: await P.checkSoloEdit().
    У P.seed материал обязателен (его нет — расхождение); у демо-пьесы (P.song) отсутствующий случай лишь называется.
@@ -1242,6 +1249,10 @@ export async function checkSoloEdit(){
     else if(e.fn==='leadOff') nPairs++;
   }
   if(!nPairs) lack('a linked pair (a solo note continued across a timbre switch)');
+  // ---- 2) ⛳ S6: партнёр — тем же, чем развязывает правка ----
+  for(const e of ties){ const want= e.fn==='leadOff' ? 'leadOn' : e.fn==='leadOn' ? 'leadOff' : null; if(!want) continue; cases++;
+    const inv=ties.filter(x=>x.fn===want && x.tk===e.tk && x.layer!==e.layer && Math.abs(x.t-e.t)<1e-9), got=tiePartners(e);
+    if(!got.length || got.some(p=>!inv.includes(p)) || (inv.length===1 && got[0]!==inv[0])) miss(`L${e.layer+1} beat ${beat(e.t)} ${e.fn} with a tie: recorder.tiePartners finds ${got.length} partner(s), the invariant ${inv.length}`); }
   // ---- P.seed: терменвокс после правки — там, куда его перенесли, с той же кривой ----
   if(isSeed){ cases++; const T=SEED_REC.solo&&SEED_REC.solo.therm;
     if(!T) miss('the solo section of the seed did not run (no record of its theremin edit)');
@@ -1249,7 +1260,6 @@ export async function checkSoloEdit(){
       if(!h) miss(`the seed's theremin note is not at beat ${T.t}`);
       else { if(h.a.ti!==T.ti||h.a.oct!==T.oct) miss(`the seed's theremin note: ti/reg ${h.a.ti}/${h.a.oct}, intended ${T.ti}/${T.oct}`);
              if(JSON.stringify(h.a.bend)!==JSON.stringify(T.bend)) miss(`the seed's theremin note: the move changed its bend to ${JSON.stringify(h.a.bend)} (intended ${JSON.stringify(T.bend)})`); } } }
-  // ---- 2) отказы ----
   const segs=()=>songSegs().segs.filter(g=>g.role==='ld' && !g.ev.jam && freezeState(g.layer)==='none');
   const isTherm=g=>!!(g.note.head.a&&g.note.head.a.bend&&g.note.head.a.bend.length);
   const offTie=g=>!!(g.endEv && g.endEv.fn==='leadOff' && g.endEv.a && g.endEv.a.tie);
@@ -1257,12 +1267,6 @@ export async function checkSoloEdit(){
   const single=g=>!!(g.first && g.endEv && g.endEv.fn==='leadOff');
   const plain=g=>single(g) && !isTherm(g) && !offTie(g) && !headTie(g);
   const find=(what,pred)=>{ const g=segs().find(pred); if(!g) lack(what); return g||null; };
-  for(const g of segs()){
-    const tie=headTie(g)||offTie(g);
-    const want=[ ['len', offTie(g) ? 'roll.tieEdge' : null], ['time', tie ? 'roll.tieEdge' : null], ['del', tie ? 'roll.tieEdge' : null] ];   // S5: длина терменвокса — без отказа
-    for(const [op,w] of want){ cases++; const got=soloEditBlock(g.ev,op);
-      if(got!==w) miss(`L${g.layer+1} solo segment at beat ${beat(g.start)}${isTherm(g)?' (theremin)':''}${tie?' (tie edge)':''}: '${op}' refusal ${got}, expected ${w}`); }
-  }
   // ---- 3) круг правки ----
   if(editIsOpen()) miss('the track editor is open — close it: the round trip opens it itself');
   else if(recording) miss('recording — stop it first');
@@ -1288,12 +1292,37 @@ export async function checkSoloEdit(){
       if(!editUndo()){ miss(`${label}: the second undo refused`); return; }
       if((d=same(snap(),S0))) miss(`${label}: the second undo does not restore the song — ${d}`);
     };
-    const refuse=(label,g,op)=>{ if(!g) return; cases++;
+    const at=e=>`L${e.layer+1} beat ${beat(e.t)}`;
+    const verSig=ly=>{ const k=freezeTicket(ly); return { v:laneEditVerOf(ly), s:k&&k.sig }; };
+    /* ⛳ S6: КРУГ ПРАВКИ КРАЯ ПАРЫ. edgeOf(g) — привязанное событие правленой ноты («вкл» или «выкл» с tie); партнёр берётся ДО правки. После
+       правки tie нет ни у края (если край ещё в песне), ни у партнёра; версия правок дорожки партнёра выросла, подпись заморозки сменилась;
+       ↶ — песня побитно прежняя (пара цела) и версия выросла снова (замороженный партнёр устарел и на ↶), ↷ — побитно как после правки и
+       версия снова выросла, второй ↶ — побитно прежняя. */
+    const pairRt=(label,g,edgeOf,op)=>{ if(!g) return; cases++;
       if(!open(g.layer)){ miss(`${label}: the editor would not open L${g.layer+1}`); return; }
-      const S0=snap(), r=op(g);
-      if(r){ miss(`${label}: the edit was accepted — it must be refused`); editUndo(); return; }
-      const d=same(snap(),S0); if(d) miss(`${label}: refused, yet the song changed — ${d}`);
+      const E=edgeOf(g), Ps=tiePartners(E);
+      if(Ps.length!==1){ miss(`${label}: ${Ps.length} partners found for the tied edge at ${at(E)} (expected 1)`); return; }
+      const P=Ps[0], S0=snap(), A=verSig(P.layer), r=op(g);
+      if(!r){ miss(`${label}: the edit was refused`); return; }
+      const S1=snap(), B=verSig(P.layer); let d;
+      if(!same(S1,S0)) miss(`${label}: the edit changed nothing`);
+      if(P.a&&P.a.tie) miss(`${label}: the partner at ${at(P)} keeps its tie`);
+      if(events.includes(E) && E.a && E.a.tie) miss(`${label}: the edited edge at ${at(E)} keeps its tie`);
+      if(!(B.v>A.v)) miss(`${label}: the partner track's edit version did not rise (${A.v} → ${B.v}) — its frozen buffer would not go stale`);
+      if(B.s===A.s) miss(`${label}: the partner track's freeze signature did not change`);
+      if(!editUndo()){ miss(`${label}: undo refused`); return; }
+      const C=verSig(P.layer);
+      if((d=same(snap(),S0))) miss(`${label}: undo does not restore the pair — ${d}`);
+      if(!(C.v>B.v)) miss(`${label}: undo did not raise the partner's edit version — a buffer frozen after the edit would stay fresh`);
+      if(!editRedo()){ miss(`${label}: redo refused`); return; }
+      if((d=same(snap(),S1))) miss(`${label}: redo does not repeat the edit — ${d}`);
+      if(!(verSig(P.layer).v>C.v)) miss(`${label}: redo did not raise the partner's edit version`);
+      if(!editUndo()){ miss(`${label}: the second undo refused`); return; }
+      if((d=same(snap(),S0))) miss(`${label}: the second undo does not restore the pair — ${d}`);
     };
+    /* Правка, НЕ трогающая время края, связку ХРАНИТ: партнёр с tie, его версия правок не меняется (обычный круг ниже — побитно). */
+    const keepCheck=(g,edgeOf)=>{ const E=edgeOf(g), P=tiePartners(E)[0], v0=P?laneEditVerOf(P.layer):0;
+      return ()=> !P ? 'no partner before the edit' : !(P.a&&P.a.tie) ? `the partner at ${at(P)} lost its tie` : laneEditVerOf(P.layer)!==v0 ? 'the partner track’s edit version changed' : null; };
     /* Цель каждой правки ищется ЗАНОВО (find после ↶ — та же песня, тот же ответ): объекты сегментов пересобираются после каждой правки. */
     try{
       const P1=()=>find('a plain solo note (its own note-off, no bend, no tie)',plain);
@@ -1329,15 +1358,43 @@ export async function checkSoloEdit(){
       rt('lengthen a theremin note (its bend is kept, the last value holds)',TH(),g=>{ const L=g.end-g.start+1, ev=editResizeSeg(g.ev,g.start+L);
         return ev && { check:bendCheck(g,ev,L) }; });
       const HT=()=>find('a solo note continuing another track (a tie on its note-on)',g=>headTie(g)&&single(g)&&!offTie(g));
-      rt('change the pitch of a tied note-on',HT(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
-      refuse('move a tied note-on in time',HT(),g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
-      refuse('delete a tied note-on',HT(),g=>editDeleteSeg(g.ev));
       const OT=()=>find('a solo note continued in another track (a tie on its note-off)',g=>offTie(g)&&g.first&&!headTie(g));
-      refuse('lengthen a note whose note-off is tied',OT(),g=>editResizeSeg(g.ev,g.end+0.5));
-      refuse('move a note whose note-off is tied',OT(),g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
-      refuse('delete a note whose note-off is tied',OT(),g=>editDeleteSeg(g.ev));
-      rt('change the pitch of a note whose note-off is tied',OT(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
+      const onE=g=>g.ev, offE=g=>g.endEv;
+      // связка ХРАНИТСЯ: время края не меняется
+      { const g=HT(); rt('change the pitch of a tied note-on (the tie is kept)',g,g=>{ const k=keepCheck(g,onE), ev=editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct); return ev && { check:k }; }); }
+      { const g=HT(); rt('lengthen a note whose note-on is tied (its own note-off moves; the tie is kept)',g,g=>{ const k=keepCheck(g,onE), ev=editResizeSeg(g.ev,g.end+0.5); return ev && { check:k }; }); }
+      { const g=OT(); rt('change the pitch of a note whose note-off is tied (the tie is kept)',g,g=>{ const k=keepCheck(g,offE), ev=editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct); return ev && { check:k }; }); }
+      // ⛳ S6: край двигается или уходит — обе половины развязаны
+      pairRt('move a note whose note-off is tied (the edge moves)',OT(),offE,g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
+      pairRt('shorten a note across its tied note-off',OT(),offE,g=>editResizeSeg(g.ev,g.start+(g.end-g.start)/2));
+      pairRt('lengthen a note past its tied note-off',OT(),offE,g=>editResizeSeg(g.ev,g.end+0.5));
+      pairRt('delete the half whose note-off is tied',OT(),offE,g=>editDeleteSeg(g.ev));
+      pairRt('move the tied note-on in time',HT(),onE,g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
+      pairRt('delete the half whose note-on is tied',HT(),onE,g=>editDeleteSeg(g.ev));
     } finally { if(editIsOpen()) editClose(); }
+    /* ⛳ S6: УДАЛЕНИЕ СТРОКИ ДОРОЖКИ (✕, необратимо) — на ВРЕМЕННОЙ паре в конце песни, в обе стороны. Запись — recorder.seedTake (та же
+       воронка, что P.seed); удаление — двойной тап laneDelTap (тот же путь, что у ✕ на полосе). После — песня побитно прежняя. */
+    if(!loop.on){
+      const S0=snap();
+      const tmpPair=()=>{ const T=Math.ceil(songBeats())+8;
+        const r=seedTake([{fn:'leadOn',a:{deg:0,oct:1,vol:.8,inst:0,v:0},t:T,id:1}, {fn:'leadOff',a:{v:0,tie:true},t:T+1,id:1},
+                          {fn:'leadOn',a:{deg:0,oct:1,vol:.8,inst:1,tie:true,v:0},t:T+1,id:2}, {fn:'leadOff',a:{v:0},t:T+2,id:2}]);
+        if(!r) return null;
+        const off=events.find(e=>e.tk===r.take&&e.fn==='leadOff'&&e.a&&e.a.tie), on=events.find(e=>e.tk===r.take&&e.fn==='leadOn'&&e.a&&e.a.tie);
+        return off&&on&&off.layer!==on.layer ? { off, on } : null; };
+      const del=ly=>{ laneDelTap(ly); return laneDelTap(ly); };
+      for(const [label,gone,keep] of [['delete the track row holding the tied note-off','off','on'],['delete the track row holding the tied note-on','on','off']]){ cases++;
+        const pr=tmpPair(); if(!pr){ miss(`${label}: the temporary linked pair could not be recorded`); continue; }
+        const G=pr[gone], K=pr[keep], A=verSig(K.layer);
+        if(!del(G.layer)) miss(`${label}: the row delete was refused`);
+        else { const B=verSig(K.layer);
+          if(K.a&&K.a.tie) miss(`${label}: the surviving half at ${at(K)} keeps its tie`);
+          if(!(B.v>A.v)) miss(`${label}: the surviving track's edit version did not rise — its frozen buffer would not go stale`);
+          if(B.s===A.s) miss(`${label}: the surviving track's freeze signature did not change`); }
+        if(events.includes(K) && !del(K.layer)) miss(`${label}: the temporary surviving track could not be removed`);
+      }
+      const d=same(snap(),S0); if(d) miss(`row delete: the song is not back as it was — ${d}`);
+    } else miss('row delete: the transport is playing — stop it first');
   }
   // ---- 4) голос после изогнутой ноты — на звуке ----
   cases++; let RU=null;
@@ -1348,7 +1405,7 @@ export async function checkSoloEdit(){
   console.log(`[scaleprobe solo-edit] solo notes ${song} · cases ${cases} · linked pairs ${nPairs} · differences ${nBad}`);
   if(absent.length) console.log('[scaleprobe solo-edit] not in this song (not checked): '+[...new Set(absent)].join('; '));
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe solo-edit] '+m));
-  if(!nBad) console.log('[scaleprobe solo-edit] no orphans; every solo note ends by its own note-off; every pitched event has a volume; every linked half has its partner; every bend lies within its note; the only refusals are the tie edges; every edit round-trips bit for bit; a theremin note’s length trims its bend exactly; a voice reused after a bent note starts unbent');
+  if(!nBad) console.log('[scaleprobe solo-edit] no orphans; every solo note ends by its own note-off; every pitched event has a volume; every linked half has its partner, found by recorder.tiePartners; every bend lies within its note; editing a tied edge unties both halves, stales the partner and round-trips bit for bit; a row delete unties the surviving half; every edit round-trips bit for bit; a theremin note’s length trims its bend exactly; a voice reused after a bent note starts unbent');
   return { cases, song, total:nBad, differences:bad };
 }
 const SID=id=>{ if(!scaleById(id)) throw new Error('no scale '+id); return id; };   // F1: адрес — сам id   // id — стабильный идентификатор (T0), не имя (правило #25)

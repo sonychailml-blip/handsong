@@ -151,8 +151,7 @@ export const DICTS = {
     'frz.empty':'Nothing to freeze — this track has no notes',
     /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ, а не постоянная надпись: см. freezePinCaptures. */
     'frz.pinned':'This track had notes added in the editor. Their effects are now fixed as they sound right now — the live controls no longer reach them.',
-    // S4: отказ правки соло (recorder.soloEditBlock): край пары связки — до S6. (Отказ длины терменвокса — roll.thereminLen — снят в S5.)
-    'roll.tieEdge':'This note continues in another track (timbre change) — moving or deleting that joined edge comes later; its pitch can change',
+    // (S4–S6: отказы правки соло roll.thereminLen — снят в S5 — и roll.tieEdge — снят в S6: край пары связки развязывается молча.)
     'roll.ghosts':'{n} in another scale',
     // T4: одна строка вместо «нет этой роли» / «нет ударных» — роль у дорожки одна, пусто значит «нот не осталось»
     'roll.emptyTrack':'No notes in this track',
@@ -622,7 +621,6 @@ export const DICTS = {
     'frz.noCancel':'Начатый рендер не остановить — дождитесь конца',
     'frz.empty':'Замораживать нечего — в дорожке нет нот',
     'frz.pinned':'В этой дорожке есть ноты, добавленные в редакторе. Их эффекты теперь закреплены такими, как звучат сейчас, — живые ручки до них больше не дотянутся.',
-    'roll.tieEdge':'Эта нота продолжается в другой дорожке (смена тембра) — переносить или удалять общий край пока нельзя; высоту менять можно',
     'roll.ghosts':'{n} в другом ладу',
     'roll.emptyTrack':'В этой дорожке нет нот',
     'roll.noTrack':'Этой дорожки больше нет',
