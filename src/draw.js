@@ -953,6 +953,41 @@ function rollSegNotes(s,ax,total){
   return N.map(n=> Math.abs(1200*Math.log2(n.f/fr))<ROLL_ON_ROW_CENTS ? { r:r0, dev:P0.dev } : chRowOfFreq(n.f,F,dpo,total));
 }
 const rollSegRows=(s,ax,total)=>rollSegNotes(s,ax,total).map(x=>x.r);
+/* ═══ S5: КРИВАЯ БЕНДА НОТЫ ТЕРМЕНВОКСА — НА ЕЁ НАСТОЯЩЕЙ ВЫСОТЕ, ПО ТОЙ ЖЕ ОСИ, ЧТО РЯДЫ (правило #9) ═══
+   Точка кривой — центы c над ценой АТАКИ ноты (leadFreqTi пары сегмента — та же цена, от которой бенд играет переигровка: ENG.leadOn →
+   scheduleBend). Её место на оси — ДРОБНЫЙ ряд по логарифму частоты между соседними рядами оси (тот же закон, что у тона аккорда вне
+   ряда и у ноты вне лада в «Лад» — ax.placeTi): частоты рядов — цена каждого целого ряда оси в регистре соло (ax.pitchOf → leadFreqTi),
+   и в «Все», и в «Лад»; уход кривой вне лада ложится между рядами. Кривая ПРИВЯЗАНА к ряду самого блока: r = ряд блока + (ряд частоты
+   точки − ряд частоты атаки), поэтому c = 0 стоит ровно на блоке — и у ноты на тусклом дубле тоники (ряд блока — дубль, а по частоте
+   это тоника следующего регистра; там же — честный предел: у самого дубля шаг кривой на ряд выше читается от тоники следующего регистра).
+   За краями оси — продолжение по крайнему шагу (рисунок обрежется клипом). → [{t, r}] (t — доля песни) или null (не терменвокс). */
+let ldRowCache={ key:null, F:null };
+function ldRowFreqs(ax,total){
+  if(ldRowCache.key===ax && ldRowCache.base===baseF() && ldRowCache.tonic===tonic && ldRowCache.F.length>=total) return ldRowCache.F;   // те же ключи, что у chRowFreqs: ось, A4/тоника (baseF), тоника-ключ fixedKey
+  const F=new Array(total);
+  for(let r=0;r<total;r++){ const p=ax.pitchOf(r); F[r]= p ? leadFreqTi(p.ti,p.oct,ax.sc) : NaN; }
+  ldRowCache={ key:ax, base:baseF(), tonic, F };
+  return F;
+}
+function rowOfHz(f,F,total){   // дробный ряд частоты f на оси F (ряды по возрастанию; у дубля тоники частота повторяется — берётся ПОСЛЕДНИЙ ряд ≤ f)
+  const n=Math.min(total,F.length); if(!(f>0)||n<2) return NaN;
+  let lo=-1, hi=n-1; while(lo<hi){ const m=(lo+hi+1)>>1; if(F[m]<=f*(1+1e-12)) lo=m; else hi=m-1; }
+  if(lo<0) return Math.log(f/F[0])/Math.log(F[1]/F[0]);                        // ниже первого ряда
+  if(lo>=n-1) return (n-1)+Math.log(f/F[n-1])/Math.log(F[n-1]/F[n-2]);          // выше последнего
+  return lo+Math.log(f/F[lo])/Math.log(F[lo+1]/F[lo]);
+}
+const bendMemo=new WeakMap();   // сегмент → { ax, base, tonic, total, pts }: сегменты пересобираются со songSegs, так что старые уходят сами
+function rollBendPts(s,ax,total){
+  const h=s.note&&s.note.head, B=h&&h.a&&h.a.bend;
+  if(s.role!=='ld'||!s.first||!B||!B.length) return null;
+  const m=bendMemo.get(s);
+  if(m && m.ax===ax && m.base===baseF() && m.tonic===tonic && m.total===total && m.B===B) return m.pts;
+  const F=ldRowFreqs(ax,total), f0=leadFreqTi(s.ti,s.oct,s.sc), r0=rollSegRoot(s,ax), rf0=rowOfHz(f0,F,total);
+  const pts= (f0>0 && Number.isFinite(rf0) && Number.isFinite(r0)) ? B.map(p=>({ t:s.start+p.dt, r:r0+rowOfHz(f0*Math.pow(2,p.c/1200),F,total)-rf0 })) : null;
+  bendMemo.set(s,{ ax, base:baseF(), tonic, total, B, pts });
+  return pts;
+}
+const ROLL_BEND_MIN_W=6;   // уже — кривую не рисуем: на блоке в несколько пикселей она была бы просто штрихом поверх цвета
 /* T4b3: СЕГМЕНТ-ПРИЗРАК переноса аккорда на ряд pit — ТА ЖЕ пара, что окажется в песне после правки: индекс и регистр ряда (T4c-1; с T5 —
    и приглушённого) и тип, который поставит правка (T5, вариант (а): recorder.chordMoveTy). ⚠️ Без
    индекса призрак прочёл бы ПРЕЖНИЙ индекс сегмента и стоял бы на старом месте — ошибка ПРОИЗВОДНОГО пути (урок T4b2). */
@@ -1530,6 +1565,20 @@ function drawRoll(){
           else if(one){ ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(x-1.5,y-1.5,w+3,h+3,4); ctx.stroke(); }
           if(off) rollDevLbl(x,y,w,h,nt.dev,sel);
         });
+        /* ⛳ S5: КРИВАЯ БЕНДА поверх блока терменвокса — СТУПЕНЯМИ, как её играет переигровка (каждая точка — setFreq с τ 20 мс: значение
+           держится до следующей точки), последняя держится до конца блока. Блок остаётся целью попадания (rollHit кривую не знает). Вершины
+           ближе полупикселя по x сливаются (на мелком масштабе длинная запись — не тысячи отрезков), вертикаль — клипом поля сетки. */
+        const BP=w>=ROLL_BEND_MIN_W ? rollBendPts(s,AX,V.total) : null;
+        if(BP){
+          ctx.save(); ctx.beginPath(); ctx.rect(x,gy0,w,gy1-gy0); ctx.clip();
+          ctx.strokeStyle = s.ev===rollSel ? 'rgba(20,20,32,.85)' : 'rgba(255,255,255,.92)'; ctx.lineWidth=1.5;
+          const cy=r=>rollRowY(V,r)+V.rowH/2;
+          ctx.beginPath(); let px=x, py=cy(rollSegRoot(s,AX)); ctx.moveTo(px,py);   // до первой точки — ступень атаки (0 центов)
+          for(let i=0;i<BP.length;i++){ const nx=laneBeatX(V,BP[i].t), ny=cy(BP[i].r);
+            if(nx-px<0.5 && i<BP.length-1){ py=ny; continue; }   // слить вершины в полпикселя — держим последнее значение
+            ctx.lineTo(nx,py); ctx.lineTo(nx,ny); px=nx; py=ny; }
+          ctx.lineTo(x2,py); ctx.stroke(); ctx.restore();
+        }
       }
     }
   }

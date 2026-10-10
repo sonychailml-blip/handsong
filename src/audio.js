@@ -2248,13 +2248,13 @@ function leadAlloc(owner,ins,when){
   if(offline){ const t=when!=null?when:AC.currentTime;
     let v=lv.find(x=>x.freeAt<=t&&x.banks[ins]) || lv.find(x=>x.freeAt<=t);
     if(!v) v=newLeadVoice();
-    v.owner=owner; v.freeAt=Infinity; leadHold[owner]=v; return v; }
+    v.owner=owner; v.freeAt=Infinity; v.handed=true; leadHold[owner]=v; return v; }
   const cap=leadCap(ins);
   let v=lv.find(x=>!x.owner&&x.banks[ins]) || lv.find(x=>!x.owner);
   if(!v&&lv.length<cap) v=newLeadVoice();
   if(!v){ const free=lv.filter(x=>!x.on); v=(free.length?free:lv).reduce((a,b)=>a.tOn<b.tOn?a:b);
     if(v.owner) delete leadHold[v.owner]; leadRelease(v,true); }
-  v.owner=owner; leadHold[owner]=v; return v;
+  v.owner=owner; v.handed=true; leadHold[owner]=v; return v;   // S5: handed — голос сменил владельца; его расписанные кривые снимет leadOn (см. там)
 }
 /* ⛔ ПРИЦЕПКИ (tremDep/vibDep/satWet) ЗДЕСЬ НЕ СБРАСЫВАЕМ, И ЭТО НАМЕРЕННО.
    Соблазн понятен: «голос уходит в пул — обнулим его величины, чтобы не утекли в следующую ноту». Но
@@ -2304,6 +2304,17 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      голоса — переставь мы это местами, живой путь перестал бы быть байт-в-байт (чтение часов могло
      бы попасть в другой квант рендера). */
   const v=leadAlloc(owner,ins,when), t=when!=null?when:AC.currentTime, b=leadVoiceBank(v,ins,t);
+  /* ⛳ S5: ГОЛОС, ВЫДАННЫЙ НОВОМУ ВЛАДЕЛЬЦУ, НАЧИНАЕТ БЕЗ РАСПИСАННОЙ КРИВОЙ — чей бы он ни был. scheduleBend расписывает точки бенда в
+     банк голоса НАПЕРЁД; если нота прежнего владельца отпущена раньше конца своей кривой (стоп, пауза, паника, шов скобы, кража), её
+     хвост точек остаётся в параметрах частоты — и прежде перестраивал СЛЕДУЮЩУЮ ноту, взявшую этот голос: ENG.leadOn звал leadCancel
+     ДО выдачи голоса, по ключу НОВОГО владельца, и чистил только голос, уже принадлежавший ему (повторная атака того же ключа).
+     Теперь — здесь, при смене владельца (флаг handed ставит leadAlloc во всех ветках выдачи, живой и офлайн; «свой» голос ведения —
+     нет): у ВСЕХ построенных банков голоса снимаются события частоты (и у FM — индекса) с момента t, ДО setFreq/strike этой атаки.
+     ⛳ НИ ОДНА ПРАВИЛЬНАЯ НОТА НЕ МЕНЯЕТСЯ: cancelScheduledValues(t) снимает только события со временем ≥ t; у голоса без чужой кривой
+     таких нет (ведения живой руки и прежние атаки лежат раньше t, глайд в работе продолжается как шёл), а всё, что эта атака ставит
+     сама (setFreq, strike, бенд ENG), ставится ПОСЛЕ отмены. Меняется ровно нота, которая унаследовала бы чужую кривую.
+     leadCancel в ENG остаётся для своего случая — повторной атаки того же владельца на ещё удержанном голосе. */
+  if(v.handed){ v.handed=false; for(const k in v.banks){ const x=v.banks[k]; if(x&&x.cancel) x.cancel(t); } }
   /* fresh СНИМАЕМ ДО применения эффектов и ДО гейта `if(v.on)return` ниже: этот гейт и ЕСТЬ граница
      «атака / уже звучит», второй такой границы заводить не надо. leadOn зовётся КАЖДЫЙ КАДР зажатой
      рукой — там fresh=false, и величины подъезжают плавно, как и должны при ведении. */

@@ -1205,15 +1205,19 @@ export function checkFrozen(){
      1) ИНВАРИАНТЫ ПЕСНИ: сирот нет (ведение или «выкл» без своей ноты); каждая нота соло кончается СВОИМ «выкл» (пары «вкл/выкл» сходятся);
         у каждого высотного «вкл»/ведения есть громкость (правило #30); каждая половина ПАРЫ СВЯЗКИ («выкл» с tie / «вкл» с tie) имеет
         партнёра — противоположное событие того же взятого на той же доле в ДРУГОЙ дорожке; точки кривой бенда лежат внутри своей ноты.
-     2) ОТКАЗЫ (recorder.soloEditBlock — тот же предикат, что у функций правки и ui): длина терменвокса — 'roll.thereminLen'; время и
-        удаление края пары связки — 'roll.tieEdge'; перенос, высота и удаление терменвокса — без отказа.
+     2) ОТКАЗЫ (recorder.soloEditBlock — тот же предикат, что у функций правки и ui): время и удаление края пары связки — 'roll.tieEdge';
+        перенос, высота, удаление и (с S5) ДЛИНА терменвокса — без отказа.
      3) КРУГ «ПРАВКА → ↶ → ↷ → ↶»: после ↶ события песни ПОБИТНО прежние (те же объекты; доля, слой, функция, взятое, вид, септаккорд и
         нагрузка — по значению), после ↷ — побитно как после правки; правки: перенос одиночной ноты, её длина, высота и удаление; отделение
         и удаление сегмента ведущей линии; высота «вкл» пары связки; перенос с транспонированием терменвокса (кривая та же); вставка.
         Отказанная правка песню не трогает. Редактор открывается и закрывается самой пробой; песня после неё — та же.
+        ⛳ S5: ДЛИНА ТЕРМЕНВОКСА — укорочение (кривая обрезана: точки ≤ новой длины прежние и по порядку, последняя — на новом конце со
+        значением кривой там; прежний массив НЕ тронут) и удлинение (кривая — тот же массив); ↶ возвращает кривую побитно (круг).
+     4) ⛳ S5: ГОЛОС ПОСЛЕ ИЗОГНУТОЙ НОТЫ НАЧИНАЕТ БЕЗ ЕЁ КРИВОЙ — на ЗВУКЕ, офлайн-рендером (render.reuseCheck): высота второй ноты на
+        том же голосе — её собственная, а контроль (своя кривая) мерой виден. Поэтому проба асинхронна: await P.checkSoloEdit().
    У P.seed материал обязателен (его нет — расхождение); у демо-пьесы (P.song) отсутствующий случай лишь называется.
    ⚠️ Круг правит только НЕЗАМОРОЖЕННЫЕ дорожки: правка поднимает версию правок дорожки, и замороженная устарела бы. */
-export function checkSoloEdit(){
+export async function checkSoloEdit(){
   const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const isSeed=!!(SEED_REC&&SEED_REC.kind==='seed'), absent=[];
   const lack=what=>{ if(isSeed) miss(`the seed lacks ${what}`); else absent.push(what); };
@@ -1255,7 +1259,7 @@ export function checkSoloEdit(){
   const find=(what,pred)=>{ const g=segs().find(pred); if(!g) lack(what); return g||null; };
   for(const g of segs()){
     const tie=headTie(g)||offTie(g);
-    const want=[ ['len', isTherm(g) ? 'roll.thereminLen' : offTie(g) ? 'roll.tieEdge' : null], ['time', tie ? 'roll.tieEdge' : null], ['del', tie ? 'roll.tieEdge' : null] ];
+    const want=[ ['len', offTie(g) ? 'roll.tieEdge' : null], ['time', tie ? 'roll.tieEdge' : null], ['del', tie ? 'roll.tieEdge' : null] ];   // S5: длина терменвокса — без отказа
     for(const [op,w] of want){ cases++; const got=soloEditBlock(g.ev,op);
       if(got!==w) miss(`L${g.layer+1} solo segment at beat ${beat(g.start)}${isTherm(g)?' (theremin)':''}${tie?' (tie edge)':''}: '${op}' refusal ${got}, expected ${w}`); }
   }
@@ -1309,7 +1313,21 @@ export function checkSoloEdit(){
       rt('move and transpose a theremin note (its bend keeps its shape)',TH(),g=>{ const B=JSON.stringify(g.note.head.a.bend), ev=editMoveSeg(g.ev,g.ev.t+0.5,g.ti+1,g.oct);
         return ev && { check:()=> JSON.stringify(ev.a.bend)!==B ? `the bend changed: ${JSON.stringify(ev.a.bend)} (was ${B})` : ev.a.ti!==g.ti+1 ? `ti ${ev.a.ti}, intended ${g.ti+1}` : null }; });
       rt('delete a theremin note',TH(),g=>editDeleteSeg(g.ev));
-      refuse('change the length of a theremin note',TH(),g=>editResizeSeg(g.ev,g.end+0.5));
+      /* ⛳ S5: ДЛИНА ТЕРМЕНВОКСА. Ожидаемая кривая укорочения считается ЗДЕСЬ, независимо от recorder.bendTrim: точки с dt ≤ L — те же и
+         по порядку, конечная точка {L, c последней оставшейся} — если что-то ушло; прежний массив не тронут (его JSON до и после). */
+      const bendCheck=(g,ev,L)=>{ const B=g.note.head.a.bend, B0=JSON.stringify(B), nb=ev&&ev.a&&ev.a.bend;
+        return ()=>{ if(JSON.stringify(B)!==B0) return 'the edit mutated the original bend array';
+          if(!Array.isArray(nb)||!nb.length) return 'the edited note lost its bend';
+          if(nb.some(p=>p.dt>L+1e-9)) return `a bend point at ${Math.max(...nb.map(p=>p.dt))} lies beyond the new length ${L}`;
+          const keep=B.filter(p=>p.dt<=L+1e-9), cut=keep.length<B.length, last=keep[keep.length-1];
+          if(!cut) return nb===B ? null : 'nothing was cut, yet the bend is a new array';
+          const want=(last&&Math.abs(last.dt-L)<=1e-9) ? keep : [...keep, { dt:L, c:last?last.c:0 }];
+          return JSON.stringify(nb)===JSON.stringify(want) ? null : `trimmed bend ${JSON.stringify(nb)}, expected ${JSON.stringify(want)}`; }; };
+      rt('shorten a theremin note (its bend is trimmed)',TH(),g=>{ const L=(g.end-g.start)/2, ev=editResizeSeg(g.ev,g.start+L);
+        const tail=g.note.head.a.bend.some(p=>p.dt>L+1e-9); if(!tail) lack('a theremin note whose bend reaches past half its length');
+        return ev && { check:bendCheck(g,ev,L) }; });
+      rt('lengthen a theremin note (its bend is kept, the last value holds)',TH(),g=>{ const L=g.end-g.start+1, ev=editResizeSeg(g.ev,g.start+L);
+        return ev && { check:bendCheck(g,ev,L) }; });
       const HT=()=>find('a solo note continuing another track (a tie on its note-on)',g=>headTie(g)&&single(g)&&!offTie(g));
       rt('change the pitch of a tied note-on',HT(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
       refuse('move a tied note-on in time',HT(),g=>editMoveSeg(g.ev,g.ev.t+0.5,g.ti,g.oct));
@@ -1321,10 +1339,16 @@ export function checkSoloEdit(){
       rt('change the pitch of a note whose note-off is tied',OT(),g=>editMoveSeg(g.ev,g.ev.t,g.ti+1,g.oct));
     } finally { if(editIsOpen()) editClose(); }
   }
+  // ---- 4) голос после изогнутой ноты — на звуке ----
+  cases++; let RU=null;
+  try{ const R=await import('./render.js'); RU=await R.reuseCheck(); }
+  catch(err){ RU={ ok:false, why:'the offline render failed: '+(err&&err.message) }; }
+  if(!RU.ok) miss(`voice reuse after a bent note: ${RU.why}`);
+  else console.log(`[scaleprobe solo-edit] voice reuse: the second note on the bent note's voice sounds ${RU.f} Hz (its own ${RU.want}); the control's own bend measures ${RU.fControl} Hz (${RU.wantControl})`);
   console.log(`[scaleprobe solo-edit] solo notes ${song} · cases ${cases} · linked pairs ${nPairs} · differences ${nBad}`);
   if(absent.length) console.log('[scaleprobe solo-edit] not in this song (not checked): '+[...new Set(absent)].join('; '));
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe solo-edit] '+m));
-  if(!nBad) console.log('[scaleprobe solo-edit] no orphans; every solo note ends by its own note-off; every pitched event has a volume; every linked half has its partner; every bend lies within its note; the refusals are exactly the theremin length and the tie edges; every edit round-trips bit for bit');
+  if(!nBad) console.log('[scaleprobe solo-edit] no orphans; every solo note ends by its own note-off; every pitched event has a volume; every linked half has its partner; every bend lies within its note; the only refusals are the tie edges; every edit round-trips bit for bit; a theremin note’s length trims its bend exactly; a voice reused after a bent note starts unbent');
   return { cases, song, total:nBad, differences:bad };
 }
 const SID=id=>{ if(!scaleById(id)) throw new Error('no scale '+id); return id; };   // F1: адрес — сам id   // id — стабильный идентификатор (T0), не имя (правило #25)

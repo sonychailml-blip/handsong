@@ -574,7 +574,7 @@ const ROLL_INSERT={
   ch:(t,ti,oct,sc,sev,len,sel)=>editInsertChord(t,ti,oct,sc,sev,len,sel),
   ld:(t,ti,oct,sc,sev,len)=>editInsertLead(t,ti,oct,sc,sev,len),
 };
-/* ⛳ S4: ОТКАЗ ПРАВКИ СОЛО ГОВОРИТ ПОЧЕМУ (длина терменвокса — до S5, край пары связки — до S6). Условие — ОДНО, в recorder
+/* ⛳ S4: ОТКАЗ ПРАВКИ СОЛО ГОВОРИТ ПОЧЕМУ (край пары связки — до S6; длина терменвокса — с S5 правится, кривая обрезается). Условие — ОДНО, в recorder
    (soloEditBlock), и правка там же откажет — здесь только слова. → true, если правку откажут (сообщение уже показано). */
 const rollSoloRefuse=(ev,op)=>{ const why=soloEditBlock(ev,op); if(why){ showCamMsg(t(why)); return true; } return false; };
 /* ═══ ПОЛОСА АВТОМАТИЗАЦИИ: ОРГАНЫ УПРАВЛЕНИЯ (слайс O-4) ═══
@@ -1005,7 +1005,7 @@ function rollUp(e){
            recorder (editResizeSeg). ⛳ E2: ВЫДЕЛЯЕМ ТО, ЧТО ВЕРНУЛ recorder — у отделённого сегмента «вкл» это НОВЫЙ
            объект события, а прежнее выделение указывало бы на событие, которого в песне больше нет. */
         const s=rollGrab.seg, ne=s.start+gd.len;
-        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9 && !rollSoloRefuse(s.ev,'len')){ const r=editResizeSeg(s.ev, ne); if(r&&r!==true) selNote(r); }   // S4: длина терменвокса / «выкл» края связки — отказ словами
+        if(Math.abs(ne-(s.end==null?ne:s.end))>1e-9 && !rollSoloRefuse(s.ev,'len')){ const r=editResizeSeg(s.ev, ne); if(r&&r!==true) selNote(r); }   // S4: «выкл» края связки — отказ словами
       }
       else if(rollGrab.seg){
         /* БАС: переносим СЕГМЕНТ — его время и/или высоту. Ряд расшифровываем ТОЙ ЖЕ формулой, что рисует

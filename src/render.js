@@ -1377,5 +1377,52 @@ function stop(){
   liveRestore(me);
 }
 
+/* ═══ S5: ГОЛОС, ВЫДАННЫЙ ПОСЛЕ ИЗОГНУТОЙ НОТЫ, НАЧИНАЕТ БЕЗ ЕЁ КРИВОЙ — ПРОВЕРКА НА ЗВУКЕ (P.checkSoloEdit) ═══
+   ⛳ ПОЧЕМУ РЕНДЕР, А НЕ СЧЁТ: расписанные события AudioParam из JS не прочесть; единственное честное доказательство — ВЫСОТА того, что
+   прозвучало. Материал на копии движка с офлайн-раскладчиком (как у заморозки): нота A (440 Гц, Флейта — почти чистый тон) получает
+   кривую с точкой +700 ¢ на 0.55 с, но ОТПУСКАЕТСЯ на 0.30 с — хвост кривой остаётся расписанным в голосе; нота B (330 Гц) берёт ТОТ ЖЕ
+   голос на 0.35 с (офлайн голос свободен с отпускания, сродство банка — тот же голос; факт reused). Высота B после 0.55 с обязана
+   остаться 330 Гц: прежде (до S5) чужая точка перестраивала её на 659 Гц (440·2^(700/1200)). КОНТРОЛЬ — тот же материал, где у B СВОЯ кривая +700 ¢ на
+   0.85 с: мера обязана её увидеть (494 Гц, окно с 0.95 с — точка устоялась: τ 20 мс), иначе «не изогнулась» могло бы значить «мера слепа». Высота — автокорреляцией окна
+   (первый пик не ниже 90 % лучшего — период, а не его кратное), допуск 1.5 % (гуманизация — ±4 ¢; 330 и 494 разнятся на 700 ¢). */
+const RU_SEC=1.2, RU_SPB=0.25, RU_INS=4, RU_F1=440, RU_F2=330, RU_C=700, RU_TOL=0.015;
+function pitchOf(buf,t0,t1){
+  const x=buf.getChannelData(0), rate=buf.sampleRate, a=Math.floor(t0*rate), b=Math.floor(t1*rate);
+  const lmin=Math.floor(rate/1500), lmax=Math.ceil(rate/80), N=b-a-lmax-1;
+  if(N<256) return NaN;
+  const cor=new Float64Array(lmax+2); let best=0;
+  for(let L=lmin; L<=lmax+1; L++){ let s=0,e0=0,e1=0;
+    for(let i=a;i<a+N;i++){ const u=x[i], v=x[i+L]; s+=u*v; e0+=u*u; e1+=v*v; }
+    cor[L]=(e0>0&&e1>0) ? s/Math.sqrt(e0*e1) : 0; if(cor[L]>best) best=cor[L]; }
+  for(let L=lmin+1; L<=lmax; L++) if(cor[L]>=0.9*best && cor[L]>=cor[L-1] && cor[L]>=cor[L+1]){
+    const y0=cor[L-1], y1=cor[L], y2=cor[L+1], q=y0-2*y1+y2, d= q ? 0.5*(y0-y2)/q : 0;   // параболическая доводка пика
+    return rate/(L+d); }
+  return NaN;
+}
+async function reuseCheck(){
+  if(!LIVE_AC) return { ok:false, why:'audio is not started (press ▶ Play)' };
+  const pass=async bendB=>{ let reused=false;
+    const R=await renderOnce(SEED_A, eng=>{
+      eng.leadOn('s5:A',RU_F1,0.8,RU_INS,undefined,undefined,undefined,undefined,0.05);   // позиционно: deg, oct, glide, tie — пусто; время ПОСЛЕДНИМ (правило #15)
+      eng.scheduleBend('s5:A',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F1,RU_SPB,0.05);              // точка +700 ¢ на 0.05+2·0.25 = 0.55 с — ПОСЛЕ отпускания A
+      const vA=eng.leadHold['s5:A'];
+      eng.leadOff('s5:A',undefined,0.3);
+      eng.leadOn('s5:B',RU_F2,0.8,RU_INS,undefined,undefined,undefined,undefined,0.35);
+      reused= !!vA && eng.leadHold['s5:B']===vA;
+      if(bendB) eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F2,RU_SPB,0.35);    // контроль: СВОЯ кривая B, точка на 0.85 с
+      eng.leadOff('s5:B',undefined,1.1);
+    }, RU_SEC, { offline:true });
+    return { reused, buf:R.buf }; };
+  const M=await pass(false), C=await pass(true);
+  const f=pitchOf(M.buf,0.65,1.05), fc=pitchOf(C.buf,0.95,1.09), want=RU_F2, wantC=RU_F2*Math.pow(2,RU_C/1200);
+  const near=(x,y)=>Number.isFinite(x) && Math.abs(x/y-1)<=RU_TOL;
+  const ok= M.reused && near(f,want) && near(fc,wantC);
+  return { ok, reused:M.reused, f:+f.toFixed(2), want, fControl:+fc.toFixed(2), wantControl:+wantC.toFixed(2),
+           why: ok ? null : !M.reused ? 'the second note did not take the first note’s voice — the material proves nothing'
+                : !near(fc,wantC) ? `the control (an intended bend) measured ${fc.toFixed(1)} Hz, not ${wantC.toFixed(1)} — the measurement is blind`
+                : `the reused voice sounded ${f.toFixed(1)} Hz, not ${want} — it inherited the previous note's curve` };
+}
+
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
-export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP };
+export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
+  reuseCheck };   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
