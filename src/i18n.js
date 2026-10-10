@@ -323,6 +323,7 @@ export const DICTS = {
     'looper.laneMute':'M',
     'looper.laneSolo':'S',
     'looper.laneDel':'✕',                                 // S3.5d: удалить дорожку (второй тап подтверждает)
+    'looper.rowsShown':'Tracks {a}–{b} of {n} · drag the rows to scroll',   // полоса дорожек не влезла по высоте: окно строк листается
     'looper.delConfirm':'Tap ✕ again to delete L{n}',
     'looper.soloOn':'SOLO',
     'looper.armed':'REC → L{n}',                    // S3.5c: куда пойдёт ●
@@ -779,6 +780,7 @@ export const DICTS = {
     'looper.laneMute':'М',    // «Молча» — кириллическая М; одна буква, как в en
     'looper.laneSolo':'С',    // «Соло»
     'looper.laneDel':'✕',
+    'looper.rowsShown':'Дорожки {a}–{b} из {n} · листайте строки пальцем',
     'looper.delConfirm':'Ещё раз ✕ — удалить L{n}',
     'looper.soloOn':'СОЛО',
     'looper.armed':'ЗАПИСЬ → L{n}',

@@ -7,7 +7,7 @@ import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChord
          handActOf, setHandAct,
          fxIsScalar, FX_VOL, fxVolReset,   // VOL-2: запись громкости цепи (строка панели) и её сброс на горизонталь для уроков; chainXDriven/fxVolFix/setFxVolFix удалены
          rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
-         rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll,
+         rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll, setLaneRow0,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
@@ -18,7 +18,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, loopScroll, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -381,26 +381,53 @@ addEventListener('pointerdown', e=>{ pointerDown=true;
    довесок поверх того же: взятый касанием край (braceEdge) ведём по pointermove. Если браузер отдаст жест
    прокрутке (pointercancel), останется уже сделанный тап — ничего не сломано. */
 let braceEdge=null;   // край, взятый касанием ('from'/'to'); держим до отпускания — иначе край «перескакивал» бы на ближний на каждом шаге
+/* ⛳ ПРОКРУТКА ПОЛОСЫ ДОРОЖЕК (починка «дорожки дальше 16-й не видны»): когда строки не влезают (draw.loopScroll не null), касание СТРОКИ —
+   это либо тап (вооружить, M, S, ✕), либо перетаскивание (листать), и различить их можно только по движению. Поэтому ТОЛЬКО в этом
+   случае действие строки откладывается до отпускания: сдвиг пальца больше LANE_SCROLL_PX — листаем (laneRow0, по строке на rowH пикселей),
+   нет — на отпускании тот же тап, что прежде. Пока все строки влезают, тап действует на касании, как всегда (поведение прежнее). Скоба
+   (своя полоса над строками) не откладывается никогда. */
+const LANE_SCROLL_PX=8;
+let laneGest=null;   // { h, y, r0, rowH, moved } — отложенный тап строки / жест прокрутки
+const laneRow0Clamp=v=>{ const S=loopScroll(); return S ? Math.max(0, Math.min(S.nAll-S.visN, v)) : 0; };
+function laneAct(h){
+  if(h.what==='del'){ laneDelTap(h.layer); updRecBtn(); return; } // S3.5d: первый тап взводит, второй по тому же ✕ — удаляет (подсказка ● называет вооружённую дорожку — могла уйти)
+  if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; } // S3.5c: вооружить/снять; подсказку ● перечитать (она называет дорожку)
+  if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);
+}
 addEventListener('pointerdown', e=>{
   if(e.target!==canvasEl) return;
   if(rollOpen){ rollDown(e); return; }        // S5.0: открыт редактор — холст принадлежит ему (полосы лупера на экране нет, loopHit и так вернул бы null)
-  const r=canvasEl.getBoundingClientRect();
-  const h=loopHit(e.clientX-r.left, e.clientY-r.top);
+  const r=canvasEl.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  const h=loopHit(px, py);
   if(!h || h.what!=='del') laneDelCancel();                     // S3.5d: любой тап по холсту, кроме ✕, снимает взведённое удаление
+  const S=loopScroll();
+  if(S && (!h || h.what!=='brace') && px>=S.x0 && px<=S.x1 && py>=S.y0 && py<=S.y1){   // строки (или подвал) прокручиваемой полосы
+    laneGest={ h, y:e.clientY, r0:S.row0, rowH:S.rowH, moved:false }; return; }
   if(!h) return;
-  if(h.what==='del'){ laneDelTap(h.layer); updRecBtn(); return; } // S3.5d: первый тап взводит, второй по тому же ✕ — удаляет (подсказка ● называет вооружённую дорожку — могла уйти)
   if(h.what==='brace'){ braceEdge=braceTap(h.beat); return; }   // null во время записи — тогда и тащить нечего
-  if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; } // S3.5c: вооружить/снять; подсказку ● перечитать (она называет дорожку)
-  if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);
+  laneAct(h);
 });
 addEventListener('pointermove', e=>{
+  if(laneGest){ const dy=e.clientY-laneGest.y;
+    if(!laneGest.moved && Math.abs(dy)>LANE_SCROLL_PX) laneGest.moved=true;
+    if(laneGest.moved) setLaneRow0(laneRow0Clamp(laneGest.r0 - Math.round(dy/laneGest.rowH)));   // палец вверх — строки вверх (видны следующие)
+    return; }
   if(braceEdge===null) return;
   const b=loopBeatAt(e.clientX-canvasEl.getBoundingClientRect().left);
   if(b===null){ braceEdge=null; return; }       // полоса пропала (клип/очистка) — жест кончился
   braceMove(braceEdge,b);                        // тот же такт — recorder сам ничего не тронет
 });
-addEventListener('pointerup',    ()=>{ braceEdge=null; });
-addEventListener('pointercancel',()=>{ braceEdge=null; });
+addEventListener('pointerup',    ()=>{ braceEdge=null; if(laneGest){ const g=laneGest; laneGest=null; if(!g.moved && g.h && !rollOpen) laneAct(g.h); } });
+addEventListener('pointercancel',()=>{ braceEdge=null; laneGest=null; });
+/* Колесо над прокручиваемой полосой — по строке за щелчок (десктоп). Редактор открыт — колесо его (свой слушатель ниже). */
+addEventListener('wheel', e=>{
+  if(rollOpen || e.target!==canvasEl) return;
+  const S=loopScroll(); if(!S) return;
+  const r=canvasEl.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  if(px<S.x0 || px>S.x1 || py<S.y0 || py>S.y1) return;
+  e.preventDefault();
+  setLaneRow0(laneRow0Clamp(S.row0 + Math.sign(e.deltaY)));
+}, {passive:false});
 
 /* ═══ РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (слайс S5.0) ═══
    Обязанности — те же, что у полосы лупера, и ровно по тем же правилам: ГЕОМЕТРИЮ знает draw

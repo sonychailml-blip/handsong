@@ -4600,6 +4600,7 @@ export {
   songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg,   // S5.5/S5.6: СЕГМЕНТЫ (высота держится до следующей смены), правка баса по ним и ДЛИНА
   editInsertChord,
   editInsertLead,   // S4: вставка ноты соло (зеркало editInsertBass)
+  laneAudible,   // слышимость дорожки (тот же предикат, что у обоих путей переигровки) — для пробы P.checkTracks
   tiePartners, laneEditVerOf,   // S6: партнёр пары связки и версия правок дорожки — для пробы P.checkSoloEdit (soloEditBlock снят: отказов нет)
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)

@@ -4,7 +4,7 @@ import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, 
 import { t, L } from './i18n.js';
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
-         rollAut, rollAutSel, rollAutDrag } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
+         rollAut, rollAutSel, rollAutDrag, laneRow0 } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) столбика не рисует   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
@@ -498,6 +498,13 @@ const LANE_OFF_A=0.34;                                    // прозрачно�
    (+13, 11px ≈ до +23), точка «устарело» (+24, радиус 2 → до +26; то же расстояние от ❄, что было всегда). Ширина
    28 — с зазором до линейки. */
 const MARK_COL_W=28, ARM_DOT_X=7, FRZ_MARK_X=13, FRZ_STALE_DX=11;
+/* ⛳ ПОЛОСА ДОРОЖЕК ПО ВЫСОТЕ ЭКРАНА (починка «дорожки дальше 16-й не видны»). Прежде коробка росла на rowH с каждой дорожкой БЕЗ
+   ПРЕДЕЛА: на экране высотой ~400–450 px строки ниже ~16-й (и HTML-транспорт под коробкой — ▶, ⤺, ✎…) уходили за нижний край, и до
+   них было не дотянуться ни тапом (вооружить, M/S, ✕), ни редактором (✎ открывает вооружённую дорожку). Теперь видимых строк — сколько
+   влезает над транспортом; лишние листаются (перетаскивание строк, колесо). Строки НЕ сжимаем: 16 px — уже предел для трёх гнёзд под
+   палец. Запас снизу — высота HTML-транспорта с зазором и подвалом (LOOP_TP_RESERVE). Пока все строки влезают — полоса байт-в-байт
+   прежняя (ни подвала, ни полосы прокрутки). Жёсткого потолка числа дорожек нет. */
+const LOOP_TP_RESERVE=60, LOOP_MIN_ROWS=3, LOOP_FOOT_H=14;
 /* Кнопка дорожки: буква в рамке, залитая — когда включена. Буква, а не значок: на 380px значок в
    21px нечитаем, а места под подпись нет. Буквы локализованы (M/S ↔ М/С) — см. словари. */
 function laneTog(x,ry,rowH,lbl,on,col){
@@ -561,12 +568,26 @@ function drawLooper(){
   /* braceH — полоса СКОБЫ ПОВТОРА (S3.5b) между заголовком и строками. ОТДЕЛЬНАЯ полоса, а не тап по
      строкам: строки уже заняты mute/solo (и скоро — выбором дорожки для записи), и «тап по времени» с
      «тапом по дорожке» обязаны быть разными целями. */
-  const nRow=Math.max(1,rows.length), rowH=16, headH=22, braceH=16, pad=7, y0=64;   // ниже заголовков зон (y≈52)
-  const gy0=y0+headH+braceH, boxH=headH+braceH+nRow*rowH+pad*2, gy1=y0+boxH-pad;
+  const rowH=16, headH=22, braceH=16, pad=7, y0=64;   // ниже заголовков зон (y≈52)
+  /* ⛳ ОКНО СТРОК (см. LOOP_TP_RESERVE): fit — сколько строк влезает над транспортом; не влезают все — одна строка высоты уходит под
+     подвал «строки a–b из n», остальные — видимое окно с первой строки laneRow0 (state, пишет ui), зажатой здесь в пределы. Во время
+     записи окно ПОКАЗЫВАЕТ пишущуюся дорожку (последнюю из слоёв взятого), даже если человек пролистал в сторону: «куда идёт запись» обязано
+     быть видно — это вычисленный сдвиг, состояние прокрутки не пишется. */
+  const allRows=rows, nAll=allRows.length, Hc=canvas.height;
+  const fit=Math.max(LOOP_MIN_ROWS, Math.floor((Hc-y0-headH-braceH-pad*2-LOOP_TP_RESERVE)/rowH));
+  const over = nAll>fit, visN = over ? Math.max(LOOP_MIN_ROWS-1, Math.floor((fit*rowH-LOOP_FOOT_H)/rowH)) : nAll;
+  let r0 = over ? Math.max(0, Math.min(nAll-visN, laneRow0)) : 0;
+  if(over && recording){ let last=-1; for(const ly of recLayers()){ const i=allRows.indexOf(ly); if(i>last) last=i; }
+    if(last>=0 && (last<r0 || last>=r0+visN)) r0=Math.max(0, Math.min(nAll-visN, last-visN+1)); }
+  const visRows = over ? allRows.slice(r0, r0+visN) : allRows;
+  const footH = over ? LOOP_FOOT_H : 0;
+  const nRow=Math.max(1,visRows.length);
+  const gy0=y0+headH+braceH, boxH=headH+braceH+nRow*rowH+footH+pad*2, gy1=gy0+nRow*rowH;   // gy1 — низ СТРОК (без подвала: сетка и бегунок не заходят в него); без подвала — прежнее y0+boxH−pad
   syncLoopTransport(true, y0+boxH+4);         // считаем из ТОГО ЖЕ boxH, что рисуем → разъехаться не могут
   /* Снимок геометрии для попадания — ОДИН объект, тот же, по которому ниже рисуем. tx0 — левый край
      первого гнезда переключателей. */
-  loopView={ x0:lx0, bx0:x0, bw, beat0:0, span:total, gy0, rowH, rows, tx0:x1+6, by0:y0+headH, hy0:y0 };   // E0-fix: x0 — начало ЛИНЕЙКИ (с колонкой значков сдвинуто), bx0 — кромка коробки   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
+  loopView={ x0:lx0, bx0:x0, bw, beat0:0, span:total, gy0, rowH, rows:visRows, tx0:x1+6, by0:y0+headH, hy0:y0,
+             over, row0:r0, nAll, visN, sx1:x0+sw+10 };   // ⛳ rows — ВИДИМЫЕ строки (их рисуем и ловим); over/row0/nAll/visN — окно прокрутки (ui листает по ним); sx1 — правая кромка коробки   // E0-fix: x0 — начало ЛИНЕЙКИ (с колонкой значков сдвинуто), bx0 — кромка коробки   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
 
   ctx.fillStyle='rgba(10,10,20,.74)'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
   ctx.beginPath(); ctx.roundRect(x0-10,y0,sw+20,boxH,11); ctx.fill(); ctx.stroke();
@@ -679,7 +700,7 @@ function drawLooper(){
   // строки слоёв + переключатели дорожки
   const soloOn=laneSoloOn();
   const rowOf=new Map();                                 // номер слоя → индекс строки (для ОДНОГО прохода по событиям, см. ниже)
-  rows.forEach((lid,ri)=>{
+  visRows.forEach((lid,ri)=>{
     rowOf.set(lid,ri);
     const ry=gy0+ri*rowH, mid=ry+rowH/2, live=isRecLayer(lid);   /* T1: строка пишущегося слоя взятого (isRecLayer сама проверяет recording) */
     const muted=laneMuted(lid), soloed=laneSoloed(lid);
@@ -735,7 +756,7 @@ function drawLooper(){
      съедала бы кадр, ради которого весь S3.2 и делался. Стало O(событий): строку находим по карте.
      Альфу дорожки применяем поштучно — строки рисуются раньше, общий globalAlpha уже снят. */
   const laneAlpha=new Map();
-  for(const lid of rows) laneAlpha.set(lid, (soloOn ? !laneSoloed(lid) : laneMuted(lid)) ? LANE_OFF_A : 1);
+  for(const lid of visRows) laneAlpha.set(lid, (soloOn ? !laneSoloed(lid) : laneMuted(lid)) ? LANE_OFF_A : 1);
   for(const e of events){
     if(e.fn==='leadOff'||e.fn==='chOff') continue;
     const ri=rowOf.get(e.layer); if(ri===undefined) continue;
@@ -745,6 +766,16 @@ function drawLooper(){
     ctx.beginPath(); ctx.roundRect(ex-1.5,ry+3,3.5,rowH-6,1.5); ctx.fill();
   }
   ctx.globalAlpha=1;
+  /* ⛳ ПОДВАЛ И ПОЛОСА ПРОКРУТКИ — только когда строки не влезают: «строки a–b из n — листайте» и тонкая полоса у правой кромки коробки
+     (её длина — доля видимого, положение — первая видимая строка). Номера — ПОЗИЦИИ строк, не L-номера (у слоёв бывают дыры). */
+  if(over){
+    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='10px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(t('looper.rowsShown',{a:r0+1, b:r0+visRows.length, n:nAll}), x0, gy1+LOOP_FOOT_H/2+1);
+    const sbx=x0+sw+5, sh=gy1-gy0, th=Math.max(10, sh*visRows.length/nAll), ty=gy0+(sh-th)*(r0/Math.max(1,nAll-visRows.length));
+    ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fillRect(sbx,gy0,3,sh);
+    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fillRect(sbx,ty,3,th);
+    ctx.textBaseline='alphabetic';
+  }
   // бегунок позиции
   if(info&&info.phase==='play'){
     /* ⛳ Тоже через ЕДИНОЕ преобразование. Прежде здесь стояло деление на info.total, а сетка делила на
@@ -2396,6 +2427,12 @@ export function loopHit(px,py){
    Вертикаль НЕ проверяем — палец, съехавший с полосы на строки, продолжает тащить взятый край.
    null — полосы нет (и тащить нечего). */
 export function loopBeatAt(px){ const V=loopView; return V ? laneBeatAt(V,px) : null; }
+/* ⛳ ОКНО ПРОКРУТКИ ПОЛОСЫ ДОРОЖЕК — для жеста ui (перетаскивание строк, колесо): по ТОМУ ЖЕ снимку, что нарисован (правило #9).
+   null — строки влезают все (листать нечего; полоса прежняя) или полосы нет. Прямоугольник — строки с подвалом, по ширине вся коробка. */
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkTracks): снимок геометрии полосы дорожек последнего кадра (тот, по которому ловит loopHit). Только чтение. */
+export const loopViewProbe=()=>loopView;
+export function loopScroll(){ const V=loopView; if(!V||!V.over) return null;
+  return { row0:V.row0, nAll:V.nAll, visN:V.visN, rowH:V.rowH, x0:V.bx0-28, x1:V.sx1, y0:V.gy0, y1:V.gy0+V.rows.length*V.rowH+LOOP_FOOT_H }; }
 /* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).
    Экспортирована, чтобы позицию мог прочитать кто угодно, а не только draw. */
 export { drawVideoBackground, drawOverlays, loopBarBottom };

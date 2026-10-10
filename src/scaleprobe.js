@@ -64,17 +64,18 @@
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
-import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel } from './state.js';   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
+import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0 } from './state.js';   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
-import { rollRowsProbe as RP } from './draw.js';   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll } from './draw.js';   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
          songNotes, editResizeSeg, editDeleteSeg, editInsertLead, editUndo, editRedo, freezeState, recording,
-         tiePartners, laneEditVerOf, freezeTicket, laneDelTap } from './recorder.js';   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         tiePartners, laneEditVerOf, freezeTicket, laneDelTap,
+         laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer } from './recorder.js';   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -983,6 +984,7 @@ const ALL_RUNS=[
   ['seed notes as intended',()=>checkSeed(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['S4 solo editing',    ()=>checkSoloEdit(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1407,6 +1409,65 @@ export async function checkSoloEdit(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe solo-edit] '+m));
   if(!nBad) console.log('[scaleprobe solo-edit] no orphans; every solo note ends by its own note-off; every pitched event has a volume; every linked half has its partner, found by recorder.tiePartners; every bend lies within its note; editing a tied edge unties both halves, stales the partner and round-trips bit for bit; a row delete unties the surviving half; every edit round-trips bit for bit; a theremin note’s length trims its bend exactly; a voice reused after a bent note starts unbent');
   return { cases, song, total:nBad, differences:bad };
+}
+/* ═══ ДОРОЖЕК БОЛЬШЕ, ЧЕМ СТРОК НА ЭКРАНЕ — P.checkTracks (починка «дорожки дальше 16-й не видны») ═══
+   Для КАЖДОЙ дорожки песни: (1) СТРОКА — после прокрутки полосы (laneRow0, как листает палец) она среди нарисованных строк, целиком на
+   экране, и попадание по ней даёт ЕЁ слой: «вооружить» у подписи, M и S в гнёздах; транспорт (▶ ⤺ ✎ …) — на экране; (2) РЕДАКТОР —
+   editOpen открывает именно её; (3) M/S — заглушение делает её неслышной, соло — слышной при неслышных прочих (тот же предикат laneAudible,
+   что у обоих путей переигровки), и всё возвращается; (4) ЗВУК — слышима при нетронутом микшере, у каждого «вкл» конечная цена (evHz —
+   то, чем играет ENG), а у дорожек ДАЛЬШЕ 16-й — офлайн-рендер (render.renderTrack — та же таблица ENG на копии движка) с ненулевым пиком.
+   Кадры ждёт сама (полоса рисуется в цикле приложения): await P.checkTracks(). Прокрутку, микшер и редактор возвращает как были; при
+   тронутом микшере (заглушено или соло) пункт 3 пропускается с пометкой. Нужна полоса на экране (во время записи видеоклипа её нет). */
+const frame=()=>new Promise(res=>requestAnimationFrame(()=>res()));
+export async function checkTracks(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b), notes=[];
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(editIsOpen()){ miss('the track editor is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const keepRow0=laneRow0, mixerTouched=laneSoloOn() || L.some(ly=>laneMuted(ly));
+  try{
+    // ---- 1) строка на полосе ----
+    await frame(); await frame();
+    for(const [i,ly] of L.entries()){ cases++;
+      let V=loopViewProbe();
+      if(!V){ miss('the track strip is not drawn (no song, or a video clip is recording)'); break; }
+      if(!V.rows.includes(ly)){ const S=loopScroll();
+        if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, i))); await frame(); await frame(); V=loopViewProbe(); } }
+      if(!V||!V.rows.includes(ly)){ miss(`L${ly+1}: not among the drawn rows even after scrolling`); continue; }
+      const ri=V.rows.indexOf(ly), y=V.gy0+ri*V.rowH+V.rowH/2;
+      if(V.gy0+(ri+1)*V.rowH>innerHeight) miss(`L${ly+1}: its row lies below the bottom of the screen (y ${Math.round(y)} of ${innerHeight})`);
+      const hA=loopHit(V.bx0-8,y); if(!hA||hA.layer!==ly||hA.what!=='arm') miss(`L${ly+1}: a tap on its label does not arm it (${hA&&hA.what} L${hA&&hA.layer+1})`);
+      let hM=null, hS=null; for(let x=V.tx0; x<V.tx0+90 && !(hM&&hS); x++){ const h=loopHit(x,y); if(h&&h.what==='mute'&&!hM) hM=h; if(h&&h.what==='solo'&&!hS) hS=h; }
+      if(!hM||hM.layer!==ly) miss(`L${ly+1}: its M button is not hittable`);
+      if(!hS||hS.layer!==ly) miss(`L${ly+1}: its S button is not hittable`);
+    }
+    const tp=document.getElementById('loopTransport');
+    if(tp){ cases++; const b=tp.getBoundingClientRect(); if(b.height>0 && b.bottom>innerHeight+0.5) miss(`the transport (▶ ⤺ ✎ …) lies below the bottom of the screen (${Math.round(b.bottom)} > ${innerHeight})`); }
+    // ---- 2) редактор, 3) M/S, 4) звук ----
+    for(const [i,ly] of L.entries()){
+      cases++; if(!editOpen(ly) || editLayer()!==ly) miss(`L${ly+1}: the editor does not open on it`); editClose();
+      if(!mixerTouched){ cases++;
+        toggleLaneMute(ly); const mOff=!laneAudible(ly); toggleLaneMute(ly); const mBack=laneAudible(ly)&&!laneMuted(ly);
+        toggleLaneSolo(ly); const other=L.find(o=>o!==ly), sOn=laneAudible(ly) && (other==null || !laneAudible(other)); toggleLaneSolo(ly); const sBack=!laneSoloOn() && laneAudible(ly);
+        if(!mOff||!mBack) miss(`L${ly+1}: mute does not ${!mOff?'silence it':'come back'}`);
+        if(!sOn||!sBack) miss(`L${ly+1}: solo does not ${!sOn?'isolate it':'come back'}`); }
+      cases++; if(!mixerTouched && !laneAudible(ly)) miss(`L${ly+1}: not audible with an untouched mixer`);
+      for(const e of events){ if(e.layer!==ly || !/^(leadOn|bassOn|chOn)$/.test(e.fn)) continue;
+        const r=e.fn==='leadOn'?'ld':e.fn==='bassOn'?'bs':'ch', hz=evHz(e.a,e,r);
+        if(r==='ch' ? !(hz.length && hz.every(f=>Number.isFinite(f)&&f>0)) : !(Number.isFinite(hz)&&hz>0)){ miss(`L${ly+1} beat ${Math.round(e.t*1000)/1000} ${e.fn}: no price — it would not sound`); break; } }
+      if(i>=16){ cases++;
+        try{ const R=await import('./render.js'), out=await R.renderTrack(ly), b=out&&out.buf; let pk=0;
+          if(b) for(let c=0;c<b.numberOfChannels;c++){ const x=b.getChannelData(c); for(let k=0;k<x.length;k++){ const v=Math.abs(x[k]); if(v>pk) pk=v; } }
+          if(!(pk>1e-4)) miss(`L${ly+1} (track ${i+1}): its offline render is silent (peak ${pk})`); else notes.push(`L${ly+1} (track ${i+1}) renders with peak ${pk.toFixed(4)}`); }
+        catch(err){ miss(`L${ly+1}: the offline render failed — ${err&&err.message}`); } }
+    }
+  } finally { setLaneRow0(keepRow0); if(editIsOpen()) editClose(); }
+  console.log(`[scaleprobe tracks] tracks ${L.length} · cases ${cases} · differences ${nBad}${mixerTouched?' · mixer touched: M/S toggles skipped':''}`);
+  notes.forEach(m=>console.log('[scaleprobe tracks] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe tracks] '+m));
+  if(!nBad) console.log('[scaleprobe tracks] every track is drawn on the strip (scrolling where needed) and hittable, opens in the editor, mutes and solos, and plays');
+  return { cases, song:L.length, total:nBad, differences:bad };
 }
 const SID=id=>{ if(!scaleById(id)) throw new Error('no scale '+id); return id; };   // F1: адрес — сам id   // id — стабильный идентификатор (T0), не имя (правило #25)
 export async function seed(opt={}){
