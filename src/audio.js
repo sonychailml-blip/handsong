@@ -108,6 +108,41 @@ const timbresOf=role=>{ const g=TIMBRE_LISTS[role]; return g ? g().map((x,i)=>({
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter;
+/* ═══ MX1: УРОВЕНЬ ДОРОЖКИ — СТУПЕНЬ В ГОЛОСЕ ═══
+   Голоса суммируются ПО РОЛЯМ (leadSum/chordBus/bassBus/drumBus → цепь роли → master), своей шины у дорожки, играющей событиями, НЕТ.
+   Поэтому уровень дорожки живёт В ГОЛОСЕ: у каждого голоса пула соло, аккордов и баса — свой GainNode `tg` (стоит ПОСЛЕ огибающей и
+   драйва, до громкости/суммы: всё за ним линейно — яркость x+w(LP(x)−x), шина, цепь эффектов, — поэтому уровень дорожки — чистый множитель
+   её вклада). Удар — одноразовый: узел-множитель строится только при уровне ≠ 1 (как фильтр яркости), при 0 удара нет вовсе.
+   ⛳ ЧЕЙ уровень — по КЛЮЧУ ВЛАДЕЛЬЦА голоса ('leadloop:N:v', 'loop:N[:k]', 'bassloop:N…'; удару — 'hit:N', дрону — 'drone:N'): функцию
+   «ключ → множитель» ставит recorder (setTrackGainOf) ТОЛЬКО ЖИВОЙ копии движка. У копии рендера она остаётся умолчанием «1» — уровень
+   в замороженный буфер НЕ вплавляется (буфер звучит на шине замороженной с тем же множителем), и движение фейдера буфер не старит.
+   Живые ключи ('lead:L', 'latch', 'bass…') — не дорожки: множитель 1. */
+let trackGainOf=()=>1;
+function setTrackGainOf(fn){ trackGainOf= typeof fn==='function' ? fn : ()=>1; }
+function ownerGain(key){ const g=+trackGainOf(key); return Number.isFinite(g)&&g>=0 ? g : 1; }
+/* Переставить уровень у ЗВУЧАЩИХ голосов: test(ключ) → множитель или null (не трогать). Будущее, расписанное окном опережения на этих
+   голосах (setValueAtTime атаки), снимаем — иначе нота, уже поставленная на ближайшие ~300 мс, зазвучала бы прежним уровнем. */
+function trackGainRetune(test){ if(!AC) return; const t=AC.currentTime;
+  const set=(v,k)=>{ const g=test(k); if(g==null||!v||!v.tg) return; v.tg.gain.cancelScheduledValues(t); v.tg.gain.setTargetAtTime(g,t,0.02); };
+  for(const k in leadHold) set(leadHold[k],k);
+  for(const k in bassHold) set(bassHold[k],k);
+  for(const k in chordHold) for(const v of chordHold[k]) set(v,k);
+}
+let hitOwnerKey=null;   // ключ владельца СЛЕДУЮЩЕГО удара (ставит ENG.drum перед drumHit; drumHit его читает и сбрасывает)
+const hitOwner=k=>{ hitOwnerKey=k; };
+/* ═══ MX1: МАСТЕР — уровень, показ лимитера, измеритель ═══
+   Уровень мастера — та же кривая v² (config.volAmp) поверх ПРЕЖНЕГО мастер-гейна 0.8: 100 = как было (0.8), 0 = тишина. Измеритель —
+   анализатор на выходе лимитера (то, что слышно); лимитер не трогаем (правило #4), только читаем его подавление (reduction, дБ). */
+const MASTER_BASE=0.8;
+let masterLvl=1, meterAn=null, meterBuf=null;
+function setMasterLevel(v){ masterLvl=Math.max(0,Math.min(1,+v||0)); if(AC&&master) master.gain.setTargetAtTime(MASTER_BASE*volAmp(masterLvl), AC.currentTime, 0.03); }
+const masterLevel=()=>masterLvl;
+function masterMeter(){
+  if(!AC||!meterAn) return null;
+  if(!meterBuf||meterBuf.length!==meterAn.fftSize) meterBuf=new Float32Array(meterAn.fftSize);
+  meterAn.getFloatTimeDomainData(meterBuf); let pk=0; for(let i=0;i<meterBuf.length;i++){ const a=Math.abs(meterBuf[i]); if(a>pk) pk=a; }
+  return { peak:pk, reduction: limiter ? limiter.reduction : 0, gain: master ? master.gain.value : 0 };
+}
 /* ⚠️ verb/verbOut УДАЛЕНЫ (Пласт 3.5.2). Это были модульные псевдонимы входа и выхода ЕДИНСТВЕННОГО
    реверба — они пережили Пласт 1 только потому, что на общий вход приходили ДВА посыла (соло и
    аккорды). Теперь у каждой роли СВОЙ экземпляр со своими in/out, и «тот самый общий verb» перестал
@@ -1680,9 +1715,10 @@ function newChordVoice(dest){
   f.type='lowpass'; f.frequency.value=1500;                 // f — огибающая атаки (тембр)
   fb.type='lowpass'; fb.frequency.value=CHORD_LP_MAX;       // fb — непрерывная яркость (выразительность); дефолт открыт → нейтраль
   g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
-  o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(dest);
+  const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей голоса, до шины (фильтры f/fb не тронуты — правило #19)
+  o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(tg); tg.connect(dest);
   voiceStartPair(o1,o2);   // пара — в фазе, голос — со своей задержкой (см. voiceStartPair: разброс фаз внутри пары гасил основной тон)
-  const v={o1,o2,g1,g2,f,fb,g,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={o1,o2,g1,g2,f,fb,g,tg,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   cv.push(v); return v;
 }
 function buildChordPool(dest, n=CHORD_POOL_N){
@@ -1733,6 +1769,7 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     v.lvl=ins.lvl*a*(1-rnd()*0.05);   // −0..5% уровня — снять машинную ровность. VOL-2b: a = v² (на v=1 — ровно прежний ins.lvl·1)
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
     v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
+    v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки (голос мог прийти от другой дорожки)
     return v;
   });
 }
@@ -1814,7 +1851,8 @@ async function initAudio(mkCtx){
   limiter.threshold.value=-6; limiter.knee.value=6; limiter.ratio.value=20;
   limiter.attack.value=0.010; limiter.release.value=0.25;
   limiter.connect(AC.destination);
-  master=AC.createGain(); master.gain.value=0.8; master.connect(limiter);
+  master=AC.createGain(); master.gain.value=MASTER_BASE*volAmp(masterLvl); master.connect(limiter);   // MX1: при уровне мастера 100 — ровно прежние 0.8
+  meterAn=AC.createAnalyser(); meterAn.fftSize=1024; limiter.connect(meterAn);   // MX1: измеритель на выходе лимитера (только чтение; в выход не идёт)
  
   /* Общий ревербератор: СЕТЬ ЗАДЕРЖЕК С ОБРАТНОЙ СВЯЗЬЮ (FDN, см. buildFDN), у каждого источника свой
      send. Заменила конвольвер со случайным шумовым IR: у свёртки хвост ЗАПЕЧЁН в буфер, и живьём
@@ -2173,13 +2211,14 @@ function newLeadVoice(){
   tremLFO.connect(tremDep); tremDep.connect(trem.gain);
   pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
   satDry.connect(satSum); satWet.connect(satSum);
-  satSum.connect(env); env.connect(vol); vol.connect(trem); trem.connect(leadSum);   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё
+  const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей (и драйва до неё), до громкости ноты; дальше всё линейно
+  satSum.connect(env); env.connect(tg); tg.connect(vol); vol.connect(trem); trem.connect(leadSum);   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё
   const bri=makeBriStage(trem,leadSum);   // ЯРКОСТЬ: две ветви рядом с прежней связью trem→leadSum (она не тронута), без величины — ровно ноль (см. makeBriStage)
   /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,vibDep,pre,satDry,satWet,env,vol,trem,tremDep,bri,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={hum,vibDep,pre,satDry,satWet,env,tg,vol,trem,tremDep,bri,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
@@ -2333,6 +2372,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
   if(v.on)return;
   v.on=true; v.tOn=t;
+  v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки
   /* Гуманизация — СВЕЖАЯ случайность на каждую атаку (в т.ч. при переигровке лупа: генерится здесь, в
      событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
      0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
@@ -2414,12 +2454,13 @@ function buildBassPool(dest, n){   // n голосов разом; зовёт Т
        вгонял лимитер в 12 дБ подавления, «прижимая» аккорды на всю длину ноты. */
     g1.gain.value=.5; g2.gain.value=.5;
     env.gain.value=0; vol.gain.value=0.5;
-    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(vol); vol.connect(dest);
+    const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей, до громкости голоса (связь vol→шина и ступень яркости не тронуты)
+    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(tg); tg.connect(vol); vol.connect(dest);
     voiceStartPair(o1,o2);   // пара — в фазе (Саб-синус: синус+синус на одной частоте — разброс фаз гасил основной тон до тишины), голос — со своей задержкой
     const bri=makeBriStage(vol,dest);   // ЯРКОСТЬ: рядом с прежней связью vol→шина (не тронута), без величины — ровно ноль (см. makeBriStage). lp голоса — ТЕМБР (огибающая атаки), его не трогаем
     /* deg/oct — КАКУЮ НОТУ голос держит (P1, зеркало соло-голоса): звуку не нужны, их читает ПОДСВЕТКА (с V2, правило
        #26) — из реестра движка, а не из состояния руки. Пишет их ТОТ ЖЕ вызов, что звучит (bassOn/bassSet), гасит bassOff. */
-    bv.push({o1,o2,g1,g2,lp,env,vol,bri,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
+    bv.push({o1,o2,g1,g2,lp,env,tg,vol,bri,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
   }
 }
 /* ОДИН новый басовый голос. ⛳ P1: единственная дверь роста пула — И ЖИВОГО (до потолка BASS_POOL_N), И офлайн-
@@ -2489,6 +2530,7 @@ function bassOn(owner,freq,vol,ins,deg,oct,glide,bri,when){
     v.lp.frequency.cancelScheduledValues(t); v.lp.frequency.setValueAtTime(v.ins.lp*fo,t);
     v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*volVel('bs',volAmp(vol))),t,ft);   // VOL-2b: скорость удара — прежнее число через амплитуду (volVel): тише прежнего пола 30% — база фильтра
     v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
+    v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки
   }
   v.tOn=t;
   v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
@@ -2637,9 +2679,11 @@ function drumHit(i,vol=1,kit=0,bri,when){
      стоит на нуле и прыгает к 0.001 в конце: тихий щелчок вместо тишины. ⚠️ Названный край: у очень тихого удара под-голос
      с пиком ниже 0.001 (самый тихий множитель — 0.12·v², то есть громкость ниже ~9) идёт ВВЕРХ к 0.001 — это −60 дБ,
      неслышно. Прежняя карта такого не знала: её пол давал пики не ниже ~0.036. */
-  if(!(volAmp(vol)>0)) return;
+  const tgv=ownerGain(hitOwnerKey); hitOwnerKey=null;   // MX1: уровень дорожки удара (ключ поставил ENG.drum; живой удар — 1)
+  if(!(volAmp(vol)>0) || !(tgv>0)) return;
   hitBus=drumBus;
   if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(drumBus); hitBus=f; }
+  if(tgv!==1){ const g=AC.createGain(); g.gain.value=tgv; g.connect(hitBus); hitBus=g; }   // MX1: множитель только при уровне ≠ 1 — на 1 удар байт-в-байт прежний
   try{ drumVoice(i,vol,kit,t); } finally{ hitBus=drumBus; }
 }
 function drumVoice(i,vol,kit,t){
@@ -2711,6 +2755,7 @@ export {
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff, droneRetune,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
+  setTrackGainOf, ownerGain, trackGainRetune, hitOwner, setMasterLevel, masterLevel, masterMeter,   // MX1: уровень дорожки (ступень в голосе по ключу владельца), мастер и измеритель
   timbresOf,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке

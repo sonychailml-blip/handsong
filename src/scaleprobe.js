@@ -70,13 +70,15 @@ import { hooks } from './hooks.js';   // F6b: перестройка панел�
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom } from './draw.js';
-import { arrApi } from './ui.js';   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { arrApi } from './ui.js';
+import { setMasterLevel, masterLevel, masterMeter, ownerGain } from './audio.js';   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
          songNotes, editResizeSeg, editDeleteSeg, editInsertLead, editUndo, editRedo, freezeState, recording,
          tiePartners, laneEditVerOf, freezeTicket, laneDelTap,
-         laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer } from './recorder.js';   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
+         laneLevelOf, setLaneLevel, frzBusGain } from './recorder.js';   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -987,6 +989,7 @@ const ALL_RUNS=[
   ['S4 solo editing',    ()=>checkSoloEdit(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AR1 arrangement window',()=>checkArrange(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['MX1 track level and master',()=>checkMixer(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1225,7 +1228,9 @@ export function checkFrozen(){
         песни (recorder.seedTake), в обе стороны: выжившая половина развязана, её версия выросла, подпись сменилась; затем обе временные
         дорожки удаляются, и песня — побитно прежняя (продвинутые счётчики дорожек и взятых — монотонны по замыслу).
      4) ⛳ S5: ГОЛОС ПОСЛЕ ИЗОГНУТОЙ НОТЫ НАЧИНАЕТ БЕЗ ЕЁ КРИВОЙ — на ЗВУКЕ, офлайн-рендером (render.reuseCheck): высота второй ноты на
-        том же голосе — её собственная, а контроль (своя кривая) мерой виден. Поэтому проба асинхронна: await P.checkSoloEdit().
+        том же голосе — её собственная, а оба контроля мерой видны: своя кривая второй ноты читается как изгиб, а смоделированная чужая
+        кривая — как наследство (мера оценивает ИЗВЕСТНЫХ кандидатов на их периодах, субгармонику не берёт). Поэтому проба асинхронна:
+        await P.checkSoloEdit().
    У P.seed материал обязателен (его нет — расхождение); у демо-пьесы (P.song) отсутствующий случай лишь называется.
    ⚠️ Круг правит только НЕЗАМОРОЖЕННЫЕ дорожки: правка поднимает версию правок дорожки, и замороженная устарела бы. */
 export async function checkSoloEdit(){
@@ -1348,7 +1353,10 @@ export async function checkSoloEdit(){
       rt('delete a theremin note',TH(),g=>editDeleteSeg(g.ev));
       /* ⛳ S5: ДЛИНА ТЕРМЕНВОКСА. Ожидаемая кривая укорочения считается ЗДЕСЬ, независимо от recorder.bendTrim: точки с dt ≤ L — те же и
          по порядку, конечная точка {L, c последней оставшейся} — если что-то ушло; прежний массив не тронут (его JSON до и после). */
-      const bendCheck=(g,ev,L)=>{ const B=g.note.head.a.bend, B0=JSON.stringify(B), nb=ev&&ev.a&&ev.a.bend;
+      /* ⚠️ ПОЧИНКА (после S5): кривую и её JSON берём ДО правки. Правка ставит голове НОВУЮ нагрузку (ход 'move'), и прежде проба читала
+         g.note.head.a.bend ПОСЛЕ неё — то есть уже обрезанную кривую: «хвоста за половиной» не находилось (ложное «в песне нет материала»),
+         а сверка обрезки сравнивала обрезанное с самим собой и проходила вхолостую. B — массив головы до правки, B0 — его JSON до правки. */
+      const bendCheck=(B,B0,ev,L)=>{ const nb=ev&&ev.a&&ev.a.bend;
         return ()=>{ if(JSON.stringify(B)!==B0) return 'the edit mutated the original bend array';
           if(!Array.isArray(nb)||!nb.length) return 'the edited note lost its bend';
           if(nb.some(p=>p.dt>L+1e-9)) return `a bend point at ${Math.max(...nb.map(p=>p.dt))} lies beyond the new length ${L}`;
@@ -1356,11 +1364,13 @@ export async function checkSoloEdit(){
           if(!cut) return nb===B ? null : 'nothing was cut, yet the bend is a new array';
           const want=(last&&Math.abs(last.dt-L)<=1e-9) ? keep : [...keep, { dt:L, c:last?last.c:0 }];
           return JSON.stringify(nb)===JSON.stringify(want) ? null : `trimmed bend ${JSON.stringify(nb)}, expected ${JSON.stringify(want)}`; }; };
-      rt('shorten a theremin note (its bend is trimmed)',TH(),g=>{ const L=(g.end-g.start)/2, ev=editResizeSeg(g.ev,g.start+L);
-        const tail=g.note.head.a.bend.some(p=>p.dt>L+1e-9); if(!tail) lack('a theremin note whose bend reaches past half its length');
-        return ev && { check:bendCheck(g,ev,L) }; });
-      rt('lengthen a theremin note (its bend is kept, the last value holds)',TH(),g=>{ const L=g.end-g.start+1, ev=editResizeSeg(g.ev,g.start+L);
-        return ev && { check:bendCheck(g,ev,L) }; });
+      rt('shorten a theremin note (its bend is trimmed)',TH(),g=>{ const L=(g.end-g.start)/2, B=g.note.head.a.bend, B0=JSON.stringify(B);
+        if(!B.some(p=>p.dt>L+1e-9)) lack('a theremin note whose bend reaches past half its length');
+        const ev=editResizeSeg(g.ev,g.start+L);
+        return ev && { check:bendCheck(B,B0,ev,L) }; });
+      rt('lengthen a theremin note (its bend is kept, the last value holds)',TH(),g=>{ const L=g.end-g.start+1, B=g.note.head.a.bend, B0=JSON.stringify(B);
+        const ev=editResizeSeg(g.ev,g.start+L);
+        return ev && { check:bendCheck(B,B0,ev,L) }; });
       const HT=()=>find('a solo note continuing another track (a tie on its note-on)',g=>headTie(g)&&single(g)&&!offTie(g));
       const OT=()=>find('a solo note continued in another track (a tie on its note-off)',g=>offTie(g)&&g.first&&!headTie(g));
       const onE=g=>g.ev, offE=g=>g.endEv;
@@ -1405,7 +1415,8 @@ export async function checkSoloEdit(){
   try{ const R=await import('./render.js'); RU=await R.reuseCheck(); }
   catch(err){ RU={ ok:false, why:'the offline render failed: '+(err&&err.message) }; }
   if(!RU.ok) miss(`voice reuse after a bent note: ${RU.why}`);
-  else console.log(`[scaleprobe solo-edit] voice reuse: the second note on the bent note's voice sounds ${RU.f} Hz (its own ${RU.want}); the control's own bend measures ${RU.fControl} Hz (${RU.wantControl})`);
+  else console.log(`[scaleprobe solo-edit] voice reuse: the second note on the bent note's voice sounds ${RU.f} Hz (its own ${RU.want}); the control's own bend reads ${RU.fControl} Hz (${RU.wantControl}); a simulated inherited curve reads as inherited`);
+  if(RU.detail) console.log('[scaleprobe solo-edit] voice reuse, candidate correlations — '+RU.detail);
   console.log(`[scaleprobe solo-edit] solo notes ${song} · cases ${cases} · linked pairs ${nPairs} · differences ${nBad}`);
   if(absent.length) console.log('[scaleprobe solo-edit] not in this song (not checked): '+[...new Set(absent)].join('; '));
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe solo-edit] '+m));
@@ -1421,6 +1432,90 @@ export async function checkSoloEdit(){
    Кадры ждёт сама (полоса рисуется в цикле приложения): await P.checkTracks(). Прокрутку, микшер и редактор возвращает как были; при
    тронутом микшере (заглушено или соло) пункт 3 пропускается с пометкой. Нужна полоса на экране (во время записи видеоклипа её нет). */
 const frame=()=>new Promise(res=>requestAnimationFrame(()=>res()));
+const waitMs=ms=>new Promise(res=>setTimeout(res,ms));
+/* ═══ MX1: УРОВЕНЬ ДОРОЖКИ И МАСТЕР — P.checkMixer ═══
+   (1) СТУПЕНЬ В ГОЛОСЕ МАСШТАБИРУЕТ ЗВУК ДОРОЖКИ: офлайн-рендер дорожки (render.renderTrack — та же таблица ENG на копии движка) с
+       множителем g (o.trackGain — тем же путём, что живой голос: ступень tg по ключу владельца, множитель удара, дрона) против g = 1 —
+       отношение RMS = g (допуск 2 %: при реверберации в цепи последние биты расходятся в разный хвост той же энергии — правило слагаемых,
+       Known limits; поэтому мера — энергия, а не сэмплы). Для высотной дорожки и, если есть, ударной.
+   (2) ЗАМОРОЖЕННАЯ: уровень — гейн её шины (frzGain), то есть буфер × g — ровно то, что дала (1) событиями; движение уровня оставляет её
+       СВЕЖЕЙ, подпись заморозки (freezeTicket) не меняется, на шину поставлена цель g. ⚠️ Читается ЦЕЛЬ (recorder.frzBusGain), не
+       bus.gain.value: при стоящем транспорте у шины нет источников, узел не обрабатывается и геттер держит старую 1.
+   (3) ЖИВОЙ ДВИЖОК: множитель по ключу владельца переигровки (audio.ownerGain) — уровень дорожки; живые ключи — 1.
+   (4) МАСТЕР: уровень мастера ставит гейн мастера 0.8·v² (читается с самого узла); измеритель отдаёт пик и подавление лимитера.
+   (5) ЛИЦО МИКШЕРА: тело строки ловится как фейдер ЕЁ дорожки, полоса мастера — как фейдер мастера.
+   Уровни, мастер, лицо и окно возвращает как были. Асинхронная: await P.checkMixer(). */
+export async function checkMixer(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); }, notes=[];
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const keepLvl=new Map(L.map(ly=>[ly,laneLevelOf(ly)])), keepM=masterLevel();
+  const rms=b=>{ let s=0,n=0; for(let c=0;c<b.numberOfChannels;c++){ const x=b.getChannelData(c); for(let i=0;i<x.length;i++){ s+=x[i]*x[i]; n++; } } return n?Math.sqrt(s/n):0; };
+  const nOf=ly=>events.reduce((m,e)=>e.layer===ly&&e.t>m?e.t:m,0);   // конец материала дорожки: рендер короче — проба быстрее
+  const pitched=L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&/^(leadOn|chOn|bassOn)$/.test(e.fn))).sort((a,b)=>nOf(a)-nOf(b));
+  const drums=L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&e.fn==='drum')).sort((a,b)=>nOf(a)-nOf(b));
+  try{
+    // ---- (1) ступень в голосе: рендер с множителем ----
+    const R=await import('./render.js'), g=0.25;
+    for(const ly of [pitched[0], drums[0]].filter(x=>x!=null)){ cases++;
+      try{ const a=await R.renderTrack(ly,{trackGain:1}), b=await R.renderTrack(ly,{trackGain:g});
+        const ra=rms(a.buf), rb=rms(b.buf), q=ra>0 ? rb/ra : NaN;
+        if(!(ra>1e-6)) miss(`L${ly+1}: the unity render is silent`);
+        else if(!(Math.abs(q/g-1)<=0.02)) miss(`L${ly+1}: at track gain ${g} the render's RMS ratio is ${q.toFixed(4)} (expected ${g})`);
+        else notes.push(`L${ly+1}: RMS ratio ${q.toFixed(4)} at gain ${g}`); }
+      catch(err){ miss(`L${ly+1}: the offline render failed — ${err&&err.message}`); } }
+    if(!pitched.length) miss('no unfrozen pitched track to render');
+    // ---- (2) замороженная: уровень — гейн шины, буфер свежий ----
+    const fz=L.find(ly=>freezeState(ly)==='fresh');
+    if(fz!=null){ cases++;
+      const sig0=freezeTicket(fz).sig;
+      setLaneLevel(fz,0.5); await waitMs(150);
+      const st=freezeState(fz), sig1=freezeTicket(fz).sig, bg=frzBusGain(fz);
+      if(st!=='fresh') miss(`L${fz+1}: moving its level made the freeze ${st}`);
+      if(sig1!==sig0) miss(`L${fz+1}: moving its level changed the freeze signature`);
+      if(laneAudible(fz) && !(bg!=null && Math.abs(bg-0.25)<1e-12)) miss(`L${fz+1}: the gain scheduled on its frozen bus is ${bg}, expected 0.25 (level 0.5 → v² = 0.25)`);
+      setLaneLevel(fz,keepLvl.get(fz)); await waitMs(100);
+    } else notes.push('no frozen track in this song — the frozen-bus part is not checked (P.seed freezes the raga bass)');
+    // ---- (3) живой движок: множитель по ключу владельца ----
+    { cases++; const ly=L[0];
+      setLaneLevel(ly,0.5);
+      const keys=['leadloop:'+ly+':0','loop:'+ly,'loop:'+ly+':2','bassloop:'+ly,'hit:'+ly,'drone:'+ly];
+      for(const k of keys){ const got=ownerGain(k); if(Math.abs(got-0.25)>1e-12) miss(`the live engine gives owner ${k} the gain ${got}, expected 0.25`); }
+      for(const k of ['lead:L','latch','bass','bass:L:1',null]){ const got=ownerGain(k); if(got!==1) miss(`the live key ${k} gets the gain ${got}, expected 1`); }
+      const other=L.find(o=>o!==ly); if(other!=null){ const got=ownerGain('loop:'+other); if(Math.abs(got-volAmpOf(laneLevelOf(other)))>1e-12) miss(`another track's owner gets ${got}`); }
+      setLaneLevel(ly,keepLvl.get(ly)); }
+    // ---- (4) мастер ----
+    { cases++;
+      setMasterLevel(0.5); await waitMs(250);
+      let m=masterMeter();
+      if(!m || Math.abs(m.gain-0.8*0.25)>0.004) miss(`master level 0.5 → master gain ${m&&m.gain}, expected 0.2 (0.8·0.5²)`);
+      if(m && !(m.reduction<=0)) miss(`the limiter reduction reads ${m.reduction}, expected ≤ 0`);
+      setMasterLevel(1); await waitMs(250); m=masterMeter();
+      if(!m || Math.abs(m.gain-0.8)>0.004) miss(`master level 1 → master gain ${m&&m.gain}, expected 0.8 (as before MX1)`); }
+    // ---- (5) лицо микшера: попадание ----
+    { cases++;
+      arrApi.open(); arrApi.face('mix'); await frame(); await frame();
+      const V=loopViewProbe();
+      if(!V||!V.mix) miss('the mixer face is not drawn');
+      else{ for(const ly of V.rows){ const y=V.gy0+V.rows.indexOf(ly)*V.rowH+V.rowH/2, h=loopHit(V.x0+V.bw/2,y);
+          if(!h||h.what!=='level'||h.layer!==ly) miss(`L${ly+1}: its row body is not its level fader (${h&&h.what})`); }
+        const hm=V.ms && loopHit(V.x0+V.bw/2,(V.ms.y0+V.ms.y1)/2); if(!hm||hm.what!=='mlevel') miss('the master strip is not the master fader');
+        if(V.ms && V.ms.y1>innerHeight) miss('the master strip lies below the bottom of the screen'); }
+    }
+  } finally {
+    for(const [ly,v] of keepLvl) if(laneLevelOf(ly)!==v) setLaneLevel(ly,v);
+    if(masterLevel()!==keepM) setMasterLevel(keepM);
+    if(arrOpen){ arrApi.face('arr'); arrApi.close(); }
+  }
+  console.log(`[scaleprobe mixer] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe mixer] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe mixer] '+m));
+  if(!nBad) console.log('[scaleprobe mixer] the voice stage scales a track proportionally, a frozen track takes its level on its bus and stays fresh, live owners get their track’s gain, the master level sets the master gain, and the mixer face hits its faders');
+  return { cases, song:L.length, total:nBad, differences:bad };
+}
+const volAmpOf=v=>{ const x=v>0?(v<1?v:1):0; return x*x; };   // та же кривая, что config.volAmp (проба не тянет config ради одной строки)
 /* ═══ AR1: ОКНО АРАНЖИРОВКИ — P.checkArrange ═══
    Окно открывается ТЕМ ЖЕ входом, что ✎ (ui.arrApi — функции кнопок), и для КАЖДОЙ дорожки, пролистав строки (laneRow0): строка нарисована
    в окне (снимок loopView с full) и целиком на экране; попадание по ней — «вооружить» у заголовка, «открыть» по телу, M / S / ❄ в гнёздах —

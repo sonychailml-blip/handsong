@@ -973,6 +973,10 @@ async function renderTrack(layer, opt){
        заморозка после прослушивания звучит ровно как прежде (копия движка одна на сессию, и флаг иначе пережил бы рендер).
        ДО initAudio: переключатель, влияющий на постройку голосов, обязан её застать (пул аккордов строится в самом initAudio). */
     eng.setDbg(o.dbg||null);
+    /* ⛳ MX1: УРОВЕНЬ ДОРОЖКИ В РЕНДЕР НЕ ВПЛАВЛЯЕТСЯ — копия движка получает множитель «1» на КАЖДЫЙ рендер (копия одна на сессию, функция
+       иначе пережила бы прошлый рендер). o.trackGain — ТОЛЬКО для пробы P.checkMixer: тем же путём, что живой голос (ступень tg в голосе по
+       ключу владельца, множитель удара и дрона), — чтобы доказать, что ступень в голосе ровно масштабирует звук дорожки. Заморозка его не передаёт. */
+    eng.setTrackGainOf(o.trackGain!=null ? ()=>o.trackGain : null);
     const tIni0=now();
     await eng.initAudio(()=>ctx);               // ⚠️ ПОСЛЕ пина: дрон берёт высоту здесь
     const tIni1=now();
@@ -1383,44 +1387,86 @@ function stop(){
    кривую с точкой +700 ¢ на 0.55 с, но ОТПУСКАЕТСЯ на 0.30 с — хвост кривой остаётся расписанным в голосе; нота B (330 Гц) берёт ТОТ ЖЕ
    голос на 0.35 с (офлайн голос свободен с отпускания, сродство банка — тот же голос; факт reused). Высота B после 0.55 с обязана
    остаться 330 Гц: прежде (до S5) чужая точка перестраивала её на 659 Гц (440·2^(700/1200)). КОНТРОЛЬ — тот же материал, где у B СВОЯ кривая +700 ¢ на
-   0.85 с: мера обязана её увидеть (494 Гц, окно с 0.95 с — точка устоялась: τ 20 мс), иначе «не изогнулась» могло бы значить «мера слепа». Высота — автокорреляцией окна
+   0.70 с: мера обязана её увидеть (494 Гц, окно с 0.85 с — точка устоялась: 7.5τ, τ 20 мс), иначе «не изогнулась» могло бы значить «мера слепа». Высота — автокорреляцией окна
    (первый пик не ниже 90 % лучшего — период, а не его кратное), допуск 1.5 % (гуманизация — ±4 ¢; 330 и 494 разнятся на 700 ¢). */
-const RU_SEC=1.2, RU_SPB=0.25, RU_INS=4, RU_F1=440, RU_F2=330, RU_C=700, RU_TOL=0.015;
-function pitchOf(buf,t0,t1){
-  const x=buf.getChannelData(0), rate=buf.sampleRate, a=Math.floor(t0*rate), b=Math.floor(t1*rate);
-  const lmin=Math.floor(rate/1500), lmax=Math.ceil(rate/80), N=b-a-lmax-1;
-  if(N<256) return NaN;
-  const cor=new Float64Array(lmax+2); let best=0;
-  for(let L=lmin; L<=lmax+1; L++){ let s=0,e0=0,e1=0;
-    for(let i=a;i<a+N;i++){ const u=x[i], v=x[i+L]; s+=u*v; e0+=u*u; e1+=v*v; }
-    cor[L]=(e0>0&&e1>0) ? s/Math.sqrt(e0*e1) : 0; if(cor[L]>best) best=cor[L]; }
-  for(let L=lmin+1; L<=lmax; L++) if(cor[L]>=0.9*best && cor[L]>=cor[L-1] && cor[L]>=cor[L+1]){
-    const y0=cor[L-1], y1=cor[L], y2=cor[L+1], q=y0-2*y1+y2, d= q ? 0.5*(y0-y2)/q : 0;   // параболическая доводка пика
-    return rate/(L+d); }
-  return NaN;
-}
+const RU_SEC=1.2, RU_SPB=0.25, RU_INS=4, RU_F1=440, RU_F2=330, RU_C=700;
+/* ⛳ ПОЧИНКА МЕРЫ (после S5): прежняя мера искала период по ВСЕМУ диапазону (80…1500 Гц) и брала первый пик не ниже 90 % лучшего — и на
+   контроле прочла 164.7 Гц вместо 494.4 (ровно треть: субгармоника). Ответ «какая высота звучит» здесь не нужен — нужен ответ «какая из
+   ИЗВЕСТНЫХ высот звучит»: у каждого рендера два кандидата (ожидаемая и та, что дала бы ошибка). Поэтому мера оценивает КАЖДОГО кандидата
+   на ЕГО периоде: нормированная автокорреляция окна при дробной задержке rate/f (линейная интерполяция), с поиском максимума в ±1 полутоне
+   (гуманизация ±4 ¢, расстройка флейты 4 ¢). Решение — сравнением кандидатов (ниже: RU_FLOOR, RU_MARGIN); если звучат оба — ВЫСШИЙ (сигнал с периодом P
+   коррелирует и на 2P, 3P… — низший кандидат «звучит» и у высшего сигнала, обратное неверно: на половине периода сигнал противофазен).
+   Субгармоника кандидатом не бывает вовсе. Числа корреляций обоих кандидатов печатаются в отчёте. */
+/* ⛳ ВТОРАЯ ПОЧИНКА (после MX1): контроль прочёлся 494.4 Гц с корреляцией 0.8786 против −0.6488 у 330 — вердикт верный, но порог 0.9
+   его отверг. ПРИЧИНА — НЕ «высота движется в окне» (окно начиналось через 5τ после точки изгиба: остаток 0.7 % скачка, ~4 ¢, и он тает
+   дальше; поиск в ±1 полутоне такое покрывает), а ЧУЖОЙ ЗВУК В ОКНЕ: (1) рендер шёл через СОЛО-ЦЕПЬ ПО УМОЛЧАНИЮ — реверб и делей
+   (state.fxChains) открыты, и хвосты 330 Гц (B до изгиба) и 440 Гц (A) лежали под окном; 330 и 494.4 — это 2:3, общий период 1/164.8 с —
+   ровно та «субгармоника», что прочла прежняя мера; (2) leadOn без applyFx берёт величины ЧУЖОЙ ноты (pendFx — модульное состояние копии
+   движка, общей на сессию: после заморозок и рендеров посева в нём может стоять вибрато или драйв чьей-то соло-ноты).
+   ПОЭТОМУ: подмес каждого шинного эффекта соло-цепи — ноль (zeroMix, тот же приём, что в опыте 1: модуль при mix=0 — тождество
+   сэмпл в сэмпл), и перед каждой атакой applyFx({}) — сухой голос без вибрато, драйва и тремоло. Окна сдвинуты туда, где высота
+   устоялась: 7.5τ после последней точки (остаток 0.06 %).
+   ⛳ РЕШЕНИЕ — СРАВНЕНИЕМ КАНДИДАТОВ, а не абсолютным порогом. Кандидатов в каждом рендере два (ожидаемая высота и та, что дала бы
+   ошибка). (а) Оба ≥ RU_FLOOR — побеждает ВЫСШИЙ: сигнал с периодом P коррелирует и на 2P (пара 330/659 — октава), а на дробной доле
+   периода — нет; так субгармоника выбраться не может. (б) Иначе победитель — тот, кто ≥ RU_FLOOR И выше другого не меньше чем на
+   RU_MARGIN. (в) Иначе — ни один (мера не решила; это расхождение, а не «прошло»).
+   ЧИСЛА — из напечатанных корреляций: даже ЗАГРЯЗНЁННЫЙ контроль (хвосты двух нот под окном) дал 0.88 против −0.65, зазор 1.53. Пол 0.6
+   оставляет 0.28 запаса под худшим увиденным верным ответом; на чистом сигнале неверный кандидат стоит на НЕ-кратной доле периода —
+   для пары 2:3 это ≈ −0.3…−0.7 по основному тону, для октавы сверху (659 на сигнале 330 — полпериода) ≈ −1, — то есть пол ему
+   недостижим. Зазор 0.5 — треть увиденного: ниже него два кандидата считаются неразличимыми. */
+const RU_FLOOR=0.6, RU_MARGIN=0.5, RU_SEMI=Math.pow(2,1/12);
+function corAt(x,a,N,lag){ const i0=Math.floor(lag), fr=lag-i0; let s=0,e0=0,e1=0;
+  for(let i=a;i<a+N;i++){ const u=x[i], v=x[i+i0]*(1-fr)+x[i+i0+1]*fr; s+=u*v; e0+=u*u; e1+=v*v; }
+  return (e0>0&&e1>0) ? s/Math.sqrt(e0*e1) : 0; }
+function candScore(buf,t0,t1,f){   // лучшая корреляция в ±1 полутоне вокруг f → { cor, f } (f — где лучшая)
+  const x=buf.getChannelData(0), rate=buf.sampleRate, a=Math.floor(t0*rate), lagHi=rate/(f/RU_SEMI), N=Math.floor(t1*rate)-a-Math.ceil(lagHi)-2;
+  if(N<256) return { cor:0, f:NaN };
+  let best={ cor:-2, f:NaN };
+  for(let lag=rate/(f*RU_SEMI); lag<=lagHi; lag+=0.05){ const c=corAt(x,a,N,lag); if(c>best.cor) best={ cor:c, f:rate/lag }; }
+  return best; }
+function whichSounds(buf,t0,t1,cands){   // ровно два кандидата → { pick: частота или null, rule, margin, scores:[{f,cor,at}] }
+  const scores=cands.map(f=>{ const r=candScore(buf,t0,t1,f); return { f, cor:+r.cor.toFixed(4), at:+(r.f||0).toFixed(1) }; });
+  const [hi,lo]=[...scores].sort((p,q)=>q.f-p.f), margin=+Math.abs(hi.cor-lo.cor).toFixed(4);
+  if(hi.cor>=RU_FLOOR && lo.cor>=RU_FLOOR) return { pick:hi.f, rule:'both clear the floor → the higher', margin, scores };
+  const w= hi.cor>=lo.cor ? hi : lo, o= w===hi ? lo : hi;
+  if(w.cor>=RU_FLOOR && w.cor-o.cor>=RU_MARGIN) return { pick:w.f, rule:'floor and margin', margin, scores };
+  return { pick:null, rule:'undecided', margin, scores }; }
+/* ТРИ РЕНДЕРА одного материала (A с кривой после своего отпускания, B на ТОМ ЖЕ голосе):
+     M — настоящий случай: B обязан звучать СВОЮ высоту 330 Гц, а не 659 (чужую кривую A); окно 0.70–1.05 с (точка A — на 0.55);
+     C — контроль «мера видит изгиб»: у B своя кривая +700 ¢ (точка на 0.70 с) → обязан прочесться 494 Гц, а не 330; окно 0.85–1.09 с
+         (отпускание B — на 1.10);
+     S — контроль «мера видит наследство»: B получает ту же точку, что дала бы чужая кривая A (659 Гц на 0.55 с), → обязан прочесться
+         659 Гц; окно 0.70–1.05 с.
+   Без C «не изогнулась» могло бы значить «мера слепа к изгибу»; без S — «мера не отличила бы унаследованную кривую». */
 async function reuseCheck(){
   if(!LIVE_AC) return { ok:false, why:'audio is not started (press ▶ Play)' };
-  const pass=async bendB=>{ let reused=false;
+  const F659=RU_F1*Math.pow(2,RU_C/1200), F494=RU_F2*Math.pow(2,RU_C/1200);
+  const pass=async kind=>{ let reused=false;
     const R=await renderOnce(SEED_A, eng=>{
+      eng.applyFx({});   // сухой голос: без вибрато/драйва/тремоло чужой ноты (pendFx копии живёт между рендерами)
       eng.leadOn('s5:A',RU_F1,0.8,RU_INS,undefined,undefined,undefined,undefined,0.05);   // позиционно: deg, oct, glide, tie — пусто; время ПОСЛЕДНИМ (правило #15)
       eng.scheduleBend('s5:A',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F1,RU_SPB,0.05);              // точка +700 ¢ на 0.05+2·0.25 = 0.55 с — ПОСЛЕ отпускания A
       const vA=eng.leadHold['s5:A'];
       eng.leadOff('s5:A',undefined,0.3);
+      eng.applyFx({});
       eng.leadOn('s5:B',RU_F2,0.8,RU_INS,undefined,undefined,undefined,undefined,0.35);
       reused= !!vA && eng.leadHold['s5:B']===vA;
-      if(bendB) eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F2,RU_SPB,0.35);    // контроль: СВОЯ кривая B, точка на 0.85 с
+      if(kind==='C') eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:1.4,c:RU_C}],RU_F2,RU_SPB,0.35);   // своя кривая B: 494 Гц с 0.35+1.4·0.25 = 0.70 с
+      if(kind==='S') eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:0.8,c:1200*Math.log2(F659/RU_F2)}],RU_F2,RU_SPB,0.35);   // как если бы кривая A перешла к B: 659 Гц с 0.55 с
       eng.leadOff('s5:B',undefined,1.1);
-    }, RU_SEC, { offline:true });
+    }, RU_SEC, { offline:true, prep:eng=>{ zeroMix(eng,CHAIN_SOLO); } });   // шинные эффекты соло-цепи — тождество: в окне только сам голос
     return { reused, buf:R.buf }; };
-  const M=await pass(false), C=await pass(true);
-  const f=pitchOf(M.buf,0.65,1.05), fc=pitchOf(C.buf,0.95,1.09), want=RU_F2, wantC=RU_F2*Math.pow(2,RU_C/1200);
-  const near=(x,y)=>Number.isFinite(x) && Math.abs(x/y-1)<=RU_TOL;
-  const ok= M.reused && near(f,want) && near(fc,wantC);
-  return { ok, reused:M.reused, f:+f.toFixed(2), want, fControl:+fc.toFixed(2), wantControl:+wantC.toFixed(2),
+  const M=await pass('M'), C=await pass('C'), S=await pass('S');
+  const m=whichSounds(M.buf,0.70,1.05,[RU_F2,F659]), c=whichSounds(C.buf,0.85,1.09,[F494,RU_F2]), sm=whichSounds(S.buf,0.70,1.05,[RU_F2,F659]);
+  const ok= M.reused && m.pick===RU_F2 && c.pick===F494 && sm.pick===F659;
+  const fmt=w=>w.scores.map(z=>`${z.f.toFixed(1)} Hz cor ${z.cor}`).join(', ')+` → ${w.pick==null?'none':w.pick.toFixed(1)+' Hz'} (${w.rule}, margin ${w.margin})`;
+  return { ok, reused:M.reused, real:m, control:c, simulated:sm,
+           f:m.pick, want:RU_F2, fControl:c.pick, wantControl:+F494.toFixed(2),
+           detail:`floor ${RU_FLOOR}, margin ${RU_MARGIN} · real case: ${fmt(m)}; control (own bend): ${fmt(c)}; simulated inheritance: ${fmt(sm)}`,
            why: ok ? null : !M.reused ? 'the second note did not take the first note’s voice — the material proves nothing'
-                : !near(fc,wantC) ? `the control (an intended bend) measured ${fc.toFixed(1)} Hz, not ${wantC.toFixed(1)} — the measurement is blind`
-                : `the reused voice sounded ${f.toFixed(1)} Hz, not ${want} — it inherited the previous note's curve` };
+                : c.pick!==F494 ? `the control (an intended bend) does not read as ${F494.toFixed(1)} Hz (${fmt(c)}) — the measurement is blind to a bend`
+                : sm.pick!==F659 ? `the simulated inheritance does not read as ${F659.toFixed(1)} Hz (${fmt(sm)}) — the measurement could not catch the defect`
+                : `the reused voice does not sound its own ${RU_F2} Hz (${fmt(m)}) — it inherited the previous note's curve` };
 }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */

@@ -7,7 +7,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, tuningOf, periodOf, chordTypeFits } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
-import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
+import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
 import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
@@ -432,6 +432,10 @@ let delPend=null;
 const laneId=new Map();      // номер слоя → СТАБИЛЬНЫЙ id дорожки
 const laneMute=new Set();    // id заглушённых дорожек
 const laneSolo=new Set();    // id дорожек в соло
+/* ⛳ MX1: УРОВЕНЬ ДОРОЖКИ (фейдер микшера) — id дорожки → v 0…1, по ТОЙ ЖЕ кривой, что громкость ноты (config.volAmp: множитель v²); нет
+   записи — 1 (единица, «как было»). Ключ — id (правило #27), как у M/S: будущий формат песни лишь запишет эту таблицу. В событие НЕ пишется,
+   в подпись заморозки НЕ входит (уровень — множитель на шине замороженной, буфер он не меняет). Уровень дорожки ≠ громкость ноты. */
+const laneLevel=new Map();
 /* ⛳ ДЛИНА МАТЕРИАЛА СЛОЯ ПОДЛОЖКИ (починка «подложка сама крутится», при слайсе «дрон и центы»): id дорожки → доля КОНЦА её материала
    (такты подложки × размер). Длина песни — позиция последнего СОБЫТИЯ (songLenRecalc), а у событий подложки нет выключений: дрон и
    бас-педаль лежат одним событием на доле 0, аккорд — одним «вкл» на такт. Без этой карты песня из одной подложки «Дрон» имела длину 0
@@ -884,14 +888,14 @@ function lanePrune(){
   takePrune();   // O-2: захват взятого уходит вместе с его событиями — одной строкой, чтобы унаследовать всех вызывающих
   const live=new Set(); for(const e of events) live.add(e.layer);
   for(const [ly,id] of laneId) if(!live.has(ly) && !isRecLayer(ly)){   // T1: пишущиеся слои взятого щадим (прежде — один loop.layer)
-    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); laneLen.delete(id); laneEditVer.delete(id); if(armLane===id) armLane=null; if(delPend&&delPend.id===id) delPend=null;
+    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); laneLevel.delete(id); laneLen.delete(id); laneEditVer.delete(id); if(armLane===id) armLane=null; if(delPend&&delPend.id===id) delPend=null;
     freezeDrop(id); }   // S3.5c: снятая дорожка (⤺, снятие подложки) снимает и вооружение — ● дальше создаст новую, а не пишет в пустоту   // F4: и БУФЕР уходит вместе с ней — иначе он остался бы звучать за дорожку, которой больше нет
 }
 /* ⚠️ laneSeq НАМЕРЕННО НЕ ОБНУЛЯЕТСЯ: счётчик монотонен на всю сессию. Обнуление вернуло бы в оборот
    уже выданные номера id — а это ровно тот вид совпадения, от которого id и заводился. Стоит он
    ничего (целое число), а класс ошибок закрывает целиком. */
 function laneReset(){ for(const id of [...frozen.keys()]) freezeDrop(id);   // F4: ✕ — песни нет, значит нет и её заморозок
-  laneId.clear(); laneMute.clear(); laneSolo.clear(); laneLen.clear(); laneEditVer.clear(); armLane=null; delPend=null; takeReset(); }   // A2: версии правок — гигиена (id не переиспользуются, мёртвая запись ни на что не влияла бы)   // O-2: захват сбрасывается вместе с дорожками (✕ и старт записи на пустой песне)
+  laneId.clear(); laneMute.clear(); laneSolo.clear(); laneLevel.clear(); laneLen.clear(); laneEditVer.clear(); armLane=null; delPend=null; takeReset(); }   // A2: версии правок — гигиена (id не переиспользуются, мёртвая запись ни на что не влияла бы)   // O-2: захват сбрасывается вместе с дорожками (✕ и старт записи на пустой песне)
 /* Слой вооружённой дорожки или null. ЧИСТОЕ чтение (его зовёт draw каждый кадр): обход таблицы дорожек —
    O(дорожек), не событий. id, не найденный в таблице, читается как «не вооружено». */
 function laneLayerOf(id){ if(id==null) return null; for(const [ly,i] of laneId) if(i===id) return ly; return null; }
@@ -965,7 +969,9 @@ const laneGated=()=> laneMute.size>0 || laneSolo.size>0;
 const droneAudible=()=>events.some(e=>e.fn==='drone'&&laneAudible(e.layer)&&!frzLayer(e.layer));
 /* Привести ЖИВОЙ дрон в соответствие со слышимостью — одна строка на всех: приглушение, заморозка,
    разморозка, устаревание. when — время шва (по умолчанию «сейчас»). */
-const droneSync=(when,tc)=>{ if(droneActive()){ if(loop.on&&droneAudible()) droneOn(undefined,when,tc); else droneOff(when,tc); } };   // tc (A2b) — короткий только на шве заморозки; иначе прежние постоянные
+/* MX1: УРОВЕНЬ ДРОНА — как в событии (a.lvl) × уровень его дорожки; несколько слышимых дронов — громкий из них (дрон один на движок). */
+const droneLevel=()=>{ let L=0; for(const e of events) if(e.fn==='drone'&&laneAudible(e.layer)&&!frzLayer(e.layer)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L) L=x; } return L; };
+const droneSync=(when,tc)=>{ if(droneActive()){ if(loop.on&&droneAudible()) droneOn(droneLevel(),when,tc); else droneOff(when,tc); } };   // tc (A2b) — короткий только на шве заморозки; иначе прежние постоянные
 const FRZ_DRONE_TC=0.02;   // A2b: дрон на шве — подмена в миг шва (буфер уходит рампой FRZ_FADE), без секундного провала
 /* Переключатели. Наружу дорожка адресуется НОМЕРОМ СЛОЯ — тем же, чем подписана её строка на полосе
    лупера; id остаётся внутренним делом (ui не может подержать протухший id).
@@ -980,6 +986,25 @@ function toggleLaneMute(layer){ const id=laneOf(layer) ?? laneNew(layer);
 function toggleLaneSolo(layer){ const id=laneOf(layer) ?? laneNew(layer);
   if(laneSolo.has(id)) laneSolo.delete(id); else laneSolo.add(id);
   laneHush(); }
+/* ⛳ MX1: УРОВЕНЬ ДОРОЖКИ. laneLevelOf — v (0…1, 1 без записи); laneGainOf — множитель v² (одна кривая с громкостью ноты). setLaneLevel
+   переставляет ЗВУЧАЩИЕ голоса дорожки (audio.trackGainRetune по ключам владельцев её слоя), шину замороженной (frzGain) и дрон
+   (droneSync) — новые атаки берут уровень сами (audio.ownerGain → функция ниже). Не правка песни: истории нет (одна история — ED7). */
+const laneLevelOf=layer=>{ const id=laneOf(layer); return (id!=null && laneLevel.has(id)) ? laneLevel.get(id) : 1; };
+const laneGainOf=layer=>volAmp(laneLevelOf(layer));
+/* Слой из КЛЮЧА ВЛАДЕЛЬЦА голоса переигровки ('leadloop:N:v', 'loop:N[:k]', 'bassloop:N…') или удара/дрона ('hit:N', 'drone:N'); живые ключи
+   ('lead:L', 'latch', 'bass…') — null. Тот же хвост «N» или «N:…», что у releaseLoopLayersAt. */
+function layerOfOwner(k){ const m=/^(?:leadloop|loop|bassloop|hit|drone):(\d+)(?::|$)/.exec(k||''); return m ? +m[1] : null; }
+function setLaneLevel(layer,v){
+  if(layer==null) return false;
+  const id=laneOf(layer) ?? laneNew(layer), x=Math.max(0,Math.min(1,+v||0));
+  if(x===1) laneLevel.delete(id); else laneLevel.set(id,x);
+  const g=volAmp(x);
+  if(AC) AUD.trackGainRetune(k=> layerOfOwner(k)===layer ? g : null);
+  frzGain(id); droneSync();
+  return true;
+}
+/* Функцию «ключ владельца → множитель» получает ТОЛЬКО ЖИВОЙ движок (рендер — своя копия audio.js, у неё умолчание 1: уровень не вплавляется). */
+AUD.setTrackGainOf(k=>{ const ly=layerOfOwner(k); return ly==null ? 1 : laneGainOf(ly); });
 /* ЧИТАТЕЛИ ДЛЯ ПОКАЗА — через тот же чистый laneOf (их зовёт draw на каждый кадр; правило #5 с
    обратной стороны: рисование не смеет менять состояние). */
 const laneMuted =layer=>{ const id=laneOf(layer); return id!=null&&laneMute.has(id); };
@@ -1316,9 +1341,16 @@ const frozenInfo=layer=>{ const f=frzOf(layer); return f?{ layer:f.layer, state:
 function frzGain(id){
   const f=frozen.get(id); if(!f) return;
   const on=laneAudible(f.layer);
-  f.bus.gain.setTargetAtTime(on?1:0, AC.currentTime, 0.01);   // не рубильник: щелчок на приглушении читался бы поломкой
+  const g=on?laneGainOf(f.layer):0; f.busTarget=g;   // MX1: цель шины — её единственный писатель здесь; читает проба (frzBusGain)
+  f.bus.gain.setTargetAtTime(g, AC.currentTime, 0.01);   // не рубильник: щелчок на приглушении читался бы поломкой. MX1: слышимая — с уровнем дорожки (тот же множитель, что у голосов её событий)
 }
 const frzGainAll=()=>{ for(const id of frozen.keys()) frzGain(id); };
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkMixer): ЦЕЛЬ гейна шины замороженной дорожки — то значение, которое движок на неё поставил (null — не
+   заморожена). ⚠️ Не bus.gain.value: пока транспорт стоит, у шины нет ни одного источника (буфер-источники создаются на пуске), браузер
+   такой узел не обрабатывает, и геттер .value держит старое значение — хотя автоматизация в линии времени параметра уже стоит и
+   применится с первого же кванта, когда буфер заиграет (на слух: фейдер в ноль на играющей замороженной дорожке её глушит). frzGain —
+   единственный писатель этого гейна, поэтому его цель и есть то, чем шина зазвучит. */
+const frzBusGain=layer=>{ const id=laneOf(layer), f=id!=null&&frozen.get(id); return f ? f.busTarget : null; };
 
 /* ═══ УЗЛЫ: ЖИЗНЕННЫЙ ЦИКЛ ═══
    ⛳ СКОЛЬКО ИХ ЖИВЁТ: на дорожку — не больше ДВУХ одновременно, и только на шве повтора. Обычно один.
@@ -3031,8 +3063,8 @@ const makeENG=A=>({
   bassOn:(a,ctx,{when,live,own}={})=>{ const f=live!=null?live:evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassOn(own||bassOwnerKey(ctx),f,a.vol,a.inst,g.deg,g.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
   bassSet:(a,ctx,{when}={})=>{ const f=evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassSet(bassOwnerKey(ctx),f,a.vol,g.deg,g.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
   bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
-  drum:(a,ctx,{when}={})=>A.drumHit(a.row,a.vol,a.kit,A.fxBriOf(a.fx),when),   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
-  drone:(a,ctx,{when}={})=>A.droneOn(a.lvl,when),        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
+  drum:(a,ctx,{when}={})=>{ if(ctx) A.hitOwner('hit:'+ctx.layer); A.drumHit(a.row,a.vol,a.kit,A.fxBriOf(a.fx),when); },   // MX1: ключ удара — для уровня дорожки (у копии рендера множитель всегда 1)   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
+  drone:(a,ctx,{when}={})=>A.droneOn(a.lvl*(ctx?A.ownerGain('drone:'+ctx.layer):1),when),   // MX1: × уровень дорожки дрона (у копии рендера — 1)        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 });
 const ENG=makeENG(AUD);   // ЖИВАЯ таблица — против живой копии движка. Поведение прежнее дословно
 const inPB=()=>loop.on;                               // для строки статуса (draw)
@@ -4601,6 +4633,7 @@ export {
   editInsertChord,
   editInsertLead,   // S4: вставка ноты соло (зеркало editInsertBass)
   laneAudible,   // слышимость дорожки (тот же предикат, что у обоих путей переигровки) — для пробы P.checkTracks
+  laneLevelOf, setLaneLevel, frzBusGain,   // MX1: уровень дорожки (фейдер микшера) — по id дорожки, не в событии и не в подписи заморозки
   tiePartners, laneEditVerOf,   // S6: партнёр пары связки и версия правок дорожки — для пробы P.checkSoloEdit (soloEditBlock снят: отказов нет)
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)

@@ -6,7 +6,7 @@ import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChord
          fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          fxIsScalar, FX_VOL, fxVolReset,   // VOL-2: запись громкости цепи (строка панели) и её сброс на горизонталь для уроков; chainXDriven/fxVolFix/setFxVolFix удалены
-         rollOpen, setRollOpen, arrOpen, setArrOpen, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
+         rollOpen, setRollOpen, arrOpen, setArrOpen, arrFace, setArrFace, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
          rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll, setLaneRow0,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
@@ -21,14 +21,14 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 import { loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
-import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
-         editInsertLead,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
+         editInsertLead, laneLevelOf, setLaneLevel,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
@@ -547,7 +547,14 @@ function closeRoll(){
    назад к игре. Рисунок — полоса дорожек во весь экран (draw.drawLooper(true)), попадание — тот же loopHit по тому же снимку (правило #9).
    Отказы — те же, что у редактора, и по той же причине: запись идёт с камеры, а окно её не читает (клип снимал бы служебный экран).
    Транспорт, если играл, ИГРАЕТ дальше: окно — не правка (пауза — у editGuard, когда правят). */
-const arrBar=$('arrBar'), arrCloseBtn=$('arrClose'), arrZoomInBtn=$('arrZoomIn'), arrZoomOutBtn=$('arrZoomOut'), arrFitBtn=$('arrFit');
+const arrBar=$('arrBar'), arrCloseBtn=$('arrClose'), arrZoomInBtn=$('arrZoomIn'), arrZoomOutBtn=$('arrZoomOut'), arrFitBtn=$('arrFit'), arrFaceBtn=$('arrFace');
+/* ⛳ MX1: ЛИЦО ОКНА — аранжировка ↔ микшер. Те же строки и прокрутка; подпись кнопки — лицо, НА КОТОРОЕ переключит (🎚 → микшер, ▤ →
+   аранжировка). Зум времени в лице микшера не нужен — кнопки зума гаснут. */
+function applyArrFace(){ const mix=arrFace==='mix';
+  arrFaceBtn.textContent= mix ? '▤' : '🎚'; arrFaceBtn.title=t(mix?'arr.toArrange':'arr.toMixer');
+  arrZoomInBtn.disabled=arrZoomOutBtn.disabled=arrFitBtn.disabled=mix; }
+arrFaceBtn.onclick=()=>{ setArrFace(arrFace==='mix'?'arr':'mix'); applyArrFace(); };
+applyArrFace(); onLangChange(applyArrFace);
 let arrWinInit=false;
 /* Стартовое окно времени — ОДИН раз за сеанс, при первом входе в студию: вся песня (с тактом запаса). Дальше окно живёт само — зум и
    прокрутка одни на окно и редактор. */
@@ -578,18 +585,30 @@ arrZoomOutBtn.onclick=()=>arrZoomBy(1.6);
 arrFitBtn.onclick=()=>setRollWinClamped(0, rollTotal()+loop.metre);
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkArrange): те же входы, что у кнопок и тапа, — открыть/закрыть окно, открыть дорожку из окна и вернуться, окно
    времени через ТОТ ЖЕ зажим. Звать из консоли — это нажать кнопки рукой. */
-export const arrApi={ open:openArr, close:closeArr, openTrack:ly=>openRoll(ly), closeTrack:()=>closeRoll(), setWin:(b0,span)=>setRollWinClamped(b0,span) };
+export const arrApi={ open:openArr, close:closeArr, openTrack:ly=>openRoll(ly), closeTrack:()=>closeRoll(), setWin:(b0,span)=>setRollWinClamped(b0,span),
+  face:f=>{ setArrFace(f); applyArrFace(); } };   // MX1: лицо окна — как кнопкой
 /* ЖЕСТЫ ОКНА. Один палец: тап (без сдвига больше LANE_SCROLL_PX) — действие строки на ОТПУСКАНИИ (открыть, M, S, ❄, вооружить); сдвиг —
    по ПЕРВОМУ направлению: вдоль — прокрутка времени (доля под пальцем держится), поперёк — прокрутка строк. Два пальца — зум с якорем в
    середине (как в редакторе). Полоса скобы — сразу, как на полосе игры (тап ставит край, тащить — общий pointermove скобы выше). */
 const arrPts=new Map(); let arrG=null, arrZoom=null;
 const arrXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+/* ⛳ MX1: ФЕЙДЕР (лицо микшера) — тело строки и полоса мастера. Сдвиг ВДОЛЬ ведёт уровень ОТНОСИТЕЛЬНО (палец берёт фейдер где угодно — без
+   скачка под палец), поперёк — листает строки (как в аранжировке). Двойной тап по фейдеру — единица (100, 0 дБ). Уровень пишется сразу,
+   на каждом движении (recorder.setLaneLevel / audio.setMasterLevel) — это не правка событий, пересобирать нечего. */
+const LEVEL_DBL_MS=350; let levelTap={ key:null, t:0 };
+function levelOf(h){ return h.what==='mlevel' ? masterLevel() : laneLevelOf(h.layer); }
+function setLevelOf(h,v){ if(h.what==='mlevel') setMasterLevel(v); else setLaneLevel(h.layer,v); }
 function arrDown(e){
   const p=arrXY(e); arrPts.set(e.pointerId,p);
   const g=arrGeom(); if(!g){ arrG=null; return; }
   if(arrPts.size===1){
     const h=loopHit(p.x,p.y);
     if(h && h.what==='brace'){ arrG=null; braceEdge=braceTap(h.beat); return; }
+    if(h && (h.what==='level'||h.what==='mlevel')){
+      const key= h.what==='mlevel' ? 'm' : 'L'+h.layer, now=performance.now(), S=loopScroll();
+      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h,1); arrG=null; return; }   // двойной тап — единица
+      levelTap={ key, t:now };
+      arrG={ h, x:p.x, y:p.y, v0:levelOf(h), fw:g.fw, r0:S?S.row0:0, rowH:g.rowH, axis:null, level:true }; return; }
     const S=loopScroll();
     arrG={ h, x:p.x, y:p.y, b0:g.beat0, span:g.span, bw:g.bw, r0:S?S.row0:0, rowH:g.rowH, axis:null };
   }else if(arrPts.size===2){
@@ -608,6 +627,10 @@ function arrMove(e){
   if(!arrG) return;
   const dx=p.x-arrG.x, dy=p.y-arrG.y;
   if(!arrG.axis){ if(Math.abs(dx)<=LANE_SCROLL_PX && Math.abs(dy)<=LANE_SCROLL_PX) return; arrG.axis= Math.abs(dx)>=Math.abs(dy) ? 'x' : 'y'; }
+  if(arrG.level){   // MX1: фейдер — вдоль уровень (относительно), поперёк строки; у полосы мастера листать нечего
+    if(arrG.axis==='x') setLevelOf(arrG.h, Math.max(0,Math.min(1, arrG.v0 + dx/Math.max(1,arrG.fw))));
+    else if(arrG.h.what==='level') setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
+    return; }
   if(arrG.axis==='x') setRollWinClamped(arrG.b0 - dx*arrG.span/arrG.bw, arrG.span);
   else setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
 }
@@ -623,7 +646,7 @@ function arrUp(e){
   if(arrPts.size<2) arrZoom=null;
   if(arrPts.size) return;
   const G=arrG; arrG=null;
-  if(G && !G.axis && G.h) arrAct(G.h);
+  if(G && !G.axis && G.h && !G.level) arrAct(G.h);   // MX1: тап по фейдеру — ничего (двойной — единица, в arrDown)
 }
 addEventListener('pointermove',  e=>{ if(arrOpen&&!rollOpen) arrMove(e); });
 addEventListener('pointerup',    e=>{ if(arrOpen&&!rollOpen) arrUp(e); });
@@ -635,6 +658,9 @@ addEventListener('wheel', e=>{
   e.preventDefault();
   const px=e.clientX-canvasEl.getBoundingClientRect().left;
   if(e.ctrlKey||e.metaKey){ const f=(px-g.x0)/g.bw, span=g.span*Math.exp(e.deltaY*0.002); setRollWinClamped(g.beat0+g.span*f-span*f, span); return; }
+  if(g.mix){   // MX1: колесо над фейдером — уровень (шаг 1 из 100), иначе строки
+    const h=loopHit(px, e.clientY-canvasEl.getBoundingClientRect().top);
+    if(h && (h.what==='level'||h.what==='mlevel')){ setLevelOf(h, Math.max(0,Math.min(1, levelOf(h) - Math.sign(e.deltaY)*0.01))); return; } }
   const S=loopScroll();
   if(S && !e.shiftKey && Math.abs(e.deltaY)>=Math.abs(e.deltaX)){ setLaneRow0(laneRow0Clamp(S.row0+Math.sign(e.deltaY))); return; }
   const d= Math.abs(e.deltaX)>Math.abs(e.deltaY) ? e.deltaX : e.deltaY;

@@ -680,6 +680,10 @@ export const setRollOpen=v=>{ rollOpen=!!v; };
    экрана — rollBeat0/rollSpan выше. Пишет ТОЛЬКО ui (openArr/closeArr). */
 export let arrOpen=false;
 export const setArrOpen=v=>{ arrOpen=!!v; };
+/* ⛳ MX1: ЛИЦО ОКНА — 'arr' (аранжировка: миниатюры нот) или 'mix' (микшер: фейдер уровня дорожки на месте миниатюр + полоса мастера). Те же
+   строки, тот же порядок, та же прокрутка (laneRow0) — меняется только то, что в теле строки. Пишет ui (кнопка лица в баре окна). */
+export let arrFace='arr';
+export const setArrFace=v=>{ arrFace= v==='mix' ? 'mix' : 'arr'; };
 export const setRollWin=(b0,span)=>{ rollBeat0=b0; rollSpan=span; };
 export const setRollSel=v=>{ rollSel=v||null; rollSelNote=null; };   // U2: новое выделение — всегда ВЕСЬ аккорд (уровень ноты сбрасывается здесь, в одном месте)
 /* ⛳ U2: ДВА УРОВНЯ ВЫДЕЛЕНИЯ У АККОРДА. rollSel — определяющее событие сегмента (весь аккорд); rollSelNote — номер ОДНОЙ его ноты
