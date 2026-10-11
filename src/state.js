@@ -674,6 +674,12 @@ export let rollBeat0=0;             // доля у ЛЕВОГО края сет�
 export let rollSpan=16;             // сколько долей видно
 export let rollSel=null;            // ВЫДЕЛЕННОЕ событие (ссылка на сам объект события) или null. S5.0 только подсвечивает — правки нет
 export const setRollOpen=v=>{ rollOpen=!!v; };
+/* ⛳ AR1 — ОКНО АРАНЖИРОВКИ: ТРЕТИЙ ЭКРАН между игрой и редактором дорожки (✎ открывает его, строка — редактор дорожки). Пока он открыт,
+   draw рисует полосу дорожек ВО ВЕСЬ ЭКРАН (тот же drawLooper, тот же снимок loopView), а main не читает камеру — как у редактора.
+   Редактор, открытый из окна, оставляет arrOpen=true: закрыл редактор — вернулся в окно на том же месте. Окно времени ОДНО на оба
+   экрана — rollBeat0/rollSpan выше. Пишет ТОЛЬКО ui (openArr/closeArr). */
+export let arrOpen=false;
+export const setArrOpen=v=>{ arrOpen=!!v; };
 export const setRollWin=(b0,span)=>{ rollBeat0=b0; rollSpan=span; };
 export const setRollSel=v=>{ rollSel=v||null; rollSelNote=null; };   // U2: новое выделение — всегда ВЕСЬ аккорд (уровень ноты сбрасывается здесь, в одном месте)
 /* ⛳ U2: ДВА УРОВНЯ ВЫДЕЛЕНИЯ У АККОРДА. rollSel — определяющее событие сегмента (весь аккорд); rollSelNote — номер ОДНОЙ его ноты

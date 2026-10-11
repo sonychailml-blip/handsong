@@ -64,12 +64,13 @@
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
-import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0 } from './state.js';   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
+import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, rollOpen, rollBeat0, rollSpan } from './state.js';   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
-import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll } from './draw.js';   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom } from './draw.js';
+import { arrApi } from './ui.js';   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
@@ -985,6 +986,7 @@ const ALL_RUNS=[
   ['frozen seed bass level',()=>checkFrozen(), r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences })],
   ['S4 solo editing',    ()=>checkSoloEdit(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['AR1 arrangement window',()=>checkArrange(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1419,6 +1421,72 @@ export async function checkSoloEdit(){
    Кадры ждёт сама (полоса рисуется в цикле приложения): await P.checkTracks(). Прокрутку, микшер и редактор возвращает как были; при
    тронутом микшере (заглушено или соло) пункт 3 пропускается с пометкой. Нужна полоса на экране (во время записи видеоклипа её нет). */
 const frame=()=>new Promise(res=>requestAnimationFrame(()=>res()));
+/* ═══ AR1: ОКНО АРАНЖИРОВКИ — P.checkArrange ═══
+   Окно открывается ТЕМ ЖЕ входом, что ✎ (ui.arrApi — функции кнопок), и для КАЖДОЙ дорожки, пролистав строки (laneRow0): строка нарисована
+   в окне (снимок loopView с full) и целиком на экране; попадание по ней — «вооружить» у заголовка, «открыть» по телу, M / S / ❄ в гнёздах —
+   ЕЁ слой; число МИНИАТЮР строки = число её сегментов (высотная роль — songSegs) или ударов (ударные — songNotes); тап «открыть» (тот же
+   вход, что тап) открывает в редакторе ИМЕННО её. Окно времени ОБЩЕЕ в обе стороны: задано в окне — тем же отрезком нарисован редактор
+   (rollGeom), задано в редакторе — тем же отрезком нарисовано окно после возврата (arrGeom). Кадры ждёт сама: await P.checkArrange().
+   Окно, прокрутку и отрезок времени возвращает как были. Нужен запущенный звук и непустая песня; во время записи — отказ. */
+export async function checkArrange(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const keep={ row0:laneRow0, b0:rollBeat0, span:rollSpan }, SV=songSegs(), NV=songNotes();
+  const near=(a,b)=>Math.abs(a-b)<1e-9;
+  try{
+    arrApi.open(); await frame(); await frame();
+    if(!arrOpen){ miss('✎ (arrApi.open) did not open the arrangement window'); return { cases, song:L.length, total:nBad, differences:bad }; }
+    for(const [i,ly] of L.entries()){ cases++;
+      let V=loopViewProbe();
+      if(!V||!V.full){ miss('the arrangement is not drawn (the snapshot is not the full-screen one)'); break; }
+      if(!V.rows.includes(ly)){ const S=loopScroll();
+        if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, i))); await frame(); await frame(); V=loopViewProbe(); } }
+      if(!V||!V.rows.includes(ly)){ miss(`L${ly+1}: not among the arrangement's rows even after scrolling`); continue; }
+      const ri=V.rows.indexOf(ly), y=V.gy0+ri*V.rowH+V.rowH/2;
+      if(V.gy0+(ri+1)*V.rowH>innerHeight) miss(`L${ly+1}: its row lies below the bottom of the screen`);
+      const at=(x,want)=>{ const h=loopHit(x,y); if(!h||h.layer!==ly||h.what!==want) miss(`L${ly+1}: a tap at x ${Math.round(x)} gives ${h?h.what+' L'+(h.layer+1):'nothing'}, not ${want}`); };
+      at(V.hx0+6,'arm'); at(V.x0+V.bw/2,'open');
+      const seen=new Set(); for(let x=V.tx0; x<V.tx0+160; x++){ const h=loopHit(x,y); if(h&&h.layer===ly) seen.add(h.what); }
+      for(const w of ['mute','solo','frz']) if(!seen.has(w)) miss(`L${ly+1}: its ${w} button is not hittable`);
+      cases++; const M=V.mini&&V.mini.get(ly);
+      const nSeg=SV.segs.filter(s=>s.layer===ly).length, nHit=NV.notes.filter(n=>n.layer===ly&&n.role==='dr').length;
+      if(!M) miss(`L${ly+1}: no miniature drawn`);
+      else if(M.items.length!==(nSeg||nHit)) miss(`L${ly+1}: ${M.items.length} miniatures, ${nSeg?nSeg+' segments':nHit+' hits'}`);
+    }
+    // ---- открыть каждую дорожку из окна; окно времени — общее в обе стороны ----
+    const W1={ b0:4, span:12 };
+    arrApi.setWin(W1.b0, W1.span); await frame(); await frame();
+    const w1=arrGeom(); cases++;
+    if(!w1 || !near(w1.beat0,rollBeat0) || !near(w1.span,rollSpan)) miss(`the arrangement does not draw the shared window (${w1&&w1.beat0}/${w1&&w1.span} vs ${rollBeat0}/${rollSpan})`);
+    for(const ly of L){ cases++;
+      const b0=rollBeat0, sp=rollSpan;
+      arrApi.openTrack(ly); await frame(); await frame();
+      if(!rollOpen || editLayer()!==ly){ miss(`L${ly+1}: tapping its row does not open it in the editor (open: ${rollOpen}, layer L${editLayer()==null?'—':editLayer()+1})`); if(rollOpen) arrApi.closeTrack(); continue; }
+      const g=rollGeom();
+      if(!g || !near(g.beat0,b0) || !near(g.span,sp)) miss(`L${ly+1}: the editor opens on ${g&&g.beat0}/${g&&g.span}, not the arrangement's ${b0}/${sp}`);
+      arrApi.closeTrack(); await frame(); await frame();
+      if(!arrOpen || rollOpen) miss(`L${ly+1}: closing the editor does not return to the arrangement`);
+    }
+    cases++;   // редактор → окно: отрезок, заданный в редакторе, окно рисует после возврата
+    arrApi.openTrack(L[0]); await frame();
+    arrApi.setWin(8, 6); await frame(); await frame();
+    const g2=rollGeom(), want={ b0:rollBeat0, span:rollSpan };
+    arrApi.closeTrack(); await frame(); await frame();
+    const w2=arrGeom();
+    if(!g2 || !w2 || !near(w2.beat0,want.b0) || !near(w2.span,want.span) || !near(g2.span,want.span)) miss(`zoom set in the editor (${want.b0}/${want.span}) is not the arrangement's after returning (${w2&&w2.beat0}/${w2&&w2.span})`);
+  } finally {
+    if(rollOpen) arrApi.closeTrack();
+    if(arrOpen) arrApi.close();
+    setLaneRow0(keep.row0); arrApi.setWin(keep.b0, keep.span);
+  }
+  console.log(`[scaleprobe arrange] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe arrange] '+m));
+  if(!nBad) console.log('[scaleprobe arrange] every track has its row in the arrangement — drawn, on screen, hittable (arm, open, M, S, ❄) — with one miniature per segment or hit; a row opens exactly its track; the time window is shared both ways');
+  return { cases, song:L.length, total:nBad, differences:bad };
+}
 export async function checkTracks(){
   const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b), notes=[];

@@ -6,7 +6,7 @@ import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChord
          fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          fxIsScalar, FX_VOL, fxVolReset,   // VOL-2: запись громкости цепи (строка панели) и её сброс на горизонталь для уроков; chainXDriven/fxVolFix/setFxVolFix удалены
-         rollOpen, setRollOpen, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
+         rollOpen, setRollOpen, arrOpen, setArrOpen, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
          rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll, setLaneRow0,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
@@ -18,7 +18,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, loopScroll, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -397,6 +397,7 @@ function laneAct(h){
 addEventListener('pointerdown', e=>{
   if(e.target!==canvasEl) return;
   if(rollOpen){ rollDown(e); return; }        // S5.0: открыт редактор — холст принадлежит ему (полосы лупера на экране нет, loopHit и так вернул бы null)
+  if(arrOpen){ arrDown(e); return; }          // AR1: окно аранжировки — свои жесты (время, строки, зум), та же геометрия попадания
   const r=canvasEl.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   const h=loopHit(px, py);
   if(!h || h.what!=='del') laneDelCancel();                     // S3.5d: любой тап по холсту, кроме ✕, снимает взведённое удаление
@@ -421,7 +422,7 @@ addEventListener('pointerup',    ()=>{ braceEdge=null; if(laneGest){ const g=lan
 addEventListener('pointercancel',()=>{ braceEdge=null; laneGest=null; });
 /* Колесо над прокручиваемой полосой — по строке за щелчок (десктоп). Редактор открыт — колесо его (свой слушатель ниже). */
 addEventListener('wheel', e=>{
-  if(rollOpen || e.target!==canvasEl) return;
+  if(rollOpen || arrOpen || e.target!==canvasEl) return;   // AR1: у окна аранжировки своё колесо (ниже)
   const S=loopScroll(); if(!S) return;
   const r=canvasEl.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
   if(px<S.x0 || px>S.x1 || py<S.y0 || py>S.y1) return;
@@ -513,19 +514,21 @@ if(rollTimbreEl) rollTimbreEl.onchange=e=>{
   if(x && editSetTimbre(x.id)){ renderAutCtl(); updRollBtns(); }
   renderTimbreCtl();                                   // отказ (редактор закрыт, тот же тембр) — выбор возвращается к правде
 };
-function openRoll(){
+function openRoll(layer){   // AR1: layer — дорожка, которую открыть (тап по строке окна аранжировки); без него — вооружённая, иначе первая
   /* Причины отказов называем словами, но САМ отказ держит recorder (editOpen): он — единственный,
      кто знает про запись и клип, и он же откажет любому будущему входу, не знающему про редактор. */
   if(recording){ showCamMsg(t('roll.refusedRec')); return; }
   if(activeKind()){ showCamMsg(t('roll.refusedClip')); return; }
   const ls=trackLayers(); if(!ls.length){ showCamMsg(t('roll.refusedEmpty')); return; }
-  const arm=armedLayer();
-  if(!editOpen(arm!=null?arm:ls[0])){ showCamMsg(t('roll.refusedRec')); return; }   // ВООРУЖЁННАЯ дорожка, иначе первая
+  const arm=armedLayer(), ly= layer!=null ? layer : (arm!=null?arm:ls[0]);
+  if(!editOpen(ly)){ showCamMsg(t('roll.refusedRec')); return; }   // ВООРУЖЁННАЯ дорожка, иначе первая
   setRollOpen(true); setRollSel(null);
   setRollDrag(null); setRollIns(false);            // S5.1: сессия начинается без призрака и с ВЫКЛЮЧЕННОЙ вставкой — режим, переживший закрытие, однажды родил бы удар «сам собой»
   rollEnterTrack();                                // ⛳ T4: роль — РОЛЬ ДОРОЖКИ (одна). Роль, пережившая закрытие, показала бы чужую ось — поэтому читаем заново на каждом открытии
-  setRollWinClamped(0, loop.metre*8);              // стартовое окно — восемь тактов от начала песни
-  barEl.classList.remove('on'); rollBar.classList.add('on'); loopTpEl.classList.add('roll');
+  /* ⛳ AR1: ОКНО ВРЕМЕНИ ОБЩЕЕ С ОКНОМ АРАНЖИРОВКИ — открытие редактора его НЕ сбрасывает (прежде — всегда «восемь тактов от начала»):
+     дорожка открывается ровно на том отрезке, что был на экране. Первый вход в студию за сеанс задаёт стартовое окно (arrWinStart). */
+  arrWinStart();
+  barEl.classList.remove('on'); arrBar.classList.remove('on'); loopTpEl.classList.remove('arr'); rollBar.classList.add('on'); loopTpEl.classList.add('roll');
   setRollAut(null); setRollAutSel(null); setRollAutDrag(null);   // O-4: редактор открывается с ЗАКРЫТОЙ полосой — адрес прошлой сессии к этой дорожке отношения не имеет
   applyRollBar(); updRecBtn();
 }
@@ -534,11 +537,109 @@ function closeRoll(){
   editClose(); setRollOpen(false); setRollSel(null); setRollDrag(null); setRollIns(false);   // S5.1: история правок умирает вместе с сессией (editClose), режим вставки и призрак — тоже
   setRollAut(null); setRollAutSel(null); setRollAutDrag(null);   // ⛳ и ПОЛОСА снимается здесь же: выбранная точка держит ссылку в ленту захвата, а дорожку могут удалить, пока редактор закрыт
   rollBar.classList.remove('on'); loopTpEl.classList.remove('roll');
-  barEl.classList.add('on'); revealBar();          // игровое поле возвращается ровно таким, каким было: роль/лад/сплит/тембр никто не трогал
+  /* AR1: редактор, открытый из окна аранжировки, возвращает В ОКНО (то же окно времени и та же прокрутка строк — их никто не трогал). */
+  if(arrOpen){ arrBar.classList.add('on'); loopTpEl.classList.add('arr'); }
+  else{ barEl.classList.add('on'); revealBar(); }   // игровое поле возвращается ровно таким, каким было: роль/лад/сплит/тембр никто не трогал
   updRecBtn();
 }
-rollBtn.onclick=openRoll;
-rollCloseBtn.onclick=closeRoll;
+/* ═══ AR1: ОКНО АРАНЖИРОВКИ ═══
+   ✎ открывает ОКНО (а не редактор): все дорожки песни на общей временной оси; тап по телу строки — эта дорожка в редакторе; ✕ окна —
+   назад к игре. Рисунок — полоса дорожек во весь экран (draw.drawLooper(true)), попадание — тот же loopHit по тому же снимку (правило #9).
+   Отказы — те же, что у редактора, и по той же причине: запись идёт с камеры, а окно её не читает (клип снимал бы служебный экран).
+   Транспорт, если играл, ИГРАЕТ дальше: окно — не правка (пауза — у editGuard, когда правят). */
+const arrBar=$('arrBar'), arrCloseBtn=$('arrClose'), arrZoomInBtn=$('arrZoomIn'), arrZoomOutBtn=$('arrZoomOut'), arrFitBtn=$('arrFit');
+let arrWinInit=false;
+/* Стартовое окно времени — ОДИН раз за сеанс, при первом входе в студию: вся песня (с тактом запаса). Дальше окно живёт само — зум и
+   прокрутка одни на окно и редактор. */
+function arrWinStart(){ if(arrWinInit) return; arrWinInit=true; setRollWinClamped(0, rollTotal()+loop.metre); }
+function openArr(){
+  if(recording){ showCamMsg(t('roll.refusedRec')); return; }
+  if(activeKind()){ showCamMsg(t('roll.refusedClip')); return; }
+  if(!trackLayers().length){ showCamMsg(t('roll.refusedEmpty')); return; }
+  arrWinStart();
+  setArrOpen(true);
+  barEl.classList.remove('on'); arrBar.classList.add('on'); loopTpEl.classList.add('arr');
+  updRecBtn();
+}
+function closeArr(){
+  if(!arrOpen) return;
+  if(rollOpen) closeRoll();
+  setArrOpen(false); arrG=null; arrZoom=null; arrPts.clear();
+  arrBar.classList.remove('on'); loopTpEl.classList.remove('arr');
+  barEl.classList.add('on'); revealBar();
+  updRecBtn();
+}
+rollBtn.onclick=openArr;          // AR1: ✎ — окно аранжировки; дорожку в редакторе открывает тап по её строке
+rollCloseBtn.onclick=closeRoll;   // из редактора — назад в окно (если пришли из него)
+arrCloseBtn.onclick=closeArr;
+const arrZoomBy=k=>{ const g=arrGeom(); if(!g) return; const c=g.beat0+g.span/2, s=g.span*k; setRollWinClamped(c-s/2,s); };
+arrZoomInBtn.onclick =()=>arrZoomBy(1/1.6);
+arrZoomOutBtn.onclick=()=>arrZoomBy(1.6);
+arrFitBtn.onclick=()=>setRollWinClamped(0, rollTotal()+loop.metre);
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkArrange): те же входы, что у кнопок и тапа, — открыть/закрыть окно, открыть дорожку из окна и вернуться, окно
+   времени через ТОТ ЖЕ зажим. Звать из консоли — это нажать кнопки рукой. */
+export const arrApi={ open:openArr, close:closeArr, openTrack:ly=>openRoll(ly), closeTrack:()=>closeRoll(), setWin:(b0,span)=>setRollWinClamped(b0,span) };
+/* ЖЕСТЫ ОКНА. Один палец: тап (без сдвига больше LANE_SCROLL_PX) — действие строки на ОТПУСКАНИИ (открыть, M, S, ❄, вооружить); сдвиг —
+   по ПЕРВОМУ направлению: вдоль — прокрутка времени (доля под пальцем держится), поперёк — прокрутка строк. Два пальца — зум с якорем в
+   середине (как в редакторе). Полоса скобы — сразу, как на полосе игры (тап ставит край, тащить — общий pointermove скобы выше). */
+const arrPts=new Map(); let arrG=null, arrZoom=null;
+const arrXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
+function arrDown(e){
+  const p=arrXY(e); arrPts.set(e.pointerId,p);
+  const g=arrGeom(); if(!g){ arrG=null; return; }
+  if(arrPts.size===1){
+    const h=loopHit(p.x,p.y);
+    if(h && h.what==='brace'){ arrG=null; braceEdge=braceTap(h.beat); return; }
+    const S=loopScroll();
+    arrG={ h, x:p.x, y:p.y, b0:g.beat0, span:g.span, bw:g.bw, r0:S?S.row0:0, rowH:g.rowH, axis:null };
+  }else if(arrPts.size===2){
+    arrG=null; braceEdge=null;
+    const [a,b]=[...arrPts.values()], mid=(a.x+b.x)/2;
+    arrZoom={ dist:Math.max(1,Math.abs(a.x-b.x)), span:g.span, midBeat:g.beat0+g.span*((mid-g.x0)/g.bw) };
+  }
+}
+function arrMove(e){
+  if(!arrPts.has(e.pointerId)) return;
+  const p=arrXY(e); arrPts.set(e.pointerId,p);
+  const g=arrGeom(); if(!g) return;
+  if(arrPts.size>=2 && arrZoom){
+    const [a,b]=[...arrPts.values()], d=Math.max(1,Math.abs(a.x-b.x)), mid=(a.x+b.x)/2, span=arrZoom.span*arrZoom.dist/d;
+    setRollWinClamped(arrZoom.midBeat-span*((mid-g.x0)/g.bw), span); return; }
+  if(!arrG) return;
+  const dx=p.x-arrG.x, dy=p.y-arrG.y;
+  if(!arrG.axis){ if(Math.abs(dx)<=LANE_SCROLL_PX && Math.abs(dy)<=LANE_SCROLL_PX) return; arrG.axis= Math.abs(dx)>=Math.abs(dy) ? 'x' : 'y'; }
+  if(arrG.axis==='x') setRollWinClamped(arrG.b0 - dx*arrG.span/arrG.bw, arrG.span);
+  else setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
+}
+function arrAct(h){
+  if(h.what==='open'){ openRoll(h.layer); return; }
+  if(h.what==='frz'){ onFreeze(h.layer); return; }
+  if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; }
+  if(h.what==='mute') toggleLaneMute(h.layer); else if(h.what==='solo') toggleLaneSolo(h.layer);
+}
+function arrUp(e){
+  if(!arrPts.has(e.pointerId)) return;
+  arrPts.delete(e.pointerId);
+  if(arrPts.size<2) arrZoom=null;
+  if(arrPts.size) return;
+  const G=arrG; arrG=null;
+  if(G && !G.axis && G.h) arrAct(G.h);
+}
+addEventListener('pointermove',  e=>{ if(arrOpen&&!rollOpen) arrMove(e); });
+addEventListener('pointerup',    e=>{ if(arrOpen&&!rollOpen) arrUp(e); });
+addEventListener('pointercancel',e=>{ if(arrOpen&&!rollOpen){ arrPts.delete(e.pointerId); arrG=null; arrZoom=null; } });
+/* Колесо окна: Ctrl/⌘ — зум под курсором; при прокручиваемых строках вертикальное колесо — строки; иначе (и Shift / горизонтальное) — время. */
+addEventListener('wheel', e=>{
+  if(!arrOpen || rollOpen || e.target!==canvasEl) return;
+  const g=arrGeom(); if(!g) return;
+  e.preventDefault();
+  const px=e.clientX-canvasEl.getBoundingClientRect().left;
+  if(e.ctrlKey||e.metaKey){ const f=(px-g.x0)/g.bw, span=g.span*Math.exp(e.deltaY*0.002); setRollWinClamped(g.beat0+g.span*f-span*f, span); return; }
+  const S=loopScroll();
+  if(S && !e.shiftKey && Math.abs(e.deltaY)>=Math.abs(e.deltaX)){ setLaneRow0(laneRow0Clamp(S.row0+Math.sign(e.deltaY))); return; }
+  const d= Math.abs(e.deltaX)>Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  setRollWinClamped(g.beat0 + d*g.span/g.bw, g.span);
+}, {passive:false});
 /* Чип дорожки: следующая по кругу. Адресуем НОМЕРОМ СЛОЯ, но держит редактор её id (правило #27) —
    поэтому дорожка, исчезнувшая под редактором, даёт editLayer()===null, и ролл честно скажет об этом. */
 rollTrackBtn.onclick=()=>{
@@ -782,11 +883,11 @@ addEventListener('keydown', e=>{
        перестань мы ждать промис, процессор всё равно доработает до конца. Кнопки «отмена» поэтому НЕТ —
        она была бы враньём; повторное нажатие ❄ во время ожидания просто отклоняется с этой надписью. */
 let frzBusy=false, frzNoticeShown=false;
-async function onFreeze(){
+async function onFreeze(lyArg){   // AR1: lyArg — дорожка с ❄ строки окна аранжировки; без него — открытая в редакторе
   /* ⛔ БЕЗ rollRefuseRO: заморозка — НЕ ПРАВКА. Подложка read-only для редактирования, но её буфер
      ничем не хуже любого другого, а снимется он вместе с ней (clearJam → lanePrune → freezeDrop). */
   if(frzBusy){ showCamMsg(t('frz.noCancel')); return; }
-  const ly=editLayer(); if(ly==null) return;
+  const ly= lyArg!=null ? lyArg : editLayer(); if(ly==null) return;
   if(freezeState(ly)==='fresh'){ unfreezeLayer(ly); showCamMsg(t('frz.dropped')); updRollBtns(); return; }
   /* T4: дорожка, опустошённая правками, — морозить нечего. Рендер отказал бы сам, но исключением с
      внутренним текстом; говорим это словами интерфейса. */
@@ -803,7 +904,7 @@ async function onFreeze(){
   }catch(e){ showCamMsg(t('frz.failed',{msg:(e&&e.message)?e.message:String(e)})); }
   finally{ frzBusy=false; updRollBtns(); }
 }
-rollFrzBtn.onclick=onFreeze;   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
+rollFrzBtn.onclick=()=>onFreeze();   // AR1: стрелкой — иначе событие клика пришло бы как номер дорожки   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
 /* ⏮ — бегунок в начало. ТОТ ЖЕ seekTo, что и тап по линейке: перемотка одна на все входы (она сама решает,
    идёт ли транспорт, гасит голоса дорожек и сбрасывает курсоры). Второго пути перемотки не заводим. */
 rollHomeBtn.onclick=()=>seekTo(0);

@@ -166,6 +166,17 @@
   #loopTransport.roll>button:not(#loopBtn):not(#rollHome){display:none;}
   /* ⏮ — часть ТРАНСПОРТА РЕДАКТОРА (S5.3): в обычной полосе её нет вовсе, появляется только с .roll,
      рядом с ▶. Так «в начало» и «играть» стоят вместе, а закрытый редактор видит прежнюю полосу. */
+  /* ---- ОКНО АРАНЖИРОВКИ (AR1): бар — той же формы, что у редактора (z 12, сверху, прокрутка на узком экране); транспорт под ним
+     оставляет ▶, ⏮ и ⟳ (скоба правится прямо в окне) — ⤺ ✕ ■ и ✎ живут на экране игры. ---- */
+  #arrBar{position:fixed; top:0; left:0; right:0; z-index:12; display:none;
+    gap:6px; padding:6px 8px; align-items:center; overflow-x:auto; scrollbar-width:none;
+    background:rgba(10,10,20,.92); border-bottom:1px solid rgba(255,255,255,.14);}
+  #arrBar::-webkit-scrollbar{display:none;}
+  #arrBar.on{display:flex;}
+  #arrBar button{padding:9px 11px; font-size:var(--fs-label); min-width:40px;}
+  #arrTitle{flex:1 1 auto; font-size:var(--fs-label); font-weight:600; white-space:nowrap; padding:0 4px;}
+  #loopTransport.arr>button:not(#loopBtn):not(#rollHome):not(#rgnBtn){display:none;}
+  #loopTransport.arr>#rollHome{display:block;}
   #loopTransport>#rollHome{display:none;}
   #loopTransport.roll>#rollHome{display:block;}
 
