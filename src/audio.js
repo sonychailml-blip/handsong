@@ -355,8 +355,8 @@ const REV_A={
    «разбросанные фазы свежего голоса» (B). Две догадки по чтению кода не подтвердились; ухо с этим инструментом нашло
    обе настоящие причины «фазера» и «подъезда» замороженной дорожки, и A и B стали ПОВЕДЕНИЕМ (см. voiceStart и leadOn/
    bassOn). Инструмент — render.aud / render.live / render.stop (довод и строки консоли — в render.js и CLAUDE.md). */
-const DBG={ noHum:false, fdnLive:false };   // fdnLive — копия строит ЖИВУЮ проводку петель реверба (A/B пробы P.checkRepeat, см. apStage)
-function setDbg(o){ DBG.noHum=!!(o&&o.noHum); DBG.fdnLive=!!(o&&o.fdnLive); }
+const DBG={ noHum:false };   // LR1-уборка: fdnLive снят вместе с прежней проводкой петель реверба (одна проводка — с одним входом)
+function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
 /* ═══ ⛳ СБРОС КОПИИ РЕНДЕРА — КАЖДЫЙ РЕНДЕР НАЧИНАЕТСЯ С ЧИСТОЙ КОПИИ (починка после MX2) ═══
    Копия движка ('./audio.js?render') ОДНА на сессию, и всё модульное, что рендер ставит ей, иначе живёт до следующего рендера: функции
    «ключ → уровень / панорама» (MX1/MX2), раскладчик offline, семя rnd, отладка DBG, ключ владельца удара, величины соло-ноты в pendFx,
@@ -369,10 +369,10 @@ function setDbg(o){ DBG.noHum=!!(o&&o.noHum); DBG.fdnLive=!!(o&&o.fdnLive); }
 function renderReset(){
   trackGainOf=()=>1; trackPanOf=()=>0; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null;
-  DBG.noHum=false; DBG.fdnLive=false; offline=false; rnd=Math.random;
+  DBG.noHum=false; offline=false; rnd=Math.random;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
-const renderStateOf=()=>({ offline, noHum:DBG.noHum, fdnLive:DBG.fdnLive, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
+const renderStateOf=()=>({ offline, noHum:DBG.noHum, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
   hitOwner:hitOwnerKey, pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(',') });
 /* ═══ ⛳ ФАЗЫ СВЕЖЕГО ГОЛОСА — РАЗБРОСАНЫ СТАРТОМ, КАК У ДАВНО ИДУЩЕГО (B, подтверждено на слух) ═══
    ⚠️ ДЕФЕКТ: осцилляторы голоса стартовали ОДНОВРЕМЕННО, то есть В ОДНОЙ ФАЗЕ. У SuperSaw пять пил, расстроенных почти
@@ -730,29 +730,23 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
    рендере, точном до 1.5e-5. Живьём это та же лотерея, но одна на сессию (граф строится один раз), поэтому на слух не ловилась.
    ⛳ У КАЖДОЙ ПЕТЛИ ОДИН ВХОД ИЗВНЕ, и сеть выходит одной и той же при любом порядке обхода — каждая петля длиннее на квант (как и
    прежде: разрыв есть всегда, разнилось лишь место). С MX2 (дополнение 3) — в копии рендера; ⛳ С LR1 — И В ЖИВОМ ГРАФЕ (решение
-   пользователя «живьём тоже», принимается после проверки на слух): живая комната = комната заморозки, и больше не меняется от загрузки
-   к загрузке страницы. ОДИН строитель на оба (apStage/buildFDN), различие — только аргумент `one`.
-   ⚠️ ПРЕЖНЯЯ ЖИВАЯ ПРОВОДКА ОСТАЁТСЯ ТОЛЬКО ЗА ПЕРЕКЛЮЧАТЕЛЕМ ДЛЯ УХА (setLiveRevWiring / консоль R.liveReverb('old'|'new'), умолчание
-   'new') — до приёмки на слух; в слайсе ПОСЛЕ приёмки её снять вместе с DBG.fdnLive (тогда one — всегда истина, аргумент уходит).
+   пользователя «живьём тоже», ПРИНЯТО НА СЛУХ: прежняя «чуть просторнее», новая «чуть чище» — берём новую): живая комната = комната
+   заморозки и больше не меняется от загрузки к загрузке страницы. ⛳ AF1 (уборка LR1): прежняя проводка, её переключатель для уха
+   (R.liveReverb('old'), setLiveRevWiring, перестройка на месте) и DBG.fdnLive СНЯТЫ — проводка одна. ⛔ Не возвращать её ради
+   «простора»: простор — честным параметром реверба (ширина, размер, диффузия), звучащим одинаково живьём и в заморозке (BACKLOG).
    Диффузор: в выход идут sum (−g) и ОТДЕЛЬНАЯ линия tap — тот же sum, задержанный на D + квант, ВНЕ петли; d петли выход больше не
    кормит. Вход в петлю {sum, d, fb} — только через sum; d тянет sum «в работе» и пишет прошлый квант, итого d[n] = sum[n−D−128] = tap[n]:
-   честный аллпас с задержкой D+128 — ровно один из двух вариантов, которые давал живой граф.
-   DBG.fdnLive (только для пробы P.checkRepeat) — копия строит ЖИВУЮ проводку: A/B, доказывающий, что расходилась именно она. */
+   честный аллпас с задержкой D+128 — ровно один из двух вариантов, которые давал прежний живой граф. */
 const RENDER_QUANTUM=128;
-/* ⛳ LR1: ПРОВОДКА ЖИВЫХ СЕТЕЙ — true = один вход (новая, умолчание), false = прежняя (только для проверки на слух). Копия рендера: всегда
-   один вход, кроме DBG.fdnLive (A/B пробы P.checkRepeat({evidence:true}) — прежняя проводка в копии). */
-let liveRevOne=true;
-const fdnOneEntry=()=> DBG.fdnLive ? false : (offline ? true : liveRevOne);
-function apStage(src,time,g,one){   // one — проводка с одним входом (LR1: решает вызывающий — buildFDN — одним числом на всю сеть)
+function apStage(src,time,g){
   const sum=AC.createGain(), d=AC.createDelay(0.25), fb=AC.createGain(), ff=AC.createGain(), out=AC.createGain();
   d.delayTime.value=time; fb.gain.value=g; ff.gain.value=-g; out.gain.value=1;
   src.connect(sum); sum.connect(d); d.connect(fb); fb.connect(sum);   // петля: +g (в цикле есть d — правило Web Audio соблюдено)
   sum.connect(ff); ff.connect(out);                                   // прямой ход: −g
-  if(one){ const tap=AC.createDelay(0.25); tap.delayTime.value=time+RENDER_QUANTUM/AC.sampleRate; sum.connect(tap); tap.connect(out); }   // копия рендера: отвод ВНЕ петли (см. шапку)
-  else d.connect(out);
+  const tap=AC.createDelay(0.25); tap.delayTime.value=time+RENDER_QUANTUM/AC.sampleRate; sum.connect(tap); tap.connect(out);   // отвод ВНЕ петли (см. шапку)
   return out;
 }
-function buildFDN(inNode,outNode,one=fdnOneEntry()){   // LR1: one — проводка (умолчание — по копии/живому флагу; перестройка живой сети передаёт явно)
+function buildFDN(inNode,outNode){
   const N=REV_A.lines.length, sc=1/Math.sqrt(N);       // энергосохраняющее распределение входа и сбор отводов
   const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=REV_A.hpf; hp.Q.value=REV_A.toneQ;   // Q — та же беда «Q в дБ» (дефолт дал бы +2 дБ горб на 80 Гц); ЗДЕСЬ безобидно (узел на прямом ходу, вне петель), правим ради единообразия — дефект один и тот же
   const pre=AC.createDelay(0.25); pre.delayTime.value=REV_A.preDelay;
@@ -761,7 +755,7 @@ function buildFDN(inNode,outNode,one=fdnOneEntry()){   // LR1: one — пров�
   hp.channelCount=1; hp.channelCountMode='explicit';
   inNode.connect(hp); hp.connect(pre);
   let src=pre;
-  for(const t of REV_A.diff) src=apStage(src,t,REV_A.diffG,one);
+  for(const t of REV_A.diff) src=apStage(src,t,REV_A.diffG);
   const dist=AC.createGain(); dist.gain.value=sc; src.connect(dist);   // один узел на все линии (вместо N)
   /* Вторая половина матрицы Хаусхолдера: S — сумма выходов всех линий, H — её масштаб −2/N.
      Первая половина (+x_i) — прямая связь fb→inSum каждой линии ниже. */
@@ -771,13 +765,12 @@ function buildFDN(inNode,outNode,one=fdnOneEntry()){   // LR1: one — пров�
   chL.gain.value=1; chR.gain.value=1; trim.gain.value=REV_A.outTrim;
   chL.connect(merge,0,0); chR.connect(merge,0,1); merge.connect(trim); trim.connect(outNode);
   const sgnL=[1,1,-1,-1], sgnR=[1,-1,-1,1];            // разные знаки/линии на каналы → декорреляция (ширина)
-  /* ⛳ КОПИЯ РЕНДЕРА — ОДИН ВХОД В СЕТЬ (см. шапку apStage). Выходы всех fb сводятся в один узел (merger → splitter), и ВСЁ, что читает
+  /* ⛳ ОДИН ВХОД В СЕТЬ (см. шапку apStage) — живой граф и копия рендера. Выходы всех fb сводятся в один узел (merger → splitter), и ВСЁ, что читает
      линии, — свой член Хаусхолдера (+x_i), сумма Σ, отводы L/R — читает их ОТТУДА. Вход в сеть извне — только этот узел; тяга, пришедшая
      в него второй раз за квант, получает прошлый квант, и так КАЖДЫЙ путь обратной связи длиннее ровно на квант, при любом порядке
-     обхода. Отводы получают текущий выход fb — как и прежде. С LR1 так же и живой граф; прежняя проводка — только one=false (переключатель
-     для уха и DBG.fdnLive). */
-  const mg=one?AC.createChannelMerger(N):null, hub=one?AC.createChannelSplitter(N):null;
-  if(one) mg.connect(hub);
+     обхода. Отводы получают текущий выход fb — как и прежде. */
+  const mg=AC.createChannelMerger(N), hub=AC.createChannelSplitter(N);
+  mg.connect(hub);
   return REV_A.lines.map((time,i)=>{                     // ← ВОЗВРАЩАЕМ линии (владелец — экземпляр эффекта)
     const inSum=AC.createGain(); inSum.gain.value=1;
     const d=AC.createDelay(0.25); d.delayTime.value=time;
@@ -788,11 +781,9 @@ function buildFDN(inNode,outNode,one=fdnOneEntry()){   // LR1: one — пров�
     const tL=AC.createGain(), tR=AC.createGain();
     tL.gain.value=sc*sgnL[i]; tR.gain.value=sc*sgnR[i];
     tL.connect(chL); tR.connect(chR);
-    if(one){ fb.connect(mg,0,i);                    // копия рендера: всё чтение линии — через узел-развилку (один вход в сеть)
-      hub.connect(inSum,i); hub.connect(S,i); H.connect(inSum);
-      hub.connect(tL,i); hub.connect(tR,i); }
-    else { fb.connect(inSum); fb.connect(S); H.connect(inSum);  // Хаусхолдер: +x_i, вклад в Σ, общий член −(2/N)Σ
-      fb.connect(tL); fb.connect(tR); }
+    fb.connect(mg,0,i);                    // всё чтение линии — через узел-развилку (один вход в сеть)
+    hub.connect(inSum,i); hub.connect(S,i); H.connect(inSum);   // Хаусхолдер: +x_i, вклад в Σ, общий член −(2/N)Σ
+    hub.connect(tL,i); hub.connect(tR,i);
     return {d,lp,fb,time};
   });
 }
@@ -820,22 +811,6 @@ function setRevDecay(lines,sec,when){ if(!AC||!lines.length)return;
 function setRevTone(lines,hz,when){ if(!AC||!lines.length)return;
   const t=when!=null?when:AC.currentTime, f=Math.max(200,Math.min(18000,hz));
   for(const L of lines) L.lp.frequency.setTargetAtTime(f,t,0.05); }
-/* LR1: длина и окраска СРАЗУ (.value) — только для свежепостроенной сети при перестройке (rewire): у неё нет расписания, и подъезд с нуля
-   (τ 0.05 у setRevDecay) дал бы первые 50 мс укороченный хвост. Те же формула и клампы, что у сеттеров выше. */
-function revSetNow(lines,sec,hz){ const rt=Math.max(0.05,sec), f=Math.max(200,Math.min(18000,hz));
-  for(const L of lines){ L.fb.gain.value=Math.min(REV_A.gMax, Math.pow(10,-3*L.time/rt)); L.lp.frequency.value=f; } }
-const REV_XF_TC=0.02;   // LR1: τ перехода входа со старой сети на новую (≈ 0.1 с до −40 дБ) — без щелчка
-const REV_DRAIN_S=6;    // LR1: через сколько секунд отключить прежнюю сеть: потолок длины хвоста 4 с (REV_PARAMS.decay.max) + запас
-/* ⛳ LR1: ПРОВОДКА ЖИВЫХ РЕВЕРБОВ — переключатель для проверки на слух ('new' — один вход, умолчание; 'old' — прежняя). Перестраивает НА
-   МЕСТЕ все уже построенные живые экземпляры реверба всех владельцев (rewire), построенные позже берут флаг сами (fdnOneEntry). Только
-   живой движок: у копии рендера offline, её проводку решает рендер. Зовёт render.liveReverb (консоль R.liveReverb). */
-function setLiveRevWiring(m){
-  if(m!=='old'&&m!=='new') return null;
-  liveRevOne= m==='new';
-  let n=0; if(AC&&!offline) for(const key of Object.keys(FX_INST)){ const r=FX_INST[key]&&FX_INST[key].reverb; if(r&&r.rewire&&r.rewire(liveRevOne)) n++; }
-  return { mode:m, rebuilt:n };
-}
-const liveRevWiring=()=> liveRevOne ? 'new' : 'old';
 /* ================= МОДУЛЬ ЭФФЕКТА — ПЛАСТ 1: абстракция + ТОЛЬКО реверб =================
    Модуль эффекта — то немногое, что ОБЩЕЕ у эффектов и НЕ зависит от их внутренностей:
      { id, labelKey, in, out, params:[ {key,labelKey,unit,def,min,max,curve,set} ] }
@@ -954,11 +929,8 @@ function makeReverbFx(){
   const send=AC.createGain();    send.gain.value=0;       // ВЛАЖНАЯ ДОЛЯ. Стартовый 0 — дефолт вносит mix.setNorm ниже
   const gate=AC.createGain();    gate.gain.value=1;       // ВКЛЮЧЕНИЕ эффекта в цепи (пишет только fxSetActive)
   fxIn.connect(send); send.connect(gate); gate.connect(inNode);   // O-1: влажная ветвь берётся ОТ ВХОДА МОДУЛЯ, а не от шины роли снаружи
-  /* LR1: СЕТЬ — ОБЪЕКТ (вход, выход, линии, проводка), а не три константы: переключатель для уха перестраивает её на месте (rewire ниже),
-     и сеттеры обязаны писать в ТЕКУЩУЮ. Узлы и порядок соединений — прежние, дословно (рендер не меняется ни на сэмпл). */
-  let net={ inNode, outNode, lines:null, one:fdnOneEntry() };
-  net.lines=buildFDN(inNode,outNode,net.one);             // СНАЧАЛА сеть — она рождает линии...
-  const setDecay=(v,w)=>setRevDecay(net.lines,v,w), setTone=(v,w)=>setRevTone(net.lines,v,w);
+  const lines=buildFDN(inNode,outNode);                  // СНАЧАЛА сеть — она рождает линии...
+  const setDecay=(v,w)=>setRevDecay(lines,v,w), setTone=(v,w)=>setRevTone(lines,v,w);
   setDecay(REV_A.decay); setTone(REV_A.tone);             // ...и ТОЛЬКО ПОТОМ параметры. ⚠️ ПОРЯДОК НЕСУЩИЙ:
   /* сеттеры молча выходят на пустых линиях (guard !lines.length), поэтому вызов ДО buildFDN не упал бы, а
      оставил бы обратные связи в нуле — реверба не стало бы ВООБЩЕ, без единой ошибки в консоли. */
@@ -976,25 +948,7 @@ function makeReverbFx(){
      Дефолт НЕнулевой намеренно: комната, которой всегда звучало приложение, обязана быть слышна из
      коробки (играющая рука её больше не ведёт — Пласт 3.1). */
   const mp=params.find(p=>p.key==='mix'); if(mp) mp.setNorm(mp.cur);
-  /* ⛳ LR1: ПЕРЕСТРОЙКА СЕТИ НА МЕСТЕ — для проверки на слух (setLiveRevWiring). Без перезагрузки и без щелчка: новая сеть строится рядом,
-     получает ТЕКУЩИЕ величины (длину и окраску — сразу, .value: у свежих узлов расписания нет), её вход ВПЛЫВАЕТ, а вход прежней УПЛЫВАЕТ
-     (τ REV_XF_TC) — сухая ветвь и подмес не тронуты. Выходы обеих складываются: хвост прежней ДОЗВУЧИВАЕТ сам (ничего не обрывается), и
-     через REV_DRAIN_S её отключают уже в тишине. Узлов-осцилляторов у сети нет — правило #3 не задето; снятая сеть уходит сборщику мусора. */
-  const rewire=one=>{
-    one=!!one; if(one===net.one) return false;
-    const t=AC.currentTime, old=net;
-    const inN=AC.createGain(); inN.gain.value=0;
-    const outN=AC.createGain(); outN.gain.value=0.9;
-    outN.connect(fxOut); gate.connect(inN);
-    const lines=buildFDN(inN,outN,one);
-    const pd=params.find(p=>p.key==='decay'), pt=params.find(p=>p.key==='tone');
-    revSetNow(lines, fxDenorm(pd,pd.cur), fxDenorm(pt,pt.cur));
-    inN.gain.setTargetAtTime(1,t,REV_XF_TC); old.inNode.gain.cancelScheduledValues(t); old.inNode.gain.setTargetAtTime(0,t,REV_XF_TC);
-    net={ inNode:inN, outNode:outN, lines, one };
-    setTimeout(()=>{ try{ gate.disconnect(old.inNode); }catch(e){} try{ old.outNode.disconnect(fxOut); }catch(e){} }, REV_DRAIN_S*1000);
-    return true;
-  };
-  return { id:'reverb', labelKey:'fx.reverb', kind:'bus', in:fxIn, out:fxOut, send, gate, params, rewire, wiring:()=> net.one ? 'new' : 'old' };   // LR1: rewire/wiring — переключатель проводки для уха   // O-1: in/out — КОНЦЫ МОДУЛЯ В ЦЕПИ (прежде это были вход и выход самой сети)
+  return { id:'reverb', labelKey:'fx.reverb', kind:'bus', in:fxIn, out:fxOut, send, gate, params };   // O-1: in/out — КОНЦЫ МОДУЛЯ В ЦЕПИ (прежде это были вход и выход самой сети)
 }
 /* ═══ ДЕЛЕЙ — ШИННЫЙ ЭФФЕКТ ЦЕПИ (слайс в.1) ═══
    ⛳ ПРИНЦИП, КОТОРЫЙ ЭТОТ СЛАЙС УСТАНАВЛИВАЕТ: ЦЕПЬ ЭФФЕКТОВ — ЭТО ОБРАБОТКА ШИНЫ. Экземпляр принимает
@@ -2931,8 +2885,8 @@ export {
   setDbg, dbgExprBypass,   // ОТЛАДКА НА СЛУХ (render.aud): переключатели и обход выразительности — ⛔ только у копии рендера, живьём вызывающих нет
   fxBriOf,   // ЯРКОСТЬ соло/баса/удара из карты события (0..1) или undefined «не задана». Читает ENG (обе копии движка)
   fxGlideOf, FX_GLIDE_KEY,   // V4: скольжение ноты из её карты эффектов (секунды) или undefined — «не задано». Читает ENG (обе копии движка — живая и рендерная — через makeENG)
-  /* LR1: проводка живых ревербов (переключатель для уха) и съём живого мастера (только для пробы P.checkRevAgree) */
-  setLiveRevWiring, liveRevWiring, probeCapture,
+  /* LR1: съём живого мастера (только для пробы P.checkRevAgree); переключатель проводки ревербов снят в AF1 (уборка LR1) */
+  probeCapture,
   fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки
   setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно

@@ -19,8 +19,8 @@
        копии: в том числе ownerGain, ownerPan, dronePan, hitOwner).
      state (ST.* и именованный импорт): chainOwners, fxIsScalar, CHAIN_SOLO, chainKeyOf, fxChainOf.
      config: SCHED_TICK_MS.
-     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps, droneBP; проба —
-       reuseCheck, copyState, renderQueue.
+     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps, droneBP, autoFreeze,
+       freezeQueue (AF1; очередь — frzqueue.js, её исполнитель — freeze); проба — reuseCheck, copyState, renderQueue, revAgree, layoutCost.
    ===================================================================== */
 /* =====================================================================
    КОНТЕКСТ РЕНДЕРА — слайсы F0 (контекст) и F1 (посеянная случайность)
@@ -220,6 +220,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
 import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
+import { autoFreeze, freezeQueue, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -1016,7 +1017,10 @@ async function renderTrackNow(layer, opt){
     for(const p of later){ if(p.fx===REC.FX_CHAIN) continue;
       const a=p.key+'|'+p.fx+'|'+p.p, q=tailVals.get(a); if(!q||p.v>q.v) tailVals.set(a,p); }
     const tailSec= SHORT ? Math.min(tailOf(eng, keys, tailVals, insRel), SHORT_TAIL) : tailOf(eng, keys, tailVals, insRel);
-    const frames=Math.max(1,Math.round(rate*(PRE_SEC+songSec+tailSec)));
+    /* ⛳ AF1: o.layoutOnly — ТОЛЬКО ЗАМЕР (P.freezeCost): раскладка без рендера. Контекст — на секунду (времена событий за его краем
+       законны: раскладка та же, их просто некому отрендерить), отчёт — длина буфера, который дал бы настоящий рендер, и мс раскладки. */
+    const fullSec=PRE_SEC+songSec+tailSec;
+    const frames=Math.max(1,Math.round(rate*(o.layoutOnly ? 1 : fullSec)));
     const ctx=new OfflineCtor(2, frames, rate);
 
     eng.renderReset();                          // ⛳ ЧИСТАЯ КОПИЯ — всё ниже ставится явно этим рендером (см. audio.renderReset)
@@ -1038,6 +1042,11 @@ async function renderTrackNow(layer, opt){
     const tIni0=now();
     await eng.initAudio(()=>ctx);               // ⚠️ ПОСЛЕ пина: дрон берёт высоту здесь
     const tIni1=now();
+    /* ⛳ AF1: ВОРОТА ПЕРЕД РАСКЛАДКОЙ (o.layoutGate — очередь автозаморозки). Здесь — последний await до синхронного участка: дальше поток
+       занят раскладкой целиком. Пока ворота закрыты (запись, клип, щипок при дорогой раскладке), ждём; офлайн-контекст до startRendering
+       не идёт, приколоченное (pinLive) равно живому. Время ожидания — gateMs, в раскладку оно не входит. */
+    let tLay0=tIni1;
+    if(o.layoutGate){ await o.layoutGate(); tLay0=now(); }
     /* ⛳ ПУЛЫ СРАЗУ ПОСЛЕ ИНИЦИАЛИЗАЦИИ — точка отсчёта для счёта голосов раскладки. ⚠️ Без неё отчёт
        врал: initAudio строит пул аккорда ЖАДНО, в полный живой размер (CHORD_POOL_N), и ударная дорожка
        печатала «аккорд 24» — голоса, которых раскладка не заводила. Раскладке принадлежит только РОСТ сверх
@@ -1125,6 +1134,11 @@ async function renderTrackNow(layer, opt){
        ⚠️ 19 взводов ctx.suspend (прогресс) происходят ПОСЛЕ этой метки и в раскладку не входят: они
        стоят микросекунды, а у автоматического рендера прогресса не будет вовсе (показывать нечего). */
     const tRnd0=now();
+    if(o.layoutOnly){   // AF1: замер — без рендера
+      out={ layer, layoutOnly:true, buf:null, songSec:+songSec.toFixed(3), tailSec:+tailSec.toFixed(3), totalSec:+fullSec.toFixed(3), rate,
+            events:evs.length, keys:[...keys], voices:pool, ms:{ importMs:Math.round(tImp1-tImp0), initMs:Math.round(tIni1-tIni0),
+            gateMs:+(tLay0-tIni1).toFixed(1), layoutMs:+(tRnd0-tLay0).toFixed(1), renderMs:0 } };
+      return out; }
     const buf=await renderWithProgress(ctx, o.onProgress);
     const tRnd1=now();
 
@@ -1136,8 +1150,8 @@ async function renderTrackNow(layer, opt){
           /* layoutMs — с десятой долей, а не целым: на ударной дорожке раскладка может уложиться в
              единицы миллисекунд, и округление до целого съело бы половину ответа. Остальные три
              оставлены целыми — их форма не менялась. */
-          ms:{ importMs:Math.round(tImp1-tImp0), initMs:Math.round(tIni1-tIni0),
-               layoutMs:+(tRnd0-tIni1).toFixed(1), renderMs:Math.round(tRnd1-tRnd0) },
+          ms:{ importMs:Math.round(tImp1-tImp0), initMs:Math.round(tIni1-tIni0), gateMs:+(tLay0-tIni1).toFixed(1),   // AF1: gateMs — ожидание ворот очереди (не раскладка)
+               layoutMs:+(tRnd0-tLay0).toFixed(1), renderMs:Math.round(tRnd1-tRnd0) },
           xRealtime: (tRnd1-tRnd0)>0 ? +((buf.duration*1000/(tRnd1-tRnd0)).toFixed(1)) : null };
   } finally {
     eng.renderReset();                  // ⛳ копия не уносит этот рендер (его панораму, уровень, семя, раскладчик) в следующий
@@ -1266,23 +1280,28 @@ function maxRel(eng, evs){
    гуманизацию, а перезаморозка той же дорожки даёт то же исполнение. Явное opt.seed по-прежнему главнее. */
 const seedOfLane=id=>(SEED_A ^ Math.imul((id|0)+1, 0x9E3779B1))>>>0;   // +1 — чтобы id 0 не дал ровно SEED_A (семя зонда)
 async function freeze(layer, opt){
-  REC.freezePinCaptures(layer);   // как ❄ в редакторе (ui.onFreeze): у ДОРОЖКИ без захвата вовсе — снимок сейчас (одному, самому раннему взятому; S1); рендер живую цепь не читает, поэтому цепь у дорожки нужна ВСЕГДА. Взятое без захвата внутри захваченной дорожки играет её цепью (fxLaneMerge) и не прикалывается. Повторный вызов ничего не делает
+  const o0=opt||{};
+  if(!o0.noPin) REC.freezePinCaptures(layer);   // o.noPin — ТОЛЬКО проба очереди (P.checkFreezeQueue): поддельный рендер не смеет оставить песне приколотый захват   // как ❄ в редакторе (ui.onFreeze): у ДОРОЖКИ без захвата вовсе — снимок сейчас (одному, самому раннему взятому; S1); рендер живую цепь не читает, поэтому цепь у дорожки нужна ВСЕГДА. Взятое без захвата внутри захваченной дорожки играет её цепью (fxLaneMerge) и не прикалывается. Повторный вызов ничего не делает
   const tk=REC.freezeTicket(layer);
   if(!tk) throw new Error('нет дорожки '+layer);
   const o={...(opt||{})}; if(o.seed==null) o.seed=seedOfLane(tk.id);
   if(o.solo==null) o.solo=LIVE.fxSnapshot(chainKeyOf('ld'));   // договор заморозки: соло без карты — снимок ЖИВОЙ цепи В МИГ БИЛЕТА (тот же, что сложила подпись); сдвинули ручку, пока ждали очередь или рендер, — freezeSet откажет по подписи
-  const r=await renderTrack(layer, o);
+  const r=await (o.renderFn||renderTrack)(layer, o);   // o.renderFn — ТОЛЬКО проба очереди: поддельный рендер (буфер-пустышка), билет и freezeSet — настоящие
   const res=REC.freezeSet(tk, r);
   r.installed = res===true;
   r.refused = res===true ? null : res;
   /* eslint-disable no-console */
-  console.log(res===true ? '  ❄ дорожка L'+(layer+1)+' ЗАМОРОЖЕНА: транспорт играет буфер вместо её событий'
+  if(!o.quiet) console.log(res===true ? '  ❄ дорожка L'+(layer+1)+' ЗАМОРОЖЕНА: транспорт играет буфер вместо её событий'
     : res==='lane' ? '  ⛔ буфер ОТВЕРГНУТ: за время рендера номер слоя '+layer+' перешёл к другой дорожке (или её нет)'
     : res==='sig'  ? '  ⛔ буфер ОТВЕРГНУТ: дорожка изменилась за время рендера (правка, дубль, тоника/A4/темп) — играет свои события'
     :                '  ⛔ не удалось зарегистрировать заморозку (нет движка?)');
   /* eslint-enable no-console */
   return r;
 }
+setFreezeRunner(freeze);   // AF1: очередь берёт дорожки и зовёт ЭТУ заморозку — тот же билет, тот же freezeSet, что у ❄
+/* ⛳ AF1: ЗАМЕР РАСКЛАДКИ — синхронный участок главного потока, без рендера (o.layoutOnly), через ту же очередь копии движка. Его читает
+   P.freezeCost (мс на дорожку и длина буфера, который дал бы настоящий рендер — память). */
+const layoutCost=layer=>renderTrack(layer,{ quiet:true, layoutOnly:true, solo:LIVE.fxSnapshot(chainKeyOf('ld')) });
 const unfreeze=layer=>{ const ok=REC.unfreezeLayer(layer);
   /* eslint-disable no-console */
   console.log(ok ? '  ☀ дорожка L'+(layer+1)+' РАЗМОРОЖЕНА: снова играет свои события'
@@ -1311,7 +1330,6 @@ const frozen=()=>{ const ls=REC.frozenLayers();
        await R.aud(1,{expr:'neutral'})      // C1: выразительность — живая нейтраль
        await R.aud(1,{expr:'bypass'})       // C2: выразительность обойдена
        await R.aud(1,{noHum:true})          // гуманизация высоты выкл
-       await R.aud(1,{fdnLive:true})        // петли реверба — живой проводкой (после MX2 копия рендера строит их с одним входом)
        await R.aud(1,{mono:true})           // моно-сумма на выходе
        await R.aud(1,{recSteps:true})       // записанная автоматизация шины СТУПЕНЬКАМИ (как до слайса «плавная внутри движения»)
        R.droneBP('cons') / R.droneBP('period') // дрон Болена–Пирса: ступень 5:3 (878¢; умолчание — выбор пользователя при T3) / тоника + тритава — живой дрон, сразу
@@ -1329,7 +1347,7 @@ const audDesc=o=>{ const p=[];
   if(o.expr==='neutral') p.push('C1: выразительность — живая нейтраль');
   if(o.expr==='bypass') p.push('C2: выразительность ОБОЙДЕНА');
   if(o.noHum) p.push('гуманизация высоты ВЫКЛ');
-  if(o.fdnLive) p.push('петли реверба — ЖИВАЯ проводка (несколько входов; разрыв петли решает порядок обхода — см. audio.apStage)');
+  if(o.fdnLive) p.push('(fdnLive снят в AF1: прежней проводки петель реверба больше нет — одна, с одним входом)');
   if(o.mono) p.push('МОНО-сумма на выходе');
   if(o.recSteps) p.push('записанная автоматизация шины — СТУПЕНЬКАМИ, как до слайса «плавная внутри движения»');
   if(o.noteSmooth) p.push('(noteSmooth больше не опыт: величины «в ноте» пишутся тонко и закон движения у них в приложении)');
@@ -1373,7 +1391,7 @@ async function aud(layer, opts){
      возвращается к тому, что стоит во всём приложении (recStepsOn), даже если рендер упал. */
   if(o.recSteps) REC.setAutRecSmooth(false);
   let r;
-  try{ r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null, fdnLive:!!o.fdnLive } }); }
+  try{ r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null } }); }
   finally{ if(o.recSteps) REC.setAutRecSmooth(!recStepsOn); }
   /* переключатели копии в «выкл» вернул сам renderTrack (renderReset в finally, внутри очереди). Прежний setDbg(null) здесь шёл МИМО очереди
      и мог сбросить отладку ЧУЖОГО рендера, начавшегося за это время. */
@@ -1563,17 +1581,8 @@ async function reuseCheck(){
 /* ⛳ СНИМОК КОПИИ ДВИЖКА ДЛЯ СТРАЖА P.all — переключатели, которые рендер ей ставит (уровень и панорама по ключу, раскладчик, семя, отладка,
    ключ удара, величины соло-ноты). После каждого рендера копия в СБРОСЕ (renderReset в finally), значит снимок между строками P.all — один
    и тот же; иной — строка оставила копию в чужом состоянии. Только чтение. */
-/* ═══ ⛳ LR1: ПРОВОДКА ЖИВЫХ РЕВЕРБОВ — ПЕРЕКЛЮЧАТЕЛЬ ДЛЯ ПРОВЕРКИ НА СЛУХ ═══
-   R.liveReverb('new') — у каждой петли один вход, как у копии рендера (умолчание с LR1); R.liveReverb('old') — прежняя живая проводка;
-   R.liveReverb() — какая сейчас. Перестраивает живые экземпляры НА МЕСТЕ (audio.setLiveRevWiring → rewire): без перезагрузки, без
-   щелчка, величины те же. ⚠️ Прежняя проводка живёт только до приёмки на слух — в слайсе после приёмки снимается вместе с этим ключом. */
-function liveReverb(m){
-  if(m==null) return LIVE.liveRevWiring();
-  const r=LIVE.setLiveRevWiring(m);
-  if(!r){ console.log("  R.liveReverb('old' | 'new') — or R.liveReverb() to read it"); return null; }   // eslint-disable-line no-console
-  console.log('%c[liveReverb] '+(m==='new'?'NEW — one entry per loop, as the frozen render':'OLD — the previous live wiring (ear test only)')+' · rebuilt '+r.rebuilt+' live reverb(s); reverbs built later follow','font-weight:bold');   // eslint-disable-line no-console
-  return r;
-}
+/* ⛳ AF1 (уборка LR1): переключатель R.liveReverb('old'|'new') СНЯТ вместе с прежней живой проводкой — проводка одна (с одним входом в каждую
+   петлю), спрашивать «какая сейчас» незачем. Принято на слух пользователем: прежняя «чуть просторнее», новая «чуть чище». */
 /* ═══ ⛳ LR1: ЖИВОЙ И ЗАМОРОЖЕННЫЙ РЕВЕРБ СОГЛАСНЫ — тело пробы P.checkRevAgree ═══
    МАТЕРИАЛ: временная дорожка аккордов в конце песни (recorder.seedTake — та же воронка, что P.seed): один аккорд органом (CHORD_INSTR[2]:
    атака 12 мс, отпускание 90 мс — после отпускания звучит почти один реверб), ≈1.5 с; на миг взятия у ЖИВОГО реверба цепи аккордов подмес
@@ -1627,7 +1636,7 @@ async function revAgree(){
       r=REC.seedTake(steps(chordUnit(CUR()))); if(!r||!r.layers.length) return null; ly=r.layers[0]; }
     made.push(ly); return ly; };
   const norm=(p,v)=>{ const x= p.curve==='log' ? Math.log(v/p.min)/Math.log(p.max/p.min) : (v-p.min)/(p.max-p.min); return Math.max(0,Math.min(1,x)); };
-  const out={ ok:false, tolE:RA_TOL_E, tolB:RA_TOL_B, wiring:LIVE.liveRevWiring() };
+  const out={ ok:false, tolE:RA_TOL_E, tolB:RA_TOL_B };
   try{
     // ---- живой против заморозки ----
     const A=take(dec0,tone0); if(A==null){ out.why='the temporary chord track could not be recorded'; return out; }
@@ -1667,6 +1676,7 @@ async function copyState(){ const eng=await engine(); return eng.renderStateOf()
 export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
   copyState,   // снимок переключателей копии движка — страж P.all между строками
-  /* LR1: проводка живых ревербов (для уха — R.liveReverb) и проба «живой и замороженный реверб согласны» (P.checkRevAgree) */
-  liveReverb, revAgree,
+  revAgree,   // LR1: проба «живой и замороженный реверб согласны» (P.checkRevAgree)
+  /* AF1: очередь автозаморозки (консоль) и замер раскладки без рендера (P.freezeCost) */
+  autoFreeze, freezeQueue, layoutCost,
   renderQueue };   // сколько рендеров ждёт или идёт (очередь — один рендер копии за раз)

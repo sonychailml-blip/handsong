@@ -76,7 +76,8 @@ import { L, t, withLang } from './i18n.js';   // T7: подписи типов �
 import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName, stripProbe } from './draw.js';   // AR2-fix: stripProbe — тексты полосы игры на заданной ширине   // AR2: имя и цвет дорожки (P.checkTrackLook)
 import { INSTR_COL, LANE_NOROLE_COL } from './config.js';   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi } from './ui.js';
-import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf } from './audio.js';   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
+import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
@@ -84,7 +85,8 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
          tiePartners, laneEditVerOf, freezeTicket, laneDelTap,
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
-         laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep } from './recorder.js';   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
+         unfreezeLayer, laneLenOf } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
@@ -426,6 +428,7 @@ const ALL_RUNS=[
   ['LR1 live and frozen reverb agree',()=>checkRevAgree(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['AF1 freeze queue',()=>checkFreezeQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1156,8 +1159,8 @@ export async function checkPan(){
    (3) ДОГОВОР ЗАМОРОЗКИ: у соло-дорожки с нотами БЕЗ карты эффектов (их звук — живая цепь соло, правило R2) подпись заморозки обязана
        меняться при сдвиге живого вибрато (state.fx) и возвращаться при возврате; у дорожки без таких нот — не меняться.
    ⛳ ДОКАЗАТЕЛЬСТВА — ТОЛЬКО ПО ЗАПРОСУ, P.checkRepeat({evidence:true}), в P.all их нет: сухой с обойдённой стадией выразительности
-   (СВЕДЕНИЕ, не провал), по одному эффекту (o.only — провал, если ступень не повторяется) и живая проводка петель реверба трижды
-   (dbg.fdnLive — A/B: она обязана расходиться; совпала — предупреждение, не провал: порядок указателей может совпасть случайно).
+   (СВЕДЕНИЕ, не провал) и по одному эффекту (o.only — провал, если ступень не повторяется). A/B прежней живой проводки петель реверба
+   (dbg.fdnLive) снят в AF1 вместе с самой проводкой (уборка LR1: проводка одна — с одним входом).
    Дорожки: самая короткая незамороженная соло-дорожка и, контролем, самая короткая ударная. Асинхронная: await P.checkRepeat(). */
 export async function checkRepeat(opt={}){
   const EVID=!!(opt&&opt.evidence);
@@ -1166,7 +1169,7 @@ export async function checkRepeat(opt={}){
   if(!L.length) return { cases:0, song:0, total:0, differences:[] };
   if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
   if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
-  const REP_DRY=1e-4, REP_WET=2e-4, REP_BITS=2e-6, OLD_SEEN=1e-3;   // объяснение — в шапке пробы
+  const REP_DRY=1e-4, REP_WET=2e-4, REP_BITS=2e-6;   // объяснение — в шапке пробы
   const endOf=ly=>events.reduce((m,e)=>e.layer===ly&&e.t>m?e.t:m,0);
   const pick=re=>L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&re.test(e.fn))).sort((a,b)=>endOf(a)-endOf(b))[0];
   const solo=pick(/^leadOn$/), drum=pick(/^drum$/);
@@ -1201,13 +1204,6 @@ export async function checkRepeat(opt={}){
           const a1=await rt(solo,{only:id}), a2=await rt(solo,{only:id}), X=bufCmp(a1,a2,REP_WET), ok= X.rel<=REP_WET && Math.abs(X.total-1)<=REP_WET;
           notes.push(`evidence · L${solo+1} solo, only ${id} open${chain.has(id)?'':' (not in this track’s chain)'}: max difference ${e3(X.rel)} of peak, total RMS ratio ${f4(X.total)} — ${ok?'repeatable':'NOT REPEATABLE'}`);
           if(!ok) miss(`L${solo+1} solo: with only ${id} open two renders differ — max ${e3(X.rel)} of peak, RMS ratio ${f4(X.total)}: this stage is not repeatable`);
-        }
-        /* A/B проводки петель реверба */
-        if(chain.has('reverb')){
-          const o=[]; for(let k=0;k<3;k++) o.push(await rt(solo,{dbg:{fdnLive:true}}));
-          let mx=0; for(const [i,j] of [[0,1],[0,2],[1,2]]){ const X=bufCmp(o[i],o[j],REP_WET); if(X.rel>mx) mx=X.rel; }
-          notes.push(`evidence · L${solo+1} solo, the LIVE reverb wiring (several entries into each loop), three renders: largest pair difference ${e3(mx)} of peak — ${mx>OLD_SEEN?'NOT repeatable: the one-entry wiring is what makes the render repeatable':'repeated this time too — not confirmed by this run (the pointer order can coincide)'}`);
-          if(!(mx>OLD_SEEN)) console.warn(`[scaleprobe repeat] L${solo+1}: three renders with the live reverb wiring agreed (largest difference ${e3(mx)}) — not confirmed by this run; run P.checkRepeat({evidence:true}) again`);
         }
       }
     }catch(err){ miss(`L${solo+1} solo: the offline render failed — ${err&&err.message}`); }
@@ -1520,6 +1516,193 @@ export async function checkTrackLook(){
   if(!nBad) console.log('[scaleprobe track-look] default names follow role and timbre in both languages; the four role colours differ in lightness; every track is drawn with one name and one colour in the play strip, the arrangement, the mixer and the editor; a rename shows everywhere and survives a scroll and a face switch; a reorder is one order everywhere and every row still opens its own track; a new track on a deleted number inherits neither name nor place');
   return done();
 }
+/* ═══ ⛳ AF1: ОЧЕРЕДЬ АВТОЗАМОРОЗКИ — P.checkFreezeQueue ═══
+   Очередь (frzqueue.js) гоняется ВРУЧНУЮ (qStep) на ПОДМЕНЁННЫХ часах и воротах, исполнитель — настоящий render.freeze (билет и freezeSet —
+   настоящие) с ПОДДЕЛЬНЫМ рендером (буфер-пустышка, без копии движка): так проверяются приоритет, ворота и устаревание за доли секунды.
+   (1) ПРИОРИТЕТ, чистая функция: слышимые раньше заглушённых; под бегунком — первыми; впереди — по расстоянию; позади — после (до конца
+       песни и с начала); при крутящейся скобе — по кругу скобы, вне скобы — последними. КОНТРОЛЬ: порядок песни ≠ ожидаемому.
+   (2) ПРИОРИТЕТ, настоящие дорожки: три незамороженные с непересекающимися краями A < B < C, бегунок на начале B: порядок исполнения B, C, A;
+       B заглушена: C, A, B. КОНТРОЛЬ: порядок песни (A, B, C) не совпадает ни с одним.
+   (3) ЗАПИСЬ и КЛИП: при закрытых воротах шаг не начинает ничего (исполнитель не позван ни разу); открыли — начал. ВНУТРИ рендера: ворота
+       закрылись после выбора — раскладка (o.layoutGate) не начинается, пока не откроются.
+   (4) ЩИПОК: раскладка дороже бюджета — ждёт; не мерили ни разу — ждёт; дешевле — идёт.
+   (5) УСТАРЕВШИЙ РЕЗУЛЬТАТ: во время «рендера» сдвинули панораму дорожки (она в подписи) — буфер НЕ поставлен (дорожка не заморожена), запись
+       снова в очереди; пока подпись не устоялась — не берётся; устоялась — второй рендер, поставлен, свежая.
+   (6) МЕНЯЛАСЬ, ПОКА ЖДАЛА: три сдвига панорамы через полвремени успокоения — ни одного рендера; после успокоения — РОВНО ОДИН, и поставленный
+       буфер свеж против ПОСЛЕДНЕЙ подписи.
+   Всё возвращается: панорамы, приглушения, заморозки, сделанные пробой (размораживаются), замеры очереди (qEnd). Нужны: звук запущен, транспорт
+   стоит, редактор и окно закрыты, R.autoFreeze выключен, ни одна дорожка не в соло; для (2) — три незамороженные дорожки с раздельными краями
+   (на посеве есть; нет — случай «не применим», не расхождение). */
+export async function checkFreezeQueue(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); }, notes=[];
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  const out=()=>({ cases, song:L.length, total:nBad, differences:bad });
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(!LIVE_AC){ miss('audio is not started (press ▶ Play)'); return out(); }
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return out(); }
+  if(recording||loop.on){ miss('the transport is playing or recording — stop it first'); return out(); }
+  if(laneSoloOn()){ miss('a track is soloed — un-solo it first (audibility is part of the priority)'); return out(); }
+  const R=await import('./render.js');
+  if(R.autoFreeze()){ miss('R.autoFreeze is ON — turn it off (R.autoFreeze(false)) before this probe'); return out(); }
+  /* ---- (1) чистая функция приоритета ---- */
+  { const ctx={p:10,end:100,rgn:null}, it=(id,audible,b0,b1)=>({id,layer:id,audible,b0,b1});
+    const items=[it(1,false,0,200),it(2,true,50,60),it(3,true,5,20),it(4,true,0,5),it(5,true,12,30)];
+    const want=[3,5,2,4,1], got=qRank(items,ctx).map(x=>x.id), got2=qRank(items.slice().reverse(),ctx).map(x=>x.id); cases+=2;
+    if(got.join()!==want.join()) miss(`priority (pure): expected ${want.join(',')} (under the playhead, ahead by distance, behind, muted last), got ${got.join(',')}`);
+    if(got2.join()!==want.join()) miss(`priority (pure): the order depends on the input order — ${got2.join(',')}`);
+    const cyc={p:20,end:100,rgn:{on:true,from:8,to:24}}, items2=[it(1,true,0,4),it(2,true,22,23),it(3,true,9,10),it(4,true,30,40)];
+    const want2=[2,3,1,4], g3=qRank(items2,cyc).map(x=>x.id); cases++;
+    if(g3.join()!==want2.join()) miss(`priority (cycling brace 8–24, playhead 20): expected ${want2.join(',')} (ahead in the cycle, then around it, outside the brace last), got ${g3.join(',')}`);
+    const songOrd=items.slice().sort((a,b)=>a.b0-b.b0||a.id-b.id).map(x=>x.id); cases++;
+    if(songOrd.join()===want.join()) miss('priority CONTROL: the song order equals the expected order — the case cannot tell priority from song order');
+    notes.push(`priority (pure): ${got.join(',')} · cycling: ${g3.join(',')}`); }
+  /* ---- подготовка: дорожки, подмены ---- */
+  const span=new Map(); for(const e of events){ const s=span.get(e.layer); if(!s) span.set(e.layer,{b0:e.t,b1:e.t}); else { s.b0=Math.min(s.b0,e.t); s.b1=Math.max(s.b1,e.t); } }
+  for(const [ly,s] of span){ const Ln=laneLenOf(ly); if(Ln>s.b1) s.b1=Ln; }
+  const free=L.filter(ly=>freezeState(ly)==='none' && !laneMuted(ly)).sort((a,b)=>span.get(a).b0-span.get(b).b0||a-b);
+  let tri=null;
+  for(const b of free){ const B=span.get(b);
+    const a=free.find(x=>x!==b && span.get(x).b1<B.b0-1e-9), c=free.find(x=>x!==b && span.get(x).b0>B.b1+1e-9);
+    if(a!=null&&c!=null){ tri=[a,b,c]; break; } }
+  if(!free.length){ miss('the song has no unfrozen, unmuted track — run await P.seed({replace:true})'); return out(); }
+  /* (2) нужна тройка с раздельными краями — на посеве есть; у демо-пьесы её может не быть (пад тянется через всю песню): тогда случай (2)
+     «не применим», это не расхождение. Случаи (3)–(6) берут любые дорожки (по кругу, повтор законен: каждый случай размораживает своё). */
+  const rest0=free.filter(ly=>!tri||!tri.includes(ly)), rest= rest0.length ? rest0 : free, pickR=i=>rest[i%rest.length];
+  let T=0; const G={ recording:false, clip:false, pinch:false }, calls=[];
+  let ctxP=0, panHit=null, gateLog=null;
+  const fake=async(layer,o)=>{ calls.push(layer);
+    await new Promise(r=>setTimeout(r,0));
+    if(panHit===layer){ setLanePan(layer, (lanePanOf(layer)===0.5?0.25:0.5)); panHit=null; }   // (5): дорожка меняется ВО ВРЕМЯ рендера
+    if(o.layoutGate){ await o.layoutGate(); if(gateLog) gateLog.passed=true; }
+    return { buf:LIVE_AC.createBuffer(2,128,LIVE_AC.sampleRate), startSec:0.5, endSec:0.5, tailSec:0, pinned:{ tonic, aRef, bpm:loop.bpm }, ms:{ layoutMs:null } }; };
+  const keepPan=new Map(L.map(ly=>[ly,lanePanOf(ly)])), touchedMute=new Set(), mine=new Set();
+  const SETTLE=100, STEP=SETTLE+1, Lb=x=>'L'+(x+1);
+  const hook={ now:()=>T, gates:{ recording:()=>G.recording, clip:()=>G.clip, pinch:()=>G.pinch },
+               ctx:()=>({ p:ctxP, end:songBeats(), rgn:null }), opt:{ renderFn:fake, noPin:true }, noPin:true, settleMs:SETTLE, frameMs:8, gatePollMs:5 };
+  if(!qBegin(hook)){ miss('the freeze queue is busy (on, or a render is running) — wait and run again'); return out(); }
+  const drain=async(max=12)=>{ for(let i=0;i<max;i++){ T+=STEP; const st=qStep();
+      if(st.startsWith('start:')){ mine.add(calls[calls.length-1]); await qRunning(); } else if(st==='idle') break; } };
+  const unfreezeMine=()=>{ for(const ly of mine) if(freezeState(ly)!=='none') unfreezeLayer(ly); };
+  try{
+    /* ---- (2) приоритет на настоящих дорожках ---- */
+    if(!tri) notes.push('priority (tracks): not applicable on this song — no three unfrozen tracks with separate spans (the seed has them)');
+    else { const [A,B,C]=tri;
+    ctxP=span.get(B).b0;
+    for(const [want,muted] of [[[B,C,A],null],[[C,A,B],B]]){ cases++;
+      if(muted!=null){ toggleLaneMute(muted); touchedMute.add(muted); }
+      calls.length=0; for(const ly of [A,B,C]) qAdd(ly,'probe');
+      await drain();
+      const got=calls.slice();
+      if(got.join()!==want.join()) miss(`priority (tracks): playhead at ${Lb(B)}'s start${muted!=null?`, ${Lb(muted)} muted`:''} — expected ${want.map(Lb).join(', ')}, rendered ${got.map(Lb).join(', ')}`);
+      if(want.join()===[A,B,C].join()) miss('priority (tracks) CONTROL: the expected order equals the song order');
+      notes.push(`priority (tracks)${muted!=null?' with '+Lb(muted)+' muted':''}: ${got.map(Lb).join(', ')}`);
+      if(muted!=null){ toggleLaneMute(muted); touchedMute.delete(muted); }
+      unfreezeMine(); } }
+    /* ---- (3) запись и клип ---- */
+    const D=pickR(0), E=pickR(1), F=pickR(2), H=pickR(3);
+    for(const g of ['recording','clip']){ cases++;
+      calls.length=0; qAdd(D,'probe'); G[g]=true;
+      const st=[]; for(let i=0;i<4;i++){ T+=STEP; st.push(qStep()); }
+      if(calls.length || st.some(s=>s!=='gate:'+g)) miss(`gate (${g}): while ${g} the queue must start nothing — steps said ${st.join(', ')}, renders started ${calls.length}`);
+      G[g]=false; T+=STEP; const s2=qStep(); if(s2.startsWith('start:')){ mine.add(D); await qRunning(); }
+      if(!s2.startsWith('start:') || calls.length!==1) miss(`gate (${g}) CONTROL: with the gate open the queue must start the track — step said ${s2}`);
+      unfreezeMine(); }
+    { cases++; calls.length=0; gateLog={ passed:false }; qAdd(E,'probe'); T+=STEP; const s=qStep();   // ворота закрылись ПОСЛЕ выбора
+      if(!s.startsWith('start:')) miss(`gate inside the render: the queue did not start ${Lb(E)} (${s})`);
+      else { G.recording=true; mine.add(E);
+        await new Promise(r=>setTimeout(r,60));
+        if(gateLog.passed) miss('gate inside the render: recording began after the pick, yet the layout went ahead');
+        G.recording=false; await qRunning();
+        if(!gateLog.passed) miss('gate inside the render CONTROL: with the gate open again the layout never ran'); }
+      gateLog=null; unfreezeMine(); }
+    /* ---- (4) щипок ---- */
+    { const cost0=qCostOf(F); G.pinch=true; qAdd(F,'probe');
+      for(const [ms,go] of [[50,false],[null,false],[2,true]]){ cases++; calls.length=0; qCostSet(F,ms); T+=STEP; const s=qStep();
+        const started=s.startsWith('start:'); if(started){ mine.add(F); await qRunning(); }
+        if(started!==go) miss(`gate (pinch): a hand pinches, the track's layout is ${ms==null?'never measured':ms+' ms'} (budget 8 ms) — it must ${go?'start':'wait'}, the step said ${s}`); }
+      G.pinch=false; qCostSet(F,cost0); unfreezeMine(); }
+    /* ---- (5) устаревший результат не ставится ---- */
+    { cases++; calls.length=0; panHit=H; qAdd(H,'probe'); T+=STEP; const s=qStep();
+      if(!s.startsWith('start:')){ miss(`stale: the queue did not start ${Lb(H)} (${s})`); }
+      else { mine.add(H); const res=await qRunning();
+        if(freezeState(H)!=='none') miss(`stale: ${Lb(H)} changed during its render, yet its buffer was installed (${freezeState(H)})`);
+        if(!/stale/.test(res)) miss(`stale: the outcome should be "stale — re-queued", got "${res}"`);
+        const en=qState().entries.find(x=>x.id===freezeTicket(H).id);
+        if(!en||!en.again) miss('stale: the track is not back in the queue (or not marked "changed during its render")');
+        setLanePan(H, keepPan.get(H));                 // подпись меняется ещё раз — успокоение заново
+        T+=SETTLE/2; const s1=qStep();
+        if(s1.startsWith('start:')){ await qRunning(); miss('stale: the track was re-rendered before its signature settled'); }
+        T+=SETTLE; const s2=qStep(); if(s2.startsWith('start:')) await qRunning();
+        if(calls.filter(x=>x===H).length!==2 || freezeState(H)!=='fresh') miss(`stale CONTROL: after the signature settled the track should render a second time and be fresh — renders ${calls.filter(x=>x===H).length}, state ${freezeState(H)}`); }
+      unfreezeMine(); }
+    /* ---- (6) менялась, пока ждала — один рендер с последней подписью ---- */
+    { cases++; calls.length=0; qAdd(D,'probe'); const p0=lanePanOf(D);
+      const st=[]; for(const p of [0.3,-0.3,0.1]){ T+=SETTLE/2; setLanePan(D,p); st.push(qStep()); }
+      if(calls.length) miss(`changing while queued: a render started before the signature settled (steps ${st.join(', ')})`);
+      for(let i=0;i<4;i++){ T+=STEP; const x=qStep(); if(x.startsWith('start:')){ mine.add(D); await qRunning(); } }
+      if(calls.length!==1) miss(`changing while queued: expected exactly one render after it settled, got ${calls.length}`);
+      if(freezeState(D)!=='fresh') miss(`changing while queued: the installed buffer is not fresh against the final signature (${freezeState(D)})`);
+      setLanePan(D,p0); unfreezeMine(); }
+  }catch(err){ miss('the probe failed: '+(err&&err.message)); }
+  finally{
+    try{ await qRunning(); }catch(e){ /* исход уже в отчёте */ }
+    qEnd();
+    for(const ly of touchedMute) toggleLaneMute(ly);
+    for(const [ly,p] of keepPan) if(lanePanOf(ly)!==p) setLanePan(ly,p);
+    for(const ly of mine) if(freezeState(ly)!=='none') unfreezeLayer(ly);
+  }
+  console.log(`[scaleprobe freeze-queue] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe freeze-queue] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe freeze-queue] '+m));
+  if(!nBad) console.log('[scaleprobe freeze-queue] the queue takes audible tracks near the playhead first, starts nothing while recording or recording a clip (and stops before the layout if that begins after the pick), waits on a pinch when the layout costs a frame, never installs a stale buffer and renders a track that kept changing once, with its final signature');
+  return out();
+}
+/* ═══ ⛳ AF1: ЗАМЕР — РАСКЛАДКА НА ГЛАВНОМ ПОТОКЕ И ПАМЯТЬ ЗАМОРОЖЕННЫХ БУФЕРОВ — P.freezeCost() (по запросу, не в P.all) ═══
+   Для КАЖДОЙ дорожки — раскладка без рендера (render.layoutCost: тот же путь, что у заморозки, до startRendering), то есть:
+     • layoutMs — синхронный участок главного потока (то, что ворота щипка сравнивают с бюджетом), худший и типичный (медиана);
+     • память буфера, который дал бы рендер СЕГОДНЯ: стерео float32 × (разгон 0.5 с + от первого события до конца материала + хвост);
+     • (a) ТОЛЬКО НОТЫ И ХВОСТ: объединение [начало ноты, конец ноты + хвост] без разгона — паузы длиннее хвоста не хранятся;
+     • (b) 16 БИТ: вдвое меньше float32 (плюс короткие куски float32 у бегунка — не в счёте);
+     • ОДИН ЦИКЛ: повторяется ли СОДЕРЖИМОЕ дорожки (те же события с тем же шагом в целое число тактов) — тогда сколько хранил бы один цикл.
+   ⚠️ Числа — от живой частоты дискретизации и цепей, как стоят; время раскладки — этой машины (телефон — отдельный замер). */
+export async function freezeCost(){
+  if(!LIVE_AC){ console.warn('[scaleprobe cost] audio is not started (press ▶ Play)'); return null; }
+  if(recording){ console.warn('[scaleprobe cost] recording — stop it first'); return null; }
+  const R=await import('./render.js');
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b), rows=[], spb=60/loop.bpm, MB=1024*1024;
+  const NV=songNotes();
+  const repeatOf=ly=>{   // наименьший шаг в целое число тактов, с которым содержимое дорожки повторяется (≥ 2 копий), или null
+    const evs=events.filter(e=>e.layer===ly).slice().sort((a,b)=>a.t-b.t); if(evs.length<2) return null;
+    const tok=e=>{ const a=e.a||{}; return [e.fn,a.ti,a.oct,a.row,a.kit,a.inst,a.vol!=null?Math.round(a.vol*1000):'',a.ty?JSON.stringify(a.ty):'',a.bri!=null?Math.round(a.bri*1000):''].join('|'); };
+    const at=new Set(evs.map(e=>Math.round(e.t*1000)+'#'+tok(e)));
+    const b0=evs[0].t, b1=evs[evs.length-1].t, Mt=loop.metre;
+    for(let P=Mt; P<=b1-b0+1e-9; P+=Mt){
+      let ok=true; for(const e of evs){ if(e.t+P>b1+1e-9) continue; if(!at.has(Math.round((e.t+P)*1000)+'#'+tok(e))){ ok=false; break; } }
+      if(ok) return { P, copies:Math.floor((b1-b0)/P+1e-9)+1 };
+    }
+    return null; };
+  for(const ly of L){
+    let r=null; try{ r=await R.layoutCost(ly); }catch(err){ rows.push({ track:'L'+(ly+1), error:err&&err.message }); continue; }
+    const B=sec=>sec*r.rate*2*4/MB;
+    const evs=events.filter(e=>e.layer===ly), t0=Math.min(...evs.map(e=>e.t)), tEnd=t0+r.songSec/spb;
+    const iv=[];
+    for(const n of NV.notes) if(n.layer===ly) iv.push([(n.start-t0)*spb, ((n.end==null?tEnd:n.end)-t0)*spb + r.tailSec]);
+    if(evs.some(e=>e.fn==='drone')) iv.push([0, (tEnd-t0)*spb + r.tailSec]);
+    iv.sort((a,b)=>a[0]-b[0]); let a=0, cs=0, ce=-1;
+    for(const [s,e] of iv){ if(s>ce){ if(ce>cs) a+=ce-cs; cs=s; ce=e; } else ce=Math.max(ce,e); } if(ce>cs) a+=ce-cs;
+    const per=repeatOf(ly);
+    rows.push({ track:'L'+(ly+1), role:laneRoleOf(ly)||'—', 'layout ms':r.ms.layoutMs, 'buffer s':+r.totalSec.toFixed(1),
+      'today MB':+B(r.totalSec).toFixed(1), '(a) notes+tail MB':+B(a).toFixed(1), '(b) 16-bit MB':+(B(r.totalSec)/2).toFixed(1), '(a)+(b) MB':+(B(a)/2).toFixed(1),
+      repeats:per?`${per.copies}× every ${per.P/loop.metre} bar(s)`:'—', 'one cycle MB':per?+B(per.P*spb+r.tailSec).toFixed(1):'—' });
+  }
+  const ok=rows.filter(x=>x['layout ms']!=null), ms=ok.map(x=>x['layout ms']).sort((a,b)=>a-b), med=ms.length?ms[Math.floor((ms.length-1)/2)]:null;
+  const sum=k=>+ok.reduce((s,x)=>s+(typeof x[k]==='number'?x[k]:0),0).toFixed(1);
+  console.table(rows);
+  const res={ tracks:rows.length, layoutWorst:ms.length?ms[ms.length-1]:null, layoutTypical:med, frameBudget:8,
+    mb:{ today:sum('today MB'), a:sum('(a) notes+tail MB'), b:sum('(b) 16-bit MB'), ab:sum('(a)+(b) MB') }, rows };
+  console.log(`[scaleprobe cost] ${rows.length} tracks · layout worst ${res.layoutWorst} ms, typical ${res.layoutTypical} ms (budget at a pinch ${res.frameBudget} ms) · memory today ${res.mb.today} MB → (a) notes+tail ${res.mb.a} MB, (b) 16-bit ${res.mb.b} MB, (a)+(b) ${res.mb.ab} MB`);
+  return res;
+}
 /* ═══ ⛳ LR1: ЖИВОЙ И ЗАМОРОЖЕННЫЙ РЕВЕРБ СОГЛАСНЫ — P.checkRevAgree ═══
    Тело — render.revAgree (там материал, мера, допуск и контроли — см. его шапку): временная дорожка аккордов играет ЖИВЫМ движком (R.live,
    выход мастера снят мимо колонок) и рендерится путём ЗАМОРОЗКИ; энергия хвоста относительно звучания и спектральный баланс хвоста обязаны
@@ -1531,10 +1714,10 @@ export async function checkRevAgree(){
   cases++; const r=await R.revAgree();
   if(!r.ok){ miss('live vs frozen reverb: '+r.why); console.warn('[scaleprobe rev-agree] '+r.why); return { cases, total:nBad, differences:bad }; }
   cases+=3;
-  if(!r.agree) miss(`live and frozen reverb disagree: tail energy Δ ${r.dEnergy} dB, tail balance Δ ${r.dBright} dB (tolerance ±${r.tolE} / ±${r.tolB} dB; live wiring '${r.wiring}')`);
+  if(!r.agree) miss(`live and frozen reverb disagree: tail energy Δ ${r.dEnergy} dB, tail balance Δ ${r.dBright} dB (tolerance ±${r.tolE} / ±${r.tolB} dB)`);
   if(Math.abs(r.ctrlDecay.dEnergy)<=r.tolE) miss(`control: a ${r.ctrlDecay.sec}-s tail moves the tail energy by only ${r.ctrlDecay.dEnergy} dB — the energy measure could not fail`);
   if(Math.abs(r.ctrlTone.dBright)<=r.tolB) miss(`control: a ${r.ctrlTone.hz}-Hz tone moves the tail balance by only ${r.ctrlTone.dBright} dB — the balance measure could not fail`);
-  console.log(`[scaleprobe rev-agree] live wiring '${r.wiring}' · tail energy live ${r.live.energy} dB / frozen ${r.frozen.energy} dB (Δ ${r.dEnergy}, tolerance ±${r.tolE}) · tail balance live ${r.live.bright} / frozen ${r.frozen.bright} dB (Δ ${r.dBright}, ±${r.tolB}) · controls: ${r.ctrlDecay.sec}-s tail Δ ${r.ctrlDecay.dEnergy} dB, ${r.ctrlTone.hz}-Hz tone Δ ${r.ctrlTone.dBright} dB · ${r.seconds} s`);
+  console.log(`[scaleprobe rev-agree] tail energy live ${r.live.energy} dB / frozen ${r.frozen.energy} dB (Δ ${r.dEnergy}, tolerance ±${r.tolE}) · tail balance live ${r.live.bright} / frozen ${r.frozen.bright} dB (Δ ${r.dBright}, ±${r.tolB}) · controls: ${r.ctrlDecay.sec}-s tail Δ ${r.ctrlDecay.dEnergy} dB, ${r.ctrlTone.hz}-Hz tone Δ ${r.ctrlTone.dBright} dB · ${r.seconds} s`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe rev-agree] '+m));
   return { cases, total:nBad, differences:bad };
 }
