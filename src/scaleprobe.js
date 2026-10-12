@@ -73,7 +73,7 @@ import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
-import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки (P.checkTrackLook)
+import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName, stripProbe } from './draw.js';   // AR2-fix: stripProbe — тексты полосы игры на заданной ширине   // AR2: имя и цвет дорожки (P.checkTrackLook)
 import { INSTR_COL, LANE_NOROLE_COL } from './config.js';   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi } from './ui.js';
 import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf } from './audio.js';   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
@@ -423,6 +423,7 @@ const ALL_RUNS=[
   ['MX1 track level and master',()=>checkMixer(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['MX2 track pan',()=>checkPan(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AR2 track names, colours, order',()=>checkTrackLook(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['LR1 live and frozen reverb agree',()=>checkRevAgree(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -441,7 +442,8 @@ const ALL_RUNS=[
    DRAWN_ROWS — строки, читающие НАРИСОВАННОЕ окно (ждут кадров): не пришёл хоть один кадр (вкладка скрыта) — строка «not checked: tab
    hidden», не FAIL и не pass; итог просит повторить при видимой вкладке. */
 const SLOW_ROWS=new Set(['T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
-  'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot']);
+  'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot',
+  'LR1 live and frozen reverb agree']);   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
 const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
 const HIDDEN='not checked: tab hidden';
 for(const n of [...SLOW_ROWS,...DRAWN_ROWS]) if(!ALL_RUNS.some(r=>r[0]===n)) console.warn(`[scaleprobe] «${n}» is not a row of P.all — the quick/drawn lists are out of date`);
@@ -1401,7 +1403,9 @@ export async function checkTrackLook(){
     if(!!V.full!==full){ miss(`${where}: the drawn screen is ${V.full?'the arrangement':'the play strip'}`); return; }
     const k=V.look&&V.look.get(ly); if(!k){ miss(`${where}: L${ly+1}: the row's name and colour are not in the snapshot`); return; }
     if(k.name!==laneTitle(ly)) miss(`${where}: L${ly+1} reads «${k.name}», not «${laneTitle(ly)}»`);
-    if(k.col!==colOf(ly)) miss(`${where}: L${ly+1} is drawn ${k.col}, its role's colour is ${colOf(ly)}`); };
+    if(k.col!==colOf(ly)) miss(`${where}: L${ly+1} is drawn ${k.col}, its role's colour is ${colOf(ly)}`);
+    const F=V.frame; if(F && k.lblX0!=null) for(const [w,a,b] of [['label',k.lblX0,k.lblX1],['name',k.nameX0,k.nameX1]])   // AR2-fix: нарисованные тексты — внутри рамки
+      if(b>a && (a<F[0]-0.5||b>F[1]+0.5)) miss(`${where}: L${ly+1}'s ${w} is drawn at [${a.toFixed(1)}, ${b.toFixed(1)}], outside the frame [${F[0]}, ${F[1]}]`); };
   const editorAt=async ly=>{ cases++;
     arrApi.openTrack(ly); await frame(); await frame();
     if(!rollOpen||editLayer()!==ly){ miss(`editor: L${ly+1} does not open`); if(rollOpen) arrApi.closeTrack(); return; }
@@ -1498,6 +1502,14 @@ export async function checkTrackLook(){
         if(events.length!==nEv || JSON.stringify(laneOrder())!==JSON.stringify(O0)) miss('rule #27: the song is not back as it was (events or order)');
       }
     } else miss('rule #27: the transport is playing — stop it first');
+    // ---- 7) AR2-fix: полоса игры на ширинах 360 / 380 / 768 / 1280 px — каждый «L#» и имя внутри рамки и своей колонки ----
+    for(const W of [360,380,768,1280]){ const SP=stripProbe(W);
+      for(const r of SP.rows){ cases++; const [f0,f1]=r.frame;
+        for(const [w,[a,b]] of [['label',r.lbl],['name',r.name]]){
+          if(b>a && (a<f0-0.5||b>f1+0.5)) miss(`strip at ${W} px: L${r.ly+1}'s ${w} [${a.toFixed(1)}, ${b.toFixed(1)}] leaves the frame [${f0}, ${f1}]`);
+          if(b>a && (a<r.col[0]-0.5||b>r.col[1]+0.5)) miss(`strip at ${W} px: L${r.ly+1}'s ${w} [${a.toFixed(1)}, ${b.toFixed(1)}] leaves its name column [${r.col[0]}, ${r.col[1]}]`); } }
+      cases++; const o=SP.old;   // контроль: прежняя раскладка («L#» правым краем у x0−4) — та, что торчала у пользователя; мера обязана её поймать
+      if(!(o.lbl[0]<o.frame[0]-0.5)) miss(`control at ${W} px: the old label place [${o.lbl[0].toFixed(1)}, ${o.lbl[1].toFixed(1)}] reads as inside the frame [${o.frame[0]}, ${o.frame[1]}] — the check could not catch the overflow`); }
   } finally {
     if(rollOpen) arrApi.closeTrack();
     restoreShow(); winRestore(wk);
@@ -1507,6 +1519,24 @@ export async function checkTrackLook(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe track-look] '+m));
   if(!nBad) console.log('[scaleprobe track-look] default names follow role and timbre in both languages; the four role colours differ in lightness; every track is drawn with one name and one colour in the play strip, the arrangement, the mixer and the editor; a rename shows everywhere and survives a scroll and a face switch; a reorder is one order everywhere and every row still opens its own track; a new track on a deleted number inherits neither name nor place');
   return done();
+}
+/* ═══ ⛳ LR1: ЖИВОЙ И ЗАМОРОЖЕННЫЙ РЕВЕРБ СОГЛАСНЫ — P.checkRevAgree ═══
+   Тело — render.revAgree (там материал, мера, допуск и контроли — см. его шапку): временная дорожка аккордов играет ЖИВЫМ движком (R.live,
+   выход мастера снят мимо колонок) и рендерится путём ЗАМОРОЗКИ; энергия хвоста относительно звучания и спектральный баланс хвоста обязаны
+   совпасть в пределах допуска (дБ), а контроли — дорожка с другой длиной хвоста и с другой окраской — обязаны из него выйти (мера умеет
+   провалиться). Временные дорожки снимаются, величины цепи аккордов возвращаются. Транспорт должен стоять. ≈ 8–10 с: в P.all, не в P.quick. */
+export async function checkRevAgree(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  let R=null; try{ R=await import('./render.js'); }catch(e){ miss('render.js did not load: '+(e&&e.message)); return { cases, total:nBad, differences:bad }; }
+  cases++; const r=await R.revAgree();
+  if(!r.ok){ miss('live vs frozen reverb: '+r.why); console.warn('[scaleprobe rev-agree] '+r.why); return { cases, total:nBad, differences:bad }; }
+  cases+=3;
+  if(!r.agree) miss(`live and frozen reverb disagree: tail energy Δ ${r.dEnergy} dB, tail balance Δ ${r.dBright} dB (tolerance ±${r.tolE} / ±${r.tolB} dB; live wiring '${r.wiring}')`);
+  if(Math.abs(r.ctrlDecay.dEnergy)<=r.tolE) miss(`control: a ${r.ctrlDecay.sec}-s tail moves the tail energy by only ${r.ctrlDecay.dEnergy} dB — the energy measure could not fail`);
+  if(Math.abs(r.ctrlTone.dBright)<=r.tolB) miss(`control: a ${r.ctrlTone.hz}-Hz tone moves the tail balance by only ${r.ctrlTone.dBright} dB — the balance measure could not fail`);
+  console.log(`[scaleprobe rev-agree] live wiring '${r.wiring}' · tail energy live ${r.live.energy} dB / frozen ${r.frozen.energy} dB (Δ ${r.dEnergy}, tolerance ±${r.tolE}) · tail balance live ${r.live.bright} / frozen ${r.frozen.bright} dB (Δ ${r.dBright}, ±${r.tolB}) · controls: ${r.ctrlDecay.sec}-s tail Δ ${r.ctrlDecay.dEnergy} dB, ${r.ctrlTone.hz}-Hz tone Δ ${r.ctrlTone.dBright} dB · ${r.seconds} s`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe rev-agree] '+m));
+  return { cases, total:nBad, differences:bad };
 }
 export async function checkTracks(){
   const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };

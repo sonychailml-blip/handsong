@@ -518,6 +518,27 @@ const ARR_HANDLE_W=28;
 /* ⛳ AR2: КОЛОНКА ИМЕНИ НА ПОЛОСЕ ИГРЫ — внутри коробки, слева от линейки (до колонки значков): доля ширины полосы в пределах MIN…MAX px.
    Цена названа: линейка уже на эту ширину (на 380 px — 58 px: 261 → 203 px). Подпись «L1» левее коробки остаётся (её называет заголовок). */
 const LANE_NAME_FR=0.17, LANE_NAME_MIN=48, LANE_NAME_MAX=100;
+/* ⛳ AR2-fix: «L#» — ВНУТРИ КОЛОНКИ ИМЕНИ, а не левее коробки. Пользователь увидел: подписи L1, L2… торчали за рамкой полосы (они висели
+   правее-налево от кромки x0−4, а рамка — x0−10; на 380 px им было некуда). Рамку растить некуда (на 380 px она и так в 10 px от краёв
+   экрана), поэтому колонка ТА ЖЕ по ширине, в ней «L#» серым, за ним имя цветом роли, обрезанное многоточием по колонке — линейка не
+   сужается (на 380 px — 203 px, как после AR2). Горизонталь полосы — ОДНА чистая функция ширины холста (stripCols): по ней рисует
+   drawLooper и по ней же проба проверяет 360 / 380 / 768 / 1280 px (stripProbe) — у проверки и рисунка одна геометрия (правило #9). */
+const LANE_NAME_FONT='600 9px system-ui', LANE_LBL_GAP=4, LANE_COL_PAD=3, STRIP_FRAME_PAD=10;
+function stripCols(W, markW){
+  const sw=Math.min(560,W-40), x0=(W-sw)/2;
+  const togBand=LANE_TOG_W*3+LANE_TOG_GAP*2+LANE_DEL_GAP+6;
+  const nameW=Math.round(Math.max(LANE_NAME_MIN, Math.min(LANE_NAME_MAX, sw*LANE_NAME_FR)));
+  const mx0=x0+nameW, lx0=mx0+markW, bw=Math.max(60, sw-togBand-markW-nameW);
+  return { sw, x0, togBand, nameW, mx0, lx0, bw, fx0:x0-STRIP_FRAME_PAD, fx1:x0+sw+STRIP_FRAME_PAD };
+}
+/* Где встанут «L#» и имя строки в колонке (шрифт ставится здесь же — меряет measureText). nm — то, что рисуется (обрезано по колонке);
+   у совсем узкой колонки имени не остаётся места — тогда один «L#». */
+function stripRowText(lid, C, name){
+  ctx.font=LANE_NAME_FONT;
+  const lbl='L'+(lid+1), lx=C.x0+LANE_COL_PAD, lw=ctx.measureText(lbl).width, nx=lx+lw+LANE_LBL_GAP, room=C.x0+C.nameW-LANE_COL_PAD-nx;
+  const nm= room>8 ? arrClip(name, room) : '', nw= nm ? ctx.measureText(nm).width : 0;
+  return { lbl, lblX0:lx, lblX1:lx+lw, nm, nameX0:nx, nameX1:nx+nw };
+}
 /* ⛳ AR2: ЦВЕТ И ИМЯ ДОРОЖКИ — ОДНИ на все виды (окно, микшер, полоса игры, редактор). Цвет — палитра ролей config.INSTR_COL (данные; почему
    она различается светлотой — там же); без роли (слой дрона) — нейтральный серый. Роль и тембр — recorder.laneLook (один проход, мемо).
    Имя — данное человеком (recorder.laneNameOf), иначе «роль · тембр» на языке интерфейса (тембр — единственный вход audio.timbresOf, T5);
@@ -612,10 +633,11 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      и зоны попадания «вооружить»/«скоба»). Гнёзда M/S/✕ не двигаются: линейка ровно на столько же короче. */
   const markCol = !FULL && rows.some(l=>(!recording&&l===armLy) || freezeState(l)!=='none');   // AR1: у окна значкам место в заголовке и на кнопке ❄ — колонки нет
   const markW = markCol ? MARK_COL_W : 0;
-  const nameW = FULL ? 0 : Math.round(Math.max(LANE_NAME_MIN, Math.min(LANE_NAME_MAX, sw*LANE_NAME_FR)));   // AR2: колонка ИМЕНИ дорожки (у полосы игры; у окна имя — в заголовке)
-  const mx0=x0+nameW;                           // AR2: начало колонки значков (за колонкой имени)
-  const lx0=mx0+markW;                          // начало ЛИНЕЙКИ; x0 остаётся кромкой коробки
-  const bw=Math.max(60,sw-togBand-markW-nameW), x1=lx0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране; без смены роли — один, ровно прежний)
+  const SC = FULL ? null : stripCols(W, markW);   // AR2-fix: горизонталь полосы игры — ОДНА функция ширины (её же гоняет проба на разных ширинах)
+  const nameW = FULL ? 0 : SC.nameW;             // AR2: колонка ИМЕНИ дорожки (у полосы игры; у окна имя — в заголовке)
+  const mx0 = FULL ? x0 : SC.mx0;                // AR2: начало колонки значков (за колонкой имени)
+  const lx0 = FULL ? x0+markW : SC.lx0;          // начало ЛИНЕЙКИ; x0 остаётся кромкой коробки
+  const bw = FULL ? Math.max(60,sw-togBand-markW) : SC.bw, x1=lx0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране; без смены роли — один, ровно прежний)
   /* rowH 13 → 16: строка стала не только читаемее, но и НАЖИМАЕМЕЕ — в ней теперь живут две кнопки.
      Выше не берём: каждая дорожка — это высота на экране, а их бывает много (см. отчёт слайса). */
   /* braceH — полоса СКОБЫ ПОВТОРА (S3.5b) между заголовком и строками. ОТДЕЛЬНАЯ полоса, а не тап по
@@ -643,7 +665,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   loopView={ x0:lx0, bx0:x0, bw, beat0, span, gy0, rowH, rows:visRows, tx0:x1+6, by0:y0+headH, hy0:y0,
              over, row0:r0, nAll, visN, sx1: FULL ? W : x0+sw+10, sx0: FULL ? 0 : x0-28,
              full:FULL, hx0:ARR_MARGIN, mini: FULL ? new Map() : null,
-             all:allRows, look:new Map(), nameW, mx0,   // AR2: all — ВСЕ строки в порядке показа (ui: место перестановки); look — нарисованные имя и цвет видимых строк (их сверяет проба); nameW/mx0 — колонка имени полосы игры и начало колонки значков
+             all:allRows, look:new Map(), nameW, mx0, frame: FULL ? [0,W] : [SC.fx0,SC.fx1],   // AR2-fix: frame — рамка, внутри которой обязан лежать каждый текст строки (проба)   // AR2: all — ВСЕ строки в порядке показа (ui: место перестановки); look — нарисованные имя и цвет видимых строк (их сверяет проба); nameW/mx0 — колонка имени полосы игры и начало колонки значков
              mix:MIX, ...mixGeom(lx0,bw), ms: MIX ? { y0:gy1+footH+8, y1:gy1+footH+8+MIX_MASTER_H } : null };   // MX1: mix — лицо микшера; fx0/fw — ход фейдера; ms — полоса мастера   // AR1: full — окно аранжировки; hx0 — левый край колонки заголовков; mini — миниатюры видимых строк (слой → записи; их сверяет проба); sx0 — левый край зоны прокрутки строк   // ⛳ rows — ВИДИМЫЕ строки (их рисуем и ловим); over/row0/nAll/visN — окно прокрутки (ui листает по ним); sx1 — правая кромка коробки   // E0-fix: x0 — начало ЛИНЕЙКИ (с колонкой значков сдвинуто), bx0 — кромка коробки   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
 
   if(FULL){ ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,W,Hc); }   // AR1: окно — свой экран (камера не рисуется), фон целиком
@@ -781,11 +803,12 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     ctx.fillStyle=live?'rgba(229,72,77,.16)':'rgba(255,255,255,.04)';
     if(FULL) ctx.fillRect(ARR_MARGIN,ry+1,hdrW+bw,rowH-2);   // AR1: фон — от колонки заголовка до конца дорожки
     else ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2);          // AR2: с колонкой имени.   E0-fix: фон строки — вместе с колонкой значков (она часть строки); без колонки markW=0 — как было
-    if(FULL) arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6, rowH, lid===armLy && !recording, name, col);
-    else{ ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='10px system-ui'; ctx.textAlign='right';
-      ctx.fillText('L'+(lid+1),x0-4,mid);
-      ctx.fillStyle=col; ctx.font='600 9px system-ui'; ctx.textAlign='left';   // AR2: ИМЯ дорожки цветом роли — в своей колонке слева от линейки (риски его не закрывают)
-      ctx.fillText(arrClip(name,nameW-6), x0+3, mid+0.5); }
+    if(FULL) Object.assign(loopView.look.get(lid), arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6, rowH, lid===armLy && !recording, name, col));   // AR2-fix: где встали тексты заголовка (проба: внутри рамки)
+    else{ const RT=stripRowText(lid, SC, name);   // AR2-fix: «L#» и ИМЯ — в колонке имени, внутри рамки (прежде «L#» висел левее коробки и торчал за рамку)
+      ctx.textAlign='left';
+      ctx.fillStyle= (lid===armLy && !recording) ? '#ff6b6f' : 'rgba(255,255,255,.5)'; ctx.fillText(RT.lbl, RT.lblX0, mid+0.5);   // вооружена — «L#» красный (как прежде)
+      if(RT.nm){ ctx.fillStyle=col; ctx.fillText(RT.nm, RT.nameX0, mid+0.5); }
+      Object.assign(loopView.look.get(lid), { lblX0:RT.lblX0, lblX1:RT.lblX1, nameX0:RT.nameX0, nameX1:RT.nameX1 }); }
     if(FULL){ clipLane(); if(MIX) drawLaneFader(lid, ry, rowH); else drawLaneMini(lid, ry, rowH); unclip(); }   // AR1: МИНИАТЮРЫ нот/ударов — в клипе дорожки; MX1: в лице микшера — фейдер
     ctx.globalAlpha=1;                                   // кнопки рисуем В ПОЛНУЮ СИЛУ: это орган управления, он обязан читаться и на погашенной строке
     /* ⛳ ВООРУЖЁННАЯ ДОРОЖКА (S3.5c) — красная рамка во всю строку, красная точка записи в её начале и красная
@@ -797,7 +820,6 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     else if(armed){
       ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,nameW+markW+bw-2,rowH-3);   // AR2: и колонка имени внутри.   рамка — вокруг ВСЕЙ строки, колонка значков внутри неё
       ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(mx0+ARM_DOT_X,mid,3.5,0,7); ctx.fill();   // AR2: колонка значков — за колонкой имени (mx0).   E0-fix: точка — в колонке значков (armed ⇒ колонка есть), а не на линейке
-      ctx.fillStyle='#ff6b6f'; ctx.font='600 10px system-ui'; ctx.textAlign='right'; ctx.fillText('L'+(lid+1),x0-4,mid);
     }
     /* ⛳ ИНДИКАТОР ЗАМОРОЗКИ (F5) — ТОЛЬКО ЗНАЧОК, без кнопки: на строке уже три органа управления и
        подпись в шестнадцати пикселях, четвёртый под палец не попал бы. Сама кнопка живёт в баре
@@ -960,11 +982,14 @@ function arrRowHeader(lid,x,ry,w,rowH,armed,name,col){
   const line2='L'+(lid+1)+(custom?' · '+laneDefName(lid):'');
   ctx.textAlign='left'; ctx.textBaseline='middle';
   ctx.fillStyle=col; ctx.font='600 12px system-ui';
-  ctx.fillText(arrClip(name,nw-(armed?8:0)), nx, ry+rowH*0.34);
+  const n1=arrClip(name,nw-(armed?8:0)), w1=ctx.measureText(n1).width;
+  ctx.fillText(n1, nx, ry+rowH*0.34);
   ctx.fillStyle= armed ? '#ff6b6f' : 'rgba(255,255,255,.55)'; ctx.font='11px system-ui';
-  ctx.fillText(arrClip(line2,nw), nx, ry+rowH*0.70);
+  const n2=arrClip(line2,nw), w2=ctx.measureText(n2).width;
+  ctx.fillText(n2, nx, ry+rowH*0.70);
   if(armed){ ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x+w,ry+rowH*0.34,3.5,0,7); ctx.fill(); }
   ctx.textBaseline='alphabetic';
+  return { nameX0:nx, nameX1:nx+w1, lblX0:nx, lblX1:nx+w2, handleX0:x+2, handleX1:x+ARR_HANDLE_W-4 };   // AR2-fix: где встали имя, «L#» и ручка
 }
 /* ═══ AR1: МИНИАТЮРЫ НОТ — ИЗ songSegs (ноты высотных ролей) и songNotes (удары) ═══
    Высотная роль: запись на СЕГМЕНТ (то, что редактор правит как ноту) — время [t0, t1] и частоты его нот (у аккорда — все ноты, той же
@@ -2653,6 +2678,19 @@ export function loopBeatAt(px){ const V=loopView; return V ? laneBeatAt(V,px) : 
    null — строки влезают все (листать нечего; полоса прежняя) или полосы нет. Прямоугольник — строки с подвалом, по ширине вся коробка. */
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkTracks): снимок геометрии полосы дорожек последнего кадра (тот, по которому ловит loopHit). Только чтение. */
 export const loopViewProbe=()=>loopView;
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkTrackLook, AR2-fix): где встанут тексты строк ПОЛОСЫ ИГРЫ на ширине холста W — по ТОЙ ЖЕ stripCols/stripRowText,
+   что рисует drawLooper (без колонки значков и с ней). old — где стоял бы «L#» ПРЕЖНЕЙ раскладки (правый край x0−4, шрифт 10px): контроль,
+   который мера обязана поймать (он за рамкой). Ничего не рисует; шрифт холста возвращается. */
+export function stripProbe(W){
+  ctx.save();
+  try{
+    const rows=[]; let old=null;
+    for(const markW of [0, MARK_COL_W]){ const C=stripCols(W, markW);
+      for(const ly of laneOrder()){ const R=stripRowText(ly, C, laneTitle(ly)); rows.push({ ly, markW, frame:[C.fx0,C.fx1], col:[C.x0, C.x0+C.nameW], lbl:[R.lblX0,R.lblX1], name:[R.nameX0,R.nameX1], nm:R.nm, bw:C.bw }); }
+      if(markW===0){ ctx.font='10px system-ui'; const ly=laneOrder().slice(-1)[0]??0, w=ctx.measureText('L'+(ly+1)).width; old={ frame:[C.fx0,C.fx1], lbl:[C.x0-4-w, C.x0-4] }; } }
+    return { W, rows, old, bw:stripCols(W,0).bw };
+  } finally { ctx.restore(); }
+}
 export function loopScroll(){ const V=loopView; if(!V||!V.over) return null;
   return { row0:V.row0, nAll:V.nAll, visN:V.visN, rowH:V.rowH, x0:V.sx0, x1:V.sx1, y0:V.gy0, y1:V.gy0+V.rows.length*V.rowH+LOOP_FOOT_H }; }
 /* ⛳ AR1: ГЕОМЕТРИЯ ОКНА АРАНЖИРОВКИ для жестов ui (прокрутка и зум времени, якорь под пальцем) — из ТОГО ЖЕ снимка (правило #9). null —

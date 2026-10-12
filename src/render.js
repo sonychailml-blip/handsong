@@ -219,7 +219,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
    render с F5 импортирует только ui — ЛЕНИВО (onFreeze), а зонд по-прежнему зовут из консоли. */
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
-import { setDroneNonOct, droneNonOct, droneDegree, CUR } from './scales.js';   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
+import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -1563,10 +1563,110 @@ async function reuseCheck(){
 /* ⛳ СНИМОК КОПИИ ДВИЖКА ДЛЯ СТРАЖА P.all — переключатели, которые рендер ей ставит (уровень и панорама по ключу, раскладчик, семя, отладка,
    ключ удара, величины соло-ноты). После каждого рендера копия в СБРОСЕ (renderReset в finally), значит снимок между строками P.all — один
    и тот же; иной — строка оставила копию в чужом состоянии. Только чтение. */
+/* ═══ ⛳ LR1: ПРОВОДКА ЖИВЫХ РЕВЕРБОВ — ПЕРЕКЛЮЧАТЕЛЬ ДЛЯ ПРОВЕРКИ НА СЛУХ ═══
+   R.liveReverb('new') — у каждой петли один вход, как у копии рендера (умолчание с LR1); R.liveReverb('old') — прежняя живая проводка;
+   R.liveReverb() — какая сейчас. Перестраивает живые экземпляры НА МЕСТЕ (audio.setLiveRevWiring → rewire): без перезагрузки, без
+   щелчка, величины те же. ⚠️ Прежняя проводка живёт только до приёмки на слух — в слайсе после приёмки снимается вместе с этим ключом. */
+function liveReverb(m){
+  if(m==null) return LIVE.liveRevWiring();
+  const r=LIVE.setLiveRevWiring(m);
+  if(!r){ console.log("  R.liveReverb('old' | 'new') — or R.liveReverb() to read it"); return null; }   // eslint-disable-line no-console
+  console.log('%c[liveReverb] '+(m==='new'?'NEW — one entry per loop, as the frozen render':'OLD — the previous live wiring (ear test only)')+' · rebuilt '+r.rebuilt+' live reverb(s); reverbs built later follow','font-weight:bold');   // eslint-disable-line no-console
+  return r;
+}
+/* ═══ ⛳ LR1: ЖИВОЙ И ЗАМОРОЖЕННЫЙ РЕВЕРБ СОГЛАСНЫ — тело пробы P.checkRevAgree ═══
+   МАТЕРИАЛ: временная дорожка аккордов в конце песни (recorder.seedTake — та же воронка, что P.seed): один аккорд органом (CHORD_INSTR[2]:
+   атака 12 мс, отпускание 90 мс — после отпускания звучит почти один реверб), ≈1.5 с; на миг взятия у ЖИВОГО реверба цепи аккордов подмес
+   поднят до упора (захват снимает величины живой цепи — это и есть «запись»), длина и окраска — те, что стоят.
+   ЖИВОЙ ПУТЬ: R.live этой дорожки (живой движок, захваченная цепь), выход МАСТЕРА снят audio.probeCapture — в колонки не идёт.
+   ПУТЬ ЗАМОРОЗКИ: renderTrack той же дорожки с семенем её заморозки (то, что стало бы буфером), тоже мастер (offlineTapMaster).
+   МЕРА (моно, начало — по порогу 5 % пика, отпускание = начало + длина аккорда):
+     ЭНЕРГИЯ ХВОСТА — 10·lg(E хвоста / E звучания), хвост — [отпускание + 0.3 с, + 1.0 с], звучание — [начало + 0.35 с, отпускание − 0.05 с];
+     отношение к звучанию снимает уровень мастера, гейн копии и гуманизацию громкости;
+     СПЕКТРАЛЬНЫЙ БАЛАНС ХВОСТА — 10·lg(E первой разности / E) в том же окне (наклон +6 дБ/окт: чем ярче хвост, тем больше).
+   ДОПУСК: живой против замороженного — |Δ| ≤ RA_TOL_E по энергии и ≤ RA_TOL_B по балансу (дБ). Прежняя живая проводка давала ±10 %
+   энергии хвоста от загрузки к загрузке (≈ ±0.4 дБ), гуманизация — доли дБ; 1 дБ — запас над ними и далеко под слышимой сменой комнаты.
+   КОНТРОЛИ (мера обязана уметь провалиться): та же дорожка, взятая с ДРУГОЙ длиной хвоста (RA_CTRL_DECAY с), — её энергия хвоста ОБЯЗАНА
+   выйти за допуск; с другой окраской (RA_CTRL_TONE Гц) — баланс ОБЯЗАН выйти за допуск. Временные дорожки снимаются (✕ дважды), величины
+   живой цепи аккордов возвращаются. Время: живой съём ≈ 3.5 с реального времени + три полных рендера (≈ 1–2 с каждый). */
+const RA_TOL_E=1.0, RA_TOL_B=1.0, RA_CTRL_DECAY=0.4, RA_CTRL_TONE=400;
+function raMeasure(L,R,rate,dur){
+  const n=Math.min(L.length,R.length), x=new Float32Array(n); let pk=0;
+  for(let i=0;i<n;i++){ const v=0.5*(L[i]+R[i]); x[i]=v; const a=v<0?-v:v; if(a>pk) pk=a; }
+  if(!(pk>0)) return { why:'silent' };
+  let on=-1; for(let i=0;i<n;i++) if(Math.abs(x[i])>0.05*pk){ on=i; break; }
+  const o=on/rate, rel=o+dur;
+  if((rel+1.0)*rate>n) return { why:`the signal is too short (${(n/rate).toFixed(2)} s for a tail up to ${(rel+1).toFixed(2)} s)` };
+  const ix=t=>Math.max(1,Math.min(n,Math.floor(t*rate)));
+  const E=(a,b)=>{ let s=0; for(let i=ix(a);i<ix(b);i++) s+=x[i]*x[i]; return s/Math.max(1,ix(b)-ix(a)); };
+  const Dd=(a,b)=>{ let s=0; for(let i=ix(a);i<ix(b);i++){ const d=x[i]-x[i-1]; s+=d*d; } return s/Math.max(1,ix(b)-ix(a)); };
+  const S=E(o+0.35, rel-0.05), T=E(rel+0.3, rel+1.0), D=Dd(rel+0.3, rel+1.0);
+  if(!(S>0)||!(T>0)) return { why:'no sustain or no tail energy' };
+  return { onset:+o.toFixed(3), energy:10*Math.log10(T/S), bright:10*Math.log10(D/T) };
+}
+async function revAgree(){
+  if(!LIVE_AC) return { ok:false, why:'audio is not started (press ▶ Play)' };
+  if(REC.loop.on||REC.recording) return { ok:false, why:'the transport is playing or recording — stop it first' };
+  if(REC.editIsOpen()) return { ok:false, why:'the track editor is open — close it first' };
+  const key=chainKeyOf('ch');
+  if(!fxChainOf(key).some(e=>e.fxId==='reverb')) return { ok:false, why:'the chord chain holds no reverb (it does by default) — add one to run this probe' };
+  const inst=LIVE.fxInstance(key,'reverb'); if(!inst) return { ok:false, why:'no live reverb instance for chords' };
+  stop();
+  const keepAll=[]; for(const e of fxChainOf(key)){ const I=LIVE.fxInstance(key,e.fxId); if(I&&I.params) for(const p of I.params) keepAll.push([p,p.cur]); }   // все величины цепи аккордов — вернуть ровно как были
+  const P=k=>inst.params.find(p=>p.key===k), dec0=P('decay').cur, tone0=P('tone').cur;
+  const spb=60/REC.loop.bpm, beats=Math.max(1,Math.round(1.5/spb)), dur=beats*spb, made=[];
+  const tStart=performance.now();
+  const take=(decN,toneN)=>{
+    P('mix').setNorm(1); P('decay').setNorm(decN); P('tone').setNorm(toneN);
+    const T=Math.ceil(REC.songBeats())+8;
+    const steps=ty=>[{fn:'chOn',a:{deg:0,oct:1,vol:0.7,inst:2,ty},t:T,id:1},{fn:'chOff',a:{},t:T+beats,id:1}];
+    let r=REC.seedTake(steps(null)); if(!r||!r.layers.length) return null;
+    let ly=r.layers[0], on=REC.events.find(e=>e.layer===ly&&e.fn==='chOn');
+    if(!on || !REC.evHz(on.a,on,'ch').length){   // лад без аккордов по правилу — однонотный аккорд (его цена — сам корень)
+      REC.laneDelTap(ly); REC.laneDelTap(ly);
+      r=REC.seedTake(steps(chordUnit(CUR()))); if(!r||!r.layers.length) return null; ly=r.layers[0]; }
+    made.push(ly); return ly; };
+  const norm=(p,v)=>{ const x= p.curve==='log' ? Math.log(v/p.min)/Math.log(p.max/p.min) : (v-p.min)/(p.max-p.min); return Math.max(0,Math.min(1,x)); };
+  const out={ ok:false, tolE:RA_TOL_E, tolB:RA_TOL_B, wiring:LIVE.liveRevWiring() };
+  try{
+    // ---- живой против заморозки ----
+    const A=take(dec0,tone0); if(A==null){ out.why='the temporary chord track could not be recorded'; return out; }
+    const capP=LIVE.probeCapture(0.3+dur+1.8);
+    if(!live(A)){ out.why='R.live refused'; return out; }
+    const cap=await capP; stop();
+    const chOf=b=>[b.getChannelData(0), b.numberOfChannels>1?b.getChannelData(1):b.getChannelData(0)];
+    const mL=raMeasure(cap.L,cap.R,cap.rate,dur);
+    const rA=await renderTrack(A,{ quiet:true, seed:seedOfLane(REC.freezeTicket(A).id) });
+    const mR=raMeasure(...chOf(rA.buf), rA.buf.sampleRate, dur);
+    if(mL.why||mR.why){ out.why='measure: live — '+(mL.why||'ok')+'; frozen — '+(mR.why||'ok'); return out; }
+    // ---- контроли: другая длина хвоста, другая окраска ----
+    const B=take(norm(P('decay'),RA_CTRL_DECAY),tone0), C=take(dec0,norm(P('tone'),RA_CTRL_TONE));
+    if(B==null||C==null){ out.why='a control track could not be recorded'; return out; }
+    const mOf=async ly=>{ const r=await renderTrack(ly,{ quiet:true, seed:seedOfLane(REC.freezeTicket(ly).id) }); return raMeasure(...chOf(r.buf), r.buf.sampleRate, dur); };
+    const mB=await mOf(B), mC=await mOf(C);
+    if(mB.why||mC.why){ out.why='control measure: '+(mB.why||mC.why); return out; }
+    const r2=v=>Math.round(v*100)/100;
+    Object.assign(out,{ live:{ energy:r2(mL.energy), bright:r2(mL.bright) }, frozen:{ energy:r2(mR.energy), bright:r2(mR.bright) },
+      dEnergy:r2(mR.energy-mL.energy), dBright:r2(mR.bright-mL.bright),
+      ctrlDecay:{ sec:RA_CTRL_DECAY, dEnergy:r2(mB.energy-mL.energy) }, ctrlTone:{ hz:RA_CTRL_TONE, dBright:r2(mC.bright-mL.bright) } });
+    out.agree= Math.abs(out.dEnergy)<=RA_TOL_E && Math.abs(out.dBright)<=RA_TOL_B;
+    out.controlsFail= Math.abs(out.ctrlDecay.dEnergy)>RA_TOL_E && Math.abs(out.ctrlTone.dBright)>RA_TOL_B;
+    out.ok=true;
+  } catch(err){ out.why='failed: '+(err&&err.message); }
+  finally{
+    stop();
+    for(const ly of made.slice().reverse()){ REC.laneDelTap(ly); REC.laneDelTap(ly); }
+    for(const [p,v] of keepAll) p.setNorm(v);
+    out.seconds=+((performance.now()-tStart)/1000).toFixed(1);
+  }
+  return out;
+}
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
 export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
   copyState,   // снимок переключателей копии движка — страж P.all между строками
+  /* LR1: проводка живых ревербов (для уха — R.liveReverb) и проба «живой и замороженный реверб согласны» (P.checkRevAgree) */
+  liveReverb, revAgree,
   renderQueue };   // сколько рендеров ждёт или идёт (очередь — один рендер копии за раз)
