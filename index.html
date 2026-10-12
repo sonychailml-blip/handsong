@@ -141,6 +141,9 @@
   <button id="arrZoomIn" data-i18n-title="arr.zoomInTitle" title="Zoom in">+</button>
   <button id="arrFit" data-i18n-title="arr.fitTitle" title="Whole song">⤢</button>
 </div>
+<!-- AR2: ПОЛЕ ИМЕНИ ДОРОЖКИ — двойной тап по имени в строке окна; ui ставит его поверх заголовка строки (position:fixed). Enter или уход
+     фокуса — оставить, Esc — отмена, пустое — снова «роль · тембр». Подсказку (title) и заготовку (placeholder) ставит ui. -->
+<input id="laneNameIn" type="text" maxlength="40" autocomplete="off" spellcheck="false" enterkeyhint="done" hidden>
 
 <!-- ================= РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (S5.0) =================
      ПАНЕЛЬ — то, у чего НЕТ временнóй геометрии: закрыть, дорожка, зум. Сама сетка живёт на

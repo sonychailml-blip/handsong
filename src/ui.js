@@ -9,6 +9,7 @@ import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChord
          rollOpen, setRollOpen, arrOpen, setArrOpen, arrFace, setArrFace, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
          rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll, setLaneRow0,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
+         setLaneDrag,   // AR2: тянущаяся за ручку строка окна (вид жеста; порядок пишет recorder.moveLane)
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
@@ -18,7 +19,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across } from './draw.js';   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -31,6 +32,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editInsertLead, laneLevelOf, setLaneLevel, lanePanOf, setLanePan,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
+         laneOrder, moveLane, laneNameOf, setLaneName,   // AR2: порядок показа (один на все виды), перестановка, имя дорожки
          freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
@@ -455,7 +457,8 @@ function rollEnterTrack(){
   const r=laneRoleOf(editLayer());
   setRollRole(r); setRollSel(null); setRollDrag(null); setRollRow0(rollDefaultRow0(r));
 }
-const trackLayers=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+/* AR2: дорожки — В ПОРЯДКЕ ПОКАЗА (recorder.laneOrder — тот же, что у окна, микшера и полосы игры): круг чипа редактора идёт по нему. */
+const trackLayers=()=>laneOrder();
 const rollTotal=()=>Math.max(songBeats(), loop.metre*loop.bars);   // пустая песня — тоже поле: показываем окно подложки
 function setRollWinClamped(b0,span){
   const M=loop.metre, total=rollTotal();
@@ -469,7 +472,8 @@ function setRollWinClamped(b0,span){
 function applyRollBar(){
   if(!rollOpen) return;
   const ly=editLayer();
-  rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1});
+  rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1})+' · '+laneTitle(ly);   // AR2: «L# · имя» — то же имя, что у строки в окне
+  rollTrackBtn.style.setProperty('--role', ly==null ? '' : laneCol(ly));                       // AR2: цвет роли дорожки — та же палитра (config.INSTR_COL)
   rollTrackBtn.disabled = trackLayers().length<2;
   renderTimbreCtl();
   /* (Чип лада #rollScale снят в T4c-2: у дорожки один вид строя — маршрут по строю, см. draw.rollGroup.) */
@@ -571,6 +575,7 @@ function openArr(){
 function closeArr(){
   if(!arrOpen) return;
   if(rollOpen) closeRoll();
+  closeRename(true); setLaneDrag(null);   // AR2: открытое поле имени — оставить; перестановка — снята
   setArrOpen(false); arrG=null; arrZoom=null; arrPts.clear();
   arrBar.classList.remove('on'); loopTpEl.classList.remove('arr');
   barEl.classList.add('on'); revealBar();
@@ -610,6 +615,7 @@ function arrDown(e){
   if(arrPts.size===1){
     const h=loopHit(p.x,p.y);
     if(h && h.what==='brace'){ arrG=null; braceEdge=braceTap(h.beat); return; }
+    if(h && h.what==='move'){ arrG={ h, x:p.x, y:p.y, move:true, to:h.row, scrollT:0 }; setLaneDrag({ layer:h.layer, to:h.row }); return; }   // AR2: ручка — перестановка (порядок пишется на отпускании)
     if(isFader(h)){
       const key= h.what==='mlevel' ? 'm' : (h.what==='pan'?'P':'L')+h.layer, now=performance.now(), S=loopScroll();
       if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h, h.what==='pan'?0:1); arrG=null; return; }   // двойной тап — единица (панорама — центр)
@@ -619,7 +625,7 @@ function arrDown(e){
     const S=loopScroll();
     arrG={ h, x:p.x, y:p.y, b0:g.beat0, span:g.span, bw:g.bw, r0:S?S.row0:0, rowH:g.rowH, axis:null };
   }else if(arrPts.size===2){
-    arrG=null; braceEdge=null;
+    arrG=null; braceEdge=null; setLaneDrag(null);   // AR2: второй палец — зум, перестановка снята
     const [a,b]=[...arrPts.values()], mid=(a.x+b.x)/2;
     arrZoom={ dist:Math.max(1,Math.abs(a.x-b.x)), span:g.span, midBeat:g.beat0+g.span*((mid-g.x0)/g.bw) };
   }
@@ -632,6 +638,7 @@ function arrMove(e){
     const [a,b]=[...arrPts.values()], d=Math.max(1,Math.abs(a.x-b.x)), mid=(a.x+b.x)/2, span=arrZoom.span*arrZoom.dist/d;
     setRollWinClamped(arrZoom.midBeat-span*((mid-g.x0)/g.bw), span); return; }
   if(!arrG) return;
+  if(arrG.move){ arrMoveTo(p.y); return; }   // AR2: строка за ручкой — только по вертикали
   const dx=p.x-arrG.x, dy=p.y-arrG.y;
   if(!arrG.axis){ if(Math.abs(dx)<=LANE_SCROLL_PX && Math.abs(dy)<=LANE_SCROLL_PX) return; arrG.axis= Math.abs(dx)>=Math.abs(dy) ? 'x' : 'y'; }
   if(arrG.level){   // MX1: фейдер — вдоль уровень (относительно), поперёк строки; у полосы мастера листать нечего
@@ -641,10 +648,59 @@ function arrMove(e){
   if(arrG.axis==='x') setRollWinClamped(arrG.b0 - dx*arrG.span/arrG.bw, arrG.span);
   else setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
 }
+/* ⛳ AR2: ПЕРЕСТАНОВКА ДОРОЖКИ — палец взял РУЧКУ строки (loopHit → 'move'); место под пальцем — строка окна + первая видимая (тот же
+   снимок, что нарисован: arrGeom.all/row0/nVis — правило #9), зажатое в [0, n−1]. Палец у верхнего или нижнего края окна строк листает их
+   (по строке не чаще LANE_AUTOSCROLL_MS — двигайте палец, чтобы листать дальше). Порядок пишет recorder.moveLane на ОТПУСКАНИИ; пока
+   тянется — только вид (state.laneDrag: draw обводит строку и рисует черту, куда она встанет). */
+const LANE_AUTOSCROLL_MS=140;
+function arrMoveTo(y){
+  const g=arrGeom(); if(!g||!arrG||!g.all.length) return;
+  const ri=Math.floor((y-g.gy0)/g.rowH), S=loopScroll(), now=performance.now();
+  if(S && now-arrG.scrollT>LANE_AUTOSCROLL_MS){
+    if(ri<0 && S.row0>0){ setLaneRow0(S.row0-1); arrG.scrollT=now; }
+    else if(ri>=g.nVis && S.row0<S.nAll-S.visN){ setLaneRow0(S.row0+1); arrG.scrollT=now; } }
+  const to=Math.max(0, Math.min(g.all.length-1, g.row0+Math.max(0, Math.min(g.nVis-1, ri))));
+  arrG.to=to; setLaneDrag({ layer:arrG.h.layer, to });
+}
+/* ⛳ AR2: ПЕРЕИМЕНОВАНИЕ — ДВОЙНОЙ ТАП ПО ИМЕНИ. Одиночный тап по заголовку по-прежнему вооружает (AR1) и действует сразу; второй тап по
+   тому же имени в пределах NAME_DBL_MS ВОЗВРАЩАЕТ вооружение, каким оно было до первого (toggleArm той дорожки, что была вооружена, —
+   recorder отдаёт только переключатель) и открывает поле имени поверх заголовка. Поле — HTML (#laneNameIn): Enter или уход фокуса —
+   оставить, Esc — отмена, пустое имя — снова «роль · тембр» (recorder.setLaneName). */
+const NAME_DBL_MS=350; let nameTap={ layer:null, t:0, prevArm:null };
+function nameTapDouble(ly,pre){   // pre — вооружённая дорожка ДО этого тапа (его toggleArm уже прошёл)
+  const now=performance.now();
+  if(nameTap.layer===ly && now-nameTap.t<NAME_DBL_MS){
+    const prev=nameTap.prevArm, cur=armedLayer(); nameTap={ layer:null, t:0, prevArm:null };
+    if(cur!==prev) toggleArm(prev!=null ? prev : cur);
+    updRecBtn(); openRename(ly); return true; }
+  nameTap={ layer:ly, t:now, prevArm:pre };
+  return false;
+}
+const laneNameIn=$('laneNameIn'); let renameLy=null;
+function openRename(ly){
+  const g=arrGeom(); if(!g||!laneNameIn) return;
+  const i=g.all.indexOf(ly)-g.row0; if(i<0||i>=g.nVis) return;
+  const r=canvasEl.getBoundingClientRect();
+  renameLy=ly;
+  Object.assign(laneNameIn.style,{ left:(r.left+g.hx0+g.handleW)+'px', top:(r.top+g.gy0+i*g.rowH+3)+'px',
+    width:Math.max(150, g.hw-g.handleW-8)+'px', height:Math.max(28, g.rowH-6)+'px' });
+  laneNameIn.value=laneNameOf(ly)||''; laneNameIn.placeholder=laneDefName(ly); laneNameIn.title=t('arr.renameTitle');
+  laneNameIn.hidden=false; laneNameIn.focus(); laneNameIn.select();
+}
+function closeRename(commit){
+  if(renameLy==null) return;
+  const ly=renameLy; renameLy=null;
+  if(commit) setLaneName(ly, laneNameIn.value);
+  laneNameIn.hidden=true; laneNameIn.blur();
+}
+if(laneNameIn){
+  laneNameIn.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); closeRename(true); } else if(e.key==='Escape'){ e.preventDefault(); closeRename(false); } };
+  laneNameIn.onblur=()=>closeRename(true);
+}
 function arrAct(h){
   if(h.what==='open'){ openRoll(h.layer); return; }
   if(h.what==='frz'){ onFreeze(h.layer); return; }
-  if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; }
+  if(h.what==='arm'){ const pre=armedLayer(); toggleArm(h.layer); updRecBtn(); if(h.name) nameTapDouble(h.layer,pre); return; }   // AR2: второй тап по имени — переименовать (вооружение возвращается)
   if(h.what==='mute') toggleLaneMute(h.layer); else if(h.what==='solo') toggleLaneSolo(h.layer);
 }
 function arrUp(e){
@@ -653,11 +709,12 @@ function arrUp(e){
   if(arrPts.size<2) arrZoom=null;
   if(arrPts.size) return;
   const G=arrG; arrG=null;
+  if(G && G.move){ setLaneDrag(null); moveLane(G.h.layer, G.to); return; }   // AR2: перестановка — на отпускании (на месте — ничего)
   if(G && !G.axis && G.h && !G.level) arrAct(G.h);   // MX1: тап по фейдеру — ничего (двойной — единица, в arrDown)
 }
 addEventListener('pointermove',  e=>{ if(arrOpen&&!rollOpen) arrMove(e); });
 addEventListener('pointerup',    e=>{ if(arrOpen&&!rollOpen) arrUp(e); });
-addEventListener('pointercancel',e=>{ if(arrOpen&&!rollOpen){ arrPts.delete(e.pointerId); arrG=null; arrZoom=null; } });
+addEventListener('pointercancel',e=>{ if(arrOpen&&!rollOpen){ arrPts.delete(e.pointerId); arrG=null; arrZoom=null; setLaneDrag(null); } });
 /* Колесо окна: Ctrl/⌘ — зум под курсором; при прокручиваемых строках вертикальное колесо — строки; иначе (и Shift / горизонтальное) — время. */
 addEventListener('wheel', e=>{
   if(!arrOpen || rollOpen || e.target!==canvasEl) return;

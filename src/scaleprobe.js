@@ -73,16 +73,18 @@ import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
-import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom } from './draw.js';
+import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки (P.checkTrackLook)
+import { INSTR_COL, LANE_NOROLE_COL } from './config.js';   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi } from './ui.js';
-import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot } from './audio.js';   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf } from './audio.js';   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
          songNotes, editResizeSeg, editDeleteSeg, editInsertLead, editUndo, editRedo, freezeState, recording,
          tiePartners, laneEditVerOf, freezeTicket, laneDelTap,
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
-         laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf } from './recorder.js';   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
+         laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep } from './recorder.js';   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
@@ -420,6 +422,7 @@ const ALL_RUNS=[
   ['AR1 arrangement window',()=>checkArrange(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['MX1 track level and master',()=>checkMixer(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['MX2 track pan',()=>checkPan(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['AR2 track names, colours, order',()=>checkTrackLook(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -439,7 +442,7 @@ const ALL_RUNS=[
    hidden», не FAIL и не pass; итог просит повторить при видимой вкладке. */
 const SLOW_ROWS=new Set(['T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
   'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot']);
-const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan']);
+const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
 const HIDDEN='not checked: tab hidden';
 for(const n of [...SLOW_ROWS,...DRAWN_ROWS]) if(!ALL_RUNS.some(r=>r[0]===n)) console.warn(`[scaleprobe] «${n}» is not a row of P.all — the quick/drawn lists are out of date`);
 /* ⛳ СТРАЖ СОСТОЯНИЯ МЕЖДУ СТРОКАМИ P.all (после MX2: проба, оставившая след, роняет ЧУЖУЮ строку — и виноватую не видно). Снимок до и после
@@ -451,6 +454,7 @@ async function stateSig(R){
   let copy='—'; try{ if(R) copy=JSON.stringify(await R.copyState()); }catch(e){ copy='copy state unreadable: '+(e&&e.message); }
   return { 'track level/pan/mute/solo': Ls.map(ly=>`L${ly+1}:${laneLevelOf(ly)}/${lanePanOf(ly)}/${laneMuted(ly)?'M':'-'}${laneSoloed(ly)?'S':'-'}`).join(' '),
            'master level': String(masterLevel()),
+           'track names and order (AR2)': laneOrder().map(ly=>`L${ly+1}${laneNameOf(ly)!=null?'='+laneNameOf(ly):''}`).join(' '),
            'windows (arrangement/face/editor)': [arrOpen, arrFace, rollOpen, editIsOpen()].join(','),
            'render engine copy': copy,
            /* ⛳ ЖИВОЕ СОСТОЯНИЕ ЗВУКА, КОТОРОЕ ЧИТАЕТ РЕНДЕР ИЛИ ПЕРЕИГРОВКА (после MX2): цепи всех владельцев (состав и адреса), их прицепочные
@@ -1316,12 +1320,12 @@ export async function checkArrange(){
       let V=loopViewProbe();
       if(!V||!V.full){ miss('the arrangement is not drawn (the snapshot is not the full-screen one)'); break; }
       if(!V.rows.includes(ly)){ const S=loopScroll();
-        if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, i))); await frame(); await frame(); V=loopViewProbe(); } }
+        if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, V.all?V.all.indexOf(ly):i))); await frame(); await frame(); V=loopViewProbe(); } }
       if(!V||!V.rows.includes(ly)){ miss(`L${ly+1}: not among the arrangement's rows even after scrolling`); continue; }
       const ri=V.rows.indexOf(ly), y=V.gy0+ri*V.rowH+V.rowH/2;
       if(V.gy0+(ri+1)*V.rowH>innerHeight) miss(`L${ly+1}: its row lies below the bottom of the screen`);
       const at=(x,want)=>{ const h=loopHit(x,y); if(!h||h.layer!==ly||h.what!==want) miss(`L${ly+1}: a tap at x ${Math.round(x)} gives ${h?h.what+' L'+(h.layer+1):'nothing'}, not ${want}`); };
-      at(V.hx0+6,'arm'); at(V.x0+V.bw/2,'open');
+      at(V.x0-8,'arm'); at(V.x0+V.bw/2,'open');   // AR2: левее ИМЕНИ теперь ручка перестановки — вооружает тап по имени (у кромки дорожки)
       const seen=new Set(); for(let x=V.tx0; x<V.tx0+160; x++){ const h=loopHit(x,y); if(h&&h.layer===ly) seen.add(h.what); }
       for(const w of ['mute','solo','frz']) if(!seen.has(w)) miss(`L${ly+1}: its ${w} button is not hittable`);
       cases++; const M=V.mini&&V.mini.get(ly);
@@ -1360,6 +1364,150 @@ export async function checkArrange(){
   if(!nBad) console.log('[scaleprobe arrange] every track has its row in the arrangement — drawn, on screen, hittable (arm, open, M, S, ❄) — with one miniature per segment or hit; a row opens exactly its track; the time window is shared both ways');
   return { cases, song:L.length, total:nBad, differences:bad };
 }
+/* ═══ AR2: ИМЕНА, ЦВЕТА И ПОРЯДОК ДОРОЖЕК — P.checkTrackLook ═══
+   (1) ИМЯ ПО УМОЛЧАНИЮ — «роль · тембр» на ОБОИХ языках, собранное здесь НЕЗАВИСИМО (recorder.laneRoleOf/laneTimbreOf — проход по событиям,
+       audio.timbresOf, словарь) против draw.laneDefName (мемо recorder.laneLook и кэш имён); laneTitle = данное имя, иначе оно.
+   (2) ПАЛИТРА — данные (config.INSTR_COL): у четырёх ролей РАЗНАЯ светлота (соседи по яркости ≥ 1.3× по контрасту — различимы и
+       дальтонику) и каждая ≥ 4.5:1 к фону строки окна (имя — текст 12 px); цвет дорожки — цвет её роли (без роли — серый).
+   (3) ВЕЗДЕ ОДНО — для КАЖДОЙ дорожки, с прокруткой строк: полоса игры, окно аранжировки, лицо микшера (снимок loopView.look — имя и цвет,
+       которыми строка нарисована) и редактор (снимок rollView.col — цвет нот; чип дорожки — «L# · имя», --role — цвет).
+   (4) ПЕРЕИМЕНОВАНИЕ — имя видно во всех четырёх местах, переживает прокрутку строк и смену лица; пустое — снова по умолчанию; длинное — 40 знаков.
+   (5) ПЕРЕСТАНОВКА — последняя дорожка встаёт первой (recorder.moveLane): порядок ОДИН в окне, микшере и на полосе (снимок all = laneOrder),
+       прочие сохраняют свой порядок; тап по телу каждой видимой строки ловится как ЕЁ дорожка («открыть» в окне, фейдер в микшере), ручка —
+       'move' с местом строки; открыв первую строку, редактор стоит на ней, а чип дорожки ведёт к СЛЕДУЮЩЕЙ в этом порядке.
+   (6) ПРАВИЛО #27 — временная дорожка с именем и ПЕРВЫМ местом снята (✕ дважды, как на полосе); следующая, родившаяся на ТОМ ЖЕ номере, —
+       без имени и В КОНЦЕ. Песня после — та же (события, порядок). Нужен стоящий транспорт (иначе часть 6 пропускается с расхождением).
+   Имена и места (ровно как были — recorder.laneShowKeep), окно, лицо, отрезок времени и прокрутку возвращает. Кадры ждёт сама:
+   await P.checkTrackLook(). */
+export async function checkTrackLook(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const LS=laneOrder();
+  const done=()=>({ cases, song:LS.length, total:nBad, differences:bad });
+  if(LS.length<2){ miss('fewer than two tracks — run await P.seed({replace:true})'); return done(); }
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return done(); }
+  if(recording){ miss('recording — stop it first'); return done(); }
+  const colOf=ly=>{ const r=laneRoleOf(ly); return r ? INSTR_COL[r] : LANE_NOROLE_COL; };
+  const defOf=ly=>{ const r=laneRoleOf(ly);
+    if(!r) return events.some(e=>e.layer===ly&&e.fn==='drone') ? t('track.drone') : t('arr.noRole');
+    const e=timbresOf(r).find(z=>z.id===laneTimbreOf(ly)); return t('track.role.'+r)+(e?' · '+L(e.name):''); };
+  const lum=h=>{ const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4)); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
+  const cr=(a,b)=>(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
+  // строка видна (прокрутить к ней по месту в ОБЩЕМ порядке) — снимок или null
+  const showRow=async ly=>{ let V=loopViewProbe(); if(!V) return null;
+    if(!V.rows.includes(ly)){ const S=loopScroll(); if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, V.all.indexOf(ly)))); await frame(); await frame(); V=loopViewProbe(); } }
+    return V&&V.rows.includes(ly) ? V : null; };
+  const lookAt=async (where,ly,full)=>{ cases++;
+    const V=await showRow(ly); if(!V){ miss(`${where}: L${ly+1} is not among the drawn rows even after scrolling`); return; }
+    if(!!V.full!==full){ miss(`${where}: the drawn screen is ${V.full?'the arrangement':'the play strip'}`); return; }
+    const k=V.look&&V.look.get(ly); if(!k){ miss(`${where}: L${ly+1}: the row's name and colour are not in the snapshot`); return; }
+    if(k.name!==laneTitle(ly)) miss(`${where}: L${ly+1} reads «${k.name}», not «${laneTitle(ly)}»`);
+    if(k.col!==colOf(ly)) miss(`${where}: L${ly+1} is drawn ${k.col}, its role's colour is ${colOf(ly)}`); };
+  const editorAt=async ly=>{ cases++;
+    arrApi.openTrack(ly); await frame(); await frame();
+    if(!rollOpen||editLayer()!==ly){ miss(`editor: L${ly+1} does not open`); if(rollOpen) arrApi.closeTrack(); return; }
+    const g=rollGeom(), chip=document.getElementById('rollTrack'), want=t('roll.track',{n:ly+1})+' · '+laneTitle(ly);
+    if(!g || (g.col||LANE_NOROLE_COL)!==colOf(ly)) miss(`editor: L${ly+1}'s notes are drawn ${g&&g.col}, its role's colour is ${colOf(ly)}`);
+    if(chip){ if(chip.textContent!==want) miss(`editor: the track chip reads «${chip.textContent}», not «${want}»`);
+      if(chip.style.getPropertyValue('--role')!==laneCol(ly) || laneCol(ly)!==colOf(ly)) miss(`editor: the track chip's colour is ${chip.style.getPropertyValue('--role')||'none'}, not ${colOf(ly)}`); }
+    arrApi.closeTrack(); await frame(); };
+  const everywhere=async (lys,label)=>{   // полоса игры → окно → микшер → редактор (из окна)
+    await frame(); await frame();
+    for(const ly of lys) await lookAt(label+' · play strip',ly,false);
+    arrApi.open(); await frame(); await frame();
+    if(!arrOpen){ miss(label+': the arrangement does not open'); return; }
+    for(const ly of lys) await lookAt(label+' · arrangement',ly,true);
+    arrApi.face('mix'); await frame(); await frame();
+    for(const ly of lys) await lookAt(label+' · mixer',ly,true);
+    arrApi.face('arr'); await frame();
+    for(const ly of lys) await editorAt(ly);
+    arrApi.close(); await frame(); };
+  const restoreShow=laneShowKeep(), wk=winKeep();
+  try{
+    // ---- 1) имя по умолчанию, оба языка ----
+    for(const lg of ['en','ru']) withLang(lg,()=>{ for(const ly of LS){ cases++;
+      const want=defOf(ly), got=laneDefName(ly);
+      if(got!==want) miss(`default name (${lg}) L${ly+1}: «${got}», not «${want}»`);
+      if(laneTitle(ly)!==(laneNameOf(ly)||want)) miss(`name (${lg}) L${ly+1}: «${laneTitle(ly)}» is neither its own name nor the default`); } });
+    // ---- 2) палитра ----
+    { cases++; const roles=['ld','ch','bs','dr'], Y=roles.map(r=>lum(INSTR_COL[r])).sort((a,b)=>a-b), bg=lum('#141420');
+      for(let i=1;i<Y.length;i++) if(cr(Y[i],Y[i-1])<1.3) miss(`palette: two role colours are too close in lightness (contrast ${cr(Y[i],Y[i-1]).toFixed(2)} < 1.3)`);
+      for(const r of roles) if(cr(lum(INSTR_COL[r]),bg)<4.5) miss(`palette: ${r} ${INSTR_COL[r]} reads ${cr(lum(INSTR_COL[r]),bg).toFixed(2)}:1 on a row, below 4.5:1`);
+      for(const ly of LS){ cases++; if(laneCol(ly)!==colOf(ly)) miss(`colour: L${ly+1} is ${laneCol(ly)}, its role's colour is ${colOf(ly)}`); } }
+    // ---- 3) везде одно ----
+    await everywhere(LS,'look');
+    // ---- 4) переименование ----
+    const A=LS[0], NAME='Probe · name ✓';
+    cases++; setLaneName(A, NAME);
+    if(laneTitle(A)!==NAME) miss(`rename: L${A+1} reads «${laneTitle(A)}» after the rename`);
+    await everywhere([A],'renamed');
+    arrApi.open(); await frame(); await frame();
+    { const S=loopScroll(); if(S){ cases++; setLaneRow0(S.nAll-S.visN); await frame(); await frame(); setLaneRow0(0); await frame(); await frame(); await lookAt('renamed · after a scroll',A,true); } }
+    arrApi.face('mix'); await frame(); await frame(); await lookAt('renamed · after a face switch',A,true);
+    arrApi.face('arr'); arrApi.close(); await frame();
+    cases++; setLaneName(A,'   ');
+    if(laneNameOf(A)!==null || laneTitle(A)!==laneDefName(A)) miss(`rename: an empty name does not return to the default («${laneTitle(A)}»)`);
+    cases++; setLaneName(A,'x'.repeat(60));
+    if((laneNameOf(A)||'').length!==40) miss(`rename: a 60-character name keeps ${(laneNameOf(A)||'').length} characters, not 40`);
+    setLaneName(A,null);
+    // ---- 5) перестановка ----
+    const Z=LS[LS.length-1]; cases++;
+    moveLane(Z,0);
+    const O=laneOrder();
+    if(O[0]!==Z) miss(`reorder: L${Z+1} moved to the top, but the order starts with L${O[0]+1}`);
+    if(JSON.stringify(O.slice(1))!==JSON.stringify(LS.filter(l=>l!==Z))) miss('reorder: the other tracks did not keep their order');
+    await frame(); await frame();
+    const sameAll=(where)=>{ cases++; const V=loopViewProbe(); if(!V||!V.all) { miss(`${where}: not drawn`); return null; }
+      if(JSON.stringify(V.all)!==JSON.stringify(O)) miss(`${where}: rows are drawn in the order ${V.all.map(l=>'L'+(l+1)).join(' ')}, not ${O.map(l=>'L'+(l+1)).join(' ')}`); return V; };
+    setLaneRow0(0); await frame(); await frame(); sameAll('reorder · play strip');
+    arrApi.open(); await frame(); await frame();
+    const hitRows=(where,want)=>{ const V=sameAll(where); if(!V) return;
+      V.rows.forEach((ly,ri)=>{ cases++; const y=V.gy0+ri*V.rowH+V.rowH/2;
+        if(ly!==O[V.row0+ri]) miss(`${where}: row ${ri+1} shows L${ly+1}, the order says L${O[V.row0+ri]+1}`);
+        const h=loopHit(V.x0+(V.mix?6:V.bw/2),y); if(!h||h.layer!==ly||h.what!==want) miss(`${where}: a tap on row ${ri+1} gives ${h?h.what+' L'+(h.layer+1):'nothing'}, not ${want} L${ly+1}`);
+        const g=loopHit(V.hx0+4,y); if(!g||g.what!=='move'||g.layer!==ly||g.row!==V.row0+ri) miss(`${where}: row ${ri+1}'s handle gives ${g?g.what+' L'+(g.layer+1)+' at '+g.row:'nothing'}, not move L${ly+1} at ${V.row0+ri}`); }); };
+    setLaneRow0(0); await frame(); await frame();
+    hitRows('reorder · arrangement','open');
+    arrApi.face('mix'); await frame(); await frame();
+    hitRows('reorder · mixer','level');
+    arrApi.face('arr'); await frame();
+    cases++; arrApi.openTrack(O[0]); await frame(); await frame();
+    if(editLayer()!==Z) miss(`reorder: opening the first row opens L${editLayer()==null?'—':editLayer()+1}, not L${Z+1}`);
+    { const chip=document.getElementById('rollTrack'); if(chip && !chip.disabled){ chip.click(); await frame();
+        if(editLayer()!==O[1]) miss(`reorder: the editor's track chip goes from L${Z+1} to L${editLayer()==null?'—':editLayer()+1}, not to the next in the order (L${O[1]+1})`); } }
+    arrApi.closeTrack(); await frame(); arrApi.close(); await frame();
+    // ---- 6) правило #27: новая дорожка на номере удалённой ----
+    if(!loop.on){ cases++;
+      const nEv=events.length, O0=laneOrder();
+      const tmp=()=>{ const T=Math.ceil(songBeats())+8;
+        const r=seedTake([{fn:'leadOn',a:{deg:0,oct:1,vol:.8,inst:0,v:0},t:T,id:1}, {fn:'leadOff',a:{v:0},t:T+1,id:1}]);
+        return r&&r.layers.length ? r.layers[0] : null; };
+      const del=ly=>{ laneDelTap(ly); return laneDelTap(ly); };
+      const T1=tmp();
+      if(T1==null) miss('rule #27: the temporary track could not be recorded');
+      else{
+        setLaneName(T1,'Probe temp'); moveLane(T1,0);
+        if(laneOrder()[0]!==T1||laneTitle(T1)!=='Probe temp') miss('rule #27: the temporary track did not take its name and the first place');
+        if(!del(T1)) miss('rule #27: the temporary track could not be deleted');
+        const T2=tmp();
+        if(T2==null) miss('rule #27: the second temporary track could not be recorded');
+        else{
+          if(T2!==T1) console.log(`[scaleprobe track-look] rule #27: the second temporary track took L${T2+1}, not the freed L${T1+1} — still checked`);
+          if(laneNameOf(T2)!==null) miss(`rule #27: a new track on L${T2+1} inherits the deleted track's name «${laneNameOf(T2)}»`);
+          const O2=laneOrder(); if(O2[O2.length-1]!==T2) miss(`rule #27: a new track on L${T2+1} is not last (it is at place ${O2.indexOf(T2)+1} of ${O2.length})`);
+          if(!del(T2)) miss('rule #27: the second temporary track could not be deleted'); }
+        if(events.length!==nEv || JSON.stringify(laneOrder())!==JSON.stringify(O0)) miss('rule #27: the song is not back as it was (events or order)');
+      }
+    } else miss('rule #27: the transport is playing — stop it first');
+  } finally {
+    if(rollOpen) arrApi.closeTrack();
+    restoreShow(); winRestore(wk);
+  }
+  await frame();
+  console.log(`[scaleprobe track-look] tracks ${LS.length} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe track-look] '+m));
+  if(!nBad) console.log('[scaleprobe track-look] default names follow role and timbre in both languages; the four role colours differ in lightness; every track is drawn with one name and one colour in the play strip, the arrangement, the mixer and the editor; a rename shows everywhere and survives a scroll and a face switch; a reorder is one order everywhere and every row still opens its own track; a new track on a deleted number inherits neither name nor place');
+  return done();
+}
 export async function checkTracks(){
   const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b), notes=[];
@@ -1374,7 +1522,7 @@ export async function checkTracks(){
       let V=loopViewProbe();
       if(!V){ miss('the track strip is not drawn (no song, or a video clip is recording)'); break; }
       if(!V.rows.includes(ly)){ const S=loopScroll();
-        if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, i))); await frame(); await frame(); V=loopViewProbe(); } }
+        if(S){ setLaneRow0(Math.max(0, Math.min(S.nAll-S.visN, V.all?V.all.indexOf(ly):i))); await frame(); await frame(); V=loopViewProbe(); } }
       if(!V||!V.rows.includes(ly)){ miss(`L${ly+1}: not among the drawn rows even after scrolling`); continue; }
       const ri=V.rows.indexOf(ly), y=V.gy0+ri*V.rowH+V.rowH/2;
       if(V.gy0+(ri+1)*V.rowH>innerHeight) miss(`L${ly+1}: its row lies below the bottom of the screen (y ${Math.round(y)} of ${innerHeight})`);

@@ -135,6 +135,9 @@ export const DICTS = {
     'arr.zoomOutTitle':'Zoom out (time)',
     'arr.fitTitle':'Show the whole song',
     'arr.noRole':'no notes',
+    'track.role.ld':'Solo', 'track.role.ch':'Chords', 'track.role.bs':'Bass', 'track.role.dr':'Drums',   // AR2: имя дорожки по умолчанию «роль · тембр» (без значка роли — имя читается в узкой колонке)
+    'track.drone':'Drone',
+    'arr.renameTitle':'Track name: Enter keeps it, Esc cancels, an empty name returns to «role · timbre»',
     // MX1: лицо «микшер» окна аранжировки — фейдеры уровня дорожек и полоса мастера
     'arr.faceTitle':'Arrangement / mixer',
     'arr.toMixer':'Show the mixer: a level fader per track and the master',
@@ -627,6 +630,9 @@ export const DICTS = {
     'arr.zoomOutTitle':'Мельче (время)',
     'arr.fitTitle':'Вся песня',
     'arr.noRole':'нот нет',
+    'track.role.ld':'Соло', 'track.role.ch':'Аккорды', 'track.role.bs':'Бас', 'track.role.dr':'Ударные',
+    'track.drone':'Дрон',
+    'arr.renameTitle':'Имя дорожки: Enter — оставить, Esc — отмена, пустое имя — снова «роль · тембр»',
     'arr.faceTitle':'Аранжировка / микшер',
     'arr.toMixer':'Показать микшер: фейдер уровня каждой дорожки и мастер',
     'arr.toArrange':'Показать аранжировку: ноты каждой дорожки',

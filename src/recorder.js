@@ -441,6 +441,18 @@ const laneLevel=new Map();
    ДО цепи эффектов, рендер её вплавляет (render.renderTrack), значит смена панорамы старит буфер — решение пользователя «панорама до
    эффектов» (см. audio, «MX2»). */
 const lanePan=new Map();
+/* ⛳ AR2: ИМЯ ДОРОЖКИ — id дорожки → строка, данная человеком; нет записи — имя ПО УМОЛЧАНИЮ «роль · тембр» (его собирает показ —
+   draw.laneTitle — из событий дорожки на языке интерфейса, поэтому оно само идёт за заменой тембра и сменой языка). Ключ — id (правило #27):
+   новая дорожка с номером удалённой имени покойника не наследует. В событие НЕ пишется, звук не трогает. Формат песни лишь запишет таблицу. */
+const laneName=new Map();
+const LANE_NAME_MAX=40;   // символов; длиннее — обрезаем (колонка заголовка всё равно режет многоточием)
+/* ⛳ AR2: ПОРЯДОК ПОКАЗА — id дорожки → место (целое, 0…). ТОЛЬКО ПОКАЗ: номер слоя — адрес ЗВУКА (ключи владельцев), его порядок не
+   трогает. Нет записи — дорожка идёт ПОСЛЕ всех поставленных, между такими — по номеру слоя. Умолчание поэтому прежнее: по номеру слоя,
+   а это и есть порядок РОЖДЕНИЯ (новая дорожка берёт nextFreeLayer — выше всех живых номеров). Первая перестановка ставит место ВСЕМ
+   дорожкам, значит всё, что родится позже, — без места и встаёт В КОНЕЦ. Ключ — id (правило #27): новая дорожка с номером удалённой не
+   наследует её место. Один порядок на все три вида — окно аранжировки, лицо микшера, полоса игры (и круг чипа редактора): его отдаёт
+   ОДНА функция laneOrder. */
+const laneRank=new Map();
 /* ⛳ ДЛИНА МАТЕРИАЛА СЛОЯ ПОДЛОЖКИ (починка «подложка сама крутится», при слайсе «дрон и центы»): id дорожки → доля КОНЦА её материала
    (такты подложки × размер). Длина песни — позиция последнего СОБЫТИЯ (songLenRecalc), а у событий подложки нет выключений: дрон и
    бас-педаль лежат одним событием на доле 0, аккорд — одним «вкл» на такт. Без этой карты песня из одной подложки «Дрон» имела длину 0
@@ -461,7 +473,7 @@ const laneLenOf=layer=>laneLen.get(laneId.get(layer))||0;   // доля конц
    звать laneNew; список мест — в отчёте слайса и в комментариях у самих мест. */
 function laneNew(layer){
   const old=laneId.get(layer);
-  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); laneLen.delete(old); if(armLane===old) armLane=null; }   // ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ: без этой строки старый id просто мёртвым грузом лежал бы в множестве и ни на что не влиял — но множества росли бы всю сессию. Вооружение (S3.5c) — снимаем: его дорожки больше нет
+  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); laneLen.delete(old); laneName.delete(old); laneRank.delete(old); if(armLane===old) armLane=null; }   // AR2: имя и место — тоже гигиена (новый id их и так не видит)   // ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ: без этой строки старый id просто мёртвым грузом лежал бы в множестве и ни на что не влиял — но множества росли бы всю сессию. Вооружение (S3.5c) — снимаем: его дорожки больше нет
   laneId.set(layer,++laneSeq);
   return laneSeq;
 }
@@ -893,14 +905,14 @@ function lanePrune(){
   takePrune();   // O-2: захват взятого уходит вместе с его событиями — одной строкой, чтобы унаследовать всех вызывающих
   const live=new Set(); for(const e of events) live.add(e.layer);
   for(const [ly,id] of laneId) if(!live.has(ly) && !isRecLayer(ly)){   // T1: пишущиеся слои взятого щадим (прежде — один loop.layer)
-    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); laneLevel.delete(id); lanePan.delete(id); laneLen.delete(id); laneEditVer.delete(id); if(armLane===id) armLane=null; if(delPend&&delPend.id===id) delPend=null;
+    laneId.delete(ly); laneMute.delete(id); laneSolo.delete(id); laneLevel.delete(id); lanePan.delete(id); laneName.delete(id); laneRank.delete(id); laneLen.delete(id); laneEditVer.delete(id); if(armLane===id) armLane=null; if(delPend&&delPend.id===id) delPend=null;   // AR2: имя и место уходят с дорожкой
     freezeDrop(id); }   // S3.5c: снятая дорожка (⤺, снятие подложки) снимает и вооружение — ● дальше создаст новую, а не пишет в пустоту   // F4: и БУФЕР уходит вместе с ней — иначе он остался бы звучать за дорожку, которой больше нет
 }
 /* ⚠️ laneSeq НАМЕРЕННО НЕ ОБНУЛЯЕТСЯ: счётчик монотонен на всю сессию. Обнуление вернуло бы в оборот
    уже выданные номера id — а это ровно тот вид совпадения, от которого id и заводился. Стоит он
    ничего (целое число), а класс ошибок закрывает целиком. */
 function laneReset(){ for(const id of [...frozen.keys()]) freezeDrop(id);   // F4: ✕ — песни нет, значит нет и её заморозок
-  laneId.clear(); laneMute.clear(); laneSolo.clear(); laneLevel.clear(); lanePan.clear(); laneLen.clear(); laneEditVer.clear(); armLane=null; delPend=null; takeReset(); }   // A2: версии правок — гигиена (id не переиспользуются, мёртвая запись ни на что не влияла бы)   // O-2: захват сбрасывается вместе с дорожками (✕ и старт записи на пустой песне)
+  laneId.clear(); laneMute.clear(); laneSolo.clear(); laneLevel.clear(); lanePan.clear(); laneName.clear(); laneRank.clear(); laneLen.clear(); laneEditVer.clear(); armLane=null; delPend=null; takeReset(); }   // A2: версии правок — гигиена (id не переиспользуются, мёртвая запись ни на что не влияла бы)   // O-2: захват сбрасывается вместе с дорожками (✕ и старт записи на пустой песне)
 /* Слой вооружённой дорожки или null. ЧИСТОЕ чтение (его зовёт draw каждый кадр): обход таблицы дорожек —
    O(дорожек), не событий. id, не найденный в таблице, читается как «не вооружено». */
 function laneLayerOf(id){ if(id==null) return null; for(const [ly,i] of laneId) if(i===id) return ly; return null; }
@@ -1027,6 +1039,57 @@ function setLanePan(layer,p){
 AUD.setTrackPanOf(k=>{ const ly=layerOfOwner(k); return ly==null ? 0 : lanePanOf(ly); });   // ⛳ живые ключи (руки) — центр
 /* Функцию «ключ владельца → множитель» получает ТОЛЬКО ЖИВОЙ движок (рендер — своя копия audio.js, у неё умолчание 1: уровень не вплавляется). */
 AUD.setTrackGainOf(k=>{ const ly=layerOfOwner(k); return ly==null ? 1 : laneGainOf(ly); });
+/* ⛳ AR2: ИМЯ ДОРОЖКИ. laneNameOf — имя, данное человеком, или null (тогда показ берёт «роль · тембр»). setLaneName — пробелы сжаты, края
+   обрезаны, не длиннее LANE_NAME_MAX; пустая строка — назад к имени по умолчанию. Не правка песни: истории нет (одна история — ED7). */
+const laneNameOf=layer=>{ const id=laneOf(layer); return (id!=null && laneName.has(id)) ? laneName.get(id) : null; };
+function setLaneName(layer,s){
+  if(layer==null) return false;
+  const id=laneOf(layer) ?? laneNew(layer), x=String(s==null?'':s).replace(/\s+/g,' ').trim().slice(0,LANE_NAME_MAX);
+  if(!x) laneName.delete(id); else laneName.set(id,x);
+  return true;
+}
+/* ⛳ AR2: ПОРЯДОК ПОКАЗА. laneSort — копия списка слоёв в порядке показа (место из laneRank; без места — после всех, по номеру слоя).
+   laneOrder — ВСЕ дорожки песни в этом порядке; во время записи в конец — ещё пустые слои взятого (их строку полоса показывает с ●). ОДИН
+   источник для окна, микшера, полосы игры и круга чипа редактора. moveLane — поставить дорожку на место `to` (0…n−1) этого же списка и
+   записать места ВСЕМ дорожкам (так всё, что родится позже, без места, встаёт в конец). Отказ во время записи (окно, где двигают, тогда
+   закрыто). Не правка песни: истории нет (ED7). */
+function laneSort(layers){
+  const rk=new Map(); for(const ly of layers){ const id=laneOf(ly); rk.set(ly, (id!=null && laneRank.has(id)) ? laneRank.get(id) : Infinity); }
+  return layers.slice().sort((a,b)=>{ const x=rk.get(a), y=rk.get(b); return x===y ? a-b : (x<y ? -1 : 1); });
+}
+function laneOrder(){
+  const s=new Set(); for(const e of events) s.add(e.layer);
+  const L=laneSort([...s]);
+  if(recording) for(const ly of recLayers()) if(!s.has(ly)) L.push(ly);
+  return L;
+}
+function moveLane(layer,to){
+  if(recording || layer==null) return false;
+  const L=laneOrder(), from=L.indexOf(layer); if(from<0) return false;
+  const k=Math.max(0, Math.min(L.length-1, Math.round(+to)||0));
+  L.splice(from,1); L.splice(k,0,layer);
+  L.forEach((ly,i)=>laneRank.set(laneOf(ly) ?? laneNew(ly), i));   // ?? laneNew — та же самопочинка, что у переключателей
+  return k!==from;
+}
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkTrackLook): снимок таблиц имён и мест показа и его возврат. Проба переименовывает и переставляет дорожки и
+   обязана вернуть РОВНО как было: песня без мест до пробы — снова без мест (а не «те же места, записанные всем»). */
+function laneShowKeep(){ const N=new Map(laneName), R=new Map(laneRank);
+  return ()=>{ laneName.clear(); for(const [k,v] of N) laneName.set(k,v); laneRank.clear(); for(const [k,v] of R) laneRank.set(k,v); }; }
+/* ⛳ AR2: РОЛЬ И ТЕМБР КАЖДОЙ ДОРОЖКИ ОДНИМ ПРОХОДОМ — для показа (цвет роли, имя по умолчанию). draw спрашивает каждый кадр на каждую
+   видимую строку; laneRoleOf/laneTimbreOf — проход по событиям на вызов. Ответы ТЕ ЖЕ (первое событие с ролью; первое начало ноты с
+   тембром), мемо — по числу событий и поколению состава (evGen поднимает каждый schedInvalidate — замена тембра тоже: editCommit). Во время
+   записи растёт число событий — мемо перестраивается. drone — у дорожки есть слой дрона (у такой роли нет). */
+let laneLookMemo={ key:null, map:null };
+function laneLook(layer){
+  const k=events.length+'|'+evGen;
+  if(laneLookMemo.key!==k){ const m=new Map();
+    for(const e of events){ let x=m.get(e.layer); if(!x){ x={ role:null, tim:null, drone:false }; m.set(e.layer,x); }
+      if(x.role==null){ const r=evRole(e.fn); if(r) x.role=r; }
+      if(x.tim==null && isNoteStart(e.fn) && e.a){ const v= e.fn==='drum' ? e.a.kit : e.a.inst; if(v!=null) x.tim=v; }
+      if(e.fn==='drone') x.drone=true; }
+    laneLookMemo={ key:k, map:m }; }
+  return laneLookMemo.map.get(layer)||null;
+}
 /* ЧИТАТЕЛИ ДЛЯ ПОКАЗА — через тот же чистый laneOf (их зовёт draw на каждый кадр; правило #5 с
    обратной стороны: рисование не смеет менять состояние). */
 const laneMuted =layer=>{ const id=laneOf(layer); return id!=null&&laneMute.has(id); };
@@ -4443,7 +4506,7 @@ function loadArrangement(sel, jam=false){
      записываемого (свёртка в скобу), а такого решения человек не принимал. */
   if(!recording && !cycling()){ setRegionOn(true); hooks.loop && hooks.loop(loop.on); }   // hooks.loop — ui обновит кнопку ⟳ (и при уже идущем транспорте, где startTransport ниже не зовётся)
   if(!loop.on)startTransport(false,0);                 // подложка лежит от начала песни — и играть её начинаем оттуда же
-  if(droneAudible())droneOn();                         // включаем дрон сразу; ⚠️ именно AUDIBLE, а не ACTIVE: заглушённая дорожка дрона не должна зазвучать от добавления соседних слоёв
+  droneSync();                                         // AR2 (хвост MX2): уровень × уровень ДОРОЖКИ и её панорама — прежний droneOn() брал 0.18 и оставлял панораму прежней (у новой подложки — чужой, после смены панорамы на паузе — устаревшей). Включаем дрон сразу; ⚠️ именно AUDIBLE, а не ACTIVE: заглушённая дорожка дрона не должна зазвучать от добавления соседних слоёв
   if(jam) hooks.tutor && hooks.tutor('loop',{ev:'jam'});   // ЗАЦЕПКА ОБУЧЕНИЯ: джем реально встал (слои добавлены) — урок «Лупер»; только для джема, не для ручной аранжировки
   return true;                                         // добавили (джем-контроллер по этому знает, что вариант встал)
 }
@@ -4495,7 +4558,7 @@ function onLoop(){
     const from = cycling()&&loop.pos>=R.to ? R.from          // повтор включён, а пауза оказалась за концом скобы (край двигали на паузе) → с начала скобы, как сделал бы шов
                : loop.pos>=songLen ? 0 : Math.max(0,loop.pos);   // доиграли до конца → следующий пуск с начала
     startTransport(false,from);
-    if(droneAudible())droneOn();                      // ⚠️ AUDIBLE: снятие паузы не должно воскрешать заглушённую дорожку дрона
+    droneSync();                                      // AR2 (хвост MX2): уровень и панорама дорожки дрона — прежний droneOn() после паузы звучал 0.18 по центру прежней панорамы, пока до конца песни не встретится событие дрона (а оно одно — на доле 0). ⚠️ droneSync спрашивает AUDIBLE: снятие паузы не должно воскрешать заглушённую дорожку дрона
   }
 }
 /* ⛳ ⤺ СНИМАЕТ ПОСЛЕДНЕЕ ВЗЯТОЕ (S3.5d), а не слой с наибольшим номером.
@@ -4663,6 +4726,10 @@ export {
   editInsertLead,   // S4: вставка ноты соло (зеркало editInsertBass)
   laneAudible,   // слышимость дорожки (тот же предикат, что у обоих путей переигровки) — для пробы P.checkTracks
   laneLevelOf, setLaneLevel, frzBusGain,   // MX1: уровень дорожки (фейдер микшера) — по id дорожки, не в событии и не в подписи заморозки
+  /* AR2: имя и порядок показа дорожки (по id дорожки, не в событии); роль и тембр каждой дорожки одним проходом — для показа */
+  laneNameOf, setLaneName, laneOrder, moveLane, laneLook,
+  /* AR2: снимок и возврат таблиц имён и мест — только для пробы P.checkTrackLook */
+  laneShowKeep,
   lanePanOf, setLanePan, layerOfOwner,   // MX2: панорама дорожки — по id дорожки, не в событии, но В ПОДПИСИ заморозки (вплавляется в буфер); layerOfOwner — слой по ключу владельца (рендер, проба)
   tiePartners, laneEditVerOf,   // S6: партнёр пары связки и версия правок дорожки — для пробы P.checkSoloEdit (soloEditBlock снят: отказов нет)
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию

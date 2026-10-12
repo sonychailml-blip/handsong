@@ -1,17 +1,17 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, tuningStatus, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, bassFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
-import { t, L } from './i18n.js';
+import { t, L, lang } from './i18n.js';   // AR2: lang — ключ кэша имён дорожек по умолчанию
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
-         rollAut, rollAutSel, rollAutDrag, laneRow0, arrOpen, arrFace } from './state.js';   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
-import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL,
+         rollAut, rollAutSel, rollAutDrag, laneRow0, arrOpen, arrFace, laneDrag } from './state.js';   // AR2: laneDrag — тянущаяся за ручку строка окна (вид жеста)   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
+import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, LANE_NOROLE_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT, fxPerm, timbresOf, masterLevel, masterMeter } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) столбика не рисует   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
-         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer, chordMoveTy, laneRoleOf, laneTimbreOf, laneLevelOf, lanePanOf } from './recorder.js';   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer, chordMoveTy, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from './recorder.js';   // AR2: имя, порядок показа, роль и тембр дорожки одним проходом   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -511,7 +511,28 @@ const LOOP_TP_RESERVE=60, LOOP_MIN_ROWS=3, LOOP_FOOT_H=14;
    у строки колонка-заголовок «L# · роль · тембр» (ARR_HDR_*), кнопки M / S / ❄ шириной под палец (❄ — НАСТОЯЩАЯ кнопка: места теперь
    хватает), вместо рисок событий — МИНИАТЮРЫ нот (laneMini), полоса скобы выше (ARR_BRACE_H). Транспорт — сверху, под баром окна, как у
    редактора. ✕ удаления строки остаётся на полосе игры (ряду под палец нужен широкий отрезок времени). */
-const ARR_ROW_H=40, ARR_BTN_W=36, ARR_BTN_GAP=4, ARR_HDR_MIN=92, ARR_HDR_MAX=170, ARR_BRACE_H=26, ARR_MARGIN=10;
+const ARR_ROW_H=40, ARR_BTN_W=36, ARR_BTN_GAP=4, ARR_HDR_MIN=100, ARR_HDR_MAX=170, ARR_BRACE_H=26, ARR_MARGIN=10;   // AR2: колонка заголовка 92 → 100 (в ней теперь ещё ручка перестановки)
+/* ⛳ AR2: ЗАГОЛОВОК СТРОКИ ОКНА — слева РУЧКА перестановки (ARR_HANDLE_W во всю высоту строки — под большой палец: 28 × 40, зона попадания та
+   же), правее — ИМЯ дорожки цветом её роли и под ним «L#» (у переименованной — ещё «роль · тембр», чтобы имя по умолчанию не терялось). */
+const ARR_HANDLE_W=28;
+/* ⛳ AR2: КОЛОНКА ИМЕНИ НА ПОЛОСЕ ИГРЫ — внутри коробки, слева от линейки (до колонки значков): доля ширины полосы в пределах MIN…MAX px.
+   Цена названа: линейка уже на эту ширину (на 380 px — 58 px: 261 → 203 px). Подпись «L1» левее коробки остаётся (её называет заголовок). */
+const LANE_NAME_FR=0.17, LANE_NAME_MIN=48, LANE_NAME_MAX=100;
+/* ⛳ AR2: ЦВЕТ И ИМЯ ДОРОЖКИ — ОДНИ на все виды (окно, микшер, полоса игры, редактор). Цвет — палитра ролей config.INSTR_COL (данные; почему
+   она различается светлотой — там же); без роли (слой дрона) — нейтральный серый. Роль и тембр — recorder.laneLook (один проход, мемо).
+   Имя — данное человеком (recorder.laneNameOf), иначе «роль · тембр» на языке интерфейса (тембр — единственный вход audio.timbresOf, T5);
+   кэш имени по умолчанию — по (язык, роль, тембр, дрон): сочетаний единицы, а timbresOf строит список на каждый вызов. */
+const laneRoleLook=ly=>{ const x=laneLook(ly); return x ? x.role : null; };
+export const laneCol=ly=> INSTR_COL[laneRoleLook(ly)] || LANE_NOROLE_COL;
+const defNameMemo=new Map();
+export function laneDefName(ly){
+  const x=laneLook(ly), role=x?x.role:null, tim=x?x.tim:null, k=lang+'|'+role+'|'+tim+'|'+(x&&x.drone?1:0);
+  let s=defNameMemo.get(k); if(s!=null) return s;
+  if(!role) s= x&&x.drone ? t('track.drone') : t('arr.noRole');
+  else { const e=timbresOf(role).find(z=>z.id===tim); s=t('track.role.'+role)+(e?' · '+L(e.name):''); }
+  defNameMemo.set(k,s); return s;
+}
+export const laneTitle=ly=> laneNameOf(ly) || laneDefName(ly);
 /* ⛳ MX1 — ЛИЦО «МИКШЕР» ТОГО ЖЕ ОКНА (state.arrFace==='mix'): те же строки и порядок, в теле строки — ФЕЙДЕР уровня дорожки вместо
    миниатюр (тянуть пальцем вдоль; ход — от кромок дорожки на MIX_PAD), снизу — полоса МАСТЕРА (MIX_MASTER_H): фейдер уровня мастера,
    измеритель выхода и подавление лимитера. Бегунок — только в полосе скобы (не поверх фейдеров). */
@@ -572,9 +593,10 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      ⚠️ ЦЕНА ВИДИМАЯ И НАЗВАННАЯ: сетка долей, метки событий и бегунок стали уже. Но ВСЕ ТРИ одинаково —
      они считаются из ОДНОГО loopView, поэтому разъехаться не могут (правило #9). */
   const togBand= FULL ? ARR_BTN_W*3+ARR_BTN_GAP*2+8 : LANE_TOG_W*3+LANE_TOG_GAP*2+LANE_DEL_GAP+6;   // AR1: у окна три гнезда под палец — M, S, ❄    // три гнезда (M, S, ✕) + зазоры + отступ ✕ + отступ от линейки. На 380px линейка 290→261px
-  const ids=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
-  const rows=ids.slice();
-  if(recording) for(const ly of recLayers()) if(!rows.includes(ly)) rows.push(ly);   // пустой слой, что пишется прямо сейчас. T1/T2: ВСЕ слои взятого (по дорожке на роль
+  const nIds=new Set(events.map(e=>e.layer)).size;   // дорожек с событиями — для заголовка («N дорожек»)
+  /* ⛳ AR2: СТРОКИ — В ПОРЯДКЕ ПОКАЗА (recorder.laneOrder — один на окно, микшер, полосу игры и чип редактора): место, поставленное
+     человеком, иначе номер слоя (умолчание прежнее); во время записи в конец — ещё пустые слои взятого (их строка видна с ●). */
+  const rows=laneOrder();   // T1/T2: ВСЕ слои взятого (по дорожке на роль
   const armLy=armedLayer();                  // S3.5c: вооружённая дорожка (слой) или null — один раз на кадр, её читают и заголовок, и строки. E0-fix: поднят сюда — от него зависит ширина колонки значков
   /* ⛳ E0-fix: КОЛОНКА ЗНАЧКОВ — СВОЯ ПОЛОСА МЕЖДУ ПОДПИСЬЮ «L1» И ЛИНЕЙКОЙ, А НЕ ПОВЕРХ ЛИНЕЙКИ.
      Линейка дорожки начинается ровно с x0 — места «слева от неё» внутри коробки нет (на 380px x0=20, подпись
@@ -590,8 +612,10 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      и зоны попадания «вооружить»/«скоба»). Гнёзда M/S/✕ не двигаются: линейка ровно на столько же короче. */
   const markCol = !FULL && rows.some(l=>(!recording&&l===armLy) || freezeState(l)!=='none');   // AR1: у окна значкам место в заголовке и на кнопке ❄ — колонки нет
   const markW = markCol ? MARK_COL_W : 0;
-  const lx0=x0+markW;                           // начало ЛИНЕЙКИ; x0 остаётся кромкой коробки
-  const bw=Math.max(60,sw-togBand-markW), x1=lx0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране; без смены роли — один, ровно прежний)
+  const nameW = FULL ? 0 : Math.round(Math.max(LANE_NAME_MIN, Math.min(LANE_NAME_MAX, sw*LANE_NAME_FR)));   // AR2: колонка ИМЕНИ дорожки (у полосы игры; у окна имя — в заголовке)
+  const mx0=x0+nameW;                           // AR2: начало колонки значков (за колонкой имени)
+  const lx0=mx0+markW;                          // начало ЛИНЕЙКИ; x0 остаётся кромкой коробки
+  const bw=Math.max(60,sw-togBand-markW-nameW), x1=lx0+bw;   // линейка времени; пол 60px — страховка на совсем узком экране; без смены роли — один, ровно прежний)
   /* rowH 13 → 16: строка стала не только читаемее, но и НАЖИМАЕМЕЕ — в ней теперь живут две кнопки.
      Выше не берём: каждая дорожка — это высота на экране, а их бывает много (см. отчёт слайса). */
   /* braceH — полоса СКОБЫ ПОВТОРА (S3.5b) между заголовком и строками. ОТДЕЛЬНАЯ полоса, а не тап по
@@ -619,6 +643,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   loopView={ x0:lx0, bx0:x0, bw, beat0, span, gy0, rowH, rows:visRows, tx0:x1+6, by0:y0+headH, hy0:y0,
              over, row0:r0, nAll, visN, sx1: FULL ? W : x0+sw+10, sx0: FULL ? 0 : x0-28,
              full:FULL, hx0:ARR_MARGIN, mini: FULL ? new Map() : null,
+             all:allRows, look:new Map(), nameW, mx0,   // AR2: all — ВСЕ строки в порядке показа (ui: место перестановки); look — нарисованные имя и цвет видимых строк (их сверяет проба); nameW/mx0 — колонка имени полосы игры и начало колонки значков
              mix:MIX, ...mixGeom(lx0,bw), ms: MIX ? { y0:gy1+footH+8, y1:gy1+footH+8+MIX_MASTER_H } : null };   // MX1: mix — лицо микшера; fx0/fw — ход фейдера; ms — полоса мастера   // AR1: full — окно аранжировки; hx0 — левый край колонки заголовков; mini — миниатюры видимых строк (слой → записи; их сверяет проба); sx0 — левый край зоны прокрутки строк   // ⛳ rows — ВИДИМЫЕ строки (их рисуем и ловим); over/row0/nAll/visN — окно прокрутки (ui листает по ним); sx1 — правая кромка коробки   // E0-fix: x0 — начало ЛИНЕЙКИ (с колонкой значков сдвинуто), bx0 — кромка коробки   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
 
   if(FULL){ ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,W,Hc); }   // AR1: окно — свой экран (камера не рисуется), фон целиком
@@ -651,8 +676,8 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
   else if(recording){ { const rl=recLayers().slice().sort((x,y)=>x-y); head= rl.length>1 ? t('looper.overdubMany',{list:rl.map(l=>l+1).join(', ')}) : t('looper.overdub',{n:rl[0]+1});
     if(armLy!=null && rl.some(l=>l!==armLy)) head+=' · '+t('looper.armedOwn',{n:armLy+1}); }   /* T3: вооружённая осталась красной, а ноты ушли в новую строку — называем это словами: она берёт только СВОЙ звук (роль и тембр) */   /* T2: взятое пишет по дорожке на роль — называем ВСЕ; одна — прежняя строка */ hc='#e5484d'; }
-  else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:ids.length}); hc='#57d9a3'; }
-  else { head=t('looper.paused',{bars:songBars, layers:ids.length}); hc='rgba(255,255,255,.7)'; }
+  else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:nIds}); hc='#57d9a3'; }
+  else { head=t('looper.paused',{bars:songBars, layers:nIds}); hc='rgba(255,255,255,.7)'; }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
      Приписка к готовой строке, а не отдельный ключ на каждую фразу — состояний заголовка четыре. */
   /* S3.5c: КУДА ПОЙДЁТ ● — словом в заголовке, рядом с красной рамкой строки. «(не слышно)» — если дорожка
@@ -744,6 +769,8 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   const rowOf=new Map();                                 // номер слоя → индекс строки (для ОДНОГО прохода по событиям, см. ниже)
   visRows.forEach((lid,ri)=>{
     rowOf.set(lid,ri);
+    const col=laneCol(lid), name=laneTitle(lid);         // AR2: ОДНИ имя и цвет на все виды; в снимок — для пробы (что нарисовано)
+    loopView.look.set(lid,{ name, col });
     const ry=gy0+ri*rowH, mid=ry+rowH/2, live=isRecLayer(lid);   /* T1: строка пишущегося слоя взятого (isRecLayer сама проверяет recording) */
     const muted=laneMuted(lid), soloed=laneSoloed(lid);
     /* ПРИГЛУШАЕМ ПО СЛЫШИМОСТИ, А НЕ ПО ГАЛОЧКЕ MUTE: при включённом соло молчат ВСЕ, кроме соло-дорожек,
@@ -753,10 +780,12 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     ctx.globalAlpha = off ? LANE_OFF_A : 1;              // одна альфа на ВСЮ строку: фон и подпись гаснут вместе
     ctx.fillStyle=live?'rgba(229,72,77,.16)':'rgba(255,255,255,.04)';
     if(FULL) ctx.fillRect(ARR_MARGIN,ry+1,hdrW+bw,rowH-2);   // AR1: фон — от колонки заголовка до конца дорожки
-    else ctx.fillRect(x0,ry+1,markW+bw,rowH-2);                // E0-fix: фон строки — вместе с колонкой значков (она часть строки); без колонки markW=0 — как было
-    if(FULL) arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6, rowH, lid===armLy && !recording);
+    else ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2);          // AR2: с колонкой имени.   E0-fix: фон строки — вместе с колонкой значков (она часть строки); без колонки markW=0 — как было
+    if(FULL) arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6, rowH, lid===armLy && !recording, name, col);
     else{ ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='10px system-ui'; ctx.textAlign='right';
-      ctx.fillText('L'+(lid+1),x0-4,mid); }
+      ctx.fillText('L'+(lid+1),x0-4,mid);
+      ctx.fillStyle=col; ctx.font='600 9px system-ui'; ctx.textAlign='left';   // AR2: ИМЯ дорожки цветом роли — в своей колонке слева от линейки (риски его не закрывают)
+      ctx.fillText(arrClip(name,nameW-6), x0+3, mid+0.5); }
     if(FULL){ clipLane(); if(MIX) drawLaneFader(lid, ry, rowH); else drawLaneMini(lid, ry, rowH); unclip(); }   // AR1: МИНИАТЮРЫ нот/ударов — в клипе дорожки; MX1: в лице микшера — фейдер
     ctx.globalAlpha=1;                                   // кнопки рисуем В ПОЛНУЮ СИЛУ: это орган управления, он обязан читаться и на погашенной строке
     /* ⛳ ВООРУЖЁННАЯ ДОРОЖКА (S3.5c) — красная рамка во всю строку, красная точка записи в её начале и красная
@@ -766,8 +795,8 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     const armed = !recording && lid===armLy;
     if(armed && FULL){ ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(ARR_MARGIN+1,ry+1.5,hdrW+bw-2,rowH-3); }   // AR1: рамка — вокруг заголовка и дорожки
     else if(armed){
-      ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,markW+bw-2,rowH-3);   // рамка — вокруг ВСЕЙ строки, колонка значков внутри неё
-      ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x0+ARM_DOT_X,mid,3.5,0,7); ctx.fill();   // E0-fix: точка — в колонке значков (armed ⇒ колонка есть), а не на линейке
+      ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,nameW+markW+bw-2,rowH-3);   // AR2: и колонка имени внутри.   рамка — вокруг ВСЕЙ строки, колонка значков внутри неё
+      ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(mx0+ARM_DOT_X,mid,3.5,0,7); ctx.fill();   // AR2: колонка значков — за колонкой имени (mx0).   E0-fix: точка — в колонке значков (armed ⇒ колонка есть), а не на линейке
       ctx.fillStyle='#ff6b6f'; ctx.font='600 10px system-ui'; ctx.textAlign='right'; ctx.fillText('L'+(lid+1),x0-4,mid);
     }
     /* ⛳ ИНДИКАТОР ЗАМОРОЗКИ (F5) — ТОЛЬКО ЗНАЧОК, без кнопки: на строке уже три органа управления и
@@ -789,7 +818,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
       laneTog(loopView.tx0+2*st, ry,rowH,'❄', fzs!=='none', fzs==='stale'?'#f5a524':'#4cc2ff', ARR_BTN_W);
       return; }
     if(fzs!=='none'){
-      const fresh=fzs==='fresh', fx = x0 + FRZ_MARK_X;
+      const fresh=fzs==='fresh', fx = mx0 + FRZ_MARK_X;   // AR2: колонка значков начинается за колонкой имени
       ctx.fillStyle = fresh?'#4cc2ff':'#f5a524';
       ctx.font='600 11px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
       ctx.fillText('❄', fx, mid);
@@ -799,9 +828,17 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);
     /* S3.5d: ✕ — залит красным, пока удаление взведено; строка при этом краснеет поверх (видно, КАКАЯ дорожка уйдёт). */
-    if(lid===delLy){ ctx.fillStyle='rgba(229,72,77,.24)'; ctx.fillRect(x0,ry+1,markW+bw,rowH-2); }   // E0-fix: вся строка, с колонкой значков
+    if(lid===delLy){ ctx.fillStyle='rgba(229,72,77,.24)'; ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2); }   // AR2: с колонкой имени   // E0-fix: вся строка, с колонкой значков
     laneTog(loopView.tx0+2*(LANE_TOG_W+LANE_TOG_GAP)+LANE_DEL_GAP, ry,rowH,t('looper.laneDel'),lid===delLy,LANE_DEL_COL);
   });
+  /* ⛳ AR2: ПЕРЕСТАНОВКА (палец тянет ручку строки окна): тянущаяся строка обведена цветом своей роли, белая черта — куда она встанет.
+     Место — в ОБЩЕМ порядке (allRows), черта — на видимой строке (минус первая видимая r0); вне окна строк черты нет. */
+  if(FULL && laneDrag){
+    const from=allRows.indexOf(laneDrag.layer), to=laneDrag.to, ri=visRows.indexOf(laneDrag.layer);
+    if(ri>=0){ ctx.strokeStyle=laneCol(laneDrag.layer); ctx.lineWidth=2; ctx.strokeRect(ARR_MARGIN+1,gy0+ri*rowH+1.5,hdrW+bw-2,rowH-3); }
+    if(from>=0 && to!==from){ const k=(to>from?to+1:to)-r0;
+      if(k>=0 && k<=visRows.length){ ctx.fillStyle='#fff'; ctx.fillRect(ARR_MARGIN, gy0+k*rowH-1.5, hdrW+bw, 3); } }
+  }
   /* ⛳ МЕТКИ СОБЫТИЙ — ОДНИМ ПРОХОДОМ ПО ВСЕМ СОБЫТИЯМ, а не проходом НА КАЖДУЮ СТРОКУ (S3.3).
      Было O(дорожек × событий) НА КАДР: на петле с тремя строками и парой сотен событий незаметно, на
      песне в несколько минут с двумя десятками дорожек — десятки миллионов чтений в секунду, и полоса
@@ -814,7 +851,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     const ri=rowOf.get(e.layer); if(ri===undefined) continue;
     const ex=laneBeatX(loopView,e.t), ry=gy0+ri*rowH;    // ⛳ через ЕДИНОЕ преобразование — то же, по которому идёт попадание
     ctx.globalAlpha=laneAlpha.get(e.layer);
-    ctx.fillStyle=e.fn[0]==='c'?'#b18cff':'#ff9e2c';
+    ctx.fillStyle=loopView.look.get(e.layer).col;           // AR2: риска — цветом РОЛИ дорожки (прежде: аккорды сиреневые, прочее оранжевое)
     ctx.beginPath(); ctx.roundRect(ex-1.5,ry+3,3.5,rowH-6,1.5); ctx.fill();
   }
   ctx.globalAlpha=1;
@@ -848,9 +885,10 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   unclip();
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
-/* ═══ AR1: ЗАГОЛОВОК СТРОКИ ОКНА — «L# · роль» и тембр второй строкой (имена дорожек придут в AR2) ═══
-   Роль и тембр — у recorder (laneRoleOf/laneTimbreOf, по СОБЫТИЯМ дорожки), имя тембра — единственный вход audio.timbresOf (T5).
-   Не влезает — обрезаем с многоточием по ширине колонки (measureText), а не переносим. armed — красная подпись (куда пойдёт ●). */
+/* ═══ ЗАГОЛОВОК СТРОКИ ОКНА (AR1; с AR2 — ручка, ИМЯ цветом роли и «L#» второй строкой) ═══
+   Имя и цвет — laneTitle/laneCol (одни на все виды; имя по умолчанию «роль · тембр» — роль и тембр по СОБЫТИЯМ дорожки, имя тембра —
+   единственный вход audio.timbresOf, T5). Не влезает — обрезаем с многоточием по ширине колонки (measureText), а не переносим. armed —
+   красная вторая строка и точка (куда пойдёт ●). Тап по имени — вооружить, двойной — переименовать (ui); ручка — тянуть (перестановка). */
 /* ═══ MX1: ФЕЙДЕР УРОВНЯ ДОРОЖКИ — в теле строки (лицо «микшер») ═══ Значение — recorder.laneLevelOf (по id дорожки); ход — [fx0, fx0+fw]
    снимка (тот же, по которому ui ведёт палец). Фон тела заливается — сетка времени под фейдером не мешает читать. */
 /* ⛳ MX2: ГЕОМЕТРИЯ ЛИЦА МИКШЕРА — ОДНА функция для снимка (рисование и попадание читают её числа): fx0/fw — ход фейдера уровня
@@ -861,7 +899,7 @@ function mixGeom(lx0,bw){
            mfx0:lx0+MIX_PAD, mfw:Math.max(1,bw-2*MIX_PAD) };
 }
 function drawLaneFader(ly,ry,rowH){
-  const V=loopView, v=laneLevelOf(ly), col=INSTR_COL[laneRoleOf(ly)]||'#ff9e2c', cy=ry+rowH/2, kx=V.fx0+v*V.fw;
+  const V=loopView, v=laneLevelOf(ly), col=laneCol(ly), cy=ry+rowH/2, kx=V.fx0+v*V.fw;
   ctx.fillStyle='rgba(10,10,20,.94)'; ctx.fillRect(V.x0,ry+1,V.bw,rowH-2);
   drawLanePan(ly,ry,rowH,col);
   ctx.fillStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.roundRect(V.fx0,cy-3,V.fw,6,3); ctx.fill();
@@ -912,14 +950,19 @@ function drawMasterStrip(ms,W){
   ctx.textBaseline='alphabetic';
 }
 function arrClip(s,w){ if(ctx.measureText(s).width<=w) return s; let a=s; while(a.length>1&&ctx.measureText(a+'…').width>w) a=a.slice(0,-1); return a+'…'; }
-function arrRowHeader(lid,x,ry,w,rowH,armed){
-  const role=laneRoleOf(lid), tim=laneTimbreOf(lid), T=role?timbresOf(role):[], e=T.find(z=>z.id===tim);
-  const line1='L'+(lid+1)+(role?' · '+t('role.'+role):''), line2=e?L(e.name):(role?'':t('arr.noRole'));
+function arrRowHeader(lid,x,ry,w,rowH,armed,name,col){
+  // ручка перестановки: три черты во всю высоту гнезда ARR_HANDLE_W (палец берёт её где угодно в строке слева)
+  const hx=x+ARR_HANDLE_W/2, hy=ry+rowH/2;
+  ctx.fillStyle='rgba(255,255,255,.07)'; ctx.beginPath(); ctx.roundRect(x+2,ry+4,ARR_HANDLE_W-6,rowH-8,4); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.55)'; for(const d of [-5,0,5]) ctx.fillRect(hx-7,hy+d-1,12,2);
+  // имя цветом роли; ниже — «L#» (у переименованной ещё «роль · тембр»: имя по умолчанию не теряется). Вооружена — «L#» и точка красные
+  const nx=x+ARR_HANDLE_W, nw=w-ARR_HANDLE_W, custom=laneNameOf(lid)!=null;
+  const line2='L'+(lid+1)+(custom?' · '+laneDefName(lid):'');
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillStyle= armed ? '#ff6b6f' : 'rgba(255,255,255,.88)'; ctx.font='600 12px system-ui';
-  ctx.fillText(arrClip(line1,w), x+4, ry+rowH*0.34);
-  ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='11px system-ui';
-  ctx.fillText(arrClip(line2,w), x+4, ry+rowH*0.70);
+  ctx.fillStyle=col; ctx.font='600 12px system-ui';
+  ctx.fillText(arrClip(name,nw-(armed?8:0)), nx, ry+rowH*0.34);
+  ctx.fillStyle= armed ? '#ff6b6f' : 'rgba(255,255,255,.55)'; ctx.font='11px system-ui';
+  ctx.fillText(arrClip(line2,nw), nx, ry+rowH*0.70);
   if(armed){ ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x+w,ry+rowH*0.34,3.5,0,7); ctx.fill(); }
   ctx.textBaseline='alphabetic';
 }
@@ -946,7 +989,7 @@ function laneMini(ly){
 }
 function drawLaneMini(ly,ry,rowH){
   const V=loopView, m=laneMini(ly); if(V&&V.mini) V.mini.set(ly,m);
-  const col=INSTR_COL[laneRoleOf(ly)]||'#ff9e2c', top=ry+5, h=rowH-10, w0=V.beat0, w1=V.beat0+V.span;
+  const col=laneCol(ly), top=ry+5, h=rowH-10, w0=V.beat0, w1=V.beat0+V.span;
   ctx.fillStyle=col;
   if(m.kind==='hits'){ for(const it of m.items){ if(it.t0<w0-1||it.t0>w1) continue;
       const x=laneBeatX(V,it.t0), y=top+h-(it.row+1)*h/DRUM_ROWS; ctx.fillRect(x-0.75,y,1.6,Math.max(1.5,h/DRUM_ROWS-1)); }
@@ -1634,7 +1677,7 @@ function drawRoll(){
                        : (gy1-gy0)/DRUM_ROWS;
   const rows = pitched ? Math.max(1,Math.min(total,Math.floor((gy1-gy0)/rowH))) : DRUM_ROWS;
   const row0 = pitched ? Math.max(0,Math.min(rollRow0,Math.max(0,total-rows))) : 0;
-  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, axis:AX, pitched, aut, noEdit };   // axis (T3) — ось высот: ряд ↔ высота строя/ступень лада   // noEdit — поле нот не отвечает на палец (см. выше)   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, axis:AX, pitched, aut, noEdit, col: rollRole ? INSTR_COL[rollRole] : null };   // AR2: col — цвет роли дорожки (палитра ролей; тот же у её строки в окне, микшере и на полосе игры)   // axis (T3) — ось высот: ряд ↔ высота строя/ступень лада   // noEdit — поле нот не отвечает на палец (см. выше)   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
   const V=rollView, pxB=V.bw/V.span, M=loop.metre;
   const DPO = pitched ? AX.rpp : 0;
   // ---- ряды: чередующаяся заливка + подпись слева (ударные — имя ряда, лад — НОТА В ЛАДУ ОСИ) ----
@@ -1723,7 +1766,7 @@ function drawRoll(){
     const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
     const w=blkW, vol=Math.max(0,Math.min(1,ev.a.vol==null?1:ev.a.vol));
     const sel = ev===rollSel;
-    ctx.fillStyle = sel ? '#fff' : hexA(INSTR_COL.dr||'#ff9e2c', 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
+    ctx.fillStyle = sel ? '#fff' : hexA(INSTR_COL.dr, 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
     ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();                          // S5.2: блок НАЧИНАЕТСЯ на доле и растёт вправо — нота «на раз» лежит ВНУТРИ такта, а не верхом на его линии
     if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke(); }
   }
@@ -1732,7 +1775,7 @@ function drawRoll(){
      (нота без «выкл» — так лежит подложка) тянем до правого края окна: выдумывать ему конец нельзя.
      ⛳ T4c-2: призраков чужих ладов больше нет — у дорожки один вид (см. rollGroup). ---- */
   if(pitched){
-    const col=INSTR_COL[rollRole]||'#3ad29f', wEnd=V.beat0+V.span;
+    const col=V.col||LANE_NOROLE_COL, wEnd=V.beat0+V.span;   // AR2: цвет роли — из снимка (тот же, что у строки дорожки)
     for(const g of (G?[G]:[])){
       for(const s of g.segs){
         const en = s.end==null ? wEnd : s.end;
@@ -1944,7 +1987,7 @@ export function rollHit(px,py){
 /* Габариты окна для ЖЕСТА прокрутки/зума: ui якорит по НИМ, а пишет через сеттеры state — поэтому
    палец, рисунок и попадание читают одно и то же число (следующий кадр строит снимок из него же). */
 export function rollGeom(){ const V=rollView;
-  return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, rows:V.rows, row0:V.row0||0, total:V.total||V.rows, pitched:!!V.pitched, sc:V.sc, aut:V.aut||null } : null; }
+  return V ? { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, rows:V.rows, row0:V.row0||0, total:V.total||V.rows, pitched:!!V.pitched, sc:V.sc, aut:V.aut||null, col:V.col } : null; }
 /* Привязка величины к десятым — ИЗ ТОГО ЖЕ снимка. Её зовёт ВСТАВКА точки (величина места тапа приходит
    готовой из rollHit); перенос идёт через rollAutDrive, у которого свой шаг. Второй копии шага в ui нет
    (правило #9): он часть ЭТОЙ оси, а не отдельная настройка. */
@@ -2586,7 +2629,8 @@ export function loopHit(px,py){
     if(V.mix && px>=V.x0 && px<V.x0+V.bw) return { layer:V.rows[ri], what: px>=V.px0 ? 'pan' : 'level' };   // MX1: в лице микшера тело строки — фейдер; MX2: правый блок — панорама
     if(dx>=0){ const k=Math.floor(dx/st); return k<3 ? { layer:V.rows[ri], what:['mute','solo','frz'][k] } : null; }
     if(px>=V.x0 && px<V.x0+V.bw) return { layer:V.rows[ri], what:'open', beat:laneBeatAt(V,px) };
-    if(px>=V.hx0 && px<V.x0) return { layer:V.rows[ri], what:'arm' };
+    if(px>=V.hx0 && px<V.hx0+ARR_HANDLE_W) return { layer:V.rows[ri], what:'move', row:V.row0+ri };   // AR2: РУЧКА — перестановка (row — место строки в общем порядке)
+    if(px>=V.hx0 && px<V.x0) return { layer:V.rows[ri], what:'arm', name:true };   // AR2: name — тап по ИМЕНИ (двойной — переименовать, ui)
     return null;
   }
   const dx=px-V.tx0, step=LANE_TOG_W+LANE_TOG_GAP;
@@ -2614,7 +2658,7 @@ export function loopScroll(){ const V=loopView; if(!V||!V.over) return null;
 /* ⛳ AR1: ГЕОМЕТРИЯ ОКНА АРАНЖИРОВКИ для жестов ui (прокрутка и зум времени, якорь под пальцем) — из ТОГО ЖЕ снимка (правило #9). null —
    окно не нарисовано (или на экране полоса игры). */
 export function arrGeom(){ const V=loopView; if(!V||!V.full) return null;
-  return { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, gy0:V.gy0, y1:V.gy0+V.rows.length*V.rowH, mix:V.mix, fx0:V.fx0, fw:V.fw, px0:V.px0, pfx0:V.pfx0, pfw:V.pfw, mfx0:V.mfx0, mfw:V.mfw, ms:V.ms }; }
+  return { x0:V.x0, bw:V.bw, beat0:V.beat0, span:V.span, rowH:V.rowH, gy0:V.gy0, y1:V.gy0+V.rows.length*V.rowH, mix:V.mix, all:V.all, row0:V.row0, nVis:V.rows.length, hx0:V.hx0, hw:V.x0-V.hx0, fx0:V.fx0, fw:V.fw, px0:V.px0, pfx0:V.pfx0, pfw:V.pfw, mfx0:V.mfx0, mfw:V.mfw, ms:V.ms, handleW:ARR_HANDLE_W }; }
 /* loopBarBottom — живая связка: нижний край холстовой полосы лупера (0, когда её нет).
    Экспортирована, чтобы позицию мог прочитать кто угодно, а не только draw. */
 export { drawVideoBackground, drawOverlays, loopBarBottom };
