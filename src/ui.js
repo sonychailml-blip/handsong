@@ -28,7 +28,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
          songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
-         editInsertLead, laneLevelOf, setLaneLevel,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
+         editInsertLead, laneLevelOf, setLaneLevel, lanePanOf, setLanePan,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
@@ -596,19 +596,26 @@ const arrXY=e=>{ const r=canvasEl.getBoundingClientRect(); return { x:e.clientX-
    скачка под палец), поперёк — листает строки (как в аранжировке). Двойной тап по фейдеру — единица (100, 0 дБ). Уровень пишется сразу,
    на каждом движении (recorder.setLaneLevel / audio.setMasterLevel) — это не правка событий, пересобирать нечего. */
 const LEVEL_DBL_MS=350; let levelTap={ key:null, t:0 };
-function levelOf(h){ return h.what==='mlevel' ? masterLevel() : laneLevelOf(h.layer); }
-function setLevelOf(h,v){ if(h.what==='mlevel') setMasterLevel(v); else setLaneLevel(h.layer,v); }
+/* ⛳ MX2: РУЧКА ПАНОРАМЫ — тот же жест, что фейдер: вдоль — значение относительно (полный ход −100…+100 — по ширине ручки, но не короче
+   PAN_DRAG_PX: узкая ручка на телефоне не делает палец сверхчувствительным), поперёк — строки, двойной тап — центр, колесо — шаг 1.
+   ФИКСАЦИЯ ЦЕНТРА: в пределах PAN_DETENT от нуля значение встаёт ровно в 0 — центр находится пальцем, а не «где-то около». */
+const PAN_DRAG_PX=160, PAN_DETENT=0.04;
+const panDet=v=>{ const x=Math.max(-1,Math.min(1,v)); return Math.abs(x)<PAN_DETENT ? 0 : x; };
+function levelOf(h){ return h.what==='mlevel' ? masterLevel() : h.what==='pan' ? lanePanOf(h.layer) : laneLevelOf(h.layer); }
+function setLevelOf(h,v){ if(h.what==='mlevel') setMasterLevel(v); else if(h.what==='pan') setLanePan(h.layer,panDet(v)); else setLaneLevel(h.layer,v); }
+const isFader=h=>!!h && (h.what==='level'||h.what==='mlevel'||h.what==='pan');
 function arrDown(e){
   const p=arrXY(e); arrPts.set(e.pointerId,p);
   const g=arrGeom(); if(!g){ arrG=null; return; }
   if(arrPts.size===1){
     const h=loopHit(p.x,p.y);
     if(h && h.what==='brace'){ arrG=null; braceEdge=braceTap(h.beat); return; }
-    if(h && (h.what==='level'||h.what==='mlevel')){
-      const key= h.what==='mlevel' ? 'm' : 'L'+h.layer, now=performance.now(), S=loopScroll();
-      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h,1); arrG=null; return; }   // двойной тап — единица
+    if(isFader(h)){
+      const key= h.what==='mlevel' ? 'm' : (h.what==='pan'?'P':'L')+h.layer, now=performance.now(), S=loopScroll();
+      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h, h.what==='pan'?0:1); arrG=null; return; }   // двойной тап — единица (панорама — центр)
       levelTap={ key, t:now };
-      arrG={ h, x:p.x, y:p.y, v0:levelOf(h), fw:g.fw, r0:S?S.row0:0, rowH:g.rowH, axis:null, level:true }; return; }
+      const span= h.what==='pan' ? 2 : 1, fw= h.what==='pan' ? Math.max(PAN_DRAG_PX,g.pfw) : h.what==='mlevel' ? g.mfw : g.fw;   // ход ручки: значение на пиксель
+      arrG={ h, x:p.x, y:p.y, v0:levelOf(h), fw:fw/span, r0:S?S.row0:0, rowH:g.rowH, axis:null, level:true }; return; }
     const S=loopScroll();
     arrG={ h, x:p.x, y:p.y, b0:g.beat0, span:g.span, bw:g.bw, r0:S?S.row0:0, rowH:g.rowH, axis:null };
   }else if(arrPts.size===2){
@@ -628,8 +635,8 @@ function arrMove(e){
   const dx=p.x-arrG.x, dy=p.y-arrG.y;
   if(!arrG.axis){ if(Math.abs(dx)<=LANE_SCROLL_PX && Math.abs(dy)<=LANE_SCROLL_PX) return; arrG.axis= Math.abs(dx)>=Math.abs(dy) ? 'x' : 'y'; }
   if(arrG.level){   // MX1: фейдер — вдоль уровень (относительно), поперёк строки; у полосы мастера листать нечего
-    if(arrG.axis==='x') setLevelOf(arrG.h, Math.max(0,Math.min(1, arrG.v0 + dx/Math.max(1,arrG.fw))));
-    else if(arrG.h.what==='level') setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
+    if(arrG.axis==='x'){ const v=arrG.v0 + dx/Math.max(1,arrG.fw); setLevelOf(arrG.h, arrG.h.what==='pan' ? v : Math.max(0,Math.min(1,v))); }
+    else if(arrG.h.what!=='mlevel') setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
     return; }
   if(arrG.axis==='x') setRollWinClamped(arrG.b0 - dx*arrG.span/arrG.bw, arrG.span);
   else setLaneRow0(laneRow0Clamp(arrG.r0 - Math.round(dy/arrG.rowH)));
@@ -660,7 +667,8 @@ addEventListener('wheel', e=>{
   if(e.ctrlKey||e.metaKey){ const f=(px-g.x0)/g.bw, span=g.span*Math.exp(e.deltaY*0.002); setRollWinClamped(g.beat0+g.span*f-span*f, span); return; }
   if(g.mix){   // MX1: колесо над фейдером — уровень (шаг 1 из 100), иначе строки
     const h=loopHit(px, e.clientY-canvasEl.getBoundingClientRect().top);
-    if(h && (h.what==='level'||h.what==='mlevel')){ setLevelOf(h, Math.max(0,Math.min(1, levelOf(h) - Math.sign(e.deltaY)*0.01))); return; } }
+    if(isFader(h)){ const v=levelOf(h) - Math.sign(e.deltaY)*0.01;   // MX2: у панорамы колесо идёт шагом 1 мимо фиксации (иначе из центра не выйти)
+      if(h.what==='pan') setLanePan(h.layer, Math.max(-1,Math.min(1,v))); else setLevelOf(h, Math.max(0,Math.min(1,v))); return; } }
   const S=loopScroll();
   if(S && !e.shiftKey && Math.abs(e.deltaY)>=Math.abs(e.deltaX)){ setLaneRow0(laneRow0Clamp(S.row0+Math.sign(e.deltaY))); return; }
   const d= Math.abs(e.deltaX)>Math.abs(e.deltaY) ? e.deltaX : e.deltaY;

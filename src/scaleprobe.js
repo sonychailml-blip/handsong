@@ -64,21 +64,22 @@
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
-import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, rollOpen, rollBeat0, rollSpan } from './state.js';   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
+import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
+         fx as liveFx, fxChains, chainOwners, chainKeyOf, leadIdx, chIdx, bassIdx, drumKitIdx, voiceMode } from './state.js';   // страж P.all: живое состояние звука, которое читает рендер   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom } from './draw.js';
 import { arrApi } from './ui.js';
-import { setMasterLevel, masterLevel, masterMeter, ownerGain } from './audio.js';   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot } from './audio.js';   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
          songNotes, editResizeSeg, editDeleteSeg, editInsertLead, editUndo, editRedo, freezeState, recording,
          tiePartners, laneEditVerOf, freezeTicket, laneDelTap,
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
-         laneLevelOf, setLaneLevel, frzBusGain } from './recorder.js';   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf } from './recorder.js';   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -990,6 +991,9 @@ const ALL_RUNS=[
   ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AR1 arrangement window',()=>checkArrange(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['MX1 track level and master',()=>checkMixer(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['MX2 track pan',()=>checkPan(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1001,19 +1005,47 @@ const ALL_RUNS=[
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
 ];
+/* ⛳ СТРАЖ СОСТОЯНИЯ МЕЖДУ СТРОКАМИ P.all (после MX2: проба, оставившая след, роняет ЧУЖУЮ строку — и виноватую не видно). Снимок до и после
+   КАЖДОЙ строки: уровень, панорама, M и S каждой дорожки; уровень мастера; окно аранжировки, его лицо, редактор; переключатели КОПИИ
+   ДВИЖКА рендера (render.copyState — уровень и панорама по ключу, раскладчик, семя, отладка, ключ удара, величины соло-ноты). Строка, после
+   которой снимок иной, получает расхождение «state guard: left changed …» с полем и значениями до/после. Вызывайте как прежде: await P.all(). */
+async function stateSig(R){
+  const Ls=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  let copy='—'; try{ if(R) copy=JSON.stringify(await R.copyState()); }catch(e){ copy='copy state unreadable: '+(e&&e.message); }
+  return { 'track level/pan/mute/solo': Ls.map(ly=>`L${ly+1}:${laneLevelOf(ly)}/${lanePanOf(ly)}/${laneMuted(ly)?'M':'-'}${laneSoloed(ly)?'S':'-'}`).join(' '),
+           'master level': String(masterLevel()),
+           'windows (arrangement/face/editor)': [arrOpen, arrFace, rollOpen, editIsOpen()].join(','),
+           'render engine copy': copy,
+           /* ⛳ ЖИВОЕ СОСТОЯНИЕ ЗВУКА, КОТОРОЕ ЧИТАЕТ РЕНДЕР ИЛИ ПЕРЕИГРОВКА (после MX2): цепи всех владельцев (состав и адреса), их прицепочные
+              величины (fxSnapshot — только чтение), старые скаляры соло, живые тембры и режимы голоса, вид строя (лад, «строй от», режим
+              аккордов, септаккорд), тоника, A4, темп, размер, транспорт. Величины сетевых параметров живых экземпляров (реверб, делей) сюда не
+              входят — их меняет только рука эффектов и переигровка, а читать их без постройки экземпляра нечем. */
+           'live effect chains': JSON.stringify(fxChains)+' '+chainOwners().map(o=>JSON.stringify(fxSnapshot(o.key))).join(' ')+' scalars '+JSON.stringify(liveFx),
+           'live timbres and voice modes': [leadIdx,chIdx,bassIdx,drumKitIdx].join(',')+' '+JSON.stringify(voiceMode),
+           'tuning view': [scaleId,tunedFrom,JSON.stringify(chordModeSel),seventh].join(','),
+           'tonic / A4 / tempo / metre': [tonic,aRef,loop.bpm,loop.metre].join(','),
+           'transport': [loop.on,recording].join(',') };
+}
 export async function all(opt={}){   // F0: async — строка снимка читает tools/scales.before.json (fetch); звать await P.all()
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
   const rows=[], lists=[], keepCM=chordModeSel;
+  let RR=null; try{ RR=await import('./render.js'); }catch(e){ RR=null; }   // страж читает копию движка рендера
+  let nGuard=0; const stall0=frameStalls;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
   try{
   for(const [name,run,read] of ALL_RUNS){
+    const g0=await stateSig(RR);
     const t0=performance.now(); let row;
     if(!opt.verbose){ console.log=console.warn=console.table=console.info=mute; }
     try{ let res=run(); if(res && typeof res.then==='function') res=await res;   // F0: проба может быть асинхронной (P.checkFiles)
          const x=read(res); row={ check:name, cases:x.cases, song:x.song==null?'—':x.song, differences:x.diff, note:x.status }; if(x.diff) lists.push([name,x.list||[]]); }
     catch(err){ row={ check:name, cases:'—', song:'—', differences:'ERROR' }; lists.push([name,[String(err&&err.stack||err)]]); }
     finally{ Object.assign(console,keep); }
-    row.ms=Math.round(performance.now()-t0); rows.push(row);
+    row.ms=Math.round(performance.now()-t0);
+    { const g1=await stateSig(RR), ch=Object.keys(g0).filter(k=>g0[k]!==g1[k]);
+      if(ch.length){ nGuard++; if(typeof row.differences==='number') row.differences+=ch.length;
+        lists.push([name+' — state guard', ch.map(k=>`state guard: left changed — ${k}: ${g0[k]} → ${g1[k]}`)]); } }
+    rows.push(row);
   }
   } finally { setChordModeSel(keepCM); }
   const M=material();
@@ -1029,10 +1061,28 @@ export async function all(opt={}){   // F0: async — строка снимка 
   const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0), noSnap=rows.some(r=>r.status==='no snapshot yet');
   if(!M.ok) console.warn(`[scaleprobe all] song: not enough material — missing ${M.missing.join('; ')} (run await P.seed({replace:true}) for a complete test song)`);
   if(noSnap) console.log('[scaleprobe all] scale-data snapshot: no tools/scales.before.json yet — P.dumpScales() makes it (F0 «tunings as files»)');
+  console.log(nGuard ? `[scaleprobe all] state guard: ${nGuard} row(s) left the mixer, the windows, the live sound state or the render engine copy changed (see the lists above)`
+                     : '[scaleprobe all] state guard: no row left the mixer, the windows, the live sound state or the render engine copy changed');
+  if(frameStalls>stall0) console.warn(`[scaleprobe all] ${frameStalls-stall0} animation frame(s) never came (tab hidden?) — rows that read the drawn window may have read a stale frame; keep the tab visible`);
   console.log(`[scaleprobe all] ${nDiff===0&&M.ok ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views)`);
   return { pass:nDiff===0&&M.ok, rows, material:M };
 }
 
+/* ═══ P.orderCheck — ПОРЯДОК НЕ ВЛИЯЕТ (после MX2) ═══ На посеянной песне: P.checkPan отдельно, затем P.all, затем P.all ЕЩЁ РАЗ — все три
+   обязаны пройти (строка MX2 идёт в P.all ПОСЛЕ S4, второй прогон ставит S4 после неё). Посев — до: await P.seed({replace:true}).
+   Асинхронная: await P.orderCheck(). */
+/* ⛳ ВСЕГДА ОБА ПРОХОДА И ОДНА ИТОГОВАЯ СТРОКА (после MX2): упавший или бросивший первый проход не отменяет второй; каждый шаг — в своём
+   try/catch; перед проходом — строка «идёт проход N из 2» (P.all молчит, пока идут строки, и долгий второй проход легко принять за конец). */
+export async function orderCheck(){
+  const run=async (label,f)=>{ console.log(`[scaleprobe order] ${label} — running…`);
+    try{ return { r:await f(), err:null }; }catch(err){ console.warn(`[scaleprobe order] ${label} threw: ${err&&err.stack||err}`); return { r:null, err }; } };
+  const failRows=x=> !x.r ? ['threw: '+(x.err&&x.err.message||x.err)] : x.r.rows.filter(z=>z.status==='FAIL'||z.differences==='ERROR').map(z=>z.check);
+  const p=await run('P.checkPan', checkPan), a=await run('P.all pass 1 of 2', all), b=await run('P.all pass 2 of 2', all);
+  const pOk= !!p.r && p.r.total===0, aOk= !!a.r && a.r.pass, bOk= !!b.r && b.r.pass, ok= pOk&&aOk&&bOk;
+  const fa=failRows(a), fb=failRows(b);
+  console.log(`[scaleprobe order] ${ok?'ORDER CHECK PASS':'ORDER CHECK FAILED'} — P.checkPan ${pOk?'pass':'FAIL'}; P.all pass 1 ${aOk?'PASS':'NOT A PASS'+(fa.length?' ('+fa.join('; ')+')':'')}; P.all pass 2 ${bOk?'PASS':'NOT A PASS'+(fb.length?' ('+fb.join('; ')+')':'')}`);
+  return { ok, pan:p.r, first:a.r, second:b.r };
+}
 /* ═══ P.seed — ДЕТЕРМИНИРОВАННАЯ ТЕСТОВАЯ ПЕСНЯ ═══
    ⛔ ЗАМЕНЯЕТ ТЕКУЩУЮ ПЕСНЮ. На непустой песне без {replace:true} — отказ (живой дубль не должен пропасть от опечатки: ничего не
    сохраняется, но потерянный дубль — всё равно потеря). Пишет ТОЛЬКО через воронки рекордера: сценарные взятые — recorder.seedTake
@@ -1416,7 +1466,7 @@ export async function checkSoloEdit(){
   catch(err){ RU={ ok:false, why:'the offline render failed: '+(err&&err.message) }; }
   if(!RU.ok) miss(`voice reuse after a bent note: ${RU.why}`);
   else console.log(`[scaleprobe solo-edit] voice reuse: the second note on the bent note's voice sounds ${RU.f} Hz (its own ${RU.want}); the control's own bend reads ${RU.fControl} Hz (${RU.wantControl}); a simulated inherited curve reads as inherited`);
-  if(RU.detail) console.log('[scaleprobe solo-edit] voice reuse, candidate correlations — '+RU.detail);
+  if(RU.detail) console.log('[scaleprobe solo-edit] voice reuse, candidate correlations and window energy — '+RU.detail);
   console.log(`[scaleprobe solo-edit] solo notes ${song} · cases ${cases} · linked pairs ${nPairs} · differences ${nBad}`);
   if(absent.length) console.log('[scaleprobe solo-edit] not in this song (not checked): '+[...new Set(absent)].join('; '));
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe solo-edit] '+m));
@@ -1431,8 +1481,18 @@ export async function checkSoloEdit(){
    то, чем играет ENG), а у дорожек ДАЛЬШЕ 16-й — офлайн-рендер (render.renderTrack — та же таблица ENG на копии движка) с ненулевым пиком.
    Кадры ждёт сама (полоса рисуется в цикле приложения): await P.checkTracks(). Прокрутку, микшер и редактор возвращает как были; при
    тронутом микшере (заглушено или соло) пункт 3 пропускается с пометкой. Нужна полоса на экране (во время записи видеоклипа её нет). */
-const frame=()=>new Promise(res=>requestAnimationFrame(()=>res()));
+/* ⛳ КАДР С ЗАПАСНЫМ ТАЙМЕРОМ (после MX2: P.orderCheck напечатал одну таблицу P.all из двух). В скрытой вкладке requestAnimationFrame не
+   приходит вовсе, и проба, ждущая кадр, висела бы бесконечно — молча. Теперь кадр — rAF или 1 с, что раньше; не дождались — счётчик
+   frameStalls (P.all печатает его: окно не рисовалось, строки окон могли читать старый снимок). Держите вкладку видимой. */
+let frameStalls=0;
+const frame=()=>new Promise(res=>{ let done=false; const fin=st=>{ if(done) return; done=true; if(st) frameStalls++; res(); };
+  requestAnimationFrame(()=>fin(false)); setTimeout(()=>fin(true),1000); });
 const waitMs=ms=>new Promise(res=>setTimeout(res,ms));
+/* ⛳ ОКНО АРАНЖИРОВКИ, ЛИЦО, ОКНО ВРЕМЕНИ И ПРОКРУТКА — СНИМОК И ВОЗВРАТ (починка после MX2). Пробы микшера открывают окно и лицо «микшер»;
+   прежде в finally ставили лицо «аранжировка» безусловно и не возвращали окно времени (первый вход в окно вписывает всю песню) и прокрутку.
+   Теперь — ровно как было до пробы, в finally (и при исключении). */
+const winKeep=()=>({ face:arrFace, b0:rollBeat0, span:rollSpan, row0:laneRow0 });
+function winRestore(k){ if(arrOpen) arrApi.close(); if(arrFace!==k.face) arrApi.face(k.face); arrApi.setWin(k.b0,k.span); setLaneRow0(k.row0); }
 /* ═══ MX1: УРОВЕНЬ ДОРОЖКИ И МАСТЕР — P.checkMixer ═══
    (1) СТУПЕНЬ В ГОЛОСЕ МАСШТАБИРУЕТ ЗВУК ДОРОЖКИ: офлайн-рендер дорожки (render.renderTrack — та же таблица ENG на копии движка) с
        множителем g (o.trackGain — тем же путём, что живой голос: ступень tg по ключу владельца, множитель удара, дрона) против g = 1 —
@@ -1451,7 +1511,7 @@ export async function checkMixer(){
   if(!L.length) return { cases:0, song:0, total:0, differences:[] };
   if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
   if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
-  const keepLvl=new Map(L.map(ly=>[ly,laneLevelOf(ly)])), keepM=masterLevel();
+  const keepLvl=new Map(L.map(ly=>[ly,laneLevelOf(ly)])), keepM=masterLevel(), KW=winKeep();
   const rms=b=>{ let s=0,n=0; for(let c=0;c<b.numberOfChannels;c++){ const x=b.getChannelData(c); for(let i=0;i<x.length;i++){ s+=x[i]*x[i]; n++; } } return n?Math.sqrt(s/n):0; };
   const nOf=ly=>events.reduce((m,e)=>e.layer===ly&&e.t>m?e.t:m,0);   // конец материала дорожки: рендер короче — проба быстрее
   const pitched=L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&/^(leadOn|chOn|bassOn)$/.test(e.fn))).sort((a,b)=>nOf(a)-nOf(b));
@@ -1507,12 +1567,277 @@ export async function checkMixer(){
   } finally {
     for(const [ly,v] of keepLvl) if(laneLevelOf(ly)!==v) setLaneLevel(ly,v);
     if(masterLevel()!==keepM) setMasterLevel(keepM);
-    if(arrOpen){ arrApi.face('arr'); arrApi.close(); }
+    winRestore(KW);
   }
   console.log(`[scaleprobe mixer] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
   notes.forEach(m=>console.log('[scaleprobe mixer] '+m));
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe mixer] '+m));
   if(!nBad) console.log('[scaleprobe mixer] the voice stage scales a track proportionally, a frozen track takes its level on its bus and stays fresh, live owners get their track’s gain, the master level sets the master gain, and the mixer face hits its faders');
+  return { cases, song:L.length, total:nBad, differences:bad };
+}
+/* ═══ MX2: ПАНОРАМА ДОРОЖКИ — P.checkPan ═══
+   (1) ВПЛАВЛЕНИЕ НАСТОЯЩИМ ПУТЁМ ЗАМОРОЗКИ: панорама ставится recorder.setLanePan (без подмены o.trackPan), затем render.renderTrack — тот
+       же рендер, что даёт ❄. Мера — доля энергии левого канала sL = EL/(EL+ER).
+       ⛳ БАЛАНС — НА СУХОМ РЕНДЕРЕ (o.dry: эффекты шины закрыты; после MX2 — мокрый центр соло читался то 0.493, то 0.443). Влажная доля —
+       не панорама: отводы реверба на L и R — РАЗНЫЕ знаковые смеси линий сети, они не отражаются панорамой (хард-лево и хард-право — не
+       зеркала), а хвост сети от рендера к рендеру иной в микроструктуре (правило слагаемых). Сухой сигнал — сама ступень панорамы:
+       хард-лево R = 0 ТОЧНО, центр L = R ТОЧНО. Пороги сухого: стороны ≥ PAN_DRY_SIDE (0.99), центр 0.5 ± PAN_DRY_MID (0.01).
+       ⛳ ОДИН МОКРЫЙ РЕНДЕР (хард-лево) — что эхо и хвосты не переворачивают картину: слева ≥ PAN_SIDE (0.8).
+       ⛳ ПОЧЕМУ 0.8, А НЕ «ПОЧТИ 1»: сухой сигнал хард-лево справа — ТОЧНО ноль (закон равной мощности, R = 0), но реверб роли сводит вход
+       в моно и кладёт влажную долю в оба канала поровну (делей и тремоло шины держат стерео — эхо остаётся слева). При L = √2·d и влажной
+       энергии W на канал (у хард-лево вход реверба вдвое тише по энергии: 0.5·(L+R)) sL = (2D+W)/(2D+2W) ≥ 0.8 ⇔ W ≤ ⅔·D — порог держит
+       любую дорожку, где влажная доля в центре не больше ~4/3 сухой на канал; мокрее — дорожка «утонула», и такой реверб надо назвать, а
+       не прятать. Центр: сухое в обоих каналах одно и то же, влажное — разнознаковые отводы сети, энергии почти равны — 0.05 (≈ ±0.9 дБ).
+       ⛳ КОНТРОЛЬ (мера обязана уметь провалиться): тест «хард-лево» прогоняется и на ЦЕНТРЕ, и на ХАРД-ПРАВО — оба обязаны его НЕ
+       пройти, иначе мера не отличила бы лево от «не лево»; и зеркально тест «хард-право» — на хард-лево.
+       Дорожки: самая короткая незамороженная высотная (ступень в голосе пула) и, если есть, ударная (ступень в ударе).
+   (2) ЗАМОРОЖЕННАЯ: смена панорамы меняет подпись (freezeTicket) и старит буфер ('stale'); возврат панорамы — снова 'fresh' и та же подпись.
+   (3) ЖИВОЙ ДВИЖОК: ключи владельцев дорожки получают её панораму (audio.ownerPan); живые ключи (руки) — центр.
+   (4) ЛИЦО МИКШЕРА: правый блок тела строки ловится как панорама ЕЁ дорожки, левый — как уровень.
+   Панорамы, окно и лицо возвращает как были. Асинхронная: await P.checkPan(). */
+export async function checkPan(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); }, notes=[];
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const PAN_SIDE=0.8, PAN_DRY_SIDE=0.99, PAN_DRY_MID=0.01;
+  const keepPan=new Map(L.map(ly=>[ly,lanePanOf(ly)])), KW=winKeep();
+  const shareL=b=>{ if(b.numberOfChannels<2) return NaN; let l=0,r=0; const x=b.getChannelData(0), y=b.getChannelData(1);
+    for(let i=0;i<x.length;i++){ l+=x[i]*x[i]; r+=y[i]*y[i]; } return (l+r)>0 ? l/(l+r) : NaN; };
+  const f3=x=>Number.isFinite(x)?x.toFixed(3):String(x);
+  const endOf=ly=>events.reduce((m,e)=>e.layer===ly&&e.t>m?e.t:m,0);   // конец материала дорожки: рендер короче — проба быстрее
+  const pitched=L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&/^(leadOn|chOn|bassOn)$/.test(e.fn))).sort((a,b)=>endOf(a)-endOf(b));
+  const drums=L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&e.fn==='drum')).sort((a,b)=>endOf(a)-endOf(b));
+  try{
+    // ---- (1) вплавление: рендер дорожки при панораме −1 / 0 / +1, поставленной самой дорожке ----
+    const R=await import('./render.js');
+    if(!pitched.length) miss('no unfrozen pitched track to render');
+    for(const ly of [pitched[0], drums[0]].filter(x=>x!=null)){ cases++;
+      try{
+        const sh={};
+        for(const [k,p] of [['left',-1],['centre',0],['right',1]]){ setLanePan(ly,p); sh[k]=shareL((await R.renderTrack(ly,{dry:true,quiet:true})).buf); }
+        setLanePan(ly,-1); const wetL=shareL((await R.renderTrack(ly,{quiet:true})).buf);
+        const tag=`L${ly+1}: left share, dry — hard left ${f3(sh.left)}, centre ${f3(sh.centre)}, hard right ${f3(sh.right)}; wet hard left ${f3(wetL)}`;
+        if(!Number.isFinite(sh.left+sh.centre+sh.right+wetL)) miss(tag+' — a render is silent or mono');
+        else{
+          if(!(sh.left>=PAN_DRY_SIDE)) miss(`${tag} — dry hard left keeps less than ${PAN_DRY_SIDE} of its energy on the left`);
+          if(!(1-sh.right>=PAN_DRY_SIDE)) miss(`${tag} — dry hard right keeps less than ${PAN_DRY_SIDE} of its energy on the right`);
+          if(!(Math.abs(sh.centre-0.5)<=PAN_DRY_MID)) miss(`${tag} — dry centre is not balanced (±${PAN_DRY_MID})`);
+          if(!(wetL>=PAN_SIDE)) miss(`${tag} — with effects, hard left keeps less than ${PAN_SIDE} on the left (echoes or tails flip the picture)`);
+          if(sh.centre>=PAN_DRY_SIDE || sh.right>=PAN_DRY_SIDE) miss(`${tag} — CONTROL: the hard-left test passes on a render that is not panned left; the measure cannot catch a wrong pan`);
+          if(1-sh.left>=PAN_DRY_SIDE || 1-sh.centre>=PAN_DRY_SIDE) miss(`${tag} — CONTROL: the hard-right test passes on a render that is not panned right`);
+          notes.push(tag+` (controls: the hard-left test on centre/right reads ${f3(sh.centre)}/${f3(sh.right)} < ${PAN_DRY_SIDE}, the hard-right test on left/centre reads ${f3(1-sh.left)}/${f3(1-sh.centre)})`);
+        }
+      }catch(err){ miss(`L${ly+1}: the offline render failed — ${err&&err.message}`); }
+      finally{ setLanePan(ly,keepPan.get(ly)); }
+    }
+    // ---- (2) замороженная: панорама в подписи ----
+    const fz=L.find(ly=>freezeState(ly)==='fresh');
+    if(fz!=null){ cases++;
+      const sig0=freezeTicket(fz).sig, p0=keepPan.get(fz), p1= p0===0.5 ? -0.5 : 0.5;
+      setLanePan(fz,p1);
+      const st1=freezeState(fz), sig1=freezeTicket(fz).sig;
+      if(sig1===sig0) miss(`L${fz+1}: a pan change did not change the freeze signature`);
+      if(st1!=='stale') miss(`L${fz+1}: after a pan change the freeze is ${st1}, expected stale`);
+      setLanePan(fz,p0);
+      const st2=freezeState(fz), sig2=freezeTicket(fz).sig;
+      if(st2!=='fresh'||sig2!==sig0) miss(`L${fz+1}: with its pan restored the freeze is ${st2}${sig2!==sig0?' and the signature differs':''}, expected fresh and the same signature`);
+      notes.push(`L${fz+1}: pan ${p1} → ${st1}; pan back → ${st2}`);
+    } else notes.push('no frozen track in this song — the frozen part is not checked (P.seed freezes the raga bass)');
+    // ---- (3) живой движок: панорама по ключу владельца ----
+    { cases++; const ly=L[0];
+      setLanePan(ly,0.3);
+      for(const k of ['leadloop:'+ly+':0','loop:'+ly,'loop:'+ly+':2','bassloop:'+ly,'hit:'+ly,'drone:'+ly]){ const got=ownerPan(k); if(Math.abs(got-0.3)>1e-12) miss(`the live engine gives owner ${k} the pan ${got}, expected 0.3`); }
+      for(const k of ['lead:L','lead:M','latch','bass','bass:L:1',null]){ const got=ownerPan(k); if(got!==0) miss(`the live key ${k} gets the pan ${got}, expected 0 (live hands stay centred)`); }
+      const other=L.find(o=>o!==ly); if(other!=null){ const got=ownerPan('loop:'+other); if(Math.abs(got-lanePanOf(other))>1e-12) miss(`another track's owner gets the pan ${got}`); }
+      setLanePan(ly,keepPan.get(ly)); }
+    // ---- (4) лицо микшера: попадание по панораме ----
+    { cases++;
+      arrApi.open(); arrApi.face('mix'); await frame(); await frame();
+      const V=loopViewProbe();
+      if(!V||!V.mix) miss('the mixer face is not drawn');
+      else for(const ly of V.rows){ const y=V.gy0+V.rows.indexOf(ly)*V.rowH+V.rowH/2;
+        const hp=loopHit(V.pfx0+V.pfw/2,y), hl=loopHit(V.fx0+V.fw/2,y);
+        if(!hp||hp.what!=='pan'||hp.layer!==ly) miss(`L${ly+1}: the pan block is not its pan control (${hp&&hp.what})`);
+        if(!hl||hl.what!=='level'||hl.layer!==ly) miss(`L${ly+1}: the level part is not its level fader (${hl&&hl.what})`); }
+      if(V && V.mix && !(V.pfw>=40)) miss(`the pan control is only ${V.pfw}px wide`);
+    }
+  } finally {
+    for(const [ly,p] of keepPan) if(lanePanOf(ly)!==p) setLanePan(ly,p);
+    winRestore(KW);
+  }
+  console.log(`[scaleprobe pan] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe pan] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe pan] '+m));
+  if(!nBad) console.log('[scaleprobe pan] a panned track renders to its side through the freeze path (and the controls show the measure would catch a wrong pan), centre is balanced, a pan change stales a frozen track and restoring it makes it fresh again, live hands stay centred, and the mixer face hits its pan controls');
+  return { cases, song:L.length, total:nBad, differences:bad };
+}
+/* ═══ ПОВТОРЯЕМОСТЬ РЕНДЕРА — P.checkRepeat (после MX2; допуски — из объяснения, дополнение 3) ═══
+   Одна и та же дорожка рендерится несколько раз с одними настройками (render.renderTrack — путь заморозки), материал и снимок живой
+   цепи соло — одни (o.solo). Допуски выведены из ДВУХ найденных механизмов, а не подобраны:
+   (1) СУХОЙ БЕЗ СТАДИИ ВЫРАЗИТЕЛЬНОСТИ (dbg.expr 'bypass') ≤ REP_BITS·пик (2e-6). Остаётся одно: узел, в который сходятся ТРИ и больше
+       ненулевых входа (банк SuperSaw — пять пил, сумма голосов leadSum, мастер), складывает их в порядке, который Chrome берёт из множества
+       указателей — свой у каждой постройки графа; float-сложение не ассоциативно, и сумма сдвигается на последний бит (2⁻²⁴ ≈ 6e-8 её
+       величины). Внутренние суммы — до нескольких пиков, таких узлов на пути — горстка: ≲1e-6. Рекурсивных фильтров на этом пути у SuperSaw
+       нет (у банка нет фильтра; ступень яркости без величины — точный ноль). Отдельный замер прежде: 2.45e-7.
+   (2) СУХОЙ ≤ REP_DRY·пик (1e-4). Стадия выразительности стоит на шине соло ВСЕГДА, и её ВАУ — пиковый фильтр 350 Гц, Q 5, 0 дБ: точное
+       тождество в точной арифметике, но состояние обратной связи биквада браузер держит с точностью float, поэтому его собственное
+       округление ходит по петле с полюсом r ≈ 1 − sin(2π·350/fs)/(2·5) ≈ 0.9954. Пока вход побитно тот же — округление то же; стоит входу
+       сдвинуться на последний бит (см. 1) — последовательность округлений иная, и разницу фильтр 1/A усиливает: √Σh² ≈ 1/(2·sinθ·√(1−r))
+       ≈ 160 по RMS, пики в несколько раз больше — ×~600 от полубита (~3e-8) ≈ 2e-5. Замер: 1.54e-5 в обоих проходах P.all. Допуск — с
+       пятикратным запасом. Строка с обходом стадии (1) доказывает, что усилитель — именно она.
+   (3) МОКРЫЙ ≤ REP_WET·пик (2e-4) и общая энергия в ±REP_WET. Разница сухого идёт сквозь цепь (сухая ветвь ×1, влажная — усиление ≤ 1 к
+       своему входу), а собственные последние биты сети ходят по петлям с усилением ≤ g < 1 (по мощности 1/(1−g²) ≈ 4 при g ≈ 0.86): ≤ ~2×
+       допуск сухого. ⛳ Так — лишь с ОДНИМ входом в каждую петлю реверба (audio.apStage/buildFDN в копии рендера). Живая проводка (несколько
+       входов) рвёт петли там, куда придёт тяга, а порядок тяги у Chrome свой на каждую постройку — до починки два рендера давали разную
+       комнату: энергия 0.91 и 1.02, расхождение до 0.76 пика.
+   ⛳ КОНТРОЛИ (мера обязана уметь провалиться): сухой с панорамой 0.5 против центра — разница > REP_DRY·100; мокрый с уровнем 0.9
+       (o.trackGain) — отношение RMS ровно 0.9 (± 1e-3: усиление линейно) и разница сэмплов > REP_WET·100; и ⛳ A/B ПРОВОДКИ: тот же мокрый
+       рендер с ЖИВОЙ проводкой петель (dbg.fdnLive) трижды — печатается наибольшее расхождение пар; если и они совпадут, предупреждение:
+       «объяснение этим прогоном не подтверждено» (порядок указателей может случайно совпасть — провалом это не считается).
+   Поиск ступени: тот же мокрый рендер, где открыт ЛИШЬ один эффект (o.only) — дважды, тот же допуск; назовёт ступень, если повтор сломается.
+   (4) ДОГОВОР ЗАМОРОЗКИ: у соло-дорожки с нотами БЕЗ карты эффектов (их звук — живая цепь соло, правило R2) подпись заморозки обязана
+       меняться при сдвиге живого вибрато (state.fx) и возвращаться при возврате; у дорожки без таких нот — не меняться.
+   Дорожки: самая короткая незамороженная соло-дорожка и, контролем, самая короткая ударная. Асинхронная: await P.checkRepeat(). */
+export async function checkRepeat(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); }, notes=[];
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const REP_BITS=2e-6, REP_DRY=1e-4, REP_WET=2e-4, OLD_SEEN=1e-3;   // объяснение — в шапке пробы
+  const endOf=ly=>events.reduce((m,e)=>e.layer===ly&&e.t>m?e.t:m,0);
+  const pick=re=>L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&re.test(e.fn))).sort((a,b)=>endOf(a)-endOf(b))[0];
+  const solo=pick(/^leadOn$/), drum=pick(/^drum$/);
+  /* ⛳ ОДИН СНИМОК ЖИВОЙ ЦЕПИ СОЛО НА ВСЕ РЕНДЕРЫ ПРОБЫ (o.solo). Ноты посева без карты звучат живой цепью соло (договор заморозки), а её
+     старые скаляры (вибрато, драйв, тремоло) пишет рука эффектов — камера работает и во время пробы. Повторяемость рендера меряем при
+     ОДНИХ входах: снимок берём один раз, здесь. */
+  const soloMap=fxSnapshot(chainKeyOf('ld'));
+  const e3=x=>Number.isFinite(x)?x.toExponential(2):String(x), f4=x=>Number.isFinite(x)?x.toFixed(4):String(x);
+  try{
+    const R=await import('./render.js');
+    const rt=o=>R.renderTrack(o.ly,{quiet:true, solo:soloMap, ...o.opt}).then(r=>r.buf);
+    if(solo==null) miss('no unfrozen solo track to render');
+    for(const [name,ly] of [['solo',solo],['drums (control)',drum]]){ if(ly==null) continue; cases++;
+      try{
+        const solo1=name==='solo';
+        const d1=await rt({ly,opt:{dry:true}}), d2=await rt({ly,opt:{dry:true}});
+        const w1=await rt({ly,opt:{}}), w2=await rt({ly,opt:{}});
+        const dp=await rt({ly,opt:{dry:true,trackPan:0.5}}), wg=await rt({ly,opt:{trackGain:0.9}});
+        const D=bufCmp(d1,d2,REP_DRY), W=bufCmp(w1,w2,REP_WET), C=bufCmp(d1,dp,REP_DRY), G=bufCmp(w1,wg,REP_WET);
+        const tag=`L${ly+1} ${name}: dry twice — max difference ${e3(D.rel)} of peak${D.first!=null?`, first at ${D.first} s`:''}; wet twice — max difference ${e3(W.rel)} of peak, total RMS ratio ${f4(W.total)} (channels ${f4(W.ratio[0])}/${f4(W.ratio[1])})${W.first!=null?`, first at ${W.first} s`:''}; controls — dry pan 0.5 vs centre ${e3(C.rel)}, wet level 0.9 vs 1 RMS ratio ${f4(G.total)}`;
+        if(!D.shape||!W.shape) miss(`${tag} — two renders of the same track have different lengths`);
+        if(!(D.rel<=REP_DRY)) miss(`${tag} — the DRY render differs by more than ${e3(REP_DRY)} of peak (the expression stage's wah can amplify last bits to ~2e-5, not more): it reads an input the render does not pin`);
+        if(!(W.rel<=REP_WET)) miss(`${tag} — the WET render differs by more than ${e3(REP_WET)} of peak: something on the effect chain is not repeatable`);
+        if(!(Math.abs(W.total-1)<=REP_WET)) miss(`${tag} — the WET render's total energy differs by more than ${e3(REP_WET)}`);
+        if(!(C.rel>REP_DRY*100)) miss(`${tag} — CONTROL: a different pan renders within ${e3(REP_DRY*100)}; the dry measure cannot see a difference`);
+        if(!(Math.abs(G.total-0.9)<=1e-3)) miss(`${tag} — CONTROL: a 0.9 track level should scale the wet RMS by exactly 0.9 (±0.001: the level stage and the chain are linear)`);
+        if(!(G.rel>REP_WET*100)) miss(`${tag} — CONTROL: a 0.9 track level renders within ${e3(REP_WET*100)} of the full level; the wet measure cannot see a difference`);
+        notes.push(tag);
+        if(solo1){
+          /* (1) сухой БЕЗ стадии выразительности — только порядок сложения: последние биты */
+          const b1=await rt({ly,opt:{dry:true,dbg:{expr:'bypass'}}}), b2=await rt({ly,opt:{dry:true,dbg:{expr:'bypass'}}}), B=bufCmp(b1,b2,REP_BITS);
+          notes.push(`L${ly+1} solo, dry with the expression stage bypassed: max difference ${e3(B.rel)} of peak${B.first!=null?`, first at ${B.first} s`:''} — with the stage ${e3(D.rel)}: ${B.rel<=REP_BITS? (D.rel>B.rel*4?'the stage (its resonant wah) amplifies the last bits, as explained':'the stage adds nothing measurable this run') : 'NOT last bits'}`);
+          if(!B.shape||!(B.rel<=REP_BITS)) miss(`L${ly+1} solo: dry without the expression stage differs by ${e3(B.rel)} of peak, more than last bits (${e3(REP_BITS)}): an input the render does not pin, not the wah`);
+          /* ⛳ поиск ступени: открыт лишь один эффект */
+          const chain=new Set(autChainOf(ly));
+          for(const id of ['reverb','dly','trmMix']){
+            const a1=await rt({ly,opt:{only:id}}), a2=await rt({ly,opt:{only:id}}), X=bufCmp(a1,a2,REP_WET);
+            const ok= X.rel<=REP_WET && Math.abs(X.total-1)<=REP_WET;
+            notes.push(`L${ly+1} solo, only ${id} open${chain.has(id)?'':' (not in this track\u2019s chain)'}: max difference ${e3(X.rel)} of peak, total RMS ratio ${f4(X.total)}${X.first!=null?`, first at ${X.first} s`:''} — ${ok?'repeatable':'NOT REPEATABLE'}`);
+            if(!ok) miss(`L${ly+1} solo: with only ${id} open two renders differ — max ${e3(X.rel)} of peak, RMS ratio ${f4(X.total)}${X.first!=null?`, from ${X.first} s`:''}: this stage is not repeatable`);
+          }
+          /* ⛳ A/B проводки: живая проводка петель реверба (несколько входов) — трижды */
+          if(chain.has('reverb')){
+            const o=[]; for(let k=0;k<3;k++) o.push(await rt({ly,opt:{dbg:{fdnLive:true}}}));
+            let mx=0, tot=1; for(const [i,j] of [[0,1],[0,2],[1,2]]){ const X=bufCmp(o[i],o[j],REP_WET); if(X.rel>mx){ mx=X.rel; tot=X.total; } }
+            notes.push(`L${ly+1} solo, the LIVE reverb wiring (several entries into each loop), three renders: largest pair difference ${e3(mx)} of peak, its RMS ratio ${f4(tot)} — ${mx>OLD_SEEN?'NOT repeatable: the render\u2019s one-entry wiring is what makes it repeatable (explanation confirmed)':'repeated this time too — the explanation is not confirmed by this run (the pointer order can coincide)'}`);
+            if(!(mx>OLD_SEEN)) console.warn(`[scaleprobe repeat] L${ly+1}: three renders with the live reverb wiring agreed (largest difference ${e3(mx)}) — the reverb-loop explanation is not confirmed by this run; run P.checkRepeat() again`);
+          }
+        }
+      }catch(err){ miss(`L${ly+1} ${name}: the offline render failed — ${err&&err.message}`); }
+    }
+    // ---- договор заморозки: соло без карты → живая цепь в подписи (синхронно: подмена и возврат вибрато — без единого await) ----
+    for(const ly of [solo,drum].filter(x=>x!=null)){ cases++;
+      const noFx=events.some(e=>e.layer===ly&&(e.fn==='leadOn'||e.fn==='leadSet')&&e.a&&e.a.fx==null);
+      const keepVib=liveFx.vib; let s0, s1, s2;
+      try{ s0=freezeTicket(ly).sig; liveFx.vib=keepVib===0.5?0.25:0.5; s1=freezeTicket(ly).sig; }
+      finally{ liveFx.vib=keepVib; }
+      s2=freezeTicket(ly).sig;
+      if(noFx && s1===s0) miss(`L${ly+1}: it has solo notes without an effect map (they sound with the live solo chain), yet moving the live vibrato does not change its freeze signature`);
+      if(!noFx && s1!==s0) miss(`L${ly+1}: every note carries its own effect map, yet moving the live vibrato changes its freeze signature`);
+      if(s2!==s0) miss(`L${ly+1}: with the live vibrato restored the freeze signature differs`);
+      notes.push(`L${ly+1}: ${noFx?'has':'no'} solo notes without a map — live vibrato ${s1===s0?'does not change':'changes'} the freeze signature`);
+    }
+  } finally {}
+  console.log(`[scaleprobe repeat] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe repeat] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe repeat] '+m));
+  if(!nBad) console.log('[scaleprobe repeat] the same track renders the same twice — dry within the last bits the expression stage’s wah can amplify (and to the last bits without it), wet within twice that, every single effect repeatable — the controls show the measure sees a change, and solo notes without a map put the live solo chain into the freeze signature');
+  return { cases, song:L.length, total:nBad, differences:bad };
+}
+/* Сравнение двух буферов: rel — наибольшая разница сэмплов в долях пика первого; total/ratio — отношение RMS (всего и по каналам); first —
+   секунда первого сэмпла, где разница больше eps·пик (последние биты в счёт не идут). */
+function bufCmp(a,b,eps){
+  if(a.length!==b.length||a.numberOfChannels!==b.numberOfChannels) return { shape:false, rel:Infinity, ratio:[NaN,NaN], total:NaN, first:null };
+  let pk=0, mx=0; const ea=[0,0], eb=[0,0];
+  for(let c=0;c<Math.min(2,a.numberOfChannels);c++){ const x=a.getChannelData(c); for(let i=0;i<x.length;i++){ const u=Math.abs(x[i]); if(u>pk) pk=u; } }
+  let first=-1; const lim=(eps||0)*pk;
+  for(let c=0;c<Math.min(2,a.numberOfChannels);c++){ const x=a.getChannelData(c), y=b.getChannelData(c);
+    for(let i=0;i<x.length;i++){ const u=x[i], v=y[i], d=Math.abs(u-v); if(!(d<=mx)) mx=d; if(d>lim && (first<0||i<first)) first=i; ea[c]+=u*u; eb[c]+=v*v; } }
+  const ta=ea[0]+ea[1], tb=eb[0]+eb[1];
+  return { shape:true, pk, rel: pk>0 ? mx/pk : (mx>0?Infinity:0), ratio: ea.map((e,c)=> e>0 ? Math.sqrt(eb[c]/e) : (eb[c]>0?Infinity:1)),
+           total: ta>0 ? Math.sqrt(tb/ta) : (tb>0?Infinity:1), first: first<0 ? null : +(first/a.sampleRate).toFixed(3) };
+}
+/* ═══ ОЧЕРЕДЬ РЕНДЕРОВ — P.checkQueue (после MX2) ═══
+   Два рендера, запрошенные ОДНОВРЕМЕННО (Promise.all, без await между запросами), обязаны дать ровно то же, что каждый ОДИН: сухой
+   рендер соло-дорожки и сухой рендер ударной — сначала поодиночке, затем оба разом, и каждый из пары сверяется со своим одиночным
+   (≤ 1e-4 пика — допуск сухого из P.checkRepeat: два независимых рендера соло расходятся на последние биты, усиленные вау стадии
+   выразительности, до ~2e-5; порча от наложения давала 1.2 пика и Infinity). Ещё — две КОПИИ одного рендера разом (тот же случай, что два быстрых ❄ на одной дорожке). Песня после — та же (число
+   событий), очередь пуста.
+   ⛳ КОНТРОЛЬ: в миг запроса пары очередь обязана держать ≥ 2 рендера — иначе запросы не пересеклись и проба ничего не проверила; и мера
+   обязана видеть разницу — одиночный против того же рендера с панорамой 0.5. Асинхронная: await P.checkQueue(). */
+export async function checkQueue(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); }, notes=[];
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  if(!L.length) return { cases:0, song:0, total:0, differences:[] };
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  if(recording){ miss('recording — stop it first'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const EPS=1e-4, n0=events.length, e3=x=>Number.isFinite(x)?x.toExponential(2):String(x);
+  const endOf=ly=>events.reduce((m,e)=>e.layer===ly&&e.t>m?e.t:m,0);
+  const pick=re=>L.filter(ly=>freezeState(ly)==='none' && events.some(e=>e.layer===ly&&re.test(e.fn))).sort((a,b)=>endOf(a)-endOf(b))[0];
+  const A=pick(/^leadOn$/)??pick(/^(chOn|bassOn)$/), B=pick(/^drum$/);
+  if(A==null||B==null){ miss('needs an unfrozen pitched track and an unfrozen drum track'); return { cases, song:L.length, total:nBad, differences:bad }; }
+  const soloMap=fxSnapshot(chainKeyOf('ld'));
+  const R=await import('./render.js');
+  const rt=(ly,opt)=>R.renderTrack(ly,{quiet:true, dry:true, solo:soloMap, ...(opt||{})}).then(r=>r.buf);
+  try{
+    const a0=await rt(A), b0=await rt(B), ap=await rt(A,{trackPan:0.5});
+    cases++;
+    const pa=rt(A), pb=rt(B), q=R.renderQueue();
+    const [a1,b1]=await Promise.all([pa,pb]);
+    if(!(q>=2)) miss(`CONTROL: when the pair was requested the queue held ${q} render(s) — the requests did not overlap, nothing was tested`);
+    const CA=bufCmp(a0,a1,EPS), CB=bufCmp(b0,b1,EPS), CC=bufCmp(a0,ap,EPS);
+    if(!(CA.rel<=EPS)) miss(`L${A+1} rendered together with L${B+1} differs from L${A+1} rendered alone — max ${e3(CA.rel)} of peak${CA.first!=null?`, from ${CA.first} s`:''}`);
+    if(!(CB.rel<=EPS)) miss(`L${B+1} rendered together with L${A+1} differs from L${B+1} rendered alone — max ${e3(CB.rel)} of peak${CB.first!=null?`, from ${CB.first} s`:''}`);
+    if(!(CC.rel>EPS*100)) miss(`CONTROL: a pan of 0.5 renders the same as centre within ${EPS} — the measure cannot see a difference`);
+    notes.push(`two tracks at once (queue ${q}): L${A+1} ${e3(CA.rel)}, L${B+1} ${e3(CB.rel)} of peak against alone; control (pan 0.5) ${e3(CC.rel)}`);
+    cases++;
+    const pc=rt(A), pd=rt(A), q2=R.renderQueue();
+    const [c1,c2]=await Promise.all([pc,pd]);
+    const C1=bufCmp(a0,c1,EPS), C2=bufCmp(a0,c2,EPS);
+    if(!(q2>=2)) miss(`CONTROL: the same track twice — the queue held ${q2} render(s) when requested`);
+    if(!(C1.rel<=EPS&&C2.rel<=EPS)) miss(`L${A+1} rendered twice at once differs from alone — ${e3(C1.rel)} / ${e3(C2.rel)} of peak`);
+    notes.push(`the same track twice at once (queue ${q2}): ${e3(C1.rel)} / ${e3(C2.rel)} of peak against alone`);
+  } catch(err){ miss('a render failed — '+(err&&err.message)); }
+  cases++;
+  if(events.length!==n0) miss(`the song changed during the renders: ${n0} events before, ${events.length} after`);
+  if(R.renderQueue()!==0) miss(`the render queue is not empty afterwards (${R.renderQueue()})`);
+  console.log(`[scaleprobe queue] cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe queue] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe queue] '+m));
+  if(!nBad) console.log('[scaleprobe queue] renders requested at once wait for each other and give exactly what each gives alone; the song and the queue are untouched afterwards');
   return { cases, song:L.length, total:nBad, differences:bad };
 }
 const volAmpOf=v=>{ const x=v>0?(v<1?v:1):0; return x*x; };   // та же кривая, что config.volAmp (проба не тянет config ради одной строки)

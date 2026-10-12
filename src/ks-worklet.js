@@ -43,13 +43,19 @@ class KSProcessor extends AudioWorkletProcessor {
     this.apX=0; this.apY=0;              // состояние аллпаса (дробная задержка)
     this.avg=0;                          // предыдущий вход петлевого фильтра
     this.prevPluck=0;
+    /* ⛳ СЕМЯ ШУМА ЩИПКА (после MX2, договор заморозки: случайность пути рендера сеется по дорожке). Ворклет — отдельный мир JS, семя
+       главного потока сюда не доходит; его приносит processorOptions.seed — его даёт ТОЛЬКО копия рендера (buildKSBank, offline), взяв
+       число из своего засеянного потока. Живьём seed нет — Math.random, как всегда. Генератор — mulberry32, тот же, что у render.js. */
+    if(o.seed!=null){ let a=o.seed>>>0;
+      this.rnd=()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+    else this.rnd=Math.random;
   }
   /* Щипок: заполняем ХВОСТ линии (L сэмплов перед указателем записи) шумом. amp — громкость,
      cut — коэффициент предфильтра яркости (мягкий щипок темнее): 0=ярко, →1=глухо. */
   excite(L,amp,cut){
     let z=0;
     for(let i=0;i<L;i++){
-      const n=Math.random()*2-1;
+      const n=this.rnd()*2-1;
       z=cut*z+(1-cut)*n;                  // одно-полюсный предфильтр по шуму
       const idx=(this.wr-L+i+this.N)%this.N;
       this.buf[idx]=z*amp;

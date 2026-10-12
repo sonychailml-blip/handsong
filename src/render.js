@@ -7,16 +7,20 @@
      recorder (REC.*): makeENG, fxLaneMerge, fxLaneExpand, evRole, FX_CHAIN, ldKey, chOwnerKey, bassOwnerKey (ключи
        владельцев — trackOpen; формулы ТОЛЬКО в recorder, копии здесь не заводить), events, loop, recording,
        freezePinCaptures, freezeTicket, freezeSet, unfreezeLayer, frozenLayers, frozenInfo,
-       setAutRecSmooth (ухо-проба записанной автоматизации: recSteps, aud({recSteps})).
-     живой audio (LIVE.* и именованный импорт): AC, ksReady, makeFrozenBus, fxPlayPath, fxPlaySet, fxRestoreAim,
+       setAutRecSmooth (ухо-проба записанной автоматизации: recSteps, aud({recSteps})), lanePanOf, layerOfOwner (MX2: панорама
+       дорожки вплавляется в рендер).
+     живой audio (LIVE.* и именованный импорт): AC, ksReady, makeFrozenBus, fxPlayPath, fxPlaySet, fxRestoreAim, fxSnapshot (карта соло-ноты без карты),
        leadOff, chordOff, bassOff, droneOff.
      копия движка ('./audio.js?render', eng.*): initAudio, setRnd, setOffline, setDbg, dbgExprBypass, offlineTapMaster,
        poolSizes, ksReady, applyExpr, leadOn, leadOff, leadHold, chordOn, chordOff, chordHold, bassOn, bassOff, bassHold,
        drumHit, droneOff, fxInstance, fxPlaySet, fxRenderPath, fxGateAt, fxDenormOf, FX_FACTORY, LEAD_INSTR, CHORD_INSTR,
-       BASS_INSTR (плюс всё, что makeENG зовёт у переданной копии).
+       BASS_INSTR, setTrackGainOf, setTrackPanOf (MX1/MX2 — ставятся на КАЖДЫЙ рендер), renderReset, renderStateOf (сброс копии в начале
+       и в конце каждого рендера; снимок для стража P.all) (плюс всё, что makeENG зовёт у переданной
+       копии: в том числе ownerGain, ownerPan, dronePan, hitOwner).
      state (ST.* и именованный импорт): chainOwners, fxIsScalar, CHAIN_SOLO, chainKeyOf, fxChainOf.
      config: SCHED_TICK_MS.
-     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps, droneBP.
+     Наружу (ui берёт лениво): freeze; консоль — probe, renderTrack, unfreeze, frozen, aud, live, stop, recSteps, droneBP; проба —
+       reuseCheck, copyState, renderQueue.
    ===================================================================== */
 /* =====================================================================
    КОНТЕКСТ РЕНДЕРА — слайсы F0 (контекст) и F1 (посеянная случайность)
@@ -228,6 +232,22 @@ import { SCHED_TICK_MS } from './config.js';   // гладкая автомат�
 const ENG_SPEC='./audio.js?render';
 let ENGP=null;
 const engine=()=>ENGP||(ENGP=import(ENG_SPEC));
+/* ⛳ ОДИН РЕНДЕР ЗА РАЗ — ОЧЕРЕДЬ (после MX2: два «await P.checkRepeat()» подряд дали мусор). Копия движка ОДНА: её AC, пулы, таблицы
+   эффектов и переключатели — модульные. Рендер ждёт (initAudio → addModule ворклета, startRendering), и в это ожидание второй рендер
+   переставлял AC копии на СВОЙ контекст, сбрасывал её переключатели (renderReset в finally первого) — ноты первого уходили не в тот
+   контекст или с чужой панорамой/семенем: «сухие ударные — 1.2 пика разницы», «Infinity». В приложении то же дали бы два быстрых ❄,
+   а с автозаморозкой — каждый день. Теперь КАЖДЫЙ рендер копии идёт через renderQueued: следующий начинается только после того, как
+   предыдущий целиком закончился (вместе с finally), ошибка одного не ломает очередь. Через неё идут ОБЕ двери рендера — renderTrack
+   (❄, freeze, R.aud, пробы) и renderOnce (R.probe, reuseCheck); других дверей к копии нет (copyState — только чтение). ⛔ Внутри
+   рендера в очередь не вставать (ни один из них другого не зовёт — иначе взаимная блокировка). */
+let RQ=Promise.resolve(), RQ_N=0;
+function renderQueued(fn){
+  RQ_N++;
+  const run=RQ.then(fn);
+  RQ=run.then(()=>{ RQ_N--; }, ()=>{ RQ_N--; });   // и успех, и ошибка освобождают очередь
+  return run;
+}
+const renderQueue=()=>RQ_N;   // сколько рендеров ждёт или идёт (проба P.checkQueue)
 
 const MIX_SEC=1.0;      // общий материал: длиннее, чтобы успели вступить хвосты цепей
 const SRC_SEC=0.3;      // одиночный источник — короче, их много (но ДЛИННЕЕ прихода влажного сигнала, см. REV_WET_SEC)
@@ -386,7 +406,8 @@ const timeReset=()=>{ TIME.n=0; TIME.importMs=0; TIME.initMs=0; TIME.renderMs=0;
 /* ОДИН ОФЛАЙН-РЕНДЕР: своя копия модуля, своё семя, свой контекст, свой материал.
    opts.noWorklet — опыт 2 (пропустить addModule); opts.prep(eng,ctx) — опыт 1 (правка ПОСЛЕ постройки
    графа и ДО материала: подмес обязан стать нулём раньше, чем зазвучит первая нота). */
-async function renderOnce(seed, material, seconds, opts){
+function renderOnce(seed, material, seconds, opts){ return renderQueued(()=>renderOnceNow(seed, material, seconds, opts)); }
+async function renderOnceNow(seed, material, seconds, opts){
   const o=opts||{};
   const rate=LIVE_AC.sampleRate;
   const frames=Math.max(1,Math.round(rate*seconds));
@@ -394,6 +415,7 @@ async function renderOnce(seed, material, seconds, opts){
   const t0=now();
   const eng=await engine();
   const t1=now();
+  eng.renderReset();   // ⛳ ЧИСТАЯ КОПИЯ: центр, единица, живой раскладчик, нейтральная нота — что бы ни поставил прошлый рендер (см. audio.renderReset)
   /* ⛳ ПОСЕВ — СТРОГО ДО initAudio, И ЭТОТ ПОРЯДОК НЕСУЩИЙ. Буфер шума набивается ВНУТРИ initAudio
      (последние строки), поэтому семя, поставленное раньше, покрывает его даром. Поставь мы семя после,
      шум разошёлся бы между рендерами, а его читает почти вся ритм-секция, и факт 5 развалился бы. */
@@ -409,11 +431,14 @@ async function renderOnce(seed, material, seconds, opts){
      sampleRate, перестроился бы на центы, а буфер при воспроизведении пересэмплировался. */
   const ctx=new OfflineCtor(2, frames, rate);
   const wkSkipped = o.noWorklet ? stubWorklet(ctx) : false;
-  await eng.initAudio(()=>ctx);
-  const t2=now();
-  if(o.prep) o.prep(eng,ctx);
-  material(eng);
-  const buf=await ctx.startRendering();
+  let t2, buf;
+  try{
+    await eng.initAudio(()=>ctx);
+    t2=now();
+    if(o.prep) o.prep(eng,ctx);
+    material(eng);
+    buf=await ctx.startRendering();
+  } finally { eng.renderReset(); }   // ⛳ и в КОНЦЕ: между рендерами копия не держит ничего, что этот рендер ей поставил (пулы и узлы — не трогаются, их читают зонды)
   const t3=now();
   const t={importMs:t1-t0, initMs:t2-t1, renderMs:t3-t2};
   TIME.n++; TIME.importMs+=t.importMs; TIME.initMs+=t.initMs; TIME.renderMs+=t.renderMs; TIME.audioSec+=seconds;
@@ -678,7 +703,7 @@ function print(R){
   console.log('        ⛳ без посева этот факт ПРОВАЛИТСЯ: весь сигнал здесь выведен из буфера шума');
   console.log('  6. КАРПЛЮС:      '+(R.ks.text||'—')+'   ·   ворклет '+y(R.ks.workletLoaded));
   console.log('     '+(R.ks.meaningful
-              ? '⛳ ОЖИДАЕМО И НЕ ЧИНИТСЯ ДОПУСКОМ: 9-е место случайности (ks-worklet.js) с главного потока посеять нельзя'
+              ? '⛳ ОЖИДАЕМО И НЕ ЧИНИТСЯ ДОПУСКОМ: зонд рендерит с живым раскладчиком (offline выкл), и ворклет семени не получает; рендер дорожки (renderTrack, ❄) его сеет — processorOptions.seed (после MX2)'
               : '⚠️ вывод недействителен — звучал запасной субтрактивный щипок'));
   if(R.bySource){
     console.log('  4a. ПО ИСТОЧНИКАМ (каждый в одиночку):');
@@ -836,9 +861,18 @@ function unpinLive(st, prev, use){
               рендер умирал бы на старом материале.
    ⚠️ ЧИНИМ В ДРАЙВЕРЕ, А НЕ В ДВИЖКЕ: подставляем тембр в КОПИЮ полезной нагрузки. Событие не
    мутируется (правило #28), живой `chordOn` не трогается — его поведение ничьё больше. */
-const patchInst=(ev, st)=>{
+/* ⛳ ДОГОВОР ЗАМОРОЗКИ (после MX2): СОЛО-НОТА БЕЗ КАРТЫ ЭФФЕКТОВ. Правило R2 (audio.applyFx): у соло-события без `a.fx` голос берёт ТЕКУЩУЮ
+   цепь соло. Живьём это живая цепь в миг игры; в копии рендера то же правило читало СМЕСЬ — состав и старые скаляры (вибрато, драйв,
+   тремоло) из ОБЩЕГО state, а величины прицепочных параметров — из экземпляров КОПИИ (их ставит захват дорожки). Буфер зависел от живых
+   ручек в миг рендера, и подпись этого не знала. Теперь рендер даёт такой ноте ОДНУ карту — снимок ЖИВОЙ цепи соло в начале рендера
+   (solo: LIVE.fxSnapshot — ровно то, чем прозвучали бы её события сейчас), а подпись заморозки (recorder.freezeSig) у дорожки с такими
+   нотами складывает тот же снимок: сдвинул живую ручку — замороженная устарела. Записанные рукой ноты карту несут всегда (жест кладёт её
+   в каждую нагрузку), без карты бывают только сценарий P.seed, демо-пьеса и вставка рядом с такой нотой. solo не передан (R.live —
+   живой движок) — не трогаем: живой путь сам читает живую цепь. Событие не мутируется (копия нагрузки). */
+const patchInst=(ev, st, solo)=>{
   const a=ev.a;
   if(a && a.inst===undefined && (ev.fn==='chOn')) return {...a, inst:st.chIdx};
+  if(solo && a && a.fx==null && (ev.fn==='leadOn'||ev.fn==='leadSet')) return {...a, fx:{...solo}};
   return a;
 };
 
@@ -887,7 +921,8 @@ function mergeOrders(seq){
    layer — НОМЕР СЛОЯ дорожки (не id: id — это идентичность для человека, а звук адресуется слоем).
    Возвращает { buf, startSec, endSec, tailSec, pinned, … } — начало/конец/хвост нужны заморозке,
    чтобы поставить буфер в транспорт, а `pinned` — чтобы переморозить теми же числами. */
-async function renderTrack(layer, opt){
+function renderTrack(layer, opt){ return renderQueued(()=>renderTrackNow(layer, opt)); }
+async function renderTrackNow(layer, opt){
   const o=opt||{};
   if(!LIVE_AC) throw new Error('живой AudioContext ещё не создан — нажмите «▶ Играть»');
   const OfflineCtor=window.OfflineAudioContext||window.webkitOfflineAudioContext;
@@ -946,11 +981,19 @@ async function renderTrack(layer, opt){
     /* ПЛАН ПРОВОДКИ по ключу: общий порядок (mergeOrders) и что открыто на старте. Ключ без единого состава (взятое без
        захвата) — ПУСТАЯ цепь, а не живая: ⛔ живую цепь рендер не читает нигде (заморозка до рендера прикалывает захват —
        freezePinCaptures, — так что у замороженной дорожки состав есть всегда). */
+    /* ⛳ o.dry — ТОЛЬКО ДЛЯ ПРОБ (P.checkPan, P.checkRepeat): рендер БЕЗ ЭФФЕКТОВ ШИНЫ — все модули цепей закрыты (тождество), величины и
+       состав из захвата не ставятся вовсе; звучат голоса (с их ступенями уровня, панорамы, яркости) и нейтральная стадия выразительности.
+       Сухой рендер повторяем до последних битов (правило слагаемых), мокрый — нет: сеть реверба разносит последние биты в иной хвост. */
+    const dry=!!o.dry;
+    /* ⛳ o.only — ТОЛЬКО ДЛЯ ПРОБЫ (P.checkRepeat, поиск источника расхождения): мокрый рендер, в котором открыт ЛИШЬ ОДИН эффект цепи (id),
+       прочие закрыты весь рендер. Величины ставятся как обычно (закрытому — без звука). Позволяет назвать СТУПЕНЬ, где два рендера расходятся. */
+    const only=o.only||null;
     const plan=new Map(); let reordered=false;
     for(const key of keys){
       const start=startOrd.get(key)||[];
       const m=mergeOrders([start, ...(ords.get(key)||[])]); if(m.conflict) reordered=true;
-      plan.set(key,{ order:m.order, start });
+      const keepId=id=> !only || id===only;
+      plan.set(key, dry ? { order:[], start:[] } : { order:m.order.filter(keepId), start:start.filter(keepId) });   // dry: ни одного эффекта не открыто (закрытый модуль — тождество); only: открыт лишь этот
     }
 
     /* ⛳ ХВОСТ СЧИТАЕМ ДО ПОСТРОЙКИ ГРАФА — по ЗАХВАЧЕННОЙ цепи, а не по живой и не на глаз. Иначе
@@ -967,6 +1010,7 @@ async function renderTrack(layer, opt){
     const frames=Math.max(1,Math.round(rate*(PRE_SEC+songSec+tailSec)));
     const ctx=new OfflineCtor(2, frames, rate);
 
+    eng.renderReset();                          // ⛳ ЧИСТАЯ КОПИЯ — всё ниже ставится явно этим рендером (см. audio.renderReset)
     eng.setRnd(mulberry32(o.seed==null?SEED_A:o.seed));
     eng.setOffline(true);                       // ⛳ F2: занятость по звучанию, рост пула, БЕЗ кражи
     /* ОТЛАДКА НА СЛУХ (aud): переключатели копии ставим на КАЖДЫЙ рендер — без o.dbg это СБРОС в «всё выключено», поэтому
@@ -977,6 +1021,11 @@ async function renderTrack(layer, opt){
        иначе пережила бы прошлый рендер). o.trackGain — ТОЛЬКО для пробы P.checkMixer: тем же путём, что живой голос (ступень tg в голосе по
        ключу владельца, множитель удара и дрона), — чтобы доказать, что ступень в голосе ровно масштабирует звук дорожки. Заморозка его не передаёт. */
     eng.setTrackGainOf(o.trackGain!=null ? ()=>o.trackGain : null);
+    /* ⛳ MX2: ПАНОРАМА ДОРОЖКИ ВПЛАВЛЯЕТСЯ — копия получает панораму ЭТОЙ дорожки (по ключу владельца её слоя; прочие ключи — центр) на
+       КАЖДЫЙ рендер, тем же путём, что живой голос (стерео-ступень за уровнем, до цепи). Читается ОДИН раз здесь: она же в подписи, и
+       билет заморозки (freezeTicket) откажет буферу, если панораму двинули во время рендера. o.trackPan — только для пробы P.checkPan. */
+    { const pan = o.trackPan!=null ? o.trackPan : REC.lanePanOf(layer);
+      eng.setTrackPanOf(k=> REC.layerOfOwner(k)==null ? 0 : pan); }
     const tIni0=now();
     await eng.initAudio(()=>ctx);               // ⚠️ ПОСЛЕ пина: дрон берёт высоту здесь
     const tIni1=now();
@@ -998,24 +1047,25 @@ async function renderTrack(layer, opt){
     for(const [key,pl] of plan) for(const id of pl.order) eng.fxInstance(key,id);   // у старых скаляров и голосовых экземпляра без узлов — безвредно
     for(const key of new Set([...ST.chainOwners().map(o=>o.key), ...plan.keys()])){
       const pl=plan.get(key); eng.fxRenderPath(key, pl?pl.order:[], pl?pl.start:[]); }
-    for(const p of startVals.values()) eng.fxPlaySet(p.key, p.fx, p.p, p.v, 0);
+    if(!dry) for(const p of startVals.values()) eng.fxPlaySet(p.key, p.fx, p.p, p.v, 0);
     /* ⛳ ДОБАВЛЕННЫЙ ПОСРЕДИ ВЗЯТОГО — ЗВУЧИТ С ЗАПИСАННЫМИ ВЕЛИЧИНАМИ С ПЕРВОЙ ЖЕ ДОЛИ. Захват кладёт в ленту все его
        параметры на доле добавления (прежней величины у адреса нет — takeCapSample пишет её сразу). Ставим эти ПЕРВЫЕ
        величины ещё на нулевой секунде: эффект закрыт, звука нет, зато к открытию он уже стоит на них, а не подъезжает от
        умолчаний сеттерами (τ 0.05–0.08). Дальше его точки идут своим чередом, каждая в свою долю. */
     const openNow=new Map(); for(const [key,pl] of plan) openNow.set(key,new Set(pl.start));
-    { const seeded=new Set();
+    if(!dry){ const seeded=new Set();
       for(const p of later){ if(p.fx===REC.FX_CHAIN||openNow.get(p.key).has(p.fx)) continue;
         const a=p.key+'|'+p.fx+'|'+p.p; if(seeded.has(a)||startVals.has(a)) continue;
         seeded.add(a); eng.fxPlaySet(p.key, p.fx, p.p, p.v, 0); } }
     /* Точка после старта: СОСТАВ — затворы тех, кто вошёл или вышел, В ЕЁ ДОЛЮ (мгновенно — fxGateAt); ВЕЛИЧИНА — как было. */
-    const applyLater=p=>{ const when=beatAt(p.t);
+    const applyLater=p=>{ if(dry) return; const when=beatAt(p.t);
       if(p.fx===REC.FX_CHAIN){ const cur=openNow.get(p.key), nxt=new Set(p.ids);
         for(const id of plan.get(p.key).order){ const now=nxt.has(id); if(cur.has(id)!==now) eng.fxGateAt(p.key,id,now,when); }
         openNow.set(p.key,nxt); return; }
       eng.fxPlaySet(p.key,p.fx,p.p,p.v,when); };
 
     /* ═══ РАСКЛАДКА: КАЖДОМУ СОБЫТИЮ — ЯВНОЕ ВРЕМЯ ═══ */
+    const soloLive=o.solo || LIVE.fxSnapshot(chainKeyOf('ld'));   // договор заморозки: соло-нота без карты — снимок ЖИВОЙ цепи соло, один на весь рендер (см. patchInst); o.solo — тот же снимок, взятый раньше (freeze — в миг билета; пробы — один на все свои рендеры)
     const ENG=REC.makeENG(eng);
     const open={lead:new Set(), ch:new Set(), bs:new Set()};
     let li=0;
@@ -1023,7 +1073,7 @@ async function renderTrack(layer, opt){
       const when=beatAt(ev.t);
       /* Точки автоматизации, чья доля НАСТУПИЛА, — перед событием: величина обязана стоять к атаке. */
       while(li<later.length && later[li].t<=ev.t+1e-9) applyLater(later[li++]);
-      const a=patchInst(ev, ST);
+      const a=patchInst(ev, ST, soloLive);
       const fn=ENG[ev.fn]; if(!fn) continue;
       fn(a, ev, {when});
       trackOpen(open, ev, a);
@@ -1081,6 +1131,7 @@ async function renderTrack(layer, opt){
                layoutMs:+(tRnd0-tIni1).toFixed(1), renderMs:Math.round(tRnd1-tRnd0) },
           xRealtime: (tRnd1-tRnd0)>0 ? +((buf.duration*1000/(tRnd1-tRnd0)).toFixed(1)) : null };
   } finally {
+    eng.renderReset();                  // ⛳ копия не уносит этот рендер (его панораму, уровень, семя, раскладчик) в следующий
     unpinLive(ST, pin.prev, pin.use);   // ⛔ ВСЕГДА: приложение не смеет остаться с чужой тоникой, даже если рендер упал. A2: и не смеет вернуть СТАРУЮ, если человек сменил её за время рендера (см. unpinLive)
   }
   if(!o.quiet) printTrack(out);   // aud печатает свою одну строку вместо отчёта
@@ -1210,6 +1261,7 @@ async function freeze(layer, opt){
   const tk=REC.freezeTicket(layer);
   if(!tk) throw new Error('нет дорожки '+layer);
   const o={...(opt||{})}; if(o.seed==null) o.seed=seedOfLane(tk.id);
+  if(o.solo==null) o.solo=LIVE.fxSnapshot(chainKeyOf('ld'));   // договор заморозки: соло без карты — снимок ЖИВОЙ цепи В МИГ БИЛЕТА (тот же, что сложила подпись); сдвинули ручку, пока ждали очередь или рендер, — freezeSet откажет по подписи
   const r=await renderTrack(layer, o);
   const res=REC.freezeSet(tk, r);
   r.installed = res===true;
@@ -1250,6 +1302,7 @@ const frozen=()=>{ const ls=REC.frozenLayers();
        await R.aud(1,{expr:'neutral'})      // C1: выразительность — живая нейтраль
        await R.aud(1,{expr:'bypass'})       // C2: выразительность обойдена
        await R.aud(1,{noHum:true})          // гуманизация высоты выкл
+       await R.aud(1,{fdnLive:true})        // петли реверба — живой проводкой (после MX2 копия рендера строит их с одним входом)
        await R.aud(1,{mono:true})           // моно-сумма на выходе
        await R.aud(1,{recSteps:true})       // записанная автоматизация шины СТУПЕНЬКАМИ (как до слайса «плавная внутри движения»)
        R.droneBP('cons') / R.droneBP('period') // дрон Болена–Пирса: ступень 5:3 (878¢; умолчание — выбор пользователя при T3) / тоника + тритава — живой дрон, сразу
@@ -1267,6 +1320,7 @@ const audDesc=o=>{ const p=[];
   if(o.expr==='neutral') p.push('C1: выразительность — живая нейтраль');
   if(o.expr==='bypass') p.push('C2: выразительность ОБОЙДЕНА');
   if(o.noHum) p.push('гуманизация высоты ВЫКЛ');
+  if(o.fdnLive) p.push('петли реверба — ЖИВАЯ проводка (несколько входов; разрыв петли решает порядок обхода — см. audio.apStage)');
   if(o.mono) p.push('МОНО-сумма на выходе');
   if(o.recSteps) p.push('записанная автоматизация шины — СТУПЕНЬКАМИ, как до слайса «плавная внутри движения»');
   if(o.noteSmooth) p.push('(noteSmooth больше не опыт: величины «в ноте» пишутся тонко и закон движения у них в приложении)');
@@ -1310,9 +1364,10 @@ async function aud(layer, opts){
      возвращается к тому, что стоит во всём приложении (recStepsOn), даже если рендер упал. */
   if(o.recSteps) REC.setAutRecSmooth(false);
   let r;
-  try{ r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null } }); }
+  try{ r=await renderTrack(layer,{ seed, quiet:true, dbg:{ noHum:!!o.noHum, expr:o.expr||null, fdnLive:!!o.fdnLive } }); }
   finally{ if(o.recSteps) REC.setAutRecSmooth(!recStepsOn); }
-  (await engine()).setDbg(null);   // буфер уже готов — переключатели копии сразу в «выкл», чтобы их не унаследовал зонд или что угодно, что поднимет копию без renderTrack
+  /* переключатели копии в «выкл» вернул сам renderTrack (renderReset в finally, внутри очереди). Прежний setDbg(null) здесь шёл МИМО очереди
+     и мог сбросить отладку ЧУЖОГО рендера, начавшегося за это время. */
   /* ИГРАЕМ ТЕМ ЖЕ ПУТЁМ, ЧТО ЗАМОРОЗКА: живая шина замороженной дорожки → живой мастер → лимитер. Моно — даунмикс ДО неё. */
   const bus=LIVE.makeFrozenBus(); if(!bus) throw new Error('живого движка нет');
   let head=bus;
@@ -1418,32 +1473,52 @@ const RU_FLOOR=0.6, RU_MARGIN=0.5, RU_SEMI=Math.pow(2,1/12);
 function corAt(x,a,N,lag){ const i0=Math.floor(lag), fr=lag-i0; let s=0,e0=0,e1=0;
   for(let i=a;i<a+N;i++){ const u=x[i], v=x[i+i0]*(1-fr)+x[i+i0+1]*fr; s+=u*v; e0+=u*u; e1+=v*v; }
   return (e0>0&&e1>0) ? s/Math.sqrt(e0*e1) : 0; }
-function candScore(buf,t0,t1,f){   // лучшая корреляция в ±1 полутоне вокруг f → { cor, f } (f — где лучшая)
-  const x=buf.getChannelData(0), rate=buf.sampleRate, a=Math.floor(t0*rate), lagHi=rate/(f/RU_SEMI), N=Math.floor(t1*rate)-a-Math.ceil(lagHi)-2;
+/* ⛳ МЕРА — ПО СУММЕ ОБОИХ КАНАЛОВ (починка после MX2). Прежде высота читалась по ЛЕВОМУ каналу: голос, по любой причине ушедший вправо
+   (панорама MX2 ставит R=√2, L=0 РОВНО на крайнем праве), дал бы в окне тишину — и «корреляцию 0» у обоих кандидатов вместо высоты.
+   Моно-сумма 0.5·(L+R) слышит голос в любом месте панорамы. */
+function monoOf(buf){ const L=buf.getChannelData(0), R=buf.numberOfChannels>1?buf.getChannelData(1):L, x=new Float32Array(L.length);
+  for(let i=0;i<x.length;i++) x[i]=0.5*(L[i]+R[i]); return x; }
+function candScore(x,rate,t0,t1,f){   // лучшая корреляция в ±1 полутоне вокруг f → { cor, f } (f — где лучшая)
+  const a=Math.floor(t0*rate), lagHi=rate/(f/RU_SEMI), N=Math.floor(t1*rate)-a-Math.ceil(lagHi)-2;
   if(N<256) return { cor:0, f:NaN };
   let best={ cor:-2, f:NaN };
   for(let lag=rate/(f*RU_SEMI); lag<=lagHi; lag+=0.05){ const c=corAt(x,a,N,lag); if(c>best.cor) best={ cor:c, f:rate/lag }; }
   return best; }
-function whichSounds(buf,t0,t1,cands){   // ровно два кандидата → { pick: частота или null, rule, margin, scores:[{f,cor,at}] }
-  const scores=cands.map(f=>{ const r=candScore(buf,t0,t1,f); return { f, cor:+r.cor.toFixed(4), at:+(r.f||0).toFixed(1) }; });
+function whichSounds(x,rate,t0,t1,cands){   // ровно два кандидата → { pick: частота или null, rule, margin, scores:[{f,cor,at}] }
+  const scores=cands.map(f=>{ const r=candScore(x,rate,t0,t1,f); return { f, cor:+r.cor.toFixed(4), at:+(r.f||0).toFixed(1) }; });
   const [hi,lo]=[...scores].sort((p,q)=>q.f-p.f), margin=+Math.abs(hi.cor-lo.cor).toFixed(4);
   if(hi.cor>=RU_FLOOR && lo.cor>=RU_FLOOR) return { pick:hi.f, rule:'both clear the floor → the higher', margin, scores };
   const w= hi.cor>=lo.cor ? hi : lo, o= w===hi ? lo : hi;
   if(w.cor>=RU_FLOOR && w.cor-o.cor>=RU_MARGIN) return { pick:w.f, rule:'floor and margin', margin, scores };
   return { pick:null, rule:'undecided', margin, scores }; }
+/* ⛳ ЭНЕРГИЯ ОКНА — ДО ВЕРДИКТА О ВЫСОТЕ. Тишина (или NaN в буфере) не высота: «0 и 0 → не решено» читалось как вердикт о звуке.
+   Порог RU_RMS_MIN = 1e-3 (−60 dBFS) по моно-сумме окна ноты B: нота громкостью 0.8 (амплитуда 0.64 у Флейты, ×0.8 мастер) лежит около
+   −25…−30 dBFS — на 30 дБ выше порога; ниже −60 dBFS в окне нет ноты — значит рендер не тот, мера читать нечего. Печатаем и по каналам
+   (L/R) и пик всего буфера: по ним видно, тишина целиком или один канал. */
+const RU_RMS_MIN=1e-3;
+function winStat(buf,t0,t1){ const rate=buf.sampleRate, a=Math.floor(t0*rate), b=Math.min(buf.length,Math.floor(t1*rate));
+  const L=buf.getChannelData(0), R=buf.numberOfChannels>1?buf.getChannelData(1):L;
+  let sl=0, sr=0, sm=0, nan=0, pk=0;
+  for(let i=0;i<buf.length;i++){ const u=L[i], v=R[i]; if(u!==u||v!==v){ nan++; continue; } const m=Math.max(Math.abs(u),Math.abs(v)); if(m>pk) pk=m; }
+  for(let i=a;i<b;i++){ const u=L[i], v=R[i]; if(u!==u||v!==v) continue; sl+=u*u; sr+=v*v; const m=0.5*(u+v); sm+=m*m; }
+  const n=Math.max(1,b-a), db=x=> x>0 ? (20*Math.log10(x)).toFixed(1) : '−∞';
+  const rms=Math.sqrt(sm/n);
+  return { ok: !nan && rms>=RU_RMS_MIN, rms, txt:`window ${t0}–${t1} s: mono ${db(rms)} dBFS (L ${db(Math.sqrt(sl/n))}, R ${db(Math.sqrt(sr/n))}), buffer peak ${db(pk)} dBFS${nan?`, ${nan} NaN samples`:''}` }; }
 /* ТРИ РЕНДЕРА одного материала (A с кривой после своего отпускания, B на ТОМ ЖЕ голосе):
      M — настоящий случай: B обязан звучать СВОЮ высоту 330 Гц, а не 659 (чужую кривую A); окно 0.70–1.05 с (точка A — на 0.55);
      C — контроль «мера видит изгиб»: у B своя кривая +700 ¢ (точка на 0.70 с) → обязан прочесться 494 Гц, а не 330; окно 0.85–1.09 с
          (отпускание B — на 1.10);
      S — контроль «мера видит наследство»: B получает ту же точку, что дала бы чужая кривая A (659 Гц на 0.55 с), → обязан прочесться
          659 Гц; окно 0.70–1.05 с.
-   Без C «не изогнулась» могло бы значить «мера слепа к изгибу»; без S — «мера не отличила бы унаследованную кривую». */
+   ⛳ ПОРЯДОК СУЖДЕНИЯ (починка после MX2): (1) голос переиспользован; (2) в окне КАЖДОГО рендера есть звук (RU_RMS_MIN) — иначе «мера не
+   состоялась: тихое окно» с цифрами каналов; (3) ОБА контроля прочлись верно — иначе «контроль провален»; (4) только тогда — вердикт по
+   настоящему случаю. Без (2) тишина читалась «не решено», без (3) «не изогнулась» могло бы значить «мера слепа». */
 async function reuseCheck(){
   if(!LIVE_AC) return { ok:false, why:'audio is not started (press ▶ Play)' };
   const F659=RU_F1*Math.pow(2,RU_C/1200), F494=RU_F2*Math.pow(2,RU_C/1200);
   const pass=async kind=>{ let reused=false;
     const R=await renderOnce(SEED_A, eng=>{
-      eng.applyFx({});   // сухой голос: без вибрато/драйва/тремоло чужой ноты (pendFx копии живёт между рендерами)
+      eng.applyFx({});   // сухой голос: без вибрато/драйва/тремоло чужой ноты (с renderReset pendFx и так нейтрален — вызов остаётся контрактом: leadOn без applyFx берёт чужие величины)
       eng.leadOn('s5:A',RU_F1,0.8,RU_INS,undefined,undefined,undefined,undefined,0.05);   // позиционно: deg, oct, glide, tie — пусто; время ПОСЛЕДНИМ (правило #15)
       eng.scheduleBend('s5:A',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F1,RU_SPB,0.05);              // точка +700 ¢ на 0.05+2·0.25 = 0.55 с — ПОСЛЕ отпускания A
       const vA=eng.leadHold['s5:A'];
@@ -1457,18 +1532,32 @@ async function reuseCheck(){
     }, RU_SEC, { offline:true, prep:eng=>{ zeroMix(eng,CHAIN_SOLO); } });   // шинные эффекты соло-цепи — тождество: в окне только сам голос
     return { reused, buf:R.buf }; };
   const M=await pass('M'), C=await pass('C'), S=await pass('S');
-  const m=whichSounds(M.buf,0.70,1.05,[RU_F2,F659]), c=whichSounds(C.buf,0.85,1.09,[F494,RU_F2]), sm=whichSounds(S.buf,0.70,1.05,[RU_F2,F659]);
-  const ok= M.reused && m.pick===RU_F2 && c.pick===F494 && sm.pick===F659;
+  const W={ M:[0.70,1.05], C:[0.85,1.09], S:[0.70,1.05] };
+  const st={ M:winStat(M.buf,...W.M), C:winStat(C.buf,...W.C), S:winStat(S.buf,...W.S) };
+  const energy=`real case ${st.M.txt}; control ${st.C.txt}; inheritance control ${st.S.txt}`;
+  const base={ reused:M.reused, want:RU_F2, wantControl:+F494.toFixed(2), energy };
+  if(!M.reused) return { ...base, ok:false, why:'the second note did not take the first note’s voice — the material proves nothing', detail:energy };
+  const silent=['M','C','S'].filter(k=>!st[k].ok);
+  if(silent.length) return { ...base, ok:false, why:`measurement failed: silent window (${silent.map(k=>({M:'real case',C:'bend control',S:'inheritance control'})[k]).join(', ')}) — ${energy}`, detail:energy };
+  const xm=monoOf(M.buf), xc=monoOf(C.buf), xs=monoOf(S.buf), rate=M.buf.sampleRate;
+  const m=whichSounds(xm,rate,...W.M,[RU_F2,F659]), c=whichSounds(xc,rate,...W.C,[F494,RU_F2]), sm=whichSounds(xs,rate,...W.S,[RU_F2,F659]);
   const fmt=w=>w.scores.map(z=>`${z.f.toFixed(1)} Hz cor ${z.cor}`).join(', ')+` → ${w.pick==null?'none':w.pick.toFixed(1)+' Hz'} (${w.rule}, margin ${w.margin})`;
-  return { ok, reused:M.reused, real:m, control:c, simulated:sm,
-           f:m.pick, want:RU_F2, fControl:c.pick, wantControl:+F494.toFixed(2),
-           detail:`floor ${RU_FLOOR}, margin ${RU_MARGIN} · real case: ${fmt(m)}; control (own bend): ${fmt(c)}; simulated inheritance: ${fmt(sm)}`,
-           why: ok ? null : !M.reused ? 'the second note did not take the first note’s voice — the material proves nothing'
-                : c.pick!==F494 ? `the control (an intended bend) does not read as ${F494.toFixed(1)} Hz (${fmt(c)}) — the measurement is blind to a bend`
-                : sm.pick!==F659 ? `the simulated inheritance does not read as ${F659.toFixed(1)} Hz (${fmt(sm)}) — the measurement could not catch the defect`
-                : `the reused voice does not sound its own ${RU_F2} Hz (${fmt(m)}) — it inherited the previous note's curve` };
+  const detail=`floor ${RU_FLOOR}, margin ${RU_MARGIN} · real case: ${fmt(m)}; control (own bend): ${fmt(c)}; simulated inheritance: ${fmt(sm)} · ${energy}`;
+  const ctl= c.pick!==F494 ? `the bend control does not read as ${F494.toFixed(1)} Hz (${fmt(c)})`
+           : sm.pick!==F659 ? `the inheritance control does not read as ${F659.toFixed(1)} Hz (${fmt(sm)})` : null;
+  if(ctl) return { ...base, ok:false, real:m, control:c, simulated:sm, f:m.pick, fControl:c.pick, detail, why:`control failed: ${ctl} — the measurement cannot judge the real case` };
+  const ok= m.pick===RU_F2;
+  return { ...base, ok, real:m, control:c, simulated:sm, f:m.pick, fControl:c.pick, detail,
+           why: ok ? null : `the reused voice does not sound its own ${RU_F2} Hz (${fmt(m)}) — it inherited the previous note's curve` };
 }
+
+/* ⛳ СНИМОК КОПИИ ДВИЖКА ДЛЯ СТРАЖА P.all — переключатели, которые рендер ей ставит (уровень и панорама по ключу, раскладчик, семя, отладка,
+   ключ удара, величины соло-ноты). После каждого рендера копия в СБРОСЕ (renderReset в finally), значит снимок между строками P.all — один
+   и тот же; иной — строка оставила копию в чужом состоянии. Только чтение. */
+async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
 export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
-  reuseCheck };   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
+  reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
+  copyState,   // снимок переключателей копии движка — страж P.all между строками
+  renderQueue };   // сколько рендеров ждёт или идёт (очередь — один рендер копии за раз)

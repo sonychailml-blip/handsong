@@ -128,6 +128,46 @@ function trackGainRetune(test){ if(!AC) return; const t=AC.currentTime;
   for(const k in bassHold) set(bassHold[k],k);
   for(const k in chordHold) for(const v of chordHold[k]) set(v,k);
 }
+/* ═══ MX2: ПАНОРАМА ДОРОЖКИ — СТЕРЕО-СТУПЕНЬ В ГОЛОСЕ (решение пользователя: ДО эффектов) ═══
+   Стоит СРАЗУ ЗА ступенью уровня `tg`: tg (моно) → два гейна L/R → ChannelMerger(2) → дальше по голосу (громкость/сумма). Значит всё, что
+   ниже по течению — громкость и тремоло голоса, ступень яркости, сумма роли, цепь эффектов роли, мастер, — получает уже ПАНОРАМИРОВАННЫЙ
+   звук: реверб «ставится вокруг ноты», как живьём. ⚠️ Вход реверба сводит стерео в моно (вход канала merger сети — моно, линейно), поэтому
+   влажная доля не знает, где стоит нота, а сухая — знает; делей и тремоло шины проходят стерео как есть (эхо остаётся там, где нота).
+   ⛳ ЗАКОН — РАВНОЙ МОЩНОСТИ С ЕДИНИЦЕЙ В ЦЕНТРЕ: L = √2·cos θ, R = √2·sin θ, θ = (p+1)·π/4, p ∈ [−1, 1]. Сумма мощностей L²+R² = 2 при
+   любом p, то есть громкость на слух постоянна; в центре L = R = 1 РОВНО (особый случай, без тригонометрии) — до MX2 моно-сигнал на
+   стерео-выходе и так шёл копией в оба канала, значит дорожка в центре звучит как прежде (до последних битов: суммы теперь стереофонические).
+   Край: L = √2 (+3 дБ в одном канале против центра — цена равной мощности), R = 0 ТОЧНО. StereoPannerNode не взят: его закон — −3 дБ в
+   центре, и каждая дорожка по умолчанию стала бы тише.
+   ⛳ ЧЬЯ панорама — по ключу владельца, как уровень (setTrackPanOf ставит recorder ЖИВОЙ копии; живые ключи — 0, руки всегда в центре).
+   ⚠️ В ОТЛИЧИЕ ОТ УРОВНЯ ПАНОРАМА ВПЛАВЛЯЕТСЯ В ЗАМОРОЖЕННЫЙ БУФЕР: рендер ставит своей копии панораму дорожки (render.renderTrack), и она
+   входит в подпись заморозки — смена панорамы старит буфер. Причина — порядок: ступень стоит ДО цепи, а реверб нелинеен по месту (сухая
+   доля панорамирована, влажная — нет), и у буфера, где цепь уже вплавлена, панорамы «до цепи» не наложить.
+   ⛳ VOL-7 (панорама НОТЫ) возьмёт ЭТУ ЖЕ ступень: панорама голоса = клэмп(панорама дорожки + панорама ноты, −1…1), ставится на атаке и
+   ведётся событиями ноты; второй ступени не будет. */
+let trackPanOf=()=>0;
+function setTrackPanOf(fn){ trackPanOf= typeof fn==='function' ? fn : ()=>0; }
+function ownerPan(key){ const p=+trackPanOf(key); return Number.isFinite(p) ? Math.max(-1,Math.min(1,p)) : 0; }
+function panGains(p){ if(!(p!==0)||!Number.isFinite(p)) return [1,1]; if(p<=-1) return [Math.SQRT2,0]; if(p>=1) return [0,Math.SQRT2];
+  const th=(p+1)*Math.PI/4; return [Math.SQRT2*Math.cos(th), Math.SQRT2*Math.sin(th)]; }
+/* Ступень строится ОДИН раз с голосом (правило #3 — только гейны, осцилляторов нет); у удара — в самом ударе, только при p ≠ 0. */
+function makePanStage(src,dest){
+  const l=AC.createGain(), r=AC.createGain(), out=AC.createChannelMerger(2); l.gain.value=1; r.gain.value=1;
+  src.connect(l); src.connect(r); l.connect(out,0,0); r.connect(out,0,1); if(dest) out.connect(dest);
+  return { l, r, out }; }
+function panSetAt(st,p,t){ if(!st) return; const [a,b]=panGains(p);   // на атаке — ставится в её миг (голос мог прийти от другой дорожки)
+  st.l.gain.cancelScheduledValues(t); st.l.gain.setValueAtTime(a,t); st.r.gain.cancelScheduledValues(t); st.r.gain.setValueAtTime(b,t); }
+function panGlide(st,p,t){ if(!st) return; const [a,b]=panGains(p);   // движение ручки — подъезд 20 мс, как у уровня (щелчка нет)
+  st.l.gain.cancelScheduledValues(t); st.l.gain.setTargetAtTime(a,t,0.02); st.r.gain.cancelScheduledValues(t); st.r.gain.setTargetAtTime(b,t,0.02); }
+/* Переставить панораму у ЗВУЧАЩИХ голосов — зеркало trackGainRetune: test(ключ) → панорама или null (не трогать); расписанное окном
+   опережения на этих голосах снимается, иначе нота, уже поставленная на ближайшие ~300 мс, встала бы прежней панорамой. */
+function trackPanRetune(test){ if(!AC) return; const t=AC.currentTime;
+  const set=(v,k)=>{ const p=test(k); if(p==null||!v||!v.pan) return; panGlide(v.pan,p,t); };
+  for(const k in leadHold) set(leadHold[k],k);
+  for(const k in bassHold) set(bassHold[k],k);
+  for(const k in chordHold) for(const v of chordHold[k]) set(v,k);
+}
+let dPan=null;   // ступень панорамы дрона (дрон один на движок; строит initAudio)
+function dronePan(p,when){ if(!AC||!dPan) return; panGlide(dPan,p,when!=null?when:AC.currentTime); }
 let hitOwnerKey=null;   // ключ владельца СЛЕДУЮЩЕГО удара (ставит ENG.drum перед drumHit; drumHit его читает и сбрасывает)
 const hitOwner=k=>{ hitOwnerKey=k; };
 /* ═══ MX1: МАСТЕР — уровень, показ лимитера, измеритель ═══
@@ -315,8 +355,25 @@ const REV_A={
    «разбросанные фазы свежего голоса» (B). Две догадки по чтению кода не подтвердились; ухо с этим инструментом нашло
    обе настоящие причины «фазера» и «подъезда» замороженной дорожки, и A и B стали ПОВЕДЕНИЕМ (см. voiceStart и leadOn/
    bassOn). Инструмент — render.aud / render.live / render.stop (довод и строки консоли — в render.js и CLAUDE.md). */
-const DBG={ noHum:false };
-function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
+const DBG={ noHum:false, fdnLive:false };   // fdnLive — копия строит ЖИВУЮ проводку петель реверба (A/B пробы P.checkRepeat, см. apStage)
+function setDbg(o){ DBG.noHum=!!(o&&o.noHum); DBG.fdnLive=!!(o&&o.fdnLive); }
+/* ═══ ⛳ СБРОС КОПИИ РЕНДЕРА — КАЖДЫЙ РЕНДЕР НАЧИНАЕТСЯ С ЧИСТОЙ КОПИИ (починка после MX2) ═══
+   Копия движка ('./audio.js?render') ОДНА на сессию, и всё модульное, что рендер ставит ей, иначе живёт до следующего рендера: функции
+   «ключ → уровень / панорама» (MX1/MX2), раскладчик offline, семя rnd, отладка DBG, ключ владельца удара, величины соло-ноты в pendFx,
+   флаг первого осциллятора голоса. initAudio чистит ПУЛЫ и ТАБЛИЦЫ эффектов, но не эти переключатели — их ставит вызывающий.
+   ⛳ ПОЭТОМУ render.js зовёт renderReset В НАЧАЛЕ И В КОНЦЕ (finally) КАЖДОГО рендера — и renderTrack, и прямого renderOnce (зонды,
+   reuseCheck): рендер видит центр, единицу, живой раскладчик, Math.random и нейтральную ноту, если сам не поставил иного, а между
+   рендерами копия не держит ничего чужого (это сверяет страж P.all — renderStateOf ниже).
+   ⛔ ЖИВАЯ КОПИЯ ЭТО НЕ ЗОВЁТ НИКОГДА: у неё функции уровня и панорамы ставит recorder при загрузке, и сброс вернул бы все дорожки в центр
+   и на единицу. Сброс — только render.js, только своей копии. */
+function renderReset(){
+  trackGainOf=()=>1; trackPanOf=()=>0; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;
+  pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null;
+  DBG.noHum=false; DBG.fdnLive=false; offline=false; rnd=Math.random;
+}
+/* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
+const renderStateOf=()=>({ offline, noHum:DBG.noHum, fdnLive:DBG.fdnLive, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
+  hitOwner:hitOwnerKey, pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(',') });
 /* ═══ ⛳ ФАЗЫ СВЕЖЕГО ГОЛОСА — РАЗБРОСАНЫ СТАРТОМ, КАК У ДАВНО ИДУЩЕГО (B, подтверждено на слух) ═══
    ⚠️ ДЕФЕКТ: осцилляторы голоса стартовали ОДНОВРЕМЕННО, то есть В ОДНОЙ ФАЗЕ. У SuperSaw пять пил, расстроенных почти
    равным шагом (−12/−6/0/+6/+12 центов), и из общей фазы они раз за разом снова СХОДЯТСЯ — ровный периодический
@@ -576,6 +633,7 @@ function buildKSBank(preBus, opts){
   opts=opts||{};
   const ig=AC.createGain(); ig.gain.value=0; ig.connect(preBus);
   const po={}; ['nl','fb','damp','exBase','exSpan'].forEach(k=>{ if(opts[k]!=null) po[k]=opts[k]; });   // только заданные — остальное дефолты ворклета
+  if(offline) po.seed=Math.floor(rnd()*4294967296)>>>0;   // ⛳ копия рендера: семя шума щипка — из засеянного потока рендера (договор заморозки); живьём не берётся — поток живых чисел не сдвинут, ворклет на Math.random
   const node=new AudioWorkletNode(AC,'ks-string',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[1],processorOptions:po});
   const freqP=node.parameters.get('freq'), pluckP=node.parameters.get('pluck');
   if(opts.body){ const bd=AC.createBiquadFilter(); bd.type='peaking';   // сухой путь через корпусный резонатор
@@ -661,17 +719,40 @@ function buildFMBank(preBus,{ratio,peak,sus,tau}){
    а сеттеры берут их аргументом — «модуль эффекта» стал настоящим экземпляром, а не обёрткой над глобалью. */
 /* Аллпас Шрёдера: y = −g·x + z(x + g·y). Задержка БЕЗ окраски спектра — ровно то, что нужно, чтобы
    размазать вход, ничего в нём не подкрасив. Возвращает выход (он же вход следующей ступени). */
+/* ═══ ⛳ ПЕТЛИ РЕВЕРБА В КОПИИ РЕНДЕРА — С ОДНИМ ВХОДОМ (после MX2, «мокрый соло-рендер не повторяется») ═══
+   ⚠️ ДЕФЕКТ. Браузер считает граф ТЯГОЙ от выхода: узел, к которому тяга пришла второй раз за тот же квант (128 сэмплов), пока он ещё
+   считается, отдаёт свой выход ПРОШЛОГО кванта — так разрывается петля. ГДЕ она разорвётся, решает порядок обхода входов узла, а этот
+   порядок у Chrome — порядок множества указателей (адреса узлов в памяти), то есть свой у каждой постройки графа. У петли с ОДНИМ
+   входом извне (делей: в линию тянут только out и её же fb) разрыв всегда в одном месте. У диффузора (выход берёт и d, и sum через ff)
+   и у сети (отводы с каждого fb, сумма Σ со всех fb) входов несколько — и от постройки к постройке получается РАЗНАЯ сеть: в одной
+   отвод читает sum[n−D], в другой sum[n−D−128]; где-то перекрёстный член Хаусхолдера запаздывает на квант, где-то нет. Два рендера
+   одной дорожки давали разную комнату — общая энергия ±10 %, расхождение сэмплов до 0.76 пика (P.checkRepeat после MX2), при сухом
+   рендере, точном до 1.5e-5. Живьём это та же лотерея, но одна на сессию (граф строится один раз), поэтому на слух не ловилась.
+   ⛳ ЧИНИМ ТОЛЬКО В КОПИИ РЕНДЕРА (offline при постройке): у каждой петли ОДИН вход извне, и сеть выходит одной и той же при любом
+   порядке обхода — каждая петля длиннее на квант (как и живьём: разрыв там есть всегда, разнится лишь место). Живой граф не тронут —
+   живое звучание остаётся как было (решение «живьём тоже» — отдельное, оно меняет живой звук: см. HANDOFF).
+   Диффузор: в выход идут sum (−g) и ОТДЕЛЬНАЯ линия tap — тот же sum, задержанный на D + квант, ВНЕ петли; d петли выход больше не
+   кормит. Вход в петлю {sum, d, fb} — только через sum; d тянет sum «в работе» и пишет прошлый квант, итого d[n] = sum[n−D−128] = tap[n]:
+   честный аллпас с задержкой D+128 — ровно один из двух вариантов, которые давал живой граф.
+   DBG.fdnLive (только для пробы P.checkRepeat) — копия строит ЖИВУЮ проводку: A/B, доказывающий, что расходилась именно она. */
+const RENDER_QUANTUM=128;
+const fdnOneEntry=()=> offline && !DBG.fdnLive;
 function apStage(src,time,g){
   const sum=AC.createGain(), d=AC.createDelay(0.25), fb=AC.createGain(), ff=AC.createGain(), out=AC.createGain();
   d.delayTime.value=time; fb.gain.value=g; ff.gain.value=-g; out.gain.value=1;
   src.connect(sum); sum.connect(d); d.connect(fb); fb.connect(sum);   // петля: +g (в цикле есть d — правило Web Audio соблюдено)
-  d.connect(out); sum.connect(ff); ff.connect(out);                   // прямой ход: −g
+  sum.connect(ff); ff.connect(out);                                   // прямой ход: −g
+  if(fdnOneEntry()){ const tap=AC.createDelay(0.25); tap.delayTime.value=time+RENDER_QUANTUM/AC.sampleRate; sum.connect(tap); tap.connect(out); }   // копия рендера: отвод ВНЕ петли (см. шапку)
+  else d.connect(out);
   return out;
 }
 function buildFDN(inNode,outNode){
   const N=REV_A.lines.length, sc=1/Math.sqrt(N);       // энергосохраняющее распределение входа и сбор отводов
   const hp=AC.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=REV_A.hpf; hp.Q.value=REV_A.toneQ;   // Q — та же беда «Q в дБ» (дефолт дал бы +2 дБ горб на 80 Гц); ЗДЕСЬ безобидно (узел на прямом ходу, вне петель), правим ради единообразия — дефект один и тот же
   const pre=AC.createDelay(0.25); pre.delayTime.value=REV_A.preDelay;
+  /* MX2: голоса стали СТЕРЕО (ступень панорамы). Сеть и так сводила их в моно — на входах канала merger (моно-входы), а она линейна, —
+     поэтому сводим РАНЬШЕ, на входе: звук тот же (0.5·(L+R); в центре 0.5·(x+x) = x точно), а четыре линии не считаются дважды. */
+  hp.channelCount=1; hp.channelCountMode='explicit';
   inNode.connect(hp); hp.connect(pre);
   let src=pre;
   for(const t of REV_A.diff) src=apStage(src,t,REV_A.diffG);
@@ -684,6 +765,13 @@ function buildFDN(inNode,outNode){
   chL.gain.value=1; chR.gain.value=1; trim.gain.value=REV_A.outTrim;
   chL.connect(merge,0,0); chR.connect(merge,0,1); merge.connect(trim); trim.connect(outNode);
   const sgnL=[1,1,-1,-1], sgnR=[1,-1,-1,1];            // разные знаки/линии на каналы → декорреляция (ширина)
+  /* ⛳ КОПИЯ РЕНДЕРА — ОДИН ВХОД В СЕТЬ (см. шапку apStage). Выходы всех fb сводятся в один узел (merger → splitter), и ВСЁ, что читает
+     линии, — свой член Хаусхолдера (+x_i), сумма Σ, отводы L/R — читает их ОТТУДА. Вход в сеть извне — только этот узел; тяга, пришедшая
+     в него второй раз за квант, получает прошлый квант, и так КАЖДЫЙ путь обратной связи длиннее ровно на квант, при любом порядке
+     обхода. Отводы получают текущий выход fb — как и прежде. Живой граф (и DBG.fdnLive) — прежняя проводка. */
+  const one=fdnOneEntry();
+  const mg=one?AC.createChannelMerger(N):null, hub=one?AC.createChannelSplitter(N):null;
+  if(one) mg.connect(hub);
   return REV_A.lines.map((time,i)=>{                     // ← ВОЗВРАЩАЕМ линии (владелец — экземпляр эффекта)
     const inSum=AC.createGain(); inSum.gain.value=1;
     const d=AC.createDelay(0.25); d.delayTime.value=time;
@@ -691,10 +779,14 @@ function buildFDN(inNode,outNode){
     const fb=AC.createGain(); fb.gain.value=0;          // ДЛИНА; настоящее значение ставит setRevDecay из RT60
     dist.connect(inSum);                                 // вход сети
     inSum.connect(d); d.connect(lp); lp.connect(fb);     // тело линии: задержка → демпфирование → потеря
-    fb.connect(inSum); fb.connect(S); H.connect(inSum);  // Хаусхолдер: +x_i, вклад в Σ, общий член −(2/N)Σ
     const tL=AC.createGain(), tR=AC.createGain();
     tL.gain.value=sc*sgnL[i]; tR.gain.value=sc*sgnR[i];
-    fb.connect(tL); tL.connect(chL); fb.connect(tR); tR.connect(chR);
+    tL.connect(chL); tR.connect(chR);
+    if(one){ fb.connect(mg,0,i);                    // копия рендера: всё чтение линии — через узел-развилку (один вход в сеть)
+      hub.connect(inSum,i); hub.connect(S,i); H.connect(inSum);
+      hub.connect(tL,i); hub.connect(tR,i); }
+    else { fb.connect(inSum); fb.connect(S); H.connect(inSum);  // Хаусхолдер: +x_i, вклад в Σ, общий член −(2/N)Σ
+      fb.connect(tL); fb.connect(tR); }
     return {d,lp,fb,time};
   });
 }
@@ -1716,9 +1808,10 @@ function newChordVoice(dest){
   fb.type='lowpass'; fb.frequency.value=CHORD_LP_MAX;       // fb — непрерывная яркость (выразительность); дефолт открыт → нейтраль
   g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
   const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей голоса, до шины (фильтры f/fb не тронуты — правило #19)
-  o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(tg); tg.connect(dest);
+  o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(tg);
+  const pan=makePanStage(tg,dest);   // MX2: панорама ДОРОЖКИ — сразу за уровнем, до шины аккордов и её цепи
   voiceStartPair(o1,o2);   // пара — в фазе, голос — со своей задержкой (см. voiceStartPair: разброс фаз внутри пары гасил основной тон)
-  const v={o1,o2,g1,g2,f,fb,g,tg,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={o1,o2,g1,g2,f,fb,g,tg,pan,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   cv.push(v); return v;
 }
 function buildChordPool(dest, n=CHORD_POOL_N){
@@ -1770,6 +1863,7 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
     v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
     v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки (голос мог прийти от другой дорожки)
+    panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — тоже с мига атаки
     return v;
   });
 }
@@ -2038,7 +2132,7 @@ async function initAudio(mkCtx){
   const dLFOg=AC.createGain(); dLFOg.gain.value=260;
   dLFO.connect(dLFOg); dLFOg.connect(dLP.frequency); dLFO.start();
   dG=AC.createGain(); dG.gain.value=0;
-  dO1.connect(dLP); dO2.connect(dLP); dLP.connect(dG); dG.connect(backBus);
+  dO1.connect(dLP); dO2.connect(dLP); dLP.connect(dG); dPan=makePanStage(dG,backBus);   // MX2: панорама дорожки дрона — за его гейтом, до шины подложки (ставит dronePan)
   dO1.start(); dO2.start();
  
   noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
@@ -2212,13 +2306,13 @@ function newLeadVoice(){
   pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
   satDry.connect(satSum); satWet.connect(satSum);
   const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей (и драйва до неё), до громкости ноты; дальше всё линейно
-  satSum.connect(env); env.connect(tg); tg.connect(vol); vol.connect(trem); trem.connect(leadSum);   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё
+  satSum.connect(env); env.connect(tg); const pan=makePanStage(tg,vol); vol.connect(trem); trem.connect(leadSum);   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё. MX2: tg → панорама → громкость ноты (дальше голос стерео)
   const bri=makeBriStage(trem,leadSum);   // ЯРКОСТЬ: две ветви рядом с прежней связью trem→leadSum (она не тронута), без величины — ровно ноль (см. makeBriStage)
   /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,vibDep,pre,satDry,satWet,env,tg,vol,trem,tremDep,bri,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={hum,vibDep,pre,satDry,satWet,env,tg,pan,vol,trem,tremDep,bri,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
@@ -2373,6 +2467,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
   if(v.on)return;
   v.on=true; v.tOn=t;
   v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки
+  panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — с мига атаки
   /* Гуманизация — СВЕЖАЯ случайность на каждую атаку (в т.ч. при переигровке лупа: генерится здесь, в
      событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
      0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
@@ -2455,12 +2550,12 @@ function buildBassPool(dest, n){   // n голосов разом; зовёт Т
     g1.gain.value=.5; g2.gain.value=.5;
     env.gain.value=0; vol.gain.value=0.5;
     const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей, до громкости голоса (связь vol→шина и ступень яркости не тронуты)
-    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(tg); tg.connect(vol); vol.connect(dest);
+    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(tg); const pan=makePanStage(tg,vol); vol.connect(dest);   // MX2: tg → панорама → громкость голоса
     voiceStartPair(o1,o2);   // пара — в фазе (Саб-синус: синус+синус на одной частоте — разброс фаз гасил основной тон до тишины), голос — со своей задержкой
     const bri=makeBriStage(vol,dest);   // ЯРКОСТЬ: рядом с прежней связью vol→шина (не тронута), без величины — ровно ноль (см. makeBriStage). lp голоса — ТЕМБР (огибающая атаки), его не трогаем
     /* deg/oct — КАКУЮ НОТУ голос держит (P1, зеркало соло-голоса): звуку не нужны, их читает ПОДСВЕТКА (с V2, правило
        #26) — из реестра движка, а не из состояния руки. Пишет их ТОТ ЖЕ вызов, что звучит (bassOn/bassSet), гасит bassOff. */
-    bv.push({o1,o2,g1,g2,lp,env,tg,vol,bri,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
+    bv.push({o1,o2,g1,g2,lp,env,tg,pan,vol,bri,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
   }
 }
 /* ОДИН новый басовый голос. ⛳ P1: единственная дверь роста пула — И ЖИВОГО (до потолка BASS_POOL_N), И офлайн-
@@ -2531,6 +2626,7 @@ function bassOn(owner,freq,vol,ins,deg,oct,glide,bri,when){
     v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*volVel('bs',volAmp(vol))),t,ft);   // VOL-2b: скорость удара — прежнее число через амплитуду (volVel): тише прежнего пола 30% — база фильтра
     v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
     v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки
+    panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — с мига атаки
   }
   v.tOn=t;
   v.o1.frequency.setTargetAtTime(freq,t,gtc); v.o2.frequency.setTargetAtTime(freq*v.ins.ratio,t,gtc);
@@ -2679,10 +2775,11 @@ function drumHit(i,vol=1,kit=0,bri,when){
      стоит на нуле и прыгает к 0.001 в конце: тихий щелчок вместо тишины. ⚠️ Названный край: у очень тихого удара под-голос
      с пиком ниже 0.001 (самый тихий множитель — 0.12·v², то есть громкость ниже ~9) идёт ВВЕРХ к 0.001 — это −60 дБ,
      неслышно. Прежняя карта такого не знала: её пол давал пики не ниже ~0.036. */
-  const tgv=ownerGain(hitOwnerKey); hitOwnerKey=null;   // MX1: уровень дорожки удара (ключ поставил ENG.drum; живой удар — 1)
+  const tgv=ownerGain(hitOwnerKey), pv=ownerPan(hitOwnerKey); hitOwnerKey=null;   // MX1: уровень дорожки удара (ключ поставил ENG.drum; живой удар — 1). MX2: и её панорама (живой — 0)
   if(!(volAmp(vol)>0) || !(tgv>0)) return;
   hitBus=drumBus;
   if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(drumBus); hitBus=f; }
+  if(pv!==0){ const pin=AC.createGain(), st=makePanStage(pin,hitBus), [a,b]=panGains(pv); st.l.gain.value=a; st.r.gain.value=b; hitBus=pin; }   // MX2: ступень панорамы удара — только при p ≠ 0 (в центре удар байт-в-байт прежний); стоит ДО шины ударных и её цепи
   if(tgv!==1){ const g=AC.createGain(); g.gain.value=tgv; g.connect(hitBus); hitBus=g; }   // MX1: множитель только при уровне ≠ 1 — на 1 удар байт-в-байт прежний
   try{ drumVoice(i,vol,kit,t); } finally{ hitBus=drumBus; }
 }
@@ -2756,6 +2853,8 @@ export {
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff, droneRetune,
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
   setTrackGainOf, ownerGain, trackGainRetune, hitOwner, setMasterLevel, masterLevel, masterMeter,   // MX1: уровень дорожки (ступень в голосе по ключу владельца), мастер и измеритель
+  setTrackPanOf, ownerPan, trackPanRetune, dronePan, panGains,   // MX2: панорама дорожки (стерео-ступень в голосе по ключу владельца, закон равной мощности)
+  renderReset, renderStateOf,   // сброс копии рендера в начале и в конце каждого рендера (зовёт ТОЛЬКО render.js у своей копии) и его снимок для стража P.all
   timbresOf,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
