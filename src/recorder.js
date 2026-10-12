@@ -327,6 +327,7 @@ function rgnApply(from,to,on){
   if(past || Math.abs(d-Math.round(d))>1e-6){                // вторая ветка — страховка: при потактовых границах d всегда целое
     const tgt=past ? R.from : p;
     releaseLoopLayersAt();
+    frzSwapCancelAll();                                      // AF2: подмены, ещё не начатые, стояли по старой карте времени — отменить (спланируются заново)
     loop.t0=AC.currentTime+0.06-tgt*spb; loop.lead=tgt; loop.cnt=false;
     loop.pos=tgt-1e-9; loop.sched=tgt; loop.clickBeat=Math.floor(tgt);
     if(tgt>1e-9){ const T=loop.t0+tgt*spb; chasePlay(tgt,T,false); chasePlay(tgt,T,true); }   // S3.5c: прыжок — тоже вход не с начала (см. chaseFor). chaseAt здесь может быть от старых границ — ключ кэша ДОЛЯ, не границы, поэтому он верен
@@ -351,6 +352,8 @@ function braceFollowGrow(){
   const to=braceCapBars()*loop.metre; if(to>R.to) R.to=to;
 }
 const regionOn=()=>loop.rgn.on;
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkSwap): поставить скобу ровно {from, to, on, user} (через rgnApply — единственный писатель) и вернуть прежнюю. */
+function braceProbe(k){ const prev={...loop.rgn}; if(k){ loop.rgn.user=!!k.user; rgnApply(k.from,k.to,!!k.on); } return prev; }
 /* ⟳ — ТОЛЬКО включить/выключить повтор скобы. Границы не трогает.
    ⚠️ СОРТИРОВКА ВО ВРЕМЯ ЗАПИСИ — несущая: schedInvalidate объявляет ВЕСЬ массив отсортированным
    префиксом (cursN=length), а дописанный хвост записи не отсортирован. Прежний setRegion звал
@@ -983,15 +986,21 @@ const laneGated=()=> laneMute.size>0 || laneSolo.size>0;
 /* ⚠️ «Слышим ЖИВЫМ ГОЛОСОМ» (A2): свежая замороженная дорожка свой дрон играет из БУФЕРА — посчитай мы её
    здесь, дрон звучал бы дважды на каждом пуске (дефект F4, найден при сверке A2). Устаревшая — снова в
    счёте: она играет события. */
-const droneAudible=()=>events.some(e=>e.fn==='drone'&&laneAudible(e.layer)&&!frzLayer(e.layer));
+/* AF2: живой ли ГОЛОС дрона этой дорожки: слышима, буфер ею ЕЩЁ не владеет (подмена впереди — играют события) и не исключена (droneSyncAt —
+   уровень на миг подмены считается так, будто её дрон уже в буфере). */
+let droneExcl=null;
+const liveDrone=e=>laneAudible(e.layer)&&!frzBufNow(e.layer)&&e.layer!==droneExcl;
+const droneAudible=()=>events.some(e=>e.fn==='drone'&&liveDrone(e));
 /* Привести ЖИВОЙ дрон в соответствие со слышимостью — одна строка на всех: приглушение, заморозка,
    разморозка, устаревание. when — время шва (по умолчанию «сейчас»). */
 /* MX1: УРОВЕНЬ ДРОНА — как в событии (a.lvl) × уровень его дорожки; несколько слышимых дронов — громкий из них (дрон один на движок). */
-const droneLevel=()=>{ let L=0; for(const e of events) if(e.fn==='drone'&&laneAudible(e.layer)&&!frzLayer(e.layer)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L) L=x; } return L; };
+const droneLevel=()=>{ let L=0; for(const e of events) if(e.fn==='drone'&&liveDrone(e)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L) L=x; } return L; };
 /* MX2: ПАНОРАМА ДРОНА — той дорожки, чей дрон взят громким (тот же выбор, что droneLevel); нет слышимого — центр. */
-const dronePanOf=()=>{ let L=-1, P=0; for(const e of events) if(e.fn==='drone'&&laneAudible(e.layer)&&!frzLayer(e.layer)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L){ L=x; P=lanePanOf(e.layer); } } return P; };
+const dronePanOf=()=>{ let L=-1, P=0; for(const e of events) if(e.fn==='drone'&&liveDrone(e)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L){ L=x; P=lanePanOf(e.layer); } } return P; };
 const droneSync=(when,tc)=>{ if(droneActive()){ if(loop.on&&droneAudible()){ AUD.dronePan(dronePanOf(),when); droneOn(droneLevel(),when,tc); } else droneOff(when,tc); } };   // tc (A2b) — короткий только на шве заморозки; иначе прежние постоянные
 const FRZ_DRONE_TC=0.02;   // A2b: дрон на шве — подмена в миг шва (буфер уходит рампой FRZ_FADE), без секундного провала
+/* AF2: уровень живого дрона на миг подмены — без дрона дорожки, уходящей в буфер (её дрон звучит из буфера). */
+const droneSyncAt=(when,tc,layer)=>{ droneExcl=layer; try{ droneSync(when,tc); } finally { droneExcl=null; } };
 /* Переключатели. Наружу дорожка адресуется НОМЕРОМ СЛОЯ — тем же, чем подписана её строка на полосе
    лупера; id остаётся внутренним делом (ui не может подержать протухший id).
    ⚠️ `?? laneNew(layer)` — НЕ «мягкое заведение id», а ЕДИНСТВЕННЫЙ БЕЗОПАСНЫЙ способ его получить,
@@ -1156,6 +1165,12 @@ const frzHas=layer=>{ const f=frzOf(layer); return !!f&&!f.drop; };   // A2b: у
 /* Буфер СЕЙЧАС владеет дорожкой (взведён) — даже если дорожка уже устарела и ждёт шва выхода. A2c: догонялка
    такую пропускает — передачу сделает frzLeave. В самом frzLeave armedRep сброшен ДО его догонялки. */
 const frzBufOwns=layer=>{ const f=frzOf(layer); return !!(f&&f.armedRep!=null); };
+/* AF2: БУФЕР ВЛАДЕЕТ ДОРОЖКОЙ СЕЙЧАС — свежая И подмены впереди нет (пока она запланирована, дорожку играют события; дрон, догонялка). */
+const frzBufNow=layer=>{ const f=frzOf(layer); return !!f && !f.swap && freezeState(layer)==='fresh'; };
+/* AF2: ДОГОНЯЛКА ПРОПУСКАЕТ дорожку, если её звук сейчас — буфер: взведённый узел, или свежая без подмены впереди, или подмена НА ШВЕ скобы
+   (догонялка шва — уже для следующего прохода, а его играет буфер). Подмена внутри прохода ещё впереди — события, догонять. */
+const frzChaseSkip=layer=>{ const f=frzOf(layer); if(!f) return false; if(f.armedRep!=null) return true;
+  if(f.swap) return !!f.swap.seam; return freezeState(layer)==='fresh'; };
 
 /* ЗАВЕСТИ/СНЯТЬ. ⛳ Зовёт их render.js — с F5 из кнопки ❄ редактора (ui.onFreeze), а также из консоли. */
 /* ⛳ ПОДПИСЬ СВЕЖЕСТИ (F5) — «изменилось ли хоть что-то, из чего рендер собирал буфер».
@@ -1315,11 +1330,111 @@ function freezeSet(ticket, rendered){
      отрезке сделает шов ВХОДА (frzEnter). Стоим — нет: пуск взведёт буфер как обычно. */
   const f={ id, layer, buf:rendered.buf, startSec:rendered.startSec, endSec:rendered.endSec,
             tailSec:rendered.tailSec, pinned:rendered.pinned, sig:ticket.sig, bus, nodes:[], armedRep:null,
-            evRun:loop.on, mark:null, drop:false };
+            evRun:loop.on, mark:null, drop:false, swap:null, lastSwap:null, ...frzBlocks(rendered.buf) };   // AF2: swap — подмена впереди; blk/thr — карта тишины буфера (паузы)
   frozen.set(id, f);
   frzGain(id);                                      // приглушение/соло действуют сразу
   return true;
 }
+/* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ В ВЫБРАННЫЙ МИГ — без зазора, без щелчка, без скачка уровня (решение пользователя) ═══
+   Транспорт стоит — буфер входит сразу (пуск взводит его, evRun=false: так было и в A2). Играет — подмена НЕ на горизонте, а:
+     (1) в ПЕРВУЮ ПАУЗУ дорожки в пределах FRZ_SWAP_BARS тактов от горизонта, лучше на ЛИНИИ ТАКТА (сперва линии тактов, потом сетка
+         FRZ_REST_GRID доли);
+     (2) паузы нет (дрон, тянущийся пад) — на ближайшей линии такта с РАВНОМОЩНЫМ ПЕРЕКРЁСТОМ FRZ_XF (20 мс): голоса дорожки уходят cos,
+         буфер вплывает sin;
+     (3) под крутящейся скобой ближайшая линия такта — её КОНЕЦ: подмена НА ШВЕ — следующий проход целиком играет буфер, а голоса
+         прохода отпускает сам шов, как всегда (их хвост — хвост прохода; buffer нового прохода его не содержит), догонялка шва дорожку
+         пропускает (frzChaseSkip), ни одна нота не удваивается и не теряется.
+   ⛳ ЧТО ТАКОЕ ПАУЗА. Определяется по САМОМУ БУФЕРУ, а не по нотам: в нём уже есть всё, что звучит за дорожку, — голоса, их отпускания
+   и хвосты её цепи (реверб, делей) в точности как отрендерено. Пауза на доле b — когда весь буфер в окне ±FRZ_REST_WIN (50 мс) вокруг
+   смещения этой доли тише FRZ_REST_DB (−60 дБ) от пика буфера (до начала и после конца буфера — тишина). Тогда живые голоса дорожки в
+   этот миг тоже отзвучали (те же ноты), и подмена ничего не режет и не удваивает. Карта тишины — пики блоков по FRZ_BLK (10 мс),
+   один проход при постановке буфера (frzBlocks).
+   ⛳ ДВОЙНОЕ ОТПУСКАНИЕ ПОЧИНЕНО. Прежде (A2) на входе голоса дорожки отпускались СВОИМ релизом (у долгого пада 1.8 с), а буфер уже играл
+   те же ноты — до +6 дБ. Теперь голоса дорожки — и удерживаемые, и ещё звучащие отпущенные хвосты — уходят В МИГ подмены за FRZ_XF
+   (audio.voicesCut: ступень уровня tg, cos); их остаток уже лежит в буфере, который вплывает с той же доли по той же формуле времени
+   (frzStart: смещение = startSec + (b − первая доля)·spb, старт = t0 + (b + сдвиг прохода)·spb — сэмпл в сэмпл с событиями).
+   Срез аккордов и баса ставит планировщик, когда его окно дошло до доли подмены (все события ДО неё уже поставлены); соло идёт «почти
+   сейчас» — его срез ставит tick заранее (FRZ_LEAD_AHEAD) и повторяет после каждого соло-события слоя, сыгранного до шва (frzLeadRecut).
+   ⚠️ Предел, названный: удары, поставленные до подмены, — одноразовые узлы без реестра; их хвосты (сотни мс) доигрывают поверх тех же
+   хвостов в буфере. В паузе их нет; при перекрёсте на такте — кратко. Реверб/делей роли: хвост срезанных голосов в живой сети роли
+   дозвучивает поверх хвоста буфера (≤ RT60) — у паузы его нет по определению паузы.
+   ⛳ Контроли пробы P.checkSwap — frzSwapDbg('old'): прежний вход A2 (голоса своим релизом, буфер сразу); frzSwapDbg('hard'): то же место,
+   что выбрано, но рубильником (без перекрёста). Только проба; без них подмена такая, как описано. */
+const FRZ_XF=0.02, FRZ_SWAP_BARS=2, FRZ_REST_DB=60, FRZ_REST_WIN=0.05, FRZ_REST_GRID=0.25, FRZ_BLK=0.01, FRZ_LEAD_AHEAD=0.075;
+let frzSwapMode=null;
+const frzSwapDbg=m=>{ frzSwapMode= m==='old'||m==='hard' ? m : null; return frzSwapMode; };
+/* Карта тишины буфера: пик каждого блока FRZ_BLK по обоим каналам и порог паузы. */
+function frzBlocks(buf){
+  if(!buf||!buf.getChannelData) return { blk:null, thr:0 };
+  const n=Math.max(1,Math.round(FRZ_BLK*buf.sampleRate)), nb=Math.ceil(buf.length/n), blk=new Float32Array(nb);
+  let pk=0;
+  for(let c=0;c<buf.numberOfChannels;c++){ const x=buf.getChannelData(c);
+    for(let i=0;i<x.length;i++){ const a=x[i]<0?-x[i]:x[i]; const k=(i/n)|0; if(a>blk[k]) blk[k]=a; if(a>pk) pk=a; } }
+  return { blk, thr:Math.max(pk*Math.pow(10,-FRZ_REST_DB/20), 1e-6) };
+}
+/* Пауза на песенной доле b? (t0b — первая доля дорожки; spb — секунд на долю.) */
+function frzRestAt(f, b, t0b, spb){
+  if(!f.blk) return false;
+  const off=f.startSec+(b-t0b)*spb, a=off-FRZ_REST_WIN, z=off+FRZ_REST_WIN, nb=f.blk.length;
+  const k0=Math.max(0,Math.floor(a/FRZ_BLK)), k1=Math.min(nb-1,Math.floor(z/FRZ_BLK));
+  for(let k=k0;k<=k1;k++) if(f.blk[k]>f.thr) return false;
+  return true;
+}
+/* ПЛАН ПОДМЕНЫ — зовёт планировщик в НАЧАЛЕ отрезка, до его событий (lo — песенная доля начала отрезка, off — сдвиг прохода). */
+function frzPlanSwap(f, lo, rep, off){
+  const spb=60/loop.bpm, M=loop.metre, T=b=>loop.t0+(b+off)*spb;
+  if(frzSwapMode==='old'){                                 // контроль пробы: прежний вход A2
+    const t=T(lo); frzEnter(f, lo, t, rep); f.mark.old=true; frzArm(f, lo, t, rep);
+    f.lastSwap={ kind:'old', beat:lo, at:t, rep }; return; }
+  const cyc=cycling(), R=loop.rgn, passEnd=cyc?R.to:Infinity, end=Math.min(lo+FRZ_SWAP_BARS*M, passEnd);
+  const t0b=frzT0(f), rest=x=>frzRestAt(f,x,t0b,spb), bar0=Math.ceil(lo/M-1e-9)*M;
+  let b=null, kind=null;
+  for(let x=bar0; x<=end+1e-9; x+=M) if(x<passEnd-1e-9 && rest(x)){ b=x; kind='rest-bar'; break; }
+  if(b==null) for(let x=Math.ceil(lo/FRZ_REST_GRID-1e-9)*FRZ_REST_GRID; x<=end+1e-9; x+=FRZ_REST_GRID) if(x<passEnd-1e-9 && rest(x)){ b=x; kind='rest'; break; }
+  if(b==null){ b=bar0; kind='xf'; }
+  const xf= frzSwapMode==='hard' ? 0 : FRZ_XF;
+  if(cyc && b>=passEnd-1e-9){                              // ближайшая линия такта — конец скобы: подмена НА ШВЕ
+    const at=T(passEnd);
+    f.swap={ seam:true, rep, beat:R.from, at, cut:false, xf };
+    f.mark={ kind:'enter', rep:rep+1, beat:R.from, at, seam:true };
+    droneSyncAt(at, FRZ_DRONE_TC, f.layer);
+    f.lastSwap={ kind:'seam', beat:passEnd, at, rep }; return; }
+  const at=T(b);
+  f.swap={ seam:false, rep, beat:b, at, cut:false, xf };
+  f.mark={ kind:'enter', rep, beat:b, at, xf };
+  frzStart(f, b, at, xf);                                  // узел буфера — со смещения доли b, ровно в миг at, вплывает за xf
+  droneSyncAt(at, FRZ_DRONE_TC, f.layer);
+  f.lastSwap={ kind: frzSwapMode==='hard' ? 'hard' : kind, beat:b, at, rep };
+}
+/* СРЕЗ аккордов и баса дорожки в миг подмены — когда окно планировщика дошло до её доли (всё до неё уже поставлено). */
+function frzSwapCut(f, rep){
+  const sw=f.swap; if(!sw||sw.cut||sw.seam) return;
+  AUD.voicesCut(k=>layerOfOwner(k)===f.layer, sw.at, sw.xf, 'pool');
+  sw.cut=true; f.armedRep=rep; f.evRun=false;
+}
+/* Соло: срез по времени шва (tick — заранее; fireNear — после соло-события слоя, сыгранного до шва). */
+function frzCutLead(f, mk){ AUD.voicesCut(k=>layerOfOwner(k)===f.layer, Math.max(mk.at, AC.currentTime), mk.xf==null?FRZ_XF:mk.xf, 'lead'); }
+function frzLeadAhead(){
+  const lim=AC.currentTime+FRZ_LEAD_AHEAD;
+  for(const f of frozen.values()){ const mk=f.mark;
+    if(mk && mk.kind==='enter' && !mk.old && !mk.seam && !mk.leadCut && mk.at<=lim){ mk.leadCut=true; frzCutLead(f, mk); } }
+}
+function frzLeadRecut(ev){
+  const f=frzOf(ev.layer), mk=f&&f.mark;
+  if(mk && mk.kind==='enter' && mk.leadCut && !mk.seam) frzCutLead(f, mk);
+}
+/* ОТМЕНА подмены, ещё не начатой (дорожка устарела, прыжок скобы): её узел глушим (он ещё не звучит), отметку снимаем, дрон — как было.
+   События так и владеют дорожкой (evRun), следующий отрезок спланирует подмену заново, если дорожка снова свежая. */
+function frzSwapCancel(f){
+  const sw=f.swap; if(!sw) return;
+  f.swap=null; f.mark=null;
+  if(!sw.seam) for(const n of f.nodes.slice()) frzKill(n, AC.currentTime);
+  droneSync(sw.at, FRZ_DRONE_TC);
+  if(f.drop) frzRetire(f);
+}
+const frzSwapCancelAll=()=>{ for(const f of [...frozen.values()]) if(f.swap&&!f.swap.cut) frzSwapCancel(f); };
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkSwap): последний план подмены дорожки — { kind:'rest-bar'|'rest'|'xf'|'seam'|'hard'|'old', beat, at, rep }. */
+const frzSwapInfo=layer=>{ const f=frzOf(layer); return f&&f.lastSwap ? {...f.lastSwap} : null; };
 /* ═══ ⛳ ДВА ШВА — ВХОД В БУФЕР И ВЫХОД ИЗ НЕГО (A2 и A2b). ОБА ЗОВЁТ ТОЛЬКО ПЛАНИРОВЩИК. ═══
    ⛳ ОДНО ПРАВИЛО НА ОБА НАПРАВЛЕНИЯ: ШОВ СТОИТ НА ГОРИЗОНТЕ ЗАПЛАНИРОВАННОГО — в начале отрезка `lo`
    планировщика, в миг T = t0 + (lo+сдвиг прохода)·spb. Всё, что до шва, УЖЕ поставлено тем, кто владел
@@ -1337,6 +1452,8 @@ function freezeSet(ticket, rendered){
    идут «почти сейчас» через fireNear, им шов — отметка f.mark (проход и песенная доля шва): события слоя
    раньше неё ещё играют, позже — нет, а tick, дойдя до неё, гасит соло-голоса слоя (frzNearDone). ⛔ Правило #20: только
    голоса ДОРОЖКИ ('loop:N'/'bassloop:N'/'leadloop:N'), живой 'latch' не трогаем. */
+/* ⚠️ AF2: прежний вход — планировщик его больше НЕ зовёт (подмена — frzPlanSwap); живёт ТОЛЬКО как контроль пробы frzSwapDbg('old'):
+   голоса уходят СВОИМ релизом поверх буфера — двойное отпускание, которое проба обязана увидеть. */
 function frzEnter(f, lo, T, rep){
   releaseLoopLayersAt(T, f.layer, 'pool');
   f.mark={ kind:'enter', rep, beat:lo, at:T }; f.evRun=false;
@@ -1361,7 +1478,7 @@ function frzLeave(f, lo, T, rep){
     const pos = n.off + (T - n.at);                 // где в буфере узел окажется на шве
     if(pos < f.endSec - 1e-6) frzKill(n, T);        // ещё музыка — уходим рампой в миг шва; иначе хвост доигрывает сам
   }
-  f.armedRep=null; f.mark={ kind:'leave', rep, beat:lo, at:T }; f.evRun=true;
+  f.armedRep=null; f.mark={ kind:'leave', rep, beat:lo, at:T }; f.evRun=true; f.swap=null;   // AF2: подмена, если была, позади — следующая свежесть спланирует новую
   chasePlay(lo, T, false, f.layer);                 // аккорды и бас — ДО событий этого отрезка (их поставит цикл сразу после)
   chasePlay(lo, T, true,  f.layer);                 // соло — по явному времени шва, как при пуске (startTransport)
   droneSync(T, FRZ_DRONE_TC);
@@ -1393,7 +1510,11 @@ function frzNearDone(rep, p){
   for(const f of frozen.values()){ const mk=f.mark; if(!mk) continue;
     if(!(rep>mk.rep || (rep===mk.rep && p>=mk.beat-1e-9) || now>=mk.at+FRZ_MARK_GRACE)) continue;
     f.mark=null;
-    if(mk.kind==='enter') releaseLoopLayersAt(undefined, f.layer, 'lead');
+    if(mk.kind==='enter'){
+      if(mk.old) releaseLoopLayersAt(undefined, f.layer, 'lead');   // контроль 'old': прежний путь
+      else if(!mk.seam && !mk.leadCut) frzCutLead(f, mk);              // страховка: срез соло не поставлен заранее (tick опоздал)
+      if(f.swap && !f.swap.seam){ if(!f.swap.cut) frzSwapCut(f, mk.rep); f.swap=null; }   // AF2: подмена состоялась — буфер владеет дорожкой
+    }
     else if(f.drop) frzRetire(f);
   }
 }
@@ -1452,7 +1573,7 @@ const frzBusGain=layer=>{ const id=laneOf(layer), f=id!=null&&frozen.get(id); re
    ⚠️ ЗАТУХАНИЕ ПРИ ОБРЫВЕ: stop() режет насухо, то есть ЩЁЛКАЕТ. Поэтому у каждого узла свой гейн, и
    обрыв — это короткая рампа FRZ_FADE, а уже потом stop. Естественный конец рампы не требует. */
 const FRZ_FADE=0.006;
-function frzStart(f, songBeat, atSec){
+function frzStart(f, songBeat, atSec, xf){   // xf (AF2) — вплыть за xf секунд равной мощностью (подмена); не задан — сразу в полный уровень, как прежде
   /* СМЕЩЕНИЕ В БУФЕРЕ: сколько секунд от начала МУЗЫКИ уже прошло, плюс «разгон», который рендер
      положил перед первой нотой. Вот и вся догонялка. */
   const spb=60/loop.bpm;
@@ -1467,7 +1588,8 @@ function frzStart(f, songBeat, atSec){
   if(off<0){ at-=off; off=0; }
   if(off>=f.buf.duration) return null;                    // вошли за конец буфера — играть нечего
   const src=AC.createBufferSource(); src.buffer=f.buf;
-  const g=AC.createGain(); g.gain.value=1;
+  const g=AC.createGain(); g.gain.value= xf>0 ? 0 : 1;
+  if(xf!=null) AUD.xfRamp(g.gain, at, xf, 1, true);
   src.connect(g); g.connect(f.bus);
   src.start(at, Math.max(0,off));
   const n={src,g,killAt:null,at,off};              // at/off (A2b): где узел будет в буфере в любой миг — frzLeave отличает по ним музыку от хвоста
@@ -1495,7 +1617,7 @@ function frzKill(n, atSec){
 }
 /* Отметки швов (A2/A2b) — сбрасываем: любой останов/перезапуск перевзводит дорожку целиком, недошитый шов
    теряет смысл (голоса гасят сами остановки). Уходящая на шве (разморожена на ходу) — уходит совсем. */
-function frzStopOne(f, atSec){ for(const n of f.nodes.slice()) frzKill(n, atSec); f.armedRep=null; f.mark=null;
+function frzStopOne(f, atSec){ for(const n of f.nodes.slice()) frzKill(n, atSec); f.armedRep=null; f.mark=null; f.swap=null;   // AF2: недошитая подмена теряет смысл, как и отметка
   if(f.drop) frzRetire(f); }
 /* ⛳ ЕДИНАЯ ДВЕРЬ ОСТАНОВКИ — её и зовут пауза, паника, конец песни, перемотка и очистка. */
 function frzStopAll(atSec){ for(const f of frozen.values()) frzStopOne(f, atSec); }
@@ -3906,7 +4028,12 @@ function scheduleLayers(){
        (устарела от правки или от тоники/A4/темпа, или разморожена на ходу), отдаём событиям с `lo`.
        Порядок несущий: догонялка открывает голоса аккорда/баса по времени шва, а события этого же
        отрезка (их ставит цикл ниже) их ведут — поставь мы их раньше, chordGlide/bassSet ушли бы в пустоту. */
-    if(frz) for(const f of frozen.values()) if(f.armedRep!=null && freezeState(f.layer)!=='fresh') frzLeave(f, lo, segT, rep);
+    if(frz) for(const f of [...frozen.values()]){
+      const fresh=freezeState(f.layer)==='fresh';
+      if(f.swap && !f.swap.cut){ if(!fresh){ frzSwapCancel(f); continue; } }   // AF2: подмена ещё впереди, а дорожка устарела — отменить, события и так владеют
+      else if(f.armedRep!=null && !fresh){ frzLeave(f, lo, segT, rep); continue; }
+      if(fresh && f.evRun && !f.swap && f.armedRep!==rep) frzPlanSwap(f, lo, rep, off);   // AF2: свежую, которую играют события, — спланировать подмену (ДО событий отрезка: те, что раньше доли подмены, ещё играют)
+    }
     /* КУРСОР: встаём на первое событие с t>=lo (продолжая с места, если оно там же) и идём, пока t<hi.
        Курсор двигаем по ВСЕМ событиям окна, а не только по сыгранным: он — позиция ВО ВРЕМЕНИ, а не
        «сколько нот прозвучало». Явная проверка ev.t>=lo оставлена НАРОЧНО (см. шапку курсоров). */
@@ -3916,7 +4043,7 @@ function scheduleLayers(){
       if(!isLayer(ev.fn)) continue;
       if(recording&&ev.tk===curTake) continue;               // S3.5c: пропускаем то, что звучит ЖИВЬЁМ (события этого взятого), а не весь слой — старый материал вооружённой дорожки должен звучать
       if(gated&&!laneAudible(ev.layer)) continue;           // дорожка заглушена (или молчит из-за чужого соло) — просто НЕ ПЛАНИРУЕМ её события; сами события НЕ трогаем
-      if(frz&&frzLayer(ev.layer)) continue;                 // F4: ЗАМОРОЖЕНА — вместо её событий играет буфер (взводится ниже, на границе прохода)
+      if(frz&&frzSkipNear(ev,rep)) continue;                 // F4: ЗАМОРОЖЕНА — вместо её событий играет буфер (взводится ниже, на границе прохода). AF2: по отметке подмены — события ДО её доли ещё играют (та же пара «проход, доля», что у fireNear)
       if(ev.t>=lo){
         const when=loop.t0+(ev.t+off)*spb;                  // ТОЧНОЕ время: песенная доля события + сдвиг прохода
         ENG[ev.fn](ev.a,ev,{when});                         // ev несёт замороженный лад (§3.4). {when} ИМЕНОВАННО (S2): позиционный третий аргумент раньше значил у разных записей разное — см. шапку ENG
@@ -3933,10 +4060,17 @@ function scheduleLayers(){
        глушили «сейчас», а события шли с горизонта — дыра до ~300 мс и молчащий аккорд до следующего «вкл»).
        СВЕЖУЮ, ещё не взведённую на этом проходе, — взводим; если до этого её играли СОБЫТИЯ (заморозили на
        ходу, либо снова стала свежей) — сперва шов ВХОДА (A2). */
-    if(frz) for(const f of frozen.values()){
-      if(freezeState(f.layer)!=='fresh' || f.armedRep===rep) continue;
-      if(f.evRun) frzEnter(f, lo, segT, rep);
-      frzArm(f, lo, segT, rep); }
+    if(frz){ const segEndT=loop.t0+(hi+off)*spb;
+      for(const f of frozen.values()){
+        if(freezeState(f.layer)!=='fresh') continue;
+        const sw=f.swap;
+        if(sw){
+          if(sw.seam){ if(segT>=sw.at-1e-6){ f.swap=null; f.evRun=false; frzArm(f, lo, segT, rep); } }   // AF2: проход после шва — буфер (отметку снимет tick)
+          else if(!sw.cut){ if(sw.at<=segEndT+1e-6) frzSwapCut(f, rep); }                                // AF2: окно дошло до доли подмены — срез голосов (всё ДО неё уже поставлено)
+          else if(rep!==sw.rep) f.swap=null;                                                              // подмена была в прошлом проходе (tick ещё не дошёл до отметки) — новый проход взводим как обычно
+          if(f.swap) continue; }
+        if(f.armedRep===rep || f.evRun) continue;          // evRun без подмены — её спланирует начало следующего отрезка
+        frzArm(f, lo, segT, rep); } }
     /* ГРАНИЦА ПРОХОДА — гасим голоса дорожек по ЯВНОМУ времени. ⚠️ НЕСУЩЕЕ, а не косметика: события
        АРАНЖИРОВКИ несут открытия без закрытий, и в петле их гасил ровно этот вызов. */
     if(cyc && segEnd>=edge-1e-9){
@@ -4077,7 +4211,7 @@ function chasePlay(x,when,lead,only){
        дорожки на входе. Живое (события взятого) отсеяно ещё при построении (chaseFor), тем же правилом, что
        в переигровке. */
     if(gated&&!laneAudible(ly)) continue;                     // заглушённая / молчащая из-за чужого соло — догнанной ноты у неё быть не должно
-    if(frzLayer(ly)||frzBufOwns(ly)) continue;                // F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам. A2c: и УСТАРЕВШЕЙ, чей буфер ещё звучит (взведён), — её передаст событиям frzLeave на своём шве; догони мы её здесь, голос открылся бы дважды
+    if(frzChaseSkip(ly)) continue;                             // AF2: см. frzChaseSkip (прежде frzLayer||frzBufOwns — без подмены впереди). F4: ЗАМОРОЖЕННОЙ ДОГОНЯЛКА НЕ НУЖНА — у источника буфера есть СМЕЩЕНИЕ, вход посреди ноты играет с середины сэмпла сам. A2c: и УСТАРЕВШЕЙ, чей буфер ещё звучит (взведён), — её передаст событиям frzLeave на своём шве; догони мы её здесь, голос открылся бы дважды
     const {a,ctx}=chaseNote(s,x);
     if(s.role==='ch'){ ENG.chOn(a,ctx,{when}); setLoopChordHl(a,ctx.sc); }   // T4b4: подсветка — из индекса (hlOf)
     else if(s.role==='bs') ENG.bassOn(a,ctx,{when});
@@ -4263,6 +4397,7 @@ function fireNear(a,b,rep=0){                                  // rep (A2b) — 
     if(gated&&!laneAudible(ev.layer)) continue;              // заглушённая / молчащая из-за чужого соло дорожка
     if(frz&&frzSkipNear(ev,rep)) continue;                      // F4: заморожена — её соло/дрон играет буфер, а не события. A2/A2b: у швов входа и выхода — по доле шва (см. frzSkipNear)
     ENG[ev.fn](ev.a,ev);
+    if(frz&&ev.fn[0]==='l') frzLeadRecut(ev);                  // AF2: соло-событие до подмены, сыгранное после постановки среза, — срезать и его голос в миг подмены
   }
   curNear.i=i; curNear.at=b;                                 // следующий вызов придёт с a===b и продолжит без поиска
 }
@@ -4327,6 +4462,7 @@ function tick(){
   if(latchOpenAt!=null && recording) recLatchOpen();  // ⛳ первый тик ПОСЛЕ отсчёта: звучащая защёлка ложится в дубль с доли начала записи (см. recLatchOpen)
   const p=songAt(m);                                  // ПЕСЕННАЯ доля (при выключенной области — она же)
   const rep=cycling()?rgnReps(m):0;                   // A2b: номер прохода — для швов заморозки (fireNear/frzNearDone), та же формула, что у планировщика
+  if(frozen.size) frzLeadAhead();                     // AF2: срез соло-голосов дорожки на миг подмены — заранее, по явному времени (соло идёт «почти сейчас»)
   if(cycling() && p<loop.pos){                        // заворот области: позиция ушла назад — тот же тест, что был у петли. cycling() — явно (S3.5b): без повтора заворота нет по определению, и ложный «назад» (разгон после старта) не должен гасить живые голоса
     fireNear(loop.pos,loop.rgn.to,rep-1);             // хвост ПРОШЛОГО прохода
     liveWrapRelease();
@@ -4758,6 +4894,8 @@ export {
   setAutRecSmooth,
   /* AF1: очередь автозаморозки (frzqueue.js) — id дорожки по слою и обратно, подпись свежести (чтение; мемо то же) */
   laneOf as laneIdOf, laneLayerOf, freezeSig,
+  /* AF2: подмена событий буфером — последний план дорожки и контроли (только проба P.checkSwap), скоба пробы */
+  frzSwapInfo, frzSwapDbg, braceProbe,
   frzGlobalKey,   // A1 (автозаморозка): дешёвый ГЛОБАЛЬНЫЙ сигнал «могла смениться подпись хоть одной дорожки» — для наблюдателя A3/A4. Чистое чтение; сегодня вызывающих нет
   recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен

@@ -1670,6 +1670,165 @@ async function revAgree(){
   }
   return out;
 }
+/* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ НЕСЛЫШИМА — тело пробы P.checkSwap ═══
+   МАТЕРИАЛ — три временные дорожки аккордов в конце песни (recorder.seedTake), темп на время пробы 180 (короче съёмы):
+     ПАД — «Пад стеклянный (долгий)» (CHORD_INSTR[5]: треугольник и синус, отпускание 1.8 с — собственные шаги между сэмплами малы, и
+       рубильник контроля на их фоне виден наверняка; у пилы шаги велики, контроль мог бы не провалиться), один аккорд на 4 такта: перекрёст
+       на линии такта, подмена на стоящем транспорте и оба контроля;
+     ПАУЗЫ — орган (CHORD_INSTR[2]), по полдоли на второй доле каждого такта, подмес реверба роли на время взятия — 0 (иначе хвост
+       реверба съел бы паузы короткой пробы): подмена ложится в паузу на линии такта;
+     ШОВ — тот же пад на один такт, скоба ровно на этот такт, повтор вкл.: подмена на шве скобы.
+   СЪЁМ — живой выход мастера (audio.probeCapture, мимо колонок) с меткой времени: один сэмпл 1.0 в миг tm до музыки — по нему индекс
+   сэмпла ↔ время AC без допущений о задержке съёма. Каждый прогон — с доли за одну до материала; подмена — freezeSet НА ХОДУ (кроме
+   «стоящего»). ЭТАЛОН — тот же прогон без заморозки (одни события). Всё мерится ОТНОСИТЕЛЬНО эталона (моно, окна относительно мига подмены T):
+     • УРОВЕНЬ: скачок = 20·lg[(RMS после / эталон после) / (RMS до / эталон до)], до — [T−W, T−30 мс], после — [T+XF+30 мс, T+XF+W]; допуск
+       ±SW_LEVEL дБ;
+     • ЗАЗОР: окна 20 мс с шагом 5 мс в [T−20 мс, T+XF+60 мс], где эталон не тише −60 дБ своего пика: RMS / эталон не ниже SW_GAP дБ. Перекрёст
+       равной мощностью двух некоррелированных копий не проседает вовсе, коррелированных в худшем случае — до −4.4 дБ (среднее по окну); настоящий
+       зазор — минус бесконечность;
+     • ЩЕЛЧОК: наибольший шаг соседних сэмплов (по каналам) в [T−5 мс, T+XF+5 мс] — не больше SW_CLICK × того же у эталона (пол 1e-4).
+   Между прогонами голоса дорожек срезаются (5 мс) и 0.4 с тишины — хвост отпускания пада (1.8 с) не ложится в следующий съём.
+   «Стоящий»: начало (первый сэмпл выше 5 % пика) совпадает с эталоном ±SW_ONSET мс, уровень звучания ±SW_LEVEL дБ, щелчка у начала нет.
+   КОНТРОЛИ (мера обязана уметь провалиться): frzSwapDbg('old') — прежний вход A2 (голоса своим отпусканием, буфер сразу) — обязан ПРОВАЛИТЬ
+   уровень; frzSwapDbg('hard') — то же место, рубильником — обязан ПРОВАЛИТЬ щелчок. Вид плана тоже сверяется: пад — 'xf', паузы — 'rest…',
+   шов — 'seam'. Временные дорожки снимаются, темп, скоба, соло и величины цепи аккордов возвращаются. Время — ≈ 25 с съёмов + три рендера. */
+const SW_LEVEL=1.0, SW_GAP=-6, SW_CLICK=3, SW_ONSET=10, SW_BPM=180, SW_XF=0.02;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function swapCheck(){
+  const out={ ok:false, cases:[], fails:[] };
+  if(!LIVE_AC) return { ...out, why:'audio is not started (press ▶ Play)' };
+  if(REC.loop.on||REC.recording) return { ...out, why:'the transport is playing or recording — stop it first' };
+  if(REC.editIsOpen()) return { ...out, why:'the track editor is open — close it first' };
+  if(REC.laneSoloOn()) return { ...out, why:'a track is soloed — un-solo it first' };
+  if(autoFreeze()) return { ...out, why:'R.autoFreeze is ON — turn it off first' };
+  const key=chainKeyOf('ch'), keepAll=[];
+  for(const e of fxChainOf(key)){ const I=LIVE.fxInstance(key,e.fxId); if(I&&I.params) for(const p of I.params) keepAll.push([p,p.cur]); }
+  const rev=fxChainOf(key).some(e=>e.fxId==='reverb') ? LIVE.fxInstance(key,'reverb') : null;
+  const keepBpm=REC.loop.bpm, keepBrace=REC.braceProbe(null), made=[], tStart=performance.now(), fail=m=>out.fails.push(m);
+  const rate=LIVE_AC.sampleRate;
+  try{
+    stop(); REC.setLoopBpm(SW_BPM);
+    const M=REC.loop.metre, B=Math.ceil(REC.songBeats()/M)*M+2*M, Br=B+6*M, Bs=B+12*M;
+    const mk=steps=>{ let r=REC.seedTake(steps(null)); if(!r||!r.layers.length) return null;
+      let ly=r.layers[0]; const on=REC.events.find(e=>e.layer===ly&&e.fn==='chOn');
+      if(!on||!REC.evHz(on.a,on,'ch').length){ REC.laneDelTap(ly); REC.laneDelTap(ly); r=REC.seedTake(steps(chordUnit(CUR()))); if(!r||!r.layers.length) return null; ly=r.layers[0]; }
+      made.push(ly); return ly; };
+    const pad=mk(ty=>[{fn:'chOn',a:{deg:0,oct:1,vol:0.7,inst:5,ty},t:B,id:1},{fn:'chOff',a:{},t:B+4*M,id:1}]);
+    const mixP=rev&&rev.params.find(p=>p.key==='mix'), mix0=mixP?mixP.cur:null;
+    if(mixP) mixP.setNorm(0);
+    const restSteps=ty=>{ const S=[]; for(let k=0;k<4;k++){ S.push({fn:'chOn',a:{deg:0,oct:1,vol:0.7,inst:2,ty},t:Br+1+k*M,id:10+k}); S.push({fn:'chOff',a:{},t:Br+1.5+k*M,id:10+k}); } return S; };
+    const rest=mk(restSteps);
+    if(mixP) mixP.setNorm(mix0);
+    const seam=mk(ty=>[{fn:'chOn',a:{deg:0,oct:1,vol:0.7,inst:5,ty},t:Bs,id:20},{fn:'chOff',a:{},t:Bs+M,id:20}]);
+    if(pad==null||rest==null||seam==null) return { ...out, why:'the temporary tracks could not be recorded' };
+    const rend={};
+    for(const ly of [pad,rest,seam]){ const tk=REC.freezeTicket(ly); rend[ly]={ tk, r:await renderTrack(ly,{ quiet:true, seed:seedOfLane(tk.id) }) }; }
+    /* ---- один прогон: съём с меткой, пуск с доли from, по желанию — заморозка до пуска (pre) или на ходу (installMs) ---- */
+    const swapRun=async(ly,o)=>{
+      REC.frzSwapDbg(o.dbg||null);
+      if(o.pre && REC.freezeSet(rend[ly].tk, rend[ly].r)!==true) throw new Error('freezeSet refused (stopped)');
+      const bus=LIVE.makeFrozenBus(), ib=LIVE_AC.createBuffer(1,1,rate); ib.getChannelData(0)[0]=1;
+      const capP=LIVE.probeCapture(o.dur), tm=LIVE_AC.currentTime+0.15, s=LIVE_AC.createBufferSource(); s.buffer=ib; s.connect(bus); s.start(tm);
+      REC.seekTo(o.from); REC.onLoop();
+      const t0=REC.loop.t0; let sw=null, fresh=null;
+      try{
+        if(o.installMs!=null){ await sleep(o.installMs); if(REC.freezeSet(rend[ly].tk, rend[ly].r)!==true) throw new Error('freezeSet refused (playing)'); await sleep(150); sw=REC.frzSwapInfo(ly); }
+        const c=await capP; fresh=REC.freezeState(ly);
+        return { c, t0, tm, sw, fresh };
+      } finally {
+        if(REC.loop.on) REC.onLoop();
+        REC.unfreezeLayer(ly); REC.frzSwapDbg(null);
+        setTimeout(()=>{ try{ bus.disconnect(); }catch(e){} }, 50);
+        LIVE.voicesCut(k=>REC.layerOfOwner(k)!=null, undefined, 0.005);   // хвосты отпускания этого прогона (у пада 1.8 с) не должны лечь в следующий съём
+        await sleep(400);
+      }
+    };
+    /* ---- мера ---- */
+    /* метка: один сэмпл посреди тишины (или остатка хвоста реверба) — выше 0.02 и в 8 раз выше обоих соседей; от уровня мастера не зависит */
+    const imp=c=>{ const x=c.L, n=Math.min(x.length-1, Math.floor(rate*1.2)); for(let i=1;i<n;i++){ const a=Math.abs(x[i]); if(a>0.02&&a>8*Math.abs(x[i-1])&&a>8*Math.abs(x[i+1])) return i; } return -1; };
+    const ix=(R,t)=>R.i0+Math.round((t-R.tm)*rate);
+    const rms=(R,a,b)=>{ const L=R.c.L, Rr=R.c.R; let s=0, n=0; for(let i=Math.max(1,ix(R,a));i<Math.min(L.length,ix(R,b));i++){ const v=0.5*(L[i]+Rr[i]); s+=v*v; n++; } return n?Math.sqrt(s/n):0; };
+    const dmax=(R,a,b)=>{ let m=0; for(const x of [R.c.L,R.c.R]) for(let i=Math.max(1,ix(R,a));i<Math.min(x.length,ix(R,b));i++){ const d=Math.abs(x[i]-x[i-1]); if(d>m) m=d; } return m; };
+    const peak=R=>{ let p=0; const L=R.c.L; for(let i=R.i0+10;i<L.length;i++){ const a=Math.abs(L[i]); if(a>p) p=a; } return p; };
+    const prep=R=>{ R.i0=imp(R.c); if(R.i0<0) throw new Error('the time marker was not found in a capture'); return R; };
+    const db=x=>20*Math.log10(Math.max(x,1e-12));
+    /* скачок, зазор, щелчок вокруг мига подмены T (время AC прогона S); E — эталон, тот же миг: T − S.t0 + E.t0 */
+    const judge=(name,S,E,T,W,xf)=>{
+      const Te=T-S.t0+E.t0, r=(a,b)=>rms(S,T+a,T+b)/Math.max(rms(E,Te+a,Te+b),1e-9);
+      const jump=db(r(xf+0.03,xf+W)/Math.max(r(-W,-0.03),1e-9));
+      const pE=peak(E); let gap=Infinity;
+      for(let u=-0.02;u<=xf+0.06+1e-9;u+=0.005){ const e=rms(E,Te+u,Te+u+0.02); if(e<pE*1e-3) continue; const g=db(rms(S,T+u,T+u+0.02)/e); if(g<gap) gap=g; }
+      const click=dmax(S,T-0.005,T+xf+0.005)/Math.max(dmax(E,Te-0.005,Te+xf+0.005),1e-4);
+      return { name, jump:+jump.toFixed(2), gap: gap===Infinity?null:+gap.toFixed(2), click:+click.toFixed(2) };
+    };
+    const solo=async(ly,fn)=>{ REC.toggleLaneSolo(ly); try{ return await fn(); } finally { REC.toggleLaneSolo(ly); } };
+    const spb=60/SW_BPM;
+    /* ---- ПАД: эталон, стоящий, перекрёст, контроли ---- */
+    await solo(pad, async()=>{
+      REC.braceProbe({ ...keepBrace, on:false });
+      const E=prep(await swapRun(pad,{from:B-1,dur:2.4}));
+      { const S=prep(await swapRun(pad,{from:B-1,dur:2.4,pre:true})), T=S.t0+B*spb, Te=E.t0+B*spb;
+        const on=(R,t)=>{ const L=R.c.L, p=peak(R); for(let i=ix(R,t-0.1);i<L.length;i++) if(Math.abs(L[i])>0.05*p) return i; return -1; };
+        const dOn=Math.abs((on(S,T)-ix(S,T))-(on(E,Te)-ix(E,Te)))/rate*1000;
+        const lvl=db(rms(S,T+0.5*spb,T+3*spb)/Math.max(rms(E,Te+0.5*spb,Te+3*spb),1e-9));
+        const click=dmax(S,T-0.05,T+0.3)/Math.max(dmax(E,Te-0.05,Te+0.3),1e-4);
+        out.cases.push({ name:'stopped', onsetMs:+dOn.toFixed(1), level:+lvl.toFixed(2), click:+click.toFixed(2), fresh:S.fresh });
+        if(!(dOn<=SW_ONSET)) fail(`stopped: the frozen track starts ${dOn.toFixed(1)} ms off the events (tolerance ${SW_ONSET} ms)`);
+        if(!(Math.abs(lvl)<=SW_LEVEL)) fail(`stopped: level ${lvl.toFixed(2)} dB against the events (tolerance ±${SW_LEVEL})`);
+        if(!(click<=SW_CLICK)) fail(`stopped: a click at the start (${click.toFixed(2)}× the events' largest step, limit ${SW_CLICK}×)`);
+        if(S.fresh!=='fresh') fail(`stopped: the buffer was not playing (state ${S.fresh})`); }
+      for(const [dbg,want] of [[null,'xf'],['old','old'],['hard','hard']]){
+        const S=prep(await swapRun(pad,{from:B-1,dur:2.4,installMs:900,dbg}));
+        if(!S.sw){ fail(`pad${dbg?' ('+dbg+')':''}: no swap was planned`); continue; }
+        const xf= dbg ? 0 : SW_XF, j=judge(dbg?'control: '+dbg:'held pad, crossfade at the bar line',S,E,S.sw.at,0.4,xf);
+        j.kind=S.sw.kind; j.beat=S.sw.beat-B; j.fresh=S.fresh; out.cases.push(j);
+        if(S.sw.kind!==want) fail(`pad${dbg?' ('+dbg+')':''}: the swap kind should be '${want}', got '${S.sw.kind}'`);
+        if(!dbg){
+          if(!(Math.abs(j.jump)<=SW_LEVEL)) fail(`held pad: level jump ${j.jump} dB at the swap (tolerance ±${SW_LEVEL})`);
+          if(!(j.gap==null||j.gap>=SW_GAP)) fail(`held pad: a gap — ${j.gap} dB in a 20-ms window (floor ${SW_GAP} dB)`);
+          if(!(j.click<=SW_CLICK)) fail(`held pad: a click — ${j.click}× the events' largest step (limit ${SW_CLICK}×)`);
+          if(Math.abs((S.sw.beat-B)%M)>1e-6) fail(`held pad: the crossfade is not on a bar line (beat ${S.sw.beat-B} of the material)`);
+          if(S.fresh!=='fresh') fail(`held pad: the buffer did not take over (state ${S.fresh})`); }
+        else if(dbg==='old'){ if(!(Math.abs(j.jump)>SW_LEVEL)) fail(`CONTROL (old swap, voices left to release): the level check did not fail (jump ${j.jump} dB) — it cannot see a double release`); }
+        else if(!(j.click>SW_CLICK)) fail(`CONTROL (hard cut, no crossfade): the click check did not fail (${j.click}×) — it cannot see a click`);
+      }
+    });
+    /* ---- ПАУЗЫ ---- */
+    await solo(rest, async()=>{
+      REC.braceProbe({ ...keepBrace, on:false });
+      const E=prep(await swapRun(rest,{from:Br-1,dur:3.0})), S=prep(await swapRun(rest,{from:Br-1,dur:3.0,installMs:800}));
+      if(!S.sw){ fail('rest: no swap was planned'); return; }
+      const j=judge('rest',S,E,S.sw.at,1.1,SW_XF); j.kind=S.sw.kind; j.beat=S.sw.beat-Br; j.fresh=S.fresh; out.cases.push(j);
+      if(!/^rest/.test(S.sw.kind)) fail(`rest: the swap should land in a rest, got '${S.sw.kind}'`);
+      if(!(Math.abs(j.jump)<=SW_LEVEL)) fail(`rest: the notes after the swap are ${j.jump} dB off the events (a dropped or doubled note; tolerance ±${SW_LEVEL})`);
+      if(!(j.click<=SW_CLICK)) fail(`rest: a click — ${j.click}× (limit ${SW_CLICK}×)`);
+      if(S.fresh!=='fresh') fail(`rest: the buffer did not take over (state ${S.fresh})`);
+    });
+    /* ---- ШОВ СКОБЫ ---- */
+    await solo(seam, async()=>{
+      REC.braceProbe({ from:Bs, to:Bs+M, on:true, user:true });
+      const E=prep(await swapRun(seam,{from:Bs-1,dur:2.4})), S=prep(await swapRun(seam,{from:Bs-1,dur:2.4,installMs:800}));
+      if(!S.sw){ fail('seam: no swap was planned'); return; }
+      const j=judge('loop seam',S,E,S.sw.at,0.5,0); j.kind=S.sw.kind; j.fresh=S.fresh; out.cases.push(j);
+      if(S.sw.kind!=='seam') fail(`seam: the swap should be at the loop seam, got '${S.sw.kind}'`);
+      if(!(Math.abs(j.jump)<=SW_LEVEL)) fail(`seam: level jump ${j.jump} dB across the seam (a doubled or dropped note; tolerance ±${SW_LEVEL})`);
+      if(!(j.gap==null||j.gap>=SW_GAP)) fail(`seam: a gap — ${j.gap} dB (floor ${SW_GAP} dB)`);
+      if(!(j.click<=SW_CLICK)) fail(`seam: a click — ${j.click}× (limit ${SW_CLICK}×)`);
+      if(S.fresh!=='fresh') fail(`seam: the buffer did not take over (state ${S.fresh})`);
+    });
+    out.ok=true;
+  } catch(err){ out.why='failed: '+(err&&err.message); }
+  finally{
+    if(REC.loop.on) REC.onLoop();
+    REC.frzSwapDbg(null);
+    for(const ly of made.slice().reverse()){ REC.unfreezeLayer(ly); REC.laneDelTap(ly); REC.laneDelTap(ly); }
+    REC.braceProbe(keepBrace);
+    REC.setLoopBpm(keepBpm);
+    for(const [p,v] of keepAll) p.setNorm(v);
+    out.seconds=+((performance.now()-tStart)/1000).toFixed(1);
+  }
+  return out;
+}
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
@@ -1679,4 +1838,6 @@ export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps
   revAgree,   // LR1: проба «живой и замороженный реверб согласны» (P.checkRevAgree)
   /* AF1: очередь автозаморозки (консоль) и замер раскладки без рендера (P.freezeCost) */
   autoFreeze, freezeQueue, layoutCost,
+  /* AF2: проба «подмена событий буфером неслышима» (P.checkSwap) */
+  swapCheck,
   renderQueue };   // сколько рендеров ждёт или идёт (очередь — один рендер копии за раз)

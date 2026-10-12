@@ -1572,6 +1572,41 @@ function makeFrozenBus(){
   const g=AC.createGain(); g.gain.value=1; g.connect(master);
   return g;
 }
+/* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ — ПЕРЕКРЁСТНОЕ ЗАТУХАНИЕ И СРЕЗ ГОЛОСОВ ДОРОЖКИ ═══
+   xfRamp — РАВНАЯ МОЩНОСТЬ (уход cos, вход sin от 0 до π/2) кусками линейных рамп по XF_SEG отрезков. ⚠️ Кусками, а не
+   setValueCurveAtTime: событие, поставленное ВНУТРИ идущей кривой (атака того же голоса, фейдер — trackGainRetune), браузер отвергает
+   исключением; линейные рампы снимаются cancelScheduledValues как обычно. Равная мощность — потому что живой голос и буфер играют ОДНУ
+   ноту с разной гуманизацией и фазами: их корреляция случайна и в среднем ноль, суммарная мощность в стыке тогда ровная.
+   dur=0 — РУБИЛЬНИК (только контроль пробы P.checkSwap: он обязан щёлкнуть). */
+const XF_SEG=8;
+function xfRamp(param, t, dur, g0, up){
+  param.cancelScheduledValues(t);
+  if(!(dur>0)){ param.setValueAtTime(up?g0:0, t); return; }
+  param.setValueAtTime(up?0:g0, t);
+  for(let k=1;k<=XF_SEG;k++){ const u=k/XF_SEG, w=up?Math.sin(u*Math.PI/2):Math.cos(u*Math.PI/2); param.linearRampToValueAtTime(g0*(Math.abs(w)<1e-9?0:w), t+u*dur); }
+}
+/* СРЕЗ ГОЛОСОВ ДОРОЖКИ В МИГ ПОДМЕНЫ: каждый голос пула, чей владелец (или ПОСЛЕДНИЙ владелец у отпущенного — его хвост ещё звучит)
+   проходит test, уходит по xfRamp на ступени уровня дорожки tg (огибающая — её форма, атаки, релиза — не тронута: tg лишь множитель),
+   а удерживаемые — ещё и отпускаются жёстко в конце ухода (голос свободен, держатель снят). part: 'pool' — аккорды и бас, 'lead' — соло,
+   иначе всё. ⛔ ДОРОЖЕЧНЫЕ ключи только (test решает recorder: layerOfOwner) — живые руки ('lead:L', 'latch', 'bass') не трогаются (#20).
+   ⚠️ ПОЧЕМУ tg: следующая атака голоса ставит tg заново (cancelScheduledValues + setValueAtTime) — срез не переживёт голос, отданный другой
+   ноте. Возвращает число срезанных голосов. */
+function voicesCut(test, when, dur, part){
+  if(!AC) return 0;
+  const t=Math.max(when!=null?when:AC.currentTime, AC.currentTime), hit=v=>{ const k=v.owner||v.last; return !!k && test(k); };
+  let n=0; const fade=v=>{ if(!v.tg) return; xfRamp(v.tg.gain, t, dur, ownerGain(v.owner||v.last), false); n++; };
+  if(part!=='lead'){
+    for(const v of cv) if(hit(v)) fade(v);
+    for(const v of bv) if(hit(v)) fade(v);
+    for(const k of Object.keys(chordHold)) if(test(k)){ for(const v of chordHold[k]) cvRelease(v,true,t+dur); delete chordHold[k]; }
+    for(const k of Object.keys(bassHold)) if(test(k)){ const v=bassHold[k]; v.deg=-1; bvRelease(v,true,t+dur); delete bassHold[k]; }
+  }
+  if(part!=='pool'){
+    for(const v of lv) if(hit(v)) fade(v);
+    for(const k of Object.keys(leadHold)) if(test(k)){ const v=leadHold[k]; delete leadHold[k]; v.deg=-1; leadRelease(v,true,t+dur); }
+  }
+  return n;
+}
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkRevAgree, LR1): снять ЖИВОЙ выход МАСТЕРА (после его гейна, до лимитера — сравнимо с рендером, который тоже
    берёт мастер, offlineTapMaster) в массивы на sec секунд, НЕ выпуская звук в колонки: на время съёма лимитер отключён от выхода и
    подключается обратно по окончании (и по сторожевому таймеру, если съём не закончился). Съём — ScriptProcessorNode (устарел, но есть во
@@ -1841,6 +1876,7 @@ function cvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   const tc=hard?0.02:(v.ins?v.ins.rel:0.3);
   v.g.gain.cancelScheduledValues(t);
   v.g.gain.setTargetAtTime(0,t,tc);
+  if(v.owner) v.last=v.owner;   // AF2: чей хвост ещё звучит — срез на подмене (voicesCut) находит и отпущенные голоса дорожки
   v.owner=null;
   if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter): следующий аккорд снимет хвост, а не зазвучит поверх него
 }
@@ -2418,6 +2454,7 @@ function leadRelease(v,hard,when){
   const tc=hard?0.02:LEAD_INSTR[v.ins<0?leadIdx:v.ins].rel;
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,tc);
+  if(v.owner) v.last=v.owner;   // AF2: см. cvRelease
   v.on=false; v.owner=null;
   if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter)
 }
@@ -2583,6 +2620,7 @@ function bvRelease(v,hard,when){ const t=when!=null?when:AC.currentTime;
   const tc=hard?0.02:(v.ins?v.ins.rel:0.2);
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,tc);
+  if(v.owner) v.last=v.owner;   // AF2: см. cvRelease
   v.owner=null; v.on=false;
   if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter)
 }
@@ -2887,6 +2925,8 @@ export {
   fxGlideOf, FX_GLIDE_KEY,   // V4: скольжение ноты из её карты эффектов (секунды) или undefined — «не задано». Читает ENG (обе копии движка — живая и рендерная — через makeENG)
   /* LR1: съём живого мастера (только для пробы P.checkRevAgree); переключатель проводки ревербов снят в AF1 (уборка LR1) */
   probeCapture,
+  /* AF2: подмена событий буфером — равномощный перекрёст и срез голосов дорожки в миг подмены (зовёт recorder) */
+  xfRamp, voicesCut,
   fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки
   setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно

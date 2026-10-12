@@ -426,6 +426,7 @@ const ALL_RUNS=[
   ['MX2 track pan',()=>checkPan(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AR2 track names, colours, order',()=>checkTrackLook(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['LR1 live and frozen reverb agree',()=>checkRevAgree(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['AF2 freeze swap inaudible',()=>checkSwap(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AF1 freeze queue',()=>checkFreezeQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -446,7 +447,7 @@ const ALL_RUNS=[
    hidden», не FAIL и не pass; итог просит повторить при видимой вкладке. */
 const SLOW_ROWS=new Set(['T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
   'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot',
-  'LR1 live and frozen reverb agree']);   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
+  'LR1 live and frozen reverb agree','AF2 freeze swap inaudible']);   // AF2: ≈ 25–30 с живого съёма   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
 const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
 const HIDDEN='not checked: tab hidden';
 for(const n of [...SLOW_ROWS,...DRAWN_ROWS]) if(!ALL_RUNS.some(r=>r[0]===n)) console.warn(`[scaleprobe] «${n}» is not a row of P.all — the quick/drawn lists are out of date`);
@@ -1719,6 +1720,24 @@ export async function checkRevAgree(){
   if(Math.abs(r.ctrlTone.dBright)<=r.tolB) miss(`control: a ${r.ctrlTone.hz}-Hz tone moves the tail balance by only ${r.ctrlTone.dBright} dB — the balance measure could not fail`);
   console.log(`[scaleprobe rev-agree] tail energy live ${r.live.energy} dB / frozen ${r.frozen.energy} dB (Δ ${r.dEnergy}, tolerance ±${r.tolE}) · tail balance live ${r.live.bright} / frozen ${r.frozen.bright} dB (Δ ${r.dBright}, ±${r.tolB}) · controls: ${r.ctrlDecay.sec}-s tail Δ ${r.ctrlDecay.dEnergy} dB, ${r.ctrlTone.hz}-Hz tone Δ ${r.ctrlTone.dBright} dB · ${r.seconds} s`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe rev-agree] '+m));
+  return { cases, total:nBad, differences:bad };
+}
+/* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ НЕСЛЫШИМА — P.checkSwap ═══
+   Тело — render.swapCheck (материал, съём с меткой времени, мера, допуски и контроли — в его шапке): подмена на стоящем транспорте, в
+   паузе, перекрёстом на линии такта у тянущегося пада и на шве скобы; каждая — без зазора, щелчка и скачка уровня против того же прогона
+   одними событиями. Контроли: прежний вход A2 (голоса своим отпусканием) обязан провалить уровень, рубильник без перекрёста — щелчок.
+   Ничего не звучит в колонках (мастер снят мимо них). Транспорт должен стоять, соло — снято, R.autoFreeze — выключен. ≈ 25–30 с: в P.all. */
+export async function checkSwap(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  let R=null; try{ R=await import('./render.js'); }catch(e){ miss('render.js did not load: '+(e&&e.message)); return { cases, total:nBad, differences:bad }; }
+  cases++; const r=await R.swapCheck();
+  if(!r.ok){ miss('swap: '+r.why); console.warn('[scaleprobe swap] '+r.why); return { cases, total:nBad, differences:bad }; }
+  cases+=r.cases.length;
+  for(const m of r.fails) miss(m);
+  console.table(r.cases);
+  console.log(`[scaleprobe swap] ${r.cases.length} swaps measured · ${r.fails.length} problem(s) · ${r.seconds} s`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe swap] '+m));
+  if(!nBad) console.log('[scaleprobe swap] the frozen buffer takes over with no gap, no click and no level jump — stopped, in a rest, crossfaded on a held pad and at the loop seam; the old double release and a hard cut both fail, so the measure can see them');
   return { cases, total:nBad, differences:bad };
 }
 export async function checkTracks(){
