@@ -802,6 +802,7 @@ function print(R){
    ===================================================================== */
 
 const PRE_SEC=0.5;        // «разгон» перед первой нотой: цепь ставится на t=0, а её сеттеры едут setTargetAtTime с τ до 0.08 с — 0.5 с хватает всем, чтобы осесть ДО первого звука
+const SHORT_TAIL=0.75;    // o.short (только пробы): хвост короткого окна — не длиннее 0.75 с
 const TAIL_MIN=0.25;      // пол хвоста: даже сухая дорожка без эффектов должна дожить свой релиз
 const TAIL_MAX=30;        // потолок хвоста — страховка от абсурдной длины, а не оценка. Пробивается только «падом на 2.5 с» в очень длинной цепи; если пробило, в отчёте это видно
 const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же мера конца хвоста, что у RT60 реверба (у раскладчика её больше нет: голос свободен с мига отпускания, см. audio.freeAfter)
@@ -932,13 +933,21 @@ async function renderTrackNow(layer, opt){
      курсоры, ни schedInvalidate не задеты. Стабильность порядка при равных долях обеспечиваем
      индексом: две ноты на одной доле обязаны лечь в том же порядке, что и в записи. */
   const src=REC.events;
-  const evs=src.map((e,i)=>({e,i})).filter(x=>x.e.layer===layer)
+  const evsAll=src.map((e,i)=>({e,i})).filter(x=>x.e.layer===layer)
                .sort((a,b)=> (a.e.t-b.e.t) || (a.i-b.i)).map(x=>x.e);
-  if(!evs.length) throw new Error('дорожка '+layer+' пуста');
+  if(!evsAll.length) throw new Error('дорожка '+layer+' пуста');
+  /* ⛳ o.short — ТОЛЬКО ДЛЯ ПРОБ (слайс «быстрые пробы»): рендер КОРОТКОГО ОКНА — short секунд песни от первого события дорожки, хвост
+     не длиннее SHORT_TAIL. События после окна не кладутся, ноты, звучащие на его краю, закрываются на краю (тем же закрытием конца, что
+     у подложки), точки автоматизации после окна не ставятся. Мерам проб (баланс каналов, отношение уровней, повтор двух рендеров) нужна
+     пара секунд звука, а не вся дорожка с хвостом. ⛔ Заморозка (freeze, ❄, R.aud) его не передаёт никогда — буфер дорожки всегда целый. */
+  const SHORT= o.short>0 ? o.short : 0;
+  const cutBeat= SHORT ? evsAll[0].t + SHORT*REC.loop.bpm/60 : Infinity;
+  const evs= SHORT ? evsAll.filter(e=>e.t<cutBeat) : evsAll;
+  const cutOff= evs.length<evsAll.length;   // окно что-то отрезало — конец рендера = край окна (иначе нота, чей «выкл» за краем, закрылась бы на своём «вкл»)
 
   /* Конец дорожки — последнее событие, НО у слоя подложки — все её такты (REC.laneLenOf): события подложки не несут выключений, и без
      этого замороженный дрон (одно событие на доле 0) звучал бы одним хвостом, а у прогрессии последний аккорд закрывался бы на своей же доле. */
-  const t0Beat=evs[0].t, tEndBeat=Math.max(evs[evs.length-1].t, REC.laneLenOf(layer));
+  const t0Beat=evs[0].t, tEndBeat= cutOff ? cutBeat : Math.min(cutBeat, Math.max(evs[evs.length-1].t, REC.laneLenOf(layer)));
   const pin=pinLive(ST, REC, o.pin);
   const spb=60/pin.use.bpm;
   const songSec=(tEndBeat-t0Beat)*spb;
@@ -970,7 +979,7 @@ async function renderTrackNow(layer, opt){
        захват кладёт состав ПЕРЕД величинами той же доли (takeCapSample); ords — те же составы, по ключу, для проводки. */
     const startVals=new Map(), startOrd=new Map(), later=[], ords=new Map();
     for(const p of lane){
-      if(!keys.has(p.key)) continue;
+      if(!keys.has(p.key) || p.t>=cutBeat) continue;   // o.short: точки после окна не ставятся
       if(p.fx===REC.FX_CHAIN){
         if(p.t<=t0Beat+1e-9) startOrd.set(p.key,p.ids);
         else { later.push(p); if(!ords.has(p.key)) ords.set(p.key,[]); ords.get(p.key).push(p.ids); }
@@ -1006,7 +1015,7 @@ async function renderTrackNow(layer, opt){
     const tailVals=new Map(startVals);
     for(const p of later){ if(p.fx===REC.FX_CHAIN) continue;
       const a=p.key+'|'+p.fx+'|'+p.p, q=tailVals.get(a); if(!q||p.v>q.v) tailVals.set(a,p); }
-    const tailSec=tailOf(eng, keys, tailVals, insRel);
+    const tailSec= SHORT ? Math.min(tailOf(eng, keys, tailVals, insRel), SHORT_TAIL) : tailOf(eng, keys, tailVals, insRel);
     const frames=Math.max(1,Math.round(rate*(PRE_SEC+songSec+tailSec)));
     const ctx=new OfflineCtor(2, frames, rate);
 
