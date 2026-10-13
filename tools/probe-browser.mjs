@@ -25,6 +25,7 @@ import { readFile, mkdir, writeFile, appendFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { execFileSync } from 'node:child_process';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOGDIR=path.join(ROOT,'tools','.probe-logs');
@@ -33,7 +34,8 @@ const REPEAT=+val('--repeat',0)||0;
 let QUICK=has('--quick'), ALL=has('--all');
 if(!QUICK && !ALL && !REPEAT) QUICK=true;
 const EVAL=val('--eval',null);
-if(EVAL && !has('--quick') && !has('--all')) QUICK=false;
+const LEAK=has('--leak');
+if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
 const HEADED=has('--headed'), VERBOSE=has('--verbose'), BROWSER=val('--browser','chrome');
 const LIMIT_ALL=(+val('--limit-min',5)||5)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=3*60e3;
 /* Строки реального времени и съёма — для таблицы --repeat (их меры печатаются по прогонам). Имена — строки P.all. */
@@ -57,6 +59,43 @@ function serve(){
     }catch(e){ r.writeHead(404); r.end(); }
   });
   return new Promise(res=>srv.listen(0,'127.0.0.1',()=>res(srv)));
+}
+
+/* ---------- process memory (OS): private bytes and threads of the given pids, summed ---------- */
+function procMem(ids){
+  const out={ privateMB:0, workingMB:0, threads:0 };
+  if(!ids.length) return out;
+  try{
+    if(process.platform==='win32'){
+      const r=execFileSync('powershell',['-NoProfile','-Command',`Get-Process -Id ${ids.join(',')} | ForEach-Object { "$($_.PrivateMemorySize64) $($_.WorkingSet64) $($_.Threads.Count)" }`],{ encoding:'utf8' });
+      for(const l of r.trim().split(/\r?\n/)){ const [a,b,c]=l.trim().split(/\s+/).map(Number); out.privateMB+=a/1048576; out.workingMB+=b/1048576; out.threads+=c; }
+    } else for(const id of ids){ const t=execFileSync('cat',[`/proc/${id}/status`],{ encoding:'utf8' });
+      const g=k=>{ const m=t.match(new RegExp(k+':\\s+(\\d+)')); return m?+m[1]:0; }; out.privateMB+=g('RssAnon')/1024; out.workingMB+=g('VmRSS')/1024; out.threads+=g('Threads'); }
+  }catch(e){ out.error=String(e&&e.message||e); }
+  out.privateMB=+out.privateMB.toFixed(1); out.workingMB=+out.workingMB.toFixed(1);
+  return out;
+}
+
+/* ---------- --leak (RENDER-LEAK): N consecutive track renders keep renderer memory within a margin of the start; control: the same
+   N renders with the fix off (KS worklet always loaded → each offline context pinned) must exceed it. Short renders (the probe window)
+   of the smallest track without a KS timbre; the watcher is paused (runner). ---------- */
+const LEAK_N=30, LEAK_MARGIN_MB=20;
+async function LEAK_PAGE({ N, margin }){
+  const R=await import('./src/render.js'), REC=await import('./src/recorder.js'), A=await import('./src/audio.js');
+  const span=l=>{ const ts=REC.events.filter(e=>e.layer===l).map(e=>e.t); return Math.max(...ts)-Math.min(...ts); };
+  const isKS=l=>REC.events.some(e=>e.layer===l&&(e.fn==='leadOn'||e.fn==='leadSet')&&e.a&&e.a.inst!=null&&e.a.inst>=A.LEAD_KS_FROM);
+  const ly=[...new Set(REC.events.map(e=>e.layer))].filter(l=>!isKS(l)&&!REC.events.some(e=>e.layer===l&&e.fn==='drone')).sort((a,b)=>span(a)-span(b))[0];
+  if(ly==null) return { ok:false, why:'no track without a KS timbre' };
+  const keep=R.renderKsLazy();
+  const go=async n=>{ const ms=[]; for(let i=0;i<n;i++){ const a=performance.now(); const r=await R.renderTrack(ly,{ short:1, quiet:true }); ms.push(performance.now()-a); if(r.buf) r.buf=null; } return ms; };
+  try{
+    R.renderKsLazy(true); await go(2);
+    const m0=await window.__procMem(); const ms=await go(N); const m1=await window.__procMem();
+    R.renderKsLazy(false); await go(N); const m2=await window.__procMem();
+    const fixMB=+(m1.privateMB-m0.privateMB).toFixed(1), ctrlMB=+(m2.privateMB-m1.privateMB).toFixed(1);
+    return { ok:true, track:'L'+(ly+1), n:N, msPerRender:Math.round(ms.reduce((a,b)=>a+b,0)/ms.length), fixMB, ctrlMB, thr:[m0.threads,m1.threads,m2.threads],
+             pass: fixMB<=margin && ctrlMB>margin };
+  } finally { R.renderKsLazy(keep); }
 }
 
 /* ---------- срок ---------- */
@@ -112,10 +151,21 @@ async function session(port, plan, label){
     out(`[${label}] P.seed finished in ${((Date.now()-t0)/1000).toFixed(1)} s — ${res.seed?res.seed.events+' events, material '+(res.seed.material?'complete':'INCOMPLETE'):'refused'}`);
     if(!seedOk){ res.error='P.seed did not finish with complete material'; return res; }
     if(!res.guard){ res.error='the console guard did not refuse P.quick() during P.seed'; return res; }
-    if(EVAL){   // --eval <файл>: тело async-функции, выполняется на странице после посева; печатается её JSON (отладка проб)
+    if(EVAL||LEAK){   // memory helpers for --eval and --leak
       /* window.__heap(): full GC, then V8 heap usage incl. ArrayBuffer backing stores (memory checks in --eval only) */
       const cdp=await ctx.newCDPSession(page);
       await page.exposeFunction('__heap', async ()=>{ await cdp.send('HeapProfiler.collectGarbage'); return await cdp.send('Runtime.getHeapUsage'); });
+      /* window.__procMem(): full GC, then the renderer processes' private memory and thread count from the OS (native memory the V8
+         heap does not see — offline audio contexts, their graphs and worklet threads) */
+      const bcdp=await browser.newBrowserCDPSession();
+      await page.exposeFunction('__procMem', async ()=>{ await cdp.send('HeapProfiler.collectGarbage'); await new Promise(r=>setTimeout(r,300)); await cdp.send('HeapProfiler.collectGarbage');
+        const pi=await bcdp.send('SystemInfo.getProcessInfo'); const ids=pi.processInfo.filter(x=>x.type==='renderer').map(x=>x.id);
+        return { ids, ...procMem(ids) }; });
+    }
+    if(LEAK){ res.leak=await within(page.evaluate(LEAK_PAGE, { N:LEAK_N, margin:LEAK_MARGIN_MB }), LIMIT_ALL, '--leak');
+      const L=res.leak; res.leakPass=!!(L&&L.ok&&L.pass);
+      out(`[${label}] --leak: ${L&&L.ok ? `${L.track} (no KS timbre), ${L.n} renders each, ${L.msPerRender} ms per render · with the fix ${L.fixMB>=0?'+':''}${L.fixMB} MB (margin ${LEAK_MARGIN_MB} MB), threads ${L.thr.join(' → ')} · CONTROL without the fix +${L.ctrlMB} MB (must exceed the margin) → ${L.pass?'PASS':'NOT A PASS'}` : 'ERROR — '+(L&&L.why)}`); }
+    if(EVAL){   // --eval <файл>: тело async-функции, выполняется на странице после посева; печатается её JSON (отладка проб)
       const src=await readFile(path.resolve(EVAL),'utf8');
       out(`[${label}] --eval ${EVAL}`);
       const r=await within(page.evaluate(async code=>{ const f=new Function('return (async()=>{'+code+'\n})()'); try{ return { ok:true, value:await f() }; }catch(e){ return { ok:false, error:String(e&&e.stack||e) }; } }, src), LIMIT_ALL, '--eval');
@@ -163,7 +213,7 @@ function repeatTable(sessions){
 
 /* ---------- main ---------- */
 await mkdir(LOGDIR,{ recursive:true });
-const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all'].filter(Boolean).join('+');
+const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',LEAK&&'leak'].filter(Boolean).join('+');
 LOG=path.join(LOGDIR, `${stamp()}-${mode}.log`);
 await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
 const srv=await serve(), port=srv.address().port;
@@ -186,8 +236,9 @@ for(const s of sessions){
     for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick):/.test(l)) out('  '+l);
     if(!r.pass) pass=false;
   }
-  if(!s.runs.length && !s.error && !EVAL) pass=false;
+  if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
+  if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }
 if(REPEAT) repeatTable(sessions);
 out(`\n[probe-browser] ${pass?'PASS':'NOT A PASS'} — ${sessions.length} browser session(s), ${sessions.reduce((n,s)=>n+s.runs.length,0)} probe run(s) · ${((Date.now()-T00)/1000).toFixed(1)} s total · log ${path.relative(ROOT,LOG)}`);

@@ -6045,3 +6045,68 @@ refuse on `afActive()` instead of `R.autoFreeze()` (ON by default).
 `P.seed` (`R.freeze(gr.layer)`), the queue (`RUNNER(layer, opt)`), console. `editClose()` — callers `ui.closeRoll` and probes, unchanged.
 `frzqueue.qAdd(layer, why, at)` — new third argument; callers `wScan` (`qAdd(ly, kind, at)`), AF1 probe (`qAdd(ly,'probe')`).
 
+### Moved from HANDOFF.md at RENDER-LEAK/AF5 (English slice records)
+### AF4 (2026-10-13) — interface without ❄ (full: archive B, «AF3 + AF4»)
+- Removed: editor ❄ + state label, the window's ❄ slot (rows M · S), the strip's ❄/stale marks, all `frz.*` strings (en, ru).
+- Added: a faint dot at the right end of a window row header — hollow waiting, pulsing rendering, nothing when frozen or live by
+  choice (`hooks.afRow` → `frzqueue.afRowState`; snapshot `loopView.dots`). Console `R.*` unchanged. UI-MAP sections in English.
+- Probe: row AR1 +5 cases; control "rendering must not read as waiting" proved by a mutation (2 differences).
+- Runner: `--quick` PASS (40.0 s), `--all` PASS (139.5 s); 0 fix rounds.
+### AF3 (2026-10-13) — the auto-freeze watcher and triggers; part 0 housekeeping (full: archive B, «AF3 + AF4»)
+- Part 0: name lists → `docs/NAME-INDEX.md` (CLAUDE.md 134.6 → 119.5 KB). AF6b check: the Float32 copy DID stay alive (Chrome pins
+  every offline context that loaded a worklet); `render.freeze` detaches it after packing: +9.41 → +0.01 MB per freeze.
+- `frzqueue.js` watcher (250 ms, `recorder.frzWatchKey()`), delays `AF_DELAY` (editor 0.5 s, others 1.0 s), holds (recording, editor's
+  track, held pan), hints via `hooks.af` from the real sites, skips (no chain, budget) not retried, tonic/A4/tempo-only staleness ignored,
+  `admit` budget check in `render.freeze`, `R.freezeQueue()` explains everything.
+- Chains pinned at birth: editor insert into a chain-less track (`editInsPush`), song load (`songPinChains`; seed 0).
+- Probe lock and the runner pause the watcher; row «AF3 auto-freeze watcher» (P.quick, ≈ 2.5 s, 4 controls). Smoke test of the real
+  path (`--eval`): after the seed 17 tracks froze themselves one by one, 49.5 MB, no errors.
+- Runner: `--quick` PASS (41.6 s), `--all` PASS (140.4 s); 0 fix rounds.
+
+### ✅ RENDER-LEAK + AF5 + HARD RULE #31 (2026-10-13; runner PASS; ear steps 69, 70 not yet done)
+**Part 0.** AF1 probe case (6) "changed while queued" removed; AF3's edit burst now also checks the installed buffer is fresh against the
+final signature (its no-reset control still fails: 3 renders). UI-MAP "Решённые вопросы"/"Порядок работ" freezing bullets rewritten in English.
+**RENDER-LEAK measurements** (runner `--eval`, `window.__procMem()` = CDP `SystemInfo.getProcessInfo` renderer pids + PowerShell
+PrivateMemorySize64/threads, after full GC). Before the fix, 30 consecutive `R.freeze` of L18 (3 beats): private 260.6 → 269.2 (1) → 332.2
+(10) → 442.0 MB (30), threads flat (52 → 48) — 5.96 MB per render. Experiments: an offline context in a removed iframe (also navigated
+away, also with every node created inside the iframe) stays alive after 3 s of GCs; dismantling the graph after render (stop + disconnect
+every node) saved little (2.2 vs 2.5–3.1 MB per 1-s context); a context WITHOUT `addModule` is collected. Fix: `render.usesKS` — the KS
+worklet only for a track with a KS timbre (`stubWorklet` otherwise). After: 255.2 → 249.4 → 256.0 → 265.9 MB (0.57 MB/render, noise);
+control (fix off) 266.0 → 271.2 → 326.3 → 443.5 MB. Render: initMs 27.3 vs 138.7, short render 1425 vs 1886 ms. The seed has NO KS track,
+so the KS case was measured only as the control. Runner `--leak`: +1.2 MB / control +137.8 MB. Seed bass: the live AudioContext came up at
+44.1 kHz (system device) — expected samples now `13.560125 s × rate` ±1 (598001 at 44.1 kHz).
+**AF5 — the bug.** Repro (`--eval`): chord track L3, editor: Volume lane point down, reverb mix point 0.02 at its last beat, close; live
+chord chain unchanged until ▶; playing past the point → live reverb mix 0.141 → 0.030; after stop still 0.030 (`fxRestoreAim` restores only
+aimed/Fixed). The Volume lane never reached live (per-note). Fix: rule #31 (CLAUDE.md). Positional callers: `audio.fxPlayPath(key, ids, hard)`
+— new 3rd arg: `recorder.fxPlayDrive` (`fxPlayPath(playKeyOf(key), ids, hard)`), `recorder.fxPlayStop` (`fxPlayPath(key,null)`, old mode only),
+`render.live` (`fxPlayPath(REC.playKeyOf(p.key), p.ids, true)` before the start; `(…, p.ids)` while playing), `render.liveRestore`
+(`fxPlayPath(key,null)`, old mode only). `audio.buildLeadBank(ins, pre, hum, vib, shim)` — one caller, `leadVoiceBank`
+(`buildLeadBank(ins, v.pre, v.hum, v.vibDep, v.shim)`). New: `audio.setTrackRouteOf(fn)` (recorder, once), `routeOfOwner`, `chainStateOf`;
+`recorder.playKeyOf`, `setLiveIsolation`, `fxPlayDriving`; `state.trackChainKeyOf`. `songPinChains()` result gains `soloMaps`, `soloSnap`.
+Cost (synthetic offline bench, slow desktop): base 37.4 ms per audio second → +94 router gains 78.0 → + one reverb-like network 88.4
+(≈ +4.1 % and +1.0 % of real time). Probe: `P.checkLiveIsolation` 11 cases, 0 differences; control live reverb mix 0.026 while playing.
+
+### Moved from HANDOFF.md at AF5-mixer (English slice record)
+### AF5 + hard rule #31 (2026-10-13) — a track and the live hands never share sound state (full: archive B, «RENDER-LEAK + AF5»)
+- The user's bug: an editor change to a track's effects (reproduced with its reverb mix) is driven by playback into the role's ONE live
+  network and stays there after ▶ stops for every parameter the hand never set (stop restores only aimed or Fixed values). The Volume
+  lane itself edits only notes and did not reach live; the shared network did.
+- Fix (structural): each role has a live head and a TRACK head with its own chain (`trackChainKeyOf`); pooled voices end in a router set
+  at attack by owner, drum hits pick their bus; recorded automation drives only the track chain; solo track voices skip the expression
+  stage and its shimmer; song load gives map-less solo notes the live solo snapshot (24 events in the seed). AF5: frozen tracks drive no
+  chain (`fxPlayBuild` filter). Track chains keep their composition at stop (tails ring), rewire without a dip at the next start.
+- Not taken: per-track chains (isolates tracks from each other too; ≈ one chain per unfrozen track).
+- Probe row «AF5 track and live isolated» (11 cases, control = old shared network). Runner: `--quick` PASS, `--all` PASS (182.7 s).
+
+### AF5-mixer (2026-10-13) — user: step 69 fails (mixer track level lowers live chords); not reproduced in the runner
+Runner repros (`--eval`): (1) clean song, chord take via onRec/WchOn('latch')/stop; window opened via the editor; the mixer fader dragged
+from 1.0 to 0.4 and the pan to −1 with real PointerEvents on the canvas (hit 'level'/'pan'); live chord voices: tg 1, pan 1/1, rL 1,
+rT 0, ownerGain('latch') 1, ownerPan 0, route live, master 1, live chain unchanged — before recording, after, window open, closed,
+disarmed. (2) Output capture (probe-cap) of a held live chord, 1 s: −34.68 / −35.03 / −34.64 / −34.64 (armed, second drag to 0.2) /
+−34.81 (disarmed) / −34.86 dB (auto-freeze on, track frozen fresh). (3) Transport playing the track under a cycling brace, live chord held
+while level 0.2 + pan −1 set, then 6 new live chords: live tg 1/pan 1/router 1 throughout, the track's voices 0.04. Code: live owner keys
+('latch', 'lead:L/R/M', 'bass', 'bass:L', live hit null) never map to a layer (`layerOfOwner`), `trackGainRetune`/`trackPanRetune` touch
+only a layer's owners, attack stages are set per owner, `voicesCut` takes `owner||last` (owner first), no monitoring code exists. Added:
+probe cases (armed + unarmed mixer level/pan on every live owner and on sounding live voices), control `recorder.setLiveLeakDbg(layer)`
+(read-out 0.04 / 0.22·1.40 — the case can fail), console `R.liveCheck()`. P.checkLiveIsolation 16 cases, 0 differences.
+

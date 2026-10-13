@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (30 hard rules), 66 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (31 hard rules), 66 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -43,7 +43,9 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   master (`P.checkMixer`) · MX2 track pan (`P.checkPan`) · AR2 names, colours, order (`P.checkTrackLook`).
 - ✅ AF1 freeze queue, console only (verified on desktop) · LR1 live reverb = render wiring (accepted by ear) · AF2 events→buffer
   swap and AF6b 16-bit frozen tracks (verified by the runner; ear steps 64, 65) · AUTO-PROBE runner and fixes (ear step 66).
-- ✅ unverified: **AF3 auto-freeze watcher + triggers (ON by default)** and **AF4 no ❄ anywhere** (runner PASS; ear/eye steps 67, 68).
+- ✅ unverified: **AF3 auto-freeze watcher + triggers (ON by default)** and **AF4 no ❄ anywhere** (runner PASS; ear/eye steps 67, 68) ·
+  **RENDER-LEAK** (non-KS renders no longer pin memory) · **AF5 + hard rule #31: a track and the live hands never share sound state**
+  (runner PASS; ear step 69 REPORTED FAILING by the user — mixer track level lowers live chords — not reproduced in the runner, see AF5-mixer; step 70 open).
   🔵 Volume VOL-0…VOL-4: **next VOL-5…VOL-7**.
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
@@ -57,7 +59,8 @@ belongs to the TRACK; live, effects will belong to the TIMBRE (chains move from 
 
 **Auto-freeze** (plan AF1–AF6: archive B, «ПЛАН „АВТОЗАМОРОЗКА“ (пересмотр при LR1)»; AF6 detail: «AF1»): a track freezes itself
 once it settles (all but the track being recorded), unnoticed. Done AF1–AF4, AF6b (AF1: worst layout 6.3 ms drums L16, typical 0.8 ms,
-under the 8 ms pinch budget; phone not measured). Next: AF5 chain to the hand → AF6 memory. **AF3 decisions (user, do not reopen):**
+under the 8 ms pinch budget; phone not measured). Done AF5 (tracks play through their role's TRACK chain, rule #31). Next: AF6 memory.
+**AF3 decisions (user, do not reopen):**
 tonic/A4/tempo do NOT re-freeze until the tonic freeze (`frzqueue.AF_REFREEZE_ON_RETUNE = false`; such tracks play live); a track
 created in the editor gets the live chain pinned at birth, inserts into an existing track inherit its chain, auto-freeze never pins (song
 load pins old chain-less tracks; seed: 0); memory guard until AF6 `AF_BUDGET_MB` 300 touch / 1024 desktop, over it = skipped, no
@@ -77,13 +80,10 @@ per-track effects and meters after auto-freeze. **Audio take** comes AFTER auto-
 **Hearing the room** (MX2; release candidate; BACKLOG §7.11): the mic follows the room's KEY or each CHORD and its TUNING (sets A4).
 Traps: freeze the tonic first; follow chords in a CHROMATIC view; echo cancellation. Key detection written OURSELVES.
 
-**Product direction** (full: BACKLOG §7; reasoning archive B, «НАПРАВЛЕНИЕ ПРОДУКТА» а–и): (a) timbres then songs on a SERVER,
-account-bound, device = cache; (b) paid = what goes through the server, creating stays generous; (c/d) our open versioned TIMBRE
-FORMAT is the source of truth (export: sample instruments, Scala), planned BEFORE the builder (entry: `audio.timbresOf`); (e) user
-MODES, shared via SCALA; (f) app as a MIDI CONTROLLER (MPE, MIDI Tuning Standard); (g) MAIN TECH DEBT: hand tracking off the main
-thread (after measuring latency, §3.32); (h) team ideas, not decisions. **Songs as FILES** (T5; BACKLOG §1): export/import;
-needs stable TIMBRE ids, the TONIC in the song, a versioned format (tracks; events (view id, index, register); chains;
-automation; tempo; metre); `src/songs.js` becomes the first song file.
+**Product direction** (full: BACKLOG §7): timbres then songs on a SERVER (device = cache); paid = what goes through the server; our open
+versioned TIMBRE FORMAT is the truth (export: samples, Scala), planned before the builder; user MODES via Scala; app as a MIDI controller;
+main tech debt: hand tracking off the main thread (§3.32). **Songs as FILES** (BACKLOG §1): need stable timbre ids, the tonic in the song,
+a versioned format; `src/songs.js` becomes the first song file.
 
 **Strategy — proposed, awaiting the user** (BACKLOG §7.12): first public release after stage 5; free → "Plus" → packs → "Pro".
 **Timbre builder** (stage 7; BACKLOG §7.13): 48 gesture addresses, one-AudioWorklet engine for play/freeze/export, multisample export.
@@ -159,8 +159,9 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect).
   save ≈ 3 MB; demo piece ≈ 280 → ≈ 140 MB; rest of AF6 (disk, paging, Opus fallback) open. No worklet → Float32 (2× memory).
 - AF2 bar-line crossfade: pre-scheduled drum tails and the role's live reverb tail play over the buffer's tails (hundreds of ms).
 - After tonic/A4/tempo change frozen tracks go stale and play through the live pools (stealing above the ceiling).
-- Every render's offline context stays alive (Chrome pins a context that loaded a worklet; found AF3 part 0b): the Float32 data are now
-  released, the engine-copy graph is not (size unmeasured) — with auto-freeze every settled edit renders (BACKLOG §1, AF6 item 7).
+- A render of a KS (plucked solo) track still pins its offline context, ≈ 6 MB per render (Chrome; no workaround found) — BACKLOG §1 AF6 7.
+- Unfrozen tracks of one role share the role's TRACK chain (last writer wins among them); per-track chains not built (BACKLOG §1).
+- AF5 adds ≈ 100 GainNodes to the live graph (≈ +4 % real time on the slow dev desktop, synthetic; phone not measured).
 - Re-render repeatability: dry ≤ 1e-4, wet ≤ 2e-4 of peak; dry drift up to 1.54e-5 (≈ −96 dB) after many renders, node unknown.
 - Lanes: a note edit doesn't rebuild its ramp; an anchor only where no event; Glide over bass theremin smooths its steps. Bass
   theremin records the nearest step only. `tmix` timbre fold correct until ids.
@@ -179,19 +180,20 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### AF4 (2026-10-13) — interface without ❄ (full: archive B, «AF3 + AF4»)
-- Removed: editor ❄ + state label, the window's ❄ slot (rows M · S), the strip's ❄/stale marks, all `frz.*` strings (en, ru).
-- Added: a faint dot at the right end of a window row header — hollow waiting, pulsing rendering, nothing when frozen or live by
-  choice (`hooks.afRow` → `frzqueue.afRowState`; snapshot `loopView.dots`). Console `R.*` unchanged. UI-MAP sections in English.
-- Probe: row AR1 +5 cases; control "rendering must not read as waiting" proved by a mutation (2 differences).
-- Runner: `--quick` PASS (40.0 s), `--all` PASS (139.5 s); 0 fix rounds.
-### AF3 (2026-10-13) — the auto-freeze watcher and triggers; part 0 housekeeping (full: archive B, «AF3 + AF4»)
-- Part 0: name lists → `docs/NAME-INDEX.md` (CLAUDE.md 134.6 → 119.5 KB). AF6b check: the Float32 copy DID stay alive (Chrome pins
-  every offline context that loaded a worklet); `render.freeze` detaches it after packing: +9.41 → +0.01 MB per freeze.
-- `frzqueue.js` watcher (250 ms, `recorder.frzWatchKey()`), delays `AF_DELAY` (editor 0.5 s, others 1.0 s), holds (recording, editor's
-  track, held pan), hints via `hooks.af` from the real sites, skips (no chain, budget) not retried, tonic/A4/tempo-only staleness ignored,
-  `admit` budget check in `render.freeze`, `R.freezeQueue()` explains everything.
-- Chains pinned at birth: editor insert into a chain-less track (`editInsPush`), song load (`songPinChains`; seed 0).
-- Probe lock and the runner pause the watcher; row «AF3 auto-freeze watcher» (P.quick, ≈ 2.5 s, 4 controls). Smoke test of the real
-  path (`--eval`): after the seed 17 tracks froze themselves one by one, 49.5 MB, no errors.
-- Runner: `--quick` PASS (41.6 s), `--all` PASS (140.4 s); 0 fix rounds.
+### AF5-mixer (2026-10-13) — step 69 reported failing: mixer track level lowers live chords (full: archive B, «AF5-mixer»)
+- NOT REPRODUCED in the runner on any path: a chord take recorded through the live functions, the editor opened, the window's mixer
+  fader and pan dragged with real pointer events, armed and not armed, transport stopped and playing, auto-freeze on and the track
+  frozen — live chord voices stay at track-level 1, pan 1/1, router live; the output RMS of a live chord stays −34.6…−35.0 dB (±5 % random
+  level); the track's own voices drop to 0.04 (level 0.2). No "monitor at the armed track's level" exists in the code.
+- Kept: the AF5 probe now checks mixer level/pan of the armed and an unarmed track on every live owner and on sounding live voices, with
+  a control that must fail (`setLiveLeakDbg`). Console `R.liveCheck()` to read the live path on the user's device right after it happens.
+- Open questions for the user: transport playing (hearing the sum with the quieter track)? the MASTER strip (directly under the row)?
+  the deployed build (GitHub Pages) or the local one? — and `R.liveCheck()` output.
+- BACKLOG §7.14 (effect chains target design), §7.15 (modes/presets as bundles). Runner: `--quick` PASS (58.4 s), `--all` PASS (293.2 s).
+### RENDER-LEAK + part 0 (2026-10-13) (full: archive B, «RENDER-LEAK + AF5»)
+- Measured (runner `__procMem`): 30 freezes of a 3-beat track: +177.5 MB before (5.94 MB/render pinned), +10.7 MB after (0.57 MB/render,
+  mostly allocator noise). Cause: Chrome pins every offline context that loaded the KS worklet; iframe/navigation/dismantling did not free
+  it. Fix: the worklet only for tracks with a KS timbre — faster too (init 27 vs 139 ms, short render 1.43 vs 1.89 s). KS tracks still pin.
+- Runner `--leak`: 30 short renders +1.2 MB (margin 20), control +137.8 MB → PASS.
+- Part 0: AF1 case (6) merged into AF3's edit burst; UI-MAP history bullets in English. Seed-bass sample count rate-aware (the dev machine's
+  audio device switched 48 → 44.1 kHz). Runner: `--quick` PASS, `--all` PASS (222.7 s, slow machine); 1 fix round.

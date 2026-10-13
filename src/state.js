@@ -121,6 +121,11 @@ export const chainKeyOf = role => CHAIN_ROLE+':'+role;
    «store ↔ цепь соло» обязана быть где-то выражена — пусть она будет выражена ЗДЕСЬ, рядом с резолвером,
    а не рассыпана литералами 'ld' по четырём слоям. */
 export const CHAIN_SOLO=chainKeyOf('ld');
+/* AF5 (user's hard rule — a track's edits never reach the live sound, the live hands never reach a track): the TRACK-PLAYBACK chain of a
+   live chain key. Tracks playing their events go through it, the hands never do. Built by table lookup — the key stays opaque. */
+export const CHAIN_TRACK='track';
+const TRACK_KEYS={};
+export const trackChainKeyOf = key => TRACK_KEYS[key] || (TRACK_KEYS[key]=CHAIN_TRACK+':'+key);
 /* ⛳ ГРОМКОСТЬ КАК ПАРАМЕТР (слайс VOL-0) — id голосового модуля «Громкость». Объявление модуля — в audio (FX_FACTORY,
    флаг perm), а id живёт ЗДЕСЬ, потому что его читает state (сеяние цепей и fxVolReset ниже), а state до audio не дотягивается
    (audio импортирует state, обратный импорт — цикл). Один id на все слои — ровно как FX_CHAIN у записи. */

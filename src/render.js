@@ -389,6 +389,15 @@ const ROLE_KEY={ chord:()=>chainKeyOf('ch'), lead:()=>CHAIN_SOLO };
    ⚠️ Если defineProperty не пройдёт (свойство не настраиваемое), возвращаем false и честно говорим,
    что пропуск в этом браузере снаружи невозможен; движковый путь тогда — необязательный аргумент у
    initAudio, но здесь мы его НЕ заводим. */
+/* ⛳ RENDER-LEAK (measured at AF5): Chrome never frees an OfflineAudioContext that called audioWorklet.addModule — the context, its graph
+   and the worklet scope stay for the session (≈ 6 MB per render of a small track; removing a hosting iframe, navigating it or taking the
+   graph apart after the render did not free it). Without addModule the context is collected. So a track render loads the KS worklet ONLY
+   when the track plays a KS timbre (solo, index ≥ LEAD_KS_FROM; a note-on without a timbre reads the pinned leadIdx); otherwise the
+   worklet is stubbed (no KS bank is ever built there, the sound is identical). renderKsLazy(false) — the probe control (old behaviour). */
+let KS_LAZY=true;
+const renderKsLazy=on=>{ if(on!=null) KS_LAZY=!!on; return KS_LAZY; };
+const usesKS=(eng, evs, leadIdx)=> evs.some(e=>{ if(e.fn!=='leadOn'&&e.fn!=='leadSet') return false;
+  const i= e.a&&e.a.inst!=null ? e.a.inst : (e.fn==='leadOn' ? leadIdx : null); return i!=null && i>=eng.LEAD_KS_FROM; });
 function stubWorklet(ctx){
   try{
     Object.defineProperty(ctx,'audioWorklet',{ configurable:true, value:{ addModule:()=>Promise.resolve() } });
@@ -1022,6 +1031,8 @@ async function renderTrackNow(layer, opt){
     const fullSec=PRE_SEC+songSec+tailSec;
     const frames=Math.max(1,Math.round(rate*(o.layoutOnly ? 1 : fullSec)));
     const ctx=new OfflineCtor(2, frames, rate);
+    const ksLoaded= !KS_LAZY || usesKS(eng, evs, pin.use.leadIdx);
+    if(!ksLoaded) stubWorklet(ctx);             // RENDER-LEAK: no KS timbre in this track → no worklet, the context can be collected
 
     eng.renderReset();                          // ⛳ ЧИСТАЯ КОПИЯ — всё ниже ставится явно этим рендером (см. audio.renderReset)
     eng.setRnd(mulberry32(o.seed==null?SEED_A:o.seed));
@@ -1135,14 +1146,14 @@ async function renderTrackNow(layer, opt){
        стоят микросекунды, а у автоматического рендера прогресса не будет вовсе (показывать нечего). */
     const tRnd0=now();
     if(o.layoutOnly){   // AF1: замер — без рендера
-      out={ layer, layoutOnly:true, buf:null, songSec:+songSec.toFixed(3), tailSec:+tailSec.toFixed(3), totalSec:+fullSec.toFixed(3), rate,
+      out={ layer, layoutOnly:true, ksLoaded, buf:null, songSec:+songSec.toFixed(3), tailSec:+tailSec.toFixed(3), totalSec:+fullSec.toFixed(3), rate,
             events:evs.length, keys:[...keys], voices:pool, ms:{ importMs:Math.round(tImp1-tImp0), initMs:Math.round(tIni1-tIni0),
             gateMs:+(tLay0-tIni1).toFixed(1), layoutMs:+(tRnd0-tLay0).toFixed(1), renderMs:0 } };
       return out; }
     const buf=await renderWithProgress(ctx, o.onProgress);
     const tRnd1=now();
 
-    out={ layer, buf, startSec:PRE_SEC, endSec, tailSec,
+    out={ layer, buf, ksLoaded, startSec:PRE_SEC, endSec, tailSec,
           songSec:+songSec.toFixed(3), totalSec:+buf.duration.toFixed(3),
           events:evs.length, keys:[...keys], pinned:pin.use, voices:pool,
           reordered,   // ⚠️ состав ПЕРЕСТАВЛЯЛСЯ посреди дорожки — рендер держит прежний порядок (см. mergeOrders)
@@ -1311,7 +1322,26 @@ async function freeze(layer, opt){
   /* eslint-enable no-console */
   return r;
 }
-setFreezeRunner(freeze);   // AF1: очередь берёт дорожки и зовёт ЭТУ заморозку — тот же билет, тот же freezeSet, что у ❄
+setFreezeRunner(freeze);
+/* ⛳ AF5 (rule #31) — R.liveCheck(): the LIVE path as it stands now — master, every role's live chain, the live owners' level/pan/route,
+   every sounding LIVE voice's stages (track level tg, pan pair, router), and each track's mixer level/pan and arm. Run it right after
+   hearing a live sound change: a live voice must read tg 1, pan 1/1, router 1/0 whatever the tracks' mixer says. Pure read. */
+function liveCheck(){
+  const g=p=>p?+p.value.toFixed(4):null, keys=['latch','lead:L','lead:R','lead:M','bass','bass:L','bass:R',null];
+  const voices=[];
+  const vRow=(k,v)=>voices.push({ owner:k, tg:g(v.tg&&v.tg.gain), panL:g(v.pan&&v.pan.l.gain), panR:g(v.pan&&v.pan.r.gain), rL:v.rt?g(v.rt.rL.gain):'—', rT:v.rt?g(v.rt.rT.gain):'—' });
+  for(const k in LIVE.chordHold) if(REC.layerOfOwner(k)==null) for(const v of LIVE.chordHold[k]) vRow(k,v);
+  for(const k in LIVE.leadHold) if(REC.layerOfOwner(k)==null) vRow(k,LIVE.leadHold[k]);
+  for(const k in LIVE.bassHold) if(REC.layerOfOwner(k)==null) vRow(k,LIVE.bassHold[k]);
+  const owners=keys.map(k=>({ owner:k==null?'(live hit)':k, gain:LIVE.ownerGain(k), pan:LIVE.ownerPan(k), route:LIVE.routeOfOwner(k) }));
+  const tracks=[...new Set(REC.events.map(e=>e.layer))].sort((a,b)=>a-b).map(l=>({ track:'L'+(l+1), level:REC.laneLevelOf(l), pan:REC.lanePanOf(l), armed:REC.armedLayer()===l, frozen:REC.freezeState(l) }));
+  const chains=Object.fromEntries(['ld','ch','bs','dr'].map(r=>[r, LIVE.chainStateOf(chainKeyOf(r))]));
+  /* eslint-disable no-console */
+  console.log(`[liveCheck] master ${LIVE.masterLevel()} · isolation ${REC.setLiveIsolation()} · sounding live voices ${voices.length} (play a chord or note while running this to see them)`);
+  console.table(owners); if(voices.length) console.table(voices); console.table(tracks); console.log('[liveCheck] live chains', chains);
+  /* eslint-enable no-console */
+  return { master:LIVE.masterLevel(), owners, voices, tracks, chains };
+}   // AF1: очередь берёт дорожки и зовёт ЭТУ заморозку — тот же билет, тот же freezeSet, что у ❄
 /* ⛳ AF1: ЗАМЕР РАСКЛАДКИ — синхронный участок главного потока, без рендера (o.layoutOnly), через ту же очередь копии движка. Его читает
    P.freezeCost (мс на дорожку и длина буфера, который дал бы настоящий рендер — память). */
 const layoutCost=layer=>renderTrack(layer,{ quiet:true, layoutOnly:true, solo:LIVE.fxSnapshot(chainKeyOf('ld')) });
@@ -1439,7 +1469,7 @@ function live(layer){
   const keys=new Set(); for(const e of evs){ const r=REC.evRole(e.fn); if(r) keys.add(chainKeyOf(r)); }
   const laneAll=REC.fxLaneExpand(REC.fxLaneMerge(), SCHED_TICK_MS/1000/spb);   // гладкая автоматизация: плавные отрезки — шагом тика, как у ▶ и у рендера
   for(const p of laneAll){ if(!keys.has(p.key)||p.t>t0+1e-9) continue;
-    if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(p.key,p.ids); else if(!ST.fxIsScalar(p.fx)) LIVE.fxPlaySet(p.key,p.fx,p.p,p.v); }
+    if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(REC.playKeyOf(p.key),p.ids,true); else if(!ST.fxIsScalar(p.fx)) LIVE.fxPlaySet(REC.playKeyOf(p.key),p.fx,p.p,p.v); }   // AF5: the track chain (the voices of a track's owners go there), set before any note
   const lanePts=laneAll.filter(p=>keys.has(p.key) && p.t>t0+1e-9 && (p.fx===REC.FX_CHAIN||!ST.fxIsScalar(p.fx)));   // после старта: состав и величины (скаляры — пер-нотные, их несут ноты)
   const open={lead:new Set(), ch:new Set(), bs:new Set()};
   const me={ open, keys, timer:null, endT:T0+(evs[evs.length-1].t-t0)*spb };
@@ -1447,7 +1477,7 @@ function live(layer){
   const pump=()=>{
     const now=LIVE_AC.currentTime, hz=now+0.1;
     while(li<lanePts.length){ const p=lanePts[li]; if(T0+(p.t-t0)*spb>now) break; li++;   // как fxPlayDrive: наступила доля — ставим сейчас
-      if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(p.key,p.ids); else LIVE.fxPlaySet(p.key,p.fx,p.p,p.v); }
+      if(p.fx===REC.FX_CHAIN) LIVE.fxPlayPath(REC.playKeyOf(p.key),p.ids); else LIVE.fxPlaySet(REC.playKeyOf(p.key),p.fx,p.p,p.v); }
     while(i<evs.length){ const ev=evs[i], when=T0+(ev.t-t0)*spb; if(when>hz) break; i++;
       const fn=ENG[ev.fn]; if(!fn) continue;
       const a=patchInst(ev, ST); fn(a, ev, {when}); trackOpen(open, ev, a); }
@@ -1466,7 +1496,8 @@ function liveClose(me, at){
   if(me.open.drone) LIVE.droneOff(at);
   me.open.lead.clear(); me.open.ch.clear(); me.open.bs.clear(); me.open.drone=false;
 }
-function liveRestore(me){ for(const key of me.keys){ LIVE.fxPlayPath(key,null); LIVE.fxRestoreAim(key); } }
+function liveRestore(me){ for(const key of me.keys){ const pk=REC.playKeyOf(key); if(pk!==key) continue;   // AF5: R.live drove the track chain — the live one was never touched; the next ▶ refolds the track chain
+  LIVE.fxPlayPath(key,null); LIVE.fxRestoreAim(key); } }
 /* СТОП того, что играет из aud/live. Живые голоса live снимаем «сейчас», цепь возвращаем руке. */
 function stop(){
   const me=AUD; AUD=null; if(!me) return;
@@ -2155,6 +2186,8 @@ export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps
   revAgree,   // LR1: проба «живой и замороженный реверб согласны» (P.checkRevAgree)
   /* AF1: очередь автозаморозки (консоль) и замер раскладки без рендера (P.freezeCost) */
   autoFreeze, freezeQueue, layoutCost,
+  liveCheck,   // AF5: the live path read-out (rule #31), for an ear report
+  renderKsLazy,   // RENDER-LEAK: KS worklet only for KS tracks (false = the old always-load — probe control)
   /* AF2: проба «подмена событий буфером неслышима» (P.checkSwap) */
   swapCheck,
   /* AF6b: проба «16-битный замороженный буфер звучит как Float32» (P.checkChunks) */

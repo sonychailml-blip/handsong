@@ -173,3 +173,12 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/scaleprobe.js`: `checkAutoFreeze` (row «AF3 auto-freeze watcher»)
 - `tools/probe-browser.mjs`: `window.__heap()` (in `--eval`)
 - Removed (stale since AF4): `#rollFrz`, `#rollFrzState`, `rollFrzBtn`, `rollFrzStateEl`, `ui.onFreeze`, `frzBusy`, `frzNoticeShown`, `frz.*` i18n keys, the window hit `'frz'`, `FRZ_MARK_X`, `FRZ_STALE_DX`
+
+## Added at RENDER-LEAK / AF5
+- `src/render.js`: `renderKsLazy`, `KS_LAZY`, `usesKS`; report field `ksLoaded`
+- `src/audio.js`: `LEAD_KS_FROM` (exported), `leadOutT`, `chordBusT`, `bassBusT`, `drumBusT`, `trackRouteOf`, `setTrackRouteOf`, `voiceRoute`, `routeAt`, `routeOfOwner`, `chainStateOf`, `bldShim`, voice fields `rt`, `shim`; `fxPlayPath(key, ids, hard)`
+- `src/state.js`: `CHAIN_TRACK`, `trackChainKeyOf`
+- `src/recorder.js`: `liveIso`, `setLiveIsolation`, `playKeyOf`, `fxPlayHard`, `frzOwnedKey`, `fxPlayDriving`; `songPinChains()` result `soloMaps`, `soloSnap`
+- `src/scaleprobe.js`: `checkLiveIsolation` (row «AF5 track and live isolated»), `seedFrozenSamples`, `SEED_REC.soloSnap`
+- `tools/probe-browser.mjs`: `--leak`, `LEAK_PAGE`, `LEAK_N`, `LEAK_MARGIN_MB`, `procMem`, `window.__procMem()`
+- AF5-mixer: `recorder.setLiveLeakDbg`, `liveLeakLy` (probe control); `render.liveCheck` (`R.liveCheck()`); probe helpers `voiceRead`, `LIVE_KEYS` in `checkLiveIsolation`

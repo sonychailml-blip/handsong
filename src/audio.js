@@ -1,4 +1,4 @@
-import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
+import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
 import { baseF, tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld } from './config.js';   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
@@ -150,6 +150,27 @@ function ownerPan(key){ const p=+trackPanOf(key); return Number.isFinite(p) ? Ma
 function panGains(p){ if(!(p!==0)||!Number.isFinite(p)) return [1,1]; if(p<=-1) return [Math.SQRT2,0]; if(p>=1) return [0,Math.SQRT2];
   const th=(p+1)*Math.PI/4; return [Math.SQRT2*Math.cos(th), Math.SQRT2*Math.sin(th)]; }
 /* Ступень строится ОДИН раз с голосом (правило #3 — только гейны, осцилляторов нет); у удара — в самом ударе, только при p ≠ 0. */
+/* ═══ AF5 — TRACKS AND LIVE HANDS NEVER SHARE AN EFFECT NETWORK (user's hard rule) ═══
+   Live copy only: every role has a second, TRACK head (leadOutT/chordBusT/bassBusT/drumBusT, the same gain as the live head) with its own
+   chain under trackChainKeyOf(role key). A pooled voice ends in a router (rL → live head, rT → track head) set at each ATTACK by its owner
+   (trackRouteOf: true for a track's owner key — installed by recorder); a drum hit picks its bus the same way. Track playback drives only
+   the track chain (recorder.fxPlayDrive), the hands only the live one. Solo track voices skip the expression stage (identity at neutral —
+   rule #22 — and the render has no hand). The render copy has no track heads: its voices connect straight to their one head, as before. */
+let leadOutT=null, chordBusT=null, bassBusT=null, drumBusT=null;
+let trackRouteOf=()=>false;
+const setTrackRouteOf=fn=>{ trackRouteOf=fn||(()=>false); };
+function voiceRoute(src,live,track){
+  if(!track){ src.connect(live); return null; }
+  const rL=AC.createGain(), rT=AC.createGain(); rL.gain.value=1; rT.gain.value=0;
+  src.connect(rL); src.connect(rT); rL.connect(live); rT.connect(track);
+  return { rL, rT };
+}
+function routeAt(v,owner,t){ const r=v&&v.rt; if(!r) return; const tr=!!trackRouteOf(owner);
+  r.rL.gain.cancelScheduledValues(t); r.rL.gain.setValueAtTime(tr?0:1,t);
+  r.rT.gain.cancelScheduledValues(t); r.rT.gain.setValueAtTime(tr?1:0,t);
+  if(v.shim){ v.shim.gain.cancelScheduledValues(t); v.shim.gain.setValueAtTime(tr?0:1,t); } }
+/* Probe only: where a role's voices of this owner would go now ('live'|'track'), and the track head of a live chain key. */
+const routeOfOwner=owner=> leadOutT && trackRouteOf(owner) ? 'track' : 'live';
 function makePanStage(src,dest){
   const l=AC.createGain(), r=AC.createGain(), out=AC.createChannelMerger(2); l.gain.value=1; r.gain.value=1;
   src.connect(l); src.connect(r); l.connect(out,0,0); r.connect(out,0,1); if(dest) out.connect(dest);
@@ -190,7 +211,7 @@ function masterMeter(){
 /* banks — СКРАТЧ строителя банков (buildLeadBanks кладёт сюда собранный банк, buildLeadBank забирает).
    Раньше это был ПОСТОЯННЫЙ массив всех 23 банков соло-цепочки; теперь банк живёт в ГОЛОСЕ пула.
    bldHum — ConstantSource гуманизации ТОГО голоса, который сейчас строится (его цепляет mkOsc). */
-let banks=[], bldHum=null, bldVib=null, vibLFO, tremLFO,
+let banks=[], bldHum=null, bldVib=null, bldShim=null, vibLFO, tremLFO,
     exprVibPitch, exprVibAmp, exprWah, exprSatSoftG, exprSatHardG, exprDlyWet;   // соло-ШИНА (expr* — узлы руки-ВЫРАЗИТЕЛЬНОСТИ (живость-вибрато / вау / текстура мягк.+жёстк. / пространство-делей), нейтральны по умолчанию)
 /* ⚠️ vibGain / tremGain / tremDepth / dlyWet УДАЛЕНЫ (Пласт 3.7.1). Это были ОБЩИЕ узлы глубины на всю
    соло-шину, и ровно поэтому эффекты были НЕ ПЕР-СЛОЙНЫМИ: последний писавший (живая рука ИЛИ любая
@@ -367,13 +388,13 @@ function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
    ⛔ ЖИВАЯ КОПИЯ ЭТО НЕ ЗОВЁТ НИКОГДА: у неё функции уровня и панорамы ставит recorder при загрузке, и сброс вернул бы все дорожки в центр
    и на единицу. Сброс — только render.js, только своей копии. */
 function renderReset(){
-  trackGainOf=()=>1; trackPanOf=()=>0; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;
+  trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null;
   DBG.noHum=false; offline=false; rnd=Math.random;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
 const renderStateOf=()=>({ offline, noHum:DBG.noHum, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
-  hitOwner:hitOwnerKey, pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(',') });
+  hitOwner:hitOwnerKey, route:routeOfOwner('loop:0'), pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(',') });
 /* ═══ ⛳ ФАЗЫ СВЕЖЕГО ГОЛОСА — РАЗБРОСАНЫ СТАРТОМ, КАК У ДАВНО ИДУЩЕГО (B, подтверждено на слух) ═══
    ⚠️ ДЕФЕКТ: осцилляторы голоса стартовали ОДНОВРЕМЕННО, то есть В ОДНОЙ ФАЗЕ. У SuperSaw пять пил, расстроенных почти
    равным шагом (−12/−6/0/+6/+12 центов), и из общей фазы они раз за разом снова СХОДЯТСЯ — ровный периодический
@@ -433,7 +454,7 @@ function dbgExprBypass(){ if(!dbgExprIO) return false; const {leadSum:s, exprGai
 function mkOsc(type,freq,dest,gainVal){
   const o=AC.createOscillator(); o.type=type; o.frequency.value=freq;
   const g=AC.createGain(); g.gain.value=gainVal;
-  o.connect(g); g.connect(dest); if(bldVib)bldVib.connect(o.detune); if(bldHum)bldHum.connect(o.detune); exprVibPitch.connect(o.detune); voiceStart(o);   // B: старт со СВОЕЙ фазой (см. voiceStart); форма — встроенная   // вибрато ЭТОГО ГОЛОСА (bldVib — с 3.7.1 глубина пер-голосовая, LFO общий) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
+  o.connect(g); g.connect(dest); if(bldVib)bldVib.connect(o.detune); if(bldHum)bldHum.connect(o.detune); (bldShim||exprVibPitch).connect(o.detune); voiceStart(o);   // B: старт со СВОЕЙ фазой (см. voiceStart); форма — встроенная   // вибрато ЭТОГО ГОЛОСА (bldVib — с 3.7.1 глубина пер-голосовая, LFO общий) + гуманизация ЭТОГО ГОЛОСА (bldHum — иначе вторая атака перестроила бы первую, ещё звучащую ноту) + шиммер ВЫРАЗИТЕЛЬНОСТИ (общий) — всё в detune (центы), сумма; exprVibPitch=0 без руки → байт-в-байт
   return o;
 }
 const HUM_CENTS=4;   // глубина гуманизации высоты: ±центов на ноту — оживляет, но не читается как «расстроено»
@@ -1235,7 +1256,7 @@ function makeVolFx(){
 }
 /* Умолчание параметра ДЛЯ ВЛАДЕЛЬЦА ЦЕПИ: defBy — объявленная таблица «роль → величина»; ключ сравниваем на РАВЕНСТВО
    (ключ непрозрачен, O-0). Нет таблицы или роли в ней — общий def, то есть для всех прежних эффектов ничего не меняется. */
-function fxDefFor(sp,key){ if(sp.defBy&&key!=null) for(const r in sp.defBy) if(chainKeyOf(r)===key) return sp.defBy[r]; return sp.def; }
+function fxDefFor(sp,key){ if(sp.defBy&&key!=null) for(const r in sp.defBy) if(chainKeyOf(r)===key||trackChainKeyOf(chainKeyOf(r))===key) return sp.defBy[r]; return sp.def; }   // AF5: a track chain takes its role's default
 /* ЧИТАТЕЛЬ СКОЛЬЖЕНИЯ: величина из КАРТЫ ЭФФЕКТОВ ноты → секунды (постоянная времени), либо undefined — «не задано»,
    и тогда движок берёт умолчание роли. Шкала — ТОЛЬКО через fxDenormOf (второй копии диапазона нет). */
 const FX_GLIDE='glide', FX_GLIDE_KEY=FX_GLIDE+':time';
@@ -1373,7 +1394,7 @@ function fxGate(key,fxId,on){
 }
 /* ids — состав переигровки, null — вернуть живую цепь. Возвращает true, если путь ДЕЙСТВИТЕЛЬНО сменился
    (вызывающий по этому знает, была ли пересборка, то есть был ли провал). */
-function fxPlayPath(key,ids){
+function fxPlayPath(key,ids,hard){   // AF5: hard — rewire without the dip (a fresh fold at transport start: nothing flows yet, a dip would swallow the first attack)
   const was=FX_PLAY_PATH[key]||null;
   /* ⚠️ СРАВНИВАЕМ СПИСКИ, А НЕ СТРОКИ: «нет пути» (null) и «пустой путь» ([]) — РАЗНЫЕ состояния
      (живая цепь против пустой цепи записи), и склейка в строку их бы слила. */
@@ -1403,7 +1424,7 @@ function fxPlayPath(key,ids){
      Теперь закон — «после вызова открыт ровно состав `after`», и он не зависит от того, чем была живая цепь. Живьём ничего
      не меняется: построенное вне цепи и так уже закрыто (fxSetActive), повторное закрытие — то же значение. */
   for(const id in (FX_INST[key]||{})) if(!after.has(id)) fxGate(key,id,false);   // в новом составе его нет — закрыть, хвост дозвучит
-  fxRespliceSmooth(key);
+  if(hard) fxResplice(key); else fxRespliceSmooth(key);
   return true;
 }
 /* ═══ ⛳ ПУТЬ РЕНДЕРА — СОСТАВ ПО ЗАПИСАННЫМ ВРЕМЕНАМ (только офлайн-копия) ═══
@@ -1544,6 +1565,13 @@ const fxNoteFollows=(fxId,pKey)=>{ const f=FX_FACTORY[fxId], sp=f&&f.params.find
    ⛔ СКАЛЯР ОФЛАЙН СЮДА НЕ ПОПАДАЕТ И НЕ ДОЛЖЕН: ветка ниже пишет `fx[fxId]` — ОБЩИЙ store state.js,
    один на живую копию и на копию рендера. Рендер обязан отсеивать скаляры САМ (он это и делает) и
    доносить их до голоса пер-нотно через `a.fx` события, как делает ENG.leadOn. */
+/* AF5 probe: the sounding state of a chain key — composition (fxPathOf), every built instance's values and the output gain. Pure read. */
+function chainStateOf(key){
+  const inst=FX_INST[key]||{}, vals={};
+  for(const id in inst) vals[id]=inst[id].params.map(p=>+(+p.cur).toFixed(6));
+  const out=FX_CHAIN_OUT[key];
+  return { path:fxPathOf(key).map(i=>Object.keys(inst).find(k=>inst[k]===i)), vals, out: out ? +out.gain.value.toFixed(6) : null };
+}
 function fxPlaySet(key,fxId,pKey,v,when){
   if(!AC) return;
   if(fxIsScalar(fxId)){ if(pKey===FX_AMT) fx[fxId]=v; return; }
@@ -1915,9 +1943,10 @@ function newChordVoice(dest){
   g1.gain.value=.5; g2.gain.value=.5; g.gain.value=0;
   const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей голоса, до шины (фильтры f/fb не тронуты — правило #19)
   o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(tg);
-  const pan=makePanStage(tg,dest);   // MX2: панорама ДОРОЖКИ — сразу за уровнем, до шины аккордов и её цепи
+  const pan=makePanStage(tg, chordBusT&&dest===chordBus ? null : dest);   // MX2: панорама ДОРОЖКИ — сразу за уровнем, до шины аккордов и её цепи
+  const rt= chordBusT&&dest===chordBus ? voiceRoute(pan.out, chordBus, chordBusT) : null;   // AF5: live head or track head, set at attack
   voiceStartPair(o1,o2);   // пара — в фазе, голос — со своей задержкой (см. voiceStartPair: разброс фаз внутри пары гасил основной тон)
-  const v={o1,o2,g1,g2,f,fb,g,tg,pan,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={o1,o2,g1,g2,f,fb,g,tg,pan,rt,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   cv.push(v); return v;
 }
 function buildChordPool(dest, n=CHORD_POOL_N){
@@ -1970,6 +1999,7 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     v.g.gain.cancelScheduledValues(t); v.g.gain.setValueAtTime(0,t);
     v.g.gain.setTargetAtTime(v.lvl,t,ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
     v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки (голос мог прийти от другой дорожки)
+    routeAt(v,owner,t);   // AF5: live hands → live chain, tracks → track chain
     panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — тоже с мига атаки
     return v;
   });
@@ -2031,6 +2061,7 @@ async function initAudio(mkCtx){
   for(const k in FX_CHAIN_OUT)   delete FX_CHAIN_OUT[k];
   for(const k in FX_CHAIN_LINKS) delete FX_CHAIN_LINKS[k];
   for(const k in FX_PLAY_PATH)   delete FX_PLAY_PATH[k];
+  leadOutT=chordBusT=bassBusT=drumBusT=null;   // AF5: track heads exist only in the live copy (built below when !mkCtx)
   for(const k in FX_DIP_T){ if(FX_DIP_T[k]) clearTimeout(FX_DIP_T[k]); delete FX_DIP_T[k]; }   // ждущая пересборка старого контекста нам не нужна и сработать не должна
   FX_AIM.clear();
   bldHum=null; bldVib=null;
@@ -2175,6 +2206,7 @@ async function initAudio(mkCtx){
      ⚠️ КОНЦЫ РЕГИСТРИРУЕМ ПОСЛЕ ОБОИХ ЭКЗЕМПЛЯРОВ — чтобы путь собрался ОДИН раз и начисто. Порядок не
      обязателен (пересборка идёт по обоим путям), но так на старте не возникает лишнего провала. */
   fxChainIO(CHAIN_SOLO,leadOut);   // концы отрезка соло: голова — leadOut, хвост создаёт и цепляет к мастеру сама функция
+  if(!mkCtx){ leadOutT=AC.createGain(); leadOutT.gain.value=LEAD_OUT_G; fxChainIO(trackChainKeyOf(CHAIN_SOLO),leadOutT); }   // AF5: the solo TRACK head (after a neutral expression stage = the same gain)
  
   /* ⛳ O-1: ПЕР-НОТНЫХ ПОСЫЛОВ СОЛО БОЛЬШЕ НЕТ, и revBus/dlyBus удалены вместе с ними. У соло, аккордов,
      баса и ударных теперь ОДИН закон: голоса складываются, сумма идёт сквозь цепь. Довод целиком — в
@@ -2222,6 +2254,7 @@ async function initAudio(mkCtx){
      dry + сеть(dry·mix)·0.9 — то же выражение теми же узлами, что прежде давала параллельная пара.
      ⛔ Явную строку chordBus.connect(master) НЕ возвращать: сухое пошло бы в обход цепи. */
   fxChainIO(chainKeyOf('ch'),chordBus);
+  if(!mkCtx){ chordBusT=AC.createGain(); chordBusT.gain.value=chordBus.gain.value; fxChainIO(trackChainKeyOf(chainKeyOf('ch')),chordBusT); }   // AF5
   buildChordPool(chordBus);
  
   /* --- БАС: пул моно-голосов (слой + живой), общая шина в master --- */
@@ -2230,11 +2263,13 @@ async function initAudio(mkCtx){
      поэтому СЕЙЧАС не строится и не цепляется НИЧЕГО: бас идёт в мастер сухим, байт-в-байт как всегда.
      Первый добавленный в меню эффект построит свой экземпляр и встанет в путь сам (см. fxInstance/fxResplice). */
   fxChainIO(chainKeyOf('bs'),bassBus);
+  if(!mkCtx){ bassBusT=AC.createGain(); bassBusT.gain.value=bassBus.gain.value; fxChainIO(trackChainKeyOf(chainKeyOf('bs')),bassBusT); }   // AF5
   /* P1: пул баса ЛЕНИВЫЙ — голоса строит bvAlloc по мере надобности (newBassVoice), как соло. Прежде здесь строились
      BASS_POOL_N голосов сразу. bv при этом пуст (сброс таблиц выше), и офлайн-копия растит его так же, с нуля. */
 
   /* --- УДАРНЫЕ: своя шина в master (сухая; своя цепь эффектов — с Пласта 3.5.4, по тому же закону) --- */
   drumBus=AC.createGain(); drumBus.gain.value=0.20;   // O-1: в мастер ведёт хвост цепи (fxChainIO), а не прямая связь
+  if(!mkCtx){ drumBusT=AC.createGain(); drumBusT.gain.value=drumBus.gain.value; fxChainIO(trackChainKeyOf(chainKeyOf('dr')),drumBusT); }   // AF5
   fxChainIO(chainKeyOf('dr'),drumBus);   // как у баса: пустая цепь → путь вырождается в «голова → хвост → мастер», ударные сухие до первого добавленного эффекта
 
   /* --- ДРОН: расстроенная пара пил через медленный НЧ-фильтр, на тонике (шина в master) ---
@@ -2380,11 +2415,11 @@ const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого ин�
 const pendFx={vib:0,drv:0,trm:0,bri:null};   // bri — яркость ноты (0..1) или null «не задана» (см. applyFx/briStage)   // O-1: dly/rev сняты вместе с пер-нотными посылами — исполнять их в голосе больше нечем (см. applyFx)
 /* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks).
    vib — узел глубины вибрато ЭТОГО голоса: mkOsc цепляет его в detune (пара к hum). */
-function buildLeadBank(ins, pre, hum, vib){
-  banks.length=0; bldHum=hum; bldVib=vib;
+function buildLeadBank(ins, pre, hum, vib, shim){   // AF5: shim — this voice's gate of the expression shimmer (live copy; null = the shared node)
+  banks.length=0; bldHum=hum; bldVib=vib; bldShim=shim||null;
   voiceBuild();                                    // B: новый банк голоса — первый осциллятор стартует сразу, остальные со своими фазами (см. voiceStart)
   buildLeadBanks(pre, ksReady, ins);
-  bldHum=null; bldVib=null;
+  bldHum=null; bldVib=null; bldShim=null;
   return banks[0];
 }
 /* ⚠️ ПЕР-ГОЛОСОВЫЕ УЗЛА ПРИЦЕПКИ (Пласт 3.7.1) — vibDep · trem+tremDep.
@@ -2426,13 +2461,14 @@ function newLeadVoice(){
   pre.connect(satDry); pre.connect(shaper); shaper.connect(satWet);
   satDry.connect(satSum); satWet.connect(satSum);
   const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей (и драйва до неё), до громкости ноты; дальше всё линейно
-  satSum.connect(env); env.connect(tg); const pan=makePanStage(tg,vol); vol.connect(trem); trem.connect(leadSum);   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё. MX2: tg → панорама → громкость ноты (дальше голос стерео)
-  const bri=makeBriStage(trem,leadSum);   // ЯРКОСТЬ: две ветви рядом с прежней связью trem→leadSum (она не тронута), без величины — ровно ноль (см. makeBriStage)
+  satSum.connect(env); env.connect(tg); const pan=makePanStage(tg,vol); vol.connect(trem); const vo= leadOutT ? AC.createGain() : leadSum; trem.connect(vo);   // AF5: vo — the voice's output before its router   // O-1: единственный выход голоса — в СУММУ. Эффекты живут ПОСЛЕ неё. MX2: tg → панорама → громкость ноты (дальше голос стерео)
+  const bri=makeBriStage(trem,vo); const rt= vo!==leadSum ? voiceRoute(vo, leadSum, leadOutT) : null;   // ЯРКОСТЬ: две ветви рядом с прежней связью trem→leadSum (она не тронута), без величины — ровно ноль (см. makeBriStage)
   /* deg/oct — КАКУЮ НОТУ этот голос сейчас держит. Звуку они не нужны (частота уже в осцилляторах), их
      держит ПОДСВЕТКА: leadHold — единственный источник правды о том, что звучит, и записываются они
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
-  const v={hum,vibDep,pre,satDry,satWet,env,tg,pan,vol,trem,tremDep,bri,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const shim= rt ? AC.createGain() : null; if(shim){ shim.gain.value=1; exprVibPitch.connect(shim); }   // AF5: the expression shimmer reaches this voice only while a live hand owns it
+  const v={hum,vibDep,pre,satDry,satWet,env,tg,pan,vol,trem,tremDep,bri,rt,shim,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
@@ -2476,7 +2512,7 @@ function applyVoiceFx(v,p,t,fresh){
    РЕАЛЬНО сыгранных инструментов × число РЕАЛЬНО занятых голосов (обычно 1–2 × 1–2), против 23 сегодня. */
 function leadVoiceBank(v,ins,when){
   let b=v.banks[ins];
-  if(!b){ b=v.banks[ins]=buildLeadBank(ins,v.pre,v.hum,v.vibDep); b.gain.gain.value=0; }   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
+  if(!b){ b=v.banks[ins]=buildLeadBank(ins,v.pre,v.hum,v.vibDep,v.shim); b.gain.gain.value=0; }   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
   if(v.ins!==ins){
     /* ПЕРВЫЙ банк голоса открываем МГНОВЕННО — ровно как это делал initAudio (banks[leadIdx].gain.value=1)
        ещё до первой ноты. Через 20мс-рампу гейта первая атака вышла бы смазанной, и «одна нота звучит
@@ -2589,6 +2625,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
   v.on=true; v.tOn=t;
   v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки
   panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — с мига атаки
+  routeAt(v,owner,t);   // AF5
   /* Гуманизация — СВЕЖАЯ случайность на каждую атаку (в т.ч. при переигровке лупа: генерится здесь, в
      событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
      0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
@@ -2671,12 +2708,12 @@ function buildBassPool(dest, n){   // n голосов разом; зовёт Т
     g1.gain.value=.5; g2.gain.value=.5;
     env.gain.value=0; vol.gain.value=0.5;
     const tg=AC.createGain();   // MX1: уровень ДОРОЖКИ — после огибающей, до громкости голоса (связь vol→шина и ступень яркости не тронуты)
-    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(tg); const pan=makePanStage(tg,vol); vol.connect(dest);   // MX2: tg → панорама → громкость голоса
+    o1.connect(g1); o2.connect(g2); g1.connect(lp); g2.connect(lp); lp.connect(env); env.connect(tg); const pan=makePanStage(tg,vol); const vo= bassBusT&&dest===bassBus ? AC.createGain() : dest; vol.connect(vo);   // MX2: tg → панорама → громкость голоса; AF5: vo — the voice's output before its router
     voiceStartPair(o1,o2);   // пара — в фазе (Саб-синус: синус+синус на одной частоте — разброс фаз гасил основной тон до тишины), голос — со своей задержкой
-    const bri=makeBriStage(vol,dest);   // ЯРКОСТЬ: рядом с прежней связью vol→шина (не тронута), без величины — ровно ноль (см. makeBriStage). lp голоса — ТЕМБР (огибающая атаки), его не трогаем
+    const bri=makeBriStage(vol,vo); const rt= vo!==dest ? voiceRoute(vo, bassBus, bassBusT) : null;   // ЯРКОСТЬ: рядом с прежней связью vol→шина (не тронута), без величины — ровно ноль (см. makeBriStage). lp голоса — ТЕМБР (огибающая атаки), его не трогаем
     /* deg/oct — КАКУЮ НОТУ голос держит (P1, зеркало соло-голоса): звуку не нужны, их читает ПОДСВЕТКА (с V2, правило
        #26) — из реестра движка, а не из состояния руки. Пишет их ТОТ ЖЕ вызов, что звучит (bassOn/bassSet), гасит bassOff. */
-    bv.push({o1,o2,g1,g2,lp,env,tg,pan,vol,bri,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
+    bv.push({o1,o2,g1,g2,lp,env,tg,pan,vol,bri,rt,owner:null,ins:null,tOn:0,on:false,freeAt:0,deg:-1,oct:0});   // freeAt — только для offline (F2); живьём не читается
   }
 }
 /* ОДИН новый басовый голос. ⛳ P1: единственная дверь роста пула — И ЖИВОГО (до потолка BASS_POOL_N), И офлайн-
@@ -2748,6 +2785,7 @@ function bassOn(owner,freq,vol,ins,deg,oct,glide,bri,when){
     v.lp.frequency.setTargetAtTime(v.ins.lp*(1+fv*volVel('bs',volAmp(vol))),t,ft);   // VOL-2b: скорость удара — прежнее число через амплитуду (volVel): тише прежнего пола 30% — база фильтра
     v.on=true; v.env.gain.cancelScheduledValues(t); v.env.gain.setTargetAtTime(1,t,v.ins.att*(0.9+rnd()*0.2));   // ±10% времени атаки
     v.tg.gain.cancelScheduledValues(t); v.tg.gain.setValueAtTime(ownerGain(owner),t);   // MX1: уровень дорожки владельца — с мига атаки
+    routeAt(v,owner,t);   // AF5
     panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — с мига атаки
   }
   v.tOn=t;
@@ -2897,10 +2935,10 @@ function drumHit(i,vol=1,kit=0,bri,when){
      стоит на нуле и прыгает к 0.001 в конце: тихий щелчок вместо тишины. ⚠️ Названный край: у очень тихого удара под-голос
      с пиком ниже 0.001 (самый тихий множитель — 0.12·v², то есть громкость ниже ~9) идёт ВВЕРХ к 0.001 — это −60 дБ,
      неслышно. Прежняя карта такого не знала: её пол давал пики не ниже ~0.036. */
-  const tgv=ownerGain(hitOwnerKey), pv=ownerPan(hitOwnerKey); hitOwnerKey=null;   // MX1: уровень дорожки удара (ключ поставил ENG.drum; живой удар — 1). MX2: и её панорама (живой — 0)
+  const tgv=ownerGain(hitOwnerKey), pv=ownerPan(hitOwnerKey), DB= drumBusT&&trackRouteOf(hitOwnerKey) ? drumBusT : drumBus; hitOwnerKey=null;   // AF5: a track's hit → the track bus   // MX1: уровень дорожки удара (ключ поставил ENG.drum; живой удар — 1). MX2: и её панорама (живой — 0)
   if(!(volAmp(vol)>0) || !(tgv>0)) return;
-  hitBus=drumBus;
-  if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(drumBus); hitBus=f; }
+  hitBus=DB;
+  if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(DB); hitBus=f; }
   if(pv!==0){ const pin=AC.createGain(), st=makePanStage(pin,hitBus), [a,b]=panGains(pv); st.l.gain.value=a; st.r.gain.value=b; hitBus=pin; }   // MX2: ступень панорамы удара — только при p ≠ 0 (в центре удар байт-в-байт прежний); стоит ДО шины ударных и её цепи
   if(tgv!==1){ const g=AC.createGain(); g.gain.value=tgv; g.connect(hitBus); hitBus=g; }   // MX1: множитель только при уровне ≠ 1 — на 1 удар байт-в-байт прежний
   try{ drumVoice(i,vol,kit,t); } finally{ hitBus=drumBus; }
@@ -3000,5 +3038,9 @@ export {
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки
   setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно
   setRnd,    // F1: ПОДМЕНИТЬ ИСТОЧНИК СЛУЧАЙНОСТИ В ЭТОЙ КОПИИ МОДУЛЯ. ⛔ У ЖИВОЙ копии вызывающих нет и не должно быть — зовёт его только render.js и только у своей ('./audio.js?render…'). Экспортирован потому, что иначе до офлайн-копии не дотянуться; глобальный патч Math.random убил бы гуманизацию ЖИВОЙ игры (довод целиком — у самого rnd)
+  /* AF5: track heads and routing (recorder installs the owner test), probe reads */
+  setTrackRouteOf, routeOfOwner, chainStateOf,
+  /* RENDER-LEAK: first solo KS timbre index — a track render loads the KS worklet only when the track uses one */
+  LEAD_KS_FROM,
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
 };

@@ -4,7 +4,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
-import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
+import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, tuningOf, periodOf, chordTypeFits } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
@@ -665,7 +665,7 @@ function takeCapSample(p){
    ⚠️ ОТБОР ПО ВЛАДЕЛЬЦУ: взятое правит цепью ТОЛЬКО тех ролей, которые в нём реально играли (evRole по
    его событиям). Иначе барабанное взятое, чей снимок тоже содержит цепь баса, перебивало бы басовую
    автоматизацию соседней дорожки — чужим значением, снятым мимоходом. */
-let fxPlayList=null, fxPlayI=0, fxPlayAt=-1, fxPlaySig='';
+let fxPlayList=null, fxPlayI=0, fxPlayAt=-1, fxPlaySig='', fxPlayHard=true;   // fxPlayHard (AF5): the next fold follows a transport start — rewire the track chain without a dip
 const fxPlayVals=new Map(), fxPlayOrd=new Map();     // свёрнутое состояние: адрес → последняя победившая точка; ключ владельца → состав
 /* ПОДПИСЬ ЛЕНТЫ: по ней решаем, не устарела ли она. Входит всё, что меняет ЛЕНТУ или ПОБЕДИТЕЛЯ в ней:
    состав событий (от них доли старта и роли взятых), состав захвата, длина дорожек и ЗАГЛУШЕНИЕ
@@ -673,7 +673,9 @@ const fxPlayVals=new Map(), fxPlayOrd=new Map();     // свёрнутое со�
    ⚠️ Множества mute/solo крошечные — склейка на тике дешевле отдельной точки инвалидации, а главное
    не требует помнить о ней в четырёх местах, где эти множества правятся. */
 const fxPlaySignature=()=>{ let n=0; for(const r of takeFx.values()) n+=r.lane.length;
-  return events.length+'|'+takeFx.size+'|'+n+'|'+takeFxVer+'|'+[...laneMute].join(',')+'/'+[...laneSolo].join(','); };   // takeFxVer — правки редактора: длины при них не меняются (см. его шапку)
+  return events.length+'|'+takeFx.size+'|'+n+'|'+takeFxVer+'|'+[...laneMute].join(',')+'/'+[...laneSolo].join(',')+'|f'+frzOwnedKey(); };   // AF5: which tracks a buffer owns now
+/* AF5: tracks whose sound is their BUFFER now (fresh, no swap ahead — frzBufNow) — their automation drives nothing. */
+const frzOwnedKey=()=>{ if(!frozen.size) return ''; let k=''; for(const f of frozen.values()) if(!f.drop && frzBufNow(f.layer)) k+=f.id+','; return k; };   // takeFxVer — правки редактора: длины при них не меняются (см. его шапку)
 /* ⛳ СЛИЯНИЕ ЛЕНТЫ — ЧИСТАЯ ФУНКЦИЯ (выделена в F3). Ничего не мутирует и ни на что не подписана:
    строит и ОТДАЁТ отсортированный список точек. ⛔ ВТОРОГО СЛИЯНИЯ БЫТЬ НЕ ДОЛЖНО — здесь и только
    здесь живёт закон «побеждает последняя по времени точка, при равенстве старшее взятое, и взятое
@@ -803,8 +805,10 @@ function fxLaneExpand(list,stepBeats){
   out.sort((a,b)=> a.t-b.t || a.tk-b.tk);   // устойчивая сортировка: при равной доле и взятом точка ленты остаётся перед сэмплом, как и была
   return out;
 }
+/* ⛳ AF5: a FROZEN track (its buffer owns it now) drives no chain — its effects are inside its buffer; filtered HERE, not in fxLaneMerge
+   (the render needs the whole lane). Before AF5 its automation kept driving the role's live chain. */
 function fxPlayBuild(){
-  fxPlayList=fxLaneMerge(); fxPlayReset();
+  fxPlayList=fxLaneMerge().filter(e=>!frzBufNow(e.layer)); fxPlayReset();
   fxPlaySig=fxPlaySignature();
 }
 function fxPlayReset(){ fxPlayI=0; fxPlayAt=-1; fxPlayVals.clear(); fxPlayOrd.clear(); }
@@ -823,13 +827,14 @@ function fxPlayDrive(x){
     if(e.fx===FX_CHAIN) fxPlayOrd.set(e.key, e.ids);             // ПОСЛЕДНЯЯ точка по адресу и побеждает — просто перезаписываем
     else fxPlayVals.set(e.key+'|'+e.fx+'|'+e.p, e);
   }
-  for(const [key,ids] of fxPlayOrd) fxPlayPath(key, ids);        // СОСТАВ — ПЕРВЫМ: величины поедут уже в верную цепь. fxPlayPath молча выходит, если состав тот же
+  const hard=fxPlayHard; fxPlayHard=false;
+  for(const [key,ids] of fxPlayOrd) fxPlayPath(playKeyOf(key), ids, hard);   // composition first, into the TRACK chain (AF5); no dip right after a start
   /* ГЛАДКАЯ АВТОМАТИЗАЦИЯ: у плавного отрезка величина на ЭТОМ тике — точка прямой (fxLaneAt). Сеттер ставит её своей τ, и
      25-мс ступеньки тика сливаются в рампу; ступенчатый отрезок отдаёт e.v, как было. Сосед справа из заглушённой дорожки не
      правит (как и в свёртке выше) — к нему не едем, держим. */
   for(const e of fxPlayVals.values()){
     const v = fxLaneSmooth(e) && !(gated && !laneAudible(e.nx.layer)) ? fxLaneAt(e,x) : e.v;
-    fxPlaySet(e.key, e.fx, e.p, v);   // fxPlaySet молча выходит, если величина уже там
+    fxPlaySet(playKeyOf(e.key), e.fx, e.p, v);   // AF5: the track chain, never the live one
   }
 }
 /* ⛳ ПРАВИТ ЛИ ЭТИМ АДРЕСОМ СЕЙЧАС ЗАПИСЬ — для показа (столбики). Ответ ПО ПАРАМЕТРУ, а не по эффекту и
@@ -837,7 +842,9 @@ function fxPlayDrive(x){
    ⚠️ Правда одна и та же для звука и для показа: ключи fxPlayVals — это РОВНО те адреса, которые тик
    сейчас ведёт (их же он и применяет строкой ниже в fxPlayDrive). Второго списка «что помечено» нет.
    Транспорт стоит → свёрнутое состояние очищено (fxPlayReset) → не правит никто, и пометок нет. */
-const fxIsDriven=(key,fxId,pKey)=> loop.on && !recording && fxPlayVals.has(key+'|'+fxId+'|'+pKey);
+/* AF5 probe: which recorded addresses drive a chain right now, and from which track layer. Pure read. */
+const fxPlayDriving=()=>[...fxPlayVals.values()].map(e=>({ key:playKeyOf(e.key), layer:e.layer, fx:e.fx, p:e.p }));
+const fxIsDriven=(key,fxId,pKey)=> !liveIso && loop.on && !recording && fxPlayVals.has(key+'|'+fxId+'|'+pKey);   // AF5: recordings never drive a live chain
 /* ⚠️ `!recording` ОБЯЗАТЕЛЕН, и это не перестраховка. Свёрнутое состояние живёт между тиками, а во время
    записи fxPlayDrive не зовётся вовсе (правило O-3: пока пишем — хозяин рука). Нажми человек ● посреди
    воспроизведения — состояние осталось бы от последнего кадра, и столбики продолжали бы помечать чужим
@@ -849,9 +856,11 @@ const fxIsDriven=(key,fxId,pKey)=> loop.on && !recording && fxPlayVals.has(key+'
    остановке, а главное — ничего бы не защитил: записанное всё равно неприкосновенно.
    ⚠️ СОСТАВ — НАОБОРОТ, ВОЗВРАЩАЕМ ВСЕГДА: это не величина, а ЧУЖАЯ раскладка, и оставить человека с
    составом чужой записи значило бы отобрать у него его собственную цепь. */
+/* AF5: with isolation the live chain was never touched — nothing to return; the track chain keeps its composition so the tails of the
+   tracks ring out (the next start refolds it, without a dip). */
 function fxPlayStop(){
-  fxPlayReset();
-  for(const {key} of chainOwners()){ fxPlayPath(key,null); fxRestoreAim(key); }   // состав — человеку обратно; звук — к ПРИЦЕЛУ руки, чтобы столбик и звук сошлись в тот же миг (см. fxRestoreAim)
+  fxPlayReset(); fxPlayHard=true;
+  if(!liveIso) for(const {key} of chainOwners()){ fxPlayPath(key,null); fxRestoreAim(key); }   // состав — человеку обратно; звук — к ПРИЦЕЛУ руки, чтобы столбик и звук сошлись в тот же миг (см. fxRestoreAim)
 }
 /* УБОРКА — тем же законом, что у дорожек: запись взятого, чьих событий больше НЕТ, снимается.
    ⚠️ ЭТО ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ (как и у lanePrune): осиротевшая запись никому не мешает, но копилась
@@ -1046,9 +1055,19 @@ function setLanePan(layer,p){
   droneSync();
   return true;
 }
-AUD.setTrackPanOf(k=>{ const ly=layerOfOwner(k); return ly==null ? 0 : lanePanOf(ly); });   // ⛳ живые ключи (руки) — центр
+/* ⛔ probe CONTROL only (P.checkLiveIsolation): a live owner takes this track's level and pan — the leak the probe must be able to see */
+let liveLeakLy=null;
+const setLiveLeakDbg=ly=>{ liveLeakLy= ly==null ? null : ly; return liveLeakLy; };
+AUD.setTrackPanOf(k=>{ const ly=layerOfOwner(k)??liveLeakLy; return ly==null ? 0 : lanePanOf(ly); });   // rule #31: a live owner → centre   // ⛳ живые ключи (руки) — центр
 /* Функцию «ключ владельца → множитель» получает ТОЛЬКО ЖИВОЙ движок (рендер — своя копия audio.js, у неё умолчание 1: уровень не вплавляется). */
-AUD.setTrackGainOf(k=>{ const ly=layerOfOwner(k); return ly==null ? 1 : laneGainOf(ly); });
+AUD.setTrackGainOf(k=>{ const ly=layerOfOwner(k)??liveLeakLy; return ly==null ? 1 : laneGainOf(ly); });   // rule #31: a live owner (no layer) → 1
+/* ⛳ AF5 — USER'S HARD RULE: a track and the live hands never share an effect network. A track's owner key (layerOfOwner ≠ null) routes
+   its voices to the role's TRACK chain (audio: track heads, set at each attack); recorded automation drives only that chain (fxPlayDrive);
+   the live chain belongs to the hands alone. liveIso=false is the probe CONTROL only (the old shared network, P.checkLiveIsolation). */
+let liveIso=true;
+const setLiveIsolation=on=>{ if(on!=null){ liveIso=!!on; fxPlayReset(); fxPlayHard=true; } return liveIso; };   // ⛔ probe only
+const playKeyOf=key=> liveIso ? trackChainKeyOf(key) : key;   // where recorded automation of a live chain key plays
+AUD.setTrackRouteOf(k=> liveIso && layerOfOwner(k)!=null);
 /* ⛳ AR2: ИМЯ ДОРОЖКИ. laneNameOf — имя, данное человеком, или null (тогда показ берёт «роль · тембр»). setLaneName — пробелы сжаты, края
    обрезаны, не длиннее LANE_NAME_MAX; пустая строка — назад к имени по умолчанию. Не правка песни: истории нет (одна история — ED7). */
 const laneNameOf=layer=>{ const id=laneOf(layer); return (id!=null && laneName.has(id)) ? laneName.get(id) : null; };
@@ -1332,6 +1351,14 @@ const frzBytesOf=layer=>{ const id=laneOf(layer); if(id==null) return 0; const f
    never has to. Returns the layers pinned. */
 function songPinChains(){
   const out=[]; for(const ly of [...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b)) if(freezePinCaptures(ly)) out.push(ly);
+  /* AF5: a solo note without an effect map replays with the hand's live solo values (R2) — the live hands would reach a recorded track.
+     At song load such notes get the live solo snapshot ONCE, as a fresh payload (they keep sounding as now; live knobs no longer reach
+     them). Recorded notes always carry a map; an editor insert copies its neighbour's map (or, in an empty track, the snapshot). */
+  let snap=null, nMap=0;
+  for(let i=0;i<events.length;i++){ const e=events[i];
+    if((e.fn==='leadOn'||e.fn==='leadSet') && e.a && e.a.fx==null){ if(!snap) snap=AUD.fxSnapshot(chainKeyOf('ld')); e.a={...e.a, fx:{...snap}}; nMap++; } }
+  if(nMap) schedInvalidate();
+  out.soloMaps=nMap; out.soloSnap=snap;
   if(hooks.af) hooks.af('song');
   return out;
 }
@@ -5089,6 +5116,8 @@ export {
   frzGlobalKey,   // A1: the cheap global "some signature may have changed" key; read through frzWatchKey
   /* AF3: the auto-freeze watcher (frzqueue.js) — its key, tonic-only staleness, chain presence, memory, song-load pinning */
   frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf, songPinChains,
+  /* AF5: where recorded automation plays (render.live), and the probe control of the old shared network */
+  playKeyOf, setLiveIsolation, fxPlayDriving, setLiveLeakDbg,
   recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен
   freezeSet, unfreezeLayer, frozenLayers, frozenInfo, freezeState, frzHas, freezePinCaptures,   // F4/F5: ЗАМОРОЗКА как РЕЖИМ ВОСПРОИЗВЕДЕНИЯ; freezeState — 'none'|'fresh'|'stale' для показа (звук гатится тем же предикатом внутри)

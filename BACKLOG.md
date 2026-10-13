@@ -5,7 +5,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 - **0. Now in progress** — the module split refactor (✅ long done; table kept as history).
 - **1. Foundation** — localStorage for settings (⬜); stable mode/tuning ids, prerequisite for saving and the scale builder (🔵);
   auto-freeze AF1–AF4 ✅ (watcher ON by default, no ❄); AF6 remainder after 16-bit (⬜: disk/browser cache, chunk paging, Opus fallback;
-  ⚠️ offline render contexts pinned by Chrome — graph leak per render, Float32 data already released); AF2 remainder: drum and live-reverb tails at a
+  KS-track renders still pin ≈ 6 MB each — other tracks fixed in RENDER-LEAK; per-track chains after AF5); AF2 remainder: drum and live-reverb tails at a
   crossfaded swap (⬜); SAVING — the user's decision (⛳: draft vs project, folder/file/account, autosave and versions); AUDIO TAKE —
   after auto-freeze (⬜); SCALA readiness (.scl/.kbm) before the mode builder (⬜); Service Worker model cache (⬜).
 - **2. Microtonality: chords and grid** — 2.1 chords in `tag:'edo'` (✅); 2.2 diatonic subsets are a GRID topic (⬜); 2.3 hysteresis below
@@ -28,7 +28,8 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   sharing/selling/other programs: own format + exports · 7.4 ⛳ the TIMBRE FORMAT is designed with all of this from the start · 7.5 polyphonic
   bass + independent bass notes ✅ · 7.6 user modes: create/save/share · 7.7 app as a MIDI controller with the mode · 7.8 ⛳ hand tracking off
   the main thread (main tech debt) · 7.9 team ideas (not decisions) · 7.10 strategist proposals (not decisions) · 7.11 ⛳ hearing the room ·
-  7.12 release and money strategy 🟡 (awaits the user) · 7.13 ⛳ the timbre builder (user's vision, stage 7).
+  7.12 release and money strategy 🟡 (awaits the user) · 7.13 ⛳ the timbre builder (user's vision, stage 7) · 7.14 ⛳ effect chains,
+  target design (per-track chains; live chain by timbre or by finger) · 7.15 modes/presets as bundles (packs).
 
 Общий список задач. Обновляется по ходу работы.
 
@@ -38,8 +39,9 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > (serial chain, capture per take, playback, aim vs sound, the automation lane); FREEZE F0–F5, A0–A2c; ONE ROLE AND ONE TIMBRE per track
 > (T0–T5); independent bass notes; the melodic instrument (voice modes V1–V5, Glide); brightness on every role; AR1/MX1/MX2/AR2.
 > **AUTO-FREEZE:** ✅ AF1 queue · ✅ AF2 swap · ✅ AF6b 16-bit · ✅ **AF3 watcher and triggers** (ON by default; tonic/A4/tempo do not
-> re-freeze until the tonic freeze) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only). Next: AF5 (the chain back to
-> the hand), AF6 rest (below, §1).
+> re-freeze until the tonic freeze) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only) · ✅ **AF5 + hard rule #31**
+> (a track and the live hands never share sound state: each role has a separate TRACK chain) · ✅ RENDER-LEAK (non-KS renders collected).
+> Next: AF6 rest (below, §1).
 > **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (ED1 selection next … ED7 one undo) → editor-own
 > (mode by degrees, cent offsets, theremin bend curve) → tonic freeze → VOL-5…VOL-7 → FOUNDATION (stable mode and timbre ids, song and
 > timbre format; §1, §7.4) → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
@@ -186,12 +188,14 @@ id нужен на границе сериализации. Отдельно р�
 5. **Memory budget** — ✅ a guard exists since AF3 (`AF_BUDGET_MB`: 300 MB touch / 1 GB desktop; over it a track stays live, skipped, no
    eviction). AF6 may replace "skip" with "the farthest inaudible tracks stay events".
 6. Without the frozen-track worklet — Float32 as before (named in `CLAUDE.md`); pack that path too if it turns out common.
-7. ⚠️ **Found at AF3 (part 0b): Chrome never collects an `OfflineAudioContext` that called `audioWorklet.addModule`** (measured: a
-   20-s context with only `addModule` stays alive with its rendered buffer, +7.32 MB; a plain one is collected). Every render keeps its
-   context and engine-copy graph. Fixed at AF3: the rendered Float32 data are DETACHED after packing (`render.releaseBuf`) — the big part
-   (≈ 9.4 MB for a 50-s track). NOT fixed: the graph itself (nodes, delay lines, the KS worklet scope) of every past render stays pinned —
-   size not measured (internal memory). With auto-freeze ON every settled edit is a render. Options: load the KS worklet into the render
-   context only when the track uses a KS timbre (non-KS renders become collectable); measure process memory over 100 renders first.
+7. **Offline contexts pinned by Chrome** (found AF3 part 0b; RENDER-LEAK): a context that called `audioWorklet.addModule` is never
+   collected — ≈ 6 MB per render of a small track. ✅ Fixed for every track WITHOUT a KS timbre (the worklet is no longer loaded there;
+   30 renders +1.2 MB, control +137.8 MB; renders got faster). ⬜ KS (plucked solo) tracks still pin ≈ 6 MB per render: tried and failed — a
+   hosting iframe (removed, navigated), building everything inside it, dismantling the graph. Options: a JS (non-worklet) KS for renders
+   only if it can be made sample-identical; or a render worker process if the platform ever offers one. Measure on a phone.
+8. ⬜ **Per-track effect chains** (AF5 follow-up): today unfrozen tracks of one role share the role's TRACK chain (last writer wins among
+   them; the live chain is separate since AF5). Per-track chains would isolate tracks from each other; cost ≈ one chain (a reverb ≈ 49 nodes)
+   per unfrozen track that uses one.
 
 ### ⬜ Подмена буфером (AF2) — остаток: хвосты ударов и живой сети роли на перекрёсте (записано при AF2; не срочно)
 При подмене без паузы (перекрёст 20 мс на такте) голоса аккордов, баса и соло дорожки срезаются точно, но (1) удары, уже поставленные до
@@ -2406,3 +2410,20 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
    Версионированные файлы тембра с ЭТАЛОННЫМИ РЕНДЕРАМИ (золотые файлы — проверка, что версия звучит как прежде).
 6. **Экспорт:** мультисэмплы на каждую ноту или на каждую СТУПЕНЬ СТРОЯ, 3–5 слоёв выразительности, WAV 24 бит / 48 кГц с корнем и
    метаданными петли — папкой WAV, SFZ, Decent Sampler и SF2, плюс .scl/.kbm для микротональных наборов (сходится с §7.3).
+
+### ⬜ 7.14. ⛳ EFFECT CHAINS — TARGET DESIGN (user's idea, recorded after AF5; for the effects / finger-roles constructor stage, not now)
+- **Every recorded track has its own chain** (today: one TRACK chain per role, shared by the role's unfrozen tracks — last writer wins).
+- **Live playing gets its chain by the user's choice**, both available and configurable: bound to the **TIMBRE** (the timbre carries its
+  chain; switching timbre switches effects) or bound to the **HAND / FINGERS** (the chain stays on the finger whatever timbre plays).
+- Today's split (AF5: a live chain + a track chain per role, rule #31) is a step toward it. What would change: the track chain becomes
+  per-track (key per lane id, built lazily; cost ≈ one chain per unfrozen track that uses effects — frozen tracks need none); the live
+  chain key moves from the role to the timbre or to the finger (`state.chainKeyOf` is already opaque — only its resolver changes);
+  capture records the chain of the timbre/finger that played; the editor shows the track's own chain (as now). Depends on stable timbre ids
+  and the timbre format (§1, §7.4).
+
+### ⬜ 7.15. MODES / PRESETS — READY-MADE BUNDLES (user's idea, recorded after AF5)
+- A bundle = tuning and mode, timbres, effects, finger roles, tempo, visuals — stored as DATA FILES like tunings (`data/…`, validated by a
+  loader, user files beside built-ins).
+- Examples: **Meditation**; **Jam** (the mode follows the room — depends on "hearing the room", §7.11); **Learning**.
+- Possible monetization (proposal, see §7.12): packs sold separately (~$5 each) and an "everything, current and future" bundle (~$25);
+  keep the number of packs small; payment fees weigh more on small prices.

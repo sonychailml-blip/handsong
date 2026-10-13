@@ -72,7 +72,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `tools/.probe-logs/` (git-ignored). Headless is the default because measured: every row runs, P.quick takes the user's manual
   time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash). The runner PAUSES auto-freeze for its whole session
   (`frzqueue.afPause('runner')`; AF3 is checked by its own deterministic row). In `--eval` the page has `window.__heap()` (full GC, then
-  V8 heap usage incl. ArrayBuffer backing stores — memory checks).
+  V8 heap usage incl. ArrayBuffer backing stores) and `window.__procMem()` (full GC, then the renderer processes' private MB and threads
+  from the OS — native memory). `--leak` (RENDER-LEAK): 30 short renders of the smallest non-KS track must stay within 20 MB of the start;
+  control: 30 more with `R.renderKsLazy(false)` must exceed it. Run it when a slice touches rendering or offline contexts.
 - **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; static import names vs exports with
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
@@ -221,13 +223,22 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 29. **Every value that shapes the sound has ONE owner at a time and is recorded BY DECLARATION.** (a) Capture walks the parameter
     declarations (`fxCaptureWalk`/`fxCaptureChain` over `inst.params` from `FX_FACTORY`); no bespoke capture path; values without a
     descriptor declared explicitly (old scalars `FX_AMT`, expression `EXPR_CH`); per-note parameters are captured but played from the
-    notes. (b) The HAND owns the sounding value while stopped, the RECORDING while playing (`fxPlayDrive` only when `!recording`); never
-    both. (c) The AIM has one writer — the hand (`gestures.fxParamsOf` → `FX_AIM`); bars draw the aim, driven parameters are marked
-    (`fxIsDriven`), playback never writes the aim.
+    notes. (b) Since AF5 owners are separate NETWORKS: the HAND always owns the live chain; recordings own the role's TRACK chain
+    (`fxPlayDrive` → `playKeyOf(key)`, only when `!recording`) — see rule #31. (c) The AIM has one writer — the hand
+    (`gestures.fxParamsOf` → `FX_AIM`); bars draw the aim; `fxIsDriven` is false while isolation is on (no recording drives a live chain).
 30. **A note's volume is never unset:** every pitched or drum event carries `a.vol`. `note:{key:'vol', required:true}`; guards in
     `recorder.js`: `pnPlan` (left of the first point takes that point's value; refuses an empty point list), `pnWith` never deletes it,
     deleting the FIRST point hands over to the next, the only point can't be deleted, moving the first point later is refused; generated
     ramp events copy `a.vol`; volume can't be removed or reordered (`fxPerm`). Volume 0 is legal. Every new event writer writes `a.vol`.
+31. ⛳ **A track and the live hands never share sound state** (user's rule, AF5 — do not reopen). Everything changed in a track's editor
+    (volume, pan, effects, their automation) belongs to that track only and never changes what the player hears live — not while editing,
+    not after leaving, not while the track plays its events (unfrozen, stale, skipped by the budget, auto-freeze off). The reverse holds
+    too: what the hands turn live never changes a recorded track. Mechanism: every role has a live head and a TRACK head (`audio`:
+    `leadOutT`/`chordBusT`/`bassBusT`/`drumBusT`, chain key `state.trackChainKeyOf(liveKey)`, live copy only); a pooled voice ends in a router
+    (`rL`/`rT`) set at each attack by its owner (`trackRouteOf` = `recorder`: `layerOfOwner(k)!=null`), a drum hit picks its bus the same
+    way; solo track voices skip the expression stage and its pitch shimmer (`v.shim`); recorded automation drives only the track chain; a
+    FROZEN track drives nothing (`fxPlayBuild` filters `frzBufNow`); song load gives map-less solo notes the live solo snapshot once. The
+    render copy has no track heads. Probe row «AF5 track and live isolated»; control `recorder.setLiveIsolation(false)` (old shared network).
 
 ## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
 - `index.html` — markup only (start card, top bar, panels `#panelScale`/`#panelSound`/`#panelLoop`, `#backingMenu`, help overlay,
@@ -795,10 +806,13 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   `loopView.dots`. The play strip shows nothing (its mark column is for the arm dot only). Console: `R.freezeQueue()` (entries, settle
   timers, trigger, skips and why, live-by-choice list, memory used/budget, holds), `R.freeze`/`R.unfreeze`/`R.frozen` (the console `freeze`
   still pins a chain-less track — explicit). No `frz.*` strings remain.
-- **Memory of a render (AF3 part 0b):** Chrome never collects an `OfflineAudioContext` that called `audioWorklet.addModule` — it keeps its
-  rendered buffer. `render.freeze` therefore DETACHES the report's Float32 data after packing (`releaseBuf`; `AudioBuffer.length`, peak,
-  rms stay readable; kept only with the probe option `keepBuf`, or when the Float32 fallback IS the frozen data). The context graph itself
-  stays pinned per render (BACKLOG §1, AF6 item 7).
+- **Memory of a render (AF3 part 0b, RENDER-LEAK):** Chrome never collects an `OfflineAudioContext` that called `audioWorklet.addModule`
+  — context, graph, worklet scope and rendered buffer stay for the session (measured ≈ 6 MB per render of a small track; a hosting iframe,
+  navigating it, or taking the graph apart did not free it). So a track render loads the KS worklet ONLY when the track plays a KS timbre
+  (`render.usesKS`, `audio.LEAD_KS_FROM`; otherwise `stubWorklet`, the sound is identical; report field `ksLoaded`; probe switch
+  `R.renderKsLazy(false)` = the old always-load). KS tracks still pin ≈ 6 MB per render (no workaround found). `render.freeze` also
+  DETACHES the report's Float32 data after packing (`releaseBuf`; kept only with `keepBuf` or when the Float32 fallback IS the frozen data).
+  Runner check `--leak`.
 - **The render (`render.js`):** a second engine instance (`'./audio.js?render…'`, own `AC`, pools, buses, effect tables), one per session,
   re-initialised against a fresh `OfflineAudioContext` per render, sample rate pinned to the live one. Seeded (`setRnd(mulberry32(seed))`
   BEFORE `initAudio`; seed from the LANE ID `seedOfLane`); every render starts and ends with `renderReset()`; ONE render at a time
@@ -823,6 +837,16 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   never `===`.
 
 ### Probe rows that render or capture — tolerances and controls
+- **AF5 track and live isolated** (`P.checkLiveIsolation`, P.quick and P.all, ≈ 4 s; reads values, no audio capture): the live chord chain
+  (composition, values, output), the live owner's route/level/pan and the solo scalars stay identical while a chord track gets a Volume-lane
+  edit, a reverb-mix point and a pan change — editor open, after leaving, playing unfrozen, playing (fake-)frozen, stopped; the track chain
+  carries the edit while playing (positive); a live reverb change never moves the track chain; a frozen track drives no address; the
+  MIXER level 0.2 and pan 0.8 of the ARMED track and of a non-armed track leave every live owner's level/pan/route (all roles) and a
+  sounding live chord's voices (tg, pan pair, router) unchanged. CONTROLS: `setLiveIsolation(false)` — the live chain must change;
+  `recorder.setLiveLeakDbg(layer)` (a live owner takes that track's level/pan) — the voice read-out must change. Console read-out for an ear
+  report: `R.liveCheck()` (live owners, sounding live voices' stages, each track's level/pan/arm, live chains).
+- **frozen seed bass level**: the sample count follows the live rate (650886 at 48 kHz = 13.560125 s; ±1 sample of rounding) — the
+  system output device may run at 44.1 kHz (it did from RENDER-LEAK on); peak/rms keep the ≥ 90 % floor.
 - **AF3 auto-freeze watcher** (`P.checkAutoFreeze`, P.quick and P.all, ≈ 2.5 s, deterministic: probe clock, 50-ms ticks, fake 128-sample
   renders through the real ticket/`freezeSet`, watcher scope one track): every trigger renders after its delay and within two ticks, not
   before (default change, pan held then released, editor via the real `editClose`, take end after the recording gate, undo, backing, row
@@ -928,9 +952,8 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **A chain reordered during a take renders in its earlier order** (gating can't reorder; report `reordered`); live gates fade (τ 0.08) and
   live dips ~40 ms on a composition change that changes the wiring, the render switches instantly; a re-opened live effect may hold an old
   tail, the render's opens empty.
-- **One network per chain owner** (`FX_INST[key][fxId]`): live playing of a role goes through the network a recording drives — different
-  live bus settings than the recording's are impossible today (freeze gives tracks their own); bars mark driven parameters; on stop the
-  sound returns to the aim. Per-note parameters escape this (V4b).
+- **One TRACK network per role** (since AF5 the live network is the hands' alone, rule #31): unfrozen tracks of the SAME role share the
+  role's track chain — the last writer wins among them (a frozen track has its own sound in its buffer). Per-track chains = BACKLOG.
 - **A latched chord with open fingers receives no updates** (per-note values only reach it on the next pinch) — VOL-6.
 - **Several takes through one chain: last writer wins** (sorted `(t, tk)`; ties by higher take; a take governs only its roles' owners);
   network parameters, compositions and expression channels only.
@@ -939,11 +962,13 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   to 1.54e-5 of peak after many renders (node unknown).
 - **A track's chain in the editor is the union of its captured takes' snapshots**; mid-take effects are not moved/removed by ▲▼⊘; an effect
   in one take's snapshot but added mid-take in another is removed only from snapshots.
-- **Chains belong to the OWNER (role), not the track** — a clean live freeze would need per-track instances.
+- **Track chains belong to the ROLE, not the track** (rule #31 separates live from tracks, not track from track).
 - **Nothing can be saved** (view and `a.ty` references; capture keyed by take) — BACKLOG §1.
 - Captured expression channels are not replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
-- **Every render's offline context stays alive** (Chrome pins a context that loaded a worklet): the rendered Float32 data are released, the
-  engine-copy graph is not — size unmeasured; with auto-freeze every settled edit is a render (BACKLOG §1, AF6 item 7).
+- **A render of a KS (plucked) track pins its offline context** (≈ 6 MB per render, Chrome; other tracks are collected since RENDER-LEAK).
+- **AF5 cost:** ≈ 100 extra GainNodes on the live graph (24 chord routers × 2, built solo voices × 4, bass voices × 3, 4 heads + 4 outs) plus
+  the track chains' effect instances when tracks play (a chord reverb ≈ 49 nodes). Synthetic bench on the (slow) dev desktop: routers ≈ +4 %
+  of real time, one extra reverb network ≈ +1 %; a phone may be ≈ 4× that — not measured on a phone.
 - **Tonic, A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until the tonic
   freeze — through the live pools, with their polyphony ceilings.
 
@@ -1091,6 +1116,10 @@ verified. Full text of every step: archive, "How to verify a change".
     re-freezes, and the music follows the new tonic; `R.freezeQueue()` lists the frozen tracks as "live by choice".
 68. No ❄ anywhere (AF4): play strip (no ❄, no stale mark), arrangement window (M · S only; the faint dot only), editor bar (no ❄, no state
     label), no toast about freezing; row «AR1 arrangement window» checks the dot states.
+69. Track ≠ live (AF5, rule #31), headphones: record a chord track, lower its volume (Volume lane) and its reverb in the editor, leave — live
+    chords stay at full volume and reverb, the track plays quieter; turn a live effect with the hand (chord reverb) while the track plays —
+    live chords change, the track doesn't; the same with `R.autoFreeze(false)` (`?probe`) and with the track frozen.
+70. The first attack of a track after ▶ is still whole (ear step 66) — the track chain rewires without a dip at a start.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

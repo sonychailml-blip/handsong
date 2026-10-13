@@ -67,7 +67,7 @@
 import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
-import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
+import { fx as stateFx, FX_VOL, trackChainKeyOf, fxChainOf, tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
          fx as liveFx, fxChains, chainOwners, chainKeyOf, leadIdx, chIdx, bassIdx, drumKitIdx, voiceMode } from './state.js';   // страж P.all: живое состояние звука, которое читает рендер   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import * as SELF from './scaleprobe.js';   // AUTO-PROBE: сам модуль — для стража консоли (api() оборачивает его функции)
@@ -78,7 +78,7 @@ import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollG
 import { INSTR_COL, LANE_NOROLE_COL } from './config.js';   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi } from './ui.js';
 import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, afBegin, afEnd, afTick, afHint, afPause, afIdle, afBusy, afActive, AF_DELAY } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
-import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { chordHold, chainStateOf, routeOfOwner, fxPlaySet, fxParamKeysOf, setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
@@ -87,7 +87,7 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
          laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
-         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer, setLiveIsolation, fxPlayDriving, autPoints, autMovePoint, autAddPoint, autDeletePoint, regionOn, seekTo, setLiveLeakDbg, WchOn, WchOff, toggleArm } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
@@ -438,6 +438,7 @@ const ALL_RUNS=[
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AF1 freeze queue',()=>checkFreezeQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AF3 auto-freeze watcher',()=>checkAutoFreeze(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['AF5 track and live isolated',()=>checkLiveIsolation(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -520,7 +521,7 @@ export async function all(opt={}){   // F0: async — строка снимка 
   console.table(rows);
   if(SEED_REC && SEED_REC.kind==='song') console.log(`[scaleprobe all] frozen seed bass: not applicable — the loaded song is P.song('${SEED_REC.name}')`);
   else { const F=SEED_REC&&SEED_REC.freeze, E=SEED_FROZEN_EXPECT;
-    console.log(F ?`[scaleprobe all] frozen seed bass L${F.layer+1}: peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`
+    console.log(F ?`[scaleprobe all] frozen seed bass L${F.layer+1}: peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${seedFrozenSamples(F)} at ${F.rate||48000} Hz)`
                   : '[scaleprobe all] frozen seed bass: none in this session (run await P.seed({replace:true}))'); }
   for(const [name,list] of lists){ console.warn(`[scaleprobe all] ${name}: first differences`); list.slice(0,opt.show||5).forEach(m=>console.warn('   '+m)); }
   const nDiff=rows.reduce((n,r)=>n+(r.status===HIDDEN?0:typeof r.differences==='number'?r.differences:1),0), noSnap=rows.some(r=>r.status==='no snapshot yet');
@@ -586,7 +587,8 @@ let SEED_REC=null;   // { kind, name?, takes:[{label, take, scaleId, tf, steps:[
 const centsShape=N=>N.map(n=>1200*Math.log2(n.f/N[0].f));
 /* Замороженный бас в раге: значения, ЗАМЕРЕННЫЕ ПОСЛЕ починки «пара голоса в фазе» (voiceStartPair, отчёт пользователя). Прежние
    0.08527/0.054304 сами были частично погашенной выборкой фазы (две одинаковые волны со случайным сдвигом), а не честным эталоном. */
-const SEED_FROZEN_EXPECT={ peak:0.08686, rms:0.055319, samples:650886, floor:0.9 };
+const SEED_FROZEN_EXPECT={ peak:0.08686, rms:0.055319, samples:650886, sec:650886/48000, floor:0.9 };   // sec: the buffer's duration — the sample count follows the live rate (650886 at 48 kHz; the system device may run at 44.1 kHz)
+const seedFrozenSamples=F=>Math.round(SEED_FROZEN_EXPECT.sec*((F&&F.rate)||48000));
 const ROLE_OF={ l:'ld', b:'bs', c:'ch' };
 const sameVal=(x,y)=> x===y || (x&&y&&typeof x==='object'&&typeof y==='object' ? JSON.stringify(x)===JSON.stringify(y) : false);
 /* Одна сверка: сохранённое событие ev против нагрузки жеста g (со ступенью). ign — поля, которые не сравниваются (их потом переписала
@@ -598,7 +600,7 @@ function writeDiff(at, ev, g, ign){
   for(const k of Object.keys(g)){ if(k==='deg'||skip(k)) continue;
     if(!(k in a)) out.push(`${at}: field ${k} lost (gesture ${JSON.stringify(g[k])})`);
     else if(!sameVal(a[k],g[k])) out.push(`${at}: field ${k} stored ${JSON.stringify(a[k])}, gesture ${JSON.stringify(g[k])}`); }
-  for(const k of Object.keys(a)) if(!(k in g) && k!=='ti' && k!=='k' && !skip(k)) out.push(`${at}: unexpected field ${k} = ${JSON.stringify(a[k])}`);
+  for(const k of Object.keys(a)) if(!(k in g) && k!=='ti' && k!=='k' && !skip(k) && !(k==='fx' && /^lead(On|Set)$/.test(ev.fn) && SEED_REC && SEED_REC.soloSnap && sameVal(a.fx, SEED_REC.soloSnap))) out.push(`${at}: unexpected field ${k} = ${JSON.stringify(a[k])}`);
   if(g.fx && a.fx===g.fx) out.push(`${at}: the effect map is the gesture's own object, not a copy`);
   if(pitched){
     if(!Number.isInteger(a.ti)) out.push(`${at}: no tuning index`);
@@ -701,7 +703,8 @@ export function checkSeed(){
     if(typeof a.inst!=='number') miss(`${at}: timbre ${a.inst}`);
     if('inst' in I && a.inst!==I.inst) miss(`${at}: timbre ${a.inst}, intended ${I.inst}`);   // S4: тембр — ближайшей ноты
     if('vol' in I && a.vol!==I.vol) miss(`${at}: volume ${a.vol}, intended ${I.vol}`);       // S4: громкость — ближайшего события с громкостью
-    if('fx' in I && JSON.stringify(a.fx??null)!==JSON.stringify(I.fx??null)) miss(`${at}: effect map ${JSON.stringify(a.fx??null)}, intended ${JSON.stringify(I.fx??null)} (a copy of the neighbour's, absence included)`);   // S4: решение пользователя 1
+    const wantFx= I.fx==null && SEED_REC && SEED_REC.soloSnap ? SEED_REC.soloSnap : I.fx;   // AF5: a copied absence is filled at song load with exactly the load snapshot
+    if('fx' in I && JSON.stringify(a.fx??null)!==JSON.stringify(wantFx??null)) miss(`${at}: effect map ${JSON.stringify(a.fx??null)}, intended ${JSON.stringify(wantFx??null)} (a copy of the neighbour's, absence included — absence filled at song load, AF5)`);   // S4: решение пользователя 1
     if(I.plain && (a.bend || a.tie || a.hold)) miss(`${at}: an inserted solo note carries ${a.bend?'a bend':a.tie?'a tie':'hold'}`);   // S4: вставленная нота — обычная
     if('ty' in I && JSON.stringify(a.ty??null)!==JSON.stringify(I.ty??null)) miss(`${at}: type ${JSON.stringify(a.ty)}, intended ${JSON.stringify(I.ty)}`);
     if(I.out!=null && !modeSlotOfTi(a.ti,a.oct,ev.sc)!==I.out) miss(`${at}: ${I.out?'should be outside':'should be inside'} its mode`);
@@ -722,10 +725,10 @@ export function checkFrozen(){
   const bad=[]; const E=SEED_FROZEN_EXPECT, F=SEED_REC&&SEED_REC.freeze;
   if(!F){ bad.push('no frozen seed track in this session — run await P.seed({replace:true}) (the freeze needs ▶ Play started)'); return { cases:0, total:1, differences:bad, got:null }; }
   if(!F.installed) bad.push(`the seed's freeze of L${F.layer+1} was not installed (${F.refused})`);
-  if(F.samples!==E.samples) bad.push(`buffer ${F.samples} samples, expected ${E.samples}`);
+  if(Math.abs(F.samples-E.sec*(F.rate||48000))>1) bad.push(`buffer ${F.samples} samples, expected ${seedFrozenSamples(F)} (${E.sec.toFixed(6)} s at ${F.rate||48000} Hz, ±1 sample of rounding)`);
   if(!(F.peak>=E.peak*E.floor)) bad.push(`peak ${F.peak} is below ${Math.round(E.floor*100)}% of the expected ${E.peak} — the frozen bass went quiet`);
   if(!(F.rms>=E.rms*E.floor)) bad.push(`rms ${F.rms} is below ${Math.round(E.floor*100)}% of the expected ${E.rms} — the frozen bass went quiet`);
-  console.log(`[scaleprobe frozen] L${F.layer+1} (bass in the raga): peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${E.samples})`);
+  console.log(`[scaleprobe frozen] L${F.layer+1} (bass in the raga): peak ${F.peak} (expected ${E.peak}), rms ${F.rms} (expected ${E.rms}), buffer ${F.samples} samples (expected ${seedFrozenSamples(F)} at ${F.rate||48000} Hz)`);
   bad.forEach(m=>console.warn('[scaleprobe frozen] '+m));
   return { cases:3, total:bad.length, differences:bad, got:F };
 }
@@ -1592,8 +1595,7 @@ export async function checkTrackLook(){
    (4) ЩИПОК: раскладка дороже бюджета — ждёт; не мерили ни разу — ждёт; дешевле — идёт.
    (5) УСТАРЕВШИЙ РЕЗУЛЬТАТ: во время «рендера» сдвинули панораму дорожки (она в подписи) — буфер НЕ поставлен (дорожка не заморожена), запись
        снова в очереди; пока подпись не устоялась — не берётся; устоялась — второй рендер, поставлен, свежая.
-   (6) МЕНЯЛАСЬ, ПОКА ЖДАЛА: три сдвига панорамы через полвремени успокоения — ни одного рендера; после успокоения — РОВНО ОДИН, и поставленный
-       буфер свеж против ПОСЛЕДНЕЙ подписи.
+   (6) "changed while queued" moved to the AF3 row's edit burst (one render after the last change, fresh against the final signature).
    Всё возвращается: панорамы, приглушения, заморозки, сделанные пробой (размораживаются), замеры очереди (qEnd). Нужны: звук запущен, транспорт
    стоит, редактор и окно закрыты, R.autoFreeze выключен, ни одна дорожка не в соло; для (2) — три незамороженные дорожки с раздельными краями
    (на посеве есть; нет — случай «не применим», не расхождение). */
@@ -1699,14 +1701,6 @@ export async function checkFreezeQueue(){
         T+=SETTLE; const s2=qStep(); if(s2.startsWith('start:')) await qRunning();
         if(calls.filter(x=>x===H).length!==2 || freezeState(H)!=='fresh') miss(`stale CONTROL: after the signature settled the track should render a second time and be fresh — renders ${calls.filter(x=>x===H).length}, state ${freezeState(H)}`); }
       unfreezeMine(); }
-    /* ---- (6) менялась, пока ждала — один рендер с последней подписью ---- */
-    { cases++; calls.length=0; qAdd(D,'probe'); const p0=lanePanOf(D);
-      const st=[]; for(const p of [0.3,-0.3,0.1]){ T+=SETTLE/2; setLanePan(D,p); st.push(qStep()); }
-      if(calls.length) miss(`changing while queued: a render started before the signature settled (steps ${st.join(', ')})`);
-      for(let i=0;i<4;i++){ T+=STEP; const x=qStep(); if(x.startsWith('start:')){ mine.add(D); await qRunning(); } }
-      if(calls.length!==1) miss(`changing while queued: expected exactly one render after it settled, got ${calls.length}`);
-      if(freezeState(D)!=='fresh') miss(`changing while queued: the installed buffer is not fresh against the final signature (${freezeState(D)})`);
-      setLanePan(D,p0); unfreezeMine(); }
   }catch(err){ miss('the probe failed: '+(err&&err.message)); }
   finally{
     try{ await qRunning(); }catch(e){ /* исход уже в отчёте */ }
@@ -1789,6 +1783,7 @@ export async function checkAutoFreeze(){
     { cases++; const b=await burst('burst');
       if(b.n!==1) miss(`five pan moves 600 ms apart: expected exactly one render, got ${b.n}`);
       else if(b.first<b.last+AF_DELAY.pan) miss(`five pan moves: the render came ${b.first} ms after the first move, before the last move + ${AF_DELAY.pan} ms (${b.last+AF_DELAY.pan})`);
+      if(freezeState(A)!=='fresh') miss(`five pan moves: the installed buffer is not fresh against the final signature (${freezeState(A)})`);   // merged from AF1 case (6)
       notes.push(`five moves 600 ms apart: ${b.n} render at +${b.first} ms (last move at +${b.last} ms)`);
       cases++; hook.dbg.noReset=true; const c=await burst('control'); hook.dbg.noReset=false;
       if(c.n<=1 && !(c.first!=null && c.first<c.last+AF_DELAY.pan)) miss('CONTROL (settle clock that does not reset): it still gave one render after the last move — the case cannot fail');
@@ -1850,6 +1845,117 @@ export async function checkAutoFreeze(){
   if(!nBad) console.log('[scaleprobe auto-freeze] every trigger makes its track a candidate after its own delay and not before, an edit burst gives one render after it ends, level and tonic/A4/tempo give none, a track over the memory budget is skipped and not retried, an editor-created track carries a pinned chain — and the controls show each case could fail');
   return out();
 }
+/* ═══ ⛳ AF5: A TRACK AND THE LIVE HANDS NEVER SHARE AN EFFECT NETWORK — P.checkLiveIsolation (row 'AF5 track and live isolated') ═══
+   The user's hard rule, read on the live voice path, not by capturing audio: the live chord chain (composition, every instance value, its
+   output gain), the live owner's route/level/pan and the live solo scalars must stay EXACTLY the same while a chord track is edited in
+   the editor (Volume lane, an effect value — reverb mix at its last beat — and its pan), after leaving, while the transport plays it
+   unfrozen, and while it is frozen. The other way: turning the live reverb mix leaves the track chain and the frozen track untouched.
+   Positive checks (the case can fail): while playing, the TRACK chain carries the edited value; the track's owner routes to the track
+   chain. AF5: a frozen track drives no chain. CONTROL that must fail: the old shared network (recorder.setLiveIsolation(false)) — the live
+   chain then takes the track's value. Real time: the transport plays ≈ 1 s per state. Everything restored. */
+export async function checkLiveIsolation(){
+  const bad=[], notes=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  const out=()=>({ cases, song:L.length, total:nBad, differences:bad, notes });
+  if(!L.length) return { cases:0, song:0, total:0, differences:[], notes };
+  if(!LIVE_AC){ miss('audio is not started (press ▶ Play)'); return out(); }
+  if(editIsOpen()||rollOpen||arrOpen||recording||loop.on){ miss('stop the transport and close the editor/arrangement first'); return out(); }
+  const R=await import('./render.js'), LK=chainKeyOf('ch'), TK=trackChainKeyOf(LK);
+  const C=L.find(ly=>laneRoleOf(ly)==='ch' && laneHasChain(ly) && freezeState(ly)==='none' && autChainOf(ly).includes('reverb') && !events.some(e=>e.layer===ly&&e.jam));
+  if(C==null){ miss('no unfrozen chord track with a reverb in its chain — run await P.seed({replace:true})'); return out(); }
+  const Lb='L'+(C+1), tl=Math.max(...events.filter(e=>e.layer===C).map(e=>e.t));
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const LIVE_KEYS=['latch','lead:L','lead:R','lead:M','bass','bass:L',null];   // live owners of every role (null — a live drum hit)
+  const liveState=()=>JSON.stringify({ chain:chainStateOf(LK), solo:chainStateOf(chainKeyOf('ld')), bs:chainStateOf(chainKeyOf('bs')), dr:chainStateOf(chainKeyOf('dr')),
+    route:LIVE_KEYS.map(routeOfOwner), gain:LIVE_KEYS.map(ownerGain), pan:LIVE_KEYS.map(ownerPan), master:masterLevel(), scal:{...stateFx}, cfg:fxChainOf(LK) });
+  /* a sounding live chord: every voice's track-level stage, pan pair and router (the stages a track's mixer level/pan act on) */
+  const voiceRead=async()=>{ WchOn('latch',0,1,0.9,chIdx); await sleep(150); const vs=chordHold['latch']||[];
+    const r=JSON.stringify(vs.map(v=>[+v.tg.gain.value.toFixed(5), +v.pan.l.gain.value.toFixed(5), +v.pan.r.gain.value.toFixed(5), v.rt?+v.rt.rL.gain.value.toFixed(5):null, v.rt?+v.rt.rT.gain.value.toFixed(5):null]));
+    WchOff('latch'); await sleep(80); return r; };
+  const mixOf=k=>{ const st=chainStateOf(k); const r=st.vals.reverb; return r ? r[fxParamKeysOf('reverb').indexOf('mix')] : null; };
+  const keep={ pan:lanePanOf(C), rgn:regionOn(), liveMix:mixOf(LK) };
+  let frozeC=false, ptAdded=false, volBack=null, mix=null;
+  const play=async(ms)=>{ seekTo(Math.max(0,tl-1)); onLoop(); await sleep(ms); };
+  const stop=async()=>{ if(loop.on) onLoop(); await sleep(60); };
+  try{
+    if(keep.rgn) setRegionOn(false);
+    const L0=liveState();
+    const same=(label)=>{ cases++; const s=liveState(); if(s!==L0) miss(`${label}: the LIVE path changed — ${diffKeys(L0,s)}`); };
+    /* 1) edits in the editor */
+    editOpen(C);
+    { const D=autPoints(C,LK,FX_VOL,'amt'), r=D&&D.pts&&D.pts.find(x=>x.pt&&!x.pt.unset);
+      if(r){ volBack={ t:r.pt.t, v:r.pt.v }; autMovePoint(r.pt, r.pt.t, Math.max(0, r.pt.v-0.5)); } else notes.push('no volume point to move'); }
+    ptAdded=!!autAddPoint(C,'reverb','mix',tl,0.02);
+    if(!ptAdded) miss(`${Lb}: the editor did not take a reverb-mix point`);
+    setLanePan(C,-0.6);
+    same('editor open, after volume, effect and pan edits');
+    editClose(); same('after leaving the editor');
+    /* 2) the track plays through events (unfrozen) */
+    await play(1100);
+    same('transport playing the edited track (unfrozen)');
+    cases++; const tm=mixOf(TK), drvC=fxPlayDriving().some(x=>x.key===TK&&x.fx==='reverb'&&x.p==='mix');   // a take may span several layers — the entry's layer is the take's first
+    if(!drvC || tm==null || !(tm<keep.liveMix)) miss(`positive: while playing, ${Lb}'s edited reverb mix should drive the TRACK chain (driving: ${drvC}, track mix ${tm}, live mix ${keep.liveMix})`);
+    cases++; if(routeOfOwner('loop:'+C)!=='track' || routeOfOwner('latch')!=='live') miss(`routing: the track's owner → ${routeOfOwner('loop:'+C)}, the live latch → ${routeOfOwner('latch')} (expected track / live)`);
+    /* 3) the other way: a live knob moves while the track plays — the track chain keeps the track's value */
+    cases++; fxPlaySet(LK,'reverb','mix',0.9); await sleep(150);
+    const tm2=mixOf(TK); if(tm2==null || !(tm2<0.2)) miss(`live → track (playing): with the live reverb mix at 0.9 the track chain reads ${tm2} — it follows its automation (< 0.2 here), never the hand`);
+    fxPlaySet(LK,'reverb','mix',keep.liveMix);
+    await stop(); same('transport stopped');
+    /* 1b) the MIXER's level and pan — of the ARMED track and of a track that is NOT armed — never reach a live voice */
+    { const V0=await voiceRead(), C2=L.find(ly=>ly!==C && laneRoleOf(ly) && ly!==armedLayer());
+      mix={ arm:armedLayer(), lv:new Map(), pn:new Map() };
+      for(const ly of [C,C2]) if(ly!=null){ mix.lv.set(ly,laneLevelOf(ly)); mix.pn.set(ly,lanePanOf(ly)); }
+      if(armedLayer()!==C) toggleArm(C);
+      for(const [ly,lab] of [[C,'armed'],[C2,'not armed']]) if(ly!=null){ cases++;
+        setLaneLevel(ly,0.2); setLanePan(ly,0.8);
+        same(`mixer level 0.2 + pan 0.8 of the ${lab} track L${ly+1}`);
+        const vr=await voiceRead(); if(vr!==V0) miss(`mixer (${lab} track L${ly+1}): a live chord voice changed — ${V0} → ${vr}`); }
+      cases++; setLiveLeakDbg(C); const vc=await voiceRead(); setLiveLeakDbg(null);
+      if(vc===V0) miss('CONTROL (a live voice takes the armed track’s level and pan): the voice read-out did not change — the mixer case cannot fail');
+      notes.push(`mixer level/pan of the armed L${C+1}${C2!=null?' and the unarmed L'+(C2+1):''}: live voices ${V0}; control ${vc}`); }
+    cases++; { const t0s=JSON.stringify(chainStateOf(TK)); fxPlaySet(LK,'reverb','mix',0.9); const t1s=JSON.stringify(chainStateOf(TK)); fxPlaySet(LK,'reverb','mix',keep.liveMix);
+      if(t1s!==t0s) miss('live → track (stopped): turning the live reverb mix changed the track chain'); }
+    /* 4) frozen (fake buffer through the real ticket): it plays its buffer, drives no chain (AF5), the live path stays */
+    const fake=async()=>({ buf:LIVE_AC.createBuffer(2,128,LIVE_AC.sampleRate), startSec:0.5, endSec:0.5, tailSec:0, pinned:{ tonic, aRef, bpm:loop.bpm }, ms:{ layoutMs:1 } });
+    const r=await R.freeze(C,{ renderFn:fake, noPin:true, quiet:true }); frozeC= !!(r&&r.installed);
+    if(!frozeC) miss(`${Lb}: the fake freeze was not installed (${r&&r.refused})`);
+    else { await play(1100);
+      same('transport playing the frozen track');
+      cases++; const drv=fxPlayDriving().filter(x=>x.layer===C); if(drv.length) miss(`AF5: the frozen ${Lb} still drives ${drv.length} address(es) (${drv.slice(0,3).map(x=>x.key+' '+x.fx+':'+x.p).join(', ')})`);
+      await stop(); }
+    /* CONTROL — the old shared network must change the live path */
+    if(frozeC){ unfreezeLayer(C); frozeC=false; }
+    cases++; setLiveIsolation(false);
+    try{ await play(1100); const s=liveState(); if(s===L0) miss('CONTROL (old shared network): the live path did not change while the edited track played — the case cannot fail');
+      notes.push(`control (shared network): live reverb mix while playing ${mixOf(LK)}`); }
+    finally{ await stop(); setLiveIsolation(true); }
+    notes.push(`${Lb}: live path unchanged in 5 states; track chain reverb mix ${tm} while playing`);
+  }catch(err){ miss('the probe failed: '+(err&&err.stack||err)); }
+  finally{
+    if(loop.on) onLoop();
+    setLiveIsolation(true);
+    if(frozeC) unfreezeLayer(C);
+    if(editIsOpen()) editClose();
+    /* undo the edits: the reverb point, the volume point, the pan; the live mix */
+    if(ptAdded||volBack){ editOpen(C);
+      if(ptAdded){ const D=autPoints(C,LK,'reverb','mix'), row=D&&D.pts&&D.pts.find(x=>x.pt&&Math.abs(x.pt.t-tl)<1e-9&&Math.abs(x.pt.v-0.02)<1e-9); if(row) autDeletePoint(row); }
+      if(volBack){ const D=autPoints(C,LK,FX_VOL,'amt'), row=D&&D.pts&&D.pts.find(x=>x.pt&&!x.pt.unset); if(row) autMovePoint(row.pt, volBack.t, volBack.v); }
+      editClose(); }
+    setLiveLeakDbg(null);
+    if(mix){ for(const [ly,v] of mix.lv) setLaneLevel(ly,v); for(const [ly,v] of mix.pn) setLanePan(ly,v);
+      if(armedLayer()!==mix.arm){ if(armedLayer()!=null) toggleArm(armedLayer()); if(mix.arm!=null) toggleArm(mix.arm); } }
+    if(lanePanOf(C)!==keep.pan) setLanePan(C,keep.pan);
+    if(mixOf(LK)!==keep.liveMix && keep.liveMix!=null) fxPlaySet(LK,'reverb','mix',keep.liveMix);
+    if(keep.rgn && !regionOn()) setRegionOn(true);
+    if(freezeState(C)!=='none') unfreezeLayer(C);
+  }
+  console.log(`[scaleprobe isolation] ${Lb} · cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe isolation] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe isolation] '+m));
+  if(!nBad) console.log('[scaleprobe isolation] editing a track (volume, an effect value, pan) never moves the live path — in the editor, after it, while the track plays unfrozen or frozen; a live knob never moves the track chain; a frozen track drives no chain; and the old shared network (control) does move it');
+  return out();
+}
+const diffKeys=(a,b)=>{ const A=JSON.parse(a), B=JSON.parse(b); return Object.keys(A).filter(k=>JSON.stringify(A[k])!==JSON.stringify(B[k])).map(k=>k+': '+JSON.stringify(A[k]).slice(0,120)+' → '+JSON.stringify(B[k]).slice(0,120)).join('; '); };
 /* ═══ ⛳ AF1: ЗАМЕР — РАСКЛАДКА НА ГЛАВНОМ ПОТОКЕ И ПАМЯТЬ ЗАМОРОЖЕННЫХ БУФЕРОВ — P.freezeCost() (по запросу, не в P.all) ═══
    Для КАЖДОЙ дорожки — раскладка без рендера (render.layoutCost: тот же путь, что у заморозки, до startRendering), то есть:
      • layoutMs — синхронный участок главного потока (то, что ворота щипка сравнивают с бюджетом), худший и типичный (медиана);
@@ -2135,7 +2241,7 @@ export async function seed(opt={}){
     // ---- 8) заморозка дорожки баса в раге ----
     const gr=songSegs().segs.find(g=>g.role==='bs'&&g.sc.id==='raga-yaman');
     if(gr){ try{ const R=await import('./render.js'); const r=await R.freeze(gr.layer);
-            SEED_REC.freeze={ layer:gr.layer, peak:r&&r.peak, rms:r&&r.rms, samples:r&&r.buf&&r.buf.length, installed:!!(r&&r.installed), refused:r&&r.refused };
+            SEED_REC.freeze={ layer:gr.layer, peak:r&&r.peak, rms:r&&r.rms, samples:r&&r.buf&&r.buf.length, rate:r&&r.buf&&r.buf.sampleRate, installed:!!(r&&r.installed), refused:r&&r.refused };
             say(r&&r.installed ? `freeze: L${gr.layer+1} (bass in the raga) frozen` : `freeze: L${gr.layer+1} rendered but not installed (${r&&r.refused})`); }
             catch(err){ say('freeze: not available from the console ('+(err&&err.message)+')'); } }
     // ---- 9) S4: СОЛО ДЛЯ РЕДАКТОРА — ведущая линия, полифония, карта эффектов, терменвокс, пара связки; правки редактора над ними ----
@@ -2180,8 +2286,8 @@ export async function seed(opt={}){
   }
   tracks();
   const pinned=songPinChains();   // AF3: song load pins the live chain on every track without one (auto-freeze never does)
-  SEED_REC.pinned=pinned.length;
-  console.log(`[scaleprobe seed] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned${pinned.length?' ('+pinned.map(l=>'L'+(l+1)).join(', ')+')':''}`);
+  SEED_REC.pinned=pinned.length; SEED_REC.soloSnap=pinned.soloSnap;   // AF5: the map given to map-less solo notes — checkSeed accepts exactly it
+  console.log(`[scaleprobe seed] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned${pinned.length?' ('+pinned.map(l=>'L'+(l+1)).join(', ')+')':''}; ${pinned.soloMaps||0} solo note event(s) without an effect map got the live solo snapshot (AF5)`);
   const M=material();
   console.log(`[scaleprobe seed] built ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. Now run P.all().`);
   return { built, events:events.length, material:M };
@@ -2196,8 +2302,8 @@ export async function song(name='triphop', opt={}){
   const r=await S.loadSong(name, opt);
   if(!r) return null;
   SEED_REC={ kind:'song', name:r.name, takes:r.takes, edited:[], freeze:null };
-  const pinned=songPinChains(); SEED_REC.pinned=pinned.length;   // AF3: song load pins the live chain on chain-less tracks
-  console.log(`[scaleprobe song] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned`);
+  const pinned=songPinChains(); SEED_REC.pinned=pinned.length; SEED_REC.soloSnap=pinned.soloSnap;   // AF3: song load pins the live chain on chain-less tracks
+  console.log(`[scaleprobe song] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned; ${pinned.soloMaps||0} solo note event(s) without an effect map got the live solo snapshot (AF5)`);
   const M=material();
   console.log(`[scaleprobe song] «${r.name}»: ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. P.all() checks it.`);
   return { name:r.name, events:events.length, material:M };
