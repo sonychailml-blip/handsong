@@ -69,11 +69,12 @@ async function session(port, plan, label){
   if(HEADED) args.push('--window-position=-2600,0','--window-size=1280,800');   // обычное окно, но за экраном: вкладка видима, кадры идут
   const browser=await chromium.launch({ channel:BROWSER, headless:!HEADED, args });
   const res={ label, runs:[], seed:null, error:null };
+  let page=null;
   try{
     const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } });
     const origin=`http://127.0.0.1:${port}`;
     await ctx.grantPermissions(['camera','microphone'],{ origin });
-    const page=await ctx.newPage();
+    page=await ctx.newPage();
     const seen=[];   // строки проб этого прогона (для сводки)
     page.on('console', async m=>{ const tx=m.text(), ty=m.type();
       await log(`[${ty}] ${tx}`);
@@ -95,6 +96,8 @@ async function session(port, plan, label){
     const env=await page.evaluate(async ()=>{ const A=await import('./src/audio.js'); return { hidden:document.hidden, visibility:document.visibilityState, ac:A.AC&&A.AC.state, rate:A.AC&&A.AC.sampleRate, ua:navigator.userAgent }; });
     res.env=env;
     out(`[${label}] started — audio ${env.ac} at ${env.rate} Hz, tab ${env.visibility}${env.hidden?' (HIDDEN — drawn-window rows will not run)':''}`);
+    /* AF3: the auto-freeze watcher is paused for the whole runner session (probes drive it with their own clock); resumed before closing */
+    await page.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', true); });
     /* посев: ждём ОКОНЧАНИЯ (его итог — строка «Now run P.all()») */
     const t0=Date.now();
     /* страж консоли: P.seed пускаем, НЕ дожидаясь, и тут же «набираем» P.quick() — обязан отказать словами (как у человека, набравшего его рано) */
@@ -110,6 +113,9 @@ async function session(port, plan, label){
     if(!seedOk){ res.error='P.seed did not finish with complete material'; return res; }
     if(!res.guard){ res.error='the console guard did not refuse P.quick() during P.seed'; return res; }
     if(EVAL){   // --eval <файл>: тело async-функции, выполняется на странице после посева; печатается её JSON (отладка проб)
+      /* window.__heap(): full GC, then V8 heap usage incl. ArrayBuffer backing stores (memory checks in --eval only) */
+      const cdp=await ctx.newCDPSession(page);
+      await page.exposeFunction('__heap', async ()=>{ await cdp.send('HeapProfiler.collectGarbage'); return await cdp.send('Runtime.getHeapUsage'); });
       const src=await readFile(path.resolve(EVAL),'utf8');
       out(`[${label}] --eval ${EVAL}`);
       const r=await within(page.evaluate(async code=>{ const f=new Function('return (async()=>{'+code+'\n})()'); try{ return { ok:true, value:await f() }; }catch(e){ return { ok:false, error:String(e&&e.stack||e) }; } }, src), LIMIT_ALL, '--eval');
@@ -126,7 +132,7 @@ async function session(port, plan, label){
       seen.length=0;
     }
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
-  finally{ await browser.close().catch(()=>{}); }
+  finally{ if(page) await page.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}); await browser.close().catch(()=>{}); }
   return res;
 }
 

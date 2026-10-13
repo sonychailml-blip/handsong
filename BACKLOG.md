@@ -4,7 +4,8 @@
 Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open · ❓ deferred, needs measurement · ℹ️ note, not a bug.
 - **0. Now in progress** — the module split refactor (✅ long done; table kept as history).
 - **1. Foundation** — localStorage for settings (⬜); stable mode/tuning ids, prerequisite for saving and the scale builder (🔵);
-  AF6 remainder after 16-bit (⬜: disk/browser cache, chunk paging, Opus fallback); AF2 remainder: drum and live-reverb tails at a
+  auto-freeze AF1–AF4 ✅ (watcher ON by default, no ❄); AF6 remainder after 16-bit (⬜: disk/browser cache, chunk paging, Opus fallback;
+  ⚠️ offline render contexts pinned by Chrome — graph leak per render, Float32 data already released); AF2 remainder: drum and live-reverb tails at a
   crossfaded swap (⬜); SAVING — the user's decision (⛳: draft vs project, folder/file/account, autosave and versions); AUDIO TAKE —
   after auto-freeze (⬜); SCALA readiness (.scl/.kbm) before the mode builder (⬜); Service Worker model cache (⬜).
 - **2. Microtonality: chords and grid** — 2.1 chords in `tag:'edo'` (✅); 2.2 diatonic subsets are a GRID topic (⬜); 2.3 hysteresis below
@@ -31,55 +32,22 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 
 Общий список задач. Обновляется по ходу работы.
 
-> **В работе — РЕДАКТОР ДОРОЖЕК (§3.39):** часть 1 ✅ сделана дугой слайсов — дорожки с М/С · явный `when`
-> у соло/дрона · закрытие нот на остановке записи · курсоры переигровки · АБСОЛЮТНОЕ время · область повтора
-> · скоба · догонялка · номера слотов/суффиксы владельцев · вооружение (запись в дорожку) · удаление дорожки /
-> отмена по взятым / паника через путь ● · закрытие нот на шве.
-> **Часть 2 — ПИАНО-РОЛЛ — ✅ все четыре роли правятся** (S4.0–S5.6, E0–E2, S0–S2, U1–U6, S4): группировка событий в ноты и
-> в ВЫСОТНЫЕ СЕГМЕНТЫ · три слайса записи, после которых СИРОТ БОЛЬШЕ НЕ ПОРОДИТЬ · оболочка во весь экран ·
-> ударные · правка с отменой И возвратом · лад протянут через подписи · бас, группы ладов, ряд-дубль тоники ·
-> подгонка рядов, длина по конечному событию, измеренная колонка подписей · аккорды — нотами (U1–U6) · соло (S4; длина ноты
-> терменвокса — S5, край пары связки — S6). Вкладок ролей с T4 нет — роль у дорожки одна.
-> **И между ними легла ДУГА ВЛАДЕНИЯ ЭФФЕКТАМИ (O-0…O-4) — ✅ сделана:** ключ владельца цепи ·
-> ПОСЛЕДОВАТЕЛЬНАЯ ЦЕПЬ (⚠️ звук изменён сознательно, пер-нотные посылы соло отданы навсегда) · ЗАХВАТ
-> всего сыгранного по взятым · ПЕРЕИГРОВКА захвата · разделение ПРИЦЕЛА и ЗВУКА · ПОЛОСА АВТОМАТИЗАЦИИ
-> в редакторе (с добавлением эффектов, которых при игре не было).
-> **⛳ АВТОЗАМОРОЗКА — план пересмотрен при LR1 (AF1–AF6, ❄ уходит; 8 вопросов пользователю, в т.ч. ПАМЯТЬ буферов: 69 МБ на
-> 3-минутную стерео-дорожку) — HANDOFF, Часть II, «ПЛАН „АВТОЗАМОРОЗКА“ (пересмотр при LR1)». ✅ LR1 — живой реверб с проводкой копии
-> рендера, ждёт проверки на слух; после приёмки — слайс-уборка прежней проводки.**
-> **Затем — ✅ ЗАМОРОЗКА (F0–F5, вручную, ❄ в редакторе), ✅ A0–A2c автозаморозки (сама автоматика — нет) и
-> ✅ ОДНА РОЛЬ И ОДИН ТЕМБР НА ДОРОЖКУ (T0–T5)** — включая замену тембра в редакторе и Backspace для удаления.
-> **И — ✅ НЕЗАВИСИМЫЕ НОТЫ БАСА (E0–E2), ✅ ВЕТКА МЕЛОДИЧЕСКОГО ИНСТРУМЕНТА (P1, P2, V1–V4b, V5 — документы):** бас и
-> соло — один инструмент с выбором «Полифония / Ведущий», Скольжение — объявленный параметр, полоса правит
-> пер-нотные величины в нотах (§7.5); ✅ заморозка звучит как живая игра (атака без подъезда, разброс фаз, голос
-> свободен с отпускания, мастер не дважды, смены цепи посреди взятого — кроме перестановки); ✅ яркость у каждой роли.
-> **⛳ ПОРЯДОК РАБОТ, КАК ОН СТОИТ СЕЙЧАС (решение пользователя при V2, обновлено в V5; подробно — HANDOFF, Часть I).
-> РЕДАКТОР ДОВОДИТСЯ ДО КОНЦА РАНЬШЕ КОНСТРУКТОРА ТЕМБРОВ:**
-> (1) ✅ режимы голоса V1–V5 → (2) 🔵 ГРОМКОСТЬ КАК ПАРАМЕТР (VOL-0…VOL-7; ✅ VOL-0…VOL-4: громкость — пер-нотный параметр,
-> строка в панели, одна кривая v² у всех ролей, полоса громкости в редакторе, громкость на глубине играющей руки) →
-> (3) ⛳ СЛЕДУЮЩЕЕ — правка соло и аккордов в пиано-ролле → затем остаток п. 2: VOL-5 (горизонталь всегда активна), VOL-6
-> (следящий за защёлкой), VOL-7 (панорама на ноту, своим планом). ⛳ Перенос — решение пользователя при VOL-4: правки соло и
-> аккордов не хватает в ежедневной работе, а эти три уточняют возможности, без которых уже можно жить; механика
-> независимых нот баса (E1/E2) и строилась, чтобы соло и аккорды её переиспользовали → (4) ФУНДАМЕНТ: стабильные идентичности ладов и тембров, формат песни и
-> формат тембра (§1, §7.4) → (5) СОХРАНЕНИЕ на устройстве + экспорт/импорт песни файлом (§3.35; не ждёт сервера: копия
-> на устройстве всё равно нужна как кэш, а формат и идентичности — те же; ⛳ песни — ФАЙЛАМИ, демо-пьесы — файлы рядом с приложением, §1) → (6) НЕОБХОДИМОЕ РЕДАКТОРУ: выделение
-> нескольких нот (копировать/вставить/дублировать), громкость ноты полосой, квантизация после записи (полная/частичная),
-> транспонирование по СТУПЕНЯМ, имена/цвета/порядок дорожек (✅ AR2), разделы (вырезать/вставить такты во всех дорожках), одна
-> отмена на всю программу → (7) ЧТО ДЕЛАЕТ РЕДАКТОР НАШИМ: перестройка дорожки в другой лад по ступеням, отклонение
-> рядов в центах, бенд терменвокса кривой → (8) ⛳ ПРИЛОЖЕНИЕ КАК MIDI-КОНТРОЛЛЕР с ладом (§7.7; «вскоре после редактора») →
-> (9) автозаморозка, микшер (громкость, панорама, мастер-полоса, строй дорожки на виду), экспорт аудио со строем в Scala →
-> (10) конструктор тембров и СВОИ ЛАДЫ со Scala (§7.6) → (11) сервер: аккаунты, синхронизация, обмен тембрами и ладами,
-> подписка, маркетплейс (управляемый облачный сервис даёт аккаунты и базу без своего сервера — дуга дешевле). См. §7.
-> ⛳ **Главный технический долг — распознавание рук вне главного потока** (§7.8).
-> **Прочее ближайшее:** §3.31 промо-ролик · §3.32 замер задержки входа · испанский/немецкий (§3.18).
->
-> ⛔ **ПРЕДПОСЫЛКА, блокирующая три вещи:** «СТАБИЛЬНЫЙ ИДЕНТИФИКАТОР ЛАДА» (§1). Без него нельзя ни
-> сохранять песни, ни делать конструктор строёв (§3.34) — у ладов нет `id`, а дорожка держит ССЫЛКУ на
-> объект лада, которую не сериализовать. **Та же предпосылка — у ТЕМБРОВ** (§7): событие хранит ИНДЕКС
-> тембра, и новый тембр соло перенацелил бы записанное (см. §7 и CLAUDE.md, соглашение о тембрах). ⛳ **И это предпосылка того, чтобы Редактор дорожек стоило доводить:**
-> пятиминутная многодорожечная песня, которую нельзя сохранить, — провал фичи, а не мелкая недоделка.
->
-> ⚠️ **Статусы сверены с кодом.** ✅ у пункта = проверено в `src/`, а не «кажется, сделали».
+> **Status banner (rewritten in English at AF3/AF4; the long Russian original is in git history).**
+> **Done:** the TRACK EDITOR (§3.39) — linear multitrack recorder (tracks, M/S, absolute time, brace, chase, arming, row delete, undo
+> by take, per-pass note closing) and the piano roll for all four roles (S4.0–S5.6, E0–E2, S0–S7, U1–U6); EFFECT OWNERSHIP O-0…O-4
+> (serial chain, capture per take, playback, aim vs sound, the automation lane); FREEZE F0–F5, A0–A2c; ONE ROLE AND ONE TIMBRE per track
+> (T0–T5); independent bass notes; the melodic instrument (voice modes V1–V5, Glide); brightness on every role; AR1/MX1/MX2/AR2.
+> **AUTO-FREEZE:** ✅ AF1 queue · ✅ AF2 swap · ✅ AF6b 16-bit · ✅ **AF3 watcher and triggers** (ON by default; tonic/A4/tempo do not
+> re-freeze until the tonic freeze) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only). Next: AF5 (the chain back to
+> the hand), AF6 rest (below, §1).
+> **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (ED1 selection next … ED7 one undo) → editor-own
+> (mode by degrees, cent offsets, theremin bend curve) → tonic freeze → VOL-5…VOL-7 → FOUNDATION (stable mode and timbre ids, song and
+> timbre format; §1, §7.4) → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
+> export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).
+> ⛳ Main technical debt: hand tracking off the main thread (§7.8). Nearby: §3.31 promo video · §3.32 input latency · es/de (§3.18).
+> ⛔ **Prerequisite blocking saving and the builders:** stable MODE ids and TIMBRE ids (§1, §7) — an event holds a view REFERENCE and a
+> timbre INDEX, neither can be serialised; a five-minute song that cannot be saved is a failed feature.
+> ⚠️ **Statuses are checked against the code.** ✅ = verified in `src/`.
 
 **Статусы:**
 `🔵` — в работе · `⬜` — готово к работе, спецификация есть · `❓` — нужна спецификация · `✅` — сделано
@@ -206,18 +174,24 @@ id нужен на границе сериализации. Отдельно р�
 (самое позднее — до заморозки и экспорта: и то и другое бессмысленно для песни, которая не переживает
 перезагрузку). Сверено: у 75 записей `SCALES` поля `id` по-прежнему нет, событие по-прежнему несёт `sc:CUR()`.
 
-### ⬜ AF6 — остаток после AF6b (замороженное в 16 битах в памяти — сделано)
-1. **На устройстве и через перезагрузку** (решение 3(c), ПОСЛЕ работы сохранения): куски Int16 (`FRZ_CHUNK`, 2^15 кадров) — файлами: в ПАПКЕ
-   ПРОЕКТА (WAV-файлы, их можно перетащить в другие программы), иначе в хранилище браузера как КЭШ (потеря кэша работы не теряет — всё
-   пересчитывается из нот). Ключ кэша — подпись свежести (`freezeSig`) + id дорожки; устаревший кэш — выбросить.
-2. **Подкачка кусками** (streaming): хранилище на потоке звука держит лишь куски у бегунка (и вокруг скобы), прочие подгружаются с диска
-   заранее; чтец (`frz-reader`) уже читает по кускам — нужен протокол «нужен кусок k» и запас (упреждение — по `SCHED_AHEAD` и такту).
-3. **Opus как запасной режим малой памяти** для слабых телефонов — только по выбору, никогда по умолчанию (WebCodecs AudioEncoder/Decoder;
-   ⚠️ декод даёт задержку кодера — куски с перекрытием или общий поток; MP3 — никогда: паддинг кодера ломает стыки).
-4. **«Только ноты и хвост»** (решение 3(a)): на посеве ≈ 3 МБ из ≈ 49, на демо ≈ 14 % — делать вместе с (1)/(2), сегментами хранения.
-5. **Бюджет памяти** — только страховка (при превышении дальние неслышимые остаются событиями).
-6. Без ворклета замороженных — Float32 как прежде (названо в `CLAUDE.md`); если окажется частым — упаковка и для этого пути (куски
-   источников буфера на сетке кадров).
+### ⬜ AF6 — the rest after AF6b (16-bit frozen data in memory is done) — rewritten in English at AF3
+1. **On the device, across reloads** (decision 3(c), AFTER saving exists): Int16 chunks (`FRZ_CHUNK`, 2^15 frames) as files — in the
+   PROJECT FOLDER (WAV, usable in other programs), else browser storage as a CACHE (losing it loses no work: it is recomputed from notes).
+   Cache key = freeze signature (`freezeSig`) + track id; a stale cache entry is discarded.
+2. **Chunk paging** (streaming): the audio-thread store keeps only chunks near the playhead (and around the brace), the rest loaded ahead;
+   `frz-reader` already reads by chunks — needs a "need chunk k" protocol and look-ahead (by `SCHED_AHEAD` and the bar).
+3. **Opus as an optional low-memory mode** for weak phones — by choice only, never default (WebCodecs; encoder delay → overlapping chunks
+   or one stream; never MP3: encoder padding breaks joins).
+4. **"Notes and tail only"** (decision 3(a)): ≈ 3 of ≈ 49 MB on the seed, ≈ 14 % on the demo — together with (1)/(2), as storage segments.
+5. **Memory budget** — ✅ a guard exists since AF3 (`AF_BUDGET_MB`: 300 MB touch / 1 GB desktop; over it a track stays live, skipped, no
+   eviction). AF6 may replace "skip" with "the farthest inaudible tracks stay events".
+6. Without the frozen-track worklet — Float32 as before (named in `CLAUDE.md`); pack that path too if it turns out common.
+7. ⚠️ **Found at AF3 (part 0b): Chrome never collects an `OfflineAudioContext` that called `audioWorklet.addModule`** (measured: a
+   20-s context with only `addModule` stays alive with its rendered buffer, +7.32 MB; a plain one is collected). Every render keeps its
+   context and engine-copy graph. Fixed at AF3: the rendered Float32 data are DETACHED after packing (`render.releaseBuf`) — the big part
+   (≈ 9.4 MB for a 50-s track). NOT fixed: the graph itself (nodes, delay lines, the KS worklet scope) of every past render stays pinned —
+   size not measured (internal memory). With auto-freeze ON every settled edit is a render. Options: load the KS worklet into the render
+   context only when the track uses a KS timbre (non-KS renders become collectable); measure process memory over 100 renders first.
 
 ### ⬜ Подмена буфером (AF2) — остаток: хвосты ударов и живой сети роли на перекрёсте (записано при AF2; не срочно)
 При подмене без паузы (перекрёст 20 мс на такте) голоса аккордов, баса и соло дорожки срезаются точно, но (1) удары, уже поставленные до

@@ -220,7 +220,7 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
 import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
-import { autoFreeze, freezeQueue, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
+import { autoFreeze, freezeQueue, afActive, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -1278,26 +1278,35 @@ function maxRel(eng, evs){
    помечен `installed:false` и причиной, ui говорит об этом словами.
    ⛳ СЕМЯ — ОТ ID ДОРОЖКИ (A2), а не одно на всех: два одинаковых дубля сохраняют каждый свою
    гуманизацию, а перезаморозка той же дорожки даёт то же исполнение. Явное opt.seed по-прежнему главнее. */
+/* Release a rendered buffer's Float32 data by detaching its channels (AF3 part 0b: measured — every render's buffer stayed alive,
+   because Chrome never collects an OfflineAudioContext that called audioWorklet.addModule). AudioBuffer.length stays. */
+function releaseBuf(b){
+  if(!b||typeof b.getChannelData!=='function') return;
+  try{ for(let c=0;c<b.numberOfChannels;c++){ const ab=b.getChannelData(c).buffer; if(ab.byteLength) structuredClone(ab,{transfer:[ab]}); } }catch(e){}
+}
 const seedOfLane=id=>(SEED_A ^ Math.imul((id|0)+1, 0x9E3779B1))>>>0;   // +1 — чтобы id 0 не дал ровно SEED_A (семя зонда)
 async function freeze(layer, opt){
   const o0=opt||{};
-  if(!o0.noPin) REC.freezePinCaptures(layer);   // o.noPin — ТОЛЬКО проба очереди (P.checkFreezeQueue): поддельный рендер не смеет оставить песне приколотый захват   // как ❄ в редакторе (ui.onFreeze): у ДОРОЖКИ без захвата вовсе — снимок сейчас (одному, самому раннему взятому; S1); рендер живую цепь не читает, поэтому цепь у дорожки нужна ВСЕГДА. Взятое без захвата внутри захваченной дорожки играет её цепью (fxLaneMerge) и не прикалывается. Повторный вызов ничего не делает
+  if(!o0.noPin) REC.freezePinCaptures(layer);   // o.noPin — the auto-freeze queue (it never pins; chain-less tracks are skipped) and probes   // как ❄ в редакторе (ui.onFreeze): у ДОРОЖКИ без захвата вовсе — снимок сейчас (одному, самому раннему взятому; S1); рендер живую цепь не читает, поэтому цепь у дорожки нужна ВСЕГДА. Взятое без захвата внутри захваченной дорожки играет её цепью (fxLaneMerge) и не прикалывается. Повторный вызов ничего не делает
   const tk=REC.freezeTicket(layer);
   if(!tk) throw new Error('нет дорожки '+layer);
   const o={...(opt||{})}; if(o.seed==null) o.seed=seedOfLane(tk.id);
   if(o.solo==null) o.solo=LIVE.fxSnapshot(chainKeyOf('ld'));   // договор заморозки: соло без карты — снимок ЖИВОЙ цепи В МИГ БИЛЕТА (тот же, что сложила подпись); сдвинули ручку, пока ждали очередь или рендер, — freezeSet откажет по подписи
   const r=await (o.renderFn||renderTrack)(layer, o);   // o.renderFn — ТОЛЬКО проба очереди: поддельный рендер (буфер-пустышка), билет и freezeSet — настоящие
-  /* AF6b: 16 БИТ — упаковка кусками, с уступками кадрам (десятки мс счёта на длинной дорожке не ложатся на один кадр). r.buf (Float32)
-     остаётся в отчёте рендера (пик, rms, длина — их читает P.seed); в реестр заморозки он не попадает. */
+  /* AF6b: 16-bit packing in slices (yields to frames). After install the report's Float32 data are released (releaseBuf) — Chrome pins an
+     offline context that loaded a worklet, and with it the rendered buffer; length, peak and rms stay readable. */
   r.pack=await REC.frzPackAsync(r.buf);
-  let res=REC.freezeSet(tk, r);
+  const bytes= r.pack ? r.pack.bytes : (r.buf&&r.buf.length ? r.buf.length*r.buf.numberOfChannels*4 : 0);
+  let res= o.admit && !o.admit(bytes) ? 'budget' : REC.freezeSet(tk, r);   // AF3: o.admit — the auto-freeze memory budget, on the exact packed size
   if(res===true) res=await REC.frzWhenReady(layer);   // AF6b-fix: играющей заморозка становится, когда поток звука доложил «готов» (данные и чтец на месте); за это время она могла устареть — тогда отказ словом
   r.installed = res===true;
   r.refused = res===true ? null : res;
+  if(!o.keepBuf && !(r.installed && !r.pack)) releaseBuf(r.buf);   // AF3/0b: the 16-bit store holds the track; the Float32 copy would stay pinned by the offline context
   /* eslint-disable no-console */
   if(!o.quiet) console.log(res===true ? '  ❄ дорожка L'+(layer+1)+' ЗАМОРОЖЕНА: транспорт играет буфер вместо её событий'
     : res==='lane' ? '  ⛔ буфер ОТВЕРГНУТ: за время рендера номер слоя '+layer+' перешёл к другой дорожке (или её нет)'
     : res==='sig'  ? '  ⛔ буфер ОТВЕРГНУТ: дорожка изменилась за время рендера (правка, дубль, тоника/A4/темп) — играет свои события'
+    : res==='budget' ? '  ⛔ not installed: over the auto-freeze memory budget'
     :                '  ⛔ не удалось зарегистрировать заморозку (нет движка?)');
   /* eslint-enable no-console */
   return r;
@@ -1742,7 +1751,7 @@ async function swapCheck(){
   if(REC.loop.on||REC.recording) return { ...out, why:'the transport is playing or recording — stop it first' };
   if(REC.editIsOpen()) return { ...out, why:'the track editor is open — close it first' };
   if(REC.laneSoloOn()) return { ...out, why:'a track is soloed — un-solo it first' };
-  if(autoFreeze()) return { ...out, why:'R.autoFreeze is ON — turn it off first' };
+  if(afActive()) return { ...out, why:'auto-freeze is running — run it as P.* (the probe lock pauses it) or R.autoFreeze(false)' };
   try{ await LIVE.probeCaptureReady(); }catch(e){ return { ...out, why:'the capture worklet did not load — '+(e&&e.message) }; }
   const key=chainKeyOf('ch'), keepAll=[];
   for(const e of fxChainOf(key)){ const I=LIVE.fxInstance(key,e.fxId); if(I&&I.params) for(const p of I.params) keepAll.push([p,p.cur]); }
@@ -1973,7 +1982,7 @@ async function chunkCheck(){
   if(REC.loop.on||REC.recording) return { ...out, why:'the transport is playing or recording — stop it first' };
   if(REC.editIsOpen()) return { ...out, why:'the track editor is open — close it first' };
   if(REC.laneSoloOn()) return { ...out, why:'a track is soloed — un-solo it first' };
-  if(autoFreeze()) return { ...out, why:'R.autoFreeze is ON — turn it off first' };
+  if(afActive()) return { ...out, why:'auto-freeze is running — run it as P.* (the probe lock pauses it) or R.autoFreeze(false)' };
   try{ await LIVE.probeCaptureReady(); }catch(e){ return { ...out, why:'the capture worklet did not load — '+(e&&e.message) }; }
   const keepBpm=REC.loop.bpm, keepBrace=REC.braceProbe(null), rate=LIVE_AC.sampleRate, CH=REC.FRZ_CHUNK, tStart=performance.now();
   let ly=null, soloOn=false;

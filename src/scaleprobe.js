@@ -77,7 +77,7 @@ import { L, t, withLang } from './i18n.js';   // T7: подписи типов �
 import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName, stripProbe } from './draw.js';   // AR2-fix: stripProbe — тексты полосы игры на заданной ширине   // AR2: имя и цвет дорожки (P.checkTrackLook)
 import { INSTR_COL, LANE_NOROLE_COL } from './config.js';   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi } from './ui.js';
-import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
+import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, afBegin, afEnd, afTick, afHint, afPause, afIdle, afBusy, afActive, AF_DELAY } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
 import { setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
@@ -87,7 +87,7 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
          laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
-         unfreezeLayer, laneLenOf, frozenInfo } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
@@ -437,6 +437,7 @@ const ALL_RUNS=[
   ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AF1 freeze queue',()=>checkFreezeQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['AF3 auto-freeze watcher',()=>checkAutoFreeze(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['write path (funnels)',()=>checkWrite(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F4 behaviour as data',()=>checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F8 root alone',      ()=>checkRootAlone(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1315,11 +1316,15 @@ export async function checkQueue(){
 const volAmpOf=v=>{ const x=v>0?(v<1?v:1):0; return x*x; };   // та же кривая, что config.volAmp (проба не тянет config ради одной строки)
 /* ═══ AR1: ОКНО АРАНЖИРОВКИ — P.checkArrange ═══
    Окно открывается ТЕМ ЖЕ входом, что ✎ (ui.arrApi — функции кнопок), и для КАЖДОЙ дорожки, пролистав строки (laneRow0): строка нарисована
-   в окне (снимок loopView с full) и целиком на экране; попадание по ней — «вооружить» у заголовка, «открыть» по телу, M / S / ❄ в гнёздах —
+   в окне (снимок loopView с full) и целиком на экране; попадание по ней — «вооружить» у заголовка, «открыть» по телу, M / S в гнёздах —
    ЕЁ слой; число МИНИАТЮР строки = число её сегментов (высотная роль — songSegs) или ударов (ударные — songNotes); тап «открыть» (тот же
    вход, что тап) открывает в редакторе ИМЕННО её. Окно времени ОБЩЕЕ в обе стороны: задано в окне — тем же отрезком нарисован редактор
    (rollGeom), задано в редакторе — тем же отрезком нарисовано окно после возврата (arrGeom). Кадры ждёт сама: await P.checkArrange().
-   Окно, прокрутку и отрезок времени возвращает как были. Нужен запущенный звук и непустая песня; во время записи — отказ. */
+   Окно, прокрутку и отрезок времени возвращает как были. Нужен запущенный звук и непустая песня; во время записи — отказ.
+   AF4: no ❄ control anywhere on a row; the freeze DOT read from the drawn snapshot (loopView.dots): with auto-freeze driven by a probe
+   clock and a held fake render — the rendering row is filled (pulsing), a waiting row hollow, frozen rows and a row stale only by the
+   tonic show nothing; CONTROL: the rendering row must not read as waiting (and the two must differ). The play strip draws no dots, and
+   with nothing armed its mark column stays closed although a track is frozen and one is stale (no ❄, no stale mark). */
 export async function checkArrange(){
   const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
@@ -1342,12 +1347,45 @@ export async function checkArrange(){
       const at=(x,want)=>{ const h=loopHit(x,y); if(!h||h.layer!==ly||h.what!==want) miss(`L${ly+1}: a tap at x ${Math.round(x)} gives ${h?h.what+' L'+(h.layer+1):'nothing'}, not ${want}`); };
       at(V.x0-8,'arm'); at(V.x0+V.bw/2,'open');   // AR2: левее ИМЕНИ теперь ручка перестановки — вооружает тап по имени (у кромки дорожки)
       const seen=new Set(); for(let x=V.tx0; x<V.tx0+160; x++){ const h=loopHit(x,y); if(h&&h.layer===ly) seen.add(h.what); }
-      for(const w of ['mute','solo','frz']) if(!seen.has(w)) miss(`L${ly+1}: its ${w} button is not hittable`);
+      for(const w of ['mute','solo']) if(!seen.has(w)) miss(`L${ly+1}: its ${w} button is not hittable`);
+      for(let x=V.hx0; x<V.tx0+160; x+=2){ const h=loopHit(x,y); if(h&&h.what==='frz'){ miss(`L${ly+1}: a ❄ control is still hittable at x ${x}`); break; } }   // AF4
       cases++; const M=V.mini&&V.mini.get(ly);
       const nSeg=SV.segs.filter(s=>s.layer===ly).length, nHit=NV.notes.filter(n=>n.layer===ly&&n.role==='dr').length;
       if(!M) miss(`L${ly+1}: no miniature drawn`);
       else if(M.items.length!==(nSeg||nHit)) miss(`L${ly+1}: ${M.items.length} miniatures, ${nSeg?nSeg+' segments':nHit+' hits'}`);
     }
+    // ---- AF4: the freeze dot (hollow = waiting, pulsing = rendering, nothing when frozen or live by choice) ----
+    { setLaneRow0(0); await frame(); await frame();
+      const V0=loopViewProbe(), vis=V0&&V0.rows||[];
+      const cand=vis.filter(ly=>freezeState(ly)==='none' && laneHasChain(ly));
+      if(cand.length<2) miss('freeze dot: fewer than two unfrozen tracks visible in the window — run await P.seed({replace:true})');
+      else { let T=0, open=null; const gateP=new Promise(r=>{ open=r; }), mine=[];
+        const fake=async()=>{ await gateP; return { buf:LIVE_AC.createBuffer(2,128,LIVE_AC.sampleRate), startSec:0.5, endSec:0.5, tailSec:0, pinned:{ tonic, aRef, bpm:loop.bpm }, ms:{ layoutMs:1 } }; };
+        const keepT=tonic;
+        if(!afBegin({ now:()=>T, gates:{ recording:()=>false, clip:()=>false, pinch:()=>false }, ctx:()=>({ p:0, end:songBeats(), rgn:null }),
+                      opt:{ renderFn:fake }, layers:cand.slice(0,2) })) miss('freeze dot: auto-freeze is busy — run again');
+        else try{
+          T+=50; afTick(); T+=AF_DELAY.change+50; const s0=afTick();
+          const R0= s0.startsWith('start:L') ? +s0.slice(7)-1 : null, W0=cand.slice(0,2).find(x=>x!==R0);
+          if(R0==null) miss(`freeze dot: no render started (${s0})`);
+          else { mine.push(R0,W0); cases+=2;
+            await frame(); await frame();
+            const V=loopViewProbe(), dR=V&&V.dots&&V.dots.get(R0), dW=V&&V.dots&&V.dots.get(W0);
+            if(!dR||dR.st!=='run'||!dR.filled) miss(`freeze dot: the rendering row L${R0+1} reads ${dR?dR.st+(dR.filled?' (filled)':' (hollow)'):'nothing'}, expected a pulsing (filled) dot`);
+            if(!dW||dW.st!=='wait'||dW.filled) miss(`freeze dot: the waiting row L${W0+1} reads ${dW?dW.st+(dW.filled?' (filled)':' (hollow)'):'nothing'}, expected a hollow dot`);
+            if(dR&&(dR.st==='wait'||(dW&&dR.st===dW.st&&dR.filled===dW.filled))) miss('freeze dot CONTROL: the rendering row reads as waiting — the two states are not told apart');
+            for(const ly of vis) if(ly!==R0&&ly!==W0){ const d=V.dots.get(ly); if(d&&d.st){ miss(`freeze dot: L${ly+1} (not in the queue) shows a ${d.st} dot`); break; } }
+            open(); await qRunning(); T+=50; const s1=afTick(); if(s1.startsWith('start:')) await qRunning();
+            cases++; await frame(); await frame();
+            const V2=loopViewProbe();
+            for(const ly of [R0,W0]){ const d=V2.dots.get(ly); if(freezeState(ly)!=='fresh') miss(`freeze dot: L${ly+1} is ${freezeState(ly)} after its render`); else if(d&&d.st) miss(`freeze dot: the frozen row L${ly+1} still shows a ${d.st} dot`); }
+            cases++; setTonic((keepT+2)%12); T+=50; afTick(); T+=AF_DELAY.retune+100; afTick(); await frame(); await frame();
+            const V3=loopViewProbe(), d3=V3.dots.get(R0);
+            if(freezeState(R0)!=='stale') miss(`freeze dot: after a tonic change L${R0+1} should be stale (live by choice), it is ${freezeState(R0)}`);
+            if(d3&&d3.st) miss(`freeze dot: L${R0+1}, stale only by the tonic (live by choice), shows a ${d3.st} dot`);
+            setTonic(keepT); }
+        } finally { open(); try{ await qRunning(); }catch(e){} afEnd(); if(tonic!==keepT) setTonic(keepT); for(const ly of mine) if(ly!=null&&freezeState(ly)!=='none') unfreezeLayer(ly); }
+      } }
     // ---- открыть каждую дорожку из окна; окно времени — общее в обе стороны ----
     const W1={ b0:4, span:12 };
     arrApi.setWin(W1.b0, W1.span); await frame(); await frame();
@@ -1369,6 +1407,15 @@ export async function checkArrange(){
     arrApi.closeTrack(); await frame(); await frame();
     const w2=arrGeom();
     if(!g2 || !w2 || !near(w2.beat0,want.b0) || !near(w2.span,want.span) || !near(g2.span,want.span)) miss(`zoom set in the editor (${want.b0}/${want.span}) is not the arrangement's after returning (${w2&&w2.beat0}/${w2&&w2.span})`);
+    // ---- AF4: the play strip draws no freeze dot and no ❄ / stale mark ----
+    { cases++; arrApi.close(); const fz=L.find(ly=>freezeState(ly)==='fresh'), keepT=tonic;
+      if(fz==null) miss('strip: no frozen track to look at (the seed freezes one)');
+      else { setTonic((keepT+2)%12); await frame(); await frame();
+        const V=loopViewProbe();
+        if(!V||V.full) miss('strip: the play strip is not drawn after closing the window');
+        else { if(V.dots) miss('strip: the play strip carries freeze dots');
+          if(armedLayer()==null && V.markW) miss(`strip: nothing is armed, yet the mark column is open (${V.markW} px) — a freeze or stale mark is drawn`); }
+        setTonic(keepT); } }
   } finally {
     if(rollOpen) arrApi.closeTrack();
     if(arrOpen) arrApi.close();
@@ -1376,7 +1423,7 @@ export async function checkArrange(){
   }
   console.log(`[scaleprobe arrange] tracks ${L.length} · cases ${cases} · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe arrange] '+m));
-  if(!nBad) console.log('[scaleprobe arrange] every track has its row in the arrangement — drawn, on screen, hittable (arm, open, M, S, ❄) — with one miniature per segment or hit; a row opens exactly its track; the time window is shared both ways');
+  if(!nBad) console.log('[scaleprobe arrange] every track has its row in the arrangement — drawn, on screen, hittable (arm, open, M, S; no ❄) — with one miniature per segment or hit; a row opens exactly its track; the time window is shared both ways; the freeze dot is hollow while waiting, pulsing while rendering, absent when frozen or live by choice, and never on the play strip');
   return { cases, song:L.length, total:nBad, differences:bad };
 }
 /* ═══ AR2: ИМЕНА, ЦВЕТА И ПОРЯДОК ДОРОЖЕК — P.checkTrackLook ═══
@@ -1560,7 +1607,7 @@ export async function checkFreezeQueue(){
   if(recording||loop.on){ miss('the transport is playing or recording — stop it first'); return out(); }
   if(laneSoloOn()){ miss('a track is soloed — un-solo it first (audibility is part of the priority)'); return out(); }
   const R=await import('./render.js');
-  if(R.autoFreeze()){ miss('R.autoFreeze is ON — turn it off (R.autoFreeze(false)) before this probe'); return out(); }
+  if(afActive()){ miss('auto-freeze is running — run this as P.* (the probe lock pauses it)'); return out(); }
   /* ---- (1) чистая функция приоритета ---- */
   { const ctx={p:10,end:100,rgn:null}, it=(id,audible,b0,b1)=>({id,layer:id,audible,b0,b1});
     const items=[it(1,false,0,200),it(2,true,50,60),it(3,true,5,20),it(4,true,0,5),it(5,true,12,30)];
@@ -1672,6 +1719,135 @@ export async function checkFreezeQueue(){
   notes.forEach(m=>console.log('[scaleprobe freeze-queue] '+m));
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe freeze-queue] '+m));
   if(!nBad) console.log('[scaleprobe freeze-queue] the queue takes audible tracks near the playhead first, starts nothing while recording or recording a clip (and stops before the layout if that begins after the pick), waits on a pinch when the layout costs a frame, never installs a stale buffer and renders a track that kept changing once, with its final signature');
+  return out();
+}
+/* ═══ ⛳ AF3: THE AUTO-FREEZE WATCHER — P.checkAutoFreeze (row 'AF3 auto-freeze watcher', P.quick and P.all) ═══
+   Deterministic: the watcher and queue run with a probe clock and hand-driven ticks (afBegin/afTick, 50-ms steps), renders are fakes
+   (a 128-sample buffer through the real ticket and freezeSet), the watcher looks at one track only (hook.layers). Cases: each trigger
+   makes a candidate after its delay and not before (start within one step after it) — default change, pan (held, then released),
+   editor (open = held; editClose is the real site), take end (recording gate, then the hint), undo, backing, row delete, song load;
+   five edits 0.6 s apart → exactly one render, 1 s after the last; level → no render; tonic, A4, tempo → no render while
+   AF_REFREEZE_ON_RETUNE is off; budget skip (no render, not retried); an editor-created track carries a pinned chain.
+   CONTROLS that must fail: a settle clock that does not reset (dbg.noReset) renders before the edits end; a watcher that reacts to
+   level (dbg.level) renders; with re-freeze on retune (dbg.retune) a tonic change renders; with the default budget the skipped track
+   renders. Everything restored in finally: pans, levels, tonic, A4, tempo, the probe's frozen tracks, the probe's track. ≈ 1–2 s. */
+export async function checkAutoFreeze(){
+  const bad=[], notes=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  const out=()=>({ cases, song:L.length, total:nBad, differences:bad, notes });
+  if(!L.length) return { cases:0, song:0, total:0, differences:[], notes };
+  if(!LIVE_AC){ miss('audio is not started (press ▶ Play)'); return out(); }
+  if(editIsOpen()||rollOpen||arrOpen){ miss('the track editor or the arrangement is open — close it first'); return out(); }
+  if(recording||loop.on){ miss('the transport is playing or recording — stop it first'); return out(); }
+  await import('./render.js');   // the queue's runner (render.freeze)
+  const A=L.find(ly=>freezeState(ly)==='none' && !laneMuted(ly) && laneHasChain(ly) && !events.some(e=>e.layer===ly&&e.fn==='drone'));
+  if(A==null){ miss('the song has no unfrozen track with a chain — run await P.seed({replace:true})'); return out(); }
+  const Lb=x=>'L'+(x+1), STEP=50, MB=1048576;
+  let T=0; const G={ rec:false }, calls=[];
+  const fake=async(layer)=>{ calls.push({ layer, T }); await new Promise(r=>setTimeout(r,0));
+    return { buf:LIVE_AC.createBuffer(2,128,LIVE_AC.sampleRate), startSec:0.5, endSec:0.5, tailSec:0, pinned:{ tonic, aRef, bpm:loop.bpm }, ms:{ layoutMs:1 } }; };
+  const hook={ now:()=>T, gates:{ recording:()=>G.rec, clip:()=>false, pinch:()=>false }, ctx:()=>({ p:0, end:songBeats(), rgn:null }),
+               opt:{ renderFn:fake }, layers:[A], dbg:{}, budgetMB:null };
+  const keep={ pan:lanePanOf(A), lvl:laneLevelOf(A), tonic, aRef, bpm:loop.bpm };
+  let made=null;
+  /* advance the probe clock by ms in STEP ticks; returns the probe times of renders started */
+  const run=async ms=>{ const st=[]; for(let x=0;x<ms;x+=STEP){ T+=STEP; const s=afTick(); if(s.startsWith('start:')){ st.push(T); await qRunning(); } } return st; };
+  const pans=[0.21,-0.33,0.47,-0.12,0.3,-0.4,0.15,-0.25,0.38,-0.05,0.27,-0.18];
+  let pi=0; const nudge=()=>setLanePan(A, pans[(pi++)%pans.length]);
+  /* one trigger: act() at t0 (the change and its hint); no render before t0+delay, one within two steps after */
+  const trial=async(label, delay, act, pre)=>{ cases++;
+    if(freezeState(A)!=='fresh'){ miss(`${label}: ${Lb(A)} is not fresh before the case (${freezeState(A)})`); return; }
+    if(pre){ const early=await pre(); if(early.length){ miss(`${label}: rendered while held (at +${early[0]} ms)`); return; } }
+    const t0=T; act();
+    const st=await run(delay+3*STEP);
+    const at=st.length ? st[0]-t0 : null;
+    if(at==null) miss(`${label}: no render within ${delay+3*STEP} ms (delay ${delay} ms)`);
+    else if(at<delay) miss(`${label}: rendered ${at} ms after the trigger — before its ${delay}-ms delay`);
+    else if(at>delay+2*STEP) miss(`${label}: rendered ${at} ms after the trigger — later than its ${delay}-ms delay plus two steps`);
+    if(st.length>1) miss(`${label}: ${st.length} renders, expected one`);
+    if(freezeState(A)!=='fresh') miss(`${label}: ${Lb(A)} is ${freezeState(A)} after its render`);
+    notes.push(`${label}: render ${at} ms after the trigger (delay ${delay} ms)`); };
+  if(!afBegin(hook)){ miss('auto-freeze is busy (a render is running or another probe drives it) — run again'); return out(); }
+  try{
+    /* (0) the first scan finds the unfrozen track: default delay */
+    { cases++; const st=await run(AF_DELAY.change+3*STEP);
+      if(st.length!==1 || freezeState(A)!=='fresh') miss(`first scan: expected one render of ${Lb(A)} after ${AF_DELAY.change} ms, got ${st.length} (${freezeState(A)})`);
+      else if(st[0]<AF_DELAY.change) miss(`first scan: rendered at ${st[0]} ms, before ${AF_DELAY.change} ms`); }
+    /* (1) each trigger */
+    await trial('any change (no hint)', AF_DELAY.change, ()=>nudge());
+    await trial('pan (held, then released)', AF_DELAY.pan, ()=>{ nudge(); afHint('pan'); },
+      async()=>{ afHint('panHold'); nudge(); return run(2000); });
+    await trial('editor (open = held; real editClose)', AF_DELAY.editor, ()=>editClose(),
+      async()=>{ editOpen(A); nudge(); const r=await run(2000); return r; });
+    await trial('take end (recording gate, then the hint)', AF_DELAY.take, ()=>{ G.rec=false; afHint('take'); },
+      async()=>{ G.rec=true; nudge(); return run(2000); });
+    for(const k of ['undo','backing','rowDelete','song']) await trial(k, AF_DELAY[k], ()=>{ nudge(); afHint(k); });
+    /* (2) repeated edits within the settle time — exactly one render, after the last */
+    const burst=async label=>{ calls.length=0; const t0=T; let tl=0;
+      for(let i=0;i<5;i++){ nudge(); afHint('pan'); tl=T; await run(600); }
+      const st=await run(AF_DELAY.pan+3*STEP); return { n:calls.length, first: calls.length ? calls[0].T-t0 : null, last:tl-t0, st }; };
+    { cases++; const b=await burst('burst');
+      if(b.n!==1) miss(`five pan moves 600 ms apart: expected exactly one render, got ${b.n}`);
+      else if(b.first<b.last+AF_DELAY.pan) miss(`five pan moves: the render came ${b.first} ms after the first move, before the last move + ${AF_DELAY.pan} ms (${b.last+AF_DELAY.pan})`);
+      notes.push(`five moves 600 ms apart: ${b.n} render at +${b.first} ms (last move at +${b.last} ms)`);
+      cases++; hook.dbg.noReset=true; const c=await burst('control'); hook.dbg.noReset=false;
+      if(c.n<=1 && !(c.first!=null && c.first<c.last+AF_DELAY.pan)) miss('CONTROL (settle clock that does not reset): it still gave one render after the last move — the case cannot fail');
+      notes.push(`control, clock not reset: ${c.n} render(s), first at +${c.first} ms`);
+      await run(AF_DELAY.pan+3*STEP); }
+    /* (3) level never triggers; control: a watcher that reacts to level */
+    { cases++; calls.length=0; setLaneLevel(A, keep.lvl===0.5?0.6:0.5); await run(3000); setLaneLevel(A, keep.lvl); await run(3000);
+      if(calls.length) miss(`level: moving ${Lb(A)}'s level gave ${calls.length} render(s) — level is not in the frozen sound`);
+      cases++; hook.dbg.level=true; await run(STEP); calls.length=0; setLaneLevel(A, keep.lvl===0.5?0.6:0.5); await run(3000);
+      hook.dbg.level=false; setLaneLevel(A, keep.lvl);
+      if(!calls.length) miss('CONTROL (a watcher that reacts to level): no render — the level case cannot fail');
+      notes.push(`level: 0 renders; control reacting to level: ${calls.length}`); await run(500); }
+    /* (4) tonic, A4, tempo: no render while the switch is off (the track plays live); restored → fresh again */
+    for(const [name, set, back] of [['tonic', ()=>setTonic((keep.tonic+2)%12), ()=>setTonic(keep.tonic)],
+                                    ['A4', ()=>setARef(keep.aRef===440?442:440), ()=>setARef(keep.aRef)],
+                                    ['tempo', ()=>setLoopBpm(keep.bpm+12), ()=>setLoopBpm(keep.bpm)]]){ cases++;
+      calls.length=0; set(); await run(3000);
+      const st=freezeState(A); back(); await run(1000);
+      if(calls.length) miss(`${name}: a change re-rendered ${Lb(A)} although AF_REFREEZE_ON_RETUNE is off`);
+      if(st!=='stale') miss(`${name}: after the change ${Lb(A)} should be stale (playing its events), it is ${st}`);
+      if(freezeState(A)!=='fresh') miss(`${name}: restored, ${Lb(A)} should be fresh again, it is ${freezeState(A)}`); }
+    { cases++; hook.dbg.retune=true; calls.length=0; const t0=T; setTonic((keep.tonic+2)%12); await run(AF_DELAY.retune+3*STEP);
+      hook.dbg.retune=false; setTonic(keep.tonic); await run(500);
+      if(!calls.length) miss('CONTROL (re-freeze on tonic/A4/tempo switched on): a tonic change gave no render — the case cannot fail');
+      else if(calls[0].T-t0<AF_DELAY.retune) miss(`CONTROL (retune): rendered ${calls[0].T-t0} ms after the change, before its ${AF_DELAY.retune}-ms delay`);
+      notes.push(`tonic/A4/tempo: 0 renders; control with the switch on: ${calls.length} render at +${calls.length?calls[0].T-t0:'—'} ms`); }
+    /* (5) memory budget: over it → skipped, not retried; control: the default budget renders it */
+    { cases++; calls.length=0; hook.budgetMB=frzBytesTotal()/MB+0.001; nudge(); afHint('pan'); await run(3000);
+      const en=qState().entries.find(e=>e.id===laneIdOf(A));
+      if(calls.length) miss(`budget: ${calls.length} render(s) over the budget`);
+      if(!en || en.state!=='skip' || !en.skip || en.skip.why!=='budget') miss(`budget: ${Lb(A)} should be listed as skipped (budget), got ${en?en.state+(en.skip?' '+en.skip.why:''):'no entry'}`);
+      cases++; hook.budgetMB=null; await run(2000);
+      if(calls.length) miss('budget: the skipped track was retried without a change');
+      cases++; nudge(); afHint('pan'); await run(AF_DELAY.pan+3*STEP);
+      if(calls.length!==1) miss(`CONTROL (budget): with the default budget and a change the track should render once, got ${calls.length}`);
+      notes.push(`budget: skipped and not retried; default budget: ${calls.length} render`); }
+    /* (6) an editor-created track carries a pinned chain (and the pin is in the insert's history entry) */
+    { cases++; const ly=Math.max(...L)+1;
+      if(editOpen(ly) && editInsertHit(0,0)){ made=ly;
+        if(!laneHasChain(ly)) miss(`editor-created track ${Lb(ly)}: no captured chain after the first insert`);
+        const ci=captureInfoOf(ly); if(!ci||!ci.takes) miss(`editor-created track ${Lb(ly)}: captureInfoOf reports no captured take`);
+        cases++; editUndo(); if(events.some(e=>e.layer===ly)) miss(`editor-created track: ↶ left its events`);
+        editRedo(); if(!laneHasChain(ly)) miss('editor-created track: ↷ brought the insert back without its chain');
+      } else miss(`editor-created track: could not open the editor on ${Lb(ly)} and insert a hit`);
+      editClose(); }
+  }catch(err){ miss('the probe failed: '+(err&&err.stack||err)); }
+  finally{
+    try{ await qRunning(); }catch(e){}
+    afEnd();
+    if(editIsOpen()) editClose();
+    if(made!=null && events.some(e=>e.layer===made)){ laneDelTap(made); laneDelTap(made); }
+    if(tonic!==keep.tonic) setTonic(keep.tonic); if(aRef!==keep.aRef) setARef(keep.aRef); if(loop.bpm!==keep.bpm) setLoopBpm(keep.bpm);
+    if(lanePanOf(A)!==keep.pan) setLanePan(A, keep.pan); if(laneLevelOf(A)!==keep.lvl) setLaneLevel(A, keep.lvl);
+    if(freezeState(A)!=='none') unfreezeLayer(A);
+  }
+  console.log(`[scaleprobe auto-freeze] ${Lb(A)} · cases ${cases} · differences ${nBad}`);
+  notes.forEach(m=>console.log('[scaleprobe auto-freeze] '+m));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe auto-freeze] '+m));
+  if(!nBad) console.log('[scaleprobe auto-freeze] every trigger makes its track a candidate after its own delay and not before, an edit burst gives one render after it ends, level and tonic/A4/tempo give none, a track over the memory budget is skipped and not retried, an editor-created track carries a pinned chain — and the controls show each case could fail');
   return out();
 }
 /* ═══ ⛳ AF1: ЗАМЕР — РАСКЛАДКА НА ГЛАВНОМ ПОТОКЕ И ПАМЯТЬ ЗАМОРОЖЕННЫХ БУФЕРОВ — P.freezeCost() (по запросу, не в P.all) ═══
@@ -2003,6 +2179,9 @@ export async function seed(opt={}){
     setScaleId(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev); setChordModeSel(keep.cm);
   }
   tracks();
+  const pinned=songPinChains();   // AF3: song load pins the live chain on every track without one (auto-freeze never does)
+  SEED_REC.pinned=pinned.length;
+  console.log(`[scaleprobe seed] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned${pinned.length?' ('+pinned.map(l=>'L'+(l+1)).join(', ')+')':''}`);
   const M=material();
   console.log(`[scaleprobe seed] built ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. Now run P.all().`);
   return { built, events:events.length, material:M };
@@ -2017,6 +2196,8 @@ export async function song(name='triphop', opt={}){
   const r=await S.loadSong(name, opt);
   if(!r) return null;
   SEED_REC={ kind:'song', name:r.name, takes:r.takes, edited:[], freeze:null };
+  const pinned=songPinChains(); SEED_REC.pinned=pinned.length;   // AF3: song load pins the live chain on chain-less tracks
+  console.log(`[scaleprobe song] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned`);
   const M=material();
   console.log(`[scaleprobe song] «${r.name}»: ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. P.all() checks it.`);
   return { name:r.name, events:events.length, material:M };
@@ -2944,10 +3125,12 @@ export function api(){
     if(typeof v!=='function' || n==='api'){ API[n]=v; continue; }
     API[n]=(...args)=>{
       if(LOCK){ const why=lockWhy(n); console.warn('[probe] '+why); return n==='all'||n==='quick' ? { pass:false, refused:true, why } : { refused:true, why }; }
-      LOCK=n; let r;
-      try{ r=v(...args); }catch(e){ LOCK=null; throw e; }
-      if(r && typeof r.then==='function') return r.finally(()=>{ LOCK=null; });
-      LOCK=null; return r;
+      LOCK=n; afPause('probe',true);   // AF3: the auto-freeze watcher is paused while any probe runs; a render in flight finishes first
+      const done=()=>{ LOCK=null; afPause('probe',false); };
+      let r;
+      try{ r= afBusy() ? afIdle().then(()=>v(...args)) : v(...args); }catch(e){ done(); throw e; }
+      if(r && typeof r.then==='function') return r.finally(done);
+      done(); return r;
     };
   }
   return API;

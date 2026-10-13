@@ -9,8 +9,9 @@ import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INST
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT, fxPerm, timbresOf, masterLevel, masterMeter } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) столбика не рисует   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
+import { hooks } from './hooks.js';   // AF4: hooks.afRow — the arrangement window's freeze dot (set by frzqueue.js)
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
-         laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer, freezeState,   // F5: состояние заморозки дорожки — 'none'|'fresh'|'stale'. Владелец реестра — recorder (правило #5), draw только рисует значок
+         laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
          songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, editLayer as rollTrackLayer, chordMoveTy, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from './recorder.js';   // AR2: имя, порядок показа, роль и тембр дорожки одним проходом   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
@@ -493,11 +494,11 @@ const LANE_TOG_W=21, LANE_TOG_GAP=2;
 const LANE_DEL_GAP=6, LANE_DEL_COL='#e5484d';
 const LANE_MUTE_COL='#e5a23c', LANE_SOLO_COL='#57d9a3';   // заглушено — янтарь (внимание), соло — тот же зелёный, что у «играет»
 const LANE_OFF_A=0.34;                                    // прозрачность НЕСЛЫШНОЙ строки
-/* КОЛОНКА ЗНАЧКОВ СТРОКИ (E0-fix): своя полоса между подписью «L1» и линейкой, есть только пока есть значки (см.
-   drawLooper). Гнёзда — от кромки коробки: красная точка вооружения (центр +7, радиус 3.5 → 3.5…10.5), ❄ заморозки
-   (+13, 11px ≈ до +23), точка «устарело» (+24, радиус 2 → до +26; то же расстояние от ❄, что было всегда). Ширина
-   28 — с зазором до линейки. */
-const MARK_COL_W=28, ARM_DOT_X=7, FRZ_MARK_X=13, FRZ_STALE_DX=11;
+/* Mark column of a strip row (E0-fix): between the name column and the lane, present only while a row is armed (the red dot).
+   AF4: freezing shows nothing on the play strip (no ❄, no stale mark). */
+const MARK_COL_W=28, ARM_DOT_X=7;
+/* AF4: the arrangement window's freeze dot — at the right end of the row header; hollow = waiting to freeze, pulsing = rendering. */
+const ARR_DOT_W=10, ARR_DOT_R=3, ARR_DOT_PULSE_MS=180;
 /* ⛳ ПОЛОСА ДОРОЖЕК ПО ВЫСОТЕ ЭКРАНА (починка «дорожки дальше 16-й не видны»). Прежде коробка росла на rowH с каждой дорожкой БЕЗ
    ПРЕДЕЛА: на экране высотой ~400–450 px строки ниже ~16-й (и HTML-транспорт под коробкой — ▶, ⤺, ✎…) уходили за нижний край, и до
    них было не дотянуться ни тапом (вооружить, M/S, ✕), ни редактором (✎ открывает вооружённую дорожку). Теперь видимых строк — сколько
@@ -613,7 +614,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      Поэтому кнопки идут СПРАВА внутри коробки, а линейка ровно на столько же короче.
      ⚠️ ЦЕНА ВИДИМАЯ И НАЗВАННАЯ: сетка долей, метки событий и бегунок стали уже. Но ВСЕ ТРИ одинаково —
      они считаются из ОДНОГО loopView, поэтому разъехаться не могут (правило #9). */
-  const togBand= FULL ? ARR_BTN_W*3+ARR_BTN_GAP*2+8 : LANE_TOG_W*3+LANE_TOG_GAP*2+LANE_DEL_GAP+6;   // AR1: у окна три гнезда под палец — M, S, ❄    // три гнезда (M, S, ✕) + зазоры + отступ ✕ + отступ от линейки. На 380px линейка 290→261px
+  const togBand= FULL ? ARR_BTN_W*2+ARR_BTN_GAP+8 : LANE_TOG_W*3+LANE_TOG_GAP*2+LANE_DEL_GAP+6;   // window: M, S (AF4: ❄ removed); strip: M, S, ✕ + gaps
   const nIds=new Set(events.map(e=>e.layer)).size;   // дорожек с событиями — для заголовка («N дорожек»)
   /* ⛳ AR2: СТРОКИ — В ПОРЯДКЕ ПОКАЗА (recorder.laneOrder — один на окно, микшер, полосу игры и чип редактора): место, поставленное
      человеком, иначе номер слоя (умолчание прежнее); во время записи в конец — ещё пустые слои взятого (их строка видна с ●). */
@@ -631,7 +632,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      исчезновении первого значка вся линейка сдвигается на эту ширину. Геометрия — ИЗ СНИМКА: x0 снимка — начало
      ЛИНЕЙКИ (от него считают метки, сетка, скоба, бегунок и попадание), bx0 — кромка коробки (от неё — подпись
      и зоны попадания «вооружить»/«скоба»). Гнёзда M/S/✕ не двигаются: линейка ровно на столько же короче. */
-  const markCol = !FULL && rows.some(l=>(!recording&&l===armLy) || freezeState(l)!=='none');   // AR1: у окна значкам место в заголовке и на кнопке ❄ — колонки нет
+  const markCol = !FULL && rows.some(l=>!recording&&l===armLy);   // AF4: only the arm dot needs the column (freezing shows nothing on the strip)
   const markW = markCol ? MARK_COL_W : 0;
   const SC = FULL ? null : stripCols(W, markW);   // AR2-fix: горизонталь полосы игры — ОДНА функция ширины (её же гоняет проба на разных ширинах)
   const nameW = FULL ? 0 : SC.nameW;             // AR2: колонка ИМЕНИ дорожки (у полосы игры; у окна имя — в заголовке)
@@ -664,7 +665,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      первого гнезда переключателей. */
   loopView={ x0:lx0, bx0:x0, bw, beat0, span, gy0, rowH, rows:visRows, tx0:x1+6, by0:y0+headH, hy0:y0,
              over, row0:r0, nAll, visN, sx1: FULL ? W : x0+sw+10, sx0: FULL ? 0 : x0-28,
-             full:FULL, hx0:ARR_MARGIN, mini: FULL ? new Map() : null,
+             full:FULL, hx0:ARR_MARGIN, mini: FULL ? new Map() : null, dots: FULL ? new Map() : null, markW,   // AF4: dots — the freeze dot drawn per visible window row (probe); markW — strip mark column
              all:allRows, look:new Map(), nameW, mx0, frame: FULL ? [0,W] : [SC.fx0,SC.fx1],   // AR2-fix: frame — рамка, внутри которой обязан лежать каждый текст строки (проба)   // AR2: all — ВСЕ строки в порядке показа (ui: место перестановки); look — нарисованные имя и цвет видимых строк (их сверяет проба); nameW/mx0 — колонка имени полосы игры и начало колонки значков
              mix:MIX, ...mixGeom(lx0,bw), ms: MIX ? { y0:gy1+footH+8, y1:gy1+footH+8+MIX_MASTER_H } : null };   // MX1: mix — лицо микшера; fx0/fw — ход фейдера; ms — полоса мастера   // AR1: full — окно аранжировки; hx0 — левый край колонки заголовков; mini — миниатюры видимых строк (слой → записи; их сверяет проба); sx0 — левый край зоны прокрутки строк   // ⛳ rows — ВИДИМЫЕ строки (их рисуем и ловим); over/row0/nAll/visN — окно прокрутки (ui листает по ним); sx1 — правая кромка коробки   // E0-fix: x0 — начало ЛИНЕЙКИ (с колонкой значков сдвинуто), bx0 — кромка коробки   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
 
@@ -803,7 +804,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     ctx.fillStyle=live?'rgba(229,72,77,.16)':'rgba(255,255,255,.04)';
     if(FULL) ctx.fillRect(ARR_MARGIN,ry+1,hdrW+bw,rowH-2);   // AR1: фон — от колонки заголовка до конца дорожки
     else ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2);          // AR2: с колонкой имени.   E0-fix: фон строки — вместе с колонкой значков (она часть строки); без колонки markW=0 — как было
-    if(FULL) Object.assign(loopView.look.get(lid), arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6, rowH, lid===armLy && !recording, name, col));   // AR2-fix: где встали тексты заголовка (проба: внутри рамки)
+    if(FULL) Object.assign(loopView.look.get(lid), arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6-ARR_DOT_W, rowH, lid===armLy && !recording, name, col));   // AF4: the header leaves room for the freeze dot   // AR2-fix: где встали тексты заголовка (проба: внутри рамки)
     else{ const RT=stripRowText(lid, SC, name);   // AR2-fix: «L#» и ИМЯ — в колонке имени, внутри рамки (прежде «L#» висел левее коробки и торчал за рамку)
       ctx.textAlign='left';
       ctx.fillStyle= (lid===armLy && !recording) ? '#ff6b6f' : 'rgba(255,255,255,.5)'; ctx.fillText(RT.lbl, RT.lblX0, mid+0.5);   // вооружена — «L#» красный (как прежде)
@@ -821,32 +822,15 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
       ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,nameW+markW+bw-2,rowH-3);   // AR2: и колонка имени внутри.   рамка — вокруг ВСЕЙ строки, колонка значков внутри неё
       ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(mx0+ARM_DOT_X,mid,3.5,0,7); ctx.fill();   // AR2: колонка значков — за колонкой имени (mx0).   E0-fix: точка — в колонке значков (armed ⇒ колонка есть), а не на линейке
     }
-    /* ⛳ ИНДИКАТОР ЗАМОРОЗКИ (F5) — ТОЛЬКО ЗНАЧОК, без кнопки: на строке уже три органа управления и
-       подпись в шестнадцати пикселях, четвёртый под палец не попал бы. Сама кнопка живёт в баре
-       РЕДАКТОРА. ⛳ Геометрия — ИЗ ТОГО ЖЕ СНИМКА loopView (правило #9): значок садится на левый край
-       дорожки, где для него есть место, и едет вместе со строкой.
-       ТРИ СОСТОЯНИЯ, РАЗЛИЧИМЫЕ С ОДНОГО ВЗГЛЯДА НА 380px: голубая ❄ — свежая (играет буфер);
-       оранжевая ❄ с точкой — УСТАРЕЛА (правили после заморозки, играет СВОИ СОБЫТИЯ); ничего — не
-       заморожена. Цвет несёт смысл сам, подпись рядом не нужна — её место занято.
-       ⛳ E0-fix: ЗНАЧОК — В КОЛОНКЕ ЗНАЧКОВ, ВСЕГДА НА ОДНОМ МЕСТЕ, за гнездом красной точки (frozen ⇒ колонка есть).
-       Первая редакция E0 лишь сдвигала его вправо на вооружённой строке — и сдвигала прямо на ноты линейки. Теперь
-       у точки и у ❄ свои гнёзда в колонке, ни друг на друга, ни на линейку они не заходят ни в одном сочетании
-       (вооружена / свежая / устарела); точка «устарело» — на прежнем расстоянии от значка. */
-    const fzs=freezeState(lid);
-    if(FULL){   // AR1: M / S / ❄ — кнопки под палец; ❄ залита по состоянию (голубая — свежая, оранжевая — устарела)
+    if(FULL){   // window: M / S under the finger; AF4: the freeze dot (no ❄, no stale mark) at the header's right end
       const st=ARR_BTN_W+ARR_BTN_GAP;
       laneTog(loopView.tx0,      ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL, ARR_BTN_W);
       laneTog(loopView.tx0+st,   ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL, ARR_BTN_W);
-      laneTog(loopView.tx0+2*st, ry,rowH,'❄', fzs!=='none', fzs==='stale'?'#f5a524':'#4cc2ff', ARR_BTN_W);
+      const dot= hooks.afRow ? hooks.afRow(lid) : null, dx=ARR_MARGIN+hdrW-ARR_DOT_W/2-3;
+      if(dot==='run'){ ctx.fillStyle=`rgba(255,255,255,${(0.3+0.35*(0.5+0.5*Math.sin(performance.now()/ARR_DOT_PULSE_MS))).toFixed(3)})`; ctx.beginPath(); ctx.arc(dx,mid,ARR_DOT_R,0,7); ctx.fill(); }
+      else if(dot==='wait'){ ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(dx,mid,ARR_DOT_R,0,7); ctx.stroke(); }
+      loopView.dots.set(lid, { st:dot, filled: dot==='run', x:dx, y:mid });
       return; }
-    if(fzs!=='none'){
-      const fresh=fzs==='fresh', fx = mx0 + FRZ_MARK_X;   // AR2: колонка значков начинается за колонкой имени
-      ctx.fillStyle = fresh?'#4cc2ff':'#f5a524';
-      ctx.font='600 11px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText('❄', fx, mid);
-      if(!fresh){ ctx.beginPath(); ctx.arc(fx+FRZ_STALE_DX,ry+5,2,0,7); ctx.fill(); }   // точка «устарело»: отличает и в оттенках серого
-      ctx.textBaseline='alphabetic';
-    }
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);
     /* S3.5d: ✕ — залит красным, пока удаление взведено; строка при этом краснеет поверх (видно, КАКАЯ дорожка уйдёт). */
@@ -2647,12 +2631,11 @@ export function loopHit(px,py){
   if(V.ms && py>=V.ms.y0 && py<V.ms.y1) return (px>=V.x0-8 && px<V.x0+V.bw+8) ? { what:'mlevel' } : null;   // MX1: полоса мастера — фейдер мастера
   if(py<V.gy0 || py>=V.gy0+V.rows.length*V.rowH) return null;
   const ri=Math.floor((py-V.gy0)/V.rowH);
-  /* ⛳ AR1: ОКНО АРАНЖИРОВКИ — гнёзда M / S / ❄ под палец; ТЕЛО строки (дорожка) — открыть её в редакторе; заголовок — вооружить. Зоны —
-     из ТОГО ЖЕ снимка, что нарисован. */
+  /* Window: M / S under the finger (AF4: no ❄); the row body opens the track in the editor; the header arms. Zones from the drawn snapshot. */
   if(V.full){
     const st=ARR_BTN_W+ARR_BTN_GAP, dx=px-V.tx0;
     if(V.mix && px>=V.x0 && px<V.x0+V.bw) return { layer:V.rows[ri], what: px>=V.px0 ? 'pan' : 'level' };   // MX1: в лице микшера тело строки — фейдер; MX2: правый блок — панорама
-    if(dx>=0){ const k=Math.floor(dx/st); return k<3 ? { layer:V.rows[ri], what:['mute','solo','frz'][k] } : null; }
+    if(dx>=0){ const k=Math.floor(dx/st); return k<2 ? { layer:V.rows[ri], what:['mute','solo'][k] } : null; }
     if(px>=V.x0 && px<V.x0+V.bw) return { layer:V.rows[ri], what:'open', beat:laneBeatAt(V,px) };
     if(px>=V.hx0 && px<V.hx0+ARR_HANDLE_W) return { layer:V.rows[ri], what:'move', row:V.row0+ri };   // AR2: РУЧКА — перестановка (row — место строки в общем порядке)
     if(px>=V.hx0 && px<V.x0) return { layer:V.rows[ri], what:'arm', name:true };   // AR2: name — тап по ИМЕНИ (двойной — переименовать, ui)

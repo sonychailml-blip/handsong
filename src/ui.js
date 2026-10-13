@@ -33,7 +33,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          laneOrder, moveLane, laneNameOf, setLaneName,   // AR2: порядок показа (один на все виды), перестановка, имя дорожки
-         freezeState, unfreezeLayer, freezePinCaptures, recLayers, editViewCheck } from './recorder.js';   // F5: ЗАМОРОЗКА — состояние для показа, разморозка и «есть ли взятое без захвата» (одноразовое известие). Сам рендер зовётся ЛЕНИВЫМ импортом render.js — см. onFreeze   // O-4: полоса автоматизации и цепь САМОЙ ДОРОЖКИ — вся правка живёт в recorder, ui только зовёт   // S5.5: правка баса идёт по СЕГМЕНТАМ   // S5.1: правки и отмена ПРАВОК живут в recorder — ui только зовёт   // S5.0: отказы и открытая дорожка живут в recorder — ui только зовёт   // дорожки (S1): состояние держит recorder, ui только зовёт переключатель; повтор и СКОБА (S3.5b) — там же
+         recLayers, editViewCheck } from './recorder.js';   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -444,7 +444,7 @@ const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTimbreEl=$('rollTimbre'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
-      rollRowsBtn=$('rollRows'), rollFrzBtn=$('rollFrz'), rollFrzStateEl=$('rollFrzState');   // F5: заморозка — в баре РЕДАКТОРА (на строке полосы лупера её ставить некуда: там уже три кнопки в 16 px)
+      rollRowsBtn=$('rollRows');
 /* ⛳ РОЛЬ РЕДАКТОРА — РОЛЬ ДОРОЖКИ (T4). Вкладок ролей больше нет: с T2 в дорожке ровно одна роль, и
    селектор с одним вариантом был бы шумом. Роль читаем у recorder (laneRoleOf — из событий дорожки) РОВНО
    в двух местах: на открытии редактора и на смене дорожки. Между ними она не перечитывается — дорожку
@@ -592,7 +592,7 @@ arrFitBtn.onclick=()=>setRollWinClamped(0, rollTotal()+loop.metre);
    времени через ТОТ ЖЕ зажим. Звать из консоли — это нажать кнопки рукой. */
 export const arrApi={ open:openArr, close:closeArr, openTrack:ly=>openRoll(ly), closeTrack:()=>closeRoll(), setWin:(b0,span)=>setRollWinClamped(b0,span),
   face:f=>{ setArrFace(f); applyArrFace(); } };   // MX1: лицо окна — как кнопкой
-/* ЖЕСТЫ ОКНА. Один палец: тап (без сдвига больше LANE_SCROLL_PX) — действие строки на ОТПУСКАНИИ (открыть, M, S, ❄, вооружить); сдвиг —
+/* ЖЕСТЫ ОКНА. Один палец: тап (без сдвига больше LANE_SCROLL_PX) — действие строки на ОТПУСКАНИИ (открыть, M, S, вооружить); сдвиг —
    по ПЕРВОМУ направлению: вдоль — прокрутка времени (доля под пальцем держится), поперёк — прокрутка строк. Два пальца — зум с якорем в
    середине (как в редакторе). Полоса скобы — сразу, как на полосе игры (тап ставит край, тащить — общий pointermove скобы выше). */
 const arrPts=new Map(); let arrG=null, arrZoom=null;
@@ -609,6 +609,10 @@ const panDet=v=>{ const x=Math.max(-1,Math.min(1,v)); return Math.abs(x)<PAN_DET
 function levelOf(h){ return h.what==='mlevel' ? masterLevel() : h.what==='pan' ? lanePanOf(h.layer) : laneLevelOf(h.layer); }
 function setLevelOf(h,v){ if(h.what==='mlevel') setMasterLevel(v); else if(h.what==='pan') setLanePan(h.layer,panDet(v)); else setLaneLevel(h.layer,v); }
 const isFader=h=>!!h && (h.what==='level'||h.what==='mlevel'||h.what==='pan');
+/* AF3: a held pan control holds auto-freeze; its release (or a wheel step, a double tap) starts the 1-s settle. Level never triggers. */
+let panHeld=false;
+const panHold=()=>{ panHeld=true; if(hooks.af) hooks.af('panHold'); };
+const panRelease=()=>{ if(!panHeld) return; panHeld=false; if(hooks.af) hooks.af('pan'); };
 function arrDown(e){
   const p=arrXY(e); arrPts.set(e.pointerId,p);
   const g=arrGeom(); if(!g){ arrG=null; return; }
@@ -618,8 +622,9 @@ function arrDown(e){
     if(h && h.what==='move'){ arrG={ h, x:p.x, y:p.y, move:true, to:h.row, scrollT:0 }; setLaneDrag({ layer:h.layer, to:h.row }); return; }   // AR2: ручка — перестановка (порядок пишется на отпускании)
     if(isFader(h)){
       const key= h.what==='mlevel' ? 'm' : (h.what==='pan'?'P':'L')+h.layer, now=performance.now(), S=loopScroll();
-      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h, h.what==='pan'?0:1); arrG=null; return; }   // двойной тап — единица (панорама — центр)
+      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h, h.what==='pan'?0:1); arrG=null; if(h.what==='pan'){ panHeld=true; panRelease(); } return; }   // двойной тап — единица (панорама — центр)
       levelTap={ key, t:now };
+      if(h.what==='pan') panHold();
       const span= h.what==='pan' ? 2 : 1, fw= h.what==='pan' ? Math.max(PAN_DRAG_PX,g.pfw) : h.what==='mlevel' ? g.mfw : g.fw;   // ход ручки: значение на пиксель
       arrG={ h, x:p.x, y:p.y, v0:levelOf(h), fw:fw/span, r0:S?S.row0:0, rowH:g.rowH, axis:null, level:true }; return; }
     const S=loopScroll();
@@ -699,7 +704,6 @@ if(laneNameIn){
 }
 function arrAct(h){
   if(h.what==='open'){ openRoll(h.layer); return; }
-  if(h.what==='frz'){ onFreeze(h.layer); return; }
   if(h.what==='arm'){ const pre=armedLayer(); toggleArm(h.layer); updRecBtn(); if(h.name) nameTapDouble(h.layer,pre); return; }   // AR2: второй тап по имени — переименовать (вооружение возвращается)
   if(h.what==='mute') toggleLaneMute(h.layer); else if(h.what==='solo') toggleLaneSolo(h.layer);
 }
@@ -708,13 +712,14 @@ function arrUp(e){
   arrPts.delete(e.pointerId);
   if(arrPts.size<2) arrZoom=null;
   if(arrPts.size) return;
+  panRelease();
   const G=arrG; arrG=null;
   if(G && G.move){ setLaneDrag(null); moveLane(G.h.layer, G.to); return; }   // AR2: перестановка — на отпускании (на месте — ничего)
   if(G && !G.axis && G.h && !G.level) arrAct(G.h);   // MX1: тап по фейдеру — ничего (двойной — единица, в arrDown)
 }
 addEventListener('pointermove',  e=>{ if(arrOpen&&!rollOpen) arrMove(e); });
 addEventListener('pointerup',    e=>{ if(arrOpen&&!rollOpen) arrUp(e); });
-addEventListener('pointercancel',e=>{ if(arrOpen&&!rollOpen){ arrPts.delete(e.pointerId); arrG=null; arrZoom=null; setLaneDrag(null); } });
+addEventListener('pointercancel',e=>{ if(arrOpen&&!rollOpen){ arrPts.delete(e.pointerId); arrG=null; arrZoom=null; setLaneDrag(null); if(!arrPts.size) panRelease(); } });
 /* Колесо окна: Ctrl/⌘ — зум под курсором; при прокручиваемых строках вертикальное колесо — строки; иначе (и Shift / горизонтальное) — время. */
 addEventListener('wheel', e=>{
   if(!arrOpen || rollOpen || e.target!==canvasEl) return;
@@ -725,7 +730,7 @@ addEventListener('wheel', e=>{
   if(g.mix){   // MX1: колесо над фейдером — уровень (шаг 1 из 100), иначе строки
     const h=loopHit(px, e.clientY-canvasEl.getBoundingClientRect().top);
     if(isFader(h)){ const v=levelOf(h) - Math.sign(e.deltaY)*0.01;   // MX2: у панорамы колесо идёт шагом 1 мимо фиксации (иначе из центра не выйти)
-      if(h.what==='pan') setLanePan(h.layer, Math.max(-1,Math.min(1,v))); else setLevelOf(h, Math.max(0,Math.min(1,v))); return; } }
+      if(h.what==='pan'){ setLanePan(h.layer, Math.max(-1,Math.min(1,v))); panHeld=true; panRelease(); } else setLevelOf(h, Math.max(0,Math.min(1,v))); return; } }
   const S=loopScroll();
   if(S && !e.shiftKey && Math.abs(e.deltaY)>=Math.abs(e.deltaX)){ setLaneRow0(laneRow0Clamp(S.row0+Math.sign(e.deltaY))); return; }
   const d= Math.abs(e.deltaX)>Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -766,17 +771,6 @@ function updRollBtns(){
     rollShapeEl.classList.toggle('act', !!(st&&st.s)); }
   rollUndoBtn.disabled = !editCanUndo();   // T5: без `ro` — на подложке в истории бывает замена тембра, и её отмена законна (прочих ходов там нет: их правки отказывают)
   rollRedoBtn.disabled = !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
-  /* ⛳ ЗАМОРОЗКА (F5). Три состояния, различимые с одного взгляда: ❄ синяя — свежая, ❄ оранжевая —
-     устарела (правили после заморозки; звучит СВОИМИ СОБЫТИЯМИ), серая — не заморожена.
-     ⛔ Правка НЕ ЗАПРЕЩЕНА: человек затем и правит, чтобы переморозить. Поэтому кнопка при устаревании
-     не блокируется, а меняет подпись на «Переморозить». */
-  const fst=frzBusy?'busy':freezeState(editLayer());
-  rollFrzBtn.disabled = frzBusy;   // ⛳ ПОДЛОЖКУ МОРОЗИТЬ МОЖНО: `ro` запрещает ПРАВКУ, а заморозка ничего не правит — это режим воспроизведения
-  rollFrzBtn.classList.toggle('act',  fst==='fresh');
-  rollFrzBtn.classList.toggle('warn', fst==='stale');
-  rollFrzBtn.title = t(fst==='none'?'frz.freeze':fst==='stale'?'frz.refreeze':'frz.unfreeze');
-  rollFrzStateEl.textContent = fst==='fresh'?'❄ '+t('frz.frozen') : fst==='stale'?'❄ '+t('frz.stale') : '';
-  rollFrzStateEl.className = fst==='stale'?'warn':'';
   const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
   const hid = !s.free && !s.drawn;
   rollSnapEl.textContent='⌗ '+lbl+(hid?' '+t('roll.snapHidden'):'');
@@ -960,42 +954,6 @@ addEventListener('keydown', e=>{
   e.preventDefault();                                  // Backspace вне поля не должен уводить браузер «назад»
   if(!rollDelBtn.disabled) rollDeleteSel();
 });
-/* ═══════════ ⛳ ЗАМОРОЗКА ДОРОЖКИ (F5) ═══════════
-   ⛳ ОДНА КНОПКА НА ТРИ ДЕЙСТВИЯ, ПО СОСТОЯНИЮ: не заморожена → заморозить; устарела → ПЕРЕМОРОЗИТЬ;
-   свежая → разморозить. Так у человека одна ❄, а не три кнопки, из которых две всегда мертвы.
-   ⛳ РЕНДЕРНЫЙ МОДУЛЬ ТЯНЕМ ЛЕНИВО, ПРЯМО ЗДЕСЬ. Он поднимает ВТОРУЮ КОПИЮ ДВИЖКА (десятки узлов), и
-   платить за неё должен только тот, кто нажал ❄. ⛔ Статическим импортом его тянуть нельзя: он попал
-   бы в стартовую загрузку всем, включая тех, кто заморозкой не пользуется.
-   ⚠️ ЖДАТЬ ПРИДЁТСЯ ПО-НАСТОЯЩЕМУ (около 1.5× реального времени на плотной дорожке), поэтому:
-     • прогресс НАСТОЯЩИЙ там, где браузер даёт suspend у офлайн-контекста, и ЧЕСТНО НЕОПРЕДЕЛЁННЫЙ,
-       где не даёт. ⛔ Выдуманных процентов не показываем;
-     • кнопка на время рендера ВЫКЛЮЧЕНА, а всё остальное приложение работает как обычно — можно
-       играть, можно закрыть редактор. ⚠️ ОТМЕНИТЬ РЕНДЕР НЕЛЬЗЯ: у startRendering нет прерывания, и
-       перестань мы ждать промис, процессор всё равно доработает до конца. Кнопки «отмена» поэтому НЕТ —
-       она была бы враньём; повторное нажатие ❄ во время ожидания просто отклоняется с этой надписью. */
-let frzBusy=false, frzNoticeShown=false;
-async function onFreeze(lyArg){   // AR1: lyArg — дорожка с ❄ строки окна аранжировки; без него — открытая в редакторе
-  /* ⛔ БЕЗ rollRefuseRO: заморозка — НЕ ПРАВКА. Подложка read-only для редактирования, но её буфер
-     ничем не хуже любого другого, а снимется он вместе с ней (clearJam → lanePrune → freezeDrop). */
-  if(frzBusy){ showCamMsg(t('frz.noCancel')); return; }
-  const ly= lyArg!=null ? lyArg : editLayer(); if(ly==null) return;
-  if(freezeState(ly)==='fresh'){ unfreezeLayer(ly); showCamMsg(t('frz.dropped')); updRollBtns(); return; }
-  /* T4: дорожка, опустошённая правками, — морозить нечего. Рендер отказал бы сам, но исключением с
-     внутренним текстом; говорим это словами интерфейса. */
-  if(!events.some(e=>e.layer===ly)){ showCamMsg(t('frz.empty')); return; }
-  /* ⚠️ ОДНОРАЗОВОЕ ИЗВЕСТИЕ. Дорожка со вставленными в редакторе нотами шла ЗА ЖИВОЙ ЦЕПЬЮ; заморозка
-     ПРИКАЛАЧИВАЕТ её к цепи в том виде, как та стоит сейчас. Звук не меняется, но живые ручки до неё
-     больше не дотянутся — до сих пор это происходило МОЛЧА. Говорим один раз за сессию. */
-  if(freezePinCaptures(ly) && !frzNoticeShown){ frzNoticeShown=true; showCamMsg(t('frz.pinned')); }
-  frzBusy=true; updRollBtns(); showCamMsg(t('frz.working'));
-  try{
-    const R=await import('./render.js');
-    const r=await R.freeze(ly, { onProgress:p=>{ showCamMsg(p==null?t('frz.working'):t('frz.workingPct',{pct:Math.round(p*100)})); } });
-    showCamMsg(t(r&&r.installed ? 'frz.done' : 'frz.refused'));   // A2: буфер мог быть ОТВЕРГНУТ билетом (дорожка изменилась за время рендера) — «заморожена» тогда была бы неправдой
-  }catch(e){ showCamMsg(t('frz.failed',{msg:(e&&e.message)?e.message:String(e)})); }
-  finally{ frzBusy=false; updRollBtns(); }
-}
-rollFrzBtn.onclick=()=>onFreeze();   // AR1: стрелкой — иначе событие клика пришло бы как номер дорожки   // S5.3: возврат правки; выделение снимаем — оно могло указывать на то, чего сейчас нет
 /* ⏮ — бегунок в начало. ТОТ ЖЕ seekTo, что и тап по линейке: перемотка одна на все входы (она сама решает,
    идёт ли транспорт, гасит голоса дорожек и сбрасывает курсоры). Второго пути перемотки не заводим. */
 rollHomeBtn.onclick=()=>seekTo(0);

@@ -966,6 +966,7 @@ function deleteLane(layer){
   curChordDeg=-1;                               // подсветка аккорда петли могла принадлежать снятой дорожке; следующий chOn выставит заново
   laneHush();
   if(!events.length) clearRec(); else hooks.loop && hooks.loop(loop.on);
+  if(hooks.af) hooks.af('rowDelete');           // AF3: a row delete may untie a pair — its partner goes stale
   return true;
 }
 /* ⛳ ПРЕДИКАТ СЛЫШИМОСТИ — ОДИН НА ОБА ПУТИ ПЕРЕИГРОВКИ (scheduleLayers и fireNear).
@@ -1041,7 +1042,7 @@ function setLanePan(layer,p){
   const id=laneOf(layer) ?? laneNew(layer), x=Math.round(Math.max(-1,Math.min(1,+p||0))*100)/100 || 0;   // || 0 — без «−0»
   if(x===0) lanePan.delete(id); else lanePan.set(id,x);
   if(AC) AUD.trackPanRetune(k=> layerOfOwner(k)===layer ? x : null);
-  frzSigMemo.delete(layer);
+  frzSigMemo.delete(layer); frzWatchVer++;   // AF3: pan is outside frzGlobalKey — the watcher's key reads this version
   droneSync();
   return true;
 }
@@ -1305,6 +1306,34 @@ function freezePinCaptures(layer){
   if(Ts.some(T=>takeFx.has(T.tk))) return false;             // у дорожки есть своя цепь — прикалывать нечего
   const E=autEarliest(Ts); takeCapStart(E.tk);
   return takeFx.has(E.tk);
+}
+/* ═══ AF3: what the auto-freeze WATCHER reads (frzqueue.js). Pure reads except songPinChains. ═══ */
+/* Watch key: frzGlobalKey + a version bumped by signature inputs outside it (pan) + the live solo chain when some solo note has no map
+   (those notes sound with the live chain, soloLiveSig). Polled ~4×/s; signatures are recomputed only when it moves. */
+let frzWatchVer=0, frzNoFxKey=null, frzNoFxAny=false;
+function frzWatchKey(){
+  const k=events.length+'|'+evGen;
+  if(frzNoFxKey!==k){ frzNoFxKey=k; frzNoFxAny=events.some(e=>e.a&&e.a.fx==null&&(e.fn==='leadOn'||e.fn==='leadSet')); }
+  return frzGlobalKey()+'|w'+frzWatchVer+(frzNoFxAny?soloLiveSig():'');
+}
+/* Stale ONLY because tonic, A4 or tempo moved (field 5 of the signature; user decision: no re-render on these until the tonic freeze). */
+const frzSigNoRetune=s=>{ const p=s.split('|'); if(p.length>5) p[5]='*'; return p.join('|'); };
+function frzRetuneOnly(layer){
+  const f=frzOf(layer); if(!f||f.drop) return false;
+  const cur=freezeSig(layer);
+  return cur!==f.sig && frzSigNoRetune(cur)===frzSigNoRetune(f.sig);
+}
+/* Does the track own an effect chain (a captured take)? Auto-freeze never pins one silently; empty track → nothing to pin. */
+function laneHasChain(layer){ const Ts=autTakesOf(layer); return !Ts.length || Ts.some(T=>takeFx.has(T.tk)); }
+/* Bytes held by frozen tracks (playing and pending), and by one track — the memory budget (AF3, until AF6). */
+function frzBytesTotal(){ let n=0; for(const f of frozen.values()) if(!f.drop) n+=f.bytes||0; for(const f of frzPend.values()) n+=f.bytes||0; return n; }
+const frzBytesOf=layer=>{ const id=laneOf(layer); if(id==null) return 0; const f=frozen.get(id), q=frzPend.get(id); return Math.max(f&&!f.drop?f.bytes||0:0, q?q.bytes||0:0); };
+/* Song load (P.seed, P.song, a future import): every track without a captured chain gets the live chain pinned NOW, once — so auto-freeze
+   never has to. Returns the layers pinned. */
+function songPinChains(){
+  const out=[]; for(const ly of [...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b)) if(freezePinCaptures(ly)) out.push(ly);
+  if(hooks.af) hooks.af('song');
+  return out;
 }
 /* ⛳ БИЛЕТ ЗАМОРОЗКИ (A2) — что именно рендер берётся заморозить, снятое ДО рендера: слой, ID дорожки и
    подпись. Рендер идёт секунды; за это время в дорожку могут влить дубль, отменить взятое (и номер слоя
@@ -1815,7 +1844,7 @@ function editOpen(layer){
   editLane=id; editHist=[]; editFuture=[]; editTake=0;   // S5.1/S5.3: сессия правки начинается с чистыми историей И будущим
   return true;
 }
-function editClose(){ editLane=null; editHist=[]; editFuture=[]; editTake=0; }
+function editClose(){ const was=editLane!=null; editLane=null; editHist=[]; editFuture=[]; editTake=0; if(was&&hooks.af) hooks.af('editor'); }   // AF3: leaving the editor is a settle trigger
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkWrite): ВЗЯТОЕ В ПЕСОЧНИЦЕ — шаги сценария проходят НАСТОЯЩУЮ воронку записи (seedTake → push: маршрут,
    ключи, копия карты эффектов, перевод ступени в индекс), получившиеся события отдаются копиями, а песня возвращается как была: события
    (содержимое массива — на месте, правило #28), дорожки без событий снимаются (lanePrune — с ними и захват взятого), состояние взятого
@@ -1890,6 +1919,10 @@ const editPush=u=>{ editHist.push(u); editFuture.length=0; };   // НОВАЯ п
    ⚠️ list строит ВЫЗЫВАЮЩИЙ, и ходы в нём ещё НЕ ПРИМЕНЕНЫ (у 'move' — оба состояния, from и to): применяет их
    editBatch тем же editApply, которым потом ходят ↶/↷, — вперёд и назад по одному пути, а не по двум.
    Вызывающий уже прошёл editGuard. */
+/* AF3: an insert into a track that has no captured chain in any take pins the live chain at that moment (user decision: a track
+   created in the editor gets a snapshot at birth); the 'autcap' step goes FIRST in the same history entry, so ↶ removes both.
+   A track that already has a chain keeps inheriting it (autCaps makes nothing). */
+function editInsPush(layer,u){ const pin=autCaps(layer,true); editPush(pin.ops.length ? { kind:'batch', list:[...pin.ops,u] } : u); }
 function editBatch(list){
   if(!list||!list.length) return false;
   list=tieUntiePass(list);                                     // ⛳ S6: правка края пары связки развязывает ОБЕ половины — той же записью истории
@@ -2444,7 +2477,7 @@ function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — ин�
   const evOn =mk('bassOn', {ti,oct,vol,inst}, t0);   // T4c-2: индекс и регистр, ступени нет
   const evOff=mk('bassOff',{}, t1);
   events.push(evOn,evOff);
-  editPush({ kind:'ins', evs:[evOn,evOff] });
+  editInsPush(layer, { kind:'ins', evs:[evOn,evOff] });
   editCommit(); return evOn;
 }
 /* ═══ ВСТАВКА НОТЫ СОЛО (S4) — ЗЕРКАЛО editInsertBass: бас и соло — один инструмент ═══
@@ -2484,7 +2517,7 @@ function editInsertLead(t,ti,oct,sc,sev,len){
   const evOn =mk('leadOn', fx ? {ti,oct,vol,fx,inst,v} : {ti,oct,vol,inst,v}, t0);   // поля — в порядке записанного «вкл» соло ({...жест, v}), ступени нет
   const evOff=mk('leadOff',{v}, t1);                          // «выкл» соло несёт свой v всегда (как recLeadOff)
   events.push(evOn,evOff);
-  editPush({ kind:'ins', evs:[evOn,evOff] });
+  editInsPush(layer, { kind:'ins', evs:[evOn,evOff] });
   editCommit(); return evOn;
 }
 /* ═══ ВСТАВКА В ДОРОЖКУ АККОРДОВ (S2; ⛳ U5 — правила пользователя) — пара «вкл»+«выкл» со СВЕЖИМ k, как у баса ═══
@@ -2541,7 +2574,7 @@ function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота ко
   const evOn =mk('chOn', bri!=null ? {ti,oct,vol,inst,ty,bri} : {ti,oct,vol,inst,ty}, t0);   // T4c-2: индекс корня и регистр, ступени нет
   const evOff=mk('chOff',{}, t1);
   events.push(evOn,evOff);
-  editPush({ kind:'ins', evs:[evOn,evOff] });
+  editInsPush(layer, { kind:'ins', evs:[evOn,evOff] });
   editCommit(); return evOn;
 }
 function editInsertHit(t,row){
@@ -2552,7 +2585,7 @@ function editInsertHit(t,row){
   if(!editTake) editTake=++takeSeq;
   const ev={ t:Math.max(0,t), layer, fn:'drum', a:{row, vol:d.vol, kit:d.kit}, sc:CUR(), sev:seventh, tk:editTake };
   events.push(ev);
-  editPush({ kind:'ins', evs:[ev] });
+  editInsPush(layer, { kind:'ins', evs:[ev] });
   editCommit(); return ev;
 }
 /* ═══ ЗАМЕНА ТЕМБРА ДОРОЖКИ (слайс T5) ═══
@@ -4701,7 +4734,7 @@ function seekTo(beat){
    ⚠️ ЧТО ● ДЕЛАЕТ СВЕРХ ЭТОГО И ЧЕГО ПАНИКА ДЕЛАТЬ НЕ ДОЛЖНА: зацепки обучения 'overdubStop'/'takeDone'. Паника —
    аварийный выход, а не «записал → услышал»; шаг урока от неё продвигаться не должен. Поэтому зацепки
    остались в onRec, а сюда вынесено только закрытие и остановка. */
-function recStop(){ latchOpenAt=null; recAllOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate(); }   // sort переставил события, а дописанный хвост стал частью отсортированного тела → новая граница cursN
+function recStop(){ latchOpenAt=null; recAllOff(); setRecording(false); events.sort((x,y)=>x.t-y.t); schedInvalidate(); if(hooks.af) hooks.af('take'); }   // AF3: the end of a take (stop, pause, panic) is a settle trigger   // sort переставил события, а дописанный хвост стал частью отсортированного тела → новая граница cursN
 function onRec(){
   if(!AC)return;
   if(editIsOpen())return;   // S5.0: редактор открыт — записывать некуда и незачем (жесты заглушены). ОДИН отказ на все входы: кнопка ●, рука-лупер и всё, что появится позже
@@ -4792,6 +4825,7 @@ function loadArrangement(sel, jam=false){
   if(!loop.on)startTransport(false,0);                 // подложка лежит от начала песни — и играть её начинаем оттуда же
   droneSync();                                         // AR2 (хвост MX2): уровень × уровень ДОРОЖКИ и её панорама — прежний droneOn() брал 0.18 и оставлял панораму прежней (у новой подложки — чужой, после смены панорамы на паузе — устаревшей). Включаем дрон сразу; ⚠️ именно AUDIBLE, а не ACTIVE: заглушённая дорожка дрона не должна зазвучать от добавления соседних слоёв
   if(jam) hooks.tutor && hooks.tutor('loop',{ev:'jam'});   // ЗАЦЕПКА ОБУЧЕНИЯ: джем реально встал (слои добавлены) — урок «Лупер»; только для джема, не для ручной аранжировки
+  if(hooks.af) hooks.af('backing');                    // AF3: a backing loaded or swapped is a settle trigger
   return true;                                         // добавили (джем-контроллер по этому знает, что вариант встал)
 }
 /* Джем — та же аранжировка-shortcut, но её слои ПОМЕЧЕНЫ (e.jam). loadJam кладёт помеченные,
@@ -4818,6 +4852,7 @@ function clearJam(){
   lanePrune();                                         // у слоёв подложки больше нет событий → снимаем их настройки, чтобы не всплыли на следующем джеме с теми же номерами
   softAllOff(); if(!droneActive())droneOff();          // бухгалтерия как в onUndo: гасим зависшее, ушёл слой-дрон → гасим дрон
   if(!events.length)clearRec(); else hooks.loop&&hooks.loop(loop.on);   // пусто → полный сброс; остались записи игрока → петля играет дальше
+  if(hooks.af) hooks.af('backing');                    // AF3
 }
 /* ⟳ — ИГРАТЬ / ПАУЗА. Позиция при паузе СОХРАНЯЕТСЯ, пуск продолжает с неё; если плейхед стоит на
    конце песни (её доиграли или остановили в самом конце) — пуск ПЕРЕМАТЫВАЕТ в начало, потому что
@@ -4874,6 +4909,7 @@ function onUndo(){
   softAllOff(); if(!droneActive())droneOff();           // сняли слой-дрон → гасим (softAllOff дрон не трогает)
   if(!events.length)clearRec(); else hooks.loop && hooks.loop(loop.on);
   hooks.tutor && hooks.tutor('loop',{ev:'undo'});       // ЗАЦЕПКА ОБУЧЕНИЯ: снят верхний слой — урок «Лупер» (дошли только при непустой петле — ранний выход выше)
+  if(hooks.af) hooks.af('undo');                        // AF3: undo of a take is a settle trigger
 }
 /* ⛳ КОНТРОЛ «ТАКТЫ» ПЕРЕЖИЛ СМЕНУ МОДЕЛИ, НО СМЕНИЛ РАБОТУ (S3.3, решение по пункту 8).
    Он задавал ДЛИНУ ПЕТЛИ — величину, которой больше не существует: длина песни выводится из материала
@@ -5050,7 +5086,9 @@ export {
   frzWhenReady,
   /* AF6b-fix2: сколько чтецов живо на потоке звука (только проба: утечки нет) */
   frzReadersAlive,
-  frzGlobalKey,   // A1 (автозаморозка): дешёвый ГЛОБАЛЬНЫЙ сигнал «могла смениться подпись хоть одной дорожки» — для наблюдателя A3/A4. Чистое чтение; сегодня вызывающих нет
+  frzGlobalKey,   // A1: the cheap global "some signature may have changed" key; read through frzWatchKey
+  /* AF3: the auto-freeze watcher (frzqueue.js) — its key, tonic-only staleness, chain presence, memory, song-load pinning */
+  frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf, songPinChains,
   recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен
   freezeSet, unfreezeLayer, frozenLayers, frozenInfo, freezeState, frzHas, freezePinCaptures,   // F4/F5: ЗАМОРОЗКА как РЕЖИМ ВОСПРОИЗВЕДЕНИЯ; freezeState — 'none'|'fresh'|'stale' для показа (звук гатится тем же предикатом внутри)

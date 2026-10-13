@@ -30,8 +30,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `?probe` in the address loads the probe (`window.P`, guarded) and the render/ear tools (`window.R`) and user files (`window.U`).
 
 ## Standing working rules (apply to every slice; prompts don't repeat them)
-- **What a new session reads:** `HANDOFF.md` and this file. Open the archives, `BACKLOG.md` or long code files only for what the
-  slice needs, by `grep`, not top to bottom.
+- **What a new session reads:** `HANDOFF.md` and this file. Open the archives, `BACKLOG.md`, `docs/NAME-INDEX.md` (every code name by
+  module, stale names) or long code files only for what the slice needs, by `grep`, not top to bottom.
 - **Never run git** (not even read-only); never commit. Never run the app, a server, a build, a browser or tests by hand — the two
   probe runners below are the exceptions (they start and stop their own server and browser).
 - ⛳ **Probes before every report — Claude Code runs them and fixes failures until PASS** (user's rule, AUTO-PROBE):
@@ -70,7 +70,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `res.measures`), `--eval file.js` (script in the page after the seed, prints JSON), `--headed` (off-screen window; worse: a drawn
   row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 5; P.quick 3, seed 3, start 3). Full console →
   `tools/.probe-logs/` (git-ignored). Headless is the default because measured: every row runs, P.quick takes the user's manual
-  time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash).
+  time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash). The runner PAUSES auto-freeze for its whole session
+  (`frzqueue.afPause('runner')`; AF3 is checked by its own deterministic row). In `--eval` the page has `window.__heap()` (full GC, then
+  V8 heap usage incl. ArrayBuffer backing stores — memory checks).
 - **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; static import names vs exports with
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
@@ -90,7 +92,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   runs a **state guard** between rows (before/after snapshot of mixer tables, windows, live sound state and the render engine
   copy's switches); probes work with the song loaded and WITHOUT the editor or hands open; they cover DERIVED paths (chase, ghost,
   selection, dissolve, highlights); accepted only at zero. A thin song proves nothing: `await P.seed({replace:true})` builds a
-  deterministic test song; `P.all()` refuses to call a thin song a pass (`material()`). `P.all()` is async — `await` it.
+  deterministic test song; `P.all()` refuses to call a thin song a pass (`material()`). `P.all()` is async — `await` it. While any
+  `P.*` runs the auto-freeze watcher is paused (lock → `afPause('probe')`; a render in flight finishes first); a probe that needs the
+  watcher drives it by hand with its own clock (`afBegin`/`afTick`/`afEnd`), never real time.
 - ⛳ **Commit rule** (user, AR2): `await P.quick()` PASS before every commit; `await P.all()` PASS before commits touching audio,
   rendering, recording or tuning data, and at least weekly — produced by Claude Code's runner since AUTO-PROBE.
 - ⛳ **Console guard** (AUTO-PROBE): `window.P` = `scaleprobe.api()` — every probe function behind one lock; while any probe runs
@@ -225,146 +229,67 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     deleting the FIRST point hands over to the next, the only point can't be deleted, moving the first point later is refused; generated
     ramp events copy `a.vol`; volume can't be removed or reordered (`fxPerm`). Volume 0 is legal. Every new event writer writes `a.vol`.
 
-## Module map (full descriptions: archive, "Module map")
-- `index.html` — markup only: start card (Play / Learn, `#fsBtnStart`, `#installBtn`+`#installHint`, footer `#langSel`/feedback/
-  donate, `#loadmsg`), top bar, three panels (`#panelScale` scale/tonic/A4/layout/fingers/triads; `#panelSound` timbres with voice-mode
-  rows `vmLdPoly`/`vmLdLead`/`vmBsPoly`/`vmBsLead`, hand functions, finger actions, effects constructor; `#panelLoop` backing length/
-  metre/BPM/quantise/division/arrangement), `#backingMenu`, help overlay, `#tutorBar` + `#lessonOv`, transport `#loopTransport`
-  (▶ `loopBtn` · ⟳ `rgnBtn` · ⤺ `undoBtn` · ✕ `clrBtn` · ■ `panicBtn` · ✎ `rollBtn` → arrangement window; ⏮ `rollHome` hidden in play;
-  class `.roll` → only ⏮ ▶, `.arr` → ⏮ ▶ ⟳), `#arrBar` (✕, zoom −/+, ⤢, face 🎚/▤), `#rollBar`, `<video>`/`<canvas>`. Base path relative.
+## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
+- `index.html` — markup only (start card, top bar, panels `#panelScale`/`#panelSound`/`#panelLoop`, `#backingMenu`, help overlay,
+  `#tutorBar`+`#lessonOv`, transport `#loopTransport`, `#arrBar`, `#rollBar`, `<video>`/`<canvas>`); base path relative.
 - `style.css` — all CSS. `manifest.json`/`sw.js` — PWA; the SW is deliberately cache-free (empty `fetch` handler, only so Chromium
   fires `beforeinstallprompt`).
-- `src/config.js` (leaf, imports nothing) — gesture thresholds, scheduler timings, pool sizes, FX-bar and palette geometry
-  (`CH_PAL_*`, `PAL_HYST_X/Y`, `palColX`/`palRowY`, `palSplitX(x0,x1)` — the single palette|notes split), `rectBandY(i,H,nRect)`,
-  `CAM_MARGIN=0.12`, `remapAxis`, `coverView(vw,vh,W,H,M)` (the single cover-crop computation), the volume curve `volAmp(v)=v²`,
-  `volVel(role,a)`, `volFromOld(role,v)=√(floor+(1−floor)·v)` (old floors: solo 0, chords 0.25, bass/drums 0.3), `AUT_RAMP_BEAT` 1/16,
-  `AUT_RAMP_EPS` 0.01, fine recording `REC_FINE_EPS` 0.01 / `REC_AVG_S` 2 / `REC_JUMP_EPS` 0.03 / `REC_HIST_S` 20 / `REC_PAUSE_S` 0.5 /
-  `REC_KNEE_F` 50, `INSTR_COL` (the ONE role palette, different LIGHTNESS: bass #20946b L*54.6, chords #b18cff 66.0, solo #ffb050 77.8,
-  drums #ffe680 91.4), `LANE_NOROLE_COL`, `LANE_NAME_*` (17 % of the strip, 48–100 px), `ARR_ROW_H` 40, `ARR_HANDLE_W` 28.
-- `src/state.js` — cross-cutting musical/layout state + setters: `scaleId`, `tonic`, `aRef` (380–480), `tunedFrom` ('T' or 0..11),
-  `seventh`, instrument indices `leadIdx/chIdx/bassIdx/drumKitIdx`, `fx` = solo-only scalars `{vib, drv, trm}`, `latchDeg/latchTy`,
-  `chordFam/chordVar`, `phoneInstr`, `handFn` (defaults `ld:{fx,note}`, `bs:{note,note}`, `ch:{latch,latch}`, `dr:{hit,hit}`;
-  `setHandFn`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`), `handActs` (finger actions, today `chFam`), `voiceMode`
-  (`{ld:'poly', bs:'lead'}`, `setVoiceMode`, `isLeadMode`), `pinchFingers` (1..4, default 4), `splitOn` + `SPLIT_ROLES` +
-  `phoneHalves(W)` (the only `W/2`), per-role registers `octReg/bassOctReg/chordOctReg` via `rectOctReg(role)`/`setRectOctReg`,
-  `rectPref` ('auto'|'rect'|'rows'), camera (`camFacing`, `mirrored()`, `flipX`, `sx`/`sy`, `viewRect`), `videoRec`, display mirrors
-  (`exprDisp`, `exprBrightDisp`, `looperMsg`/`looperClear`), `chordModeSel`/`chordModeVer`, `laneRow0`, editor/window state (`rollOpen`,
-  `arrOpen`, `arrFace`, `rollBeat0/rollSpan`, `rollRole`, `rollSel`/`rollSelNote`, `laneDrag`). **Chain-owner key:** `CHAIN_ROLE`,
-  `chainKeyOf(role)` → `'role:ld'`, `CHAIN_SOLO`, `fxChains`, `fxChainOf(key)`, `FX_VOL`, `fxVolReset(key)`, `fxChainMove`,
-  `chainOwners()` → `[{key, kind}]`. ⛔ The key is OPAQUE — equality and indexing only, never parsed.
-- `src/hooks.js` — nullable callbacks for lower layers (`leadInstr, bassInstr, drumKit, rec, loop, tutor, scales`).
-  `hooks.tutor(kind,payload)` is the tutorial's single channel.
-- `src/i18n.js` — `LANGS=['en','ru']` (`es`/`de` prepared, not enabled), `DICTS`, `t(key,params)` (dict → en → `params.def` → the key),
-  `L(field)` (data names), `store` (localStorage with memory fallback), `lang`, `setLang`, `onLangChange`, `applyI18n` (`data-i18n`,
-  `data-i18n-title`, `<html lang>`); persisted as `handsong.lang`.
-- `data/` + `src/scaleload.js` — ALL scale data are JSON files (v1): `data/index.json` (manifest; mode order = menu order = F0 index
-  `i`), `data/menu.json`, `data/tunings/`, `data/modes/`, `data/palettes/`, `data/chordmodes/` (file name = id); comments in
-  `data/README.md`. `loadScaleData`/`loadReport`: fetch (`no-cache`), validate per file (shapes, ranges, rising pitches, ratio/cents
-  agree, degrees, palette kind vs tuning, chord-mode `set` whitelist, unique ids); a broken file is SKIPPED (one console line,
-  `#loadmsg` notice); manifest/menu unreadable or nothing valid → the embedded EMERGENCY PAIR (`edo12`, `chromatic`, `chrom12`). Since
-  F6, USER files (IndexedDB `handsong-user`/`files`, key `kind:id`, ids `u.<uuid>` — `scaleload.USER_ID`) load after the built-ins
-  through the same validator.
-- `src/userstore.js` / `src/userfiles.js` — user file storage (IndexedDB, else `store`) and the console/back-end API (`install`, `list`,
-  `remove`, `exportFile`, `example`, `installExample`, `brokenExample`, `storeUnchecked`; `window.U` with `?probe`); effective
-  immediately via `scales.registerRecord`/`unregisterRecord`; a record others depend on can't be removed (`scales.dependentsOf`);
-  deleting never breaks recordings (views pin their tuning, `TUNING_OF_MODE`, `SRC` WeakMap; `P.checkUserDelete`).
-- `src/scales.js` — the teaching layer and pitch truth. Top-level `await loadScaleData()`; builder → `TRADITIONS` (6), `GRP`,
-  `TUNINGS` (18), `CHORD_FAM_SETS`, `SCALES` (74, 0..73). Pitch: `a3()=aRef/2` → `baseF()` and `cFix(s)`; `anchorOf`, `keyOf`,
-  `tonicFreq(s)`, `periodOf(s)=s.period||2`; ONE pitch function `pitchHz(T,A,z,k,R)=A·P^R·ρ(k)` (⚠️ keep its multiplication order);
-  `modeAnchor`, `degK`; `leadFreq`/`bassFreq`/`chordFreqs`/`centsOf` and the index versions `leadFreqTi`/`bassFreqTi`/`chordNotesAt`/
-  `chordFreqsAt`/`chordRowFreqAt`; `chordNotes` (`{f, iv}` per note; `chordFreqs` = its frequencies), `chordUnit(s)` (the one-note
-  root type per branch), `chordReadsTi`, `tuningIndexOf`, `modeSlotOfTi`, `chordPitchHz`, `ruleChordSteps`, `stackLabel`,
-  `chordTypeFits`, `chordAtRoot` (F8), `chordBuildOf`, `chordModeOf`/`chordModeName`/`chordModeHint`, `scaleView` + `CUR()` (memoised
-  view), `viewIdOf`, `scaleById`, `viewOfId`, `applyScaleId` (aliases), `tuningOf`, `namingOf`, `listLbl`/`listName`, `regWord`/
-  `regWordFull`, `tuningStatus`, `droneDegree`/`droneSecondHz`, `backingRhythmOf`, `seventhAddsNote`, `menuOf`, predicates
-  (`supportsProgressions`, `supportsChords`, `typedChords`, `rectGrid`, `fixedKey`), rect helpers (`rectLayout`, `REG_N`,
-  `rectNoteAt`/`rectSlotOf`, `rectBase`/`rectBaseMax`, `rectEligible`, `rectDefault`, `rectRows`/`rectNotes`/`rectRowsFull`),
-  theremin `thereminSpan`/`thereminHz` (M = `rectNotes()` under rectangles). `registerRecord`/`unregisterRecord`/`dependentsOf`.
-- `src/audio.js` — the Web Audio engine (see "Audio engine"): pools, three synthesis paths, drums, drone, metronome, FDN reverb, effect
-  modules (`FX_FACTORY`), chain wiring, capture/playback helpers, track level/pan (`setTrackGainOf`, `ownerGain`, `trackGainRetune`,
-  `setTrackPanOf`, `ownerPan`, `panGains`, `trackPanRetune`, `makePanStage`), master (`setMasterLevel`, `masterLevel`, `masterMeter`,
-  `MASTER_BASE` 0.8), frozen-track store/reader (`frzReady`, `frzStorePut`, `frzStoreDel`, `frzStoreDbg`, `frzReader`, `frzStoreCount`,
-  `frzSink`), `voicesCut`, `xfRamp`, `timbresOf(role)`, `createRecordingTap()`, probe helpers (`probeCapture`, `probeCaptureReady`,
-  `fxDipLog`), render helpers (`renderReset`, `renderStateOf`, `setRnd`, `setOffline`, `offlineTapMaster`, `setDbg`).
-- `src/ks-worklet.js` — Karplus–Strong processor `ks-string` (mandatory worklet: a native delay loop is floored at 128 samples ≈ 344 Hz
-  and quantised); first-order allpass fractional delay + loop-filter phase compensation (< 1 cent); a-rate `freq`/`pluck`; in track
-  renders seeded via `processorOptions.seed` (own `mulberry32`); live stays on `Math.random`.
-- `src/frz-worklet.js` — frozen-track STORE (`frz-store`: transferred Int16 chunks; `put`/`del`/`dbg`/`count`) and READER (`frz-reader`:
-  context frame F ≥ startF plays buffer frame F + d, integer frames, × the track scale; `{play:{startF,d}}` for spares; `{stop:frame}`;
-  reports `{ended, played, first, seen}`; `ready` once processor and data exist; `ALIVE` count). Frame never goes backwards
-  (`max(currentFrame, prev+128)` — Chrome sometimes repeats `currentFrame`). Loaded on the LIVE context only.
-- `src/probe-cap-worklet.js` — probes only: capture of the live master on the audio thread (`probe-cap`), returning `F0` (frame of the
-  first sample = the most common `currentFrame − samples so far`), `gaps` (real discontinuities), `stale` (single stale readings).
-- `src/arrange.js` — arrangement data + pure generation: `PROGRESSIONS`, `HARMONIES`, `RHYTHMS` (18 patterns; `beats`, optional `sub`,
-  `subOf`, `gridOk`, `rhythmFits`, `rhythmsForMetre`), `BASS_MODES`, `buildArrangement` (also drums-only `sel.prog<0`). Volumes in the
-  OLD per-role scale (`CHORD_VOL` 0.55, `BASS_VOL` 0.6), converted at event birth by `volFromOld`. Imports only `config.js`.
-- `src/recorder.js` — the recorder (see "Time, tracks and the recorder" and "Freeze"): `events` (stable array), `loop`, `W*`/`ENG`
-  (`makeENG(engine)`), scheduler, lanes, brace, chase, undo, stops, `softAllOff`, `loadArrangement`/`loadJam`/`clearJam`, capture
-  (`takeFx`, `takeFxVer`/`takeFxTouch`, `takeCapStart`/`takeCapSample`, `fineStep`/`fineKnee`, `FX_CHAIN='#chain'`), playback
-  (`fxPlayBuild`/`fxPlayDrive`/`fxPlayStop`/`fxPlaySignature`/`fxIsDriven`, `fxLaneMerge`, `fxLaneAt`, `fxLaneExpand`, `fxLaneSmooth`,
-  `autSmoothOf`), the editor API (`songNotes`/`songSegs`, `editOpen`/`editClose`/`editGuard`/`editPush`/`editUndo`/`editRedo`/
-  `editBatch`/`editCommit`, `EDIT_ROLE`, `editMoveHit`/`editDeleteHit`/`editInsertHit`, `editMoveSeg`/`editResizeSeg`/`editDeleteSeg`,
-  `editInsertBass`/`editInsertChord`/`editInsertLead`, `editDeleteChordNote`/`editMoveChordNote`/`editResizeChordNote`,
-  `dissolvePlan`, `detachPlan`/`commitDetach`, `chordMoveTy`, `slotPt`, `tiePartners`/`tieUntiePass`, `editSetTimbre`, `aut*` lane
-  functions, `pnPlan`/`pnView`/`pnPoints`/`pnFreeze`), lane tables (`laneLevel`, `lanePan`, `laneName`, `laneRank`, `laneOrder()`,
-  `moveLane`, `laneLook`, `laneRoleOf`, `laneTimbreOf`, `noteSource`), freeze (`freezeSig`, `freezeTicket`, `freezeSet`, `frzWhenReady`,
-  `frzPack`/`frzPackAsync`, …), `seedTake`, `probeWithEvents`, `evHz`, `evReg`.
-- `src/frzqueue.js` — the automatic-freeze QUEUE (AF1, console only): lazily loaded by `render.js` (`setRunner(render.freeze)`); by
-  track id, one entry per track, one render at a time; priority `qRank` (audible first, then `untilHeard`, song order, layer); gates
-  (never while recording or a clip records; while a hand pinches a track waits if its layout costs more than `QF.frameMs` 8 ms; checked
-  at pick and again before layout via `layoutGate`); stale results never install (re-queued); a track is taken only after its
-  signature is stable for `QF.settleMs` 1 s. Console `R.autoFreeze(true|false)`, `R.freezeQueue()`. No watcher/triggers (AF3).
-- `src/vision.js` — camera + MediaPipe (`video`, `canvas`, `ctx`, `roundRect` polyfill, `resize`, `landmarker`, `initVision`,
-  `openCamera(facing)`, `switchCamera` — the landmarker is never recreated).
-- `src/clip.js` — clip/audio recorder: `startClip('video'|'audio')`/`stopClip`, `activeKind()`, `onClipChange(fn)`, `captureFrame()`
-  (called last in every frame, throttled to `REC_FPS` 30; stream via `canvas.captureStream(0)` + the audio tap; bitrate from canvas
-  size ≈ 0.12 bit/px/frame, 3.5–12 Mbit/s); `recKind` is the single truth; sets `videoRec` only for video, only once recording starts.
-- `src/demo.js` — start-screen tunings demo (own mini-engine, own `noiseBuf`); scenes by stable id (`SCENES[].id`), captions `demo.scene.*`.
+- `src/config.js` (leaf, imports nothing) — thresholds, scheduler timings, pool sizes, palette/FX geometry (`palSplitX` = the single
+  palette|notes split, `rectBandY`, `coverView` = the single cover crop), volume curve `volAmp(v)=v²`/`volVel`/`volFromOld`,
+  fine-recording constants, `INSTR_COL` (the ONE role palette, different lightness), arrangement sizes.
+- `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `aRef`, `tunedFrom`, instruments, `handFn`,
+  `voiceMode`, split + `phoneHalves(W)` (the only `W/2`), registers, camera, editor/window state). Chain-owner key `chainKeyOf(role)`
+  → `'role:ld'`, `fxChains`, `FX_VOL`, `chainOwners()`. ⛔ The key is OPAQUE — equality and indexing only, never parsed.
+- `src/hooks.js` — nullable callbacks for lower layers; `hooks.tutor(kind,payload)` is the tutorial's single channel; `hooks.af(kind)` —
+  auto-freeze settle hints (recorder: take, undo, backing, rowDelete, editor, song; ui: panHold, pan); `hooks.afRow(layer)` — the window's
+  freeze dot (both set by `frzqueue.js`).
+- `src/i18n.js` — `LANGS=['en','ru']`, `DICTS`, `t(key,params)` (dict → en → `params.def` → the key), `L(field)`, `store`,
+  `applyI18n`; persisted as `handsong.lang`.
+- `data/` + `src/scaleload.js` — ALL scale data are JSON files (v1; manifest order = menu order = F0 index); per-file validation; a
+  broken file is SKIPPED (one console line, `#loadmsg`); nothing valid → the embedded emergency pair. User files (IndexedDB, ids
+  `u.<uuid>`) load after the built-ins through the same validator.
+- `src/userstore.js` / `src/userfiles.js` — user file storage and the console API (`window.U` with `?probe`); a record others depend on
+  can't be removed; deleting never breaks recordings (`P.checkUserDelete`).
+- `src/scales.js` — the teaching layer and pitch truth: builder → `TRADITIONS` (6), `TUNINGS` (18), `CHORD_FAM_SETS`, `SCALES` (74).
+  ONE pitch function `pitchHz(T,A,z,k,R)=A·P^R·ρ(k)` (⚠️ keep its multiplication order); chord pricing `chordNotes`; memoised view
+  `scaleView`/`CUR()`; predicates; rect layout; theremin; `registerRecord`/`unregisterRecord`.
+- `src/audio.js` — the Web Audio engine (see "Audio engine"): pools, synthesis paths, drums, drone, metronome, FDN reverb, `FX_FACTORY`,
+  chain wiring, track level/pan, master, frozen-track store/reader, probe and render helpers.
+- `src/ks-worklet.js` — Karplus–Strong `ks-string` (mandatory worklet: a native delay loop is floored at 128 samples); allpass
+  fractional delay + loop-filter phase compensation (< 1 cent); seeded via `processorOptions.seed` only in track renders.
+- `src/frz-worklet.js` — frozen-track STORE (`frz-store`, transferred Int16 chunks) and READER (`frz-reader`: context frame F ≥ startF
+  plays buffer frame F + d, integer frames; reports `{ended, played, first, seen}`; `ready`; `ALIVE`). Frame never goes backwards.
+  Loaded on the LIVE context only.
+- `src/probe-cap-worklet.js` — probes only: audio-thread capture of the live master (`F0`, `gaps`, `stale`).
+- `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`);
+  volumes in the OLD per-role scale, converted at event birth. Imports only `config.js`.
+- `src/recorder.js` — the recorder (see "Time, tracks and the recorder", "Freeze"): `events` (stable array), `loop`, `ENG`, scheduler,
+  lanes, brace, chase, undo, stops, backing, capture and playback of effects, the editor API, lane tables, freeze registry and
+  signature, `seedTake`, `evHz`.
+- `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
+- `src/vision.js` — camera + MediaPipe (`openCamera(facing)`, `switchCamera` — the landmarker is never recreated).
+- `src/clip.js` — clip/audio recorder (`startClip`/`stopClip`, `activeKind()`, `captureFrame()` last in every frame, `REC_FPS` 30);
+  `recKind` is the single truth.
+- `src/demo.js` — start-screen tunings demo (own mini-engine); scenes by stable id (`SCENES[].id`).
 - `src/tutor.js` — lesson list + step engine (see "The tutorial").
-- `src/gestures.js` — the gesture state machine: `HANDS`, `processHands`, `chOwner`, `monoOwner[role]`, `polyZone`/`leadZone`,
-  `liveKey(role,hand,finger)`/`monoKey(role)`, `wOn`/`wOff`, `voiceModeReset(role)`, `degHyst`/`degRaw`, `axHyst`/`cellHyst`,
-  `noteVolOf(zk,xn,zOf)`, `depthOf(S,lm)` (depth smoothed ONCE per hand per frame, memo `S.hsF`), `noteHandRole(key,S,W)`, `handHalfRole`,
-  `fxChordBri()`, `fxParamsOf` (the aim's single door), `ACTIONS`, expression (`EXPR_CFG`, `exprFeatures`, `EXPR`, `tickExpr`),
-  `rectPlay`, the `'oct'` zone, looper hand (`fireLooperCmd`, `doLooper`), `tutorTap`. At pinch capture the hand's role and X-range are
-  frozen on `S` (`S.role`, `S.rx0`, `S.rx1`, `S.zone`, `S.fn`).
-- `src/draw.js` — canvas: `drawVideoBackground`, `drawOverlays` → `drawPhone`, `drawRole(instr,rx0,rx1,playH)`, `drawHandsPhone`, grids
-  (`drawGrid`, `drawRectGrid`, `drawRectOctBand`, `drawThereminLines`, `drawDrumGrid`, `drawChordPalette`), `drawChordReadout`/
-  `latchChordFreqs`, `drawFxBars(role,rx1,H)` (+ `fxBarHidden`), `drawStatus` (`scales.tuningStatus`), `noteLbl` (the one label
-  function), `tunPitchLbl`, the editor (`drawRoll`, snapshot `rollView`, `rollAxis(view, all)`, `rollGroup`, `rollSegRows`/
-  `rollSegNotes`/`rollSegRoot`, `chRowOfFreq`, `rollChordTotal`, `rollGutterW`, `rollDragTarget`, `rollGhostSeg`, `rollBendPts`,
-  `drawAutLane`), `drawLooper(full)` (strip and arrangement window; snapshot `loopView`; `laneBeatX`/`laneBeatAt`; `loopHit`,
-  `loopBeatAt`, `loopScroll`, `arrGeom`, `mixGeom`, `stripCols(W,markW)`, `stripProbe(W)`, `laneMini`, `laneTitle`, `laneDefName`,
-  `laneCol`).
-- `src/ui.js` — menus, buttons and handlers: `buildUI`, `fillScales`, role buttons (`instrBtn`, `instrBtnL/R`, `cycleHalf`), split
-  (`splitBtn`, `applySplit`, `canSplit()`), camera, fullscreen, clip buttons, backing (`#backingMenu`, `backingStep`, `backingName`),
-  canvas pointer routing (strip taps via `loopHit`), effects panel `renderFxCtl` (two zones, two add lists), voice-mode buttons
-  (`pickVoiceMode`), hand functions `renderHandFn`, A4 control, layout control `renderRectCtl`, chord modes `renderChordMode`, "tuned from"
-  `renderTunedFrom`, metre `refreshMetreCtl`, auto-hiding bar (`BAR_HIDE_MS` 3500, `MOUSE_EPS` 8), start card (install by capability,
-  `FEEDBACK_URL`, `DONATE_URL` — empty hides the line, JS-assembled mail fallback), the editor (`openRoll`/`closeRoll`, `rollEnterTrack`,
-  `ROLL_INSERT`, `renderAutCtl`, `#rollShape`, `renderTimbreCtl`, `rollDeleteSel` — 🗑 and ⌫/Delete, not in text fields), arrangement
-  (`openArr`, `arrApi`, `#laneNameIn`), `onFreeze(layer)`, tutorial helpers (`tutorReset`, `tutorSetScale`, `tutorResetHandFn`,
-  `tutorClearLoop`, `tutorSplitInit`, `tutorSyncBar`, `syncTutorBarPos`, `hushStrip`, `armStripReturn`).
-- `src/main.js` — composition root: `loop()` (frame: video → detect → `handsGuarded(processHands)` → overlays → `captureFrame`; each
-  distinct error printed once), `startApp()` (the one start path), editor/window branch (camera open but not read: `processHands(null)`
-  every frame, `latest`/`lastTs` cleared), `?probe` loading (`window.P = scaleprobe.api()`, `window.R`, `window.U`).
+- `src/gestures.js` — the gesture state machine (`HANDS`, `processHands`, owner keys, voice modes, hysteresis, depth, `fxParamsOf` =
+  the aim's single door, expression, looper hand). At pinch capture the hand's role and X-range are frozen on `S` (`S.role`, `S.rx0`,
+  `S.rx1`, `S.zone`, `S.fn`).
+- `src/draw.js` — canvas: video background, overlays, roles, grids, palette, FX bars, status, `noteLbl` (the ONE label function), the
+  editor (`drawRoll`, snapshot `rollView`, `rollAxis`), the strip and arrangement window (`drawLooper(full)`, snapshot `loopView`).
+- `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
+  hand functions, the editor shell, arrangement window, tutorial helpers.
+- `src/main.js` — composition root: `loop()` (video → detect → `processHands` → overlays → `captureFrame`; each distinct error printed
+  once), `startApp()` (the one start path), editor/window branch, `?probe` loading (`window.P`, `window.R`, `window.U`).
 - `src/render.js` — render context, seeding and track render behind freeze (see "Freeze"): one engine copy per session
-  (`'./audio.js?render…'`, `ENG_SPEC` constant, `ENGP` memo — ⛔ never a unique specifier per render), `renderTrack(layer, opt)`,
-  `freeze(layer)`, `unfreeze`, `frozen`, `renderQueued` (ONE render at a time; ⛔ no third door, never await one render inside
-  another), `renderQueue()`, `probe()` (F0–F2 facts), `layoutCost`, `autoFreeze`/`freezeQueue`, ear tools (`aud`, `live`, `stop`,
-  `recSteps`, `droneBP`), probe bodies (`reuseCheck`, `revAgree`, `swapCheck`, `chunkCheck`, `copyState`, `capStats`, `capAligned`).
-- `src/songs.js` — demo songs loaded by `P.song(name, {replace:true})` (today `triphop`, ≈2:41, 84 BPM, 4/4, D minor, seven tracks + a
-  D–A drone backing); one take per ROLE; sets tonic/A4/tempo/metre/scale through the panel's controls; refuses while recording,
-  playing, with the editor open, or on a non-empty song without `replace`.
-- `src/scaleprobe.js` — the browser probe (`P`): `all`, `quick`, `seed`, `song`, `api`, ~50 checks, `material`, `meas`, `orderCheck`,
-  `freezeCost`, `dumpScales`, `renewSnapshot`. `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (T0, T1, T2, T6b,
-  stacked chords, F4; frozen references; imports only scales/state/i18n). ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
+  (`'./audio.js?render…'`, ⛔ never a unique specifier per render), `renderTrack`, `freeze`, `renderQueued` (ONE render at a time; ⛔ no
+  third door, never await one render inside another), console `R.*`, ear tools, probe bodies.
+- `src/songs.js` — demo songs (`P.song(name, {replace:true})`; today `triphop`); refuses while recording, playing, with the editor
+  open, or on a non-empty song without `replace`.
+- `src/scaleprobe.js` — the browser probe (`P`). `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (imports only
+  scales/state/i18n). ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
 - `tools/check-static.mjs` (static checker), `tools/probe-browser.mjs` (browser runner), `tools/scales.before.json` (F0 snapshot).
-- Stale names to ignore (removed): `backing.js`, `playRec`, `toggleRec`, `stopRec`, `recStart`, `drawChordSectors`, `sectHyst`, `S.sect`,
-  `TYPED_CH_VOL`, `uiMode`, `drawPC`, `drawBar`, `zoneAt`, `zoneX`, `FXW`/`ZB`, `modeBtn`, `applyMode`, `.phone`, `#modeHint`, `#arrHint`,
-  `#helpBtn`, `swapHands`, global `theremin`, `thereminBtn`, `swapBtn`, `drawThereminGrid`, `BEATS_PER_BAR` as a constant, `handRole`,
-  `jamStep`/`applyJam`/`jamTo`, `jam.*` keys, `loop.first`, `setRegion`, `takeEv`, `revDisp`, `chBrightDisp`, `drawChordBright`,
-  `verb`/`verbOut`/`revLead`/`revCh`, `leadOwner`, `fxAttach`/`fxRoleBus`/`fxRoleOut`, `roleXDriven`, `bassOwner`, `soloNoteHand`,
-  per-voice `dlySend`/`revSend`, `RELEASE_TAILS` as a rule, `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
+- Stale (removed) names to ignore: list in `docs/NAME-INDEX.md`, "Stale names".
 
 ## Architecture (full reasoning per section: archive, same titles)
 The frame loop lives in `main.js`: draw video → MediaPipe detect → `processHands()` (gestures drive audio) → `drawOverlays()`. The
@@ -803,7 +728,7 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   records as a line); a PAUSE is found by shape after a gap > 0.5 s ("flat then rising" vs a line, F > 50) → a HOLD point at the previous
   value. Per-note value-only changes carry their own beat (not quantised); pitch/chord changes are. A/B switch `R.recSteps(true|false)`.
 
-### Freeze — tracks rendered offline and played as buffers (F0–F5, A0–A2c, AF1, AF2, AF6b, AUTO-PROBE)
+### Freeze — tracks rendered offline and played as buffers (F0–F5, A0–A2c, AF1–AF4, AF6b, AUTO-PROBE)
 - **A playback MODE** (`recorder.js`): a frozen track plays its buffer instead of its events; events are never discarded; unfreeze = instant
   and lossless. ⛔ Registry keyed by LANE ID (rule #27), never written into events (rule #28; touches neither cursors nor `schedInvalidate`).
   Both replay paths and `chasePlay` skip a fresh-frozen layer (`frzLayer` = `freezeState(layer)==='fresh'`; a stale one falls back to events).
@@ -846,11 +771,34 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   track's `laneEditVer` (bumped by its own edits, `'lanetouch'`), tonic, A4, tempo, pinned fallbacks only when an event reads them, the track's
   TIMBRES (`tmix` packs ids `|0`, "indices < 63" — rewrite when string ids arrive), pan, `chordModeVer`, the live solo chain snapshot for solo
   notes without a map (`soloLiveSig`). Memoised per track (`frzSigMemo`), cleared when `frzGlobalKey()` changes (event count + `evGen` +
-  `takeFxVer` + pinned fields) — exported for AF3, no caller yet. ⛔ Mute/solo and level excluded; other tracks' events excluded. The gate is
-  "frozen AND fresh".
-- **Control:** one ❄ in the editor bar (freeze / re-freeze / unfreeze by state); the strip shows only an indicator (blue fresh, orange with a
-  dot stale). Progress real where `OfflineAudioContext.suspend` exists, else indeterminate (never fabricated). A render can't be cancelled.
-  One-time notice when a capture-less track gets one (`freezePinCaptures`).
+  `takeFxVer` + pinned fields), which the watcher reads through `frzWatchKey()`. ⛔ Mute/solo and level excluded; other tracks' events
+  excluded. The gate is "frozen AND fresh".
+- **Auto-freeze (AF3) — tracks freeze themselves, ON by default** (`R.autoFreeze(false)` = off for the session; `src/frzqueue.js`, loaded by
+  `render.js`, which `main.startApp` imports right after the engine starts). ONE watcher (timer `QF.pollMs` 250 ms) polls
+  `recorder.frzWatchKey()` = `frzGlobalKey` + `frzWatchVer` (bumped by pan) + the live solo chain when a solo note has no map; only when it
+  moves are signatures looked at. A track is a CANDIDATE once not fresh and its signature has not changed for the settle delay of the LAST
+  trigger — `AF_DELAY` (one place): editor 0.5 s, take/pan/undo/backing/rowDelete/song/any other change 1.0 s, retune 1.5 s (unused while the
+  switch is off). Every signature change (and every hint) resets the clock → an edit session of any length = one render after it. Hints
+  come through `hooks.af` from the real sites (`recStop`, `onUndo`, `loadArrangement`/`clearJam`, `deleteLane`, `editClose`,
+  `songPinChains`; ui pan press/release/wheel/double tap). HOLDS: recording (queue gate), the editor's open track, a held pan control.
+  Candidates go through the AF1 queue (priority, gates) and swap in via AF2.
+- ⛔ **Not auto-frozen (live by choice):** tracks stale ONLY by tonic, A4 or tempo while `AF_REFREEZE_ON_RETUNE` is false (user decision until
+  the tonic freeze; `recorder.frzRetuneOnly` masks field 5 of the signature) — they play their events as before; tracks without a captured
+  chain (`laneHasChain` false — auto-freeze NEVER pins the live chain: the queue passes `noPin`; skipped "no chain"); tracks over the memory
+  budget `AF_BUDGET_MB` (300 MB touch = `(pointer: coarse)`, 1 GB desktop; estimate before the render, exact `admit(bytes)` in
+  `render.freeze` before install, refusal `'budget'`; skipped until the signature changes or memory frees; no eviction until AF6).
+- **Chains are pinned at BIRTH, never by auto-freeze:** an editor insert into a track with no captured chain pins the live chain
+  (`recorder.editInsPush`: `autCaps(layer,true)`, its `'autcap'` first in the insert's history entry — ↶ removes both); song load pins every
+  chain-less track (`recorder.songPinChains()`, called by `P.seed`/`P.song`; the seed: 0 tracks). Inserts into a captured track keep its chain.
+- **Interface (AF4): no ❄ anywhere.** Only the arrangement window shows a faint dot at the right end of a row header (`draw`, via
+  `hooks.afRow` → `frzqueue.afRowState`): hollow = waiting, pulsing = rendering, nothing = frozen or live by choice; snapshot
+  `loopView.dots`. The play strip shows nothing (its mark column is for the arm dot only). Console: `R.freezeQueue()` (entries, settle
+  timers, trigger, skips and why, live-by-choice list, memory used/budget, holds), `R.freeze`/`R.unfreeze`/`R.frozen` (the console `freeze`
+  still pins a chain-less track — explicit). No `frz.*` strings remain.
+- **Memory of a render (AF3 part 0b):** Chrome never collects an `OfflineAudioContext` that called `audioWorklet.addModule` — it keeps its
+  rendered buffer. `render.freeze` therefore DETACHES the report's Float32 data after packing (`releaseBuf`; `AudioBuffer.length`, peak,
+  rms stay readable; kept only with the probe option `keepBuf`, or when the Float32 fallback IS the frozen data). The context graph itself
+  stays pinned per render (BACKLOG §1, AF6 item 7).
 - **The render (`render.js`):** a second engine instance (`'./audio.js?render…'`, own `AC`, pools, buses, effect tables), one per session,
   re-initialised against a fresh `OfflineAudioContext` per render, sample rate pinned to the live one. Seeded (`setRnd(mulberry32(seed))`
   BEFORE `initAudio`; seed from the LANE ID `seedOfLane`); every render starts and ends with `renderReset()`; ONE render at a time
@@ -875,6 +823,16 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   never `===`.
 
 ### Probe rows that render or capture — tolerances and controls
+- **AF3 auto-freeze watcher** (`P.checkAutoFreeze`, P.quick and P.all, ≈ 2.5 s, deterministic: probe clock, 50-ms ticks, fake 128-sample
+  renders through the real ticket/`freezeSet`, watcher scope one track): every trigger renders after its delay and within two ticks, not
+  before (default change, pan held then released, editor via the real `editClose`, take end after the recording gate, undo, backing, row
+  delete, song); five pan moves 0.6 s apart → one render 1 s after the last; level → none; tonic, A4, tempo → none (stale, then fresh when
+  restored); budget → skipped, not retried; an editor-created track carries a pinned chain (↶/↷ keep it consistent). CONTROLS that must
+  fail: `dbg.noReset` (clock not reset → early/extra renders), `dbg.level` (a watcher reacting to level renders), `dbg.retune` (tonic
+  renders after 1.5 s), default budget renders the skipped track.
+- **AR1 arrangement window** also checks AF4: no ❄ hittable; the freeze dot from `loopView.dots` — rendering = filled, waiting = hollow,
+  frozen and stale-by-tonic rows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
+  armed, no mark column although a track is frozen and one stale.
 - **Capture** (`audio.probeCapture`, audio-thread worklet): every probe checks its marker sits EXACTLY at `Mf − F0` and `gaps` is 0
   (`render.capAligned`), else the row errors with the reason; `R.capStats()` counts captures, stale readings, gaps.
 - **LR1 live and frozen reverb agree** (`render.revAgree`): an organ chord (`CHORD_INSTR[2]`) with the chord reverb mix at full, played by
@@ -984,6 +942,10 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **Chains belong to the OWNER (role), not the track** — a clean live freeze would need per-track instances.
 - **Nothing can be saved** (view and `a.ty` references; capture keyed by take) — BACKLOG §1.
 - Captured expression channels are not replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
+- **Every render's offline context stays alive** (Chrome pins a context that loaded a worklet): the rendered Float32 data are released, the
+  engine-copy graph is not — size unmeasured; with auto-freeze every settled edit is a render (BACKLOG §1, AF6 item 7).
+- **Tonic, A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until the tonic
+  freeze — through the live pools, with their polyphony ceilings.
 
 ## How to verify a change
 No unit tests. Claude Code runs the static check, `node tools/probe-data.mjs` and `node tools/probe-browser.mjs` per the probe budget,
@@ -1072,9 +1034,9 @@ verified. Full text of every step: archive, "How to verify a change".
     per-note lanes from the notes (not hollow during ▶); a mid-take reverb listed, not re-offered, frozen copy brings it in at its moment.
 42. Per-pass closing: held solo/bass/latched chord across seams while recording — every pass sounds, nothing rings past its end, the live
     latch never broke.
-43. Freeze ❄: progress toast, «Track frozen», blue ❄; sounds the same (reverb micro-structure may differ); an edit → orange ❄, plays events;
-    ❄ again re-freezes/unfreezes; pressing ❄ during a render says it can't stop; a frozen sustained bass survives tonic/A4 changes while
-    playing; a track starting at bar 3 enters at bar 3; a drone backing not doubled; ❄ on an emptied track says nothing to freeze.
+43. Freezing (by itself since AF3/AF4): a frozen track sounds the same (reverb micro-structure may differ); an edit → it plays its events
+    until it re-freezes; a frozen sustained bass survives tonic/A4 changes while playing; a track starting at bar 3 enters at bar 3; a drone
+    backing not doubled; console `R.freeze`/`R.unfreeze` still work.
 44. One role and timbre per track: split solo+chords in one take = two rows, one ⤺; solo timbre switch mid-note continues in a new row (20 ms
     crossfade, replayed); bass switch mid-note stays; an armed track of another timbre → a new row with the header message; a chord latched
     before ● is written from the first beat.
@@ -1112,8 +1074,8 @@ verified. Full text of every step: archive, "How to verify a change".
     drag handle reorders everywhere; new take last; event ticks in role colours; phone-width works without zoom.
 62. Live reverb (LR1): the room sounds the same after reload and frozen (`R.live` vs `R.aud`); `R.liveReverb` gone; row «LR1 live and
     frozen reverb agree» PASS; strip labels inside the frame at 360 px.
-63. Freeze queue (AF1, console): `R.autoFreeze(true)` queues and freezes audible tracks first; no new render while recording; costly layouts
-    wait while pinching; a track changed while waiting renders once after 1 s; `R.autoFreeze(false)` drops waiting ones; `P.freezeCost`.
+63. Freeze queue (AF1): audible tracks near the playhead freeze first; no new render while recording; costly layouts wait while pinching;
+    a track changed while waiting renders once after it settles; `R.autoFreeze(false)` drops waiting ones for the session; `P.freezeCost`.
 64. THE SWAP (AF2) — ear test on a held pad (headphones): freeze a long pad while it rings → swap at a bar line with no dip, click or swell;
     rests → nothing to hear; under a brace → at the seam, no doubled attack; stopped → starts exactly like the events. Row «AF2 freeze swap
     inaudible» is run by the runner (`--all`): stopped (envelope onset ≤ 10 ms, level ±1 dB, click), held pad (jump ±1 dB, gap ≥ −6 dB,
@@ -1123,6 +1085,12 @@ verified. Full text of every step: archive, "How to verify a change".
     nothing sounds different; `P.freezeCost` «today MB» = real 16-bit bytes; row «AF6b 16-bit frozen playback» (runner).
 66. The first attack of a track (AUTO-PROBE fix): a percussive chord track starting at bar 3, ▶ from bar 1 → the first chord at bar 3 has its
     full attack on the beat (before: its first ~40–100 ms swallowed by a needless chord-bus dip). Same for solo/bass tracks starting later.
+67. Auto-freeze (AF3) — ear and eye, arrangement window open: (1) record a take, stop — about a second later the row's dot goes hollow →
+    pulsing → gone and NOTHING audible changes; (2) edit a track in the editor and leave it — the same, once, ~0.5 s after leaving; (3) move
+    a pan control and release — the same, ~1 s after release (moving a LEVEL fader shows no dot); (4) change the tonic — no dot, nothing
+    re-freezes, and the music follows the new tonic; `R.freezeQueue()` lists the frozen tracks as "live by choice".
+68. No ❄ anywhere (AF4): play strip (no ❄, no stale mark), arrangement window (M · S only; the faint dot only), editor bar (no ❄, no state
+    label), no toast about freezing; row «AR1 arrangement window» checks the dot states.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.
@@ -1130,21 +1098,3 @@ verified. Full text of every step: archive, "How to verify a change".
   `data-i18n`); musical data names inline via `L()` in the three shapes. `es`/`de` prepared, deliberately not enabled (terminology unchecked).
 - **Docs:** `HANDOFF.md` and this file in concise English; archives Russian verbatim; BACKLOG/UI-MAP Russian except sections edited later.
 - Chat replies to the user: English (the terminal mangles Cyrillic); the strategist explains to the user in Russian.
-
-## Name index — other code names, by module (meaning: grep `archive/CLAUDE-full.md` and the code)
-- `src/audio.js`: `REV_PARAMS`, `applyVoiceFx`, `backBus`, `bassBus`, `bassSet`, `buildChordPool`, `bvRelease`, `chordBus`, `chordGlide`, `chordOn`, `cvAlloc`, `cvRelease`, `dDum`, `dNoise`, `dTek`, `droneOff`, `droneOn`, `dronePan`, `drumBus`, `drumVoice`, `exprCur`, `exprGain`, `exprVibAmp`, `fstrike`, `fxAimGet`, `fxAimSet`, `fxBriOf`, `fxDefFor`, `fxDefaultsOf`, `fxGate`, `fxGlideOf`, `fxHandRange`, `fxParamKeysOf`, `fxParamMetaOf`, `fxPathOf`, `fxRestoreAim`, `fxSnapshot`, `fxWrapParam`, `gMax`, `hitOwner`, `leadRelease`, `leadVoiceBank`, `makeReverbFx`, `modGain`, `scheduleBend`, `setLeadInstr`, `tabNa`, `taikoDrum`, `taikoKa`
-- `src/clip.js`: `fireChange`, `videoBitrate`
-- `src/config.js`: `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `CH_PAL_PAD`, `CH_PAL_W`, `PAL_HYST_Y`
-- `src/draw.js`: `fitLeadNotes`, `handLeadNotes`, `packSegs`, `rollHit`, `rollRow0Across`, `rollRowPitch`, `rowOfTi`
-- `src/frzqueue.js`: `qAdd`, `qBegin`, `qCostOf`, `qCostSet`, `qEnd`, `qRunning`, `qState`, `qStep`
-- `src/gestures.js`: `depthN`, `octRight`, `pinchRatios`
-- `src/i18n.js`: `LANG_LABEL`
-- `src/probedata.js`: `TAG_OF`, `allViews`, `checkBehaviour`, `checkData`, `checkPitch`, `checkStack`, `checkUntyped`, `checkView`, `isTert`, `legacyBassFreq`, `legacyCentsOf`, `legacyChordNotes`, `legacyChordSteps`, `legacyLeadFreq`, `legacyTonicFreq`, `sweep`, `tagOf`
-- `src/recorder.js`: `WbassOff`, `autChainMove`, `autChainRemove`, `autDeletePoint`, `autMovePoint`, `autTakesOf`, `bassOwnerKey`, `bassSlot`, `braceMove`, `braceTap`, `chOwnerKey`, `chaseNote`, `clearRec`, `curBeat`, `curChordOct`, `deleteLane`, `droneLevel`, `dronePanOf`, `droneSyncAt`, `editApply`, `editTake`, `frzEnter`, `frzKill`, `frzPinned`, `frzSkipNear`, `hlOf`, `inPB`, `isLayer`, `isTrackOwner`, `laneDelTap`, `laneLayerOf`, `laneLen`, `laneNameOf`, `laneShowKeep`, `layerOfOwner`, `ldKey`, `liveDrone`, `loopPos`, `pnAdd`, `pnDelete`, `pnMove`, `pnShape`, `pnStripMoves`, `pushLy`, `recBassEv`, `recChSet`, `recLead`, `recLeadEv`, `segChordNotes`, `setLaneName`, `setLoopBars`, `setLoopChordHl`, `setLoopSub`, `setRegionOn`, `songBeats`, `songLen`, `storeTi`, `takeJoin`, `takePrune`, `takeReset`, `takeSrc`, `toggleLaneMute`, `toggleLaneSolo`
-- `src/render.js`: `maxRel`, `pinLive`, `renderOnce`
-- `src/scaleload.js`: `checkRecord`, `chordModeSets`
-- `src/scaleprobe.js`: `checkFrozen`, `checkHl`, `checkLabels`, `checkMerge`, `checkRevAgree`, `checkRootAlone`, `checkRowFix`, `checkRows`, `checkSeed`, `checkSong`, `checkSound`, `checkSwap`
-- `src/scales.js`: `IVX`, `buildChordModeSet`, `buildMode`, `buildPalette`, `buildTuning`, `chordLabel`, `chordNotesStr`, `grpKey`, `rootName`, `rowLabel`, `scaleData`, `scalesOfTrad`, `stepName`, `tradOfScale`, `untypedNotes`
-- `src/state.js`: `chFitDeg`, `fxChainAdd`, `handActsOf`, `handSide`, `latchOct`, `playsNotes`, `scaleIdx`, `setARef`, `setCamFacing`, `setChordMode`, `setHandAct`, `setLooperClear`, `setRectPref`, `setScaleId`, `setSplitRole`, `setVideoRec`, `setViewRect`
-- `src/tutor.js`: `openLessons`, `wireStarter`
-- `src/ui.js`: `FB_MAIL_USER`, `HAS_HANDFN`, `INSTR_SEQ`, `JR_BY_ID`, `aRefSel`, `applyBacking`, `applyRollBar`, `applyVoiceMode`, `armBarHide`, `autShapeState`, `backingMode`, `backingTo`, `buildStartLinks`, `drumVariants`, `fitRhythm`, `onResize`, `panelOpen`, `renderHandActs`, `resetJamDisplay`, `revealBar`, `rollDown`, `rollMove`, `rollUp`, `rootRow`, `showCamMsg`, `trackLayers`, `updRollBtns`

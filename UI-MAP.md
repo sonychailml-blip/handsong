@@ -3,11 +3,10 @@
 Фундамент интерфейса. К этому документу возвращаемся при любой задаче про UI,
 меню, роли, лупер. **Не реализация — карта.** Прежде чем строить кусок UI, свериться отсюда.
 
-> Сверено с кодом после слайса T5 (одна роль на дорожку, замена тембра): верхний бар, транспорт, полоса
-> лупера (с индикатором заморозки), редактор дорожки целиком (бар, ❄, тембр, полоса автоматизации, подвал,
-> клавиатура). В проходе V5 (после режимов голоса) сверены и поправлены: панель «🎛 Звук» (строки режима голоса, два
-> списка «добавить», Скольжение), полоса автоматизации (пер-нотные адреса, эффекты, добавленные посреди взятого),
-> сплит и «Функции рук». Разделы про звукоряды, подложку и обучение НЕ перепроверялись.
+> Checked against the code after T5 (top bar, transport, play strip, the whole track editor); after V5 (the 🎛 Sound panel, the
+> automation lane, split, hand functions); after AF4 (the play strip, the arrangement window and the editor bar have no freeze controls —
+> tracks freeze themselves; a faint dot in the arrangement window only). Sections about scales, backing and the tutorial were not
+> re-checked. Sections rewritten since DOCS-EN are in English.
 
 ---
 
@@ -178,199 +177,154 @@
 
 ---
 
-## Полоса лупера — песня, скоба, дорожки (сверено с `draw.drawLooper`)
+## Play strip — song, brace, tracks (checked against `draw.drawLooper`; rewritten in English at AF4)
 
-Коробка сверху по центру; видна, пока идёт транспорт или в песне есть события. Сверху вниз:
+A box at the top centre; visible while the transport runs or the song has events. Top to bottom:
 
-**Заголовок.** Режим словом: «ОТСЧЁТ n» · «● ЗАПИСЬ · дорожка N» (или «дорожки L1, L3», если взятое родило
-несколько — сплит, смена роли или тембра посреди дубля) · «▶ ИГРАЕТ · N т. · дорожек M» ·
-«ПЕСНЯ · N т. · дорожек M · «▶ играть»». Приписки: **«ЗАПИСЬ → Ln»** (куда пойдёт ●; «(не слышно)», если
-дорожка заглушена или молчит из-за чужого соло) · **«ПОВТОР»** · **«СОЛО»**. При взведённом удалении
-заголовок ЦЕЛИКОМ заменяется красным «Ещё раз ✕ — удалить Ln».
+**Header.** The mode in words: "COUNT n" · "● REC · track N" (or "tracks L1, L3" when a take made several — split, a role or timbre
+change mid-take) · "▶ PLAYING · N bars · M tracks" · "SONG · N bars · M tracks · ▶ play". Suffixes: **"REC → Ln"** (where ● goes;
+"(not heard)" when that track is muted or silenced by another's solo) · **"REPEAT"** · **"SOLO"**. With a delete armed the whole header is
+replaced by red "✕ again — delete Ln".
 
-**Таймлайн — вся песня в ширину.** Длина выводится из материала; ширина = max(длина песни, позиция,
-длина подложки, конец скобы). Сетка тактов всегда, доли — пока различимы (≥6px), такты прореживаются на
-длинной песне. **Бегунок едет по ПЕСЕННОЙ позиции:** при повторе крутится внутри скобы, и полоса НЕ растёт.
-Геометрия — ОДИН снимок (`loopView`); прямое «доля→пиксель» и обратное «пиксель→доля» лежат рядом и
-читаются из него же — рисунок и попадание не разъезжаются.
+**Timeline — the whole song across.** Length comes from the material; width = max(song length, position, backing length, brace end).
+Bar grid always, beats while distinguishable (≥ 6 px), bars thinned on a long song. **The playhead follows the SONG position:** with
+repeat it cycles inside the brace and the strip does not grow. Geometry = ONE snapshot (`loopView`); beat→pixel and pixel→beat read it.
 
-**Полоса скобы (16px, между заголовком и дорожками — СВОЯ цель тапа).** Заливка — такты под скобой
-(ЗЕЛЁНАЯ, когда повтор включён; серая — скоба есть, но не крутится: она всё равно задаёт начало записи).
-Края-скобки ⌈…⌉: **сплошные** — скобу поставил человек; **пунктир + «авто»** — скоба следует за
-материалом. Надпись — номера тактов «3–5». Риски линий тактов — цели тапа. **Тап** ставит ближний край на
-ближайшую линию такта; **перетаскивание** ведёт взятый край. Зона попадания — заголовок вместе с полосой
-(~38px под большой палец). Квант — ТАКТ, минимум — один такт. Во время записи правка запрещена.
+**Brace band (16 px, between header and tracks — its own tap target).** Fill = the bars under the brace (GREEN with repeat on; grey —
+a brace exists but does not cycle: it still sets where recording starts). Ends ⌈…⌉: **solid** — set by the user; **dashed + "auto"** —
+follows the material. Label: bar numbers "3–5". Bar ticks are tap targets. **Tap** moves the nearer end to the nearest bar line;
+**drag** moves the taken end. Hit zone = header + band (~38 px for a thumb). Quantum: a BAR, minimum one bar. No edits while recording.
 
-**Строка дорожки (16px).** Внутри коробки, слева от линейки — **КОЛОНКА ИМЕНИ**: «L1» серым (красным — вооружена; AR2-fix: прежде «L1» висел
-левее коробки и торчал за рамку), за ним имя дорожки цветом её
-роли, «роль · тембр» по умолчанию или данное в окне; 17 % ширины полосы, 48–100 px — на 380 px линейка 261 → 203 px; на линейке —
-метки событий цветом РОЛИ дорожки (AR2; прежде аккорды сиреневые, остальное оранжевое); справа три гнезда: **М** (заглушить) · **С** (соло) · отступ · **✕** (удалить).
-Неслышная строка (mute или чужое соло) приглушена; пишущаяся — залита красным.
-- **Индикатор заморозки** (F5) — ТОЛЬКО значок, без кнопки (сама ❄ живёт в баре редактора): **голубая ❄** —
-  заморожена и свежа (играет буфер); **оранжевая ❄ с точкой** — устарела (правили после заморозки, или
-  сменились тоника/A4/темп/тембр — играет СВОИ СОБЫТИЯ); ничего — не заморожена. Цвет несёт смысл, точка
-  различает и в оттенках серого.
-- **КОЛОНКА ЗНАЧКОВ** (с поправки E0): пока хоть одна строка несёт значок — красную точку вооружения или ❄, —
-  между подписью «L1» и линейкой стоит своя колонка шириной 28px, и линейка на столько же уже (гнёзда М/С/✕ не
-  двигаются). В колонке у каждого значка своё гнездо: точка, затем ❄ с точкой «устарело» — они не налезают ни
-  друг на друга, ни на ноты линейки. Значков нет — колонки нет, полоса прежняя. Цена: при появлении первого
-  значка (или исчезновении последнего) линейка сдвигается на эту ширину. Тап по колонке вооружает строку, как
-  тап по подписи. Геометрия — из того же снимка `loopView`.
-- **Тембр строка называет** (с AR2): имя по умолчанию — «роль · тембр»; после замены тембра в редакторе имя меняется само (у
-  переименованной дорожки — нет: её имя дано человеком). Порядок строк — ОДИН с окном аранжировки (переставляется там, ручкой).
-- **Вооружение** — тап по строке ВНЕ кнопок (включая «L1»): красная рамка во всю строку, красная точка,
-  красная подпись; повторный тап снимает. ● пишет в неё, новой строки не появляется. ⛔ К вооружению
-  удаление НЕ привязано: красная рамка значит «куда запишу», и только это.
-- **Удаление** — ✕ дважды за 3 с: первый тап заливает кнопку и строку красным, второй удаляет. Любой другой
-  тап по полосе снимает взвод. **Удаление НЕ отменяется** — вес несёт подтверждение.
+**Track row (16 px).** Inside the box, left of the lane — the **NAME COLUMN**: "L1" grey (red when armed), then the track name in its
+role colour ("role · timbre" by default, or the name given in the window); 17 % of the strip, 48–100 px (at 380 px the lane is
+261 → 203 px). On the lane — event ticks in the ROLE colour; on the right three slots: **M** (mute) · **S** (solo) · gap · **✕** (delete).
+An inaudible row (mute or another's solo) is dimmed; the row being recorded is filled red.
+- **No freeze marks (AF4).** Tracks freeze themselves (auto-freeze); the play strip shows nothing about it — no ❄, no stale mark.
+- **MARK COLUMN** (E0-fix): only while a row is ARMED (outside recording) a 28-px column sits between the name column and the lane with the
+  red arm dot; the lane is that much narrower (M/S/✕ do not move). No armed row — no column. Tapping it arms, like tapping the name.
+- **The name follows the timbre** (AR2): the default name is "role · timbre"; replacing the timbre in the editor renames it (a renamed
+  track keeps its given name). Row order is ONE with the arrangement window (reordered there, by the handle).
+- **Arming** — a tap on the row OUTSIDE the buttons (including "L1"): red frame, red dot, red label; tap again to disarm. ● records into
+  it, no new row. ⛔ Deleting is NOT tied to arming: the red frame means "where I will record", nothing else.
+- **Delete** — ✕ twice within 3 s: the first tap fills the button and the row red, the second deletes. Any other tap on the strip disarms
+  it. **A delete cannot be undone** — the confirmation carries the weight.
 
-**380px — честный счёт:** коробка 340px, линейка 261px (до трёх гнёзд было 290), гнёзда 21×16px (зона
-попадания 23×16). ⚠️ По ВЫСОТЕ строка меньше пальца — у М/С так было и раньше; подтверждение ✕ спасает от
-разрушения, но не от промаха. Самая дешёвая починка — строка 16→22px (цена — высота на каждую дорожку).
+**380 px — honest count:** box 340 px, lane 261 px, slots 21×16 px (hit 23×16). ⚠️ The row is shorter than a finger (M/S always were);
+the ✕ confirmation prevents damage, not misses. Cheapest fix: rows 16 → 22 px (cost: height per track).
 
 ---
 
-## ОКНО АРАНЖИРОВКИ И МИКШЕР — третий экран (AR1, MX1, MX2, AR2; сверено с `index.html`, `style.css`, `ui.js`, `draw.drawLooper(true)`)
+## ARRANGEMENT WINDOW AND MIXER — the third screen (AR1, MX1, MX2, AR2, AF4; checked against `index.html`, `style.css`, `ui.js`, `draw.drawLooper(true)`; rewritten in English at AF4)
 
-**Открывается кнопкой ✎ в транспорте, ЭКРАН ЦЕЛИКОМ** (камера не читается — та же ветка `main.loop`, что у редактора). Это та же полоса
-дорожек, выросшая во весь экран: одна строка на дорожку, вверху — СВОЙ бар `#arrBar`: **✕** (назад к игре) · заголовок · **🎚 / ▤** (лицо:
-микшер / аранжировка) · **−** **+** (зум времени) · **⤢** (вся песня). Под баром транспорт `.arr`: **⏮ ▶ ⟳** (⤺ ✕ ■ ✎ — на экране игры).
-Ниже — строка состояния, полоса СКОБЫ (тап/перетаскивание края, как на полосе игры), строки дорожек по 40 px:
-- **слева заголовок** (AR2): **≡ РУЧКА** (28 px во всю высоту строки — тянуть вверх/вниз: строка переезжает, белая черта показывает куда, у
-  краёв окна строки листаются; порядок один на окно, микшер, полосу игры и чип редактора; новая дорожка — в конец), правее — **ИМЯ** цветом
-  роли («роль · тембр» по умолчанию) и «L#» второй строкой (у переименованной — ещё «роль · тембр»). Тап по имени — вооружить (красная
-  вторая строка, точка и рамка); **двойной тап — переименовать**: поле поверх заголовка, Enter или тап мимо — оставить, Esc — отмена,
-  пустое — снова по умолчанию (вооружение при этом остаётся, каким было). Цвета ролей различаются СВЕТЛОТОЙ (бас темнее всех, ударные
-  светлее всех) — читаются и в оттенках серого;
-- **тело строки** — в лице «аранжировка» МИНИАТЮРЫ нот (блоки по высоте в пределах дорожки; аккорд — стопкой; удары — рисками по ряду
-  набора); тап по телу — дорожка открывается в РЕДАКТОРЕ на том же отрезке времени; в лице «микшер» — слева ФЕЙДЕР уровня дорожки (тянуть
-  вдоль, относительно; двойной тап — 100 / 0 дБ; подпись «число · дБ»), справа РУЧКА ПАНОРАМЫ (MX2: −100…+100, заливка от центра, метка
-  центра; тянуть вдоль, у центра фиксация; двойной тап — центр; подпись «L 30 / C / R 30», по-русски «Л / Ц / П»);
-- **справа гнёзда 36 px**: M · S · ❄ (заморозить / разморозить; голубая — свежая, оранжевая — устарела).
-В лице «микшер» снизу — **полоса МАСТЕРА**: фейдер уровня мастера, измеритель выхода (пик после лимитера, дБFS, с удержанием) и подавление
-лимитера («Лимитер −x дБ», красное при работе). Жесты: сдвиг вдоль — время (в микшере — фейдер), поперёк — строки, два пальца — зум,
-колесо (Ctrl/⌘ — зум; в микшере над фейдером — уровень, над ручкой — панорама, шаг 1). Окно времени ОДНО с редактором: открыл дорожку — тот же отрезок, вернулся (✕
-редактора) — тот же. ✕ удаления дорожки — только на полосе игры.
+**Opened by ✎ in the transport, FULL SCREEN** (the camera is not read — the same `main.loop` branch as the editor). It is the play strip
+grown to the whole screen: one row per track; on top its own bar `#arrBar`: **✕** (back to play) · title · **🎚 / ▤** (face: mixer /
+arrangement) · **−** **+** (time zoom) · **⤢** (whole song). Under it the transport `.arr`: **⏮ ▶ ⟳** (⤺ ✕ ■ ✎ live on the play screen).
+Below: a status line, the BRACE band (tap/drag an end, as on the play strip), track rows of 40 px:
+- **header on the left** (AR2): **≡ HANDLE** (28 px, full row height — drag up/down: the row moves, a white line shows where, rows
+  scroll at the window edges; one order for the window, mixer, play strip and the editor's track chip; a new track goes last), then the
+  **NAME** in the role colour ("role · timbre" by default) and "L#" on a second line (a renamed track also shows "role · timbre"). Tap the
+  name — arm (red second line, dot and frame); **double tap — rename**: a field over the header, Enter or tapping elsewhere keeps, Esc
+  cancels, empty → the default again (arming stays as it was). Role colours differ in LIGHTNESS (bass darkest, drums lightest) — readable
+  in greyscale.
+- **the freeze dot (AF4)** — at the right end of the header, faint: **hollow** = waiting to freeze (settling after a change, or ready),
+  **pulsing** = rendering now; **nothing** = frozen, or playing live by choice (skipped by the memory budget, no captured chain, or stale
+  only by tonic/A4/tempo while re-freezing on those is off). `R.freezeQueue()` in the console says why. Not a button.
+- **row body** — in the arrangement face, note MINIATURES (blocks by pitch within the track's range; a chord as a stack; hits as ticks by
+  kit row); a tap opens the track in the EDITOR on the same time span; in the mixer face — the track LEVEL fader on the left (drag along,
+  relative; double tap — 100 / 0 dB; label "number · dB") and the PAN control on the right (MX2: −100…+100, fill from the centre, centre
+  mark; drag along with a centre detent; double tap — centre; label "L 30 / C / R 30", in Russian "Л / Ц / П");
+- **slots on the right, 36 px**: M · S (AF4: the ❄ slot is gone).
+In the mixer face, at the bottom — the **MASTER strip**: master level fader, output meter (peak after the limiter, dBFS, with hold) and
+limiter gain reduction ("Limiter −x dB", red when acting). Gestures: drag along — time (in the mixer — the fader), across — rows, two
+fingers — zoom, wheel (Ctrl/⌘ — zoom; in the mixer over a fader — level, over the pan control — pan, step 1). The time window is ONE with
+the editor: open a track — the same span; come back (editor ✕) — the same. Releasing a pan control (or a wheel step, a double tap) starts
+the 1-s settle of auto-freeze; level never does. Row ✕ delete — only on the play strip.
 
 ---
 
-## РЕДАКТОР ДОРОЖКИ — пиано-ролл во весь экран (сверено с `index.html`, `style.css`, `ui.js`, `draw.drawRoll` — после T5)
+## TRACK EDITOR — full-screen piano roll (checked against `index.html`, `style.css`, `ui.js`, `draw.drawRoll` after T5; ❄ removed at AF4; rewritten in English at AF4)
 
-**Открывается тапом по строке дорожки в ОКНЕ АРАНЖИРОВКИ (с AR1; ✎ открывает окно), занимает ЭКРАН ЦЕЛИКОМ; ✕ — назад в окно.** Камеры не видно: `main.loop` уходит в другую
-ветку — поток камеры ОСТАЁТСЯ открытым (возврат мгновенный, прав никто не переспрашивает), но кадр не
-читается и не рисуется, а распознавание пропускается вовсе. Верхняя полоса игры (`#bar`) прячется,
-вместо неё — СВОЙ бар `#rollBar`; транспорт под холстом ужимается классом `.roll` до **ДВУХ кнопок:
-⏮ в начало · ▶ играть/пауза** (⟳ ✕ ■ ✎ и ⤺ скрыты CSS — повтор, очистка и «паника» меняли бы песню под
-открытым редактором, ✎ уже нажата, а ⤺ «отменить дубль» намеренно убрана, чтобы её не путали с ↶
-«отменить правку»).
+**Opened by tapping a track row in the ARRANGEMENT WINDOW (since AR1; ✎ opens the window), FULL SCREEN; ✕ — back to the window.** No
+camera: `main.loop` takes another branch — the camera stream STAYS open (instant return, no new permission prompt) but frames are not
+read or drawn and hand tracking is skipped. The play bar (`#bar`) hides; the editor's own bar `#rollBar` replaces it; the transport under
+the canvas shrinks (class `.roll`) to **TWO buttons: ⏮ to start · ▶ play/pause** (⟳ ✕ ■ ✎ and ⤺ hidden by CSS — repeat, clear and panic
+would change the song under the open editor; ⤺ "undo take" is hidden so it is not confused with ↶ "undo edit").
 
-**КАКАЯ ДОРОЖКА И НА ЧЁМ ОТКРЫВАЕТСЯ.** Та, по чьей строке тапнули в окне аранжировки (прежде ✎ открывал вооружённую, иначе первую). **Вкладок ролей НЕТ**
-(сняты слайсом T4): в дорожке ровно одна роль, и редактор открывается прямо на ней — ударные на шести
-рядах, бас, аккорды и соло на рядах строя/лада (с S4 правятся все четыре роли одной машинерией; прежняя строка
-«ноты этой роли пока не правятся» снята). Роль читается из событий дорожки на открытии и на смене дорожки и держится до конца
-сессии: дорожку можно опустошить удалением, и ось остаётся той же, чтобы ✚ и ↶ работали. Дорожка, у которой
-нот нет с самого открытия (слой ДРОНА подложки; вооружённая, опустошённая и открытая заново), открывается
-строкой «В этой дорожке нет нот» — без оси и без выдуманной роли (прежде такая открывалась на ударных).
+**WHICH TRACK AND ON WHAT.** The one whose row was tapped in the window. **No role tabs** (removed at T4): a track holds one role and the
+editor opens on it — drums on six rows, bass, chords and solo on the rows of the tuning/mode (since S4 all four roles are edited by one
+machinery). The role is read from the track's events when it opens or the track changes, and kept for the session: a track emptied by
+deletes keeps its axis so ✚ and ↶ work. A track with no notes from the start (a backing DRONE layer; an armed, emptied and reopened one)
+opens with "This track has no notes" — no axis, no invented role.
 
-**ОТКАЗЫ В ОБЕ СТОРОНЫ И ОБА СЛОВАМИ.** Редактор не открывается поверх идущей записи (●), поверх записи
-клипа (🎥/🎙) и на пустой песне; ● не пишет, пока редактор открыт. Дорожка ПОДЛОЖКИ (🎵): её НОТЫ только
-читаются — любая правка нот отказывает с объяснением («Дорожка подложки — только чтение»), потому что
-снятие подложки (`clearJam`) унесло бы события, а правка осталась бы обрывком. ⛳ **Исключение — замена
-тембра** (разрешена подложке решением пользователя: она переписывает все события дорожки и обрывков не
-рождает), и ↶/↷ на подложке снимают/возвращают только её.
+**REFUSALS BOTH WAYS, IN WORDS.** The editor does not open over a running recording (●), a clip recording (🎥/🎙) or an empty song; ●
+does not record while the editor is open. A BACKING track (🎵): its NOTES are read-only — any note edit refuses with a reason ("Backing
+track — read only"), because removing the backing (`clearJam`) would take its events and leave the edit as a fragment. ⛳ **Exception —
+timbre replacement** (allowed for backing by user decision: it rewrites every event of the track and leaves no fragments); ↶/↷ there only
+undo/redo that.
 
-**ЧТО НА ЭКРАНЕ, СВЕРХУ ВНИЗ:** бар редактора · ЛИНЕЙКА тактов (тап = перемотка; перетаскивания нет
-намеренно — оно обещало бы скрабинг) · СЕТКА нот (или одна строка — см. выше) · [полоса автоматизации,
-если открыта] · ПОДВАЛ из двух строк. Бегунок позиции идёт СКВОЗЬ линейку, сетку И полосу: время у них одно.
-Ряды ладовой роли РАСТЯГИВАЮТСЯ на всю высоту, когда влезают (до 30px), иначе держат 18px и прокручиваются;
-колонка подписей слева ИЗМЕРЯЕТСЯ по подписям лада дорожки (потолок — 42% холста). Верх холста у ролла —
-постоянная (`ROLL_BAR_H=46` + транспорт 44), а не мера бара: бар — одна прокручиваемая строка, и сколько
-органов в нём ни стоит, линейка и сетка не сдвигаются — снятие вкладок (T4) поэтому ничего не подвинуло.
+**ON SCREEN, TOP TO BOTTOM:** the editor bar · the bar RULER (tap = seek; no drag on purpose — it would promise scrubbing) · the note GRID
+(or the one-line message above) · [the automation lane, when open] · a two-line FOOTER. The playhead runs THROUGH the ruler, grid AND lane:
+one time. Mode rows STRETCH to the full height when they fit (up to 30 px), else 18 px with scrolling; the label column on the left is
+MEASURED from the track's mode labels (capped at 42 % of the canvas). The roll's top is a constant (`ROLL_BAR_H=46` + transport 44), not
+the bar's measured height: the bar is one scrolling line, so the ruler and grid never move.
 
-**БАР РЕДАКТОРА — 18 элементов в разметке (два из них — подписи, не кнопки), по порядку** (сверено с `index.html`, блок `#rollBar`; бар —
-одна строка, на узком экране прокручивается вбок):
-`✕` закрыть · `L1 · имя` сменить дорожку (с AR2 — номер и ИМЯ дорожки цветом её роли, длинное — многоточием; по кругу в ПОРЯДКЕ ПОКАЗА окна; гаснет, если дорожка одна) · **селект ТЕМБРА дорожки**
-(`#rollTimbre`, T5 — тембры РОЛИ дорожки, у ударных — наборы; скрыт, если у дорожки нет нот) · `[лад 1/2]`
-чип лада оси — **виден ТОЛЬКО когда в дорожке события в разных ладах** · `✚` режим вставки · `🗑` удалить
-выбранное (ноту или точку автоматизации; подсказка говорит, что именно) · `↶` отменить правку · `↷` вернуть
-правку · **`❄` заморозка** (одна кнопка, три действия по состоянию: «Заморозить» / «Переморозить» /
-«Разморозить»; свежая — акцентная рамка, устаревшая — оранжевая) · **подпись состояния** рядом с ❄
-(«❄ заморожена» / оранжевое «❄ устарела — правили после заморозки; играет свои события» / пусто) ·
-`⌗ 1/4` подпись привязки («свободно» без квантизации; «(сетка мельче пикселя)», если шаг мельче
-рисуемого) · **селект полосы автоматизации** (первый пункт «— без автоматизации —») · **селект «+ эффект
-этой дорожке»** · `▲` раньше в цепи · `▼` позже в цепи · `⊘` убрать эффект у дорожки · **`╱`/`⌐` форма отрезка**
-(гладкая автоматизация: видна, пока открыта полоса; жива, когда выбрана точка, перед которой есть точка с величиной;
-значок — ТЕКУЩАЯ форма отрезка, входящего в точку: `╱` плавно, `⌐` скачком; тап меняет, тост называет новую форму
-словами) · `−`/`+` зум.
-⚠️ **ПРАВЯТСЯ СЕГОДНЯ ТОЛЬКО ДВЕ РОЛИ ИЗ ЧЕТЫРЁХ** — ударные и бас (`ROLL_EDITABLE`). Соло и аккорды — см.
-«какая дорожка» выше.
-**Клавиатура:** **Backspace / Delete** удаляют выбранное — тем же путём, что 🗑, и только когда 🗑 жива.
-Молчат, пока фокус в поле ввода (темп, A4, любое текстовое/числовое), при удержании (повтор) и с
-Ctrl/Cmd/Alt. Выпадающий список полем ввода не считается.
+**EDITOR BAR — 16 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
+narrow screen): `✕` close · `L1 · name` switch track (number and NAME in the role colour, long ones ellipsised; cycles in the window's
+DISPLAY ORDER; dims when there is one track) · **TIMBRE select** (`#rollTimbre`, T5 — the track ROLE's timbres, kits for drums; hidden on a
+track without notes) · `[mode 1/2]` the axis mode chip — **shown ONLY when the track has events in different modes** · `✚` insert mode ·
+`🗑` delete the selection (a note or an automation point; the tooltip says which) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
+("free" without quantise; "(grid finer than a pixel)" when the step is below what is drawn) · **automation lane select** (first item
+"— no automation —") · **"+ effect for this track" select** · `▲` earlier in the chain · `▼` later · `⊘` remove the effect from the track ·
+**`╱`/`⌐` segment shape** (smooth automation: visible while the lane is open; live when the selected point has a point with a value before
+it; the icon is the CURRENT shape of the segment entering the point: `╱` smooth, `⌐` step; a tap toggles, a toast names the new shape) ·
+`−`/`+` zoom. (AF4: the `❄` button and its state label are gone — tracks freeze themselves.)
+**Keyboard:** **Backspace / Delete** delete the selection — the same path as 🗑, only when 🗑 is live. Silent while focus is in an input
+field (tempo, A4, any text/number), on key repeat and with Ctrl/Cmd/Alt. A dropdown is not an input field.
 
-**ЗАМЕНА ТЕМБРА (T5).** Выбрал в `#rollTimbre` другой тембр — вся дорожка звучит им: переписываются все
-начала нот (у ударных — набор каждого удара), ноты и ритм не меняются. **Одна правка истории:** один ↶ — вся
-замена назад, один ↷ — снова. **Эффекты дорожки НЕ меняются** (цепь принадлежит дорожке, записанная
-автоматика и есть исполнение). Замороженная дорожка УСТАРЕВАЕТ и играет событиями уже в новом тембре; ❄ её
-переморозит. Только ВНУТРИ роли (бас — басовым тембром, ударные — набором). У слоя дрона выбора нет.
+**TIMBRE REPLACEMENT (T5).** Pick another timbre in `#rollTimbre` — the whole track sounds with it: every note start is rewritten (for
+drums the kit of every hit); notes and rhythm unchanged. **One history entry:** one ↶ undoes it all, one ↷ redoes. **The track's effects
+do NOT change** (the chain belongs to the track; recorded automation is the performance). A frozen track goes stale, plays its events in
+the new timbre and re-freezes by itself after leaving the editor. Only WITHIN the role (bass by a bass timbre, drums by a kit). A drone
+layer has no choice.
 
-**❄ ЗАМОРОЗКА (F5).** Дорожка рендерится в буфер, и транспорт играет его вместо событий (события не
-выбрасываются — разморозка мгновенна). Прогресс в тосте — настоящий процент там, где браузер умеет
-`OfflineAudioContext.suspend`, иначе просто «Заморозка…»; ⚠️ начатый рендер не остановить, повторный ❄ во
-время ожидания говорит это словами. Дорожка со вставленными в редакторе нотами получает ОДНОРАЗОВОЕ
-известие: её эффекты закрепляются такими, как звучат сейчас. Правка после заморозки — не запрет, а
-устаревание: дорожка играет свои события, ❄ предлагает переморозить. Дорожка без нот: «Замораживать нечего».
-Заморозить можно и подложку (заморозка — не правка). ⛳ Автоматической заморозки ещё НЕТ — ❄ единственный
-вход (план «автозаморозка» — HANDOFF).
+**FREEZING (AF3/AF4) — no control here.** A track renders to a buffer by itself after it settles (0.5 s after leaving the editor, 1 s after
+a take, a pan release, an undo…); the transport plays the buffer instead of the events (events are never discarded). An edit never waits
+for it: the track goes stale and plays its events until it re-freezes. Console only: `R.freezeQueue()`, `R.autoFreeze(false)`,
+`R.freeze`/`R.unfreeze`.
 
-**ПОДВАЛ — ДВЕ СТРОКИ, и обе несущие.** Верхняя — подсказка жестов поля («тянуть ноту — перенос · её
-правый край — длина · пустое место — прокрутка · два пальца — зум · линейка — бегунок»). Нижняя —
-**СВОДКА ЗАХВАТА**: чем записана ИМЕННО ЭТА дорожка — её роль и эффекты её цепи плюс число точек
-автоматизации («захвачено — 🎚 Бас: Реверб · Делей · точек автоматизации: 214»), либо «захвачено — 🎚 Бас:
-без эффектов». Роль у дорожки одна (T4), поэтому и цепь в строке одна: басовая дорожка не рекламирует делей
-соло. У дорожки без нот строки нет. ⛳ Это зародыш будущего «заморожено с …», а не отладка на выброс.
+**FOOTER — TWO LINES, both load-bearing.** The upper one — field gesture hints ("drag a note — move · its right edge — length · empty space
+— scroll · two fingers — zoom · ruler — playhead"). The lower one — **CAPTURE SUMMARY**: what EXACTLY THIS track was recorded with — its
+role and the effects of its chain plus the number of automation points ("captured — 🎚 Bass: Reverb · Delay · automation points: 214"), or
+"captured — 🎚 Bass: no effects". One role per track (T4), so one chain in the line. A track without notes has no line.
 
-**ПОЛОСА АВТОМАТИЗАЦИИ (O-4)** — вторая горизонтальная полоса ПОД сеткой нот, высотой 30% свободного поля в
-пределах 56…92px («не полэкрана, но и не щель»); сетка нот отдаёт ей ровно эту высоту и пересчитывает свои
-ряды. Ось ВРЕМЕНИ — та же, что у нот (один снимок на оба поля), ось ВЕЛИЧИНЫ — 0..100 с линиями по
-десятым и подписями «100»/«0» у левого края. Открывается и закрывается ОДНИМ селектом в баре: первый
-пункт закрывает, остальные — параметры эффектов ЦЕПИ ЭТОЙ ДОРОЖКИ (она одна — цепь её роли), сгруппированные
-по эффекту в ПОРЯДКЕ ЦЕПИ. **Первый пункт у каждой дорожки с ролью — «Громкость»** (VOL-3; её точки — из нот, как у
-всех пер-нотных адресов ниже; «не задано» у неё не бывает). В полосе: слева вверху имя адреса, линия, точки, полка слева
-до первой точки (состояние на старте взятого). **Линия — ступенькой или прямой, как ЗВУЧИТ:** у каждого отрезка своя
-форма, она живёт на точке, в которую отрезок входит. Записанные точки — всегда ступенькой (рука писала точку, только
-когда двигалась). Поставленная ✚ точка — ПЛАВНАЯ, если перед ней есть точка (от полки — ступенькой). Сменить форму
-выбранной точки — кнопкой `╱`/`⌐` в баре; ↶/↷ её возвращают.
-**Жесты:** палец на точке — взял; ось решается первым движением (вертикаль = величина, горизонталь =
-время) и до отпускания не меняется; величина — ДЕСЯТЫМИ рядом с полосой и ПО ЕДИНИЦЕ, если увести палец
-в сторону (число едет рядом с пальцем и гаснет на отпускании); ВРЕМЯ — свободное, квантизация полосе не
-указ. `✚` + тап по пустому месту — новая точка; `🗑` или Backspace — снять выбранную (та же корзина, что у
-нот: у человека одна «удалить»).
-**ПЕР-НОТНЫЕ АДРЕСА (V4b) — полоса правит САМИ НОТЫ.** У Скольжения, яркости, вибрато/драйва/тремоло-ноты величину
-несёт каждая нота, и прежде полоса вела лишь живую настройку — двигаешь кривую, а записанное звучит по-старому. Теперь у
-такого адреса полоса строится ИЗ НОТ: подряд идущие ноты с одной величиной — один отрезок, точка в его начале. Тянешь
-точку по величине — меняются все ноты отрезка; по времени — граница отрезка; удаление отдаёт отрезку величину
-предыдущего (у первого — «не задано»); новая точка покрывает ноты от себя до следующей границы. Одна правка — одна
-запись истории, замороженная дорожка устаревает. «Не задано» (нота играет умолчание роли) — полая точка на уровне
-умолчания; между нотами линия притушена (там ничего не звучит; у ударных пауз нет). **С гладкой автоматизацией** точка
-ставится и ПОСРЕДИ удерживаемой ноты (редактор кладёт туда ведение — якорь), а плавный отрезок звучит ВНУТРИ длинной
-ноты (редактор пишет ведения по прямой) — нарастание громкости внутри одной ноты делается двумя точками. Скольжение
-плавно меняется от смены высоты к смене (его голос читает только там). Названные границы: правка НОТЫ (перенос, длина)
-рампу не перестраивает — перестроит следующая правка этого адреса на полосе; Скольжение поверх записанного
-бас-терменвокса сгладит его ступени.
-**ЭФФЕКТЫ, ДОБАВЛЕННЫЕ ПОСРЕДИ ВЗЯТОГО**, полоса тоже перечисляет — в конце списка, с линией от момента добавления и
-без полки до него (эффекта тогда не было).
-**Вторая половина полосы — ЦЕПЬ САМОЙ ДОРОЖКИ:** селект «+ эффект этой дорожке» добавляет эффект, которого
-при игре не было — сначала голосовые модули роли дорожки (их величина ляжет в ноты; снятие модуля той же одной отменой
-чистит его и в нотах), потом шинные; эффекты, которые у дорожки уже есть, в том числе добавленные посреди взятого, он
-не предлагает (повторное добавление поставило бы эффект в начальную цепь, и он зазвучал бы с начала). `▲▼` двигают
-показанный эффект в цепи, `⊘` убирает; на эффект, добавленный посреди взятого, они пока не действуют. Выбора «в чью цепь» нет — цепь у
-дорожки одна (прежде, на дорожке нескольких ролей, её выбирала вкладка). ⛔ Живая цепь рук при этом НЕ
-ТРОГАЕТСЯ ни на символ — добавленное живёт в ЗАХВАТЕ дорожки. У дорожки без нот «+ эффект» выключен.
-⚠️ У дорожки без захвата (сегодня — только ноты, вставленные в редакторе) захват СОЗДАЁТСЯ снимком живой
-цепи — дорожка продолжает звучать как звучала, но с этого мига живые ручки до неё больше не дотягиваются.
-На пути заморозки об этом говорит одноразовое известие; на пути «+ эффект» предупреждения на экране НЕТ
-(известный долг).
+**AUTOMATION LANE (O-4)** — a second horizontal band UNDER the note grid, 30 % of the free field within 56…92 px; the grid gives it exactly
+that height and recomputes its rows. The TIME axis is the notes' (one snapshot for both fields); the VALUE axis is 0..100 with lines at
+tenths and "100"/"0" labels at the left. Opened and closed by ONE select in the bar: the first item closes, the others are the parameters
+of THIS TRACK's chain effects (one chain — its role's), grouped by effect in CHAIN ORDER. **The first item of every track with a role is
+"Volume"** (VOL-3; its points come from the notes, like every per-note address below; it is never "not set"). In the lane: the address
+name top left, the line, points, a shelf left of the first point (the state at the take's start). **The line is a step or a ramp, as it
+SOUNDS:** each segment has its own shape, stored on the point it enters. Recorded points are always steps; a point placed with ✚ is SMOOTH
+when a point precedes it (from the shelf — a step). Change the selected point's shape with `╱`/`⌐`; ↶/↷ restore it.
+**Gestures:** a finger on a point takes it; the axis is decided by the first move (vertical = value, horizontal = time) and kept until
+release; the value moves by TENTHS near the lane and by ONES when the finger moves aside (the number follows the finger and fades on
+release); TIME is free (quantise does not apply). `✚` + tap on empty space — a new point; `🗑` or Backspace — remove the selected one.
+**PER-NOTE ADDRESSES (V4b) — the lane edits THE NOTES.** For Glide, brightness, vibrato/drive/tremolo, each note carries the value; the
+lane is built FROM THE NOTES: consecutive notes with one value = one segment, a point at its start. Dragging a point's value changes every
+note of the segment; dragging its time moves the segment boundary; deleting gives the segment the previous value (the first — "not set");
+a new point covers the notes up to the next boundary. One edit — one history entry; a frozen track goes stale. "Not set" (the note plays
+the role default) — a hollow point at the default level; between notes the line is dimmed. **With smooth automation** a point can sit IN
+THE MIDDLE of a held note (an anchor change event) and a smooth segment sounds INSIDE a long note (the editor writes change events along the
+ramp) — a swell inside one note is two points. Glide changes only where the pitch changes. Named limits: a NOTE edit (move, length) does
+not rebuild its ramp — the next edit of that address does; Glide over a recorded bass theremin smooths its steps.
+**EFFECTS ADDED MID-TAKE** are listed too — at the end, with the line from the moment of adding and no shelf before it.
+**The second half of the lane — THE TRACK'S OWN CHAIN:** "+ effect for this track" adds an effect not played live — first the role's
+voice modules (their values go into the notes; removing the module in the same undoable step clears them from the notes), then bus
+effects; effects the track already has (also those added mid-take) are not offered. `▲▼` move the shown effect in the chain, `⊘` removes
+it; on an effect added mid-take they do not act yet. ⛔ The live hand chain is NOT touched — additions live in the track's CAPTURE. "+
+effect" is disabled on a track without notes.
+⚠️ A track without any captured chain gets one as a SNAPSHOT of the live chain: on its first insert in the editor (AF3: a track created in
+the editor), at song load, or on the first chain edit — it keeps sounding as it did, but from then on live knobs no longer reach it.
+Auto-freeze never pins the live chain by itself (such a track would be skipped). No on-screen notice on the "+ effect" path (known debt).
 
 ---
 

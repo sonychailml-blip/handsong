@@ -107,6 +107,7 @@ async function startApp(){
     revealBar();                             // панель видна на старте (учит, где меню), затем сама сворачивается через BAR_HIDE_MS
     started=true;
     loop();
+    import('./render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
     return true;
   }catch(err){
     btn.disabled=false; if(learn) learn.disabled=false;

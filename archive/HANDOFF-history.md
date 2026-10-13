@@ -6000,3 +6000,48 @@ Web Audio. Поверх живой игры — лупер (запись нам�
 - Конструктор жестов (§3.29) — ПОСЛЕ того, как рука-выразительность устоится: он ляжет на ГОТОВЫЙ набор
   осей и параметров, а не будет строиться в пустоте.
 
+### Moved from HANDOFF.md at AF3/AF4 (English slice records)
+### AUTO-PROBE (2026-10-13) — browser runner, console lock, AF2/AF6b fixed (full: archive B, «AUTO-PROBE»)
+- `tools/probe-browser.mjs`: own server, fresh profile, headless Chrome, fake camera; `--quick/--all/--repeat N/--eval`.
+- `window.P` = `scaleprobe.api()`: one probe at a time; check + control in row "write path (funnels)".
+- Root of the "random" AF2/AF6b failures: the ScriptProcessor capture lost blocks on a busy main thread → now an audio-thread
+  capture with frame numbers (`src/probe-cap-worklet.js`), marker must sit at `Mf − F0`.
+- Real defect fixed: `fxPlayPath` dipped a role for 40–100 ms when the recorded composition equalled the live one, swallowing a
+  track's first attack (ear step 66).
+- Reader stop sent 100 ms after the fade (`FRZ_STOP_LEAD`), frame never backwards; AF2 measures made phase-independent (envelope
+  onset, rest by leftover, deterministic hard-splice control).
+- Result: `--repeat 3` three P.all PASS (137.0/145.9/137.2 s), P.quick PASS; 7 fix rounds (+1 for time).
+### DOCS-EN (2026-10-13) — docs in concise English, probe budget
+- Russian HANDOFF (Part I as it was + all history) → `archive/HANDOFF-history.md`; full old `CLAUDE.md` → `archive/CLAUDE-full.md`.
+- `HANDOFF.md` and `CLAUDE.md` rewritten in concise English; English index on top of `BACKLOG.md`.
+- New standing rules in `CLAUDE.md`: English short code comments, short slice records, probe budget.
+
+### ✅ AF3 + AF4 — THE AUTO-FREEZE WATCHER AND TRIGGERS; INTERFACE WITHOUT ❄ (2026-10-13; runner PASS; ear/eye steps 67, 68 not yet done)
+**Part 0.** (a) `CLAUDE.md`'s module map lost its long name lists; they and the "Name index" appendix (and the stale-name list) live in
+`docs/NAME-INDEX.md` (grep only). (b) The AF6b claim "the render report keeps a Float32 copy" was checked with the runner's new
+`window.__heap()` (`--eval`; CDP `HeapProfiler.collectGarbage` + `Runtime.getHeapUsage`, backing stores): after a normal freeze of L11
+(9.39 MB Float32) the backing stores grew by 9.41 MB and stayed after the next render; two bare renders kept both buffers (+16.43 MB). Cause,
+isolated: an `OfflineAudioContext` that called `audioWorklet.addModule` is never collected by Chrome (plain context: collected, Δ 0; with only
+`addModule`: Δ 7.32 MB for 20 s, alive; a processor returning false at the end does not help). Detaching the channel ArrayBuffers
+(`structuredClone(ab,{transfer:[ab]})`) frees the data (Δ 0). Fix: `render.releaseBuf` after packing, unless the Float32 fallback is the
+frozen data or the probe option `keepBuf`. Result: +9.41 → +0.01 MB per freeze; the seed's own freeze no longer holds 4.96 MB.
+`P.freezeCost` before/after: identical (float32 99.4, today 49.5, a16 46, frozenNow 2.48 → 7.18 MB after the test freeze) — it counts the
+store, not the heap. Not fixed: the graph of every past render stays pinned (BACKLOG §1, AF6 item 7).
+**AF3 design.** Watcher = one timer; key `frzWatchKey()` (`frzGlobalKey` + `frzWatchVer` bumped in `setLanePan` + `soloLiveSig()` when some
+solo note has no map). On a key change: per track — fresh → drop; stale only by tonic/A4/tempo (signature field 5 masked) → ignore while
+`AF_REFREEZE_ON_RETUNE` is false; else an entry {sig, since, settle, kind}. A change found right after a hint dates from the hint. Hints:
+`afHint(kind)` resets every waiting entry's clock to now with that delay. Holds: `PANHOLD` (ui pan press → release), editor's open track
+(`editIsOpen()/editLayer()`), recording (queue gate). Queue step (AF1) + checks before a pick: `laneHasChain` (else skip "no chain"),
+budget estimate (skip "budget" with the total; retried only after a signature change or when memory falls); `qRun` passes `noPin` and
+`admit(bytes)` (exact, after packing). `afPause(token)` (counted), `afIdle()`, `afActive()`; `afBegin/afTick/afEnd` for probes.
+**Sites:** `recStop` 'take', `onUndo` 'undo', `loadArrangement`/`clearJam` 'backing', `deleteLane` 'rowDelete', `editClose` 'editor',
+`songPinChains` 'song'; ui `panHold`/`panRelease` (fader press, release, pointercancel, wheel, double tap). Level never.
+**Chains at birth:** `editInsPush(layer,u)` wraps the four editor inserts; `songPinChains()` in `P.seed`/`P.song` — the seed: 0 pinned.
+**Probe:** `P.checkAutoFreeze` — notes from a run: any change 1050 ms (delay 1000), pan 1000, editor 500, take 1000, undo/backing/rowDelete/song
+1000; five moves 600 ms apart → 1 render at +3400 (last move +2400); control without reset → 3 renders, first at +1000; level 0, control
+1; tonic/A4/tempo 0, control 1 at +1550; budget skipped and not retried, default budget 1. `P.checkFreezeQueue` and the render probes now
+refuse on `afActive()` instead of `R.autoFreeze()` (ON by default).
+**AF4:** see HANDOFF. Positional callers: `render.freeze(layer, opt)` — signature unchanged, new options `admit`, `keepBuf`; callers
+`P.seed` (`R.freeze(gr.layer)`), the queue (`RUNNER(layer, opt)`), console. `editClose()` — callers `ui.closeRoll` and probes, unchanged.
+`frzqueue.qAdd(layer, why, at)` — new third argument; callers `wScan` (`qAdd(ly, kind, at)`), AF1 probe (`qAdd(ly,'probe')`).
+

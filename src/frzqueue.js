@@ -1,122 +1,172 @@
-/* ═══════════════ ⛳ ОЧЕРЕДЬ АВТОЗАМОРОЗКИ — СЛАЙС AF1 (дуга «АВТОЗАМОРОЗКА», план AF1–AF6 — HANDOFF, Часть II) ═══════════════
-   ЧТО ЭТО. Дорожки встают в очередь на заморозку ПО ID (правило #27: номер слоя — лишь адрес звука сейчас, его переиспользуют), очередь
-   берёт их ПО ОДНОЙ (рендер копии движка и так один за раз — render.renderQueued) в порядке ПРИОРИТЕТА и только при открытых ВОРОТАХ.
-   ⛳ В AF1 ВХОД — ТОЛЬКО КОНСОЛЬ: R.autoFreeze(true) ставит в очередь каждую несвежую дорожку (кроме пишущейся), R.autoFreeze(false)
-   выключает, R.freezeQueue() показывает очередь. Наблюдателя и триггеров с задержками нет (AF3), интерфейса нет (AF4), подмены в выбранный
-   миг нет (AF2: готовый буфер входит прежним швом A2 на горизонте планировщика).
-   ⛳ ПРИОРИТЕТ (решение пользователя 7): сперва СЛЫШИМЫЕ сейчас (не заглушены, соло не мимо них), затем — те, до которых бегунок дойдёт
-   РАНЬШЕ (под бегунком — ноль; впереди — сколько долей до начала; позади — до конца песни и с начала; при крутящейся скобе — по кругу скобы,
-   а дорожки вне скобы — после всех); дальше — по песне, по номеру. Порядок считается В МИГ ВЫБОРА, поэтому новая массовая смена
-   пересортировывает очередь сама.
-   ⛳ ВОРОТА: (1) запись — НИКОГДА (кадры принадлежат руке, а пишущаяся дорожка и так не готова); (2) запись клипа — никогда (рывок кадра лёг
-   бы в файл); (3) ЩИПОК — ждём, ЕСЛИ раскладка этой дорожки стоит кадра: мера — её прошлая раскладка (ms.layoutMs, замер A0/AF1), у новой —
-   наибольшая виденная, а не мерили ни разу — считаем, что стоит (QF.frameMs — половина кадра при 60/с). Ворота проверяются ДВАЖДЫ: при
-   выборе (не начинать) и ВНУТРИ рендера прямо перед раскладкой (render: o.layoutGate) — между выбором и раскладкой есть await (импорт,
-   initAudio с addModule), и щипок мог начаться в нём; синхронный участок раскладки начинается только при открытых воротах.
-   ⛳ УСТАРЕВШИЙ РЕЗУЛЬТАТ — никогда не ставится: это делает билет A2 (render.freeze → REC.freezeSet сверяет подпись); очередь лишь читает
-   отказ 'sig' и ставит дорожку обратно — её возьмут, когда подпись УСТОИТСЯ (QF.settleMs без изменений). Подпись сверяется на каждом шаге:
-   дорожка, менявшаяся много раз, пока ждала, будет отрендерена ОДИН раз — с последней подписью.
-   ⛔ Рендер не отменить (у startRendering нет прерывания): выключение очереди снимает ЖДУЩИЕ, идущий доигрывает и ставится, если ещё верен.
-   ⛳ ДЛЯ ПРОБЫ (P.checkFreezeQueue) — подмена часов, ворот, исполнителя (render.freeze с поддельным рендером) и шаг вручную (qStep): так
-   приоритет, ворота и устаревание проверяются без настоящих рендеров и за доли секунды. Приложение эти подмены не трогает никогда.
-   Нижний слой: DOM не трогает (правило #5). Грузится ЛЕНИВО — его импортирует только render.js. */
-import { events, loop, recording, freezeState, freezeSig, freezePinCaptures, laneIdOf, laneLayerOf, laneAudible, isRecLayer,
-         loopPos, songBeats, cycling, laneLenOf } from './recorder.js';
+/* ═══════════════ ⛳ AUTO-FREEZE — the WATCHER (AF3) and the QUEUE (AF1) ═══════════════
+   Tracks freeze themselves, unnoticed. Loaded once by render.js (it sets the runner, render.freeze); main.startApp imports render.js
+   right after the engine starts, so the watcher runs from the first frame. ON by default; R.autoFreeze(false) turns it off for the session.
+   ⛳ THE WATCHER: one timer (QF.pollMs ≈ 250 ms) compares the cheap watch key (recorder.frzWatchKey: global key + pan version + live solo
+   chain when some solo note has no map); only when it moves are the tracks' signatures looked at. A track becomes a CANDIDATE once it is
+   not fresh and its signature has not changed for its SETTLE delay — the delay of the last trigger (AF_DELAY): 0.5 s after leaving the
+   editor, 1.0 s after a take ends / a pan control is released / an undo / a backing / a row delete / a song load / any other change.
+   Every signature change resets the clock, so an edit session of any length gives one render after it ends. HOLDS: while recording
+   (all), while the editor is open (its track), while a pan control is held (all). Triggers reach the watcher as hints through
+   hooks.af(kind) (recorder: take, undo, backing, rowDelete, editor, song; ui: panHold, pan).
+   ⛔ Never re-rendered automatically: tracks stale ONLY by tonic, A4 or tempo while AF_REFREEZE_ON_RETUNE is off (user decision until the
+   tonic freeze) — they play their events, as before; tracks without a captured chain (auto-freeze never pins the live chain; song load
+   and editor inserts pin it — recorder.songPinChains / editInsPush); tracks over the memory budget (skipped, not retried until their
+   signature changes or memory is freed; no eviction).
+   ⛳ THE QUEUE (AF1): entries by track id (rule #27), one render at a time, priority audible-and-near-the-playhead first (qRank), gates:
+   never while recording or recording a clip; at a pinch only if the track's layout fits QF.frameMs (checked at pick and again before the
+   layout, render o.layoutGate). A stale result never installs (A2 ticket); 'sig' refusal re-queues the track.
+   ⛳ PROBES: the watcher is paused while any P.* runs (scaleprobe.api lock → afPause) and for the whole browser runner session; a probe
+   drives it by hand with its own clock (afBegin/afTick/afEnd) — deterministic, no real time. Lower layer: no DOM (rule #5). */
+import { events, loop, recording, freezeState, freezeSig, laneIdOf, laneLayerOf, laneAudible, isRecLayer,
+         loopPos, songBeats, cycling, laneLenOf, frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf,
+         editIsOpen, editLayer, laneLevelOf } from './recorder.js';
 import { HANDS } from './gestures.js';
 import { activeKind } from './clip.js';
+import { hooks } from './hooks.js';
+import { AC } from './audio.js';
 
-/* Числа очереди. settleMs — сколько подпись должна стоять без изменений, прежде чем дорожку возьмут (в AF3 задержку задаст триггер: 0.5 /
-   1.0 / 1.5 с; здесь — одна). pollMs — шаг водителя. frameMs — бюджет раскладки при щипке (половина кадра 60/с: раскладка дольше — рывок
-   руки → звука виден). gatePollMs — шаг ожидания ворот внутри рендера. fails — сколько ошибок рендера подряд терпим, прежде чем снять. */
+/* ═══ NUMBERS — all auto-freeze delays and limits live here ═══ */
+const AF_DELAY={ editor:500, take:1000, pan:1000, undo:1000, backing:1000, rowDelete:1000, song:1000, change:1000, retune:1500 };   // settle, ms
+/* User decision (AF3): tonic, A4 and tempo do NOT trigger re-freezing until the tonic-freeze plan; such tracks play live. */
+const AF_REFREEZE_ON_RETUNE=false;
+/* Memory guard until AF6: total frozen 16-bit data. Touch = primary pointer coarse. */
+const AF_BUDGET_MB={ touch:300, desktop:1024 };
+const AF_TOUCH= typeof matchMedia==='function' && matchMedia('(pointer: coarse)').matches;
+const AF_EST={ preSec:0.5, tailSec:3, ch:2, bytes:2 };   // pre-render size estimate: lead-in + material + a typical tail, stereo 16-bit
+/* Queue numbers (AF1): settleMs — console entries; pollMs — the timer; frameMs — layout budget at a pinch; gatePollMs; fails; logN. */
 const QF={ settleMs:1000, pollMs:250, frameMs:8, gatePollMs:50, fails:2, logN:40 };
 
-const Q=new Map();        // id дорожки → { id, sig, since, state:'wait'|'run', runs, again, fails, pinned, why, added }
-const COST=new Map();     // id дорожки → её последняя раскладка, мс (ворота щипка)
-let costMax=null;         // наибольшая виденная раскладка — оценка для дорожки, которую ещё не мерили
-let ON=false, RUN=null, RUNP=null, TIMER=null, RUNNER=null, HOOK=null;
-const LOG=[];             // последние исходы: { L, id, res, layoutMs, ms, runs, why }
+const Q=new Map();        // track id → { id, sig, since, settle, kind, state:'wait'|'run'|'skip', runs, again, fails, pinned, skip, gate, added }
+const COST=new Map();     // track id → its last layout, ms (pinch gate)
+let costMax=null;
+let ON=true, RUN=null, RUNP=null, TIMER=null, RUNNER=null, HOOK=null;
+const PAUSE=new Map();    // pause token → count (probe lock, runner)
+let WKEY=null, WLAST=-Infinity, CTX=null, PANHOLD=false;   // watcher: last key, last scan time, last hint {kind,t}, pan held
+const LVL=new Map();      // probe control only (dbg.level): last level seen per track id
+const LOG=[];
 
 const nowMs=()=> HOOK&&HOOK.now ? HOOK.now() : performance.now();
-/* Исполнитель — render.freeze (ставит его render.js при загрузке: прямой импорт render.js отсюда был бы кругом модулей). */
 const setRunner=fn=>{ RUNNER=fn; };
+const dbg=k=> !!(HOOK&&HOOK.dbg&&HOOK.dbg[k]);
+const retuneOn=()=> AF_REFREEZE_ON_RETUNE || dbg('retune');
+const budgetBytes=()=> (HOOK&&HOOK.budgetMB!=null ? HOOK.budgetMB : (AF_TOUCH?AF_BUDGET_MB.touch:AF_BUDGET_MB.desktop))*1048576;
+const paused=()=>{ for(const n of PAUSE.values()) if(n>0) return true; return false; };
 
-/* ═══ ВОРОТА ═══ Каждое — функция, которую проба может подменить (HOOK.gates). */
+/* ═══ GATES (a probe may replace each) ═══ */
 const anyPinch=()=>{ for(const k in HANDS) if(HANDS[k]&&HANDS[k].pinch) return true; return false; };
 const G={
   recording:()=> HOOK&&HOOK.gates&&HOOK.gates.recording ? HOOK.gates.recording() : recording,
   clip:     ()=> HOOK&&HOOK.gates&&HOOK.gates.clip      ? HOOK.gates.clip()      : activeKind()!=null,
   pinch:    ()=> HOOK&&HOOK.gates&&HOOK.gates.pinch     ? HOOK.gates.pinch()     : anyPinch(),
 };
-/* Ожидаемая раскладка дорожки: своя прошлая, иначе наибольшая виденная, иначе «неизвестно» = стоит кадра. */
 const costOf=id=> COST.has(id) ? COST.get(id) : (costMax!=null ? costMax : Infinity);
-/* Что сейчас держит ворота для этой дорожки (null — открыты). */
 function gateBlock(id){
   if(G.recording()) return 'recording';
   if(G.clip()) return 'clip';
   if(G.pinch() && !(costOf(id)<=QF.frameMs)) return 'pinch';
   return null;
 }
-/* Ожидание ворот ВНУТРИ рендера (render: o.layoutGate) — перед синхронной раскладкой. */
 function gateWait(e){
   return new Promise(res=>{
     const step=()=>{ const b=gateBlock(e.id); e.gate=b; if(!b) return res(); setTimeout(step, QF.gatePollMs); };
     step(); });
 }
+/* Held now: the editor's track while it is open; everything while a pan control is held. (Recording is a queue gate; its end is a hint.) */
+function heldLayer(ly){ return PANHOLD || (editIsOpen() && editLayer()===ly); }
 
-/* ═══ ПРИОРИТЕТ — чистая функция (проба сверяет её и на выдуманных записях) ═══
-   it: { id, layer, audible, b0, b1 } — доли начала и конца материала дорожки; ctx: { p — песенная доля бегунка, end — конец песни,
-   rgn — { on, from, to } крутящаяся скоба или null }. Возвращает НОВЫЙ массив по порядку взятия. */
+/* ═══ PRIORITY — pure (the AF1 probe checks it on made-up entries). it: { id, layer, audible, b0, b1 }; ctx: { p, end, rgn } ═══ */
 function untilHeard(it, ctx){
   const p=ctx.p, b0=it.b0, b1=it.b1;
-  if(ctx.rgn&&ctx.rgn.on){ const f=ctx.rgn.from, t=ctx.rgn.to, L=t-f;
+  if(ctx.rgn&&ctx.rgn.on){ const f=ctx.rgn.from, t=ctx.rgn.to;
     const s=Math.max(b0,f), e=Math.min(b1,t);
-    if(!(e>s-1e-9)) return 2*Math.max(ctx.end,1)+b0;   // вне скобы: пока она крутится, не прозвучит — после всех
-    const q= p>=f&&p<t ? p : f;                        // бегунок перед скобой войдёт в неё с начала
+    if(!(e>s-1e-9)) return 2*Math.max(ctx.end,1)+b0;   // outside a cycling brace: after everything
+    const q= p>=f&&p<t ? p : f;
     const lead= p<f ? f-p : 0;
     if(q>=s-1e-9 && q<=e+1e-9) return lead;
     return lead + (s>q ? s-q : (t-q)+(s-f));
   }
   if(p>=b0-1e-9 && p<=b1+1e-9) return 0;
   if(b0>p) return b0-p;
-  return Math.max(0,ctx.end-p)+b0;                     // позади: следующий раз — с начала песни
+  return Math.max(0,ctx.end-p)+b0;                     // behind: next heard from the song start
 }
 function qRank(list, ctx){
   return list.map(it=>({it, k:[it.audible?0:1, untilHeard(it,ctx), it.b0, it.layer]}))
     .sort((x,y)=>{ for(let i=0;i<4;i++){ const d=x.k[i]-y.k[i]; if(d) return d; } return 0; })
     .map(x=>x.it);
 }
-/* Контекст приоритета из живого транспорта: бегунок — песенная доля (играет) или место, где стоит; скоба — если крутится. */
 function rankCtx(){
   if(HOOK&&HOOK.ctx) return HOOK.ctx();
   const lp=loopPos(), p= lp&&lp.phase==='play' ? lp.pos : Math.max(0, loop.pos||0);
   return { p, end:songBeats(), rgn: cycling() ? { on:true, from:loop.rgn.from, to:loop.rgn.to } : null };
 }
-/* Края материала по слоям — один проход по событиям (зовётся раз на выбор, не на кадр). */
 function spans(){
   const m=new Map();
   for(const e of events){ const s=m.get(e.layer); if(!s) m.set(e.layer,{b0:e.t,b1:e.t}); else { if(e.t<s.b0) s.b0=e.t; if(e.t>s.b1) s.b1=e.t; } }
-  for(const [ly,s] of m){ const L=laneLenOf(ly); if(L>s.b1) s.b1=L; }   // подложка звучит все свои такты
+  for(const [ly,s] of m){ const L=laneLenOf(ly); if(L>s.b1) s.b1=L; }
   return m;
 }
+/* Pre-render size of a track's frozen data (bytes): lead-in + its material + a typical tail. The exact check follows the render (admit). */
+function estBytes(ly, sp){
+  const s=sp.get(ly)||{b0:0,b1:0}, rate=AC?AC.sampleRate:48000;
+  return Math.round((AF_EST.preSec + (s.b1-s.b0)*60/loop.bpm + AF_EST.tailSec)*rate)*AF_EST.ch*AF_EST.bytes;
+}
+const fitsBudget=(ly, bytes)=> frzBytesTotal()-frzBytesOf(ly)+bytes <= budgetBytes();
 
-/* ═══ ПОСТАНОВКА ═══ */
-function qAdd(layer, why){
+/* ═══ ENTRIES ═══ The watched signature: freezeSig (+ the level, only in the probe's control "a watcher that reacts to level"). */
+const watchSig=ly=> freezeSig(ly) + (dbg('level') ? '|lv'+laneLevelOf(ly) : '');
+const delayOf=kind=> AF_DELAY[kind]!=null ? AF_DELAY[kind] : AF_DELAY.change;
+function qAdd(layer, why, at){
   const id=laneIdOf(layer); if(id==null) return false;
   if(!events.some(e=>e.layer===layer)) return false;
-  if(freezeState(layer)==='fresh') return false;
-  const e=Q.get(id), sig=freezeSig(layer), t=nowMs();
-  if(e){ if(e.state==='wait' && e.sig!==sig){ e.sig=sig; e.since=t; } return true; }
-  Q.set(id,{ id, sig, since:t, state:'wait', runs:0, again:false, fails:0, pinned:false, why:why||'console', added:t, gate:null });
+  const e=Q.get(id), sig=watchSig(layer), t=at!=null?at:nowMs();
+  if(e){ if(e.state!=='run' && e.sig!==sig){ e.sig=sig; if(!dbg('noReset')) e.since=t; if(e.state==='skip'&&e.skip&&e.skip.why!=='no chain'){ e.state='wait'; e.skip=null; } } return true; }
+  Q.set(id,{ id, sig, since:t, settle: AF_DELAY[why]!=null ? AF_DELAY[why] : QF.settleMs, kind:why||'console', state:'wait', runs:0, again:false, fails:0,
+             pinned:false, skip:null, gate:null, added:t });
   return true;
 }
-/* Все несвежие дорожки, кроме пишущейся. */
-function qAddAll(why){
-  let n=0; for(const ly of [...new Set(events.map(e=>e.layer))]) if(!isRecLayer(ly) && qAdd(ly, why)) n++;
-  return n;
+/* Is the track a candidate at all: has events, not being recorded, not fresh, not stale only by tonic/A4/tempo (switch off). */
+function wants(ly){
+  if(isRecLayer(ly)) return false;
+  const st=freezeState(ly);
+  if(st==='fresh') return dbg('level') && LVL.has(laneIdOf(ly)) && LVL.get(laneIdOf(ly))!==laneLevelOf(ly);
+  if(st==='stale' && !retuneOn() && frzRetuneOnly(ly)) return false;
+  return true;
 }
 
-/* ═══ ОДИН ШАГ ОЧЕРЕДИ ═══ Обновить записи (подпись, уход, свежесть), проверить ворота, взять ОДНУ по приоритету.
-   Возвращает слово состояния: 'off' | 'busy' | 'idle' | 'settling' | 'gate:recording' | 'gate:clip' | 'gate:pinch' | 'start:L#'. */
+/* ═══ THE WATCHER — one scan when the watch key moved (or a hint asked for one) ═══ */
+function wScan(force){
+  const t=nowMs(), key=frzWatchKey()+(dbg('level')?'|'+[...new Set(events.map(e=>e.layer))].map(laneLevelOf).join(','):'');
+  if(!force && key===WKEY) return false;
+  WKEY=key;
+  const at= CTX && CTX.t>WLAST ? CTX.t : t;            // a change that came with a hint dates from the hint
+  const kind= CTX && CTX.t>WLAST ? CTX.kind : 'change';
+  WLAST=t;
+  const only= HOOK&&HOOK.layers ? new Set(HOOK.layers) : null;
+  const lys=[...new Set(events.map(e=>e.layer))].filter(ly=>!only||only.has(ly));
+  for(const ly of lys){ const id=laneIdOf(ly); if(id==null) continue;
+    const e=Q.get(id);
+    if(!wants(ly)){ if(e&&e.state!=='run') Q.delete(id); if(freezeState(ly)==='fresh') LVL.set(id, laneLevelOf(ly)); continue; }
+    if(!e){ qAdd(ly, kind, at); const n=Q.get(id); if(n&&kind==='change'&&frzRetuneOnly(ly)){ n.settle=AF_DELAY.retune; n.kind='retune'; } continue; }
+    if(e.state==='run') continue;
+    const sig=watchSig(ly);
+    if(sig!==e.sig){ e.sig=sig; if(!dbg('noReset')) e.since=at; e.settle=delayOf(kind); e.kind=kind;
+      if(e.state==='skip'&&e.skip&&e.skip.why!=='no chain'){ e.state='wait'; e.skip=null; } }
+  }
+  for(const e of [...Q.values()]) if(e.state!=='run'){ const ly=laneLayerOf(e.id); if(ly==null||!events.some(x=>x.layer===ly)) Q.delete(e.id); }
+  return true;
+}
+/* A trigger: its delay applies from NOW to every waiting entry (the settle clock resets) and to changes the next scan finds.
+   'panHold' only holds (a pan control is pressed); 'pan' releases it. */
+function afHint(kind){
+  if(kind==='panHold'){ PANHOLD=true; return; }
+  if(kind==='pan') PANHOLD=false;
+  const t=nowMs(); CTX={ kind, t };
+  for(const e of Q.values()) if(e.state==='wait'){ if(!dbg('noReset')) e.since=t; e.settle=delayOf(kind); e.kind=kind; }
+  WKEY=null;                                             // the next tick scans even if the key did not move
+}
+hooks.af=afHint;
+
+/* ═══ ONE QUEUE STEP ═══ Returns 'off' | 'busy' | 'idle' | 'settling' | 'held' | 'gate:…' | 'skip:L#:why' | 'start:L#'. */
 function qStep(){
   if(!ON) return 'off';
   const t=nowMs();
@@ -125,43 +175,54 @@ function qStep(){
     const ly=laneLayerOf(e.id);
     if(ly==null){ qLog(e,null,'gone'); Q.delete(e.id); continue; }
     if(!events.some(x=>x.layer===ly)){ qLog(e,ly,'empty'); Q.delete(e.id); continue; }
-    if(freezeState(ly)==='fresh'){ qLog(e,ly,'fresh already'); Q.delete(e.id); continue; }
-    const sig=freezeSig(ly); if(sig!==e.sig){ e.sig=sig; e.since=t; }
+    if(freezeState(ly)==='fresh' && !dbg('level')){ Q.delete(e.id); continue; }
+    const sig=watchSig(ly); if(sig!==e.sig){ e.sig=sig; if(!dbg('noReset')) e.since=t; if(e.state==='skip'&&e.skip.why!=='no chain'){ e.state='wait'; e.skip=null; } }
+    if(e.state==='skip'){
+      if(e.skip.why==='no chain' && laneHasChain(ly)){ e.state='wait'; e.skip=null; }
+      else if(e.skip.why==='budget' && frzBytesTotal()<e.skip.total){ e.state='wait'; e.skip=null; } }
   }
   if(RUN) return 'busy';
   if(!Q.size) return 'idle';
+  if(!RUNNER) return 'no runner';                    // render.js not loaded yet
   if(G.recording()) return 'gate:recording';
   if(G.clip()) return 'gate:clip';
-  const sp=spans(), ready=[];
+  const sp=spans(), ready=[]; let held=false;
   for(const e of Q.values()){
+    if(e.state!=='wait') continue;
     const ly=laneLayerOf(e.id); if(ly==null || isRecLayer(ly)) continue;
-    if(t-e.since<QF.settleMs) continue;
+    if(heldLayer(ly)){ held=true; continue; }
+    if(t-e.since<e.settle) continue;
     const s=sp.get(ly)||{b0:0,b1:0};
     ready.push({ id:e.id, layer:ly, audible:laneAudible(ly), b0:s.b0, b1:s.b1 });
   }
-  if(!ready.length) return 'settling';
+  if(!ready.length) return held ? 'held' : 'settling';
   const order=qRank(ready, rankCtx());
-  const pick=order.find(it=>!gateBlock(it.id));
+  for(const it of order){ const e=Q.get(it.id);
+    if(!laneHasChain(it.layer)){ e.state='skip'; e.skip={ why:'no chain' }; qLog(e,it.layer,'skipped: no captured chain (auto-freeze never pins the live chain)'); return 'skip:L'+(it.layer+1)+':no chain'; }
+    const est=estBytes(it.layer, sp);
+    if(!fitsBudget(it.layer, est)){ e.state='skip'; e.skip={ why:'budget', total:frzBytesTotal(), est };
+      qLog(e,it.layer,`skipped: over the memory budget (${mb(frzBytesTotal())} + ~${mb(est)} > ${mb(budgetBytes())} MB)`); return 'skip:L'+(it.layer+1)+':budget'; } }
+  const pick=order.find(it=>Q.get(it.id).state==='wait' && !gateBlock(it.id));
   if(!pick){ for(const it of order) Q.get(it.id).gate='pinch'; return 'gate:pinch'; }
   RUNP=qRun(Q.get(pick.id), pick.layer);
   return 'start:L'+(pick.layer+1);
 }
-/* ═══ ИСПОЛНЕНИЕ ═══ render.freeze: билет ДО рендера, freezeSet сверяет подпись после. ⛳ Захват прикалываем ЗДЕСЬ и запоминаем: у дорожки
-   без захвата вовсе freeze сделал бы это МОЛЧА (решение 8 — творить цепь при рождении дорожки — план AF3); здесь это хотя бы видно в
-   R.freezeQueue(). Повторный вызов внутри freeze ничего не делает. */
+const mb=b=>(b/1048576).toFixed(1);
+/* ═══ RUN ═══ render.freeze with the A2 ticket; never pins (noPin) — a chain-less track was skipped above; admit = the exact budget check
+   on the packed size, before install. */
 async function qRun(e, layer){
   RUN=e; e.state='run'; e.runs++; e.gate=null;
   const t0=nowMs(); let res='error', why=null, lay=null;
   try{
-    if(!(HOOK&&HOOK.noPin)) e.pinned = freezePinCaptures(layer) || e.pinned;
-    const opt={ quiet:true, layoutGate:()=>gateWait(e), ...(HOOK&&HOOK.opt?HOOK.opt:null) };
+    const opt={ quiet:true, noPin:true, layoutGate:()=>gateWait(e), admit:bytes=>fitsBudget(layer, bytes), ...(HOOK&&HOOK.opt?HOOK.opt:null) };
     const r=await RUNNER(layer, opt);
     lay= r&&r.ms&&r.ms.layoutMs!=null ? r.ms.layoutMs : null;
     if(lay!=null){ COST.set(e.id, lay); costMax= costMax==null ? lay : Math.max(costMax, lay); }
-    if(r&&r.installed){ res='installed'; Q.delete(e.id); }
+    if(r&&r.installed){ res='installed'; Q.delete(e.id); LVL.set(e.id, laneLevelOf(layer)); }
     else if(r&&r.refused==='sig'){ res='stale — re-queued';
       if(!ON) Q.delete(e.id);
-      else { const ly=laneLayerOf(e.id); e.state='wait'; e.again=true; e.since=nowMs(); e.sig= ly!=null ? freezeSig(ly) : e.sig; } }
+      else { const ly=laneLayerOf(e.id); e.state='wait'; e.again=true; e.since=nowMs(); e.sig= ly!=null ? watchSig(ly) : e.sig; } }
+    else if(r&&r.refused==='budget'){ res='skipped: over the memory budget after render'; e.state='skip'; e.skip={ why:'budget', total:frzBytesTotal() }; }
     else if(r&&r.refused==='lane'){ res='gone'; Q.delete(e.id); }
     else { res='refused: '+(r&&r.refused); Q.delete(e.id); }
   }catch(err){
@@ -174,31 +235,48 @@ async function qRun(e, layer){
   return res;
 }
 function qLog(e, layer, res, x){
-  LOG.push({ L: layer!=null ? 'L'+(layer+1) : '—', id:e.id, res, runs:e.runs, pinned:e.pinned, ...(x||null) });
+  LOG.push({ L: layer!=null ? 'L'+(layer+1) : '—', id:e.id, res, runs:e.runs, trigger:e.kind, ...(x||null) });
   while(LOG.length>QF.logN) LOG.shift();
 }
 
-/* ═══ ВОДИТЕЛЬ ═══ Таймер шагов, пока очередь включена или рендер идёт. */
+/* ═══ DRIVER ═══ The timer runs while auto-freeze is on (or a render finishes); does nothing while paused or driven by a probe. */
+function afTick(){ wScan(false); return qStep(); }
 function pump(){
   TIMER=null;
-  try{ qStep(); }catch(err){ console.warn('[autoFreeze] step failed: '+(err&&err.message)); }   // eslint-disable-line no-console
+  if(!HOOK && !paused()){ try{ afTick(); }catch(err){ console.warn('[autoFreeze] step failed: '+(err&&err.message)); } }   // eslint-disable-line no-console
   if(ON || RUN) TIMER=setTimeout(pump, QF.pollMs);
 }
 const pumpStart=()=>{ if(!TIMER) TIMER=setTimeout(pump, 0); };
+/* Pause by token (counted; the probe lock nests). afIdle — resolves when no render runs (a probe waits for one in flight). */
+function afPause(token, on){
+  const n=(PAUSE.get(token)||0)+(on?1:-1);
+  if(n>0) PAUSE.set(token,n); else PAUSE.delete(token);
+  if(!on && !paused()){ WKEY=null; if(ON) pumpStart(); }   // on resume: a full scan
+  return paused();
+}
+const afBusy=()=>!!RUN;
+const afIdle=()=> RUNP && RUN ? RUNP.then(()=>{},()=>{}) : Promise.resolve();
+/* Is auto-freeze able to start something right now (probes refuse to run beside it). */
+const afActive=()=> !!RUN || (ON && !paused() && !HOOK);
+/* AF4: the arrangement window's dot for a row — 'run' rendering, 'wait' waiting to freeze (settling, ready or gated), null otherwise
+   (fresh, live by choice: skipped or stale only by tonic/A4/tempo). */
+function afRowState(layer){
+  if(!ON && !RUN) return null;
+  const id=laneIdOf(layer); if(id==null) return null;
+  const e=Q.get(id); if(!e) return null;
+  return e.state==='run' ? 'run' : e.state==='wait' ? 'wait' : null;
+}
+hooks.afRow=afRowState;
 
-/* ═══ КОНСОЛЬ ═══ R.autoFreeze(true|false) · R.freezeQueue(). */
+/* ═══ CONSOLE ═══ R.autoFreeze(true|false) · R.freezeQueue(). */
 function autoFreeze(on){
   if(on==null) return ON;
-  if(HOOK) { console.warn('[autoFreeze] a probe is using the queue — try again when it finishes'); return ON; }   // eslint-disable-line no-console
-  if(on){
-    ON=true; const n=qAddAll('console');
-    console.log(`%c[autoFreeze] ON — ${n} track(s) queued (every track that is not frozen-and-fresh, except one being recorded). One render at a time; never while recording or recording a clip; a track whose layout costs more than ${QF.frameMs} ms waits while a hand pinches. R.freezeQueue() lists it.`,'font-weight:bold');   // eslint-disable-line no-console
-    pumpStart();
-  } else {
-    ON=false; const n=[...Q.values()].filter(e=>e.state==='wait').length;
-    for(const e of [...Q.values()]) if(e.state==='wait') Q.delete(e.id);
-    console.log(`[autoFreeze] OFF — ${n} waiting track(s) dropped${RUN?'; the render in progress cannot be cancelled: it finishes and installs if still valid':''}.`);   // eslint-disable-line no-console
-  }
+  if(HOOK){ console.warn('[autoFreeze] a probe is using the queue — try again when it finishes'); return ON; }   // eslint-disable-line no-console
+  if(on){ ON=true; WKEY=null; pumpStart();
+    console.log(`%c[autoFreeze] ON — tracks freeze themselves after their settle delay (editor ${AF_DELAY.editor} ms, take/pan/undo/backing/row delete/song ${AF_DELAY.take} ms). One render at a time; never while recording or recording a clip; a costly layout waits while a hand pinches. R.freezeQueue() lists it.`,'font-weight:bold'); }   // eslint-disable-line no-console
+  else { ON=false; const n=[...Q.values()].filter(e=>e.state!=='run').length;
+    for(const e of [...Q.values()]) if(e.state!=='run') Q.delete(e.id);
+    console.log(`[autoFreeze] OFF for this session — ${n} waiting track(s) dropped${RUN?'; the render in progress cannot be cancelled: it finishes and installs if still valid':''}.`); }   // eslint-disable-line no-console
   return ON;
 }
 function freezeQueue(){
@@ -206,38 +284,51 @@ function freezeQueue(){
   for(const e of Q.values()){ const ly=laneLayerOf(e.id), s=ly!=null?sp.get(ly):null;
     list.push({ id:e.id, layer:ly, audible: ly!=null&&laneAudible(ly), b0:s?s.b0:0, b1:s?s.b1:0, e }); }
   const ord=qRank(list, rankCtx());
-  const rows=ord.map((it,i)=>{ const e=it.e, quiet=t-e.since;
+  const rows=ord.map((it,i)=>{ const e=it.e, quiet=t-e.since, held=it.layer!=null&&heldLayer(it.layer);
     return { '#':i+1, track: it.layer!=null?'L'+(it.layer+1):'—',
-      state: e.state==='run' ? 'rendering' : (quiet<QF.settleMs ? `settling (${((QF.settleMs-quiet)/1000).toFixed(1)} s)` : (e.gate ? 'waiting: '+e.gate : 'ready')),
-      audible: it.audible, 'beats': it.b0+'–'+it.b1, 'layout ms (last)': COST.has(e.id)?COST.get(e.id):'—',
-      renders: e.runs, again: e.again, 'pinned live chain': e.pinned }; });
+      state: e.state==='run' ? 'rendering' : e.state==='skip' ? 'skipped: '+e.skip.why : held ? 'held ('+(PANHOLD?'pan held':'editor open')+')'
+        : quiet<e.settle ? `settling (${((e.settle-quiet)/1000).toFixed(2)} s left)` : (e.gate ? 'waiting: '+e.gate : 'ready'),
+      trigger: e.kind, 'settle ms': e.settle, audible: it.audible, beats: it.b0+'–'+it.b1, 'est MB': it.layer!=null?+mb(estBytes(it.layer,sp)):'—',
+      'layout ms (last)': COST.has(e.id)?COST.get(e.id):'—', renders: e.runs, again: e.again }; });
+  /* tracks that play live by choice: stale only by tonic/A4/tempo (switch off) */
+  const live=[...new Set(events.map(e=>e.layer))].filter(ly=>!retuneOn() && frzRetuneOnly(ly)).map(ly=>({ track:'L'+(ly+1), why:'stale only by tonic/A4/tempo — AF_REFREEZE_ON_RETUNE is off (user decision): plays its events' }));
+  const used=frzBytesTotal(), lim=budgetBytes();
   /* eslint-disable no-console */
-  console.log(`[freezeQueue] ${ON?'ON':'OFF'} · ${Q.size} queued · ${RUN?'rendering now':'idle'} · settle ${QF.settleMs} ms · pinch budget ${QF.frameMs} ms · gates now: recording ${G.recording()}, clip ${G.clip()}, pinch ${G.pinch()}`);
+  console.log(`[freezeQueue] ${ON?'ON':'OFF'}${paused()?' · PAUSED ('+[...PAUSE.keys()].join(', ')+')':''} · ${Q.size} entr${Q.size===1?'y':'ies'} · ${RUN?'rendering now':'idle'} · memory ${mb(used)} of ${mb(lim)} MB (${AF_TOUCH?'touch':'desktop'} budget) · re-freeze on tonic/A4/tempo ${retuneOn()?'ON':'OFF'} · holds: recording ${G.recording()}, editor ${editIsOpen()}, pan ${PANHOLD} · gates: clip ${G.clip()}, pinch ${G.pinch()}`);
   if(rows.length) console.table(rows);
+  if(live.length){ console.log('[freezeQueue] live by choice:'); console.table(live); }
   if(LOG.length){ console.log('[freezeQueue] last outcomes:'); console.table(LOG.slice(-10)); }
   /* eslint-enable no-console */
-  return { on:ON, running:!!RUN, queue:rows, log:LOG.slice() };
+  return { on:ON, paused:paused(), running:!!RUN, queue:rows, live, memory:{ usedMB:+mb(used), budgetMB:+mb(lim), touch:AF_TOUCH }, delays:{...AF_DELAY}, retune:retuneOn(), log:LOG.slice() };
 }
 
-/* ═══ ДЛЯ ПРОБЫ ═══ qBegin(hook) — очередь включается БЕЗ водителя (шаги — qStep вручную), с подменами hook: { now, gates:{recording,
-   clip, pinch}, ctx, opt (добавка к опциям исполнителя — поддельный рендер), noPin, settleMs, frameMs, gatePollMs }; qEnd() — всё назад.
-   Отказывает, если очередь уже включена или идёт рендер. */
-let QF_KEEP=null;
-function qBegin(hook){
-  if(ON||RUN||HOOK) return false;
-  HOOK=hook||{}; ON=true; Q.clear(); QF_KEEP={...QF, cost:new Map(COST), costMax};
-  COST.clear(); costMax=null;   // проба начинает с чистых замеров (оценка «наибольшая виденная» из прошлых рендеров сессии сломала бы случай «не мерили»); qEnd вернёт
+/* ═══ FOR PROBES ═══ afBegin(hook): the watcher and queue run with NO timer — steps by hand (afTick / qStep), with hook replacements:
+   { now, gates:{recording,clip,pinch}, ctx, opt (merged into the runner's options — a fake render), settleMs, frameMs, gatePollMs,
+   layers (watcher scope), budgetMB, dbg:{ noReset, level, retune } (controls) }. afEnd() puts everything back. Refuses while a render
+   runs or another probe drives it. qBegin/qEnd = the AF1 names. */
+let KEEP=null;
+function afBegin(hook){
+  if(RUN||HOOK) return false;
+  KEEP={ QF:{...QF}, cost:new Map(COST), costMax, on:ON, panHold:PANHOLD };
+  HOOK=hook||{}; ON=true; Q.clear(); LVL.clear(); WKEY=null; WLAST=-Infinity; CTX=null; PANHOLD=false;
+  COST.clear(); costMax=null;
   for(const k of ['settleMs','frameMs','gatePollMs']) if(HOOK[k]!=null) QF[k]=HOOK[k];
   return true;
 }
-function qEnd(){ ON=false; Q.clear(); HOOK=null;
-  if(QF_KEEP){ const {cost, costMax:cm, ...num}=QF_KEEP; Object.assign(QF,num); COST.clear(); for(const [k,v] of cost) COST.set(k,v); costMax=cm; }   // замеры пробы не остаются оценкой приложения
-  QF_KEEP=null; }
-const qRunning=()=>RUNP;                 // обещание последнего начатого исполнения (проба ждёт его)
+function afEnd(){
+  Q.clear(); LVL.clear(); HOOK=null; WKEY=null; WLAST=-Infinity; CTX=null;
+  if(KEEP){ Object.assign(QF,KEEP.QF); COST.clear(); for(const [k,v] of KEEP.cost) COST.set(k,v); costMax=KEEP.costMax; ON=KEEP.on; PANHOLD=KEEP.panHold; }
+  KEEP=null; if(ON) pumpStart();
+}
+const qBegin=afBegin, qEnd=afEnd;
+const qRunning=()=>RUNP;
 const qState=()=>({ on:ON, running:!!RUN, size:Q.size, entries:[...Q.values()].map(e=>({...e})) });
 const qCostSet=(layer,ms)=>{ const id=laneIdOf(layer); if(id==null) return; if(ms==null) COST.delete(id); else COST.set(id,ms); };
 const qCostOf=layer=>{ const id=laneIdOf(layer); return id==null||!COST.has(id) ? null : COST.get(id); };
 
-export { autoFreeze, freezeQueue, setRunner,
-  /* только для пробы P.checkFreezeQueue */
-  qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, QF };
+pumpStart();   // ON by default: the watcher starts with the module (loaded by render.js after the engine starts)
+
+export { autoFreeze, freezeQueue, setRunner, afPause, afIdle, afBusy, afActive, afRowState,
+  AF_DELAY, AF_REFREEZE_ON_RETUNE, AF_BUDGET_MB,
+  /* probes only (P.checkFreezeQueue, P.checkAutoFreeze) */
+  afBegin, afEnd, afTick, afHint, qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, QF };
