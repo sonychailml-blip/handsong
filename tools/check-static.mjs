@@ -217,7 +217,7 @@ const GLOBALS=new Set((
   'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event '+
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream AudioContext OfflineAudioContext webkitAudioContext '+
-  'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener '+
+  'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel '+
   /* область AudioWorklet (ks-worklet.js) */ 'AudioWorkletProcessor registerProcessor sampleRate currentTime currentFrame'
 ).split(/\s+/).filter(Boolean));
 const undeclared=new Set();   // «файл:строка: имя» — одно сообщение на строку

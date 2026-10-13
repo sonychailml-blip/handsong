@@ -914,7 +914,7 @@ function lanePrune(){
 /* ⚠️ laneSeq НАМЕРЕННО НЕ ОБНУЛЯЕТСЯ: счётчик монотонен на всю сессию. Обнуление вернуло бы в оборот
    уже выданные номера id — а это ровно тот вид совпадения, от которого id и заводился. Стоит он
    ничего (целое число), а класс ошибок закрывает целиком. */
-function laneReset(){ for(const id of [...frozen.keys()]) freezeDrop(id);   // F4: ✕ — песни нет, значит нет и её заморозок
+function laneReset(){ for(const id of [...frozen.keys()]) freezeDrop(id); for(const id of [...frzPend.keys()]) frzPendCancel(id,'dropped');   // F4: ✕ — песни нет, значит нет и её заморозок
   laneId.clear(); laneMute.clear(); laneSolo.clear(); laneLevel.clear(); lanePan.clear(); laneName.clear(); laneRank.clear(); laneLen.clear(); laneEditVer.clear(); armLane=null; delPend=null; takeReset(); }   // A2: версии правок — гигиена (id не переиспользуются, мёртвая запись ни на что не влияла бы)   // O-2: захват сбрасывается вместе с дорожками (✕ и старт записи на пустой песне)
 /* Слой вооружённой дорожки или null. ЧИСТОЕ чтение (его зовёт draw каждый кадр): обход таблицы дорожек —
    O(дорожек), не событий. id, не найденный в таблице, читается как «не вооружено». */
@@ -1320,20 +1320,70 @@ function freezeTicket(layer){
    у другой дорожки или её нет; 'sig' — дорожка изменилась за время рендера; 'engine' — нет движка).
    ⛔ «Раз уж посчитали — поставим» НЕЛЬЗЯ НИКОГДА: это неверная музыка, помеченная свежей. */
 function freezeSet(ticket, rendered){
-  if(!AC||!ticket||!rendered||!rendered.buf) return 'engine';
+  if(!AC||!ticket||!rendered||!(rendered.buf||rendered.pack)) return 'engine';
   const {layer, id}=ticket;
   if(laneOf(layer)!==id) return 'lane';
   if(freezeSig(layer)!==ticket.sig) return 'sig';
-  freezeDrop(id);                                   // перезаморозка: старый буфер и его узлы уходят целиком
+  /* AF6b: 16 БИТ. Упаковку готовит render.freeze заранее, кусками и с уступками потоку (frzPackAsync); иначе — здесь, разом (буферы проб).
+     Ворклета нет — дорожка держит прежний Float32-буфер (рост памяти вдвое, звук тот же). */
+  const pk= AUD.frzReady ? (rendered.pack&&!rendered.pack.used ? rendered.pack : (rendered.buf ? frzPack(rendered.buf, frzStoreKind) : null)) : null;
+  if(AUD.frzReady && !pk) return 'engine';
+  frzPendCancel(id, 'superseded');                  // AF6b-fix: прежняя, ещё не готовая заморозка этой дорожки — снята
   const bus=makeFrozenBus(); if(!bus) return 'engine';
+  let store;
+  if(pk){ const key='frz:'+id+':'+(++frzKeySeq);
+    if(!AUD.frzStorePut(key, pk)){ try{ bus.disconnect(); }catch(e){} return 'engine'; }
+    pk.used=true;
+    store={ key, len:pk.len, dur:pk.len/pk.rate, kind:pk.kind, peak:pk.peak, bytes:pk.bytes, blk:pk.blk, thr:pk.thr }; }
+  else { const b=rendered.buf;
+    store={ buf:b, len:b.length, dur:b.duration, kind:'float32-buffer', peak:null, bytes:b.length*b.numberOfChannels*4, ...frzBlocks(b) }; }
   /* evRun — «в этом прогоне дорожку сейчас играют СОБЫТИЯ». Играем — да: планировщик на ближайшем
      отрезке сделает шов ВХОДА (frzEnter). Стоим — нет: пуск взведёт буфер как обычно. */
-  const f={ id, layer, buf:rendered.buf, startSec:rendered.startSec, endSec:rendered.endSec,
+  const f={ id, layer, startSec:rendered.startSec, endSec:rendered.endSec,
             tailSec:rendered.tailSec, pinned:rendered.pinned, sig:ticket.sig, bus, nodes:[], armedRep:null,
-            evRun:loop.on, mark:null, drop:false, swap:null, lastSwap:null, ...frzBlocks(rendered.buf) };   // AF2: swap — подмена впереди; blk/thr — карта тишины буфера (паузы)
-  frozen.set(id, f);
-  frzGain(id);                                      // приглушение/соло действуют сразу
+            evRun:loop.on, mark:null, drop:false, swap:null, lastSwap:null, log:[], spare:null, spareOk:false, ...store };   // AF2: swap — подмена впереди; blk/thr — карта тишины буфера (паузы). AF6b: key — данные в хранилище ворклета (16 бит), иначе buf; log — узлы для пробы; spare — чтец-запас (AF6b-fix)
+  /* ⛳ AF6b-fix: ДВЕ ФАЗЫ. Буфер, чьи данные ещё не на потоке звука (или чей чтец там ещё не построен), играть НЕЛЬЗЯ — первый старт
+     после заморозки терял бы начало (найдено пробой AF2 «стоящий»: начало на 101.9 мс позже событий). Поэтому запись реестра ждёт в
+     frzPend, а прежняя заморозка (если была) — играет; ИГРАЮЩЕЙ запись становится, когда чтец-запас доложил «готов» (frzActivate): тогда
+     же сверяются дорожка и подпись — изменилась за это время, буфер не ставится. Без ворклета (Float32-запас) — сразу, как прежде.
+     Готовность ждут render.freeze и пробы — frzWhenReady(layer). */
+  if(!f.key){ frozen.set(id, f); frzGain(id); return true; }
+  f.readyP=new Promise(res=>{ f.readyRes=res; });
+  frzPend.set(id, f);
+  frzNewSpare(f, ()=>frzActivate(f, true));
+  f.readyTimer=setTimeout(()=>frzActivate(f, false), FRZ_READY_MS);
   return true;
+}
+/* ⛳ AF6b-fix: ОЖИДАЮЩИЕ ГОТОВНОСТИ ЗАМОРОЗКИ — id дорожки → запись реестра, ещё не играющая. */
+const frzPend=new Map();
+const FRZ_READY_MS=3000;   // страховка: поток звука не доложил «готов» за 3 с — заморозка не ставится ('engine')
+function frzActivate(f, ok){
+  if(frzPend.get(f.id)!==f) return;                 // снята или заменена раньше
+  frzPend.delete(f.id); clearTimeout(f.readyTimer);
+  const why= !ok ? 'engine' : laneOf(f.layer)!==f.id ? 'lane' : freezeSig(f.layer)!==f.sig ? 'sig' : null;
+  if(why){ frzPendDispose(f); f.readyRes(why); return; }
+  freezeDrop(f.id);                                 // перезаморозка: старый буфер и его узлы уходят только СЕЙЧАС — до этого он играл
+  f.evRun=loop.on;                                  // играем — подмену спланирует планировщик (AF2); стоим — пуск взведёт буфер
+  frozen.set(f.id, f);
+  frzGain(f.id);                                    // приглушение/соло действуют сразу
+  f.readyRes(true);
+}
+function frzPendDispose(f){
+  const b=f.bus, key=f.key, sp=f.spare; f.spare=null;
+  if(sp){ try{ sp.port.postMessage({ stop:0 }); }catch(e){} }
+  setTimeout(()=>{ try{ b.disconnect(); }catch(e){} if(key) AUD.frzStoreDel(key); }, 80);
+}
+function frzPendCancel(id, why){ const f=frzPend.get(id); if(!f) return; frzPend.delete(id); clearTimeout(f.readyTimer); frzPendDispose(f); f.readyRes(why||'dropped'); }
+/* Готова ли заморозка дорожки (ждать её — render.freeze, пробы): true — играет; иначе слово причины ('sig', 'lane', 'engine', 'superseded',
+   'dropped'); 'none' — заморозки нет вовсе. */
+function frzWhenReady(layer){ const id=laneOf(layer); const f=id==null?null:frzPend.get(id);
+  if(f) return f.readyP; return Promise.resolve(id!=null && frozen.has(id) ? true : 'none'); }
+const frzReadersAlive=()=>AUD.frzStoreCount();   // ⛔ только проба: {alive} или null
+/* ЧТЕЦ-ЗАПАС дорожки: построен заранее (пустым), «готов» докладывает поток звука. onReady — однократно. */
+function frzNewSpare(f, onReady){
+  const sp=AUD.frzReader(f.key, null, 0); f.spare=sp; f.spareOk=false;
+  if(!sp){ if(onReady) onReady(); return; }
+  sp.port.onmessage=e=>{ const m=e.data||{}; if(m.ready && f.spare===sp){ f.spareOk=true; if(onReady){ const cb=onReady; onReady=null; cb(); } } };
 }
 /* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ В ВЫБРАННЫЙ МИГ — без зазора, без щелчка, без скачка уровня (решение пользователя) ═══
    Транспорт стоит — буфер входит сразу (пуск взводит его, evRun=false: так было и в A2). Играет — подмена НЕ на горизонте, а:
@@ -1372,6 +1422,58 @@ function frzBlocks(buf){
     for(let i=0;i<x.length;i++){ const a=x[i]<0?-x[i]:x[i]; const k=(i/n)|0; if(a>blk[k]) blk[k]=a; if(a>pk) pk=a; } }
   return { blk, thr:Math.max(pk*Math.pow(10,-FRZ_REST_DB/20), 1e-6) };
 }
+/* ═══ ⛳ AF6b: ЗАМОРОЖЕННЫЙ БУФЕР В 16 БИТАХ — УПАКОВКА ═══
+   После рендера Float32 превращается в 16-битные куски по FRZ_CHUNK кадров на канал и уходит в хранилище на потоке звука
+   (audio.frzStorePut → frz-worklet.js), Float32-копия в реестр не попадает. Память — вдвое меньше; звук — прежний до последних бит.
+   ⛳ МАСШТАБ ДОРОЖКИ: до лимитера замороженная дорожка может быть громче 1.0 — поэтому q = round(x · 32767 / пик), а чтец множит на
+   пик/32767 (mul): ничего не срезается, а вся сетка 16 бит отдана самой дорожке. Ошибка ≤ ½ ступени = пик/65534 — −96.3 дБ к пику (в
+   среднем ≈ −101 дБ). ⛳ ПОДМЕШИВАНИЯ (TPDF) НЕТ — решено по мере: треугольный шум ±1 ступени поднял бы наибольшую ошибку до 1.5 ступени
+   (−86.8 дБ к пику — за допуском −90 дБ) и сделал бы перезаморозку разной от раза к разу; без него ошибка коррелирована с сигналом лишь
+   ниже −96 дБ к пику (хвост ещё и под мастером и лимитером) — неслышимо. Проба P.checkChunks меряет обе на самой дорожке.
+   ⛳ КУСОК — единица ХРАНЕНИЯ (и будущей подкачки с диска, AF6), а не единица воспроизведения: чтец читает насквозь, стыков кусков в
+   звуке нет. Степень двойки — индекс куска сдвигом. Карта тишины (паузы AF2) строится тем же проходом.
+   ⛔ Режимы хранения 'f32' (эталон пробы: тот же чтец, Float32) и 'noscale' (контроль пробы: без масштаба — должно срезаться) — только проба. */
+const FRZ_CHUNK=1<<15;          // кадров в куске хранения (≈ 0.68 с при 48 кГц)
+const FRZ_PACK_SLICE=4;         // кусков за один заход асинхронной упаковки (≈ 1–3 мс на заход) — между заходами поток отдаётся кадру
+let frzStoreKind='i16', frzKeySeq=0;
+const frzStoreMode=m=>{ frzStoreKind= m==='f32'||m==='noscale' ? m : 'i16'; return frzStoreKind; };   // ⛔ только проба
+/* Генератор упаковки: проход 1 — пик и карта тишины, проход 2 — куски; уступает после каждых FRZ_PACK_SLICE кусков. */
+function* frzPackGen(buf, kind){
+  const nch=buf.numberOfChannels, len=buf.length, rate=buf.sampleRate, X=[];
+  for(let c=0;c<nch;c++) X.push(buf.getChannelData(c));
+  const bn=Math.max(1,Math.round(FRZ_BLK*rate)), blk=new Float32Array(Math.ceil(len/bn));
+  let pk=0, i=0, step=FRZ_CHUNK*FRZ_PACK_SLICE;
+  while(i<len){ const z=Math.min(len,i+step);
+    for(const x of X) for(let j=i;j<z;j++){ const a=x[j]<0?-x[j]:x[j]; const k=(j/bn)|0; if(a>blk[k]) blk[k]=a; if(a>pk) pk=a; }
+    i=z; yield; }
+  const S= kind==='noscale' ? 1 : (pk>0?pk:1), mul= kind==='f32' ? 1 : S/32767, inv=1/mul;
+  const ch=X.map(()=>[]); let bytes=0;
+  for(let a=0;a<len;a+=FRZ_CHUNK){ const z=Math.min(len,a+FRZ_CHUNK);
+    for(let c=0;c<nch;c++){ const x=X[c];
+      if(kind==='f32'){ const o=new Float32Array(z-a); o.set(x.subarray(a,z)); ch[c].push(o); bytes+=o.byteLength; }
+      else { const o=new Int16Array(z-a); for(let j=a;j<z;j++){ let q=Math.round(x[j]*inv); if(q>32767) q=32767; else if(q<-32767) q=-32767; o[j-a]=q; } ch[c].push(o); bytes+=o.byteLength; } }
+    if(((a/FRZ_CHUNK)+1)%FRZ_PACK_SLICE===0) yield; }
+  return { ch, len, rate, chunk:FRZ_CHUNK, mul, peak:pk, kind, bytes, blk, thr:Math.max(pk*Math.pow(10,-FRZ_REST_DB/20), 1e-6), used:false };
+}
+function frzPack(buf, kind){ const g=frzPackGen(buf, kind||frzStoreKind); let r=g.next(); while(!r.done) r=g.next(); return r.value; }
+/* Асинхронно — для настоящей заморозки (render.freeze): упаковка трёхминутной дорожки — несколько десятков мс счёта, отдаём их кадрам
+   заходами. Нет ворклета — null (freezeSet оставит Float32). */
+/* Уступка потоку между заходами — через MessageChannel, а не setTimeout: в скрытой вкладке таймер дросселируется до секунды, и упаковка
+   длинной дорожки шла бы минутами. */
+let frzYCh=null; const frzYQ=[];
+function frzYield(){ if(!frzYCh){ frzYCh=new MessageChannel(); frzYCh.port1.onmessage=()=>{ const f=frzYQ.shift(); if(f) f(); }; }
+  return new Promise(res=>{ frzYQ.push(res); frzYCh.port2.postMessage(0); }); }
+async function frzPackAsync(buf){
+  if(!AUD.frzReady||!buf) return null;
+  const g=frzPackGen(buf, frzStoreKind); let r=g.next();
+  while(!r.done){ await frzYield(); r=g.next(); }
+  return r.value;
+}
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkChunks): кусок хранения дорожки со сдвигом на сэмпл (shift) или тишиной (drop); null — снять. */
+const frzChunkDbg=(layer,dbg)=>{ const f=frzOf(layer); if(!f||!f.key) return false; AUD.frzStoreDbg(f.key, dbg||null); return true; };
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ: как хранится дорожка и какие узлы-чтецы она завела (кадр старта, сдвиг d: кадр буфера = кадр контекста + d,
+   сколько выдал, где остановлен). */
+const frzNodesInfo=layer=>{ const f=frzOf(layer); return f ? { key:f.key||null, kind:f.kind, len:f.len, chunk:FRZ_CHUNK, peak:f.peak, bytes:f.bytes, log:f.log.map(x=>({...x})) } : null; };
 /* Пауза на песенной доле b? (t0b — первая доля дорожки; spb — секунд на долю.) */
 function frzRestAt(f, b, t0b, spb){
   if(!f.blk) return false;
@@ -1524,9 +1626,11 @@ function frzNearDone(rep, p){
 function frzRetire(f){
   if(frozen.get(f.id)!==f) return;
   frozen.delete(f.id);
-  const b=f.bus; setTimeout(()=>{ try{ b.disconnect(); }catch(e){} }, 80);
+  const b=f.bus, key=f.key, sp=f.spare; f.spare=null; if(sp){ try{ sp.port.postMessage({ stop:0 }); }catch(e){} }   // AF6b-fix: чтец-запас — завершить
+  setTimeout(()=>{ try{ b.disconnect(); }catch(e){} if(key) AUD.frzStoreDel(key); }, 80);   // AF6b: данные в хранилище — снять (уже играющие чтецы держат свою ссылку)
 }
 function freezeDrop(id){
+  frzPendCancel(id, 'dropped');                     // AF6b-fix: и ещё не готовая заморозка этой дорожки
   const f=frozen.get(id); if(!f) return false;
   frzStopOne(f, 0);                                 // 0 — «сейчас»: рампа FRZ_FADE, затем отсроченное отключение шины
   frzRetire(f);
@@ -1539,12 +1643,13 @@ function freezeDrop(id){
    ближайшем отрезке — тем же frzLeave, что и устаревание. Запись реестра живёт до шва и уходит в
    frzNearDone (или на любой остановке — frzStopOne). */
 const unfreezeLayer=layer=>{
-  const id=laneOf(layer); const f=id==null?null:frozen.get(id); if(!f||f.drop) return false;
+  const id=laneOf(layer); if(id!=null) frzPendCancel(id,'dropped');   // AF6b-fix: ещё не готовая — снять
+  const f=id==null?null:frozen.get(id); if(!f||f.drop) return false;
   if(loop.on && f.armedRep!=null){ f.drop=true; return true; }
   freezeDrop(id); droneSync(); return true;
 };
 const frozenLayers=()=>[...frozen.values()].filter(f=>!f.drop).map(f=>f.layer);   // A2b: уходящая на шве — уже не в списке
-const frozenInfo=layer=>{ const f=frzOf(layer); return f?{ layer:f.layer, state:freezeState(layer), seconds:+f.buf.duration.toFixed(3),
+const frozenInfo=layer=>{ const f=frzOf(layer); return f?{ layer:f.layer, state:freezeState(layer), seconds:+f.dur.toFixed(3), bytes:f.bytes, kind:f.kind,   // AF6b: bytes — НАСТОЯЩАЯ память буфера (16 бит или Float32-запас)
   startSec:f.startSec, endSec:+f.endSec.toFixed(3), tailSec:+f.tailSec.toFixed(2), pinned:f.pinned, nodes:f.nodes.length }:null; };
 
 /* ПРИГЛУШЕНИЕ/СОЛО — ОДНО ПРИСВАИВАНИЕ. ⚠️ У буфера нет голосов, которые можно отпустить, поэтому
@@ -1573,6 +1678,7 @@ const frzBusGain=layer=>{ const id=laneOf(layer), f=id!=null&&frozen.get(id); re
    ⚠️ ЗАТУХАНИЕ ПРИ ОБРЫВЕ: stop() режет насухо, то есть ЩЁЛКАЕТ. Поэтому у каждого узла свой гейн, и
    обрыв — это короткая рампа FRZ_FADE, а уже потом stop. Естественный конец рампы не требует. */
 const FRZ_FADE=0.006;
+const FRZ_STOP_LEAD=0.1;   // AUTO-PROBE: чтец молчит и завершается через столько после конца рампы — команда успевает прийти на поток звука (см. frzStart)
 function frzStart(f, songBeat, atSec, xf){   // xf (AF2) — вплыть за xf секунд равной мощностью (подмена); не задан — сразу в полный уровень, как прежде
   /* СМЕЩЕНИЕ В БУФЕРЕ: сколько секунд от начала МУЗЫКИ уже прошло, плюс «разгон», который рендер
      положил перед первой нотой. Вот и вся догонялка. */
@@ -1586,15 +1692,42 @@ function frzStart(f, songBeat, atSec, xf){   // xf (AF2) — вплыть за x
      start(at, max(0,off)) пускал буфер С НАЧАЛА И СРАЗУ — дорожка, записанная с 3-го такта, играла с 1-го.
      Отрицательное смещение значит «ещё рано»: старт откладываем на столько же, смещение — ноль. */
   if(off<0){ at-=off; off=0; }
-  if(off>=f.buf.duration) return null;                    // вошли за конец буфера — играть нечего
-  const src=AC.createBufferSource(); src.buffer=f.buf;
+  if(off>=f.dur) return null;                             // вошли за конец буфера — играть нечего
   const g=AC.createGain(); g.gain.value= xf>0 ? 0 : 1;
   if(xf!=null) AUD.xfRamp(g.gain, at, xf, 1, true);
-  src.connect(g); g.connect(f.bus);
-  src.start(at, Math.max(0,off));
-  const n={src,g,killAt:null,at,off};              // at/off (A2b): где узел будет в буфере в любой миг — frzLeave отличает по ним музыку от хвоста
-  src.onended=()=>{ const i=f.nodes.indexOf(n); if(i>=0) f.nodes.splice(i,1); try{ g.disconnect(); }catch(e){} };
-  f.nodes.push(n);
+  let n=null;
+  const done=()=>{ const i=f.nodes.indexOf(n); if(i>=0) f.nodes.splice(i,1); try{ g.disconnect(); }catch(e){} };
+  if(f.key){
+    /* ⛳ AF6b: ЧТЕЦ 16-БИТНОГО ХРАНИЛИЩА. Старт и смещение — ЦЕЛЫЕ КАДРЫ: кадр буфера = кадр контекста + d. Отсчёт — от кадра опоры
+       транспорта T0F = round(t0·sr): так узлы одного прогона лежат на одной сетке кадров независимо от дробной части t0 (два прогона —
+       одна и та же раскладка по кадрам относительно своей опоры), и на стыке проходов скобы новый узел не уезжает на кадр от старого.
+       Против прежнего источника буфера с дробным стартом (браузер интерполировал его на долю сэмпла) — сдвиг ≤ ½ кадра (≤ 11 мкс). */
+    const sr=AC.sampleRate, T0F=Math.round(loop.t0*sr), startF=T0F+Math.round((at-loop.t0)*sr), offF=Math.round(off*sr), d=offF-startF;
+    /* AF6b-fix: пускаем ЗАПАС, построенный заранее (команда — сообщением с кадром старта), и тут же строим следующий; запаса нет
+       (два старта подряд быстрее, чем поток звука строит чтеца) — новый чтец сразу с параметрами, как в AF6b. */
+    let src=null, spare=false;
+    if(f.spare && f.spareOk){ src=f.spare; spare=true; f.spare=null; f.spareOk=false; src.port.postMessage({ play:{ startF, d } }); }
+    else src=AUD.frzReader(f.key, startF, d);
+    if(!src){ try{ g.disconnect(); }catch(e){} return null; }
+    if(!f.spare) frzNewSpare(f, null);
+    src.connect(g); g.connect(f.bus);
+    const rec={ startF, d, offF, T0F, played:null, killF:null, stopF:null, first:null, seen:null, spare };
+    f.log.push(rec); if(f.log.length>32) f.log.shift();
+    /* ⛳ ОСТАНОВКА ЧТЕЦА — С ЗАПАСОМ FRZ_STOP_LEAD ПОСЛЕ КОНЦА РАМПЫ (слайс AUTO-PROBE). killF — где звук дорожки кончился (рампа FRZ_FADE
+       ушла в ноль: это и есть слышимый конец), stopF — кадр, с которого чтец молчит и завершается. Прежде stopF = killF, а остановка «сейчас»
+       (пауза, перемотка) — это «сейчас + 6 мс»: сообщение порта приходило на поток звука ПОЗЖЕ этого кадра (раннер: на 96 и 224 кадра), чтец
+       успевал выдать лишний квант — неслышимо (гейн уже ноль), но не кадр в кадр. Запас 100 мс: команда приходит до своего кадра, остановка
+       точна; кадр, на котором чтец её получил, он докладывает (seen) — опоздание названо, а не угадывается. */
+    n={ src, g, killAt:null, at, off, rec, stop:t=>{ rec.killF=Math.round(t*sr); rec.stopF=rec.killF+Math.round(FRZ_STOP_LEAD*sr); rec.stopAt=performance.now(); src.port.postMessage({ stop:rec.stopF }); } };
+    src.port.onmessage=e=>{ const m=e.data||{}; if(m.ended){ rec.played=m.played; rec.first=m.first; rec.seen=m.seen==null?null:m.seen; rec.endLagMs= rec.stopAt!=null ? +(performance.now()-rec.stopAt).toFixed(1) : null; done(); } };   // AF6b-fix2: endLagMs — сколько шёл отчёт о конце после команды остановки (проба)
+  } else {                                                 // запас без ворклета: прежний источник Float32-буфера
+    const src=AC.createBufferSource(); src.buffer=f.buf;
+    src.connect(g); g.connect(f.bus);
+    src.start(at, Math.max(0,off));
+    n={ src, g, killAt:null, at, off, stop:t=>src.stop(t) };
+    src.onended=done;
+  }
+  f.nodes.push(n);                                         // at/off (A2b): где узел будет в буфере в любой миг — frzLeave отличает по ним музыку от хвоста
   return n;
 }
 /* ПЕРВАЯ ДОЛЯ ДОРОЖКИ — та же, от которой рендер считал раскладку. ⚠️ Берём из СОБЫТИЙ, а не храним:
@@ -1606,13 +1739,17 @@ function frzT0(f){
 }
 function frzKill(n, atSec){
   if(!n||n.killAt!=null) return;
-  const t=Math.max(atSec==null?AC.currentTime:atSec, AC.currentTime);
+  /* AF6b: миг обрыва — на сетке кадров опоры транспорта (как старт чтеца, см. frzStart): рампа FRZ_FADE ложится на одни и те же кадры
+     относительно опоры в любом прогоне (сдвиг ≤ ½ кадра). Иначе её дробная фаза разнилась бы от прогона к прогону. */
+  const sr=AC.sampleRate, T0F=Math.round(loop.t0*sr);
+  let t=Math.max(atSec==null?AC.currentTime:atSec, AC.currentTime);
+  t=(T0F+Math.round((t-loop.t0)*sr))/sr; if(t<AC.currentTime) t=AC.currentTime;
   n.killAt=t;
   try{
     n.g.gain.cancelScheduledValues(t);
     n.g.gain.setValueAtTime(n.g.gain.value,t);
     n.g.gain.linearRampToValueAtTime(0,t+FRZ_FADE);     // де-щелчок: рубильник слышен как поломка
-    n.src.stop(t+FRZ_FADE);
+    n.stop(t+FRZ_FADE);                                  // AF6b: чтецу — кадр остановки сообщением; запасному источнику — stop()
   }catch(e){}
 }
 /* Отметки швов (A2/A2b) — сбрасываем: любой останов/перезапуск перевзводит дорожку целиком, недошитый шов
@@ -4074,6 +4211,12 @@ function scheduleLayers(){
     /* ГРАНИЦА ПРОХОДА — гасим голоса дорожек по ЯВНОМУ времени. ⚠️ НЕСУЩЕЕ, а не косметика: события
        АРАНЖИРОВКИ несут открытия без закрытий, и в петле их гасил ровно этот вызов. */
     if(cyc && segEnd>=edge-1e-9){
+      /* ⛳ AF2-fix: ПОДМЕНА НА ШВЕ — голоса прохода этой дорожки уходят В МИГ ШВА (равномощно, FRZ_XF), а не своим отпусканием. Найдено пробой
+         («шов: скачок 4.4 дБ»): одними событиями новый проход тут же забирает те же голоса пула (cvAlloc берёт первый свободный — отпущенные
+         на шве) и рубит их хвосты; у буфера на шве прежний узел тоже глушится (frzArm). А при подмене голоса никто не забирал — хвост
+         долгого пада (1.8 с) звучал поверх нового прохода из буфера: двойное отпускание, ровно то, что AF2 чинил внутри прохода. */
+      if(frz){ const eT=loop.t0+edge*spb; for(const f of frozen.values()){ const sw=f.swap;
+        if(sw && sw.seam && !sw.seamCut && Math.abs(sw.at-eT)<1e-6){ sw.seamCut=true; AUD.voicesCut(k=>layerOfOwner(k)===f.layer, eT, sw.xf); } } }
       releaseLoopLayersAt(loop.t0+edge*spb);
       chasePlay(R.from, loop.t0+edge*spb, false);           // S3.5c: следующий проход начинается с R.from — поднять аккорды/бас, открытые к нему, ПО ТОМУ ЖЕ времени шва и ДО событий прохода (они пойдут следующим оборотом цикла). R.from=0 — пусто и бесплатно
     }
@@ -4525,6 +4668,11 @@ function startTransport(countIn, from=0){
      пропустила — голосов нет); устаревшую — событиям (догонялка её подняла), и если она станет свежей на
      ходу, шов ВХОДА погасит эти голоса. Копия списка — frzStopOne отпускает разморожённые на ходу записи. */
   for(const f of [...frozen.values()]){ frzStopOne(f, AC.currentTime); f.evRun=freezeState(f.layer)!=='fresh'; }
+  /* ⛳ AF6b-fix: ПЕРВОЕ ОКНО ПЛАНИРУЕМ СРАЗУ, в этом же вызове, а не первым тиком через 25 мс. Разгон до первой доли — 60 мс; заминка
+     главного потока на старте (сборщик мусора, тяжёлый кадр) длиннее этого делала первый отрезок ОПОЗДАВШИМ: события звучали позже, а
+     замороженный узел стартовал «с опозданием» со сдвинутым смещением (frzStart) — в разных пусках по-разному (проба AF6b получила
+     «разные чтецы» в двух прогонах). Теперь окно опережения расписано до любой заминки; тик дальше идёт как шёл. */
+  scheduleLayers();
   pumpTimer=setInterval(tick,SCHED_TICK_MS);
   hooks.loop && hooks.loop(true);
 }
@@ -4896,6 +5044,12 @@ export {
   laneOf as laneIdOf, laneLayerOf, freezeSig,
   /* AF2: подмена событий буфером — последний план дорожки и контроли (только проба P.checkSwap), скоба пробы */
   frzSwapInfo, frzSwapDbg, braceProbe,
+  /* AF6b: упаковка замороженного буфера в 16 бит (render.freeze — заранее, кусками), режим хранения и дефекты кусков (только проба), узлы-чтецы */
+  frzPackAsync, frzStoreMode, frzChunkDbg, frzNodesInfo, FRZ_CHUNK,
+  /* AF6b-fix: заморозка играет только после «готов» с потока звука — ждать её (render.freeze, пробы) */
+  frzWhenReady,
+  /* AF6b-fix2: сколько чтецов живо на потоке звука (только проба: утечки нет) */
+  frzReadersAlive,
   frzGlobalKey,   // A1 (автозаморозка): дешёвый ГЛОБАЛЬНЫЙ сигнал «могла смениться подпись хоть одной дорожки» — для наблюдателя A3/A4. Чистое чтение; сегодня вызывающих нет
   recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен

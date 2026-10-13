@@ -1287,7 +1287,11 @@ async function freeze(layer, opt){
   const o={...(opt||{})}; if(o.seed==null) o.seed=seedOfLane(tk.id);
   if(o.solo==null) o.solo=LIVE.fxSnapshot(chainKeyOf('ld'));   // договор заморозки: соло без карты — снимок ЖИВОЙ цепи В МИГ БИЛЕТА (тот же, что сложила подпись); сдвинули ручку, пока ждали очередь или рендер, — freezeSet откажет по подписи
   const r=await (o.renderFn||renderTrack)(layer, o);   // o.renderFn — ТОЛЬКО проба очереди: поддельный рендер (буфер-пустышка), билет и freezeSet — настоящие
-  const res=REC.freezeSet(tk, r);
+  /* AF6b: 16 БИТ — упаковка кусками, с уступками кадрам (десятки мс счёта на длинной дорожке не ложатся на один кадр). r.buf (Float32)
+     остаётся в отчёте рендера (пик, rms, длина — их читает P.seed); в реестр заморозки он не попадает. */
+  r.pack=await REC.frzPackAsync(r.buf);
+  let res=REC.freezeSet(tk, r);
+  if(res===true) res=await REC.frzWhenReady(layer);   // AF6b-fix: играющей заморозка становится, когда поток звука доложил «готов» (данные и чтец на месте); за это время она могла устареть — тогда отказ словом
   r.installed = res===true;
   r.refused = res===true ? null : res;
   /* eslint-disable no-console */
@@ -1620,6 +1624,7 @@ async function revAgree(){
   const key=chainKeyOf('ch');
   if(!fxChainOf(key).some(e=>e.fxId==='reverb')) return { ok:false, why:'the chord chain holds no reverb (it does by default) — add one to run this probe' };
   const inst=LIVE.fxInstance(key,'reverb'); if(!inst) return { ok:false, why:'no live reverb instance for chords' };
+  try{ await LIVE.probeCaptureReady(); }catch(e){ return { ok:false, why:'the capture worklet did not load — '+(e&&e.message) }; }
   stop();
   const keepAll=[]; for(const e of fxChainOf(key)){ const I=LIVE.fxInstance(key,e.fxId); if(I&&I.params) for(const p of I.params) keepAll.push([p,p.cur]); }   // все величины цепи аккордов — вернуть ровно как были
   const P=k=>inst.params.find(p=>p.key===k), dec0=P('decay').cur, tone0=P('tone').cur;
@@ -1643,6 +1648,8 @@ async function revAgree(){
     const capP=LIVE.probeCapture(0.3+dur+1.8);
     if(!live(A)){ out.why='R.live refused'; return out; }
     const cap=await capP; stop();
+    capCount(cap);
+    if(cap.gaps){ out.why=`the live capture has ${cap.gaps} gap(s) on the audio thread (at capture index : frames skipped — ${(cap.jumps||[]).map(j=>j.join(':')).join(', ')})`; return out; }
     const chOf=b=>[b.getChannelData(0), b.numberOfChannels>1?b.getChannelData(1):b.getChannelData(0)];
     const mL=raMeasure(cap.L,cap.R,cap.rate,dur);
     const rA=await renderTrack(A,{ quiet:true, seed:seedOfLane(REC.freezeTicket(A).id) });
@@ -1677,7 +1684,8 @@ async function revAgree(){
        на линии такта, подмена на стоящем транспорте и оба контроля;
      ПАУЗЫ — орган (CHORD_INSTR[2]), по полдоли на второй доле каждого такта, подмес реверба роли на время взятия — 0 (иначе хвост
        реверба съел бы паузы короткой пробы): подмена ложится в паузу на линии такта;
-     ШОВ — тот же пад на один такт, скоба ровно на этот такт, повтор вкл.: подмена на шве скобы.
+     ШОВ — та же дорожка пада, скоба на её первый такт, повтор вкл.: подмена на шве скобы (AF2-fix: прежде — отдельная дорожка на такт;
+       лишний полный рендер стоил ≈ 4.5 с).
    СЪЁМ — живой выход мастера (audio.probeCapture, мимо колонок) с меткой времени: один сэмпл 1.0 в миг tm до музыки — по нему индекс
    сэмпла ↔ время AC без допущений о задержке съёма. Каждый прогон — с доли за одну до материала; подмена — freezeSet НА ХОДУ (кроме
    «стоящего»). ЭТАЛОН — тот же прогон без заморозки (одни события). Всё мерится ОТНОСИТЕЛЬНО эталона (моно, окна относительно мига подмены T):
@@ -1688,12 +1696,46 @@ async function revAgree(){
        зазор — минус бесконечность;
      • ЩЕЛЧОК: наибольший шаг соседних сэмплов (по каналам) в [T−5 мс, T+XF+5 мс] — не больше SW_CLICK × того же у эталона (пол 1e-4).
    Между прогонами голоса дорожек срезаются (5 мс) и 0.4 с тишины — хвост отпускания пада (1.8 с) не ложится в следующий съём.
-   «Стоящий»: начало (первый сэмпл выше 5 % пика) совпадает с эталоном ±SW_ONSET мс, уровень звучания ±SW_LEVEL дБ, щелчка у начала нет.
+   «Стоящий»: начало (с AUTO-PROBE — по огибающей: RMS 20 мс не ниже −30 дБ уровня звучания; прежде — первый сэмпл выше 5 % пика, лотерея фаз
+   живых нот) совпадает с эталоном ±SW_ONSET мс, уровень звучания ±SW_LEVEL дБ, щелчка у начала нет. ПАУЗА (с AUTO-PROBE) — ОСТАТКОМ над
+   буфером по точным кадрам против прогона, где буфер играл с пуска (≤ SW_LEFT); щелчок — против него же; её скачок уровня — сведение.
    КОНТРОЛИ (мера обязана уметь провалиться): frzSwapDbg('old') — прежний вход A2 (голоса своим отпусканием, буфер сразу) — обязан ПРОВАЛИТЬ
-   уровень; frzSwapDbg('hard') — то же место, рубильником — обязан ПРОВАЛИТЬ щелчок. Вид плана тоже сверяется: пад — 'xf', паузы — 'rest…',
+   остаток; жёсткая склейка съёма событий с самим собой в миг подмены — ЩЕЛЧОК (детерминированно; прежний живой frzSwapDbg('hard') щёлкал
+   лишь при несовпадении фаз буфера и голосов — остался для уха). Начало: та же мера на эталоне, сдвинутом на 15 мс, видит 15 мс. Вид плана тоже сверяется: пад — 'xf', паузы — 'rest…',
    шов — 'seam'. Временные дорожки снимаются, темп, скоба, соло и величины цепи аккордов возвращаются. Время — ≈ 25 с съёмов + три рендера. */
 const SW_LEVEL=1.0, SW_GAP=-6, SW_CLICK=3, SW_ONSET=10, SW_BPM=180, SW_XF=0.02;
+/* ⛳ AF2-fix2: ОСТАТОК ПРЕЖНИХ ГОЛОСОВ ПОСЛЕ ПОДМЕНЫ — мера, не зависящая от фазы. Прогон с подменой против прогона «стоящий» (там звучит ОДИН
+   буфер): кадры буфера сопоставлены ТОЧНО (у обоих прогонов — свой чтец: кадр буфера = кадр контекста + d; метки — целые кадры), разность =
+   всё, что звучит сверх буфера. ≤ SW_LEFT дБ к буферу в окне [T+XF+30 мс, T+XF+W]. Пад без гуманизации высоты (hj:0) — живые голоса и буфер
+   играют ОДНИ И ТЕ ЖЕ частоты с постоянным случайным сдвигом фаз, и двойное отпускание прибавляет к УРОВНЮ от ≈ +0.4 до ≈ +5 дБ (корреляция ρ
+   шести пар осцилляторов: 1 + a² + 2aρ при a ≈ 0.88) — во втором прогоне пользователя выпало +0.18 (ρ ≈ −0.41), и контроль «прежняя
+   подмена» уровнем не провалился. Остаток видит лишние голоса при ЛЮБОЙ фазе: у прежней подмены ≈ −1 дБ (голоса ≈ 0.88 буфера), у
+   настоящей — хвост живого реверба срезанных голосов (предел AF2) и только. */
+const SW_LEFT=-6;
+const SW_ENV=0.02, SW_ON_DB=-30, SW_ON_CTRL=15;   // AUTO-PROBE: начало «стоящего» по огибающей (окно, порог к уровню звучания) и сдвиг контроля, мс
+const SW_SHORT=4;   // AF2-fix2 (время): окно рендера пробы, с — покрывает всё, что проба играет из буфера
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+/* ⛳ AF6b-fix2: ЖДАТЬ ОТЧЁТОВ ЧТЕЦОВ О КОНЦЕ — до срока ms, а не фиксированные 150 мс. Отчёт идёт сообщением с потока звука, и в нагруженном
+   P.all он приходил позже 150 мс (второй прогон: «чтец не доложил конец» у последнего остановленного в каждом прогоне). Срок — потолок, а не
+   пауза: дождались всех — идём дальше сразу. Что не дождались за срок — проба считает НЕ завершившимся (и это проверяет контроль). */
+/* ⛳ СЪЁМ СПЛОШНОЙ И МЕТКА ТАМ, ГДЕ ГОВОРЯТ КАДРЫ (слайс AUTO-PROBE). Съём идёт на потоке звука с номером кадра первого сэмпла (audio.
+   probeCapture → F0): метка, поставленная на кадр Mf, обязана найтись РОВНО на индексе Mf − F0, а разрывов на потоке звука быть не должно.
+   Не так — съём негоден, проба бросает (строка P.all — ERROR с причиной), а не меряет сдвинутое: прежний съём ScriptProcessor'ом на главном
+   потоке терял блоки при нагрузке, и пробы реального времени сравнивали РАЗНЫЕ мгновения звука. */
+const CAP_STATS={ captures:0, stale:0, gaps:0 };   // сведение для раннера: сколько съёмов, устаревших показаний currentFrame и разрывов (R.capStats)
+const capStats=()=>({ ...CAP_STATS });
+function capCount(c){ CAP_STATS.captures++; CAP_STATS.stale+=c.stale||0; CAP_STATS.gaps+=c.gaps||0; }
+function capAligned(c, i0, Mf){
+  capCount(c);
+  if(c.F0==null) throw new Error('the capture carries no frame number (old capture path?)');
+  if(c.gaps) throw new Error(`the capture has ${c.gaps} gap(s) on the audio thread (at capture index : frames skipped — ${(c.jumps||[]).map(j=>j.join(':')).join(', ')})`);
+  if(i0!==Mf-c.F0) throw new Error(`the time marker is at capture index ${i0}, the frame numbers put it at ${Mf-c.F0} — the capture is not continuous or started late (F0 ${c.F0}, marker frame ${Mf})`);
+}
+async function frzWaitEnds(ly, ms){
+  const t0=performance.now(); let info=REC.frzNodesInfo(ly);
+  while(info && info.log.some(x=>x.played==null) && performance.now()-t0<ms){ await sleep(20); info=REC.frzNodesInfo(ly); }
+  return { info, waited:Math.round(performance.now()-t0) };
+}
 async function swapCheck(){
   const out={ ok:false, cases:[], fails:[] };
   if(!LIVE_AC) return { ...out, why:'audio is not started (press ▶ Play)' };
@@ -1701,6 +1743,7 @@ async function swapCheck(){
   if(REC.editIsOpen()) return { ...out, why:'the track editor is open — close it first' };
   if(REC.laneSoloOn()) return { ...out, why:'a track is soloed — un-solo it first' };
   if(autoFreeze()) return { ...out, why:'R.autoFreeze is ON — turn it off first' };
+  try{ await LIVE.probeCaptureReady(); }catch(e){ return { ...out, why:'the capture worklet did not load — '+(e&&e.message) }; }
   const key=chainKeyOf('ch'), keepAll=[];
   for(const e of fxChainOf(key)){ const I=LIVE.fxInstance(key,e.fxId); if(I&&I.params) for(const p of I.params) keepAll.push([p,p.cur]); }
   const rev=fxChainOf(key).some(e=>e.fxId==='reverb') ? LIVE.fxInstance(key,'reverb') : null;
@@ -1708,7 +1751,7 @@ async function swapCheck(){
   const rate=LIVE_AC.sampleRate;
   try{
     stop(); REC.setLoopBpm(SW_BPM);
-    const M=REC.loop.metre, B=Math.ceil(REC.songBeats()/M)*M+2*M, Br=B+6*M, Bs=B+12*M;
+    const M=REC.loop.metre, B=Math.ceil(REC.songBeats()/M)*M+2*M, Br=B+6*M;
     const mk=steps=>{ let r=REC.seedTake(steps(null)); if(!r||!r.layers.length) return null;
       let ly=r.layers[0]; const on=REC.events.find(e=>e.layer===ly&&e.fn==='chOn');
       if(!on||!REC.evHz(on.a,on,'ch').length){ REC.laneDelTap(ly); REC.laneDelTap(ly); r=REC.seedTake(steps(chordUnit(CUR()))); if(!r||!r.layers.length) return null; ly=r.layers[0]; }
@@ -1719,28 +1762,42 @@ async function swapCheck(){
     const restSteps=ty=>{ const S=[]; for(let k=0;k<4;k++){ S.push({fn:'chOn',a:{deg:0,oct:1,vol:0.7,inst:2,ty},t:Br+1+k*M,id:10+k}); S.push({fn:'chOff',a:{},t:Br+1.5+k*M,id:10+k}); } return S; };
     const rest=mk(restSteps);
     if(mixP) mixP.setNorm(mix0);
-    const seam=mk(ty=>[{fn:'chOn',a:{deg:0,oct:1,vol:0.7,inst:5,ty},t:Bs,id:20},{fn:'chOff',a:{},t:Bs+M,id:20}]);
-    if(pad==null||rest==null||seam==null) return { ...out, why:'the temporary tracks could not be recorded' };
+    /* AF2-fix (время): шов меряется на ТОЙ ЖЕ дорожке пада — скоба на её первый такт (аккорд держится через шов, «вкл» — на начале скобы,
+       как у прежней отдельной дорожки шва). Минус одна временная дорожка и один полный рендер (у пада хвост ≈ 12 с — ≈ 4.5 с счёта). */
+    const seam=pad, Bs=B;
+    if(pad==null||rest==null) return { ...out, why:'the temporary tracks could not be recorded' };
     const rend={};
-    for(const ly of [pad,rest,seam]){ const tk=REC.freezeTicket(ly); rend[ly]={ tk, r:await renderTrack(ly,{ quiet:true, seed:seedOfLane(tk.id) }) }; }
+    /* AF2-fix2 (время): рендер КОРОТКИМ окном (o.short, только пробы) — SW_SHORT с песни от первой ноты дорожки: проба играет из буфера лишь
+       первые ≈ 2–2.6 с, и в этой области окно — тот же рендер сэмпл в сэмпл (те же ноты, то же семя; нота закрывается лишь на краю окна,
+       после всего измеряемого). Полный рендер пада — ≈ 20 с буфера (хвост отпускания ≈ 12 с) и ≈ 4.5 с счёта; окно — ≈ 1.3 с. */
+    for(const ly of [pad,rest]){ const tk=REC.freezeTicket(ly); rend[ly]={ tk, r:await renderTrack(ly,{ quiet:true, seed:seedOfLane(tk.id), short:SW_SHORT }) }; }
     /* ---- один прогон: съём с меткой, пуск с доли from, по желанию — заморозка до пуска (pre) или на ходу (installMs) ---- */
     const swapRun=async(ly,o)=>{
       REC.frzSwapDbg(o.dbg||null);
-      if(o.pre && REC.freezeSet(rend[ly].tk, rend[ly].r)!==true) throw new Error('freezeSet refused (stopped)');
+      const install=async()=>{ const a=REC.freezeSet(rend[ly].tk, rend[ly].r); const w= a===true ? await REC.frzWhenReady(ly) : a;   // AF6b-fix: ставится, лишь когда поток звука доложил «готов»
+        if(w!==true) throw new Error('the freeze was refused ('+w+')'); };
+      if(o.pre) await install();
       const bus=LIVE.makeFrozenBus(), ib=LIVE_AC.createBuffer(1,1,rate); ib.getChannelData(0)[0]=1;
-      const capP=LIVE.probeCapture(o.dur), tm=LIVE_AC.currentTime+0.15, s=LIVE_AC.createBufferSource(); s.buffer=ib; s.connect(bus); s.start(tm);
+      const capP=LIVE.probeCapture(o.dur), Mf=Math.ceil((LIVE_AC.currentTime+0.15)*rate), tm=Mf/rate, s=LIVE_AC.createBufferSource(); s.buffer=ib; s.connect(bus); s.start(tm);   // AF2-fix2: метка — на целом кадре Mf (остаток против «одного буфера» сверяется по кадрам)
       REC.seekTo(o.from); REC.onLoop();
       const t0=REC.loop.t0; let sw=null, fresh=null;
+      /* сведение: миг атаки, который движок получил для первого аккорда дорожки (голос пула), — против её доли; t0 — сдвинут ли за прогон */
+      const atk={ tOn:null, t0moved:false }; let polling=true;
+      (async()=>{ while(polling){ const k=Object.keys(LIVE.chordHold).find(q=>REC.layerOfOwner(q)===ly); if(k&&atk.tOn==null) atk.tOn=LIVE.chordHold[k][0].tOn; if(REC.loop.on&&REC.loop.t0!==t0) atk.t0moved=true; await sleep(5); } })();
       try{
-        if(o.installMs!=null){ await sleep(o.installMs); if(REC.freezeSet(rend[ly].tk, rend[ly].r)!==true) throw new Error('freezeSet refused (playing)'); await sleep(150); sw=REC.frzSwapInfo(ly); }
+        if(o.installMs!=null){ await sleep(o.installMs); await install(); await sleep(150); sw=REC.frzSwapInfo(ly); }
         const c=await capP; fresh=REC.freezeState(ly);
-        return { c, t0, tm, sw, fresh };
+        if(REC.loop.on) REC.onLoop();
+        const we=await frzWaitEnds(ly, 1000);             // AF6b-fix2: отчёты о конце — сообщением; ждём до 1 с (без ожидания first «стоящего» оставался пустым и проверка опоздания молча не шла)
+        atk.dips=LIVE.fxDipLog().filter(d=>d.key===chainKeyOf('ch') && d.t>=t0+(o.from-0.5)*60/REC.loop.bpm).map(d=>+((d.t-t0)/(60/REC.loop.bpm)).toFixed(3));   // провалы цепи аккордов за прогон — в долях песни
+        return { c, t0, tm, Mf, sw, fresh, nodes:we.info, atk };
       } finally {
+        polling=false;
         if(REC.loop.on) REC.onLoop();
         REC.unfreezeLayer(ly); REC.frzSwapDbg(null);
         setTimeout(()=>{ try{ bus.disconnect(); }catch(e){} }, 50);
         LIVE.voicesCut(k=>REC.layerOfOwner(k)!=null, undefined, 0.005);   // хвосты отпускания этого прогона (у пада 1.8 с) не должны лечь в следующий съём
-        await sleep(400);
+        await sleep(o.gap||200);   // AF2-fix (время): 0.2 с; перед «стоящим» — 0.4 с (o.gap): хвост живого реверба эталона не должен дотянуться до поиска начала
       }
     };
     /* ---- мера ---- */
@@ -1750,7 +1807,7 @@ async function swapCheck(){
     const rms=(R,a,b)=>{ const L=R.c.L, Rr=R.c.R; let s=0, n=0; for(let i=Math.max(1,ix(R,a));i<Math.min(L.length,ix(R,b));i++){ const v=0.5*(L[i]+Rr[i]); s+=v*v; n++; } return n?Math.sqrt(s/n):0; };
     const dmax=(R,a,b)=>{ let m=0; for(const x of [R.c.L,R.c.R]) for(let i=Math.max(1,ix(R,a));i<Math.min(x.length,ix(R,b));i++){ const d=Math.abs(x[i]-x[i-1]); if(d>m) m=d; } return m; };
     const peak=R=>{ let p=0; const L=R.c.L; for(let i=R.i0+10;i<L.length;i++){ const a=Math.abs(L[i]); if(a>p) p=a; } return p; };
-    const prep=R=>{ R.i0=imp(R.c); if(R.i0<0) throw new Error('the time marker was not found in a capture'); return R; };
+    const prep=R=>{ R.i0=imp(R.c); if(R.i0<0) throw new Error('the time marker was not found in a capture'); capAligned(R.c, R.i0, R.Mf); return R; };
     const db=x=>20*Math.log10(Math.max(x,1e-12));
     /* скачок, зазор, щелчок вокруг мига подмены T (время AC прогона S); E — эталон, тот же миг: T − S.t0 + E.t0 */
     const judge=(name,S,E,T,W,xf)=>{
@@ -1763,51 +1820,104 @@ async function swapCheck(){
     };
     const solo=async(ly,fn)=>{ REC.toggleLaneSolo(ly); try{ return await fn(); } finally { REC.toggleLaneSolo(ly); } };
     const spb=60/SW_BPM;
+    /* остаток сверх буфера (дБ к буферу): S — прогон с подменой, St — «стоящий» (один буфер); T — миг подмены в часах S */
+    const leftover=(S,St,T,xf,W)=>{
+      const lS=S.nodes&&S.nodes.log, lT=St.nodes&&St.nodes.log; if(!lS||!lS.length||!lT||!lT.length) return null;
+      const FT=S.Mf+Math.round((T-S.tm)*rate), xS=lS.filter(x=>x.startF<=FT+Math.round(xf*rate)+1).pop()||lS[0], xT=lT[0];
+      let se=0, sb=0, n=0;
+      for(let i=ix(S,T+xf+0.03); i<ix(S,T+xf+W); i++){ const b=S.Mf+(i-S.i0)+xS.d, j=St.i0+(b-xT.d-St.Mf);
+        if(i<1||i>=S.c.L.length||j<1||j>=St.c.L.length) continue;
+        for(const ch of ['L','R']){ const a=S.c[ch][i], r=St.c[ch][j]; se+=(a-r)*(a-r); sb+=r*r; } n++; }
+      return n>rate*0.1 && sb>0 ? 10*Math.log10(Math.max(se,1e-30)/sb) : null; };
     /* ---- ПАД: эталон, стоящий, перекрёст, контроли ---- */
     await solo(pad, async()=>{
       REC.braceProbe({ ...keepBrace, on:false });
-      const E=prep(await swapRun(pad,{from:B-1,dur:2.4}));
-      { const S=prep(await swapRun(pad,{from:B-1,dur:2.4,pre:true})), T=S.t0+B*spb, Te=E.t0+B*spb;
-        const on=(R,t)=>{ const L=R.c.L, p=peak(R); for(let i=ix(R,t-0.1);i<L.length;i++) if(Math.abs(L[i])>0.05*p) return i; return -1; };
-        const dOn=Math.abs((on(S,T)-ix(S,T))-(on(E,Te)-ix(E,Te)))/rate*1000;
+      const E=prep(await swapRun(pad,{from:B-1,dur:2.3,gap:400}));
+      let Sst=null;
+      { const S=prep(await swapRun(pad,{from:B-1,dur:2.3,pre:true})), T=S.t0+B*spb, Te=E.t0+B*spb; Sst=S;
+        /* ⛳ НАЧАЛО — ПО ОГИБАЮЩЕЙ, НЕ ПО ПЕРВОМУ СЭМПЛУ (слайс AUTO-PROBE). Прежде: первый сэмпл выше 5 % пика. На медленной атаке пада
+           это время зависит от того, как в первых периодах сложились ТРИ ноты аккорда, — а фазы живых голосов пула случайны (осцилляторы
+           идут непрерывно), у буфера же они свои и неизменны: начало событий гуляло 24–158 мс, буфера — всегда ≈ 30 мс (замер раннером:
+           время атаки события = время доли, команда уходила за 170–230 мс). Теперь: RMS в окне SW_ENV (20 мс — больше периода биений нот
+           аккорда) шагом 1 мс, начало — первое окно не ниже SW_ON_DB (−30 дБ: само начало атаки, где случайный ±10 % разброс её времени у живых голосов почти не сказывается) уровня звучания (окно уровня — то же, что у проверки уровня).
+           Допуск SW_ONSET не тронут. Контроль: та же мера на съёме событий, сдвинутом на SW_ON_CTRL мс, обязана увидеть этот сдвиг. */
+        const lvlS=rms(S,T+0.5*spb,T+3*spb), lvlE=rms(E,Te+0.5*spb,Te+3*spb);
+        const on=(R,t,ref,sh=0)=>{ const L=R.c.L, Rr=R.c.R, w=Math.round(SW_ENV*rate), st=Math.round(rate/1000), thr=ref*Math.pow(10,SW_ON_DB/20);
+          for(let i=ix(R,t-0.1);i+w+sh<L.length;i+=st){ let q=0; for(let k=i;k<i+w;k++){ const j=k-sh, v= j<1?0:0.5*(L[j]+Rr[j]); q+=v*v; } if(Math.sqrt(q/w)>=thr) return i; } return -1; };
+        const oSi=on(S,T,lvlS), oEi=on(E,Te,lvlE), dOn= oSi<0||oEi<0 ? Infinity : Math.abs((oSi-ix(S,T))-(oEi-ix(E,Te)))/rate*1000;
+        const oCi=on(E,Te,lvlE,Math.round(SW_ON_CTRL*rate/1000)), dCtl= oCi<0||oEi<0 ? 0 : Math.abs(oCi-oEi)/rate*1000;
         const lvl=db(rms(S,T+0.5*spb,T+3*spb)/Math.max(rms(E,Te+0.5*spb,Te+3*spb),1e-9));
         const click=dmax(S,T-0.05,T+0.3)/Math.max(dmax(E,Te-0.05,Te+0.3),1e-4);
-        out.cases.push({ name:'stopped', onsetMs:+dOn.toFixed(1), level:+lvl.toFixed(2), click:+click.toFixed(2), fresh:S.fresh });
-        if(!(dOn<=SW_ONSET)) fail(`stopped: the frozen track starts ${dOn.toFixed(1)} ms off the events (tolerance ${SW_ONSET} ms)`);
+        /* AF6b-fix: ОПОЗДАНИЕ ЧТЕЦА — кадр, с которого он на деле выдал первый сэмпл, против кадра старта (у стоящего старта буфер со
+           смещением ≥ 0, значит обязаны совпасть). Прежнее «начало на 101.9 мс позже событий» иначе не отличить от сдвига в расчёте. */
+        const n0=S.nodes&&S.nodes.log&&S.nodes.log[0], late= n0&&n0.first!=null ? (n0.first-Math.max(n0.startF, n0.startF-Math.min(0,n0.offF)))/rate*1000 : null;
+        const oS=(oSi-ix(S,T))/rate*1000, oE=(oEi-ix(E,Te))/rate*1000, pre=R=>{ const p=peak(R); return +db(rms(R,R===S?T-0.1:Te-0.1,R===S?T-0.02:Te-0.02)/Math.max(p,1e-9)).toFixed(1); };
+        const pkAt=(R,t0)=>{ let p=0,j=0; const L=R.c.L; for(let i=R.i0+10;i<L.length;i++){ const a=Math.abs(L[i]); if(a>p){ p=a; j=i; } } return { v:+p.toFixed(4), ms:+((j-ix(R,t0))/rate*1000).toFixed(1) }; };
+        out.cases.push({ name:'stopped', onsetMs:+dOn.toFixed(1), onsetCtrlMs:+dCtl.toFixed(1), eventsAttackLateMs: E.atk.tOn==null?null:+((E.atk.tOn-Te)*1000).toFixed(1), eventsT0moved:E.atk.t0moved, onsetFrozenMs:+oS.toFixed(1), onsetEventsMs:+oE.toFixed(1), preDbFrozen:pre(S), preDbEvents:pre(E), peakFrozen:pkAt(S,T), peakEvents:pkAt(E,Te), level:+lvl.toFixed(2), click:+click.toFixed(2), fresh:S.fresh, readerLateMs: late==null?null:+late.toFixed(2), spare: n0?n0.spare:null });
+        if(late!=null && late>0) fail(`stopped: the frozen track's reader produced its first sample ${late.toFixed(2)} ms after its start frame — the buffer was not ready when the transport started`);
+        if(!n0) fail('stopped: no reader was started for the frozen track');
+        else if(n0.played==null) fail('stopped: the reader never reported its end within 1 s — its first-sample frame (lateness) could not be checked');
+        if(!(Math.abs(dCtl-SW_ON_CTRL)<=2)) fail(`CONTROL (onset of the events capture shifted by ${SW_ON_CTRL} ms): the measure saw ${dCtl.toFixed(1)} ms — it cannot resolve a start offset`);
+        if(!(dOn<=SW_ONSET)) fail(`stopped: the frozen track starts ${dOn.toFixed(1)} ms off the events (tolerance ${SW_ONSET} ms) — onset frozen ${oS.toFixed(1)} ms, events ${oE.toFixed(1)} ms after the start beat; level before it frozen ${pre(S)} dB, events ${pre(E)} dB re peak; the engine was given the events' attack ${E.atk.tOn==null?'never':((E.atk.tOn-Te)*1000).toFixed(1)+' ms after the beat'}${E.atk.t0moved?', and the transport time base moved during the run':''}; chord-chain dips during the run at beats [${(E.atk.dips||[]).join(', ')}] (the chord starts at beat ${B})`);
         if(!(Math.abs(lvl)<=SW_LEVEL)) fail(`stopped: level ${lvl.toFixed(2)} dB against the events (tolerance ±${SW_LEVEL})`);
         if(!(click<=SW_CLICK)) fail(`stopped: a click at the start (${click.toFixed(2)}× the events' largest step, limit ${SW_CLICK}×)`);
         if(S.fresh!=='fresh') fail(`stopped: the buffer was not playing (state ${S.fresh})`); }
-      for(const [dbg,want] of [[null,'xf'],['old','old'],['hard','hard']]){
-        const S=prep(await swapRun(pad,{from:B-1,dur:2.4,installMs:900,dbg}));
+      /* ⛳ AUTO-PROBE: КОНТРОЛЬ ЩЕЛЧКА — ДЕТЕРМИНИРОВАННЫЙ. Прежний контроль — живой прогон frzSwapDbg('hard') (рубильник без перекрёста) —
+         щёлкал ровно на |буфер(T) − голоса(T)|, а их фазы случайны: встретились в фазе — щелчка на деле НЕТ, и контроль «не провалился»
+         (раннер: 0.95× в одном прогоне из четырёх). Контроль, в котором дефекта может не быть, контролем не является. Теперь: съём событий E
+         склеивается встык САМ С СОБОЙ в миг подмены — со скачком на ту точку ближайших 5 мс, что дальше всего от последнего сэмпла (скачок
+         ≈ размах волны, есть всегда); та же мера щелчка обязана его увидеть (> SW_CLICK). frzSwapDbg('hard') остаётся для уха. */
+      const splice=(R,t)=>{ const i=ix(R,t), x=R.c.L; let bd=0; for(let u=1;u<=Math.round(0.005*rate);u++){ const d=Math.abs(x[i+u]-x[i-1]); if(d>bd) bd=d; }
+        return bd/Math.max(dmax(R,t-0.005,t+0.005),1e-4); };
+      for(const [dbg,want] of [[null,'xf'],['old','old']]){
+        const S=prep(await swapRun(pad,{from:B-1,dur:2.3,installMs:900,dbg}));
         if(!S.sw){ fail(`pad${dbg?' ('+dbg+')':''}: no swap was planned`); continue; }
         const xf= dbg ? 0 : SW_XF, j=judge(dbg?'control: '+dbg:'held pad, crossfade at the bar line',S,E,S.sw.at,0.4,xf);
-        j.kind=S.sw.kind; j.beat=S.sw.beat-B; j.fresh=S.fresh; out.cases.push(j);
+        j.kind=S.sw.kind; j.beat=S.sw.beat-B; j.fresh=S.fresh;
+        const lo= leftover(S,Sst,S.sw.at,xf,0.4); j.leftoverDb= lo==null?null:+lo.toFixed(1);
+        out.cases.push(j);
         if(S.sw.kind!==want) fail(`pad${dbg?' ('+dbg+')':''}: the swap kind should be '${want}', got '${S.sw.kind}'`);
         if(!dbg){
           if(!(Math.abs(j.jump)<=SW_LEVEL)) fail(`held pad: level jump ${j.jump} dB at the swap (tolerance ±${SW_LEVEL})`);
           if(!(j.gap==null||j.gap>=SW_GAP)) fail(`held pad: a gap — ${j.gap} dB in a 20-ms window (floor ${SW_GAP} dB)`);
           if(!(j.click<=SW_CLICK)) fail(`held pad: a click — ${j.click}× the events' largest step (limit ${SW_CLICK}×)`);
           if(Math.abs((S.sw.beat-B)%M)>1e-6) fail(`held pad: the crossfade is not on a bar line (beat ${S.sw.beat-B} of the material)`);
-          if(S.fresh!=='fresh') fail(`held pad: the buffer did not take over (state ${S.fresh})`); }
-        else if(dbg==='old'){ if(!(Math.abs(j.jump)>SW_LEVEL)) fail(`CONTROL (old swap, voices left to release): the level check did not fail (jump ${j.jump} dB) — it cannot see a double release`); }
-        else if(!(j.click>SW_CLICK)) fail(`CONTROL (hard cut, no crossfade): the click check did not fail (${j.click}×) — it cannot see a click`);
+          if(S.fresh!=='fresh') fail(`held pad: the buffer did not take over (state ${S.fresh})`);
+          if(lo==null) fail('held pad: the leftover over the buffer could not be measured (no reader log or too short a window)');
+          else if(!(lo<=SW_LEFT)) fail(`held pad: ${lo.toFixed(1)} dB of something besides the buffer remains after the swap (limit ${SW_LEFT} dB re the buffer) — the old voices were not cut`);
+          const Te=S.sw.at-S.t0+E.t0, sc=splice(E,Te);
+          out.cases.push({ name:'control: hard splice of the events', click:+sc.toFixed(2) });
+          if(!(sc>SW_CLICK)) fail(`CONTROL (the events capture spliced hard onto itself at the swap moment): the click check did not fail (${sc.toFixed(2)}×) — it cannot see a click`); }
+        else if(dbg==='old'){
+          /* AF2-fix2: контроль проваливает ОСТАТОК (не зависит от фазы); его скачок уровня — сведение (см. SW_LEFT) */
+          if(lo==null) fail('CONTROL (old swap): the leftover could not be measured');
+          else if(!(lo>SW_LEFT)) fail(`CONTROL (old swap, voices left to release): the leftover over the buffer is only ${lo.toFixed(1)} dB (must exceed ${SW_LEFT} dB) — the measure cannot see a double release`); }
       }
     });
     /* ---- ПАУЗЫ ---- */
     await solo(rest, async()=>{
       REC.braceProbe({ ...keepBrace, on:false });
-      const E=prep(await swapRun(rest,{from:Br-1,dur:3.0})), S=prep(await swapRun(rest,{from:Br-1,dur:3.0,installMs:800}));
+      /* ⛳ AUTO-PROBE: ПАУЗА СУДИТСЯ ОСТАТКОМ, А НЕ СКАЧКОМ УРОВНЯ. Скачок (RMS после/до против эталона событий) на органе — лотерея фаз: его
+         гармоники почти совпадают у нот аккорда и бьются с СЛУЧАЙНОЙ у живых голосов фазой — раннер видел ±2.3 дБ при верной подмене.
+         Остаток (та же мера, что у пада, контроль «прежняя подмена» доказывает, что она видит лишнее) сверяет прогон с подменой с прогоном,
+         где буфер играл с пуска (Sst), ПО ТОЧНЫМ КАДРАМ БУФЕРА: после подмены в паузе звучит ровно буфер — удвоенная или потерянная нота
+         даёт ≈ 0 дБ. Скачок печатается сведением. */
+      /* эталон щелчка и сведения — прогон, где буфер играл С ПУСКА (St): после подмены в паузе звучит ровно он; отдельный прогон одними событиями
+         паузе не нужен (−3.4 с у строки) */
+      const St=prep(await swapRun(rest,{from:Br-1,dur:2.95,pre:true})), S=prep(await swapRun(rest,{from:Br-1,dur:2.95,installMs:800}));
       if(!S.sw){ fail('rest: no swap was planned'); return; }
-      const j=judge('rest',S,E,S.sw.at,1.1,SW_XF); j.kind=S.sw.kind; j.beat=S.sw.beat-Br; j.fresh=S.fresh; out.cases.push(j);
+      const j=judge('rest',S,St,S.sw.at,1.1,SW_XF); j.kind=S.sw.kind; j.beat=S.sw.beat-Br; j.fresh=S.fresh;
+      const lo=leftover(S,St,S.sw.at,SW_XF,0.9); j.leftoverDb= lo==null?null:+lo.toFixed(1); out.cases.push(j);
       if(!/^rest/.test(S.sw.kind)) fail(`rest: the swap should land in a rest, got '${S.sw.kind}'`);
-      if(!(Math.abs(j.jump)<=SW_LEVEL)) fail(`rest: the notes after the swap are ${j.jump} dB off the events (a dropped or doubled note; tolerance ±${SW_LEVEL})`);
+      if(lo==null) fail('rest: the leftover over the buffer could not be measured (no reader log or too short a window)');
+      else if(!(lo<=SW_LEFT)) fail(`rest: ${lo.toFixed(1)} dB of something besides the buffer sounds after the swap (limit ${SW_LEFT} dB re the buffer) — a doubled or dropped note`);
       if(!(j.click<=SW_CLICK)) fail(`rest: a click — ${j.click}× (limit ${SW_CLICK}×)`);
       if(S.fresh!=='fresh') fail(`rest: the buffer did not take over (state ${S.fresh})`);
     });
     /* ---- ШОВ СКОБЫ ---- */
     await solo(seam, async()=>{
       REC.braceProbe({ from:Bs, to:Bs+M, on:true, user:true });
-      const E=prep(await swapRun(seam,{from:Bs-1,dur:2.4})), S=prep(await swapRun(seam,{from:Bs-1,dur:2.4,installMs:800}));
+      const E=prep(await swapRun(seam,{from:Bs-1,dur:2.3})), S=prep(await swapRun(seam,{from:Bs-1,dur:2.3,installMs:800}));
       if(!S.sw){ fail('seam: no swap was planned'); return; }
       const j=judge('loop seam',S,E,S.sw.at,0.5,0); j.kind=S.sw.kind; j.fresh=S.fresh; out.cases.push(j);
       if(S.sw.kind!=='seam') fail(`seam: the swap should be at the loop seam, got '${S.sw.kind}'`);
@@ -1829,6 +1939,204 @@ async function swapCheck(){
   }
   return out;
 }
+/* ═══ ⛳ AF6b: 16-БИТНЫЙ ЗАМОРОЖЕННЫЙ БУФЕР ЗВУЧИТ КАК FLOAT32 — тело пробы P.checkChunks ═══
+   МАТЕРИАЛ: временная дорожка аккордов в конце песни («Стеклянный пад» CK_INS, смена аккорда на каждой доле — содержимое меняется), темп
+   на время пробы CK_BPM; рендер — с множителем уровня (o.trackGain, только пробы) так, чтобы пик был ≈ CK_PEAK > 1.0: дорожка громче 1.0 до
+   мастера — ровно случай, ради которого у хранения масштаб. Скоба — ровно на такт дорожки, повтор вкл.
+   ПРОГОН: заморозка ДО пуска (тот же билет и тот же рендер в каждом прогоне, меняется лишь режим хранения), съём мастера (мимо колонок) с
+   меткой времени — один сэмпл в миг КАДРА Mf, — пуск с доли за одну до дорожки, шов скобы, на ходу ПЕРЕМОТКА (seekTo) внутрь скобы, конец
+   съёма. Прогоны: A — хранение Float32 тем же чтецом (эталон: ровно буфер рендера), B — 16 бит, C — 16 бит с дефектами кусков (кусок
+   CK_SHIFT читается со сдвигом на сэмпл, кусок CK_DROP — тишиной), D — 16 бит БЕЗ масштаба.
+   СОПОСТАВЛЕНИЕ — по КАДРАМ, а не на глаз: индекс съёма = метка + (кадр − Mf); узлы-чтецы прогона сообщают кадр старта, сдвиг d (кадр
+   буфера = кадр + d) и опору T0F; кадры двух прогонов сравниваются ОТНОСИТЕЛЬНО своей опоры (до перемотки — первой, после — второй), без
+   полосы перемотки (её миг — стенные часы, разный в прогонах) и без краёв съёма; сдвиг метки проверяется поиском ±CK_LAG (обязан быть 0).
+   ПРОВЕРКИ (B против A, относительно пика A):
+     • ОСТАТОК ≤ CK_RES (−90 дБ) — по всем сравнимым кадрам, через шов скобы и после перемотки;
+     • ЧТЕЦ ТОЧЕН: A против самого буфера рендера (×усиление, найденное наименьшими квадратами) в области одного узла — ≤ −100 дБ (у
+       Float32-хранения ошибки нет вовсе: так видно, что чтец не сдвигает и не интерполирует);
+     • СТЫКИ КУСКОВ: в ±1 сэмпле от каждого стыка (кадр буфера k·FRZ_CHUNK) шаг соседних сэмплов B ≤ CK_STEP × наибольшего шага A в ±64
+       сэмплах; стыков не меньше CK_JOINS;
+     • ДЛИНА — до сэмпла: в хранилище ровно столько кадров, сколько в рендере, и каждый узел выдал ровно столько сэмплов буфера, сколько
+       лежит между его стартом и остановкой (или концом буфера).
+   КОНТРОЛИ (обязаны провалиться): C — остаток в кадрах куска со сдвигом и в кадрах выброшенного куска; D — остаток (срез выше 1.0).
+   СВЕДЕНИЕ (не провал): ошибка упаковки самой дорожки без подмешивания и с треугольным (TPDF ±1 ступень) — наибольшая и средняя, дБ к пику:
+   довод, почему подмешивания нет. Временная дорожка снимается, темп, скоба, соло, режим хранения возвращаются. ≈ 12 с. */
+const CK_INS=1;   // AF6b-fix (время): «Стеклянный пад» (треугольник+синус, отпускание 0.6 с) — хвост буфера ≈ 4 с вместо ≈ 12 с у долгого пада; гладкость та же
+/* AF6b-fix2: срок ожидания отчётов о конце (обычный прогон) и окно контроля «чтец не слышит остановки» (там отчёта не будет — ждать полный
+   срок незачем); CK_LEAK_WAIT — сколько ждать, пока число живых чтецов вернётся к исходному после всех прогонов. */
+const CK_END_WAIT=1500, CK_CTRL_WAIT=400, CK_LEAK_WAIT=1500;
+const CK_BPM=240, CK_PEAK=2.2, CK_DUR=2.4, CK_SEEK_MS=1700, CK_RES=-90, CK_EXACT=-100, CK_STEP=3, CK_JOINS=3, CK_LAG=3, CK_SHIFT=1, CK_DROP=0;
+async function chunkCheck(){
+  const out={ ok:false, fails:[], notes:[] }, fail=m=>out.fails.push(m), note=m=>out.notes.push(m);
+  if(!LIVE_AC) return { ...out, why:'audio is not started (press ▶ Play)' };
+  if(!LIVE.frzReady) return { ...out, why:'the frozen-track worklet did not load — frozen tracks stay Float32 in this browser' };
+  if(REC.loop.on||REC.recording) return { ...out, why:'the transport is playing or recording — stop it first' };
+  if(REC.editIsOpen()) return { ...out, why:'the track editor is open — close it first' };
+  if(REC.laneSoloOn()) return { ...out, why:'a track is soloed — un-solo it first' };
+  if(autoFreeze()) return { ...out, why:'R.autoFreeze is ON — turn it off first' };
+  try{ await LIVE.probeCaptureReady(); }catch(e){ return { ...out, why:'the capture worklet did not load — '+(e&&e.message) }; }
+  const keepBpm=REC.loop.bpm, keepBrace=REC.braceProbe(null), rate=LIVE_AC.sampleRate, CH=REC.FRZ_CHUNK, tStart=performance.now();
+  let ly=null, soloOn=false;
+  const db=x=>20*Math.log10(Math.max(x,1e-15));
+  try{
+    stop(); REC.setLoopBpm(CK_BPM);
+    const M=REC.loop.metre, B=Math.ceil(REC.songBeats()/M)*M+2*M;
+    const steps=ty=>{ const S=[{fn:'chOn',a:{deg:0,oct:1,vol:0.8,inst:CK_INS,ty},t:B,id:1}];
+      [2,4,5].forEach((d,i)=>{ if(i+1<M) S.push({fn:'chSet',a:{deg:d,oct:1,vol:0.8,ty},t:B+i+1,id:1}); });
+      S.push({fn:'chOff',a:{},t:B+M,id:1}); return S; };
+    let r=REC.seedTake(steps(null)); if(!r||!r.layers.length) return { ...out, why:'the temporary track could not be recorded' };
+    ly=r.layers[0]; const on=REC.events.find(e=>e.layer===ly&&e.fn==='chOn');
+    if(!on||!REC.evHz(on.a,on,'ch').length){ REC.laneDelTap(ly); REC.laneDelTap(ly); r=REC.seedTake(steps(chordUnit(CUR()))); if(!r||!r.layers.length) return { ...out, why:'the temporary track could not be recorded' }; ly=r.layers[0]; }
+    const tk=REC.freezeTicket(ly), seed=seedOfLane(tk.id);
+    const r0=await renderTrack(ly,{ quiet:true, seed, short:1.2 }); const k=CK_PEAK/Math.max(r0.peak,1e-6);   // AF6b-fix (время): усиление — по короткому окну (пик — внутри такта аккордов), полный рендер — один
+    const rl=await renderTrack(ly,{ quiet:true, seed, trackGain:k });
+    const buf=rl.buf, len=buf.length;
+    if(!(rl.peak>1)) fail(`the loud render peaks at ${rl.peak} — not above 1.0, the scale-factor control cannot work`);
+    /* ---- сведение: ошибка упаковки без подмешивания и с TPDF ---- */
+    { const S=rl.peak, mul=S/32767, inv=1/mul, rnd=mulberry32(seed^0xD17);
+      let m0=0,s0=0,m1=0,s1=0,n=0;
+      for(let c=0;c<buf.numberOfChannels;c++){ const x=buf.getChannelData(c);
+        for(let i=0;i<len;i++){ const v=x[i];
+          let q=Math.round(v*inv); q=Math.max(-32767,Math.min(32767,q)); const e0=q*mul-v;
+          let p=Math.round(v*inv+rnd()-rnd()); p=Math.max(-32767,Math.min(32767,p)); const e1=p*mul-v;
+          const a0=Math.abs(e0), a1=Math.abs(e1); if(a0>m0) m0=a0; if(a1>m1) m1=a1; s0+=e0*e0; s1+=e1*e1; n++; } }
+      out.dither={ none:{ maxDb:+db(m0/S).toFixed(1), rmsDb:+db(Math.sqrt(s0/n)/S).toFixed(1) }, tpdf:{ maxDb:+db(m1/S).toFixed(1), rmsDb:+db(Math.sqrt(s1/n)/S).toFixed(1) } };
+      if(!(db(m0/S)<=CK_RES)) fail(`16-bit packing error without dither ${db(m0/S).toFixed(1)} dB re peak — above ${CK_RES} dB`);
+      note(`packing error re peak: none — max ${out.dither.none.maxDb} dB, rms ${out.dither.none.rmsDb} dB; TPDF — max ${out.dither.tpdf.maxDb} dB, rms ${out.dither.tpdf.rmsDb} dB${db(m1/S)>CK_RES?` (TPDF would exceed ${CK_RES} dB — the reason there is no dither)`:''}`); }
+    REC.toggleLaneSolo(ly); soloOn=true;
+    REC.braceProbe({ from:B, to:B+M, on:true, user:true });
+    /* ---- один прогон ---- */
+    const runOne=async(kind,dbg,afterStop)=>{
+      REC.frzStoreMode(kind);
+      { const a=REC.freezeSet(tk, rl), w= a===true ? await REC.frzWhenReady(ly) : a; if(w!==true) throw new Error('the freeze was refused ('+kind+': '+w+')'); }   // AF6b-fix: ставится по «готов»
+      if(dbg) REC.frzChunkDbg(ly, dbg);
+      const bus=LIVE.makeFrozenBus(), ib=LIVE_AC.createBuffer(1,1,rate); ib.getChannelData(0)[0]=1;
+      const capP=LIVE.probeCapture(CK_DUR), Mf=Math.ceil((LIVE_AC.currentTime+0.15)*rate), s=LIVE_AC.createBufferSource();
+      s.buffer=ib; s.connect(bus); s.start(Mf/rate);
+      await sleep(30);
+      REC.seekTo(B-1); REC.onLoop();
+      try{
+        await sleep(CK_SEEK_MS); REC.seekTo(B+1);
+        const c=await capP;
+        if(REC.loop.on) REC.onLoop();
+        const we=await frzWaitEnds(ly, afterStop ? CK_CTRL_WAIT : CK_END_WAIT);   // AF6b-fix2: до срока, а не 150 мс
+        const info=we.info;
+        if(afterStop) await afterStop(info);
+        return { c, Mf, info, waited:we.waited };
+      } finally {
+        if(REC.loop.on) REC.onLoop();
+        REC.unfreezeLayer(ly); REC.frzStoreMode('i16');
+        setTimeout(()=>{ try{ bus.disconnect(); }catch(e){} }, 50);
+        LIVE.voicesCut(k2=>REC.layerOfOwner(k2)!=null, undefined, 0.005);
+        await sleep(300);
+      }
+    };
+    const imp=c=>{ const x=c.L, n=Math.min(x.length-1, Math.floor(rate*1.0)); for(let i=1;i<n;i++){ const a=Math.abs(x[i]); if(a>0.02&&a>8*Math.abs(x[i-1])&&a>8*Math.abs(x[i+1])) return i; } return -1; };
+    const prep=R=>{ R.i0=imp(R.c); if(R.i0<0) throw new Error('the time marker was not found in a capture'); capAligned(R.c, R.i0, R.Mf); R.at=F=>R.i0+(F-R.Mf); return R; };
+    /* ⛳ AF6b-fix2: УТЕЧКИ НЕТ — число живых чтецов на потоке звука до пробы (запасы прочих замороженных дорожек) обязано вернуться к себе
+       после всех прогонов. КОНТРОЛЬ: в прогоне C один чтец «не слышит остановки» (dbg.nostop) — он обязан остаться неотчитавшимся И живым;
+       затем dbg снимается, и он завершается (иначе проба сама оставила бы утечку). */
+    const base=await REC.frzReadersAlive();
+    if(!base) fail('the audio thread did not answer the live-reader count — the leak check cannot run');
+    let ctl=null;
+    const A=prep(await runOne('f32')), Bq=prep(await runOne('i16')),
+          C=prep(await runOne('i16',{shift:CK_SHIFT, drop:CK_DROP, nostop:true}, async info=>{
+            const a=await REC.frzReadersAlive();
+            ctl={ unreported:info.log.filter(x=>x.played==null).length, alive:a?a.alive:null };
+            REC.frzChunkDbg(ly, null);                       // снять «не слышит остановки» — чтец завершится на ближайшем кванте
+            await frzWaitEnds(ly, CK_END_WAIT); })),
+          D=prep(await runOne('noscale'));
+    if(!ctl || !(ctl.unreported>=1) || !(base && ctl.alive!=null && ctl.alive>base.alive))
+      fail(`CONTROL (a reader that ignores its stop): it was not seen — unreported ${ctl&&ctl.unreported}, alive ${ctl&&ctl.alive} (before the probe ${base&&base.alive}); the end and leak checks could not catch a real leak`);
+    out.endLag=Math.max(0,...[A,Bq].flatMap(R=>R.info.log.map(x=>x.endLagMs||0)));
+    out.endWait=Math.max(A.waited,Bq.waited);
+    let pkA=0; for(const ch of ['L','R']) for(let i=A.i0+10;i<A.c[ch].length;i++){ const v=Math.abs(A.c[ch][i]); if(v>pkA) pkA=v; }
+    /* ---- длина ---- */
+    if(A.info.len!==len || Bq.info.len!==len) fail(`stored length ${Bq.info.len} frames (Float32 store ${A.info.len}) — the render has ${len}`);
+    for(const R of [A,Bq]) for(const x of R.info.log){
+      if(x.played==null){ fail(`a reader never reported its end within ${CK_END_WAIT} ms of the stop (start ${x.startF})`); continue; }
+      const hi= x.stopF==null ? len : Math.min(len, x.stopF+x.d), want=Math.max(0, hi-Math.max(x.offF,0));
+      if(x.played!==want) fail(`a reader played ${x.played} samples of the buffer, expected exactly ${want} (start ${x.startF}, offset ${x.offF}, stop ${x.stopF}${x.seen!=null&&x.stopF!=null?`; the stop reached the reader at frame ${x.seen}, ${x.seen<=x.stopF?(x.stopF-x.seen)+' frames before':(x.seen-x.stopF)+' frames AFTER'} its stop frame`:''})`); }
+    /* ---- сравнимые кадры: по опорам (до перемотки — первая, после — вторая) ---- */
+    const groups=R=>{ const g=new Map(); for(const x of R.info.log){ if(!g.has(x.T0F)) g.set(x.T0F,[]); g.get(x.T0F).push(x); } return [...g.entries()].sort((a,b)=>a[0]-b[0]); };
+    const segs=(X)=>{ const gA=groups(A), gX=groups(X); if(gA.length!==gX.length||gA.length<2) throw new Error(`expected two transport runs (before and after the seek), got ${gA.length}/${gX.length}`);
+      const S=[], m=Math.round(0.01*rate);
+      for(let i=0;i<2;i++){ const [TA,la0]=gA[i], [TX,lx0]=gX[i];
+        /* конец сравнимого: последняя остановка группы (перемотка — у первой, конец съёма — у второй) и конец съёма; узлы, начавшиеся
+           позже (следующий проход, взведённый перед самой остановкой — в одном прогоне успел, в другом нет), в сравнение не входят */
+        const endRel=(L,T)=>Math.max(...L.map(x=>x.killF!=null?x.killF:x.stopF!=null?x.stopF:Infinity))-T;   // AUTO-PROBE: конец СЛЫШИМОГО (рампа в нуле), чтец же молчит дальше до stopF
+        let b=Math.min(endRel(la0,TA), endRel(lx0,TX));
+        const capEnd=(R,T)=>(R.c.L.length-1-R.i0)+R.Mf-T; b=Math.min(b, capEnd(A,TA), capEnd(X,TX));
+        const la=la0.filter(x=>x.startF-TA<b), lx=lx0.filter(x=>x.startF-TX<b);
+        if(la.length!==lx.length || la.some((x,j)=>x.startF-TA!==lx[j].startF-TX || x.d+x.startF!==lx[j].d+lx[j].startF)) throw new Error('the two runs scheduled different readers — the comparison would be meaningless');
+        S.push({ TA, TX, a:la[0].startF-TA+m, b:b-m, la, lx }); }
+      return S; };
+    const cmp=(X,sel)=>{ let mx=0, pk=0, at=null; const lagOf=[];
+      for(const [si,sg] of segs(X).entries()){
+        let w0=sg.a; while(w0<sg.b && (Math.abs(A.c.L[A.at(sg.TA+w0)])<0.05*pkA || Math.abs(A.at(sg.TA+w0)-A.i0)<=1)) w0++;   // (и не метка)   // окно поиска сдвига — где есть звук, а не тишина разгона
+        let best=0, bErr=Infinity; const w1=Math.min(sg.b, w0+Math.round(0.2*rate));
+        for(let lag=-CK_LAG;lag<=CK_LAG;lag++){ let e=0; for(let F=w0;F<w1;F++){ const d=X.c.L[X.at(sg.TX+F)+lag]-A.c.L[A.at(sg.TA+F)]; e+=d*d; } if(e<bErr){ bErr=e; best=lag; } }
+        lagOf.push(best);
+        for(let F=sg.a;F<sg.b;F++){ const ia=A.at(sg.TA+F), ix=X.at(sg.TX+F)+best;
+          if(sel && !sel(sg,F)) continue;
+          if(Math.abs(ia-A.i0)<=1 || Math.abs(ix-X.i0)<=1) continue;   // ⛳ AUTO-PROBE: сэмпл МЕТКИ (не звук дорожки) — мимо сравнения: первый чтец стартует в ±11 мс от неё (пустой разгон буфера), и метка одного съёма попадала в сравнимые кадры другого (раннер: «Float32 0.8, 16-bit 0»)
+          for(const ch of ['L','R']){ const va=A.c[ch][ia], d=Math.abs(X.c[ch][ix]-va), aa=Math.abs(va); if(d>mx){ mx=d; at={ seg:si, ms:+((F-sg.a)/rate*1000).toFixed(1), of:+((sg.b-sg.a)/rate*1000).toFixed(1), a:+va.toFixed(5), x:+X.c[ch][ix].toFixed(5) }; } if(aa>pk) pk=aa; } } }
+      return { mx, pk, lag:lagOf, at }; };
+    /* ---- 16 бит против эталона ---- */
+    const rb=cmp(Bq), resB=db(rb.mx/pkA);
+    out.residual=+resB.toFixed(1); out.lags=rb.lag;
+    if(rb.lag.some(l=>l!==0)) note(`marker alignment needed a lag of ${rb.lag.join(', ')} samples (expected 0)`);
+    out.markerMs=[A,Bq].map(R=>{ const x=R.info.log[0]; return x ? +((x.startF-R.Mf)/rate*1000).toFixed(1) : null; });   // сведение: первый чтец — через столько мс после метки
+    out.residualAt=rb.at;   // где худшая разница: отрезок (0 — до перемотки, 1 — после), мс от начала сравнимого, значения эталона и 16 бит
+    if(!(resB<=CK_RES)) fail(`16-bit playback differs from the Float32 render by ${resB.toFixed(1)} dB re peak (limit ${CK_RES} dB) — worst at segment ${rb.at&&rb.at.seg}, ${rb.at&&rb.at.ms} ms of ${rb.at&&rb.at.of} ms (Float32 ${rb.at&&rb.at.a}, 16-bit ${rb.at&&rb.at.x})`);
+    /* ---- чтец точен: A против буфера рендера (один узел, без перекрытий) ---- */
+    { const sg=segs(A)[0], x0=sg.la[0], F0=x0.startF+Math.round(0.02*rate), F1=(sg.la[1]?sg.la[1].startF:x0.startF+Math.round(0.5*rate))-Math.round(0.02*rate);
+      let sab=0, sbb=0; const L=buf.getChannelData(0);
+      const mk=F=>Math.abs(A.at(F)-A.i0)<=1;   // AUTO-PROBE: сэмпл метки — мимо
+      for(let F=F0;F<F1;F++){ if(mk(F)) continue; const b=L[F+x0.d], a=A.c.L[A.at(F)]; sab+=a*b; sbb+=b*b; }
+      const g=sbb>0?sab/sbb:0; let mx=0, pk=0;
+      for(let F=F0;F<F1;F++){ if(mk(F)) continue; const b=g*L[F+x0.d], a=A.c.L[A.at(F)]; const d=Math.abs(a-b); if(d>mx) mx=d; if(Math.abs(b)>pk) pk=Math.abs(b); }
+      out.readerExact=+db(mx/Math.max(pk,1e-12)).toFixed(1);
+      if(!(F1-F0>rate*0.1)) fail('reader exactness: the single-reader region is too short to measure');
+      else if(!(out.readerExact<=CK_EXACT)) fail(`the reader does not reproduce the render exactly: ${out.readerExact} dB re peak (limit ${CK_EXACT} dB) — a shift or interpolation`); }
+    /* ---- стыки кусков ---- */
+    { let n=0, worst=0;
+      for(const sg of segs(Bq)) for(let j=0;j<sg.lx.length;j++){ const x=sg.lx[j], xa=sg.la[j];
+        const lo=Math.max(x.offF,0), hi= x.stopF!=null ? x.stopF+x.d : len;
+        for(let kk=Math.ceil((lo+1)/CH)*CH; kk<hi; kk+=CH){ const Fx=kk-x.d, rel=Fx-sg.TX; if(rel<sg.a||rel>=sg.b) continue;
+          const ix=Bq.at(Fx), ia=A.at(kk-xa.d);
+          let sx=0; for(let i=ix-1;i<=ix+1;i++){ if(Math.abs(i-Bq.i0)<=1) continue; for(const ch of ['L','R']) sx=Math.max(sx, Math.abs(Bq.c[ch][i]-Bq.c[ch][i-1])); }
+          let sa=0; for(let i=ia-64;i<=ia+64;i++){ if(Math.abs(i-A.i0)<=1) continue; for(const ch of ['L','R']) sa=Math.max(sa, Math.abs(A.c[ch][i]-A.c[ch][i-1])); }   // AUTO-PROBE: сэмпл метки — мимо
+          const ratio=sx/Math.max(sa, pkA*1e-6); worst=Math.max(worst, ratio); n++;
+          if(ratio>CK_STEP) fail(`a chunk join (buffer frame ${kk}) steps ${ratio.toFixed(2)}× the Float32 render's largest nearby step (limit ${CK_STEP}×)`); } }
+      out.joins=n; out.joinWorst=+worst.toFixed(2);
+      if(n<CK_JOINS) fail(`only ${n} chunk joins fell inside the compared frames (need ${CK_JOINS})`); }
+    /* ---- контроли ---- */
+    { const inChunk=kk=>(sg,F)=>{ const L=sg.lx; let x=null; for(const y of L) if(F+sg.TX>=y.startF && (y.killF==null||F+sg.TX<y.killF-Math.round(0.01*rate))) x=y; if(!x) return false; const bi=F+sg.TX+x.d; return bi>=0 && (bi>>Math.round(Math.log2(CH)))===kk; };
+      const rs=cmp(C,inChunk(CK_SHIFT)), rd=cmp(C,inChunk(CK_DROP));
+      out.controls={ shift:+db(rs.mx/pkA).toFixed(1), drop:+db(rd.mx/pkA).toFixed(1) };
+      if(!(db(rs.mx/pkA)>CK_RES)) fail(`CONTROL (chunk ${CK_SHIFT} shifted by one sample): the residual stayed ${db(rs.mx/pkA).toFixed(1)} dB — the measure cannot see a one-sample shift`);
+      if(!(db(rd.mx/pkA)>CK_RES)) fail(`CONTROL (chunk ${CK_DROP} dropped): the residual stayed ${db(rd.mx/pkA).toFixed(1)} dB — the measure cannot see a dropped chunk`);
+      const rn=cmp(D), resN=db(rn.mx/pkA); out.controls.noscale=+resN.toFixed(1);
+      if(!(resN>CK_RES)) fail(`CONTROL (no scale factor on a track peaking at ${rl.peak}): the residual stayed ${resN.toFixed(1)} dB — clipping was not seen`); }
+    out.peak=rl.peak; out.len=len; out.ok=true;
+    out.base=base?base.alive:null;
+  } catch(err){ out.why='failed: '+(err&&err.message); }
+  finally{
+    if(REC.loop.on) REC.onLoop();
+    REC.frzStoreMode('i16');
+    if(ly!=null){ if(soloOn) REC.toggleLaneSolo(ly); REC.unfreezeLayer(ly); REC.laneDelTap(ly); REC.laneDelTap(ly); }
+    REC.braceProbe(keepBrace);
+    REC.setLoopBpm(keepBpm);
+  }
+  /* утечка: после снятия временной дорожки число живых чтецов — не больше исходного (ждём до CK_LEAK_WAIT) */
+  if(out.ok && out.base!=null){ const t0=performance.now(); let a=null;
+    do{ a=await REC.frzReadersAlive(); if(a&&a.alive<=out.base) break; await sleep(50); } while(performance.now()-t0<CK_LEAK_WAIT);
+    out.aliveAfter=a?a.alive:null;
+    if(!(a&&a.alive<=out.base)) out.fails.push(`${a?a.alive-out.base:'?'} reader(s) still alive on the audio thread ${CK_LEAK_WAIT} ms after every stop and the track's removal — audio-thread work leaks`); }
+  out.seconds=+((performance.now()-tStart)/1000).toFixed(1);
+  return out;
+}
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
@@ -1840,4 +2148,7 @@ export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps
   autoFreeze, freezeQueue, layoutCost,
   /* AF2: проба «подмена событий буфером неслышима» (P.checkSwap) */
   swapCheck,
+  /* AF6b: проба «16-битный замороженный буфер звучит как Float32» (P.checkChunks) */
+  chunkCheck,
+  capStats,   // AUTO-PROBE: сведение о съёмах проб (устаревшие показания currentFrame, разрывы)
   renderQueue };   // сколько рендеров ждёт или идёт (очередь — один рендер копии за раз)

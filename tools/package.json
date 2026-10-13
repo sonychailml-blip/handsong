@@ -1,0 +1,9 @@
+{
+  "name": "handsong-tools",
+  "private": true,
+  "description": "Developer tools only (probe runners). The app itself has no build and no dependencies.",
+  "type": "module",
+  "devDependencies": {
+    "playwright-core": "^1.48.0"
+  }
+}

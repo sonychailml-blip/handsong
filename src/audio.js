@@ -1379,8 +1379,19 @@ function fxPlayPath(key,ids){
      (живая цепь против пустой цепи записи), и склейка в строку их бы слила. */
   const same = (!was&&!ids) || (!!was&&!!ids&&was.length===ids.length&&was.every((x,i)=>x===ids[i]));
   if(same) return false;
-  const before=new Set(was||fxIdsOfChain(key));
+  /* ⛳ ОДИН И ТОТ ЖЕ ПРОВОДИМЫЙ СОСТАВ — ГРАФ НЕ ТРОГАЕМ (слайс AUTO-PROBE). «Нет пути» (живая цепь) и путь записи, РАВНЫЙ живой цепи,
+     дают fxPathOf один и тот же список — тот же граф и те же затворы. Прежде такая смена всё равно звала fxRespliceSmooth: выход роли
+     уводился в ноль, пересборка ждала стенного таймера и поднимала обратно — роль молчала ≈ 40–100 мс. Переигровка ставит состав взятого
+     на его ПЕРВОЙ доле, и провал проглатывал атаку первой ноты дорожки (раннер: аккорд с атакой ровно на доле звучал на 83–95 мс позже,
+     в журнале провалов — провал на той же доле, оба списка [vol, reverb, bright]). Сравниваем ДЕЙСТВУЮЩИЕ списки; равны — запоминаем путь
+     (null и [] по-прежнему разные состояния) и выходим без пересборки — закрыв построенное вне состава (затвор — не пересборка). */
+  const effB=was||fxIdsOfChain(key), effA=ids||fxIdsOfChain(key);
+  const sameWired= effB.length===effA.length && effB.every((x,i)=>x===effA[i]);
   if(ids) FX_PLAY_PATH[key]=ids.slice(); else delete FX_PLAY_PATH[key];
+  if(sameWired){   // ⚠️ затворы — всё равно: закрыть построенное вне состава (довод ниже — копия рендера строит часть эффектов ОТКРЫТЫМИ); живьём — то же значение
+    const keep=new Set(effA); for(const id in (FX_INST[key]||{})) if(!keep.has(id)) fxGate(key,id,false);
+    return false; }
+  const before=new Set(effB);
   const after=new Set(FX_PLAY_PATH[key]||fxIdsOfChain(key));
   for(const id of after) if(!before.has(id)) fxGate(key,id,true);    // запись им пользовалась — открыть
   /* ⛳ ЗАКРЫТЬ — ВСЁ ПОСТРОЕННОЕ, ЧЕГО НЕТ В НОВОМ СОСТАВЕ, а не только «было в прежнем и пропало».
@@ -1572,6 +1583,35 @@ function makeFrozenBus(){
   const g=AC.createGain(); g.gain.value=1; g.connect(master);
   return g;
 }
+/* ═══ ⛳ AF6b: 16-БИТНОЕ ХРАНИЛИЩЕ ЗАМОРОЖЕННЫХ ДОРОЖЕК И ЧТЕЦ (frz-worklet.js) ═══
+   frzStorePut — передать куски дорожки в хранилище на потоке звука (transfer: на главном потоке они ОТСОЕДИНЯЮТСЯ — копия одна);
+   frzStoreDel — снять; frzStoreDbg — только проба (кусок со сдвигом / тишиной). frzReader(key, startF, d) — узел-чтец, двухканальный:
+   на кадре контекста F ≥ startF звучит сэмпл буфера F + d (целые кадры — без дробного старта). Владелец всех вызовов — recorder. */
+function frzStorePut(key, pack){
+  if(!frzReady||!frzStoreNode) return false;
+  const tr=[]; for(const c of pack.ch) for(const a of c) tr.push(a.buffer);
+  frzStoreNode.port.postMessage({ op:'put', key, ch:pack.ch, len:pack.len, chunk:pack.chunk, mul:pack.mul, kind:pack.kind }, tr);
+  return true;
+}
+const frzStoreDel=key=>{ if(frzStoreNode) frzStoreNode.port.postMessage({ op:'del', key }); };
+const frzStoreDbg=(key,dbg)=>{ if(frzStoreNode) frzStoreNode.port.postMessage({ op:'dbg', key, shift:dbg&&dbg.shift, drop:dbg&&dbg.drop, nostop:!!(dbg&&dbg.nostop) }); };
+/* ⛳ AF6b-fix2: ЧТЕЦ ВСЕГДА ПОДКЛЮЧЁН К НЕМОМУ СТОКУ (frzSink). Узел, которого граф не тянет, не обрабатывается вовсе — значит не увидит и
+   своей остановки и не завершится никогда: так было с запасом, снятым неиспользованным (он не был подключён), и с чтецом, чью шину отключили
+   (frzRetire, через 80 мс) раньше, чем до него дошло сообщение об остановке. Сток держит каждого чтеца в обработке до его конца — что бы ни
+   случилось с его гейном и шиной. Цена — один немой вход мастера; простаивающий запас лишь обнуляет свой выход. */
+function frzReader(key, startF, d){   // AF6b-fix: startF == null — чтец-ЗАПАС (пустой; пускает сообщение {play:{startF, d}})
+  if(!frzReady) return null;
+  const n=new AudioWorkletNode(AC,'frz-reader',{ numberOfInputs:0, numberOfOutputs:1, outputChannelCount:[2], processorOptions: startF==null ? { key } : { key, startF, d } });
+  if(frzSink) n.connect(frzSink);
+  return n;
+}
+/* ⛔ ТОЛЬКО ПРОБА: сколько чтецов живо на потоке звука (построены и не завершились). Ответ — сообщением хранилища; нет ответа за 2 с — null. */
+function frzStoreCount(){
+  if(!frzStoreNode) return Promise.resolve(null);
+  const id=++frzCountSeq;
+  return new Promise(res=>{ frzCountWait.set(id,res); frzStoreNode.port.postMessage({ op:'count', id });
+    setTimeout(()=>{ if(frzCountWait.has(id)){ frzCountWait.delete(id); res(null); } }, 2000); });
+}
 /* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ — ПЕРЕКРЁСТНОЕ ЗАТУХАНИЕ И СРЕЗ ГОЛОСОВ ДОРОЖКИ ═══
    xfRamp — РАВНАЯ МОЩНОСТЬ (уход cos, вход sin от 0 до π/2) кусками линейных рамп по XF_SEG отрезков. ⚠️ Кусками, а не
    setValueCurveAtTime: событие, поставленное ВНУТРИ идущей кривой (атака того же голоса, фейдер — trackGainRetune), браузер отвергает
@@ -1607,23 +1647,34 @@ function voicesCut(test, when, dur, part){
   }
   return n;
 }
-/* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkRevAgree, LR1): снять ЖИВОЙ выход МАСТЕРА (после его гейна, до лимитера — сравнимо с рендером, который тоже
-   берёт мастер, offlineTapMaster) в массивы на sec секунд, НЕ выпуская звук в колонки: на время съёма лимитер отключён от выхода и
-   подключается обратно по окончании (и по сторожевому таймеру, если съём не закончился). Съём — ScriptProcessorNode (устарел, но есть во
-   всех браузерах и ничего не требует грузить; живой граф без пробы его не содержит). Возвращает { L, R, rate }. */
+/* ⛔ ТОЛЬКО ДЛЯ ПРОБ (P.checkRevAgree, P.checkSwap, P.checkChunks): снять ЖИВОЙ выход МАСТЕРА (после его гейна, до лимитера — сравнимо с
+   рендером, который тоже берёт мастер, offlineTapMaster) в массивы на sec секунд, НЕ выпуская звук в колонки: на время съёма лимитер
+   отключён от выхода и подключается обратно по окончании (и по сторожевому таймеру, если съём не закончился).
+   ⛳ СЪЁМ — НА ПОТОКЕ ЗВУКА (src/probe-cap-worklet.js, процессор 'probe-cap'), С НОМЕРОМ КАДРА ПЕРВОГО СЭМПЛА F0. До этого слайса —
+   ScriptProcessorNode на главном потоке: при занятом главном потоке его блоки терялись/повторялись, съём переставал быть сплошным, и пробы
+   реального времени падали «случайно» (довод — в шапке ворклета). Модуль грузится по первому probeCaptureReady() (пробы зовут его до
+   съёма: probeCapture создаёт узел СИНХРОННО — вызывающий сразу ставит метку на кадр Mf и обязан знать, что съём уже идёт).
+   Возвращает { L, R, rate, F0, gaps, stale, jumps } — индекс i съёма ↔ кадр контекста F0 + i; gaps — разрывы на потоке звука (обязаны быть 0);
+   stale — одиночные устаревшие показания currentFrame у Chrome (сведение, звук сплошной — см. ворклет). */
+let capMod=null, capOk=false;
+function probeCaptureReady(){ if(!AC||offline) return Promise.resolve(false);
+  return capMod||(capMod=AC.audioWorklet.addModule('src/probe-cap-worklet.js').then(()=>(capOk=true), e=>{ capMod=null; throw e; })); }
 function probeCapture(sec){
   if(!AC||!master||!limiter||offline) return Promise.reject(new Error('no live engine'));
+  if(!capOk) return Promise.reject(new Error('the capture worklet is not loaded — await audio.probeCaptureReady() first'));
+  const want=Math.ceil(sec*AC.sampleRate);
+  let node;
+  try{ node=new AudioWorkletNode(AC,'probe-cap',{ numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[1], channelCount:2, channelCountMode:'explicit', processorOptions:{ want } }); }
+  catch(e){ return Promise.reject(e); }
   return new Promise((res,rej)=>{
-    const N=4096, sp=AC.createScriptProcessor(N,2,2), L=[], R=[], want=Math.ceil(sec*AC.sampleRate); let got=0, done=false;
-    const fin=err=>{ if(done) return; done=true; sp.onaudioprocess=null;
-      try{ master.disconnect(sp); }catch(e){} try{ sp.disconnect(); }catch(e){} try{ limiter.connect(AC.destination); }catch(e){}
+    let done=false;
+    const fin=(err,m)=>{ if(done) return; done=true; node.port.onmessage=null;
+      try{ master.disconnect(node); }catch(e){} try{ node.disconnect(); }catch(e){} try{ limiter.connect(AC.destination); }catch(e){}
       if(err) return rej(err);
-      const cat=a=>{ const o=new Float32Array(got); let k=0; for(const b of a){ o.set(b.subarray(0,Math.min(b.length,got-k)),k); k+=b.length; if(k>=got) break; } return o; };
-      res({ L:cat(L), R:cat(R), rate:AC.sampleRate }); };
+      res({ L:m.L, R:m.R, rate:AC.sampleRate, F0:m.F0, gaps:m.gaps, stale:m.stale, jumps:m.jumps||[] }); };
     try{ limiter.disconnect(AC.destination); }catch(e){}
-    master.connect(sp); sp.connect(AC.destination);
-    sp.onaudioprocess=e=>{ const b=e.inputBuffer; L.push(new Float32Array(b.getChannelData(0))); R.push(new Float32Array(b.numberOfChannels>1?b.getChannelData(1):b.getChannelData(0)));
-      got+=b.length; if(got>=want) fin(null); };
+    master.connect(node); node.connect(AC.destination);   // выход молчит (процессор ничего не пишет) — подключён, чтобы граф тянул узел
+    node.port.onmessage=e=>fin(null, e.data||{});
     setTimeout(()=>fin(new Error('the capture did not finish (is the audio context suspended?)')), (sec+3)*1000);
   });
 }
@@ -1681,6 +1732,8 @@ const FX_DIP=0.02;
    цепь В МОМЕНТ СРАБАТЫВАНИЯ, поэтому берёт САМОЕ СВЕЖЕЕ состояние: несколько правок подряд сходятся в
    ОДИН провал и ОДНУ сборку — что и слышно как одно переключение. */
 const FX_DIP_T={};
+const FX_DIP_LOG=[];   // ⛔ только пробы: последние провалы мягкой пересборки {key, t — время AC начала провала}
+const fxDipLog=()=>FX_DIP_LOG.slice();
 function fxRespliceSmooth(key){
   const out=FX_CHAIN_OUT[key];
   if(!AC||!out){ fxResplice(key); return; }                // нечего гасить (ещё не построено) — собираем молча
@@ -1693,6 +1746,7 @@ function fxRespliceSmooth(key){
   if(offline){ fxResplice(key); return; }
   if(FX_DIP_T[key]) return;                                // провал уже идёт — его пересборка подхватит и эту правку
   const t=AC.currentTime;
+  FX_DIP_LOG.push({ key, t }); if(FX_DIP_LOG.length>32) FX_DIP_LOG.shift();   // сведение для проб: когда и чей выход проваливался
   out.gain.cancelScheduledValues(t);
   out.gain.setValueAtTime(out.gain.value,t);
   out.gain.linearRampToValueAtTime(0,t+FX_DIP);
@@ -1987,6 +2041,17 @@ async function initAudio(mkCtx){
   try{ await AC.audioWorklet.addModule('src/ks-worklet.js'); }
   catch(e){ ksOk=false; console.warn('KS-ворклет не загрузился — ставлю запасные щипки:',e); }
   ksReady=ksOk;                                    // голоса пула строятся ЛЕНИВО, уже после initAudio — запоминаем результат загрузки
+  /* AF6b: ХРАНИЛИЩЕ И ЧТЕЦ ЗАМОРОЖЕННЫХ ДОРОЖЕК (16 бит) — только ЖИВОЙ контекст: копии рендера чтец не нужен. Провал загрузки — не падаем:
+     замороженные дорожки тогда держат прежний буфер Float32 и играют одноразовым источником (frzReady=false — recorder это видит). */
+  frzReady=false; frzStoreNode=null;
+  if(!offline){
+    try{ await AC.audioWorklet.addModule('src/frz-worklet.js');
+         frzStoreNode=new AudioWorkletNode(AC,'frz-store',{numberOfInputs:0, numberOfOutputs:1});
+         frzStoreNode.port.onmessage=e=>{ const m=e.data||{}; if(m.count){ const r=frzCountWait.get(m.id); if(r){ frzCountWait.delete(m.id); r(m.count); } } };
+         frzSink=AC.createGain(); frzSink.gain.value=0; frzSink.connect(AC.destination);   // немой сток прямо в выход: тянется всегда (и когда проба снимает лимитер с выхода), звука не даёт
+         frzReady=true; }   // ⚠️ 0 входов И 0 выходов Web Audio запрещает (NotSupportedError); выход есть, но не подключён — узел лишь держит порт
+    catch(e){ console.warn('Ворклет замороженных дорожек не загрузился — они останутся во Float32:',e); }
+  }
   /* Мастер: сумма → лимитер (жёсткий компрессор) → выход.
      Лимитер обязателен: аккорды + драйв + подложка легко клиппируют. */
   limiter=AC.createDynamicsCompressor();
@@ -2300,6 +2365,8 @@ const lv=[]; const leadHold={};            // голоса пула и влад�
    ⛔ Отдаём ЧИСЛА, а не сами массивы: наружу не должно утекать то, что можно нечаянно изменить.
    ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — спрашивает только render.js у своей. */
 const poolSizes=()=>({ lead:lv.length, chord:cv.length, bass:bv.length });
+let frzReady=false, frzStoreNode=null, frzSink=null;   // AF6b-fix2: frzSink — немой сток (гейн 0 → мастер), к которому КАЖДЫЙ чтец подключён навсегда: его тянут, пока он не завершится
+const frzCountWait=new Map(); let frzCountSeq=0;   // AF6b: ворклет хранилища/чтеца замороженных дорожек загрузился в ЖИВОЙ контекст (и узел хранилища)
 let leadSum=null, ksReady=true;            // шина соло (вход эффектов) + загрузился ли KS-ворклет (для ленивой стройки)
 const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого индекса начинаются KS-инструменты (считаем, не зашиваем)
 /* ЗНАЧЕНИЯ ЭФФЕКТОВ ТЕКУЩЕЙ НОТЫ (Пласт 3.7.1). Их кладёт applyFx — а он по построению зовётся
@@ -2924,9 +2991,11 @@ export {
   fxBriOf,   // ЯРКОСТЬ соло/баса/удара из карты события (0..1) или undefined «не задана». Читает ENG (обе копии движка)
   fxGlideOf, FX_GLIDE_KEY,   // V4: скольжение ноты из её карты эффектов (секунды) или undefined — «не задано». Читает ENG (обе копии движка — живая и рендерная — через makeENG)
   /* LR1: съём живого мастера (только для пробы P.checkRevAgree); переключатель проводки ревербов снят в AF1 (уборка LR1) */
-  probeCapture,
+  probeCapture, probeCaptureReady, fxDipLog,
   /* AF2: подмена событий буфером — равномощный перекрёст и срез голосов дорожки в миг подмены (зовёт recorder) */
   xfRamp, voicesCut,
+  /* AF6b: 16-битное хранилище замороженных дорожек на потоке звука и чтец; frzReady — ворклет загрузился (живая связка) */
+  frzReady, frzStorePut, frzStoreDel, frzStoreDbg, frzReader, frzStoreCount,
   fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки
   setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно

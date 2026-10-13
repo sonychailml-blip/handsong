@@ -70,6 +70,7 @@ import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, cho
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
          fx as liveFx, fxChains, chainOwners, chainKeyOf, leadIdx, chIdx, bassIdx, drumKitIdx, voiceMode } from './state.js';   // страж P.all: живое состояние звука, которое читает рендер   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
+import * as SELF from './scaleprobe.js';   // AUTO-PROBE: сам модуль — для стража консоли (api() оборачивает его функции)
 import { hooks } from './hooks.js';   // F6b: перестройка панели (hooks.scales) — проверка кнопок режимов аккордов   // F6: та же проверка записи, что у загрузчика и консоли файлов пользователя
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
@@ -86,7 +87,7 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
          laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
-         unfreezeLayer, laneLenOf } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+         unfreezeLayer, laneLenOf, frozenInfo } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
 import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
@@ -399,6 +400,11 @@ export function material(){
    приложения, попавшие в это время, тоже не напечатаются), если не P.all({verbose:true}). Итог — ОДНА таблица: проба, случаи, материал песни
    (сколько песенных единиц она прошла), расхождения, время; под таблицей — первые расхождения каждой ненулевой строки. Песенные строки не
    засчитываются, если песне не хватает материала (material) — тогда вердикт «song: not enough material» и перечень недостающего. */
+/* ⛳ МЕРЫ СТРОК (слайс AUTO-PROBE): проба кладёт сюда измеренные величины с допуском — {name, value, limit, dir:'max'|'min'|'abs'|null,
+   unit}; P.all собирает их по строкам (res.measures), раннер tools/probe-browser.mjs --repeat печатает по прогонам с запасом до допуска,
+   чтобы хрупкие строки было видно ДО того, как они упадут. Вердикт меры не решают — их решает сама проба, как прежде. */
+let MEAS=[];
+const meas=(name,value,limit=null,dir=null,unit='')=>{ if(value!=null && Number.isFinite(+value)) MEAS.push({ name, value:+(+value).toPrecision(4), limit, dir, unit }); };
 const ALL_RUNS=[
   ['T0 data',            ()=>checkData(),   r=>({ cases:r.checks, diff:r.mismatches.length, list:r.mismatches })],
   ['T1 pitch',           ()=>checkPitch(),  r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
@@ -427,6 +433,7 @@ const ALL_RUNS=[
   ['AR2 track names, colours, order',()=>checkTrackLook(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['LR1 live and frozen reverb agree',()=>checkRevAgree(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['AF2 freeze swap inaudible',()=>checkSwap(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['AF6b 16-bit frozen playback',()=>checkChunks(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['render repeatability',()=>checkRepeat(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['renders serialized',()=>checkQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AF1 freeze queue',()=>checkFreezeQueue(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -447,7 +454,7 @@ const ALL_RUNS=[
    hidden», не FAIL и не pass; итог просит повторить при видимой вкладке. */
 const SLOW_ROWS=new Set(['T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
   'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot',
-  'LR1 live and frozen reverb agree','AF2 freeze swap inaudible']);   // AF2: ≈ 25–30 с живого съёма   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
+  'LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback']);   // AF2: ≈ 25–30 с живого съёма   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
 const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
 const HIDDEN='not checked: tab hidden';
 for(const n of [...SLOW_ROWS,...DRAWN_ROWS]) if(!ALL_RUNS.some(r=>r[0]===n)) console.warn(`[scaleprobe] «${n}» is not a row of P.all — the quick/drawn lists are out of date`);
@@ -476,27 +483,31 @@ async function stateSig(R){
 export async function all(opt={}){   // F0: async — строка снимка читает tools/scales.before.json (fetch); звать await P.all()
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
   const T00=performance.now(), title=opt.quick?'P.quick':'P.all';
-  const rows=[], lists=[], keepCM=chordModeSel;
+  const rows=[], lists=[], keepCM=chordModeSel, measures={};
   let RR=null; try{ RR=await import('./render.js'); }catch(e){ RR=null; }   // страж читает копию движка рендера
   let nGuard=0; const stall0=frameStalls;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
   QUICK=!!opt.quick;
+  const nRun=ALL_RUNS.filter(([n])=>!(opt.quick && SLOW_ROWS.has(n))).length;
   try{
   for(const [name,run,read] of ALL_RUNS){
     if(opt.quick && SLOW_ROWS.has(name)) continue;
     const g0=await stateSig(RR), st0=frameStalls;
-    const t0=performance.now(); let row;
+    const t0=performance.now(); let row; MEAS=[];
     if(!opt.verbose){ console.log=console.warn=console.table=console.info=mute; }
     try{ let res=run(); if(res && typeof res.then==='function') res=await res;   // F0: проба может быть асинхронной (P.checkFiles)
          const x=read(res); row={ check:name, cases:x.cases, song:x.song==null?'—':x.song, differences:x.diff, note:x.status }; if(x.diff) lists.push([name,x.list||[]]); }
     catch(err){ row={ check:name, cases:'—', song:'—', differences:'ERROR' }; lists.push([name,[String(err&&err.stack||err)]]); }
     finally{ Object.assign(console,keep); }
     row.ms=Math.round(performance.now()-t0);
+    if(MEAS.length) measures[name]=MEAS; MEAS=[];
     if(DRAWN_ROWS.has(name) && frameStalls>st0) row.hidden=true;   // кадры не пришли — окно не рисовалось, снимок мог быть старым
     { const g1=await stateSig(RR), ch=Object.keys(g0).filter(k=>g0[k]!==g1[k]);
       if(ch.length){ nGuard++; if(typeof row.differences==='number') row.differences+=ch.length;
         lists.push([name+' — state guard', ch.map(k=>`state guard: left changed — ${k}: ${g0[k]} → ${g1[k]}`)]); } }
     rows.push(row);
+    /* ⛳ ХОД ПРОГОНА (раннер tools/probe-browser.mjs): строка на каждую пробу сразу по её завершении — мимо приглушения (keep.log) */
+    if(opt.progress) keep.log(`[scaleprobe row] ${rows.length}/${nRun} ${name} · cases ${row.cases} · differences ${row.differences} · ${row.ms} ms`);
   }
   } finally { setChordModeSel(keepCM); QUICK=false; }
   const M=material();
@@ -519,7 +530,7 @@ export async function all(opt={}){   // F0: async — строка снимка 
   if(frameStalls>stall0) console.warn(`[scaleprobe all] ${frameStalls-stall0} animation frame(s) never came (tab hidden?) — ${nHidden} row(s) that read the drawn window are marked «${HIDDEN}»; rerun with the tab visible`);
   const pass=nDiff===0&&M.ok&&!nHidden, sec=((performance.now()-T00)/1000).toFixed(1);
   console.log(`[scaleprobe all] ${title}: ${pass ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences${nHidden?`, ${nHidden} not checked (tab hidden — rerun with the tab visible)`:''}, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views) · ${sec} s`);
-  return { pass, rows, material:M, hidden:nHidden, seconds:+sec };
+  return { pass, rows, material:M, hidden:nHidden, seconds:+sec, measures };
 }
 
 /* ═══ P.quick — БЫСТРЫЙ БАРЬЕР (слайс «быстрые пробы») ═══ Те же строки, что P.all, без SLOW_ROWS (прогоны данных по всем видам — их
@@ -637,6 +648,7 @@ export function checkWrite(){
         for(const m of writeDiff(at,ev,b.a)) miss(m); });
     }
   } finally { setScaleId(keep.sc); setTunedFrom(keep.tf); setSeventh(keep.sev); }
+  cases+=guardSelfTest(miss);   // AUTO-PROBE: страж консоли и его контроль
   console.log(`[scaleprobe write] views ${nView} · gesture and backing payloads ${cases} · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe write] '+m));
   if(!nBad) console.log('[scaleprobe write] every field survives both funnels, no degree is stored, and every price equals the frozen reference from the gesture degree');
@@ -994,7 +1006,8 @@ export async function checkMixer(){
         const ra=rms(a.buf), rb=rms(b.buf), q=ra>0 ? rb/ra : NaN;
         if(!(ra>1e-6)) miss(`L${ly+1}: the unity render is silent`);
         else if(!(Math.abs(q/g-1)<=0.02)) miss(`L${ly+1}: at track gain ${g} the render's RMS ratio is ${q.toFixed(4)} (expected ${g})`);
-        else notes.push(`L${ly+1}: RMS ratio ${q.toFixed(4)} at gain ${g}`); }
+        else notes.push(`L${ly+1}: RMS ratio ${q.toFixed(4)} at gain ${g}`);
+        meas(`L${ly+1} RMS ratio / gain − 1`, q/g-1, 0.02, 'abs'); }
       catch(err){ miss(`L${ly+1}: the offline render failed — ${err&&err.message}`); } }
     if(!pitched.length) miss('no unfrozen pitched track to render');
     // ---- (2) замороженная: уровень — гейн шины, буфер свежий ----
@@ -1097,6 +1110,7 @@ export async function checkPan(){
           if(!(wetL>=PAN_SIDE)) miss(`${tag} — with effects, hard left keeps less than ${PAN_SIDE} on the left (echoes or tails flip the picture)`);
           if(sh.centre>=PAN_DRY_SIDE || sh.right>=PAN_DRY_SIDE) miss(`${tag} — CONTROL: the hard-left test passes on a render that is not panned left; the measure cannot catch a wrong pan`);
           if(1-sh.left>=PAN_DRY_SIDE || 1-sh.centre>=PAN_DRY_SIDE) miss(`${tag} — CONTROL: the hard-right test passes on a render that is not panned right`);
+          meas(`L${ly+1} dry hard-left share`, sh.left, PAN_DRY_SIDE, 'min'); meas(`L${ly+1} dry centre share − 0.5`, sh.centre-0.5, PAN_DRY_MID, 'abs'); meas(`L${ly+1} wet hard-left share`, wetL, PAN_SIDE, 'min');
           notes.push(tag+` (controls: the hard-left test on centre/right reads ${f3(sh.centre)}/${f3(sh.right)} < ${PAN_DRY_SIDE}, the hard-right test on left/centre reads ${f3(1-sh.left)}/${f3(1-sh.centre)})`);
         }
       }catch(err){ miss(`L${ly+1}: the offline render failed — ${err&&err.message}`); }
@@ -1188,6 +1202,7 @@ export async function checkRepeat(opt={}){
       const D=bufCmp(d1,d2,REP_DRY), W=bufCmp(w1,w2,REP_WET), C=bufCmp(d1,dp,REP_DRY), G=bufCmp(w1,wg,REP_WET);
       const tag=`L${solo+1} solo: dry twice — max difference ${e3(D.rel)} of peak${D.first!=null?`, first at ${D.first} s`:''}; wet twice — max difference ${e3(W.rel)} of peak, total RMS ratio ${f4(W.total)}${W.first!=null?`, first at ${W.first} s`:''}; controls — dry pan 0.5 vs centre ${e3(C.rel)}, wet level 0.9 RMS ratio ${f4(G.total)} (max difference ${e3(G.rel)})`;
       if(!D.shape||!W.shape) miss(`${tag} — two renders of the same track have different lengths`);
+      meas(`${tag.split(' ')[0]} dry difference (of peak)`, D.rel, REP_DRY, 'max'); meas(`${tag.split(' ')[0]} wet difference (of peak)`, W.rel, REP_WET, 'max'); meas(`${tag.split(' ')[0]} control: pan difference`, C.rel, REP_DRY*100, 'min');
       if(!(D.rel<=REP_DRY)) miss(`${tag} — the DRY render differs by more than ${e3(REP_DRY)} of peak (build-order float differences stay near 1.5e-5, inaudible): it reads an input the render does not pin`);
       if(!(W.rel<=REP_WET)) miss(`${tag} — the WET render differs by more than ${e3(REP_WET)} of peak: something on the effect chain is not repeatable`);
       if(!(Math.abs(W.total-1)<=REP_WET)) miss(`${tag} — the WET render's total energy differs by more than ${e3(REP_WET)}`);
@@ -1278,6 +1293,7 @@ export async function checkQueue(){
     if(!(CA.rel<=EPS)) miss(`L${A+1} rendered together with L${B+1} differs from L${A+1} rendered alone — max ${e3(CA.rel)} of peak${CA.first!=null?`, from ${CA.first} s`:''}`);
     if(!(CB.rel<=EPS)) miss(`L${B+1} rendered together with L${A+1} differs from L${B+1} rendered alone — max ${e3(CB.rel)} of peak${CB.first!=null?`, from ${CB.first} s`:''}`);
     if(!(CC.rel>EPS*100)) miss(`CONTROL: a pan of 0.5 renders the same as centre within ${EPS} — the measure cannot see a difference`);
+    meas('pitched together vs alone (of peak)', CA.rel, EPS, 'max'); meas('drums together vs alone (of peak)', CB.rel, EPS, 'max'); meas('control: pan 0.5 vs centre', CC.rel, EPS*100, 'min');
     notes.push(`two tracks at once (queue ${q}): L${A+1} ${e3(CA.rel)}, L${B+1} ${e3(CB.rel)} of peak against alone; control (pan 0.5) ${e3(CC.rel)}`);
     cases++;
     const pc=rt(A), pd=rt(A), q2=R.renderQueue();
@@ -1692,16 +1708,20 @@ export async function freezeCost(){
     iv.sort((a,b)=>a[0]-b[0]); let a=0, cs=0, ce=-1;
     for(const [s,e] of iv){ if(s>ce){ if(ce>cs) a+=ce-cs; cs=s; ce=e; } else ce=Math.max(ce,e); } if(ce>cs) a+=ce-cs;
     const per=repeatOf(ly);
-    rows.push({ track:'L'+(ly+1), role:laneRoleOf(ly)||'—', 'layout ms':r.ms.layoutMs, 'buffer s':+r.totalSec.toFixed(1),
-      'today MB':+B(r.totalSec).toFixed(1), '(a) notes+tail MB':+B(a).toFixed(1), '(b) 16-bit MB':+(B(r.totalSec)/2).toFixed(1), '(a)+(b) MB':+(B(a)/2).toFixed(1),
+    /* AF6b: «today» — ПАМЯТЬ СЕЙЧАС: у замороженной — настоящие байты хранилища (frozenInfo.bytes: 16 бит, или Float32-запас без ворклета),
+       у прочих — сколько заняла бы её заморозка в 16 битах; «Float32» — прежняя мера (до AF6b), для сравнения */
+    const fi=frozenInfo(ly), now16=fi ? fi.bytes/MB : B(r.totalSec)/2;
+    rows.push({ track:'L'+(ly+1), role:laneRoleOf(ly)||'—', 'layout ms':r.ms.layoutMs, 'buffer s':+r.totalSec.toFixed(1), frozen: fi ? fi.kind : '—',
+      'Float32 MB (before AF6b)':+B(r.totalSec).toFixed(1), 'today MB':+now16.toFixed(2), '(a) notes+tail 16-bit MB':+(B(a)/2).toFixed(1),
       repeats:per?`${per.copies}× every ${per.P/loop.metre} bar(s)`:'—', 'one cycle MB':per?+B(per.P*spb+r.tailSec).toFixed(1):'—' });
   }
   const ok=rows.filter(x=>x['layout ms']!=null), ms=ok.map(x=>x['layout ms']).sort((a,b)=>a-b), med=ms.length?ms[Math.floor((ms.length-1)/2)]:null;
   const sum=k=>+ok.reduce((s,x)=>s+(typeof x[k]==='number'?x[k]:0),0).toFixed(1);
   console.table(rows);
   const res={ tracks:rows.length, layoutWorst:ms.length?ms[ms.length-1]:null, layoutTypical:med, frameBudget:8,
-    mb:{ today:sum('today MB'), a:sum('(a) notes+tail MB'), b:sum('(b) 16-bit MB'), ab:sum('(a)+(b) MB') }, rows };
-  console.log(`[scaleprobe cost] ${rows.length} tracks · layout worst ${res.layoutWorst} ms, typical ${res.layoutTypical} ms (budget at a pinch ${res.frameBudget} ms) · memory today ${res.mb.today} MB → (a) notes+tail ${res.mb.a} MB, (b) 16-bit ${res.mb.b} MB, (a)+(b) ${res.mb.ab} MB`);
+    mb:{ float32:sum('Float32 MB (before AF6b)'), today:sum('today MB'), a16:sum('(a) notes+tail 16-bit MB'),
+         frozenNow:+ok.reduce((s,x)=>s+(x.frozen!=='—'?x['today MB']:0),0).toFixed(2) }, rows };
+  console.log(`[scaleprobe cost] ${rows.length} tracks · layout worst ${res.layoutWorst} ms, typical ${res.layoutTypical} ms (budget at a pinch ${res.frameBudget} ms) · memory: Float32 (before AF6b) ${res.mb.float32} MB → today (16-bit; real bytes of the frozen tracks) ${res.mb.today} MB, of which frozen now ${res.mb.frozenNow} MB → with (a) notes+tail also ${res.mb.a16} MB`);
   return res;
 }
 /* ═══ ⛳ LR1: ЖИВОЙ И ЗАМОРОЖЕННЫЙ РЕВЕРБ СОГЛАСНЫ — P.checkRevAgree ═══
@@ -1715,6 +1735,8 @@ export async function checkRevAgree(){
   cases++; const r=await R.revAgree();
   if(!r.ok){ miss('live vs frozen reverb: '+r.why); console.warn('[scaleprobe rev-agree] '+r.why); return { cases, total:nBad, differences:bad }; }
   cases+=3;
+  meas('tail energy live − frozen', r.dEnergy, r.tolE, 'abs', ' dB'); meas('tail balance live − frozen', r.dBright, r.tolB, 'abs', ' dB');
+  meas('control: decay moves energy by', Math.abs(r.ctrlDecay.dEnergy), r.tolE, 'min', ' dB'); meas('control: tone moves balance by', Math.abs(r.ctrlTone.dBright), r.tolB, 'min', ' dB');
   if(!r.agree) miss(`live and frozen reverb disagree: tail energy Δ ${r.dEnergy} dB, tail balance Δ ${r.dBright} dB (tolerance ±${r.tolE} / ±${r.tolB} dB)`);
   if(Math.abs(r.ctrlDecay.dEnergy)<=r.tolE) miss(`control: a ${r.ctrlDecay.sec}-s tail moves the tail energy by only ${r.ctrlDecay.dEnergy} dB — the energy measure could not fail`);
   if(Math.abs(r.ctrlTone.dBright)<=r.tolB) miss(`control: a ${r.ctrlTone.hz}-Hz tone moves the tail balance by only ${r.ctrlTone.dBright} dB — the balance measure could not fail`);
@@ -1722,10 +1744,32 @@ export async function checkRevAgree(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe rev-agree] '+m));
   return { cases, total:nBad, differences:bad };
 }
+/* ═══ ⛳ AF6b: 16-БИТНЫЙ ЗАМОРОЖЕННЫЙ БУФЕР ЗВУЧИТ КАК FLOAT32 — P.checkChunks ═══
+   Тело — render.chunkCheck (материал, прогоны, сопоставление по кадрам, допуски и контроли — в его шапке): живой мастер, пока замороженная
+   дорожка (громче 1.0) играет через стыки кусков, шов скобы и перемотку, против того же прогона с Float32-хранением тем же чтецом; чтец
+   против самого рендера; длина до сэмпла. Контроли: кусок со сдвигом на сэмпл, выброшенный кусок, хранение без масштаба — обязаны
+   провалиться. Беззвучно (мастер мимо колонок). Транспорт стоит, соло снято, R.autoFreeze выключен. ≈ 12 с — в P.all, не в P.quick. */
+export async function checkChunks(){
+  const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  let R=null; try{ R=await import('./render.js'); }catch(e){ miss('render.js did not load: '+(e&&e.message)); return { cases, total:nBad, differences:bad }; }
+  cases++; const r=await R.chunkCheck();
+  if(!r.ok){ miss('16-bit frozen playback: '+r.why); console.warn('[scaleprobe chunks] '+r.why); return { cases, total:nBad, differences:bad }; }
+  cases+=9;   // AF6b-fix2: + утечка чтецов и её контроль
+  meas('16-bit vs Float32 residual', r.residual, -90, 'max', ' dB'); meas('reader vs render', r.readerExact, -100, 'max', ' dB'); meas('worst chunk-join step', r.joinWorst, 3, 'max', '×');
+  if(r.controls){ meas('control: one-sample shift', r.controls.shift, -90, 'min', ' dB'); meas('control: dropped chunk', r.controls.drop, -90, 'min', ' dB'); meas('control: no scale', r.controls.noscale, -90, 'min', ' dB'); }
+  meas('slowest end report after stop', r.endLag, null, null, ' ms');
+  for(const m of r.fails) miss(m);
+  r.notes.forEach(m=>console.log('[scaleprobe chunks] '+m));
+  console.log(`[scaleprobe chunks] track peak ${r.peak} (above 1.0 before the master) · ${r.len} frames · 16-bit vs Float32 residual ${r.residual} dB re peak (limit −90) · reader vs render ${r.readerExact} dB · chunk joins ${r.joins}, worst step ${r.joinWorst}× · controls: one-sample shift ${r.controls&&r.controls.shift} dB, dropped chunk ${r.controls&&r.controls.drop} dB, no scale ${r.controls&&r.controls.noscale} dB (each must be above −90) · end reports: slowest ${r.endLag} ms after the stop (waited up to ${r.endWait} ms) · live readers on the audio thread: before ${r.base}, after ${r.aliveAfter} · ${r.seconds} s`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe chunks] '+m));
+  if(!nBad) console.log('[scaleprobe chunks] the 16-bit frozen buffer plays as the Float32 render to below −90 dB re its peak — through chunk joins, the loop seam and a seek, exact to the sample; a shifted chunk, a dropped chunk and storage without the scale factor all fail');
+  return { cases, total:nBad, differences:bad };
+}
 /* ═══ ⛳ AF2: ПОДМЕНА СОБЫТИЙ БУФЕРОМ НЕСЛЫШИМА — P.checkSwap ═══
    Тело — render.swapCheck (материал, съём с меткой времени, мера, допуски и контроли — в его шапке): подмена на стоящем транспорте, в
    паузе, перекрёстом на линии такта у тянущегося пада и на шве скобы; каждая — без зазора, щелчка и скачка уровня против того же прогона
-   одними событиями. Контроли: прежний вход A2 (голоса своим отпусканием) обязан провалить уровень, рубильник без перекрёста — щелчок.
+   одними событиями. Контроли: прежний вход A2 (голоса своим отпусканием) обязан провалить ОСТАТОК над буфером, жёсткая склейка съёма событий
+   с самим собой в миг подмены — щелчок (AUTO-PROBE: прежний живой рубильник щёлкал лишь при несовпадении фаз и однажды «не провалился»).
    Ничего не звучит в колонках (мастер снят мимо них). Транспорт должен стоять, соло — снято, R.autoFreeze — выключен. ≈ 25–30 с: в P.all. */
 export async function checkSwap(){
   const bad=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
@@ -1733,11 +1777,18 @@ export async function checkSwap(){
   cases++; const r=await R.swapCheck();
   if(!r.ok){ miss('swap: '+r.why); console.warn('[scaleprobe swap] '+r.why); return { cases, total:nBad, differences:bad }; }
   cases+=r.cases.length;
+  for(const c of r.cases){ const n=c.name;
+    if(n==='stopped'){ meas('stopped: onset frozen vs events', c.onsetMs, 10, 'max', ' ms'); meas('stopped: control onset shift seen', c.onsetCtrlMs-15, 2, 'abs', ' ms'); meas('stopped: level', c.level, 1, 'abs', ' dB'); meas('stopped: click', c.click, 3, 'max', '×'); }
+    else if(/^held pad/.test(n)){ meas('pad: level jump', c.jump, 1, 'abs', ' dB'); meas('pad: gap', c.gap, -6, 'min', ' dB'); meas('pad: click', c.click, 3, 'max', '×'); meas('pad: leftover over the buffer', c.leftoverDb, -6, 'max', ' dB'); }
+    else if(n==='control: old') meas('control old swap: leftover', c.leftoverDb, -6, 'min', ' dB');
+    else if(/^control: hard splice/.test(n)) meas('control hard splice: click', c.click, 3, 'min', '×');
+    else if(n==='rest'){ meas('rest: leftover over the buffer', c.leftoverDb, -6, 'max', ' dB'); meas('rest: click', c.click, 3, 'max', '×'); meas('rest: level jump (information)', c.jump, null, null, ' dB'); }
+    else if(n==='loop seam'){ meas('seam: level jump', c.jump, 1, 'abs', ' dB'); meas('seam: gap', c.gap, -6, 'min', ' dB'); meas('seam: click', c.click, 3, 'max', '×'); } }
   for(const m of r.fails) miss(m);
   console.table(r.cases);
   console.log(`[scaleprobe swap] ${r.cases.length} swaps measured · ${r.fails.length} problem(s) · ${r.seconds} s`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe swap] '+m));
-  if(!nBad) console.log('[scaleprobe swap] the frozen buffer takes over with no gap, no click and no level jump — stopped, in a rest, crossfaded on a held pad and at the loop seam; the old double release and a hard cut both fail, so the measure can see them');
+  if(!nBad) console.log('[scaleprobe swap] the frozen buffer takes over with no gap, no click and no level jump — stopped, in a rest, crossfaded on a held pad and at the loop seam; the old double release and a hard splice both fail, so the measures can see them');
   return { cases, total:nBad, differences:bad };
 }
 export async function checkTracks(){
@@ -2874,4 +2925,46 @@ export function checkRootAlone(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe F8] '+m));
   if(!nBad) console.log('[scaleprobe F8] a type that does not fit sounds the root alone, by the one rule, and is stored as a one-note chord; Free sounds the whole type');
   return { cases, song, total:nBad, differences:bad };
+}
+
+/* ═══ ⛳ СТРАЖ КОНСОЛИ — ОДНА ПРОБА ЗА РАЗ (слайс AUTO-PROBE) ═══
+   window.P (адрес с ?probe — main.js) — НЕ сам модуль, а api(): каждая функция модуля обёрнута замком. Пока идёт любая проба (P.seed
+   тоже), другой вызов P.* ОТКАЗЫВАЕТ словами и ничего не делает. Найдено у пользователя: P.quick, набранный до конца P.seed, прогнал
+   строки на недостроенной песне (секция соло посева не прошла, замороженного баса не было) — 20 расхождений, ни одно не про код.
+   Внутри модуля пробы зовут друг друга напрямую (P.all → checkSwap …) — мимо замка, как и прежде. Отказ — объект { refused:true, why }
+   (у P.all/P.quick ещё pass:false), строка в консоль. ⚠️ Прямой импорт модуля (const P = await import(...)) — без стража. */
+let LOCK=null;
+const lockWhy=n=> LOCK==='seed' ? `P.seed is still running — wait for 'Now run P.all()' before P.${n}()`
+                                : `P.${LOCK} is still running — wait for its result before P.${n}()`;
+let API=null;
+export function api(){
+  if(API) return API;
+  API={};
+  for(const [n,v] of Object.entries(SELF)){
+    if(typeof v!=='function' || n==='api'){ API[n]=v; continue; }
+    API[n]=(...args)=>{
+      if(LOCK){ const why=lockWhy(n); console.warn('[probe] '+why); return n==='all'||n==='quick' ? { pass:false, refused:true, why } : { refused:true, why }; }
+      LOCK=n; let r;
+      try{ r=v(...args); }catch(e){ LOCK=null; throw e; }
+      if(r && typeof r.then==='function') return r.finally(()=>{ LOCK=null; });
+      LOCK=null; return r;
+    };
+  }
+  return API;
+}
+/* Проверка стража (строка «write path (funnels)»): пока замок взят, обёрнутый P.quick отказывает и не прогоняет ни строки; КОНТРОЛЬ — с
+   отпущенным замком та же обёртка у дешёвой функции (material) работает (страж не отказывает всем подряд). Замок, взятый извне (P.all),
+   возвращается как был. */
+function guardSelfTest(miss){
+  const held=LOCK, A=api(); let cases=0;
+  try{
+    LOCK=held||'checkWrite'; cases++;
+    const r=A.quick();
+    if(!(r && r.refused && /still running/.test(r.why||''))) miss('console guard: P.quick() started while another probe held the lock');
+    LOCK=null; cases++;
+    const m=A.material();
+    if(!m || m.refused || typeof m.ok!=='boolean') miss('CONTROL (console guard): with no probe running, the guarded P.material() was refused or gave nothing — the guard refuses everything');
+    if(LOCK!==null) miss('console guard: a finished call did not release the lock');
+  } finally { LOCK=held; }
+  return cases;
 }
