@@ -1,5 +1,34 @@
 # BACKLOG — Handsong (бывш. Air Synth 3)
 
+## English index (DOCS-EN; the sections below stay in Russian — any section edited from now on is rewritten in English)
+Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open · ❓ deferred, needs measurement · ℹ️ note, not a bug.
+- **0. Now in progress** — the module split refactor (✅ long done; table kept as history).
+- **1. Foundation** — localStorage for settings (⬜); stable mode/tuning ids, prerequisite for saving and the scale builder (🔵);
+  AF6 remainder after 16-bit (⬜: disk/browser cache, chunk paging, Opus fallback); AF2 remainder: drum and live-reverb tails at a
+  crossfaded swap (⬜); SAVING — the user's decision (⛳: draft vs project, folder/file/account, autosave and versions); AUDIO TAKE —
+  after auto-freeze (⬜); SCALA readiness (.scl/.kbm) before the mode builder (⬜); Service Worker model cache (⬜).
+- **2. Microtonality: chords and grid** — 2.1 chords in `tag:'edo'` (✅); 2.2 diatonic subsets are a GRID topic (⬜); 2.3 hysteresis below
+  noise level (🔵, one case left); maqam: no bug (ℹ️).
+- **3. Features** — 3.1 chord latch ✅ · 3.2 English UI ✅ (→3.18) · 3.3 backings rework (dropped) · 3.4 intent events ✅ · 3.5 looper ✅ ·
+  3.6 music-theory lesson content ⬜ · 3.7 tuning comparison ⬜ · 3.8 cents deviation display ⬜ · 3.9 FDN reverb ✅ · 3.9b reverb space as an
+  honest PARAMETER ⬜ · 3.10 rich microtonal chord palette ✅ · 3.11 video/sound recording ✅ · 3.12 more tunings and timbres ⬜ · 3.12a
+  Karplus–Strong in CHORDS ❓ (phone measurement) · 3.13 per-layer mixer ⬜ (superseded by MX1/MX2) · 3.14 A/B tuning comparison in time ⬜ ·
+  3.15 own tuning per role (live polymodality) ⬜ · 3.16 jam content 🔵 · 3.17 camera frame margin ✅ · 3.18 i18n 🔵 (en+ru done; es/de await
+  a reviewer) · 3.19 floating menu ✅ · 3.20 tutorial mode ✅ · 3.21 start screen ✅ · 3.22 menu layout ✅ · 3.23 metres beyond 4/4 ✅ · 3.24
+  polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
+  ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
+  latency as a NUMBER ⬜ · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
+  3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
+  ordinary tunings ✅ · 3.39 EFFECTS builder 🔵.
+- **4. Bugs** — mostly ✅/ℹ️ history; open: hand identification `key+=i` ⬜; captured expression-hand channels not replayed ⬜ (debt).
+- **5. Decided NOT to do.**
+- **6. Spec: chord latch** (✅ shipped; kept as history) — also menu rework ✅, 3.10, 3.11, 3.12/3.12a, 3.13–3.39 continue below it.
+- **7. Product direction** (user decisions) — 7.1 server storage (timbres, then songs) · 7.2 free vs paid, towards a subscription · 7.3
+  sharing/selling/other programs: own format + exports · 7.4 ⛳ the TIMBRE FORMAT is designed with all of this from the start · 7.5 polyphonic
+  bass + independent bass notes ✅ · 7.6 user modes: create/save/share · 7.7 app as a MIDI controller with the mode · 7.8 ⛳ hand tracking off
+  the main thread (main tech debt) · 7.9 team ideas (not decisions) · 7.10 strategist proposals (not decisions) · 7.11 ⛳ hearing the room ·
+  7.12 release and money strategy 🟡 (awaits the user) · 7.13 ⛳ the timbre builder (user's vision, stage 7).
+
 Общий список задач. Обновляется по ходу работы.
 
 > **В работе — РЕДАКТОР ДОРОЖЕК (§3.39):** часть 1 ✅ сделана дугой слайсов — дорожки с М/С · явный `when`
