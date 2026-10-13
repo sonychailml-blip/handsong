@@ -690,13 +690,22 @@ export const setArrOpen=v=>{ arrOpen=!!v; };
 export let arrFace='arr';
 export const setArrFace=v=>{ arrFace= v==='mix' ? 'mix' : 'arr'; };
 export const setRollWin=(b0,span)=>{ rollBeat0=b0; rollSpan=span; };
-export const setRollSel=v=>{ rollSel=v||null; rollSelNote=null; };   // U2: новое выделение — всегда ВЕСЬ аккорд (уровень ноты сбрасывается здесь, в одном месте)
+export const setRollSel=v=>{ rollSel=v||null; rollSelNote=null; rollSelMany=new Set(); };   // U2: новое выделение — всегда ВЕСЬ аккорд (уровень ноты сбрасывается здесь, в одном месте)
 /* ⛳ U2: ДВА УРОВНЯ ВЫДЕЛЕНИЯ У АККОРДА. rollSel — определяющее событие сегмента (весь аккорд); rollSelNote — номер ОДНОЙ его ноты
    (индекс в scales.chordNotes сегмента — тот же порядок, что у блоков на экране, draw.rollSegNotes) или null = выделен весь аккорд.
    Номер, а не событие: у ноты аккорда своего события нет, все они звучат из одного «вкл». Номеру не дают устареть: ЛЮБАЯ правка
    выделяет заново через setRollSel (а он сбрасывает номер), ↶/↷ снимают выделение. У баса и ударных уровень один — номер не ставят. */
 export let rollSelNote=null;
 export const setRollSelNote=v=>{ rollSelNote= (v==null||!rollSel) ? null : v|0; };
+/* ED1: SEVERAL notes selected — a Set of defining events (segment heads, drum hits), only when 2 or more; one note stays in rollSel, so
+   every single-note path (chord note level, U5 insert shape) is untouched. setRollSelMany normalises: 0 → nothing, 1 → rollSel. */
+export let rollSelMany=new Set();
+export const setRollSelMany=list=>{ const S=new Set((list||[]).filter(Boolean)); rollSelNote=null;
+  if(S.size>1){ rollSelMany=S; rollSel=null; } else { rollSelMany=new Set(); rollSel= S.size ? [...S][0] : null; } };
+/* ED1: pick mode (⬚ — a tap adds or removes a note, a drag on empty space draws a box) and the box being drawn {x0,y0,x1,y1} or null. */
+export let rollPick=false, rollBox=null;
+export const setRollPick=v=>{ rollPick=!!v; };
+export const setRollBox=v=>{ rollBox=v||null; };
 /* ПРАВКА (S5.1). rollDrag — ПРЕДПРОСМОТР перетаскивания {ev,t,row}: пока палец ведёт, СОБЫТИЕ НЕ
    ТРОГАЕМ (иначе каждое движение пальца пересобирало бы ноты всей песни), рисуем призрак по этим
    числам, а настоящую правку делаем ОДИН раз на отпускании. rollIns — режим вставки (явный, чтобы

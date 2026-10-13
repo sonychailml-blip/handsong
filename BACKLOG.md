@@ -37,12 +37,12 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > **Done:** the TRACK EDITOR (§3.39) — linear multitrack recorder (tracks, M/S, absolute time, brace, chase, arming, row delete, undo
 > by take, per-pass note closing) and the piano roll for all four roles (S4.0–S5.6, E0–E2, S0–S7, U1–U6); EFFECT OWNERSHIP O-0…O-4
 > (serial chain, capture per take, playback, aim vs sound, the automation lane); FREEZE F0–F5, A0–A2c; ONE ROLE AND ONE TIMBRE per track
-> (T0–T5); independent bass notes; the melodic instrument (voice modes V1–V5, Glide); brightness on every role; AR1/MX1/MX2/AR2.
+> (T0–T5); independent bass notes; the melodic instrument (voice modes V1–V5, Glide); brightness on every role; AR1/MX1/MX2/AR2; ED1 several notes at once and ED2 copy/paste/duplicate (2026-10-13).
 > **AUTO-FREEZE:** ✅ AF1 queue · ✅ AF2 swap · ✅ AF6b 16-bit · ✅ **AF3 watcher and triggers** (ON by default; tonic/A4/tempo do not
 > re-freeze until the tonic freeze) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only) · ✅ **AF5 + hard rule #31**
 > (a track and the live hands never share sound state: each role has a separate TRACK chain) · ✅ RENDER-LEAK (non-KS renders collected).
 > Next: AF6 rest (below, §1).
-> **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (ED1 selection next … ED7 one undo) → editor-own
+> **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (✅ ED1 selection, ✅ ED2 copy/paste/duplicate; ED3 quantise next … ED7 one undo) → editor-own
 > (mode by degrees, cent offsets, theremin bend curve) → tonic freeze → VOL-5…VOL-7 → FOUNDATION (stable mode and timbre ids, song and
 > timbre format; §1, §7.4) → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
 > export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).

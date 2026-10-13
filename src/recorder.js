@@ -1974,9 +1974,17 @@ function editGuard(backingOk){
   if(!AC||!editIsOpen()||editLayer()==null) return false;
   if(!backingOk && editBackingOpen()) return false;
   if(loop.on) onLoop();
+  evSeqFill();
   return true;
 }
-function editCommit(){ events.sort((x,y)=>x.t-y.t); schedInvalidate(); takeFxTouch(); laneEditTouch(); }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка. T4c-2: индекс правка пишет сама (пересчёта по ступени нет — ступени нет)
+/* ED1 fix: events at the SAME beat keep their order through edits and undo. songNotes pairs a key's events by array order, and a note-off
+   and the next note-on of that key often share a beat; a plain stable sort put an event moved away and back AFTER its neighbour (undo of
+   a moved note → the next note closed at once, its own off an orphan). Every event gets a birth number before any edit touches it
+   (editGuard — the one entry of every edit, undo and redo); the editor sorts by (beat, birth number). */
+const evSeq=new WeakMap(); let evSeqN=0;
+function evSeqFill(){ for(const e of events) if(!evSeq.has(e)) evSeq.set(e,++evSeqN); }
+const evOrder=(x,y)=> x.t-y.t || (evSeq.get(x)||Infinity)-(evSeq.get(y)||Infinity) || 0;
+function editCommit(){ evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch(); laneEditTouch(); }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка. T4c-2: индекс правка пишет сама (пересчёта по ступени нет — ступени нет)
 /* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
    кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
 function editDrumDefaults(layer,t){
@@ -2265,13 +2273,19 @@ function commitDetach(P,keep){
    → событие, которое редактор выделит после правки (у отделённой — её новое «вкл»), или false. */
 /* U4: ty (необязателен) — тип, который ложится вместе со ступенью и регистром на каждое событие, несущее высоту: так однонотный аккорд
    переносится на ряд в КАНОНИЧЕСКОЙ форме (chordUnit) и звучит ровно высоту ряда. Без ty — прежний перенос, тип не трогается. */
+/* A segment's new pitch payload {ti, oct[, ty]}, or false when it cannot go there. Untyped whole chord off the mode keeps its shape
+   (T5 a); a chord type missing on the new root in the tuning refuses (T7); any pitch of the tuning (T5). Shared by editMoveSeg and
+   the group move (ED1). */
+function segPitchPt(seg,ti,oct,ty){
+  if(ty===undefined){ const ct=chordMoveTy(seg,ti,oct); if(ct===null) return false; ty=ct; }
+  if(seg.role==='ch' && !chordTypeFits(ty!==undefined ? ty : seg.ty, ti, seg.sc)) return false;
+  return slotPt(ti,oct,ty) || false;
+}
 function editMoveSeg(ev,t,ti,oct,ty){
   if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
   if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); редактор пускает сюда бас и аккорды с S2, соло — с S4 (ROLL_EDITABLE)
   const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
-  if(ty===undefined){ const ct=chordMoveTy(seg,ti,oct); if(ct===null) return false; ty=ct; }   // ⛳ T5 (а): целый нетипизированный аккорд на высоту вне лада — с формой
-  if(seg.role==='ch' && !chordTypeFits(ty!==undefined ? ty : seg.ty, ti, seg.sc)) return false;   // ⛳ T7: тип, которого на новом корне нет в строе (Партч — вне 43 высот), туда не переносится (ui называет причину)
-  const pt=slotPt(ti,oct,ty); if(!pt) return false;          // T5: любая высота строя (яркий или приглушённый ряд)
+  const pt=segPitchPt(seg,ti,oct,ty); if(!pt) return false;
   const nt=Math.max(0,t);
   if(Math.abs(nt-ev.t)<=1e-9){
     const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
@@ -2474,6 +2488,183 @@ function editResizeSeg(ev,t){
   for(const it of P.items) if(it!==on && it!==off && it.t>=T-EDIT_GAP) it.drop=true;   // ведения громкости за новым концом
   return commitDetach(P,true);
 }
+/* ═══ ED1: SEVERAL NOTES AT ONCE — ONE HISTORY ENTRY ═══
+   A group edit runs the single-note edits one after another (each sees the song the previous one left: fresh keys, detaches, tie
+   untying all stay theirs) and merges what they pushed into ONE entry — undo walks it back in reverse. A refusal anywhere rolls the
+   applied part back and leaves history and redo as they were. run(h0) gets the history length at the start (for editRemap). */
+function editGroup(run){
+  if(!editGuard()) return false;
+  const h0=editHist.length, fut=editFuture.slice();
+  let r=false, subs=[];
+  try{ r=run(h0); }
+  finally{
+    subs=editHist.splice(h0);
+    if(!r){ for(let i=subs.length-1;i>=0;i--) editApply(subs[i],true);
+      if(subs.length) editCommit();
+      editFuture.length=0; editFuture.push(...fut); }
+    else if(subs.length) editHist.push(subs.length===1 ? subs[0] : { kind:'batch', list:subs });
+  }
+  return subs.length ? r : false;
+}
+/* A selected event an earlier sub-edit replaced (a detach turns the next segment's pitch change into a new note-on at the same beat):
+   follow del → ins pairs in the entries pushed since h0. → the live event or null. */
+function editRemap(ev,h0){
+  const flat=(u,o)=>{ if(u.kind==='batch') for(const s of u.list) flat(s,o); else if(u.kind==='del') o.del.push(...u.evs); else if(u.kind==='ins') o.ins.push(...u.evs); return o; };
+  for(let i=h0; ev && i<editHist.length && !events.includes(ev); i++){
+    const o=flat(editHist[i],{del:[],ins:[]});
+    if(o.del.includes(ev)) ev=o.ins.find(e=>e.layer===ev.layer && Math.abs(e.t-ev.t)<1e-9 && chaseRole(e.fn)===chaseRole(ev.fn) && chaseKind(e.fn)!=='f')||null;
+  }
+  return ev && events.includes(ev) ? ev : null;
+}
+/* The selection grouped by note: drum hits, notes whose every segment is selected (they move or go WHOLE — a glide stays one note) and
+   the remaining segments (parts of a line — they go through the single-segment edit and detach, as one edit would). null = not this
+   track or not a defining event. */
+function selGroups(evs,ly){
+  const SV=songSegs(), nSegs=new Map(), byNote=new Map(), drums=[], whole=[], parts=[], live=new Set(events);
+  for(const g of SV.segs) nSegs.set(g.note,(nSegs.get(g.note)||0)+1);
+  for(const ev of evs){
+    if(!ev||ev.layer!==ly||!live.has(ev)) return null;
+    if(ev.fn==='drum'){ drums.push(ev); continue; }
+    const s=SV.byEv.get(ev); if(!s||s.ev!==ev||!editRoleOf(ev.fn)) return null;
+    const L=byNote.get(s.note)||[]; if(!L.includes(s)) L.push(s); byNote.set(s.note,L);
+  }
+  for(const [n,L] of byNote){ L.sort((a,b)=>a.start-b.start); if(L.length===nSegs.get(n)) whole.push({n,L}); else parts.push(...L); }
+  parts.sort((a,b)=>a.start-b.start);
+  return { drums, whole, parts };
+}
+/* Move a whole note by d; ptOf(seg) → its new pitch payload, null = unchanged, false = refuse. Fresh identity on a key clash (E1). */
+function editMoveWhole(n,d,ptOf){
+  const R=EDIT_ROLE[n.role]; if(!R||n.end==null) return false;
+  const SV=songSegs(), fr= keyClash(n, n.start+d, n.end+d) ? R.fresh(n.layer) : null, memo=new Map(), list=[];
+  for(const e of n.evs){
+    const s= chaseKind(e.fn)!=='f' ? SV.byEv.get(e) : null;
+    if(s && !memo.has(s)) memo.set(s, ptOf(s));
+    const pt= s ? memo.get(s) : null; if(pt===false) return false;
+    list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+d, a:(pt||fr) ? {...e.a, ...pt, ...fr} : e.a} });
+  }
+  return editBatch(list);
+}
+/* ED1 group move. items: pitched {ev, ti, oct} (the segment's new pitch; ti undefined = unchanged), drums {ev, row}; dt — one shift for
+   all, clamped so nothing goes before beat 0. → the defining events to select afterwards, or false (nothing moved). */
+function editMoveSel(items,dt){
+  const ly=editLayer(); if(!items||!items.length||ly==null) return false;
+  const X=new Map(items.map(x=>[x.ev,x]));
+  dt=Math.max(-Math.min(...items.map(x=>x.ev.t)), dt||0);
+  const moved=x=> Math.abs(dt)>1e-9 || (x.ev.fn==='drum' ? x.row!=null&&x.row!==(x.ev.a.row|0) : x.ti!==undefined);
+  if(!items.some(moved)) return false;
+  return editGroup(h0=>{
+    const G=selGroups(items.map(x=>x.ev),ly); if(!G) return false;
+    const out=[];
+    if(G.drums.length){
+      const list=G.drums.map(e=>{ const x=X.get(e), row= x.row!=null ? x.row|0 : (e.a.row|0);
+        return { kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+dt, a: row!==(e.a.row|0) ? {...e.a, row} : e.a} }; });
+      if(!editBatch(list)) return false; out.push(...G.drums); }
+    const ptOf=s=>{ const x=X.get(s.ev); return !x||x.ti===undefined ? null : segPitchPt(s,x.ti,x.oct); };
+    for(const {n,L} of G.whole){ if(!editMoveWhole(n,dt,ptOf)) return false; out.push(...L.map(s=>s.ev)); }
+    for(const s of G.parts){
+      const x=X.get(s.ev); if(!moved(x)) { out.push(s.ev); continue; }
+      const e=editRemap(s.ev,h0); if(!e) return false;
+      const r=editMoveSeg(e, s.start+dt, x.ti!==undefined?x.ti:s.ti, x.ti!==undefined?x.oct:s.oct);
+      if(!r) return false; out.push(r===true?e:r);
+    }
+    return out.filter(e=>events.includes(e));
+  });
+}
+/* ED1 group delete: drum hits and whole notes go in one 'del'; parts of a line through editDeleteSeg (silence in their place, E2). */
+function editDeleteSel(evs){
+  const ly=editLayer(); if(!evs||!evs.length||ly==null) return false;
+  return editGroup(h0=>{
+    const G=selGroups(evs,ly); if(!G) return false;
+    const gone=[...G.drums]; for(const {n} of G.whole) gone.push(...n.evs);
+    if(gone.length && !editBatch([{ kind:'del', evs:gone }])) return false;
+    for(const s of G.parts){ const e=editRemap(s.ev,h0); if(!e||!editDeleteSeg(e)) return false; }
+    return true;
+  });
+}
+/* ═══ ED2: COPY, PASTE, DUPLICATE — the third birth place of events (after push and loadArrangement), obeying the same law ═══
+   The clipboard holds COPIES of the selected notes (start-relative beats are taken at paste), kept for the whole session: it outlives a
+   track switch and closing the editor, so notes can go into another track. A note is copied as a standalone note: a fully selected
+   note as it is (its glide intact); adjacent selected segments of a line as ONE note (the first becomes a note-on with the line's timbre,
+   the end gets its own note-off — the detach recipe, E2); drum hits one by one.
+   Paste (rule #7, #27, #30; plan ED2): into a track of the SAME role and the same tuning view (a track holds one view); every pasted note
+   gets a fresh identity (bass/chords their own k above the track's, solo its own v above the track's — layerTakeTop/layerSlotTop), the
+   session take (editTake: ⤺ outside the editor removes the session's inserts and pastes together), ties are dropped (a pasted note is
+   never a continuation of another track's note); volume is always present. The track keeps its ONE timbre: pasted notes take the target
+   track's timbre (or kit) — notes are what is copied, the sound belongs to the track. ⚠️ `hold` on a theremin note's changes is KEPT:
+   it is part of the note (without it the changes would re-pitch and erase the bend). Captured effect lanes (bus automation) are not
+   copied — they belong to takes, not notes; per-note values ride in the notes and are copied. One paste = one history entry ('ins',
+   pinning the live chain first when the track has no captured chain, as an insert does). */
+let editClip=null;
+function runNote(run){   // adjacent segments of one note → that part as a standalone note (copies of its events, beats absolute)
+  const n=run[0].note, R=EDIT_ROLE[n.role], last=run[run.length-1], X=last.endEv, E=run[0].ev;
+  if(!R||last.end==null) return null;
+  const inst=((n.head&&n.head.a)||{}).inst, withInst=inst!==undefined?{inst}:null, out=[];
+  for(const s of run) for(const e of segEvs(s)){ const on=e===E;
+    out.push({ t:e.t, fn:on?R.on:e.fn, a:on&&e.fn!==R.on?{...e.a, ...withInst}:e.a, sc:e.sc, sev:e.sev }); }
+  if(X && chaseKind(X.fn)==='f') out.push({ t:X.t, fn:X.fn, a:X.a, sc:X.sc, sev:X.sev });
+  else out.push({ t:last.end, fn:R.off, a:{...R.keep(E.a)}, sc:E.sc, sev:E.sev });
+  return out;
+}
+/* The selection → a clip { role, sc, notes:[[event copies]], t0 (first beat), t1 (last note end / last hit) } or null. */
+function clipOf(evs){
+  const ly=editLayer(); if(ly==null||!evs||!evs.length) return null;
+  const G=selGroups(evs,ly); if(!G) return null;
+  const notes=G.drums.map(e=>[{ t:e.t, fn:e.fn, a:e.a, sc:e.sc, sev:e.sev }]), runs=G.whole.map(w=>w.L), byNote=new Map();
+  for(const s of G.parts){ const L=byNote.get(s.note)||[]; L.push(s); byNote.set(s.note,L); }
+  for(const L of byNote.values()){ let run=[L[0]];
+    for(let i=1;i<L.length;i++){ if(L[i-1].endEv===L[i].ev) run.push(L[i]); else { runs.push(run); run=[L[i]]; } }
+    runs.push(run); }
+  for(const run of runs){ const n=runNote(run); if(!n) return null; notes.push(n); }
+  if(!notes.length) return null;
+  notes.sort((x,y)=>x[0].t-y[0].t);
+  const ts=notes.flat().map(e=>e.t), pitched=notes.find(n=>n[0].fn!=='drum');
+  return { role:laneRoleOf(ly), sc: pitched ? pitched[0].sc : null, notes, t0:Math.min(...ts), t1:Math.max(...ts) };
+}
+function editCopySel(evs){ const C=clipOf(evs); if(!C) return false; editClip=C; return C.notes.length; }
+const editClipInfo=()=> editClip ? { role:editClip.role, notes:editClip.notes.length } : null;
+/* Why a paste of clip C into track ly refuses: 'empty' (nothing copied), 'role' (another role, or a track without notes), 'view'
+   (another tuning view — a track holds one), or null. One predicate for the paste and for ui's words. */
+function pasteBlock(C,ly){
+  if(!C) return 'empty';
+  const role=laneRoleOf(ly); if(!role||role!==C.role) return 'role';
+  if(role!=='dr'){ const g=songSegs().segs.find(s=>s.layer===ly&&s.role===role); if(g && g.sc!==C.sc) return 'view'; }
+  return null;
+}
+const editPasteWhy=()=>pasteBlock(editClip, editLayer());
+function pasteClip(C,at){
+  if(!editGuard()) return false;
+  const ly=editLayer(); if(pasteBlock(C,ly)) return false;
+  const role=C.role, f= role==='dr' ? 'kit' : 'inst', tim=laneTimbreOf(ly);
+  if(!editTake) editTake=++takeSeq;
+  let k= (role==='bs'||role==='ch') ? layerTakeTop(ly) : 0, v= role==='ld' ? layerSlotTop(ly) : 0;
+  const d=Math.max(0,at)-C.t0, all=[], heads=[];
+  for(const note of C.notes){
+    const id= role==='ld' ? {v:v++} : (role==='bs'||role==='ch') ? {k:k++} : null;
+    note.forEach((ce,i)=>{
+      const a={...noTie(ce.a)};
+      if(a.fx) a.fx={...a.fx};
+      if(a.bend) a.bend=a.bend.slice();
+      if(id){ Object.assign(a,id); if(id.k===0) delete a.k; }   // k absent = 0 (the payload's own convention)
+      if(tim!=null && a[f]!==undefined && a[f]!==tim) a[f]=tim;
+      if(isNoteStart(ce.fn) && typeof a.vol!=='number') a.vol=editDefVol(role);   // rule #30
+      const ev={ t:Math.max(0,ce.t+d), layer:ly, fn:ce.fn, a, sc:ce.sc, sev:ce.sev, tk:editTake };
+      all.push(ev); if(!i) heads.push(ev);
+    });
+  }
+  events.push(...all);
+  editInsPush(ly, { kind:'ins', evs:all });
+  editCommit(); return heads;
+}
+const editPaste=at=>pasteClip(editClip, at);
+/* Duplicate: the selection pasted right after itself (the clipboard untouched). Offset = the selection's span rounded up to the snap
+   step (step 0 = no snapping); a selection longer than half a bar goes to whole bars, so a phrase keeps its place in the metre. A drum
+   hit counts one grid cell long. → [t0, offset] for the probe and ui, through the same function. */
+function dupOffset(C,step){
+  const cell=step||1/(loop.sub||4), span=Math.max(1e-9, C.t1-C.t0 + (C.role==='dr' ? cell : 0)), M=loop.metre;
+  const g= step ? Math.ceil(span/step-1e-9)*step : span;
+  return span>M/2 ? Math.ceil(span/M-1e-9)*M : g;
+}
+function editDuplicateSel(evs,step){ const C=clipOf(evs); return C ? pasteClip(C, C.t0+dupOffset(C,step)) : false; }
 /* Вставка бас-ноты: пара «вкл»+«выкл» со СВЕЖИМ k (свой владелец — см. довод о порядке выше).
    ⛳ ОТКУДА ПОЛЯ: тембр — ТОЛЬКО с «вкл» соседней ноты (у ведения он записан, но звук его не читает —
    тембр печётся на атаке; брать его с ведения значит списывать у того, кто им не распоряжается);
@@ -5080,6 +5271,8 @@ export {
   lanePanOf, setLanePan, layerOfOwner,   // MX2: панорама дорожки — по id дорожки, не в событии, но В ПОДПИСИ заморозки (вплавляется в буфер); layerOfOwner — слой по ключу владельца (рендер, проба)
   tiePartners, laneEditVerOf,   // S6: партнёр пары связки и версия правок дорожки — для пробы P.checkSoloEdit (soloEditBlock снят: отказов нет)
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
+  editMoveSel, editDeleteSel,
+  editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo,   // ED2: copy, paste, duplicate (the clipboard lives here)
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки

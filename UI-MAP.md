@@ -268,18 +268,32 @@ one time. Mode rows STRETCH to the full height when they fit (up to 30 px), else
 MEASURED from the track's mode labels (capped at 42 % of the canvas). The roll's top is a constant (`ROLL_BAR_H=46` + transport 44), not
 the bar's measured height: the bar is one scrolling line, so the ruler and grid never move.
 
-**EDITOR BAR — 16 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
+**EDITOR BAR — 20 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
 narrow screen): `✕` close · `L1 · name` switch track (number and NAME in the role colour, long ones ellipsised; cycles in the window's
 DISPLAY ORDER; dims when there is one track) · **TIMBRE select** (`#rollTimbre`, T5 — the track ROLE's timbres, kits for drums; hidden on a
 track without notes) · `[mode 1/2]` the axis mode chip — **shown ONLY when the track has events in different modes** · `✚` insert mode ·
-`🗑` delete the selection (a note or an automation point; the tooltip says which) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
+`⬚` pick mode (ED1) · `🗑` delete the selection (a note, several notes or an automation point; the tooltip says which) · `⧉` copy ·
+`📋` paste at the playhead · `⧉⁺` duplicate right after the selection (ED2) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
 ("free" without quantise; "(grid finer than a pixel)" when the step is below what is drawn) · **automation lane select** (first item
 "— no automation —") · **"+ effect for this track" select** · `▲` earlier in the chain · `▼` later · `⊘` remove the effect from the track ·
 **`╱`/`⌐` segment shape** (smooth automation: visible while the lane is open; live when the selected point has a point with a value before
 it; the icon is the CURRENT shape of the segment entering the point: `╱` smooth, `⌐` step; a tap toggles, a toast names the new shape) ·
 `−`/`+` zoom. (AF4: the `❄` button and its state label are gone — tracks freeze themselves.)
 **Keyboard:** **Backspace / Delete** delete the selection — the same path as 🗑, only when 🗑 is live. Silent while focus is in an input
-field (tempo, A4, any text/number), on key repeat and with Ctrl/Cmd/Alt. A dropdown is not an input field.
+field (tempo, A4, any text/number), on key repeat and with Ctrl/Cmd/Alt. A dropdown is not an input field. **Ctrl/⌘+A** select every note
+of the track · **Esc** select nothing · **Ctrl/⌘+C / V / D** copy / paste / duplicate (ED1/ED2; same input-field guard).
+
+**SEVERAL NOTES (ED1).** `⬚` pick mode (or holding Shift): a tap on a note adds or removes it, a drag starting on empty space draws a
+dashed box and adds every note it covers, a tap on empty space selects nothing (pick mode and ✚ insert exclude each other; the field's
+frame brightens). Selected notes are white; chords are selected whole. Dragging any selected note moves the whole group — the grabbed note
+snaps to the grid, the others keep their distance, rows follow the finger; dashed ghosts show where every note lands. 🗑 / ⌫ deletes the
+group. Each is ONE ↶. A fully selected glide moves as one gliding note; a part of a line detaches (as a single edit would). A group that
+cannot go there (a chord type missing on a root, a note leaving the registers) moves nothing and says so. With ⬚ off a tap selects one
+note as before (the chord-note level and ✚'s chord shape work on a single selection only).
+**COPY / PASTE / DUPLICATE (ED2).** `⧉` copies the selection (toast «Copied: n»; works on a backing too) — the clipboard lives until the
+app is closed, across tracks. `📋` pastes at the playhead (snapped like an insert) into this track or another track of the SAME role and
+mode — other role or mode: a toast says why; the pasted notes take the TARGET track's timbre and become the selection. `⧉⁺` repeats the
+selection right after itself (a phrase longer than half a bar lands on the next bar line). One ↶ per paste.
 
 **TIMBRE REPLACEMENT (T5).** Pick another timbre in `#rollTimbre` — the whole track sounds with it: every note start is rewritten (for
 drums the kit of every hit); notes and rhythm unchanged. **One history entry:** one ↶ undoes it all, one ↷ redoes. **The track's effects

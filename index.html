@@ -164,7 +164,13 @@
   <!-- ПРАВКА (S5.1): вставка — ЯВНЫЙ режим, иначе прокрутка, кончившаяся тапом, молча рождала бы удар.
        ↶ снимает ОДНУ правку и живёт только здесь; ⤺ (целое взятое) на время редактора с экрана убран. -->
   <button id="rollIns" data-i18n-title="roll.insertTitle" title="Режим вставки">✚</button>
+  <!-- ED1: pick mode — a tap adds or removes a note, a drag on empty space draws a selection box; a selected group moves and deletes as one edit. -->
+  <button id="rollPick" data-i18n-title="roll.pickTitle" title="Выбор нескольких нот">⬚</button>
   <button id="rollDel" data-i18n-title="roll.delTitle" title="Удалить выбранный удар">🗑</button>
+  <!-- ED2: copy the selected notes · paste them at the playhead (this track or another of the same role and mode) · duplicate them right after themselves. -->
+  <button id="rollCopy" data-i18n-title="roll.copyTitle" title="Копировать выбранные ноты">⧉</button>
+  <button id="rollPaste" data-i18n-title="roll.pasteTitle" title="Вставить у бегунка">📋</button>
+  <button id="rollDup" data-i18n-title="roll.dupTitle" title="Повторить выбранное следом">⧉⁺</button>
   <!-- ↶/↷ — отмена и ВОЗВРАТ ПРАВКИ (S5.3). Обе гаснут, когда делать нечего: мёртвая кнопка должна
        выглядеть мёртвой, а не молча не работать. -->
   <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку">↶</button>

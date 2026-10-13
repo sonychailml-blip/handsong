@@ -3,7 +3,7 @@ import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртв�
 import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, tuningStatus, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, bassFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L, lang } from './i18n.js';   // AR2: lang — ключ кэша имён дорожек по умолчанию
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
+         rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollSelMany, rollPick, rollBox, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
          rollAut, rollAutSel, rollAutDrag, laneRow0, arrOpen, arrFace, laneDrag } from './state.js';   // AR2: laneDrag — тянущаяся за ручку строка окна (вид жеста)   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, LANE_NOROLE_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
@@ -1774,7 +1774,7 @@ function drawRoll(){
     const ev=hits[i], r=ev.a.row|0; if(r<0||r>=rows) continue;
     const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
     const w=blkW, vol=Math.max(0,Math.min(1,ev.a.vol==null?1:ev.a.vol));
-    const sel = ev===rollSel;
+    const sel = ev===rollSel || rollSelMany.has(ev);   // ED1: one of several selected
     ctx.fillStyle = sel ? '#fff' : hexA(INSTR_COL.dr, 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
     ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();                          // S5.2: блок НАЧИНАЕТСЯ на доле и растёт вправо — нота «на раз» лежит ВНУТРИ такта, а не верхом на его линии
     if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke(); }
@@ -1800,7 +1800,7 @@ function drawRoll(){
            ⛳ U2: НОТА ВНЕ РЯДА (dev ≠ null — между ступенями лада) видна безошибочно, двумя знаками, спокойно: блок СВЕТЛЕЕ (заливка
            приглушена) и обведён контуром цвета роли; на блоке — отступление в центах от ближайшей ступени ЭТОГО лада («−22»), если
            влезает, иначе — рядом с блоком, когда он выделен (rollDevLbl). Мера — лад, не равномерная темперация (chRowOfFreq). */
-        const h=V.rowH*0.7, vol=Math.max(0,Math.min(1,s.vol==null?1:s.vol)), chSel=s.ev===rollSel, one=chSel&&rollSelNote!=null;
+        const h=V.rowH*0.7, vol=Math.max(0,Math.min(1,s.vol==null?1:s.vol)), chSel=s.ev===rollSel||rollSelMany.has(s.ev), one=s.ev===rollSel&&rollSelNote!=null;   // ED1: a member of a group selection is white too
         rollSegNotes(s,AX,V.total).forEach((nt,i)=>{
           const r=nt.r;
           if(r<row0-0.5||r>row0+rows-0.5) return;                      // за краем видимых рядов (и не залезать на линейку)
@@ -1811,7 +1811,7 @@ function drawRoll(){
           if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
             /* РУЧКА ДЛИНЫ — только у ВЫДЕЛЕННОГО и только там, где тянуть есть за что (есть endEv и блок
                шире порога). Показываем на выделенном, а не на всех: иначе каждая нота обрастала бы засечкой. */
-            if(s.endEv && w>=ROLL_EDGE_MIN_W){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }   // U3: и у ОДНОЙ выделенной ноты — её длина правится отдельно (sel истинно только у неё)
+            if(s.endEv && w>=ROLL_EDGE_MIN_W && !rollSelMany.size){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }   // U3: и у ОДНОЙ выделенной ноты — её длина правится отдельно (sel истинно только у неё)
           else if(one){ ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(x-1.5,y-1.5,w+3,h+3,4); ctx.stroke(); }
           if(off) rollDevLbl(x,y,w,h,nt.dev,sel);
         });
@@ -1821,7 +1821,7 @@ function drawRoll(){
         const BP=w>=ROLL_BEND_MIN_W ? rollBendPts(s,AX,V.total) : null;
         if(BP){
           ctx.save(); ctx.beginPath(); ctx.rect(x,gy0,w,gy1-gy0); ctx.clip();
-          ctx.strokeStyle = s.ev===rollSel ? 'rgba(20,20,32,.85)' : 'rgba(255,255,255,.92)'; ctx.lineWidth=1.5;
+          ctx.strokeStyle = (s.ev===rollSel||rollSelMany.has(s.ev)) ? 'rgba(20,20,32,.85)' : 'rgba(255,255,255,.92)'; ctx.lineWidth=1.5;
           const cy=r=>rollRowY(V,r)+V.rowH/2;
           ctx.beginPath(); let px=x, py=cy(rollSegRoot(s,AX)); ctx.moveTo(px,py);   // до первой точки — ступень атаки (0 центов)
           for(let i=0;i<BP.length;i++){ const nx=laneBeatX(V,BP[i].t), ny=cy(BP[i].r);
@@ -1865,6 +1865,23 @@ function drawRoll(){
     }
     ctx.setLineDash([]);
   }
+  /* ED1: GROUP GHOST — every selected note where the group move puts it: dt beats later, dr rows up (pitch through rollShiftPit, the
+     function the edit reads — rule #9). */
+  if(rollDrag&&rollDrag.many){
+    const {dt,dr}=rollDrag, isSel=e=>e===rollSel||rollSelMany.has(e);
+    const box=(gx,gr,gw,gh)=>{ if(gr<row0-0.5||gr>row0+rows-0.5) return; const gy=rollRowY(V,gr)+(V.rowH-gh)/2; ctx.beginPath(); ctx.roundRect(gx,gy,gw,gh,3); ctx.stroke(); };
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+    if(pitched && G) for(const s of G.segs){ if(!isSel(s.ev)) continue;
+      const pit= dr ? rollShiftPit(s,dr) : null; if(dr && !pit) continue;
+      const gx=laneBeatX(V,s.start+dt), gw=Math.max(3,laneBeatX(V,(s.end==null?s.start+1:s.end)+dt)-gx);
+      for(const gr of rollSegRows(pit ? rollGhostSeg(s,pit) : s, AX, V.total)) box(gx,gr,gw,V.rowH*0.7); }
+    else if(!pitched) for(const ev of hits) if(isSel(ev)) box(laneBeatX(V,ev.t+dt), (ev.a.row|0)+dr, blkW, V.rowH*0.62);
+    ctx.setLineDash([]);
+  }
+  /* ED1: the selection box being drawn. */
+  if(rollBox){ const b=rollBox, bx=Math.min(b.x0,b.x1), by=Math.min(b.y0,b.y1), bw=Math.abs(b.x1-b.x0), bh=Math.abs(b.y1-b.y0);
+    ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(bx,by,bw,bh);
+    ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(bx,by,bw,bh); ctx.setLineDash([]); }
   /* ⛳ O-4: ПОЛОСА — ДО БЕГУНКА. Она своё поле и заливает свой фон; нарисуй мы её после, фон лёг бы
      поверх бегунка ровно на её высоте, и линия времени разорвалась бы посреди экрана. */
   if(V.aut) drawAutLane(V,ly);
@@ -1882,8 +1899,8 @@ function drawRoll(){
     ctx.beginPath(); ctx.moveTo(px-5,V.ry0); ctx.lineTo(px+5,V.ry0); ctx.lineTo(px,V.ry0+7); ctx.closePath(); ctx.fill();
   }
   // ---- рамка поля и подсказка/пустота ----
-  ctx.strokeStyle= rollIns ? hexA(INSTR_COL.dr,.75) : 'rgba(255,255,255,.14)';   // режим вставки виден и на холсте, а не только по кнопке: тап здесь СОЗДАЁТ удар
-  ctx.lineWidth= rollIns ? 2 : 1;
+  ctx.strokeStyle= rollIns ? hexA(INSTR_COL.dr,.75) : rollPick ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.14)';   // ED1: pick mode shows on the canvas too   // режим вставки виден и на холсте, а не только по кнопке: тап здесь СОЗДАЁТ удар
+  ctx.lineWidth= (rollIns||rollPick) ? 2 : 1;
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
   /* T4: «пусто» значит одно — в ДОРОЖКЕ не осталось нот (роль у неё одна, «нет этой роли» больше не бывает). */
@@ -1993,6 +2010,30 @@ export function rollHit(px,py){
   }
   return best&&bd<=tol ? { what:'hit', ev:best, row:r, beat } : { what:'grid', row:r, beat };
 }
+/* ED1: the pitch a segment takes when a group moves dr rows — its root row on the axis plus dr, read back as a pitch of the tuning (the
+   ghost and the edit read this one function, rule #9). null = off the axis or outside the registers. */
+export function rollShiftPit(seg,dr){ const V=rollView, ax=V&&V.axis; if(!ax||!seg) return null;
+  const r=Math.round(rollSegRoot(seg,ax)+dr); if(!Number.isFinite(r)||r<0) return null;
+  const p=ax.pitchOf(r); return p && p.oct>=0 && p.oct<REG_N ? p : null; }
+/* ED1: notes under a box (canvas px), blocks exactly as drawn (same snapshot and functions) → segment heads or drum hits. */
+export function rollBoxHits(b){
+  const V=rollView; if(!V||V.noEdit||!b) return [];
+  const x0=Math.min(b.x0,b.x1), x1=Math.max(b.x0,b.x1), y0=Math.min(b.y0,b.y1), y1=Math.max(b.y0,b.y1), row0=V.row0||0, out=[];
+  const meet=(bx,by,bw,bh)=> bx<=x1 && bx+bw>=x0 && by<=y1 && by+bh>=y0;
+  if(V.pitched){ const G=rollGroup(); if(!G) return out; const wEnd=V.beat0+V.span, h=V.rowH*0.7;
+    for(const s of G.segs){ const en=s.end==null?wEnd:s.end; if(en<V.beat0||s.start>wEnd) continue;
+      const x=laneBeatX(V,Math.max(s.start,V.beat0)), w=Math.max(3,laneBeatX(V,Math.min(en,wEnd))-x);
+      if(rollSegNotes(s,V.axis,V.total).some(nt=> nt.r>=row0-0.5 && nt.r<=row0+V.rows-0.5 && meet(x, rollRowY(V,nt.r)+(V.rowH-h)/2, w, h))) out.push(s.ev); }
+    return out; }
+  const blk=rollBlockPx(V), h=V.rowH*0.62;
+  for(const ev of rollHits()){ const r=ev.a.row|0; if(r<0||r>=V.rows) continue;
+    if(meet(laneBeatX(V,ev.t), rollRowY(V,r)+(V.rowH-h)/2, blk, h)) out.push(ev); }
+  return out;
+}
+/* ED1: every note of the open track (select all) — the segment heads of its one view, or its drum hits. */
+export function rollSelectable(){ const V=rollView; if(!V||V.noEdit) return [];
+  if(V.pitched){ const G=rollGroup(); return G ? G.segs.map(s=>s.ev) : []; }
+  return rollHits().slice(); }
 /* Габариты окна для ЖЕСТА прокрутки/зума: ui якорит по НИМ, а пишет через сеттеры state — поэтому
    палец, рисунок и попадание читают одно и то же число (следующий кадр строит снимок из него же). */
 export function rollGeom(){ const V=rollView;

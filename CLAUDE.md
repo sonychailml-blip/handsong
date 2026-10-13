@@ -139,7 +139,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   completable from any previous lesson. Don't touch the engine.
 - **A user-facing string** = a key in `DICTS.en` AND `DICTS.ru` (chrome), or an inline `L()`-shaped name next to the data.
 - **A behaviour gate** = a scale property + a predicate in `scales.js`, never a `tag`/index check.
-- **A path that creates or removes events** (the editor is the third such path) = stamp `tk`, keep `t` in absolute song beats, choose
+- **A path that creates or removes events** (the editor is the third such path — insert and ED2 paste) = stamp `tk`, keep `t` in absolute song beats, choose
   `a.v`/`a.k` that don't collide (`layerSlotTop`/`layerTakeTop`), remove with `compactEvents`, then `schedInvalidate` exactly once
   (sort first while recording); always write `a.vol` (rule #30).
 
@@ -687,6 +687,19 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
 - **Undo/redo:** `editGuard` (editor open, track alive, not backing, transport PAUSED — pauses itself); every edit: absolute time, `tk`,
   `compactEvents`, ONE `editCommit` (sort, `schedInvalidate`, `takeFxTouch`); `editPush` is the single history writer (a new edit drops the
   redo branch); compound edits = `kind:'batch'` (sub-kinds move/ins/del/timbre/automation/lanetouch). ↶ ≠ ⤺. History dies with the session.
+  Events at one beat keep their order through edits and undo: birth numbers (`evSeq`, filled in `editGuard`), the editor sorts by (beat,
+  birth) — `songNotes` pairs a key's events by array order (a note-off and the next note-on often share a beat).
+- **Several notes at once (ED1):** `state.rollSelMany` (2+ defining events; one note stays `rollSel`, so every single-note path is
+  unchanged), ⬚ pick mode `rollPick` (or Shift: tap adds/removes, a drag on empty space draws `rollBox` → `draw.rollBoxHits`), Ctrl/⌘+A
+  (`rollSelectable`), Esc. A group drags (`rollDrag.many {dt, dr}`, pitch per note through `draw.rollShiftPit` — ghost and edit) and deletes
+  through `recorder.editMoveSel`/`editDeleteSel`: `editGroup` runs the single edits in sequence and merges what they pushed into ONE
+  history entry (a refusal rolls everything back); a note with every segment selected moves/goes WHOLE (`editMoveWhole`, glide intact),
+  parts of a line go through `editMoveSeg`/`editDeleteSeg` (detach as one edit would; `editRemap` follows replaced events).
+- **Copy, paste, duplicate (ED2):** the clipboard (`recorder.editClip`, copies; lives for the app session) — whole notes as they are,
+  adjacent selected segments of a line as ONE note (`runNote`), drum hits. Paste (`editPaste(at)`, at the snapped playhead) only into a
+  track of the same role and view (`pasteBlock`/`editPasteWhy`: 'empty'|'role'|'view'); duplicate (`editDuplicateSel(evs, step)`, offset
+  `dupOffset`: span to the snap step, past half a bar to whole bars). A paste obeys the birth law: session take, fresh k/v per note, ties
+  dropped, `a.vol` always, the TARGET track's timbre/kit (one source per track), theremin `hold` kept; one `'ins'` entry via `editInsPush`.
 - **Timbre replacement (T5):** `#rollTimbre`, entries from `audio.timbresOf(role)`, `editSetTimbre` rewrites every note start and timbre-
   carrying `leadSet` (fresh payloads), one entry `kind:'timbre'`; a frozen track goes stale; effects unchanged; no picker on a drone layer.
   ⌫/Delete = `rollDeleteSel` (not in text fields, not on key repeat or with modifiers).
@@ -1120,6 +1133,12 @@ verified. Full text of every step: archive, "How to verify a change".
     chords stay at full volume and reverb, the track plays quieter; turn a live effect with the hand (chord reverb) while the track plays —
     live chords change, the track doesn't; the same with `R.autoFreeze(false)` (`?probe`) and with the track frozen.
 70. The first attack of a track after ▶ is still whole (ear step 66) — the track chain rewires without a dip at a start.
+71. Several notes (ED1), eye: ⬚ on → taps add/remove notes (white), a drag on empty space draws a box and adds what it covers, Esc clears,
+    Ctrl+A selects all; drag one selected note — every selected note follows (dashed ghosts), rows too; one ↶ puts all back, ↷ again;
+    🗑/⌫ deletes the group (one ↶); a fully selected bass/solo glide moves as one gliding note; with ⬚ off, tapping a note selects it alone.
+72. Copy/paste/duplicate (ED2), eye and ear: select notes, ⧉ (toast «Copied: n»), move the playhead, 📋 → the same notes at the playhead,
+    selected, sounding the same; ⧉⁺ → a copy right after (a phrase longer than half a bar lands on the next bar line); paste into another
+    track of the same role and mode → they take THAT track's timbre; into another role or mode → a toast says why; one ↶ per paste.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

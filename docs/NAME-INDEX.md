@@ -182,3 +182,12 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/scaleprobe.js`: `checkLiveIsolation` (row «AF5 track and live isolated»), `seedFrozenSamples`, `SEED_REC.soloSnap`
 - `tools/probe-browser.mjs`: `--leak`, `LEAK_PAGE`, `LEAK_N`, `LEAK_MARGIN_MB`, `procMem`, `window.__procMem()`
 - AF5-mixer: `recorder.setLiveLeakDbg`, `liveLeakLy` (probe control); `render.liveCheck` (`R.liveCheck()`); probe helpers `voiceRead`, `LIVE_KEYS` in `checkLiveIsolation`
+
+## Added at ED1 / ED2
+- `src/recorder.js`: `segPitchPt`, `editGroup`, `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`, `editDeleteSel`, `evSeq`, `evSeqN`, `evSeqFill`, `evOrder`; ED2 `editClip`, `runNote`, `clipOf`, `editCopySel`, `editClipInfo`, `pasteBlock`, `editPasteWhy`, `pasteClip`, `editPaste`, `dupOffset`, `editDuplicateSel`
+- `src/state.js`: `rollSelMany`, `setRollSelMany`, `rollPick`, `setRollPick`, `rollBox`, `setRollBox`
+- `src/draw.js`: `rollShiftPit`, `rollBoxHits`, `rollSelectable`; `rollDrag.many {dt, dr}` (group ghost)
+- `src/ui.js`: `selList`, `selHas`, `selMany`, `selToggle`, `groupDrive`, `groupCommit`, `rollCopy`, `rollPaste`, `rollDuplicate`, `rollPickBtn`, `rollCopyBtn`, `rollPasteBtn`, `rollDupBtn`; `rollGrab.group`, `rollPan.box`
+- `index.html`: `#rollPick`, `#rollCopy`, `#rollPaste`, `#rollDup`
+- `src/i18n.js`: `roll.pickTitle`, `roll.groupNo`, `roll.groupOut`, `roll.copyTitle`, `roll.pasteTitle`, `roll.dupTitle`, `roll.copied`, `roll.pasteEmpty`, `roll.pasteRole`, `roll.pasteView`
+- `src/scaleprobe.js`: `checkSelect` (row «ED1 several notes at once»), `checkPaste` (row «ED2 copy, paste, duplicate»)

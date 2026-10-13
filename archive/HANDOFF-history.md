@@ -6110,3 +6110,50 @@ only a layer's owners, attack stages are set per owner, `voicesCut` takes `owner
 probe cases (armed + unarmed mixer level/pan on every live owner and on sounding live voices), control `recorder.setLiveLeakDbg(layer)`
 (read-out 0.04 / 0.22·1.40 — the case can fail), console `R.liveCheck()`. P.checkLiveIsolation 16 cases, 0 differences.
 
+### Moved from HANDOFF.md at ED1/ED2 (English slice record)
+### RENDER-LEAK + part 0 (2026-10-13) (full: archive B, «RENDER-LEAK + AF5»)
+- Measured (runner `__procMem`): 30 freezes of a 3-beat track: +177.5 MB before (5.94 MB/render pinned), +10.7 MB after (0.57 MB/render,
+  mostly allocator noise). Cause: Chrome pins every offline context that loaded the KS worklet; iframe/navigation/dismantling did not free
+  it. Fix: the worklet only for tracks with a KS timbre — faster too (init 27 vs 139 ms, short render 1.43 vs 1.89 s). KS tracks still pin.
+- Runner `--leak`: 30 short renders +1.2 MB (margin 20), control +137.8 MB → PASS.
+- Part 0: AF1 case (6) merged into AF3's edit burst; UI-MAP history bullets in English. Seed-bass sample count rate-aware (the dev machine's
+  audio device switched 48 → 44.1 kHz). Runner: `--quick` PASS, `--all` PASS (222.7 s, slow machine); 1 fix round.
+
+### ✅ ED1 + ED2 — SEVERAL NOTES AT ONCE; COPY, PASTE, DUPLICATE (2026-10-13; runner PASS; eye steps 71, 72 not yet done)
+ED1. State: `rollSelMany` (Set, 2+ defining events; 0/1 normalised into `rollSel` by `setRollSelMany`), `rollPick`, `rollBox`; `setRollSel`
+clears the Set, so every old single-selection path (U2 chord note level, U5 insert shape, ↶/↷ clearing) is unchanged. ui: `selList`,
+`selHas`, `selMany`, `selToggle`, `groupDrive` (the grabbed note snaps to `rollSnap`, the rest keep their distance; `dt` ≥ −first start;
+rows follow the finger once it left its row; drums clamped to six rows), `groupCommit` (pitch per note through `draw.rollShiftPit` =
+`axis.pitchOf(round(rollSegRoot + dr))`, null outside the registers → toast `roll.groupOut`), the box (`rollPan.box` → `draw.rollBoxHits`,
+blocks as drawn; adds to the selection; a tap on empty space in pick mode clears), Ctrl/⌘+A (`draw.rollSelectable`), Esc. Pick and insert
+exclude each other. Draw: members white, no length handle on a group, group ghost (`rollDrag.many {dt, dr}`), the dashed box, a brighter
+field frame in pick mode. Recorder: `editGroup(run)` (editGuard once; runs `run(h0)`; the entries pushed since `h0` become ONE batch;
+on refusal they are applied back in reverse, `editCommit`, the redo stack restored), `editRemap` (del→ins pair at the same beat, same
+layer and role, not an off), `selGroups` (drums / whole notes / parts, counted per note on `songSegs`), `editMoveWhole(n,d,ptOf)` (fresh
+identity on a key clash, E1), `segPitchPt` (extracted from `editMoveSeg`: T5 (a) shape, T7 fit, `slotPt`) — byte-identical single moves.
+Order fix: `evSeq` WeakMap birth numbers filled in `editGuard` (before any edit touches an event) and in `editCommit`; sort `evOrder`
+(beat, birth). Found because «ch: move 3 notes» showed an orphan bassOff at beat 16 in L2: the earlier «bs glide» case had moved the
+glide (0–12, key clash → fresh k) and undone it; the stable sort put its off at 12 after the next note's on at 12 → that note closed at
+once, its own off at 16 an orphan. Field-by-field snapshots could not see it; the row now compares the exact array after undo.
+ED2. Recorder: `editClip` (session), `runNote` (adjacent segments → standalone note, first event becomes R.on with the head's timbre, own
+or new off with `R.keep`), `clipOf`, `editCopySel`, `editClipInfo`, `pasteBlock` ('empty'|'role'|'view'), `editPasteWhy`, `pasteClip`
+(fresh k/v per note from `layerTakeTop`/`layerSlotTop`, `editTake`, `noTie`, copies of fx/bend, target timbre, `editDefVol` if a start
+lacks volume, `editInsPush`), `editPaste(at)`, `dupOffset`, `editDuplicateSel(evs, step)`. ui: `rollCopy`, `rollPaste` (at
+`rollSnapBeat(loop.pos)`), `rollDuplicate`, buttons `#rollCopy/#rollPaste/#rollDup`, Ctrl/⌘+C/V/D; copying allowed on a backing.
+i18n: `roll.pickTitle`, `roll.groupNo`, `roll.groupOut`, `roll.copyTitle`, `roll.pasteTitle`, `roll.dupTitle`, `roll.copied`,
+`roll.pasteEmpty`, `roll.pasteRole`, `roll.pasteView`. Probe rows `checkSelect`, `checkPaste` (P.quick and P.all). Runner: `--quick` PASS
+(44.8 s), `--all` PASS (141.4 s); `--quick --all` in one session: «seed notes as intended» fails on `sh:{"vol:amt":"h"}` left by the AF5
+row (it restores its Volume point with `autMovePoint`, which marks the point hand-placed) — pre-existing; fix: restore by `editUndo` or
+compare without `sh`. No signature changed; new callers listed in the report.
+
+### Moved from HANDOFF.md at ED1/ED2 (English slice record, 2)
+### AF5-mixer (2026-10-13) — step 69 reported failing: mixer track level lowers live chords (full: archive B, «AF5-mixer»)
+- NOT REPRODUCED in the runner on any path: a chord take recorded through the live functions, the editor opened, the window's mixer
+  fader and pan dragged with real pointer events, armed and not armed, transport stopped and playing, auto-freeze on and the track
+  frozen — live chord voices stay at track-level 1, pan 1/1, router live; the output RMS of a live chord stays −34.6…−35.0 dB (±5 % random
+  level); the track's own voices drop to 0.04 (level 0.2). No "monitor at the armed track's level" exists in the code.
+- Kept: the AF5 probe now checks mixer level/pan of the armed and an unarmed track on every live owner and on sounding live voices, with
+  a control that must fail (`setLiveLeakDbg`). Console `R.liveCheck()` to read the live path on the user's device right after it happens.
+- Open questions for the user: transport playing (hearing the sum with the quieter track)? the MASTER strip (directly under the row)?
+  the deployed build (GitHub Pages) or the local one? — and `R.liveCheck()` output.
+- BACKLOG §7.14 (effect chains target design), §7.15 (modes/presets as bundles). Runner: `--quick` PASS (58.4 s), `--all` PASS (293.2 s).
