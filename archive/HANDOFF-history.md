@@ -6473,3 +6473,93 @@ Final: data PASS 49.5 s; `--quick --all --cdn-cache` PASS — P.quick 67.5 s (44
 row 215 lines 0 differences against the pre-TF1 file; frozen seed bass L4 at 44.1 kHz peak 0.08804, rms 0.055326, 598001 samples —
 identical to the 44.1 kHz runs of 2026-10-13 (at 48 kHz 0.08686 / 0.055319 / 650886). Risks found: listed above (⚠️ six).
 
+### Moved from HANDOFF.md at TF2/TF3 (English slice record)
+### TF0 + TF1 (2026-10-14) — song sound fingerprint; the key in the view, inaudibly (full: archive B)
+- TF0: inventory of live-key readers (archive B) + row «TF0 song sound fingerprint»: every event's Hz via `evHz`, the drone, every track
+  view's rows/labels/cents/chord rows, at the seed key and after the real tonic control +2, vs `tools/song.print.json`; control: one track
+  one cent sharp (`evHzDbg`) must differ.
+- TF1: views carry `key` (memo per key); ONE door `scales.viewKey(s)` for all pitch/label reads, answering the LIVE tonic until TF2;
+  shim `recorder.keyFollow` (tonic control, ↶/↷) re-keys recorded views so recordings still follow the tonic; `viewKeyIdOf` = track
+  source. Row «TF1 key in the view» (TF2 reading checked ahead; controls: shim off, live reading). Nothing audible changes.
+- Probe F7 fixed: it compared a view's identity across a tonic change (now at its own key). Fix rounds: TF0 0, TF1 1.
+- Final: data PASS 49.5 s; `--quick --all` PASS — P.quick 67.5 s (44), P.all 216.4 s (58), UI PASS; frozen L4 equal per sample rate.
+
+### Moved from HANDOFF.md at TF2/TF3 — closed arcs (English, verbatim)
+**Live reverb (LR1)**: accepted by ear; old wiring removed in AF1. More space only as an honest reverb PARAMETER (width/decorrelation,
+size, diffusion), the same live and frozen; never the old wiring back (BACKLOG §3.9b).
+
+**Solo editing — arc closed** (S0–S7). Leftover bass/solo differences are timbre-format policies (BACKLOG §7.4). Postponed: a
+triad/seventh switch for untyped modes.
+
+**Editor essentials** (archive B, «ПЛАН „НЕОБХОДИМОЕ РЕДАКТОРУ“»; 7 user decisions as recommended): ✅ AR1 → ✅ MX1 → ✅ MX2 → ✅ AR2 →
+✅ ED1 selection → ✅ ED2 copy → ✅ ED3 quantise → ✅ ED4 by degrees → ✅ ED5 volume bars → ✅ ED6 sections → ✅ ED7 one undo → ✅ OWN1
+mode by degrees → ✅ OWN2 bend curve (+ BEND-CURVE shapes). Decisions: quantise inside a line moves the boundary (glissando intact); by degrees — an out-of-mode
+note keeps its offset; ONE undo for everything (mixer, names, row delete; ⤺ is an ordinary step).
+**Earlier editor answers** (2026-10-13/14: paste keeps `hold`, lessons last, OWN3 deferred, ED6-1, sections on a user brace, arming/mute/solo
+out of undo, ✕ then ↶ brings the brace back, OWN2 as built, BEND-CURVE glides): archive B, records ED6-fix…ED7-fix2.
+
+### ✅ TF2 + TF3 — RECORDINGS KEEP THEIR KEY; TRANSPOSE BY SEMITONES (2026-10-14; runner PASS; ear steps 84–87 not yet done by the user)
+**TF2 — the key knob stops moving recordings** (user answers Q1–Q3). Every place the TF1 inventory listed as "still live for recorded
+material" now reads the recording:
+- `scales.viewKey(s)` answers the view's OWN key (`KEY_FOLLOWS=false`; `keyFollowsDbg(true)` = the old reading, probe control only).
+- (1) DRONE: `audio.droneUse(view)` holds the view the drone sounds; `ENG.drone` passes its event's `sc`, `recorder.droneSync` the view of
+  the loudest live drone event (`droneViewNow`; none = the live view). `droneOn`/`droneRetune` price from it (`droneHz()`); a drone coming
+  up from silence takes its pitch at once (`dUp`) — the render copy builds its oscillators at the live view and a 0.3-s glide from there
+  would be heard. `renderReset` clears `dView`/`dUp`/`pendSymp`.
+- (2) KS SYMPATHETIC STRINGS: `ENG.leadOn`/`leadSet` call `A.sympBase(baseF(ctx.sc))` (live: null = the live key) before the engine call;
+  the KS bank builds its bands at that base and `strike(t, vel, base)` retunes them at the strike time (`max(t, now)`; was "now").
+- (3) FREEZE SIGNATURE / RENDER PINS: field 5 = A4, tempo (the tonic only inside the noSc fallback for an event without a view; the drone
+  no longer forces the noSc fallback — only its live BP choice `droneNonOct` is signed); `frzSigTonicDbg(true)` = the old signature (probe
+  control). `render.pinLive`/`unpinLive` no longer pin the tonic; console prints dropped it.
+- (4) TONIC HANDLER: `setTonic → liveAllOff → backingFollowKey → droneRetune → updScaleBtn`. `recorder.liveAllOff` stops only live owners
+  (`liveOwnersOff`, shared with `softAllOff`) and, while recording, closes what the take holds first (`recAllOff`) — the hand re-attacks in
+  the new key, its source (`viewKeyIdOf`) differs, so the note lands in a NEW track (Q2). Stopped: it is `softAllOff`.
+- (5) BACKINGS (Q3): `backingFollowKey()` re-keys every `ev.jam` event's view to the live key IN PLACE — arrangements are written in degrees
+  (arrange.js knows no key; `backingEvent` stores `ti` via the view), so this is exactly the backing re-made in the new key, without the
+  side effects of a reload (a reload would start a stopped transport, turn ⟳ on and mint new lane ids). Lane ids, levels, pans, names kept;
+  `laneVerBump` for its tracks (frozen ones go stale and re-freeze), `trackResplice(only)` hands its held notes over at the horizon
+  (new optional `only` = a Set of layers; `chasePlay(…, ly)` per layer), the drone takes the new view, `hooks.af('backing')`. Not a
+  history step (the key is a listening switch).
+- (6) `recorder.keyFollow`/`keyFollowDbg` deleted (ui handler, `histCommit`, probe).
+- Not changed: `CUR()` (live view at the live key); songs.js sets the piece's key on an empty song before writing it.
+**TF3 — Transpose by semitones** (Q4). `transposePlan(layers, n)` re-keys every non-drum event's view
+(`scaleView(mode, its tunedFrom, its chord mode, key+n)`; `'move'` steps carrying `sc` — the OWN1 form); notes, beats and payload objects
+untouched. Keys are integers within −12..23 (`TR_KEY_MIN/MAX`): B + 1 = 12 = C above (never an octave down) — `baseF`, `keyOf`, `cFix` and
+the table carry in `pitchHz` are linear in the key, labels take it mod 12. `editTranspose(n)` (editor «−1 st / +1 st», `#rollTrDn/#rollTrUp`;
+refuses 'drums', 'backing', 'range', 'none') → one step through `editPush`/`editCommit` (the open track's edit version). `songTranspose(n)`
+(window «−1 st / +1 st», `#songTrDn/#songTrUp`; every track with pitch, the backing included; refuses 'rec', 'editor', 'empty', 'range',
+'none') pauses like a section edit, applies, adds `'lanetouch'` per touched track, one step `{kind:'batch', label:'transpose'}`, af hint.
+History toast `hist.k.transpose`. **Decision (asked in the prompt):** non-12 tunings — Partch, 19/31-TET, gamelan, Bohlen–Pierce — are
+all priced from the view's base (`modeAnchor`: `A: baseF(s)` for every mobile tuning), so a key step already moves their 1/1 by exactly
+100 cents: Transpose is enabled everywhere; no disabled button, no wait for TF5. Historical temperaments change key colour (expected).
+**Probes.** Row «TF2 recordings keep their key» (`P.checkKeyKeep`, 600 cases; replaces «TF1 key in the view»): the real key control +5 —
+recorded views, sounds, view rows/labels/cents/chord rows/drone strings unchanged; live view follows; frozen tracks stay fresh; drone engine
+with a view stays; the seed's backing (L14–L16) takes the new key in its mode, recordings don't, and back at the old key holds its old
+objects; a sandboxed take with a key change (`seedTake` step `{do}`) uses two tracks with keys 9 and 2; key-less views read the live key;
+twelve keys = twelve views. CONTROLS (each must fail): old reading `keyFollowsDbg(true)`; old signature `frzSigTonicDbg(true)`; drone
+without a view; key without the handler (backing left behind); the take without the key change (one track). Row «TF3 transpose by
+semitones» (`P.checkTranspose`, 454 cases): expected pitch = the key-less view priced at the live tonic n away (= what the knob did before
+TF2, key colour and non-12 1/1 included); track +1 on the frozen seed track (views, payloads, other tracks, one 'transpose' step, stale,
+↶/↷/↶ exact); B → C (+3 from 9 = key 12, ×2^(3/12) within 1e-12); song −1 (backing too, drums untouched, one step, frozen stale, ↶ exact);
+refusals 'range', 'drums', 'backing'; the four buttons exist. CONTROLS: `trDbg({noTouch})` (the frozen track must stay fresh — and the
+control's own transpose must happen), `trDbg({ti})` (naive tuning index + 1 must miss on the non-12 tracks). Changed rows: AF3 «tonic →
+none» now expects the track to stay FRESH and its retune control uses A4; AR1's two stale-by-retune cases use A4. 12-tonic sweeps
+(probedata `sweep`, T6b, stack, F4 behaviour; scaleprobe T6c labels, T7b modes, F0 snapshot builder, F3 names, F7 merge, bare mode) read
+KEY-LESS copies of their views (`probedata.keyless`, memoised) — they compare with frozen references that read the live tonic.
+**Fingerprint** `tools/song.print.json` renewed by `P.dumpSongPrint()` through the runner and diffed by category before saving: base half
+107 lines identical; "+2" half — 84 recorded event lines and 13 recorded view lines now equal their base lines (recordings keep their key),
+backing L14 chords and L15 bass lines (8) move exactly +2 semitones (ratio within 1e-12; Q3), two NEW lines = the backing's major view at
+key 11 (B) (it had shared one view object with recorded major tracks), the live drone line unchanged (109 lines). meta.renewed says why.
+**Fix rounds:** TF2 1 (the TF2 row and the fingerprint first counted the backing as recorded material); TF3 2 (the probe picked the backing
+drum track; then the editor stayed on the backing so the noTouch control's transpose was refused — the control now requires its own
+transpose to happen).
+**Positional callers of changed functions:** `trackResplice(only)` — softAllOff `()`, backingFollowKey `(L)`; bank `strike(t, vel, base)` —
+audio.leadOn `(t, volVel('ld',a), pendSymp)` (other banks ignore the third argument; no other caller); KS `retune(base, t)` internal;
+`seedTake(steps)` — steps may be `{do}` (probeTake and P.seed pass none); `pinLive`/`unpinLive` — signature unchanged, objects without
+`tonic` (readers: render prints, fixed). New: `liveAllOff()`, `backingFollowKey()`, `droneViewNow()`, `frzSigTonicDbg(on)`,
+`audio.droneUse(s)`, `droneHz()`, `sympBase(hz)`, `editTranspose(n)`, `editTransposeWhy(n)`, `songTranspose(n)`, `songTransposeWhy(n)`,
+`trDbg(o)`, probedata `keyless(v)`. Deleted: `keyFollow`, `keyFollowDbg`.
+**Final:** static PASS; data PASS 41.0 s; `--quick --all --cdn-cache` PASS — P.quick 63.3 s (45 checks), P.all 195.7 s (59 checks), UI checks
+PASS, total 284.2 s; frozen seed bass L4 at 48 kHz peak 0.08686, rms 0.055319, 650886 samples (unchanged). TF2 gate alone: P.quick 70.6 s
+(44), P.all 270.6 s (58). Open: song transpose moves the backing away from the knob's key until the knob moves (decided: the backing is
+part of the song); armed tracks and paste respect the key (a recorded track in another key is another view).

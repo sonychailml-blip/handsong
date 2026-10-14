@@ -389,7 +389,7 @@ function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
    и на единицу. Сброс — только render.js, только своей копии. */
 function renderReset(){
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
-  pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null;
+  pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
   DBG.noHum=false; offline=false; rnd=Math.random;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
@@ -662,15 +662,17 @@ function buildKSBank(preBus, opts){
   else node.connect(ig);
   let symp=null;
   if(opts.symp){ const s=opts.symp, sum=AC.createGain(); sum.gain.value=s.gain;   // сочувственные струны — тихий параллельный посыл
+    const b0=pendSymp||baseF();   // TF2: built for the note that needs it — its view's tonic (live: the live key)
     symp=s.ratios.map(r=>{ const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=s.Q;
-      bp.frequency.value=baseF()*r; node.connect(bp); bp.connect(sum); return {bp,r}; });
+      bp.frequency.value=b0*r; node.connect(bp); bp.connect(sum); return {bp,r}; });
     sum.connect(ig); }
-  const retune=()=>{ if(!symp)return; const b=baseF(), t=AC.currentTime;   // следуют за тоникой (как дрон)
+  /* TF2: the strings follow the KEY OF THE NOTE being plucked (a replayed track: its view's key; live: the live key) */
+  const retune=(base,t)=>{ if(!symp)return; const b=base||baseF();
     symp.forEach(x=>x.bp.frequency.setTargetAtTime(b*x.r,t,0.05)); };
   banks.push({gain:ig,
     setFreq:(f,tc=LEAD_GLIDE_TC,t)=>freqP.setTargetAtTime(f,t,tc),
     cancel:t=>freqP.cancelScheduledValues(t),
-    strike:(t,vel)=>{ retune(); const v=Math.max(0.05,Math.min(1,vel==null?0.6:vel));
+    strike:(t,vel,base)=>{ retune(base, Math.max(t||0, AC.currentTime)); const v=Math.max(0.05,Math.min(1,vel==null?0.6:vel));
       pluckP.cancelScheduledValues(t); pluckP.setValueAtTime(v,t); pluckP.setValueAtTime(0,t+0.005); },   // импульс: фронт=щипок, спад — чтобы следующая нота дала новый фронт
     hum:0});
 }
@@ -2278,8 +2280,8 @@ async function initAudio(mkCtx){
      который включают тумблером; выбрать его в конструкторе нельзя (FX_ROLE_SEQ его не содержит),
      значит и цепь ему некому править. Остаётся сухим — намеренно. */
   backBus=AC.createGain(); backBus.gain.value=0.28; backBus.connect(master);
-  dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=tonicFreq()/2;         // tonicFreq: у fixedKey — ФИКСИРОВАННАЯ высота ключа (не бьётся с сеткой); у прочих = baseF()
-  dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=droneSecondHz();       // вторая струна — СОБСТВЕННАЯ высота строя (квинта лада, иначе кварта/септима/период; scales.droneDegree), а не ×1.498. Уровень, тембр и фильтр — прежние
+  dO1=AC.createOscillator(); dO1.type='sawtooth'; dO1.frequency.value=tonicFreq(dv())/2;         // tonicFreq: у fixedKey — ФИКСИРОВАННАЯ высота ключа (не бьётся с сеткой); у прочих = baseF()
+  dO2=AC.createOscillator(); dO2.type='sawtooth'; dO2.frequency.value=droneSecondHz(dv());       // вторая струна — СОБСТВЕННАЯ высота строя (квинта лада, иначе кварта/септима/период; scales.droneDegree), а не ×1.498. Уровень, тембр и фильтр — прежние
   const dLP=AC.createBiquadFilter(); dLP.type='lowpass'; dLP.frequency.value=520;
   const dLFO=AC.createOscillator(); dLFO.frequency.value=0.06;
   const dLFOg=AC.createGain(); dLFOg.gain.value=260;
@@ -2412,6 +2414,10 @@ const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого ин�
    которое оставил кто угодно — живая рука или нота петли. Здесь же величина принадлежит КОНКРЕТНОМУ
    событию и живёт ровно до того, как её заберёт голос этой ноты. Формат события не тронут: поля
    vib/drv/trm/dly лежали в полезной нагрузке всегда (просто до 3.7.1 их некуда было применить пер-нотно). */
+/* TF2: the tonic (Hz) of the view of the solo note about to sound — sympathetic strings of a plucked bank tune to it (ENG.leadOn/leadSet set
+   it before every audio.leadOn/leadSet; null = the live key). Like pendFx: brought down the call stack, read by the voice. */
+let pendSymp=null;
+const sympBase=hz=>{ pendSymp= hz>0 ? hz : null; };
 const pendFx={vib:0,drv:0,trm:0,bri:null};   // bri — яркость ноты (0..1) или null «не задана» (см. applyFx/briStage)   // O-1: dly/rev сняты вместе с пер-нотными посылами — исполнять их в голосе больше нечем (см. applyFx)
 /* Собрать ОДИН банк по индексу инструмента в вход голоса. banks — скратч (см. buildLeadBanks).
    vib — узел глубины вибрато ЭТОГО голоса: mkOsc цепляет его в detune (пара к hum). */
@@ -2635,7 +2641,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
   const attJ = LEAD_INSTR[ins].att*(0.9+rnd()*0.2);   // ±10% времени атаки
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(lvlJ,t,tie?0.02:attJ);  // T3: связка — вход за τ 20 мс, как кроссфейд банков живьём
-  if(!tie) b.strike && b.strike(t, volVel('ld',a));  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
+  if(!tie) b.strike && b.strike(t, volVel('ld',a), pendSymp);  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
 }
 /* ins (T0-fix) — тембр ВЕДЕНИЯ: смена ЖИВОГО тембра соло посреди ноты ПЕРЕЛИВАЕТ звучащую ноту (живой путь
    зовёт leadOn каждый кадр, и leadVoiceBank делает кроссфейд банков голоса за 20 мс). Запись пишет это
@@ -2816,19 +2822,29 @@ function bassOff(owner,when){ const v=bassHold[owner]; if(!v||!AC)return; v.deg=
 /* tc (A2b) — постоянная времени уровня; по умолчанию прежние 1.2 с (вход) и 0.6 с (выход), байт-в-байт.
    Короткую передаёт ТОЛЬКО шов заморозки: там живой дрон подменяет дрон буфера в одно мгновение, и
    секундный наплыв читался бы провалом. */
+/* TF2: the drone sounds the VIEW of its drone event (droneUse — recorder: droneSync and ENG.drone), not the live mode; no view = the live
+   view. A drone coming up from silence takes its pitch at once (dUp): the render copy builds its oscillators at the live view, and a 0.3-s
+   glide from there would be heard; live, the gate fades in from zero over 1.2 s, so the jump is not. */
+let dView=null, dUp=false;
+const dv=()=>dView||undefined;
+function droneUse(s){ dView=s||null; }
+const droneHz=()=>[tonicFreq(dv())/2, droneSecondHz(dv())];   // what the drone sounds now (probe read-out)
 function droneOn(level=0.18,when,tc=1.2){ if(!AC)return; const t=when!=null?when:AC.currentTime;
   dG.gain.setTargetAtTime(level,t,tc);
-  dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
-  dO2.frequency.setTargetAtTime(droneSecondHz(),t,0.3);
+  const [f1,f2]=droneHz();
+  if(dUp){ dO1.frequency.setTargetAtTime(f1,t,0.3); dO2.frequency.setTargetAtTime(f2,t,0.3); }
+  else { dO1.frequency.setValueAtTime(f1,t); dO2.frequency.setValueAtTime(f2,t); }
+  dUp=true;
 }
 /* ПЕРЕСТРОЙКА ДРОНА БЕЗ УРОВНЯ (слайс «дрон и центы»): тоника, лад, «строй от» и A4 меняют его высоты, а дрон живёт ВНЕ softAllOff —
    поэтому ui зовёт это на каждую такую смену. ⛔ Гейт dG не трогаем: стоящий транспорт с заглушённым дроном молчит и дальше (прежде на
    смену A4 звался droneOn, и он поднимал уровень даже на стоящем транспорте). Та же постоянная 0.3 с, что у droneOn. */
 function droneRetune(when){ if(!AC||!dO1)return; const t=when!=null?when:AC.currentTime;
-  dO1.frequency.setTargetAtTime(tonicFreq()/2,t,0.3);
-  dO2.frequency.setTargetAtTime(droneSecondHz(),t,0.3);
+  const [f1,f2]=droneHz();   // TF2: the drone event's view (A4 still retunes it; the key knob no longer does)
+  dO1.frequency.setTargetAtTime(f1,t,0.3);
+  dO2.frequency.setTargetAtTime(f2,t,0.3);
 }
-function droneOff(when,tc=0.6){ if(!AC)return; dG.gain.setTargetAtTime(0,when!=null?when:AC.currentTime,tc); }
+function droneOff(when,tc=0.6){ if(!AC)return; dUp=false; dG.gain.setTargetAtTime(0,when!=null?when:AC.currentTime,tc); }
 /* Живой селектор набора ударных: только глобальный индекс + дропдаун (удар транзиентный,
    тембр берётся на КАЖДЫЙ удар из a.kit — заморожен в событии, как бас/аккорд). */
 function setDrumKit(i){
@@ -3012,6 +3028,7 @@ export {
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff, droneRetune,
+  droneUse, droneHz, sympBase,   // TF2: the drone sounds its event's view; sympathetic strings tune to the solo note's view (ENG sets both)
   LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_NAMES, DRUM_ROWS, DRUM_KITS, createRecordingTap,
   setTrackGainOf, ownerGain, trackGainRetune, hitOwner, setMasterLevel, masterLevel, masterMeter,   // MX1: уровень дорожки (ступень в голосе по ключу владельца), мастер и измеритель
   setTrackPanOf, ownerPan, trackPanRetune, dronePan, panGains,   // MX2: панорама дорожки (стерео-ступень в голосе по ключу владельца, закон равной мощности)

@@ -821,8 +821,8 @@ const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же ме
    в initAudio) и при раскладке (leadFreq/bassFreq/chordFreqs читают baseF() → tonic и aRef).
    ⛔ ИМЕННО НА ЭТОМ ЗОНД ОБМАНЫВАЛ НАС ТРИ ЗАХОДА, поэтому пин стоит ДО офлайн-initAudio, а не после.
    ⚠️ ЧТО ПИНИМ И ЗАЧЕМ КАЖДОЕ:
-     tonic, aRef — из них считается КАЖДАЯ частота дорожки (лад заморожен в событии, а тоника нет:
-                   записанный слой ТРАНСПОНИРУЕТСЯ за живой тоникой — это осознанное поведение);
+     aRef        — из него считается КАЖДАЯ частота дорожки. TF2: the tonic is NOT pinned — each event's view carries its key, so the
+                   live key changes no recorded sound (the signature dropped it too);
      scaleId     — CUR() читается ENG только когда у события нет `sc`; таких не бывает, но пусть будет
                    определённым (F1: id лада, был индекс scaleIdx); ⛳ T2: лад + tunedFrom — ровно КЛЮЧ ВИДА (лад, якорь), который отдаёт CUR(): приколоты
                    они — приколот и вид (тот же объект, scales.scaleView запоминает его на эту пару);
@@ -833,13 +833,13 @@ const DB60=Math.log(1000);// 6.908 — «спад на 60 дБ», та же ме
    ⛳ Пин — ЭТО И ЗАПИСЬ: те же числа уходят в результат, поэтому повторный рендер той же дорожки можно
    будет сделать теми же (это понадобится заморозке, чтобы «переморозить без правок» звучало так же). */
 function pinLive(st, rec, want){
-  const prev={ tonic:st.tonic, aRef:st.aRef, scaleId:st.scaleId, tunedFrom:st.tunedFrom, chordModeSel:st.chordModeSel, seventh:st.seventh,   // tunedFrom (P3 «строй от») и режимы аккордов (T7b) — части CUR(), как scaleIdx
+  const prev={ aRef:st.aRef, scaleId:st.scaleId, tunedFrom:st.tunedFrom, chordModeSel:st.chordModeSel, seventh:st.seventh,   // tunedFrom (P3 «строй от») и режимы аккордов (T7b) — части CUR(), как scaleIdx
                leadIdx:st.leadIdx, bassIdx:st.bassIdx, chIdx:st.chIdx, bpm:rec.loop.bpm };
   /* ⚠️ ТЕМП НЕ ПОДМЕНЯЕМ, ТОЛЬКО ЗАПИСЫВАЕМ. Секунду на долю считаем мы, но `scheduleBend` внутри ENG
      берёт `60/loop.bpm` у ЖИВОГО транспорта — подставь мы сюда другое число, кривая бенда разъехалась
      бы с нотой молча. Темп принадлежит транспорту; рендер его фиксирует в отчёте, а не меняет. */
   const use={...prev, ...(want||{}), bpm:rec.loop.bpm};
-  st.setTonic(use.tonic); st.setARef(use.aRef); st.setScaleId(use.scaleId); st.setTunedFrom(use.tunedFrom); if(st.chordModeSel!==use.chordModeSel) st.setChordModeSel(use.chordModeSel); st.setSeventh(use.seventh);
+  st.setARef(use.aRef); st.setScaleId(use.scaleId); st.setTunedFrom(use.tunedFrom); if(st.chordModeSel!==use.chordModeSel) st.setChordModeSel(use.chordModeSel); st.setSeventh(use.seventh);
   st.setLeadIdx(use.leadIdx); st.setBassIdx(use.bassIdx); st.setChIdx(use.chIdx);
   return {prev, use};
 }
@@ -852,7 +852,6 @@ function pinLive(st, rec, want){
    присваивание; важна именно оговорка «если не тронули». */
 function unpinLive(st, prev, use){
   const u=use||prev;
-  if(st.tonic===u.tonic)       st.setTonic(prev.tonic);
   if(st.aRef===u.aRef)         st.setARef(prev.aRef);
   if(st.scaleId===u.scaleId) st.setScaleId(prev.scaleId);
   if(st.tunedFrom===u.tunedFrom) st.setTunedFrom(prev.tunedFrom);
@@ -1225,7 +1224,7 @@ function printTrack(r){
      читались бы как ошибка. */
   console.log('  границы буфера: разгон '+r.startSec+' с · музыка до '+(+r.endSec.toFixed(3))+' с · хвост '
               +(+r.tailSec.toFixed(2))+' с (посчитан по ЗАХВАЧЕННОЙ цепи, не на глаз)');
-  console.log('  приколочено: тоника '+r.pinned.tonic+' · A4 '+r.pinned.aRef+' · лад '+r.pinned.scaleId
+  console.log('  приколочено: A4 '+r.pinned.aRef+' · лад '+r.pinned.scaleId
               +' · темп '+r.pinned.bpm+' · запасные тембры соло/бас/аккорд '
               +r.pinned.leadIdx+'/'+r.pinned.bassIdx+'/'+r.pinned.chIdx);
   console.log('  время: импорт '+r.ms.importMs+' мс · initAudio '+r.ms.initMs+' мс (по часам, внутри await ворклета) · '
@@ -1356,7 +1355,7 @@ const frozen=()=>{ const ls=REC.frozenLayers();
   if(!ls.length) console.log('  — заморожённых дорожек нет');
   else for(const l of ls){ const i=REC.frozenInfo(l);
     console.log('  ❄ L'+(l+1)+': '+i.seconds+' с (музыка до '+i.endSec+' с, хвост '+i.tailSec
-                +' с) · живых источников '+i.nodes+' · тоника '+i.pinned.tonic+' · A4 '+i.pinned.aRef+' · темп '+i.pinned.bpm); }
+                +' с) · живых источников '+i.nodes+' · A4 '+i.pinned.aRef+' · темп '+i.pinned.bpm); }
   /* eslint-enable no-console */
   return ls; };
 

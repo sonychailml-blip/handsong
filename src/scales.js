@@ -197,11 +197,12 @@ export const IVX=(s=CUR())=>s.iv.concat([s.edo]);           // + верхняя 
    — уехало ВСЁ, подвижные и фиксированные строи вместе (иначе гамелан уехал бы на 415, а Веркмайстер
    остался на 440 — «расстроенный инструмент»). aRef — импорт-биндинг, обе функции пересчитываются сами. */
 const a3=()=>aRef/2;                                        // A3 из живого эталона A4 — единственная деривация опоры
-/* ⛳ TF1 — THE KEY IN THE VIEW (tonic freeze, stage 2). A view carries the key it was made in (v.key, 0..11); viewKey(s) is the ONE door
-   every pitch and label path reads a key through. Until TF2 recordings still follow the tonic, so the door answers the live tonic for
-   every view (KEY_FOLLOWS); TF2 flips it to the view's own key. No view, or a view without a key (a bare mode, an old view): the live tonic. */
-let KEY_FOLLOWS=true;
-export const keyFollowsDbg=on=>{ KEY_FOLLOWS=!!on; };   // probe only: false = the TF2 reading (each view its own key)
+/* ⛳ TF1/TF2 — THE KEY IN THE VIEW (tonic freeze, stage 2). A view carries the key it was made in (v.key; 0..11 from the knob, any integer
+   after a Transpose — TF3: 12 = C an octave up); viewKey(s) is the ONE door every pitch and label path reads a key through. Since TF2 it
+   answers the VIEW'S OWN key, so the key knob moves only what the hands play (CUR() = the view at the live key). No view, or a view without
+   a key (a bare mode, an old view): the live tonic. Probe switch keyFollowsDbg(true) = the old reading (recordings follow the knob). */
+let KEY_FOLLOWS=false;
+export const keyFollowsDbg=on=>{ KEY_FOLLOWS=!!on; };   // probe CONTROL only: true = every view reads the live tonic (the pre-TF2 reading)
 export const viewKey=s=> KEY_FOLLOWS || !s || s.key==null ? tonic : s.key;
 export const baseF=s=>a3()*Math.pow(2,(viewKey(s)-9)/12);   // the tonic's frequency in view s (no s: the live key); C=130.81 Hz at A4=440
 /* ═══ «СТРОЙ ОТ» — ЯКОРЬ ФИКСИРОВАННОЙ СЕТКИ (слайс P1 дуги «СТРОЙ ОТ», HANDOFF) ═══
@@ -873,9 +874,8 @@ export const centsOf=(deg,s=CUR())=>{
    ⛳ УМОЛЧАНИЕ Б–П — СТУПЕНЬ 5:3 (878¢): РЕШЕНИЕ ПОЛЬЗОВАТЕЛЯ НА СЛУХ (записано при T3), сравнившего обе кандидатуры консолью render.js
      (R.droneBP('cons'|'period')). Прежнее умолчание слайса «дрон и центы» — тритава (3:1, собственная эквивалентность строя); переключатель
      оставлен, чтобы её можно было услышать.
-   ⚠️ Дрон читает ЖИВОЙ лад (CUR — как и прежде: tonicFreq() без аргумента), а не замороженный лад события дрона. Его корень —
-     tonicFreq()/2, побитно прежний; вторая струна — та же функция высоты (pitchHz) в регистре корня (A/2): высота строя, та же, что
-     у мелодии в этом ладу, — дрон не бьётся с нотами лада. */
+   TF2: the drone sounds the VIEW of its drone event (audio.droneUse), not the live mode: root tonicFreq(view)/2, second string the same
+     pitch function in the root's register — the tuning's own pitch, so it never beats against the mode's notes. */
 export const DRONE_TOL=17;   // ¢ — см. довод выше: между слендро (+15.0, квинта) и волком Натурального (+19.6, не квинта)
 const C_OF=r=>1200*Math.log2(r);
 const DRONE_FIFTH=C_OF(3/2), DRONE_OCT_FALLBACK=[C_OF(4/3), C_OF(15/8), C_OF(9/5), C_OF(16/9)];

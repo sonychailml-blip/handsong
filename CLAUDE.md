@@ -171,12 +171,13 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    `rectLayout` memo, chord-insert lookup rely on it). ⛔ A bare `SCALES` object must never become an event's `sc`. `a.ty` is usually a
    reference into `CHORD_FAM_SETS` but since U2 can be a fresh one-note array: compare by value (`recorder.tyEq`), price only through
    `scales.chordNotes`. The reference can't be serialised; stable ids (`id`, `tuning`, `scales.viewIdOf`) are the serialisation
-   boundary; user-tuning ids and Scala readiness remain prerequisites for saving. ⛳ **TF1: the view carries the KEY** (`v.key` 0..11;
-   `scaleView(mode, tf, cm, key)` memoised per key; default = a view's own key, a bare mode the live tonic). Every pitch and label path reads
-   a key through ONE door `scales.viewKey(s)` (`baseF(s)`, `anchorOf`, `keyOf`, `cFix`, labels, editor row caches); until TF2 the door
-   answers the LIVE tonic (`KEY_FOLLOWS`, probe switch `keyFollowsDbg`), and the shim `recorder.keyFollow()` (ui tonic control, ↶/↷)
-   re-keys recorded views so a track keeps one view object. `viewIdOf` stays key-free (F0 snapshot, songs, probes); `viewKeyIdOf` adds
-   `~key` and is the track SOURCE (`noteSource`). A view without `key` (old/bare) reads the live tonic in both readings.
+   boundary; user-tuning ids and Scala readiness remain prerequisites for saving. ⛳ **TF1/TF2: the view carries the KEY** (`v.key`: 0..11
+   from the knob, any integer after a Transpose — 12 = C an octave up; `scaleView(mode, tf, cm, key)` memoised per key; default = a view's
+   own key, a bare mode the live tonic). Every pitch and label path reads a key through ONE door `scales.viewKey(s)` (`baseF(s)`,
+   `anchorOf`, `keyOf`, `cFix`, labels, editor row caches), and since TF2 it answers the VIEW'S OWN key: ⛳ **the key knob moves only what
+   the hands play** (`CUR()` = the view at the live key); recordings keep their key; only Transpose (TF3) moves them, by re-keying views.
+   Probe control `keyFollowsDbg(true)` = the old reading. `viewIdOf` stays key-free (F0 snapshot, songs, probes); `viewKeyIdOf` adds
+   `~key` and is the track SOURCE (`noteSource`). A view without `key` (old/bare) reads the live tonic (the probe sweeps use `keyless`).
 8. **The video draw and `detectForVideo` read the same camera frame** (background before detect, overlays after, one synchronous tick).
 9. **ONE layout; never reintroduce a mode gate.** New behaviour keys off scale properties and `splitOn`. **Hit-test and render derive
    geometry from the SAME frozen range** (`S.role`/`S.rx0`/`S.rx1` frozen at capture; `phoneHalves`, `palSplitX`, `rectBandY`/`rectRows`
@@ -521,7 +522,9 @@ empty»). The transport buttons still work.
 `master → limiter → destination`. Chains: (1) solo pool; (2) chord pool (`CHORD_POOL_N` 24 always-on 2-osc voices, gain-gated); (3) bass
 pool (lazy up to `BASS_POOL_N` 12, allocation like `leadAlloc`: free, new below the ceiling, steal released-first by oldest `tOn`;
 voices record `deg`/`oct`); (4) drums (per-hit synths, `DRUM_KITS`: Standard/Darbuka/Tabla/Gamelan/Taiko, same 6 rows); (5) drone
-(detuned saw pair, LFO-swept LP, root `tonicFreq()/2`; second string from the live MODE — `scales.droneDegree`: nearest 3/2 within
+(detuned saw pair, LFO-swept LP, root `tonicFreq(view)/2`; TF2: the VIEW OF ITS DRONE EVENT (`audio.droneUse` from `ENG.drone` and
+`recorder.droneSync` → `droneViewNow`; none = the live view; from silence it takes its pitch at once, `dUp`); second string —
+`scales.droneDegree` of that view: nearest 3/2 within
 17¢, else 4/3 (octave tunings), else a seventh 15/8·9/5·16/9, else the tonic one period up; BP: the 5:3 degree (878¢) by default
 (data `drone.withoutFifth` on bp13; ear switch `R.droneBP('cons'|'period')`); `droneRetune` re-pitches, never re-levels). Plus the
 metronome (`metroClick(t,level)`, 4 levels).
@@ -606,7 +609,8 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   whose buffer owns it skipped (`frzBufOwns`). Cached per entry beat, reset by `schedInvalidate`.
 - **Tracks (lanes):** layer number (sound address) + lane id (identity, rule #27). `laneAudible` (solo overrides mute), `laneGated()` once
   per scheduler call, `laneHush()` releases newly inaudible tracks. ⛳ **A track holds exactly ONE source** (T2/T3/routing by tuning):
-  `noteSource(fn,a,sc)` → `'role:inst|viewId'` (drums `'dr:kit'`; the tonic is not part of it); `takeRoute` (inside `push`, after the
+  `noteSource(fn,a,sc)` → `'role:inst|viewKeyId'` (drums `'dr:kit'`; the view's KEY is part of it — TF2: a key change mid-take
+  starts a NEW track, user answer Q2); `takeRoute` (inside `push`, after the
   count-in refusal) sends a note START to the take's track of that source, else the unclaimed track born at ●, else a new one (`takeMint`
   → `laneNew`, number from `nextFreeLayer()`); changes/releases follow their note's `layer`. An ARMED track accepts only its own source
   (else a new track; header «L{n} takes only its own sound», `looper.armedOwn`). One ● = one take (`tk`); ⤺ removes all its tracks.
@@ -622,8 +626,9 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   deleted, unties surviving tie halves (`untieAcross`). Transport ✕ clears everything (brace back to following, repeat off).
 - **Three stops:** pause (▶ while playing, `onLoop`) holds the position; panic (■) = `recStop()` if recording, halt, `softAllOff`, rewind to
   the brace start, keeping song/brace/mutes/arm; clear resets everything. ⛳ `softAllOff` while playing stops only LIVE owners and hands
-  every event-played track over with `trackResplice` (release at the horizon + the same chase) — a held track note survives tonic/scale/A4
-  changes; frozen buffers are stopped only when the transport is stopped.
+  every event-played track over with `trackResplice` (release at the horizon + the same chase) — a held track note survives scale/A4
+  changes; frozen buffers are stopped only when the transport is stopped. ⛳ TF2: the KEY knob calls `liveAllOff` instead (live owners only,
+  closing what a take holds; tracks are not touched at all) and `backingFollowKey` (below, Backing).
 - **Closing notes:** every stop that ends a recording closes what is held (`recAllOff`); at each seam (`recFoldRoll`) open solo notes get
   `leadOff` at the pass end, a held bass `bassOff`, a latched/held chord `chOff` at the pass end + a written `chOn` at the pass start (live
   voice untouched, rule #20). `push` refuses during the count-in; held notes are opened by their hand; a LATCHED chord with open fingers is
@@ -788,6 +793,13 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   an out-of-mode pitch moves from the NEAREST degree (tuning steps, a tie takes the lower) keeping its offset (user decision 5); the root one
   register above the last is written as the top tonic. Pitch-only: every pitch-carrying event of each selected segment, glides whole, no
   detach; chords through `segPitchPt` (untyped follow the rule, typed keep the type, T7 refuses); one `editBatch`. Beats never change.
+- **Transpose by semitones (TF3, user answer Q4):** `recorder.editTranspose(n)` / `editTransposeWhy` ('none'|'range'|'drums'|'backing') for
+  the open track (`#rollTrDn`/`#rollTrUp` «−1 st / +1 st»), `songTranspose(n)` / `songTransposeWhy` ('rec'|'editor'|'empty'|'none'|'range')
+  for every track with pitch, the backing too (`#songTrDn`/`#songTrUp` in `#arrBar`); one plan `transposePlan(layers, n)`: every non-drum
+  event's view → `scaleView(mode, its tunedFrom, its chord mode, key ± n)` (`'move'` steps carrying `sc`); notes, beats, payloads untouched;
+  keys within `TR_KEY_MIN..MAX` (−12..23). Every tuning prices from the key: 12-note tunings move a semitone (a historical temperament changes
+  key colour — expected), Partch / 19/31-TET / gamelan / Bohlen–Pierce move their 1/1 by 100 cents (the key model expresses it — no
+  disabled button). One step (label 'transpose'; the song step carries `'lanetouch'` per track), frozen tracks go stale and re-freeze.
 - **Track into another mode (OWN1):** `#rollMode` lists `scales.modesLikeView(view)` — modes of the SAME tuning (user decision) with the same
   number of degrees; `recorder.editTrackMode(mode)` / `editTrackModeWhy` ('none'|'same'|'reg'|'fit'|'chords'): every event of the track takes
   the new view (`scaleView(mode, its tunedFrom, its chord mode if the new mode has it)`), every pitch-carrying event the same degree there by
@@ -870,7 +882,7 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   Mute/solo = one assignment on the track's bus gain (`makeFrozenBus` straight into `master`, from `laneHush`). Stops: `softAllOff` (only
   when stopped), `stopAtEnd`, `seekTo`, `startTransport`; buffers dropped in `lanePrune`/`laneReset`.
 - **Splices by the SCHEDULER at segment start `lo` (horizon T):** LEAVING (`frzLeave`, before the segment's events) for stale-by-edit,
-  stale-by-tonic/A4/tempo and unfreeze-while-playing (marks `drop`; retired by `frzNearDone` or any stop): the buffer fades with `FRZ_FADE`
+  stale-by-A4/tempo and unfreeze-while-playing (marks `drop`; retired by `frzNearDone` or any stop): the buffer fades with `FRZ_FADE`
   at T, `chasePlay(lo, T, lead, only)` reopens the track's held notes. Splice mark `f.mark = {kind, rep, beat, at}` compared as the PAIR
   (pass, song beat) by `fireNear` too; `FRZ_MARK_GRACE`. Drone sounded live only for audible, not-fresh-frozen layers
   (`droneAudible`/`droneSync`; 20 ms switch). `frzRetire` disconnects the bus after a delay.
@@ -887,7 +899,8 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   tails scheduled before a crossfaded swap and the role's live reverb tail ring over the buffer's tails. Probe-only `frzSwapDbg('old'|'hard'|null)`
   ('hard' is an ear switch only since AUTO-PROBE), `frzSwapInfo`, `braceProbe`.
 - **Staleness (F5):** editing is never refused; the buffer goes STALE. `freezeSig(layer)`: event count, first/last beat, SUM of beats, the
-  track's `laneEditVer` (bumped by its own edits, `'lanetouch'`), tonic, A4, tempo, pinned fallbacks only when an event reads them, the track's
+  track's `laneEditVer` (bumped by its own edits, `'lanetouch'`), A4, tempo (TF2: NOT the tonic — views carry their keys; the live tonic only
+  for an event without a view; probe control `frzSigTonicDbg`), pinned fallbacks only when an event reads them, the drone's live BP choice, the track's
   TIMBRES (`tmix` packs ids `|0`, "indices < 63" — rewrite when string ids arrive), pan, `chordModeVer`, the live solo chain snapshot for solo
   notes without a map (`soloLiveSig`). Memoised per track (`frzSigMemo`), cleared when `frzGlobalKey()` changes (event count + `evGen` +
   `takeFxVer` + pinned fields), which the watcher reads through `frzWatchKey()`. ⛔ Mute/solo and level excluded; other tracks' events
@@ -901,8 +914,8 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   come through `hooks.af` from the real sites (`recStop`, `onUndo`, `loadArrangement`/`clearJam`, `deleteLane`, `editClose`,
   `songPinChains`; ui pan press/release/wheel/double tap). HOLDS: recording (queue gate), the editor's open track, a held pan control.
   Candidates go through the AF1 queue (priority, gates) and swap in via AF2.
-- ⛔ **Not auto-frozen (live by choice):** tracks stale ONLY by tonic, A4 or tempo while `AF_REFREEZE_ON_RETUNE` is false (user decision until
-  the tonic freeze; `recorder.frzRetuneOnly` masks field 5 of the signature) — they play their events as before; tracks without a captured
+- ⛔ **Not auto-frozen (live by choice):** tracks stale ONLY by A4 or tempo while `AF_REFREEZE_ON_RETUNE` is false (user decision until
+  TF4; `recorder.frzRetuneOnly` masks field 5 of the signature) — they play their events as before; tracks without a captured
   chain (`laneHasChain` false — auto-freeze NEVER pins the live chain: the queue passes `noPin`; skipped "no chain"); tracks over the memory
   budget `AF_BUDGET_MB` (300 MB touch = `(pointer: coarse)`, 1 GB desktop; estimate before the render, exact `admit(bytes)` in
   `render.freeze` before install, refusal `'budget'`; skipped until the signature changes or memory frees; no eviction until AF6).
@@ -925,7 +938,7 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   re-initialised against a fresh `OfflineAudioContext` per render, sample rate pinned to the live one. Seeded (`setRnd(mulberry32(seed))`
   BEFORE `initAudio`; seed from the LANE ID `seedOfLane`); every render starts and ends with `renderReset()`; ONE render at a time
   (`renderQueued`). `renderTrack(layer)` reuses `makeENG(copy)` and `fxLaneMerge()`; does NOT skip inaudible tracks; every event gets an
-  explicit time (solo and drone too); pins tonic, A4, scale, seventh, the three instrument indices, "tuned from", chord modes BEFORE
+  explicit time (solo and drone too); pins A4 (TF2: not the tonic), scale, seventh, the three instrument indices, "tuned from", chord modes BEFORE
   `initAudio` and restores in `finally` (`unpinLive` restores only fields still at the pinned value); tempo recorded, not substituted;
   closes everything left open; taps `master` with gain 1 (`offlineTapMaster`); tail from the captured chain (reverb decay RT60; delay
   `time · ln1000/ln(1/fb)`; longest release) via `fxDenormOf` (largest value over the track); follows chain changes made during a take by
@@ -958,22 +971,31 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
 - **AF3 auto-freeze watcher** (`P.checkAutoFreeze`, P.quick and P.all, ≈ 2.5 s, deterministic: probe clock, 50-ms ticks, fake 128-sample
   renders through the real ticket/`freezeSet`, watcher scope one track): every trigger renders after its delay and within two ticks, not
   before (default change, pan held then released, editor via the real `editClose`, take end after the recording gate, undo, backing, row
-  delete, song); five pan moves 0.6 s apart → one render 1 s after the last; level → none; tonic, A4, tempo → none (stale, then fresh when
-  restored); budget → skipped, not retried; an editor-created track carries a pinned chain (↶/↷ keep it consistent). CONTROLS that must
-  fail: `dbg.noReset` (clock not reset → early/extra renders), `dbg.level` (a watcher reacting to level renders), `dbg.retune` (tonic
+  delete, song); five pan moves 0.6 s apart → one render 1 s after the last; level → none; tonic → none and the track stays FRESH (TF2); A4, tempo → none
+  (stale, then fresh when restored); budget → skipped, not retried; an editor-created track carries a pinned chain (↶/↷ keep it consistent). CONTROLS that must
+  fail: `dbg.noReset` (clock not reset → early/extra renders), `dbg.level` (a watcher reacting to level renders), `dbg.retune` (A4
   renders after 1.5 s), default budget renders the skipped track.
 - **TF0 song sound fingerprint** (`P.checkSongPrint`, quick and all, deterministic data, no render): every pitched event's frequencies
   through `recorder.evHz` (what ENG plays and renders with), the live drone's two strings, and per track view the editor rows, labels,
   cents, chord labels, roots and chord-row Hz (labels in English) — at the seed's environment and again after the REAL tonic control
   moved the key +2; compared line by line with `tools/song.print.json` (made by `P.dumpSongPrint()` on unchanged code; renewed only by
-  a slice that changes sound by decision — TF2 renews the +2 half). Applies only to the unchanged seed song in its environment. CONTROL:
+  a slice that changes sound by decision). TF2 renewed the +2 half: recorded lines equal the base lines, the backing L14/L15 moves +2 (Q3)
+  and its view at the new key adds two lines; the live drone line moves. Applies only to the unchanged seed song in its environment. CONTROL:
   `recorder.evHzDbg(layer, 1)` (one track one cent sharp through the real pricing) must change lines.
-- **TF1 key in the view** (`P.checkKeyView`, quick and all): every recorded view carries the live key, one view object per track, the real
-  tonic control re-keys and gives the same objects back; the TF2 reading (`keyFollowsDbg(false)`, live tonic moved without re-key) prices
-  every event and names every view row exactly as at its own key; key-less views fall back to the live key; twelve keys = twelve views,
-  one `viewIdOf`. CONTROLS: shim off (`recorder.keyFollowDbg(false)`) leaves stale keys; the TF1 reading at another tonic must differ.
+- **TF2 recordings keep their key** (`P.checkKeyKeep`, quick and all): the REAL key control +5 — every recorded event keeps its view object,
+  sound (`evHz`), view rows/labels/cents/chord rows/drone strings; the live view follows (key and ×2^(5/12)); frozen tracks stay fresh; the
+  drone engine sounds the view it is given; the backing takes the new key in its mode, recordings don't; a key change mid-take (sandboxed,
+  `seedTake` step `{do}`) lands in a new track; key-less views read the live key; twelve keys = twelve views. CONTROLS: the old reading
+  (`keyFollowsDbg(true)`) must move recordings; the old signature (`frzSigTonicDbg(true)`) must stale the frozen track; the drone without a
+  view must move; the key set without the handler leaves the backing behind; the same take without the key change keeps one track.
+- **TF3 transpose by semitones** (`P.checkTranspose`, quick and all): expected pitch = what the knob n semitones away sounded before TF2
+  (key-less view at that live tonic — key colour and non-12 1/1 included). Track +1 (the seed's frozen track): views re-keyed, payloads and
+  beats kept, other tracks untouched, one 'transpose' step, the frozen track stale, ↶/↷/↶ exact; B → C (+3 from 9 → key 12) exactly
+  ×2^(3/12) on a mobile track; song −1 (backing too, drums untouched), one step, frozen tracks stale, ↶ exact; refusals 'range', 'drums',
+  'backing'; the four buttons exist. CONTROLS: `trDbg({noTouch})` — the frozen track stays fresh, must be noticed; `trDbg({ti})` — the naive
+  transpose (tuning index + 1) must miss on the non-12 tracks.
 - **AR1 arrangement window** also checks AF4: no ❄ hittable; the freeze dot from `loopView.dots` — rendering = filled, waiting = hollow,
-  frozen and stale-by-tonic rows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
+  frozen and stale-by-A4 rows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
   armed, no mark column although a track is frozen and one stale.
 - **Capture** (`audio.probeCapture`, audio-thread worklet): every probe checks its marker sits EXACTLY at `Mf − F0` and `gaps` is 0
   (`render.capAligned`), else the row errors with the reason; `R.capStats()` counts captures, stale readings, gaps.
@@ -1042,7 +1064,10 @@ is NAMED (button `🥁 <name> · 4/10`, CSS ellipsis `#jamBtn{max-width:44vw}`, 
 loaded selection; `backingName(sel)` via `L()`. Jam variants keyed on scale PROPERTIES (`supportsProgressions`/`supportsChords`, the mode's
 `backing.rhythm` — maqsum for maqams); drums-only = `rhythmsForMetre(loop.metre)` (metre with no pattern → item disabled with a reason). Both
 paths go through `loadJam` (one flag `ev.jam`); switching paths clears the previous backing. ⚠️ Known defect: drums-only has no cultural gate
-(BACKLOG §3.33 item 1; fix must be property-driven).
+(BACKLOG §3.33 item 1; fix must be property-driven). ⛳ TF2 (user answer Q3): a backing FOLLOWS THE KEY KNOB — `recorder.backingFollowKey()`
+re-keys every `ev.jam` event's view in place (arrangements are written in degrees, so this IS the backing re-made in the new key): lane ids,
+levels, pans and the transport are kept, its held notes handed over (`trackResplice(only)`), the drone retuned, its frozen tracks stale
+(edit version) and re-frozen; not a history step. Its notes stay read-only in the editor (Transpose refuses 'backing').
 
 ### The expression hand (solo, function `'expr'`)
 Plays no notes. Four features off RAW landmarks (`exprFeatures`): energy (palm-centre speed in palm sizes/s; position EMA before
@@ -1115,8 +1140,11 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   (↶ of ✕ restores the song AND the brace with ⟳). A note starting inside a cut is removed with its tail; a note closed by the next note's
   start exactly on an insert point is lengthened (held through the new bars); insert-then-cut leaves beats equal to ~1e-15 beat, not bit
   for bit (float). Copies of a duplicate belong to the source take (⤺ of that take removes them too).
-- **Tonic, A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until the tonic
-  freeze — through the live pools, with their polyphony ceilings.
+- **A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until TF4 — through
+  the live pools, with their polyphony ceilings. The key knob no longer stales anything (TF2).
+- **Transpose keys stay within −12..23** (two octaves around the knob); a track or song already there refuses one more step ('range').
+- **Paste and arming respect the key** (TF2): a clipboard pastes only into a track of the same view — key included; an armed track recorded in
+  another key than the knob's takes nothing (a new track starts, as for another mode).
 
 ## How to verify a change
 No unit tests. Claude Code runs the static check, `node tools/probe-data.mjs` and `node tools/probe-browser.mjs` per the probe budget,
@@ -1304,6 +1332,15 @@ verified. Full text of every step: archive, "How to verify a change".
 83. Undo after ✕ (ED7-fix2): with a few tracks, press ✕ — the strip disappears, a box «Song cleared — ↶ Undo» shows for ~6 s under the
     top bar and a lone ↶ ↷ stays where the transport was; tap Undo in the box → everything is back; ✕ again, wait 6 s, tap the lone ↶ →
     back; ✕ again, Ctrl+Z → back. With nothing recorded and an empty history, nothing extra is shown.
+84. The key knob (TF2), headphones: play a few recorded tracks and change the tonic in «Scale» — the recordings keep sounding in their key,
+    without a gap; your live playing follows the new tonic; in the arrangement window no freeze dot appears on frozen tracks.
+85. Backing follows the key (TF2, Q3): start a Jam backing, change the tonic — the backing re-plays in the new key at once (a held chord
+    moves), the transport keeps running; a recorded track does not move.
+86. Key change while recording (TF2, Q2): record solo, change the tonic mid-take, keep playing — the notes after the change land in a NEW
+    track; one ⤺ removes both.
+87. Transpose (TF3): in the editor bar «−1 st / +1 st» moves the whole open track a semitone (a toast, one ↶); in the arrangement window bar
+    «−1 st / +1 st» moves the whole song (backing too, drums untouched; one ↶); from B a step up goes to C ABOVE, not an octave down; in
+    Werckmeister the key colour changes; in Partch / Bohlen–Pierce the 1/1 moves 100 cents; frozen tracks re-freeze (dots).
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

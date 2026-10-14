@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewKeyIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, baseF, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewKeyIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { bendAt, bendSplit, curveU, REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -1016,7 +1016,10 @@ const droneAudible=()=>events.some(e=>e.fn==='drone'&&liveDrone(e));
 const droneLevel=()=>{ let L=0; for(const e of events) if(e.fn==='drone'&&liveDrone(e)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L) L=x; } return L; };
 /* MX2: ПАНОРАМА ДРОНА — той дорожки, чей дрон взят громким (тот же выбор, что droneLevel); нет слышимого — центр. */
 const dronePanOf=()=>{ let L=-1, P=0; for(const e of events) if(e.fn==='drone'&&liveDrone(e)){ const x=((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer); if(x>L){ L=x; P=lanePanOf(e.layer); } } return P; };
-const droneSync=(when,tc)=>{ if(droneActive()){ if(loop.on&&droneAudible()){ AUD.dronePan(dronePanOf(),when); droneOn(droneLevel(),when,tc); } else droneOff(when,tc); } };   // tc (A2b) — короткий только на шве заморозки; иначе прежние постоянные
+/* TF2: the view the drone sounds — of the loudest live drone event (as its level), else of any drone event; null = the live view */
+const droneViewNow=()=>{ let L=-1, V=null; for(const e of events) if(e.fn==='drone'){ const x= liveDrone(e) ? ((e.a&&e.a.lvl)??0.18)*laneGainOf(e.layer) : -0.5; if(x>L){ L=x; V=e.sc||null; } } return V; };
+const droneViewSync=()=>AUD.droneUse(droneViewNow());
+const droneSync=(when,tc)=>{ if(droneActive()){ droneViewSync(); if(loop.on&&droneAudible()){ AUD.dronePan(dronePanOf(),when); droneOn(droneLevel(),when,tc); } else droneOff(when,tc); } };   // tc (A2b) — короткий только на шве заморозки; иначе прежние постоянные
 const FRZ_DRONE_TC=0.02;   // A2b: дрон на шве — подмена в миг шва (буфер уходит рампой FRZ_FADE), без секундного провала
 /* AF2: уровень живого дрона на миг подмены — без дрона дорожки, уходящей в буфер (её дрон звучит из буфера). */
 const droneSyncAt=(when,tc,layer)=>{ droneExcl=layer; try{ droneSync(when,tc); } finally { droneExcl=null; } };
@@ -1267,6 +1270,8 @@ const laneEditVer=new Map();                 // id дорожки → число
 const laneEditTouch=()=>{ if(editLane!=null) laneEditVer.set(editLane,(laneEditVer.get(editLane)||0)+1); };
 const laneVerBump=id=>{ laneEditVer.set(id,(laneEditVer.get(id)||0)+1); };   // S6: версия правок ЛЮБОЙ дорожки по id — партнёр пары связки (ход 'lanetouch', удаление строки)
 const laneEditVerOf=layer=>{ const id=laneOf(layer); return id==null ? 0 : (laneEditVer.get(id)||0); };   // S6: чтение для пробы
+let frzSigTonic=false;
+const frzSigTonicDbg=on=>{ frzSigTonic=!!on; frzSigMemo.clear(); };   // probe CONTROL only (row «TF2 recordings keep their key»)
 function freezeSig(layer){
   const P=frzPinned();
   const g=events.length+'|'+evGen+'|'+takeFxVer+'|'+P;          // = frzGlobalKey(), но P уже посчитан. takeFxVer здесь ОСТАЁТСЯ: это ключ МЕМО («могла ли смениться хоть одна подпись»), а не сама подпись
@@ -1288,11 +1293,11 @@ function freezeSig(layer){
      ⚠️ Мемо подписи сбрасывается по глобальному ключу (число событий, поколение, takeFxVer, приколоченное):
      замена тембра обязана пройти через editCommit — он поднимает takeFxVer, как и любая правка редактора. */
   const tmix=(h,tag,x)=>(Math.imul(h,31)+tag*64+((x==null?-1:x)|0)+1)|0;   // индексы < 63 (тембров соло 23, наборов 5). ⚠️ ВЕРНО ТОЛЬКО ДЛЯ ВСТРОЕННЫХ ИНДЕКСОВ: id упакован малым целым (|0), и строковый id (стабильные id тембров, BACKLOG §7.4) свернётся в 0 — два разных тембра подпишутся одинаково. ПЕРЕПИСАТЬ вместе со стабильными id
-  let n=0, first=null, last=null, sum=0, noSc=false, ld=false, ch=false, bs=false, tim=0, noFx=false;
+  let n=0, first=null, last=null, sum=0, noSc=false, dr=false, ld=false, ch=false, bs=false, tim=0, noFx=false;
   for(const e of events) if(e.layer===layer){
     n++; sum+=e.t; if(first===null||e.t<first) first=e.t; if(last===null||e.t>last) last=e.t;
     if(!e.sc) noSc=true;
-    if(e.fn==='drone') noSc=true;   // слайс «дрон и центы»: дрон читает ЖИВОЙ лад (вторая струна — ступень лада, scales.droneDegree), а не sc события — значит смена лада/«строй от» меняет его звук, и замороженная дорожка с дроном обязана устареть
+    if(e.fn==='drone') dr=true;   // TF2: the drone sounds its event's view; only the live Bohlen–Pierce drone choice (droneNonOct) stays live
     const a=e.a; if(a&&a.fx==null&&(e.fn==='leadOn'||e.fn==='leadSet')) noFx=true;   // договор заморозки: соло-нота без карты звучит ЖИВОЙ цепью соло (R2) — см. soloLiveSig
     if(a){ if(e.fn==='leadOn'){ tim=tmix(tim,1,a.inst); if(a.inst===undefined) ld=true; }
                         else if(e.fn==='leadSet'&&a.inst!=null) tim=tmix(tim,5,a.inst);   // T0-fix: ведение соло несёт тембр (нота переливается), и рендер его играет — значит и подпись его видит
@@ -1300,8 +1305,10 @@ function freezeSig(layer){
                         else if(e.fn==='bassOn'){ tim=tmix(tim,3,a.inst); if(a.inst==null) bs=true; }
                         else if(e.fn==='drum') tim=tmix(tim,4,a.kit); } }
   const id=laneOf(layer), ver=id==null?0:(laneEditVer.get(id)||0);
-  const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+tonic+','+aRef+','+loop.bpm
-         +'|'+(noSc?scaleId+','+tunedFrom+','+chordModeVer+','+(seventh?1:0)+','+droneNonOct():'-')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim
+  /* TF2: the tonic left field 5 — a view carries its key, so the key knob changes no recorded sound (an event without a view still reads
+     it: the noSc fallback). frzSigTonic = the probe CONTROL (the old signature, a key change stales every frozen track). */
+  const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+(frzSigTonic?tonic+',':'')+aRef+','+loop.bpm
+         +'|'+(noSc?tonic+','+scaleId+','+tunedFrom+','+chordModeVer+','+(seventh?1:0)+','+droneNonOct():'-')+(dr?',d'+droneNonOct():'')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim
          +'|p'+lanePanOf(layer);   // MX2: панорама дорожки вплавлена в буфер (ступень до цепи) — её смена старит; уровня здесь НЕТ (он на шине замороженной)   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
   frzSigMemo.set(layer, {v, noFx});
   return v+(noFx?soloLiveSig():'');
@@ -1347,7 +1354,8 @@ function frzWatchKey(){
   if(frzNoFxKey!==k){ frzNoFxKey=k; frzNoFxAny=events.some(e=>e.a&&e.a.fx==null&&(e.fn==='leadOn'||e.fn==='leadSet')); }
   return frzGlobalKey()+'|w'+frzWatchVer+(frzNoFxAny?soloLiveSig():'');
 }
-/* Stale ONLY because tonic, A4 or tempo moved (field 5 of the signature; user decision: no re-render on these until the tonic freeze). */
+/* Stale ONLY because A4 or tempo moved (field 5 of the signature; user decision: no re-render on these until TF4). Since TF2 the tonic is
+   not in it: a key change leaves frozen tracks fresh. */
 const frzSigNoRetune=s=>{ const p=s.split('|'); if(p.length>5) p[5]='*'; return p.join('|'); };
 function frzRetuneOnly(layer){
   const f=frzOf(layer); if(!f||f.drop) return false;
@@ -2088,7 +2096,6 @@ function histTouched(u,S=new Set()){
   return S;
 }
 function histCommit(u){
-  keyFollow();   // TF1: an event brought back by ↶/↷ takes the live key like the rest
   evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch();
   for(const ly of histTouched(u)){ const id=laneOf(ly); if(id!=null) laneVerBump(id); }
   if(u.kind==='snap'){ curChordDeg=-1; delPend=null; softAllOff(); if(!droneActive()) droneOff(); }
@@ -2981,6 +2988,54 @@ function editTrackMode(mode){
   if(!editGuard()) return false;
   const P=trackModePlan(editLayer(),mode); if(P.why) return false;
   return editBatch([{ kind:'batch', label:'mode', list:P.list }]);
+}
+/* ═══ TF3: TRANSPOSE BY SEMITONES — one track (editor) or the whole song (window) ═══
+   A transposition moves the KEY of each event's view (scaleView(mode, its tunedFrom, its chord mode, key ± n)); notes (ti, oct), beats,
+   volumes, bends and effects stay. The key is an integer (12 = C an octave up), so ±1 is exactly a semitone, also across B → C. Every
+   tuning is priced from its view's key: 12-note tunings move a semitone (a historical temperament changes key colour, as an organ would);
+   Partch, 19/31-TET, gamelan, Bohlen–Pierce move their 1/1 by 100 cents. Drum hits carry no pitch (skipped). Keys stay in TR_KEY_MIN..MAX
+   (two octaves around the knob). One history step (label 'transpose'); the touched tracks' freeze goes stale (edit version).
+   → { list, layers } or { why: 'none' | 'range' }. trDbg (probe CONTROLS only): noTouch — no edit version bump; ti — the naive transpose
+   (tuning index + n steps, the view kept). */
+const TR_KEY_MIN=-12, TR_KEY_MAX=23;
+let trDbgO={};
+const trDbg=o=>{ trDbgO=o||{}; };
+function transposePlan(layers,n){
+  const list=[], L=new Set();
+  if(!Number.isInteger(n) || !n) return { why:'none' };
+  for(const e of events){
+    if((layers && !layers.has(e.layer)) || !e.sc || !e.sc.mode || e.fn==='drum') continue;
+    const k=(e.sc.key!=null ? e.sc.key : tonic)+n;
+    if(k<TR_KEY_MIN || k>TR_KEY_MAX) return { why:'range' };
+    const to= trDbgO.ti ? { t:e.t, a: e.a && typeof e.a.ti==='number' ? { ...e.a, ti:e.a.ti+n } : e.a, sc:e.sc }
+                        : { t:e.t, a:e.a, sc:scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k) };
+    list.push({ kind:'move', ev:e, from:{ t:e.t, a:e.a, sc:e.sc }, to }); L.add(e.layer); }
+  return list.length ? { list, layers:L } : { why:'none' };
+}
+/* the open track (editor): refused on drums and on a backing (its notes are read-only; it follows the key knob, Q3) */
+const editTransposeWhy=n=>{ const ly=editLayer(); if(ly==null) return 'none'; if(editBackingOpen()) return 'backing'; if(laneRoleOf(ly)==='dr') return 'drums';
+  return transposePlan(new Set([ly]),n).why||null; };
+function editTranspose(n){
+  if(editTransposeWhy(n) || !editGuard()) return false;
+  const P=transposePlan(new Set([editLayer()]),n); if(P.why) return false;
+  for(const u of P.list) editApply(u,false);
+  editPush({ kind:'batch', label:'transpose', n, list:P.list });
+  if(trDbgO.noTouch) { evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch(); histSeal(); } else editCommit();
+  return true;
+}
+/* the whole song (window): every track with pitch, the backing included (it is part of the song) */
+const songTransposeWhy=n=>{ if(recording) return 'rec'; if(editIsOpen()) return 'editor'; if(!events.length) return 'empty'; return transposePlan(null,n).why||null; };
+function songTranspose(n){
+  if(songTransposeWhy(n) || !AC) return false;
+  if(loop.on) onLoop();
+  evSeqFill();
+  const P=transposePlan(null,n); if(P.why) return false;
+  for(const u of P.list) editApply(u,false);
+  if(!trDbgO.noTouch) for(const ly of P.layers){ const id=laneOf(ly); if(id!=null){ const u={ kind:'lanetouch', id }; editApply(u,false); P.list.push(u); } }
+  events.sort(evOrder); schedInvalidate(); takeFxTouch();
+  if(histPush({ kind:'batch', label:'transpose', n, list:P.list })) histSeal();
+  if(hooks.af) hooks.af('transpose');
+  return true;
 }
 function editDegreeSel(evs,n){
   if(!editGuard()) return false;
@@ -4286,11 +4341,13 @@ const makeENG=A=>({
               const gl=A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль. V4: заодно отдаёт СКОЛЬЖЕНИЕ ноты (или undefined — не задано)
               /* ⛔ V4, КОНТРАКТ V1: живой кадр ТЕРМЕНВОКСА (live!=null) скольжения НЕ получает — его 20 мс это сглаживание слежения, а не
                  портаменто; руке с долгим Скольжением высота отставала бы от руки. Свежую атаку отсекает сам движок (fresh → умолчание). */
+              A.sympBase(ctx&&ctx.sc ? baseF(ctx.sc) : null);   // TF2: sympathetic strings of a replayed note follow its view's key; live — the live key
               const g=evReg(a,ctx); A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:a.inst,g.deg,g.oct,live!=null?undefined:gl,a.tie,when);   // время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
               if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,60/loop.bpm,a.bendFrom||0,when); },   // BEND-CURVE: bendFrom — the chase enters the curve late (chaseNote)   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
   leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
               const gl=A.applyFx(a.fx);   // V4: скольжение ведения — из ЕГО карты (карта ведения несёт величину на миг ведения: сдвинул палец посреди ноты — следующий переезд уже с новой)
               const f=a.hold?null:evHz(a,ctx,'ld'); if(f!==null && !okHz(f)) return;   // T4c-1: нет индекса — ведения нет
+              A.sympBase(ctx&&ctx.sc ? baseF(ctx.sc) : null);   // TF2: a bank built mid-note (timbre change) tunes to the note's key
               const g=evReg(a,ctx); A.leadSet(o,f,a.vol,g.deg,g.oct,a.inst,gl,when); },   // T4b1: цена — из индекса в строе   // ведение терменвокса (hold) частоты не несёт — скольжению там применяться не к чему   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
   leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),a&&a.tie,when),   // V2: tie ПЕРЕД when (правило #15)   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
   /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
@@ -4307,7 +4364,7 @@ const makeENG=A=>({
   bassSet:(a,ctx,{when}={})=>{ const f=evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassSet(bassOwnerKey(ctx),f,a.vol,g.deg,g.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
   bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
   drum:(a,ctx,{when}={})=>{ if(ctx) A.hitOwner('hit:'+ctx.layer); A.drumHit(a.row,a.vol,a.kit,A.fxBriOf(a.fx),when); },   // MX1: ключ удара — для уровня дорожки (у копии рендера множитель всегда 1)   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
-  drone:(a,ctx,{when}={})=>{ if(ctx) A.dronePan(A.ownerPan('drone:'+ctx.layer),when); A.droneOn(a.lvl*(ctx?A.ownerGain('drone:'+ctx.layer):1),when); },   // MX2: панорама дорожки дрона (у копии рендера — панорама дорожки, которую рендерят)   // MX1: × уровень дорожки дрона (у копии рендера — 1)        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
+  drone:(a,ctx,{when}={})=>{ if(ctx) A.dronePan(A.ownerPan('drone:'+ctx.layer),when); A.droneUse(ctx?ctx.sc:null); A.droneOn(a.lvl*(ctx?A.ownerGain('drone:'+ctx.layer):1),when); },   // MX2: панорама дорожки дрона (у копии рендера — панорама дорожки, которую рендерят)   // MX1: × уровень дорожки дрона (у копии рендера — 1)        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
 });
 const ENG=makeENG(AUD);   // ЖИВАЯ таблица — против живой копии движка. Поведение прежнее дословно
 const inPB=()=>loop.on;                               // для строки статуса (draw)
@@ -4885,9 +4942,7 @@ function softAllOff(){ if(!AC)return;
     /* ЖИВЫЕ — сейчас, как всегда: руки соло ('lead:*'), живой аккорд ('latch' — правило #20 о шве повтора, а
        softAllOff гасил его всегда и гасит дальше), живой бас ('bass' и 'bass:…' — всё, что не isTrackOwner). Дорожки —
        передаёт trackResplice. */
-    for(const k of Object.keys(leadHold))  if(!isTrackOwner(k)) leadOff(k);
-    for(const k of Object.keys(chordHold)) if(!isTrackOwner(k)) chordOff(k);
-    for(const k of Object.keys(bassHold))  if(!isTrackOwner(k)) bassOff(k);
+    liveOwnersOff();
     trackResplice();
   }else{
     leadAllOff();                                   // все владельцы соло: 'lead:L/R' + 'leadloop:N:v' (раньше был один noteOff — соло было моно)
@@ -4896,6 +4951,37 @@ function softAllOff(){ if(!AC)return;
   }
   setLatchDeg(-1); setLatchTy(null); liveCh=null;   // живой аккорд погашен — и его запись-зеркало тоже. тип гасим вместе со ступенью: иначе после паники/очистки
   recDrop(); }                                    // следующий щипок той же ступени прочёлся бы как «тот же аккорд»; состояние записи — в ноль (при записи оно уже закрыто выше)
+function liveOwnersOff(){
+  for(const k of Object.keys(leadHold))  if(!isTrackOwner(k)) leadOff(k);
+  for(const k of Object.keys(chordHold)) if(!isTrackOwner(k)) chordOff(k);
+  for(const k of Object.keys(bassHold))  if(!isTrackOwner(k)) bassOff(k);
+}
+/* TF2: the key knob — only what the HANDS play stops (a held note re-attacks next frame in the new key; while recording it is closed
+   first, so it lands in a NEW track — the source carries the view's key, Q2). Tracks keep playing untouched: their views hold their keys.
+   Stopped: the same as softAllOff (nothing of a track is sounding but release tails). */
+function liveAllOff(){ if(!AC)return;
+  if(!loop.on) return softAllOff();
+  if(recording) recAllOff();
+  liveOwnersOff();
+  setLatchDeg(-1); setLatchTy(null); liveCh=null;
+  recDrop();
+}
+/* TF2 (user answer Q3): a backing (Jam, Drums) follows the key knob. Arrangements are written in DEGREES (arrange.js knows no key), so the
+   backing re-made in the new key is exactly its events in the view of the new key — done in place: its tracks keep their ids, levels, pans,
+   names and the transport keeps running. Not a history step (the key is a listening switch). Its held notes are handed over at the
+   horizon (trackResplice of its layers), the drone takes the new view, its frozen tracks go stale (edit version) and re-freeze by
+   themselves. → the layers re-keyed. */
+function backingFollowKey(){
+  const k=tonic, L=new Set();
+  for(const e of events) if(e.jam && e.sc && e.sc.mode && e.sc.key!==k){ e.sc=scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k); L.add(e.layer); }
+  if(!L.size) return [];
+  for(const ly of L){ const id=laneOf(ly); if(id!=null) laneVerBump(id); }
+  notesView=null; chaseAt=null; frzSigMemo.clear();   // memos hold views; cursors and order untouched (safe while recording)
+  if(loop.on) trackResplice(L);
+  droneViewSync();
+  if(hooks.af) hooks.af('backing');
+  return [...L];
+}
 /* Владелец голоса ДОРОЖКИ — по префиксу ключа (те же, что у chOwnerKey/bassOwnerKey/ldKey и releaseLoopLayersAt). */
 const isTrackOwner=k=> k.slice(0,5)==='loop:' || k.slice(0,9)==='bassloop:' || k.slice(0,9)==='leadloop:';
 const trackOwnerLayer=k=> parseInt(k.slice(k.indexOf(':')+1),10);   // 'loop:3:2' → 3, 'leadloop:12:0' → 12
@@ -4910,13 +4996,16 @@ const trackOwnerLayer=k=> parseInt(k.slice(k.indexOf(':')+1),10);   // 'loop:3:2
    frzLeave, см. frzBufOwns в chasePlay); устаревшую и уже переданную — передаёт как любую.
    ⚠️ Во время записи: recAllOff (выше) уже закрыл открытое в дубле, а события пишущегося взятого chaseFor
    пропускает — дубль этим не задет. */
-function trackResplice(){
+/* only (TF2) — a Set of layers to hand over (the backing after a key change); absent = every track. */
+function trackResplice(only){
   const spb=60/loop.bpm, m=loop.sched, T=loop.t0+m*spb, lo=songAt(m);
   const alive=new Set(); for(const e of events) alive.add(e.layer);
   const at=k=> alive.has(trackOwnerLayer(k)) ? T : undefined;          // живая дорожка — на шве; снятая — сейчас
-  for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:')     chordOff(k, at(k));
-  for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:') bassOff(k, at(k));
-  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:') leadOff(k, undefined, at(k));   // V2: слот tie пуст — время в слоте when
+  const mine=k=> !only || only.has(trackOwnerLayer(k));
+  for(const k of Object.keys(chordHold)) if(k.slice(0,5)==='loop:' && mine(k))     chordOff(k, at(k));
+  for(const k of Object.keys(bassHold))  if(k.slice(0,9)==='bassloop:' && mine(k)) bassOff(k, at(k));
+  for(const k of Object.keys(leadHold))  if(k.slice(0,9)==='leadloop:' && mine(k)) leadOff(k, undefined, at(k));   // V2: слот tie пуст — время в слоте when
+  if(only){ for(const ly of only){ chasePlay(lo, T, false, ly); chasePlay(lo, T, true, ly); } return; }
   chasePlay(lo, T, false);                          // аккорды и бас — по времени шва, до событий следующего отрезка
   chasePlay(lo, T, true);                           // соло — по явному времени шва, как при пуске
 }
@@ -5005,22 +5094,6 @@ function cursSeek(c,x){
    вызове; мемо по слою такой случайности не имеет. А schedInvalidate и так стоит на КАЖДОМ пути,
    меняющем состав событий (правило #28) — второго списка мест не заводим. Запись (push) его не зовёт,
    но она меняет длину на каждом событии. */
-/* ⛳ TF1 SHIM — RECORDINGS STILL FOLLOW THE TONIC (until TF2). After the person moves the key (ui tonic control) every recorded event's view,
-   the clipboard and the open recorded chord take the view of the new key, so a track keeps ONE view object (editor grouping, routing,
-   paste). The sound does not depend on it: scales.viewKey follows the live tonic. Cursors untouched (safe while recording); the note and
-   chase memos hold views, so they are dropped. TF2 deletes this. Probe switch: keyFollowDbg(false) (the CONTROL of «TF1 key in the view»). */
-let KEY_FOLLOW_ON=true;
-const keyFollowDbg=on=>{ KEY_FOLLOW_ON=!!on; };
-function keyFollow(){
-  if(!KEY_FOLLOW_ON) return 0;
-  const k=tonic, re=v=> v && v.mode && v.key!=null && v.key!==k ? scaleView(v.mode, v.tunedFrom, v.chordMode, k) : v;
-  let n=0;
-  for(const e of events){ const v=re(e.sc); if(v!==e.sc){ e.sc=v; n++; } }
-  if(editClip){ editClip.sc=re(editClip.sc); for(const L of editClip.notes) for(const e of L) e.sc=re(e.sc); }
-  if(recCh && recCh.sc) recCh.sc=re(recCh.sc);
-  if(n){ notesView=null; chaseAt=null; }
-  return n;
-}
 let evGen=0;
 function schedInvalidate(){ evGen++; cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); }   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
 /* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
@@ -5864,6 +5937,7 @@ function seedTake(steps){
   const lyOf=new Map(); let n=0;
   try{
     for(const st of steps){
+      if(st.do){ st.do(); continue; }   // TF2: a probe step that changes the environment mid-take (the key)
       const ly = (st.id!=null && lyOf.has(st.id)) ? lyOf.get(st.id) : undefined;
       if(!push(st.fn, st.a, st.t, st.fz||null, false, ly)) continue;
       n++; if(ly===undefined && st.id!=null) lyOf.set(st.id, pushLy);
@@ -5943,7 +6017,8 @@ export {
   editQuantSel,   // ED3: quantise the selection after recording
   editDegreeSel, editDegreeWhy,   // ED4: transpose the selection by degrees of its mode, and why it cannot
   pnBars, editVolSel,   // ED5: the Volume address as one bar per note, and a bar drag (shift whole notes' volume)
-  editBendPoint, bendDbg, editBendShape, bendEdited, editTrackMode, editTrackModeWhy, trackViewOfLayer,   // OWN1: a whole track into another mode by degrees; OWN2: move / add / delete a theremin note's bend point (bendDbg — probe control only); BEND-CURVE: segment shape, the pure edit (drag ghost)
+  editBendPoint, bendDbg, editBendShape, bendEdited, editTrackMode, editTrackModeWhy, trackViewOfLayer,
+  editTranspose, editTransposeWhy, songTranspose, songTransposeWhy, trDbg,   // TF3: transpose a track (editor) or the whole song (window) by semitones; trDbg — probe controls   // OWN1: a whole track into another mode by degrees; OWN2: move / add / delete a theremin note's bend point (bendDbg — probe control only); BEND-CURVE: segment shape, the pure edit (drag ghost)
   /* ED6: sections — markers, insert / cut / duplicate bars in every track, the song history (↶/↷ of the arrangement window) */
   sections, secAdd, secRename, secDelete, songEdit, songEditWhy, songUndo, songRedo, songCanUndo, songCanRedo,
   /* ED6 probe only: the forgetting plan (control), the song history reset, the tracks' edit versions kept and restored, the capture lanes as data */
@@ -5958,7 +6033,7 @@ export {
   seedTake,   // засев тестовой песни через push (scaleprobe P.seed) — не часть игры
   viewAudit, editViewCheck,   // T6a: защитные проверки вида — сводка для пробы P.checkRules и проверка правки (ui зовёт у расшифровки ряда)
   evHz, evHzDbg, evReg, segChordNotes, probeTake, backingEvent,
-  keyFollow, keyFollowDbg,   // TF1: recordings follow the key the person sets (ui tonic control) — until TF2   // T4c-1/T4c-2: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
+  liveAllOff, backingFollowKey, droneViewNow, frzSigTonicDbg,   // TF2: the key knob silences live owners only; the backing follows the key; the drone's view; signature control   // T4c-1/T4c-2: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
   hlOf,   // T4b4: место подсветки переигранной ноты из индекса (прежнее по ступени снято в T4c-2) — для пробы P.checkHl; legacy уходит в T4c
   laneRoleOf, laneLenOf, chaseFor, chaseNote,   // chaseFor/chaseNote — для песенной строки пробы (P.checkSong); legacy* сняты в T4c-2. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять

@@ -43,7 +43,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editBendPoint,   // OWN2
          editTrackMode, editTrackModeWhy, trackViewOfLayer,   // OWN1: the track into another mode by degrees
          histUndo, histRedo, histCanUndo, histCanRedo, histTopLabel, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
-         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, keyFollow } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
+         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, liveAllOff, backingFollowKey, editTranspose, editTransposeWhy, songTranspose, songTransposeWhy } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META, curveK } from './config.js';   // curveK — BEND-CURVE: a middle handle's position → curvature
 import { hooks } from './hooks.js';
@@ -456,7 +456,7 @@ const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
       rollRowsBtn=$('rollRows'), rollPickBtn=$('rollPick'), rollCopyBtn=$('rollCopy'), rollPasteBtn=$('rollPaste'), rollDupBtn=$('rollDup'),
       rollQuantBtn=$('rollQuant'), rollQGridEl=$('rollQGrid'), rollQWhatEl=$('rollQWhat'), rollQAmtEl=$('rollQAmt'),
-      rollDegUpBtn=$('rollDegUp'), rollDegDnBtn=$('rollDegDn'), rollVolBarsBtn=$('rollVolBars');
+      rollDegUpBtn=$('rollDegUp'), rollDegDnBtn=$('rollDegDn'), rollTrUpBtn=$('rollTrUp'), rollTrDnBtn=$('rollTrDn'), rollVolBarsBtn=$('rollVolBars');
 /* ⛳ РОЛЬ РЕДАКТОРА — РОЛЬ ДОРОЖКИ (T4). Вкладок ролей больше нет: с T2 в дорожке ровно одна роль, и
    селектор с одним вариантом был бы шумом. Роль читаем у recorder (laneRoleOf — из событий дорожки) РОВНО
    в двух местах: на открытии редактора и на смене дорожки. Между ними она не перечитывается — дорожку
@@ -744,6 +744,7 @@ if(laneNameIn){
    Esc cancels). The bar buttons act on the bars UNDER THE BRACE, in every track: ＋▯ inserts as many empty bars before it as it is long,
    ✂ cuts them, ⧉ duplicates them right after; §✕ removes the selected marker; ↶/↷ — the song history (recorder.songUndo/songRedo). A
    brace that still follows the whole song is refused with a hint (set it on the bars first). */
+const songTrUpBtn=$('songTrUp'), songTrDnBtn=$('songTrDn');   // TF3
 const secInsBtn=$('secIns'), secCutBtn=$('secCut'), secDupBtn=$('secDup'), secDelBtn=$('secDel'), secRenBtn=$('secRen'), songUndoBtn=$('songUndo'), songRedoBtn=$('songRedo'), secNameIn=$('secNameIn');
 const barNo=b=>Math.round(b/loop.metre)+1;
 function updSecBtns(){
@@ -754,7 +755,14 @@ function updSecBtns(){
   secDelBtn.disabled= secSel==null || !sections().some(m=>m.id===secSel);
   if(secRenBtn) secRenBtn.disabled=secDelBtn.disabled;   // ED6-fix: the second way to rename — the selected marker
   songUndoBtn.disabled=!histCanUndo(); songRedoBtn.disabled=!histCanRedo();
+  if(songTrUpBtn) songTrUpBtn.disabled=songTrDnBtn.disabled=off;   // TF3
 }
+/* TF3: the whole song a semitone up or down (every track with pitch, the backing too; one ↶); a refusal says why. */
+function songTr(n){
+  const why=songTransposeWhy(n);
+  if(why || !songTranspose(n)){ showCamMsg(t('arr.trNo.'+(why==='rec'||why==='range' ? why : 'none'))); updSecBtns(); return; }
+  showCamMsg(t(n>0?'arr.trDoneUp':'arr.trDoneDn')); updSecBtns(); }
+if(songTrUpBtn){ songTrUpBtn.onclick=()=>songTr(1); songTrDnBtn.onclick=()=>songTr(-1); }
 function secOp(kind){
   const R=loop.rgn, M=loop.metre;
   if(!R.user){ showCamMsg(t('sec.needBrace')); return; }
@@ -874,6 +882,7 @@ function updRollBtns(){
   rollDelBtn.disabled  = ro || !(rollSel||rollSelMany.size||rollAutSel||rollBendSel!=null);
   if(rollCopyBtn){ const any=!!(rollSel||rollSelMany.size); rollCopyBtn.disabled=!any; rollDupBtn.disabled=ro||!any; rollPasteBtn.disabled=ro||!editClipInfo(); }
   if(rollQuantBtn) rollQuantBtn.disabled=ro||!(rollSel||rollSelMany.size);   // ED3
+  if(rollTrUpBtn) rollTrUpBtn.disabled=rollTrDnBtn.disabled=ro||rollRole==='dr'||editLayer()==null;   // TF3
   if(rollDegUpBtn) rollDegUpBtn.disabled=rollDegDnBtn.disabled=ro||rollRole==='dr'||!(rollSel||rollSelMany.size);   // ED4   // ED2: copying is reading — allowed on a backing too   // ED1: or several notes   // O-4: 🗑 удаляет ВЫБРАННОЕ — ноту или точку автоматизации; у человека одна кнопка «удалить»
   /* ⛳ И КОРЗИНА ГОВОРИТ, ЧТО ИМЕННО УБЕРЁТ. Одна кнопка на два поля — честно (у человека одно «удалить»),
      но молча она читается как «удалить удар», и точку автоматизации убрать ОТСЮДА никто не догадается.
@@ -1075,7 +1084,7 @@ rollDelBtn.onclick=rollDeleteSel;
    histDo runs the one history and names what it undid in a toast; afterHist refreshes whichever screen is open (an undo can remove the
    track open in the editor — then the editor closes back to the window). 'changed' — the tripwire fired (the song was changed outside the
    history): the history is gone and the toast says so. */
-const HIST_KEY={ mode:'mode', bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
+const HIST_KEY={ transpose:'transpose', mode:'mode', bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
 const histKeyOf=l=> l && l.startsWith('sec:') ? 'section' : HIST_KEY[l] || 'edit';
 const histUndoBtn=$('histUndo'), histRedoBtn=$('histRedo');
 function updHistBtns(){ if(histUndoBtn){ histUndoBtn.disabled=!histCanUndo(); histRedoBtn.disabled=!histCanRedo(); }
@@ -1170,6 +1179,12 @@ function rollDegree(n){ if(rollRefuseRO()) return;
   if(!editDegreeSel(L,n)){ const w=editDegreeWhy(L,n); showCamMsg(t(w==='reg' ? 'roll.degReg' : w==='fit' ? 'roll.degFit' : 'roll.degNone')); }
   updRollBtns(); }
 if(rollDegUpBtn){ rollDegUpBtn.onclick=()=>rollDegree(1); rollDegDnBtn.onclick=()=>rollDegree(-1); }
+/* TF3: the whole open track a semitone up or down (its key moves; one ↶); a refusal says why (recorder.editTransposeWhy). */
+function rollTranspose(n){
+  const why=editTransposeWhy(n);
+  if(why || !editTranspose(n)){ showCamMsg(t('roll.trNo.'+(why||'none'))); return; }
+  showCamMsg(t(n>0?'roll.trDoneUp':'roll.trDoneDn')); renderAutCtl(); updRollBtns(); }
+if(rollTrUpBtn){ rollTrUpBtn.onclick=()=>rollTranspose(1); rollTrDnBtn.onclick=()=>rollTranspose(-1); }
 /* ED1: Ctrl/⌘+A selects every note of the track, Esc clears the selection (never while typing). ED2: Ctrl/⌘+C / V / D. */
 addEventListener('keydown', e=>{
   if(!rollOpen || e.repeat) return;
@@ -1755,7 +1770,7 @@ selScale.onchange=e=>{
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
   if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); keyFollow(); softAllOff(); droneRetune(); updScaleBtn(); };   // TF1: recordings follow the key (their views re-keyed) until TF2   // 3/3: смена тоники
+selTonic.onchange=e=>{ setTonic(+e.target.value); liveAllOff(); backingFollowKey(); droneRetune(); updScaleBtn(); };   // TF2: the key knob moves only the hands (and the backing, Q3); recordings keep their key, tracks keep playing
 /* P3 «СТРОЙ ОТ»: ТОТ ЖЕ ШОВ, ЧТО У ТОНИКИ — живые ноты гаснут и переатакуют (рука соло/баса — на следующем кадре), защёлка
    замолкает, играющие дорожки пересращиваются (softAllOff при идущем транспорте → trackResplice) и звучат со СВОИМ якорем:
    их sc — вид лада (строй, лад, якорь; T2), записанный в момент игры. Записанное этот выбор не перестраивает (правило #7). */

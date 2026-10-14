@@ -78,8 +78,8 @@ import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollG
 import { INSTR_COL, LANE_NOROLE_COL, bendPlan, bendAt, curveU, BEND_GLIDE_STEP_S, BEND_GLIDE_TC } from './config.js';   // BEND-CURVE: the one ramp law (P.checkBendCurve)   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi, undoUiDbg } from './ui.js';
 import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, afBegin, afEnd, afTick, afHint, afPause, afIdle, afBusy, afActive, AF_DELAY } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
-import { chordHold, chainStateOf, routeOfOwner, fxPlaySet, fxParamKeysOf, setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
-import { events, evHz, evHzDbg, keyFollow, keyFollowDbg, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
+import { droneUse, droneHz, chordHold, chainStateOf, routeOfOwner, fxPlaySet, fxParamKeysOf, setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
+import { events, evHz, evHzDbg, frzSigTonicDbg, editTranspose, editTransposeWhy, songTranspose, songTransposeWhy, trDbg, histTopLabel, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
          seedTake, clearRec, editOpen, editClose, editSetLayer, editIsOpen, editDeleteChordNote, editMoveChordNote, editMoveSeg, chordMoveTy, editInsertBass, editInsertChord, loadJam, braceTap, setRegionOn,
          onLoop, loop, songBeats, setLoopMetre,
          songNotes, editResizeSeg, editDeleteSeg, editInsertLead, editUndo, editRedo, freezeState, recording,
@@ -88,7 +88,7 @@ import { events, evHz, evHzDbg, keyFollow, keyFollowDbg, evReg, segChordNotes, p
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
          laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
          unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer, setLiveIsolation, fxPlayDriving, autPoints, autMovePoint, autAddPoint, autDeletePoint, regionOn, seekTo, setLiveLeakDbg, WchOn, WchOff, toggleArm, editMoveSel, editDeleteSel, editCanUndo, editCopySel, editPaste, editDuplicateSel, editSetTimbre, editHistPeek, editRevert, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, autAddrs, sections, secAdd, songEdit, songEditWhy, songUndo, songRedo, songCanUndo, secDbg, songHistReset, laneVerKeep, takeFxDump, secDelete, histReset, histLen, histUndo, histRedo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg, onUndo, clearJam, secRename, editBendPoint, bendDbg, braceSet, braceProbe, editBendShape, autCurvePoint, fxLaneMerge, fxLaneExpand, editTrackMode, editTrackModeWhy, trackViewOfLayer } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
-import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX, checkDegrees as checkDegreesData, checkModeMap } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
+import { keyless, isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX, checkDegrees as checkDegreesData, checkModeMap } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour, checkDegrees as checkDegreesData, checkModeMap } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
@@ -461,7 +461,8 @@ const ALL_RUNS=[
   ['F6 user files: deletion keeps recordings',()=>checkUserDelete(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['F3 naming as data', ()=>checkNames(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['TF0 song sound fingerprint',()=>checkSongPrint(), r=>({ cases:r.cases, song:r.status?null:r.song, diff:r.total, list:r.differences, status:r.status })],
-  ['TF1 key in the view',()=>checkKeyView(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['TF2 recordings keep their key',()=>checkKeyKeep(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['TF3 transpose by semitones',()=>checkTranspose(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
 ];
@@ -2631,7 +2632,7 @@ export async function checkArrange(){
       if(cand.length<2) miss('freeze dot: fewer than two unfrozen tracks visible in the window — run await P.seed({replace:true})');
       else { let T=0, open=null; const gateP=new Promise(r=>{ open=r; }), mine=[];
         const fake=async()=>{ await gateP; return { buf:LIVE_AC.createBuffer(2,128,LIVE_AC.sampleRate), startSec:0.5, endSec:0.5, tailSec:0, pinned:{ tonic, aRef, bpm:loop.bpm }, ms:{ layoutMs:1 } }; };
-        const keepT=tonic;
+        const keepT=tonic, keepA0=aRef;
         if(!afBegin({ now:()=>T, gates:{ recording:()=>false, clip:()=>false, pinch:()=>false }, ctx:()=>({ p:0, end:songBeats(), rgn:null }),
                       opt:{ renderFn:fake }, layers:cand.slice(0,2) })) miss('freeze dot: auto-freeze is busy — run again');
         else try{
@@ -2649,12 +2650,12 @@ export async function checkArrange(){
             cases++; await frame(); await frame();
             const V2=loopViewProbe();
             for(const ly of [R0,W0]){ const d=V2.dots.get(ly); if(freezeState(ly)!=='fresh') miss(`freeze dot: L${ly+1} is ${freezeState(ly)} after its render`); else if(d&&d.st) miss(`freeze dot: the frozen row L${ly+1} still shows a ${d.st} dot`); }
-            cases++; setTonic((keepT+2)%12); T+=50; afTick(); T+=AF_DELAY.retune+100; afTick(); await frame(); await frame();
+            cases++; const keepA=aRef; setARef(keepA+2); T+=50; afTick(); T+=AF_DELAY.retune+100; afTick(); await frame(); await frame();   // TF2: the tonic no longer stales; A4 still does (live by choice until TF4)
             const V3=loopViewProbe(), d3=V3.dots.get(R0);
-            if(freezeState(R0)!=='stale') miss(`freeze dot: after a tonic change L${R0+1} should be stale (live by choice), it is ${freezeState(R0)}`);
-            if(d3&&d3.st) miss(`freeze dot: L${R0+1}, stale only by the tonic (live by choice), shows a ${d3.st} dot`);
-            setTonic(keepT); }
-        } finally { open(); try{ await qRunning(); }catch(e){} afEnd(); if(tonic!==keepT) setTonic(keepT); for(const ly of mine) if(ly!=null&&freezeState(ly)!=='none') unfreezeLayer(ly); }
+            if(freezeState(R0)!=='stale') miss(`freeze dot: after an A4 change L${R0+1} should be stale (live by choice), it is ${freezeState(R0)}`);
+            if(d3&&d3.st) miss(`freeze dot: L${R0+1}, stale only by A4 (live by choice), shows a ${d3.st} dot`);
+            setARef(keepA); }
+        } finally { open(); try{ await qRunning(); }catch(e){} afEnd(); if(tonic!==keepT) setTonic(keepT); if(aRef!==keepA0) setARef(keepA0); for(const ly of mine) if(ly!=null&&freezeState(ly)!=='none') unfreezeLayer(ly); }
       } }
     // ---- открыть каждую дорожку из окна; окно времени — общее в обе стороны ----
     const W1={ b0:4, span:12 };
@@ -2680,12 +2681,12 @@ export async function checkArrange(){
     // ---- AF4: the play strip draws no freeze dot and no ❄ / stale mark ----
     { cases++; arrApi.close(); const fz=L.find(ly=>freezeState(ly)==='fresh'), keepT=tonic;
       if(fz==null) miss('strip: no frozen track to look at (the seed freezes one)');
-      else { setTonic((keepT+2)%12); await frame(); await frame();
+      else { const keepA=aRef; setARef(keepA+2); await frame(); await frame();   // TF2: a stale track by A4 (the tonic no longer stales)
         const V=loopViewProbe();
         if(!V||V.full) miss('strip: the play strip is not drawn after closing the window');
         else { if(V.dots) miss('strip: the play strip carries freeze dots');
           if(armedLayer()==null && V.markW) miss(`strip: nothing is armed, yet the mark column is open (${V.markW} px) — a freeze or stale mark is drawn`); }
-        setTonic(keepT); } }
+        setARef(keepA); } }
   } finally {
     if(rollOpen) arrApi.closeTrack();
     if(arrOpen) arrApi.close();
@@ -3063,18 +3064,21 @@ export async function checkAutoFreeze(){
       hook.dbg.level=false; setLaneLevel(A, keep.lvl);
       if(!calls.length) miss('CONTROL (a watcher that reacts to level): no render — the level case cannot fail');
       notes.push(`level: 0 renders; control reacting to level: ${calls.length}`); await run(500); }
-    /* (4) tonic, A4, tempo: no render while the switch is off (the track plays live); restored → fresh again */
-    for(const [name, set, back] of [['tonic', ()=>setTonic((keep.tonic+2)%12), ()=>setTonic(keep.tonic)],
-                                    ['A4', ()=>setARef(keep.aRef===440?442:440), ()=>setARef(keep.aRef)],
+    /* (4) TF2: the tonic leaves the frozen track fresh (no render); A4, tempo: no render while the switch is off (the track plays live),
+       restored → fresh again */
+    { cases++; calls.length=0; setTonic((keep.tonic+2)%12); await run(3000); const st=freezeState(A); setTonic(keep.tonic); await run(1000);
+      if(calls.length) miss(`tonic: a key change re-rendered ${Lb(A)} — recordings keep their key (TF2)`);
+      if(st!=='fresh') miss(`tonic: after a key change ${Lb(A)} should stay fresh (TF2), it is ${st}`); }
+    for(const [name, set, back] of [['A4', ()=>setARef(keep.aRef===440?442:440), ()=>setARef(keep.aRef)],
                                     ['tempo', ()=>setLoopBpm(keep.bpm+12), ()=>setLoopBpm(keep.bpm)]]){ cases++;
       calls.length=0; set(); await run(3000);
       const st=freezeState(A); back(); await run(1000);
       if(calls.length) miss(`${name}: a change re-rendered ${Lb(A)} although AF_REFREEZE_ON_RETUNE is off`);
       if(st!=='stale') miss(`${name}: after the change ${Lb(A)} should be stale (playing its events), it is ${st}`);
       if(freezeState(A)!=='fresh') miss(`${name}: restored, ${Lb(A)} should be fresh again, it is ${freezeState(A)}`); }
-    { cases++; hook.dbg.retune=true; calls.length=0; const t0=T; setTonic((keep.tonic+2)%12); await run(AF_DELAY.retune+3*STEP);
-      hook.dbg.retune=false; setTonic(keep.tonic); await run(500);
-      if(!calls.length) miss('CONTROL (re-freeze on tonic/A4/tempo switched on): a tonic change gave no render — the case cannot fail');
+    { cases++; hook.dbg.retune=true; calls.length=0; const t0=T; setARef(keep.aRef===440?442:440); await run(AF_DELAY.retune+3*STEP);
+      hook.dbg.retune=false; setARef(keep.aRef); await run(500);
+      if(!calls.length) miss('CONTROL (re-freeze on A4/tempo switched on): an A4 change gave no render — the case cannot fail');
       else if(calls[0].T-t0<AF_DELAY.retune) miss(`CONTROL (retune): rendered ${calls[0].T-t0} ms after the change, before its ${AF_DELAY.retune}-ms delay`);
       notes.push(`tonic/A4/tempo: 0 renders; control with the switch on: ${calls.length} render at +${calls.length?calls[0].T-t0:'—'} ms`); }
     /* (5) memory budget: over it → skipped, not retried; control: the default budget renders it */
@@ -3587,7 +3591,7 @@ export function checkLabels(){
   const bad=[]; let cases=0, hidden=0; const hiddenIds=new Set(); const keepT=tonic;
   try{
     for(const [s0,tf] of allViews()){
-      const v=scaleView(s0,tf), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, shown= k==='tertian'||k==='stack';
+      const v=keyless(scaleView(s0,tf)), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, shown= k==='tertian'||k==='stack';   // TF2: key-less — the loop steps the live tonic
       const vRef= k==='stack' ? {...v, tag:'dia'} : v;   // «стопка»: ноты стопки сверяются с прежней арифметикой стопки
       const id=v.id+(v.tunable?`[from ${tf}]`:'');
       for(let tn=0;tn<12;tn++){ setTonic(tn);
@@ -3836,7 +3840,7 @@ export function checkModes(){
     // 1) «Свободно» против прежнего кода
     for(const id of ['partch-43','bohlen-pierce']){
       const s0=SCALES.find(x=>x.id===id); if(!s0){ miss(`no mode ${id}`); continue; }
-      const v=scaleView(s0,'T','free'), key=v.typedChords, PRE=PRE_T7_SETS[key];
+      const v=keyless(scaleView(s0,'T','free')), key=v.typedChords, PRE=PRE_T7_SETS[key];   // TF2: key-less — the loop steps the live tonic
       cases++; if(json(chordFams(v))!==json(PRE)) miss(`${id} Free: the chord set differs from the pre-T7 set '${key}'`);
       cases++; if(json(chordUnit(v))!==json(preT7ChordUnit(v))) miss(`${id} Free: chordUnit ${json(chordUnit(v))}, pre-T7 ${json(preT7ChordUnit(v))}`);
       const T=TUNINGS[v.tuning], E=T.equal!=null?T.equal:T.cents.length, n=v.iv.length, types=PRE.flatMap(f=>f.types.map(x=>x.iv));
@@ -3867,7 +3871,7 @@ export function checkModes(){
       cases+=2; if(nOn(0)!==24) miss(`partch As on the instrument: ${nOn(0)} types on 1/1, 24 expected`); if(nOn(8)!==8) miss(`partch As on the instrument: ${nOn(8)} types on 9/8, 8 expected`); }
     // 3) пауэр-аккорд у ладов стопки
     for(const s0 of SCALES){ if(!s0.chordModes || !s0.chordModes.some(x=>x.id==='power')) continue;
-      const vp=scaleView(s0,'T','power'), vs=scaleView(s0,'T','stack'), n=vp.iv.length;
+      const vp=keyless(scaleView(s0,'T','power')), vs=scaleView(s0,'T','stack'), n=vp.iv.length;
       cases+=2; if(vp.chordRule.kind!=='power') miss(`${s0.id} power: rule ${vp.chordRule.kind}`); if(vs.chordRule!==s0.chordRule) miss(`${s0.id} stack: the view carries another rule`);
       for(let tn=0;tn<12;tn++){ setTonic(tn);
         for(const sev of [false,true]) for(let o=0;o<4;o++) for(let d=0; d<=n; d++){
@@ -4139,7 +4143,8 @@ export async function checkFiles(){
    Every pitched event's frequencies through the engine's own pricing (recorder.evHz — what ENG plays and renders with), the drone's two
    strings, and per track view the editor's row labels, cents, chord labels, roots and chord-row frequencies. Deterministic data, no
    render, no capture (renders repeat to 1e-4 of peak, not bit for bit — this is exact). Taken at the seed's live environment and again
-   after the REAL tonic control moved the key +2 (today recordings follow the tonic; TF2 changes that half on purpose).
+   after the REAL tonic control moved the key +2. Since TF2 recordings keep their key: every recorded line after +2 equals the base line;
+   only the live drone line moves (no drone event: the live view).
    Reference: tools/song.print.json, made on unchanged code (P.dumpSongPrint()); later slices must equal it line for line.
    CONTROL (must fail): one track priced one cent sharp (recorder.evHzDbg) — through the engine's real pricing path. */
 const PRINT_FILE='tools/song.print.json';
@@ -4149,7 +4154,7 @@ function songSoundLines(){
   const out=[], S=x=>String(x), role=fn=>/^lead(On|Set)$/.test(fn)?'ld':/^bass(On|Set)$/.test(fn)?'bs':/^ch(On|Set)$/.test(fn)?'ch':null;
   for(const e of events){ const r=role(e.fn);
     if(r){ const f=evHz(e.a,e,r); out.push(`${e.t}|L${e.layer+1}|${e.fn}|${Array.isArray(f)?f.map(S).join(','):S(f)}`); }
-    else if(e.fn==='drone') out.push(`${e.t}|L${e.layer+1}|drone|${S(tonicFreq()/2)},${S(droneSecondHz())}`); }   // the drone engine reads the live view
+    else if(e.fn==='drone') out.push(`${e.t}|L${e.layer+1}|drone|${S(tonicFreq(e.sc)/2)},${S(droneSecondHz(e.sc))}`); }   // TF2: the drone sounds its event's view
   const views=[]; for(const e of events) if(e.sc && e.fn!=='drum' && e.fn!=='drone' && !views.includes(e.sc)) views.push(e.sc);
   out.push(`live drone|${S(tonicFreq()/2)},${S(droneSecondHz())}`);   // the seed has no drone backing: the live drone's two strings
   RP.reset();
@@ -4172,7 +4177,7 @@ function tonicByControl(k){ const el=document.getElementById('selTonic'); if(!el
 function songPrintTake(E){
   const keep=liveEnv();
   try{ liveEnvSet(E); const at=songSoundLines(); tonicByControl((E.tonic+2)%12); const up2=songSoundLines(); tonicByControl(E.tonic); return { at, up2 }; }
-  finally{ const t0=tonic; liveEnvSet(keep); if(tonic!==t0) keyFollow(); }   // TF1: recorded views back at the person's key
+  finally{ liveEnvSet(keep); }
 }
 export function dumpSongPrint(){
   if(!SEED_REC || SEED_REC.kind!=='seed' || SEED_REC.print!==songPrint()){ console.warn('[scaleprobe print] run await P.seed({replace:true}) first (the fingerprint is of the unchanged seed song)'); return null; }
@@ -4200,56 +4205,197 @@ export async function checkSongPrint(){
   return { cases, song:events.length, total:nBad, differences:bad };
 }
 
-/* ═══ TF1 — THE KEY IN THE VIEW, INVISIBLY (tonic freeze, stage 2) ═══
-   (1) every recorded view carries the live key, one view object per track; (2) the REAL tonic control re-keys every recorded view and,
-   moved back, gives the very same objects — CONTROL: with the shim off (recorder.keyFollowDbg) the keys must go stale; (3) the TF2 reading
-   ahead of time (scales.keyFollowsDbg(false), live tonic moved away without re-keying): every pitched event, the drone of each view and every
-   view's rows, labels, cents and chord rows equal what they are at the view's own key — CONTROL: the TF1 reading at that tonic must differ;
-   (4) old views without a key fall back to the live key in both readings; (5) a view of a view keeps its key; twelve keys = twelve
-   objects, one viewIdOf, twelve viewKeyIdOf. Restores the tonic, the switches and the views in finally. */
-export function checkKeyView(){
+/* ═══ TF2 — RECORDINGS KEEP THEIR KEY (tonic freeze, stage 2) ═══
+   The REAL key control (#selTonic) moved +5, then back:
+   (1) every event keeps its view object, every pitched event sounds the same (evHz), every track view's rows, labels, cents, chord rows and
+       its drone strings read the same — CONTROL: the old reading (scales.keyFollowsDbg(true): every view reads the knob) must move them;
+   (2) live pricing follows the knob: CUR() carries the new key and its tonic moved by exactly that interval;
+   (3) frozen tracks stay fresh — CONTROL: the old signature (recorder.frzSigTonicDbg(true)) must stale them;
+   (4) the drone engine sounds the view it is given (audio.droneUse): a recorded view's drone stays when the knob moves — CONTROL: no view
+       (the live view) must move;
+   (5) a backing follows the knob (Q3): a track marked as backing for a moment takes the new key in the same mode, the others keep theirs,
+       and back at the old key it holds its old view objects — CONTROL: the key set without the handler leaves the backing behind;
+   (6) a key change while recording starts a new track (Q2): in a sandboxed take a note after the key moved lands in another track than
+       the note before it, each with its own key — CONTROL: the same take without the key change keeps one track;
+   (7) old views without a key read the live key; a view of a view keeps its key; twelve keys = twelve views, one viewIdOf.
+   Restores the tonic, the switches, the marks and the tracks' edit versions in finally. */
+export function checkKeyKeep(){
   const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const S=x=>String(x), role=fn=>/^lead(On|Set)$/.test(fn)?'ld':/^bass(On|Set)$/.test(fn)?'bs':/^ch(On|Set)$/.test(fn)?'ch':null;
   const hz=(e,ctx)=>{ const f=evHz(e.a,ctx||e,role(e.fn)); return Array.isArray(f)?f.map(S).join(','):S(f); };
-  const keepT=tonic, before=events.map(e=>e.sc), at=e=>`L${e.layer+1} beat ${e.t} ${e.fn}`;
-  const oneView=when=>{ const M=new Map(); for(const e of events) if(e.sc && e.fn!=='drum' && e.fn!=='drone'){ const L=M.get(e.layer)||new Set(); L.add(e.sc); M.set(e.layer,L); }
-    for(const [ly,L] of M){ cases++; if(L.size>1) miss(`${when}: L${ly+1} holds ${L.size} view objects (${[...L].map(viewKeyIdOf).join(' + ')})`); } };
-  const keysLive=when=>{ for(const e of events) if(e.sc){ cases++; song++; if(e.sc.key!==tonic) miss(`${when}: ${at(e)} carries key ${e.sc.key}, the live key is ${tonic}`); } };
-  const views=[]; for(const e of events) if(e.sc && e.fn!=='drum' && e.fn!=='drone' && !views.includes(e.sc)) views.push(e.sc);
+  const keepT=tonic, before=events.map(e=>e.sc), at=e=>`L${e.layer+1} beat ${e.t} ${e.fn}`, up=(keepT+5)%12;
+  const rec=e=>e.sc && !e.jam;   // recorded material (a backing follows the knob — check 5)
+  const views=[]; for(const e of events) if(rec(e) && e.fn!=='drum' && e.fn!=='drone' && !views.includes(e.sc)) views.push(e.sc);
+  const P=events.filter(e=>rec(e) && role(e.fn));
+  const lbl=()=>{ RP.reset(); const o=withLang('en',()=>views.flatMap(v=>[...viewPrint(v), `drone ${viewKeyIdOf(v)}|${S(tonicFreq(v)/2)},${S(droneSecondHz(v))}`])); RP.reset(); return o; };
+  let marked=[], scBack=null, verBack=null;
   try{
-    keysLive('as seeded'); oneView('as seeded');
-    tonicByControl((keepT+5)%12); keysLive('after the key control moved +5'); oneView('after the key control moved +5');
-    keyFollowDbg(false); tonicByControl((keepT+7)%12); keyFollowDbg(true);
-    cases++; const stale=events.filter(e=>e.sc && e.sc.key!==tonic).length;
-    if(!stale) miss('CONTROL: with the re-key shim off the recorded views still carry the live key — checks (1)/(2) cannot fail');
+    const ref=P.map(e=>hz(e)), refL=lbl(), live0=tonicFreq();
+    const fresh0=[...new Set(events.map(e=>e.layer))].filter(ly=>freezeState(ly)==='fresh');
+    tonicByControl(up);
+    /* (1) recordings stay */
+    events.forEach((e,i)=>{ if(e.jam) return; cases++; song++; if(e.sc!==before[i]) miss(`${at(e)}: the key control gave it another view (${viewKeyIdOf(e.sc)}, was ${viewKeyIdOf(before[i])})`); });
+    P.forEach((e,i)=>{ cases++; const g=hz(e); if(g!==ref[i]) miss(`${at(e)} sounds ${g} after the key moved, ${ref[i]} before`); });
+    lbl().forEach((x,i)=>{ cases++; if(x!==refL[i]) miss(`after the key moved: «${x.slice(0,120)}», before «${(refL[i]||'').slice(0,120)}»`); });
+    keyFollowsDbg(true);
+    try{ cases++; const d=P.filter((e,i)=>hz(e)!==ref[i]).length, dl=lbl().filter((x,i)=>x!==refL[i]).length;
+      if(!P.length || !d || !dl) miss(`CONTROL: the old reading (views follow the knob) moves ${d} event(s) and ${dl} line(s) — check (1) cannot fail`); }
+    finally{ keyFollowsDbg(false); }
+    /* (2) the hands follow */
+    cases++; { const c=CUR(), r=tonicFreq()/live0, want=Math.pow(2,(up-keepT)/12);
+      if(c.key!==up || Math.abs(r/want-1)>1e-12) miss(`live view: key ${c.key} (want ${up}), its tonic moved ×${r} (want ×${want})`); }
+    /* (3) frozen tracks stay fresh */
+    cases++; if(!fresh0.length) miss('no frozen fresh track in the song — check (3) proves nothing (run after P.seed)');
+    for(const ly of fresh0){ cases++; if(freezeState(ly)!=='fresh') miss(`L${ly+1}: a frozen track went ${freezeState(ly)} when the key moved`); }
+    frzSigTonicDbg(true);
+    try{ cases++; const st=fresh0.filter(ly=>freezeState(ly)==='stale').length;
+      if(fresh0.length && !st) miss('CONTROL: the old signature (tonic in it) leaves every frozen track fresh after a key change — check (3) cannot fail'); }
+    finally{ frzSigTonicDbg(false); }
+    /* (4) the drone engine */
+    if(views.length){ const v=views[0], want=[tonicFreq(v)/2, droneSecondHz(v)].map(S).join(',');
+      try{ droneUse(v); cases++; const g=droneHz().map(S).join(','); if(g!==want) miss(`drone with view ${viewKeyIdOf(v)}: ${g} at live key ${up}, ${want} at the view's key`);
+        droneUse(null); cases++; if(droneHz().map(S).join(',')===want) miss('CONTROL: the drone without a view (the live view) sounds the recorded view at another key — check (4) cannot fail'); }
+      finally{ droneUse(null); } }
     tonicByControl(keepT);
-    events.forEach((e,i)=>{ cases++; if(e.sc!==before[i]) miss(`key back at ${keepT}: ${at(e)} holds another view object than before`); });
-    /* (3) the TF2 reading, and (4) old views without a key */
-    const P=events.filter(e=>e.sc && role(e.fn)), ref=P.map(e=>hz(e));
-    const bare=v=>{ const c={...v}; delete c.key; return c; }, refBare=P.map(e=>hz(e,{...e, sc:bare(e.sc)}));
-    const lbl=()=>{ RP.reset(); const o=withLang('en',()=>views.flatMap(v=>[...viewPrint(v), `drone ${viewIdOf(v)}|${S(tonicFreq(v)/2)},${S(droneSecondHz(v))}`])); RP.reset(); return o; };
-    const refL=lbl(), away=(keepT+3)%12;
-    setTonic(away);   // directly: no re-key — the views keep the key they were made in
-    { cases++; const d=P.filter((e,i)=>hz(e)!==ref[i]).length, dl=lbl().filter((x,i)=>x!==refL[i]).length;
-      if(!d || !dl) miss(`CONTROL: the TF1 reading at another live key prices ${d} event(s) and names ${dl} line(s) differently — the TF2 check cannot fail`); }
-    const awayBare=P.map(e=>hz(e,{...e, sc:bare(e.sc)}));
-    keyFollowsDbg(false);
-    try{
-      P.forEach((e,i)=>{ cases++; const g=hz(e); if(g!==ref[i]) miss(`TF2 reading: ${at(e)} sounds ${g} at live key ${away}, ${ref[i]} at its own key ${e.sc.key}`); });
-      lbl().forEach((x,i)=>{ cases++; if(x!==refL[i]) miss(`TF2 reading: «${x.slice(0,120)}» at live key ${away}, «${(refL[i]||'').slice(0,120)}» at the view's key`); });
-      P.forEach((e,i)=>{ cases++; const g=hz(e,{...e, sc:bare(e.sc)}); if(g!==awayBare[i]) miss(`old view (no key), TF2 reading: ${at(e)} sounds ${g}, the live key gives ${awayBare[i]}`); });
-    } finally { keyFollowsDbg(true); setTonic(keepT); }
-    P.forEach((e,i)=>{ cases++; const g=hz(e,{...e, sc:bare(e.sc)}); if(g!==refBare[i] || refBare[i]!==ref[i]) miss(`old view (no key): ${at(e)} sounds ${g}, with its key ${ref[i]}`); });
-    /* (5) identity: a view of a view keeps its key; one mode, twelve keys */
-    for(const v of views){ cases++;
-      setTonic((keepT+4)%12); const again=scaleView(v, v.tunedFrom!==undefined ? v.tunedFrom : tunedFrom, v.chordMode); setTonic(keepT);
-      if(again!==v) miss(`${viewKeyIdOf(v)}: a view of the view at another live key is another object`);
-      const K=range(12).map(k=>scaleView(v.mode, v.tunedFrom, v.chordMode, k));
+    /* (5) the backing follows the knob: the song's backing, or (none) one pitched track marked as backing for a moment; the real control */
+    { const jam0=events.filter(e=>e.jam && e.sc), ly= jam0.length ? null : (P[0]||{}).layer;
+      if(jam0.length || ly!=null){ const mine= jam0.length ? jam0 : events.filter(e=>e.layer===ly && e.sc), M=new Set(mine), others=events.filter(e=>!M.has(e) && e.sc), oSc=others.map(e=>e.sc);
+        verBack=laneVerKeep(); scBack=mine.map(e=>[e,e.sc]);
+        if(!jam0.length) for(const e of mine){ e.jam=true; marked.push(e); }
+        setTonic(up); cases++;   // CONTROL: the key without the handler (no backingFollowKey) must leave the backing behind
+        if(!mine.some(e=>e.sc.key!==up)) miss('CONTROL: without the handler the backing is already at the new key — check (5) cannot fail');
+        setTonic(keepT);
+        tonicByControl(up);
+        scBack.forEach(([e,v])=>{ cases++; if(!e.sc || e.sc.key!==up || e.sc.mode!==v.mode) miss(`backing ${at(e)}: key ${e.sc&&e.sc.key}, want ${up} in the same mode`); });
+        others.forEach((e,i)=>{ cases++; if(e.sc!==oSc[i]) miss(`recorded ${at(e)} changed its view when the backing followed the knob`); });
+        tonicByControl(keepT);
+        scBack.forEach(([e,v])=>{ cases++; if(e.sc!==v) miss(`backing ${at(e)}: back at key ${keepT} it holds another view object`); }); } }
+    /* (6) a key change while recording starts a new track (Q2) */
+    { const take=k=>{ const steps=[{fn:'leadOn',a:{deg:0,oct:1,vol:0.7,inst:3,v:0},t:0},{fn:'leadOff',a:{v:0},t:0.5}];
+        if(k) steps.push({do:()=>setTonic(up)});
+        steps.push({fn:'leadOn',a:{deg:2,oct:1,vol:0.7,inst:3,v:0},t:1},{fn:'leadOff',a:{v:0},t:1.5});
+        try{ return probeTake(steps); } finally { setTonic(keepT); } };
+      const A=take(true), B=take(false), on=R=>R.events.filter(e=>e.fn==='leadOn'), lys=R=>new Set(on(R).map(e=>e.layer)).size;
+      cases++;
+      if(!A.ok || !B.ok) miss(`the sandboxed take was refused — ${A.why||B.why}`);
+      else { if(lys(A)!==2) miss(`a key change mid-take: the notes before and after it landed in ${lys(A)} track(s), want 2`);
+        cases++; const k=on(A).map(e=>e.sc.key).join(','); if(k!==keepT+','+up) miss(`a key change mid-take: the two notes carry keys ${k}, want ${keepT},${up}`);
+        cases++; if(lys(B)!==1) miss(`CONTROL: the same take without a key change used ${lys(B)} track(s) — check (6) cannot fail`); } }
+    /* (7) key-less views, a view of a view, twelve keys */
+    const bare=v=>{ const c={...v}; delete c.key; return c; };
+    setTonic(up);
+    try{ P.forEach(e=>{ cases++; const g=hz(e,{...e, sc:bare(e.sc)}), w=hz(e,{...e, sc:scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, up)});
+        if(g!==w) miss(`old view (no key): ${at(e)} sounds ${g}, the live key ${up} gives ${w}`); });
+      for(const v of views){ cases++; if(scaleView(v, v.tunedFrom!==undefined ? v.tunedFrom : tunedFrom, v.chordMode)!==v) miss(`${viewKeyIdOf(v)}: a view of the view at another live key is another object`); } }
+    finally{ setTonic(keepT); }
+    for(const v of views){ const K=range(12).map(k=>scaleView(v.mode, v.tunedFrom, v.chordMode, k));
       cases++; if(new Set(K).size!==12 || new Set(K.map(viewKeyIdOf)).size!==12 || new Set(K.map(viewIdOf)).size!==1 || K.some((x,k)=>x.key!==k) || K[v.key]!==v)
         miss(`${viewIdOf(v)}: twelve keys do not give twelve views with their own keys, one viewIdOf and twelve viewKeyIdOf`); }
-  } finally { keyFollowDbg(true); keyFollowsDbg(true); if(tonic!==keepT) tonicByControl(keepT); RP.reset(); }
-  console.log(`[scaleprobe TF1] ${cases} cases · ${events.length} events · ${views.length} views · differences ${nBad}`);
-  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe TF1] '+m));
+  } finally {
+    keyFollowsDbg(false); frzSigTonicDbg(false); droneUse(null);
+    for(const e of marked) delete e.jam;
+    if(scBack) for(const [e,v] of scBack) e.sc=v;
+    if(tonic!==keepT) tonicByControl(keepT);
+    if(verBack) verBack();
+    RP.reset();
+  }
+  console.log(`[scaleprobe TF2] ${cases} cases · ${events.length} events · ${views.length} views · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe TF2] '+m));
+  return { cases, song, total:nBad, differences:bad };
+}
+
+/* ═══ TF3 — TRANSPOSE BY SEMITONES (one track in the editor, the whole song in the window) ═══
+   Expected pitch: what the same note sounded with the KEY KNOB n semitones away before TF2 — the key-less view priced at that live tonic
+   (row TF2 (7) proves the key-less reading); key colour of historical temperaments and the 1/1 of non-12 tunings included.
+   (1) TRACK +1 (the seed's frozen track): every event keeps its beat and payload object and takes its mode's view at key+1; every pitched
+       event sounds as expected; the other tracks keep their view objects; one history step 'transpose'; the frozen track goes stale; ↶ gives
+       back the very same views; ↷ again, ↶.
+   (2) B → C: +3 from key 9 crosses 11 → 12 and every pitch rises by exactly 2^(3/12) on a mobile track (never an octave down); ↶.
+   (3) SONG −1: every track with pitch (the backing too) as expected, drum hits untouched, one step, touched frozen tracks stale; ↶ exact.
+   (4) refusals: a key past the range ('range'); a drum track ('drums').
+   CONTROLS: trDbg({noTouch}) — the frozen track stays fresh, the staleness check must notice; trDbg({ti}) — the naive transpose (tuning
+   index + 1) must miss the expected pitch on the non-12 tracks of the seed. Restores views, edit versions, the editor and the history. */
+export function checkTranspose(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const S=x=>String(x), role=fn=>/^lead(On|Set)$/.test(fn)?'ld':/^bass(On|Set)$/.test(fn)?'bs':/^ch(On|Set)$/.test(fn)?'ch':null;
+  const hz=(e,ctx)=>{ const f=evHz(e.a,ctx||e,role(e.fn)); return Array.isArray(f)?f.map(S).join(','):S(f); };
+  const keepT=tonic, at=e=>`L${e.layer+1} beat ${e.t} ${e.fn}`;
+  const pitched=e=>e.sc && role(e.fn);
+  const sc0=new Map(events.map(e=>[e,e.sc])), a0=new Map(events.map(e=>[e,e.a]));
+  const restoreVer=laneVerKeep(), h0=histLen();
+  /* the note as the knob n semitones away sounded before TF2 (key-less view at that live tonic) */
+  const expect=(e,n)=>{ const v0=sc0.get(e), k=v0.key+n; if(k<0||k>11) return null; setTonic(k); try{ return hz({ ...e, a:a0.get(e) }, { ...e, a:a0.get(e), sc:keyless(v0) }); } finally { setTonic(keepT); } };
+  const checkMoved=(evs,n,what,ctl)=>{ let off=0;
+    for(const e of evs){ const v0=sc0.get(e); if(!v0) continue; cases++; song++;
+      if(!ctl && e.a!==a0.get(e)) { miss(`${what}: ${at(e)} got another payload`); continue; }
+      if(!ctl && (e.sc.mode!==v0.mode || e.sc.key!==v0.key+n || e.sc!==scaleView(v0.mode, v0.tunedFrom, v0.chordMode, v0.key+n))) miss(`${what}: ${at(e)} holds ${viewKeyIdOf(e.sc)}, want the view of its mode at key ${v0.key+n}`);
+      if(role(e.fn)){ const w=expect(e,n); if(w!=null && hz(e)!==w){ off++; if(!ctl) miss(`${what}: ${at(e)} sounds ${hz(e)}, the knob ${n>0?'+':''}${n} sounded ${w}`); } } }
+    return off; };
+  const untouched=(skip,what)=>{ for(const e of events){ if(skip(e)) continue; cases++; if(e.sc!==sc0.get(e) || e.a!==a0.get(e)) miss(`${what}: ${at(e)} (not transposed) changed`); } };
+  const back=what=>{ cases++; const r=histUndo(); if(!r || r==='changed') miss(`${what}: ↶ refused (${r})`);
+    for(const e of events){ if(e.sc!==sc0.get(e) || e.a!==a0.get(e)){ miss(`${what}: after ↶ ${at(e)} does not hold its old view and payload`); break; } } };
+  const layers=[...new Set(events.filter(e=>pitched(e)&&!e.jam).map(e=>e.layer))];
+  const ly=layers.find(l=>freezeState(l)==='fresh') ?? layers[0];
+  const drum=[...new Set(events.map(e=>e.layer))].find(l=>laneRoleOf(l)==='dr' && !events.some(e=>e.layer===l&&e.jam));   // a recorded drum track (a backing refuses as 'backing')
+  try{
+    if(ly==null){ miss('no pitched recorded track in the song (run after P.seed)'); return { cases, song, total:nBad, differences:bad }; }
+    const wasFresh=freezeState(ly)==='fresh', mine=events.filter(e=>e.layer===ly);
+    cases++; for(const id of ['rollTrDn','rollTrUp','songTrDn','songTrUp']) if(!document.getElementById(id)){ miss(`no #${id} button`); break; }
+    cases++; if(!wasFresh) miss(`L${ly+1}: no frozen fresh track to watch go stale (run after P.seed)`);
+    /* (1) one track +1 */
+    cases++; if(!editOpen(ly)){ miss(`could not open L${ly+1} in the editor`); return { cases, song, total:nBad, differences:bad }; }
+    cases++; if(editTransposeWhy(1)!==null || !editTranspose(1)) miss(`L${ly+1}: transpose +1 refused (${editTransposeWhy(1)})`);
+    else {
+      checkMoved(mine,1,`track L${ly+1} +1`);
+      untouched(e=>e.layer===ly, `track L${ly+1} +1`);
+      cases++; if(histLen()!==h0+1 || histTopLabel()!=='transpose') miss(`track +1: ${histLen()-h0} history step(s), top «${histTopLabel()}» — want one 'transpose'`);
+      cases++; if(wasFresh && freezeState(ly)!=='stale') miss(`track +1: the frozen L${ly+1} is ${freezeState(ly)}, want stale`);
+      back('track +1');
+      cases++; if(!histRedo()) miss('track +1: ↷ refused'); else { checkMoved(mine,1,`track L${ly+1} +1 after ↷`); back('track +1 after ↷'); } }
+    /* (2) B → C on a mobile track (12-TET or any tuning priced from the key): +3 from key 9 gives key 12, exactly 2^(3/12) higher */
+    { const L2=layers.find(l=>{ const v=sc0.get(events.find(e=>e.layer===l&&e.sc)); return v && !v.fixedKey && v.key+3>11; });
+      if(L2==null) { cases++; miss('no mobile track whose key +3 crosses B → C'); }
+      else { editSetLayer(L2); const m2=events.filter(e=>e.layer===L2 && pitched(e)), f0=m2.map(e=>evHz(e.a,e,role(e.fn)));
+        cases++; if(!editTranspose(3)) miss(`L${L2+1}: transpose +3 refused (${editTransposeWhy(3)})`);
+        else { const R=Math.pow(2,3/12);
+          m2.forEach((e,i)=>{ cases++; const f=evHz(e.a,e,role(e.fn)), A=[].concat(f), B=[].concat(f0[i]);
+            if(e.sc.key!==sc0.get(e).key+3 || A.length!==B.length || A.some((x,j)=>Math.abs(x/B[j]/R-1)>1e-12)) miss(`B → C: ${at(e)} at key ${e.sc.key} sounds ${A}, want ${B.map(x=>x*R)}`); });
+          back('B → C +3'); } } }
+    /* (4) refusals */
+    editSetLayer(ly);
+    cases++; if(editTransposeWhy(40)!=='range') miss(`a key 40 semitones away: refusal ${editTransposeWhy(40)}, want 'range'`);
+    { const bk=[...new Set(events.filter(e=>e.jam).map(e=>e.layer))][0];
+      if(bk!=null){ editSetLayer(bk); cases++; if(editTransposeWhy(1)!=='backing') miss(`backing track L${bk+1}: refusal ${editTransposeWhy(1)}, want 'backing'`); editSetLayer(ly); } }
+    if(drum!=null){ editSetLayer(drum); cases++; if(editTransposeWhy(1)!=='drums') miss(`drum track L${drum+1}: refusal ${editTransposeWhy(1)}, want 'drums'`); editSetLayer(ly); }
+    /* CONTROL (a): no edit-version bump — the frozen track must stay fresh, so the staleness check above must be able to fail */
+    if(wasFresh){ restoreVer(); trDbg({ noTouch:true }); try{ cases++; if(editLayer()!==ly || !editTranspose(1)) miss(`CONTROL (no edit version bump): the transpose of L${ly+1} itself was refused — the control proves nothing`); else if(freezeState(ly)!=='fresh') miss(`CONTROL (no edit version bump): L${ly+1} went ${freezeState(ly)} anyway — the staleness check cannot fail`); }
+      finally{ trDbg(null); } back('control noTouch'); restoreVer(); }
+    editClose();
+    /* (3) the whole song −1 */
+    const freshAll=[...new Set(events.map(e=>e.layer))].filter(l=>freezeState(l)==='fresh');
+    cases++; if(songTransposeWhy(-1)!==null || !songTranspose(-1)) miss(`song −1 refused (${songTransposeWhy(-1)})`);
+    else {
+      checkMoved(events.filter(e=>e.sc && e.fn!=='drum'),-1,'song −1');
+      untouched(e=>e.fn!=='drum', 'song −1 (drum hits)');
+      cases++; if(histTopLabel()!=='transpose') miss(`song −1: top history step «${histTopLabel()}», want 'transpose'`);
+      for(const l of freshAll) if(events.some(e=>e.layer===l && e.sc && e.fn!=='drum')){ cases++; if(freezeState(l)!=='stale') miss(`song −1: frozen L${l+1} is ${freezeState(l)}, want stale`); }
+      back('song −1'); }
+    /* CONTROL (b): the naive transpose (tuning index + 1) must miss on the non-12 tracks */
+    { const non12=events.filter(e=>pitched(e) && !e.jam && tuningOf(sc0.get(e)).equal!==12);
+      cases++; if(!non12.length) miss('no non-12 track in the song — control (b) proves nothing');
+      else { trDbg({ ti:true }); let off=0;
+        try{ if(songTranspose(1)){ off=checkMoved(non12,1,'control ti',true); back('control ti'); } }
+        finally{ trDbg(null); }
+        if(!off) miss('CONTROL (naive transpose by tuning index): the non-12 tracks sound as expected — the pitch check cannot fail'); } }
+  } finally {
+    trDbg(null);
+    if(editIsOpen()) editClose();
+    for(const e of events){ if(sc0.has(e)){ e.sc=sc0.get(e); e.a=a0.get(e); } }
+    if(tonic!==keepT) setTonic(keepT);
+    restoreVer(); histReset();
+  }
+  console.log(`[scaleprobe TF3] ${cases} cases · ${events.length} events · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe TF3] '+m));
   return { cases, song, total:nBad, differences:bad };
 }
 
@@ -4495,7 +4641,7 @@ export function checkMerge(){
   const presets=[['follows the tonic + Free','ji-adaptive','T','free'], ['tuned from C + As on the instrument','ji-fixed',0,'instrument']];
   try{
     for(const [name,oldId,tf,cm] of presets){
-      const nv=scaleView(M,tf,cm), ov=scaleView(preF7(oldId),'T');
+      const nv0=scaleView(M,tf,cm), nv=keyless(nv0), ov=keyless(scaleView(preF7(oldId),'T'));   // TF2: key-less for the tonic loop; identity below on nv0
       const types=chordFams(ov).flatMap(f=>f.types.map(x=>x.iv));
       eqP(`${name}: palette`, chordFams(nv), chordFams(ov)); eqP(`${name}: root unit`, chordUnit(nv), chordUnit(ov));
       for(let tn=0;tn<12;tn++){ setTonic(tn);
@@ -4520,9 +4666,9 @@ export function checkMerge(){
       cases+=4; const R=resolveScaleId(oldId);
       if(!R || R.id!=='just-intonation' || R.tunedFrom!==tf || R.chordMode!==cm) miss(`alias ${oldId} resolves to ${JSON.stringify(R)}`);
       if(scaleById(oldId)!==M) miss(`scaleById('${oldId}') is not the merged mode`);
-      setTonic(keep.t);   // TF1: a view carries its key — identity is compared at the key nv was made in
-      if(viewOfId(oldId)!==nv) miss(`viewOfId('${oldId}') is not the view of its preset`);
-      applyScaleId(oldId); if(CUR()!==nv) miss(`applyScaleId('${oldId}') does not make its preset live`);
+      setTonic(keep.t);   // TF1: a view carries its key — identity is compared at the key nv0 was made in
+      if(viewOfId(oldId)!==nv0) miss(`viewOfId('${oldId}') is not the view of its preset`);
+      applyScaleId(oldId); if(CUR()!==nv0) miss(`applyScaleId('${oldId}') does not make its preset live`);
     }
     cases+=2; if(SCALES_ALL.some(x=>x.id==='ji-adaptive'||x.id==='ji-fixed')) miss('an old Natural mode is still a mode of its own');
     const eu=menuOf('europe').flatMap(g=>g.items.map(({s})=>s.id)); if(eu.filter(id=>id==='just-intonation').length!==1) miss(`Historical Europe lists: ${eu.join(', ')}`);
@@ -4543,7 +4689,7 @@ export function checkBare(){
   const J=x=>JSON.stringify(x), keepT=tonic;
   try{
     for(const s of SCALES){ if(!s.chordModes) continue; nModes++;
-      const cm=s.chordModes[0].id, v=scaleView(s, s.tunable ? 0 : 'T', cm), w=`${s.id} (default «${cm}»)`;
+      const cm=s.chordModes[0].id, v=keyless(scaleView(s, s.tunable ? 0 : 'T', cm)), w=`${s.id} (default «${cm}»)`;
       for(const [f,a,b] of [['chord build',chordBuildOf(s),chordBuildOf(v)],['palette',s.typedChords,v.typedChords],['rule',J(s.chordRule),J(v.chordRule)],
                             ['grid',!!s.gridChords,!!v.gridChords]]){ cases++; if(a!==b) miss(`${w}: ${f} — bare ${a}, default view ${b}`); }
       const types=chordFams(v).map(fm=>fm.types.map(x=>x.iv)).flat(), n=s.iv.length;

@@ -491,6 +491,11 @@ const OLD={ lead:legacyLeadFreq, bass:legacyBassFreq, chord:legacyChordNotesRef,
 /* ⛳ F7: у фиксированного вида, чьи ступени режим аккордов называет ПОРЯДКОВЫМИ (Натуральный в «Свободно», degNaming), показ центов — в
    периоде (верхняя тоника 0), как у каждой нумерованной таблицы; прочие ступени лежат ниже 1200, поэтому опора — прежняя по модулю 1200. */
 function fixedCents(d,v){ const r=Math.round(fixedExact(d,v)); return v.degNaming==='ordinal' ? r%1200 : r; }
+/* TF2: a view keeps the key it was made in. The sweeps below step the live tonic and compare with frozen reference bodies that read it, so
+   they read KEY-LESS copies of their views (the old-view reading: viewKey → the live tonic). Row «TF2 recordings keep their key» proves a
+   key-less view prices and names exactly as the view at the live key. Memoised: one copy per view (identity-keyed caches stay valid). */
+const KEYLESS=new WeakMap();
+const keyless=v=>{ if(!v||v.key==null) return v; let c=KEYLESS.get(v); if(!c){ c={...v}; delete c.key; KEYLESS.set(v,c); } return c; };
 const allViews=()=>{ const out=[];
   for(const s of SCALES){ if(s.tunable){ out.push([s,'T']); for(let pc=0;pc<12;pc++) out.push([s,pc]); } else out.push([s,'T']); }
   return out; };
@@ -504,7 +509,7 @@ function sweep(stage, what, A, B, pick, opt={}){
        из голого лада: у лада с режимами вид может строить аккорд отношениями («Свободно»), а голый лад — шагами; единица голого ([0])
        на виде, считающем отношения, давала 0 Гц С ОБЕИХ сторон — и сверка молча «проходила» на тишине. */
     for(const [s,tf,cm] of (opt.views || allViews().map(([a,b])=>[a,b,undefined]))){
-      const [va,vb]=pick(s,tf,cm), n=s.iv.length, id=s.id+(s.tunable?`[from ${tf}]`:'')+(cm?'#'+cm:'');
+      const [va,vb]=pick(s,tf,cm).map(keyless), n=s.iv.length, id=s.id+(s.tunable?`[from ${tf}]`:'')+(cm?'#'+cm:'');
       const tys=[[null,false],[null,true],[chordUnit(va),false]];
       for(const f of chordFams(va)) for(const ty of f.types) tys.push([ty.iv,false]);
       for(let tn=0;tn<12;tn++){ setTonic(tn);
@@ -610,7 +615,7 @@ export function checkUntyped(){
   const keepT=tonic, keepA=aRef;
   try{
     for(const [s0,tf] of allViews()){
-      const v=scaleView(s0,tf), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, id=v.id+(v.tunable?`[from ${tf}]`:'');
+      const v=keyless(scaleView(s0,tf)), n=v.iv.length, k=v.chordRule&&v.chordRule.kind, id=v.id+(v.tunable?`[from ${tf}]`:'');
       if(k==='none'){ for(let d=0;d<=n;d++) for(const sev of [false,true]){ none++;
           if(chordNotes(d,0,v,sev,null).length) miss(`${id} degree ${d}: a chordless mode still prices an untyped chord`);
           if(chordLabel(d,v,sev)!==''||chordNotesStr(d,v,sev)!=='') miss(`${id} degree ${d}: a chordless mode still names an untyped chord`); }
@@ -646,7 +651,7 @@ export function checkStack(){
   const bad=[]; let cases=0;
   const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
   const keepT=tonic, views=[];
-  for(const [s0,tf] of allViews()){ const v=scaleView(s0,tf); if(v.chordRule&&v.chordRule.kind==='stack') views.push(v); }
+  for(const [s0,tf] of allViews()){ const v=keyless(scaleView(s0,tf)); if(v.chordRule&&v.chordRule.kind==='stack') views.push(v); }
   try{
     for(const v of views){ const n=v.iv.length, E=v.edo, inMode=new Set(v.iv.map(x=>((x%E)+E)%E));
       for(const sev of [false,true]) for(let d=0;d<=n;d++){
@@ -677,7 +682,7 @@ function canon(x){
 function snapViews(){ const out=[];
   for(const s0 of SCALES){
     const tfs = s0.tunable ? ['T', ...range(12)] : ['T'], cms = s0.chordModes ? s0.chordModes.map(m=>m.id) : [undefined];
-    for(const tf of tfs) for(const cm of cms) out.push({ s0, tf, cm, v:scaleView(s0,tf,cm) });
+    for(const tf of tfs) for(const cm of cms) out.push({ s0, tf, cm, v:keyless(scaleView(s0,tf,cm)) });   // TF2: key-less (tonic sweeps)
   }
   return out;
 }
@@ -704,7 +709,7 @@ export function checkBehaviour(){
   if(!nBad) console.log('[scaleprobe behaviour] drone, progressions, backing rhythm and status line read from data equal the pre-F4 code');
   return { cases, total:nBad, differences:bad };
 }
-export { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, A4_SET, PRINT_MAX, OLD, allViews, sweep, canon, snapViews, KEEP_MAX };
+export { keyless, isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, A4_SET, PRINT_MAX, OLD, allViews, sweep, canon, snapViews, KEEP_MAX };
 /* ═══ ED4 — P.checkDegrees(): TRANSPOSE BY DEGREES (scales.shiftDegrees) against a reference written here by ABSOLUTE tuning steps ═══
    Every view × every tuning index of one period plus the top tonic (in the mode and out of it) × registers 0..3 × n = ±1..±9, ±(mode size),
    ±(mode size + 1): the result equals the reference — the nearest mode pitch by absolute steps (a tie takes the lower), moved n degrees,

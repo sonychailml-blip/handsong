@@ -219,7 +219,9 @@ the ✕ confirmation prevents damage, not misses. Cheapest fix: rows 16 → 22 p
 **Opened by ✎ in the transport, FULL SCREEN** (the camera is not read — the same `main.loop` branch as the editor). It is the play strip
 grown to the whole screen: one row per track; on top its own bar `#arrBar`: **✕** (back to play) · title · **🎚 / ▤** (face: mixer /
 arrangement) · **−** **+** (time zoom) · **⤢** (whole song) · ED6: **＋▯** insert as many EMPTY bars before the brace as it is long ·
-**✂** cut the bars under the brace · **⧉** duplicate them right after · **§✕** remove the selected section marker · **↶ ↷** undo / redo
+**✂** cut the bars under the brace · **⧉** duplicate them right after · **§✕** remove the selected section marker · TF3: **−1 st / +1 st**
+(ru «−1 пт / +1 пт») the WHOLE SONG a semitone down / up — every track with pitch, the backing too, drums untouched; one ↶; refused while
+recording · **↶ ↷** undo / redo
 of these (the song history — section edits and marker changes; the tooltips name the bars). Under it the transport `.arr`: **⏮ ▶ ⟳**
 (⤺ ✕ ■ ✎ live on the play screen). **§✎** (ED6 fix) renames the selected marker. ED7: the window's **↶ ↷** are the ONE history's.
 Below: a status line, the **SECTIONS band** (ED6, 20 px: named markers at bar lines, amber, a faint line down the rows; **tap empty band**
@@ -235,7 +237,7 @@ the marker (it opens on the second tap's release), Enter or tapping elsewhere ke
   in greyscale.
 - **the freeze dot (AF4)** — at the right end of the header, faint: **hollow** = waiting to freeze (settling after a change, or ready),
   **pulsing** = rendering now; **nothing** = frozen, or playing live by choice (skipped by the memory budget, no captured chain, or stale
-  only by tonic/A4/tempo while re-freezing on those is off). `R.freezeQueue()` in the console says why. Not a button.
+  only by A4/tempo while re-freezing on those is off — since TF2 the key knob stales nothing). `R.freezeQueue()` in the console says why. Not a button.
 - **row body** — in the arrangement face, note MINIATURES (blocks by pitch within the track's range; a chord as a stack; hits as ticks by
   kit row); a tap opens the track in the EDITOR on the same time span; in the mixer face — the track LEVEL fader on the left (drag along,
   relative; double tap — 100 / 0 dB; label "number · dB") and the PAN control on the right (MX2: −100…+100, fill from the centre, centre
@@ -283,14 +285,14 @@ one time. Mode rows STRETCH to the full height when they fit (up to 30 px), else
 MEASURED from the track's mode labels (capped at 42 % of the canvas). The roll's top is a constant (`ROLL_BAR_H=46` + transport 44), not
 the bar's measured height: the bar is one scrolling line, so the ruler and grid never move.
 
-**EDITOR BAR — 28 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
+**EDITOR BAR — 30 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
 narrow screen): `✕` close · `L1 · name` switch track (number and NAME in the role colour, long ones ellipsised; cycles in the window's
 DISPLAY ORDER; dims when there is one track) · **TIMBRE select** (`#rollTimbre`, T5 — the track ROLE's timbres, kits for drums; hidden on a
 track without notes) · **MODE select** (`#rollMode`, OWN1 — the modes of the track's tuning with as many degrees; picking one moves the
 whole track by degrees; hidden on drums, on a backing and when there is no other such mode) · `[mode 1/2]` the axis mode chip — **shown ONLY when the track has events in different modes** · `✚` insert mode ·
 `⬚` pick mode (ED1) · `🗑` delete the selection (a note, several notes or an automation point; the tooltip says which) · `⧉` copy ·
 `📋` paste at the playhead · `⧉⁺` duplicate right after the selection (ED2) · `⌗` quantise the selection + three selects: grid (1, 1/2, 1/4,
-1/8, 1/3, 1/6 of a beat; starts at the snap step), what (Starts / Ends / Starts + ends), strength (100/75/50/25 %) (ED3) · `−1°` / `+1°` the selection one degree of its mode down / up (ED4) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
+1/8, 1/3, 1/6 of a beat; starts at the snap step), what (Starts / Ends / Starts + ends), strength (100/75/50/25 %) (ED3) · `−1°` / `+1°` the selection one degree of its mode down / up (ED4) · `−1 st` / `+1 st` the WHOLE TRACK a semitone down / up (TF3) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
 ("free" without quantise; "(grid finer than a pixel)" when the step is below what is drawn) · **automation lane select** (first item
 "— no automation —") · **"+ effect for this track" select** · `▲` earlier in the chain · `▼` later · `⊘` remove the effect from the track ·
 **`╱`/`⌐` segment shape** (smooth automation: visible while the lane is open — and, BEND-CURVE, while a bend point is selected: then it is
@@ -320,6 +322,13 @@ Nothing to move → toast «Nothing moved — already on the grid». One ↶.
 **BY DEGREES (ED4).** `−1°` / `+1°` (Alt+↓ / Alt+↑) move every selected note one degree of its own mode (C→D→E… in major); a note outside
 the mode keeps its distance from the nearest degree (C# → D#); chords move to the chord of the next degree. Times never change, glides
 stay whole. Past the registers, a chord type that does not fit, or drum hits only → a toast says why, nothing moves. One ↶ per press.
+**TRANSPOSE BY SEMITONES (TF3).** `−1 st` / `+1 st` (ru «−1 пт / +1 пт») move the WHOLE open track a semitone: its key moves, notes,
+times, volumes, bends and effects stay. In a historical temperament the key colour changes (as on an organ); in tunings without 12 notes
+(Partch, 19/31-TET, gamelan, Bohlen–Pierce) their 1/1 moves 100 cents. Refused on drums («Drums have no pitch»), on a backing («A backing
+follows the key — change the key instead») and two octaves away. One ↶; a frozen track re-freezes by itself after the editor closes.
+**THE KEY KNOB (TF2).** The tonic in the «Scale» panel changes only what the HANDS play (and re-makes a Jam / Drums backing in the new
+key); recorded tracks keep the key they were played in and keep playing; frozen tracks stay frozen. Changing it while recording starts a
+NEW track (as a mode change does). To move recordings: the Transpose buttons above.
 
 **BEND CURVE (OWN2).** Select a theremin note (one with a curve): its points become white dots. Drag a dot up/down — cents (from the
 note's attack pitch), sideways — time inside the note (one axis per gesture; the first dot only moves up/down; a dot stops before its
