@@ -6,13 +6,13 @@ import { fx, fxIsScalar, fxChainOf, chainKeyOf, FX_VOL, exprDisp, exprBrightDisp
          rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollSelMany, rollPick, rollBox, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
          rollAut, rollAutSel, rollAutDrag, rollVolBars, secSel, rollBendSel, rollBendDrag, laneRow0, arrOpen, arrFace, laneDrag } from './state.js';   // AR2: laneDrag — тянущаяся за ручку строка окна (вид жеста)   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, LANE_NOROLE_COL,
-         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS } from './config.js';
+         CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS, bendSeg, curveU } from './config.js';
 import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxInstance, fxAimGet, FX_AMT, fxPerm, timbresOf, masterLevel, masterMeter } from './audio.js';   // fxPerm — VOL-0: постоянная запись цепи (громкость) столбика не рисует   // O-3.1: столбик показывает ПРИЦЕЛ РУКИ (fxAimGet), а не звучащую величину — довод у FX_AIM в audio   // leadHold — реестр ЗВУЧАЩИХ соло-голосов: единственный источник для подсветки (см. drawRole)
 
 import { hooks } from './hooks.js';   // AF4: hooks.afRow — the arrangement window's freeze dot (set by frzqueue.js)
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
-         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, pnBars, sections, editLayer as rollTrackLayer, chordMoveTy, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from './recorder.js';   // AR2: имя, порядок показа, роль и тембр дорожки одним проходом   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, pnBars, sections, editLayer as rollTrackLayer, chordMoveTy, bendEdited, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from './recorder.js';   // AR2: имя, порядок показа, роль и тембр дорожки одним проходом   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -1252,6 +1252,7 @@ function rollBendPts(s,ax,total){
   const m=bendMemo.get(s);
   if(m && m.ax===ax && m.base===baseF() && m.tonic===tonic && m.total===total && m.B===B) return m.pts;
   const pts=bendRowsOf(s,B,ax,total);
+  if(pts) pts.path=bendPathOf(s,B,ax,total);   // BEND-CURVE: what is drawn (steps and glides), beside the points (the handles)
   bendMemo.set(s,{ ax, base:baseF(), tonic, total, B, pts });
   return pts;
 }
@@ -1259,6 +1260,27 @@ function rollBendPts(s,ax,total){
 function bendRowsOf(s,B,ax,total){
   const F=ldRowFreqs(ax,total), f0=leadFreqTi(s.ti,s.oct,s.sc), r0=rollSegRoot(s,ax), rf0=rowOfHz(f0,F,total);
   return (f0>0 && Number.isFinite(rf0) && Number.isFinite(r0)) ? B.map(p=>({ t:s.start+p.dt, r:r0+rowOfHz(f0*Math.pow(2,p.c/1200),F,total)-rf0 })) : null;
+}
+/* BEND-CURVE: the drawn path of curve B — {t, r, g}: a step point (g false: hold, then up/down to it) or a sample of a glide (g true:
+   straight to it), the glide sampled by the replay's own law (config.bendSeg) */
+const BEND_DRAW_N=24;
+function bendPathOf(s,B,ax,total){
+  const F=ldRowFreqs(ax,total), f0=leadFreqTi(s.ti,s.oct,s.sc), r0=rollSegRoot(s,ax), rf0=rowOfHz(f0,F,total);
+  if(!(f0>0 && Number.isFinite(rf0) && Number.isFinite(r0))) return null;
+  const R=c=>r0+rowOfHz(f0*Math.pow(2,c/1200),F,total)-rf0, out=[];
+  B.forEach((q,j)=>{ const p=B[j-1];
+    if(p && q.sh==='s' && q.dt>p.dt) for(let n=1;n<=BEND_DRAW_N;n++){ const u=n/BEND_DRAW_N; out.push({ t:s.start+p.dt+(q.dt-p.dt)*u, r:R(bendSeg(p,q,u)), g:true }); }
+    else out.push({ t:s.start+q.dt, r:R(q.c), g:false }); });
+  return out;
+}
+/* stroke a bend path from (x, the attack row) to the block's end x2 */
+function bendStroke(V,P,x,x2,y0,cy){
+  ctx.beginPath(); let px=x, py=y0; ctx.moveTo(px,py);   // до первой точки — ступень атаки (0 центов)
+  for(let i=0;i<P.length;i++){ const nx=laneBeatX(V,P[i].t), ny=cy(P[i].r);
+    if(P[i].g){ ctx.lineTo(nx,ny); px=nx; py=ny; continue; }
+    if(nx-px<0.5 && i<P.length-1 && !P[i+1].g){ py=ny; continue; }   // слить вершины в полпикселя — держим последнее значение
+    ctx.lineTo(nx,py); ctx.lineTo(nx,ny); px=nx; py=ny; }
+  ctx.lineTo(x2,py); ctx.stroke();
 }
 function hzOfRow(q,F,total){   // the inverse of rowOfHz: a fractional row → Hz on the axis F
   const n=Math.min(total,F.length); if(n<2) return NaN;
@@ -1269,6 +1291,8 @@ function hzOfRow(q,F,total){   // the inverse of rowOfHz: a fractional row → H
 /* OWN2: cents (from the attack pitch) and beats (from the note start) of a screen point over the selected theremin note — the same
    snapshot the handles were drawn from (rule #9); null when no theremin note is selected. */
 /* probe only (the runner's real-input check): the drawn bend handles of the selected theremin note */
+/* BEND-CURVE: the lane value (0..1) at screen y, from the drawn snapshot (rule #9); null without a lane */
+export const rollAutValAt=py=>{ const V=rollView; return V&&V.aut ? autVAt(V,py) : null; };
 export const rollBendProbe=()=>{ const b=rollView&&rollView.bend; return b ? b.pts.map(q=>({ i:q.i, x:q.x, y:q.y, dt:q.dt, c:q.c })) : null; };
 export function rollBendAt(px,py){
   const V=rollView, b=V&&V.bend; if(!b) return null;
@@ -1281,19 +1305,28 @@ const ROLL_BEND_MIN_W=6;
    inside the note. The ghost clamps like the edit (first point at 0, between neighbours, before the end). */
 function rollBendHandles(V,s,AX,BP,x,x2,cy){
   const B=s.note.head.a.bend, F=ldRowFreqs(AX,V.total), f0=leadFreqTi(s.ti,s.oct,s.sc), r0=rollSegRoot(s,AX), rf0=rowOfHz(f0,F,V.total);
-  V.bend={ ev:s.ev, start:s.start, end:s.end, F, f0, r0, rf0, pts:BP.map((q,i)=>({ i, x:laneBeatX(V,q.t), y:cy(q.r), dt:B[i].dt, c:B[i].c })) };
+  const R=c=>r0+rowOfHz(f0*Math.pow(2,c/1200),F,V.total)-rf0;
+  V.bend={ ev:s.ev, start:s.start, end:s.end, F, f0, r0, rf0, pts:BP.map((q,i)=>({ i, x:laneBeatX(V,q.t), y:cy(q.r), dt:B[i].dt, c:B[i].c })), mids:[] };
+  /* BEND-CURVE: a middle handle on every glide of the selected note — drag it up/down to curve the glide */
+  B.forEach((q,j)=>{ const p=B[j-1]; if(!p||q.sh!=='s'||!(q.dt>p.dt)) return;
+    V.bend.mids.push({ i:j, x:laneBeatX(V,s.start+(p.dt+q.dt)/2), y:cy(R(bendSeg(p,q,0.5))) }); });
   const D= rollBendDrag && rollBendDrag.ev===s.ev ? rollBendDrag : null;
-  if(D){ const len= s.end==null ? Infinity : s.end-s.start, i=D.i, lo= i>0 ? B[i-1].dt+1e-6 : 0, hi= i+1<B.length ? B[i+1].dt-1e-6 : len-1e-6;
-    const B2=B.slice(); B2[i]={ dt: i===0 ? 0 : Math.max(lo,Math.min(hi,D.dt)), c:Math.round(D.c) };
-    const G=bendRowsOf(s,B2,AX,V.total);
-    if(G){ ctx.save(); ctx.setLineDash([4,3]); ctx.strokeStyle='#ffd479'; ctx.lineWidth=1.5; ctx.beginPath();
-      let px=x, py=cy(rollSegRoot(s,AX)); ctx.moveTo(px,py);
-      for(const q of G){ const nx=laneBeatX(V,q.t), ny=cy(q.r); ctx.lineTo(nx,py); ctx.lineTo(nx,ny); px=nx; py=ny; }
-      ctx.lineTo(x2,py); ctx.stroke(); ctx.restore();
-      const gx=laneBeatX(V,G[i].t), gy=cy(G[i].r), txt=(B2[i].c>0?'+':'')+B2[i].c+'¢ · '+(Math.round(B2[i].dt*100)/100);
+  if(D){ const len= s.end==null ? Infinity : s.end-s.start, i=D.i;
+    let B2;
+    if(D.mid){ B2=B.slice(); B2[i]={ ...B[i], sh:'s', k:D.k }; }                     // a curved glide (the edit: recorder.editBendShape)
+    else { const E=bendEdited(B,'move',i,D.dt,D.c,len); B2=E ? E.B : B; }        // the same pure edit as the release (recorder.bendEdited)
+    const G=bendPathOf(s,B2,AX,V.total);
+    if(G){ ctx.save(); ctx.setLineDash([4,3]); ctx.strokeStyle='#ffd479'; ctx.lineWidth=1.5;
+      bendStroke(V,G,x,x2,cy(rollSegRoot(s,AX)),cy); ctx.restore();
+      const q=B2[i], p=B2[i-1], mid=D.mid&&p;
+      const gx=laneBeatX(V,s.start+(mid ? (p.dt+q.dt)/2 : q.dt)), gy=cy(R(mid ? bendSeg(p,q,0.5) : q.c));
+      const txt= mid ? '⌒ '+(D.k>0?'+':'')+(Math.round(D.k*100)/100) : (q.c>0?'+':'')+q.c+'¢ · '+(Math.round(q.dt*100)/100);
       ctx.font='11px system-ui'; ctx.textBaseline='middle'; const tw=ctx.measureText(txt).width+10;
       ctx.fillStyle='rgba(8,10,16,.86)'; ctx.fillRect(gx+10,gy-8,tw,16); ctx.strokeStyle='#ffd479'; ctx.lineWidth=1; ctx.strokeRect(gx+10.5,gy-7.5,tw-1,15);
       ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(txt,gx+15,gy+.5); ctx.textBaseline='alphabetic'; } }
+  for(const m of V.bend.mids){ const sel=rollBendSel===m.i;   // a hollow diamond: a shape handle, not a point
+    ctx.beginPath(); ctx.moveTo(m.x,m.y-4.5); ctx.lineTo(m.x+4.5,m.y); ctx.lineTo(m.x,m.y+4.5); ctx.lineTo(m.x-4.5,m.y); ctx.closePath();
+    ctx.fillStyle='rgba(20,20,32,.85)'; ctx.fill(); ctx.strokeStyle= sel ? '#ffd479' : '#fff'; ctx.lineWidth=1.4; ctx.stroke(); }
   for(const q of V.bend.pts){ const sel=rollBendSel===q.i;
     ctx.fillStyle= sel ? '#ffd479' : '#fff'; ctx.beginPath(); ctx.arc(q.x,q.y,sel?5:3.5,0,Math.PI*2); ctx.fill();
     ctx.strokeStyle='rgba(20,20,32,.9)'; ctx.lineWidth=1.2; ctx.stroke(); }
@@ -1527,6 +1560,7 @@ const AUT_U=10, AUT_U_FINE=1;
 const autSnapU=(v,u)=> Math.max(0,Math.min(1, Math.round(v*100/u)*u/100));
 const autSnapV=v=>autSnapU(v,AUT_U);
 const autY=(V,v)=> V.aut.y1-(V.aut.y1-V.aut.y0)*Math.max(0,Math.min(1,v));
+const AUT_CURVE_N=16;   // BEND-CURVE: samples of a curved glide on the lane
 const autVAt=(V,py)=> Math.max(0,Math.min(1,(V.aut.y1-py)/Math.max(1,V.aut.y1-V.aut.y0)));
 /* ============ ЗОНА ТОЧНОСТИ И ОСЬ ЖЕСТА ============
    ⛳ ТОНКОСТЬ ПОКУПАЕТСЯ РАССТОЯНИЕМ, А НЕ ПИКСЕЛЯМИ ЭКРАНА: полосу растить нельзя — она откусывает от
@@ -1614,9 +1648,11 @@ function drawAutLane(V,ly){
   const drag=rollAutDrag;
   const vOf=r=> (drag&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.v : r.pt.v;
   const tOf=r=> (drag&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.t : r.pt.t;
+  const kOf=r=> (drag&&drag.mid&&rollAutSel&&r.pt===rollAutSel.pt) ? drag.k : (r.pt.k||0);   // BEND-CURVE: the curvature (a dragged middle handle shows its ghost value)
+  V.aut.mid=null;
   ctx.lineWidth=2;
   const path=new Path2D();   // V4b: путь строим ОДИН раз — у адреса «в ноте» он штрихуется дважды (приглушённо везде, ярко там, где звучат ноты)
-  let started=false, lastY=null, fromPt=false, prevX=V.x0;   // prevX — x предыдущей точки: от g0 ровный кусок ведём, только если он правее неё
+  let started=false, lastY=null, fromPt=false, prevX=V.x0, prevV=0;   // prevX — x предыдущей точки: от g0 ровный кусок ведём, только если он правее неё
   if(D.base!=null){ lastY=autY(V,D.base); path.moveTo(V.x0,lastY); started=true; }   // ПОЛКА слева: величина из снимка старта взятого — до первой точки величина именно такая (у адреса «в ноте» — уровень «не задано»)
   for(let i=from;i<to;i++){
     const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
@@ -1631,10 +1667,14 @@ function drawAutLane(V,ly){
       /* g0 — у ЗАПИСАННОЙ величины «в ноте» после паузы прямая начинается не от предыдущей точки, а от мига, где рука ушла (там
          лежит ведение удержания — recorder.pnPoints): до него — ровно, как и звучит. У шины и у формы человека g0 нет. */
       if(r.g0!=null){ const xg=laneBeatX(V,r.g0); if(xg>prevX) path.lineTo(xg,lastY); }
+      const k=r.per ? 0 : kOf(r), v1=vOf(r);
+      if(k) for(let n=1;n<AUT_CURVE_N;n++){ const u=n/AUT_CURVE_N; path.lineTo(prevX+(x-prevX)*u, autY(V,prevV+(v1-prevV)*curveU(u,k))); }   // BEND-CURVE: the replay's law (recorder.fxLaneAt → config.curveU)
       path.lineTo(x,y);
+      /* the middle handle of the glide INTO the selected point (bus lanes only — per-note addresses are not curved) */
+      if(!r.per && rollAutSel && r.pt===rollAutSel.pt) V.aut.mid={ rec:r, x:(prevX+x)/2, y:autY(V,prevV+(v1-prevV)*curveU(0.5,k)), v0:prevV, v1 };
     }
     else { path.lineTo(x,lastY); path.lineTo(x,y); }   // ДЕРЖИМ прежнюю величину до самой точки, затем переезд: ровно то, что делает fxPlayDrive (у «в ноте» — каждая нота держит величину своего события)
-    lastY=y; fromPt=true; prevX=x;
+    lastY=y; fromPt=true; prevX=x; prevV=vOf(r);
   }
   if(started&&lastY!=null) path.lineTo(V.x0+V.bw,lastY);
   /* ⛳ V4b: У АДРЕСА «В НОТЕ» ПАУЗЫ ЧЕСТНЫ. Величину несут ноты, и там, где у дорожки не звучит ни одна (D.spans — интервалы
@@ -1649,6 +1689,9 @@ function drawAutLane(V,ly){
     }
     ctx.clip(); ctx.strokeStyle=col; ctx.stroke(path); ctx.restore();
   }else{ ctx.strokeStyle=col; ctx.stroke(path); }
+  if(V.aut.mid){ const m=V.aut.mid;   // BEND-CURVE: a hollow diamond — a shape handle, not a point
+    ctx.beginPath(); ctx.moveTo(m.x,m.y-4.5); ctx.lineTo(m.x+4.5,m.y); ctx.lineTo(m.x,m.y+4.5); ctx.lineTo(m.x-4.5,m.y); ctx.closePath();
+    ctx.fillStyle='rgba(8,10,16,.9)'; ctx.fill(); ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.stroke(); }
   // ---- точки ----
   for(let i=from;i<to;i++){
     const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
@@ -1676,7 +1719,7 @@ function drawAutLane(V,ly){
      ⛳ ЗОНА ТОЧНОСТИ НАЗВАНА СЛОВОМ, а не только цветом: «шаг стал другой» — это не оттенок, это факт. */
   if(rollAutSel && drag){                                               // палец лёг на точку — число уже видно, ещё до первого движения
     const px=Math.max(V.x0, Math.min(V.x0+V.bw, laneBeatX(V,drag.t))), py=autY(V,drag.v);
-    const txt=Math.round(drag.v*100)+(drag.fine?' · '+t('aut.fine'):'');
+    const txt= drag.mid ? '⌒ '+(drag.k>0?'+':'')+drag.k : Math.round(drag.v*100)+(drag.fine?' · '+t('aut.fine'):'');
     ctx.font='11px system-ui'; ctx.textBaseline='middle';
     const tw=ctx.measureText(txt).width, bw=tw+10, bh=16;
     const left = px+12+bw > V.x0+V.bw;                                  // у правого края переворачиваем сторону: иначе табличка уезжает за поле
@@ -1923,11 +1966,7 @@ function drawRoll(){
           ctx.save(); ctx.beginPath(); ctx.rect(x,gy0,w,gy1-gy0); ctx.clip();
           ctx.strokeStyle = (s.ev===rollSel||rollSelMany.has(s.ev)) ? 'rgba(20,20,32,.85)' : 'rgba(255,255,255,.92)'; ctx.lineWidth=1.5;
           const cy=r=>rollRowY(V,r)+V.rowH/2;
-          ctx.beginPath(); let px=x, py=cy(rollSegRoot(s,AX)); ctx.moveTo(px,py);   // до первой точки — ступень атаки (0 центов)
-          for(let i=0;i<BP.length;i++){ const nx=laneBeatX(V,BP[i].t), ny=cy(BP[i].r);
-            if(nx-px<0.5 && i<BP.length-1){ py=ny; continue; }   // слить вершины в полпикселя — держим последнее значение
-            ctx.lineTo(nx,py); ctx.lineTo(nx,ny); px=nx; py=ny; }
-          ctx.lineTo(x2,py); ctx.stroke(); ctx.restore();
+          bendStroke(V,BP.path||BP,x,x2,cy(rollSegRoot(s,AX)),cy); ctx.restore();   // BEND-CURVE: steps where it steps, the glide law where it glides
           if(s.ev===rollSel && s.first && !rollSelMany.size) rollBendHandles(V,s,AX,BP,x,x2,cy);   // OWN2: the selected theremin note's points
         }
       }
@@ -2066,9 +2105,11 @@ export function rollHit(px,py){
       if(d<bd){ bd=d; best=r; }
     }
     if(best && bd<=Math.max(tolX,tolY)) return { what:'autpt', rec:best, beat, v };
+    { const m=V.aut.mid; if(m && Math.hypot(m.x-px,m.y-py)<=ROLL_HIT_PX) return { what:'autmid', rec:m.rec, v0:m.v0, v1:m.v1, beat, v }; }   // BEND-CURVE
     return { what:'autgrid', beat, v };
   }
   if(V.bend){ for(const q of V.bend.pts) if(Math.hypot(q.x-px,q.y-py)<=ROLL_HIT_PX) return { what:'bendpt', ev:V.bend.ev, i:q.i, dt:q.dt, c:q.c, beat };   // OWN2: a point of the selected theremin note's curve
+    for(const m of V.bend.mids) if(Math.hypot(m.x-px,m.y-py)<=ROLL_HIT_PX) return { what:'bendmid', ev:V.bend.ev, i:m.i, beat };   // BEND-CURVE: a glide's middle handle
   }
   if(V.noEdit) return null;                            // неправимая роль: поле нот НЕ цель — ни выбора, ни вставки (линейка и полоса выше — живы)
   const r=rollRowAt(V,py);

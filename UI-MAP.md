@@ -283,16 +283,18 @@ one time. Mode rows STRETCH to the full height when they fit (up to 30 px), else
 MEASURED from the track's mode labels (capped at 42 % of the canvas). The roll's top is a constant (`ROLL_BAR_H=46` + transport 44), not
 the bar's measured height: the bar is one scrolling line, so the ruler and grid never move.
 
-**EDITOR BAR — 27 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
+**EDITOR BAR — 28 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
 narrow screen): `✕` close · `L1 · name` switch track (number and NAME in the role colour, long ones ellipsised; cycles in the window's
 DISPLAY ORDER; dims when there is one track) · **TIMBRE select** (`#rollTimbre`, T5 — the track ROLE's timbres, kits for drums; hidden on a
-track without notes) · `[mode 1/2]` the axis mode chip — **shown ONLY when the track has events in different modes** · `✚` insert mode ·
+track without notes) · **MODE select** (`#rollMode`, OWN1 — the modes of the track's tuning with as many degrees; picking one moves the
+whole track by degrees; hidden on drums, on a backing and when there is no other such mode) · `[mode 1/2]` the axis mode chip — **shown ONLY when the track has events in different modes** · `✚` insert mode ·
 `⬚` pick mode (ED1) · `🗑` delete the selection (a note, several notes or an automation point; the tooltip says which) · `⧉` copy ·
 `📋` paste at the playhead · `⧉⁺` duplicate right after the selection (ED2) · `⌗` quantise the selection + three selects: grid (1, 1/2, 1/4,
 1/8, 1/3, 1/6 of a beat; starts at the snap step), what (Starts / Ends / Starts + ends), strength (100/75/50/25 %) (ED3) · `−1°` / `+1°` the selection one degree of its mode down / up (ED4) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
 ("free" without quantise; "(grid finer than a pixel)" when the step is below what is drawn) · **automation lane select** (first item
 "— no automation —") · **"+ effect for this track" select** · `▲` earlier in the chain · `▼` later · `⊘` remove the effect from the track ·
-**`╱`/`⌐` segment shape** (smooth automation: visible while the lane is open; live when the selected point has a point with a value before
+**`╱`/`⌐` segment shape** (smooth automation: visible while the lane is open — and, BEND-CURVE, while a bend point is selected: then it is
+the shape of the bend segment entering that point; live when the selected point has a point with a value before
 it; the icon is the CURRENT shape of the segment entering the point: `╱` smooth, `⌐` step; a tap toggles, a toast names the new shape) ·
 **`▮▮`/`•—` Volume face** (ED5: shown only while the lane shows Volume — bars, one per note, or the line of points; the icon is the
 CURRENT face) · `−`/`+` zoom. (AF4: the `❄` button and its state label are gone — tracks freeze themselves.)
@@ -323,9 +325,20 @@ stay whole. Past the registers, a chord type that does not fit, or drum hits onl
 note's attack pitch), sideways — time inside the note (one axis per gesture; the first dot only moves up/down; a dot stops before its
 neighbour); a dashed ghost and «+35¢ · 1.25» follow the finger. With ✚ on, a tap inside the selected note's time adds a dot there. 🗑 / ⌫
 removes the selected dot (the first stays). Each change is one ↶.
+**BEND SHAPES (BEND-CURVE).** A dot you add or drag GLIDES: the pitch slides into it from the previous dot and on to the next one (a dot
+straight from the recording keeps its recorded step — recordings are dense, so they already sound smooth). Every glide of the selected
+note shows a small hollow DIAMOND at its middle: drag it up/down to bend the glide (up = reaches the new pitch early, down = late; near the
+straight line it snaps straight); the ghost shows «⌒ +0.35». To make a deliberate JUMP: tap the dot at the END of that segment, then tap
+`╱`/`⌐` in the editor bar — `⌐` = hold, then jump at the dot; tap again for `╱` = glide. The automation lane works the same way for bus
+effects (reverb, delay, tremolo mix): select a point — its incoming glide shows the diamond; `╱`/`⌐` as before. Per-note lanes (Volume,
+brightness, glide…) have no diamond yet. Each change is one ↶.
+**TRACK INTO ANOTHER MODE (OWN1).** The `MODE` select in the editor bar lists the modes of the track's tuning with the same number of degrees.
+Pick one — every note of the track moves to the same degree of the new mode (in C: major → Dorian turns E into E♭, B into B♭); a note
+outside the old mode keeps its distance from the nearest degree. Times, volumes, bends stay. One ↶; a frozen track re-freezes by itself.
 **ONE UNDO (ED7).** ↶ ↷ in the editor bar, in the window bar and on the play screen (next to ⤺), and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z (Ctrl+Y):
 one history for takes, ⤺, note edits, automation, mixer level / pan / master, names and order, row delete, backing, sections and markers,
-✕ clear. A toast names what was undone. Not in the history: mute, solo, arming, the brace, tempo, tonic.
+✕ clear (its ↶ brings the brace and ⟳ back too). A toast names what was undone. Not in the history: mute, solo, arming, the brace, tempo,
+tonic.
 
 **VOLUME BARS (ED5).** With the lane on Volume and `▮▮` on (the default face), every NOTE is one bar at its start, height = its
 volume (a chord is one bar, a drum hit one bar; a faint line follows the volume where it changes inside a note). Drag a bar up/down (the

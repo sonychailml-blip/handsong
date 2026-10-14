@@ -210,6 +210,53 @@ export const REC_KNEE_F=50;
 export const AUT_RAMP_BEAT=1/16;
 export const AUT_RAMP_EPS=0.01;
 export const BEND_EPS_CENTS=5;                    // мёртвая зона бенда терменвокса: сдвиг < 5¢ точку не пишет (само-прореживание: держишь ровно — точек мало, ведёшь бенд — гуще)
+/* ═══ BEND-CURVE: ONE SHAPE LAW FOR CURVED SEGMENTS (bend points and bus automation lanes) ═══
+   A segment's shape lives on its END point: sh 's' glides into it, 'h' steps (holds, then jumps at it); k ∈ [−1, 1] bends a glide
+   (0 / absent = straight; k > 0 starts fast, k < 0 starts slow — the exponential curve of DAW curve handles). A bend point WITHOUT sh
+   is a recorded one and steps, exactly as before this slice (recorded bends are dense, so they already sound smooth). */
+export const CURVE_A=8;                           // k = ±1 puts the midpoint at 98 % / 2 % of the way
+export const curveU=(u,k)=>{ if(!k) return u; const a=-k*CURVE_A; return Math.expm1(a*u)/Math.expm1(a); };
+/* the k whose curve passes the fraction m of the way at the segment's middle (the drag of the middle handle); near straight → 0 */
+export const curveK=m=>{ m=Math.max(0.02,Math.min(0.98,m)); const k=Math.round(-2*Math.log(1/m-1)/CURVE_A*100)/100; return Math.abs(k)<0.04 ? 0 : Math.max(-1,Math.min(1,k)); };
+/* the value of segment p→q at the fraction u (bend: cents) */
+export const bendSeg=(p,q,u)=> p.c+(q.c-p.c)*curveU(u,q.k||0);
+/* a bend curve's cents at x beats from the attack: 0 before the first point, the last point's value after the last one */
+export function bendAt(B,x){
+  if(!B||!B.length) return 0;
+  let i=-1; for(let j=0;j<B.length&&B[j].dt<=x;j++) i=j;
+  if(i<0) return 0;
+  const p=B[i], q=B[i+1];
+  return q && q.sh==='s' && q.dt>p.dt ? bendSeg(p,q,(x-p.dt)/(q.dt-p.dt)) : p.c;
+}
+/* the same curve with a point at x — exact: a curved glide splits into two curves of the same law (k·u and k·(1−u)); a step gets a
+   point holding the value. The same array when a point already sits at x or x is past the last point. */
+export function bendSplit(B,x,eps=1e-9){
+  let i=-1; for(let j=0;j<B.length&&B[j].dt<=x+eps;j++) i=j;
+  if(i<0 || Math.abs(B[i].dt-x)<=eps || i===B.length-1) return B;
+  const p=B[i], q=B[i+1];
+  if(q.sh!=='s') return [...B.slice(0,i+1), { dt:x, c:p.c }, ...B.slice(i+1)];
+  const u=(x-p.dt)/(q.dt-p.dt), k=q.k||0, m={ dt:x, c:bendSeg(p,q,u), sh:'s' }, q2={ ...q };
+  if(k){ m.k=k*u; q2.k=k*(1-u); }
+  return [...B.slice(0,i+1), m, q2, ...B.slice(i+2)];
+}
+/* ⛳ THE ONE FUNCTION THAT TURNS BEND POINTS INTO FREQUENCY RAMPS — live replay and frozen renders both call it (audio.scheduleBend in
+   either engine instance; both import this module). → [{f, at, tc}] for bank.setFreq(f, tc, at): a step point = one setFreq at its
+   time with the bank's default τ (tc undefined — byte for byte the pre-slice schedule); a glide = sub-steps every BEND_GLIDE_STEP_S,
+   each aiming at the curve's value at its sub-step's END with τ = half a step (the follow lags half a step, the aim leads half a step:
+   the pitch rides the curve). `from` (beats) = entering the note late (the chase): the curve's value there, then what follows. */
+export const BEND_GLIDE_STEP_S=0.01, BEND_GLIDE_TC=0.005;
+export function bendPlan(B,base,spb,t0,from=0){
+  const out=[], hz=c=>base*Math.pow(2,c/1200), T=dt=>t0+(dt-from)*spb;
+  let j0=0;
+  if(from>0){ let k=-1; for(let j=0;j<B.length&&B[j].dt<=from;j++) k=j; if(k>=0) out.push({ f:hz(bendAt(B,from)), at:t0 }); j0=k+1; }
+  for(let j=j0;j<B.length;j++){ const q=B[j], p=B[j-1];
+    if(p && q.sh==='s' && q.dt>p.dt){
+      const a=Math.max(p.dt,from), n=Math.max(1,Math.ceil((q.dt-a)*spb/BEND_GLIDE_STEP_S-1e-9));
+      for(let i=1;i<=n;i++){ const x0=a+(q.dt-a)*(i-1)/n, x=a+(q.dt-a)*i/n; out.push({ f:hz(bendSeg(p,q,(x-p.dt)/(q.dt-p.dt))), at:T(x0), tc:BEND_GLIDE_TC }); }
+    } else out.push({ f:hz(q.c), at:T(q.dt) });
+  }
+  return out;
+}
 
 /* Размеры голосовых пулов (всегда запущенные осцилляторы, правило #3 CLAUDE.md).
    Многослойный лупер: аккорды — до ~5 септаккордов (4 слоя + живой).

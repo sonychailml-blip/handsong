@@ -78,7 +78,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   Hygiene (runner fix, 2026-10-14): every exit path (end, failure, time limit, Ctrl+C, SIGTERM, uncaught error) closes the browser with a
   bounded wait, then kills its process tree, then the server (Playwright's own signal handlers are off — the runner's take over); at start
   it lists browsers and profile folders left by earlier sessions (found by Playwright's temp-profile path `playwright_chromiumdev_profile-…`);
-  `--kill-stale` kills / removes them, `--clean-only` does only that; `--selftest-exit sigint|error` fires one exit path 3 s after ▶ (a
+  `--kill-stale` kills / removes them, `--clean-only` does only that; `--limit-start M` (app start limit, default 3 min) and `--cdn-cache`
+  (the pinned MediaPipe files served from `tools/.cdn-cache/`, fetched once — for a slow network); `--selftest-exit sigint|error` fires one exit path 3 s after ▶ (a
   cleanup test). UI checks with REAL input after the seed in every session (`--no-ui` skips): a section marker renamed by mouse double click,
   CDP touch double tap and §✎ (control: the old rename opened inside the press must fail), and a bend point dragged with the mouse (one
   step, cents up). Measured: a hard kill of node (a tool timeout) runs no handler, but Chrome exits by itself when its pipe closes — only
@@ -189,7 +190,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 15. **Track events are scheduled AHEAD at explicit times; the `when` argument stays, and the time is ALWAYS the LAST argument.**
     `scheduleLayers` fires at `loop.t0 + (ev.t + off)*spb` within `SCHED_AHEAD`. Every argument added since (`deg`/`oct`, `glide`, `tie`,
     `bri`) sits BEFORE `when` (`leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when)`, `bassOn(owner,freq,vol,ins,deg,oct,glide,bri,when)`,
-    `leadOff(owner,tie,when)`); every positional caller that passes a time fills new slots explicitly (`leadOff(k, undefined, at)`).
+    `leadOff(owner,tie,when)`, `scheduleBend(owner,points,base,spb,from,when)`); every positional caller that passes a time fills new slots explicitly (`leadOff(k, undefined, at)`).
     An explicit `null` glide means "no glide of my own", never a zero time constant.
 16. **`fixedKey` scales are tuned from an ANCHOR note; the tonic is a KEY within that grid, not a multiplier.** The five historical
     temperaments: always C. Pythagorean: `tunable`, its anchor = its "tuned from" choice. Every fixedKey branch reads
@@ -255,7 +256,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   fires `beforeinstallprompt`).
 - `src/config.js` (leaf, imports nothing) — thresholds, scheduler timings, pool sizes, palette/FX geometry (`palSplitX` = the single
   palette|notes split, `rectBandY`, `coverView` = the single cover crop), volume curve `volAmp(v)=v²`/`volVel`/`volFromOld`,
-  fine-recording constants, `INSTR_COL` (the ONE role palette, different lightness), arrangement sizes.
+  fine-recording constants, `INSTR_COL` (the ONE role palette, different lightness), arrangement sizes, the ONE curve law of bends and bus
+  lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan` — BEND-CURVE).
 - `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `aRef`, `tunedFrom`, instruments, `handFn`,
   `voiceMode`, split + `phoneHalves(W)` (the only `W/2`), registers, camera, editor/window state). Chain-owner key `chainKeyOf(role)`
   → `'role:ld'`, `fxChains`, `FX_VOL`, `chainOwners()`. ⛔ The key is OPAQUE — equality and indexing only, never parsed.
@@ -746,7 +748,8 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   row delete (`'rowdel'`), backing load/removal (`'backing'`), ✕ (`clearSong` → `'clear'`; also the looper hand's clear): events removed /
   added / changed (objects with beats and payloads), capture records by take, track ids with table rows (`laneRow`, `laneDrop` drops the
   freeze), markers. One pending snapshot at a time: ⤺ / backing / row delete during a take fold into the take's step; `probeTake` and
-  `histOff` write none. NOT steps: mute, solo, arm, the brace, tempo, tonic. `histUndo`/`histRedo` (aliases `editUndo`/`editRedo`,
+  `histOff` write none. NOT steps: mute, solo, arm, the brace, tempo, tonic (user answer: listening switches, not edits) — except that the
+  ✕ step carries the brace and ⟳ (`br`, `braceKey`), so ↶ of ✕ brings them back (control `histDbg {noBrace}`). `histUndo`/`histRedo` (aliases `editUndo`/`editRedo`,
   `songUndo`/`songRedo`): refused while recording, pause the transport, `histCommit` bumps the edit version of every track the step
   touches (`histTouched` — events, lane points via their take, chains, snapshot events) → frozen ones go stale and re-freeze ('undo'
   hint). ⛳ TRIPWIRE: each step keeps `h` = `histHash()` (order-free FNV over events: birth number, beat, payload object id, layer; capture
@@ -761,11 +764,26 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   note's time adds a point; 🗑/⌫ deletes the selected point (not the first). `recorder.editBendPoint(ev, 'move'|'add'|'del', i, dt, c)`:
   first point at dt 0, times strictly increasing (clamped between neighbours), inside the note, whole cents ±2400, a NEW payload and array,
   one step (label 'bend'); `bendDbg` = the probe's control (in place). State `rollBendSel`, `rollBendDrag`.
+- **Bend shapes (BEND-CURVE, user request):** a point's optional `sh` ('s' glide / 'h' step) and `k` (curvature −1..1) describe the segment
+  INTO it; NO `sh` = a recorded point = a step exactly as before (recorded bends are dense). A point the person adds or moves glides in, and
+  the next point without a shape glides on (`bendEdited`, pure — the edit and the drag ghost); a delete makes the next shapeless point
+  glide. ONE ramp function `config.bendPlan(B, base, spb, t0, from)` for live replay and renders (both engine instances call it through
+  `scheduleBend`): a step point = one `setFreq` with the bank's default τ (the old schedule, byte for byte); a glide = sub-steps every
+  `BEND_GLIDE_STEP_S` 10 ms aimed at the curve's value at the sub-step's end with τ `BEND_GLIDE_TC` 5 ms. Shape law `curveU(u,k)` =
+  exponential (`CURVE_A` 8). The chase passes `a.bendFrom` (no rewritten curve); `bendTrim`, the ED6 insert/cut (`bendIns`/`bendCut`) split
+  glides EXACTLY (`bendSplit`: a curve splits into k·u and k·(1−u)); curves without glides take the old paths. UI: a hollow diamond at the
+  middle of every glide of the selected note (`rollView.bend.mids`, hit `'bendmid'`) — a vertical drag sets k (`curveK`, snaps to 0 near
+  straight), `recorder.editBendShape(ev, i, sh, k)`; with a bend point selected `#rollShape` ╱/⌐ toggles its incoming glide ↔ step.
 - **Transpose by degrees (ED4):** `recorder.editDegreeSel(evs, n)` / `editDegreeWhy` ('none'|'reg'|'fit'); ui −1°/+1°, Alt+↓/↑. Pitch
   arithmetic is ONE function `scales.shiftDegrees(ti, oct, view, n)`: degree + n in the segment's frozen view, wrapping into the register;
   an out-of-mode pitch moves from the NEAREST degree (tuning steps, a tie takes the lower) keeping its offset (user decision 5); the root one
   register above the last is written as the top tonic. Pitch-only: every pitch-carrying event of each selected segment, glides whole, no
   detach; chords through `segPitchPt` (untyped follow the rule, typed keep the type, T7 refuses); one `editBatch`. Beats never change.
+- **Track into another mode (OWN1):** `#rollMode` lists `scales.modesLikeView(view)` — modes of the SAME tuning (user decision) with the same
+  number of degrees; `recorder.editTrackMode(mode)` / `editTrackModeWhy` ('none'|'same'|'reg'|'fit'|'chords'): every event of the track takes
+  the new view (`scaleView(mode, its tunedFrom, its chord mode if the new mode has it)`), every pitch-carrying event the same degree there by
+  `scales.mapDegrees` (ED4's nearest-degree + offset rule: `degFrom`/`degTo`, shared with `shiftDegrees`); one step (label 'mode'; a `'move'`
+  step may carry `sc`); frozen tracks go stale. Rule #7 holds: the view changes only by this explicit edit of the whole track.
 - **Timbre replacement (T5):** `#rollTimbre`, entries from `audio.timbresOf(role)`, `editSetTimbre` rewrites every note start and timbre-
   carrying `leadSet` (fresh payloads), one entry `kind:'timbre'`; a frozen track goes stale; effects unchanged; no picker on a drone layer.
   ⌫/Delete = `rollDeleteSel` (not in text fields, not on key repeat or with modifiers).
@@ -810,7 +828,9 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   the single door and are non-linear). Per-note smooth segments = change events (`pnPlan`): inside held notes `…Set` every `AUT_RAMP_BEAT`
   where the value moved ≥ `AUT_RAMP_EPS`; marks `a.sh[addr]` ('s' point entered smoothly, 'r' inside) and `a.gen[addr]=1`; a generated solo
   change carries `hold:true` only for a theremin note; glide (`readAt:'pitch'`) gets no ramps or anchors. ╱/⌐ button `#rollShape`
-  (`autShapePoint`, history `'autshape'`, toast). Named limits: a note edit carries its ramp events without rebuilding; anchors only where no
+  (`autShapePoint`, history `'autshape'`, toast). BEND-CURVE: a bus point may carry `k` (curvature of the glide into it; `fxLaneMerge`
+  copies it, `fxLaneAt` applies `curveU`); the selected point's incoming glide shows a diamond (`rollView.aut.mid`, hit `'autmid'`,
+  `recorder.autCurvePoint(rec, k)`, step `'autcurve'`); per-note addresses are NOT curved (they live in note events — later). Named limits: a note edit carries its ramp events without rebuilding; anchors only where no
   event; with several takes on one bus address the lane draws a diagonal across another take's snapshot where playback steps.
 - **Fine recording** (`recorder.fineStep`/`fineKnee`, one automaton for bus capture and per-note values; constants in config): records
   one-unit steps of the AVERAGE over 2 s (jitter σ ≈ 0.002–0.006 averages out), placed at the window's mean sample time, never before a raw
@@ -963,7 +983,16 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   16 steps of every kind, full ↶ and full ↷ compared EXACTLY with a snapshot after each step; CONTROLS: a step kind left out (`histDbg
   {skip:'level'}`) and a redo kept after a new step (`histDbg {keepFuture}`) must fail; the tripwire answers 'changed' after a direct write;
   300 steps kept. **OWN2 bend curve** (`P.checkBend`): move / clamp / first point / add / delete exactly as computed, refusals, one step
-  each, undo/redo bit for bit; CONTROL: an in-place change survives ↶.
+  each, undo/redo bit for bit; CONTROL: an in-place change survives ↶. ED7 (2b): ✕ then ↶ brings the brace and ⟳ back exactly, ↷ clears
+  them; CONTROL `histDbg {noBrace}` must leave the brace following.
+- **BEND-CURVE glides and shapes** (`P.checkBendCurve`, quick and all, deterministic, one short render): recorded curves schedule exactly
+  (===) as before, chase entries too; hand points glide / curve ±0.6 / step through the editor (one step each, ↶/↷ bit for bit); the
+  ramps applied by Web Audio itself (ConstantSource in an OfflineAudioContext) pass the curve within one sub-step's movement; the render
+  copy schedules exactly `bendPlan` of what live replay derives (`render.bendTrace`); bus lane k merges and expands by `curveU`. CONTROLS:
+  hand points as old steps miss the glide midpoint; the straight glide is not "above"; the glide does not "hold"; a lane without k sits on
+  the line. **OWN1** rows: «OWN1 modes by degrees (sweep)» (`checkModeMap`, data, every view × every same-tuning same-size mode × every
+  index and register vs an absolute-step reference; CONTROL: out-of-mode, ties and moved pitches present) and «OWN1 track into another
+  mode» (`checkTrackMode`: solo, bass, chord tracks re-mapped exactly, refusals, the frozen track goes stale).
 - **renders serialized** (`P.checkQueue`): two renders requested at once each equal alone (≤ 1e-4), the queue held both, song and queue
   untouched after.
 - **MX1** (`P.checkMixer`): RMS ratio at track gain 0.25 within 2 %; frozen bus target 0.25, stays fresh; owner gains; master gain 0.8·v².
@@ -1061,7 +1090,7 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   the track chains' effect instances when tracks play (a chord reverb ≈ 49 nodes). Synthetic bench on the (slow) dev desktop: routers ≈ +4 %
   of real time, one extra reverb network ≈ +1 %; a phone may be ≈ 4× that — not measured on a phone.
 - **The one history (ED7)** keeps 300 steps; mute/solo/arm, the brace, tempo and tonic are not steps; ✕ resets a user brace to following
-  (↶ of ✕ restores the song, not the brace). A note starting inside a cut is removed with its tail; a note closed by the next note's
+  (↶ of ✕ restores the song AND the brace with ⟳). A note starting inside a cut is removed with its tail; a note closed by the next note's
   start exactly on an insert point is lengthened (held through the new bars); insert-then-cut leaves beats equal to ~1e-15 beat, not bit
   for bit (float). Copies of a duplicate belong to the source take (⤺ of that take removes them too).
 - **Tonic, A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until the tonic
@@ -1243,6 +1272,13 @@ verified. Full text of every step: archive, "How to verify a change".
 79. Bend curve (OWN2), eye and ear: select a theremin note — white dots on its curve; drag one up → it bends higher (dashed ghost,
     «+35¢ · 1.25»), sideways → it moves in time but not past its neighbours; ✚ then tap inside the note → a new point; 🗑 → the selected
     point goes (the first one stays); each one ↶; play it — the replay follows the new curve.
+80. Brace after ✕ (ED7-fix): set a brace on bars 3–5, ⟳ on, press ✕, then ↶ — the song AND the brace on bars 3–5 with ⟳ on are back.
+81. Bend glides and shapes (BEND-CURVE), headphones: select a theremin note, ✚ and tap two new points far apart in pitch — on ▶ the pitch
+    SLIDES between them (no jump); drag the diamond in the middle up → the slide arrives early, down → late; tap the end point, then ⌐ →
+    hold then jump; ╱ → slide again; each one ↶; an old recorded theremin note sounds exactly as before; on a chord track's reverb lane,
+    select a point → its diamond bends the reverb ramp the same way; frozen and live sound the same (`R.live(n)` vs `await R.aud(n)`).
+82. Track into another mode (OWN1), ear: open a C-major solo track, Mode → Dorian — E becomes E♭ and B becomes B♭ everywhere, rhythm and
+    volumes unchanged; a C# (outside the mode) stays C# — it keeps its distance from C, the nearest degree below a tie; ↶ brings major back; a frozen track re-freezes by itself (dot).
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

@@ -64,7 +64,7 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { shiftDegrees, SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
+import { shiftDegrees, mapDegrees, modesLikeView, SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { fx as stateFx, FX_VOL, trackChainKeyOf, fxChainOf, tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
@@ -75,7 +75,7 @@ import { hooks } from './hooks.js';   // F6b: перестройка панел�
 import { example as userExample, chordModesExample as userCmExample } from './userfiles.js';   // F6b: свой набор из трёх режимов аккордов   // F6: пример файла пользователя — материал пробы удаления
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName, stripProbe } from './draw.js';   // AR2-fix: stripProbe — тексты полосы игры на заданной ширине   // AR2: имя и цвет дорожки (P.checkTrackLook)
-import { INSTR_COL, LANE_NOROLE_COL } from './config.js';   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
+import { INSTR_COL, LANE_NOROLE_COL, bendPlan, bendAt, curveU, BEND_GLIDE_STEP_S, BEND_GLIDE_TC } from './config.js';   // BEND-CURVE: the one ramp law (P.checkBendCurve)   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
 import { arrApi } from './ui.js';
 import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, afBegin, afEnd, afTick, afHint, afPause, afIdle, afBusy, afActive, AF_DELAY } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
 import { chordHold, chainStateOf, routeOfOwner, fxPlaySet, fxParamKeysOf, setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
@@ -87,9 +87,9 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
          laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
-         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer, setLiveIsolation, fxPlayDriving, autPoints, autMovePoint, autAddPoint, autDeletePoint, regionOn, seekTo, setLiveLeakDbg, WchOn, WchOff, toggleArm, editMoveSel, editDeleteSel, editCanUndo, editCopySel, editPaste, editDuplicateSel, editSetTimbre, editHistPeek, editRevert, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, autAddrs, sections, secAdd, songEdit, songEditWhy, songUndo, songRedo, songCanUndo, secDbg, songHistReset, laneVerKeep, takeFxDump, secDelete, histReset, histLen, histUndo, histRedo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg, onUndo, clearJam, secRename, editBendPoint, bendDbg } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
-import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX, checkDegrees as checkDegreesData } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
-export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour, checkDegrees as checkDegreesData } from './probedata.js';
+         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer, setLiveIsolation, fxPlayDriving, autPoints, autMovePoint, autAddPoint, autDeletePoint, regionOn, seekTo, setLiveLeakDbg, WchOn, WchOff, toggleArm, editMoveSel, editDeleteSel, editCanUndo, editCopySel, editPaste, editDuplicateSel, editSetTimbre, editHistPeek, editRevert, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, autAddrs, sections, secAdd, songEdit, songEditWhy, songUndo, songRedo, songCanUndo, secDbg, songHistReset, laneVerKeep, takeFxDump, secDelete, histReset, histLen, histUndo, histRedo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg, onUndo, clearJam, secRename, editBendPoint, bendDbg, braceSet, braceProbe, editBendShape, autCurvePoint, fxLaneMerge, fxLaneExpand, editTrackMode, editTrackModeWhy, trackViewOfLayer } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX, checkDegrees as checkDegreesData, checkModeMap } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
+export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour, checkDegrees as checkDegreesData, checkModeMap } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -431,10 +431,13 @@ const ALL_RUNS=[
   ['ED3 quantise after recording',()=>checkQuant(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED4 transpose by degrees',()=>checkDegrees(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED4 degrees (sweep)',()=>checkDegreesData(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['OWN1 modes by degrees (sweep)',()=>checkModeMap(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['OWN1 track into another mode',()=>checkTrackMode(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED5 volume bars',()=>checkVolBars(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED6 sections',()=>checkSections(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED7 one history',()=>checkHistory(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['OWN2 bend curve',()=>checkBend(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['BEND-CURVE glides and shapes',()=>checkBendCurve(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AR1 arrangement window',()=>checkArrange(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['MX1 track level and master',()=>checkMixer(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -1496,6 +1499,223 @@ export function checkBend(){
   if(!nBad) console.log('[scaleprobe OWN2] bend points move, clamp, add and delete exactly as computed here, the first stays at 0; refusals change nothing; one history step each, undo/redo bit for bit; CONTROL: an in-place change survives ↶');
   return out();
 }
+/* ═══ BEND-CURVE: GLIDES AND SHAPES — P.checkBendCurve ═══
+   Deterministic (no real-time capture). Material: a temporary theremin take after the song end — a recorded-style curve [0:0, 1:0, 6:0]
+   (no shapes), 8 beats long; its row is deleted at the end.
+   (1) RECORDED CURVES UNCHANGED: for every theremin note of the song, config.bendPlan gives exactly (===) the pre-slice schedule — one
+       setFreq per point at t0 + dt·spb with the bank's default τ — and every chase entry (each point's beat and each midpoint) exactly the
+       pre-slice chase rewrite; chaseNote hands the whole curve and its entry beat. CONTROL: a curve with one glide must differ.
+   (2) THROUGH THE EDITOR (each one history step, undo/redo bit for bit — edKit): a hand-added point glides in and the recorded point after
+       it glides on; then with two hand-added points (beat 2 at 0¢, beat 4 at +300¢) the glide between them curved +0.6 and −0.6 and
+       switched to a step; refusals (no change, the first point).
+   (3) THE PITCH ALONG THE CURVE: each captured curve's ramps (bendPlan) applied by Web Audio itself (a ConstantSource offset in an
+       OfflineAudioContext, setTargetAtTime as a bank does) and read back: the glide passes 75 / 150 / 225¢ at beats 2.5 / 3 / 3.5; +0.6
+       above and −0.6 below the straight line at their curve's value; the step holds 0¢ just before beat 4 and is at +300¢ 0.2 s after.
+       Tolerance = how far the ideal curve moves within one sub-step around that moment (the ramp's own resolution). CONTROLS that must
+       fail: the old behaviour (hand points without shapes) for the glide; the straight glide for "above the line"; the glide for "holds".
+   (4) LIVE = RENDER: what the render copy schedules for the temporary track (render.bendTrace, the curved glide applied) carries the
+       event's curve, its attack pitch (evHz), the tempo and no entry beat, and its ramps equal bendPlan for those arguments exactly — the
+       arguments live replay derives (recorder ENG.leadOn) and the function it calls.
+   (5) BUS LANES: two hand points on a chord track's reverb lane; the glide into the second curved +0.6 / −0.6 (one step each, ↶/↷ exact):
+       the merged lane (fxLaneMerge — what ▶ and the render read) carries k and its expansion passes above / below the line at the
+       midpoint by the curve law. CONTROL: the lane without k sits on the line (must fail "above"). */
+export async function checkBendCurve(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const K=edKit(miss,()=>cases++), M=loop.metre, spb=60/loop.bpm, r2=x=>Math.round(x*100)/100, done=r=> !!r && r!=='changed';
+  const oldPlan=(B,base,t0)=>B.map(p=>({ f:base*Math.pow(2,p.c/1200), at:t0+p.dt*spb, tc:undefined }));
+  const oldChase=(B,base,t0,off)=>{ let k=-1; for(let j=0;j<B.length&&B[j].dt<=off;j++) k=j;
+    const nb= k>=0 ? [{ dt:0, c:B[k].c }] : []; for(let j=k+1;j<B.length;j++) nb.push({ dt:B[j].dt-off, c:B[j].c }); return oldPlan(nb,base,t0); };
+  const eqPlan=(A,B)=> A.length===B.length && A.every((x,i)=>x.f===B[i].f && x.at===B[i].at && x.tc===B[i].tc);
+  const restoreVer=laneVerKeep(), S00=K.snap(), FX00=takeFxDump();
+  let tmpLy=null, autLy=null, ev=null; const cap={};
+  try{
+    const T0=Math.ceil(songBeats()/M-1e-9)*M+M;
+    const R=seedTake([{ fn:'leadOn', a:{ deg:2, oct:1, vol:0.8, inst:0, bend:[{dt:0,c:0},{dt:1,c:0},{dt:6,c:0}], v:0 }, t:T0, id:1 },
+                      { fn:'leadOff', a:{ v:0 }, t:T0+8, id:1 }]);
+    ev= R ? events.find(e=>e.tk===R.take&&e.fn==='leadOn') : null; tmpLy= ev ? ev.layer : null;
+    if(!ev){ miss('the temporary theremin take could not be recorded'); return out(); }
+    histReset();
+    const S0=K.snap();
+    /* (1) recorded curves */
+    const th=songNotes().notes.filter(n=>n.role==='ld' && n.head.a && n.head.a.bend && n.head.a.bend.length && !n.head.a.bend.some(p=>p.sh));
+    song=th.length;
+    if(th.length<2) miss(`${th.length} recorded theremin notes in the song (the seed has one, the probe adds one)`);
+    for(const n of th){ cases++; const h=n.head, B=h.a.bend, base=evHz(h.a,h,'ld'), t0=1.25, at=`L${n.layer+1} beat ${r2(n.start)}`;
+      if(!eqPlan(bendPlan(B,base,spb,t0,0), oldPlan(B,base,t0))){ miss(`${at}: a recorded curve is not scheduled exactly as before`); continue; }
+      const xs=[...new Set([...B.map(p=>p.dt), ...B.slice(1).map((p,i)=>(B[i].dt+p.dt)/2)])].filter(x=>x>0);
+      for(const off of xs) if(!eqPlan(bendPlan(B,base,spb,t0,off), oldChase(B,base,t0,off))){ miss(`${at}: entering at +${r2(off)} beats is not scheduled exactly as the old chase`); break; }
+      for(const off of xs){ const x=n.start+off; if(n.end!=null && x>=n.end) continue;
+        const s=chaseFor(x).find(c=>c.on===h); if(!s) continue;
+        const A=chaseNote(s,x).a; if(A.bend!==B || A.bendFrom!==x-h.t){ miss(`${at}: the chase at +${r2(off)} hands bend ${A.bend===B?'(same)':'(another)'} from ${A.bendFrom}`); break; } } }
+    { cases++; const B=[{dt:0,c:0},{dt:1,c:0},{dt:3,c:300,sh:'s'}];
+      if(eqPlan(bendPlan(B,440,spb,0,0), oldPlan(B,440,0))) miss('CONTROL: a curve with a glide is scheduled as the old steps — the comparison cannot fail'); }
+    /* (2) the editor */
+    const ly=tmpLy, Bnow=()=>ev.a.bend, cp=()=>Bnow().map(q=>({ ...q }));
+    K.rt('a hand-added point glides in, the recorded point after it glides on', ly, ()=>{ const r=editBendPoint(ev,'add',null,2,0);
+      return r!==false && { r:true, check:()=>{ const B=Bnow(); return B[2].sh==='s' && B[3].sh==='s' && !B[1].sh ? null : `shapes ${JSON.stringify(B.map(q=>q.sh||'-'))}, intended - - s s`; } }; });
+    if(!K.open(ly)){ miss('the editor would not open the temporary track'); return out(); }
+    const h0=histLen();
+    if(editBendPoint(ev,'add',null,2,0)===false || editBendPoint(ev,'add',null,4,300)===false || histLen()!==h0+2){ miss('the two hand points could not be added (one step each)'); return out(); }
+    cap.glide=cp();
+    if(JSON.stringify(cap.glide)!==JSON.stringify([{dt:0,c:0},{dt:1,c:0},{dt:2,c:0,sh:'s'},{dt:4,c:300,sh:'s'},{dt:6,c:0,sh:'s'}])) miss(`two hand points: the curve is ${JSON.stringify(cap.glide)}`);
+    for(const [k,key] of [[0.6,'up'],[-0.6,'down']])
+      K.rt(`the glide between them curved ${k>0?'+':''}${k}`, ly, ()=>{ const r=editBendShape(ev,3,'s',k);
+        return r!==false && { r:true, check:()=>{ cap[key]=cp(); return Bnow()[3].k===k && Bnow()[3].sh==='s' ? null : `point 3 is ${JSON.stringify(Bnow()[3])}`; } }; });
+    K.rt('the glide switched to a step', ly, ()=>{ const r=editBendShape(ev,3,'h');
+      return r!==false && { r:true, check:()=>{ cap.step=cp(); return Bnow()[3].sh==='h' ? null : `point 3 is ${JSON.stringify(Bnow()[3])}`; } }; });
+    K.rt('a shape that changes nothing (refused)', ly, ()=>editBendShape(ev,3,'s'), { refuse:true });
+    K.rt('the first point has no segment into it (refused)', ly, ()=>editBendShape(ev,0,'h'), { refuse:true });
+    /* (4) live = render, with the curved glide in place */
+    { cases++; K.open(ly);
+      if(editBendShape(ev,3,'s',0.6)===false) miss('(4): the curve could not be set');
+      editClose();
+      let log=null; try{ const RR=await import('./render.js'); log=await RR.bendTrace(ly); }catch(e){ miss(`(4): the render failed — ${e&&e.message}`); }
+      const want=JSON.stringify(ev.a.bend), base=evHz(ev.a,ev,'ld');
+      const L=(log||[]).filter(x=>JSON.stringify(x.B)===want);
+      if(log && L.length!==1) miss(`(4): the render scheduled ${L.length} curves equal to the note's (of ${log.length} calls), one intended`);
+      for(const x of L){
+        if(x.base!==base) miss(`(4): the render's attack pitch is ${x.base} Hz, live derives ${base} Hz`);
+        if(x.spb!==spb) miss(`(4): the render's beat is ${x.spb} s, live uses ${spb} s`);
+        if(x.from!==0) miss(`(4): the render enters the curve at ${x.from}, not 0`);
+        if(!eqPlan(x.plan, bendPlan(ev.a.bend,base,spb,x.t0,0))) miss('(4): the render ramps differ from bendPlan for the same arguments');
+        const B=ev.a.bend, ng=x.plan.filter(s=>s.tc===BEND_GLIDE_TC).length;
+        const ex=B.reduce((n,q,j)=> n + (j && q.sh==='s' ? Math.ceil((q.dt-B[j-1].dt)*spb/BEND_GLIDE_STEP_S-1e-9) : 0), 0);
+        if(ng!==ex || !ng) miss(`(4): ${ng} glide sub-steps in the render, ${ex} intended (one per ${BEND_GLIDE_STEP_S*1000} ms of each glide)`); }
+      if(!done(histUndo())) miss('(4): the curve step could not be undone'); }
+    { let ok=true; for(let i=0;i<2;i++) ok=done(histUndo())&&ok;
+      if(editIsOpen()) editClose(); const d=K.same(K.snap(),S0); if(!ok||d) miss(`the temporary note is not back after undoing the two points — ${d||'undo refused'}`); }
+    /* (3) the pitch along the curve, applied by Web Audio */
+    const base=evHz(ev.a,ev,'ld'), SR=16000, Tq=0.05, db=BEND_GLIDE_STEP_S/spb;
+    const evalAt=async(B,secs)=>{ const plan=bendPlan(B,base,spb,Tq,0), end=Tq+Math.max(...secs)+0.3;
+      const oc=new OfflineAudioContext(1,Math.ceil(end*SR),SR), cs=oc.createConstantSource();
+      cs.offset.setValueAtTime(base,0);
+      for(const s of plan) cs.offset.setTargetAtTime(s.f, s.at, s.tc===undefined ? 0.02 : s.tc);   // 0.02 — the banks' default τ (audio LEAD_GLIDE_TC)
+      cs.connect(oc.destination); cs.start(0);
+      const d=(await oc.startRendering()).getChannelData(0);
+      return secs.map(s=>1200*Math.log2(d[Math.round((Tq+s)*SR)]/base)); };
+    const tolAt=(B,x)=>Math.max(0.05, Math.abs(bendAt(B,x+db)-bendAt(B,x)), Math.abs(bendAt(B,x)-bendAt(B,x-db)));
+    const near=async(B,xs)=>{ const v=await evalAt(B,xs.map(x=>x*spb)); return xs.map((x,i)=>({ x, v:v[i], want:bendAt(B,x), tol:tolAt(B,x) })); };
+    const offBy=Rs=>Rs.filter(r=>Math.abs(r.v-r.want)>r.tol);
+    const fmt=Rs=>Rs.map(r=>`beat ${r.x}: ${r2(r.v)}¢ (curve ${r2(r.want)}¢ ±${r2(r.tol)})`).join('; ');
+    if(cap.glide){ cases+=2;
+      const G=await near(cap.glide,[2.5,3,3.5]); if(offBy(G).length) miss(`the glide misses its curve — ${fmt(offBy(G))}`);
+      if(Math.abs(G[1].want-150)>1e-9) miss(`the glide's midpoint by the law is ${G[1].want}¢, not 150`);
+      const ctl=cap.glide.map(({ sh, k, ...q })=>q), C=await near(ctl,[3]);
+      if(Math.abs(C[0].v-G[1].want)<=G[1].tol) miss(`CONTROL: hand points acting as steps (the old behaviour) still pass the glide's midpoint (${r2(C[0].v)}¢)`); }
+    else miss('(3): the glide curve was not captured');
+    for(const [key,sg] of [['up',1],['down',-1]]){ if(!cap[key]){ miss(`(3): the ${key} curve was not captured`); continue; } cases++;
+      const [r]=await near(cap[key],[3]);
+      if(offBy([r]).length) miss(`the curved glide (${key}) misses its curve — ${fmt([r])}`);
+      if(!(sg*(r.v-150)>r.tol)) miss(`the curved glide (${key}) is not ${sg>0?'above':'below'} the straight line: ${r2(r.v)}¢ at the midpoint`); }
+    if(cap.glide){ cases++; const [r]=await near(cap.glide,[3]); if(r.v-150>r.tol) miss(`CONTROL: the straight glide reads as above the line (${r2(r.v)}¢) — the check cannot fail`); }
+    if(cap.step){ cases++;
+      const [a]=await evalAt(cap.step,[4*spb-0.02]), [b]=await near(cap.step,[4+0.2/spb]);
+      if(Math.abs(a)>0.01) miss(`the step does not hold before its point: ${r2(a)}¢ just before beat 4`);
+      if(offBy([b]).length || b.want<250) miss(`the step does not jump to +300¢ at beat 4 — ${fmt([b])}`);
+      if(cap.glide){ const [g]=await evalAt(cap.glide,[3.5*spb]); if(Math.abs(g)<=0.01) miss('CONTROL: the glide reads as holding — the hold check cannot fail'); } }
+    else miss('(3): the step curve was not captured');
+    /* (5) bus lanes */
+    autLy=laneOrder().find(l=>laneRoleOf(l)==='ch' && freezeState(l)==='none' && !events.some(e=>e.layer===l&&e.jam)) ?? null;
+    if(autLy==null || !editOpen(autLy)) miss('(5): no unfrozen chord track to put lane points on');
+    else { const A=autAddrs(autLy).find(x=>x.fx==='reverb'), F0=takeFxDump(), t1=T0+1, t2=T0+5, n0=histLen();
+      const p1=A&&autAddPoint(autLy,A.fx,A.p,t1,0.2), p2=A&&autAddPoint(autLy,A.fx,A.p,t2,0.8);
+      if(!p1||!p2) miss('(5): two lane points could not be added (no reverb on the chord track)');
+      else {
+        if(p2.sh!=='s') miss(`(5): the second hand point enters with ${p2.sh}, not a glide`);
+        const recOf=()=>autPoints(autLy,A.key,A.fx,A.p).pts.find(r=>r.pt===p2);
+        const mid=()=>{ const L=fxLaneMerge(), e=L.find(x=>x.fx===A.fx&&x.p===A.p&&x.t===t1&&x.v===0.2&&x.nx&&x.nx.t===t2);
+          if(!e) return null; const X=fxLaneExpand([e,e.nx],(t2-t1)/2).find(x=>Math.abs(x.t-(t1+t2)/2)<1e-9); return X ? { v:X.v, k:e.nx.k } : null; };
+        for(const k of [0.6,-0.6]){ cases++; const h1=histLen(), k0=p2.k;
+          if(!autCurvePoint(recOf(),k) || histLen()!==h1+1){ miss(`(5): curving the lane glide by ${k} was refused or took ${histLen()-h1} steps`); continue; }
+          const m=mid(), want=0.2+0.6*curveU(0.5,k);
+          if(!m) miss(`(5): the merged lane lost the glide (k ${k})`);
+          else { if(m.k!==k) miss(`(5): the merged lane carries k ${m.k}, not ${k}`);
+            if(Math.abs(m.v-want)>1e-12) miss(`(5): the expanded midpoint is ${m.v}, the curve law gives ${want}`);
+            if(!(Math.sign(k)*(m.v-0.5)>0.01)) miss(`(5): the curved lane (k ${k}) is not ${k>0?'above':'below'} the line at its midpoint (${r2(m.v)})`); }
+          if(!done(histUndo()) || p2.k!==k0) miss(`(5): ↶ did not bring the curvature ${k0} back (k ${p2.k})`);
+          if(!done(histRedo()) || p2.k!==k) miss(`(5): ↷ did not bring the curvature ${k} back (k ${p2.k})`); }
+        { cases++; const k=p2.k; delete p2.k; const m=mid(); p2.k=k;
+          if(m && m.v-0.5>0.01) miss('CONTROL: the lane without its curvature still reads above the line — the check cannot fail'); }
+        while(histLen()>n0 && done(histUndo())){ /* back to before the lane points */ }
+        if(takeFxDump()!==F0) miss('(5): the captured lanes are not back after undoing the lane edits'); }
+      editClose(); }
+  } finally {
+    if(editIsOpen()) editClose();
+    if(tmpLy!=null){ laneDelTap(tmpLy); laneDelTap(tmpLy); }
+    histReset(); restoreVer();
+    { const d=K.same(K.snap(),S00); if(d) miss(`the song is not back as it was before the probe — ${d}`); }
+    if(takeFxDump()!==FX00) miss('the captured lanes are not back as before the probe');
+  }
+  console.log(`[scaleprobe BEND-CURVE] recorded theremin notes ${song} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe BEND-CURVE] '+m));
+  if(!nBad) console.log('[scaleprobe BEND-CURVE] recorded curves schedule exactly as before; hand points glide, curve up/down and step exactly as the shape law says (read back from Web Audio); the render schedules what live replay computes; bus lanes curve by the same law; CONTROLS fail');
+  return out();
+}
+/* ═══ OWN1: A TRACK INTO ANOTHER MODE — P.checkTrackMode ═══
+   On the seed, through recorder.editTrackMode with the editor open (edKit: one history step, undo / redo bit for bit, nothing else in the
+   song changes): for the first unfrozen solo, bass and chord track, the first other mode it can go to (scales.modesLikeView) — every event
+   of the track takes that mode's view; every pitch-carrying event gets exactly the pitch scales.mapDegrees gives (expected from the state
+   before, computed here); beats, volumes and bends unchanged. The seed's frozen track goes stale with the edit and after its ↶ (it
+   re-freezes by itself), fresh again once the edit versions are back. Refusals: the same mode, a mode of another tuning or with another
+   number of degrees, a drum track. CONTROL: each case must move pitches (a no-op re-map would pass a weaker check). */
+export function checkTrackMode(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const K=edKit(miss,()=>cases++), restoreVer=laneVerKeep();
+  const pitchOf=e=> e.a && typeof e.a.ti==='number';
+  try{
+    for(const role of ['ld','bs','ch']){
+      const ly=K.layersOf(role).find(l=>trackViewOfLayer(l)); if(ly==null){ miss(`no unfrozen ${role} track in the song`); continue; }
+      const v=trackViewOfLayer(ly), M=modesLikeView(v).filter(m=>m!==(v.mode||v));
+      if(!K.open(ly)){ miss(`L${ly+1}: the editor would not open`); continue; }
+      const moves=x=>events.some(e=>e.layer===ly && e.a && typeof e.a.ti==='number' && (q=>q && (q.ti!==e.a.ti||q.oct!==(e.a.oct|0)))(mapDegrees(e.a.ti, e.a.oct|0, e.sc, scaleView(x, v.tunedFrom))));
+      const m=M.find(x=>editTrackModeWhy(x)===null && moves(x)); if(!m){ miss(`L${ly+1} (${role}, ${v.id}): no other mode it can go to that moves a pitch (${M.length} of the same tuning and size)`); continue; }   // material: a target where the track's pitches really move
+      song++;
+      const E0=events.filter(e=>e.layer===ly).map(e=>({ e, t:e.t, a:e.a }));
+      K.rt(`L${ly+1} ${role}: ${v.id} → ${m.id}`, ly, ()=>{ const r=editTrackMode(m);
+        return r && { r:true, pitch:false, check:()=>{ const v2=trackViewOfLayer(ly); let moved=0;
+          if(!v2 || (v2.mode||v2)!==m) return `the track's view is ${v2&&v2.id}, not ${m.id}`;
+          for(const x of E0){ const e=x.e;
+            if(e.sc!==v2) return `the ${e.fn} at beat ${K.beat(e.t)} kept another view (${e.sc&&e.sc.id})`;
+            if(e.t!==x.t) return `the ${e.fn} at beat ${K.beat(x.t)} moved in time`;
+            if(!pitchOf(e)){ if(e.a!==x.a) return `the ${e.fn} at beat ${K.beat(x.t)} without a pitch got a new payload`; continue; }
+            const w=mapDegrees(x.a.ti, x.a.oct|0, v, v2);
+            if(!w || e.a.ti!==w.ti || e.a.oct!==w.oct) return `the ${e.fn} at beat ${K.beat(x.t)}: ${x.a.ti}/${x.a.oct} → ${e.a.ti}/${e.a.oct}, intended ${w&&w.ti}/${w&&w.oct}`;
+            if(e.a.ti!==x.a.ti || e.a.oct!==x.a.oct) moved++;
+            for(const f of ['vol','bend','fx','inst','ty','bri']) if(e.a[f]!==x.a[f]) return `the ${e.fn} at beat ${K.beat(x.t)} changed its ${f}`; }
+          return moved ? null : `CONTROL: no pitch moved (${E0.length} events) — the case proves nothing`; } }; });
+      K.rt(`L${ly+1}: its own mode (refused)`, ly, ()=>editTrackMode(v.mode||v), { refuse:true });
+      { cases++; if(editTrackModeWhy(v.mode||v)!=='same') miss(`L${ly+1}: the reason for its own mode is ${editTrackModeWhy(v.mode||v)}, not 'same'`); }
+      const other=SCALES.find(x=>x.sel && x.tuning!==(v.mode||v).tuning), size=SCALES.find(x=>x.sel && x.tuning===(v.mode||v).tuning && x.iv.length!==v.iv.length);
+      if(other) K.rt(`L${ly+1}: a mode of another tuning (${other.id}, refused)`, ly, ()=>editTrackMode(other), { refuse:true });
+      if(size) K.rt(`L${ly+1}: a mode with ${size.iv.length} degrees (${size.id}, refused)`, ly, ()=>editTrackMode(size), { refuse:true });
+    }
+    { const ly=laneOrder().find(l=>laneRoleOf(l)==='dr' && freezeState(l)==='none' && !events.some(e=>e.layer===l&&e.jam));
+      if(ly!=null) K.rt(`L${ly+1}: a drum track (refused)`, ly, ()=>editTrackMode(SCALES.find(x=>x.sel)), { refuse:true }); }
+    /* the frozen track */
+    const FZ=laneOrder().find(l=>freezeState(l)==='fresh' && trackViewOfLayer(l) && laneRoleOf(l)!=='dr');
+    if(FZ==null) miss('the seed has no frozen pitched track');
+    else { cases++; const v=trackViewOfLayer(FZ), m=modesLikeView(v).find(x=>x!==(v.mode||v));
+      if(!m) miss(`L${FZ+1}: its mode ${v.id} has no other mode of the same tuning and size`);
+      else if(!editOpen(FZ)) miss(`L${FZ+1}: the editor would not open the frozen track`);
+      else { const r=editTrackMode(m); editClose();
+        if(!r) miss(`L${FZ+1}: re-mapping the frozen track was refused (${editTrackModeWhy(m)})`);
+        else { if(freezeState(FZ)!=='stale') miss(`L${FZ+1}: after the re-map its freeze is ${freezeState(FZ)}, not stale`);
+          const u=histUndo(); if(!u||u==='changed') miss(`L${FZ+1}: undo refused (${u})`);
+          if(trackViewOfLayer(FZ)!==v) miss(`L${FZ+1}: undo did not bring its view back`);
+          if(freezeState(FZ)!=='stale') miss(`L${FZ+1}: after the undo its freeze is ${freezeState(FZ)} — a track touched by ↶ re-freezes by itself`);
+          restoreVer(); if(freezeState(FZ)!=='fresh') miss(`L${FZ+1}: not fresh again once the edit versions are back (${freezeState(FZ)})`); } } }
+  } finally { if(editIsOpen()) editClose(); histReset(); restoreVer(); }
+  console.log(`[scaleprobe OWN1] tracks ${song} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe OWN1] '+m));
+  if(!nBad) console.log('[scaleprobe OWN1] a whole track takes the new view and every pitch lands on the same degree of the new mode (an out-of-mode note keeps its offset); one history step, undo/redo bit for bit; refusals change nothing; the frozen track goes stale');
+  return out();
+}
 /* ═══ ED7: ONE HISTORY — P.checkHistory ═══
    (1) FROZEN: an editor step on the seed's frozen track makes it stale; its ↶ leaves it stale (the track re-freezes by itself), the
        edit versions restored → fresh again.
@@ -1581,6 +1801,22 @@ export async function checkHistory(){
     for(let i=S.length-1;i>0;i--) if(!done(histUndo())){ miss('the final undo to the start was refused'); break; }
     { const d=diff(snap(),S00); if(d) miss(`the song is not back at the start after the sequence — ${d}`); }
     histReset();
+    /* (2b) ✕ then ↶ brings the brace and ⟳ back exactly (user answer 2026-10-14); ↷ clears them again. CONTROL: a ✕ that forgets the
+       brace (histDbg noBrace) must leave it following after ↶. */
+    { const rg0=braceProbe(null), bk=()=>JSON.stringify([loop.rgn.user,loop.rgn.from,loop.rgn.to,loop.rgn.on]);
+      for(const ctl of [false,true]){ cases++;
+        braceSet(M,3*M); setRegionOn(true); if(loop.on) onLoop();
+        const want=bk(); if(!loop.rgn.user||!loop.rgn.on){ miss('(2b): the brace could not be set for the case'); break; }
+        histDbg(ctl?{ noBrace:true }:null); clearSong(); histDbg(null);
+        const gone=bk(); if(loop.rgn.user||loop.rgn.on) miss(`(2b): ✕ left the brace ${gone}`);
+        const u=histUndo(), got=bk();
+        if(!done(u)) miss(`(2b): undo of ✕ refused (${u})`);
+        else if(!ctl && got!==want) miss(`(2b): ↶ of ✕ gives the brace ${got}, it was ${want}`);
+        else if(ctl && got===want) miss('(2b) CONTROL: with ✕ forgetting the brace, ↶ still brought it back — the check cannot fail');
+        if(!ctl){ const r=histRedo(); if(!done(r)) miss(`(2b): redo of ✕ refused (${r})`); else if(bk()!==gone) miss(`(2b): ↷ of ✕ gives the brace ${bk()}, not ${gone}`);
+          if(!done(histUndo())) miss('(2b): the second undo of ✕ was refused'); else if(bk()!==want) miss(`(2b): the second ↶ gives the brace ${bk()}, not ${want}`); }
+        { const d=diff(snap(),S00); if(d) miss(`(2b): the song is not back after ↶ of ✕ — ${d}`); }
+        braceProbe(rg0); histReset(); } }
     /* (3) controls and the tripwire */
     { cases++; const A=snap(), v0=laneLevelOf(ly);
       histDbg({ skip:'level' }); setLaneLevel(ly,0.42); histTab(ly,'level',v0); histDbg(null);

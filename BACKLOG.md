@@ -42,9 +42,10 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > re-freeze until the tonic freeze) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only) · ✅ **AF5 + hard rule #31**
 > (a track and the live hands never share sound state: each role has a separate TRACK chain) · ✅ RENDER-LEAK (non-KS renders collected).
 > Next: AF6 rest (below, §1).
-> **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (✅ ED1 selection, ✅ ED2 copy/paste/duplicate, ✅ ED3 quantise, ✅ ED4 by degrees, ✅ ED5 volume bars, ✅ ED6 sections, ✅ ED7 one undo (2026-10-14); then OWN1 — OWN2 bend curve ✅ 2026-10-14) →
-> editor-own (OWN1 mode by degrees — only modes of the same tuning, out-of-mode notes keep their offset; OWN2 theremin bend curve;
-> OWN3 cents per row DEFERRED — user, 2026-10-13) → tonic freeze (its plan proposes "key into the note index or into the view") → VOL-5…VOL-7 → FOUNDATION (stable mode and timbre ids, song and
+> **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (✅ ED1 selection, ✅ ED2 copy/paste/duplicate, ✅ ED3 quantise, ✅ ED4 by degrees, ✅ ED5 volume bars, ✅ ED6 sections, ✅ ED7 one undo (2026-10-14)) →
+> editor-own (✅ OWN1 mode by degrees — same tuning, same number of degrees, out-of-mode notes keep their offset; ✅ OWN2 theremin bend curve
+> + ✅ BEND-CURVE glides/shapes/steps on bends and bus lanes, 2026-10-14; LATER: curvature on per-note lanes (Volume, brightness, glide), OWN1
+> into modes with a different number of degrees (needs a rule — ask the user); OWN3 cents per row DEFERRED — user, 2026-10-13) → tonic freeze (its plan proposes "key into the note index or into the view") → VOL-5…VOL-7 → FOUNDATION (stable mode and timbre ids, song and
 > timbre format; §1, §7.4) → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
 > export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).
 > **Last stage, after everything else:** the LESSONS / TUTORIAL update (§3.6, §3.20) — no lesson edits before it (user, 2026-10-13).

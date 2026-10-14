@@ -212,3 +212,16 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/scaleprobe.js`: `checkHistory` (row «ED7 one history»), `checkBend` (row «OWN2 bend curve»)
 - `tools/probe-browser.mjs`: `uiSecRename`, `uiBendDrag`; flag `--no-ui`
 - Stale since ED7: `songHist`, `songFuture`, `songPrint`, `printSame` (recorder; ED6's song history merged into the one history); `editHist`, `editFuture` (renamed `hist`, `histFut`)
+
+## Added at ED7-fix / BEND-CURVE / OWN1
+- `src/config.js`: `CURVE_A`, `curveU`, `curveK`, `bendSeg`, `bendAt`, `bendSplit`, `BEND_GLIDE_STEP_S`, `BEND_GLIDE_TC`, `bendPlan`; bend point fields `sh` ('s'/'h'), `k`
+- `src/audio.js`: `bendTap`, `bendTapSet`; `scheduleBend(owner, points, base, spb, from, when)`
+- `src/recorder.js`: ED7-fix `histNoBrace`, `braceKey`, snap step field `br`; BEND-CURVE `bendEdited`, `bendNoteOf`, `bendCommit`, `editBendShape`, `autCurvePoint`, step kind `'autcurve'`, lane point field `k`, chase field `a.bendFrom`, section helpers `bendIns`, `bendCut`; OWN1 `trackViewOfLayer`, `trackModePlan`, `editTrackModeWhy`, `editTrackMode` (label `'mode'`; a `'move'` step may carry `sc`)
+- `src/scales.js`: `degFrom`, `degTo`, `modesLikeView`, `mapDegrees`
+- `src/draw.js`: `BEND_DRAW_N`, `bendPathOf`, `bendStroke`, `AUT_CURVE_N`, `rollAutValAt`; snapshots `rollView.bend.mids`, `rollView.aut.mid`; hits `'bendmid'`, `'autmid'`
+- `src/ui.js`: `bendShapeState`, `renderModeCtl`, `rollModeEl`; `rollGrab.bendMid`, `rollGrab.autMid`
+- `src/render.js`: `bendTrace`
+- `index.html`: `#rollMode`
+- `src/i18n.js`: `roll.modeTitle`, `roll.modeDone`, `roll.modeNo.*`, `hist.k.mode`
+- `src/scaleprobe.js`: `checkBendCurve` (row «BEND-CURVE glides and shapes»), `checkTrackMode` (row «OWN1 track into another mode»); `src/probedata.js`: `checkModeMap` (row «OWN1 modes by degrees (sweep)»)
+- `tools/probe-browser.mjs`: `--limit-start M`, `--cdn-cache` (`CDN_CACHE`, `CDN_DIR`, `cdnCache`; folder `tools/.cdn-cache/`, git-ignored)

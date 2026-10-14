@@ -675,15 +675,34 @@ export function modeSlotOfTi(ti, oct, s=CUR()){
    top tonic (the editor's top row). → { ti, oct } (oct may leave the registers — the caller refuses) or null (no mode selection). */
 export function shiftDegrees(ti, oct, s, n){
   if(typeof ti!=='number' || !s || !s.sel || !Number.isInteger(n)) return null;
+  const F=degFrom(ti,s);
+  return degTo(s, F.best+n, F.delta, oct+F.c);
+}
+/* ED4/OWN1: the nearest degree of mode s to tuning index ti (a tie takes the lower), the offset from it, the register carry */
+function degFrom(ti,s){
   const T=tuningOf(s), E=tSize(T), N=s.iv.length;
   let j=ti-s.root, c=Math.floor(j/E); j-=E*c;
   let best=0, dist=Infinity;
   for(let d=0; d<=N; d++){ const x=Math.abs(j-(degK(s,d,T)-s.root)); if(x<dist){ dist=x; best=d; } }
   const delta=j-(degK(s,best,T)-s.root); if(best===N){ best=0; c++; }
-  const D=best+n, deg=((D%N)+N)%N;
-  let k=degK(s,deg,T)-s.root+delta, r=oct+c+Math.floor(D/N);
+  return { best, delta, c };
+}
+/* degree D of mode s (wrapping by the period into the register r) plus an offset in tuning steps → { ti, oct } */
+function degTo(s,D,delta,r){
+  const T=tuningOf(s), E=tSize(T), N=s.iv.length, deg=((D%N)+N)%N;
+  let k=degK(s,deg,T)-s.root+delta; r+=Math.floor(D/N);
   const cc=Math.floor(k/E); k-=E*cc; r+=cc;
   return (r===REG_N && k===0) ? { ti:s.root+E, oct:REG_N-1 } : { ti:s.root+k, oct:r };
+}
+/* OWN1: modes a track in view v can be re-mapped into by degrees — the SAME tuning (user decision) and the same number of degrees (a degree
+   then has exactly one counterpart); v's own mode included. */
+export const modesLikeView=v=> !v||!v.sel ? [] : SCALES.filter(m=> m.sel && m.tuning===(v.mode||v).tuning && m.iv.length===v.iv.length);
+/* OWN1: a pitch of view s moved to the same degree of view s2 (same tuning, same degree count); an out-of-mode pitch keeps its offset from
+   the nearest degree (the ED4 rule). → { ti, oct } (oct may leave the registers — the caller refuses) or null. */
+export function mapDegrees(ti, oct, s, s2){
+  if(typeof ti!=='number' || !s || !s2 || !s.sel || !s2.sel || (s.mode||s).tuning!==(s2.mode||s2).tuning || s.iv.length!==s2.iv.length) return null;
+  const F=degFrom(ti,s);
+  return degTo(s2, F.best, F.delta, oct+F.c);
 }
 export function chordFreqsAt(ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(ti,oct,s,sev,ty).map(n=>n.f); }   // T4c-1: без ступени
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */

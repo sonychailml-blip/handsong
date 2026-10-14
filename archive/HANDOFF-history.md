@@ -6321,3 +6321,40 @@ recorder.laneNameStep; histMaster(from, merge) in ui.levelStep; moveLaneStep(lay
 ui.closeRename; clearSong() in ui ✕ and gestures looper clear; histUndo()/histRedo() in ui.histDo; editBendPoint(ev, 'move', i, dt, c) /
 (ev, 'add', null, dt, c) / (ev, 'del', i) in ui and the probe; rollBendAt(px, py) in ui; probe histDbg({skip}|{keepFuture}), bendDbg(v).
 Final runner: data PASS 40.5 s; `--quick --all` one session PASS — P.quick 49.8 s (38 checks), P.all 188.1 s (52 checks), UI checks PASS.
+
+### ✅ ED7-fix + BEND-CURVE + OWN1 — BRACE AFTER ✕, BEND GLIDES AND SHAPES, TRACK INTO ANOTHER MODE (2026-10-14; runner PASS; steps 80–82 not yet done by the user)
+User answers first (after ED7/OWN2): arming, mute and solo stay out of the history; ✕ then ↶ must bring the brace back; OWN2 decisions
+accepted (first point fixed and not deletable, points can't pass neighbours or the note end, whole cents ±2400, ✚ + tap adds).
+PART 0 (ED7-fix). `snapState` keeps `rg` (the brace); `snapEnd` stores `br {from,to}` only for the 'clear' step and only when the brace as
+the person set it changed (`braceKey`: a user brace by its edges and ⟳, a following brace by ⟳ only — its edges follow the material);
+`snapApply` sets `loop.rgn.user` and calls `rgnApply` after the events; `histCommit`'s `rgnSync` clamps to the restored material. Probe
+`checkHistory` (2b): user brace bars 2–3 + ⟳, ✕, ↶ → exact; ↷ → following/off; ↶ again → exact; control `histDbg({noBrace})` must fail.
+PART 1 (BEND-CURVE). Decisions taken: (1) recorded bend points (no `sh`) keep the old step schedule byte for byte (they are dense; changing
+them would change every recorded theremin note); (2) a point the person adds or moves glides in, and the next shapeless point glides on —
+so a new point is "passed through" smoothly; a delete makes the next shapeless point glide from the previous one; explicit shapes stay;
+(3) shape = curvature k −1..1 on an exponential (DAW-style), set by dragging a hollow diamond at the segment's middle (snaps to straight
+near the line); (4) step ↔ glide: select the dot at the END of the segment and tap ╱/⌐ in the editor bar (the existing shape button; the
+first dot has none); (5) the automation lanes: bus lanes (reverb, delay, tremolo mix) get the same curvature — a diamond on the glide into
+the selected point; per-note addresses (Volume, brightness, glide, …) NOT YET: their values live in the notes' events and smooth segments
+are generated `…Set` events (`pnPlan`), so a curvature needs a new per-address mark in every carrying event and a ramp rebuild — a separate
+slice, with the rule #30 guards re-checked. Mechanism: `config.bendPlan(B, base, spb, t0, from)` is the ONE function turning points into
+`setFreq` ramps; `audio.scheduleBend(owner, points, base, spb, from, when)` calls it in either engine instance (both import config.js);
+step point = one setFreq with the bank's default τ (old schedule), glide = sub-steps every 10 ms aimed at the curve's end-of-sub-step value
+with τ 5 ms (the follow lags half a step, the aim leads half a step). The chase hands `a.bendFrom` instead of rewriting the curve (equal to
+the old rewrite for step curves — proved exactly in the probe). `bendTrim`, the ED6 insert (`bendIns`: a glide across the point holds
+through the new bars) and cut (`bendCut`: split at a and b, drop between, the value at b from just after a) are exact via `bendSplit`
+(an exponential curve splits into k·u and k·(1−u)); curves without glides keep their old code paths (ED6 identity unchanged). Draw: steps
+where it steps, 24 samples per glide (`bendPathOf`, `bendStroke`); ghost of a point drag through the same pure edit (`bendEdited`).
+Positional callers of the changed `scheduleBend(owner, points, base, spb, from, when)`: recorder `makeENG.leadOn` (a.bendFrom||0, when);
+render `reuseCheck` ×3 (0, 0.05 / 0.35). New: `editBendShape(ev, i, sh, k)` in ui (diamond release, ╱/⌐) and the probe; `autCurvePoint(rec,
+k)` in ui and the probe; `bendEdited(B, op, i, dt, c, len)` in recorder `editBendPoint` and draw `rollBendHandles`.
+PART 2 (OWN1). `#rollMode` lists `modesLikeView(view)` — same tuning id, same number of degrees (decision: a degree then has exactly one
+counterpart; modes with another number of degrees are left out — open question to the user). `editTrackMode(mode)`: every event takes
+`scaleView(mode, its tunedFrom, its chord mode if the new mode has it)`; pitch events move by `mapDegrees` (ED4's nearest degree + offset,
+`degFrom`/`degTo` now shared with `shiftDegrees` — the ED4 sweep unchanged); refusals 'same', 'reg', 'fit' (typed chord), 'chords' (mode
+without chords), 'none'; one step label 'mode' (a 'move' step may carry `sc`). Probes: data sweep `checkModeMap` (every view × every
+same-tuning same-size mode × every index and register vs an absolute-step reference; controls: out-of-mode, ties, moved pitches) and
+`checkTrackMode` (solo, bass, chord tracks; refusals; the frozen track goes stale and is fresh again after ↶ + versions).
+Runner: `--limit-start M` and `--cdn-cache` added (the CDN ran at ~300 B/s for the hand model; the model was fetched by 60 parallel range
+requests, MD5 15318430ea3851670fe9914116a9cfad = the server ETag). Fix rounds: Part 0 — 0; Parts 1–2 — 1 (probe expectations only).
+Final runner: data PASS 40.8 s (8 checks); `--quick --all --cdn-cache` PASS — P.quick 60.4 s (41 checks), P.all 202.8 s (55), UI checks PASS.

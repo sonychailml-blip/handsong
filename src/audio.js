@@ -1,7 +1,7 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
 import { baseF, tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
-import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld } from './config.js';   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
+import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld, bendPlan } from './config.js';   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
@@ -2670,13 +2670,14 @@ function leadAllOff(){ for(const k of Object.keys(leadHold)) leadOff(k); }      
 /* ⛳ when (S2) — ЯКОРЬ КРИВОЙ, то есть время АТАКИ ноты, от которого отсчитываются dt точек. Без него —
    «сейчас», ровно как было. Это и есть та единственная строка, из-за которой глиссандо нельзя было
    отрендерить офлайн: кривая ложилась от currentTime, а он в офлайн-контексте под JS не движется. */
-function scheduleBend(owner, points, baseFreq, secPerBeat, when){
+/* BEND-CURVE: the ramps come from config.bendPlan — the one function for live replay and renders (step points = the old schedule,
+   glides = sub-steps); `from` (beats, before the time — rule #15) enters the curve late (the chase). */
+let bendTap=null; const bendTapSet=a=>{ bendTap=a||null; };   // probe only: log what this engine instance schedules
+function scheduleBend(owner, points, baseFreq, secPerBeat, from, when){
   const v=leadHold[owner]; if(!v)return; const b=v.banks[v.ins]; if(!b)return;
-  const t0=when!=null?when:AC.currentTime;
-  for(const pt of points){
-    const f=baseFreq*Math.pow(2,pt.c/1200), at=t0+pt.dt*secPerBeat;
-    b.setFreq(f,undefined,at);   // V1: точки бенда — умолчание банка (20 мс сглаживания), НЕ время скольжения; undefined занимает слот tc, чтобы время осталось последним и не попало в tc
-  }
+  const t0=when!=null?when:AC.currentTime, plan=bendPlan(points,baseFreq,secPerBeat,t0,from||0);
+  for(const s of plan) b.setFreq(s.f,s.tc,s.at);   // tc undefined (a step point) — the bank's default 20 ms, as before
+  if(bendTap) bendTap.push({ owner, B:points, base:baseFreq, spb:secPerBeat, from:from||0, t0, plan });
 }
 /* Снять расписанные рампы частоты (на атаке переигранной ноты, ctx): чтобы бенд предыдущей
    ноты не перетёк в следующую. Живой путь (без ctx) не зовёт — живой звук не трогаем.
@@ -3007,7 +3008,7 @@ function createRecordingTap(){
 
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
 export {
-  initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, leadCancel, metroClick,
+  initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, bendTapSet, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,
   setBassInstr, bassOn, bassSet, bassOff, bassHold, drumHit, setDrumKit, droneOn, droneOff, droneRetune,

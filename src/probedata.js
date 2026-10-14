@@ -6,7 +6,7 @@
    scaleprobe.js импортирует его и отдаёт те же P.checkData/…/P.checkBehaviour, что и прежде; P.all() держит эти строки как раньше.
    ⛔ Сюда — только то, что не трогает draw/ui/audio/recorder/userfiles: иначе node не загрузит модуль (проверяет check-static —
    неизвестное имя в модуле — и сам node при запуске раннера). */
-import { shiftDegrees, SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
+import { shiftDegrees, mapDegrees, modesLikeView, SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
@@ -742,4 +742,38 @@ export function checkDegrees(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED4] '+m));
   if(!bad.length) console.log('[scaleprobe ED4] every pitch moves exactly n degrees of its mode; an out-of-mode pitch keeps its offset from the nearest degree; −n brings a mode pitch back');
   return { views, cases, total:bad.length, differences:bad };
+}
+/* ═══ OWN1 — P.checkModeMap(): A TRACK INTO ANOTHER MODE BY DEGREES (scales.mapDegrees) against a reference written here by ABSOLUTE steps ═══
+   Every view × every other mode it may go to (scales.modesLikeView: same tuning, same number of degrees) × every tuning index of one period
+   plus the top tonic × registers 0..3: the result equals the reference — the nearest degree of the old mode by absolute steps (a tie takes
+   the lower), the SAME degree of the new mode, plus the same offset (the ED4 rule). A mode pitch lands on that degree of the new mode
+   (modeSlotOfTi) and maps back exactly. CONTROLS: the sweep holds out-of-mode pitches and ties, and pitches that really move (a no-op
+   mapping would fail it). Pure arithmetic, nothing plays. */
+export function checkModeMap(){
+  const bad=[]; let cases=0, pairs=0, offMode=0, ties=0, moved=0; const miss=m=>{ if(bad.length<KEEP_MAX) bad.push(m); };
+  for(const [s0,tf] of allViews()){
+    const v=scaleView(s0,tf), n=v.iv.length, T=tuningOf(v), E= T.equal!=null ? T.equal : T.cents.length, R0=v.root;
+    for(const m2 of modesLikeView(v)){ if(m2===(v.mode||v)) continue;
+      const v2=scaleView(m2,tf), id=`${v.id}${v.tunable?`[from ${tf}]`:''} → ${v2.id}`; pairs++;
+      const abs=(s,d,r)=>tuningIndexOf(d,s)+E*r;
+      const ref=A=>{ const r0=Math.floor((A-R0)/E); let bd=-1, br=0, bD=Infinity, tie=false;
+        for(let r=r0-1;r<=r0+1;r++) for(let d=0;d<n;d++){ const x=Math.abs(A-abs(v,d,r)); if(x===bD) tie=true; if(x<bD || (x===bD && abs(v,d,r)<abs(v,bd,br))){ if(x<bD) tie=false; bD=x; bd=d; br=r; } }
+        if(bD>0){ offMode++; if(tie) ties++; }
+        return abs(v2,bd,br) + (A-abs(v,bd,br)); };
+      for(let j=0;j<=E;j++) for(let o=0;o<REG_N;o++){
+        const ti=R0+j, A=ti+E*o, p=mapDegrees(ti,o,v,v2), at=`${id} index ${ti} reg ${o}`; cases++;
+        if(!p){ miss(`${at}: no result`); continue; }
+        const got=p.ti+E*p.oct, w=ref(A);
+        if(got!==w){ miss(`${at}: ${p.ti}/${p.oct} (abs ${got}), reference abs ${w}`); continue; }
+        if(got!==A) moved++;
+        const m=modeSlotOfTi(ti,o,v);
+        if(m && m.deg<n){ const q=modeSlotOfTi(p.ti,p.oct,v2), qd= q && (q.deg===n ? 0 : q.deg), qo= q && (q.deg===n ? q.oct+1 : q.oct);
+          if(!q || qd!==m.deg || qo!==o) miss(`${at}: degree ${m.deg} → ${q?q.deg+'/'+q.oct:'off the mode'}, intended ${m.deg}/${o}`);
+          else { const b=mapDegrees(p.ti,p.oct,v2,v); cases++; if(!b || b.ti+E*b.oct!==A) miss(`${at}: and back gives ${b?b.ti+'/'+b.oct:'nothing'}`); } }
+      } } }
+  if(!pairs||!offMode||!ties||!moved) miss(`control: the sweep holds ${pairs} mode pairs, ${offMode} out-of-mode cases, ${ties} ties and ${moved} moved pitches — it could not fail`);
+  console.log(`[scaleprobe OWN1] mode pairs ${pairs} · cases ${cases} (out of the mode ${offMode}, ties ${ties}, moved ${moved}) · differences ${bad.length}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe OWN1] '+m));
+  if(!bad.length) console.log('[scaleprobe OWN1] every pitch lands on the same degree of the new mode (same tuning); an out-of-mode pitch keeps its offset from the nearest degree; a mode pitch maps back exactly');
+  return { pairs, cases, total:bad.length, differences:bad };
 }

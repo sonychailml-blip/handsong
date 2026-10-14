@@ -1,3 +1,4 @@
 commitmsg.txt
 tools/node_modules/
 tools/.probe-logs/
+tools/.cdn-cache/

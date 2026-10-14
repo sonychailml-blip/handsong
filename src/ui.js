@@ -23,8 +23,9 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { rollBendAt, loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { rollBendAt, rollAutValAt, loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
+import { modesLikeView } from './scales.js';   // OWN1: the modes a track can be re-mapped into
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
@@ -34,16 +35,17 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editMoveHit, editDeleteHit, editInsertHit, editCanUndo, editCanRedo, editBackingOpen,
          songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
          editInsertLead, laneLevelOf, setLaneLevel, lanePanOf, setLanePan,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
-         autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
+         autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint, editBendShape,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
          laneOrder, laneNameOf,   // AR2: порядок показа (один на все виды), перестановка, имя дорожки
          recLayers, editViewCheck,
          sections, secAdd, secRename, secDelete, songEdit, songEditWhy, braceSet,   // ED6: sections and the song history
          editBendPoint,   // OWN2
+         editTrackMode, editTrackModeWhy, trackViewOfLayer,   // OWN1: the track into another mode by degrees
          histUndo, histRedo, histCanUndo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
          editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
-import { INSTR_COL, FX_META } from './config.js';
+import { INSTR_COL, FX_META, curveK } from './config.js';   // curveK — BEND-CURVE: a middle handle's position → curvature
 import { hooks } from './hooks.js';
 import { lang, setLang, applyI18n, L, t, onLangChange } from './i18n.js';
 
@@ -449,7 +451,7 @@ addEventListener('wheel', e=>{
    ⛔ ПОКА РЕДАКТОР ОТКРЫТ: верхняя панель скрыта (она про игру), транспорт оставляет одну ▶ (класс .roll)
    — ⤺/✕/⟳/■ меняли бы песню под открытым редактором, вплоть до сноса самой открытой дорожки. */
 const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
-      rollTrackBtn=$('rollTrack'), rollTimbreEl=$('rollTimbre'),
+      rollTrackBtn=$('rollTrack'), rollTimbreEl=$('rollTimbre'), rollModeEl=$('rollMode'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
       rollRowsBtn=$('rollRows'), rollPickBtn=$('rollPick'), rollCopyBtn=$('rollCopy'), rollPasteBtn=$('rollPaste'), rollDupBtn=$('rollDup'),
@@ -522,7 +524,26 @@ function renderTimbreCtl(){
     const o=document.createElement('option'); o.value=String(x.id); o.textContent=L(x.name); rollTimbreEl.appendChild(o); }
   const cur=laneTimbreOf(ly);
   rollTimbreEl.value = cur==null ? '' : String(cur);
+  renderModeCtl();
 }
+/* OWN1: the track's mode — the modes of its tuning with as many degrees (scales.modesLikeView); hidden when there is no other one, on drums
+   and on a backing (read-only notes). A pick re-maps the whole track by degrees (one ↶). */
+function renderModeCtl(){
+  if(!rollModeEl) return;
+  const ly=editLayer(), role= ly==null?null:laneRoleOf(ly), v= role&&role!=='dr' ? trackViewOfLayer(ly) : null, M=v ? modesLikeView(v) : [];
+  rollModeEl.hidden = M.length<2 || editBackingOpen();
+  rollModeEl.textContent='';
+  if(rollModeEl.hidden) return;
+  for(const m of M){ const o=document.createElement('option'); o.value=m.id; o.textContent=L(m.name); rollModeEl.appendChild(o); }
+  rollModeEl.value=(v.mode||v).id;
+}
+if(rollModeEl) rollModeEl.onchange=e=>{
+  const m=modesLikeView(trackViewOfLayer(editLayer())).find(x=>x.id===e.target.value);
+  if(m && !rollRefuseRO()){ const why=editTrackModeWhy(m);
+    if(!why && editTrackMode(m)){ setRollSel(null); setRollSelMany([]); showCamMsg(t('roll.modeDone',{ mode:L(m.name) })); renderAutCtl(); updRollBtns(); }
+    else if(why && why!=='same') showCamMsg(t('roll.modeNo.'+why)); }
+  renderTimbreCtl();                                   // a refusal returns the pick to the truth
+};
 if(rollTimbreEl) rollTimbreEl.onchange=e=>{
   const x=timbresOf(laneRoleOf(editLayer())).find(q=>String(q.id)===e.target.value);   // id берём ИЗ СПИСКА, а не разбором строки: у тембра пользователя id не обязан быть числом
   if(x && editSetTimbre(x.id)){ renderAutCtl(); updRollBtns(); }
@@ -858,8 +879,8 @@ function updRollBtns(){
      но молча она читается как «удалить удар», и точку автоматизации убрать ОТСЮДА никто не догадается.
      Подпись идёт за выделением; приоритет тот же, что у самого удаления (точка перебивает ноту). */
   rollDelBtn.title = t(rollAutSel ? 'aut.ptDelTitle' : 'roll.delTitle');
-  if(rollShapeEl){ const st=autShapeState();   // гладкая автоматизация: кнопка видна, пока открыта полоса; жива — у точки, в которую есть откуда въехать
-    rollShapeEl.hidden = !rollAut || volBarsOn();
+  if(rollShapeEl){ const bs=bendShapeState(), st=bs||autShapeState();   // гладкая автоматизация: кнопка видна, пока открыта полоса; жива — у точки, в которую есть откуда въехать. BEND-CURVE: and with a bend point selected (its incoming glide ↔ step)
+    rollShapeEl.hidden = !bs && (!rollAut || volBarsOn());
     rollShapeEl.disabled = ro || !st || !st.ok;
     rollShapeEl.textContent = st&&st.s ? '╱' : '⌐';
     rollShapeEl.classList.toggle('act', !!(st&&st.s)); }
@@ -983,7 +1004,18 @@ function autShapeState(){
   const ok = i>0 && !rollAutSel.pt.unset && !D.pts[i-1].pt.unset;
   return { ok, s: ok && !!D.pts[i].smooth };   // форма — из вида (тот же закон, что у звука: у записанной точки — выведенная). Точка ленты, ставшая первой после переноса, форму хранит, но звучит ступенькой (от полки не едут) — значок обязан сказать то, что звучит
 }
+/* BEND-CURVE: with a bend point selected, ╱/⌐ is the shape of the segment INTO it — glide ↔ step (the first point has none) */
+function bendShapeState(){
+  if(rollBendSel==null||!rollSel||rollSelMany.size) return null;
+  const B=rollSel.a&&rollSel.a.bend, q=B&&B[rollBendSel]; if(!q) return null;
+  return { ok: rollBendSel>0, s: rollBendSel>0 && q.sh==='s' };
+}
 if(rollShapeEl) rollShapeEl.onclick=()=>{
+  const bs=bendShapeState();
+  if(bs){ if(rollRefuseRO()) return;
+    if(!bs.ok){ showCamMsg(t('aut.shapeNo')); return; }
+    if(editBendShape(rollSel,rollBendSel,bs.s?'h':'s')!==false) showCamMsg(t(bs.s ? 'aut.shapeStep' : 'aut.shapeSmooth'));
+    updRollBtns(); return; }
   if(!rollAutSel||rollRefuseRO()) return;
   const st=autShapeState();
   if(!st||!st.ok){ showCamMsg(t('aut.shapeNo')); return; }
@@ -1043,7 +1075,7 @@ rollDelBtn.onclick=rollDeleteSel;
    histDo runs the one history and names what it undid in a toast; afterHist refreshes whichever screen is open (an undo can remove the
    track open in the editor — then the editor closes back to the window). 'changed' — the tripwire fired (the song was changed outside the
    history): the history is gone and the toast says so. */
-const HIST_KEY={ bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
+const HIST_KEY={ mode:'mode', bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
 const histKeyOf=l=> l && l.startsWith('sec:') ? 'section' : HIST_KEY[l] || 'edit';
 const histUndoBtn=$('histUndo'), histRedoBtn=$('histRedo');
 function updHistBtns(){ if(histUndoBtn){ histUndoBtn.disabled=!histCanUndo(); histRedoBtn.disabled=!histCanRedo(); } }
@@ -1218,6 +1250,11 @@ function rollDown(e){
       setRollAutSel(null); rollPan={ aut:true, x:p.x, y:p.y, atBeat:0, row0:0 };
       updRollBtns(); return;
     }
+    if(h&&h.what==='autmid'&&!editBackingOpen()){   // BEND-CURVE: the middle handle of the glide into the selected lane point
+      const pt=h.rec.pt; rollGrab={ autMid:true, rec:h.rec, v0:h.v0, v1:h.v1, x:p.x, y:p.y };
+      setRollAutDrag({ t:pt.t, v:pt.v, k:pt.k||0, mid:true, axis:null, fine:false });
+      rollPan={ aut:true, x:p.x, y:p.y, atBeat:0, row0:0 };
+      updRollBtns(); return; }
     if(h&&(h.what==='autpt'||h.what==='autgrid')){
       if(h.what==='autpt'&&!editBackingOpen()){
         selAutPt(h.rec);
@@ -1242,6 +1279,12 @@ function rollDown(e){
     if(h&&h.what==='bendpt'&&!editBackingOpen()){
       setRollBendSel(h.i); setRollAutSel(null);
       rollGrab={ bend:true, ev:h.ev, i:h.i, x:p.x, y:p.y, dt0:h.dt, c0:h.c, axis:null };
+      updRollBtns(); return; }
+    /* BEND-CURVE: a glide's MIDDLE HANDLE — drag it up/down to curve the glide (one step on release); a tap selects its end point (the
+       point whose ╱/⌐ switches that glide to a step and back) */
+    if(h&&h.what==='bendmid'&&!editBackingOpen()){
+      setRollBendSel(h.i); setRollAutSel(null);
+      rollGrab={ bendMid:true, ev:h.ev, i:h.i, x:p.x, y:p.y };
       updRollBtns(); return; }
     if(rollIns && !editBackingOpen()){ const b=rollBendAt(p.x,p.y);
       if(b && b.dt>0 && (b.end==null || b.start+b.dt<b.end) && h && (h.what==='grid'||(h.what==='seg'&&h.ev===b.ev))){ rollPan={ bendAdd:b, x:p.x, y:p.y }; return; } }
@@ -1327,6 +1370,16 @@ function rollMove(e){
     return;
   }
   if(rollPan&&rollPan.bendAdd){ if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true; return; }
+  if(rollGrab&&rollGrab.bendMid){   // BEND-CURVE: the fraction of the way the finger sits at the glide's middle → its curvature
+    const G=rollGrab; if(Math.abs(p.y-G.y)>4) rollMoved=true; if(!rollMoved) return;
+    const B=G.ev.a.bend, q=B&&B[G.i], pr=B&&B[G.i-1], a=rollBendAt(p.x,p.y); if(!q||!pr||!a||Math.abs(q.c-pr.c)<1) return;
+    setRollBendDrag({ ev:G.ev, i:G.i, mid:true, k:curveK((a.c-pr.c)/(q.c-pr.c)) });
+    return; }
+  if(rollGrab&&rollGrab.autMid){
+    const G=rollGrab; if(Math.abs(p.y-G.y)>4) rollMoved=true; const v=rollAutValAt(p.y);
+    if(!rollMoved||v==null||Math.abs(G.v1-G.v0)<1e-3) return;
+    setRollAutDrag({ ...rollAutDrag, k:curveK((v-G.v0)/(G.v1-G.v0)) });
+    return; }
   if(rollGrab&&rollGrab.bar){   // ED5: value only; d = the grabbed bar's snapped value minus its stored one
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
     if(rollGrab.ro) return;
@@ -1415,6 +1468,14 @@ function rollUp(e){
     if(rollMoved && D){ const r=editBendPoint(G.ev,'move',G.i,D.dt,D.c); if(r!==false) setRollBendSel(r); }
     updRollBtns(); return;
   }
+  if(rollGrab&&rollGrab.bendMid){   // BEND-CURVE: release — a drag is one step; a tap only selected the glide's end point
+    const G=rollGrab, D=rollBendDrag; rollGrab=null; rollPan=null; setRollBendDrag(null);
+    if(rollMoved && D && D.mid) editBendShape(G.ev,G.i,'s',D.k);
+    updRollBtns(); return; }
+  if(rollGrab&&rollGrab.autMid){
+    const G=rollGrab, D=rollAutDrag; rollGrab=null; rollPan=null; setRollAutDrag(null);
+    if(rollMoved && D && D.mid && autCurvePoint(G.rec,D.k)){ const ly=editLayer(), A=rollAut, P=autPoints(ly,A.key,A.fx,A.p); selAutPt(P.pts.find(x=>x.pt===G.rec.pt)||null); }
+    updRollBtns(); return; }
   if(rollPan&&rollPan.bendAdd){ const b=rollPan.bendAdd; rollPan=null;
     if(!rollMoved && !rollRefuseRO()){ const r=editBendPoint(b.ev,'add',null,b.dt,b.c); if(r!==false){ setRollBendSel(r); showCamMsg(t('roll.bendAdded')); } }
     updRollBtns(); return; }

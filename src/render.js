@@ -1584,6 +1584,11 @@ function winStat(buf,t0,t1){ const rate=buf.sampleRate, a=Math.floor(t0*rate), b
    ⛳ ПОРЯДОК СУЖДЕНИЯ (починка после MX2): (1) голос переиспользован; (2) в окне КАЖДОГО рендера есть звук (RU_RMS_MIN) — иначе «мера не
    состоялась: тихое окно» с цифрами каналов; (3) ОБА контроля прочлись верно — иначе «контроль провален»; (4) только тогда — вердикт по
    настоящему случаю. Без (2) тишина читалась «не решено», без (3) «не изогнулась» могло бы значить «мера слепа». */
+/* BEND-CURVE (probe only, P.checkBendCurve): every scheduleBend the render copy makes while rendering a track — its arguments and ramps
+   (audio bendTapSet), inside the one render queue so no other render can add to the log. */
+function bendTrace(layer){ return renderQueued(async()=>{ const eng=await engine(), log=[]; eng.bendTapSet(log);
+  try{ await renderTrackNow(layer,{ quiet:true }); } finally { eng.bendTapSet(null); }
+  return log; }); }
 async function reuseCheck(){
   if(!LIVE_AC) return { ok:false, why:'audio is not started (press ▶ Play)' };
   const F659=RU_F1*Math.pow(2,RU_C/1200), F494=RU_F2*Math.pow(2,RU_C/1200);
@@ -1591,14 +1596,14 @@ async function reuseCheck(){
     const R=await renderOnce(SEED_A, eng=>{
       eng.applyFx({});   // сухой голос: без вибрато/драйва/тремоло чужой ноты (с renderReset pendFx и так нейтрален — вызов остаётся контрактом: leadOn без applyFx берёт чужие величины)
       eng.leadOn('s5:A',RU_F1,0.8,RU_INS,undefined,undefined,undefined,undefined,0.05);   // позиционно: deg, oct, glide, tie — пусто; время ПОСЛЕДНИМ (правило #15)
-      eng.scheduleBend('s5:A',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F1,RU_SPB,0.05);              // точка +700 ¢ на 0.05+2·0.25 = 0.55 с — ПОСЛЕ отпускания A
+      eng.scheduleBend('s5:A',[{dt:0,c:0},{dt:2,c:RU_C}],RU_F1,RU_SPB,0,0.05);              // точка +700 ¢ на 0.05+2·0.25 = 0.55 с — ПОСЛЕ отпускания A
       const vA=eng.leadHold['s5:A'];
       eng.leadOff('s5:A',undefined,0.3);
       eng.applyFx({});
       eng.leadOn('s5:B',RU_F2,0.8,RU_INS,undefined,undefined,undefined,undefined,0.35);
       reused= !!vA && eng.leadHold['s5:B']===vA;
-      if(kind==='C') eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:1.4,c:RU_C}],RU_F2,RU_SPB,0.35);   // своя кривая B: 494 Гц с 0.35+1.4·0.25 = 0.70 с
-      if(kind==='S') eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:0.8,c:1200*Math.log2(F659/RU_F2)}],RU_F2,RU_SPB,0.35);   // как если бы кривая A перешла к B: 659 Гц с 0.55 с
+      if(kind==='C') eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:1.4,c:RU_C}],RU_F2,RU_SPB,0,0.35);   // своя кривая B: 494 Гц с 0.35+1.4·0.25 = 0.70 с
+      if(kind==='S') eng.scheduleBend('s5:B',[{dt:0,c:0},{dt:0.8,c:1200*Math.log2(F659/RU_F2)}],RU_F2,RU_SPB,0,0.35);   // как если бы кривая A перешла к B: 659 Гц с 0.55 с
       eng.leadOff('s5:B',undefined,1.1);
     }, RU_SEC, { offline:true, prep:eng=>{ zeroMix(eng,CHAIN_SOLO); } });   // шинные эффекты соло-цепи — тождество: в окне только сам голос
     return { reused, buf:R.buf }; };
@@ -2181,6 +2186,7 @@ async function copyState(){ const eng=await engine(); return eng.renderStateOf()
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
 export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
+  bendTrace,   // BEND-CURVE: what the render copy schedules for a track's bend curves (P.checkBendCurve)
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
   copyState,   // снимок переключателей копии движка — страж P.all между строками
   revAgree,   // LR1: проба «живой и замороженный реверб согласны» (P.checkRevAgree)

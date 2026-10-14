@@ -47,6 +47,7 @@ const ROWS=[
   ['stacked chords',            ()=>P.checkStack(),     r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
   ['F4 behaviour as data',      ()=>P.checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['ED4 degrees (sweep)',       ()=>P.checkDegrees(),   r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['OWN1 modes by degrees (sweep)', ()=>P.checkModeMap(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

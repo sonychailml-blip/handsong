@@ -10,6 +10,8 @@
                                                      строк реального времени по прогонам и запас до допуска
    Ключи: --headed (обычное окно, вынесенное за экран, вместо безголового), --browser chrome|msedge, --limit-min M (потолок на один
    P.all, умолчание 5; P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
+   --cdn-cache: serve the pinned MediaPipe files from tools/.cdn-cache/ (fetched once; for a slow network).
+   --limit-start M: the app start limit in minutes (default 3; the hand model comes from the CDN — raise it on a slow network).
    Hygiene: at start it lists browsers left by earlier runner sessions (found by Playwright's temporary profile path) and orphaned
    profile folders; --kill-stale kills / removes them (--clean-only: only that, then exit). Every exit path (end, failure, time limit,
    Ctrl+C, SIGTERM, uncaught error) closes the browser with a bounded wait, then kills its process tree, then closes the server;
@@ -35,6 +37,20 @@ import { chromium } from 'playwright-core';
 import { execFileSync } from 'node:child_process';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+/* --cdn-cache: the pinned MediaPipe files (library, WASM, hand model — versioned URLs) are fetched once into tools/.cdn-cache/ and served
+   from there on later runs (a slow network made the app start miss its limit). Off by default: a normal run loads them from the CDN. */
+const CDN_CACHE=process.argv.includes('--cdn-cache'), CDN_DIR=path.join(ROOT,'tools','.cdn-cache');
+async function cdnCache(ctx){
+  await mkdir(CDN_DIR,{ recursive:true });
+  const keyOf=u=>Buffer.from(u).toString('base64url').slice(-120);
+  const serve=async route=>{ const u=route.request().url(), f=path.join(CDN_DIR,keyOf(u));
+    try{ const meta=JSON.parse(await readFile(f+'.json','utf8')); return route.fulfill({ status:200, headers:meta.headers, body:await readFile(f) }); }catch(e){ /* not cached yet */ }
+    const r=await route.fetch({ timeout:0 }), body=await r.body(), h=r.headers();
+    const headers={ 'content-type':h['content-type']||'application/octet-stream', 'access-control-allow-origin':'*' };
+    if(r.status()===200){ await writeFile(f,body); await writeFile(f+'.json',JSON.stringify({ url:u, headers })); }
+    return route.fulfill({ status:r.status(), headers, body }); };
+  await ctx.route(/^https:\/\/(cdn\.jsdelivr\.net\/npm\/@mediapipe|storage\.googleapis\.com\/mediapipe-models)\//, serve);
+}
 const LOGDIR=path.join(ROOT,'tools','.probe-logs');
 const argv=process.argv.slice(2), has=f=>argv.includes(f), val=(f,d)=>{ const i=argv.indexOf(f); return i>=0&&argv[i+1]!=null ? argv[i+1] : d; };
 const REPEAT=+val('--repeat',0)||0;
@@ -44,7 +60,7 @@ const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
 const HEADED=has('--headed'), VERBOSE=has('--verbose'), BROWSER=val('--browser','chrome');
-const LIMIT_ALL=(+val('--limit-min',5)||5)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=3*60e3;
+const LIMIT_ALL=(+val('--limit-min',5)||5)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
 /* Строки реального времени и съёма — для таблицы --repeat (их меры печатаются по прогонам). Имена — строки P.all. */
 const RT_ROWS=['LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback','MX1 track level and master','MX2 track pan','render repeatability','renders serialized','S4 solo editing'];
 
@@ -268,6 +284,7 @@ async function session(port, plan, label){
     const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } });
     const origin=`http://127.0.0.1:${port}`;
     await ctx.grantPermissions(['camera','microphone'],{ origin });
+    if(CDN_CACHE) await cdnCache(ctx);
     page=await ctx.newPage();
     const seen=[];   // строки проб этого прогона (для сводки)
     page.on('console', async m=>{ const tx=m.text(), ty=m.type();
