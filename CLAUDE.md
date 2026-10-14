@@ -171,7 +171,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    `rectLayout` memo, chord-insert lookup rely on it). ⛔ A bare `SCALES` object must never become an event's `sc`. `a.ty` is usually a
    reference into `CHORD_FAM_SETS` but since U2 can be a fresh one-note array: compare by value (`recorder.tyEq`), price only through
    `scales.chordNotes`. The reference can't be serialised; stable ids (`id`, `tuning`, `scales.viewIdOf`) are the serialisation
-   boundary; user-tuning ids and Scala readiness remain prerequisites for saving.
+   boundary; user-tuning ids and Scala readiness remain prerequisites for saving. ⛳ **TF1: the view carries the KEY** (`v.key` 0..11;
+   `scaleView(mode, tf, cm, key)` memoised per key; default = a view's own key, a bare mode the live tonic). Every pitch and label path reads
+   a key through ONE door `scales.viewKey(s)` (`baseF(s)`, `anchorOf`, `keyOf`, `cFix`, labels, editor row caches); until TF2 the door
+   answers the LIVE tonic (`KEY_FOLLOWS`, probe switch `keyFollowsDbg`), and the shim `recorder.keyFollow()` (ui tonic control, ↶/↷)
+   re-keys recorded views so a track keeps one view object. `viewIdOf` stays key-free (F0 snapshot, songs, probes); `viewKeyIdOf` adds
+   `~key` and is the track SOURCE (`noteSource`). A view without `key` (old/bare) reads the live tonic in both readings.
 8. **The video draw and `detectForVideo` read the same camera frame** (background before detect, overlays after, one synchronous tick).
 9. **ONE layout; never reintroduce a mode gate.** New behaviour keys off scale properties and `splitOn`. **Hit-test and render derive
    geometry from the SAME frozen range** (`S.role`/`S.rx0`/`S.rx1` frozen at capture; `phoneHalves`, `palSplitX`, `rectBandY`/`rectRows`
@@ -309,7 +314,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   open, or on a non-empty song without `replace`.
 - `src/scaleprobe.js` — the browser probe (`P`). `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (imports only
   scales/state/i18n). ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
-- `tools/check-static.mjs` (static checker), `tools/probe-browser.mjs` (browser runner), `tools/scales.before.json` (F0 snapshot).
+- `tools/check-static.mjs` (static checker), `tools/probe-browser.mjs` (browser runner), `tools/scales.before.json` (F0 snapshot),
+  `tools/song.print.json` (TF0 song sound fingerprint of the seed).
 - Stale (removed) names to ignore: list in `docs/NAME-INDEX.md`, "Stale names".
 
 ## Architecture (full reasoning per section: archive, same titles)
@@ -458,8 +464,8 @@ semitone offsets for fixed-grid scales (Pythagorean since P2, Natural-fixed pres
   blues, whole-tone, Prometheus); the choice is kept.
 
 ### Reference pitch (`aRef`) — one source
-A4 in Hz (default 440, UI 380–480 via presets + clamped input). `a3()=aRef/2` → `baseF()` and `cFix()`; changes retune everything live
-(solo, bass, chords, drone, theremin, replayed layers).
+A4 in Hz (default 440, UI 380–480 via presets + clamped input). `a3()=aRef/2` → `baseF(s)` and `cFix(s)` (TF1: both take the view and
+read its key through `viewKey`); changes retune everything live (solo, bass, chords, drone, theremin, replayed layers).
 
 ### fixedKey — the tonic is a KEY in an anchored grid
 The six (Pythagorean, Just intonation preset "from C + As on the instrument", meantone, Werckmeister, Vallotti, Kirnberger): grid nailed to
@@ -956,6 +962,16 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   restored); budget → skipped, not retried; an editor-created track carries a pinned chain (↶/↷ keep it consistent). CONTROLS that must
   fail: `dbg.noReset` (clock not reset → early/extra renders), `dbg.level` (a watcher reacting to level renders), `dbg.retune` (tonic
   renders after 1.5 s), default budget renders the skipped track.
+- **TF0 song sound fingerprint** (`P.checkSongPrint`, quick and all, deterministic data, no render): every pitched event's frequencies
+  through `recorder.evHz` (what ENG plays and renders with), the live drone's two strings, and per track view the editor rows, labels,
+  cents, chord labels, roots and chord-row Hz (labels in English) — at the seed's environment and again after the REAL tonic control
+  moved the key +2; compared line by line with `tools/song.print.json` (made by `P.dumpSongPrint()` on unchanged code; renewed only by
+  a slice that changes sound by decision — TF2 renews the +2 half). Applies only to the unchanged seed song in its environment. CONTROL:
+  `recorder.evHzDbg(layer, 1)` (one track one cent sharp through the real pricing) must change lines.
+- **TF1 key in the view** (`P.checkKeyView`, quick and all): every recorded view carries the live key, one view object per track, the real
+  tonic control re-keys and gives the same objects back; the TF2 reading (`keyFollowsDbg(false)`, live tonic moved without re-key) prices
+  every event and names every view row exactly as at its own key; key-less views fall back to the live key; twelve keys = twelve views,
+  one `viewIdOf`. CONTROLS: shim off (`recorder.keyFollowDbg(false)`) leaves stale keys; the TF1 reading at another tonic must differ.
 - **AR1 arrangement window** also checks AF4: no ❄ hittable; the freeze dot from `loopView.dots` — rendering = filled, waiting = hollow,
   frozen and stale-by-tonic rows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
   armed, no mark column although a track is frozen and one stale.

@@ -6425,3 +6425,51 @@ song format).
   today's default; historical anchor one tap away.
 **Between stage 2 and stage 3:** nothing else is scheduled (VOL-5/VOL-6 closed, VOL-7 moved after stage 3). Candidates if a window
 opens: AF6 memory remainder (eviction, chunk paging), hand tracking off the main thread (after measuring latency), the promo video.
+
+### ✅ TF0 + TF1 — SONG SOUND FINGERPRINT; THE KEY IN THE VIEW, INAUDIBLY (2026-10-14; runner PASS; nothing to hear by design)
+**User answers to the stage-2 questions (2026-10-14):** Q1 yes — the key knob changes only what the hands play; recordings keep their key; a
+Transpose button moves them (with ↶). Q2 — a key change while recording starts a new track (as a mode change does). Q3 — a backing (Jam or
+Drums) is re-made in the new key on a key change. Q4 yes — ±1 semitone Transpose for one track (editor) and the whole song (window), one ↶
+each; key colour changes in historical temperaments are expected. Q5 yes — after an A4 or tempo change frozen tracks re-render by
+themselves. Q6 — Partch keeps today's key; «historical G» one tap away, not the default. Accepted: the key goes into each note's view for
+every tuning.
+**TF0 — inventory of every reader of the live key** (after TF1 every recorded-material reader goes through `scales.viewKey`):
+- LIVE (stays live after TF2): `CUR()` = the live view (hands' pricing `recorder.evTi`/gestures, palette, grid, status, live tag cents
+  `draw` `baseF()` at the playing tag); ui scale button `NOTE_NAMES[tonic]` and `#selTonic`; `songs.js` sets the piece's tonic (environment);
+  demo (own scenes, bare views).
+- RECORDED, now through the view's key (`viewKey`, answering the live tonic until TF2): `scales` `baseF(s)`, `anchorOf` ('T'), `keyOf`, `cFix`
+  → `modeAnchor` → `leadFreqTi`/`bassFreqTi`/`chordNotesAt`/`chordRowFreq`/`chordPitchHz`/`centsOf`/`degCentsExact`/`tonicFreq(s)`/
+  `droneSecondHz(s)`; the equal chord paths (`untypedNotes`, typed equal branch, `chordNotes`) `baseF(s)`; labels `rootName`, `stepName`
+  (notes12/notes24), `stackLabel`, `chordLabel`; `draw` editor caches (`chRowFreqs`, `ldRowFreqs`, `rollBendPts` memo, `rollChordTotal`,
+  `rollGutterW`) keyed on `viewKey(ax.sc)`/`baseF(ax.sc)`; `recorder.evHz` → ENG (live replay) and the render copy.
+- ⚠️ STILL LIVE FOR RECORDED MATERIAL — TF2 must change: (1) the DRONE engine (`audio` `tonicFreq()/2`, `droneSecondHz()`, `droneRetune`) reads
+  the live view, not the drone event's view; (2) `audio` KS sympathetic bands (`baseF()` at build and retune) — a REPLAYED sitar's tarab strings
+  follow the live key; (3) `recorder.freezeSig` field 5 and `frzPinned` (tonic) and `render` pins (`pinLive`: tonic before `initAudio`, the
+  drone built from it); (4) ui tonic handler → `softAllOff` hands every track over (`trackResplice`); (5) backings freeze `CUR()` at
+  generation (Q3: regenerate); (6) the TF1 shim `keyFollow` itself.
+- Row «TF0 song sound fingerprint» (`P.checkSongPrint`; `P.dumpSongPrint()` made `tools/song.print.json`, 42 KB, 107+107 lines, on the
+  unchanged code): every pitched On/Set event's Hz via `evHz` (String = exact), the live drone's two strings, per track view rows/notes/
+  cents/chord labels/chord-row Hz/roots (English), at the seed environment (tonic 9, A4 440, minor-penta, 'T', no seventh, default chord
+  modes — pinned during the row, restored after) and after the REAL `#selTonic` change +2 (today a +2 transposition of every line). Applies
+  only to the unchanged seed song (`SEED_REC.print`, `SEED_REC.env`), else «not applicable». CONTROL `recorder.evHzDbg(layer,1)`: one track
+  one cent sharp through ENG's own pricing — must change lines (it does). Fix rounds 0. Data PASS 55.3 s; P.quick PASS 128.3 s (43).
+**TF1 — the key in the view, inaudibly.** `scaleView(s, tf, cm, k)` (4th optional: default a view's own `key`, a bare mode the live tonic;
+memo key `tf|cm|k`; `v.key=k`). ONE door `viewKey(s) = KEY_FOLLOWS || !s || s.key==null ? tonic : s.key` (`KEY_FOLLOWS` true until TF2;
+probe switch `keyFollowsDbg`). Byte-identical by construction: every `(tonic-9)/12`, `tonic-A`, `A>tonic` became the same expression on
+`viewKey(s)`, which returns `tonic`. `viewIdOf` unchanged (F0 snapshot ids, songs, probes); `viewKeyIdOf(v)=viewIdOf(v)+'~'+key` is the
+track source (`recorder.noteSource`). Shim `recorder.keyFollow()` — called by the ui tonic handler and first in `histCommit` — re-keys
+every event's `sc`, the clipboard and the open recorded chord to the live key (cursors untouched, safe while recording; drops `notesView`,
+`chaseAt`), so recordings still follow the tonic and a track keeps one view object; `keyFollowDbg(false)` = its control. OWN1
+`trackModePlan` keeps the track's key (`scaleView(mode, tf, cm, v.key)`). Row «TF1 key in the view» (`P.checkKeyView`, 919 cases): keys
+live and one view per track; the real control re-keys (+5) and gives the same objects back; CONTROL shim off → stale keys; the TF2 reading
+ahead (gate off, live tonic +3 without re-key) prices every event, names every view row and both drone strings exactly as at its own key;
+CONTROL the TF1 reading at +3 must differ; key-less views fall back to the live key in both readings; view-of-view keeps its key; twelve
+keys = twelve objects, one `viewIdOf`, twelve `viewKeyIdOf`. Probe F7 «Just intonation merge» compared `viewOfId(old)===nv` after its
+tonic loop (views now differ by key): it now restores the tonic first — same exact identity demand at the key `nv` was made in (fix round
+1). Positional callers of changed functions: `scaleView` (4th arg new, optional) — demo.js:184 (3 args), scales `CUR` (1), `viewOfId` (3),
+recorder `trackModePlan` (now 4: `v.key`), probedata (2–3 args, unchanged), scaleprobe (2–3 args; TF1 row 3–4); `baseF(s)` (1st arg new,
+optional) — scales internal now pass `s`; audio.js:666/668, draw.js:2570 (live, no arg); draw caches pass `ax.sc`. `evHz` signature unchanged.
+Final: data PASS 49.5 s; `--quick --all --cdn-cache` PASS — P.quick 67.5 s (44 checks), P.all 216.4 s (58 checks), UI checks PASS; TF0
+row 215 lines 0 differences against the pre-TF1 file; frozen seed bass L4 at 44.1 kHz peak 0.08804, rms 0.055326, 598001 samples —
+identical to the 44.1 kHz runs of 2026-10-13 (at 48 kHz 0.08686 / 0.055319 / 650886). Risks found: listed above (⚠️ six).
+

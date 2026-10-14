@@ -1,9 +1,9 @@
 import { ctx, canvas, video } from './vision.js';
 import { HANDS, degRaw } from './gestures.js';   // leadOwner был мёртвым импортом и исчез вместе с моно-соло
-import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, tuningStatus, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, bassFreqTi, chordTypeFits, tuningIndexOf, tuningOf } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
+import { CUR, IVX, chordLabel, rowLabel, chordNotesStr, chordRowFreq, leadFreq, bassFreq, centsOf, OCT_ROMAN, REG_N, supportsChords, typedChords, chordFams, rootName, rectGrid, rectLayout, rectBase, rectBaseMax, rectNoteAt, rectSlotOf, thereminSpan, baseF, periodOf, regWord, regWordFull, tuningStatus, listLbl, listName, namingOf, TUNINGS, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, bassFreqTi, chordTypeFits, tuningIndexOf, tuningOf, viewKey } from './scales.js';   // T3: строй, имена его высот и высота ряда вне лада — для оси редактора   // T4b3: ряды и ноты сегмента — из хранимого индекса в строе
 import { t, L, lang } from './i18n.js';   // AR2: lang — ключ кэша имён дорожек по умолчанию
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, FX_VOL, exprDisp, exprBrightDisp, chFitDeg, latchDeg, latchOct, latchTy, chordFam, chordVar, phoneInstr, rectOctReg, roleHasTherm, roleHasExpr, handFnOf, splitOn, phoneHalves, mirrored, sx, sy, setViewRect, videoRec, looperMsg, looperClear, handSide,
-         rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollSelMany, rollPick, rollBox, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, tonic, ROLL_EDITABLE,
+         rollOpen, rollBeat0, rollSpan, rollSel, rollSelNote, rollSelMany, rollPick, rollBox, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, ROLL_EDITABLE,
          rollAut, rollAutSel, rollAutDrag, rollVolBars, secSel, rollBendSel, rollBendDrag, laneRow0, arrOpen, arrFace, laneDrag } from './state.js';   // AR2: laneDrag — тянущаяся за ручку строка окна (вид жеста)   // O-4: какой адрес показан на полосе автоматизации, какая точка выбрана и призрак её переноса   // tonic (S5.6) — ключ кэша ширины колонки подписей: тоника ЖИВАЯ, и имена нот едут за ней   // S5.0: вид редактора (окно времени и выделение) — живые связки, пишет их ui сеттерами
 import { FX_META, REV_COLOR, FINGER_TIPS, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX, INSTR_COL, LANE_NOROLE_COL,
          CH_PAL_PAD, CH_PAL_GAP, CH_PAL_HEAD_H, palColX, palRowY, rectBandY, palSplitX, coverView, CLEAR_HOLD_MS, bendSeg, curveU } from './config.js';
@@ -1165,13 +1165,13 @@ function rollGroup(){
 const ROLL_ON_ROW_CENTS=1;
 let chRowCache={ key:null, F:null };
 function chRowFreqs(ax,sev,total){
-  const key=ax; if(chRowCache.key===key && chRowCache.base===baseF() && chRowCache.tonic===tonic && chRowCache.F.length>=total) return chRowCache.F;   // частоты рядов зависят от оси (лад и «Все»/«Лад»), живой тоники и A4 (baseF), у fixedKey — от тоники-ключа
+  const key=ax; if(chRowCache.key===key && chRowCache.base===baseF(ax.sc) && chRowCache.tonic===viewKey(ax.sc) && chRowCache.F.length>=total) return chRowCache.F;   // TF1: keyed by the track view's key (the one door)   // частоты рядов зависят от оси (лад и «Все»/«Лад»), живой тоники и A4 (baseF), у fixedKey — от тоники-ключа
   const F=new Array(total);
   /* T3: ряд со ступенью — цена корня на нём (chordRowFreq, как прежде); приглушённый — та же высота строя в регистре аккордов
      (scales.chordPitchHz — та же функция высоты и доля роли). Ряды по-прежнему растут по высоте — двоичный поиск chRowOfFreq цел. */
   for(let r=0;r<total;r++){ const e=ax.ent(r), o=Math.floor(r/ax.rpp);
     F[r]= e.deg>=0 ? chordRowFreq(e.deg, o, ax.sc, sev) : chordPitchHz(e.j, o, ax.sc); }
-  chRowCache={ key, base:baseF(), tonic, F };
+  chRowCache={ key, base:baseF(ax.sc), tonic:viewKey(ax.sc), F };
   return F;
 }
 /* Ряд частоты f на оси F → { r, dev }. r — целый ряд (нота на нём) или дробный (между рядами, по логарифму частоты).
@@ -1236,10 +1236,10 @@ const rollSegRows=(s,ax,total)=>rollSegNotes(s,ax,total).map(x=>x.r);
    За краями оси — продолжение по крайнему шагу (рисунок обрежется клипом). → [{t, r}] (t — доля песни) или null (не терменвокс). */
 let ldRowCache={ key:null, F:null };
 function ldRowFreqs(ax,total){
-  if(ldRowCache.key===ax && ldRowCache.base===baseF() && ldRowCache.tonic===tonic && ldRowCache.F.length>=total) return ldRowCache.F;   // те же ключи, что у chRowFreqs: ось, A4/тоника (baseF), тоника-ключ fixedKey
+  if(ldRowCache.key===ax && ldRowCache.base===baseF(ax.sc) && ldRowCache.tonic===viewKey(ax.sc) && ldRowCache.F.length>=total) return ldRowCache.F;   // TF1: the track view's key   // те же ключи, что у chRowFreqs: ось, A4/тоника (baseF), тоника-ключ fixedKey
   const F=new Array(total);
   for(let r=0;r<total;r++){ const p=ax.pitchOf(r); F[r]= p ? leadFreqTi(p.ti,p.oct,ax.sc) : NaN; }
-  ldRowCache={ key:ax, base:baseF(), tonic, F };
+  ldRowCache={ key:ax, base:baseF(ax.sc), tonic:viewKey(ax.sc), F };
   return F;
 }
 function rowOfHz(f,F,total){   // дробный ряд частоты f на оси F (ряды по возрастанию; у дубля тоники частота повторяется — берётся ПОСЛЕДНИЙ ряд ≤ f)
@@ -1254,10 +1254,10 @@ function rollBendPts(s,ax,total){
   const h=s.note&&s.note.head, B=h&&h.a&&h.a.bend;
   if(s.role!=='ld'||!s.first||!B||!B.length) return null;
   const m=bendMemo.get(s);
-  if(m && m.ax===ax && m.base===baseF() && m.tonic===tonic && m.total===total && m.B===B) return m.pts;
+  if(m && m.ax===ax && m.base===baseF(ax.sc) && m.tonic===viewKey(ax.sc) && m.total===total && m.B===B) return m.pts;
   const pts=bendRowsOf(s,B,ax,total);
   if(pts) pts.path=bendPathOf(s,B,ax,total);   // BEND-CURVE: what is drawn (steps and glides), beside the points (the handles)
-  bendMemo.set(s,{ ax, base:baseF(), tonic, total, B, pts });
+  bendMemo.set(s,{ ax, base:baseF(ax.sc), tonic:viewKey(ax.sc), total, B, pts });
   return pts;
 }
 /* any curve B of segment s → rows (OWN2: the ghost of a dragged point uses the same mapping as the drawn curve) */
@@ -1354,9 +1354,9 @@ function rollSegPick(ns,rp){ let dr=Infinity, ni=0; ns.forEach((x,i)=>{ const d=
 let rollTopCache={ segs:null };
 function rollChordTotal(G,ax){
   const base=REG_N*ax.rpp; if(!G||!G.segs.length) return base;
-  const c=rollTopCache; if(c.segs===G.segs && c.ax===ax && c.base===baseF() && c.tonic===tonic) return c.total;
+  const c=rollTopCache; if(c.segs===G.segs && c.ax===ax && c.base===baseF(ax.sc) && c.tonic===viewKey(ax.sc)) return c.total;
   const total=chordTotalWith(G,ax,rollSegNotes,rollSegRoot);
-  rollTopCache={ segs:G.segs, ax, base:baseF(), tonic, total };
+  rollTopCache={ segs:G.segs, ax, base:baseF(ax.sc), tonic:viewKey(ax.sc), total };
   return total;
 }
 /* Сам расчёт, без мемо: notes/root — функции нот и ряда корня сегмента (T4b3: путь индекса; проба подставляет прежний путь ступени). */
@@ -1499,13 +1499,13 @@ function axisLbl(ax,r){
    Кэш — на (лад, тоника): имена нот зависят от ЖИВОЙ тоники, поэтому она в ключе. */
 let lblCache={ax:null,tonic:-1,w:ROLL_LBL_W};
 function rollGutterW(ax){
-  if(lblCache.ax===ax&&lblCache.tonic===tonic) return lblCache.w;
+  if(lblCache.ax===ax&&lblCache.tonic===viewKey(ax.sc)) return lblCache.w;
   const prev=ctx.font;
   ctx.font='11px system-ui';
   let w=0;
   for(let r=0;r<ax.rpp;r++) w=Math.max(w, ctx.measureText(axisLbl(ax,r)+(r===0?'V':'')).width);   // T3: подписи ОСИ (и приглушённые); у ряда 0 axisLbl уже дописал « I», 'V' — запас до « IV»
   ctx.font=prev;
-  lblCache={ ax, tonic, w:Math.max(ROLL_LBL_W, Math.ceil(w)+14) };   // +14: зазор до сетки и запас на округление
+  lblCache={ ax, tonic:viewKey(ax.sc), w:Math.max(ROLL_LBL_W, Math.ceil(w)+14) };   // +14: зазор до сетки и запас на округление
   return lblCache.w;
 }
 const rollLower=(hits,t)=>{ let lo=0,hi=hits.length; while(lo<hi){ const m=(lo+hi)>>1; if(hits[m].t<t) lo=m+1; else hi=m; } return lo; };

@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewKeyIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { bendAt, bendSplit, curveU, REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -136,7 +136,7 @@ const ts=layer=> takeSt.get(layer) || takeJoin(layer);
    и есть то, что запишет их push (fz у них нет). */
 const noteSource=(fn,a,sc=CUR())=>{ const r=evRole(fn); if(!r) return null;
   const x = r==='dr' ? (a&&a.kit) : (a&&a.inst);
-  return r+':'+(x==null?'-':x) + (r==='dr' ? '' : '|'+viewIdOf(sc)); };
+  return r+':'+(x==null?'-':x) + (r==='dr' ? '' : '|'+viewKeyIdOf(sc)); };   // TF1: the view with its key (equal ⇔ one view object)
 /* Источник дорожки — по её первому «вкл»/удару. Дорожка одного источника по построению (с T2), поэтому первый и
    есть её; null — ни одной ноты (например, слой дрона). */
 /* ⚠️ T3: ТОЛЬКО «вкл» и удары. Ведения тембра не несут (у аккорда и баса его в них нет вовсе), и ключ по ведению
@@ -2088,6 +2088,7 @@ function histTouched(u,S=new Set()){
   return S;
 }
 function histCommit(u){
+  keyFollow();   // TF1: an event brought back by ↶/↷ takes the live key like the rest
   evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch();
   for(const ly of histTouched(u)){ const id=laneOf(ly); if(id!=null) laneVerBump(id); }
   if(u.kind==='snap'){ curChordDeg=-1; delPend=null; softAllOff(); if(!droneActive()) droneOff(); }
@@ -2961,7 +2962,7 @@ function trackModePlan(layer,mode){
   const v=trackViewOfLayer(layer), role=laneRoleOf(layer);
   if(!v || !mode || !role || role==='dr' || !modesLikeView(v).includes(mode)) return { why:'none' };
   const ms=mode.chordModes, cm= ms ? (ms.some(x=>x.id===v.chordMode) ? v.chordMode : ms[0].id) : undefined;
-  const v2=scaleView(mode, v.tunedFrom!==undefined ? v.tunedFrom : tunedFrom, cm);
+  const v2=scaleView(mode, v.tunedFrom!==undefined ? v.tunedFrom : tunedFrom, cm, v.key);   // TF1: the track keeps its key
   if(v2===v) return { why:'same' };
   if(role==='ch' && (!supportsChords(v2) || (v2.chordRule && v2.chordRule.kind==='none' && events.some(e=>e.layer===layer&&e.a&&e.a.ti!=null&&!e.a.ty)))) return { why:'chords' };
   const list=[];
@@ -4251,7 +4252,14 @@ function evTi(a,ctx,chord){ return ctx ? a.ti : tuningIndexOf(a.deg, CUR(), chor
 /* ⛳ T4c-1: ЦЕНА СОБЫТИЯ ДЛЯ ЗВУКА — ОДНА ЧИСТАЯ ФУНКЦИЯ на роль (соло 'ld', бас 'bs' — частота; аккорд 'ch' — частоты нот). Её зовут
    таблица ENG и проба P.checkStrip — второй формулы нет. Читает a.ti, a.oct, a.ty и вид/септаккорд контекста; ступень — только у ЖИВОЙ
    нагрузки (evTi). Нет цены (нет индекса, высоты нет в ладу) — соло/бас NaN, аккорд — пустой список: таблица атаку пропускает. */
+/* TF0 control (probe only): one track priced off by a few cents — the song fingerprint must catch it. null = off (the normal path). */
+let EVHZ_DBG=null;
+const evHzDbg=(layer,cents)=>{ EVHZ_DBG= layer==null ? null : { layer, r:Math.pow(2,cents/1200) }; };
 function evHz(a,ctx,role){
+  const f=evHz0(a,ctx,role), D=EVHZ_DBG;
+  return D && ctx && ctx.layer===D.layer ? (Array.isArray(f) ? f.map(x=>x*D.r) : f*D.r) : f;
+}
+function evHz0(a,ctx,role){
   const sc=ctx?ctx.sc:CUR(), ti=evTi(a,ctx,role==='ch');
   if(role==='ld') return leadFreqTi(ti,a.oct,sc);
   if(role==='bs') return bassFreqTi(ti,a.oct,sc);
@@ -4997,6 +5005,22 @@ function cursSeek(c,x){
    вызове; мемо по слою такой случайности не имеет. А schedInvalidate и так стоит на КАЖДОМ пути,
    меняющем состав событий (правило #28) — второго списка мест не заводим. Запись (push) его не зовёт,
    но она меняет длину на каждом событии. */
+/* ⛳ TF1 SHIM — RECORDINGS STILL FOLLOW THE TONIC (until TF2). After the person moves the key (ui tonic control) every recorded event's view,
+   the clipboard and the open recorded chord take the view of the new key, so a track keeps ONE view object (editor grouping, routing,
+   paste). The sound does not depend on it: scales.viewKey follows the live tonic. Cursors untouched (safe while recording); the note and
+   chase memos hold views, so they are dropped. TF2 deletes this. Probe switch: keyFollowDbg(false) (the CONTROL of «TF1 key in the view»). */
+let KEY_FOLLOW_ON=true;
+const keyFollowDbg=on=>{ KEY_FOLLOW_ON=!!on; };
+function keyFollow(){
+  if(!KEY_FOLLOW_ON) return 0;
+  const k=tonic, re=v=> v && v.mode && v.key!=null && v.key!==k ? scaleView(v.mode, v.tunedFrom, v.chordMode, k) : v;
+  let n=0;
+  for(const e of events){ const v=re(e.sc); if(v!==e.sc){ e.sc=v; n++; } }
+  if(editClip){ editClip.sc=re(editClip.sc); for(const L of editClip.notes) for(const e of L) e.sc=re(e.sc); }
+  if(recCh && recCh.sc) recCh.sc=re(recCh.sc);
+  if(n){ notesView=null; chaseAt=null; }
+  return n;
+}
 let evGen=0;
 function schedInvalidate(){ evGen++; cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); }   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
 /* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
@@ -5933,7 +5957,8 @@ export {
   laneTimbreOf, editSetTimbre,   // T5: тембр дорожки (индекс тембра роли / набора ударных) и его ЗАМЕНА — одна правка истории
   seedTake,   // засев тестовой песни через push (scaleprobe P.seed) — не часть игры
   viewAudit, editViewCheck,   // T6a: защитные проверки вида — сводка для пробы P.checkRules и проверка правки (ui зовёт у расшифровки ряда)
-  evHz, evReg, segChordNotes, probeTake, backingEvent,   // T4c-1/T4c-2: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
+  evHz, evHzDbg, evReg, segChordNotes, probeTake, backingEvent,
+  keyFollow, keyFollowDbg,   // TF1: recordings follow the key the person sets (ui tonic control) — until TF2   // T4c-1/T4c-2: цена и место в реестре голосов события (их зовёт ENG), ноты аккорда сегмента (распад) и подмена событий — для пробы P.checkStrip
   hlOf,   // T4b4: место подсветки переигранной ноты из индекса (прежнее по ступени снято в T4c-2) — для пробы P.checkHl; legacy уходит в T4c
   laneRoleOf, laneLenOf, chaseFor, chaseNote,   // chaseFor/chaseNote — для песенной строки пробы (P.checkSong); legacy* сняты в T4c-2. eventTuningIndex (T4a) — индекс в строе, который ДОЛЖЕН стоять у события (проба сверяет a.ti). laneLenOf — конец материала слоя подложки (render: длина буфера заморозки).  T4: РОЛЬ ДОРОЖКИ (одна с T2) или null — редактор открывается на ней, а вкладок ролей больше нет
   captureInfoOf,   // O-2: СВОДКА захвата дорожки — единственный сегодняшний читатель реестра (показ в редакторе). Сам реестр наружу не отдаём: его пока некому исполнять

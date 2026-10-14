@@ -197,7 +197,13 @@ export const IVX=(s=CUR())=>s.iv.concat([s.edo]);           // + верхняя 
    — уехало ВСЁ, подвижные и фиксированные строи вместе (иначе гамелан уехал бы на 415, а Веркмайстер
    остался на 440 — «расстроенный инструмент»). aRef — импорт-биндинг, обе функции пересчитываются сами. */
 const a3=()=>aRef/2;                                        // A3 из живого эталона A4 — единственная деривация опоры
-export const baseF=()=>a3()*Math.pow(2,(tonic-9)/12);       // частота тоники (C=130.81 Гц при A4=440)
+/* ⛳ TF1 — THE KEY IN THE VIEW (tonic freeze, stage 2). A view carries the key it was made in (v.key, 0..11); viewKey(s) is the ONE door
+   every pitch and label path reads a key through. Until TF2 recordings still follow the tonic, so the door answers the live tonic for
+   every view (KEY_FOLLOWS); TF2 flips it to the view's own key. No view, or a view without a key (a bare mode, an old view): the live tonic. */
+let KEY_FOLLOWS=true;
+export const keyFollowsDbg=on=>{ KEY_FOLLOWS=!!on; };   // probe only: false = the TF2 reading (each view its own key)
+export const viewKey=s=> KEY_FOLLOWS || !s || s.key==null ? tonic : s.key;
+export const baseF=s=>a3()*Math.pow(2,(viewKey(s)-9)/12);   // the tonic's frequency in view s (no s: the live key); C=130.81 Hz at A4=440
 /* ═══ «СТРОЙ ОТ» — ЯКОРЬ ФИКСИРОВАННОЙ СЕТКИ (слайс P1 дуги «СТРОЙ ОТ», HANDOFF) ═══
    Фиксированный строй (fixedKey) — это инструмент, который НАСТРОЙЩИК настроил от одной ноты (якоря), а МУЗЫКАНТ играет
    в любой тональности (тоника). Две независимые вещи — и в арифметике высоты они теперь названы порознь:
@@ -215,7 +221,7 @@ export const baseF=()=>a3()*Math.pow(2,(tonic-9)/12);       // частота т
 /* P3: якорь берётся из ЛАДА (поле варианта tunedFrom), а НЕ из живого state — поэтому записанное событие, чей sc — вариант со своим
    якорем, звучит со СВОИМ якорем, как бы ни двигали выбор. 'T' — следует за тоникой (якорь = тоника: keyOf=0, cFix=baseF — подвижный
    путь); число — закреплённая нота; поля нет (пять прочих фиксированных строёв и голый объект лада; демо с F1 — вид от C) — C, историческая практика. */
-const anchorOf=s=> s.tunedFrom==='T' ? tonic : (s.tunedFrom==null ? 0 : s.tunedFrom);
+const anchorOf=s=> s.tunedFrom==='T' ? viewKey(s) : (s.tunedFrom==null ? 0 : s.tunedFrom);   // 'T' follows the view's key (TF1)
 /* ⛳ ВИД — (СТРОЙ, ЛАД, ЯКОРЬ) ОДНИМ ОБЪЕКТОМ (слайс T2 универсальной модели строя; обобщает вариант лада на якорь из P3).
    CUR() отдаёт ВИД, и каждое событие, которое и так хранит sc: CUR(), морозит теперь ВИД целиком (правило #7) — без нового поля события.
    ФОРМА: копия полей лада (все прежние читатели — iv, edo, cents, period, fixedKey, sel, root, tunedFrom… — работают как прежде) и сверху:
@@ -240,11 +246,12 @@ export function chordModeOf(s){
   const b=s&&(s.mode||s), ms=b&&b.chordModes; if(!ms) return undefined;
   const m=chordModeSel[b.id]; return ms.some(x=>x.id===m) ? m : ms[0].id;
 }
-export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s)){
+/* TF1: the key is the view's third key (after the anchor and the chord mode); default — a view keeps its own key, a mode takes the live one. */
+export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s), k=(s && s.key!=null ? s.key : tonic)){
   if(!s) return s;
   const base=s.mode||s, ms=base.chordModes;
   const cmv= ms ? (ms.some(x=>x.id===cm) ? cm : ms[0].id) : undefined;   // T7b: режим аккордов — второй ключ вида (как якорь); неизвестный — умолчание
-  const key=(base.tunable ? tf : '')+'|'+(cmv||'');           // у лада без выбора якорь один, без режимов — режим один: ключ один
+  const key=(base.tunable ? tf : '')+'|'+(cmv||'')+'|'+k;
   let m=SCALE_VIEWS.get(base); if(!m){ m=new Map(); SCALE_VIEWS.set(base,m); }
   let v=m.get(key);
   if(!v){
@@ -253,6 +260,7 @@ export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s)){
     if(ms){ Object.assign(v, ms.find(x=>x.id===cmv).over); v.chordMode=cmv; }   // ⛳ T7b: поля режима ПОВЕРХ полей лада — читатели видят обычные поля (chordBuild/typedChords/chordRule)
     v.mode=base; v.tuningRec=TUNING_OF_MODE.get(base) || TUNINGS[base.tuning];   // F6: строй, закреплённый за ладом при сборке
     v.anchor={ policy, from: policy==='choice' ? tf : policy==='C' ? 0 : 'T' };
+    v.key=k;
     m.set(key,v);
   }
   return v;
@@ -267,8 +275,11 @@ export function viewIdOf(v){
   return b.id + (b.tunable ? '@'+(v.tunedFrom===undefined ? 'bare' : v.tunedFrom) : '')
               + (b.chordModes ? '#'+(v.chordMode===undefined ? 'bare' : v.chordMode) : '');   // ⛳ T7b: и режим аккордов — второй ключ вида
 }
-export const keyOf=s=>{ const A=anchorOf(s); return tonic-A+(A>tonic?12:0); };
-export const cFix=(s=CUR())=>{ const A=anchorOf(s); return a3()*Math.pow(2,(A-9-(A>tonic?12:0))/12); };   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
+/* TF1: the view's identity WITH its key — the source of a track (recorder.noteSource). viewIdOf stays key-free: it names the mode's view
+   for the F0 snapshot, songs and probes. Equal strings ⇔ the same view object. */
+export const viewKeyIdOf=v=> viewIdOf(v) + (v && v.key!=null ? '~'+v.key : '');
+export const keyOf=s=>{ const A=anchorOf(s), k=viewKey(s); return k-A+(A>k?12:0); };
+export const cFix=(s=CUR())=>{ const A=anchorOf(s), k=viewKey(s); return a3()*Math.pow(2,(A-9-(A>k?12:0))/12); };   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
 /* Частота ТОНИКИ/КЛЮЧА для дрона и родственного: у fixedKey — ФИКСИРОВАННАЯ высота ключа
    (cFix·2^(cents[ключ]/1200)), иначе дрон бился бы с приколоченной сеткой; у прочих — baseF()
    (подвижная тоника). Опора та же (cFix←a3←aRef) — не разъедется. P1: ключ — keyOf (при якоре C это tonic). */
@@ -490,7 +501,7 @@ export const chordFams=(s=CUR())=>CHORD_FAM_SETS[s.typedChords]||CHORD_FAM_SETS.
    ЛАД (правило #7), а тоника — глобальная и живая: высоту переигровка тоже берёт от живой тоники
    (baseF/fixedSlot). Замороженная в подписи тоника разошлась бы с тем, что звучит. */
 export const rootName=(deg,s=CUR())=>{ const n=s.iv.length, d=((deg%n)+n)%n;   // F3: по схеме строя (было s.edo===12)
-  return namingOf(s).pitch==='notes12' ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
+  return namingOf(s).pitch==='notes12' ? NOTE_NAMES[(((viewKey(s)+s.iv[d])%12)+12)%12] : 'ст'+s.iv[d]; };
 
 /* ================= ТЕОРИЯ: СТУПЕНИ, АККОРДЫ, ИМЕНА =================
    ФОРМУЛЫ ВЫСОТЫ СЕГОДНЯ (их сведёт в одну функция высоты T1 универсальной модели строя):
@@ -568,7 +579,7 @@ export function tuningOf(s){ return (s && s.tuningRec) || (s && TUNING_OF_MODE.g
        выбирает КЛЮЧ (keyOf). «Строй от» = тоника (P3) даёт key 0 и cFix — то же выражение, что baseF: подвижный путь;
      подвижный: на тонике (baseF) звучит КОРЕНЬ лада (root — 0 у всех, кроме Баранга: Пелог, индекс 1), ключа нет.
    ⚠️ До T2 якорь собирается на каждый вызов из тех же cFix/keyOf/baseF, что читали прежние ветви; замороженный вид — T2. */
-const modeAnchor=s=> s.fixedKey ? { A:cFix(s), z:0, key:keyOf(s) } : { A:baseF(), z:s.root, key:0 };
+const modeAnchor=s=> s.fixedKey ? { A:cFix(s), z:0, key:keyOf(s) } : { A:baseF(s), z:s.root, key:0 };
 /* Индекс строя ступени i ∈ [0..n] (i = n — верхняя тоника, дубль: корень периодом выше — то, что IVX дописывает как edo). */
 const degK=(s,i,T)=> i<s.sel.length ? s.sel[i] : s.root+tSize(T);
 /* ⛳ T4a: ИНДЕКС В СТРОЕ — ОДНА ФУНКЦИЯ ПЕРЕВОДА «ступень лада → индекс строя» для записи в событие (поле a.ti). Ступень оборачивается
@@ -627,7 +638,7 @@ function untypedNotes(deg,oct,s,sev){
   const T=tuningOf(s), n=s.iv.length, P=periodOf(s);
   const r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
   const TE= T.equal!=null ? T : { period:P, equal:s.edo };
-  return ruleChordSteps(deg,s,sev).map(st=>({ f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 }));
+  return ruleChordSteps(deg,s,sev).map(st=>({ f: pitchHz(TE,baseF(s)/2,0,st,oct), iv: st-r0 }));
 }
 /* ⛳ T4c-1: ЦЕНА АККОРДА — ТОЛЬКО ИЗ ИНДЕКСА КОРНЯ (ti) И РЕГИСТРА; ступени в аргументах больше нет. Где цена прежде шла по ступени
    (аккорд без индекса, правило без ветки по индексу — palette/none у нетипизированного, строй без ветки по индексу у типизированного),
@@ -644,7 +655,7 @@ export function chordNotesAt(ti,oct, s=CUR(), sev=seventh, ty=null){
     return ty.map(off=>({ f: pitchHz(T,a.A/2,a.z,a.key+K+off,R), iv:off })); }
   if (s.cents || (periodOf(s)!==2 && chordBuildOf(s)==='adaptive')){ const a=modeAnchor(s), rootF=pitchHz(T,a.A/2,a.z,a.key+K,R);   // T7: неоктавный строй «из строя» (Болен–Пирс) — равной веткой ниже, шагами
     return ty.map(ra=>({ f:rootF*ra, iv:ra })); }
-  return ty.map(iv=>({ f: pitchHz(T,baseF()/2,0,ti+iv,oct), iv }));   // равная ветка, типизированный путь chordSteps: шаг корня (= ti, неприведённый) + интервал, регистр oct
+  return ty.map(iv=>({ f: pitchHz(T,baseF(s)/2,0,ti+iv,oct), iv }));   // равная ветка, типизированный путь chordSteps: шаг корня (= ti, неприведённый) + интервал, регистр oct
 }
 /* T4b3: частота РЯДА корня из индекса — chordRowFreq по индексу (та же единица корня chordUnit, та же цена chordNotesAt). Проба T4b1
    (прогон с типом chordUnit) — она побитно равна chordRowFreq по ступени. Зовёт редактор у аккорда, читающего индекс (chordReadsTi). */
@@ -800,14 +811,14 @@ export function chordNotes(deg,oct, s=CUR(), sev=seventh, ty=null){ // база 
   if(!ty) return untypedNotes(deg,oct,s,sev);   // ⛳ T6b: без типа — по правилу лада (тот же расчёт; 'none' — ноль нот)
   const r0=s.iv[((deg%n)+n)%n]+s.edo*Math.floor(deg/n);
   const TE= T.equal!=null ? T : { period:P, equal:s.edo };
-  return ty.map(iv=>{ const st=r0+iv; return { f: pitchHz(TE,baseF()/2,0,st,oct), iv: st-r0 }; }); }   // T4c-2: шаги типа от корня — то, что давала типизированная ветка chordSteps (она ушла в пробу)
+  return ty.map(iv=>{ const st=r0+iv; return { f: pitchHz(TE,baseF(s)/2,0,st,oct), iv: st-r0 }; }); }   // T4c-2: шаги типа от корня — то, что давала типизированная ветка chordSteps (она ушла в пробу)
  
 export function name24(q){ q=((q%24)+24)%24;      // имена четвертьтонов: чётный шаг = обычная нота,
   return q%2 ? NOTE_NAMES[(((q+1)/2)|0)%12]+'½♭' : NOTE_NAMES[(q/2)%12]; } // нечётный = полубемоль
 /* Имя ШАГА лада st (шаги — в единицах edo лада) по схеме строя (F3: было по s.edo 12/24). */
 export function stepName(st,s=CUR()){ const p=namingOf(s).pitch;
-  if (p==='notes12') return NOTE_NAMES[(((tonic+st)%12)+12)%12];
-  if (p==='notes24') return name24(tonic*2+st);
+  if (p==='notes12') return NOTE_NAMES[(((viewKey(s)+st)%12)+12)%12];
+  if (p==='notes24') return name24(viewKey(s)*2+st);
   return 'ст'+(((st%s.edo)+s.edo)%s.edo);
 }
 /* Имя РЯДА ступени deg: у схем нот — имя шага (stepName), иначе — номер шага, «Т» на тонике (F3: было по s.edo 12/24). */
@@ -946,7 +957,7 @@ const STACK_Q3={'4,7':'','3,7':'m','3,6':'°','4,8':'+','2,7':'sus2','5,7':'sus4
 const STACK_Q4={'4,7,11':'maj7','4,7,10':'7','3,7,10':'m7','3,6,10':'ø','3,6,9':'°7','4,7,9':'6','3,7,9':'m6','2,4,7':'add9','2,3,7':'madd9','5,7,10':'7sus4','4,8,11':'+(maj7)'};
 function stackLabel(st, s){
   if (namingOf(s).pitch!=='notes12') return st.map(x=>stepName(x,s)).join('–');
-  const pc=x=>((x%12)+12)%12, nm=x=>NOTE_NAMES[pc(tonic+x)];
+  const pc=x=>((x%12)+12)%12, K=viewKey(s), nm=x=>NOTE_NAMES[pc(K+x)];
   const order=[]; for(const x of st){ const p=pc(x); if(!order.includes(p)) order.push(p); }
   const Q= order.length===3 ? STACK_Q3 : order.length===4 ? STACK_Q4 : null;
   if (Q) for(const r of order){
@@ -960,11 +971,11 @@ export function chordLabel(deg,s=CUR(),sev=seventh){
   if (s.chordRule && s.chordRule.kind==='none') return '';
   if (s.chordRule && s.chordRule.kind==='stack') return stackLabel(ruleChordSteps(deg,s,sev), s);   // ⛳ стопка — по набору высот   // ⛳ T6b: аккорда нет — и имени нет (chordNotesStr даёт '' сам: ноль нот)
   if (!(s.chordRule && s.chordRule.kind==='tertian')){
-    return p12 ? NOTE_NAMES[(((tonic+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
+    return p12 ? NOTE_NAMES[(((viewKey(s)+s.iv[d])%12)+12)%12]+'5' : 'ст'+s.iv[d]+'·5';
   }
   const st=ruleChordSteps(deg,s,sev), r=st[0];
   if (p12){
-    const root=NOTE_NAMES[(((tonic+r)%12)+12)%12];
+    const root=NOTE_NAMES[(((viewKey(s)+r)%12)+12)%12];
     let q=qual(st[1]-r, st[2]-r);
     if (q==null) return root+'?';
     if (sev){ const sv=st[3]-r; q=SEV[q+'|'+sv] ?? (q+'⁷'); }

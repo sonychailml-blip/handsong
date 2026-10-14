@@ -43,7 +43,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editBendPoint,   // OWN2
          editTrackMode, editTrackModeWhy, trackViewOfLayer,   // OWN1: the track into another mode by degrees
          histUndo, histRedo, histCanUndo, histCanRedo, histTopLabel, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
-         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
+         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, keyFollow } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META, curveK } from './config.js';   // curveK — BEND-CURVE: a middle handle's position → curvature
 import { hooks } from './hooks.js';
@@ -1755,7 +1755,7 @@ selScale.onchange=e=>{
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
   if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); softAllOff(); droneRetune(); updScaleBtn(); };   // 3/3: смена тоники
+selTonic.onchange=e=>{ setTonic(+e.target.value); keyFollow(); softAllOff(); droneRetune(); updScaleBtn(); };   // TF1: recordings follow the key (their views re-keyed) until TF2   // 3/3: смена тоники
 /* P3 «СТРОЙ ОТ»: ТОТ ЖЕ ШОВ, ЧТО У ТОНИКИ — живые ноты гаснут и переатакуют (рука соло/баса — на следующем кадре), защёлка
    замолкает, играющие дорожки пересращиваются (softAllOff при идущем транспорте → trackResplice) и звучат со СВОИМ якорем:
    их sc — вид лада (строй, лад, якорь; T2), записанный в момент игры. Записанное этот выбор не перестраивает (правило #7). */

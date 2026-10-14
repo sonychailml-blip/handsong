@@ -47,7 +47,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > editor-own (✅ OWN1 mode by degrees — same tuning, same number of degrees, out-of-mode notes keep their offset; ✅ OWN2 theremin bend curve
 > + ✅ BEND-CURVE glides/shapes/steps on bends and bus lanes, 2026-10-14; DEFERRED by the user 2026-10-14: curvature on per-note lanes (Volume, brightness,
 > glide), OWN1 into modes with a different number of degrees (maybe never); OWN3 cents per row DEFERRED — user, 2026-10-13) → tonic freeze (stage 2; plan
-> proposed 2026-10-14, archive B «TONIC FREEZE — PLAN») (VOL-5 and VOL-6 CLOSED by the user's test 2026-10-14 — they already work; VOL-7 per-note
+> archive B «TONIC FREEZE — PLAN», user answers Q1–Q6 2026-10-14; ✅ TF0 song fingerprint, ✅ TF1 key in the view (inaudible); next TF2) (VOL-5 and VOL-6 CLOSED by the user's test 2026-10-14 — they already work; VOL-7 per-note
 > pan deferred until after stage 3) → FOUNDATION = stage 3 (stable mode and timbre ids, song and
 > timbre format; §1, §7.4) → FIRST-RELEASE candidate §7.16 «Calm» mode → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
 > export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).

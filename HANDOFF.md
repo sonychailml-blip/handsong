@@ -109,15 +109,8 @@ triad/seventh switch for untyped modes.
 ✅ ED1 selection → ✅ ED2 copy → ✅ ED3 quantise → ✅ ED4 by degrees → ✅ ED5 volume bars → ✅ ED6 sections → ✅ ED7 one undo → ✅ OWN1
 mode by degrees → ✅ OWN2 bend curve (+ BEND-CURVE shapes). Decisions: quantise inside a line moves the boundary (glissando intact); by degrees — an out-of-mode
 note keeps its offset; ONE undo for everything (mixer, names, row delete; ⤺ is an ordinary step).
-**Earlier editor answers (2026-10-13/14; full: archive B):** paste keeps theremin `hold` · lessons/tutorial only as the LAST stage ·
-OWN3 deferred · the tonic-freeze plan proposes "key into the note index or the view" · ED6-1 "lengthen / shorten" edge notes · section
-edits act on a user brace · duplicates stay in their take · Volume bars are the default face.
-**User answers (2026-10-14, after BEND-CURVE/OWN1):** decisions accepted · OWN1 into modes of another size, curvature of per-note
-lanes — deferred · VOL-7 after stage 3 · VOL-5, VOL-6 closed (already work) · ✕ must stay undoable on an empty song (done, ED7-fix2).
-**User answers (2026-10-14, after ED7/OWN2):** (1) arming, mute and solo stay OUT of the undo history (listening switches, not edits) ·
-(2) ✕ then ↶ brings the brace back as before ✕ (done, ED7-fix) · (3) OWN2 accepted as built (first point fixed and not deletable; points
-can't pass neighbours or the note end; whole cents ±2400; ✚ + tap adds) · (4) BEND-CURVE asked: glide between points by default, shapes,
-step on demand, the same model on effect lanes.
+**Earlier editor answers** (2026-10-13/14: paste keeps `hold`, lessons last, OWN3 deferred, ED6-1, sections on a user brace, arming/mute/solo
+out of undo, ✕ then ↶ brings the brace back, OWN2 as built, BEND-CURVE glides): archive B, records ED6-fix…ED7-fix2.
 
 **Tuning — rest of the model** (archive B, «ПЛАН „УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ“»): **DON'T NARROW MUSICAL POSSIBILITIES** (T7b) —
 offer a theory restriction as a MODE, not a rule · **chord-building property** for the builder: ADAPTIVE (pure ratios, a choir) or
@@ -126,15 +119,19 @@ FROM THE TUNING (an instrument); only mobile Natural is adaptive; `chordBuild` /
 never from code · **tunings as files**: a song will store a COPY of each tuning it uses; files from others are untrusted ·
 **Scala readiness**: exact ratios as data (started), names as data (✅ F3), import normalisation, a round-trip probe (equal → generator
 form) · a mode may need a "central tone" (Lima/Nem patets) — study with musicians.
-**Tonic** (user decision): THE TONIC IS FROZEN IN THE EVENT (own plan): the drone follows the event's view; fixed tunings' key goes
-into the index (or view); transposing a song = an editor "by degrees" edit with undo. **Tuning anchor** (MX1; with that plan;
+**Tonic** (user decision): THE TONIC IS FROZEN IN THE EVENT (stage 2, archive B «TONIC FREEZE — PLAN»): the drone follows the event's view;
+the key lives in each note's VIEW for every tuning (user accepted 2026-10-14). **User answers Q1–Q6 (2026-10-14):** Q1 the key knob changes
+only what the hands play; recordings keep their key; a Transpose button moves them (with ↶) · Q2 a key change while recording starts a NEW
+track (as a mode change) · Q3 a backing (Jam/Drums) is re-made in the new key · Q4 ±1 semitone Transpose for a track (editor) and the
+whole song (window), one ↶ each; key colour changes in historical temperaments are expected · Q5 after an A4 or tempo change frozen tracks
+re-render by themselves · Q6 Partch keeps today's key; «historical G» one tap away, not the default. **Tuning anchor** (MX1; with that plan;
 serves Scala `.kbm`): for non-12 tunings the tonic means "where 1/1 is" — any frequency (Partch 1/1 = G 392 Hz; Sa to the singer);
 12 notes stay the main choice plus a cent offset or Hz; a tuning may declare its historical anchor (data field); the control then
 reads "1/1 = G".
 
 ## Work order (user decision: "editor before the timbre builder")
-✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → **TONIC FREEZE = stage 2** (NEXT; plan proposed 2026-10-14, archive B «TONIC FREEZE —
-PLAN», awaits the user's answers) → ✅ VOL-5, VOL-6 (closed) → **FOUNDATION = stage 3** (stable timbre ids (and user-mode ids), song format and timbre
+✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → **TONIC FREEZE = stage 2** (IN PROGRESS: ✅ TF0, ✅ TF1; NEXT TF2; archive B «TONIC FREEZE —
+PLAN», answers Q1–Q6 above) → ✅ VOL-5, VOL-6 (closed) → **FOUNDATION = stage 3** (stable timbre ids (and user-mode ids), song format and timbre
 format — voice mode and Glide default are the first "timbre policies" —, songs as files: export/import) → candidate FIRST RELEASE:
 **«Calm» mode** (§7.16) → VOL-7 → **SAVING** (on the device + file export/import;
 does not wait for the server — same format and ids) → **AUTO-FREEZE A3–A6 (A7 if measured), MIXER per-track effects and meters,
@@ -155,7 +152,7 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). The tonic is live
-  (changing it transposes recordings). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
+  (changing it transposes recordings — until TF2; since TF1 the key is stored in each view but read live). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
   the main thread; hand→sound latency not measured.
 - Roll: per-note automation lanes (Volume, brightness, glide…) have no curvature yet (BEND-CURVE did bends and bus lanes); OWN1 offers
   only modes with as many degrees as the track's; unison/theremin tie pairs untie all candidates of that beat (S6); dissolve
@@ -186,13 +183,12 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### ED7-fix2 (2026-10-14) — undo after ✕ on an empty song; «Calm» mode recorded; tonic-freeze plan (full: archive B)
-- After ✕ the strip (with its ↶) vanished with the song. Now: a box «Song cleared — ↶ Undo» for 6 s (✕ button and looper hand, via
-  `hooks.cleared`), and the play transport stays with ONLY ↶ ↷ on an empty song while the history is not empty. Ctrl+Z unchanged.
-- Row «ED7-fix2 undo after clear» (real clicks; control: the pre-fix UI leaves no undo). Fix rounds 0. data PASS 40.9 s; P.quick PASS
-  67.6 s (42), UI checks PASS.
-- Docs: BACKLOG §7.16 «Calm» mode; VOL-5/VOL-6 closed; stage-2 plan with six user questions (archive B «TONIC FREEZE — PLAN»).
-### ED7-fix + BEND-CURVE + OWN1 (2026-10-14) — brace after ✕, bend glides and shapes, track into another mode (full: archive B)
-- ✕'s step carries the brace; bend points glide (diamond = curvature, ╱/⌐ = step), one `config.bendPlan` live and frozen; bus lanes
-  curved too; `#rollMode` moves a track by degrees into another mode of its tuning. Runner flags `--limit-start`, `--cdn-cache`.
-  Final: data PASS; P.quick 60.4 s (41); P.all 202.8 s (55); UI PASS; fix rounds 0 / 1.
+### TF0 + TF1 (2026-10-14) — song sound fingerprint; the key in the view, inaudibly (full: archive B)
+- TF0: inventory of live-key readers (archive B) + row «TF0 song sound fingerprint»: every event's Hz via `evHz`, the drone, every track
+  view's rows/labels/cents/chord rows, at the seed key and after the real tonic control +2, vs `tools/song.print.json`; control: one track
+  one cent sharp (`evHzDbg`) must differ.
+- TF1: views carry `key` (memo per key); ONE door `scales.viewKey(s)` for all pitch/label reads, answering the LIVE tonic until TF2;
+  shim `recorder.keyFollow` (tonic control, ↶/↷) re-keys recorded views so recordings still follow the tonic; `viewKeyIdOf` = track
+  source. Row «TF1 key in the view» (TF2 reading checked ahead; controls: shim off, live reading). Nothing audible changes.
+- Probe F7 fixed: it compared a view's identity across a tonic change (now at its own key). Fix rounds: TF0 0, TF1 1.
+- Final: data PASS 49.5 s; `--quick --all` PASS — P.quick 67.5 s (44), P.all 216.4 s (58), UI PASS; frozen L4 equal per sample rate.
