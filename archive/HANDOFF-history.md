@@ -6563,3 +6563,75 @@ audio.leadOn `(t, volVel('ld',a), pendSymp)` (other banks ignore the third argum
 PASS, total 284.2 s; frozen seed bass L4 at 48 kHz peak 0.08686, rms 0.055319, 650886 samples (unchanged). TF2 gate alone: P.quick 70.6 s
 (44), P.all 270.6 s (58). Open: song transpose moves the backing away from the knob's key until the knob moves (decided: the backing is
 part of the song); armed tracks and paste respect the key (a recorded track in another key is another view).
+
+### Moved from HANDOFF.md at TF3b–TF6 (English slice record)
+### TF2 + TF3 (2026-10-14) — recordings keep their key; Transpose by semitones (full: archive B)
+- TF2: `scales.viewKey` answers the view's own key (the TF1 shim `keyFollow` deleted). The key knob calls `recorder.liveAllOff` (live owners
+  only; a take closes what it holds → the next note lands in a NEW track, Q2) and `backingFollowKey` (Jam/Drums events re-keyed in place =
+  re-made in the new key, Q3; held notes handed over, frozen backing re-freezes). Drone sounds its event's view (`audio.droneUse`); KS
+  sympathetic strings tune to the note's view (`audio.sympBase`, set by ENG); freeze signature and render pins drop the tonic.
+- TF3: `editTranspose(n)` (editor «−1 st / +1 st») and `songTranspose(n)` (window, backing included) re-key views (key may leave 0..11:
+  B+1 = 12 = C above); one 'transpose' step; touched frozen tracks stale. Non-12 tunings (Partch, 19/31-TET, gamelan, BP): the key model
+  already moves their 1/1 by 100 cents — enabled everywhere, no disabled button (decided).
+- Probes: row «TF2 recordings keep their key» (replaces «TF1 key in the view»), «TF3 transpose by semitones», each with failing controls;
+  `tools/song.print.json` +2 half renewed (recorded lines = base; backing +2; its new view adds 2 lines); AF3/AR1 stale cases use A4;
+  12-tonic sweeps read `keyless` views. Fix rounds: TF2 1, TF3 2 (probe setup).
+- Final: data PASS 41.0 s; `--quick --all` PASS — P.quick 63.3 s (45), P.all 195.7 s (59), UI PASS; frozen L4 unchanged.
+
+### ✅ TF3b + TF4 + TF5 + TF6 — SONG TRANSPOSE MOVES THE KNOB; A4/TEMPO RE-FREEZE; «1/1 = G» WITH CENTS; STAGE 2 CLOSED (2026-10-14; runner PASS; ear steps 88–90 not yet done by the user)
+**User answers to the TF2/TF3 report (2026-10-14):** (1) Song Transpose ALSO moves the key knob, so live playing stays in the song's key; track
+Transpose in the editor does not move the knob. (2) The backing's re-key on a knob change is NOT a ↶ step (the knob itself is not in the
+history). (3) Paste and arming respecting the key (another key = another view) is OK for now; a future «paste transposed into the track's
+key» may come later (BACKLOG §3.40). The TF2/TF3 decisions were accepted. Also recorded (docs only): BACKLOG §7.17 Calm — playing along with
+outside music (one-shot «Listen», pentatonic of the detected key, own key detection, not Essentia), §7.18 installation (kiosk) mode + B2B
+sales plan (price ladder, references, markets, sales path, business entity pending); §7.11 rewritten in English with links.
+**TF3b — song Transpose moves the knob.** `songTranspose(n)` appends a sub-step `{kind:'key', from:tonic, to:(tonic+n) mod 12}` to its batch
+and applies it; `histApplyX` handles `'key'` through `keyStepSet(k)` (setTonic, `liveAllOff`, `AUD.droneRetune`, `hooks.key` → ui sets
+`#selTonic` and the scale button). ↶/↷ set the knob ABSOLUTELY (from / to): a knob turned by hand between the step and its ↶ re-keyed the
+backing outside the history; the step's own 'move' sub-steps restore the backing's views to the pre-transpose ones, so an absolute knob keeps
+knob and backing in agreement (a relative −n would not). Found by the probe (fix round 1): the knob's `backingFollowKey` also re-keyed the
+backing's DRUM hits, which Transpose never touches, so ↶ left them at the turned key — `backingFollowKey` now skips drum hits (no pitch;
+the same rule as Transpose; TF2 row (5) counts pitched backing events). The histHash tripwire does not include the tonic (a knob turn is
+not a history write). Decision: the knob moves mod 12 (B + 1 → knob C while the song sits at key 12; the hands' register picks the octave).
+**TF4 — A4/tempo re-freeze (Q5).** `frzqueue.AF_REFREEZE_ON_RETUNE = true`; `retuneOn()` = the switch unless the probe control
+`dbg.noRetune` (was `dbg.retune` turning it on). The watcher's kind for a track stale only by A4/tempo (`frzRetuneOnly`) is 'retune' for new
+AND existing entries (one helper line; before, a second move on a waiting entry fell back to the 1.0 s default), so every move resets the
+1.5 s settle. Until re-rendered the track plays its events (unchanged mechanism: `frzLeave`, then the AF2 swap). Console texts drop
+«tonic». AF3 row (4): tonic → none, stays fresh; A4 three moves 0.6 s apart, A4 restored, tempo, tempo restored → stale at once, exactly one
+re-render 1550 ms after the last move (1500 + one 50-ms tick), fresh; CONTROL `noRetune` → 0 renders, stale; back at the old A4 fresh again
+(its old buffer). AR1: the stale-by-A4 row shows a hollow (waiting) dot, then both rows re-render and show nothing.
+**TF5 — the tuning anchor «1/1 = G» (Q6).** The key gets CENTS: `scaleView(s, tf, cm, k, c)` — 5th argument with the key's default rule (a
+view keeps its own `keyC`, a mode takes `state.tonicCents`); kept only where `scales.keyByOneOne(base)` — the tuning's naming scheme (data)
+is not notes12/notes24 and the mode is not fixedKey: Partch, 19/31-TET, Carlos α/β/γ, BP, Slendro, Pelog (+ patets), 22 shruti (+ ragas).
+Memo key gets `|c` and the view gets `keyC` ONLY when c ≠ 0, so every existing view is the very same object. One door `viewKeyC(s)` (no
+view = the live view's `keyC`; a view without a key = the knob's cents if the tuning allows); applied ONLY in `baseF` (×2^(c/1200), no
+multiplication at 0 ¢) — every mobile price (solo, bass, chords of all four branches, tonic, drone, KS sympathetic base, editor caches keyed
+on `baseF`) follows; fixedKey grids never take cents. `viewKeyIdOf` adds `+13c` (a nudge mid-take starts a new track, as a key change).
+Carried by Transpose (`transposePlan` passes `keyC`), OWN1 (`trackModePlan`), backing re-key (`scaleView(…, k, tonicCents)`, compared by
+object). Freeze signature: the view-less fallback adds the cents; `frzPinned` lists `tonicCents`. Data: tuning field
+`anchor.historical {key 0..11, cents −50…50, note}` (validator in `scaleload.checkTuning`; refused on 12-named tunings); Partch declares
+G (key 7, «Partch tuned 1/1 to G (392 Hz)»). Read through `SRC` only (`historicalKeyOf`) — the built tuning objects and the F0 snapshot are
+unchanged (no renewal needed). UI (`ui.renderOneOne`, called from `updScaleBtn`): the key label switches to «1/1 =» (`data-i18n` swapped,
+so language changes follow), the ¢ field `#tonicCents` shows, `#tonicHist` «Historical 1/1: G» (✓ and disabled when there; title = the
+file's note); handlers share `keyMoved()` with the tonic select (liveAllOff, backingFollowKey, droneRetune, updScaleBtn). Scale button «… ·
+1/1 = A +12¢». Live cents persist across scales (the knob's state) but are heard only in 1/1 tunings. Row «TF5 tuning anchor 1/1»
+(`P.checkOneOne`, 17 508 cases): gate vs an independent id list; 0 ¢ views = plain objects for 12 keys; 12-named refuse cents (CONTROL
+`keyCDbg('ungated')`); every 1/1 mode at keys 9/2 × +17/−23/+50 ¢: per degree×register solo/bass/chord, tonic, drone second string
+×2^(c/1200) within 1e-12 (CONTROL `keyCDbg('off')`); the real Partch controls (label, field, Q6 no jump, +12 ¢ live, recordings and frozen
+tracks untouched, historical → G 0 ¢ disabled; a 12-note mode hides them); a seed 1/1 track re-viewed at +13 ¢, editor +1 st → key+1,
+13 ¢ kept, ×2^(1/12), ↶ exact, the source differs. The TF0 fingerprint pins 0 ¢ outside its env object (the file's env has no cents) — its
+base half proves existing songs unchanged. Fix round 1 (the probe read `chordNotesAt` notes as numbers; they are `{f, iv}`).
+**Positional callers of changed functions:** `scaleView` (5th argument new, optional) — demo.js:184 (3 args: bare mode → live key and
+cents, start screen, cents 0), scales `CUR` (1), `viewOfId` (3), recorder `trackModePlan` (now 5: `v.key, v.keyC||0`), `transposePlan`
+(now 5: `k, e.sc.keyC||0`), `backingFollowKey` (now 5: `k, tonicCents`), scaleprobe TF2/TF3 (4, bare mode at the probe's 0 ¢), TF5 (5),
+probedata (2–3). `baseF(s)` — signature unchanged. New: `state.tonicCents`/`setTonicCents`/`KEY_CENTS_MAX`, `scales.viewKeyC`,
+`keyByOneOne`, `historicalKeyOf`, `keyCDbg`, `recorder.keyStepSet` (internal), `hooks.key`, ui `renderOneOne`, `keyMoved`, `keyCentsTxt`.
+`trDbg` gains `noKnob`; frzqueue `dbg.retune` → `dbg.noRetune`.
+**TF6 — docs.** HANDOFF (stage 2 closed; next the foundation plan at maximum effort), CLAUDE.md (rule #7 cents, hooks.key, TF3b, TF4,
+probe rows, known limits, steps 88–90), BACKLOG (status banner, §3.40, §7.11 English, §7.16 links, §7.17, §7.18), data/README.md
+(`anchor.historical`).
+**Final:** static PASS; data PASS 31.3 s; `--quick --all --cdn-cache` PASS — P.quick 104.9 s (46 checks), P.all 279.7 s (60 checks), UI checks PASS.
+Intermediate: Part 1 `--quick` PASS 75.6 s (45); Part 2 `--quick --all` PASS — P.quick 92.8 s (45), P.all 287.3 s (59); AF3 notes read
+through `--eval` (re-renders at +1550 ms, control 0). Frozen seed bass L4 at 48 kHz unchanged (peak 0.08686, rms 0.055319, 650886).
+**What is next:** stage 3 — first the FOUNDATION PLAN ("PLAN ONLY", maximum effort): song format and versions, draft vs project,
+folder/file/server, stable timbre and user-mode ids, migration; then the foundation slices; then the first-release candidate «Calm» (§7.16).

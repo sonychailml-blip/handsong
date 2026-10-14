@@ -20,7 +20,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
   latency as a NUMBER ⬜ · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
   3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
-  ordinary tunings ✅ · 3.39 EFFECTS builder 🔵.
+  ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later).
 - **4. Bugs** — mostly ✅/ℹ️ history; open: hand identification `key+=i` ⬜; captured expression-hand channels not replayed ⬜ (debt).
 - **5. Decided NOT to do.**
 - **6. Spec: chord latch** (✅ shipped; kept as history) — also menu rework ✅, 3.10, 3.11, 3.12/3.12a, 3.13–3.39 continue below it.
@@ -30,7 +30,8 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   the main thread (main tech debt) · 7.9 team ideas (not decisions) · 7.10 strategist proposals (not decisions) · 7.11 ⛳ hearing the room ·
   7.12 release and money strategy 🟡 (awaits the user) · 7.13 ⛳ the timbre builder (user's vision, stage 7) · 7.14 ⛳ effect chains,
   target design (per-track chains; live chain by timbre or by finger) · 7.15 modes/presets as bundles (packs) · 7.16 ⛳ «Calm» mode — rooms of
-  light and sound (candidate for the FIRST RELEASE, after stage 3).
+  light and sound (candidate for the FIRST RELEASE, after stage 3) · 7.17 Calm — playing along with outside music («Listen», after the
+  first Calm release, part of hearing the room) · 7.18 installation (kiosk) mode + B2B sales plan (after Calm).
 
 Общий список задач. Обновляется по ходу работы.
 
@@ -39,15 +40,15 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > by take, per-pass note closing) and the piano roll for all four roles (S4.0–S5.6, E0–E2, S0–S7, U1–U6); EFFECT OWNERSHIP O-0…O-4
 > (serial chain, capture per take, playback, aim vs sound, the automation lane); FREEZE F0–F5, A0–A2c; ONE ROLE AND ONE TIMBRE per track
 > (T0–T5); independent bass notes; the melodic instrument (voice modes V1–V5, Glide); brightness on every role; AR1/MX1/MX2/AR2; ED1 several notes at once, ED2 copy/paste/duplicate, ED3 quantise after recording, ED4 transpose by degrees (2026-10-13), ED5 volume bars (one bar per note) and ED6 sections (named bar markers; insert / cut / duplicate bars in every track, one song ↶) (2026-10-14).
-> **AUTO-FREEZE:** ✅ AF1 queue · ✅ AF2 swap · ✅ AF6b 16-bit · ✅ **AF3 watcher and triggers** (ON by default; A4/tempo do not
-> re-freeze until TF4; since TF2 the tonic stales nothing) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only) · ✅ **AF5 + hard rule #31**
+> **AUTO-FREEZE:** ✅ AF1 queue · ✅ AF2 swap · ✅ AF6b 16-bit · ✅ **AF3 watcher and triggers** (ON by default; since TF4 A4/tempo
+> re-freeze too, after a 1.5 s settle; since TF2 the tonic stales nothing) · ✅ **AF4 no ❄ anywhere** (a faint dot in the arrangement window only) · ✅ **AF5 + hard rule #31**
 > (a track and the live hands never share sound state: each role has a separate TRACK chain) · ✅ RENDER-LEAK (non-KS renders collected).
 > Next: AF6 rest (below, §1).
 > **Order of work (user decision; full: HANDOFF "Work order"):** editor essentials (✅ ED1 selection, ✅ ED2 copy/paste/duplicate, ✅ ED3 quantise, ✅ ED4 by degrees, ✅ ED5 volume bars, ✅ ED6 sections, ✅ ED7 one undo (2026-10-14)) →
 > editor-own (✅ OWN1 mode by degrees — same tuning, same number of degrees, out-of-mode notes keep their offset; ✅ OWN2 theremin bend curve
 > + ✅ BEND-CURVE glides/shapes/steps on bends and bus lanes, 2026-10-14; DEFERRED by the user 2026-10-14: curvature on per-note lanes (Volume, brightness,
 > glide), OWN1 into modes with a different number of degrees (maybe never); OWN3 cents per row DEFERRED — user, 2026-10-13) → tonic freeze (stage 2; plan
-> archive B «TONIC FREEZE — PLAN», user answers Q1–Q6 2026-10-14; ✅ TF0 song fingerprint, ✅ TF1 key in the view (inaudible), ✅ TF2 recordings keep their key (the key knob moves only the hands and the backing; a key change mid-take starts a new track), ✅ TF3 Transpose ±1 semitone for a track (editor) and the whole song (window); next TF4 auto-refreeze on A4/tempo) (VOL-5 and VOL-6 CLOSED by the user's test 2026-10-14 — they already work; VOL-7 per-note
+> archive B «TONIC FREEZE — PLAN», user answers Q1–Q6 2026-10-14; ✅ TF0 song fingerprint, ✅ TF1 key in the view (inaudible), ✅ TF2 recordings keep their key (the key knob moves only the hands and the backing; a key change mid-take starts a new track), ✅ TF3 Transpose ±1 semitone for a track (editor) and the whole song (window; since TF3b it moves the key knob too, one ↶), ✅ TF4 frozen tracks re-freeze by themselves after A4/tempo, ✅ TF5 «1/1 = G» with a cents nudge and a tuning's historical 1/1, ✅ TF6 docs — STAGE 2 CLOSED 2026-10-14; next: the FOUNDATION PLAN at maximum effort) (VOL-5 and VOL-6 CLOSED by the user's test 2026-10-14 — they already work; VOL-7 per-note
 > pan deferred until after stage 3) → FOUNDATION = stage 3 (stable mode and timbre ids, song and
 > timbre format; §1, §7.4) → FIRST-RELEASE candidate §7.16 «Calm» mode → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
 > export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).
@@ -2200,6 +2201,12 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
 играющую руку и прочие роли. Развилку (а)/(б) решать НА СЛУХ, собрав один эффект по варианту (б):
 три ручки у задержки сразу покажут, даёт ли глубина больше, чем ширина.
 
+### ⬜ 3.40. Paste TRANSPOSED into the track's key (user answer, 2026-10-14; later, not scheduled)
+- Today (TF2): paste goes only into a track of the same VIEW — key (and TF5 cents) included; a clipboard from another key is refused with a
+  reason; an armed track recorded in another key than the knob's takes nothing (the take starts a new track). The user accepts this for now.
+- Later: «paste transposed» — the clipboard's notes land in the TARGET track's key (re-keyed to its view, as Transpose does, so `ti`/`oct` stay
+  and only the key moves), offered when the keys differ. Same for a key-respecting «record into this track» if wanted.
+
 ---
 
 ## 7. НАПРАВЛЕНИЕ ПРОДУКТА (решения пользователя, записаны в проходе по документации после T5)
@@ -2365,21 +2372,23 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
 8. **Регулярные проверки на настоящем телефоне** (сегодня проверяют браузер на компьютере; на телефоне, например, не
    мерили размер пулов голосов — P4).
 
-### ⬜ 7.11. ⛳ СЛЫШАТЬ КОМНАТУ — следовать музыке, звучащей вокруг (направление пользователя, записано при MX2; кандидат в первый публичный выпуск)
-> Приложение слушает микрофоном музыку в комнате и следует ей, чтобы всё, что играет человек, звучало к месту.
-1. **Два режима.** (а) Следовать ТОНАЛЬНОСТИ песни — надёжно: профиль высотных классов (хрома) за несколько секунд, сверка с профилями
-   тональностей. (б) Следовать каждому АККОРДУ — по долям; медленнее и неточнее (задержка ~0.5–1 с), нужен поиск долей, чтобы смена
-   ложилась на сильную долю; мягкий вариант — держать лад тональности и подтягивать руку к звукам текущего аккорда.
-2. **Строй комнаты:** узнать опорную высоту (оркестр на 435 Гц) и поставить по ней A4 (`state.aRef` — единственный источник, правило #17).
-3. **Библиотеки для браузера есть:** Essentia.js (тональность, аккорды, доли).
-4. **Две ловушки нашей архитектуры:** (а) тоника сегодня ЖИВАЯ — автоматическая смена тональности посреди дубля транспонировала бы
-   записанное: сначала ЗАМОРОЗКА ТОНИКИ (её план — в порядке работ); (б) смена лада начинает новую дорожку (одна дорожка — один вид) —
-   следование аккордам рассыпало бы дубль на десятки дорожек: в режиме следования писать в ХРОМАТИЧЕСКИЙ вид (один вид — одна дорожка), а
-   следование лишь ограничивает, куда дотягивается рука.
-5. **Микрофон слышит само приложение:** наушники или эхоподавление (`getUserMedia({audio:{echoCancellation:true}})`), иначе приложение
-   будет следовать само себе.
-6. **Шаги:** (1) показать найденную тональность и строй комнаты с кнопкой «применить»; (2) следовать тональности — после заморозки тоники;
-   (3) следовать аккордам — с синхронизацией по долям и хроматической записью.
+### ⬜ 7.11. ⛳ HEARING THE ROOM — follow the music playing around (user's direction, recorded at MX2; first-public-release candidate; rewritten in English 2026-10-14)
+> The app listens to the room through the microphone and follows it, so whatever the person plays fits.
+1. **Two modes.** (a) Follow the song's KEY — reliable: a pitch-class profile (chroma) over a few seconds matched against key profiles.
+   (b) Follow each CHORD — by beats; slower and less exact (~0.5–1 s latency), needs beat tracking so a change lands on a strong beat; a soft
+   variant keeps the key's mode and pulls the hand towards the current chord's notes.
+2. **The room's tuning:** detect the reference pitch (an orchestra at 435 Hz) and set A4 by it (`state.aRef` — the one source, rule #17).
+3. **Libraries exist** (Essentia.js: key, chords, beats) — but key detection is written OURSELVES (§7.12 item 4: Essentia is AGPLv3; a paid
+   product needs a commercial licence).
+4. **Two traps of our architecture:** (a) ✅ solved by stage 2 (TF2): the key knob moves only live playing, recordings keep their key — a
+   detected key may now move the knob safely; (b) a mode change starts a new track (one track — one view): following chords would scatter a
+   take into dozens of tracks — in follow mode record in a CHROMATIC view (one view — one track) and let following only limit where the hand
+   reaches.
+5. **The mic hears the app itself:** headphones or echo cancellation (`getUserMedia({audio:{echoCancellation:true}})`), else the app follows
+   itself. A ONE-SHOT listen with the app muted avoids it entirely (§7.17).
+6. **Steps:** (1) show the detected key and room tuning with an «apply» button — the one-shot «Listen» of §7.17 is this step; (2) follow the
+   key continuously (after the tonic freeze — done); (3) follow chords — with beat sync and chromatic recording.
+- Linked: §7.16 «Calm» mode, §7.17 playing along with outside music, §7.15 «Jam» preset (continuous following belongs mainly there).
 
 ### 🟡 7.12. СТРАТЕГИЯ ВЫПУСКА И ДЕНЕГ — ⚠️ ПРЕДЛОЖЕНО, ЖДЁТ РЕШЕНИЯ ПОЛЬЗОВАТЕЛЯ (записано при AR2, 2026-10-12)
 > Каждый пункт — ПРЕДЛОЖЕНИЕ, не решение. Решение пользователя заменит пометку «ПРЕДЛОЖЕНО».
@@ -2451,3 +2460,31 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   scene; (3) relief lighting / depth layers. Needs a low-power visual setting for phones.
 - **Value:** the clearest demo of Handsong, best for short videos, fits installations.
 - **Plan:** 3–4 rooms at level 1 + one showcase room at level 2 → show to 3–5 people → then expand.
+- **Next ideas (user, 2026-10-14):** playing along with outside music — §7.17 (after the first Calm release); installation (kiosk) mode and
+  B2B sales — §7.18 (after Calm).
+
+### ⬜ 7.17. ⛳ CALM — PLAYING ALONG WITH OUTSIDE MUSIC (user's idea, recorded 2026-10-14; NOT in the first Calm release — after it, as part of «hearing the room», §7.11; Calm itself: §7.16)
+- **One-shot «Listen» button:** the app mutes itself for 5–10 s, listens through the microphone, detects the tonic and a rough mode, then
+  resumes in that key. Muted while listening → no self-capture problem.
+- **In Calm it sets the PENTATONIC of the detected key:** safe over both the major and its relative minor, and forgiving of detection errors.
+- **Continuous listening is harder** — the mic hears our own sound: headphones solve it; browser echo cancellation helps partly; subtracting
+  our known output is complex. Key changes are rare in calm music, so continuous mode belongs mainly to a **Jam** mode (§7.15), with
+  headphones or as experimental.
+- **After stage 2** (done): the detected key moves only live playing (the knob), never recordings.
+- **Key detection with our own code** (chroma + key profiles), not Essentia (AGPL; commercial use needs a paid licence) — §7.12 item 4.
+
+### ⬜ 7.18. ⛳ INSTALLATION MODE + B2B SALES PLAN (user's idea, recorded 2026-10-14; after Calm, §7.16)
+- **Kiosk mode:** runs all day unattended; auto-restarts; no buttons or menus; an «attract» idle state; works OFFLINE (today it does not —
+  MediaPipe from a CDN, SW caches nothing: BACKLOG §1 «Service Worker: model cache»); defined behaviour with several people in front of the
+  camera; the camera image is never shown (as in Calm).
+- **Price ladder (estimates):** self-install licence $300–1,500 one-time per location or $30–150/month; turnkey (hardware spec + remote setup +
+  branded room) $2,000–8,000; custom room for an exhibition theme $5,000–20,000+; event rental $200–1,000/day.
+- **Reference prices:** museum interactive studios quote ~$20–50K per single station, $40–150K+ per zone, 8–24 weeks; packaged interactive
+  projection systems start around $5.8K.
+- **Markets:** museums, galleries, children's centres, sensory/therapy rooms, clinics, spas, yoga studios, hotel lobbies, cafés/bars,
+  festivals, corporate events.
+- **Sales path:** 1–2 near-free pilots in Tbilisi in exchange for filming visitors and a testimonial; a 1–2 minute video in a real dark room
+  (§3.31 promo video); a one-page PDF and a 3-tier price sheet; direct outreach; AV integrators and rental firms as resellers (20–30%); event
+  agencies; art/tech open calls and grants. Sales cycle 2–6 months.
+- **Prerequisite:** a business entity for contracts (pending the user's legal consultation in Georgia). Related: §7.12 item 2 (licences to
+  schools and installations).

@@ -1,4 +1,4 @@
-import { scaleId, tonic, seventh, aRef, rectPref, tunedFrom, chordModeSel, setScaleId, setTunedFrom, setChordMode } from './state.js';   // F7: setTunedFrom/setChordMode — предустановка псевдонима (applyScaleId)   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
+import { scaleId, tonic, tonicCents, seventh, aRef, rectPref, tunedFrom, chordModeSel, setScaleId, setTunedFrom, setChordMode } from './state.js';   // F7: setTunedFrom/setChordMode — предустановка псевдонима (applyScaleId)   // tunedFrom — P3 «строй от»: читает ТОЛЬКО scaleView (CUR); chordModeSel — T7b, выбранный режим аккордов лада (тоже только scaleView/chordModeOf)
 import { t, L } from './i18n.js';   // t — для regWord (слово-регистр); L — для имён списка строя (listName, F3) и слова периода строя пользователя (имена ладов/групп резолвят L() на стороне рисующих)
 import { loadScaleData, loadReport } from './scaleload.js';
 import { hooks } from './hooks.js';   // F6: hooks.scales — реестр ладов изменился (установка/удаление файла пользователя) → ui перестраивает меню   // F5: данные ладов — ФАЙЛЫ data/ (форма v1), загрузчик с проверкой; сборщик ниже
@@ -204,7 +204,26 @@ const a3=()=>aRef/2;                                        // A3 из живо�
 let KEY_FOLLOWS=false;
 export const keyFollowsDbg=on=>{ KEY_FOLLOWS=!!on; };   // probe CONTROL only: true = every view reads the live tonic (the pre-TF2 reading)
 export const viewKey=s=> KEY_FOLLOWS || !s || s.key==null ? tonic : s.key;
-export const baseF=s=>a3()*Math.pow(2,(viewKey(s)-9)/12);   // the tonic's frequency in view s (no s: the live key); C=130.81 Hz at A4=440
+/* TF5: the key's CENTS (v.keyC) — the «1/1 = G +12¢» nudge, only in tunings not named by the 12 notes (keyByOneOne); a view without it
+   reads 0, so every 12-note view and every view made at 0 ¢ prices exactly as before (no multiplication at all). Same door rules as viewKey:
+   no view = the live view; a view without a key = the live knob. keyCDbg (probe CONTROLS only): 'off' — cents ignored in pricing;
+   'ungated' — 12-note tunings take the knob's cents too. */
+let KEYC_DBG=null;
+export const keyCDbg=m=>{ KEYC_DBG=m||null; };
+export const viewKeyC=s=>{
+  if(KEYC_DBG==='off') return 0;
+  if(!s) return CUR().keyC||0;
+  return KEY_FOLLOWS || s.key==null ? (keyByOneOne(s) ? tonicCents : 0) : (s.keyC||0);
+};
+export const baseF=s=>{ const c=viewKeyC(s), f=a3()*Math.pow(2,(viewKey(s)-9)/12); return c ? f*Math.pow(2,c/1200) : f; };   // the tonic's frequency in view s (no s: the live key); C=130.81 Hz at A4=440; TF5: × the key's cents
+/* TF5: is the key «where 1/1 is» (a tuning not named by the 12 notes: ordinal or a name list — Partch, 19/31-TET, gamelan, BP, Carlos,
+   22 shruti)? Then the knob reads «1/1 = G» and takes a cents nudge. Read from the TUNING's naming scheme (data); fixedKey grids never. */
+export const keyByOneOne=s=>{ if(!s) return false; const b=s.mode||s; if(b.fixedKey) return false;
+  const tf=SRC.get(tuningOf(b)), sc=tf && tf.naming && tf.naming.scheme; return KEYC_DBG==='ungated' || (sc!=='notes12' && sc!=='notes24'); };
+/* TF5 (user answer Q6): a tuning file may declare its historical 1/1 (anchor.historical: {key 0..11, cents, note}) — offered as one tap,
+   never the default. → { key, cents, note } or null. */
+export const historicalKeyOf=s=>{ if(!s) return null; const tf=SRC.get(tuningOf(s.mode||s)), h=tf && tf.anchor && tf.anchor.historical;
+  return h ? { key:h.key, cents:h.cents||0, note:h.note||null } : null; };
 /* ═══ «СТРОЙ ОТ» — ЯКОРЬ ФИКСИРОВАННОЙ СЕТКИ (слайс P1 дуги «СТРОЙ ОТ», HANDOFF) ═══
    Фиксированный строй (fixedKey) — это инструмент, который НАСТРОЙЩИК настроил от одной ноты (якоря), а МУЗЫКАНТ играет
    в любой тональности (тоника). Две независимые вещи — и в арифметике высоты они теперь названы порознь:
@@ -247,12 +266,14 @@ export function chordModeOf(s){
   const b=s&&(s.mode||s), ms=b&&b.chordModes; if(!ms) return undefined;
   const m=chordModeSel[b.id]; return ms.some(x=>x.id===m) ? m : ms[0].id;
 }
-/* TF1: the key is the view's third key (after the anchor and the chord mode); default — a view keeps its own key, a mode takes the live one. */
-export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s), k=(s && s.key!=null ? s.key : tonic)){
+/* TF1: the key is the view's third key (after the anchor and the chord mode); default — a view keeps its own key, a mode takes the live one.
+   TF5: the 5th argument, the key's cents, follows the same default (a view keeps its own, a mode takes the knob's). */
+export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s), k=(s && s.key!=null ? s.key : tonic), c=(s && s.key!=null ? (s.keyC||0) : tonicCents)){
   if(!s) return s;
   const base=s.mode||s, ms=base.chordModes;
   const cmv= ms ? (ms.some(x=>x.id===cm) ? cm : ms[0].id) : undefined;   // T7b: режим аккордов — второй ключ вида (как якорь); неизвестный — умолчание
-  const key=(base.tunable ? tf : '')+'|'+(cmv||'')+'|'+k;
+  const kc= c && keyByOneOne(base) ? c : 0;   // TF5: cents only where the key is «1/1 = …»; 0 leaves the memo key and the view as before
+  const key=(base.tunable ? tf : '')+'|'+(cmv||'')+'|'+k+(kc ? '|'+kc : '');
   let m=SCALE_VIEWS.get(base); if(!m){ m=new Map(); SCALE_VIEWS.set(base,m); }
   let v=m.get(key);
   if(!v){
@@ -261,7 +282,7 @@ export function scaleView(s, tf=tunedFrom, cm=chordModeOf(s), k=(s && s.key!=nul
     if(ms){ Object.assign(v, ms.find(x=>x.id===cmv).over); v.chordMode=cmv; }   // ⛳ T7b: поля режима ПОВЕРХ полей лада — читатели видят обычные поля (chordBuild/typedChords/chordRule)
     v.mode=base; v.tuningRec=TUNING_OF_MODE.get(base) || TUNINGS[base.tuning];   // F6: строй, закреплённый за ладом при сборке
     v.anchor={ policy, from: policy==='choice' ? tf : policy==='C' ? 0 : 'T' };
-    v.key=k;
+    v.key=k; if(kc) v.keyC=kc;
     m.set(key,v);
   }
   return v;
@@ -278,7 +299,7 @@ export function viewIdOf(v){
 }
 /* TF1: the view's identity WITH its key — the source of a track (recorder.noteSource). viewIdOf stays key-free: it names the mode's view
    for the F0 snapshot, songs and probes. Equal strings ⇔ the same view object. */
-export const viewKeyIdOf=v=> viewIdOf(v) + (v && v.key!=null ? '~'+v.key : '');
+export const viewKeyIdOf=v=> viewIdOf(v) + (v && v.key!=null ? '~'+v.key+(v.keyC ? (v.keyC>0?'+':'')+v.keyC+'c' : '') : '');   // TF5: cents too (a nudge mid-take → a new track, as a key change)
 export const keyOf=s=>{ const A=anchorOf(s), k=viewKey(s); return k-A+(A>k?12:0); };
 export const cFix=(s=CUR())=>{ const A=anchorOf(s), k=viewKey(s); return a3()*Math.pow(2,(A-9-(A>k?12:0))/12); };   // C3 = 130.81 Гц при A4=440 (та же опора, что baseF)
 /* Частота ТОНИКИ/КЛЮЧА для дрона и родственного: у fixedKey — ФИКСИРОВАННАЯ высота ключа

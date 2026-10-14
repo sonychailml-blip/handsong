@@ -272,7 +272,10 @@
     <div class="psep" data-i18n="panel.scale.sepScale">Лад и тоника</div>
     <div class="prow"><label data-i18n="panel.scale.tradition">Строй</label><select id="selTradition"></select></div>
     <div class="prow"><label data-i18n="panel.scale.mode">Лад</label><select id="selScale"></select></div>
-    <div class="prow"><label data-i18n="panel.scale.tonic">Тоника</label><select id="selTonic"></select></div>
+    <!-- TF5: in a tuning not named by the 12 notes the label reads «1/1 =» and a cents nudge appears; a tuning file may declare its
+         historical 1/1 (Partch: G) — one tap, never the default. Visibility from the tuning's data (ui.renderOneOne). -->
+    <div class="prow" id="tonicRow"><label id="tonicLbl" data-i18n="panel.scale.tonic">Тоника</label><select id="selTonic"></select><input type="number" id="tonicCents" min="-50" max="50" step="1" value="0" inputmode="numeric" data-i18n-title="panel.scale.centsTitle" hidden><span class="unit" id="tonicCentsU" hidden>¢</span></div>
+    <div class="prow" id="tonicHistRow" style="display:none"><button id="tonicHist" type="button"></button></div>
     <!-- «Строй от» (слайс P0): фиксированные исторические строи (свойство лада fixedKey) настроены от C — строка это ГОВОРИТ.
          Только показ, не выбор; видимость ставит ui.updScaleBtn по свойству лада (правило #25: не по имени).
          P3: у лада с выбором (tunable — Пифагор) вместо строки — РЯД ВЫБОРА #tunedFromRow и подсказка, меняющаяся по состоянию. -->

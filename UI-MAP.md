@@ -142,6 +142,10 @@
 следует режиму голоса СВОЕЙ роли. Поворот
 в портрет на включённом сплите — авто-выключение (без зависших нот).
 
+> **TF3b/TF5 (2026-10-14, English):** in «Scale», for a tuning NOT named by the 12 notes (Partch, 19/31-TET, gamelan, Bohlen–Pierce,
+> Carlos, 22 shruti) the key row reads «1/1 =» with a ¢ field (−50…+50) and, when the tuning file declares one, a button «Historical 1/1: G»
+> (Partch); the scale button shows «· 1/1 = A +12¢». The arrangement window's «−1 st / +1 st» (song) also moves the key knob; one ↶ undoes both.
+
 **Три панели** (сверено с `index.html`), разделены по смыслу: **«Звукоряд»** = какие ноты есть и где лежат
 (лад/тоника/**эталон A4**/раскладка нот/пальцев в руке/септаккорды) · **«🎛 Звук»** = как это звучит и чем
 управляют (тембры — и **под тембром соло и под тембром баса строка РЕЖИМА ГОЛОСА: «Полифония / Ведущий»** (V3; две

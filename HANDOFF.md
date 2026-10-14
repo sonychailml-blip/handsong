@@ -54,6 +54,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   ✅ Volume VOL-0…VOL-6 (VOL-5 and VOL-6 CLOSED 2026-10-14 by the user's test — they already work); VOL-7 deferred until after stage 3.
   ✅ unverified: **ED7-fix2 undo after ✕** (runner PASS; step 83).
   ✅ unverified: **TF2 recordings keep their key** and **TF3 Transpose ±1 semitone** (runner PASS; ear steps 84–87).
+  ✅ unverified: **TF3b song Transpose moves the knob**, **TF4 A4/tempo re-freeze**, **TF5 «1/1 = G» + cents + historical 1/1** — STAGE 2
+  CLOSED (runner PASS; ear steps 88–90).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -68,7 +70,7 @@ belongs to the TRACK; live, effects will belong to the TIMBRE (chains move from 
 once it settles (all but the track being recorded), unnoticed. Done AF1–AF4, AF6b (AF1: worst layout 6.3 ms drums L16, typical 0.8 ms,
 under the 8 ms pinch budget; phone not measured). Done AF5 (tracks play through their role's TRACK chain, rule #31). Next: AF6 memory.
 **AF3 decisions (user, do not reopen):**
-A4/tempo do NOT re-freeze until TF4 (`frzqueue.AF_REFREEZE_ON_RETUNE = false`; such tracks play live; since TF2 the tonic stales nothing); a track
+since TF4 A4/tempo re-freeze too (1.5 s settle after the last move; Q5); since TF2 the tonic stales nothing; a track
 created in the editor gets the live chain pinned at birth, inserts into an existing track inherit its chain, auto-freeze never pins (song
 load pins old chain-less tracks; seed: 0); memory guard until AF6 `AF_BUDGET_MB` 300 touch / 1024 desktop, over it = skipped, no
 eviction; ON by default, `R.autoFreeze(false)` off for the session; paused while any probe runs. AF1 user decisions (frozen sound = a CACHE; 16-bit;
@@ -110,19 +112,14 @@ FROM THE TUNING (an instrument); only mobile Natural is adaptive; `chordBuild` /
 never from code · **tunings as files**: a song will store a COPY of each tuning it uses; files from others are untrusted ·
 **Scala readiness**: exact ratios as data (started), names as data (✅ F3), import normalisation, a round-trip probe (equal → generator
 form) · a mode may need a "central tone" (Lima/Nem patets) — study with musicians.
-**Tonic** (user decision): THE TONIC IS FROZEN IN THE EVENT (stage 2, archive B «TONIC FREEZE — PLAN»): the drone follows the event's view;
-the key lives in each note's VIEW for every tuning (user accepted 2026-10-14). **User answers Q1–Q6 (2026-10-14):** Q1 the key knob changes
-only what the hands play; recordings keep their key; a Transpose button moves them (with ↶) · Q2 a key change while recording starts a NEW
-track (as a mode change) · Q3 a backing (Jam/Drums) is re-made in the new key · Q4 ±1 semitone Transpose for a track (editor) and the
-whole song (window), one ↶ each; key colour changes in historical temperaments are expected · Q5 after an A4 or tempo change frozen tracks
-re-render by themselves · Q6 Partch keeps today's key; «historical G» one tap away, not the default. **Tuning anchor** (MX1; with that plan;
-serves Scala `.kbm`): for non-12 tunings the tonic means "where 1/1 is" — any frequency (Partch 1/1 = G 392 Hz; Sa to the singer);
-12 notes stay the main choice plus a cent offset or Hz; a tuning may declare its historical anchor (data field); the control then
-reads "1/1 = G".
+**Tonic — stage 2 ✅ CLOSED 2026-10-14** (plan, answers Q1–Q6 and the three later answers: archive B «TONIC FREEZE — PLAN» and the TF
+records): the key (and, for 1/1 tunings, its cents) lives in each note's VIEW; the knob moves only the hands and the backing; Transpose moves
+recordings (a song Transpose moves the knob too); A4/tempo re-freeze by themselves; «1/1 = G» with a historical 1/1 one tap away (Q6). Still open from the anchor
+idea: 1/1 typed as any frequency in Hz (Sa to the singer) and Scala `.kbm` export (with SCALA readiness).
 
 ## Work order (user decision: "editor before the timbre builder")
-✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → **TONIC FREEZE = stage 2** (IN PROGRESS: ✅ TF0, ✅ TF1, ✅ TF2, ✅ TF3; NEXT TF4 auto-refreeze on A4/tempo,
-then TF5 tuning anchor «1/1 = G», TF6 docs; archive B «TONIC FREEZE — PLAN», answers Q1–Q6 above) → ✅ VOL-5, VOL-6 (closed) → **FOUNDATION = stage 3** (stable timbre ids (and user-mode ids), song format and timbre
+✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → NEXT: the **FOUNDATION PLAN** ("PLAN ONLY",
+maximum effort: song format, draft/project, folder/file/server, versions, migration) → **FOUNDATION = stage 3** (stable timbre ids (and user-mode ids), song format and timbre
 format — voice mode and Glide default are the first "timbre policies" —, songs as files: export/import) → candidate FIRST RELEASE:
 **«Calm» mode** (§7.16) → VOL-7 → **SAVING** (on the device + file export/import;
 does not wait for the server — same format and ids) → **AUTO-FREEZE A3–A6 (A7 if measured), MIXER per-track effects and meters,
@@ -143,7 +140,7 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). Since TF2 the key is
-  frozen in each note's view (the knob moves only the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
+  frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
   the main thread; hand→sound latency not measured.
 - Roll: per-note automation lanes (Volume, brightness, glide…) have no curvature yet (BEND-CURVE did bends and bus lanes); OWN1 offers
   only modes with as many degrees as the track's; unison/theremin tie pairs untie all candidates of that beat (S6); dissolve
@@ -153,8 +150,8 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 - One history (ED7): 300 steps; NOT steps — mute, solo, arm, the brace, tempo, tonic (✕'s step carries the brace and ⟳).
   The ED2 clipboard lives for the app session; captured bus automation is not copied.
 - Captured expression channels are written but NOT replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
-- After an A4 or tempo change frozen tracks go stale and play through the live pools (stealing above the ceiling) — until TF4.
-- Paste goes only into a track of the same view, KEY included; an armed track in another key than the knob's takes nothing (new track).
+- After an A4 or tempo change frozen tracks play through the live pools (stealing above the ceiling) until they re-freeze (TF4: 1.5 s + render).
+- Paste goes only into a track of the same view, KEY (and TF5 cents) included; an armed track in another key takes nothing (§3.40 later).
 - A render of a KS (plucked solo) track still pins its offline context, ≈ 6 MB per render (Chrome; no workaround found) — BACKLOG §1 AF6 7.
 - Unfrozen tracks of one role share the role's TRACK chain (last writer wins among them); per-track chains not built (BACKLOG §1).
 - Lanes: a note edit doesn't rebuild its ramp; an anchor only where no event; Glide over bass theremin smooths its steps. Bass
@@ -175,15 +172,16 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### TF2 + TF3 (2026-10-14) — recordings keep their key; Transpose by semitones (full: archive B)
-- TF2: `scales.viewKey` answers the view's own key (the TF1 shim `keyFollow` deleted). The key knob calls `recorder.liveAllOff` (live owners
-  only; a take closes what it holds → the next note lands in a NEW track, Q2) and `backingFollowKey` (Jam/Drums events re-keyed in place =
-  re-made in the new key, Q3; held notes handed over, frozen backing re-freezes). Drone sounds its event's view (`audio.droneUse`); KS
-  sympathetic strings tune to the note's view (`audio.sympBase`, set by ENG); freeze signature and render pins drop the tonic.
-- TF3: `editTranspose(n)` (editor «−1 st / +1 st») and `songTranspose(n)` (window, backing included) re-key views (key may leave 0..11:
-  B+1 = 12 = C above); one 'transpose' step; touched frozen tracks stale. Non-12 tunings (Partch, 19/31-TET, gamelan, BP): the key model
-  already moves their 1/1 by 100 cents — enabled everywhere, no disabled button (decided).
-- Probes: row «TF2 recordings keep their key» (replaces «TF1 key in the view»), «TF3 transpose by semitones», each with failing controls;
-  `tools/song.print.json` +2 half renewed (recorded lines = base; backing +2; its new view adds 2 lines); AF3/AR1 stale cases use A4;
-  12-tonic sweeps read `keyless` views. Fix rounds: TF2 1, TF3 2 (probe setup).
-- Final: data PASS 41.0 s; `--quick --all` PASS — P.quick 63.3 s (45), P.all 195.7 s (59), UI PASS; frozen L4 unchanged.
+### TF3b + TF4 + TF5 + TF6 (2026-10-14) — stage 2 CLOSED (full: archive B)
+- User answers (2026-10-14): 1 song Transpose also moves the key knob (track Transpose does not); 2 the backing's re-key on a knob change is
+  not a ↶ step; 3 paste/arming respecting the key is OK for now — «paste transposed» later (BACKLOG §3.40). TF2/TF3 decisions accepted.
+- TF3b: the song Transpose step carries `{kind:'key'}` (knob ±n mod 12, `hooks.key` → ui); ↶/↷ set the knob absolutely. The knob's backing
+  re-key now skips drum hits (no pitch), so ↶ restores knob and backing together.
+- TF4: `AF_REFREEZE_ON_RETUNE` true — a track stale only by A4/tempo re-renders 1.5 s after the last move (each move resets it).
+- TF5: `v.keyC` cents in the view only for 1/1 tunings (`keyByOneOne`, from the tuning's naming scheme); `state.tonicCents`; one door
+  `viewKeyC` → `baseF` only; Scale panel: «1/1 =» label, ¢ field, «Historical 1/1: G» from `anchor.historical` (Partch file; Q6: one tap,
+  not default). 0 ¢ views are the same objects; F0 snapshot and TF0 base half unchanged.
+- Probes: TF3 row + knob cases (control `noKnob`), AF3 (4) rewritten (control `noRetune`), AR1 stale-by-A4 dot = hollow then re-render, new
+  row «TF5 tuning anchor 1/1» (controls `keyCDbg('ungated'|'off')`). Fix rounds: TF3b 1 (backing drum views), TF4 0, TF5 1 (probe read
+  chord notes as numbers).
+- Final: data PASS 31.3 s; `--quick --all` PASS — P.quick 104.9 s (46), P.all 279.7 s (60), UI PASS. Docs: BACKLOG §7.11 (English), §7.17, §7.18, §3.40.

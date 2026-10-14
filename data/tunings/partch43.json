@@ -54,5 +54,6 @@
   "naming": {"scheme": "ordinal"},
   "periodWord": {"short": "reg.oct", "full": "reg.octaveFull"},
   "describe": {"kind": "table"},
-  "chordFit": "ratios"
+  "chordFit": "ratios",
+  "anchor": {"historical": {"key": 7, "cents": 0, "note": {"en": "Partch tuned 1/1 to G (392 Hz)", "ru": "Парч настраивал 1/1 на соль (392 Гц)"}}}
 }

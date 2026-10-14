@@ -4,7 +4,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxCaptureChain, fxCaptureWalk, fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
-import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
+import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, setTonic, tonicCents, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { chordUnit, CUR, baseF, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewKeyIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { bendAt, bendSplit, curveU, REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
@@ -1254,7 +1254,7 @@ const frzChaseSkip=layer=>{ const f=frzOf(layer); if(!f) return false; if(f.arme
    ⛳ В ПОДПИСЬ ДОРОЖКИ он попадает ТОЛЬКО через эту запасную ветку (noSc в freezeSig): у события есть sc — вариант лада со своим
    якорем, и смена выбора его звук не меняет; значит замороженная дорожка от передвижения выбора НЕ стареет (мемо подписи лишь
    пересчитается к той же строке). ⛳ T2: пара (лад, tunedFrom) — ровно КЛЮЧ ВИДА (строй, лад, якорь), который отдаёт CUR(). */
-const frzPinned=()=>[tonic,aRef,scaleId,tunedFrom,chordModeVer,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct()].join(',');   // T4c-2: флаг временного R.powerOld снят вместе с ним
+const frzPinned=()=>[tonic,tonicCents,aRef,scaleId,tunedFrom,chordModeVer,seventh?1:0,loop.bpm,leadIdx,bassIdx,chIdx,droneNonOct()].join(',');   // T4c-2: флаг временного R.powerOld снят вместе с ним
 const frzGlobalKey=()=>events.length+'|'+evGen+'|'+takeFxVer+'|'+frzPinned();
 const frzSigMemo=new Map(); let frzSigG=null;
 /* ⛳ ВЕРСИЯ ПРАВОК ДОРОЖКИ (A2) — по ID, не по номеру (правило #27). Поднимается там же, где takeFxTouch
@@ -1308,7 +1308,7 @@ function freezeSig(layer){
   /* TF2: the tonic left field 5 — a view carries its key, so the key knob changes no recorded sound (an event without a view still reads
      it: the noSc fallback). frzSigTonic = the probe CONTROL (the old signature, a key change stales every frozen track). */
   const v=n+'|'+first+'|'+last+'|'+sum.toFixed(6)+'|e'+ver+'|'+(frzSigTonic?tonic+',':'')+aRef+','+loop.bpm
-         +'|'+(noSc?tonic+','+scaleId+','+tunedFrom+','+chordModeVer+','+(seventh?1:0)+','+droneNonOct():'-')+(dr?',d'+droneNonOct():'')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim
+         +'|'+(noSc?tonic+(tonicCents?'~'+tonicCents+'c':'')+','+scaleId+','+tunedFrom+','+chordModeVer+','+(seventh?1:0)+','+droneNonOct():'-')+(dr?',d'+droneNonOct():'')+'|'+(ld?leadIdx:'-')+','+(ch?chIdx:'-')+','+(bs?bassIdx:'-')+'|i'+tim
          +'|p'+lanePanOf(layer);   // MX2: панорама дорожки вплавлена в буфер (ступень до цепи) — её смена старит; уровня здесь НЕТ (он на шине замороженной)   // флип R.powerOld старит ТОЛЬКО дорожки со стопками
   frzSigMemo.set(layer, {v, noFx});
   return v+(noFx?soloLiveSig():'');
@@ -1354,8 +1354,8 @@ function frzWatchKey(){
   if(frzNoFxKey!==k){ frzNoFxKey=k; frzNoFxAny=events.some(e=>e.a&&e.a.fx==null&&(e.fn==='leadOn'||e.fn==='leadSet')); }
   return frzGlobalKey()+'|w'+frzWatchVer+(frzNoFxAny?soloLiveSig():'');
 }
-/* Stale ONLY because A4 or tempo moved (field 5 of the signature; user decision: no re-render on these until TF4). Since TF2 the tonic is
-   not in it: a key change leaves frozen tracks fresh. */
+/* Stale ONLY because A4 or tempo moved (field 5 of the signature): the watcher gives such tracks the longer 'retune' settle (TF4). Since
+   TF2 the tonic is not in it: a key change leaves frozen tracks fresh. */
 const frzSigNoRetune=s=>{ const p=s.split('|'); if(p.length>5) p[5]='*'; return p.join('|'); };
 function frzRetuneOnly(layer){
   const f=frzOf(layer); if(!f||f.drop) return false;
@@ -2070,7 +2070,14 @@ function moveLaneStep(layer,to){
   if(!same && histPush({ kind:'ranks', label:'order', from:R0, to:new Map(laneRank) })) histSeal();
   return r;
 }
+/* the key knob inside a song Transpose step (user answer 1): ↶/↷ set it back / again ABSOLUTELY (the backing re-keyed by a knob turn in
+   between is restored by the step's own view moves, so knob and backing agree again). Live hands stop; tracks are not touched here. */
+function keyStepSet(k){
+  if(k===tonic) return;
+  setTonic(k); liveAllOff(); AUD.droneRetune(); hooks.key && hooks.key();
+}
 function histApplyX(u,undo){
+  if(u.kind==='key'){ keyStepSet(undo?u.from:u.to); return true; }
   if(u.kind==='snap'){ snapApply(u,undo); return true; }
   if(u.kind==='tab'){ const ly=laneLayerOf(u.id), v= undo?u.from:u.to; if(ly==null) return true;
     if(u.f==='level') setLaneLevel(ly,v); else if(u.f==='pan') setLanePan(ly,v); else setLaneName(ly,v||''); return true; }
@@ -2969,7 +2976,7 @@ function trackModePlan(layer,mode){
   const v=trackViewOfLayer(layer), role=laneRoleOf(layer);
   if(!v || !mode || !role || role==='dr' || !modesLikeView(v).includes(mode)) return { why:'none' };
   const ms=mode.chordModes, cm= ms ? (ms.some(x=>x.id===v.chordMode) ? v.chordMode : ms[0].id) : undefined;
-  const v2=scaleView(mode, v.tunedFrom!==undefined ? v.tunedFrom : tunedFrom, cm, v.key);   // TF1: the track keeps its key
+  const v2=scaleView(mode, v.tunedFrom!==undefined ? v.tunedFrom : tunedFrom, cm, v.key, v.keyC||0);   // TF1/TF5: the track keeps its key and its cents
   if(v2===v) return { why:'same' };
   if(role==='ch' && (!supportsChords(v2) || (v2.chordRule && v2.chordRule.kind==='none' && events.some(e=>e.layer===layer&&e.a&&e.a.ti!=null&&!e.a.ty)))) return { why:'chords' };
   const list=[];
@@ -2996,7 +3003,7 @@ function editTrackMode(mode){
    Partch, 19/31-TET, gamelan, Bohlen–Pierce move their 1/1 by 100 cents. Drum hits carry no pitch (skipped). Keys stay in TR_KEY_MIN..MAX
    (two octaves around the knob). One history step (label 'transpose'); the touched tracks' freeze goes stale (edit version).
    → { list, layers } or { why: 'none' | 'range' }. trDbg (probe CONTROLS only): noTouch — no edit version bump; ti — the naive transpose
-   (tuning index + n steps, the view kept). */
+   (tuning index + n steps, the view kept); noKnob — the song step leaves the key knob (pre-TF3b). */
 const TR_KEY_MIN=-12, TR_KEY_MAX=23;
 let trDbgO={};
 const trDbg=o=>{ trDbgO=o||{}; };
@@ -3008,7 +3015,7 @@ function transposePlan(layers,n){
     const k=(e.sc.key!=null ? e.sc.key : tonic)+n;
     if(k<TR_KEY_MIN || k>TR_KEY_MAX) return { why:'range' };
     const to= trDbgO.ti ? { t:e.t, a: e.a && typeof e.a.ti==='number' ? { ...e.a, ti:e.a.ti+n } : e.a, sc:e.sc }
-                        : { t:e.t, a:e.a, sc:scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k) };
+                        : { t:e.t, a:e.a, sc:scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k, e.sc.keyC||0) };   // TF5: the cents stay
     list.push({ kind:'move', ev:e, from:{ t:e.t, a:e.a, sc:e.sc }, to }); L.add(e.layer); }
   return list.length ? { list, layers:L } : { why:'none' };
 }
@@ -3032,6 +3039,7 @@ function songTranspose(n){
   const P=transposePlan(null,n); if(P.why) return false;
   for(const u of P.list) editApply(u,false);
   if(!trDbgO.noTouch) for(const ly of P.layers){ const id=laneOf(ly); if(id!=null){ const u={ kind:'lanetouch', id }; editApply(u,false); P.list.push(u); } }
+  if(!trDbgO.noKnob){ const u={ kind:'key', from:tonic, to:((tonic+n)%12+12)%12 }; editApply(u,false); P.list.push(u); }   // TF3b (user answer 1): the knob moves with the song
   events.sort(evOrder); schedInvalidate(); takeFxTouch();
   if(histPush({ kind:'batch', label:'transpose', n, list:P.list })) histSeal();
   if(hooks.af) hooks.af('transpose');
@@ -4973,7 +4981,7 @@ function liveAllOff(){ if(!AC)return;
    themselves. → the layers re-keyed. */
 function backingFollowKey(){
   const k=tonic, L=new Set();
-  for(const e of events) if(e.jam && e.sc && e.sc.mode && e.sc.key!==k){ e.sc=scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k); L.add(e.layer); }
+  for(const e of events) if(e.jam && e.sc && e.sc.mode && e.fn!=='drum'){ const nv=scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k, tonicCents); if(nv!==e.sc){ e.sc=nv; L.add(e.layer); } }   // TF3b: drum hits carry no pitch (as in Transpose), so ↶ of a song Transpose restores the whole backing; TF5: the knob's cents too
   if(!L.size) return [];
   for(const ly of L){ const id=laneOf(ly); if(id!=null) laneVerBump(id); }
   notesView=null; chaseAt=null; frzSigMemo.clear();   // memos hold views; cursors and order untouched (safe while recording)

@@ -178,6 +178,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    the hands play** (`CUR()` = the view at the live key); recordings keep their key; only Transpose (TF3) moves them, by re-keying views.
    Probe control `keyFollowsDbg(true)` = the old reading. `viewIdOf` stays key-free (F0 snapshot, songs, probes); `viewKeyIdOf` adds
    `~key` and is the track SOURCE (`noteSource`). A view without `key` (old/bare) reads the live tonic (the probe sweeps use `keyless`).
+   ⛳ **TF5: the key's CENTS** `v.keyC` (5th `scaleView` argument, same default rule; memo key and field only when ≠ 0) exist only where
+   `scales.keyByOneOne(s)` (tuning NOT named by the 12 notes — its naming scheme in data; never fixedKey): the knob reads «1/1 = G» +
+   `state.tonicCents` (−50…50). Read through ONE door `viewKeyC(s)`, applied only in `baseF` (×2^(c/1200), no multiplication at 0 ¢ —
+   12-note views and 0 ¢ views are the very objects and prices they were); `viewKeyIdOf` adds `+13c`. Probe control `keyCDbg('off'|'ungated')`.
 8. **The video draw and `detectForVideo` read the same camera frame** (background before detect, overlays after, one synchronous tick).
 9. **ONE layout; never reintroduce a mode gate.** New behaviour keys off scale properties and `splitOn`. **Hit-test and render derive
    geometry from the SAME frozen range** (`S.role`/`S.rx0`/`S.rx1` frozen at capture; `phoneHalves`, `palSplitX`, `rectBandY`/`rectRows`
@@ -264,12 +268,13 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   palette|notes split, `rectBandY`, `coverView` = the single cover crop), volume curve `volAmp(v)=v²`/`volVel`/`volFromOld`,
   fine-recording constants, `INSTR_COL` (the ONE role palette, different lightness), arrangement sizes, the ONE curve law of bends and bus
   lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan` — BEND-CURVE).
-- `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `aRef`, `tunedFrom`, instruments, `handFn`,
+- `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents` (TF5), `aRef`, `tunedFrom`, instruments, `handFn`,
   `voiceMode`, split + `phoneHalves(W)` (the only `W/2`), registers, camera, editor/window state). Chain-owner key `chainKeyOf(role)`
   → `'role:ld'`, `fxChains`, `FX_VOL`, `chainOwners()`. ⛔ The key is OPAQUE — equality and indexing only, never parsed.
 - `src/hooks.js` — nullable callbacks for lower layers; `hooks.tutor(kind,payload)` is the tutorial's single channel; `hooks.cleared()` — ✕ happened (ui: the undo toast, ED7-fix2); `hooks.af(kind)` —
   auto-freeze settle hints (recorder: take, undo, backing, rowDelete, editor, song; ui: panHold, pan); `hooks.afRow(layer)` — the window's
-  freeze dot (both set by `frzqueue.js`).
+  freeze dot (both set by `frzqueue.js`); `hooks.key()` — a song Transpose step (or its ↶/↷) moved the key knob (ui: `#selTonic`, scale
+  button, TF5 row).
 - `src/i18n.js` — `LANGS=['en','ru']`, `DICTS`, `t(key,params)` (dict → en → `params.def` → the key), `L(field)`, `store`,
   `applyI18n`; persisted as `handsong.lang`.
 - `data/` + `src/scaleload.js` — ALL scale data are JSON files (v1; manifest order = menu order = F0 index); per-file validation; a
@@ -279,7 +284,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   can't be removed; deleting never breaks recordings (`P.checkUserDelete`).
 - `src/scales.js` — the teaching layer and pitch truth: builder → `TRADITIONS` (6), `TUNINGS` (18), `CHORD_FAM_SETS`, `SCALES` (74).
   ONE pitch function `pitchHz(T,A,z,k,R)=A·P^R·ρ(k)` (⚠️ keep its multiplication order); chord pricing `chordNotes`; memoised view
-  `scaleView`/`CUR()`; predicates; rect layout; theremin; `registerRecord`/`unregisterRecord`.
+  `scaleView`/`CUR()`; predicates (TF5: `keyByOneOne`, `historicalKeyOf`, the cents door `viewKeyC`); rect layout; theremin; `registerRecord`/`unregisterRecord`.
 - `src/audio.js` — the Web Audio engine (see "Audio engine"): pools, synthesis paths, drums, drone, metronome, FDN reverb, `FX_FACTORY`,
   chain wiring, track level/pan, master, frozen-track store/reader, probe and render helpers.
 - `src/ks-worklet.js` — Karplus–Strong `ks-string` (mandatory worklet: a native delay loop is floored at 128 samples); allpass
@@ -760,7 +765,8 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   added / changed (objects with beats and payloads), capture records by take, track ids with table rows (`laneRow`, `laneDrop` drops the
   freeze), markers. One pending snapshot at a time: ⤺ / backing / row delete during a take fold into the take's step; `probeTake` and
   `histOff` write none. NOT steps: mute, solo, arm, the brace, tempo, tonic (user answer: listening switches, not edits) — except that the
-  ✕ step carries the brace and ⟳ (`br`, `braceKey`), so ↶ of ✕ brings them back (control `histDbg {noBrace}`). `histUndo`/`histRedo` (aliases `editUndo`/`editRedo`,
+  ✕ step carries the brace and ⟳ (`br`, `braceKey`), so ↶ of ✕ brings them back (control `histDbg {noBrace}`), and a song Transpose step
+  carries the key knob (TF3b). `histUndo`/`histRedo` (aliases `editUndo`/`editRedo`,
   `songUndo`/`songRedo`): refused while recording, pause the transport, `histCommit` bumps the edit version of every track the step
   touches (`histTouched` — events, lane points via their take, chains, snapshot events) → frozen ones go stale and re-freeze ('undo'
   hint). ⛳ TRIPWIRE: each step keeps `h` = `histHash()` (order-free FNV over events: birth number, beat, payload object id, layer; capture
@@ -800,6 +806,10 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   keys within `TR_KEY_MIN..MAX` (−12..23). Every tuning prices from the key: 12-note tunings move a semitone (a historical temperament changes
   key colour — expected), Partch / 19/31-TET / gamelan / Bohlen–Pierce move their 1/1 by 100 cents (the key model expresses it — no
   disabled button). One step (label 'transpose'; the song step carries `'lanetouch'` per track), frozen tracks go stale and re-freeze.
+  ⛳ **TF3b (user answer 1):** the SONG step also moves the key knob by n (mod 12; sub-step `{kind:'key', from, to}`, `recorder.keyStepSet`:
+  setTonic + `liveAllOff` + drone + `hooks.key`) so live playing stays in the song's key; ↶/↷ set the knob ABSOLUTELY to from/to (a knob
+  turned in between re-keyed the backing; the step's own view moves restore it, so knob and backing agree). The track step (editor) never
+  moves the knob. Cents (`keyC`) ride along unchanged. Probe control `trDbg({noKnob})`.
 - **Track into another mode (OWN1):** `#rollMode` lists `scales.modesLikeView(view)` — modes of the SAME tuning (user decision) with the same
   number of degrees; `recorder.editTrackMode(mode)` / `editTrackModeWhy` ('none'|'same'|'reg'|'fit'|'chords'): every event of the track takes
   the new view (`scaleView(mode, its tunedFrom, its chord mode if the new mode has it)`), every pitch-carrying event the same degree there by
@@ -914,8 +924,10 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   come through `hooks.af` from the real sites (`recStop`, `onUndo`, `loadArrangement`/`clearJam`, `deleteLane`, `editClose`,
   `songPinChains`; ui pan press/release/wheel/double tap). HOLDS: recording (queue gate), the editor's open track, a held pan control.
   Candidates go through the AF1 queue (priority, gates) and swap in via AF2.
-- ⛔ **Not auto-frozen (live by choice):** tracks stale ONLY by A4 or tempo while `AF_REFREEZE_ON_RETUNE` is false (user decision until
-  TF4; `recorder.frzRetuneOnly` masks field 5 of the signature) — they play their events as before; tracks without a captured
+- ⛳ **TF4 (user answer Q5): A4 and tempo re-freeze too** (`AF_REFREEZE_ON_RETUNE` true): a track stale ONLY by them (`recorder.frzRetuneOnly`
+  masks field 5 of the signature) waits the 'retune' settle 1.5 s after the LAST move (each move resets it) and plays its events meanwhile.
+  Probe control `dbg.noRetune` (the old switch off).
+- ⛔ **Not auto-frozen (live by choice):** tracks without a captured
   chain (`laneHasChain` false — auto-freeze NEVER pins the live chain: the queue passes `noPin`; skipped "no chain"); tracks over the memory
   budget `AF_BUDGET_MB` (300 MB touch = `(pointer: coarse)`, 1 GB desktop; estimate before the render, exact `admit(bytes)` in
   `render.freeze` before install, refusal `'budget'`; skipped until the signature changes or memory frees; no eviction until AF6).
@@ -923,7 +935,7 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   (`recorder.editInsPush`: `autCaps(layer,true)`, its `'autcap'` first in the insert's history entry — ↶ removes both); song load pins every
   chain-less track (`recorder.songPinChains()`, called by `P.seed`/`P.song`; the seed: 0 tracks). Inserts into a captured track keep its chain.
 - **Interface (AF4): no ❄ anywhere.** Only the arrangement window shows a faint dot at the right end of a row header (`draw`, via
-  `hooks.afRow` → `frzqueue.afRowState`): hollow = waiting, pulsing = rendering, nothing = frozen or live by choice; snapshot
+  `hooks.afRow` → `frzqueue.afRowState`): hollow = waiting, pulsing = rendering, nothing = frozen or live by choice (no chain, budget); snapshot
   `loopView.dots`. The play strip shows nothing (its mark column is for the arm dot only). Console: `R.freezeQueue()` (entries, settle
   timers, trigger, skips and why, live-by-choice list, memory used/budget, holds), `R.freeze`/`R.unfreeze`/`R.frozen` (the console `freeze`
   still pins a chain-less track — explicit). No `frz.*` strings remain.
@@ -971,10 +983,10 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
 - **AF3 auto-freeze watcher** (`P.checkAutoFreeze`, P.quick and P.all, ≈ 2.5 s, deterministic: probe clock, 50-ms ticks, fake 128-sample
   renders through the real ticket/`freezeSet`, watcher scope one track): every trigger renders after its delay and within two ticks, not
   before (default change, pan held then released, editor via the real `editClose`, take end after the recording gate, undo, backing, row
-  delete, song); five pan moves 0.6 s apart → one render 1 s after the last; level → none; tonic → none and the track stays FRESH (TF2); A4, tempo → none
-  (stale, then fresh when restored); budget → skipped, not retried; an editor-created track carries a pinned chain (↶/↷ keep it consistent). CONTROLS that must
-  fail: `dbg.noReset` (clock not reset → early/extra renders), `dbg.level` (a watcher reacting to level renders), `dbg.retune` (A4
-  renders after 1.5 s), default budget renders the skipped track.
+  delete, song); five pan moves 0.6 s apart → one render 1 s after the last; level → none; tonic → none and the track stays FRESH (TF2); TF4:
+  A4 (three moves 0.6 s apart), A4 restored, tempo, tempo restored → stale at once, ONE re-render 1.5 s after the last move (+1 tick), fresh; budget → skipped, not retried; an editor-created track carries a pinned chain (↶/↷ keep it consistent). CONTROLS that must
+  fail: `dbg.noReset` (clock not reset → early/extra renders), `dbg.level` (a watcher reacting to level renders), `dbg.noRetune` (the
+  pre-TF4 switch: an A4 change must stay unrendered), default budget renders the skipped track.
 - **TF0 song sound fingerprint** (`P.checkSongPrint`, quick and all, deterministic data, no render): every pitched event's frequencies
   through `recorder.evHz` (what ENG plays and renders with), the live drone's two strings, and per track view the editor rows, labels,
   cents, chord labels, roots and chord-row Hz (labels in English) — at the seed's environment and again after the REAL tonic control
@@ -992,10 +1004,17 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   (key-less view at that live tonic — key colour and non-12 1/1 included). Track +1 (the seed's frozen track): views re-keyed, payloads and
   beats kept, other tracks untouched, one 'transpose' step, the frozen track stale, ↶/↷/↶ exact; B → C (+3 from 9 → key 12) exactly
   ×2^(3/12) on a mobile track; song −1 (backing too, drums untouched), one step, frozen tracks stale, ↶ exact; refusals 'range', 'drums',
-  'backing'; the four buttons exist. CONTROLS: `trDbg({noTouch})` — the frozen track stays fresh, must be noticed; `trDbg({ti})` — the naive
-  transpose (tuning index + 1) must miss on the non-12 tracks.
+  'backing'; the four buttons exist. TF3b: song −1 moves the knob (value, `#selTonic`, live view key), ↶/↷/↶ set it back/again, a knob turned
+  by hand between the step and its ↶ — knob and backing restored. CONTROLS: `trDbg({noTouch})` — the frozen track stays fresh, must be
+  noticed; `trDbg({ti})` — the naive transpose (tuning index + 1) must miss on the non-12 tracks; `trDbg({noKnob})` — the knob left behind.
+- **TF5 tuning anchor 1/1** (`P.checkOneOne`, quick and all, ≈ 17 500 cases, data + real controls): the gate = an independent list of the
+  1/1 tunings' ids; every built-in view at 0 ¢ is the plain object (12 keys); 12-note tunings refuse cents; every 1/1 view at +17/−23/+50 ¢
+  (keys 9, 2) prices solo/bass/chords per degree×register, tonic and drone ×2^(c/1200) (1e-12); the real Partch controls (label, cents
+  field, Q6 no G by itself, recordings and frozen tracks untouched, «Historical 1/1: G» → G 0 ¢); a 12-note mode hides them; Transpose of a
+  +13 ¢ seed track keeps the cents, ×2^(1/12), ↶ exact; the +13 ¢ source differs. CONTROLS: `keyCDbg('ungated')`, `keyCDbg('off')`.
+  The TF0 fingerprint pins 0 ¢ (its base half proves existing songs unchanged).
 - **AR1 arrangement window** also checks AF4: no ❄ hittable; the freeze dot from `loopView.dots` — rendering = filled, waiting = hollow,
-  frozen and stale-by-A4 rows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
+  frozen rows nothing; TF4: a row stale by A4 shows a hollow (waiting) dot, then re-renders and shows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
   armed, no mark column although a track is frozen and one stale.
 - **Capture** (`audio.probeCapture`, audio-thread worklet): every probe checks its marker sits EXACTLY at `Mf − F0` and `gaps` is 0
   (`render.capAligned`), else the row errors with the reason; `R.capStats()` counts captures, stale readings, gaps.
@@ -1067,7 +1086,9 @@ paths go through `loadJam` (one flag `ev.jam`); switching paths clears the previ
 (BACKLOG §3.33 item 1; fix must be property-driven). ⛳ TF2 (user answer Q3): a backing FOLLOWS THE KEY KNOB — `recorder.backingFollowKey()`
 re-keys every `ev.jam` event's view in place (arrangements are written in degrees, so this IS the backing re-made in the new key): lane ids,
 levels, pans and the transport are kept, its held notes handed over (`trackResplice(only)`), the drone retuned, its frozen tracks stale
-(edit version) and re-frozen; not a history step. Its notes stay read-only in the editor (Transpose refuses 'backing').
+(edit version) and re-frozen; not a history step (user answer 2, 2026-10-14). Its notes stay read-only in the editor (Transpose refuses
+'backing'). Drum hits keep their view (no pitch — as in Transpose, so ↶ of a song Transpose restores the whole backing, TF3b); the TF5 cents
+knob re-keys it too (a 12-note backing ignores cents).
 
 ### The expression hand (solo, function `'expr'`)
 Plays no notes. Four features off RAW landmarks (`exprFeatures`): energy (palm-centre speed in palm sizes/s; position EMA before
@@ -1140,11 +1161,14 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   (↶ of ✕ restores the song AND the brace with ⟳). A note starting inside a cut is removed with its tail; a note closed by the next note's
   start exactly on an insert point is lengthened (held through the new bars); insert-then-cut leaves beats equal to ~1e-15 beat, not bit
   for bit (float). Copies of a duplicate belong to the source take (⤺ of that take removes them too).
-- **A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until TF4 — through
-  the live pools, with their polyphony ceilings. The key knob no longer stales anything (TF2).
+- **After an A4 or tempo change frozen tracks play their events** (through the live pools, with their polyphony ceilings) until they
+  re-freeze — 1.5 s after the last move plus one render per track, one at a time (TF4). The key knob stales nothing (TF2).
 - **Transpose keys stay within −12..23** (two octaves around the knob); a track or song already there refuses one more step ('range').
-- **Paste and arming respect the key** (TF2): a clipboard pastes only into a track of the same view — key included; an armed track recorded in
-  another key than the knob's takes nothing (a new track starts, as for another mode).
+- **Paste and arming respect the key** (TF2; accepted by the user 2026-10-14): a clipboard pastes only into a track of the same view — key and
+  TF5 cents included; an armed track recorded in another key than the knob's takes nothing (a new track starts, as for another mode). Later:
+  «paste transposed into the track's key» (BACKLOG §3.40).
+- **The cents nudge is offered only for 1/1 tunings** (TF5); a 12-note tuning in another temperament than 12-TET is moved by A4 (one
+  source). Song Transpose moves the knob mod 12 (B + 1 → knob C while the song sits at key 12).
 
 ## How to verify a change
 No unit tests. Claude Code runs the static check, `node tools/probe-data.mjs` and `node tools/probe-browser.mjs` per the probe budget,
@@ -1287,7 +1311,7 @@ verified. Full text of every step: archive, "How to verify a change".
 67. Auto-freeze (AF3) — ear and eye, arrangement window open: (1) record a take, stop — about a second later the row's dot goes hollow →
     pulsing → gone and NOTHING audible changes; (2) edit a track in the editor and leave it — the same, once, ~0.5 s after leaving; (3) move
     a pan control and release — the same, ~1 s after release (moving a LEVEL fader shows no dot); (4) change the tonic — no dot, nothing
-    re-freezes, and the music follows the new tonic; `R.freezeQueue()` lists the frozen tracks as "live by choice".
+    re-freezes, the recordings keep their key (TF2); (5) change A4 — see step 89.
 68. No ❄ anywhere (AF4): play strip (no ❄, no stale mark), arrangement window (M · S only; the faint dot only), editor bar (no ❄, no state
     label), no toast about freezing; row «AR1 arrangement window» checks the dot states.
 69. Track ≠ live (AF5, rule #31), headphones: record a chord track, lower its volume (Volume lane) and its reverb in the editor, leave — live
@@ -1341,6 +1365,14 @@ verified. Full text of every step: archive, "How to verify a change".
 87. Transpose (TF3): in the editor bar «−1 st / +1 st» moves the whole open track a semitone (a toast, one ↶); in the arrangement window bar
     «−1 st / +1 st» moves the whole song (backing too, drums untouched; one ↶); from B a step up goes to C ABOVE, not an octave down; in
     Werckmeister the key colour changes; in Partch / Bohlen–Pierce the 1/1 moves 100 cents; frozen tracks re-freeze (dots).
+88. Song Transpose moves the knob (TF3b): note the tonic in «Scale», press «+1 st» in the arrangement window — the tonic reads one semitone
+    higher and your live playing fits the song; ↶ — song and tonic back; in the editor «+1 st» leaves the tonic alone.
+89. A4 / tempo re-freeze (TF4), headphones, window open: change A4 (e.g. 440 → 442) while frozen tracks play — they keep sounding (now note by
+    note, at the new pitch); ~1.5 s after you stop, the dots go hollow → pulsing → gone, one track at a time, with no audible seam; the
+    same with the tempo.
+90. «1/1 = G» (TF5): pick Partch — the key row reads «1/1 =» with a ¢ field and a button «Historical 1/1: G»; the knob did NOT jump to G
+    by itself; type 12 in ¢ → live notes a little higher, the scale button shows «+12¢», recordings unchanged; tap the button → G, ✓,
+    disabled; pick a 12-note scale — the ¢ field and the button disappear and nothing is nudged; an old Partch recording sounds as before.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

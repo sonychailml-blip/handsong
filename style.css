@@ -379,6 +379,11 @@
   #aRefRow #aRefInput{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
     border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl);}
   #aRefRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:#5a6079;}
+  /* TF5: the key's cents nudge beside the note select («1/1 = G  +12 ¢»); the historical 1/1 — one button under it */
+  #tonicRow #tonicCents{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
+    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl);}
+  #tonicRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:#5a6079;}
+  #tonicHistRow #tonicHist{flex:1; min-width:0;}
   /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: заголовок эффекта = строка аккордеона (Пласт 3.4.3) ═══
      [▸/▾][имя][сводка адресов][✕] — одна строка на эффект, пока он свёрнут.
      ⚠️ НЕСУЩЕЕ ЗДЕСЬ — .fxsum: она одна тянется (flex:1) и одна же обрезается многоточием. Без

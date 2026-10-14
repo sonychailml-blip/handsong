@@ -66,8 +66,8 @@
    голоса частоту сами не перечитывают — их не задевает. */
 import { shiftDegrees, mapDegrees, modesLikeView, SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
-         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot, droneSecondHz, keyFollowsDbg, viewKeyIdOf } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
-import { fx as stateFx, FX_VOL, trackChainKeyOf, fxChainOf, tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
+         CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot, droneSecondHz, keyFollowsDbg, viewKeyIdOf, keyByOneOne, keyCDbg } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
+import { fx as stateFx, FX_VOL, trackChainKeyOf, fxChainOf, tonic, tonicCents, setTonicCents, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
          fx as liveFx, fxChains, chainOwners, chainKeyOf, leadIdx, chIdx, bassIdx, drumKitIdx, voiceMode } from './state.js';   // страж P.all: живое состояние звука, которое читает рендер   // laneRow0 — прокрутка полосы дорожек (P.checkTracks листает её и возвращает)   // T7b: режимы аккордов — сценарий P.seed и прогон P.checkModes (и их возврат)   // P.seed: лад, «строй от» и септаккорд сценария — и их возврат
 import { checkRecord } from './scaleload.js';
 import * as SELF from './scaleprobe.js';   // AUTO-PROBE: сам модуль — для стража консоли (api() оборачивает его функции)
@@ -463,6 +463,7 @@ const ALL_RUNS=[
   ['TF0 song sound fingerprint',()=>checkSongPrint(), r=>({ cases:r.cases, song:r.status?null:r.song, diff:r.total, list:r.differences, status:r.status })],
   ['TF2 recordings keep their key',()=>checkKeyKeep(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['TF3 transpose by semitones',()=>checkTranspose(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['TF5 tuning anchor 1/1',()=>checkOneOne(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['F0 scale data snapshot',()=>checkFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, status: r.noSnap ? 'no snapshot yet' : undefined })],
   ['tracks: one view',   ()=>tracks(),      r=>{ const m=r.filter(x=>x.view.includes(' + ')); return { cases:r.length, song:r.length, diff:m.length, list:m.map(x=>`${x.track} holds ${x.view}`) }; }],
 ];
@@ -2650,10 +2651,13 @@ export async function checkArrange(){
             cases++; await frame(); await frame();
             const V2=loopViewProbe();
             for(const ly of [R0,W0]){ const d=V2.dots.get(ly); if(freezeState(ly)!=='fresh') miss(`freeze dot: L${ly+1} is ${freezeState(ly)} after its render`); else if(d&&d.st) miss(`freeze dot: the frozen row L${ly+1} still shows a ${d.st} dot`); }
-            cases++; const keepA=aRef; setARef(keepA+2); T+=50; afTick(); T+=AF_DELAY.retune+100; afTick(); await frame(); await frame();   // TF2: the tonic no longer stales; A4 still does (live by choice until TF4)
+            cases++; const keepA=aRef; setARef(keepA+2); T+=50; afTick(); await frame(); await frame();   // TF4: stale by A4 waits (hollow), then re-renders
             const V3=loopViewProbe(), d3=V3.dots.get(R0);
-            if(freezeState(R0)!=='stale') miss(`freeze dot: after an A4 change L${R0+1} should be stale (live by choice), it is ${freezeState(R0)}`);
-            if(d3&&d3.st) miss(`freeze dot: L${R0+1}, stale only by A4 (live by choice), shows a ${d3.st} dot`);
+            if(freezeState(R0)!=='stale') miss(`freeze dot: after an A4 change L${R0+1} should be stale, it is ${freezeState(R0)}`);
+            if(!d3||d3.st!=='wait'||d3.filled) miss(`freeze dot: L${R0+1}, stale by A4, reads ${d3&&d3.st?d3.st+(d3.filled?' (filled)':' (hollow)'):'nothing'} — want a hollow (waiting) dot (TF4)`);
+            T+=AF_DELAY.retune+100; for(let i=0;i<4;i++){ T+=50; const s=afTick(); if(s.startsWith('start:')) await qRunning(); }
+            cases++; await frame(); await frame(); const V4=loopViewProbe();
+            for(const ly of [R0,W0]){ const d=V4.dots.get(ly); if(freezeState(ly)!=='fresh') miss(`freeze dot: after the A4 re-render L${ly+1} is ${freezeState(ly)}, want fresh (TF4)`); else if(d&&d.st) miss(`freeze dot: the re-frozen row L${ly+1} still shows a ${d.st} dot`); }
             setARef(keepA); }
         } finally { open(); try{ await qRunning(); }catch(e){} afEnd(); if(tonic!==keepT) setTonic(keepT); if(aRef!==keepA0) setARef(keepA0); for(const ly of mine) if(ly!=null&&freezeState(ly)!=='none') unfreezeLayer(ly); }
       } }
@@ -2988,11 +2992,12 @@ export async function checkFreezeQueue(){
    (a 128-sample buffer through the real ticket and freezeSet), the watcher looks at one track only (hook.layers). Cases: each trigger
    makes a candidate after its delay and not before (start within one step after it) — default change, pan (held, then released),
    editor (open = held; editClose is the real site), take end (recording gate, then the hint), undo, backing, row delete, song load;
-   five edits 0.6 s apart → exactly one render, 1 s after the last; level → no render; tonic, A4, tempo → no render while
-   AF_REFREEZE_ON_RETUNE is off; budget skip (no render, not retried); an editor-created track carries a pinned chain.
+   five edits 0.6 s apart → exactly one render, 1 s after the last; level → no render; tonic → no render, stays fresh (TF2); A4, tempo
+   (TF4) → stale at once, one re-render 1.5 s after the last move (three A4 moves 0.6 s apart → one), restored → once more; budget skip
+   (no render, not retried); an editor-created track carries a pinned chain.
    CONTROLS that must fail: a settle clock that does not reset (dbg.noReset) renders before the edits end; a watcher that reacts to
-   level (dbg.level) renders; with re-freeze on retune (dbg.retune) a tonic change renders; with the default budget the skipped track
-   renders. Everything restored in finally: pans, levels, tonic, A4, tempo, the probe's frozen tracks, the probe's track. ≈ 1–2 s. */
+   level (dbg.level) renders; the pre-TF4 switch (dbg.noRetune) leaves an A4 change unrendered; with the default budget the skipped
+   track renders. Everything restored in finally: pans, levels, tonic, A4, tempo, the probe's frozen tracks, the probe's track. ≈ 1–2 s. */
 export async function checkAutoFreeze(){
   const bad=[], notes=[]; let nBad=0, cases=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
   const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
@@ -3064,23 +3069,35 @@ export async function checkAutoFreeze(){
       hook.dbg.level=false; setLaneLevel(A, keep.lvl);
       if(!calls.length) miss('CONTROL (a watcher that reacts to level): no render — the level case cannot fail');
       notes.push(`level: 0 renders; control reacting to level: ${calls.length}`); await run(500); }
-    /* (4) TF2: the tonic leaves the frozen track fresh (no render); A4, tempo: no render while the switch is off (the track plays live),
-       restored → fresh again */
+    /* (4) TF2: the tonic leaves the frozen track fresh (no render). TF4: A4, tempo — the track goes stale at once (plays its events), renders
+       after the 'retune' settle and not before, fresh again; three moves 0.6 s apart → one render after the last; restored → once more. */
     { cases++; calls.length=0; setTonic((keep.tonic+2)%12); await run(3000); const st=freezeState(A); setTonic(keep.tonic); await run(1000);
       if(calls.length) miss(`tonic: a key change re-rendered ${Lb(A)} — recordings keep their key (TF2)`);
       if(st!=='fresh') miss(`tonic: after a key change ${Lb(A)} should stay fresh (TF2), it is ${st}`); }
-    for(const [name, set, back] of [['A4', ()=>setARef(keep.aRef===440?442:440), ()=>setARef(keep.aRef)],
-                                    ['tempo', ()=>setLoopBpm(keep.bpm+12), ()=>setLoopBpm(keep.bpm)]]){ cases++;
-      calls.length=0; set(); await run(3000);
-      const st=freezeState(A); back(); await run(1000);
-      if(calls.length) miss(`${name}: a change re-rendered ${Lb(A)} although AF_REFREEZE_ON_RETUNE is off`);
-      if(st!=='stale') miss(`${name}: after the change ${Lb(A)} should be stale (playing its events), it is ${st}`);
-      if(freezeState(A)!=='fresh') miss(`${name}: restored, ${Lb(A)} should be fresh again, it is ${freezeState(A)}`); }
-    { cases++; hook.dbg.retune=true; calls.length=0; const t0=T; setARef(keep.aRef===440?442:440); await run(AF_DELAY.retune+3*STEP);
-      hook.dbg.retune=false; setARef(keep.aRef); await run(500);
-      if(!calls.length) miss('CONTROL (re-freeze on A4/tempo switched on): an A4 change gave no render — the case cannot fail');
-      else if(calls[0].T-t0<AF_DELAY.retune) miss(`CONTROL (retune): rendered ${calls[0].T-t0} ms after the change, before its ${AF_DELAY.retune}-ms delay`);
-      notes.push(`tonic/A4/tempo: 0 renders; control with the switch on: ${calls.length} render at +${calls.length?calls[0].T-t0:'—'} ms`); }
+    const retuneTrial=async(name, vals, set)=>{ cases++;
+      if(freezeState(A)!=='fresh'){ miss(`${name}: ${Lb(A)} is not fresh before the case (${freezeState(A)})`); return null; }
+      calls.length=0; const t0=T; let tl=t0, st0=null;
+      for(let i=0;i<vals.length;i++){ if(i) await run(600); set(vals[i]); tl=T; if(!i){ await run(STEP); st0=freezeState(A); } }
+      const st=await run(AF_DELAY.retune+3*STEP), at= calls.length ? calls[0].T-tl : null;
+      return { st0, n:calls.length, at, fresh:freezeState(A)==='fresh', starts:st }; };
+    const retuneCheck=(label,r)=>{ if(!r) return;
+      if(r.st0!=='stale') miss(`${label}: right after the change ${Lb(A)} should be stale (playing its events), it is ${r.st0}`);
+      if(r.n!==1) miss(`${label}: expected exactly one re-render after the last move, got ${r.n}`);
+      else if(r.at<AF_DELAY.retune) miss(`${label}: re-rendered ${r.at} ms after the last move — before its ${AF_DELAY.retune}-ms delay`);
+      else if(r.at>AF_DELAY.retune+2*STEP) miss(`${label}: re-rendered ${r.at} ms after the last move — later than ${AF_DELAY.retune} ms plus two steps`);
+      if(!r.fresh) miss(`${label}: after the re-render ${Lb(A)} is ${freezeState(A)}, want fresh`);
+      notes.push(`${label}: ${r.n} re-render at +${r.at} ms after the last move (delay ${AF_DELAY.retune} ms)`); };
+    const a1=keep.aRef===440?442:440, a2=keep.aRef===440?443:441, a3=keep.aRef===440?444:439;
+    retuneCheck('A4 (three moves)', await retuneTrial('A4', [a1,a2,a3], v=>setARef(v)));
+    retuneCheck('A4 restored', await retuneTrial('A4 restored', [keep.aRef], v=>setARef(v)));
+    retuneCheck('tempo', await retuneTrial('tempo', [keep.bpm+12], v=>setLoopBpm(v)));
+    retuneCheck('tempo restored', await retuneTrial('tempo restored', [keep.bpm], v=>setLoopBpm(v)));
+    /* CONTROL: the pre-TF4 switch (off) — an A4 change must leave the track stale with no render, so the cases above can fail */
+    { cases++; hook.dbg.noRetune=true; const r=await retuneTrial('control', [a1], v=>setARef(v)); hook.dbg.noRetune=false;
+      if(r && r.n===1 && r.fresh) miss('CONTROL (re-freeze on A4/tempo switched off): the A4 change still re-rendered — the cases cannot fail');
+      notes.push(`control, switch off: ${r?r.n:'—'} render(s), ${freezeState(A)}`);
+      setARef(keep.aRef); await run(AF_DELAY.retune+3*STEP);
+      cases++; if(freezeState(A)!=='fresh') miss(`control: back at A4 ${keep.aRef} ${Lb(A)} should be fresh again (its old buffer), it is ${freezeState(A)}`); }
     /* (5) memory budget: over it → skipped, not retried; control: the default budget renders it */
     { cases++; calls.length=0; hook.budgetMB=frzBytesTotal()/MB+0.001; nudge(); afHint('pan'); await run(3000);
       const en=qState().entries.find(e=>e.id===laneIdOf(A));
@@ -4175,9 +4192,9 @@ function viewPrint(v){
 /* The tonic moved by the person: the same control and handler the panel uses (ui: setTonic, softAllOff, droneRetune, label). */
 function tonicByControl(k){ const el=document.getElementById('selTonic'); if(!el){ setTonic(k); return; } el.value=String(k); el.dispatchEvent(new Event('change')); }
 function songPrintTake(E){
-  const keep=liveEnv();
-  try{ liveEnvSet(E); const at=songSoundLines(); tonicByControl((E.tonic+2)%12); const up2=songSoundLines(); tonicByControl(E.tonic); return { at, up2 }; }
-  finally{ liveEnvSet(keep); }
+  const keep=liveEnv(), kc=tonicCents;   // TF5: the seed environment is at 0 ¢ (kept outside env: the file's env has no cents)
+  try{ liveEnvSet(E); setTonicCents(0); const at=songSoundLines(); tonicByControl((E.tonic+2)%12); const up2=songSoundLines(); tonicByControl(E.tonic); return { at, up2 }; }
+  finally{ liveEnvSet(keep); setTonicCents(kc); }
 }
 export function dumpSongPrint(){
   if(!SEED_REC || SEED_REC.kind!=='seed' || SEED_REC.print!==songPrint()){ console.warn('[scaleprobe print] run await P.seed({replace:true}) first (the fingerprint is of the unchanged seed song)'); return null; }
@@ -4258,7 +4275,7 @@ export function checkKeyKeep(){
       finally{ droneUse(null); } }
     tonicByControl(keepT);
     /* (5) the backing follows the knob: the song's backing, or (none) one pitched track marked as backing for a moment; the real control */
-    { const jam0=events.filter(e=>e.jam && e.sc), ly= jam0.length ? null : (P[0]||{}).layer;
+    { const jam0=events.filter(e=>e.jam && e.sc && e.fn!=='drum'), ly= jam0.length ? null : (P[0]||{}).layer;
       if(jam0.length || ly!=null){ const mine= jam0.length ? jam0 : events.filter(e=>e.layer===ly && e.sc), M=new Set(mine), others=events.filter(e=>!M.has(e) && e.sc), oSc=others.map(e=>e.sc);
         verBack=laneVerKeep(); scBack=mine.map(e=>[e,e.sc]);
         if(!jam0.length) for(const e of mine){ e.jam=true; marked.push(e); }
@@ -4304,6 +4321,94 @@ export function checkKeyKeep(){
   return { cases, song, total:nBad, differences:bad };
 }
 
+/* ═══ TF5 — THE TUNING ANCHOR «1/1 = G» WITH A CENTS NUDGE (P.checkOneOne, quick and all) ═══
+   (1) the gate is the tuning's DATA: «1/1 = …» exactly for the tunings not named by the 12 notes (an independent list of ids); fixedKey never.
+   (2) at 0 ¢ every built-in view is the very object it was (no keyC field) for 12 keys — existing songs keep their views (TF0 row: their sound).
+   (3) 12-note tunings refuse cents (the view at +17 ¢ is the 0 ¢ view). CONTROL keyCDbg('ungated') must make them differ.
+   (4) pricing: every 1/1 view at +17, −23, +50 ¢ (keys 9 and 2): every degree × register for solo, bass, chord, the tonic and the drone's
+       second string sound exactly ×2^(c/1200) (1e-12). CONTROL keyCDbg('off') must miss.
+   (5) the REAL controls on Partch: the label reads «1/1 =», the cents field shows, Q6: switching to Partch keeps the knob (no G by itself);
+       the cents field → the live view carries them, recordings and frozen tracks untouched; «Historical 1/1: G» → G at 0 ¢, then disabled;
+       on a 12-note mode the field and the button hide and the live view has no cents.
+   (6) Transpose keeps the cents: a seed track with a 1/1 view re-viewed at +13 ¢, +1 st in the editor → key+1, cents kept, ×2^(1/12)
+       exactly; the source (viewKeyIdOf) differs from the 0 ¢ one. Everything restored (views, edit versions, knob, scale, history). */
+export function checkOneOne(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const ONE=new Set(['bp13','carlos-alpha','carlos-beta','carlos-gamma','edo19','edo31','partch43','pelog','slendro','shruti22']);
+  const keepT=tonic, keepC=tonicCents, keepId=scaleId, sc0=new Map(events.map(e=>[e,e.sc])), restoreVer=laneVerKeep(), h0=histLen();
+  const fresh0=[...new Set(events.map(e=>e.layer))].filter(l=>freezeState(l)==='fresh');
+  const vOf=(m,k,c)=>scaleView(m, m.tunable?'T':undefined, m.chordModes?m.chordModes[0].id:undefined, k, c);
+  const near=(a,b,R)=>{ const A=[].concat(a), B=[].concat(b); return A.length===B.length && A.every((x,i)=>Math.abs(x/(B[i]*R)-1)<=1e-12); };
+  const role=fn=>/^lead(On|Set)$/.test(fn)?'ld':/^bass(On|Set)$/.test(fn)?'bs':/^ch(On|Set)$/.test(fn)?'ch':null;
+  const $id=id=>document.getElementById(id), panel=()=>hooks.key && hooks.key();   // ui's panel sync (the knob, the scale button, the TF5 row)
+  /* (4) one view pair → misses (ctl: counted, not reported) */
+  const priced=(m,k,c,ctl)=>{ let off=0; const v0=vOf(m,k,0), vc=vOf(m,k,c), R=Math.pow(2,c/1200);
+    const chk=(what,a,b)=>{ cases++; if(!near(a,b,R)){ off++; if(!ctl) miss(`${m.id} key ${k} ${c>0?'+':''}${c}¢ ${what}: ${a}, want ${[].concat(b).map(x=>x*R)}`); } };
+    chk('tonic',tonicFreq(vc),tonicFreq(v0)); chk('drone 2nd',droneSecondHz(vc),droneSecondHz(v0));
+    for(let d=0; d<m.iv.length; d++) for(let o=0; o<REG_N; o++){ const ti=tuningIndexOf(d,v0);
+      chk(`solo deg ${d} reg ${o}`,leadFreqTi(ti,o,vc),leadFreqTi(ti,o,v0)); chk(`bass deg ${d} reg ${o}`,bassFreqTi(ti,o,vc),bassFreqTi(ti,o,v0));
+      const cf=v=>(chordNotesAt(tuningIndexOf(d,v,true),o,v,false,null)||[]).map(n=>n.f), c0=cf(v0); if(c0.length) chk(`chord deg ${d} reg ${o}`,cf(vc),c0); }
+    return off; };
+  try{
+    const mods=SCALES.filter(m=>m.iv);
+    /* (1) + (2) + (3) */
+    for(const m of mods){ cases++; const want=!m.fixedKey && ONE.has(m.tuning);
+      if(keyByOneOne(m)!==want) miss(`${m.id} (${m.tuning}): «1/1 =» is ${keyByOneOne(m)}, want ${want}`);
+      for(let k=0;k<12;k++){ cases++; const v=vOf(m,k,0); if(v!==vOf(m,k) || 'keyC' in v) miss(`${m.id} key ${k}: the 0 ¢ view is not the plain view`);
+        if(!want){ cases++; if(vOf(m,k,17)!==v) miss(`${m.id} key ${k}: a 12-note tuning took a cents nudge`); } } }
+    { const m=mods.find(x=>!keyByOneOne(x)); keyCDbg('ungated'); try{ cases++; if(m && vOf(m,9,17)===vOf(m,9,0)) miss('CONTROL (ungated): a 12-note mode still refuses cents — check (3) cannot fail'); } finally{ keyCDbg(null); } }
+    /* (4) pricing */
+    const one=mods.filter(m=>keyByOneOne(m));
+    cases++; if(one.length<8) miss(`only ${one.length} «1/1» modes — expected Partch, BP, Carlos, 19/31-TET, gamelan, 22 shruti and the ragas`);
+    for(const m of one) for(const k of [9,2]) for(const c of [17,-23,50]) priced(m,k,c);
+    { keyCDbg('off'); let off=0; try{ off=priced(one[0],9,17,true); } finally{ keyCDbg(null); }
+      cases++; if(!off) miss('CONTROL (cents ignored in pricing): every price still moved — check (4) cannot fail'); }
+    /* (5) the real controls on Partch */
+    const par=mods.find(m=>m.tuning==='partch43'), maj=scaleById(keepId)||mods.find(m=>!keyByOneOne(m));
+    if(!par){ cases++; miss('no Partch mode'); }
+    else { setScaleId(par.id); panel();
+      const lbl=$id('tonicLbl'), ci=$id('tonicCents'), hb=$id('tonicHist'), hr=$id('tonicHistRow');
+      cases++; if(!lbl||!ci||!hb) miss('the TF5 controls (#tonicLbl, #tonicCents, #tonicHist) are missing');
+      else {
+        cases++; if(tonic!==keepT || tonicCents!==keepC) miss(`Q6: switching to Partch moved the knob (${tonic}, ${tonicCents} ¢)`);
+        cases++; if(lbl.textContent!==t('panel.scale.oneOne') || ci.hidden || hr.style.display==='none') miss(`Partch: label «${lbl.textContent}», cents field ${ci.hidden?'hidden':'shown'}, historical ${hr.style.display==='none'?'hidden':'shown'}`);
+        cases++; if(!hb.textContent.includes(NOTE_NAMES[7]) || hb.disabled) miss(`Partch: the historical button reads «${hb.textContent}»${hb.disabled?' (disabled)':''}, want G`);
+        ci.value='12'; ci.dispatchEvent(new Event('change'));
+        cases++; const L0=CUR(); if(tonicCents!==12 || L0.keyC!==12 || L0.key!==keepT) miss(`cents field 12: knob ${tonicCents} ¢, live view key ${L0.key} ${L0.keyC} ¢`);
+        cases++; if(Math.abs(tonicFreq(L0)/tonicFreq(vOf(par,keepT,0))/Math.pow(2,12/1200)-1)>1e-12) miss('cents field 12: the live 1/1 did not move by 12 ¢');
+        for(const e of events){ if(e.jam) continue; song++; cases++; if(e.sc!==sc0.get(e)){ miss(`L${e.layer+1} beat ${e.t}: the cents knob changed a recording's view`); break; } }
+        for(const l of fresh0){ cases++; if(freezeState(l)!=='fresh') miss(`L${l+1}: a frozen track went ${freezeState(l)} on the cents knob`); }
+        hb.click();
+        cases++; if(tonic!==7 || tonicCents!==0 || CUR().key!==7 || CUR().keyC) miss(`historical: knob ${tonic} ${tonicCents} ¢, want G at 0 ¢`);
+        cases++; if(!hb.disabled) miss('historical: the button stays active at G');
+        setTonicCents(12); setScaleId(maj.id); panel();
+        cases++; if(lbl.textContent!==t('panel.scale.tonic') || !ci.hidden || hr.style.display!=='none' || 'keyC' in CUR()) miss(`12-note mode: label «${lbl.textContent}», cents field ${ci.hidden?'hidden':'shown'}, live view keyC ${CUR().keyC}`); } }
+    setScaleId(keepId); setTonicCents(keepC); tonicByControl(keepT);
+    for(const [e,v] of sc0) e.sc=v; restoreVer();
+    /* (6) Transpose keeps the cents */
+    { const ly=[...new Set(events.filter(e=>e.sc && role(e.fn) && !e.jam && keyByOneOne(e.sc)).map(e=>e.layer))][0];
+      cases++; if(ly==null) miss('no seed track in a «1/1» tuning (run after P.seed)');
+      else { const mine=events.filter(e=>e.layer===ly && e.sc);
+        for(const e of mine) e.sc=scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, e.sc.key, 13);
+        const v13=new Map(mine.map(e=>[e,e.sc])), f13=new Map(mine.filter(e=>role(e.fn)).map(e=>[e,evHz(e.a,e,role(e.fn))]));
+        cases++; if(viewKeyIdOf(mine[0].sc)===viewKeyIdOf(sc0.get(mine[0]))) miss('the source of a +13 ¢ view equals the 0 ¢ one — a cents nudge mid-take would not start a new track');
+        cases++; if(!editOpen(ly) || !editTranspose(1)) miss(`L${ly+1}: transpose +1 refused (${editTransposeWhy(1)})`);
+        else { const R=Math.pow(2,1/12);
+          for(const e of mine){ cases++; const v=v13.get(e); if(e.sc.key!==v.key+1 || e.sc.keyC!==13) miss(`L${ly+1} beat ${e.t}: after +1 st key ${e.sc.key} ${e.sc.keyC} ¢, want ${v.key+1} 13 ¢`);
+            if(f13.has(e)){ cases++; if(!near(evHz(e.a,e,role(e.fn)),f13.get(e),R)) miss(`L${ly+1} beat ${e.t}: +1 st sounds ${evHz(e.a,e,role(e.fn))}, want ×2^(1/12)`); } }
+          cases++; const r=histUndo(); if(!r || r==='changed' || mine.some(e=>e.sc!==v13.get(e))) miss(`L${ly+1}: ↶ of the transpose did not give back the +13 ¢ views (${r})`); }
+        if(editIsOpen()) editClose(); } }
+  }catch(err){ miss('the probe failed: '+(err&&err.stack||err)); }
+  finally{
+    keyCDbg(null); if(editIsOpen()) editClose();
+    if(scaleId!==keepId) setScaleId(keepId); setTonicCents(keepC); if(tonic!==keepT) tonicByControl(keepT);
+    for(const [e,v] of sc0) e.sc=v; restoreVer(); if(histLen()!==h0) histReset(); panel();
+  }
+  console.log(`[scaleprobe TF5] ${cases} cases · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe TF5] '+m));
+  return { cases, song, total:nBad, differences:bad };
+}
+
 /* ═══ TF3 — TRANSPOSE BY SEMITONES (one track in the editor, the whole song in the window) ═══
    Expected pitch: what the same note sounded with the KEY KNOB n semitones away before TF2 — the key-less view priced at that live tonic
    (row TF2 (7) proves the key-less reading); key colour of historical temperaments and the 1/1 of non-12 tunings included.
@@ -4313,6 +4418,8 @@ export function checkKeyKeep(){
    (2) B → C: +3 from key 9 crosses 11 → 12 and every pitch rises by exactly 2^(3/12) on a mobile track (never an octave down); ↶.
    (3) SONG −1: every track with pitch (the backing too) as expected, drum hits untouched, one step, touched frozen tracks stale; ↶ exact.
    (4) refusals: a key past the range ('range'); a drum track ('drums').
+   (5) TF3b: the song step moves the key knob by n (mod 12; select and live view too); ↶/↷ set it back/again; a knob turned by hand between
+       the step and its ↶ — ↶ restores knob and backing absolutely. CONTROL trDbg({noKnob}) — the old step leaves the knob: must be caught.
    CONTROLS: trDbg({noTouch}) — the frozen track stays fresh, the staleness check must notice; trDbg({ti}) — the naive transpose (tuning
    index + 1) must miss the expected pitch on the non-12 tracks of the seed. Restores views, edit versions, the editor and the history. */
 export function checkTranspose(){
@@ -4324,7 +4431,7 @@ export function checkTranspose(){
   const sc0=new Map(events.map(e=>[e,e.sc])), a0=new Map(events.map(e=>[e,e.a]));
   const restoreVer=laneVerKeep(), h0=histLen();
   /* the note as the knob n semitones away sounded before TF2 (key-less view at that live tonic) */
-  const expect=(e,n)=>{ const v0=sc0.get(e), k=v0.key+n; if(k<0||k>11) return null; setTonic(k); try{ return hz({ ...e, a:a0.get(e) }, { ...e, a:a0.get(e), sc:keyless(v0) }); } finally { setTonic(keepT); } };
+  const expect=(e,n)=>{ const v0=sc0.get(e), k=v0.key+n; if(k<0||k>11) return null; const t0=tonic; setTonic(k); try{ return hz({ ...e, a:a0.get(e) }, { ...e, a:a0.get(e), sc:keyless(v0) }); } finally { setTonic(t0); } };   // TF3b: the knob may have moved with the song
   const checkMoved=(evs,n,what,ctl)=>{ let off=0;
     for(const e of evs){ const v0=sc0.get(e); if(!v0) continue; cases++; song++;
       if(!ctl && e.a!==a0.get(e)) { miss(`${what}: ${at(e)} got another payload`); continue; }
@@ -4334,6 +4441,10 @@ export function checkTranspose(){
   const untouched=(skip,what)=>{ for(const e of events){ if(skip(e)) continue; cases++; if(e.sc!==sc0.get(e) || e.a!==a0.get(e)) miss(`${what}: ${at(e)} (not transposed) changed`); } };
   const back=what=>{ cases++; const r=histUndo(); if(!r || r==='changed') miss(`${what}: ↶ refused (${r})`);
     for(const e of events){ if(e.sc!==sc0.get(e) || e.a!==a0.get(e)){ miss(`${what}: after ↶ ${at(e)} does not hold its old view and payload`); break; } } };
+  /* TF3b (user answer 1): a SONG transpose moves the key knob too (mod 12), shown in #selTonic and in the live view; ↶/↷ with it */
+  const selT=document.getElementById('selTonic'), kDn=((keepT-1)%12+12)%12;
+  const knobAt=(k,what,ctl)=>{ cases++; const ok= tonic===k && selT && selT.value===String(k) && CUR().key===k;
+    if(!ok && !ctl) miss(`${what}: the key knob reads ${tonic} (select ${selT&&selT.value}, live view key ${CUR().key}), want ${k}`); return ok; };
   const layers=[...new Set(events.filter(e=>pitched(e)&&!e.jam).map(e=>e.layer))];
   const ly=layers.find(l=>freezeState(l)==='fresh') ?? layers[0];
   const drum=[...new Set(events.map(e=>e.layer))].find(l=>laneRoleOf(l)==='dr' && !events.some(e=>e.layer===l&&e.jam));   // a recorded drum track (a backing refuses as 'backing')
@@ -4379,7 +4490,19 @@ export function checkTranspose(){
       untouched(e=>e.fn!=='drum', 'song −1 (drum hits)');
       cases++; if(histTopLabel()!=='transpose') miss(`song −1: top history step «${histTopLabel()}», want 'transpose'`);
       for(const l of freshAll) if(events.some(e=>e.layer===l && e.sc && e.fn!=='drum')){ cases++; if(freezeState(l)!=='stale') miss(`song −1: frozen L${l+1} is ${freezeState(l)}, want stale`); }
-      back('song −1'); }
+      knobAt(kDn,'song −1');
+      back('song −1'); knobAt(keepT,'song −1 after ↶');
+      cases++; if(!histRedo()) miss('song −1: ↷ refused'); else { knobAt(kDn,'song −1 after ↷'); back('song −1 after ↷'); knobAt(keepT,'song −1 after ↷ ↶'); }
+      /* the knob turned by hand between the step and its ↶: ↶ restores the knob AND the backing (re-keyed by that turn) absolutely */
+      cases++; if(!songTranspose(-1)) miss('song −1 (knob turned after): refused');
+      else { const kh=(keepT+5)%12; selT.value=String(kh); selT.dispatchEvent(new Event('change'));
+        cases++; if(tonic!==kh) miss(`the real knob did not move to ${kh} (${tonic})`);
+        back('song −1, knob turned, ↶'); knobAt(keepT,'song −1, knob turned, ↶'); } }
+    /* CONTROL (c): the song step that leaves the knob (pre-TF3b) — the knob check must fail */
+    trDbg({ noKnob:true });
+    try{ cases++; if(!songTranspose(-1)) miss('CONTROL (knob left behind): its own song −1 was refused — the control proves nothing');
+      else { if(knobAt(kDn,'control noKnob',true)) miss('CONTROL (knob left behind): the knob check passes — it cannot fail'); back('control noKnob'); } }
+    finally{ trDbg(null); }
     /* CONTROL (b): the naive transpose (tuning index + 1) must miss on the non-12 tracks */
     { const non12=events.filter(e=>pitched(e) && !e.jam && tuningOf(sc0.get(e)).equal!==12);
       cases++; if(!non12.length) miss('no non-12 track in the song — control (b) proves nothing');
@@ -4391,7 +4514,7 @@ export function checkTranspose(){
     trDbg(null);
     if(editIsOpen()) editClose();
     for(const e of events){ if(sc0.has(e)){ e.sc=sc0.get(e); e.a=a0.get(e); } }
-    if(tonic!==keepT) setTonic(keepT);
+    if(tonic!==keepT){ setTonic(keepT); if(document.getElementById('selTonic')) document.getElementById('selTonic').value=String(keepT); }
     restoreVer(); histReset();
   }
   console.log(`[scaleprobe TF3] ${cases} cases · ${events.length} events · differences ${nBad}`);

@@ -8,8 +8,8 @@
    Every signature change resets the clock, so an edit session of any length gives one render after it ends. HOLDS: while recording
    (all), while the editor is open (its track), while a pan control is held (all). Triggers reach the watcher as hints through
    hooks.af(kind) (recorder: take, undo, backing, rowDelete, editor, song; ui: panHold, pan).
-   ⛔ Never re-rendered automatically: tracks stale ONLY by tonic, A4 or tempo while AF_REFREEZE_ON_RETUNE is off (user decision until the
-   tonic freeze) — they play their events, as before; tracks without a captured chain (auto-freeze never pins the live chain; song load
+   TF4 (user answer Q5): tracks stale ONLY by A4 or tempo re-render too, after the 'retune' settle (they play their events meanwhile); the
+   tonic stales nothing since TF2. ⛔ Never re-rendered automatically: tracks without a captured chain (auto-freeze never pins the live chain; song load
    and editor inserts pin it — recorder.songPinChains / editInsPush); tracks over the memory budget (skipped, not retried until their
    signature changes or memory is freed; no eviction).
    ⛳ THE QUEUE (AF1): entries by track id (rule #27), one render at a time, priority audible-and-near-the-playhead first (qRank), gates:
@@ -27,8 +27,8 @@ import { AC } from './audio.js';
 
 /* ═══ NUMBERS — all auto-freeze delays and limits live here ═══ */
 const AF_DELAY={ editor:500, take:1000, pan:1000, undo:1000, backing:1000, rowDelete:1000, song:1000, change:1000, retune:1500 };   // settle, ms
-/* User decision (AF3): tonic, A4 and tempo do NOT trigger re-freezing until the tonic-freeze plan; such tracks play live. */
-const AF_REFREEZE_ON_RETUNE=false;
+/* TF4 (user answer Q5): an A4 or tempo change re-freezes stale tracks by itself (was off since AF3; the tonic stales nothing since TF2). */
+const AF_REFREEZE_ON_RETUNE=true;
 /* Memory guard until AF6: total frozen 16-bit data. Touch = primary pointer coarse. */
 const AF_BUDGET_MB={ touch:300, desktop:1024 };
 const AF_TOUCH= typeof matchMedia==='function' && matchMedia('(pointer: coarse)').matches;
@@ -48,7 +48,7 @@ const LOG=[];
 const nowMs=()=> HOOK&&HOOK.now ? HOOK.now() : performance.now();
 const setRunner=fn=>{ RUNNER=fn; };
 const dbg=k=> !!(HOOK&&HOOK.dbg&&HOOK.dbg[k]);
-const retuneOn=()=> AF_REFREEZE_ON_RETUNE || dbg('retune');
+const retuneOn=()=> AF_REFREEZE_ON_RETUNE && !dbg('noRetune');   // noRetune — probe CONTROL: the pre-TF4 switch (off)
 const budgetBytes=()=> (HOOK&&HOOK.budgetMB!=null ? HOOK.budgetMB : (AF_TOUCH?AF_BUDGET_MB.touch:AF_BUDGET_MB.desktop))*1048576;
 const paused=()=>{ for(const n of PAUSE.values()) if(n>0) return true; return false; };
 
@@ -124,7 +124,7 @@ function qAdd(layer, why, at){
              pinned:false, skip:null, gate:null, added:t });
   return true;
 }
-/* Is the track a candidate at all: has events, not being recorded, not fresh, not stale only by tonic/A4/tempo (switch off). */
+/* Is the track a candidate at all: has events, not being recorded, not fresh, not stale only by A4/tempo while the switch is off. */
 function wants(ly){
   if(isRecLayer(ly)) return false;
   const st=freezeState(ly);
@@ -146,10 +146,11 @@ function wScan(force){
   for(const ly of lys){ const id=laneIdOf(ly); if(id==null) continue;
     const e=Q.get(id);
     if(!wants(ly)){ if(e&&e.state!=='run') Q.delete(id); if(freezeState(ly)==='fresh') LVL.set(id, laneLevelOf(ly)); continue; }
-    if(!e){ qAdd(ly, kind, at); const n=Q.get(id); if(n&&kind==='change'&&frzRetuneOnly(ly)){ n.settle=AF_DELAY.retune; n.kind='retune'; } continue; }
+    const k2= kind==='change' && frzRetuneOnly(ly) ? 'retune' : kind;   // TF4: an A4/tempo move (stale by it alone) settles longer, each time
+    if(!e){ qAdd(ly, k2, at); continue; }
     if(e.state==='run') continue;
     const sig=watchSig(ly);
-    if(sig!==e.sig){ e.sig=sig; if(!dbg('noReset')) e.since=at; e.settle=delayOf(kind); e.kind=kind;
+    if(sig!==e.sig){ e.sig=sig; if(!dbg('noReset')) e.since=at; e.settle=delayOf(k2); e.kind=k2;
       if(e.state==='skip'&&e.skip&&e.skip.why!=='no chain'){ e.state='wait'; e.skip=null; } }
   }
   for(const e of [...Q.values()]) if(e.state!=='run'){ const ly=laneLayerOf(e.id); if(ly==null||!events.some(x=>x.layer===ly)) Q.delete(e.id); }
@@ -290,11 +291,11 @@ function freezeQueue(){
         : quiet<e.settle ? `settling (${((e.settle-quiet)/1000).toFixed(2)} s left)` : (e.gate ? 'waiting: '+e.gate : 'ready'),
       trigger: e.kind, 'settle ms': e.settle, audible: it.audible, beats: it.b0+'–'+it.b1, 'est MB': it.layer!=null?+mb(estBytes(it.layer,sp)):'—',
       'layout ms (last)': COST.has(e.id)?COST.get(e.id):'—', renders: e.runs, again: e.again }; });
-  /* tracks that play live by choice: stale only by tonic/A4/tempo (switch off) */
-  const live=[...new Set(events.map(e=>e.layer))].filter(ly=>!retuneOn() && frzRetuneOnly(ly)).map(ly=>({ track:'L'+(ly+1), why:'stale only by tonic/A4/tempo — AF_REFREEZE_ON_RETUNE is off (user decision): plays its events' }));
+  /* tracks that play live by choice: stale only by A4/tempo while the switch is off (never since TF4, except the probe control) */
+  const live=[...new Set(events.map(e=>e.layer))].filter(ly=>!retuneOn() && frzRetuneOnly(ly)).map(ly=>({ track:'L'+(ly+1), why:'stale only by A4/tempo — AF_REFREEZE_ON_RETUNE is off: plays its events' }));
   const used=frzBytesTotal(), lim=budgetBytes();
   /* eslint-disable no-console */
-  console.log(`[freezeQueue] ${ON?'ON':'OFF'}${paused()?' · PAUSED ('+[...PAUSE.keys()].join(', ')+')':''} · ${Q.size} entr${Q.size===1?'y':'ies'} · ${RUN?'rendering now':'idle'} · memory ${mb(used)} of ${mb(lim)} MB (${AF_TOUCH?'touch':'desktop'} budget) · re-freeze on tonic/A4/tempo ${retuneOn()?'ON':'OFF'} · holds: recording ${G.recording()}, editor ${editIsOpen()}, pan ${PANHOLD} · gates: clip ${G.clip()}, pinch ${G.pinch()}`);
+  console.log(`[freezeQueue] ${ON?'ON':'OFF'}${paused()?' · PAUSED ('+[...PAUSE.keys()].join(', ')+')':''} · ${Q.size} entr${Q.size===1?'y':'ies'} · ${RUN?'rendering now':'idle'} · memory ${mb(used)} of ${mb(lim)} MB (${AF_TOUCH?'touch':'desktop'} budget) · re-freeze on A4/tempo ${retuneOn()?'ON':'OFF'} · holds: recording ${G.recording()}, editor ${editIsOpen()}, pan ${PANHOLD} · gates: clip ${G.clip()}, pinch ${G.pinch()}`);
   if(rows.length) console.table(rows);
   if(live.length){ console.log('[freezeQueue] live by choice:'); console.table(live); }
   if(LOG.length){ console.log('[freezeQueue] last outcomes:'); console.table(LOG.slice(-10)); }
@@ -304,7 +305,7 @@ function freezeQueue(){
 
 /* ═══ FOR PROBES ═══ afBegin(hook): the watcher and queue run with NO timer — steps by hand (afTick / qStep), with hook replacements:
    { now, gates:{recording,clip,pinch}, ctx, opt (merged into the runner's options — a fake render), settleMs, frameMs, gatePollMs,
-   layers (watcher scope), budgetMB, dbg:{ noReset, level, retune } (controls) }. afEnd() puts everything back. Refuses while a render
+   layers (watcher scope), budgetMB, dbg:{ noReset, level, noRetune } (controls) }. afEnd() puts everything back. Refuses while a render
    runs or another probe drives it. qBegin/qEnd = the AF1 names. */
 let KEEP=null;
 function afBegin(hook){

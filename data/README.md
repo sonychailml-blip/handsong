@@ -40,6 +40,10 @@ scales.js выводит из них РОВНО сегодняшние объе�
              для лада без аккордов: 'maqsum' у макамов; нет поля — без ударных);
   у строя с F3 ещё naming: {scheme: 'notes12'|'notes24'|'ordinal'|'list', names?: [{name, detail?}] — у list, по высоте} и
              periodWord: {short, full?} — слово периода (строка — ключ словаря, объект — имя en/ru); читает scales.namingOf.
+  TF5 (tuning, English): anchor?: {historical: {key: 0..11 (C = 0), cents?: whole −50…50, note?: name}} — the tuning's historical 1/1
+             (Partch: G), offered in the Scale panel as one tap «Historical: G», never the default; only in a tuning NOT named by the
+             12 notes (ordinal or list — there the key control reads «1/1 = …» with a cents nudge; scales.keyByOneOne, historicalKeyOf).
+             Read through SRC only (not copied into the built tuning — the F0 snapshot is unchanged).
 ⚠️ compat.tag — поле, которое ВЫВЕСТИ НЕЛЬЗЯ (семейство лада: 'penta' стоит и у пентатоник, и у раг, и у патетов): его читают только
 замороженные опоры пробы и isTert; уйдёт, когда уйдут они. Всё прочее у лада выводится (см. сборщик в scales.js).
 ⛔ Дроби (period, ratios правил, отношения палитр и строёв) — СТРОКАМИ; сборщик делит их тем же действием, что прежний литерал JS (5/4 —

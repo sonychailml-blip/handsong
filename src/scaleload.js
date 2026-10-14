@@ -60,7 +60,7 @@ function checkMenu(x){
   need(isObj(x.groups) && Object.values(x.groups).every(isLName),'groups must map keys to names');
 }
 function checkTuning(x,id){
-  head(x,F.tuning,id); keysOnly(x,['format','version','id','name','period','pitches','chordFit','naming','periodWord','describe','drone'],'tuning');
+  head(x,F.tuning,id); keysOnly(x,['format','version','id','name','period','pitches','chordFit','naming','periodWord','describe','drone','anchor'],'tuning');   // TF5: anchor (the historical 1/1)
   if(x.name!==undefined) need(isLName(x.name),'name must be a name: a string or {en, ru, …}');   // F6b: имя строя (у встроенных — есть у всех)
   if(USER_ID.test(String(x.id))) need(x.name!==undefined,'a user tuning needs a name ({en, ru})');
   need(isRatio(x.period) && ratioVal(x.period)>1,'period must be a ratio above 1, e.g. "2/1"');
@@ -88,6 +88,14 @@ function checkTuning(x,id){
   const Dd=x.describe; need(isObj(Dd) && (Dd.kind==='equal'||Dd.kind==='table'),'describe.kind must be equal or table'); keysOnly(Dd,['kind','step'],'describe');
   need(Dd.kind===(P.equal!=null?'equal':'table'),'describe.kind does not match the pitches'); need(Dd.step===undefined || typeof Dd.step==='boolean','describe.step must be true or false');
   if(x.drone!==undefined){ need(isObj(x.drone) && isRatio(x.drone.withoutFifth) && ratioVal(x.drone.withoutFifth)>1,'drone.withoutFifth must be a ratio above 1'); keysOnly(x.drone,['withoutFifth'],'drone'); }
+  /* TF5: the historical 1/1 — a note 0..11 (C = 0) and a cents nudge −50…+50, offered as one tap (never the default); only where the key is
+     «1/1 = …» (a tuning not named by the 12 notes) */
+  if(x.anchor!==undefined){ need(isObj(x.anchor),'anchor must be an object'); keysOnly(x.anchor,['historical'],'anchor');
+    const H=x.anchor.historical; need(isObj(H) && isInt(H.key) && H.key>=0 && H.key<=11,'anchor.historical.key must be a note 0..11 (C = 0)');
+    keysOnly(H,['key','cents','note'],'anchor.historical');
+    need(H.cents===undefined || (isInt(H.cents) && Math.abs(H.cents)<=50),'anchor.historical.cents must be a whole number −50…50');
+    need(H.note===undefined || isLName(H.note),'anchor.historical.note must be a name: a string or {en, ru, …}');
+    need(N.scheme!=='notes12' && N.scheme!=='notes24','anchor.historical belongs to a tuning not named by the 12 notes'); }
 }
 function checkRule(r,where){
   need(isObj(r) && ['tertian','stack','power','ratios','palette','none'].includes(r.kind),`${where}: rule.kind unknown`);

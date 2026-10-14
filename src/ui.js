@@ -1,4 +1,4 @@
-import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChordMode, setSeventh, setChIdx,
+import { scaleId, tonic, setScaleId, setTonic, tonicCents, setTonicCents, tunedFrom, setTunedFrom, setChordMode, setSeventh, setChIdx,
          phoneInstr, setPhoneInstr, handFn, setHandFn, splitOn, setSplitOn, SPLIT_ROLES, setSplitRole,
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
@@ -25,7 +25,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
 import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
-import { modesLikeView } from './scales.js';   // OWN1: the modes a track can be re-mapped into
+import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // OWN1: the modes a track can be re-mapped into; TF5: «1/1 = …» and the historical 1/1
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
@@ -78,14 +78,28 @@ const recBtn=$('recBtn'), loopBtn=$('loopBtn'),
    после КАЖДОЙ смены лада или тоники (иначе надпись протухает). */
 function updScaleBtn(){ const s=CUR().mode, fixedFrom = s.tunable && tunedFrom!=='T';
   const cm=chordModeOf(s), cmNotDef = s.chordModes && cm!==s.chordModes[0].id;   // T7b: режим аккордов не по умолчанию — виден на кнопке, как закреплённый «строй от»
-  scaleBtn.textContent=`${L(s.name)} · ${NOTE_NAMES[tonic]}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '')
+  const v=CUR(), oneOne=keyByOneOne(v);   // TF5: «1/1 = G +12¢» in a tuning not named by the 12 notes
+  scaleBtn.textContent=`${L(s.name)} · ${oneOne ? '1/1 = ' : ''}${NOTE_NAMES[tonic]}${oneOne ? keyCentsTxt(v.keyC||0) : ''}`+(fixedFrom ? ' · '+t('scale.tunedFrom',{n:NOTE_NAMES[tunedFrom]}) : '')
     +(cmNotDef ? ' · '+chordModeName(s.chordModes.find(x=>x.id===cm)) : '');   // F6b: ключ словаря или своё имя   // P3: закреплённый «строй от» виден на кнопке; «следует за тоникой» — нет (это умолчание)
   /* P0 «СТРОЙ ОТ»: у фиксированного исторического строя (fixedKey — СВОЙСТВО лада, не имя: правило #25) под тоникой строка
      «Настроен от C (историческая практика)». Здесь, потому что updScaleBtn зовут после КАЖДОЙ смены лада (меню лада, меню строя,
      уроки), тоники и языка — второй точки синхронизации не заводим. Текст ведёт applyI18n по data-i18n, язык меняется сам.
      P3: у лада с выбором (tunable — Пифагор) вместо строки — ряд выбора (renderTunedFrom). */
   tunedFromNote.hidden = !s.fixedKey || !!s.tunable;
-  renderTunedFrom(s); renderChordMode(s); renderSevCtl(); }
+  renderTunedFrom(s); renderChordMode(s); renderSevCtl(); renderOneOne(v); }
+/* TF5: the key as «where 1/1 is» — in a tuning not named by the 12 notes (scales.keyByOneOne, from the tuning's data) the label reads
+   «1/1 =» and a cents nudge appears; a historical 1/1 declared by the tuning file (historicalKeyOf) is one button, never the default (Q6). */
+const keyCentsTxt=c=> c ? ` ${c>0?'+':'−'}${Math.abs(c)}¢` : '';
+function renderOneOne(v){
+  const on=keyByOneOne(v), lbl=$('tonicLbl'), ci=$('tonicCents'), cu=$('tonicCentsU'), hr=$('tonicHistRow'), hb=$('tonicHist');
+  if(!lbl) return;
+  const k= on ? 'panel.scale.oneOne' : 'panel.scale.tonic'; lbl.setAttribute('data-i18n',k); lbl.textContent=t(k);
+  ci.hidden=cu.hidden=!on; if(on && document.activeElement!==ci) ci.value=String(tonicCents);
+  const H= on ? historicalKeyOf(v) : null;
+  hr.style.display= H ? '' : 'none';
+  if(H){ const at= tonic===H.key && tonicCents===H.cents;
+    hb.textContent=t(at?'panel.scale.histOn':'panel.scale.hist',{ n:NOTE_NAMES[H.key]+keyCentsTxt(H.cents) }); hb.disabled=at; hb.title= H.note ? L(H.note) : ''; }
+}
 /* ⛳ T7b: РЕЖИМ АККОРДОВ — две кнопки под пальцем (тот же .seg, что у режима голоса) и строка подсказки, только у лада со свойством
    chordModes (где режимы различаются). Смена — шов тоники/«строй от»: setChordMode + softAllOff (при записи сперва закрывает открытые ноты:
    ни одна нота не тянется через два вида) + updScaleBtn. Режим — часть ВИДА (scaleView), поэтому записанное звучит, как записано, а новая
@@ -1770,7 +1784,12 @@ selScale.onchange=e=>{
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
   if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
-selTonic.onchange=e=>{ setTonic(+e.target.value); liveAllOff(); backingFollowKey(); droneRetune(); updScaleBtn(); };   // TF2: the key knob moves only the hands (and the backing, Q3); recordings keep their key, tracks keep playing
+const keyMoved=()=>{ liveAllOff(); backingFollowKey(); droneRetune(); updScaleBtn(); };   // TF2: the key knob moves only the hands (and the backing, Q3); recordings keep their key, tracks keep playing
+selTonic.onchange=e=>{ setTonic(+e.target.value); keyMoved(); };
+/* TF5: the cents nudge and the historical 1/1 are the same knob (a listening switch; a nudge mid-take starts a new track, as a key change) */
+$('tonicCents').onchange=e=>{ setTonicCents(e.target.value); e.target.value=String(tonicCents); keyMoved(); };
+$('tonicHist').onclick=()=>{ const H=historicalKeyOf(CUR()); if(!H) return; setTonic(H.key); setTonicCents(H.cents); selTonic.value=tonic; keyMoved(); };
+hooks.key=()=>{ selTonic.value=tonic; updScaleBtn(); };   // TF3b: a song Transpose (and its ↶/↷) moved the knob
 /* P3 «СТРОЙ ОТ»: ТОТ ЖЕ ШОВ, ЧТО У ТОНИКИ — живые ноты гаснут и переатакуют (рука соло/баса — на следующем кадре), защёлка
    замолкает, играющие дорожки пересращиваются (softAllOff при идущем транспорте → trackResplice) и звучат со СВОИМ якорем:
    их sc — вид лада (строй, лад, якорь; T2), записанный в момент игры. Записанное этот выбор не перестраивает (правило #7). */

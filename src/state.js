@@ -613,6 +613,11 @@ export let chordOctReg=1;
 /* Сеттеры: присваивать импортированному биндингу нельзя (TypeError). */
 export const setScaleId=v=>{ scaleId=v; };   // F1: id лада (scales.scaleById); прежний setScaleIdx (позиция в SCALES) снят
 export const setTonic=v=>{ tonic=v; };
+/* TF5: the key knob's cents nudge (−50…+50), heard only in tunings not named by the 12 notes («1/1 = G +12¢»; scales.keyByOneOne gates it
+   into the view). A listening switch like the tonic: recordings keep the cents of their own view. */
+export let tonicCents=0;
+export const KEY_CENTS_MAX=50;
+export const setTonicCents=v=>{ v=Math.round(+v||0); tonicCents=Math.max(-KEY_CENTS_MAX, Math.min(KEY_CENTS_MAX, v)); };
 export const setARef=v=>{ aRef=v; };             // v уже проверен/клампнут в UI (380–480); высота пересчитается сама
 export const setTunedFrom=v=>{ tunedFrom = v==='T' ? 'T' : ((((v|0)%12)+12)%12); };   // P3: 'T' или класс высоты 0..11
 export const setChordMode=(id,m)=>{ chordModeSel={...chordModeSel, [id]:m}; chordModeVer++; };   // T7b: режим аккордов лада id
