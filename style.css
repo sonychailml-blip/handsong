@@ -190,6 +190,14 @@
   #camMsg{position:fixed; top:52px; left:0; right:0; z-index:20; text-align:center;
     opacity:0; transition:opacity .25s; pointer-events:none;}
   #camMsg.on{opacity:1;}
+  /* ED7-fix2: the undo toast after ✕ — clickable (unlike #camMsg), below the camera toast */
+  #undoToast{position:fixed; top:96px; left:50%; transform:translateX(-50%); z-index:21; display:none; align-items:center; gap:12px;
+    background:rgba(10,10,20,.92); color:var(--ink); font-size:var(--fs-label); padding:6px 6px 6px 14px; border-radius:var(--r-sm);
+    border:1px solid rgba(255,255,255,.22); backdrop-filter:blur(6px); white-space:nowrap;}
+  #undoToast.on{display:flex;}
+  #undoToast button{padding:6px 12px; font-size:var(--fs-label);}
+  /* ED7-fix2: empty song, history not empty — the transport row keeps only ↶ ↷ */
+  #loopTransport.empty>button:not(#histUndo):not(#histRedo){display:none;}
   #camMsg::before{content:attr(data-msg); display:inline-block;
     background:rgba(10,10,20,.9); color:var(--ink); font-size:var(--fs-label);
     padding:8px 14px; border-radius:var(--r-sm); border:1px solid rgba(255,255,255,.22);

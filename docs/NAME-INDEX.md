@@ -225,3 +225,12 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/i18n.js`: `roll.modeTitle`, `roll.modeDone`, `roll.modeNo.*`, `hist.k.mode`
 - `src/scaleprobe.js`: `checkBendCurve` (row «BEND-CURVE glides and shapes»), `checkTrackMode` (row «OWN1 track into another mode»); `src/probedata.js`: `checkModeMap` (row «OWN1 modes by degrees (sweep)»)
 - `tools/probe-browser.mjs`: `--limit-start M`, `--cdn-cache` (`CDN_CACHE`, `CDN_DIR`, `cdnCache`; folder `tools/.cdn-cache/`, git-ignored)
+
+## Added at ED7-fix2 (undo after ✕)
+- `src/hooks.js`: `hooks.cleared`
+- `src/recorder.js`: `histTopLabel`
+- `src/draw.js`: `LOOP_EMPTY_TOP`, `tpEmpty`, `emptyTpOld`, `setEmptyTpOld`; `syncLoopTransport(on, bottom, empty)`
+- `src/ui.js`: `UNDO_TOAST_MS`, `undoToastT`, `hideUndoToast`, `showUndoToast`, `undoToastBtn`, `undoUiOld`, `undoUiDbg`
+- `index.html`: `#undoToast`, `#undoToastBtn`; `style.css`: `#undoToast`, `#loopTransport.empty`
+- `src/i18n.js`: `hist.clearedToast`, `hist.undoBtn`
+- `src/scaleprobe.js`: `checkUndoClear` (row «ED7-fix2 undo after clear»); `tools/check-static.mjs`: global `KeyboardEvent`

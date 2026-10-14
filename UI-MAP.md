@@ -337,7 +337,9 @@ Pick one — every note of the track moves to the same degree of the new mode (i
 outside the old mode keeps its distance from the nearest degree. Times, volumes, bends stay. One ↶; a frozen track re-freezes by itself.
 **ONE UNDO (ED7).** ↶ ↷ in the editor bar, in the window bar and on the play screen (next to ⤺), and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z (Ctrl+Y):
 one history for takes, ⤺, note edits, automation, mixer level / pan / master, names and order, row delete, backing, sections and markers,
-✕ clear (its ↶ brings the brace and ⟳ back too). A toast names what was undone. Not in the history: mute, solo, arming, the brace, tempo,
+✕ clear (its ↶ brings the brace and ⟳ back too). **After ✕** the strip disappears with the song, so a box «Song cleared — ↶ Undo»
+shows for ~6 s under the top bar (its button undoes the clear), and the transport row stays where it was with ONLY ↶ ↷ while there is
+anything to undo (ED7-fix2). A toast names what was undone. Not in the history: mute, solo, arming, the brace, tempo,
 tonic.
 
 **VOLUME BARS (ED5).** With the lane on Volume and `▮▮` on (the default face), every NOTE is one bar at its start, height = its

@@ -23,7 +23,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { rollBendAt, rollAutValAt, loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { modesLikeView } from './scales.js';   // OWN1: the modes a track can be re-mapped into
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
@@ -42,7 +42,7 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          sections, secAdd, secRename, secDelete, songEdit, songEditWhy, braceSet,   // ED6: sections and the song history
          editBendPoint,   // OWN2
          editTrackMode, editTrackModeWhy, trackViewOfLayer,   // OWN1: the track into another mode by degrees
-         histUndo, histRedo, histCanUndo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
+         histUndo, histRedo, histCanUndo, histCanRedo, histTopLabel, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
          editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META, curveK } from './config.js';   // curveK — BEND-CURVE: a middle handle's position → curvature
@@ -1078,7 +1078,18 @@ rollDelBtn.onclick=rollDeleteSel;
 const HIST_KEY={ mode:'mode', bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
 const histKeyOf=l=> l && l.startsWith('sec:') ? 'section' : HIST_KEY[l] || 'edit';
 const histUndoBtn=$('histUndo'), histRedoBtn=$('histRedo');
-function updHistBtns(){ if(histUndoBtn){ histUndoBtn.disabled=!histCanUndo(); histRedoBtn.disabled=!histCanRedo(); } }
+function updHistBtns(){ if(histUndoBtn){ histUndoBtn.disabled=!histCanUndo(); histRedoBtn.disabled=!histCanRedo(); }
+  if(histTopLabel()!=='clear') hideUndoToast(); }   // ED7-fix2: the toast undoes ✕ only while ✕ is the newest step
+/* ED7-fix2: "Song cleared — ↶ Undo" for UNDO_TOAST_MS after ✕ (recorder.clearSong → hooks.cleared; the ✕ button and the looper hand) */
+const UNDO_TOAST_MS=6000; let undoToastT=0;   // looked up when called: updHistBtns may run before this line
+function hideUndoToast(){ const el=$('undoToast'); if(!el) return; el.classList.remove('on'); clearTimeout(undoToastT); }
+let undoUiOld=false;   // probe CONTROL only: the pre-fix UI (no toast, no ↶ on an empty song)
+export const undoUiDbg=v=>{ undoUiOld=!!v; setEmptyTpOld(v); };
+function showUndoToast(){ const el=$('undoToast'); if(!el || undoUiOld || histTopLabel()!=='clear') return;
+  el.classList.add('on'); clearTimeout(undoToastT); undoToastT=setTimeout(hideUndoToast,UNDO_TOAST_MS); }
+const undoToastBtn=$('undoToastBtn');
+if(undoToastBtn) undoToastBtn.onclick=()=>{ hideUndoToast(); if(histTopLabel()==='clear') histDo(-1); };
+hooks.cleared=()=>{ updHistBtns(); showUndoToast(); };
 function afterHist(r){
   if(rollOpen){ if(editLayer()==null) closeRoll(); else { setRollSel(null); setRollAutSel(null); renderTimbreCtl(); renderAutCtl(); updRollBtns(); } }
   if(secSel!=null && !sections().some(m=>m.id===secSel)) setSecSel(null);

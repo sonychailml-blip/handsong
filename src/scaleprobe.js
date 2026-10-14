@@ -76,7 +76,7 @@ import { example as userExample, chordModesExample as userCmExample } from './us
 import { L, t, withLang } from './i18n.js';   // T7: подписи типов в отчёте P.checkPure; F0: имена режимов аккордов (t) и язык снимка без записи выбора (withLang)
 import { rollRowsProbe as RP, loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName, stripProbe } from './draw.js';   // AR2-fix: stripProbe — тексты полосы игры на заданной ширине   // AR2: имя и цвет дорожки (P.checkTrackLook)
 import { INSTR_COL, LANE_NOROLE_COL, bendPlan, bendAt, curveU, BEND_GLIDE_STEP_S, BEND_GLIDE_TC } from './config.js';   // BEND-CURVE: the one ramp law (P.checkBendCurve)   // AR2: палитра ролей — данные, которые сверяет P.checkTrackLook
-import { arrApi } from './ui.js';
+import { arrApi, undoUiDbg } from './ui.js';
 import { qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, afBegin, afEnd, afTick, afHint, afPause, afIdle, afBusy, afActive, AF_DELAY } from './frzqueue.js';   // AF1: очередь автозаморозки — шаг вручную на подменённых часах и воротах (P.checkFreezeQueue)
 import { chordHold, chainStateOf, routeOfOwner, fxPlaySet, fxParamKeysOf, setMasterLevel, masterLevel, masterMeter, ownerGain, ownerPan, fxSnapshot, timbresOf, AC as LIVE_AC } from './audio.js';   // AF1: LIVE_AC — буфер-пустышка поддельного рендера (P.checkFreezeQueue)   // AR2: timbresOf — имя тембра для независимой сборки имени по умолчанию   // MX1: мастер и множитель уровня дорожки живого движка — P.checkMixer; MX2: ownerPan — панорама по ключу владельца (P.checkPan)   // AR1: открыть/закрыть окно аранжировки и дорожку из него — те же входы, что у кнопок (P.checkArrange)   // полоса дорожек: снимок последнего кадра, попадание, окно прокрутки — P.checkTracks   // пути рядов редактора без открытого редактора (и частоты рядов для замороженных рядов по ступени)
 import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, chaseFor, chaseNote, hlOf, laneRoleOf, laneTimbreOf, viewAudit,
@@ -436,6 +436,7 @@ const ALL_RUNS=[
   ['ED5 volume bars',()=>checkVolBars(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED6 sections',()=>checkSections(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED7 one history',()=>checkHistory(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['ED7-fix2 undo after clear',()=>checkUndoClear(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['OWN2 bend curve',()=>checkBend(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['BEND-CURVE glides and shapes',()=>checkBendCurve(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -469,7 +470,7 @@ const ALL_RUNS=[
 const SLOW_ROWS=new Set(['ED4 degrees (sweep)','T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
   'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot',
   'LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback']);   // AF2: ≈ 25–30 с живого съёма   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
-const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
+const DRAWN_ROWS=new Set(['ED7-fix2 undo after clear','tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
 const HIDDEN='not checked: tab hidden';
 for(const n of [...SLOW_ROWS,...DRAWN_ROWS]) if(!ALL_RUNS.some(r=>r[0]===n)) console.warn(`[scaleprobe] «${n}» is not a row of P.all — the quick/drawn lists are out of date`);
 /* ⛳ СТРАЖ СОСТОЯНИЯ МЕЖДУ СТРОКАМИ P.all (после MX2: проба, оставившая след, роняет ЧУЖУЮ строку — и виноватую не видно). Снимок до и после
@@ -1714,6 +1715,60 @@ export function checkTrackMode(){
   console.log(`[scaleprobe OWN1] tracks ${song} · cases ${cases} · differences ${nBad}`);
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe OWN1] '+m));
   if(!nBad) console.log('[scaleprobe OWN1] a whole track takes the new view and every pitch lands on the same degree of the new mode (an out-of-mode note keeps its offset); one history step, undo/redo bit for bit; refusals change nothing; the frozen track goes stale');
+  return out();
+}
+/* ═══ ED7-fix2: UNDO AFTER ✕ — P.checkUndoClear ═══
+   Through the REAL buttons (element clicks, the handlers people use), editor and window closed, transport stopped: ✕ (#clrBtn) empties the
+   song → the toast «Song cleared — ↶ Undo» is on with its button visible, and after two frames the transport row stays (classes on + empty)
+   showing ↶ enabled and nothing else (✕, ▶ hidden). The toast's Undo brings the song back exactly (events, payloads, beats, lanes) and goes
+   away; ✕ again → the transport's ↶ brings it back; ✕ again → Ctrl+Z brings it back. CONTROL that must fail: the pre-fix UI
+   (ui.undoUiDbg — no toast, the strip hidden with the song) leaves no undo control after ✕ (Ctrl+Z then restores the song). The frozen
+   tracks ✕ dropped are re-frozen at the end. */
+export async function checkUndoClear(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()||arrOpen){ miss('the editor or the arrangement window is open — close it'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const $=id=>document.getElementById(id), shown=el=> !!el && getComputedStyle(el).display!=='none' && el.offsetParent!==null;
+  const K=edKit(miss,()=>{}), restoreVer=laneVerKeep(), fz0=new Map([...new Set(events.map(e=>e.layer))].map(l=>[l,freezeState(l)])), FX0=takeFxDump();
+  const back=label=>{ const d=K.same(K.snap(),S0); if(d) miss(`${label}: the song is not back — ${d}`); if(takeFxDump()!==FX0) miss(`${label}: the captured lanes are not back`); };
+  const present=()=>({ toast: $('undoToast').classList.contains('on') && shown($('undoToastBtn')),
+    tp: $('loopTransport').classList.contains('on') && $('loopTransport').classList.contains('empty') && shown($('histUndo')) && !$('histUndo').disabled });
+  const clear=async()=>{ $('clrBtn').click(); await frame(); await frame(); return !events.length; };
+  const ctrlZ=()=>window.dispatchEvent(new KeyboardEvent('keydown',{ key:'z', code:'KeyZ', ctrlKey:true, bubbles:true }));
+  histReset(); const S0=K.snap(); song=events.length;
+  try{
+    /* the toast */
+    { cases++; if(!await clear()){ miss('✕ did not empty the song'); return out(); }
+      const P=present();
+      if(!P.toast) miss('after ✕ no «Song cleared — Undo» toast with a visible button');
+      if(!P.tp) miss('after ✕ the transport ↶ is not shown (or is disabled) on the empty song');
+      if(shown($('clrBtn')) || shown($('loopBtn'))) miss('the empty-song transport shows more than ↶ ↷');
+      $('undoToastBtn').click(); await frame();
+      back('the toast\'s Undo');
+      if($('undoToast').classList.contains('on')) miss('the toast stays after its Undo'); }
+    /* the transport ↶ */
+    { cases++; if(!await clear()) miss('the second ✕ did not empty the song');
+      $('histUndo').click(); await frame(); back('the transport ↶'); }
+    /* Ctrl+Z */
+    { cases++; if(!await clear()) miss('the third ✕ did not empty the song');
+      ctrlZ(); await frame(); back('Ctrl+Z'); }
+    /* CONTROL: the pre-fix UI */
+    { cases++; undoUiDbg(true);
+      try{ if(!await clear()) miss('CONTROL: ✕ did not empty the song');
+        const P=present(); if(P.toast||P.tp) miss('CONTROL: with the pre-fix UI an undo control is still found after ✕ — the check cannot fail'); }
+      finally{ undoUiDbg(false); }
+      ctrlZ(); await frame(); back('CONTROL (restored by Ctrl+Z)'); }
+  } finally {
+    undoUiDbg(false); histReset(); restoreVer();
+    for(const [l,s] of fz0) if(s==='fresh' && freezeState(l)!=='fresh'){
+      try{ const R=await import('./render.js'); await R.freeze(l); }catch(e){ miss(`L${l+1}: re-freezing failed — ${e&&e.message}`); } }
+    restoreVer();
+    for(const [l,s] of fz0) if(freezeState(l)!==s) miss(`L${l+1}: its freeze is ${freezeState(l)} after the probe, ${s} before`);
+  }
+  console.log(`[scaleprobe ED7-fix2] events ${song} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED7-fix2] '+m));
+  if(!nBad) console.log('[scaleprobe ED7-fix2] after ✕ the toast offers Undo and the transport keeps ↶ on the empty song; toast, ↶ and Ctrl+Z each bring the song back exactly; CONTROL: the pre-fix UI leaves no undo control');
   return out();
 }
 /* ═══ ED7: ONE HISTORY — P.checkHistory ═══

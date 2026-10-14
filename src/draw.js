@@ -12,7 +12,7 @@ import { DRUM_NAMES, DRUM_ROWS, chordHold, leadHold, bassHold, FX_FACTORY, fxIns
 import { hooks } from './hooks.js';   // AF4: hooks.afRow — the arrangement window's freeze dot (set by frzqueue.js)
 import { recording, inPB, loop, events, loopPos, recLayers, isRecLayer, loopChordDeg, loopChordOct, beatLevel, songBeats,
          laneMuted, laneSoloed, laneSoloOn, cycling, regionOn, armedLayer, laneDelPendingLayer,
-         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, pnBars, sections, editLayer as rollTrackLayer, chordMoveTy, bendEdited, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from './recorder.js';   // AR2: имя, порядок показа, роль и тембр дорожки одним проходом   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
+         songNotes, songSegs, captureInfoOf, fxIsDriven, autPoints, pnBars, sections, editLayer as rollTrackLayer, histCanUndo, chordMoveTy, bendEdited, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from './recorder.js';   // AR2: имя, порядок показа, роль и тембр дорожки одним проходом   // S5.0: ноты песни (только чтение) и НОМЕР СЛОЯ открытой в редакторе дорожки   // состояние дорожек ЧИТАЕМ (пишет его ui через свои сеттеры) — вид строки обязан идти за звуком, а не за своей копией флага; songBeats — длина песни в долях (S3.3)
  
 /* Геометрия столбиков эффектов. Правый край считаем ИЗ КОНСТАНТ, чтобы подписи
    ступеней сдвигались автоматически при подкрутке ширины/зазора — иначе разъедется. */
@@ -158,11 +158,15 @@ const statusEl=document.getElementById('status');
    Пишем в DOM только при ИЗМЕНЕНИИ, а не каждый кадр (§0.5: draw — презентационный
    слой, statusEl уже так работает). */
 const loopTransportEl=document.getElementById('loopTransport');
+let emptyTpOld=false; export const setEmptyTpOld=v=>{ emptyTpOld=!!v; };   // probe CONTROL only (P.checkUndoClear): the pre-fix strip, hidden with the song
+const LOOP_EMPTY_TOP=64;   // ED7-fix2: the play strip's top (drawLooper y0) — where the ↶-only transport sits when the song is empty
 let loopBarBottom=0;                       // нижний край холстовой полосы лупера, CSS-px (canvas px == CSS px)
-let tpOn=null, tpTop=-1;
-function syncLoopTransport(on,bottom){
+let tpOn=null, tpTop=-1, tpEmpty=null;
+/* empty (ED7-fix2): the song is empty but the history is not — the row stays, showing only ↶ ↷ (CSS .empty), so ✕ can always be undone */
+function syncLoopTransport(on,bottom,empty=false){
   loopBarBottom = on ? bottom : 0;
   if(on!==tpOn){ tpOn=on; loopTransportEl.classList.toggle('on',on); }
+  if(empty!==tpEmpty){ tpEmpty=empty; loopTransportEl.classList.toggle('empty',empty); }
   if(on && bottom!==tpTop){ tpTop=bottom; loopTransportEl.style.top=bottom+'px'; }
 }
  
@@ -585,7 +589,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
       ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(t('roll.refusedEmpty'), canvas.width/2, canvas.height/2); ctx.textBaseline='alphabetic'; ctx.textAlign='left';
       syncLoopTransport(true, ROLL_BAR_H+4); }
-    else syncLoopTransport(false,0);
+    else { const u=histCanUndo()&&!emptyTpOld; syncLoopTransport(u, LOOP_EMPTY_TOP, u); }   // ED7-fix2: nothing to show but something to undo — ↶ stays where the transport sits
     loopView=null; return; }
   const W=canvas.width, info=loopPos();
   /* ⛳ ЛИНЕЙНЫЙ ТАЙМЛАЙН (S3.3). Раньше полоса показывала ОДИН круг петли: total = такты×размер, и

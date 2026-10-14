@@ -216,7 +216,7 @@ const GLOBALS=new Set((
   /* браузер */ 'window self document navigator location history screen performance localStorage sessionStorage indexedDB IDBKeyRange crypto '+
   'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event '+
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
-  'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream AudioContext OfflineAudioContext webkitAudioContext '+
+  'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel '+
   /* область AudioWorklet (ks-worklet.js) */ 'AudioWorkletProcessor registerProcessor sampleRate currentTime currentFrame'
 ).split(/\s+/).filter(Boolean));

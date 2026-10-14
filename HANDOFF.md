@@ -51,7 +51,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   steps 71–74) · **ED5 volume bars**, **ED6 sections** (runner PASS; eye/ear steps 75, 76; the rename bug the user found is fixed — step 77)
   · **ED7 one history** and **OWN2 bend curve** (runner PASS; steps 78, 79) · **ED7-fix brace after ✕**, **BEND-CURVE glides and shapes**,
   **OWN1 track into another mode** (runner PASS; steps 80–82).
-  🔵 Volume VOL-0…VOL-4: VOL-5…VOL-7 explained to the user 2026-10-14, awaiting their decision.
+  ✅ Volume VOL-0…VOL-6 (VOL-5 and VOL-6 CLOSED 2026-10-14 by the user's test — they already work); VOL-7 deferred until after stage 3.
+  ✅ unverified: **ED7-fix2 undo after ✕** (runner PASS; step 83).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -89,10 +90,10 @@ a versioned format; `src/songs.js` becomes the first song file.
 **Bass and solo are one instrument**: they differ by voice builder and register; other differences are policies that belong in
 the TIMBRE FORMAT as data. Code MIRRORS, not merges, until the timbre format. Chords and drums are their own families.
 
-**Volume — remaining plan** (archive B, «ПЛАН „ГРОМКОСТЬ КАК ПАРАМЕТР“»): VOL-5 — the playing hand's horizontal always active
-(not only under a pinch); per-hand values of other per-note parameters on axes. VOL-6 — latch follower: volume and brightness
-reach a ringing latched chord AND are recorded as `chSet` (new event writer: quantise, order guard `chLastT`, count-in refusal,
-seam closing; rule #30 — `a.vol` always). VOL-7 — PER-NOTE pan (own plan; stereo stage in each voice); note pan ≠ track pan.
+**Volume** (archive B, «ПЛАН „ГРОМКОСТЬ КАК ПАРАМЕТР“»): VOL-5 and VOL-6 CLOSED (user's test 2026-10-14: the playing hand's axes already
+carry assigned parameters and follow its position like volume; a ringing latched chord already follows the hand after release —
+left–right volume, near–far timbre). VOL-7 — PER-NOTE pan (own plan; stereo stage in each voice; ≠ track pan) — after stage 3.
+**«Calm» mode** (BACKLOG §7.16; user's idea 2026-10-14): candidate for the FIRST RELEASE, after stage 3, before the big constructors.
 
 **Live reverb (LR1)**: accepted by ear; old wiring removed in AF1. More space only as an honest reverb PARAMETER (width/decorrelation,
 size, diffusion), the same live and frozen; never the old wiring back (BACKLOG §3.9b).
@@ -111,6 +112,8 @@ note keeps its offset; ONE undo for everything (mixer, names, row delete; ⤺ is
 **Earlier editor answers (2026-10-13/14; full: archive B):** paste keeps theremin `hold` · lessons/tutorial only as the LAST stage ·
 OWN3 deferred · the tonic-freeze plan proposes "key into the note index or the view" · ED6-1 "lengthen / shorten" edge notes · section
 edits act on a user brace · duplicates stay in their take · Volume bars are the default face.
+**User answers (2026-10-14, after BEND-CURVE/OWN1):** decisions accepted · OWN1 into modes of another size, curvature of per-note
+lanes — deferred · VOL-7 after stage 3 · VOL-5, VOL-6 closed (already work) · ✕ must stay undoable on an empty song (done, ED7-fix2).
 **User answers (2026-10-14, after ED7/OWN2):** (1) arming, mute and solo stay OUT of the undo history (listening switches, not edits) ·
 (2) ✕ then ↶ brings the brace back as before ✕ (done, ED7-fix) · (3) OWN2 accepted as built (first point fixed and not deletable; points
 can't pass neighbours or the note end; whole cents ±2400; ✚ + tap adds) · (4) BEND-CURVE asked: glide between points by default, shapes,
@@ -130,10 +133,10 @@ serves Scala `.kbm`): for non-12 tunings the tonic means "where 1/1 is" — any 
 reads "1/1 = G".
 
 ## Work order (user decision: "editor before the timbre builder")
-✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → **EDITOR ESSENTIALS** (window and mixer
-first; ED5 next) → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → **TONIC FREEZE plan** (NEXT; VOL-5…7 wait for the user's decision) →
-**VOL-5 → VOL-6 → VOL-7** → **FOUNDATION** (stable timbre ids (and user-mode ids), song format and timbre format — voice mode and
-Glide default are the first "timbre policies" —, songs as files: export/import) → **SAVING** (on the device + file export/import;
+✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → **TONIC FREEZE = stage 2** (NEXT; plan proposed 2026-10-14, archive B «TONIC FREEZE —
+PLAN», awaits the user's answers) → ✅ VOL-5, VOL-6 (closed) → **FOUNDATION = stage 3** (stable timbre ids (and user-mode ids), song format and timbre
+format — voice mode and Glide default are the first "timbre policies" —, songs as files: export/import) → candidate FIRST RELEASE:
+**«Calm» mode** (§7.16) → VOL-7 → **SAVING** (on the device + file export/import;
 does not wait for the server — same format and ids) → **AUTO-FREEZE A3–A6 (A7 if measured), MIXER per-track effects and meters,
 AUDIO EXPORT** (with the tuning attached as Scala) and **AUDIO TAKE** (after auto-freeze) → **MIDI CONTROLLER** → **TIMBRE BUILDER
 and USER MODES with Scala** → **SERVER** (accounts, sync, sharing timbres and modes, subscription, marketplace; a managed cloud
@@ -158,7 +161,7 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
   only modes with as many degrees as the track's; unison/theremin tie pairs untie all candidates of that beat (S6); dissolve
   and lead-segment detach re-articulate edges; overlapping polyphonic notes on one row — the hit takes the first.
 - One effect network per role: live play goes through the network the recording drives (bus params only). Reorder mid-take: render
-  keeps the earlier order (`reordered`). Effects added mid-take: ▲▼⊘ don't act. Latched chord with open fingers gets no updates (VOL-6).
+  keeps the earlier order (`reordered`). Effects added mid-take: ▲▼⊘ don't act. A ringing latched chord follows the hand (user-tested, VOL-6 closed).
 - One history (ED7): 300 steps; NOT steps — mute, solo, arm, the brace, tempo, tonic (✕'s step carries the brace and ⟳).
   The ED2 clipboard lives for the app session; captured bus automation is not copied.
 - Captured expression channels are written but NOT replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
@@ -183,14 +186,13 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
+### ED7-fix2 (2026-10-14) — undo after ✕ on an empty song; «Calm» mode recorded; tonic-freeze plan (full: archive B)
+- After ✕ the strip (with its ↶) vanished with the song. Now: a box «Song cleared — ↶ Undo» for 6 s (✕ button and looper hand, via
+  `hooks.cleared`), and the play transport stays with ONLY ↶ ↷ on an empty song while the history is not empty. Ctrl+Z unchanged.
+- Row «ED7-fix2 undo after clear» (real clicks; control: the pre-fix UI leaves no undo). Fix rounds 0. data PASS 40.9 s; P.quick PASS
+  67.6 s (42), UI checks PASS.
+- Docs: BACKLOG §7.16 «Calm» mode; VOL-5/VOL-6 closed; stage-2 plan with six user questions (archive B «TONIC FREEZE — PLAN»).
 ### ED7-fix + BEND-CURVE + OWN1 (2026-10-14) — brace after ✕, bend glides and shapes, track into another mode (full: archive B)
-- ED7-fix: the ✕ step carries the brace and ⟳ (`br`); ↶ of ✕ brings them back, ↷ clears them (row ED7 case 2b, control `noBrace`).
-- BEND-CURVE: a bend point's `sh`/`k` shape the segment into it; recorded points (no `sh`) step exactly as before; added / moved points
-  glide in and out. One ramp function `config.bendPlan` (live replay and render; glides = 10 ms sub-steps). Diamond handle in the middle of
-  each glide curves it; `╱`/`⌐` with a bend point selected = glide ↔ step. Bus lanes got the same curvature (`k`, `autCurvePoint`); per-note
-  lanes not yet. Chase, trim and section cut/insert split glides exactly (`bendSplit`).
-- OWN1: `#rollMode` — modes of the same tuning with as many degrees; the whole track moves by degree (`scales.mapDegrees`, ED4's rule).
-- Runner: `--limit-start M`, `--cdn-cache` (the network was too slow for the hand model; it was fetched in parallel ranges, MD5 = ETag).
-- Rows «BEND-CURVE glides and shapes» (20 cases), «OWN1 modes by degrees (sweep)» (50016), «OWN1 track into another mode» (16); ED7 now 56.
-  Fix rounds: Part 0 — 0; Part 1+2 — 1 (two probe expectations: material where pitches move; ↶ returns the previous curvature).
-  Final: data PASS 40.8 s (8 checks); P.quick PASS 60.4 s (41); P.all PASS 202.8 s (55); UI checks PASS.
+- ✕'s step carries the brace; bend points glide (diamond = curvature, ╱/⌐ = step), one `config.bendPlan` live and frozen; bus lanes
+  curved too; `#rollMode` moves a track by degrees into another mode of its tuning. Runner flags `--limit-start`, `--cdn-cache`.
+  Final: data PASS; P.quick 60.4 s (41); P.all 202.8 s (55); UI PASS; fix rounds 0 / 1.

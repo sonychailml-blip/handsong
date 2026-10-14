@@ -261,7 +261,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `aRef`, `tunedFrom`, instruments, `handFn`,
   `voiceMode`, split + `phoneHalves(W)` (the only `W/2`), registers, camera, editor/window state). Chain-owner key `chainKeyOf(role)`
   → `'role:ld'`, `fxChains`, `FX_VOL`, `chainOwners()`. ⛔ The key is OPAQUE — equality and indexing only, never parsed.
-- `src/hooks.js` — nullable callbacks for lower layers; `hooks.tutor(kind,payload)` is the tutorial's single channel; `hooks.af(kind)` —
+- `src/hooks.js` — nullable callbacks for lower layers; `hooks.tutor(kind,payload)` is the tutorial's single channel; `hooks.cleared()` — ✕ happened (ui: the undo toast, ED7-fix2); `hooks.af(kind)` —
   auto-freeze settle hints (recorder: take, undo, backing, rowDelete, editor, song; ui: panHold, pan); `hooks.afRow(layer)` — the window's
   freeze dot (both set by `frzqueue.js`).
 - `src/i18n.js` — `LANGS=['en','ru']`, `DICTS`, `t(key,params)` (dict → en → `params.def` → the key), `L(field)`, `store`,
@@ -758,6 +758,9 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   Song loads reset the history (`loadSong`, `P.seed`, `tutorClearLoop`); every P.all row starts with `histReset()`. ui: `histDo(±1)` behind
   every ↶/↷ (editor `#rollUndo/#rollRedo`, window `#songUndo/#songRedo`, play transport `#histUndo/#histRedo`) and Ctrl/⌘+Z,
   Ctrl/⌘+Shift+Z, Ctrl+Y (not in text fields); toast names the step (`hist.k.*`); an undo that removes the open track closes the editor.
+  ED7-fix2: ✕ leaves no strip (empty song), so `recorder.clearSong` → `hooks.cleared` → ui shows `#undoToast` «Song cleared — ↶ Undo»
+  (`UNDO_TOAST_MS` 6 s; acts only while ✕ is the newest step, `histTopLabel`), and `draw.drawLooper` keeps the play transport on an empty
+  song whenever `histCanUndo()` — class `.empty` shows only ↶ ↷ at `LOOP_EMPTY_TOP`. Probe control `ui.undoUiDbg(true)` (the pre-fix UI).
 - **Bend curve (OWN2):** with a theremin note selected, its curve points are handles (`draw.rollBendHandles`, snapshot `rollView.bend`, hit
   `'bendpt'`, `rollBendAt(px,py)` → cents from the attack pitch and beats from the note start, via `hzOfRow` — the inverse of `rowOfHz`).
   Drag: one axis per gesture (time or cents; the first point only cents), ghost dashed with «+35¢ · 1.25»; ✚ + tap inside the selected
@@ -984,7 +987,9 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   {skip:'level'}`) and a redo kept after a new step (`histDbg {keepFuture}`) must fail; the tripwire answers 'changed' after a direct write;
   300 steps kept. **OWN2 bend curve** (`P.checkBend`): move / clamp / first point / add / delete exactly as computed, refusals, one step
   each, undo/redo bit for bit; CONTROL: an in-place change survives ↶. ED7 (2b): ✕ then ↶ brings the brace and ⟳ back exactly, ↷ clears
-  them; CONTROL `histDbg {noBrace}` must leave the brace following.
+  them; CONTROL `histDbg {noBrace}` must leave the brace following. **ED7-fix2 undo after clear** (`P.checkUndoClear`, quick and all, DRAWN,
+  ≈ 6 s incl. re-freezing): the REAL ✕ button → toast with a visible Undo and the ↶-only transport (✕, ▶ hidden); toast Undo, transport ↶
+  and Ctrl+Z each bring the song back exactly; CONTROL `undoUiDbg(true)` (no toast, strip hidden) must leave no undo control.
 - **BEND-CURVE glides and shapes** (`P.checkBendCurve`, quick and all, deterministic, one short render): recorded curves schedule exactly
   (===) as before, chase entries too; hand points glide / curve ±0.6 / step through the editor (one step each, ↶/↷ bit for bit); the
   ramps applied by Web Audio itself (ConstantSource in an OfflineAudioContext) pass the curve within one sub-step's movement; the render
@@ -1074,7 +1079,8 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   tail, the render's opens empty.
 - **One TRACK network per role** (since AF5 the live network is the hands' alone, rule #31): unfrozen tracks of the SAME role share the
   role's track chain — the last writer wins among them (a frozen track has its own sound in its buffer). Per-track chains = BACKLOG.
-- **A latched chord with open fingers receives no updates** (per-note values only reach it on the next pinch) — VOL-6.
+- (VOL-6 CLOSED 2026-10-14: the user tested that a ringing latched chord follows the hand after release — left–right volume, near–far
+  timbre; the old limit «a latched chord with open fingers receives no updates» was wrong.)
 - **Several takes through one chain: last writer wins** (sorted `(t, tk)`; ties by higher take; a take governs only its roles' owners);
   network parameters, compositions and expression channels only.
 - **Randomness:** see "Audio engine — random draws"; nothing random is recorded; "the same performance" is the requirement.
@@ -1279,6 +1285,9 @@ verified. Full text of every step: archive, "How to verify a change".
     select a point → its diamond bends the reverb ramp the same way; frozen and live sound the same (`R.live(n)` vs `await R.aud(n)`).
 82. Track into another mode (OWN1), ear: open a C-major solo track, Mode → Dorian — E becomes E♭ and B becomes B♭ everywhere, rhythm and
     volumes unchanged; a C# (outside the mode) stays C# — it keeps its distance from C, the nearest degree below a tie; ↶ brings major back; a frozen track re-freezes by itself (dot).
+83. Undo after ✕ (ED7-fix2): with a few tracks, press ✕ — the strip disappears, a box «Song cleared — ↶ Undo» shows for ~6 s under the
+    top bar and a lone ↶ ↷ stays where the transport was; tap Undo in the box → everything is back; ✕ again, wait 6 s, tap the lone ↶ →
+    back; ✕ again, Ctrl+Z → back. With nothing recorded and an empty history, nothing extra is shown.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

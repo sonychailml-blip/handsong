@@ -6358,3 +6358,70 @@ same-tuning same-size mode × every index and register vs an absolute-step refer
 Runner: `--limit-start M` and `--cdn-cache` added (the CDN ran at ~300 B/s for the hand model; the model was fetched by 60 parallel range
 requests, MD5 15318430ea3851670fe9914116a9cfad = the server ETag). Fix rounds: Part 0 — 0; Parts 1–2 — 1 (probe expectations only).
 Final runner: data PASS 40.8 s (8 checks); `--quick --all --cdn-cache` PASS — P.quick 60.4 s (41 checks), P.all 202.8 s (55), UI checks PASS.
+
+### ✅ ED7-fix2 — UNDO AFTER ✕ ON AN EMPTY SONG; «CALM» MODE RECORDED; TONIC FREEZE PLAN (2026-10-14; runner PASS; step 83 not yet done by the user)
+User answers first (after BEND-CURVE/OWN1): decisions accepted; OWN1 into modes with another number of degrees — deferred (maybe never);
+curvature of per-note lanes — deferred; VOL-7 per-note pan — after stage 3; VOL-5 CLOSED (tested: the playing hand's axes already carry
+assigned parameters and follow its position like volume); VOL-6 CLOSED (tested: a ringing latched chord already follows the hand after
+release — left–right volume, near–far timbre). The old Known limit «a latched chord with open fingers receives no updates» was corrected.
+Bug: after ✕ the play strip (and the transport row with ↶) disappeared with the song — `draw.drawLooper` hid the transport whenever
+`!loop.on && !events.length`; the clear could only be undone by Ctrl+Z. Fix: (1) `recorder.clearSong` → `hooks.cleared` → ui
+`showUndoToast`: `#undoToast` «Song cleared — ↶ Undo» for `UNDO_TOAST_MS` 6 s, its button undoes only while ✕ is still the newest step
+(`histTopLabel()==='clear'`, re-checked in `updHistBtns`, hidden after any other step) — covers the ✕ button and the looper hand's clear;
+(2) the empty-song branch of `drawLooper` keeps the play transport while `histCanUndo()`, class `.empty` → CSS shows only ↶ ↷, at
+`LOOP_EMPTY_TOP` 64 (the strip's top). The editor and the window keep their own ↶. Positional callers: `syncLoopTransport(on, bottom,
+empty)` got an optional third argument — only the new empty-song call passes it (draw: window-empty, strip, editor calls unchanged).
+Probe «ED7-fix2 undo after clear» (`P.checkUndoClear`, DRAWN, quick and all): real clicks on #clrBtn, the toast button, #histUndo and a
+Ctrl+Z keydown; song compared exactly each time; CONTROL `ui.undoUiDbg(true)` (pre-fix UI) must leave no undo control; frozen tracks
+re-frozen at the end. Fix rounds 0. Runner: data PASS 40.9 s; `--quick --cdn-cache` PASS — P.quick 67.6 s (42 checks), UI checks PASS.
+Docs: BACKLOG §7.16 «Calm» mode (the user's idea, candidate for the first release after stage 3); HANDOFF work order.
+
+### TONIC FREEZE — PLAN (stage 2; proposed 2026-10-14, awaits the user's answers)
+**Today.** An event freezes its VIEW (mode, "tuned from", chord mode) but not the key: pitch = live `tonic` (+ `aRef`) through `baseF()`;
+fixedKey scales read `keyOf(s)` = live tonic − anchor. So changing the tonic transposes every recording (and makes frozen buffers stale;
+auto-freeze does not re-render them — `AF_REFREEZE_ON_RETUNE=false`; they play events). Readers of live `tonic`: scales 20, draw 14,
+render 10, recorder 6, ui 4, arrange 2 (labels, drone, pins, freeze signature).
+**Recommendation — the key goes INTO THE VIEW, for every scale (fixed tunings included), not into the note index.** The view becomes
+(mode, tunedFrom, chord mode, KEY); `scaleView` memoises one object per key; `baseF(s)`, `keyOf(s)`, `cFix(s)`, `tonicFreq(s)` read the key
+from the view they are given (live play: CUR() = the view with the live key). Why: (1) one rule for all tunings — a 12-semitone key cannot
+be an index shift in 19-TET, Partch, gamelan or Bohlen–Pierce; (2) the note format (`ti`, `oct`) stays as it is; (3) rule #7 already makes
+each event carry its view, so the key is frozen by the same mechanism, and the editor already groups and labels by view; (4) for fixed
+tunings both choices sound the same (the key picks where in the anchored grid the tonic sits — key colour preserved), so the simpler
+uniform one wins. **Tuning anchor «1/1 = G»:** the view's key is {note 0..11, cents}; 12 note names stay the main control, tunings not
+named by the 12 notes show «1/1 = G» and allow a cents nudge; a tuning file may declare its historical anchor (Partch G) offered as a
+one-tap «historical» choice — not the default (the default stays the current key, so nothing changes by itself).
+**Slices (in order):**
+- TF0 (S) — inventory + safety net: classify every live-`tonic` reader as LIVE (hands, palette, live drone, status) or RECORDED (event
+  pitch, editor rows and labels, chase, render pins, freeze signature); a probe that records the whole song's sound inputs (every
+  event's Hz via `evHz`, drone, labels) so the following slices can prove "nothing changed while the key is not touched".
+- TF1 (L) — the key in the view, invisibly: `scaleView(mode, tf, cm, key)`, `viewIdOf` with the key, events record `sc` with the key;
+  every pitch path reads the view's key. With the live key equal to every event's key, every probe sweep must be byte-for-byte unchanged.
+- TF2 (M) — the live tonic stops moving recordings: tonic change → only live owners retune; `softAllOff` no longer hands tracks over on a
+  tonic change; drone events follow their own view; freeze signature drops the tonic (field 5 keeps A4 and tempo). Probe: change the
+  tonic while frozen and unfrozen tracks play — both keep their pitches (render compare), live hands follow.
+- TF3 (S–M) — explicit TRANSPOSE: editor (track) and window (whole song) «−1 / +1 semitone» (12-note tunings) and «1/1» nudge for the
+  others, one history step each; fixed tunings change key colour like a real organ. Backings follow Q3.
+- TF4 (S) — auto-refreeze ON: `AF_REFREEZE_ON_RETUNE` true for A4 and tempo (tonic no longer stales anything); AF3 probe cases updated
+  (A4/tempo render after the 1.5 s settle; tonic → nothing).
+- TF5 (M) — tuning anchor: data field (`anchor.historical`), «1/1 = G» control with cents, F0 snapshot renewed for the declared field only.
+- TF6 (S) — docs, Known limits, ear steps.
+**Risks:** a missed live-`tonic` reader (recordings drifting or labels lying) — TF0's song fingerprint and the sweeps catch it; the view
+memo grows ×12 (tiny); routing — a key change mid-take (Q2); backings stop following the key unless regenerated (Q3); lessons that change
+the tonic (untouched until the last stage — check they still read right); saving later stores the key inside the view id (good for the
+song format).
+**User questions (plain words, recommended answer first):**
+- Q1. After the change, turning the key knob changes only what your hands play; recorded tracks stay in the key they were played in, and a
+  «Transpose» button moves them (with ↶). OK? — Recommended: yes (it is the earlier decision «the tonic is frozen in the event»).
+- Q2. If you change the key WHILE recording, should the notes after the change go to a NEW track (as changing the mode does today) or the
+  same one? — Recommended: a new track for now (simple and consistent); a key change inside one track can come later.
+- Q3. With a backing (Jam / Drums) playing, when you change the key — should the backing follow (be re-made in the new key) or stay? —
+  Recommended: follow; it is accompaniment, not a recording (one ↶ step, as loading a backing is).
+- Q4. Transpose a recorded track or the whole song by semitones (besides «by degrees», which exists)? In a historical temperament the key
+  colour changes, as on a real organ. — Recommended: yes, ±1 semitone buttons in the editor (track) and the window (song).
+- Q5. When you change A4 or the tempo, frozen tracks re-render by themselves in the background (the faint dot, ~1 s per track after you
+  stop moving the control); meanwhile they play live. OK? — Recommended: yes.
+- Q6. In unusual tunings (Partch, gamelan, Bohlen–Pierce, 19/31-TET) the key control reads «1/1 = G» with a cents nudge. Should Partch
+  start on its historical G (it would sound different from today) or keep today's key with «historical G» one tap away? — Recommended: keep
+  today's default; historical anchor one tap away.
+**Between stage 2 and stage 3:** nothing else is scheduled (VOL-5/VOL-6 closed, VOL-7 moved after stage 3). Candidates if a window
+opens: AF6 memory remainder (eviction, chunk paging), hand tracking off the main thread (after measuring latency), the promo video.

@@ -98,6 +98,8 @@
 <!-- Тост камеры: короткое сообщение при отказе переключения (нет второй камеры / нет доступа).
      Отдельный элемент, а не строка #status — её каждый кадр переписывает drawStatus. -->
 <div id="camMsg"></div>
+<!-- ED7-fix2: after ✕ — "Song cleared" with an Undo button inside, for several seconds (ui.showUndoToast) -->
+<div id="undoToast" role="status"><span data-i18n="hist.clearedToast">Song cleared</span><button id="undoToastBtn" data-i18n="hist.undoBtn">↶ Undo</button></div>
 
 <!-- Выбор подложки: крошечное меню под кнопкой 🎵. Открывается ТОЛЬКО с покоя (первый тап), дальше
      кнопка переключает варианты внутри выбранного пути одним тапом, как раньше. Долгий тап по 🎵 —

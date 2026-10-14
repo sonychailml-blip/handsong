@@ -2120,7 +2120,9 @@ function histRedo(){
 function clearSong(){
   if(recording) recStop();
   const tok=snapBegin('clear'); clearRec(); snapEnd(tok);
+  if(hooks.cleared) hooks.cleared();   // ED7-fix2: ui offers "Song cleared — Undo" (the ✕ button and the looper hand alike)
 }
+const histTopLabel=()=> hist.length ? histLabelOf(hist[hist.length-1]) : null;   // ED7-fix2: the newest step's label (the undo toast acts only while it is ✕)
 let editTake=0;   // сделанное · отменённое (ждёт ↷) · номер взятого для ВСТАВОК сессии
 const editCanUndo=()=>histCanUndo();   // ED7: the editor's ↶/↷ are the one history's
 const editCanRedo=()=>histCanRedo();
@@ -5923,7 +5925,7 @@ export {
   /* ED6 probe only: the forgetting plan (control), the song history reset, the tracks' edit versions kept and restored, the capture lanes as data */
   secDbg, songHistReset, laneVerKeep, takeFxDump,
   /* ED7: the one history — ↶/↷ everywhere, table steps (level / pan / name / order / master), ✕ as a step; probe: reset, length, hash, controls */
-  histUndo, histRedo, histCanUndo, histCanRedo, histLen, histReset, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg,
+  histUndo, histRedo, histCanUndo, histCanRedo, histLen, histReset, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg, histTopLabel,
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint,   // autCurvePoint — BEND-CURVE: curvature of a glide into a bus lane point. autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
