@@ -175,7 +175,7 @@
   #arrTitle{flex:1 1 auto; font-size:var(--fs-label); font-weight:600; white-space:nowrap; padding:0 4px;}
   /* AR2: поле имени дорожки — поверх заголовка строки окна (место и размер ставит ui). Тёмное, как окно; шрифт не мельче 16 px, иначе
      iOS приближает страницу при фокусе. Видимость — только атрибут hidden (display здесь не задаём). */
-  #laneNameIn{position:fixed; z-index:13; box-sizing:border-box; padding:4px 8px; font:600 16px system-ui;
+  #laneNameIn,#secNameIn{position:fixed; z-index:13; box-sizing:border-box; padding:4px 8px; font:600 16px system-ui;
     color:#fff; background:#1b1b2a; border:2px solid var(--accent); border-radius:6px; outline:none;}
   /* AR2: чип дорожки в редакторе — цветом РОЛИ дорожки (та же палитра, что у строки в окне); длинное имя — многоточием. */
   #rollTrack{border-color:var(--role,rgba(255,255,255,.3)); color:var(--role,inherit); font-weight:600;

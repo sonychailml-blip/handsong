@@ -669,6 +669,22 @@ export function modeSlotOfTi(ti, oct, s=CUR()){
   const d=m.j.get(j); if(d===undefined) return null;
   return { deg:d, oct: c ? oct+c : oct };
 }
+/* ED4: a pitch (tuning index, register) moved by n degrees of the view's mode. In the mode: degree + n, wrapping by the period into the
+   register. Out of the mode (user decision 5): from the NEAREST degree in tuning steps (a tie takes the lower one), keeping the same
+   offset. The top tonic counts as degree 0 of the next register; a result on the root one register above the last is written as that
+   top tonic (the editor's top row). → { ti, oct } (oct may leave the registers — the caller refuses) or null (no mode selection). */
+export function shiftDegrees(ti, oct, s, n){
+  if(typeof ti!=='number' || !s || !s.sel || !Number.isInteger(n)) return null;
+  const T=tuningOf(s), E=tSize(T), N=s.iv.length;
+  let j=ti-s.root, c=Math.floor(j/E); j-=E*c;
+  let best=0, dist=Infinity;
+  for(let d=0; d<=N; d++){ const x=Math.abs(j-(degK(s,d,T)-s.root)); if(x<dist){ dist=x; best=d; } }
+  const delta=j-(degK(s,best,T)-s.root); if(best===N){ best=0; c++; }
+  const D=best+n, deg=((D%N)+N)%N;
+  let k=degK(s,deg,T)-s.root+delta, r=oct+c+Math.floor(D/N);
+  const cc=Math.floor(k/E); k-=E*cc; r+=cc;
+  return (r===REG_N && k===0) ? { ti:s.root+E, oct:REG_N-1 } : { ti:s.root+k, oct:r };
+}
 export function chordFreqsAt(ti,oct, s=CUR(), sev=seventh, ty=null){ return chordNotesAt(ti,oct,s,sev,ty).map(n=>n.f); }   // T4c-1: без ступени
 /* Мелодия и бас: ступень → индекс строя тем же оборачиванием, что прежде (длина IVX = n+1, переполнение — в регистр). */
 export function leadFreq(deg,oct, s=CUR()){ const T=tuningOf(s), len=s.iv.length+1, a=modeAnchor(s);

@@ -75,6 +75,14 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   V8 heap usage incl. ArrayBuffer backing stores) and `window.__procMem()` (full GC, then the renderer processes' private MB and threads
   from the OS — native memory). `--leak` (RENDER-LEAK): 30 short renders of the smallest non-KS track must stay within 20 MB of the start;
   control: 30 more with `R.renderKsLazy(false)` must exceed it. Run it when a slice touches rendering or offline contexts.
+  Hygiene (runner fix, 2026-10-14): every exit path (end, failure, time limit, Ctrl+C, SIGTERM, uncaught error) closes the browser with a
+  bounded wait, then kills its process tree, then the server (Playwright's own signal handlers are off — the runner's take over); at start
+  it lists browsers and profile folders left by earlier sessions (found by Playwright's temp-profile path `playwright_chromiumdev_profile-…`);
+  `--kill-stale` kills / removes them, `--clean-only` does only that; `--selftest-exit sigint|error` fires one exit path 3 s after ▶ (a
+  cleanup test). UI checks with REAL input after the seed in every session (`--no-ui` skips): a section marker renamed by mouse double click,
+  CDP touch double tap and §✎ (control: the old rename opened inside the press must fail), and a bend point dragged with the mouse (one
+  step, cents up). Measured: a hard kill of node (a tool timeout) runs no handler, but Chrome exits by itself when its pipe closes — only
+  the profile folder is left.
 - **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; static import names vs exports with
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
@@ -91,8 +99,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   ≤ 0.75 s) — never `freeze`/❄/`R.aud`. On demand only: `P.checkRepeat({evidence:true})`, `P.orderCheck()`, `await P.freezeCost()`.
   `DRAWN_ROWS` (tracks reachable, AR1, MX1, MX2, AR2) read "not checked: tab hidden" when frames don't come.
 - **Probes — discipline:** a probe that changes mixer state, windows or engine options restores ALL of it in `finally`; `P.all()`
-  runs a **state guard** between rows (before/after snapshot of mixer tables, windows, live sound state and the render engine
-  copy's switches); probes work with the song loaded and WITHOUT the editor or hands open; they cover DERIVED paths (chase, ghost,
+  runs a **state guard** between rows (before/after snapshot of mixer tables, windows, live sound state, the render engine
+  copy's switches and a fingerprint of the song's events — payloads, marks and order); probes work with the song loaded and WITHOUT the editor or hands open; they cover DERIVED paths (chase, ghost,
   selection, dissolve, highlights); accepted only at zero. A thin song proves nothing: `await P.seed({replace:true})` builds a
   deterministic test song; `P.all()` refuses to call a thin song a pass (`material()`). `P.all()` is async — `await` it. While any
   `P.*` runs the auto-freeze watcher is paused (lock → `afPause('probe')`; a render in flight finishes first); a probe that needs the
@@ -628,6 +636,22 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   0 dB (dB = 40·log10 v); master = 0.8 × v². Levels/pans are tables keyed by track id (`laneLevel`/`laneLevelOf`/`setLaneLevel`,
   `lanePan`/`lanePanOf`/`setLanePan`, step 0.01); no undo (ED7). Level is NEVER baked into a frozen buffer (bus `frzGain`; never stales);
   PAN is baked (before the chain) and folded into `freezeSig` (`|p<pan>`).
+- **Sections (ED6, user decision ED6-1 "lengthen / shorten"):** markers `{id, beat, name}` in `recorder.secMarks` (bar lines; default
+  names A, B, …; `secAdd/secRename/secDelete`; cleared by `clearRec`), drawn in the window's sections band (`ARR_SEC_H` 20, snapshot
+  `loopView.sec`, hits `'sec'`/`'secband'`; tap a marker → `braceSet` on its section). `recorder.songEdit(kind, a, b)` — `'ins'` (b−a empty
+  beats at a), `'cut'` [a,b), `'dup'` [a,b) — on the bars under a USER brace, every track: `secPlan` → steps of the editor's kinds
+  (move/del/ins, `autmove/autins/autdel`, `lanetouch` per touched track) + `'brace'`, `'marks'`, `'lanelen'` (`secApply` inside
+  `editApply`), applied with `editApply`, NOT `editBatch` (its tie pass would untie pairs that move together; `secUntie` unties only a half
+  left alone), then `secCommit` (sort, `schedInvalidate`, `takeFxTouch`, `hooks.af('section')`). Rules: INSERT — from a on everything
+  moves (an off exactly at a stays; a note ringing across lengthens; a note closed by the next note's start exactly at a lengthens too);
+  CUT — what starts inside goes whole (tail included), a note from before ends at a or is L shorter (its last change inside applies from a,
+  its bend keeps the value it had at b; closed by a removed note → an own note-off at a, birth number before the moved notes), lane points
+  inside → the last per address at a, drone levels likewise; DUPLICATE — copies of what starts inside at +L (fresh k/v per note, the SAME
+  take so its copied lane points govern them, ties dropped, own note-off when the original was closed by its next note), an original
+  ringing past b ends at b (its copy carries the tail), then insert-at-b; lanes inside copied after b from the value at a; markers copied.
+  Brace (user) mapped, `to` as an end; backing `laneLen` reaching past a grows/shrinks. ONE step of the one history (ED7: `{kind:'batch',
+  label:'sec:'+kind, list}`; markers `{kind:'marks', label:'mark'|'rename'|'unmark'}`); `songUndo/songRedo/songCanUndo` are aliases. Refusals `songEditWhy`: 'rec', 'editor',
+  'range', 'empty'; ui refuses a brace still following the song. `autdel` remembers its index so ↶ puts the point back in place.
 - AR2: `laneName` (≤ 40 chars; empty → default «role · timbre», `laneDefName`), `laneRank`, `laneOrder()` (THE order everywhere; unplaced
   tracks after placed ones by layer number; the take's empty layers last), `moveLane(layer,to)`, `laneLook(layer)` → `{role, tim, drone}`
   memoised on `events.length`+`evGen`; `laneTitle`/`laneCol`; reorder handle (`ARR_HANDLE_W` 28) → `'move'`, `state.laneDrag`; a second
@@ -685,8 +709,9 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   `ROLL_PITCH_ROW_MAX` 30, else `ROLL_PITCH_ROW_H` 18 with scrolling; length handle only on a segment with its own ending event (`endEv`);
   gutter MEASURED (`rollGutterW`, capped at 42 %, cached on scale+tonic; enters snapshot `x0`).
 - **Undo/redo:** `editGuard` (editor open, track alive, not backing, transport PAUSED — pauses itself); every edit: absolute time, `tk`,
-  `compactEvents`, ONE `editCommit` (sort, `schedInvalidate`, `takeFxTouch`); `editPush` is the single history writer (a new edit drops the
-  redo branch); compound edits = `kind:'batch'` (sub-kinds move/ins/del/timbre/automation/lanetouch). ↶ ≠ ⤺. History dies with the session.
+  `compactEvents`, ONE `editCommit` (sort, `schedInvalidate`, `takeFxTouch`, `histSeal`); `editPush` → `histPush`, the single writer of the
+  ONE history (ED7; a new step drops the redo branch); compound edits = `kind:'batch'` (sub-kinds move/ins/del/timbre/automation/lanetouch).
+  Since ED7 the history is the song's: it survives closing the editor and switching tracks; ⤺ is one of its steps.
   Events at one beat keep their order through edits and undo: birth numbers (`evSeq`, filled in `editGuard`), the editor sorts by (beat,
   birth) — `songNotes` pairs a key's events by array order (a note-off and the next note-on often share a beat).
 - **Several notes at once (ED1):** `state.rollSelMany` (2+ defining events; one note stays `rollSel`, so every single-note path is
@@ -700,6 +725,47 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   track of the same role and view (`pasteBlock`/`editPasteWhy`: 'empty'|'role'|'view'); duplicate (`editDuplicateSel(evs, step)`, offset
   `dupOffset`: span to the snap step, past half a bar to whole bars). A paste obeys the birth law: session take, fresh k/v per note, ties
   dropped, `a.vol` always, the TARGET track's timbre/kit (one source per track), theremin `hold` kept; one `'ins'` entry via `editInsPush`.
+- **Quantise after recording (ED3):** `recorder.editQuantSel(evs, step, what, amt)` (`what` 'start'|'end'|'both', `amt` 0..1; ui ⌗ +
+  grid/what/strength selects, grid defaults to the snap step). A note's START moves the whole note (length kept); a boundary INSIDE a line
+  moves by itself — the neighbour's length follows, no detach (user decision 4); an END moves the own note-off (a note closed by the next
+  note's start keeps start and end); an edge that would leave a segment < `EDIT_MIN_LEN` stays; inner value events a moved edge passes over
+  are dropped; a note reaching into another of its key takes a fresh identity (E1); a shortened theremin trims its bend; drums with starts.
+  Notes one by one inside `editGroup` (one entry); pitches never change; nothing moved → false.
+- **Volume bars (ED5):** the Volume lane's second face (`state.rollVolBars`, default ON; `#rollVolBars` ▮▮/•— while the lane shows
+  Volume): one bar per NOTE at its start (`recorder.pnBars(layer)`, memoised on songNotes; a chord one bar, a drum hit one; a faint line
+  where the volume changes inside a note), snapshot `rollView.aut.bars`, hit `'autbar'`. A drag (value axis only — `rollAutDrive` with
+  `G.vOnly`; sideways = the fine zone) → `recorder.editVolSel(evs, d)`: every volume value of each whole note +d, clamped 0..1 (rule #30),
+  the note's own Volume ramp marks become steps (`'r'/'s'` → `'h'`, generated-for-Volume flags dropped), one `editBatch`; a note of a
+  multi-selection moves the whole selection by the same d. ⛳ Per NOTE, not per moment: two notes on one beat keep their own values (the
+  line, `pnPlan`, holds one value per beat — the probe's control). No point insert or ╱/⌐ on the bars face.
+- **ONE HISTORY (ED7, plan decision 6):** `recorder.hist`/`histFut`, `histPush` the single writer, newest `HIST_MAX` 300 kept (not trimmed
+  inside `editGroup`). Steps: the editor's own kinds (unchanged); ED6 sections and markers; `'tab'` {id, f:'level'|'pan'|'name', from, to}
+  (`histTab(layer, f, from, merge)` — ui calls it at the END of a fader / pan gesture, a double tap, a rename; wheel steps on one control
+  within `HIST_MERGE_MS` 800 merge); `'master'` (`histMaster`); `'ranks'` (`moveLaneStep`); `'snap'` — diff snapshot steps for a TAKE
+  (`takeBegin` before the take's lane and capture record exist: `onRec`, `seedTake`; ends in `setRecording(false)`), ⤺ (`'untake'`),
+  row delete (`'rowdel'`), backing load/removal (`'backing'`), ✕ (`clearSong` → `'clear'`; also the looper hand's clear): events removed /
+  added / changed (objects with beats and payloads), capture records by take, track ids with table rows (`laneRow`, `laneDrop` drops the
+  freeze), markers. One pending snapshot at a time: ⤺ / backing / row delete during a take fold into the take's step; `probeTake` and
+  `histOff` write none. NOT steps: mute, solo, arm, the brace, tempo, tonic. `histUndo`/`histRedo` (aliases `editUndo`/`editRedo`,
+  `songUndo`/`songRedo`): refused while recording, pause the transport, `histCommit` bumps the edit version of every track the step
+  touches (`histTouched` — events, lane points via their take, chains, snapshot events) → frozen ones go stale and re-freeze ('undo'
+  hint). ⛳ TRIPWIRE: each step keeps `h` = `histHash()` (order-free FNV over events: birth number, beat, payload object id, layer; capture
+  records and points; track tables; markers; master) of the state it left (`histSeal` in `editCommit`/`autCommit`/after table and snap
+  steps); ↶ refuses with 'changed' and drops the history when the state differs (a path writing outside the history — console, probe).
+  Song loads reset the history (`loadSong`, `P.seed`, `tutorClearLoop`); every P.all row starts with `histReset()`. ui: `histDo(±1)` behind
+  every ↶/↷ (editor `#rollUndo/#rollRedo`, window `#songUndo/#songRedo`, play transport `#histUndo/#histRedo`) and Ctrl/⌘+Z,
+  Ctrl/⌘+Shift+Z, Ctrl+Y (not in text fields); toast names the step (`hist.k.*`); an undo that removes the open track closes the editor.
+- **Bend curve (OWN2):** with a theremin note selected, its curve points are handles (`draw.rollBendHandles`, snapshot `rollView.bend`, hit
+  `'bendpt'`, `rollBendAt(px,py)` → cents from the attack pitch and beats from the note start, via `hzOfRow` — the inverse of `rowOfHz`).
+  Drag: one axis per gesture (time or cents; the first point only cents), ghost dashed with «+35¢ · 1.25»; ✚ + tap inside the selected
+  note's time adds a point; 🗑/⌫ deletes the selected point (not the first). `recorder.editBendPoint(ev, 'move'|'add'|'del', i, dt, c)`:
+  first point at dt 0, times strictly increasing (clamped between neighbours), inside the note, whole cents ±2400, a NEW payload and array,
+  one step (label 'bend'); `bendDbg` = the probe's control (in place). State `rollBendSel`, `rollBendDrag`.
+- **Transpose by degrees (ED4):** `recorder.editDegreeSel(evs, n)` / `editDegreeWhy` ('none'|'reg'|'fit'); ui −1°/+1°, Alt+↓/↑. Pitch
+  arithmetic is ONE function `scales.shiftDegrees(ti, oct, view, n)`: degree + n in the segment's frozen view, wrapping into the register;
+  an out-of-mode pitch moves from the NEAREST degree (tuning steps, a tie takes the lower) keeping its offset (user decision 5); the root one
+  register above the last is written as the top tonic. Pitch-only: every pitch-carrying event of each selected segment, glides whole, no
+  detach; chords through `segPitchPt` (untyped follow the rule, typed keep the type, T7 refuses); one `editBatch`. Beats never change.
 - **Timbre replacement (T5):** `#rollTimbre`, entries from `audio.timbresOf(role)`, `editSetTimbre` rewrites every note start and timbre-
   carrying `leadSet` (fresh payloads), one entry `kind:'timbre'`; a frozen track goes stale; effects unchanged; no picker on a drone layer.
   ⌫/Delete = `rollDeleteSel` (not in text fields, not on key repeat or with modifiers).
@@ -886,6 +952,18 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   overlapping readers at a seam ≤ 1 LSB = −90.3 dB).
 - **render repeatability** (`P.checkRepeat`): dry ≤ 1e-4, wet ≤ 2e-4 of peak (samples and energy); controls pan 0.5 (> 1e-2) and level 0.9
   (RMS ratio exactly 0.9 ± 0.001); solo notes without a map put the live solo chain into the signature.
+- **ED6 sections** (`P.checkSections`, quick and all, deterministic, no render): temporary material (a theremin take crossing a bar line,
+  three reverb lane points, three markers; the range chosen from the song: notes start inside and others ring across it); insert k bars
+  then cut them = the song again at four points — objects, order and payloads bit for bit, shifted beats to 1e-9 beat (a float shift and
+  its inverse are not exact: 0.9 + 4 − 4 = 0.9000000000000004); insert / cut / duplicate expectations computed in the probe; ↶/↷ exact;
+  touched tracks change their freeze signature, untouched keep it; the seed's frozen track goes stale / stays fresh; CONTROLS: a cut that
+  forgets lanes, bends, brace, markers or backing lengths (`recorder.secDbg`) must fail the identity check. Restores the tracks' edit
+  versions (`laneVerKeep`) so the frozen track is fresh again.
+- **ED7 one history** (`P.checkHistory`, quick and all, ≈ 5 s incl. one re-freeze): a frozen track touched by ↶ goes stale; a sequence of
+  16 steps of every kind, full ↶ and full ↷ compared EXACTLY with a snapshot after each step; CONTROLS: a step kind left out (`histDbg
+  {skip:'level'}`) and a redo kept after a new step (`histDbg {keepFuture}`) must fail; the tripwire answers 'changed' after a direct write;
+  300 steps kept. **OWN2 bend curve** (`P.checkBend`): move / clamp / first point / add / delete exactly as computed, refusals, one step
+  each, undo/redo bit for bit; CONTROL: an in-place change survives ↶.
 - **renders serialized** (`P.checkQueue`): two renders requested at once each equal alone (≤ 1e-4), the queue held both, song and queue
   untouched after.
 - **MX1** (`P.checkMixer`): RMS ratio at track gain 0.25 within 2 %; frozen bus target 0.25, stays fresh; owner gains; master gain 0.8·v².
@@ -982,6 +1060,10 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **AF5 cost:** ≈ 100 extra GainNodes on the live graph (24 chord routers × 2, built solo voices × 4, bass voices × 3, 4 heads + 4 outs) plus
   the track chains' effect instances when tracks play (a chord reverb ≈ 49 nodes). Synthetic bench on the (slow) dev desktop: routers ≈ +4 %
   of real time, one extra reverb network ≈ +1 %; a phone may be ≈ 4× that — not measured on a phone.
+- **The one history (ED7)** keeps 300 steps; mute/solo/arm, the brace, tempo and tonic are not steps; ✕ resets a user brace to following
+  (↶ of ✕ restores the song, not the brace). A note starting inside a cut is removed with its tail; a note closed by the next note's
+  start exactly on an insert point is lengthened (held through the new bars); insert-then-cut leaves beats equal to ~1e-15 beat, not bit
+  for bit (float). Copies of a duplicate belong to the source take (⤺ of that take removes them too).
 - **Tonic, A4 and tempo changes leave frozen tracks stale and playing events** (by decision, `AF_REFREEZE_ON_RETUNE` false) until the tonic
   freeze — through the live pools, with their polyphony ceilings.
 
@@ -1139,6 +1221,28 @@ verified. Full text of every step: archive, "How to verify a change".
 72. Copy/paste/duplicate (ED2), eye and ear: select notes, ⧉ (toast «Copied: n»), move the playhead, 📋 → the same notes at the playhead,
     selected, sounding the same; ⧉⁺ → a copy right after (a phrase longer than half a bar lands on the next bar line); paste into another
     track of the same role and mode → they take THAT track's timbre; into another role or mode → a toast says why; one ↶ per paste.
+73. Quantise (ED3), eye and ear: select a few loose notes, ⌗ with «1/4 · Starts · 100%» → their starts sit on the grid lines, lengths kept,
+    same pitches; «Ends» → only the ends move; 50% → halfway; a selected glide's middle pitch change moves onto the grid and the line stays one
+    gliding note; already on the grid → toast «Nothing moved»; one ↶ puts everything back.
+74. Transpose by degrees (ED4), eye and ear: select a melody, +1° → every note one degree of ITS mode higher (in major C→D, E→F), times
+    unchanged, a glide stays one gliding note; a note outside the mode (C# in C major) +1° → D#; −1° back; a chord moves to the next
+    degree's chord of the mode; past the top register → toast, nothing moves; Alt+↑/↓ do the same; one ↶ per press.
+75. Volume bars (ED5), eye and ear: open a track, lane → Volume — bars, one per note; drag one down → that note is quieter, the number
+    beside it; drag a bar of a selected group → all selected move together; on a drum track with kick and hat on one beat, lower the hat
+    only — the kick keeps its volume; •— shows the line again; one ↶ per drag.
+76. Sections (ED6), eye and ear, arrangement window: tap the sections band at bar 3 and bar 5 — markers A and B; double-tap A → rename
+    it; tap A → the brace covers bars 3–4; ✂ → bars 3–4 are gone in every track, what followed plays right after bar 2, a held chord
+    from bar 2 stops or rings on as before, frozen tracks re-freeze by themselves (dots); ↶ → all back; ⧉ → bars 3–4 play twice; ＋▯ → two
+    silent bars before bar 3 (a chord ringing across keeps ringing through them); ↶/↷ after each.
+77. Section rename (ED6 fix), mouse and finger: an empty sections strip says «+ section — tap here…»; tap it → marker A; double-click /
+    double-tap the name → the field opens and stays (type, Enter); or tap the marker once and press §✎.
+78. One undo (ED7): record a take, move a note in the editor, close it, lower a track's fader, rename a track, cut bars in the window,
+    press ⤺ — then ↶ (play screen, window or editor, or Ctrl+Z) seven times: each step comes back in reverse order with a toast naming
+    it, the take last; ↷ (Ctrl+Shift+Z) replays them; a new edit after ↶ greys ↷; ✕ clear then ↶ → the whole song is back; a frozen
+    track touched by ↶ re-freezes by itself (its dot in the window).
+79. Bend curve (OWN2), eye and ear: select a theremin note — white dots on its curve; drag one up → it bends higher (dashed ghost,
+    «+35¢ · 1.25»), sideways → it moves in time but not past its neighbours; ✚ then tap inside the note → a new point; 🗑 → the selected
+    point goes (the first one stays); each one ↶; play it — the replay follows the new curve.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

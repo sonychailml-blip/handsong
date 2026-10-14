@@ -121,6 +121,10 @@
        откуда начинается запись. Кнопка границ не переопределяет. -->
   <button id="rgnBtn" data-i18n-title="transport.regionTitle" title="Повторять такты под скобой">⟳</button>
   <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Отменить последний дубль">⤺</button>
+  <!-- ED7: ↶ / ↷ of the ONE history (every step: takes, ⤺, edits, mixer, names, order, sections, row delete, ✕) — the same pair as in the
+       editor and the window; Ctrl/⌘+Z, Ctrl/⌘+Shift+Z. Shown on the play screen only (the editor and the window have their own pair). -->
+  <button id="histUndo" data-i18n-title="hist.undoTitle" title="Undo">↶</button>
+  <button id="histRedo" data-i18n-title="hist.redoTitle" title="Redo">↷</button>
   <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить всю песню">✕</button>
   <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
   <!-- ✎ (AR1): открывает ОКНО АРАНЖИРОВКИ — все дорожки; тап по строке там открывает РЕДАКТОР ДОРОЖКИ (пиано-ролл, S5.0). (Прежде ✎ открывал вооружённую дорожку, иначе первую.) Отказ — при
@@ -140,10 +144,21 @@
   <button id="arrZoomOut" data-i18n-title="arr.zoomOutTitle" title="Zoom out">−</button>
   <button id="arrZoomIn" data-i18n-title="arr.zoomInTitle" title="Zoom in">+</button>
   <button id="arrFit" data-i18n-title="arr.fitTitle" title="Whole song">⤢</button>
+  <!-- ED6: SECTIONS — act on the bars under the brace, in every track: insert as many empty bars before it as it is long, cut them,
+       duplicate them right after; remove the selected marker; ↶/↷ — the song history (section edits and marker changes). Titles name the bars (ui). -->
+  <button id="secIns" title="Insert empty bars">＋▯</button>
+  <button id="secCut" title="Cut bars">✂</button>
+  <button id="secDup" title="Duplicate bars">⧉</button>
+  <button id="secRen" data-i18n-title="sec.renTitle" title="Rename the section">§✎</button>
+  <button id="secDel" data-i18n-title="sec.delTitle" title="Remove the section marker">§✕</button>
+  <button id="songUndo" data-i18n-title="sec.undoTitle" title="Undo">↶</button>
+  <button id="songRedo" data-i18n-title="sec.redoTitle" title="Redo">↷</button>
 </div>
 <!-- AR2: ПОЛЕ ИМЕНИ ДОРОЖКИ — двойной тап по имени в строке окна; ui ставит его поверх заголовка строки (position:fixed). Enter или уход
      фокуса — оставить, Esc — отмена, пустое — снова «роль · тембр». Подсказку (title) и заготовку (placeholder) ставит ui. -->
 <input id="laneNameIn" type="text" maxlength="40" autocomplete="off" spellcheck="false" enterkeyhint="done" hidden>
+<!-- ED6: the section name field — a double tap on a marker in the window's sections band (ui places it over the marker). -->
+<input id="secNameIn" type="text" maxlength="24" autocomplete="off" spellcheck="false" enterkeyhint="done" hidden>
 
 <!-- ================= РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (S5.0) =================
      ПАНЕЛЬ — то, у чего НЕТ временнóй геометрии: закрыть, дорожка, зум. Сама сетка живёт на
@@ -171,6 +186,14 @@
   <button id="rollCopy" data-i18n-title="roll.copyTitle" title="Копировать выбранные ноты">⧉</button>
   <button id="rollPaste" data-i18n-title="roll.pasteTitle" title="Вставить у бегунка">📋</button>
   <button id="rollDup" data-i18n-title="roll.dupTitle" title="Повторить выбранное следом">⧉⁺</button>
+  <!-- ED3: quantise the selection after recording — ⌗ applies; beside it the grid (beats), what moves (starts / ends / both) and the strength. -->
+  <button id="rollQuant" data-i18n-title="roll.quantTitle" title="Квантовать выбранные ноты">⌗</button>
+  <select id="rollQGrid" data-i18n-title="roll.qGridTitle" title="Сетка квантизации"></select>
+  <select id="rollQWhat" data-i18n-title="roll.qWhatTitle" title="Что двигать"></select>
+  <select id="rollQAmt" data-i18n-title="roll.qAmtTitle" title="Сила квантизации"></select>
+  <!-- ED4: transpose the selection one degree of its mode down / up (an out-of-mode note keeps its offset); Alt+↓ / Alt+↑. -->
+  <button id="rollDegDn" data-i18n-title="roll.degDnTitle" title="На ступень ниже">−1°</button>
+  <button id="rollDegUp" data-i18n-title="roll.degUpTitle" title="На ступень выше">+1°</button>
   <!-- ↶/↷ — отмена и ВОЗВРАТ ПРАВКИ (S5.3). Обе гаснут, когда делать нечего: мёртвая кнопка должна
        выглядеть мёртвой, а не молча не работать. -->
   <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку">↶</button>
@@ -193,6 +216,8 @@
        жест на полосе: тап по полосе уже значит «выбрать», «вставить» и «снять выбор», а тянуть — «перенести». Видна, пока полоса
        открыта; живая — когда выбрана точка. Значок показывает ТЕКУЩУЮ форму, тап её меняет. -->
   <button id="rollShape" data-i18n-title="aut.shapeTitle" title="Форма отрезка к точке" hidden>╱</button>
+  <!-- ED5: the Volume lane's face — bars (one per note, drag a bar up/down) or the line of points. Shown only while the lane shows Volume. -->
+  <button id="rollVolBars" data-i18n-title="aut.barsTitle" title="Громкость: столбики нот или линия" hidden>▮▮</button>
   <button id="rollZoomOut" data-i18n-title="roll.zoomOutTitle" title="Отдалить">−</button>
   <button id="rollZoomIn" data-i18n-title="roll.zoomInTitle" title="Приблизить">+</button>
 </div>

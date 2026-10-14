@@ -760,5 +760,16 @@ export let rollAut=null, rollAutSel=null, rollAutDrag=null;
 export const setRollAut=v=>{ rollAut=v||null; };
 export const setRollAutSel=v=>{ rollAutSel=v||null; };
 export const setRollAutDrag=v=>{ rollAutDrag=v||null; };
+/* ED5: the Volume address drawn as BARS — one per note, height = its volume (true, the default) — or as the line of points (false).
+   A view choice only; both faces edit the same field (a.vol). */
+/* ED6: the selected section marker of the arrangement window (its id) or null; ui writes, draw outlines it. */
+/* OWN2: the selected bend point (its index in the selected theremin note's curve) or null, and the ghost of a dragged one {ev, i, dt, c}. */
+export let rollBendSel=null, rollBendDrag=null;
+export const setRollBendSel=v=>{ rollBendSel= v==null ? null : v|0; };
+export const setRollBendDrag=v=>{ rollBendDrag=v||null; };
+export let secSel=null;
+export const setSecSel=v=>{ secSel= v==null ? null : v; };
+export let rollVolBars=true;
+export const setRollVolBars=v=>{ rollVolBars=!!v; };
 export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };

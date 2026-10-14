@@ -191,3 +191,24 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `index.html`: `#rollPick`, `#rollCopy`, `#rollPaste`, `#rollDup`
 - `src/i18n.js`: `roll.pickTitle`, `roll.groupNo`, `roll.groupOut`, `roll.copyTitle`, `roll.pasteTitle`, `roll.dupTitle`, `roll.copied`, `roll.pasteEmpty`, `roll.pasteRole`, `roll.pasteView`
 - `src/scaleprobe.js`: `checkSelect` (row «ED1 several notes at once»), `checkPaste` (row «ED2 copy, paste, duplicate»)
+
+## Added at ED5 / ED6 (and the runner hygiene)
+- `src/recorder.js`: ED5 `pnBars`, `editVolSel`; ED6 `secMarks`, `secSeq`, `songHist`, `songFuture`, `secCopy`, `sections`, `secIns`, `secCut`, `isOffFn`, `songPrint`, `printSame`, `secLaneVal`, `secPlan`, `secApply`, `secCommit`, `secUntie`, `songEditWhy`, `songEdit`, `secName`, `secPush`, `secAdd`, `secRename`, `secDelete`, `songCanUndo`, `songCanRedo`, `songUndo`, `songRedo`, `songHistReset`, `braceSet`; probe only `secDbg` / `secForget`, `laneVerKeep`, `takeFxDump`; step kinds `'brace'`, `'marks'`, `'lanelen'`; `autdel` steps remember `at`
+- `src/state.js`: `rollVolBars`, `setRollVolBars`, `secSel`, `setSecSel`
+- `src/draw.js`: `drawVolBars`, `ARR_SEC_H`; snapshots `rollView.aut.bars`, `loopView.sec {y0, y1, marks}`, `arrGeom().sec`; hits `'autbar'`, `'sec'`, `'secband'`; `rollAutDrive` reads `G.vOnly`
+- `src/ui.js`: `volBarsOn`, `rollVolBarsBtn`, `rollGrab.bar`; `updSecBtns`, `secOp`, `songStep`, `secTapAt`, `secBandTap`, `openSecRename`, `closeSecRename`, `barNo`, `secInsBtn`, `secCutBtn`, `secDupBtn`, `secDelBtn`, `songUndoBtn`, `songRedoBtn`, `secNameIn`
+- `index.html`: `#rollVolBars`, `#secIns`, `#secCut`, `#secDup`, `#secDel`, `#songUndo`, `#songRedo`, `#secNameIn`
+- `src/i18n.js`: `aut.bars`, `aut.barsTitle`; `sec.insTitle`, `sec.cutTitle`, `sec.dupTitle`, `sec.delTitle`, `sec.undoTitle`, `sec.redoTitle`, `sec.didIns`, `sec.didCut`, `sec.didDup`, `sec.stepDone`, `sec.changed`, `sec.needBrace`, `sec.noRec`, `sec.noEmpty`, `sec.nothing`, `sec.added`, `sec.removed`, `sec.renameTitle`
+- `src/scaleprobe.js`: `checkVolBars` (row «ED5 volume bars»), `checkSections` (row «ED6 sections»)
+- `tools/probe-browser.mjs`: `PROFILE_TAG`, `procList`, `runnerBrowsers`, `killTree`, `rmProfile`, `staleScan`, `LIVE`, `closeBrowser`, `closeAll`, `bail`; flags `--kill-stale`, `--clean-only`, `--selftest-exit sigint|error`
+
+## Added at ED6-fix / ED7 / OWN2
+- `src/recorder.js`: ED7 `HIST_MAX`, `HIST_MERGE_MS`, `hist`, `histFut`, `histOff`, `snapPend`, `takeTok`, `histGroupDepth`, `histDbg`, `histCanUndo`, `histCanRedo`, `histLen`, `histReset`, `histLabelOf`, `histPush`, `payId`, `pidOf`, `strHash`, `histHash`, `takeBegin`, `histSeal`, `laneRow`, `laneRowSet`, `laneDrop`, `snapState`, `snapBegin`, `snapEnd`, `snapApply`, `histTab`, `histMaster`, `laneNameStep`, `moveLaneStep`, `histApplyX`, `histTouched`, `histCommit`, `histUndo`, `histRedo`, `clearSong`, `deleteLaneDo`, `onUndoDo`, `loadArrangementDo`, `clearJamDo`; step kinds `'snap'`, `'tab'`, `'master'`, `'ranks'`; OWN2 `BEND_C_MAX`, `BEND_EPS`, `editBendPoint`, `bendDbg`
+- `src/state.js`: `rollBendSel`, `setRollBendSel`, `rollBendDrag`, `setRollBendDrag`
+- `src/draw.js`: `bendRowsOf`, `hzOfRow`, `rollBendAt`, `rollBendProbe`, `rollBendHandles`; snapshot `rollView.bend`; hit `'bendpt'`
+- `src/ui.js`: ED6-fix `secRenBtn`, `secRenPend`, `secRenT`, `secRenDbg`, `SEC_BLUR_MS`, `arrApi.secRenameDbg`; ED7 `levelStep`, `HIST_KEY`, `histKeyOf`, `histUndoBtn`, `histRedoBtn`, `updHistBtns`, `afterHist`, `histDo`; OWN2 `rollGrab.bend`, `rollPan.bendAdd`
+- `index.html`: `#secRen`, `#histUndo`, `#histRedo`
+- `src/i18n.js`: `sec.renTitle`, `sec.hint`, `hist.*` (undoTitle, redoTitle, undone, redone, noUndo, noRedo, noRec, changed, `hist.k.*`), `roll.bendAdded`, `roll.bendFirst`
+- `src/scaleprobe.js`: `checkHistory` (row «ED7 one history»), `checkBend` (row «OWN2 bend curve»)
+- `tools/probe-browser.mjs`: `uiSecRename`, `uiBendDrag`; flag `--no-ui`
+- Stale since ED7: `songHist`, `songFuture`, `songPrint`, `printSame` (recorder; ED6's song history merged into the one history); `editHist`, `editFuture` (renamed `hist`, `histFut`)

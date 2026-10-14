@@ -64,7 +64,7 @@
    ⛔ Ничего не сохраняет и не играет. ⚠️ T1 на время прогона ПЕРЕСТАВЛЯЕТ живые тонику и эталон A4 (через их сеттеры — иначе их не
    перебрать) и ВОЗВРАЩАЕТ их в finally; прогон синхронный, поэтому ни кадр, ни планировщик между ними не вклиниваются. Звучащие
    голоса частоту сами не перечитывают — их не задевает. */
-import { SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
+import { shiftDegrees, SCALES as SCALES_ALL, TUNINGS as TUNINGS_ALL, scaleView, chordFams, chordUnit, droneDegree, tuningIndexOf, leadFreqTi, bassFreqTi, chordNotesAt, REG_N, modeSlotOfTi, viewIdOf, chordLabel, chordNotesStr,
          leadFreq, bassFreq, chordNotes, chordRowFreq, tonicFreq, centsOf, ruleChordSteps,
          CUR, IVX, NOTE_NAMES, stepName, qual, SEV, ROMAN, fifthStep, periodOf, baseF, keyOf, cFix, chordBuildOf, chordTypeFits, chordPitchHz, pitchHz, chordModeOf, CHORD_FAM_SETS as CFS_ALL, TRADITIONS, GRP, menuOf, scaleById, regWord, rootName, range, droneNonOct, chordRowFreqAt, regWordFull, rowLabel, OCT_ROMAN, tuningOf, name24, supportsProgressions, backingRhythmOf, tuningStatus, degCentsExact, DRONE_TOL, setDroneNonOct, scaleData, registerRecord, unregisterRecord, chordModeName, chordModeHint, viewOfId, resolveScaleId, applyScaleId, namingOf, chordAtRoot } from './scales.js';   // F8: что звучит на корне   // F7: псевдонимы ладов   // F0: снимок «строи файлами»   // T7: как строятся аккорды строя, тип целиком в строе, высота строя в регистре аккордов   // T4c-2: последняя строка — то, что читают ЗАМОРОЖЕННЫЕ ОПОРЫ (ниже)
 import { fx as stateFx, FX_VOL, trackChainKeyOf, fxChainOf, tonic, aRef, setTonic, setARef, scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chordModeSel, setChordMode, setChordModeSel, laneRow0, setLaneRow0, arrOpen, arrFace, rollOpen, rollBeat0, rollSpan,
@@ -87,9 +87,9 @@ import { events, evHz, evReg, segChordNotes, probeTake, backingEvent, songSegs, 
          laneAudible, toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, editLayer,
          laneLevelOf, setLaneLevel, frzBusGain, lanePanOf, setLanePan, autChainOf,
          laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep,
-         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer, setLiveIsolation, fxPlayDriving, autPoints, autMovePoint, autAddPoint, autDeletePoint, regionOn, seekTo, setLiveLeakDbg, WchOn, WchOff, toggleArm, editMoveSel, editDeleteSel, editCanUndo, editCopySel, editPaste, editDuplicateSel, editSetTimbre } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
-import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
-export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour } from './probedata.js';
+         unfreezeLayer, laneLenOf, frozenInfo, laneHasChain, frzBytesTotal, songPinChains, setLoopBpm, editInsertHit, captureInfoOf, laneIdOf, armedLayer, setLiveIsolation, fxPlayDriving, autPoints, autMovePoint, autAddPoint, autDeletePoint, regionOn, seekTo, setLiveLeakDbg, WchOn, WchOff, toggleArm, editMoveSel, editDeleteSel, editCanUndo, editCopySel, editPaste, editDuplicateSel, editSetTimbre, editHistPeek, editRevert, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, autAddrs, sections, secAdd, songEdit, songEditWhy, songUndo, songRedo, songCanUndo, secDbg, songHistReset, laneVerKeep, takeFxDump, secDelete, histReset, histLen, histUndo, histRedo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg, onUndo, clearJam, secRename, editBendPoint, bendDbg } from './recorder.js';   // AF1: P.checkFreezeQueue / P.freezeCost   // AR2: имя, порядок показа, перестановка, снимок таблиц (P.checkTrackLook)   // MX1   // P.checkTracks   // S4: правка соло — P.seed (ч. 9) и P.checkSoloEdit   // T4c-2: песенная строка (P.checkSong) — цена, реестр, подсветка, сегменты, догонялка, распад
+import { isUserId, SCALES, TUNINGS, CHORD_FAM_SETS, userCount, tagOf, isTert, legacyChordLabel, legacyChordNotesStr, legacyChordNotesRef, preF3RegWord, preF3RegWordFull, preF3RootName, preF3StepName, preF3RowLabel, preF3ChordLabel, preF3ChordNotesStr, preF3NoteLbl, preF3AxisLbl, preF4Status, PRE_T7_SETS, preT7ChordNotesAt, preT7ChordNotes, preT7ChordUnit, legacyLeadFreq, legacyBassFreq, legacyChordNotes, check, checkData, A4_SET, PRINT_MAX, OLD, allViews, sweep, checkPitch, checkView, drone, checkUntyped, checkStack, canon, snapViews, checkBehaviour, KEEP_MAX, checkDegrees as checkDegreesData } from './probedata.js';   // слайс «быстрые пробы»: пробы данных и их опоры — в probedata.js (грузится и в node)
+export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour, checkDegrees as checkDegreesData } from './probedata.js';
 /* ⛳ F6: ПРОБЫ — ПО ВСТРОЕННЫМ ЛАДАМ. Файлы пользователя (id «u.…», userfiles.js) в прогоны и снимок F0 не входят: их нет ни в
    замороженных опорах, ни в снимке, и знать о них сверке нечего. Реестры ниже — живые таблицы scales без записей пользователя (снимок
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
@@ -428,6 +428,13 @@ const ALL_RUNS=[
   ['S4 solo editing',    ()=>checkSoloEdit(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED1 several notes at once',()=>checkSelect(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['ED2 copy, paste, duplicate',()=>checkPaste(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['ED3 quantise after recording',()=>checkQuant(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['ED4 transpose by degrees',()=>checkDegrees(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['ED4 degrees (sweep)',()=>checkDegreesData(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['ED5 volume bars',()=>checkVolBars(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['ED6 sections',()=>checkSections(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['ED7 one history',()=>checkHistory(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
+  ['OWN2 bend curve',()=>checkBend(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['tracks: every one reachable',()=>checkTracks(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['AR1 arrangement window',()=>checkArrange(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
   ['MX1 track level and master',()=>checkMixer(), r=>({ cases:r.cases, song:r.song, diff:r.total, list:r.differences })],
@@ -456,7 +463,7 @@ const ALL_RUNS=[
    tools/probe-data.mjs — или они читают оси редактора через draw) и прокрутка всех дорожек кадрами. P.all() — полный барьер, в нём всё.
    DRAWN_ROWS — строки, читающие НАРИСОВАННОЕ окно (ждут кадров): не пришёл хоть один кадр (вкладка скрыта) — строка «not checked: tab
    hidden», не FAIL и не pass; итог просит повторить при видимой вкладке. */
-const SLOW_ROWS=new Set(['T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
+const SLOW_ROWS=new Set(['ED4 degrees (sweep)','T1 pitch','T2 view','T4b1 sound (sweep)','T4b3 editor rows (sweep)','T4b4 highlights (sweep)','T5 out-of-mode pitches (sweep)',
   'T6b untyped chords (sweep)','tracks: every one reachable','F3 naming as data','F0 scale data snapshot',
   'LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback']);   // AF2: ≈ 25–30 с живого съёма   // LR1: ≈ 8–10 с (живой съём в реальном времени + три полных рендера) — только в P.all
 const DRAWN_ROWS=new Set(['tracks: every one reachable','AR1 arrangement window','MX1 track level and master','MX2 track pan','AR2 track names, colours, order']);
@@ -466,6 +473,15 @@ for(const n of [...SLOW_ROWS,...DRAWN_ROWS]) if(!ALL_RUNS.some(r=>r[0]===n)) con
    КАЖДОЙ строки: уровень, панорама, M и S каждой дорожки; уровень мастера; окно аранжировки, его лицо, редактор; переключатели КОПИИ
    ДВИЖКА рендера (render.copyState — уровень и панорама по ключу, раскладчик, семя, отладка, ключ удара, величины соло-ноты). Строка, после
    которой снимок иной, получает расхождение «state guard: left changed …» с полем и значениями до/после. Вызывайте как прежде: await P.all(). */
+/* Part 0 (ED3): a fingerprint of the song's events in array order — beat, layer, kind, take, payload, view. A row that leaves an event
+   changed (a mark, a payload, the order at one beat) is named by the guard right after it, not by a later row it happens to break. */
+function songPrint(){
+  let h=0x811c9dc5;
+  const mix=str=>{ for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,0x01000193); } };
+  for(const e of events) mix(`${e.t}|${e.layer}|${e.fn}|${e.tk}|${e.jam?1:0}|${e.sc?viewIdOf(e.sc):''}|${e.sev?1:0}|${JSON.stringify(e.a)}
+`);
+  return `${events.length} events #${(h>>>0).toString(16)}`;
+}
 async function stateSig(R){
   const Ls=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
   let copy='—'; try{ if(R) copy=JSON.stringify(await R.copyState()); }catch(e){ copy='copy state unreadable: '+(e&&e.message); }
@@ -482,7 +498,8 @@ async function stateSig(R){
            'live timbres and voice modes': [leadIdx,chIdx,bassIdx,drumKitIdx].join(',')+' '+JSON.stringify(voiceMode),
            'tuning view': [scaleId,tunedFrom,JSON.stringify(chordModeSel),seventh].join(','),
            'tonic / A4 / tempo / metre': [tonic,aRef,loop.bpm,loop.metre].join(','),
-           'transport': [loop.on,recording].join(',') };
+           'transport': [loop.on,recording].join(','),
+           'song events': songPrint() };
 }
 export async function all(opt={}){   // F0: async — строка снимка читает tools/scales.before.json (fetch); звать await P.all()
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
@@ -496,6 +513,7 @@ export async function all(opt={}){   // F0: async — строка снимка 
   try{
   for(const [name,run,read] of ALL_RUNS){
     if(opt.quick && SLOW_ROWS.has(name)) continue;
+    histReset();   // ED7: every row starts with an empty history (probes write the song directly; the tripwire would refuse a stale step)
     const g0=await stateSig(RR), st0=frameStalls;
     const t0=performance.now(); let row; MEAS=[];
     if(!opt.verbose){ console.log=console.warn=console.table=console.info=mute; }
@@ -530,7 +548,7 @@ export async function all(opt={}){   // F0: async — строка снимка 
   if(!M.ok) console.warn(`[scaleprobe all] song: not enough material — missing ${M.missing.join('; ')} (run await P.seed({replace:true}) for a complete test song)`);
   if(noSnap) console.log('[scaleprobe all] scale-data snapshot: no tools/scales.before.json yet — P.dumpScales() makes it (F0 «tunings as files»)');
   console.log(nGuard ? `[scaleprobe all] state guard: ${nGuard} row(s) left the mixer, the windows, the live sound state or the render engine copy changed (see the lists above)`
-                     : '[scaleprobe all] state guard: no row left the mixer, the windows, the live sound state or the render engine copy changed');
+                     : '[scaleprobe all] state guard: no row left the mixer, the windows, the live sound state, the song events or the render engine copy changed');
   if(frameStalls>stall0) console.warn(`[scaleprobe all] ${frameStalls-stall0} animation frame(s) never came (tab hidden?) — ${nHidden} row(s) that read the drawn window are marked «${HIDDEN}»; rerun with the tab visible`);
   const pass=nDiff===0&&M.ok&&!nHidden, sec=((performance.now()-T00)/1000).toFixed(1);
   console.log(`[scaleprobe all] ${title}: ${pass ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences${nHidden?`, ${nHidden} not checked (tab hidden — rerun with the tab visible)`:''}, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views) · ${sec} s`);
@@ -1195,6 +1213,713 @@ export function checkPaste(){
   bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED2] '+m));
   if(!nBad) console.log('[scaleprobe ED2] pasted and duplicated notes sound exactly like their sources shifted, are one fresh take with fresh keys, no ties and a volume on every start; another track keeps its own timbre; another role refuses; undo and redo round-trip bit for bit and in order');
   return { cases, song, total:nBad, differences:bad };
+}
+/* ═══ ED3/ED4 probe kit — one round trip of an editor edit, shared by P.checkQuant and P.checkDegrees ═══
+   rt(label, ly, op, o): o.prep() — a set-up edit (its own history entry, undone at the end); op() → { r, check?, dn?, pitch? } or false;
+   o.refuse — a refusal expected (song and history untouched). After the edit: no orphans, notes count n0+dn, every pitch-carrying event
+   that stayed sounds as before (unless pitch:false), check() → null or the defect; exactly ONE history entry; undo restores the song bit
+   for bit and in order, redo repeats it, a second undo restores it; the set-up is undone and the song is as before the case. */
+function edKit(miss,tick){
+  const beat=t=>Math.round(t*1000)/1000;
+  const snap=()=>new Map(events.map(e=>[e,[e.t,e.layer,e.fn,e.tk,e.sc,e.sev,!!e.jam,JSON.stringify(e.a)]]));
+  const FIELD=['t','layer','fn','tk','sc','sev','jam','a'];
+  const same=(A,B)=>{ if(A.size!==B.size) return `${A.size} events instead of ${B.size}`;
+    for(const [e,x] of B){ const y=A.get(e); if(!y) return `the ${x[2]} at beat ${beat(x[0])} is gone`;
+      for(let i=0;i<x.length;i++) if(x[i]!==y[i]) return `the ${x[2]} at beat ${beat(x[0])} differs (field ${FIELD[i]})`; }
+    return null; };
+  const order=O=>{ const i=events.findIndex((e,j)=>e!==O[j]); return i<0 ? null : `first at #${i}, beat ${beat(events[i].t)} ${events[i].fn}`; };
+  const open=ly=> editIsOpen() ? editSetLayer(ly) : editOpen(ly);
+  const okLayer=ly=> ly!=null && freezeState(ly)==='none' && !events.some(e=>e.layer===ly&&e.jam);
+  const layersOf=role=>laneOrder().filter(ly=>laneRoleOf(ly)===role && okLayer(ly));
+  const segsOf=ly=>songSegs().segs.filter(g=>g.layer===ly && g.end!=null).sort((a,b)=>a.start-b.start);
+  const findIn=(role,pred)=>{ for(const ly of layersOf(role)){ const g=segsOf(ly).find(pred); if(g) return g; } return null; };
+  const single=g=>g.first && g.endEv && /Off$/.test(g.endEv.fn);
+  const notesOf=ly=>songNotes().notes.filter(n=>n.layer===ly).length;
+  const roleOfFn=f=> f[0]==='c'?'ch' : f[0]==='b'?'bs' : f[0]==='l'?'ld' : null;
+  const hz=e=>{ const r=roleOfFn(e.fn); if(!r||/Off$/.test(e.fn)) return null; const f=evHz(e.a,e,r); return Array.isArray(f) ? f.map(x=>x.toFixed(6)).join(',') : (f==null?null:f.toFixed(6)); };
+  const segOf=ev=>songSegs().byEv.get(ev);
+  const nh=()=>editHistPeek().length;
+  const rt=(label,ly,op,o={})=>{ tick();
+    if(!open(ly)){ miss(`${label}: the editor would not open L${ly+1}`); return; }
+    const SA=snap(), OA=events.slice();
+    if(o.prep && !o.prep()){ miss(`${label}: the set-up edit was refused`); return; }
+    const S0=snap(), O0=events.slice(), H0=new Map(events.map(e=>[e,hz(e)])), h0=nh(), n0=notesOf(ly);
+    let d;
+    const res=op();
+    if(o.refuse){ if(res) miss(`${label}: the edit was accepted`);
+      if((d=same(snap(),S0))) miss(`${label}: the refused edit changed the song — ${d}`);
+      if(nh()!==h0) miss(`${label}: the refused edit changed the history`); }
+    else if(!res) miss(`${label}: the edit was refused`);
+    else {
+      const S1=snap();
+      if(!same(S1,S0)) miss(`${label}: the edit changed nothing`);
+      { const O=songNotes().orphans; if(O.length) miss(`${label}: ${O.length} orphan events after the edit — first L${O[0].layer+1} beat ${beat(O[0].t)} ${O[0].fn}`); }
+      if(notesOf(ly)!==n0+(res.dn||0)) miss(`${label}: L${ly+1} has ${notesOf(ly)} notes after the edit, ${n0+(res.dn||0)} intended`);
+      if(res.pitch!==false) for(const [e,h] of H0) if(events.includes(e) && hz(e)!==h){ miss(`${label}: the ${e.fn} at beat ${beat(e.t)} sounds ${hz(e)} instead of ${h}`); break; }
+      if(res.check && (d=res.check())) miss(`${label}: ${d}`);
+      if(nh()!==h0+1) miss(`${label}: the edit left ${nh()-h0} history entries, one intended`);
+      if(!editUndo()) miss(`${label}: undo refused`);
+      else { if((d=same(snap(),S0))) miss(`${label}: one undo does not restore the song — ${d}`);
+        if((d=order(O0))) miss(`${label}: undo restores the events but not their order (${d})`);
+        if(!editRedo()) miss(`${label}: redo refused`);
+        else { if((d=same(snap(),S1))) miss(`${label}: redo does not repeat the edit — ${d}`);
+          if(!editUndo()) miss(`${label}: the second undo refused`);
+          else if((d=same(snap(),S0))) miss(`${label}: the second undo does not restore the song — ${d}`); } }
+    }
+    if(o.prep){ if(!editUndo()) miss(`${label}: the set-up edit could not be undone`);
+      else if((d=same(snap(),SA)||order(OA))) miss(`${label}: the song is not back as before the case — ${d}`); }
+  };
+  return { beat, snap, same, open, layersOf, segsOf, findIn, single, segOf, rt };
+}
+/* ═══ ED3: QUANTISE AFTER RECORDING — P.checkQuant ═══
+   On every pitched role's first unfrozen, non-backing track (editor opened and closed by the probe), through recorder.editQuantSel: single
+   notes first nudged off the grid (one group move), then quantised — starts (the note keeps its length), ends, starts + ends at 50 %; a
+   boundary INSIDE a glide moves by itself (the line stays ONE note with as many segments — user decision 4, no detach; the previous segment
+   ends exactly there); the seed's theremin note moves whole by its start (its bend unchanged). Drum hits on a temporary take: starts at 50 %;
+   'ends' leaves hits alone (refused); hits already on the grid are refused. The expected beats are computed HERE from the grid; pitches
+   never change; round trip as in the kit (one entry, undo/redo bit for bit and in order). */
+export function checkQuant(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const isSeed=!!(SEED_REC&&SEED_REC.kind==='seed'), absent=[];
+  const lack=what=>{ if(isSeed) miss(`the seed lacks ${what}`); else absent.push(what); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const K=edKit(miss,()=>cases++), MIN=1/32, eq=(a,b)=>Math.abs(a-b)<1e-9;
+  const q=(t,s,amt=1)=> t+amt*(Math.round(t/s)*s-t);
+  /* the expected start and end of a single note, computed from the grid here */
+  const want=(s0,e0,step,what,amt)=>{ const S=what!=='end', E=what!=='start';
+    const d= S ? q(s0,step,amt)-s0 : 0, s1=s0+d; let e1=e0+d;
+    if(E){ let g=Math.round(e1/step)*step; if(g<s1+MIN) g=(Math.floor(s1/step+1e-9)+1)*step; const x=e1+amt*(g-e1); if(x>=s1+MIN-1e-9) e1=x; }
+    return { s:s1, e:e1 }; };
+  const landed=(evs,W)=>()=>{ for(let i=0;i<evs.length;i++){ const g=K.segOf(evs[i]); if(!g) return `note ${i+1} is gone`;
+      if(!eq(g.start,W[i].s)||!eq(g.note.end,W[i].e)) return `note ${i+1} spans ${K.beat(g.start)}–${K.beat(g.note.end)}, intended ${K.beat(W[i].s)}–${K.beat(W[i].e)}`; }
+    return null; };
+  try{
+    for(const role of ['bs','ch','ld']){
+      const ly=K.layersOf(role)[0] ?? null; if(ly==null){ lack(`an unfrozen ${role} track`); continue; }
+      song++;
+      const W=K.segsOf(ly).filter(K.single).slice(0,3);
+      if(W.length<2) lack(`two single ${role} notes in one track`);
+      else for(const [what,step,amt] of [['start',1/4,1],['end',1/4,1],['both',1,0.5]]){
+        const evs=W.map(g=>g.ev);
+        K.rt(`${role}: ${what} ${amt*100} % on grid ${step} (notes nudged 0.137 beat off it first)`, ly, ()=>{
+          const Wn=evs.map(e=>{ const g=K.segOf(e); return want(g.start, g.note.end, step, what, amt); });
+          const r=editQuantSel(evs, step, what, amt);
+          return r && { r, check:landed(evs,Wn) }; },
+          { prep:()=>editMoveSel(evs.map(e=>({ ev:e })), 0.137) });
+      }
+      /* a boundary inside a glide: it moves, the neighbour's length follows, no detach */
+      const mid=K.findIn(role,g=>!g.first && g.endEv && g.note.end!=null);
+      if(!mid) lack(`a later segment of a ${role} glide`);
+      else { const segs=songSegs().segs.filter(x=>x.note===mid.note).sort((a,b)=>a.start-b.start), i=segs.indexOf(mid);
+        const right= i+1<segs.length ? segs[i+1].start : mid.note.end;
+        const step=[1,0.4,0.3,0.7,0.45].find(s=>{ const B=q(mid.start,s); return !eq(B,mid.start) && B>=segs[i-1].start+MIN && B<=right-MIN; });
+        if(step==null) lack(`a ${role} glide boundary that some grid can move`);
+        else { const B=q(mid.start,step), k=segs.length;
+          K.rt(`${role}: the boundary inside a glide onto grid ${step} (stays one note)`, mid.layer, ()=>{
+            const r=editQuantSel([mid.ev], step, 'start', 1);
+            return r && { r, check:()=>{ const g=K.segOf(mid.ev); if(!g||g.ev!==mid.ev) return 'the boundary is no longer a segment start';
+              const all=songSegs().segs.filter(x=>x.note===g.note).sort((a,b)=>a.start-b.start), j=all.indexOf(g);
+              if(all.length!==k) return `the glide has ${all.length} segments, ${k} before (it fell apart or merged)`;
+              if(!eq(g.start,B)) return `the boundary sits at ${K.beat(g.start)}, intended ${K.beat(B)}`;
+              if(!eq(all[j-1].end,B)) return `the previous segment ends at ${K.beat(all[j-1].end)}, not at the boundary ${K.beat(B)}`;
+              return null; } }; }); } }
+    }
+    /* the seed's theremin note: its start moves the whole note, the bend stays */
+    { const th=K.findIn('ld',g=>K.single(g) && g.note.head.a && g.note.head.a.bend && g.note.head.a.bend.length);
+      if(!th) lack('a solo theremin note (with a bend)');
+      else { const step=[1,0.4,0.3].find(s=>!eq(q(th.start,s),th.start)), s0=th.start, e0=th.note.end, B=JSON.stringify(th.note.head.a.bend);
+        K.rt(`ld: a theremin note's start onto grid ${step} (moves whole, bend kept)`, th.layer, ()=>{
+          const d=q(s0,step)-s0, r=editQuantSel([th.ev], step, 'start', 1);
+          return r && { r, check:()=>{ const g=K.segOf(th.ev); if(!g) return 'the theremin note is gone';
+            if(!eq(g.start,s0+d)||!eq(g.note.end,e0+d)) return `it spans ${K.beat(g.start)}–${K.beat(g.note.end)}, intended ${K.beat(s0+d)}–${K.beat(e0+d)}`;
+            return JSON.stringify(g.note.head.a.bend)!==B ? `its bend changed to ${JSON.stringify(g.note.head.a.bend)}` : null; } }; }); } }
+    /* drums — on a temporary take at the song end (the seed's drums are a backing) */
+    if(editIsOpen()) editClose();
+    let tmpLy=null; const S00=K.snap();
+    { const T=Math.ceil(songBeats())+8, R=seedTake([0,1.3,2.55,3.8].map((x,i)=>({ fn:'drum', a:{ row:i%3, vol:0.8, kit:0 }, t:T+x })));
+      tmpLy= R ? events.find(e=>e.tk===R.take&&e.fn==='drum')?.layer ?? null : null; }
+    if(tmpLy==null) miss('drums: the temporary drum take could not be recorded');
+    else { song++;
+      const H=events.filter(e=>e.layer===tmpLy&&e.fn==='drum').sort((a,b)=>a.t-b.t), off=H.filter(e=>!eq(e.t,Math.round(e.t)));
+      if(off.length<2) lack('two drum hits off the beat in the temporary take');
+      else { K.rt(`dr: ${off.length} hits, starts 50 % on grid 1`, tmpLy, ()=>{ const Wt=off.map(e=>q(e.t,1,0.5)), r=editQuantSel(off, 1, 'start', 0.5);
+          return r && { r, check:()=>{ for(let i=0;i<off.length;i++) if(!eq(off[i].t,Wt[i])) return `a hit at ${K.beat(off[i].t)}, intended ${K.beat(Wt[i])}`; return null; } }; });
+        K.rt('dr: "ends" moves no hit (refused)', tmpLy, ()=>editQuantSel(off, 1, 'end', 1), { refuse:true }); }
+      const on=H.filter(e=>eq(e.t,Math.round(e.t)));
+      if(!on.length) lack('a drum hit on the beat in the temporary take');
+      else K.rt('dr: a hit already on the grid (refused)', tmpLy, ()=>editQuantSel(on, 1, 'start', 1), { refuse:true });
+      if(editIsOpen()) editClose();
+      laneDelTap(tmpLy); laneDelTap(tmpLy);
+      { const d=K.same(K.snap(),S00); if(d) miss(`drums: the song is not back as it was after the temporary take — ${d}`); } }
+  } finally { if(editIsOpen()) editClose(); }
+  console.log(`[scaleprobe ED3] tracks ${song} · cases ${cases} · differences ${nBad}`);
+  if(absent.length) console.log('[scaleprobe ED3] not in this song (not checked): '+[...new Set(absent)].join('; '));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED3] '+m));
+  if(!nBad) console.log('[scaleprobe ED3] starts, ends and both (with strength) land where the grid says, notes keep their pitch and length where intended, a glide boundary moves without detaching, a theremin note moves whole with its bend; one history entry each, undo/redo bit for bit; nothing to move is refused');
+  return out();
+}
+/* ═══ ED4: TRANSPOSE BY DEGREES — P.checkDegrees ═══
+   On every pitched role's first unfrozen, non-backing track (editor opened and closed by the probe), through recorder.editDegreeSel:
+   single notes +1 degree, a whole glide −2 (it stays ONE note with as many segments), a later segment of a glide +1 (no detach: the other
+   segments keep their pitch), the seed's theremin note +1 (every event of it carries the new pitch, the bend unchanged), a note moved off
+   the mode first (one tuning step) then +1 — it keeps its offset from the nearest degree. Every pitch is checked against an expectation
+   computed HERE by absolute tuning steps (nearest mode pitch, a tie taking the lower; degree + n; the same offset), beats never change.
+   Refusals change nothing: a shift past the last register ('reg'), drum hits only ('none'). Round trip as in the kit. The pure pitch
+   arithmetic over every view is the node row «ED4 degrees (sweep)». */
+export function checkDegrees(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const isSeed=!!(SEED_REC&&SEED_REC.kind==='seed'), absent=[];
+  const lack=what=>{ if(isSeed) miss(`the seed lacks ${what}`); else absent.push(what); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const K=edKit(miss,()=>cases++);
+  /* the expected pitch, by absolute tuning steps (a second derivation, not scales.shiftDegrees) */
+  const want=(ti,oct,v,k)=>{ const T=tuningOf(v), E= T.equal!=null ? T.equal : T.cents.length, n=v.iv.length, A=ti+E*oct;
+    const abs=(d,r)=>tuningIndexOf(d,v)+E*r, r0=Math.floor((A-v.root)/E);
+    let bd=-1, br=0, bD=Infinity;
+    for(let r=r0-1;r<=r0+1;r++) for(let d=0;d<n;d++){ const x=Math.abs(A-abs(d,r)); if(x<bD || (x===bD && abs(d,r)<abs(bd,br))){ bD=x; bd=d; br=r; } }
+    const D=bd+k; return { abs: abs(((D%n)+n)%n, br+Math.floor(D/n)) + (A-abs(bd,br)), E }; };
+  /* every listed segment (by its defining event, read before the edit) now sits n degrees away; its beats and the other events untouched */
+  const moved=(list,k)=>{ const X=list.map(g=>({ ev:g.ev, t:g.start, w:want(g.ti,g.oct,g.sc,k), evs:g.note.evs.filter(e=>songSegs().byEv.get(e)===g) }));
+    return ()=>{ for(const x of X){ const g=K.segOf(x.ev); if(!g||g.ev!==x.ev) return `the segment at ${K.beat(x.t)} is no longer a segment start`;
+        if(Math.abs(g.start-x.t)>1e-9) return `the segment at ${K.beat(x.t)} moved in time to ${K.beat(g.start)}`;
+        const got=g.ti+x.w.E*g.oct; if(got!==x.w.abs) return `the segment at ${K.beat(x.t)} sits at ${g.ti}/${g.oct} (abs ${got}), intended abs ${x.w.abs}`;
+        for(const e of x.evs) if(!/Off$/.test(e.fn) && (e.a.ti!==g.ti || (e.a.oct|0)!==g.oct)) return `an event of the segment at ${K.beat(x.t)} (beat ${K.beat(e.t)}) kept the old pitch`; }
+      return null; }; };
+  try{
+    for(const role of ['bs','ch','ld']){
+      const ly=K.layersOf(role)[0] ?? null; if(ly==null){ lack(`an unfrozen ${role} track`); continue; }
+      song++;
+      const W=K.segsOf(ly).filter(K.single).slice(0,3);
+      if(W.length<2) lack(`two single ${role} notes in one track`);
+      else K.rt(`${role}: ${W.length} notes one degree up`, ly, ()=>{ const c=moved(W,1), r=editDegreeSel(W.map(g=>g.ev),1); return r && { r, pitch:false, check:c }; });
+      const glide=K.findIn(role,g=>g.first && songSegs().segs.filter(x=>x.note===g.note).length>=2 && g.note.end!=null);
+      if(!glide) lack(`a ${role} glide`);
+      else { const all=songSegs().segs.filter(x=>x.note===glide.note), k=all.length;
+        K.rt(`${role}: a whole glide two degrees down (stays one note)`, glide.layer, ()=>{ const c=moved(all,-2), r=editDegreeSel(all.map(g=>g.ev),-2);
+          return r && { r, pitch:false, check:()=>{ const d=c(); if(d) return d; const g=K.segOf(glide.ev); const m=songSegs().segs.filter(x=>x.note===g.note).length;
+            return m!==k ? `the glide has ${m} segments, ${k} before` : null; } }; }); }
+      const mid=K.findIn(role,g=>!g.first && g.endEv && g.note.end!=null);
+      if(!mid) lack(`a later segment of a ${role} glide`);
+      else { const others=songSegs().segs.filter(x=>x.note===mid.note && x!==mid).map(x=>({ ev:x.ev, ti:x.ti, oct:x.oct }));
+        /* a shift that lands on a neighbour's pitch merges the two segments (the honest result of a pitch-only edit) — take one that does not */
+        const nb=songSegs().segs.filter(x=>x.note===mid.note && (x.endEv===mid.ev || mid.endEv===x.ev));
+        const k=[1,-1,2,-2,3,-3].find(k=>{ const p=shiftDegrees(mid.ti,mid.oct,mid.sc,k); return p && p.oct>=0 && p.oct<REG_N && !nb.some(x=>x.ti===p.ti&&x.oct===p.oct); });
+        if(k==null) lack(`a ${role} glide segment that can move without meeting its neighbour’s pitch`);
+        else K.rt(`${role}: a later segment of a glide ${k>0?'+':''}${k} degree(s) (no detach)`, mid.layer, ()=>{ const c=moved([mid],k), r=editDegreeSel([mid.ev],k);
+          return r && { r, pitch:false, check:()=>{ const d=c(); if(d) return d;
+            for(const o of others){ const g=K.segOf(o.ev); if(!g||g.ev!==o.ev||g.ti!==o.ti||g.oct!==o.oct) return `another segment of the glide changed (at ${K.beat(o.ev.t)})`; }
+            return null; } }; }); }
+      /* a note off the mode keeps its offset: set up by moving one single note one tuning step to a pitch outside the mode */
+      const off=W.find(g=>!modeSlotOfTi(g.ti+1,g.oct,g.sc));
+      if(!off) absent.push(`a ${role} note whose next tuning step is off the mode (${role==='ch'?'chromatic chords':'a mode filling its tuning'})`);
+      else K.rt(`${role}: an out-of-mode note one degree up (keeps its offset)`, ly, ()=>{ const g=K.segOf(off.ev), c=moved([g],1), r=editDegreeSel([off.ev],1); return r && { r, pitch:false, check:c }; },
+        { prep:()=>editMoveSel([{ ev:off.ev, ti:off.ti+1, oct:off.oct }],0) });
+      /* refusal: past the last register */
+      if(W.length) K.rt(`${role}: ${W.length>1?'notes':'a note'} shifted past the last register (refused)`, ly, ()=>{
+        const evs=W.map(g=>g.ev), n=40*(W[0].sc.iv.length);
+        if(editDegreeWhy(evs,n)!=='reg') miss(`${role}: the reason for a shift past the registers is ${editDegreeWhy(evs,n)}, not 'reg'`);
+        return editDegreeSel(evs,n); }, { refuse:true });
+    }
+    /* the seed's theremin note: every event carries the new pitch (the hold changes too), the bend unchanged */
+    { const th=K.findIn('ld',g=>K.single(g) && g.note.head.a && g.note.head.a.bend && g.note.head.a.bend.length);
+      if(!th) lack('a solo theremin note (with a bend)');
+      else { const B=JSON.stringify(th.note.head.a.bend);
+        K.rt('ld: a theremin note one degree up (bend kept)', th.layer, ()=>{ const c=moved([th],1), r=editDegreeSel([th.ev],1);
+          return r && { r, pitch:false, check:()=>{ const d=c(); if(d) return d; const g=K.segOf(th.ev);
+            return JSON.stringify(g.note.head.a.bend)!==B ? `its bend changed to ${JSON.stringify(g.note.head.a.bend)}` : null; } }; }); } }
+    /* drums only: nothing to transpose — refused, the reason 'none' (a temporary take at the song end) */
+    if(editIsOpen()) editClose();
+    let tmpLy=null; const S00=K.snap();
+    { const T=Math.ceil(songBeats())+8, R=seedTake([0,1].map(x=>({ fn:'drum', a:{ row:x, vol:0.8, kit:0 }, t:T+x })));
+      tmpLy= R ? events.find(e=>e.tk===R.take&&e.fn==='drum')?.layer ?? null : null; }
+    if(tmpLy==null) miss('drums: the temporary drum take could not be recorded');
+    else { const H=events.filter(e=>e.layer===tmpLy&&e.fn==='drum');
+      K.rt('dr: drum hits only (refused)', tmpLy, ()=>{ if(editDegreeWhy(H,1)!=='none') miss(`dr: the reason is ${editDegreeWhy(H,1)}, not 'none'`); return editDegreeSel(H,1); }, { refuse:true });
+      if(editIsOpen()) editClose();
+      laneDelTap(tmpLy); laneDelTap(tmpLy);
+      { const d=K.same(K.snap(),S00); if(d) miss(`drums: the song is not back as it was after the temporary take — ${d}`); } }
+  } finally { if(editIsOpen()) editClose(); }
+  console.log(`[scaleprobe ED4] tracks ${song} · cases ${cases} · differences ${nBad}`);
+  if(absent.length) console.log('[scaleprobe ED4] not in this song (not checked): '+[...new Set(absent)].join('; '));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED4] '+m));
+  if(!nBad) console.log('[scaleprobe ED4] every selected segment moves exactly n degrees of its mode (an out-of-mode note keeps its offset), beats never change, glides stay whole, a theremin keeps its bend; one history entry each, undo/redo bit for bit; past the registers and drums-only are refused');
+  return out();
+}
+/* ═══ OWN2: THE BEND CURVE — P.checkBend ═══
+   On the seed's theremin note (the first solo note with a curve of ≥ 3 points, unfrozen track), through recorder.editBendPoint with the
+   editor open: a point's cents +35 (its time kept); a point's time past its neighbour (clamped just before it); the first point's time
+   (stays 0, only its cents); a point added between two (sorted in); a point deleted; refused: deleting the first point, adding on an
+   existing point's time or past the note's end. Each edit: the curve is exactly the one computed here, the note's pitch and every other
+   event untouched, ONE history step, undo / redo bit for bit (edKit). CONTROL that must fail: the array changed in place (bendDbg) — ↶
+   cannot bring the old curve back. */
+export function checkBend(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const isSeed=!!(SEED_REC&&SEED_REC.kind==='seed');
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const K=edKit(miss,()=>cases++);
+  const th=K.findIn('ld',g=>K.single(g) && g.note.head.a && g.note.head.a.bend && g.note.head.a.bend.length>=3);
+  if(!th){ if(isSeed) miss('the seed lacks a solo theremin note with three bend points'); return out(); }
+  song=1;
+  const ev=th.note.head, ly=th.layer, len=th.note.end-th.note.start, B=()=>ev.a.bend.map(p=>({ dt:p.dt, c:p.c }));
+  const is=(W,label)=>()=>{ const G=B(); return JSON.stringify(G)===JSON.stringify(W) ? null : `${label}: the curve is ${JSON.stringify(G)}, intended ${JSON.stringify(W)}`; };
+  try{
+    { const B0=B(), W=B0.map((p,i)=>i===1?{ dt:p.dt, c:p.c+35 }:p);
+      K.rt('a point +35 cents', ly, ()=>{ const r=editBendPoint(ev,'move',1,B0[1].dt,B0[1].c+35); return r!==false && { r:true, check:is(W,'+35 cents') }; }); }
+    { const B0=B(), W=B0.map((p,i)=>i===1?{ dt:B0[2].dt-1e-6, c:p.c }:p);
+      K.rt('a point dragged past its neighbour (clamped)', ly, ()=>{ const r=editBendPoint(ev,'move',1,B0[2].dt+0.5,B0[1].c); return r!==false && { r:true, check:is(W,'clamped') }; }); }
+    { const B0=B(), W=B0.map((p,i)=>i===0?{ dt:0, c:p.c-20 }:p);
+      K.rt('the first point: time stays 0, cents −20', ly, ()=>{ const r=editBendPoint(ev,'move',0,0.7,B0[0].c-20); return r!==false && { r:true, check:is(W,'first point') }; }); }
+    { const B0=B(), t=(B0[0].dt+B0[1].dt)/2, W=[B0[0],{ dt:t, c:-50 },...B0.slice(1)];
+      K.rt('a point added between the first two', ly, ()=>{ const r=editBendPoint(ev,'add',null,t,-50); return r===1 && { r:true, check:is(W,'added') }; }); }
+    { const B0=B(), W=B0.filter((p,i)=>i!==2);
+      K.rt('a point deleted', ly, ()=>{ const r=editBendPoint(ev,'del',2); return r!==false && { r:true, check:is(W,'deleted') }; }); }
+    K.rt('deleting the first point (refused)', ly, ()=>editBendPoint(ev,'del',0), { refuse:true });
+    K.rt('adding on an existing point (refused)', ly, ()=>editBendPoint(ev,'add',null,B()[1].dt,10), { refuse:true });
+    K.rt('adding past the note end (refused)', ly, ()=>editBendPoint(ev,'add',null,len+1,10), { refuse:true });
+    /* CONTROL: an in-place change survives ↶ */
+    { cases++; if(K.open(ly)){ const a0=ev.a, keep=B();
+        bendDbg(true); const r=editBendPoint(ev,'move',1,keep[1].dt,keep[1].c+15); bendDbg(false);
+        editUndo();
+        const back=JSON.stringify(B())===JSON.stringify(keep);
+        if(r===false) miss('CONTROL: the in-place edit was refused');
+        else if(back) miss('CONTROL: with the curve changed in place, ↶ still brought it back — the check cannot fail');
+        ev.a=a0; a0.bend.length=0; a0.bend.push(...keep); histReset(); } }
+  } finally { bendDbg(false); if(editIsOpen()) editClose(); }
+  console.log(`[scaleprobe OWN2] cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe OWN2] '+m));
+  if(!nBad) console.log('[scaleprobe OWN2] bend points move, clamp, add and delete exactly as computed here, the first stays at 0; refusals change nothing; one history step each, undo/redo bit for bit; CONTROL: an in-place change survives ↶');
+  return out();
+}
+/* ═══ ED7: ONE HISTORY — P.checkHistory ═══
+   (1) FROZEN: an editor step on the seed's frozen track makes it stale; its ↶ leaves it stale (the track re-freezes by itself), the
+       edit versions restored → fresh again.
+   (2) A MIXED SEQUENCE of every kind of step through the paths the interface uses — a take, an editor edit (ED5 volume) and a lane point,
+       track level, pan, master, name, order, a marker added / renamed, a bars insert (ED6), the marker deleted, a row delete, ⤺, removing
+       the backing, ✕ clear — a full snapshot after each (every event object, beat, layer, fn, take, view, payload, in order; capture lanes;
+       per track id: level, pan, name, place, length, mute, solo; markers; master). Then full ↶ to the start and full ↷ to the end, each state
+       compared EXACTLY with its snapshot (undo/redo restore stored values; no tolerance needed).
+   (3) CONTROLS that must fail: a step kind left out of the history (histDbg skip 'level': the full undo does not reach the start); a redo
+       branch a new step does not drop (histDbg keepFuture: ↷ still offered). The TRIPWIRE: a payload written directly → ↶ answers 'changed'.
+   (4) The size limit: HIST_MAX steps kept. Re-freezes the frozen track at the end (✕ dropped its buffer) and restores edit versions. */
+export async function checkHistory(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const M=loop.metre, bt=t=>Math.round(t*1000)/1000;
+  const lys=()=>[...new Set(events.map(e=>e.layer))].sort((x,y)=>x-y);
+  const snap=()=>({ ev:events.map(e=>[e,e.t,e.layer,e.fn,e.tk,e.sc,e.sev,!!e.jam,JSON.stringify(e.a)]), fx:takeFxDump(),
+    tab:JSON.stringify(lys().map(l=>[l, laneIdOf(l), laneLevelOf(l), lanePanOf(l), laneNameOf(l), laneOrder().indexOf(l), laneLenOf(l), laneMuted(l), laneSoloed(l)])),
+    mk:JSON.stringify(sections()), ms:masterLevel() });
+  const F=['object','beat','layer','fn','take','view','seventh','jam','payload'];
+  const diff=(A,B)=>{ if(A.ev.length!==B.ev.length) return `${A.ev.length} events instead of ${B.ev.length}`;
+    for(let i=0;i<B.ev.length;i++){ const x=B.ev[i], y=A.ev[i]; for(let j=0;j<x.length;j++) if(x[j]!==y[j]) return `event #${i} (${x[3]} at beat ${bt(x[1])}) differs in its ${F[j]}`; }
+    if(A.fx!==B.fx) return 'the captured lanes differ'; if(A.tab!==B.tab) return `the track tables differ (${A.tab.slice(0,160)} … instead of ${B.tab.slice(0,160)} …)`;
+    if(A.mk!==B.mk) return 'the markers differ'; if(A.ms!==B.ms) return `the master level is ${A.ms}, not ${B.ms}`; return null; };
+  const done=r=> !!r && r!=='changed';
+  const restoreVer=laneVerKeep(), fz0=new Map(lys().map(l=>[l,freezeState(l)])), FZ=lys().find(l=>fz0.get(l)==='fresh'), master0=masterLevel();
+  const pick=role=>laneOrder().find(l=>laneRoleOf(l)===role && freezeState(l)==='none' && !events.some(e=>e.layer===l&&e.jam)) ?? null;
+  const firstHead=ly=>{ const n=songNotes().notes.find(x=>x.layer===ly && x.role!=='dr'); return n&&n.head; };
+  histReset(); const S00=snap();
+  try{
+    /* (1) the frozen track */
+    if(FZ==null) miss('the seed has no frozen track (P.seed freezes the raga bass)');
+    else { cases++;
+      const h=firstHead(FZ);
+      if(!h || !editOpen(FZ)) miss(`L${FZ+1}: no note to edit on the frozen track`);
+      else { const r=editVolSel([h],-0.05); editClose();
+        if(!r) miss(`L${FZ+1}: the volume edit on the frozen track was refused`);
+        else { if(freezeState(FZ)!=='stale') miss(`L${FZ+1}: an edit left its freeze ${freezeState(FZ)}`);
+          const u=histUndo(); if(!done(u)) miss(`L${FZ+1}: undo refused (${u})`);
+          if(freezeState(FZ)!=='stale') miss(`L${FZ+1}: after the undo its freeze is ${freezeState(FZ)} — a track touched by ↶ must go stale and re-freeze`);
+          restoreVer(); if(freezeState(FZ)!=='fresh') miss(`L${FZ+1}: not fresh again once the edit versions are back (${freezeState(FZ)})`); } }
+      histReset(); }
+    /* (2) the mixed sequence */
+    const S=[snap()], labels=[];
+    const step=(label,fn)=>{ cases++; let ok=false; try{ ok=fn(); }catch(e){ miss(`${label}: threw ${e&&e.message}`); }
+      if(ok===false||ok==null){ miss(`${label}: the step was refused`); return false; }
+      if(histLen()!==S.length){ miss(`${label}: the history holds ${histLen()} steps after ${S.length} steps`); S.push(snap()); labels.push(label); return false; }
+      S.push(snap()); labels.push(label); return true; };
+    const ly=pick('ch'), lb=pick('bs'), T=Math.ceil(songBeats()/M+1e-9)*M+M;
+    if(ly==null||lb==null){ miss('the seed lacks an unfrozen chord or bass track'); return out(); }
+    song=lys().length;
+    let tmp=null;
+    step('take', ()=>{ const R=seedTake([{ fn:'bassOn', a:{ deg:0, oct:1, vol:0.8, inst:0 }, t:T, id:1 }, { fn:'bassOff', a:{}, t:T+2, id:1 }, { fn:'drum', a:{ row:0, vol:0.8, kit:0 }, t:T }]);
+      tmp= R ? events.find(e=>e.tk===R.take)?.layer ?? null : null; return !!R; });
+    step('editor: volume of a note (ED5)', ()=>{ if(!editOpen(lb)) return false; const r=editVolSel([firstHead(lb)],-0.1); editClose(); return !!r; });
+    step('editor: a lane point', ()=>{ if(!editOpen(ly)) return false; const A=autAddrs(ly).find(x=>x.fx==='reverb'); const r=A&&autAddPoint(ly,A.fx,A.p,9.5,0.4); editClose(); return !!r; });
+    step('level', ()=>{ const v0=laneLevelOf(ly); setLaneLevel(ly,0.5); return histTab(ly,'level',v0); });
+    step('pan', ()=>{ const v0=lanePanOf(ly); setLanePan(ly,0.3); return histTab(ly,'pan',v0); });
+    step('master', ()=>{ const v0=masterLevel(); setMasterLevel(0.6); return histMaster(v0); });
+    step('name', ()=>laneNameStep(ly,'History probe'));
+    step('order', ()=>{ const L=laneOrder(), i=L.indexOf(lb); moveLaneStep(lb, i===0 ? 1 : 0); return true; });
+    let mid=null;
+    step('marker add', ()=>{ const m=secAdd(2*M,'A'); mid=m&&m.id; return !!m; });
+    step('marker rename', ()=>secRename(mid,'B'));
+    step('bars insert (ED6)', ()=>songEdit('ins',3*M,4*M));
+    step('marker delete', ()=>secDelete(mid));
+    step('row delete', ()=>{ if(tmp==null) return false; laneDelTap(tmp); return laneDelTap(tmp); });
+    step('⤺ take removed', ()=>{ const n=events.length; onUndo(); return events.length<n; });
+    step('backing removed', ()=>{ const n=events.length; clearJam(); return events.length<n; });
+    step('✕ clear', ()=>{ clearSong(); return !events.length; });
+    /* full undo to the start, full redo to the end — exact */
+    for(let i=S.length-1;i>0;i--){ cases++; const r=histUndo();
+      if(!done(r)){ miss(`undo of «${labels[i-1]}» refused (${r})`); break; }
+      const d=diff(snap(),S[i-1]); if(d){ miss(`undo of «${labels[i-1]}» does not give the state before it — ${d}`); break; } }
+    if(histUndo()!==false) miss('an undo past the start of the history was not refused');
+    { const d=diff(snap(),S[0]); if(d) miss(`after the full undo the song is not as at the start — ${d}`); }
+    for(let i=1;i<S.length;i++){ cases++; const r=histRedo();
+      if(!done(r)){ miss(`redo of «${labels[i-1]}» refused (${r})`); break; }
+      const d=diff(snap(),S[i]); if(d){ miss(`redo of «${labels[i-1]}» does not give the state after it — ${d}`); break; } }
+    { const d=diff(snap(),S[S.length-1]); if(d) miss(`after the full redo the song is not as at the end — ${d}`); }
+    for(let i=S.length-1;i>0;i--) if(!done(histUndo())){ miss('the final undo to the start was refused'); break; }
+    { const d=diff(snap(),S00); if(d) miss(`the song is not back at the start after the sequence — ${d}`); }
+    histReset();
+    /* (3) controls and the tripwire */
+    { cases++; const A=snap(), v0=laneLevelOf(ly);
+      histDbg({ skip:'level' }); setLaneLevel(ly,0.42); histTab(ly,'level',v0); histDbg(null);
+      editOpen(lb); editVolSel([firstHead(lb)],0.05); editClose();
+      while(histLen()) if(!done(histUndo())) break;
+      const d=diff(snap(),A);
+      if(!d) miss('CONTROL: with the level step left out of the history the full undo still reached the start — the check cannot fail');
+      setLaneLevel(ly,v0); histReset(); }
+    for(const ctl of [false,true]){ cases++;
+      const n0=laneNameOf(ly); histDbg(ctl?{ keepFuture:true }:null);
+      laneNameStep(ly,'x1'); histUndo(); laneNameStep(ly,'x2');
+      const can=histCanRedo(); histDbg(null);
+      if(!ctl && can) miss('a new step did not drop the redo branch');
+      if(ctl && !can) miss('CONTROL: with the redo branch kept, the check still saw no redo — it cannot fail');
+      setLaneName(ly,n0); histReset(); }
+    { cases++; laneNameStep(ly,'tripwire'); const e=events.find(x=>x.fn==='chOn'), a0=e.a; e.a={ ...a0, vol:0.123 };
+      const r=histUndo(); e.a=a0; if(r!=='changed') miss(`a payload written outside the history: ↶ answered ${r}, not 'changed'`);
+      if(histLen()) miss('the tripwire did not drop the history'); setLaneName(ly,null); histReset(); }
+    /* (4) the size limit */
+    { cases++; const n0=laneNameOf(ly); for(let i=0;i<305;i++) laneNameStep(ly,'n'+i);
+      if(histLen()!==300) miss(`after 305 steps the history holds ${histLen()} (HIST_MAX 300)`);
+      setLaneName(ly,n0); histReset(); }
+  } finally {
+    histDbg(null); if(editIsOpen()) editClose();
+    while(histLen()) if(!done(histUndo())) break;
+    histReset(); setMasterLevel(master0);
+    const d=diff(snap(),S00); if(d) miss(`the song is not back as it was before the probe — ${d}`);
+    restoreVer();
+    for(const [l,s] of fz0) if(s==='fresh' && freezeState(l)!=='fresh'){
+      try{ const R=await import('./render.js'); await R.freeze(l); }catch(e){ miss(`L${l+1}: re-freezing failed — ${e&&e.message}`); } }
+    restoreVer();
+    for(const [l,s] of fz0) if(freezeState(l)!==s) miss(`L${l+1}: its freeze is ${freezeState(l)} after the probe, ${s} before`);
+  }
+  console.log(`[scaleprobe ED7] tracks ${song} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED7] '+m));
+  if(!nBad) console.log('[scaleprobe ED7] every kind of step undoes and redoes exactly through one history; a frozen track touched by ↶ goes stale; CONTROLS: a step kind left out and a redo kept after a new step both fail; the tripwire refuses after a direct write; 300 steps kept');
+  return out();
+}
+/* ═══ ED6: SECTIONS — P.checkSections ═══
+   On the seed (plus temporary material: a theremin take crossing a bar line at the song end, two reverb-mix lane points on a chord track,
+   three markers), through recorder.songEdit / songUndo / songRedo with the editor closed:
+   (1) IDENTITY (the plan's check): insert k bars, then cut the same bars → every event (object, beat, layer, fn, take, view, payload) in
+       the same order, every captured lane, the brace, the markers and the backing lengths are bit for bit as before — at the start, mid
+       song (notes ringing across), inside the theremin note (its bend), at the song end; both steps undo and redo bit for bit.
+   (2) INSERT, computed here: every event from the point on is L later (a note-off exactly on the point stays), a note ringing across is
+       L longer, pitches unchanged, a crossing theremin's bend points after the point move by L, lane points / markers / brace / backing
+       lengths from the point on move; tracks with material after the point change their freeze signature, tracks wholly before keep it.
+   (3) CUT [a,b): notes starting inside are gone, notes after move left, a note that began earlier ends at a (ended inside) or is L shorter
+       (rang past b); no orphans, every tie keeps its partner, pitches unchanged; lane points inside → at most one per address, at a.
+   (4) DUPLICATE [a,b): every note starting inside has a copy L later with the same pitches and length; an original ringing past b ends at
+       b; notes after move L later; lane points and markers inside are copied.
+   (5) FROZEN: the seed's frozen track goes stale when the edit moves its material and stays fresh when the edit is wholly after it; the
+       auto-freeze hint 'section' is sent.
+   (6) Refusals: not whole bars, the editor open. CONTROLS that must fail (identity check): a cut that forgets the lanes, the bends, the
+       brace, the markers, the backing lengths. Everything is undone; the song, the tracks' edit versions and the freezes are as before. */
+export function checkSections(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const M=loop.metre, E=1e-9, eq=(x,y)=> x==null||y==null ? x===y : Math.abs(x-y)<1e-9, bt=t=>t==null?'open':Math.round(t*1000)/1000;
+  const F=['object','beat','layer','fn','take','view','seventh','jam','payload'];
+  const lys=()=>[...new Set(events.map(e=>e.layer))].sort((x,y)=>x-y);
+  const snapAll=()=>({ ev:events.map(e=>[e,e.t,e.layer,e.fn,e.tk,e.sc,e.sev,!!e.jam,JSON.stringify(e.a)]), fx:takeFxDump(),
+    br:JSON.stringify([loop.rgn.from,loop.rgn.to,loop.rgn.user]), mk:JSON.stringify(sections()), len:JSON.stringify(lys().map(l=>[l,laneLenOf(l)])) });
+  /* near: shifted beats compared to 1e-9 beat — a shift and its inverse in floating point are not exact (0.9 + 4 − 4 = 0.9000000000000004);
+     objects, order, every other field and payload are compared bit for bit. Undo / redo restore stored values: compared exactly. */
+  const rj=x=>x.replace(/-?\d+\.\d+(e-?\d+)?/g, m=>String(Math.round(+m*1e9)/1e9));
+  const diff=(A,B,near)=>{ if(A.ev.length!==B.ev.length) return `${A.ev.length} events instead of ${B.ev.length}`;
+    for(let i=0;i<B.ev.length;i++){ const x=B.ev[i], y=A.ev[i]; for(let j=0;j<x.length;j++){ if(x[j]===y[j]) continue;
+      if(near && j===1 && Math.abs(x[j]-y[j])<=1e-9) continue;
+      if(near && j===8 && rj(x[j])===rj(y[j])) continue;
+      return `event #${i} (${x[3]} at beat ${bt(x[1])}) differs in its ${F[j]}`; } }
+    if(A.fx!==B.fx && !(near && rj(A.fx)===rj(B.fx))) return 'the captured lanes differ';
+    if(A.br!==B.br) return `the brace differs (${A.br} instead of ${B.br})`;
+    if(A.mk!==B.mk) return `the markers differ (${A.mk} instead of ${B.mk})`;
+    if(A.len!==B.len) return `the backing lengths differ (${A.len} instead of ${B.len})`;
+    return null; };
+  const roleOfFn=f=> f[0]==='c'?'ch' : f[0]==='b'?'bs' : f[0]==='l'?'ld' : null;
+  const hz=e=>{ const r=roleOfFn(e.fn); if(!r||/Off$/.test(e.fn)) return null; const f=evHz(e.a,e,r); return Array.isArray(f) ? f.map(x=>x.toFixed(6)).join(',') : (f==null?null:f.toFixed(6)); };
+  const notes=()=>songNotes().notes.map(n=>({ n, head:n.head, layer:n.layer, role:n.role, start:n.start, end:n.end, endBy:n.endBy, hz:n.evs.map(hz).filter(x=>x!=null).join(';') }));
+  const sigs=()=>new Map(lys().map(l=>{ const k=freezeTicket(l); return [l, k&&k.sig]; }));
+  const lanePts=()=>JSON.parse(takeFxDump()).flatMap(([tk,ch,L])=>L.map(s=>({ tk, ...JSON.parse(s) })));
+  const ptKey=p=>[p.tk,p.key,p.fx,p.p,JSON.stringify(p.v??p.ids)].join('|');
+  const tiesOk=()=>events.filter(e=>e.a&&e.a.tie&&!tiePartners(e).length).length;
+  const ok=(label,r)=>{ cases++; if(!r){ miss(`${label}: the edit was refused`); return false; } return true; };
+  /* undo, redo and undo again: the song before / after / before, bit for bit */
+  const done=r=> !!r && r!=='changed';   // 'changed' — refused: the song changed since (the history is dropped)
+  const round=(label,SB,SA)=>{ let d;
+    if(!done(songUndo())) return miss(`${label}: undo refused`);
+    if((d=diff(snapAll(),SB))) return miss(`${label}: one undo does not restore the song — ${d}`);
+    if(!done(songRedo())) return miss(`${label}: redo refused`);
+    if((d=diff(snapAll(),SA))) return miss(`${label}: redo does not repeat the edit — ${d}`);
+    if(!done(songUndo())) return miss(`${label}: the second undo refused`);
+    if((d=diff(snapAll(),SB))) miss(`${label}: the second undo does not restore the song — ${d}`); };
+  const restoreVer=laneVerKeep(), S0=snapAll(), pos0=Math.max(0,loop.pos), fz0=new Map(lys().map(l=>[l,freezeState(l)])), H0=histLen();
+  const afSeen=[], afPrev=hooks.af; hooks.af=k=>{ afSeen.push(k); if(afPrev) afPrev(k); };
+  let tmpLy=null, autLy=null, autList=null;
+  try{
+    /* the range for cut and duplicate, chosen from the material: notes start inside, notes ring across it from before (and, preferably,
+       a note that began before ends inside) */
+    let a=null, k=1;
+    { const N=notes().filter(x=>x.role!=='dr'), nb=Math.floor(songBeats()/M);
+      let best=-1;
+      for(let j=1;j+2<nb;j++) for(const kk of [1,2]){ const A=j*M, B2=A+kk*M;
+        const st=N.filter(x=>x.start>A-E&&x.start<B2-E).length, cr=N.filter(x=>x.start<A-E&&(x.end==null||x.end>B2+E)).length,
+              ei=N.filter(x=>x.start<A-E&&x.end!=null&&x.end>A+E&&x.end<=B2+E).length;
+        const sc= st&&cr ? 100+(ei?50:0)+Math.min(st,10) : -1; if(sc>best){ best=sc; a=A; k=kk; } } }
+    if(a==null){ miss('no bar range where notes start inside and others ring across it'); return out(); }
+    const b=a+k*M;
+    /* set-up: a theremin note crossing a bar line after the song, lane points on a chord track, markers */
+    const T0=Math.ceil(songBeats()/M-E)*M+M;
+    { const R=seedTake([{ fn:'leadOn', a:{ deg:2, oct:1, vol:0.8, inst:0, bend:[{dt:0,c:0},{dt:1,c:40},{dt:3,c:-20},{dt:5,c:15}], v:0 }, t:T0+2, id:1 },
+                        { fn:'leadOff', a:{ v:0 }, t:T0+8, id:1 }]);
+      tmpLy= R ? events.find(e=>e.tk===R.take&&e.fn==='leadOn')?.layer ?? null : null; }
+    if(tmpLy==null) miss('the temporary theremin take could not be recorded');
+    autLy=laneOrder().find(l=>laneRoleOf(l)==='ch' && freezeState(l)==='none' && !events.some(e=>e.layer===l&&e.jam)) ?? null;
+    if(autLy!=null && editOpen(autLy)){ const A=autAddrs(autLy).find(x=>x.fx==='reverb');
+      if(A){ autAddPoint(autLy,A.fx,A.p,a+1.5,0.6); autAddPoint(autLy,A.fx,A.p,b-1.25,0.3); autAddPoint(autLy,A.fx,A.p,b+5,0.8); autList=editHistPeek(); }
+      editClose(); }
+    if(!autList||autList.length<3) miss('the lane points of the set-up could not be added (no chord track with a reverb)');
+    secAdd(Math.max(0,a-M),'Intro'); secAdd(a,'Verse'); secAdd(b+M,'Chorus');
+    if(sections().length!==3) miss(`${sections().length} markers after adding three`);
+    song=lys().length;
+    /* (1)+(2) insert then cut: identity; insert expectations */
+    for(const [a,k] of [[b,1],[0,1],[T0+4,2],[T0,1]]){
+      const L=k*M, b=a+L, label=`insert ${k} bar(s) at beat ${a}, then cut them`;
+      const SB=snapAll(), N0=notes(), H0=new Map(events.map(e=>[e,[e.t,hz(e)]])), P0=lanePts(), MK0=sections(), R0={...loop.rgn}, LL0=new Map(lys().map(l=>[l,laneLenOf(l)])), G0=sigs();
+      const th=N0.find(x=>x.head.a&&x.head.a.bend&&x.head.a.bend.length&&x.start<a-E&&(x.end==null||x.end>a+E)), B0=th&&th.head.a.bend.map(q=>({...q}));
+      afSeen.length=0;
+      if(!ok(label, songEdit('ins',a,b))) continue;
+      const SA=snapAll();
+      /* the insert, computed here */
+      { const N1=new Map(notes().map(x=>[x.head,x]));
+        for(const [e,[t0,h]] of H0){ const off=/Off$/.test(e.fn), want= (t0>a+E || (!off && t0>a-E)) ? t0+L : t0;
+          if(!eq(e.t,want)){ miss(`${label}: the ${e.fn} at beat ${bt(t0)} sits at ${bt(e.t)}, intended ${bt(want)}`); break; }
+          if(hz(e)!==h){ miss(`${label}: the ${e.fn} at beat ${bt(t0)} changed its pitch`); break; } }
+        for(const x of N0){ const y=N1.get(x.head); if(!y){ miss(`${label}: the note at ${bt(x.start)} (L${x.layer+1}) is gone`); break; }
+          const s1= x.start>a-E ? x.start+L : x.start, e1= x.role==='dr' ? s1 : x.end==null ? null : (x.end>a+E || (x.endBy==='next'&&Math.abs(x.end-a)<E)) ? x.end+L : x.end;
+          if(!eq(y.start,s1)||!eq(y.end,e1)){ miss(`${label}: the note ${bt(x.start)}–${bt(x.end)} (L${x.layer+1}) spans ${bt(y.start)}–${bt(y.end)}, intended ${bt(s1)}–${bt(e1)}`); break; } }
+        if(N1.size!==N0.length) miss(`${label}: ${N1.size} notes instead of ${N0.length}`);
+        if(th){ const B1=th.head.a.bend, W=B0.map(q=>th.start+q.dt>a-E ? {dt:q.dt+L,c:q.c} : q);
+          if(JSON.stringify(B1)!==JSON.stringify(W)) miss(`${label}: the crossing theremin's bend is ${JSON.stringify(B1)}, intended ${JSON.stringify(W)}`); }
+        const P1=lanePts().map(ptKey).sort(), PW=P0.map(p=>ptKey({ ...p, t:p.t>a-E?p.t+L:p.t })).sort();
+        if(JSON.stringify(P1)!==JSON.stringify(PW)) miss(`${label}: the lane points did not move as intended`);
+        if(JSON.stringify(P0.map(p=>p.t>a-E?p.t+L:p.t).sort((x,y)=>x-y))!==JSON.stringify(lanePts().map(p=>p.t).sort((x,y)=>x-y))) miss(`${label}: the lane point beats are not the intended ones`);
+        const MW=MK0.map(m=>({ ...m, beat: m.beat>a-E ? m.beat+L : m.beat })), MK1=sections();
+        if(JSON.stringify(MK1)!==JSON.stringify(MW)) miss(`${label}: the markers are ${JSON.stringify(MK1)}, intended ${JSON.stringify(MW)}`);
+        if(R0.user){ const f=R0.from>a-E?R0.from+L:R0.from, t=R0.to>a+E?R0.to+L:R0.to;
+          if(!eq(loop.rgn.from,f)||!eq(loop.rgn.to,t)) miss(`${label}: the brace is ${loop.rgn.from}–${loop.rgn.to}, intended ${f}–${t}`); }
+        for(const [l,len] of LL0){ const w= len>a+E ? len+L : len; if(!eq(laneLenOf(l),w)) miss(`${label}: L${l+1}'s backing length is ${laneLenOf(l)}, intended ${w}`); }
+        const G1=sigs(); let nCh=0, nSame=0;
+        const tkM=new Set(P0.filter(p=>p.t>a-E).map(p=>p.tk));
+        for(const [l,s] of G0){ const moved=events.some(e=>e.layer===l && (e.t!==H0.get(e)[0] || tkM.has(e.tk||0))) || (th && th.layer===l);
+          if(moved){ if(G1.get(l)===s) miss(`${label}: L${l+1}'s material moved but its freeze signature did not change`); else nCh++; }
+          else { if(G1.get(l)!==s) miss(`${label}: L${l+1} lies wholly before the point but its freeze signature changed`); else nSame++; } }
+        if(a>0 && a<songBeats() && (!nCh||!nSame)) miss(`${label}: ${nCh} tracks changed and ${nSame} kept their signature — a mid-song point must give both`);
+        if(!afSeen.includes('section')) miss(`${label}: no auto-freeze hint 'section' was sent`);
+        if(songNotes().orphans.length) miss(`${label}: ${songNotes().orphans.length} orphan events`); }
+      if(!ok(label, songEdit('cut',a,b))) { songUndo(); continue; }
+      { const d=diff(snapAll(),SB,true); if(d) miss(`${label}: the song is not back — ${d}`); }
+      /* both steps undo / redo bit for bit */
+      { let d; if(songUndo()!=='sec:cut') miss(`${label}: undo of the cut refused`); else if((d=diff(snapAll(),SA))) miss(`${label}: undoing the cut does not give the inserted song — ${d}`);
+        if(songUndo()!=='sec:ins') miss(`${label}: undo of the insert refused`); else if((d=diff(snapAll(),SB))) miss(`${label}: undoing both does not restore the song — ${d}`);
+        if(!done(songRedo())||!done(songRedo())) miss(`${label}: redo refused`); else if((d=diff(snapAll(),SB,true))) miss(`${label}: redoing both does not give the same song — ${d}`);
+        songUndo(); songUndo(); }
+    }
+    /* (3) cut [20,28): computed here */
+    { const L=b-a, label=`cut bars ${a/M+1}–${b/M}`;
+      const SB=snapAll(), N0=notes(), P0=lanePts(), MK0=sections(), H0=new Map(events.map(e=>[e,hz(e)]));
+      if(ok(label, songEdit('cut',a,b))){ const SA=snapAll(), N1=new Map(notes().map(x=>[x.head,x]));
+        let gone=0, cross=0, short=0;
+        for(const x of N0){ const y=N1.get(x.head);
+          if(x.start>a-E && x.start<b-E){ gone++; if(y) miss(`${label}: the note starting inside at ${bt(x.start)} (L${x.layer+1}) is still there`); continue; }
+          if(!y){ miss(`${label}: the note ${bt(x.start)}–${bt(x.end)} (L${x.layer+1}) is gone`); continue; }
+          const s1= x.start>b-E ? x.start-L : x.start;
+          const e1= x.role==='dr' ? s1 : x.end==null ? null : x.start>b-E || x.end>b+E ? x.end-L : x.end>a+E || (x.endBy==='next'&&x.end>a-E) ? a : x.end;
+          if(x.start<a-E && (x.end==null||x.end>b+E)) cross++; else if(x.start<a-E && x.end!=null && x.end>a+E) short++;
+          if(!eq(y.start,s1)||!eq(y.end,e1)) miss(`${label}: the note ${bt(x.start)}–${bt(x.end)} (L${x.layer+1}, ended by ${x.endBy}) spans ${bt(y.start)}–${bt(y.end)}, intended ${bt(s1)}–${bt(e1)}`); }
+        if(N1.size!==N0.length-gone) miss(`${label}: ${N1.size} notes, ${N0.length-gone} intended`);
+        if(!gone||!cross) miss(`${label}: the range must remove notes (${gone}) and shorten notes ringing across it (${cross})`);
+        for(const [e,h] of H0) if(events.includes(e) && hz(e)!==h){ miss(`${label}: the ${e.fn} now at ${bt(e.t)} changed its pitch`); break; }
+        if(songNotes().orphans.length) miss(`${label}: ${songNotes().orphans.length} orphan events`);
+        if(tiesOk()) miss(`${label}: ${tiesOk()} tie halves without a partner`);
+        /* lane points, computed here: before the cut as they were, after it L earlier, inside it only the LAST per address, at a */
+        { const last=new Map(); for(const p of P0) if(p.t>a-E&&p.t<b-E){ const k=[p.tk,p.key,p.fx,p.p].join('|'), o=last.get(k); if(!o||p.t>=o.t) last.set(k,p); }
+          const W=P0.filter(p=>!(p.t>a-E&&p.t<b-E)).map(p=>({ ...p, t:p.t>b-E?p.t-L:p.t })).concat([...last.values()].map(p=>({ ...p, t:a })));
+          const got=lanePts().map(p=>rj(ptKey(p)+'@'+p.t)).sort(), want=W.map(p=>rj(ptKey(p)+'@'+p.t)).sort();
+          if(JSON.stringify(got)!==JSON.stringify(want)) miss(`${label}: the lane points are ${got.join(' ')}, intended ${want.join(' ')}`);
+          if(!last.size) miss(`${label}: no lane point inside the cut — the set-up points did not land there`); }
+        const MW=MK0.filter(m=>!(m.beat>a-E&&m.beat<b-E)).map(m=>({ ...m, beat:m.beat>b-E?m.beat-L:m.beat }));
+        if(JSON.stringify(sections())!==JSON.stringify(MW)) miss(`${label}: the markers are ${JSON.stringify(sections())}, intended ${JSON.stringify(MW)}`);
+        cases+=2; round(label,SB,SA); } }
+    /* (4) duplicate [20,28): computed here */
+    { const L=b-a, label=`duplicate bars ${a/M+1}–${b/M}`;
+      const SB=snapAll(), N0=notes(), P0=lanePts(), MK0=sections();
+      if(ok(label, songEdit('dup',a,b))){ const SA=snapAll(), N1=notes(), byHead=new Map(N1.map(x=>[x.head,x])), heads=new Set(N0.map(x=>x.head));
+        const copies=N1.filter(x=>!heads.has(x.head)), src=N0.filter(x=>x.start>a-E&&x.start<b-E);
+        if(!src.length) miss(`${label}: no note starts inside the range`);
+        if(N1.length!==N0.length+src.length) miss(`${label}: ${N1.length} notes, ${N0.length+src.length} intended`);
+        for(const x of N0){ const y=byHead.get(x.head); if(!y){ miss(`${label}: the note ${bt(x.start)} (L${x.layer+1}) is gone`); continue; }
+          const inside=x.start>a-E&&x.start<b-E, s1= x.start>b-E ? x.start+L : x.start;
+          const e1= x.role==='dr' ? s1 : inside ? (x.end==null||x.end>b+E ? b : x.end) : x.end==null ? null : (x.start>b-E || x.end>b+E || (x.endBy==='next'&&Math.abs(x.end-b)<E)) ? x.end+L : x.end;
+          if(!eq(y.start,s1)||!eq(y.end,e1)) miss(`${label}: the note ${bt(x.start)}–${bt(x.end)} (L${x.layer+1}) spans ${bt(y.start)}–${bt(y.end)}, intended ${bt(s1)}–${bt(e1)}`);
+          if(!inside) continue;
+          const c=copies.find(z=>z.layer===x.layer && eq(z.start,x.start+L) && z.hz===x.hz && eq(z.end, x.end==null?null:x.end+L));
+          if(!c) miss(`${label}: no copy of the note ${bt(x.start)}–${bt(x.end)} (L${x.layer+1}) at ${bt(x.start+L)} with the same pitches and length`); }
+        if(songNotes().orphans.length) miss(`${label}: ${songNotes().orphans.length} orphan events`);
+        if(tiesOk()) miss(`${label}: ${tiesOk()} tie halves without a partner`);
+        const P1=new Set(lanePts().map(ptKey));
+        for(const p of P0) if(p.t>a-E&&p.t<b-E && !P1.has(ptKey({ ...p, t:p.t+L }))){ miss(`${label}: the lane point at ${bt(p.t)} has no copy at ${bt(p.t+L)}`); break; }
+        for(const m of MK0) if(m.beat>a-E&&m.beat<b-E && !sections().some(z=>z.name===m.name&&eq(z.beat,m.beat+L))) miss(`${label}: the marker «${m.name}» has no copy at ${m.beat+L}`);
+        cases+=2; round(label,SB,SA); } }
+    /* (5) the frozen track: an edit inside its material makes it stale; an edit wholly after it keeps it fresh */
+    { const fzl=lys().filter(l=>fz0.get(l)==='fresh');
+      if(!fzl.length) miss('the seed has no frozen track (P.seed freezes the raga bass)');
+      for(const l of fzl){ const ts=events.filter(e=>e.layer===l).map(e=>e.t), f0=Math.floor(Math.min(...ts)/M)*M, f1=Math.ceil((Math.max(...ts)+E)/M)*M;
+        cases++; if(ok(`ins at the frozen L${l+1}'s start`, songEdit('ins',f0,f0+M))){ if(freezeState(l)!=='stale') miss(`L${l+1}: an insert at its start left its freeze ${freezeState(l)}`); songUndo(); }
+        restoreVer(); if(freezeState(l)!=='fresh') miss(`L${l+1}: not fresh again after the round trip (${freezeState(l)})`);
+        cases++; if(ok(`ins after the frozen L${l+1}`, songEdit('ins',f1+M,f1+2*M))){ if(freezeState(l)!=='fresh') miss(`L${l+1}: an insert after its material made its freeze ${freezeState(l)}`); songUndo(); }
+        restoreVer(); } }
+    /* (6) refusals and CONTROLS */
+    cases++; if(songEditWhy('cut',1,5)!=='range') miss(`a cut of beats 1–5 is refused for '${songEditWhy('cut',1,5)}', not 'range'`);
+    if(autLy!=null && editOpen(autLy)){ cases++; if(songEditWhy('cut',0,M)!=='editor') miss(`with the editor open a cut is refused for '${songEditWhy('cut',0,M)}', not 'editor'`); editClose(); }
+    for(const [x,p,what] of [['lanes',a,'captured lanes'],['bend',T0+4,'payload'],['brace',4,'brace'],['marks',a,'markers'],['len',4,'backing lengths']]){
+      cases++; const SB=snapAll();
+      if(!songEdit('ins',p,p+M)){ miss(`CONTROL ${x}: the insert was refused`); continue; }
+      secDbg(x); const r=songEdit('cut',p,p+M); secDbg(null);
+      const d=r ? diff(snapAll(),SB,true) : null;
+      if(!r) miss(`CONTROL ${x}: the defective cut was refused`);
+      else if(!d || !d.includes(what)) miss(`CONTROL: a cut that forgets the ${x} passed the identity check${d?` (it found: ${d})`:''}`);
+      if(r) songUndo(); songUndo();
+      { const d2=diff(snapAll(),SB); if(d2) miss(`CONTROL ${x}: two undos do not restore the song — ${d2}`); } }
+  } finally {
+    secDbg(null); hooks.af=afPrev;
+    if(editIsOpen()) editClose();
+    /* ED7: the set-up (the temporary take, the lane points, the markers) and every edit are steps of the one history — undo back to the
+       probe's start; if the history refuses, fall back to removing the set-up by hand */
+    let clean=true; while(histLen()>H0){ const r=songUndo(); if(!done(r)){ clean=false; miss(`cleanup: the history refused to undo (${r}) — set-up removed by hand`); break; } }
+    if(!clean){ for(const m of sections()) secDelete(m.id);
+      if(autList&&autList.length){ if(editOpen(autLy)){ editRevert(autList); editClose(); } }
+      if(tmpLy!=null && events.some(e=>e.layer===tmpLy)){ laneDelTap(tmpLy); laneDelTap(tmpLy); } }
+    restoreVer(); seekTo(pos0);
+    { const d=diff(snapAll(),S0); if(d) miss(`the song is not back as it was before the probe — ${d}`); }
+    for(const [l,s] of fz0) if(freezeState(l)!==s) miss(`L${l+1}: its freeze is ${freezeState(l)} after the probe, ${s} before`);
+  }
+  console.log(`[scaleprobe ED6] tracks ${song} · cases ${cases} · differences ${nBad}`);
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED6] '+m));
+  if(!nBad) console.log('[scaleprobe ED6] insert then cut = the song bit for bit (events, lanes, brace, markers, backing lengths; undo/redo too); insert, cut and duplicate move every timeline item as computed here; touched tracks change their freeze signature, untouched ones keep it; CONTROLS: a cut that forgets lanes, bends, brace, markers or backing lengths fails the identity check');
+  return out();
+}
+/* ═══ ED5: VOLUME BARS — P.checkVolBars ═══
+   recorder.pnBars / editVolSel on every pitched role's first unfrozen, non-backing track and a temporary drum take: (1) one bar per note,
+   at its start, with the note's own start volume; (2) a bar drag shifts EVERY volume value of that note by d (clamped 0..1, never unset —
+   rule #30) and nothing else in the song; (3) two selected notes move by the same d; (4) clamping at 1 and at 0 (0 is a value); (5) a note
+   inside a hand-drawn smooth segment (set up through the lane: a point mid-note) loses its Volume ramp marks — no 'r'/'s', no
+   generated-for-Volume flag — so the lane shows what sounds; (6) two drum hits on ONE beat keep their own volumes: the edited one moves,
+   the other does not. CONTROL that must fail (6): the same edit through the LINE (autMovePoint on that beat — one value per beat, pnPlan)
+   flattens the other hit. Every case: one history entry, undo / redo bit for bit and in order (edKit). */
+export function checkVolBars(){
+  const bad=[]; let nBad=0, cases=0, song=0; const miss=m=>{ nBad++; if(bad.length<KEEP_MAX) bad.push(m); };
+  const isSeed=!!(SEED_REC&&SEED_REC.kind==='seed'), absent=[];
+  const lack=what=>{ if(isSeed) miss(`the seed lacks ${what}`); else absent.push(what); };
+  const out=()=>({ cases, song, total:nBad, differences:bad });
+  if(editIsOpen()){ miss('the track editor is open — close it: the probe opens it itself'); return out(); }
+  if(recording||loop.on){ miss('recording or playing — stop first'); return out(); }
+  const K=edKit(miss,()=>cases++), MK='vol:amt';
+  const car=e=>/^(leadOn|leadSet|bassOn|bassSet|chOn|chSet|drum)$/.test(e.fn);
+  const noteOf=ev=>songNotes().notes.find(n=>n.evs.includes(ev));
+  /* the intended values, computed here from a.vol (a second derivation, not pnGet); others = every other carrier's volume, unchanged */
+  const shifted=(heads,d)=>{ const N=heads.map(noteOf), mine=new Set(N.flatMap(n=>n.evs));
+    const W=N.map(n=>n.evs.filter(car).map(e=>({ e, v:Math.max(0,Math.min(1,e.a.vol+d)) })));
+    const O=events.filter(e=>car(e)&&!mine.has(e)).map(e=>[e,e.a.vol]);
+    return ()=>{ for(const L of W) for(const {e,v} of L){ if(typeof e.a.vol!=='number') return `the ${e.fn} at beat ${K.beat(e.t)} has no volume`;
+        if(Math.abs(e.a.vol-v)>1e-6) return `the ${e.fn} at beat ${K.beat(e.t)} has volume ${e.a.vol}, intended ${+v.toFixed(6)}`; }
+      for(const [e,v] of O) if(events.includes(e) && e.a.vol!==v) return `another note's ${e.fn} at beat ${K.beat(e.t)} changed its volume ${v} → ${e.a.vol}`;
+      return null; }; };
+  const bars=ly=>{ const B=pnBars(ly), N=songNotes().notes.filter(n=>n.layer===ly && n.evs.some(car));
+    if(B.length!==N.length) return `L${ly+1}: ${B.length} bars for ${N.length} notes`;
+    for(let i=0;i<N.length;i++){ const b=B[i], n=N[i], h=n.evs.find(car);
+      if(b.ev!==n.head || b.t!==n.start) return `L${ly+1}: bar ${i+1} is not at its note's start`;
+      if(b.v!==h.a.vol) return `L${ly+1}: bar ${i+1} shows ${b.v}, its note starts at ${h.a.vol}`; }
+    return null; };
+  try{
+    for(const role of ['bs','ch','ld']){
+      const ly=K.layersOf(role)[0] ?? null; if(ly==null){ lack(`an unfrozen ${role} track`); continue; }
+      song++; cases++;
+      { const d=bars(ly); if(d) miss(`${role}: ${d}`); }
+      const W=K.segsOf(ly).filter(K.single).slice(0,2);
+      if(W.length<2){ lack(`two single ${role} notes in one track`); continue; }
+      const h0=W[0].note.head, h1=W[1].note.head;
+      K.rt(`${role}: one bar −15`, ly, ()=>{ const c=shifted([h0],-0.15), r=editVolSel([h0],-0.15); return r && { r, check:c }; });
+      K.rt(`${role}: two selected bars +10`, ly, ()=>{ const c=shifted([h0,h1],0.1), r=editVolSel([W[0].ev,W[1].ev],0.1); return r && { r, check:c }; });
+      K.rt(`${role}: a bar pulled past the top (clamped at 100)`, ly, ()=>{ const c=shifted([h0],5), r=editVolSel([h0],5); return r && { r, check:c }; });
+      K.rt(`${role}: a bar pulled to the floor (0 is a value)`, ly, ()=>{ const c=shifted([h0],-5), r=editVolSel([h0],-5); return r && { r, check:c }; });
+    }
+    /* (5) a held note inside a hand-drawn smooth segment: the lane's point mid-note gives it an anchor and ramp events ('r', generated) */
+    { const g=K.findIn('ch',x=>K.single(x) && x.note.end-x.start>=2) || K.findIn('bs',x=>K.single(x) && x.note.end-x.start>=2);
+      if(!g) lack('a chord or bass note of two beats or more');
+      else { const ly=g.layer, mid=g.start+(g.note.end-g.start)/2, head=g.note.head;
+        K.rt(`${laneRoleOf(ly)}: a bar edit on a note with a smooth Volume ramp (ramp marks become steps)`, ly, ()=>{
+          const n=noteOf(head), marked=n.evs.some(e=>e.a&&((e.a.sh&&e.a.sh[MK])||(e.a.gen&&e.a.gen[MK])));
+          if(!marked) return miss(`${laneRoleOf(ly)}: the set-up point made no ramp inside the note`), false;
+          const c=shifted([head],0.05), r=editVolSel([head],0.05);
+          return r && { r, check:()=>{ const d=c(); if(d) return d;
+            for(const e of noteOf(head).evs){ const s=e.a.sh&&e.a.sh[MK], x=e.a.gen&&e.a.gen[MK];
+              if(s==='r'||s==='s'||x) return `the ${e.fn} at beat ${K.beat(e.t)} kept a Volume ramp mark (${s||'gen'})`; }
+            return null; } }; },
+          { prep:()=>!!autAddPoint(ly,FX_VOL,'amt',mid,0.35) }); } }
+    /* (6) two drum hits on one beat (kick 0.8, hat 0.5), a temporary take at the song end; then its control through the line */
+    if(editIsOpen()) editClose();
+    const S00=K.snap(); let tmpLy=null;
+    { const T=Math.ceil(songBeats())+8, R=seedTake([{ fn:'drum', a:{ row:0, vol:0.8, kit:0 }, t:T }, { fn:'drum', a:{ row:3, vol:0.5, kit:0 }, t:T }, { fn:'drum', a:{ row:0, vol:0.7, kit:0 }, t:T+1 }]);
+      tmpLy= R ? events.find(e=>e.tk===R.take&&e.fn==='drum')?.layer ?? null : null; }
+    if(tmpLy==null) miss('drums: the temporary drum take could not be recorded');
+    else { song++;
+      const H=events.filter(e=>e.layer===tmpLy&&e.fn==='drum').sort((a,b)=>a.t-b.t||a.a.row-b.a.row), kick=H[0], hat=H.find(e=>e.t===kick.t&&e!==kick);
+      if(!hat) miss('drums: the two hits did not land on one beat');
+      else {
+        K.rt('dr: one of two hits on one beat +10 (the other keeps its volume)', tmpLy, ()=>{ cases++; const d=bars(tmpLy); if(d) miss(`dr: ${d}`);
+          const c=shifted([kick],0.1), r=editVolSel([kick],0.1); return r && { r, check:c }; });
+        /* CONTROL: the line holds one value per beat — the same edit there must flatten the hat */
+        cases++;
+        if(!(editIsOpen() ? editSetLayer(tmpLy) : editOpen(tmpLy))) miss('drums control: the editor would not open');
+        else { const A=autAddrs(tmpLy).find(a=>a.fx===FX_VOL), D=A&&autPoints(tmpLy,A.key,A.fx,A.p), pt=D&&D.pts.find(r=>Math.abs(r.pt.t-kick.t)<1e-9&&Math.abs(r.pt.v-0.8)<1e-9);
+          const hatV=hat.a.vol, ok=pt && autMovePoint(pt.pt, pt.pt.t, 0.9);
+          if(!ok) miss('drums control: the line edit was refused');
+          else { if(hat.a.vol===hatV) miss(`CONTROL: the line edit left the hat at ${hatV} — the per-note check would not catch a one-value-per-beat edit`);
+            if(!editUndo()) miss('drums control: undo refused'); } }
+      }
+      if(editIsOpen()) editClose();
+      laneDelTap(tmpLy); laneDelTap(tmpLy);
+      { const d=K.same(K.snap(),S00); if(d) miss(`drums: the song is not back as it was after the temporary take — ${d}`); } }
+  } finally { if(editIsOpen()) editClose(); }
+  console.log(`[scaleprobe ED5] tracks ${song} · cases ${cases} · differences ${nBad}`);
+  if(absent.length) console.log('[scaleprobe ED5] not in this song (not checked): '+[...new Set(absent)].join('; '));
+  bad.slice(0,PRINT_MAX).forEach(m=>console.warn('[scaleprobe ED5] '+m));
+  if(!nBad) console.log('[scaleprobe ED5] one bar per note at its own start volume; a bar drag shifts every volume value of its notes by the same amount (clamped, never unset) and nothing else; smooth ramp marks of an edited note become steps; two hits on one beat keep their own volumes (CONTROL: the line flattens them); one history entry each, undo/redo bit for bit');
+  return out();
 }
 /* ═══ ДОРОЖЕК БОЛЬШЕ, ЧЕМ СТРОК НА ЭКРАНЕ — P.checkTracks (починка «дорожки дальше 16-й не видны») ═══
    Для КАЖДОЙ дорожки песни: (1) СТРОКА — после прокрутки полосы (laneRow0, как листает палец) она среди нарисованных строк, целиком на
@@ -2123,7 +2848,7 @@ export async function checkLiveIsolation(){
     WchOff('latch'); await sleep(80); return r; };
   const mixOf=k=>{ const st=chainStateOf(k); const r=st.vals.reverb; return r ? r[fxParamKeysOf('reverb').indexOf('mix')] : null; };
   const keep={ pan:lanePanOf(C), rgn:regionOn(), liveMix:mixOf(LK) };
-  let frozeC=false, ptAdded=false, volBack=null, mix=null;
+  let frozeC=false, ptAdded=false, hist=null, mix=null;
   const play=async(ms)=>{ seekTo(Math.max(0,tl-1)); onLoop(); await sleep(ms); };
   const stop=async()=>{ if(loop.on) onLoop(); await sleep(60); };
   try{
@@ -2133,11 +2858,12 @@ export async function checkLiveIsolation(){
     /* 1) edits in the editor */
     editOpen(C);
     { const D=autPoints(C,LK,FX_VOL,'amt'), r=D&&D.pts&&D.pts.find(x=>x.pt&&!x.pt.unset);
-      if(r){ volBack={ t:r.pt.t, v:r.pt.v }; autMovePoint(r.pt, r.pt.t, Math.max(0, r.pt.v-0.5)); } else notes.push('no volume point to move'); }
+      if(r) autMovePoint(r.pt, r.pt.t, Math.max(0, r.pt.v-0.5)); else notes.push('no volume point to move'); }
     ptAdded=!!autAddPoint(C,'reverb','mix',tl,0.02);
     if(!ptAdded) miss(`${Lb}: the editor did not take a reverb-mix point`);
     setLanePan(C,-0.6);
     same('editor open, after volume, effect and pan edits');
+    hist=editHistPeek();   // the edits are walked back through the editor's own undo at the end (exact payloads, no shape marks left)
     editClose(); same('after leaving the editor');
     /* 2) the track plays through events (unfrozen) */
     await play(1100);
@@ -2184,12 +2910,10 @@ export async function checkLiveIsolation(){
     if(loop.on) onLoop();
     setLiveIsolation(true);
     if(frozeC) unfreezeLayer(C);
-    if(editIsOpen()) editClose();
-    /* undo the edits: the reverb point, the volume point, the pan; the live mix */
-    if(ptAdded||volBack){ editOpen(C);
-      if(ptAdded){ const D=autPoints(C,LK,'reverb','mix'), row=D&&D.pts&&D.pts.find(x=>x.pt&&Math.abs(x.pt.t-tl)<1e-9&&Math.abs(x.pt.v-0.02)<1e-9); if(row) autDeletePoint(row); }
-      if(volBack){ const D=autPoints(C,LK,FX_VOL,'amt'), row=D&&D.pts&&D.pts.find(x=>x.pt&&!x.pt.unset); if(row) autMovePoint(row.pt, volBack.t, volBack.v); }
-      editClose(); }
+    if(editIsOpen()){ if(!hist) hist=editHistPeek(); editClose(); }
+    /* undo the editor edits (volume point, reverb point) through the editor's own history — the exact payloads come back; restoring by
+       moving the point again left a hand-shape mark ('sh') on the seed's volume and failed «seed notes as intended» in a later P.all */
+    if(hist&&hist.length){ editOpen(C); if(!editRevert(hist)) miss(`${Lb}: the editor edits could not be reverted`); editClose(); }
     setLiveLeakDbg(null);
     if(mix){ for(const [ly,v] of mix.lv) setLaneLevel(ly,v); for(const [ly,v] of mix.pn) setLanePan(ly,v);
       if(armedLayer()!==mix.arm){ if(armedLayer()!=null) toggleArm(armedLayer()); if(mix.arm!=null) toggleArm(mix.arm); } }
@@ -2538,6 +3262,7 @@ export async function seed(opt={}){
   SEED_REC.pinned=pinned.length; SEED_REC.soloSnap=pinned.soloSnap;   // AF5: the map given to map-less solo notes — checkSeed accepts exactly it
   console.log(`[scaleprobe seed] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned${pinned.length?' ('+pinned.map(l=>'L'+(l+1)).join(', ')+')':''}; ${pinned.soloMaps||0} solo note event(s) without an effect map got the live solo snapshot (AF5)`);
   const M=material();
+  histReset();   // ED7: the seed starts with an empty history
   console.log(`[scaleprobe seed] built ${events.length} events; song material ${M.ok?'complete':'INCOMPLETE — missing '+M.missing.join('; ')}. Now run P.all().`);
   return { built, events:events.length, material:M };
 }

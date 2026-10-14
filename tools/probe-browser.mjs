@@ -10,6 +10,12 @@
                                                      строк реального времени по прогонам и запас до допуска
    Ключи: --headed (обычное окно, вынесенное за экран, вместо безголового), --browser chrome|msedge, --limit-min M (потолок на один
    P.all, умолчание 5; P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
+   Hygiene: at start it lists browsers left by earlier runner sessions (found by Playwright's temporary profile path) and orphaned
+   profile folders; --kill-stale kills / removes them (--clean-only: only that, then exit). Every exit path (end, failure, time limit,
+   Ctrl+C, SIGTERM, uncaught error) closes the browser with a bounded wait, then kills its process tree, then closes the server;
+   --selftest-exit sigint|error fires one of those paths 3 s after ▶ (a cleanup test; the run fails by design).
+   UI checks with trusted input after the seed (section rename by double click / double tap / §✎, with its control; a bend point dragged
+   with the mouse); --no-ui skips them.
    ⛳ УСТРОЙСТВО (почему так):
    • Свой статический сервер на свободном порту 127.0.0.1 (не Live Server, не 5500) — поднимается и гасится скриптом; файлы с диска
      как есть, без кэша (Cache-Control: no-store), запрос (?render…) отбрасывается — так же, как его видит любой статический сервер.
@@ -21,7 +27,8 @@
    • Полная консоль страницы — в файл tools/.probe-logs/<время>-<режим>.log (в .gitignore); на экран — только строки проб.
    ⚠️ Нужен интернет: MediaPipe грузится с CDN (как у приложения). */
 import http from 'node:http';
-import { readFile, mkdir, writeFile, appendFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile, appendFile, readdir, rm } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
@@ -45,6 +52,73 @@ const out=s=>process.stdout.write(s+'\n');
 const stamp=()=>new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
 let LOG=null;
 const log=async s=>{ if(LOG) await appendFile(LOG, s+'\n'); };
+
+/* ---------- hygiene: browsers and profiles left by earlier runner sessions ----------
+   Playwright launches every browser with a fresh profile under os.tmpdir() named PROFILE_TAG-xxxxxx; that path in a command line is
+   the runner's fingerprint. A hard kill of node (a tool timeout) runs no handler, so the next start looks for what was left. */
+const PROFILE_TAG='playwright_chromiumdev_profile';
+const KILL_STALE=has('--kill-stale')||has('--clean-only'), CLEAN_ONLY=has('--clean-only');
+function procList(){
+  try{
+    if(process.platform==='win32'){
+      const q=`Get-CimInstance Win32_Process -Filter "Name='chrome.exe' OR Name='msedge.exe' OR Name='chromium.exe' OR Name='node.exe'" | Select-Object ProcessId,ParentProcessId,Name,CommandLine,@{n='Started';e={$_.CreationDate.ToString('s')}} | ConvertTo-Json -Compress`;
+      const r=execFileSync('powershell',['-NoProfile','-Command',q],{ encoding:'utf8', maxBuffer:64<<20, windowsHide:true });
+      const j=r.trim()?JSON.parse(r):[]; return (Array.isArray(j)?j:[j]).map(p=>({ pid:p.ProcessId, ppid:p.ParentProcessId, name:p.Name, cmd:p.CommandLine||'', started:p.Started }));
+    }
+    const r=execFileSync('ps',['-eo','pid=,ppid=,lstart=,args='],{ encoding:'utf8', maxBuffer:64<<20 });
+    return r.trim().split('\n').map(l=>{ const m=l.trim().match(/^(\d+)\s+(\d+)\s+(\w+\s+\w+\s+\d+\s+[\d:]+\s+\d+)\s+(.*)$/); return m&&{ pid:+m[1], ppid:+m[2], started:m[3], cmd:m[4], name:m[4].split(/\s/)[0] }; }).filter(Boolean);
+  }catch(e){ return null; }
+}
+const profOf=c=>{ const m=c.match(new RegExp(PROFILE_TAG+'-[A-Za-z0-9]+')); return m&&m[0]; };
+/* runner browsers grouped by profile; a group is LEFTOVER unless its main process's parent is a live node (a runner running now) */
+function runnerBrowsers(){
+  const L=procList(); if(!L) return null;
+  const alive=new Map(L.map(p=>[p.pid,p])), groups=new Map();
+  for(const p of L){ const pr=profOf(p.cmd); if(!pr) continue; if(!groups.has(pr)) groups.set(pr,{ profile:pr, procs:[], main:null }); const g=groups.get(pr); g.procs.push(p); if(!/--type=/.test(p.cmd)) g.main=p; }
+  for(const g of groups.values()){ const par=g.main&&alive.get(g.main.ppid); g.owner= par&&/node/i.test(par.name||par.cmd) ? par.pid : null; g.mine= g.owner===process.pid; }
+  return [...groups.values()];
+}
+function killTree(pid){ try{ if(process.platform==='win32') execFileSync('taskkill',['/PID',String(pid),'/T','/F'],{ stdio:'ignore', windowsHide:true }); else process.kill(pid,'SIGKILL'); return true; }catch(e){ return false; } }
+async function rmProfile(dir){ for(let i=0;i<5;i++){ try{ await rm(dir,{ recursive:true, force:true }); return true; }catch(e){ await new Promise(r=>setTimeout(r,400)); } } return false; }
+async function staleScan(){
+  const G=runnerBrowsers();
+  if(!G){ out('[probe-browser] hygiene: could not list processes (skipped)'); return; }
+  const left=G.filter(g=>!g.owner), other=G.filter(g=>g.owner&&!g.mine);
+  const used=new Set(G.map(g=>g.profile));
+  let dirs=[]; try{ dirs=(await readdir(os.tmpdir())).filter(n=>n.startsWith(PROFILE_TAG)&&!used.has(n)); }catch(e){}
+  for(const g of other) out(`[probe-browser] hygiene: a runner session is running now (node pid ${g.owner}, ${g.procs.length} browser processes, ${g.profile}) — left alone`);
+  if(!left.length && !dirs.length){ out('[probe-browser] hygiene: no leftover runner browsers, no orphaned profiles'); return; }
+  for(const g of left) out(`[probe-browser] hygiene: LEFTOVER runner browser — ${g.procs.length} processes, main pid ${g.main?g.main.pid:'?'} started ${g.main?g.main.started:'?'}, ${g.profile}${KILL_STALE?'':' (run with --kill-stale to kill it)'}`);
+  if(dirs.length) out(`[probe-browser] hygiene: ${dirs.length} orphaned profile folder(s) in ${os.tmpdir()}${KILL_STALE?'':' (--kill-stale removes them)'}`);
+  if(!KILL_STALE) return;
+  for(const g of left){ const ok=g.main?killTree(g.main.pid):g.procs.map(p=>killTree(p.pid)).some(Boolean); out(`[probe-browser] hygiene: killed ${g.profile} → ${ok?'done':'FAILED'}`); dirs.push(g.profile); }
+  let n=0; for(const d of dirs) if(await rmProfile(path.join(os.tmpdir(),d))) n++;
+  out(`[probe-browser] hygiene: removed ${n} of ${dirs.length} profile folder(s)`);
+}
+
+/* every browser this process launched is closed on every exit path (bounded wait, then its process tree), then the server */
+const LIVE={ browsers:new Set(), srv:null, closing:null };
+const timeout=(ms,v)=>new Promise(r=>setTimeout(()=>r(v),ms));
+async function closeBrowser(b){
+  if(!LIVE.browsers.has(b)) return; LIVE.browsers.delete(b);
+  const ok=await Promise.race([ b.close().then(()=>true,()=>false), timeout(10e3,false) ]);
+  const mine=(runnerBrowsers()||[]).filter(g=>g.mine);   // whatever is still ours after close
+  for(const g of mine){ if(g.main) killTree(g.main.pid); else g.procs.forEach(p=>killTree(p.pid)); await rmProfile(path.join(os.tmpdir(),g.profile)); }
+  if(!ok || mine.length) out(`[probe-browser] browser close ${ok?'returned':'TIMED OUT'}; ${mine.length} process group(s) killed by tree`);
+}
+function closeAll(){ return LIVE.closing||(LIVE.closing=(async()=>{ for(const b of [...LIVE.browsers]) await closeBrowser(b); if(LIVE.srv){ if(LIVE.srv.closeAllConnections) LIVE.srv.closeAllConnections(); LIVE.srv.close(); LIVE.srv=null; } })()); }
+let EXITING=false;
+async function bail(code, why){
+  if(EXITING) return; EXITING=true; out(`\n[probe-browser] ${why} — closing the browser and the server`);
+  await Promise.race([ closeAll(), timeout(20e3) ]);
+  const left=(runnerBrowsers()||[]).filter(g=>g.mine); out(`[probe-browser] cleanup done — ${left.length?left.length+' process group(s) STILL ALIVE':'no runner browser left'}`);
+  process.exit(code);
+}
+process.on('SIGINT', ()=>bail(130,'interrupted (Ctrl+C)'));
+process.on('SIGTERM', ()=>bail(143,'terminated (SIGTERM)'));
+process.on('SIGHUP', ()=>bail(129,'hang-up (SIGHUP)'));
+process.on('uncaughtException', e=>bail(1,'uncaught error: '+(e&&e.stack||e)));
+process.on('unhandledRejection', e=>bail(1,'unhandled rejection: '+(e&&e.stack||e)));
 
 /* ---------- статический сервер ---------- */
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8',
@@ -98,6 +172,86 @@ async function LEAK_PAGE({ N, margin }){
   } finally { R.renderKsLazy(keep); }
 }
 
+/* ---------- UI check with REAL input (ED6 rename fix): a double click / double tap on a section marker opens its name field and keeps it ----------
+   Synthetic DOM events carry no default actions (the focus move of a press), so this runs from here with trusted input: Playwright's mouse
+   and CDP touch. The page part puts one marker in the window and reports its screen point; after the gesture the field must be visible and
+   focused 400 ms later; typing a name + Enter must rename the marker. CONTROL (when the app has the switch): the old behaviour — the field
+   opened inside the second press, no blur guard — must fail. Everything is undone: the window closed, the marker removed, the history reset. */
+async function uiSecRename(page, cdp, label){
+  const lines=[], bad=[];
+  const prep=await page.evaluate(async ()=>{
+    const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js'), D=await import('./src/draw.js');
+    UI.arrApi.open();
+    const M=REC.loop.metre; let m=REC.sections()[0];
+    if(!m){ m=REC.secAdd(M,'Probe'); }
+    for(let i=0;i<4;i++) await new Promise(r=>requestAnimationFrame(()=>r()));
+    const g=D.arrGeom(), r=document.getElementById('canvas').getBoundingClientRect();
+    const mk=g&&g.sec&&g.sec.marks.find(x=>x.id===m.id);
+    if(!mk) return { ok:false, why:'the marker is not drawn in the window' };
+    return { ok:true, id:m.id, x:r.left+(mk.x0+mk.x1)/2, y:r.top+(g.sec.y0+g.sec.y1)/2, ctl:!!(UI.arrApi.secRenameDbg) };
+  });
+  if(!prep.ok) return { pass:false, lines:[`${label}: ${prep.why}`] };
+  const state=()=>page.evaluate(()=>{ const el=document.getElementById('secNameIn'); return { open:!!el&&!el.hidden, focused:document.activeElement===el }; });
+  const nameOf=id=>page.evaluate(async id=>{ const REC=await import('./src/recorder.js'); const m=REC.sections().find(x=>x.id===id); return m&&m.name; }, prep.id);
+  const touchTap=async(x,y)=>{ const p=[{ x, y, radiusX:6, radiusY:6, force:1, id:1 }];
+    await cdp.send('Input.dispatchTouchEvent',{ type:'touchStart', touchPoints:p }); await page.waitForTimeout(40);
+    await cdp.send('Input.dispatchTouchEvent',{ type:'touchEnd', touchPoints:[] }); };
+  const tryOne=async(how, name)=>{
+    if(how==='mouse') await page.mouse.dblclick(prep.x, prep.y, { delay:30 });
+    else { await touchTap(prep.x,prep.y); await page.waitForTimeout(120); await touchTap(prep.x,prep.y); }
+    await page.waitForTimeout(400);
+    const s=await state();
+    if(!s.open||!s.focused) return `${how}: after the double ${how==='mouse'?'click':'tap'} the name field is ${s.open?'open but not focused':'closed'}`;
+    await page.keyboard.press('Control+A'); await page.keyboard.type(name); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+    const n=await nameOf(); if(n!==name) return `${how}: typed «${name}» + Enter, the marker is named «${n}»`;
+    return null; };
+  for(const [how,name] of [['mouse','Bridge'],['touch','Coda']]){ const d=await tryOne(how,name); if(d) bad.push(d); else lines.push(`${how}: double ${how==='mouse'?'click':'tap'} opened the field, «${name}» kept`); }
+  { await page.mouse.click(prep.x, prep.y); await page.waitForTimeout(450);   // the second way: select the marker, then §✎
+    await page.click('#secRen'); await page.waitForTimeout(300);
+    const st=await state();
+    if(!st.open||!st.focused) bad.push(`button: §✎ after selecting the marker left the field ${st.open?'unfocused':'closed'}`);
+    else { await page.keyboard.press('Control+A'); await page.keyboard.type('Outro'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+      const n=await nameOf(); if(n!=='Outro') bad.push(`button: typed «Outro» + Enter, the marker is named «${n}»`); else lines.push('button: §✎ on the selected marker opened the field, «Outro» kept'); } }
+  if(prep.ctl){
+    await page.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.secRenameDbg('down'); });
+    const d=await tryOne('mouse','Ctrl');
+    await page.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.secRenameDbg(null); const el=document.getElementById('secNameIn'); if(el&&!el.hidden){ el.dispatchEvent(new KeyboardEvent('keydown',{ key:'Escape' })); } });
+    if(!d) bad.push('CONTROL: with the field opened inside the second press (the old code) the double click still worked — the check cannot fail');
+    else lines.push(`control (old behaviour) fails as it must — ${d}`);
+  } else lines.push('no control switch in this build (arrApi.secRenameDbg) — control not run');
+  await page.evaluate(async id=>{ const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js');
+    if(REC.secDelete) REC.secDelete(id); if(REC.histReset) REC.histReset(); else if(REC.songHistReset) REC.songHistReset(); UI.arrApi.close(); }, prep.id);
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
+/* ---------- UI check with REAL input (OWN2): drag a bend point of the selected theremin note upward → higher cents, one history step ---------- */
+async function uiBendDrag(page, label){
+  const prep=await page.evaluate(async ()=>{
+    const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js'), D=await import('./src/draw.js'), ST=await import('./src/state.js');
+    const n=REC.songNotes().notes.find(x=>x.role==='ld' && x.head.a && x.head.a.bend && x.head.a.bend.length>=3 && REC.freezeState(x.layer)==='none');
+    if(!n) return { ok:false, why:'no theremin note with three points' };
+    UI.arrApi.open(); UI.arrApi.openTrack(n.layer);
+    UI.arrApi.setWin(Math.max(0,n.start-1), (n.end-n.start)+2);
+    ST.setRollSel(n.head); REC.histReset();
+    for(let i=0;i<4;i++) await new Promise(r=>requestAnimationFrame(()=>r()));
+    const P=D.rollBendProbe(), r=document.getElementById('canvas').getBoundingClientRect();
+    if(!P||P.length<3) return { ok:false, why:'the handles are not drawn on the selected theremin note' };
+    window.__bendEv=n.head;
+    return { ok:true, x:r.left+P[1].x, y:r.top+P[1].y, c0:P[1].c };
+  });
+  if(!prep.ok) return { pass:false, lines:[`${label}: ${prep.why}`] };
+  await page.mouse.move(prep.x, prep.y); await page.mouse.down();
+  for(let k=1;k<=6;k++){ await page.mouse.move(prep.x, prep.y-k*6); await page.waitForTimeout(16); }
+  await page.mouse.up(); await page.waitForTimeout(150);
+  const after=await page.evaluate(async ()=>{ const REC=await import('./src/recorder.js'); const e=window.__bendEv; return { c:e.a.bend[1].c, n:REC.histLen() }; });
+  const lines=[], bad=[];
+  if(!(after.c>prep.c0)) bad.push(`dragging point 2 up 36 px left its cents at ${after.c} (was ${prep.c0})`);
+  else if(after.n!==1) bad.push(`the drag left ${after.n} history steps, one intended`);
+  else lines.push(`dragging point 2 up: ${prep.c0} → ${after.c} cents, one history step`);
+  await page.evaluate(async ()=>{ const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js'); while(REC.histLen()) if(!REC.histUndo()) break; REC.histReset(); UI.arrApi.closeTrack(); UI.arrApi.close(); delete window.__bendEv; });
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
 /* ---------- срок ---------- */
 function within(p, ms, what){ let t; return Promise.race([ p.finally(()=>clearTimeout(t)), new Promise((_,rej)=>{ t=setTimeout(()=>rej(new Error(`TIME LIMIT — ${what} did not finish within ${Math.round(ms/1000)} s`)), ms); }) ]); }
 
@@ -106,7 +260,8 @@ async function session(port, plan, label){
   const args=['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required',
     '--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding','--disable-features=CalculateNativeWinOcclusion'];
   if(HEADED) args.push('--window-position=-2600,0','--window-size=1280,800');   // обычное окно, но за экраном: вкладка видима, кадры идут
-  const browser=await chromium.launch({ channel:BROWSER, headless:!HEADED, args });
+  const browser=await chromium.launch({ channel:BROWSER, headless:!HEADED, args, handleSIGINT:false, handleSIGTERM:false, handleSIGHUP:false });
+  LIVE.browsers.add(browser);
   const res={ label, runs:[], seed:null, error:null };
   let page=null;
   try{
@@ -130,6 +285,9 @@ async function session(port, plan, label){
     out(`[${label}] page open — waiting for the app and the probe module`);
     await within(page.waitForFunction(()=>window.P && window.R, null, { timeout:0 }), 60e3, 'loading the app');
     await page.click('#startBtn');
+    /* --selftest-exit sigint|error: fire that exit path once the app is starting (tests the cleanup; the run fails by design) */
+    const ST=val('--selftest-exit',null);
+    if(ST) setTimeout(()=>{ if(ST==='sigint') process.emit('SIGINT'); else Promise.reject(new Error('selftest')); }, 3000);
     out(`[${label}] ▶ Play pressed — waiting for the start (hand-tracking model from the CDN, fake camera)`);
     await within(page.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:0 }), LIMIT_START, 'the app start');
     const env=await page.evaluate(async ()=>{ const A=await import('./src/audio.js'); return { hidden:document.hidden, visibility:document.visibilityState, ac:A.AC&&A.AC.state, rate:A.AC&&A.AC.sampleRate, ua:navigator.userAgent }; });
@@ -151,6 +309,14 @@ async function session(port, plan, label){
     out(`[${label}] P.seed finished in ${((Date.now()-t0)/1000).toFixed(1)} s — ${res.seed?res.seed.events+' events, material '+(res.seed.material?'complete':'INCOMPLETE'):'refused'}`);
     if(!seedOk){ res.error='P.seed did not finish with complete material'; return res; }
     if(!res.guard){ res.error='the console guard did not refuse P.quick() during P.seed'; return res; }
+    if(!has('--no-ui')){   // the trusted-input UI check (section rename) — every session; --no-ui skips it
+      const ucdp=await ctx.newCDPSession(page);
+      res.ui=await within(uiSecRename(page, ucdp, `[${label}] UI section rename`), 60e3, 'the UI check').catch(e=>({ pass:false, lines:[`[${label}] UI section rename: ERROR — ${e&&e.message||e}`] }));
+      for(const l of res.ui.lines) out(l);
+      const ub=await within(uiBendDrag(page, `[${label}] UI bend drag`), 60e3, 'the bend UI check').catch(e=>({ pass:false, lines:[`[${label}] UI bend drag: ERROR — ${e&&e.message||e}`] }));
+      for(const l of ub.lines) out(l);
+      res.ui={ pass:res.ui.pass&&ub.pass, lines:[...res.ui.lines, ...ub.lines] };
+    }
     if(EVAL||LEAK){   // memory helpers for --eval and --leak
       /* window.__heap(): full GC, then V8 heap usage incl. ArrayBuffer backing stores (memory checks in --eval only) */
       const cdp=await ctx.newCDPSession(page);
@@ -182,7 +348,11 @@ async function session(port, plan, label){
       seen.length=0;
     }
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
-  finally{ if(page) await page.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}); await browser.close().catch(()=>{}); }
+  finally{
+    // resume the watcher (bounded: a page stuck past a time limit must not keep the browser alive), then close
+    if(page) await Promise.race([ page.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}), timeout(5e3) ]);
+    await closeBrowser(browser);
+  }
   return res;
 }
 
@@ -212,11 +382,13 @@ function repeatTable(sessions){
 }
 
 /* ---------- main ---------- */
+await staleScan();
+if(CLEAN_ONLY) process.exit(0);
 await mkdir(LOGDIR,{ recursive:true });
 const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',LEAK&&'leak'].filter(Boolean).join('+');
 LOG=path.join(LOGDIR, `${stamp()}-${mode}.log`);
 await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
-const srv=await serve(), port=srv.address().port;
+const srv=await serve(), port=srv.address().port; LIVE.srv=srv;
 out(`[probe-browser] ${BROWSER}, ${HEADED?'headed window placed off-screen':'headless'}; static server http://127.0.0.1:${port}; full console log → ${path.relative(ROOT,LOG)}`);
 const T00=Date.now();
 const sessions=[];
@@ -226,7 +398,10 @@ try{
     for(let i=1;i<=REPEAT;i++){ out(`\n[probe-browser] run ${i} of ${REPEAT} — fresh browser, fresh profile`); await log(`===== run ${i} of ${REPEAT} =====`);
       sessions.push(await session(port, QUICK?['quick','all']:['all'], `run ${i}/${REPEAT}`)); }
   } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all'].filter(Boolean), mode||'eval'));
-} finally { srv.close(); }
+} finally { await closeAll(); }
+if(EXITING) await new Promise(()=>{});   // a signal/error path is closing — it prints and exits itself
+const stillMine=(runnerBrowsers()||[]).filter(g=>g.mine);
+out(`[probe-browser] cleanup: ${stillMine.length?stillMine.length+' runner browser group(s) STILL ALIVE':'browser and server closed, no runner browser left'}`);
 out('\n=== summary ===');
 for(const s of sessions){
   if(s.error){ pass=false; out(`[${s.label}] NOT A PASS — ${s.error}`); }
@@ -237,6 +412,7 @@ for(const s of sessions){
     if(!r.pass) pass=false;
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
+  if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }

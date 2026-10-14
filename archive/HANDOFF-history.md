@@ -6157,3 +6157,167 @@ compare without `sh`. No signature changed; new callers listed in the report.
 - Open questions for the user: transport playing (hearing the sum with the quieter track)? the MASTER strip (directly under the row)?
   the deployed build (GitHub Pages) or the local one? — and `R.liveCheck()` output.
 - BACKLOG §7.14 (effect chains target design), §7.15 (modes/presets as bundles). Runner: `--quick` PASS (58.4 s), `--all` PASS (293.2 s).
+
+
+### Moved from HANDOFF.md at ED3/ED4 (English slice records)
+### ED2 (2026-10-13) — copy, paste, duplicate (full: archive B, «ED1 + ED2»)
+- ⧉ copy · 📋 paste at the playhead · ⧉⁺ duplicate after the selection (Ctrl/⌘+C/V/D); clipboard lives for the app session; paste only
+  into a track of the same role and view (refusal says why); pasted notes become the selection.
+- Third birth place: session take, fresh k/v per note, ties dropped, volume always, the TARGET track's timbre/kit (one source per track);
+  theremin `hold` kept (removing it would erase the bend — the plan said "removed"); bus automation not copied; adjacent selected segments
+  of a glide paste as ONE note. Duplicate offset: span to the snap step, past half a bar to whole bars.
+- Row «ED2 copy, paste, duplicate» (16 cases): evHz = source, fresh take/keys, timbre (forced to differ), role refusal, undo/redo in order.
+### ED1 (2026-10-13) — several notes at once (full: archive B, «ED1 + ED2»)
+- ⬚ pick mode (or Shift): tap adds/removes, drag on empty space = box; Ctrl/⌘+A, Esc. A group drags (time + rows) and deletes as ONE
+  history entry (`recorder.editGroup` merges the single edits; a refusal rolls back). Fully selected glides move whole; parts detach.
+- ⛳ Fixed an old editor bug the row found: undo did not restore the ORDER of events at one beat (a note-off could fall after the next
+  note-on and orphan it). Birth numbers in `editGuard`, sort by (beat, birth).
+- Row «ED1 several notes at once» (18 cases). Fix rounds 2. Runner: `--quick` PASS 44.8 s, `--all` PASS 141.4 s, data PASS. ⚠️ `--quick
+  --all` in ONE session fails «seed notes as intended»: the AF5 row leaves `sh` on a seed chord (pre-existing; not fixed).
+
+### Moved from HANDOFF.md at ED3/ED4 — AF1 user decisions (English, verbatim)
+User decisions (AF1): no mono (pan baked); frozen sound is a CACHE recomputable from notes;
+(a) store only notes + tail, a track repeating under the brace — ONE cycle; (b) 16-bit in memory, sample-exact chunks (✅ AF6b);
+(c) later, after saving — on the device in chunks, survives reload (project folder, else browser cache); (d) Opus only as an
+optional low-memory mode, never default, never MP3 (encoder padding breaks joins); memory budget only as a safety net · freeze the
+TONIC before any tonic/A4/tempo trigger (until then AF3 doesn't re-render on them) · swap: first rest within 2 bars, else bar line
++ 20 ms crossfade (✅) · AF4: a pale dot by the row ONLY in the arrangement window (hollow = waiting, pulsing = rendering) ·
+re-render order: audible and near the playhead first (✅ `qRank`) · a track with no captured chain gets the LIVE chain's snapshot AT
+BIRTH and never follows live knobs again (inserted notes follow the track's chain; solo notes copy the neighbour's map; plan in AF3)
+· settle delays 0.5 / 1.0 / 1.5 s.
+
+### Moved from HANDOFF.md at ED3/ED4 — minor known limits (English, verbatim)
+- Play-strip name column: timeline 261 → 203 px at 380 px; ≈ 33 px for the name, then ellipsis.
+- "step N MENU-PLAN" comments point into `archive/`. Barang patet (root ≠ 0): T5 probe compares in cents (1e-6).
+- AF6b residual margin 1.2 dB is deterministic (two overlapping readers at a seam ≤ 1 LSB = −90.3 dB re peak).
+
+### ✅ ED3 + ED4 + part 0 — QUANTISE AFTER RECORDING, TRANSPOSE BY DEGREES, AF5 PROBE LEFTOVER (2026-10-13; runner PASS; eye steps 73, 74 not yet done)
+User answers recorded first (HANDOFF «Editor essentials»): hold kept on paste; lessons/tutorial only as a final separate stage; OWN1 same
+tuning only, out-of-mode notes keep their offset; AF5 leftover to fix; step 69 closed (master fader); OWN3 deferred; the tonic-freeze plan
+proposes "key into index or view" itself.
+Part 0. Cause: P.checkLiveIsolation restored the seed's Volume point by `autMovePoint`, which freezes shapes and marks the point
+hand-placed (`sh:'h'`) — the payload differed, and «seed notes as intended» failed in a later P.all of the same session. Fix: the row keeps
+the session's history (`recorder.editHistPeek`, probe only) before closing the editor and, at the end, re-opens the track and walks it back
+(`recorder.editRevert` → `editApply(u,true)` in reverse + `editCommit`) — exact payloads and capture lanes. The P.all state guard gained
+'song events' (FNV-1a of every event in array order: beat, layer, fn, tk, jam, view id, sev, JSON payload): the same leftover would now be
+named on the AF5 row itself. First `--quick --all` reached the runner's 5-min P.all limit (slow machine: MX2 49 s); with `--limit-min 10`:
+P.quick PASS 79.0 s, P.all PASS 378.2 s, same session.
+ED3. `recorder.quantTo`, `quantPlan(n, sel, step, amt, S, E)`, `editQuantSel(evs, step, what, amt)` — per note (start order) inside
+`editGroup`, each note re-read from songSegs before its edit. Shift d of the whole note when its first segment is selected and it ends on
+its own note-off; boundaries (start of a selected segment / end of a selected previous one) to q(B) when it keeps ≥ EDIT_MIN_LEN on both
+sides (else unchanged); end: nearest line, or the next line after the last start when it would collapse; inner events crossed by a moved
+edge dropped; fresh identity when the new span reaches over another note of the key (only the added parts are checked, inclusive);
+bendTrim on a shortened theremin; drums with starts. ui: ⌗ `#rollQuant`, selects `#rollQGrid` (1, 1/2, 1/4, 1/8, 1/3, 1/6; default the
+snap step), `#rollQWhat`, `#rollQAmt`; i18n `roll.quantTitle`, `roll.qGridTitle`, `roll.qWhatTitle`, `roll.qAmtTitle`, `roll.qStart`,
+`roll.qEnd`, `roll.qBoth`, `roll.quantNone`. Row «ED3 quantise after recording» (16 cases; a shared kit `edKit` with round trip, exactly
+one history entry via `editHistPeek`, set-up edit undone and compared). Fix rounds 0.
+ED4. `scales.shiftDegrees(ti, oct, s, n)` (offset above the root within one period; nearest degree incl. the top tonic, tie → lower; degree
++ n; same offset; normalised into one period; the root one register above the last → (root+E, REG_N−1)). `recorder.degreePlan`,
+`editDegreeSel(evs, n)`, `editDegreeWhy`. ui: `#rollDegDn`/`#rollDegUp` (−1°/+1°), Alt+↓/↑; i18n `roll.degUpTitle`, `roll.degDnTitle`,
+`roll.degReg`, `roll.degFit`, `roll.degNone`. Rows: browser «ED4 transpose by degrees» (16 cases; expectation by absolute tuning steps),
+node+browser «ED4 degrees (sweep)» (98 views, 216 480 cases, 45 760 out of the mode, 20 416 ties; control: no off-mode or no tie → fail;
+SLOW_ROWS in the browser). Fix round 1: the probe moved ONE later glide segment +1 onto its neighbour's pitch (bass beat 8, solo 135) —
+the two segments merged (named behaviour of a pitch-only edit); the case now picks a shift that does not meet a neighbour.
+Positional callers: no existing signature changed. New: editQuantSel(selList(), +grid, what, +amt) in ui.rollQuantize; editDegreeSel(L, ±1)
+and editDegreeWhy(L, ±1) in ui.rollDegree; probe calls editQuantSel(evs, step, what, amt), editDegreeSel(evs, k), editDegreeWhy(evs, n),
+shiftDegrees(ti, oct, sc, k), editMoveSel(items, 0.137 | 0) as set-ups; recorder: shiftDegrees(s.ti, s.oct, s.sc, n), segPitchPt(s, ti, oct),
+segEvs(s), keyClash(n, a, b), bendTrim(B, L), quantPlan(note, set, step, amt, S, E).
+Final runner: data PASS 55.6 s (7 checks); `--quick --all` one session PASS — P.quick 72.5 s, P.all 328.4 s (48 checks), state guard clean.
+
+### Moved from HANDOFF.md at ED5/ED6 (English slice record)
+### ED3 + ED4 + part 0 (2026-10-13) — quantise, transpose by degrees, AF5 leftover (full: archive B, «ED3 + ED4»)
+- Part 0: the AF5 row now walks its editor edits back through the editor's own history (`recorder.editHistPeek`/`editRevert`, probe only)
+  instead of re-moving the volume point (that left `sh:'h'`). The P.all state guard now also fingerprints the song's EVENTS (payload,
+  marks, order), so a row leaving them changed is named at once. `--quick --all` in one session PASS.
+- ED3 ⌗ + grid/what/strength: `editQuantSel` — a start moves the whole note; a boundary inside a line moves alone (decision 4, no
+  detach); an end moves the own note-off; collapsing edges stay; crossed inner value events dropped; fresh key on overlap (E1).
+- ED4 −1°/+1° (Alt+↓/↑): `scales.shiftDegrees` (out-of-mode keeps its offset from the nearest degree, tie → lower; decision 5);
+  `editDegreeSel` pitch-only on every selected segment, one entry; refusals 'reg'/'fit'/'none' with toasts. Named: a segment moved onto
+  its glide neighbour's pitch merges with it (pitch-only edit, as an ED1 drag).
+- Rows «ED3 quantise after recording» (16), «ED4 transpose by degrees» (16), node «ED4 degrees (sweep)» (216 480; 45 760 out of the
+  mode, 20 416 ties; control: none → fail). Fix rounds: 0 (ED3), 1 (ED4: the probe's own collision case).
+
+### Moved from HANDOFF.md at ED5/ED6 — known limits (English, verbatim)
+- Frozen memory: 16 bit (192 KB/s stereo at 48 kHz); seed 99.4 MB → ≈ 49.4–49.7 MB (`P.freezeCost`, "today MB"); notes+tail would
+  save ≈ 3 MB; demo piece ≈ 280 → ≈ 140 MB; rest of AF6 (disk, paging, Opus fallback) open. No worklet → Float32 (2× memory).
+- AF2 bar-line crossfade: pre-scheduled drum tails and the role's live reverb tail play over the buffer's tails (hundreds of ms).
+- AF5 adds ≈ 100 GainNodes to the live graph (≈ +4 % real time on the slow dev desktop, synthetic; phone not measured).
+- Re-render repeatability: dry ≤ 1e-4, wet ≤ 2e-4 of peak; dry drift up to 1.54e-5 (≈ −96 dB) after many renders, node unknown.
+
+### ✅ ED5 + ED6 + runner hygiene — VOLUME BARS, SECTIONS, RUNNER CLOSES ITS BROWSER (2026-10-14; runner PASS; eye/ear steps 75, 76 not yet done)
+Part 0. The user saw P.all page time grow 140 → 380 s through 2026-10-13 and suspected runner browsers left running. Found on this machine:
+no runner browser process at all (only the user's own Chrome, up since 12.10 13:09, with a capture service alive), two orphaned Playwright
+profile folders from 12.10 21:19. Experiment: node hard-killed mid-run (taskkill /F — what a tool timeout does): 10 runner Chrome processes
+→ 0 within 4 s (Chrome exits when its pipe closes); only the profile folder stays. Log comparison 15:47 (141 s) vs 18:07 (328 s): render
+rows 4× slower (MX2 6 → 39 s, LR1 8 → 32 s, render repeatability 7.5 → 25 s), JS sweeps 1.3× (T1 9 → 12 s) — contention on the machine,
+not the probes. After cleanup, same code: P.quick 43.0 s, P.all 195.5 s. Fix anyway: `chromium.launch({handleSIGINT/SIGTERM/SIGHUP:false})`,
+own handlers (`bail`) for SIGINT/SIGTERM/SIGHUP/uncaught/unhandled rejection → `closeAll` (browser close bounded 10 s, then the runner's own
+process groups — parent pid = this node — killed by tree, profile removed; server `closeAllConnections` + close); the `finally` of a session
+bounds its watcher-resume evaluate to 5 s (a page stuck past a time limit kept the close from running); start-up `staleScan` (CIM/ps,
+groups by profile; leftover = main process's parent is not a live node); `--kill-stale`, `--clean-only`, `--selftest-exit sigint|error`
+(tested: both paths → "no runner browser left"; time limit 0.05 min → clean; hard kill → folder found and removed by `--clean-only`).
+ED5. `recorder.pnBars(layer)` (per note: head, start, end, start volume, path of inner changes; memo on songNotes), `editVolSel(evs, d)`
+(whole notes; `pnWith(e, FX_VOL, 'amt', clamp(x+d))`; own Volume marks 'r'/'s' → 'h', gen flag dropped via `pnMarks`; one `editBatch`).
+draw `drawVolBars` (stems + heads, selected white, dragged set shows v+d, number beside the grabbed bar; snapshot `rollView.aut.bars`),
+`rollHit` → 'autbar'; `rollAutDrive` axis fixed to value when `G.vOnly`. ui: `#rollVolBars` (hidden unless the lane shows Volume), grab /
+drag / release (`rollGrab.bar`, group = bars of the multi-selection), no point insert on the bars face, ╱/⌐ hidden there. Row «ED5 volume
+bars» (19 cases): one bar per note at its start volume; −15, two notes +10, clamp at 100 and 0; a smooth ramp set up through the lane
+loses its marks; two drum hits on one beat — only the edited moves; CONTROL: `autMovePoint` on that beat flattens the other hit. Fix rounds 0.
+ED6. User decision ED6-1 asked during the slice ("lengthen / shorten", as recommended). recorder: `secPlan` (ins / cut / dup), `secApply`
+(new step kinds 'brace', 'marks', 'lanelen' — called by `editApply`), `secUntie`, `secCommit`, `songEdit`, `songEditWhy`, markers
+(`secAdd`, `secRename`, `secDelete`, `sections`), `songUndo/songRedo` guarded by `songPrint/printSame`, `braceSet`; probe only `secDbg`,
+`laneVerKeep`, `takeFxDump`, `songHistReset`. `editApply('autdel')` now records the index and ↶ re-inserts there (before: at the lane's
+end — the fingerprint then refused ↷). draw: sections band `ARR_SEC_H` 20 in the window (snapshot `loopView.sec`, hits 'sec'/'secband';
+the window's brace zone starts below it — `hy0`), `arrGeom().sec`. ui: `#secIns #secCut #secDup #secDel #songUndo #songRedo`, `#secNameIn`,
+`updSecBtns` (titles name the bars), marker tap / double tap / band tap. Row «ED6 sections» (25 cases). Fix rounds 2: (1) seven
+differences — real: insert-then-cut moved a leadOff 0.9 → 0.9000000000000004 (float: a shift and its inverse are not exact; the identity
+now compares shifted beats to 1e-9 beat and everything else bit for bit — undo/redo stay exact); real: undone lane deletes re-ordered the
+lane (fixed above); probe: drum hits' end = start, a fixed range [20,28) had no note starting inside (now chosen from the material), ↷
+answering 'changed' was taken as success; (2) one — the probe looked for points "inside the cut" in post-cut beats; now the exact expected
+point set from the pre-cut lane. Controls: a cut forgetting lanes / bends / brace / markers / backing lengths each fail the identity.
+Positional callers: no existing signature changed. New: pnBars(ly) in draw.drawVolBars and ui.rollDown; editVolSel([...G.set], dr.d) in
+ui.rollUp; songEdit(kind, R.from, R.to) and songEditWhy(kind, a, b) in ui.secOp; secAdd(barBeat) in ui.secBandTap; secRename(id, value),
+secDelete(id), braceSet(m.beat, end) in ui; probe: editVolSel([h], d), songEdit('ins'|'cut'|'dup', a, b), secAdd(beat, name), secDbg(x).
+Final runner: data PASS 40.8 s; `--quick --all` one session PASS — P.quick 47.9 s (36 checks), P.all 198.0 s (50 checks), state guard clean.
+
+### Moved from HANDOFF.md at ED7 (English slice record)
+### ED5 + ED6 + runner hygiene (2026-10-14) — volume bars, sections (full: archive B, «ED5 + ED6»)
+- Part 0: the runner closes browser and server on every exit path (bounded close, then the process tree; own SIGINT/SIGTERM/uncaught
+  handlers) and lists leftovers by Playwright's temp-profile path at start (`--kill-stale`, `--clean-only`, `--selftest-exit`). Found: no
+  leftover browser; two orphaned profile folders (12.10) removed; a hard-killed node leaves only the folder (Chrome exits on pipe close).
+  The day's slowdown was the machine: render rows 4× slower, JS rows 1.3×; after cleanup P.quick 43 s, P.all 195.5 s (was 328–378 s).
+- ED5: the Volume lane's bars face (one bar per note; `pnBars`, `editVolSel` — whole notes +d, per note, rule #30), ▮▮/•— toggle.
+- ED6: markers in a sections band of the window; ＋▯ / ✂ / ⧉ on the bars under the brace in every track (`songEdit` → `secPlan`:
+  events, bends, lanes, brace, markers, backing lengths; `lanetouch` per touched track), one song-history ↶/↷ guarded by `songPrint`;
+  edge rule = user decision ED6-1 (asked during the slice). Fixed on the way: an undone lane-point delete went back to the lane's end.
+- Rows «ED5 volume bars» (19 cases; control: the line flattens two hits on one beat) and «ED6 sections» (25 cases; controls: a cut that
+  forgets lanes / bends / brace / markers / backing lengths fails). Identity beats to 1e-9 (float), all else bit for bit.
+
+### ✅ ED6-fix + ED7 + OWN2 — MARKER RENAME, ONE HISTORY, BEND CURVE (2026-10-14; runner PASS; steps 77–79 not yet done by the user)
+User answers first: all five ED5/ED6 decisions accepted and recorded as user decisions (HANDOFF "Open decisions").
+Part 0. Bug (user, desktop mouse): a double click on a marker did not rename. Diagnosis checked with REAL input before fixing: the runner's
+new check (Playwright mouse dblclick; CDP Input.dispatchTouchEvent double tap) on the old code — mouse: field closed, touch: worked. Cause:
+`openSecRename` focused the field inside the second pointerdown; the press's default action (focus to the canvas) ran after the handler
+and blurred it → `closeSecRename(true)` at once. Fix: `secTapAt` marks `secRenPend`, `arrUp` opens it on the release; `onblur` within
+SEC_BLUR_MS 500 re-focuses (touch compatibility mouse events); `#secRen` §✎ for a selected marker; `sec.hint` drawn in an empty strip.
+Control `arrApi.secRenameDbg('down')` (the old behaviour) must fail — it does. Fix rounds 0.
+ED7. Design and reasoning: CLAUDE.md "ONE HISTORY (ED7)". The editor's `editHist/editFuture` became `hist/histFut` (renamed; editOpen /
+editClose / editSetLayer no longer clear them); `editUndo/editRedo` → `histUndo/histRedo` (no editor needed; `histCommit` instead of
+`editCommit`, bumping each touched track's edit version via `histTouched`); ED6's `songHist/songFuture/songPrint/printSame` removed (songUndo
+etc. are aliases). Snapshot steps: `takeBegin` in onRec and seedTake (before laneNew / takeCapStart) and in setRecording(true); `snapEnd`
+in setRecording(false); `deleteLane`/`onUndo`/`loadArrangement`/`clearJam` wrap their old bodies (`…Do`) in snapBegin/snapEnd; `clearRec` no
+longer resets history (it cancels a pending take); `clearSong` (✕, looper-hand clear) = snap around clearRec. ui: `levelStep` at gesture
+end (drag release, double tap, wheel with merge), `laneNameStep`, `moveLaneStep`, `histDo`, `afterHist`, `#histUndo/#histRedo`, keyboard.
+Song loads / P.seed / tutor reset the history; P.all resets it before each row. Measured: an editor step ≈ 1.4 KB (100 volume edits);
+`histHash` 0.25 ms on 194 events; the ✕ step's heap delta was GC noise — estimated from its structure (≈ 50 B per event entry + removed
+events kept alive). Fix round 1: the first P.quick — ED6's cleanup by undo left one capture record (tk 20): `seedTake` ran takeCapStart
+before setRecording(true) began the snapshot → `takeBegin` moved before it (onRec too).
+OWN2. Plan line: "points as in the automation lane; a new note-on payload; the S5 trim the same". Decisions taken: points move with one
+axis per gesture (time / cents), first point only cents, clamped between neighbours and inside the note, whole cents ±2400; ✚ + a tap
+inside the selected note's time adds a point (instead of a note); 🗑/⌫ deletes the selected point (never the first). recorder
+`editBendPoint`, draw `rollBendHandles`/`rollBendAt`/`hzOfRow`/`bendRowsOf`, ui gestures. Fix rounds 0.
+Positional callers: no existing signature changed. New: histTab(layer, 'level'|'pan'|'name', from, merge) in ui.levelStep and
+recorder.laneNameStep; histMaster(from, merge) in ui.levelStep; moveLaneStep(layer, to) in ui.arrUp; laneNameStep(ly, value) in
+ui.closeRename; clearSong() in ui ✕ and gestures looper clear; histUndo()/histRedo() in ui.histDo; editBendPoint(ev, 'move', i, dt, c) /
+(ev, 'add', null, dt, c) / (ev, 'del', i) in ui and the probe; rollBendAt(px, py) in ui; probe histDbg({skip}|{keepFuture}), bendDbg(v).
+Final runner: data PASS 40.5 s; `--quick --all` one session PASS — P.quick 49.8 s (38 checks), P.all 188.1 s (52 checks), UI checks PASS.

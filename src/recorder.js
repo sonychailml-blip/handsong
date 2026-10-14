@@ -5,7 +5,7 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, tuningOf, periodOf, chordTypeFits } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -389,6 +389,12 @@ function braceMove(edge,beat){
   if(R.user && from===R.from && to===R.to) return;         // перетаскивание внутри того же такта: ничего не трогаем (и не перепривязываем каждый кадр)
   R.user=true;
   rgnApply(from,to,R.on); schedInvalidate();
+}
+/* ED6: put BOTH brace edges on bar lines at once (a tapped section: the brace covers it); the brace becomes the person's. */
+function braceSet(from,to){
+  if(!AC||recording) return false;
+  const M=loop.metre, [f,t]=braceClamp(Math.round(from/M)*M, Math.round(to/M)*M);
+  loop.rgn.user=true; rgnApply(f,t,loop.rgn.on); schedInvalidate(); return true;
 }
 /* ГРУППИРОВКА (акценты) по размеру — СТАТИЧНАЯ, по умолчанию. Массив длин групп, сумма = размер.
    Нечётные размеры чувствуются НЕ ровно: балканская 7 = 3+2+2, 9 = 2+2+2+3, 5 = 2+3; индийский
@@ -967,6 +973,9 @@ function laneDelPendingLayer(){ if(!delPend || performance.now()>=delPend.until)
    ОСТАВШИХСЯ дорожек: ушёл последний слой-дрон — дрон гаснет). */
 function deleteLane(layer){
   if(!AC || isRecLayer(layer)) return false;   // T1: любой слой взятого (прежде — loop.layer)
+  const tok=snapBegin('rowdel'); try{ return deleteLaneDo(layer); } finally { snapEnd(tok); }   // ED7: a row delete is one step (↶ brings the track back, with its tables)
+}
+function deleteLaneDo(layer){
   releaseLoopLayersAt(undefined,layer);
   if(recording) events.sort((x,y)=>x.t-y.t);   // хвост взятого — в отсортированный префикс ДО schedInvalidate (см. setRegionOn)
   untieAcross(layer);                           // ⛳ S6: выжившие половины пар связки этой дорожки — обычные ноты (своя атака); их замороженные буферы устаревают
@@ -1104,6 +1113,9 @@ function moveLane(layer,to){
    обязана вернуть РОВНО как было: песня без мест до пробы — снова без мест (а не «те же места, записанные всем»). */
 function laneShowKeep(){ const N=new Map(laneName), R=new Map(laneRank);
   return ()=>{ laneName.clear(); for(const [k,v] of N) laneName.set(k,v); laneRank.clear(); for(const [k,v] of R) laneRank.set(k,v); }; }
+/* ED6 probe only: snapshot and restore of the tracks' edit versions (a section edit and its ↶ both bump them, so a frozen track stays
+   stale after a round trip); the restore drops the signature memo so freshness is read again. */
+function laneVerKeep(){ const V=new Map(laneEditVer); return ()=>{ laneEditVer.clear(); for(const [k,v] of V) laneEditVer.set(k,v); frzSigMemo.clear(); frzWatchVer++; }; }
 /* ⛳ AR2: РОЛЬ И ТЕМБР КАЖДОЙ ДОРОЖКИ ОДНИМ ПРОХОДОМ — для показа (цвет роли, имя по умолчанию). draw спрашивает каждый кадр на каждую
    видимую строку; laneRoleOf/laneTimbreOf — проход по событиям на вызов. Ответы ТЕ ЖЕ (первое событие с ролью; первое начало ноты с
    тембром), мемо — по числу событий и поколению состава (evGen поднимает каждый schedInvalidate — замена тембра тоже: editCommit). Во время
@@ -1868,10 +1880,10 @@ function editOpen(layer){
   if(!AC||recording||activeKind()||layer==null) return false;
   const id=laneOf(layer) ?? laneNew(layer);
   if(loop.on) onLoop(); else softAllOff();
-  editLane=id; editHist=[]; editFuture=[]; editTake=0;   // S5.1/S5.3: сессия правки начинается с чистыми историей И будущим
+  editLane=id; editTake=0;   // ED7: the history is the song's, not the session's — it survives opening, closing and switching tracks
   return true;
 }
-function editClose(){ const was=editLane!=null; editLane=null; editHist=[]; editFuture=[]; editTake=0; if(was&&hooks.af) hooks.af('editor'); }   // AF3: leaving the editor is a settle trigger
+function editClose(){ const was=editLane!=null; editLane=null; editTake=0; if(was&&hooks.af) hooks.af('editor'); }   // AF3: leaving the editor is a settle trigger
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkWrite): ВЗЯТОЕ В ПЕСОЧНИЦЕ — шаги сценария проходят НАСТОЯЩУЮ воронку записи (seedTake → push: маршрут,
    ключи, копия карты эффектов, перевод ступени в индекс), получившиеся события отдаются копиями, а песня возвращается как была: события
    (содержимое массива — на месте, правило #28), дорожки без событий снимаются (lanePrune — с ними и захват взятого), состояние взятого
@@ -1883,12 +1895,12 @@ function probeTake(steps){
   if(loop.on) return { ok:false, why:'the transport is playing' };
   if(editLane!=null) return { ok:false, why:'the track editor is open' };
   const keep=events.slice(), had=new Set(keep), keepLayer=loop.layer, keepTake=curTake;
-  let out=null;
+  let out=null; histOff++;   // ED7: the sandbox take leaves no step
   try{ const r=seedTake(steps); if(r) out=events.filter(e=>!had.has(e)).map(e=>({...e, a:e.a&&{...e.a}})); }
   finally{
     events.length=0; for(const e of keep) events.push(e);
     takeSt.clear(); takeSrc.clear(); loop.layer=keepLayer; curTake=keepTake;
-    schedInvalidate(); lanePrune();
+    schedInvalidate(); lanePrune(); histOff--;
   }
   return out ? { ok:true, events:out } : { ok:false, why:'the recorder refused the take' };
 }
@@ -1896,7 +1908,7 @@ function probeTake(steps){
 function editSetLayer(layer){
   if(editLane==null||layer==null) return false;
   const id=laneOf(layer); if(id==null) return false;
-  editLane=id; editHist=[]; editFuture=[]; editTake=0;   // S5.1/S5.3: история И будущее — про ТУ дорожку, что на экране; отмена/возврат «вслепую» на другой были бы враньём
+  editLane=id; editTake=0;   // ED7: one history across tracks (was: cleared per track); отмена/возврат «вслепую» на другой были бы враньём
   return true;
 }
 /* ═══ ПРАВКА УДАРОВ И ОТМЕНА ПРАВОК (слайс S5.1) ═══
@@ -1932,10 +1944,182 @@ const editDefVol=role=>volFromOld(role,0.8);
    истории — editPush, и он же чистит будущее: забыть про обрыв невозможно, потому что мимо него не пройти.
    Будущее живёт ровно столько же, сколько история (открытие/закрытие/смена дорожки) — по той же причине:
    ссылка на событие, пережившая сессию, однажды указала бы в пустоту. */
-let editHist=[], editFuture=[], editTake=0;   // сделанное · отменённое (ждёт ↷) · номер взятого для ВСТАВОК сессии
-const editCanUndo=()=>editHist.length>0;
-const editCanRedo=()=>editFuture.length>0;
-const editPush=u=>{ editHist.push(u); editFuture.length=0; };   // НОВАЯ правка обрывает ветку отменённого
+/* ═══ ED7: ONE HISTORY FOR EVERYTHING (plan decision 6) ═══
+   One list of steps, newest last; ↶ walks it back, ↷ forward; a new step drops the redo branch (histPush is the single writer). It holds:
+   the editor's own steps (move/del/ins/timbre/automation… — unchanged, now kept across editor sessions and tracks), section edits and
+   markers (ED6), mixer level / pan / master, track names and order ('tab', 'ranks', 'master'), and DIFF SNAPSHOT steps ('snap') for the
+   coarse operations — a take, ⤺, a row delete, a backing load or removal, ✕ clear: the events removed / added / changed (objects with their
+   beats and payloads), the takes' capture records, the track ids with their table rows, the markers. Applied backwards or forwards they
+   restore exactly, object for object. An operation inside a running take (⤺, backing, a row delete while recording) folds into the take's
+   step (one pending snapshot at a time). NOT in the history: mute / solo / arming (listening switches), the brace, tempo, tonic.
+   ⛳ The old "the song changed since" guard is not needed for any user path — every path that changes the song is a step. It stays as a
+   cheap TRIPWIRE: each step keeps a content hash of the state it left (histHash, order-free, O(events)); ↶/↷ refuse ('changed') and drop
+   the history when the state differs — a missed path (a console or probe tool writing directly) can never be undone into a corrupt song.
+   Size: the newest HIST_MAX steps are kept (older ones dropped). Memory: an editor step ≈ 1.4 KB (measured: a volume edit — it holds the
+   old and new payloads); a snapshot step ≈ 50 bytes per event it removed, added or changed, and it keeps the REMOVED events alive (≈ 0.5 KB
+   each) — a take of 500 events ≈ 25 KB, ✕ of a 3000-event song ≈ 1.5–2 MB while that step is in the history. The hash ≈ 0.25 ms per 200
+   events. Tracks touched by ↶/↷ get
+   their edit version bumped: frozen ones go stale and re-freeze by themselves (hint 'undo'). */
+const HIST_MAX=300, HIST_MERGE_MS=800;
+let hist=[], histFut=[], histOff=0, snapPend=null, takeTok=null, histGroupDepth=0;   // histGroupDepth: no trimming inside a group edit (it counts from an index)
+let histSkip=null, histKeepFut=false;   // probe CONTROLS only: a step kind left out of the history; a redo branch a new step does not drop
+const histDbg=o=>{ histSkip=(o&&o.skip)||null; histKeepFut=!!(o&&o.keepFuture); };
+const histCanUndo=()=>hist.length>0, histCanRedo=()=>histFut.length>0, histLen=()=>hist.length;
+const histReset=()=>{ hist=[]; histFut=[]; };
+const histLabelOf=u=> u.label || u.f || u.kind;
+function histPush(u){
+  if(histOff) return false;
+  if(histSkip && histLabelOf(u)===histSkip) return false;
+  hist.push(u); if(!histKeepFut) histFut.length=0;
+  if(hist.length>HIST_MAX && !histGroupDepth) hist.splice(0, hist.length-HIST_MAX);
+  return true;
+}
+/* content hash, order-free: events (birth number, beat, payload object, layer), capture records and points, track tables, markers, master */
+const payId=new WeakMap(); let payN=0;
+const pidOf=o=>{ if(o==null||typeof o!=='object') return 0; let i=payId.get(o); if(!i){ i=++payN; payId.set(o,i); } return i; };
+const strHash=s=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++) h=Math.imul(h^s.charCodeAt(i),16777619)>>>0; return h; };
+function histHash(){
+  evSeqFill();
+  const mix=(h,x)=>Math.imul((h^(x|0))>>>0,16777619)>>>0, num=(h,x)=>{ const v=Math.round((+x||0)*1e6); return mix(mix(h,v),Math.floor(v/4294967296)); };
+  let S=events.length>>>0;
+  for(const e of events){ let h=2166136261; h=mix(h,evSeq.get(e)||0); h=num(h,e.t); h=mix(h,pidOf(e.a)); h=mix(h,e.layer); S=(S+h)>>>0; }
+  for(const [tk,r] of takeFx){ let h=mix(mix(2166136261,tk),pidOf(r)); h=mix(h,r.lane.length); h=mix(h,strHash(JSON.stringify(r.chains)));
+    for(const p of r.lane){ let q=mix(2166136261,pidOf(p)); q=num(q,p.t); q=num(q,typeof p.v==='number'?p.v:0); h=(h+q)>>>0; } S=(S+h)>>>0; }
+  for(const [ly,id] of laneId){ let h=mix(mix(2166136261,ly),id); h=num(h,laneLevel.has(id)?laneLevel.get(id):1); h=num(h,lanePan.get(id)||0);
+    h=mix(h,strHash(laneName.get(id)||'')); h=mix(h,laneRank.has(id)?laneRank.get(id):-1); h=num(h,laneLen.get(id)||0); S=(S+h)>>>0; }
+  S=mix(S,strHash(JSON.stringify(secMarks))); S=num(S,AUD.masterLevel?AUD.masterLevel():0);
+  return S;
+}
+const takeBegin=()=>{ if(!takeTok) takeTok=snapBegin('take'); };   // the pending snapshot of a take (no-op when one is pending)
+const histSeal=()=>{ if(hist.length) hist[hist.length-1].h=histHash(); };
+/* ---- diff snapshot steps ---- */
+const laneRow=id=>({ mute:laneMute.has(id), solo:laneSolo.has(id), level:laneLevel.get(id), pan:lanePan.get(id), name:laneName.get(id),
+                     rank:laneRank.get(id), len:laneLen.get(id), ver:laneEditVer.get(id) });
+function laneRowSet(id,r){
+  if(r.mute) laneMute.add(id); else laneMute.delete(id);
+  if(r.solo) laneSolo.add(id); else laneSolo.delete(id);
+  for(const [M,v] of [[laneLevel,r.level],[lanePan,r.pan],[laneName,r.name],[laneRank,r.rank],[laneLen,r.len],[laneEditVer,r.ver]]) if(v==null) M.delete(id); else M.set(id,v);
+}
+function laneDrop(ly,id){
+  if(laneId.get(ly)===id) laneId.delete(ly);
+  laneMute.delete(id); laneSolo.delete(id); laneLevel.delete(id); lanePan.delete(id); laneName.delete(id); laneRank.delete(id); laneLen.delete(id); laneEditVer.delete(id);
+  if(armLane===id) armLane=null; if(delPend&&delPend.id===id) delPend=null;
+  freezeDrop(id);
+}
+const snapState=()=>({ evs:events.slice(), t:events.map(e=>e.t), a:events.map(e=>e.a), fx:new Map(takeFx), lanes:new Map(laneId),
+  rows:new Map([...laneId.values()].map(id=>[id,laneRow(id)])), marks:secCopy(secMarks) });
+function snapBegin(label){ if(histOff||snapPend) return null; snapPend={ label, S:snapState() }; return snapPend; }
+function snapEnd(tok){
+  if(!tok||snapPend!==tok) return false;
+  snapPend=null;
+  const S=tok.S, A=new Set(events), B=new Set(S.evs), rem=[], add=[], ch=[];
+  S.evs.forEach((e,i)=>{ if(!A.has(e)) rem.push([e,S.t[i],S.a[i]]); else if(e.t!==S.t[i]||e.a!==S.a[i]) ch.push([e,S.t[i],S.a[i],e.t,e.a]); });
+  for(const e of events) if(!B.has(e)) add.push([e,e.t,e.a]);
+  const remT=[], addT=[]; for(const [tk,r] of S.fx) if(takeFx.get(tk)!==r) remT.push([tk,r]); for(const [tk,r] of takeFx) if(S.fx.get(tk)!==r) addT.push([tk,r]);
+  const remL=[], addL=[]; for(const [ly,id] of S.lanes) if(laneId.get(ly)!==id) remL.push([ly,id,S.rows.get(id)]);
+  for(const [ly,id] of laneId) if(S.lanes.get(ly)!==id) addL.push([ly,id,laneRow(id)]);
+  const mk= JSON.stringify(S.marks)!==JSON.stringify(secMarks) ? { from:S.marks, to:secCopy(secMarks) } : null;
+  if(!rem.length&&!add.length&&!ch.length&&!remT.length&&!addT.length&&!remL.length&&!addL.length&&!mk) return false;
+  if(!histPush({ kind:'snap', label:tok.label, rem, add, ch, remT, addT, remL, addL, mk })) return false;
+  histSeal(); return true;
+}
+function snapApply(u,undo){
+  const out= undo ? u.add : u.rem, inn= undo ? u.rem : u.add;
+  if(out.length){ const X=new Set(out.map(x=>x[0])); compactEvents(e=>X.has(e)); }
+  for(const [e,t,a] of inn){ e.t=t; e.a=a; events.push(e); }
+  for(const c of u.ch){ c[0].t= undo?c[1]:c[3]; c[0].a= undo?c[2]:c[4]; }
+  for(const [tk] of (undo?u.addT:u.remT)) takeFx.delete(tk);
+  for(const [tk,r] of (undo?u.remT:u.addT)) takeFx.set(tk,r);
+  for(const [ly,id] of (undo?u.addL:u.remL)) laneDrop(ly,id);
+  for(const [ly,id,row] of (undo?u.remL:u.addL)){ laneId.set(ly,id); if(row) laneRowSet(id,row); }
+  if(u.mk) secMarks=secCopy(undo?u.mk.from:u.mk.to);
+}
+/* ---- table steps: level / pan / name of a track (by id, rule #27), the display order, the master level ---- */
+function histTab(layer,f,from,merge){
+  const id=laneOf(layer); if(id==null) return false;
+  const to= f==='level' ? laneLevelOf(layer) : f==='pan' ? lanePanOf(layer) : laneNameOf(layer);
+  if(to===from) return false;
+  const top=hist[hist.length-1], now=performance.now();
+  if(merge && top && top.kind==='tab' && top.id===id && top.f===f && now-top.at<HIST_MERGE_MS && !histFut.length){ top.to=to; top.at=now; histSeal(); return true; }
+  if(histPush({ kind:'tab', id, f, from, to, at:now })) histSeal();
+  return true;
+}
+function histMaster(from,merge){
+  const to=AUD.masterLevel(); if(to===from) return false;
+  const top=hist[hist.length-1], now=performance.now();
+  if(merge && top && top.kind==='master' && now-top.at<HIST_MERGE_MS && !histFut.length){ top.to=to; top.at=now; histSeal(); return true; }
+  if(histPush({ kind:'master', from, to, at:now })) histSeal();
+  return true;
+}
+function laneNameStep(layer,s){ const f=laneNameOf(layer); if(!setLaneName(layer,s)) return false; return histTab(layer,'name',f); }
+function moveLaneStep(layer,to){
+  const R0=new Map(laneRank), r=moveLane(layer,to), same=R0.size===laneRank.size && [...laneRank].every(([k,v])=>R0.get(k)===v);
+  if(!same && histPush({ kind:'ranks', label:'order', from:R0, to:new Map(laneRank) })) histSeal();
+  return r;
+}
+function histApplyX(u,undo){
+  if(u.kind==='snap'){ snapApply(u,undo); return true; }
+  if(u.kind==='tab'){ const ly=laneLayerOf(u.id), v= undo?u.from:u.to; if(ly==null) return true;
+    if(u.f==='level') setLaneLevel(ly,v); else if(u.f==='pan') setLanePan(ly,v); else setLaneName(ly,v||''); return true; }
+  if(u.kind==='master'){ AUD.setMasterLevel(undo?u.from:u.to); return true; }
+  if(u.kind==='ranks'){ const M=undo?u.from:u.to; laneRank.clear(); for(const [k,v] of M) laneRank.set(k,v); return true; }
+  return false;
+}
+/* the tracks a step touches (their freeze goes stale): events it moves, removes or adds, lane points through their take, chains, backing lengths */
+function histTouched(u,S=new Set()){
+  const tkLy=tk=>{ for(const e of events) if((e.tk||0)===tk) S.add(e.layer); };
+  const recOf=pred=>{ for(const [tk,r] of takeFx) if(pred(r)) return tk; return null; };
+  switch(u.kind){
+    case 'batch': for(const s of u.list) histTouched(s,S); break;
+    case 'move': S.add(u.ev.layer); break;
+    case 'del': case 'ins': for(const e of u.evs) S.add(e.layer); break;
+    case 'timbre': for(const c of u.ch) S.add(c.ev.layer); break;
+    case 'snap': for(const L of [u.rem,u.add,u.ch]) for(const x of L) S.add(x[0].layer); break;
+    case 'autmove': case 'autshape': { const tk=recOf(r=>r.lane.includes(u.pt)); if(tk!=null) tkLy(tk); break; }
+    case 'autins': case 'autdel': { const tk=recOf(r=>r.lane===u.lane); if(tk!=null) tkLy(tk); break; }
+    case 'autfxins': case 'autfxdel': case 'autfxmove': { const tk=recOf(r=>Object.values(r.chains).includes(u.ch)); if(tk!=null) tkLy(tk); break; }
+    case 'autcap': tkLy(u.tk); break;
+  }
+  return S;
+}
+function histCommit(u){
+  evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch();
+  for(const ly of histTouched(u)){ const id=laneOf(ly); if(id!=null) laneVerBump(id); }
+  if(u.kind==='snap'){ curChordDeg=-1; delPend=null; softAllOff(); if(!droneActive()) droneOff(); }
+  droneSync();
+  hooks.loop && hooks.loop(loop.on);
+  if(hooks.af) hooks.af('undo');
+}
+/* ↶ / ↷ — everywhere (editor, window, play screen, Ctrl+Z / Ctrl+Shift+Z). Refused while recording; the transport pauses (as any edit).
+   → the step's label, 'changed' (the tripwire: the history is dropped), or false (nothing to do). */
+function histUndo(){
+  const u=hist[hist.length-1];
+  if(!u||!AC||recording) return false;
+  if(u.h!=null && histHash()!==u.h){ histReset(); return 'changed'; }
+  if(loop.on) onLoop();
+  evSeqFill();
+  hist.pop(); editApply(u,true); histCommit(u); u.hb=histHash(); histFut.push(u);
+  return histLabelOf(u);
+}
+function histRedo(){
+  const u=histFut[histFut.length-1];
+  if(!u||!AC||recording) return false;
+  if(u.hb!=null && histHash()!==u.hb){ histReset(); return 'changed'; }
+  if(loop.on) onLoop();
+  evSeqFill();
+  histFut.pop(); editApply(u,false); histCommit(u); u.h=histHash(); hist.push(u);
+  return histLabelOf(u);
+}
+/* ✕ clear — an ordinary step: the whole song comes back with ↶ (a running take ends first, as its own step). The brace returns to
+   following the material. */
+function clearSong(){
+  if(recording) recStop();
+  const tok=snapBegin('clear'); clearRec(); snapEnd(tok);
+}
+let editTake=0;   // сделанное · отменённое (ждёт ↷) · номер взятого для ВСТАВОК сессии
+const editCanUndo=()=>histCanUndo();   // ED7: the editor's ↶/↷ are the one history's
+const editCanRedo=()=>histCanRedo();
+const editPush=u=>{ histPush(u); };   // ED7: the single writer of the one history (a new step drops the redo branch)   // НОВАЯ правка обрывает ветку отменённого
 /* ⛳ СОСТАВНАЯ ПРАВКА (E1) — ОДНА запись истории из НЕСКОЛЬКИХ ходов уже существующих видов ('move', 'ins',
    'del', 'timbre', ходы полосы автоматизации). Вперёд — по порядку, назад — в ОБРАТНОМ (editApply, 'batch'),
    сортировка и сброс курсоров — ОДИН раз на всю правку (editCommit, правило #28).
@@ -1984,7 +2168,7 @@ function editGuard(backingOk){
 const evSeq=new WeakMap(); let evSeqN=0;
 function evSeqFill(){ for(const e of events) if(!evSeq.has(e)) evSeq.set(e,++evSeqN); }
 const evOrder=(x,y)=> x.t-y.t || (evSeq.get(x)||Infinity)-(evSeq.get(y)||Infinity) || 0;
-function editCommit(){ evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch(); laneEditTouch(); }   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка. T4c-2: индекс правка пишет сама (пересчёта по ступени нет — ступени нет)
+function editCommit(){ evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch(); laneEditTouch(); histSeal(); }   // ED7: histSeal — the tripwire hash of the state this step left   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка. T4c-2: индекс правка пишет сама (пересчёта по ступени нет — ступени нет)
 /* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
    кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
 function editDrumDefaults(layer,t){
@@ -2494,15 +2678,17 @@ function editResizeSeg(ev,t){
    applied part back and leaves history and redo as they were. run(h0) gets the history length at the start (for editRemap). */
 function editGroup(run){
   if(!editGuard()) return false;
-  const h0=editHist.length, fut=editFuture.slice();
+  const h0=hist.length, fut=histFut.slice();
   let r=false, subs=[];
+  histGroupDepth++;
   try{ r=run(h0); }
   finally{
-    subs=editHist.splice(h0);
+    histGroupDepth--;
+    subs=hist.splice(h0);
     if(!r){ for(let i=subs.length-1;i>=0;i--) editApply(subs[i],true);
       if(subs.length) editCommit();
-      editFuture.length=0; editFuture.push(...fut); }
-    else if(subs.length) editHist.push(subs.length===1 ? subs[0] : { kind:'batch', list:subs });
+      histFut.length=0; histFut.push(...fut); }
+    else if(subs.length){ hist.push(subs.length===1 ? subs[0] : { kind:'batch', list:subs }); histSeal(); }   // ED7: the merged step carries the tripwire hash too
   }
   return subs.length ? r : false;
 }
@@ -2510,8 +2696,8 @@ function editGroup(run){
    follow del → ins pairs in the entries pushed since h0. → the live event or null. */
 function editRemap(ev,h0){
   const flat=(u,o)=>{ if(u.kind==='batch') for(const s of u.list) flat(s,o); else if(u.kind==='del') o.del.push(...u.evs); else if(u.kind==='ins') o.ins.push(...u.evs); return o; };
-  for(let i=h0; ev && i<editHist.length && !events.includes(ev); i++){
-    const o=flat(editHist[i],{del:[],ins:[]});
+  for(let i=h0; ev && i<hist.length && !events.includes(ev); i++){
+    const o=flat(hist[i],{del:[],ins:[]});
     if(o.del.includes(ev)) ev=o.ins.find(e=>e.layer===ev.layer && Math.abs(e.t-ev.t)<1e-9 && chaseRole(e.fn)===chaseRole(ev.fn) && chaseKind(e.fn)!=='f')||null;
   }
   return ev && events.includes(ev) ? ev : null;
@@ -2665,6 +2851,101 @@ function dupOffset(C,step){
   return span>M/2 ? Math.ceil(span/M-1e-9)*M : g;
 }
 function editDuplicateSel(evs,step){ const C=clipOf(evs); return C ? pasteClip(C, C.t0+dupOffset(C,step)) : false; }
+/* ═══ ED3: QUANTISE AFTER RECORDING ═══
+   The selection's edges go toward the nearest line of a grid of `step` beats by `amt` (1 = onto the line); what: 'start' | 'end' | 'both'.
+   A note's START moves the whole note (its length kept); a pitch change INSIDE a line moves by itself — the boundary moves, the neighbour
+   gets longer or shorter, the glide stays one note (user decision 4: no detach); a note's END moves its own note-off. An edge that would
+   leave a segment shorter than EDIT_MIN_LEN stays. Value changes inside a segment keep their beats; those a moved edge passes over are
+   dropped (as a resize drops them past a new end). A note reaching into another note of its key takes a fresh identity (E1); a shortened
+   theremin note trims its bend (S5). A note closed by the next note's start (no own note-off) keeps its start and end. Pitches never
+   change. Drum hits quantise with starts. One history entry. → the selected events, or false (nothing moved). */
+const quantTo=(t,step,amt)=> t + amt*(Math.round(t/step)*step - t);
+function quantPlan(n,sel,step,amt,S,E){
+  const R=EDIT_ROLE[n.role]; if(!R) return null;
+  const SV=songSegs(), segs=[];
+  for(const e of n.evs){ const g=SV.byEv.get(e); if(g && g.ev===e) segs.push(g); }
+  const m=segs.length; if(!m) return null;
+  const on=i=>sel.has(segs[i].ev), X=segs[m-1].endEv, own=!!(X && chaseKind(X.fn)==='f');
+  let d= S && on(0) && own ? quantTo(n.start,step,amt)-n.start : 0; if(Math.abs(d)<=1e-9) d=0;
+  const nb=segs.map(g=>g.start+d), moved=new Array(m+1).fill(false);
+  for(let i=1;i<m;i++){
+    if(!((S&&on(i))||(E&&on(i-1)))) continue;
+    const right= i+1<m ? segs[i+1].start+d : own ? X.t+d : n.end!=null ? n.end+d : Infinity;
+    const q=quantTo(nb[i],step,amt);
+    if(Math.abs(q-nb[i])>1e-9 && q>=nb[i-1]+EDIT_MIN_LEN-1e-9 && q<=right-EDIT_MIN_LEN+1e-9){ nb[i]=q; moved[i]=true; }
+  }
+  let te= own ? X.t+d : null;
+  if(own && E && on(m-1)){
+    const last=nb[m-1];
+    let g=Math.round(te/step)*step; if(g<last+EDIT_MIN_LEN) g=(Math.floor(last/step+1e-9)+1)*step;   // never onto its own start: the next line
+    const q=te+amt*(g-te);
+    if(Math.abs(q-te)>1e-9 && q>=last+EDIT_MIN_LEN-1e-9){ te=q; moved[m]=true; }
+  }
+  if(!d && !moved.some(Boolean)) return [];
+  const s0=n.start, e0= own ? X.t : n.end, ne= own ? te : e0;
+  const fr= (nb[0]<s0-1e-9 && keyClash(n,nb[0],s0)) || (ne!=null && e0!=null && ne>e0+1e-9 && keyClash(n,e0,ne)) ? R.fresh(n.layer) : null;
+  const H=n.head, B=H&&H.a&&H.a.bend, nbend= own && B && B.length && te<X.t+d-1e-9 ? bendTrim(B, te-(H.t+d)) : B;
+  const list=[], drop=[];
+  for(const e of n.evs){
+    const g=SV.byEv.get(e), i= g ? segs.indexOf(g) : -1;
+    let t=e.t+d;
+    if(e===X) t=te;
+    else if(g && g.ev===e) t=nb[i];
+    else if(i>=0){ const hi= i+1<m ? nb[i+1] : te;
+      if((moved[i] && t<=nb[i]+EDIT_GAP) || (moved[i+1] && hi!=null && t>=hi-EDIT_GAP)){ drop.push(e); continue; } }
+    const trim= e===H && nbend!==B;
+    if(Math.abs(t-e.t)<=1e-9 && !fr && !trim) continue;
+    list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t, a: fr||trim ? {...e.a, ...fr, ...(trim?{bend:nbend}:null)} : e.a} });
+  }
+  if(drop.length) list.push({ kind:'del', evs:drop });
+  return list;
+}
+function editQuantSel(evs,step,what,amt){
+  const ly=editLayer(); if(!evs||!evs.length||ly==null||!(step>0)) return false;
+  amt=Math.max(0,Math.min(1,amt==null?1:amt)); if(!amt) return false;
+  const S=what!=='end', E=what!=='start';
+  return editGroup(()=>{
+    const G=selGroups(evs,ly); if(!G) return false;
+    if(S && G.drums.length){
+      const list=[]; for(const e of G.drums){ const t=quantTo(e.t,step,amt); if(Math.abs(t-e.t)>1e-9) list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t, a:e.a} }); }
+      if(list.length && !editBatch(list)) return false; }
+    /* pitched: the selected defining events by note, notes in start order; each note is re-read before its own edit (an earlier note may
+       have taken a fresh key) */
+    const byNote=new Map();
+    for(const {n,L} of G.whole) byNote.set(n, L.map(s=>s.ev));
+    for(const s of G.parts){ const L=byNote.get(s.note)||[]; L.push(s.ev); byNote.set(s.note,L); }
+    for(const [,L] of [...byNote].sort((a,b)=>a[0].start-b[0].start)){
+      const g=songSegs().byEv.get(L[0]); if(!g) return false;
+      const P=quantPlan(g.note, new Set(L), step, amt, S, E); if(P===null) return false;
+      if(P.length && !editBatch(P)) return false;
+    }
+    return evs.filter(e=>events.includes(e));
+  });
+}
+/* ═══ ED4: TRANSPOSE BY DEGREES ═══
+   Every selected segment moves n degrees of its own frozen mode (scales.shiftDegrees; an out-of-mode note keeps its offset from the nearest
+   degree — user decision 5). A pitch-only change: every pitch-carrying event of the segment gets the new pitch, glides stay whole, nothing
+   detaches. An untyped chord follows the mode's rule on the new degree; a typed chord keeps its type and refuses where it does not fit
+   (T7). One history entry; drum hits are left alone. degreePlan → { list, heads } or { why: 'none' | 'reg' | 'fit' }. */
+function degreePlan(evs,n){
+  const ly=editLayer(); if(!evs||!evs.length||ly==null||!Number.isInteger(n)||!n) return { why:'none' };
+  const G=selGroups(evs,ly); if(!G) return { why:'none' };
+  const segs=[...G.whole.flatMap(w=>w.L), ...G.parts]; if(!segs.length) return { why:'none' };
+  const list=[];
+  for(const s of segs){
+    const p=shiftDegrees(s.ti, s.oct, s.sc, n); if(!p) return { why:'none' };
+    if(p.oct<0 || p.oct>=REG_N) return { why:'reg' };
+    const pt=segPitchPt(s,p.ti,p.oct); if(!pt) return { why:'fit' };
+    for(const e of segEvs(s)) list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} });
+  }
+  return { list, heads:segs.map(s=>s.ev) };
+}
+const editDegreeWhy=(evs,n)=>{ const P=degreePlan(evs,n); return P.why||null; };
+function editDegreeSel(evs,n){
+  if(!editGuard()) return false;
+  const P=degreePlan(evs,n); if(P.why) return false;
+  return editBatch(P.list) ? P.heads : false;
+}
 /* Вставка бас-ноты: пара «вкл»+«выкл» со СВЕЖИМ k (свой владелец — см. довод о порядке выше).
    ⛳ ОТКУДА ПОЛЯ: тембр — ТОЛЬКО с «вкл» соседней ноты (у ведения он записан, но звук его не читает —
    тембр печётся на атаке; брать его с ведения значит списывать у того, кто им не распоряжается);
@@ -3254,6 +3535,272 @@ function pnStripMoves(layer,fxId){
   for(const pk of fxParamKeysOf(fxId)) if(fxIsPerNote(fxId,pk)){ const R=pnPlan(layer,fxId,pk,[]); if(R) list.push(...R.list); }
   return list;
 }
+/* ═══ OWN2: THE BEND CURVE OF A THEREMIN NOTE, EDITED BY ITS POINTS ═══
+   a.bend on the note-on — [{dt, c}]: beats from the note start, cents from its attack pitch, held step by step as the replay plays it.
+   op 'move' (i, dt, c), 'add' (dt, c), 'del' (i). The first point stays at dt 0 (only its cents move) and cannot be deleted; times stay
+   strictly increasing (a move is clamped between its neighbours) and inside the note (before its end); cents are whole, clamped ±2400.
+   A NEW payload with a new array (the old one goes to the history whole — S5's rule; a later shortening trims it with bendTrim as
+   before); one editor step of the one history. → the point's index after the edit, or false (refused or nothing changed). */
+const BEND_C_MAX=2400, BEND_EPS=1e-6;
+let bendInPlace=false; const bendDbg=v=>{ bendInPlace=!!v; };   // probe CONTROL only: the array changed in place — ↶ cannot bring it back
+function editBendPoint(ev,op,i,dt,c){
+  if(!editGuard()||!ev||ev.fn!=='leadOn'||ev.layer!==editLayer()) return false;
+  const B=ev.a&&ev.a.bend; if(!B||!B.length) return false;
+  const n=songNotes().notes.find(x=>x.head===ev); if(!n) return false;
+  const len= n.end==null ? Infinity : n.end-n.start, cc=x=>Math.max(-BEND_C_MAX,Math.min(BEND_C_MAX,Math.round(+x||0)));
+  let B2=B.slice(), at=i;
+  if(op==='move'){ if(!(i>=0&&i<B.length)) return false;
+    const lo= i>0 ? B[i-1].dt+BEND_EPS : 0, hi= i+1<B.length ? B[i+1].dt-BEND_EPS : len-BEND_EPS;
+    const p={ dt: i===0 ? 0 : Math.max(lo,Math.min(hi,+dt||0)), c:cc(c) };
+    if(p.dt===B[i].dt && p.c===B[i].c) return false;
+    B2[i]=p; }
+  else if(op==='add'){ if(!(dt>BEND_EPS && dt<len-BEND_EPS) || B.some(p=>Math.abs(p.dt-dt)<BEND_EPS)) return false;
+    at=B.findIndex(p=>p.dt>dt); if(at<0) at=B.length; B2.splice(at,0,{ dt, c:cc(c) }); }
+  else if(op==='del'){ if(!(i>0&&i<B.length)) return false; B2.splice(i,1); at=i-1; }
+  else return false;
+  const from={t:ev.t, a:ev.a};
+  if(bendInPlace){ B.length=0; B.push(...B2); }
+  const to={t:ev.t, a: bendInPlace ? ev.a : { ...ev.a, bend:B2 }};
+  editPush({ kind:'move', label:'bend', ev, from, to }); ev.a=to.a; editCommit();
+  return at;
+}
+/* ED5: VOLUME BARS — the Volume address per NOTE (a chord is one note, a drum hit is one): its value at the start and, when it changes
+   inside the note, the note's own values [t, v]. Same field as the lane (pnGet 'vol:amt'); memoised on songNotes' identity (reset by
+   schedInvalidate, rule #28). */
+let pnBarsN=null, pnBarsL=null, pnBarsV=null;
+function pnBars(layer){
+  const N=songNotes(); if(pnBarsN===N && pnBarsL===layer) return pnBarsV;
+  const out=[];
+  for(const n of N.notes){ if(n.layer!==layer) continue;
+    const car=n.evs.filter(e=>pnCarrier(e.fn)); if(!car.length) continue;
+    const v=pnGet(car[0],FX_VOL,'amt'); if(v==null) continue;
+    let path=null, last=v;
+    for(const e of car){ const x=pnGet(e,FX_VOL,'amt'); if(x!=null && !pnSame(x,last)){ (path||(path=[[car[0].t,v]])).push([e.t,x]); last=x; } }
+    out.push({ t:n.start, end:n.end, v, ev:n.head, evs:n.evs, path, role:n.role });
+  }
+  pnBarsN=N; pnBarsL=layer; pnBarsV=out; return out;
+}
+/* ED5: a bar drag — shift the volume of whole NOTES by d: every volume value of each note moves by d, clamped to 0..1 (rule #30: always a
+   value). A bar is a note, not a moment: two notes on one beat (two hands, kick and hat) keep their own values, unlike the line, which
+   holds one value per beat (pnPlan). The edited notes' own smooth marks for Volume become steps ('r'/'s' → 'h', generated-for-Volume
+   flags dropped): their values have left the drawn line, and the lane must show what sounds. A segment head selects its whole note.
+   One history entry; returns the notes' heads or false (nothing changed). */
+function editVolSel(evs,d){
+  if(!editGuard()||!evs||!evs.length||!Number.isFinite(d)) return false;
+  const ly=editLayer(), mk=pnMk(FX_VOL,'amt'), want=new Set(evs), list=[], heads=[];
+  for(const n of songNotes().notes){
+    if(n.layer!==ly || !n.evs.some(e=>want.has(e))) continue;
+    heads.push(n.head);
+    for(const e of n.evs){ if(!pnCarrier(e.fn)) continue;
+      const x=pnGet(e,FX_VOL,'amt'); if(x==null) continue;
+      const y=Math.max(0,Math.min(1,Math.round((x+d)*1e6)/1e6)), s=pnShOf(e,mk), g=pnGenOf(e,mk), s2= s==='r'||s==='s' ? 'h' : s;
+      if(pnSame(x,y) && s2===s && !g) continue;
+      let a=pnWith(e,FX_VOL,'amt',y); if(s2!==s||g) a=pnMarks(a,mk,s2,false);
+      list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a} });
+    }
+  }
+  return list.length && editBatch(list) ? heads : false;
+}
+/* ═══ ED6: SECTIONS — named bar markers; insert, cut or duplicate BARS in every track at once ═══
+   Everything on the timeline moves by one rule: events of every role (notes, drum hits, drone levels, orphans), theremin bend curves,
+   every take's captured lane (bus points and chain-composition entries), the brace, backing lengths, the markers themselves. Track
+   level / pan / name / place are tables by track id with no time — nothing to move. A track whose material moved goes stale through a
+   'lanetouch' step (frozen buffers re-freeze by themselves, AF3); a track wholly before the edit point keeps its buffer.
+   ⛳ EDGE NOTES (user decision ED6-1, "lengthen / shorten"): INSERT — everything from the point on moves later; a note ringing across the
+   point keeps ringing through the new bars; an end exactly on the point stays (a note ending on the bar line is not lengthened). CUT
+   [a,b) — everything that starts inside is removed (a note starting inside goes whole, its tail past b too); a note that began earlier is
+   shortened by the cut: it rings on after it (its last change inside the cut applies from a, its bend keeps the value it had at b) or
+   ends at a if it ended inside; everything after moves left. So insert-then-cut of the same bars is the identity, bit for bit (probe).
+   DUPLICATE [a,b) — a copy of everything that starts inside goes right after b (fresh owner keys; the SAME take, so the take's captured
+   automation, copied with it, keeps governing the copy; ties dropped); a note starting inside and ringing past b ends at b in the
+   original and its copy carries the tail; everything from b on moves L later (as an insert at b). Copied lanes start from the value they
+   had at a; copied drone levels too.
+   ⛳ ONE HISTORY ENTRY in the SONG history (ui ↶/↷ in the arrangement window; the editor's history lives inside one track's session —
+   ED7 merges the two). The entry is the editor's own step kinds (move/del/ins, lane-point steps, lanetouch) plus 'brace', 'marks',
+   'lanelen'; since ED7 it is a step of the one history (histPush), guarded by the history's tripwire hash.
+   ⛔ Not through editBatch: its tie pass unties an edge whose time changes, and here both halves of a pair move together. Pairs that DO
+   lose a half (cut, a copy) are untied after applying, inside the same entry. */
+const SEC_E=1e-9;
+let secMarks=[], secSeq=0;
+/* probe only (CONTROL of P.checkSections): a plan that forgets one kind of timeline item — 'lanes' | 'bend' | 'brace' | 'marks' | 'len' */
+let secForget=null; const secDbg=k=>{ secForget=k||null; };
+const secCopy=L=>L.map(m=>({ id:m.id, beat:m.beat, name:m.name }));
+const sections=()=>secCopy(secMarks).sort((x,y)=>x.beat-y.beat);
+/* time after inserting L at a: from a on moves; an END exactly at a stays */
+const secIns=(x,a,L,end)=> (x>a+SEC_E || (!end && x>a-SEC_E)) ? x+L : x;
+/* time after cutting [a,b): inside → a */
+const secCut=(x,a,b)=> x<a-SEC_E ? x : x<b-SEC_E ? a : x-(b-a);
+const isOffFn=fn=> fn!=='drum' && fn!=='drone' && chaseKind(fn)==='f';
+/* the value of an address of take record r at beat t, from its own lane (last entry before t) or its start snapshot */
+function secLaneVal(r,key,fx,p,t){
+  let best=null;
+  for(const q of r.lane) if(q.key===key && q.fx===fx && q.p===p && q.t<t-SEC_E && (!best||q.t>=best.t)) best=q;
+  if(best) return best;
+  const ch=r.chains[key]; if(!ch) return null;
+  if(fx===FX_CHAIN) return { t:0, key, fx, p, ids:ch.map(e=>e.fxId) };
+  const eff=ch.find(e=>e.fxId===fx), i=fxParamKeysOf(fx).indexOf(p);
+  return eff && i>=0 && eff.params[i]!=null ? { t:0, key, fx, p, v:eff.params[i] } : null;
+}
+/* The plan of one section edit → { list (steps, not applied), news (created events) } or { why }. kind 'ins' | 'cut' | 'dup', [a,b) beats. */
+function secPlan(kind,a,b){
+  const L=b-a, at=new Map(), dels=new Set(), news=[], lanes=[];
+  const N=songNotes(), setT=(e,t)=>{ const x=at.get(e)||{}; x.t=t; at.set(e,x); }, setA=(e,p)=>{ const x=at.get(e)||{}; x.a=p; at.set(e,x); };
+  const setB=(e,p)=>{ if(secForget!=='bend') setA(e,p); };
+  const shiftBend=(n,B,f)=>{ const B2=B.map(q=>{ const t2=f(n.start+q.dt); return t2===n.start+q.dt ? q : { dt:t2-n.start, c:q.c }; });
+    if(B2.some((q,i)=>q!==B[i])) setB(n.head,{ ...n.head.a, bend:B2 }); };
+  const offAt=(n,t)=>{ const R=EDIT_ROLE[n.role], h=n.head, e={ t, layer:n.layer, fn:R.off, a:{ ...R.oldOff(h.a) }, sc:h.sc, sev:h.sev, tk:n.tk };
+    if(h.jam) e.jam=true; evSeq.set(e,(evSeq.get(n.evs[n.evs.length-1])||0)+0.5); news.push(e); };   // sorts before a same-key note moved onto t (recorded later)
+  const insRule=(p,skip)=>{   // the insert-at-p part: every event (offs exactly at p stay), crossing theremin bends (not of `skip` notes)
+    for(const e of events) if(!dels.has(e)){ const t2=secIns(e.t,p,L,isOffFn(e.fn)); if(t2!==e.t) setT(e,t2); }
+    for(const n of N.notes){ const B=n.head.a&&n.head.a.bend;
+      if(B&&B.length && !(skip&&skip.has(n)) && n.start<p-SEC_E && (n.end==null||n.end>p+SEC_E)) shiftBend(n,B,x=>secIns(x,p,L,false)); } };
+  if(kind==='ins') insRule(a);
+  else if(kind==='cut'){
+    for(const n of N.notes){
+      if(n.role==='dr'){ const e=n.head; if(e.t>=b-SEC_E) setT(e,e.t-L); else if(e.t>=a-SEC_E) dels.add(e); continue; }
+      if(n.start>=b-SEC_E){ for(const e of n.evs) setT(e,e.t-L); continue; }
+      if(n.start>=a-SEC_E){ for(const e of n.evs) dels.add(e); continue; }
+      const cont= n.end==null || n.end>b+SEC_E; let last=null;
+      for(const e of n.evs){ if(e.t<a-SEC_E) continue;
+        if(e.t>=b-SEC_E) setT(e,e.t-L);
+        else if(isOffFn(e.fn)) setT(e,a);
+        else { dels.add(e); last=e; } }
+      if(cont && last){ dels.delete(last); setT(last,a); }        // the state at b applies from the cut on
+      if(n.endBy==='next' && n.end>=a-SEC_E && n.end<b-SEC_E) offAt(n,a);   // its closer starts inside and goes — it ends at a
+      const B=n.head.a&&n.head.a.bend;
+      if(B&&B.length){
+        if(cont){ const inR=B.filter(q=>{ const x=n.start+q.dt; return x>=a-SEC_E && x<b-SEC_E; }), lastIn=inR[inR.length-1];
+          let B2=B.filter(q=>!inR.includes(q)).map(q=>{ const x=n.start+q.dt; return x>=b-SEC_E ? { dt:q.dt-L, c:q.c } : q; });
+          if(lastIn) B2=[...B2.filter(q=>n.start+q.dt<a-SEC_E), { dt:a-n.start, c:lastIn.c }, ...B2.filter(q=>n.start+q.dt>=a-SEC_E)];
+          if(inR.length || B2.some((q,i)=>q!==B[i])) setB(n.head,{ ...n.head.a, bend:B2 }); }
+        else { const B2=bendTrim(B, a-n.start); if(B2!==B) setB(n.head,{ ...n.head.a, bend:B2 }); } }
+    }
+    const lastLv=new Map();                                       // drone levels: the last one inside the cut holds from a
+    for(const e of N.levels){ if(e.t>=b-SEC_E) setT(e,e.t-L); else if(e.t>=a-SEC_E){ dels.add(e); lastLv.set(e.layer,e); } }
+    for(const e of lastLv.values()){ dels.delete(e); setT(e,a); }
+    for(const e of [...N.orphans, ...N.other]){ if(e.t>=b-SEC_E) setT(e,e.t-L); else if(e.t>=a-SEC_E) dels.add(e); }
+  }else{   // 'dup'
+    const src=N.notes.filter(n=>n.start>=a-SEC_E && n.start<b-SEC_E), cut=new Set();
+    for(const n of src) if(n.role!=='dr' && (n.end==null || n.end>b+SEC_E)){   // the original ends at b; the copy carries the tail
+      cut.add(n);
+      for(const e of n.evs) if(e!==n.head && e.t>b-SEC_E) dels.add(e);
+      offAt(n,b);
+      const B=n.head.a&&n.head.a.bend; if(B&&B.length){ const B2=bendTrim(B,b-n.start); if(B2!==B) setB(n.head,{ ...n.head.a, bend:B2 }); } }
+    insRule(b,cut);
+    const kTop=new Map(), vTop=new Map();
+    for(const n of src){
+      const id= n.role==='ld' ? (()=>{ const v=vTop.has(n.layer)?vTop.get(n.layer):layerSlotTop(n.layer); vTop.set(n.layer,v+1); return {v}; })()
+              : (n.role==='bs'||n.role==='ch') ? (()=>{ const k=kTop.has(n.layer)?kTop.get(n.layer):layerTakeTop(n.layer); kTop.set(n.layer,k+1); return {k}; })() : null;
+      for(const e of n.evs){ const p={ ...noTie(e.a) };
+        if(p.fx) p.fx={ ...p.fx }; if(p.bend) p.bend=p.bend.slice();
+        if(id){ Object.assign(p,id); if(id.k===0) delete p.k; if(id.v===0) delete p.v; }
+        const c={ t:e.t+L, layer:e.layer, fn:e.fn, a:p, sc:e.sc, sev:e.sev, tk:e.tk }; if(e.jam) c.jam=true;
+        news.push(c); }
+      if(n.role!=='dr' && n.endBy==='next'){   // closed by its next note in the original — the copy has its own key, so its own note-off
+        const R=EDIT_ROLE[n.role], h=n.head, c={ t:n.end+L, layer:n.layer, fn:R.off, a:{ ...R.oldOff({ ...h.a, ...id }) }, sc:h.sc, sev:h.sev, tk:n.tk };
+        if(id&&id.k===0) delete c.a.k; if(h.jam) c.jam=true; news.push(c); } }
+    const byLy=new Map(); for(const e of N.levels){ const L2=byLy.get(e.layer)||[]; L2.push(e); byLy.set(e.layer,L2); }
+    for(const [ly,Ls] of byLy){ const inR=Ls.filter(e=>e.t>=a-SEC_E && e.t<b-SEC_E); if(!inR.length) continue;
+      const pre=Ls.filter(e=>e.t<a-SEC_E).pop(), cp=e=>({ t:e.t+L, layer:ly, fn:e.fn, a:{ ...e.a }, sc:e.sc, sev:e.sev, tk:e.tk, ...(e.jam?{jam:true}:null) });
+      if(pre && Math.abs(inR[0].t-a)>SEC_E) news.push({ ...cp(pre), t:b });   // the copy starts at the level the original had at a
+      for(const e of inR) news.push(cp(e)); }
+  }
+  /* captured lanes: the same rule per point; a cut keeps the LAST point per address inside the cut (moved to a); a duplicate copies the
+     points inside [a,b) after b, starting from the value at a */
+  const lt=new Set();
+  for(const [tk,r] of (secForget==='lanes'?[]:takeFx)){ const keyOf=q=>q.key+'|'+q.fx+'|'+(q.p||'');
+    if(kind==='cut'){ const lastIn=new Map();
+      for(const q of r.lane){ if(q.t>=b-SEC_E) lanes.push({ kind:'autmove', pt:q, from:{t:q.t,v:q.v}, to:{t:q.t-L,v:q.v} });
+        else if(q.t>=a-SEC_E){ const k=keyOf(q), o=lastIn.get(k); if(o) lanes.push({ kind:'autdel', lane:r.lane, pt:o }); lastIn.set(k,q); } }
+      for(const q of lastIn.values()) if(Math.abs(q.t-a)>SEC_E) lanes.push({ kind:'autmove', pt:q, from:{t:q.t,v:q.v}, to:{t:a,v:q.v} });
+    }else{ const p= kind==='ins' ? a : b, inR= kind==='dup' ? r.lane.filter(q=>q.t>=a-SEC_E && q.t<b-SEC_E) : [];
+      const starts=new Map(); for(const q of inR){ const k=keyOf(q); if(!starts.has(k)) starts.set(k,q); }
+      for(const q of r.lane){ const t2=secIns(q.t,p,L,false); if(t2!==q.t) lanes.push({ kind:'autmove', pt:q, from:{t:q.t,v:q.v}, to:{t:t2,v:q.v} }); }
+      for(const [k,q0] of starts) if(Math.abs(q0.t-a)>SEC_E){ const s=secLaneVal(r,q0.key,q0.fx,q0.p,a);
+        if(s) lanes.push({ kind:'autins', lane:r.lane, pt:{ ...s, t:b, sh:'h' } }); }
+      for(const q of inR) lanes.push({ kind:'autins', lane:r.lane, pt:{ ...q, t:q.t+L } }); }
+    if(lanes.some(u=>u.lane===r.lane || r.lane.includes(u.pt))) lt.add(tk);
+  }
+  /* the steps: moves (one per event, final beat and payload), removed, created, lanes, brace, markers, backing lengths, touched tracks */
+  const list=[], touched=new Set();
+  for(const [e,x] of at){ if(dels.has(e)) continue; const t= x.t!=null ? x.t : e.t, p= x.a || e.a;
+    if(t!==e.t || p!==e.a){ list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t, a:p} }); touched.add(e.layer); } }
+  if(dels.size){ list.push({ kind:'del', evs:[...dels] }); for(const e of dels) touched.add(e.layer); }
+  if(news.length){ list.push({ kind:'ins', evs:news }); for(const e of news) touched.add(e.layer); }
+  list.push(...lanes);
+  for(const e of events) if(lt.has(e.tk||0)) touched.add(e.layer);
+  const R=loop.rgn, mapB=(x,end)=> kind==='cut' ? secCut(x,a,b) : secIns(x, kind==='ins'?a:b, L, end);
+  if(R.user && secForget!=='brace'){ let f=mapB(R.from,false), t=mapB(R.to,true); if(t<f+loop.metre) t=f+loop.metre;
+    if(f!==R.from || t!==R.to) list.push({ kind:'brace', from:{ from:R.from, to:R.to, user:true }, to:{ from:f, to:t, user:true } }); }
+  const M0=secCopy(secMarks); let M1=[];
+  for(const m of M0){ if(kind==='cut' && m.beat>=a-SEC_E && m.beat<b-SEC_E) continue; M1.push({ ...m, beat:mapB(m.beat,false) }); }
+  if(kind==='dup') for(const m of M0) if(m.beat>=a-SEC_E && m.beat<b-SEC_E) M1.push({ id:++secSeq, beat:m.beat+L, name:m.name });
+  if(secForget!=='marks' && JSON.stringify(M1)!==JSON.stringify(M0)) list.push({ kind:'marks', from:M0, to:M1 });
+  const ll=[]; for(const [id,len] of laneLen){ const n= kind==='cut' ? secCut(len,a,b) : len>a+SEC_E ? len+L : len; if(n!==len) ll.push({ id, from:len, to:n }); }
+  if(ll.length && secForget!=='len') list.push({ kind:'lanelen', ch:ll });
+  for(const ly of touched){ const id=laneOf(ly); if(id!=null) list.push({ kind:'lanetouch', id }); }
+  return { list, news };
+}
+/* Section edits apply their extra step kinds here (editApply calls it for kinds it does not know). */
+function secApply(u,undo){
+  const s= undo ? u.from : u.to;
+  if(u.kind==='brace'){ loop.rgn.user=s.user; rgnApply(s.from, s.to, loop.rgn.on); return true; }
+  if(u.kind==='marks'){ secMarks=secCopy(s); return true; }
+  if(u.kind==='lanelen'){ for(const c of u.ch){ const v= undo ? c.from : c.to; if(v) laneLen.set(c.id,v); else laneLen.delete(c.id); } return true; }
+  return false;
+}
+function secCommit(){ evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch(); if(hooks.af) hooks.af('section'); }
+/* After applying: a tie whose partner is gone or no longer at its beat is untied (same entry). */
+function secUntie(list){
+  const extra=[];
+  for(const e of events){ if(!e.a||!e.a.tie||tiePartners(e).length) continue;
+    const u={ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:noTie(e.a)} }; editApply(u,false); extra.push(u);
+    const id=laneOf(e.layer); if(id!=null){ const v={ kind:'lanetouch', id }; editApply(v,false); extra.push(v); } }
+  list.push(...extra);
+}
+/* Why a section edit refuses: 'rec' (recording), 'editor' (the track editor is open), 'range' (not whole bars), 'empty' (no song), or null. */
+function songEditWhy(kind,a,b){
+  if(recording) return 'rec';
+  if(editIsOpen()) return 'editor';
+  const M=loop.metre, bar=x=>Math.abs(x/M-Math.round(x/M))<1e-6;
+  if(!['ins','cut','dup'].includes(kind) || !(b>a+SEC_E) || a<-SEC_E || !bar(a) || !bar(b)) return 'range';
+  if(!events.length) return 'empty';
+  return null;
+}
+/* One section edit — insert (b−a empty beats at a), cut [a,b) or duplicate [a,b) — in every track; one song-history entry. → true or false. */
+function songEdit(kind,a,b){
+  if(songEditWhy(kind,a,b)||!AC) return false;
+  if(loop.on) onLoop();
+  evSeqFill();
+  const pos=Math.max(0,loop.pos);
+  const P=secPlan(kind,a,b);
+  if(!P.list.some(u=>u.kind!=='lanetouch')) return false;
+  for(const u of P.list) editApply(u,false);
+  secUntie(P.list);
+  secCommit();
+  if(histPush({ kind:'batch', label:'sec:'+kind, a, b, list:P.list })) histSeal();   // ED7: one step of the one history
+  const L=b-a; seekTo(kind==='cut' ? secCut(pos,a,b) : secIns(pos, kind==='ins'?a:b, L, false));
+  return true;
+}
+/* Markers: add (at a bar line, a default name A, B, … when none given), rename, delete — each one song-history entry. */
+function secName(){ const used=new Set(secMarks.map(m=>m.name));
+  for(let i=0;;i++){ const n=String.fromCharCode(65+i%26)+(i>=26?Math.floor(i/26)+1:''); if(!used.has(n)) return n; } }
+function secPush(to,what){ const from=secCopy(secMarks), u={ kind:'marks', label:what, from, to };
+  secApply(u,false); if(histPush(u)) histSeal(); return true; }
+function secAdd(beat,name){
+  if(recording) return null;
+  const M=loop.metre, b=Math.max(0,Math.round(beat/M)*M);
+  if(secMarks.some(m=>Math.abs(m.beat-b)<SEC_E)) return null;
+  const m={ id:++secSeq, beat:b, name:(name&&String(name).trim().slice(0,24))||secName() };
+  secPush([...secCopy(secMarks), m],'mark'); return { ...m };
+}
+function secRename(id,name){ const nm=String(name||'').trim().slice(0,24), m=secMarks.find(x=>x.id===id);
+  if(!m||!nm||nm===m.name) return false; return secPush(secCopy(secMarks).map(x=>x.id===id?{ ...x, name:nm }:x),'rename'); }
+function secDelete(id){ if(!secMarks.some(m=>m.id===id)) return false; return secPush(secCopy(secMarks).filter(m=>m.id!==id),'unmark'); }
+/* ED6's song history became the one history (ED7): the old names stay as aliases (ui of the window, the ED6 probe). */
+const songCanUndo=()=>histCanUndo(), songCanRedo=()=>histCanRedo(), songUndo=()=>histUndo(), songRedo=()=>histRedo(), songHistReset=()=>histReset();
+/* probe only: every take's captured lane and chain snapshot as plain data (points sorted — their order in a lane carries no meaning) */
+const takeFxDump=()=>JSON.stringify([...takeFx].sort((x,y)=>x[0]-y[0]).map(([tk,r])=>[tk, r.chains, r.lane.map(p=>JSON.stringify(p)).sort()]));
 let autMemoK='', autMemoV=null;
 function autPoints(layer,key,fxId,pKey){
   const mk=layer+'|'+key+'|'+fxId+'|'+pKey+'|'+takeFxVer+'|'+evGen+'|'+loop.bpm;   // + loop.bpm: форма записанной точки выводится по промежутку в СЕКУНДАХ (autSmoothOf). Переключатель уха поднимает takeFxVer сам. V4b: + evGen (поднимает КАЖДЫЙ schedInvalidate): вид «в ноте» строится из СОБЫТИЙ, а takeFxVer поднимают только правки редактора — новое взятое в ту же дорожку оставило бы мемо прежним
@@ -3288,7 +3835,7 @@ function autPointsCalc(layer,key,fxId,pKey){
 /* ⛳ ОБЩИЙ ХВОСТ ВСЕХ ПРАВОК ПОЛОСЫ. editCommit сортирует СОБЫТИЯ и сбрасывает курсоры — здесь этого не
    нужно и НЕЛЬЗЯ: захват не события (правило #28). Нужно ровно одно — поднять версию захвата, чтобы
    лента переигровки пересобралась и правка зазвучала на следующем ▶. */
-const autCommit=()=>{ takeFxTouch(); laneEditTouch(); };   // A2: см. laneEditVer
+const autCommit=()=>{ takeFxTouch(); laneEditTouch(); histSeal(); };   // A2: см. laneEditVer
 /* ═══ S1: ОДНА ЦЕПЬ ДОРОЖКИ В РЕДАКТОРЕ ═══
    ⛳ ЦЕПЬ ДОРОЖКИ — ЭТО СНИМКИ ВСЕХ ЕЁ ЗАХВАЧЕННЫХ ВЗЯТЫХ. Каждый снимок вступает с первой доли своего взятого (fxLaneMerge),
    поэтому правка цепи, легшая в ОДНО взятое, звучала бы лишь с его старта. Отсюда закон: добавить, снять, переставить —
@@ -3487,8 +4034,8 @@ function editApply(u,undo){
   if(u.kind==='autshape'){ autShapeSet(u.pt, undo?u.from:u.to); takeFxTouch(); return; }   // гладкая автоматизация: форма отрезка точки ленты — оба состояния в записи, как у переноса
   if(u.kind==='autins'||u.kind==='autdel'){
     const add=(u.kind==='autdel')===undo;
-    if(add){ if(u.lane.indexOf(u.pt)<0) u.lane.push(u.pt); }
-    else { const i=u.lane.indexOf(u.pt); if(i>=0) u.lane.splice(i,1); }
+    if(add){ if(u.lane.indexOf(u.pt)<0) u.lane.splice(u.kind==='autdel'&&u.at!=null ? Math.min(u.at,u.lane.length) : u.lane.length, 0, u.pt); }   // ED6: an undone delete goes back to its own place (the song fingerprint compares lanes in order)
+    else { const i=u.lane.indexOf(u.pt); if(i>=0){ if(u.kind==='autdel') u.at=i; u.lane.splice(i,1); } }
     takeFxTouch(); return;
   }
   if(u.kind==='autfxins'||u.kind==='autfxdel'){
@@ -3506,28 +4053,24 @@ function editApply(u,undo){
   if(u.kind==='autcap'){
     if(undo){ if(takeFx.get(u.tk)===u.rec) takeFx.delete(u.tk); } else takeFx.set(u.tk,u.rec);
     takeFxTouch(); return; }
+  if(secApply(u,undo)) return;   // ED6: brace, markers, backing lengths (section edits)
+  if(histApplyX(u,undo)) return;   // ED7: snapshot steps, level / pan / name, order, master
   /* S5.5: удаление/вставка возят НАБОР событий (бас-нота — это «вкл»+«выкл», а то и её ведения), но
      механизм тот же и объекты ТЕ ЖЕ. Набор из одного — прежний случай удара, байт-в-байт. */
   const back=new Set(u.evs);
   if((u.kind==='del')===undo) events.push(...u.evs);
   else compactEvents(e=>back.has(e));
 }
-/* ↶ — снять последнюю правку (и положить её в будущее, чтобы ↷ мог вернуть). */
-/* T5: ход ЗАМЕНЫ ТЕМБРА снимается и на подложке — ровно тем же послаблением, каким был сделан. Прочих ходов
-   на подложке не бывает (их правки отказывают), так что отмена ей не открывает ничего сверх замены. */
-function editUndo(){
-  const u=editHist[editHist.length-1];
-  if(!u||!editGuard(u.kind==='timbre')) return false;
-  editHist.pop(); editApply(u,true); editFuture.push(u);
-  editCommit(); return u.kind;
-}
-/* ↷ — вернуть отменённое. ⛔ Мимо editPush — И ЭТО ВЕРНО: возврат не создаёт новой ветки, он идёт ПО ТОЙ
-   ЖЕ, и чистить будущее здесь было бы ошибкой (стёрло бы остаток очереди ↷). Ветку рвёт только НОВАЯ правка. */
-function editRedo(){
-  const u=editFuture[editFuture.length-1];
-  if(!u||!editGuard(u.kind==='timbre')) return false;
-  editFuture.pop(); editApply(u,false); editHist.push(u);
-  editCommit(); return u.kind;
+/* ↶ / ↷ of the editor — since ED7 the one history (histUndo / histRedo: any step, any track, editor open or not). */
+const editUndo=()=>histUndo();
+const editRedo=()=>histRedo();
+/* ⛔ Probe only (P.checkLiveIsolation): the open session's history, and walking such a list back in a LATER session on the same track —
+   safe only when nothing changed the song in between (the probe plays and freezes, it edits nothing). Restores the exact payloads. */
+const editHistPeek=()=>hist.slice();
+function editRevert(list){
+  if(!list||!list.length||!editGuard(true)) return false;
+  for(let i=list.length-1;i>=0;i--) editApply(list[i],true);
+  editCommit(); histReset(); return true;   // ED7: the reverted steps are still in the one history — it is dropped (probe only)
 }
 
 /* Позиция для визуализации: фаза отсчёта / игры, ПЕСЕННАЯ доля, длина песни в долях.
@@ -4279,7 +4822,9 @@ function trackResplice(){
   chasePlay(lo, T, false);                          // аккорды и бас — по времени шва, до событий следующего отрезка
   chasePlay(lo, T, true);                           // соло — по явному времени шва, как при пуске
 }
-function setRecording(v){ recording=v; hooks.rec && hooks.rec(v); }
+function setRecording(v){ const was=recording; recording=v;
+  if(v&&!was) takeBegin(); else if(!v&&was){ const t=takeTok; takeTok=null; snapEnd(t); }   // ED7: a take is one step (what happened between ● and its end)
+  hooks.rec && hooks.rec(v); }
 
 /* --- Транспорт петли --- */
 function clearPump(){ if(pumpTimer){ clearInterval(pumpTimer); pumpTimer=null; } }
@@ -4974,6 +5519,7 @@ function onRec(){
      всё записанное. Чистит только ✕.
      ⛳ МЕСТО РОЖДЕНИЯ ДОРОЖКИ (см. закон у laneNew): пустая песня → дорожка 0 и сброс настроек дорожек;
      иначе → maxLayer()+1. Номер МОГ УЖЕ ЖИТЬ (его освободила ⤺ отмена), поэтому laneNew обязателен. */
+  takeBegin();   // ED7: the take's step starts BEFORE anything of it exists (its lane, its capture record)
   const fresh=!events.length;
   /* ⛳ S3.5c: ВООРУЖЕНА живая дорожка → пишем В НЕЁ (слияние: её события остаются, новые дописываются рядом).
      laneNew здесь НЕ зовём: он выдал бы свежий id — дорожка потеряла бы свои mute/solo и само вооружение.
@@ -5019,6 +5565,9 @@ function onRec(){
    работа вместе с таймлайном редактора (см. отчёт слайса). */
 function loadArrangement(sel, jam=false){
   if(!AC)return false;
+  const tok=snapBegin('backing'); try{ return loadArrangementDo(sel, jam); } finally { snapEnd(tok); }   // ED7: a backing load is one step
+}
+function loadArrangementDo(sel, jam){
   /* drumKitIdx передаём ЯВНО: без него buildArrangement брал дефолт 0 и слои аранжировки всегда играли
      «Стандартом», какой бы кит ни был выбран — паттерны, писанные В РОЛЯХ ради кит-независимости, звучали
      одним китом. bars — ДЛИНА ПОДЛОЖКИ в тактах (loop.bars сменил смысл в S3.3): её берёт путь «только
@@ -5060,6 +5609,9 @@ function backingEvent(e, layer, tk, jam){
 }
 function clearJam(){
   if(!events.length)return;
+  const tok=snapBegin('backing'); try{ clearJamDo(); } finally { snapEnd(tok); }   // ED7: removing a backing is one step (a switch = remove + load, folded when nested)
+}
+function clearJamDo(){
   const removed=compactEvents(e=>e.jam);               // ОДИН проход вместо splice-в-цикле (см. compactEvents)
   if(!removed)return;
   /* S3.5d-fix: при записи — ЗАКРЫТЬ удержанное ДО softAllOff: тот обнуляет состояние записи БЕЗ концов, и ноты взятого
@@ -5112,6 +5664,9 @@ function onLoop(){
    раньше; clearJam по-прежнему снимает РОВНО помеченное ev.jam, номера взятых ему не нужны. */
 function onUndo(){
   if(!events.length)return;
+  const tok=snapBegin('untake'); try{ onUndoDo(); } finally { snapEnd(tok); }   // ED7: ⤺ is an ordinary step (↶ brings the take back)
+}
+function onUndoDo(){
   let top=-Infinity; for(const e of events){ const k=e.tk||0; if(k>top) top=k; }
   /* S3.5d-fix: при записи снимается НЕ текущее взятое (например, слой подложки, положенной посреди записи) — закрыть
      удержанное ДО softAllOff, иначе его «вкл» останутся без «выкл». Если снимается само текущее взятое, закрывать нечего:
@@ -5188,6 +5743,7 @@ function setLoopBpm(v){
    а маршрут по строю (noteSource) разводит их по дорожкам сам. Без fz — живой CUR()/seventh, как было. */
 function seedTake(steps){
   if(!AC || recording || loop.on || editIsOpen()) return null;
+  takeBegin();   // ED7: as onRec — before the lane and the capture record are born
   const fresh=!events.length;
   if(fresh){ laneReset(); loop.layer=0; } else loop.layer=nextFreeLayer();
   laneNew(loop.layer);
@@ -5206,7 +5762,8 @@ function seedTake(steps){
   return { take:curTake, events:n, layers:[...new Set(lyOf.values())] };
 }
 function clearRec(){
-  clearPump(); loop.on=false; fxPlayStop(); events.length=0; loop.rgn.user=false; rgnApply(0,loop.metre,false); schedInvalidate(); laneReset(); setRecording(false); softAllOff(); droneOff();   // S3.5b: loop.on=false ПЕРЕД rgnApply — остановленному транспорту перепривязывать нечего; скоба — снова «следует», повтор выключен (user — не часть временнóй карты, поэтому пишется напрямую)   // ✕ — песни больше нет, значит нет ни дорожек, ни области повтора: помеченный участок пустой песни был бы ложью на экране
+  clearPump(); loop.on=false; fxPlayStop(); events.length=0; secMarks=[]; if(takeTok){ if(snapPend===takeTok) snapPend=null; takeTok=null; }   // ED6: markers go with the song; ED7: a take cleared away is no step (the history itself stays — ✕ is a step, clearSong; loads reset it)
+  loop.rgn.user=false; rgnApply(0,loop.metre,false); schedInvalidate(); laneReset(); setRecording(false); softAllOff(); droneOff();   // S3.5b: loop.on=false ПЕРЕД rgnApply — остановленному транспорту перепривязывать нечего; скоба — снова «следует», повтор выключен (user — не часть временнóй карты, поэтому пишется напрямую)   // ✕ — песни больше нет, значит нет ни дорожек, ни области повтора: помеченный участок пустой песни был бы ложью на экране
   hooks.loop && hooks.loop(false);
 }
 /* ⚠️ panic НАМЕРЕННО НЕ ТРОГАЕТ настройки дорожек: события переживают панику, значит переживают и
@@ -5253,7 +5810,7 @@ export {
   softAllOff, panic, inPB, recording,
   onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, setLoopSub, SUBS, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
   songBeats, seekTo,   // S3.3: длина песни в долях (её читает полоса лупера, чтобы вписать таймлайн) и перемотка (пока по ней ездит только «пуск с конца → с начала»)
-  setRegionOn, regionOn, cycling, braceTap, braceMove,   // S3.5b: ⟳ только вкл/выкл повтора; скобу двигает тап/перетаскивание (ui), границы и user draw читает из loop.rgn
+  setRegionOn, regionOn, cycling, braceTap, braceMove, braceSet,   // ED6: braceSet — both edges at once (a tapped section).  S3.5b: ⟳ только вкл/выкл повтора; скобу двигает тап/перетаскивание (ui), границы и user draw читает из loop.rgn
   loadArrangement, loadJam, clearJam, loopChordDeg, loopChordOct,
   toggleLaneMute, toggleLaneSolo, laneMuted, laneSoloed, laneSoloOn, toggleArm, armedLayer, laneDelTap, laneDelCancel, laneDelPendingLayer,   // дорожки (S1): ПИШЕТ ui (тап по полосе), ЧИТАЕТ draw (вид строки). Адрес — НОМЕР СЛОЯ, id остаётся внутри
   songNotes,      // S4.0: события, собранные в НОТЫ (только чтение) — по ним рисует пиано-ролл
@@ -5273,6 +5830,16 @@ export {
   chordMoveTy,   // T5 (а): тип, который получит целый аккорд при переносе на высоту вне лада — правка и призрак (draw) читают ОДНУ функцию
   editMoveSel, editDeleteSel,
   editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo,   // ED2: copy, paste, duplicate (the clipboard lives here)
+  editQuantSel,   // ED3: quantise the selection after recording
+  editDegreeSel, editDegreeWhy,   // ED4: transpose the selection by degrees of its mode, and why it cannot
+  pnBars, editVolSel,   // ED5: the Volume address as one bar per note, and a bar drag (shift whole notes' volume)
+  editBendPoint, bendDbg,   // OWN2: move / add / delete a theremin note's bend point (bendDbg — probe control only)
+  /* ED6: sections — markers, insert / cut / duplicate bars in every track, the song history (↶/↷ of the arrangement window) */
+  sections, secAdd, secRename, secDelete, songEdit, songEditWhy, songUndo, songRedo, songCanUndo, songCanRedo,
+  /* ED6 probe only: the forgetting plan (control), the song history reset, the tracks' edit versions kept and restored, the capture lanes as data */
+  secDbg, songHistReset, laneVerKeep, takeFxDump,
+  /* ED7: the one history — ↶/↷ everywhere, table steps (level / pan / name / order / master), ✕ as a step; probe: reset, length, hash, controls */
+  histUndo, histRedo, histCanUndo, histCanRedo, histLen, histReset, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg,
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,   // autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки
@@ -5311,6 +5878,8 @@ export {
   frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf, songPinChains,
   /* AF5: where recorded automation plays (render.live), and the probe control of the old shared network */
   playKeyOf, setLiveIsolation, fxPlayDriving, setLiveLeakDbg,
+  /* probe only: revert an editor session's edits after it closed (P.checkLiveIsolation) */
+  editHistPeek, editRevert,
   recLayers, isRecLayer,   // T1: СЛОИ ВЗЯТОГО — полоса и заголовок читают их вместо одиночного loop.layer (в T1 слой один)
   freezeTicket,   // A2: БИЛЕТ заморозки (слой + id дорожки + подпись), снятый ДО рендера; freezeSet ставит буфер только если билет ещё верен
   freezeSet, unfreezeLayer, frozenLayers, frozenInfo, freezeState, frzHas, freezePinCaptures,   // F4/F5: ЗАМОРОЗКА как РЕЖИМ ВОСПРОИЗВЕДЕНИЯ; freezeState — 'none'|'fresh'|'stale' для показа (звук гатится тем же предикатом внутри)

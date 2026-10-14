@@ -3,7 +3,7 @@ import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_
 import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordAtRoot, tuningIndexOf, CUR } from './scales.js';   // T7: chordTypeFits — тип аккорда целиком в строе на этом корне (Партч)
 import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
-         onRec, onLoop, onUndo, clearRec, recording, loop, events } from './recorder.js';
+         onRec, onLoop, onUndo, clearRec, clearSong, recording, loop, events } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
 import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT, FX_GLIDE_KEY, fxHandRange } from './audio.js';   // fxHandRange — VOL-1: ход руки по громкости из её объявления   // FX_GLIDE_KEY — V4: ключ Скольжения в карте ноты (терменвокс его в запись не несёт, см. noteFx)   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
@@ -256,7 +256,7 @@ function doLooper(cmd){
     onUndo(); looperMsgSet(t('msg.undo'), true);
   }else if(cmd==='clear'){
     if(!loop.on && !events.length){ looperMsgSet(t('msg.alreadyEmpty'), false); return; }    // нечего очищать — движок не дёргаем
-    clearRec(); looperMsgSet(t('msg.cleared'), true);
+    clearSong(); looperMsgSet(t('msg.cleared'), true);   // ED7: the looper hand's clear is a step (↶ brings the song back)
   }
 }
 /* Вызов НА ЗАХВАТЕ щипка (edge) → единичное срабатывание по построению. index/middle/ring — сразу;

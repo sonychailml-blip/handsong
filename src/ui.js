@@ -10,6 +10,9 @@ import { scaleId, tonic, setScaleId, setTonic, tunedFrom, setTunedFrom, setChord
          rollSelMany, setRollSelMany, rollPick, setRollPick, rollBox, setRollBox,   // ED1: several notes selected, pick mode, the selection box
          rollRole, setRollRole, rollRow0, setRollRow0, rollRowsAll, setRollRowsAll, setLaneRow0,
          rollAut, setRollAut, rollAutSel, setRollAutSel, rollAutDrag, setRollAutDrag,
+         rollVolBars, setRollVolBars,   // ED5: the Volume address as bars (one per note) or as the line
+         secSel, setSecSel,   // ED6: the selected section marker of the window
+         rollBendSel, setRollBendSel, rollBendDrag, setRollBendDrag,   // OWN2: the selected bend point and the ghost of a dragged one
          setLaneDrag,   // AR2: тянущаяся за ручку строка окна (вид жеста; порядок пишет recorder.moveLane)
          seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
@@ -20,7 +23,7 @@ import { switchCamera, canvas as canvasEl } from './vision.js';
 /* loopHit — ГЕОМЕТРИЯ ПОПАДАНИЯ по полосе лупера. Живёт в draw, потому что там же она и РИСУЕТСЯ
    (правило #9: две копии разъедутся, и палец возьмёт не ту кнопку, которую видит). ui не считает
    ничего сам — переводит тап в вызов. Цикла импортов нет: draw про ui не знает. */
-import { loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
+import { rollBendAt, loopHit, loopBeatAt, loopScroll, arrGeom, rollHit, rollGeom, rollSnap, rollSnapBeat, rollTrackView, rollRowPitch, rollDragTarget, rollAxisHasDim, rollBoxHits, rollSelectable, rollShiftPit, fxTitleOf, rollAutSnapV, rollAutDrive, rollDefaultRow0For, rollAxisNow, rollRow0Across, laneTitle, laneCol, laneDefName } from './draw.js';   // AR2: имя и цвет дорожки — одни на все виды (чип редактора, поле переименования)   // O-4: привязка величины и ведение точки пальцем (ось жеста, зона точности) — из ТОГО ЖЕ снимка, что нарисован (правило #9)   // fxTitleOf — ЕДИНАЯ резолюция имени эффекта (меню + подвал редактора), живёт в draw: ui→draw уже есть, обратный импорт был бы циклом   // S5.5: группы ладов дорожки и расшифровка ряда в (ступень,регистр) — ТОЙ ЖЕ формулой, что рисует ряды   // S5.1: шаг привязки считает draw (он знает плотность пикселей) — второй копии лестницы не заводим   // S5.0: попадание и габариты окна пиано-ролла — из ТОГО ЖЕ снимка, по которому он нарисован
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
@@ -28,14 +31,17 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
-         editMoveHit, editDeleteHit, editInsertHit, editUndo, editRedo, editCanUndo, editCanRedo, editBackingOpen,
+         editMoveHit, editDeleteHit, editInsertHit, editCanUndo, editCanRedo, editBackingOpen,
          songSegs, editMoveSeg, editDeleteSeg, editInsertBass, editResizeSeg, editInsertChord, editDeleteChordNote, editMoveChordNote, editResizeChordNote,
          editInsertLead, laneLevelOf, setLaneLevel, lanePanOf, setLanePan,   // S4: вставка ноты соло и предикат двух отказов правки соло (причину называем по нему)
          autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint,
          autChainOf, autChainAdd, autChainRemove, autChainMove, laneRoleOf, laneTimbreOf, editSetTimbre,   // T5: тембр дорожки и его замена   // T4: роль дорожки — на ней редактор и открывается (вкладок ролей нет)
-         laneOrder, moveLane, laneNameOf, setLaneName,   // AR2: порядок показа (один на все виды), перестановка, имя дорожки
+         laneOrder, laneNameOf,   // AR2: порядок показа (один на все виды), перестановка, имя дорожки
          recLayers, editViewCheck,
-         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
+         sections, secAdd, secRename, secDelete, songEdit, songEditWhy, braceSet,   // ED6: sections and the song history
+         editBendPoint,   // OWN2
+         histUndo, histRedo, histCanUndo, histCanRedo, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
+         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META } from './config.js';
 import { hooks } from './hooks.js';
@@ -233,8 +239,8 @@ function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' :
 const rgnBtn=$('rgnBtn');
 function updRgnBtn(){ rgnBtn.classList.toggle('on', regionOn()); }
 rgnBtn.onclick=()=>{ setRegionOn(!regionOn()); updRgnBtn(); };
-hooks.rec       = () => { updRecBtn(); syncTutorBarPos(); };   // запись вкл/выкл → коробка лупера появляется/меняется → переставить подсказку тура
-hooks.loop      = on => { loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); updRgnBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет), вид кнопки области И положение подсказки (коробка появилась/ушла)
+hooks.rec       = () => { updRecBtn(); syncTutorBarPos(); updHistBtns(); };   // ED7: a take ends → one more step   // запись вкл/выкл → коробка лупера появляется/меняется → переставить подсказку тура
+hooks.loop      = on => { updHistBtns(); loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); updRgnBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет), вид кнопки области И положение подсказки (коробка появилась/ушла)
 
 /* ТРИ ПАНЕЛИ (звукоряд · звук и управление · лупер) — все оверлеи на ОДНОМ месте (сверху), поэтому
    открытой может быть РОВНО ОДНА. Лупер РАНЬШЕ жил снизу, чтобы холстовая сетка тактов оставалась
@@ -446,7 +452,9 @@ const rollBar=$('rollBar'), rollBtn=$('rollBtn'), rollCloseBtn=$('rollClose'),
       rollTrackBtn=$('rollTrack'), rollTimbreEl=$('rollTimbre'),
       rollZoomInBtn=$('rollZoomIn'), rollZoomOutBtn=$('rollZoomOut'), loopTpEl=$('loopTransport'),
       rollInsBtn=$('rollIns'), rollDelBtn=$('rollDel'), rollUndoBtn=$('rollUndo'), rollRedoBtn=$('rollRedo'), rollSnapEl=$('rollSnap'), rollHomeBtn=$('rollHome'),
-      rollRowsBtn=$('rollRows'), rollPickBtn=$('rollPick'), rollCopyBtn=$('rollCopy'), rollPasteBtn=$('rollPaste'), rollDupBtn=$('rollDup');
+      rollRowsBtn=$('rollRows'), rollPickBtn=$('rollPick'), rollCopyBtn=$('rollCopy'), rollPasteBtn=$('rollPaste'), rollDupBtn=$('rollDup'),
+      rollQuantBtn=$('rollQuant'), rollQGridEl=$('rollQGrid'), rollQWhatEl=$('rollQWhat'), rollQAmtEl=$('rollQAmt'),
+      rollDegUpBtn=$('rollDegUp'), rollDegDnBtn=$('rollDegDn'), rollVolBarsBtn=$('rollVolBars');
 /* ⛳ РОЛЬ РЕДАКТОРА — РОЛЬ ДОРОЖКИ (T4). Вкладок ролей больше нет: с T2 в дорожке ровно одна роль, и
    селектор с одним вариантом был бы шумом. Роль читаем у recorder (laneRoleOf — из событий дорожки) РОВНО
    в двух местах: на открытии редактора и на смене дорожки. Между ними она не перечитывается — дорожку
@@ -477,7 +485,7 @@ function applyRollBar(){
   rollTrackBtn.textContent = ly==null ? '—' : t('roll.track',{n:ly+1})+' · '+laneTitle(ly);   // AR2: «L# · имя» — то же имя, что у строки в окне
   rollTrackBtn.style.setProperty('--role', ly==null ? '' : laneCol(ly));                       // AR2: цвет роли дорожки — та же палитра (config.INSTR_COL)
   rollTrackBtn.disabled = trackLayers().length<2;
-  renderTimbreCtl();
+  renderTimbreCtl(); renderQuantCtl();
   /* (Чип лада #rollScale снят в T4c-2: у дорожки один вид строя — маршрут по строю, см. draw.rollGroup.) */
   /* T3: КНОПКА «ВСЕ / ЛАД» — только когда у лада оси есть высоты строя вне лада (rollAxisHasDim); подпись — ТЕКУЩИЙ вид. */
   rollRowsBtn.hidden = !rollAxisHasDim();
@@ -570,14 +578,14 @@ function openArr(){
   if(activeKind()){ showCamMsg(t('roll.refusedClip')); return; }
   if(!trackLayers().length){ showCamMsg(t('roll.refusedEmpty')); return; }
   arrWinStart();
-  setArrOpen(true);
+  setArrOpen(true); updSecBtns();
   barEl.classList.remove('on'); arrBar.classList.add('on'); loopTpEl.classList.add('arr');
   updRecBtn();
 }
 function closeArr(){
   if(!arrOpen) return;
   if(rollOpen) closeRoll();
-  closeRename(true); setLaneDrag(null);   // AR2: открытое поле имени — оставить; перестановка — снята
+  closeRename(true); closeSecRename(true); setLaneDrag(null);   // AR2: открытое поле имени — оставить; перестановка — снята (ED6: и имя раздела)
   setArrOpen(false); arrG=null; arrZoom=null; arrPts.clear();
   arrBar.classList.remove('on'); loopTpEl.classList.remove('arr');
   barEl.classList.add('on'); revealBar();
@@ -593,7 +601,8 @@ arrFitBtn.onclick=()=>setRollWinClamped(0, rollTotal()+loop.metre);
 /* ⛔ ТОЛЬКО ДЛЯ ПРОБЫ (P.checkArrange): те же входы, что у кнопок и тапа, — открыть/закрыть окно, открыть дорожку из окна и вернуться, окно
    времени через ТОТ ЖЕ зажим. Звать из консоли — это нажать кнопки рукой. */
 export const arrApi={ open:openArr, close:closeArr, openTrack:ly=>openRoll(ly), closeTrack:()=>closeRoll(), setWin:(b0,span)=>setRollWinClamped(b0,span),
-  face:f=>{ setArrFace(f); applyArrFace(); } };   // MX1: лицо окна — как кнопкой
+  face:f=>{ setArrFace(f); applyArrFace(); },
+  secRenameDbg:m=>{ secRenDbg=m||null; } };   // ED6-fix: probe control only — 'down' = the old rename (opened inside the press)   // MX1: лицо окна — как кнопкой
 /* ЖЕСТЫ ОКНА. Один палец: тап (без сдвига больше LANE_SCROLL_PX) — действие строки на ОТПУСКАНИИ (открыть, M, S, вооружить); сдвиг —
    по ПЕРВОМУ направлению: вдоль — прокрутка времени (доля под пальцем держится), поперёк — прокрутка строк. Два пальца — зум с якорем в
    середине (как в редакторе). Полоса скобы — сразу, как на полосе игры (тап ставит край, тащить — общий pointermove скобы выше). */
@@ -610,6 +619,8 @@ const PAN_DRAG_PX=160, PAN_DETENT=0.04;
 const panDet=v=>{ const x=Math.max(-1,Math.min(1,v)); return Math.abs(x)<PAN_DETENT ? 0 : x; };
 function levelOf(h){ return h.what==='mlevel' ? masterLevel() : h.what==='pan' ? lanePanOf(h.layer) : laneLevelOf(h.layer); }
 function setLevelOf(h,v){ if(h.what==='mlevel') setMasterLevel(v); else if(h.what==='pan') setLanePan(h.layer,panDet(v)); else setLaneLevel(h.layer,v); }
+/* ED7: one history step per gesture (drag release, double tap; wheel steps on one control merge) — from the value at its start */
+function levelStep(h,v0,merge){ const r= h.what==='mlevel' ? histMaster(v0,merge) : histTab(h.layer, h.what==='pan'?'pan':'level', v0, merge); if(r) updHistBtns(); return r; }
 const isFader=h=>!!h && (h.what==='level'||h.what==='mlevel'||h.what==='pan');
 /* AF3: a held pan control holds auto-freeze; its release (or a wheel step, a double tap) starts the 1-s settle. Level never triggers. */
 let panHeld=false;
@@ -620,11 +631,13 @@ function arrDown(e){
   const g=arrGeom(); if(!g){ arrG=null; return; }
   if(arrPts.size===1){
     const h=loopHit(p.x,p.y);
+    if(h && h.what==='sec'){ arrG=null; secTapAt(h); return; }          // ED6: a marker — select (brace on its section) / double tap renames
+    if(h && h.what==='secband'){ arrG=null; secBandTap(h.beat); return; }   // ED6: empty sections band — a new marker at that bar
     if(h && h.what==='brace'){ arrG=null; braceEdge=braceTap(h.beat); return; }
     if(h && h.what==='move'){ arrG={ h, x:p.x, y:p.y, move:true, to:h.row, scrollT:0 }; setLaneDrag({ layer:h.layer, to:h.row }); return; }   // AR2: ручка — перестановка (порядок пишется на отпускании)
     if(isFader(h)){
       const key= h.what==='mlevel' ? 'm' : (h.what==='pan'?'P':'L')+h.layer, now=performance.now(), S=loopScroll();
-      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; setLevelOf(h, h.what==='pan'?0:1); arrG=null; if(h.what==='pan'){ panHeld=true; panRelease(); } return; }   // двойной тап — единица (панорама — центр)
+      if(levelTap.key===key && now-levelTap.t<LEVEL_DBL_MS){ levelTap={ key:null, t:0 }; const v0=levelOf(h); setLevelOf(h, h.what==='pan'?0:1); levelStep(h,v0); arrG=null; if(h.what==='pan'){ panHeld=true; panRelease(); } return; }   // двойной тап — единица (панорама — центр)
       levelTap={ key, t:now };
       if(h.what==='pan') panHold();
       const span= h.what==='pan' ? 2 : 1, fw= h.what==='pan' ? Math.max(PAN_DRAG_PX,g.pfw) : h.what==='mlevel' ? g.mfw : g.fw;   // ход ручки: значение на пиксель
@@ -697,12 +710,85 @@ function openRename(ly){
 function closeRename(commit){
   if(renameLy==null) return;
   const ly=renameLy; renameLy=null;
-  if(commit) setLaneName(ly, laneNameIn.value);
+  if(commit){ laneNameStep(ly, laneNameIn.value); updHistBtns(); }   // ED7: a rename is one step
   laneNameIn.hidden=true; laneNameIn.blur();
 }
 if(laneNameIn){
   laneNameIn.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); closeRename(true); } else if(e.key==='Escape'){ e.preventDefault(); closeRename(false); } };
   laneNameIn.onblur=()=>closeRename(true);
+}
+/* ═══ ED6: SECTIONS IN THE WINDOW ═══
+   The sections band (above the brace band): a tap on empty band adds a marker at that bar (named A, B, …), a tap on a marker selects it
+   and puts the brace on its section (to the next marker or the song end), a double tap renames it (#secNameIn: Enter or leaving keeps,
+   Esc cancels). The bar buttons act on the bars UNDER THE BRACE, in every track: ＋▯ inserts as many empty bars before it as it is long,
+   ✂ cuts them, ⧉ duplicates them right after; §✕ removes the selected marker; ↶/↷ — the song history (recorder.songUndo/songRedo). A
+   brace that still follows the whole song is refused with a hint (set it on the bars first). */
+const secInsBtn=$('secIns'), secCutBtn=$('secCut'), secDupBtn=$('secDup'), secDelBtn=$('secDel'), secRenBtn=$('secRen'), songUndoBtn=$('songUndo'), songRedoBtn=$('songRedo'), secNameIn=$('secNameIn');
+const barNo=b=>Math.round(b/loop.metre)+1;
+function updSecBtns(){
+  if(!secInsBtn) return;
+  const R=loop.rgn, M=loop.metre, n=Math.max(1,Math.round((R.to-R.from)/M)), a=barNo(R.from), b=barNo(R.to)-1, off=recording||!events.length;
+  secInsBtn.disabled=secCutBtn.disabled=secDupBtn.disabled=off;
+  secInsBtn.title=t('sec.insTitle',{n,a}); secCutBtn.title=t('sec.cutTitle',{a,b}); secDupBtn.title=t('sec.dupTitle',{a,b});
+  secDelBtn.disabled= secSel==null || !sections().some(m=>m.id===secSel);
+  if(secRenBtn) secRenBtn.disabled=secDelBtn.disabled;   // ED6-fix: the second way to rename — the selected marker
+  songUndoBtn.disabled=!histCanUndo(); songRedoBtn.disabled=!histCanRedo();
+}
+function secOp(kind){
+  const R=loop.rgn, M=loop.metre;
+  if(!R.user){ showCamMsg(t('sec.needBrace')); return; }
+  const a=R.from, b=R.to, why=songEditWhy(kind,a,b);
+  if(why){ showCamMsg(t(why==='rec'?'sec.noRec':why==='empty'?'sec.noEmpty':'sec.nothing')); return; }
+  if(!songEdit(kind,a,b)){ showCamMsg(t('sec.nothing')); updSecBtns(); return; }
+  showCamMsg(t(kind==='ins'?'sec.didIns':kind==='cut'?'sec.didCut':'sec.didDup',{ a:barNo(a), b:barNo(b)-1, n:Math.round((b-a)/M) }));
+  updSecBtns();
+}
+if(secInsBtn){
+  secInsBtn.onclick=()=>secOp('ins'); secCutBtn.onclick=()=>secOp('cut'); secDupBtn.onclick=()=>secOp('dup');
+  secDelBtn.onclick=()=>{ const m=sections().find(x=>x.id===secSel); if(!m) return;
+    if(secDelete(m.id)){ setSecSel(null); showCamMsg(t('sec.removed',{ name:m.name })); } updSecBtns(); };
+  songUndoBtn.onclick=()=>histDo(-1); songRedoBtn.onclick=()=>histDo(1);
+  if(secRenBtn) secRenBtn.onclick=()=>{ if(secSel!=null) openSecRename(secSel); };
+  onLangChange(updSecBtns);
+}
+/* ED6-fix: the double tap OPENS the field on the second tap's RELEASE (arrUp), not inside its press: the press's own default action
+   (a mouse press moves focus to the canvas) ran after the handler and blurred a field focused there — it closed at once. A blur within
+   SEC_BLUR_MS of opening (touch's compatibility mouse events) re-focuses instead of closing. secRenDbg 'down' = the old behaviour (probe
+   control only). */
+const SEC_DBL_MS=350, SEC_BLUR_MS=500; let secTap={ id:null, t:0 }, secRenId=null, secRenPend=null, secRenT=0, secRenDbg=null;
+function secTapAt(h){
+  const now=performance.now();
+  if(secTap.id===h.id && now-secTap.t<SEC_DBL_MS){ secTap={ id:null, t:0 }; if(secRenDbg==='down') openSecRename(h.id); else secRenPend=h.id; return; }
+  secTap={ id:h.id, t:now };
+  const ms=sections(), i=ms.findIndex(m=>m.id===h.id); if(i<0) return;
+  setSecSel(h.id);
+  const end= i+1<ms.length ? ms[i+1].beat : Math.ceil(songBeats()/loop.metre-1e-9)*loop.metre;
+  if(end>ms[i].beat) braceSet(ms[i].beat, end);
+  updSecBtns();
+}
+function secBandTap(beat){
+  if(recording) return;
+  const M=loop.metre, m=secAdd(Math.floor(Math.max(0,beat)/M)*M);
+  if(m){ setSecSel(m.id); secTap={ id:m.id, t:0 }; showCamMsg(t('sec.added',{ name:m.name, n:barNo(m.beat) })); }
+  updSecBtns();
+}
+function openSecRename(id){
+  const g=arrGeom(); if(!g||!g.sec||!secNameIn) return;
+  const r0=g.sec.marks.find(m=>m.id===id); if(!r0) return;
+  const r=canvasEl.getBoundingClientRect(); secRenId=id;
+  Object.assign(secNameIn.style,{ left:(r.left+r0.x0)+'px', top:(r.top+g.sec.y0-5)+'px', width:'170px', height:Math.max(28,g.sec.y1-g.sec.y0+10)+'px' });
+  secNameIn.value=r0.name; secNameIn.title=t('sec.renameTitle'); secNameIn.hidden=false; secNameIn.focus(); secNameIn.select(); secRenT=performance.now();
+}
+function closeSecRename(commit){
+  if(secRenId==null) return;
+  const id=secRenId; secRenId=null;
+  if(commit) secRename(id, secNameIn.value);
+  secNameIn.hidden=true; secNameIn.blur(); updSecBtns();
+}
+if(secNameIn){
+  secNameIn.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); closeSecRename(true); } else if(e.key==='Escape'){ e.preventDefault(); closeSecRename(false); } };
+  secNameIn.onblur=()=>{ if(secRenDbg!=='down' && secRenId!=null && performance.now()-secRenT<SEC_BLUR_MS){ setTimeout(()=>{ if(secRenId!=null) secNameIn.focus(); },0); return; }
+    closeSecRename(true); };
 }
 function arrAct(h){
   if(h.what==='open'){ openRoll(h.layer); return; }
@@ -714,9 +800,11 @@ function arrUp(e){
   arrPts.delete(e.pointerId);
   if(arrPts.size<2) arrZoom=null;
   if(arrPts.size) return;
-  panRelease();
+  panRelease(); updSecBtns();   // ED6: the brace may have moved — the bar buttons name its bars
+  if(secRenPend!=null){ const id=secRenPend; secRenPend=null; openSecRename(id); }   // ED6-fix: a double tap renames on its release
   const G=arrG; arrG=null;
-  if(G && G.move){ setLaneDrag(null); moveLane(G.h.layer, G.to); return; }   // AR2: перестановка — на отпускании (на месте — ничего)
+  if(G && G.move){ setLaneDrag(null); moveLaneStep(G.h.layer, G.to); updHistBtns(); return; }   // ED7: a reorder is one step   // AR2: перестановка — на отпускании (на месте — ничего)
+  if(G && G.level && G.axis==='x') levelStep(G.h, G.v0);   // ED7: the fader / pan drag is one step
   if(G && !G.axis && G.h && !G.level) arrAct(G.h);   // MX1: тап по фейдеру — ничего (двойной — единица, в arrDown)
 }
 addEventListener('pointermove',  e=>{ if(arrOpen&&!rollOpen) arrMove(e); });
@@ -731,7 +819,7 @@ addEventListener('wheel', e=>{
   if(e.ctrlKey||e.metaKey){ const f=(px-g.x0)/g.bw, span=g.span*Math.exp(e.deltaY*0.002); setRollWinClamped(g.beat0+g.span*f-span*f, span); return; }
   if(g.mix){   // MX1: колесо над фейдером — уровень (шаг 1 из 100), иначе строки
     const h=loopHit(px, e.clientY-canvasEl.getBoundingClientRect().top);
-    if(isFader(h)){ const v=levelOf(h) - Math.sign(e.deltaY)*0.01;   // MX2: у панорамы колесо идёт шагом 1 мимо фиксации (иначе из центра не выйти)
+    if(isFader(h)){ const w0=levelOf(h), v=w0 - Math.sign(e.deltaY)*0.01; queueMicrotask(()=>levelStep(h,w0,true));   // MX2: у панорамы колесо идёт шагом 1 мимо фиксации (иначе из центра не выйти)
       if(h.what==='pan'){ setLanePan(h.layer, Math.max(-1,Math.min(1,v))); panHeld=true; panRelease(); } else setLevelOf(h, Math.max(0,Math.min(1,v))); return; } }
   const S=loopScroll();
   if(S && !e.shiftKey && Math.abs(e.deltaY)>=Math.abs(e.deltaX)){ setLaneRow0(laneRow0Clamp(S.row0+Math.sign(e.deltaY))); return; }
@@ -762,17 +850,21 @@ function updRollBtns(){
   const ro=editBackingOpen();
   rollInsBtn.classList.toggle('act', rollIns); rollInsBtn.disabled=ro;
   if(rollPickBtn){ rollPickBtn.classList.toggle('act', rollPick); rollPickBtn.disabled=ro; }
-  rollDelBtn.disabled  = ro || !(rollSel||rollSelMany.size||rollAutSel);
-  if(rollCopyBtn){ const any=!!(rollSel||rollSelMany.size); rollCopyBtn.disabled=!any; rollDupBtn.disabled=ro||!any; rollPasteBtn.disabled=ro||!editClipInfo(); }   // ED2: copying is reading — allowed on a backing too   // ED1: or several notes   // O-4: 🗑 удаляет ВЫБРАННОЕ — ноту или точку автоматизации; у человека одна кнопка «удалить»
+  rollDelBtn.disabled  = ro || !(rollSel||rollSelMany.size||rollAutSel||rollBendSel!=null);
+  if(rollCopyBtn){ const any=!!(rollSel||rollSelMany.size); rollCopyBtn.disabled=!any; rollDupBtn.disabled=ro||!any; rollPasteBtn.disabled=ro||!editClipInfo(); }
+  if(rollQuantBtn) rollQuantBtn.disabled=ro||!(rollSel||rollSelMany.size);   // ED3
+  if(rollDegUpBtn) rollDegUpBtn.disabled=rollDegDnBtn.disabled=ro||rollRole==='dr'||!(rollSel||rollSelMany.size);   // ED4   // ED2: copying is reading — allowed on a backing too   // ED1: or several notes   // O-4: 🗑 удаляет ВЫБРАННОЕ — ноту или точку автоматизации; у человека одна кнопка «удалить»
   /* ⛳ И КОРЗИНА ГОВОРИТ, ЧТО ИМЕННО УБЕРЁТ. Одна кнопка на два поля — честно (у человека одно «удалить»),
      но молча она читается как «удалить удар», и точку автоматизации убрать ОТСЮДА никто не догадается.
      Подпись идёт за выделением; приоритет тот же, что у самого удаления (точка перебивает ноту). */
   rollDelBtn.title = t(rollAutSel ? 'aut.ptDelTitle' : 'roll.delTitle');
   if(rollShapeEl){ const st=autShapeState();   // гладкая автоматизация: кнопка видна, пока открыта полоса; жива — у точки, в которую есть откуда въехать
-    rollShapeEl.hidden = !rollAut;
+    rollShapeEl.hidden = !rollAut || volBarsOn();
     rollShapeEl.disabled = ro || !st || !st.ok;
     rollShapeEl.textContent = st&&st.s ? '╱' : '⌐';
     rollShapeEl.classList.toggle('act', !!(st&&st.s)); }
+  if(rollVolBarsBtn){ rollVolBarsBtn.hidden = !(rollAut && rollAut.fx===FX_VOL);   // ED5: face toggle, only while the lane shows Volume
+    rollVolBarsBtn.textContent = rollVolBars ? '▮▮' : '•—'; rollVolBarsBtn.classList.toggle('act', rollVolBars); }
   rollUndoBtn.disabled = !editCanUndo();   // T5: без `ro` — на подложке в истории бывает замена тембра, и её отмена законна (прочих ходов там нет: их правки отказывают)
   rollRedoBtn.disabled = !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
   const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
@@ -905,6 +997,9 @@ if(rollShapeEl) rollShapeEl.onclick=()=>{
   updRollBtns();
 };
 
+/* ED5: the Volume lane's two faces — bars (one per note) or the line of points; switching drops a selected point (bars have none). */
+const volBarsOn=()=> !!(rollAut && rollAut.fx===FX_VOL && rollVolBars);
+if(rollVolBarsBtn) rollVolBarsBtn.onclick=()=>{ setRollVolBars(!rollVolBars); setRollAutSel(null); setRollAutDrag(null); updRollBtns(); };
 rollInsBtn.onclick =()=>{ if(rollRefuseRO()) return; setRollIns(!rollIns); if(rollIns) setRollPick(false); updRollBtns(); };
 /* ED1: pick mode — a tap adds or removes a note, a drag on empty space draws a selection box; insert and pick exclude each other. */
 if(rollPickBtn) rollPickBtn.onclick=()=>{ if(rollRefuseRO()) return; setRollPick(!rollPick); if(rollPick) setRollIns(false); updRollBtns(); };
@@ -925,6 +1020,7 @@ function rollDeleteSel(){ if(rollRefuseRO()) return;
      классическая рассинхронизация «кто включает» и «кто выполняет». Страж теперь ОДИН на два поля и
      стоит ПОСЛЕДНИМ, а не первым. */
   if(rollAutSel){ if(autDeletePoint(rollAutSel)) setRollAutSel(null); updRollBtns(); return; }
+  if(rollBendSel!=null && rollSel){ const r=editBendPoint(rollSel,'del',rollBendSel); if(r!==false) setRollBendSel(r>0?r:null); else showCamMsg(t('roll.bendFirst')); updRollBtns(); return; }   // OWN2: a bend point (the first one stays)
   if(rollSelMany.size){ if(editDeleteSel([...rollSelMany])) setRollSel(null); else showCamMsg(t('roll.groupNo')); renderTimbreCtl(); updRollBtns(); return; }   // ED1: several notes — one history entry
   if(!rollSel){ showCamMsg(t('roll.needSel')); return; }
   /* ⛳ УДАЛЕНИЕ ВЕДЁТ РОЛЬ: у ударных это одиночное событие, у баса — СЕГМЕНТ. С независимых нот (E2) сегмент
@@ -943,8 +1039,36 @@ rollDelBtn.onclick=rollDeleteSel;
 /* ↶/↷ — БЕЗ rollRefuseRO (T5): на подложке в истории бывает только замена тембра, и снять её должно быть
    можно. Что именно отменяется на подложке, решает recorder (editUndo/editRedo пускают там лишь ход
    'timbre'); кнопки гаснут по пустой истории, а не по «подложке». */
-rollUndoBtn.onclick=()=>{ if(editUndo()){ setRollSel(null); setRollAutSel(null); } renderTimbreCtl(); renderAutCtl(); updRollBtns(); };   // O-4: ход мог создать или снять точку — выделение и список адресов перестраиваем. T5: и тембр — ход мог его вернуть
-rollRedoBtn.onclick=()=>{ if(editRedo()){ setRollSel(null); setRollAutSel(null); } renderTimbreCtl(); renderAutCtl(); updRollBtns(); };
+/* ═══ ED7: ONE ↶ / ↷ — the same pair in the editor, the window and the play screen, and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z, Ctrl+Y ═══
+   histDo runs the one history and names what it undid in a toast; afterHist refreshes whichever screen is open (an undo can remove the
+   track open in the editor — then the editor closes back to the window). 'changed' — the tripwire fired (the song was changed outside the
+   history): the history is gone and the toast says so. */
+const HIST_KEY={ bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
+const histKeyOf=l=> l && l.startsWith('sec:') ? 'section' : HIST_KEY[l] || 'edit';
+const histUndoBtn=$('histUndo'), histRedoBtn=$('histRedo');
+function updHistBtns(){ if(histUndoBtn){ histUndoBtn.disabled=!histCanUndo(); histRedoBtn.disabled=!histCanRedo(); } }
+function afterHist(r){
+  if(rollOpen){ if(editLayer()==null) closeRoll(); else { setRollSel(null); setRollAutSel(null); renderTimbreCtl(); renderAutCtl(); updRollBtns(); } }
+  if(secSel!=null && !sections().some(m=>m.id===secSel)) setSecSel(null);
+  updSecBtns(); updHistBtns(); updRecBtn();
+  return r;
+}
+function histDo(dir){
+  if(recording){ showCamMsg(t('hist.noRec')); return false; }
+  const r= dir<0 ? histUndo() : histRedo();
+  showCamMsg(r==='changed' ? t('hist.changed') : r ? t(dir<0?'hist.undone':'hist.redone',{ what:t('hist.k.'+histKeyOf(r)) }) : t(dir<0?'hist.noUndo':'hist.noRedo'));
+  return afterHist(r);
+}
+if(histUndoBtn){ histUndoBtn.onclick=()=>histDo(-1); histRedoBtn.onclick=()=>histDo(1); }
+addEventListener('keydown', e=>{
+  if(e.repeat || !(e.ctrlKey||e.metaKey) || e.altKey) return;
+  if(isTypingField(e.target) || isTypingField(document.activeElement)) return;
+  const k=(e.key||'').toLowerCase();
+  if(k==='z'){ e.preventDefault(); histDo(e.shiftKey?1:-1); }
+  else if(k==='y' && !e.shiftKey){ e.preventDefault(); histDo(1); }
+});
+rollUndoBtn.onclick=()=>histDo(-1);   // O-4: ход мог создать или снять точку — выделение и список адресов перестраиваем. T5: и тембр — ход мог его вернуть
+rollRedoBtn.onclick=()=>histDo(1);
 /* ⌫ / Delete — удалить ВЫБРАННОЕ (ноту или точку автоматизации) тем же путём, что 🗑 (T5).
    ⛔ НЕ ПОКА ПЕЧАТАЮТ: в поле ввода (темп, A4 и любое текстовое/числовое) Backspace — это правка ТЕКСТА, и
    удалить ноту из-под набора цифр было бы худшим сюрпризом. Страж — по полю, где стоит фокус, а не по
@@ -975,6 +1099,34 @@ function rollDuplicate(){ if(rollRefuseRO()) return;
   if(r&&r.length){ selMany(r); renderTimbreCtl(); }
   updRollBtns(); }
 if(rollCopyBtn){ rollCopyBtn.onclick=rollCopy; rollPasteBtn.onclick=rollPaste; rollDupBtn.onclick=rollDuplicate; }
+/* ED3: quantise the selection. The grid defaults to the editor's snap step (1/loop.sub of a beat) until a grid is picked; what moves and
+   the strength are kept for the app session. The selected events stay selected (the edit moves the same objects). */
+const Q_GRIDS=[1,1/2,1/4,1/8,1/3,1/6], Q_AMTS=[1,0.75,0.5,0.25];
+let qGrid=null, qWhat='start', qAmt=1;
+function renderQuantCtl(){
+  if(!rollQGridEl) return;
+  const g=qGrid ?? 1/(loop.sub||4);
+  rollQGridEl.textContent=''; for(const x of Q_GRIDS){ const o=document.createElement('option'); o.value=String(x); o.textContent= x===1 ? '1' : '1/'+Math.round(1/x); rollQGridEl.appendChild(o); }
+  rollQGridEl.value=String(Q_GRIDS.find(x=>Math.abs(x-g)<1e-9) ?? 1/4);
+  rollQWhatEl.textContent=''; for(const [v,k] of [['start','roll.qStart'],['end','roll.qEnd'],['both','roll.qBoth']]){ const o=document.createElement('option'); o.value=v; o.textContent=t(k); rollQWhatEl.appendChild(o); }
+  rollQWhatEl.value=qWhat;
+  rollQAmtEl.textContent=''; for(const x of Q_AMTS){ const o=document.createElement('option'); o.value=String(x); o.textContent=Math.round(x*100)+'%'; rollQAmtEl.appendChild(o); }
+  rollQAmtEl.value=String(qAmt);
+}
+function rollQuantize(){ if(rollRefuseRO()) return;
+  const L=selList(); if(!L.length){ showCamMsg(t('roll.needSel')); return; }
+  if(!editQuantSel(L, +rollQGridEl.value, rollQWhatEl.value, +rollQAmtEl.value)) showCamMsg(t('roll.quantNone'));
+  updRollBtns(); }
+if(rollQuantBtn){ rollQuantBtn.onclick=rollQuantize;
+  rollQGridEl.onchange=()=>{ qGrid=+rollQGridEl.value; };
+  rollQWhatEl.onchange=()=>{ qWhat=rollQWhatEl.value; };
+  rollQAmtEl.onchange=()=>{ qAmt=+rollQAmtEl.value; }; }
+/* ED4: the selection n degrees of its mode up or down; a refusal says why (recorder.editDegreeWhy — the edit's own plan). The selection stays. */
+function rollDegree(n){ if(rollRefuseRO()) return;
+  const L=selList(); if(!L.length){ showCamMsg(t('roll.needSel')); return; }
+  if(!editDegreeSel(L,n)){ const w=editDegreeWhy(L,n); showCamMsg(t(w==='reg' ? 'roll.degReg' : w==='fit' ? 'roll.degFit' : 'roll.degNone')); }
+  updRollBtns(); }
+if(rollDegUpBtn){ rollDegUpBtn.onclick=()=>rollDegree(1); rollDegDnBtn.onclick=()=>rollDegree(-1); }
 /* ED1: Ctrl/⌘+A selects every note of the track, Esc clears the selection (never while typing). ED2: Ctrl/⌘+C / V / D. */
 addEventListener('keydown', e=>{
   if(!rollOpen || e.repeat) return;
@@ -984,6 +1136,7 @@ addEventListener('keydown', e=>{
   else if(mod && k==='c'){ if(!rollCopyBtn.disabled){ e.preventDefault(); rollCopy(); } }
   else if(mod && k==='v'){ e.preventDefault(); rollPaste(); }
   else if(mod && k==='d'){ e.preventDefault(); if(!rollDupBtn.disabled) rollDuplicate(); }
+  else if(e.altKey && !mod && (k==='arrowup'||k==='arrowdown')){ e.preventDefault(); if(rollDegUpBtn && !rollDegUpBtn.disabled) rollDegree(k==='arrowup'?1:-1); }   // ED4
   else if(k==='escape' && !mod && !e.altKey){ selMany([]); updRollBtns(); }
 });
 /* ⏮ — бегунок в начало. ТОТ ЖЕ seekTo, что и тап по линейке: перемотка одна на все входы (она сама решает,
@@ -998,12 +1151,12 @@ rollHomeBtn.onclick=()=>seekTo(0);
    что-то определённое. Прежде связь была ОДНОСТОРОННЕЙ: тап по полосе снимал выделение ноты, а тап по
    ноте оставлял выбранную точку висеть, и корзина (у которой точка в приоритете) убрала бы НЕ ТО, на что
    человек смотрит. Теперь взаимное исключение — в одном месте, а не в семи местах жеста. */
-const selNote =ev => { setRollSel(ev||null);  setRollAutSel(null); };
-const selAutPt=rec=> { setRollAutSel(rec||null); setRollSel(null); };
+const selNote =ev => { setRollSel(ev||null);  setRollAutSel(null); setRollBendSel(null); };
+const selAutPt=rec=> { setRollAutSel(rec||null); setRollSel(null); setRollBendSel(null); };
 /* ED1: the note selection as a list (one or several) and its writers — state.setRollSelMany normalises (1 note → rollSel). */
 const selList=()=> rollSelMany.size ? [...rollSelMany] : rollSel ? [rollSel] : [];
 const selHas=ev=> ev===rollSel || rollSelMany.has(ev);
-const selMany=list=>{ setRollSelMany(list); setRollAutSel(null); };
+const selMany=list=>{ setRollSelMany(list); setRollAutSel(null); setRollBendSel(null); };
 const selToggle=ev=>{ const L=selList(); selMany(L.includes(ev) ? L.filter(x=>x!==ev) : [...L, ev]); };
 /* ED1: the group drag — the grabbed note snaps like a single note, the others keep their distance; rows follow the finger once it left
    its row (drums: clamped to the six rows). The ghost (draw) and the edit (groupCommit) read the same {dt, dr}. */
@@ -1054,6 +1207,17 @@ function rollDown(e){
        см. rollAutDrive); палец на пустом месте полосы — это не прокрутка поля и не вставка ноты: полоса своя, и
        прокручивать по вертикали в ней нечего. Тап по пустому в режиме вставки родит точку (на отпускании,
        как и у нот), тап без режима — снимет выделение. */
+    /* ED5: a BAR — a vertical drag shifts its note's volume (or, when the note is part of a multi-selection, every selected note's by the
+       same amount; rollAutDrive with the axis fixed to value, sideways = the fine zone); a tap selects the note (pick mode / Shift: add
+       or remove). A backing track only selects. */
+    if(h&&h.what==='autbar'){
+      const b=h.bar, grp= rollSelMany.size && b.evs.some(x=>rollSelMany.has(x));
+      const set=new Set(grp ? pnBars(editLayer()).filter(x=>x.evs.some(y=>rollSelMany.has(y))).map(x=>x.ev) : [b.ev]);
+      rollGrab={ bar:b, set, add:rollPick||e.shiftKey, ro:editBackingOpen(), x:p.x, y:p.y, v0:b.v, axis:null, fine:null, vOnly:true };
+      if(!rollGrab.ro) setRollAutDrag({ bar:true, set, t:b.t, v0:b.v, d:0, fine:false });
+      setRollAutSel(null); rollPan={ aut:true, x:p.x, y:p.y, atBeat:0, row0:0 };
+      updRollBtns(); return;
+    }
     if(h&&(h.what==='autpt'||h.what==='autgrid')){
       if(h.what==='autpt'&&!editBackingOpen()){
         selAutPt(h.rec);
@@ -1073,6 +1237,14 @@ function rollDown(e){
        чтобы она не прыгала под пальцем; len — длина сегмента, её держит призрак. */
     /* ED1: GROUP. A note of a group selection — or any note in pick mode / with Shift — drags the whole selection; a tap without
        movement adds or removes it (pick mode, Shift) or picks it alone. */
+    /* OWN2: a POINT of the selected theremin note's curve — select it and drag it (one axis per gesture: time or cents, as on the lane);
+       with ✚ on, a tap inside that note's time adds a point there (on release, as every insert). */
+    if(h&&h.what==='bendpt'&&!editBackingOpen()){
+      setRollBendSel(h.i); setRollAutSel(null);
+      rollGrab={ bend:true, ev:h.ev, i:h.i, x:p.x, y:p.y, dt0:h.dt, c0:h.c, axis:null };
+      updRollBtns(); return; }
+    if(rollIns && !editBackingOpen()){ const b=rollBendAt(p.x,p.y);
+      if(b && b.dt>0 && (b.end==null || b.start+b.dt<b.end) && h && (h.what==='grid'||(h.what==='seg'&&h.ev===b.ev))){ rollPan={ bendAdd:b, x:p.x, y:p.y }; return; } }
     const addMode = rollPick || e.shiftKey;
     if(h&&(h.what==='hit'||h.what==='seg')&&!editBackingOpen()&&(addMode||rollSelMany.has(h.ev))){
       rollGrab={ group:true, ev:h.ev, add:addMode, x:p.x, y:p.y, dt:h.beat-h.ev.t, t0:h.ev.t, row:h.row, grabRow:h.row };
@@ -1145,6 +1317,23 @@ function rollMove(e){
      Писать на каждом движении значило бы пересобирать ноты всей песни десятки раз в секунду. */
   if(rollGrab&&rollGrab.group){ groupDrive(rollGrab,p,g); return; }   // ED1
   if(rollPan&&rollPan.box){ if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true; setRollBox({ x0:rollPan.x, y0:rollPan.y, x1:p.x, y1:p.y }); return; }
+  if(rollGrab&&rollGrab.bend){   // OWN2: one axis per gesture — time (beats inside the note) or cents (relative to where the point was taken)
+    const G=rollGrab, dx=p.x-G.x, dy=p.y-G.y;
+    if(!G.axis && (Math.abs(dx)>6||Math.abs(dy)>6)){ G.axis= Math.abs(dx)>Math.abs(dy) && G.i>0 ? 't' : 'c'; rollMoved=true;
+      const a0=rollBendAt(G.x,G.y); G.ca=a0?a0.c:0; G.da=a0?a0.dt:0; }
+    if(!G.axis) return;
+    const a=rollBendAt(p.x,p.y); if(!a) return;
+    setRollBendDrag({ ev:G.ev, i:G.i, dt: G.axis==='t' ? G.dt0+(a.dt-G.da) : G.dt0, c: G.axis==='c' ? G.c0+(a.c-G.ca) : G.c0 });
+    return;
+  }
+  if(rollPan&&rollPan.bendAdd){ if(Math.abs(p.x-rollPan.x)>4||Math.abs(p.y-rollPan.y)>4) rollMoved=true; return; }
+  if(rollGrab&&rollGrab.bar){   // ED5: value only; d = the grabbed bar's snapped value minus its stored one
+    if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
+    if(rollGrab.ro) return;
+    const d=rollAutDrive(rollGrab,p.x,p.y);
+    setRollAutDrag({ ...rollAutDrag, d: d.axis ? d.v-rollGrab.bar.v : 0, fine:d.fine });
+    return;
+  }
   if(rollGrab&&rollGrab.aut){
     if(Math.abs(p.x-rollGrab.x)>4||Math.abs(p.y-rollGrab.y)>4) rollMoved=true;
     /* ⛳ ОДИН ЖЕСТ — ОДНА ОСЬ. rollAutDrive решает, что правится (время или величина), и отдаёт величину
@@ -1221,6 +1410,21 @@ function rollUp(e){
   if(rollPan&&rollPan.box){ const b=rollBox; setRollBox(null); rollPan=null;   // ED1: the box adds what it covers; a tap on empty space clears
     if(!rollMoved) selMany([]); else if(b) selMany([...selList(), ...rollBoxHits(b)]);
     updRollBtns(); return; }
+  if(rollGrab&&rollGrab.bend){   // OWN2: release — a drag is one edit (one history step); a tap only selected the point
+    const G=rollGrab, D=rollBendDrag; rollGrab=null; rollPan=null; setRollBendDrag(null);
+    if(rollMoved && D){ const r=editBendPoint(G.ev,'move',G.i,D.dt,D.c); if(r!==false) setRollBendSel(r); }
+    updRollBtns(); return;
+  }
+  if(rollPan&&rollPan.bendAdd){ const b=rollPan.bendAdd; rollPan=null;
+    if(!rollMoved && !rollRefuseRO()){ const r=editBendPoint(b.ev,'add',null,b.dt,b.c); if(r!==false){ setRollBendSel(r); showCamMsg(t('roll.bendAdded')); } }
+    updRollBtns(); return; }
+  if(rollGrab&&rollGrab.bar){   // ED5: release — a tap selects, a drag is one edit (one history entry)
+    const G=rollGrab, dr=rollAutDrag; rollGrab=null; rollPan=null; setRollAutDrag(null);
+    if(!rollMoved || G.ro){ if(G.add) selToggle(G.bar.ev); else selNote(G.bar.ev); }
+    else if(dr && Math.abs(dr.d)>1e-9){ const r=editVolSel([...G.set], dr.d);
+      if(r){ if(G.set.size>1) selMany(r); else selNote(r[0]); } }
+    updRollBtns(); return;
+  }
   if(rollGrab&&rollGrab.aut){
     /* ОТПУСКАНИЕ — ЕДИНСТВЕННОЕ место, где перенос точки попадает в захват (тот же закон, что у нот:
        на каждом движении пересобирать ленту переигровки нельзя). autMovePoint сам откажет, если точка
@@ -1286,7 +1490,7 @@ function rollUp(e){
     const h=rollHit(rollPan.x,rollPan.y), ly=editLayer();
     /* ВСТАВКА ТОЧКИ — как у нот: ТОЛЬКО в явном режиме и только по ПУСТОМУ месту полосы. Тап без режима
        снимает выделение. Так прокрутка, кончившаяся тапом, ничего не создаёт. */
-    if(rollIns && h && h.what==='autgrid' && rollAut && ly!=null && !rollRefuseRO()){
+    if(rollIns && h && h.what==='autgrid' && !h.bars && rollAut && ly!=null && !rollRefuseRO()){   // ED5: no point insert on the bars face
       /* Вставка — по ТОМУ ЖЕ закону, что и перенос: точка ложится ТУДА, КУДА ПОСТАВИЛИ, без привязки ко
          времени. Иначе одно и то же поле жило бы по двум правилам — свободный перенос и квантованная
          вставка, — и человек не смог бы сказать, где точка окажется. Величина привязывается к десятой:
@@ -1413,7 +1617,7 @@ export function tutorReset(){   // урок учит SINGLE-ROLE соло: га�
    подложки в покой (её цикл начнётся заново, путь — джем/только ударные — спросят снова). Зовётся из
    tutorReset (чистый старт любого урока) и из шага подложки урока «Лупер» (она встаёт на ПУСТУЮ петлю →
    любой вариант принимается независимо от размера/лада). */
-export function tutorClearLoop(){ clearRec(); resetJamDisplay(); }
+export function tutorClearLoop(){ clearRec(); histReset(); resetJamDisplay(); updHistBtns(); }   // ED7: a lesson starts a new song — and a new history
 /* Урок задаёт стартовый лад (Аккорды → Хроматика: у неё полная палитра типов аккордов). Ставим ТЕМ ЖЕ
    путём, что selScale.onchange, плюс синхроним выпадашки традиции/лада, чтобы панель показывала выбранный
    лад (не «украли настройку молча»). Лад по окончании урока НЕ восстанавливаем — человек только что учил
@@ -1591,8 +1795,8 @@ selDrumKit.onchange=e=>setDrumKit(+e.target.value);
  
 recBtn.onclick=onRec;
 loopBtn.onclick=onLoop;
-$('undoBtn').onclick=onUndo;
-$('clrBtn').onclick=()=>{ clearRec(); resetJamDisplay(); };   // очистка петли → кнопка подложки в покой
+$('undoBtn').onclick=()=>{ onUndo(); updHistBtns(); };   // ED7: ⤺ is an ordinary step of the one history (↶ brings the take back)
+$('clrBtn').onclick=()=>{ clearSong(); resetJamDisplay(); updHistBtns(); };   // ED7: ✕ is a step too — ↶ brings the whole song back   // очистка петли → кнопка подложки в покой
 loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bars; };
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
 loopMetre.onchange=e=>{ setLoopMetre(+e.target.value); refreshMetreCtl(); applyBacking(); };   // сеттер гейтит пустую петлю; refresh перечитает (клампнутое) значение + перефильтрует ритмы; applyBacking — подпись кнопки подложки зависит от числа доступных ритмов

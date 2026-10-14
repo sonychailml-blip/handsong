@@ -214,12 +214,19 @@ the ✕ confirmation prevents damage, not misses. Cheapest fix: rows 16 → 22 p
 
 ---
 
-## ARRANGEMENT WINDOW AND MIXER — the third screen (AR1, MX1, MX2, AR2, AF4; checked against `index.html`, `style.css`, `ui.js`, `draw.drawLooper(true)`; rewritten in English at AF4)
+## ARRANGEMENT WINDOW AND MIXER — the third screen (AR1, MX1, MX2, AR2, AF4, ED6; checked against `index.html`, `style.css`, `ui.js`, `draw.drawLooper(true)`; rewritten in English at AF4)
 
 **Opened by ✎ in the transport, FULL SCREEN** (the camera is not read — the same `main.loop` branch as the editor). It is the play strip
 grown to the whole screen: one row per track; on top its own bar `#arrBar`: **✕** (back to play) · title · **🎚 / ▤** (face: mixer /
-arrangement) · **−** **+** (time zoom) · **⤢** (whole song). Under it the transport `.arr`: **⏮ ▶ ⟳** (⤺ ✕ ■ ✎ live on the play screen).
-Below: a status line, the BRACE band (tap/drag an end, as on the play strip), track rows of 40 px:
+arrangement) · **−** **+** (time zoom) · **⤢** (whole song) · ED6: **＋▯** insert as many EMPTY bars before the brace as it is long ·
+**✂** cut the bars under the brace · **⧉** duplicate them right after · **§✕** remove the selected section marker · **↶ ↷** undo / redo
+of these (the song history — section edits and marker changes; the tooltips name the bars). Under it the transport `.arr`: **⏮ ▶ ⟳**
+(⤺ ✕ ■ ✎ live on the play screen). **§✎** (ED6 fix) renames the selected marker. ED7: the window's **↶ ↷** are the ONE history's.
+Below: a status line, the **SECTIONS band** (ED6, 20 px: named markers at bar lines, amber, a faint line down the rows; **tap empty band**
+— a new marker at that bar, named A, B, …; an empty strip says «+ section — tap here to mark a bar»; **tap a marker** — select it
+(outlined) and put the brace on its section, to the next marker or the song end; **double tap / double click** — rename it in a field over
+the marker (it opens on the second tap's release), Enter or tapping elsewhere keeps, Esc cancels; or select it and press **§✎**), the BRACE band
+(tap/drag an end, as on the play strip), track rows of 40 px:
 - **header on the left** (AR2): **≡ HANDLE** (28 px, full row height — drag up/down: the row moves, a white line shows where, rows
   scroll at the window edges; one order for the window, mixer, play strip and the editor's track chip; a new track goes last), then the
   **NAME** in the role colour ("role · timbre" by default) and "L#" on a second line (a renamed track also shows "role · timbre"). Tap the
@@ -239,6 +246,13 @@ limiter gain reduction ("Limiter −x dB", red when acting). Gestures: drag alon
 fingers — zoom, wheel (Ctrl/⌘ — zoom; in the mixer over a fader — level, over the pan control — pan, step 1). The time window is ONE with
 the editor: open a track — the same span; come back (editor ✕) — the same. Releasing a pan control (or a wheel step, a double tap) starts
 the 1-s settle of auto-freeze; level never does. Row ✕ delete — only on the play strip.
+**SECTION EDITS (ED6)** act on the bars under the brace in EVERY track at once: notes of all roles, drum hits, theremin bends, captured
+automation, the brace, the markers and backing lengths move together. INSERT: everything from the brace start moves later; a note ringing
+across keeps ringing through the new bars. CUT: what starts inside goes (a note starting inside goes whole, its tail too); a note that
+began earlier is shortened by the cut. DUPLICATE: what starts inside is repeated right after (its automation too); a note ringing past the
+end stops there and its copy carries the tail. A brace that still follows the whole song is refused («Put the brace on the bars first»).
+One ↶ undoes the whole edit (ED7: it is one step of the ONE history, like every other change). Frozen tracks whose
+material moved re-freeze by themselves; tracks wholly before the edit keep their freeze.
 
 ---
 
@@ -248,7 +262,8 @@ the 1-s settle of auto-freeze; level never does. Row ✕ delete — only on the 
 camera: `main.loop` takes another branch — the camera stream STAYS open (instant return, no new permission prompt) but frames are not
 read or drawn and hand tracking is skipped. The play bar (`#bar`) hides; the editor's own bar `#rollBar` replaces it; the transport under
 the canvas shrinks (class `.roll`) to **TWO buttons: ⏮ to start · ▶ play/pause** (⟳ ✕ ■ ✎ and ⤺ hidden by CSS — repeat, clear and panic
-would change the song under the open editor; ⤺ "undo take" is hidden so it is not confused with ↶ "undo edit").
+would change the song under the open editor). ED7: the editor's **↶ ↷** are the ONE history's — they undo any step (a take, ⤺, the
+mixer, a section edit…), not only this track's edits; an undo that removes the open track returns to the window.
 
 **WHICH TRACK AND ON WHAT.** The one whose row was tapped in the window. **No role tabs** (removed at T4): a track holds one role and the
 editor opens on it — drums on six rows, bass, chords and solo on the rows of the tuning/mode (since S4 all four roles are edited by one
@@ -268,20 +283,22 @@ one time. Mode rows STRETCH to the full height when they fit (up to 30 px), else
 MEASURED from the track's mode labels (capped at 42 % of the canvas). The roll's top is a constant (`ROLL_BAR_H=46` + transport 44), not
 the bar's measured height: the bar is one scrolling line, so the ruler and grid never move.
 
-**EDITOR BAR — 20 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
+**EDITOR BAR — 27 elements in the markup, in order** (checked against `index.html`, block `#rollBar`; one line, scrolls sideways on a
 narrow screen): `✕` close · `L1 · name` switch track (number and NAME in the role colour, long ones ellipsised; cycles in the window's
 DISPLAY ORDER; dims when there is one track) · **TIMBRE select** (`#rollTimbre`, T5 — the track ROLE's timbres, kits for drums; hidden on a
 track without notes) · `[mode 1/2]` the axis mode chip — **shown ONLY when the track has events in different modes** · `✚` insert mode ·
 `⬚` pick mode (ED1) · `🗑` delete the selection (a note, several notes or an automation point; the tooltip says which) · `⧉` copy ·
-`📋` paste at the playhead · `⧉⁺` duplicate right after the selection (ED2) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
+`📋` paste at the playhead · `⧉⁺` duplicate right after the selection (ED2) · `⌗` quantise the selection + three selects: grid (1, 1/2, 1/4,
+1/8, 1/3, 1/6 of a beat; starts at the snap step), what (Starts / Ends / Starts + ends), strength (100/75/50/25 %) (ED3) · `−1°` / `+1°` the selection one degree of its mode down / up (ED4) · `↶` undo edit · `↷` redo edit · `⌗ 1/4` snap label
 ("free" without quantise; "(grid finer than a pixel)" when the step is below what is drawn) · **automation lane select** (first item
 "— no automation —") · **"+ effect for this track" select** · `▲` earlier in the chain · `▼` later · `⊘` remove the effect from the track ·
 **`╱`/`⌐` segment shape** (smooth automation: visible while the lane is open; live when the selected point has a point with a value before
 it; the icon is the CURRENT shape of the segment entering the point: `╱` smooth, `⌐` step; a tap toggles, a toast names the new shape) ·
-`−`/`+` zoom. (AF4: the `❄` button and its state label are gone — tracks freeze themselves.)
+**`▮▮`/`•—` Volume face** (ED5: shown only while the lane shows Volume — bars, one per note, or the line of points; the icon is the
+CURRENT face) · `−`/`+` zoom. (AF4: the `❄` button and its state label are gone — tracks freeze themselves.)
 **Keyboard:** **Backspace / Delete** delete the selection — the same path as 🗑, only when 🗑 is live. Silent while focus is in an input
 field (tempo, A4, any text/number), on key repeat and with Ctrl/Cmd/Alt. A dropdown is not an input field. **Ctrl/⌘+A** select every note
-of the track · **Esc** select nothing · **Ctrl/⌘+C / V / D** copy / paste / duplicate (ED1/ED2; same input-field guard).
+of the track · **Esc** select nothing · **Ctrl/⌘+C / V / D** copy / paste / duplicate (ED1/ED2; same input-field guard) · **Alt+↑ / Alt+↓** one degree up / down (ED4).
 
 **SEVERAL NOTES (ED1).** `⬚` pick mode (or holding Shift): a tap on a note adds or removes it, a drag starting on empty space draws a
 dashed box and adds every note it covers, a tap on empty space selects nothing (pick mode and ✚ insert exclude each other; the field's
@@ -294,6 +311,28 @@ note as before (the chord-note level and ✚'s chord shape work on a single sele
 app is closed, across tracks. `📋` pastes at the playhead (snapped like an insert) into this track or another track of the SAME role and
 mode — other role or mode: a toast says why; the pasted notes take the TARGET track's timbre and become the selection. `⧉⁺` repeats the
 selection right after itself (a phrase longer than half a bar lands on the next bar line). One ↶ per paste.
+**QUANTISE (ED3).** `⌗` moves the selection toward the grid chosen in the selects beside it. «Starts»: a note's start goes to the grid and
+the note keeps its length; a pitch change inside a glide moves by itself — the line stays one gliding note, its neighbour gets longer or
+shorter. «Ends»: only note ends move. Strength below 100 % moves part of the way. Drum hits move with «Starts». Pitches never change.
+Nothing to move → toast «Nothing moved — already on the grid». One ↶.
+**BY DEGREES (ED4).** `−1°` / `+1°` (Alt+↓ / Alt+↑) move every selected note one degree of its own mode (C→D→E… in major); a note outside
+the mode keeps its distance from the nearest degree (C# → D#); chords move to the chord of the next degree. Times never change, glides
+stay whole. Past the registers, a chord type that does not fit, or drum hits only → a toast says why, nothing moves. One ↶ per press.
+
+**BEND CURVE (OWN2).** Select a theremin note (one with a curve): its points become white dots. Drag a dot up/down — cents (from the
+note's attack pitch), sideways — time inside the note (one axis per gesture; the first dot only moves up/down; a dot stops before its
+neighbour); a dashed ghost and «+35¢ · 1.25» follow the finger. With ✚ on, a tap inside the selected note's time adds a dot there. 🗑 / ⌫
+removes the selected dot (the first stays). Each change is one ↶.
+**ONE UNDO (ED7).** ↶ ↷ in the editor bar, in the window bar and on the play screen (next to ⤺), and Ctrl/⌘+Z, Ctrl/⌘+Shift+Z (Ctrl+Y):
+one history for takes, ⤺, note edits, automation, mixer level / pan / master, names and order, row delete, backing, sections and markers,
+✕ clear. A toast names what was undone. Not in the history: mute, solo, arming, the brace, tempo, tonic.
+
+**VOLUME BARS (ED5).** With the lane on Volume and `▮▮` on (the default face), every NOTE is one bar at its start, height = its
+volume (a chord is one bar, a drum hit one bar; a faint line follows the volume where it changes inside a note). Drag a bar up/down (the
+number shows beside it; tenths near the bar, single units with the finger moved aside) — that note's whole volume moves by the same
+amount; when the note is part of a several-notes selection, every selected note moves together. Two notes on one beat (two hands, kick
+and hat) keep their own volumes — unlike the line, which holds one value per moment. A tap selects the note. One ↶ per drag. `•—` returns
+to the line of points (point insert and ╱/⌐ live there).
 
 **TIMBRE REPLACEMENT (T5).** Pick another timbre in `#rollTimbre` — the whole track sounds with it: every note start is rewritten (for
 drums the kit of every hit); notes and rhythm unchanged. **One history entry:** one ↶ undoes it all, one ↷ redoes. **The track's effects

@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (31 hard rules), 72 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (31 hard rules), 74 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -45,9 +45,11 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   swap and AF6b 16-bit frozen tracks (verified by the runner; ear steps 64, 65) · AUTO-PROBE runner and fixes (ear step 66).
 - ✅ unverified: **AF3 auto-freeze watcher + triggers (ON by default)** and **AF4 no ❄ anywhere** (runner PASS; ear/eye steps 67, 68) ·
   **RENDER-LEAK** (non-KS renders no longer pin memory) · **AF5 + hard rule #31: a track and the live hands never share sound state**
-  (runner PASS; ear step 69 REPORTED FAILING by the user — mixer track level lowers live chords — not reproduced in the runner; open
-  questions: transport playing? the MASTER strip? deployed or local build? `R.liveCheck()` output — archive B, «AF5-mixer»; step 70 open).
-- ✅ unverified: **ED1 several notes at once** and **ED2 copy / paste / duplicate** (runner PASS; eye steps 71, 72).
+  (runner PASS; step 69 CLOSED 2026-10-13 — the user had moved the MASTER fader, not the track's: no bug; the stronger probe and
+  `R.liveCheck()` stay; step 70 open).
+- ✅ unverified: **ED1 several notes at once**, **ED2 copy / paste / duplicate** and **ED3 quantise**, **ED4 by degrees** (runner PASS; eye
+  steps 71–74) · **ED5 volume bars**, **ED6 sections** (runner PASS; eye/ear steps 75, 76; the rename bug the user found is fixed — step 77)
+  · **ED7 one history** and **OWN2 bend curve** (runner PASS; steps 78, 79).
   🔵 Volume VOL-0…VOL-4: **next VOL-5…VOL-7**.
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
@@ -66,15 +68,10 @@ under the 8 ms pinch budget; phone not measured). Done AF5 (tracks play through 
 tonic/A4/tempo do NOT re-freeze until the tonic freeze (`frzqueue.AF_REFREEZE_ON_RETUNE = false`; such tracks play live); a track
 created in the editor gets the live chain pinned at birth, inserts into an existing track inherit its chain, auto-freeze never pins (song
 load pins old chain-less tracks; seed: 0); memory guard until AF6 `AF_BUDGET_MB` 300 touch / 1024 desktop, over it = skipped, no
-eviction; ON by default, `R.autoFreeze(false)` off for the session; paused while any probe runs. User decisions (AF1): no mono (pan baked); frozen sound is a CACHE recomputable from notes;
-(a) store only notes + tail, a track repeating under the brace — ONE cycle; (b) 16-bit in memory, sample-exact chunks (✅ AF6b);
-(c) later, after saving — on the device in chunks, survives reload (project folder, else browser cache); (d) Opus only as an
-optional low-memory mode, never default, never MP3 (encoder padding breaks joins); memory budget only as a safety net · freeze the
-TONIC before any tonic/A4/tempo trigger (until then AF3 doesn't re-render on them) · swap: first rest within 2 bars, else bar line
-+ 20 ms crossfade (✅) · AF4: a pale dot by the row ONLY in the arrangement window (hollow = waiting, pulsing = rendering) ·
-re-render order: audible and near the playhead first (✅ `qRank`) · a track with no captured chain gets the LIVE chain's snapshot AT
-BIRTH and never follows live knobs again (inserted notes follow the track's chain; solo notes copy the neighbour's map; plan in AF3)
-· settle delays 0.5 / 1.0 / 1.5 s.
+eviction; ON by default, `R.autoFreeze(false)` off for the session; paused while any probe runs. AF1 user decisions (no mono; frozen sound = a CACHE;
+notes + tail, one cycle under the brace; 16-bit ✅; device chunks after saving; Opus only optional, never MP3; tonic freeze before any
+tonic/A4/tempo trigger; swap ✅; the dot ✅; audible-first ✅; chain snapshot at birth; settle delays): archive B, «Moved … AF1 user
+decisions».
 
 **Mixer**: second face of the arrangement window + MASTER strip (master = what AUDIO EXPORT renders); fader ≠ note volume;
 per-track effects and meters after auto-freeze. **Audio take** comes AFTER auto-freeze (the role network must carry only live sound).
@@ -109,9 +106,19 @@ write-then-replace, one editing tab, `storage.persist()`, honest warnings.
 triad/seventh switch for untyped modes.
 
 **Editor essentials** (archive B, «ПЛАН „НЕОБХОДИМОЕ РЕДАКТОРУ“»; 7 user decisions as recommended): ✅ AR1 → ✅ MX1 → ✅ MX2 → ✅ AR2 →
-✅ ED1 selection → ✅ ED2 copy → **ED3 quantise (NEXT)** → ED4 by degrees → ED5 volume bars → ED6 sections → ED7 one undo; then OWN1 mode
-by degrees, OWN2 bend curve. Decisions: quantise inside a line moves the boundary (glissando intact); by degrees — an out-of-mode
+✅ ED1 selection → ✅ ED2 copy → ✅ ED3 quantise → ✅ ED4 by degrees → ✅ ED5 volume bars → ✅ ED6 sections → ✅ ED7 one undo; then OWN1 (NEXT) — OWN2 ✅
+mode by degrees, OWN2 bend curve. Decisions: quantise inside a line moves the boundary (glissando intact); by degrees — an out-of-mode
 note keeps its offset; ONE undo for everything (mixer, names, row delete; ⤺ is an ordinary step).
+**User answers (2026-10-13, after ED1/ED2):** (1) theremin `hold` is KEPT when pasting — agreed · (2) lessons and the tutorial are NOT
+touched now: their update is a separate stage at the very end, after everything else is built · (3) OWN1 offers only modes of the SAME
+tuning; notes outside the new mode keep their offset (the ED4 rule) · (4) fix the AF5 probe leftover (done) · (5) step 69 closed ·
+(6) OWN3 (cents per row) deferred until serious work in unusual tunings — today's
+deviation marks are enough · (7) the tonic-freeze plan (stage 2) proposes "key into the note index or into the view" itself, with a
+recommendation. **ED6-1 (2026-10-14): edge notes "lengthen / shorten"** — insert lengthens a note ringing across the point, cut removes
+what starts inside and shortens a note from before, duplicate ends an original at the range end and its copy carries the tail.
+**User decisions (2026-10-14, accepting the ED5/ED6 report):** section edits act on the brace and are refused while it still covers the
+whole song · duplicated notes stay in their original take · a note closed by the next note's start exactly on an insert point lengthens
+· bars are the Volume lane's default face · ED6 kept its own undo until ED7 (now merged into the one history).
 
 **Tuning — rest of the model** (archive B, «ПЛАН „УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ“»): **DON'T NARROW MUSICAL POSSIBILITIES** (T7b) —
 offer a theory restriction as a MODE, not a rule · **chord-building property** for the builder: ADAPTIVE (pure ratios, a choir) or
@@ -128,7 +135,7 @@ reads "1/1 = G".
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → **EDITOR ESSENTIALS** (window and mixer
-first; ED3 next) → **EDITOR-OWN** (mode by degrees; cent offset per row; theremin bend curve) → **TONIC FREEZE plan** →
+first; ED5 next) → **EDITOR-OWN** (OWN1 mode by degrees, same tuning only; OWN2 theremin bend curve) → **TONIC FREEZE plan** →
 **VOL-5 → VOL-6 → VOL-7** → **FOUNDATION** (stable timbre ids (and user-mode ids), song format and timbre format — voice mode and
 Glide default are the first "timbre policies" —, songs as files: export/import) → **SAVING** (on the device + file export/import;
 does not wait for the server — same format and ids) → **AUTO-FREEZE A3–A6 (A7 if measured), MIXER per-track effects and meters,
@@ -136,6 +143,7 @@ AUDIO EXPORT** (with the tuning attached as Scala) and **AUDIO TAKE** (after aut
 and USER MODES with Scala** → **SERVER** (accounts, sync, sharing timbres and modes, subscription, marketplace; a managed cloud
 service makes it cheaper). Off-line, when there is a window: hand tracking off the main thread (after latency is measured, §3.32)
 · promo video (§3.31) · Spanish/German (await terminology check, §3.18) · Turkish maqams (§3.25).
+**Last stage, after everything else is built: LESSONS / TUTORIAL update** (user answer 2) — no lesson or tutorial edits before it.
 
 ## Decided, not scheduled
 Hand tracking off the main thread · register as a setting (bass/solo differ only by timbre) · timbres on fingers (source = finger's
@@ -144,7 +152,7 @@ Pythagorean mode (P5, postponed; appended at the end) · voice-leading lines bet
 · retrigger in lead mode (legato everywhere today) · study Arabic, Indian and other traditions with musicians (mode anchor,
 intonation, central tone, what a chord means) · team ideas: two UI faces, hand on a rest, mode lessons, spoken menu, light theme ·
 small: settings in localStorage, SW cache for offline, polyrhythm (§3.24), swing as a ratio (§3.30), gesture builder (§3.29),
-cultural gate for "Drums only" (§3.33 item 1 — a defect).
+cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per row in the editor (deferred, user answer 6).
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). The tonic is live
@@ -154,23 +162,18 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect).
   and lead-segment detach re-articulate edges; overlapping polyphonic notes on one row — the hit takes the first.
 - One effect network per role: live play goes through the network the recording drives (bus params only). Reorder mid-take: render
   keeps the earlier order (`reordered`). Effects added mid-take: ▲▼⊘ don't act. Latched chord with open fingers gets no updates (VOL-6).
-- Not undoable: row delete ✕ (and its S6 untie), track name/place, level, pan (one history — ED7). The editor's history and the
-  ED2 clipboard: history dies with the editor session, the clipboard lives for the app session; captured bus automation is not copied.
+- One history (ED7): 300 steps; NOT steps — mute, solo, arm, the brace, tempo, tonic; ↶ of ✕ restores the song but not a user brace.
+  The ED2 clipboard lives for the app session; captured bus automation is not copied.
 - Captured expression channels are written but NOT replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
-- Play-strip name column: timeline 261 → 203 px at 380 px; ≈ 33 px for the name, then ellipsis.
-- Frozen memory: 16 bit (192 KB/s stereo at 48 kHz); seed 99.4 MB → ≈ 49.4–49.7 MB (`P.freezeCost`, "today MB"); notes+tail would
-  save ≈ 3 MB; demo piece ≈ 280 → ≈ 140 MB; rest of AF6 (disk, paging, Opus fallback) open. No worklet → Float32 (2× memory).
-- AF2 bar-line crossfade: pre-scheduled drum tails and the role's live reverb tail play over the buffer's tails (hundreds of ms).
 - After tonic/A4/tempo change frozen tracks go stale and play through the live pools (stealing above the ceiling).
 - A render of a KS (plucked solo) track still pins its offline context, ≈ 6 MB per render (Chrome; no workaround found) — BACKLOG §1 AF6 7.
 - Unfrozen tracks of one role share the role's TRACK chain (last writer wins among them); per-track chains not built (BACKLOG §1).
-- AF5 adds ≈ 100 GainNodes to the live graph (≈ +4 % real time on the slow dev desktop, synthetic; phone not measured).
-- Re-render repeatability: dry ≤ 1e-4, wet ≤ 2e-4 of peak; dry drift up to 1.54e-5 (≈ −96 dB) after many renders, node unknown.
 - Lanes: a note edit doesn't rebuild its ramp; an anchor only where no event; Glide over bass theremin smooths its steps. Bass
   theremin records the nearest step only. `tmix` timbre fold correct until ids.
+- Frozen-memory figures, AF2 crossfade tails, AF5 node cost, re-render repeatability: `CLAUDE.md` "Known limits" / archive B.
+- Sections (ED6): a note starting inside a cut loses its tail;
+  a note closed by the next note's start exactly on an insert point is lengthened; insert-then-cut beats equal to ~1e-15, not bitwise.
 - Opening the editor silences a ringing latch. "Drums only" backing lacks a cultural gate (§3.33 item 1).
-- "step N MENU-PLAN" comments point into `archive/`. Barang patet (root ≠ 0): T5 probe compares in cents (1e-6).
-- AF6b residual margin 1.2 dB is deterministic (two overlapping readers at a seam ≤ 1 LSB = −90.3 dB re peak).
 
 ## Key lessons (expanded: archive, «КЛЮЧЕВЫЕ УРОКИ»)
 Check REAL code first; diagnose before building · the ear beats the maths — listen first (`R.aud`/`R.live`) · behaviour keys off
@@ -183,17 +186,14 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### ED2 (2026-10-13) — copy, paste, duplicate (full: archive B, «ED1 + ED2»)
-- ⧉ copy · 📋 paste at the playhead · ⧉⁺ duplicate after the selection (Ctrl/⌘+C/V/D); clipboard lives for the app session; paste only
-  into a track of the same role and view (refusal says why); pasted notes become the selection.
-- Third birth place: session take, fresh k/v per note, ties dropped, volume always, the TARGET track's timbre/kit (one source per track);
-  theremin `hold` kept (removing it would erase the bend — the plan said "removed"); bus automation not copied; adjacent selected segments
-  of a glide paste as ONE note. Duplicate offset: span to the snap step, past half a bar to whole bars.
-- Row «ED2 copy, paste, duplicate» (16 cases): evHz = source, fresh take/keys, timbre (forced to differ), role refusal, undo/redo in order.
-### ED1 (2026-10-13) — several notes at once (full: archive B, «ED1 + ED2»)
-- ⬚ pick mode (or Shift): tap adds/removes, drag on empty space = box; Ctrl/⌘+A, Esc. A group drags (time + rows) and deletes as ONE
-  history entry (`recorder.editGroup` merges the single edits; a refusal rolls back). Fully selected glides move whole; parts detach.
-- ⛳ Fixed an old editor bug the row found: undo did not restore the ORDER of events at one beat (a note-off could fall after the next
-  note-on and orphan it). Birth numbers in `editGuard`, sort by (beat, birth).
-- Row «ED1 several notes at once» (18 cases). Fix rounds 2. Runner: `--quick` PASS 44.8 s, `--all` PASS 141.4 s, data PASS. ⚠️ `--quick
-  --all` in ONE session fails «seed notes as intended»: the AF5 row leaves `sh` on a seed chord (pre-existing; not fixed).
+### ED6-fix + ED7 + OWN2 (2026-10-14) — marker rename, one history, bend curve (full: archive B, «ED6-fix + ED7 + OWN2»)
+- Rename: the field opened inside the second press and the press's own focus move closed it (mouse; confirmed with real input). Now it
+  opens on the release, a blur within 0.5 s re-focuses, §✎ renames the selected marker, an empty strip shows «+ section». The runner
+  checks it with REAL input (mouse, CDP touch, §✎; control: the old way must fail) and drags a bend point with the mouse.
+- ED7: `recorder.hist` is the one history — editor steps (now kept across sessions), sections, markers, mixer level/pan/master, names,
+  order, and diff snapshot steps for takes, ⤺, row delete, backing, ✕ (`clearSong`). The old guard is unnecessary for user paths; it
+  stays as a cheap tripwire hash ('changed' = refuse and drop). Touched tracks' freezes go stale. ↶ ↷ everywhere + Ctrl+Z / Ctrl+Shift+Z.
+- OWN2: drag / add (✚ + tap) / delete bend points of a selected theremin note (`editBendPoint`), one step each.
+- Rows «ED7 one history» (54 cases; controls: a step kind left out, a redo kept after a new step; tripwire), «OWN2 bend curve» (9; control:
+  an in-place change survives ↶). Fix rounds: Part 0 — 0 (bug reproduced first), ED7 — 1 (a take's capture record was born before its
+  snapshot), OWN2 — 0. Final: data PASS, P.quick 49.8 s (38), P.all 188.1 s (52), UI checks PASS.

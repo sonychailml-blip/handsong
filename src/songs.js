@@ -25,7 +25,7 @@ import { scaleById, scaleView, chordFams, chordNotesAt, viewIdOf, periodOf, view
 import { tonic, aRef, setTonic, setARef } from './state.js';
 import { events, loop, recording, seedTake, clearRec, setLoopMetre, setLoopBpm, editOpen, editClose, editIsOpen,
          editResizeChordNote, editResizeSeg, autChainOf, autChainAdd, autChainRemove, autAddPoint, autShapePoint,
-         loadJam, setRegionOn, panic, songNotes, songSegs, laneRoleOf, laneTimbreOf } from './recorder.js';
+         loadJam, setRegionOn, panic, songNotes, songSegs, laneRoleOf, laneTimbreOf, histReset } from './recorder.js';
 import { FX_FACTORY, timbresOf } from './audio.js';
 import { CHORD_POOL_N, LEAD_POOL_N, BASS_POOL_N } from './config.js';
 import { tutorSetScale } from './ui.js';
@@ -72,7 +72,7 @@ export async function loadSong(name='triphop', opt={}){
   if(loop.on){ console.warn('[song] the transport is playing — stop it first (■ or ⏸).'); return null; }
   if(events.length && !opt.replace){ console.warn(`[song] the song has ${events.length} events — refusing. Run await P.song('${name}', {replace:true}) to replace it.`); return null; }
   console.log(`[song] «${name}» REPLACES the current song (nothing is saved).`);
-  return build();
+  const r=await build(); histReset(); return r;   // ED7: a loaded song starts with an empty history
 }
 
 /* ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
