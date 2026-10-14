@@ -6635,3 +6635,788 @@ Intermediate: Part 1 `--quick` PASS 75.6 s (45); Part 2 `--quick --all` PASS —
 through `--eval` (re-renders at +1550 ms, control 0). Frozen seed bass L4 at 48 kHz unchanged (peak 0.08686, rms 0.055319, 650886).
 **What is next:** stage 3 — first the FOUNDATION PLAN ("PLAN ONLY", maximum effort): song format and versions, draft vs project,
 folder/file/server, stable timbre and user-mode ids, migration; then the foundation slices; then the first-release candidate «Calm» (§7.16).
+
+## STAGE 3 — FOUNDATION PLAN (proposed 2026-10-14; PLAN ONLY — no code changed; awaits the user's answers, §13)
+**Reading order.** §0 summary · §1 facts from the code · §2 target architecture in plain words · §3 module map (folders; today's file →
+target) · §4 contracts (14 short specs) · §5 audio engine strategy · §6 latency · §7 what a recording stores; latency compensation ·
+§8 privacy, diagnostics, offline, packs, licences · §9 browser limits · §10 build now vs socket, by stage · §11 slices in order (how the big
+files split, how the app keeps working, the two lines) · §12 risks · §13 user questions · §14 hard rules to add as slices land.
+
+### 0. Summary
+Handsong becomes a small **core** (pitch truth, the song and its commands, musical time, a registry of everything installable, the file
+formats, an event bus — plain JavaScript, no DOM, no Web Audio, tested in node) surrounded by **modules** that plug in through short
+contracts: effects, sound engines (timbres), hand sources, inputs, outputs, track types, visuals, gesture recognisers. The **engine** turns
+explicit commands and data into sound and is the same code live and offline; today's Web Audio code stays inside it, and a Rust →
+WebAssembly engine replaces it module by module from stage 5 (effects first, voices with the timbre builder in stage 7). Stage 3 builds
+three new safety nets (golden renders of every sound, a gesture fingerprint fed by synthetic hands, a latency meter), splits the big files
+along seams that already exist, gives everything that will be saved a permanent id, defines the timbre, song and pack formats and the
+contracts, and measures latency on the user's devices. MIDI, audio input, headsets, the store and co-play get their socket now and their
+body later. **34 slices** (7 S, 25 M, 2 L), each shippable and proven by today's probes plus the new nets; after slice 18 two lines can run
+in parallel (engine & sound · song, input & visuals → Calm).
+
+### 1. Facts from the code (checked 2026-10-14)
+- **Sizes.** `recorder.js` 6082 lines · `scaleprobe.js` 4915 · `audio.js` 3064 (~150 exported names) · `ui.js` 2905 · `draw.js` 2884 ·
+  `render.js` 2201 · `gestures.js` 1194 · `i18n.js` 1166 · `scales.js` 1011 · `state.js` 780; 22 app modules, the probe pair, the demo
+  songs and 3 worklets; no build.
+- **Already foundation-shaped.** Data files `handsong/<kind>` v1 with per-file validation, a broken file skipped (`scaleload.js`); user files
+  in IndexedDB with ids `u.<uuid>` and live registration (`scales.registerRecord`); effects carry PARAMETER PASSPORTS (`FX_FACTORY`: id,
+  kind voice/bus/insert, params with unit, range, curve, default, per-role default, per-note field) — six modules (vol, reverb, bright,
+  glide, dly, trmMix); ONE history with a tripwire (ED7); ONE event → engine table (`makeENG`) used by live replay and the render; a render
+  copy of the engine proves live = offline within 1e-4 (dry) / 2e-4 (wet) of peak; frozen tracks as 16-bit chunks on the audio thread;
+  ONE pricing truth (`scales`, views with keys).
+- **What blocks the next years.** (1) Timbres are INDICES (`a.inst`/`a.kit`, `leadIdx`…; the KS block must stay the tail of
+  `LEAD_INSTR`) — nothing can be saved or appended safely. (2) Events hold a VIEW OBJECT and no id; history steps hold OBJECT
+  references (events, points, payloads) — not serialisable. (3) `render.js` imports a second copy of the engine (`'./audio.js?render'`):
+  every bit of engine STATE must live in that one file — a naive split of `audio.js` into stateful submodules would make live and render
+  share state. (4) Hand detection runs synchronously on the main thread inside `requestAnimationFrame`; no timestamps, no latency number
+  anywhere; camera 640×480 with no frame-rate request; `latencyHint:'interactive'` but `baseLatency`/`outputLatency` never read. (5) No
+  probe feeds hands (the runner's fake camera has none) — the gesture layer is unprotected. (6) The static checker reads only top-level
+  `src/*.js`; probe rows are one hard-coded list (`ALL_RUNS`, `SLOW_ROWS`, `DRAWN_ROWS`). (7) MediaPipe library, WASM and model come
+  from two CDNs; the service worker caches nothing (no offline). (8) `index.html` loads **Vercel Web Analytics** (cookieless page views,
+  only on the Vercel deployment) — no document mentions it.
+- **Baseline at this plan:** static PASS; data PASS 33.1 s; `--quick` PASS — 46 checks, 66.6 s, UI checks PASS; frozen seed bass L4
+  0.08686 / 0.055319 / 650886 samples at 48 kHz (unchanged).
+
+### 2. Target architecture in plain words
+Five parts. Dependencies point one way: the app shell uses modules; modules use the core and the engine contract; the core uses
+nothing but data.
+1. **Core** — what does not depend on any device: pitch truth (tunings, modes, views: `scales.js` + data), the SONG document and its
+   COMMANDS (history, journal), musical TIME (tempo and metre maps, transport arithmetic), the REGISTRY (kinds, records, modules, packs),
+   the FILE FORMATS and their versions, the EVENT BUS, latency bookkeeping, entitlement checks. Plain JavaScript; no DOM, no Web Audio,
+   no camera, MIDI or network; runs in node (the data runner tests it) and unchanged in a desktop shell.
+2. **Engine** — turns commands (notes with frequency, velocity and per-note values; parameter changes; routing; clip playback — each with
+   an explicit time) and DATA (timbre recipes, effect values, the routing graph) into sound; the same code live and offline; never reads
+   app state. Today: the Web Audio engine (`audio.js` and its render copy). Later: one Rust → WebAssembly core in an AudioWorklet (live),
+   in a Worker (offline renders) and in node (probes); one day native in a desktop app or a plugin.
+3. **Modules** — everything pluggable, one file each, with a PASSPORT (id, version, parameters, cost class, capabilities) and its own
+   CONTRACT PROBE: effects, timbre engine types, hand sources, input devices, output devices, track types, visuals, gesture recognisers.
+   Adding a module = its file + one line in the module index (`src/modules/index.js`); no core edit.
+4. **App shell** — the composition root and the frame loop (`main.js`), live state (`state/*`), canvas views (play surface, strip and
+   window, editor), DOM panels (`ui/*`), language, the tutorial.
+5. **Data** — files of one family `handsong/<kind>`: tunings, modes, palettes, chord modes (today); timbres, effect and chain presets,
+   mappings, gestures, key maps, layouts, rooms, songs, packs, licence keys (new). Built-ins, the person's files and packs pass ONE
+   validator.
+**The connections** (each arrow = a contract of §4): input devices → NoteIntent / ControlEvent → core (gesture layer → mappings → live
+notes and values; recorder → commands) → engine commands; core → bus topics → visuals, outputs, diagnostics; UI → commands → song;
+modules and data → registry.
+**Principles.** P1 the core is pure. P2 everything that survives a session has a permanent id, never an index (generalises rules #25,
+#27). P3 every change to the song is a command. P4 the engine's inputs are explicit; the same code runs live and offline. P5 a module plugs
+in through the registry, declares its cost, ships its probe. P6 a recording keeps what was HEARD (notes, values), not how it was made.
+P7 latency first — live sound never waits for anything. P8 images, sound and hand data stay on the device. P9 offline-first. P10
+licence-clean by construction (rule #32).
+
+### 3. Module map
+**Folders (target; reached slice by slice; an old path stays as a re-exporting facade until its last importer moves):**
+```
+src/core/        registry · format · ids · bus · latency · entitlements          pure; imported by the node data runner
+src/scales.js, src/scaleload.js, data/                                       pitch truth — stay where they are
+src/song/        store · lanes · takes · capture · notes · history · edit-* · automation · sections · transpose
+src/transport/   clock (tempo/metre maps, brace) · scheduler (look-ahead, chase, fireNear, tick) · fxplay
+src/live/        record (push, rec*, W* → NoteIntent API, stops) · eng (event → engine adapter, evHz) · backing
+src/freeze/      registry · swap · render (render.js) · queue (frzqueue.js)
+src/audio.js     stays the Web Audio engine core (state, pools, wiring, master); src/engine/ fdn · frozen · probe · worklets/ (wasm/ later)
+src/modules/     effects/* · timbres/* · hands/* · inputs/* · outputs/* · tracks/* · visuals/* · index.js (the module index)
+src/gestures/    features (pure) · expr · fxhand · looper · hands (processHands) · recognise · mapping
+src/views/       play · strip · roll · camera            src/ui/  panels · scale-panel · sound-panel · fx-panel · editor · arrange · backing · shell · bar · tutor-helpers
+src/state/       scale · hands · layout · chains · camera · windows (state.js = facade)       src/probes/  by area + rows registry
+dsp/             (stage 5) the Rust crate; compiled engine committed under src/engine/wasm/       vendor/  (stage 4) MediaPipe for offline
+```
+**Today's file → target.**
+| Today | Becomes |
+|---|---|
+| `recorder.js` | `song/*`, `transport/*`, `live/*`, `freeze/registry+swap`; `recorder.js` = facade (render.js `REC.*`, probes, tutor keep working) |
+| `audio.js` | stays the engine core; STATELESS builders move out: `modules/timbres/*`, `modules/effects/*`, `engine/fdn`, `engine/frozen`, `engine/probe` |
+| `render.js`, `frzqueue.js` | `freeze/render`, `freeze/queue` (+ ear tools `debug/ear`, probe bodies `probes/render`) — moved with W0 (stage 5) |
+| `ks-`, `frz-`, `probe-cap-worklet.js` | `engine/worklets/` (with AUD2; page-relative `addModule` paths updated) |
+| `vision.js` | `modules/hands/camera-mediapipe.js` (HandSource contract) |
+| `gestures.js` | `gestures/features` (pure), `expr`, `fxhand`, `looper`, `hands` |
+| `draw.js` | `views/play`, `views/strip`, `views/roll`, `views/camera`; visual-module wrappers (VIS1) |
+| `ui.js`, `state.js` | `ui/*` by panel; `state/*` by domain (facades kept) |
+| `scaleprobe.js` | `probes/*` by area + a rows registry; `probedata.js` stays node-only |
+| `songs.js` | `data/songs/*.json` (song format) + the generator kept as a probe tool |
+| `clip.js` | `modules/outputs/clip.js` (with the output layer, stage 5) |
+| `scales.js`, `scaleload.js`, `config.js`, `i18n.js`, `hooks.js`, `main.js`, `demo.js`, `tutor.js`, `arrange.js`, user files | stay (validators move to `core/format`; i18n dictionaries split per area; tutor untouched until the last stage) |
+| new | `core/*`, `transport/clock`, `modules/index.js`, `modules/{hands,inputs,outputs,tracks,visuals}/*` |
+
+### 4. Contracts (short specs; each module type ships a contract probe generated from its passport)
+**4.1 Effect module** (`src/modules/effects/<id>.js`) — evolves today's `FX_FACTORY` entry.
+`{ kind:'effect', id, version, labelKey, place:'chain'|'note', params:[{key, labelKey, short, unit, min, max, def, defBy?, curve:'lin'|'log'|
+'exp'|'step', smooth:{tc}, scope:'chain'|'note', note?:{key, inv, roles, required}, readAt?:'attack'|'pitch'|'always', handRange?}],
+neutral:{key:value}, tail(values)→seconds, cost:{cls:'light'|'medium'|'heavy', nodes, lite?}, build(E)→{in, out, set(key, v, time),
+setActive(on, time)}, dsp?:'<kernel id>' }`. `place:'chain'` = audio in → audio out, accepts ANY signal (live hand chain, a note track's
+chain, a recorded audio track, a bus, the master); `place:'note'` = a per-note property a timbre reads at the attack (volume, brightness,
+glide; the old solo scalars vibrato/drive/tremolo-note join here). Rules: the file holds NO state (`E` = the engine instance's context,
+random source and helpers — §5.1); values are normalised 0..1 at every boundary (UI, mappings, automation, files); the setter is the one
+door (no native ramp around it); `neutral` is an exact identity (sample for sample); live and offline instances come from the same
+`build`; serialisation is generic `{id, version, v:{key:v01}}`. Contract probe: identity at neutral, offline repeat, measured tail ≤
+`tail()`, norm/denorm round trip, passport valid; later WASM ≡ worklet ≡ worker.
+**4.2 Timbre** — an ENGINE TYPE in code + a TIMBRE RECORD in data.
+Engine type (`src/modules/timbres/<type>.js`): `{ kind:'timbre-engine', id:'subtractive'|'fm'|'ks'|'chord2'|'bass2'|'drumkit' (later
+'va', 'wavetable', 'fm4', 'sampler', 'granular'), version, recipe:<passport of its fields>, noteParams:[…], policies:{voiceMode, glide,
+register, quant}, cost:{perVoice}, build(E, recipe, dest)→Bank {gain, setFreq(f, tc, t), cancel(t), strike?(t, vel), hum} }`.
+Timbre record (`data/timbres/<id>.json`): `{ format:'handsong/timbre', version:1, id, family:'solo'|'chord'|'bass'|'kit', engine, name,
+recipe:{…}, env:{att, rel}, policies:{voiceMode:'poly'|'lead', glide, register, quant}, author?, licence? }`. Rules: an event names its
+timbre by id; a missing timbre never breaks a track (the song carries a copy; else the family's fallback with a visible note); built-in ids
+are permanent; the same recipe builds the same graph live and offline, in the same CREATION ORDER (seeded phase draws depend on it);
+policies (BACKLOG §7.4: voice mode, glide default, register base, record quantise) are data with today's values.
+**4.3 Tuning / mode** — kept as they are (`handsong/tuning|mode|palette|chordmodes` v1, validator, user ids). Runtime: the VIEW (mode,
+tunedFrom, chordMode, key, keyC) is one memoised object (rule #7); `viewIdOf` (F0) and `viewKeyIdOf` (+key, +cents) are its ids in files.
+The pricing API (`leadFreqTi`, `bassFreqTi`, `chordNotesAt`, `pitchHz`, `centsOf` with a view) is the ONLY pitch truth for every consumer —
+engine adapter, MIDI out (Hz → 12-TET + bend, or MTS), visuals, editor. Later: Scala `.scl`/`.kbm` import/export as converters to and from
+these records (round-trip probe; an equal tuning returns to its generator form).
+**4.4 Engine** (the central contract; `audio.js` and the render copy implement it now, the WASM engine later):
+`noteOn(voice, {hz, vel, timbre, values, glide?, tie?}, time)` · `noteSet(voice, {hz?, values?, glide?}, time)` · `noteOff(voice, {tie?},
+time)` · `bend(voice, plan, time)` · `hit(owner, {row, vel, kit, values}, time)` · `drone(owner, {hz, hz2, level, pan}, time)` ·
+`setParam(dest, v01, time)` · `setGraph(graph)` · `clipPut / clipPlay / clipStop` (frozen and audio tracks) · `levels()` · `load()` ·
+`voices()`. Rules: every call carries its time (rule #15; live passes "now" and never waits); routing changes only through `setGraph`
+(heads, chains, master as data); random draws seeded per lane and note (live may stay unseeded where it is today); sample-accurate within
+the backend (Web Audio: a-rate automation; WASM: the exact frame inside the 128-frame block); explicit inputs (reached step by step —
+ENG1 cuts the engine's own reads of app state).
+**4.5 Mapping source / destination** (the matrix; sockets in stage 3, UI in stages 6–7).
+Source `{ id:'hand.R.x'|'hand.R.z'|'hand.L.f2.y'|'hand.R.pinch.f0'|'hand.R.open'|'hand.R.spread'|'hand.R.tilt'|'hand.R.speed'|
+'expr.space'|'midi.cc.74'|'mpe.pressure'|'mic.level'|…, shape:'continuous'|'gate'|'trigger', polarity:'uni'|'bi', rate:'frame'|'event',
+scope:'global'|'hand'|'note', speed:'fast'|'slow' }` (the speed hint is §3.29's suitability rule). Destination `{ id:'<chain owner>/<fxId>/
+<pKey>' | 'timbre:<slot>/<pKey>' | 'mix:<trackId>/level|pan' | 'visual:<id>/<pKey>' | 'midi.out:<port>/cc/<n>' }` — range, curve and
+smoothing from the passport. Mapping record (`handsong/mapping` v1) `{ id, src, dst, mode:'abs'|'rel'|'mod', range:[lo,hi], curve:{kind,k},
+invert, smooth:{tau}|{slew}, gate?:{src, latch}, depth?, enabled }`. Evaluation (pure, once per frame): normalise → curve → invert → range →
+smooth → `abs` sets the base · `rel` = base at capture + Δ, latched on release (today's effects hand) · `mod` = base + Σ depth·x (clamped).
+Rules: one BASE writer per destination at a time (rule #29: the hand, OR a recording, OR the fixed value) plus any number of mods; many
+sources → one destination and one source → many destinations allowed; mappings are setup data (presets), not song data. Today's
+addresses map 1:1: `{drive, hand:'fx', finger, axis}` → `hand.fx.f<n>.<axis>` rel · `{drive, hand:'play', axis}` → `hand.play.<axis>` abs ·
+`{fixed, v01}` → no mapping, base = v01. Timbre LAYOUT (splits and layers on fingers and octave ranges) is a sibling record
+(`handsong/layout`: zones {hands, fingers, range} → timbres[] with levels) resolved before a NoteIntent reaches the engine; chains bind to
+a track, a timbre or a finger by a resolver policy (§7.14; `chainKeyOf` is already opaque — only the resolver changes).
+**4.6 Gesture layer.** Features per hand per frame (pure, from RAW coordinates — rule #12): pinch ratios ×4, touched set (PINCH_ON/OFF
+hysteresis), palm x/y raw and play-space, depth (one smoothing step per frame — VOL-4), openness, spread, tilt, roll, speed, acceleration,
+confidence, side, a CONTINUITY id (hand identity by tracking, the model's L/R label only a hint — fixes the open `key+=i` class).
+Gesture definition (`handsong/gestures` v1) `{ id, kind:'pinch'|'hold'|'double'|'swipe'|'fist'|'open'|'pose', hand, finger?, ms?, gapMs?,
+axis?, minSpeed?, confirmFrames, cooldownMs, excludes:['notes'] }`. Recogniser: `feed(features, t) → {gesture, phase:'begin'|'progress'|
+'fire'|'cancel', value}`; fires ONCE on the edge (rule #21); a finger sounding notes in that zone cannot fire a command; thresholds
+normalised to hand size; dead zones return exactly 0 (rule #22). The expression middle layer (spring, pump, sub-step) stays as it is and
+its four channels become SOURCES.
+**4.7 Hand-data source** (`src/modules/hands/<id>.js`): `{ kind:'hands', id:'camera-mediapipe'|'synthetic'|'replay' (later 'webxr',
+'leap', a better model), caps:{fps, depth:'relative'|'metric', joints:21, handedness, world}, start(opts), stop(), onFrame(cb) }`;
+`HandFrame { seq, tCapture (performance ms; rVFC captureTime where offered), tReady, image? (display handle, camera only, never leaves the
+device), hands:[{ id, side, score, pts:Float32Array(63) raw image-normalised, world?:Float32Array(63) metres }] }`. Rules: a source never
+draws and never mirrors (rule #13 stays in the view); a surface mapper turns raw into play space (camera: the cover crop of rule #12; XR: a
+virtual plane); WebXR's 25 joints map onto the 21; synthetic and replay sources feed the probes.
+**4.8 Input device** `{ kind:'hands'|'pointer'|'midi'|'audio', id, name, latencyMs (measured), compensate, open(), close(), onIntent(cb),
+onControl(cb) }`. `NoteIntent { phase:'on'|'set'|'off', voice:'<opaque owner key>', role, timbre?, pitch:{view, ti, oct}|{view, deg, oct},
+live?:{hz|cents} (live-only continuous pitch — rule #11), vel, values:{'fxId:pKey':v01}, chord?:{ty}, row?, t (performance ms of the
+physical action), src:{device, latencyMs} }` · `ControlEvent { src, value, t }`. Rules: every input produces these (hands today, pointer,
+MIDI with `.kbm`/MPE, later audio); live sound starts at once; the recorder turns `t − compensation` into a song beat through the clock and
+stores pitch as `ti`/`oct` in the view, never Hz.
+**4.9 Output device** `{ kind:'audio'|'midi'|'file', id, name, caps:{mpe, mts, clock, latencyMs}, open(), close() }`. Audio: the engine
+master → a device (`setSinkId` where offered). File: offline render → WAV 16/24-bit, stems per track, with `.scl`/`.kbm` beside. MIDI: the
+note stream → MIDI 1.0 with timestamps (`send(data, t)`); pitch as 12-TET + per-channel bend (MPE) or MTS tables; CC from mapping
+destinations (any source can be sent); clock out. Rules: outputs subscribe to the stream the engine gets; nothing an output does changes
+the song.
+**4.10 Track type** `{ kind:'notes'|'audio'|'midi', version, schedule(window, clock, sink), chase(beat, time), stop(), render?(offline),
+edits (registered commands), serialize, deserialize, chain:true }`. notes = today; audio = clips `{id, storeKey, startBeat, offset, length,
+gain, fades}` played by today's frozen-track store and reader (the same service); midi = note events sent to an output. Rules: identity =
+lane id (rule #27); one source per track; every track may own a chain (§7.14); a frozen note track is an audio rendering CACHE, an audio
+track IS audio.
+**4.11 Visual module** `{ kind:'visual', id, version, layer:'background'|'scene'|'instrument'|'overlay', cost:{cls, gpu}, lowPower:{fps,…},
+params (passport — mappable), subscribes:['hands','features','notes','levels','transport','params'], mount(surface), frame(t, dt),
+resize(), unmount() }`. Rules: reads the bus only; never touches sound, the song or the network; only the `camera` visual draws the camera
+picture (Calm omits it — §7.16); declares its low-power path; a camera visual shows the SAME frame the landmarks came from (rule #8).
+**4.12 Clock** `{ tempoMap:[{beat, bpm}], metreMap:[{bar, beats, groups}], secOfBeat, beatOfSec, acOfBeat, beatOfAc (transport t0, brace
+fold), spbAt, metreAt, follow(sync|null) }`. Rules: the audio clock is the master; EVERY beat ↔ time conversion goes through it (no
+`60/loop.bpm` elsewhere); one segment today (byte-identical); external sync (MIDI Clock in) bends t0/tempo smoothly; MIDI Clock out is
+scheduled ahead with timestamps; Ableton Link only in a native wrapper.
+**4.13 Command** `{ kind, label, undo:true|false, payload (ids and values only), h (tripwire hash after apply) }`; API `do · undo · redo ·
+register(kind, {apply(cmd, dir), touched(cmd), toJSON, fromJSON}) · onApplied(fn)`. Rules: EVERY change to the song or project is a
+command; mute, solo, arm, brace, tempo and the key knob are commands with `undo:false` (the ED7 decision stands — not undo steps, but
+saved and later shared); serialised payloads hold ids, never object references (in memory a step may keep references for speed);
+`onApplied` is the journal for autosave, co-play and MIDI learn; apply is deterministic; the tripwire stays.
+**4.14 File format** — envelope `{ format:'handsong/<kind>', version:<int>, id, name?, rev?, author?, licence?, pack?, requires?:{kind:[ids]} }`.
+Kinds: tuning · mode · palette · chordmodes (v1 today) · timbre · fxpreset · chain · mapping · gestures · keymap · layout · room · song ·
+pack · licence. Rules: ids permanent — built-ins kebab-case, user records `u.<uuid>`, pack records `<packId>/<name>`; readers MIGRATE older
+versions (one pure function per step) and REFUSE newer ones in words; one validator per kind; a song carries COPIES of every resource it
+uses (+ ids); packs are data only; UTF-8 JSON with stable key order (compressed container later). Song v1 sketch: `{ format:'handsong/
+song', version:1, id, name, created, modified, app, settings:{aRef, key, keyC, bars, sub, quant}, tempo:[…], metre:[…], views:[{id, mode,
+tunedFrom, chordMode, key, keyC}], resources:{tunings, modes, palettes, chordModeSets, timbres}, tracks:[{id, slot, kind, name, rank,
+level, pan, mute, solo, len}], events:[{id, t, track, fn, a, view, sev, tk, jam?}], takes:[{tk, capture}], sections, brace, master,
+backing }` — frozen audio is never stored (a cache, re-rendered after loading).
+
+### 5. Audio engine strategy (requirement 19 and 25)
+**5.1 Stage 3 — the contract only; Web Audio stays inside.** (a) The engine-submodule rule (AUD1): a builder that moves out of `audio.js`
+receives `E` — the engine INSTANCE's context, random source, helpers and buses — and keeps no module state; the live engine and the
+render copy each pass their own `E`, so the `'./audio.js?render'` copy keeps working and nothing is shared (static check + a probe that
+two copies share no instance object). Effects and timbre engine types become such files (AUD1, AUD2). (b) The contract surface (ENG1:
+explicit Hz, timbre, values, time; `makeENG` calls only it). (c) Routing as data (ROUTE1). (d) Passports with cost classes, readouts,
+power class (ENG2). The full "engine as one instance object" conversion (no more render copy) happens only with the WASM engine (W0) — it
+is not needed before, and doing it now would rewrite ~150 exports for no gain.
+**5.2 What the Web Audio engine can and cannot do for professional timbres.** CAN: band-limited native oscillators (any harmonic
+spectrum via PeriodicWave), audio-rate modulation of parameters (FM, AM), biquad filters with automation, convolution, a compressor,
+delays ≥ 128 samples, WaveShaper with 2×/4× oversampling, AudioWorklet for custom DSP (our KS string), offline rendering. CANNOT or
+only badly: feedback loops shorter than one 128-frame quantum (no comb, waveguide, flanger feedback or zero-delay-feedback filters
+without a worklet — KS needed one); nonlinear filters (saturation inside the loop); smooth wavetable morphing (PeriodicWave swaps
+click); oscillator phase reset, hard sync, cheap PWM; per-voice modulation matrices (every LFO and envelope route costs nodes per voice);
+arbitrary envelope curves (we banned `setValueCurveAtTime`); deterministic output (summing order — "same performance, never the same
+samples", 1–3 ULP) and the same sound in every browser (biquad, compressor and oscillator tables differ between Chrome, Safari and
+Firefox); idle cost (rule #3 keeps 24 chord voices × 2 oscillators running in silence); garbage from per-hit nodes; control from the main
+thread (jitter when it is busy — `SCHED_AHEAD` exists only to hide that). §7.13's timbre builder (VA with unison, wavetables, 4-op FM,
+physical models, two filters, four envelopes, three LFOs, a mod matrix, per-note expression, alias-free in any tuning) needs our own engine.
+**5.3 Later — one engine in an AudioWorklet, DSP in Rust → WebAssembly.** A `no_std` Rust crate `dsp/`: one block core (128 frames;
+events applied at their exact frame inside the block; parameter smoothing from the passport; own seeded random per note; denormal guard;
+fixed summing order → deterministic) compiled to `wasm32-unknown-unknown` with SIMD128, raw exports, no JS glue library (the worklet scope
+lacks some web APIs). The SAME `.wasm` runs in four hosts: the AudioWorklet (live); a Web Worker for offline renders — freeze, export,
+analysis, golden tests — faster than real time and free of Chrome's leak (an OfflineAudioContext that loaded a worklet is never freed,
+≈ 6 MB per render, RENDER-LEAK); node inside the data runner (DSP contract tests without a browser); native code in a desktop app or
+plugin. Order (line A, from stage 5): W0 toolchain, empty engine, the four hosts, the build tool, engine-as-instance (M) → W1 the FDN
+reverb, an exact port of today's topology (feedback loops are where native nodes hurt most) (M) → W2 the chain processor: a role's whole
+bus chain in one worklet node; offline in two passes — native voices rendered dry, then the chain in the worker (M) → W3 delay and
+tremolo-mix (S each) → W4 new effects: chorus, phaser, EQ, compressor, plate (S–M each) → W5 default switch after golden and ear
+acceptance (S) → stage 7: voices (VA with band-limited oscillators and ZDF filters, wavetable/morph, 4-op FM, the KS port, drums, the
+SAMPLER with SFZ / Decent Sampler import, granular), then the native voice paths retire role by role; the timbre builder (§7.13: 48 finger
+addresses = mapping destinations into the timbre passport, A–D morphing = interpolation of recipes, the sound portrait = worker renders +
+the GOLD feature extractor, multisample export = worker renders per note or per tuning step) sits on it.
+**5.4 Rust or C++ — recommendation: Rust.**
+| | Rust | C++ |
+|---|---|---|
+| Web toolchain | rustup + cargo, `wasm32-unknown-unknown`, no Emscripten, no glue | Emscripten (large; its AudioWorklet mode needs SharedArrayBuffer) or clang + wasi-sdk |
+| Safety | memory and data-race errors stopped by the compiler — matters when an AI writes most of the code and nobody reviews it line by line | undefined behaviour shows up as glitches or crashes |
+| Speed, SIMD | LLVM; equal | LLVM; equal |
+| Desktop / plugin later | Tauri (MIT/Apache), cpal (Apache-2.0), midir (MIT), CLAP bindings (MIT/Apache); VST3 bindings must avoid GPL ones (e.g. vst3-sys) | iPlug2 (zlib-style), DPF (ISC), CLAP (MIT); JUCE only with a paid licence (rule #32) |
+| Talent pool | smaller, growing | larger |
+VST3 SDK: reportedly re-licensed under MIT by Steinberg in 2025 — verify when the plugin stage starts (as rule #32 says).
+**5.5 Optional sources (reading only, never dependencies).** Faust: the compiler is GPL, its generated code is not, but many standard
+library functions are GPL/LGPL — usable at most as a prototyping aid on our own code without library imports. Cmajor: tooling GPLv3 or
+commercial — check the generated-code terms before any use. Elementary Audio: reportedly MIT — verify; its runtime model differs from ours.
+Our DSP is written from published methods: PolyBLEP/BLAMP and MinBLEP (Välimäki et al.; Brandt), ZDF/TPT filters (Zavalishin, "The Art of
+VA Filter Design"), FDN reverbs (Jot & Chaigne; Schlecht), plate (Dattorro 1997), Karplus–Strong and waveguides (Karplus & Strong 1983;
+Jaffe & Smith 1983; J. O. Smith, PASP), FM (Chowning 1973), oversampling and antiderivative anti-aliasing (Parker, Esqueda, Bilbao),
+granular (Roads), interpolation (Niemitalo).
+**5.6 Build-free for the player.** The compiled `.wasm` (≈ 0.2–0.6 MB) is committed; `tools/build-dsp.mjs` (Claude Code only — needs the
+user's permission, Q5) runs cargo, writes the `.wasm` and a hash of its sources; the data runner fails when the committed `.wasm` is older
+than its sources. The app loads it with `fetch` + `WebAssembly.compile` and passes the module to the worklet — no SharedArrayBuffer.
+**5.7 Cross-origin isolation (COOP/COEP).** Needed ONLY for SharedArrayBuffer (a lock-free ring buffer to the audio thread, WASM threads).
+Not needed for WASM in an AudioWorklet or for MessagePort transport. Consequences if ever adopted: GitHub Pages cannot send headers → a
+service worker re-serves pages with COOP/COEP (a published technique; one reload on the first visit; some in-app browsers and webviews
+do not honour it → the app must still run without isolation); with `require-corp` every cross-origin file needs CORP/CORS — the two
+MediaPipe CDNs become a risk unless VENDORED (stage 4 vendors them anyway); embedding the app in another site needs that site isolated too.
+Recommendation: design the control channel with two transports (MessagePort always; a SAB ring buffer when `crossOriginIsolated`), start
+with MessagePort, adopt SAB only if the latency meter shows message delivery is a real share of the budget.
+**5.8 Phone performance budget.** Audio thread: ≤ 50 % of each quantum on a 2021–22 mid-range phone (128 frames = 2.67 ms at 48 kHz →
+≤ 1.3 ms of DSP). Indicative WASM costs per quantum on such a phone (to be measured by W0's benchmark): VA voice 15–30 µs, FM voice
+15–25 µs, KS string 8–15 µs, sampler voice 5–15 µs, FDN reverb 40–80 µs, delay 5–10 µs → 16 voices + 2 reverbs + 2 delays ≈ 0.35–0.7 ms;
+low-power path: 8 voices, a lighter reverb, no oversampling. A WASM engine processes only SOUNDING voices (today's native pools run idle).
+Main thread: ≤ 8 ms of our JS per 60 Hz frame (gestures ≤ 1, drawing ≤ 4, scheduler/recorder ≤ 1, bus/visual logic ≤ 2); detection in a
+worker. GPU: MediaPipe and the Calm visuals share it — visuals ≤ 4 ms per frame in low power at 30 fps. Memory: frozen audio ≤ 300 MB on
+touch devices (exists), sampler instruments ≤ 100 MB each on phones (streaming later), WASM heaps ≤ 16 MB. Every passport declares its
+cost class; ENG2 measures a power class at start; the low-power path is chosen automatically or by a switch (Calm needs it).
+**5.9 Migration size.** Rust host core (voices, command decoder, smoothing, buses, meters, random, block splitting) ≈ 3 k lines; DSP
+modules ≈ 7–9 k (oscillators 0.8, filters 0.6, envelopes/LFOs 0.3, FM 0.4, KS 0.3, FDN 0.4, delay/chorus 0.3, shapers/oversampling 0.4,
+drums 0.9, sampler 0.8 + its import parsers 0.6 in JS, granular 0.6); JS hosts, adapters and probes ≈ 2 k → ≈ 12–14 k lines over ≈ 30–40
+S/M slices in stages 5–7.
+**5.10 How we prove nothing changed audibly.** (1) TF0 song fingerprint — every event's Hz through `evHz`: the new engine receives the same
+pitches. (2) GOLD (slice GOLD1) — every built-in sound and effect rendered at a fixed 48 kHz, compact features (per-band energies per
+20 ms, envelope, peak) against `tools/gold.print.json`: refactors must match within the measured repeatability; an EXACT PORT (the FDN:
+same delays, same cookbook biquad formulas, Butterworth Q in dB) must match the native render sample by sample within 1e-4 of peak
+(−80 dB); a REDESIGNED module (oscillators: wavetable vs BLEP) cannot be bit-equal by nature — it must pass named perceptual tolerances
+(loudness ±0.5 dB, band energies ±1 dB, centroid ±3 %, pitch ±1 cent, attack ±2 ms, T60 ±5 %) AND the user's A/B by ear (`R.aud` old/new
+per track), the old path switchable until accepted (Q7); the GOLD file is then renewed by decision for that module only (as TF0 was).
+(3) Render rows (LR1, AF2, AF6b, repeatability, MX1/MX2, frozen seed numbers) keep running; for pure WASM paths "live worklet vs worker
+render" becomes EXACT (deterministic code). (4) Contract probes per module (identity, stability, tail, no NaN, cost under budget) — in
+node for WASM kernels. (5) The ear has the last word (Key lessons).
+
+### 6. Latency — a first-class requirement (requirement 26)
+**6.1 Budget per stage** — TODAY = estimates from typical published figures (nothing has been measured — §3.32); LAT1 replaces them with the
+user's numbers.
+| Stage | Today (estimate) | After stage 3 (LAT1, LAT2) | Target (latency plan + WASM) |
+|---|---|---|---|
+| 1 Camera: light → frame in the page | 40–80 ms at 30 fps (frame time + readout + driver/browser) | 25–50 ms where the camera gives 60 fps | hardware |
+| 2 Waiting for our loop | 0–17 ms (rAF; mean ≈ 8) | ≈ 0–2 ms (requestVideoFrameCallback) | ≈ 0–2 ms |
+| 3 Hand detection (MediaPipe, GPU) | desktop ≈ 8–20 ms, phone ≈ 15–45 ms, ON the main thread | same, measured | same cost, in a worker |
+| 4 Gesture logic (`processHands`) | < 1 ms | < 1 ms | < 1 ms |
+| 5 Main-thread contention (drawing, GC, recorder tick) | 0–15 ms jitter | smaller | ≈ 0 for notes (worker → audio thread with the WASM engine) |
+| 6 Note → audio thread | 3–6 ms (to the next 128-frame quantum) | same | ≤ 3 ms |
+| 7 Audio out (buffer + device) | desktop ≈ 10–30; good Android 20–40, others 40–100; iPhone 10–30; Bluetooth 150–250 | measured, shown; Bluetooth warned | smallest safe buffer |
+| Total, wired | desktop ≈ 70–150 · phone ≈ 90–250 | ≈ 50–120 · ≈ 70–220 | ≈ 45–80 · ≈ 60–150 (the phone's output dominates) |
+| Our software's share (2, 4, 5, 6) | ≈ 5–40 ms | ≈ 5–20 ms | ≈ 3–6 ms — "only a few milliseconds" |
+**6.2 Measures.** (a) The budget above, measured per stage on the user's device (LAT1, stage 3, FIRST — "measure before building", §3.32).
+(b) Live notes bypass the look-ahead (true today: live `W*` calls pass no time); rule to keep: never schedule live sound in the future,
+never quantise live sound (only the recording). Control to the audio thread without the main thread: with the WASM engine the gesture
+pipeline in the worker posts note commands straight to the engine worklet through a transferred MessagePort (no main-thread hop); a SAB
+ring buffer only if measured worth it (§5.7) — stage 4 (detection in a worker) and 7 (gestures beside it, straight to the WASM engine —
+the end state; it is why the core and the gesture features must be pure, P1). (c) Detection in a worker (MediaPipe in a Worker with an
+OffscreenCanvas for the GPU delegate; frames as `ImageBitmap` from the video, transferred; results carry the frame id and the picture of
+THAT frame is shown with them — rule #8 kept; fallback to the main thread where workers or OffscreenCanvas WebGL fail) — stage 4, first
+slice of the "latency and hands" plan, earlier if LAT1 shows the main-thread block is large; region of interest: MediaPipe's video mode
+already tracks inside a box (palm detection only when lost) — we add a smaller input when it helps; every camera frame processed on
+arrival (requestVideoFrameCallback) and 60 fps requested where the camera offers it (LAT2, stage 3). (d) `latencyHint:'interactive'`
+stays the default; `baseLatency`/`outputLatency`/`getOutputTimestamp()` read and shown (LAT1); a "lowest / stable" choice (numeric hint
+vs 'balanced') with dropouts watched where the browser reports playout statistics — stage 4. (e) Pinch-onset prediction: from the thumb–
+finger closing speed over 2–3 frames, predict the contact; fire early only when the approach is fast and steady and the finger is in its
+cone; if the next frame does not confirm, cut the note within 5 ms (a ghost); measured on synthetic and recorded real landmark streams for
+GAIN (ms) and GHOSTS per minute; off by default, first for sustained sounds (Q19) — stage 4/5 (latency plan). (f) The latency meter: per
+stage on the user's device (camera = now − captureTime at the frame callback; wait; detection; gestures; engine delivery; audio output),
+mean, 95th percentile and jitter; console `R.latency()` + a Diagnostics overlay — LAT1 (stage 3). (g) Bluetooth: no API says "Bluetooth"
+— heuristic: output latency ≥ 100 ms or an output device label matching Bluetooth/AirPods/Buds/hands-free → a gentle warning once per
+device ("Bluetooth adds 150–250 ms; use wired headphones or the speaker") — LAT1.
+
+### 7. What a recording stores; latency compensation
+**Decision (recommended, Q12): a recording stores what was HEARD — notes as intent (pitch as tuning index + register in the frozen view,
+volume, per-note values) and the RESULTING parameter values per destination — never the source gestures.** Why: (1) replay must not depend
+on the mapping (remap later, MIDI learn, sharing songs with people whose mappings and devices differ); (2) gestures, MIDI CC and editor
+edits converge on the same values; (3) the automation lanes edit values; (4) freeze and export need values; (5) it is today's model (rule
+#29 "recorded by declaration", the looper principle "a layer is a frozen moment"); (6) values are compact (fine recording already thins them).
+An optional per-take "performance capture" of FEATURES (not images, not raw landmarks) may come later for re-mapping a performance — off by
+default.
+**Latency compensation (requirement 7; recommended, Q11).** Today a note is stamped at the moment the call arrives (`AC.currentTime`):
+solo notes (never quantised) land late by camera + detection + output delay if the player moves on the beat they hear. Proposal: each
+input stamps the physical-action time (`t` = frame capture time for hands, Web MIDI event timestamp, audio-in frame time) and the
+recorder files the event at `t − compensation`; default compensation = input latency + output latency (the DAW convention for audio),
+refined by a 10-second "tap along with the click" test per input and device that measures what THIS person actually does; switchable off.
+Live sound still starts at once; quantised roles snap after compensation. Built in stage 5 (with audio input) on the IN1 socket.
+
+### 8. Privacy, diagnostics, offline, packs, licences
+**Privacy (requirement 20) — a core principle, rule #33 from PRIV1.** Camera images never leave the device: frames are processed by the
+hand model inside the browser; no image, video, landmark stream, microphone sound or recording is sent anywhere by the app. The app's own
+network use is limited to: loading itself and its assets; links the person opens (feedback form, donate); later, only by the person's
+explicit action, syncing songs, timbres and settings to their account and sending an opt-in diagnostic report of NUMBERS ONLY. Honest
+note: the Vercel deployment runs Vercel Web Analytics (cookieless page-view counts; it never sees camera, sound or hand data) — to be named
+in a privacy notice or removed (Q14). Enforcement: a network guard in the static check (every `fetch`/XHR/WebSocket/`sendBeacon`/
+EventSource/RTCPeerConnection call site listed with its reason); a Content-Security-Policy `<meta>` whose `connect-src` lists the allowed
+hosts (the browser itself blocks anything else); packs are data only (no third-party code); no tracking scripts beyond the named counter.
+**Diagnostics (requirement 21).** A local Diagnostics view for everyone (latency per stage, frame rate, detection time, audio buffer and
+output latency, dropouts where the browser reports them, device class, browser version) — LAT1 (stage 3) and its panel (stage 4). Sending
+only by a button that first SHOWS the report (numbers only); until a server exists the button copies it for the feedback form; automatic
+sending only with consent after the server (stage 8).
+**Offline-first (requirement 22) — stage 4, before Calm's release** (installations need it): vendor MediaPipe (library, WASM, model ≈ 15–20 MB,
+Apache-2.0 — LICENSE/NOTICE kept) under `vendor/`; the service worker gets a VERSIONED cache (cache name = app version; network-first
+for the page and manifest, cache-first for versioned assets; a new version installs in the background and offers "reload to update" —
+never mid-session), which answers the "stuck old version" worry that kept the cache out; `storage.persist()` asked when the person saves.
+**Packs and keys (requirement 18).** Core `entitlements.js`: a pack = data files + a `handsong/pack` manifest; a licence key =
+`handsong/licence` `{licensee, packs, issued, expires?, keyId, sig}` signed with our private key, verified OFFLINE with the embedded public
+key (WebCrypto ECDSA P-256 — supported by every current browser); the registry offers a pack's records only when entitled. Honest limit:
+a key checked in the browser stops casual copying, not a determined person (BACKLOG §7.2) — real protection is server-delivered content
+(stage 8). Third-party packs are DATA ONLY (validators accept known kinds and fields; no scripts, no executable URLs) — also a security
+rule. Format and check in stage 3 (PACK1); purchase flow in stage 8; a Calm pack UI in stage 4 if Calm is sold.
+**Licence policy (requirement 24)** — written into `CLAUDE.md` as hard rule #32 by this plan (the user's rule); register and checker in
+LIC1. Today's third-party items: MediaPipe tasks-vision 0.10.35 (Apache-2.0, CDN), the hand landmarker model (Apache-2.0 per its model
+card — LIC1 records the card), playwright-core 1.64.0 (Apache-2.0, dev tools only, no dependencies), Vercel Web Analytics (a hosted
+service script), the app icons (provenance unknown — Q13). Watch list: Essentia(.js) AGPL (key detection is written ourselves, §7.11),
+JUCE free tier, GPL Faust libraries, Ableton Link (GPL-2.0 or a separate licence from Ableton — only the latter), GPL VST3 bindings,
+BlackHole (GPL — the person installs it; never shipped).
+
+### 9. Browser limits (honest)
+- **Web MIDI:** Chrome, Edge, Opera on desktop and Android; Firefox with a permission flow; NOT Safari (macOS, iOS, iPadOS) — no MIDI on
+  iPhone/iPad from the web app (a desktop or native app later). MIDI Tuning Standard needs SysEx → an extra permission.
+- **No virtual MIDI ports from a browser:** to reach a DAW on the same computer — macOS IAC Driver (built in); Windows a loopback tool (e.g.
+  loopMIDI; newer Windows MIDI Services include loopback — verify then); the app then sees those ports.
+- **Live audio into a DAW:** browser sound goes to an output device only → a virtual audio device the person installs (e.g. VB-CABLE on
+  Windows, BlackHole on macOS); choosing the output device needs `setSinkId` (Chromium; not Safari).
+- **Audio input latency** is not reported reliably (≈ 10–40 ms desktop, more on phones); echo cancellation, noise suppression and auto
+  gain must be OFF for music (they add delay and damage the sound); Bluetooth microphones fall back to the low-quality hands-free profile;
+  we measure the round trip with a click test (stage 5).
+- **Output:** Bluetooth 150–250 ms and no API names it (heuristic only); Android latency varies widely by device.
+- **Background tabs** throttle timers and frames; the audio clock runs on — today's main-thread scheduler is hidden only by the look-ahead;
+  a sequencer inside the WASM engine would make playback independent of the main thread (stage 7).
+- **WebXR hands:** Meta Quest Browser yes; Apple Vision Pro Safari has WebXR — hand-input details to verify at that time; no WebXR on
+  iPhone. **File System Access** (project folders): Chromium desktop only — elsewhere download/upload and the browser's private storage.
+  **SharedArrayBuffer** needs cross-origin isolation (§5.7). **Safari** evicts site data after 7 days without a visit unless installed
+  (§3.35). **Ableton Link** needs UDP multicast — impossible in a browser. **A DAW plugin** is native code: the web app cannot be one; the
+  Rust engine and the core's data formats carry over, the camera-in-a-plugin question is decided then.
+
+### 10. Build now (stage 3) vs socket for later — with the stage of each later part
+Stage map (follows the HANDOFF work order; numbering proposed — Q1): **3** foundation → **4** «Calm», first release (rooms as visual
+modules, offline-first, detection in a worker + the latency plan, low-power path, Diagnostics panel; the installation mode §7.18 right
+after) → VOL-7 → **5** saving and output (draft/project/autosave/versions §3.35, export WAV/stems + `.scl`/`.kbm`, audio tracks and audio
+take with mic input and calibration, mixer per-track effects and meters, AF6 rest, «Listen» §7.11/§7.17; LINE A starts the WASM engine:
+W0–W5 effects) → **6** MIDI (out: notes, CC for every source, MPE, MTS, MIDI learn; in: keyboards, MPE, `.kbm`; MIDI Clock in/out; tempo
+and metre changes in songs; the mapping UI) → **7** sound engine and builders (WASM voices, sampler with SFZ/Decent import, timbre builder,
+user modes with Scala, gesture builder §3.29, live chains bound to timbre or finger §7.14, bass/solo merged as one melodic engine) → **8**
+server (accounts, sync, sharing, store and online entitlements, diagnostics sending; co-play after) → desktop wrapper, plugin, headsets —
+not scheduled. Lessons and the tutorial — the LAST stage (user rule).
+| Requirement | Stage 3 builds | Socket only → later stage |
+|---|---|---|
+| 1 Effects as modules | module files, registry, passports with tail/cost/neutral, generated contract rows | WASM kernels (5), new effects (5+) |
+| 2 Timbres, tunings | timbre ids, timbre format + data files, engine types, policies; tunings stay files | builder (7), sampler (7), user modes + Scala (7) |
+| 3 Mapping matrix | sources/destinations registries, mapping format, pure evaluator, today's addresses expressed | runtime switch + UI (6), layouts on fingers (6–7), chains by timbre/finger (5: per-track; 7: live binding) |
+| 4 One input layer | HandSource (camera, synthetic), NoteIntent API, input registry | pointer play (4 if wanted), MIDI/MPE/.kbm (6), mic (5), WebXR/Leap (when a headset is a target) |
+| 5 One output layer | contract; audio device behind it | device choice + WAV/stems (5), MIDI out/MPE/MTS/learn (6), DAW routing guide (6) |
+| 6 Track types | `lane.kind` + contract; notes | audio tracks (5), MIDI-out tracks (6) |
+| 7 Latency compensation | timestamps in intents, compensation hook (off) | calibration + on (5) |
+| 8 Platform-independent core | `core/` pure and node-tested; engine contract | desktop wrapper, plugin (later) |
+| 9 Formats | envelope, versions, migrations; timbre, song, pack, licence v1 | chain/mapping/gestures/keymap/layout/room as they arrive (4–7) |
+| 10 Phones | cost classes, power class, low-power flag | low-power path + auto-degrade (4), WASM idle savings (5–7) |
+| 11 Keep everything working | nets GOLD, HAND1, LAT1 + facades | — |
+| 12 Commands | serialisable steps, registry, journal hook | autosave/versions (5), co-play (8+) |
+| 13 Swappable hand source | contract + two sources | worker (4), WebXR, Leap, better models (later) |
+| 14 Gesture layer | pure features, recognisers, looper commands through them, hand identity by continuity | gesture builder (7), double pinch (§3.39 3.6), prediction (4/5) |
+| 15 Clock | tempo/metre maps (one segment), every reader through it | tempo changes (6), MIDI Clock (6), Link (desktop only) |
+| 16 Sampler | engine type id reserved, clip store shared | 7 |
+| 17 Visuals as modules | contract + bus; play surface, camera, hand points as modules | Calm rooms (4), installation attract (4b), backgrounds |
+| 18 Entitlements | pack + licence formats, offline check | Calm pack (4), store (8) |
+| 19, 25 Engine | contract, stateless submodules, routing as data, readouts | W0–W5 (5), voices (7) |
+| 20 Privacy | rule #33, network guard, CSP | — |
+| 21 Diagnostics | local meter | panel (4), sending (8) |
+| 22 Offline-first | — | vendoring + versioned SW cache (4) |
+| 23 Module probes | rows registry, generated contract rows | per new module |
+| 24 Licences | rule #32, register, checker in the data runner | Cargo.lock check (5) |
+| 26 Latency | LAT1 meter, LAT2 frame callback + 60 fps, Bluetooth warning | worker (4), prediction (4/5), buffer choice (4), SAB only if measured (7) |
+
+### 11. Slices in order
+**11.1 What keeps the app working after every slice.** (1) A MOVE slice moves code verbatim (comments rewritten only where a function is
+edited); the old module re-exports what moved (a facade), so importers, `render.js` namespaces (`REC.*`, `LIVE.*`), the probes and
+`tutor.js` keep working; a facade is removed in a later S cleanup when no importer remains. (2) Behaviour changes never ride in a move slice.
+(3) Proof per slice: static check (folders and cycles from REC1, the stateless-submodule rule from AUD1), the data runner, the browser
+runner (`--quick`; `--quick --all` for anything touching sound, rendering, recording or tuning data, per the probe budget) and the nets:
+TF0 song fingerprint, F0 data snapshot, GOLD renders, HAND1 gesture print, ED7 exact undo, AF3 watcher, frozen seed numbers, the state
+guard. (4) Each slice updates the CLAUDE.md module map lines it moved, adds its rule (§14) and updates NAME-INDEX. (5) The tutorial and
+lessons are not edited (user rule); facades keep `tutor.js`'s imports valid. (6) Sizes: S ≈ one module, < ~300 changed lines; M ≈ one
+family of modules or a 500–1500-line move; L ≈ many readers or a 2000+-line transformation.
+**11.2 The slices** (☆ = socket that may slide to stage 4–5 if Calm should come sooner — Q2).
+*Phase A — nets and policy (one line).*
+1. **LIC1** (S) — `THIRD-PARTY-LICENSES.md` + `tools/licences.json` (name, version, licence, source, files/URLs, shipped|CDN|dev-only);
+   `tools/check-licences.mjs` run by the data runner (its own verdict line): every external URL in `src/` and `index.html`, every file under
+   `vendor/`, `assets/`, `icons/`, every package in `tools/package-lock.json` (later `Cargo.lock`) needs an entry with an allowed licence.
+   Proof: PASS today; CONTROLS an unlisted URL and a GPL entry must fail.
+2. **PRIV1** (S) — rule #33 in CLAUDE.md; network guard in check-static; CSP `<meta>` (`connect-src` self + the MediaPipe hosts + the counter
+   if kept; `script-src` self + the CDN + `'wasm-unsafe-eval'`); the inline analytics stub moved to a file. Proof: the runner starts the app
+   and P.quick passes under the CSP; CONTROL: a console `fetch` to an unlisted host is blocked.
+3. **LAT1** (M) — measure first: timestamps through the frame (rVFC metadata where offered: captureTime, presentation; detection,
+   gestures, drawing), `baseLatency`/`outputLatency`/`getOutputTimestamp`, long tasks; `core/latency.js`; `R.latency()` + a Diagnostics
+   overlay (toggle); the Bluetooth warning. Proof: row «LAT1 latency meter» (fake camera: fields present and plausible). User: the
+   numbers on phone and desktop — the first real data.
+4. **PROBE1** (M) — `scaleprobe.js` split by area into `src/probes/`; rows register themselves with flags (slow, drawn, real-time, song,
+   node); a family for generated module-contract rows. Proof: the same rows, results and runner output.
+5. **GOLD1** (M) — golden renders of all 51 built-in timbres (kits all six rows), the drone and the six effects at three settings, at a fixed
+   48 kHz → compact features in `tools/gold.print.json` (`P.dumpGold()` on unchanged code); row «GOLD timbres and effects» (P.all, slow).
+   CONTROL: one timbre's filter +1 % must fail. The net for every engine and timbre slice; the "before" of the WASM migration.
+6. **HAND1** (M) — synthetic hands: a probe clock for gestures, a pose → 21-landmark generator, a scripted performance (solo, bass, chords,
+   drums, split, effects hand, expression, theremin, several fingers, lead-mode hand-over, looper record/stop) through the REAL
+   `processHands`; W* calls, voice keys, tutor hooks and recorded events → `tools/gesture.print.json`; row «HAND1 gesture fingerprint»
+   (quick). CONTROL: PINCH_ON nudged must change the print.
+*Phase B — split along existing seams (behaviour-identical moves).*
+7. **REC1** (M) — check-static reads folders and prints import cycles; `song/store.js` (events, evGen, birth order, `compactEvents`,
+   `schedInvalidate` listeners) + `song/lanes.js` (lane tables, arm, row delete).
+8. **REC2** (M) — `song/notes.js` (songNotes/songSegs, owner and chase keys, view audit) + `song/history.js` (ED7; step kinds REGISTER
+   their apply/touched instead of one switch).
+9. **REC3** (M) — `song/edit-notes|edit-chords|edit-group|clipboard.js`, `song/automation.js`, `song/sections.js`, `song/transpose.js`.
+10. **REC4** (M) — `transport/clock.js` with the tempo and metre maps (one segment; every `60/loop.bpm` and `loop.t0 + x·spb` through
+    it — byte-identical) + `transport/scheduler.js`.
+11. **REC5** (M) — `live/record.js` (push, rec*, W*, stops), `live/eng.js` (makeENG, evHz), `live/backing.js`, `freeze/registry.js` +
+    `freeze/swap.js`; `recorder.js` = facade.
+12. **AUD1** (M) — the engine-submodule rule (`E`; no module state; static check + "two copies share nothing" probe); timbre builders out:
+    `modules/timbres/{subtractive,fm,ks,chord2,bass2,drumkit}.js`, creation order kept.
+13. **AUD2** (M) — effects out: `modules/effects/{volume,bright,glide,reverb,delay,trem-mix}.js` + `engine/fdn.js`; `FX_FACTORY` from the
+    registry; generated contract rows per effect (identity at neutral, offline repeat, tail vs measured decay, passport round trip).
+14. **GES1** (M) — `gestures/features.js` (pure; node rows in the data runner), `expr.js`, `fxhand.js`, `looper.js`, `hands.js`.
+15. **DRAW1** (M) — `views/play.js`, `views/strip.js`, `views/roll.js`, `views/camera.js`.
+16. **UI1** (M) — `ui/*` by panel; `state/*` by domain; i18n dictionaries per area (fewer merge conflicts). ⛳ **Grown by the user's goal
+    (2026-10-14, BACKLOG §7.19):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes, spacing; `style.css`
+    `:root` + the canvas palette read from the same tokens) and ONE icon component / SVG sprite replacing every emoji and Unicode glyph
+    in the UI (DOM and canvas; LIC1's glyph audit is the list), so the user's authored design drops in later without code changes. May
+    need splitting into UI1a (split) and UI1b (tokens + icons) — the strategist decides.
+17. **FMT1** (M) — `core/format.js` (envelope, kinds, versions, migrations; validators moved from `scaleload`) + `core/registry.js`;
+    `scaleload` uses them (F0 snapshot proves nothing moved).
+18. **TIM1** (S) — permanent ids for the 51 built-in timbres (`solo.supersaw`, `chord.warm-pad`, `bass.sub-sine`, `kit.tabla` …);
+    `timbreById`; `timbresOf` returns ids; selectors by id; events unchanged (index ↔ id at the boundary). → **THE FORK.**
+*Line A — engine and sound.*
+19. **ENG1** (M) — the contract surface of §4.4 as functions of `audio.js`; `makeENG` calls only it; the engine's own reads of app state
+    listed and cut where cheap (drone Hz, sympathetic-string base, timbre fallback move into the adapter). Proof: `--all`, GOLD.
+20. **ROUTE1** ☆ (M) — routing as data: heads, chains, master in one graph object; chain keys from a resolver policy (role today; per-track
+    keys allowed — the §7.14 socket); rule #31 intact. Proof: AF5, MX1/MX2, AF2, GOLD.
+21. **TIM2** (M) — events and live state store timbre ids; every reader (recorder 25, render 8, audio 4, probes, songs); `tmix` in
+    `freezeSig` rewritten; the KS-tail constraint retires. Proof: `--all`, GOLD, frozen numbers (frozen tracks re-render once).
+22. **TIM3** (L) — timbres as data `data/timbres/<id>.json` + engine types building EXACTLY today's graphs; policies as fields with today's
+    values; user timbre files through the same validator (no UI). Proof: GOLD exact, `tools/timbres.before.json` snapshot, `--all`.
+23. **ENG2** ☆ (S) — engine readouts (load, voices, levels), cost class in every passport, a start-up power class (short offline benchmark,
+    no worklet) → the low-power flag (Calm uses it).
+*Line B — song, input, visuals.*
+24. **IDS1** (M) — permanent ids: events (`e.id` from the birth numbers), lane points, chain entries, capture records. Proof: ED1, ED6, ED7.
+25. **CMD1** (M) — commands: every history step serialisable by ids; the step-kind registry; `onApplied`; mute/solo/arm/brace/tempo/knob
+    through the same layer with `undo:false`. Proof: the ED7 sequence — every step serialised, parsed back and USED for ↶/↷ — exact.
+26. **SONG1** (L) — `handsong/song` v1 (§4.14) with migrations; save → clear → load round trip on the seed and the demo song: event print,
+    TF0, every payload key, captures, sections, brace, tables, per-track renders (≤ 1e-4), empty history, auto-freeze re-renders. CONTROL: a
+    writer that drops one field must fail.
+27. **SONG2** (M) — the demo song becomes `data/songs/triphop.json`; `P.song` reads files; the code generator stays a probe tool.
+28. **SONG3** (S) — «Save song to file» / «Open song file» in the Looper panel (opening asks first and is ONE ↶ step, like ✕); clear
+    refusals in words (newer version, broken file). Eye step.
+29. **IN1** ☆ (M) — the input layer: HandSource (camera-mediapipe, synthetic), the NoteIntent API in front of W*, the input registry, the
+    compensation hook (off). Proof: HAND1.
+30. **GES2** ☆ (M) — recognisers and gesture definitions as data (the looper commands through them), hand identity by continuity, the mapping
+    socket (§4.5: registries, format, pure evaluator, today's addresses expressed read-only). Proof: HAND1 + node rows.
+31. **LAT2** ☆ (M) — the camera tick on requestVideoFrameCallback (background, detection, hands and overlays in one tick per camera frame —
+    rule #8), 60 fps requested. Proof: HAND1 at 30 and 60 fps; LAT1 before/after on the user's devices; hand step.
+32. **VIS1** (M) — visual modules and the event bus: the play surface, the camera picture and the hand points become the first three
+    modules (Calm can drop the camera one). Proof: drawn rows, UI checks, eye.
+33. **PACK1** ☆ (S) — pack and licence-key formats, offline ECDSA check with a test key, the registry gate; no UI.
+34. **DOC1** (S) — CLAUDE.md module map for the new tree, rules of §14 consolidated, NAME-INDEX regenerated by a tool, BACKLOG §1 rewritten
+    in English.
+Count: 7 S (1, 2, 18, 23, 28, 33, 34), 25 M, 2 L (22, 26). Stage-3 core (before Calm and saving): 1–19, 21, 22, 24–28, 32, 34;
+☆ sockets (may slide to stage 4–5): 20, 23, 29, 30, 31, 33.
+**11.3 How the big files split** (line ranges of 2026-10-14).
+| `recorder.js` lines | Content | Goes to |
+|---|---|---|
+| 1–250 | flags, take routing (`noteSource`, `takeRoute`, `takeMint`, `takeSt`), take numbers | `song/takes.js` |
+| 250–430 | song length, the brace, metre accents | `transport/clock.js` (brace part may become `transport/brace.js`) |
+| 430–1180 | lanes (`laneNew`, arm, delete, tables, order, look), drone sync, capture + fine recording, lane playback (`fxLaneMerge`, `fxPlayDrive`) | `song/lanes.js`, `song/capture.js`, `transport/fxplay.js` |
+| 1185–1880 | freeze registry, signatures, packing, swap, splices | `freeze/registry.js`, `freeze/swap.js` |
+| 1884–2195 | editor session, ED7 history and snapshots, `editGuard`/`editCommit`, birth order | `song/history.js`, `song/store.js` |
+| 2196–3240 | edit operations, ties, detach/dissolve, groups, clipboard, quantise, degrees, mode, transpose, inserts, timbre | `song/edit-*.js`, `song/transpose.js` |
+| 3242–4228 | automation (aut*, pn*), bends, volume bars, sections, `editApply` | `song/automation.js`, `song/sections.js` (`editApply` → kinds registered in `song/history.js`) |
+| 4229–4379 | `loopPos`, owner keys, `makeENG`, `evHz` | `live/eng.js` (owner keys → `song/notes.js`) |
+| 4380–5020 | quantise grid, `push`, `rec*`, `W*`, `softAllOff`/`liveAllOff`, backing follows key, `trackResplice` | `live/record.js` |
+| 5024–5700 | cursors, `schedInvalidate`, `compactEvents`, `scheduleLayers`, release, chase, `songNotes`/`songSegs`, `fireNear`, `tick`, start/seek/stop, `onRec`/`recStop` | `transport/scheduler.js`, `song/store.js`, `song/notes.js`, `live/record.js` |
+| 5757–6082 | backing load/clear, `onLoop`, `onUndo`, loop settings, `seedTake`, `clearRec`, `panic`, exports | `live/backing.js`, `transport/controls.js`; facade |
+| `audio.js` lines | Content | Goes to |
+|---|---|---|
+| 6–108 | timbre tables, `timbresOf` | ids (TIM1) → `data/timbres/*` (TIM3) |
+| 109–453 | engine state, master, limiter, meters, random source, offline flag, `renderReset`, `voiceStart` | stays (the engine core) |
+| 454–716 | `mkOsc`, solo banks (14 subtractive/organ, 3 FM, 7 KS + fallback) | `modules/timbres/subtractive|fm|ks.js` |
+| 717–836 | FDN network | `engine/fdn.js` |
+| 837–1268 | effect abstraction, param specs, effect builders | `modules/effects/*.js` |
+| 1269–1926 | factory, instances, chain wiring, play path, gates, capture helpers, frozen store/reader, probe capture, offline tap | wiring stays; `engine/frozen.js`, `engine/probe.js` |
+| 1927–2038 | chord pool | `modules/timbres/chord2.js` (builder); pool stays |
+| 2039–2377 | `initAudio`, expression stage | stays; the expression stage builder → `engine/expr-stage.js` |
+| 2378–2812 | solo and bass pools | stay |
+| 2813–2999 | drone, drum kits | `engine/drone.js`, `modules/timbres/drumkit.js` |
+| 3000–3064 | metronome, recording tap, exports | stay |
+`draw.js`: play surface (186–530, 2261–2818) → `views/play.js`; strip and window (533–1038) → `views/strip.js`; camera (1039–1096) →
+`views/camera.js`; editor (1097–2260) → `views/roll.js` (axis and lanes may split further); hit tests go with their views. `ui.js`: panels
+(52–360, 1742–1980) → `ui/panels|scale-panel|sound-panel.js`; bar (362–417) → `ui/bar.js`; editor shell and window (418–1675) →
+`ui/editor.js`, `ui/arrange.js`; tutorial helpers (1676–1741) → `ui/tutor-helpers.js`; effects constructor (1982–2547) → `ui/fx-panel.js`;
+split, camera, fullscreen, install, record buttons (2548–2746) → `ui/shell.js`; backing (2747–2867) → `ui/backing.js`. `gestures.js`: features incl. `exprFeatures` (17–62, 96–141, 378–418) →
+`features.js`; expression dynamics (64–95, 142–175) → `expr.js`; looper (239–285) → `looper.js`; effects hand (447–537) → `fxhand.js`; the rest of
+the state machine (176–445, 538–1193) → `hands.js`. `state.js` → `state/scale|hands|layout|chains|camera|windows.js`. `scaleprobe.js` → `probes/<area>.js` + `probes/rows.js`.
+**11.4 Two lines in parallel (Q3).** From the fork (after slice 18). LINE A — engine and sound — owns `audio.js`, `render.js`, `src/engine/**`,
+`src/modules/effects|timbres/**`, `src/freeze/**`, `data/timbres/**`, later `dsp/**`: slices 19–23, then stage 5's W0–W5. LINE B — song,
+input and visuals — owns `src/song/**`, `src/live/**`, `src/transport/**`, `src/core/**` (except `format`/`registry`), `src/gestures/**`,
+`src/modules/hands|inputs|outputs|tracks|visuals/**`, `src/views/**`, `src/ui/**`, `data/songs|rooms/**`: slices 24–33, then stage 4 Calm.
+SHARED (`core/format.js`, `core/registry.js`, the contracts in CLAUDE.md, `config.js`, i18n dictionaries): changed only in a slice that names
+the other line's files it touches; the strategist sequences such slices. Mechanics: two Claude Code sessions, each in its own copy of the
+folder (git worktree), the user commits each line and merges; after a merge Claude Code runs the full probes in the merged folder before
+the next slice. Until the fork: one line.
+
+### 12. Risks and how each is caught
+| Risk | Where | Caught / prevented by |
+|---|---|---|
+| A move breaks an import, a live binding or evaluation order (cycles, TDZ) | 7–17 | static check with folders, cycles and undeclared names; facades; `--quick --all`; one cluster per slice |
+| Engine state shared by live and render after `audio.js` loses code | 12–13 | the stateless-submodule rule + static check; "two copies share nothing" probe; GOLD; render rows |
+| A seeded render changes because node creation order changed | 12, 13, 22 | creation order kept by rule; GOLD within repeatability; frozen seed numbers |
+| Hidden change in the feel of playing | 14, 29–31 | HAND1 gesture print (tutor hooks included); hand step for 31 |
+| A field lost in the song file | 26 | round trip: event print, TF0, every payload key, captures, sections, brace, tables, per-track renders; control writer |
+| History steps serialised wrong | 25 | every ED7 step serialised, parsed back and used for ↶/↷ — exact snapshots |
+| Timbre ids break freezing or index arithmetic | 21 | static (no `*_INSTR[`/`a.inst` arithmetic left), `--all`, GOLD; frozen tracks re-render once (expected) |
+| CSP blocks something the app needs | 2 | the runner starts the app and runs P.quick; any CSP violation fails the run |
+| Probe time grows past the budget | all | GOLD and heavy contract rows are slow rows (P.all); DSP and format rows run in node |
+| The two lines collide | after 18 | folder ownership; shared files only in named slices; full probes after each merge |
+| Stage 3 grows and delays Calm | — | ☆ sockets can slide (Q2); the strategist reports the count each week |
+| Latency changes make playing feel different | 31 | LAT1 before/after on the user's devices; HAND1 at 30 and 60 fps; ear and hand steps |
+| Licence contamination (esp. DSP) | all | rule #32; register + checker; GPL sources reading-only |
+| Privacy regression (a module sends data) | all | rule #33; network guard; CSP `connect-src`; data-only packs |
+| WASM sounds different from native | 5+ | GOLD perceptual tolerances, exact-port tolerance, the user's A/B; old path switchable until accepted |
+| Chrome's worklet-context leak in offline renders | 5+ | WASM renders run in a Worker, never in an OfflineAudioContext |
+| Isolation breaks hosting or embedding | only if SAB | not required; MessagePort first; vendoring first |
+| Docs drift after the moves | all | each slice edits CLAUDE.md and NAME-INDEX; DOC1 regenerates the index |
+| A song format chosen too early | 26 | versions + migrations from v1; resource copies; ids; the format is data only |
+| Licence keys bypassed | 33 | said openly; real protection = server-delivered content (8) |
+
+### 13. User questions (plain words; recommended answer first)
+- **Q1. The order after stage 3:** 4 «Calm» (first release: offline, hand tracking off the main thread, low-power) → VOL-7 → 5 saving + audio
+  export + audio tracks + per-track effects + «Listen» → 6 MIDI → 7 the new sound engine's instruments + timbre builder + your own modes
+  with Scala + sampler → 8 server; lessons last. — Recommended: yes.
+- **Q2. Stage 3 is 34 small steps; 6 of them are "sockets" for later.** Keep all in stage 3, or move the 6 after Calm to reach Calm sooner? —
+  Recommended: keep them (cheap now); move them only if stage 3 runs long.
+- **Q3. Two lines at once** after the first 18 steps — one on the sound engine, one on songs, input and visuals (then Calm) — each in its own
+  copy of the project folder that you commit and merge? — Recommended: yes; the strategist plans the merges.
+- **Q4. The new sound engine in Rust** (compiled to WebAssembly so it runs in the browser; the same code later in a desktop app or a
+  plugin)? — Recommended: Rust — safer for code written mostly by an AI, one simple toolchain, permissive libraries for desktop and plugins.
+- **Q5. May Claude Code install and run the Rust compiler** as a third allowed tool (like the probe runners)? The compiled engine file is
+  committed, so players never need any build. — Recommended: yes, when the engine line starts (stage 5).
+- **Q6. Effects first:** reverb, then delay and tremolo, then new effects move into the new engine before the instrument voices (voices with
+  the timbre builder, stage 7). — Recommended: yes.
+- **Q7. A moved sound may differ very slightly** from the browser's built-in version. Accept each only when the measurements pass AND you
+  approve it by ear (A/B), the old version switchable until then? — Recommended: yes.
+- **Q8. Recordings name their sound by a permanent name** ("warm-pad") instead of a list number; afterwards new sounds can be added
+  anywhere. Frozen tracks re-render once in the background after that update. — Recommended: yes.
+- **Q9. Songs as files in stage 3:** «Save song to file» / «Open song file» in the Looper panel (opening asks first and ↶ undoes it); the
+  full saving (draft, project folder, autosave, versions) after Calm, as decided. — Recommended: yes.
+- **Q10. A song file carries its own copy** of every tuning, mode and sound it uses, so it opens anywhere — even if that sound was deleted or
+  the other person does not have it (sounds from paid packs: decided at the store stage). — Recommended: yes.
+- **Q11. Notes recorded by hand land ≈ 0.1–0.2 s late** (camera + sound delay). Move them earlier by your device's measured delay —
+  measured once by a short "tap along with the click" test, switchable off? — Recommended: yes, after the measurement step shows the numbers.
+- **Q12. Recordings keep what you HEARD** (notes, sound values), not your hand movements; keeping the raw movements too (to re-map a
+  performance later) may come as an option. — Recommended: yes.
+- **Q13. Licences for material that is not code** (sounds, room impulse responses, pictures, fonts): allow CC0, CC-BY 4.0 (with credit),
+  the SIL Open Font Licence, our own work and AI-generated pictures (tool and terms recorded); refuse share-alike, non-commercial and
+  no-derivatives. And: who made the app icons? — Recommended: yes to the list; tell us the icons' origin.
+- **Q14. The Vercel deployment counts visitors** (Vercel Web Analytics: cookieless, no camera, sound or hand data). Keep it and name it in a
+  privacy notice, or remove it? — Recommended: keep and name it.
+- **Q15. Privacy as a hard rule** in CLAUDE.md: camera images, sound and hand data never leave the device except by your explicit action;
+  the browser itself blocks sending to unlisted addresses. — Recommended: yes.
+- **Q16. Diagnostics:** a "speed and delay" view for everyone; a report goes out only by a button that first shows exactly what is sent
+  (numbers only); until there is a server the button copies it for the feedback form. — Recommended: yes.
+- **Q17. Packs:** a licence key the app checks without internet (it stops casual copying, not a determined person); packs from other people
+  may contain only data — sounds, presets, pictures — never program code. — Recommended: yes.
+- **Q18. Offline:** bundle the hand-tracking model and its library inside the app (≈ 15–20 MB, downloaded once) so it works without
+  internet and in installations — stage 4, before Calm's release. — Recommended: yes.
+- **Q19. Predicting a pinch** from finger speed could win back ≈ 15–30 ms of camera delay but may very rarely sound a note you did not play.
+  Try it as an option, off by default, first for soft and sustained sounds? — Recommended: yes, measured first (stage 4).
+
+### 13b. User answers (2026-10-14) — and where the plan changes
+- **Q1 (differs):** 3 foundation → **4 Calm** → **4b installation (kiosk) mode** (BACKLOG §7.18) → **5** saving, export, audio tracks,
+  per-track effects, «Listen» → **VOL-7** (after 5, not before) → **6** MIDI → **7** new-engine instruments, timbre builder, own modes with
+  Scala, sampler → **8** server; lessons last. The user's own authored visual design (BACKLOG §7.19) is done BEFORE the Calm release.
+- **Q2 (differs):** of the six ☆ sockets, **LAT2, PACK1 and ENG2 stay BEFORE Calm**; **ROUTE1, IN1 and GES2 move to after Calm**.
+- **Q3 (differs in mechanics):** two lines after step 18 — yes; **Claude Code prepares and performs the merges itself and reports them**;
+  the user only confirms and commits (§11.4 "the user commits each line and merges" is replaced by this).
+- **Q4–Q12: as recommended** — Rust; the Rust compiler allowed from stage 5 with the compiled `.wasm` committed; effects first, reverb first;
+  a moved sound accepted only after the measurements AND the user's A/B ear approval, the old version kept switchable until then;
+  permanent sound names, one background re-render; «Save song to file / Open song file» in stage 3, full saving after Calm; song files carry
+  copies of what they use; latency compensation via a tap-along test, switchable off; recordings keep values.
+- **Q13 (as recommended + an audit):** material licences CC0, CC-BY 4.0 (attribution), SIL OFL, own work, AI-generated pictures (tool and
+  terms recorded); refuse SA, NC, ND. Icons: the app icons and UI symbols were made by Claude Code (code-drawn PNG; Unicode/emoji glyphs
+  drawn by system fonts); whether anything was copied is unknown → LIC1 audits every icon, glyph, image and font with its origin and marks
+  all of them «to be replaced by the user's own authored design». NEW GOAL: an original authored visual design and a complete own icon set
+  (BACKLOG §7.19) → slice 16 UI1 grows (design tokens + one icon component / SVG sprite).
+- **Q14:** keep the Vercel visitor counter and name it in a privacy notice. Vercel Hobby forbids commercial use — before selling, a paid plan
+  or other hosting (BACKLOG §7.12 item 6).
+- **Q15–Q19: as recommended** — privacy hard rule (#33, PRIV1); a local diagnostics view, a report only by a button that shows its content
+  first; offline pack keys, data-only third-party packs; the hand model bundled in stage 4; pinch prediction off by default, only after
+  measuring.
+- Stale docs fixed at LIC1: «Publication & PWA» now names the Vercel deployment and its counter; BACKLOG §7.12 and HANDOFF «Strategy» say
+  Calm is the first release; UI-MAP «75 modes» → 74.
+
+### 14. Hard rules to add as slices land (#32 is in CLAUDE.md now)
+#33 privacy (PRIV1) · #34 an engine submodule is stateless; all engine state lives in the engine instance (`audio.js` today) (AUD1) · #35 the
+core (`src/core/**`) never touches DOM, Web Audio, camera, MIDI or the network and runs in node (FMT1) · #36 everything that survives a
+session is addressed by a permanent id — timbres, events, lane points, chain entries, views, resources; indices are runtime handles only
+(TIM1, IDS1; generalises #25 and #27) · #37 every change to the song is a command, serialisable by ids (CMD1) · #38 modules plug in
+through the registry and their contract; adding one never edits the core; each ships its contract probe (AUD2) · #39 every beat ↔ time
+conversion goes through the clock (REC4) · #40 live input never waits for the look-ahead; a recording is stamped from the input's own time
+minus its compensation, not from "now" (IN1).
+
+### Moved from HANDOFF.md at the STAGE 3 plan (English, verbatim; 2026-10-14)
+**«Current state» lines as they stood before the plan:**
+- ✅ unverified: Track strip larger than screen (`P.checkTracks`) · AR1 arrangement window (`P.checkArrange`) · MX1 track level +
+  master (`P.checkMixer`) · MX2 track pan (`P.checkPan`) · AR2 names, colours, order (`P.checkTrackLook`).
+- ✅ AF1 freeze queue, console only (verified on desktop) · LR1 live reverb = render wiring (accepted by ear) · AF2 events→buffer
+  swap and AF6b 16-bit frozen tracks (verified by the runner; ear steps 64, 65) · AUTO-PROBE runner and fixes (ear step 66).
+- ✅ unverified: **AF3 auto-freeze watcher + triggers (ON by default)** and **AF4 no ❄ anywhere** (runner PASS; ear/eye steps 67, 68) ·
+  **RENDER-LEAK** (non-KS renders no longer pin memory) · **AF5 + hard rule #31: a track and the live hands never share sound state**
+  (runner PASS; step 69 CLOSED 2026-10-13 — the user had moved the MASTER fader, not the track's: no bug; the stronger probe and
+  `R.liveCheck()` stay; step 70 open).
+- ✅ unverified: **ED1 several notes at once**, **ED2 copy / paste / duplicate** and **ED3 quantise**, **ED4 by degrees** (runner PASS; eye
+  steps 71–74) · **ED5 volume bars**, **ED6 sections** (runner PASS; eye/ear steps 75, 76; the rename bug the user found is fixed — step 77)
+  · **ED7 one history** and **OWN2 bend curve** (runner PASS; steps 78, 79) · **ED7-fix brace after ✕**, **BEND-CURVE glides and shapes**,
+  **OWN1 track into another mode** (runner PASS; steps 80–82).
+  ✅ Volume VOL-0…VOL-6 (VOL-5 and VOL-6 CLOSED 2026-10-14 by the user's test — they already work); VOL-7 deferred until after stage 3.
+  ✅ unverified: **ED7-fix2 undo after ✕** (runner PASS; step 83).
+  ✅ unverified: **TF2 recordings keep their key** and **TF3 Transpose ±1 semitone** (runner PASS; ear steps 84–87).
+  ✅ unverified: **TF3b song Transpose moves the knob**, **TF4 A4/tempo re-freeze**, **TF5 «1/1 = G» + cents + historical 1/1** — STAGE 2
+  CLOSED (runner PASS; ear steps 88–90).
+
+**Slice record:**
+### TF3b + TF4 + TF5 + TF6 (2026-10-14) — stage 2 CLOSED (full: archive B)
+- User answers (2026-10-14): 1 song Transpose also moves the key knob (track Transpose does not); 2 the backing's re-key on a knob change is
+  not a ↶ step; 3 paste/arming respecting the key is OK for now — «paste transposed» later (BACKLOG §3.40). TF2/TF3 decisions accepted.
+- TF3b: the song Transpose step carries `{kind:'key'}` (knob ±n mod 12, `hooks.key` → ui); ↶/↷ set the knob absolutely. The knob's backing
+  re-key now skips drum hits (no pitch), so ↶ restores knob and backing together.
+- TF4: `AF_REFREEZE_ON_RETUNE` true — a track stale only by A4/tempo re-renders 1.5 s after the last move (each move resets it).
+- TF5: `v.keyC` cents in the view only for 1/1 tunings (`keyByOneOne`, from the tuning's naming scheme); `state.tonicCents`; one door
+  `viewKeyC` → `baseF` only; Scale panel: «1/1 =» label, ¢ field, «Historical 1/1: G» from `anchor.historical` (Partch file; Q6: one tap,
+  not default). 0 ¢ views are the same objects; F0 snapshot and TF0 base half unchanged.
+- Probes: TF3 row + knob cases (control `noKnob`), AF3 (4) rewritten (control `noRetune`), AR1 stale-by-A4 dot = hollow then re-render, new
+  row «TF5 tuning anchor 1/1» (controls `keyCDbg('ungated'|'off')`). Fix rounds: TF3b 1 (backing drum views), TF4 0, TF5 1 (probe read
+  chord notes as numbers).
+- Final: data PASS 31.3 s; `--quick --all` PASS — P.quick 104.9 s (46), P.all 279.7 s (60), UI PASS. Docs: BACKLOG §7.11 (English), §7.17, §7.18, §3.40.
+
+**Open-decision paragraphs as they stood before they were shortened at the plan:**
+- a track freezes itself
+  once it settles (all but the track being recorded), unnoticed. Done AF1–AF4, AF6b (AF1: worst layout 6.3 ms drums L16, typical 0.8 ms,
+  under the 8 ms pinch budget; phone not measured). Done AF5 (tracks play through their role's TRACK chain, rule #31). Next: AF6 memory.
+-  **Songs as FILES** (BACKLOG §1): need stable timbre ids, the tonic in the song,
+  a versioned format; `src/songs.js` becomes the first song file.
+- **Volume** (archive B, «ПЛАН „ГРОМКОСТЬ КАК ПАРАМЕТР“»): VOL-5 and VOL-6 CLOSED (user's test 2026-10-14: the playing hand's axes already
+  carry assigned parameters and follow its position like volume; a ringing latched chord already follows the hand after release —
+  left–right volume, near–far timbre). VOL-7 — PER-NOTE pan (own plan; stereo stage in each voice; ≠ track pan) — after stage 3.
+  **«Calm» mode** (BACKLOG §7.16; user's idea 2026-10-14): candidate for the FIRST RELEASE, after stage 3, before the big constructors.
+- **Tonic — stage 2 ✅ CLOSED 2026-10-14** (plan, answers Q1–Q6 and the three later answers: archive B «TONIC FREEZE — PLAN» and the TF
+  records): the key (and, for 1/1 tunings, its cents) lives in each note's VIEW; the knob moves only the hands and the backing; Transpose moves
+  recordings (a song Transpose moves the knob too); A4/tempo re-freeze by themselves; «1/1 = G» with a historical 1/1 one tap away (Q6). Still open from the anchor
+  idea: 1/1 typed as any frequency in Hz (Sa to the singer) and Scala `.kbm` export (with SCALA readiness).
+-  Off-line, when there is a window: hand tracking off the main thread (after latency is measured, §3.32)
+  · promo video (§3.31)
+- Hand tracking off the main thread · register as a setting
+- small: settings in localStorage, SW cache for offline, polyrhythm
+
+### Moved from HANDOFF.md at LIC1/PRIV1/LAT1 (English, verbatim; 2026-10-14)
+**Slice record:**
+### STAGE 3 FOUNDATION PLAN (2026-10-14) — plan only (full: archive B «STAGE 3 — FOUNDATION PLAN»)
+- PLAN ONLY at maximum effort; no code changed. Written: the plan (appended to archive B), hard rule #32 (licence policy) in `CLAUDE.md`,
+  the summary above. The previous slice record (TF3b–TF6) moved verbatim to archive B.
+- Found while reading the code: `index.html` loads Vercel Web Analytics (in no document; Q14); the static checker reads no subfolders;
+  no probe feeds hands; the render's second engine copy (`audio.js?render`) forbids stateful audio submodules (→ AUD1's rule).
+- Probes (baseline, nothing changed): static PASS; data PASS 33.1 s; `--quick --cdn-cache` PASS — 46 checks, 66.6 s, UI checks PASS;
+  frozen seed bass L4 0.08686 / 0.055319 / 650886 at 48 kHz. Fix rounds 0.
+
+**Decisions block «Tuning — rest of the model» and «Tonic» (as they stood):**
+**Tuning — rest of the model** (archive B, «ПЛАН „УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ“»): **DON'T NARROW MUSICAL POSSIBILITIES** (T7b) —
+offer a theory restriction as a MODE, not a rule · **chord-building property** for the builder: ADAPTIVE (pure ratios, a choir) or
+FROM THE TUNING (an instrument); only mobile Natural is adaptive; `chordBuild` / `scales.chordBuildOf` (absent ⇒ from the tuning)
+· **scale-panel principle** (F6b): every panel switch comes from the MODE'S DATA (declared field, validated in `scaleload.js`),
+never from code · **tunings as files**: a song will store a COPY of each tuning it uses; files from others are untrusted ·
+**Scala readiness**: exact ratios as data (started), names as data (✅ F3), import normalisation, a round-trip probe (equal → generator
+form) · a mode may need a "central tone" (Lima/Nem patets) — study with musicians.
+**Tonic** (stage 2 closed; archive B «TONIC FREEZE — PLAN» + the TF records). Still open from the anchor idea: 1/1 typed as any
+frequency in Hz (Sa to the singer) and Scala `.kbm` export (with SCALA readiness).
+
+**Saving (as it stood):** **Saving — user decision** (AF1; with the FOUNDATION; full: BACKLOG §3.35): the song is the person's work,
+frozen audio a cache. "Draft" vs "Project — saved in …" (project folder via File System Access, project file, later an account); autosave
++ versions, write-then-replace, one editing tab, `storage.persist()`, honest warnings.
+
+### ✅ LIC1 + PRIV1 + LAT1 — LICENCE REGISTER, PRIVACY RULE #33 + CSP, LATENCY METER (2026-10-14; stage 3 slices 1–3; runner PASS; steps 91, 92 not yet done by the user)
+**User answers Q1–Q19** recorded in the plan (§13b) — order 3 → 4 Calm → 4b installation → 5 → VOL-7 → 6 → 7 → 8; ☆ LAT2, PACK1, ENG2
+before Calm, ROUTE1, IN1, GES2 after; Claude Code performs the two-line merges; Q13 icon audit + the new goal «own authored visual design and
+icon set» (BACKLOG §7.19; slice UI1 grows: design tokens + one icon component); Q14 keep the Vercel counter (Hobby forbids selling —
+BACKLOG §7.12 item 6). Stale docs fixed: «Publication & PWA» (Vercel + counter), BACKLOG §7.12 and HANDOFF «Strategy» (Calm first),
+UI-MAP «75 modes» → 74 (its «Axis 1» subsection rewritten in English).
+**LIC1.** `tools/licences.json` — the register (policy; items: MediaPipe Tasks Vision 0.10.35 Apache-2.0 CDN, the hand landmarker model
+float16/1 Apache-2.0 CDN, Vercel Web Analytics (service, decision Q14), the feedback-form and donate links, playwright-core 1.64.0
+Apache-2.0 dev-only, the app icons (AI-generated by Claude Code: three flat rectangles, no metadata; copying unknown), the system fonts
+(device), the Unicode glyphs (device); 72 glyphs with meaning and kind icon/typography/notation/console). `THIRD-PARTY-LICENSES.md` is
+generated (`--write`). `tools/check-licences.mjs` checks (1) entries and licences by class, (2) every external URL outside comments, root-absolute
+and missing local references in index.html, manifest icons, and (since PRIV1) that every CSP host source covers a register entry, (3)
+non-code files and `vendor/`, (4) the npm lock (version + licence), (5) the glyph audit both ways, (6) the generated document; six controls
+must fail (unlisted URL, unlisted CSP host, GPL, unlisted glyph, unlisted image file, package version bump). The lexer moved to
+`tools/lex.mjs` (check-static imports it). Data-runner row «LIC1 licence register» ≈ 2.5 s (the controls reuse one lexing per file).
+**PRIV1.** Hard rule #33 (CLAUDE.md). CSP `<meta>` first in `<head>`: `default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/
+@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/;
+img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri
+'self'; form-action 'none'`. Checked by reading the pinned MediaPipe files: the library adds a script tag (jsDelivr), fetches the WASM and
+the model, compiles WebAssembly (needs 'wasm-unsafe-eval'); no eval / new Function. The counter's inline stub moved to `src/va-stub.js`.
+Static check section 8: NETWORK GUARD — `NET_LISTED` per module, kind and count with a reason (scaleload fetch 1, scaleprobe fetch 2,
+audio addModule 3, clip share 1, ui SW register 1, vision external import 1 = 9 sites); control: an unlisted sendBeacon and a fetch in a
+new module are caught. Runner: an init script collects every `securitypolicyviolation`; any one fails the run; control: `fetch` to
+https://example.com must be refused by connect-src; `--eval` now evaluates an expression (the CSP forbids new Function). Privacy notice:
+start card footer «Privacy» (`#privacyNote`, keys `privacy.title/body/counter`, en + ru). Live CDN session (no cache): the four MediaPipe
+files 200, the model loaded, 0 violations.
+**LAT1.** `src/core/latency.js` (pure: `makeMeter`, `statsOf`, `handToSound`, `looksBluetooth`) — node row «LAT1 latency stats (core)», 15
+exact cases. `src/latmeter.js` (browser): rVFC metadata (captureTime / presentationTime / presentedFrames), per-frame stages from
+`main.loop` (`latFrame(t0, tBg, tDet, tHands, tEnd, det)`; the tick's order unchanged), audio every 500 ms (baseLatency, outputLatency,
+getOutputTimestamp path), long tasks; overlay `#latDiag` (Sound panel → «Diagnostics · Latency meter» On/Off; «Copy» copies the shown
+text; numbers only, nothing sent), console `R.latency()` (render.js export `latency`), Bluetooth warning `#latWarn` once per output device
+(output ≥ 100 ms or a wireless-looking name; 4 s after start and on devicechange). check-static now reads sub-folders of src/ (`listJs`);
+global `PerformanceObserver`. Browser row «LAT1 latency meter» (DRAWN, 14 cases, 2.6 s): samples arrive, plausible numbers, exact 128-frame
+block, overlay via the real buttons; CONTROL `latPauseDbg(true)`.
+**Headless runner numbers** (HeadlessChrome 154, software GPU, fake camera without hands, fake audio output, 12 s after the seed): camera
+14.7 fps 640x480, capture time reported; picture taken → app 21.8 ms (p95 55.9), frame shown → app 20.5 (54.7); hand detection 51.5 ms
+(p95 58.2, max 87) ON the main thread; gestures 0.0 (0.1); drawing 3.9 (9.3); a frame every 59.7 ms; audio base 10 ms, output 42 ms,
+block 2.67 ms, measured output path 44.7 ms; long tasks 436 in the last minute (the seed's renders; longest 11.9 s); estimated hand → sound
+≈ 126.6 ms. 368 camera frames detected, 76 detections re-read an already detected frame (the loop runs at the display rate — LAT2's
+frame callback removes that). Headless numbers say little about a phone: the user's devices give the real ones (step 92).
+**Probes:** static PASS (30 modules incl. `core/latency.js`; network guard 9 sites, control caught); data PASS — 10 checks, 0 differences
+(71.5 s); browser `--quick --cdn-cache` PASS — P.quick 47 checks, 100.0 s in the page, 133.8 s total; UI checks PASS; CSP PASS (0
+violations, control refused); frozen seed bass L4 0.08686 / 0.055319 / 650886 at 48 kHz; state guard clean. Per slice: LIC1 data 43.4 s,
+browser 102.3 s; PRIV1 data 83.2 s (ran beside the browser), browser 100.0 s, live-CDN session 44.3 s. Fix rounds: LIC1 1 (the checker found
+♮ in a palette file — listed); PRIV1 2 (CSP host sources needed their own rule; then its regex stopped at the first quote — the new
+control caught it); LAT1 1 (static: `PerformanceObserver` global; licence: a new ≠ in probe text replaced by words).
+**Positional callers of changed functions:** none changed. New: `latFrame` — one caller (`main.loop`, 6 arguments); `latStart`,
+`latIdle` — `main.js` only; `checkLatency` — ALL_RUNS; `check`/`run` (check-licences) — probe-data and its own CLI.
+**Left undone / noticed:** detection re-reads frames (LAT2); the overlay is a first look (the Diagnostics panel is stage 4); Vercel itself
+not exercised by the runner (same-origin script — allowed by 'self'); `#helpOv` text glyphs are counted although the overlay is unreachable.

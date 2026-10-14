@@ -234,3 +234,17 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `index.html`: `#undoToast`, `#undoToastBtn`; `style.css`: `#undoToast`, `#loopTransport.empty`
 - `src/i18n.js`: `hist.clearedToast`, `hist.undoBtn`
 - `src/scaleprobe.js`: `checkUndoClear` (row «ED7-fix2 undo after clear»); `tools/check-static.mjs`: global `KeyboardEvent`
+
+## Added at LIC1 / PRIV1 / LAT1 (stage 3, slices 1–3)
+- `tools/licences.json` (the licence register: `policy`, `items[]` {id, name, class, use, version, licence, source, urls/files/npm, decision, tool, replace}, `glyphs[]` {ch, name, kind}); `THIRD-PARTY-LICENSES.md` (generated)
+- `tools/check-licences.mjs`: `gather`, `check`, `renderMd`, `controls`, `run`; `--write`; `tools/lex.mjs`: `lex` (moved out of check-static)
+- `tools/probe-data.mjs`: rows «LIC1 licence register», «LAT1 latency stats (core)» (`latCore`)
+- `tools/check-static.mjs`: section 8 network guard — `NET_KINDS`, `NET_LISTED`, `netSites`, `netCheck`, `NET`; `listJs` (reads sub-folders of src/); global `PerformanceObserver`
+- `tools/probe-browser.mjs`: `window.__csp` (init script), `res.csp`, the CSP check + control after the probe runs; `--eval` evaluated as an expression (no `new Function`)
+- `index.html`: the CSP `<meta>`, `#privacyNote`, Sound panel `#latOn`/`#latOff`, `#latDiag` (`#latDiagTx`, `#latCopy`, `#latClose`), `#latWarn` (`#latWarnTx`, `#latWarnOk`); `style.css`: `#privacyNote`, `#latDiag`, `#latWarn`
+- `src/va-stub.js` (the Vercel counter's queue stub, classic script)
+- `src/i18n.js`: `privacy.title`, `privacy.body`, `privacy.counter`; `diag.sep`, `diag.lat`, `diag.title`, `diag.camera`, `diag.cameraNoCap`, `diag.detect`, `diag.gestures`, `diag.draw`, `diag.audio`, `diag.long`, `diag.total`, `diag.totalPart`, `diag.bt`, `diag.copy`, `diag.copied`, `diag.close`, `lat.btWarn`, `lat.ok`
+- `src/core/latency.js`: `LAT_N`, `makeMeter`, `statsOf`, `handToSound`, `BT_MS`, `BT_LABEL`, `looksBluetooth`
+- `src/latmeter.js`: `latStart`, `latFrame`, `latIdle`, `latReport`, `latText`, `latConsole`, `latShow`, `latShown`, `latCount`, `latPauseDbg`
+- `src/main.js`: `latStart`/`latFrame`/`latIdle` calls in `startApp`/`loop`; `src/render.js`: `latency` (console `R.latency()`)
+- `src/scaleprobe.js`: `checkLatency` (row «LAT1 latency meter», DRAWN)

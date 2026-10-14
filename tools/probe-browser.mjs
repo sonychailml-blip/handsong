@@ -18,6 +18,8 @@
    --selftest-exit sigint|error fires one of those paths 3 s after ▶ (a cleanup test; the run fails by design).
    UI checks with trusted input after the seed (section rename by double click / double tap / §✎, with its control; a bend point dragged
    with the mouse); --no-ui skips them.
+   PRIV1: every Content-Security-Policy violation of the session fails the run; CONTROL — a fetch to https://example.com must be refused
+   by connect-src (every session).
    ⛳ УСТРОЙСТВО (почему так):
    • Свой статический сервер на свободном порту 127.0.0.1 (не Live Server, не 5500) — поднимается и гасится скриптом; файлы с диска
      как есть, без кэша (Cache-Control: no-store), запрос (?render…) отбрасывается — так же, как его видит любой статический сервер.
@@ -285,6 +287,8 @@ async function session(port, plan, label){
     const origin=`http://127.0.0.1:${port}`;
     await ctx.grantPermissions(['camera','microphone'],{ origin });
     if(CDN_CACHE) await cdnCache(ctx);
+    /* PRIV1: every Content-Security-Policy violation of the whole session is collected (an init script runs before the page's own) */
+    await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push({ dir:e.effectiveDirective||e.violatedDirective, uri:e.blockedURI, src:e.sourceFile, line:e.lineNumber })); });
     page=await ctx.newPage();
     const seen=[];   // строки проб этого прогона (для сводки)
     page.on('console', async m=>{ const tx=m.text(), ty=m.type();
@@ -351,7 +355,9 @@ async function session(port, plan, label){
     if(EVAL){   // --eval <файл>: тело async-функции, выполняется на странице после посева; печатается её JSON (отладка проб)
       const src=await readFile(path.resolve(EVAL),'utf8');
       out(`[${label}] --eval ${EVAL}`);
-      const r=await within(page.evaluate(async code=>{ const f=new Function('return (async()=>{'+code+'\n})()'); try{ return { ok:true, value:await f() }; }catch(e){ return { ok:false, error:String(e&&e.stack||e) }; } }, src), LIMIT_ALL, '--eval');
+      // evaluated as an expression through the debugger (the page's CSP forbids new Function — PRIV1)
+      const expr=`(async()=>{ try{ return { ok:true, value:await (async()=>{${src}\n})() }; }catch(e){ return { ok:false, error:String(e&&e.stack||e) }; } })()`;
+      const r=await within(page.evaluate(expr), LIMIT_ALL, '--eval');
       out(JSON.stringify(r, null, 1));
       res.evalResult=r;
     }
@@ -364,6 +370,16 @@ async function session(port, plan, label){
       res.runs.push({ kind, ...r, wall:(Date.now()-ts)/1000, lines:seen.filter(l=>/^\[scaleprobe all\]/.test(l)).slice(-12) });
       seen.length=0;
     }
+    /* PRIV1: no CSP violation in the whole session; CONTROL — a fetch to an unlisted host must be refused by connect-src (no request leaves) */
+    res.csp=await within(page.evaluate(async ()=>{
+      const meta=!!document.querySelector('meta[http-equiv="Content-Security-Policy"]'), before=window.__csp.slice();
+      let blocked=false, err=''; try{ await fetch('https://example.com/handsong-csp-control'); }catch(e){ blocked=true; err=String(e&&e.message||e); }
+      await new Promise(r=>setTimeout(r,300));
+      const v=window.__csp.slice(before.length);
+      return { meta, list:before, blocked, err, ctl:v.some(x=>/connect-src/.test(x.dir)&&/example\.com/.test(x.uri)) };
+    }), 30e3, 'the CSP check');
+    { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
+      out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
   finally{
     // resume the watcher (bounded: a page stuck past a time limit must not keep the browser alive), then close
@@ -430,6 +446,7 @@ for(const s of sessions){
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
+  if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }

@@ -31,10 +31,28 @@ globalThis.fetch=async (u,o)=>{
 
 const verbose=process.argv.includes('--verbose');
 const T00=performance.now();
-let P, loadReport;
+let P, loadReport, LIC, LAT;
+/* LAT1: the latency core's arithmetic, exactly — statistics, the ring window, the hand → sound sum, the Bluetooth heuristic */
+function latCore(){
+  const d=[], eq=(name,got,want)=>{ if(JSON.stringify(got)!==JSON.stringify(want)) d.push(`${name}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); };
+  const s=LAT.statsOf(Array.from({ length:100 },(_,i)=>i+1));
+  eq('statsOf 1..100', [s.n,s.mean,s.p5,s.p50,s.p95,s.jitter,s.max], [100,50.5,5,50,95,90,100]);
+  eq('statsOf []', Number.isNaN(LAT.statsOf([]).mean), true);
+  const M=LAT.makeMeter(4); for(const x of [1,2,3,4,5,6]) M.add('a',x); M.add('a',NaN);
+  const m=M.stats('a'); eq('ring of 4 after 6 (+ one NaN ignored)', [m.n,m.kept,m.mean,m.max,M.count('a')], [6,4,4.5,6,6]);
+  eq('unknown stage', [M.count('b'), M.stats('b').kept], [0,0]);
+  eq('hand → sound, all parts', LAT.handToSound({ camera:40, detect:12, gestures:1, quantumWait:1.5, base:10, output:20 }), { ms:84.5, missing:[] });
+  eq('hand → sound, camera unknown', LAT.handToSound({ camera:NaN, detect:12, gestures:1, quantumWait:1.5, base:10, output:20 }), { ms:44.5, missing:['camera'] });
+  const bt=[[{ outputMs:180 },true],[{ outputMs:99.9 },false],[{ outputMs:100 },true],[{ outputMs:20, label:'Default - Headphones (AirPods Pro)' },true],
+    [{ outputMs:20, label:'Headset (WH-1000XM4 Hands-Free AG Audio)' },true],[{ outputMs:20, label:'Speakers (Realtek(R) Audio)' },false],[{},false]];
+  for(const [a,w] of bt) eq(`looksBluetooth ${JSON.stringify(a)}`, LAT.looksBluetooth(a), w);
+  return { cases:8+bt.length, total:d.length, differences:d };
+}
 try{
   P=await import(new URL('../src/probedata.js', import.meta.url).href);
   ({ loadReport }=await import(new URL('../src/scaleload.js', import.meta.url).href));
+  LIC=await import(new URL('./check-licences.mjs', import.meta.url).href);   // LIC1: the licence register (text only, no app code)
+  LAT=await import(new URL('../src/core/latency.js', import.meta.url).href);   // LAT1: the pure core (no DOM, no Web Audio — runs in node)
 }catch(e){ out('[probe-data] ERROR loading the data modules: '+String(e&&e.stack||e)); verdict(false,'the data modules did not load'); process.exit(1); }
 const loadMs=Math.round(performance.now()-T00);
 
@@ -48,6 +66,8 @@ const ROWS=[
   ['F4 behaviour as data',      ()=>P.checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['ED4 degrees (sweep)',       ()=>P.checkDegrees(),   r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['OWN1 modes by degrees (sweep)', ()=>P.checkModeMap(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['LIC1 licence register',     ()=>LIC.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['LAT1 latency stats (core)', ()=>latCore(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

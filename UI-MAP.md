@@ -20,39 +20,30 @@
 
 ## Три оси (из них растёт всё)
 
-### Ось 1 — ЗВУКОРЯД (в каком музыкальном мире я нахожусь)
-Глобальный, один активный за раз, меняется РЕДКО. Живёт в меню звукоряда.
-Организован по **разделам ПО ЗВУЧАНИЮ, а не по механизму** (сейчас ШЕСТЬ; 75 ладов, индексы 0..74).
-⚠️ Порядок массива `SCALES` и ВСЕ индексы НЕ тронуты — переехал только текст `trad`/`grp` каждой записи:
-- **Привычное** (`common`, 12-TET) — куда попадает новичок: диатоника (мажоры/миноры), лады-моды,
-  этнические, пентатоники/блюз, **симметричные (целотон/октатоники/Мессиан)**, экзотические
-  (фриг.доминантный, двойной гарм., Энигматическая, Прометей…), мировые пентатоники, японские,
-  хроматика (12 нот, аккорд типом-палитрой). Симметричные и хроматика — ОБЫЧНЫЙ 12-TET, поэтому здесь,
-  а НЕ в «Экспериментах».
-- **Ближний Восток** (`mideast`, 24-TET): макамы (Раст, Баяти, Хиджаз, Саба, Сикях, Нахаванд, Курд,
-  Аджам, Никриз, Нава Атар) — БЕЗ лестницы аккордов, подгруппа «Макамы». (Позже — турецкие макамы.)
-- **Индия** (`indian`): сетка **22 шрути** (чистая интонация, наименьший шаг 22¢ — механизм `cents`,
-  октавная) + **10 раг**, каждая выбирает 7 свар из сетки (потому ДВЕ группы: сетка, затем раги). Все
-  `noChords` (индийская классика мелодична — осознанный выбор модели). Ярлыки (`swaraLbl`, свойства
-  `swaraNames`/`swaraFull`): полная сетка — «свара · имя-шрути» (тоника «Са · Чхандовати» — свара на
-  ПОСЛЕДНЕЙ шрути группы, Сангита-Ратнакара), раги — только свары (Са Ре Га Ма Па Дха Ни). Честность
-  в коде: рага БОЛЬШЕ звукоряда (ароха/авароха, вади, фразы — не моделируем); Кафи и Мальхар делят один
-  звукоряд намеренно.
-- **Ява и Дальний Восток** (`easia`): яванский **гамелан** (Слендро, Пелог, **патеты пелога**
-  Лима/Нем/Баранг — Лима и Нем СПЕЦИАЛЬНО с одинаковыми нотами, различие функциональное, не баг-дубль)
-  + японские и дальневосточные пентатоники (хирадзёси, кумои, ин, ивато, ман гонг, ритусэн). Гамелан —
-  по реальным центам (`cents`), монофоничен (`noChords`).
-- **Европа историческая** (`europe`) — теперь СВОЙ раздел верхнего уровня (был grp-полкой внутри
-  прежней Ладовой): темперация и лад — РАЗНОЕ, поэтому не в одной корзине. Плоский, читается
-  ХРОНОЛОГИЧЕСКИ (см. «Историческая линия» ниже).
-- **Эксперименты** (`exp`) — ограничен ПО СТРОЮ, не по ладу: равные микротональные EDO (19/31-TET,
-  палитра типов аккордов), **Парч** (43-тоновая чистая интонация, 11-предел; аккорды чистыми
-  ОТНОШЕНИЯМИ, палитра `partch`), **Болен–Пирс** (тритава 3:1, 13 равных; аккорды подгруппы 3.5.7 —
-  палитра `bp`) и **гаммы Уэнди Карлос** α/β/γ (делят чистую квинту 3:2 на 9/11/20; регистр на КВИНТУ;
-  `noChords`; гамма — rect-раскладка). У неоктавных (`period`≠2:1) регистр двигает на ПЕРИОД строя.
+### Axis 1 — THE SCALE (which musical world I am in)
+Global, one active at a time, changed RARELY; lives in the scale menu. Organised in sections **BY SOUND, not by mechanism** (six today;
+74 modes, indices 0..73). ⚠️ The order of `SCALES` and EVERY index stayed put — only each record's `trad`/`grp` text moved:
+- **Common** (`common`, 12-TET) — where a beginner lands: diatonic (majors/minors), modes, ethnic, pentatonics/blues, **symmetric
+  (whole-tone/octatonic/Messiaen)**, exotic (Phrygian dominant, double harmonic, Enigmatic, Prometheus…), world pentatonics, Japanese,
+  chromatic (12 notes, chord type from the palette). Symmetric and chromatic are ORDINARY 12-TET, hence here, NOT in «Experiments».
+- **Middle East** (`mideast`, 24-TET): maqamat (Rast, Bayati, Hijaz, Saba, Sikah, Nahawand, Kurd, Ajam, Nikriz, Nawa Athar) — NO chord
+  ladder, subgroup «Maqamat». (Turkish maqams later.)
+- **India** (`india`): the **22-shruti** grid (just intonation, smallest step 22¢ — the `cents` mechanism, octave-based) + **10 ragas**,
+  each picking 7 swaras from the grid (two groups: grid, then ragas). All `noChords` (Indian classical music is melodic — a deliberate
+  model choice). Labels from the tuning's naming list: full grid «swara · shruti name» (tonic «Sa · Chhandovati» — the swara sits on the
+  LAST shruti of its group, Sangita-Ratnakara), ragas swaras only (Sa Re Ga Ma Pa Dha Ni). Honest in code: a raga is MORE than a scale
+  (aroha/avaroha, vadi, phrases — not modelled); Kafi and Malhar share one scale on purpose.
+- **Java and the Far East** (`easia`): Javanese **gamelan** (Slendro, Pelog, **Pelog patets** Lima/Nem/Barang — Lima and Nem have the
+  SAME notes on purpose, the difference is functional, not a duplicate bug) + Japanese and Far-Eastern pentatonics (hirajoshi, kumoi, in,
+  iwato, man gong, ritsusen). Gamelan by real cents (`cents`), monophonic (`noChords`).
+- **Historical Europe** (`europe`) — its OWN top-level section (temperament and mode are DIFFERENT things, so not one bucket). Flat, read
+  CHRONOLOGICALLY (see «The historical line» below).
+- **Experiments** (`exp`) — bounded BY TUNING, not by mode: equal microtonal EDOs (19/31-TET, chord-type palette), **Partch** (43-tone
+  just intonation, 11-limit; chords as pure RATIOS, palette `partch`), **Bohlen–Pierce** (tritave 3:1, 13 equal; 3.5.7 chords — palette
+  `bp`) and **Wendy Carlos** α/β/γ (divide the pure fifth 3:2 into 9/11/20; register by the FIFTH; `noChords`; γ in rectangles).
+  Non-octave tunings (`period` ≠ 2:1) move the register by the tuning's PERIOD.
 
-**Правило размещения (на будущее):** новый лад — в раздел по КУЛЬТУРЕ или ЗВУЧАНИЮ; НИКОГДА не заводить
-общую корзину «прочее».
+**Placement rule (for the future):** a new mode goes into the section of its CULTURE or SOUND; NEVER a generic «other» bucket.
 
 **Историческая линия «Европа историческая»** — про РАЗНЫЕ СТРОИ ОДНИХ И ТЕХ ЖЕ 12 нот, замыкает
 историю: **Пифагоров** (чистые квинты → резкая терция 81/64) → **Натуральный подвижный, хор** (аккорд
@@ -408,6 +399,19 @@ the editor), at song load, or on the first chain edit — it keeps sounding as i
 Auto-freeze never pins the live chain by itself (such a track would be skipped). No on-screen notice on the "+ effect" path (known debt).
 
 ---
+
+## PRIVACY NOTICE AND LATENCY METER (PRIV1, LAT1 — 2026-10-14; checked against `index.html`, `style.css`, `latmeter.js`)
+- **Start card, footer, last line:** «Privacy» — a fold (`<details id="privacyNote">`); a tap opens two short paragraphs: camera picture,
+  sound and hand movements stay on the device (detection runs in the browser; the app downloads only itself and the hand model from
+  jsDelivr and Google's storage; recordings leave only when the person saves or shares them) and the Vercel copy's anonymous visit counter.
+- **«🎛 Sound» panel, last section «Diagnostics»:** row «Latency meter» with On / Off (default Off).
+- **On → a small box top-left under the bar** (`#latDiag`, over the camera picture, not in video clips): the delay on this device in ms
+  (average · 95 % of frames) — camera fps and size with «picture taken → app» (or «frame shown → app» where the browser does not report the
+  capture time), hand detection, gestures and sound commands, drawing with the frame interval, sound (buffer · output device · audio block ·
+  measured path), page busy (long tasks) in the last minute, and «Hand → sound ≈ N ms»; a Bluetooth line when suspected. Buttons «Copy»
+  (copies exactly the shown text, nothing is sent) and «Close» (= Off). Refreshed twice a second.
+- **Bluetooth warning** (`#latWarn`, below the bar, centred, with «OK»; hides by itself after 15 s): once per output device, about 4 s
+  after the start or after the output changes, when the output latency is 100 ms or more or the device's name looks wireless.
 
 ## ОБУЧЕНИЕ — шесть уроков ВНУТРИ живого приложения
 

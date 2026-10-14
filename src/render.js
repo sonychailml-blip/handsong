@@ -222,6 +222,7 @@ import * as ST from './state.js';   // состав цепи роли — ЧИТ
 import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { autoFreeze, freezeQueue, afActive, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
+import { latConsole } from './latmeter.js';   // LAT1: R.latency() — the latency meter's report in the console
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
    спецификатор ('?render=1', '?render=2', …), потому что повторный initAudio на одной копии накапливал
@@ -2199,3 +2200,5 @@ export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps
   chunkCheck,
   capStats,   // AUTO-PROBE: сведение о съёмах проб (устаревшие показания currentFrame, разрывы)
   renderQueue };   // сколько рендеров ждёт или идёт (очередь — один рендер копии за раз)
+/* LAT1: the latency meter in the console — prints the per-stage report (ms) and returns it */
+export const latency=()=>latConsole();

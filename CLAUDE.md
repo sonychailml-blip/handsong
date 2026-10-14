@@ -60,7 +60,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   (before stage 3), hearing the room (before 5), synthesis core (before 7), latency and hands, a periodic deep review + type-checking prep.
 - **The data runner `tools/probe-data.mjs`** is the one exception to "never execute application code in node": it runs only the
   data modules (`probedata.js` → scales/state/i18n and their imports) against `data/`, prints a line per check and ALWAYS a final
-  verdict (`[probe-data] PASS — …` / `NOT A PASS — …`, exit 0/1; no verdict = failure). 40 s – 2 min. Quote its verdict.
+  verdict (`[probe-data] PASS — …` / `NOT A PASS — …`, exit 0/1; no verdict = failure). 40 s – 2 min. Quote its verdict. Its last row
+  «LIC1 licence register» runs `tools/check-licences.mjs` (text only; alone: `node tools/check-licences.mjs`, ≈ 2 s); the row «LAT1
+  latency stats (core)» runs `src/core/latency.js` — the CORE is pure by design (no DOM, Web Audio, camera, network) and may run in node.
 - **The browser runner `tools/probe-browser.mjs`** (AUTO-PROBE; `npm install` once in `tools/`): own static server on a free port,
   fresh temporary profile per run (the user's browser data is never touched), headless installed Chrome (`channel:'chrome'`, no
   download), fake camera (no hands), autoplay allowed; presses ▶, starts `P.seed({replace:true})`, types `P.quick()` during it
@@ -258,10 +260,40 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     way; solo track voices skip the expression stage and its pitch shimmer (`v.shim`); recorded automation drives only the track chain; a
     FROZEN track drives nothing (`fxPlayBuild` filters `frzBufNow`); song load gives map-less solo notes the live solo snapshot once. The
     render copy has no track heads. Probe row «AF5 track and live isolated»; control `recorder.setLiveIsolation(false)` (old shared network).
+32. ⛳ **Licence policy — the product must stay sellable as closed-source commercial software** (user's rule, STAGE 3 plan, 2026-10-14). Our
+    code is written from published methods (papers, textbooks, standards) — never copied, translated or ported from another project's
+    source. Third-party code, compiled-in libraries and models only under MIT, BSD (2/3-clause), Apache-2.0, ISC or zlib. ⛔ No GPL, AGPL or
+    LGPL — JUCE's free tier, GPL Faust libraries and Essentia(.js) included — and no non-commercial or share-alike terms; any other licence
+    (MPL, CC-BY-SA, unclear terms) needs the user's decision first. Every third-party item — code, models (the MediaPipe hand model), impulse
+    responses, samples, fonts, images (AI-generated too, with the tool and its terms) — is an entry of the REGISTER `tools/licences.json`
+    (LIC1: id, name, version, licence, class, use shipped / CDN / service / link / device / dev-only, source, urls / files / npm; a hosted
+    service carries the user's `decision`; icons, images, fonts and glyphs carry the audit mark `replace`); `THIRD-PARTY-LICENSES.md` is
+    GENERATED from it (`node tools/check-licences.mjs --write`, never by hand). The data runner's row «LIC1 licence register»
+    (`tools/check-licences.mjs`) fails on an external URL, a non-code file (or anything under `vendor/`), an npm package (lock version and
+    licence) or a Unicode symbol/emoji not in the register, on a refused licence, on an entry no longer used and on a stale document; five
+    CONTROLS must fail. Names are generic, never trademarks («ladder filter», «plate reverb»). Plugin SDKs (VST3, AU, CLAP) and Ableton
+    Link (GPL-2.0 or a separate licence from Ableton — only the latter) are checked when that stage starts. ⛳ Non-code material (user, Q13,
+    2026-10-14): CC0, CC-BY 4.0 (with attribution), SIL OFL, our own work, AI-generated pictures (tool and terms recorded); refused: SA, NC,
+    ND. Every icon, glyph, image and font today is marked «to be replaced by the user's own authored design» (Q13; the design lands before
+    the Calm release through UI1's design tokens and icon component).
+33. ⛳ **Privacy — images, sound and hand data never leave the device** (user, Q15, 2026-10-14; PRIV1). Frames are processed by the hand
+    model inside the browser; the app sends no image, video, landmark stream, microphone sound or recording anywhere. Its own network use
+    is limited to: loading itself and its assets (own origin; the pinned MediaPipe files of the register); links the person opens (feedback,
+    donate); the named page-view counter of the Vercel deployment (Q14); a clip handed to the system share sheet by the person's tap; later,
+    only by the person's explicit action, account sync and a numbers-only diagnostic report shown before sending (Q16). Enforcement: (a) the
+    Content-Security-Policy `<meta>` first in `index.html` — `connect-src`/`script-src` list only our origin and the MediaPipe paths, no
+    inline script (`src/va-stub.js`), `'wasm-unsafe-eval'` for the model, no `'unsafe-eval'`; a new host needs the user's decision, a
+    register entry (LIC1 checks every CSP host lies over one) and the CSP line; (b) the static check's NETWORK GUARD (`NET_LISTED` in
+    `tools/check-static.mjs`): every fetch / XHR / WebSocket / EventSource / sendBeacon / RTCPeerConnection / Worker / importScripts /
+    addModule / share / window.open / SW register call and every external import is listed per module with its count and reason; (c) the
+    browser runner fails on ANY CSP violation in its session and proves the policy by a fetch to an unlisted host that must be refused;
+    (d) packs and other people's files are data only. The privacy notice is on the start card (`#privacyNote`, keys `privacy.*`).
 
 ## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
 - `index.html` — markup only (start card, top bar, panels `#panelScale`/`#panelSound`/`#panelLoop`, `#backingMenu`, help overlay,
-  `#tutorBar`+`#lessonOv`, transport `#loopTransport`, `#arrBar`, `#rollBar`, `<video>`/`<canvas>`); base path relative.
+  `#tutorBar`+`#lessonOv`, transport `#loopTransport`, `#arrBar`, `#rollBar`, `<video>`/`<canvas>`); base path relative. First in `<head>`:
+  the CSP `<meta>` (rule #33); the privacy notice `#privacyNote` ends the start card's footer. `src/va-stub.js` — the counter's queue
+  stub (classic script, no imports).
 - `style.css` — all CSS. `manifest.json`/`sw.js` — PWA; the SW is deliberately cache-free (empty `fetch` handler, only so Chromium
   fires `beforeinstallprompt`).
 - `src/config.js` (leaf, imports nothing) — thresholds, scheduler timings, pool sizes, palette/FX geometry (`palSplitX` = the single
@@ -312,7 +344,18 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
   hand functions, the editor shell, arrangement window, tutorial helpers.
 - `src/main.js` — composition root: `loop()` (video → detect → `processHands` → overlays → `captureFrame`; each distinct error printed
-  once), `startApp()` (the one start path), editor/window branch, `?probe` loading (`window.P`, `window.R`, `window.U`).
+  once; LAT1 timestamps around each stage → `latFrame`, `latIdle` in the editor/window branch), `startApp()` (the one start path; calls
+  `latStart`), editor/window branch, `?probe` loading (`window.P`, `window.R`, `window.U`).
+- `src/core/` — the pure CORE (stage-3 target; no DOM, Web Audio, camera or network; runs in node). Today `core/latency.js` (LAT1):
+  `makeMeter` (ring of `LAT_N` 240 samples per stage), `statsOf` (mean, nearest-rank p5/p50/p95, jitter = p95 − p5, max), `handToSound`
+  (camera + detection + gestures + ½ audio block + base + output; unknown parts listed in `missing`), `looksBluetooth` (`BT_MS` 100 or
+  `BT_LABEL`).
+- `src/latmeter.js` — LAT1 latency meter, browser side (UI-level; owns `#latDiag`, `#latWarn` and the Sound-panel toggle `#latOn/#latOff`):
+  `requestVideoFrameCallback` (captureTime, presentationTime, presentedFrames → camera fps and «picture taken → app»), per-frame stages
+  (`detect`, `gestures`, `draw`, `loop`; a camera frame detected twice counts as `sameFrameAgain`), audio every 500 ms (`baseLatency`,
+  `outputLatency`, `getOutputTimestamp` → `pipeline`), long tasks (PerformanceObserver, last minute); `latReport`/`latText`, console
+  `R.latency()` (render.js), «Copy» copies the shown text only; Bluetooth warning once per output device (`handsong.btWarned.<label>`,
+  4 s after start and on `devicechange`). Probe-only `latCount`, `latPauseDbg`. Measures only — changes nothing it measures; sends nothing.
 - `src/render.js` — render context, seeding and track render behind freeze (see "Freeze"): one engine copy per session
   (`'./audio.js?render…'`, ⛔ never a unique specifier per render), `renderTrack`, `freeze`, `renderQueued` (ONE render at a time; ⛔ no
   third door, never await one render inside another), console `R.*`, ear tools, probe bodies.
@@ -320,6 +363,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   open, or on a non-empty song without `replace`.
 - `src/scaleprobe.js` — the browser probe (`P`). `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (imports only
   scales/state/i18n). ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
+- `tools/check-licences.mjs` + `tools/licences.json` (LIC1 licence register and its checker; `THIRD-PARTY-LICENSES.md` generated),
+  `tools/lex.mjs` (the comment/string lexer shared by both checkers),
 - `tools/check-static.mjs` (static checker), `tools/probe-browser.mjs` (browser runner), `tools/scales.before.json` (F0 snapshot),
   `tools/song.print.json` (TF0 song sound fingerprint of the seed).
 - Stale (removed) names to ignore: list in `docs/NAME-INDEX.md`, "Stale names".
@@ -1013,6 +1058,11 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   field, Q6 no G by itself, recordings and frozen tracks untouched, «Historical 1/1: G» → G 0 ¢); a 12-note mode hides them; Transpose of a
   +13 ¢ seed track keeps the cents, ×2^(1/12), ↶ exact; the +13 ¢ source differs. CONTROLS: `keyCDbg('ungated')`, `keyCDbg('off')`.
   The TF0 fingerprint pins 0 ¢ (its base half proves existing songs unchanged).
+- **LAT1 latency meter** (`P.checkLatency`, quick and all, DRAWN, ≈ 2.5 s): frame-loop and detection samples keep arriving over 0.8 s (the
+  fake camera has frames, no hands); the report's numbers are plausible (fps 1–240, detection 0.01–2000 ms, gestures ≤ 200, frame interval
+  2–2000, base ≤ 500, output ≤ 2000, hand → sound 0.5–5000), the audio block is exactly 128 frames, the camera size readable; the overlay
+  shows numbers through the REAL Sound-panel buttons and hides again. CONTROL: `latPauseDbg(true)` — a paused meter must add nothing. The
+  pure arithmetic: node row «LAT1 latency stats (core)» (exact values). PRIV1's CSP check is the runner's, not a P row.
 - **AR1 arrangement window** also checks AF4: no ❄ hittable; the freeze dot from `loopView.dots` — rendering = filled, waiting = hollow,
   frozen rows nothing; TF4: a row stale by A4 shows a hollow (waiting) dot, then re-renders and shows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
   armed, no mark column although a track is frozen and one stale.
@@ -1116,7 +1166,10 @@ the collapsed rule is `#tutorBar.on.mini`; `syncTutorBarPos`/`hushStrip` bail ou
 
 ### Publication & PWA
 Live at https://sonychailml-blip.github.io/handsong/ (GitHub Pages; custom domain `handsong.app` intended, not attached; no file in the
-app references either URL — update only these docs). Installable: `manifest.json` (name «Handsong», standalone, three icons incl. maskable)
+app references either URL — update only these docs). Also deployed on **Vercel** (its URL is not recorded here): `index.html` loads
+**Vercel Web Analytics** (`/_vercel/insights/script.js`, same origin; cookieless page-view counts; inert on GitHub Pages, where the
+root-absolute path does not resolve) — kept by the user and named in the privacy notice (Q14, 2026-10-14; register entry
+`vercel-web-analytics`); ⚠️ Vercel's Hobby plan forbids commercial use — a paid plan or other hosting before selling. Installable: `manifest.json` (name «Handsong», standalone, three icons incl. maskable)
 + cache-free `sw.js`. Install button by REAL capability: Chromium → held `beforeinstallprompt`; iOS Safari → Share-sheet instruction;
 standalone → hidden. If offline is ever wanted, the cache goes in `sw.js` — and MediaPipe from the CDN would still block it.
 
@@ -1373,6 +1426,14 @@ verified. Full text of every step: archive, "How to verify a change".
 90. «1/1 = G» (TF5): pick Partch — the key row reads «1/1 =» with a ¢ field and a button «Historical 1/1: G»; the knob did NOT jump to G
     by itself; type 12 in ¢ → live notes a little higher, the scale button shows «+12¢», recordings unchanged; tap the button → G, ✓,
     disabled; pick a 12-note scale — the ¢ field and the button disappear and nothing is nudged; an old Partch recording sounds as before.
+91. Privacy (PRIV1): the start card's footer ends with «Privacy» — a tap opens two short paragraphs (what stays on the device; the Vercel
+    counter), in English and Russian; the app starts and plays as before (camera, model, sound). On the Vercel copy: DevTools → Console shows
+    no «Refused to …» line and Network shows the counter's `script.js`/`view` requests (same origin).
+92. Latency meter (LAT1), on the phone AND the desktop: ▶ Play, then «🎛 Sound» → at the bottom «Diagnostics · Latency meter» → On. A
+    small box top-left shows, in ms (average · 95 %): camera fps and «picture taken → app», hand detection, gestures, drawing and the frame
+    interval, sound (buffer · output device · audio block · measured path), long tasks in the last minute and «Hand → sound ≈ N ms». Play
+    for ~20 s with a hand in view, then «Copy» and paste the text to the strategist. With Bluetooth headphones a one-time warning appears
+    ~4 s after start (or after switching the output); the box adds a Bluetooth line. Off hides the box; nothing else changes.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

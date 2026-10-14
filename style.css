@@ -195,6 +195,18 @@
     background:rgba(10,10,20,.92); color:var(--ink); font-size:var(--fs-label); padding:6px 6px 6px 14px; border-radius:var(--r-sm);
     border:1px solid rgba(255,255,255,.22); backdrop-filter:blur(6px); white-space:nowrap;}
   #undoToast.on{display:flex;}
+  /* LAT1: the Diagnostics overlay (top left, under the bar; small, readable on a phone) and the Bluetooth warning */
+  #latDiag{position:fixed; top:56px; left:8px; z-index:22; max-width:calc(100vw - 16px); padding:8px 10px; border-radius:var(--r-sm);
+    background:rgba(10,10,20,.82); color:var(--ink); font-size:var(--fs-hint);}
+  #latDiag[hidden]{display:none;}
+  #latDiag pre{margin:0 0 6px; font:inherit; font-variant-numeric:tabular-nums; white-space:pre-wrap;}
+  #latDiag .latBtns{display:flex; gap:8px;}
+  #latDiag button{padding:4px 10px; font-size:var(--fs-hint);}
+  #latWarn{position:fixed; top:140px; left:50%; transform:translateX(-50%); z-index:21; display:none; align-items:center; gap:12px;
+    max-width:min(560px, calc(100vw - 32px)); padding:10px 14px; border-radius:var(--r-sm); background:rgba(16,16,28,.92); color:var(--ink);
+    font-size:var(--fs-label);}
+  #latWarn.on{display:flex;}
+  #latWarn button{padding:6px 12px; font-size:var(--fs-label);}
   #undoToast button{padding:6px 12px; font-size:var(--fs-label);}
   /* ED7-fix2: empty song, history not empty — the transport row keeps only ↶ ↷ */
   #loopTransport.empty>button:not(#histUndo):not(#histRedo){display:none;}
@@ -518,6 +530,10 @@
   /* Строка поддержки — чуть тише подвала. «Donate» заметнее «Feedback» (жирнее, ярче подчёркивание). */
   .startSupport{margin:10px 0 0; color:#6a7089;}
   #donateLink{font-weight:700; border-bottom-color:rgba(180,83,9,.6);}
+  /* PRIV1: the privacy notice — a quiet fold at the end of the footer; the text opens on a tap */
+  #privacyNote{margin:10px 0 0; color:#6a7089; text-align:left;}
+  #privacyNote summary{cursor:pointer; text-align:center; color:var(--accent-ink); font-weight:600;}
+  #privacyNote p{margin:6px 0 0; font-size:var(--fs-hint);}
 
   /* ДЕМО «путешествие по строям»: оверлей поверх стартового (z 35 > start 30). Фон-тинт
      ставит demo.js поцветно на каждую сцену; здесь — только раскладка подписи. */

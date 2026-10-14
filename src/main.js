@@ -9,6 +9,7 @@ import { openLessons, wireStarter } from './tutor.js';   // обучение: «
 import { t } from './i18n.js';
 import { loadReport } from './scales.js';   // F5: итог загрузки файлов данных ладов — известие на стартовой карточке
 import { rollOpen, arrOpen } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
+import { latStart, latFrame, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
 
 /* =====================================================================
    HANDSONG — жестовый синтезатор + интерактивный учебник ладов
@@ -68,19 +69,25 @@ function loop(){
     handsGuarded(null);                      // страж кадра (см. handsGuarded): ошибка в руках не обрывает отрисовку редактора
     drawOverlays(null);
     captureFrame();
+    latIdle();                               // LAT1: no camera here — no frame interval measured across this branch
     return;
   }
+  const t0=performance.now();                // LAT1: timestamps only — the order of the tick is unchanged (rule #8)
   drawVideoBackground();                     // фон — ДО детекции, тем же кадром видео
+  const tBg=performance.now(); let tDet=tBg, det=false;
   if(video.readyState>=2&&landmarker){
     const ts=performance.now();
     if(ts>lastTs){
       try{latest=landmarker.detectForVideo(video,ts);}catch(e){}      // читает тот же кадр (тик не прерывался)
-      lastTs=ts;
+      lastTs=ts; det=true;
     }
+    tDet=performance.now();
   }
   handsGuarded(latest);                      // страж кадра: ошибка в жестах/звуке/записи печатается один раз и НЕ обрывает отрисовку ниже
+  const tHands=performance.now();
   drawOverlays(latest);                      // накладки — ПОСЛЕ, поверх того же кадра
   captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр (захват в фазе с отрисовкой); иначе no-op
+  latFrame(t0, tBg, tDet, tHands, performance.now(), det);   // LAT1: the latency meter (latmeter.js)
 }
 
 /* ================= СТАРТ =================
@@ -107,6 +114,7 @@ async function startApp(){
     revealBar();                             // панель видна на старте (учит, где меню), затем сама сворачивается через BAR_HIDE_MS
     started=true;
     loop();
+    latStart();                              // LAT1: the latency meter starts with the camera and the audio
     import('./render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
     return true;
   }catch(err){

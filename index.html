@@ -3,6 +3,11 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8"/>
+<!-- PRIV1 (hard rule #33): the browser itself refuses any address not listed here. connect-src/script-src name only our own origin and
+     the pinned MediaPipe files (register tools/licences.json); the Vercel counter is same-origin. No inline script (the counter's stub is
+     src/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
+     the user's decision, a register entry and a line here. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
 <title data-i18n="app.title">Handsong — жестовый синтезатор и интерактивный учебник ладов</title>
 <!-- PWA: манифест + светлый theme-color под стартовый экран. start_url/scope в манифесте ОТНОСИТЕЛЬНЫЕ
@@ -20,9 +25,7 @@
      Считает посетителей ТОЛЬКО на развёртывании Vercel: путь /_vercel/ АБСОЛЮТНЫЙ, а GitHub Pages
      отдаёт из подпапки — там он не разрешается, и счётчик молча бездействует. Так и задумано.
      Сбор данных должен быть включён и в панели Vercel (уже включён). -->
-<script>
-  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-</script>
+<script src="src/va-stub.js"></script>
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
@@ -74,6 +77,10 @@
       </p>
       <p><span data-i18n="foot.feedbackText">First version — bugs and rough edges are likely. Tell me what breaks:</span> <a id="fbLink" rel="noopener"></a></p>
       <p id="startSupport" class="startSupport"><span data-i18n="foot.supportText">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development:</span> <a id="donateLink" rel="noopener"></a></p>
+      <!-- PRIV1 (rule #33, Q14): the privacy notice — what stays on the device, what the app loads, the named visitor counter -->
+      <details id="privacyNote"><summary data-i18n="privacy.title">Privacy</summary>
+        <p data-i18n="privacy.body">Your camera picture, your sound and your hand movements stay on this device.</p>
+        <p data-i18n="privacy.counter">The copy hosted on Vercel counts page visits anonymously.</p></details>
     </div>
   </div>
 </div>
@@ -364,7 +371,17 @@
          «Эффектах» (об этом говорит подсказка внутри). -->
     <div class="psep" id="fxCtlSep" data-i18n="panel.scale.fxCtl">Конструктор эффектов</div>
     <div id="fxCtlRows"></div>
+
+    <!-- LAT1: the latency meter (latmeter.js) — numbers stay on the device; «Copy» only copies the shown text -->
+    <div class="psep" data-i18n="diag.sep">Diagnostics</div>
+    <div class="prow"><label data-i18n="diag.lat">Latency meter</label>
+      <div class="seg"><button id="latOn" data-i18n="common.on">On</button><button id="latOff" class="act" data-i18n="common.off">Off</button></div></div>
   </div>
+
+<!-- LAT1: the Diagnostics overlay (latency per stage) and the one-time Bluetooth warning; both filled by latmeter.js -->
+<div id="latDiag" hidden><pre id="latDiagTx"></pre>
+  <div class="latBtns"><button id="latCopy" data-i18n="diag.copy">Copy</button><button id="latClose" data-i18n="diag.close">Close</button></div></div>
+<div id="latWarn" role="status"><span id="latWarnTx"></span><button id="latWarnOk" data-i18n="lat.ok">OK</button></div>
 
 <!-- ================= ЛУПЕР: время и слои (оверлей на месте «Звукоряда») ================= -->
 <div id="panelLoop">

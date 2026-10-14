@@ -18,7 +18,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   a reviewer) · 3.19 floating menu ✅ · 3.20 tutorial mode ✅ · 3.21 start screen ✅ · 3.22 menu layout ✅ · 3.23 metres beyond 4/4 ✅ · 3.24
   polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
   ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
-  latency as a NUMBER ⬜ · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
+  latency as a NUMBER 🟡 (LAT1 meter built 2026-10-14; the user's phone/desktop numbers pending) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
   3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
   ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later).
 - **4. Bugs** — mostly ✅/ℹ️ history; open: hand identification `key+=i` ⬜; captured expression-hand channels not replayed ⬜ (debt).
@@ -28,10 +28,11 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   sharing/selling/other programs: own format + exports · 7.4 ⛳ the TIMBRE FORMAT is designed with all of this from the start · 7.5 polyphonic
   bass + independent bass notes ✅ · 7.6 user modes: create/save/share · 7.7 app as a MIDI controller with the mode · 7.8 ⛳ hand tracking off
   the main thread (main tech debt) · 7.9 team ideas (not decisions) · 7.10 strategist proposals (not decisions) · 7.11 ⛳ hearing the room ·
-  7.12 release and money strategy 🟡 (awaits the user) · 7.13 ⛳ the timbre builder (user's vision, stage 7) · 7.14 ⛳ effect chains,
+  7.12 release and money strategy 🟡 (item 1 decided: Calm is the first release; Vercel Hobby forbids selling) · 7.13 ⛳ the timbre builder (user's vision, stage 7) · 7.14 ⛳ effect chains,
   target design (per-track chains; live chain by timbre or by finger) · 7.15 modes/presets as bundles (packs) · 7.16 ⛳ «Calm» mode — rooms of
   light and sound (candidate for the FIRST RELEASE, after stage 3) · 7.17 Calm — playing along with outside music («Listen», after the
-  first Calm release, part of hearing the room) · 7.18 installation (kiosk) mode + B2B sales plan (after Calm).
+  first Calm release, part of hearing the room) · 7.18 installation (kiosk) mode + B2B sales plan (stage 4b, right after Calm) · 7.19 ⛳ own authored visual design and icon set
+  (before the Calm release; UI1 makes the UI themable).
 
 Общий список задач. Обновляется по ходу работы.
 
@@ -48,9 +49,9 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > editor-own (✅ OWN1 mode by degrees — same tuning, same number of degrees, out-of-mode notes keep their offset; ✅ OWN2 theremin bend curve
 > + ✅ BEND-CURVE glides/shapes/steps on bends and bus lanes, 2026-10-14; DEFERRED by the user 2026-10-14: curvature on per-note lanes (Volume, brightness,
 > glide), OWN1 into modes with a different number of degrees (maybe never); OWN3 cents per row DEFERRED — user, 2026-10-13) → tonic freeze (stage 2; plan
-> archive B «TONIC FREEZE — PLAN», user answers Q1–Q6 2026-10-14; ✅ TF0 song fingerprint, ✅ TF1 key in the view (inaudible), ✅ TF2 recordings keep their key (the key knob moves only the hands and the backing; a key change mid-take starts a new track), ✅ TF3 Transpose ±1 semitone for a track (editor) and the whole song (window; since TF3b it moves the key knob too, one ↶), ✅ TF4 frozen tracks re-freeze by themselves after A4/tempo, ✅ TF5 «1/1 = G» with a cents nudge and a tuning's historical 1/1, ✅ TF6 docs — STAGE 2 CLOSED 2026-10-14; next: the FOUNDATION PLAN at maximum effort) (VOL-5 and VOL-6 CLOSED by the user's test 2026-10-14 — they already work; VOL-7 per-note
+> archive B «TONIC FREEZE — PLAN», user answers Q1–Q6 2026-10-14; ✅ TF0 song fingerprint, ✅ TF1 key in the view (inaudible), ✅ TF2 recordings keep their key (the key knob moves only the hands and the backing; a key change mid-take starts a new track), ✅ TF3 Transpose ±1 semitone for a track (editor) and the whole song (window; since TF3b it moves the key knob too, one ↶), ✅ TF4 frozen tracks re-freeze by themselves after A4/tempo, ✅ TF5 «1/1 = G» with a cents nudge and a tuning's historical 1/1, ✅ TF6 docs — STAGE 2 CLOSED 2026-10-14; the FOUNDATION PLAN written 2026-10-14 — archive B «STAGE 3 — FOUNDATION PLAN», answered by the user 2026-10-14; LIC1, PRIV1, LAT1 done 2026-10-14) (VOL-5 and VOL-6 CLOSED by the user's test 2026-10-14 — they already work; VOL-7 per-note
 > pan deferred until after stage 3) → FOUNDATION = stage 3 (stable mode and timbre ids, song and
-> timbre format; §1, §7.4) → FIRST-RELEASE candidate §7.16 «Calm» mode → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
+> timbre format; §1, §7.4) → FIRST RELEASE §7.16 «Calm» (decided, Q1; own visual design §7.19 before it) → §7.18 installation mode → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
 > export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).
 > **Last stage, after everything else:** the LESSONS / TUTORIAL update (§3.6, §3.20) — no lesson edits before it (user, 2026-10-13).
 > ⛳ Main technical debt: hand tracking off the main thread (§7.8). Nearby: §3.31 promo video · §3.32 input latency · es/de (§3.18).
@@ -2390,22 +2391,24 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
    key continuously (after the tonic freeze — done); (3) follow chords — with beat sync and chromatic recording.
 - Linked: §7.16 «Calm» mode, §7.17 playing along with outside music, §7.15 «Jam» preset (continuous following belongs mainly there).
 
-### 🟡 7.12. СТРАТЕГИЯ ВЫПУСКА И ДЕНЕГ — ⚠️ ПРЕДЛОЖЕНО, ЖДЁТ РЕШЕНИЯ ПОЛЬЗОВАТЕЛЯ (записано при AR2, 2026-10-12)
-> Каждый пункт — ПРЕДЛОЖЕНИЕ, не решение. Решение пользователя заменит пометку «ПРЕДЛОЖЕНО».
-1. **Первый публичный выпуск — после этапа 5 плана** (этапы: редактор → тоника и громкость → фундамент → вывод → подготовка выпуска), то
-   есть ДО MIDI-контроллера и до конструкторов тембров и ладов.
-2. **Лестница монетизации:** бесплатная игра → **«Plus»** разовой покупкой (все строи, все тембры, дорожки без предела, экспорт WAV/MP3) →
-   **платные наборы** (звуковые миры, наборы традиций) → **подписка «Pro»** — только когда у неё есть РАСТУЩЕЕ содержимое (облако, MIDI/MPE,
-   конструкторы, ежемесячные звуковые миры) → **лицензии** школам и инсталляциям. Сходится с §7.2: платное — то, что проверяется сервером
-   или растёт; разовое «Plus» честно запирается только при сервере или подписанной сборке — цена названа там же.
-3. **Кнопка «записать клип»:** видео камеры + СЛЕДЫ РУК + звук одним файлом, чтобы делиться. Кандидат в первый выпуск. Сегодня `clip.js`
-   пишет ХОЛСТ (сетка, руки, ярлыки — без HTML-панелей) со звуком одной дорожкой WebM; «следы рук» — новый рисунок поверх (затухающие хвосты
-   точек кончиков), в кадр клипа он попал бы сам, если рисовать его на холсте.
-4. **Определение тональности для «слышать комнату» (§7.11) пишем САМИ** — профиль высотных классов (хрома за несколько секунд) и сверка с
-   профилями тональностей. Не Essentia.js: она под **AGPLv3** для некоммерческого использования, платному продукту нужна коммерческая
-   лицензия.
-5. **Простой режим — вторая ВИТРИНА того же кода** (переключатели функций, своё имя), а не отдельное приложение: один движок, одни данные,
-   одна проверка.
+### 🟡 7.12. RELEASE AND MONEY STRATEGY (proposed at AR2, 2026-10-12; item 1 DECIDED by the user 2026-10-14; rewritten in English at LIC1)
+> Items 2–5 are still PROPOSALS, not decisions.
+1. ⛳ **DECIDED (user, stage-3 answer Q1, 2026-10-14): the first public release is «Calm» (§7.16), right after stage 3.** Order: 3 foundation
+   → 4 Calm (offline, detection in a worker, low-power) → 4b installation (kiosk) mode (§7.18) → 5 saving, export, audio tracks, per-track
+   effects, «Listen» → VOL-7 → 6 MIDI → 7 new-engine instruments, timbre builder, own modes with Scala, sampler → 8 server; lessons last.
+   The user's own authored visual design and icon set (§7.19) is done BEFORE the Calm release. (Was: «first release after stage 5».)
+2. **Monetisation ladder:** free play → **«Plus»** one-time purchase (all tunings, all timbres, unlimited tracks, WAV export) → **paid packs**
+   (sound worlds, tradition sets) → **«Pro» subscription** only when it has GROWING content (cloud, MIDI/MPE, builders, monthly sound worlds)
+   → **licences** for schools and installations. Matches §7.2: paid = what a server checks or what grows; a one-time «Plus» locks honestly
+   only with a server or a signed build.
+3. **«Record a clip» button:** camera video + HAND TRAILS + sound in one file for sharing. Today `clip.js` records the CANVAS (grid, hands,
+   labels — no HTML panels) with sound as one WebM; trails would be a new drawing on the canvas and land in the clip by themselves.
+4. **Key detection for «hearing the room» (§7.11) is written OURSELVES** (pitch-class chroma over a few seconds against key profiles). Not
+   Essentia.js: AGPLv3 for non-commercial use; a paid product needs a commercial licence (hard rule #32).
+5. **A simple mode is a second SHOP WINDOW of the same code** (feature switches, its own name), not a separate app.
+6. ⛳ **Hosting before selling (user, Q14, 2026-10-14):** the Vercel deployment's visitor counter (Vercel Web Analytics) stays and is named in
+   the privacy notice — but **Vercel's Hobby plan forbids commercial use**: before anything is sold, move to a paid Vercel plan or other
+   hosting (GitHub Pages' terms to be checked then as well).
 
 ### ⬜ 7.13. ⛳ КОНСТРУКТОР ТЕМБРОВ — ЗАМЫСЕЛ ПОЛЬЗОВАТЕЛЯ (хранить для этапа 7; записано при AR2, 2026-10-12)
 > Записано словами пользователя. Не спланировано по слайсам; формат тембра (§7.4) — своим планом ДО этого.
@@ -2488,3 +2491,16 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   agencies; art/tech open calls and grants. Sales cycle 2–6 months.
 - **Prerequisite:** a business entity for contracts (pending the user's legal consultation in Georgia). Related: §7.12 item 2 (licences to
   schools and installations).
+
+### ⬜ 7.19. ⛳ OWN AUTHORED VISUAL DESIGN AND A COMPLETE OWN ICON SET (user's goal, recorded at LIC1, 2026-10-14; BEFORE the Calm release)
+- **Goal:** an original, authored visual design for the whole app and a complete icon set of our own — replacing every icon, glyph, image
+  and font in use today. Today's set (audited in LIC1, `THIRD-PARTY-LICENSES.md`): three code-drawn PNG app icons («H» of rectangles, made by
+  Claude Code; whether anything was copied is unknown), ≈ 72 Unicode symbols and emoji drawn by each device's own fonts (they look different
+  on every phone and may carry the font owner's terms in marketing images), and the system font stack. All of it is marked «to be replaced by
+  the user's own authored design».
+- **Who designs:** the user, a hired illustrator, or AI-assisted then hand-refined (tool and terms recorded — hard rule #32, Q13). The user
+  still has to pick a direction from the earlier design canvas.
+- **Preparation in code (slice UI1 of stage 3):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes,
+  spacing; today partly in `style.css :root`) and ONE icon component / SVG sprite replacing emoji and Unicode glyphs in the UI (DOM and
+  canvas), so the authored design drops in later WITHOUT code changes. LIC1's glyph audit lists every symbol to replace.
+- **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).

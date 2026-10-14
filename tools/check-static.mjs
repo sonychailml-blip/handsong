@@ -23,6 +23,8 @@
         модуле, считается объявленным везде (ловится «нигде не объявлено и не импортировано» — ровно класс F7; «объявлено в соседней
         функции» — нет). Свойства (после «.»), ключи объектных литералов и шаблонов, имена методов, метки и сами импорт/экспорт-списки
         ссылками не считаются.
+     8) NETWORK GUARD (PRIV1, rule #33): every network / share call site is listed with its reason and count (NET_LISTED); a control
+        (an unlisted sendBeacon, a fetch in a new module) must be caught.
    Что сообщается как СВЕДЕНИЕ (не ошибка): экспорты, которых никто не импортирует статически (у модулей, грузимых динамически или
    целиком как пространство имён, не считаются), и импорты, которые модуль больше не упоминает.
    Разбор — лексический: строки, шаблоны (с вложенными ${…}), регулярные выражения и комментарии различаются; полного парсера JS здесь нет,
@@ -31,43 +33,15 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, relative } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { lex } from './lex.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC=join(ROOT,'src');
-const files=readdirSync(SRC).filter(f=>f.endsWith('.js')).sort();
+// every module of src/ and its sub-folders (LAT1: src/core/), as a path relative to src/ with '/'
+const listJs=(d='')=>readdirSync(join(SRC,d),{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listJs(d+e.name+'/') : e.name.endsWith('.js') ? [d+e.name] : []);
+const files=listJs().sort();
 
-/* ЛЕКСЕР: вырезает комментарии (заменяя пробелами — смещения и переводы строк сохраняются); bare — то же, но и содержимое строк,
-   шаблонов и регулярных выражений заменено пробелами (для поиска упоминаний имён). */
-const KW=new Set(['return','typeof','case','in','of','new','delete','void','throw','instanceof','do','else','yield','await']);
-function lex(src){
-  const n=src.length; let code='', bare='', i=0;
-  const tpl=[];   // стек глубины фигурных скобок внутри ${…} шаблонов
-  let brace=0, last='';   // last — последний значимый символ/слово (для различения / как деления и как регулярки)
-  const put=(c,b)=>{ code+=c; bare+=(b===undefined?c:b); };
-  const blank=s=>s.replace(/[^\n]/g,' ');
-  while(i<n){
-    const c=src[i], d=src[i+1];
-    if(c==='/'&&d==='/'){ let j=src.indexOf('\n',i); if(j<0) j=n; const s=src.slice(i,j); put(blank(s),blank(s)); i=j; continue; }
-    if(c==='/'&&d==='*'){ let j=src.indexOf('*/',i+2); j= j<0 ? n : j+2; const s=src.slice(i,j); put(blank(s),blank(s)); i=j; continue; }
-    if(c==="'"||c==='"'){ let j=i+1; while(j<n&&src[j]!==c){ if(src[j]==='\\') j++; j++; } j++; const s=src.slice(i,j); put(s, c+blank(s.slice(1,-1))+c); i=j; last='str'; continue; }
-    if(c==='`'||(c==='}'&&tpl.length&&tpl[tpl.length-1]===brace)){
-      if(c==='}') tpl.pop();
-      let j=i+1; while(j<n){ if(src[j]==='\\'){ j+=2; continue; } if(src[j]==='`'){ j++; break; } if(src[j]==='$'&&src[j+1]==='{'){ j+=2; tpl.push(brace); break; } j++; }
-      const s=src.slice(i,j); put(s, s[0]+blank(s.slice(1))); i=j; last='str'; continue;
-    }
-    if(c==='/'){
-      const regex = last===''||/[(,=:[!&|?{};+\-*%<>~^]/.test(last)||KW.has(last);
-      if(regex){ let j=i+1, cls=false; while(j<n){ const e=src[j]; if(e==='\\'){ j+=2; continue; } if(e==='[') cls=true; else if(e===']') cls=false; else if(e==='/'&&!cls) break; else if(e==='\n') break; j++; }
-        j++; while(j<n&&/[a-z]/i.test(src[j])) j++; const s=src.slice(i,j); put(s, s.replace(/[^\n]/g,' ')); i=j; last='re'; continue; }
-    }
-    if(c==='{') brace++; else if(c==='}') brace--;
-    if(/[A-Za-z_$]/.test(c)){ let j=i; while(j<n&&/[\w$]/.test(src[j])) j++; const w=src.slice(i,j); put(w); last=w; i=j; continue; }
-    if(!/\s/.test(c)) last=c;
-    put(c); i++;
-  }
-  return { code, bare };
-}
-
+/* The lexer lives in tools/lex.mjs (shared with check-licences). */
 const ID=/^[A-Za-z_$][\w$]*$/;
 function declaratorNames(text){   // «a=…, {b,c}=…, [d]=…» на верхнем уровне → имена
   const out=[]; let depth=0, start=0, parts=[];
@@ -217,7 +191,7 @@ const GLOBALS=new Set((
   'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event '+
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext '+
-  'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel '+
+  'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+
   /* область AudioWorklet (ks-worklet.js) */ 'AudioWorkletProcessor registerProcessor sampleRate currentTime currentFrame'
 ).split(/\s+/).filter(Boolean));
 const undeclared=new Set();   // «файл:строка: имя» — одно сообщение на строку
@@ -247,6 +221,42 @@ for(const f of files){ const m=mods[f]; let b=m.bare;
     undeclared.add(`${f}:${lineAt(b,i)}: '${nm}' is not declared, imported or a known global — a missing import or a typo`); }
 }
 fails.push(...undeclared);
+/* 8) NETWORK GUARD (PRIV1, hard rule #33): every call that can reach the network or hand data off the device is LISTED here with its
+   reason, per module and kind, with the exact count. A new call site (or a changed count) fails until it is listed; an unlisted host is
+   also refused by the browser itself (the CSP in index.html). Read from text without comments and strings. */
+const NET_KINDS={ fetch:/(?<![\w$])fetch\s*\(/g, xhr:/\bXMLHttpRequest\b/g, websocket:/\bWebSocket\b/g, eventsource:/\bEventSource\b/g,
+  beacon:/\bsendBeacon\s*\(/g, rtc:/\bRTCPeerConnection\b/g, worker:/\bnew\s+(?:Shared)?Worker\s*\(/g, importScripts:/\bimportScripts\s*\(/g,
+  addModule:/\baddModule\s*\(/g, share:/\bnavigator\s*\.\s*share\s*\(/g, open:/\bwindow\s*\.\s*open\s*\(/g, swRegister:/\bserviceWorker\s*\.\s*register\s*\(/g };
+const NET_LISTED={
+  'scaleload.js':  { fetch:[1,'reads the data/ files (tunings, modes, palettes) from the app\'s own origin'] },
+  'scaleprobe.js': { fetch:[2,'probe only (?probe): reads tools/scales.before.json and tools/song.print.json from the own origin'] },
+  'audio.js':      { addModule:[3,'loads our own worklets (src/ks-, frz-, probe-cap-worklet.js) from the own origin into the audio context'] },
+  'clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
+  'ui.js':         { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
+  'vision.js':     { external:[1,'imports MediaPipe Tasks Vision from jsDelivr (register entry mediapipe-tasks-vision; it fetches its WASM and the hand model — CSP connect-src)'] },
+};
+function netSites(m){   // kind → count for one module (external = static import from an http(s) address)
+  const n={}; for(const [k,re] of Object.entries(NET_KINDS)){ const c=(m.bare.match(re)||[]).length; if(c) n[k]=c; }
+  const ext=m.imports.filter(im=>/^https?:/.test(im.spec)).length+m.dyn.filter(s=>/^https?:/.test(s)).length; if(ext) n.external=ext;
+  return n;
+}
+function netCheck(modsIn){
+  const bad=[]; let total=0;
+  for(const f of Object.keys(modsIn)){ const got=netSites(modsIn[f]), want=NET_LISTED[f]||{};
+    for(const [k,c] of Object.entries(got)){ total+=c; const w=want[k];
+      if(!w) bad.push(`${f}: ${c} network call site(s) of kind «${k}» not listed — add them to NET_LISTED in tools/check-static.mjs with the reason (rule #33)`);
+      else if(w[0]!==c) bad.push(`${f}: ${c} call site(s) of kind «${k}», ${w[0]} listed — re-check each one, then update NET_LISTED`); }
+    for(const k of Object.keys(want)) if(!got[k]) bad.push(`${f}: NET_LISTED names «${k}», which the module no longer has — remove it`); }
+  for(const f of Object.keys(NET_LISTED)) if(!modsIn[f]) bad.push(`NET_LISTED names ${f}, which is not a module in src/`);
+  return { bad, total };
+}
+const NET=netCheck(mods);
+fails.push(...NET.bad);
+{ /* CONTROL: an unlisted beacon in a listed module and a fetch in a new module must both be caught */
+  const fake={ ...mods, 'ui.js':{ ...mods['ui.js'], bare:mods['ui.js'].bare+'\nnavigator.sendBeacon(u, d);' }, 'probe-net.js':{ bare:'fetch(x)', imports:[], dyn:[] } };
+  const c=netCheck(fake);
+  if(!(c.bad.some(x=>/ui\.js: 1 .*«beacon»/.test(x)) && c.bad.some(x=>/probe-net\.js: .*«fetch»/.test(x)))) fails.push('network guard CONTROL: an unlisted sendBeacon / fetch was not caught — the guard cannot fail');
+}
 // сведения: неиспользуемые экспорты и импорты
 for(const f of files){ const m=mods[f];
   const imported=files.some(g=>mods[g].imports.some(im=>target(g,im.spec)===f));
@@ -257,7 +267,7 @@ for(const f of files){ const m=mods[f];
 }
 
 console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})`);
-for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(16)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
+for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(18)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }
-console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations) and undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals) are consistent.`);
+console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations), undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals) and the network guard (${NET.total} call sites, all listed with a reason; control caught) are consistent.`);

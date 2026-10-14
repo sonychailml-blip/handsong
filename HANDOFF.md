@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (31 hard rules), 74 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (33 hard rules), 92 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -16,10 +16,10 @@ this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (31 h
 - Always read current `src/` before editing; memory and old line numbers lie.
 - Prompts English, chat with the user Russian, terminal replies English (Cyrillic breaks there). Phone:
   `npx cloudflared tunnel --url http://localhost:5500`, cache bust `?v=N`.
-- **Max-effort mode is for PLANS** ("PLAN ONLY" prompts; user's rule, AF2), not for AF/ED/AR/MX or record slices. Planned: the
-  foundation plan (before stage 3: song format, draft/project, folder/file/server, versions, migration); hearing the room (before
-  stage 5); the synthesis core (before stage 7 or earlier: one AudioWorklet, band-limited, live = freeze = export); latency and hands
-  (smoothing, frame wait, output buffer); a deep code review + type-checking prep every few months.
+- **Max-effort mode is for PLANS** ("PLAN ONLY" prompts; user's rule, AF2), not for AF/ED/AR/MX or record slices. Done: the foundation
+  plan (2026-10-14). Planned: latency and hands (before stage 4's release: detection in a worker, pinch prediction, output buffer — on
+  LAT1's numbers); hearing the room (before stage 5); the synthesis core (before stage 7 or earlier: one AudioWorklet in Rust →
+  WebAssembly, band-limited, live = freeze = export); a deep code review + type-checking prep every few months.
 - **Probes before every report — Claude Code runs them itself** (user's rule, AUTO-PROBE; probe budget DOCS-EN): see
   `CLAUDE.md` "Standing working rules". The user does only ear, camera/hand and phone steps, plus a manual `await P.all()`
   about weekly as a cross-check. In the console `P` is locked: while a probe (or `P.seed`) runs, other `P.*` calls refuse.
@@ -39,23 +39,14 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   sound = live · Smooth automation + fine recording · Brightness on every role · "Tuned from" P0–P4 (P5 postponed) · Universal
   tuning model T0–T6, T4a–T4c (note stores `a.ti`) · T5 dimmed rows · T7/T7b chord modes (T7 unverified) · U5 insert · Tunings as
   files F0–F8 (106 data files; F1, F3–F7 unverified; F7 snapshot to renew, change f7) · Demo piece `P.song('triphop')`.
-- ✅ unverified: Track strip larger than screen (`P.checkTracks`) · AR1 arrangement window (`P.checkArrange`) · MX1 track level +
-  master (`P.checkMixer`) · MX2 track pan (`P.checkPan`) · AR2 names, colours, order (`P.checkTrackLook`).
-- ✅ AF1 freeze queue, console only (verified on desktop) · LR1 live reverb = render wiring (accepted by ear) · AF2 events→buffer
-  swap and AF6b 16-bit frozen tracks (verified by the runner; ear steps 64, 65) · AUTO-PROBE runner and fixes (ear step 66).
-- ✅ unverified: **AF3 auto-freeze watcher + triggers (ON by default)** and **AF4 no ❄ anywhere** (runner PASS; ear/eye steps 67, 68) ·
-  **RENDER-LEAK** (non-KS renders no longer pin memory) · **AF5 + hard rule #31: a track and the live hands never share sound state**
-  (runner PASS; step 69 CLOSED 2026-10-13 — the user had moved the MASTER fader, not the track's: no bug; the stronger probe and
-  `R.liveCheck()` stay; step 70 open).
-- ✅ unverified: **ED1 several notes at once**, **ED2 copy / paste / duplicate** and **ED3 quantise**, **ED4 by degrees** (runner PASS; eye
-  steps 71–74) · **ED5 volume bars**, **ED6 sections** (runner PASS; eye/ear steps 75, 76; the rename bug the user found is fixed — step 77)
-  · **ED7 one history** and **OWN2 bend curve** (runner PASS; steps 78, 79) · **ED7-fix brace after ✕**, **BEND-CURVE glides and shapes**,
-  **OWN1 track into another mode** (runner PASS; steps 80–82).
-  ✅ Volume VOL-0…VOL-6 (VOL-5 and VOL-6 CLOSED 2026-10-14 by the user's test — they already work); VOL-7 deferred until after stage 3.
-  ✅ unverified: **ED7-fix2 undo after ✕** (runner PASS; step 83).
-  ✅ unverified: **TF2 recordings keep their key** and **TF3 Transpose ±1 semitone** (runner PASS; ear steps 84–87).
-  ✅ unverified: **TF3b song Transpose moves the knob**, **TF4 A4/tempo re-freeze**, **TF5 «1/1 = G» + cents + historical 1/1** — STAGE 2
-  CLOSED (runner PASS; ear steps 88–90).
+- ✅ AF1 freeze queue (verified on desktop) · LR1 live reverb (accepted by ear) · AF2 swap and AF6b 16-bit (runner; ear steps 64, 65) ·
+  AUTO-PROBE runner and fixes (ear step 66) · Volume VOL-0…VOL-6 (VOL-5/VOL-6 closed by the user's test 2026-10-14; VOL-7 after stage 5).
+- ✅ unverified (runner PASS; the user's steps in brackets): track strip larger than the screen, AR1, MX1, MX2, AR2 · AF3 auto-freeze (67),
+  AF4 no ❄ (68), RENDER-LEAK, AF5 + rule #31 (69 closed 2026-10-13; 70 open) · ED1–ED4 (71–74), ED5–ED6 (75–77), ED7 + OWN2 (78, 79),
+  ED7-fix, BEND-CURVE, OWN1 (80–82), ED7-fix2 (83) · TF2, TF3 (84–87), TF3b, TF4, TF5 (88–90) — STAGE 2 CLOSED 2026-10-14. Each line as it
+  stood: archive B, «Moved from HANDOFF.md at the STAGE 3 plan».
+- ✅ **STAGE 3 PLAN** written 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; summary below); user answers Q1–Q19 given 2026-10-14
+  (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -67,8 +58,7 @@ belongs to the TRACK; live, effects will belong to the TIMBRE (chains move from 
 ⛔ No new SOLO timbre, not even appended, until stable timbre ids exist (KS block is the tail of `LEAD_INSTR`).
 
 **Auto-freeze** (plan AF1–AF6: archive B, «ПЛАН „АВТОЗАМОРОЗКА“ (пересмотр при LR1)»; AF6 detail: «AF1»): a track freezes itself
-once it settles (all but the track being recorded), unnoticed. Done AF1–AF4, AF6b (AF1: worst layout 6.3 ms drums L16, typical 0.8 ms,
-under the 8 ms pinch budget; phone not measured). Done AF5 (tracks play through their role's TRACK chain, rule #31). Next: AF6 memory.
+once it settles (all but the track being recorded), unnoticed. Done AF1–AF5, AF6b (AF1 layout costs: archive B). Next: AF6 memory (stage 5).
 **AF3 decisions (user, do not reopen):**
 since TF4 A4/tempo re-freeze too (1.5 s settle after the last move; Q5); since TF2 the tonic stales nothing; a track
 created in the editor gets the live chain pinned at birth, inserts into an existing track inherit its chain, auto-freeze never pins (song
@@ -84,64 +74,71 @@ Traps: freeze the tonic first; follow chords in a CHROMATIC view; echo cancellat
 
 **Product direction** (full: BACKLOG §7): timbres then songs on a SERVER (device = cache); paid = what goes through the server; our open
 versioned TIMBRE FORMAT is the truth (export: samples, Scala), planned before the builder; user MODES via Scala; app as a MIDI controller;
-main tech debt: hand tracking off the main thread (§3.32). **Songs as FILES** (BACKLOG §1): need stable timbre ids, the tonic in the song,
-a versioned format; `src/songs.js` becomes the first song file.
+main tech debt: hand tracking off the main thread (§3.32). Songs as FILES: stage 3 (SONG1–SONG3).
 
-**Strategy — proposed, awaiting the user** (BACKLOG §7.12): first public release after stage 5; free → "Plus" → packs → "Pro".
+**Strategy** (BACKLOG §7.12): ⛳ the FIRST public release is **«Calm»** right after stage 3 (user, Q1, 2026-10-14); the user's own authored
+visual design and icon set (§7.19) comes before it. Proposed still: free → "Plus" → packs → "Pro". Vercel Hobby forbids selling (paid plan
+or other hosting first, §7.12 item 6).
 **Timbre builder** (stage 7; BACKLOG §7.13): 48 gesture addresses, one-AudioWorklet engine for play/freeze/export, multisample export.
 
 **Bass and solo are one instrument**: they differ by voice builder and register; other differences are policies that belong in
 the TIMBRE FORMAT as data. Code MIRRORS, not merges, until the timbre format. Chords and drums are their own families.
 
-**Volume** (archive B, «ПЛАН „ГРОМКОСТЬ КАК ПАРАМЕТР“»): VOL-5 and VOL-6 CLOSED (user's test 2026-10-14: the playing hand's axes already
-carry assigned parameters and follow its position like volume; a ringing latched chord already follows the hand after release —
-left–right volume, near–far timbre). VOL-7 — PER-NOTE pan (own plan; stereo stage in each voice; ≠ track pan) — after stage 3.
-**«Calm» mode** (BACKLOG §7.16; user's idea 2026-10-14): candidate for the FIRST RELEASE, after stage 3, before the big constructors.
+**VOL-7** — PER-NOTE pan (own plan; a stereo stage in each voice; ≠ track pan) — after stage 5. **«Calm» mode** (BACKLOG §7.16): the
+FIRST RELEASE (stage 4), then the installation (kiosk) mode §7.18 (stage 4b).
 
-**Closed arcs** (live reverb LR1, solo editing S0–S7, editor essentials and the editor answers): archive B, «Moved from HANDOFF.md at
-TF2/TF3» (decisions kept there verbatim).
+**Closed arcs** (LR1, S0–S7, editor essentials): archive B, «Moved from HANDOFF.md at TF2/TF3». **Saving — user decision** (AF1; full:
+BACKLOG §3.35): the song is the person's work, frozen audio a cache; draft vs project, autosave + versions, `storage.persist()`.
 
-**Saving — user decision** (AF1; with the FOUNDATION; full: BACKLOG §3.35): the song is the person's work, frozen audio a cache.
-"Draft" vs "Project — saved in …" (project folder via File System Access, project file, later an account); autosave + versions,
-write-then-replace, one editing tab, `storage.persist()`, honest warnings.
-
-**Tuning — rest of the model** (archive B, «ПЛАН „УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ“»): **DON'T NARROW MUSICAL POSSIBILITIES** (T7b) —
-offer a theory restriction as a MODE, not a rule · **chord-building property** for the builder: ADAPTIVE (pure ratios, a choir) or
-FROM THE TUNING (an instrument); only mobile Natural is adaptive; `chordBuild` / `scales.chordBuildOf` (absent ⇒ from the tuning)
-· **scale-panel principle** (F6b): every panel switch comes from the MODE'S DATA (declared field, validated in `scaleload.js`),
-never from code · **tunings as files**: a song will store a COPY of each tuning it uses; files from others are untrusted ·
-**Scala readiness**: exact ratios as data (started), names as data (✅ F3), import normalisation, a round-trip probe (equal → generator
-form) · a mode may need a "central tone" (Lima/Nem patets) — study with musicians.
-**Tonic — stage 2 ✅ CLOSED 2026-10-14** (plan, answers Q1–Q6 and the three later answers: archive B «TONIC FREEZE — PLAN» and the TF
-records): the key (and, for 1/1 tunings, its cents) lives in each note's VIEW; the knob moves only the hands and the backing; Transpose moves
-recordings (a song Transpose moves the knob too); A4/tempo re-freeze by themselves; «1/1 = G» with a historical 1/1 one tap away (Q6). Still open from the anchor
-idea: 1/1 typed as any frequency in Hz (Sa to the singer) and Scala `.kbm` export (with SCALA readiness).
+**Tuning — rest of the model** (verbatim: archive B «Moved from HANDOFF.md at LIC1/PRIV1/LAT1»): DON'T NARROW MUSICAL POSSIBILITIES
+(T7b — a theory restriction is a MODE) · chord build adaptive vs from the tuning · scale-panel switches from the MODE'S DATA (F6b) · songs
+store a COPY of each tuning · Scala readiness · a "central tone" for patets · open: 1/1 typed in Hz, Scala `.kbm` export.
 
 ## Work order (user decision: "editor before the timbre builder")
-✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → NEXT: the **FOUNDATION PLAN** ("PLAN ONLY",
-maximum effort: song format, draft/project, folder/file/server, versions, migration) → **FOUNDATION = stage 3** (stable timbre ids (and user-mode ids), song format and timbre
-format — voice mode and Glide default are the first "timbre policies" —, songs as files: export/import) → candidate FIRST RELEASE:
-**«Calm» mode** (§7.16) → VOL-7 → **SAVING** (on the device + file export/import;
-does not wait for the server — same format and ids) → **AUTO-FREEZE A3–A6 (A7 if measured), MIXER per-track effects and meters,
-AUDIO EXPORT** (with the tuning attached as Scala) and **AUDIO TAKE** (after auto-freeze) → **MIDI CONTROLLER** → **TIMBRE BUILDER
-and USER MODES with Scala** → **SERVER** (accounts, sync, sharing timbres and modes, subscription, marketplace; a managed cloud
-service makes it cheaper). Off-line, when there is a window: hand tracking off the main thread (after latency is measured, §3.32)
-· promo video (§3.31) · Spanish/German (await terminology check, §3.18) · Turkish maqams (§3.25).
+✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1; next PROBE1 — summary below) → **4 «Calm»** = FIRST
+RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
+(§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
+per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
+TIMBRE BUILDER, USER MODES with Scala, sampler → **8 SERVER** (accounts, sync, sharing, subscription, marketplace). Off-line, when there is a window: promo video (§3.31) · Spanish/German (await terminology check, §3.18) · Turkish maqams (§3.25).
 **Last stage, after everything else is built: LESSONS / TUTORIAL update** (user answer 2) — no lesson or tutorial edits before it.
 
+## Stage 3 — foundation plan (summary; full plan, contracts, reasoning: archive B «STAGE 3 — FOUNDATION PLAN»)
+- **Target:** a pure CORE (pitch truth, song + commands, clock, registry, file formats, event bus; no DOM or Web Audio; tested in node) +
+  MODULES through short contracts (effects, timbre engine types, hand sources, inputs, outputs, track types, visuals, gestures — each a file
+  with a passport, a cost class and a contract probe) + an ENGINE contract (explicit commands and data; the same code live and offline; Web
+  Audio inside now; Rust → WebAssembly in an AudioWorklet module by module from stage 5 — effects first, voices in stage 7; offline renders
+  of WASM tracks in a Worker, which also avoids Chrome's worklet-context leak).
+- **A recording keeps what was heard** (notes + resulting values), never gestures; mappings are setup data. Latency compensation from the
+  input's own timestamp (stage 5; tap-along test, switchable off). Privacy: rule #33 (PRIV1 ✅). Licences: rule #32 + register (LIC1 ✅).
+- **34 slices (7 S, 25 M, 2 L).** Nets and policy: LIC1, PRIV1, LAT1 (latency meter — the first real numbers), PROBE1 (probe rows
+  registry), GOLD1 (golden renders of all 51 sounds + effects), HAND1 (synthetic hands → gesture fingerprint). Splits along existing seams,
+  old paths kept as facades: REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre and effect modules that
+  receive the engine's `E`, so the `audio.js?render` copy keeps working), GES1, DRAW1, UI1 (+ THEMABLE: design tokens in one place and
+  one icon component / SVG sprite replacing emoji and glyphs — §7.19), FMT1 (core/format + registry), TIM1 (permanent timbre ids) → THE
+  FORK: line A ENG1 contract, TIM2 ids in events, TIM3 timbres as data files, ENG2 costs and power class; line B IDS1, CMD1 serialisable
+  commands, SONG1 song format v1, SONG2 demo song as a file, SONG3 save/open, LAT2 frame callback + 60 fps, VIS1 visual modules, PACK1
+  pack keys; DOC1. **Moved after Calm (Q2): ROUTE1, IN1, GES2.**
+- **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** stage order as in «Work order»; Q3 two lines after slice 18 — Claude Code
+  prepares and PERFORMS the merges and reports them, the user confirms and commits; Q4–Q12 and Q15–Q19 as recommended (Rust; compiler from
+  stage 5, `.wasm` committed; effects first; A/B ear acceptance; permanent sound names; song files carry copies; values not movements; local
+  diagnostics; offline keys, data-only packs; model bundled in stage 4; pinch prediction off by default); Q13 material licences + icon audit
+  (all marked «to be replaced by the user's own authored design»); Q14 keep the Vercel counter, named in the privacy notice.
+
 ## Decided, not scheduled
-Hand tracking off the main thread · register as a setting (bass/solo differ only by timbre) · timbres on fingers (source = finger's
+Register as a setting (bass/solo differ only by timbre) · timbres on fingers (source = finger's
 timbre; `recorder.noteSource`) · merging bass/solo code and voice mode as timbre data (wait for the timbre format) · 7-note
 Pythagorean mode (P5, postponed; appended at the end) · voice-leading lines between chords · triad/seventh switch for untyped modes
 · retrigger in lead mode (legato everywhere today) · study Arabic, Indian and other traditions with musicians (mode anchor,
 intonation, central tone, what a chord means) · team ideas: two UI faces, hand on a rest, mode lessons, spoken menu, light theme ·
-small: settings in localStorage, SW cache for offline, polyrhythm (§3.24), swing as a ratio (§3.30), gesture builder (§3.29),
+small: settings in localStorage, polyrhythm (§3.24), swing as a ratio (§3.30), gesture builder (§3.29),
 cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per row in the editor (deferred, user answer 6).
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). Since TF2 the key is
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
-  the main thread; hand→sound latency not measured.
+  the main thread; hand→sound latency MEASURED by LAT1 (headless only so far; the user's device numbers pending — step 92). The loop
+  detects at the display rate, so a camera frame can be detected twice (LAT2).
 - Roll: per-note automation lanes (Volume, brightness, glide…) have no curvature yet (BEND-CURVE did bends and bus lanes); OWN1 offers
   only modes with as many degrees as the track's; unison/theremin tie pairs untie all candidates of that beat (S6); dissolve
   and lead-segment detach re-articulate edges; overlapping polyphonic notes on one row — the hit takes the first.
@@ -172,16 +169,15 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### TF3b + TF4 + TF5 + TF6 (2026-10-14) — stage 2 CLOSED (full: archive B)
-- User answers (2026-10-14): 1 song Transpose also moves the key knob (track Transpose does not); 2 the backing's re-key on a knob change is
-  not a ↶ step; 3 paste/arming respecting the key is OK for now — «paste transposed» later (BACKLOG §3.40). TF2/TF3 decisions accepted.
-- TF3b: the song Transpose step carries `{kind:'key'}` (knob ±n mod 12, `hooks.key` → ui); ↶/↷ set the knob absolutely. The knob's backing
-  re-key now skips drum hits (no pitch), so ↶ restores knob and backing together.
-- TF4: `AF_REFREEZE_ON_RETUNE` true — a track stale only by A4/tempo re-renders 1.5 s after the last move (each move resets it).
-- TF5: `v.keyC` cents in the view only for 1/1 tunings (`keyByOneOne`, from the tuning's naming scheme); `state.tonicCents`; one door
-  `viewKeyC` → `baseF` only; Scale panel: «1/1 =» label, ¢ field, «Historical 1/1: G» from `anchor.historical` (Partch file; Q6: one tap,
-  not default). 0 ¢ views are the same objects; F0 snapshot and TF0 base half unchanged.
-- Probes: TF3 row + knob cases (control `noKnob`), AF3 (4) rewritten (control `noRetune`), AR1 stale-by-A4 dot = hollow then re-render, new
-  row «TF5 tuning anchor 1/1» (controls `keyCDbg('ungated'|'off')`). Fix rounds: TF3b 1 (backing drum views), TF4 0, TF5 1 (probe read
-  chord notes as numbers).
-- Final: data PASS 31.3 s; `--quick --all` PASS — P.quick 104.9 s (46), P.all 279.7 s (60), UI PASS. Docs: BACKLOG §7.11 (English), §7.17, §7.18, §3.40.
+### LIC1 + PRIV1 + LAT1 (2026-10-14) — stage 3 slices 1–3 (full: archive B «LIC1 + PRIV1 + LAT1»)
+- LIC1: register `tools/licences.json` → generated `THIRD-PARTY-LICENSES.md`; `tools/check-licences.mjs` = data-runner row «LIC1 licence
+  register» (URLs, CSP hosts, non-code files, npm lock, 72-glyph audit, stale document; 6 controls). Every icon/glyph/image/font marked «to be
+  replaced by the user's own authored design».
+- PRIV1: hard rule #33; CSP `<meta>` (no inline script — `src/va-stub.js`); static NETWORK GUARD (9 sites listed); runner fails on any CSP
+  violation, control fetch refused; privacy notice `#privacyNote` names the Vercel counter. Live CDN under the CSP: 4 files 200.
+- LAT1: `src/core/latency.js` (pure, node row «LAT1 latency stats (core)») + `src/latmeter.js` (overlay: Sound panel → «Latency meter»;
+  `R.latency()`; Bluetooth warning); row «LAT1 latency meter» (control: paused meter); check-static reads sub-folders. Headless: camera
+  14.7 fps, picture→app 21.8 ms (p95 55.9), detection 51.5 (58.2), gestures 0.0, drawing 3.9, frame every 59.7, buffer 10 + output 42
+  (measured 44.7), hand→sound ≈ 127 ms; 76 of 444 detections re-read a frame (→ LAT2). Real numbers: the user's devices (step 92).
+- Probes: static PASS; data PASS 10 checks (71.5 s); `--quick --cdn-cache` PASS — 47 checks, 100.0 s, UI and CSP checks PASS; frozen seed
+  bass L4 0.08686 / 0.055319 / 650886. Fix rounds: LIC1 1 (♮ unlisted), PRIV1 2 (CSP hosts rule, its regex), LAT1 1 (global + a glyph).
