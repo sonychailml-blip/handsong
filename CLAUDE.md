@@ -90,8 +90,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; static import names vs exports with
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
-  called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there)) and `node --check` on changed
-  files. Report the result.
+  called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module
+  under `src/song/` imports only `song/`, `core/` and `config.js` — and the import cycles (printed; a cycle through `song/` fails; CONTROL
+  a fake `song/store.js → recorder.js` import)) and `node --check` on changed files. Report the result.
 - **Read `src/` before changing anything**; re-verify every line number.
 - ⛔ **Never insert a comment in the middle of an export list**; re-read every export list you touch.
 - **Changed a signature or a stored field's meaning → find every reader**, positional callers included (rule #15); the probe module
@@ -302,8 +303,11 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 34. ⛳ **A device-level camera control is never changed without restoring it** (user, CAM-FIX, 2026-10-15: «short exposure» left the user's
     UVC webcam dark — in Zoom too, after a reload). A webcam keeps exposure / white balance IN THE DEVICE. So: originals (`getSettings`) are
     saved before the first change; Off, leaving the page (pagehide / visibilitychange) and the next open RESTORE actively (automatic modes
-    back to 'continuous', other touched controls to their originals — `core/camlight.restoreConstraints`); every camera open heals a device
-    found in manual exposure / white balance and the meter says so. Chrome applies ONLY the camera controls of a set that holds one and
+    back to 'continuous', other touched controls to their originals — `core/camlight.restoreConstraints`). ⛳ 0a (user, 2026-10-15): the
+    open-time repair touches ONLY what a test of ours left — a test that applies a device control writes a record (localStorage
+    `handsong.camTest`: camera name and id, originals, touched keys; cleared once a restore went through); the next open of that camera
+    restores those originals and clears it (meter: «… left by an unfinished test — restored»); without our record a manual setting (the
+    person's own, from another app) is left alone. Chrome applies ONLY the camera controls of a set that holds one and
     ignores its format part (width, frameRate) — measured — so format and controls always go in two calls (`vision.applySet`).
 
 ## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
@@ -344,9 +348,18 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/probe-cap-worklet.js` — probes only: audio-thread capture of the live master (`F0`, `gaps`, `stale`).
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`);
   volumes in the OLD per-role scale, converted at event birth. Imports only `config.js`.
-- `src/recorder.js` — the recorder (see "Time, tracks and the recorder", "Freeze"): `events` (stable array), `loop`, `ENG`, scheduler,
-  lanes, brace, chase, undo, stops, backing, capture and playback of effects, the editor API, lane tables, freeze registry and
-  signature, `seedTake`, `evHz`.
+- `src/recorder.js` — the recorder (see "Time, tracks and the recorder", "Freeze"): `loop`, `ENG`, scheduler, brace, chase, undo, stops,
+  backing, capture and playback of effects, the editor API, freeze registry and signature, `seedTake`, `evHz`; since REC1 also the FACADE
+  that re-exports `song/store.js` and `song/lanes.js` (importers, `render.js` `REC.*`, probes, tutor unchanged).
+- `src/song/` (REC1, stage 3; pure — no DOM, no Web Audio; imports only `song/`, `core/`, `config.js`): `store.js` — `events` (the stable
+  array), `evGen`, THE rebase point `schedInvalidate` (bumps `evGen`, then runs the listeners of `onInvalidate` in order — today the
+  recorder's cursors, chase cache, note view, song length, brace), birth order `evSeq`/`evSeqFill`/`evOrder`, `compactEvents`, `maxLayer`,
+  event kinds `evRole`/`chaseRole`/`isNoteStart`. `lanes.js` — the track tables by lane id (`laneId` via `laneNew` only, mute, solo, level,
+  pan, name, rank, material length, edit version), the arm, the pending row delete (`laneDelTap`), readers (`laneOf`, `laneAudible`,
+  `laneGated`, `laneLevelOf`/`laneGainOf`, `lanePanOf`, `laneNameOf`, `laneOrder`, `laneLook`, `layerOfOwner` …), table writers
+  (`setLaneName`, `moveLane`, `laneForget`, `laneTablesClear`, `laneRow`/`laneRowSet`); what it needs from the recorder (recording, the
+  take's layers, audio up, `deleteLane`) comes once through `laneWire`. Still in `recorder.js` (REC2–REC5): `deleteLane`, `lanePrune`,
+  `laneReset`, `laneHush`, `toggleLaneMute/Solo`, `setLaneLevel/Pan` (they touch sound, freeze or history).
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
 - `src/vision.js` — camera + the DETECTION PATH + the FRAME PUMP (LAT2). Path: a detector object `{kind, run(job), setDelegate, dbg, close}`
   built by `buildDet` — the main thread (default, `mainDet`: handdet.js imported dynamically) or the worker (`workerDet`: src/hand-worker.js;
@@ -365,9 +378,16 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `setLowLight('off'|'fps15'|'fps24'|'exposure')` (applyConstraints on the running track — the set from `core/camlight.lowConstraints` over
   today's request `camBase()`; then 1 s settle + 2 s count of delivered frames (`vfRing`, the pump's rVFC) → `lowVerdict`; an error or no
   effect → back to Off, reason in `lowInfo().note`; a camera reopen resets it to Off, note 'reopened'; CAM-FIX (rule #34): Off, a
-  fall-back, leaving the page and a reopen restore the device (`devRestore`), every open heals (`camHeal`), `lowInfo().dev` = the last
-  heal / restore for the meter; probe-only `lowDbg({fail, fakeFps, noFallback, extra, noRestore, noHeal, devClear, reset})`,
-  `camSimDbg(sim)` (a simulated UVC webcam around the real track)); `camInfo` also gives `caps` (getCapabilities),
+  fall-back, leaving the page and a reopen restore the device (`devRestore`), an open restores what our test record names (`camHeal`, 0a),
+  `lowInfo().dev` = the last heal / restore for the meter; probe-only `lowDbg({fail, fakeFps, noFallback, extra, noRestore, noHeal,
+  healAll, crash, devClear, reset})`,
+  `camSimDbg(sim)` (a simulated UVC webcam around the real track)); 0b ROBUST START: opens are SERIALISED (exactly one getUserMedia each,
+  never two in flight; an earlier request still pending → wait ≤ 3 s, else refuse), the old track stopped first; getUserMedia times out
+  after 15 s only when camera access is already granted (never during a permission prompt), the first picture after 8 s; a failure stops
+  every track it obtained (a timed-out request's late stream is stopped when it lands); `startCamera` retries once after 1 s and throws with
+  `camKind` (`core/camlight.camErrKind`: busy / notfound / denied / other); pagehide releases the camera (after the test restore), a page
+  back from the back/forward cache reopens it; the start is `initDetector` (once) + `startCamera`; counters `camStats()`, probe-only
+  `camOpenDbg({gum, timeoutMs, playFail, noSerial, noRelease, noRetry, reset})`, `camStatsDbg()`; `camInfo` also gives `caps` (getCapabilities),
   `settings`, `label`. `VISION_DEF` = `{hands:'2s', delegate:'GPU', camFps:null, path:'main', low:'off'}`.
 - `src/handdet.js` (LAT2) — the DETECTOR, worker-safe (no DOM): `createDetector({delegate, blank, step})` downloads the model ONCE
   (`MP_MODEL`, a fetch) and builds two models from it — L2 (numHands 2) and L1 (numHands 1), sequentially (MediaPipe's loader keeps one
@@ -1183,8 +1203,15 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   SIMULATED UVC webcam (the user's ASUS capabilities, controls that persist across opens, Chrome's routing of mixed sets) wraps the real
   track; through the REAL buttons: short exposure sets manual, Off brings automatic exposure + white balance + every other control back
   (values an automatic mode drives excepted) and the meter says so; exposure → 15 fps (15 reaches the format) → Off; a fall-back; an extra
-  touched control (brightness) back to its original; pagehide; a camera left dark healed at reopen with the meter line; the warning line.
-  CONTROLS that must be flagged: `lowDbg({noRestore})` (the pre-fix Off), `lowDbg({noHeal})`. The
+  touched control (brightness) back to its original; pagehide (restored AND the camera released); 0a: a camera our test left dark (record
+  stored, the page «crashed» — `lowDbg({crash})`) restored at reopen with the meter line and the record cleared; a manual setting WITHOUT our
+  record stays as it is; the warning line. CONTROLS that must be flagged: `lowDbg({noRestore})` (the pre-fix Off), `lowDbg({noHeal})`,
+  `lowDbg({healAll})` (the pre-0a heal of every manual mode). «CAM-START robust camera start» (`P.checkCamStart`, quick, drawn, ≈ 12 s):
+  the real start made exactly one getUserMedia, never two at once; two opens at once are serialised; through a getUserMedia stand-in —
+  not found, not allowed, no picture (busy), no answer in time — each fails after exactly one retry ≈ 1 s later, releases every track (late
+  streams too) and the start card (`main.startFail`) shows the right message with «Try again»; the real camera reopens and detects.
+  CONTROLS: `camOpenDbg({noSerial})`, `{noRelease}`, `{noRetry}` must be flagged. Node row «LAT3 low light (core)» also: the test record
+  (`testRecNext`, `testRecRepair`; CONTROL another camera's record) and `camErrKind` (13 cases). The
   runner also checks every REQUEST of the session — page and workers (a worker has
   no page CSP of its own) — goes to the own origin or the MediaPipe paths; CONTROL: a worker asking example.com (intercepted, aborted).
 - **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–120 s headless): 79 cases rendered alone through the engine copy
@@ -1656,7 +1683,13 @@ verified. Full text of every step: archive, "How to verify a change".
     «at least 24 fps», «short exposure»: tap it, wait ~3 s, look at the picture, tap «Off», wait ~2 s — the picture must look as before the
     test (short exposure: dark while on, normal after Off; the box says «After the test: camera exposure and white balance back to
     automatic…»). Then reload the page and open Zoom (or the Windows Camera app): the picture is normal. A camera left dark by any app: the
-    next ▶ Play heals it and the box says «Camera exposure … was manual — restored to automatic».
+    next ▶ Play heals it and the box says «Camera exposure … was manual — restored to automatic». (0a, 2026-10-15: only a camera OUR test left
+    dark is repaired — the box says «… left by an unfinished test — restored»; a manual exposure you set in another app stays as you set it.)
+97. Camera start (0b), laptop: close every app using the camera, ▶ Play — starts as before. Then open Zoom (or the Windows Camera app) so it
+    holds the camera, reload Handsong, ▶ Play — after a few seconds the start card says «The camera is busy or not responding. Close Zoom…»
+    and shows «Try again»; close Zoom, tap «Try again» — the app opens (no second sound engine, no reload). With the camera switched off (a
+    camera key, or unplugged): «No camera found. Check that the camera is switched on…». With camera access blocked for the page (lock icon
+    → Camera → Block): the message explains how to allow it. The page never hangs on «Starting the camera…».
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

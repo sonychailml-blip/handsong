@@ -16,9 +16,9 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   Karplus–Strong in CHORDS ❓ (phone measurement) · 3.13 per-layer mixer ⬜ (superseded by MX1/MX2) · 3.14 A/B tuning comparison in time ⬜ ·
   3.15 own tuning per role (live polymodality) ⬜ · 3.16 jam content 🔵 · 3.17 camera frame margin ✅ · 3.18 i18n 🔵 (en+ru done; es/de await
   a reviewer) · 3.19 floating menu ✅ · 3.20 tutorial mode ✅ · 3.21 start screen ✅ · 3.22 menu layout ✅ · 3.23 metres beyond 4/4 ✅ · 3.24
-  polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
+  polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.25b world catalogue of tunings (added 2026-10-15) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
   ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ (+ the user's «expression hand»: hand map, expression lab — added 2026-10-15) · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
-  latency as a NUMBER 🟡 (LAT1 meter 2026-10-14; desktop numbers in, LAT2 built on them 2026-10-15; phone pending) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
+  latency as a NUMBER 🟡 (LAT1 meter 2026-10-14; desktop numbers in, LAT2 built on them 2026-10-15; phone pending; + dual-GPU laptops and a medium-exposure experiment, added 2026-10-15) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
   3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
   ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later) · 3.41 hand prediction
   (latency) ⬜ (idea, a later slice).
@@ -31,7 +31,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   the main thread (main tech debt) · 7.9 team ideas (not decisions) · 7.10 strategist proposals (not decisions) · 7.11 ⛳ hearing the room ·
   7.12 release and money strategy 🟡 (item 1 decided: Calm is the first release; Vercel Hobby forbids selling) · 7.13 ⛳ the timbre builder (user's vision, stage 7) · 7.14 ⛳ effect chains,
   target design (per-track chains; live chain by timbre or by finger) · 7.15 modes/presets as bundles (packs) · 7.16 ⛳ «Calm» mode — rooms of
-  light and sound (candidate for the FIRST RELEASE, after stage 3) · 7.17 Calm — playing along with outside music («Listen», after the
+  light and sound (candidate for the FIRST RELEASE, after stage 3; + «musicians in the scene», added 2026-10-15) · 7.17 Calm — playing along with outside music («Listen», after the
   first Calm release, part of hearing the room) · 7.18 installation (kiosk) mode + B2B sales plan (stage 4b, right after Calm) · 7.19 ⛳ own authored visual design and icon set
   (before the Calm release; UI1 makes the UI themable).
 
@@ -1197,6 +1197,16 @@ khali = ОСЛАБЛЕННАЯ голова, не тишина. (б) **патт�
 раги, гамелан, японские лады, неоктавные (Болен–Пирс/Карлос), Партч. Дальше — не белые пятна, а
 углубление уже покрытого (тембры §3.12, кураторский джем §3.16), не новые семейства строёв.
 
+### ⬜ 3.25b. World catalogue of tunings and scales (added 2026-10-15; later, not scheduled)
+The strategist will prepare, OUTSIDE the repo, a researched catalogue of world tunings and scales: European modes and historical
+temperaments; Arabic / Turkish maqam and Persian dastgah; Hindustani thaats and the 72 Carnatic melakartas; Japanese and Chinese scales;
+gamelan slendro / pelog from documented measurements; Ethiopian qenet; Georgian traditional polyphony tuning; jazz scales, Messiaen modes;
+EDOs 19 / 22 / 24 / 31 / 53, the harmonic series, Bohlen–Pierce, Carlos alpha / beta / gamma — each with cents, sources, region / family,
+en + ru descriptions and an «approximation» flag where the tradition is more than a pitch set.
+- Numbers are facts: no third-party scale files are copied (hard rule #32); every entry is written from its published sources.
+- Import is a short later slice, AFTER stable ids exist (FMT1 / TIM1), and needs browsing by region / family, search and favourites in the
+  scale selector.
+
 ### 🔵 3.26. Фиксированный строй: тоника = КЛЮЧ (§1–5 СДЕЛАНО, хвосты — ниже)
 
 **СДЕЛАНО (эта сессия), НЕ проверено в браузере.** Свойство `fixedKey:true` на шести исторических
@@ -1432,6 +1442,17 @@ above stays as written; this block only adds.
 
 **Побочная выгода замера:** он же даст цифру для суб-шага выразительности (`EXPR_CFG.subDt`, hard rule 22)
 — сейчас известно лишь, что ниже ~13 fps пружина самовозбуждалась.
+
+**➕ Dual-GPU laptops** (user's measurements, added 2026-10-15). The user's laptop has Intel HD 4000 + NVIDIA GeForce GT 635M; Chrome
+used Intel by default. After switching Chrome to the NVIDIA GPU (Windows: Settings → System → Display → Graphics → Chrome → High
+performance), evening, two hands: detection 52.9 ms (tracking 41.5 · full search 77.9) vs 69 on Intel (tracking 66); hand → sound 119.6 vs
+133 ms. The first start on the new GPU had one 8989-ms startup task (one-time shader setup; the next start 1437 ms).
+- ⬜ Idea: when the meter's graphics line shows an integrated GPU while a discrete one may exist, offer a one-time hint how to switch the
+  browser to the high-performance GPU.
+
+**➕ Low light — a later experiment** (added 2026-10-15, after the user's evening LAT3 run; not now): a MEDIUM manual exposure (≈ 50–66 ms →
+≈ 15 fps) plus raised camera brightness, measured with the meter's «hands lost» line. Today's «short exposure» (≈ 23 ms) gives 30 fps but a
+picture too dark to find hands in dim light; light on the hands stays the real remedy (§7.18, the «Too dark» hint).
 
 ### ⬜ 3.33. Барабанные ритмы как фон — наполнение и КУЛЬТУРНАЯ уместность (future, не начато)
 
@@ -2540,6 +2561,18 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
     the Night forest character (its decay shape, brightness, density) at ≈ 1 % CPU, as the phone / low-power choice of the same effect.
   - ⬜ **In the Rust → WASM engine** (stage 5 / 7): an ALGORITHMIC reverb that sounds like Night forest at a fraction of the convolution
     cost — measured against the convolution by ear (A/B) and by the GOLD features.
+
+- ⬜ **Musicians in the scene** (user's idea, added 2026-10-15). In Calm worlds the backing parts are «played» by characters of the world:
+  forest — a frog whose throat swells on the bass, a woodpecker on the ticks with a real drum-roll, an owl on a short melody, a firefly swarm
+  pulsing with the pads; monastery — monks with bells; and so on per world.
+  - **Sync from our own note events, never from audio analysis:** each motion is driven by the exact note events of our own backing sequence,
+    scheduled with the audio output latency, so the picture lands on the sound. A visible wind-up before each hit lets the player anticipate
+    the beat.
+  - **Calm first:** small, in the depth of the scene, soft motion, never brighter than the player's light; a «Musicians: on/off» setting.
+  - The backing gets softer while the player plays (visible ducking); owl and frog turn towards the player's light.
+  - Later: the backing builds as musicians arrive; touching a musician with the light mutes / unmutes its part.
+  - A working prototype exists outside the repo (the strategist's «Rooms of light» demo). Strong for installations (§7.18), children and
+    short shareable videos.
 
 ### ⬜ 7.17. ⛳ CALM — PLAYING ALONG WITH OUTSIDE MUSIC (user's idea, recorded 2026-10-14; NOT in the first Calm release — after it, as part of «hearing the room», §7.11; Calm itself: §7.16)
 - **One-shot «Listen» button:** the app mutes itself for 5–10 s, listens through the microphone, detects the tonic and a rough mode, then

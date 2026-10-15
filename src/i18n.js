@@ -92,7 +92,7 @@ export const DICTS = {
     'diag.why.reopened':'the camera was reopened',
     'diag.why.left':'the page was left',   // CAM-FIX
     'diag.sw.lowWarn':"Test: changes the camera's own settings; Off restores them.",
-    'diag.dev.heal':'Camera {what} was manual — restored to automatic',
+    'diag.dev.heal':'Camera {what} left by an unfinished test — restored',   // 0a: only what a test of ours left
     'diag.dev.healFail':'Camera {what} is manual and did not return to automatic',
     'diag.dev.restore':'After the test: camera {what} back to automatic, other settings restored',
     'diag.dev.restoreFail':'After the test: camera {what} did not return to automatic',
@@ -153,6 +153,10 @@ export const DICTS = {
     'load.camera':'Starting the camera…',
     'load.warm':'Warming up hand tracking…',   // LAT2: the model's first detection (≈ 1–2 s)
     'load.error':'Couldn’t start: {msg}. Check camera access and that the page is served over https.',
+    'start.retry':'Try again',   // 0b: after a failed start (only the camera is retried)
+    'cam.busy':'The camera is busy or not responding. Close Zoom and other apps that use the camera, then press Start again.',
+    'cam.notfound':'No camera found. Check that the camera is switched on (some laptops have a camera key, e.g. Fn+F10) and connected, then press Start again.',
+    'cam.denied':'Camera access is blocked for this page. Click the camera or lock icon at the left of the address bar, allow the camera, then press Start again.',
     // верхняя панель
     'bar.scale':'Scale',
     'bar.scaleTitle':'Scale: mode, tonic, timbres',
@@ -749,7 +753,7 @@ export const DICTS = {
     'diag.why.reopened':'камера была открыта заново',
     'diag.why.left':'страница была закрыта или скрыта',   // CAM-FIX
     'diag.sw.lowWarn':'Проба меняет собственные настройки камеры; «Выкл.» их возвращает.',
-    'diag.dev.heal':'Камера: {what} — была ручная, возвращена автоматическая',
+    'diag.dev.heal':'Камера: {what} — осталась от незаконченной пробы, возвращена',   // 0a
     'diag.dev.healFail':'Камера: {what} — ручная, автоматическая не вернулась',
     'diag.dev.restore':'После пробы: камера — {what} снова автоматически, прочие настройки возвращены',
     'diag.dev.restoreFail':'После пробы: камера — {what} не вернулась к автоматике',
@@ -807,6 +811,10 @@ export const DICTS = {
     'load.camera':'Включаю камеру…',
     'load.warm':'Разогреваю распознавание рук…',   // LAT2
     'load.error':'Не получилось: {msg}. Проверьте доступ к камере и что страница открыта по https.',
+    'start.retry':'Попробовать снова',   // 0b
+    'cam.busy':'Камера занята или не отвечает. Закройте Zoom и другие программы, которые используют камеру, и нажмите «Играть» ещё раз.',
+    'cam.notfound':'Камера не найдена. Проверьте, что камера включена (на некоторых ноутбуках есть клавиша камеры, например Fn+F10) и подключена, и нажмите «Играть» ещё раз.',
+    'cam.denied':'Доступ к камере для этой страницы запрещён. Нажмите значок камеры или замка слева в адресной строке, разрешите камеру и нажмите «Играть» ещё раз.',
     'bar.scale':'Лад',
     'bar.scaleTitle':'Звукоряд: лад, тоника, тембры',
     'bar.instrTitle':'Соло / Аккорды',

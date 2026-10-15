@@ -164,6 +164,19 @@ function lowCore(){
   n++; eq('short exposure → 15 fps → Off: automatic again', path(CL.restoreConstraints(cA, base, oA, ['exposureMode','exposureTime'])), 'continuous');
   n++; { const dn=d.length; eq('CONTROL (must differ)', path(CL.lowConstraints('off', cA, base, 'fps15')), 'continuous');
     if(d.length===dn) d.push('CONTROL: the pre-fix Off brought the simulated camera back to automatic — the check cannot fail'); else d.length=dn; }
+  /* 0a: our own test record — originals of the first change kept, touched keys united; repair only for this camera's record */
+  const r1=CL.testRecNext(null, { label:'ASUS', dev:'d1', orig:oA, touched:['exposureMode','exposureTime'] }), r2=CL.testRecNext(r1, { label:'x', dev:'d2', orig:{ exposureMode:'manual' }, touched:['brightness'] });
+  n++; eq('test record: first originals kept, touched united', [r2.label, r2.dev, r2.orig, r2.touched], ['ASUS', 'd1', oA, ['exposureMode','exposureTime','brightness']]);
+  n++; eq('repair from our record = the restore set', CL.testRecRepair(cA, r1, { deviceId:'d1' }), autoBoth);
+  n++; eq('no record / a broken one / another camera: nothing', [CL.testRecRepair(cA, null, {}), CL.testRecRepair(cA, { v:1 }, {}), CL.testRecRepair(cA, r1, { deviceId:'d9' })], [null, null, null]);
+  n++; { const dn=d.length; eq('CONTROL (must differ)', CL.testRecRepair(cA, r1, { deviceId:'d9' }), autoBoth);
+    if(d.length===dn) d.push('CONTROL: a record of another camera was applied — the device check cannot fail'); else d.length=dn; }
+  /* 0b: why a camera did not start */
+  const ek=(name,message='')=>CL.camErrKind({ name, message });
+  n++; eq('camera error kinds', [ek('NotReadableError'), ek('AbortError','Timeout starting video source'), ek('TimeoutError'), ek('TrackStartError'),
+    ek('NotFoundError','Requested device not found'), ek('DevicesNotFoundError'), ek('OverconstrainedError'), ek('NotAllowedError'), ek('PermissionDeniedError'),
+    ek('SecurityError'), ek('TypeError'), ek('Error','Could not start video source'), CL.camErrKind(null)],
+    ['busy','busy','busy','busy','notfound','notfound','notfound','denied','denied','denied','other','busy','other']);
   return { cases:n, total:d.length, differences:d };
 }
 /* SND-F1: the Night forest IR of the pure core — the same twice and pinned per rate (44.1 / 48 kHz), its length, its envelope sample by

@@ -7852,3 +7852,86 @@ probe-data; `autoLeft(adv, s)` — vision stillManual 2, probe-data; `devSnap(s)
 setLowLight, devRestore (CONTROL), probe-data; `devRestore(tr, kind)` — vision lowOff, lowLeave, openCamera; `camHeal()` — openCamera;
 `applySet(tr, c)` — devRestore, setLowLight; `stillManual(adv, tr)` — devRestore, camHeal; `camSimDbg(sim)` — probes/lat.js 2; `devTx(D)` —
 latmeter latText. Unchanged signatures: `setLowLight(m)` (latmeter SW 4, probes/lat.js 2), `lowInfo()` (+ `dev`), `lowDbg(o)` (+ keys).
+
+### LAT3 — the user's evening results (2026-10-15; added at REC1)
+The user's laptop webcam in the evening, one hand, the meter's «Low light (test)»: «at least 15 fps» and «at least 24 fps» both fall back to
+Off — this webcam ignores frame-rate requests (by design of the camera, not a bug in the app). «Short exposure» works on the camera: delivered
+6.3 → 30.6 fps, frame wait 80 → 16.6 ms, BUT the picture is too dark to detect hands in dim light: tracking «—», only empty full-frame
+searches, 0 hands found — so its 112 ms «incl. frame wait» is not a real playing number. Conclusion: in dim light the fix is light (the «Too
+dark» hint). Later experiment (BACKLOG §3.32, not now): a medium manual exposure (≈ 50–66 ms → ≈ 15 fps) plus raised camera brightness,
+measured with the «hands lost» line.
+
+### Moved from HANDOFF.md at REC1 (English, verbatim; 2026-10-15)
+### CAM-FIX (2026-10-15) — the webcam's own settings restored (full: archive B «CAM-FIX — record»)
+- Incident: «short exposure» left the user's UVC webcam dark in the DEVICE (Off, reload, Zoom all dark); he healed it from the console.
+  Causes: the old Off handed exposure back only right after «short exposure» (exposure → fps test → Off forgot it); nothing healed at open;
+  Chrome applies ONLY the camera controls of a set that holds one and ignores its format part (measured). Only «short exposure» writes a
+  camera control; the fps tests change the requested format only.
+- Fix = hard rule #34: originals saved; Off / fall-back / leaving the page / reopen restore (automatic exposure + white balance, other
+  controls to originals); every open heals manual modes (meter: «… was manual — restored to automatic»); format and controls in two calls;
+  warning under the switch «Test: changes the camera's own settings; Off restores them».
+- Also: warm-up in two steps (runner: one 9681-ms task → 9479 + 718 ms; slow headless GPU today); `main.js` probe-import `.catch` no longer
+  swallowed by a comment (no other case in `src/`).
+- Idea recorded: the user's «EXPRESSION HAND» (pedal-like hand, hand map, expression lab, presets) — BACKLOG §3.29 «➕» block; after GES1.
+- Probes: data PASS 13 (LAT3 core 40 cases); P.quick PASS 56 (112.9 s; new row «CAM-FIX camera settings restored», simulated UVC webcam,
+  controls noRestore / noHeal). Fix rounds 3.
+- ⬜ User step 96 (each test then Off — the picture comes back; reload + Zoom normal), then step 95.
+
+### REC1 — record (2026-10-15): song/store + song/lanes, folder rule and import cycles; camera start made robust; open-time repair = ours only
+**0a — the open-time repair touches only our own changes.** CAM-FIX healed every camera found in manual exposure / white balance at open,
+which would also undo a manual exposure the person set on purpose in another app. Now a low-light test that applies a device control writes a
+record to localStorage (`handsong.camTest` — the user's example name «hs.camTest», the app's own key prefix kept: camera name and device id,
+the originals of the first change, the touched keys; updated by each further test). A restore that leaves nothing manual (Off, a fall-back,
+leaving the page, a reopen during a test) clears it. At open, `camHeal` restores only from a record of THIS camera (`core/camlight.
+testRecRepair`; another camera's record is left for later) and clears it; without a record nothing is touched. The meter line reads «Camera
+… left by an unfinished test — restored». Off itself is unchanged (CAM-FIX: automatic exposure and white balance back) — after a test of
+ours the device holds OUR value, so «back to automatic» is a restore of what we changed.
+**0b — a robust camera start.** The user's laptop webcam failed twice («Timeout starting video source», then «Requested device not found»,
+the device gone until a full power-off) and the app did not open after the next «Start». Found in the code: a failed start left the card
+usable, but the next press ran the WHOLE start again — `initAudio` a second time (a second live AudioContext over the live engine copy) and
+the hand model loaded again; getUserMedia and `video.play()` had no time limits and nothing stopped a stream that arrived late. Now:
+`vision.openCamera` is serialised (one open at a time, exactly one getUserMedia each; an earlier request still pending → wait ≤ 3 s, else a
+«busy» refusal — never two in flight); the old stream is stopped first; getUserMedia times out after 15 s only when access is already
+granted (`permissions.query`; never while a permission prompt is open), the first picture after 8 s; any failure stops every track it
+obtained, a timed-out request's late stream is stopped the moment it lands; the open-time repair is applyConstraints on the started track,
+bounded, logged and never blocking; `startCamera` retries once after 1 s, then throws with `camKind` (`core/camlight.camErrKind`: busy —
+NotReadable / Abort / Timeout / TrackStart; notfound — NotFound / DevicesNotFound / Overconstrained; denied — NotAllowed / PermissionDenied /
+Security; other); pagehide releases the camera after the test restore; a page restored from the back/forward cache reopens it. `main.
+startApp` is staged (`stage.audio`, `stage.det`): sound and the hand model once, the camera each time; a failure shows the message by kind
+(`cam.busy`, `cam.notfound`, `cam.denied`, en + ru, the user's wording) or the old generic one, and «Try again» (`#camRetry`).
+**REC1 — as the plan defines it, with one adaptation.** Plan: «check-static reads folders and prints import cycles; `song/store.js`
+(events, evGen, birth order, `compactEvents`, `schedInvalidate` listeners) + `song/lanes.js` (lane tables, arm, row delete)». Conflicts with
+today's code: (1) check-static already read sub-folders since LAT1 — added the folder rule and the cycles; (2) the ROW DELETE itself
+(`deleteLane`/`deleteLaneDo`) releases voices, unties pairs, closes the history snapshot, drops freezes and writes the recorder's chord
+highlight — moving it would need recorder.js imported back (a cycle) — so the two-tap confirmation (`laneDelTap` …) moved and the delete
+body stays in recorder.js with `lanePrune`, `laneReset`, `laneHush`, `toggleLaneMute/Solo`, `setLaneLevel/Pan` (they move with their
+dependencies in REC2–REC5); (3) `evRole` needs `chaseRole` (planned for song/notes.js in REC2) — the one-line `chaseRole` moved to the store
+with `evRole` and `isNoteStart` as «the kind of an event». Moved verbatim (comments kept); the few edits: `schedInvalidate` = `evGen++` +
+the `onInvalidate` listeners (the recorder's former body is its listener, same statements, same order); table writers in recorder go
+through `laneForget(id)` / `laneTablesClear()` / `laneDelCancel()`; the lanes' five needs from the recorder (`recording`, `recLayers`,
+`isRecLayer`, audio up, `deleteLane`) come once through `laneWire`. 243 lines left recorder.js (6085 → 5843); store 59, lanes 225 lines.
+Static check: rule «a module under src/song/ imports only song/, core/, config.js»; Tarjan import cycles printed — today ONE group, inside
+the probes (scaleprobe ↔ probes/run, seed, guard, edit, history, key), none through song/; CONTROL a fake song/store.js → recorder.js import
+must break both. Plan §14 numbering: #34 is the camera rule (CAM-FIX), so the plan's later rules shift by one (#35 stateless engine
+submodule at AUD1, #36 the core never touches DOM…, #37 permanent ids, …).
+**Probes.** data PASS 13 (43.9 s; LAT3 core 40 → 45 cases: test record, another camera's record (CONTROL), 13 error kinds). Static PASS.
+Two `--quick` runs hit P.quick's 180-s limit at row 32 with 0 differences — a Chrome renderer OUTSIDE the runner (the user's own browser)
+used ≈ one core of four the whole time; rows ran 3–10× slower (ED7 28 s). Then once `--all --limit-min 25`: PASS — P.all 76 checks, 0
+differences, 800.5 s; GOLD 84 / 0, HAND1 525 / 0, frozen seed bass 0.08686 / 0.055319 / 650886, AF2, AF6b, LR1, LAT3 34 / 0, CAM-FIX 35 / 0,
+CAM-START 12 / 0, UI checks, CSP, network (191 requests) PASS. Fix rounds 1 (a probe message with an unescaped quote, caught by the static
+check). Row «CAM-START robust camera start» (`checkCamStart`): the real start made 1 getUserMedia, never 2 at once; two opens at once
+serialised; not found / not allowed / no picture / no answer in time each fail after one retry ≈ 1 s later, release every track (late ones
+too), show the right message and «Try again»; CONTROLS noSerial, noRelease, noRetry flagged. Row CAM-FIX adds: the test record exists while
+a test holds a control and is cleared by Off and by pagehide; pagehide releases the camera; a camera our test left dark (simulated crash)
+restored at reopen, record cleared; a manual setting without our record untouched; CONTROLS noHeal (with a record), healAll (the pre-0a heal).
+**Positional callers of changed / new functions:** `startCamera(facing)` — main 0 args, vision `initVision` (camFacing), probes/lat (camFacing);
+`initDetector(msg)` — main, `initVision`; `openCamera(facing)` (signature unchanged) — vision startCamera ×2, pageshow, switchCamera,
+setCamFps ×2, lowOff; `camHeal()` — openOnce; `lowLeave()` (now returns its restore) — pagehide, visibilitychange; `camRelease(restoring)` —
+pagehide; `startFail(err)` — main, probes/lat; `testRecNext(prev, {label, dev, orig, touched})` — vision setLowLight, probe-data;
+`testRecRepair(caps, rec, settings)` — vision camHeal, probe-data ×3; `camErrKind(e)` — vision startCamera ×2, probe-data; `camOpenDbg(o)`,
+`camStats()`, `camStatsDbg()` — probes/lat; `onInvalidate(fn)` — recorder ×1; `laneWire(o)` — recorder ×1; `laneForget(id)` — recorder
+lanePrune, laneDrop; `laneTablesClear()` — recorder laneReset. Unchanged signatures: `schedInvalidate()`, `toggleArm`, `laneDelTap`,
+`laneOrder`, `moveLane`, every moved reader.
+**Docs.** CLAUDE.md (module map song/, static-check line, rule #34 0a, vision 0b, probe rows, step 96 note, step 97), NAME-INDEX, UI-MAP (start
+card failure), BACKLOG (§7.16 musicians in the scene, §3.25b world catalogue, §3.32 dual-GPU laptops + medium-exposure experiment),
+THIRD-PARTY-LICENSES.md regenerated (≈ now also in probes/lat.js).

@@ -267,6 +267,46 @@ fails.push(...NET.bad);
   const c=netCheck(fake);
   if(!(c.bad.some(x=>/ui\.js: 1 .*«beacon»/.test(x)) && c.bad.some(x=>/probe-net\.js: .*«fetch»/.test(x)))) fails.push('network guard CONTROL: an unlisted sendBeacon / fetch was not caught — the guard cannot fail');
 }
+/* 9) REC1 — FOLDERS AND IMPORT CYCLES. The static import graph (import … from and export … from; dynamic imports are not edges — they
+   resolve after evaluation). Strongly connected groups (Tarjan) are the import cycles: today's are printed as information (each one is a
+   place where evaluation order and live bindings matter); a cycle through a module of a REC folder fails. Folder rule: a module under
+   src/song/ imports only src/song/, src/core/ and the leaf config.js — the song store never reaches up into the recorder, the engine or the
+   screen (the layers above register with it instead: store.onInvalidate, lanes.laneWire). CONTROL: a fake import song/store.js →
+   recorder.js must be caught by both checks. */
+const FOLDER_RULES={ 'song/':t=>t.startsWith('song/')||t.startsWith('core/')||t==='config.js' };
+const edgesOf=ms=>{ const G={}; for(const f of Object.keys(ms)){ G[f]=new Set();
+  for(const im of ms[f].imports){ const t=target(f,im.spec); if(t!=null && ms[t]) G[f].add(t); } } return G; };
+function sccs(G){   // Tarjan, iterative enough for this size (recursion depth ≤ module count)
+  let idx=0; const I={}, low={}, on=new Set(), st=[], out=[];
+  const visit=v=>{ I[v]=low[v]=idx++; st.push(v); on.add(v);
+    for(const w of G[v]){ if(I[w]==null){ visit(w); low[v]=Math.min(low[v],low[w]); } else if(on.has(w)) low[v]=Math.min(low[v],I[w]); }
+    if(low[v]===I[v]){ const c=[]; let w; do{ w=st.pop(); on.delete(w); c.push(w); }while(w!==v); if(c.length>1 || G[v].has(v)) out.push(c.sort()); } };
+  for(const v of Object.keys(G).sort()) if(I[v]==null) visit(v);
+  return out;
+}
+function cyclePath(G, members){   // one concrete loop through the group, for the message
+  const M=new Set(members), start=members[0], prev={ [start]:null }, q=[start];
+  while(q.length){ const v=q.shift(); for(const w of G[v]) if(M.has(w)){ if(w===start){ const p=[start]; let x=v; while(x!==start&&x!=null){ p.splice(1,0,x); x=prev[x]; } return [...p,start].join(' → '); } if(!(w in prev)){ prev[w]=v; q.push(w); } } }
+  return members.join(' · ');
+}
+function layerCheck(ms){
+  const G=edgesOf(ms), bad=[], groups=sccs(G);
+  for(const [dir,ok] of Object.entries(FOLDER_RULES)) for(const f of Object.keys(ms)) if(f.startsWith(dir)) for(const t of G[f]) if(!ok(t)) bad.push(`${f}: imports ${t} — a module under src/${dir} imports only its folder, core/ and config.js (REC1)`);
+  for(const g of groups) if(g.some(f=>Object.keys(FOLDER_RULES).some(d=>f.startsWith(d)))) bad.push(`import cycle through a REC folder: ${cyclePath(G,g)}`);
+  return { bad, groups, G };
+}
+const LAY=layerCheck(mods);
+fails.push(...LAY.bad);
+{ const dirs={}; for(const f of files){ const d=f.includes('/') ? f.slice(0,f.lastIndexOf('/')+1) : '(src)'; dirs[d]=(dirs[d]||0)+1; }
+  infos.push(`folders: ${Object.entries(dirs).map(([d,n])=>`${d} ${n}`).join(' · ')}`);
+  infos.push(LAY.groups.length ? `import cycles (${LAY.groups.length}; evaluation order and live bindings matter inside each): ${LAY.groups.map(g=>cyclePath(LAY.G,g)+(g.length>2?` (group of ${g.length}: ${g.join(', ')})`:'')).join(' ;  ')}` : 'import cycles: none'); }
+{ /* CONTROL: song/store.js importing recorder.js must break the folder rule AND close a cycle */
+  if(mods['song/store.js'] && mods['recorder.js']){
+    const fake={ ...mods, 'song/store.js':{ ...mods['song/store.js'], imports:[...mods['song/store.js'].imports, { spec:'../recorder.js', names:[] }] } };
+    const c=layerCheck(fake);
+    if(!(c.bad.some(x=>/song\/store\.js: imports recorder\.js/.test(x)) && c.bad.some(x=>/import cycle through a REC folder: .*song\/store\.js/.test(x)))) fails.push('folder / cycle CONTROL: song/store.js → recorder.js was not caught — the check cannot fail'); }
+  else fails.push('folder / cycle CONTROL: src/song/store.js or src/recorder.js missing');
+}
 // сведения: неиспользуемые экспорты и импорты
 for(const f of files){ const m=mods[f];
   const imported=files.some(g=>mods[g].imports.some(im=>target(g,im.spec)===f));
@@ -280,4 +320,4 @@ console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})
 for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(18)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }
-console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations), undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals) and the network guard (${NET.total} call sites, all listed with a reason; control caught) are consistent.`);
+console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations), undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals), the network guard (${NET.total} call sites, all listed with a reason; control caught) and the folder rule with import cycles (${LAY.groups.length} import cycle(s), none through a REC folder; control caught) are consistent.`);

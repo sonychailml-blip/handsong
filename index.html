@@ -61,6 +61,8 @@
     <button id="installBtn" data-i18n="install.btn" data-i18n-title="install.title" title="Add Handsong to your home screen" style="display:none">⬇ Install</button>
     <p id="installHint" style="display:none"></p>
     <p id="loadmsg"></p>
+    <!-- 0b: shown only after a failed start; retries the camera (sound and the hand model are already built) -->
+    <button id="camRetry" data-i18n="start.retry" hidden>Try again</button>
     <p id="learnMsg"></p>
     <!-- Подвал: тихо, но читаемо. Метки ссылок пишет ui.js (URL — константы там). Отзыв виден всегда
          (форма или почта-fallback, адрес собирается в JS, не mailto в исходнике). Строка поддержки —

@@ -1,5 +1,5 @@
 import { initAudio, AC } from './audio.js';
-import { video, initVision, setHandsSink, pollFrame } from './vision.js';
+import { video, initDetector, startCamera, setHandsSink, pollFrame } from './vision.js';
 import { processHands } from './gestures.js';
 import { drawVideoBackground, syncViewRect, drawOverlays } from './draw.js';
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
@@ -103,16 +103,30 @@ function loop(){
 if(loadReport.emergency || loadReport.problems.length){ const el=$('loadmsg'), nU=loadReport.problems.filter(p=>p.user).length, nB=loadReport.problems.length-nU;
   if(el) el.textContent = loadReport.emergency ? t('data.emergency')
     : [nB ? t('data.skipped',{n:nB}) : '', nU ? t('data.userSkipped',{n:nU}) : ''].filter(Boolean).join(' '); }   // F6: файлы пользователя — отдельной фразой
-let started=false;
+/* 0b: the start is staged — sound and the hand model are built ONCE; a failed camera leaves the card usable («Try again» retries only the
+   camera; a second press never builds a second AudioContext or reloads the model). */
+let started=false, starting=false;
+const stage={ audio:false, det:false };
+/* the start card after a failure: a message by its kind (core camErrKind: busy / notfound / denied, else the generic one) + «Try again» */
+function startFail(err){
+  const btn=$('startBtn'), learn=$('learnBtn'), retry=$('camRetry'), kind=err&&err.camKind;
+  btn.disabled=false; if(learn) learn.disabled=false; $('start').classList.remove('busy');
+  $('loadmsg').textContent= kind&&kind!=='other' ? t('cam.'+kind) : t('load.error',{msg:(err&&err.message?err.message:err)});
+  if(retry) retry.hidden=false;
+}
 async function startApp(){
   if(started) return true;
-  const btn=$('startBtn'), learn=$('learnBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s;
-  btn.disabled=true; if(learn) learn.disabled=true;
+  if(starting) return false;                 // a second press while starting does nothing
+  starting=true;
+  const btn=$('startBtn'), learn=$('learnBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s, retry=$('camRetry');
+  btn.disabled=true; if(learn) learn.disabled=true; if(retry) retry.hidden=true;
   const card=$('start'); card.classList.add('busy');   // LAT2: the start card shows that it is loading (a pulse on the message line)
   try{
-    await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется)
+    if(!stage.audio){ await initAudio(); stage.audio=true; }   // rule #1: the context is created in this click's synchronous part (first press only)
     await AC.resume();
-    await initVision(msg);
+    if(!stage.det){ await initDetector(msg); stage.det=true; }
+    msg(t('load.camera'));
+    await startCamera();                     // 0b: one getUserMedia, one retry after ~1 s, tracks released on failure
     try{await navigator.wakeLock.request('screen');}catch(e){}
     card.classList.remove('busy','on');
     $('bar').classList.add('on');
@@ -123,10 +137,10 @@ async function startApp(){
     import('./render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
     return true;
   }catch(err){
-    btn.disabled=false; if(learn) learn.disabled=false; card.classList.remove('busy');
-    msg(t('load.error',{msg:(err&&err.message?err.message:err)}));
+    console.warn('[start] failed:', err);
+    startFail(err);
     return false;
-  }
+  }finally{ starting=false; }
 }
 /* ⛳ ПРОБА ПО ФЛАГУ АДРЕСА: ?probe в адресе страницы — модуль пробы (src/scaleprobe.js) и консоль уха (src/render.js) грузятся сразу и
    кладутся в window.P и window.R, чтобы в консоли хватало `await P.all()` / `R.live(1)` без строки импорта. Без флага не меняется
@@ -138,5 +152,8 @@ if(new URLSearchParams(location.search).has('probe')){
   import('./userfiles.js').then(m=>{ window.U=m; }).catch(e=>console.warn('[probe] userfiles failed to load', e));   // F6: файлы пользователя из консоли
 }
 wireStarter(startApp);                                                       // урок/«Свободная игра» поднимают приложение этим (правило #1: старт зовётся в клике выбора)
-$('startBtn').onclick=()=>{ startApp(); };                                   // «Играть» — как прежде
+$('startBtn').onclick=()=>{ startApp(); };
+{ const r=$('camRetry'); if(r) r.onclick=()=>{ startApp(); }; }             // 0b: «Try again» after a failed start                                   // «Играть» — как прежде
 $('learnBtn').onclick=()=>{ openLessons(); };                                // «Обучение» — открыть список уроков (приложение поднимет уже выбор урока/«Свободная игра»)
+
+export { startFail };   // probe only (0b): the failure message on the start card

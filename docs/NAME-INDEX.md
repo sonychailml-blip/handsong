@@ -335,3 +335,23 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   restoreFail`, `diag.ctl.exposureMode/whiteBalanceMode/focusMode/and`, `diag.why.left`.
 - `src/probes/lat.js`: `checkCamRestore` (row «CAM-FIX camera settings restored», at 586), `uvcSim`; LAT3 `lowProblems(…, calls)`, `FMT`,
   `isFmt`, `isCtl`. `tools/check-static.mjs` GLOBALS + `MediaStreamTrack`.
+
+## Added at REC1 + camera start (2026-10-15)
+- **MOVED (REC1, verbatim; `recorder.js` re-exports them — old imports keep working):**
+  `src/song/store.js` — `events`, `evGen`, `schedInvalidate` (now: `evGen++`, then the `onInvalidate` listeners; the recorder's former body
+  is its listener), `onInvalidate` (new), `compactEvents`, `evSeq`, `evSeqN` (private), `evSeqFill`, `evOrder`, `maxLayer`, `evRole`,
+  `chaseRole`, `isNoteStart`, `invalidateFns` (private).
+  `src/song/lanes.js` — `laneSeq`, `armLane`, `delPend` (private lets), `laneId`, `laneMute`, `laneSolo`, `laneLevel`, `lanePan`,
+  `laneName`, `LANE_NAME_MAX`, `laneRank`, `laneLen`, `laneLenOf`, `laneNew`, `laneOf` (re-exported as `laneIdOf` too), `laneEditVer`,
+  `laneVerBump`, `laneEditVerOf`, `laneLayerOf`, `armedLayer`, `toggleArm`, `DEL_CONFIRM_MS`, `laneDelTap`, `laneDelCancel`,
+  `laneDelPendingLayer`, `laneAudible`, `laneGated`, `laneLevelOf`, `laneGainOf`, `layerOfOwner`, `lanePanOf`, `laneNameOf`, `setLaneName`,
+  `laneSort`, `laneOrder`, `moveLane`, `laneShowKeep`, `laneLookMemo`, `laneLook`, `laneMuted`, `laneSoloed`, `laneSoloOn`, `laneRow`,
+  `laneRowSet`; new: `laneWire` (+ private `W`), `laneForget(id)`, `laneTablesClear()`.
+- `tools/check-static.mjs` — `FOLDER_RULES`, `edgesOf`, `sccs` (Tarjan), `cyclePath`, `layerCheck`, `LAY`.
+- `core/camlight.js` — `TEST_REC_KEY` ('handsong.camTest'), `testRecNext`, `testRecRepair`, `camErrKind`.
+- `vision.js` — `startCamera`, `initDetector` (+ `initVision` = both, unused by main), `openOnce`, `gumOnce`, `accessGranted`, `withTimeout`,
+  `stopStream`, `camErr`, `camRelease`, `testRec`, `testRecSet`, `CS` (counters), `GUM_MS` 15000, `PLAY_MS` 8000, `PEND_WAIT_MS` 3000,
+  `CAM_RETRY_MS` 1000, `camStats`, probe-only `camOpenDbg`, `camStatsDbg`; `lowDbg` adds `healAll`, `crash`.
+- `main.js` — `startFail(err)` (exported, probe), `stage {audio, det}`, `starting`; markup `#camRetry`; keys `start.retry`, `cam.busy`,
+  `cam.notfound`, `cam.denied` (en + ru); `diag.dev.heal` reworded.
+- Probes: `checkCamStart` (row «CAM-START robust camera start», `probes/lat.js`).

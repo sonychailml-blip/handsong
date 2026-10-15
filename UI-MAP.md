@@ -400,6 +400,12 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
 
 ---
 
+## START CARD — WHEN THE CAMERA FAILS (0b, added 2026-10-15; checked against `index.html`, `main.js`)
+- A failed start keeps the card usable: the message line says why — busy / not responding («Close Zoom and other apps…»), no camera found
+  («…switched on (Fn+F10)… connected»), access blocked («…allow the camera…»), else the generic «Couldn't start: …» — and a «Try again»
+  button (`#camRetry`) appears under it; Play and Learn stay enabled. «Try again» (or Play) retries only the camera: the sound engine and the
+  hand model are already built. The camera is tried twice (once more after ~1 s) before the message shows.
+
 ## PRIVACY NOTICE AND LATENCY METER (PRIV1, LAT1 — 2026-10-14; checked against `index.html`, `style.css`, `latmeter.js`)
 - **Start card, footer, last line:** «Privacy» — a fold (`<details id="privacyNote">`); a tap opens two short paragraphs: camera picture,
   sound and hand movements stay on the device (detection runs in the browser; the app downloads only itself and the hand model from

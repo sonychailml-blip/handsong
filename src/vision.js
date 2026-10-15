@@ -3,7 +3,7 @@ import { t } from './i18n.js';
 import { schedNew, schedPlan, schedAfter, HAND_POLICIES } from './core/handsched.js';
 import { MP_LINE, rateOf } from './core/latency.js';
 import { LOW_MODES, lowConstraints, lowVerdict, exposureSupported, LOW_SETTLE_MS, LOW_MEASURE_MS, devSnap, restoreAdvanced, restoreConstraints,
-  healList, autoLeft } from './core/camlight.js';
+  healList, autoLeft, TEST_REC_KEY, testRecNext, testRecRepair, camErrKind } from './core/camlight.js';
 
 /* ================= КАМЕРА + MEDIAPIPE ================= */
 const video=document.getElementById('video');
@@ -25,23 +25,81 @@ const VISION_DEF={ hands:'2s', delegate:'GPU', camFps:null, path:'main', low:'of
 const opts={ ...VISION_DEF };
 let camStartT=NaN;   // performance time the current camera stream started playing (LAT1b: «startup» long tasks)
 
-/* Open camera `facing` on the same <video>. Old tracks are stopped FIRST (a phone rarely opens a second camera while the first lives);
-   a failed request throws upward — the caller rolls back (ui.js). LAT1b: frameRate is requested only when the test switch asks. */
+/* Open camera `facing` on the same <video>. 0b (robust start): opens are SERIALISED (one at a time, exactly one getUserMedia each); the
+   old stream is stopped FIRST (a phone rarely opens a second camera while the first lives); a request that times out is abandoned and its
+   late stream stopped the moment it lands; any failure stops what it obtained and throws upward with `camKind` (core camErrKind) — the
+   caller rolls back (ui.js) or shows a message (main.js). LAT1b: frameRate is requested only when the test switch asks. */
 const camBase=()=>({ width:{ideal:640}, height:{ideal:480}, ...(opts.camFps ? { frameRate:{ideal:opts.camFps} } : {}) });   // LAT3: also the base of every low-light set
 const camWant=()=>({ facingMode:camFacing, ...camBase() });
-/* CAM-FIX: before the old track stops, a low-light test gives the device back its own settings; the new track is healed if the device
-   was left in manual mode (by an earlier session, a crash or another app). Both bounded — a hanging camera call never blocks the start. */
-async function openCamera(facing){
-  if(stream){ if(opts.low!=='off' || low.touched.size){ low.gen++; await bounded(devRestore(vtrack(), 'restore')); } for(const tr of stream.getTracks()) tr.stop(); stream=null; }
+const GUM_MS=15000, PLAY_MS=8000, PEND_WAIT_MS=3000, CAM_RETRY_MS=1000;   // getUserMedia (only once access is granted — never while the person decides) · first picture · an earlier abandoned request · retry
+const CS={ calls:0, live:0, max:0, late:0, pending:null, startCalls:null, obtained:new Set() };   // getUserMedia counters; obtained = streams not yet stopped
+let camOpenDbgO={}, opening=null;
+const stopStream=s=>{ if(!s) return; if(!camOpenDbgO.noRelease) for(const tr of s.getTracks()) tr.stop(); CS.obtained.delete(s); };
+const camErr=(name, msg)=>Object.assign(new Error(msg), { name });
+async function accessGranted(){ try{ const p=await navigator.permissions.query({ name:'camera' }); return p.state==='granted'; }catch(e){ return false; } }
+/* one getUserMedia; with a timeout only when access is already granted (a permission prompt may stay open as long as the person likes) */
+async function gumOnce(c){
+  const ms=camOpenDbgO.timeoutMs || (await accessGranted() ? GUM_MS : 0);
+  return new Promise((resolve, reject)=>{
+    let done=false, tm=0;
+    CS.calls++; CS.live++; CS.max=Math.max(CS.max, CS.live);
+    const p=Promise.resolve().then(()=>(camOpenDbgO.gum || (x=>navigator.mediaDevices.getUserMedia(x)))(c));
+    const settled=()=>{ CS.live--; if(CS.pending===p) CS.pending=null; };
+    CS.pending=p;
+    p.then(s=>{ settled(); CS.obtained.add(s); if(done){ CS.late++; stopStream(s); return; } done=true; clearTimeout(tm); resolve(s); },
+           e=>{ settled(); if(done) return; done=true; clearTimeout(tm); reject(e); });
+    if(ms) tm=setTimeout(()=>{ if(done) return; done=true; reject(camErr('TimeoutError', `the camera did not answer within ${Math.round(ms/1000)} s`)); }, ms);
+  });
+}
+const withTimeout=(p, ms, name, msg)=>Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(camErr(name, msg)), ms))]);
+function openCamera(facing){
+  if(camOpenDbgO.noSerial) return openOnce(facing);   // CONTROL: two opens at once must be caught
+  const p=(opening||Promise.resolve()).catch(()=>{}).then(()=>openOnce(facing));
+  opening=p; p.finally(()=>{ if(opening===p) opening=null; }).catch(()=>{});
+  return p;
+}
+/* CAM-FIX: before the old track stops, a low-light test gives the device back its own settings; 0a: the new track gets back only what a
+   test of ours left behind (the stored record). Both bounded and after the track started — a hanging camera call never blocks the start. */
+async function openOnce(facing){
+  if(stream){ if(opts.low!=='off' || low.touched.size){ low.gen++; await bounded(devRestore(vtrack(), 'restore')); } stopStream(stream); stream=null; video.srcObject=null; }
+  if(CS.pending){ await bounded(CS.pending, PEND_WAIT_MS); if(CS.pending) throw camErr('AbortError', 'an earlier camera request still has not answered'); }
   const want={ ...camWant(), facingMode:facing };
-  stream=await navigator.mediaDevices.getUserMedia({ video:want, audio:false });
-  video.srcObject=stream; await video.play();
+  const s=await gumOnce({ video:want, audio:false });
+  try{
+    video.srcObject=s;
+    if(camOpenDbgO.playFail) throw camErr(camOpenDbgO.playFail, 'simulated by the probe');
+    await withTimeout(video.play(), PLAY_MS, 'TimeoutError', `the camera gave no picture within ${PLAY_MS/1000} s`);
+  }catch(e){ stopStream(s); if(video.srcObject===s) video.srcObject=null; throw e; }
+  stream=s;
   camStartT=performance.now();
   if(opts.low!=='off'){ opts.low='off'; low.note='reopened'; low.asked=null; }   // LAT3: a reopened camera gets today's request
   low.orig=null; low.touched.clear();
-  await bounded(camHeal());
+  await bounded(camHeal().catch(e=>console.warn('[camera] settings repair at open failed — carrying on:', e)));
   pumpStart();
 }
+/* 0b: the start's camera — one retry after ~1 s, then the error with its kind for the message */
+async function startCamera(facing=camFacing){
+  const c0=CS.calls;
+  try{ await openCamera(facing); }
+  catch(e){
+    if(camOpenDbgO.noRetry) throw Object.assign(e, { camKind:camErrKind(e) });
+    console.warn('[camera] start failed, one retry in 1 s:', e&&e.name, e&&e.message);
+    await sleep(CAM_RETRY_MS);
+    try{ await openCamera(facing); }catch(e2){ throw Object.assign(e2, { camKind:camErrKind(e2), first:e }); }
+  }
+  finally{ if(CS.startCalls==null && !camOpenDbgO.gum) CS.startCalls=CS.calls-c0; }   // the app's own start (a probe stand-in never counts)
+}
+/* 0b: leaving the page releases the camera — every track stopped, a pending request's stream stopped when it lands (after the test
+   restore, bounded); a page shown again from the back/forward cache reopens it */
+let camWasOn=false;
+function camRelease(restoring){
+  camWasOn=!!stream; opening=null;
+  const s=stream; stream=null;
+  const done=()=>{ stopStream(s); for(const x of [...CS.obtained]) stopStream(x); };
+  if(restoring) bounded(restoring, 1500).then(done); else done();
+  if(CS.pending) CS.pending.then(x=>stopStream(x), ()=>{});
+}
+addEventListener('pageshow', e=>{ if(e.persisted && camWasOn && !stream) openCamera(camFacing).catch(err=>console.warn('[camera] reopen after back/forward failed:', err)); });
 
 /* LAT1b: which processor the hand model REALLY runs on. MediaPipe's task API does not report it; its WebAssembly prints its own log
    lines to the console — the CPU path announces the XNNPACK delegate, the GPU path only its WebGL context. A tap on the console keeps
@@ -218,13 +276,13 @@ async function pump(){
 /* the sink gets every processed frame; paused() = the editor or the arrangement window is open (no frame is taken then) */
 function setHandsSink(fn, paused){ sink=fn; isPaused=paused||(()=>false); }
 
-async function initVision(msg){
+/* 0b: the start in two steps — the hand model once, the camera (retried by startCamera) as often as the person presses «Try again» */
+async function initDetector(msg){
   msg(t('load.model'));
   newWindow();
   await setPath(opts.path, s=>{ if(s==='warm') msg(t('load.warm')); });
-  msg(t('load.camera'));
-  await openCamera(camFacing);                   // стартовая камера — из состояния (по умолчанию фронтальная 'user')
 }
+async function initVision(msg){ await initDetector(msg); msg(t('load.camera')); await startCamera(camFacing); }
 
 /* Переключение камеры (фронт↔тыл) — уже ПОСЛЕ старта (панель #bar видна только после «▶ Запустить»,
    поэтому кнопки на странице при загрузке нет — правило AudioContext/камера соблюдено). Детектор не пересоздаём:
@@ -289,16 +347,24 @@ async function devRestore(tr, kind){
   await applySet(tr, c);
   const adv=c.advanced||[], left=await stillManual(adv, tr), modes=adv.filter(e=>Object.values(e)[0]==='continuous').map(e=>Object.keys(e)[0]);
   low.dev= touched.length||left.length ? { kind, ok:!left.length, what:left.length ? left : modes } : null;   // fps-only tests touch no device control
+  if(!left.length) testRecSet(null);   // 0a: nothing of ours is left on the device
 }
-/* CAM-FIX: at every open — a device found in manual exposure / white balance (left by an earlier session, a crash or another app) is
-   set back to automatic; the meter says so. probe CONTROL noHeal skips it. */
+/* 0a (CAM-FIX follow-up): at open the camera gets back ONLY what a test of ours left behind — the stored record of this camera (a page
+   that closed or crashed before its restore went through); then the record is cleared. A manual setting the person made elsewhere, with
+   no record of ours, is left alone. The meter says so. probe CONTROLS: noHeal skips the repair; healAll = the pre-0a heal (every manual
+   mode back to automatic, ours or not). */
+const testRec=()=>{ try{ const r=JSON.parse(localStorage.getItem(TEST_REC_KEY)||'null'); return r&&typeof r==='object' ? r : null; }catch(e){ return null; } };
+const testRecSet=r=>{ try{ if(r) localStorage.setItem(TEST_REC_KEY, JSON.stringify(r)); else localStorage.removeItem(TEST_REC_KEY); }catch(e){} };
 async function camHeal(){
   const tr=vtrack(); if(!tr || !tr.applyConstraints || lowDbgO.noHeal) return;
-  const bad=healList(capsOf(tr), settingsOf(tr)); if(!bad.length) return;
-  const adv=bad.map(m=>({ [m]:'continuous' }));
-  try{ await tr.applyConstraints({ advanced:adv }); }catch(e){}   // controls only: the format stays as opened
+  let adv;
+  if(lowDbgO.healAll){ adv=healList(capsOf(tr), settingsOf(tr)).map(m=>({ [m]:'continuous' })); if(!adv.length) return; }
+  else { adv=testRecRepair(capsOf(tr), testRec(), settingsOf(tr)); if(!adv) return; }
+  try{ if(adv.length) await tr.applyConstraints({ advanced:adv }); }   // controls only: the format stays as opened
+  catch(e){ console.warn('[camera] restoring the settings a test left failed:', e); low.dev={ kind:'heal', ok:false, what:adv.filter(e=>Object.values(e)[0]==='continuous').map(e=>Object.keys(e)[0]) }; return; }
   const left=await stillManual(adv, tr);
-  low.dev={ kind:'heal', ok:!left.length, what:left.length ? left : bad };
+  low.dev={ kind:'heal', ok:!left.length, what:left.length ? left : adv.filter(e=>Object.values(e)[0]==='continuous').map(e=>Object.keys(e)[0]) };
+  if(!left.length && !lowDbgO.healAll) testRecSet(null);
 }
 async function lowOff(tr, caps, from, why){
   opts.low='off';
@@ -308,12 +374,12 @@ async function lowOff(tr, caps, from, why){
 /* CAM-FIX: leaving the page ends a running test and restores the device (best effort: the page may be gone before the camera answers;
    the next open heals what is left) */
 function lowLeave(){
-  if(opts.low==='off' && !low.touched.size) return;
-  const tr=vtrack(); if(!tr) return;
+  if(opts.low==='off' && !low.touched.size) return null;
+  const tr=vtrack(); if(!tr) return null;
   low.gen++; opts.low='off'; low.note='left';
-  devRestore(tr, 'restore').catch(()=>{});
+  return devRestore(tr, 'restore').catch(()=>{});
 }
-addEventListener('pagehide', lowLeave);
+addEventListener('pagehide', ()=>camRelease(lowLeave()));   // 0b: the camera is released after the test restore
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') lowLeave(); });
 async function setLowLight(m){
   if(!LOW_MODES.includes(m)) throw new Error('low light: '+LOW_MODES.join(', '));
@@ -327,6 +393,7 @@ async function setLowLight(m){
   if(!low.orig) low.orig=devSnap(settingsOf(tr));   // CAM-FIX: originals before the first change on this track
   if(low.touched.size){ const undo=restoreAdvanced(caps, low.orig, [...low.touched]); c.advanced=[...undo, ...(c.advanced||[])]; }   // from one test to another: undo the last one first
   for(const e of c.advanced||[]) for(const k in e) low.touched.add(k);
+  if(low.touched.size){ const st=settingsOf(tr); testRecSet(testRecNext(testRec(), { label:tr.label||'', dev:st.deviceId||'', orig:low.orig, touched:[...low.touched] })); }   // 0a: our change, on record until restored
   low.before=fpsOver(t0-2000, t0); low.after=NaN; low.note=''; low.asked=c; opts.low=m;
   try{
     if(lowDbgO.fail){ const e=new Error('simulated by the probe'); e.name=lowDbgO.fail; e.constraint='frameRate'; lowDbgO.fail=null; throw e; }
@@ -350,7 +417,14 @@ const lowInfo=()=>{ const tr=vtrack(); let applied=null; try{ applied=tr&&tr.get
 /* probe only: fail = the next applyConstraints throws an error of that name; fakeFps = the measured «after»; noFallback = CONTROL (a
    failure stays in the failed mode — the probe must catch it); CAM-FIX: extra = one more control in every test set, noRestore / noHeal =
    CONTROLS (the pre-fix Off; no heal at open); devClear forgets the last device action; reset */
-function lowDbg(o={}){ lowDbgO= o.reset ? {} : { ...lowDbgO, ...o }; if(o.devClear) low.dev=null; }
+function lowDbg(o={}){ const { crash, ...rest }=o; lowDbgO= o.reset ? {} : { ...lowDbgO, ...rest }; if(o.devClear) low.dev=null;
+  if(crash){ low.gen++; opts.low='off'; low.touched.clear(); low.orig=null; low.note=''; } }   // 0a: crash = the page forgot its test without restoring (the record stays)
+/* probe only (0b): gum = a getUserMedia stand-in, timeoutMs (the timeout applies whatever the permission), playFail = the picture step
+   throws that error; CONTROLS noSerial (opens not serialised), noRelease (tracks of a failure not stopped), noRetry; reset */
+function camOpenDbg(o={}){ camOpenDbgO= o.reset ? {} : { ...camOpenDbgO, ...o }; }
+function camStatsDbg(){ CS.max=CS.live; CS.late=0; }   // probe only: forget a control's overlap and late counts
+const camStats=()=>({ calls:CS.calls, live:CS.live, max:CS.max, late:CS.late, startCalls:CS.startCalls, pending:!!CS.pending, open:!!stream,
+  unstopped:[...CS.obtained].reduce((n,s)=>n+s.getTracks().filter(tr=>tr.readyState!=='ended').length, 0) });
 /* probe only (CAM-FIX): sim = { wrap(track) → a track-like object } or null — the runner's fake camera cannot read back 'continuous', and
    its controls do not outlive a reopen; a simulated UVC device can, like the user's webcam */
 function camSimDbg(sim){ camSim=sim||null; }
@@ -375,6 +449,6 @@ function pumpDbg(o={}){
 }
 
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
-export { video, canvas, ctx, initVision, switchCamera, setHandsSink, pollFrame,
+export { video, canvas, ctx, initVision, initDetector, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, detRunDbg, lowDbg, camSimDbg };
+  pathInfo, pumpStats, pumpDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg };

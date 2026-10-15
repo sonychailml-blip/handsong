@@ -232,8 +232,10 @@ export async function checkLowLight(){
    (vision.camSimDbg). Through the REAL buttons: (A) short exposure really sets manual, Off brings automatic exposure and white balance
    and every other control back and the meter says so; (B) the user's likely path short exposure → 15 fps → Off; (C) a fall-back to Off
    restores too; (D) a touched value without an automatic mode returns to its original; (H) leaving the page (pagehide) ends the test and
-   restores; (F) a camera left in manual mode is healed at the next open, the meter says «was manual — restored to automatic»; (I) the
-   warning line under the switch. CONTROLS that must be flagged: (E) the pre-fix Off, (G) an open without the heal. */
+   restores and (0b) releases the camera; (F) 0a: a camera left in manual mode by a test of ours (its record in localStorage, the page
+   «crashed» before its restore) is restored at the next open and the record cleared, the meter says so; a manual setting WITHOUT our record
+   (the person's own, from another app) stays as it is; (I) the warning line under the switch. CONTROLS that must be flagged: (E) the pre-fix
+   Off, (G) an open without the repair, (J) the pre-0a heal of every manual mode. */
 function uvcSim(){
   const caps={ exposureMode:['continuous','manual'], exposureTime:{ min:39.063, max:1250, step:39.063 }, whiteBalanceMode:['continuous','manual'],
     colorTemperature:{ min:2800, max:6500, step:1 }, brightness:{ min:-64, max:64, step:1 } };
@@ -266,6 +268,10 @@ export async function checkCamRestore(){
   const what=keys=>keys.map(k=>t('diag.ctl.'+k)).join(t('diag.ctl.and'));
   const reopen=async ()=>{ await V.switchCamera(ST.camFacing); await sleep(200); };
   const darken=()=>Object.assign(sim.dev, { exposureMode:'manual', exposureTime:39.063, whiteBalanceMode:'manual', colorTemperature:2800 });
+  const C=await import('../core/camlight.js'), recGet=()=>{ try{ return localStorage.getItem(C.TEST_REC_KEY); }catch(e){ return null; } };
+  const recPut=v=>{ try{ if(v==null) localStorage.removeItem(C.TEST_REC_KEY); else localStorage.setItem(C.TEST_REC_KEY, v); }catch(e){} };
+  const rec0=recGet(); recPut(null);
+  const noRec=what=>{ cases++; if(recGet()!=null) miss(`${what}: our test record is still stored (${recGet()})`); };
   cases++; if(V.visionOpts().low!=='off') miss(`low light not Off at the start («${V.visionOpts().low}»)`);
   V.camSimDbg(sim); L.latSwSync();
   try{
@@ -275,8 +281,10 @@ export async function checkCamRestore(){
     /* (A) short exposure → Off */
     V.lowDbg({ fakeFps:30 }); await press('swLowExp');
     cases++; if(V.lowInfo().mode!=='exposure' || sim.dev.exposureMode!=='manual' || sim.dev.exposureTime!==234.378) miss(`short exposure did not reach the camera (mode «${V.lowInfo().mode}», ${JSON.stringify(sim.dev)})`);
+    { let r=null; try{ r=JSON.parse(recGet()); }catch(e){} cases++;   // 0a: the test is on record while it holds a device control
+      if(!r || !(r.touched||[]).includes('exposureMode') || !r.orig || r.orig.exposureMode!=='continuous') miss(`short exposure: no test record with the originals (${recGet()})`); }
     await press('swLowOff');
-    restored('short exposure → Off');
+    restored('short exposure → Off'); noRec('short exposure → Off');
     { const D=V.lowInfo().dev; cases++; if(!D || D.kind!=='restore' || !D.ok || JSON.stringify(D.what)!==JSON.stringify(AUTO)) miss(`the restore is not recorded for the meter (${JSON.stringify(D)})`);
       cases++; const want=t('diag.dev.restore', { what:what(AUTO) }); if(!L.latText().includes(want)) miss(`the meter does not say «${want}»`); }
     /* (B) short exposure → 15 fps → Off (the user's likely path: the pre-fix Off forgot the exposure after another test) */
@@ -296,29 +304,113 @@ export async function checkCamRestore(){
     await press('swLowOff'); restored('short exposure + brightness → Off');
     /* (H) leaving the page */
     V.lowDbg({ reset:true }); V.lowDbg({ fakeFps:30 }); await press('swLowExp');
-    window.dispatchEvent(new Event('pagehide')); await sleep(600);
+    window.dispatchEvent(new Event('pagehide'));
+    { const t0=performance.now(); while(V.camStats().unstopped && performance.now()-t0<3000) await sleep(50); }
     cases++; if(V.visionOpts().low!=='off' || V.lowInfo().note!=='left') miss(`pagehide: mode «${V.visionOpts().low}», note «${V.lowInfo().note}»`);
-    restored('short exposure → the page left');
+    restored('short exposure → the page left'); noRec('short exposure → the page left');
+    { const cs=V.camStats(); cases++; if(cs.open || cs.unstopped) miss(`pagehide: the camera was not released (open ${cs.open}, live tracks ${cs.unstopped})`); }   // 0b
+    await reopen();
     /* (E) CONTROL: the pre-fix Off must be flagged */
     V.lowDbg({ reset:true }); V.lowDbg({ fakeFps:30, noRestore:true }); await press('swLowExp'); await press('swLowOff');
     control('pre-fix Off', 'the pre-fix Off');
     V.lowDbg({ reset:true });
-    /* (F) a camera left in manual mode is healed at the next open */
-    darken(); V.lowDbg({ devClear:true }); await reopen();
-    restored('camera left dark → reopened (heal)');
-    { const D=V.lowInfo().dev; cases++; if(!D || D.kind!=='heal' || !D.ok || JSON.stringify(D.what)!==JSON.stringify(AUTO)) miss(`the heal is not recorded for the meter (${JSON.stringify(D)})`);
+    /* (F) 0a: our test left the camera dark (the page forgot it without restoring) → the next open restores it and clears the record */
+    const crash=async ()=>{ V.lowDbg({ fakeFps:30 }); await press('swLowExp'); V.lowDbg({ reset:true }); V.lowDbg({ crash:true, devClear:true }); };
+    Object.assign(sim.dev, dev0); recPut(null);   // the pre-fix control above left the simulated camera dark
+    await crash();
+    cases++; if(sim.dev.exposureMode!=='manual' || recGet()==null) miss(`the simulated crash did not leave the camera dark with our record (${JSON.stringify(sim.dev)}, ${recGet()})`);
+    await reopen();
+    restored('our test left the camera dark → reopened (repair)'); noRec('repair at open');
+    { const D=V.lowInfo().dev; cases++; if(!D || D.kind!=='heal' || !D.ok || JSON.stringify(D.what)!==JSON.stringify(AUTO)) miss(`the repair is not recorded for the meter (${JSON.stringify(D)})`);
       cases++; const want=t('diag.dev.heal', { what:what(AUTO) }); if(!L.latText().includes(want)) miss(`the meter does not say «${want}»`); }
-    /* (G) CONTROL: without the heal the camera stays dark */
-    darken(); V.lowDbg({ noHeal:true, devClear:true }); await reopen();
-    control('open without heal', 'an open without the heal');
-    V.lowDbg({ reset:true }); await reopen(); restored('healed after the control');
+    /* (F2) 0a: the person's own manual exposure, no record of ours → left alone */
+    const own=()=>{ darken(); recPut(null); V.lowDbg({ devClear:true }); return JSON.stringify(sim.dev); };
+    { const want=own(); await reopen(); cases++; if(JSON.stringify(sim.dev)!==want) miss(`a manual setting without our record was changed at open (${want} → ${JSON.stringify(sim.dev)})`);
+      cases++; if(V.lowInfo().dev) miss(`the meter reports a repair although nothing of ours was there (${JSON.stringify(V.lowInfo().dev)})`); }
+    /* (J) CONTROL: the pre-0a heal changes the person's own setting — the same check must notice */
+    { const want=own(); V.lowDbg({ healAll:true }); await reopen(); V.lowDbg({ reset:true });
+      cases++; if(JSON.stringify(sim.dev)===want) miss('CONTROL: the pre-0a heal left the person’s own manual setting alone — the check cannot fail'); }
+    Object.assign(sim.dev, dev0);
+    /* (G) CONTROL: with our record but without the repair the camera stays dark */
+    await crash(); V.lowDbg({ noHeal:true }); await reopen();
+    control('open without repair', 'an open without the repair');
+    V.lowDbg({ reset:true }); await reopen(); restored('repaired after the control'); noRec('repaired after the control');
     notes.push(`simulated webcam after the row: ${JSON.stringify(sim.dev)}`);
   } finally {
     V.lowDbg({ reset:true });
     if(V.visionOpts().low!=='off') await V.setLowLight('off').catch(e=>miss('restore: '+e.message));
-    V.camSimDbg(null); V.lowDbg({ devClear:true }); L.latSwSync();
+    V.camSimDbg(null); V.lowDbg({ devClear:true }); L.latSwSync(); recPut(rec0);
   }
   cases++; if(JSON.stringify(V.visionOpts())!==JSON.stringify(V.VISION_DEF)) miss(`the switches did not return to their defaults (${JSON.stringify(V.visionOpts())})`);
+  return { cases, total:diff.length, differences:diff, notes };
+}
+
+/* ═══ 0b — A ROBUST CAMERA START (P.checkCamStart, quick and all; DRAWN ≈ 12 s) ═══
+   The user's laptop webcam failed twice («Timeout starting video source», then «Requested device not found») and the app did not open
+   after the next press. (1) The real start made exactly ONE getUserMedia and never two at once. (2) Two opens at once are serialised
+   (never two requests in flight). (3) Through a getUserMedia stand-in: not found, not allowed, a camera that gives no picture (busy) and
+   a request that never answers in time — each fails after exactly one retry ~1 s later, releases every track it obtained (late streams
+   too), and the start card shows the right message with «Try again». CONTROLS that must be flagged: opens not serialised, tracks of a
+   failure not stopped, no retry. Then the real camera is opened again and detection runs. */
+export async function checkCamStart(){
+  const L=await import('../latmeter.js'), V=await import('../vision.js'), ST=await import('../state.js'), M=await import('../main.js');
+  const diff=[], miss=s=>diff.push(s), notes=[]; let cases=0;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms)), $=id=>document.getElementById(id);
+  const made=[];   // every stand-in stream (real MediaStreams from a canvas)
+  const mkStream=()=>{ const c=document.createElement('canvas'); c.width=c.height=16; c.getContext('2d').fillRect(0,0,16,16); const s=c.captureStream(10); made.push(s); return s; };
+  const live=()=>made.reduce((n,s)=>n+s.getTracks().filter(tr=>tr.readyState!=='ended').length, 0);
+  const stopMade=()=>{ for(const s of made) for(const tr of s.getTracks()) tr.stop(); };
+  const err=(msg,name)=>new DOMException(msg, name);
+  const card={ msg:$('loadmsg').textContent, retry:$('camRetry').hidden, b:$('startBtn').disabled, l:$('learnBtn')&&$('learnBtn').disabled };
+  { const cs=V.camStats(); cases++; if(cs.startCalls!==1) miss(`the start made ${cs.startCalls} getUserMedia calls, expected 1`);
+    cases++; if(cs.max!==1) miss(`getUserMedia ran ${cs.max} at once during the session, expected never more than 1`); }
+  /* one failing start through the stand-in: calls, retry gap, release, kind, message */
+  const fail=async (name, o, kind, msgKey, wait=0)=>{
+    const c0=V.camStats().calls, at=[]; let e=null;
+    V.camOpenDbg({ reset:true }); V.camOpenDbg({ ...o, gum:c=>{ at.push(performance.now()); return o.gum(c); } });
+    try{ await V.startCamera(ST.camFacing); }catch(x){ e=x; }
+    if(wait) await sleep(wait);
+    const n=V.camStats().calls-c0, cs=V.camStats(), P=[];
+    if(!e) P.push(`${name}: the start did not fail`);
+    if(n!==2) P.push(`${name}: ${n} getUserMedia calls, expected 2 (one retry)`);
+    if(at.length===2 && !(at[1]-at[0]>=900)) P.push(`${name}: the retry came after ${Math.round(at[1]-at[0])} ms, expected ≈ 1 s`);
+    if(live() || cs.unstopped || cs.open) P.push(`${name}: not released — ${live()} live stand-in tracks, ${cs.unstopped} unstopped, camera open ${cs.open}`);
+    if(e && e.camKind!==kind) P.push(`${name}: kind «${e.camKind}», expected «${kind}» (${e.name}: ${e.message})`);
+    if(cs.max!==1) P.push(`${name}: ${cs.max} getUserMedia at once`);
+    if(e){ M.startFail(e); const tx=$('loadmsg').textContent;
+      if(tx!==t(msgKey)) P.push(`${name}: the start card says «${tx}», expected «${t(msgKey)}»`);
+      if($('camRetry').hidden) P.push(`${name}: no «Try again» button`); }
+    return P;
+  };
+  try{
+    /* (2) serialised; CONTROL: not serialised */
+    const conc=async noSerial=>{
+      V.camOpenDbg({ reset:true }); V.camOpenDbg({ noSerial, playFail:'NotReadableError', gum:()=>new Promise(r=>setTimeout(()=>r(mkStream()),300)) });
+      await Promise.allSettled([V.switchCamera(ST.camFacing), V.switchCamera(ST.camFacing)]);
+      return V.camStats().max; };
+    { const m=await conc(false); cases++; if(m!==1) miss(`two opens at once ran ${m} getUserMedia together`); }
+    { const m=await conc(true); cases++; if(m<2) miss('CONTROL: opens not serialised still never overlapped — the check cannot fail'); }
+    stopMade(); V.camOpenDbg({ reset:true }); V.camStatsDbg();   // the control's overlap must not count against the cases below
+    /* (3) the four failures */
+    for(const [name,o,kind,key,wait] of [
+      ['not found', { gum:()=>Promise.reject(err('Requested device not found','NotFoundError')) }, 'notfound', 'cam.notfound'],
+      ['not allowed', { gum:()=>Promise.reject(err('Permission denied','NotAllowedError')) }, 'denied', 'cam.denied'],
+      ['no picture (busy)', { gum:()=>Promise.resolve(mkStream()), playFail:'NotReadableError' }, 'busy', 'cam.busy'],
+      ['no answer in time', { gum:()=>new Promise(r=>setTimeout(()=>r(mkStream()),1200)), timeoutMs:300 }, 'busy', 'cam.busy', 1500],
+    ]){ cases++; const P=await fail(name, o, kind, key, wait); P.forEach(miss); if(!P.length) notes.push(`${name}: one retry, released, «${t(key).slice(0,40)}…»`); }
+    { const cs=V.camStats(); cases++; if(cs.late<2) miss(`the abandoned requests' late streams: ${cs.late} stopped, expected 2`); }
+    /* CONTROLS: no release, no retry */
+    { const P=await fail('CONTROL no release', { gum:()=>Promise.resolve(mkStream()), playFail:'NotReadableError', noRelease:true }, 'busy', 'cam.busy');
+      cases++; if(!P.some(x=>/not released/.test(x))) miss('CONTROL: tracks of a failure left running were not noticed — the check cannot fail'); }
+    stopMade();
+    { const P=await fail('CONTROL no retry', { gum:()=>Promise.reject(err('Requested device not found','NotFoundError')), noRetry:true }, 'notfound', 'cam.notfound');
+      cases++; if(!P.some(x=>/getUserMedia calls/.test(x))) miss('CONTROL: a start without the retry was not noticed — the check cannot fail'); }
+  } finally {
+    V.camOpenDbg({ reset:true }); stopMade(); V.camStatsDbg();
+    $('loadmsg').textContent=card.msg; $('camRetry').hidden=card.retry; $('startBtn').disabled=card.b; if($('learnBtn')) $('learnBtn').disabled=card.l;
+    await V.switchCamera(ST.camFacing).catch(e=>miss('the real camera did not reopen: '+e.message));
+  }
+  { const a=L.latCount('detect'); await sleep(900); cases++; if(!(L.latCount('detect')>a)) miss('after the row the real camera gives no detections'); }
   return { cases, total:diff.length, differences:diff, notes };
 }
 
@@ -327,3 +419,4 @@ row({ at:580, name:'LAT1 latency meter', run:()=>checkLatency(), read:r=>({ case
 row({ at:581, name:'LAT1b test switches', run:()=>checkLatSwitches(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
 row({ at:585, name:'LAT3 low light', run:()=>checkLowLight(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
 row({ at:586, name:'CAM-FIX camera settings restored', run:()=>checkCamRestore(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
+row({ at:587, name:'CAM-START robust camera start', run:()=>checkCamStart(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });

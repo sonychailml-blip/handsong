@@ -131,3 +131,32 @@ export function capsText(caps, settings={}){
   }
   return out.join(' · ');
 }
+
+/* ---------- 0a: our own test record (CAM-FIX follow-up) ----------
+   A camera found in manual mode at open may be the person's own choice (set in another app) — the open-time repair touches ONLY what a
+   low-light test of ours changed. The app keeps a record (localStorage, written by vision.js) while a test holds device controls: the
+   camera's name and id, the originals and the touched keys. At the next open: the record of THIS camera → restore those originals and
+   clear it; no record (or another camera) → leave the settings alone. */
+export const TEST_REC_KEY='handsong.camTest';
+/* the record after one more test set: originals kept from the first change, touched keys united */
+export function testRecNext(prev, { label='', dev='', orig={}, touched=[] }){
+  const p=prev && typeof prev==='object' ? prev : null;
+  return { v:1, label:p ? p.label : label, dev:p ? p.dev : dev, orig:p ? p.orig : { ...orig }, touched:[...new Set([...(p ? p.touched : []), ...touched])] };
+}
+/* the advanced entries the open-time repair applies, or null (nothing of ours, a broken record, or a record of another camera) */
+export function testRecRepair(caps, rec, settings={}){
+  if(!rec || rec.v!==1 || !Array.isArray(rec.touched) || !rec.orig || typeof rec.orig!=='object') return null;
+  if(rec.dev && settings.deviceId && rec.dev!==settings.deviceId) return null;
+  return restoreAdvanced(caps, rec.orig, rec.touched);
+}
+
+/* ---------- 0b: why a camera did not start ----------
+   getUserMedia / play errors by name → the message the start card shows: 'busy' (in use, not responding, timed out), 'notfound' (no
+   camera, it disappeared), 'denied' (access refused), 'other'. Old Chrome names included. */
+export function camErrKind(e){
+  const n=String(e && e.name || ''), m=String(e && e.message || '');
+  if(/^(NotAllowedError|PermissionDeniedError|SecurityError)$/.test(n)) return 'denied';
+  if(/^(NotFoundError|DevicesNotFoundError|OverconstrainedError|ConstraintNotSatisfiedError)$/.test(n) || /device not found/i.test(m)) return 'notfound';
+  if(/^(NotReadableError|TrackStartError|AbortError|TimeoutError)$/.test(n) || /timeout|could not start|in use/i.test(m)) return 'busy';
+  return 'other';
+}
