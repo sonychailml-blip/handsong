@@ -70,7 +70,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   lines and every "first differences" block; exit 0 only on PASS. Flags: `--quick` (default), `--all`, `--quick --all`,
   `--repeat N` (N fresh browsers, P.all each, then a table of every measured value with its margin — `meas()` in the probe,
   `res.measures`), `--eval file.js` (script in the page after the seed, prints JSON), `--headed` (off-screen window; worse: a drawn
-  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 5; P.quick 3, seed 3, start 3). Full console →
+  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 8 since GOLD1; P.quick 3, seed 3, start 3). Full console →
   `tools/.probe-logs/` (git-ignored). Headless is the default because measured: every row runs, P.quick takes the user's manual
   time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash). The runner PAUSES auto-freeze for its whole session
   (`frzqueue.afPause('runner')`; AF3 is checked by its own deterministic row). In `--eval` the page has `window.__heap()` (full GC, then
@@ -94,13 +94,13 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - **Read `src/` before changing anything**; re-verify every line number.
 - ⛔ **Never insert a comment in the middle of an export list**; re-read every export list you touch.
 - **Changed a signature or a stored field's meaning → find every reader**, positional callers included (rule #15); the probe module
-  `src/scaleprobe.js` is a caller too. The report LISTS every positional caller of every changed function with its arguments.
+  `src/scaleprobe.js` and `src/probes/*` are callers too. The report LISTS every positional caller of every changed function with its arguments.
 - **Stay inside the slice.** Defects outside it are reported, not fixed.
-- **Probes — speed:** `await P.quick()` = `P.all()` without `SLOW_ROWS` (all-view sweeps T1, T2, T4b1, T4b3, T4b4, T5, T6b, F0, F3;
-  "tracks: every one reachable"; LR1; AF2; AF6b); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
+- **Probes — speed:** `await P.quick()` = `P.all()` without the rows flagged `slow` (all-view sweeps T1, T2, T4b1, T4b3, T4b4, T5, T6b, F0,
+  F3; "tracks: every one reachable"; LR1; AF2; AF6b; GOLD); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
   only the pitched track. Every rendering probe renders a SHORT window (`renderTrack(…, {short})`, `PROBE_SHORT` 1 s of song, tail
   ≤ 0.75 s) — never `freeze`/❄/`R.aud`. On demand only: `P.checkRepeat({evidence:true})`, `P.orderCheck()`, `await P.freezeCost()`.
-  `DRAWN_ROWS` (tracks reachable, AR1, MX1, MX2, AR2) read "not checked: tab hidden" when frames don't come.
+  Rows flagged `drawn` (LAT1, ED7-fix2, tracks reachable, AR1, MX1, MX2, AR2) read "not checked: tab hidden" when frames don't come.
 - **Probes — discipline:** a probe that changes mixer state, windows or engine options restores ALL of it in `finally`; `P.all()`
   runs a **state guard** between rows (before/after snapshot of mixer tables, windows, live sound state, the render engine
   copy's switches and a fingerprint of the song's events — payloads, marks and order); probes work with the song loaded and WITHOUT the editor or hands open; they cover DERIVED paths (chase, ghost,
@@ -338,7 +338,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/tutor.js` — lesson list + step engine (see "The tutorial").
 - `src/gestures.js` — the gesture state machine (`HANDS`, `processHands`, owner keys, voice modes, hysteresis, depth, `fxParamsOf` =
   the aim's single door, expression, looper hand). At pinch capture the hand's role and X-range are frozen on `S` (`S.role`, `S.rx0`,
-  `S.rx1`, `S.zone`, `S.fn`).
+  `S.rx1`, `S.zone`, `S.fn`). HAND1 probe-only: `handsProbe(clk, looperTap)` / `processHandsProbe(res)` (the probe clock), `pinchDbg(d)`;
+  `recorder.wTapSet(f)` taps every W* call (all no-ops when unset).
 - `src/draw.js` — canvas: video background, overlays, roles, grids, palette, FX bars, status, `noteLbl` (the ONE label function), the
   editor (`drawRoll`, snapshot `rollView`, `rollAxis`), the strip and arrangement window (`drawLooper(full)`, snapshot `loopView`).
 - `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
@@ -361,12 +362,19 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   third door, never await one render inside another), console `R.*`, ear tools, probe bodies.
 - `src/songs.js` — demo songs (`P.song(name, {replace:true})`; today `triphop`); refuses while recording, playing, with the editor
   open, or on a non-empty song without `replace`.
-- `src/scaleprobe.js` — the browser probe (`P`). `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (imports only
-  scales/state/i18n). ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
+- `src/scaleprobe.js` — the browser probe (`P`), since PROBE1 a FACADE: explicit re-exports of `src/probes/<area>.js` (`run` P.all/P.quick/
+  orderCheck/material, `tuning`, `seed` P.seed/P.song + write path, `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `gold`, `hand`,
+  `guard` api/lock, `kit` shared helpers, `data` the node rows). ⛳ **Rows register themselves** next to their probe: `probes/rows.js`
+  `row({ at, name, run, read, slow?, drawn?, realtime?, song?, node? })` (order by `at`; the pre-PROBE1 order = old position × 10),
+  `family({ at, name, rows })` for generated rows (module contracts); `rowProblems()` (duplicate names/places, bad shapes) counts as
+  differences in P.all and the data runner (CONTROL: a duplicate name must be caught). A new row = a `row()` call in its area file, nothing
+  else. `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (imports only scales/state/i18n); the data runner runs the
+  registry's `node` rows (`probes/data.js`) plus LIC1 and LAT1 core. ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
 - `tools/check-licences.mjs` + `tools/licences.json` (LIC1 licence register and its checker; `THIRD-PARTY-LICENSES.md` generated),
   `tools/lex.mjs` (the comment/string lexer shared by both checkers),
 - `tools/check-static.mjs` (static checker), `tools/probe-browser.mjs` (browser runner), `tools/scales.before.json` (F0 snapshot),
-  `tools/song.print.json` (TF0 song sound fingerprint of the seed).
+  `tools/song.print.json` (TF0 song sound fingerprint of the seed), `tools/gold.print.json` (GOLD1 golden renders),
+  `tools/gesture.print.json` (HAND1 gesture fingerprint).
 - Stale (removed) names to ignore: list in `docs/NAME-INDEX.md`, "Stale names".
 
 ## Architecture (full reasoning per section: archive, same titles)
@@ -1063,6 +1071,25 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   2–2000, base ≤ 500, output ≤ 2000, hand → sound 0.5–5000), the audio block is exactly 128 frames, the camera size readable; the overlay
   shows numbers through the REAL Sound-panel buttons and hides again. CONTROL: `latPauseDbg(true)` — a paused meter must add nothing. The
   pure arithmetic: node row «LAT1 latency stats (core)» (exact values). PRIV1's CSP check is the runner's, not a P row.
+- **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–90 s headless): 70 cases rendered alone through the engine copy
+  (`render.goldRender(play, sec, chains)`: 48 kHz fixed, one seed, offline allocator — seeds the KS pluck —, tapped before the limiter,
+  every chain owner on an explicit path): 23 solo, 16 chord, 7 bass timbres (one note), 5 kits × 6 rows, the drone (major, key 0, A4 440),
+  vol/bright/glide at three values, reverb/delay/tremolo-mix on the chord chain at three settings → features (mid loudness per 50 ms,
+  side energy, 10 octave bands × 3 segments, dB) vs `tools/gold.print.json` (`P.dumpGold()` on unchanged code; renewed only by a slice
+  that changes sound by decision, or by a Chrome update that changes built-in DSP — say so). Tolerance 0.01 dB per value; values below
+  −100 dB on both sides skipped (same-seed spread measured ≤ 0.0011 dB, at −98 dB). CONTROL: the copy's Warm pad chord filter +1 %
+  (`CHORD_INSTR[0].lp`, restored) must leave its golden case.
+- **HAND1 gesture fingerprint** (`P.checkGesture`, quick and all, ≈ 1 s): a pose → 21-landmark generator and a scripted performance (solo:
+  slow pinch, degrees, volume, register finger, 2–3 fingers; effects hand; lead-mode hand-over; hold; theremin; expression hand; bass and
+  its theremin; latch on/glide/off; typed palette on Chromatic; drums; split; looper index/middle/ring edges, the 3-s pinky clear and its
+  cancel; a hand leaving the frame) through the REAL `processHands` on the probe clock (`gestures.handsProbe({t, W:1000, H:600}, tap)`:
+  time and play field from the clock, app-loop calls ignored, the machine's hands/latch/lead/expression state set aside and put back;
+  looper commands printed and swallowed — the transport never starts) → per frame the W* calls (`recorder.wTapSet`), looper commands,
+  tutor hooks, live voice keys, hand states, effect aims, the expression display and shown looper messages (English) vs
+  `tools/gesture.print.json` (`P.dumpGesture()`). Environment pinned and restored (role, layout, hand functions, voice modes, fingers,
+  major key 0, timbres 0, front camera, default crop, palette choice, displays); live chains or a non-default chord-mode choice → «not
+  applicable». Recording is not in the print (push stamps from the audio clock; the W* stream is its input; funnels: «write path»).
+  CONTROL: `gestures.pinchDbg(0.03)` (PINCH_ON + 0.03) must change the print (the slow approaches cross the threshold).
 - **AR1 arrangement window** also checks AF4: no ❄ hittable; the freeze dot from `loopView.dots` — rendering = filled, waiting = hollow,
   frozen rows nothing; TF4: a row stale by A4 shows a hollow (waiting) dot, then re-renders and shows nothing; CONTROL: the rendering row must not read as waiting; the play strip has no dots and, with nothing
   armed, no mark column although a track is frozen and one stale.
@@ -1166,7 +1193,7 @@ the collapsed rule is `#tutorBar.on.mini`; `syncTutorBarPos`/`hushStrip` bail ou
 
 ### Publication & PWA
 Live at https://sonychailml-blip.github.io/handsong/ (GitHub Pages; custom domain `handsong.app` intended, not attached; no file in the
-app references either URL — update only these docs). Also deployed on **Vercel** (its URL is not recorded here): `index.html` loads
+app references either URL — update only these docs). Also deployed on **Vercel** at https://handsong.vercel.app (production; user, 2026-10-15): `index.html` loads
 **Vercel Web Analytics** (`/_vercel/insights/script.js`, same origin; cookieless page-view counts; inert on GitHub Pages, where the
 root-absolute path does not resolve) — kept by the user and named in the privacy notice (Q14, 2026-10-14; register entry
 `vercel-web-analytics`); ⚠️ Vercel's Hobby plan forbids commercial use — a paid plan or other hosting before selling. Installable: `manifest.json` (name «Handsong», standalone, three icons incl. maskable)

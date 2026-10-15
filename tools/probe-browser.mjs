@@ -9,7 +9,7 @@
      node tools/probe-browser.mjs --repeat 3         P.all три раза, каждый раз — СВЕЖИЙ браузер и свой посев; затем таблица мер
                                                      строк реального времени по прогонам и запас до допуска
    Ключи: --headed (обычное окно, вынесенное за экран, вместо безголового), --browser chrome|msedge, --limit-min M (потолок на один
-   P.all, умолчание 5; P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
+   P.all, default 8 since GOLD1; P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
    --cdn-cache: serve the pinned MediaPipe files from tools/.cdn-cache/ (fetched once; for a slow network).
    --limit-start M: the app start limit in minutes (default 3; the hand model comes from the CDN — raise it on a slow network).
    Hygiene: at start it lists browsers left by earlier runner sessions (found by Playwright's temporary profile path) and orphaned
@@ -62,7 +62,7 @@ const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
 const HEADED=has('--headed'), VERBOSE=has('--verbose'), BROWSER=val('--browser','chrome');
-const LIMIT_ALL=(+val('--limit-min',5)||5)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
+const LIMIT_ALL=(+val('--limit-min',8)||8)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
 /* Строки реального времени и съёма — для таблицы --repeat (их меры печатаются по прогонам). Имена — строки P.all. */
 const RT_ROWS=['LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback','MX1 track level and master','MX2 track pan','render repeatability','renders serialized','S4 solo editing'];
 

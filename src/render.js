@@ -420,7 +420,7 @@ const timeReset=()=>{ TIME.n=0; TIME.importMs=0; TIME.initMs=0; TIME.renderMs=0;
 function renderOnce(seed, material, seconds, opts){ return renderQueued(()=>renderOnceNow(seed, material, seconds, opts)); }
 async function renderOnceNow(seed, material, seconds, opts){
   const o=opts||{};
-  const rate=LIVE_AC.sampleRate;
+  const rate=o.rate||LIVE_AC.sampleRate;   // GOLD1: a fixed rate on request (golden renders at 48 kHz whatever the device runs)
   const frames=Math.max(1,Math.round(rate*seconds));
   const OfflineCtor=window.OfflineAudioContext||window.webkitOfflineAudioContext;
   const t0=now();
@@ -2182,12 +2182,28 @@ async function chunkCheck(){
   out.seconds=+((performance.now()-tStart)/1000).toFixed(1);
   return out;
 }
+/* ═══ GOLD1: ONE GOLDEN RENDER — a sound played straight into the engine copy, at a fixed 48 kHz and one seed ═══
+   play(eng) schedules notes with explicit times; chains = { chainKey: { ids:[fxId…], set:{ 'fxId:pKey': v01 } } } — every chain owner of
+   the copy gets an explicit render path (absent = empty: dry), so the live chains are read nowhere. Offline allocator (seeds the KS
+   pluck too); tapped at the master, before the limiter (as a freeze). Returns { L, R, rate } (copies). Probes only (P.checkGold). */
+const GOLD_RATE=48000, GOLD_SEED=0x601D;
+function goldRender(play, seconds, chains={}){
+  return renderOnce(GOLD_SEED, eng=>play(eng), seconds, { offline:true, rate:GOLD_RATE, prep:eng=>{
+    eng.offlineTapMaster();
+    for(const key of new Set([...ST.chainOwners().map(o=>o.key), ...Object.keys(chains)])){
+      const c=chains[key]||{ ids:[] };
+      for(const id of c.ids) eng.fxInstance(key,id);
+      eng.fxRenderPath(key, c.ids, c.ids);
+      for(const [a,v] of Object.entries(c.set||{})){ const [fx,p]=a.split(':'); eng.fxPlaySet(key,fx,p,v,0); } } } })
+    .then(r=>({ L:r.buf.getChannelData(0).slice(), R:r.buf.getChannelData(r.buf.numberOfChannels>1?1:0).slice(), rate:r.rate }));
+}
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
 export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
   bendTrace,   // BEND-CURVE: what the render copy schedules for a track's bend curves (P.checkBendCurve)
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
+  goldRender,   // GOLD1: golden renders of every timbre, the drone and the effects (P.checkGold)
   copyState,   // снимок переключателей копии движка — страж P.all между строками
   revAgree,   // LR1: проба «живой и замороженный реверб согласны» (P.checkRevAgree)
   /* AF1: очередь автозаморозки (консоль) и замер раскладки без рендера (P.freezeCost) */

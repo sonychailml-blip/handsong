@@ -46,7 +46,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   ED7-fix, BEND-CURVE, OWN1 (80–82), ED7-fix2 (83) · TF2, TF3 (84–87), TF3b, TF4, TF5 (88–90) — STAGE 2 CLOSED 2026-10-14. Each line as it
   stood: archive B, «Moved from HANDOFF.md at the STAGE 3 plan».
 - ✅ **STAGE 3 PLAN** written 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; summary below); user answers Q1–Q19 given 2026-10-14
-  (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92).
+  (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92) ·
+  ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -96,7 +97,7 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1; next PROBE1 — summary below) → **4 «Calm»** = FIRST
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1; next REC1 — or LAT2 first, open question 2026-10-15) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -169,15 +170,16 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### LIC1 + PRIV1 + LAT1 (2026-10-14) — stage 3 slices 1–3 (full: archive B «LIC1 + PRIV1 + LAT1»)
-- LIC1: register `tools/licences.json` → generated `THIRD-PARTY-LICENSES.md`; `tools/check-licences.mjs` = data-runner row «LIC1 licence
-  register» (URLs, CSP hosts, non-code files, npm lock, 72-glyph audit, stale document; 6 controls). Every icon/glyph/image/font marked «to be
-  replaced by the user's own authored design».
-- PRIV1: hard rule #33; CSP `<meta>` (no inline script — `src/va-stub.js`); static NETWORK GUARD (9 sites listed); runner fails on any CSP
-  violation, control fetch refused; privacy notice `#privacyNote` names the Vercel counter. Live CDN under the CSP: 4 files 200.
-- LAT1: `src/core/latency.js` (pure, node row «LAT1 latency stats (core)») + `src/latmeter.js` (overlay: Sound panel → «Latency meter»;
-  `R.latency()`; Bluetooth warning); row «LAT1 latency meter» (control: paused meter); check-static reads sub-folders. Headless: camera
-  14.7 fps, picture→app 21.8 ms (p95 55.9), detection 51.5 (58.2), gestures 0.0, drawing 3.9, frame every 59.7, buffer 10 + output 42
-  (measured 44.7), hand→sound ≈ 127 ms; 76 of 444 detections re-read a frame (→ LAT2). Real numbers: the user's devices (step 92).
-- Probes: static PASS; data PASS 10 checks (71.5 s); `--quick --cdn-cache` PASS — 47 checks, 100.0 s, UI and CSP checks PASS; frozen seed
-  bass L4 0.08686 / 0.055319 / 650886. Fix rounds: LIC1 1 (♮ unlisted), PRIV1 2 (CSP hosts rule, its regex), LAT1 1 (global + a glyph).
+### PROBE1 + GOLD1 + HAND1 (2026-10-15) — stage 3 slices 4–6, safety nets (full: archive B «PROBE1 + GOLD1 + HAND1»)
+- PROBE1: `scaleprobe.js` → facade over `src/probes/<area>.js` (moved verbatim, checked line by line); rows register themselves
+  (`probes/rows.js`: `row`/`family`, flags slow/drawn/realtime/song/node, order `at`); registry problems fail P.all and the data runner
+  (control: a duplicate name). Same 47 rows, results and order; the data runner reads its rows from the registry (F4 now after the sweeps).
+- GOLD1: 70 golden renders (51 timbres incl. 5 kits × 6 rows, drone, 6 effects × 3) at 48 kHz → `tools/gold.print.json`; row «GOLD timbres
+  and effects» (P.all, slow, 50–64 s); tol 0.01 dB (measured spread ≤ 0.0011); control: Warm pad filter +1 % caught. Runner P.all limit 8 min.
+- HAND1: synthetic hands on a probe clock through the real `processHands` → `tools/gesture.print.json` (523 lines: W* calls, looper commands,
+  tutor hooks, voices, hands, aims, expression); row «HAND1 gesture fingerprint» (quick, 0.3 s); control: PINCH_ON + 0.03 caught. Probe-only
+  hooks: `gestures.handsProbe/processHandsProbe/pinchDbg`, `recorder.wTapSet` (no-ops when unset). Recording is not in the print (audio clock).
+- Probes: static PASS; data PASS 10 checks (35.4 s); `--quick --all --cdn-cache` PASS — P.quick 48 checks 86.4 s, P.all 63 checks 350.7 s, UI and
+  CSP PASS; frozen seed bass L4 0.08686 / 0.055319 / 650886. Fix rounds: PROBE1 2 (split tool: template braces, spread imports; registry
+  family check order), GOLD1 1 (P.all over the 5-min limit → windows shortened, limit 8), HAND1 2 (state leaking between runs: display,
+  message, palette; message language). Vercel production URL recorded: https://handsong.vercel.app.

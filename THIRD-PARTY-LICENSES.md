@@ -65,9 +65,9 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 
 | Glyph | Code point | Meaning | Kind | Used in |
 |---|---|---|---|---|
-| ↶ | U+21B6 | undo (history) | icon | index.html, src/i18n.js, src/scaleprobe.js |
-| ↷ | U+21B7 | redo (history) | icon | index.html, src/scaleprobe.js |
-| ⤺ | U+293A | undo the last take | icon | index.html, src/i18n.js, src/scaleprobe.js |
+| ↶ | U+21B6 | undo (history) | icon | index.html, src/i18n.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
+| ↷ | U+21B7 | redo (history) | icon | index.html, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
+| ⤺ | U+293A | undo the last take | icon | index.html, src/i18n.js, src/probes/history.js, src/probes/window.js |
 | ⇄ | U+21C4 | swap hands (help text) | icon | index.html |
 | ⊘ | U+2298 | remove effect from a track | icon | index.html |
 | ⌐ | U+2310 | step shape (automation / bend) | icon | src/i18n.js, src/ui.js |
@@ -77,13 +77,13 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ⏮ | U+23EE | to the start | icon | index.html |
 | ⏸ | U+23F8 | pause (message) | icon | src/i18n.js, src/songs.js |
 | ❚ | U+275A | pause bars | icon | src/i18n.js |
-| ▶ | U+25B6 | play / start | icon | index.html, src/i18n.js, src/recorder.js, src/render.js, src/scaleprobe.js, src/songs.js |
+| ▶ | U+25B6 | play / start | icon | index.html, src/i18n.js, src/probes/freeze.js, src/probes/seed.js, src/probes/window.js, src/recorder.js, src/render.js, src/songs.js |
 | ■ | U+25A0 | stop (panic) | icon | index.html, src/songs.js |
 | ⟳ | U+27F3 | repeat the brace | icon | index.html, src/songs.js |
 | ● | U+25CF | record / lesson step done | icon | index.html, src/i18n.js, src/tutor.js |
 | ○ | U+25CB | lesson step to come | icon | src/tutor.js |
-| ✕ | U+2715 | close / delete / clear | icon | index.html, src/i18n.js, src/scaleprobe.js, src/ui.js |
-| ✎ | U+270E | edit / rename / arrangement window | icon | index.html, src/scaleprobe.js, src/songs.js |
+| ✕ | U+2715 | close / delete / clear | icon | index.html, src/i18n.js, src/probes/history.js, src/ui.js |
+| ✎ | U+270E | edit / rename / arrangement window | icon | index.html, src/probes/window.js, src/songs.js |
 | ✂ | U+2702 | cut bars | icon | index.html |
 | ⧉ | U+29C9 | copy / duplicate | icon | index.html, src/i18n.js |
 | 📋 | U+1F4CB | paste | icon | index.html |
@@ -104,7 +104,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ◆ | U+25C6 | depth hand axis | icon | src/ui.js |
 | ◧ | U+25E7 | left half (split) | icon | index.html, src/ui.js |
 | ◨ | U+25E8 | right half / split | icon | index.html, src/i18n.js, src/ui.js |
-| ✓ | U+2713 | done / chosen | icon | src/i18n.js, src/scaleprobe.js, src/tutor.js |
+| ✓ | U+2713 | done / chosen | icon | src/i18n.js, src/probes/window.js, src/tutor.js |
 | ⚙ | U+2699 | settings | icon | index.html, src/i18n.js |
 | ⛶ | U+26F6 | full screen | icon | index.html, src/i18n.js |
 | ⬇ | U+2B07 | install | icon | index.html, src/i18n.js |
@@ -120,10 +120,10 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | index.html |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/render.js, src/scaleprobe.js, src/songs.js |
-| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/draw.js, src/i18n.js, src/probedata.js, src/render.js, src/scaleload.js, src/scaleprobe.js, src/ui.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/draw.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/scaleload.js, src/ui.js |
 | ≈ | U+2248 | approximately | typography | src/draw.js, src/i18n.js, src/render.js |
-| ≤ | U+2264 | less or equal | typography | src/scaleprobe.js |
+| ≤ | U+2264 | less or equal | typography | src/probes/window.js |
 | ≥ | U+2265 | greater or equal | typography | src/scaleload.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | src/draw.js, src/render.js |
 | √ | U+221A | square root (console text) | typography | src/render.js |
@@ -135,5 +135,5 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ⛳ | U+26F3 | rule flag (console) | console | src/render.js |
 | ✅ | U+2705 | done (console) | console | src/render.js |
 | ❌ | U+274C | failed (console) | console | src/render.js |
-| ❄ | U+2744 | frozen (console) | console | src/render.js, src/scaleprobe.js |
+| ❄ | U+2744 | frozen (console) | console | src/probes/window.js, src/render.js |
 | ☀ | U+2600 | sun (console) | console | src/render.js |

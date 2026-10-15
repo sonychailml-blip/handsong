@@ -248,3 +248,10 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/latmeter.js`: `latStart`, `latFrame`, `latIdle`, `latReport`, `latText`, `latConsole`, `latShow`, `latShown`, `latCount`, `latPauseDbg`
 - `src/main.js`: `latStart`/`latFrame`/`latIdle` calls in `startApp`/`loop`; `src/render.js`: `latency` (console `R.latency()`)
 - `src/scaleprobe.js`: `checkLatency` (row «LAT1 latency meter», DRAWN)
+
+## Added at PROBE1 / GOLD1 / HAND1 (stage 3, slices 4–6)
+- `src/scaleprobe.js` is a FACADE (explicit re-exports; every earlier `scaleprobe` name above now lives in `src/probes/<area>.js`): `run` (`all`, `quick`, `orderCheck`, `material`, `songPrint`, `stateSig`, `registryProblems`), `tuning`, `seed` (`seed`, `song`, `SEED_REC`, `checkWrite`, `checkSeed`, `checkFrozen`), `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `guard` (`api`, `guardSelfTest`, `LOCK`), `kit` (`frame`, `waitMs`, `meas`, `MEAS`, `measReset`, `QUICK`, `setQuick`, `PROBE_SHORT`, `frameStalls`, `winKeep`, `winRestore`), `data` (the node rows)
+- `src/probes/rows.js`: `row`, `family`, `rows(filter)`, `rowProblems`, `rowCheck`; flags `slow`, `drawn`, `realtime`, `song`, `node`; stale: `ALL_RUNS`, `SLOW_ROWS`, `DRAWN_ROWS`
+- `src/probes/gold.js`: `dumpGold`, `checkGold` (row «GOLD timbres and effects», slow), `goldCases`, `goldFeats`, `goldCmp`, `fft`, `GOLD_TOL`, `GOLD_FLOOR`; `tools/gold.print.json`; `src/render.js`: `goldRender`, `GOLD_RATE`, `GOLD_SEED`, `renderOnce` option `rate`
+- `src/probes/hand.js`: `dumpGesture`, `checkGesture` (row «HAND1 gesture fingerprint»), `pose`, `script`, `perform`, `ENV0`, `fxKeep`; `tools/gesture.print.json`; `src/gestures.js`: `handsProbe`, `processHandsProbe`, `pinchDbg`, `nowMs`, `PRB`, `looperTap`, `pinchD`; `src/recorder.js`: `wTap`, `wTapSet`
+- `tools/probe-data.mjs`: rows from `probes/rows.js` (flag node) + LIC1 + LAT1 core; `REG`, registry problems in the verdict; `tools/probe-browser.mjs`: `--limit-min` default 8; `tools/check-static.mjs` `NET_LISTED`: `probes/files.js`, `probes/key.js`, `probes/gold.js`, `probes/hand.js` (one fetch each; was `scaleprobe.js` 2)

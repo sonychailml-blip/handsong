@@ -40,7 +40,7 @@ function touchedFingers(r,prev){
   const now=new Set();
   for(let i=0;i<FINGER_TIPS.length;i++){
     const v=r[FINGER_TIPS[i]];
-    if(prev.has(i) ? v<=PINCH_OFF : v<PINCH_ON) now.add(i);
+    if(prev.has(i) ? v<=PINCH_OFF : v<PINCH_ON+pinchD) now.add(i);   // pinchD: HAND1 probe control only (0 otherwise)
   }
   return now;
 }
@@ -241,8 +241,9 @@ let latchLen=0;   // сколько нот звучит у 'latch': по нем�
    thumb+палец: указ.→запись, средн.→пуск/пауза, безым.→отмена последнего взятого, мизинец→очистить ВСЁ (только после
    3с удержания с отсчётом — единственное разрушительное действие). Невозможные команды сообщаются, а не
    молчат. Здесь только логика; кнопки транспорта в UI работают как прежде (это ЕЩЁ один вход). */
-function looperMsgSet(text,ok){ setLooperMsg({text, until:performance.now()+LOOPER_MSG_MS, ok}); }
+function looperMsgSet(text,ok){ setLooperMsg({text, until:nowMs()+LOOPER_MSG_MS, ok}); }
 function doLooper(cmd){
+  if(looperTap && looperTap(cmd)) return;   // HAND1: a probe session prints the command and keeps the transport still
   if(cmd==='rec'){                                        // всегда возможно: не пишет→запись, пишет→стоп
     /* ⛳ S3.3: развилка «первый круг / наложение» исчезла вместе с loop.first — различать здесь нечего. КУДА
        писать, решает onRec: с S3.5c — во ВООРУЖЁННУЮ дорожку, если она есть, иначе в новую. Рука-лупер
@@ -263,7 +264,7 @@ function doLooper(cmd){
    мизинец только заводит 3с-таймер (S.clearT0) и показывает отсчёт, сама очистка — в блоке удержания. */
 function fireLooperCmd(S,mf){
   const f=FINGER_TIPS.indexOf(mf);                        // 0 указ · 1 средн · 2 безым · 3 мизинец
-  if(f===3){ S.clearT0=performance.now(); S.clearFired=false; setLooperClear(CLEAR_HOLD_MS); return; }
+  if(f===3){ S.clearT0=nowMs(); S.clearFired=false; setLooperClear(CLEAR_HOLD_MS); return; }
   if(f===0) doLooper('rec');
   else if(f===1) doLooper('play');
   else if(f===2) doLooper('undo');
@@ -436,7 +437,7 @@ function endPinch(key,S){
       chOwner=null;
     }
     if(S.zone==='loop'&&S.clearT0!=null&&!S.clearFired){   // мизинец отпущен ДО 3с → очистка ОТМЕНЕНА (ничего не делаем, гасим отсчёт)
-      setLooperClear(-1); setLooperMsg({text:t('msg.clearCancelled'), until:performance.now()+LOOPER_MSG_MS, ok:true});
+      setLooperClear(-1); setLooperMsg({text:t('msg.clearCancelled'), until:nowMs()+LOOPER_MSG_MS, ok:true});
     }
   }
   S.pinch=false; S.adj=null; S.deg=-1; S.slot=-1; S.rect=null; S.ty=null;   // S.rect — гистерезис прямоугольника, как S.pc/S.pr у палитры; S.ty — замороженный на атаке тип аккорда
@@ -535,8 +536,25 @@ function captureFx(S,finger,lm,H){
   S.adj={ finger, p0:{ x:lm[4].x, y:lm[4].y*H, z:null }, ent };
   S.tutFx=null;   // S.tutFx — база для зацепки обучения 'fx' (сдвиг эффекта)
 }
+/* ⛳ HAND1: THE PROBE CLOCK. While a probe session runs (handsProbe({t, W, H}, looperTap)), processHands takes its time and play-field
+   size from the clock and ignores the app loop's own calls; the machine's state (hands, latch and lead owners, expression) is set aside
+   and put back at the end; looper commands go to looperTap first (true = swallowed). With no session every line here is a no-op. */
+let PRB=null, prbCall=false, prbKeep=null, looperTap=null, pinchD=0;
+const nowMs=()=> PRB ? PRB.t : performance.now();
+function handsProbe(clk, tap){
+  if(clk && !PRB){ prbKeep={ hands:{...HANDS}, chOwner, mono:{...monoOwner}, latchLen, exprPrevT, expr:{...EXPR}, tutSeenT };
+    for(const k in HANDS) delete HANDS[k]; chOwner=null; monoOwner.ld=monoOwner.bs=null; latchLen=0; exprPrevT=0; for(const k in EXPR) EXPR[k]=0; tutSeenT=0; }
+  else if(!clk && PRB && prbKeep){ const K=prbKeep; prbKeep=null;
+    for(const k in HANDS) delete HANDS[k]; Object.assign(HANDS,K.hands); chOwner=K.chOwner; Object.assign(monoOwner,K.mono); latchLen=K.latchLen;
+    exprPrevT=K.exprPrevT; Object.assign(EXPR,K.expr); tutSeenT=K.tutSeenT;
+    if(EXPR.engage<=1e-3){ applyExpr(0,0,0,0,0,EXPR_CFG.tcNode); setExprDisp(0); setExprBrightDisp(0); } }   // the probe's expression hand left the stage moving: back to neutral
+  PRB=clk||null; looperTap= clk ? (tap||null) : null;
+}
+function processHandsProbe(res){ prbCall=true; try{ processHands(res); } finally { prbCall=false; } }
+const pinchDbg=d=>{ pinchD=+d||0; };   // HAND1 control: the pinch threshold nudged (0 = off)
 function processHands(res){
-  const W=canvas.width, H=canvas.height, now=performance.now();
+  if(PRB && !prbCall) return;   // HAND1: the app loop waits while a probe session runs
+  const W=PRB?PRB.W:canvas.width, H=PRB?PRB.H:canvas.height, now=nowMs();
   const dtm=exprPrevT?clamp((now-exprPrevT)/1000,EXPR_CFG.dtMin,EXPR_CFG.dtMax):EXPR_CFG.dtMin;   // dt кадра для «смычка», КЛАМП обязателен (застрявший кадр иначе взорвал бы интеграторы)
   exprPrevT=now;
   const seen=new Set();
@@ -794,7 +812,7 @@ function processHands(res){
            щипок — здесь НЕ повторяются). Живёт лишь ОЧИСТКА (мизинец): 3с-обратный отсчёт, срабатывает
            РАЗ на отметке (гейт S.clearFired), отпускание раньше — отмена (endPinch гасит отсчёт). */
         if(S.clearT0!=null && !S.clearFired){
-          const rem=CLEAR_HOLD_MS-(performance.now()-S.clearT0);
+          const rem=CLEAR_HOLD_MS-(nowMs()-S.clearT0);
           if(rem<=0){ S.clearFired=true; setLooperClear(-1); doLooper('clear'); }
           else setLooperClear(rem);
         }
@@ -1191,4 +1209,5 @@ function processHands(res){
 /* fxParamsOf экспортирован для меню конструктора (слайс 2.6.2): фиксированное значение обязано уходить
    в звук ЧЕРЕЗ ТОТ ЖЕ set, что и палец, — иначе развилка «скаляр или модуль» размножится копией в ui.
    Цикла импорта нет: gestures тянет config/state/scales/recorder/i18n/hooks/audio/vision и НИКОГДА ui. */
-export { HANDS, processHands, degRaw, fxParamsOf, ACTIONS, voiceModeReset };   // voiceModeReset — V3: панель сменила режим голоса роли   // ACTIONS — для меню (слайс «д»): подпись действия и его avail() берутся ОТТУДА ЖЕ, откуда их читает движок, иначе меню и жест разошлись бы в том, что доступно
+export { HANDS, processHands, degRaw, fxParamsOf, ACTIONS, voiceModeReset,
+  handsProbe, processHandsProbe, pinchDbg };   // HAND1: the probe clock, the probe's frame door, the pinch-threshold control   // voiceModeReset — V3: панель сменила режим голоса роли   // ACTIONS — для меню (слайс «д»): подпись действия и его avail() берутся ОТТУДА ЖЕ, откуда их читает движок, иначе меню и жест разошлись бы в том, что доступно

@@ -7420,3 +7420,64 @@ control caught it); LAT1 1 (static: `PerformanceObserver` global; licence: a new
 `latIdle` — `main.js` only; `checkLatency` — ALL_RUNS; `check`/`run` (check-licences) — probe-data and its own CLI.
 **Left undone / noticed:** detection re-reads frames (LAT2); the overlay is a first look (the Diagnostics panel is stage 4); Vercel itself
 not exercised by the runner (same-origin script — allowed by 'self'); `#helpOv` text glyphs are counted although the overlay is unreachable.
+
+### Moved from HANDOFF.md at PROBE1/GOLD1/HAND1 (English, verbatim; 2026-10-15)
+### LIC1 + PRIV1 + LAT1 (2026-10-14) — stage 3 slices 1–3 (full: archive B «LIC1 + PRIV1 + LAT1»)
+- LIC1: register `tools/licences.json` → generated `THIRD-PARTY-LICENSES.md`; `tools/check-licences.mjs` = data-runner row «LIC1 licence
+  register» (URLs, CSP hosts, non-code files, npm lock, 72-glyph audit, stale document; 6 controls). Every icon/glyph/image/font marked «to be
+  replaced by the user's own authored design».
+- PRIV1: hard rule #33; CSP `<meta>` (no inline script — `src/va-stub.js`); static NETWORK GUARD (9 sites listed); runner fails on any CSP
+  violation, control fetch refused; privacy notice `#privacyNote` names the Vercel counter. Live CDN under the CSP: 4 files 200.
+- LAT1: `src/core/latency.js` (pure, node row «LAT1 latency stats (core)») + `src/latmeter.js` (overlay: Sound panel → «Latency meter»;
+  `R.latency()`; Bluetooth warning); row «LAT1 latency meter» (control: paused meter); check-static reads sub-folders. Headless: camera
+  14.7 fps, picture→app 21.8 ms (p95 55.9), detection 51.5 (58.2), gestures 0.0, drawing 3.9, frame every 59.7, buffer 10 + output 42
+  (measured 44.7), hand→sound ≈ 127 ms; 76 of 444 detections re-read a frame (→ LAT2). Real numbers: the user's devices (step 92).
+- Probes: static PASS; data PASS 10 checks (71.5 s); `--quick --cdn-cache` PASS — 47 checks, 100.0 s, UI and CSP checks PASS; frozen seed
+  bass L4 0.08686 / 0.055319 / 650886. Fix rounds: LIC1 1 (♮ unlisted), PRIV1 2 (CSP hosts rule, its regex), LAT1 1 (global + a glyph).
+
+### ✅ PROBE1 + GOLD1 + HAND1 — PROBE ROWS REGISTRY, GOLDEN RENDERS, SYNTHETIC HANDS (2026-10-15; stage 3 slices 4–6; runner PASS; nothing to hear)
+**User answers at the start:** the Vercel production URL is https://handsong.vercel.app (recorded in CLAUDE.md «Publication & PWA»); the
+privacy wording stays as is until the user asks; LIC1/PRIV1/LAT1 decisions accepted.
+**PROBE1.** `src/scaleprobe.js` (4952 lines) split by a one-off tool (top-level declaration → area, imports computed, cross-file names exported)
+into `src/probes/`: run (P.all, P.quick, orderCheck, material, state guard), tuning, seed (P.seed, P.song, write path, seed notes, frozen bass),
+edit, history, window, freeze, files, key, lat, guard (api, lock, self-test), kit (frame, meas, QUICK, short window, window keep/restore),
+data (the node rows). Verified: every original body line reappears verbatim in the new files except the old row list, its flag sets and the
+loop that read them. `scaleprobe.js` = facade with EXPLICIT re-exports (window.P has exactly the same names; internal helpers stay off P).
+Mutable lets read across files got setters (`setQuick`, `measReset`); SEED_REC stays with its writers (seed.js). The registry
+`probes/rows.js` is pure (node loads it): `row({at, name, run, read, slow, drawn, realtime, song, node})`, `family({at, name, rows})`
+(generated rows at at + i/1000 — for module-contract rows later), `rows(filter)`, `rowProblems()` (bad shapes, duplicate names, a shared
+`at`) counted as differences by P.all and the data runner; CONTROL in P.all: `rowCheck` on a list with a duplicate name must report it.
+`at` = old position × 10, so P.all/P.quick run the same rows in the same order (47 quick checks, same results). The data runner runs the
+registry's node rows + LIC1 + LAT1 core (F4 now runs after the ED4/OWN1 sweeps — registry order). NET_LISTED: `probes/files.js` and
+`probes/key.js` fetch 1 each (was scaleprobe.js 2). THIRD-PARTY-LICENSES.md regenerated (glyph file lists moved to the new files).
+**GOLD1.** `render.goldRender(play, seconds, chains)` — `renderOnce` at a fixed 48 kHz (`renderOnceNow` option `rate`, default unchanged),
+seed 0x601D, offline allocator (also seeds the KS pluck), `offlineTapMaster`, every chain owner on an explicit `fxRenderPath` (absent = dry),
+params via `fxPlaySet`. `src/probes/gold.js`: 70 cases — 23 solo, 16 chord, 7 bass timbres (one note 0.05–0.5 s, 1.0 s window), 5 kits
+(six rows 0.3 s apart, 2.4 s), the drone (major key 0, A4 pinned 440 for the case), vol 0.25/0.6/1, chord brightness depth 0/0.5/0.9, glide
+0.004/0.04/0.2 s on a legato move, reverb/delay/tremolo-mix on the chord chain (Organ) at three settings. Features: mid-signal loudness every
+50 ms, side energy, 10 octave bands × 3 time segments (radix-2 FFT 4096, Hann), dB to 4 decimals; `tools/gold.print.json` 36.6 KB.
+Repeat in one session: max 0.0011 dB (at −98 dB); tolerance 0.01 dB, values below −100 dB on both sides skipped. Made in one browser
+session, passed in two later fresh sessions. CONTROL: the copy's `CHORD_INSTR[0].lp` × 1.01 must leave the golden case (restored in finally).
+Cost: 50–90 s per pass headless (offline rendering ≈ real time: the copy's chord pool always runs) — P.all grew 280 → 351–380 s, so the
+runner's per-P.all limit default went 5 → 8 min. Note: a Chrome update that changes built-in DSP may move the goldens — renew by decision.
+**HAND1.** `src/probes/hand.js`: pose → 21 landmarks (thumb tip at the pinch point, finger gaps in palm sizes, spread, tilt via z; screen
+fractions inverted through the default crop and the front-camera mirror), a scripted performance of 448 frames at 30 fps on a 1000×600
+field (sections listed in CLAUDE.md, row HAND1), environment pinned and restored (role, split, hand functions, voice modes, fingers, layout,
+major key 0, timbres 0, camera, crop, palette choice, displays, looper message; live effect values and aims kept and put back). gestures.js:
+`handsProbe(clk, looperTap)` — while set, `processHands` reads time (`nowMs`) and W/H from the clock and ignores the app loop; the hands,
+latch owner, lead owners, expression state and 'seen' throttle are set aside and restored (expression stage and displays back to neutral);
+looper commands go to the tap (printed, swallowed — the transport never starts); `pinchDbg(d)` nudges PINCH_ON (control only); every
+`performance.now()` in gestures goes through `nowMs()`. recorder.js: `wTapSet(f)` — each W* call reports (name, args) first. Print: 523
+lines; three runs in one session identical; fresh session PASS; messages read in English (`withLang`). Recording is NOT printed: `push` stamps
+live events from the audio clock (not deterministic); the W* stream is exactly the recorder's input and the funnels are covered by «write
+path». CONTROL: PINCH_ON + 0.03 changes the print (the slow approaches engage a frame earlier). Live chains changed or a chord-mode choice →
+row «not applicable».
+**Probes:** static PASS (48 modules); data PASS 10 checks 35.4 s; final `--quick --all --cdn-cache`: P.quick PASS 48 checks 86.4 s, P.all PASS
+63 checks 350.7 s (GOLD 50.4 s, HAND1 0.3 s), UI checks PASS, CSP PASS, frozen seed bass L4 0.08686 / 0.055319 / 650886, state guard clean.
+Fix rounds: PROBE1 2, GOLD1 1, HAND1 2 (see HANDOFF record).
+**Positional callers of changed functions:** no existing signature changed (`renderOnceNow` got an option field `rate`). New: `goldRender` — 1
+caller (`gold.renderCase`, 3 args); `handsProbe` — `hand.perform` (2 args) and its finally (1); `processHandsProbe` — 1; `pinchDbg` — 2
+(`checkGesture`); `wTapSet` — 2 (`perform`); `row` — 63 registrations.
+**Left undone / noticed:** check-static's «imported but never used» does not count a spread (`...x`) as a use (it flagged `chordModeSel`,
+`stateFx` while rule 7 required them) — a checker inconsistency, not fixed; a few moved files import `t`/`L` they shadow locally (info only,
+as before the move).

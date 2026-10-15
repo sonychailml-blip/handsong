@@ -4867,8 +4867,11 @@ function recDrop(){ recLeadReset(); recCh=null; recBass.clear(); }
    зовёт ENG напрямую, мимо W* → сама себя не пишет; живой гейт больше не нужен. */
 /* own — КЛЮЧ ВЛАДЕЛЬЦА живого голоса ('lead:L'/'lead:R', строит gestures). В событие он НЕ пишется:
    в петле нота принадлежит СЛОЮ, а не руке — там ключ соберёт ldKey из ctx.layer и a.v. */
-const WleadOn =(own,p,live)=>{ ENG.leadOn(p,null,{live,own}); recLeadEv(own,p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается. ⚠️ when НЕ передаём: живой путь звучит «сейчас», как всегда
-const WleadOff=own=>{ ENG.leadOff(null,null,{own}); recLeadOff(own); };
+/* HAND1: the probe's tap on the gesture layer's output — every W* call, before it acts (null = off) */
+let wTap=null;
+const wTapSet=f=>{ wTap=f||null; };
+const WleadOn =(own,p,live)=>{ if(wTap) wTap('leadOn',[own,p,live]); ENG.leadOn(p,null,{live,own}); recLeadEv(own,p,live); };   // live: в звук (стадия a) И в запись бенда (стадия b); ENG.leadOn получает p БЕЗ bend — живая нота не трогается. ⚠️ when НЕ передаём: живой путь звучит «сейчас», как всегда
+const WleadOff=own=>{ if(wTap) wTap('leadOff',[own]); ENG.leadOff(null,null,{own}); recLeadOff(own); };
 /* ty — интервалы типизированного аккорда. Живёт в ПОЛЕЗНОЙ НАГРУЗКЕ a (как a.inst —
    тембр), а не рядом с sc/sev: тип — свойство самого аккорда, а не ладового контекста.
    Так он замораживается в событии сам собой и переигрывается как сыгран. */
@@ -4878,9 +4881,9 @@ const WleadOff=own=>{ ENG.leadOff(null,null,{own}); recLeadOff(own); };
    защёлку, которая уже звучит, когда запись начинается (recLatchOpen). Снимается вместе с живым аккордом —
    WchOff и softAllOff. ⛔ Правило #20 не задето: это чтение, живой голос никто не трогает. */
 let liveCh=null;
-const WchOn =(_o,deg,oct,vol,ins,ty,bri)=>{ const a={deg,oct,vol,inst:ins,ty,bri}; ENG.chOn(a); recChOn(a); liveCh={...a}; };   // bri — живая яркость руки: в звук (ENG) И в запись (rec), как a.rev у соло
-const WchSet=(_o,deg,oct,vol,ty,bri)    =>{ const a={deg,oct,vol,ty,bri};          ENG.chSet(a); recChSet(a); if(liveCh) liveCh={...liveCh,...a}; };   // тембр остаётся от атаки (в a его нет)
-const WchOff=_o                 =>{ ENG.chOff(); recChOff(); liveCh=null; };
+const WchOn =(_o,deg,oct,vol,ins,ty,bri)=>{ if(wTap) wTap('chOn',[_o,deg,oct,vol,ins,ty,bri]); const a={deg,oct,vol,inst:ins,ty,bri}; ENG.chOn(a); recChOn(a); liveCh={...a}; };   // bri — живая яркость руки: в звук (ENG) И в запись (rec), как a.rev у соло
+const WchSet=(_o,deg,oct,vol,ty,bri)    =>{ if(wTap) wTap('chSet',[_o,deg,oct,vol,ty,bri]); const a={deg,oct,vol,ty,bri};          ENG.chSet(a); recChSet(a); if(liveCh) liveCh={...liveCh,...a}; };   // тембр остаётся от атаки (в a его нет)
+const WchOff=_o                 =>{ if(wTap) wTap('chOff',[_o]); ENG.chOff(); recChOff(); liveCh=null; };
 /* ⛳ ЗАЩЁЛКА, УЖЕ ЗВУЧАЩАЯ В НАЧАЛЕ ЗАПИСИ, ОБЯЗАНА ЛЕЧЬ В ДУБЛЬ — запись идёт за звуком. Прежде она пропадала:
    в отсчёте push отказывает (S4.1), а покоящаяся защёлка с разомкнутыми пальцами не шлёт НИ ОДНОГО вызова записи
    (вызовы аккорда живут только внутри щипка) — человек слышал аккорд весь дубль, а на переигровке его не было,
@@ -4909,9 +4912,9 @@ function recLatchOpen(){
 }
 /* P2: own — КЛЮЧ ВЛАДЕЛЬЦА живой бас-ноты, как у WleadOn/WleadOff. ПОСЛЕДНИМ и с умолчанием 'bass'. С V2 gestures передают его
    всегда (wOn/wOff): 'bass' в ведущем режиме, 'bass:L[:f]' в полифоническом. В событие ключ не пишется. */
-const WbassOn =(p,live,own='bass')=>{ ENG.bassOn(p,null,{live,own}); recBassEv(own,p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло (правило #11). ⚠️ Прежде здесь стояло (p,null,undefined,live) — дырка под when позиционно; с именованным набором её не существует
-const WbassOff=(own='bass')=>{ ENG.bassOff(null,null,{own}); recBassOff(own); };
-const WdrumHit=(row,vol,fx)=>{ const a={row,vol,kit:drumKitIdx}; if(fx&&Object.keys(fx).length) a.fx=fx; ENG.drum(a); recDrum(a); };   // fx — карта эффектов удара: ТОЛЬКО когда цепь ударных её даёт (как у баса); иначе поля нет, удар байт-в-байт прежний
+const WbassOn =(p,live,own='bass')=>{ if(wTap) wTap('bassOn',[own,p,live]); ENG.bassOn(p,null,{live,own}); recBassEv(own,p); };   // live в звук, НЕ в запись (recBassEv пишет ступень) — инвариант «живые Гц не записываются», как у соло (правило #11). ⚠️ Прежде здесь стояло (p,null,undefined,live) — дырка под when позиционно; с именованным набором её не существует
+const WbassOff=(own='bass')=>{ if(wTap) wTap('bassOff',[own]); ENG.bassOff(null,null,{own}); recBassOff(own); };
+const WdrumHit=(row,vol,fx)=>{ if(wTap) wTap('drumHit',[row,vol,fx]); const a={row,vol,kit:drumKitIdx}; if(fx&&Object.keys(fx).length) a.fx=fx; ENG.drum(a); recDrum(a); };   // fx — карта эффектов удара: ТОЛЬКО когда цепь ударных её даёт (как у баса); иначе поля нет, удар байт-в-байт прежний
 
 /* ⛳ softAllOff — ЕДИНСТВЕННАЯ ТОЧКА «ЗАГЛУШИТЬ ВСЁ», И ТЕПЕРЬ ОНА ЖЕ ЗАКРЫВАЕТ ЗАПИСЬ (слайс S4.1).
    БЫЛО: последняя строка обнуляла состояние записи БЕЗ «выкл». Звук гас здесь же, а нота в дорожке оставалась открытой и
@@ -5998,7 +6001,7 @@ function panic(){
 
 /* Экспорт: `recording` через export-клаузу — живая связка (её читает draw). */
 export {
-  WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
+  WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit, wTapSet,
   softAllOff, panic, inPB, recording,
   onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, METRES, setLoopSub, SUBS, beatLevel, setLoopQuant, setLoopBpm, loop, events, loopPos,
   songBeats, seekTo,   // S3.3: длина песни в долях (её читает полоса лупера, чтобы вписать таймлайн) и перемотка (пока по ней ездит только «пуск с конца → с начала»)

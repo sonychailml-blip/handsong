@@ -48,24 +48,20 @@ function latCore(){
   for(const [a,w] of bt) eq(`looksBluetooth ${JSON.stringify(a)}`, LAT.looksBluetooth(a), w);
   return { cases:8+bt.length, total:d.length, differences:d };
 }
+let REG;
 try{
   P=await import(new URL('../src/probedata.js', import.meta.url).href);
+  await import(new URL('../src/probes/data.js', import.meta.url).href);   // PROBE1: the data rows register themselves (flag node)
+  REG=await import(new URL('../src/probes/rows.js', import.meta.url).href);
   ({ loadReport }=await import(new URL('../src/scaleload.js', import.meta.url).href));
   LIC=await import(new URL('./check-licences.mjs', import.meta.url).href);   // LIC1: the licence register (text only, no app code)
   LAT=await import(new URL('../src/core/latency.js', import.meta.url).href);   // LAT1: the pure core (no DOM, no Web Audio — runs in node)
 }catch(e){ out('[probe-data] ERROR loading the data modules: '+String(e&&e.stack||e)); verdict(false,'the data modules did not load'); process.exit(1); }
 const loadMs=Math.round(performance.now()-T00);
 
-// те же чтения итога, что в ALL_RUNS у scaleprobe.js (имена строк — те же)
+// PROBE1: the browser's data rows come from the registry (same names, runs and reads as P.all, in its order); then the node-only rows
 const ROWS=[
-  ['T0 data',                   ()=>P.checkData(),      r=>({ cases:r.checks, diff:r.mismatches.length, list:r.mismatches })],
-  ['T1 pitch',                  ()=>P.checkPitch(),     r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
-  ['T2 view',                   ()=>P.checkView(),      r=>({ cases:r.checks+r.cases, diff:r.total, list:r.mismatches })],
-  ['T6b untyped chords (sweep)',()=>P.checkUntyped(),   r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
-  ['stacked chords',            ()=>P.checkStack(),     r=>({ cases:r.cases, diff:r.total, list:r.mismatches })],
-  ['F4 behaviour as data',      ()=>P.checkBehaviour(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
-  ['ED4 degrees (sweep)',       ()=>P.checkDegrees(),   r=>({ cases:r.cases, diff:r.total, list:r.differences })],
-  ['OWN1 modes by degrees (sweep)', ()=>P.checkModeMap(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ...REG.rows({ node:true }).map(r=>[r.name, r.run, r.read]),
   ['LIC1 licence register',     ()=>LIC.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['LAT1 latency stats (core)', ()=>latCore(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
@@ -90,6 +86,8 @@ for(const [name,list] of lists){ console.warn(`[probe-data] ${name}: first diffe
 const problems=loadReport.problems||[];
 if(problems.length){ console.warn(`[probe-data] data files: ${problems.length} problem(s) — a broken file is skipped by the loader`); problems.slice(0,10).forEach(m=>console.warn(`   ${m.file} — ${m.why}`)); }
 if(loadReport.emergency) console.warn('[probe-data] data files: the loader fell back to the EMERGENCY PAIR — data/ could not be read');
-const nDiff=rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
+const regBad=REG.rowProblems();   // PROBE1: duplicate names, shared places, bad shapes in the registry
+if(regBad.length){ console.warn(`[probe-data] probe rows registry: ${regBad.length} problem(s)`); regBad.slice(0,5).forEach(m=>console.warn('   '+m)); }
+const nDiff=regBad.length+rows.reduce((n,r)=>n+(typeof r.differences==='number'?r.differences:1),0);
 const pass=nDiff===0 && !problems.length && !loadReport.emergency;
 verdict(pass, `${rows.length} checks, ${nDiff} differences, data files ${loadReport.files} (${problems.length} problems) · load ${loadMs} ms · total ${((performance.now()-T00)/1000).toFixed(1)} s`);

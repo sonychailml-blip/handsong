@@ -229,7 +229,10 @@ const NET_KINDS={ fetch:/(?<![\w$])fetch\s*\(/g, xhr:/\bXMLHttpRequest\b/g, webs
   addModule:/\baddModule\s*\(/g, share:/\bnavigator\s*\.\s*share\s*\(/g, open:/\bwindow\s*\.\s*open\s*\(/g, swRegister:/\bserviceWorker\s*\.\s*register\s*\(/g };
 const NET_LISTED={
   'scaleload.js':  { fetch:[1,'reads the data/ files (tunings, modes, palettes) from the app\'s own origin'] },
-  'scaleprobe.js': { fetch:[2,'probe only (?probe): reads tools/scales.before.json and tools/song.print.json from the own origin'] },
+  'probes/files.js': { fetch:[1,'probe only (?probe): reads tools/scales.before.json from the own origin'] },
+  'probes/key.js':   { fetch:[1,'probe only (?probe): reads tools/song.print.json from the own origin'] },
+  'probes/gold.js':  { fetch:[1,'probe only (?probe): reads tools/gold.print.json from the own origin'] },
+  'probes/hand.js':  { fetch:[1,'probe only (?probe): reads tools/gesture.print.json from the own origin'] },
   'audio.js':      { addModule:[3,'loads our own worklets (src/ks-, frz-, probe-cap-worklet.js) from the own origin into the audio context'] },
   'clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
   'ui.js':         { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
