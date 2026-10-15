@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (33 hard rules), 95 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (34 hard rules), 96 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -50,7 +50,7 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear) ·
   ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: archive B «LAT2 input»), **SND-F1** + **SND-F1b** Firefly,
   Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open)
-  · **LAT3** low-light camera: capabilities, «Low light (test)», hands lost, player hint «Too dark»; «Picture» switch removed (step 95).
+  · **LAT3** low-light camera: capabilities, «Low light (test)», hands lost, player hint «Too dark»; «Picture» switch removed (step 95) · **CAM-FIX** the webcam's own settings restored (rule #34, step 96).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -100,7 +100,7 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3 (2026-10-15);
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX (2026-10-15);
 NEXT **REC1**) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
@@ -131,7 +131,8 @@ Pythagorean mode (P5, postponed; appended at the end) · voice-leading lines bet
 · retrigger in lead mode (legato everywhere today) · study Arabic, Indian and other traditions with musicians (mode anchor,
 intonation, central tone, what a chord means) · team ideas: two UI faces, hand on a rest, mode lessons, spoken menu, light theme ·
 small: settings in localStorage, polyrhythm (§3.24), swing as a ratio (§3.30), gesture builder (§3.29),
-cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per row in the editor (deferred, user answer 6).
+cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per row in the editor (deferred, user answer 6) · the user's
+«EXPRESSION HAND» — a pedal-like hand, hand map, expression lab (BACKLOG §3.29 «➕», 2026-10-15; after GES1).
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). Since TF2 the key is
@@ -160,19 +161,20 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 ### LAT2 (2026-10-15) — frames once, search schedule, worker option: record moved to archive B «Moved from HANDOFF.md at LAT3».
 - ⬜ OPEN CHECK (postponed by the user): phone latency — A defaults and D 30 fps; on the phone also compare the worker path (decides its default).
 
-### LAT3 (2026-10-15) — low-light camera (full: archive B «LAT3 — record»)
-- Input (user's desktop, evening): camera granted 30 fps but DELIVERED 6.3 (frame wait ≈ 79 ms dominates; hand → sound 125 / 204 incl. wait);
-  daytime 14–30 fps. Worker 93 ms detection → main thread stays the default (LAT2 decision confirmed).
-- User decisions: the «exact frame» picture is the only one — the «Picture: live camera» switch is deleted (code, UI, i18n, docs, probes;
-  rule #8 says so); low light matters (evening, Calm before sleep) → a real player hint, not only test switches.
-- Meter: the webcam's name + capabilities (getCapabilities / getSettings) in «Copy»; «Low light (test)» Off / ≥ 15 fps / ≥ 24 fps / short
-  exposure (only when the camera has manual exposure; applyConstraints; refused or no effect → back to Off with the reason); «Hands lost
-  and found again within 1 s: N per minute»; when the longest startup task began.
-- Player hint «Too dark: the camera slowed to N fps…» (en + ru): delivered < 12 fps for > 3 s while granted ≥ 24; once per session; frame
-  timing only (rule #33); taps pass through; never while recording, a clip, the editor or the window. Pure core `src/core/camlight.js`.
-- Startup 1397-ms task CONFIRMED behind the start card: the warm-up runs in a setTimeout continuation BEFORE the camera opens (runner: the
-  longest startup task, «TimerHandler:setTimeout», began ≈ 15 s before the camera start; the meter now prints that offset).
-- Runner's fake camera: «≥ 15» held, «≥ 24» refused by Chrome (OverconstrainedError, frameRate), manual exposure offered (range 10–100).
-- Probes: data PASS 13 (+ «LAT3 low light (core)», 29 cases); P.quick PASS 55 (118 s, + «LAT3 low light», 34 cases); P.all PASS 74
-  (733 s, under outside load). Fix rounds 2. Earlier quick runs hit the 3-min limit while the user's Chrome used ~2 of 4 cores.
-- ⬜ User step 95 (evening, one hand, each low-light setting 20 s + Copy; picture darker / grainier? hands lost more?).
+### LAT3 (2026-10-15) — low-light camera: record moved to archive B «Moved from HANDOFF.md at CAM-FIX».
+- ⬜ User step 95 (evening, one hand, each low-light setting 20 s + Copy) — do it AFTER step 96 (CAM-FIX).
+
+### CAM-FIX (2026-10-15) — the webcam's own settings restored (full: archive B «CAM-FIX — record»)
+- Incident: «short exposure» left the user's UVC webcam dark in the DEVICE (Off, reload, Zoom all dark); he healed it from the console.
+  Causes: the old Off handed exposure back only right after «short exposure» (exposure → fps test → Off forgot it); nothing healed at open;
+  Chrome applies ONLY the camera controls of a set that holds one and ignores its format part (measured). Only «short exposure» writes a
+  camera control; the fps tests change the requested format only.
+- Fix = hard rule #34: originals saved; Off / fall-back / leaving the page / reopen restore (automatic exposure + white balance, other
+  controls to originals); every open heals manual modes (meter: «… was manual — restored to automatic»); format and controls in two calls;
+  warning under the switch «Test: changes the camera's own settings; Off restores them».
+- Also: warm-up in two steps (runner: one 9681-ms task → 9479 + 718 ms; slow headless GPU today); `main.js` probe-import `.catch` no longer
+  swallowed by a comment (no other case in `src/`).
+- Idea recorded: the user's «EXPRESSION HAND» (pedal-like hand, hand map, expression lab, presets) — BACKLOG §3.29 «➕» block; after GES1.
+- Probes: data PASS 13 (LAT3 core 40 cases); P.quick PASS 56 (112.9 s; new row «CAM-FIX camera settings restored», simulated UVC webcam,
+  controls noRestore / noHeal). Fix rounds 3.
+- ⬜ User step 96 (each test then Off — the picture comes back; reload + Zoom normal), then step 95.

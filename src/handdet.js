@@ -32,8 +32,11 @@ export async function createDetector({ delegate='GPU', blank=null, step=null }={
   let ts=0, slowMs=0, script=null, scriptI=0, fake=false;
   const nextTs=t=>{ ts=Math.max(ts+1, Math.floor(t)); return ts; };   // VIDEO mode: strictly increasing timestamps per model
   const warmMs={};
-  const warm=()=>{ for(const [k,L] of [['L2',L2],['L1',L1]]){ const t0=performance.now(); L.detectForVideo(blank(), nextTs(performance.now())); warmMs[k]=performance.now()-t0; } };
-  if(blank){ if(step) await step('warm'); warm(); }
+  const warmOne=(k,L)=>{ const t0=performance.now(); L.detectForVideo(blank(), nextTs(performance.now())); warmMs[k]=performance.now()-t0; };
+  const warm=()=>{ warmOne('L2',L2); warmOne('L1',L1); };
+  /* at start the two warm-ups are two tasks with a yield between them (the step awaits a paint on the main thread): two shorter
+     freezes behind the start card instead of one long one */
+  if(blank){ if(step) await step('warm'); warmOne('L2',L2); if(step) await step('warm2'); warmOne('L1',L1); }
   const model=a=> a==='track1' ? L1 : L2;
   /* one frame: run `action` ('skip' runs nothing); a tracking action that found no hand retries a search (schedRetry). Returns the
      plain result, the action that finally ran and the model time. Probe hooks: slowMs (busy-wait, a detector slower than the camera)

@@ -132,7 +132,8 @@ async function startApp(){
    кладутся в window.P и window.R, чтобы в консоли хватало `await P.all()` / `R.live(1)` без строки импорта. Без флага не меняется
    ничего: модули не грузятся. Адрес тот же, что у приложения, — это те же экземпляры модулей, а не копии. */
 if(new URLSearchParams(location.search).has('probe')){
-  import('./scaleprobe.js').then(m=>{ window.P=m.api(); console.log('[probe] window.P ready — await P.seed({replace:true}), P.all()'); })   // AUTO-PROBE: P — с замком: одна проба за раз (scaleprobe.api).catch(e=>console.warn('[probe] scaleprobe failed to load', e));
+  // AUTO-PROBE: P is locked — one probe at a time (scaleprobe.api); a failed load is reported (the .catch was once swallowed by this comment)
+  import('./scaleprobe.js').then(m=>{ window.P=m.api(); console.log('[probe] window.P ready — await P.seed({replace:true}), P.all()'); }).catch(e=>console.warn('[probe] scaleprobe failed to load', e));
   import('./render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));
   import('./userfiles.js').then(m=>{ window.U=m; }).catch(e=>console.warn('[probe] userfiles failed to load', e));   // F6: файлы пользователя из консоли
 }

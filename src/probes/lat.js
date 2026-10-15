@@ -124,7 +124,8 @@ export async function checkLatSwitches(){
 /* ═══ LAT3 — LOW LIGHT (P.checkLowLight, quick and all; DRAWN ≈ 12 s) ═══
    (1) The webcam's capabilities reach the report and the Copy text, with the low-light and hands-lost lines; «short exposure» is offered
    exactly when the camera reports manual exposure. (2) The REAL buttons «at least 15 / 24 fps»: either the mode holds with the
-   constraints claimed (the set passed to applyConstraints AND the browser's own getConstraints, against literals written here) and a
+   constraints claimed (the set passed to applyConstraints, against literals written here, AND the calls that went through: format and
+   camera controls in separate calls — CAM-FIX) and a
    verdict that agrees with its measured fps, or it fell back to Off with a reason and today's request back on the track. (3) A simulated
    OverconstrainedError and (4) a simulated «no effect» fall back to Off, say so in the meter and the switch note, and detection keeps
    running. CONTROL (5): with the fall-back disabled the same failure must be flagged by the same check. (6) Hands lost: scripted
@@ -134,20 +135,27 @@ export async function checkLatSwitches(){
 const LOW_BASE={ width:{ ideal:640 }, height:{ ideal:480 } };
 /* 1/40 s in 100-µs units (250), clamped into the camera's range and snapped to its step — written here independently of the core */
 const expUnits=r=>{ let v=Math.min(r.max, Math.max(r.min, 250)); if(r.step>0){ v=r.min+Math.round((v-r.min)/r.step)*r.step; if(v>r.max) v-=r.step; } return +v.toFixed(6); };
-function lowProblems(w, mode, C, caps){
-  const L=[], fr=x=>x&&x.frameRate, exp=mode==='exposure';
+/* CAM-FIX: Chrome keeps reporting the last camera-control set in getConstraints() and ignores the format part of a set that holds a
+   camera control (measured), so the evidence is the calls themselves: `calls` = every applyConstraints of the press { c, ok }. */
+const FMT=['width','height','frameRate','aspectRatio','resizeMode'];
+const isFmt=c=>!c.advanced, isCtl=c=>!!c.advanced && !FMT.some(k=>k in c);
+function lowProblems(w, mode, C, caps, calls){
+  const L=[], exp=mode==='exposure', okc=calls.filter(x=>x.ok).map(x=>x.c);
   if(w.mode===mode){
     const want=JSON.stringify(exp ? { ...LOW_BASE, advanced:[{ exposureMode:'manual', exposureTime:expUnits(caps.exposureTime) }] } : { ...LOW_BASE, frameRate:{ min:mode==='fps15'?15:24, ideal:30 } });
     if(JSON.stringify(w.asked)!==want) L.push(`${mode}: asked ${JSON.stringify(w.asked)}, expected ${want}`);
-    if(!exp && (!fr(w.applied) || fr(w.applied).min!==(mode==='fps15'?15:24))) L.push(`${mode}: the track's own constraints ${JSON.stringify(w.applied)} lack frameRate.min`);
-    if(exp && !JSON.stringify(w.applied||{}).includes('"manual"')) L.push(`exposure: the track's own constraints ${JSON.stringify(w.applied)} lack exposureMode manual`);
+    if(!exp && !okc.some(c=>isFmt(c) && c.frameRate && c.frameRate.min===(mode==='fps15'?15:24))) L.push(`${mode}: no format-only call with frameRate.min went through (${JSON.stringify(calls)})`);
+    if(exp && !okc.some(c=>isCtl(c) && c.advanced.some(e=>e.exposureMode==='manual'))) L.push(`exposure: no controls-only call with manual exposure went through (${JSON.stringify(calls)})`);
     const v=C.lowVerdict({ mode, before:w.before, after:w.after, settings:{ exposureMode:'manual' } });
     if(!v.ok) L.push(`${mode}: kept although its verdict says «${v.why}» (${w.before} → ${w.after} fps)`);
   } else if(w.mode==='off'){
     if(!w.note) L.push(`${mode}: back at Off with no reason in the meter`);
-    if(fr(w.applied) && fr(w.applied).min!=null) L.push(`${mode}: back at Off but the track still asks frameRate.min ${fr(w.applied).min}`);
-    const back=exp && caps.exposureMode.includes('continuous') ? { ...LOW_BASE, advanced:[{ exposureMode:'continuous' }] } : LOW_BASE;   // Off after exposure hands it back
+    const last=okc.filter(isFmt).pop();
+    if(!last || (last.frameRate && last.frameRate.min!=null)) L.push(`${mode}: back at Off but no format-only call without frameRate.min went through (${JSON.stringify(calls)})`);
+    const auto=['exposureMode','whiteBalanceMode'].filter(k=>Array.isArray(caps[k]) && caps[k].includes('continuous')).map(k=>({ [k]:'continuous' }));
+    const back=auto.length ? { ...LOW_BASE, advanced:auto } : LOW_BASE;   // CAM-FIX: every Off hands exposure and white balance back to the camera
     if(JSON.stringify(w.asked)!==JSON.stringify(back)) L.push(`${mode}: back at Off with ${JSON.stringify(w.asked)} instead of ${JSON.stringify(back)}`);
+    if(auto.length && !okc.some(c=>isCtl(c) && c.advanced.some(e=>e.exposureMode==='continuous'))) L.push(`${mode}: back at Off but no controls-only call handed exposure back (${JSON.stringify(calls)})`);
   } else L.push(`${mode}: the switch ended in «${w.mode}»`);
   return L;
 }
@@ -156,7 +164,9 @@ export async function checkLowLight(){
   const diff=[], miss=s=>diff.push(s), notes=[]; let cases=0;
   const sleep=ms=>new Promise(r=>setTimeout(r,ms)), $=id=>document.getElementById(id);
   const head=k=>t(k,{}).split('{')[0].replace(/^[\s—·]+/,'').trim().slice(0,16);
-  const press=async id=>{ $(id).click(); const t0=performance.now(); await sleep(30); while($(id).disabled && performance.now()-t0<20000) await sleep(50); };
+  const calls=[], AP=MediaStreamTrack.prototype.applyConstraints;   // CAM-FIX: every applyConstraints of a press
+  MediaStreamTrack.prototype.applyConstraints=async function(c){ const e={ c:JSON.parse(JSON.stringify(c||{})), ok:false }; calls.push(e); const r=await AP.call(this, c); e.ok=true; return r; };
+  const press=async id=>{ calls.length=0; $(id).click(); const t0=performance.now(); await sleep(30); while($(id).disabled && performance.now()-t0<20000) await sleep(50); };
   const detects=async what=>{ const a=L.latCount('detect'); await sleep(900); cases++; if(!(L.latCount('detect')>a)) miss(`after «${what}» hand detection stopped`); };
   cases++; if(JSON.stringify(V.visionOpts())!==JSON.stringify(V.VISION_DEF)) miss(`the switches are not at their defaults (${JSON.stringify(V.visionOpts())})`);
   try{
@@ -172,6 +182,7 @@ export async function checkLowLight(){
     V.pumpDbg({ hold:true }); await sleep(300);
     { const n0=L.latLostDbg().n, T=performance.now()+5000, f=n=>({ n, action:'track1', ms:1, t0:0, cap:NaN, pres:NaN, vfNow:0, xfer:NaN });
       const feed=(seq,t)=>{ seq.forEach((n,i)=>{ const x=t+i*33; L.latHands({ ...f(n), t0:x, vfNow:x }, x, x+0.1); }); return t+seq.length*33; };
+      feed([0], T-1500);   // a defined start: no hand, any earlier gap expired (the last real frame may still carry a scripted 2 — LAT2a)
       let t1=feed([1,1,0,1,1], T); cases++; if(L.latLostDbg().n-n0!==1) miss(`hands lost: 1·1·0·1·1 counted ${L.latLostDbg().n-n0}, expected 1`);
       t1=feed([1,...Array(40).fill(0),1,1], t1+100); cases++; if(L.latLostDbg().n-n0!==1) miss(`hands lost: a hand away 1.3 s counted as lost (${L.latLostDbg().n-n0-1})`);
       feed([0,0,0], t1+2000); }
@@ -180,7 +191,7 @@ export async function checkLowLight(){
     const caps=r.camera.caps||{}, real=[['swLow15','fps15'],['swLow24','fps24'], ...(C.exposureSupported(caps) ? [['swLowExp','exposure']] : [])];
     if(real.length<3) notes.push('«short exposure» not offered by this camera — not pressed');
     for(const [id,mode] of real){
-      await press(id); const w=V.lowInfo(); cases++; const p=lowProblems(w, mode, C, caps); p.forEach(miss);
+      await press(id); const w=V.lowInfo(); cases++; const p=lowProblems(w, mode, C, caps, calls); p.forEach(miss);
       notes.push(`${mode}: ${w.mode==='off' ? 'fell back to Off — '+w.note : 'held'} (camera ${w.before} → ${w.after} fps)`);
       await detects(mode);
       await press('swLowOff'); cases++; if(V.visionOpts().low!=='off') miss(`«Off» did not take effect after ${mode}`); }
@@ -188,7 +199,7 @@ export async function checkLowLight(){
     for(const [o,id,mode,want] of [[{ fail:'OverconstrainedError' },'swLow24','fps24','OverconstrainedError'],[{ fakeFps:3 },'swLow15','fps15','noeffect']]){
       V.lowDbg(o); await press(id); V.lowDbg({ reset:true });
       const w=V.lowInfo(); cases++; if(w.mode!=='off' || !String(w.note).includes(want)) miss(`simulated ${want}: mode «${w.mode}», reason «${w.note}» — expected a fall-back to Off naming it`);
-      lowProblems(w, mode, C, caps).forEach(miss);
+      lowProblems(w, mode, C, caps, calls).forEach(miss);
       cases++; if(!L.latText().includes(head('diag.lowBack'))) miss(`simulated ${want}: the meter does not say «${head('diag.lowBack')}»`);
       cases++; if(!$('swNote').textContent.includes(head('diag.lowBack'))) miss(`simulated ${want}: the switch note does not say it fell back («${$('swNote').textContent}»)`);
       await detects('fall-back from '+want); }
@@ -205,9 +216,107 @@ export async function checkLowLight(){
       $('darkHintOk').click(); cases++; if(box.classList.contains('on')) miss('OK did not hide «Too dark»');
       const g2=L.darkDbg(ts, 20); cases++; if(g2.at!==-1 || box.classList.contains('on')) miss('«Too dark» shown for a camera granted only 20 fps'); }
   } finally {
+    MediaStreamTrack.prototype.applyConstraints=AP;
     V.lowDbg({ reset:true }); V.pumpDbg({ hold:false }); L.darkHideDbg();
     if(V.visionOpts().low!=='off') await V.setLowLight('off').catch(e=>miss('restore: '+e.message));
     L.latSwSync();
+  }
+  cases++; if(JSON.stringify(V.visionOpts())!==JSON.stringify(V.VISION_DEF)) miss(`the switches did not return to their defaults (${JSON.stringify(V.visionOpts())})`);
+  return { cases, total:diff.length, differences:diff, notes };
+}
+
+/* ═══ /* CAM-FIX — THE WEBCAM'S OWN SETTINGS COME BACK (P.checkCamRestore, quick and all; DRAWN ≈ 6 s) ═══
+   The user's webcam stayed dark (in Zoom too) after «short exposure»: a UVC webcam keeps exposure / white balance IN THE DEVICE. The
+   runner's fake camera cannot show it (it always reads 'manual' and forgets everything on reopen), so a SIMULATED UVC device — the user's
+   ASUS capabilities, controls that persist across opens, Chrome's refusal of an unknown key — is wrapped around the real track
+   (vision.camSimDbg). Through the REAL buttons: (A) short exposure really sets manual, Off brings automatic exposure and white balance
+   and every other control back and the meter says so; (B) the user's likely path short exposure → 15 fps → Off; (C) a fall-back to Off
+   restores too; (D) a touched value without an automatic mode returns to its original; (H) leaving the page (pagehide) ends the test and
+   restores; (F) a camera left in manual mode is healed at the next open, the meter says «was manual — restored to automatic»; (I) the
+   warning line under the switch. CONTROLS that must be flagged: (E) the pre-fix Off, (G) an open without the heal. */
+function uvcSim(){
+  const caps={ exposureMode:['continuous','manual'], exposureTime:{ min:39.063, max:1250, step:39.063 }, whiteBalanceMode:['continuous','manual'],
+    colorTemperature:{ min:2800, max:6500, step:1 }, brightness:{ min:-64, max:64, step:1 } };
+  const dev={ exposureMode:'continuous', exposureTime:156.25, whiteBalanceMode:'continuous', colorTemperature:4600, brightness:0 };
+  const BASIC=['width','height','frameRate','aspectRatio','resizeMode','facingMode','deviceId'];
+  const fits=(k,v)=>{ const c=caps[k]; return Array.isArray(c) ? c.includes(v) : !!c && typeof v==='number' && v>=c.min && v<=c.max; };
+  const S={ caps, dev, cons:{}, format:null, wrap(tr){ return {
+    kind:'video', label:'simulated UVC webcam', get readyState(){ return tr.readyState; },
+    getCapabilities:()=>({ ...tr.getCapabilities(), ...caps }), getSettings:()=>({ ...tr.getSettings(), ...dev }), getConstraints:()=>S.cons,
+    async applyConstraints(c={}){   // like Chrome: a set with a camera control applies ONLY the controls; one without changes the format
+      for(const e of c.advanced||[]) for(const k in e) if(!(k in caps) && !BASIC.includes(k)){ const x=new Error('Unsupported constraint'); x.name='OverconstrainedError'; throw x; }
+      if(!(c.advanced||[]).some(e=>Object.keys(e).some(k=>k in caps))){ await tr.applyConstraints(c); S.format=JSON.parse(JSON.stringify(c)); S.cons=S.format; return; }
+      for(const e of c.advanced||[]){ if(!Object.entries(e).every(([k,v])=>fits(k,v))) continue;   // an advanced entry is all or nothing
+        Object.assign(dev, e); if('exposureTime' in e && !('exposureMode' in e)) dev.exposureMode='manual'; if('colorTemperature' in e && !('whiteBalanceMode' in e)) dev.whiteBalanceMode='manual'; }
+      S.cons=JSON.parse(JSON.stringify(c)); },
+    stop(){ tr.stop(); } }; } };
+  return S;
+}
+export async function checkCamRestore(){
+  const L=await import('../latmeter.js'), V=await import('../vision.js'), ST=await import('../state.js');
+  const diff=[], miss=s=>diff.push(s), notes=[]; let cases=0;
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms)), $=id=>document.getElementById(id);
+  const press=async id=>{ $(id).click(); const t0=performance.now(); await sleep(30); while($(id).disabled && performance.now()-t0<20000) await sleep(50); };
+  const sim=uvcSim(), dev0={ ...sim.dev }, AUTO=['exposureMode','whiteBalanceMode'];
+  /* restored = automatic modes and every other control at its original (a value an automatic mode drives is the camera's own) */
+  const GOV={ exposureTime:'exposureMode', colorTemperature:'whiteBalanceMode' };   // under its automatic mode the camera chooses the value
+  const restored=what=>{ const bad=Object.keys(dev0).filter(k=>!(GOV[k] && sim.dev[GOV[k]]==='continuous') && sim.dev[k]!==dev0[k]);
+    cases++; if(bad.length){ miss(`${what}: the camera kept ${bad.map(k=>`${k} ${sim.dev[k]} (was ${dev0[k]})`).join(', ')}`); return false; } return true; };
+  const control=(what, name)=>{ const n=diff.length, ok=restored(what); diff.length=n; if(ok) miss(`CONTROL: ${name} left the camera automatic — the check cannot fail`); };
+  const what=keys=>keys.map(k=>t('diag.ctl.'+k)).join(t('diag.ctl.and'));
+  const reopen=async ()=>{ await V.switchCamera(ST.camFacing); await sleep(200); };
+  const darken=()=>Object.assign(sim.dev, { exposureMode:'manual', exposureTime:39.063, whiteBalanceMode:'manual', colorTemperature:2800 });
+  cases++; if(V.visionOpts().low!=='off') miss(`low light not Off at the start («${V.visionOpts().low}»)`);
+  V.camSimDbg(sim); L.latSwSync();
+  try{
+    /* (I) the warning, the exposure button */
+    cases++; { const w=$('swLowWarn'); if(!w || w.hidden || w.textContent.trim()!==t('diag.sw.lowWarn')) miss(`the warning under «Low light (test)» is missing («${w&&w.textContent}»)`); }
+    cases++; if($('swLowExp').hidden) miss('«short exposure» hidden on a camera with manual exposure');
+    /* (A) short exposure → Off */
+    V.lowDbg({ fakeFps:30 }); await press('swLowExp');
+    cases++; if(V.lowInfo().mode!=='exposure' || sim.dev.exposureMode!=='manual' || sim.dev.exposureTime!==234.378) miss(`short exposure did not reach the camera (mode «${V.lowInfo().mode}», ${JSON.stringify(sim.dev)})`);
+    await press('swLowOff');
+    restored('short exposure → Off');
+    { const D=V.lowInfo().dev; cases++; if(!D || D.kind!=='restore' || !D.ok || JSON.stringify(D.what)!==JSON.stringify(AUTO)) miss(`the restore is not recorded for the meter (${JSON.stringify(D)})`);
+      cases++; const want=t('diag.dev.restore', { what:what(AUTO) }); if(!L.latText().includes(want)) miss(`the meter does not say «${want}»`); }
+    /* (B) short exposure → 15 fps → Off (the user's likely path: the pre-fix Off forgot the exposure after another test) */
+    await press('swLowExp'); await press('swLow15');
+    cases++; if(V.lowInfo().mode!=='fps15') miss(`15 fps did not hold after short exposure («${V.lowInfo().mode}» — ${V.lowInfo().note})`);
+    restored('short exposure → 15 fps (each test starts from the camera\'s own settings)');
+    cases++; if(!(sim.format && sim.format.frameRate && sim.format.frameRate.min===15)) miss(`15 fps did not reach the video format (${JSON.stringify(sim.format)})`);
+    await press('swLowOff'); restored('short exposure → 15 fps → Off');
+    cases++; if(!sim.format || (sim.format.frameRate && sim.format.frameRate.min!=null)) miss(`Off left the video format at ${JSON.stringify(sim.format)}`);
+    /* (C) a fall-back restores too */
+    V.lowDbg({ fakeFps:3 }); await press('swLowExp');
+    cases++; if(V.lowInfo().mode!=='off' || V.lowInfo().note!=='noeffect') miss(`simulated no effect: mode «${V.lowInfo().mode}», note «${V.lowInfo().note}»`);
+    restored('short exposure → fall-back to Off');
+    /* (D) a touched value without an automatic mode */
+    V.lowDbg({ fakeFps:30, extra:{ brightness:40 } }); await press('swLowExp');
+    cases++; if(sim.dev.brightness!==40) miss(`the extra control did not reach the camera (brightness ${sim.dev.brightness})`);
+    await press('swLowOff'); restored('short exposure + brightness → Off');
+    /* (H) leaving the page */
+    V.lowDbg({ reset:true }); V.lowDbg({ fakeFps:30 }); await press('swLowExp');
+    window.dispatchEvent(new Event('pagehide')); await sleep(600);
+    cases++; if(V.visionOpts().low!=='off' || V.lowInfo().note!=='left') miss(`pagehide: mode «${V.visionOpts().low}», note «${V.lowInfo().note}»`);
+    restored('short exposure → the page left');
+    /* (E) CONTROL: the pre-fix Off must be flagged */
+    V.lowDbg({ reset:true }); V.lowDbg({ fakeFps:30, noRestore:true }); await press('swLowExp'); await press('swLowOff');
+    control('pre-fix Off', 'the pre-fix Off');
+    V.lowDbg({ reset:true });
+    /* (F) a camera left in manual mode is healed at the next open */
+    darken(); V.lowDbg({ devClear:true }); await reopen();
+    restored('camera left dark → reopened (heal)');
+    { const D=V.lowInfo().dev; cases++; if(!D || D.kind!=='heal' || !D.ok || JSON.stringify(D.what)!==JSON.stringify(AUTO)) miss(`the heal is not recorded for the meter (${JSON.stringify(D)})`);
+      cases++; const want=t('diag.dev.heal', { what:what(AUTO) }); if(!L.latText().includes(want)) miss(`the meter does not say «${want}»`); }
+    /* (G) CONTROL: without the heal the camera stays dark */
+    darken(); V.lowDbg({ noHeal:true, devClear:true }); await reopen();
+    control('open without heal', 'an open without the heal');
+    V.lowDbg({ reset:true }); await reopen(); restored('healed after the control');
+    notes.push(`simulated webcam after the row: ${JSON.stringify(sim.dev)}`);
+  } finally {
+    V.lowDbg({ reset:true });
+    if(V.visionOpts().low!=='off') await V.setLowLight('off').catch(e=>miss('restore: '+e.message));
+    V.camSimDbg(null); V.lowDbg({ devClear:true }); L.latSwSync();
   }
   cases++; if(JSON.stringify(V.visionOpts())!==JSON.stringify(V.VISION_DEF)) miss(`the switches did not return to their defaults (${JSON.stringify(V.visionOpts())})`);
   return { cases, total:diff.length, differences:diff, notes };
@@ -217,3 +326,4 @@ export async function checkLowLight(){
 row({ at:580, name:'LAT1 latency meter', run:()=>checkLatency(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
 row({ at:581, name:'LAT1b test switches', run:()=>checkLatSwitches(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
 row({ at:585, name:'LAT3 low light', run:()=>checkLowLight(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
+row({ at:586, name:'CAM-FIX camera settings restored', run:()=>checkCamRestore(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });

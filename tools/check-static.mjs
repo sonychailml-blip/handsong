@@ -193,6 +193,7 @@ const GLOBALS=new Set((
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+
   /* LAT2: frames to the detection worker */ 'Worker createImageBitmap ImageBitmap '+
+  /* CAM-FIX: the probe records camera constraint calls */ 'MediaStreamTrack '+
   /* the detection worker's own scope (hand-worker.js) */ 'postMessage '+
   /* область AudioWorklet (ks-worklet.js) */ 'AudioWorkletProcessor registerProcessor sampleRate currentTime currentFrame'
 ).split(/\s+/).filter(Boolean));

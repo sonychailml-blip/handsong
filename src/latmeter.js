@@ -158,6 +158,7 @@ export function latText(r=latReport()){
   L.push(t('diag.frameWait', { ms:f(C.frameWaitMs) }));
   L.push(C.capsText ? t('diag.caps', { name:C.label||t('diag.unknown'), caps:C.capsText }) : t('diag.capsNone'));   // LAT3
   L.push(t('diag.low', { mode:t('diag.low.'+C.lowLight.mode), fps:lowFpsTx(C.lowLight), note:lowNoteTx(C.lowLight) }));
+  if(C.lowLight.dev) L.push(devTx(C.lowLight.dev));   // CAM-FIX: the last heal / restore of the webcam's own settings
   L.push(t('diag.lost', { n:f(C.lostPerMinute) }));
   { const D=r.detection; L.push(t('diag.path', { path:t(D.runs==='worker'?'diag.pathWorker':D.runs==='main'?'diag.pathMain':'diag.pathNone'), why:D.why?t('diag.cause',{ c:D.why }):'' })); }
   L.push(t('diag.detect', { mean:f(S.detect.mean), p95:f(S.detect.p95), tr:f(S.detTrack.mean), se:f(S.detSearch.mean), det:f(r.detection.detectedFps), proc:f(C.processedFps) }));
@@ -178,6 +179,7 @@ export function latText(r=latReport()){
 }
 /* LAT3: the low-light line's parts — fps before → after, and the outcome's reason (a fall-back to Off, or kept with a remark) */
 const lowFpsTx=W=>{ const fx=x=>Number.isFinite(x)?String(r1(x)):'—'; return Number.isFinite(W.after)||Number.isFinite(W.before) ? t('diag.lowFps', { a:fx(W.before), b:fx(W.after) }) : ''; };
+const devTx=D=>t('diag.dev.'+D.kind+(D.ok?'':'Fail'), { what:D.what.map(k=>t('diag.ctl.'+k, { def:k })).join(t('diag.ctl.and')) });
 const lowNoteTx=W=>W.note ? t(W.mode==='off' ? 'diag.lowBack' : 'diag.lowKept', { why:t('diag.why.'+W.note, { def:W.note }) }) : '';
 export function latConsole(){ const r=latReport(); console.log(latText(r)); console.table(r.stages); return r; }
 

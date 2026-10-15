@@ -7105,6 +7105,8 @@ family of modules or a 500–1500-line move; L ≈ many readers or a 2000+-line 
 13. **AUD2** (M) — effects out: `modules/effects/{volume,bright,glide,reverb,delay,trem-mix}.js` + `engine/fdn.js`; `FX_FACTORY` from the
     registry; generated contract rows per effect (identity at neutral, offline repeat, tail vs measured decay, passport round trip).
 14. **GES1** (M) — `gestures/features.js` (pure; node rows in the data runner), `expr.js`, `fxhand.js`, `looper.js`, `hands.js`.
+    → (added 2026-10-15, CAM-FIX) after GES1: the user's «EXPRESSION HAND» idea — a pedal-like hand, hand map, expression lab, presets —
+      BACKLOG §3.29, block «➕ EXPRESSION HAND» (idea, not scheduled).
 15. **DRAW1** (M) — `views/play.js`, `views/strip.js`, `views/roll.js`, `views/camera.js`.
 16. **UI1** (M) — `ui/*` by panel; `state/*` by domain; i18n dictionaries per area (fewer merge conflicts). ⛳ **Grown by the user's goal
     (2026-10-14, BACKLOG §7.19):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes, spacing; `style.css`
@@ -7792,3 +7794,61 @@ latReport, latSwSync, latSwitch; probes/lat.js; `lowDbg(o)` — probes/lat.js; `
 lowOff; probe-data 6; `lowVerdict(o)` — vision 1, probes/lat.js 1, probe-data 6; `darkStep(st, t, o)` — latmeter onVF, darkDbg; probes/lat.js
 1; probe-data 1; `lostStep(st, t, n)` — latmeter latHands; probe-data 1; `capsText(caps, settings)` — latmeter latReport; probe-data 2;
 `latHands(f, tA, tB)` unchanged — new caller probes/lat.js (scripted frames, pump held).
+
+### Moved from HANDOFF.md at CAM-FIX (English, verbatim; 2026-10-15)
+### LAT3 (2026-10-15) — low-light camera (full: archive B «LAT3 — record»)
+- Input (user's desktop, evening): camera granted 30 fps but DELIVERED 6.3 (frame wait ≈ 79 ms dominates; hand → sound 125 / 204 incl. wait);
+  daytime 14–30 fps. Worker 93 ms detection → main thread stays the default (LAT2 decision confirmed).
+- User decisions: the «exact frame» picture is the only one — the «Picture: live camera» switch is deleted (code, UI, i18n, docs, probes;
+  rule #8 says so); low light matters (evening, Calm before sleep) → a real player hint, not only test switches.
+- Meter: the webcam's name + capabilities (getCapabilities / getSettings) in «Copy»; «Low light (test)» Off / ≥ 15 fps / ≥ 24 fps / short
+  exposure (only when the camera has manual exposure; applyConstraints; refused or no effect → back to Off with the reason); «Hands lost
+  and found again within 1 s: N per minute»; when the longest startup task began.
+- Player hint «Too dark: the camera slowed to N fps…» (en + ru): delivered < 12 fps for > 3 s while granted ≥ 24; once per session; frame
+  timing only (rule #33); taps pass through; never while recording, a clip, the editor or the window. Pure core `src/core/camlight.js`.
+- Startup 1397-ms task CONFIRMED behind the start card: the warm-up runs in a setTimeout continuation BEFORE the camera opens (runner: the
+  longest startup task, «TimerHandler:setTimeout», began ≈ 15 s before the camera start; the meter now prints that offset).
+- Runner's fake camera: «≥ 15» held, «≥ 24» refused by Chrome (OverconstrainedError, frameRate), manual exposure offered (range 10–100).
+- Probes: data PASS 13 (+ «LAT3 low light (core)», 29 cases); P.quick PASS 55 (118 s, + «LAT3 low light», 34 cases); P.all PASS 74
+  (733 s, under outside load). Fix rounds 2. Earlier quick runs hit the 3-min limit while the user's Chrome used ~2 of 4 cores.
+- ⬜ User step 95 (evening, one hand, each low-light setting 20 s + Copy; picture darker / grainier? hands lost more?).
+
+### CAM-FIX — record (2026-10-15): the webcam's own settings restored; warm-up in two steps; probe import catch; «expression hand» idea recorded
+**Part A — urgent.** The user switched «Low light (test)» to a non-Off value on his laptop webcam («ASUS USB2.0 Webcam (1bcf:2883)», UVC;
+capabilities from his meter: frameRate 0–30 = 30 · exposureMode continuous/manual = continuous · exposureTime 39.063–1250 (step 39.063) =
+156.25 · whiteBalanceMode continuous/manual = continuous · colorTemperature 2800–6500 = 4600 · brightness −64–64 = 0 …). The picture went
+almost black; Off, a reload and Zoom stayed dark — the setting lived IN THE DEVICE. He restored it from the console (exposureMode and
+whiteBalanceMode 'continuous'). Causes: (1) the old Off sent only the format request and handed exposure back only when the PREVIOUS mode was
+«short exposure» — any path exposure → 15/24 fps (or their fall-back) → Off forgot it; nothing healed at open; (2) measured on the runner's
+camera: Chrome applies ONLY the camera controls of a set that holds one and silently ignores its format part (a 24-fps minimum the camera
+cannot give was accepted inside such a set, refused alone); a format-only set leaves the controls alone; `getConstraints()` keeps the last
+controls set. Which test darkens: «short exposure» writes the camera's exposure (1/40 s → 23.4 ms on the ASUS grid vs the camera's own ≈ 100+
+ms in a dim room ≈ 5× less light); the frame-rate tests write no control (only the format; a driver may shorten its exposure while one runs).
+Fix (hard rule #34): originals saved before the first change; Off, a fall-back, pagehide / visibilitychange-hidden and a reopen RESTORE
+(automatic exposure + white balance, other touched controls to their originals, `core/camlight.restoreConstraints`); a test switched to
+another test first undoes the last one; format and controls in two calls (`vision.applySet`); every open heals manual modes
+(`camHeal`) and the meter says «Camera exposure … was manual — restored to automatic» (or «… did not return»); a warning line under the
+switch (en + ru). The runner's fake camera reads 'manual' forever (it cannot show 'continuous') — its heal is named «did not return».
+**Part B.** (6) The two hand-model warm-ups are two steps with a paint between them. Runner (headless, slow GPU today): before — one task
+9681 ms (warm L2 8938 + L1 741); after — 9479 ms (L2) and 718 ms (L1), both ≈ 10 s before the camera start (behind the card). The first
+warm-up carries the shared shader compile, so the halves are not equal; on the user's desktop (1583 ms total) expect ≈ 0.85 + 0.7 s. (7)
+`main.js`: the `?probe` import's `.catch` sat inside a `//` comment (a failed load was silent); fixed; a scan of all `src/` found no other
+code hidden behind a line comment.
+**Part C.** The user's «expression hand» idea appended to BACKLOG §3.29 (pedal analogy, signals, hand map, expression lab, design notes,
+status; nothing existing changed), linked from GES1 in the stage-3 plan.
+**Probes.** data PASS 13 (LAT3 core 29 → 40 cases: restore set, heal list, the user's path exposure → 15 fps → Off through a minimal UVC model;
+CONTROL the pre-fix Off). P.quick PASS 56 (112.9 s) incl. the new row «CAM-FIX camera settings restored» (25 cases; a simulated UVC webcam
+around the real track; CONTROLS noRestore, noHeal caught); frozen seed bass 0.08686 / 0.055319 / 650886; HAND1 PASS; UI checks, CSP, network
+PASS. P.all not run (no sound, render, recording or tuning code touched; GOLD is P.all-only). Fix rounds 3: (1) the heal check compared
+colour temperature, which automatic white balance chooses — values an automatic mode drives are skipped; (2) LAT3 read `getConstraints()`,
+which Chrome leaves on the heal's controls set — replaced by the record of the calls that went through (format-only with frameRate.min;
+controls-only with manual / continuous) and this exposed the mixed-set routing, fixed in the app by `applySet`; (3) LAT3 «hands lost» inherited
+the counter state of LAT2a's last scripted frame (two hands) on a slow run — the feed now starts from a defined state (a no-hand frame 1.5 s
+before). Checker false positive avoided: `...restoreAdvanced(…)` read as a property call («imported but never used»).
+**Positional callers of changed/new functions:** `createDetector({delegate, blank, step})` (step now also 'warm2') — vision mainDet, hand-worker;
+`lowProblems(w, mode, C, caps, calls)` — probes/lat.js 2; new `restoreConstraints(caps, base, orig, touched)` — vision devRestore, probe-data;
+`restoreAdvanced(caps, orig, touched)` — camlight restoreConstraints, vision setLowLight, probe-data; `healList(caps, s)` — vision camHeal,
+probe-data; `autoLeft(adv, s)` — vision stillManual 2, probe-data; `devSnap(s)` — vision setLowLight, probe-data; `lowConstraints(…)` — vision
+setLowLight, devRestore (CONTROL), probe-data; `devRestore(tr, kind)` — vision lowOff, lowLeave, openCamera; `camHeal()` — openCamera;
+`applySet(tr, c)` — devRestore, setLowLight; `stillManual(adv, tr)` — devRestore, camHeal; `camSimDbg(sim)` — probes/lat.js 2; `devTx(D)` —
+latmeter latText. Unchanged signatures: `setLowLight(m)` (latmeter SW 4, probes/lat.js 2), `lowInfo()` (+ `dev`), `lowDbg(o)` (+ keys).

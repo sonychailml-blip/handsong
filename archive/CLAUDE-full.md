@@ -665,3 +665,25 @@ Never report a change as done without stating which steps you could not verify.
 - **Why the main thread stays the default.** The worker was built as planned and gives identical results, but on the user's GPU WebGL inside
   a worker is about twice as slow for this model; for an instrument the hand → sound time outweighs the long-task count. The phone may
   differ — measure before changing the default.
+
+## Device-level camera controls (CAM-FIX, hard rule #34) — reasoning (English; 2026-10-15)
+- **What happened.** The user's laptop webcam («ASUS USB2.0 Webcam», UVC) went almost black after a non-Off «Low light (test)» setting;
+  Off, a reload and even Zoom stayed dark. He fixed it by hand from the console (exposureMode and whiteBalanceMode 'continuous'). A UVC
+  webcam stores exposure mode / time and white balance in the DEVICE: they outlive the stream, the page and the app.
+- **Why the old Off failed.** Off sent only today's format request; it added `exposureMode:'continuous'` only when the PREVIOUS mode was
+  «short exposure». Any path short exposure → a frame-rate test (or its automatic fall-back) → Off forgot the exposure. A reload never touched
+  the camera's controls at all.
+- **Chrome's routing (measured on the runner's camera).** A constraint set that holds a camera control goes to Chrome's image-capture path:
+  only the controls are applied and the set's format part (width, frameRate) is ignored without an error (a 24-fps minimum the camera cannot
+  give was accepted inside such a set, refused alone). A set without a control changes only the format and leaves the controls alone (that
+  is exactly what the old Off did). And `getConstraints()` keeps reporting the last controls set. Hence two calls (`applySet`) and probe
+  evidence from the calls themselves.
+- **Which test does it.** «Short exposure» writes the camera's exposure mode and time (1/40 s → 23.4 ms on the ASUS step grid; in a dim room
+  the camera's own exposure was ≈ 100 ms or more — about 5× less light). The frame-rate tests ask only for a video format; no web API writes
+  «exposure priority», though a driver may shorten its exposure to keep that frame rate while the stream runs (not after).
+- **Why heal at every open.** The page cannot guarantee its restore runs (a crash, a closed tab before the camera answers, another app).
+  Reading `getSettings()` at open and setting manual modes back to automatic heals any of those; a camera that cannot report 'continuous'
+  (the runner's fake camera) is named in the meter instead of pretending.
+- **Why a simulated device in the probe.** The fake camera reads 'manual' forever and forgets everything on reopen — it can show neither the
+  bug nor the fix. The simulated UVC device (the user's capabilities, persistent controls, Chrome's routing) wraps the real track, so the real
+  buttons, the real reopen and the real meter are exercised; two controls (the pre-fix Off, an open without heal) must fail.

@@ -299,6 +299,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     addModule / share / window.open / SW register call and every external import is listed per module with its count and reason; (c) the
     browser runner fails on ANY CSP violation in its session and proves the policy by a fetch to an unlisted host that must be refused;
     (d) packs and other people's files are data only. The privacy notice is on the start card (`#privacyNote`, keys `privacy.*`).
+34. ⛳ **A device-level camera control is never changed without restoring it** (user, CAM-FIX, 2026-10-15: «short exposure» left the user's
+    UVC webcam dark — in Zoom too, after a reload). A webcam keeps exposure / white balance IN THE DEVICE. So: originals (`getSettings`) are
+    saved before the first change; Off, leaving the page (pagehide / visibilitychange) and the next open RESTORE actively (automatic modes
+    back to 'continuous', other touched controls to their originals — `core/camlight.restoreConstraints`); every camera open heals a device
+    found in manual exposure / white balance and the meter says so. Chrome applies ONLY the camera controls of a set that holds one and
+    ignores its format part (width, frameRate) — measured — so format and controls always go in two calls (`vision.applySet`).
 
 ## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
 - `index.html` — markup only (start card, top bar, panels `#panelScale`/`#panelSound`/`#panelLoop`, `#backingMenu`, help overlay,
@@ -358,12 +364,15 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   MediaPipe prints its processor line only at a model's first inference) / `setCamFps` (reopens the camera) / `setDetectPath` / LAT3
   `setLowLight('off'|'fps15'|'fps24'|'exposure')` (applyConstraints on the running track — the set from `core/camlight.lowConstraints` over
   today's request `camBase()`; then 1 s settle + 2 s count of delivered frames (`vfRing`, the pump's rVFC) → `lowVerdict`; an error or no
-  effect → back to Off (today's request; after 'exposure' `exposureMode:'continuous'`), reason in `lowInfo().note`; a camera reopen resets
-  it to Off, note 'reopened'; probe-only `lowDbg({fail, fakeFps, noFallback, reset})`); `camInfo` also gives `caps` (getCapabilities),
+  effect → back to Off, reason in `lowInfo().note`; a camera reopen resets it to Off, note 'reopened'; CAM-FIX (rule #34): Off, a
+  fall-back, leaving the page and a reopen restore the device (`devRestore`), every open heals (`camHeal`), `lowInfo().dev` = the last
+  heal / restore for the meter; probe-only `lowDbg({fail, fakeFps, noFallback, extra, noRestore, noHeal, devClear, reset})`,
+  `camSimDbg(sim)` (a simulated UVC webcam around the real track)); `camInfo` also gives `caps` (getCapabilities),
   `settings`, `label`. `VISION_DEF` = `{hands:'2s', delegate:'GPU', camFps:null, path:'main', low:'off'}`.
 - `src/handdet.js` (LAT2) — the DETECTOR, worker-safe (no DOM): `createDetector({delegate, blank, step})` downloads the model ONCE
   (`MP_MODEL`, a fetch) and builds two models from it — L2 (numHands 2) and L1 (numHands 1), sequentially (MediaPipe's loader keeps one
-  global) — and warms each on a blank frame (the first inference stalls ≈ 1.3–1.6 s); `run(src, t, action, policy)` → plain result
+  global) — and warms each on a blank frame (the first inference stalls ≈ 1.3–1.6 s; at start two steps with a yield between them — two
+  shorter freezes behind the start card, CAM-FIX); `run(src, t, action, policy)` → plain result
   (`plainResult`: landmarks + handednesses), the action that ran (a tracking action that found no hand retries a search on the same
   frame: 'track1>search') and the model time. The only static import of MediaPipe.
 - `src/hand-worker.js` (LAT2b) — a CLASSIC worker (MediaPipe starts each model by `importScripts` of its loader; in a module worker the
@@ -1161,13 +1170,21 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   the main thread with the reason; back to the default) · node «LAT2 search schedule (core)» (exact sequences, retry, policies,
   `handToSound` with `transfer`; CONTROL policy '1'). «LAT3 low light» (`P.checkLowLight`, quick, drawn, ≈ 12–15 s): capabilities and the
   three new lines in the Copy text; «short exposure» offered iff the camera has it; the REAL buttons 15 / 24 fps / short exposure — either
-  held with the constraint set claimed (passed AND `getConstraints`, against literals in the probe) and a consistent verdict, or back at Off
-  with a reason and today's request (the runner's fake camera: 15 held, 24 refused by Chrome «OverconstrainedError (frameRate)», short
+  held with the constraint set claimed (passed, against literals in the probe, AND the applyConstraints calls that went through — format
+  and controls in separate calls; since CAM-FIX not `getConstraints`, which Chrome leaves on the last controls set) and a consistent
+  verdict, or back at Off with a reason, today's format and automatic exposure (the runner's fake camera: 15 held, 24 refused by Chrome «OverconstrainedError (frameRate)», short
   exposure offered — range 10–100); a simulated OverconstrainedError and a simulated «no effect» fall back to Off and say so (meter and
   switch note), detection keeps running; CONTROL `lowDbg({noFallback})` must be flagged; hands lost through the real `latHands` (1·0·1 →
   one, away 1.3 s → none); «Too dark» through its real show path at the core's frame, taps pass, OK hides, granted 20 → nothing. Node row
   «LAT3 low light (core)» (exact: hint frame, never at granted < 24 / recovered in 2.5 s / 12.5 fps, once per session, waits for allowed;
-  loss counts; constraint sets; verdicts; capabilities line; CONTROLS: a hint without its 3-s wait, a counter without its 1-s limit). The
+  loss counts; constraint sets; verdicts; capabilities line; CAM-FIX restore set, heal list, the user's path exposure → 15 fps → Off through
+  a minimal UVC model; CONTROLS: a hint without its 3-s wait, a counter without its 1-s limit, the pre-fix Off). «CAM-FIX camera settings
+  restored» (`P.checkCamRestore`, quick, drawn, ≈ 2.5 s): the runner's fake camera always reads 'manual' and forgets on reopen, so a
+  SIMULATED UVC webcam (the user's ASUS capabilities, controls that persist across opens, Chrome's routing of mixed sets) wraps the real
+  track; through the REAL buttons: short exposure sets manual, Off brings automatic exposure + white balance + every other control back
+  (values an automatic mode drives excepted) and the meter says so; exposure → 15 fps (15 reaches the format) → Off; a fall-back; an extra
+  touched control (brightness) back to its original; pagehide; a camera left dark healed at reopen with the meter line; the warning line.
+  CONTROLS that must be flagged: `lowDbg({noRestore})` (the pre-fix Off), `lowDbg({noHeal})`. The
   runner also checks every REQUEST of the session — page and workers (a worker has
   no page CSP of its own) — goes to the own origin or the MediaPipe paths; CONTROL: a worker asking example.com (intercepted, aborted).
 - **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–120 s headless): 79 cases rendered alone through the engine copy
@@ -1371,7 +1388,10 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   in the evening vs 14–30 by day — the frame wait ≈ 79 ms then dominates hand → sound). No web API sets a webcam's «exposure priority»;
   `frameRate.min` may be refused (OverconstrainedError) or ignored by the driver; manual exposure exists only on cameras that report it, and
   a shorter exposure means a darker, noisier picture. The real remedy is light on the hands (BACKLOG §7.18). The hint needs
-  requestVideoFrameCallback (no hint without it).
+  requestVideoFrameCallback (no hint without it). CAM-FIX: «short exposure» writes the webcam's OWN exposure (a UVC control that outlives
+  the page and other apps — restored per rule #34; in the evening 23 ms instead of the camera's own ≈ 100+ ms is ≈ 5× less light); the
+  frame-rate tests write no camera control (only the requested format; a driver may shorten its exposure while one runs, never after). A
+  restore is best effort when the page closes; the next open heals.
 - **Night forest is costly** (offline render time per second of audio on the dev desktop, SND-F1b): Short ≈ 14 %, Medium ≈ 15 %, Long
   ≈ 27 % of a core; three Medium rooms at once ≈ 48 %, three Long ≈ 122 % (Chrome's partitioned convolution is not linear in length — Short
   saves little over Medium); a phone ≈ 4×. Each chain that holds it has its own convolver (live and track chains separate) — a SHARED
@@ -1631,6 +1651,12 @@ verified. Full text of every step: archive, "How to verify a change".
     setting that does nothing or is refused falls back to Off and says why. The hint: in a dim room with Off, within ~4 s of the camera
     slowing below 12 fps a small message «Too dark: the camera slowed to N fps…» appears once at the top, taps go through it, OK or 9 s
     hide it; it never appears while recording or in the editor, and not again in the same session.
+96. Camera settings come back (CAM-FIX, rule #34), the user's desktop, one test at a time: ▶ Play → «🎛 Sound» → Diagnostics → Latency meter
+    On; the warning «Test: changes the camera's own settings; Off restores them» is under «Low light (test)». For each of «at least 15 fps»,
+    «at least 24 fps», «short exposure»: tap it, wait ~3 s, look at the picture, tap «Off», wait ~2 s — the picture must look as before the
+    test (short exposure: dark while on, normal after Off; the box says «After the test: camera exposure and white balance back to
+    automatic…»). Then reload the page and open Zoom (or the Windows Camera app): the picture is normal. A camera left dark by any app: the
+    next ▶ Play heals it and the box says «Camera exposure … was manual — restored to automatic».
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

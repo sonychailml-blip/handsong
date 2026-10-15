@@ -19,7 +19,8 @@ export function exposureUnits(caps, sec=LOW_EXPOSURE_S){
   return +v.toFixed(6);
 }
 /* The constraint set applyConstraints receives (it REPLACES the track's set, so the base — today's request — always rides along).
-   null = the mode is not possible on this camera. Off after 'exposure' hands the exposure back to the camera ('continuous'). */
+   null = the mode is not possible on this camera. Its 'off' branch is the PRE-FIX Off (CAM-FIX: kept only as the probe's CONTROL) —
+   the app's Off is `restoreConstraints` below. */
 export function lowConstraints(mode, caps, base, prev='off'){
   if(!LOW_MODES.includes(mode)) return null;
   const c={ ...base };
@@ -29,6 +30,42 @@ export function lowConstraints(mode, caps, base, prev='off'){
   c.frameRate={ min:n, ideal:Math.max(n, b||30) };
   return c;
 }
+/* CAM-FIX — device-level controls. A UVC webcam keeps exposure / white balance IN THE DEVICE: they outlast the page, a reload and other
+   apps (the user's ASUS webcam stayed dark in Zoom after «short exposure»). Rules: originals saved before the first change; Off, leaving
+   the page and the next open RESTORE actively (automatic modes back to 'continuous', other touched controls to their saved values); any
+   camera found in manual mode at open is healed to automatic. Mode keys and the value each mode governs: */
+export const HEAL_MODES=['exposureMode','whiteBalanceMode'];
+export const AUTO_OF={ exposureTime:'exposureMode', iso:'exposureMode', colorTemperature:'whiteBalanceMode', focusDistance:'focusMode' };
+export const DEV_KEYS=['exposureMode','exposureTime','exposureCompensation','iso','whiteBalanceMode','colorTemperature','brightness',
+  'contrast','saturation','sharpness','focusMode','focusDistance'];
+const canAuto=(caps,k)=>!!(caps && Array.isArray(caps[k]) && caps[k].includes('continuous'));
+const isMode=k=>/Mode$/.test(k);
+/* the device controls of a getSettings() result — the originals */
+export const devSnap=s=>{ const o={}; for(const k of DEV_KEYS) if(s && s[k]!=null) o[k]=s[k]; return o; };
+/* the advanced entries that undo `touched`: every heal mode and every touched mode (or a mode governing a touched value) → 'continuous'
+   where the camera offers it; a touched value with no automatic mode → its original. One entry per key (an advanced entry is all or
+   nothing, and a key the camera lacks makes Chrome refuse the call — measured on the runner's camera). */
+export function restoreAdvanced(caps, orig={}, touched=[]){
+  const modes=[...HEAL_MODES], vals=[];
+  for(const k of touched){ const m=isMode(k) ? k : AUTO_OF[k]; if(m && !modes.includes(m)) modes.push(m); }
+  const adv=[];
+  for(const m of modes) if(canAuto(caps,m)) adv.push({ [m]:'continuous' });
+  for(const k of touched){
+    const m=isMode(k) ? k : AUTO_OF[k];
+    if(m && canAuto(caps,m)) continue;   // the automatic mode drives it
+    if(orig && orig[k]!=null && caps && caps[k]!=null && !vals.includes(k)){ vals.push(k); adv.push({ [k]:orig[k] }); }
+  }
+  return adv;
+}
+export function restoreConstraints(caps, base, orig, touched){
+  const adv=restoreAdvanced(caps, orig, touched);
+  return adv.length ? { ...base, advanced:adv } : { ...base };
+}
+/* modes found in 'manual' that the camera can run automatically — what a camera open heals */
+export const healList=(caps, s)=>HEAL_MODES.filter(m=>s && s[m]==='manual' && canAuto(caps,m));
+/* after a restore or heal: the modes asked 'continuous' that still read 'manual' (an empty list = done) */
+export const autoLeft=(adv, s)=>adv.filter(e=>Object.values(e)[0]==='continuous').map(e=>Object.keys(e)[0]).filter(m=>s && s[m]==='manual');
+
 /* Did the mode do anything? Measured delivered fps before and after (after = counted once the camera settled). Kept when it reaches
    90 % of its target, or when it helped by a quarter at least ('partly'); manual exposure also needs the camera to report 'manual'.
    No measurement (NaN) = kept, named 'unmeasured'. */

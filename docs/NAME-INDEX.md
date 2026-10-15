@@ -322,3 +322,16 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   «LAT3 low light (core)» (`lowCore`, `CL`).
 - Stale since LAT2: `vision.landmarker`, `main.lastTs`, `latmeter.lastN`, `latmeter.dup` (a count; now `pumpStats().dup`), `vision.MP_LINE`
   (moved to core/latency.js), `vision.js` external import (moved to handdet.js).
+## Added at CAM-FIX (2026-10-15)
+- `src/core/camlight.js`: `HEAL_MODES` ['exposureMode','whiteBalanceMode'], `AUTO_OF` (value → the automatic mode that drives it),
+  `DEV_KEYS`, `devSnap(settings)`, `restoreAdvanced(caps, orig, touched)` → advanced entries (one key each), `restoreConstraints(caps, base,
+  orig, touched)`, `healList(caps, settings)`, `autoLeft(adv, settings)`; internal `canAuto`, `isMode`. `lowConstraints(…, 'off', prev)` is
+  now only the probe's CONTROL (the pre-fix Off).
+- `src/vision.js`: `camSimDbg(sim)` (probe only); `lowInfo()` adds `dev` {kind:'heal'|'restore', ok, what}; `lowDbg` adds `extra`,
+  `noRestore`, `noHeal`, `devClear`; internal `camSim`, `applySet` (format and camera controls in two calls), `stillManual`, `devRestore`,
+  `camHeal`, `lowLeave` (pagehide / visibilitychange), `bounded`, `settingsOf`; `low` adds `orig`, `touched`, `dev`.
+- `src/handdet.js`: internal `warmOne` (start: two warm-up steps 'warm' / 'warm2').
+- `src/latmeter.js`: `devTx` (the camera line). `index.html`: `#swLowWarn`. i18n: `diag.sw.lowWarn`, `diag.dev.heal/healFail/restore/
+  restoreFail`, `diag.ctl.exposureMode/whiteBalanceMode/focusMode/and`, `diag.why.left`.
+- `src/probes/lat.js`: `checkCamRestore` (row «CAM-FIX camera settings restored», at 586), `uvcSim`; LAT3 `lowProblems(…, calls)`, `FMT`,
+  `isFmt`, `isCtl`. `tools/check-static.mjs` GLOBALS + `MediaStreamTrack`.

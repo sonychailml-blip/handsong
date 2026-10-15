@@ -17,7 +17,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   3.15 own tuning per role (live polymodality) ⬜ · 3.16 jam content 🔵 · 3.17 camera frame margin ✅ · 3.18 i18n 🔵 (en+ru done; es/de await
   a reviewer) · 3.19 floating menu ✅ · 3.20 tutorial mode ✅ · 3.21 start screen ✅ · 3.22 menu layout ✅ · 3.23 metres beyond 4/4 ✅ · 3.24
   polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
-  ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
+  ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ (+ the user's «expression hand»: hand map, expression lab — added 2026-10-15) · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
   latency as a NUMBER 🟡 (LAT1 meter 2026-10-14; desktop numbers in, LAT2 built on them 2026-10-15; phone pending) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
   3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
   ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later) · 3.41 hand prediction
@@ -1322,6 +1322,32 @@ khali = ОСЛАБЛЕННАЯ голова, не тишина. (б) **патт�
 **ПОРЯДОК.** Делать ПОСЛЕ того, как нынешняя рука выразительности устоится и обрастёт отложенным
 (акценты от рывка, микро-движение, выход на параметры FM и Карплюса): конструктор ляжет на ГОТОВЫЙ
 набор осей и параметров, а не будет строиться в пустоте.
+
+**➕ «EXPRESSION HAND» — THE USER'S IDEA, IN HIS WORDS (added 2026-10-15; idea only, no build now; planned AFTER GES1).** The Russian text
+above stays as written; this block only adds.
+- **What expression does in the code TODAY** (for orientation): hand function `'expr'`, solo only (`state.roleHasExpr`); it plays no notes.
+  `gestures.exprFeatures` reads four features from RAW landmarks — energy (palm speed), openness, finger spread, tilt; the middle layer
+  (`tickExpr` → `EXPR`: pump-and-decay, a spring per channel, 8-ms sub-step, dead zones = exactly 0; rules #22, #23) drives four FIXED
+  axes in `audio.applyExpr` (`EXPR_A`): liveness (pitch + amplitude shimmer), WAH (openness → a high-Q peak filter), texture (spread →
+  the distortion character) and space (tilt → delay send). On screen: one «ВЫР» bar and the hand dot's hue/size. The person cannot change
+  any of it; its five output scalars (`EXPR_CH`) are captured per take but not replayed (§4 debt).
+- **The idea: one hand used like the EXPRESSION PEDAL of a guitar multi-effects processor** — it continuously controls effect or sound
+  parameters: the wah today; later ANY parameter of any effect, the timbre, a filter, volume, a reverb send…
+- **Hand signals that can drive a parameter:** hand height · left–right position · distance to the camera (hand size) · tilt / roll /
+  rotation · openness of the hand · pinch distance · EACH FINGER'S BEND SEPARATELY · finger spread. (⚠️ Point 1 above says MediaPipe reads
+  a single finger reliably only as clearly bent / clearly straight — to be measured before a finger's bend is offered as a smooth value;
+  the user's wish is recorded as he said it.)
+- **HAND MAP:** an on-screen drawing of a hand with its fingers. Each controllable signal is a SPOT on the drawing; tapping a spot shows
+  what it controls, its range (min / max), curve, invert and smoothing, and a LIVE BAR of the current value while playing — so the player
+  sees exactly which finger or movement does what.
+- **EXPRESSION LAB:** a screen to try it — all signals shown live, any signal assigned to any parameter, saved as a PRESET (per mode / per
+  song).
+- **Design notes:** smoothing vs responsiveness (the latency rule — smoothing adds delay; LAT1 measures it); conflicts with fingers already
+  used for notes or commands in a role (cf. «РУК ДВЕ» above and the stage-3 plan §4.6 «a finger sounding notes cannot fire a command»);
+  mappings stored in the song / preset format (FMT1) with stable ids (TIM1-style); later also mappable to MIDI CC (the plan's destination
+  `midi.out:<port>/cc/<n>`); part of the unified gesture assignment (GES1; the mapping record of plan §4.5 already has range, curve, invert,
+  smoothing).
+- **Status:** idea, planned after GES1 (and GES2's mapping socket); linked from GES1 in the stage-3 plan (archive B); noted in HANDOFF.
 ### ⬜ 3.30. Свинг как ОТНОШЕНИЕ (не сетка) — follow-up к триольному дроблению (future, не начато)
 
 **Предпосылка СДЕЛАНА.** Паттерн ритма теперь объявляет `sub` (ячеек на долю: 4 = шестнадцатые, 3 =

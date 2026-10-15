@@ -89,8 +89,9 @@ function schedCore(){
 }
 /* LAT3: low light in the pure core (src/core/camlight.js), exactly — the «Too dark» hint from frame times (shown once, at the right
    frame; never for a camera granted < 24, never when the rate recovers in time, once per session, waits for «allowed»), the hands-lost
-   counter, the low-light constraint sets and verdicts, the capabilities line. CONTROLS: a hint without its 3-s wait, and a counter
-   without its 1-s limit, must each differ from the expectation. */
+   counter, the low-light constraint sets and verdicts, the capabilities line; CAM-FIX: the restore set, heal list and verification of the
+   webcam's own settings. CONTROLS: a hint without its 3-s wait, a counter without its 1-s limit, and the pre-fix Off (which leaves a camera
+   in manual exposure), must each differ from the expectation. */
 function lowCore(){
   const d=[], eq=(name,got,want)=>{ if(JSON.stringify(got)!==JSON.stringify(want)) d.push(`${name}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); }; let n=0;
   const frames=(segs)=>{ const ts=[]; let t=0; for(const [fps,ms] of segs){ const end=t+ms; for(;t<end;t+=1000/fps) ts.push(+t.toFixed(6)); } return ts; };
@@ -141,6 +142,28 @@ function lowCore(){
     { frameRate:30, exposureMode:'continuous', width:640 }),
     'frameRate 1–30 = 30 · width 1–1280 (1) = 640 · exposureMode continuous/manual = continuous · exposureTime 1.221–5000 (1.221) · iso 100–800');
   n++; eq('no capabilities', [CL.capsText(null), CL.capsText({})], ['', '']);
+  /* CAM-FIX: restoring the webcam's own settings — capabilities and originals of the user's ASUS webcam (from his meter) */
+  const cA={ exposureMode:['continuous','manual'], exposureTime:{ min:39.063, max:1250, step:39.063 }, whiteBalanceMode:['continuous','manual'],
+    colorTemperature:{ min:2800, max:6500 }, brightness:{ min:-64, max:64 } };
+  const oA={ exposureMode:'continuous', exposureTime:156.25, whiteBalanceMode:'continuous', colorTemperature:4600, brightness:0, contrast:16 };
+  const autoBoth=[{ exposureMode:'continuous' },{ whiteBalanceMode:'continuous' }];
+  n++; eq('short exposure on the ASUS webcam = 23.44 ms (1/40 s snapped to its step)', CL.lowConstraints('exposure', cA, base).advanced, [{ exposureMode:'manual', exposureTime:234.378 }]);
+  n++; eq('restore after short exposure: both automatic modes, no exposure time', CL.restoreConstraints(cA, base, oA, ['exposureMode','exposureTime']), { ...base, advanced:autoBoth });
+  n++; eq('restore with nothing touched (an fps test): both automatic modes', CL.restoreConstraints(cA, base, oA, []), { ...base, advanced:autoBoth });
+  n++; eq('restore of a touched value without an automatic mode: its original', CL.restoreAdvanced(cA, oA, ['exposureMode','brightness']), [...autoBoth, { brightness:0 }]);
+  n++; eq('a camera without automatic exposure: originals back', CL.restoreAdvanced({ exposureMode:['manual'], exposureTime:{ min:1, max:100 } }, { exposureMode:'manual', exposureTime:50 }, ['exposureMode','exposureTime']),
+    [{ exposureMode:'manual' },{ exposureTime:50 }]);
+  n++; eq("the runner's camera (no white balance): exposure only", CL.restoreAdvanced({ exposureMode:['manual','continuous'] }, {}, ['exposureMode']), [{ exposureMode:'continuous' }]);
+  n++; eq('originals = device controls only', CL.devSnap({ width:640, frameRate:30, ...oA, deviceId:'x' }), oA);
+  n++; eq('heal at open', [CL.healList(cA, { exposureMode:'manual', whiteBalanceMode:'manual' }), CL.healList(cA, oA), CL.healList({ exposureMode:['manual'] }, { exposureMode:'manual' })],
+    [['exposureMode','whiteBalanceMode'], [], []]);
+  n++; eq('still manual after asking automatic', [CL.autoLeft(autoBoth, { exposureMode:'manual', whiteBalanceMode:'continuous' }), CL.autoLeft([...autoBoth, { brightness:0 }], oA)], [['exposureMode'], []]);
+  /* the user's path: short exposure, then a frame-rate test, then Off — through a minimal UVC device whose controls persist */
+  const uvc=()=>({ ...oA }), put=(dev, set)=>{ for(const e of set.advanced||[]){ if(!Object.keys(e).every(k=>k in cA)) continue; Object.assign(dev, e); if('exposureTime' in e && !('exposureMode' in e)) dev.exposureMode='manual'; } return dev; };
+  const path=offSet=>{ const dev=uvc(); put(dev, CL.lowConstraints('exposure', cA, base)); put(dev, CL.lowConstraints('fps15', cA, base)); put(dev, offSet); return dev.exposureMode; };
+  n++; eq('short exposure → 15 fps → Off: automatic again', path(CL.restoreConstraints(cA, base, oA, ['exposureMode','exposureTime'])), 'continuous');
+  n++; { const dn=d.length; eq('CONTROL (must differ)', path(CL.lowConstraints('off', cA, base, 'fps15')), 'continuous');
+    if(d.length===dn) d.push('CONTROL: the pre-fix Off brought the simulated camera back to automatic — the check cannot fail'); else d.length=dn; }
   return { cases:n, total:d.length, differences:d };
 }
 /* SND-F1: the Night forest IR of the pure core — the same twice and pinned per rate (44.1 / 48 kHz), its length, its envelope sample by

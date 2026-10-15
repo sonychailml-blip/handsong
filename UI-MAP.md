@@ -433,6 +433,10 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
   back to Off and the hint line says why. New lines in the box (and «Copy»): «Camera «name» can: frameRate … · exposureMode … · …» (what
   the browser reports for this webcam, with current values), «Low light (test): … · camera A → B fps — …», «Hands lost and found again
   within 1 s: N per minute»; the startup line adds when its longest task began («… before the camera started (behind the start card)»).
+- **CAM-FIX (2026-10-15):** under «Low light (test)» a warning line «Test: changes the camera's own settings; Off restores them.» Off now
+  gives the webcam back its automatic exposure and white balance (and any other control a test changed); so do leaving the page and the next
+  camera open. A new line in the box when it happened: «Camera exposure (and white balance) was manual — restored to automatic» at open, or
+  «After the test: camera … back to automatic, other settings restored» (or «… did not return to automatic»).
 - **Player hint «Too dark» (LAT3, a product message, en + ru):** a small box at the top centre (`#darkHint`, under the bar) — «Too dark: the
   camera slowed to N fps, so sound answers later. More light helps.» + OK. Once per session, when the camera delivers fewer than 12 fps for
   more than 3 s although it was granted at least 24; from frame timing only. Taps pass through it (only OK takes them); hides after 9 s, at

@@ -2,7 +2,8 @@ import { camFacing } from './state.js';
 import { t } from './i18n.js';
 import { schedNew, schedPlan, schedAfter, HAND_POLICIES } from './core/handsched.js';
 import { MP_LINE, rateOf } from './core/latency.js';
-import { LOW_MODES, lowConstraints, lowVerdict, exposureSupported, LOW_SETTLE_MS, LOW_MEASURE_MS } from './core/camlight.js';
+import { LOW_MODES, lowConstraints, lowVerdict, exposureSupported, LOW_SETTLE_MS, LOW_MEASURE_MS, devSnap, restoreAdvanced, restoreConstraints,
+  healList, autoLeft } from './core/camlight.js';
 
 /* ================= КАМЕРА + MEDIAPIPE ================= */
 const video=document.getElementById('video');
@@ -28,13 +29,17 @@ let camStartT=NaN;   // performance time the current camera stream started playi
    a failed request throws upward — the caller rolls back (ui.js). LAT1b: frameRate is requested only when the test switch asks. */
 const camBase=()=>({ width:{ideal:640}, height:{ideal:480}, ...(opts.camFps ? { frameRate:{ideal:opts.camFps} } : {}) });   // LAT3: also the base of every low-light set
 const camWant=()=>({ facingMode:camFacing, ...camBase() });
+/* CAM-FIX: before the old track stops, a low-light test gives the device back its own settings; the new track is healed if the device
+   was left in manual mode (by an earlier session, a crash or another app). Both bounded — a hanging camera call never blocks the start. */
 async function openCamera(facing){
-  if(stream){ for(const tr of stream.getTracks()) tr.stop(); stream=null; }
+  if(stream){ if(opts.low!=='off' || low.touched.size){ low.gen++; await bounded(devRestore(vtrack(), 'restore')); } for(const tr of stream.getTracks()) tr.stop(); stream=null; }
   const want={ ...camWant(), facingMode:facing };
   stream=await navigator.mediaDevices.getUserMedia({ video:want, audio:false });
   video.srcObject=stream; await video.play();
   camStartT=performance.now();
   if(opts.low!=='off'){ opts.low='off'; low.note='reopened'; low.asked=null; }   // LAT3: a reopened camera gets today's request
+  low.orig=null; low.touched.clear();
+  await bounded(camHeal());
   pumpStart();
 }
 
@@ -71,7 +76,8 @@ const modelInfo=()=>({ requested:opts.delegate, actual:delegateOf(mpLog, xnnBefo
 
 /* LAT1b: the camera's request and what the browser granted (track.getSettings). LAT3: + what the webcam can do (getCapabilities), its
    full settings and its name — read on the device, leaving it only inside the text the person copies (rule #33). */
-const vtrack=()=>stream&&stream.getVideoTracks()[0];
+let camSim=null;   // probe only (CAM-FIX): a simulated webcam whose device controls persist across opens, wrapped around the real track
+const vtrack=()=>{ const tr=stream&&stream.getVideoTracks()[0]; return tr&&camSim ? camSim.wrap(tr) : tr; };
 const capsOf=tr=>{ try{ return tr&&tr.getCapabilities ? tr.getCapabilities() : null; }catch(e){ return null; } };
 function camInfo(){
   const tr=vtrack(), s=tr&&tr.getSettings ? tr.getSettings() : {};
@@ -255,34 +261,82 @@ async function setDetectPath(p){
    settles (1 s) and the delivered frames are counted (2 s). An error (OverconstrainedError …) or no effect → back to Off (today's request,
    the exposure handed back to the camera); the reason stays in `low.note` for the meter. The camera is never closed for this; only when
    even Off cannot be applied is it reopened with today's request. */
-const low={ asked:null, note:'', before:NaN, after:NaN, gen:0 };
+/* CAM-FIX: `orig` = the device controls (getSettings) before the first test change on this track; `touched` = every device control a
+   test set carried; `dev` = the last device action for the meter: { kind:'heal'|'restore', ok, what:[mode keys] }. */
+const low={ asked:null, note:'', before:NaN, after:NaN, gen:0, orig:null, touched:new Set(), dev:null };
 let lowDbgO={};
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const bounded=(p, ms=2000)=>Promise.race([p.catch(()=>{}), sleep(ms)]);
+const settingsOf=tr=>{ try{ return tr&&tr.getSettings ? tr.getSettings() : {}; }catch(e){ return {}; } };
 const fpsOver=(a,b)=>rateOf(vfRing.filter(x=>x[0]>=a && x[0]<=b));
+/* Chrome routes a set holding a camera control (exposure, white balance…) to its image-capture path and IGNORES the set's format part
+   (width, frameRate); a set without one changes the format and leaves the controls alone (measured on the runner's camera, CAM-FIX — the
+   pre-fix Off was such a format-only set). So the format and the controls go in two calls. */
+async function applySet(tr, c){
+  const { advanced, ...fmt }=c;
+  await tr.applyConstraints(fmt);
+  if(advanced && advanced.length) await tr.applyConstraints({ advanced });
+}
+/* modes still manual after asking 'continuous' — read again once after 300 ms (a camera may report its new state a little late) */
+async function stillManual(adv, tr){ let left=autoLeft(adv, settingsOf(tr)); if(left.length){ await sleep(300); left=autoLeft(adv, settingsOf(tr)); } return left; }
+/* CAM-FIX: give the device its own settings back — automatic exposure / white balance, touched values to their originals — and check
+   what the camera reports afterwards. Throws when the camera refuses the set. probe CONTROL noRestore = the pre-fix Off (base only). */
+async function devRestore(tr, kind){
+  if(!tr || !tr.applyConstraints) return;
+  const caps=capsOf(tr), touched=[...low.touched];
+  const c=lowDbgO.noRestore ? lowConstraints('off', caps, camBase(), 'off') : restoreConstraints(caps, camBase(), low.orig||{}, touched);
+  low.asked=c; low.touched.clear(); low.orig=null;
+  await applySet(tr, c);
+  const adv=c.advanced||[], left=await stillManual(adv, tr), modes=adv.filter(e=>Object.values(e)[0]==='continuous').map(e=>Object.keys(e)[0]);
+  low.dev= touched.length||left.length ? { kind, ok:!left.length, what:left.length ? left : modes } : null;   // fps-only tests touch no device control
+}
+/* CAM-FIX: at every open — a device found in manual exposure / white balance (left by an earlier session, a crash or another app) is
+   set back to automatic; the meter says so. probe CONTROL noHeal skips it. */
+async function camHeal(){
+  const tr=vtrack(); if(!tr || !tr.applyConstraints || lowDbgO.noHeal) return;
+  const bad=healList(capsOf(tr), settingsOf(tr)); if(!bad.length) return;
+  const adv=bad.map(m=>({ [m]:'continuous' }));
+  try{ await tr.applyConstraints({ advanced:adv }); }catch(e){}   // controls only: the format stays as opened
+  const left=await stillManual(adv, tr);
+  low.dev={ kind:'heal', ok:!left.length, what:left.length ? left : bad };
+}
 async function lowOff(tr, caps, from, why){
-  const c=lowConstraints('off', caps, camBase(), from);
-  low.asked=c; opts.low='off';
-  try{ await tr.applyConstraints(c); }catch(e){ try{ await openCamera(camFacing); }catch(e2){} }
+  opts.low='off';
+  try{ await devRestore(tr, 'restore'); }catch(e){ try{ await openCamera(camFacing); }catch(e2){} }
   low.note=why;
 }
+/* CAM-FIX: leaving the page ends a running test and restores the device (best effort: the page may be gone before the camera answers;
+   the next open heals what is left) */
+function lowLeave(){
+  if(opts.low==='off' && !low.touched.size) return;
+  const tr=vtrack(); if(!tr) return;
+  low.gen++; opts.low='off'; low.note='left';
+  devRestore(tr, 'restore').catch(()=>{});
+}
+addEventListener('pagehide', lowLeave);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') lowLeave(); });
 async function setLowLight(m){
   if(!LOW_MODES.includes(m)) throw new Error('low light: '+LOW_MODES.join(', '));
   const tr=vtrack(); if(!tr || !tr.applyConstraints) throw new Error('the camera is not running');
   if(m===opts.low) return;
   const caps=capsOf(tr), from=opts.low, g=++low.gen, t0=performance.now();
+  if(m==='off'){ low.before=fpsOver(t0-2000, t0); low.after=NaN; await lowOff(tr, caps, from, ''); return; }
   const c=lowConstraints(m, caps, camBase(), from);
   if(!c) throw new Error('this camera offers no manual exposure');
+  if(lowDbgO.extra) c.advanced=[...(c.advanced||[]), { ...lowDbgO.extra }];   // probe: a test set that touches one more control
+  if(!low.orig) low.orig=devSnap(settingsOf(tr));   // CAM-FIX: originals before the first change on this track
+  if(low.touched.size){ const undo=restoreAdvanced(caps, low.orig, [...low.touched]); c.advanced=[...undo, ...(c.advanced||[])]; }   // from one test to another: undo the last one first
+  for(const e of c.advanced||[]) for(const k in e) low.touched.add(k);
   low.before=fpsOver(t0-2000, t0); low.after=NaN; low.note=''; low.asked=c; opts.low=m;
   try{
     if(lowDbgO.fail){ const e=new Error('simulated by the probe'); e.name=lowDbgO.fail; e.constraint='frameRate'; lowDbgO.fail=null; throw e; }
-    await tr.applyConstraints(c);
+    await applySet(tr, c);
   }catch(e){
     const why=(e&&e.name||'Error')+(e&&e.constraint ? ' ('+e.constraint+')' : e&&e.message ? ': '+e.message : '');
     if(!lowDbgO.noFallback) await lowOff(tr, caps, m, why);
     return;
   }
-  if(m==='off') return;
-  await sleep(LOW_SETTLE_MS+LOW_MEASURE_MS);
+  await sleep(lowDbgO.fakeFps!=null ? 50 : LOW_SETTLE_MS+LOW_MEASURE_MS);   // probe: a faked reading needs no counting
   if(g!==low.gen || opts.low!==m) return;   // superseded by another press or a camera reopen
   let after=fpsOver(t0+LOW_SETTLE_MS, performance.now()); if(lowDbgO.fakeFps!=null) after=lowDbgO.fakeFps;
   const v=lowVerdict({ mode:m, before:low.before, after, settings:tr.getSettings() });
@@ -292,10 +346,14 @@ async function setLowLight(m){
 /* the low-light state for the meter: mode, the set passed to applyConstraints, the browser's own record of it (getConstraints), fps
    before / after, the reason of a fall-back ('noeffect', 'manual', an error name; 'partly' / 'unmeasured' when kept; 'reopened') */
 const lowInfo=()=>{ const tr=vtrack(); let applied=null; try{ applied=tr&&tr.getConstraints ? tr.getConstraints() : null; }catch(e){}
-  return { mode:opts.low, asked:low.asked, applied, before:low.before, after:low.after, note:low.note, exposure:exposureSupported(capsOf(tr)) }; };
+  return { mode:opts.low, asked:low.asked, applied, before:low.before, after:low.after, note:low.note, exposure:exposureSupported(capsOf(tr)), dev:low.dev }; };
 /* probe only: fail = the next applyConstraints throws an error of that name; fakeFps = the measured «after»; noFallback = CONTROL (a
-   failure stays in the failed mode — the probe must catch it); reset */
-function lowDbg(o={}){ lowDbgO= o.reset ? {} : { ...lowDbgO, ...o }; }
+   failure stays in the failed mode — the probe must catch it); CAM-FIX: extra = one more control in every test set, noRestore / noHeal =
+   CONTROLS (the pre-fix Off; no heal at open); devClear forgets the last device action; reset */
+function lowDbg(o={}){ lowDbgO= o.reset ? {} : { ...lowDbgO, ...o }; if(o.devClear) low.dev=null; }
+/* probe only (CAM-FIX): sim = { wrap(track) → a track-like object } or null — the runner's fake camera cannot read back 'continuous', and
+   its controls do not outlive a reopen; a simulated UVC device can, like the user's webcam */
+function camSimDbg(sim){ camSim=sim||null; }
 const visionOpts=()=>({ ...opts });
 const pathInfo=()=>({ asked:opts.path, runs:path.runs, why:path.why, warmMs:path.warmMs });
 const pumpStats=()=>({ ...PS, log:PS.log.slice(), sched:{ ...sched }, policy:opts.hands });
@@ -319,4 +377,4 @@ function pumpDbg(o={}){
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, switchCamera, setHandsSink, pollFrame,
   camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, detRunDbg, lowDbg };
+  pathInfo, pumpStats, pumpDbg, detRunDbg, lowDbg, camSimDbg };
