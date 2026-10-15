@@ -3,16 +3,17 @@
    limiter) → compact features (loudness every 50 ms, side energy, 10 octave bands in three time segments, dB) compared with
    tools/gold.print.json, made by P.dumpGold() on unchanged code. The net for every engine and timbre slice (AUD1, AUD2, TIM1–TIM3,
    ENG1, and the WASM migration later). Renewed only by a slice that changes sound by decision.
-   Tolerance GOLD_TOL dB per value (values below GOLD_FLOOR on both sides are not compared — numerically noisy, inaudible); same-seed
+   Tolerance GOLD_TOL dB per value; a value below GOLD_FLOOR (−80 dB, SND-F1b — user decision) on BOTH sides is not compared (inaudible,
+   and numerically noisy: «fx reverb 3» band 11 at −92 dB flickered ±0.012 dB between fresh sessions); one side below = compared; same-seed
    renders repeat to a few ULP, so the measured spread is far below it. CONTROL: the Warm pad chord timbre with its filter +1 % (the
    copy's own CHORD_INSTR entry, restored after) must differ from its golden case. */
 import { row } from './rows.js';
 import { timbresOf } from '../audio.js';
 import { aRef, setARef, chainKeyOf } from '../state.js';
 import { scaleView, scaleById } from '../scales.js';
-import { DYN_GLUE, DYN_LIMIT } from '../core/dsp.js';   // SND-F1: the master Glue / Limiter cases
+import { DYN_GLUE, DYN_LIMIT, DYN_MASTER } from '../core/dsp.js';   // SND-F1: the master Glue / Limiter cases
 
-const GOLD_FILE='tools/gold.print.json', GOLD_TOL=0.01, GOLD_FLOOR=-100, WIN=0.05, NFFT=4096;
+const GOLD_FILE='tools/gold.print.json', GOLD_TOL=0.01, GOLD_FLOOR=-80, WIN=0.05, NFFT=4096;
 const BANDS=[0,63,125,250,500,1000,2000,4000,8000,16000,24001];
 const F3=[220,277.1826,329.6276];   // a chord with three distinct partials sets
 const off=undefined;   // positional empty slots before the time (rule #15)
@@ -34,10 +35,14 @@ function goldCases(){
   bus('dly',[{ 'dly:mix':0.3, 'dly:time':0.2, 'dly:fb':0.2 },{ 'dly:mix':0.6, 'dly:time':0.5, 'dly:fb':0.5 },{ 'dly:mix':1, 'dly:time':0.8, 'dly:fb':0.8 }],2.2,0.4);
   bus('trmMix',[{ 'trmMix:depth':0.3, 'trmMix:rate':0.2 },{ 'trmMix:depth':0.6, 'trmMix:rate':0.5 },{ 'trmMix:depth':1, 'trmMix:rate':0.9 }],1.2,0.9);
   /* SND-F1: Night forest (3 sends), Glue on the chord chain (3 settings), the master's Glue and safety Limiter (a hot master) */
-  bus('forest',[{ 'forest:mix':0.3 },{ 'forest:mix':0.8 },{ 'forest:mix':1 }],4.0,0.4);
+  bus('forest',[{ 'forest:mix':0.3, 'forest:room':1 },{ 'forest:mix':0.8, 'forest:room':1 },{ 'forest:mix':1, 'forest:room':1 }],4.0,0.4);   // Long room (3.4 s) — the SND-F1 entries
+  /* SND-F1b: the Medium (1.7 s) and Short (0.85 s) rooms at the prototype's send */
+  add('fx forest medium',4.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['forest'], set:{ 'forest:mix':0.8, 'forest:room':0.5 } } });
+  add('fx forest short',4.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['forest'], set:{ 'forest:mix':0.8, 'forest:room':0 } } });
   bus('glue',[{ 'glue:thr':0.5, 'glue:ratio':0.37 },{ 'glue:thr':0.25, 'glue:ratio':0.6, 'glue:att':0.2, 'glue:rel':0.3 },{ 'glue:thr':0, 'glue:ratio':1, 'glue:knee':0.5, 'glue:makeup':0.6 }],1.2,0.9);
   add('master glue',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'comp', set:{ ...DYN_GLUE, on:1 }, gain:4 });
   add('master limiter',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'limit', set:{ ...DYN_LIMIT, on:1 }, gain:16 });
+  add('master limiter (hold)',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'limit', set:{ ...DYN_MASTER, on:1 }, gain:16 });   // SND-F1b: the master's settings
   return C;
 }
 /* In-place radix-2 FFT (re, im of length 2^k). */
@@ -100,6 +105,14 @@ export async function checkGold(){
     try{ I.lp=lp*1.01; const d=G['ch 0'] ? goldCmp('ch 0', G['ch 0'], await renderCase(R,c)) : [];
       if(!d.length) miss('CONTROL: the Warm pad chord with its filter +1 % still matches its golden case — the net cannot fail'); }
     finally { I.lp=lp; }
+    /* CONTROL (SND-F1b floor): an audible value moved 0.02 dB must be caught; a value pair both under the floor must not; one side under
+       the floor must still be compared */
+    { const g=G['ch 0'], aud=g.spec.findIndex(x=>x>GOLD_FLOOR+10); cases++;
+      const mv=k=>({ ...g, spec:g.spec.map((x,i)=>i===aud ? x+k : x) });
+      if(aud<0 || !goldCmp('ch 0', g, mv(0.02)).length) miss('CONTROL: an audible band moved by 0.02 dB passed — audible bands are not compared');
+      const lo={ env:[], side:-120, spec:[GOLD_FLOOR-12] }, lo2={ env:[], side:-120, spec:[GOLD_FLOOR-10] }, one={ env:[], side:-120, spec:[GOLD_FLOOR+1] };
+      if(goldCmp('floor', lo, lo2).length) miss('CONTROL: two values under the floor were compared');
+      if(!goldCmp('floor', lo, one).length) miss('CONTROL: a value under the floor against one above it was not compared'); }
   });
   return { cases, total:diff.length, differences:diff };
 }

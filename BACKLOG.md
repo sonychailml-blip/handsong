@@ -2443,8 +2443,9 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   equal offline), ZERO LOOKAHEAD (no added latency), DETERMINISTIC (live = offline = frozen), later moved into the Rust → WASM engine.
   - ✅ **Glue** — soft-knee stereo-linked compressor (`dyn-worklet.js` mode 'comp'); a chain module and the master's optional Glue (off by
     default). Preset tuned to sit close to the Calm prototype's built-in compressor (residual −34 dB on a Firefly + Night forest phrase).
-  - ✅ **Limiter** — the master's safety limiter (mode 'limit', ceiling −1 dBFS, instant attack, exact identity below the ceiling; on by
-    default, after the browser limiter that rule #4 keeps).
+  - ✅ **Limiter** — the master's limiter (mode 'limit', ceiling −1 dBFS, instant attack, hold 40 ms, release 150 ms, exact identity below
+    the ceiling). Since SND-F1b (user decision) it REPLACES the browser's compressor-limiter (which delayed 6.0 ms and still let hot material
+    over 0 dBFS); always on; the old limiter's +2.31 dB makeup kept as a plain gain.
   - ⬜ **Sustain compressor** — for plucked timbres (KS strings, Firefly) and a guitar through audio-in: longer notes without a louder attack.
   - ⬜ **Ducking / sidechain** — the backing yields to the solo hand (key for Calm: the melody always on top without turning the room down).
   - ⬜ **Noise gate** — for audio-in (a microphone or a guitar between phrases).
@@ -2483,8 +2484,11 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   - **Per-note «distance colour» for 3D rooms (prototype):** lowpass 900 + 8000·(1−depth)^1.5 Hz, dry 1 − 0.55·depth, reverb send
     0.5 + 0.8·depth (depth 0 near … 1 far).
   - The prototype's rooms are 3D (Three.js, MIT licence — allowed by rule #32; a register entry when it is added).
-  - ⚠️ CPU (measured 2026-10-15, desktop, offline proxy): one Night forest convolver ≈ 19–24 % of a core (3.4 s), 1.7 s ≈ 10 %, 0.85 s ≈ 6 %;
-    a phone ≈ 4× — a phone budget needs a shorter IR or the FDN shaped like the forest (proposal in HANDOFF, SND-F1; not applied).
+  - ✅ **Room** (SND-F1b): Short 0.85 / Medium 1.7 (default for now; the user chooses by ear) / Long 3.4 s — same recipe and seeds, the
+    envelope recomputed per length.
+  - ⚠️ CPU (SND-F1b, desktop, offline proxy, % of one core): Short ≈ 14, Medium ≈ 15, Long ≈ 27; three Medium at once ≈ 48, three Long ≈ 122;
+    a phone ≈ 4× → too heavy on a phone with several roles. ⬜ PROPOSAL (not built): a SHARED reverb send — one room per network (live, track)
+    fed by per-role sends, so the cost stays one convolver per network whatever the number of roles; or the FDN shaped like the forest.
 
 ### ⬜ 7.17. ⛳ CALM — PLAYING ALONG WITH OUTSIDE MUSIC (user's idea, recorded 2026-10-14; NOT in the first Calm release — after it, as part of «hearing the room», §7.11; Calm itself: §7.16)
 - **One-shot «Listen» button:** the app mutes itself for 5–10 s, listens through the microphone, detects the tonic and a rough mode, then

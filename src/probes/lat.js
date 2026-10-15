@@ -50,10 +50,11 @@ function latFieldProblems(r){
   const num=x=>typeof x==='number' && Number.isFinite(x);
   c(r.gpu && typeof r.gpu.renderer==='string' && r.gpu.renderer.length>0, `graphics renderer «${r.gpu&&r.gpu.renderer}» missing`);
   c(r.gpu && typeof r.gpu.software==='boolean', `graphics hardware/software unknown (${r.gpu&&r.gpu.software})`);
-  const once=!!(r.model && r.model.actual==='unknown' && r.model.once);   // the XNNPACK line was already used up on this page (TFLite prints it once)
-  c(r.model && (r.model.actual==='GPU'||r.model.actual==='CPU'||once), `the hand model's real processor unknown («${r.model&&r.model.actual}»)`);
+  c(r.model && ['GPU','CPU','GPU+CPU'].includes(r.model.actual), `the hand model's real processor unknown («${r.model&&r.model.actual}»)`);
   c(r.model && r.switches && r.model.requested===r.switches.delegate, 'the model request differs from the switch');
-  c(r.model && (r.model.actual===r.model.requested || once), `the hand model runs on ${r.model&&r.model.actual} though ${r.model&&r.model.requested} was asked`);
+  c(r.model && (r.model.actual===r.model.requested || (r.model.requested==='GPU' && r.model.actual==='GPU+CPU')), `the hand model runs on ${r.model&&r.model.actual} though ${r.model&&r.model.requested} was asked`);
+  c(Number.isFinite(r.camera&&r.camera.processedFps) && r.camera.processedFps>0 && r.camera.processedFps<=r.camera.fps*1.05+1, `processed ${r.camera&&r.camera.processedFps} fps vs delivered ${r.camera&&r.camera.fps} — we cannot process more new frames than the camera delivers`);
+  c(r.audio && r.audio.masterPathMs===0, `the master path delays ${r.audio&&r.audio.masterPathMs} ms (our limiter adds none; 6 ms = the browser limiter is back)`);
   const g=r.camera&&r.camera.granted||{}, q=r.camera&&r.camera.requested||{};
   c(num(g.width)&&g.width>0 && num(g.height)&&g.height>0 && num(g.frameRate)&&g.frameRate>0, `granted camera settings unreadable (${JSON.stringify(g)})`);
   c(q.width===640 && q.height===480 && q.frameRate===(r.switches?r.switches.camFps:undefined), `requested camera settings wrong (${JSON.stringify(q)})`);
@@ -83,18 +84,17 @@ export async function checkLatSwitches(){
   const waitModel=async want=>{ let m=V.modelInfo(); const t0=performance.now(); while(m.actual!==want && performance.now()-t0<5000){ await sleep(100); m=V.modelInfo(); } return m; };
   const D=V.VISION_DEF, o0=V.visionOpts();
   cases++; if(JSON.stringify(o0)!==JSON.stringify(D)) miss(`the switches are not at their defaults before the row (${JSON.stringify(o0)}) — a previous run leaked`);
-  const m0=V.modelInfo(), first=!m0.once; let notes=[];   // `first`: no CPU switch on this page yet — the processor read-out can prove CPU
-  cases++; if(first ? m0.actual!=='GPU' : m0.actual==='CPU') miss(`at the default the hand model reads «${m0.actual}» — headless Chrome ran it on GPU when measured`);
+  const m0=V.modelInfo(); let notes=[];
+  cases++; if(m0.actual!=='GPU') miss(`at the default the hand model reads «${m0.actual}» — headless Chrome ran it on GPU when measured (it must never read «unknown» for GPU)`);
   try{
     await press('swModelCPU', o=>o.delegate==='CPU', 'Hand model on: CPU');
-    { const m=await waitModel('CPU'); cases++;
-      if(first){ if(m.actual!=='CPU') miss(`asked for CPU, MediaPipe reports «${m.actual}» (evidence: ${m.evidence.join(' | ')||'none'})`); }
-      else { if(m.actual==='GPU') miss('asked for CPU, the read-out says GPU'); notes.push('second CPU switch on this page: MediaPipe stays silent, the read-out says «unknown» (the first switch per page is checked exactly)'); } }
+    { const m=await waitModel('CPU'); cases++; if(m.actual!=='CPU') miss(`asked for CPU, the read-out says «${m.actual}» (evidence: ${m.evidence.join(' | ')||'none'})`);
+      if(m.once) notes.push('a second CPU switch on this page: MediaPipe stays silent; the read-out keeps CPU from its first confirmation'); }
     await detects('model on CPU');
     /* CONTROL: the GPU read-out from before the switch, as the answer to the CPU request, must be flagged by the field check */
     { const r=L.latReport(); cases++; if(!latFieldProblems({ ...r, model:{ requested:'CPU', actual:'GPU', once:false, hands:2, evidence:[] } }).list.length) miss('CONTROL: a GPU read-out passed as the answer to a CPU request — the processor check cannot fail'); }
     await press('swModelGPU', o=>o.delegate==='GPU', 'Hand model on: GPU');
-    { const m=await waitModel('GPU'); cases++; if(!(m.actual==='GPU' || (m.actual==='unknown' && m.once))) miss(`back to GPU, the read-out says «${m.actual}»`); }
+    { const m=await waitModel('GPU'); cases++; if(m.actual!=='GPU') miss(`back to GPU, the read-out says «${m.actual}»`); }
     await press('swHands1', o=>o.hands===1, 'Hands tracked: 1'); await detects('1 hand');
     await press('swHands2', o=>o.hands===2, 'Hands tracked: 2');
     for(const f of [30,60]){ const s0=V.camInfo().startT;

@@ -372,13 +372,11 @@
     <div class="psep" id="fxCtlSep" data-i18n="panel.scale.fxCtl">Конструктор эффектов</div>
     <div id="fxCtlRows"></div>
 
-    <!-- SND-F1: the master's dynamics (ui.js → audio.masterDynSet); session only. Glue off, Limiter on by default -->
+    <!-- SND-F1: the master's dynamics (ui.js → audio.masterDynSet); session only. Glue off by default; the limiter is always on (SND-F1b) -->
     <div class="psep" data-i18n="master.sep">Master</div>
     <div class="prow"><label data-i18n="master.glue">Glue (gentle compressor)</label>
       <div class="seg"><button id="mGlueOn" data-i18n="common.on">On</button><button id="mGlueOff" class="act" data-i18n="common.off">Off</button></div></div>
-    <div class="prow"><label data-i18n="master.limiter">Limiter (never clips)</label>
-      <div class="seg"><button id="mLimOn" class="act" data-i18n="common.on">On</button><button id="mLimOff" data-i18n="common.off">Off</button></div></div>
-    <p class="phint" data-i18n="master.hint">Both work without delay. Glue evens out the whole mix; the limiter only acts on peaks that would clip.</p>
+    <p class="phint" data-i18n="master.hint">Glue evens out the whole mix. At the very end a limiter is always on: loud passages never crackle. Both work without delay.</p>
 
     <!-- LAT1: the latency meter (latmeter.js) — numbers stay on the device; «Copy» only copies the shown text -->
     <div class="psep" data-i18n="diag.sep">Diagnostics</div>

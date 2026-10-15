@@ -28,9 +28,10 @@ export function statsOf(xs, total=xs.length){
 }
 
 /* Hand → sound estimate from the stage means (ms): camera capture → our loop, detection, gestures, half an audio quantum (the mean wait
-   for the audio thread), the audio buffer and the output device. A part that is unknown (NaN) is left out and named in `missing`. */
+   for the audio thread), the master path's own delay inside the audio graph (SND-F1b: 0 with our limiter, 6 ms with the browser's), the
+   audio buffer and the output device. A part that is unknown (NaN) is left out and named in `missing`. */
 export function handToSound(parts){
-  const order=['camera','detect','gestures','quantumWait','base','output'];
+  const order=['camera','detect','gestures','quantumWait','graph','base','output'];
   let ms=0; const missing=[];
   for(const k of order){ const v=parts[k]; if(Number.isFinite(v)) ms+=v; else missing.push(k); }
   return { ms, missing };
@@ -49,6 +50,12 @@ export function looksBluetooth({ outputMs, label }={}){
 export const frameWaitMs=fps=> Number.isFinite(fps)&&fps>0 ? 500/fps : NaN;
 /* The second total: hand → sound including that wait (the first total stays as it was) */
 export const withFrameWait=(ms, wait)=> Number.isFinite(ms)&&Number.isFinite(wait) ? ms+wait : NaN;
+/* LAT1b fix: a rate (per second) from [time ms, counter] samples — first to last; NaN with fewer than two or no time between */
+export function rateOf(samples){
+  if(!samples || samples.length<2) return NaN;
+  const a=samples[0], b=samples[samples.length-1], dt=(b[0]-a[0])/1000;
+  return dt>0 ? (b[1]-a[1])/dt : NaN;
+}
 /* How many timestamps (ms) fall within the last minute before `now` */
 export const perMinute=(times, now)=> times.reduce((n,t)=>n+(t>now-60e3&&t<=now?1:0), 0);
 /* Long tasks [{t, ms, cause}] split at camStart + STARTUP_MS: «startup» (everything before, incl. page load) and «while playing» (only the

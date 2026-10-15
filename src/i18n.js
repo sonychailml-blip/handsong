@@ -56,12 +56,12 @@ export const DICTS = {
     'diag.sep':'Diagnostics',   // LAT1: the latency meter (latmeter.js)
     'diag.lat':'Latency meter',
     'diag.title':'Delay on this device, ms (average · 95 % of frames)',
-    'diag.camera':'Camera {fps} fps {size} · picture taken → app {mean} · {p95}',
-    'diag.cameraNoCap':'Camera {fps} fps {size} · frame shown → app {mean} · {p95} (the browser does not report when the picture was taken)',
+    'diag.camera':'Camera delivers {fps} fps {size} · we process {proc} fps · picture taken → app {mean} · {p95}',
+    'diag.cameraNoCap':'Camera delivers {fps} fps {size} · we process {proc} fps · frame shown → app {mean} · {p95} (the browser does not report when the picture was taken)',
     'diag.detect':'Hand detection {mean} · {p95}',
     'diag.gestures':'Gestures and sound commands {mean} · {p95}',
     'diag.draw':'Drawing {mean} · {p95} · a frame every {loop}',
-    'diag.audio':'Sound: buffer {base} · output device {out} · audio block {q} · measured path {pipe}',
+    'diag.audio':'Sound: buffer {base} · output device {out} · audio block {q} · measured path {pipe} · master path {mp}',
     'diag.camSet':'Camera asked {rw}x{rh} · {rf} fps — given {gw}x{gh} · {gf} fps',   // LAT1b
     'diag.frameWait':'Waiting for the next camera frame ≈ {ms}',
     'diag.dup':'Detections on an already seen frame: {n} per minute',
@@ -70,7 +70,8 @@ export const DICTS = {
     'diag.gpuHard':'hardware',
     'diag.gpuSoft':'software — no graphics processor',
     'diag.unknown':'unknown',
-    'diag.unknownOnce':'unknown (the hand model tells this only once per page — reload the page to check)',
+    'diag.cpuOnce':'CPU (confirmed earlier on this page)',
+    'diag.gpuPart':'GPU, with a part on the processor (CPU)',
     'diag.longStart':'Page busy at startup (first 10 s): {n} long tasks, longest {max}{why}',
     'diag.longPlay':'Page busy while playing (last minute): {n}, longest {max}{why}',
     'diag.cause':' — {c}',
@@ -480,6 +481,10 @@ export const DICTS = {
     'fx.trmMix.rate':'Rate',
     'fx.forest':'Night forest',   // SND-F1
     'fx.forest.mix':'Amount',
+    'fx.forest.room':'Room',   // SND-F1b
+    'fx.forest.room.short':'Short {s} s',
+    'fx.forest.room.medium':'Medium {s} s',
+    'fx.forest.room.long':'Long {s} s',
     'fx.glue':'Glue',
     'fx.glue.thr':'Threshold',
     'fx.glue.ratio':'Ratio',
@@ -490,8 +495,7 @@ export const DICTS = {
     'fx.cat.dyn':'Dynamics',
     'master.sep':'Master',
     'master.glue':'Glue (gentle compressor)',
-    'master.limiter':'Limiter (never clips)',
-    'master.hint':'Both work without delay. Glue evens out the whole mix; the limiter only acts on peaks that would clip.',
+    'master.hint':'Glue evens out the whole mix. At the very end a limiter is always on: loud passages never crackle. Both work without delay.',
     'fx.param.amt':'Amount',            // у старых скалярных эффектов параметр один и он же сам эффект
     // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— none —',
@@ -661,12 +665,12 @@ export const DICTS = {
     'diag.sep':'Диагностика',   // LAT1
     'diag.lat':'Измеритель задержки',
     'diag.title':'Задержка на этом устройстве, мс (в среднем · у 95 % кадров)',
-    'diag.camera':'Камера {fps} к/с {size} · снимок → приложение {mean} · {p95}',
-    'diag.cameraNoCap':'Камера {fps} к/с {size} · кадр показан → приложение {mean} · {p95} (браузер не сообщает, когда сделан снимок)',
+    'diag.camera':'Камера даёт {fps} к/с {size} · мы обрабатываем {proc} к/с · снимок → приложение {mean} · {p95}',
+    'diag.cameraNoCap':'Камера даёт {fps} к/с {size} · мы обрабатываем {proc} к/с · кадр показан → приложение {mean} · {p95} (браузер не сообщает, когда сделан снимок)',
     'diag.detect':'Распознавание рук {mean} · {p95}',
     'diag.gestures':'Жесты и команды звука {mean} · {p95}',
     'diag.draw':'Рисование {mean} · {p95} · кадр каждые {loop}',
-    'diag.audio':'Звук: буфер {base} · устройство вывода {out} · аудиоблок {q} · измеренный путь {pipe}',
+    'diag.audio':'Звук: буфер {base} · устройство вывода {out} · аудиоблок {q} · измеренный путь {pipe} · путь мастера {mp}',
     'diag.camSet':'Камера: просили {rw}x{rh} · {rf} к/с — дали {gw}x{gh} · {gf} к/с',   // LAT1b
     'diag.frameWait':'Ожидание следующего кадра камеры ≈ {ms}',
     'diag.dup':'Распознаваний уже виденного кадра: {n} в минуту',
@@ -675,7 +679,8 @@ export const DICTS = {
     'diag.gpuHard':'аппаратная',
     'diag.gpuSoft':'программная — без графического процессора',
     'diag.unknown':'неизвестно',
-    'diag.unknownOnce':'неизвестно (модель рук сообщает это лишь раз за загрузку страницы — перезагрузите страницу, чтобы проверить)',
+    'diag.cpuOnce':'CPU (подтверждено раньше на этой странице)',
+    'diag.gpuPart':'GPU, часть — на процессоре (CPU)',
     'diag.longStart':'Страница занята при запуске (первые 10 с): {n} долгих задач, самая долгая {max}{why}',
     'diag.longPlay':'Страница занята во время игры (последняя минута): {n}, самая долгая {max}{why}',
     'diag.cause':' — {c}',
@@ -1049,6 +1054,10 @@ export const DICTS = {
     'fx.trmMix.rate':'Частота',
     'fx.forest':'Ночной лес',   // SND-F1
     'fx.forest.mix':'Подмес',
+    'fx.forest.room':'Комната',   // SND-F1b
+    'fx.forest.room.short':'Малая {s} с',
+    'fx.forest.room.medium':'Средняя {s} с',
+    'fx.forest.room.long':'Большая {s} с',
     'fx.glue':'Склейка',
     'fx.glue.thr':'Порог',
     'fx.glue.ratio':'Степень',
@@ -1059,8 +1068,7 @@ export const DICTS = {
     'fx.cat.dyn':'Динамика',
     'master.sep':'Мастер',
     'master.glue':'Склейка (мягкий компрессор)',
-    'master.limiter':'Лимитер (без перегруза)',
-    'master.hint':'Оба работают без задержки. Склейка выравнивает весь микс; лимитер трогает только пики, которые перегрузили бы выход.',
+    'master.hint':'Склейка выравнивает весь микс. В самом конце всегда работает лимитер: громкие места не трещат. Оба — без задержки.',
     'fx.param.amt':'Величина',          // у старых скалярных эффектов параметр один и он же сам эффект
     // конструктор эффектов: раскладка по пальцам + ось/инверсия на параметр
     'fx.none':'— нет —',

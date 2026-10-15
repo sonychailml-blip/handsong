@@ -10,11 +10,14 @@ export function seeded(seed){
 }
 
 /* ---------- «Night forest» — a convolution room from a generated noise impulse response ----------
-   3.4 s, stereo, independent noise per channel (one fixed seed each), envelope (1 − i/len)^2.6; the wet return 0.55 and the note send
-   0.8 are the prototype's gains. The IR is a pure function of the sample rate. */
-export const FOREST={ sec:3.4, pow:2.6, wet:0.55, send:0.8, seeds:[0x4E464F31, 0x4E464F32] };
-export function forestIR(rate){
-  const len=Math.round(rate*FOREST.sec);
+   Stereo, independent noise per channel (one fixed seed each), envelope (1 − i/len)^2.6 over the WHOLE chosen length; the wet return 0.55
+   and the note send 0.8 are the prototype's gains. Three room lengths (SND-F1b): Short 0.85 s, Medium 1.7 s, Long 3.4 s (the prototype) —
+   the same recipe and seeds, the envelope recomputed for each length (a shorter room, not a cut tail). A pure function of rate and length. */
+export const FOREST={ sec:3.4, rooms:[0.85, 1.7, 3.4], room:1.7, pow:2.6, wet:0.55, send:0.8, seeds:[0x4E464F31, 0x4E464F32] };
+/* the nearest offered room length (in log space: 0.85 · 1.7 · 3.4 are octave steps) */
+export const forestRoom=sec=> FOREST.rooms.reduce((a,b)=> Math.abs(Math.log(b/sec))<Math.abs(Math.log(a/sec)) ? b : a);
+export function forestIR(rate, sec=FOREST.sec){
+  const len=Math.round(rate*sec);
   return FOREST.seeds.map(sd=>{ const r=seeded(sd), d=new Float32Array(len);
     for(let i=0;i<len;i++) d[i]=(r()*2-1)*Math.pow(1-i/len, FOREST.pow);
     return d; });
@@ -53,6 +56,12 @@ export const compGainDb=(x, p)=> p.makeup-(x-compCurveDb(x, p.thr, p.ratio, p.kn
    AT its threshold and spans 30 dB, so ours sits higher with a narrow knee; the error surface is flat around it. LIMIT: the master's
    safety ceiling. */
 export const DYN_GLUE={ thr:-12, ratio:3, knee:6, att:0.01, rel:0.25, makeup:0.9 };
-export const DYN_LIMIT={ ceil:-1, rel:0.05 };
+export const DYN_LIMIT={ ceil:-1, rel:0.05, hold:0 };
+/* SND-F1b: the MASTER's limiter (replaces the browser's compressor-limiter): a 40-ms hold and 150-ms release keep the gain from rippling
+   inside bass waveforms (distortion 8 dB over the ceiling, measured: 30 Hz −149, 55 Hz −47, 110 Hz −66 dB; the old browser limiter
+   −40 / −48 / −54; hold 0 / release 50 ms −23 / −27 / −32). MASTER_MAKEUP_DB: the old limiter's own makeup on everything below ≈ −6 dBFS
+   (measured +2.31 dB) — kept as a plain gain so nothing gets quieter. */
+export const DYN_MASTER={ ceil:-1, rel:0.15, hold:0.04 };
+export const MASTER_MAKEUP_DB=2.31;
 /* one-pole coefficient for a time constant (s) at a sample rate */
 export const dynCoef=(sec, rate)=> sec>0 ? Math.exp(-1/(sec*rate)) : 0;

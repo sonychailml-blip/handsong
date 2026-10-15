@@ -7572,3 +7572,67 @@ runs hit the 8-min limit before the new rows — every row that ran passed): «d
 every run; live body/tail −1.2…−6 dB in 3/3 loaded runs (Chrome's live ConvolverNode drops background-thread IR stages under load) — fix
 round 2: one warm-up play (the first-use fade-in, 0.6 dB) → 2/2 pass (Δ ≤ 0.11 dB). The row can still fail under heavy load: that is a real
 live-vs-frozen difference of Chrome's convolver, reported, tolerance kept.
+
+
+### Moved from HANDOFF.md at SND-F1b (English, verbatim; 2026-10-15)
+### LAT1b (2026-10-15) — latency diagnostics before LAT2 (full: archive B «LAT1b + SND-F1»)
+- Meter (+ «Copy», `R.latency()`): graphics renderer (hardware/software), the hand model's REAL processor (MediaPipe's own log lines),
+  camera asked vs given, duplicates per minute, frame wait (½ frame) + a second total, long tasks at startup / while playing with causes.
+  Test switches (Sound → Diagnostics, session only, defaults = before): hands 2/1, model GPU/CPU, camera fps default/30/60. Headless: Intel
+  HD 4000 (hardware), GPU; the fake camera always gives 20 fps (30/60 only on real cameras).
+- **User's measurement plan** (desktop, daylight, ~20 s of play each, «Copy» after each): A defaults · C 1 hand · D 30 fps · E 60 fps ·
+  B model CPU LAST (MediaPipe names the CPU path once per page: after B the read-out says «unknown» — reload to start over); then A and D
+  on the phone. Path: ▶ Play → «🎛 Sound» → bottom «Diagnostics».
+- Probes: rows «LAT1 latency meter» (+ new fields, 4 controls) and «LAT1b test switches» (real buttons; control) — fix rounds: data 1 (my expectation), licence glyph 1, static 1;
+  runner 1 (TFLite names the CPU path once per page → later read-outs say «unknown», CPU test last in the plan).
+
+### SND-F1 (2026-10-15) — sounds from the Calm prototype (full: archive B «LAT1b + SND-F1»)
+- Chord timbre «Firefly» (`CHORD_INSTR[16]`, appended): the prototype's struck tine exactly (−146 dB residual; × chord bus 0.28), one-shot
+  strikes (rule #3 exception like drums), live/track routing (rule #31). ⛔ Not a solo/bass timbre: the user's rule «no new solo timbre until
+  stable ids» — after TIM1. Night forest (`forest`, bus): seeded 3.4-s stereo IR (`core/dsp.js`), our spec normalisation, mix = send 0.8.
+- Dynamics (`dyn-worklet.js`, our code, zero lookahead, deterministic): Glue (chain module, «Dynamics» group; master Glue OFF by default)
+  and a safety Limiter on the master (ON, −1 dBFS, exact identity below). The browser master limiter KEPT (rule #4) — it delays 6.0 ms
+  (288 frames, measured): replacing it by our limiter would cut 6 ms from hand → sound — **user's decision**.
+- Glue vs the prototype's built-in compressor (Firefly + Night forest phrase): residual −34 dB, same loudness, worst 50-ms envelope
+  1.2 dB; preset thr −12, ratio 3, knee 6, att 10 ms, rel 250 ms, makeup +0.9 dB.
+- ⚠️ CPU (offline proxy, desktop): one Night forest ≈ 19–24 % of a core; 1.7 s IR ≈ 10 %, 0.85 s ≈ 6 %; phone ≈ 4× → PROPOSAL (not applied):
+  1.7-s IR on phones, or the FDN shaped like the forest. Latency: our nodes add 0 frames; LAT1b totals on/off: hand → sound 125.2 / incl. frame wait 162.3 ms (all off) vs 120.3 / 196.3 (all on; the second total follows the fake camera's measured fps on a busy machine — buffer/output 10/42 vs 10/32 ms).
+- Probes: 5 new rows + node row + 9 golden cases (existing 70 untouched); fix rounds: static 3, freeze parity 2 (master
+  gain in the capture, `only` quirk, warm-up), live = offline 1 (start margin). ⚠️ Found, outside the slice: GOLD «fx reverb 3» spec[11] flickers
+  ±0.012 dB in ~half of fresh sessions (also without this slice — not widened); under heavy CPU load Chrome's LIVE convolver drops Night
+  forest's later IR stages (frozen keeps them) — the parity row fails then. Decisions recorded: golden-render renewal
+  rules (CLAUDE.md, GOLD); BACKLOG §7.14 «Dynamics», §7.16 Forest drone + distance colour.
+
+### ✅ SND-F1b — OUR MASTER LIMITER, GOLD FLOOR −80 dB, NIGHT FOREST ROOM, LAT1b FIXES (2026-10-15; user decisions after SND-F1)
+**Master.** Measured before changing (offline, 48 kHz): the browser compressor-limiter with the app's settings (thr −6, knee 6, ratio 20,
+att 10 ms, rel 250 ms) gave +2.31 dB to every level from −40 to −6 dBFS (+1.17 at −3, −1.26 at 0) — its automatic makeup — and let a mix of
+many chords + drums pushed to +1.3 dBFS out at +0.49 dBFS (9 samples over 0 dBFS). Our limiter variants on the same material: always −1.00
+dBFS; distortion of a sine 8 dB over the ceiling (fit-the-fundamental residual): 30 / 55 / 110 Hz — old browser −40 / −47.8 / −54; ours hold 0
+rel 50 ms −22.8 / −27 / −32.2; hold 20 ms rel 100 −149 / −36.3 / −46.2; hold 20 rel 150 −149 / −39.4 / −49.4; hold 20 rel 300 −149 / −44.8 / −55;
+hold 40 rel 150 −149 / −46.7 / −65.7 → chosen `DYN_MASTER` {ceil −1, rel 0.15, hold 0.04}. The worklet's limit mode got `hold` (default 0 =
+the old algorithm exactly, so golden «master limiter» stays) and `report` (reduction every 50 ms for the mixer strip). Live path: master →
+Glue (off) → makeup +2.31 dB → our limiter → output; the browser node only as the fallback without the worklet and in the render copy
+(unheard). The Limiter On/Off switch was removed (always on). Live delay measured by the new row: master path 0 frames; a browser compressor
+beside it 264 frames = 5.99 ms at 44.1 kHz (the output device ran at 44.1 kHz that session). LAT1b counts the master path as part `graph`
+of hand → sound (0 now; the old totals silently missed its 6 ms).
+**GOLD.** Floor −80 dB on both sides (one side below = compared) + three controls (audible band moved 0.02 dB caught; both under the floor
+skipped; one under / one over compared). All 79 existing entries unchanged after the limiter replacement and the Room parameter (renders tap
+the master before any limiter, so nothing to renew under rule b); +3 entries: «fx forest medium», «fx forest short», «master limiter (hold)».
+The «fx reverb 3» band-11 flicker (−92 dB) now falls under the floor.
+**Night forest Room.** `forestIR(rate, sec)`, rooms 0.85 / 1.7 / 3.4 s (log curve: 0 / ½ / 1 exact), default Medium, pinned hashes 44.1 kHz
+e3971e11 / 5f0c78e3 / c28f730d and 48 kHz 68fc1b7c / 64c9afb0 / 19381a1c (Long, Medium, Short); a Short room is not a cut of the Long one
+(control). The panel shows three buttons and the parameter starts «Fixed». CPU (offline render time per s of audio, desktop, machine slower
+that hour — base 5.9 ms): Short 137.7, Medium 149.5, Long 266.5, three Medium 476.4, three Long 1221.8 ms → proposal: a shared reverb send.
+Live vs frozen under 3 busy worker threads (4-core desktop): Medium Δ strike/body/tail 0.03/0.28/0.36 then 0.00/0.00/0.00 dB; Long
+0.00/0.01/0.00; one more Long run lost to a capture gap (load starved the audio thread — reported by the probe as such).
+**LAT1b fixes.** (a) delivered fps = presentedFrames per second from requestVideoFrameCallback (`camN`), processed fps = new frames we
+detected per second (`procT`); the frame wait uses the delivered rate; headless: delivered 20, processed 17.3. (b) The user saw «unknown (…
+once per page)» on defaults: under the old rule that needs a window with an XNNPACK line before, which only a CPU switch (or a GPU path that
+prints XNNPACK) produces; not reproducible headless (no hands in the fake camera, so the hand-landmark sub-model never runs). New rule:
+start from the request (MediaPipe throws, it does not fall back), evidence only adds: GPU → 'GPU' or 'GPU+CPU' (an XNNPACK line while GPU
+was asked); CPU → 'CPU' (now or earlier on the page) or 'unknown' only if never confirmed; the listening window is 120 s (covers a hand
+appearing). (c) The user's numbers are in HANDOFF «LAT2 input».
+**Positional callers of changed functions:** `dynNode(mode, set, keep, report)` — audio.js 4 calls (master glue 3 args, master limiter 4,
+Glue module 3, offlineMasterDyn 3); `forestData(rate, sec)` — audio.js forestBuffer (2), probes/sound.js (1 and 2 args); `forestIR(rate,
+sec)` — audio.js (2), probes (1–2), probe-data (1–2); `handToSound(parts)` unchanged signature (new key `graph`); `delegateOf(lines, before,
+asked)` — vision.js modelInfo (3); `checkFreezeParity(o)` — run registry (0 args), evals (1).

@@ -2,7 +2,7 @@ import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx
 import { baseF, tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld, bendPlan } from './config.js';
-import { FOREST, forestIR, irNormScale, DYN_GLUE, DYN_LIMIT } from './core/dsp.js';   // SND-F1: Night forest IR, dynamics presets (pure core)   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
+import { FOREST, forestIR, forestRoom, irNormScale, DYN_GLUE, DYN_LIMIT, DYN_MASTER, MASTER_MAKEUP_DB } from './core/dsp.js';   // SND-F1: Night forest IR, dynamics presets (pure core)   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
@@ -200,13 +200,20 @@ const hitOwner=k=>{ hitOwnerKey=k; };
    анализатор на выходе лимитера (то, что слышно); лимитер не трогаем (правило #4), только читаем его подавление (reduction, дБ). */
 const MASTER_BASE=0.8;
 let masterLvl=1, meterAn=null, meterBuf=null;
-/* SND-F1: the master's dynamics (live only). mGlue — our compressor, OFF by default; mLim — the safety limiter, ON by default; outLast —
-   the node that feeds the speakers (the meter, the clip tap and the probe capture hang there). Session switches (Sound panel). */
-let mGlue=null, mLim=null, outLast=null, mGlueOn=false, mLimOn=true;
+/* SND-F1 / SND-F1b: the master's dynamics (live only). mGlue — our compressor, OFF by default (Sound panel); mMake — the old browser
+   limiter's makeup kept as a plain gain (+2.31 dB, MASTER_MAKEUP_DB); mLim — OUR limiter (DYN_MASTER), always on at the very end since
+   SND-F1b, zero delay; outLast — the node that feeds the speakers (meter, clip tap, probe capture). The browser's DynamicsCompressorNode
+   (`limiter`) is built only as the FALLBACK when the dynamics worklet does not load — it delays everything by 6.0 ms (measured). */
+let mGlue=null, mMake=null, mLim=null, outLast=null, mGlueOn=false, mLimOn=true, limRed=0;
+const DCN_DELAY_S=0.006;   // the browser compressor's lookahead, measured 288 frames at 48 kHz (SND-F1)
+/* the master path's own delay (ms) — 0 with our limiter, the browser limiter's lookahead in the fallback (LAT1b's «master path») */
+const masterDelayMs=()=> AC&&!offline&&!mLim&&limiter ? Math.round(DCN_DELAY_S*AC.sampleRate)/AC.sampleRate*1000 : 0;
+const masterProbeNodes=()=>({ master, out:outLast });   // probes only: the live master's input and the node that feeds the speakers
+const masterPathKinds=()=>{ const k=[]; if(mGlue) k.push('glue'); if(mMake) k.push('gain'); if(mLim) k.push('limit'); if(!mLim&&limiter) k.push('browser-compressor'); return k; };
 const MASTER_GLUE_MAKEUP=DYN_GLUE.makeup;
 function masterDynSet(which,on){ const n= which==='glue' ? mGlue : mLim; if(which==='glue') mGlueOn=!!on; else mLimOn=!!on;
   if(n&&AC){ const q=n.parameters.get('on'), t=AC.currentTime; q.cancelScheduledValues(t); q.setValueAtTime(on?1:0,t); } return masterDyn(); }
-const masterDyn=()=>({ ready:!!(mGlue&&mLim), glue:mGlueOn, limiter:mLimOn });
+const masterDyn=()=>({ ready:!!(mGlue&&mLim), glue:mGlueOn, limiter:mLimOn, path:masterPathKinds(), delayMs:masterDelayMs() });
 /* probe / golden renders only: an offline copy's master through one dynamics node (after offlineTapMaster), with a master gain */
 function offlineMasterDyn(mode,set,gain){
   if(!AC||!offline||!master||!dynReady) return false;
@@ -221,7 +228,7 @@ function masterMeter(){
   if(!AC||!meterAn) return null;
   if(!meterBuf||meterBuf.length!==meterAn.fftSize) meterBuf=new Float32Array(meterAn.fftSize);
   meterAn.getFloatTimeDomainData(meterBuf); let pk=0; for(let i=0;i<meterBuf.length;i++){ const a=Math.abs(meterBuf[i]); if(a>pk) pk=a; }
-  return { peak:pk, reduction: limiter ? limiter.reduction : 0, gain: master ? master.gain.value : 0 };
+  return { peak:pk, reduction: mLim ? limRed : (limiter ? limiter.reduction : 0), gain: master ? master.gain.value : 0 };
 }
 /* ⚠️ verb/verbOut УДАЛЕНЫ (Пласт 3.5.2). Это были модульные псевдонимы входа и выхода ЕДИНСТВЕННОГО
    реверба — они пережили Пласт 1 только потому, что на общий вход приходили ДВА посыла (соло и
@@ -1291,26 +1298,34 @@ function fxGlideOf(m){ const v=m&&m[FX_GLIDE_KEY]; return v==null ? undefined : 
    per chain instance (live and track chains separate, rule #31), never per note. The IR is normalised by us exactly as the Web Audio
    spec's normalize = true would (core/dsp.irNormScale) and the node runs with normalize = false — the level does not depend on the browser.
    A mix 0 module is identity (dry 1, send 0). Generated once per sample rate (≈ 10 ms) and shared by every instance. */
-const FOREST_PARAMS=[ {key:'mix', labelKey:'fx.forest.mix', short:'FRST', unit:'', def:FOREST.send, min:0, max:1, curve:'lin'} ];
+/* SND-F1b «room»: Short 0.85 · Medium 1.7 (default) · Long 3.4 s — log curve, so 0 / ½ / 1 of the range are exactly the three lengths;
+   `pick` = the offered values (the panel shows buttons, the value snaps). A change swaps the convolver's IR at once (not schedulable: a
+   room change cuts the ringing tail — it is a set-once choice; a change recorded mid-take is applied from the render's start). */
+const FOREST_PARAMS=[ {key:'mix', labelKey:'fx.forest.mix', short:'FRST', unit:'', def:FOREST.send, min:0, max:1, curve:'lin'},
+  {key:'room', labelKey:'fx.forest.room', short:'ROOM', unit:'s', def:FOREST.room, min:FOREST.rooms[0], max:FOREST.rooms[2], curve:'log', pick:FOREST.rooms,
+   pickKeys:['fx.forest.room.short','fx.forest.room.medium','fx.forest.room.long']} ];
 const forestIRs={};
-function forestData(rate){
-  if(!forestIRs[rate]){ const ch=forestIR(rate), k=irNormScale(ch, rate); forestIRs[rate]=ch.map(d=>d.map(x=>x*k)); }
-  return forestIRs[rate];
+function forestData(rate, sec=FOREST.sec){
+  const k0=rate+'/'+sec;
+  if(!forestIRs[k0]){ const ch=forestIR(rate, sec), k=irNormScale(ch, rate); forestIRs[k0]=ch.map(d=>d.map(x=>x*k)); }
+  return forestIRs[k0];
 }
+function forestBuffer(sec){ const ch=forestData(AC.sampleRate, sec), b=AC.createBuffer(2, ch[0].length, AC.sampleRate); ch.forEach((d,i)=>b.copyToChannel(d,i)); return b; }
 function makeForestFx(){
   const fxIn=AC.createGain(), fxOut=AC.createGain(), dry=AC.createGain(); fxIn.gain.value=1; fxOut.gain.value=1; dry.gain.value=1;
   fxIn.connect(dry); dry.connect(fxOut);
   const send=AC.createGain(); send.gain.value=0;
   const gate=AC.createGain(); gate.gain.value=1;
   const conv=AC.createConvolver(); conv.normalize=false;   // normalize BEFORE the buffer: it is read when the buffer is set
-  const ch=forestData(AC.sampleRate), buf=AC.createBuffer(2, ch[0].length, AC.sampleRate); ch.forEach((d,i)=>buf.copyToChannel(d,i)); conv.buffer=buf;
+  let room=FOREST.room; conv.buffer=forestBuffer(room);
   const ret=AC.createGain(); ret.gain.value=FOREST.wet;
   fxIn.connect(send); send.connect(gate); gate.connect(conv); conv.connect(ret); ret.connect(fxOut);
-  const SET={ mix:(v,w)=>{ send.gain.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.08); } };
+  const SET={ mix:(v,w)=>{ send.gain.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.08); },
+              room:v=>{ const r=forestRoom(v); if(r!==room){ room=r; conv.buffer=forestBuffer(r); } } };
   const params=FOREST_PARAMS.map(sp=>({...sp, set:SET[sp.key]}));
   for(const p of params) fxWrapParam(p);
   params[0].setNorm(params[0].cur);
-  return { id:'forest', labelKey:'fx.forest', kind:'bus', in:fxIn, out:fxOut, send, gate, params, conv };
+  return { id:'forest', labelKey:'fx.forest', kind:'bus', in:fxIn, out:fxOut, send, gate, params, conv, room:()=>room };
 }
 /* ═══ SND-F1 — «GLUE»: OUR COMPRESSOR (insert module; also the master's optional Glue) ═══
    The dynamics worklet (dyn-worklet.js, mode 'comp'): zero lookahead, deterministic, soft knee, stereo-linked. ⛔ Not the built-in
@@ -1327,9 +1342,9 @@ const GLUE_PARAMS=[
 ];
 let dynReady=false, dynWarned=false;
 /* one dynamics node: mode 'comp' | 'limit'; set = initial parameter values; keep = an engine node that lives as long as its context */
-function dynNode(mode,set,keep){
+function dynNode(mode,set,keep,report){   // report: the limiter posts its gain reduction (dB) every 50 ms (the mixer's master strip)
   return new AudioWorkletNode(AC,'dyn',{ numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit',
-    channelInterpretation:'speakers', processorOptions:{ mode, keep:!!keep }, parameterData:{ ...set } });
+    channelInterpretation:'speakers', processorOptions:{ mode, keep:!!keep, report:!!report }, parameterData:{ ...set } });
 }
 function makeGlueFx(){
   let node=null;
@@ -1770,7 +1785,7 @@ let capMod=null, capOk=false;
 function probeCaptureReady(){ if(!AC||offline) return Promise.resolve(false);
   return capMod||(capMod=AC.audioWorklet.addModule('src/probe-cap-worklet.js').then(()=>(capOk=true), e=>{ capMod=null; throw e; })); }
 function probeCapture(sec){
-  if(!AC||!master||!limiter||offline) return Promise.reject(new Error('no live engine'));
+  if(!AC||!master||!outLast||offline) return Promise.reject(new Error('no live engine'));
   if(!capOk) return Promise.reject(new Error('the capture worklet is not loaded — await audio.probeCaptureReady() first'));
   const want=Math.ceil(sec*AC.sampleRate);
   let node;
@@ -2207,26 +2222,26 @@ async function initAudio(mkCtx){
   }
   /* Мастер: сумма → лимитер (жёсткий компрессор) → выход.
      Лимитер обязателен: аккорды + драйв + подложка легко клиппируют. */
-  limiter=AC.createDynamicsCompressor();
-  /* Лимитер — АВАРИЙНЫЙ потолок, а не компрессор. Порог/ratio оставлены как защита,
-     но время смягчено: attack 2 мс был КОРОЧЕ периода басовой волны (55 Гц = 18 мс) —
-     детектор шёл по самим колебаниям и модулировал весь микс на частоте баса.
-     10 мс длиннее периода → реагирует на огибающую; release 250 мс превращает
-     остаточное подавление в ровное смещение вместо «дыхания»; knee 6 — мягкий вход. */
-  limiter.threshold.value=-6; limiter.knee.value=6; limiter.ratio.value=20;
-  limiter.attack.value=0.010; limiter.release.value=0.25;
-  /* SND-F1: the dynamics worklet (Glue, safety Limiter). Live: master → Glue (off by default) → the limiter above (kept, rule #4) →
-     safety Limiter (on by default; exact identity below its ceiling) → output. Both zero-lookahead. The render copy taps the master
-     before all of this (offlineTapMaster), so frozen buffers never carry master processing. A failed load leaves the old path. */
-  dynReady=false; mGlue=mLim=null;
+  /* SND-F1b: live master = master → Glue (off by default) → makeup gain → OUR limiter → output (zero delay). The browser's compressor-
+     limiter (6 ms lookahead) only as the fallback without the dynamics worklet, and in the render copy (whose end nobody hears: renders
+     tap the master before it — offlineTapMaster). */
+  dynReady=false; mGlue=mMake=mLim=null; limRed=0; limiter=null;
   try{ await AC.audioWorklet.addModule('src/dyn-worklet.js'); dynReady=true; }
-  catch(e){ console.warn('Dynamics worklet did not load — Glue and the safety limiter are bypassed:',e); }
-  if(!mkCtx && dynReady){ try{ mGlue=dynNode('comp', { ...DYN_GLUE, makeup:MASTER_GLUE_MAKEUP, on:mGlueOn?1:0 }, true); mLim=dynNode('limit', { ...DYN_LIMIT, on:mLimOn?1:0 }, true); }
-    catch(e){ mGlue=mLim=null; console.warn('Dynamics nodes failed — master path unchanged:',e); } }
-  if(mGlue) mGlue.connect(limiter);
-  if(mLim){ limiter.connect(mLim); mLim.connect(AC.destination); } else limiter.connect(AC.destination);
-  outLast=mLim||limiter;
-  master=AC.createGain(); master.gain.value=MASTER_BASE*volAmp(masterLvl); master.connect(mGlue||limiter);   // MX1: при уровне мастера 100 — ровно прежние 0.8
+  catch(e){ console.warn('Dynamics worklet did not load — the browser limiter is used instead (6 ms later):',e); }
+  if(!mkCtx && dynReady){ try{
+      mGlue=dynNode('comp', { ...DYN_GLUE, makeup:MASTER_GLUE_MAKEUP, on:mGlueOn?1:0 }, true);
+      mMake=AC.createGain(); mMake.gain.value=Math.pow(10, MASTER_MAKEUP_DB/20);
+      mLim=dynNode('limit', { ...DYN_MASTER, on:mLimOn?1:0 }, true, true);
+      mLim.port.onmessage=e=>{ const d=e.data||{}; if(Number.isFinite(d.red)) limRed=d.red; };
+    } catch(e){ mGlue=mMake=mLim=null; console.warn('Dynamics nodes failed — the browser limiter is used instead:',e); } }
+  if(mLim){ mGlue.connect(mMake); mMake.connect(mLim); mLim.connect(AC.destination); outLast=mLim; }
+  else {
+    limiter=AC.createDynamicsCompressor();
+    /* the old emergency ceiling (fallback / render copy): threshold −6, knee 6, ratio 20, attack 10 ms (longer than a bass period), release 250 ms */
+    limiter.threshold.value=-6; limiter.knee.value=6; limiter.ratio.value=20;
+    limiter.attack.value=0.010; limiter.release.value=0.25;
+    limiter.connect(AC.destination); outLast=limiter; }
+  master=AC.createGain(); master.gain.value=MASTER_BASE*volAmp(masterLvl); master.connect(mGlue||limiter);
   meterAn=AC.createAnalyser(); meterAn.fftSize=1024; outLast.connect(meterAn);   // MX1: измеритель на выходе лимитера (только чтение; в выход не идёт)
  
   /* Общий ревербератор: СЕТЬ ЗАДЕРЖЕК С ОБРАТНОЙ СВЯЗЬЮ (FDN, см. buildFDN), у каждого источника свой
@@ -3192,5 +3207,5 @@ export {
   /* RENDER-LEAK: first solo KS timbre index — a track render loads the KS worklet only when the track uses one */
   LEAD_KS_FROM,
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
-  masterDynSet, masterDyn, offlineMasterDyn, forestData, dynReady, ffInfo,
+  masterDynSet, masterDyn, offlineMasterDyn, forestData, dynReady, ffInfo, masterDelayMs, masterProbeNodes,
 };

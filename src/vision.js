@@ -32,8 +32,9 @@ async function openCamera(facing){
 /* LAT1b: which processor the hand model REALLY runs on. MediaPipe's task API does not report it; its WebAssembly prints its own log
    lines to the console — the CPU path announces the XNNPACK delegate, the GPU path only its WebGL context. A tap
    on the console keeps those lines (only MediaPipe-shaped ones; everything is passed through unchanged) since the last (re)start. */
-const MP_LINE=/^[IWEF]\d{4} |TensorFlow Lite|XNNPACK|Graph successfully/, TAP_MS=15000;
-let mpLog=[], tapOff=null, tapT=0, xnnBefore=false;   // xnnBefore: an earlier window already showed the XNNPACK line (TFLite prints it once per page)
+/* TAP_MS: two minutes after a (re)start — long enough to see lines printed when the hand model first meets a hand */
+const MP_LINE=/^[IWEF]\d{4} |TensorFlow Lite|XNNPACK|Graph successfully/, TAP_MS=120000;
+let mpLog=[], tapOff=null, tapT=0, xnnBefore=false, xnnOnGpu=false;   // xnnBefore: an earlier window showed the XNNPACK line (TFLite prints it once per page); xnnOnGpu: it came while GPU was asked
 function mpTap(){   // only for TAP_MS after a (re)start: outside that window the console is the browser's own (DevTools source lines stay true)
   clearTimeout(tapT); tapT=setTimeout(()=>{ if(tapOff){ tapOff(); tapOff=null; } }, TAP_MS);
   if(tapOff) return;
@@ -42,15 +43,19 @@ function mpTap(){   // only for TAP_MS after a (re)start: outside that window th
     console[k]=function(...a){ const s=a[0]; if(typeof s==='string' && s.length<600 && MP_LINE.test(s) && mpLog.length<40) mpLog.push(s); return f.apply(this,a); }; }
   tapOff=()=>{ for(const k in orig) console[k]=orig[k]; };
 }
-/* measured (runner, 2026-10-15): BOTH paths create a WebGL context (image conversion); only the CPU path creates the XNNPACK delegate —
-   and TensorFlow Lite announces it ONCE per page: after it was seen, a later window without it proves nothing ('unknown', `once`) */
+/* measured (runner, 2026-10-15): BOTH paths create a WebGL context (image conversion); the CPU path creates the XNNPACK delegate, and
+   TensorFlow Lite announces it ONCE per page. SND-F1b fix (the user saw «unknown» on a page where he had not asked for CPU): the read-out
+   starts from what was ASKED and SUCCEEDED (MediaPipe throws, it does not fall back, when a processor cannot start) and only evidence
+   changes it — never «unknown» for GPU. Asked GPU: 'GPU', or 'GPU+CPU' once an XNNPACK line came while GPU was asked (a part of the model
+   on the processor). Asked CPU: 'CPU' when its line came now or earlier on this page (`once`), 'unknown' only if it never came. */
 const XNN=/XNNPACK/i;
-function delegateOf(lines, before){
-  const cpu=lines.some(s=>XNN.test(s)), gl=lines.some(s=>/gl_context/i.test(s));
-  return cpu ? 'CPU' : before ? 'unknown' : gl ? 'GPU' : 'unknown';
+function delegateOf(lines, before, asked){
+  const xnn=lines.some(s=>XNN.test(s));
+  if(asked==='GPU') return xnn||xnnOnGpu ? 'GPU+CPU' : 'GPU';
+  return xnn||before ? 'CPU' : 'unknown';
 }
-const newWindow=()=>{ if(mpLog.some(s=>XNN.test(s))) xnnBefore=true; mpLog=[]; mpTap(); };
-const modelInfo=()=>({ requested:opts.delegate, actual:delegateOf(mpLog, xnnBefore), once:xnnBefore && !mpLog.some(s=>XNN.test(s)), hands:opts.hands,
+const newWindow=()=>{ if(mpLog.some(s=>XNN.test(s))){ xnnBefore=true; if(opts.delegate==='GPU') xnnOnGpu=true; } mpLog=[]; mpTap(); };
+const modelInfo=()=>({ requested:opts.delegate, actual:delegateOf(mpLog, xnnBefore, opts.delegate), once:opts.delegate==='CPU' && xnnBefore && !mpLog.some(s=>XNN.test(s)), hands:opts.hands,
   evidence:mpLog.filter(s=>/gl_context.*GL version|XNNPACK|delegate/i.test(s)).map(s=>s.replace(/^[IWEF]\d{4} [\d:.]+ \d+ /,'').slice(0,160)) });
 
 /* LAT1b: the camera's request and what the browser granted (track.getSettings) */

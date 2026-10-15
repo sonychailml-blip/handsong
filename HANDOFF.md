@@ -48,8 +48,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
 - ✅ **STAGE 3 PLAN** written 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; summary below); user answers Q1–Q19 given 2026-10-14
   (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92) ·
   ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear) ·
-  ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92 + the measurement plan below), **SND-F1** Firefly,
-  Night forest, Glue, Limiter (step 93).
+  ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: «LAT2 input» below), **SND-F1** + **SND-F1b** Firefly,
+  Night forest (Room), Glue, our master Limiter (step 93).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -154,30 +154,33 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### LAT1b (2026-10-15) — latency diagnostics before LAT2 (full: archive B «LAT1b + SND-F1»)
-- Meter (+ «Copy», `R.latency()`): graphics renderer (hardware/software), the hand model's REAL processor (MediaPipe's own log lines),
-  camera asked vs given, duplicates per minute, frame wait (½ frame) + a second total, long tasks at startup / while playing with causes.
-  Test switches (Sound → Diagnostics, session only, defaults = before): hands 2/1, model GPU/CPU, camera fps default/30/60. Headless: Intel
-  HD 4000 (hardware), GPU; the fake camera always gives 20 fps (30/60 only on real cameras).
-- **User's measurement plan** (desktop, daylight, ~20 s of play each, «Copy» after each): A defaults · C 1 hand · D 30 fps · E 60 fps ·
-  B model CPU LAST (MediaPipe names the CPU path once per page: after B the read-out says «unknown» — reload to start over); then A and D
-  on the phone. Path: ▶ Play → «🎛 Sound» → bottom «Diagnostics».
-- Probes: rows «LAT1 latency meter» (+ new fields, 4 controls) and «LAT1b test switches» (real buttons; control) — fix rounds: data 1 (my expectation), licence glyph 1, static 1;
-  runner 1 (TFLite names the CPU path once per page → later read-outs say «unknown», CPU test last in the plan).
+### LAT1b + SND-F1 (2026-10-15) — summary (full records: archive B «LAT1b + SND-F1» and «Moved … at SND-F1b»)
+- LAT1b: meter lines (graphics, the model's real processor, camera asked/given, duplicates, frame wait + second total, long tasks with
+  causes) and three session-only test switches in Sound → Diagnostics. SND-F1: chord timbre Firefly (struck, one-shot; not solo until
+  TIM1), Night forest (seeded convolution room), our dynamics worklet (Glue; Limiter), golden renewal rules, BACKLOG §7.14 / §7.16.
 
-### SND-F1 (2026-10-15) — sounds from the Calm prototype (full: archive B «LAT1b + SND-F1»)
-- Chord timbre «Firefly» (`CHORD_INSTR[16]`, appended): the prototype's struck tine exactly (−146 dB residual; × chord bus 0.28), one-shot
-  strikes (rule #3 exception like drums), live/track routing (rule #31). ⛔ Not a solo/bass timbre: the user's rule «no new solo timbre until
-  stable ids» — after TIM1. Night forest (`forest`, bus): seeded 3.4-s stereo IR (`core/dsp.js`), our spec normalisation, mix = send 0.8.
-- Dynamics (`dyn-worklet.js`, our code, zero lookahead, deterministic): Glue (chain module, «Dynamics» group; master Glue OFF by default)
-  and a safety Limiter on the master (ON, −1 dBFS, exact identity below). The browser master limiter KEPT (rule #4) — it delays 6.0 ms
-  (288 frames, measured): replacing it by our limiter would cut 6 ms from hand → sound — **user's decision**.
-- Glue vs the prototype's built-in compressor (Firefly + Night forest phrase): residual −34 dB, same loudness, worst 50-ms envelope
-  1.2 dB; preset thr −12, ratio 3, knee 6, att 10 ms, rel 250 ms, makeup +0.9 dB.
-- ⚠️ CPU (offline proxy, desktop): one Night forest ≈ 19–24 % of a core; 1.7 s IR ≈ 10 %, 0.85 s ≈ 6 %; phone ≈ 4× → PROPOSAL (not applied):
-  1.7-s IR on phones, or the FDN shaped like the forest. Latency: our nodes add 0 frames; LAT1b totals on/off: hand → sound 125.2 / incl. frame wait 162.3 ms (all off) vs 120.3 / 196.3 (all on; the second total follows the fake camera's measured fps on a busy machine — buffer/output 10/42 vs 10/32 ms).
-- Probes: 5 new rows + node row + 9 golden cases (existing 70 untouched); fix rounds: static 3, freeze parity 2 (master
-  gain in the capture, `only` quirk, warm-up), live = offline 1 (start margin). ⚠️ Found, outside the slice: GOLD «fx reverb 3» spec[11] flickers
-  ±0.012 dB in ~half of fresh sessions (also without this slice — not widened); under heavy CPU load Chrome's LIVE convolver drops Night
-  forest's later IR stages (frozen keeps them) — the parity row fails then. Decisions recorded: golden-render renewal
-  rules (CLAUDE.md, GOLD); BACKLOG §7.14 «Dynamics», §7.16 Forest drone + distance colour.
+### SND-F1b (2026-10-15) — user decisions after SND-F1 (full: archive B «SND-F1b»)
+- Master: the browser compressor-limiter (6.0 ms lookahead; measured live 264 frames at 44.1 kHz) REPLACED by our limiter, always on, no
+  switch: ceiling −1 dBFS, hold 40 ms, release 150 ms (bass distortion 8 dB over: −47 dB at 55 Hz vs −27 without hold; old limiter −48),
+  + the old limiter's makeup kept as +2.31 dB (measured) so nothing got quieter. The old one let chords + drums 12 dB hot reach +0.49 dBFS
+  (9 clipped samples); ours never passes −1 dBFS. Live master path delay 6.0 → 0 ms (probe «SND-F1b master path (live)»); the meter
+  counts it as «master path» in hand → sound.
+- GOLD floor −80 dB on BOTH sides (user decision; control added); the «fx reverb 3» band-11 flicker (−92 dB) is below it — note removed.
+- Night forest «Room»: Short 0.85 / Medium 1.7 (default) / Long 3.4 s, recomputed envelope, buttons in the effect. CPU (% of a core,
+  desktop): 14 / 15 / 27; three Medium 48, three Long 122; phone ≈ 4× → PROPOSAL (not built): a shared reverb send per network.
+  Live vs frozen under 3 busy threads: Medium 2/2, Long 1/1 agree (≤ 0.4 dB; one run lost to a capture gap) — the «shorter live tail» did
+  not reappear.
+- LAT1b fixes: «camera delivers N fps» (presented frames) vs «we process N fps»; frame wait from the delivered rate; the model read-out
+  starts from the request (never «unknown» for GPU). GOLD: 79 existing entries unchanged; +3 (`fx forest medium/short`, `master limiter (hold)`).
+- Probes: data PASS 11; P.quick PASS 52; P.all PASS 70 (673 s — one earlier P.all hit the 12-min limit at row 47/70 with the machine ≈ 3×
+  slower; the default 8-min runner limit is now too short for P.all on this desktop: proposal `--limit-min` 15). Fix rounds: 1 (node test
+  value: 1.2 s sits on the log midpoint of 0.85 and 1.7).
+
+### LAT2 input — the user's desktop (2026-10-15; Intel HD Graphics 4000, hardware WebGL; camera grants 30 fps)
+- Defaults: «camera 14.3 fps» (= frames WE processed — the old meter line), detection 75.5 ms, frame every 79.9 ms, long tasks while
+  playing 491/min (longest 247, FrameRequestCallback), hand → sound 149.9 / incl. frame wait 184.9; startup longest 1188 ms
+  (WakeLock.request.then, main.js — the start chain).
+- 1 hand: 16.5 fps, detection 54, frame every 57.9, long tasks 2/min, hand → sound 126.6 / 156.9. Requested 30 / 60 fps: no change.
+  Model on CPU: clearly slower (the default really runs on the GPU). Earlier (LAT1): ≈ 126 ms daylight, ≈ 180 ms evening, 6.3 fps.
+- Reading: detection (54–76 ms per frame on this GPU) bounds everything — the loop processes 14–17 of 30 delivered frames; 2 hands cost
+  ≈ 20 ms of detection and ~490 long tasks/min. These totals do not yet include the 6 ms of the old master limiter (removed in SND-F1b).

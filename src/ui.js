@@ -1885,9 +1885,8 @@ function pickVoiceMode(role,m){
 }
 $('vmLdPoly').onclick=()=>pickVoiceMode('ld','poly'); $('vmLdLead').onclick=()=>pickVoiceMode('ld','lead');
 /* SND-F1: the master's Glue and safety Limiter (Sound panel → Master); session only */
-function masterDynShow(st){ for(const [k,a,b] of [['glue','mGlueOn','mGlueOff'],['limiter','mLimOn','mLimOff']]){ const on=!!st[k]; $(a).classList.toggle('act',on); $(b).classList.toggle('act',!on); } }
+function masterDynShow(st){ for(const [k,a,b] of [['glue','mGlueOn','mGlueOff']]){ const on=!!st[k]; $(a).classList.toggle('act',on); $(b).classList.toggle('act',!on); } }
 $('mGlueOn').onclick=()=>masterDynShow(masterDynSet('glue',true)); $('mGlueOff').onclick=()=>masterDynShow(masterDynSet('glue',false));
-$('mLimOn').onclick=()=>masterDynShow(masterDynSet('limiter',true)); $('mLimOff').onclick=()=>masterDynShow(masterDynSet('limiter',false));
 $('vmBsPoly').onclick=()=>pickVoiceMode('bs','poly'); $('vmBsLead').onclick=()=>pickVoiceMode('bs','lead');
 applyVoiceMode();
 qOn.onclick =()=>{ setLoopQuant(true);  qOn.classList.add('act');  qOff.classList.remove('act'); };
@@ -2307,7 +2306,8 @@ function fxAddRow(avail,headKey,allKey){
          меню бы врало. Для старого скалярного это тот же ноль (его погасило удаление) — сходится.
          V4: у Скольжения живое значение — умолчание ЭТОЙ роли (fxInstance досеял defBy), поэтому и фиксированное
          встаёт на сегодняшние 20/12 мс, а не на ноль. */
-      const ps=fxParamsOf(fxCtlChain(),id), eff=fxChainOf(fxCtlChain())[idx];
+      const ps=fxParamsOf(fxCtlChain(),id), eff=fxChainOf(fxCtlChain())[idx], specs=(FX_FACTORY[id]||{}).params||[];
+      eff.params.forEach((pa,pi)=>{ if(specs[pi]&&specs[pi].pick) setFxParamMode(fxCtlChain(),idx,pi,'fixed'); });   // SND-F1b: a choice (e.g. Night forest's Room) is set, not played
       eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && ps[pi]) setFxParamFixed(fxCtlChain(),idx,pi,ps[pi].get()); });
       fxOpenId=id;   // разворачиваем добавленное: у него может не быть пальца (все заняты), и это надо увидеть сразу, а не искать
     }
@@ -2483,7 +2483,18 @@ function renderFxCtl(){
         const g=share.get(fxAddrKey(pa));
         if(g&&g.length>1) sub.appendChild(fxShareChip([g]));
       }
-      if(pa.mode==='fixed'){
+      const spec=((FX_FACTORY[eff.fxId]||{}).params||[])[pi];
+      if(pa.mode==='fixed' && spec && spec.pick){   // SND-F1b: a choice of a few values (Night forest's Room) — one button each
+        const seg=document.createElement('div'); seg.className='seg';
+        const v01Of=v=>spec.curve==='log' ? Math.log(v/spec.min)/Math.log(spec.max/spec.min) : (v-spec.min)/(spec.max-spec.min);
+        const cur=pa.v01!=null ? pa.v01 : v01Of(spec.def);
+        let best=0; spec.pick.forEach((v,k)=>{ if(Math.abs(v01Of(v)-cur)<Math.abs(v01Of(spec.pick[best])-cur)) best=k; });
+        spec.pick.forEach((v,k)=>{ const b=document.createElement('button'); b.type='button'; b.textContent=t(spec.pickKeys[k],{ s:v });
+          if(k===best) b.classList.add('act');
+          b.onclick=()=>{ const x=v01Of(v); setFxParamFixed(fxCtlChain(),effIdx,pi,x); const p=fxParamsOf(fxCtlChain(),eff.fxId)[pi]; if(p) p.set(x); renderFxCtl(); };
+          seg.appendChild(b); });
+        sub.appendChild(seg);
+      }else if(pa.mode==='fixed'){
         /* ФИКСИРОВАННОЕ ЗНАЧЕНИЕ: поле 0..100 = v01*100, чисто для показа. В звук уходит v01 (0..1)
            ЧЕРЕЗ ТОТ ЖЕ fxParamsOf().set, что и палец, — значит min/max/curve остаются жить только в
            setNorm/fxDenorm, второго представления диапазона не возникает, а лог-шкала реверба (секунды,

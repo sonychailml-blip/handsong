@@ -222,7 +222,7 @@ import * as ST from './state.js';   // состав цепи роли — ЧИТ
 import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { autoFreeze, freezeQueue, afActive, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
-import { FOREST } from './core/dsp.js';   // SND-F1: the Night forest IR length (a track's render tail)
+import { FOREST, forestRoom } from './core/dsp.js';   // SND-F1: the Night forest room length (a track's render tail)
 import { latConsole } from './latmeter.js';   // LAT1: R.latency() — the latency meter's report in the console
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -903,7 +903,8 @@ function tailOf(eng, keys, startVals, insRel){
   for(const key of keys){
     const dec=get(key,'reverb','decay');
     if(dec!=null) tail=Math.max(tail,dec);                                   // decay это и есть RT60 — уже «−60 дБ»
-    const fm=get(key,'forest','mix'); if(fm!=null && fm>0) tail=Math.max(tail, FOREST.sec);   // SND-F1: the Night forest IR is 3.4 s long
+    const fm=get(key,'forest','mix'), fr=get(key,'forest','room');   // SND-F1b: the Night forest tail = its room length (Medium when not captured)
+    if(fm!=null && fm>0) tail=Math.max(tail, fr!=null ? forestRoom(fr) : FOREST.room);
     const dt=get(key,'dly','time'), fb=get(key,'dly','fb');
     if(dt!=null&&fb!=null&&fb>0&&fb<1) tail=Math.max(tail, dt*(DB60/Math.log(1/fb)));
   }

@@ -2,7 +2,7 @@
    Rows register themselves (probes/rows.js). Deterministic offline renders except the two rows flagged realtime (live = offline needs a
    live capture; frozen = live needs R.live). Every row carries a CONTROL that must fail. */
 import { row } from './rows.js';
-import { forestIR, irNormScale, f32Hash, compGainDb, seeded, DYN_GLUE, DYN_LIMIT } from '../core/dsp.js';
+import { forestIR, irNormScale, f32Hash, compGainDb, seeded, DYN_GLUE, DYN_LIMIT, DYN_MASTER, FOREST } from '../core/dsp.js';
 import * as LIVE from '../audio.js';
 import * as REC from '../recorder.js';
 import { CUR, chordUnit } from '../scales.js';
@@ -61,14 +61,22 @@ export async function checkFirefly(){
 /* ═══ SND-F1 Night forest IR (P.checkForest, quick and all) ═══
    The engine's room (live engine and render copy, at 44.1 and 48 kHz and the live rate) is EXACTLY the pure core's seeded IR × the
    spec's normalisation — no Math.random, the same at any rate and offline (frozen = live). The node row «SND-F1 Night forest IR (core)»
-   pins the hashes and the envelope in node. CONTROL: the copy's IR compared with the core at another rate must differ. */
+   pins the hashes and the envelope in node. SND-F1b: each Room length (Short 0.85 · Medium 1.7 · Long 3.4 s) the same way, and a render
+   whose chain sets a room really plays that IR (the convolver's buffer length); a new module starts Medium. CONTROL: the copy's IR compared
+   with the core at another rate must differ. */
 export async function checkForest(){
   const diff=[], miss=s=>diff.push(s); let cases=0;
-  const E=await import('../audio.js?render'), want=rate=>{ const ch=forestIR(rate), k=irNormScale(ch, rate); return ch.map(d=>d.map(x=>x*k)); };
+  const E=await import('../audio.js?render'), want=(rate,sec)=>{ const ch=forestIR(rate,sec), k=irNormScale(ch, rate); return ch.map(d=>d.map(x=>x*k)); };
   const same=(a,b)=>a.length===b.length && a.every((d,i)=>d.length===b[i].length && f32Hash([d])===f32Hash([b[i]]));
-  for(const rate of [44100, 48000]){ cases++; if(!same(E.forestData(rate), want(rate))) miss(`the render copy's Night forest IR at ${rate} Hz is not the core's seeded IR`); }
+  for(const rate of [44100, 48000]){ cases++; if(!same(E.forestData(rate), want(rate))) miss(`the render copy's Night forest IR at ${rate} Hz is not the core's seeded IR`);
+    for(const sec of FOREST.rooms){ cases++; if(!same(E.forestData(rate,sec), want(rate,sec))) miss(`the ${sec}-s room at ${rate} Hz is not the core's seeded IR`); } }
+  { const R=await import('../render.js'), key=(await import('../state.js')).chainKeyOf('ch'), seen={};
+    for(const [v01,sec] of [[null,FOREST.room],[0,0.85],[0.5,1.7],[1,3.4]]){
+      await R.goldRender(e=>{ const i=e.fxInstance(key,'forest'); seen[v01]=[i.room(), i.conv.buffer.length]; }, 0.05, { [key]:{ ids:['forest'], set: v01==null ? {} : { 'forest:room':v01 } } });
+      cases++; const [r,len]=seen[v01]||[]; if(r!==sec || len!==Math.round(48000*sec)) miss(`room ${v01==null?'(default)':v01}: the module plays ${r} s with a ${len}-frame IR, expected ${sec} s`); } }
   if(LIVE.AC){ const r=LIVE.AC.sampleRate; cases++; if(!same(LIVE.forestData(r), want(r))) miss(`the live engine's Night forest IR at ${r} Hz is not the core's seeded IR`); }
   cases++; if(same(E.forestData(44100), want(48000))) miss('CONTROL: the 44.1-kHz IR matched the 48-kHz one — the comparison cannot fail');
+  cases++; if(same(E.forestData(48000,0.85), want(48000,1.7))) miss('CONTROL: the Short room matched the Medium one — the comparison cannot fail');
   return { cases, total:diff.length, differences:diff };
 }
 
@@ -77,12 +85,14 @@ export async function checkForest(){
    end of each step equals core/dsp.compGainDb (≤ DYN_TOL dB); 1 — Glue on an impulse: out on the SAME frame, nothing before; 2 — the
    Limiter on a hot signal (sine 2.0, a 3.0 burst, 4.0 impulses): never above its ceiling; a quiet sine afterwards passes untouched (exact);
    an isolated impulse comes out on its own frame at the ceiling. CONTROLS: the curve with ratio 2 must miss; channel 3 = the Limiter
-   switched off must exceed the ceiling; channel 4 = the built-in DynamicsCompressorNode on the impulse must fail the latency check. */
+   switched off must exceed the ceiling; channel 4 = the built-in DynamicsCompressorNode on the impulse must fail the latency check.
+   SND-F1b: channels 2–3 use the MASTER's limiter (hold 40 ms, release 150 ms); channel 5 = many chords + drums from the engine copy pushed
+   12 dB hot through it — never above the ceiling; the live master path holds our limiter and no browser compressor, 0 ms of delay. */
 const DYN_TOL=0.01;
 export async function checkDynamics(){
   const diff=[], miss=s=>diff.push(s); let cases=0;
   const rate=48000, STEP=0.4, LV=[-40,-30,-24,-18,-14,-12,-9,-6,-3,0], N=Math.round(STEP*rate)*LV.length, IMP=4800;
-  const C=new OfflineAudioContext(5, N, rate);
+  const C=new OfflineAudioContext(6, N, rate);
   try{ await C.audioWorklet.addModule('src/dyn-worklet.js'); }catch(e){ miss('the dynamics worklet did not load offline: '+(e&&e.message)); return { cases, total:diff.length, differences:diff }; }
   const buf=fill=>{ const b=C.createBuffer(1,N,rate), d=b.getChannelData(0); fill(d); return b; };
   const stair=buf(d=>{ const w=Math.round(STEP*rate); LV.forEach((l,k)=>d.fill(Math.pow(10,l/20), k*w, (k+1)*w)); });
@@ -93,13 +103,18 @@ export async function checkDynamics(){
     for(const p of [1.4,1.6,1.8]) d[Math.round(p*rate)]=4.0;
     for(let i=QS;i<QS+0.5*rate;i++) d[i]=0.3*Math.sin(2*Math.PI*330*i/rate);
     d[HI]=4.0; });
-  const m=C.createChannelMerger(5); m.connect(C.destination);
+  const R=await import('../render.js');
+  const mix=await R.goldRender(e=>{ for(let k=0;k<6;k++){ const t=0.05+k*0.5; e.chordOn('a'+k,[110,165,220,277,330],1,[0,2,9,15][k%4],null,t); e.chordOn('b'+k,[440,554,660],1,2,null,t+0.25);
+    for(let r=0;r<6;r++) e.drumHit(r,1,k%5,undefined,t+r*0.08); e.chordOff('a'+k,t+0.45); e.chordOff('b'+k,t+0.5); } }, N/rate);
+  const loud=buf(d=>{ for(let i=0;i<N;i++) d[i]=0.8*4*mix.L[i]; });   // the master gain 0.8, then 12 dB hotter
+  const m=C.createChannelMerger(6); m.connect(C.destination);
   const chain=(b,node,ch)=>{ const s=C.createBufferSource(); s.buffer=b; s.connect(node); node.connect(m,0,ch); s.start(0); };
   chain(stair, new AudioWorkletNode(C,'dyn',dynOpts('comp',{ ...DYN_GLUE, on:1 })), 0);
   chain(imp,   new AudioWorkletNode(C,'dyn',dynOpts('comp',{ ...DYN_GLUE, on:1 })), 1);
-  chain(hot,   new AudioWorkletNode(C,'dyn',dynOpts('limit',{ ...DYN_LIMIT, on:1 })), 2);
-  chain(hot,   new AudioWorkletNode(C,'dyn',dynOpts('limit',{ ...DYN_LIMIT, on:0 })), 3);
+  chain(hot,   new AudioWorkletNode(C,'dyn',dynOpts('limit',{ ...DYN_MASTER, on:1 })), 2);
+  chain(hot,   new AudioWorkletNode(C,'dyn',dynOpts('limit',{ ...DYN_MASTER, on:0 })), 3);
   chain(imp,   C.createDynamicsCompressor(), 4);
+  chain(loud,  new AudioWorkletNode(C,'dyn',dynOpts('limit',{ ...DYN_MASTER, on:1 })), 5);
   const B=await C.startRendering(), o=k=>B.getChannelData(k);
   /* the static curve */
   const w=Math.round(STEP*rate), meas=LV.map((l,k)=>20*Math.log10(o(0)[(k+1)*w-1]/Math.pow(10,l/20)));
@@ -111,13 +126,49 @@ export async function checkDynamics(){
   cases++; { const l=lat(o(1)); if(l.first!==IMP || l.at!==IMP) miss(`Glue: an impulse at frame ${IMP} came out first at ${l.first}, loudest at ${l.at} — not zero latency`); }
   cases++; { const l=lat(o(4)); if(l.first===IMP && l.at===IMP) miss('CONTROL: the built-in compressor passed the zero-latency check — the check cannot fail'); }
   /* the ceiling */
-  const c=Math.fround(Math.pow(10, DYN_LIMIT.ceil/20)), pk=d=>d.reduce((a,x)=>Math.max(a,Math.abs(x)),0);
+  const c=Math.fround(Math.pow(10, DYN_MASTER.ceil/20)), pk=d=>d.reduce((a,x)=>Math.max(a,Math.abs(x)),0);
   cases++; { const p=pk(o(2)); if(!(p<=c)) miss(`the Limiter let ${p.toFixed(6)} through, above its ceiling ${c.toFixed(6)}`); }
   cases++; { const p=pk(o(3)); if(!(p>c)) miss(`CONTROL: the Limiter switched off stayed under the ceiling (${p.toFixed(4)}) — the hot signal is not hot`); }
   cases++; { const d=o(2), h=hot.getChannelData(0); let bad=-1; for(let i=QS+Math.round(0.1*rate);i<QS+0.5*rate;i++) if(d[i]!==h[i]){ bad=i; break; }
     if(bad>=0) miss(`below the ceiling the Limiter changed the signal (frame ${bad}: ${d[bad]} vs ${h[bad]}) — it must be exact identity there`); }
   cases++; { const d=o(2); if(!(Math.abs(d[HI])===c && d[HI-1]===0)) miss(`the Limiter: an isolated 4.0 impulse came out as ${d[HI]} (frame before: ${d[HI-1]}) — expected exactly the ceiling on the same frame`); }
+  cases++; { const inPk=pk(loud.getChannelData(0)), p=pk(o(5)); if(!(inPk>1 && p<=c)) miss(`chords + drums pushed to ${(20*Math.log10(inPk)).toFixed(1)} dBFS came out at ${(20*Math.log10(p)).toFixed(2)} dBFS (ceiling ${DYN_MASTER.ceil})`); }
+  if(LIVE.AC){ const md=LIVE.masterDyn(); cases++;
+    if(JSON.stringify(md.path)!==JSON.stringify(['glue','gain','limit']) || md.delayMs!==0) miss(`the live master path is ${md.path.join(' → ')} with ${md.delayMs} ms of delay — expected Glue → makeup → our limiter, 0 ms`); }
   return { cases, total:diff.length, differences:diff, notes:[`steady gains ${meas.map(x=>x.toFixed(2)).join(' ')} dB at ${LV.join(' ')} dBFS`] };
+}
+
+/* ═══ SND-F1b master path, live (P.checkMasterPath, P.all only; REALTIME ≈ 1 s) ═══
+   A −50 dBFS impulse into the live master, captured on the audio thread at the master's input and at the node that feeds the speakers:
+   the same frame (our path adds no delay). CONTROL: a browser DynamicsCompressorNode (the old limiter's settings) on the same master,
+   captured beside them, must come out later (it did by 288 frames at 48 kHz). Only a live capture shows the live graph's own delay. */
+export async function checkMasterPath(){
+  const diff=[], miss=s=>diff.push(s); let cases=0;
+  const ac=LIVE.AC; if(!ac){ miss('audio is not started'); return { cases, total:diff.length, differences:diff }; }
+  try{ await LIVE.probeCaptureReady(); }catch(e){ miss('the capture worklet did not load'); return { cases, total:diff.length, differences:diff }; }
+  const { master, out }=LIVE.masterProbeNodes(), sr=ac.sampleRate;
+  const dcn=ac.createDynamicsCompressor(); dcn.threshold.value=-6; dcn.knee.value=6; dcn.ratio.value=20; dcn.attack.value=0.010; dcn.release.value=0.25;
+  const z=ac.createGain(); z.gain.value=0; z.connect(ac.destination);
+  const Fs=Math.ceil((ac.currentTime+0.5)*sr/128)*128, want=Fs-Math.floor(ac.currentTime*sr)+Math.round(0.2*sr);
+  const cap=src=>{ const n=new AudioWorkletNode(ac,'probe-cap',{ numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[1], channelCount:2, channelCountMode:'explicit', processorOptions:{ want } });
+    const p=new Promise((res,rej)=>{ n.port.onmessage=e=>res(e.data||{}); setTimeout(()=>rej(new Error('the live capture did not finish')), (want/sr+3)*1000); });
+    src.connect(n); n.connect(z); return { n, p }; };
+  master.connect(dcn);
+  const A=cap(master), B=cap(out), D=cap(dcn);
+  const bus=LIVE.makeFrozenBus(), b=ac.createBuffer(1,256,sr); b.getChannelData(0)[0]=Math.pow(10,-50/20);
+  const s=ac.createBufferSource(); s.buffer=b; s.connect(bus); s.start(Fs/sr);
+  const late=ac.currentTime*sr>=Fs;
+  let r; try{ r=await Promise.all([A.p,B.p,D.p]); }catch(e){ miss(e.message); }
+  finally{ try{ master.disconnect(dcn); }catch(e){} for(const x of [A,B,D]) try{ x.n.disconnect(); }catch(e){} try{ bus.disconnect(); z.disconnect(); }catch(e){} }
+  if(!r) return { cases, total:diff.length, differences:diff };
+  if(late){ miss('the impulse was scheduled 0.5 s ahead and the main thread was still late — the machine is too busy for this real-time row'); return { cases, total:diff.length, differences:diff }; }
+  const at=m=>{ let mx=0, k=-1; for(let i=0;i<m.L.length;i++){ const a=Math.abs(m.L[i]); if(a>mx){ mx=a; k=i; } } return k<0 ? NaN : m.F0+k; };
+  const [fa,fb,fd]=r.map(at);
+  cases++; if(r.some(m=>m.gaps)) miss('a live capture has gaps on the audio thread');
+  cases++; if(fa!==Fs) miss(`the impulse reached the master at frame ${fa}, scheduled for ${Fs}`);
+  cases++; if(fb!==fa) miss(`the master path delays the sound by ${fb-fa} frames (${((fb-fa)/sr*1000).toFixed(2)} ms) — expected 0`);
+  cases++; if(!(fd-fa>0)) miss(`CONTROL: the browser compressor came out after ${fd-fa} frames — the delay check cannot fail`);
+  return { cases, total:diff.length, differences:diff, notes:[`master path ${fb-fa} frames; browser compressor ${fd-fa} frames = ${((fd-fa)/sr*1000).toFixed(2)} ms at ${sr} Hz`] };
 }
 
 /* ═══ SND-F1 dynamics live = offline (P.checkDynLive, P.all only; REALTIME ≈ 1 s) ═══
@@ -172,7 +223,7 @@ function fpMeasure(L,R,rate){
   const E=(a,b)=>{ const i0=on+Math.round(a*rate), i1=Math.min(n,on+Math.round(b*rate)); if(i1-i0<rate*0.1) return NaN; let s=0; for(let i=i0;i<i1;i++) s+=x[i]*x[i]; return 10*Math.log10(s/(i1-i0)+1e-30); };
   return { strike:E(0,0.4), body:E(0.6,1.4), tail:E(1.6,3.0) };
 }
-export async function checkFreezeParity(){
+export async function checkFreezeParity(o={}){   // o.room: a Night forest room v01 (0 Short · 0.5 Medium · 1 Long; default = the module's Medium)
   const diff=[], miss=s=>diff.push(s); let cases=0, notes=[];
   const R=await import('../render.js'), E=LIVE;
   if(!E.AC){ miss('audio is not started'); return { cases, total:diff.length, differences:diff }; }
@@ -186,7 +237,9 @@ export async function checkFreezeParity(){
     let ly=r.layers[0], on=REC.events.find(e=>e.layer===ly&&e.fn==='chOn'); made.push(ly);
     if(!on || !REC.evHz(on.a,on,'ch').length){ REC.laneDelTap(ly); REC.laneDelTap(ly); made.pop();
       r=REC.seedTake(steps(chordUnit(CUR()))); ly=r.layers[0]; made.push(ly); }
-    REC.editOpen(ly); const okF=REC.autChainAdd(ly,'forest'), okG=REC.autChainAdd(ly,'glue'); REC.editClose();
+    REC.editOpen(ly); const okF=REC.autChainAdd(ly,'forest'), okG=REC.autChainAdd(ly,'glue');
+    if(o.room!=null) REC.autAddPoint(ly,'forest','room',T,o.room);
+    REC.editClose();
     cases++; if(!okF||!okG || !REC.autChainOf(ly).includes('forest') || !REC.autChainOf(ly).includes('glue')) { miss(`the track's chain did not take Night forest and Glue (${REC.autChainOf(ly).join(', ')})`); return { cases, total:diff.length, differences:diff }; }
     if(R.live(ly)){ await sleep(1500); } R.stop(); await sleep(300);   // warm-up: the track chain's new effects fade in on first use (≈ 0.6 dB measured)
     const gM=E.masterMeter().gain, gDb=20*Math.log10(gM);   // the live master gain inside the capture
@@ -213,5 +266,6 @@ const rd=r=>({ cases:r.cases, diff:r.total, list:r.differences });
 row({ at:406, name:'SND-F1 Firefly identity', run:()=>checkFirefly(), read:rd });
 row({ at:407, name:'SND-F1 Night forest IR', run:()=>checkForest(), read:rd });
 row({ at:408, name:'SND-F1 dynamics: curve, latency, ceiling', run:()=>checkDynamics(), read:rd });
+row({ at:408.5, name:'SND-F1b master path (live)', run:()=>checkMasterPath(), read:rd, slow:true, realtime:true });
 row({ at:409, name:'SND-F1 dynamics live = offline', run:()=>checkDynLive(), read:rd, slow:true, realtime:true });
 row({ at:409.5, name:'SND-F1 freeze parity (Firefly, Night forest, Glue)', run:()=>checkFreezeParity(), read:rd, slow:true, realtime:true });
