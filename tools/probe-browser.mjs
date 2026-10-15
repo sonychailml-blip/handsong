@@ -9,7 +9,7 @@
      node tools/probe-browser.mjs --repeat 3         P.all три раза, каждый раз — СВЕЖИЙ браузер и свой посев; затем таблица мер
                                                      строк реального времени по прогонам и запас до допуска
    Ключи: --headed (обычное окно, вынесенное за экран, вместо безголового), --browser chrome|msedge, --limit-min M (потолок на один
-   P.all, default 8 since GOLD1; P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
+   P.all, default 15 since LAT2 (8 since GOLD1); P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
    --cdn-cache: serve the pinned MediaPipe files from tools/.cdn-cache/ (fetched once; for a slow network).
    --limit-start M: the app start limit in minutes (default 3; the hand model comes from the CDN — raise it on a slow network).
    Hygiene: at start it lists browsers left by earlier runner sessions (found by Playwright's temporary profile path) and orphaned
@@ -19,7 +19,8 @@
    UI checks with trusted input after the seed (section rename by double click / double tap / §✎, with its control; a bend point dragged
    with the mouse); --no-ui skips them.
    PRIV1: every Content-Security-Policy violation of the session fails the run; CONTROL — a fetch to https://example.com must be refused
-   by connect-src (every session).
+   by connect-src (every session). LAT2: every request of the session — the page's and its workers' (a worker has no page CSP of its own)
+   — must go to the own origin or the MediaPipe paths of the register; anything else fails the run.
    ⛳ УСТРОЙСТВО (почему так):
    • Свой статический сервер на свободном порту 127.0.0.1 (не Live Server, не 5500) — поднимается и гасится скриптом; файлы с диска
      как есть, без кэша (Cache-Control: no-store), запрос (?render…) отбрасывается — так же, как его видит любой статический сервер.
@@ -62,7 +63,7 @@ const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
 const HEADED=has('--headed'), VERBOSE=has('--verbose'), BROWSER=val('--browser','chrome');
-const LIMIT_ALL=(+val('--limit-min',8)||8)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
+const LIMIT_ALL=(+val('--limit-min',15)||15)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
 /* Строки реального времени и съёма — для таблицы --repeat (их меры печатаются по прогонам). Имена — строки P.all. */
 const RT_ROWS=['LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback','MX1 track level and master','MX2 track pan','render repeatability','renders serialized','S4 solo editing'];
 
@@ -287,9 +288,15 @@ async function session(port, plan, label){
     const origin=`http://127.0.0.1:${port}`;
     await ctx.grantPermissions(['camera','microphone'],{ origin });
     if(CDN_CACHE) await cdnCache(ctx);
+    /* LAT2 / PRIV1: every request of the session, the workers' included (Chromium reports a dedicated worker's requests too) */
+    const NET_OK=[origin+'/', 'https://cdn.jsdelivr.net/npm/@mediapipe/', 'https://storage.googleapis.com/mediapipe-models/'];
+    res.net={ n:0, workers:0, bad:[], workerUrls:[] };
+    ctx.on('request', q=>{ const u=q.url(); if(/^(data|blob):/.test(u)) return; res.net.n++;
+      if(!NET_OK.some(p=>u.startsWith(p)) && !/handsong-csp-control/.test(u)) res.net.bad.push(u); });
     /* PRIV1: every Content-Security-Policy violation of the whole session is collected (an init script runs before the page's own) */
     await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push({ dir:e.effectiveDirective||e.violatedDirective, uri:e.blockedURI, src:e.sourceFile, line:e.lineNumber })); });
     page=await ctx.newPage();
+    page.on('worker', w=>{ const u=w.url().replace(origin,''); if(/net-control/.test(u)) return; res.net.workers++; res.net.workerUrls.push(u); });   // the control's worker is not counted
     const seen=[];   // строки проб этого прогона (для сводки)
     page.on('console', async m=>{ const tx=m.text(), ty=m.type();
       await log(`[${ty}] ${tx}`);
@@ -378,6 +385,16 @@ async function session(port, plan, label){
       const v=window.__csp.slice(before.length);
       return { meta, list:before, blocked, err, ctl:v.some(x=>/connect-src/.test(x.dir)&&/example\.com/.test(x.uri)) };
     }), 30e3, 'the CSP check');
+    /* CONTROL of the network check: a worker of ours asks an unlisted host (intercepted here and aborted — nothing leaves the machine);
+       the check must see it, then that one request is set aside */
+    { const CTL='https://example.com/handsong-net-control', f=path.join(LOGDIR,'net-control-worker.js');
+      await writeFile(f, `fetch(${JSON.stringify(CTL)}).catch(()=>{}).finally(()=>postMessage(1));`);
+      await ctx.route(CTL, r=>r.abort());
+      await within(page.evaluate(()=>new Promise(r=>{ const w=new Worker('./tools/.probe-logs/net-control-worker.js'); w.onmessage=()=>{ w.terminate(); r(); }; w.onerror=()=>r(); setTimeout(r,5000); })), 15e3, 'the network control');
+      const k=res.net.bad.indexOf(CTL); res.net.ctl=k>=0; if(k>=0) res.net.bad.splice(k,1);
+      await rm(f,{ force:true }); }
+    { const N=res.net; N.pass=!N.bad.length && N.n>0 && N.ctl;
+      out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin and the MediaPipe paths: '+N.bad.slice(0,5).join(', '):'all to the own origin or the MediaPipe paths'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
     { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
       out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
@@ -446,7 +463,8 @@ for(const s of sessions){
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
-  if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false; }
+  if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
+    out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }

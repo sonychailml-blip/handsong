@@ -1,20 +1,24 @@
-import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 import { camFacing } from './state.js';
 import { t } from './i18n.js';
+import { schedNew, schedPlan, schedAfter, HAND_POLICIES } from './core/handsched.js';
+import { MP_LINE } from './core/latency.js';
 
 /* ================= КАМЕРА + MEDIAPIPE ================= */
 const video=document.getElementById('video');
 const canvas=document.getElementById('canvas');
 const ctx=canvas.getContext('2d',{alpha:false});
 if(!ctx.roundRect)ctx.roundRect=function(x,y,w,h,r){this.rect(x,y,w,h);return this;};
-let landmarker=null;                             // lastTs/latest — у цикла, в main.js
 let stream=null;                                 // текущий видеопоток — держим, чтобы гасить дорожки при переключении камеры
 function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}
 addEventListener('resize',resize); resize();
 
-/* LAT1b test switches (session only, never saved; defaults = the app as before): hands tracked, the model's processor, the camera
-   frame rate requested. camFps null = no frame rate requested (the default constraint set, unchanged). */
-const VISION_DEF={ hands:2, delegate:'GPU', camFps:null };
+/* Test switches (session only, never saved). LAT1b: the model's processor, the camera frame rate requested (null = none, the default
+   constraint set). LAT2: hands = the search policy ('2s' two hands, full search every 3rd frame — default; '2' search every frame — the
+   app before LAT2; '1' one hand), path = where detection runs, picture = what the canvas shows ('matched' = the detected frame, rule #8;
+   'live' = the live video under the latest result). ⛳ path 'main' by default (LAT2b, measured on the user's desktop GPU, Intel HD 4000,
+   sample hand photo): in a worker the same model runs ≈ 2× slower — one hand 98 vs 53 ms per frame, two hands 160 vs 80 — because WebGL
+   inside a worker is slower there (plain JavaScript is not); 'worker' stays one switch away and falls back to 'main' by itself. */
+const VISION_DEF={ hands:'2s', delegate:'GPU', camFps:null, path:'main', picture:'matched' };
 const opts={ ...VISION_DEF };
 let camStartT=NaN;   // performance time the current camera stream started playing (LAT1b: «startup» long tasks)
 
@@ -27,13 +31,15 @@ async function openCamera(facing){
   stream=await navigator.mediaDevices.getUserMedia({ video:want, audio:false });
   video.srcObject=stream; await video.play();
   camStartT=performance.now();
+  pumpStart();
 }
 
 /* LAT1b: which processor the hand model REALLY runs on. MediaPipe's task API does not report it; its WebAssembly prints its own log
-   lines to the console — the CPU path announces the XNNPACK delegate, the GPU path only its WebGL context. A tap
-   on the console keeps those lines (only MediaPipe-shaped ones; everything is passed through unchanged) since the last (re)start. */
+   lines to the console — the CPU path announces the XNNPACK delegate, the GPU path only its WebGL context. A tap on the console keeps
+   those lines (only MediaPipe-shaped ones; everything is passed through unchanged) since the last (re)start; LAT2: the detection worker
+   forwards its own lines (they land in the same list). */
 /* TAP_MS: two minutes after a (re)start — long enough to see lines printed when the hand model first meets a hand */
-const MP_LINE=/^[IWEF]\d{4} |TensorFlow Lite|XNNPACK|Graph successfully/, TAP_MS=120000;
+const TAP_MS=120000;
 let mpLog=[], tapOff=null, tapT=0, xnnBefore=false, xnnOnGpu=false;   // xnnBefore: an earlier window showed the XNNPACK line (TFLite prints it once per page); xnnOnGpu: it came while GPU was asked
 function mpTap(){   // only for TAP_MS after a (re)start: outside that window the console is the browser's own (DevTools source lines stay true)
   clearTimeout(tapT); tapT=setTimeout(()=>{ if(tapOff){ tapOff(); tapOff=null; } }, TAP_MS);
@@ -55,6 +61,7 @@ function delegateOf(lines, before, asked){
   return xnn||before ? 'CPU' : 'unknown';
 }
 const newWindow=()=>{ if(mpLog.some(s=>XNN.test(s))){ xnnBefore=true; if(opts.delegate==='GPU') xnnOnGpu=true; } mpLog=[]; mpTap(); };
+const mpLine=s=>{ if(mpLog.length<40) mpLog.push(s); };   // a line forwarded by the worker
 const modelInfo=()=>({ requested:opts.delegate, actual:delegateOf(mpLog, xnnBefore, opts.delegate), once:opts.delegate==='CPU' && xnnBefore && !mpLog.some(s=>XNN.test(s)), hands:opts.hands,
   evidence:mpLog.filter(s=>/gl_context.*GL version|XNNPACK|delegate/i.test(s)).map(s=>s.replace(/^[IWEF]\d{4} [\d:.]+ \d+ /,'').slice(0,160)) });
 
@@ -64,40 +71,161 @@ function camInfo(){
   return { requested:{ width:640, height:480, frameRate:opts.camFps }, granted:{ width:s.width??null, height:s.height??null, frameRate:s.frameRate??null }, startT:camStartT };
 }
 
+/* ================= LAT2 — THE DETECTION PATH =================
+   A detector object: { kind:'worker'|'main', run(job) → Promise<{res, action, n, ms, w0, w1, bmp}>, setDelegate(d), dbg(o), close(),
+   warmMs }. LAT2b: when the worker (src/hand-worker.js, a classic worker: MediaPipe's own loader needs importScripts) is asked for and
+   cannot start (no Worker or OffscreenCanvas, the model fails there, 90 s without an answer) detection runs on the main thread through
+   the same handdet.js — the meter says which and why. A worker that dies later hands over to the main thread the same way. */
+const W_READY_MS=90000, EMPTY=Object.freeze({ landmarks:[], handednesses:[] });
+const path={ runs:null, why:'', warmMs:null };
+let det=null, detGen=0, workerFailDbg=false;
+const nextPaint=()=>new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0)));   // let a message paint before the main thread blocks
+function workerDet(step){
+  return new Promise((resolve, reject)=>{
+    let w; try{ w=new Worker(new URL('./hand-worker.js', import.meta.url)); }catch(e){ reject(e); return; }
+    const pend=new Map(); let ready=false, seq=0, delegP=null, me=null;
+    const fail=why=>{
+      if(!ready){ clearTimeout(tm); w.terminate(); reject(new Error(why)); return; }
+      for(const [,p] of pend) p.reject(new Error(why)); pend.clear(); w.terminate();
+      if(det===me) detLost(why);
+    };
+    const tm=setTimeout(()=>fail('the worker did not answer within 90 s'), W_READY_MS);
+    w.onerror=e=>{ if(e.preventDefault) e.preventDefault(); fail(e.message||'the worker failed to load'); };
+    w.onmessageerror=()=>fail('a message from the worker could not be read');
+    w.onmessage=e=>{ const m=e.data;
+      if(m.type==='log') mpLine(m.line);
+      else if(m.type==='step'){ if(step) step(m.step); }
+      else if(m.type==='ready'){ ready=true; clearTimeout(tm); resolve(me=api(m.warmMs)); }
+      else if(m.type==='fail') fail(m.msg);
+      else if(m.type==='res'){ const p=pend.get(m.id); if(!p){ if(m.bmp) m.bmp.close(); return; } pend.delete(m.id);
+        if(m.err) p.reject(new Error(m.err)); else { const o=performance.timeOrigin; p.resolve({ res:m.res, action:m.action, n:m.n, ms:m.ms, w0:m.t0-o, w1:m.t1-o, bmp:m.bmp }); } }
+      else if(m.type==='delegated'){ const p=delegP; delegP=null; if(p){ if(m.err) p.reject(new Error(m.err)); else p.resolve(); } }
+    };
+    const api=warmMs=>({ kind:'worker', warmMs,
+      run(job){ return new Promise((res, rej)=>{ const id=++seq; pend.set(id,{ resolve:res, reject:rej });
+        w.postMessage({ type:'frame', id, t:job.t, bmp:job.bmp, action:job.action, policy:job.policy }, [job.bmp]); }); },
+      setDelegate(d){ return new Promise((res, rej)=>{ delegP={ resolve:res, reject:rej }; w.postMessage({ type:'delegate', d }); }); },
+      dbg(o){ w.postMessage({ type:'dbg', o }); },
+      close(){ ready=false; w.terminate(); for(const [,p] of pend) p.reject(new Error('closed')); pend.clear(); } });
+    w.postMessage({ type:'init', delegate:opts.delegate, w:640, h:480, failInit:workerFailDbg });
+  });
+}
+async function mainDet(step){
+  const H=await import('./handdet.js');
+  const blank=()=>{ const c=typeof OffscreenCanvas!=='undefined' ? new OffscreenCanvas(640,480) : Object.assign(document.createElement('canvas'),{ width:640, height:480 });
+    const g=c.getContext('2d'); g.fillStyle='#000'; g.fillRect(0,0,640,480); return c; };
+  const D=await H.createDetector({ delegate:opts.delegate, blank, step:async s=>{ if(step) step(s); await nextPaint(); } });
+  return { kind:'main', warmMs:D.warmMs,
+    run(job){ try{ const w0=performance.now(), r=D.run(job.bmp, job.t, job.action, job.policy); return Promise.resolve({ ...r, w0, w1:performance.now(), bmp:job.bmp }); }
+              catch(e){ return Promise.reject(e); } },
+    setDelegate:d=>D.setDelegate(d), dbg:o=>D.dbg(o), close:()=>D.close() };
+}
+async function buildDet(asked, step){
+  if(asked==='worker'){
+    if(typeof Worker==='undefined' || typeof OffscreenCanvas==='undefined') return { d:await mainDet(step), runs:'main', why:'no OffscreenCanvas or Worker in this browser' };
+    try{ return { d:await workerDet(step), runs:'worker', why:'' }; }
+    catch(e){ const why=String(e&&e.message||e); console.warn('[vision] hand detection worker unavailable — the main thread detects instead:', why);
+      return { d:await mainDet(step), runs:'main', why }; }
+  }
+  return { d:await mainDet(step), runs:'main', why:'' };
+}
+/* (re)build the detection path; the old one keeps working until the new one is ready, then it is closed */
+async function setPath(asked, step){
+  const b=await buildDet(asked, step), old=det;
+  det=b.d; detGen++; path.runs=b.runs; path.why=b.why; path.warmMs=b.d.warmMs;
+  sched=schedNew(); if(old) old.close();
+}
+function detLost(why){   // the worker died mid-session: the main thread takes over
+  console.warn('[vision] hand detection worker stopped — the main thread takes over:', why);
+  det=null; detGen++; path.runs=null; path.why=why;
+  buildDet('main').then(b=>{ if(det) { b.d.close(); return; } det=b.d; detGen++; path.runs='main'; path.why=why; path.warmMs=b.d.warmMs; sched=schedNew(); },
+                        e=>{ path.why=why+' · main thread: '+(e&&e.message||e); });
+}
+
+/* ================= LAT2a — THE FRAME PUMP =================
+   Every NEW camera frame (requestVideoFrameCallback; without it the draw loop polls the video's time) is snapshotted ONCE as an
+   ImageBitmap and goes through at most one detection: one frame in flight, one waiting — a newer frame REPLACES the waiting one (stale
+   frames are dropped, never queued). The schedule (core/handsched.js) picks what runs on it ('skip' runs nothing). Each processed frame
+   is handed to the sink (main.js) with its result and its picture: the canvas draws the very frame whose hands it shows (rule #8). */
+let sched=schedNew(), busy=false, pend=null, vfh=null, sink=null, isPaused=()=>false, lastId=-1, snapMax=-1, faultDbg=null, schedStayDbg=false, holdDbg=false, delayDbg=0;
+const PS={ snapped:0, processed:0, detected:0, dropped:0, dup:0, notNewest:0, errors:0, err:'', log:[] };   // log: the last 300 processed frames {id, pf (the camera's presentedFrames), action, n}
+function pumpStart(){
+  if(!video.requestVideoFrameCallback) return;
+  if(vfh!=null && video.cancelVideoFrameCallback) video.cancelVideoFrameCallback(vfh);
+  vfh=video.requestVideoFrameCallback(onVF);
+}
+/* frames are numbered here (the browser calls once per presented frame; presentedFrames may restart with a new camera stream) */
+let frameSeq=0, pollT=-1;
+function onVF(now, md){ vfh=video.requestVideoFrameCallback(onVF); takeFrame(++frameSeq, md.captureTime, md.presentationTime, now, md.presentedFrames); }
+function pollFrame(){   // fallback (no requestVideoFrameCallback): a new frame = the video's time moved; called by the draw loop
+  if(video.requestVideoFrameCallback || video.readyState<2 || video.currentTime===pollT) return;
+  pollT=video.currentTime; takeFrame(++frameSeq, NaN, NaN, performance.now());
+}
+function takeFrame(id, cap, pres, now, pf=NaN){
+  if(!det || isPaused() || holdDbg || video.readyState<2) return;
+  const snapT=performance.now();
+  let p; try{ p=createImageBitmap(video); }catch(e){ return; }   // the frame on screen now = this callback's frame
+  p.then(bmp=>{
+    if(isPaused()){ bmp.close(); return; }
+    PS.snapped++; if(id>snapMax) snapMax=id;
+    if(id<=lastId || (pend && pend.id>id)){ bmp.close(); PS.dropped++; return; }   // a snapshot that resolved after a newer one: stale
+    const job={ id, pf, cap, pres, vfNow:now, snapT, bmp };
+    if(pend){ if(faultDbg==='queue'){ bmp.close(); PS.dropped++; return; } pend.bmp.close(); PS.dropped++; }   // 'queue' = CONTROL: keep the oldest
+    pend=job; pump();
+  }, ()=>{});
+}
+async function pump(){
+  if(busy || !pend || !det) return;
+  const job=pend; pend=null; busy=true;
+  const d=det, g=detGen;
+  try{
+    if(job.id<=lastId) PS.dup++;              // a frame detected before (must never happen)
+    if(job.id<snapMax) PS.notNewest++;        // a newer snapshot existed (must never happen)
+    if(job.id>lastId) lastId=job.id;
+    const policy=opts.hands, action=schedPlan(sched, policy), t0=performance.now();
+    const r= action==='skip' ? { res:EMPTY, action, n:0, ms:0, w0:t0, w1:t0, bmp:job.bmp }
+                             : await d.run({ bmp:job.bmp, t:job.snapT, action, policy });
+    if(delayDbg) await new Promise(res=>setTimeout(res, delayDbg));   // probe: a detector slower than the camera that does not block
+    const t1=performance.now();
+    if(g!==detGen){ if(r.bmp) r.bmp.close(); return; }   // the path was rebuilt meanwhile
+    if(action!=='skip') PS.detected++;
+    sched=schedAfter(sched, r.action.split('>').pop(), schedStayDbg && r.n>=2 ? 1 : r.n);   // schedStayDbg = CONTROL: a second hand never switches
+    PS.processed++; PS.log.push({ id:job.id, pf:job.pf, action:r.action, n:r.n }); if(PS.log.length>300) PS.log.shift();
+    if(faultDbg==='dupe' && !job.again){ pend={ ...job, bmp:r.bmp, again:true }; return; }   // CONTROL: the same frame goes through once more
+    const f={ res:r.res||EMPTY, frame:r.bmp, id:job.id, action:r.action, n:r.n, cap:job.cap, pres:job.pres, vfNow:job.vfNow, snapT:job.snapT, t0, t1, ms:r.ms,
+              xfer: d.kind==='worker' && action!=='skip' ? Math.max(0, (t1-t0)-(r.w1-r.w0)) : NaN, path:d.kind };
+    if(sink && !isPaused()) sink(f); else if(f.frame) f.frame.close();
+  }catch(e){ PS.errors++; PS.err=String(e&&e.message||e); }
+  finally{ busy=false; if(pend) pump(); }
+}
+/* the sink gets every processed frame; paused() = the editor or the arrangement window is open (no frame is taken then) */
+function setHandsSink(fn, paused){ sink=fn; isPaused=paused||(()=>false); }
+
 async function initVision(msg){
   msg(t('load.model'));
-  const files=await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
   newWindow();
-  landmarker=await HandLandmarker.createFromOptions(files,{
-    baseOptions:{
-      modelAssetPath:"https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-      delegate:opts.delegate
-    },
-    runningMode:"VIDEO", numHands:opts.hands,
-    minHandDetectionConfidence:0.5, minTrackingConfidence:0.5
-  });
+  await setPath(opts.path, s=>{ if(s==='warm') msg(t('load.warm')); });
   msg(t('load.camera'));
   await openCamera(camFacing);                   // стартовая камера — из состояния (по умолчанию фронтальная 'user')
 }
 
 /* Переключение камеры (фронт↔тыл) — уже ПОСЛЕ старта (панель #bar видна только после «▶ Запустить»,
-   поэтому кнопки на странице при загрузке нет — правило AudioContext/камера соблюдено). MediaPipe
-   читает ТОТ ЖЕ элемент <video>, поэтому landmarker НЕ пересоздаём. Бросает при отказе — откат в ui.js. */
+   поэтому кнопки на странице при загрузке нет — правило AudioContext/камера соблюдено). Детектор не пересоздаём:
+   новый поток идёт в тот же <video>, кадры приходят тем же насосом. Бросает при отказе — откат в ui.js. */
 async function switchCamera(facing){ await openCamera(facing); }
 
-/* LAT1b test switches — each re-initialises only what it needs: hands and processor through the landmarker's own setOptions (the same
-   landmarker, its graph rebuilt), the frame rate by reopening the camera on the same <video>. Values outside the offered ones refuse. */
-async function setHandsTracked(n){
-  if(n!==1&&n!==2) throw new Error('hands tracked: 1 or 2');
-  if(n===opts.hands) return; if(!landmarker) throw new Error('the hand model is not running yet');
-  await landmarker.setOptions({ numHands:n }); opts.hands=n;
+/* Test switches. Hands: the schedule's policy (instant — both models are always built). Processor: setOptions on both models (graph
+   rebuild ≈ 1 s each, in the worker when it runs). Frame rate: reopens the camera. Path: builds the other path, then swaps. Picture: a
+   drawing choice only. Values outside the offered ones refuse. */
+async function setHandsTracked(m){
+  if(!HAND_POLICIES.includes(m)) throw new Error('hands tracked: '+HAND_POLICIES.join(', '));
+  if(m===opts.hands) return; opts.hands=m; sched=schedNew();
 }
 async function setModelDelegate(d){
   if(d!=='GPU'&&d!=='CPU') throw new Error('model processor: GPU or CPU');
-  if(d===opts.delegate) return; if(!landmarker) throw new Error('the hand model is not running yet');
+  if(d===opts.delegate) return; if(!det) throw new Error('the hand model is not running yet');
   const keep=mpLog, kb=xnnBefore; newWindow();
-  try{ await landmarker.setOptions({ baseOptions:{ delegate:d } }); opts.delegate=d; }
+  try{ await det.setDelegate(d); opts.delegate=d; sched=schedNew(); }
   catch(e){ mpLog=keep; xnnBefore=kb; throw e; }
 }
 async function setCamFps(f){
@@ -106,8 +234,37 @@ async function setCamFps(f){
   const keep=opts.camFps; opts.camFps=f;
   try{ await openCamera(camFacing); } catch(e){ opts.camFps=keep; try{ await openCamera(camFacing); }catch(e2){} throw e; }
 }
+async function setDetectPath(p){
+  if(p!=='worker'&&p!=='main') throw new Error('detection path: worker or main');
+  if(path.runs===p){ opts.path=p; path.why=''; return; }   // already there (e.g. after a fallback)
+  const keep=opts.path; opts.path=p;
+  try{ await setPath(p); }catch(e){ opts.path=keep; throw e; }
+}
+async function setPicture(p){
+  if(p!=='matched'&&p!=='live') throw new Error('picture: matched or live');
+  opts.picture=p;
+}
 const visionOpts=()=>({ ...opts });
+const pathInfo=()=>({ asked:opts.path, runs:path.runs, why:path.why, warmMs:path.warmMs });
+const pumpStats=()=>({ ...PS, log:PS.log.slice(), sched:{ ...sched }, policy:opts.hands });
+/* probe only: fault 'dupe' | 'queue' | null (CONTROLS of the frame-once row), schedStay (CONTROL of the schedule row), workerFail (the
+   next worker start refuses — the fallback row), hold, delayMs (an awaited delay after each detection), and the detector's own hooks
+   slowMs (a BLOCKING delay) / script / fake (handdet.js) */
+async function detRunDbg(bmp, action, policy='2s'){   // one frame through the RUNNING detector, outside the pump (hold it first)
+  if(!det) throw new Error('no detector'); const d=det; const r=await d.run({ bmp, t:performance.now(), action, policy }); return { kind:d.kind, ...r };
+}
+function pumpDbg(o={}){
+  if('fault' in o) faultDbg=o.fault||null;
+  if('schedStay' in o) schedStayDbg=!!o.schedStay;
+  if('workerFail' in o) workerFailDbg=!!o.workerFail;
+  if('hold' in o) holdDbg=!!o.hold;
+  if('delayMs' in o) delayDbg=+o.delayMs||0;   // the pump takes no frame (the worker = main comparison feeds its own)
+  const dd={}; for(const k of ['slowMs','script','fake']) if(k in o) dd[k]=o[k];
+  if(Object.keys(dd).length && det) det.dbg(dd);
+  if('reset' in o){ if(pend){ pend.bmp.close(); pend=null; } for(const k of ['snapped','processed','detected','dropped','dup','notNewest','errors']) PS[k]=0; PS.err=''; PS.log.length=0; lastId=-1; snapMax=-1; sched=schedNew(); }
+}
 
-/* Экспорт: landmarker через export-клаузу — живая связка (null до initVision). */
-export { video, canvas, ctx, landmarker, initVision, switchCamera,
-  camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps };   // LAT1b: diagnostics read-outs and test switches
+/* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
+export { video, canvas, ctx, initVision, switchCamera, setHandsSink, pollFrame,
+  camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setPicture,
+  pathInfo, pumpStats, pumpDbg, detRunDbg };

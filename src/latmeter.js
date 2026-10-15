@@ -5,17 +5,20 @@
    LAT1b adds: the graphics renderer (hardware or software), the processor the hand model really runs on, the camera settings granted,
    duplicate detections per minute, the camera frame wait and a second total, long tasks split into startup / while playing with causes,
    and three session-only TEST SWITCHES (hands tracked, model processor, camera frame rate) — defaults leave the app exactly as before.
+   LAT2 adds: where detection runs (worker / main thread, and why), tracking vs full-search time, the frame's trip to the worker and back,
+   frames processed vs frames the model ran on, and the switches «2 · search every 3rd frame» (default), «Detection runs in», «Picture».
    UI-level module (owns its DOM: #latDiag, #latWarn, the Diagnostics rows in #panelSound); nothing here is recorded or sent anywhere
    (rule #33): the renderer string stays on the device and leaves it only inside the text the person chooses to copy. */
 import { makeMeter, handToSound, looksBluetooth, frameWaitMs, withFrameWait, perMinute, splitLongTasks, isSoftwareGL, STARTUP_MS, rateOf } from './core/latency.js';
+import { HAND_SEARCH_EVERY } from './core/handsched.js';
 import { AC, masterDelayMs } from './audio.js';
-import { video, camInfo, modelInfo, visionOpts, setHandsTracked, setModelDelegate, setCamFps } from './vision.js';
+import { video, camInfo, modelInfo, visionOpts, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setPicture, pathInfo, pumpStats } from './vision.js';
 import { t } from './i18n.js';
 
 const M=makeMeter();
 let on=false, paused=false, shown=false, longOk=false, loafOk=false;
-let prevT0=NaN, lastN=-1, vf=null, fresh=0, dup=0, outLabel='', btSeen=false, camStart0=NaN, gpu=null, playFrom=-Infinity;
-const camT=[], camN=[], procT=[], longT=[], loafT=[], dupT=[];   // camN: [time, presentedFrames] — what the camera DELIVERS; procT: our new-frame detections
+let prevT0=NaN, vf=null, fresh=0, detN=0, dup0=0, outLabel='', btSeen=false, camStart0=NaN, gpu=null, playFrom=-Infinity;
+const camT=[], camN=[], procT=[], detT=[], longT=[], loafT=[], dupT=[];   // camN: [time, presentedFrames] — what the camera DELIVERS; procT: frames we processed; detT: frames the model ran on
 const el=id=>document.getElementById(id);
 
 /* the camera's frame clock: one call per presented camera frame */
@@ -26,19 +29,28 @@ function onVF(now, md){
   video.requestVideoFrameCallback(onVF);
 }
 
-/* one call per play frame from main.loop: t0 start, tBg after the video background, tDet after detection, tHands after processHands,
-   tEnd after the overlays; det = detection ran this frame */
-export function latFrame(t0, tBg, tDet, tHands, tEnd, det){
+/* one call per SCREEN frame from main.loop: t0 start, tEnd after the picture, the overlays and the clip capture */
+export function latFrame(t0, tEnd){
   if(!on||paused) return;
   if(Number.isFinite(prevT0)) M.add('loop', t0-prevT0);
   prevT0=t0;
-  M.add('draw', (tBg-t0)+(tEnd-tHands));
-  if(!det) return;
-  M.add('detect', tDet-tBg); M.add('gestures', tHands-tDet);
-  if(vf && vf.n!==lastN){ lastN=vf.n; fresh++; procT.push([t0, fresh]); while(procT.length>2 && t0-procT[0][0]>3000) procT.shift();   // a NEW camera frame: how long since the camera took it / the page got it
-    if(Number.isFinite(vf.cap) && vf.cap>0) M.add('camera', tBg-vf.cap);
-    M.add('wait', tBg-(Number.isFinite(vf.pres)&&vf.pres>0 ? vf.pres : vf.now)); }
-  else { dup++; dupT.push(t0); if(dupT.length>4000) dupT.splice(0, dupT.length-4000); }   // the same camera frame detected again (the loop runs at the display rate)
+  M.add('draw', tEnd-t0);
+}
+/* LAT2: one call per PROCESSED camera frame from main.onHands (vision.js's pump): f carries the frame's capture / presentation times,
+   when its detection started (t0) and what ran on it; tA..tB = processHands. «camera» = picture taken → detection starts (a frame that
+   waited for a busy detector waited in front of the hands too); detection = the model's own time (inside the worker on that path);
+   transfer = the frame's trip to the worker and back (the rest of the round trip). */
+export function latHands(f, tA, tB){
+  if(!on||paused) return;
+  M.add('gestures', tB-tA);
+  fresh++; procT.push([tA, fresh]); while(procT.length>2 && tA-procT[0][0]>3000) procT.shift();
+  if(Number.isFinite(f.cap) && f.cap>0) M.add('camera', f.t0-f.cap);
+  M.add('wait', f.t0-(Number.isFinite(f.pres)&&f.pres>0 ? f.pres : f.vfNow));
+  if(f.action!=='skip'){
+    M.add('detect', f.ms); M.add(/search/.test(f.action) ? 'detSearch' : 'detTrack', f.ms);
+    if(Number.isFinite(f.xfer)) M.add('transfer', f.xfer);
+    detN++; detT.push([tA, detN]); while(detT.length>2 && tA-detT[0][0]>3000) detT.shift(); }
+  const d=pumpStats().dup; if(d<dup0) dup0=d; if(d>dup0){ for(let i=dup0;i<d;i++) dupT.push(tA); dup0=d; if(dupT.length>4000) dupT.splice(0, dupT.length-4000); }
 }
 export function latIdle(){ prevT0=NaN; }   // editor/window branch: no camera, no frame interval across it
 
@@ -103,22 +115,24 @@ const st=k=>{ const s=M.stats(k); return { n:s.n, mean:r1(s.mean), p95:r1(s.p95)
 const msOf=x=>Number.isFinite(x) ? x*1000 : NaN;
 export function latReport(){
   const sr=AC?AC.sampleRate:NaN, q=128/sr*1000, base=msOf(AC&&AC.baseLatency), outp=msOf(AC&&AC.outputLatency);
-  const fps=rateOf(camN), proc=rateOf(procT);   // LAT1b fix: delivered by the camera vs processed by us (the old «fps» was the latter)
-  const stages={}; for(const k of ['camera','wait','detect','gestures','draw','loop','pipeline']) stages[k]=st(k);
+  const fps=rateOf(camN), proc=rateOf(procT), detFps=rateOf(detT);   // LAT1b fix: delivered by the camera vs processed by us; LAT2: the model ran on detFps
+  const stages={}; for(const k of ['camera','wait','detect','detTrack','detSearch','transfer','gestures','draw','loop','pipeline']) stages[k]=st(k);
+  const pi=pathInfo(), vo=visionOpts();
   const now=performance.now(), lt=longT.filter(x=>x.t>now-60e3);
   const graph=masterDelayMs();   // SND-F1b: the master path's own delay (0 with our limiter)
-  const tot=handToSound({ camera:M.stats('camera').mean, detect:M.stats('detect').mean, gestures:M.stats('gestures').mean, quantumWait:q/2, graph, base, output:outp });
+  const tot=handToSound({ camera:M.stats('camera').mean, detect:M.stats('detect').mean, transfer: pi.runs==='worker' ? M.stats('transfer').mean : undefined, gestures:M.stats('gestures').mean, quantumWait:q/2, graph, base, output:outp });
   const w=vf&&vf.w||video.videoWidth, h=vf&&vf.h||video.videoHeight, ci=camInfo(), fw=frameWaitMs(fps);
   const split=splitLongTasks(longT.filter(x=>x.t<camStart0+STARTUP_MS || x.t>=playFrom).map(x=>({ t:x.t, ms:x.ms, cause:causeOf(x) })), camStart0, now);   // «while playing» restarts after a test switch
   const part=p=>({ n:p.n, maxMs:r1(p.maxMs), cause:p.cause });
-  return { camera:{ fps:r1(fps), processedFps:r1(proc), size:w&&h?`${w}x${h}`:null, captureTime:stages.camera.n>0, framesDetected:fresh, sameFrameAgain:dup,
+  return { camera:{ fps:r1(fps), processedFps:r1(proc), size:w&&h?`${w}x${h}`:null, captureTime:stages.camera.n>0, framesProcessed:fresh, framesDetected:detN, sameFrameAgain:pumpStats().dup,
                     requested:ci.requested, granted:ci.granted, duplicatesPerMinute:perMinute(dupT, now), frameWaitMs:r1(fw) },
            stages, longTasks: longOk ? { lastMinute:lt.length, maxMs:r1(lt.reduce((a,x)=>Math.max(a,x.ms),0)), totalMs:r1(lt.reduce((a,x)=>a+x.ms,0)),
                                         startup:part(split.startup), playing:part(split.playing), causes:loafOk } : null,
            audio:{ state:AC&&AC.state, sampleRate:sr, quantumMs:q, baseMs:r1(base), outputMs:r1(outp), pipelineMs:stages.pipeline.mean, masterPathMs:r1(graph) },
            output:{ label:outLabel, bluetooth:btSeen }, handToSoundMs:r1(tot.ms), missing:tot.missing,
            handToSoundWithWaitMs:r1(withFrameWait(r1(tot.ms), r1(fw))),
-           gpu:gpuInfo(), model:modelInfo(), switches:visionOpts(),
+           detection:{ runs:pi.runs, asked:pi.asked, why:pi.why, warmMs:pi.warmMs, policy:vo.hands, searchEvery:HAND_SEARCH_EVERY, detectedFps:r1(detFps), picture:vo.picture },
+           gpu:gpuInfo(), model:modelInfo(), switches:vo,
            userAgent:navigator.userAgent };
 }
 /* the overlay's text (also what «Copy» copies) — numbers, the switches and the graphics renderer's name */
@@ -129,9 +143,11 @@ export function latText(r=latReport()){
   L.push(t('diag.camSet', { rw:f(C.requested.width), rh:f(C.requested.height), rf:C.requested.frameRate==null?t('diag.sw.fpsDef'):f(C.requested.frameRate),
     gw:f(C.granted.width), gh:f(C.granted.height), gf:f(r1(C.granted.frameRate)) }));
   L.push(t('diag.frameWait', { ms:f(C.frameWaitMs) }));
-  L.push(t('diag.detect', { mean:f(S.detect.mean), p95:f(S.detect.p95) }));
+  { const D=r.detection; L.push(t('diag.path', { path:t(D.runs==='worker'?'diag.pathWorker':D.runs==='main'?'diag.pathMain':'diag.pathNone'), why:D.why?t('diag.cause',{ c:D.why }):'' })); }
+  L.push(t('diag.detect', { mean:f(S.detect.mean), p95:f(S.detect.p95), tr:f(S.detTrack.mean), se:f(S.detSearch.mean), det:f(r.detection.detectedFps), proc:f(C.processedFps) }));
+  if(r.detection.runs==='worker') L.push(t('diag.xfer', { mean:f(S.transfer.mean), p95:f(S.transfer.p95) }));
   L.push(t('diag.dup', { n:f(C.duplicatesPerMinute) }));
-  L.push(t('diag.model', { req:r.model.requested, act:r.model.actual==='unknown' ? t('diag.unknown') : r.model.actual==='GPU+CPU' ? t('diag.gpuPart') : r.model.once ? t('diag.cpuOnce') : r.model.actual, hands:f(r.model.hands) }));
+  L.push(t('diag.model', { req:r.model.requested, act:r.model.actual==='unknown' ? t('diag.unknown') : r.model.actual==='GPU+CPU' ? t('diag.gpuPart') : r.model.once ? t('diag.cpuOnce') : r.model.actual, hands:t('diag.hands.'+r.model.hands) }));
   L.push(t('diag.gpu', { name:r.gpu.renderer||t('diag.unknown'), kind:r.gpu.software==null?t('diag.unknown'):t(r.gpu.software?'diag.gpuSoft':'diag.gpuHard') }));
   L.push(t('diag.gestures', { mean:f(S.gestures.mean), p95:f(S.gestures.p95) }));
   L.push(t('diag.draw', { mean:f(S.draw.mean), p95:f(S.draw.p95), loop:f(S.loop.mean) }));
@@ -163,9 +179,11 @@ export const latShown=()=>shown;
 }
 
 /* ---------- LAT1b test switches (Sound panel → Diagnostics): session only, never saved ---------- */
-const SW=[ ['swHands2',()=>setHandsTracked(2),o=>o.hands===2], ['swHands1',()=>setHandsTracked(1),o=>o.hands===1],
+const SW=[ ['swHands2s',()=>setHandsTracked('2s'),o=>o.hands==='2s'], ['swHands2',()=>setHandsTracked('2'),o=>o.hands==='2'], ['swHands1',()=>setHandsTracked('1'),o=>o.hands==='1'],
            ['swModelGPU',()=>setModelDelegate('GPU'),o=>o.delegate==='GPU'], ['swModelCPU',()=>setModelDelegate('CPU'),o=>o.delegate==='CPU'],
-           ['swFpsDef',()=>setCamFps(null),o=>o.camFps==null], ['swFps30',()=>setCamFps(30),o=>o.camFps===30], ['swFps60',()=>setCamFps(60),o=>o.camFps===60] ];
+           ['swFpsDef',()=>setCamFps(null),o=>o.camFps==null], ['swFps30',()=>setCamFps(30),o=>o.camFps===30], ['swFps60',()=>setCamFps(60),o=>o.camFps===60],
+           ['swPathWorker',()=>setDetectPath('worker'),o=>o.path==='worker'], ['swPathMain',()=>setDetectPath('main'),o=>o.path==='main'],   // LAT2
+           ['swPicMatched',()=>setPicture('matched'),o=>o.picture==='matched'], ['swPicLive',()=>setPicture('live'),o=>o.picture==='live'] ];
 let swBusy=null;
 export function latSwSync(){ const o=visionOpts(); for(const [id,,is] of SW){ const b=el(id); if(b){ b.classList.toggle('act', is(o)); b.disabled=!!swBusy; } } }
 /* one switch press; resolves when it took effect (the probe awaits it); a refusal or failure is shown in the note line */
@@ -174,7 +192,7 @@ export async function latSwitch(id){
   if(swBusy) await swBusy.catch(()=>{});
   const note=el('swNote');
   swBusy=s[1](); latSwSync(); if(note) note.textContent=t('diag.sw.busy');
-  try{ await swBusy; if(note) note.textContent=t('diag.sw.note'); M.reset(); camT.length=0; camN.length=0; procT.length=0; dupT.length=0; prevT0=NaN; playFrom=performance.now(); }   // numbers restart with the new setting
+  try{ await swBusy; if(note) note.textContent=t('diag.sw.note'); M.reset(); camT.length=0; camN.length=0; procT.length=0; detT.length=0; dupT.length=0; prevT0=NaN; playFrom=performance.now(); }   // numbers restart with the new setting
   catch(e){ if(note) note.textContent=t('diag.sw.fail', { msg:(e&&e.message)||String(e) }); throw e; }
   finally{ swBusy=null; latSwSync(); }
 }

@@ -384,11 +384,16 @@
       <div class="seg"><button id="latOn" data-i18n="common.on">On</button><button id="latOff" class="act" data-i18n="common.off">Off</button></div></div>
     <!-- LAT1b: test switches (latmeter.js; session only, defaults = the app as before) -->
     <div class="prow"><label data-i18n="diag.sw.hands">Hands tracked (test)</label>
-      <div class="seg"><button id="swHands2" class="act">2</button><button id="swHands1">1</button></div></div>
+      <div class="seg"><button id="swHands2s" class="act" data-i18n="diag.sw.hands2s">2 · search every 3rd frame</button><button id="swHands2" data-i18n="diag.sw.hands2">2 · search every frame</button><button id="swHands1">1</button></div></div>
     <div class="prow"><label data-i18n="diag.sw.model">Hand model on (test)</label>
       <div class="seg"><button id="swModelGPU" class="act">GPU</button><button id="swModelCPU">CPU</button></div></div>
     <div class="prow"><label data-i18n="diag.sw.fps">Camera frame rate (test)</label>
       <div class="seg"><button id="swFpsDef" class="act" data-i18n="diag.sw.fpsDef">default</button><button id="swFps30">30</button><button id="swFps60">60</button></div></div>
+    <!-- LAT2: where hand detection runs, and what the picture shows (session only) -->
+    <div class="prow"><label data-i18n="diag.sw.path">Detection runs in (test)</label>
+      <div class="seg"><button id="swPathMain" class="act" data-i18n="diag.sw.pathMain">main thread</button><button id="swPathWorker" data-i18n="diag.sw.pathWorker">background worker</button></div></div>
+    <div class="prow"><label data-i18n="diag.sw.pic">Picture (test)</label>
+      <div class="seg"><button id="swPicMatched" class="act" data-i18n="diag.sw.picMatched">matched to hands</button><button id="swPicLive" data-i18n="diag.sw.picLive">live camera</button></div></div>
     <p class="phint" id="swNote" data-i18n="diag.sw.note">Test switches are for this session only; the meter restarts its numbers after each.</p>
   </div>
 

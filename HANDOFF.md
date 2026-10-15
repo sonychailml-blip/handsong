@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (33 hard rules), 92 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (33 hard rules), 94 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -48,8 +48,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
 - ✅ **STAGE 3 PLAN** written 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; summary below); user answers Q1–Q19 given 2026-10-14
   (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92) ·
   ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear) ·
-  ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: «LAT2 input» below), **SND-F1** + **SND-F1b** Firefly,
-  Night forest (Room), Glue, our master Limiter (step 93).
+  ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: archive B «LAT2 input»), **SND-F1** + **SND-F1b** Firefly,
+  Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -99,8 +99,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; NEXT **LAT2**
-(user decision 2026-10-15: right after HAND1, before REC1 — on the LAT1b numbers from the user's devices), then REC1) → **4 «Calm»** = FIRST
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2 (2026-10-15);
+NEXT **REC1**) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -115,8 +115,7 @@ TIMBRE BUILDER, USER MODES with Scala, sampler → **8 SERVER** (accounts, sync,
   of WASM tracks in a Worker, which also avoids Chrome's worklet-context leak).
 - **A recording keeps what was heard** (notes + resulting values), never gestures; mappings are setup data. Latency compensation from the
   input's own timestamp (stage 5; tap-along test, switchable off). Privacy: rule #33 (PRIV1 ✅). Licences: rule #32 + register (LIC1 ✅).
-- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1 (+ LAT1b, SND-F1); next LAT2 (frame callback + 60 fps;
-  moved before REC1, 2026-10-15); then REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
+- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2 (+ LAT1b, SND-F1); next REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
   modules receiving the engine's `E`), GES1, DRAW1, UI1 (+ THEMABLE, §7.19), FMT1, TIM1 (permanent timbre ids) → THE FORK: line A ENG1,
   TIM2, TIM3, ENG2; line B IDS1, CMD1, SONG1–SONG3, VIS1, PACK1; DOC1. Moved after Calm (Q2): ROUTE1, IN1, GES2.
 - **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** Q3 two lines after slice 18 — Claude Code prepares and PERFORMS the merges,
@@ -137,8 +136,8 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). Since TF2 the key is
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
   the main thread; hand→sound latency MEASURED by LAT1 (user's desktop 2026-10-15: ≈ 126 ms daylight, ≈ 180 ms evening; detection 54 ms vs a
-  real GPU's 10–20; LAT1b device runs pending — plan in its record). The master's browser limiter delays 6.0 ms (measured, SND-F1). The loop
-  detects at the display rate, so a camera frame can be detected twice (LAT2).
+  real GPU's 10–20; phone runs pending). Since LAT2 each camera frame is detected once; detection stays on the main thread by default (the worker path
+  is ≈ 2× slower on the user's desktop GPU); the old browser limiter's 6 ms are gone (SND-F1b).
 - Editor, lanes, history, paste, sections, effect networks, frozen-track and render limits (KS / Glue renders pin ≈ 6 MB, Firefly tails
   ring out, Night forest CPU): `CLAUDE.md` "Known limits" (one list, kept there). Captured expression channels are not replayed (§4).
 - Opening the editor silences a ringing latch. "Drums only" backing lacks a cultural gate (§3.33 item 1).
@@ -154,33 +153,21 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### LAT1b + SND-F1 (2026-10-15) — summary (full records: archive B «LAT1b + SND-F1» and «Moved … at SND-F1b»)
-- LAT1b: meter lines (graphics, the model's real processor, camera asked/given, duplicates, frame wait + second total, long tasks with
-  causes) and three session-only test switches in Sound → Diagnostics. SND-F1: chord timbre Firefly (struck, one-shot; not solo until
-  TIM1), Night forest (seeded convolution room), our dynamics worklet (Glue; Limiter), golden renewal rules, BACKLOG §7.14 / §7.16.
+### Earlier stage-3 records — LAT1b + SND-F1, SND-F1b, «LAT2 input» (the user's desktop numbers): archive B «Moved from HANDOFF.md at LAT2».
 
-### SND-F1b (2026-10-15) — user decisions after SND-F1 (full: archive B «SND-F1b»)
-- Master: the browser compressor-limiter (6.0 ms lookahead; measured live 264 frames at 44.1 kHz) REPLACED by our limiter, always on, no
-  switch: ceiling −1 dBFS, hold 40 ms, release 150 ms (bass distortion 8 dB over: −47 dB at 55 Hz vs −27 without hold; old limiter −48),
-  + the old limiter's makeup kept as +2.31 dB (measured) so nothing got quieter. The old one let chords + drums 12 dB hot reach +0.49 dBFS
-  (9 clipped samples); ours never passes −1 dBFS. Live master path delay 6.0 → 0 ms (probe «SND-F1b master path (live)»); the meter
-  counts it as «master path» in hand → sound.
-- GOLD floor −80 dB on BOTH sides (user decision; control added); the «fx reverb 3» band-11 flicker (−92 dB) is below it — note removed.
-- Night forest «Room»: Short 0.85 / Medium 1.7 (default) / Long 3.4 s, recomputed envelope, buttons in the effect. CPU (% of a core,
-  desktop): 14 / 15 / 27; three Medium 48, three Long 122; phone ≈ 4× → PROPOSAL (not built): a shared reverb send per network.
-  Live vs frozen under 3 busy threads: Medium 2/2, Long 1/1 agree (≤ 0.4 dB; one run lost to a capture gap) — the «shorter live tail» did
-  not reappear.
-- LAT1b fixes: «camera delivers N fps» (presented frames) vs «we process N fps»; frame wait from the delivered rate; the model read-out
-  starts from the request (never «unknown» for GPU). GOLD: 79 existing entries unchanged; +3 (`fx forest medium/short`, `master limiter (hold)`).
-- Probes: data PASS 11; P.quick PASS 52; P.all PASS 70 (673 s — one earlier P.all hit the 12-min limit at row 47/70 with the machine ≈ 3×
-  slower; the default 8-min runner limit is now too short for P.all on this desktop: proposal `--limit-min` 15). Fix rounds: 1 (node test
-  value: 1.2 s sits on the log midpoint of 0.85 and 1.7).
-
-### LAT2 input — the user's desktop (2026-10-15; Intel HD Graphics 4000, hardware WebGL; camera grants 30 fps)
-- Defaults: «camera 14.3 fps» (= frames WE processed — the old meter line), detection 75.5 ms, frame every 79.9 ms, long tasks while
-  playing 491/min (longest 247, FrameRequestCallback), hand → sound 149.9 / incl. frame wait 184.9; startup longest 1188 ms
-  (WakeLock.request.then, main.js — the start chain).
-- 1 hand: 16.5 fps, detection 54, frame every 57.9, long tasks 2/min, hand → sound 126.6 / 156.9. Requested 30 / 60 fps: no change.
-  Model on CPU: clearly slower (the default really runs on the GPU). Earlier (LAT1): ≈ 126 ms daylight, ≈ 180 ms evening, 6.3 fps.
-- Reading: detection (54–76 ms per frame on this GPU) bounds everything — the loop processes 14–17 of 30 delivered frames; 2 hands cost
-  ≈ 20 ms of detection and ~490 long tasks/min. These totals do not yet include the 6 ms of the old master limiter (removed in SND-F1b).
+### LAT2 (2026-10-15) — each camera frame once, a cheaper second-hand search, worker option (full: archive B «LAT2 — record»)
+- LAT2a: a frame PUMP (requestVideoFrameCallback; one frame in flight, one waiting, a newer one replaces it — never a queue) snapshots each
+  camera frame ONCE (ImageBitmap); processHands runs as soon as that frame's detection ends; the canvas draws that very frame (rule #8 reworded).
+- Two models from one model download (L2 numHands 2, L1 numHands 1); schedule `core/handsched.js`: both hands → L2 every frame; one → L1 +
+  full search every 3rd frame (`HAND_SEARCH_EVERY`); none → search every 3rd, nothing between; a hand lost by tracking → search on the same
+  frame. Switching numHands by setOptions measured and rejected (≈ 1 s per switch, tracking lost).
+- Measured on the user's GPU (the headless runner uses the same Intel HD 4000; MediaPipe's sample photo, scratch only): one hand 75 → 53 ms
+  per frame, none 35 → 12, two 80 → 80; a still hand's jitter unchanged. Fake camera (no hands): long tasks 215 → 5/min, a screen frame
+  every 45 → 19 ms, hand → sound 109 → 98 (incl. frame wait 134 → 124), duplicates 0.
+- Startup: the 1188-ms task was the model's FIRST detection (warm-up ≈ 1.3–1.6 s): now on a blank frame behind «Warming up hand tracking…».
+- LAT2b: a CLASSIC worker `src/hand-worker.js` (MediaPipe needs importScripts) with fallback to the main thread; results bit-identical (12/12
+  frames), but WebGL inside a worker is ≈ 2× slower on this GPU (one hand 98 vs 53 ms, two 160 vs 80) → DEFAULT = MAIN THREAD, the worker
+  one switch away (zero main-thread long tasks). CSP unchanged (worker-src 'self' was there); the runner checks every request, workers too.
+- Switches: «Hands tracked» 2 · search every 3rd (default) / 2 · every frame / 1; «Detection runs in» main / worker; «Picture» matched / live.
+- Probes: data PASS 12 (+ «LAT2 search schedule (core)»); P.quick PASS 54; P.all PASS 73 (449 s; runner P.all limit now 15 min). Fix rounds 2.
+- ⬜ OPEN CHECK (postponed by the user): phone latency — A defaults and D 30 fps; on the phone also compare the worker path (decides its default).

@@ -27,13 +27,14 @@ export function statsOf(xs, total=xs.length){
   return { n:total, kept:s.length, mean, p5:q(0.05), p50:q(0.5), p95:q(0.95), jitter:q(0.95)-q(0.05), max:s[s.length-1] };
 }
 
-/* Hand → sound estimate from the stage means (ms): camera capture → our loop, detection, gestures, half an audio quantum (the mean wait
-   for the audio thread), the master path's own delay inside the audio graph (SND-F1b: 0 with our limiter, 6 ms with the browser's), the
+/* Hand → sound estimate from the stage means (ms): camera capture → our loop, detection, the frame's trip to the detection worker and
+   back (LAT2b; only on that path — absent, i.e. undefined, it is not a part at all), gestures, half an audio quantum (the mean wait for
+   the audio thread), the master path's own delay inside the audio graph (SND-F1b: 0 with our limiter, 6 ms with the browser's), the
    audio buffer and the output device. A part that is unknown (NaN) is left out and named in `missing`. */
 export function handToSound(parts){
-  const order=['camera','detect','gestures','quantumWait','graph','base','output'];
+  const order=['camera','detect','transfer','gestures','quantumWait','graph','base','output'];
   let ms=0; const missing=[];
-  for(const k of order){ const v=parts[k]; if(Number.isFinite(v)) ms+=v; else missing.push(k); }
+  for(const k of order){ const v=parts[k]; if(k==='transfer' && v===undefined) continue; if(Number.isFinite(v)) ms+=v; else missing.push(k); }
   return { ms, missing };
 }
 
@@ -66,6 +67,9 @@ export function splitLongTasks(tasks, camStart, now){
     return { n:xs.length, maxMs:w?w.ms:0, cause:w&&w.cause||'' }; };
   return { startup:part(tasks.filter(x=>x.t<cut)), playing:part(tasks.filter(x=>x.t>=cut && x.t>now-60e3)) };
 }
+/* MediaPipe's own log lines (its WebAssembly prints them): the CPU path announces XNNPACK — the model's real processor (LAT1b; LAT2:
+   read on the main thread and forwarded from the detection worker) */
+export const MP_LINE=/^[IWEF]\d{4} |TensorFlow Lite|XNNPACK|Graph successfully/;
 /* WebGL renderer strings of software rasterisers (no graphics processor behind the page) */
 export const SOFT_GL=/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic|mesa offscreen/i;
 export const isSoftwareGL=(renderer, caveat)=> caveat===true || SOFT_GL.test(renderer||'');

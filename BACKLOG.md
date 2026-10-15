@@ -18,9 +18,10 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   a reviewer) · 3.19 floating menu ✅ · 3.20 tutorial mode ✅ · 3.21 start screen ✅ · 3.22 menu layout ✅ · 3.23 metres beyond 4/4 ✅ · 3.24
   polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
   ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
-  latency as a NUMBER 🟡 (LAT1 meter built 2026-10-14; the user's phone/desktop numbers pending) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
+  latency as a NUMBER 🟡 (LAT1 meter 2026-10-14; desktop numbers in, LAT2 built on them 2026-10-15; phone pending) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
   3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
-  ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later).
+  ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later) · 3.41 hand prediction
+  (latency) ⬜ (idea, a later slice).
 - **4. Bugs** — mostly ✅/ℹ️ history; open: hand identification `key+=i` ⬜; captured expression-hand channels not replayed ⬜ (debt).
 - **5. Decided NOT to do.**
 - **6. Spec: chord latch** (✅ shipped; kept as history) — also menu rework ✅, 3.10, 3.11, 3.12/3.12a, 3.13–3.39 continue below it.
@@ -54,7 +55,9 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 > timbre format; §1, §7.4) → FIRST RELEASE §7.16 «Calm» (decided, Q1; own visual design §7.19 before it) → §7.18 installation mode → SAVING on the device + song files (§3.35) → auto-freeze rest, mixer per-track effects and meters, audio
 > export with the tuning as Scala, audio take → MIDI controller (§7.7) → timbre builder and user modes with Scala (§7.6) → server (§7).
 > **Last stage, after everything else:** the LESSONS / TUTORIAL update (§3.6, §3.20) — no lesson edits before it (user, 2026-10-13).
-> ⛳ Main technical debt: hand tracking off the main thread (§7.8). Nearby: §3.31 promo video · §3.32 input latency · es/de (§3.18).
+> ⛳ Main technical debt: hand tracking off the main thread (§7.8) — LAT2 (2026-10-15) built the worker path; on the user's desktop GPU it runs
+> the model ≈ 2× slower, so the main thread stays the default there (phone numbers pending). Nearby: §3.31 promo video · §3.32 input latency ·
+> §3.41 hand prediction · es/de (§3.18).
 > ⛔ **Prerequisite blocking saving and the builders:** stable MODE ids and TIMBRE ids (§1, §7) — an event holds a view REFERENCE and a
 > timbre INDEX, neither can be serialised; a five-minute song that cannot be saved is a failed feature.
 > ⚠️ **Statuses are checked against the code.** ✅ = verified in `src/`.
@@ -2208,6 +2211,17 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
 - Later: «paste transposed» — the clipboard's notes land in the TARGET track's key (re-keyed to its view, as Transpose does, so `ti`/`oct` stay
   and only the key moves), offered when the keys differ. Same for a key-respecting «record into this track» if wanted.
 
+### ⬜ 3.41. Hand PREDICTION — hide the camera and detection delay (user's idea, recorded at LAT2, 2026-10-15; a later slice, not now)
+- **What:** extrapolate each hand 30–50 ms ahead from its recent velocity (landmarks of the last frames), so the gesture layer acts on where
+  the hand WILL be when the sound comes out — hides part of the camera wait + detection (on the user's desktop ≈ 50–80 ms of the ≈ 125-ms
+  hand → sound after LAT2).
+- ⛔ **Must never create a false note:** a prediction may move pitch, volume or an effect value earlier, but a pinch START or STOP is decided
+  only on a measured frame (or the predicted one must be confirmed by the next measured frame before it sounds; a wrong guess is cheaper as
+  a few ms of lateness than as a phantom note). Rule #11 / #23 spirit: nothing predicted is ever recorded.
+- **How to check:** HAND1-style synthetic performances (the fingerprint unchanged with prediction off; with it on, no extra W* note
+  starts/stops on any scripted move); the latency meter shows the gain; the user's ear on fast passages.
+- Related: plan Q-answers «pinch prediction off» (stage 3, archive B §13b); LAT2 (frames once, search schedule, worker option).
+
 ---
 
 ## 7. НАПРАВЛЕНИЕ ПРОДУКТА (решения пользователя, записаны в проходе по документации после T5)
@@ -2449,6 +2463,13 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   - ⬜ **Sustain compressor** — for plucked timbres (KS strings, Firefly) and a guitar through audio-in: longer notes without a louder attack.
   - ⬜ **Ducking / sidechain** — the backing yields to the solo hand (key for Calm: the melody always on top without turning the room down).
   - ⬜ **Noise gate** — for audio-in (a microphone or a guitar between phrases).
+- ⛳ **EVERY EFFECT, THREE PLACEMENTS — like a real mixing desk** (user's requirement, recorded at LAT2, 2026-10-15):
+  1. **Insert on any single channel** — a role or a track; live and track chains stay separate (rule #31).
+  2. **Insert on the master output** — on everything that sounds (as Glue / Limiter are today).
+  3. **Shared send / return buses** — ONE instance of an effect (e.g. a reverb room) with a per-channel «send» amount, pre- or post-fader,
+     so many channels share one room at the cost of one. This is also the CPU answer for Night forest (one shared room instead of one
+     per role; §7.16 CPU note).
+  Any effect module may be placed in any of the three; the declaration (rule #29) stays the one description of its parameters.
 
 ### ⬜ 7.15. MODES / PRESETS — READY-MADE BUNDLES (user's idea, recorded after AF5)
 - A bundle = tuning and mode, timbres, effects, finger roles, tempo, visuals — stored as DATA FILES like tunings (`data/…`, validated by a
@@ -2489,6 +2510,10 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   - ⚠️ CPU (SND-F1b, desktop, offline proxy, % of one core): Short ≈ 14, Medium ≈ 15, Long ≈ 27; three Medium at once ≈ 48, three Long ≈ 122;
     a phone ≈ 4× → too heavy on a phone with several roles. ⬜ PROPOSAL (not built): a SHARED reverb send — one room per network (live, track)
     fed by per-role sends, so the cost stays one convolver per network whatever the number of roles; or the FDN shaped like the forest.
+  - ⬜ **A light «forest-like» reverb for phones and Calm** (user, LAT2 record, 2026-10-15): shape the existing cheap FDN reverb (§3.9b) to
+    the Night forest character (its decay shape, brightness, density) at ≈ 1 % CPU, as the phone / low-power choice of the same effect.
+  - ⬜ **In the Rust → WASM engine** (stage 5 / 7): an ALGORITHMIC reverb that sounds like Night forest at a fraction of the convolution
+    cost — measured against the convolution by ear (A/B) and by the GOLD features.
 
 ### ⬜ 7.17. ⛳ CALM — PLAYING ALONG WITH OUTSIDE MUSIC (user's idea, recorded 2026-10-14; NOT in the first Calm release — after it, as part of «hearing the room», §7.11; Calm itself: §7.16)
 - **One-shot «Listen» button:** the app mutes itself for 5–10 s, listens through the microphone, detects the tonic and a rough mode, then

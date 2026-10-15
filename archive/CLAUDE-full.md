@@ -651,3 +651,17 @@ Never report a change as done without stating which steps you could not verify.
   - **Musical data names** (`SCALES`, `TRADITIONS`, `grp`, `CHORD_FAM_SETS`, `LEAD_INSTR`/`CHORD_INSTR`/`BASS_INSTR`/`DRUM_KITS`, `HARMONIES`/`RHYTHMS`/`BASS_MODES`) stay **inline** next to the data, read via `L()`, in one of the three shapes — bare string (international notation) / `{default, ru}` (a proper noun, transliterated) / full object (a translatable word). See "Localisation".
   - `es`/`de` are prepared by shape but **deliberately not enabled**: nobody has been able to check the musical terminology, and a wrong term reads to a native speaker as a bug.
 - Chat responses to the user: **English** (the Windows terminal mangles Cyrillic).
+
+
+## Hand detection (LAT2) — reasoning (English; 2026-10-15)
+- **Rule #8 reworded.** Before LAT2 one synchronous tick drew the video, detected and drew the overlays, so picture and hands shared a frame
+  by construction — and the loop re-detected a frame whenever the screen outran the camera. Now each camera frame is detected once, on its
+  own clock; to keep the guarantee the frame is snapshotted (ImageBitmap) and THAT snapshot is drawn under its hands. The picture then
+  moves at the detection rate while hands are in view (as before: the old tick moved at the detection rate too). «Picture: live camera» is
+  the test of the other choice (smooth video, dots trailing by one detection).
+- **Why two models.** MediaPipe's hand landmarker runs its palm detector on every frame while it tracks fewer hands than numHands; tracking
+  one hand with numHands 2 therefore pays the full-frame search every frame. Rebuilding the graph to change numHands costs about a second
+  and loses tracking, so two models (numHands 1 and 2) are kept and the schedule chooses per frame.
+- **Why the main thread stays the default.** The worker was built as planned and gives identical results, but on the user's GPU WebGL inside
+  a worker is about twice as slow for this model; for an instrument the hand → sound time outweighs the long-task count. The phone may
+  differ — measure before changing the default.

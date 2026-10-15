@@ -70,7 +70,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   lines and every "first differences" block; exit 0 only on PASS. Flags: `--quick` (default), `--all`, `--quick --all`,
   `--repeat N` (N fresh browsers, P.all each, then a table of every measured value with its margin — `meas()` in the probe,
   `res.measures`), `--eval file.js` (script in the page after the seed, prints JSON), `--headed` (off-screen window; worse: a drawn
-  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 8 since GOLD1; P.quick 3, seed 3, start 3). Full console →
+  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 15 since LAT2; P.quick 3, seed 3, start 3). Full console →
   `tools/.probe-logs/` (git-ignored). Headless is the default because measured: every row runs, P.quick takes the user's manual
   time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash). The runner PAUSES auto-freeze for its whole session
   (`frzqueue.afPause('runner')`; AF3 is checked by its own deterministic row). In `--eval` the page has `window.__heap()` (full GC, then
@@ -97,10 +97,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `src/scaleprobe.js` and `src/probes/*` are callers too. The report LISTS every positional caller of every changed function with its arguments.
 - **Stay inside the slice.** Defects outside it are reported, not fixed.
 - **Probes — speed:** `await P.quick()` = `P.all()` without the rows flagged `slow` (all-view sweeps T1, T2, T4b1, T4b3, T4b4, T5, T6b, F0,
-  F3; "tracks: every one reachable"; LR1; AF2; AF6b; GOLD; SND-F1 live = offline and freeze parity); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
+  F3; "tracks: every one reachable"; LR1; AF2; AF6b; GOLD; SND-F1 live = offline and freeze parity; LAT2b worker = main thread); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
   only the pitched track. Every rendering probe renders a SHORT window (`renderTrack(…, {short})`, `PROBE_SHORT` 1 s of song, tail
   ≤ 0.75 s) — never `freeze`/❄/`R.aud`. On demand only: `P.checkRepeat({evidence:true})`, `P.orderCheck()`, `await P.freezeCost()`.
-  Rows flagged `drawn` (LAT1, ED7-fix2, tracks reachable, AR1, MX1, MX2, AR2) read "not checked: tab hidden" when frames don't come.
+  Rows flagged `drawn` (LAT1, LAT1b, LAT2a/b, ED7-fix2, tracks reachable, AR1, MX1, MX2, AR2) read "not checked: tab hidden" when frames don't come.
 - **Probes — discipline:** a probe that changes mixer state, windows or engine options restores ALL of it in `finally`; `P.all()`
   runs a **state guard** between rows (before/after snapshot of mixer tables, windows, live sound state, the render engine
   copy's switches and a fingerprint of the song's events — payloads, marks and order); probes work with the song loaded and WITHOUT the editor or hands open; they cover DERIVED paths (chase, ghost,
@@ -191,7 +191,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    `scales.keyByOneOne(s)` (tuning NOT named by the 12 notes — its naming scheme in data; never fixedKey): the knob reads «1/1 = G» +
    `state.tonicCents` (−50…50). Read through ONE door `viewKeyC(s)`, applied only in `baseF` (×2^(c/1200), no multiplication at 0 ¢ —
    12-note views and 0 ¢ views are the very objects and prices they were); `viewKeyIdOf` adds `+13c`. Probe control `keyCDbg('off'|'ungated')`.
-8. **The video draw and `detectForVideo` read the same camera frame** (background before detect, overlays after, one synchronous tick).
+8. **The picture and the hands are ONE camera frame** (LAT2): each new camera frame is snapshotted once (an ImageBitmap) and detected at most
+   once; the canvas draws the snapshot whose hands are current, overlays on top (`main.onHands` keeps it as `shown`). The session switch
+   «Picture: live camera» (`setPicture('live')`) draws the live `<video>` under the latest result instead — a test, never the default.
 9. **ONE layout; never reintroduce a mode gate.** New behaviour keys off scale properties and `splitOn`. **Hit-test and render derive
    geometry from the SAME frozen range** (`S.role`/`S.rx0`/`S.rx1` frozen at capture; `phoneHalves`, `palSplitX`, `rectBandY`/`rectRows`
    single sources; one snapshot per drawn surface — `loopView`, `rollView`).
@@ -338,13 +340,29 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   lanes, brace, chase, undo, stops, backing, capture and playback of effects, the editor API, lane tables, freeze registry and
   signature, `seedTake`, `evHz`.
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
-- `src/vision.js` — camera + MediaPipe (`openCamera(facing)`, `switchCamera` — the landmarker is never recreated). LAT1b: `camInfo`
+- `src/vision.js` — camera + the DETECTION PATH + the FRAME PUMP (LAT2). Path: a detector object `{kind, run(job), setDelegate, dbg, close}`
+  built by `buildDet` — the main thread (default, `mainDet`: handdet.js imported dynamically) or the worker (`workerDet`: src/hand-worker.js;
+  cannot start / 90 s silent / dies → the main thread by itself, `path.why`); `setDetectPath`, `pathInfo`. Pump: every new camera frame
+  (`requestVideoFrameCallback`, else `pollFrame` from the draw loop) → `createImageBitmap(video)` once → one frame in flight, one waiting
+  (a newer snapshot REPLACES the waiting one; older-than-processed snapshots dropped) → `schedPlan` picks the action ('skip' runs nothing)
+  → result + picture to the sink `setHandsSink(fn, paused)` (main.onHands); nothing is taken while the editor or the window is open.
+  Counters `pumpStats()` (snapped, processed, detected, dropped, dup, notNewest, log {id, pf, action, n}); probe hooks `pumpDbg`,
+  `detRunDbg`. `openCamera(facing)`, `switchCamera` (the detector is never recreated). LAT1b: `camInfo`
   (requested vs granted `getSettings`), `modelInfo` (the processor the model really runs on: starts from what was ASKED and succeeded —
   MediaPipe throws rather than falls back — and MediaPipe's own log lines (tap for 120 s after a (re)start, `mpTap`) only add evidence:
   asked GPU → 'GPU', or 'GPU+CPU' if an XNNPACK line came while GPU was asked; asked CPU → 'CPU' when its line came now or earlier on the
   page (TFLite prints it ONCE per page; `once`), 'unknown' only if it never came — never «unknown» for GPU (SND-F1b fix)), test switches
-  `setHandsTracked` / `setModelDelegate` (landmarker `setOptions`, same landmarker) / `setCamFps` (reopens the camera); `VISION_DEF` = the
-  defaults (2 hands, GPU, no frame rate requested — the app as before).
+  `setHandsTracked('2s'|'2'|'1')` (the schedule's policy, instant) / `setModelDelegate` (`setOptions` on both models, then both warm up —
+  MediaPipe prints its processor line only at a model's first inference) / `setCamFps` (reopens the camera) / `setDetectPath` / `setPicture`;
+  `VISION_DEF` = `{hands:'2s', delegate:'GPU', camFps:null, path:'main', picture:'matched'}`.
+- `src/handdet.js` (LAT2) — the DETECTOR, worker-safe (no DOM): `createDetector({delegate, blank, step})` downloads the model ONCE
+  (`MP_MODEL`, a fetch) and builds two models from it — L2 (numHands 2) and L1 (numHands 1), sequentially (MediaPipe's loader keeps one
+  global) — and warms each on a blank frame (the first inference stalls ≈ 1.3–1.6 s); `run(src, t, action, policy)` → plain result
+  (`plainResult`: landmarks + handednesses), the action that ran (a tracking action that found no hand retries a search on the same
+  frame: 'track1>search') and the model time. The only static import of MediaPipe.
+- `src/hand-worker.js` (LAT2b) — a CLASSIC worker (MediaPipe starts each model by `importScripts` of its loader; in a module worker the
+  second model fails «ModuleFactory not set»): imports handdet.js and `MP_LINE` dynamically inside `init` (a failure comes back as a
+  `fail` message with its reason), ImageBitmaps transferred in and back, times in the page's clock, MediaPipe's log lines forwarded.
 - `src/clip.js` — clip/audio recorder (`startClip`/`stopClip`, `activeKind()`, `captureFrame()` last in every frame, `REC_FPS` 30);
   `recKind` is the single truth.
 - `src/demo.js` — start-screen tunings demo (own mini-engine); scenes by stable id (`SCENES[].id`).
@@ -357,10 +375,13 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   editor (`drawRoll`, snapshot `rollView`, `rollAxis`), the strip and arrangement window (`drawLooper(full)`, snapshot `loopView`).
 - `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
   hand functions, the editor shell, arrangement window, tutorial helpers.
-- `src/main.js` — composition root: `loop()` (video → detect → `processHands` → overlays → `captureFrame`; each distinct error printed
-  once; LAT1 timestamps around each stage → `latFrame`, `latIdle` in the editor/window branch), `startApp()` (the one start path; calls
+- `src/main.js` — composition root: `onHands(f)` (one processed camera frame: `syncViewRect` → `processHands` at once → keep its picture
+  as `shown` → `latHands`), `loop()` (every screen frame: `pollFrame`, the shown snapshot (or the live video), overlays, `captureFrame`,
+  `latFrame`; each distinct error printed once; `latIdle` in the editor/window branch), the start card's `.busy` pulse, `startApp()` (the one start path; calls
   `latStart`), editor/window branch, `?probe` loading (`window.P`, `window.R`, `window.U`).
-- `src/core/` — the pure CORE (stage-3 target; no DOM, Web Audio, camera or network; runs in node). Today `core/latency.js` (LAT1):
+- `src/core/` — the pure CORE (stage-3 target; no DOM, Web Audio, camera or network; runs in node). `core/handsched.js` (LAT2): the SEARCH
+  SCHEDULE — `HAND_SEARCH_EVERY` 3, `schedPlan`/`schedAfter`/`schedRetry`/`schedRun`, policies '2s' (default) / '2' / '1' (see "Hand
+  detection"). `core/latency.js` (LAT1; LAT2: `MP_LINE`, `handToSound` part `transfer`):
   `makeMeter` (ring of `LAT_N` 240 samples per stage), `statsOf` (mean, nearest-rank p5/p50/p95, jitter = p95 − p5, max), `handToSound`
   (camera + detection + gestures + ½ audio block + base + output; unknown parts listed in `missing`), `looksBluetooth` (`BT_MS` 100 or
   `BT_LABEL`); LAT1b `frameWaitMs` (½ frame), `withFrameWait`, `perMinute`, `splitLongTasks` (startup = before camera start + `STARTUP_MS`
@@ -375,7 +396,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `audio.masterDelayMs()` — 0 with our limiter) and `rateOf` (delivered / processed frame rates).
 - `src/latmeter.js` — LAT1 latency meter, browser side (UI-level; owns `#latDiag`, `#latWarn` and the Sound-panel toggle `#latOn/#latOff`):
   `requestVideoFrameCallback` (captureTime, presentationTime, presentedFrames → camera fps and «picture taken → app»), per-frame stages
-  (`detect`, `gestures`, `draw`, `loop`; a camera frame detected twice counts as `sameFrameAgain`), audio every 500 ms (`baseLatency`,
+  (LAT2: `latHands` per processed frame — `camera` = capture → detection start, `detect` (+ `detTrack`/`detSearch`), `transfer` (worker),
+  `gestures`; `latFrame` per screen frame — `draw`, `loop`; `sameFrameAgain` = the pump's repeats, always 0), audio every 500 ms (`baseLatency`,
   `outputLatency`, `getOutputTimestamp` → `pipeline`), long tasks (PerformanceObserver, last minute); `latReport`/`latText`, console
   `R.latency()` (render.js), «Copy» copies the shown text only; Bluetooth warning once per output device (`handsong.btWarned.<label>`,
   4 s after start and on `devicechange`). Probe-only `latCount`, `latPauseDbg`. Measures only — changes nothing it measures; sends nothing.
@@ -385,7 +407,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/songs.js` — demo songs (`P.song(name, {replace:true})`; today `triphop`); refuses while recording, playing, with the editor
   open, or on a non-empty song without `replace`.
 - `src/scaleprobe.js` — the browser probe (`P`), since PROBE1 a FACADE: explicit re-exports of `src/probes/<area>.js` (`run` P.all/P.quick/
-  orderCheck/material, `tuning`, `seed` P.seed/P.song + write path, `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `gold`, `hand`,
+  orderCheck/material, `tuning`, `seed` P.seed/P.song + write path, `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `detect` (LAT2), `gold`, `hand`,
   `sound` (SND-F1), `guard` api/lock, `kit` shared helpers, `data` the node rows). ⛳ **Rows register themselves** next to their probe: `probes/rows.js`
   `row({ at, name, run, read, slow?, drawn?, realtime?, song?, node? })` (order by `at`; the pre-PROBE1 order = old position × 10),
   `family({ at, name, rows })` for generated rows (module contracts); `rowProblems()` (duplicate names/places, bad shapes) counts as
@@ -400,8 +422,22 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - Stale (removed) names to ignore: list in `docs/NAME-INDEX.md`, "Stale names".
 
 ## Architecture (full reasoning per section: archive, same titles)
-The frame loop lives in `main.js`: draw video → MediaPipe detect → `processHands()` (gestures drive audio) → `drawOverlays()`. The
-recorder thins ~60 engine calls/s into a few intent events per note.
+Two clocks in `main.js` (LAT2): each new CAMERA frame → detection (vision.js pump, the search schedule) → `processHands()` at once
+(gestures drive audio); each SCREEN frame → the detected frame's picture → `drawOverlays()`. The recorder thins ~60 engine calls/s into a
+few intent events per note.
+
+### Hand detection (LAT2) — each frame once, a cheaper search, main thread or worker
+- **Two models** (handdet.js): L2 (numHands 2) palm-searches the whole frame on every run while it tracks fewer than two hands (that is
+  why two-hand mode cost 75 vs 54 ms on the user's desktop); L1 (numHands 1) tracks one hand by landmarks alone. `setOptions({numHands})`
+  per frame was measured and rejected (≈ 1 s graph rebuild per switch, tracking lost).
+- **The schedule** (`core/handsched.js`, policy '2s'): both hands tracked → L2 every frame; one → L1 every frame and L2 (the search) on
+  every `HAND_SEARCH_EVERY`-th processed frame; none → L2 every 3rd frame, nothing between ('skip'); a second hand found → L2 from the
+  next frame; a tracking run that lost every hand retries the search on the SAME frame. Measured with real hands on the user's GPU (Intel
+  HD 4000, the runner's headless Chrome uses it; MediaPipe's sample photo, measurement only): one hand 75 → 53 ms per frame (track 42,
+  search 75), none 35 → 12, two hands 80 unchanged; jitter of a still hand unchanged. ⛔ Two hands stay tracked everywhere (user decision).
+- **Main thread vs worker** (LAT2b): same frames → bit-identical landmarks (12 of 12, sample photo). But WebGL inside a worker is slower on
+  this GPU (plain JavaScript is not): one hand 98 vs 53 ms, two 160 vs 80 — so the DEFAULT is the main thread; the worker is the test
+  switch «Detection runs in» and takes no main-thread long tasks. Decide again on phone numbers (HANDOFF open check).
 
 ### Screen model — one layout, optional split
 - Single role: `phoneInstr` ('ld'/'ch'/'bs'/'dr'), cycled by `instrBtn`; what each hand does comes from `handFn`.
@@ -1098,6 +1134,17 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   2–2000, base ≤ 500, output ≤ 2000, hand → sound 0.5–5000), the audio block is exactly 128 frames, the camera size readable; the overlay
   shows numbers through the REAL Sound-panel buttons and hides again. CONTROL: `latPauseDbg(true)` — a paused meter must add nothing. The
   pure arithmetic: node row «LAT1 latency stats (core)» (exact values). PRIV1's CSP check is the runner's, not a P row.
+- **LAT2 rows** (`src/probes/detect.js`; the fake camera has no hands — the schedule's reaction to hands is driven by a SCRIPT of hands in
+  view per model run, L1 never seeing more than one): «LAT2a frame once» (quick, drawn, ≈ 10 s: a detector 120 ms slower than the
+  camera, (a) awaited — snapshots dropped, never queued, no frame twice, always the newest; (b) blocking — by the camera's own frame
+  counter no frame twice and frames skipped; CONTROLS fault 'dupe' and 'queue') · «LAT2a search schedule (live)» (quick, drawn, ≈ 9 s:
+  no hand → search exactly every 3rd processed frame; scripted one hand then two → track1 between searches, the second hand found by a
+  search, track2 every frame after; a lost hand → 'track1>search' on the same frame; CONTROL `schedStay`) · «LAT2b worker = main thread,
+  fallback» (P.all only, drawn, ≈ 35 s: the REAL switch puts detection in the worker; the same snapshots through the worker and a fresh
+  main-thread detector → identical actions and results (CONTROL: the worker adds a hand); a worker that cannot start (`workerFail`) →
+  the main thread with the reason; back to the default) · node «LAT2 search schedule (core)» (exact sequences, retry, policies,
+  `handToSound` with `transfer`; CONTROL policy '1'). The runner also checks every REQUEST of the session — page and workers (a worker has
+  no page CSP of its own) — goes to the own origin or the MediaPipe paths; CONTROL: a worker asking example.com (intercepted, aborted).
 - **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–120 s headless): 79 cases rendered alone through the engine copy
   (`render.goldRender(play, sec, chains, post)`: 48 kHz fixed, one seed, offline allocator — seeds the KS pluck —, tapped before the limiter,
   every chain owner on an explicit path; `post` = a master dynamics node, SND-F1): 23 solo, 17 chord (Firefly = `ch 16`), 7 bass timbres
@@ -1291,6 +1338,10 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   strikes that have not begun are cancelled; level, pan and brightness are taken at the strike (a mixer move or a depth change does not
   reach a ringing strike); a chase (start/seek into a held chord) strikes again, as a KS pluck re-plucks. Offered only as a CHORD timbre:
   ⛔ no new solo timbre until stable timbre ids (HANDOFF) — bass/solo Firefly wait for TIM1.
+- **Hand detection (LAT2):** a hand entering while one or none is tracked is found by the next search — up to 2 processed frames later
+  (≈ 0–70 ms at 30 fps; before LAT2: the next frame); a hand lost by tracking is searched for on the same frame. The worker path runs the
+  model ≈ 2× slower on the user's desktop GPU (WebGL in a worker), hence not the default. The picture (matched to hands) updates at the
+  detection rate, not the camera's, while hands are in view. Each camera frame costs one ImageBitmap copy (≈ 0.1 ms).
 - **Night forest is costly** (offline render time per second of audio on the dev desktop, SND-F1b): Short ≈ 14 %, Medium ≈ 15 %, Long
   ≈ 27 % of a core; three Medium rooms at once ≈ 48 %, three Long ≈ 122 % (Chrome's partitioned convolution is not linear in length — Short
   saves little over Medium); a phone ≈ 4×. Each chain that holds it has its own convolver (live and track chains separate) — a SHARED
@@ -1534,6 +1585,12 @@ verified. Full text of every step: archive, "How to verify a change".
     buttons — compare by ear; → «Dynamics · Glue» → the mix sits a little more even; «Master» → «Glue» On/Off → a gentle level change, no
     delay. The limiter is always on (no switch since SND-F1b): strike many chords hard with drums — no crackle, and nothing sounds quieter
     than before. Record a short chord take with Night forest: the frozen track sounds the same as live (wait ~1 s after stopping).
+94. Hand detection (LAT2), desktop then phone: ▶ Play — the start card's message pulses through «Warming up hand tracking…» and the page
+    never freezes after it closes; «🎛 Sound» → Diagnostics → Latency meter On. One hand in view ~20 s: «Hand detection … (tracking ·
+    full-frame search)», «the model ran on N of N frames/s», duplicates 0; then two hands. A hand that leaves and comes back is picked up
+    almost at once; crossing hands, the lead hand-over, the looper's 3-s clear behave as before. Compare «Hands tracked: 2 · search every
+    frame» (old) and «Detection runs in: background worker» (fewer long tasks, slower detection on weak GPUs) and «Picture: live camera»;
+    «Copy» the box after each and send it to the strategist.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

@@ -27,7 +27,7 @@ export async function checkLatency(){
   for(const [what,cut] of [['the graphics renderer',x=>{ x.gpu={ ...x.gpu, renderer:'' }; }],['the second total',x=>{ x.handToSoundWithWaitMs=null; }],
                            ['the startup long tasks',x=>{ x.longTasks={ ...x.longTasks, startup:undefined }; }],['the granted camera settings',x=>{ x.camera={ ...x.camera, granted:{} }; }]]){
     const bad={ ...r }; cut(bad); cases++; if(!latFieldProblems(bad).list.length) miss(`CONTROL: a report without ${what} passed the field check — the check cannot fail`); }
-  { const tx=L.latText(r), keys=['diag.camSet','diag.frameWait','diag.dup','diag.model','diag.gpu','diag.longStart','diag.longPlay','diag.totalWait'];
+  { const tx=L.latText(r), keys=['diag.camSet','diag.frameWait','diag.dup','diag.model','diag.gpu','diag.longStart','diag.longPlay','diag.totalWait','diag.path'];
     for(const k of keys){ cases++; const head=t(k,{}).split('{')[0].trim().slice(0,18); if(head && !tx.includes(head)) miss(`the meter text has no line «${head}…» (${k})`); } }
   cases++; if(r.audio.quantumMs!==128/r.audio.sampleRate*1000) miss(`audio block ${r.audio.quantumMs} ms is not 128 frames at ${r.audio.sampleRate} Hz`);
   cases++; if(!/^\d+x\d+$/.test(r.camera.size||'')) miss(`camera size «${r.camera.size}» unreadable`);
@@ -61,6 +61,9 @@ function latFieldProblems(r){
   c(Number.isInteger(r.camera&&r.camera.duplicatesPerMinute) && r.camera.duplicatesPerMinute>=0, `duplicates per minute «${r.camera&&r.camera.duplicatesPerMinute}»`);
   c(num(r.camera&&r.camera.frameWaitMs) && Math.abs(r.camera.frameWaitMs-500/r.camera.fps)<=0.06+500/r.camera.fps*0.01, `frame wait ${r.camera&&r.camera.frameWaitMs} ms is not half the frame interval at ${r.camera&&r.camera.fps} fps`);
   c(num(r.handToSoundWithWaitMs) && Math.abs(r.handToSoundWithWaitMs-(r.handToSoundMs+r.camera.frameWaitMs))<=0.11, `the second total ${r.handToSoundWithWaitMs} is not ${r.handToSoundMs} + ${r.camera&&r.camera.frameWaitMs}`);
+  const D=r.detection;   // LAT2: where detection runs (the asked path in a browser that has it), with the switches' policy
+  c(D && ['main','worker'].includes(D.runs) && r.switches && D.runs===r.switches.path && D.policy===r.switches.hands, `detection path «${D&&D.runs}» / policy «${D&&D.policy}» vs switches ${JSON.stringify(r.switches&&{ path:r.switches.path, hands:r.switches.hands })}`);
+  c(r.camera && r.camera.sameFrameAgain===0, `${r.camera&&r.camera.sameFrameAgain} detection(s) of an already processed frame (LAT2: never)`);
   const lt=r.longTasks;
   c(!lt || (lt.startup && Number.isInteger(lt.startup.n) && typeof lt.startup.cause==='string' && lt.playing && Number.isInteger(lt.playing.n)), `long tasks not split into startup / playing (${JSON.stringify(lt&&{ s:lt.startup, p:lt.playing })})`);
   return { cases:n, list };
@@ -71,7 +74,8 @@ function latFieldProblems(r){
    Headless can show: the model's real processor (MediaPipe's own log lines: XNNPACK only on the CPU path), that the camera was reopened
    with the requested frame rate in its constraints, that detection keeps running after each switch, that the buttons light the active
    setting. It cannot show: a frame rate the fake camera does not obey (it always gives 20 fps), or two hands vs one (no hands in frame) —
-   those are the user's steps. CONTROL: the read-out from before the CPU switch, offered as the answer to the CPU request, must be flagged. */
+   those are the user's steps. LAT2: the three «Hands tracked» values and «Picture»; «Detection runs in» is row «LAT2b worker = main
+   thread, fallback». CONTROL: the read-out from before the CPU switch, offered as the answer to the CPU request, must be flagged. */
 export async function checkLatSwitches(){
   const L=await import('../latmeter.js'), V=await import('../vision.js'), diff=[], miss=s=>diff.push(s); let cases=0;
   const sleep=ms=>new Promise(r=>setTimeout(r,ms)), $=id=>document.getElementById(id);
@@ -92,11 +96,14 @@ export async function checkLatSwitches(){
       if(m.once) notes.push('a second CPU switch on this page: MediaPipe stays silent; the read-out keeps CPU from its first confirmation'); }
     await detects('model on CPU');
     /* CONTROL: the GPU read-out from before the switch, as the answer to the CPU request, must be flagged by the field check */
-    { const r=L.latReport(); cases++; if(!latFieldProblems({ ...r, model:{ requested:'CPU', actual:'GPU', once:false, hands:2, evidence:[] } }).list.length) miss('CONTROL: a GPU read-out passed as the answer to a CPU request — the processor check cannot fail'); }
+    { const r=L.latReport(); cases++; if(!latFieldProblems({ ...r, model:{ requested:'CPU', actual:'GPU', once:false, hands:'2s', evidence:[] } }).list.length) miss('CONTROL: a GPU read-out passed as the answer to a CPU request — the processor check cannot fail'); }
     await press('swModelGPU', o=>o.delegate==='GPU', 'Hand model on: GPU');
     { const m=await waitModel('GPU'); cases++; if(m.actual!=='GPU') miss(`back to GPU, the read-out says «${m.actual}»`); }
-    await press('swHands1', o=>o.hands===1, 'Hands tracked: 1'); await detects('1 hand');
-    await press('swHands2', o=>o.hands===2, 'Hands tracked: 2');
+    await press('swHands1', o=>o.hands==='1', 'Hands tracked: 1'); await detects('1 hand');
+    await press('swHands2', o=>o.hands==='2', 'Hands tracked: 2 · search every frame'); await detects('2, search every frame');
+    await press('swHands2s', o=>o.hands==='2s', 'Hands tracked: 2 · search every 3rd frame');
+    await press('swPicLive', o=>o.picture==='live', 'Picture: live camera'); await detects('live picture');
+    await press('swPicMatched', o=>o.picture==='matched', 'Picture: matched to hands');
     for(const f of [30,60]){ const s0=V.camInfo().startT;
       await press('swFps'+f, o=>o.camFps===f, `Camera frame rate: ${f}`);
       const ci=V.camInfo(); cases++; if(ci.requested.frameRate!==f || !(ci.startT>s0)) miss(`frame rate ${f}: the camera was not reopened with it (requested ${ci.requested.frameRate}, start ${s0} → ${ci.startT})`);
@@ -109,6 +116,7 @@ export async function checkLatSwitches(){
     const o=V.visionOpts();
     if(o.delegate!==D.delegate) await V.setModelDelegate(D.delegate).catch(e=>miss('restore: '+e.message));
     if(o.hands!==D.hands) await V.setHandsTracked(D.hands).catch(e=>miss('restore: '+e.message));
+    if(o.picture!==D.picture) await V.setPicture(D.picture).catch(e=>miss('restore: '+e.message));
     if(o.camFps!==D.camFps) await V.setCamFps(D.camFps).catch(e=>miss('restore: '+e.message));
     L.latSwSync();
   }

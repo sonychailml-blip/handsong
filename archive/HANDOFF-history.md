@@ -7636,3 +7636,97 @@ appearing). (c) The user's numbers are in HANDOFF «LAT2 input».
 Glue module 3, offlineMasterDyn 3); `forestData(rate, sec)` — audio.js forestBuffer (2), probes/sound.js (1 and 2 args); `forestIR(rate,
 sec)` — audio.js (2), probes (1–2), probe-data (1–2); `handToSound(parts)` unchanged signature (new key `graph`); `delegateOf(lines, before,
 asked)` — vision.js modelInfo (3); `checkFreezeParity(o)` — run registry (0 args), evals (1).
+
+
+### Moved from HANDOFF.md at LAT2 (English, verbatim; 2026-10-15)
+### LAT1b + SND-F1 (2026-10-15) — summary (full records: archive B «LAT1b + SND-F1» and «Moved … at SND-F1b»)
+- LAT1b: meter lines (graphics, the model's real processor, camera asked/given, duplicates, frame wait + second total, long tasks with
+  causes) and three session-only test switches in Sound → Diagnostics. SND-F1: chord timbre Firefly (struck, one-shot; not solo until
+  TIM1), Night forest (seeded convolution room), our dynamics worklet (Glue; Limiter), golden renewal rules, BACKLOG §7.14 / §7.16.
+
+### SND-F1b (2026-10-15) — user decisions after SND-F1 (full: archive B «SND-F1b»)
+- Master: the browser compressor-limiter (6.0 ms lookahead; measured live 264 frames at 44.1 kHz) REPLACED by our limiter, always on, no
+  switch: ceiling −1 dBFS, hold 40 ms, release 150 ms (bass distortion 8 dB over: −47 dB at 55 Hz vs −27 without hold; old limiter −48),
+  + the old limiter's makeup kept as +2.31 dB (measured) so nothing got quieter. The old one let chords + drums 12 dB hot reach +0.49 dBFS
+  (9 clipped samples); ours never passes −1 dBFS. Live master path delay 6.0 → 0 ms (probe «SND-F1b master path (live)»); the meter
+  counts it as «master path» in hand → sound.
+- GOLD floor −80 dB on BOTH sides (user decision; control added); the «fx reverb 3» band-11 flicker (−92 dB) is below it — note removed.
+- Night forest «Room»: Short 0.85 / Medium 1.7 (default) / Long 3.4 s, recomputed envelope, buttons in the effect. CPU (% of a core,
+  desktop): 14 / 15 / 27; three Medium 48, three Long 122; phone ≈ 4× → PROPOSAL (not built): a shared reverb send per network.
+  Live vs frozen under 3 busy threads: Medium 2/2, Long 1/1 agree (≤ 0.4 dB; one run lost to a capture gap) — the «shorter live tail» did
+  not reappear.
+- LAT1b fixes: «camera delivers N fps» (presented frames) vs «we process N fps»; frame wait from the delivered rate; the model read-out
+  starts from the request (never «unknown» for GPU). GOLD: 79 existing entries unchanged; +3 (`fx forest medium/short`, `master limiter (hold)`).
+- Probes: data PASS 11; P.quick PASS 52; P.all PASS 70 (673 s — one earlier P.all hit the 12-min limit at row 47/70 with the machine ≈ 3×
+  slower; the default 8-min runner limit is now too short for P.all on this desktop: proposal `--limit-min` 15). Fix rounds: 1 (node test
+  value: 1.2 s sits on the log midpoint of 0.85 and 1.7).
+
+### LAT2 input — the user's desktop (2026-10-15; Intel HD Graphics 4000, hardware WebGL; camera grants 30 fps)
+- Defaults: «camera 14.3 fps» (= frames WE processed — the old meter line), detection 75.5 ms, frame every 79.9 ms, long tasks while
+  playing 491/min (longest 247, FrameRequestCallback), hand → sound 149.9 / incl. frame wait 184.9; startup longest 1188 ms
+  (WakeLock.request.then, main.js — the start chain).
+- 1 hand: 16.5 fps, detection 54, frame every 57.9, long tasks 2/min, hand → sound 126.6 / 156.9. Requested 30 / 60 fps: no change.
+  Model on CPU: clearly slower (the default really runs on the GPU). Earlier (LAT1): ≈ 126 ms daylight, ≈ 180 ms evening, 6.3 fps.
+- Reading: detection (54–76 ms per frame on this GPU) bounds everything — the loop processes 14–17 of 30 delivered frames; 2 hands cost
+  ≈ 20 ms of detection and ~490 long tasks/min. These totals do not yet include the 6 ms of the old master limiter (removed in SND-F1b).
+
+### LAT2 — record (2026-10-15): each camera frame once, a cheaper second-hand search, hand detection in a worker (optional)
+**Order.** LAT2a (frame pump + search schedule) was built and probed on the main thread first (rows «LAT2a frame once», «LAT2a search
+schedule (live)», node «LAT2 search schedule (core)» all PASS), then LAT2b (worker) on top.
+**Discovery.** The runner's headless Chrome renders with this machine's real GPU — «ANGLE (Intel, Intel(R) HD Graphics 4000 … D3D11)» — the
+user's desktop. So the headless numbers below are the user's GPU (the CPU load of a real camera and real drawing not included).
+**Candidates for the search schedule (measured, MediaPipe's own sample photo woman_hands.jpg downloaded into the session scratchpad only —
+never into the repo: its licence class (Apache-2.0 image) would need the user's decision under rule #32):**
+- A (before): one model, numHands 2, every frame — 1 hand 87.5 ms, 2 hands 88.6, 0 hands 39.6 (palm search ≈ 40, landmarks ≈ 45 per hand).
+- B: numHands 1 every frame — 1 hand 45.2 (only one hand ever).
+- C (chosen): two models, L1 tracks + L2 searches every 3rd frame — L1 45.8, L2 search 85.9 → ≈ 59 ms per frame with one hand; the same
+  frame through L1 and L2: max landmark difference 0.0031 (frame units), same handedness; still-hand jitter: before 2.0e-4 mean / 9.7e-4 max,
+  C 1.5e-4 / 2.5e-4; moving: 3.27e-3 vs 3.50e-3 mean.
+- D: switching numHands by setOptions — 1025 ms mean per switch (graph rebuild, 1.6 s worst), the first detection after it up to 1.1 s,
+  tracking lost — rejected.
+- Building two models: download the model ONCE (fetch, 7.8 MB; 12.8 s on this network uncached) and build both from the buffer: 0.74 + 0.65 s;
+  sequentially (concurrent starts race on MediaPipe's loader global). The FIRST detection of each model: 1.3–1.6 s (shaders) — this was the
+  1188-ms startup task of LAT1b («WakeLock.request.then» = the first `loop()` after the start chain). A blank frame warms it (the first frame
+  with a hand afterwards costs +70 ms, not 1.3 s); a drawn hand silhouette (our own drawing) is NOT detected by the palm model (18 variants).
+**End-to-end with the schedule (sample photo, both paths, same frames, `core/handsched.js` driving the actions):**
+| | main before | main LAT2 | worker LAT2 |
+|---|---|---|---|
+| 1 hand, ms per frame | 74.9 | 53.2 (track 42.2, search 75.1) | 98.3 (track 78.4, search 138.3) |
+| 2 hands | 79.7 | 79.5 | 160.7 |
+| 0 hands | 35.0 | 11.7 (search 35.1 every 3rd) | 18.6 (search 55.9) |
+Second hand appearing at frame 12 with one hand tracked: found at frame 12 (a search frame), track2 from frame 13 — both paths.
+**Why the worker is slower here.** Plain JavaScript is FASTER in the worker (3·10⁷ sqrt: 165–178 vs 207–223 ms); the worker's WebGL is the
+hardware GPU too (same ANGLE string); but a texture upload + read-back takes 4–8 ms vs 3.1 on the main thread, and MediaPipe's GPU inference
+does many such sync points; the CPU delegate is also ≈ 30 % slower (it still converts images through WebGL). Classic and module workers alike
+(51 vs 39.5 ms per palm search after 150 runs — no tier-up catch-up). Decision (Claude Code, reported to the user): DEFAULT = main thread; the
+worker stays one switch away and falls back by itself; decide again on phone numbers.
+**Worker = main thread.** The same 12 frames (one hand, then two; search / track1 / track2) through the worker and a main-thread detector:
+12 of 12 results identical, max landmark difference 0.
+**Module worker trap.** MediaPipe starts a model by loading its WebAssembly loader: script tag (page) or importScripts (classic worker); in a
+module worker importScripts throws and it falls back to `import()`, which runs a module ONCE — the second model fails «ModuleFactory not set».
+Hence a CLASSIC worker that pulls our modules in by dynamic import (also turns a load failure into a readable `fail` message).
+**Meter, fake camera (no hands), 12 s each:** before-like (search every frame, main): model 44.4 ms on 20.2 of 20.1 frames/s, long tasks
+215/min (max 59), a screen frame every 45 ms, hand → sound 108.8 / incl. frame wait 133.7, duplicates 0 · LAT2 main: model 36.3 ms on 6.5 of
+19.6 frames/s, long tasks 5/min, a screen frame every 18.9 ms, 98.3 / 124.1 · LAT2 worker: model 58.3 + 3.5 ms trip, long tasks 0, a screen
+frame every 16.6 ms, 128.2 / 153.4. (The old loop also detected stale frames at the display rate — the user saw duplicates per minute; now 0
+by construction, probe-checked.)
+**Expected on the user's desktop (camera 30 fps):** one hand ≈ 53 ms per frame instead of 75 → ≈ 19 frames/s processed instead of 13–14, hand
+→ sound ≈ 125–130 ms instead of ≈ 150 (incl. frame wait ≈ 145 instead of ≈ 185); two hands unchanged (≈ 80 ms, ≈ 12 frames/s); no hands: the
+model runs every 3rd frame. Long tasks with hands on the main thread: L1 ≈ 42–54 ms sits at the 50-ms threshold — expect fewer, not none;
+the worker path has none but detects ≈ 2× slower. A returning hand: found by the next search — 0–2 processed frames later (≈ 0–100 ms at
+19 frames/s; before: the next frame).
+**Decisions taken by Claude Code:** two models (C) over option switching (D); `HAND_SEARCH_EVERY` 3; a tracking run that loses every hand
+retries a search on the same frame (not in the prompt — protects fast moves); after two hands drop to one the next frame searches (the
+schedule's counter keeps running during two-hand tracking — cheap insurance for crossing hands); the picture shows the detected frame
+(rule #8 kept; «Picture: live camera» as a test switch); processHands runs right after its frame's detection (as before, now on
+the camera's clock instead of the screen's); main-thread default; classic worker; the warm-up behind the start card.
+**Probes:** data PASS 12 (+ «LAT2 search schedule (core)» 15 cases); P.quick PASS 54; P.all PASS 73 (449 s; «LAT2b worker = main thread, fallback» 49 s; GOLD 125 s; 2 workers started, 188 requests all
+listed). Fix rounds 2: (1) frame-once assumed a
+backlog on the main thread — a blocking detector stops the frame callbacks, the browser itself skips frames → (a) awaited / (b) blocking
+variants with the camera's frame counter; (2) «GPU+CPU» after CPU → GPU — MediaPipe prints its processor line at a model's FIRST inference;
+the unused second model printed it inside the next window → both models warm up after a processor switch. Runner: P.all limit 8 → 15 min;
+network check (every request of the page and its workers; CONTROL a worker asking example.com, intercepted).
+**Positional callers of changed functions:** `latFrame(t0, tEnd)` (was 6 args) — main.loop (2); `drawVideoBackground(src=video)` — main.loop
+(1); `setHandsTracked(m)` ('2s'|'2'|'1', was 1|2) — latmeter SW (3), probes/lat.js restore (1), probes/detect.js (4); `handToSound(parts)` —
+signature unchanged, optional key `transfer` (latmeter 1, probe-data 4); `takeFrame(id, cap, pres, now, pf)` — onVF (5), pollFrame (4);
+new: `latHands(f, tA, tB)` (main.onHands), `syncViewRect(vw, vh)` (main.onHands), `setDetectPath`, `setPicture` (latmeter SW, probes).

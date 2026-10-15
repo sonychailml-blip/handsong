@@ -1,7 +1,7 @@
 import { initAudio, AC } from './audio.js';
-import { video, landmarker, initVision } from './vision.js';
+import { video, initVision, setHandsSink, pollFrame, visionOpts } from './vision.js';
 import { processHands } from './gestures.js';
-import { drawVideoBackground, drawOverlays } from './draw.js';
+import { drawVideoBackground, syncViewRect, drawOverlays } from './draw.js';
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
 import { $, revealBar } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: демо «путешествие по строям» (без камеры). Его КНОПКИ на старте БОЛЬШЕ НЕТ — demo.js вешает обработчик защитно (if(db)), сам код жив и ждёт переезда внутрь обучения
@@ -9,7 +9,7 @@ import { openLessons, wireStarter } from './tutor.js';   // обучение: «
 import { t } from './i18n.js';
 import { loadReport } from './scales.js';   // F5: итог загрузки файлов данных ладов — известие на стартовой карточке
 import { rollOpen, arrOpen } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
-import { latStart, latFrame, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
+import { latStart, latFrame, latHands, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
 
 /* =====================================================================
    HANDSONG — жестовый синтезатор + интерактивный учебник ладов
@@ -20,10 +20,10 @@ import { latStart, latFrame, latIdle } from './latmeter.js';   // LAT1: latency 
 
    ДВЕ ВЕЩИ, за которые отвечает main:
 
-   1) КАДР (loop). Один синхронный тик, порядок ОБЯЗАТЕЛЕН (правило #8):
-      видеофон → детекция MediaPipe → processHands → накладки → захват
-      кадра в клип. Фон рисуется ДО детекции, накладки ПОСЛЕ, и оба берут
-      ОДИН И ТОТ ЖЕ кадр видео — иначе рука разъедется с картинкой.
+   1) FRAME (LAT2, rule #8). Each new camera frame is detected once (vision.js,
+      a worker when possible) and its hands go to processHands at once (onHands);
+      every screen frame (loop) draws THAT frame's snapshot, then the overlays,
+      then the clip capture — picture and hands are one camera frame.
 
    2) СТАРТ (startApp). ЕДИНСТВЕННЫЙ путь подъёма приложения, общий у
       «▶ Играть» и «Обучение»: AudioContext создаётся только внутри клика
@@ -38,7 +38,11 @@ import { latStart, latFrame, latIdle } from './latmeter.js';   // LAT1: latency 
    ===================================================================== */
 
 /* ================= ЦИКЛ ================= */
-let lastTs=-1, latest=null;
+/* LAT2: two clocks instead of one tick. HANDS — each new camera frame, once, when its detection is done (vision.js's pump → onHands):
+   the crop, processHands (sound now, not at the next screen frame), the meter. PICTURE — every screen frame (loop): the snapshot of the
+   frame whose hands are current, then the overlays over it (rule #8: picture and hands are one camera frame; the session switch
+   «Picture: live camera» draws the live video instead). */
+let latest=null, shown=null;
 
 /* ⛳ КАДР ДОРИСОВЫВАЕТСЯ ВСЕГДА — ОШИБКА В ОБРАБОТКЕ РУК НЕ СТИРАЕТ ЭКРАН. processHands ведёт жесты, звук и ЗАПИСЬ (W* → rec*), и
    исключение там обрывало весь кадр ДО отрисовки: сетка и точки пальцев пропадали, пока держится нота (так и случилось — запись
@@ -54,40 +58,40 @@ function handsGuarded(res){
     if(!loopErrSeen.has(k)){ loopErrSeen.add(k); console.error('[кадр] ошибка в обработке рук (жесты/звук/запись) — кадр дорисован; одна и та же ошибка печатается один раз:', e); }   // eslint-disable-line no-console
   }
 }
+const studio=()=>rollOpen||arrOpen;   // the editor or the arrangement window: the camera stays open but is not read
+/* one processed camera frame (vision.js): its hands drive gestures and sound at once; its picture becomes the shown one */
+function onHands(f){
+  if(studio()){ if(f.frame) f.frame.close(); return; }
+  const tA=performance.now();
+  if(f.frame) syncViewRect(f.frame.width, f.frame.height);   // the crop of this frame before its hands are remapped (rule #12)
+  latest=f.res;
+  handsGuarded(latest);                      // страж кадра: ошибка в жестах/звуке/записи печатается один раз и НЕ обрывает отрисовку
+  const tB=performance.now();
+  if(f.frame){ if(shown) shown.close(); shown=f.frame; }
+  latHands(f, tA, tB);                       // LAT1/LAT2: the latency meter (latmeter.js)
+}
+setHandsSink(onHands, studio);
 function loop(){
   requestAnimationFrame(loop);
-  /* ⛳ РЕДАКТОР ДОРОЖКИ (S5.0): камеру НЕ читаем и НЕ рисуем — экран занят сеткой, а распознавание на
-     этом же потоке стоит дороже всего остального вместе взятого (см. «Планировщик» в CLAUDE.md). Поток
-     камеры при этом ОСТАЁТСЯ открытым: возврат в игру мгновенный и без повторного запроса прав.
-     ⚠️ latest СБРАСЫВАЕМ КАЖДЫЙ КАДР, и это не перестраховка: processHands на выходе из редактора иначе
-     получил бы ПОСЛЕДНИЙ ДОКАДРОВЫЙ результат камеры и сыграл бы щипок, которого никто не делал.
-     ⚠️ processHands(null) зовём НАМЕРЕННО, а не пропускаем: «рук в кадре нет» — это то, что закрывает
-     удержанные щипки штатным watchdog'ом (120 мс), а заодно уводит выразительность к нейтрали. Просто
-     перестань мы его звать — HANDS замерли бы с зажатыми пальцами до самого закрытия. */
-  if(rollOpen||arrOpen){   // AR1: окно аранжировки — тот же «экран студии»: камера открыта, но не читается и не рисуется
-    latest=null; lastTs=-1;
+  /* ⛳ РЕДАКТОР ДОРОЖКИ (S5.0): камеру НЕ читаем и НЕ рисуем — экран занят сеткой, а распознавание стоит дороже всего остального вместе
+     взятого (см. «Планировщик» в CLAUDE.md). Поток камеры при этом ОСТАЁТСЯ открытым: возврат в игру мгновенный и без повторного запроса
+     прав. ⚠️ latest СБРАСЫВАЕМ: processHands на выходе из редактора иначе получил бы ПОСЛЕДНИЙ ДОКАДРОВЫЙ результат камеры и сыграл бы
+     щипок, которого никто не делал. ⚠️ processHands(null) зовём каждый кадр НАМЕРЕННО: «рук в кадре нет» закрывает удержанные щипки
+     штатным watchdog'ом (120 мс) и уводит выразительность к нейтрали. LAT2: насос кадров в это время кадров не берёт (studio). */
+  if(studio()){   // AR1: окно аранжировки — тот же «экран студии»
+    latest=null; if(shown){ shown.close(); shown=null; }
     handsGuarded(null);                      // страж кадра (см. handsGuarded): ошибка в руках не обрывает отрисовку редактора
     drawOverlays(null);
     captureFrame();
     latIdle();                               // LAT1: no camera here — no frame interval measured across this branch
     return;
   }
-  const t0=performance.now();                // LAT1: timestamps only — the order of the tick is unchanged (rule #8)
-  drawVideoBackground();                     // фон — ДО детекции, тем же кадром видео
-  const tBg=performance.now(); let tDet=tBg, det=false;
-  if(video.readyState>=2&&landmarker){
-    const ts=performance.now();
-    if(ts>lastTs){
-      try{latest=landmarker.detectForVideo(video,ts);}catch(e){}      // читает тот же кадр (тик не прерывался)
-      lastTs=ts; det=true;
-    }
-    tDet=performance.now();
-  }
-  handsGuarded(latest);                      // страж кадра: ошибка в жестах/звуке/записи печатается один раз и НЕ обрывает отрисовку ниже
-  const tHands=performance.now();
-  drawOverlays(latest);                      // накладки — ПОСЛЕ, поверх того же кадра
-  captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр (захват в фазе с отрисовкой); иначе no-op
-  latFrame(t0, tBg, tDet, tHands, performance.now(), det);   // LAT1: the latency meter (latmeter.js)
+  pollFrame();                               // LAT2: only without requestVideoFrameCallback — a new camera frame found by its time
+  const t0=performance.now();
+  drawVideoBackground(visionOpts().picture==='live' || !shown ? video : shown);   // the frame whose hands are shown (rule #8)
+  drawOverlays(latest);                      // накладки — поверх того же кадра
+  captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр; иначе no-op
+  latFrame(t0, performance.now());           // LAT1: drawing time and the screen-frame interval
 }
 
 /* ================= СТАРТ =================
@@ -104,12 +108,13 @@ async function startApp(){
   if(started) return true;
   const btn=$('startBtn'), learn=$('learnBtn'), msgEl=$('loadmsg'), msg=s=>msgEl.textContent=s;
   btn.disabled=true; if(learn) learn.disabled=true;
+  const card=$('start'); card.classList.add('busy');   // LAT2: the start card shows that it is loading (a pulse on the message line)
   try{
     await initAudio();                       // async: ждём загрузку KS-ворклета (иначе banks[] разъедется)
     await AC.resume();
     await initVision(msg);
     try{await navigator.wakeLock.request('screen');}catch(e){}
-    $('start').classList.remove('on');
+    card.classList.remove('busy','on');
     $('bar').classList.add('on');
     revealBar();                             // панель видна на старте (учит, где меню), затем сама сворачивается через BAR_HIDE_MS
     started=true;
@@ -118,7 +123,7 @@ async function startApp(){
     import('./render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
     return true;
   }catch(err){
-    btn.disabled=false; if(learn) learn.disabled=false;
+    btn.disabled=false; if(learn) learn.disabled=false; card.classList.remove('busy');
     msg(t('load.error',{msg:(err&&err.message?err.message:err)}));
     return false;
   }

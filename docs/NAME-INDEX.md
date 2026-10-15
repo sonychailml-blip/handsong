@@ -92,8 +92,8 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   (never while recording or a clip records; while a hand pinches a track waits if its layout costs more than `QF.frameMs` 8 ms; checked
   at pick and again before layout via `layoutGate`); stale results never install (re-queued); a track is taken only after its
   signature is stable for `QF.settleMs` 1 s. Console `R.autoFreeze(true|false)`, `R.freezeQueue()`. No watcher/triggers (AF3).
-- `src/vision.js` — camera + MediaPipe (`video`, `canvas`, `ctx`, `roundRect` polyfill, `resize`, `landmarker`, `initVision`,
-  `openCamera(facing)`, `switchCamera` — the landmarker is never recreated).
+- `src/vision.js` — camera + the detection path + the frame pump (`video`, `canvas`, `ctx`, `roundRect` polyfill, `resize`, `initVision`,
+  `openCamera(facing)`, `switchCamera` — the detector is never recreated by a camera switch; `landmarker` is stale since LAT2, see below).
 - `src/clip.js` — clip/audio recorder: `startClip('video'|'audio')`/`stopClip`, `activeKind()`, `onClipChange(fn)`, `captureFrame()`
   (called last in every frame, throttled to `REC_FPS` 30; stream via `canvas.captureStream(0)` + the audio tap; bitrate from canvas
   size ≈ 0.12 bit/px/frame, 3.5–12 Mbit/s); `recKind` is the single truth; sets `videoRec` only for video, only once recording starts.
@@ -273,3 +273,33 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - SND-F1b: `core/dsp.js` `forestRoom`, `FOREST.rooms`/`FOREST.room`, `forestIR(rate, sec)`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `DYN_LIMIT.hold`; `core/latency.js` `rateOf`, `handToSound` part `graph`; `dyn-worklet.js` parameter `hold`, option `report`, fields `hc`, `gMin`; `audio.js` `mMake`, `limRed`, `DCN_DELAY_S`, `masterDelayMs`, `masterPathKinds`, `masterProbeNodes`, `forestBuffer`, `forestData(rate, sec)`, param `forest:room` (`pick`, `pickKeys`), instance `room()`; `dynNode(mode, set, keep, report)`; `vision.js` `xnnOnGpu`, `delegateOf(lines, before, asked)`; `latmeter.js` `camN`, `procT`, report `camera.processedFps`, `audio.masterPathMs`; i18n `fx.forest.room(.short/.medium/.long)`, `diag.cpuOnce`, `diag.gpuPart`; stale: `master.limiter`, `diag.unknownOnce`, `#mLimOn`/`#mLimOff`; `probes/sound.js` `checkMasterPath` (row «SND-F1b master path (live)»), `checkFreezeParity(o)`; `probes/gold.js` `GOLD_FLOOR` −80, cases `fx forest medium`, `fx forest short`, `master limiter (hold)`
 - `tools/probe-data.mjs`: row «SND-F1 Night forest IR (core)» (`forestCore`, `FOREST_HASH`); LAT1 core row extended; `tools/check-static.mjs` `NET_LISTED`: `audio.js` addModule 4, `render.js` addModule 1, `probes/sound.js` addModule 2
 
+## Added at LAT2 (2026-10-15)
+- `src/core/handsched.js` (new, pure core): `HAND_SEARCH_EVERY` 3, `HAND_POLICIES` ['2s','2','1'], `schedNew`, `schedPlan(s, policy)` →
+  'skip'|'track1'|'track2'|'search', `schedRetry(action, n, policy)`, `schedAfter(s, action, n)`, `schedRun(counts, {policy, lost})`.
+- `src/handdet.js` (new, worker-safe): `MP_WASM`, `MP_MODEL`, `plainResult`, `EMPTY_RESULT`, `createDetector({delegate, blank, step})` →
+  `{ run(src, t, action, policy) → {res, action, n, ms}, warmMs, setDelegate, dbg({slowMs, script, fake}), close }`; internal `L1`, `L2`,
+  `nextTs`, `warm`.
+- `src/hand-worker.js` (new, CLASSIC worker): messages in `init`/`frame`/`delegate`/`dbg`, out `ready`/`fail`/`step`/`res`/`log`/`delegated`;
+  `tapConsole(MP_LINE)`.
+- `src/core/latency.js`: `MP_LINE` (moved from vision.js); `handToSound` part `transfer` (optional — absent = not a part).
+- `src/vision.js`: `setHandsSink(fn, paused)`, `pollFrame`, `setDetectPath('main'|'worker')`, `setPicture('matched'|'live')`, `pathInfo`,
+  `pumpStats`, `pumpDbg({fault, schedStay, workerFail, hold, delayMs, slowMs, script, fake, reset})`, `detRunDbg`; `VISION_DEF` now
+  `{hands:'2s', delegate, camFps, path:'main', picture:'matched'}`; internal `det`, `detGen`, `path`, `workerDet`, `mainDet`, `buildDet`,
+  `setPath`, `detLost`, `W_READY_MS`, `EMPTY`, `nextPaint`, `sched`, `busy`, `pend`, `vfh`, `sink`, `isPaused`, `frameSeq`, `pumpStart`,
+  `onVF`, `takeFrame`, `pump`, `PS` (`snapped`, `processed`, `detected`, `dropped`, `dup`, `notNewest`, `errors`, `log` {id, pf, action, n}),
+  `mpLine`. `setHandsTracked` takes '2s'|'2'|'1'.
+- `src/draw.js`: `syncViewRect(vw, vh)`; `drawVideoBackground(src=video)`.
+- `src/main.js`: `onHands(f)`, `studio()`, `shown` (the drawn frame's ImageBitmap); `#start.busy` while starting.
+- `src/latmeter.js`: `latHands(f, tA, tB)`, `latFrame(t0, tEnd)` (two arguments now); stages `detTrack`, `detSearch`, `transfer`; `detT`,
+  `detN`, `dup0`; report `detection` {runs, asked, why, warmMs, policy, searchEvery, detectedFps, picture}, `camera.framesProcessed`; switches
+  `swHands2s`, `swPathMain`, `swPathWorker`, `swPicMatched`, `swPicLive`.
+- i18n: `diag.path`, `diag.pathWorker`, `diag.pathMain`, `diag.pathNone`, `diag.xfer`, `diag.hands.2s/.2/.1`, `diag.sw.hands2s`,
+  `diag.sw.hands2`, `diag.sw.path`, `diag.sw.pathWorker`, `diag.sw.pathMain`, `diag.sw.pic`, `diag.sw.picMatched`, `diag.sw.picLive`,
+  `load.warm`; `diag.detect` gained {tr, se, det, proc}.
+- `src/probes/detect.js` (new): `checkFrameOnce` (row «LAT2a frame once»), `checkSchedule` («LAT2a search schedule (live)»), `checkWorker`
+  («LAT2b worker = main thread, fallback», slow); `fresh`, `schedProblems`. `tools/probe-data.mjs`: row «LAT2 search schedule (core)»
+  (`schedCore`, `HS`). `tools/probe-browser.mjs`: `--limit-min` default 15; `res.net` (`NET_OK`, the network check and its control
+  `net-control-worker.js`). `tools/check-static.mjs`: GLOBALS `Worker createImageBitmap ImageBitmap postMessage`; NET_LISTED `vision.js`
+  worker 1, `handdet.js` external 1 + fetch 1.
+- Stale since LAT2: `vision.landmarker`, `main.lastTs`, `latmeter.lastN`, `latmeter.dup` (a count; now `pumpStats().dup`), `vision.MP_LINE`
+  (moved to core/latency.js), `vision.js` external import (moved to handdet.js).

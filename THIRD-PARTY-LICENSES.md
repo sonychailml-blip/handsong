@@ -16,7 +16,7 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 | MediaPipe Tasks Vision — JavaScript library and its WebAssembly files | 0.10.35 | Apache-2.0 | CDN | https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35 | https://github.com/google-ai-edge/mediapipe (npm @mediapipe/tasks-vision) |
 | MediaPipe hand landmarker model (float16, version 1) | float16/1 | Apache-2.0 | CDN | https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task | Google MediaPipe model card «Hand Tracking (Lite/Full)»; models listed at https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker |
 
-- **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (src/vision.js). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
+- **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (src/handdet.js — on the main thread or in our worker src/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
 - **MediaPipe hand landmarker model (float16, version 1)** — Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4).
 
 ## Hosted services
@@ -120,7 +120,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | index.html |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/detect.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
 | − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/draw.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/scaleload.js, src/ui.js |
 | ≈ | U+2248 | approximately | typography | src/draw.js, src/i18n.js, src/render.js |
 | ≤ | U+2264 | less or equal | typography | src/probes/window.js |

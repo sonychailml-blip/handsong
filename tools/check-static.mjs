@@ -192,6 +192,8 @@ const GLOBALS=new Set((
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
   'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+
+  /* LAT2: frames to the detection worker */ 'Worker createImageBitmap ImageBitmap '+
+  /* the detection worker's own scope (hand-worker.js) */ 'postMessage '+
   /* область AudioWorklet (ks-worklet.js) */ 'AudioWorkletProcessor registerProcessor sampleRate currentTime currentFrame'
 ).split(/\s+/).filter(Boolean));
 const undeclared=new Set();   // «файл:строка: имя» — одно сообщение на строку
@@ -238,7 +240,9 @@ const NET_LISTED={
   'render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'] },
   'clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
   'ui.js':         { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
-  'vision.js':     { external:[1,'imports MediaPipe Tasks Vision from jsDelivr (register entry mediapipe-tasks-vision; it fetches its WASM and the hand model — CSP connect-src)'] },
+  'vision.js':     { worker:[1,'starts our own src/hand-worker.js (own origin, CSP worker-src self): hand detection off the main thread (LAT2b)'] },
+  'handdet.js':    { external:[1,'imports MediaPipe Tasks Vision from jsDelivr (register entry mediapipe-tasks-vision; it loads its WASM — CSP script-src/connect-src); in the worker too'],
+                     fetch:[1,'downloads the hand model once (register entry mediapipe-hand-landmarker, storage.googleapis.com/mediapipe-models — CSP connect-src) for both models (L1, L2)'] },
 };
 function netSites(m){   // kind → count for one module (external = static import from an http(s) address)
   const n={}; for(const [k,re] of Object.entries(NET_KINDS)){ const c=(m.bare.match(re)||[]).length; if(c) n[k]=c; }

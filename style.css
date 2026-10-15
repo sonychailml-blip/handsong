@@ -497,6 +497,10 @@
   #learnBtn{font-size:15px; padding:12px 20px; background:#eef1f8;
     color:#2a2f45; border:1px solid rgba(20,24,50,.16); font-weight:600;}
   #loadmsg{font-size:var(--fs-hint); color:#5a6079; min-height:1.2em; margin:12px 0 0;}
+  /* LAT2: while the app starts (model, warm-up, camera) the message line pulses — an opacity animation the compositor keeps running
+     even when the main thread is busy (the fallback warms the model on it) */
+  #start.busy #loadmsg{animation:loadPulse 1.1s ease-in-out infinite; color:#3d4a8a;}
+  @keyframes loadPulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
   #learnMsg{font-size:var(--fs-hint); color:#b26a00; min-height:1em; margin:6px 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
   /* ⬇ Установка (PWA) — ТИХАЯ кнопка ПОД двумя главными: своя тонкая рамка (не заливка var(--note)/светлая
      как у главных), поэтому не спорит с «Играть»/«Обучение». Отдельный ребёнок карточки (не в .startBtns —

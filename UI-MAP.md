@@ -421,6 +421,15 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
 - **«Diagnostics» test switches (LAT1b, session only, never saved; defaults = the app as before):** «Hands tracked (test)» 2 / 1 · «Hand
   model on (test)» GPU / CPU · «Camera frame rate (test)» default / 30 / 60; a hint line under them (shows «Applying…» or why a switch did
   not apply). After a switch the meter restarts its numbers.
+- **LAT2 (2026-10-15):** «Hands tracked (test)» now has three buttons — «2 · search every 3rd frame» (default), «2 · search every frame»
+  (the app before LAT2), «1». Two new rows under «Camera frame rate»: «Detection runs in (test)» main thread (default) / background worker
+  (falls back to the main thread by itself when the worker cannot start) and «Picture (test)» matched to hands (default: the canvas shows
+  the very camera frame whose hands are drawn) / live camera (the live video, hands from the latest detection). New lines in the box:
+  «Detection runs in: …» (+ the reason after a fallback), «Hand detection … (tracking N · full-frame search N) · the model ran on N of N
+  frames/s», «Frame to the worker and back …» (worker only); «hands tracked» shows the policy's name.
+- **Start card while starting (LAT2):** the message line pulses (`#start.busy`) through «Loading the hand-tracking model…», «Warming up hand
+  tracking…» (the model's first detection on a blank frame, ≈ 1–2 s — this was the 1.2-s freeze after the card closed), «Starting the
+  camera…»; the card closes only after the warm-up.
 
 ## MASTER DYNAMICS, NIGHT FOREST, FIREFLY (SND-F1 — 2026-10-15; checked against `index.html`, `ui.js`, `audio.js`)
 - **«🎛 Sound» panel, section «Master» (above «Diagnostics»):** «Glue (gentle compressor)» On / Off (default Off) · a hint line (the limiter

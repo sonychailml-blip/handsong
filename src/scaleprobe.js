@@ -81,6 +81,7 @@ export { checkRepeat, checkQueue, checkFreezeQueue, checkAutoFreeze, checkLiveIs
 export { dumpScales, checkFiles, checkNames, SNAPSHOT_CHANGES, renewSnapshot, checkUserDelete, checkUserChordModes, checkMerge, checkBare, checkRootAlone } from './probes/files.js';
 export { dumpSongPrint, checkSongPrint, checkKeyKeep, checkOneOne, checkTranspose } from './probes/key.js';
 export { checkLatency, checkLatSwitches } from './probes/lat.js';
+export { checkFrameOnce, checkSchedule, checkWorker } from './probes/detect.js';
 export { dumpGold, checkGold } from './probes/gold.js';
 export { checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './probes/sound.js';
 export { dumpGesture, checkGesture } from './probes/hand.js';
