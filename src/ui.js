@@ -27,7 +27,7 @@ import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScrol
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // OWN1: the modes a track can be re-mapped into; TF5: «1/1 = …» and the historical 1/1
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
-import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -1884,6 +1884,10 @@ function pickVoiceMode(role,m){
   setVoiceMode(role,m); softAllOff(); voiceModeReset(role); applyVoiceMode();
 }
 $('vmLdPoly').onclick=()=>pickVoiceMode('ld','poly'); $('vmLdLead').onclick=()=>pickVoiceMode('ld','lead');
+/* SND-F1: the master's Glue and safety Limiter (Sound panel → Master); session only */
+function masterDynShow(st){ for(const [k,a,b] of [['glue','mGlueOn','mGlueOff'],['limiter','mLimOn','mLimOff']]){ const on=!!st[k]; $(a).classList.toggle('act',on); $(b).classList.toggle('act',!on); } }
+$('mGlueOn').onclick=()=>masterDynShow(masterDynSet('glue',true)); $('mGlueOff').onclick=()=>masterDynShow(masterDynSet('glue',false));
+$('mLimOn').onclick=()=>masterDynShow(masterDynSet('limiter',true)); $('mLimOff').onclick=()=>masterDynShow(masterDynSet('limiter',false));
 $('vmBsPoly').onclick=()=>pickVoiceMode('bs','poly'); $('vmBsLead').onclick=()=>pickVoiceMode('bs','lead');
 applyVoiceMode();
 qOn.onclick =()=>{ setLoopQuant(true);  qOn.classList.add('act');  qOff.classList.remove('act'); };
@@ -2287,7 +2291,10 @@ function fxAddRow(avail,headKey,allKey){
   const head=document.createElement('option'); head.value='';
   head.textContent = avail.length ? t(headKey) : t(allKey);
   sel.appendChild(head);
-  for(const [id,label] of avail){ const o=document.createElement('option'); o.value=id; o.textContent=label; sel.appendChild(o); }
+  const grp={};   // SND-F1: modules of a category (FX_FACTORY[id].cat) under their own heading, e.g. «Dynamics»
+  for(const [id,label,,cat] of avail){ const o=document.createElement('option'); o.value=id; o.textContent=label;
+    if(cat){ if(!grp[cat]){ grp[cat]=document.createElement('optgroup'); grp[cat].label=t('fx.cat.'+cat); } grp[cat].appendChild(o); } else sel.appendChild(o); }
+  for(const g of Object.values(grp)) sel.appendChild(g);
   sel.value=''; sel.disabled=!avail.length;
   sel.onchange=e=>{
     const id=e.target.value; if(!id) return;
@@ -2525,7 +2532,7 @@ function renderFxCtl(){
        (fxParamsOf возвращает [] вне соло) — здесь мы просто не предлагаем того, что не заработает.
        V4: они живут В ГОЛОСЕ — поэтому их место в списке «в ноту». */
     if(fxCtlChain()===CHAIN_SOLO) for(const m of FX_META) if(fxIsScalar(m.k)) voiceAll.push([m.k, t(m.fullKey), 1]);   // с в.1 ДЕЛЕЙ — МОДУЛЬ (шинный); здесь его отсекает fxIsScalar
-    for(const id in FX_FACTORY){ const f=FX_FACTORY[id], it=[id, t(f.labelKey), f.params.length];
+    for(const id in FX_FACTORY){ const f=FX_FACTORY[id], it=[id, t(f.labelKey), f.params.length, f.cat];
       if(f.perm) continue;                                       // VOL-0: постоянную запись (громкость) не предлагаем — она в цепи всегда
       if(f.kind==='voice'){ if((f.roles||[]).includes(fxCtlRole)) voiceAll.push(it); }   // голосовой — только объявленным ролям
       else if(!chain.some(e=>e.fxId===id)) busAvail.push(it); }

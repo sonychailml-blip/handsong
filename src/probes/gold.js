@@ -10,6 +10,7 @@ import { row } from './rows.js';
 import { timbresOf } from '../audio.js';
 import { aRef, setARef, chainKeyOf } from '../state.js';
 import { scaleView, scaleById } from '../scales.js';
+import { DYN_GLUE, DYN_LIMIT } from '../core/dsp.js';   // SND-F1: the master Glue / Limiter cases
 
 const GOLD_FILE='tools/gold.print.json', GOLD_TOL=0.01, GOLD_FLOOR=-100, WIN=0.05, NFFT=4096;
 const BANDS=[0,63,125,250,500,1000,2000,4000,8000,16000,24001];
@@ -19,7 +20,7 @@ const off=undefined;   // positional empty slots before the time (rule #15)
 /* The case list: name → { sec, play(eng), chains? } — names are the identity in the golden file. */
 function goldCases(){
   const C=[], chK=chainKeyOf('ch');
-  const add=(name,sec,play,chains)=>C.push({ name, sec, play, chains });
+  const add=(name,sec,play,chains,post)=>C.push({ name, sec, play, chains, post });
   timbresOf('ld').forEach((_,i)=>add(`ld ${i}`,1.0,e=>{ e.applyFx({}); e.leadOn('g',220,0.8,i,off,off,off,off,0.05); e.leadOff('g',off,0.5); }));
   timbresOf('ch').forEach((_,i)=>add(`ch ${i}`,1.0,e=>{ e.chordOn('g',F3,0.8,i,null,0.05); e.chordOff('g',0.5); }));
   timbresOf('bs').forEach((_,i)=>add(`bs ${i}`,1.0,e=>{ e.bassOn('g',55,0.8,i,off,off,off,off,0.05); e.bassOff('g',0.5); }));
@@ -32,6 +33,11 @@ function goldCases(){
   bus('reverb',[{ 'reverb:decay':0.2, 'reverb:tone':0.8, 'reverb:mix':0.3 },{ 'reverb:decay':0.5, 'reverb:tone':0.5, 'reverb:mix':0.6 },{ 'reverb:decay':0.9, 'reverb:tone':0.2, 'reverb:mix':1 }],2.2,0.4);
   bus('dly',[{ 'dly:mix':0.3, 'dly:time':0.2, 'dly:fb':0.2 },{ 'dly:mix':0.6, 'dly:time':0.5, 'dly:fb':0.5 },{ 'dly:mix':1, 'dly:time':0.8, 'dly:fb':0.8 }],2.2,0.4);
   bus('trmMix',[{ 'trmMix:depth':0.3, 'trmMix:rate':0.2 },{ 'trmMix:depth':0.6, 'trmMix:rate':0.5 },{ 'trmMix:depth':1, 'trmMix:rate':0.9 }],1.2,0.9);
+  /* SND-F1: Night forest (3 sends), Glue on the chord chain (3 settings), the master's Glue and safety Limiter (a hot master) */
+  bus('forest',[{ 'forest:mix':0.3 },{ 'forest:mix':0.8 },{ 'forest:mix':1 }],4.0,0.4);
+  bus('glue',[{ 'glue:thr':0.5, 'glue:ratio':0.37 },{ 'glue:thr':0.25, 'glue:ratio':0.6, 'glue:att':0.2, 'glue:rel':0.3 },{ 'glue:thr':0, 'glue:ratio':1, 'glue:knee':0.5, 'glue:makeup':0.6 }],1.2,0.9);
+  add('master glue',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'comp', set:{ ...DYN_GLUE, on:1 }, gain:4 });
+  add('master limiter',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'limit', set:{ ...DYN_LIMIT, on:1 }, gain:16 });
   return C;
 }
 /* In-place radix-2 FFT (re, im of length 2^k). */
@@ -59,7 +65,7 @@ function goldFeats({ L, R, rate }){
     for(const p of pw) spec.push(dB(frames ? p/frames/NFFT : 0)); }
   return { env, side:dB(side/n), spec };
 }
-async function renderCase(R,c){ return goldFeats(await R.goldRender(c.play, c.sec, c.chains||{})); }
+async function renderCase(R,c){ return goldFeats(await R.goldRender(c.play, c.sec, c.chains||{}, c.post||null)); }
 /* Value-by-value comparison of two feature sets → list of differences (strings). */
 function goldCmp(name,a,b){
   const out=[];

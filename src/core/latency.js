@@ -42,3 +42,23 @@ export const BT_LABEL=/bluetooth|airpods|\bbuds\b|hands-?free|a2dp|\bbt\b/i;
 export function looksBluetooth({ outputMs, label }={}){
   return (Number.isFinite(outputMs) && outputMs>=BT_MS) || BT_LABEL.test(label||'');
 }
+
+/* ---------- LAT1b ---------- */
+/* Waiting for the next camera frame: a hand moves at a random moment between two frames, so on average half a frame interval passes
+   before the camera even takes the picture that shows it. NaN when the frame rate is unknown. */
+export const frameWaitMs=fps=> Number.isFinite(fps)&&fps>0 ? 500/fps : NaN;
+/* The second total: hand → sound including that wait (the first total stays as it was) */
+export const withFrameWait=(ms, wait)=> Number.isFinite(ms)&&Number.isFinite(wait) ? ms+wait : NaN;
+/* How many timestamps (ms) fall within the last minute before `now` */
+export const perMinute=(times, now)=> times.reduce((n,t)=>n+(t>now-60e3&&t<=now?1:0), 0);
+/* Long tasks [{t, ms, cause}] split at camStart + STARTUP_MS: «startup» (everything before, incl. page load) and «while playing» (only the
+   last minute). Each part: count, the longest and its cause ('' when the browser gave none). */
+export const STARTUP_MS=10000;
+export function splitLongTasks(tasks, camStart, now){
+  const cut=Number.isFinite(camStart) ? camStart+STARTUP_MS : -Infinity, part=xs=>{ let w=null; for(const x of xs) if(!w||x.ms>w.ms) w=x;
+    return { n:xs.length, maxMs:w?w.ms:0, cause:w&&w.cause||'' }; };
+  return { startup:part(tasks.filter(x=>x.t<cut)), playing:part(tasks.filter(x=>x.t>=cut && x.t>now-60e3)) };
+}
+/* WebGL renderer strings of software rasterisers (no graphics processor behind the page) */
+export const SOFT_GL=/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic|mesa offscreen/i;
+export const isSoftwareGL=(renderer, caveat)=> caveat===true || SOFT_GL.test(renderer||'');

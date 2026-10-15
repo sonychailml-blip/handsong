@@ -2438,6 +2438,16 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   chain key moves from the role to the timbre or to the finger (`state.chainKeyOf` is already opaque — only its resolver changes);
   capture records the chain of the timbre/finger that played; the editor shows the track's own chain (as now). Depends on stable timbre ids
   and the timbre format (§1, §7.4).
+- **Category «Dynamics»** (SND-F1, 2026-10-15; the add-effect list shows it as its own group). Rule for every module of it: OUR OWN code
+  (no browser DynamicsCompressorNode in the sound path — Chrome's delays the signal 6 ms, differs between browsers and is not guaranteed
+  equal offline), ZERO LOOKAHEAD (no added latency), DETERMINISTIC (live = offline = frozen), later moved into the Rust → WASM engine.
+  - ✅ **Glue** — soft-knee stereo-linked compressor (`dyn-worklet.js` mode 'comp'); a chain module and the master's optional Glue (off by
+    default). Preset tuned to sit close to the Calm prototype's built-in compressor (residual −34 dB on a Firefly + Night forest phrase).
+  - ✅ **Limiter** — the master's safety limiter (mode 'limit', ceiling −1 dBFS, instant attack, exact identity below the ceiling; on by
+    default, after the browser limiter that rule #4 keeps).
+  - ⬜ **Sustain compressor** — for plucked timbres (KS strings, Firefly) and a guitar through audio-in: longer notes without a louder attack.
+  - ⬜ **Ducking / sidechain** — the backing yields to the solo hand (key for Calm: the melody always on top without turning the room down).
+  - ⬜ **Noise gate** — for audio-in (a microphone or a guitar between phrases).
 
 ### ⬜ 7.15. MODES / PRESETS — READY-MADE BUNDLES (user's idea, recorded after AF5)
 - A bundle = tuning and mode, timbres, effects, finger roles, tempo, visuals — stored as DATA FILES like tunings (`data/…`, validated by a
@@ -2465,6 +2475,16 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
 - **Plan:** 3–4 rooms at level 1 + one showcase room at level 2 → show to 3–5 people → then expand.
 - **Next ideas (user, 2026-10-14):** playing along with outside music — §7.17 (after the first Calm release); installation (kiosk) mode and
   B2B sales — §7.18 (after Calm).
+- **Sounds from the Calm prototype (SND-F1, 2026-10-15).** Built in the app: the chord timbre «Firefly» (struck tine, one-shot), the effect
+  «Night forest» (seeded 3.4-s convolution room), the dynamics «Glue» and «Limiter» (§7.14). Recorded here, NOT built yet:
+  - **The «Forest» drone (prototype recipe, verbatim):** sine 110 Hz @0.09 + sine 164.81 Hz @0.05 + looped white noise → bandpass 520 Hz
+    Q 0.6, centre swept ±260 Hz by a 0.06 Hz LFO, @0.05; fade-in time constant 1.2 s; send 0.7 to the reverb. (In the app the pitches must
+    come from the scale and A4 — rule #2 — and the noise from a seeded generator.)
+  - **Per-note «distance colour» for 3D rooms (prototype):** lowpass 900 + 8000·(1−depth)^1.5 Hz, dry 1 − 0.55·depth, reverb send
+    0.5 + 0.8·depth (depth 0 near … 1 far).
+  - The prototype's rooms are 3D (Three.js, MIT licence — allowed by rule #32; a register entry when it is added).
+  - ⚠️ CPU (measured 2026-10-15, desktop, offline proxy): one Night forest convolver ≈ 19–24 % of a core (3.4 s), 1.7 s ≈ 10 %, 0.85 s ≈ 6 %;
+    a phone ≈ 4× — a phone budget needs a shorter IR or the FDN shaped like the forest (proposal in HANDOFF, SND-F1; not applied).
 
 ### ⬜ 7.17. ⛳ CALM — PLAYING ALONG WITH OUTSIDE MUSIC (user's idea, recorded 2026-10-14; NOT in the first Calm release — after it, as part of «hearing the room», §7.11; Calm itself: §7.16)
 - **One-shot «Listen» button:** the app mutes itself for 5–10 s, listens through the microphone, detects the tonic and a rough mode, then

@@ -412,6 +412,24 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
   (copies exactly the shown text, nothing is sent) and «Close» (= Off). Refreshed twice a second.
 - **Bluetooth warning** (`#latWarn`, below the bar, centred, with «OK»; hides by itself after 15 s): once per output device, about 4 s
   after the start or after the output changes, when the output latency is 100 ms or more or the device's name looks wireless.
+- **LAT1b (2026-10-15) — more lines in the box (and in «Copy», `R.latency()`):** camera asked vs given (size, frame rate); «waiting for the
+  next camera frame ≈ N» (half a frame); detections of an already seen frame per minute; the hand model asked / really running on (GPU or
+  CPU, read from MediaPipe's own log lines; «unknown (… once per page …)» after an earlier CPU switch) and hands tracked; the graphics renderer's name with «hardware» or «software»; page busy at
+  startup (first 10 s) and while playing (last minute, restarted by a test switch) with the longest task's cause where the browser names
+  it; a second total «Hand → sound incl. frame wait ≈ N ms» under the first.
+- **«Diagnostics» test switches (LAT1b, session only, never saved; defaults = the app as before):** «Hands tracked (test)» 2 / 1 · «Hand
+  model on (test)» GPU / CPU · «Camera frame rate (test)» default / 30 / 60; a hint line under them (shows «Applying…» or why a switch did
+  not apply). After a switch the meter restarts its numbers.
+
+## MASTER DYNAMICS, NIGHT FOREST, FIREFLY (SND-F1 — 2026-10-15; checked against `index.html`, `ui.js`, `audio.js`)
+- **«🎛 Sound» panel, section «Master» (above «Diagnostics»):** «Glue (gentle compressor)» On / Off (default Off) · «Limiter (never clips)»
+  On / Off (default On) · a hint line. Session only.
+- **Chord timbre «Firefly» (Светлячок):** «🎛 Sound» → «Chord instrument» (the last entry), also in the track editor's timbre list of chord
+  tracks. Struck: each pinch strikes the notes once and they ring out (≈ 1.6 s); a latched chord keeps its place but its sound decays; a
+  move to another degree strikes again.
+- **Effects «Night forest» and «Glue»:** «🎛 Sound» → «Effects constructor» → «+ add effect» list: «Night forest» among the ordinary
+  effects, «Glue» under its own heading «Dynamics». Night forest has one parameter (Amount, default 0.8 = the prototype); Glue six
+  (Threshold, Ratio, Knee, Attack, Release, Makeup gain). Also in the track editor's chain list.
 
 ## ОБУЧЕНИЕ — шесть уроков ВНУТРИ живого приложения
 

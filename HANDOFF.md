@@ -47,7 +47,9 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   stood: archive B, «Moved from HANDOFF.md at the STAGE 3 plan».
 - ✅ **STAGE 3 PLAN** written 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; summary below); user answers Q1–Q19 given 2026-10-14
   (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92) ·
-  ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear).
+  ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear) ·
+  ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92 + the measurement plan below), **SND-F1** Firefly,
+  Night forest, Glue, Limiter (step 93).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -97,7 +99,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1; next REC1 — or LAT2 first, open question 2026-10-15) → **4 «Calm»** = FIRST
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; NEXT **LAT2**
+(user decision 2026-10-15: right after HAND1, before REC1 — on the LAT1b numbers from the user's devices), then REC1) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -112,19 +115,14 @@ TIMBRE BUILDER, USER MODES with Scala, sampler → **8 SERVER** (accounts, sync,
   of WASM tracks in a Worker, which also avoids Chrome's worklet-context leak).
 - **A recording keeps what was heard** (notes + resulting values), never gestures; mappings are setup data. Latency compensation from the
   input's own timestamp (stage 5; tap-along test, switchable off). Privacy: rule #33 (PRIV1 ✅). Licences: rule #32 + register (LIC1 ✅).
-- **34 slices (7 S, 25 M, 2 L).** Nets and policy: LIC1, PRIV1, LAT1 (latency meter — the first real numbers), PROBE1 (probe rows
-  registry), GOLD1 (golden renders of all 51 sounds + effects), HAND1 (synthetic hands → gesture fingerprint). Splits along existing seams,
-  old paths kept as facades: REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre and effect modules that
-  receive the engine's `E`, so the `audio.js?render` copy keeps working), GES1, DRAW1, UI1 (+ THEMABLE: design tokens in one place and
-  one icon component / SVG sprite replacing emoji and glyphs — §7.19), FMT1 (core/format + registry), TIM1 (permanent timbre ids) → THE
-  FORK: line A ENG1 contract, TIM2 ids in events, TIM3 timbres as data files, ENG2 costs and power class; line B IDS1, CMD1 serialisable
-  commands, SONG1 song format v1, SONG2 demo song as a file, SONG3 save/open, LAT2 frame callback + 60 fps, VIS1 visual modules, PACK1
-  pack keys; DOC1. **Moved after Calm (Q2): ROUTE1, IN1, GES2.**
-- **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** stage order as in «Work order»; Q3 two lines after slice 18 — Claude Code
-  prepares and PERFORMS the merges and reports them, the user confirms and commits; Q4–Q12 and Q15–Q19 as recommended (Rust; compiler from
-  stage 5, `.wasm` committed; effects first; A/B ear acceptance; permanent sound names; song files carry copies; values not movements; local
-  diagnostics; offline keys, data-only packs; model bundled in stage 4; pinch prediction off by default); Q13 material licences + icon audit
-  (all marked «to be replaced by the user's own authored design»); Q14 keep the Vercel counter, named in the privacy notice.
+- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1 (+ LAT1b, SND-F1); next LAT2 (frame callback + 60 fps;
+  moved before REC1, 2026-10-15); then REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
+  modules receiving the engine's `E`), GES1, DRAW1, UI1 (+ THEMABLE, §7.19), FMT1, TIM1 (permanent timbre ids) → THE FORK: line A ENG1,
+  TIM2, TIM3, ENG2; line B IDS1, CMD1, SONG1–SONG3, VIS1, PACK1; DOC1. Moved after Calm (Q2): ROUTE1, IN1, GES2.
+- **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** Q3 two lines after slice 18 — Claude Code prepares and PERFORMS the merges,
+  the user confirms and commits; the rest as recommended (Rust, compiler from stage 5, effects first, A/B ear acceptance, permanent sound
+  names, song files carry copies, values not movements, local diagnostics, data-only packs, model bundled in stage 4, pinch prediction off);
+  Q13 material licences + icon audit; Q14 the Vercel counter kept and named in the privacy notice.
 
 ## Decided, not scheduled
 Register as a setting (bass/solo differ only by timbre) · timbres on fingers (source = finger's
@@ -138,25 +136,11 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
 - Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). Since TF2 the key is
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
-  the main thread; hand→sound latency MEASURED by LAT1 (headless only so far; the user's device numbers pending — step 92). The loop
+  the main thread; hand→sound latency MEASURED by LAT1 (user's desktop 2026-10-15: ≈ 126 ms daylight, ≈ 180 ms evening; detection 54 ms vs a
+  real GPU's 10–20; LAT1b device runs pending — plan in its record). The master's browser limiter delays 6.0 ms (measured, SND-F1). The loop
   detects at the display rate, so a camera frame can be detected twice (LAT2).
-- Roll: per-note automation lanes (Volume, brightness, glide…) have no curvature yet (BEND-CURVE did bends and bus lanes); OWN1 offers
-  only modes with as many degrees as the track's; unison/theremin tie pairs untie all candidates of that beat (S6); dissolve
-  and lead-segment detach re-articulate edges; overlapping polyphonic notes on one row — the hit takes the first.
-- One effect network per role: live play goes through the network the recording drives (bus params only). Reorder mid-take: render
-  keeps the earlier order (`reordered`). Effects added mid-take: ▲▼⊘ don't act. A ringing latched chord follows the hand (user-tested, VOL-6 closed).
-- One history (ED7): 300 steps; NOT steps — mute, solo, arm, the brace, tempo, tonic (✕'s step carries the brace and ⟳).
-  The ED2 clipboard lives for the app session; captured bus automation is not copied.
-- Captured expression channels are written but NOT replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
-- After an A4 or tempo change frozen tracks play through the live pools (stealing above the ceiling) until they re-freeze (TF4: 1.5 s + render).
-- Paste goes only into a track of the same view, KEY (and TF5 cents) included; an armed track in another key takes nothing (§3.40 later).
-- A render of a KS (plucked solo) track still pins its offline context, ≈ 6 MB per render (Chrome; no workaround found) — BACKLOG §1 AF6 7.
-- Unfrozen tracks of one role share the role's TRACK chain (last writer wins among them); per-track chains not built (BACKLOG §1).
-- Lanes: a note edit doesn't rebuild its ramp; an anchor only where no event; Glide over bass theremin smooths its steps. Bass
-  theremin records the nearest step only. `tmix` timbre fold correct until ids.
-- Frozen-memory figures, AF2 crossfade tails, AF5 node cost, re-render repeatability: `CLAUDE.md` "Known limits" / archive B.
-- Sections (ED6): a note starting inside a cut loses its tail;
-  a note closed by the next note's start exactly on an insert point is lengthened; insert-then-cut beats equal to ~1e-15, not bitwise.
+- Editor, lanes, history, paste, sections, effect networks, frozen-track and render limits (KS / Glue renders pin ≈ 6 MB, Firefly tails
+  ring out, Night forest CPU): `CLAUDE.md` "Known limits" (one list, kept there). Captured expression channels are not replayed (§4).
 - Opening the editor silences a ringing latch. "Drums only" backing lacks a cultural gate (§3.33 item 1).
 
 ## Key lessons (expanded: archive, «КЛЮЧЕВЫЕ УРОКИ»)
@@ -170,16 +154,30 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### PROBE1 + GOLD1 + HAND1 (2026-10-15) — stage 3 slices 4–6, safety nets (full: archive B «PROBE1 + GOLD1 + HAND1»)
-- PROBE1: `scaleprobe.js` → facade over `src/probes/<area>.js` (moved verbatim, checked line by line); rows register themselves
-  (`probes/rows.js`: `row`/`family`, flags slow/drawn/realtime/song/node, order `at`); registry problems fail P.all and the data runner
-  (control: a duplicate name). Same 47 rows, results and order; the data runner reads its rows from the registry (F4 now after the sweeps).
-- GOLD1: 70 golden renders (51 timbres incl. 5 kits × 6 rows, drone, 6 effects × 3) at 48 kHz → `tools/gold.print.json`; row «GOLD timbres
-  and effects» (P.all, slow, 50–64 s); tol 0.01 dB (measured spread ≤ 0.0011); control: Warm pad filter +1 % caught. Runner P.all limit 8 min.
-- HAND1: synthetic hands on a probe clock through the real `processHands` → `tools/gesture.print.json` (523 lines: W* calls, looper commands,
-  tutor hooks, voices, hands, aims, expression); row «HAND1 gesture fingerprint» (quick, 0.3 s); control: PINCH_ON + 0.03 caught. Probe-only
-  hooks: `gestures.handsProbe/processHandsProbe/pinchDbg`, `recorder.wTapSet` (no-ops when unset). Recording is not in the print (audio clock).
-- Probes: static PASS; data PASS 10 checks (35.4 s); `--quick --all --cdn-cache` PASS — P.quick 48 checks 86.4 s, P.all 63 checks 350.7 s, UI and
-  CSP PASS; frozen seed bass L4 0.08686 / 0.055319 / 650886. Fix rounds: PROBE1 2 (split tool: template braces, spread imports; registry
-  family check order), GOLD1 1 (P.all over the 5-min limit → windows shortened, limit 8), HAND1 2 (state leaking between runs: display,
-  message, palette; message language). Vercel production URL recorded: https://handsong.vercel.app.
+### LAT1b (2026-10-15) — latency diagnostics before LAT2 (full: archive B «LAT1b + SND-F1»)
+- Meter (+ «Copy», `R.latency()`): graphics renderer (hardware/software), the hand model's REAL processor (MediaPipe's own log lines),
+  camera asked vs given, duplicates per minute, frame wait (½ frame) + a second total, long tasks at startup / while playing with causes.
+  Test switches (Sound → Diagnostics, session only, defaults = before): hands 2/1, model GPU/CPU, camera fps default/30/60. Headless: Intel
+  HD 4000 (hardware), GPU; the fake camera always gives 20 fps (30/60 only on real cameras).
+- **User's measurement plan** (desktop, daylight, ~20 s of play each, «Copy» after each): A defaults · C 1 hand · D 30 fps · E 60 fps ·
+  B model CPU LAST (MediaPipe names the CPU path once per page: after B the read-out says «unknown» — reload to start over); then A and D
+  on the phone. Path: ▶ Play → «🎛 Sound» → bottom «Diagnostics».
+- Probes: rows «LAT1 latency meter» (+ new fields, 4 controls) and «LAT1b test switches» (real buttons; control) — fix rounds: data 1 (my expectation), licence glyph 1, static 1;
+  runner 1 (TFLite names the CPU path once per page → later read-outs say «unknown», CPU test last in the plan).
+
+### SND-F1 (2026-10-15) — sounds from the Calm prototype (full: archive B «LAT1b + SND-F1»)
+- Chord timbre «Firefly» (`CHORD_INSTR[16]`, appended): the prototype's struck tine exactly (−146 dB residual; × chord bus 0.28), one-shot
+  strikes (rule #3 exception like drums), live/track routing (rule #31). ⛔ Not a solo/bass timbre: the user's rule «no new solo timbre until
+  stable ids» — after TIM1. Night forest (`forest`, bus): seeded 3.4-s stereo IR (`core/dsp.js`), our spec normalisation, mix = send 0.8.
+- Dynamics (`dyn-worklet.js`, our code, zero lookahead, deterministic): Glue (chain module, «Dynamics» group; master Glue OFF by default)
+  and a safety Limiter on the master (ON, −1 dBFS, exact identity below). The browser master limiter KEPT (rule #4) — it delays 6.0 ms
+  (288 frames, measured): replacing it by our limiter would cut 6 ms from hand → sound — **user's decision**.
+- Glue vs the prototype's built-in compressor (Firefly + Night forest phrase): residual −34 dB, same loudness, worst 50-ms envelope
+  1.2 dB; preset thr −12, ratio 3, knee 6, att 10 ms, rel 250 ms, makeup +0.9 dB.
+- ⚠️ CPU (offline proxy, desktop): one Night forest ≈ 19–24 % of a core; 1.7 s IR ≈ 10 %, 0.85 s ≈ 6 %; phone ≈ 4× → PROPOSAL (not applied):
+  1.7-s IR on phones, or the FDN shaped like the forest. Latency: our nodes add 0 frames; LAT1b totals on/off: hand → sound 125.2 / incl. frame wait 162.3 ms (all off) vs 120.3 / 196.3 (all on; the second total follows the fake camera's measured fps on a busy machine — buffer/output 10/42 vs 10/32 ms).
+- Probes: 5 new rows + node row + 9 golden cases (existing 70 untouched); fix rounds: static 3, freeze parity 2 (master
+  gain in the capture, `only` quirk, warm-up), live = offline 1 (start margin). ⚠️ Found, outside the slice: GOLD «fx reverb 3» spec[11] flickers
+  ±0.012 dB in ~half of fresh sessions (also without this slice — not widened); under heavy CPU load Chrome's LIVE convolver drops Night
+  forest's later IR stages (frozen keeps them) — the parity row fails then. Decisions recorded: golden-render renewal
+  rules (CLAUDE.md, GOLD); BACKLOG §7.14 «Dynamics», §7.16 Forest drone + distance colour.

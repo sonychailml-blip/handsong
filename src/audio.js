@@ -1,7 +1,8 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
 import { baseF, tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
-import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld, bendPlan } from './config.js';   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
+import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld, bendPlan } from './config.js';
+import { FOREST, forestIR, irNormScale, DYN_GLUE, DYN_LIMIT } from './core/dsp.js';   // SND-F1: Night forest IR, dynamics presets (pure core)   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
@@ -69,7 +70,10 @@ const CHORD_INSTR=[
   {label:{en:'Warm pad (clean)', ru:'Пад тёплый (чистый)'},     t1:'sawtooth', t2:'triangle', ratio:1, det:0,  m1:.48, m2:.34, lp:1400, lvl:.16, att:.30,  rel:2.0, fo:1.4, ft:.35, fv:.6, hj:0},  // ЧИСТЫЕ ПАДЫ (det=0 — биения только от строя)
   {label:{en:'Glass pad (clean)', ru:'Пад стеклянный (чистый)'}, t1:'triangle', t2:'sine',     ratio:2, det:0,  m1:.52, m2:.28, lp:3000, lvl:.18, att:.28,  rel:2.0, fo:1.4, ft:.30, fv:.6, hj:0},  // ratio 2 = чистая октава (без биений)
   {label:{en:'Strings', ru:'Струнные'},                t1:'sawtooth', t2:'sawtooth', ratio:1, det:6,  m1:.46, m2:.40, lp:2200, lvl:.17, att:.18,  rel:.80, fo:1.6, ft:.30, fv:.8, hj:0},  // СМЫЧКОВЫЕ: мягкая атака + медленное открытие фильтра (наплыв), лёгкая ширина ансамбля
-  {label:{en:'Plucked', ru:'Щипковые'},                t1:'sawtooth', t2:'square',   ratio:1, det:3,  m1:.44, m2:.28, lp:2800, lvl:.19, att:.003, rel:.20, fo:3.5, ft:.08, fv:1.5, hj:1},  // ЯРКИЙ ЩИПОК: быстрая атака, резкое открытие/закрытие фильтра — для макамов/пентатоник, где пад неуместен
+  {label:{en:'Plucked', ru:'Щипковые'},                t1:'sawtooth', t2:'square',   ratio:1, det:3,  m1:.44, m2:.28, lp:2800, lvl:.19, att:.003, rel:.20, fo:3.5, ft:.08, fv:1.5, hj:1},
+  /* SND-F1: «Firefly» — a struck tine, ONE-SHOT per note (strike:'firefly' → ffStrike; the oscillator fields are the pool voice's silent
+     bookkeeping). lvl = the prototype's gain at full velocity (0.08 + 0.16); rel = the longest partial decay (render tail). */
+  {label:{en:'Firefly', ru:'Светлячок'}, strike:'firefly', t1:'triangle', t2:'sine', ratio:2, det:0, m1:0, m2:0, lp:18000, lvl:.24, att:.006, rel:1.6, fo:1, ft:.02, fv:0, hj:0},  // ЯРКИЙ ЩИПОК: быстрая атака, резкое открытие/закрытие фильтра — для макамов/пентатоник, где пад неуместен
 ];
 /* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio, расстройка det),
    НЧ-фильтр lp, огибающая att/rel. Плюс огибающая фильтра на атаке: fo — открытие, ft — время,
@@ -196,6 +200,21 @@ const hitOwner=k=>{ hitOwnerKey=k; };
    анализатор на выходе лимитера (то, что слышно); лимитер не трогаем (правило #4), только читаем его подавление (reduction, дБ). */
 const MASTER_BASE=0.8;
 let masterLvl=1, meterAn=null, meterBuf=null;
+/* SND-F1: the master's dynamics (live only). mGlue — our compressor, OFF by default; mLim — the safety limiter, ON by default; outLast —
+   the node that feeds the speakers (the meter, the clip tap and the probe capture hang there). Session switches (Sound panel). */
+let mGlue=null, mLim=null, outLast=null, mGlueOn=false, mLimOn=true;
+const MASTER_GLUE_MAKEUP=DYN_GLUE.makeup;
+function masterDynSet(which,on){ const n= which==='glue' ? mGlue : mLim; if(which==='glue') mGlueOn=!!on; else mLimOn=!!on;
+  if(n&&AC){ const q=n.parameters.get('on'), t=AC.currentTime; q.cancelScheduledValues(t); q.setValueAtTime(on?1:0,t); } return masterDyn(); }
+const masterDyn=()=>({ ready:!!(mGlue&&mLim), glue:mGlueOn, limiter:mLimOn });
+/* probe / golden renders only: an offline copy's master through one dynamics node (after offlineTapMaster), with a master gain */
+function offlineMasterDyn(mode,set,gain){
+  if(!AC||!offline||!master||!dynReady) return false;
+  let n; try{ n=dynNode(mode, { ...set }, true); }catch(e){ return false; }
+  try{ master.disconnect(); }catch(e){}
+  if(gain!=null) master.gain.value=gain;
+  master.connect(n); n.connect(AC.destination); return true;
+}
 function setMasterLevel(v){ masterLvl=Math.max(0,Math.min(1,+v||0)); if(AC&&master) master.gain.setTargetAtTime(MASTER_BASE*volAmp(masterLvl), AC.currentTime, 0.03); }
 const masterLevel=()=>masterLvl;
 function masterMeter(){
@@ -1266,13 +1285,73 @@ function fxGlideOf(m){ const v=m&&m[FX_GLIDE_KEY]; return v==null ? undefined : 
 /* roles — У ГОЛОСОВОГО модуля: каким ролям он что-то делает, то есть кому его ПРЕДЛАГАТЬ в зоне «в ноте» (ui). Шинные
    принимают любой сигнал и поля не имеют. ⚠️ Прежде общий список «+ Добавить» перечислял ВСЮ фабрику, и яркость аккордов
    предлагалась соло, басу и ударным, где её не читает никто. */
+/* ═══ SND-F1 — «NIGHT FOREST»: A CONVOLUTION ROOM (bus module) ═══
+   The Calm prototype's room: a 3.4-s stereo noise impulse response with the envelope (1 − i/len)^2.6 (core/dsp.forestIR — SEEDED, the same
+   at any sample rate, live and offline: frozen = live), wet return 0.55, the note send «mix» (default 0.8 = the prototype). ONE convolver
+   per chain instance (live and track chains separate, rule #31), never per note. The IR is normalised by us exactly as the Web Audio
+   spec's normalize = true would (core/dsp.irNormScale) and the node runs with normalize = false — the level does not depend on the browser.
+   A mix 0 module is identity (dry 1, send 0). Generated once per sample rate (≈ 10 ms) and shared by every instance. */
+const FOREST_PARAMS=[ {key:'mix', labelKey:'fx.forest.mix', short:'FRST', unit:'', def:FOREST.send, min:0, max:1, curve:'lin'} ];
+const forestIRs={};
+function forestData(rate){
+  if(!forestIRs[rate]){ const ch=forestIR(rate), k=irNormScale(ch, rate); forestIRs[rate]=ch.map(d=>d.map(x=>x*k)); }
+  return forestIRs[rate];
+}
+function makeForestFx(){
+  const fxIn=AC.createGain(), fxOut=AC.createGain(), dry=AC.createGain(); fxIn.gain.value=1; fxOut.gain.value=1; dry.gain.value=1;
+  fxIn.connect(dry); dry.connect(fxOut);
+  const send=AC.createGain(); send.gain.value=0;
+  const gate=AC.createGain(); gate.gain.value=1;
+  const conv=AC.createConvolver(); conv.normalize=false;   // normalize BEFORE the buffer: it is read when the buffer is set
+  const ch=forestData(AC.sampleRate), buf=AC.createBuffer(2, ch[0].length, AC.sampleRate); ch.forEach((d,i)=>buf.copyToChannel(d,i)); conv.buffer=buf;
+  const ret=AC.createGain(); ret.gain.value=FOREST.wet;
+  fxIn.connect(send); send.connect(gate); gate.connect(conv); conv.connect(ret); ret.connect(fxOut);
+  const SET={ mix:(v,w)=>{ send.gain.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.08); } };
+  const params=FOREST_PARAMS.map(sp=>({...sp, set:SET[sp.key]}));
+  for(const p of params) fxWrapParam(p);
+  params[0].setNorm(params[0].cur);
+  return { id:'forest', labelKey:'fx.forest', kind:'bus', in:fxIn, out:fxOut, send, gate, params, conv };
+}
+/* ═══ SND-F1 — «GLUE»: OUR COMPRESSOR (insert module; also the master's optional Glue) ═══
+   The dynamics worklet (dyn-worklet.js, mode 'comp'): zero lookahead, deterministic, soft knee, stereo-linked. ⛔ Not the built-in
+   DynamicsCompressorNode: it delays the signal (lookahead), differs between browsers and is not guaranteed equal offline. Inactive = an
+   exact bypass inside the worklet (10-ms crossfade). Without the worklet (load failed; a track render that does not need it) the module
+   is an identity gain — never a different sound path. */
+const GLUE_PARAMS=[
+  {key:'thr',   labelKey:'fx.glue.thr',   short:'THR',  unit:'dB', def:DYN_GLUE.thr,   min:-48,    max:0,   curve:'lin'},
+  {key:'ratio', labelKey:'fx.glue.ratio', short:'RAT',  unit:'',   def:DYN_GLUE.ratio, min:1,      max:20,  curve:'log'},
+  {key:'knee',  labelKey:'fx.glue.knee',  short:'KNEE', unit:'dB', def:DYN_GLUE.knee,  min:0,      max:40,  curve:'lin'},
+  {key:'att',   labelKey:'fx.glue.att',   short:'ATT',  unit:'s',  def:DYN_GLUE.att,   min:0.0005, max:0.1, curve:'log'},
+  {key:'rel',   labelKey:'fx.glue.rel',   short:'REL',  unit:'s',  def:DYN_GLUE.rel,   min:0.02,   max:2,   curve:'log'},
+  {key:'makeup',labelKey:'fx.glue.makeup',short:'GAIN', unit:'dB', def:DYN_GLUE.makeup,min:-12,    max:24,  curve:'lin'},
+];
+let dynReady=false, dynWarned=false;
+/* one dynamics node: mode 'comp' | 'limit'; set = initial parameter values; keep = an engine node that lives as long as its context */
+function dynNode(mode,set,keep){
+  return new AudioWorkletNode(AC,'dyn',{ numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[2], channelCount:2, channelCountMode:'explicit',
+    channelInterpretation:'speakers', processorOptions:{ mode, keep:!!keep }, parameterData:{ ...set } });
+}
+function makeGlueFx(){
+  let node=null;
+  if(dynReady){ try{ node=dynNode('comp', { ...DYN_GLUE, on:1 }, true); }catch(e){ node=null; } }
+  if(!node){ if(!dynWarned){ dynWarned=true; console.warn('[glue] the dynamics worklet is not loaded in this context — Glue passes the sound unchanged'); }
+    node=AC.createGain(); node.gain.value=1; }
+  const par=k=>node.parameters ? node.parameters.get(k) : null;
+  const SET=k=>(v,w)=>{ const q=par(k); if(q) q.setTargetAtTime(v, w!=null?w:AC.currentTime, 0.02); };
+  const params=GLUE_PARAMS.map(sp=>({...sp, set:SET(sp.key)}));
+  for(const p of params) fxWrapParam(p);
+  return { id:'glue', labelKey:'fx.glue', kind:'insert', in:node, out:node, params, worklet:!!node.parameters,
+           setActive:(on,w)=>{ const q=par('on'); if(!q) return; const t=w!=null?w:AC.currentTime; q.cancelScheduledValues(t); q.setValueAtTime(on?1:0,t); } };
+}
 const FX_FACTORY={
   [FX_VOL]:{ id:FX_VOL, labelKey:'fx.vol', kind:'voice', params:VOL_PARAMS, make:makeVolFx, roles:['ld','ch','bs','dr'], perm:true },   // VOL-0: ГРОМКОСТЬ — постоянная голосовая запись каждой цепи (см. VOL_PARAMS). Первой: так читается «в ноте» сверху вниз
   reverb:{ id:'reverb', labelKey:'fx.reverb', kind:'bus',   params:REV_PARAMS,    make:makeReverbFx },
   bright:{ id:'bright', labelKey:'fx.bright', kind:'voice', params:BRIGHT_PARAMS, make:makeBrightFx, roles:['ch','ld','bs','dr'] },   // яркость — ВСЕМ ролям: у аккордов фильтр fb голоса, у прочих — ступень яркости (makeBriStage / удар)
   glide: { id:'glide',  labelKey:'fx.glide',  kind:'voice', params:GLIDE_PARAMS,  make:makeGlideFx,  roles:['ld','bs'] },   // V4: мелодические роли
   dly:   { id:'dly',    labelKey:'fx.dly',    kind:'bus',   params:DLY_PARAMS,    make:makeDelayFx },
-  trmMix:{ id:'trmMix', labelKey:'fx.trmMix', kind:'insert',params:TRMIX_PARAMS,  make:makeTremMixFx },   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
+  trmMix:{ id:'trmMix', labelKey:'fx.trmMix', kind:'insert',params:TRMIX_PARAMS,  make:makeTremMixFx },
+  forest:{ id:'forest', labelKey:'fx.forest', kind:'bus',   params:FOREST_PARAMS, make:makeForestFx },   // SND-F1: «Night forest» room
+  glue:  { id:'glue',   labelKey:'fx.glue',   kind:'insert',params:GLUE_PARAMS,   make:makeGlueFx, cat:'dyn' },   // SND-F1: category «Dynamics»   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
 };
 /* ⛳ ПОСТОЯННАЯ ЗАПИСЬ ЦЕПИ (VOL-0) — ОДИН предикат на все места, где запись цепи ПОКАЗЫВАЮТ или ПРЕДЛАГАЮТ: столбики и их
    габарит (draw), панель — строки, подсказка, карта общих адресов, списки «добавить» (ui), голосовой список дорожки
@@ -1667,6 +1746,7 @@ function voicesCut(test, when, dur, part){
   let n=0; const fade=v=>{ if(!v.tg) return; xfRamp(v.tg.gain, t, dur, ownerGain(v.owner||v.last), false); n++; };
   if(part!=='lead'){
     for(const v of cv) if(hit(v)) fade(v);
+    for(const x of ffLive) if(x.owner && test(x.owner)){ if(x.t<t) xfRamp(x.g.gain, t, dur, x.g0, false); else x.g.gain.setValueAtTime(0, x.t); n++; }   // SND-F1: struck notes
     for(const v of bv) if(hit(v)) fade(v);
     for(const k of Object.keys(chordHold)) if(test(k)){ for(const v of chordHold[k]) cvRelease(v,true,t+dur); delete chordHold[k]; }
     for(const k of Object.keys(bassHold)) if(test(k)){ const v=bassHold[k]; v.deg=-1; bvRelease(v,true,t+dur); delete bassHold[k]; }
@@ -1699,10 +1779,10 @@ function probeCapture(sec){
   return new Promise((res,rej)=>{
     let done=false;
     const fin=(err,m)=>{ if(done) return; done=true; node.port.onmessage=null;
-      try{ master.disconnect(node); }catch(e){} try{ node.disconnect(); }catch(e){} try{ limiter.connect(AC.destination); }catch(e){}
+      try{ master.disconnect(node); }catch(e){} try{ node.disconnect(); }catch(e){} try{ outLast.connect(AC.destination); }catch(e){}
       if(err) return rej(err);
       res({ L:m.L, R:m.R, rate:AC.sampleRate, F0:m.F0, gaps:m.gaps, stale:m.stale, jumps:m.jumps||[] }); };
-    try{ limiter.disconnect(AC.destination); }catch(e){}
+    try{ outLast.disconnect(AC.destination); }catch(e){}
     master.connect(node); node.connect(AC.destination);   // выход молчит (процессор ничего не пишет) — подключён, чтобы граф тянул узел
     node.port.onmessage=e=>fin(null, e.data||{});
     setTimeout(()=>fin(new Error('the capture did not finish (is the audio context suspended?)')), (sec+3)*1000);
@@ -1984,7 +2064,11 @@ function cvAlloc(when){
    голоса 'latch'), и наоборот. Ровно это и есть причина ухода с общей шины на пер-голосовой fb. */
 function chordOn(owner,freqs,vol,insIdx,bri,when){
   chordOff(owner,when);
-  const ins=CHORD_INSTR[insIdx], t=when!=null?when:AC.currentTime, briHz=briToHz(bri);   // bri==null (аранжировка/джем) → briToHz→CHORD_LP_MAX (открыт, нейтраль = сегодняшний звук)
+  const ins=CHORD_INSTR[insIdx], t=when!=null?when:AC.currentTime, briHz=briToHz(bri);
+  if(ins.strike){ const amp=ins.lvl*volAmp(vol);   // SND-F1: a struck timbre — silent pool voices hold the note, the strikes sound (ffStrike)
+    chordHold[owner]=freqs.map(fr=>{ const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t; v.lvl=0; v.ffHz=fr; v.ffBri=bri;
+      if(amp>0) ffStrike(owner,fr,amp,bri,t); return v; });
+    return; }   // bri==null (аранжировка/джем) → briToHz→CHORD_LP_MAX (открыт, нейтраль = сегодняшний звук)
   chordHold[owner]=freqs.map(fr=>{
     const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
@@ -2006,10 +2090,45 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     return v;
   });
 }
+/* ═══ SND-F1 — FIREFLY: a struck tine, ONE-SHOT per note (chord timbre «Firefly») ═══
+   Three partials, each with its own envelope (6 ms linear attack, exponential decay to 0.0001): body 1×f triangle 1.6 s, octave 2×f sine
+   0.28 · 0.9 s, the inharmonic tine «click» 4.2×f sine 0.12 · 0.28 s — the Calm prototype's recipe exactly (row «SND-F1 Firefly identity»
+   compares it sample by sample). ⛳ A sanctioned exception to rule #3, like a drum hit: a strike makes its own oscillators at its moment
+   and they stop when the decay ends — a struck tine has no sustain to gate. The pool voice still holds the note (owner, pitch for the
+   readout and highlights, release) but stays silent. Each strike takes its owner's level, pan, route (live head or track head, rule #31)
+   and brightness AT THE STRIKE, like a drum hit (a stage only when not neutral). chordOff cancels the owner's strikes that have not begun
+   (stop, panic, seams, a replaced chord) and lets begun ones ring out — the decay IS the note; voicesCut fades them at a freeze swap. */
+const FIREFLY=[ [1,1.00,1.6,'triangle'], [2,0.28,0.9,'sine'], [4.2,0.12,0.28,'sine'] ];
+const FF_END=Math.max(...FIREFLY.map(p=>p[2]))+0.05;
+const ffLive=[];   // strikes not yet over: { owner, g, t, g0, route, cancelled? }
+const ffInfo=()=>ffLive.map(x=>({ owner:x.owner, t:x.t, route:x.route, cancelled:!!x.cancelled }));   // probes only
+function ffStrike(owner,f,amp,bri,t){
+  const d=Math.max(0,Math.min(1,bri||0)), pv=ownerPan(owner), g0=amp*ownerGain(owner);
+  const tr=!!(chordBusT&&trackRouteOf(owner));
+  let out= tr ? chordBusT : chordBus;
+  if(d>0){ const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=briToHz(d); lp.connect(out); out=lp; }
+  if(pv!==0){ const pin=AC.createGain(), st=makePanStage(pin,out), [a,b]=panGains(pv); st.l.gain.value=a; st.r.gain.value=b; out=pin; }
+  const g=AC.createGain(); g.gain.value=g0; g.connect(out);
+  for(const [ratio,a,decay,type] of FIREFLY){
+    const o=AC.createOscillator(), pg=AC.createGain();
+    o.type=type; o.frequency.value=f*ratio;
+    pg.gain.setValueAtTime(0,t); pg.gain.linearRampToValueAtTime(a,t+0.006); pg.gain.exponentialRampToValueAtTime(0.0001,t+decay);
+    o.connect(pg); pg.connect(g); o.start(t); o.stop(t+decay+0.05);
+  }
+  const now=AC.currentTime; for(let i=ffLive.length-1;i>=0;i--) if(ffLive[i].t+FF_END<now) ffLive.splice(i,1);
+  ffLive.push({ owner, g, t, g0, route: tr ? 'track' : 'live' });
+}
+/* strikes of `owner` that begin at or after `when` never sound */
+function ffCancel(owner,when){
+  for(const x of ffLive) if(x.owner===owner && x.t>=when-1e-9){ x.g.gain.setValueAtTime(0, Math.min(when, x.t)); x.owner=null; x.cancelled=true; }
+}
 function chordGlide(owner,freqs,vol,bri,when){    // смена аккорда без переатаки — voice leading; bri ПЕРЕД when (when — последний, для планировщика)
   const vs=chordHold[owner]; if(!vs)return; const t=when!=null?when:AC.currentTime;
   const briHz=bri==null?null:briToHz(bri);       // bri==null (аранжировка/джем: chSet без яркости) → fb НЕ трогаем, остаётся с атаки
   vs.forEach((v,i)=>{ const fr=freqs[i]; if(fr==null)return;
+    if(v.ins&&v.ins.strike){   // SND-F1: a struck note cannot glide — a new pitch is a new strike; volume and brightness only at a strike
+      if(!(v.ffHz>0) || Math.abs(1200*Math.log2(fr/v.ffHz))>0.5){ v.ffHz=fr; if(bri!=null) v.ffBri=bri; const amp=v.ins.lvl*volAmp(vol); if(amp>0) ffStrike(owner,fr,amp,v.ffBri,t); }
+      return; }
     v.o1.frequency.setTargetAtTime(fr,t,0.035);
     v.o2.frequency.setTargetAtTime(fr*v.ins.ratio,t,0.035);
     if(briHz!=null)v.fb.frequency.setTargetAtTime(briHz,t,0.05);   // яркость ведём setTargetAtTime → без щелчка; f (атака) не трогаем — расцеплены
@@ -2017,7 +2136,7 @@ function chordGlide(owner,freqs,vol,bri,when){    // смена аккорда �
     if(Math.abs(L-v.lvl)>0.003){ v.lvl=L; v.g.gain.setTargetAtTime(L,t,0.05); }
   });
 }
-function chordOff(owner,when){ const vs=chordHold[owner]; if(!vs)return;
+function chordOff(owner,when){ if(ffLive.length) ffCancel(owner, when!=null?when:AC.currentTime); const vs=chordHold[owner]; if(!vs)return;
   vs.forEach(v=>cvRelease(v,false,when)); delete chordHold[owner]; }
 
 /* ⛳ mkCtx — ФАБРИКА КОНТЕКСТА (слайс F0 дуги «ЗАМОРОЗКА»). Не задана — всё ровно как было: живой
@@ -2066,6 +2185,7 @@ async function initAudio(mkCtx){
   leadOutT=chordBusT=bassBusT=drumBusT=null;   // AF5: track heads exist only in the live copy (built below when !mkCtx)
   for(const k in FX_DIP_T){ if(FX_DIP_T[k]) clearTimeout(FX_DIP_T[k]); delete FX_DIP_T[k]; }   // ждущая пересборка старого контекста нам не нужна и сработать не должна
   FX_AIM.clear();
+  ffLive.length=0;   // SND-F1: strikes of an earlier context are gone with it
   bldHum=null; bldVib=null;
   /* KS-ворклет грузим В НАЧАЛЕ (по-прежнему внутри клика — правило #1 цело), ДО buildLeadBanks,
      чтобы banks[] строился синхронно и не разъехался с LEAD_INSTR. Провал загрузки — не падаем:
@@ -2095,9 +2215,19 @@ async function initAudio(mkCtx){
      остаточное подавление в ровное смещение вместо «дыхания»; knee 6 — мягкий вход. */
   limiter.threshold.value=-6; limiter.knee.value=6; limiter.ratio.value=20;
   limiter.attack.value=0.010; limiter.release.value=0.25;
-  limiter.connect(AC.destination);
-  master=AC.createGain(); master.gain.value=MASTER_BASE*volAmp(masterLvl); master.connect(limiter);   // MX1: при уровне мастера 100 — ровно прежние 0.8
-  meterAn=AC.createAnalyser(); meterAn.fftSize=1024; limiter.connect(meterAn);   // MX1: измеритель на выходе лимитера (только чтение; в выход не идёт)
+  /* SND-F1: the dynamics worklet (Glue, safety Limiter). Live: master → Glue (off by default) → the limiter above (kept, rule #4) →
+     safety Limiter (on by default; exact identity below its ceiling) → output. Both zero-lookahead. The render copy taps the master
+     before all of this (offlineTapMaster), so frozen buffers never carry master processing. A failed load leaves the old path. */
+  dynReady=false; mGlue=mLim=null;
+  try{ await AC.audioWorklet.addModule('src/dyn-worklet.js'); dynReady=true; }
+  catch(e){ console.warn('Dynamics worklet did not load — Glue and the safety limiter are bypassed:',e); }
+  if(!mkCtx && dynReady){ try{ mGlue=dynNode('comp', { ...DYN_GLUE, makeup:MASTER_GLUE_MAKEUP, on:mGlueOn?1:0 }, true); mLim=dynNode('limit', { ...DYN_LIMIT, on:mLimOn?1:0 }, true); }
+    catch(e){ mGlue=mLim=null; console.warn('Dynamics nodes failed — master path unchanged:',e); } }
+  if(mGlue) mGlue.connect(limiter);
+  if(mLim){ limiter.connect(mLim); mLim.connect(AC.destination); } else limiter.connect(AC.destination);
+  outLast=mLim||limiter;
+  master=AC.createGain(); master.gain.value=MASTER_BASE*volAmp(masterLvl); master.connect(mGlue||limiter);   // MX1: при уровне мастера 100 — ровно прежние 0.8
+  meterAn=AC.createAnalyser(); meterAn.fftSize=1024; outLast.connect(meterAn);   // MX1: измеритель на выходе лимитера (только чтение; в выход не идёт)
  
   /* Общий ревербератор: СЕТЬ ЗАДЕРЖЕК С ОБРАТНОЙ СВЯЗЬЮ (FDN, см. buildFDN), у каждого источника свой
      send. Заменила конвольвер со случайным шумовым IR: у свёртки хвост ЗАПЕЧЁН в буфер, и живьём
@@ -3018,8 +3148,9 @@ function metroClick(t,level){
 function createRecordingTap(){
   if(!AC) return null;
   const dest=AC.createMediaStreamDestination();
-  limiter.connect(dest);
-  return { stream:dest.stream, dispose:()=>{ try{ limiter.disconnect(dest); }catch(e){} } };
+  outLast.connect(dest);
+  const src=outLast;
+  return { stream:dest.stream, dispose:()=>{ try{ src.disconnect(dest); }catch(e){} } };
 }
 
 /* Экспорт: `let` через export-клаузу — живые связки (AC виден после initAudio). */
@@ -3061,4 +3192,5 @@ export {
   /* RENDER-LEAK: first solo KS timbre index — a track render loads the KS worklet only when the track uses one */
   LEAD_KS_FROM,
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
+  masterDynSet, masterDyn, offlineMasterDyn, forestData, dynReady, ffInfo,
 };

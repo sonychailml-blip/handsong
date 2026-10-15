@@ -97,7 +97,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `src/scaleprobe.js` and `src/probes/*` are callers too. The report LISTS every positional caller of every changed function with its arguments.
 - **Stay inside the slice.** Defects outside it are reported, not fixed.
 - **Probes — speed:** `await P.quick()` = `P.all()` without the rows flagged `slow` (all-view sweeps T1, T2, T4b1, T4b3, T4b4, T5, T6b, F0,
-  F3; "tracks: every one reachable"; LR1; AF2; AF6b; GOLD); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
+  F3; "tracks: every one reachable"; LR1; AF2; AF6b; GOLD; SND-F1 live = offline and freeze parity); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
   only the pitched track. Every rendering probe renders a SHORT window (`renderTrack(…, {short})`, `PROBE_SHORT` 1 s of song, tail
   ≤ 0.75 s) — never `freeze`/❄/`R.aud`. On demand only: `P.checkRepeat({evidence:true})`, `P.orderCheck()`, `await P.freezeCost()`.
   Rows flagged `drawn` (LAT1, ED7-fix2, tracks reachable, AR1, MX1, MX2, AR2) read "not checked: tab hidden" when frames don't come.
@@ -161,9 +161,14 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 2. **Never hardcode frequencies, note tables or the octave `2`.** Pitch derives from `baseF()` and the current (or frozen) scale:
    `P^(iv/edo)` with `P=periodOf(s)`, or the cents overlay `2^(cents/1200)`.
 3. **Pool oscillators start once and never stop** (solo/chord/bass gated by GainNodes; per-hit drums, metronome, drone LFO, frozen-track
-   readers are the one-shot exceptions). Lazily built solo voices and banks obey it: cached and gated, never torn down. The offline
+   readers and — since SND-F1 — the strikes of a struck chord timbre («Firefly», `ffStrike`: a tine has no sustain to gate) are the
+   one-shot exceptions). Lazily built solo voices and banks obey it: cached and gated, never torn down. The offline
    engine copy is a second instance of this rule (its own oscillators live as long as its own context).
-4. **The master limiter stays.**
+4. **The master limiter stays.** SND-F1: live master path = `master` → `mGlue` (our compressor, off by default) → `limiter` (the browser's
+   DynamicsCompressorNode — measured: it delays everything by 288 frames = 6.0 ms at 48 kHz; replacing it is the user's decision, see
+   HANDOFF) → `mLim` (our safety limiter, on by default, ceiling −1 dBFS, exact identity below it) → output; `outLast` feeds the meter, the
+   clip tap and the probe capture. Our dynamics are zero-lookahead. The render copy taps `master` before all of it (frozen buffers carry
+   no master processing).
 5. **Lower layers never touch the DOM** — `audio.js`, `arrange.js`, `recorder.js` reach the UI only via `hooks`. `draw.js` is exempt.
 6. **Live bindings — write state only through its setter**, never a module-level `const` copy. The recorder re-reads `baseF()`/`CUR()`
    every step.
@@ -331,7 +336,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   lanes, brace, chase, undo, stops, backing, capture and playback of effects, the editor API, lane tables, freeze registry and
   signature, `seedTake`, `evHz`.
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
-- `src/vision.js` — camera + MediaPipe (`openCamera(facing)`, `switchCamera` — the landmarker is never recreated).
+- `src/vision.js` — camera + MediaPipe (`openCamera(facing)`, `switchCamera` — the landmarker is never recreated). LAT1b: `camInfo`
+  (requested vs granted `getSettings`), `modelInfo` (the processor the model REALLY runs on: MediaPipe's own log lines for 15 s after a
+  (re)start, `mpTap` — XNNPACK ⇒ CPU, only a GL context ⇒ GPU; measured: both paths create a WebGL context; TFLite prints the XNNPACK line
+  ONCE per page, so after it was seen a later window reads 'unknown' + `once` — never a guess), test switches
+  `setHandsTracked` / `setModelDelegate` (landmarker `setOptions`, same landmarker) / `setCamFps` (reopens the camera); `VISION_DEF` = the
+  defaults (2 hands, GPU, no frame rate requested — the app as before).
 - `src/clip.js` — clip/audio recorder (`startClip`/`stopClip`, `activeKind()`, `captureFrame()` last in every frame, `REC_FPS` 30);
   `recKind` is the single truth.
 - `src/demo.js` — start-screen tunings demo (own mini-engine); scenes by stable id (`SCENES[].id`).
@@ -350,7 +360,13 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/core/` — the pure CORE (stage-3 target; no DOM, Web Audio, camera or network; runs in node). Today `core/latency.js` (LAT1):
   `makeMeter` (ring of `LAT_N` 240 samples per stage), `statsOf` (mean, nearest-rank p5/p50/p95, jitter = p95 − p5, max), `handToSound`
   (camera + detection + gestures + ½ audio block + base + output; unknown parts listed in `missing`), `looksBluetooth` (`BT_MS` 100 or
-  `BT_LABEL`).
+  `BT_LABEL`); LAT1b `frameWaitMs` (½ frame), `withFrameWait`, `perMinute`, `splitLongTasks` (startup = before camera start + `STARTUP_MS`
+  10 s / playing = last minute), `isSoftwareGL`. `core/dsp.js` (SND-F1): `seeded` (mulberry32), `FOREST`/`forestIR` (the Night forest IR,
+  seeded per channel, any rate), `irNormScale` (the Web Audio spec's convolver normalisation, applied by us), `f32Hash`, `compCurveDb` /
+  `compGainDb` (soft-knee curve), presets `DYN_GLUE`, `DYN_LIMIT`, `dynCoef`.
+- `src/dyn-worklet.js` — SND-F1 dynamics processor `'dyn'` (mode `comp` = Glue: stereo-linked, soft knee, branching peak detector in dB,
+  makeup; mode `limit`: instant attack, release, ceiling; `on` = exact bypass with a 10-ms crossfade; all k-rate). Zero lookahead,
+  deterministic; imports `core/dsp.js`. Loaded on the live context and, in a track render, only when the chain holds Glue.
 - `src/latmeter.js` — LAT1 latency meter, browser side (UI-level; owns `#latDiag`, `#latWarn` and the Sound-panel toggle `#latOn/#latOff`):
   `requestVideoFrameCallback` (captureTime, presentationTime, presentedFrames → camera fps and «picture taken → app»), per-frame stages
   (`detect`, `gestures`, `draw`, `loop`; a camera frame detected twice counts as `sameFrameAgain`), audio every 500 ms (`baseLatency`,
@@ -364,7 +380,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   open, or on a non-empty song without `replace`.
 - `src/scaleprobe.js` — the browser probe (`P`), since PROBE1 a FACADE: explicit re-exports of `src/probes/<area>.js` (`run` P.all/P.quick/
   orderCheck/material, `tuning`, `seed` P.seed/P.song + write path, `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `gold`, `hand`,
-  `guard` api/lock, `kit` shared helpers, `data` the node rows). ⛳ **Rows register themselves** next to their probe: `probes/rows.js`
+  `sound` (SND-F1), `guard` api/lock, `kit` shared helpers, `data` the node rows). ⛳ **Rows register themselves** next to their probe: `probes/rows.js`
   `row({ at, name, run, read, slow?, drawn?, realtime?, song?, node? })` (order by `at`; the pre-PROBE1 order = old position × 10),
   `family({ at, name, rows })` for generated rows (module contracts); `rowProblems()` (duplicate names/places, bad shapes) counts as
   differences in P.all and the data runner (CONTROL: a duplicate name must be caught). A new row = a `row()` call in its area file, nothing
@@ -594,10 +610,13 @@ metronome (`metroClick(t,level)`, 4 levels).
   Loops are wired with ONE entry (live and render since LR1/AF1; one builder `apStage`/`buildFDN`, no wiring argument): a node pulled
   twice in a quantum returns its previous quantum, so several entries cut the loop in a build-order-dependent place. ⛔ Don't bring the
   old wiring back; more space = a reverb parameter (BACKLOG §3.9b).
-- **Effect modules** (`FX_FACTORY`, six): `vol` (`kind:'voice'`, all roles, `perm`, seeded FIRST on `play:x`, raw 0..1 so `v01 === a.vol`,
+- **Effect modules** (`FX_FACTORY`, eight): `vol` (`kind:'voice'`, all roles, `perm`, seeded FIRST on `play:x`, raw 0..1 so `v01 === a.vol`,
   `note:{key:'vol', required:true}`, per-role default `volFromOld(role,0.8)` ≈ 0.894 solo / 0.922 chords / 0.927 bass & drums; hidden from
   add lists, `fxVoiceIdsFor`, lane addresses, `autChainOf`; `fxPerm`), `reverb` (`bus`), `bright` (`voice`, 4 roles), `glide` (`voice`,
-  solo+bass, `readAt:'pitch'` → `fxNoteFollows` false), `dly` (`bus`), `trmMix` (bus tremolo, `insert`). A declaration carries `roles`,
+  solo+bass, `readAt:'pitch'` → `fxNoteFollows` false), `dly` (`bus`), `trmMix` (bus tremolo, `insert`), `forest` (SND-F1 «Night forest»,
+  `bus`: one ConvolverNode per instance, the seeded IR × our normalisation with `normalize=false`, return 0.55, `mix` = send, default 0.8 =
+  the prototype), `glue` (SND-F1 «Glue», `insert`, `cat:'dyn'` → the add list's «Dynamics» group; the dyn worklet, identity gain where it is
+  not loaded). A declaration carries `roles`,
   `attach:true` (per-note, `fxIsPerNote`), optional `note:{key,inv,roles}` (own event field, `fxNoteField`), `defBy`, `readAt`. Instances per
   chain-owner key, lazy, never torn down (`FX_INST[key][fxId]`, `fxInstance`). **The chain is SERIAL** (O-1): `fxChainIO(key, head)`;
   `fxResplice`/`fxRespliceSmooth` rebuild `head → fx₁ → … → tail → master` in chain order (connections only). A signal module carries its
@@ -1071,14 +1090,33 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   2–2000, base ≤ 500, output ≤ 2000, hand → sound 0.5–5000), the audio block is exactly 128 frames, the camera size readable; the overlay
   shows numbers through the REAL Sound-panel buttons and hides again. CONTROL: `latPauseDbg(true)` — a paused meter must add nothing. The
   pure arithmetic: node row «LAT1 latency stats (core)» (exact values). PRIV1's CSP check is the runner's, not a P row.
-- **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–90 s headless): 70 cases rendered alone through the engine copy
-  (`render.goldRender(play, sec, chains)`: 48 kHz fixed, one seed, offline allocator — seeds the KS pluck —, tapped before the limiter,
-  every chain owner on an explicit path): 23 solo, 16 chord, 7 bass timbres (one note), 5 kits × 6 rows, the drone (major, key 0, A4 440),
-  vol/bright/glide at three values, reverb/delay/tremolo-mix on the chord chain at three settings → features (mid loudness per 50 ms,
+- **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–120 s headless): 79 cases rendered alone through the engine copy
+  (`render.goldRender(play, sec, chains, post)`: 48 kHz fixed, one seed, offline allocator — seeds the KS pluck —, tapped before the limiter,
+  every chain owner on an explicit path; `post` = a master dynamics node, SND-F1): 23 solo, 17 chord (Firefly = `ch 16`), 7 bass timbres
+  (one note), 5 kits × 6 rows, the drone (major, key 0, A4 440), vol/bright/glide at three values, reverb/delay/tremolo-mix/Night forest/Glue
+  on the chord chain at three settings, the master Glue and Limiter (hot master) → features (mid loudness per 50 ms,
   side energy, 10 octave bands × 3 segments, dB) vs `tools/gold.print.json` (`P.dumpGold()` on unchanged code; renewed only by a slice
   that changes sound by decision, or by a Chrome update that changes built-in DSP — say so). Tolerance 0.01 dB per value; values below
   −100 dB on both sides skipped (same-seed spread measured ≤ 0.0011 dB, at −98 dB). CONTROL: the copy's Warm pad chord filter +1 %
   (`CHORD_INSTR[0].lp`, restored) must leave its golden case.
+  ⛳ **Renewal rules (user decision, 2026-10-15):** (a) after a Chrome update Claude Code may renew `tools/gold.print.json` itself — only in a
+  slice that did not change sound code, only if the shift is spread across many cases (browser-wide), reporting the largest before/after
+  differences; (b) in a slice that changed sound code: never renew silently — explain every changed entry (new entries are appended, the
+  existing ones stay byte for byte); (c) at the Rust → WASM engine switch: new-engine timbres get fresh entries and old ones are retired —
+  matching the old sound is NOT required (new timbres may and should be better); only timbres the user explicitly asks to keep «close to
+  the original» get a closeness measurement against their old entry.
+- **SND-F1 rows** (`src/probes/sound.js`): «Firefly identity» (quick; one A4 note at velocity 0.7 through the chord path vs the prototype's
+  function verbatim: equal after the chord bus level 0.28 within 1e-5 of peak — measured 1.4e-7; L = R; in the live engine a live strike
+  routes live, a track owner's to the track chain, a stop before a strike cancels it; CONTROL: tine 4.3 × f must differ) · «Night forest IR»
+  (quick; engine IR at 44.1/48 kHz and the live rate = the core's, exact; CONTROL: other rate) · node row «SND-F1 Night forest IR (core)»
+  (pinned hashes 44.1 kHz `e3971e11`, 48 kHz `68fc1b7c`, envelope sample by sample, normalisation; CONTROLS: exponent 2.5, another seed) ·
+  «dynamics: curve, latency, ceiling» (quick; one 5-channel offline render: Glue's steady gain = `compGainDb` ≤ 0.01 dB at 10 levels, an
+  impulse out on its own frame, the Limiter never above its ceiling and exact identity below it; CONTROLS: ratio 2, Limiter off, the
+  built-in compressor fails the latency check) · «dynamics live = offline» (slow, REALTIME ≈ 1 s: a fresh Glue node in the live context,
+  captured on the audio thread, = offline within 1e-6 of peak; started 0.5 s ahead, a late start is named; CONTROL: makeup +0.5 dB) · «freeze parity (Firefly, Night forest, Glue)»
+  (slow, REALTIME ≈ 10 s: a temporary Firefly track whose own chain gets Night forest + Glue in the editor; one warm-up play, then R.live
+  captured (÷ the live master gain it contains) vs renderTrack
+  (`dynLoaded`) — strike / body / room-tail energies within ±1 dB, LR1's tolerance; CONTROL: the render without the room misses the tail).
 - **HAND1 gesture fingerprint** (`P.checkGesture`, quick and all, ≈ 1 s): a pose → 21-landmark generator and a scripted performance (solo:
   slow pinch, degrees, volume, register finger, 2–3 fingers; effects hand; lead-mode hand-over; hold; theremin; expression hand; bass and
   its theremin; latch on/glide/off; typed palette on Chromatic; drums; split; looper index/middle/ring edges, the 3-s pinky clear and its
@@ -1234,6 +1272,17 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **Nothing can be saved** (view and `a.ty` references; capture keyed by take) — BACKLOG §1.
 - Captured expression channels are not replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
 - **A render of a KS (plucked) track pins its offline context** (≈ 6 MB per render, Chrome; other tracks are collected since RENDER-LEAK).
+  Since SND-F1 the same holds for a track whose chain holds Glue (the dynamics worklet is loaded only then).
+- **Firefly (SND-F1) is a one-shot struck timbre:** a struck note rings out its decay (≤ 1.65 s) after a release, a mute or a stop — only
+  strikes that have not begun are cancelled; level, pan and brightness are taken at the strike (a mixer move or a depth change does not
+  reach a ringing strike); a chase (start/seek into a held chord) strikes again, as a KS pluck re-plucks. Offered only as a CHORD timbre:
+  ⛔ no new solo timbre until stable timbre ids (HANDOFF) — bass/solo Firefly wait for TIM1.
+- **Night forest is costly** (SND-F1, offline proxy on the dev desktop): ≈ 19–24 % of a core per convolver with the 3.4-s IR; a phone ≈ 4×.
+  Each chain that holds it has its own convolver (live and track chains separate). A shorter IR / an FDN shaped like it is proposed, not applied.
+  Under heavy CPU load Chrome's LIVE convolver drops its later IR stages (they run on a background thread) — live then sounds shorter than
+  frozen (measured: body/tail −1.2…−6 dB on a loaded machine; equal within 0.1 dB unloaded). Offline renders compute everything.
+- **GOLD «fx reverb 3» spec[11]** (−92.28 dB, 63–125 Hz, the longest FDN tail) flickers ±0.012 dB in about half of fresh sessions on the
+  first GOLD pass (also without SND-F1); the tolerance is NOT widened — a P.all failing only there is this, say so in the report.
 - **AF5 cost:** ≈ 100 extra GainNodes on the live graph (24 chord routers × 2, built solo voices × 4, bass voices × 3, 4 heads + 4 outs) plus
   the track chains' effect instances when tracks play (a chord reverb ≈ 49 nodes). Synthetic bench on the (slow) dev desktop: routers ≈ +4 %
   of real time, one extra reverb network ≈ +1 %; a phone may be ≈ 4× that — not measured on a phone.
@@ -1461,6 +1510,14 @@ verified. Full text of every step: archive, "How to verify a change".
     interval, sound (buffer · output device · audio block · measured path), long tasks in the last minute and «Hand → sound ≈ N ms». Play
     for ~20 s with a hand in view, then «Copy» and paste the text to the strategist. With Bluetooth headphones a one-time warning appears
     ~4 s after start (or after switching the output); the box adds a Bluetooth line. Off hides the box; nothing else changes.
+    LAT1b adds lines (camera asked vs given, frame wait, duplicates per minute, model GPU/CPU, graphics hardware/software, long tasks at
+    startup and while playing with causes, «Hand → sound incl. frame wait») and three test switches under the toggle (hands 2/1, model
+    GPU/CPU, camera fps default/30/60 — session only). Measurement plan: HANDOFF, LAT1b.
+93. Firefly, Night forest, Glue, Limiter (SND-F1), headphones then the phone speaker: «🎛 Sound» → «Chord instrument» → «Firefly»; the
+    Chords role; pinches strike soft bell-like chords that ring ~1.5 s and fade (moving to another degree strikes again); «Effects
+    constructor» (role Chords) → «+ add effect» → «Night forest» → a long dark forest room; → «Dynamics · Glue» → the mix sits a little
+    more even; «Master» → «Glue» On/Off → a gentle level change, no delay; «Limiter» stays On — strike many chords hard with the effects
+    on: no crackle. Record a short chord take with Night forest: the frozen track sounds the same as live (wait ~1 s after stopping).
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

@@ -222,6 +222,7 @@ import * as ST from './state.js';   // состав цепи роли — ЧИТ
 import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
 import { autoFreeze, freezeQueue, afActive, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
+import { FOREST } from './core/dsp.js';   // SND-F1: the Night forest IR length (a track's render tail)
 import { latConsole } from './latmeter.js';   // LAT1: R.latency() — the latency meter's report in the console
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -399,9 +400,11 @@ let KS_LAZY=true;
 const renderKsLazy=on=>{ if(on!=null) KS_LAZY=!!on; return KS_LAZY; };
 const usesKS=(eng, evs, leadIdx)=> evs.some(e=>{ if(e.fn!=='leadOn'&&e.fn!=='leadSet') return false;
   const i= e.a&&e.a.inst!=null ? e.a.inst : (e.fn==='leadOn' ? leadIdx : null); return i!=null && i>=eng.LEAD_KS_FROM; });
-function stubWorklet(ctx){
+/* allow — path fragments that still load for real (SND-F1: the dynamics worklet for a track whose chain holds Glue) */
+function stubWorklet(ctx, allow){
   try{
-    Object.defineProperty(ctx,'audioWorklet',{ configurable:true, value:{ addModule:()=>Promise.resolve() } });
+    const real=ctx.audioWorklet, ok=u=>!!allow && allow.some(a=>String(u).includes(a));
+    Object.defineProperty(ctx,'audioWorklet',{ configurable:true, value:{ addModule:(u,o)=> ok(u) ? real.addModule(u,o) : Promise.resolve() } });
     return true;
   }catch(e){ return false; }
 }
@@ -900,6 +903,7 @@ function tailOf(eng, keys, startVals, insRel){
   for(const key of keys){
     const dec=get(key,'reverb','decay');
     if(dec!=null) tail=Math.max(tail,dec);                                   // decay это и есть RT60 — уже «−60 дБ»
+    const fm=get(key,'forest','mix'); if(fm!=null && fm>0) tail=Math.max(tail, FOREST.sec);   // SND-F1: the Night forest IR is 3.4 s long
     const dt=get(key,'dly','time'), fb=get(key,'dly','fb');
     if(dt!=null&&fb!=null&&fb>0&&fb<1) tail=Math.max(tail, dt*(DB60/Math.log(1/fb)));
   }
@@ -1032,7 +1036,8 @@ async function renderTrackNow(layer, opt){
     const frames=Math.max(1,Math.round(rate*(o.layoutOnly ? 1 : fullSec)));
     const ctx=new OfflineCtor(2, frames, rate);
     const ksLoaded= !KS_LAZY || usesKS(eng, evs, pin.use.leadIdx);
-    if(!ksLoaded) stubWorklet(ctx);             // RENDER-LEAK: no KS timbre in this track → no worklet, the context can be collected
+    const dynLoaded= [...plan.values()].some(x=>x.order.includes('glue'));   // SND-F1: Glue runs in the dynamics worklet — loaded only when the chain holds it (same leak)
+    if(!ksLoaded) stubWorklet(ctx, dynLoaded ? ['dyn-worklet'] : null);             // RENDER-LEAK: no KS timbre in this track → no worklet, the context can be collected
 
     eng.renderReset();                          // ⛳ ЧИСТАЯ КОПИЯ — всё ниже ставится явно этим рендером (см. audio.renderReset)
     eng.setRnd(mulberry32(o.seed==null?SEED_A:o.seed));
@@ -1146,14 +1151,14 @@ async function renderTrackNow(layer, opt){
        стоят микросекунды, а у автоматического рендера прогресса не будет вовсе (показывать нечего). */
     const tRnd0=now();
     if(o.layoutOnly){   // AF1: замер — без рендера
-      out={ layer, layoutOnly:true, ksLoaded, buf:null, songSec:+songSec.toFixed(3), tailSec:+tailSec.toFixed(3), totalSec:+fullSec.toFixed(3), rate,
+      out={ layer, layoutOnly:true, ksLoaded, dynLoaded, buf:null, songSec:+songSec.toFixed(3), tailSec:+tailSec.toFixed(3), totalSec:+fullSec.toFixed(3), rate,
             events:evs.length, keys:[...keys], voices:pool, ms:{ importMs:Math.round(tImp1-tImp0), initMs:Math.round(tIni1-tIni0),
             gateMs:+(tLay0-tIni1).toFixed(1), layoutMs:+(tRnd0-tLay0).toFixed(1), renderMs:0 } };
       return out; }
     const buf=await renderWithProgress(ctx, o.onProgress);
     const tRnd1=now();
 
-    out={ layer, buf, ksLoaded, startSec:PRE_SEC, endSec, tailSec,
+    out={ layer, buf, ksLoaded, dynLoaded, startSec:PRE_SEC, endSec, tailSec,
           songSec:+songSec.toFixed(3), totalSec:+buf.duration.toFixed(3),
           events:evs.length, keys:[...keys], pinned:pin.use, voices:pool,
           reordered,   // ⚠️ состав ПЕРЕСТАВЛЯЛСЯ посреди дорожки — рендер держит прежний порядок (см. mergeOrders)
@@ -2187,9 +2192,10 @@ async function chunkCheck(){
    the copy gets an explicit render path (absent = empty: dry), so the live chains are read nowhere. Offline allocator (seeds the KS
    pluck too); tapped at the master, before the limiter (as a freeze). Returns { L, R, rate } (copies). Probes only (P.checkGold). */
 const GOLD_RATE=48000, GOLD_SEED=0x601D;
-function goldRender(play, seconds, chains={}){
+function goldRender(play, seconds, chains={}, post=null){
   return renderOnce(GOLD_SEED, eng=>play(eng), seconds, { offline:true, rate:GOLD_RATE, prep:eng=>{
     eng.offlineTapMaster();
+    if(post && !eng.offlineMasterDyn(post.mode, post.set, post.gain)) throw new Error('the dynamics worklet is not available in the render copy');   // SND-F1: master Glue / Limiter cases
     for(const key of new Set([...ST.chainOwners().map(o=>o.key), ...Object.keys(chains)])){
       const c=chains[key]||{ ids:[] };
       for(const id of c.ids) eng.fxInstance(key,id);

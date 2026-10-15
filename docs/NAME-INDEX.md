@@ -255,3 +255,20 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/probes/gold.js`: `dumpGold`, `checkGold` (row «GOLD timbres and effects», slow), `goldCases`, `goldFeats`, `goldCmp`, `fft`, `GOLD_TOL`, `GOLD_FLOOR`; `tools/gold.print.json`; `src/render.js`: `goldRender`, `GOLD_RATE`, `GOLD_SEED`, `renderOnce` option `rate`
 - `src/probes/hand.js`: `dumpGesture`, `checkGesture` (row «HAND1 gesture fingerprint»), `pose`, `script`, `perform`, `ENV0`, `fxKeep`; `tools/gesture.print.json`; `src/gestures.js`: `handsProbe`, `processHandsProbe`, `pinchDbg`, `nowMs`, `PRB`, `looperTap`, `pinchD`; `src/recorder.js`: `wTap`, `wTapSet`
 - `tools/probe-data.mjs`: rows from `probes/rows.js` (flag node) + LIC1 + LAT1 core; `REG`, registry problems in the verdict; `tools/probe-browser.mjs`: `--limit-min` default 8; `tools/check-static.mjs` `NET_LISTED`: `probes/files.js`, `probes/key.js`, `probes/gold.js`, `probes/hand.js` (one fetch each; was `scaleprobe.js` 2)
+
+## Added at LAT1b / SND-F1 (2026-10-15)
+- `src/vision.js`: `camInfo`, `modelInfo`, `visionOpts`, `VISION_DEF`, `setHandsTracked`, `setModelDelegate`, `setCamFps`; internal `opts`, `camWant`, `camStartT`, `mpLog`, `mpTap`, `MP_LINE`, `TAP_MS`, `delegateOf`, `XNN`, `xnnBefore`, `newWindow`; `modelInfo().once`
+- `src/core/latency.js`: `frameWaitMs`, `withFrameWait`, `perMinute`, `STARTUP_MS`, `splitLongTasks`, `SOFT_GL`, `isSoftwareGL`
+- `src/latmeter.js`: `latSwitch`, `latSwSync`; internal `gpuInfo`, `causeOf`, `pruneLong`, `loafT`, `dupT`, `camStart0`, `playFrom`, `SW`; report fields `camera.requested/granted/duplicatesPerMinute/frameWaitMs`, `longTasks.startup/playing/causes`, `handToSoundWithWaitMs`, `gpu`, `model`, `switches`
+- `index.html`: `#swHands2`/`#swHands1`, `#swModelGPU`/`#swModelCPU`, `#swFpsDef`/`#swFps30`/`#swFps60`, `#swNote`; Master section `#mGlueOn`/`#mGlueOff`, `#mLimOn`/`#mLimOff`
+- `src/i18n.js`: `diag.camSet`, `diag.frameWait`, `diag.dup`, `diag.model`, `diag.gpu`, `diag.gpuHard`, `diag.gpuSoft`, `diag.unknown`, `diag.unknownOnce`, `diag.longStart`, `diag.longPlay`, `diag.cause`, `diag.totalWait`, `diag.sw.*` (hands, model, fps, fpsDef, note, busy, fail); `fx.forest`, `fx.forest.mix`, `fx.glue`, `fx.glue.*` (thr, ratio, knee, att, rel, makeup), `fx.cat.dyn`, `master.sep`, `master.glue`, `master.limiter`, `master.hint`; stale: `diag.long`
+- `src/core/dsp.js` (new, pure): `seeded`, `FOREST`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `dynCoef`
+- `src/dyn-worklet.js` (new): processor `'dyn'` (modes `comp` / `limit`; parameters `thr`, `ratio`, `knee`, `att`, `rel`, `makeup`, `ceil`, `on`; option `keep`)
+- `src/audio.js`: chord timbre «Firefly» (`CHORD_INSTR[16]`, field `strike:'firefly'`), `FIREFLY`, `FF_END`, `ffLive`, `ffStrike`, `ffCancel`, `ffInfo`; voice fields `ffHz`, `ffBri`; `FOREST_PARAMS`, `forestIRs`, `forestData`, `makeForestFx` (effect `forest`); `GLUE_PARAMS`, `dynReady`, `dynWarned`, `dynNode`, `makeGlueFx` (effect `glue`, `cat:'dyn'`); master `mGlue`, `mLim`, `outLast`, `mGlueOn`, `mLimOn`, `MASTER_GLUE_MAKEUP`, `masterDynSet`, `masterDyn`, `offlineMasterDyn`
+- `src/render.js`: `stubWorklet(ctx, allow)`, report field `dynLoaded`; `goldRender(play, seconds, chains, post)`; `tailOf` reads `forest`
+- `src/ui.js`: `masterDynShow`; `fxAddRow` groups by `FX_FACTORY[id].cat` (`<optgroup>`)
+- `src/probes/lat.js`: `checkLatSwitches` (row «LAT1b test switches», DRAWN), `latFieldProblems`
+- `src/probes/sound.js` (new): `checkFirefly`, `checkForest`, `checkDynamics`, `checkDynLive` (realtime, slow), `checkFreezeParity` (realtime, slow), `fireflyNote` (the prototype's reference), `fpMeasure`, `FF_TOL`, `DYN_TOL`, `LIVE_TOL`, `FP_TOL`
+- `src/probes/gold.js`: cases `ch 16`, `fx forest 1–3`, `fx glue 1–3`, `master glue`, `master limiter`; `add(…, post)`
+- `tools/probe-data.mjs`: row «SND-F1 Night forest IR (core)» (`forestCore`, `FOREST_HASH`); LAT1 core row extended; `tools/check-static.mjs` `NET_LISTED`: `audio.js` addModule 4, `render.js` addModule 1, `probes/sound.js` addModule 2
+

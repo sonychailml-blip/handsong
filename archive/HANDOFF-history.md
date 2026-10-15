@@ -7481,3 +7481,94 @@ caller (`gold.renderCase`, 3 args); `handsProbe` — `hand.perform` (2 args) and
 **Left undone / noticed:** check-static's «imported but never used» does not count a spread (`...x`) as a use (it flagged `chordModeSel`,
 `stateFx` while rule 7 required them) — a checker inconsistency, not fixed; a few moved files import `t`/`L` they shadow locally (info only,
 as before the move).
+
+
+### Moved from HANDOFF.md at LAT1b/SND-F1 (English, verbatim; 2026-10-15)
+### PROBE1 + GOLD1 + HAND1 (2026-10-15) — stage 3 slices 4–6, safety nets (full: archive B «PROBE1 + GOLD1 + HAND1»)
+- PROBE1: `scaleprobe.js` → facade over `src/probes/<area>.js` (moved verbatim, checked line by line); rows register themselves
+  (`probes/rows.js`: `row`/`family`, flags slow/drawn/realtime/song/node, order `at`); registry problems fail P.all and the data runner
+  (control: a duplicate name). Same 47 rows, results and order; the data runner reads its rows from the registry (F4 now after the sweeps).
+- GOLD1: 70 golden renders (51 timbres incl. 5 kits × 6 rows, drone, 6 effects × 3) at 48 kHz → `tools/gold.print.json`; row «GOLD timbres
+  and effects» (P.all, slow, 50–64 s); tol 0.01 dB (measured spread ≤ 0.0011); control: Warm pad filter +1 % caught. Runner P.all limit 8 min.
+- HAND1: synthetic hands on a probe clock through the real `processHands` → `tools/gesture.print.json` (523 lines: W* calls, looper commands,
+  tutor hooks, voices, hands, aims, expression); row «HAND1 gesture fingerprint» (quick, 0.3 s); control: PINCH_ON + 0.03 caught. Probe-only
+  hooks: `gestures.handsProbe/processHandsProbe/pinchDbg`, `recorder.wTapSet` (no-ops when unset). Recording is not in the print (audio clock).
+- Probes: static PASS; data PASS 10 checks (35.4 s); `--quick --all --cdn-cache` PASS — P.quick 48 checks 86.4 s, P.all 63 checks 350.7 s, UI and
+  CSP PASS; frozen seed bass L4 0.08686 / 0.055319 / 650886. Fix rounds: PROBE1 2 (split tool: template braces, spread imports; registry
+  family check order), GOLD1 1 (P.all over the 5-min limit → windows shortened, limit 8), HAND1 2 (state leaking between runs: display,
+  message, palette; message language). Vercel production URL recorded: https://handsong.vercel.app.
+
+Known limits, as they stood in HANDOFF (now one list in CLAUDE.md "Known limits" plus these):
+- Roll: per-note automation lanes (Volume, brightness, glide…) have no curvature yet (BEND-CURVE did bends and bus lanes); OWN1 offers
+  only modes with as many degrees as the track's; unison/theremin tie pairs untie all candidates of that beat (S6); dissolve
+  and lead-segment detach re-articulate edges; overlapping polyphonic notes on one row — the hit takes the first.
+- One effect network per role: live play goes through the network the recording drives (bus params only). Reorder mid-take: render
+  keeps the earlier order (`reordered`). Effects added mid-take: ▲▼⊘ don't act. A ringing latched chord follows the hand (user-tested, VOL-6 closed).
+- One history (ED7): 300 steps; NOT steps — mute, solo, arm, the brace, tempo, tonic (✕'s step carries the brace and ⟳).
+  The ED2 clipboard lives for the app session; captured bus automation is not copied.
+- Captured expression channels are written but NOT replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
+- After an A4 or tempo change frozen tracks play through the live pools (stealing above the ceiling) until they re-freeze (TF4: 1.5 s + render).
+- Paste goes only into a track of the same view, KEY (and TF5 cents) included; an armed track in another key takes nothing (§3.40 later).
+- A render of a KS (plucked solo) track still pins its offline context, ≈ 6 MB per render (Chrome; no workaround found) — BACKLOG §1 AF6 7.
+- Unfrozen tracks of one role share the role's TRACK chain (last writer wins among them); per-track chains not built (BACKLOG §1).
+- Lanes: a note edit doesn't rebuild its ramp; an anchor only where no event; Glide over bass theremin smooths its steps. Bass
+  theremin records the nearest step only. `tmix` timbre fold correct until ids.
+- Frozen-memory figures, AF2 crossfade tails, AF5 node cost, re-render repeatability: `CLAUDE.md` "Known limits" / archive B.
+- Sections (ED6): a note starting inside a cut loses its tail;
+  a note closed by the next note's start exactly on an insert point is lengthened; insert-then-cut beats equal to ~1e-15, not bitwise.
+
+### ✅ LAT1b + SND-F1 — LATENCY DIAGNOSTICS, SOUNDS FROM THE CALM PROTOTYPE (2026-10-15; runner PASS; user steps 92 (+ plan), 93)
+**LAT1b.** User context: desktop daylight meter 14.3 fps, capture → app 20.8, detection 53.9 · 81.2, frame every 57.9, sound 10/40/2.7/45.4,
+140 long tasks (longest 880), hand → sound 126.1; evening 6.3 fps, detection 83.9, 179.8. Built: `vision.js` — request/granted camera settings
+(`camInfo`), the model's real processor (`modelInfo`: a console tap for 15 s after each (re)start keeps MediaPipe's own log lines; measured in
+the runner: the CPU path logs «Created TensorFlow Lite XNNPACK delegate for CPU», BOTH paths log «gl_context.cc … GL version» (the image
+conversion uses WebGL), so XNNPACK ⇒ CPU, GL only ⇒ GPU; the tap is temporary so DevTools source lines stay true otherwise), switches
+`setHandsTracked` / `setModelDelegate` (landmarker.setOptions; the library applies `baseOptions.delegate` and rebuilds the graph) /
+`setCamFps` (reopen with `frameRate:{ideal}`; default = no frameRate in the constraints — byte-for-byte the old request). `latmeter.js` —
+WebGL renderer (unmasked where given) + software check (`failIfMajorPerformanceCaveat` or a software rasteriser's name), duplicates per
+minute, frame wait = 500/fps, the second total, long tasks split (startup = everything before camera start + 10 s; playing = last minute
+since the last switch) with causes (longtask attribution when it names a container, else the longest script of the overlapping Long
+Animation Frame: invoker + file), switch buttons (`latSwitch` resets the meter's numbers). Headless facts: Intel HD 4000 via ANGLE D3D11
+(hardware), model on GPU, fake camera always 20 fps whatever is requested (30/60 visible only on real cameras), startup longest
+«WakeLock.request.catch (main.js)» (the start chain), playing longest «FrameRequestCallback (main.js)».
+**SND-F1.** Firefly = appended chord timbre (index 16) because the user's rule forbids any new solo timbre until stable ids (KS block must
+be the tail of LEAD_INSTR). One-shot strikes (`ffStrike`) — the prototype's three partials verbatim; level `lvl·v²` (0.24 = the prototype's
+gain at velocity 1; the prototype's floor 0.08 at velocity 0 is not kept: volume 0 is silence, rule #30); the pool voice is silent
+bookkeeping (`ffHz` for the readout); routing/level/pan/brightness at the strike; `ffCancel` in chordOff for strikes not begun; voicesCut
+fades strikes at a swap. Night forest = `forest` bus module, IR from `core/dsp.forestIR` (mulberry32 per channel, seeds 0x4E464F31/32),
+scaled by the spec normalisation (`irNormScale`, −58 dB calibration × 44100/rate) and played with normalize=false (identical to Chrome's
+normalize=true, browser-independent); cached per rate. Dynamics worklet `dyn` (comp: Giannoulis et al. 2012 soft knee + branching peak
+detector in dB; limit: instant-attack peak envelope, release, clamp at the ceiling) — zero lookahead (impulse out on its own frame,
+probed), live = offline exactly (probed with a live capture, difference 0). Master: master → Glue (off) → browser limiter (kept) → Limiter
+(on, −1 dBFS) → output; meter, clip tap and probe capture moved to the real output end (`outLast`). Measured: Chrome's DynamicsCompressor
+delays by 288 frames = 6.000 ms at 48 kHz with every setting tried (default, the app's limiter settings, the prototype's) — the app's own
+master limiter therefore adds 6 ms to hand → sound today. Glue tuning: 648-point grid against the built-in node (prototype settings) on a
+12-note Firefly phrase + chord through Night forest, master 0.85, the built-in output shifted back by its 288 frames: flat optimum ≈ −34 dB
+residual; chosen preset thr −12, ratio 3, knee 6, att 10 ms, rel 250 ms, makeup +0.9 dB (loudness equal, worst 50-ms envelope 1.2 dB, peaks
+−6.55 vs −6.71 dBFS). CPU (offline render time per second of audio, dev desktop, one convolver): base 2.4 ms, IR 0.85 s 63, 1.7 s 98, 2.4 s
+119, 3.4 s 189–237 ms (mono input no cheaper); proposal (not applied): 1.7-s IR on touch devices or an FDN shaped like the forest.
+Latency on/off (headless, 5 s windows): all off — hand → sound 125.2, incl. frame wait 162.3, buffer/output/measured 10/42/43.6; Night forest +
+Glue on the chord chain + master Glue + Limiter on — 120.3 / 196.3, 10/32/41.6 (the second total moved with the fake camera's measured fps
+on a busy machine, not the audio path; our nodes add 0 frames).
+Freeze parity row: fix round 1 — the live capture includes the master gain 0.8 (−1.94 dB) and the first control used `only` (see below);
+after the fix two runs: Δ strike/body/tail 0.01/0.61/0.71 dB (first play: the live track chain's new Night forest fades in) then 0.00/0.01/0.01.
+**Probe findings outside the slice (reported, not fixed):** (1) GOLD «fx reverb 3» spec[11] (−92.28 dB, the 63–125 Hz band of the longest
+FDN tail) flickers by 0.011–0.013 dB in about half of fresh sessions on the first GOLD pass (−92.2884/−92.2886/−92.267/−92.2909 vs golden
+−92.2779); the second pass in the same session always matches; the same with the dynamics worklet removed from offline contexts (2 of 4) —
+pre-existing, not this slice; GOLD1's «spread ≤ 0.0011 dB» does not hold for that value. Not widened, not renewed. (2) `renderTrack`'s
+probe option `only` gates first and then the start-value replay builds the other effects OPEN — `only` does not isolate an effect.
+**Positional callers of changed functions:** `goldRender(play, sec, chains, post)` — `gold.renderCase` (4 args), `sound.checkFirefly`
+(2 args); `stubWorklet(ctx, allow)` — renderTrackNow (2 args), renderOnceNow (1 arg, unchanged); `chordOn`/`chordGlide`/`chordOff`
+signatures unchanged; new: `ffStrike` (2 callers), `ffCancel` (1), `dynNode` (3 in audio.js), `masterDynSet` (ui ×4).
+
+LAT1b fix round (final runner, 2026-10-15): the second CPU switch on one page (P.quick then P.all) read «GPU» — TensorFlow Lite prints «Created
+TensorFlow Lite XNNPACK delegate for CPU» only once per page. Now a window without it after it was seen reads 'unknown' (`once`); the
+LAT1b row checks CPU exactly on the first switch of a page (P.quick in every runner session) and accepts 'unknown' afterwards; the
+measurement plan puts the CPU test last.
+
+SND-F1 realtime rows on a loaded machine (2026-10-15, the user's Chrome + VS Code busy; P.all rows ran 5–10× slower, three `--repeat 3`
+runs hit the 8-min limit before the new rows — every row that ran passed): «dynamics live = offline» 3/3 exact, then one late start
+(main thread stalled > 128 ms → fix: start 0.5 s ahead, a late start named) → 8/8 (7 exact, one 1e-10). «freeze parity»: frozen identical
+every run; live body/tail −1.2…−6 dB in 3/3 loaded runs (Chrome's live ConvolverNode drops background-thread IR stages under load) — fix
+round 2: one warm-up play (the first-use fade-in, 0.6 dB) → 2/2 pass (Δ ≤ 0.11 dB). The row can still fail under heavy load: that is a real
+live-vs-frozen difference of Chrome's convolver, reported, tolerance kept.
