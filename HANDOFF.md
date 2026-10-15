@@ -51,7 +51,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: archive B «LAT2 input»), **SND-F1** + **SND-F1b** Firefly,
   Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open)
   · **LAT3** low-light camera: capabilities, «Low light (test)», hands lost, player hint «Too dark»; «Picture» switch removed (step 95) · **CAM-FIX** the webcam's own settings restored (rule #34, step 96) · **REC1** `song/store.js` + `song/lanes.js`, folder rule +
-  import cycles in the static check; camera start made robust and the open-time repair limited to our own test changes (step 97).
+  import cycles in the static check; camera start made robust and the open-time repair limited to our own test changes (step 97) ·
+  **REC2** `song/notes.js` + `song/history.js` (step kinds register) · **REC3 part 1** `song/edit-notes|edit-chords|edit-group.js` (nothing to hear or see).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -101,8 +102,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1 (2026-10-15);
-NEXT **REC2**) → **4 «Calm»** = FIRST
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 part 1 (2026-10-15);
+NEXT **REC3 part 2**) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -117,7 +118,7 @@ TIMBRE BUILDER, USER MODES with Scala, sampler → **8 SERVER** (accounts, sync,
   of WASM tracks in a Worker, which also avoids Chrome's worklet-context leak).
 - **A recording keeps what was heard** (notes + resulting values), never gestures; mappings are setup data. Latency compensation from the
   input's own timestamp (stage 5; tap-along test, switchable off). Privacy: rule #33 (PRIV1 ✅). Licences: rule #32 + register (LIC1 ✅).
-- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2, REC1 (+ LAT1b, SND-F1, LAT3, CAM-FIX); next REC2–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
+- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2, REC1, REC2, REC3 part 1 (+ LAT1b, SND-F1, LAT3, CAM-FIX); next REC3 part 2, REC4, REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
   modules receiving the engine's `E`), GES1, DRAW1, UI1 (+ THEMABLE, §7.19), FMT1, TIM1 (permanent timbre ids) → THE FORK: line A ENG1,
   TIM2, TIM3, ENG2; line B IDS1, CMD1, SONG1–SONG3, VIS1, PACK1; DOC1. Moved after Calm (Q2): ROUTE1, IN1, GES2.
 - **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** Q3 two lines after slice 18 — Claude Code prepares and PERFORMS the merges,
@@ -164,24 +165,20 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 
 ### LAT3 (2026-10-15) — low-light camera: record moved to archive B «Moved from HANDOFF.md at CAM-FIX».
 - ⬜ User step 95 (evening, one hand, each low-light setting 20 s + Copy) — do it AFTER step 96 (CAM-FIX).
-- The user's evening results (2026-10-15; full: archive B «LAT3 — the user's evening results»): «at least 15 / 24» fall back to Off on this
-  webcam (it ignores frame-rate requests — by design, not a bug); «short exposure» 6.3 → 30.6 fps, frame wait 80 → 16.6 ms, but the picture
-  is too dark to find hands in dim light (0 hands found) — its 112 ms is not a playing number. In dim light the fix is light (the hint);
-  a medium-exposure experiment is in BACKLOG §3.32.
+- The user's evening results (full: archive B «LAT3 — the user's evening results»): «15 / 24 fps» fall back to Off on this webcam;
+  «short exposure» 30 fps but too dark to find hands — in dim light the fix is light (the hint).
 
-### CAM-FIX (2026-10-15) — record moved to archive B «Moved from HANDOFF.md at REC1».
-- ⬜ User step 96 (each test then Off — the picture comes back; reload + Zoom normal), then step 95.
+### CAM-FIX + REC1 (2026-10-15) — records moved to archive B «Moved from HANDOFF.md at REC2».
+- ⬜ User step 96 (each test then Off — the picture comes back; reload + Zoom normal), then step 95; step 97 (camera busy / off / blocked →
+  message, «Try again»).
 
-### REC1 + camera start (2026-10-15) — full: archive B «REC1 — record»
-- 0a: the open-time camera repair touches only what OUR test left (record `handsong.camTest`, cleared after a restore); a manual setting made
-  in another app stays. Rule #34 text updated.
-- 0b: one serialised getUserMedia per open, timeouts, tracks stopped on failure / pagehide, one retry, a message by kind + «Try again»;
-  sound and the hand model are built once (before: a second press built a second AudioContext and reloaded the model).
-- REC1 (plan adaptation, said in the report): `src/song/store.js` (events, evGen, `schedInvalidate` + `onInvalidate` listeners, birth
-  order, `compactEvents`, event kinds) + `src/song/lanes.js` (track tables, arm, row-delete confirm, readers; `laneWire`). Row delete,
-  prune/reset, hush, mute/solo, level/pan setters stay in `recorder.js` (sound, freeze, history) until REC2–REC5; it re-exports all.
-- Static check: folder rule for `src/song/` + import cycles printed (today 1, inside the probe modules; none through song/; control caught).
-- Plan §14 numbering: #34 is now the camera rule, so the plan's later rules shift by one (#35 stateless engine submodule at AUD1, …).
-- Probes: data PASS 13; static PASS; `--all` PASS — P.all 76 / 0 (800.5 s: a busy Chrome tab outside the runner; two `--quick` runs hit
-  the 180-s limit at row 32, 0 differences); new row «CAM-START» (12 cases, 3 controls); CAM-FIX 35 cases. Fix rounds 1.
-- ⬜ User step 97 (camera busy / off / blocked → message, «Try again»); step 96's note.
+### REC2 + REC3 part 1 (2026-10-15) — full: archive B «REC2 + REC3 part 1 — record»
+- REC2: `song/notes.js` (owner and chase keys, `songNotes`/`songSegs`, view checks; reads the store's new `sortedLen()`) + `song/history.js`
+  (the one history; ⛳ step kinds REGISTER: `histKind(kind, apply, touched)` replaces the editApply if-chain and the histTouched switch; an
+  unknown kind throws; `histWire` brings ready/pause/commit and the hash's capture records, markers, master). Snapshot steps stay in recorder.
+- REC3 was ≈ 2000 lines — only part 1 done: `song/edit-notes.js` (edit core, ties, detach, segment/hit edits; `editWire`),
+  `song/edit-chords.js` (U2–U4), `song/edit-group.js` (ED1). Part 2 (inserts, timbre, clipboard, quantise, degrees/mode/transpose, bends,
+  automation, sections) is next. Plan adaptation: song/ may import `scales.js` (pitch truth; edits need chord notes and degrees).
+- recorder.js 5844 → 4897 lines. Static PASS (new CONTROL song/history.js → audio.js); data PASS 13.
+- Browser (user's Chrome busy, ~64 % of a core): P.quick hit its 180-s limit at row 50 with 0 differences → P.all instead, twice: 73/76 and
+  74/76 — the misses were real-time rows only (LR1 capture gap; LAT2a frames; live Glue), each PASS on one targeted re-run. Fix rounds 1.

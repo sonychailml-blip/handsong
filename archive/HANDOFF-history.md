@@ -7935,3 +7935,78 @@ lanePrune, laneDrop; `laneTablesClear()` — recorder laneReset. Unchanged signa
 **Docs.** CLAUDE.md (module map song/, static-check line, rule #34 0a, vision 0b, probe rows, step 96 note, step 97), NAME-INDEX, UI-MAP (start
 card failure), BACKLOG (§7.16 musicians in the scene, §3.25b world catalogue, §3.32 dual-GPU laptops + medium-exposure experiment),
 THIRD-PARTY-LICENSES.md regenerated (≈ now also in probes/lat.js).
+
+### Moved from HANDOFF.md at REC2 (English, verbatim; 2026-10-15)
+### CAM-FIX (2026-10-15) — record moved to archive B «Moved from HANDOFF.md at REC1».
+- ⬜ User step 96 (each test then Off — the picture comes back; reload + Zoom normal), then step 95.
+
+### REC1 + camera start (2026-10-15) — full: archive B «REC1 — record»
+- 0a: the open-time camera repair touches only what OUR test left (record `handsong.camTest`, cleared after a restore); a manual setting made
+  in another app stays. Rule #34 text updated.
+- 0b: one serialised getUserMedia per open, timeouts, tracks stopped on failure / pagehide, one retry, a message by kind + «Try again»;
+  sound and the hand model are built once (before: a second press built a second AudioContext and reloaded the model).
+- REC1 (plan adaptation, said in the report): `src/song/store.js` (events, evGen, `schedInvalidate` + `onInvalidate` listeners, birth
+  order, `compactEvents`, event kinds) + `src/song/lanes.js` (track tables, arm, row-delete confirm, readers; `laneWire`). Row delete,
+  prune/reset, hush, mute/solo, level/pan setters stay in `recorder.js` (sound, freeze, history) until REC2–REC5; it re-exports all.
+- Static check: folder rule for `src/song/` + import cycles printed (today 1, inside the probe modules; none through song/; control caught).
+- Plan §14 numbering: #34 is now the camera rule, so the plan's later rules shift by one (#35 stateless engine submodule at AUD1, …).
+- Probes: data PASS 13; static PASS; `--all` PASS — P.all 76 / 0 (800.5 s: a busy Chrome tab outside the runner; two `--quick` runs hit
+  the 180-s limit at row 32, 0 differences); new row «CAM-START» (12 cases, 3 controls); CAM-FIX 35 cases. Fix rounds 1.
+- ⬜ User step 97 (camera busy / off / blocked → message, «Try again»); step 96's note.
+
+### REC2 + REC3 part 1 — record (2026-10-15): song/notes + song/history (step kinds register); song/edit-notes|edit-chords|edit-group
+**REC2 — as the plan defines it, with two adaptations.** Plan: «`song/notes.js` (songNotes/songSegs, owner and chase keys, view audit) +
+`song/history.js` (ED7; step kinds REGISTER their apply/touched instead of one switch)». (1) `songNotes` read the scheduler's cursor bound
+`cursN` (the sorted prefix); the store now fixes that bound itself at every rebase (`sortedN`, `sortedLen()` = min(sortedN, events.length) —
+the same value: cursN was set to events.length in the rebase listener and only ever clamped down to events.length); the recorder's cursors
+keep `cursN` until REC4. The note view resets in its own `onInvalidate` listener (registered first, before the recorder's) and through
+`notesReset()` (the backing follows the key — a view change without a rebase). (2) The SNAPSHOT steps (`snapBegin`/`snapEnd`/`snapApply`,
+`takeBegin`, `snapPend`/`takeTok`) stay in recorder.js: they read and write the capture records, the brace (`rgnApply`) and the freeze
+registry (`laneDrop` → `freezeDrop`) — they move with those (REC4/REC5). Moved to `song/history.js`: the lists, `histPush` (single writer),
+the tripwire `histHash`/`histSeal`, `histUndo`/`histRedo`, `histTab`/`histMaster`/`laneNameStep`/`moveLaneStep`, `histTopLabel`, and the
+history half of `editGroup` (`histGroup(run, commit)` — the same statements; `editRemap` reads `histSince(h0)`). The registry:
+`histKind(kind, apply(u,undo), touched?(u,S))` — registering a kind twice throws; `histApply(u,undo)` dispatches (recorder imports it as
+`editApply`, every caller unchanged); `histTouched(u,S)` asks the kind. Before: one if-chain in `editApply` whose LAST branch treated any
+unknown kind as del/ins (forward: a TypeError on `push(...undefined)`; backward: a silent no-op) — now an unknown kind throws in both
+directions (no user path produces one). history.js registers the song's own kinds: move, timbre, lanetouch, batch, del, ins, ranks;
+recorder.js registers autmove, autshape, autcurve, autins, autdel, autfxins, autfxdel, autfxmove, autcap (touched: the takes holding the
+point / lane / chain entry), brace, marks, lanelen (secApply), snap, tab, master, key. `histWire({ready, pause, commit, takes, marks,
+master})`: ready = sound started and not recording, pause = `onLoop` while playing, commit = `histCommit` (sort, rebase, edit versions of the
+touched tracks, snapshot cleanup, drone, hooks — sound side, stays in recorder), takes/marks/master for the hash. The probe controls became
+one object `histDbgO` (skip, keepFut, noBrace — `snapEnd` reads noBrace); `histOff` through `histOffAdd(d)` / `histOffNow()`.
+**REC3 — much larger than one slice (≈ 2000 lines: the editor's operations 1811–2890, automation and per-note lanes 2894–3400, sections
+3401–3600, chain edits 3600–3830 in the REC2 file), so only its FIRST PART** (the user's instruction). Done: `song/edit-notes.js` (440
+lines) — the edit core (`editPush`, `editBatch`, `editGuard`, `editCommit`, `laneIsBacking`, `editBackingOpen`), drum hit move/delete,
+`EDIT_GAP`/`EDIT_MIN_LEN`/`EDIT_ROLE`/`editRoleOf`, tie pairs, `segEvs`, `keyClash`, `slotPt`, `chordMoveTy`, `editMoveNote`, detach,
+`segPitchPt`, `editMoveSeg`, `editDeleteSeg`, `segChordNotes`, `bendTrim`, `editResizeSeg`; `song/edit-chords.js` (127) — dissolve and the
+three chord-note edits; `song/edit-group.js` (94) — `editGroup`, `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`, `editDeleteSel`.
+`layerSlotTop`/`layerTakeTop` (pure; fresh owner-key slots) moved to `song/notes.js`. The editor SESSION (`editLane`, `editOpen`, `editClose`,
+`editSetLayer`, `editTake`, `laneEditTouch`) stays in recorder.js (it needs the sound, the clip recorder, the transport); the edits read it
+through `editWire({ready, isOpen, layer, pause, touch})` (touch = `takeFxTouch` + `laneEditTouch`, same order as before inside
+`editCommit`). Edited lines: `editGuard` (W.ready / W.pause), `editCommit` (W.touch), `editGroup` (→ `histGroup`), `editRemap` (`histSince`).
+No cycle: edit-chords and edit-group import edit-notes, never the reverse. Left for part 2: inserts (`editInsPush` needs `autCaps`), timbre,
+clipboard (ED2), quantise (ED3), degrees / mode / transpose (ED4, OWN1, TF3), bends (OWN2), volume bars, automation and per-note lanes,
+sections (ED6) — they need the capture records, the brace and seek, which move later or come through the wires.
+**Plan adaptation — the folder rule.** REC1's rule allowed song/ to import only song/, core/ and config.js. The edits price and move pitches
+(chord notes, degrees, modes) — `scales.js`, which the plan keeps where it is as the pitch truth, and which the data runner already loads in
+node. So song/ may now also import `scales.js`; it still never reaches the recorder, the engine (audio.js) or the screen. New CONTROL: a fake
+`song/history.js → audio.js` import must be flagged (it is). Import cycles: still the one inside the probe files; none through song/.
+**Sizes.** recorder.js 5844 → 5533 (REC2) → 4897 (REC3 part 1); store 62, lanes 225, notes 179, history 180, edit-notes 440, edit-chords
+127, edit-group 94 lines.
+**Positional callers of new / changed functions:** `sortedLen()` — notes.songNotes; `notesReset()` — recorder backingFollowKey;
+`histWire(o)` — recorder ×1; `histKind(kind, apply, touched)` — history ×7, recorder 13 calls + one loop (16 kinds);
+`histApply(u, undo)` (= `editApply`, signature unchanged) — history (batch, histUndo, histRedo, histGroup), edit-notes editBatch, recorder
+(editTranspose, songTranspose ×3, secUntie ×2, songEdit, autBatch, editRevert); `histGroup(run, commit)` — edit-group editGroup; `histSince(h0)` —
+edit-group editRemap; `histPeek()` — recorder editHistPeek; `histOffAdd(d)` — recorder probeTake ×2; `histOffNow()` — recorder snapBegin;
+`editWire(o)` — recorder ×1. Unchanged signatures: every moved function.
+**Probes.** Static PASS (twice); data PASS 13 (twice). Browser: the user's Chrome used ≈ 64 % of one of four cores (one renderer) the whole
+time. REC2: `--quick` hit P.quick's fixed 180-s limit at row 50 with 0 differences (rows 3–10× slower; ED7 15 s, renders serialized 34 s) →
+`--all --limit-min 25`: 73 / 76, 0 differences elsewhere, 737.8 s; misses LR1 (the live capture had a gap on the audio thread — frames
+skipped — the row refuses a gapped capture), LAT2a frame once (its CONTROL not reached — too few frames), LAT2a search schedule (1 frame
+after the second hand) → one `--eval` run of the three: LR1 4 / 0, LAT2a 8 / 0 and 7 / 0. REC3 (and the final P.all): 74 / 76, 1124.9 s
+(heavier: GOLD 281 s vs 121 s); misses SND-F1 dynamics live = offline (live Glue capture off by the whole peak — timing) and LAT2a search
+schedule → one `--eval` run: 3 / 0 and 7 / 0. In both P.all runs: GOLD 84 / 0, HAND1 525 / 0, frozen seed bass 0.08686 / 0.055319 / 650886,
+AF2, AF6b, ED1–ED7, S4, sections, TF0, AF3, AF5, CAM-FIX 35 / 0, CAM-START 12 / 0, state guard clean, UI checks, CSP and network PASS. Fix
+rounds 1 (a missing comma / the wire's import in recorder.js, caught by the static check). Proposal: P.quick's 180-s limit is fixed in the
+runner — a `--limit-quick M` flag (like `--limit-min`) would let a loaded machine finish the quick suite instead of switching to P.all.
+**Docs.** CLAUDE.md (static-check line, module map song/), NAME-INDEX, HANDOFF. Nothing for the user to hear or see.

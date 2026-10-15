@@ -270,10 +270,11 @@ fails.push(...NET.bad);
 /* 9) REC1 — FOLDERS AND IMPORT CYCLES. The static import graph (import … from and export … from; dynamic imports are not edges — they
    resolve after evaluation). Strongly connected groups (Tarjan) are the import cycles: today's are printed as information (each one is a
    place where evaluation order and live bindings matter); a cycle through a module of a REC folder fails. Folder rule: a module under
-   src/song/ imports only src/song/, src/core/ and the leaf config.js — the song store never reaches up into the recorder, the engine or the
-   screen (the layers above register with it instead: store.onInvalidate, lanes.laneWire). CONTROL: a fake import song/store.js →
-   recorder.js must be caught by both checks. */
-const FOLDER_RULES={ 'song/':t=>t.startsWith('song/')||t.startsWith('core/')||t==='config.js' };
+   src/song/ imports only src/song/, src/core/, the leaf config.js and (REC3) the pitch truth scales.js — the song never reaches up into the
+   recorder, the engine or the screen (the layers above register with it instead: store.onInvalidate, lanes.laneWire, history.histWire,
+   edit-notes.editWire). REC3: the edits price and move pitches through scales.js (chord notes, degrees, modes), which is node-runnable data
+   (the data runner loads it). CONTROL: a fake import song/store.js → recorder.js must be caught by both checks. */
+const FOLDER_RULES={ 'song/':t=>t.startsWith('song/')||t.startsWith('core/')||t==='config.js'||t==='scales.js' };
 const edgesOf=ms=>{ const G={}; for(const f of Object.keys(ms)){ G[f]=new Set();
   for(const im of ms[f].imports){ const t=target(f,im.spec); if(t!=null && ms[t]) G[f].add(t); } } return G; };
 function sccs(G){   // Tarjan, iterative enough for this size (recursion depth ≤ module count)
@@ -291,7 +292,7 @@ function cyclePath(G, members){   // one concrete loop through the group, for th
 }
 function layerCheck(ms){
   const G=edgesOf(ms), bad=[], groups=sccs(G);
-  for(const [dir,ok] of Object.entries(FOLDER_RULES)) for(const f of Object.keys(ms)) if(f.startsWith(dir)) for(const t of G[f]) if(!ok(t)) bad.push(`${f}: imports ${t} — a module under src/${dir} imports only its folder, core/ and config.js (REC1)`);
+  for(const [dir,ok] of Object.entries(FOLDER_RULES)) for(const f of Object.keys(ms)) if(f.startsWith(dir)) for(const t of G[f]) if(!ok(t)) bad.push(`${f}: imports ${t} — a module under src/${dir} imports only its folder, core/, config.js and scales.js (REC1, REC3)`);
   for(const g of groups) if(g.some(f=>Object.keys(FOLDER_RULES).some(d=>f.startsWith(d)))) bad.push(`import cycle through a REC folder: ${cyclePath(G,g)}`);
   return { bad, groups, G };
 }
@@ -306,6 +307,11 @@ fails.push(...LAY.bad);
     const c=layerCheck(fake);
     if(!(c.bad.some(x=>/song\/store\.js: imports recorder\.js/.test(x)) && c.bad.some(x=>/import cycle through a REC folder: .*song\/store\.js/.test(x)))) fails.push('folder / cycle CONTROL: song/store.js → recorder.js was not caught — the check cannot fail'); }
   else fails.push('folder / cycle CONTROL: src/song/store.js or src/recorder.js missing');
+  /* REC3 CONTROL: the scales.js exception must not open the engine — song/history.js importing audio.js must break the folder rule */
+  if(mods['song/history.js'] && mods['audio.js']){
+    const fake={ ...mods, 'song/history.js':{ ...mods['song/history.js'], imports:[...mods['song/history.js'].imports, { spec:'../audio.js', names:[] }] } };
+    if(!layerCheck(fake).bad.some(x=>/song\/history\.js: imports audio\.js/.test(x))) fails.push('folder CONTROL: song/history.js → audio.js was not caught — the check cannot fail'); }
+  else fails.push('folder CONTROL: src/song/history.js or src/audio.js missing');
 }
 // сведения: неиспользуемые экспорты и импорты
 for(const f of files){ const m=mods[f];

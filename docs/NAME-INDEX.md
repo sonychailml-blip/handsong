@@ -355,3 +355,27 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `main.js` — `startFail(err)` (exported, probe), `stage {audio, det}`, `starting`; markup `#camRetry`; keys `start.retry`, `cam.busy`,
   `cam.notfound`, `cam.denied` (en + ru); `diag.dev.heal` reworded.
 - Probes: `checkCamStart` (row «CAM-START robust camera start», `probes/lat.js`).
+
+## Added at REC2 + REC3 part 1 (2026-10-15)
+- **MOVED (verbatim; `recorder.js` re-exports them — old imports keep working):**
+  `src/song/notes.js` (REC2) — `chOwnerKey`, `bassOwnerKey`, `ldKey`, `chaseKind`, `chaseKey`, `songNotes`, `notesView` (private), `ldTherm`,
+  `tyEq`, `segView`/`VIEW_WARNED` (private), `viewWarn`, `noteSpansViews`, `layerViews`, `viewAudit`, `editViewCheck`, `trackViewCheck`,
+  `storedTi`, `songSegs`; REC3: `layerSlotTop`, `layerTakeTop`; new: `notesReset()`.
+  `src/song/history.js` (REC2) — `HIST_MAX`, `HIST_MERGE_MS`, `hist`/`histFut`/`histOff`/`histGroupDepth` (private), `histDbg`,
+  `histCanUndo`, `histCanRedo`, `histLen`, `histReset`, `histLabelOf`, `histPush`, `payId`/`pidOf`/`strHash` (private), `histHash`,
+  `histSeal`, `histTab`, `histMaster`, `laneNameStep`, `moveLaneStep`, `histTouched` (now from the registry), `histUndo`, `histRedo`,
+  `histTopLabel`; new: `histWire` (+ private `W`), `histKind`, `histApply` (imported by recorder.js as `editApply`), `histGroup(run, commit)`,
+  `histSince(h0)`, `histPeek()`, `histOffAdd(d)`, `histOffNow()`, `histDbgO` (the probe-control flags object; was `histSkip`/`histKeepFut`/
+  `histNoBrace`). Gone: `histApplyX` (its kinds register), the switch in `histTouched`, the if-chain in `editApply`.
+  `src/song/edit-notes.js` (REC3) — `editCanUndo`, `editCanRedo`, `editPush`, `editBatch`, `laneIsBacking`, `editBackingOpen`, `editGuard`,
+  `editCommit`, `editMoveHit`, `editDeleteHit`, `EDIT_GAP`, `EDIT_MIN_LEN`, `EDIT_ROLE`, `editRoleOf`, `noTie`, `tiePitch`, `tiePartners`,
+  `tieUntiePass`, `untieAcross`, `segEvs`, `keyClash`, `slotPt`, `chordMoveTy`, `editMoveNote`, `detachPlan`, `commitDetach`, `segPitchPt`,
+  `editMoveSeg`, `editDeleteSeg`, `segChordNotes`, `bendTrim`, `editResizeSeg`; new: `editWire` (+ private `W`), local `editIsOpen`/
+  `editLayer` (read through the wire; the recorder's own are the source).
+  `src/song/edit-chords.js` (REC3) — `dissolvePlan`, `editDeleteChordNote`, `chordNoteEdit`, `editMoveChordNote`, `editResizeChordNote`.
+  `src/song/edit-group.js` (REC3) — `editGroup` (now `histGroup(run, editCommit)`), `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`,
+  `editDeleteSel`.
+- `src/song/store.js` — `sortedN` (private), `sortedLen()` (the sorted prefix fixed at each rebase).
+- `src/recorder.js` — `snapPend`, `takeTok` (stay with the snapshot steps); private `tkLy`, `recOf`, `capTouched`, `ptTouched`, `lnTouched`,
+  `chTouched`, `autLaneApply`, `autFxApply` (the kinds it registers).
+- `tools/check-static.mjs` — `FOLDER_RULES` song/ also allows `scales.js`; CONTROL `song/history.js → audio.js`.

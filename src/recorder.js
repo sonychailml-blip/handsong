@@ -5,14 +5,19 @@ import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOn, leadSet, l
          fxParamMetaOf, fxDefaultsOf, makeFrozenBus,
          fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
 import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, setTonic, tonicCents, aRef, scaleId, tunedFrom, chordModeVer, setLatchDeg, setLatchTy, chainOwners, fxChainOf, chainKeyOf, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
-import { chordUnit, CUR, baseF, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, chordNotesAt, modeSlotOfTi, viewKeyIdOf, tuningOf, periodOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
+import { chordUnit, CUR, baseF, droneNonOct, tuningIndexOf, leadFreqTi, bassFreqTi, chordFreqsAt, modeSlotOfTi, viewKeyIdOf, chordTypeFits, shiftDegrees, mapDegrees, modesLikeView, scaleView, supportsChords, REG_N } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { buildArrangement } from './arrange.js';
 import { bendAt, bendSplit, curveU, REC_VOL_EPS, REC_REV_EPS, REC_FX_EPS, BEND_EPS_CENTS, SCHED_TICK_MS, SCHED_AHEAD, BEATS_PER_BAR, volFromOld, volAmp, AUT_RAMP_BEAT, AUT_RAMP_EPS, REC_FINE_EPS, REC_AVG_S, REC_JUMP_EPS, REC_HIST_S, REC_PAUSE_S, REC_KNEE_F } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
 import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
 import { events, evGen, schedInvalidate, onInvalidate, compactEvents, evSeq, evSeqFill, evOrder, maxLayer, evRole, chaseRole, isNoteStart } from './song/store.js';   // REC1: the song's event store (recorder re-exports what others read)
-import { laneId, laneMute, laneSolo, laneLevel, lanePan, laneName, laneRank, laneLen, laneLenOf, laneEditVer, laneVerBump, laneEditVerOf, laneNew, laneOf, laneForget, laneTablesClear, laneLayerOf, armedLayer, toggleArm, laneDelTap, laneDelCancel, laneDelPendingLayer, laneAudible, laneGated, laneLevelOf, laneGainOf, layerOfOwner, lanePanOf, laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep, laneLook, laneMuted, laneSoloed, laneSoloOn, laneRow, laneRowSet, laneWire } from './song/lanes.js';   // REC1: the track tables
+import { layerSlotTop, layerTakeTop, chOwnerKey, bassOwnerKey, ldKey, chaseKind, chaseKey, songNotes, notesReset, ldTherm, viewAudit, editViewCheck, trackViewCheck, songSegs } from './song/notes.js';   // REC2: the song as notes, owner and chase keys, view checks
+import { histWire, histKind, histApply as editApply, histTouched, histPush, histSeal, histHash, histReset, histCanUndo, histCanRedo, histLen, histTopLabel, histUndo, histRedo, histTab, histMaster, laneNameStep, moveLaneStep, histPeek, histOffAdd, histOffNow, histDbg, histDbgO } from './song/history.js';   // REC2: the one history (ED7); step kinds register with it
+import { EDIT_GAP, EDIT_MIN_LEN, EDIT_ROLE, bendTrim, chordMoveTy, editBackingOpen, editBatch, editCanRedo, editCanUndo, editCommit, editDeleteHit, editDeleteSeg, editGuard, editMoveHit, editMoveSeg, editPush, editResizeSeg, keyClash, noTie, segChordNotes, segEvs, segPitchPt, tiePartners, untieAcross, editWire } from './song/edit-notes.js';   // REC3: the editor's edit core and note edits
+import { editDeleteChordNote, editMoveChordNote, editResizeChordNote } from './song/edit-chords.js';   // REC3: chord-note edits (dissolve)
+import { editDeleteSel, editGroup, editMoveSel, selGroups } from './song/edit-group.js';   // REC3: group edits (ED1)
+import { laneId, laneMute, laneSolo, laneLevel, lanePan, laneLen, laneLenOf, laneEditVer, laneVerBump, laneEditVerOf, laneNew, laneOf, laneForget, laneTablesClear, laneLayerOf, armedLayer, toggleArm, laneDelTap, laneDelCancel, laneDelPendingLayer, laneAudible, laneGated, laneLevelOf, laneGainOf, layerOfOwner, lanePanOf, laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep, laneLook, laneMuted, laneSoloed, laneSoloOn, laneRow, laneRowSet, laneWire } from './song/lanes.js';   // REC1: the track tables
 
 /* ================= ЗАПИСЬ И ЛИНЕЙНЫЙ ТРАНСПОРТ =================
    ⛳ ЗДЕСЬ ПРОИЗОШЛА СМЕНА МОДЕЛИ (слайс S3.3). Раньше приложение было ЛУПЕРОМ: время события
@@ -1702,12 +1707,12 @@ function probeTake(steps){
   if(loop.on) return { ok:false, why:'the transport is playing' };
   if(editLane!=null) return { ok:false, why:'the track editor is open' };
   const keep=events.slice(), had=new Set(keep), keepLayer=loop.layer, keepTake=curTake;
-  let out=null; histOff++;   // ED7: the sandbox take leaves no step
+  let out=null; histOffAdd(1);   // ED7: the sandbox take leaves no step
   try{ const r=seedTake(steps); if(r) out=events.filter(e=>!had.has(e)).map(e=>({...e, a:e.a&&{...e.a}})); }
   finally{
     events.length=0; for(const e of keep) events.push(e);
     takeSt.clear(); takeSrc.clear(); loop.layer=keepLayer; curTake=keepTake;
-    schedInvalidate(); lanePrune(); histOff--;
+    schedInvalidate(); lanePrune(); histOffAdd(-1);
   }
   return out ? { ok:true, events:out } : { ok:false, why:'the recorder refused the take' };
 }
@@ -1741,64 +1746,8 @@ function editSetLayer(layer){
 /* Громкость вставленной в редакторе ноты, когда в дорожке спросить не у кого: прежние 0.8, пересчитанные в новую шкалу
    (VOL-2b, config.volFromOld) — чтобы вставка звучала так же громко, как до стандартизации (удар и бас: √0.86 ≈ 0.927). */
 const editDefVol=role=>volFromOld(role,0.8);
-/* ⛳ ИСТОРИЯ ДВУНАПРАВЛЕННАЯ (S5.3). ⚠️ РЕДО — НЕ ЗЕРКАЛО ОТМЕНЫ, и запись не симметрична: отмене хватало
-   ОБРАТНОГО хода, а возврату нужен ПРЯМОЙ. Поэтому запись переноса несёт ОБА состояния (from/to), а
-   удаление и вставка симметричны сами по себе — там хватает ССЫЛКИ НА СОБЫТИЕ, и в обе стороны едет ОДИН
-   И ТОТ ЖЕ объект (это несущее: и спаривание нот, и выделение держатся за сам объект, а не за копию).
-   ⛔ ОБРЫВ БУДУЩЕГО. Отменил три правки, сделал НОВУЮ — отменённое больше недостижимо: оно описывает песню,
-   которой уже нет. Не выбрось мы его здесь, ↷ применил бы старый ход к изменившемуся материалу, и это НЕ
-   упало бы с ошибкой — просто удар появился бы там, куда его никто не ставил. Поэтому ЕДИНСТВЕННЫЙ писатель
-   истории — editPush, и он же чистит будущее: забыть про обрыв невозможно, потому что мимо него не пройти.
-   Будущее живёт ровно столько же, сколько история (открытие/закрытие/смена дорожки) — по той же причине:
-   ссылка на событие, пережившая сессию, однажды указала бы в пустоту. */
-/* ═══ ED7: ONE HISTORY FOR EVERYTHING (plan decision 6) ═══
-   One list of steps, newest last; ↶ walks it back, ↷ forward; a new step drops the redo branch (histPush is the single writer). It holds:
-   the editor's own steps (move/del/ins/timbre/automation… — unchanged, now kept across editor sessions and tracks), section edits and
-   markers (ED6), mixer level / pan / master, track names and order ('tab', 'ranks', 'master'), and DIFF SNAPSHOT steps ('snap') for the
-   coarse operations — a take, ⤺, a row delete, a backing load or removal, ✕ clear: the events removed / added / changed (objects with their
-   beats and payloads), the takes' capture records, the track ids with their table rows, the markers. Applied backwards or forwards they
-   restore exactly, object for object. An operation inside a running take (⤺, backing, a row delete while recording) folds into the take's
-   step (one pending snapshot at a time). NOT in the history: mute / solo / arming (listening switches), the brace, tempo, tonic.
-   ⛳ The old "the song changed since" guard is not needed for any user path — every path that changes the song is a step. It stays as a
-   cheap TRIPWIRE: each step keeps a content hash of the state it left (histHash, order-free, O(events)); ↶/↷ refuse ('changed') and drop
-   the history when the state differs — a missed path (a console or probe tool writing directly) can never be undone into a corrupt song.
-   Size: the newest HIST_MAX steps are kept (older ones dropped). Memory: an editor step ≈ 1.4 KB (measured: a volume edit — it holds the
-   old and new payloads); a snapshot step ≈ 50 bytes per event it removed, added or changed, and it keeps the REMOVED events alive (≈ 0.5 KB
-   each) — a take of 500 events ≈ 25 KB, ✕ of a 3000-event song ≈ 1.5–2 MB while that step is in the history. The hash ≈ 0.25 ms per 200
-   events. Tracks touched by ↶/↷ get
-   their edit version bumped: frozen ones go stale and re-freeze by themselves (hint 'undo'). */
-const HIST_MAX=300, HIST_MERGE_MS=800;
-let hist=[], histFut=[], histOff=0, snapPend=null, takeTok=null, histGroupDepth=0;   // histGroupDepth: no trimming inside a group edit (it counts from an index)
-let histSkip=null, histKeepFut=false, histNoBrace=false;   // probe CONTROLS only: a step kind left out of the history; a redo branch a new step does not drop; ✕ that forgets the brace
-const histDbg=o=>{ histSkip=(o&&o.skip)||null; histKeepFut=!!(o&&o.keepFuture); histNoBrace=!!(o&&o.noBrace); };
-const histCanUndo=()=>hist.length>0, histCanRedo=()=>histFut.length>0, histLen=()=>hist.length;
-const histReset=()=>{ hist=[]; histFut=[]; };
-const histLabelOf=u=> u.label || u.f || u.kind;
-function histPush(u){
-  if(histOff) return false;
-  if(histSkip && histLabelOf(u)===histSkip) return false;
-  hist.push(u); if(!histKeepFut) histFut.length=0;
-  if(hist.length>HIST_MAX && !histGroupDepth) hist.splice(0, hist.length-HIST_MAX);
-  return true;
-}
-/* content hash, order-free: events (birth number, beat, payload object, layer), capture records and points, track tables, markers, master */
-const payId=new WeakMap(); let payN=0;
-const pidOf=o=>{ if(o==null||typeof o!=='object') return 0; let i=payId.get(o); if(!i){ i=++payN; payId.set(o,i); } return i; };
-const strHash=s=>{ let h=2166136261>>>0; for(let i=0;i<s.length;i++) h=Math.imul(h^s.charCodeAt(i),16777619)>>>0; return h; };
-function histHash(){
-  evSeqFill();
-  const mix=(h,x)=>Math.imul((h^(x|0))>>>0,16777619)>>>0, num=(h,x)=>{ const v=Math.round((+x||0)*1e6); return mix(mix(h,v),Math.floor(v/4294967296)); };
-  let S=events.length>>>0;
-  for(const e of events){ let h=2166136261; h=mix(h,evSeq.get(e)||0); h=num(h,e.t); h=mix(h,pidOf(e.a)); h=mix(h,e.layer); S=(S+h)>>>0; }
-  for(const [tk,r] of takeFx){ let h=mix(mix(2166136261,tk),pidOf(r)); h=mix(h,r.lane.length); h=mix(h,strHash(JSON.stringify(r.chains)));
-    for(const p of r.lane){ let q=mix(2166136261,pidOf(p)); q=num(q,p.t); q=num(q,typeof p.v==='number'?p.v:0); h=(h+q)>>>0; } S=(S+h)>>>0; }
-  for(const [ly,id] of laneId){ let h=mix(mix(2166136261,ly),id); h=num(h,laneLevel.has(id)?laneLevel.get(id):1); h=num(h,lanePan.get(id)||0);
-    h=mix(h,strHash(laneName.get(id)||'')); h=mix(h,laneRank.has(id)?laneRank.get(id):-1); h=num(h,laneLen.get(id)||0); S=(S+h)>>>0; }
-  S=mix(S,strHash(JSON.stringify(secMarks))); S=num(S,AUD.masterLevel?AUD.masterLevel():0);
-  return S;
-}
+let snapPend=null, takeTok=null;   // ED7: the one pending diff snapshot, and the running take's own
 const takeBegin=()=>{ if(!takeTok) takeTok=snapBegin('take'); };   // the pending snapshot of a take (no-op when one is pending)
-const histSeal=()=>{ if(hist.length) hist[hist.length-1].h=histHash(); };
 /* ---- diff snapshot steps ---- */
 function laneDrop(ly,id){
   if(laneId.get(ly)===id) laneId.delete(ly);
@@ -1809,7 +1758,7 @@ const snapState=()=>({ evs:events.slice(), t:events.map(e=>e.t), a:events.map(e=
   rows:new Map([...laneId.values()].map(id=>[id,laneRow(id)])), marks:secCopy(secMarks), rg:{ ...loop.rgn } });
 /* the brace as the person set it: a following brace is derived from the material (rgnSync), so only its ⟳ counts */
 const braceKey=r=> JSON.stringify(r.user ? [1,r.from,r.to,!!r.on] : [0,!!r.on]);
-function snapBegin(label){ if(histOff||snapPend) return null; snapPend={ label, S:snapState() }; return snapPend; }
+function snapBegin(label){ if(histOffNow()||snapPend) return null; snapPend={ label, S:snapState() }; return snapPend; }
 function snapEnd(tok){
   if(!tok||snapPend!==tok) return false;
   snapPend=null;
@@ -1821,7 +1770,7 @@ function snapEnd(tok){
   for(const [ly,id] of laneId) if(S.lanes.get(ly)!==id) addL.push([ly,id,laneRow(id)]);
   const mk= JSON.stringify(S.marks)!==JSON.stringify(secMarks) ? { from:S.marks, to:secCopy(secMarks) } : null;
   /* ✕ (user answer, 2026-10-14): its ↶ brings the brace and ⟳ back too. Only ✕ — the brace is otherwise not part of the history. */
-  const br= tok.label==='clear' && !histNoBrace && braceKey(S.rg)!==braceKey(loop.rgn) ? { from:S.rg, to:{ ...loop.rgn } } : null;
+  const br= tok.label==='clear' && !histDbgO.noBrace && braceKey(S.rg)!==braceKey(loop.rgn) ? { from:S.rg, to:{ ...loop.rgn } } : null;
   if(!rem.length&&!add.length&&!ch.length&&!remT.length&&!addT.length&&!remL.length&&!addL.length&&!mk&&!br) return false;
   if(!histPush({ kind:'snap', label:tok.label, rem, add, ch, remT, addT, remL, addL, mk, br })) return false;
   histSeal(); return true;
@@ -1838,60 +1787,11 @@ function snapApply(u,undo){
   if(u.mk) secMarks=secCopy(undo?u.mk.from:u.mk.to);
   if(u.br){ const B= undo ? u.br.from : u.br.to; loop.rgn.user=!!B.user; rgnApply(B.from,B.to,!!B.on); }   // after the events: histCommit's rgnSync clamps it to the material
 }
-/* ---- table steps: level / pan / name of a track (by id, rule #27), the display order, the master level ---- */
-function histTab(layer,f,from,merge){
-  const id=laneOf(layer); if(id==null) return false;
-  const to= f==='level' ? laneLevelOf(layer) : f==='pan' ? lanePanOf(layer) : laneNameOf(layer);
-  if(to===from) return false;
-  const top=hist[hist.length-1], now=performance.now();
-  if(merge && top && top.kind==='tab' && top.id===id && top.f===f && now-top.at<HIST_MERGE_MS && !histFut.length){ top.to=to; top.at=now; histSeal(); return true; }
-  if(histPush({ kind:'tab', id, f, from, to, at:now })) histSeal();
-  return true;
-}
-function histMaster(from,merge){
-  const to=AUD.masterLevel(); if(to===from) return false;
-  const top=hist[hist.length-1], now=performance.now();
-  if(merge && top && top.kind==='master' && now-top.at<HIST_MERGE_MS && !histFut.length){ top.to=to; top.at=now; histSeal(); return true; }
-  if(histPush({ kind:'master', from, to, at:now })) histSeal();
-  return true;
-}
-function laneNameStep(layer,s){ const f=laneNameOf(layer); if(!setLaneName(layer,s)) return false; return histTab(layer,'name',f); }
-function moveLaneStep(layer,to){
-  const R0=new Map(laneRank), r=moveLane(layer,to), same=R0.size===laneRank.size && [...laneRank].every(([k,v])=>R0.get(k)===v);
-  if(!same && histPush({ kind:'ranks', label:'order', from:R0, to:new Map(laneRank) })) histSeal();
-  return r;
-}
 /* the key knob inside a song Transpose step (user answer 1): ↶/↷ set it back / again ABSOLUTELY (the backing re-keyed by a knob turn in
    between is restored by the step's own view moves, so knob and backing agree again). Live hands stop; tracks are not touched here. */
 function keyStepSet(k){
   if(k===tonic) return;
   setTonic(k); liveAllOff(); AUD.droneRetune(); hooks.key && hooks.key();
-}
-function histApplyX(u,undo){
-  if(u.kind==='key'){ keyStepSet(undo?u.from:u.to); return true; }
-  if(u.kind==='snap'){ snapApply(u,undo); return true; }
-  if(u.kind==='tab'){ const ly=laneLayerOf(u.id), v= undo?u.from:u.to; if(ly==null) return true;
-    if(u.f==='level') setLaneLevel(ly,v); else if(u.f==='pan') setLanePan(ly,v); else setLaneName(ly,v||''); return true; }
-  if(u.kind==='master'){ AUD.setMasterLevel(undo?u.from:u.to); return true; }
-  if(u.kind==='ranks'){ const M=undo?u.from:u.to; laneRank.clear(); for(const [k,v] of M) laneRank.set(k,v); return true; }
-  return false;
-}
-/* the tracks a step touches (their freeze goes stale): events it moves, removes or adds, lane points through their take, chains, backing lengths */
-function histTouched(u,S=new Set()){
-  const tkLy=tk=>{ for(const e of events) if((e.tk||0)===tk) S.add(e.layer); };
-  const recOf=pred=>{ for(const [tk,r] of takeFx) if(pred(r)) return tk; return null; };
-  switch(u.kind){
-    case 'batch': for(const s of u.list) histTouched(s,S); break;
-    case 'move': S.add(u.ev.layer); break;
-    case 'del': case 'ins': for(const e of u.evs) S.add(e.layer); break;
-    case 'timbre': for(const c of u.ch) S.add(c.ev.layer); break;
-    case 'snap': for(const L of [u.rem,u.add,u.ch]) for(const x of L) S.add(x[0].layer); break;
-    case 'autmove': case 'autshape': case 'autcurve': { const tk=recOf(r=>r.lane.includes(u.pt)); if(tk!=null) tkLy(tk); break; }
-    case 'autins': case 'autdel': { const tk=recOf(r=>r.lane===u.lane); if(tk!=null) tkLy(tk); break; }
-    case 'autfxins': case 'autfxdel': case 'autfxmove': { const tk=recOf(r=>Object.values(r.chains).includes(u.ch)); if(tk!=null) tkLy(tk); break; }
-    case 'autcap': tkLy(u.tk); break;
-  }
-  return S;
 }
 function histCommit(u){
   evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch();
@@ -1901,26 +1801,9 @@ function histCommit(u){
   hooks.loop && hooks.loop(loop.on);
   if(hooks.af) hooks.af('undo');
 }
-/* ↶ / ↷ — everywhere (editor, window, play screen, Ctrl+Z / Ctrl+Shift+Z). Refused while recording; the transport pauses (as any edit).
-   → the step's label, 'changed' (the tripwire: the history is dropped), or false (nothing to do). */
-function histUndo(){
-  const u=hist[hist.length-1];
-  if(!u||!AC||recording) return false;
-  if(u.h!=null && histHash()!==u.h){ histReset(); return 'changed'; }
-  if(loop.on) onLoop();
-  evSeqFill();
-  hist.pop(); editApply(u,true); histCommit(u); u.hb=histHash(); histFut.push(u);
-  return histLabelOf(u);
-}
-function histRedo(){
-  const u=histFut[histFut.length-1];
-  if(!u||!AC||recording) return false;
-  if(u.hb!=null && histHash()!==u.hb){ histReset(); return 'changed'; }
-  if(loop.on) onLoop();
-  evSeqFill();
-  histFut.pop(); editApply(u,false); histCommit(u); u.h=histHash(); hist.push(u);
-  return histLabelOf(u);
-}
+/* REC2: what the one history (song/history.js) needs from here — the ↶/↷ gates and commit; for the hash the capture records, markers, master */
+histWire({ ready:()=>!!AC&&!recording, pause:()=>{ if(loop.on) onLoop(); }, commit:histCommit,
+  takes:()=>takeFx, marks:()=>secMarks, master:()=>AUD.masterLevel?AUD.masterLevel():0 });
 /* ✕ clear — an ordinary step: the whole song comes back with ↶ (a running take ends first, as its own step). The brace returns to
    following the material; ↶ brings it (and ⟳) back as it was. */
 function clearSong(){
@@ -1928,53 +1811,13 @@ function clearSong(){
   const tok=snapBegin('clear'); clearRec(); snapEnd(tok);
   if(hooks.cleared) hooks.cleared();   // ED7-fix2: ui offers "Song cleared — Undo" (the ✕ button and the looper hand alike)
 }
-const histTopLabel=()=> hist.length ? histLabelOf(hist[hist.length-1]) : null;   // ED7-fix2: the newest step's label (the undo toast acts only while it is ✕)
 let editTake=0;   // сделанное · отменённое (ждёт ↷) · номер взятого для ВСТАВОК сессии
-const editCanUndo=()=>histCanUndo();   // ED7: the editor's ↶/↷ are the one history's
-const editCanRedo=()=>histCanRedo();
-const editPush=u=>{ histPush(u); };   // ED7: the single writer of the one history (a new step drops the redo branch)   // НОВАЯ правка обрывает ветку отменённого
-/* ⛳ СОСТАВНАЯ ПРАВКА (E1) — ОДНА запись истории из НЕСКОЛЬКИХ ходов уже существующих видов ('move', 'ins',
-   'del', 'timbre', ходы полосы автоматизации). Вперёд — по порядку, назад — в ОБРАТНОМ (editApply, 'batch'),
-   сортировка и сброс курсоров — ОДИН раз на всю правку (editCommit, правило #28).
-   ⛳ ЗАЧЕМ ИМЕННО ТАК: у человека одна ↶, и она обязана снимать ОДНО действие, из скольких бы событий оно ни
-   состояло — перенос ноты целиком (E1), отделение сегмента глиссандо (E2: «выкл» слева + ноты под свежим
-   ключом + «вкл» справа), затем правка соло и аккордов. Нового вида хода для каждой из них не заводим:
-   они собираются из тех, что уже умеют ходить в обе стороны.
-   ⚠️ list строит ВЫЗЫВАЮЩИЙ, и ходы в нём ещё НЕ ПРИМЕНЕНЫ (у 'move' — оба состояния, from и to): применяет их
-   editBatch тем же editApply, которым потом ходят ↶/↷, — вперёд и назад по одному пути, а не по двум.
-   Вызывающий уже прошёл editGuard. */
+/* REC3: what the edits (song/edit-notes.js) need from the editor session and the recorder */
+editWire({ ready:()=>!!AC, isOpen:editIsOpen, layer:editLayer, pause:()=>{ if(loop.on) onLoop(); }, touch:()=>{ takeFxTouch(); laneEditTouch(); } });
 /* AF3: an insert into a track that has no captured chain in any take pins the live chain at that moment (user decision: a track
    created in the editor gets a snapshot at birth); the 'autcap' step goes FIRST in the same history entry, so ↶ removes both.
    A track that already has a chain keeps inheriting it (autCaps makes nothing). */
 function editInsPush(layer,u){ const pin=autCaps(layer,true); editPush(pin.ops.length ? { kind:'batch', list:[...pin.ops,u] } : u); }
-function editBatch(list){
-  if(!list||!list.length) return false;
-  list=tieUntiePass(list);                                     // ⛳ S6: правка края пары связки развязывает ОБЕ половины — той же записью истории
-  for(const u of list) editApply(u,false);
-  editPush(list.length===1 ? list[0] : { kind:'batch', list });   // один ход — сам ход, без обёртки: в истории та же запись, что дала бы прежняя одиночная правка
-  editCommit(); return true;
-}
-/* Дорожка ПОДЛОЖКИ (🎵): её события помечены ev.jam, и clearJam снимает их ЦЕЛИКОМ. Правка внутри такой
-   дорожки пережила бы снятие подложки осиротевшим обрывком — поэтому подложка в S5.1 ТОЛЬКО ЧИТАЕТСЯ.
-   ⚠️ Аранжировка из ⚙-панели метки НЕ несёт (известное расхождение, см. отчёт) и потому правится как
-   обычная запись — это честно: clearJam её и не тронет. */
-const laneIsBacking=layer=> layer!=null && events.some(e=>e.layer===layer&&e.jam);
-const editBackingOpen=()=>laneIsBacking(editLayer());
-/* ЕДИНЫЙ ВХОД ВСЕХ ПРАВОК: редактор открыт, дорожка жива и не подложка, транспорт ОСТАНОВЛЕН.
-   ⚠️ ПАУЗУ СТАВИМ ЗДЕСЬ, А НЕ В ui: правка при идущем транспорте легла бы под уже запланированные в окно
-   опережения события и под звучащие голоса. onLoop — обычная пауза, а следующий ▶ поднимет состояние
-   обычной догонялкой (chasePlay в startTransport) — уже с учётом правки. */
-/* ⛳ T5: backingOk — ЕДИНСТВЕННОЕ послабление: ЗАМЕНА ТЕМБРА подложке разрешена (решение пользователя №2).
-   Она переписывает тембр у всех событий дорожки и не рождает обрывков — clearJam снимает их все, ev.jam
-   цел. Ноты подложки по-прежнему только читаются: все прочие правки зовут editGuard() без флага. */
-function editGuard(backingOk){
-  if(!AC||!editIsOpen()||editLayer()==null) return false;
-  if(!backingOk && editBackingOpen()) return false;
-  if(loop.on) onLoop();
-  evSeqFill();
-  return true;
-}
-function editCommit(){ evSeqFill(); events.sort(evOrder); schedInvalidate(); takeFxTouch(); laneEditTouch(); histSeal(); }   // ED7: histSeal — the tripwire hash of the state this step left   // A2: laneEditTouch — устаревает ТОЛЬКО правленая дорожка. T4c-2: индекс правка пишет сама (пересчёта по ступени нет — ступени нет)
 /* Кит и громкость вставленного удара — у БЛИЖАЙШЕГО удара ЭТОЙ дорожки («как здесь принято»), иначе живой
    кит и средняя громкость. Обход O(n) — один на вставку, не на кадр. */
 function editDrumDefaults(layer,t){
@@ -1982,597 +1825,6 @@ function editDrumDefaults(layer,t){
   for(const e of events) if(e.layer===layer&&e.fn==='drum'){ const d=Math.abs(e.t-t); if(d<bd){ bd=d; best=e; } }
   return { kit: best&&best.a.kit!=null ? best.a.kit : drumKitIdx,
            vol: best&&best.a.vol!=null ? best.a.vol : editDefVol('dr') };
-}
-function editMoveHit(ev,t,row){
-  if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
-  const from={t:ev.t, a:ev.a}, to={t:Math.max(0,t), a:{...ev.a, row}};   // ОБА состояния: from для ↶, to для ↷
-  editPush({ kind:'move', ev, from, to });
-  ev.t=to.t; ev.a=to.a;
-  editCommit(); return true;
-}
-function editDeleteHit(ev){
-  if(!editGuard()||!ev||ev.fn!=='drum'||ev.layer!==editLayer()) return false;
-  if(!compactEvents(e=>e===ev)) return false;
-  editPush({ kind:'del', evs:[ev] });                      // держим САМИ объекты — и ↶, и ↷ возвращают/убирают ровно их
-  editCommit(); return true;
-}
-/* ═══ БАС: ПРАВКА ПО СЕГМЕНТАМ (слайс S5.5; НЕЗАВИСИМЫЕ НОТЫ — E1/E2) ═══
-   ⛳ ПОЧЕМУ НЕ «НОТА». У бас-ноты ОДИН владелец голоса (в ведущем режиме — один на дорожку; в полифоническом у каждой
-   одновременной ноты свой, по a.v), и смена высоты — это ВЕДЕНИЕ (bassSet),
-   а не новая нота: бас-линия, сыгранная одним непрерывным движением, — это ОДНА нота songNotes на
-   много высот. Редактировать её как одну — значит показать многоминутную полосу на одной высоте.
-   Единица правки здесь — СЕГМЕНТ: событие, которое ЗАДАЁТ высоту («вкл» или ведение со сменой ступени),
-   и промежуток до следующей такой смены. Вывод сегментов — songSegs, рядом с songNotes.
-   ⛔ ПОРЯДОК ВНУТРИ КЛЮЧА ВЛАДЕЛЬЦА — вот чем бас опаснее удара (у того ключа нет вовсе). Все события
-   одной бас-ноты И все ноты того же k делят ключ 'bassloop:N[:k]', а движок требует, чтобы время внутри
-   ключа не шло назад: переставь ведение за соседа — и на переигровке ноты поменяются местами, а «выкл»
-   закроет чужую.
-   ⛳ S0 (правка соло и аккордов): функции ниже больше не басовые — роль берут из таблицы EDIT_ROLE (чуть ниже), и та же
-   машинерия отделения служит соло и аккордам. С S2 правимы и аккорды (state.ROLL_EDITABLE), с S4 — соло (бас и соло — ОДИН
-   инструмент: та же правка). Слово «бас» в доводах ниже — это история того, для кого их писали; закон тот же у всех трёх ролей.
-   ⛳ E2: ЗАКОН НЕЗАВИСИМОСТИ. Прежде порядок стерегли ЗАЖИМОМ — событие нельзя было увести за соседа по ключу, —
-   и именно зажим делал ноты ЗАВИСИМЫМИ: перенос сегмента глиссандо двигал общую с соседом границу, длина
-   середины отнималась у следующего, удаление середины давало прежней высоте тянуться дальше. Пользователь это
-   отверг: в редакторе ноты обязаны быть независимы. Теперь правка, которая задела бы соседа, сперва ОТДЕЛЯЕТ
-   сегмент в собственную ноту под СВЕЖИМ k (тот же ход, что у вставки editInsertBass), и столкнуться ему больше
-   не с кем — зажим не нужен вовсе. Перекрытие двух бас-нот переигровка уже умеет: ключ различает голоса. */
-const EDIT_GAP=1e-4;                                        // зазор у границы: «вплотную» с равным t порядок решила бы сортировка, а не мы
-const EDIT_MIN_LEN=1/32;                                    // минимальная длина ноты в долях: короче — это уже не нота, а щелчок
-/* ═══ ТАБЛИЦА РОЛЕЙ ПРАВКИ (слайс S0 правки соло и аккордов) ═══
-   ⛳ ОДНА МОДЕЛЬ ПРАВКИ НА ТРИ ЛАДОВЫЕ РОЛИ. Отделение сегмента, перенос ноты целиком, длина и удаление (E1/E2) строились для
-   баса, но в них нет ничего басового, кроме ТРЁХ вещей, — их и держит эта таблица, а функции ниже читают её вместо литералов:
-     on / off — какие события начинают и кончают ноту роли;
-     fresh(слой) — СВЕЖАЯ идентичность ноты (часть ключа владельца, которой в слое ещё нет): у баса и аккордов — суффикс взятого k
-       ('bassloop:N:k[:v]', 'loop:N:k'; layerTakeTop — выше всех k слоя), у соло — номер ноты v ('leadloop:N:v'; layerSlotTop —
-       выше всех номеров слоя). ⚠️ У ключа соло суффикса k НЕТ ВОВСЕ — свежий k соло ничего бы не развёл (и layerTakeTop на
-       дорожке соло всегда 0);
-     keep(a) — поля ключа, которые нота ОСТАВЛЯЕТ себе при свежей идентичности: у баса это номер ноты v (P2: ключ 'bassloop:N:k:v'
-       различает одновременные бас-ноты и при новом k); у аккорда и соло — ничего (у соло v и есть свежая идентичность);
-     oldOff(a) — что несёт «выкл», закрывающий ноту под ПРЕЖНИМ ключом (по нагрузке определяющего события): бас — k и v, только
-       ненулевые (байт-в-байт прежний E2); аккорд — k, только ненулевой; соло — v ВСЕГДА, как пишет запись (recLeadOff).
-   ⛔ ВСТАВКА СЮДА НЕ ВХОДИТ: у каждой роли свои поля новой ноты (тембр, карта, тип) — это слайсы S2/S4.
-   ⚠️ S0 был НЕВИДИМ (список правимых ролей не тронут); S2 открыл аккорды, S4 — соло (его отказы сняты к S6 — см. «ПАРЫ СВЯЗКИ» ниже);
-   у баса каждая функция ниже даёт ТЕ ЖЕ события, что и прежде (сверено построчно — см. отчёт слайса). */
-const EDIT_ROLE={
-  bs:{ on:'bassOn', off:'bassOff', fresh:ly=>({k:layerTakeTop(ly)}),
-       keep:a=>{ const v=(a&&a.v)||0; return v?{v}:null; },
-       oldOff:a=>{ const k=(a&&a.k)||0, v=(a&&a.v)||0; return {...(k?{k}:null), ...(v?{v}:null)}; } },
-  ch:{ on:'chOn', off:'chOff', fresh:ly=>({k:layerTakeTop(ly)}),
-       keep:()=>null,
-       oldOff:a=>{ const k=(a&&a.k)||0; return k?{k}:{}; } },
-  ld:{ on:'leadOn', off:'leadOff', fresh:ly=>({v:layerSlotTop(ly)}),
-       keep:()=>null,
-       oldOff:a=>({v:(a&&a.v)||0}) },
-};
-const editRoleOf=fn=>EDIT_ROLE[chaseRole(fn)]||null;       // null — удар, дрон, сирота без роли: правкам сегмента не подлежит
-/* ═══ S4: ОТКАЗ ПРАВКИ СОЛО — ОДИН ПРЕДИКАТ (с S5 отказ ОДИН; ⛳ С S6 ОТКАЗОВ НЕТ — ПРЕДИКАТ СНЯТ) ═══
-   ⛳ S6: край пары связки больше не отказывается — правка, двигающая или снимающая его, РАЗВЯЗЫВАЕТ обе половины (tieUntiePass в
-   editBatch). Предикат, всегда отвечающий «нет», — мёртвый код и ложное обещание крючка: общее правило теперь живёт в editBatch, через
-   который идёт каждая правка нот, и нового отказа сюда не добавить, не обойдя его. Текст ниже — история S4/S5. */
-/* (история)
-   Соло правится ТОЙ ЖЕ машинерией, что бас (бас и соло — один инструмент). В S4 отказывали две правки, каждая — до своего слайса:
-     • (СНЯТ в S5) ДЛИНА НОТЫ ТЕРМЕНВОКСА. Перенос «выкл» оставлял бы точки кривой бенда ПОСЛЕ отпускания. С S5 укорочение ОБРЕЗАЕТ кривую
-       (bendTrim, editResizeSeg), а голос, выданный новому владельцу, начинается без расписанной кривой (audio.leadAlloc → leadOn). Перенос
-       целиком, смена высоты и удаление терменвокса верны по построению с S4: события едут все вместе, dt точек бенда — от атаки, центы —
-       от ступени атаки (контур переносится и транспонируется сам).
-     • КРАЙ ПАРЫ СВЯЗКИ (до S6) — «вкл» с a.tie (нота продолжает ноту другой дорожки после смены тембра, T3) или «выкл» с a.tie (её
-       продолжает нота другой дорожки). Правка, меняющая ВРЕМЯ такого края или снимающая его, оставила бы ноту, входящую без атаки из
-       ничего, или обрубок с быстрым релизом посреди звука. Смена ОДНОЙ высоты край не трогает — разрешена.
-   op: 'time' — перенос во времени (editMoveSeg с другой долей: одиночная нота целиком или отделение — время меняют события самого
-   сегмента: «вкл», если сегмент — начало ноты, и «выкл», если он последний), 'del' — удаление (то же множество краёв), 'len' — длина
-   (двигается только «выкл», и только когда сегмент кончается СВОИМ «выкл»; граница глиссандо отделяет сегмент, не трогая краёв).
-   → ключ словаря с причиной ('roll.tieEdge') или null. ⛔ ОДИН ИСТОЧНИК: его зовут и функции правки (инвариант),
-   и ui (сказать почему) — второй копии условия в ui нет. Только чтение. */
-/* ═══ S6: ПАРЫ СВЯЗКИ — НАЙТИ ПАРТНЁРА, РАЗВЯЗАТЬ ОБЕ ПОЛОВИНЫ ═══
-   ПАРА (T3): нота соло, продолженная через смену тембра, — «выкл» с a.tie в дорожке прежнего тембра и «вкл» с a.tie в дорожке нового, в ОДНУ
-   долю, в ОДНОМ взятом. Переигровка делает из пары 20-мс переход (быстрый релиз + вход без атаки и удара). Правка, СДВИГАЮЩАЯ общий край во
-   времени или СНИМАЮЩАЯ его (перенос ноты, длина, удаление, перенос целиком — на любом пути: editMoveNote, отделение, editResizeSeg,
-   editDeleteSeg), оставила бы обрубок с быстрым релизом или ноту, входящую без атаки из ничего. РЕШЕНИЕ ПОЛЬЗОВАТЕЛЯ: такая правка МОЛЧА
-   снимает tie с ОБЕИХ половин той же записью истории — дальше это две обычные ноты (своя атака, свой релиз). Смена одной высоты время края не
-   трогает — связка остаётся.
-   ⛳ ПАРТНЁР: противоположное событие соло («вкл» ↔ «выкл») с a.tie, того же взятого (tk), на ТОЙ ЖЕ доле, в ДРУГОЙ дорожке. Кандидатов
-   больше одного — когда при смене тембра звучало НЕСКОЛЬКО нот (две руки, несколько пальцев): каждая даёт свою пару, все в одну долю и
-   одну пару дорожек. Тогда сверяется ВЫСОТА — пара (ti, oct) ноты на краю (у «выкл» — сегмент, который он кончает; у «вкл» — его сегмент).
-   Не различает её только УНИСОН двух нот (или терменвокс: продолжение начинается с ближайшей ступени, а не со ступени атаки) — тогда
-   развязываются ВСЕ кандидаты (названо: лишняя развязка лишь даёт соседней паре свою атаку; оставить связанной чужую — хуже).
-   → массив партнёров (пустой — не край пары). Только чтение. */
-const noTie=a=>{ if(!a||!('tie' in a)) return a; const {tie, ...rest}=a; return rest; };
-function tiePitch(ev){
-  const S=songSegs();
-  const g= ev.fn==='leadOn' ? S.byEv.get(ev) : S.segs.find(s=>s.endEv===ev);
-  return g ? { ti:g.ti, oct:g.oct } : null;
-}
-function tiePartners(ev){
-  const a=ev&&ev.a; if(!a||!a.tie) return [];
-  const want= ev.fn==='leadOff' ? 'leadOn' : ev.fn==='leadOn' ? 'leadOff' : null; if(!want) return [];
-  const C=events.filter(e=>e!==ev && e.fn===want && e.a && e.a.tie && e.tk===ev.tk && e.layer!==ev.layer && Math.abs(e.t-ev.t)<1e-9);
-  if(C.length<2) return C;
-  const p=tiePitch(ev); if(!p) return C;
-  const M=C.filter(e=>{ const q=tiePitch(e); return !!q && q.ti===p.ti && q.oct===p.oct; });
-  return M.length ? M : C;
-}
-/* ПРОХОД РАЗВЯЗКИ — внутри editBatch, то есть у КАЖДОЙ правки нот (список ходов ещё не применён: события в прежнем состоянии).
-   Край пары, чьё время меняет ход 'move' (to.t ≠ from.t), теряет tie в своём же ходе (новая нагрузка to.a); край, уходящий ходом 'del',
-   уходит со своей нагрузкой (↶ вернёт её с tie). Каждому партнёру — ход 'move' без смены времени с нагрузкой без tie (НОВЫЙ объект: ↶ вернёт
-   прежний побитно) и ход 'lanetouch' его дорожки: freezeSig tie не сворачивает, а версия правок дорожки (laneEditVer) — сворачивает, и
-   editCommit поднимает её только у ПРАВЛЕНОЙ дорожки. Ход 'lanetouch' поднимает версию партнёра и вперёд, и назад — замороженный партнёр
-   устаревает на правке, на ↶ и на ↷. Нет краёв пары — список прежний, тем же объектом (байт-в-байт прежние правки). */
-function tieUntiePass(list){
-  const moved=[], gone=[], inList=new Set();
-  for(const u of list){
-    if(u.kind==='move'){ inList.add(u.ev); if(u.from&&u.from.a&&u.from.a.tie && Math.abs(u.to.t-u.from.t)>1e-9) moved.push(u); }
-    else if(u.kind==='del'||u.kind==='ins') for(const e of u.evs){ inList.add(e); if(u.kind==='del'&&e.a&&e.a.tie) gone.push(e); }
-  }
-  if(!moved.length&&!gone.length) return list;
-  const extra=[], ids=new Set(), done=new Set();
-  for(const e of [...moved.map(u=>u.ev), ...gone])
-    for(const p of tiePartners(e)){ if(done.has(p)||inList.has(p)) continue; done.add(p);
-      extra.push({ kind:'move', ev:p, from:{t:p.t, a:p.a}, to:{t:p.t, a:noTie(p.a)} });
-      const id=laneOf(p.layer); if(id!=null) ids.add(id); }
-  for(const u of moved) u.to={ t:u.to.t, a:noTie(u.to.a) };   // свой tie — в своём же ходе (to — объект плана, не события)
-  for(const id of ids) extra.push({ kind:'lanetouch', id });
-  return [...list, ...extra];
-}
-/* Удаление СТРОКИ дорожки (✕): выжившие половины её пар развязываются (решение пользователя). ⚠️ Удаление строки НЕ ОТМЕНЯЕТСЯ (S3.5d) —
-   развязка идёт тем же необратимым шагом: нагрузка партнёра заменяется новым объектом без tie, версия правок его дорожки поднимается
-   (замороженный партнёр устаревает). → сколько партнёров развязано. */
-function untieAcross(layer){
-  const ids=new Set(); let n=0;
-  for(const e of events){ if(e.layer!==layer||!e.a||!e.a.tie) continue;
-    for(const p of tiePartners(e)){ if(p.layer===layer||!p.a.tie) continue; p.a=noTie(p.a); n++; const id=laneOf(p.layer); if(id!=null) ids.add(id); } }
-  for(const id of ids) laneVerBump(id);
-  return n;
-}
-/* События ОДНОГО сегмента, по времени: определяющее («вкл» или смена высоты) и ведения громкости внутри.
-   Берём тем же обратным указателем byEv, которым songSegs их и собрал: «выкл» туда не входит (он кончает
-   сегмент, а не принадлежит ему), определяющее событие следующего сегмента — тоже. */
-function segEvs(seg){ const SV=songSegs(); return seg.note.evs.filter(e=>SV.byEv.get(e)===seg); }
-/* Есть ли на отрезке [a,b] (с зазором) событие ДРУГОЙ ноты того же ключа владельца. O(n) на правку, не на кадр.
-   S0: роль — у самой ноты (n.role), ключ — тем же chaseKey, что у движка и songNotes; у баса проверка дословно прежняя. */
-function keyClash(n,a,b){
-  const own=new Set(n.evs);
-  for(const e of events){
-    if(own.has(e)||e.layer!==n.layer||chaseRole(e.fn)!==n.role||chaseKey(n.role,e)!==n.key) continue;
-    if(e.t>=a-EDIT_GAP && e.t<=b+EDIT_GAP) return true;
-  }
-  return false;
-}
-/* ⛳ E1: НОТА ИЗ ОДНОГО СЕГМЕНТА ПЕРЕНОСИТСЯ ЦЕЛИКОМ. Прежде перенос двигал ТОЛЬКО определяющее событие — «вкл», —
-   зажатое перед соседом по ключу, а соседом у одиночной ноты оказывался её же «выкл». Призрак при этом рисовал
-   блок ПРЕЖНЕЙ длины на новом месте (ui держит rollDrag.len), а в песню ложилось другое: нота, утащенная вправо,
-   укорачивалась и не могла перейти свой старый конец, влево — удлинялась. Обещание и результат расходились
-   (правило #9 — о том же, со стороны правки).
-   Одиночная нота = сегмент-НАЧАЛО (first), кончающийся СВОИМ «выкл» (endEv — «выкл»): смены высоты в ней нет.
-   Ведения ГРОМКОСТИ границами сегмента не являются (songSegs режет только по смене высоты), поэтому записанная
-   нота с дрожью руки внутри — по-прежнему ОДИН сегмент, и сюда она попадает.
-   Такую ноту переносим ЦЕЛИКОМ — «вкл», её ведения громкости и «выкл» на одну и ту же дельту, одной составной
-   правкой. Высота — всем событиям, которые её несут («выкл» высоты не несёт).
-   ⛳ ЧУЖАЯ НОТА ТОГО ЖЕ КЛЮЧА на новом месте — нота берёт СВЕЖИЙ k (см. шапку): зажим снова разошёлся бы с призраком. */
-/* ⛳ T4c-1: ПРАВКА ПОЛУЧАЕТ ВЫСОТУ ИНДЕКСОМ В СТРОЕ (ti) и регистром — так её отдаёт ряд редактора (draw: ось → {ti, oct}).
-   ⛳ T5: ЛЮБАЯ ВЫСОТА СТРОЯ — ЯРКИЙ ряд или приглушённый. Два слоя (решение пользователя): строй даёт высоты, лад их подсвечивает;
-   правка может выйти из лада, живая игра руками — нет. Нота вне лада — просто другой индекс строя: поля альтерации нет, ступени
-   в событии нет (T4c-2), поэтому писать нечего, кроме самой пары. Прежде (до T5) высота вне лада давала null — правки не было.
-   Отказ — только у нецелого индекса или регистра (такого ряд не отдаёт). */
-function slotPt(ti,oct,ty){ return (Number.isInteger(ti)&&Number.isInteger(oct)) ? (ty ? {ti,oct,ty} : {ti,oct}) : null; }   // T5: без вида — проверять в ладу больше нечего
-/* ⛳ T5, ВАРИАНТ (а) (решение пользователя): ЦЕЛЫЙ НЕТИПИЗИРОВАННЫЙ аккорд, перенесённый на высоту ВНЕ лада (приглушённый ряд),
-   СОХРАНЯЕТ ФОРМУ — становится типизированным со своими НЫНЕШНИМИ интервалами (iv нот segChordNotes — шаги строя от корня, то, что он
-   звучит сейчас). «Терции через ступень лада» от корня вне лада не определены; форма — определена. Вернувшись на яркий ряд, он ОСТАЁТСЯ
-   типизированным (как перенесённые ноты U4): тип в событии — данные, а не ссылка в палитру (правило #7, сравнение — tyEq).
-   → undefined — тип не трогать (не аккорд; уже типизирован — переносится жёстко, как прежде; корень в ладу — правило лада, как прежде);
-     массив интервалов — писать его; null — отказ: форма в шагах строя неотличима от формы по правилу только на РАВНОМ октавном строе,
-     чей шаг — шаг лада (цена нетипизированного — номинально-равная, типизированного — в шагах строя). Сегодня каждый лад с правилом
-     аккордов стоит на таком строе (P.checkRules), так что отказ недостижим; он — страж для лада пользователя.
-   ОДНА функция на правку (editMoveSeg) и на призрак переноса (draw.rollGhostSeg) — правило #9. */
-function chordMoveTy(seg,ti,oct){
-  if(!seg||seg.role!=='ch'||seg.ty||modeSlotOfTi(ti,oct,seg.sc)) return undefined;
-  const sc=seg.sc, T=sc&&tuningOf(sc);   // F1: строй вида события
-  if(!T || sc.cents || periodOf(sc)!==2 || T.equal!==sc.edo) return null;
-  const N=segChordNotes(seg); return N.length ? N.map(n=>n.iv) : null;
-}
-function editMoveNote(n,t,pt){
-  const R=EDIT_ROLE[n.role]; if(!R||!pt) return false;                  // U4: ty — однонотный аккорд в КАНОНИЧЕСКОЙ форме ряда (chordUnit); без него — прежние {deg,oct}
-  const d=Math.max(0,t)-n.start;
-  const fr= keyClash(n, n.start+d, n.end+d) ? R.fresh(n.layer) : null;   // S0: свежая идентичность ПО РОЛИ (бас/аккорд — {k} ≥1: в слое есть хотя бы эта нота; соло — {v} выше всех номеров слоя)
-  const list=n.evs.map(e=>{
-    const pitch = chaseKind(e.fn)!=='f';                     // S0: «выкл» высоты не несёт — у любой роли (у баса прежнее e.fn!=='bassOff')
-    const a = (pitch||fr) ? {...e.a, ...(pitch?pt:null), ...fr} : e.a;   // нагрузка — НОВЫМ объектом (как у переноса); sc/sev/tk едут с самим событием (правило #7). Порядок полей прежний: {…, deg, oct, k}
-    return { kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+d, a} };
-  });
-  return editBatch(list) ? n.head : false;
-}
-/* ═══ E2: ОТДЕЛЕНИЕ СЕГМЕНТА ГЛИССАНДО ═══
-   Сегмент s ноты под ключом K становится ОТДЕЛЬНОЙ нотой — строится ПЛАН, ещё ничего не тронуто:
-     • s — не начало ноты → в его начале под K ложится «выкл»: левая часть ноты кончается там;
-     • события s (определяющее и ведения громкости внутри) переходят под СВЕЖИЙ k. Определяющее, если оно было
-       сменой высоты, становится «вкл» — с тембром НАЧАЛА ноты (ведения баса тембра не несут, T0);
-     • конец s: свой «выкл» ноты (s — последний) переходит под новый k вместе с ним; иначе в конце s ложится
-       новый «выкл» под новый k;
-     • s кончался СЛЕДУЮЩЕЙ СМЕНОЙ ВЫСОТЫ → та смена становится «вкл» под K: правая часть — новая атака и дальше
-       идёт под K как шла. Время внутри K монотонно: левая часть < «выкл» в начале s < «вкл» в конце s.
-   Затем правка применяется к ОТДЕЛЁННОЙ ноте (items), и всё вместе — ОДНА составная запись истории (editBatch):
-   один ↶ возвращает глиссандо в точности (те же объекты событий, те же нагрузки).
-   ⚠️ ЦЕНА ПЛАТИТСЯ ЗДЕСЬ, И ОНА НАЗВАНА: скольжение В отделённую ноту и ИЗ неё пропадает — где было непрерывное
-   глиссандо, теперь «выкл» и новая атака (левая часть отпускается с хвостом релиза, отделённая и правая
-   атакуют заново). Нетронутые части звучат ровно как прежде. ⛔ Отделяется ТОЛЬКО то, что правят, и только
-   правкой, которая иначе задела бы соседа (перенос во времени, длина на границе глиссандо, удаление); смена
-   одной высоты глиссандо сохраняет (решение пользователя).
-   ⛔ Новые события — в ТОМ ЖЕ взятом (tk), в том же слое (правило #27) и в СВОЁМ замороженном ладу (sc/sev
-   копируются с события, чьё место они занимают, — правило #7): ⤺ снаружи снимет их вместе с дублем.
-   null — отделять нечего или некуда (открытый сегмент без конца — так лежит подложка, а её не правят).
-   ⛳ S0: РОЛЬ — ИЗ ТАБЛИЦЫ EDIT_ROLE (вид событий, свежая идентичность, «выкл» под прежним ключом). «Под свежим k» выше — это у
-   баса и аккордов; у соло свежая идентичность — номер ноты v (см. таблицу). У баса нагрузки и порядок их полей — прежние. */
-function detachPlan(seg){
-  const n=seg.note, E=seg.ev, X=seg.endEv, R=EDIT_ROLE[n.role];
-  if(seg.end==null||!R) return null;
-  const fr=R.fresh(n.layer);                                  // свежая идентичность отделённой ноты: бас/аккорд {k}, соло {v}
-  /* P2: НОМЕР НОТЫ v — часть ключа владельца баса (bassOwnerKey). Все события одной ноты несут один v, поэтому новый «выкл»
-     левой части и «выкл» отделённой ноты обязаны нести его тоже: иначе «выкл» ушёл бы под ДРУГОЙ ключ и не закрыл свою
-     ноту. При v=0 (ведущий режим, один владелец) поля нет — нагрузки те же, что до P2; у полифонического баса v бывает ≠0.
-     S0: это и есть R.keep (бас) и R.oldOff (у баса — {k?, v?}); у соло «выкл» прежнего ключа несёт свой v всегда (как запись). */
-  const keep=R.keep(E.a);
-  const inst=((n.head&&n.head.a)||{}).inst, withInst=inst!==undefined?{inst}:null;   // тембр НАЧАЛА ноты: ведения баса и аккорда тембра не несут (T0); у соло ведение несёт тот же тембр, что «вкл» (с T3 открытая нота тембр не меняет)
-  const ops=[], items=[];
-  if(!seg.first) ops.push({ kind:'ins', evs:[{ t:seg.start, layer:n.layer, fn:R.off, a:R.oldOff(E.a), sc:E.sc, sev:E.sev, tk:E.tk }] });
-  for(const e of segEvs(seg)){
-    const on = e===E;
-    items.push({ orig:e, fn: on?R.on:e.fn, t:e.t, a:{...e.a, ...(on&&e.fn!==R.on?withInst:null), ...fr} });
-  }
-  if(X && chaseKind(X.fn)==='f') items.push({ orig:X, fn:R.off, t:X.t, a:{...X.a, ...fr} });
-  else {
-    items.push({ orig:null, proto:E, fn:R.off, t:seg.end, a:{...fr, ...keep} });
-    if(X) ops.push({ kind:'del', evs:[X] },
-                   { kind:'ins', evs:[{ t:X.t, layer:X.layer, fn:R.on, a:{...X.a, ...withInst}, sc:X.sc, sev:X.sev, tk:X.tk }] });
-  }
-  return { ops, items };
-}
-/* ПЛАН → ОДНА СОСТАВНАЯ ПРАВКА. items уже несут КОНЕЧНОЕ состояние отделённой ноты (с правкой). Событие, чей
-   вид не меняется, едет ходом 'move' (оба состояния); сменившее вид (ведение → «вкл») и новое — 'del'+'ins'
-   новым объектом (вид события в ходе 'move' не хранится); keep=false или it.drop — событие уходит.
-   → «вкл» отделённой ноты (его выделит редактор; это НОВЫЙ объект, если «вкл» родилось из смены высоты),
-   true для удаления, false при отказе. */
-/* U3: у РАСПАДА «вкл» в плане несколько (по одному на ноту), и выделить редактору надо не последний, а ту ноту, которую правили, —
-   её «вкл» помечен it.sel; без пометки (отделение E2, удаление U2) — прежнее правило: последнее «вкл» плана. */
-function commitDetach(P,keep){
-  const list=P.ops.slice(), del=[], ins=[]; let head=null, pick=null;
-  for(const it of P.items){
-    if(!keep||it.drop){ if(it.orig) del.push(it.orig); continue; }
-    if(it.orig && it.orig.fn===it.fn){
-      list.push({ kind:'move', ev:it.orig, from:{t:it.orig.t, a:it.orig.a}, to:{t:it.t, a:it.a} });
-      if(chaseKind(it.fn)==='n'){ head=it.orig; if(it.sel) pick=it.orig; }   // S0: «вкл» отделённой ноты — у любой роли (у баса прежнее it.fn==='bassOn': в плане бывают только события своей роли)
-    }else{
-      if(it.orig) del.push(it.orig);
-      const p=it.orig||it.proto, ev={ t:it.t, layer:p.layer, fn:it.fn, a:it.a, sc:p.sc, sev:p.sev, tk:p.tk };
-      ins.push(ev); if(chaseKind(it.fn)==='n'){ head=ev; if(it.sel) pick=ev; }
-    }
-  }
-  if(del.length) list.push({ kind:'del', evs:del });
-  if(ins.length) list.push({ kind:'ins', evs:ins });
-  if(!editBatch(list)) return false;
-  return keep ? (pick||head) : true;
-}
-/* Перенос СЕГМЕНТА: во времени и/или по высоте. Высота — НОВАЯ нагрузка (deg/oct), всё прочее едет с
-   объектом: ⛔ ev.sc НЕ ТРОГАЕМ НИКОГДА — событие остаётся в СВОЁМ ладу (правило #7), иначе правка в
-   хроматике молча переписала бы партчевскую ноту на полутона.
-   Три пути, по тому, ЧТО меняется:
-     ТОЛЬКО ВЫСОТА (время на месте) — глиссандо СОХРАНЯЕТСЯ (решение пользователя): новая ступень ложится на
-       КАЖДОЕ событие сегмента, несущее высоту, — определяющее И ведения громкости внутри. ⚠️ Это починка E1:
-       прежде ступень получало одно определяющее событие, а ведения внутри несли старую, и нота РАСПАДАЛАСЬ —
-       с первого же ведения снова звучала прежняя высота (songSegs видел смену и резал сегмент).
-     ОДИНОЧНАЯ НОТА во времени — целиком (E1, editMoveNote).
-     СЕГМЕНТ ГЛИССАНДО во времени — ОТДЕЛЯЕТСЯ и едет один (E2): все его события на одну дельту, соседи на месте.
-   → событие, которое редактор выделит после правки (у отделённой — её новое «вкл»), или false. */
-/* U4: ty (необязателен) — тип, который ложится вместе со ступенью и регистром на каждое событие, несущее высоту: так однонотный аккорд
-   переносится на ряд в КАНОНИЧЕСКОЙ форме (chordUnit) и звучит ровно высоту ряда. Без ty — прежний перенос, тип не трогается. */
-/* A segment's new pitch payload {ti, oct[, ty]}, or false when it cannot go there. Untyped whole chord off the mode keeps its shape
-   (T5 a); a chord type missing on the new root in the tuning refuses (T7); any pitch of the tuning (T5). Shared by editMoveSeg and
-   the group move (ED1). */
-function segPitchPt(seg,ti,oct,ty){
-  if(ty===undefined){ const ct=chordMoveTy(seg,ti,oct); if(ct===null) return false; ty=ct; }
-  if(seg.role==='ch' && !chordTypeFits(ty!==undefined ? ty : seg.ty, ti, seg.sc)) return false;
-  return slotPt(ti,oct,ty) || false;
-}
-function editMoveSeg(ev,t,ti,oct,ty){
-  if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(!editRoleOf(ev.fn)) return false;                       // S0: ладовая роль из таблицы (бас/аккорды/соло); редактор пускает сюда бас и аккорды с S2, соло — с S4 (ROLL_EDITABLE)
-  const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;   // правится только ОПРЕДЕЛЯЮЩЕЕ событие сегмента — его и отдаёт попадание (h.ev)
-  const pt=segPitchPt(seg,ti,oct,ty); if(!pt) return false;
-  const nt=Math.max(0,t);
-  if(Math.abs(nt-ev.t)<=1e-9){
-    const list=segEvs(seg).map(e=>({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t, a:{...e.a, ...pt}} }));
-    return editBatch(list) ? ev : false;
-  }
-  if(seg.first && seg.endEv && chaseKind(seg.endEv.fn)==='f') return editMoveNote(seg.note,nt,pt);
-  const P=detachPlan(seg); if(!P) return false;
-  const d=nt-P.items[0].t;                                   // items[0] — определяющее событие (события сегмента идут по времени)
-  for(const it of P.items){ it.t+=d; if(chaseKind(it.fn)!=='f') it.a={...it.a, ...pt}; }   // S0: «выкл» высоты не несёт — у любой роли
-  return commitDetach(P,true);
-}
-/* Удаление сегмента.
-     ОДИНОЧНАЯ нота (и нота без собственного конца) — уходит ЦЕЛИКОМ, как прежде: все её события.
-     СЕГМЕНТ ГЛИССАНДО — E2: отделяется и уходит ОДИН. На его месте — ТИШИНА: левая часть кончается в его начале,
-       правая начинается в его конце новой атакой. Прежде уходило одно событие, и предыдущая высота ТЯНУЛАСЬ через
-       место удалённой, а удаление НАЧАЛА глиссандо уносило ВСЮ ноту — обе вещи задевали соседей. */
-function editDeleteSeg(ev){
-  if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  if(!editRoleOf(ev.fn)) return false;                       // S0: см. editMoveSeg
-  const seg=songSegs().byEv.get(ev);
-  const whole = !seg || (seg.first && !(seg.endEv && chaseKind(seg.endEv.fn)!=='f'));   // нет сегмента (сирота) / одиночная / начало ноты без смены высоты за ним
-  if(!whole){ const P=detachPlan(seg); if(P) return commitDetach(P,false); }
-  const evs = (seg&&seg.first&&seg.note) ? seg.note.evs.slice() : [ev];
-  if(!evs.some(e=>events.includes(e))) return false;         // прежний отказ compactEvents (удалять нечего)
-  return editBatch([{ kind:'del', evs }]);                   // S6: через editBatch — проход развязки видит удаляемый край пары. Один ход — та же запись истории, что прежде (editPush без обёртки)
-}
-/* ═══ U2: РАСПАД АККОРДА — ПРАВКА ОДНОЙ ЕГО НОТЫ ═══
-   ⛳ ЗАКОН (решение пользователя, план «АККОРД КАК НОТЫ»): правка ОДНОЙ ноты аккорда РАСПУСКАЕТ его на ОДНОНОТНЫЕ аккорды, и
-   правка применяется к одной из них. U2 — УДАЛЕНИЕ ноты, U3 — её перенос во времени и длина, U4 — по высоте (chordNoteEdit ниже).
-   ⛳ ЧТО ПИШЕТСЯ. Сперва — ТО ЖЕ ОТДЕЛЕНИЕ, что у переноса и удаления сегмента (detachPlan, E2): сегмент посреди ведения
-   (аккорды, сменённые одной защёлкой) становится отдельной нотой; одиночный аккорд (сегмент-начало со своим «выкл») берётся как
-   есть — отделять его не от чего. Затем отделённая нота РАЗМНОЖАЕТСЯ: на каждую оставшуюся ноту аккорда — своя копия ВСЕХ её
-   событий («вкл», ведения громкости и яркости внутри, «выкл»), каждая
-     • с ТЕМ ЖЕ корнем и регистром (a.deg/a.oct) и ТЕМ ЖЕ замороженным ладом (sc/sev едут с событием — правило #7);
-     • с ОДНОЭЛЕМЕНТНЫМ ТИПОМ a.ty = [интервал этой ноты] — интервал ровно тот, что вернула scales.chordNotes (iv — в мере ветки
-       цены: целые полутоны у сетки и ступенчатых наборов, отношение у чистых); ⚠️ это НОВЫЙ массив, а не ссылка в наборе
-       семейств (правило #7 — тип в событии теперь бывает и данными вне палитры; сравнение — tyEq, по значению);
-     • со СВОИМ свежим суффиксом взятого k (k0, k0+1, … — выше всех k слоя, layerTakeTop), то есть со своим владельцем
-       'loop:N:k': у каждой ноты свой голос, ничья с ничьей не путается;
-     • громкость, яркость, тембр («вкл»), отметки автоматизации (sh/gen) — КОПИИ полей исходных событий, ничего не выдумано.
-   Удаляемая нота просто не получает копии. Первая оставшаяся нота едет на ИСХОДНЫХ объектах событий (ход 'move'), прочие —
-   новыми объектами в том же взятом (tk) и слое (правило #27). Всё — ОДНА составная правка (commitDetach → editBatch): один ↶
-   возвращает аккорд в точности (те же объекты, те же нагрузки), одна запись истории.
-   ⛳ ПОЧЕМУ ЗВУК ОСТАВШИХСЯ НОТ НЕ МЕНЯЕТСЯ (доказательство — по движку, audio.chordOn/chordGlide/chordOff):
-     • ВЫСОТА: chordFreqs(deg,oct,sc,sev,[iv_i]) — та же ветка chordNotes с тем же корнем (корень не зависит от типа ни в одной из
-       четырёх ветвей), нота = корень·iv_i (или ступень корень+iv_i сетки / шаг r0+iv_i) — ровно частота ноты i исходного аккорда;
-     • УРОВЕНЬ: голос аккорда получает ins.lvl·volAmp(vol)·(1−rnd·0.05) — от ЧИСЛА нот уровень не зависит (нормировки на число
-       голосов в chordOn нет), значит одна нота звучит так же, как в составе;
-     • ФИЛЬТРЫ: f (атака) ставится из тембра и громкости, fb (яркость) — из a.bri; оба — пер-голосовые и от состава не зависят
-       (правило #19 не тронуто);
-     • ВЕДЕНИЕ: chordGlide сопоставляет голос i частоте i; у однонотного аккорда голос 0 — частоте 0, то есть той же ноте;
-     • ШИНА: все владельцы 'loop:N:*' слоя идут в одну chordBus → одна цепь эффектов дорожки;
-     • ГОЛОСОВ не больше, чем было (N−1 из N): живой пул 24 крадёт не раньше прежнего.
-     Различается лишь гуманизация (−0..5% уровня, ±10% атаки, центы) — она СВЕЖАЯ на каждой атаке и не записывается (правило
-     #11), то есть различалась и между двумя переигровками одного аккорда.
-   ⚠️ ЦЕНА ПЛАТИТСЯ ЗДЕСЬ (та же, что у E2, и только у сегмента ВНУТРИ ведения): там, где аккорд плавно сменялся из соседнего и
-   плавно перетекал в следующий, теперь «выкл» и новая атака — края сегмента РЕ-АРТИКУЛИРУЮТСЯ (detachPlan). Одиночный аккорд
-   распадается без цены: ноты атакуют и отпускаются ровно там, где и прежде.
-   null — распускать нечего или некуда (открытый сегмент — так лежит подложка, её не правят). */
-function dissolvePlan(seg,N,drop){
-  const n=seg.note, X=seg.endEv;
-  const alone = seg.first && X && chaseKind(X.fn)==='f';      // одиночный аккорд: отделять не от чего — берём все его события как есть
-  const P = alone ? { ops:[], items:n.evs.map(e=>({ orig:e, fn:e.fn, t:e.t, a:e.a })) } : detachPlan(seg);
-  if(!P) return null;
-  const k0=layerTakeTop(n.layer), items=[];
-  N.map((x,i)=>i).filter(i=>i!==drop).forEach((i,j)=>{
-    const ty=[N[i].iv], k=k0+j;                               // свой тип из одной ноты и свой владелец 'loop:N:k'
-    for(const it of P.items){
-      const a={...it.a, ...(chaseKind(it.fn)!=='f'?{ty}:null), k};   // «выкл» типа не несёт — у него только ключ
-      items.push({ ...(j===0 ? {...it, a} : { orig:null, proto:it.orig||it.proto, fn:it.fn, t:it.t, a }), note:i });   // U3: note — номер ноты в chordNotes, чья это копия (по нему перенос и длина находят СВОЮ однонотную)
-    }
-  });
-  return { ops:P.ops, items };
-}
-/* ⛳ T4c-1: НОТЫ АККОРДА СЕГМЕНТА — ОДНА функция для распада (удаление одной ноты), правки одной ноты и пробы P.checkStrip: из индекса
-   корня, регистра, типа и замороженного вида сегмента (ступени у сегмента больше нет). Интервалы iv — то, что ложится в однонотные типы. */
-function segChordNotes(seg){ return chordNotesAt(seg.ti,seg.oct,seg.sc,seg.sev,seg.ty); }
-/* Удалить ОДНУ ноту аккорда (idx — её номер в scales.chordNotes сегмента, тот же, что у блока на экране): аккорд распадается
-   на однонотные, удаляемая уходит (см. dissolvePlan). Аккорд из одной ноты — это удаление сегмента целиком, как прежде.
-   → true или false. */
-function editDeleteChordNote(ev,idx){
-  if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
-  const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
-  const N=segChordNotes(seg);   // T4b2: ноты — по индексу корня (типизированный), иначе по ступени — те же интервалы, что играет ENG (проба T4b1)
-  if(!(idx>=0&&idx<N.length)) return false;
-  if(N.length<2) return editDeleteSeg(ev);
-  const P=dissolvePlan(seg,N,idx); if(!P) return false;
-  return !!commitDetach(P,true);
-}
-/* ═══ U3: ПЕРЕНОС ВО ВРЕМЕНИ И ДЛИНА ОДНОЙ НОТЫ АККОРДА ═══
-   ⛳ ТОТ ЖЕ РАСПАД, ЧТО У УДАЛЕНИЯ (U2), — без второй модели: dissolvePlan(seg, N, -1) распускает сегмент на однонотные аккорды, НИ
-   ОДНОЙ не снимая (каждая звучит ровно как в составе — доказательство в шапке распада), а затем правка трогает ТОЛЬКО копию выбранной
-   ноты (it.note === idx): перенос сдвигает ВСЕ её события («вкл», ведения громкости/яркости внутри, «выкл») на одну дельту; длина
-   двигает её «выкл» и снимает её же ведения за новым концом (как editResizeSeg). Прочие копии стоят где стояли.
-   ⛳ СТОЛКНУТЬСЯ НЕ С ЧЕМ: у каждой копии свой свежий k выше всех k слоя (dissolvePlan), значит ни перенос, ни удлинение не заходят на
-   чужой ключ — зажим и «свежий k по столкновению» (E1) здесь не нужны. Перекрытие с соседним аккордом — два голоса, как у E2.
-   ⚠️ ЦЕНА — та же, что у распада: сегмент внутри ведения сперва ОТДЕЛЯЕТСЯ (detachPlan), и его края ре-артикулируются.
-   Всё — ОДНА составная правка (commitDetach → editBatch): один ↶ возвращает аккорд в точности.
-   Высота одной ноты — U4 (editMoveChordNote с deg/oct, ниже). Аккорд из одной ноты — обычный сегмент: editMoveSeg / editResizeSeg.
-   → «вкл» правленой однонотной (её выделит редактор) или false. */
-function chordNoteEdit(ev,idx,fn){
-  if(!editGuard()||!ev||ev.layer!==editLayer()||chaseRole(ev.fn)!=='ch') return false;
-  const seg=songSegs().byEv.get(ev); if(!seg||seg.ev!==ev) return false;
-  const N=segChordNotes(seg);   // T4b2: см. editDeleteChordNote (T4c-1: без ступени)
-  if(!(idx>=0&&idx<N.length)) return false;
-  if(N.length<2) return fn(seg,null);
-  const P=dissolvePlan(seg,N,-1); if(!P) return false;
-  const mine=P.items.filter(it=>it.note===idx);               // копия выбранной ноты: «вкл» первым, свой «выкл» последним (события сегмента идут по времени)
-  if(!mine.length||fn(seg,mine)===false) return false;
-  for(const it of mine) if(chaseKind(it.fn)==='n') it.sel=true;
-  return commitDetach(P,true);
-}
-/* ⛳ U4: ПЕРЕНОС ОДНОЙ НОТЫ ПО ВЫСОТЕ — тот же распад, затем копия выбранной ноты получает КАНОНИЧЕСКУЮ ФОРМУ РЯДА: ступень и регистр
-   ряда (deg/oct — ui расшифровывает ряд rollRowPitch по ладу оси) и однонотный тип scales.chordUnit(лад сегмента) — единицу корня, то
-   есть аккорд из одного корня. Нота звучит ровно высоту ряда — ступени лада, то есть высоты СТРОЯ (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ»:
-   ноты строятся из высот строя, лад — подсветка; ряд вне лада — приглушённый; с T5 нота встаёт и на него — та же каноническая форма, высота строя вне лада): нота
-   вне ряда (чистое отношение между высотами строя), перенесённая
-   на ряд, ПРИЛИПАЕТ к нему. Лад события не трогаем (правило #7): форма считается в его же sc.
-   deg==null — высота не меняется (только время, U3). Время и высота вместе — ОДНА правка. Высота на все события копии, несущие
-   высоту («вкл» и ведения внутри); «выкл» её не несёт.
-   Аккорд из одной ноты (сам — нота): обычный перенос сегмента, но с той же канонической формой (editMoveSeg с ty) — иначе его
-   прежний однонотный тип [iv] от прежнего корня увёл бы ноту мимо ряда, к которому её тянули (у нетипизированного лада корень
-   идёт по ступеням, а интервал — в шагах). */
-/* ⛳ T4c-1: высота приходит ИНДЕКСОМ (ti, oct — ряд оси). ⛳ T5: ряд — любой, яркий или приглушённый (slotPt). */
-function editMoveChordNote(ev,idx,t,ti,oct){
-  const pitch = ti!=null && oct!=null;
-  return chordNoteEdit(ev,idx,(seg,mine)=>{
-    if(!mine) return pitch ? editMoveSeg(seg.ev,t,ti,oct,chordUnit(seg.sc)) : editMoveSeg(seg.ev,t,seg.ti,seg.oct);
-    const d=Math.max(0,t)-mine[0].t;
-    if(Math.abs(d)<=1e-9 && !pitch) return false;
-    const pt=pitch ? slotPt(ti,oct,chordUnit(seg.sc)) : null;   // T5: любая высота строя — однонотный аккорд в канонической форме ряда
-    if(pitch && !pt) return false;
-    for(const it of mine){ it.t+=d; if(pt && chaseKind(it.fn)!=='f') it.a={...it.a, ...pt}; }
-  });
-}
-function editResizeChordNote(ev,idx,t){
-  return chordNoteEdit(ev,idx,(seg,mine)=>{
-    if(!mine) return editResizeSeg(seg.ev,t);
-    const on=mine[0], off=mine[mine.length-1];
-    if(chaseKind(off.fn)!=='f') return false;
-    const T=Math.max(t, on.t+EDIT_MIN_LEN);
-    if(Math.abs(T-off.t)<=1e-9) return false;
-    off.t=T;
-    for(const it of mine) if(it!==on && it!==off && it.t>=T-EDIT_GAP) it.drop=true;   // ведения этой ноты за новым концом — после «выкл» они сироты
-  });
-}
-/* ═══ S5: ОБРЕЗКА КРИВОЙ БЕНДА ПО НОВОЙ ДЛИНЕ НОТЫ ═══
-   B — кривая (точки {dt, c}, dt в долях от атаки, по возрастанию), L — новая длина ноты в долях. Остаются точки с dt ≤ L; если что-то
-   ушло, кривая ЗАКАНЧИВАЕТСЯ точкой {dt:L, c} — значением на новом конце. Значение кривой между точками — значение ПОСЛЕДНЕЙ точки до
-   него (переигровка ставит каждую точку ступенью: scheduleBend → setFreq с τ 20 мс), поэтому c конечной точки — c последней оставшейся.
-   → ТОТ ЖЕ массив, если за L ничего нет (удлинение, короткая кривая), иначе НОВЫЙ массив; ⛔ ни массив, ни точки не мутируются
-   (на них держатся ↶ и прежние нагрузки). Точки в новом массиве — те же объекты (их никто не меняет), конечная — новая. */
-function bendTrim(B,L){
-  if(!B||!B.length||!(B[B.length-1].dt>L+1e-9)) return B;
-  const keep=B.filter(p=>p.dt<=L+1e-9), last=keep[keep.length-1];
-  if(last && Math.abs(last.dt-L)<=1e-9) return keep;
-  if(last && B[keep.length].sh==='s') return bendSplit(B,L).filter(p=>p.dt<=L+1e-9);   // BEND-CURVE: a glide across the new end ends on its own value there (exact split)
-  return [...keep, { dt:L, c: last ? last.c : 0 }];   // до первой точки голос стоит на ступени атаки (0 центов)
-}
-/* ═══ ДЛИНА СЕГМЕНТА (S5.6; E2) ═══
-   ⛳ ЧТО ДВИГАЕТ ИЗМЕНЕНИЕ ДЛИНЫ — по тому, ЧЕМ сегмент кончается:
-     СВОИМ «выкл» (одиночная нота или последний сегмент глиссандо) → двигаем этот «выкл»: это и есть длина ноты,
-       соседей она не задевает. Ведения громкости этого сегмента, оказавшиеся за новым концом, уходят (после «выкл»
-       они сироты — их не слышно); прежде их время ЗАЖИМАЛО укорочение, и записанную ноту с дрожью руки внутри
-       нельзя было укоротить. Удлинение поверх чужой ноты того же ключа → нота берёт свежий k (как перенос, E1),
-       а не упирается в соседку.
-     СЛЕДУЮЩЕЙ СМЕНОЙ ВЫСОТЫ (граница глиссандо) → E2: сегмент ОТДЕЛЯЕТСЯ, и двигается ЕГО СОБСТВЕННЫЙ новый «выкл».
-       Прежде двигалась общая граница: этот сегмент рос, следующий на столько же укорачивался.
-     «ВКЛ» СОСЕДНЕЙ НОТЫ того же ключа (endEv нет) / открытый сегмент — тянуть нечего, отказ (как было).
-   ⚠️ НУЛЕВОЙ И ОТРИЦАТЕЛЬНОЙ ДЛИНЫ НЕ БЫВАЕТ: конец не ближе EDIT_MIN_LEN к началу.
-   → определяющее событие сегмента (его выделит редактор; у отделённого — его новое «вкл») или false. */
-function editResizeSeg(ev,t){
-  if(!editGuard()||!ev||ev.layer!==editLayer()) return false;
-  const R=editRoleOf(ev.fn); if(!R) return false;            // S0: см. editMoveSeg
-  // S4–S6: отказов соло нет (край пары связки с S6 развязывается — tieUntiePass в editBatch); длина терменвокса обрезает кривую ниже (bendTrim, S5)
-  const seg=songSegs().byEv.get(ev); if(!seg||!seg.endEv||seg.end==null) return false;
-  const X=seg.endEv;
-  if(chaseKind(X.fn)==='f'){
-    const n=seg.note, T=Math.max(t, seg.start+EDIT_MIN_LEN);
-    if(Math.abs(T-X.t)<=1e-9) return false;
-    const drop=segEvs(seg).filter(e=>e!==seg.ev && e.t>=T-EDIT_GAP);
-    const fr= (T>X.t && keyClash(n, X.t, T)) ? R.fresh(n.layer) : null;   // S0: свежая идентичность по роли (у баса — прежний {k})
-    /* ⛳ S5: УКОРОЧЕНИЕ НОТЫ ТЕРМЕНВОКСА ОБРЕЗАЕТ ЕЁ КРИВУЮ — НОВОЙ нагрузкой «вкл» (ход 'move' везёт оба состояния: ↶ возвращает прежний
-       объект нагрузки и с ним ПРЕЖНИЙ массив бенда, побитно). Удлинение кривую не трогает (bendTrim отдаёт тот же массив): последнее
-       значение держится до нового конца. Нагрузки без бенда (бас, аккорд, обычное соло) — дословно прежние ходы. */
-    const H=n.head, B=H&&H.a&&H.a.bend, nb=(B&&B.length) ? bendTrim(B, T-H.t) : B;
-    const list=[];
-    for(const e of n.evs){
-      if(drop.includes(e)) continue;
-      const trim= e===H && nb!==B;
-      if(e!==X && !fr && !trim) continue;
-      list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t: e===X?T:e.t, a: (fr||trim)?{...e.a, ...fr, ...(trim?{bend:nb}:null)}:e.a} });
-    }
-    if(drop.length) list.push({ kind:'del', evs:drop });
-    return editBatch(list) ? seg.ev : false;
-  }
-  const P=detachPlan(seg); if(!P) return false;
-  const on=P.items[0], off=P.items[P.items.length-1];         // отделённая нота: «вкл» первым, свой «выкл» последним
-  const T=Math.max(t, on.t+EDIT_MIN_LEN);
-  off.t=T;
-  for(const it of P.items) if(it!==on && it!==off && it.t>=T-EDIT_GAP) it.drop=true;   // ведения громкости за новым концом
-  return commitDetach(P,true);
-}
-/* ═══ ED1: SEVERAL NOTES AT ONCE — ONE HISTORY ENTRY ═══
-   A group edit runs the single-note edits one after another (each sees the song the previous one left: fresh keys, detaches, tie
-   untying all stay theirs) and merges what they pushed into ONE entry — undo walks it back in reverse. A refusal anywhere rolls the
-   applied part back and leaves history and redo as they were. run(h0) gets the history length at the start (for editRemap). */
-function editGroup(run){
-  if(!editGuard()) return false;
-  const h0=hist.length, fut=histFut.slice();
-  let r=false, subs=[];
-  histGroupDepth++;
-  try{ r=run(h0); }
-  finally{
-    histGroupDepth--;
-    subs=hist.splice(h0);
-    if(!r){ for(let i=subs.length-1;i>=0;i--) editApply(subs[i],true);
-      if(subs.length) editCommit();
-      histFut.length=0; histFut.push(...fut); }
-    else if(subs.length){ hist.push(subs.length===1 ? subs[0] : { kind:'batch', list:subs }); histSeal(); }   // ED7: the merged step carries the tripwire hash too
-  }
-  return subs.length ? r : false;
-}
-/* A selected event an earlier sub-edit replaced (a detach turns the next segment's pitch change into a new note-on at the same beat):
-   follow del → ins pairs in the entries pushed since h0. → the live event or null. */
-function editRemap(ev,h0){
-  const flat=(u,o)=>{ if(u.kind==='batch') for(const s of u.list) flat(s,o); else if(u.kind==='del') o.del.push(...u.evs); else if(u.kind==='ins') o.ins.push(...u.evs); return o; };
-  for(let i=h0; ev && i<hist.length && !events.includes(ev); i++){
-    const o=flat(hist[i],{del:[],ins:[]});
-    if(o.del.includes(ev)) ev=o.ins.find(e=>e.layer===ev.layer && Math.abs(e.t-ev.t)<1e-9 && chaseRole(e.fn)===chaseRole(ev.fn) && chaseKind(e.fn)!=='f')||null;
-  }
-  return ev && events.includes(ev) ? ev : null;
-}
-/* The selection grouped by note: drum hits, notes whose every segment is selected (they move or go WHOLE — a glide stays one note) and
-   the remaining segments (parts of a line — they go through the single-segment edit and detach, as one edit would). null = not this
-   track or not a defining event. */
-function selGroups(evs,ly){
-  const SV=songSegs(), nSegs=new Map(), byNote=new Map(), drums=[], whole=[], parts=[], live=new Set(events);
-  for(const g of SV.segs) nSegs.set(g.note,(nSegs.get(g.note)||0)+1);
-  for(const ev of evs){
-    if(!ev||ev.layer!==ly||!live.has(ev)) return null;
-    if(ev.fn==='drum'){ drums.push(ev); continue; }
-    const s=SV.byEv.get(ev); if(!s||s.ev!==ev||!editRoleOf(ev.fn)) return null;
-    const L=byNote.get(s.note)||[]; if(!L.includes(s)) L.push(s); byNote.set(s.note,L);
-  }
-  for(const [n,L] of byNote){ L.sort((a,b)=>a.start-b.start); if(L.length===nSegs.get(n)) whole.push({n,L}); else parts.push(...L); }
-  parts.sort((a,b)=>a.start-b.start);
-  return { drums, whole, parts };
-}
-/* Move a whole note by d; ptOf(seg) → its new pitch payload, null = unchanged, false = refuse. Fresh identity on a key clash (E1). */
-function editMoveWhole(n,d,ptOf){
-  const R=EDIT_ROLE[n.role]; if(!R||n.end==null) return false;
-  const SV=songSegs(), fr= keyClash(n, n.start+d, n.end+d) ? R.fresh(n.layer) : null, memo=new Map(), list=[];
-  for(const e of n.evs){
-    const s= chaseKind(e.fn)!=='f' ? SV.byEv.get(e) : null;
-    if(s && !memo.has(s)) memo.set(s, ptOf(s));
-    const pt= s ? memo.get(s) : null; if(pt===false) return false;
-    list.push({ kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+d, a:(pt||fr) ? {...e.a, ...pt, ...fr} : e.a} });
-  }
-  return editBatch(list);
-}
-/* ED1 group move. items: pitched {ev, ti, oct} (the segment's new pitch; ti undefined = unchanged), drums {ev, row}; dt — one shift for
-   all, clamped so nothing goes before beat 0. → the defining events to select afterwards, or false (nothing moved). */
-function editMoveSel(items,dt){
-  const ly=editLayer(); if(!items||!items.length||ly==null) return false;
-  const X=new Map(items.map(x=>[x.ev,x]));
-  dt=Math.max(-Math.min(...items.map(x=>x.ev.t)), dt||0);
-  const moved=x=> Math.abs(dt)>1e-9 || (x.ev.fn==='drum' ? x.row!=null&&x.row!==(x.ev.a.row|0) : x.ti!==undefined);
-  if(!items.some(moved)) return false;
-  return editGroup(h0=>{
-    const G=selGroups(items.map(x=>x.ev),ly); if(!G) return false;
-    const out=[];
-    if(G.drums.length){
-      const list=G.drums.map(e=>{ const x=X.get(e), row= x.row!=null ? x.row|0 : (e.a.row|0);
-        return { kind:'move', ev:e, from:{t:e.t, a:e.a}, to:{t:e.t+dt, a: row!==(e.a.row|0) ? {...e.a, row} : e.a} }; });
-      if(!editBatch(list)) return false; out.push(...G.drums); }
-    const ptOf=s=>{ const x=X.get(s.ev); return !x||x.ti===undefined ? null : segPitchPt(s,x.ti,x.oct); };
-    for(const {n,L} of G.whole){ if(!editMoveWhole(n,dt,ptOf)) return false; out.push(...L.map(s=>s.ev)); }
-    for(const s of G.parts){
-      const x=X.get(s.ev); if(!moved(x)) { out.push(s.ev); continue; }
-      const e=editRemap(s.ev,h0); if(!e) return false;
-      const r=editMoveSeg(e, s.start+dt, x.ti!==undefined?x.ti:s.ti, x.ti!==undefined?x.oct:s.oct);
-      if(!r) return false; out.push(r===true?e:r);
-    }
-    return out.filter(e=>events.includes(e));
-  });
-}
-/* ED1 group delete: drum hits and whole notes go in one 'del'; parts of a line through editDeleteSeg (silence in their place, E2). */
-function editDeleteSel(evs){
-  const ly=editLayer(); if(!evs||!evs.length||ly==null) return false;
-  return editGroup(h0=>{
-    const G=selGroups(evs,ly); if(!G) return false;
-    const gone=[...G.drums]; for(const {n} of G.whole) gone.push(...n.evs);
-    if(gone.length && !editBatch([{ kind:'del', evs:gone }])) return false;
-    for(const s of G.parts){ const e=editRemap(s.ev,h0); if(!e||!editDeleteSeg(e)) return false; }
-    return true;
-  });
 }
 /* ═══ ED2: COPY, PASTE, DUPLICATE — the third birth place of events (after push and loadArrangement), obeying the same law ═══
    The clipboard holds COPIES of the selected notes (start-relative beats are taken at paste), kept for the whole session: it outlives a
@@ -3952,59 +3204,59 @@ function autChainMove(layer,fxId,dir){
   }
   return autBatch(list);
 }
-/* ОДИН ход истории в ЛЮБУЮ сторону. undo=true — назад, false — вперёд. Перенос переставляет время и
-   нагрузку на нужное состояние; удаление и вставка — зеркальны друг другу и возят ТОТ ЖЕ объект события
-   (никаких копий: за объект держатся выделение и спаривание нот). */
-function editApply(u,undo){
-  if(u.kind==='move'){ const s= undo?u.from:u.to; u.ev.t=s.t; u.ev.a=s.a; if(s.sc) u.ev.sc=s.sc; return; }   // OWN1: a step may carry the event's view (a track into another mode)
-  if(u.kind==='timbre'){ for(const c of u.ch) c.ev.a = undo?c.from:c.to; return; }   // T5: вся замена — одним ходом, нагрузки те же объекты
-  if(u.kind==='lanetouch'){ laneVerBump(u.id); return; }   // ⛳ S6: версия правок ДРУГОЙ дорожки (партнёра пары связки) — поднимается В ОБЕ стороны: и ↶, и ↷ меняют её события, её замороженный буфер обязан устареть снова
-  if(u.kind==='batch'){ const L=u.list;                                            // E1: составная правка — вперёд по порядку, назад в обратном (см. editBatch)
-    if(undo) for(let i=L.length-1;i>=0;i--) editApply(L[i],true); else for(const s of L) editApply(s,false);
-    return; }
-  /* ⛳ ПРАВКИ ПОЛОСЫ АВТОМАТИЗАЦИИ (O-4) — В ТОЙ ЖЕ ИСТОРИИ, что и ноты, и по той же форме: ход возит
-     ТОТ ЖЕ объект (точку или запись цепи), а не копию. Разной у них только цель: там массив событий,
-     здесь массив дорожки автоматизации или снимок цепи взятого.
-     ⛔ ВТОРОЙ ИСТОРИИ НЕ ЗАВОДИМ: ↶ у человека одна, и она обязана снимать последнее сделанное, чем бы
-     оно ни было. Отсюда же и общий хвост — takeFxTouch, чтобы снятая правка перестала звучать. */
-  if(u.kind==='autmove'){ const s= undo?u.from:u.to; u.pt.t=s.t; u.pt.v=s.v; takeFxTouch(); return; }
-  if(u.kind==='autshape'){ autShapeSet(u.pt, undo?u.from:u.to); takeFxTouch(); return; }
-  if(u.kind==='autcurve'){ const k= undo?u.from:u.to; if(k) u.pt.k=k; else delete u.pt.k; takeFxTouch(); return; }   // BEND-CURVE   // гладкая автоматизация: форма отрезка точки ленты — оба состояния в записи, как у переноса
-  if(u.kind==='autins'||u.kind==='autdel'){
-    const add=(u.kind==='autdel')===undo;
-    if(add){ if(u.lane.indexOf(u.pt)<0) u.lane.splice(u.kind==='autdel'&&u.at!=null ? Math.min(u.at,u.lane.length) : u.lane.length, 0, u.pt); }   // ED6: an undone delete goes back to its own place (the song fingerprint compares lanes in order)
-    else { const i=u.lane.indexOf(u.pt); if(i>=0){ if(u.kind==='autdel') u.at=i; u.lane.splice(i,1); } }
-    takeFxTouch(); return;
-  }
-  if(u.kind==='autfxins'||u.kind==='autfxdel'){
-    const add=(u.kind==='autfxdel')===undo;
-    if(add){ if(u.ch.indexOf(u.ent)<0) u.ch.splice(u.at==null?u.ch.length:Math.min(u.at,u.ch.length),0,u.ent); }
-    else { const i=u.ch.indexOf(u.ent); if(i>=0) u.ch.splice(i,1); }
-    takeFxTouch(); return;
-  }
-  if(u.kind==='autfxmove'){ const from=undo?u.to:u.from, to=undo?u.from:u.to;
-    if(from>=0&&from<u.ch.length){ const [e]=u.ch.splice(from,1); u.ch.splice(to,0,e); }
-    takeFxTouch(); return; }
-  /* S1: ЗАХВАТ, ЗАВЕДЁННЫЙ ПРАВКОЙ ЦЕПИ дорожке, у которой его не было вовсе (autCaps). Вперёд — поставить (при первом ходе он уже
-     стоит: его завела takeCapStart), назад — снять, и дорожка снова идёт за живой цепью, как до правки. Снимаем, только если на
-     месте ТОТ ЖЕ объект: чужой захват того же взятого не наш. */
-  if(u.kind==='autcap'){
-    if(undo){ if(takeFx.get(u.tk)===u.rec) takeFx.delete(u.tk); } else takeFx.set(u.tk,u.rec);
-    takeFxTouch(); return; }
-  if(secApply(u,undo)) return;   // ED6: brace, markers, backing lengths (section edits)
-  if(histApplyX(u,undo)) return;   // ED7: snapshot steps, level / pan / name, order, master
-  /* S5.5: удаление/вставка возят НАБОР событий (бас-нота — это «вкл»+«выкл», а то и её ведения), но
-     механизм тот же и объекты ТЕ ЖЕ. Набор из одного — прежний случай удара, байт-в-байт. */
-  const back=new Set(u.evs);
-  if((u.kind==='del')===undo) events.push(...u.evs);
-  else compactEvents(e=>back.has(e));
-}
+/* REC2: ONE step either way is song/history.js histApply (imported here as editApply); step kinds register themselves. This module
+   registers the kinds it owns: lane automation and chain edits (capture records), the capture a chain edit creates, the section kinds, snapshot
+   steps, the mixer tables, the master level and the key knob. 'touched' = the tracks whose freeze goes stale (lane points through their take). */
+const tkLy=(tk,S)=>{ for(const e of events) if((e.tk||0)===tk) S.add(e.layer); };
+const recOf=pred=>{ for(const [tk,r] of takeFx) if(pred(r)) return tk; return null; };
+const capTouched=pred=>(u,S)=>{ const tk=recOf(r=>pred(r,u)); if(tk!=null) tkLy(tk,S); };
+const ptTouched=capTouched((r,u)=>r.lane.includes(u.pt)), lnTouched=capTouched((r,u)=>r.lane===u.lane), chTouched=capTouched((r,u)=>Object.values(r.chains).includes(u.ch));
+/* ⛳ ПРАВКИ ПОЛОСЫ АВТОМАТИЗАЦИИ (O-4) — В ТОЙ ЖЕ ИСТОРИИ, что и ноты, и по той же форме: ход возит
+   ТОТ ЖЕ объект (точку или запись цепи), а не копию. Разной у них только цель: там массив событий,
+   здесь массив дорожки автоматизации или снимок цепи взятого.
+   ⛔ ВТОРОЙ ИСТОРИИ НЕ ЗАВОДИМ: ↶ у человека одна, и она обязана снимать последнее сделанное, чем бы
+   оно ни было. Отсюда же и общий хвост — takeFxTouch, чтобы снятая правка перестала звучать. */
+histKind('autmove', (u,undo)=>{ const s= undo?u.from:u.to; u.pt.t=s.t; u.pt.v=s.v; takeFxTouch(); }, ptTouched);
+histKind('autshape', (u,undo)=>{ autShapeSet(u.pt, undo?u.from:u.to); takeFxTouch(); }, ptTouched);
+histKind('autcurve', (u,undo)=>{ const k= undo?u.from:u.to; if(k) u.pt.k=k; else delete u.pt.k; takeFxTouch(); }, ptTouched);   // BEND-CURVE   // гладкая автоматизация: форма отрезка точки ленты — оба состояния в записи, как у переноса
+const autLaneApply=(u,undo)=>{
+  const add=(u.kind==='autdel')===undo;
+  if(add){ if(u.lane.indexOf(u.pt)<0) u.lane.splice(u.kind==='autdel'&&u.at!=null ? Math.min(u.at,u.lane.length) : u.lane.length, 0, u.pt); }   // ED6: an undone delete goes back to its own place (the song fingerprint compares lanes in order)
+  else { const i=u.lane.indexOf(u.pt); if(i>=0){ if(u.kind==='autdel') u.at=i; u.lane.splice(i,1); } }
+  takeFxTouch();
+};
+histKind('autins', autLaneApply, lnTouched);
+histKind('autdel', autLaneApply, lnTouched);
+const autFxApply=(u,undo)=>{
+  const add=(u.kind==='autfxdel')===undo;
+  if(add){ if(u.ch.indexOf(u.ent)<0) u.ch.splice(u.at==null?u.ch.length:Math.min(u.at,u.ch.length),0,u.ent); }
+  else { const i=u.ch.indexOf(u.ent); if(i>=0) u.ch.splice(i,1); }
+  takeFxTouch();
+};
+histKind('autfxins', autFxApply, chTouched);
+histKind('autfxdel', autFxApply, chTouched);
+histKind('autfxmove', (u,undo)=>{ const from=undo?u.to:u.from, to=undo?u.from:u.to;
+  if(from>=0&&from<u.ch.length){ const [e]=u.ch.splice(from,1); u.ch.splice(to,0,e); }
+  takeFxTouch(); }, chTouched);
+/* S1: ЗАХВАТ, ЗАВЕДЁННЫЙ ПРАВКОЙ ЦЕПИ дорожке, у которой его не было вовсе (autCaps). Вперёд — поставить (при первом ходе он уже
+   стоит: его завела takeCapStart), назад — снять, и дорожка снова идёт за живой цепью, как до правки. Снимаем, только если на
+   месте ТОТ ЖЕ объект: чужой захват того же взятого не наш. */
+histKind('autcap', (u,undo)=>{
+  if(undo){ if(takeFx.get(u.tk)===u.rec) takeFx.delete(u.tk); } else takeFx.set(u.tk,u.rec);
+  takeFxTouch(); }, (u,S)=>{ tkLy(u.tk,S); });
+for(const k of ['brace','marks','lanelen']) histKind(k, secApply);   // ED6: brace, markers, backing lengths (section edits)
+/* ED7: snapshot steps, level / pan / name of a track, master, the key knob of a song Transpose ('ranks' — song/history.js) */
+histKind('snap', snapApply, (u,S)=>{ for(const L of [u.rem,u.add,u.ch]) for(const x of L) S.add(x[0].layer); });
+histKind('tab', (u,undo)=>{ const ly=laneLayerOf(u.id), v= undo?u.from:u.to; if(ly==null) return;
+  if(u.f==='level') setLaneLevel(ly,v); else if(u.f==='pan') setLanePan(ly,v); else setLaneName(ly,v||''); });
+histKind('master', (u,undo)=>{ AUD.setMasterLevel(undo?u.from:u.to); });
+histKind('key', (u,undo)=>{ keyStepSet(undo?u.from:u.to); });
 /* ↶ / ↷ of the editor — since ED7 the one history (histUndo / histRedo: any step, any track, editor open or not). */
 const editUndo=()=>histUndo();
 const editRedo=()=>histRedo();
 /* ⛔ Probe only (P.checkLiveIsolation): the open session's history, and walking such a list back in a LATER session on the same track —
    safe only when nothing changed the song in between (the probe plays and freezes, it edits nothing). Restores the exact payloads. */
-const editHistPeek=()=>hist.slice();
+const editHistPeek=()=>histPeek();
 function editRevert(list){
   if(!list||!list.length||!editGuard(true)) return false;
   for(let i=list.length-1;i>=0;i--) editApply(list[i],true);
@@ -4041,29 +3293,6 @@ function loopPos(){
    сами страхуют ступень вне лада (модуло+октава), так что частота не улетает в NaN.
    Владелец голосов ПО СЛОЮ (ctx=событие переигровки): аккорд — 'loop:'+layer / живой
    'latch'; бас — 'bassloop:'+layer / живой 'bass'. Так слой не крадёт голос у живого. */
-/* ⛳ СУФФИКС ВЗЯТОГО (a.k, слайс S3.5c). У аккорда и баса ОДИН владелец на слой — «последний побеждает»
-   было их задуманным поведением, пока каждое взятое рождало НОВЫЙ слой. Запись В СУЩЕСТВУЮЩУЮ дорожку
-   это ломает: аккорды нового взятого и старые аккорды той же дорожки легли бы на ОДИН владелец, и на
-   переигровке chOn нового гасил бы старый, а chOff старого — новый. «Слияние» на деле стало бы заменой.
-   Поэтому взятое, влитое в дорожку, где уже есть аккорды/бас, получает свой k ≥ 1, и его владелец —
-   'loop:N:k'.
-   ⛳ И ТОТ ЖЕ k ПОДНИМАЕТСЯ НА КАЖДОМ ШВЕ ПОВТОРА (S3.5e, recFoldRoll): проходы одного взятого — это тоже
-   наложение на одно и то же время, и без подъёма «выкл» последнего прохода обрывал бы аккорд каждого.
-   Событие без k — это k=0, ключ БЕЗ суффикса: так звучат старые записи и ПЕРВЫЙ проход взятого в новую
-   дорожку; следующие проходы того же взятого при крутящейся скобе уже идут с k ≥ 1. Обходы по префиксу
-   (releaseLoopLayersAt: хвост 'N' или 'N:…') суффикс понимают — так устроены ключи соло 'leadloop:N:v'. */
-const chOwnerKey  =ctx=> ctx?'loop:'+ctx.layer+(ctx.a&&ctx.a.k?':'+ctx.a.k:''):'latch';
-/* P2: БАС — ЕЩЁ И НОМЕР НОТЫ v (одновременные бас-ноты одного взятого, зеркало 'leadloop:N:v'). Хвост ':k:v' — только при
-   v≠0, и тогда k пишется всегда (даже 0), чтобы 'N:k' и 'N:k:v' не путались. ⛔ При v=0 ключ БАЙТ-В-БАЙТ прежний — так
-   звучит весь бас, записанный до P2, и весь бас одного владельца. Префиксное сравнение дорожки (releaseLoopLayersAt:
-   хвост 'N' или 'N:…') с обеими формами работает. */
-const bassOwnerKey=ctx=>{ if(!ctx) return 'bass';
-  const k=(ctx.a&&ctx.a.k)||0, v=(ctx.a&&ctx.a.v)||0;
-  return 'bassloop:'+ctx.layer+(v ? ':'+k+':'+v : (k ? ':'+k : '')); };
-/* Ключ владельца СОЛО-голоса на ПЕРЕИГРОВКЕ: слой + номер одновременной ноты (a.v). Живой ключ
-   ('lead:L'/'lead:R') строит gestures и передаёт явным аргументом — в событие он НЕ попадает (это
-   состояние руки, а не намерение). a.v||0 — вот та самая совместимость: событие без v = нота №0. */
-const ldKey=(ctx,a)=> ctx ? 'leadloop:'+ctx.layer+':'+(a.v||0) : 'lead:?';
 /* ⛳ ЕДИНАЯ ФОРМА ВЫЗОВА: КАЖДАЯ запись ENG — это (a, ctx, opt), где opt — ОДИН И ТОТ ЖЕ ИМЕНОВАННЫЙ
    набор `{when, live, own}`. Слайс S2 завёл эту форму, и это НЕ косметика, а снятие ловушки.
    ⚠️ ЧТО БЫЛО: у записей была РАЗНАЯ позиционная форма — `leadOn:(a,ctx,live,own)` против
@@ -4312,26 +3541,6 @@ function pushBend(r,live){
 function lowestFree(used,base){ let v=base; while(used.has(v))v++; return v; }
 function freeSlot(layer){ const used=new Set(); for(const [o,v] of vSlots){ const r=recLead.get(o); if(!r||r.layer===layer) used.add(v); }
   return lowestFree(used, ts(layer).vBase); }
-/* Первый номер v ВЫШЕ всех соло-нот, уже лежащих в слое layer (0 — соло-нот нет). Событие без v — это
-   нота №0 (совместимость ldKey), поэтому считаем его как 0, и слой со старой записью даст 1.
-   ⛳ ОБХОД O(n) — ОДИН РАЗ НА ВЗЯТОЕ, на нажатии ●, а НЕ на ноту и НЕ в push: слайс S3.2 затем и был,
-   чтобы на горячем пути не ходить по всей песне. На том же нажатии и так идёт maxLayer() — такой же
-   полный обход, то есть цена нажатия ● по порядку не меняется. Кэша по слою НЕ заводим сознательно:
-   его пришлось бы держать в строю через onUndo/clearJam/compactEvents — ещё одна точка рассинхрона.
-   Отсортированность массива не нужна (максимум), поэтому хвост записи ему не помеха. */
-function layerSlotTop(layer){
-  let top=0;
-  for(const e of events) if(e.layer===layer && e.fn.slice(0,4)==='lead'){ const v=(e.a&&e.a.v)||0; if(v+1>top) top=v+1; }
-  return top;
-}
-/* S3.5c: суффикс взятого для аккорда/баса — выше всех k, уже лежащих в слое у аккордов/баса; 0, если их там
-   нет вовсе (тогда и сталкиваться не с чем, и ключи остаются прежними). Тот же довод о цене, что выше:
-   один обход на нажатие ●. */
-function layerTakeTop(layer){
-  let top=-1;
-  for(const e of events) if(e.layer===layer && (e.fn[0]==='c'||e.fn[0]==='b')){ const k=(e.a&&e.a.k)||0; if(k>top) top=k; }
-  return top+1;
-}
 /* live!=null ⟺ соло-рука назначена на ТЕРМЕНВОКС (функция руки 'therm' — gestures шлёт S.hz только
    оттуда). Тогда высоту несёт БЕНД: deg/oct ЗАМОРОЖЕНЫ на атаке (не сравниваем и не обновляем — у c
    стабильная опора), а leadSet пишем лишь на смену громкости/реверба/тембра с меткой hold (переигровка
@@ -4771,7 +3980,7 @@ function backingFollowKey(){
   for(const e of events) if(e.jam && e.sc && e.sc.mode && e.fn!=='drum'){ const nv=scaleView(e.sc.mode, e.sc.tunedFrom, e.sc.chordMode, k, tonicCents); if(nv!==e.sc){ e.sc=nv; L.add(e.layer); } }   // TF3b: drum hits carry no pitch (as in Transpose), so ↶ of a song Transpose restores the whole backing; TF5: the knob's cents too
   if(!L.size) return [];
   for(const ly of L){ const id=laneOf(ly); if(id!=null) laneVerBump(id); }
-  notesView=null; chaseAt=null; frzSigMemo.clear();   // memos hold views; cursors and order untouched (safe while recording)
+  notesReset(); chaseAt=null; frzSigMemo.clear();   // memos hold views; cursors and order untouched (safe while recording)
   if(loop.on) trackResplice(L);
   droneViewSync();
   if(hooks.af) hooks.af('backing');
@@ -4852,7 +4061,6 @@ let cursN=0;                        // длина ОТСОРТИРОВАННОГ
 const curSched={i:0,at:null};       // курсор scheduleLayers: i — индекс, at — доля, которой он соответствует
 const curNear ={i:0,at:null};       // курсор fireNear (своя временнáя база, см. довод у fireNear)
 let chaseAt=null, chaseList=null;   // кэш догонялки (S3.5c): доля входа → владельцы, открытые к ней; сбрасывает schedInvalidate, см. chaseFor
-let notesView=null;                 // кэш вида «ноты песни» (S4.0): строит songNotes ЛЕНИВО, сбрасывает schedInvalidate — рядом с chaseAt и по той же причине
 /* Первый индекс в [0,cursN) с events[i].t >= t. Классический lower_bound. */
 function cursLowerBound(t){
   let lo=0, hi=cursN;
@@ -4881,7 +4089,7 @@ function cursSeek(c,x){
    Здесь же заново берётся и cursN — длина отсортированного префикса: эта функция вызывается ТОЛЬКО
    когда массив приведён в порядок (сразу после sort/уплотнения/очистки) либо когда запись ещё ничего
    не дописала, поэтому `events.length` в этот момент и есть граница сортированного. */
-onInvalidate(()=>{ cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; notesView=null; songLenRecalc(); rgnSync(); });   // notesView (S4.0) — ТОЛЬКО обнуление, не построение: сброс на горячих путях (темп, скоба, старт) стоит одно присваивание   // rgnSync (S3.5b): длина песни могла смениться → «следующая» скоба пересчитывается, «поставленная» поджимается; при повторе опора перепривязывается там же   // ⛳ здесь же пересчитываем ДЛИНУ ПЕСНИ: эта функция и так стоит на каждом пути, меняющем состав событий, поэтому второго списка мест заводить не надо
+onInvalidate(()=>{ cursN=events.length; curSched.at=null; curNear.at=null; chaseAt=null; songLenRecalc(); rgnSync(); });   // REC2: the note view resets itself (song/notes.js listener); song length and brace follow the material
 
 /* 1) СЛОИ ВПЕРЁД: на каждый опрос планируем события в окне [loop.sched, горизонт) по их ТОЧНОМУ времени
    loop.t0 + доля*spb. Интервал ПОЛУОТКРЫТ [lo,hi): включает начало → доля 0 (сильный удар) не теряется
@@ -5039,8 +4247,6 @@ function releaseLoopLayersAt(when,layer,part){
    chOwnerKey/bassOwnerKey/ldKey, что и ENG), а его chOff/bassOff/leadOff — обычное событие прохода.
    ⚠️ Владелец, у которого РОВНО на доле входа стоит своё «вкл» или «выкл», не догоняется: проход сыграет его
    сам в тот же миг (иначе — лишняя атака, тут же снятая, и украденные голоса пула). */
-const chaseKind=f=> f[f.length-1];                                                // 'n' — …On, 't' — …Set, 'f' — …Off
-const chaseKey=(role,ev)=> role==='ch'?chOwnerKey(ev) : role==='bs'?bassOwnerKey(ev) : ldKey(ev,ev.a);
 /* Владельцы, открытые к доле x (события с t<x). ⛳ СТОИМОСТЬ: построение — ОДИН линейный проход по
    отсортированному префиксу до x (O(n) на пятиминутной песне: десятки тысяч событий, доли миллисекунды), и
    ТОЛЬКО когда сменилась доля входа или состав событий. Результат КЭШИРУЕТСЯ по x и сбрасывается в
@@ -5112,159 +4318,6 @@ function chasePlay(x,when,lead,only){
       ENG.leadOn(a,ctx,{when});
     }
   }
-}
-/* ═══ НОТЫ ПЕСНИ: СОБЫТИЯ, СОБРАННЫЕ В НОТЫ (слайс S4.0 — фундамент пиано-ролла) ═══
-   ЗАЧЕМ. Нота — НЕ событие: у соло это «вкл», ведения и «выкл», связанные номером a.v; у аккорда и баса — та же
-   форма, связанная суффиксом a.k; удар — одиночное событие без пары. Двигать, менять высоту и удалять нельзя, пока
-   нельзя спросить «какие события составляют эту ноту», — а снятое «вкл» без его «выкл» оставит голос, который
-   нечем погасить. Здесь — ТОЛЬКО ЧТЕНИЕ: ни одного изменения событий, звука, показа; сегодня этого никто не зовёт.
-   ⛳ ТОЖДЕСТВО НОТЫ = КЛЮЧ ВЛАДЕЛЬЦА ГОЛОСА, ТОТ ЖЕ, ЧТО У ДВИЖКА: chaseRole/chaseKind/chaseKey → ldKey / chOwnerKey /
-   bassOwnerKey. ⛔ Второй формулы спаривания не заводить: разойдись она с ключом движка — редактор показывал бы одну
-   ноту, а звучала бы другая.
-   ⚠️ ВНУТРИ КЛЮЧА НОТЫ РАЗЛИЧАЕТ ТОЛЬКО ПОРЯДОК ВО ВРЕМЕНИ — номера ноты нет. Для спаривания этого хватает ровно пока
-   ноты одного ключа не перекрываются: запись это гарантирует (vBase/takeK), движок этого ТРЕБУЕТ (иначе кража голоса).
-   Для ПРАВКИ это условие: нота, сдвинутая поверх соседки того же ключа, перепутает и спаривание, и звук — правка
-   обязана развести их a.v/a.k (layerSlotTop/layerTakeTop).
-   ⛳ РУЧКА НОТЫ — head, САМ ОБЪЕКТ её «вкл» (у удара — сам удар, у сироты — сама сирота). Сортировка и compactEvents
-   переставляют ССЫЛКИ и объектов не пересоздают, поэтому после любой пересборки нота находится по head===прежний.
-   Порядковый номер внутри ключа ручкой быть НЕ может: сдвиг или удаление соседки его меняет. Ссылка не
-   сериализуется — как и sc (правило #7).
-   ⛳ ПРАВИЛА ЧТЕНИЯ — поведение ДВИЖКА, а не пожелание (что не слышно, то и не нота):
-     …On при ОТКРЫТОЙ ноте того же ключа — закрывает прежнюю (endBy:'next') и открывает новую. Аккорд так и звучит:
-         chordOn сперва chordOff — переатака; так пишет смена плотности защёлки, так лежит подложка (chOn на такт без
-         chOff). ⚠️ Бас и соло на том же ключе НЕ переатакуют (bassOn/leadOn при звучащем голосе только ведут, тембр не
-         перепекают) — на слух это ведение. Делим всё равно по «вкл»: «нота на такт» подложки — намерение, а разницу
-         несёт role. Так же читает догонялка (chaseFor: новое «вкл» затирает прежнее).
-     …Set / …Off без открытой ноты — СИРОТА (orphans). Движок её тоже не слышит: chordGlide/bassSet/leadSet/…Off без
-         голоса выходят молча.
-     «вкл» без «выкл» до конца префикса — ОТКРЫТАЯ нота: end=null, endBy:'open'. НЕ выбрасываем и НЕ выдумываем конец:
-         подложка так устроена намеренно, а СЛЫШИМЫЙ конец зависит от транспорта (конец песни и шов скобы гасят голоса
-         дорожек — releaseLoopLayersAt), не от событий.
-     drum  — нота-удар: end=start, endBy:'hit', key=null.
-     drone — НЕ нота, а УРОВЕНЬ (levels): droneOn живёт жизненным циклом (droneAudible), время события после старта
-         не читается никем.
-     иное fn — other (сегодня пусто; заведётся новое — увидится, а не пропадёт).
-     mixedTk — у ноты события РАЗНЫХ взятых: два взятых делят ключ владельца. Запись такого не порождает; признак для
-         правки, а не ошибка чтения.
-   ⛳ ЧИТАЕМ ТОЛЬКО ОТСОРТИРОВАННЫЙ ПРЕФИКС [0,cursN) — тот же, что у курсоров. Хвост идущего взятого не отсортирован
-   (швы сворачивают время) и растёт в push БЕЗ сброса; спаривать его значило бы сортировать копию на каждое чтение
-   или сбрасывать кэш из push — то есть вторую точку инвалидации. prefix — сколько событий покрыто: меньше
-   events.length бывает только во время записи (и тогда разница — ровно хвост взятого).
-   ⛳ ЦЕНА: один линейный проход O(n) + Map открытых ключей (размером с одновременно звучащие ноты), ЛЕНИВО — на первом
-   чтении после schedInvalidate, дальше готовый объект. ⛔ НЕ ЗВАТЬ из tick / scheduleLayers / fireNear / chase* / ENG /
-   push / rec*: ни один путь звука её не зовёт, а schedInvalidate её лишь ОБНУЛЯЕТ. Проход достаётся потребителю
-   (показ/правка), на его кадр.
-   ⛳ ИНВАЛИДАЦИЯ — в schedInvalidate, рядом с chaseAt (правило #28). Своей не заводить.
-   ТОЛЬКО ЧТЕНИЕ: вид, записи нот и их массивы заморожены. СОБЫТИЯ внутри — живые объекты песни (бенд терменвокса
-   дописывается в a.bend по ссылке), и менять их можно только путями рекордера. */
-function songNotes(){
-  if(notesView) return notesView;
-  const N=Math.min(cursN,events.length);                     // та же страховка, что в cursSeek, но БЕЗ записи в cursN: чтение состояния не меняет
-  const notes=[], levels=[], orphans=[], other=[], open=new Map();
-  for(let i=0;i<N;i++){ const ev=events[i], f=ev.fn, tk=ev.tk||0;
-    if(f==='drum'){ notes.push({role:'dr', layer:ev.layer, tk, key:null, head:ev, evs:[ev], start:ev.t, end:ev.t, endBy:'hit', mixedTk:false}); continue; }
-    if(f==='drone'){ levels.push(ev); continue; }
-    const role=chaseRole(f), kind=chaseKind(f);
-    if(!role || (kind!=='n'&&kind!=='t'&&kind!=='f')){ other.push(ev); continue; }
-    const k=chaseKey(role,ev); let n=open.get(k);
-    if(kind==='n'){
-      if(n){ n.end=ev.t; n.endBy='next'; }                    // «вкл» поверх открытой ноты того же ключа — прежняя кончилась здесь
-      n={role, layer:ev.layer, tk, key:k, head:ev, evs:[ev], start:ev.t, end:null, endBy:'open', mixedTk:false};
-      notes.push(n); open.set(k,n);
-    }else if(!n) orphans.push(ev);                            // ведение/«выкл» без «вкл» — сирота
-    else { n.evs.push(ev); if(tk!==n.tk) n.mixedTk=true;
-      if(kind==='f'){ n.end=ev.t; n.endBy='off'; open.delete(k); } }
-  }
-  for(const n of notes){ Object.freeze(n.evs); Object.freeze(n); }
-  notesView=Object.freeze({ notes:Object.freeze(notes), levels:Object.freeze(levels), orphans:Object.freeze(orphans), other:Object.freeze(other), prefix:N });
-  return notesView;
-}
-/* ═══ СЕГМЕНТЫ: ВЫСОТА ДЕРЖИТСЯ ДО СЛЕДУЮЩЕЙ СМЕНЫ (слайс S5.5) ═══
-   ⚠️ ЗАЧЕМ ОТДЕЛЬНО ОТ songNotes, а не вместо неё. songNotes группирует ЖИЗНЬ ГОЛОСА — и это верно для
-   звука: одна бас-нота = один голос от «вкл» до «выкл». Но у баса и соло смена высоты внутри ноты — это
-   ВЕДЕНИЕ, поэтому бас-линия, сыгранная одним движением, — ОДНА нота на десяток высот. Нарисуй её как
-   ноту — получишь одну полосу через всю песню на высоте ПЕРВОЙ ступени, а остальные высоты исчезнут.
-   СЕГМЕНТ — то, что музыкант и называет нотой: событие, ЗАДАЮЩЕЕ высоту, и промежуток до следующей смены.
-   ⛳ ГРАНИЦА — ТОЛЬКО СМЕНА ВЫСОТЫ. Ведения, меняющие лишь громкость или эффекты, границами НЕ являются:
-   они внутри сегмента (иначе одна нота с крещендо рассыпалась бы на десяток «нот» одной высоты).
-   ⛳ У КАЖДОГО СЕГМЕНТА СВОЙ ЛАД — тот, что заморожен в ЕГО событии (sc/sev). Это не формальность: ось
-   рисуется в ладу показанной группы, и сегмент обязан знать свой собственный.
-   ⛳ ИНВАЛИДАЦИЯ — ЧУЖАЯ: мемо на ИДЕНТИЧНОСТЬ объекта songNotes(). Тот пересобирается только в
-   schedInvalidate, значит второй точки сброса здесь нет (правило #28) — как и у кэша ролла в draw.
-   byEv — обратный указатель «событие → его сегмент»: правке нужно знать, сегмент ли это начала ноты. */
-/* ⛳ НОТА ТЕРМЕНВОКСА СОЛО — у её «вкл» есть кривая бенда (recLeadOpen кладёт a.bend=[] и сразу стартовую точку). ОДИН тест на
-   весь рекордер: его же берёт перестройка «в ноте» (pnPlan — порождённому ведению hold:true только у такой ноты), и проход
-   сегментов (songSegs — такая нота одним сегментом). Разойдись они — полоса считала бы ноту терменвоксом, а ролл резал бы её. */
-const ldTherm=n=> n.role==='ld' && !!(n.head && n.head.a && n.head.a.bend && n.head.a.bend.length);
-/* ТИП АККОРДА — ПО ЗНАЧЕНИЮ (слайс U1). Записанный аккорд несёт ссылку в CHORD_FAM_SETS, и у одной записи одна ссылка — для него
-   «то же значение» и «та же ссылка» совпадают, ничего не меняется. Распавшаяся нота (U2) несёт ЛИТЕРАЛ интервала ([iv]) — свой массив у
-   каждого события; сравнение по ссылке резало бы её на ложные сегменты на каждом ведении. null — нетипизированный аккорд. */
-const tyEq=(a,b)=> a===b || (!!a && !!b && a.length===b.length && a.every((x,i)=>x===b[i]));
-let segView=null;
-/* ⛳ T6a — ЗАЩИТНЫЕ ПРОВЕРКИ ВИДА. Маршрут по строю (ключ источника — роль + тембр + вид) делает дорожку и ноту ОДНОГО вида для всего
-   нового материала, поэтому страховки плана T6 («новый сегмент, если вид события другой»; «проверка вида в функциях правки») стали
-   ПРОВЕРКАМИ: каждая пишет в консоль ОДИН раз за сессию на свой вид нарушения и НИЧЕГО не меняет в поведении. Сработать они могут только
-   на материале, записанном до маршрута по строю (ничего не сохраняется — после перезагрузки такого нет). Те же предикаты отдаёт
-   viewAudit — их сверяет проба P.checkRules на загруженной песне. */
-const VIEW_WARNED=new Set();
-function viewWarn(kind,msg){ if(VIEW_WARNED.has(kind)) return; VIEW_WARNED.add(kind); console.warn('[recorder] '+msg); }
-const noteSpansViews=n=>{ const h=n.head&&n.head.sc; return !!h && n.evs.some(e=>e.sc&&e.sc!==h); };
-/* Виды высотных событий дорожки (у ударов вида нет: высоты нет). */
-function layerViews(layer){ const S=new Set(); for(const e of events) if(e.layer===layer&&e.sc&&e.fn!=='drum') S.add(e.sc); return S; }
-function viewAudit(){
-  const notes=[], tracks=[];
-  for(const n of songNotes().notes) if(n.role!=='dr'&&noteSpansViews(n)) notes.push(n);
-  for(const ly of new Set(events.map(e=>e.layer))) if(layerViews(ly).size>1) tracks.push(ly);
-  return { notes, tracks };
-}
-/* Правка расшифровала ряд в ВИДЕ ОСИ sc — у правимого сегмента вид обязан быть тот же (попадание ловит только группу оси). */
-function editViewCheck(ev,sc){ const g=songSegs().byEv.get(ev);
-  if(g&&sc&&g.sc!==sc) viewWarn('edit',`an edit decoded a row in another tuning view than its note's (L${g.layer+1})`); }
-/* Вставка в дорожку пишет вид оси — в дорожке с нотами он обязан быть её видом. */
-function trackViewCheck(layer,sc){ const V=layerViews(layer);
-  if(sc&&V.size&&!V.has(sc)) viewWarn('insert',`an insert wrote a tuning view the track L${layer+1} does not hold`); }
-/* T4b2: индекс в строе ХРАНИМОГО события (T4c-1: только a.ti; у события без него — undefined, ступень не читается). */
-const storedTi=ev=>{ const a=ev.a; return (a&&typeof a.ti==='number') ? a.ti : undefined; };   // T4c-2: ступени в событии нет вовсе   // ⛳ T4c-1: перевода ступени больше нет — нет индекса, нет высоты
-function songSegs(){
-  const V=songNotes();
-  if(segView&&segView.view===V) return segView;
-  const segs=[], byEv=new Map();
-  for(const n of V.notes){
-    if(n.role!=='bs'&&n.role!=='ld'&&n.role!=='ch') continue;
-    /* ⛳ S0: НОТА ТЕРМЕНВОКСА — ОДИН СЕГМЕНТ. Её высоту несёт кривая бенда от ступени АТАКИ, а ведения с hold:true пишут
-       ЖИВУЮ ближайшую ступень (recLeadEv: {...p, hold:true}) — звук её не читает (ENG.leadSet: hold → частоты нет), читает только
-       подсветка. Сравни проход их ступени — одна согнутая нота рассыпалась бы на ложные «ноты» по ближайшим ступеням, и правка
-       любой из них резала бы глиссандо, которого на этих границах нет. Поэтому внутри такой ноты смен высоты не бывает, а ведение
-       hold сменой высоты не считается НИКОГДА (подстраховка: hold пишется только терменвоксом). У баса и аккордов — как было. */
-    const therm=ldTherm(n);
-    if(noteSpansViews(n)) viewWarn('note',`a note of L${n.layer+1} spans two tuning views (recorded before routing by tuning)`);   // T6a: проверка, поведение не меняет
-    let cur=null;
-    for(const ev of n.evs){
-      const kind=chaseKind(ev.fn);
-      if(kind==='f'){ if(cur){ cur.end=ev.t; cur.endBy='off'; cur.endEv=ev; } continue; }   // «выкл» закрывает последний сегмент
-      const a=ev.a||{};
-      /* ⛳ T4b2: СМЕНА ВЫСОТЫ — по ХРАНИМОЙ ПАРЕ (индекс в строе a.ti, регистр a.oct), у аккорда ещё тип по значению; ⛔ НЕ по абсолютной
-         высоте: дубль тоники вверху регистра r и корень регистра r+1 звучат одинаково, но это РАЗНЫЕ записанные пары, и редактор держит
-         их разными нотами (как держал по ступени). В пределах одного вида пара (ti, oct) взаимно однозначна с (ступень, регистр) — ответ
-         прежний; доказательство было пробой P.checkLogic (против прежних сегментов по ступени) — снята в T4c-2 вместе со ступенью. */
-      const ti=storedTi(ev);
-      const pitchChanged = !cur || (!therm && !(n.role==='ld'&&a.hold) &&
-                           (ti!==cur.ti || (a.oct|0)!==cur.oct || (n.role==='ch'&&!tyEq(a.ty,cur.ty))));   // U1: тип — ПО ЗНАЧЕНИЮ (tyEq)
-      if(kind==='n'||pitchChanged){
-        if(cur){ cur.end=ev.t; cur.endBy='next'; cur.endEv=ev; }   // S5.6: КАКОЕ событие кончает сегмент — его и двигает изменение длины
-        cur={ role:n.role, layer:n.layer, key:n.key, tk:ev.tk||0, note:n, ev, endEv:null,
-              first:ev===n.head, start:ev.t, end:null, endBy:'open',
-              ti, oct:a.oct|0, ty:a.ty, sc:ev.sc, sev:ev.sev, inst:((n.head&&n.head.a)||{}).inst, vol:a.vol };   // T4b2: ti — индекс в строе сегмента; с T4b3 по нему ряды и рисование редактора (deg читают правка — расшифровка ряда до T5 — и нетипизированный аккорд до T6)   // T0: тембр сегмента — тембр НОТЫ (её «вкл»): ведения его не несут (у аккорда не несли никогда)
-        segs.push(cur); byEv.set(ev,cur);
-      }else byEv.set(ev,cur);                                                  // ведение громкости/эффектов — ВНУТРИ сегмента
-    }
-    /* Нота закрылась «вкл» СОСЕДНЕЙ ноты — хвостовой сегмент кончается там же, но endEv НЕ ставим: то
-       событие принадлежит ДРУГОЙ ноте, и тянуть за него длину этой значило бы двигать чужое начало. */
-    if(cur&&cur.end==null&&n.end!=null){ cur.end=n.end; cur.endBy=n.endBy; }
-  }
-  segs.sort((a,b)=>a.start-b.start);
-  segView={ view:V, segs, byEv };
-  return segView;
 }
 /* 2) ЛИД/дрон — почти-сейчас (как раньше): события в (a,b] БЕЗ when → AC.currentTime. Слои тут пропускаем.
    ⚠️ УСЛОВИЯ РАЗВЁРНУТЫ В continue-ветки (было одно длинное &&) РАДИ ЧИТАЕМОСТИ ПОСЛЕ ДОБАВЛЕНИЯ

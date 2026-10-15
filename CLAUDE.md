@@ -91,8 +91,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
   called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module
-  under `src/song/` imports only `song/`, `core/` and `config.js` — and the import cycles (printed; a cycle through `song/` fails; CONTROL
-  a fake `song/store.js → recorder.js` import)) and `node --check` on changed files. Report the result.
+  under `src/song/` imports only `song/`, `core/`, `config.js` and (REC3) the pitch truth `scales.js` — and the import cycles (printed; a
+  cycle through `song/` fails; CONTROLS a fake `song/store.js → recorder.js` and `song/history.js → audio.js` import)) and `node --check`
+  on changed files. Report the result.
 - **Read `src/` before changing anything**; re-verify every line number.
 - ⛔ **Never insert a comment in the middle of an export list**; re-read every export list you touch.
 - **Changed a signature or a stored field's meaning → find every reader**, positional callers included (rule #15); the probe module
@@ -350,16 +351,33 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   volumes in the OLD per-role scale, converted at event birth. Imports only `config.js`.
 - `src/recorder.js` — the recorder (see "Time, tracks and the recorder", "Freeze"): `loop`, `ENG`, scheduler, brace, chase, undo, stops,
   backing, capture and playback of effects, the editor API, freeze registry and signature, `seedTake`, `evHz`; since REC1 also the FACADE
-  that re-exports `song/store.js` and `song/lanes.js` (importers, `render.js` `REC.*`, probes, tutor unchanged).
-- `src/song/` (REC1, stage 3; pure — no DOM, no Web Audio; imports only `song/`, `core/`, `config.js`): `store.js` — `events` (the stable
-  array), `evGen`, THE rebase point `schedInvalidate` (bumps `evGen`, then runs the listeners of `onInvalidate` in order — today the
-  recorder's cursors, chase cache, note view, song length, brace), birth order `evSeq`/`evSeqFill`/`evOrder`, `compactEvents`, `maxLayer`,
+  that re-exports what moved to `song/` (importers, `render.js` `REC.*`, probes, tutor unchanged).
+- `src/song/` (REC1–REC3, stage 3; pure — no DOM, no Web Audio; imports only `song/`, `core/`, `config.js`, `scales.js`): `store.js` —
+  `events` (the stable array), `evGen`, THE rebase point `schedInvalidate` (bumps `evGen`, fixes the sorted prefix `sortedLen()`, then runs
+  the listeners of `onInvalidate` in order — the note view, then the recorder's cursors, chase cache, song length, brace), birth order `evSeq`/`evSeqFill`/`evOrder`, `compactEvents`, `maxLayer`,
   event kinds `evRole`/`chaseRole`/`isNoteStart`. `lanes.js` — the track tables by lane id (`laneId` via `laneNew` only, mute, solo, level,
   pan, name, rank, material length, edit version), the arm, the pending row delete (`laneDelTap`), readers (`laneOf`, `laneAudible`,
   `laneGated`, `laneLevelOf`/`laneGainOf`, `lanePanOf`, `laneNameOf`, `laneOrder`, `laneLook`, `layerOfOwner` …), table writers
   (`setLaneName`, `moveLane`, `laneForget`, `laneTablesClear`, `laneRow`/`laneRowSet`); what it needs from the recorder (recording, the
   take's layers, audio up, `deleteLane`) comes once through `laneWire`. Still in `recorder.js` (REC2–REC5): `deleteLane`, `lanePrune`,
   `laneReset`, `laneHush`, `toggleLaneMute/Solo`, `setLaneLevel/Pan` (they touch sound, freeze or history).
+  `notes.js` (REC2) — owner keys of replayed voices `chOwnerKey`/`bassOwnerKey`/`ldKey` (THE engine keys), fresh slots `layerSlotTop`/
+  `layerTakeTop`, chase keys `chaseKind`/`chaseKey`, the note view `songNotes()` (sorted prefix only; reset by its own `onInvalidate`
+  listener or `notesReset()`), `songSegs()`, `ldTherm`, `tyEq`, the T6a view checks (`viewAudit`, `editViewCheck`, `trackViewCheck`).
+  `history.js` (REC2) — the ONE history (ED7): `histPush` (single writer), the tripwire `histHash`/`histSeal`, `histUndo`/`histRedo`, group
+  edits `histGroup`/`histSince`, table steps `histTab`/`histMaster`/`laneNameStep`/`moveLaneStep`, probe controls `histDbg`/`histDbgO`;
+  ⛳ STEP KINDS REGISTER THEMSELVES: `histKind(kind, apply(u,undo), touched?(u,S))`, one dispatcher `histApply` (= the recorder's
+  `editApply`) and `histTouched`; an unknown kind throws. The song's own kinds (move, del, ins, timbre, lanetouch, batch, ranks) register in
+  history.js; recorder.js registers the kinds it owns (aut*, autcap, brace/marks/lanelen, snap, tab, master, key) — a new kind = one
+  `histKind` next to its owner. What it needs from above comes once through `histWire` (ready / pause / commit for ↶/↷; capture records,
+  markers, master level for the hash). Snapshot steps (`snapBegin`/`snapEnd`/`snapApply`) stay in recorder.js (capture, brace, freeze).
+  `edit-notes.js` (REC3) — the editor's edit core (`editGuard`, `editCommit`, `editBatch`, `editPush`, `EDIT_ROLE`, `EDIT_GAP`/
+  `EDIT_MIN_LEN`), tie pairs (`tiePartners`, `tieUntiePass`, `untieAcross`), `keyClash`, detach (`detachPlan`/`commitDetach`), `slotPt`,
+  `chordMoveTy`, `segChordNotes`, `segPitchPt`, move / resize / delete of segments and hits, `bendTrim`; the editor session (`editLane`,
+  `editOpen`…) stays in recorder.js and comes through `editWire` (ready, isOpen, layer, pause, touch). `edit-chords.js` (REC3) — U2–U4
+  chord-note edits (`dissolvePlan`, `editDeleteChordNote`, `editMoveChordNote`, `editResizeChordNote`). `edit-group.js` (REC3) — ED1
+  (`editGroup`, `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`, `editDeleteSel`). Still in recorder.js (REC3 part 2): inserts,
+  timbre, clipboard (ED2), quantise (ED3), degrees/mode/transpose (ED4, OWN1, TF3), bends (OWN2), automation and per-note lanes, sections (ED6).
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
 - `src/vision.js` — camera + the DETECTION PATH + the FRAME PUMP (LAT2). Path: a detector object `{kind, run(job), setDelegate, dbg, close}`
   built by `buildDet` — the main thread (default, `mainDet`: handdet.js imported dynamically) or the worker (`workerDet`: src/hand-worker.js;

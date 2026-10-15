@@ -35,11 +35,14 @@ const evOrder=(x,y)=> x.t-y.t || (evSeq.get(x)||Infinity)-(evSeq.get(y)||Infinit
    вызове; мемо по слою такой случайности не имеет. А schedInvalidate и так стоит на КАЖДОМ пути,
    меняющем состав событий (правило #28) — второго списка мест не заводим. Запись (push) его не зовёт,
    но она меняет длину на каждом событии. */
-let evGen=0;
+let evGen=0, sortedN=0;
 const invalidateFns=[];
 /* REC1: the layers above register what a change of the event set must reset; they run synchronously, in registration order */
 const onInvalidate=fn=>{ invalidateFns.push(fn); };
-function schedInvalidate(){ evGen++; for(const fn of invalidateFns) fn(); }
+/* REC2: every rebase also fixes the SORTED PREFIX [0, sortedN) — the whole array (callers sort first, rule #28); a running take appends its
+   unsorted tail after it without a rebase. The recorder's cursors read the same boundary (cursN). */
+function schedInvalidate(){ evGen++; sortedN=events.length; for(const fn of invalidateFns) fn(); }
+const sortedLen=()=>Math.min(sortedN,events.length);
 /* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
    событием: каждый splice сдвигает ВЕСЬ хвост, поэтому снятие 10 000 событий из 30 000 — это сотни
    миллионов перемещений, то есть многосекундная заморозка потока, на котором висят и распознавание, и
@@ -56,4 +59,4 @@ function compactEvents(drop){
   return removed;
 }
 
-export { events, evGen, schedInvalidate, onInvalidate, compactEvents, evSeq, evSeqFill, evOrder, maxLayer, evRole, chaseRole, isNoteStart };
+export { events, evGen, schedInvalidate, onInvalidate, sortedLen, compactEvents, evSeq, evSeqFill, evOrder, maxLayer, evRole, chaseRole, isNoteStart };
