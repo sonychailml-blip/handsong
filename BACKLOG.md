@@ -2540,6 +2540,15 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   agencies; art/tech open calls and grants. Sales cycle 2–6 months.
 - **Prerequisite:** a business entity for contracts (pending the user's legal consultation in Georgia). Related: §7.12 item 2 (licences to
   schools and installations).
+- **Light on the hands — plan the hardware (LAT3, 2026-10-15):** venues are often dim, and a webcam in low light lengthens its exposure and
+  delivers fewer frames, so every hand answer comes later. Measured on the same webcam (the user's desktop): 6.3 fps in the evening vs
+  14–30 fps by day; at 6.3 fps the wait for the next frame alone is ≈ 79 ms and hand → sound grows from ≈ 125 to ≈ 205 ms. No web API can
+  force a webcam's frame rate in the dark (LAT3's test switch: a minimum frame rate may be refused or ignored; a short manual exposure exists
+  only on some cameras and gives a darker, noisier picture). So every installation spec includes ONE of: (a) soft, even light on the hands'
+  zone — a diffuse lamp aimed at the play area (not at the camera, not into the visitors' eyes; warm/dim light for the room can stay), or
+  (b) an infrared camera with its own IR illuminator (invisible light, works in a dark room; check that the hand model tracks IR images
+  before buying). The turnkey price includes it; the self-install licence names it as a requirement. Before a pilot: measure the room with
+  the latency meter (camera fps and «Hands lost» line).
 
 ### ⬜ 7.19. ⛳ OWN AUTHORED VISUAL DESIGN AND A COMPLETE OWN ICON SET (user's goal, recorded at LIC1, 2026-10-14; BEFORE the Calm release)
 - **Goal:** an original, authored visual design for the whole app and a complete icon set of our own — replacing every icon, glyph, image

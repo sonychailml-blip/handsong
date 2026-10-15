@@ -7730,3 +7730,65 @@ network check (every request of the page and its workers; CONTROL a worker askin
 (1); `setHandsTracked(m)` ('2s'|'2'|'1', was 1|2) — latmeter SW (3), probes/lat.js restore (1), probes/detect.js (4); `handToSound(parts)` —
 signature unchanged, optional key `transfer` (latmeter 1, probe-data 4); `takeFrame(id, cap, pres, now, pf)` — onVF (5), pollFrame (4);
 new: `latHands(f, tA, tB)` (main.onHands), `syncViewRect(vw, vh)` (main.onHands), `setDetectPath`, `setPicture` (latmeter SW, probes).
+
+### Moved from HANDOFF.md at LAT3 (English, verbatim; 2026-10-15)
+### LAT2 (2026-10-15) — each camera frame once, a cheaper second-hand search, worker option (full: archive B «LAT2 — record»)
+- LAT2a: a frame PUMP (requestVideoFrameCallback; one frame in flight, one waiting, a newer one replaces it — never a queue) snapshots each
+  camera frame ONCE (ImageBitmap); processHands runs as soon as that frame's detection ends; the canvas draws that very frame (rule #8 reworded).
+- Two models from one model download (L2 numHands 2, L1 numHands 1); schedule `core/handsched.js`: both hands → L2 every frame; one → L1 +
+  full search every 3rd frame (`HAND_SEARCH_EVERY`); none → search every 3rd, nothing between; a hand lost by tracking → search on the same
+  frame. Switching numHands by setOptions measured and rejected (≈ 1 s per switch, tracking lost).
+- Measured on the user's GPU (the headless runner uses the same Intel HD 4000; MediaPipe's sample photo, scratch only): one hand 75 → 53 ms
+  per frame, none 35 → 12, two 80 → 80; a still hand's jitter unchanged. Fake camera (no hands): long tasks 215 → 5/min, a screen frame
+  every 45 → 19 ms, hand → sound 109 → 98 (incl. frame wait 134 → 124), duplicates 0.
+- Startup: the 1188-ms task was the model's FIRST detection (warm-up ≈ 1.3–1.6 s): now on a blank frame behind «Warming up hand tracking…».
+- LAT2b: a CLASSIC worker `src/hand-worker.js` (MediaPipe needs importScripts) with fallback to the main thread; results bit-identical (12/12
+  frames), but WebGL inside a worker is ≈ 2× slower on this GPU (one hand 98 vs 53 ms, two 160 vs 80) → DEFAULT = MAIN THREAD, the worker
+  one switch away (zero main-thread long tasks). CSP unchanged (worker-src 'self' was there); the runner checks every request, workers too.
+- Switches: «Hands tracked» 2 · search every 3rd (default) / 2 · every frame / 1; «Detection runs in» main / worker; «Picture» matched / live.
+- Probes: data PASS 12 (+ «LAT2 search schedule (core)»); P.quick PASS 54; P.all PASS 73 (449 s; runner P.all limit now 15 min). Fix rounds 2.
+- ⬜ OPEN CHECK (postponed by the user): phone latency — A defaults and D 30 fps; on the phone also compare the worker path (decides its default).
+
+### LAT3 — record (2026-10-15): low-light camera — capabilities, a low-light test switch, hands lost, the «Too dark» hint
+**Input** (the user's desktop, evening, after LAT2): camera granted 640x480 · 30 fps but DELIVERED 6.3 fps (low light: the webcam lengthens its
+exposure); frame wait ≈ 79 ms. One hand: detection 60.8 (tracking 60 · search 74.7), the model ran on 2.1 of 6.3 frames/s, long tasks while
+playing 74/min, hand → sound 125.2 / incl. frame wait 204.1. Two hands: detection 69, 133 / 212.8. Worker: detection 93.2, long tasks 0,
+160.7 / 240 → the main thread stays the default. «Picture: live camera»: 131.7 / 212. Startup: 62 long tasks in the first 10 s, longest
+1397 ms «TimerHandler:setTimeout». Daytime the same camera: 14–30 fps.
+**User decisions:** (1) the dots must match the hand exactly — the «exact frame» picture is the only mode; the «Picture: live camera» test
+switch is removed everywhere (vision `setPicture`/`opts.picture`, main.js branch, latmeter switch + report field, index.html row, i18n
+`diag.sw.pic*` en + ru, probes LAT1b presses, docs; rule #8 reworded). (2) Playing in low light matters (home in the evening; Calm before
+sleep) → a real player hint, not only test switches.
+**Built:**
+- `src/core/camlight.js` (pure core, node): `lowConstraints` (the set applyConstraints receives — it REPLACES the track's set, so today's
+  request `camBase()` always rides along: fps modes `frameRate {min:N, ideal:max(N, 30 or the test request)}`; exposure
+  `advanced:[{exposureMode:'manual', exposureTime}]` with 1/40 s in the spec's 100-µs units clamped/snapped to the camera's range; Off
+  after exposure hands it back `exposureMode:'continuous'`), `lowVerdict` (kept at ≥ 90 % of the target, or ≥ +25 % = 'partly'; exposure
+  needs 'manual' in getSettings; NaN = 'unmeasured'), the hint decision `darkStep` (frames in the last 1 s; below 12 fps for MORE than 3 s
+  after a full window, granted ≥ 24, once per session, shown at the first allowed frame while still dark), the loss counter `lostStep`
+  (the number of hands drops and is back within 1 s = one loss; several drops in one gap = one; away longer = it left; entering = none),
+  `capsText` (one line: frameRate, size, resizeMode, exposure mode/time/compensation, brightness, contrast, saturation, sharpness, gain,
+  iso, white balance, focus, torch, background blur — whatever the browser reports, with current values).
+- `src/vision.js`: `setLowLight(mode)` — applyConstraints on the running track, 1 s settle + 2 s count of DELIVERED frames (the pump's
+  rVFC `presentedFrames`, ring `vfRing`), verdict; an error (OverconstrainedError …) or no effect → Off (today's request; the camera is
+  never closed for it — reopened only if even Off cannot be applied) with the reason in `lowInfo().note`; a camera reopen (fps test
+  switch, front/back) resets to Off ('reopened'). `camInfo` adds `caps`, `settings`, `label`. Probe-only `lowDbg`.
+- `src/latmeter.js`: report + Copy text lines «Camera «name» can: …», «Low light (test): mode · camera A → B fps — reason», «Hands lost and
+  found again within 1 s: N per minute» (per processed frame, restarted by a switch), the startup line's «began N s before/after the camera
+  started»; switches `swLowOff/15/24/Exp` (Exp hidden unless offered); the hint `#darkHint` (top centre, `pointer-events:none` except OK,
+  9 s, hidden as soon as a recording / clip / editor / window starts — never shown during them).
+- Startup task CONFIRMED behind the start card: `mainDet`'s step 'warm' awaits `nextPaint()` (rAF → setTimeout 0), so both models' warm-up
+  runs inside that setTimeout task's continuation, BEFORE `openCamera` — while the card shows «Warming up hand tracking…». Runner: the
+  longest startup task «TimerHandler:setTimeout» began ≈ 15 s before the camera start (headless under load: 14.5 s; warm-up L2 1031 ms,
+  L1 1080 ms). Possible later trim (not done — outside the slice): yield between the two models' warm-ups (two ≈ 0.7-s tasks instead of one).
+- Runner's fake camera (headless Chrome): «frameRate 0–20 = 20 · width 1–3840 · height 1–2160 · resizeMode none/crop-and-scale ·
+  exposureMode manual/continuous = manual · exposureTime 10–100 (5) = 50 · focusMode manual/continuous»; «≥ 15» held, «≥ 24» refused by
+  Chrome «OverconstrainedError (frameRate)» → Off, «short exposure» offered and held ('partly', 13.6 → 17.3 fps on a loaded machine).
+**Probes:** node tools/probe-data.mjs PASS (13 rows; «LAT3 low light (core)» 29 cases, two CONTROLS caught); node tools/probe-browser.mjs --quick PASS (P.quick 55 checks, 0 differences, 118 s; UI checks, CSP, network PASS); --all --limit-min 40: P.all PASS 74 checks, 0 differences, 733 s (GOLD 84 cases 0, frozen seed bass 0.08686 / 0.055319 / 650886, HAND1, LAT1/LAT1b/LAT2a/LAT2b/LAT3 0) — that session's touch double-tap UI check failed once under load (the user's Chrome used ~2 of 4 cores; three sessions before and the session after passed). Three earlier --quick runs stopped at the fixed 3-min P.quick limit at row ~33 under the same load (every finished row passing). Fix rounds 2: the core row's expected snapped exposure (1.22 + 102·2.44 = 250.1, my arithmetic, not the code); the browser row's place 582 (taken by «LAT2a frame once» — caught by the registry check) and its line-head check (it substituted parameters).
+**Positional callers of changed/new functions:** `setPicture` removed (callers were latmeter SW 2, probes/lat.js 3 — all removed);
+`drawVideoBackground(shown || video)` — main.loop 1 (same argument shape); `camInfo()` — latmeter latReport 1, latStart 1, 500-ms tick 1,
+probes/lat.js 6 (unchanged signature, more fields); new: `setLowLight(m)` — latmeter SW 4, probes/lat.js finally 1; `lowInfo()` — latmeter
+latReport, latSwSync, latSwitch; probes/lat.js; `lowDbg(o)` — probes/lat.js; `lowConstraints(mode, caps, base, prev)` — vision setLowLight,
+lowOff; probe-data 6; `lowVerdict(o)` — vision 1, probes/lat.js 1, probe-data 6; `darkStep(st, t, o)` — latmeter onVF, darkDbg; probes/lat.js
+1; probe-data 1; `lostStep(st, t, n)` — latmeter latHands; probe-data 1; `capsText(caps, settings)` — latmeter latReport; probe-data 2;
+`latHands(f, tA, tB)` unchanged — new caller probes/lat.js (scripted frames, pump held).

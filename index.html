@@ -389,11 +389,12 @@
       <div class="seg"><button id="swModelGPU" class="act">GPU</button><button id="swModelCPU">CPU</button></div></div>
     <div class="prow"><label data-i18n="diag.sw.fps">Camera frame rate (test)</label>
       <div class="seg"><button id="swFpsDef" class="act" data-i18n="diag.sw.fpsDef">default</button><button id="swFps30">30</button><button id="swFps60">60</button></div></div>
-    <!-- LAT2: where hand detection runs, and what the picture shows (session only) -->
+    <!-- LAT2: where hand detection runs (session only) -->
     <div class="prow"><label data-i18n="diag.sw.path">Detection runs in (test)</label>
       <div class="seg"><button id="swPathMain" class="act" data-i18n="diag.sw.pathMain">main thread</button><button id="swPathWorker" data-i18n="diag.sw.pathWorker">background worker</button></div></div>
-    <div class="prow"><label data-i18n="diag.sw.pic">Picture (test)</label>
-      <div class="seg"><button id="swPicMatched" class="act" data-i18n="diag.sw.picMatched">matched to hands</button><button id="swPicLive" data-i18n="diag.sw.picLive">live camera</button></div></div>
+    <!-- LAT3: low light — camera constraints through applyConstraints (session only; «short exposure» only when the camera has it) -->
+    <div class="prow"><label data-i18n="diag.sw.low">Low light (test)</label>
+      <div class="seg"><button id="swLowOff" class="act" data-i18n="diag.sw.lowOff">Off</button><button id="swLow15" data-i18n="diag.sw.low15">at least 15 fps</button><button id="swLow24" data-i18n="diag.sw.low24">at least 24 fps</button><button id="swLowExp" hidden data-i18n="diag.sw.lowExp">short exposure</button></div></div>
     <p class="phint" id="swNote" data-i18n="diag.sw.note">Test switches are for this session only; the meter restarts its numbers after each.</p>
   </div>
 
@@ -401,6 +402,8 @@
 <div id="latDiag" hidden><pre id="latDiagTx"></pre>
   <div class="latBtns"><button id="latCopy" data-i18n="diag.copy">Copy</button><button id="latClose" data-i18n="diag.close">Close</button></div></div>
 <div id="latWarn" role="status"><span id="latWarnTx"></span><button id="latWarnOk" data-i18n="lat.ok">OK</button></div>
+<!-- LAT3: the player hint «Too dark» (latmeter.js; once per session, from the camera's frame timing only) -->
+<div id="darkHint" role="status"><span id="darkHintTx"></span><button id="darkHintOk" data-i18n="lat.ok">OK</button></div>
 
 <!-- ================= ЛУПЕР: время и слои (оверлей на месте «Звукоряда») ================= -->
 <div id="panelLoop">

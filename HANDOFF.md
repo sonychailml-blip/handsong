@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (33 hard rules), 94 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (33 hard rules), 95 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -49,7 +49,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92) ·
   ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear) ·
   ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: archive B «LAT2 input»), **SND-F1** + **SND-F1b** Firefly,
-  Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open).
+  Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open)
+  · **LAT3** low-light camera: capabilities, «Low light (test)», hands lost, player hint «Too dark»; «Picture» switch removed (step 95).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -99,7 +100,7 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2 (2026-10-15);
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3 (2026-10-15);
 NEXT **REC1**) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
@@ -115,7 +116,7 @@ TIMBRE BUILDER, USER MODES with Scala, sampler → **8 SERVER** (accounts, sync,
   of WASM tracks in a Worker, which also avoids Chrome's worklet-context leak).
 - **A recording keeps what was heard** (notes + resulting values), never gestures; mappings are setup data. Latency compensation from the
   input's own timestamp (stage 5; tap-along test, switchable off). Privacy: rule #33 (PRIV1 ✅). Licences: rule #32 + register (LIC1 ✅).
-- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2 (+ LAT1b, SND-F1); next REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
+- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2 (+ LAT1b, SND-F1, LAT3); next REC1–REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
   modules receiving the engine's `E`), GES1, DRAW1, UI1 (+ THEMABLE, §7.19), FMT1, TIM1 (permanent timbre ids) → THE FORK: line A ENG1,
   TIM2, TIM3, ENG2; line B IDS1, CMD1, SONG1–SONG3, VIS1, PACK1; DOC1. Moved after Calm (Q2): ROUTE1, IN1, GES2.
 - **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** Q3 two lines after slice 18 — Claude Code prepares and PERFORMS the merges,
@@ -137,7 +138,8 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
   the main thread; hand→sound latency MEASURED by LAT1 (user's desktop 2026-10-15: ≈ 126 ms daylight, ≈ 180 ms evening; detection 54 ms vs a
   real GPU's 10–20; phone runs pending). Since LAT2 each camera frame is detected once; detection stays on the main thread by default (the worker path
-  is ≈ 2× slower on the user's desktop GPU); the old browser limiter's 6 ms are gone (SND-F1b).
+  is ≈ 2× slower on the user's desktop GPU); the old browser limiter's 6 ms are gone (SND-F1b). In low light the webcam itself slows
+  (6.3 fps evening vs 14–30 day, LAT3): no web API forces its frame rate — light on the hands is the remedy (hint; BACKLOG §7.18).
 - Editor, lanes, history, paste, sections, effect networks, frozen-track and render limits (KS / Glue renders pin ≈ 6 MB, Firefly tails
   ring out, Night forest CPU): `CLAUDE.md` "Known limits" (one list, kept there). Captured expression channels are not replayed (§4).
 - Opening the editor silences a ringing latch. "Drums only" backing lacks a cultural gate (§3.33 item 1).
@@ -155,19 +157,22 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
 ### Earlier stage-3 records — LAT1b + SND-F1, SND-F1b, «LAT2 input» (the user's desktop numbers): archive B «Moved from HANDOFF.md at LAT2».
 
-### LAT2 (2026-10-15) — each camera frame once, a cheaper second-hand search, worker option (full: archive B «LAT2 — record»)
-- LAT2a: a frame PUMP (requestVideoFrameCallback; one frame in flight, one waiting, a newer one replaces it — never a queue) snapshots each
-  camera frame ONCE (ImageBitmap); processHands runs as soon as that frame's detection ends; the canvas draws that very frame (rule #8 reworded).
-- Two models from one model download (L2 numHands 2, L1 numHands 1); schedule `core/handsched.js`: both hands → L2 every frame; one → L1 +
-  full search every 3rd frame (`HAND_SEARCH_EVERY`); none → search every 3rd, nothing between; a hand lost by tracking → search on the same
-  frame. Switching numHands by setOptions measured and rejected (≈ 1 s per switch, tracking lost).
-- Measured on the user's GPU (the headless runner uses the same Intel HD 4000; MediaPipe's sample photo, scratch only): one hand 75 → 53 ms
-  per frame, none 35 → 12, two 80 → 80; a still hand's jitter unchanged. Fake camera (no hands): long tasks 215 → 5/min, a screen frame
-  every 45 → 19 ms, hand → sound 109 → 98 (incl. frame wait 134 → 124), duplicates 0.
-- Startup: the 1188-ms task was the model's FIRST detection (warm-up ≈ 1.3–1.6 s): now on a blank frame behind «Warming up hand tracking…».
-- LAT2b: a CLASSIC worker `src/hand-worker.js` (MediaPipe needs importScripts) with fallback to the main thread; results bit-identical (12/12
-  frames), but WebGL inside a worker is ≈ 2× slower on this GPU (one hand 98 vs 53 ms, two 160 vs 80) → DEFAULT = MAIN THREAD, the worker
-  one switch away (zero main-thread long tasks). CSP unchanged (worker-src 'self' was there); the runner checks every request, workers too.
-- Switches: «Hands tracked» 2 · search every 3rd (default) / 2 · every frame / 1; «Detection runs in» main / worker; «Picture» matched / live.
-- Probes: data PASS 12 (+ «LAT2 search schedule (core)»); P.quick PASS 54; P.all PASS 73 (449 s; runner P.all limit now 15 min). Fix rounds 2.
+### LAT2 (2026-10-15) — frames once, search schedule, worker option: record moved to archive B «Moved from HANDOFF.md at LAT3».
 - ⬜ OPEN CHECK (postponed by the user): phone latency — A defaults and D 30 fps; on the phone also compare the worker path (decides its default).
+
+### LAT3 (2026-10-15) — low-light camera (full: archive B «LAT3 — record»)
+- Input (user's desktop, evening): camera granted 30 fps but DELIVERED 6.3 (frame wait ≈ 79 ms dominates; hand → sound 125 / 204 incl. wait);
+  daytime 14–30 fps. Worker 93 ms detection → main thread stays the default (LAT2 decision confirmed).
+- User decisions: the «exact frame» picture is the only one — the «Picture: live camera» switch is deleted (code, UI, i18n, docs, probes;
+  rule #8 says so); low light matters (evening, Calm before sleep) → a real player hint, not only test switches.
+- Meter: the webcam's name + capabilities (getCapabilities / getSettings) in «Copy»; «Low light (test)» Off / ≥ 15 fps / ≥ 24 fps / short
+  exposure (only when the camera has manual exposure; applyConstraints; refused or no effect → back to Off with the reason); «Hands lost
+  and found again within 1 s: N per minute»; when the longest startup task began.
+- Player hint «Too dark: the camera slowed to N fps…» (en + ru): delivered < 12 fps for > 3 s while granted ≥ 24; once per session; frame
+  timing only (rule #33); taps pass through; never while recording, a clip, the editor or the window. Pure core `src/core/camlight.js`.
+- Startup 1397-ms task CONFIRMED behind the start card: the warm-up runs in a setTimeout continuation BEFORE the camera opens (runner: the
+  longest startup task, «TimerHandler:setTimeout», began ≈ 15 s before the camera start; the meter now prints that offset).
+- Runner's fake camera: «≥ 15» held, «≥ 24» refused by Chrome (OverconstrainedError, frameRate), manual exposure offered (range 10–100).
+- Probes: data PASS 13 (+ «LAT3 low light (core)», 29 cases); P.quick PASS 55 (118 s, + «LAT3 low light», 34 cases); P.all PASS 74
+  (733 s, under outside load). Fix rounds 2. Earlier quick runs hit the 3-min limit while the user's Chrome used ~2 of 4 cores.
+- ⬜ User step 95 (evening, one hand, each low-light setting 20 s + Copy; picture darker / grainier? hands lost more?).

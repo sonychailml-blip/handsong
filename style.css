@@ -207,6 +207,12 @@
     font-size:var(--fs-label);}
   #latWarn.on{display:flex;}
   #latWarn button{padding:6px 12px; font-size:var(--fs-label);}
+  /* LAT3: the «Too dark» hint — small, top centre, taps pass through it (only its OK takes them) */
+  #darkHint{position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:21; display:none; align-items:center; gap:10px;
+    max-width:min(480px, calc(100vw - 32px)); padding:8px 12px; border-radius:var(--r-sm); background:rgba(16,16,28,.85); color:var(--ink);
+    font-size:var(--fs-hint); pointer-events:none;}
+  #darkHint.on{display:flex;}
+  #darkHint button{padding:4px 10px; font-size:var(--fs-hint); pointer-events:auto;}
   #undoToast button{padding:6px 12px; font-size:var(--fs-label);}
   /* ED7-fix2: empty song, history not empty — the transport row keeps only ↶ ↷ */
   #loopTransport.empty>button:not(#histUndo):not(#histRedo){display:none;}

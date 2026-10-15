@@ -427,6 +427,16 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
   the very camera frame whose hands are drawn) / live camera (the live video, hands from the latest detection). New lines in the box:
   «Detection runs in: …» (+ the reason after a fallback), «Hand detection … (tracking N · full-frame search N) · the model ran on N of N
   frames/s», «Frame to the worker and back …» (worker only); «hands tracked» shows the policy's name.
+- **LAT3 (2026-10-15):** the row «Picture (test)» is GONE (user decision: the picture always matches the dots). New row «Low light (test)»
+  (session only): Off (default) / at least 15 fps / at least 24 fps / short exposure (the last only when the camera reports manual
+  exposure). «Applying…» lasts ≈ 3 s (the camera settles, then its frames are counted); a setting that is refused or changes nothing falls
+  back to Off and the hint line says why. New lines in the box (and «Copy»): «Camera «name» can: frameRate … · exposureMode … · …» (what
+  the browser reports for this webcam, with current values), «Low light (test): … · camera A → B fps — …», «Hands lost and found again
+  within 1 s: N per minute»; the startup line adds when its longest task began («… before the camera started (behind the start card)»).
+- **Player hint «Too dark» (LAT3, a product message, en + ru):** a small box at the top centre (`#darkHint`, under the bar) — «Too dark: the
+  camera slowed to N fps, so sound answers later. More light helps.» + OK. Once per session, when the camera delivers fewer than 12 fps for
+  more than 3 s although it was granted at least 24; from frame timing only. Taps pass through it (only OK takes them); hides after 9 s, at
+  OK, or when a recording, a clip, the editor or the arrangement window starts; never appears during them.
 - **Start card while starting (LAT2):** the message line pulses (`#start.busy`) through «Loading the hand-tracking model…», «Warming up hand
   tracking…» (the model's first detection on a blank frame, ≈ 1–2 s — this was the 1.2-s freeze after the card closed), «Starting the
   camera…»; the card closes only after the warm-up.

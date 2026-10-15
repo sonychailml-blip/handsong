@@ -162,7 +162,8 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   `#helpBtn`, `swapHands`, global `theremin`, `thereminBtn`, `swapBtn`, `drawThereminGrid`, `BEATS_PER_BAR` as a constant, `handRole`,
   `jamStep`/`applyJam`/`jamTo`, `jam.*` keys, `loop.first`, `setRegion`, `takeEv`, `revDisp`, `chBrightDisp`, `drawChordBright`,
   `verb`/`verbOut`/`revLead`/`revCh`, `leadOwner`, `fxAttach`/`fxRoleBus`/`fxRoleOut`, `roleXDriven`, `bassOwner`, `soloNoteHand`,
-  per-voice `dlySend`/`revSend`, `RELEASE_TAILS` as a rule, `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
+  per-voice `dlySend`/`revSend`, `RELEASE_TAILS` as a rule, `vision.setPicture`, `VISION_DEF.picture`, `swPicMatched`/`swPicLive`,
+  `diag.sw.pic*` keys, latmeter report `detection.picture` (LAT3: the live-camera picture switch removed), `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
 ## Added at AF3 / AF4
 - `src/frzqueue.js`: `AF_DELAY`, `AF_REFREEZE_ON_RETUNE`, `AF_BUDGET_MB`, `AF_TOUCH`, `AF_EST`, `wScan`, `wants`, `watchSig`, `afHint`, `afTick`, `afPause`, `afIdle`, `afBusy`, `afActive`, `afRowState`, `afBegin`, `afEnd`, `heldLayer`, `estBytes`, `fitsBudget`, `budgetBytes`, `PANHOLD`, `LVL`
 - `src/recorder.js`: `frzWatchKey`, `frzWatchVer`, `frzRetuneOnly`, `frzSigNoRetune`, `laneHasChain`, `frzBytesTotal`, `frzBytesOf`, `songPinChains`, `editInsPush`
@@ -301,5 +302,23 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   (`schedCore`, `HS`). `tools/probe-browser.mjs`: `--limit-min` default 15; `res.net` (`NET_OK`, the network check and its control
   `net-control-worker.js`). `tools/check-static.mjs`: GLOBALS `Worker createImageBitmap ImageBitmap postMessage`; NET_LISTED `vision.js`
   worker 1, `handdet.js` external 1 + fetch 1.
+## Added at LAT3 (2026-10-15)
+- `src/core/camlight.js` (new, pure core): `LOW_MODES` ['off','fps15','fps24','exposure'], `LOW_TARGET`, `LOW_EXPOSURE_S` 1/40,
+  `LOW_SETTLE_MS` 1000, `LOW_MEASURE_MS` 2000, `exposureSupported(caps)`, `exposureUnits(caps, sec)`, `lowConstraints(mode, caps, base, prev)`,
+  `lowVerdict({mode, before, after, settings})` → {ok, why: ''|'partly'|'unmeasured'|'noeffect'|'manual'}; hint `DARK_FPS` 12, `DARK_MS`
+  3000, `DARK_GRANTED` 24, `DARK_WIN` 1000, `darkNew(cfg)`, `darkStep(st, t, {granted, allowed})` → true once; `LOST_MS` 1000, `lostNew(cfg)`,
+  `lostStep(st, t, n)`; `capsText(caps, settings)`, internal `CAP_KEYS`.
+- `src/vision.js`: `setLowLight(mode)`, `lowInfo()` → {mode, asked, applied, before, after, note, exposure}, `lowDbg({fail, fakeFps,
+  noFallback, reset})`; `VISION_DEF.low` 'off'; `camInfo()` adds `caps`, `settings`, `label`; internal `camBase`, `vtrack`, `capsOf`,
+  `vfRing`, `low`, `lowDbgO`, `fpsOver`, `lowOff`, `sleep`.
+- `src/latmeter.js`: report `camera.label/caps/settings/capsText/lowLight/lostPerMinute/lostWithinMs/hint`, `longTasks.startup.maxAtMs`;
+  switches `swLowOff`, `swLow15`, `swLow24`, `swLowExp`; hint `HINT_MS` 9000, `hintAllowed`, `darkShow`, `darkHide`, `dark`, `grantedFps`,
+  `lost`, `lowFpsTx`, `lowNoteTx`; probe-only `darkDbg(times, granted)`, `darkHideDbg`, `latLostDbg`.
+- `index.html`: row `diag.sw.low` with `#swLowOff/#swLow15/#swLow24/#swLowExp`; `#darkHint` (`#darkHintTx`, `#darkHintOk`). CSS `#darkHint`.
+- i18n: `diag.sw.low`, `diag.sw.lowOff/low15/low24/lowExp`, `diag.low`, `diag.low.off/fps15/fps24/exposure`, `diag.lowFps`, `diag.lowBack`,
+  `diag.lowKept`, `diag.why.noeffect/manual/partly/unmeasured/reopened`, `diag.caps`, `diag.capsNone`, `diag.lost`, `diag.longBefore`,
+  `diag.longAfter`, `lat.dark` (the player hint).
+- `src/probes/lat.js`: `checkLowLight` (row «LAT3 low light», at 585), `lowProblems`, `LOW_BASE`, `expUnits`. `tools/probe-data.mjs`: row
+  «LAT3 low light (core)» (`lowCore`, `CL`).
 - Stale since LAT2: `vision.landmarker`, `main.lastTs`, `latmeter.lastN`, `latmeter.dup` (a count; now `pumpStats().dup`), `vision.MP_LINE`
   (moved to core/latency.js), `vision.js` external import (moved to handdet.js).

@@ -1,7 +1,8 @@
 import { camFacing } from './state.js';
 import { t } from './i18n.js';
 import { schedNew, schedPlan, schedAfter, HAND_POLICIES } from './core/handsched.js';
-import { MP_LINE } from './core/latency.js';
+import { MP_LINE, rateOf } from './core/latency.js';
+import { LOW_MODES, lowConstraints, lowVerdict, exposureSupported, LOW_SETTLE_MS, LOW_MEASURE_MS } from './core/camlight.js';
 
 /* ================= КАМЕРА + MEDIAPIPE ================= */
 const video=document.getElementById('video');
@@ -14,23 +15,26 @@ addEventListener('resize',resize); resize();
 
 /* Test switches (session only, never saved). LAT1b: the model's processor, the camera frame rate requested (null = none, the default
    constraint set). LAT2: hands = the search policy ('2s' two hands, full search every 3rd frame — default; '2' search every frame — the
-   app before LAT2; '1' one hand), path = where detection runs, picture = what the canvas shows ('matched' = the detected frame, rule #8;
-   'live' = the live video under the latest result). ⛳ path 'main' by default (LAT2b, measured on the user's desktop GPU, Intel HD 4000,
+   app before LAT2; '1' one hand), path = where detection runs. LAT3: low = the «Low light (test)» mode ('off' = today's camera request;
+   core/camlight.js). The canvas always draws the detected frame (rule #8; LAT3 removed the «live camera» picture switch — the dots must
+   match the hand exactly). ⛳ path 'main' by default (LAT2b, measured on the user's desktop GPU, Intel HD 4000,
    sample hand photo): in a worker the same model runs ≈ 2× slower — one hand 98 vs 53 ms per frame, two hands 160 vs 80 — because WebGL
    inside a worker is slower there (plain JavaScript is not); 'worker' stays one switch away and falls back to 'main' by itself. */
-const VISION_DEF={ hands:'2s', delegate:'GPU', camFps:null, path:'main', picture:'matched' };
+const VISION_DEF={ hands:'2s', delegate:'GPU', camFps:null, path:'main', low:'off' };
 const opts={ ...VISION_DEF };
 let camStartT=NaN;   // performance time the current camera stream started playing (LAT1b: «startup» long tasks)
 
 /* Open camera `facing` on the same <video>. Old tracks are stopped FIRST (a phone rarely opens a second camera while the first lives);
    a failed request throws upward — the caller rolls back (ui.js). LAT1b: frameRate is requested only when the test switch asks. */
-const camWant=()=>({ facingMode:camFacing, width:{ideal:640}, height:{ideal:480}, ...(opts.camFps ? { frameRate:{ideal:opts.camFps} } : {}) });
+const camBase=()=>({ width:{ideal:640}, height:{ideal:480}, ...(opts.camFps ? { frameRate:{ideal:opts.camFps} } : {}) });   // LAT3: also the base of every low-light set
+const camWant=()=>({ facingMode:camFacing, ...camBase() });
 async function openCamera(facing){
   if(stream){ for(const tr of stream.getTracks()) tr.stop(); stream=null; }
   const want={ ...camWant(), facingMode:facing };
   stream=await navigator.mediaDevices.getUserMedia({ video:want, audio:false });
   video.srcObject=stream; await video.play();
   camStartT=performance.now();
+  if(opts.low!=='off'){ opts.low='off'; low.note='reopened'; low.asked=null; }   // LAT3: a reopened camera gets today's request
   pumpStart();
 }
 
@@ -65,10 +69,14 @@ const mpLine=s=>{ if(mpLog.length<40) mpLog.push(s); };   // a line forwarded by
 const modelInfo=()=>({ requested:opts.delegate, actual:delegateOf(mpLog, xnnBefore, opts.delegate), once:opts.delegate==='CPU' && xnnBefore && !mpLog.some(s=>XNN.test(s)), hands:opts.hands,
   evidence:mpLog.filter(s=>/gl_context.*GL version|XNNPACK|delegate/i.test(s)).map(s=>s.replace(/^[IWEF]\d{4} [\d:.]+ \d+ /,'').slice(0,160)) });
 
-/* LAT1b: the camera's request and what the browser granted (track.getSettings) */
+/* LAT1b: the camera's request and what the browser granted (track.getSettings). LAT3: + what the webcam can do (getCapabilities), its
+   full settings and its name — read on the device, leaving it only inside the text the person copies (rule #33). */
+const vtrack=()=>stream&&stream.getVideoTracks()[0];
+const capsOf=tr=>{ try{ return tr&&tr.getCapabilities ? tr.getCapabilities() : null; }catch(e){ return null; } };
 function camInfo(){
-  const tr=stream&&stream.getVideoTracks()[0], s=tr&&tr.getSettings ? tr.getSettings() : {};
-  return { requested:{ width:640, height:480, frameRate:opts.camFps }, granted:{ width:s.width??null, height:s.height??null, frameRate:s.frameRate??null }, startT:camStartT };
+  const tr=vtrack(), s=tr&&tr.getSettings ? tr.getSettings() : {};
+  return { requested:{ width:640, height:480, frameRate:opts.camFps }, granted:{ width:s.width??null, height:s.height??null, frameRate:s.frameRate??null }, startT:camStartT,
+           caps:capsOf(tr), settings:{ ...s }, label:tr&&tr.label||'' };
 }
 
 /* ================= LAT2 — THE DETECTION PATH =================
@@ -156,7 +164,10 @@ function pumpStart(){
 }
 /* frames are numbered here (the browser calls once per presented frame; presentedFrames may restart with a new camera stream) */
 let frameSeq=0, pollT=-1;
-function onVF(now, md){ vfh=video.requestVideoFrameCallback(onVF); takeFrame(++frameSeq, md.captureTime, md.presentationTime, now, md.presentedFrames); }
+const vfRing=[];   // LAT3: [time, presentedFrames] of the last 4 s — what the camera delivers, for the low-light verdict
+function onVF(now, md){ vfh=video.requestVideoFrameCallback(onVF);
+  vfRing.push([now, md.presentedFrames]); while(vfRing.length>2 && now-vfRing[0][0]>4000) vfRing.shift();
+  takeFrame(++frameSeq, md.captureTime, md.presentationTime, now, md.presentedFrames); }
 function pollFrame(){   // fallback (no requestVideoFrameCallback): a new frame = the video's time moved; called by the draw loop
   if(video.requestVideoFrameCallback || video.readyState<2 || video.currentTime===pollT) return;
   pollT=video.currentTime; takeFrame(++frameSeq, NaN, NaN, performance.now());
@@ -215,8 +226,8 @@ async function initVision(msg){
 async function switchCamera(facing){ await openCamera(facing); }
 
 /* Test switches. Hands: the schedule's policy (instant — both models are always built). Processor: setOptions on both models (graph
-   rebuild ≈ 1 s each, in the worker when it runs). Frame rate: reopens the camera. Path: builds the other path, then swaps. Picture: a
-   drawing choice only. Values outside the offered ones refuse. */
+   rebuild ≈ 1 s each, in the worker when it runs). Frame rate: reopens the camera. Path: builds the other path, then swaps. Low light:
+   applyConstraints on the running track (below). Values outside the offered ones refuse. */
 async function setHandsTracked(m){
   if(!HAND_POLICIES.includes(m)) throw new Error('hands tracked: '+HAND_POLICIES.join(', '));
   if(m===opts.hands) return; opts.hands=m; sched=schedNew();
@@ -240,10 +251,51 @@ async function setDetectPath(p){
   const keep=opts.path; opts.path=p;
   try{ await setPath(p); }catch(e){ opts.path=keep; throw e; }
 }
-async function setPicture(p){
-  if(p!=='matched'&&p!=='live') throw new Error('picture: matched or live');
-  opts.picture=p;
+/* LAT3: «Low light (test)». The mode's constraint set (core/camlight.js) goes to applyConstraints on the running track; then the camera
+   settles (1 s) and the delivered frames are counted (2 s). An error (OverconstrainedError …) or no effect → back to Off (today's request,
+   the exposure handed back to the camera); the reason stays in `low.note` for the meter. The camera is never closed for this; only when
+   even Off cannot be applied is it reopened with today's request. */
+const low={ asked:null, note:'', before:NaN, after:NaN, gen:0 };
+let lowDbgO={};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const fpsOver=(a,b)=>rateOf(vfRing.filter(x=>x[0]>=a && x[0]<=b));
+async function lowOff(tr, caps, from, why){
+  const c=lowConstraints('off', caps, camBase(), from);
+  low.asked=c; opts.low='off';
+  try{ await tr.applyConstraints(c); }catch(e){ try{ await openCamera(camFacing); }catch(e2){} }
+  low.note=why;
 }
+async function setLowLight(m){
+  if(!LOW_MODES.includes(m)) throw new Error('low light: '+LOW_MODES.join(', '));
+  const tr=vtrack(); if(!tr || !tr.applyConstraints) throw new Error('the camera is not running');
+  if(m===opts.low) return;
+  const caps=capsOf(tr), from=opts.low, g=++low.gen, t0=performance.now();
+  const c=lowConstraints(m, caps, camBase(), from);
+  if(!c) throw new Error('this camera offers no manual exposure');
+  low.before=fpsOver(t0-2000, t0); low.after=NaN; low.note=''; low.asked=c; opts.low=m;
+  try{
+    if(lowDbgO.fail){ const e=new Error('simulated by the probe'); e.name=lowDbgO.fail; e.constraint='frameRate'; lowDbgO.fail=null; throw e; }
+    await tr.applyConstraints(c);
+  }catch(e){
+    const why=(e&&e.name||'Error')+(e&&e.constraint ? ' ('+e.constraint+')' : e&&e.message ? ': '+e.message : '');
+    if(!lowDbgO.noFallback) await lowOff(tr, caps, m, why);
+    return;
+  }
+  if(m==='off') return;
+  await sleep(LOW_SETTLE_MS+LOW_MEASURE_MS);
+  if(g!==low.gen || opts.low!==m) return;   // superseded by another press or a camera reopen
+  let after=fpsOver(t0+LOW_SETTLE_MS, performance.now()); if(lowDbgO.fakeFps!=null) after=lowDbgO.fakeFps;
+  const v=lowVerdict({ mode:m, before:low.before, after, settings:tr.getSettings() });
+  low.after=after;
+  if(!v.ok && !lowDbgO.noFallback) await lowOff(tr, caps, m, v.why); else low.note=v.why;
+}
+/* the low-light state for the meter: mode, the set passed to applyConstraints, the browser's own record of it (getConstraints), fps
+   before / after, the reason of a fall-back ('noeffect', 'manual', an error name; 'partly' / 'unmeasured' when kept; 'reopened') */
+const lowInfo=()=>{ const tr=vtrack(); let applied=null; try{ applied=tr&&tr.getConstraints ? tr.getConstraints() : null; }catch(e){}
+  return { mode:opts.low, asked:low.asked, applied, before:low.before, after:low.after, note:low.note, exposure:exposureSupported(capsOf(tr)) }; };
+/* probe only: fail = the next applyConstraints throws an error of that name; fakeFps = the measured «after»; noFallback = CONTROL (a
+   failure stays in the failed mode — the probe must catch it); reset */
+function lowDbg(o={}){ lowDbgO= o.reset ? {} : { ...lowDbgO, ...o }; }
 const visionOpts=()=>({ ...opts });
 const pathInfo=()=>({ asked:opts.path, runs:path.runs, why:path.why, warmMs:path.warmMs });
 const pumpStats=()=>({ ...PS, log:PS.log.slice(), sched:{ ...sched }, policy:opts.hands });
@@ -266,5 +318,5 @@ function pumpDbg(o={}){
 
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, switchCamera, setHandsSink, pollFrame,
-  camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setPicture,
-  pathInfo, pumpStats, pumpDbg, detRunDbg };
+  camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
+  pathInfo, pumpStats, pumpDbg, detRunDbg, lowDbg };

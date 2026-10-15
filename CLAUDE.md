@@ -62,7 +62,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   data modules (`probedata.js` → scales/state/i18n and their imports) against `data/`, prints a line per check and ALWAYS a final
   verdict (`[probe-data] PASS — …` / `NOT A PASS — …`, exit 0/1; no verdict = failure). 40 s – 2 min. Quote its verdict. Its last row
   «LIC1 licence register» runs `tools/check-licences.mjs` (text only; alone: `node tools/check-licences.mjs`, ≈ 2 s); the row «LAT1
-  latency stats (core)» runs `src/core/latency.js` — the CORE is pure by design (no DOM, Web Audio, camera, network) and may run in node.
+  latency stats (core)» runs `src/core/latency.js` (also «LAT2 search schedule (core)» `core/handsched.js`, «LAT3 low light (core)»
+  `core/camlight.js`) — the CORE is pure by design (no DOM, Web Audio, camera, network) and may run in node.
 - **The browser runner `tools/probe-browser.mjs`** (AUTO-PROBE; `npm install` once in `tools/`): own static server on a free port,
   fresh temporary profile per run (the user's browser data is never touched), headless installed Chrome (`channel:'chrome'`, no
   download), fake camera (no hands), autoplay allowed; presses ▶, starts `P.seed({replace:true})`, types `P.quick()` during it
@@ -192,8 +193,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    `state.tonicCents` (−50…50). Read through ONE door `viewKeyC(s)`, applied only in `baseF` (×2^(c/1200), no multiplication at 0 ¢ —
    12-note views and 0 ¢ views are the very objects and prices they were); `viewKeyIdOf` adds `+13c`. Probe control `keyCDbg('off'|'ungated')`.
 8. **The picture and the hands are ONE camera frame** (LAT2): each new camera frame is snapshotted once (an ImageBitmap) and detected at most
-   once; the canvas draws the snapshot whose hands are current, overlays on top (`main.onHands` keeps it as `shown`). The session switch
-   «Picture: live camera» (`setPicture('live')`) draws the live `<video>` under the latest result instead — a test, never the default.
+   once; the canvas draws the snapshot whose hands are current, overlays on top (`main.onHands` keeps it as `shown`; the live `<video>` only
+   until the first frame is detected). ⛳ The only picture (user decision, LAT3: the dots must match the hand exactly) — the «Picture: live
+   camera» test switch is deleted; don't bring it back.
 9. **ONE layout; never reintroduce a mode gate.** New behaviour keys off scale properties and `splitOn`. **Hit-test and render derive
    geometry from the SAME frozen range** (`S.role`/`S.rx0`/`S.rx1` frozen at capture; `phoneHalves`, `palSplitX`, `rectBandY`/`rectRows`
    single sources; one snapshot per drawn surface — `loopView`, `rollView`).
@@ -353,8 +355,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   asked GPU → 'GPU', or 'GPU+CPU' if an XNNPACK line came while GPU was asked; asked CPU → 'CPU' when its line came now or earlier on the
   page (TFLite prints it ONCE per page; `once`), 'unknown' only if it never came — never «unknown» for GPU (SND-F1b fix)), test switches
   `setHandsTracked('2s'|'2'|'1')` (the schedule's policy, instant) / `setModelDelegate` (`setOptions` on both models, then both warm up —
-  MediaPipe prints its processor line only at a model's first inference) / `setCamFps` (reopens the camera) / `setDetectPath` / `setPicture`;
-  `VISION_DEF` = `{hands:'2s', delegate:'GPU', camFps:null, path:'main', picture:'matched'}`.
+  MediaPipe prints its processor line only at a model's first inference) / `setCamFps` (reopens the camera) / `setDetectPath` / LAT3
+  `setLowLight('off'|'fps15'|'fps24'|'exposure')` (applyConstraints on the running track — the set from `core/camlight.lowConstraints` over
+  today's request `camBase()`; then 1 s settle + 2 s count of delivered frames (`vfRing`, the pump's rVFC) → `lowVerdict`; an error or no
+  effect → back to Off (today's request; after 'exposure' `exposureMode:'continuous'`), reason in `lowInfo().note`; a camera reopen resets
+  it to Off, note 'reopened'; probe-only `lowDbg({fail, fakeFps, noFallback, reset})`); `camInfo` also gives `caps` (getCapabilities),
+  `settings`, `label`. `VISION_DEF` = `{hands:'2s', delegate:'GPU', camFps:null, path:'main', low:'off'}`.
 - `src/handdet.js` (LAT2) — the DETECTOR, worker-safe (no DOM): `createDetector({delegate, blank, step})` downloads the model ONCE
   (`MP_MODEL`, a fetch) and builds two models from it — L2 (numHands 2) and L1 (numHands 1), sequentially (MediaPipe's loader keeps one
   global) — and warms each on a blank frame (the first inference stalls ≈ 1.3–1.6 s); `run(src, t, action, policy)` → plain result
@@ -385,7 +391,11 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `makeMeter` (ring of `LAT_N` 240 samples per stage), `statsOf` (mean, nearest-rank p5/p50/p95, jitter = p95 − p5, max), `handToSound`
   (camera + detection + gestures + ½ audio block + base + output; unknown parts listed in `missing`), `looksBluetooth` (`BT_MS` 100 or
   `BT_LABEL`); LAT1b `frameWaitMs` (½ frame), `withFrameWait`, `perMinute`, `splitLongTasks` (startup = before camera start + `STARTUP_MS`
-  10 s / playing = last minute), `isSoftwareGL`. `core/dsp.js` (SND-F1): `seeded` (mulberry32), `FOREST`/`forestIR` (the Night forest IR,
+  10 s / playing = last minute), `isSoftwareGL`. `core/camlight.js` (LAT3): `LOW_MODES`/`LOW_TARGET` (15/24/24 fps), `lowConstraints`,
+  `exposureSupported`/`exposureUnits` (1/40 s in 100-µs units, clamped, snapped), `lowVerdict` (kept at ≥ 90 % of the target or +25 % =
+  'partly'; exposure also needs 'manual' in the settings), the hint decision `darkNew`/`darkStep` (`DARK_FPS` 12, `DARK_MS` 3000,
+  `DARK_GRANTED` 24, `DARK_WIN` 1000 ms; once per session, waits for «allowed»), the counter `lostNew`/`lostStep` (`LOST_MS` 1000), `capsText`.
+  `core/dsp.js` (SND-F1): `seeded` (mulberry32), `FOREST`/`forestIR` (the Night forest IR,
   seeded per channel, any rate), `irNormScale` (the Web Audio spec's convolver normalisation, applied by us), `f32Hash`, `compCurveDb` /
   `compGainDb` (soft-knee curve), presets `DYN_GLUE`, `DYN_LIMIT`, `dynCoef`.
 - `src/dyn-worklet.js` — SND-F1 dynamics processor `'dyn'` (mode `comp` = Glue: stereo-linked, soft knee, branching peak detector in dB,
@@ -401,6 +411,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `outputLatency`, `getOutputTimestamp` → `pipeline`), long tasks (PerformanceObserver, last minute); `latReport`/`latText`, console
   `R.latency()` (render.js), «Copy» copies the shown text only; Bluetooth warning once per output device (`handsong.btWarned.<label>`,
   4 s after start and on `devicechange`). Probe-only `latCount`, `latPauseDbg`. Measures only — changes nothing it measures; sends nothing.
+  LAT3: the report and Copy text add the camera's name and capabilities (`capsText`), the low-light switch's outcome, hands lost per minute
+  (`lostStep` per processed frame), when the longest startup task began relative to the camera start (`maxAtMs`, < 0 = behind the start
+  card); switches `swLowOff/swLow15/swLow24/swLowExp` (the last hidden unless `exposureSupported`); the PLAYER HINT `#darkHint` «Too dark»
+  (key `lat.dark`, en + ru): `darkStep` on every delivered frame (frame timing only — rule #33), shown once per session, not while
+  recording, a clip, the editor or the window (hidden when one starts), auto-hides after 9 s, taps pass through it except its OK; probe-only
+  `darkDbg(times, granted)`, `darkHideDbg`, `latLostDbg`.
 - `src/render.js` — render context, seeding and track render behind freeze (see "Freeze"): one engine copy per session
   (`'./audio.js?render…'`, ⛔ never a unique specifier per render), `renderTrack`, `freeze`, `renderQueued` (ONE render at a time; ⛔ no
   third door, never await one render inside another), console `R.*`, ear tools, probe bodies.
@@ -1143,7 +1159,16 @@ Not a looper since S3.3: a linear song in absolute beats; looping = an optional 
   fallback» (P.all only, drawn, ≈ 35 s: the REAL switch puts detection in the worker; the same snapshots through the worker and a fresh
   main-thread detector → identical actions and results (CONTROL: the worker adds a hand); a worker that cannot start (`workerFail`) →
   the main thread with the reason; back to the default) · node «LAT2 search schedule (core)» (exact sequences, retry, policies,
-  `handToSound` with `transfer`; CONTROL policy '1'). The runner also checks every REQUEST of the session — page and workers (a worker has
+  `handToSound` with `transfer`; CONTROL policy '1'). «LAT3 low light» (`P.checkLowLight`, quick, drawn, ≈ 12–15 s): capabilities and the
+  three new lines in the Copy text; «short exposure» offered iff the camera has it; the REAL buttons 15 / 24 fps / short exposure — either
+  held with the constraint set claimed (passed AND `getConstraints`, against literals in the probe) and a consistent verdict, or back at Off
+  with a reason and today's request (the runner's fake camera: 15 held, 24 refused by Chrome «OverconstrainedError (frameRate)», short
+  exposure offered — range 10–100); a simulated OverconstrainedError and a simulated «no effect» fall back to Off and say so (meter and
+  switch note), detection keeps running; CONTROL `lowDbg({noFallback})` must be flagged; hands lost through the real `latHands` (1·0·1 →
+  one, away 1.3 s → none); «Too dark» through its real show path at the core's frame, taps pass, OK hides, granted 20 → nothing. Node row
+  «LAT3 low light (core)» (exact: hint frame, never at granted < 24 / recovered in 2.5 s / 12.5 fps, once per session, waits for allowed;
+  loss counts; constraint sets; verdicts; capabilities line; CONTROLS: a hint without its 3-s wait, a counter without its 1-s limit). The
+  runner also checks every REQUEST of the session — page and workers (a worker has
   no page CSP of its own) — goes to the own origin or the MediaPipe paths; CONTROL: a worker asking example.com (intercepted, aborted).
 - **GOLD timbres and effects** (`P.checkGold`, P.all only (slow), ≈ 60–120 s headless): 79 cases rendered alone through the engine copy
   (`render.goldRender(play, sec, chains, post)`: 48 kHz fixed, one seed, offline allocator — seeds the KS pluck —, tapped before the limiter,
@@ -1342,6 +1367,11 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   (≈ 0–70 ms at 30 fps; before LAT2: the next frame); a hand lost by tracking is searched for on the same frame. The worker path runs the
   model ≈ 2× slower on the user's desktop GPU (WebGL in a worker), hence not the default. The picture (matched to hands) updates at the
   detection rate, not the camera's, while hands are in view. Each camera frame costs one ImageBitmap copy (≈ 0.1 ms).
+- **Low light slows the camera (LAT3):** a webcam lengthens its exposure in the dark and delivers fewer frames (the user's desktop: 6.3 fps
+  in the evening vs 14–30 by day — the frame wait ≈ 79 ms then dominates hand → sound). No web API sets a webcam's «exposure priority»;
+  `frameRate.min` may be refused (OverconstrainedError) or ignored by the driver; manual exposure exists only on cameras that report it, and
+  a shorter exposure means a darker, noisier picture. The real remedy is light on the hands (BACKLOG §7.18). The hint needs
+  requestVideoFrameCallback (no hint without it).
 - **Night forest is costly** (offline render time per second of audio on the dev desktop, SND-F1b): Short ≈ 14 %, Medium ≈ 15 %, Long
   ≈ 27 % of a core; three Medium rooms at once ≈ 48 %, three Long ≈ 122 % (Chrome's partitioned convolution is not linear in length — Short
   saves little over Medium); a phone ≈ 4×. Each chain that holds it has its own convolver (live and track chains separate) — a SHARED
@@ -1577,8 +1607,12 @@ verified. Full text of every step: archive, "How to verify a change".
     ~4 s after start (or after switching the output); the box adds a Bluetooth line. Off hides the box; nothing else changes.
     LAT1b adds lines (camera asked vs given, «camera delivers N fps · we process N fps» (SND-F1b; the wait from the delivered rate), master
     path ms, frame wait, duplicates per minute, model GPU/CPU, graphics hardware/software, long tasks at
-    startup and while playing with causes, «Hand → sound incl. frame wait») and three test switches under the toggle (hands 2/1, model
-    GPU/CPU, camera fps default/30/60 — session only). Measurement plan: HANDOFF, LAT1b.
+    startup and while playing with causes, «Hand → sound incl. frame wait»). LAT2/LAT3 add: where detection runs, tracking vs full-frame
+    search, «the model ran on N of N frames/s», the camera's name and capabilities («Camera «…» can: frameRate … · exposureMode …»), the
+    low-light line, hands lost per minute, and when the longest startup task began. Test switches under the toggle (session only, defaults
+    = the app as before): «Hands tracked» 2 · search every 3rd frame (default) / 2 · every frame / 1; «Hand model on» GPU/CPU; «Camera frame
+    rate» default/30/60; «Detection runs in» main thread / background worker; «Low light» Off / at least 15 fps / at least 24 fps / short
+    exposure (only if the camera has it). Measurement plan: HANDOFF, LAT1b.
 93. Firefly, Night forest, Glue, Limiter (SND-F1), headphones then the phone speaker: «🎛 Sound» → «Chord instrument» → «Firefly»; the
     Chords role; pinches strike soft bell-like chords that ring ~1.5 s and fade (moving to another degree strikes again); «Effects
     constructor» (role Chords) → «+ add effect» → «Night forest» → a forest room; open it (tap its name) → «Room»: Short / Medium / Long
@@ -1589,8 +1623,14 @@ verified. Full text of every step: archive, "How to verify a change".
     never freezes after it closes; «🎛 Sound» → Diagnostics → Latency meter On. One hand in view ~20 s: «Hand detection … (tracking ·
     full-frame search)», «the model ran on N of N frames/s», duplicates 0; then two hands. A hand that leaves and comes back is picked up
     almost at once; crossing hands, the lead hand-over, the looper's 3-s clear behave as before. Compare «Hands tracked: 2 · search every
-    frame» (old) and «Detection runs in: background worker» (fewer long tasks, slower detection on weak GPUs) and «Picture: live camera»;
-    «Copy» the box after each and send it to the strategist.
+    frame» (old) and «Detection runs in: background worker» (fewer long tasks, slower detection on weak GPUs); «Copy» the box after each and
+    send it to the strategist. (LAT3: the «Picture» switch is gone — the picture always matches the dots.)
+95. Low light (LAT3), desktop in the evening (dim room), one hand: ▶ Play → «🎛 Sound» → Diagnostics → Latency meter On. For each «Low light
+    (test)» setting — Off, at least 15 fps, at least 24 fps, short exposure (only if offered): tap it, wait for «Applying…» to end, play
+    ~20 s, «Copy»; note how the picture looks (darker? grainy?) and whether the hand gets lost more (the line «Hands lost … per minute»). A
+    setting that does nothing or is refused falls back to Off and says why. The hint: in a dim room with Off, within ~4 s of the camera
+    slowing below 12 fps a small message «Too dark: the camera slowed to N fps…» appears once at the top, taps go through it, OK or 9 s
+    hide it; it never appears while recording or in the editor, and not again in the same session.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

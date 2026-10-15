@@ -80,7 +80,7 @@ export { checkMixer, checkPan, checkArrange, checkTrackLook, checkTracks } from 
 export { checkRepeat, checkQueue, checkFreezeQueue, checkAutoFreeze, checkLiveIsolation, freezeCost, checkRevAgree, checkChunks, checkSwap } from './probes/freeze.js';
 export { dumpScales, checkFiles, checkNames, SNAPSHOT_CHANGES, renewSnapshot, checkUserDelete, checkUserChordModes, checkMerge, checkBare, checkRootAlone } from './probes/files.js';
 export { dumpSongPrint, checkSongPrint, checkKeyKeep, checkOneOne, checkTranspose } from './probes/key.js';
-export { checkLatency, checkLatSwitches } from './probes/lat.js';
+export { checkLatency, checkLatSwitches, checkLowLight } from './probes/lat.js';
 export { checkFrameOnce, checkSchedule, checkWorker } from './probes/detect.js';
 export { dumpGold, checkGold } from './probes/gold.js';
 export { checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './probes/sound.js';

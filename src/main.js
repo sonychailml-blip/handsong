@@ -1,5 +1,5 @@
 import { initAudio, AC } from './audio.js';
-import { video, initVision, setHandsSink, pollFrame, visionOpts } from './vision.js';
+import { video, initVision, setHandsSink, pollFrame } from './vision.js';
 import { processHands } from './gestures.js';
 import { drawVideoBackground, syncViewRect, drawOverlays } from './draw.js';
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
@@ -40,8 +40,8 @@ import { latStart, latFrame, latHands, latIdle } from './latmeter.js';   // LAT1
 /* ================= ЦИКЛ ================= */
 /* LAT2: two clocks instead of one tick. HANDS — each new camera frame, once, when its detection is done (vision.js's pump → onHands):
    the crop, processHands (sound now, not at the next screen frame), the meter. PICTURE — every screen frame (loop): the snapshot of the
-   frame whose hands are current, then the overlays over it (rule #8: picture and hands are one camera frame; the session switch
-   «Picture: live camera» draws the live video instead). */
+   frame whose hands are current, then the overlays over it (rule #8: picture and hands are one camera frame — the only picture since
+   LAT3; the live video only until the first frame is detected). */
 let latest=null, shown=null;
 
 /* ⛳ КАДР ДОРИСОВЫВАЕТСЯ ВСЕГДА — ОШИБКА В ОБРАБОТКЕ РУК НЕ СТИРАЕТ ЭКРАН. processHands ведёт жесты, звук и ЗАПИСЬ (W* → rec*), и
@@ -88,7 +88,7 @@ function loop(){
   }
   pollFrame();                               // LAT2: only without requestVideoFrameCallback — a new camera frame found by its time
   const t0=performance.now();
-  drawVideoBackground(visionOpts().picture==='live' || !shown ? video : shown);   // the frame whose hands are shown (rule #8)
+  drawVideoBackground(shown || video);   // the frame whose hands are shown (rule #8)
   drawOverlays(latest);                      // накладки — поверх того же кадра
   captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр; иначе no-op
   latFrame(t0, performance.now());           // LAT1: drawing time and the screen-frame interval
