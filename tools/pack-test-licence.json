@@ -1,0 +1,26 @@
+{
+ "note": "PACK1 fixture: TEST keys signed by the test private key (tools/.pack-test-key.json, git-ignored) — verified offline against src/core/pack.js PACK_PUBKEYS.test",
+ "pack": {
+  "format": "handsong/pack",
+  "version": 1,
+  "id": "test-pack",
+  "name": {
+   "en": "Test pack",
+   "ru": "Тестовый пакет"
+  },
+  "licence": true,
+  "items": [
+   {
+    "kind": "timbre",
+    "id": "test-pack/glass-bell"
+   },
+   {
+    "kind": "mode",
+    "id": "test-pack/night-mode"
+   }
+  ]
+ },
+ "key": "HS1.eyJ2IjoxLCJraWQiOiJ0ZXN0IiwicGFjayI6InRlc3QtcGFjayIsImtleSI6ImVkZDhlNWU5LWY4NzktNDNjMi05MGRlLWI5ZTFiMzQ3ZjMyOCIsImlzc3VlZCI6IjIwMjYtMTAtMTYifQ.Rkqi212RNub2snBgWcXyXAWTHVU_GjGY9PRihdWe4s_Ut1j_sIDoXtirfwonUjZ5KCTq6vW-9Dhjv1IgCTFcPw",
+ "otherPackKey": "HS1.eyJ2IjoxLCJraWQiOiJ0ZXN0IiwicGFjayI6Im90aGVyLXBhY2siLCJrZXkiOiI2MzE4ODk0OS04NDg2LTQxNjgtOTJhMC0yZTkyYmEyMzAyYTciLCJpc3N1ZWQiOiIyMDI2LTEwLTE2In0.V9RFPnguPSt_2EM6qt3QhACnHNIGwP5VfWQptglgP1vX-20GyLsTLwOfiDTh_Ga-OX7svR0XNr0z4DsBZS_Xig",
+ "expiredKey": "HS1.eyJ2IjoxLCJraWQiOiJ0ZXN0IiwicGFjayI6InRlc3QtcGFjayIsImtleSI6IjdkYzBiNjY2LTg3NmItNGE5NC1iYWNlLTE4OTcwOGM2Y2Y1YiIsImlzc3VlZCI6IjIwMjYtMTAtMTYiLCJ1bnRpbCI6IjIwMDAtMDEtMDEifQ.t6rr7y-OtFJVoVC_tV1DBROczHM8-uJuh2oGG4_-zJDk9y-qdlLZHFsxcR-4Ru53qztyUciswYRLUJ52-y8Z4g"
+}

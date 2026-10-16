@@ -17,8 +17,8 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   `CAM_MARGIN=0.12`, `remapAxis`, `coverView(vw,vh,W,H,M)` (the single cover-crop computation), the volume curve `volAmp(v)=v²`,
   `volVel(role,a)`, `volFromOld(role,v)=√(floor+(1−floor)·v)` (old floors: solo 0, chords 0.25, bass/drums 0.3), `AUT_RAMP_BEAT` 1/16,
   `AUT_RAMP_EPS` 0.01, fine recording `REC_FINE_EPS` 0.01 / `REC_AVG_S` 2 / `REC_JUMP_EPS` 0.03 / `REC_HIST_S` 20 / `REC_PAUSE_S` 0.5 /
-  `REC_KNEE_F` 50, `INSTR_COL` (the ONE role palette, different LIGHTNESS: bass #20946b L*54.6, chords #b18cff 66.0, solo #ffb050 77.8,
-  drums #ffe680 91.4), `LANE_NOROLE_COL`, `LANE_NAME_*` (17 % of the strip, 48–100 px), `ARR_ROW_H` 40, `ARR_HANDLE_W` 28.
+  `REC_KNEE_F` 50, (DRAW1b: `INSTR_COL`, `LANE_NOROLE_COL`, `REV_COLOR` gone — `palette.ROLE_COL`, `noRoleCol()`, `cv('fx-rev')`; `FX_META[].color`
+  → `.col` = a token name), `LANE_NAME_*` (17 % of the strip, 48–100 px), `ARR_ROW_H` 40, `ARR_HANDLE_W` 28.
 - `src/state.js` — cross-cutting musical/layout state + setters: `scaleId`, `tonic`, `aRef` (380–480), `tunedFrom` ('T' or 0..11),
   `seventh`, instrument indices `leadIdx/chIdx/bassIdx/drumKitIdx`, `fx` = solo-only scalars `{vib, drv, trm}`, `latchDeg/latchTy`,
   `chordFam/chordVar`, `phoneInstr`, `handFn` (defaults `ld:{fx,note}`, `bs:{note,note}`, `ch:{latch,latch}`, `dr:{hit,hit}`;
@@ -435,4 +435,31 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   `songDirty`; `ui.songSaveText`, `songOpenText` (+ `songDownload`, `songLiveApply`, `syncLoopPanel`, `songOpenSay`); `render.seedOfLane`
   (exported); DOM `#songName`, `#songSave`, `#songOpen`, `#songFile`; keys `song.*`; probe rows «SAVE1 song file (core)» (node),
   «SAVE1 song file save → open» (`checkSongFile`); runner UI check `uiSongFile`.
+- AUTOSAVE1: `src/autosave.js` — `AS` (pollMs, settleMs, gapMs, playMs, idleMs), `AS_KEEP`, `asPut`, `asWire`, `asStart`, `asTick`,
+  `asWrite`, `asAdopt`, `asFresh`, `asFlush`, `asInfo`, `asList`, `asGet`, `asEnabled`, `asSetEnabled`, `asPause` ('probe', 'probe-song'),
+  `asDbg`, `asDbgState`, `asDrop`; `hooks.renderBusy` (render.js); `ui.asRestoreId`, `songResumeOffer` (+ `asShow`, `asFill`, `asTime`);
+  DOM `#asOn`, `#asOff`, `#asStatus`, `#asPick`, `#asRestore`, `#resumeToast` (`#resumeText`, `#resumeYes`, `#resumeNo`); keys `as.*`;
+  localStorage `handsong.autosave`; probe row «AUTOSAVE1 song kept on the device» (`checkAutosave`); runner UI check `uiAutosave`.
+- SONG2: `songs.loadSong` (opens `data/songs/<name>.json`), `songBuild` (the generator), `songRefuse`, `SONG_FILES`; probes `dumpSong`,
+  `checkSongFile2` (`probes/song2.js`); file `data/songs/triphop.json`.
+- PACK1: `core/pack.js` — `PACK_FORMAT`, `PACK_VERSION`, `KEY_PREFIX`, `KEY_FORMAT`, `PACK_PUBKEYS`, `packCheck`, `keySign`, `keyVerify`,
+  `createPackGate`, `packUnlock`; `core/registry.createRegistry(kind, {gate})`, `isLocked`; tools `pack-keygen.mjs`, `pack-test-licence.json`,
+  `.pack-test-key.json` (git-ignored); rows «PACK1 packs and licence keys (core)» (`packCore`), «PACK1 licence keys in the page» (`checkPack`).
+- IDS1: `song/store.evIdFill`, `evIdFloor`; `e.id`; part 2: `song/capture.laneIdFill`, `laneIdFloor`, lane point `p.id`, file v5 `songV4toV5`; `core/songfile` v4 `songV3toV4`; `fileDbg({noIds})`; row «IDS1 permanent event ids»
+  (`checkEventIds`, `probes/ids.js`).
+- ENG1: `audio.noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone` (+ `okHzE`); `live/eng.makeENG` calls only them.
+- AUD2b: `probes/fxcontract.js` `checkFx(id, part)`; families «AUD2b effect contracts» / «AUD2b effect tails»; `render.engineProbe` `opt.sec`.
+- AUD2a: `src/modules/effects/{param,reverb,delay,trem-mix,bright,glide,volume,forest,glue}.js`, `src/engine/fdn.js` (names: CLAUDE.md
+  module map); `config.FX_VOL` (state re-exports); E `wk.dynWarned`, `buf.forestData`; `FX_FACTORY[id].make(E)`.
+- AUD1c: `src/modules/timbres/{stages,voice,fm,ks,subtractive,chord-voice,bass-voice,drumkits}.js` (names: CLAUDE.md module map); E
+  `look.ownerGain/ownerPan`; data row «AUD1c timbre data pure (core)» (`timbreData` in tools/probe-data.mjs). Moved out of audio.js: `mkOsc`,
+  `voiceStart*`, `buildLeadBank(s)`, `buildFMBank`, `buildKSBank`, `buildKSFallback`, `KS_BANKS`, `newChordVoice`, `buildChordPool`, `FIREFLY`,
+  `ffStrike`, `buildBassPool`, the drum-kit hit builders, `makePanStage`, `voiceRoute`, `makeBriStage`, `panGains` (re-exported), …
+- AUD1a: `audio.engineCtx` (E); `src/engine/surface.js` `SURFACE`, `SURFACE_INTERNAL`; `render.engineProbe`; check-static `surfaceUses`,
+  `surfaceCheck`; probe rows «AUD1 engine context» (`checkEngineCtx`), «AUD1 node census» (`checkCensus`, `dumpCensus`; `tools/census.print.json`).
+- SONG1: `scales.userRecordsOf`; `core/songfile` `SONG_VERSION` 3, `songV2toV3`, `REC_KINDS`, `OWN_ID`; `song/file.songNeeds`,
+  `fileDbg({noRecs})`; `scaleload.checkRecordList`; `ui.songKeep` (+ `songRecs`, `songKeepShow`, `songRecNames`, `REC_SECT`); DOM `#songKeepRow`,
+  `#songKeep`, `#songKeepHint`; keys `song.fromSong`, `song.no.records`, `song.keep*`, `song.kept`; probe row «SONG1 songs carry their own
+  scales» (`checkSongRecords`, `probes/song1.js`).
+- DRAW1b: `src/palette.js` — `cv(name)`, `ROLE_COL`, `noRoleCol`; tokens.css section «canvas» (`--cv-*`); check-static `canvasCheck`.
 - DRAW1: `src/views/common.js`, `camera.js`, `strip.js` (+ `loopViewClear`), `roll.js`, `play.js`; `draw.js` = facade.

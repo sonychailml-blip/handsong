@@ -93,7 +93,7 @@ export async function checkDynamics(){
   const diff=[], miss=s=>diff.push(s); let cases=0;
   const rate=48000, STEP=0.4, LV=[-40,-30,-24,-18,-14,-12,-9,-6,-3,0], N=Math.round(STEP*rate)*LV.length, IMP=4800;
   const C=new OfflineAudioContext(6, N, rate);
-  try{ await C.audioWorklet.addModule('src/dyn-worklet.js'); }catch(e){ miss('the dynamics worklet did not load offline: '+(e&&e.message)); return { cases, total:diff.length, differences:diff }; }
+  try{ await C.audioWorklet.addModule('src/engine/worklets/dyn-worklet.js'); }catch(e){ miss('the dynamics worklet did not load offline: '+(e&&e.message)); return { cases, total:diff.length, differences:diff }; }
   const buf=fill=>{ const b=C.createBuffer(1,N,rate), d=b.getChannelData(0); fill(d); return b; };
   const stair=buf(d=>{ const w=Math.round(STEP*rate); LV.forEach((l,k)=>d.fill(Math.pow(10,l/20), k*w, (k+1)*w)); });
   const imp=buf(d=>{ d[IMP]=0.5; });
@@ -186,25 +186,38 @@ export async function checkDynLive(){
   const sr=ac.sampleRate, len=Math.round(0.6*sr), r=seeded(0x5EED);
   const sig=new Float32Array(len); for(let i=0;i<len;i++){ const env=Math.exp(-3*i/len); sig[i]=env*(0.7*(r()*2-1)+0.4*Math.sin(2*Math.PI*180*i/sr)); }
   const play=(ctx,node,at)=>{ const b=ctx.createBuffer(1,len,sr); b.copyToChannel(sig,0); const s=ctx.createBufferSource(); s.buffer=b; s.connect(node); s.start(at); };
-  const offline=async set=>{ const C=new OfflineAudioContext(2, len+2560, sr); await C.audioWorklet.addModule('src/dyn-worklet.js');
+  const offline=async set=>{ const C=new OfflineAudioContext(2, len+2560, sr); await C.audioWorklet.addModule('src/engine/worklets/dyn-worklet.js');
     const n=new AudioWorkletNode(C,'dyn',dynOpts('comp',set)); n.connect(C.destination); play(C,n,1280/sr); return (await C.startRendering()).getChannelData(0).slice(1280,1280+len); };
   const A=await offline({ ...DYN_GLUE, on:1 }), Actl=await offline({ ...DYN_GLUE, makeup:DYN_GLUE.makeup+0.5, on:1 });
-  const n=new AudioWorkletNode(ac,'dyn',dynOpts('comp',{ ...DYN_GLUE, on:1 })), z=ac.createGain(); z.gain.value=0;
-  const Fs=(Math.ceil((ac.currentTime+0.5)*sr/128))*128, want=Fs-Math.floor(ac.currentTime*sr)+len+8192;
-  const cap=new AudioWorkletNode(ac,'probe-cap',{ numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[1], channelCount:2, channelCountMode:'explicit', processorOptions:{ want } });
-  const got=new Promise((res,rej)=>{ cap.port.onmessage=e=>res(e.data||{}); setTimeout(()=>rej(new Error('the live capture did not finish')), (want/sr+3)*1000); });
-  n.connect(cap); cap.connect(z); z.connect(ac.destination); play(ac,n,Fs/sr);
-  const late=ac.currentTime*sr>=Fs;   // the main thread stalled past the planned start: the frames would not line up — say so, not «differ»
-  let m; try{ m=await got; } catch(e){ miss(e.message); return { cases, total:diff.length, differences:diff }; }
-  finally{ try{ n.disconnect(); cap.disconnect(); z.disconnect(); }catch(e){} }
-  cases++; if(m.gaps) miss(`the live capture has ${m.gaps} gap(s) on the audio thread`);
-  if(late){ miss('the live start was scheduled 0.5 s ahead and the main thread was still late — the machine is too busy for this real-time row'); return { cases, total:diff.length, differences:diff }; }
-  const live=new Float32Array(len); for(let i=0;i<len;i++){ const j=Fs+i-m.F0; live[i]= j>=0&&j<m.L.length ? m.L[j] : NaN; }
+  /* one live capture → the live window, or { why } (RUN 3: a capture that saw NO signal is named and retried once — under heavy load the
+     capture has missed the node's output entirely, which read as a full-scale difference) */
+  const silentOf=w=>{ let pk=0; for(const x of w) if(Math.abs(x)>pk) pk=Math.abs(x); return !(pk>1e-6); };   // NaN (outside the capture) counts as nothing
+  const liveTry=async()=>{
+    const n=new AudioWorkletNode(ac,'dyn',dynOpts('comp',{ ...DYN_GLUE, on:1 })), z=ac.createGain(); z.gain.value=0;
+    const Fs=(Math.ceil((ac.currentTime+0.5)*sr/128))*128, want=Fs-Math.floor(ac.currentTime*sr)+len+8192;
+    const cap=new AudioWorkletNode(ac,'probe-cap',{ numberOfInputs:1, numberOfOutputs:1, outputChannelCount:[1], channelCount:2, channelCountMode:'explicit', processorOptions:{ want } });
+    const got=new Promise((res,rej)=>{ cap.port.onmessage=e=>res(e.data||{}); setTimeout(()=>rej(new Error('the live capture did not finish')), (want/sr+3)*1000); });
+    n.connect(cap); cap.connect(z); z.connect(ac.destination); play(ac,n,Fs/sr);
+    const late=ac.currentTime*sr>=Fs;   // the main thread stalled past the planned start: the frames would not line up — say so, not «differ»
+    let m; try{ m=await got; } catch(e){ return { why:e.message }; }
+    finally{ try{ n.disconnect(); cap.disconnect(); z.disconnect(); }catch(e){} }
+    if(m.gaps) return { why:`the live capture has ${m.gaps} gap(s) on the audio thread` };
+    if(late) return { why:'the live start was scheduled 0.5 s ahead and the main thread was still late — the machine is too busy for this real-time row' };
+    const live=new Float32Array(len); for(let i=0;i<len;i++){ const j=Fs+i-m.F0; live[i]= j>=0&&j<m.L.length ? m.L[j] : NaN; }
+    if(silentOf(live)) return { why:'the live capture saw no signal (silence or nothing in the window)', silent:true };
+    return { live };
+  };
+  cases++; if(!silentOf(new Float32Array(64)) || silentOf(sig)) miss('CONTROL: the silence test does not tell silence from the test signal');
+  let T=await liveTry(), retried=false;
+  if(T.silent){ retried=true; T=await liveTry(); }
+  cases++;
+  if(!T.live){ miss(T.why+(retried?' — twice (one retry)':'')); return { cases, total:diff.length, differences:diff }; }
+  const live=T.live;
   const cmp=X=>{ let mx=0, pk=0; for(let i=0;i<len;i++){ mx=Math.max(mx, Math.abs(live[i]-X[i])); pk=Math.max(pk, Math.abs(X[i])); } return pk>0&&Number.isFinite(mx) ? mx/pk : Infinity; };
   const e0=cmp(A), e1=cmp(Actl);
   cases++; if(!(e0<=LIVE_TOL)) miss(`Glue live vs offline differ by ${e0.toExponential(2)} of the peak (limit ${LIVE_TOL})`);
   cases++; if(!(e1>LIVE_TOL)) miss('CONTROL: an offline run with +0.5 dB makeup matched the live one — the comparison cannot fail');
-  return { cases, total:diff.length, differences:diff, notes:[`live vs offline ${e0.toExponential(2)} of peak (control ${e1.toExponential(2)})`] };
+  return { cases, total:diff.length, differences:diff, notes:[`live vs offline ${e0.toExponential(2)} of peak (control ${e1.toExponential(2)})${retried?' · the first capture saw no signal — retried once':''}`] };
 }
 
 /* ═══ SND-F1 freeze parity: Firefly + Night forest + Glue (P.checkFreezeParity, P.all only; REALTIME ≈ 8 s) ═══

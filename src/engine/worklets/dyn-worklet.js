@@ -9,7 +9,7 @@
    input, sample for sample). Our own code from published methods (core/dsp.js names them); every parameter is k-rate.
    processorOptions.keep: true for the engine's permanent nodes (master, chain modules); probes create nodes that may end.
    processorOptions.report (limit): posts { red } — the deepest gain reduction (dB, ≤ 0) of the last ≈ 50 ms — for the mixer's master strip. */
-import { compCurveDb, dynCoef, DYN_GLUE, DYN_LIMIT } from './core/dsp.js';
+import { compCurveDb, dynCoef, DYN_GLUE, DYN_LIMIT } from '../../core/dsp.js';
 
 const dB=x=>20*Math.log10(x), lin=d=>Math.pow(10, d/20);
 class Dyn extends AudioWorkletProcessor {

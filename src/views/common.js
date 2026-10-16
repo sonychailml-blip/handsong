@@ -3,7 +3,8 @@ import { HANDS } from '../gestures.js';
 import { CUR, IVX, rowLabel, listLbl, namingOf } from '../scales.js';
 import { t } from '../i18n.js';
 import { fx, fxIsScalar, fxChainOf } from '../state.js';
-import { FX_META, REV_COLOR, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX } from '../config.js';
+import { FX_META, FX_BAR_W, FX_BAR_GAP, FX_BAR_MAX } from '../config.js';
+import { cv } from '../palette.js';   // DRAW1b: canvas colours are design tokens
 import { FX_FACTORY, fxInstance, fxAimGet, FX_AMT, fxPerm } from '../audio.js';
 import { fxIsDriven } from '../recorder.js';
 
@@ -109,7 +110,7 @@ const fxBarItems=(role,key)=>{
   fxChainOf(key).forEach(eff=>{   // ЦЕПЬ ЭТОЙ РОЛИ (слайс б.1; прежде литерал 'ld' — «столбики бывают только у соло»). С б.2 зовут для ЛЮБОЙ роли (drawFxBars — у правой кромки каждой роли/половины)
     if(fxBarHidden(eff)) return;                   // VOL-2: громкость — столбик только на пальце (тот же предикат — в fxBarsMaxN выше: рисунок и габарит считают одно)
     const m=FX_META.find(q=>q.k===eff.fxId);   // МЕТАДАННЫЕ ПОКАЗА (цвет, подпись) — у трёх скаляров и у делея-модуля (в.1): его столбики остались синими
-    if(fxIsScalar(eff.fxId)){ out.push({v:fxAimGet(key,eff.fxId,FX_AMT,fx[eff.fxId]), c:m.color, l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0]), drv:fxIsDriven(key,eff.fxId,FX_AMT)}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META. O-3.1: величина — ПРИЦЕЛ руки, drv — правит ли этим адресом запись
+    if(fxIsScalar(eff.fxId)){ out.push({v:fxAimGet(key,eff.fxId,FX_AMT,fx[eff.fxId]), c:cv(m.col), l:m.label, fing:eff.params[0], play:fxParamIsPlay(eff.params[0]), drv:fxIsDriven(key,eff.fxId,FX_AMT)}); return; }   // старый скалярный — как было (у него ровно один параметр). Признак — по store (в.1), не по FX_META. O-3.1: величина — ПРИЦЕЛ руки, drv — правит ли этим адресом запись
     const mod=fxInstOf(key,eff); if(!mod) return;                                  // нет экземпляра (неизвестная запись / ещё нет AudioContext) — молча без столбика, как было при пустом реестре
     /* Идём по ИНДЕКСАМ, а не по значениям: индекс — единственное, чем дескриптор модуля (mod.params)
        связан со своим параметром в цепи (eff.params), где и лежит адрес управления.
@@ -119,7 +120,7 @@ const fxBarItems=(role,key)=>{
        разворот обязан следовать за ПАРАМЕТРОМ. На дефолтной цепи это ровно прежнее поведение. */
     const idx=(mod.params.length>1 && eff.params.some(pa=>fxParamOnFinger(pa,act))) ? mod.params.map((_,i)=>i) : [0];
     for(const i of idx){ const p=mod.params[i];
-      out.push({v:fxAimGet(key,eff.fxId,p.key,p.cur), c:m?m.color:REV_COLOR, l:p.short, fing:eff.params[i],
+      out.push({v:fxAimGet(key,eff.fxId,p.key,p.cur), c:cv(m?m.col:'fx-rev'), l:p.short, fing:eff.params[i],
                 play:fxParamIsPlay(eff.params[i]), drv:fxIsDriven(key,eff.fxId,p.key)}); }   // O-3.1: v — ПРИЦЕЛ руки (что поставил палец), drv — ведёт ли этот адрес запись. Признак ПО ПАРАМЕТРУ: у одного эффекта подмес может быть записан, а длина — нет   // REV_COLOR — исторический тон реверба; отдельного столбика REV больше нет (Пласт 3.1), реверб показывают ЕГО СОБСТВЕННЫЕ параметры: TAIL/TONE/MIX
   });
   return out;

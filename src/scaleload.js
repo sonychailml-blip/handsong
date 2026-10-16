@@ -108,6 +108,15 @@ export function checkRecord(kind, rec, D){
     return null;
   }catch(e){ return e instanceof Bad ? e.message : String(e && e.message || e); }
 }
+/* SONG1: records a song brings, checked in order (dependencies first) against the live set D plus the list's earlier records — the same
+   validator as data/ files. → null or the first reason in words. Changes nothing. */
+export function checkRecordList(list, D){
+  const O={ ...D, tunings:{ ...D.tunings }, palettes:{ ...D.palettes }, chordModeSets:{ ...D.chordModeSets }, modes:{ ...D.modes } };
+  for(const [kind,rec] of list){ if(!USER_ID.test(String(rec && rec.id))) return `${kind} «${rec && rec.id}»: a user record id must be u.<uuid>`;
+    if(kindOfRecord(rec)!==kind) return `${kind} «${rec.id}»: not a ${kind} record`;
+    const why=checkRecord(kind, rec, O); if(why) return `${kind} «${rec.id}»: ${why}`; O[sectOf(kind)][rec.id]=rec; }
+  return null;
+}
 async function addUserFiles(D, problems){
   const all=await userAll(); let ok=0;
   const skip=(e,why)=>{ problems.push({file:`user ${e.kind} ${e.id}`, why, user:true}); console.warn(`[scales] skipped user file ${e.kind} "${e.id}" — ${why}`); };

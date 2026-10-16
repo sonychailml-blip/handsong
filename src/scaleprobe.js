@@ -75,6 +75,13 @@ export { material, all, quick, orderCheck } from './probes/run.js';
 export { checkSound, checkRows, checkRowFix, checkHl, tracks, checkRules, checkScroll, checkLabels, checkSong, checkTypes, checkModes, checkPure, checkOut } from './probes/tuning.js';
 export { checkWrite, checkSeed, checkFrozen, seed, song } from './probes/seed.js';
 export { checkSongFile } from './probes/songfile.js';   // SAVE1: Save → Open round trip, old / newer / damaged files
+export { checkAutosave } from './probes/autosave.js';   // AUTOSAVE1: the song kept on the device (change → write, off, full / blocked, ring, restore)
+export { checkSongRecords } from './probes/song1.js';   // SONG1: songs carry copies of the person's own scales
+export { checkEventIds } from './probes/ids.js';   // IDS1: permanent event ids (unique, kept by edits, ↶/↷ and the file)
+export { checkPack } from './probes/pack.js';   // PACK1: offline licence keys and the pack gate, in the page's WebCrypto
+export { checkSongFile2, dumpSong } from './probes/song2.js';   // SONG2: the demo song file = its generator; the dump for data/songs/
+export { checkEngineCtx, checkCensus, dumpCensus } from './probes/engine.js';   // AUD1a: the engine context E (three times, both copies) and the node census
+export { checkFx } from './probes/fxcontract.js';   // AUD2b: generated contract rows, one per effect (round trip, identity, repeat, tail)
 export { checkSoloEdit, checkSelect, checkPaste, checkQuant, checkDegrees, checkBend, checkBendCurve, checkTrackMode, checkVolBars } from './probes/edit.js';
 export { checkUndoClear, checkHistory, checkSections } from './probes/history.js';
 export { checkMixer, checkPan, checkArrange, checkTrackLook, checkTracks } from './probes/window.js';

@@ -1,6 +1,7 @@
 /* PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX2, AR2. Moved from scaleprobe.js verbatim; rows register themselves (probes/rows.js). */
 import { masterLevel, ownerGain, setMasterLevel, masterMeter, ownerPan, AC as LIVE_AC, timbresOf } from '../audio.js';
-import { INSTR_COL, LANE_NOROLE_COL } from '../config.js';
+import { ROLE_COL as INSTR_COL, noRoleCol } from '../palette.js';   // DRAW1b: the palette from the tokens
+const LANE_NOROLE_COL=noRoleCol();
 import { loopViewProbe, loopHit, loopScroll, arrGeom, rollGeom, laneTitle, laneCol, laneDefName, stripProbe } from '../draw.js';
 import { afBegin, afTick, AF_DELAY, qRunning, afEnd } from '../frzqueue.js';
 import { L, t, withLang } from '../i18n.js';

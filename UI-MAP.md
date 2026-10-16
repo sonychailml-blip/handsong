@@ -410,6 +410,14 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
   says how many tracks, whether the file was upgraded from an older version, and which timbres this app lacks. Damaged, too large,
   newer-version or foreign files are refused with one line each; the current song is never touched by a refused file.
 - Not on the canvas, not in the arrangement window or the editor (the editor hides the top bar). The redesign may move it (UX inventory).
+- **Autosave (AUTOSAVE1, RUN 3 2026-10-16)** — in the same section under the hint: row **Autosave** with **On / Off** (default On); a
+  state line («Autosave is on…» / «Autosaved on this device at HH:MM…» / «Autosave is off…» / why it could not write); row **Earlier**
+  (a list of the last 5 autosaved songs: «name · N tracks · time») and a **Restore** button (asks before replacing unsaved work).
+- **From the song (SONG1)** — a row «From the song» with **Keep in my scales** and a line naming the scales; shown only after opening a
+  song (file or autosave) whose own scales this device did not have (they play from the song for this session); the tap stores them.
+- **«Continue where you left off?» box** (`#resumeToast`, below the bar, centred, like the undo toast): at ▶ Play (not from a lesson),
+  once, only on an empty song with autosave on and an autosave present: «… «name» · N tracks · saved HH:MM» with **Continue** and **New
+  song**; hides by itself after 30 s (the song stays in «Earlier»).
 
 ## START CARD — WHEN THE CAMERA FAILS (0b, added 2026-10-15; checked against `index.html`, `main.js`)
 - A failed start keeps the card usable: the message line says why — busy / not responding («Close Zoom and other apps…»), no camera found

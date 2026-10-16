@@ -175,3 +175,56 @@
   --z-demo:35;
   --z-help:40;
 }
+
+/* ═══ CANVAS (DRAW1b, RUN 3 2026-10-16) — the play field, the track strip, the arrangement window, the mixer and the editor draw every
+   colour through palette.cv('<name>') = the value of --cv-<name> (exact text of the literal it replaced, so the canvas parses the same
+   colour — tools/ui-snap.mjs proves the pixels identical). Names: family + alpha as above (--cv-white-a55 = white at .55). ⛳ A new canvas
+   colour is a token here first (static check 11 fails on a colour literal in src/views/ or config.js, and on a cv() name with no token). */
+:root{
+  /* ROLE PALETTE (AR2; once config.INSTR_COL): the four roles differ by LIGHTNESS, not only hue (colour-blind safe) — a ladder with an
+     equal ≈1.45× luminance step: bass #20946b (Y 0.225, L* 54.6) · chords #b18cff (0.353, 66.0) · solo #ffb050 (0.529, 77.8) · drums
+     #ffe680 (0.794, 91.4). WCAG contrast on the window background #0b0b14: 5.1 / 7.5 / 10.8 / 15.8; on a row (#141420): 4.8 / 7.0 / 10.1 /
+     14.7 (a 12-px track name needs ≥ 4.5 — met even by bass); the play strip over a bright camera (box .74 over white ≈ #4a4a52): 2.3 / 3.4 /
+     4.8 / 7.1. Bass is not made darker: below Y 0.206 the name on a row falls under 4.5:1. */
+  --cv-role-ld:#ffb050; --cv-role-ch:#b18cff; --cv-role-bs:#20946b; --cv-role-dr:#ffe680;
+  --cv-lane-norole:#9aa0b4;   /* a track without a role (a drone layer, an emptied one) — neutral grey, not another role's colour */
+  /* effect bars (config.FX_META col) and the reverb / module bar */
+  --cv-fx-dly:#4cc2ff; --cv-fx-vib:#ffb84c; --cv-fx-drv:#ff5d5d; --cv-fx-trm:#9b7bff; --cv-fx-vol:#e6e6e6; --cv-fx-glide:#ff7fc8;
+  --cv-fx-trmmix:#d4b8ff; --cv-fx-rev:#57d9a3;
+  --cv-white-rgb:255,255,255;   /* channels only: the pulsing freeze dot composes its own alpha */
+  --cv-amber-a85:rgba(255,210,63,.85); --cv-amber-a05:rgba(255,210,63,.05);
+  --cv-bg-a50:rgba(7,7,13,.5);
+  --cv-black-a22:rgba(0,0,0,.22);
+  --cv-blue-a20:rgba(140,180,255,.20);
+  --cv-chord:#b18cff;
+  --cv-cyan:#5ad1ff;
+  --cv-deep-a90:rgba(8,10,16,.9); --cv-deep-a86:rgba(8,10,16,.86);
+  --cv-gold:#ffd479; --cv-gold-a95:rgba(255,212,121,.95); --cv-gold-a45:rgba(255,212,121,.45); --cv-gold-a28:rgba(255,212,121,.28);
+  --cv-gold-a22:rgba(255,212,121,.22);
+  --cv-indigo:#3a5cff;
+  --cv-mint:#7ee0b6;
+  --cv-night-a94:rgba(10,10,20,.94); --cv-night-a85:rgba(10,10,20,.85); --cv-night-a82:rgba(10,10,20,.82); --cv-night-a74:rgba(10,10,20,.74);
+  --cv-night-a38:rgba(10,10,20,.38); --cv-night-a30:rgba(10,10,20,.30);
+  --cv-ochre:#e5a23c;
+  --cv-orange-a95:rgba(255,190,120,.95);
+  --cv-rec:#e5484d; --cv-rec-a85:rgba(229,72,77,.85); --cv-rec-a24:rgba(229,72,77,.24); --cv-rec-a16:rgba(229,72,77,.16);
+  --cv-rec-pale:#ff8a8d;
+  --cv-rec-soft:#ff6b6f;
+  --cv-saffron:#f5a524;
+  --cv-sky:#4cc2ff;
+  --cv-slate-a90:rgba(20,20,32,.9); --cv-slate-a85:rgba(20,20,32,.85);
+  --cv-slate2:#14141f;
+  --cv-tonic:#57d9a3; --cv-tonic-a70:rgba(87,217,163,.7); --cv-tonic-a55:rgba(87,217,163,.55); --cv-tonic-a50:rgba(87,217,163,.5);
+  --cv-tonic-a40:rgba(87,217,163,.40); --cv-tonic-a30:rgba(87,217,163,.30); --cv-tonic-a10:rgba(87,217,163,.10);
+  --cv-white:#fff; --cv-white-a92:rgba(255,255,255,.92); --cv-white-a90:rgba(255,255,255,.9); --cv-white-a88:rgba(255,255,255,.88);
+  --cv-white-a80:rgba(255,255,255,.8); --cv-white-a75:rgba(255,255,255,.75); --cv-white-a72:rgba(255,255,255,.72); --cv-white-a70:rgba(255,255,255,.7);
+  --cv-white-a65:rgba(255,255,255,.65); --cv-white-a62:rgba(255,255,255,.62); --cv-white-a60:rgba(255,255,255,.6); --cv-white-a55:rgba(255,255,255,.55);
+  --cv-white-a50:rgba(255,255,255,.5); --cv-white-a45:rgba(255,255,255,.45); --cv-white-a40:rgba(255,255,255,.4); --cv-white-a34:rgba(255,255,255,.34);
+  --cv-white-a30:rgba(255,255,255,.3); --cv-white-a28:rgba(255,255,255,.28); --cv-white-a26:rgba(255,255,255,.26); --cv-white-a24:rgba(255,255,255,.24);
+  --cv-white-a22:rgba(255,255,255,.22); --cv-white-a20:rgba(255,255,255,.20); --cv-white-a16:rgba(255,255,255,.16); --cv-white-a14:rgba(255,255,255,.14);
+  --cv-white-a12:rgba(255,255,255,.12); --cv-white-a11:rgba(255,255,255,.11); --cv-white-a10:rgba(255,255,255,.10); --cv-white-a09:rgba(255,255,255,.09);
+  --cv-white-a08:rgba(255,255,255,.08); --cv-white-a075:rgba(255,255,255,.075); --cv-white-a07:rgba(255,255,255,.07); --cv-white-a05:rgba(255,255,255,.05);
+  --cv-white-a042:rgba(255,255,255,.042); --cv-white-a04:rgba(255,255,255,.04); --cv-white-a035:rgba(255,255,255,.035); --cv-white-a03:rgba(255,255,255,.03);
+  --cv-white-a028:rgba(255,255,255,.028); --cv-white-a015:rgba(255,255,255,.015);
+  --cv-win:#0b0b14; --cv-win-a82:rgba(11,11,20,.82);
+}

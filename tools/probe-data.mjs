@@ -303,6 +303,7 @@ function songCore(){
   const ok={ format:SF.SONG_FORMAT, version:SF.SONG_VERSION, name:'t', settings:{ aRef:440, bpm:90, metre:4, bars:2, sub:4, quant:true, master:0.8,
       brace:{ user:false, from:0, to:4, on:false }, live:{ scaleId:'major', tonic:0, tonicCents:0, tunedFrom:'T' } },
     views:[{ mode:'major', key:0 }], timbres:{ 'chord.firefly':{ role:'ch', name:'Firefly', def:{ id:'chord.firefly' } } },
+    records:{ tuning:{ 'u.5013a000-0000-4000-8000-0000000000aa':{ format:'handsong/tuning', version:1, id:'u.5013a000-0000-4000-8000-0000000000aa' } } },
     tracks:[{ layer:0 }], takes:[{ tk:1, kinds:{}, chains:{}, lane:[] }], marks:[{ id:1, beat:0, name:'A' }],
     events:[{ t:0, layer:0, fn:'chOn', a:{ ti:0, oct:1, vol:0.5, inst:'chord.firefly' }, v:0, sev:false, tk:1 }, { t:1, layer:0, fn:'chOff', a:{}, v:0, sev:false, tk:1 }] };
   const txt=JSON.stringify(ok);
@@ -320,6 +321,10 @@ function songCore(){
   { const v1=JSON.parse(txt); v1.version=1; delete v1.timbres; v1.events[0].a.inst=16; v1.events.push({ t:2, layer:0, fn:'drum', a:{ row:0, vol:0.5, kit:2 }, v:-1, sev:false, tk:1 });
     const keep=JSON.stringify(v1), u=SF.songUpgrade(v1), u2=SF.songUpgrade(JSON.parse(JSON.stringify(u)));
     eq('v1 → v2: positions → ids (frozen TIM1 table)', [u.version, u.events[0].a.inst, u.events[2].a.kit], [SF.SONG_VERSION, 'chord.firefly', 'kit.tabla']);
+    { const v3={ ...JSON.parse(txt), version:3 }, u3=SF.songUpgrade(v3); eq('v3 → v4 → v5 (IDS1): nothing rewritten, the version raised', [u3.version, JSON.stringify(u3.events), JSON.stringify(u3.takes)], [SF.SONG_VERSION, JSON.stringify(v3.events), JSON.stringify(v3.takes)]); }
+    { const w=JSON.parse(txt); w.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:1 }, { t:1, key:'role:ch', fx:'reverb', p:'mix', v:0.4, id:2 }]; eq('IDS1 part 2: lane points with fresh ids pass the check', SF.songCheck(w), []); }
+    { const w=JSON.parse(txt); w.events[0].id=1; w.events[1].id=2; eq('IDS1: events with fresh ids pass the check (CONTROL: not over-strict)', SF.songCheck(w), []); }
+    eq('v2 → v3 (SONG1): records kept, or an empty set where an older file had none', [JSON.stringify(u.records), JSON.stringify(SF.songUpgrade({ ...JSON.parse(txt), version:2, records:undefined }).records)], [JSON.stringify(v1.records), '{}']);
     eq('the upgrade is idempotent', JSON.stringify(u2), JSON.stringify(u));
     eq('the upgrade leaves its input untouched', JSON.stringify(v1), keep);
     eq('an upgraded record passes the check', SF.songCheck(u), []);
@@ -328,8 +333,90 @@ function songCore(){
   const dmg=[['an event on a missing track', r=>{ r.events[0].layer=7; }], ['a timbre stored as a number', r=>{ r.events[0].a.inst=3; }],
     ['a volume above 1', r=>{ r.events[0].a.vol=2; }], ['a view index out of range', r=>{ r.events[0].v=5; }], ['tempo 0', r=>{ r.settings.bpm=0; }],
     ['a brace that ends before it starts', r=>{ r.settings.brace.from=8; }], ['an unknown event kind', r=>{ r.events[0].fn='eval'; }],
-    ['a take number 0', r=>{ r.takes[0].tk=0; }], ['A4 of 1000 Hz', r=>{ r.settings.aRef=1000; }], ['a track twice', r=>{ r.tracks.push({ layer:0 }); }]];
+    ['a take number 0', r=>{ r.takes[0].tk=0; }], ['A4 of 1000 Hz', r=>{ r.settings.aRef=1000; }], ['a track twice', r=>{ r.tracks.push({ layer:0 }); }],
+    ['SONG1: no records set', r=>{ delete r.records; }], ['SONG1: a record kind that does not exist', r=>{ r.records.script={}; }],
+    ['SONG1: a copy under a built-in id', r=>{ r.records.tuning={ edo12:{ format:'handsong/tuning', version:1, id:'edo12' } }; }],
+    ['SONG1: a copy whose id differs from its key', r=>{ r.records.tuning['u.5013a000-0000-4000-8000-0000000000aa'].id='u.5013a000-0000-4000-8000-0000000000ab'; }],
+    ['SONG1: a copy of the wrong kind', r=>{ r.records.tuning['u.5013a000-0000-4000-8000-0000000000aa'].format='handsong/mode'; }],
+    ['IDS1: two events with one id', r=>{ r.events[0].id=7; r.events[1].id=7; }], ['IDS1: an event id that is not a positive integer', r=>{ r.events[0].id=-1; }],
+    ['IDS1 part 2: two lane points with one id', r=>{ r.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:3 }, { t:1, key:'role:ch', fx:'reverb', p:'mix', v:0.4, id:3 }]; }],
+    ['IDS1 part 2: a lane point id that is not an integer', r=>{ r.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:1.5 }]; }]];
   for(const [what,mut] of dmg){ n++; const r=JSON.parse(txt); mut(r); if(!SF.songCheck(r).length) d.push(`damage not caught: ${what}`); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* AUD1c + AUD2a / review R2: the timbre data and the effect declarations moved into the shared engine submodules (src/modules/, src/engine/) are PURE DATA — numbers, strings,
+   booleans, plain arrays and objects (no node, buffer, port or function), deep-frozen (a write would throw in BOTH engine copies, which
+   share these modules). The modules load in node: nothing at their top level touches Web Audio (rule #38). CONTROLS: a table holding a
+   function and an unfrozen table must both be caught. */
+async function timbreData(){
+  const d=[]; let n=0;
+  const imp=f=>import(new URL('../src/modules/timbres/'+f, import.meta.url).href);
+  const pure=(x,path,out)=>{ if(x===null || ['number','string','boolean'].includes(typeof x)) return;
+    if(typeof x!=='object'){ out.push(`${path}: a ${typeof x}`); return; }
+    const pr=Object.getPrototypeOf(x); if(pr!==Object.prototype && pr!==Array.prototype){ out.push(`${path}: a ${x.constructor && x.constructor.name}`); return; }
+    if(!Object.isFrozen(x)) out.push(`${path}: not frozen`);
+    for(const k of Object.keys(x)) pure(x[k], path+'.'+k, out); };
+  const M={}; for(const f of ['stages.js','voice.js','fm.js','ks.js','subtractive.js','chord-voice.js','bass-voice.js','drumkits.js']){ n++;
+    try{ M[f]=await imp(f); }catch(e){ d.push(`${f} does not load in node (a top-level Web Audio use?): ${e && e.message}`); } }
+  for(const f of ['param.js','reverb.js','delay.js','trem-mix.js','bright.js','glide.js','volume.js','forest.js','glue.js']){ n++;   // AUD2a: the effects
+    try{ M['fx/'+f]=await import(new URL('../src/modules/effects/'+f, import.meta.url).href); }catch(e){ d.push(`effects/${f} does not load in node: ${e && e.message}`); } }
+  n++; try{ M['fdn']=await import(new URL('../src/engine/fdn.js', import.meta.url).href); }catch(e){ d.push(`engine/fdn.js does not load in node: ${e && e.message}`); }
+  for(const [f,name] of [['ks.js','KS_BANKS'],['chord-voice.js','FIREFLY'],['stages.js','BRI_HZ'],['fdn','REV_A'],['fx/reverb.js','REV_PARAMS'],['fx/delay.js','DLY_A'],
+      ['fx/delay.js','DLY_PARAMS'],['fx/trem-mix.js','TRMIX_A'],['fx/trem-mix.js','TRMIX_PARAMS'],['fx/bright.js','BRIGHT_PARAMS'],['fx/glide.js','GLIDE_PARAMS'],
+      ['fx/volume.js','VOL_PARAMS'],['fx/forest.js','FOREST_PARAMS'],['fx/glue.js','GLUE_PARAMS']]){ n++; const v=M[f] && M[f][name];
+    if(!v){ d.push(`${f}: ${name} missing`); continue; } const out=[]; pure(v,name,out); d.push(...out); }
+  { n++; const out=[]; pure(Object.freeze([Object.freeze({ f:()=>1 })]),'ctl',out); if(!out.length) d.push('CONTROL: a function inside a table was not caught'); }
+  { n++; const out=[]; pure([{ a:1 }],'ctl2',out); if(!out.length) d.push('CONTROL: an unfrozen table was not caught'); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* PACK1: packs and offline licence keys (src/core/pack.js) — node's WebCrypto, no network. The SHIPPED test public key verifies the committed
+   fixture keys (tools/pack-test-licence.json, signed by the git-ignored test private key); a fresh key pair made here signs the tamper cases:
+   a changed payload, a changed signature, an unknown key id, a newer key format, an expired key, a key for another pack — each refused in
+   words; malformed texts refused; the gate keeps a pack's records out of a registry's order until the pack is unlocked; a free pack opens
+   without a key. CONTROLS: a valid key must PASS (a verifier refusing everything cannot pass the refusal cases); a gate that never locks
+   must be caught by the «locked before unlock» case. */
+async function packCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
+  const K=await import(new URL('../src/core/pack.js', import.meta.url).href), REG=await import(new URL('../src/core/registry.js', import.meta.url).href);
+  const F=JSON.parse(await readFile(new URL('./pack-test-licence.json', import.meta.url),'utf8')), today='2026-10-16';
+  eq('the fixture pack passes the check', K.packCheck(F.pack), []);
+  eq('a newer pack version is refused in words', K.packCheck({ ...F.pack, version:2 }).some(x=>/newer Handsong/.test(x)), true);
+  eq('an item outside its pack is refused', K.packCheck({ ...F.pack, items:[{ kind:'timbre', id:'other/x' }] }).length>0, true);
+  eq('an item named twice is refused', K.packCheck({ ...F.pack, items:[F.pack.items[0], F.pack.items[0]] }).length>0, true);
+  /* the shipped TEST public key verifies the fixture keys */
+  { const v=await K.keyVerify(F.key,{ today }); eq('the fixture key verifies with the shipped test key (CONTROL: a valid key passes)', [v.ok, v.pack], [true, 'test-pack']); }
+  eq('the fixture key for another pack verifies — for that pack', (await K.keyVerify(F.otherPackKey,{ today })).pack, 'other-pack');
+  eq('an expired fixture key is refused', (await K.keyVerify(F.expiredKey,{ today })).why, 'expired');
+  /* a fresh pair for tamper cases */
+  const kp=await crypto.subtle.generateKey({ name:'ECDSA', namedCurve:'P-256' }, true, ['sign','verify']);
+  const spki=Buffer.from(await crypto.subtle.exportKey('spki', kp.publicKey)).toString('base64'), pub={ t:spki };
+  const base={ v:K.KEY_FORMAT, kid:'t', pack:'test-pack', key:'k-1', issued:'2026-10-16' };
+  const good=await K.keySign(base, kp.privateKey);
+  eq('a fresh key verifies with its public key', (await K.keyVerify(good,{ pubkeys:pub, today })).ok, true);
+  eq('a key signed by another issuer under the test key id is refused by the shipped key', (await K.keyVerify(await K.keySign({ ...base, kid:'test' }, kp.privateKey),{ today })).why, 'signature');
+  { const [h,p,s]=good.split('.'); const P=JSON.parse(Buffer.from(p.replace(/-/g,'+').replace(/_/g,'/'),'base64').toString()); P.pack='free-loot';
+    const p2=Buffer.from(JSON.stringify(P)).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    eq('a changed payload is refused (signature)', (await K.keyVerify(`${h}.${p2}.${s}`,{ pubkeys:pub, today })).why, 'signature');
+    const s2=(s[0]==='A'?'B':'A')+s.slice(1);
+    eq('a changed signature is refused (signature)', (await K.keyVerify(`${h}.${p}.${s2}`,{ pubkeys:pub, today })).why, 'signature'); }
+  eq('an unknown key id is refused', (await K.keyVerify(await K.keySign({ ...base, kid:'nobody' }, kp.privateKey),{ pubkeys:pub, today })).why, 'unknownKey');
+  eq('a newer key format is refused', (await K.keyVerify(await K.keySign({ ...base, v:2 }, kp.privateKey),{ pubkeys:pub, today })).why, 'format');
+  eq('another key prefix is refused (format)', (await K.keyVerify(good.replace(/^HS1/,'HS2'),{ pubkeys:pub, today })).why, 'format');
+  eq('an expired key is refused', (await K.keyVerify(await K.keySign({ ...base, until:'2026-10-15' }, kp.privateKey),{ pubkeys:pub, today })).why, 'expired');
+  eq('a key valid until today passes', (await K.keyVerify(await K.keySign({ ...base, until:'2026-10-16' }, kp.privateKey),{ pubkeys:pub, today })).ok, true);
+  for(const [w,t] of [['empty',''],['garbage','hello'],['two parts','HS1.abc'],['bad base64','HS1.@@@.###'],['not JSON',`HS1.${Buffer.from('nope').toString('base64')}.${good.split('.')[2]}`]])
+    eq(`malformed (${w}) is refused`, (await K.keyVerify(t,{ pubkeys:pub, today })).why, 'malformed');
+  /* the gate and the registry */
+  const G=K.createPackGate(), R=REG.createRegistry('timbre',{ gate:G });
+  R.add({ id:'solo.supersaw' },{ builtin:true }); R.add({ id:'test-pack/glass-bell' });
+  eq('a pack record is out of the order while its pack is locked', [R.order(), R.isLocked('test-pack/glass-bell'), !!R.get('test-pack/glass-bell')], [['solo.supersaw'], true, true]);
+  eq('a key for another pack does not unlock it', (await K.packUnlock(G, F.pack, F.otherPackKey,{ today })).why, 'wrongPack');
+  eq('a tampered key does not unlock it', (await K.packUnlock(G, F.pack, F.key.slice(0,-2)+(F.key.endsWith('A')?'BB':'AA'),{ today })).ok, false);
+  eq('the right key unlocks it', [(await K.packUnlock(G, F.pack, F.key,{ today })).ok, R.order(), R.isLocked('test-pack/glass-bell')], [true, ['solo.supersaw','test-pack/glass-bell'], false]);
+  { const G2=K.createPackGate(); eq('a free pack opens without a key', [(await K.packUnlock(G2, { ...F.pack, licence:false }, null)).ok, G2.unlocked('test-pack')], [true, true]); }
+  /* CONTROL: a gate that never locks must be caught by the locked case */
+  { const R2=REG.createRegistry('timbre',{ gate:{ usable:()=>true } }); R2.add({ id:'test-pack/glass-bell' }); n++;
+    if(!R2.order().includes('test-pack/glass-bell')) d.push('CONTROL: a gate that never locks hid the record — the locked check cannot tell'); }
   return { cases:n, total:d.length, differences:d };
 }
 let REG;
@@ -363,6 +450,8 @@ const ROWS=[
   ['GES1 gesture features (core)', ()=>gesCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['UI1b icons (core)',          ()=>iconCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['SAVE1 song file (core)',     ()=>songCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['AUD1c/AUD2a engine data pure (core)', ()=>timbreData(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['PACK1 packs and licence keys (core)', ()=>packCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

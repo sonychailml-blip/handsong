@@ -324,6 +324,34 @@ async function uiSongFile(page, label){
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
+/* AUTOSAVE1 — the real thing at the END of a session: the seed song is autosaved by the app's own timer (the probe's hold released),
+   the page is RELOADED, ▶ Play pressed again → the «Continue where you left off?» box must offer it; «Continue» → the same song. */
+async function uiAutosave(page, label){
+  const lines=[], bad=[];
+  const pre=await page.evaluate(async ()=>{ const A=await import('./src/autosave.js'), RUN=await import('./src/probes/run.js');
+    A.asPause('probe-song', false); A.asSetEnabled(true); return { print:RUN.songPrint() }; });
+  let I=null; const t0=Date.now();
+  for(let i=0;i<60;i++){ I=await page.evaluate(async ()=>{ const A=await import('./src/autosave.js'); return A.asInfo(); }); if(I.n>0 && !I.pending) break; await page.waitForTimeout(500); }
+  if(!(I && I.n>0 && !I.pending)){ bad.push(`the app's own timer did not autosave the song within 30 s (${JSON.stringify(I)})`); return { pass:false, lines:bad.map(b=>`${label}: NOT A PASS — ${b}`) }; }
+  lines.push(`the app autosaved the song by itself after ${((Date.now()-t0)/1000).toFixed(1)} s (write ${I.lastMs} ms)`);
+  await page.reload();
+  await within(page.waitForFunction(()=>window.P && window.R, null, { timeout:0 }), 60e3, 'reloading the app');
+  await page.click('#startBtn');
+  await within(page.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:0 }), LIMIT_START, 'the app start after the reload');
+  const shown=await page.waitForFunction(()=>document.getElementById('resumeToast').classList.contains('on'), null, { timeout:10000 }).then(()=>true, ()=>false);
+  const q=await page.evaluate(()=>document.getElementById('resumeText').textContent);
+  if(!shown){ bad.push('after the reload ▶ Play offered nothing'); }
+  else {
+    const empty=await page.evaluate(async ()=>{ const REC=await import('./src/recorder.js'); return REC.events.length; });
+    if(empty) bad.push(`the song was loaded BEFORE the answer (${empty} events)`); else lines.push(`after the reload ▶ Play asks «${q}» and the song stays empty until the answer`);
+    await page.click('#resumeYes'); await page.waitForTimeout(1500);
+    const a=await page.evaluate(async ()=>{ const RUN=await import('./src/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
+    if(a.print!==pre.print) bad.push(`«Continue» gave a different song (${pre.print} → ${a.print})`);
+    else lines.push(`«Continue» → the same song (${a.print}), message «${a.msg}»`);
+  }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
 /* ---------- срок ---------- */
 function within(p, ms, what){ let t; return Promise.race([ p.finally(()=>clearTimeout(t)), new Promise((_,rej)=>{ t=setTimeout(()=>rej(new Error(`TIME LIMIT — ${what} did not finish within ${Math.round(ms/1000)} s`)), ms); }) ]); }
 
@@ -460,6 +488,11 @@ async function session(port, plan, label){
       out(`[${label}] network (PRIV1, LAT2): ${N.n} request(s) of the page and its workers (${N.workers} worker(s) started${N.workerUrls.length?': '+[...new Set(N.workerUrls)].join(', '):''}) — ${N.bad.length?N.bad.length+' OUTSIDE the own origin and the MediaPipe paths: '+N.bad.slice(0,5).join(', '):'all to the own origin or the MediaPipe paths'} · control (a worker asking an unlisted host) ${N.ctl?'caught':'NOT CAUGHT'} → ${N.pass?'PASS':'NOT A PASS'}`); }
     { const C=res.csp; C.pass=C.meta && !C.list.length && C.blocked && C.ctl;
       out(`[${label}] CSP (PRIV1): policy ${C.meta?'present':'MISSING'} · ${C.list.length} violation(s) during the run${C.list.length?' — '+C.list.slice(0,5).map(x=>`${x.dir} ${x.uri} (${x.src}:${x.line})`).join('; '):''} · control fetch to https://example.com ${C.blocked&&C.ctl?'refused by connect-src':'NOT REFUSED ('+(C.err||'it went out')+')'} → ${C.pass?'PASS':'NOT A PASS'}`); }
+    if(!has('--no-ui') && res.ui){   // AUTOSAVE1: reload → «Continue?» → the same song (last: it reloads the page)
+      const ua=await within(uiAutosave(page, `[${label}] UI autosave`), LIMIT_START+120e3, 'the autosave UI check').catch(e=>({ pass:false, lines:[`[${label}] UI autosave: ERROR — ${e&&e.message||e}`] }));
+      for(const l of ua.lines) out(l);
+      res.ui={ pass:res.ui.pass&&ua.pass, lines:[...res.ui.lines, ...ua.lines] };
+    }
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
   finally{
     // resume the watcher (bounded: a page stuck past a time limit must not keep the browser alive), then close
@@ -526,7 +559,7 @@ for(const s of sessions){
     if(!r.pass) pass=false;
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
-  if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
+  if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;

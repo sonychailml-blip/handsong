@@ -41,7 +41,15 @@ const takeFx=new Map();
    ⛔ ЭТО НЕ schedInvalidate И РЯДОМ С НИМ НЕ СТОИТ: захват — не события (правило #28), у него своя
    лента, свой курсор и вот эта своя точка сброса. Смешаешь — захват станет источником событий. */
 let takeFxVer=0;
-const takeFxTouch=()=>{ takeFxVer++; };
+/* ⛳ IDS1 part 2 (RUN 3): every captured LANE POINT has a permanent id `p.id` (a positive integer, unique in its song) — given at the one
+   capture-change hook (takeFxTouch: every lane edit, take end and song open calls it), kept by edits that keep the object and by ↶/↷ (the
+   same objects come back) and by the song file; a new point (a capture sample, a hand-placed point, a section copy) gets the next number.
+   The other two identities need no new field: a capture record is its TAKE NUMBER (`tk`), a chain entry is (its chain key, its effect id)
+   — an effect appears at most once in a chain. */
+let laneIdN=0;
+function laneIdFill(){ for(const rec of takeFx.values()) for(const p of rec.lane||[]) if(!(p.id>0)) p.id=++laneIdN; }
+const laneIdFloor=n=>{ if(n>laneIdN) laneIdN=n; };
+const takeFxTouch=()=>{ laneIdFill(); takeFxVer++; };
 const FX_CHAIN='#chain';   // ⚠️ ЗАРЕЗЕРВИРОВАННЫЙ id записи состава. Решётка не может встретиться в настоящем fxId (те — идентификаторы), поэтому столкнуться не с чем
 /* ═══ ГЛАДКАЯ АВТОМАТИЗАЦИЯ ШИННЫХ ПАРАМЕТРОВ — ОДИН ЗАКОН ИНТЕРПОЛЯЦИИ ═══
    ⛳ ФОРМА ЖИВЁТ НА ТОЧКЕ И ОПИСЫВАЕТ ОТРЕЗОК, КОТОРЫЙ В НЕЁ ВХОДИТ (поле sh точки ленты). ТРИ значения:
@@ -132,4 +140,4 @@ function captureInfoOf(layer){
   return { takes:tks.size, role, fx:[...ids], pts };
 }
 
-export { takeNext, takeSeqFloor, takeFx, takeFxVer, takeFxTouch, FX_CHAIN, setAutRecSmooth, autSmoothOf, fxLaneSmooth, fxLaneAt, fxLaneExpand, laneRoleOf, laneChainKey, captureInfoOf };
+export { takeNext, takeSeqFloor, takeFx, takeFxVer, takeFxTouch, laneIdFill, laneIdFloor, FX_CHAIN, setAutRecSmooth, autSmoothOf, fxLaneSmooth, fxLaneAt, fxLaneExpand, laneRoleOf, laneChainKey, captureInfoOf };

@@ -25,6 +25,14 @@ const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
 const evSeq=new WeakMap(); let evSeqN=0;
 function evSeqFill(){ for(const e of events) if(!evSeq.has(e)) evSeq.set(e,++evSeqN); }
 const evOrder=(x,y)=> x.t-y.t || (evSeq.get(x)||Infinity)-(evSeq.get(y)||Infinity) || 0;
+/* ⛳ IDS1 (RUN 3, 2026-10-16; rule #37): every event of the song has a PERMANENT id — a positive integer stored ON the event (`e.id`), unique
+   in its song, kept by every edit that keeps the object (moves, payload changes, ↶/↷ put the same objects back) and by the song file; a
+   new object (a recorded note, an insert, a paste, a copy, a dissolved chord note) gets the next number. Given at the one rebase point
+   (schedInvalidate — every path that changes the event set calls it, rule #28), in array order; a song opened from a file keeps its ids and
+   the counter continues above them (evIdFloor). Never reused within a session. */
+let evIdN=0;
+function evIdFill(){ for(const e of events) if(!(e.id>0)) e.id=++evIdN; }
+const evIdFloor=n=>{ if(n>evIdN) evIdN=n; };
 
 /* ---- the generation and the one rebase point ---- */
 /* ⛳ ПОКОЛЕНИЕ СОСТАВА СОБЫТИЙ (A1) — счётчик, который поднимает ТОЛЬКО schedInvalidate. Читает его ровно
@@ -41,7 +49,7 @@ const invalidateFns=[];
 const onInvalidate=fn=>{ invalidateFns.push(fn); };
 /* REC2: every rebase also fixes the SORTED PREFIX [0, sortedN) — the whole array (callers sort first, rule #28); a running take appends its
    unsorted tail after it without a rebase. The recorder's cursors read the same boundary (cursN). */
-function schedInvalidate(){ evGen++; sortedN=events.length; for(const fn of invalidateFns) fn(); }
+function schedInvalidate(){ evIdFill(); evGen++; sortedN=events.length; for(const fn of invalidateFns) fn(); }   // IDS1: new events get their ids first
 const sortedLen=()=>Math.min(sortedN,events.length);
 /* ⛳ УПЛОТНЕНИЕ НА МЕСТЕ вместо splice-в-цикле. Прежде и onUndo, и clearJam удаляли событие за
    событием: каждый splice сдвигает ВЕСЬ хвост, поэтому снятие 10 000 событий из 30 000 — это сотни
@@ -59,4 +67,4 @@ function compactEvents(drop){
   return removed;
 }
 
-export { events, evGen, schedInvalidate, onInvalidate, sortedLen, compactEvents, evSeq, evSeqFill, evOrder, maxLayer, evRole, chaseRole, isNoteStart };
+export { events, evGen, schedInvalidate, onInvalidate, sortedLen, compactEvents, evSeq, evSeqFill, evOrder, evIdFill, evIdFloor, maxLayer, evRole, chaseRole, isNoteStart };

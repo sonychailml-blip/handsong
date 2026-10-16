@@ -1,0 +1,33 @@
+{
+ "meta": {
+  "format": "handsong/node-census",
+  "version": 1,
+  "made": "2026-10-16T11:10:44.781Z",
+  "file": "tools/census.print.json",
+  "chains": "{\"role:ld\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]},{\"fxId\":\"reverb\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"y\",\"inv\":false},{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"x\",\"inv\":false},{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"z\",\"inv\":false}]},{\"fxId\":\"dly\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":1,\"axis\":\"y\",\"inv\":false},{\"mode\":\"fixed\"},{\"mode\":\"fixed\"}]},{\"fxId\":\"drv\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":2,\"axis\":\"y\",\"inv\":false}]},{\"fxId\":\"vib\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":3,\"axis\":\"y\",\"inv\":false}]}],\"role:ch\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]},{\"fxId\":\"reverb\",\"params\":[{\"mode\":\"fixed\"},{\"mode\":\"fixed\"},{\"mode\":\"fixed\"}]},{\"fxId\":\"bright\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"z\",\"inv\":true}]}],\"role:bs\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]}],\"role:dr\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]}]}"
+ },
+ "counts": {
+  "init": {
+   "DynamicsCompressor": 1,
+   "Gain": 258,
+   "Analyser": 1,
+   "BiquadFilter": 61,
+   "Delay": 24,
+   "ChannelMerger": 29,
+   "ChannelSplitter": 2,
+   "Oscillator": 54,
+   "WaveShaper": 2,
+   "Buffer": 1
+  },
+  "play": {
+   "ConstantSource": 23,
+   "Gain": 679,
+   "WaveShaper": 23,
+   "ChannelMerger": 57,
+   "BiquadFilter": 120,
+   "Oscillator": 154,
+   "Worklet:ks-string": 7,
+   "BufferSource": 15
+  }
+ }
+}

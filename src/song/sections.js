@@ -147,7 +147,7 @@ function secPlan(kind,a,b){
       for(const q of r.lane){ const t2=secIns(q.t,p,L,false); if(t2!==q.t) lanes.push({ kind:'autmove', pt:q, from:{t:q.t,v:q.v}, to:{t:t2,v:q.v} }); }
       for(const [k,q0] of starts) if(Math.abs(q0.t-a)>SEC_E){ const s=secLaneVal(r,q0.key,q0.fx,q0.p,a);
         if(s) lanes.push({ kind:'autins', lane:r.lane, pt:{ ...s, t:b, sh:'h' } }); }
-      for(const q of inR) lanes.push({ kind:'autins', lane:r.lane, pt:{ ...q, t:q.t+L } }); }
+      for(const q of inR) lanes.push({ kind:'autins', lane:r.lane, pt:(({ id, ...c })=>({ ...c, t:q.t+L }))(q) }); }   // IDS1: a copy is a NEW point — never its original's id
     if(lanes.some(u=>u.lane===r.lane || r.lane.includes(u.pt))) lt.add(tk);
   }
   /* the steps: moves (one per event, final beat and payload), removed, created, lanes, brace, markers, backing lengths, touched tracks */

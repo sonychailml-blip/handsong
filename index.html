@@ -110,6 +110,8 @@
 <div id="camMsg"></div>
 <!-- ED7-fix2: after ✕ — "Song cleared" with an Undo button inside, for several seconds (ui.showUndoToast) -->
 <div id="undoToast" role="status"><span data-i18n="hist.clearedToast">Song cleared</span><button id="undoToastBtn" data-i18n="hist.undoBtn">Undo</button></div>
+<!-- AUTOSAVE1: at ▶ Play, when an autosaved song exists and the song is empty — never loaded without this answer (ui.songResumeOffer) -->
+<div id="resumeToast" role="dialog"><span id="resumeText"></span><button id="resumeYes" data-i18n="as.resume.yes">Continue</button><button id="resumeNo" data-i18n="as.resume.no">New song</button></div>
 
 <!-- Выбор подложки: крошечное меню под кнопкой 🎵. Открывается ТОЛЬКО с покоя (первый тап), дальше
      кнопка переключает варианты внутри выбранного пути одним тапом, как раньше. Долгий тап по 🎵 —
@@ -417,7 +419,15 @@
     <div class="prow"><label data-i18n="song.name">Name</label><input type="text" id="songName" maxlength="120" autocomplete="off" spellcheck="false"></div>
     <div class="prow"><label></label><div class="seg"><button id="songSave" data-i18n="song.save">Save</button><button id="songOpen" data-i18n="song.open">Open…</button></div></div>
     <input type="file" id="songFile" accept=".handsong,application/json" hidden>
+    <!-- SONG1: scales a song brought this session (from its own copies), not in the person's list yet -->
+    <div class="prow" id="songKeepRow" hidden><label data-i18n="song.keepRow">From the song</label><div class="seg"><button id="songKeep" data-i18n="song.keep">Keep in my scales</button></div></div>
+    <p class="phint" id="songKeepHint" hidden></p>
     <p class="phint" data-i18n="song.hint">Save writes the whole song to a file on this device; Open reads one back. Nothing is uploaded.</p>
+    <!-- AUTOSAVE1: the song kept on this device by itself (autosave.js; ui.js) — the switch, its state, earlier autosaves -->
+    <div class="prow"><label data-i18n="as.label">Autosave</label><div class="seg"><button id="asOn" data-i18n="as.on">On</button><button id="asOff" data-i18n="as.off">Off</button></div></div>
+    <p class="phint" id="asStatus"></p>
+    <div class="prow"><label data-i18n="as.earlier">Earlier</label><select id="asPick" data-i18n-title="as.pickTitle" title="Restore an earlier autosave"></select></div>
+    <div class="prow"><label></label><div class="seg"><button id="asRestore" data-i18n="as.restore">Restore</button></div></div>
     <div class="psep" data-i18n="panel.loop.sepLoop">Песня</div>
     <div class="prow"><label data-i18n="panel.loop.length">Длина подложки (такты)</label>
       <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus" data-icon="plus"></button></div>

@@ -1,5 +1,5 @@
 /* PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost. Moved from scaleprobe.js verbatim; rows register themselves (probes/rows.js). */
-import { fxSnapshot, AC as LIVE_AC, chainStateOf, routeOfOwner, ownerGain, ownerPan, masterLevel, chordHold, fxParamKeysOf, fxPlaySet } from '../audio.js';
+import { fxSnapshot, fxInstance, AC as LIVE_AC, chainStateOf, routeOfOwner, ownerGain, ownerPan, masterLevel, chordHold, fxParamKeysOf, fxPlaySet } from '../audio.js';
 import { afActive, qRank, qBegin, qStep, qRunning, qAdd, qCostOf, qCostSet, qState, qEnd, afTick, afBegin, AF_DELAY, afHint, afEnd } from '../frzqueue.js';
 import { L } from '../i18n.js';
 import { KEEP_MAX, PRINT_MAX } from '../probedata.js';
@@ -468,7 +468,10 @@ export async function checkLiveIsolation(){
     const r=JSON.stringify(vs.map(v=>[+v.tg.gain.value.toFixed(5), +v.pan.l.gain.value.toFixed(5), +v.pan.r.gain.value.toFixed(5), v.rt?+v.rt.rL.gain.value.toFixed(5):null, v.rt?+v.rt.rT.gain.value.toFixed(5):null]));
     WchOff('latch'); await sleep(80); return r; };
   const mixOf=k=>{ const st=chainStateOf(k); const r=st.vals.reverb; return r ? r[fxParamKeysOf('reverb').indexOf('mix')] : null; };
-  const keep={ pan:lanePanOf(C), rgn:regionOn(), liveMix:mixOf(LK) };
+  /* RUN 3: the live mix is kept and restored EXACTLY (chainStateOf rounds to 6 digits — restoring that left the live chord reverb mix
+     5e-7 off for every later row; the SONG2 row saw it) */
+  const exactMix=k=>{ const st=chainStateOf(k); if(!st.vals.reverb) return null; const p=fxInstance(k,'reverb').params.find(q=>q.key==='mix'); return p ? p.cur : mixOf(k); };
+  const keep={ pan:lanePanOf(C), rgn:regionOn(), liveMix:exactMix(LK) };
   let frozeC=false, ptAdded=false, hist=null, mix=null;
   const play=async(ms)=>{ seekTo(Math.max(0,tl-1)); onLoop(); await sleep(ms); };
   const stop=async()=>{ if(loop.on) onLoop(); await sleep(60); };
@@ -539,7 +542,8 @@ export async function checkLiveIsolation(){
     if(mix){ for(const [ly,v] of mix.lv) setLaneLevel(ly,v); for(const [ly,v] of mix.pn) setLanePan(ly,v);
       if(armedLayer()!==mix.arm){ if(armedLayer()!=null) toggleArm(armedLayer()); if(mix.arm!=null) toggleArm(mix.arm); } }
     if(lanePanOf(C)!==keep.pan) setLanePan(C,keep.pan);
-    if(mixOf(LK)!==keep.liveMix && keep.liveMix!=null) fxPlaySet(LK,'reverb','mix',keep.liveMix);
+    if(exactMix(LK)!==keep.liveMix && keep.liveMix!=null) fxPlaySet(LK,'reverb','mix',keep.liveMix);
+    cases++; if(keep.liveMix!=null && exactMix(LK)!==keep.liveMix) miss(`the live chord reverb mix is ${exactMix(LK)} after the row, not exactly ${keep.liveMix}`);
     if(keep.rgn && !regionOn()) setRegionOn(true);
     if(freezeState(C)!=='none') unfreezeLayer(C);
   }

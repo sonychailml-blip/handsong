@@ -3,13 +3,14 @@ import { video, initDetector, startCamera, setHandsSink, pollFrame } from './vis
 import { processHands } from './gestures.js';
 import { drawVideoBackground, syncViewRect, drawOverlays } from './draw.js';
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
-import { $, revealBar } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
+import { $, revealBar, songResumeOffer } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: демо «путешествие по строям» (без камеры). Его КНОПКИ на старте БОЛЬШЕ НЕТ — demo.js вешает обработчик защитно (if(db)), сам код жив и ждёт переезда внутрь обучения
 import { openLessons, wireStarter } from './tutor.js';   // обучение: «Обучение» открывает список уроков; выбор урока сам поднимает приложение через startApp
 import { t } from './i18n.js';
 import { loadReport } from './scales.js';   // F5: итог загрузки файлов данных ладов — известие на стартовой карточке
 import { rollOpen, arrOpen } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
 import { latStart, latFrame, latHands, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
+import { asStart } from './autosave.js';   // AUTOSAVE1: the song kept on this device by itself
 
 /* =====================================================================
    HANDSONG — жестовый синтезатор + интерактивный учебник ладов
@@ -134,6 +135,7 @@ async function startApp(){
     started=true;
     loop();
     latStart();                              // LAT1: the latency meter starts with the camera and the audio
+    asStart();                               // AUTOSAVE1: the autosave poll (writes only after a change has settled)
     import('./render.js').catch(e=>console.warn('[autoFreeze] render.js failed to load', e));   // AF3: auto-freeze (watcher + queue) lives behind render.js — loaded once the engine runs
     return true;
   }catch(err){
@@ -152,8 +154,8 @@ if(new URLSearchParams(location.search).has('probe')){
   import('./userfiles.js').then(m=>{ window.U=m; }).catch(e=>console.warn('[probe] userfiles failed to load', e));   // F6: файлы пользователя из консоли
 }
 wireStarter(startApp);                                                       // урок/«Свободная игра» поднимают приложение этим (правило #1: старт зовётся в клике выбора)
-$('startBtn').onclick=()=>{ startApp(); };
-{ const r=$('camRetry'); if(r) r.onclick=()=>{ startApp(); }; }             // 0b: «Try again» after a failed start                                   // «Играть» — как прежде
+$('startBtn').onclick=()=>{ startApp().then(ok=>{ if(ok) songResumeOffer(); }); };   // AUTOSAVE1: «Continue where you left off?» (Play only, not a lesson)
+{ const r=$('camRetry'); if(r) r.onclick=()=>{ startApp().then(ok=>{ if(ok) songResumeOffer(); }); }; }             // 0b: «Try again» after a failed start                                   // «Играть» — как прежде
 $('learnBtn').onclick=()=>{ openLessons(); };                                // «Обучение» — открыть список уроков (приложение поднимет уже выбор урока/«Свободная игра»)
 
 export { startFail };   // probe only (0b): the failure message on the start card

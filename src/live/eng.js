@@ -2,7 +2,6 @@
    event pricing at play time (evHz, evTi, evReg) — moved from recorder.js (which re-exports them — a facade). Moved verbatim. */
 import { CUR, baseF, bassFreqTi, chordFreqsAt, leadFreqTi, modeSlotOfTi, tuningIndexOf } from '../scales.js';
 import { leadIdx, seventh } from '../state.js';
-import { bassOff, bassOn, bassSet, leadOff, leadOn, leadSet } from '../audio.js';
 import { bassOwnerKey, chOwnerKey, ldKey } from '../song/notes.js';
 import { secPerBeat } from '../transport/clock.js';
 import * as AUD from '../audio.js';
@@ -69,44 +68,34 @@ function evReg(a,ctx){
   return modeSlotOfTi(evTi(a,ctx,false), a.oct, ctx.sc) || { deg:undefined, oct:a.oct };
 }
 const okHz=f=>typeof f==='number' && Number.isFinite(f);
+/* ⛳ ENG1 (RUN 3): the adapter calls ONLY the engine contract (audio.js noteOn / noteSet / noteOff / bend / hit / drone, plan §4.4) and
+   prices every note itself — Hz from the event's frozen view (evHz), the timbre id → position (timbreIdx; an unknown id → the live timbre),
+   the sympathetic-string base from the note's view. ⚠️ setLeadInstr(a.inst) is not called here on purpose: a replayed layer must never
+   repaint the live instrument — the timbre is baked into the voice at its attack. `when` — the explicit time (the scheduler's look-ahead);
+   the live path (W*) passes none (= now). `live` — the theremin's continuous Hz (live only, rule #11); replay prices from the frozen view. */
 const makeENG=A=>({
-  /* ⚠️ setLeadInstr(a.inst) ОТСЮДА УБРАН, и это ПОЧИНКА, а не потеря: переигранный слой уводил ЖИВОЙ
-     инструмент (и кнопку в панели) — слой на Ситаре молча перекрашивал руку, играющую Органом. Теперь
-     тембр печётся В ГОЛОСЕ на атаке (leadOn получает inst), как это давно делают аккорды и бас. */
   leadOn:(a,ctx,{when,live,own}={})=>{ const o=own||ldKey(ctx,a);
-              /* live — ЖИВОЙ override частоты (терменвокс): непрерывные Гц вместо ступенной leadFreq.
-                 Только на ЖИВОМ пути (WleadOn); переигровка зовёт ENG без live → частота из leadFreq по
-                 замороженному ладу (полимодальность цела). */
-              const base=evHz(a,ctx,'ld');           // T4c-1: цена — из индекса в строе (одна функция с пробой)
-              if(live==null && !okHz(base)) return;  // T4c-1: нет индекса — ноты нет
-              if(ctx)A.leadCancel(o,when);           // атака переигранной ноты на голосе, ЕЩЁ удержанном ТЕМ ЖЕ владельцем: снять рампы его прошлого бенда (не перетечёт) — в своём голосе и в то же время, что атака. ⛳ S5: голос, выданный НОВОМУ владельцу, чистит сам audio.leadOn (флаг handed) — здесь этот случай не ловился (голоса у ключа ещё не было)
-              const gl=A.applyFx(a.fx);   // КАРТА ЭФФЕКТОВ ЭТОГО СОБЫТИЯ (3.7.2). Нет карты (события аранжировки) → applyFx возьмёт ТЕКУЩУЮ цепь роли, а не нейтраль. V4: заодно отдаёт СКОЛЬЖЕНИЕ ноты (или undefined — не задано)
-              /* ⛔ V4, КОНТРАКТ V1: живой кадр ТЕРМЕНВОКСА (live!=null) скольжения НЕ получает — его 20 мс это сглаживание слежения, а не
-                 портаменто; руке с долгим Скольжением высота отставала бы от руки. Свежую атаку отсекает сам движок (fresh → умолчание). */
-              A.sympBase(ctx&&ctx.sc ? baseF(ctx.sc) : null);   // TF2: sympathetic strings of a replayed note follow its view's key; live — the live key
-              const g=evReg(a,ctx); A.leadOn(o,(live!=null?live:base),a.vol,a.inst===undefined?leadIdx:(A.timbreIdx('ld',a.inst)??leadIdx),g.deg,g.oct,live!=null?undefined:gl,a.tie,when);   // время — в слоте when   // deg/oct — не для звука (частота уже посчитана), а для ПОДСВЕТКИ: leadHold знает, что звучит
-              if(a.bend&&a.bend.length)A.scheduleBend(o,a.bend,base,secPerBeat(),a.bendFrom||0,when); },   // BEND-CURVE: bendFrom — the chase enters the curve late (chaseNote)   // переигровка: кривая бенда поверх ступени замороженного лада, в СВОЙ голос, с якорем в момент атаки
-  leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a);
-              const gl=A.applyFx(a.fx);   // V4: скольжение ведения — из ЕГО карты (карта ведения несёт величину на миг ведения: сдвинул палец посреди ноты — следующий переезд уже с новой)
-              const f=a.hold?null:evHz(a,ctx,'ld'); if(f!==null && !okHz(f)) return;   // T4c-1: нет индекса — ведения нет
-              A.sympBase(ctx&&ctx.sc ? baseF(ctx.sc) : null);   // TF2: a bank built mid-note (timbre change) tunes to the note's key
-              const g=evReg(a,ctx); A.leadSet(o,f,a.vol,g.deg,g.oct,A.timbreIdx('ld',a.inst),gl,when); },   // T4b1: цена — из индекса в строе   // ведение терменвокса (hold) частоты не несёт — скольжению там применяться не к чему   // T0-fix: a.inst — смена тембра ПОСРЕДИ НОТЫ, как она прозвучала живьём (кроссфейд банков голоса; см. audio.leadSet)   // live здесь не читался никогда: ведение терменвокса идёт через hold:true (частоту не сбиваем), а не через override
-  leadOff:(a,ctx,{when,own}={})=>A.leadOff(own||ldKey(ctx,a),a&&a.tie,when),   // V2: tie ПЕРЕД when (правило #15)   // a.tie (T3) — нота продолжена в другой дорожке после смены тембра: быстрый релиз
-  /* when — ЯВНОЕ время (опережение лупера, §планировщик). Живой путь (W*) зовёт без when → undefined
-     → аудио-функции берут AC.currentTime (сейчас), байт-в-байт. Переигровка слоёв передаёт точное время. */
-  chOn:(a,ctx,{when}={})=>{ const F=evHz(a,ctx,'ch'); if(F.length) A.chordOn(chOwnerKey(ctx),F,a.vol,A.timbreIdx('ch',a.inst),a.bri,when); },   // T4c-1: цена — из индекса корня (evHz); нот нет — атаки нет   // T4b1: типизированный — из индекса корня; без типа — по ступени (терции/пауэр — T6)   // a.bri — пер-событийная яркость (0=нейтраль); when остаётся ПОСЛЕДНИМ (планировщик)
-  chSet:(a,ctx,{when}={})=>{ const F=evHz(a,ctx,'ch'); if(F.length) A.chordGlide(chOwnerKey(ctx),F,a.vol,a.bri,when); },
-  chOff:(a,ctx,{when}={})=>A.chordOff(chOwnerKey(ctx),when),
-  /* ⛳ V4: СКОЛЬЖЕНИЕ БАСА — ИЗ КАРТЫ СОБЫТИЯ, И ОТСУТСТВИЕ КАРТЫ ЗНАЧИТ «НЕ ЗАДАНО» (умолчание движка BASS_GLIDE_TC), а НЕ
-     «возьми живую цепь». Карту бас несёт ТОЛЬКО при прицепочном параметре в цепи баса (gestures), поэтому ей нет у всего
-     записанного без Скольжения, у подложки (arrange строит нагрузку сам) и у нот, вставленных в редакторе. Правило соло
-     «нет карты → текущая цепь» здесь заставило бы басовую линию подложки скользить так, как сейчас стоит рука, — ровно
-     довод яркости аккордов (fxChordBri). Кадр терменвокса (live) скольжения не получает — контракт V1. */
-  bassOn:(a,ctx,{when,live,own}={})=>{ const f=live!=null?live:evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassOn(own||bassOwnerKey(ctx),f,a.vol,A.timbreIdx('bs',a.inst),g.deg,g.oct,live!=null?undefined:A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ — из карты; нет карты — «не задана» (правило баса), звук как сегодня   // P1: deg/oct — для подсветки из реестра движка (как у leadOn); when ПОСЛЕДНИМ (правило #15)   // live — живой override Гц (терменвокс-бас), как у leadOn; переигровка без него → bassFreq (полимодальность цела)
-  bassSet:(a,ctx,{when}={})=>{ const f=evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx); A.bassSet(bassOwnerKey(ctx),f,a.vol,g.deg,g.oct,A.fxGlideOf(a.fx),A.fxBriOf(a.fx),when); },   // ЯРКОСТЬ ведения — своя величина события. V4: скольжение — из карты ведения; нет карты — BASS_GLIDE_TC, та же, что у живого баса без Скольжения
-  bassOff:(a,ctx,{when,own}={})=>A.bassOff(own||bassOwnerKey(ctx),when),   // P2: own — живой владелец (WbassOff), как у leadOff; переигровка его не передаёт — ключ из события
-  drum:(a,ctx,{when}={})=>{ if(ctx) A.hitOwner('hit:'+ctx.layer); A.drumHit(a.row,a.vol,A.timbreIdx('dr',a.kit),A.fxBriOf(a.fx),when); },   // MX1: ключ удара — для уровня дорожки (у копии рендера множитель всегда 1)   // ЯРКОСТЬ удара — из его карты (карта есть, только когда в цепи ударных есть прицепочный параметр); нет — удар как сегодня
-  drone:(a,ctx,{when}={})=>{ if(ctx) A.dronePan(A.ownerPan('drone:'+ctx.layer),when); A.droneUse(ctx?ctx.sc:null); A.droneOn(a.lvl*(ctx?A.ownerGain('drone:'+ctx.layer):1),when); },   // MX2: панорама дорожки дрона (у копии рендера — панорама дорожки, которую рендерят)   // MX1: × уровень дорожки дрона (у копии рендера — 1)        // дрон: выделенные узлы, гасится по жизненному циклу (не в softAllOff)
+              const base=evHz(a,ctx,'ld'); if(live==null && !okHz(base)) return;   // T4c-1: no index — no note
+              const g=evReg(a,ctx);
+              A.noteOn(o,{ role:'ld', hz: live!=null?live:base, vel:a.vol, timbre: a.inst===undefined?leadIdx:(A.timbreIdx('ld',a.inst)??leadIdx), deg:g.deg, oct:g.oct,
+                live: live!=null, tie:a.tie, values:a.fx, symp: ctx&&ctx.sc ? baseF(ctx.sc) : null, cancel:!!ctx }, when);   // TF2: a replayed note's strings follow its view's key
+              if(a.bend&&a.bend.length) A.bend(o,{ points:a.bend, base, spb:secPerBeat(), from:a.bendFrom||0 }, when); },   // BEND-CURVE: bendFrom — the chase enters the curve late
+  leadSet:(a,ctx,{when,own}={})=>{ const o=own||ldKey(ctx,a), g=evReg(a,ctx);
+              A.noteSet(o,{ role:'ld', hz: a.hold?null:evHz(a,ctx,'ld'), vel:a.vol, deg:g.deg, oct:g.oct, timbre:A.timbreIdx('ld',a.inst), values:a.fx,
+                symp: ctx&&ctx.sc ? baseF(ctx.sc) : null }, when); },   // a theremin hold carries no pitch; an unpriced note applies its values only (as before)
+  leadOff:(a,ctx,{when,own}={})=>A.noteOff(own||ldKey(ctx,a),{ role:'ld', tie:a&&a.tie },when),   // T3: a.tie — the note continues in another track after a timbre switch
+  chOn:(a,ctx,{when}={})=>{ const F=evHz(a,ctx,'ch'); if(F.length) A.noteOn(chOwnerKey(ctx),{ role:'ch', hz:F, vel:a.vol, timbre:A.timbreIdx('ch',a.inst), bri:a.bri },when); },   // no notes — no attack
+  chSet:(a,ctx,{when}={})=>{ const F=evHz(a,ctx,'ch'); if(F.length) A.noteSet(chOwnerKey(ctx),{ role:'ch', hz:F, vel:a.vol, bri:a.bri },when); },
+  chOff:(a,ctx,{when}={})=>A.noteOff(chOwnerKey(ctx),{ role:'ch' },when),
+  /* V4: the bass glide and brightness come from the event's map; NO map = «not set» (the engine's own BASS_GLIDE_TC), never the live chain
+     (a backing bass line must not glide as the hand is set now). A theremin frame (live) gets no glide (contract V1). */
+  bassOn:(a,ctx,{when,live,own}={})=>{ const f=live!=null?live:evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx);
+              A.noteOn(own||bassOwnerKey(ctx),{ role:'bs', hz:f, vel:a.vol, timbre:A.timbreIdx('bs',a.inst), deg:g.deg, oct:g.oct, live: live!=null, values:a.fx },when); },
+  bassSet:(a,ctx,{when}={})=>{ const f=evHz(a,ctx,'bs'); if(!okHz(f)) return; const g=evReg(a,ctx);
+              A.noteSet(bassOwnerKey(ctx),{ role:'bs', hz:f, vel:a.vol, deg:g.deg, oct:g.oct, values:a.fx },when); },
+  bassOff:(a,ctx,{when,own}={})=>A.noteOff(own||bassOwnerKey(ctx),{ role:'bs' },when),   // P2: own — the live owner (WbassOff); replay takes the key from the event
+  drum:(a,ctx,{when}={})=>A.hit(ctx ? 'hit:'+ctx.layer : null,{ row:a.row, vel:a.vol, kit:A.timbreIdx('dr',a.kit), values:a.fx },when),   // MX1: the hit key — the track's level and pan
+  drone:(a,ctx,{when}={})=>A.drone(ctx ? 'drone:'+ctx.layer : null,{ view: ctx?ctx.sc:null, level:a.lvl },when),   // TF2: the drone sounds its event's view; MX1/MX2: the track's level and pan
 });
 const ENG=makeENG(AUD);   // ЖИВАЯ таблица — против живой копии движка. Поведение прежнее дословно
 

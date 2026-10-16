@@ -1,10 +1,11 @@
 /* DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis, the automation lane, hit tests) — moved from draw.js verbatim (draw.js is the facade). Canvas only; nothing visible changed. */
 import { ctx, canvas } from '../vision.js';
+import { cv, ROLE_COL, noRoleCol } from '../palette.js';   // DRAW1b: canvas colours are design tokens (tokens.css «canvas»)
 import { CUR, chordRowFreq, OCT_ROMAN, REG_N, baseF, listName, namingOf, stepName, chordPitchHz, chordNotesAt, chordRowFreqAt, leadFreqTi, tuningOf, viewKey } from '../scales.js';
 import { icon } from '../icons.js';
 import { t, L } from '../i18n.js';
 import { fx, FX_VOL, rollBeat0, rollSpan, rollSel, rollSelNote, rollSelMany, rollPick, rollBox, rollDrag, rollIns, rollRole, rollRow0, rollRowsAll, ROLL_EDITABLE, rollAut, rollAutSel, rollAutDrag, rollVolBars, rollBendSel, rollBendDrag } from '../state.js';
-import { FX_META, INSTR_COL, LANE_NOROLE_COL, bendSeg, curveU } from '../config.js';
+import { FX_META, bendSeg, curveU } from '../config.js';
 import { DRUM_NAMES, DRUM_ROWS, FX_FACTORY } from '../audio.js';
 import { loop, loopPos, beatLevel, regionOn, songNotes, songSegs, captureInfoOf, autPoints, pnBars, editLayer as rollTrackLayer, chordMoveTy, bendEdited } from '../recorder.js';
 import { ROLL_BAR_H, ROLL_TP_H, hexA, laneBeatAt, laneBeatX, noteLbl, rollRowAt, rollRowY, statusEl, syncLoopTransport } from './common.js';
@@ -260,20 +261,20 @@ function rollBendHandles(V,s,AX,BP,x,x2,cy){
     if(D.mid){ B2=B.slice(); B2[i]={ ...B[i], sh:'s', k:D.k }; }                     // a curved glide (the edit: recorder.editBendShape)
     else { const E=bendEdited(B,'move',i,D.dt,D.c,len); B2=E ? E.B : B; }        // the same pure edit as the release (recorder.bendEdited)
     const G=bendPathOf(s,B2,AX,V.total);
-    if(G){ ctx.save(); ctx.setLineDash([4,3]); ctx.strokeStyle='#ffd479'; ctx.lineWidth=1.5;
+    if(G){ ctx.save(); ctx.setLineDash([4,3]); ctx.strokeStyle=cv('gold'); ctx.lineWidth=1.5;
       bendStroke(V,G,x,x2,cy(rollSegRoot(s,AX)),cy); ctx.restore();
       const q=B2[i], p=B2[i-1], mid=D.mid&&p;
       const gx=laneBeatX(V,s.start+(mid ? (p.dt+q.dt)/2 : q.dt)), gy=cy(R(mid ? bendSeg(p,q,0.5) : q.c));
       const txt= mid ? icon('curve')+' '+(D.k>0?'+':'')+(Math.round(D.k*100)/100) : (q.c>0?'+':'')+q.c+'¢ · '+(Math.round(q.dt*100)/100);
       ctx.font='11px system-ui'; ctx.textBaseline='middle'; const tw=ctx.measureText(txt).width+10;
-      ctx.fillStyle='rgba(8,10,16,.86)'; ctx.fillRect(gx+10,gy-8,tw,16); ctx.strokeStyle='#ffd479'; ctx.lineWidth=1; ctx.strokeRect(gx+10.5,gy-7.5,tw-1,15);
-      ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(txt,gx+15,gy+.5); ctx.textBaseline='alphabetic'; } }
+      ctx.fillStyle=cv('deep-a86'); ctx.fillRect(gx+10,gy-8,tw,16); ctx.strokeStyle=cv('gold'); ctx.lineWidth=1; ctx.strokeRect(gx+10.5,gy-7.5,tw-1,15);
+      ctx.fillStyle=cv('white'); ctx.textAlign='left'; ctx.fillText(txt,gx+15,gy+.5); ctx.textBaseline='alphabetic'; } }
   for(const m of V.bend.mids){ const sel=rollBendSel===m.i;   // a hollow diamond: a shape handle, not a point
     ctx.beginPath(); ctx.moveTo(m.x,m.y-4.5); ctx.lineTo(m.x+4.5,m.y); ctx.lineTo(m.x,m.y+4.5); ctx.lineTo(m.x-4.5,m.y); ctx.closePath();
-    ctx.fillStyle='rgba(20,20,32,.85)'; ctx.fill(); ctx.strokeStyle= sel ? '#ffd479' : '#fff'; ctx.lineWidth=1.4; ctx.stroke(); }
+    ctx.fillStyle=cv('slate-a85'); ctx.fill(); ctx.strokeStyle= sel ? cv('gold') : cv('white'); ctx.lineWidth=1.4; ctx.stroke(); }
   for(const q of V.bend.pts){ const sel=rollBendSel===q.i;
-    ctx.fillStyle= sel ? '#ffd479' : '#fff'; ctx.beginPath(); ctx.arc(q.x,q.y,sel?5:3.5,0,Math.PI*2); ctx.fill();
-    ctx.strokeStyle='rgba(20,20,32,.9)'; ctx.lineWidth=1.2; ctx.stroke(); }
+    ctx.fillStyle= sel ? cv('gold') : cv('white'); ctx.beginPath(); ctx.arc(q.x,q.y,sel?5:3.5,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=cv('slate-a90'); ctx.lineWidth=1.2; ctx.stroke(); }
 }   // уже — кривую не рисуем: на блоке в несколько пикселей она была бы просто штрихом поверх цвета
 /* T4b3: СЕГМЕНТ-ПРИЗРАК переноса аккорда на ряд pit — ТА ЖЕ пара, что окажется в песне после правки: индекс и регистр ряда (T4c-1; с T5 —
    и приглушённого) и тип, который поставит правка (T5, вариант (а): recorder.chordMoveTy). ⚠️ Без
@@ -324,10 +325,10 @@ function rollDevLbl(x,y,w,h,dev,sel){
   ctx.font = h>=12 ? '10px system-ui' : '9px system-ui';
   ctx.textAlign='left'; ctx.textBaseline='middle';
   const tw=ctx.measureText(txt).width;
-  if(w>=tw+6 && h>=9){ ctx.fillStyle= sel ? '#0b0b14' : 'rgba(255,255,255,.88)'; ctx.fillText(txt, x+3, y+h/2); return; }
+  if(w>=tw+6 && h>=9){ ctx.fillStyle= sel ? cv('win') : cv('white-a88'); ctx.fillText(txt, x+3, y+h/2); return; }
   if(!sel) return;
-  ctx.fillStyle='rgba(11,11,20,.82)'; ctx.fillRect(x+w+3, y+h/2-7, tw+6, 14);
-  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillText(txt, x+w+6, y+h/2);
+  ctx.fillStyle=cv('win-a82'); ctx.fillRect(x+w+3, y+h/2-7, tw+6, 14);
+  ctx.fillStyle=cv('white-a90'); ctx.fillText(txt, x+w+6, y+h/2);
 }
 /* ═══ ОСЬ ВЫСОТ РЕДАКТОРА — ОДИН ОБЪЕКТ (слайс T3 универсальной модели строя) ═══
    ⛳ РЯДЫ — ИЗ СТРОЯ. Строй даёт все высоты, лад их подсвечивает (HANDOFF, «УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ»). Ось «Все» (rollRowsAll,
@@ -560,18 +561,18 @@ export function rollAutDrive(G,px,py){
 function drawAutLane(V,ly){
   const A=V.aut; if(!A) return;
   const addr=rollAut;
-  ctx.fillStyle='rgba(255,255,255,.028)'; ctx.fillRect(V.x0,A.y0,V.bw,A.y1-A.y0);
+  ctx.fillStyle=cv('white-a028'); ctx.fillRect(V.x0,A.y0,V.bw,A.y1-A.y0);
   // ---- горизонтали десятых + подписи 0/100 у левого края ----
-  ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=1;
+  ctx.strokeStyle=cv('white-a07'); ctx.lineWidth=1;
   for(let k=0;k<=10;k++){ const y=autY(V,k/10);
     ctx.beginPath(); ctx.moveTo(V.x0,y); ctx.lineTo(V.x0+V.bw,y); ctx.stroke(); }
-  ctx.strokeStyle='rgba(255,255,255,.16)';
+  ctx.strokeStyle=cv('white-a16');
   ctx.beginPath(); ctx.moveTo(V.x0,A.y0); ctx.lineTo(V.x0+V.bw,A.y0); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(V.x0,A.y1); ctx.lineTo(V.x0+V.bw,A.y1); ctx.stroke();
-  ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.font='9px system-ui'; ctx.fillStyle='rgba(255,255,255,.4)';
+  ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.font='9px system-ui'; ctx.fillStyle=cv('white-a40');
   ctx.fillText('100', V.x0-6, A.y0+5); ctx.fillText('0', V.x0-6, A.y1-5);
   if(!addr||ly==null){
-    ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle='rgba(255,255,255,.45)';
+    ctx.textAlign='center'; ctx.font='11px system-ui'; ctx.fillStyle=cv('white-a45');
     ctx.fillText(t('aut.pick'), V.x0+V.bw/2, (A.y0+A.y1)/2);
     ctx.textAlign='left'; ctx.textBaseline='alphabetic'; return;
   }
@@ -635,14 +636,14 @@ function drawAutLane(V,ly){
   }else{ ctx.strokeStyle=col; ctx.stroke(path); }
   if(V.aut.mid){ const m=V.aut.mid;   // BEND-CURVE: a hollow diamond — a shape handle, not a point
     ctx.beginPath(); ctx.moveTo(m.x,m.y-4.5); ctx.lineTo(m.x+4.5,m.y); ctx.lineTo(m.x,m.y+4.5); ctx.lineTo(m.x-4.5,m.y); ctx.closePath();
-    ctx.fillStyle='rgba(8,10,16,.9)'; ctx.fill(); ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.stroke(); }
+    ctx.fillStyle=cv('deep-a90'); ctx.fill(); ctx.strokeStyle=col; ctx.lineWidth=1.4; ctx.stroke(); }
   // ---- точки ----
   for(let i=from;i<to;i++){
     const r=P[i], x=laneBeatX(V,tOf(r)), y=autY(V,vOf(r));
     if(x<V.x0-6||x>V.x0+V.bw+6) continue;
     const sel=rollAutSel&&rollAutSel.pt===r.pt;
     if(r.pt.unset&&!sel){ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,3.2,0,Math.PI*2); ctx.stroke(); continue; }   // V4b: «не задано» (нота играет сегодняшнее умолчание) — полым кружком, как полая планка «ведёт не рука»
-    ctx.fillStyle= sel?'#fff':col;
+    ctx.fillStyle= sel?cv('white'):col;
     ctx.beginPath(); ctx.arc(x,y,sel?4.5:3.2,0,Math.PI*2); ctx.fill();
     if(sel){ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2); ctx.stroke(); }
   }
@@ -668,9 +669,9 @@ function drawAutLane(V,ly){
     const tw=ctx.measureText(txt).width, bw=tw+10, bh=16;
     const left = px+12+bw > V.x0+V.bw;                                  // у правого края переворачиваем сторону: иначе табличка уезжает за поле
     const bx = left ? px-12-bw : px+12, by=Math.max(A.y0+2, Math.min(A.y1-2-bh, py-bh/2));
-    ctx.fillStyle='rgba(8,10,16,.86)'; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=cv('deep-a86'); ctx.fillRect(bx,by,bw,bh);
     ctx.strokeStyle= drag.fine?AUT_FINE_COL:col; ctx.lineWidth=1; ctx.strokeRect(bx+.5,by+.5,bw-1,bh-1);
-    ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(txt, bx+5, by+bh/2+.5);
+    ctx.fillStyle=cv('white'); ctx.textAlign='left'; ctx.fillText(txt, bx+5, by+bh/2+.5);
   }
   /* ⛳ ГДЕ ЧЕЛОВЕК УЗНАЁТ ПРО ЕДИНИЦЫ И ПРО УДАЛЕНИЕ — РОВНО ТАМ, ГДЕ ЭТО СТАЛО ВОЗМОЖНЫМ: точка выбрана.
      Подсказка стоит на месте прежнего числа (взгляд уже приучен к этому углу) и уходит, как только палец
@@ -678,7 +679,7 @@ function drawAutLane(V,ly){
      панели редактора одна на ноту и на точку, ей и говорим. */
   if(hint){
     ctx.textAlign='right'; ctx.textBaseline='alphabetic'; ctx.font='10px system-ui';
-    ctx.fillStyle='rgba(255,255,255,.5)';
+    ctx.fillStyle=cv('white-a50');
     ctx.fillText(hint, V.x0+V.bw-4, A.y0+12);
   }
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
@@ -704,9 +705,9 @@ function drawVolBars(V,ly){
   A.bars=vis.filter(r=>r.x>=V.x0-6&&r.x<=V.x0+V.bw+6);
   for(const {b,x} of A.bars){
     const v= moved(b) ? Math.max(0,Math.min(1,b.v+drag.d)) : b.v, y=autY(V,v), s=isSel(b)||moved(b);
-    ctx.strokeStyle= s ? '#fff' : hexA(col,.8); ctx.lineWidth= s ? 3 : 2;
+    ctx.strokeStyle= s ? cv('white') : hexA(col,.8); ctx.lineWidth= s ? 3 : 2;
     ctx.beginPath(); ctx.moveTo(x,A.y1); ctx.lineTo(x,y); ctx.stroke();
-    ctx.fillStyle= s ? '#fff' : col; ctx.beginPath(); ctx.arc(x,y,s?4:3,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle= s ? cv('white') : col; ctx.beginPath(); ctx.arc(x,y,s?4:3,0,Math.PI*2); ctx.fill();
   }
   ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.font='10px system-ui';
   ctx.fillStyle=hexA(col,.85); ctx.fillText(fxTitleOf(FX_VOL)+' · '+t('aut.bars'), V.x0+4, A.y0+12);
@@ -716,14 +717,14 @@ function drawVolBars(V,ly){
     ctx.font='11px system-ui'; ctx.textBaseline='middle';
     const bw=ctx.measureText(txt).width+10, bh=16, left= px+12+bw > V.x0+V.bw;
     const bx= left ? px-12-bw : px+12, by=Math.max(A.y0+2, Math.min(A.y1-2-bh, py-bh/2));
-    ctx.fillStyle='rgba(8,10,16,.86)'; ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=cv('deep-a86'); ctx.fillRect(bx,by,bw,bh);
     ctx.strokeStyle= drag.fine?AUT_FINE_COL:col; ctx.lineWidth=1; ctx.strokeRect(bx+.5,by+.5,bw-1,bh-1);
-    ctx.fillStyle='#fff'; ctx.fillText(txt, bx+5, by+bh/2+.5);
+    ctx.fillStyle=cv('white'); ctx.fillText(txt, bx+5, by+bh/2+.5);
   }
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
-const AUT_FINE_COL='#ffd479';   // зона точности: янтарь против зелени полосы — «шаг другой» видно и боковым зрением
-const AUT_COL='#7ee0b6';   // тон полосы: родня бегунку (он тоже про ВРЕМЯ и тоже поверх поля), но не спорит с ролями
+const AUT_FINE_COL=cv('gold');   // зона точности: янтарь против зелени полосы — «шаг другой» видно и боковым зрением
+const AUT_COL=cv('mint');   // тон полосы: родня бегунку (он тоже про ВРЕМЯ и тоже поверх поля), но не спорит с ролями
 function drawRoll(){
   const W=canvas.width, H=canvas.height;
   /* Полосы лупера на экране нет → и попадать в неё нечем: снимаем её геометрию, как это делает запись
@@ -733,7 +734,7 @@ function drawRoll(){
   /* ⛳ ПОЗИЦИЮ ТРАНСПОРТА ПО-ПРЕЖНЕМУ ВЛАДЕЕТ DRAW, тем же syncLoopTransport — только теперь полоса
      швартуется под панелью редактора, а не под коробкой лупера. Один владелец, одна функция. */
   syncLoopTransport(true, ROLL_BAR_H+4);
-  ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,W,H);       // камеру не рисуем — фон честно непрозрачный
+  ctx.fillStyle=cv('win'); ctx.fillRect(0,0,W,H);       // камеру не рисуем — фон честно непрозрачный
   const ly=rollTrackLayer();
   /* ry0 — верх ЛИНЕЙКИ (S5.2). Сетка начинается там же, где и раньше (ry0+ROLL_RULER_H === прежний gy0),
      поэтому поле нот не сдвинулось ни на пиксель: линейка заняла тот отступ, что и так пустовал. */
@@ -773,7 +774,7 @@ function drawRoll(){
                        : (gy1-gy0)/DRUM_ROWS;
   const rows = pitched ? Math.max(1,Math.min(total,Math.floor((gy1-gy0)/rowH))) : DRUM_ROWS;
   const row0 = pitched ? Math.max(0,Math.min(rollRow0,Math.max(0,total-rows))) : 0;
-  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, axis:AX, pitched, aut, noEdit, col: rollRole ? INSTR_COL[rollRole] : null };   // AR2: col — цвет роли дорожки (палитра ролей; тот же у её строки в окне, микшере и на полосе игры)   // axis (T3) — ось высот: ряд ↔ высота строя/ступень лада   // noEdit — поле нот не отвечает на палец (см. выше)   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
+  rollView={ x0, bw:Math.max(1,x1-x0), beat0:rollBeat0, span:Math.max(1e-6,rollSpan), ry0, gy0, rowH, rows, row0, total, sc:axSc, axis:AX, pitched, aut, noEdit, col: rollRole ? ROLE_COL[rollRole] : null };   // AR2: col — цвет роли дорожки (палитра ролей; тот же у её строки в окне, микшере и на полосе игры)   // axis (T3) — ось высот: ряд ↔ высота строя/ступень лада   // noEdit — поле нот не отвечает на палец (см. выше)   // aut — габарит полосы автоматизации (или null): попадание берёт ЕГО, а не считает заново
   const V=rollView, pxB=V.bw/V.span, M=loop.metre;
   const DPO = pitched ? AX.rpp : 0;
   // ---- ряды: чередующаяся заливка + подпись слева (ударные — имя ряда, лад — НОТА В ЛАДУ ОСИ) ----
@@ -782,11 +783,11 @@ function drawRoll(){
     const r=row0+i, y=rollRowY(V,r), e=pitched?AX.ent(r):null;
     const dup = pitched && e.dup;                     // верхний ряд регистра — ДУБЛЬ тоники следующего: та же высота
     const dim = pitched && !e.bright;                 // T3: высота строя ВНЕ лада — приглушённый ряд (только показ; правка на нём — T5)
-    ctx.fillStyle = dim ? 'rgba(0,0,0,.22)' : (pitched ? (r%DPO===0) : r%2) ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.015)';   // тоника регистра выделена заливкой — по ней читается октава; приглушённый — темнее фона
+    ctx.fillStyle = dim ? cv('black-a22') : (pitched ? (r%DPO===0) : r%2) ? cv('white-a05') : cv('white-a015');   // тоника регистра выделена заливкой — по ней читается октава; приглушённый — темнее фона
     ctx.fillRect(V.x0,y,V.bw,V.rowH);
-    ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=1;
+    ctx.strokeStyle=cv('white-a08'); ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(V.x0,y); ctx.lineTo(V.x0+V.bw,y); ctx.stroke();
-    ctx.fillStyle= dim ? 'rgba(255,255,255,.26)' : dup ? 'rgba(255,255,255,.3)' : 'rgba(255,255,255,.62)';
+    ctx.fillStyle= dim ? cv('white-a26') : dup ? cv('white-a30') : cv('white-a62');
     /* ⛳ ПОДПИСЬ — В ЛАДУ ОСИ, а не в живом: ради этого и заводился параметр у noteLbl (S5.4). Тоника
        ЖИВАЯ — высоту переигровка тоже берёт от живой тоники, и подпись обязана идти за ней.
        ⛳ КЛИП ПО КОЛОНКЕ (S5.6): ширину мы измерили, но у неё есть потолок — и на потолке хвост обязан
@@ -801,15 +802,15 @@ function drawRoll(){
   // ---- скоба повтора: только ПОКАЗ (правка скобы живёт на полосе лупера) ----
   if(regionOn()){
     const R=loop.rgn, bx0=laneBeatX(V,Math.max(R.from,V.beat0)), bx1=laneBeatX(V,Math.min(R.to,V.beat0+V.span));
-    if(bx1>bx0){ ctx.fillStyle='rgba(87,217,163,.10)'; ctx.fillRect(bx0,gy0,bx1-bx0,gy1-gy0);
-      ctx.strokeStyle='rgba(87,217,163,.5)'; ctx.lineWidth=1.5;
+    if(bx1>bx0){ ctx.fillStyle=cv('tonic-a10'); ctx.fillRect(bx0,gy0,bx1-bx0,gy1-gy0);
+      ctx.strokeStyle=cv('tonic-a50'); ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(bx0,gy0); ctx.lineTo(bx0,gy1); ctx.moveTo(bx1,gy0); ctx.lineTo(bx1,gy1); ctx.stroke(); }
   }
   /* ---- ЛИНЕЙКА (S5.2): ОТДЕЛЬНАЯ полоса под перемотку. Ровно тот же приём, что у полосы скобы на полосе
      лупера: её низ — это gy0, то есть верх сетки, поэтому один тап физически не может попасть и в линейку,
      и в ноту. Сетка уже занята выбором и вставкой — третьему смыслу там места нет. ---- */
-  ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fillRect(V.x0,V.ry0,V.bw,gy0-V.ry0);
-  ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1;
+  ctx.fillStyle=cv('white-a05'); ctx.fillRect(V.x0,V.ry0,V.bw,gy0-V.ry0);
+  ctx.strokeStyle=cv('white-a12'); ctx.lineWidth=1;
   ctx.beginPath(); ctx.moveTo(V.x0,gy0); ctx.lineTo(V.x0+V.bw,gy0); ctx.stroke();
   /* ---- ПОДСЕТКА — РИСУЕТСЯ ВСЕГДА (S5.3; в S5.2 она появлялась только с квантизацией, и это смешивало
      две РАЗНЫЕ вещи). ПРИВЯЗКА — про то, куда встанет нота; ВИДИМОСТЬ — про то, где человек находится во
@@ -824,7 +825,7 @@ function drawRoll(){
      Потолок видимости прежний (ROLL_GRID_MIN_PX): слившиеся линии не рисуем ни в том, ни в другом виде. ---- */
   const snap=rollSnap();
   if(snap.drawn){
-    ctx.strokeStyle= snap.free ? 'rgba(255,255,255,.042)' : 'rgba(255,255,255,.075)';
+    ctx.strokeStyle= snap.free ? cv('white-a042') : cv('white-a075');
     ctx.lineWidth=0.7;
     if(snap.free) ctx.setLineDash([2,4]);
     const s0=Math.ceil(V.beat0/snap.step)*snap.step;
@@ -847,13 +848,13 @@ function drawRoll(){
     const gx=laneBeatX(V,b); if(gx<V.x0-1||gx>V.x0+V.bw+1) continue;
     const lvl=beatLevel(M,bib);
     let sc,lw;
-    if(bib===0){ sc='rgba(255,255,255,.34)'; lw=1.4; }
-    else if(lvl===1){ sc='rgba(255,255,255,.22)'; lw=1.1; }
-    else if(lvl===-1){ sc='rgba(140,180,255,.20)'; lw=1.0; }
-    else { sc='rgba(255,255,255,.10)'; lw=0.8; }
+    if(bib===0){ sc=cv('white-a34'); lw=1.4; }
+    else if(lvl===1){ sc=cv('white-a22'); lw=1.1; }
+    else if(lvl===-1){ sc=cv('blue-a20'); lw=1.0; }
+    else { sc=cv('white-a10'); lw=0.8; }
     ctx.strokeStyle=sc; ctx.lineWidth=lw;
     ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
-    if(bib===0 && pxB*M>=30){ ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillText(String((b/M|0)+1), gx+3, gy0-8); }   // номер такта — с единицы, как в подписи скобы
+    if(bib===0 && pxB*M>=30){ ctx.fillStyle=cv('white-a45'); ctx.fillText(String((b/M|0)+1), gx+3, gy0-8); }   // номер такта — с единицы, как в подписи скобы
   }
   // ---- удары: только попавшие в окно (двоичный поиск по началу) ----
   const hits=(pitched||noEdit)?[]:rollHits(), blkW=rollBlockPx(V);   // noEdit: pitched там ложно, и без этой оговорки на поле соло легли бы УДАРЫ дорожки   // ширина блока — ОДНА на отрисовку, призрак и попадание
@@ -862,16 +863,16 @@ function drawRoll(){
     const x=laneBeatX(V,ev.t), yT=rollRowY(V,r), h=V.rowH*0.62, y=yT+(V.rowH-h)/2;
     const w=blkW, vol=Math.max(0,Math.min(1,ev.a.vol==null?1:ev.a.vol));
     const sel = ev===rollSel || rollSelMany.has(ev);   // ED1: one of several selected
-    ctx.fillStyle = sel ? '#fff' : hexA(INSTR_COL.dr, 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
+    ctx.fillStyle = sel ? cv('white') : hexA(ROLE_COL.dr, 0.35+0.55*vol);   // громкость читается насыщенностью — она записана в событии
     ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();                          // S5.2: блок НАЧИНАЕТСЯ на доле и растёт вправо — нота «на раз» лежит ВНУТРИ такта, а не верхом на его линии
-    if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke(); }
+    if(sel){ ctx.strokeStyle=cv('white'); ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke(); }
   }
   /* ---- СЕГМЕНТЫ ЛАДОВОЙ РОЛИ (S5.5): у каждого своя ДЛИНА (от смены высоты до следующей), поэтому блок
      рисуется от start до end — в отличие от удара, у которого длительности нет вовсе. Открытый сегмент
      (нота без «выкл» — так лежит подложка) тянем до правого края окна: выдумывать ему конец нельзя.
      ⛳ T4c-2: призраков чужих ладов больше нет — у дорожки один вид (см. rollGroup). ---- */
   if(pitched){
-    const col=V.col||LANE_NOROLE_COL, wEnd=V.beat0+V.span;   // AR2: цвет роли — из снимка (тот же, что у строки дорожки)
+    const col=V.col||noRoleCol(), wEnd=V.beat0+V.span;   // AR2: цвет роли — из снимка (тот же, что у строки дорожки)
     for(const g of (G?[G]:[])){
       for(const s of g.segs){
         const en = s.end==null ? wEnd : s.end;
@@ -892,14 +893,14 @@ function drawRoll(){
           const r=nt.r;
           if(r<row0-0.5||r>row0+rows-0.5) return;                      // за краем видимых рядов (и не залезать на линейку)
           const y=rollRowY(V,r)+(V.rowH-h)/2, off=nt.dev!=null, sel=chSel&&(!one||i===rollSelNote);
-          ctx.fillStyle = sel ? (off?'rgba(255,255,255,.72)':'#fff') : hexA(col, (0.35+0.55*vol)*(off?0.45:1));
+          ctx.fillStyle = sel ? (off?cv('white-a72'):cv('white')) : hexA(col, (0.35+0.55*vol)*(off?0.45:1));
           ctx.beginPath(); ctx.roundRect(x,y,w,h,3); ctx.fill();
           if(off&&!sel){ ctx.strokeStyle=hexA(col,.95); ctx.lineWidth=1.25; ctx.beginPath(); ctx.roundRect(x+0.6,y+0.6,w-1.2,h-1.2,3); ctx.stroke(); }
-          if(sel){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
+          if(sel){ ctx.strokeStyle=cv('white'); ctx.lineWidth=2; ctx.beginPath(); ctx.roundRect(x-2,y-2,w+4,h+4,4); ctx.stroke();
             /* РУЧКА ДЛИНЫ — только у ВЫДЕЛЕННОГО и только там, где тянуть есть за что (есть endEv и блок
                шире порога). Показываем на выделенном, а не на всех: иначе каждая нота обрастала бы засечкой. */
             if(s.endEv && w>=ROLL_EDGE_MIN_W && !rollSelMany.size){ ctx.fillStyle=hexA(col,.95); ctx.fillRect(x+w-3,y+2,3,h-4); } }   // U3: и у ОДНОЙ выделенной ноты — её длина правится отдельно (sel истинно только у неё)
-          else if(one){ ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(x-1.5,y-1.5,w+3,h+3,4); ctx.stroke(); }
+          else if(one){ ctx.strokeStyle=cv('white-a45'); ctx.lineWidth=1; ctx.beginPath(); ctx.roundRect(x-1.5,y-1.5,w+3,h+3,4); ctx.stroke(); }
           if(off) rollDevLbl(x,y,w,h,nt.dev,sel);
         });
         /* ⛳ S5: КРИВАЯ БЕНДА поверх блока терменвокса — СТУПЕНЯМИ, как её играет переигровка (каждая точка — setFreq с τ 20 мс: значение
@@ -908,7 +909,7 @@ function drawRoll(){
         const BP=w>=ROLL_BEND_MIN_W ? rollBendPts(s,AX,V.total) : null;
         if(BP){
           ctx.save(); ctx.beginPath(); ctx.rect(x,gy0,w,gy1-gy0); ctx.clip();
-          ctx.strokeStyle = (s.ev===rollSel||rollSelMany.has(s.ev)) ? 'rgba(20,20,32,.85)' : 'rgba(255,255,255,.92)'; ctx.lineWidth=1.5;
+          ctx.strokeStyle = (s.ev===rollSel||rollSelMany.has(s.ev)) ? cv('slate-a85') : cv('white-a92'); ctx.lineWidth=1.5;
           const cy=r=>rollRowY(V,r)+V.rowH/2;
           bendStroke(V,BP.path||BP,x,x2,cy(rollSegRoot(s,AX)),cy); ctx.restore();   // BEND-CURVE: steps where it steps, the glide law where it glides
           if(s.ev===rollSel && s.first && !rollSelMany.size) rollBendHandles(V,s,AX,BP,x,x2,cy);   // OWN2: the selected theremin note's points
@@ -941,7 +942,7 @@ function drawRoll(){
     const gx=laneBeatX(V,rollDrag.t), gh=V.rowH*(pitched?0.7:0.62);
     /* Призрак ладовой роли держит ДЛИНУ сегмента (rollDrag.len), у удара длины нет — там блок привязки. */
     const gw = pitched ? Math.max(3, laneBeatX(V,rollDrag.t+(rollDrag.len||1))-gx) : blkW;
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+    ctx.strokeStyle=cv('white'); ctx.lineWidth=2; ctx.setLineDash([3,3]);
     for(const gr of ghostRows){
       if(chordGhost ? (gr<row0-0.5||gr>row0+rows-0.5) : !(gr>=row0&&gr<row0+rows)) continue;
       const gy=rollRowY(V,gr)+(V.rowH-gh)/2;
@@ -954,7 +955,7 @@ function drawRoll(){
   if(rollDrag&&rollDrag.many){
     const {dt,dr}=rollDrag, isSel=e=>e===rollSel||rollSelMany.has(e);
     const box=(gx,gr,gw,gh)=>{ if(gr<row0-0.5||gr>row0+rows-0.5) return; const gy=rollRowY(V,gr)+(V.rowH-gh)/2; ctx.beginPath(); ctx.roundRect(gx,gy,gw,gh,3); ctx.stroke(); };
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.setLineDash([3,3]);
+    ctx.strokeStyle=cv('white'); ctx.lineWidth=2; ctx.setLineDash([3,3]);
     if(pitched && G) for(const s of G.segs){ if(!isSel(s.ev)) continue;
       const pit= dr ? rollShiftPit(s,dr) : null; if(dr && !pit) continue;
       const gx=laneBeatX(V,s.start+dt), gw=Math.max(3,laneBeatX(V,(s.end==null?s.start+1:s.end)+dt)-gx);
@@ -964,8 +965,8 @@ function drawRoll(){
   }
   /* ED1: the selection box being drawn. */
   if(rollBox){ const b=rollBox, bx=Math.min(b.x0,b.x1), by=Math.min(b.y0,b.y1), bw=Math.abs(b.x1-b.x0), bh=Math.abs(b.y1-b.y0);
-    ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(bx,by,bw,bh);
-    ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(bx,by,bw,bh); ctx.setLineDash([]); }
+    ctx.fillStyle=cv('white-a08'); ctx.fillRect(bx,by,bw,bh);
+    ctx.strokeStyle=cv('white-a75'); ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(bx,by,bw,bh); ctx.setLineDash([]); }
   /* ⛳ O-4: ПОЛОСА — ДО БЕГУНКА. Она своё поле и заливает свой фон; нарисуй мы её после, фон лёг бы
      поверх бегунка ровно на её высоте, и линия времени разорвалась бы посреди экрана. */
   if(V.aut) drawAutLane(V,ly);
@@ -976,27 +977,27 @@ function drawRoll(){
   const playing=!!(info&&info.phase==='play');
   const phBeat= playing ? info.pos : Math.max(0,loop.pos);
   if(phBeat>=V.beat0&&phBeat<=V.beat0+V.span){
-    const px=laneBeatX(V,phBeat), col= playing ? '#57d9a3' : 'rgba(87,217,163,.55)';
+    const px=laneBeatX(V,phBeat), col= playing ? cv('tonic') : cv('tonic-a55');
     ctx.strokeStyle=col; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(px,V.ry0); ctx.lineTo(px, V.aut?V.aut.y1:gy1); ctx.stroke();   // O-4: сквозь ОБА поля — время у них одно, и линия обязана это показывать
     ctx.fillStyle=col;
     ctx.beginPath(); ctx.moveTo(px-5,V.ry0); ctx.lineTo(px+5,V.ry0); ctx.lineTo(px,V.ry0+7); ctx.closePath(); ctx.fill();
   }
   // ---- рамка поля и подсказка/пустота ----
-  ctx.strokeStyle= rollIns ? hexA(INSTR_COL.dr,.75) : rollPick ? 'rgba(255,255,255,.6)' : 'rgba(255,255,255,.14)';   // ED1: pick mode shows on the canvas too   // режим вставки виден и на холсте, а не только по кнопке: тап здесь СОЗДАЁТ удар
+  ctx.strokeStyle= rollIns ? hexA(ROLE_COL.dr,.75) : rollPick ? cv('white-a60') : cv('white-a14');   // ED1: pick mode shows on the canvas too   // режим вставки виден и на холсте, а не только по кнопке: тап здесь СОЗДАЁТ удар
   ctx.lineWidth= (rollIns||rollPick) ? 2 : 1;
   ctx.strokeRect(V.x0,gy0,V.bw,gy1-gy0);
   ctx.textAlign='center'; ctx.font='12px system-ui';
   /* T4: «пусто» значит одно — в ДОРОЖКЕ не осталось нот (роль у неё одна, «нет этой роли» больше не бывает). */
   const emptyTrack = noRole || (pitched ? !G : !hits.length);
   if(ly==null||noEdit||emptyTrack){
-    ctx.fillStyle='rgba(255,255,255,.55)';
+    ctx.fillStyle=cv('white-a55');
     ctx.fillText(ly==null ? t('roll.noTrack') : t('roll.emptyTrack'), V.x0+V.bw/2, (gy0+gy1)/2);   // S4: «роль — позже» снята (правимы все роли)
   }
   /* ⛔ ПРИВЯЗКУ ЗАДАЁМ ЯВНО, А НЕ НАСЛЕДУЕМ. Отсюда и родился баг: textBaseline ставился на 'middle' у
      подписей рядов ~170 строк выше, и одно и то же число y значило здесь не то, что читалось при чтении
      кода. Подвал теперь объявляет своё состояние сам — как и всякий, кто рисует далеко от источника. */
-  ctx.textBaseline='middle'; ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.34)'; ctx.font='10px system-ui';
+  ctx.textBaseline='middle'; ctx.textAlign='center'; ctx.fillStyle=cv('white-a34'); ctx.font='10px system-ui';
   ctx.fillText(t('roll.hint'), V.x0+V.bw/2, gy1+ROLL_FOOT_STEP);
   /* ⛳ ЧТО У ДОРОЖКИ ЗАХВАЧЕНО (слайс O-2) — ЕДИНСТВЕННЫЙ сегодняшний читатель реестра захвата.
      Захват сам по себе НЕВИДИМ (его пока никто не исполняет), а невидимое нельзя проверить — поэтому
@@ -1012,7 +1013,7 @@ function drawRoll(){
     if(cap){
       const rn=t('role.'+cap.role);
       const nm=cap.fx.map(fxTitleOf).join(' · ');   // ⛳ ТА ЖЕ резолюция имени, что в меню эффектов (см. fxTitleOf выше): старые скаляры больше не выводятся сырым id
-      ctx.textAlign='left'; ctx.fillStyle='rgba(255,255,255,.28)';
+      ctx.textAlign='left'; ctx.fillStyle=cv('white-a28');
       ctx.fillText(cap.fx.length ? t('roll.cap',{role:rn,fx:nm,n:cap.pts}) : t('roll.capNone',{role:rn}),
                    V.x0, gy1+ROLL_FOOT_STEP*2);
     }

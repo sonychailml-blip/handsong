@@ -129,7 +129,8 @@ export const trackChainKeyOf = key => TRACK_KEYS[key] || (TRACK_KEYS[key]=CHAIN_
 /* ⛳ ГРОМКОСТЬ КАК ПАРАМЕТР (слайс VOL-0) — id голосового модуля «Громкость». Объявление модуля — в audio (FX_FACTORY,
    флаг perm), а id живёт ЗДЕСЬ, потому что его читает state (сеяние цепей и fxVolReset ниже), а state до audio не дотягивается
    (audio импортирует state, обратный импорт — цикл). Один id на все слои — ровно как FX_CHAIN у записи. */
-export const FX_VOL='vol';
+import { FX_VOL } from './config.js';   // AUD2a: the Volume effect's id lives in config.js (the effect modules read it there)
+export { FX_VOL };
 /* ⚠️ КЛЮЧИ ЦЕПЕЙ — ВЫЧИСЛЯЕМЫЕ ИМЕНА СВОЙСТВ, а не выписанные строки: состав цепей не менялся ни на
    запись, ни на параметр, сменился ТОЛЬКО ключ объекта. Литералы ролей здесь — АРГУМЕНТЫ РЕЗОЛВЕРА,
    то есть ровно та граница, где ролевой мир встречается с ключевым; ключом ни один из них не является. */

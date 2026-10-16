@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (37 hard rules), 97 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (38 hard rules), 97 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -45,15 +45,9 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   AF4 no ❄ (68), RENDER-LEAK, AF5 + rule #31 (69 closed 2026-10-13; 70 open) · ED1–ED4 (71–74), ED5–ED6 (75–77), ED7 + OWN2 (78, 79),
   ED7-fix, BEND-CURVE, OWN1 (80–82), ED7-fix2 (83) · TF2, TF3 (84–87), TF3b, TF4, TF5 (88–90) — STAGE 2 CLOSED 2026-10-14. Each line as it
   stood: archive B, «Moved from HANDOFF.md at the STAGE 3 plan».
-- ✅ **STAGE 3 PLAN** written 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; summary below); user answers Q1–Q19 given 2026-10-14
-  (archive B, plan §13b). ✅ unverified: **LIC1** licence register, **PRIV1** privacy rule #33 + CSP, **LAT1** latency meter (steps 91, 92) ·
-  ✅ **PROBE1** rows registry, **GOLD1** golden renders, **HAND1** gesture fingerprint (2026-10-15; nets only, nothing to hear) ·
-  ✅ unverified (2026-10-15): **LAT1b** latency diagnostics + test switches (step 92; the user's numbers: archive B «LAT2 input»), **SND-F1** + **SND-F1b** Firefly,
-  Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open)
-  · **LAT3** low-light camera: capabilities, «Low light (test)», hands lost, player hint «Too dark»; «Picture» switch removed (step 95) · **CAM-FIX** the webcam's own settings restored (rule #34, step 96) · **REC1** `song/store.js` + `song/lanes.js`, folder rule +
-  import cycles in the static check; camera start made robust and the open-time repair limited to our own test changes (step 97) ·
-  **REC2** `song/notes.js` + `song/history.js` (step kinds register) · **REC3 part 1** `song/edit-notes|edit-chords|edit-group.js` · NIGHT run
-  2026-10-16: **REC3 part 2**, **REC4**, **REC5** (recorder 4897 → 725 lines; nothing to hear or see).
+- ✅ **STAGE 3 PLAN** 2026-10-14 (archive B «STAGE 3 — FOUNDATION PLAN»; answers Q1–Q19 there, §13b). Done since, mostly unverified by
+  the user (steps 91–98): LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT1b, SND-F1/F1b, LAT2, LAT3, CAM-FIX, REC1–REC5, FMT1, TIM1, GES1, UI1b,
+  TIM2, SAVE1, DRAW1, AUTOSAVE1, DRAW1b, SONG1 (the full line as it stood: archive B «… at RUN 3»).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (permanent id in `a.inst`/`a.kit`, TIM2), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -104,7 +98,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
 answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, ✅ GES1 (NIGHT + DAY run), ✅ UI1b, ✅ TIM2, ✅ SAVE1 (files), ✅ DRAW1 (DAY run);
-NEXT AUD1 (plan written: `docs/AUD1-design.md`, awaiting review)) → **4 «Calm»** = FIRST
+✅ AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1 part 1, SONG3 (= SAVE1 + AUTOSAVE1) (RUN 3); ✅ PACK1, IDS1 part 2, SONG2; plans TIM3/ENG2 written;
+NEXT: CMD1 plan → VIS1 → DOC1 (questions in WORK-LOG); UI1a after the redesign) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -138,7 +133,8 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 «EXPRESSION HAND» — a pedal-like hand, hand map, expression lab (BACKLOG §3.29 «➕», 2026-10-15; after GES1).
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
-- Songs save only as FILES by hand (SAVE1; no autosave yet — proposal in WORK-LOG); events carry timbre ids (TIM2). Since TF2 the key is
+- Songs save as FILES by hand (SAVE1) and AUTOSAVE on the device (AUTOSAVE1: last 5 songs, offer at ▶ Play); a song carries copies of
+  the person's own scales (SONG1, file v3); events carry timbre ids (TIM2). Since TF2 the key is
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
   the main thread; hand→sound latency MEASURED by LAT1 (user's desktop 2026-10-15: ≈ 126 ms daylight, ≈ 180 ms evening; detection 54 ms vs a
   real GPU's 10–20; phone runs pending). Since LAT2 each camera frame is detected once; detection stays on the main thread by default (the worker path
@@ -165,15 +161,15 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
   exposure too dark — light is the fix) · step 97 (camera busy / off / blocked → message, «Try again»).
 
 ### NIGHT run (2026-10-16): record in archive B («… at the DAY run»), log `NIGHT-LOG.md`.
-### DAY run (2026-10-16) — full log: `WORK-LOG.md` (root)
-- Static check: (10) a write to an imported binding fails; an import used only after `...x` counts as used; lexer keeps `${`'s brace.
-- AUD1 PLAN: `docs/AUD1-design.md` (engine context `E`; options A/B/C, recommendation C; sends/master inserts; WASM mapping; slices).
-- GES1 done: `gestures/hands.js` (state machine), `gestures/roles.js` (stateless helpers); gestures.js = facade. HAND1 identical.
-- UI1b: `tokens.css` (every DOM design value as a token; static check 11) + `src/icons.js` (THE icon component; LIC1 fails on an
-  interface glyph outside it); proof `tools/ui-snap.mjs` — 10 screens pixel-identical.
-- TIM2: events store timbre IDs (birth: push / backing / editor); engine door `timbreIdx`/`timbreKey`; `timbreSnapshot`; freeze
-  signature hashes id strings. No stored songs existed → nothing to upgrade; the file migration v1→v2 lives in SAVE1.
-- SAVE1: ⚙ Loop → «Song file»: Name, Save (downloads `.handsong`), Open… (asks when unsaved). `core/songfile.js` (parse, limits,
-  forbidden keys, migrations, strict check), `song/file.js` (record ↔ song), recorder/ui glue. Frozen audio not stored. Autosave PROPOSED
-  (WORK-LOG). Probes: data «SAVE1 song file (core)», browser «SAVE1 song file save → open», runner UI check with the real download.
-- DRAW1 and the UX inventory: see WORK-LOG (state at the end of the run).
+### DAY run (2026-10-16): record in archive B («… at RUN 3»), log in `WORK-LOG.md` (DAY RUN part).
+### RUN 3 (2026-10-16) — full records: archive B «Moved from HANDOFF.md at RUN 3 (records)»; log: `WORK-LOG.md` «RUN 3»
+- Done: AUTOSAVE1 (step 98), DRAW1b, SONG1 (file v3), AUD1a–c + AUD2a–c (E, surface, rule #38, timbres / effects / FDN / worklets out of
+  audio.js 3225 → 2142 lines; GOLD 84/0, census identical), ENG1 (engine contract §4.4), IDS1 part 1 (event ids, file v4). Last P.all PASS 97/0.
+- User answers (2026-10-16): UI1a after the redesign · SONG3 = SAVE1 + AUTOSAVE1 (done) · TIM3 and ENG2 PLAN ONLY first
+  (docs/TIM3-design.md, docs/ENG2-design.md) · PACK1 build now (offline ECDSA P-256 keys, no network, no UI) · the flaky «dynamics live =
+  offline» row: name a capture that saw no signal, retry once.
+- PACK1 built (core/pack.js: pack format, offline ECDSA P-256 licence keys «HS1…», the registry gate; TEST key pair only, private half
+  git-ignored in tools/; no UI, no network). Plans for review: docs/TIM3-design.md, docs/ENG2-design.md. SONG3 done (= SAVE1 + AUTOSAVE1).
+- IDS1 part 2 (lane-point ids, file v5) and SONG2 (the demo song is `data/songs/triphop.json`, P.song opens it; generator = probe tool).
+  Not started, questions in WORK-LOG: CMD1 (needs a plan — the tripwire hash compares objects), VIS1 (with the redesign?), DOC1 (cut
+  CLAUDE.md ≈ 237 KB?).

@@ -1,9 +1,9 @@
 /* DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer (drawLooper, loopView, their hit tests and probes) — moved from draw.js verbatim (draw.js is the facade). Canvas only; nothing visible changed. */
 import { ctx, canvas } from '../vision.js';
+import { cv, ROLE_COL, noRoleCol } from '../palette.js';   // DRAW1b: canvas colours are design tokens (tokens.css «canvas»)
 import { chordNotesAt, leadFreqTi, bassFreqTi } from '../scales.js';
 import { t, L, lang } from '../i18n.js';
 import { sy, rollBeat0, rollSpan, secSel, laneRow0, arrFace, laneDrag } from '../state.js';
-import { INSTR_COL, LANE_NOROLE_COL } from '../config.js';
 import { DRUM_ROWS, timbresOf, masterLevel, masterMeter } from '../audio.js';
 import { hooks } from '../hooks.js';
 import { recording, loop, events, loopPos, recLayers, isRecLayer, beatLevel, songBeats, laneMuted, laneSoloed, laneSoloOn, cycling, armedLayer, laneDelPendingLayer, songNotes, songSegs, sections, histCanUndo, laneLevelOf, lanePanOf, laneNameOf, laneOrder, laneLook } from '../recorder.js';
@@ -29,8 +29,8 @@ const LANE_TOG_W=21, LANE_TOG_GAP=2;
 /* ✕ удаления (S3.5d) — третьим гнездом, но ОТСТУПЛЕН на LANE_DEL_GAP: соседство с S шириной в 2px делало бы
    промах «хотел соло — взвёл удаление» частым. Промах всё равно не разрушает (нужен второй тап), но
    отступ снимает большую часть ложных взводов. Зазор — мёртвая зона, тап в него не делает ничего. */
-const LANE_DEL_GAP=6, LANE_DEL_COL='#e5484d';
-const LANE_MUTE_COL='#e5a23c', LANE_SOLO_COL='#57d9a3';   // заглушено — янтарь (внимание), соло — тот же зелёный, что у «играет»
+const LANE_DEL_GAP=6, LANE_DEL_COL=cv('rec');
+const LANE_MUTE_COL=cv('ochre'), LANE_SOLO_COL=cv('tonic');   // заглушено — янтарь (внимание), соло — тот же зелёный, что у «играет»
 const LANE_OFF_A=0.34;                                    // прозрачность НЕСЛЫШНОЙ строки
 /* Mark column of a strip row (E0-fix): between the name column and the lane, present only while a row is armed (the red dot).
    AF4: freezing shows nothing on the play strip (no ❄, no stale mark). */
@@ -79,12 +79,12 @@ function stripRowText(lid, C, name){
   const nm= room>8 ? arrClip(name, room) : '', nw= nm ? ctx.measureText(nm).width : 0;
   return { lbl, lblX0:lx, lblX1:lx+lw, nm, nameX0:nx, nameX1:nx+nw };
 }
-/* ⛳ AR2: ЦВЕТ И ИМЯ ДОРОЖКИ — ОДНИ на все виды (окно, микшер, полоса игры, редактор). Цвет — палитра ролей config.INSTR_COL (данные; почему
+/* ⛳ AR2: ЦВЕТ И ИМЯ ДОРОЖКИ — ОДНИ на все виды (окно, микшер, полоса игры, редактор). Цвет — палитра ролей config.ROLE_COL (данные; почему
    она различается светлотой — там же); без роли (слой дрона) — нейтральный серый. Роль и тембр — recorder.laneLook (один проход, мемо).
    Имя — данное человеком (recorder.laneNameOf), иначе «роль · тембр» на языке интерфейса (тембр — единственный вход audio.timbresOf, T5);
    кэш имени по умолчанию — по (язык, роль, тембр, дрон): сочетаний единицы, а timbresOf строит список на каждый вызов. */
 const laneRoleLook=ly=>{ const x=laneLook(ly); return x ? x.role : null; };
-export const laneCol=ly=> INSTR_COL[laneRoleLook(ly)] || LANE_NOROLE_COL;
+export const laneCol=ly=> ROLE_COL[laneRoleLook(ly)] || noRoleCol();
 const defNameMemo=new Map();
 export function laneDefName(ly){
   const x=laneLook(ly), role=x?x.role:null, tim=x?x.tim:null, k=lang+'|'+role+'|'+tim+'|'+(x&&x.drone?1:0);
@@ -110,17 +110,17 @@ const levelLbl=v=> Math.round(v*100)+' · '+(v<=0 ? '−∞' : (40*Math.log10(v)
 function laneTog(x,ry,rowH,lbl,on,col,w=LANE_TOG_W){   // AR1: w — ширина гнезда (у окна аранжировки — под палец)
   const h=rowH-3, y=ry+1.5;
   ctx.beginPath(); ctx.roundRect(x,y,w,h,3);
-  ctx.fillStyle   = on ? col : 'rgba(255,255,255,.07)'; ctx.fill();
-  ctx.strokeStyle = on ? col : 'rgba(255,255,255,.20)'; ctx.lineWidth=1; ctx.stroke();
-  ctx.fillStyle   = on ? '#0b0b14' : 'rgba(255,255,255,.60)';
+  ctx.fillStyle   = on ? col : cv('white-a07'); ctx.fill();
+  ctx.strokeStyle = on ? col : cv('white-a20'); ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle   = on ? cv('win') : cv('white-a60');
   ctx.font= w>LANE_TOG_W ? '600 14px system-ui' : '600 10px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText(lbl, x+w/2, y+h/2+0.5);
 }
 function drawLooper(full){   // AR1: full — окно аранжировки (во весь экран); без аргумента — полоса на экране игры, как была
   const FULL=!!full;
   if(!loop.on && !events.length){   // нет петли — полоса прячется (и попадать не во что)
-    if(FULL){ ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    if(FULL){ ctx.fillStyle=cv('win'); ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle=cv('white-a55'); ctx.font='13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.fillText(t('roll.refusedEmpty'), canvas.width/2, canvas.height/2); ctx.textBaseline='alphabetic'; ctx.textAlign='left';
       syncLoopTransport(true, ROLL_BAR_H+4); }
     else { const u=histCanUndo()&&!emptyTpOld; syncLoopTransport(u, LOOP_EMPTY_TOP, u); }   // ED7-fix2: nothing to show but something to undo — ↶ stays where the transport sits
@@ -209,8 +209,8 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
              all:allRows, look:new Map(), nameW, mx0, frame: FULL ? [0,W] : [SC.fx0,SC.fx1],   // AR2-fix: frame — рамка, внутри которой обязан лежать каждый текст строки (проба)   // AR2: all — ВСЕ строки в порядке показа (ui: место перестановки); look — нарисованные имя и цвет видимых строк (их сверяет проба); nameW/mx0 — колонка имени полосы игры и начало колонки значков
              mix:MIX, ...mixGeom(lx0,bw), ms: MIX ? { y0:gy1+footH+8, y1:gy1+footH+8+MIX_MASTER_H } : null };   // MX1: mix — лицо микшера; fx0/fw — ход фейдера; ms — полоса мастера   // AR1: full — окно аранжировки; hx0 — левый край колонки заголовков; mini — миниатюры видимых строк (слой → записи; их сверяет проба); sx0 — левый край зоны прокрутки строк   // ⛳ rows — ВИДИМЫЕ строки (их рисуем и ловим); over/row0/nAll/visN — окно прокрутки (ui листает по ним); sx1 — правая кромка коробки   // E0-fix: x0 — начало ЛИНЕЙКИ (с колонкой значков сдвинуто), bx0 — кромка коробки   // by0 — верх полосы скобы (рисование); hy0 — верх её ЗОНЫ ПОПАДАНИЯ: вместе с заголовком, в котором тапать больше не во что, — ~38px под большой палец вместо 16
 
-  if(FULL){ ctx.fillStyle='#0b0b14'; ctx.fillRect(0,0,W,Hc); }   // AR1: окно — свой экран (камера не рисуется), фон целиком
-  else{ ctx.fillStyle='rgba(10,10,20,.74)'; ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1;
+  if(FULL){ ctx.fillStyle=cv('win'); ctx.fillRect(0,0,W,Hc); }   // AR1: окно — свой экран (камера не рисуется), фон целиком
+  else{ ctx.fillStyle=cv('night-a74'); ctx.strokeStyle=cv('white-a14'); ctx.lineWidth=1;
     ctx.beginPath(); ctx.roundRect(x0-10,y0,sw+20,boxH,11); ctx.fill(); ctx.stroke(); }
   /* AR1: у окна время уходит за края дорожки (зум) — всё, что на временной оси, рисуем в КЛИПЕ дорожки [lx0, lx0+bw]. У полосы игры
      время — вся песня, за края ничего не выходит, клипа нет (рисунок прежний). */
@@ -224,9 +224,9 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   const RG=loop.rgn, cyc=cycling();   // cyc — тот же предикат, по которому ЗВУК решает, есть ли повтор (S3.5b; прежде здесь стояла своя копия условия)
   if(cyc){
     const rx0=laneBeatX(loopView,RG.from), rx1=laneBeatX(loopView,RG.to);
-    ctx.fillStyle='rgba(87,217,163,.10)';                       // тот же зелёный, что у «играет» — это его участок
+    ctx.fillStyle=cv('tonic-a10');                       // тот же зелёный, что у «играет» — это его участок
     ctx.fillRect(rx0,gy0,Math.max(1,rx1-rx0),gy1-gy0);
-    ctx.strokeStyle='rgba(87,217,163,.55)'; ctx.lineWidth=1.5;  // скобки по краям: видно, ГДЕ шов
+    ctx.strokeStyle=cv('tonic-a55'); ctx.lineWidth=1.5;  // скобки по краям: видно, ГДЕ шов
     ctx.beginPath(); ctx.moveTo(rx0,gy0); ctx.lineTo(rx0,gy1); ctx.moveTo(rx1,gy0); ctx.lineTo(rx1,gy1); ctx.stroke();
   }
 
@@ -236,11 +236,11 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   const songBars=Math.max(1,Math.ceil(songBeats()/loop.metre));
   const delLy=laneDelPendingLayer();         // S3.5d: дорожка со взведённым удалением или null
   let head, hc;
-  if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc='#57d9a3'; }
+  if(info&&info.phase==='count'){ head=t('looper.count',{n:info.countLeft}); hc=cv('tonic'); }
   else if(recording){ { const rl=recLayers().slice().sort((x,y)=>x-y); head= rl.length>1 ? t('looper.overdubMany',{list:rl.map(l=>l+1).join(', ')}) : t('looper.overdub',{n:rl[0]+1});
-    if(armLy!=null && rl.some(l=>l!==armLy)) head+=' · '+t('looper.armedOwn',{n:armLy+1}); }   /* T3: вооружённая осталась красной, а ноты ушли в новую строку — называем это словами: она берёт только СВОЙ звук (роль и тембр) */   /* T2: взятое пишет по дорожке на роль — называем ВСЕ; одна — прежняя строка */ hc='#e5484d'; }
-  else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:nIds}); hc='#57d9a3'; }
-  else { head=t('looper.paused',{bars:songBars, layers:nIds}); hc='rgba(255,255,255,.7)'; }
+    if(armLy!=null && rl.some(l=>l!==armLy)) head+=' · '+t('looper.armedOwn',{n:armLy+1}); }   /* T3: вооружённая осталась красной, а ноты ушли в новую строку — называем это словами: она берёт только СВОЙ звук (роль и тембр) */   /* T2: взятое пишет по дорожке на роль — называем ВСЕ; одна — прежняя строка */ hc=cv('rec'); }
+  else if(loop.on){ head=t('looper.playing',{bars:songBars, layers:nIds}); hc=cv('tonic'); }
+  else { head=t('looper.paused',{bars:songBars, layers:nIds}); hc=cv('white-a70'); }
   /* СОЛО ОБЪЯВЛЯЕМ В ЗАГОЛОВКЕ: иначе «молчит половина дорожек» читается как поломка, а не как режим.
      Приписка к готовой строке, а не отдельный ключ на каждую фразу — состояний заголовка четыре. */
   /* S3.5c: КУДА ПОЙДЁТ ● — словом в заголовке, рядом с красной рамкой строки. «(не слышно)» — если дорожка
@@ -255,7 +255,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   if(laneSoloOn()) head += ' · ' + t('looper.soloOn');
   /* S3.5d: ВЗВЕДЁННОЕ УДАЛЕНИЕ ЗАМЕНЯЕТ заголовок целиком, красным: это единственное, что сейчас важно, и
      приписка к и без того длинной строке на 380px ушла бы за кромку. */
-  if(delLy!=null){ head=t('looper.delConfirm',{n:delLy+1}); hc='#ff6b6f'; }
+  if(delLy!=null){ head=t('looper.delConfirm',{n:delLy+1}); hc=cv('rec-soft'); }
   unclip();   // заголовок — не время
   ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='600 12px system-ui';
   ctx.fillStyle=hc; ctx.fillText(head, FULL ? ARR_MARGIN : x0-2, y0+headH/2+1);
@@ -273,7 +273,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   const bA=Math.max(0,Math.floor(beat0)), bZ=Math.min(total, Math.ceil(beat0+span));   // видимые доли (у полосы игры — 0…total, как было)
   const barStep=Math.max(1,Math.ceil(3/(pxPerBeat*loop.metre)));   // рисовать каждый barStep-й такт
   if(loop.sub!==4 && pxPerBeat/loop.sub>=4){
-    ctx.strokeStyle='rgba(255,255,255,.07)'; ctx.lineWidth=0.8;
+    ctx.strokeStyle=cv('white-a07'); ctx.lineWidth=0.8;
     const sy0=gy0+(gy1-gy0)*0.35;                  // короче долевых — читается как «мельче», не спорит с ними
     for(let b=bA;b<bZ;b++) for(let k=1;k<loop.sub;k++){
       const gx=laneBeatX(loopView,b+k/loop.sub);
@@ -288,28 +288,28 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     else if(!showBeats) continue;                             // доли не различимы — не рисуем вовсе
     const gx=laneBeatX(loopView,b), lvl=beatLevel(loop.metre,bib);   // видно 3+2+2, а не N одинаковых чёрточек; X — через ЕДИНОЕ преобразование, как метки и бегунок
     let sc,lw;
-    if(bib===0){ sc='rgba(255,255,255,.34)'; lw=1.4; }        // начало такта
-    else if(lvl===1){ sc='rgba(255,255,255,.24)'; lw=1.1; }   // голова группы
-    else if(lvl===-1){ sc='rgba(140,180,255,.20)'; lw=1.0; }  // khali — холодный тусклый штрих («пустая» голова)
-    else { sc='rgba(255,255,255,.11)'; lw=0.8; }              // обычная доля
+    if(bib===0){ sc=cv('white-a34'); lw=1.4; }        // начало такта
+    else if(lvl===1){ sc=cv('white-a24'); lw=1.1; }   // голова группы
+    else if(lvl===-1){ sc=cv('blue-a20'); lw=1.0; }  // khali — холодный тусклый штрих («пустая» голова)
+    else { sc=cv('white-a11'); lw=0.8; }              // обычная доля
     ctx.strokeStyle=sc; ctx.lineWidth=lw;
     ctx.beginPath(); ctx.moveTo(gx,gy0); ctx.lineTo(gx,gy1); ctx.stroke();
   }
   /* ED6: SECTIONS — markers at bar lines with their names (a faint line down the rows), the selected one outlined; a label is clipped
      to the next marker. Drawn rectangles go into the snapshot (loopView.sec.marks) — loopHit reads exactly what was drawn. */
   if(loopView.sec){ const S=loopView.sec, ms=sections(), sy=S.y0+1, sh=S.y1-S.y0-3;
-    ctx.fillStyle='rgba(255,255,255,.035)'; ctx.fillRect(lx0,sy,bw,sh);
+    ctx.fillStyle=cv('white-a035'); ctx.fillRect(lx0,sy,bw,sh);
     ctx.font='600 11px system-ui'; ctx.textBaseline='middle'; ctx.textAlign='left';
-    if(!ms.length){ ctx.fillStyle='rgba(255,212,121,.45)'; ctx.fillText(t('sec.hint'), lx0+6, sy+sh/2+.5); }   // ED6-fix: an empty strip says what it is for
+    if(!ms.length){ ctx.fillStyle=cv('gold-a45'); ctx.fillText(t('sec.hint'), lx0+6, sy+sh/2+.5); }   // ED6-fix: an empty strip says what it is for
     for(let i=0;i<ms.length;i++){ const m=ms[i], x=laneBeatX(loopView,m.beat), xn= i+1<ms.length ? laneBeatX(loopView,ms[i+1].beat) : lx0+bw+200;
       if(x>lx0+bw+2 || xn<lx0-2) continue;
       const sel=secSel===m.id, w=Math.max(14, Math.min(ctx.measureText(m.name).width+10, xn-x-2));
-      ctx.strokeStyle= sel ? 'rgba(255,255,255,.55)' : 'rgba(255,212,121,.28)'; ctx.lineWidth=1;
+      ctx.strokeStyle= sel ? cv('white-a55') : cv('gold-a28'); ctx.lineWidth=1;
       ctx.beginPath(); ctx.moveTo(x,S.y0); ctx.lineTo(x,gy1); ctx.stroke();
-      ctx.fillStyle= sel ? 'rgba(255,212,121,.95)' : 'rgba(255,212,121,.22)'; ctx.fillRect(x,sy,w,sh);
-      if(sel){ ctx.strokeStyle='#fff'; ctx.strokeRect(x+.5,sy+.5,w-1,sh-1); }
+      ctx.fillStyle= sel ? cv('gold-a95') : cv('gold-a22'); ctx.fillRect(x,sy,w,sh);
+      if(sel){ ctx.strokeStyle=cv('white'); ctx.strokeRect(x+.5,sy+.5,w-1,sh-1); }
       ctx.save(); ctx.beginPath(); ctx.rect(x,sy,w,sh); ctx.clip();
-      ctx.fillStyle= sel ? '#14141f' : '#ffd479'; ctx.fillText(m.name, x+5, sy+sh/2+.5); ctx.restore();
+      ctx.fillStyle= sel ? cv('slate2') : cv('gold'); ctx.fillText(m.name, x+5, sy+sh/2+.5); ctx.restore();
       S.marks.push({ id:m.id, beat:m.beat, name:m.name, x0:x, x1:x+w }); }
     ctx.textBaseline='alphabetic'; }
   /* ⛳ ПОЛОСА СКОБЫ ПОВТОРА (S3.5b). Читается честно и без легенды:
@@ -322,14 +322,14 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
      ⛔ Все X — через laneBeatX того же loopView (правило #9); попадание — через laneBeatAt того же V. */
   {
     const M=loop.metre, byA=loopView.by0+2, byB=gy0-3, bh=byB-byA, tab=5;
-    ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fillRect(lx0,byA,bw,bh);   // E0-fix: полоса скобы — это ВРЕМЯ, значит от начала линейки (колонка значков ей не принадлежит)
-    ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=1;
+    ctx.fillStyle=cv('white-a05'); ctx.fillRect(lx0,byA,bw,bh);   // E0-fix: полоса скобы — это ВРЕМЯ, значит от начала линейки (колонка значков ей не принадлежит)
+    ctx.strokeStyle=cv('white-a22'); ctx.lineWidth=1;
     for(let b=Math.floor(bA/M/barStep)*barStep;b*M<=bZ+1e-9;b+=barStep){ const gx=laneBeatX(loopView,b*M);
       ctx.beginPath(); ctx.moveTo(gx,byB-4); ctx.lineTo(gx,byB); ctx.stroke(); }
     const bx0=laneBeatX(loopView,RG.from), bx1=laneBeatX(loopView,RG.to);
-    ctx.fillStyle= cyc ? 'rgba(87,217,163,.40)' : 'rgba(255,255,255,.16)';
+    ctx.fillStyle= cyc ? cv('tonic-a40') : cv('white-a16');
     ctx.fillRect(bx0,byA,Math.max(1,bx1-bx0),bh);
-    ctx.strokeStyle= cyc ? '#57d9a3' : 'rgba(255,255,255,.8)'; ctx.lineWidth= RG.user ? 2 : 1.2;
+    ctx.strokeStyle= cyc ? cv('tonic') : cv('white-a80'); ctx.lineWidth= RG.user ? 2 : 1.2;
     if(!RG.user) ctx.setLineDash([2,2]);
     ctx.beginPath();
     ctx.moveTo(bx0+tab,byA); ctx.lineTo(bx0,byA); ctx.lineTo(bx0,byB); ctx.lineTo(bx0+tab,byB);
@@ -340,7 +340,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     const room=bx1-bx0-2*tab-4;
     let lbl= RG.user ? nums : nums+' · '+t('looper.braceAuto');
     if(ctx.measureText(lbl).width>room) lbl=nums;               // узко — только номера; «авто» всё равно читается по пунктиру
-    if(ctx.measureText(lbl).width<=room){ ctx.fillStyle='rgba(255,255,255,.92)'; ctx.fillText(lbl,(bx0+bx1)/2,(byA+byB)/2+0.5); }
+    if(ctx.measureText(lbl).width<=room){ ctx.fillStyle=cv('white-a92'); ctx.fillText(lbl,(bx0+bx1)/2,(byA+byB)/2+0.5); }
     ctx.textAlign='left';
   }
   unclip();
@@ -358,13 +358,13 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
        выглядело бы как «ничего не изменилось», хотя замолчало почти всё. Тот же предикат, что и в звуке. */
     const off = soloOn ? !soloed : muted;
     ctx.globalAlpha = off ? LANE_OFF_A : 1;              // одна альфа на ВСЮ строку: фон и подпись гаснут вместе
-    ctx.fillStyle=live?'rgba(229,72,77,.16)':'rgba(255,255,255,.04)';
+    ctx.fillStyle=live?cv('rec-a16'):cv('white-a04');
     if(FULL) ctx.fillRect(ARR_MARGIN,ry+1,hdrW+bw,rowH-2);   // AR1: фон — от колонки заголовка до конца дорожки
     else ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2);          // AR2: с колонкой имени.   E0-fix: фон строки — вместе с колонкой значков (она часть строки); без колонки markW=0 — как было
     if(FULL) Object.assign(loopView.look.get(lid), arrRowHeader(lid, ARR_MARGIN, ry, hdrW-6-ARR_DOT_W, rowH, lid===armLy && !recording, name, col));   // AF4: the header leaves room for the freeze dot   // AR2-fix: где встали тексты заголовка (проба: внутри рамки)
     else{ const RT=stripRowText(lid, SC, name);   // AR2-fix: «L#» и ИМЯ — в колонке имени, внутри рамки (прежде «L#» висел левее коробки и торчал за рамку)
       ctx.textAlign='left';
-      ctx.fillStyle= (lid===armLy && !recording) ? '#ff6b6f' : 'rgba(255,255,255,.5)'; ctx.fillText(RT.lbl, RT.lblX0, mid+0.5);   // вооружена — «L#» красный (как прежде)
+      ctx.fillStyle= (lid===armLy && !recording) ? cv('rec-soft') : cv('white-a50'); ctx.fillText(RT.lbl, RT.lblX0, mid+0.5);   // вооружена — «L#» красный (как прежде)
       if(RT.nm){ ctx.fillStyle=col; ctx.fillText(RT.nm, RT.nameX0, mid+0.5); }
       Object.assign(loopView.look.get(lid), { lblX0:RT.lblX0, lblX1:RT.lblX1, nameX0:RT.nameX0, nameX1:RT.nameX1 }); }
     if(FULL){ clipLane(); if(MIX) drawLaneFader(lid, ry, rowH); else drawLaneMini(lid, ry, rowH); unclip(); }   // AR1: МИНИАТЮРЫ нот/ударов — в клипе дорожки; MX1: в лице микшера — фейдер
@@ -374,24 +374,24 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
        на 380px, где слева от линейки места под значок нет (подпись L1 и так упирается в кромку).
        Во время записи рамку не рисуем: пишущуюся строку уже выделяет красная заливка (live). */
     const armed = !recording && lid===armLy;
-    if(armed && FULL){ ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(ARR_MARGIN+1,ry+1.5,hdrW+bw-2,rowH-3); }   // AR1: рамка — вокруг заголовка и дорожки
+    if(armed && FULL){ ctx.strokeStyle=cv('rec'); ctx.lineWidth=2; ctx.strokeRect(ARR_MARGIN+1,ry+1.5,hdrW+bw-2,rowH-3); }   // AR1: рамка — вокруг заголовка и дорожки
     else if(armed){
-      ctx.strokeStyle='#e5484d'; ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,nameW+markW+bw-2,rowH-3);   // AR2: и колонка имени внутри.   рамка — вокруг ВСЕЙ строки, колонка значков внутри неё
-      ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(mx0+ARM_DOT_X,mid,3.5,0,7); ctx.fill();   // AR2: колонка значков — за колонкой имени (mx0).   E0-fix: точка — в колонке значков (armed ⇒ колонка есть), а не на линейке
+      ctx.strokeStyle=cv('rec'); ctx.lineWidth=2; ctx.strokeRect(x0+1,ry+1.5,nameW+markW+bw-2,rowH-3);   // AR2: и колонка имени внутри.   рамка — вокруг ВСЕЙ строки, колонка значков внутри неё
+      ctx.fillStyle=cv('rec'); ctx.beginPath(); ctx.arc(mx0+ARM_DOT_X,mid,3.5,0,7); ctx.fill();   // AR2: колонка значков — за колонкой имени (mx0).   E0-fix: точка — в колонке значков (armed ⇒ колонка есть), а не на линейке
     }
     if(FULL){   // window: M / S under the finger; AF4: the freeze dot (no ❄, no stale mark) at the header's right end
       const st=ARR_BTN_W+ARR_BTN_GAP;
       laneTog(loopView.tx0,      ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL, ARR_BTN_W);
       laneTog(loopView.tx0+st,   ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL, ARR_BTN_W);
       const dot= hooks.afRow ? hooks.afRow(lid) : null, dx=ARR_MARGIN+hdrW-ARR_DOT_W/2-3;
-      if(dot==='run'){ ctx.fillStyle=`rgba(255,255,255,${(0.3+0.35*(0.5+0.5*Math.sin(performance.now()/ARR_DOT_PULSE_MS))).toFixed(3)})`; ctx.beginPath(); ctx.arc(dx,mid,ARR_DOT_R,0,7); ctx.fill(); }
-      else if(dot==='wait'){ ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(dx,mid,ARR_DOT_R,0,7); ctx.stroke(); }
+      if(dot==='run'){ ctx.fillStyle=`rgba(${cv('white-rgb')},${(0.3+0.35*(0.5+0.5*Math.sin(performance.now()/ARR_DOT_PULSE_MS))).toFixed(3)})`; ctx.beginPath(); ctx.arc(dx,mid,ARR_DOT_R,0,7); ctx.fill(); }
+      else if(dot==='wait'){ ctx.strokeStyle=cv('white-a40'); ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(dx,mid,ARR_DOT_R,0,7); ctx.stroke(); }
       loopView.dots.set(lid, { st:dot, filled: dot==='run', x:dx, y:mid });
       return; }
     laneTog(loopView.tx0,                          ry,rowH,t('looper.laneMute'),muted, LANE_MUTE_COL);
     laneTog(loopView.tx0+LANE_TOG_W+LANE_TOG_GAP,  ry,rowH,t('looper.laneSolo'),soloed,LANE_SOLO_COL);
     /* S3.5d: ✕ — залит красным, пока удаление взведено; строка при этом краснеет поверх (видно, КАКАЯ дорожка уйдёт). */
-    if(lid===delLy){ ctx.fillStyle='rgba(229,72,77,.24)'; ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2); }   // AR2: с колонкой имени   // E0-fix: вся строка, с колонкой значков
+    if(lid===delLy){ ctx.fillStyle=cv('rec-a24'); ctx.fillRect(x0,ry+1,nameW+markW+bw,rowH-2); }   // AR2: с колонкой имени   // E0-fix: вся строка, с колонкой значков
     laneTog(loopView.tx0+2*(LANE_TOG_W+LANE_TOG_GAP)+LANE_DEL_GAP, ry,rowH,t('looper.laneDel'),lid===delLy,LANE_DEL_COL);
   });
   /* ⛳ AR2: ПЕРЕСТАНОВКА (палец тянет ручку строки окна): тянущаяся строка обведена цветом своей роли, белая черта — куда она встанет.
@@ -400,7 +400,7 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     const from=allRows.indexOf(laneDrag.layer), to=laneDrag.to, ri=visRows.indexOf(laneDrag.layer);
     if(ri>=0){ ctx.strokeStyle=laneCol(laneDrag.layer); ctx.lineWidth=2; ctx.strokeRect(ARR_MARGIN+1,gy0+ri*rowH+1.5,hdrW+bw-2,rowH-3); }
     if(from>=0 && to!==from){ const k=(to>from?to+1:to)-r0;
-      if(k>=0 && k<=visRows.length){ ctx.fillStyle='#fff'; ctx.fillRect(ARR_MARGIN, gy0+k*rowH-1.5, hdrW+bw, 3); } }
+      if(k>=0 && k<=visRows.length){ ctx.fillStyle=cv('white'); ctx.fillRect(ARR_MARGIN, gy0+k*rowH-1.5, hdrW+bw, 3); } }
   }
   /* ⛳ МЕТКИ СОБЫТИЙ — ОДНИМ ПРОХОДОМ ПО ВСЕМ СОБЫТИЯМ, а не проходом НА КАЖДУЮ СТРОКУ (S3.3).
      Было O(дорожек × событий) НА КАДР: на петле с тремя строками и парой сотен событий незаметно, на
@@ -421,11 +421,11 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
   /* ⛳ ПОДВАЛ И ПОЛОСА ПРОКРУТКИ — только когда строки не влезают: «строки a–b из n — листайте» и тонкая полоса у правой кромки коробки
      (её длина — доля видимого, положение — первая видимая строка). Номера — ПОЗИЦИИ строк, не L-номера (у слоёв бывают дыры). */
   if(over){
-    ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font='10px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillStyle=cv('white-a55'); ctx.font='10px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
     ctx.fillText(t('looper.rowsShown',{a:r0+1, b:r0+visRows.length, n:nAll}), FULL ? ARR_MARGIN : x0, gy1+LOOP_FOOT_H/2+1);
     const sbx=x0+sw+5, sh=gy1-gy0, th=Math.max(10, sh*visRows.length/nAll), ty=gy0+(sh-th)*(r0/Math.max(1,nAll-visRows.length));
-    ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fillRect(sbx,gy0,3,sh);
-    ctx.fillStyle='rgba(255,255,255,.6)'; ctx.fillRect(sbx,ty,3,th);
+    ctx.fillStyle=cv('white-a12'); ctx.fillRect(sbx,gy0,3,sh);
+    ctx.fillStyle=cv('white-a60'); ctx.fillRect(sbx,ty,3,th);
     ctx.textBaseline='alphabetic';
   }
   if(MIX) drawMasterStrip(loopView.ms, W);   // MX1: полоса мастера — под строками
@@ -436,15 +436,15 @@ function drawLooper(full){   // AR1: full — окно аранжировки (�
     /* ⛳ Тоже через ЕДИНОЕ преобразование. Прежде здесь стояло деление на info.total, а сетка делила на
        свой total — величины совпадали, но источников было ДВА; теперь источник один (loopView.span). */
     const px=laneBeatX(loopView,info.pos), ph0=loopView.by0+2;   // S3.5b: бегунок идёт и сквозь полосу скобы — видно, где он относительно неё
-    if(cyc){ ctx.strokeStyle='rgba(10,10,20,.85)'; ctx.lineWidth=4;   // тёмная подложка ТОЛЬКО при повторе: на зелёной заливке скобы зелёный бегунок иначе тонет
+    if(cyc){ ctx.strokeStyle=cv('night-a85'); ctx.lineWidth=4;   // тёмная подложка ТОЛЬКО при повторе: на зелёной заливке скобы зелёный бегунок иначе тонет
       ctx.beginPath(); ctx.moveTo(px,ph0); ctx.lineTo(px,gy1+2); ctx.stroke(); }
-    ctx.strokeStyle=recording?'#e5484d':'#57d9a3'; ctx.lineWidth=2;
+    ctx.strokeStyle=recording?cv('rec'):cv('tonic'); ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(px,ph0); ctx.lineTo(px,gy1+2); ctx.stroke();
     ctx.fillStyle=ctx.strokeStyle; ctx.beginPath(); ctx.arc(px,ph0,3,0,7); ctx.fill();
   }
   if(FULL && !(info&&info.phase==='play')){   // AR1: на остановленном транспорте бегунок тоже виден (приглушённо) — у окна это «откуда ▶»
     const px=laneBeatX(loopView,Math.max(0,loop.pos)), ph0=loopView.by0+2;
-    ctx.strokeStyle='rgba(87,217,163,.55)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(px,ph0); ctx.lineTo(px,gy1+2); ctx.stroke(); }
+    ctx.strokeStyle=cv('tonic-a55'); ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(px,ph0); ctx.lineTo(px,gy1+2); ctx.stroke(); }
   unclip();
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
@@ -463,12 +463,12 @@ function mixGeom(lx0,bw){
 }
 function drawLaneFader(ly,ry,rowH){
   const V=loopView, v=laneLevelOf(ly), col=laneCol(ly), cy=ry+rowH/2, kx=V.fx0+v*V.fw;
-  ctx.fillStyle='rgba(10,10,20,.94)'; ctx.fillRect(V.x0,ry+1,V.bw,rowH-2);
+  ctx.fillStyle=cv('night-a94'); ctx.fillRect(V.x0,ry+1,V.bw,rowH-2);
   drawLanePan(ly,ry,rowH,col);
-  ctx.fillStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.roundRect(V.fx0,cy-3,V.fw,6,3); ctx.fill();
+  ctx.fillStyle=cv('white-a12'); ctx.beginPath(); ctx.roundRect(V.fx0,cy-3,V.fw,6,3); ctx.fill();
   ctx.fillStyle=hexA(col,.8); ctx.beginPath(); ctx.roundRect(V.fx0,cy-3,Math.max(0,kx-V.fx0),6,3); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.roundRect(kx-6,ry+5,12,rowH-10,4); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='11px system-ui'; ctx.textBaseline='middle';
+  ctx.fillStyle=cv('white'); ctx.beginPath(); ctx.roundRect(kx-6,ry+5,12,rowH-10,4); ctx.fill();
+  ctx.fillStyle=cv('white-a75'); ctx.font='11px system-ui'; ctx.textBaseline='middle';
   const lbl=levelLbl(v), tw=ctx.measureText(lbl).width; ctx.textAlign= kx>V.fx0+V.fw/2 ? 'left' : 'right';
   ctx.fillText(lbl, kx>V.fx0+V.fw/2 ? V.fx0+2 : V.fx0+V.fw-2, ry+9); ctx.textAlign='left'; ctx.textBaseline='alphabetic'; void tw;
 }
@@ -476,12 +476,12 @@ function drawLaneFader(ly,ry,rowH){
    метка центра (фиксация), подпись «L 30» / «C» / «R 30» над дорожкой ручки. ═══ */
 function drawLanePan(ly,ry,rowH,col){
   const V=loopView, p=lanePanOf(ly), cy=ry+rowH/2, cx=V.pfx0+V.pfw/2, kx=V.pfx0+(p+1)/2*V.pfw;
-  ctx.strokeStyle='rgba(255,255,255,.14)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(V.px0+0.5,ry+6); ctx.lineTo(V.px0+0.5,ry+rowH-6); ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.roundRect(V.pfx0,cy-3,V.pfw,6,3); ctx.fill();
+  ctx.strokeStyle=cv('white-a14'); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(V.px0+0.5,ry+6); ctx.lineTo(V.px0+0.5,ry+rowH-6); ctx.stroke();
+  ctx.fillStyle=cv('white-a12'); ctx.beginPath(); ctx.roundRect(V.pfx0,cy-3,V.pfw,6,3); ctx.fill();
   ctx.fillStyle=hexA(col,.8); ctx.fillRect(Math.min(cx,kx),cy-3,Math.abs(kx-cx),6);
-  ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillRect(cx-1,cy-7,2,14);
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.roundRect(kx-6,ry+5,12,rowH-10,4); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.font='11px system-ui'; ctx.textBaseline='middle'; ctx.textAlign='center';
+  ctx.fillStyle=cv('white-a45'); ctx.fillRect(cx-1,cy-7,2,14);
+  ctx.fillStyle=cv('white'); ctx.beginPath(); ctx.roundRect(kx-6,ry+5,12,rowH-10,4); ctx.fill();
+  ctx.fillStyle=cv('white-a75'); ctx.font='11px system-ui'; ctx.textBaseline='middle'; ctx.textAlign='center';
   ctx.fillText(panLbl(p), cx, ry+9); ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 /* ═══ MX1: ПОЛОСА МАСТЕРА — уровень мастера (фейдер), измеритель выхода (пик после лимитера, дБFS, с удержанием пика) и подавление лимитера.
@@ -489,35 +489,35 @@ function drawLanePan(ly,ry,rowH,col){
 let meterHold=0, meterHoldT=0;
 function drawMasterStrip(ms,W){
   const V=loopView, v=masterLevel(), m=masterMeter(), y0=ms.y0, h=ms.y1-ms.y0;
-  ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fillRect(ARR_MARGIN,y0,W-2*ARR_MARGIN,h);
-  ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.lineWidth=1; ctx.strokeRect(ARR_MARGIN+0.5,y0+0.5,W-2*ARR_MARGIN-1,h-1);
+  ctx.fillStyle=cv('white-a05'); ctx.fillRect(ARR_MARGIN,y0,W-2*ARR_MARGIN,h);
+  ctx.strokeStyle=cv('white-a16'); ctx.lineWidth=1; ctx.strokeRect(ARR_MARGIN+0.5,y0+0.5,W-2*ARR_MARGIN-1,h-1);
   ctx.textAlign='left'; ctx.textBaseline='middle';
-  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='600 12px system-ui'; ctx.fillText(t('mix.master'), ARR_MARGIN+6, y0+h*0.28);
+  ctx.fillStyle=cv('white-a90'); ctx.font='600 12px system-ui'; ctx.fillText(t('mix.master'), ARR_MARGIN+6, y0+h*0.28);
   const red=m ? m.reduction : 0, redOn=red<-0.5;
-  ctx.fillStyle= redOn ? '#ff6b6f' : 'rgba(255,255,255,.55)'; ctx.font='11px system-ui';
+  ctx.fillStyle= redOn ? cv('rec-soft') : cv('white-a55'); ctx.font='11px system-ui';
   ctx.fillText(t('mix.limiter',{db:(Math.abs(red)<0.05?0:red).toFixed(1).replace('-','−')}), ARR_MARGIN+6, y0+h*0.72);
   // фейдер мастера — в верхней половине, тем же ходом, что у строк
   const fy=y0+h*0.3, kx=V.mfx0+v*V.mfw;   // MX2: у мастера свой ход во всю ширину (у строк его делит панорама)
-  ctx.fillStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.roundRect(V.mfx0,fy-3,V.mfw,6,3); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.7)'; ctx.beginPath(); ctx.roundRect(V.mfx0,fy-3,Math.max(0,kx-V.mfx0),6,3); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.roundRect(kx-6,y0+4,12,h*0.5-6,4); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText(levelLbl(v), V.x0+V.bw+8, fy);
+  ctx.fillStyle=cv('white-a12'); ctx.beginPath(); ctx.roundRect(V.mfx0,fy-3,V.mfw,6,3); ctx.fill();
+  ctx.fillStyle=cv('white-a70'); ctx.beginPath(); ctx.roundRect(V.mfx0,fy-3,Math.max(0,kx-V.mfx0),6,3); ctx.fill();
+  ctx.fillStyle=cv('white'); ctx.beginPath(); ctx.roundRect(kx-6,y0+4,12,h*0.5-6,4); ctx.fill();
+  ctx.fillStyle=cv('white-a75'); ctx.fillText(levelLbl(v), V.x0+V.bw+8, fy);
   // измеритель — в нижней половине: −60…0 дБFS, удержание пика ~1 с
   const pk=m?m.peak:0, db=pk>0?20*Math.log10(pk):-120, fr=Math.max(0,Math.min(1,(db+60)/60)), now=performance.now();
   if(fr>=meterHold || now-meterHoldT>1000){ meterHold=fr; meterHoldT=now; }
   const my=y0+h*0.66, mh=Math.max(6,h*0.2);
-  ctx.fillStyle='rgba(255,255,255,.08)'; ctx.fillRect(V.mfx0,my,V.mfw,mh);
-  ctx.fillStyle= db>-1 ? '#ff6b6f' : db>-6 ? '#f5a524' : '#57d9a3'; ctx.fillRect(V.mfx0,my,V.mfw*fr,mh);
-  ctx.fillStyle='#fff'; ctx.fillRect(V.mfx0+V.mfw*meterHold-1,my,2,mh);
-  ctx.fillStyle='rgba(255,255,255,.75)'; ctx.fillText((db<=-120?'−∞':db.toFixed(1).replace('-','−'))+' '+t('mix.dbfs'), V.x0+V.bw+8, my+mh/2);
+  ctx.fillStyle=cv('white-a08'); ctx.fillRect(V.mfx0,my,V.mfw,mh);
+  ctx.fillStyle= db>-1 ? cv('rec-soft') : db>-6 ? cv('saffron') : cv('tonic'); ctx.fillRect(V.mfx0,my,V.mfw*fr,mh);
+  ctx.fillStyle=cv('white'); ctx.fillRect(V.mfx0+V.mfw*meterHold-1,my,2,mh);
+  ctx.fillStyle=cv('white-a75'); ctx.fillText((db<=-120?'−∞':db.toFixed(1).replace('-','−'))+' '+t('mix.dbfs'), V.x0+V.bw+8, my+mh/2);
   ctx.textBaseline='alphabetic';
 }
 function arrClip(s,w){ if(ctx.measureText(s).width<=w) return s; let a=s; while(a.length>1&&ctx.measureText(a+'…').width>w) a=a.slice(0,-1); return a+'…'; }
 function arrRowHeader(lid,x,ry,w,rowH,armed,name,col){
   // ручка перестановки: три черты во всю высоту гнезда ARR_HANDLE_W (палец берёт её где угодно в строке слева)
   const hx=x+ARR_HANDLE_W/2, hy=ry+rowH/2;
-  ctx.fillStyle='rgba(255,255,255,.07)'; ctx.beginPath(); ctx.roundRect(x+2,ry+4,ARR_HANDLE_W-6,rowH-8,4); ctx.fill();
-  ctx.fillStyle='rgba(255,255,255,.55)'; for(const d of [-5,0,5]) ctx.fillRect(hx-7,hy+d-1,12,2);
+  ctx.fillStyle=cv('white-a07'); ctx.beginPath(); ctx.roundRect(x+2,ry+4,ARR_HANDLE_W-6,rowH-8,4); ctx.fill();
+  ctx.fillStyle=cv('white-a55'); for(const d of [-5,0,5]) ctx.fillRect(hx-7,hy+d-1,12,2);
   // имя цветом роли; ниже — «L#» (у переименованной ещё «роль · тембр»: имя по умолчанию не теряется). Вооружена — «L#» и точка красные
   const nx=x+ARR_HANDLE_W, nw=w-ARR_HANDLE_W, custom=laneNameOf(lid)!=null;
   const line2='L'+(lid+1)+(custom?' · '+laneDefName(lid):'');
@@ -525,10 +525,10 @@ function arrRowHeader(lid,x,ry,w,rowH,armed,name,col){
   ctx.fillStyle=col; ctx.font='600 12px system-ui';
   const n1=arrClip(name,nw-(armed?8:0)), w1=ctx.measureText(n1).width;
   ctx.fillText(n1, nx, ry+rowH*0.34);
-  ctx.fillStyle= armed ? '#ff6b6f' : 'rgba(255,255,255,.55)'; ctx.font='11px system-ui';
+  ctx.fillStyle= armed ? cv('rec-soft') : cv('white-a55'); ctx.font='11px system-ui';
   const n2=arrClip(line2,nw), w2=ctx.measureText(n2).width;
   ctx.fillText(n2, nx, ry+rowH*0.70);
-  if(armed){ ctx.fillStyle='#e5484d'; ctx.beginPath(); ctx.arc(x+w,ry+rowH*0.34,3.5,0,7); ctx.fill(); }
+  if(armed){ ctx.fillStyle=cv('rec'); ctx.beginPath(); ctx.arc(x+w,ry+rowH*0.34,3.5,0,7); ctx.fill(); }
   ctx.textBaseline='alphabetic';
   return { nameX0:nx, nameX1:nx+w1, lblX0:nx, lblX1:nx+w2, handleX0:x+2, handleX1:x+ARR_HANDLE_W-4 };   // AR2-fix: где встали имя, «L#» и ручка
 }

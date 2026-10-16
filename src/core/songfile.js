@@ -5,7 +5,7 @@
    «__proto__», «constructor», «prototype» refused anywhere (an object built from the file must never reach a prototype). */
 
 const SONG_FORMAT='handsong/song';
-const SONG_VERSION=2;
+const SONG_VERSION=5;   // SONG1 (3): + records (copies of the person's own tunings / modes); IDS1 (4): every event's permanent id; (5): every lane point's
 const SONG_MAX_BYTES=8*1024*1024;   // a song of notes, lanes and timbre copies is ~0.1–1 MB; 8 MB leaves room and refuses junk early
 const SONG_MAX_DEPTH=24;
 const BAD_KEYS=new Set(['__proto__','constructor','prototype']);
@@ -34,7 +34,15 @@ function songV1toV2(r){
   if(!r.timbres) r.timbres={};
   return r;
 }
-const SONG_MIGRATIONS=[songV1toV2];
+/* v2 → v3 (SONG1): a song carries copies of the person's own records it stands on; an older file has none (it opens only where they exist) */
+function songV2toV3(r){ if(!r.records) r.records={}; return r; }
+/* v3 → v4 (IDS1): events carry their permanent ids; an older file has none — the app gives them at open (nothing to rewrite here) */
+const songV3toV4=r=>r;
+/* v4 → v5 (IDS1 part 2): lane points carry their permanent ids; an older file has none — the app gives them at open */
+const songV4toV5=r=>r;
+const SONG_MIGRATIONS=[songV1toV2, songV2toV3, songV3toV4, songV4toV5];
+const REC_KINDS={ tuning:'handsong/tuning', palette:'handsong/palette', chordmodes:'handsong/chordmodes', mode:'handsong/mode' };
+const OWN_ID=/^u\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;   // = core/registry USER_ID
 
 /* ---- reading a text ---- */
 function songParse(text){
@@ -87,23 +95,29 @@ function songCheck(r){
       && (v.tunedFrom===undefined || v.tunedFrom==='T' || (isInt(v.tunedFrom) && v.tunedFrom>=0 && v.tunedFrom<12)) && (v.chordMode===undefined || isStr(v.chordMode)),`view ${i}`); });
   if(need(isObj(r.timbres),'timbres')) for(const [id,t] of Object.entries(r.timbres))
     need(isStr(id,80) && isObj(t) && ['ld','ch','bs','dr'].includes(t.role) && isObj(t.def),`timbre ${String(id).slice(0,40)}`);
+  if(need(isObj(r.records),'records')) for(const [kind,map] of Object.entries(r.records)){   // SONG1: shape only (the full check: scaleload.checkRecord in the page)
+    if(!need(REC_KINDS[kind] && isObj(map) && Object.keys(map).length<=200,`records.${String(kind).slice(0,20)}`)) continue;
+    for(const [id,x] of Object.entries(map)) if(!need(OWN_ID.test(id) && isObj(x) && x.id===id && x.format===REC_KINDS[kind],`records.${kind} ${String(id).slice(0,40)}`)) break; }
   const layers=new Set();
   if(need(Array.isArray(r.tracks) && r.tracks.length<=256,'tracks')) r.tracks.forEach((t,i)=>{
     if(!need(isObj(t) && isInt(t.layer) && t.layer>=0 && t.layer<1024 && !layers.has(t.layer),`track ${i}`)) return; layers.add(t.layer);
     need((t.name===undefined||isStr(t.name,40)) && (t.level===undefined||(isNum(t.level)&&t.level>=0&&t.level<=1)) && (t.pan===undefined||(isNum(t.pan)&&Math.abs(t.pan)<=1))
       && (t.rank===undefined||isNum(t.rank)) && (t.len===undefined||(isNum(t.len)&&t.len>=0)) && (t.mute===undefined||typeof t.mute==='boolean') && (t.solo===undefined||typeof t.solo==='boolean'),`track ${i} fields`); });
-  const tks=new Set();
+  const tks=new Set(), pids=new Set();
   if(need(Array.isArray(r.takes) && r.takes.length<=100000,'takes')) r.takes.forEach((k,i)=>{
     if(!need(isObj(k) && isInt(k.tk) && k.tk>0 && !tks.has(k.tk) && isObj(k.kinds) && isObj(k.chains) && Array.isArray(k.lane),`take ${i}`)) return; tks.add(k.tk);
-    for(const p of k.lane) if(!need(isObj(p) && isNum(p.t) && isStr(p.key) && isStr(p.fx),`take ${k.tk} lane point`)) break; });
+    for(const p of k.lane){ if(!need(isObj(p) && isNum(p.t) && isStr(p.key) && isStr(p.fx),`take ${k.tk} lane point`)) break;
+      if(p.id!==undefined){ if(!need(isInt(p.id) && p.id>0 && p.id<=1e9 && !pids.has(p.id),`take ${k.tk}: a lane point id is not a fresh positive integer`)) break; pids.add(p.id); } } });   // IDS1 part 2
   if(need(Array.isArray(r.marks) && r.marks.length<=1000,'marks')) r.marks.forEach((m,i)=>need(isObj(m) && isNum(m.beat) && m.beat>=0 && isStr(m.name,40),`mark ${i}`));
+  const ids=new Set();
   if(need(Array.isArray(r.events) && r.events.length<=2000000,'events')) for(let i=0;i<r.events.length;i++){ const e=r.events[i];
     const ok=isObj(e) && isNum(e.t) && e.t>=0 && e.t<1e6 && isInt(e.layer) && layers.has(e.layer) && FNS.has(e.fn) && isObj(e.a) && isInt(e.tk) && e.tk>0
       && (e.v===-1 || (isInt(e.v) && e.v>=0 && e.v<nV)) && typeof e.sev==='boolean' && (e.jam===undefined || e.jam===true);
     if(!need(ok,`event ${i}`)) break;
     const role=ROLE_OF_FN[e.fn], f= role==='dr' ? 'kit' : 'inst';
     if(role && e.a[f]!==undefined && !need(isStr(e.a[f],80),`event ${i}: the timbre is not an id`)) break;
-    if(e.a.vol!==undefined && !need(isNum(e.a.vol) && e.a.vol>=0 && e.a.vol<=1,`event ${i}: volume`)) break; }
+    if(e.a.vol!==undefined && !need(isNum(e.a.vol) && e.a.vol>=0 && e.a.vol<=1,`event ${i}: volume`)) break;
+    if(e.id!==undefined){ if(!need(isInt(e.id) && e.id>0 && e.id<=1e9 && !ids.has(e.id),`event ${i}: the id is not a fresh positive integer`)) break; ids.add(e.id); } }   // IDS1
   return P;
 }
 export { SONG_FORMAT, SONG_VERSION, SONG_MAX_BYTES, SONG_MIGRATIONS, TIM1_POSITIONS, songParse, songUpgrade, songCheck };

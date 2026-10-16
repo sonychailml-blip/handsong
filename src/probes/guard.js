@@ -1,6 +1,7 @@
 /* PROBE1: The console guard: window.P = api() — one probe at a time; its self-test runs inside row «write path (funnels)». Moved from scaleprobe.js verbatim; rows register themselves (probes/rows.js). */
 import * as SELF from '../scaleprobe.js';
 import { afPause, afBusy, afIdle } from '../frzqueue.js';
+import { asPause } from '../autosave.js';   // AUTOSAVE1: no autosave while a probe holds the lock
 
 /* ═══ ⛳ СТРАЖ КОНСОЛИ — ОДНА ПРОБА ЗА РАЗ (слайс AUTO-PROBE) ═══
    window.P (адрес с ?probe — main.js) — НЕ сам модуль, а api(): каждая функция модуля обёрнута замком. Пока идёт любая проба (P.seed
@@ -20,8 +21,8 @@ export function api(){
     if(typeof v!=='function' || n==='api'){ API[n]=v; continue; }
     API[n]=(...args)=>{
       if(LOCK){ const why=lockWhy(n); console.warn('[probe] '+why); return n==='all'||n==='quick' ? { pass:false, refused:true, why } : { refused:true, why }; }
-      LOCK=n; afPause('probe',true);   // AF3: the auto-freeze watcher is paused while any probe runs; a render in flight finishes first
-      const done=()=>{ LOCK=null; afPause('probe',false); };
+      LOCK=n; afPause('probe',true); asPause('probe',true);   // AF3: the auto-freeze watcher is paused while any probe runs; a render in flight finishes first
+      const done=()=>{ LOCK=null; afPause('probe',false); asPause('probe',false); };
       let r;
       try{ r= afBusy() ? afIdle().then(()=>v(...args)) : v(...args); }catch(e){ done(); throw e; }
       if(r && typeof r.then==='function') return r.finally(done);

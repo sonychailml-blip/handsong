@@ -33,7 +33,8 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   target design (per-track chains; live chain by timbre or by finger) · 7.15 modes/presets as bundles (packs) · 7.16 ⛳ «Calm» mode — rooms of
   light and sound (candidate for the FIRST RELEASE, after stage 3; + «musicians in the scene», added 2026-10-15) · 7.17 Calm — playing along with outside music («Listen», after the
   first Calm release, part of hearing the room) · 7.18 installation (kiosk) mode + B2B sales plan (stage 4b, right after Calm) · 7.19 ⛳ own authored visual design and icon set
-  (before the Calm release; UI1 makes the UI themable).
+  (before the Calm release; UI1 makes the UI themable) · 7.20 ⛳ learning — a music-theory course taught through the body (added 2026-10-16;
+  lessons as data, checked with HAND1's synthetic hands; after the core).
 
 Общий список задач. Обновляется по ходу работы.
 
@@ -2520,6 +2521,11 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
      so many channels share one room at the cost of one. This is also the CPU answer for Night forest (one shared room instead of one
      per role; §7.16 CPU note).
   Any effect module may be placed in any of the three; the declaration (rule #29) stays the one description of its parameters.
+  - ⛳ **Freeze and shared sends (finding of the AUD1 plan, recorded 2026-10-16 by the strategist's review):** a FROZEN track must feed
+    the shared returns LIVE — its buffer carries only its own channel chain, and its send amounts drive a send tap on its frozen bus into
+    the shared return. A frozen track must NEVER bake a private copy of the room into its buffer (that would double the room, break
+    «one room for many tracks» and make the frozen sound differ from live). This belongs to the slice that adds sends (ROUTE1), not to
+    AUD1; AUD1 only reserves the `send:<id>` / `master` chain keys and the `E.ret` table (docs/AUD1-design.md §5).
 
 ### ⬜ 7.15. MODES / PRESETS — READY-MADE BUNDLES (user's idea, recorded after AF5)
 - A bundle = tuning and mode, timbres, effects, finger roles, tempo, visuals — stored as DATA FILES like tunings (`data/…`, validated by a
@@ -2627,9 +2633,27 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
 - **Done in code (UI1b, DAY run 2026-10-16):** `tokens.css` holds every colour, type size / weight / line height, spacing, radius, shadow and
   z-index of the DOM interface (built from today's values; style.css and JS styles use only tokens — static check 11); `src/icons.js` is
   the ONE icon component (names by meaning; DOM `data-icon`, dictionary `{i:name}`, `icon()` in ui/draw/tutor); LIC1 fails on an interface
-  glyph outside it. Proof: tools/ui-snap.mjs — 10 screens pixel-identical. Left for DRAW1: the CANVAS palette (draw.js literals,
-  config.INSTR_COL) read from tokens.
+  glyph outside it. Proof: tools/ui-snap.mjs — 10 screens pixel-identical. DRAW1b (RUN 3, 2026-10-16) did the CANVAS palette:
+  tokens.css «canvas» (`--cv-*`), read by src/palette.js; the play field, strip, window, mixer and editor are pixel-identical.
 - **Preparation in code (slice UI1 of stage 3; UI1b done — see above):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes,
   spacing; today partly in `style.css :root`) and ONE icon component / SVG sprite replacing emoji and Unicode glyphs in the UI (DOM and
   canvas), so the authored design drops in later WITHOUT code changes. LIC1's glyph audit lists every symbol to replace.
 - **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).
+
+### ⬜ 7.20. ⛳ LEARNING — A MUSIC-THEORY COURSE TAUGHT THROUGH THE BODY (user's idea, added 2026-10-16; lessons stay scheduled AFTER the core, as the user decided earlier — record only, no code)
+- **The idea:** an interactive music-theory course inside Handsong where the body is the instrument of understanding. The 12 rows are a
+  ready chromatic grid (a semitone = the neighbouring row, a tone = two rows); an INTERVAL = the distance between the two hands; the
+  OCTAVE = hand height.
+- **Each lesson:** ~30 s explanation → a demonstration (rows light up + sound) → «your turn» with the hands → an AUTOMATIC CHECK (the app
+  sees which note / interval / chord was shown) → a small game.
+- **Course outline:** pitch and octave; the chromatic scale, tone / semitone; major / minor scales as step patterns, and keys; intervals
+  (names, character, ear training «hear it and show it»); chords (triads, inversions, sevenths, functions, simple progressions); the circle
+  of fifths (an interactive wheel); modes and world scales with the world catalogue, microtones, equal vs just intonation heard side by
+  side (beating); improvisation over a backing with the «safe» notes lit, call-and-response games.
+- **Lessons are DATA, not code:** a small lesson-script format (highlight rows, play notes, wait for a gesture condition, check) — so lessons
+  can be written in batches and tested AUTOMATICALLY with HAND1's synthetic hands (the pose generator and the probe clock).
+- **Markets:** self-learners, children, music teachers and schools (B2B, like the installations §7.18).
+- **For the future redesign** (`docs/UX-INVENTORY.md`, §7.19): reserve a «LESSON LAYER» — row highlights, hints, a check indicator — that
+  can sit on top of the play screen.
+- Relation to today: the six lessons of `tutor.js` (§3.20) and the planned lesson content (§3.6) are the seed of it; the LESSONS / TUTORIAL
+  update remains the LAST stage (user, 2026-10-13).

@@ -9,6 +9,7 @@ import { scaleId, tunedFrom, seventh, setScaleId, setTunedFrom, setSeventh, chor
 import { guardSelfTest } from './guard.js';
 import { liveEnv } from './key.js';
 import { row } from './rows.js';
+import { asPause } from '../autosave.js';   // AUTOSAVE1: the probe's test songs are not autosaved
 import { material, songPrint } from './run.js';
 import { tracks } from './tuning.js';
 /* ═══ P.seed — ДЕТЕРМИНИРОВАННАЯ ТЕСТОВАЯ ПЕСНЯ ═══
@@ -196,6 +197,7 @@ export async function seed(opt={}){
   console.log('[scaleprobe seed] P.seed REPLACES the current song with a test song (nothing is saved).');
   if(editIsOpen()){ console.warn('[scaleprobe seed] the track editor is open — close it first.'); return null; }
   if(events.length && !opt.replace){ console.warn(`[scaleprobe seed] the song has ${events.length} events — refusing. Run await P.seed({replace:true}) to replace it.`); return null; }
+  asPause('probe-song',true);   // AUTOSAVE1: a test song never enters the person's autosaves
   const keep={ sc:scaleId, tf:tunedFrom, sev:seventh, cm:chordModeSel };   // T7b: и выбор режимов аккордов
   const built=[]; const say=m=>{ built.push(m); console.log('[scaleprobe seed] '+m); };
   try{
@@ -371,6 +373,7 @@ export async function song(name='triphop', opt={}){
   if(!editIsOpen()) setChordModeSel({});   // T7b: пьеса написана в режимах аккордов по умолчанию (как тоника и лад, выбор остаётся у пьесы)
   const r=await S.loadSong(name, opt);
   if(!r) return null;
+  asPause('probe-song',true);   // AUTOSAVE1
   SEED_REC={ kind:'song', name:r.name, takes:r.takes, edited:[], freeze:null };
   const pinned=songPinChains(); SEED_REC.pinned=pinned.length; SEED_REC.soloSnap=pinned.soloSnap;   // AF3: song load pins the live chain on chain-less tracks
   console.log(`[scaleprobe song] song load: ${pinned.length} track(s) without a captured chain got the live chain pinned; ${pinned.soloMaps||0} solo note event(s) without an effect map got the live solo snapshot (AF5)`);

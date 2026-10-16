@@ -87,7 +87,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   CDP touch double tap and §✎ (control: the old rename opened inside the press must fail), and a bend point dragged with the mouse (one
   step, cents up). Measured: a hard kill of node (a tool timeout) runs no handler, but Chrome exits by itself when its pipe closes — only
   the profile folder is left.
-- **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; static import names vs exports with
+- **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; (12) the engine surface `src/engine/surface.js`; (13) rule #38; static import names vs exports with
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
   called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module
@@ -162,9 +162,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   in); inventory and principles: `docs/UX-INVENTORY.md`.
 - **An interface glyph / icon** = a name in `src/icons.js` `ICONS` (by meaning), rendered by `icon(name)`, `{i:name}` in a dictionary
   string or `data-icon` in the markup — never the glyph itself (UI1b). **A colour / size / spacing / radius / shadow / layer** = a token in
-  `tokens.css` first, then `var(--token)`.
+  `tokens.css` first, then `var(--token)` (a CANVAS colour: a `--cv-*` token, drawn with `palette.cv('name')` — DRAW1b).
 - **A behaviour gate** = a scale property + a predicate in `scales.js`, never a `tag`/index check.
-- **A path that creates or removes events** (the editor is the third such path — insert and ED2 paste) = stamp `tk`, keep `t` in absolute song beats, choose
+- **A path that creates or removes events** (the editor is the third such path — insert and ED2 paste) = a NEW object (never a spread copy of an
+  event — it would copy its permanent `id`, IDS1), stamp `tk`, keep `t` in absolute song beats, choose
   `a.v`/`a.k` that don't collide (`layerSlotTop`/`layerTakeTop`), remove with `compactEvents`, then `schedInvalidate` exactly once
   (sort first while recording); always write `a.vol` (rule #30).
 
@@ -334,6 +335,15 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     song). A built-in is HIDDEN, never destroyed (songs that use it always play); a user record may be removed. Songs will store the id AND
     a full copy of the record (SONG1): a missing id (deleted, another person's song) still plays from the copy and offers «add it back to my
     list». ⛔ Never rename or reuse an id (the TIM1 probe pins the list).
+38. ⛳ **An engine submodule is STATELESS** (AUD1b, RUN 3 2026-10-16; strategist's review of the AUD1 plan): a module under `src/modules/**`
+   or `src/engine/**` (the worklet processors in `src/engine/worklets/` excepted) keeps no state of its own — no top-level `let`/`var`, no
+   top-level table it writes; everything made from a context or changing while playing (nodes, buffers, caches, the scratch of a voice being
+   built) lives in the ENGINE CONTEXT `E` it receives as its first argument (`audio.engineCtx()`: getters/setters over that instance's
+   variables, never a stale copy — R1). It imports only `core/`, `config.js`, `scales.js` and the stateless tree itself (`src/modules/**`,
+   `src/engine/**`; widened at AUD2a — the effects use the timbre stages and `engine/fdn.js`). Why: such a module is imported
+   ONCE and shared by the live engine and the render copy (`audio.js?render`) — only statelessness makes that safe. Pure data moves there only
+   after it is proved pure (R2: no node, buffer, port or function; deep-frozen). Static check 13 (CONTROLS: a top-level let, a written table,
+   a forbidden import caught; a clean module passes).
 
 ## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
 - `index.html` — markup only (start card, top bar, panels `#panelScale`/`#panelSound`/`#panelLoop`, `#backingMenu`, help overlay,
@@ -343,8 +353,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `tokens.css` (UI1b) — the DESIGN TOKENS: every colour, type size / weight / line height, spacing, radius, shadow and z-index of the DOM
   interface as custom properties on `:root` (today's values; names: colours by family + alpha `--c-white-a22`, sizes/spacing by today's px
   `--fs-15`, `--sp-9`, layers by role `--z-panel`). ⛳ `style.css` and JS-set styles carry no such literal (static check 11: also every
-  `var(--x)` must be defined there or listed in `RUNTIME_VARS`, today `--role`); a new value is added to tokens.css first. The CANVAS palette
-  is not in it yet (DRAW1). `src/icons.js` (UI1b) — THE ICON COMPONENT: `ICONS` by MEANING (one glyph may serve two names: 🎚 mixer /
+  `var(--x)` must be defined there or listed in `RUNTIME_VARS`, today `--role`); a new value is added to tokens.css first. DRAW1b: the CANVAS palette
+  too — section «canvas» `--cv-*` (role colours `--cv-role-ld/ch/bs/dr`, `--cv-lane-norole`, effect bars `--cv-fx-*`, 82 family+alpha colours),
+  read by `src/palette.js` (`cv(name)` = the token's exact text, cached; `ROLE_COL`, `noRoleCol()`); static check 11 fails on a colour
+  literal in `src/views/` or `config.js` and on a `cv()` name without a token (CONTROL). `src/icons.js` (UI1b) — THE ICON COMPONENT: `ICONS` by MEANING (one glyph may serve two names: 🎚 mixer /
   bass), `icon(name)`, `iconText(s)` expands `{i:name}` (the dictionaries carry tokens; `t()` expands them), `applyIcons(root)` fills
   `[data-icon]` (a name or a `{i:…}` template; called by `applyI18n`). ⛳ An interface glyph outside icons.js fails LIC1 (exempt: probes and
   the console texts of songs/recorder/render, `ICON_EXEMPT`); data row «UI1b icons (core)». Proof tool for no-visible-change slices:
@@ -353,7 +365,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   fires `beforeinstallprompt`).
 - `src/config.js` (leaf, imports nothing) — thresholds, scheduler timings, pool sizes, palette/FX geometry (`palSplitX` = the single
   palette|notes split, `rectBandY`, `coverView` = the single cover crop), volume curve `volAmp(v)=v²`/`volVel`/`volFromOld`,
-  fine-recording constants, `INSTR_COL` (the ONE role palette, different lightness), arrangement sizes, the ONE curve law of bends and bus
+  fine-recording constants (the role palette moved to tokens — `palette.ROLE_COL`, DRAW1b), arrangement sizes, the ONE curve law of bends and bus
   lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan` — BEND-CURVE).
 - `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents` (TF5), `aRef`, `tunedFrom`, instruments, `handFn`,
   `voiceMode`, split + `phoneHalves(W)` (the only `W/2`), registers, camera, editor/window state). Chain-owner key `chainKeyOf(role)`
@@ -374,12 +386,53 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `scaleView`/`CUR()`; predicates (TF5: `keyByOneOne`, `historicalKeyOf`, the cents door `viewKeyC`); rect layout; theremin; `registerRecord`/`unregisterRecord`.
 - `src/audio.js` — the Web Audio engine (see "Audio engine"): pools, synthesis paths, drums, drone, metronome, FDN reverb, `FX_FACTORY`,
   chain wiring, track level/pan, master, frozen-track store/reader, probe and render helpers.
-- `src/ks-worklet.js` — Karplus–Strong `ks-string` (mandatory worklet: a native delay loop is floored at 128 samples); allpass
+- AUD1a (RUN 3): `audio.js` `engineCtx()` → `E`, THE ENGINE CONTEXT of this module instance (live and `?render` copy each their own;
+  docs/AUD1-design.md option C, review R1–R5): every field a GETTER over the instance's module variable — `ac`, `offline`, `rate`, `rnd`,
+  `dbg`; `master.{in, glue, make, lim, limiter, out, meter, level, limRed}`; `bus.{ldSum, ch, bs, dr, drone}`, `head(key)`; `trackBus.*`;
+  `lfo.*`; `expr.*`; `fx.{inst, head, out, links, path, aim, dipT}`; `pool.{ld, ch, bs}`; `wk.{ks, dyn, frz, frzStore, frzSink, cap, capOk}`;
+  `look.{gainOf, panOf, routeOf}`; `buf.{noise, forestIRs}`; `drone.*`; `build.*` (scratch of the voice being built, with setters).
+  `src/engine/surface.js` — THE ENGINE'S OUTWARD SURFACE: every audio.js export listed by its caller module (static check 12: listed =
+  exported, every export listed, every module's calls listed — named imports, `ns.x`, makeENG's `A.x`, the render copy's `eng.x`; CONTROL).
+  `render.engineProbe(fn, {real, wrap, phase, after})` (probes only). Probe rows «AUD1 engine context» (three times, both copies, nothing
+  shared; CONTROLS stale snapshot / shared node) and «AUD1 node census» (`tools/census.print.json` from `P.dumpCensus()`: nodes by kind of
+  the copy's initAudio + one note of every timbre / kit row / the drone; «not applicable» when the live chains differ).
+- AUD1c (RUN 3): `src/modules/timbres/` — the TIMBRE BUILDERS moved out of audio.js (rule #38: stateless, the first argument is E, shared
+  by both engine copies): `stages.js` (`makePanStage`, `voiceRoute`, `makeBriStage`, `panGains`, `makeSatCurve`/`makeHardCurve`, `BRI_HZ`,
+  `BRI_OPEN`, `briHzOf`, `CHORD_LP_MAX/MIN`, `briToHz`, `HUM_CENTS`, `LEAD_GLIDE_TC`, `fstrike`, `freezeDeep`), `voice.js` (`voiceBuild`,
+  `voiceStart`, `voiceStartPair`, `mkOsc`), `fm.js` (`buildFMBank`), `ks.js` (`KS_BANKS` deep-frozen, `buildKSBank`, `buildKSFallback`),
+  `subtractive.js` (`buildLeadBanks`, `buildLeadBank`), `chord-voice.js` (`newChordVoice`, `buildChordPool`, `FIREFLY`, `FF_END`,
+  `ffStrike`), `bass-voice.js` (`buildBassPool`), `drumkits.js` (the five kits' hit synths, `dNoise`, `drumVoice`). Same code, same creation
+  order; state read through E (`E.ac`, `E.rnd`, `E.build.*`, `E.pool.*`, `E.look.ownerPan/ownerGain` …). The timbre TABLES (`LEAD_INSTR` …),
+  pools, allocation and routing stay in audio.js (until TIM3). Data row «AUD1c timbre data pure (core)» (R2: the modules load in node, the
+  tables are pure and deep-frozen; CONTROLS).
+- AUD2a (RUN 3): `src/modules/effects/` — the EFFECTS moved out of audio.js (rule #38): `param.js` (`fxNorm`, `fxDenorm`, `fxWrapParam`),
+  `reverb.js` (`REV_PARAMS`, `makeReverbFx`), `delay.js` (`DLY_A`, `DLY_PARAMS`, `makeDelayFx`), `trem-mix.js`, `bright.js`, `glide.js`,
+  `volume.js`, `forest.js` (`forestBuffer`; the IR cache stays in audio.js — `E.buf.forestData`), `glue.js` (`dynNode` — also the master's
+  Glue and Limiter, `makeGlueFx`); `src/engine/fdn.js` (`REV_A`, `apStage`, `buildFDN`, `setRevDecay`, `setRevTone` — the JS reference for the
+  WASM reverb W1). Every declaration deep-frozen (shared by both engine copies; the makers copy before wrapping). `FX_FACTORY` stays in
+  audio.js, the same keys in the same order; a factory is called `make(E)` (`fxInstance`). `FX_VOL` moved to config.js (state.js
+  re-exports it); `BASS_GLIDE_TC` to `modules/timbres/stages.js`.
+- ENG1 (RUN 3): THE ENGINE CONTRACT (plan §4.4) in audio.js — `noteOn(voice, n, time)`, `noteSet`, `noteOff`, `bend(voice, plan, time)`,
+  `hit(owner, h, time)`, `drone(owner, d, time)`; `n` = { role 'ld'|'ch'|'bs', hz (a chord: a list), vel, timbre (position), deg, oct, values
+  (the note's map), bri, glide/live, tie, symp, cancel }; time always last (rule #15). `live/eng.js` makeENG calls ONLY these (+ `timbreIdx`,
+  the id → position lookup) and prices every note itself; each call does what the adapter did, in the same order. The engine's REMAINING
+  reads of app state (to cut later): `state.js` live timbre positions (`leadIdx`, `bassIdx`, `drumKitIdx`), the live solo scalars `fx`,
+  the chain tables (`fxChainOf`, `chainKeyOf`, `trackChainKeyOf`, `CHAIN_SOLO` — routing as data is ROUTE1 / `setGraph`); `scales.js`
+  `tonicFreq`, `droneSecondHz` (the drone prices its view — later `drone(owner, {hz, hz2})`); `modules/timbres/ks.js` `baseF()` (the
+  sympathetic strings when `symp` is null); `hooks.js` (UI notices).
+- AUD2b (RUN 3): `src/probes/fxcontract.js` — GENERATED CONTRACT ROWS, one per `FX_FACTORY` effect, each built ALONE by its own `make(E)` on
+  the render copy (`render.engineProbe`, `opt.sec`), a seeded noise burst after 0.4 s of settling: family «AUD2b effect contracts» (quick:
+  parameter round trip — default in range, getNorm, norm → units → norm 1e-9; identity at neutral — mix 0 / depth 0 / Glue thr 0, knee 0,
+  makeup 0 → the input sample for sample (Glue 1e-6); CONTROLS: a 1 % units error, the effect fully on) and family «AUD2b effect tails»
+  (P.all: two renders equal ≤ 2e-4 of peak; the output falls 60 dB below peak no later than render.js's declared tail — reverb decay, forest
+  room, delay time·ln1000/ln(1/fb), inserts 50 ms; CONTROL: half the reverb decay must be exceeded). Voice modules: parameters only.
+- `src/engine/worklets/ks-worklet.js` (AUD2c: the four worklets live in `src/engine/worklets/`, page-relative `addModule` paths; rule #38
+  exempts them) — Karplus–Strong `ks-string` (mandatory worklet: a native delay loop is floored at 128 samples); allpass
   fractional delay + loop-filter phase compensation (< 1 cent); seeded via `processorOptions.seed` only in track renders.
-- `src/frz-worklet.js` — frozen-track STORE (`frz-store`, transferred Int16 chunks) and READER (`frz-reader`: context frame F ≥ startF
+- `src/engine/worklets/frz-worklet.js` — frozen-track STORE (`frz-store`, transferred Int16 chunks) and READER (`frz-reader`: context frame F ≥ startF
   plays buffer frame F + d, integer frames; reports `{ended, played, first, seen}`; `ready`; `ALIVE`). Frame never goes backwards.
   Loaded on the LIVE context only.
-- `src/probe-cap-worklet.js` — probes only: audio-thread capture of the live master (`F0`, `gaps`, `stale`).
+- `src/engine/worklets/probe-cap-worklet.js` — probes only: audio-thread capture of the live master (`F0`, `gaps`, `stale`).
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`);
   volumes in the OLD per-role scale, converted at event birth. Imports only `config.js`.
 - `src/recorder.js` — since REC1–REC5 (NIGHT run 2026-10-16: 4897 → 725 lines) mostly the FACADE: it re-exports everything that moved
@@ -455,6 +508,38 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `scaleView`, a missing mode refuses; a timbre id this app lacks → mapped to an own timbre with equal settings, else kept by id and
   named — its copy is re-saved), `fileDbg` (probe controls). `recorder.songSaveRec/songOpenApply/songMark/songDirty` (open = clear + install
   + history reset, like a song load); `ui.songSaveText/songOpenText` (+ download, file picker, confirm). Frozen audio is never stored.
+- PACK1 (RUN 3): `src/core/pack.js` (pure; WebCrypto only, NO network — rule #33; provider-agnostic: a payment provider later only DELIVERS
+  a key text) — the pack record `handsong/pack` v1 `{ id (kebab, permanent), name, licence, items:[{kind, id:'<pack>/<name>'}] }` (`packCheck`,
+  a newer version refused in words); the LICENCE KEY «HS1.<payload>.<signature>» (base64url; payload `{ v:1, kid, pack, key, issued, until? }`,
+  no personal data; ECDSA P-256 / SHA-256, `keySign` for tools/probes only, `keyVerify` offline → refusals malformed / format / unknownKey /
+  signature / expired); `PACK_PUBKEYS` holds only the TEST public key (its private half: `tools/.pack-test-key.json`, git-ignored, made by
+  `tools/pack-keygen.mjs`; a production pair is made the same way when a provider is chosen — its private half never in the repo);
+  `createPackGate` + `packUnlock` (wrongPack; a free pack opens without a key); `core/registry.createRegistry(kind, {gate})` leaves locked
+  pack records out of `order()` (`isLocked`), `get` still answers (songs play from their copies). No UI, no stored keys yet. Fixture
+  `tools/pack-test-licence.json`; rows «PACK1 packs and licence keys (core)» (node) and «PACK1 licence keys in the page».
+- IDS1 (RUN 3, part 1 — events): every event has a PERMANENT id `e.id` (positive integer, unique in its song) — given in array order by
+  `song/store.evIdFill` at the one rebase point (`schedInvalidate`), kept by every edit that keeps the object and by ↶/↷ (the same objects),
+  saved in the song file (version 4; migration v3→v4 writes nothing — an older file's events get ids at open); Open keeps the file's ids and
+  `evIdFloor(max)` continues the counter above them; never reused in a session. `songCheck`: an id, when present, a fresh positive integer.
+  Row «IDS1 permanent event ids» (CONTROL `fileDbg({noIds})`). IDS1 part 2: every captured LANE POINT has a permanent id `p.id` too
+  (`song/capture.laneIdFill` at the one capture-change hook `takeFxTouch`, `laneIdFloor` at open; file version 5; a copy — the section
+  «duplicate» — is a NEW point, never a spread of its original's id); a capture record is identified by its take number `tk`, a chain entry by
+  (its chain key, its effect id) — no new field. ⚠️ A lane point is never copied with a spread that keeps `id`.
+- SONG1 (RUN 3): file version 3 (`core/songfile.js`: migration v2→v3 adds `records:{}`; `songCheck` checks the shape — kinds tuning /
+  palette / chordmodes / mode, keys `u.<uuid>` = the record's id and format). `song/file.js` `songData` writes `records` from
+  `scales.userRecordsOf(view)` (the person's own records a view stands on, read from the VIEW — dependencies first); `songNeeds(rec)` →
+  `{install, missing}` (pure); `scaleload.checkRecordList(list, D)` checks the copies in order like data files; `ui.songOpenText`: needs →
+  check → ask → `registerRecord` each (rolled back on any failure) → plan → open; `songRecs` + `#songKeepRow`/`songKeep()` («Keep in my
+  scales» → `userstore.userPut`). Probe control `fileDbg({noRecs})`.
+- AUTOSAVE1 (RUN 3): `src/autosave.js` (no DOM) — the song kept on the device by itself: IndexedDB `handsong-songs`/`auto`, one entry per
+  song id `{id, name, at, tracks, events, ms, text}` (`text` = exactly what Save writes; restore = `ui.songOpenText` of it, every SAVE1
+  check), newest `AS_KEEP` 5 kept (trimmed in the write's transaction). `asTick(now)` every `AS.pollMs` 1 s: key = `histHash()` + the song
+  settings; writes after `AS.settleMs` 2.5 s still, ≥ `AS.gapMs` 8 s apart, in `requestIdleCallback`; never while recording, a clip, a
+  render (`hooks.renderBusy`), a probe (`asPause('probe')`), a probe's test song (`'probe-song'` hold), or playing when the last write took
+  > `AS.playMs` 40 ms; an empty song is never written; material after an empty song = a new song (new id). `asFlush` on pagehide. Setting
+  `handsong.autosave` (default on, `asSetEnabled`). Errors → `'full'` (quota) / `'blocked'` / `'error'` + one message. ui: `#asOn/#asOff`,
+  `#asStatus`, `#asPick` + `#asRestore` (`asRestoreId`), `#resumeToast` (`songResumeOffer`, at ▶ Play only, once, 30 s). Probe controls
+  `asDbg({db, fail, silent, ignoreOff, noTrim})`, `asPut`, `asDrop`.
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
 - `src/vision.js` — camera + the DETECTION PATH + the FRAME PUMP (LAT2). Path: a detector object `{kind, run(job), setDelegate, dbg, close}`
   built by `buildDet` — the main thread (default, `mainDet`: handdet.js imported dynamically) or the worker (`workerDet`: src/hand-worker.js;
@@ -514,7 +599,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `rollRowY`/`rollRowAt`, bar heights `ROLL_BAR_H`/`ROLL_TP_H`), `camera.js` (`syncViewRect`, `drawVideoBackground`), `strip.js` (play strip,
   arrangement window, mixer: `drawLooper`, `loopView` + its one outside writer `loopViewClear`, hit tests, probes), `roll.js` (the editor:
   `drawRoll`, `rollView`, axis, lane, hits), `play.js` (`drawOverlays` and the play screen). Imports: play → roll, strip, common; roll →
-  strip, common; strip → common (no cycle). The canvas palette is still literals + `config.INSTR_COL` (tokens for it: a later DRAW1b).
+  strip, common; strip → common (no cycle). The canvas palette is tokens since DRAW1b (`src/palette.js`, `cv('…')`; `FX_META[].col` names a token).
 - (before DRAW1, all in draw.js) — canvas: video background, overlays, roles, grids, palette, FX bars, status, `noteLbl` (the ONE label function), the
   editor (`drawRoll`, snapshot `rollView`, `rollAxis`), the strip and arrangement window (`drawLooper(full)`, snapshot `loopView`).
 - `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
@@ -541,7 +626,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `core/dsp.js` (SND-F1): `seeded` (mulberry32), `FOREST`/`forestIR` (the Night forest IR,
   seeded per channel, any rate), `irNormScale` (the Web Audio spec's convolver normalisation, applied by us), `f32Hash`, `compCurveDb` /
   `compGainDb` (soft-knee curve), presets `DYN_GLUE`, `DYN_LIMIT`, `dynCoef`.
-- `src/dyn-worklet.js` — SND-F1 dynamics processor `'dyn'` (mode `comp` = Glue: stereo-linked, soft knee, branching peak detector in dB,
+- `src/engine/worklets/dyn-worklet.js` — SND-F1 dynamics processor `'dyn'` (mode `comp` = Glue: stereo-linked, soft knee, branching peak detector in dB,
   makeup; mode `limit`: instant attack, release, ceiling; `on` = exact bypass with a 10-ms crossfade; all k-rate). Zero lookahead,
   deterministic; imports `core/dsp.js`. Loaded on the live context and, in a track render, only when the chain holds Glue. SND-F1b: the
   limiter holds its peak `hold` seconds before releasing (bass distortion 8 dB over the ceiling: 55 Hz −47 dB vs −27 without hold) and,
@@ -564,7 +649,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   (`'./audio.js?render…'`, ⛔ never a unique specifier per render), `renderTrack`, `freeze`, `renderQueued` (ONE render at a time; ⛔ no
   third door, never await one render inside another), console `R.*`, ear tools, probe bodies.
 - `src/songs.js` — demo songs (`P.song(name, {replace:true})`; today `triphop`); refuses while recording, playing, with the editor
-  open, or on a non-empty song without `replace`.
+  open, or on a non-empty song without `replace`. SONG2 (RUN 3): a demo song is a FILE `data/songs/<name>.json` (the song-file format)
+  opened through `ui.songOpenText`; the code generator stays a probe tool (`songBuild`; `P.dumpSong(name)` writes the file's text on
+  unchanged code); row «SONG2 demo song file = its generator» (P.all; ids and take numbers aside; CONTROL a changed volume).
 - `src/scaleprobe.js` — the browser probe (`P`), since PROBE1 a FACADE: explicit re-exports of `src/probes/<area>.js` (`run` P.all/P.quick/
   orderCheck/material, `tuning`, `seed` P.seed/P.song + write path, `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `detect` (LAT2), `gold`, `hand`,
   `sound` (SND-F1), `guard` api/lock, `kit` shared helpers, `data` the node rows). ⛳ **Rows register themselves** next to their probe: `probes/rows.js`
@@ -1513,8 +1600,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **A track's chain in the editor is the union of its captured takes' snapshots**; mid-take effects are not moved/removed by ▲▼⊘; an effect
   in one take's snapshot but added mid-take in another is removed only from snapshots.
 - **Track chains belong to the ROLE, not the track** (rule #31 separates live from tracks, not track from track).
-- **Songs save only as FILES, by hand** (SAVE1): no autosave, no in-browser song storage yet (proposal in WORK-LOG); a song using the
-  person's own tunings/modes opens only where those files exist (copies inside the song = SONG1); a timbre this app lacks plays as the
+- **Songs save as FILES by hand and AUTOSAVE on the device** (SAVE1, AUTOSAVE1): autosave keeps the last 5 SONGS (one entry per song id,
+  not versions of one song; the undo history covers the steps); a probe's test song (P.seed/P.song) is never autosaved; the offer appears
+  only at ▶ Play on an empty song (not from a lesson); a private window keeps autosaves only while it is open; SONG1: a song carries
+  copies of the person's own tunings / modes / palettes / chord-mode sets (`records`, file version 3) — a mode this app lacks plays from
+  the copy (installed for the session, «Keep in my scales» stores it); where the app HAS the id, its own record wins (rule #37); an older
+  (v2) file without copies opens only where those records exist; a timbre this app lacks plays as the
   live timbre of its role (its settings stay in the song); `a.ty` comes back as a fresh array (compared by value — `tyEq`); the undo
   history starts fresh after Open (Open asks first when the song has unsaved changes).
 - Captured expression channels are not replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
@@ -1807,6 +1898,10 @@ verified. Full text of every step: archive, "How to verify a change".
     and shows «Try again»; close Zoom, tap «Try again» — the app opens (no second sound engine, no reload). With the camera switched off (a
     camera key, or unplugged): «No camera found. Check that the camera is switched on…». With camera access blocked for the page (lock icon
     → Camera → Block): the message explains how to allow it. The page never hangs on «Starting the camera…».
+98. Autosave (AUTOSAVE1): ▶ Play, record a short take, wait ~5 s; «⚙ Loop» → «Song file» says «Autosaved on this device at HH:MM»;
+    reload the page, ▶ Play — a box «Continue where you left off? …» appears and the song is NOT loaded yet; «Continue» → the song is back
+    (tracks re-freeze by themselves); reload again and choose «New song» → an empty song, and «⚙ Loop → Earlier» still lists the old one
+    (Restore brings it back, asking first if the current song has unsaved changes). «Autosave: Off» → nothing new is saved; back On.
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

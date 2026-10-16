@@ -224,6 +224,7 @@ import { autoFreeze, freezeQueue, afActive, setRunner as setFreezeRunner } from 
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 import { FOREST, forestRoom } from './core/dsp.js';   // SND-F1: the Night forest room length (a track's render tail)
 import { latConsole } from './latmeter.js';   // LAT1: R.latency() — the latency meter's report in the console
+import { hooks } from './hooks.js';   // AUTOSAVE1: hooks.renderBusy (the live hooks — this module is not the engine copy)
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
    спецификатор ('?render=1', '?render=2', …), потому что повторный initAudio на одной копии накапливал
@@ -251,6 +252,7 @@ function renderQueued(fn){
   return run;
 }
 const renderQueue=()=>RQ_N;   // сколько рендеров ждёт или идёт (проба P.checkQueue)
+hooks.renderBusy=()=>RQ_N>0;   // AUTOSAVE1: no autosave while a render is queued or running
 
 const MIX_SEC=1.0;      // общий материал: длиннее, чтобы успели вступить хвосты цепей
 const SRC_SEC=0.3;      // одиночный источник — короче, их много (но ДЛИННЕЕ прихода влажного сигнала, см. REV_WET_SEC)
@@ -421,6 +423,18 @@ const timeReset=()=>{ TIME.n=0; TIME.importMs=0; TIME.initMs=0; TIME.renderMs=0;
    opts.noWorklet — опыт 2 (пропустить addModule); opts.prep(eng,ctx) — опыт 1 (правка ПОСЛЕ постройки
    графа и ДО материала: подмес обязан стать нулём раньше, чем зазвучит первая нота). */
 function renderOnce(seed, material, seconds, opts){ return renderQueued(()=>renderOnceNow(seed, material, seconds, opts)); }
+/* AUD1a (probes only): the engine copy initialised against a short offline context; fn(eng, ctx) runs right after initAudio, inside the
+   render queue, the copy reset before and after (opt.sec: the context's length, 0.1 s by default). opt.real — the worklets load for real (else stubbed: the context can be collected,
+   RENDER-LEAK); opt.wrap(ctx) before initAudio (the node census counts the context's create* calls); opt.phase(ctx) right after it;
+   opt.after(ctx) at the end, whatever happened. */
+function engineProbe(fn, opt={}){ return renderQueued(async()=>{
+  const eng=await engine(), rate=LIVE_AC.sampleRate, Ctor=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const ctx=new Ctor(2, Math.max(1,Math.round(rate*(opt.sec||0.1))), rate);   // opt.sec — the context's length (AUD2b renders an effect alone)
+  if(!opt.real) stubWorklet(ctx);
+  eng.renderReset(); eng.setRnd(mulberry32(SEED_A)); eng.setOffline(true);
+  try{ if(opt.wrap) opt.wrap(ctx); await eng.initAudio(()=>ctx); if(opt.phase) opt.phase(ctx); return await fn(eng, ctx); }
+  finally{ if(opt.after) opt.after(ctx); eng.setOffline(false); eng.renderReset(); }
+}); }
 async function renderOnceNow(seed, material, seconds, opts){
   const o=opts||{};
   const rate=o.rate||LIVE_AC.sampleRate;   // GOLD1: a fixed rate on request (golden renders at 48 kHz whatever the device runs)
@@ -2206,7 +2220,7 @@ function goldRender(play, seconds, chains={}, post=null){
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
-export { seedOfLane, probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
+export { seedOfLane, engineProbe, probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
   bendTrace,   // BEND-CURVE: what the render copy schedules for a track's bend curves (P.checkBendCurve)
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
   goldRender,   // GOLD1: golden renders of every timbre, the drone and the effects (P.checkGold)

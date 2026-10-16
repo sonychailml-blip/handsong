@@ -21,8 +21,11 @@ function newUserId(rnd){
    can only be hidden); remove — user and pack records only (a built-in refuses: hide it). rename — the name only. order() — the visible
    ids in the person's order (setOrder keeps unknown ids out and appends what the list does not name, in the order they were added).
    → each change answers null (done) or a refusal in words. */
-function createRegistry(kind){
+/* PACK1: opts.gate (core/pack createPackGate) — a record in the pack id space is usable only while its pack is unlocked: order() leaves
+   locked ones out, isLocked(id) says so; get() still answers (a song that names it plays from its copy — rule #37). */
+function createRegistry(kind, { gate=null }={}){
   const byId=new Map(), hidden=new Set(); let order=[];
+  const usable=id=> !gate || gate.usable(id);
   const why=(c,w)=> c ? null : w;
   return {
     kind,
@@ -47,7 +50,8 @@ function createRegistry(kind){
     },
     rename(id, name){ const e=why(byId.has(id), `no ${kind} «${id}»`); if(!e) byId.get(id).rec={ ...byId.get(id).rec, name }; return e; },
     setOrder(ids){ const want=(ids||[]).filter((x,i,a)=>byId.has(x) && a.indexOf(x)===i); order=[...want, ...order.filter(x=>!want.includes(x))]; return null; },
-    order:()=> order.filter(id=>!hidden.has(id)),
+    order:()=> order.filter(id=>!hidden.has(id) && usable(id)),
+    isLocked:id=> byId.has(id) && !usable(id),
     all:()=> [...order],
   };
 }

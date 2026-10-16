@@ -32,7 +32,11 @@ import { tutorSetScale } from './ui.js';
 import { L } from './i18n.js';
 
 const SONGS={ triphop:buildTripHop };
-export const songNames=()=>Object.keys(SONGS);
+/* ⛳ SONG2 (RUN 3, 2026-10-16): a demo song is a FILE — data/songs/<name>.json in the song-file format (core/songfile.js), made from the
+   generator below by P.dumpSong(name) and saved there; P.song(name) OPENS that file through ui.songOpenText (every SAVE1 check, the same
+   path as «Open…»). The generator stays as a PROBE TOOL (songBuild): the row «SONG2 demo song file = its generator» proves they agree. */
+const SONG_FILES={ triphop:'data/songs/triphop.json' };
+export const songNames=()=>Object.keys(SONG_FILES);
 
 /* ═══ ОБЩЕЕ ═══ */
 const SID=id=>{ if(!scaleById(id)) throw new Error('no scale '+id); return id; };   // id — стабильный (T0), не имя (правило #25); F1: им и адресуем
@@ -64,13 +68,31 @@ const ORD=fn=> /Off$/.test(fn) ? 0 : 1;
 const sortPart=P=>P.steps.sort((x,y)=> x.t-y.t || ORD(x.fn)-ORD(y.fn));
 
 /* ═══ ВХОД ═══ */
+/* the refusals shared by both doors (a song REPLACES the current one) */
+function songRefuse(name, opt){
+  if(editIsOpen()){ console.warn('[song] the track editor is open — close it first.'); return true; }
+  if(recording){ console.warn('[song] recording — stop it first.'); return true; }
+  if(loop.on){ console.warn('[song] the transport is playing — stop it first (■ or ⏸).'); return true; }
+  if(events.length && !opt.replace){ console.warn(`[song] the song has ${events.length} events — refusing. Run await P.song('${name}', {replace:true}) to replace it.`); return true; }
+  return false;
+}
+/* P.song: open the demo song FILE (SONG2) → { name, takes:[], events, fromFile } | null */
 export async function loadSong(name='triphop', opt={}){
+  const url=SONG_FILES[name];
+  if(!url){ console.warn(`[song] no song «${name}» — known: ${songNames().join(', ')}`); return null; }
+  if(songRefuse(name, opt)) return null;
+  let text; try{ const r=await fetch(url,{ cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); text=await r.text(); }
+  catch(e){ console.warn(`[song] could not read ${url} — ${e&&e.message||e}`); return null; }
+  const UI=await import('./ui.js'), o=UI.songOpenText(text, ()=>true);
+  if(!o.ok){ console.warn(`[song] ${url} did not open: ${o.why}`); return null; }
+  console.log(`[song] «${name}» opened from ${url} — it REPLACES the current song (nothing is saved).`);
+  histReset(); return { name, takes:[], events:events.length, fromFile:true };
+}
+/* the generator (probe tool): rebuilds the song in code, exactly as before SONG2 */
+export async function songBuild(name='triphop', opt={}){
   const build=SONGS[name];
-  if(!build){ console.warn(`[song] no song «${name}» — known: ${songNames().join(', ')}`); return null; }
-  if(editIsOpen()){ console.warn('[song] the track editor is open — close it first.'); return null; }
-  if(recording){ console.warn('[song] recording — stop it first.'); return null; }
-  if(loop.on){ console.warn('[song] the transport is playing — stop it first (■ or ⏸).'); return null; }
-  if(events.length && !opt.replace){ console.warn(`[song] the song has ${events.length} events — refusing. Run await P.song('${name}', {replace:true}) to replace it.`); return null; }
+  if(!build){ console.warn(`[song] no song «${name}» — known: ${Object.keys(SONGS).join(', ')}`); return null; }
+  if(songRefuse(name, opt)) return null;
   console.log(`[song] «${name}» REPLACES the current song (nothing is saved).`);
   const r=await build(); histReset(); return r;   // ED7: a loaded song starts with an empty history
 }

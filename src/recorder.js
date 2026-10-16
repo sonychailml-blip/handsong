@@ -5,14 +5,14 @@ import { REC_VOL_EPS, REC_REV_EPS, volAmp } from './config.js';   // volFromOld 
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
 import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
-import { events, schedInvalidate, compactEvents, evSeqFill, evOrder, evRole } from './song/store.js';   // REC1: the song's event store (recorder re-exports what others read)
+import { events, schedInvalidate, compactEvents, evSeqFill, evOrder, evRole, evIdFloor } from './song/store.js';   // REC1: the song's event store (recorder re-exports what others read)
 import { chOwnerKey, bassOwnerKey, ldKey, songNotes, notesReset, viewAudit, editViewCheck, songSegs } from './song/notes.js';   // REC2: the song as notes, owner and chase keys, view checks
 import { histWire, histKind, histApply as editApply, histTouched, histPush, histSeal, histHash, histReset, histCanUndo, histCanRedo, histLen, histTopLabel, histUndo, histRedo, histTab, histMaster, laneNameStep, moveLaneStep, histPeek, histOffAdd, histOffNow, histDbg, histDbgO } from './song/history.js';   // REC2: the one history (ED7); step kinds register with it
 import { chordMoveTy, editBackingOpen, editCanRedo, editCanUndo, editCommit, editDeleteHit, editDeleteSeg, editGuard, editMoveHit, editMoveSeg, editResizeSeg, segChordNotes, tiePartners, untieAcross, editWire } from './song/edit-notes.js';   // REC3: the editor's edit core and note edits
 import { editDeleteChordNote, editMoveChordNote, editResizeChordNote } from './song/edit-chords.js';   // REC3: chord-note edits (dissolve)
 import { editDeleteSel, editMoveSel } from './song/edit-group.js';   // REC3: group edits (ED1)
 import { laneId, laneMute, laneSolo, laneLevel, lanePan, laneLenOf, laneEditVer, laneVerBump, laneEditVerOf, laneNew, laneOf, laneForget, laneTablesClear, laneLayerOf, armedLayer, toggleArm, laneDelTap, laneDelCancel, laneDelPendingLayer, laneAudible, laneLevelOf, laneGainOf, layerOfOwner, lanePanOf, laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep, laneLook, laneMuted, laneSoloed, laneSoloOn, laneRow, laneRowSet, laneWire } from './song/lanes.js';   // REC1: the track tables
-import { takeNext, takeSeqFloor, takeFx, takeFxTouch, FX_CHAIN, setAutRecSmooth, fxLaneExpand, laneRoleOf, captureInfoOf } from './song/capture.js';   // REC3 part 2: capture records, lane law, track role
+import { takeNext, takeSeqFloor, takeFx, takeFxTouch, laneIdFloor, FX_CHAIN, setAutRecSmooth, fxLaneExpand, laneRoleOf, captureInfoOf } from './song/capture.js';   // REC3 part 2: capture records, lane law, track role
 import { envWire } from './song/env.js';
 import { songData, songPlan } from './song/file.js';   // SAVE1: the song ↔ its file record   // REC3 part 2: the song layer's environment (wired below)
 import { bendDbg, autAddrs, bendEdited, editBendPoint, editBendShape, pnBars, editVolSel, takeFxDump, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint, autChainOf, autChainAdd, autChainRemove, autChainMove } from './song/automation.js';   // REC3 part 2: automation and per-note lanes, bends, volume bars, track chain edits
@@ -405,8 +405,10 @@ function songOpenApply(P){
   setARef(S.aRef); setLoopMetre(S.metre); setLoopBpm(S.bpm); setLoopBars(S.bars); setLoopSub(S.sub); setLoopQuant(S.quant); AUD.setMasterLevel(S.master);
   for(const T of P.tracks){ const id=laneNew(T.layer); laneRowSet(id,{ mute:!!T.mute, solo:!!T.solo, level:T.level, pan:T.pan, name:T.name, rank:T.rank, len:T.len }); }
   let tkMax=0;
-  for(const [tk,rec] of P.takes){ takeFx.set(tk,rec); if(tk>tkMax) tkMax=tk; }
-  for(const e of P.events){ events.push(e); if(e.tk>tkMax) tkMax=e.tk; }   // in the file's order = birth order
+  let pidMax=0; for(const [tk,rec] of P.takes){ takeFx.set(tk,rec); if(tk>tkMax) tkMax=tk; for(const p of rec.lane||[]) if(p.id>pidMax) pidMax=p.id; }
+  laneIdFloor(pidMax);   // IDS1 part 2: the file's lane point ids stay; new points count on above them
+  let idMax=0; for(const e of P.events){ events.push(e); if(e.tk>tkMax) tkMax=e.tk; if(e.id>idMax) idMax=e.id; }   // in the file's order = birth order
+  evIdFloor(idMax);   // IDS1: the file's event ids stay; new events count on above them (events of an older file get theirs at the rebase)
   takeSeqFloor(tkMax);
   evSeqFill(); events.sort(evOrder);
   secMarksSet(P.marks);

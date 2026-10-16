@@ -45,9 +45,15 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          histUndo, histRedo, histCanUndo, histCanRedo, histTopLabel, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
          editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, liveAllOff, backingFollowKey, editTranspose, editTransposeWhy, songTranspose, songTransposeWhy, songSaveRec, songOpenApply, songPlan, songMark, songDirty } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
-import { INSTR_COL, FX_META, curveK } from './config.js';   // curveK — BEND-CURVE: a middle handle's position → curvature
+import { FX_META, curveK } from './config.js';
+import { ROLE_COL } from './palette.js';   // DRAW1b: the role colours are design tokens   // curveK — BEND-CURVE: a middle handle's position → curvature
 import { hooks } from './hooks.js';
 import { lang, setLang, applyI18n, L, t, onLangChange } from './i18n.js';
+import { asWire, asInfo, asList, asGet, asAdopt, asFresh, asEnabled, asSetEnabled } from './autosave.js';
+import { scaleData, registerRecord, unregisterRecord } from './scales.js';   // SONG1: a song's own scales installed for the session
+import { checkRecordList } from './scaleload.js';
+import { userPut } from './userstore.js';   // SONG1: «Keep in my scales»
+import { songNeeds } from './song/file.js';   // AUTOSAVE1: the song kept on this device
 import { icon } from './icons.js';   // UI1b: every interface glyph through the icon component
 import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from './core/songfile.js';   // SAVE1: reading a song file (pure)
 
@@ -291,7 +297,7 @@ const PANELS={
      ⚠️ ЗОВЁМ ОБЕ СЕКЦИИ ЯВНО (Пласт 3.4.1): конструктор не принадлежит «Функциям рук», и причина
      пересборки относится к нему НАПРЯМУЮ, а не по наследству от соседа. */
   sound:{ el:()=>panelSoundEl, btn:()=>soundBtn, tutor:'sound', open:()=>{ renderHandFn(); renderHandActs(); renderFxCtl(); } },
-  loop: { el:()=>panelLoopEl,  btn:()=>loopPanelBtn, tutor:'loop', open:()=>refreshMetreCtl() },   // актуализируем блокировку размера: петля могла измениться при закрытой панели
+  loop: { el:()=>panelLoopEl,  btn:()=>loopPanelBtn, tutor:'loop', open:()=>{ refreshMetreCtl(); asShow(); asFill(); } },   // AUTOSAVE1: its state line and the earlier autosaves   // актуализируем блокировку размера: петля могла измениться при закрытой панели
 };
 function showPanel(key,on){
   for(const k in PANELS){
@@ -1947,21 +1953,48 @@ export function songOpenText(text, ask=q=>confirm(q)){
   const p=songParse(text); if(!p.ok) return { ok:false, why:p.why, version:p.version };
   const from=p.rec.version, rec=songUpgrade(p.rec), probs=songCheck(rec);
   if(probs.length) return { ok:false, why:'check', problems:probs };
-  const P=songPlan(rec); if(!P.ok) return { ok:false, why:P.why, missing:P.missing };
+  /* SONG1: modes this app lacks come from the song's own copies (checked like data files, installed for this session only) */
+  const need=songNeeds(rec);
+  if(need.missing.length) return { ok:false, why:'modes', missing:{ modes:need.missing, timbres:[] } };
+  if(need.install.length){ const why=checkRecordList(need.install, scaleData()); if(why) return { ok:false, why:'records', problems:[why] }; }
   if(songDirty() && !ask(t('song.open.confirm'))) return { ok:false, why:'cancelled' };
-  const r=songOpenApply(P); if(!r.ok) return r;
+  const done=[]; for(const [kind,x] of need.install){ const q=registerRecord(kind,x); if(q.ok) done.push([kind,x]); }
+  const undo=()=>{ for(const [kind,x] of done.slice().reverse()) unregisterRecord(kind,x.id); };
+  if(done.length<need.install.length){ undo(); return { ok:false, why:'records', problems:['could not install'] }; }
+  const P=songPlan(rec); if(!P.ok){ undo(); return { ok:false, why:P.why, missing:P.missing }; }
+  const r=songOpenApply(P); if(!r.ok){ undo(); return r; }
+  for(const [kind,x] of done) songRecs.set(x.id,{ kind, rec:x }); songKeepShow();
   songId=P.id||null; if(songNameEl) songNameEl.value=P.name||'';
   songLiveApply(P.settings);
   syncLoopPanel(); resetJamDisplay(); updHistBtns(); songMark();
-  return { ...r, upgraded: from<rec.version ? from : 0, missing:P.missing };
+  return { ...r, upgraded: from<rec.version ? from : 0, missing:P.missing, fromSong:done.filter(([k])=>k==='mode').map(([,x])=>x.id) };
 }
 function songOpenSay(r){
   if(r.ok){ let m=t('song.opened',{ n:r.tracks }); if(r.upgraded) m+=' '+t('song.upgraded',{ v:r.upgraded });
     if(r.missing && r.missing.timbres.length) m+=' '+t('song.missingTimbres',{ list:r.missing.timbres.map(x=>L(x.name)).join(', ') });
+    if(r.fromSong && r.fromSong.length) m+=' '+t('song.fromSong',{ list:songRecNames(r.fromSong) });
     showCamMsg(m); return; }
   if(r.why==='cancelled') return;
   showCamMsg(t('song.no.'+r.why, r.why==='newer' ? { v:r.version } : r.why==='modes' ? { list:r.missing.modes.join(', ') } : undefined));
 }
+/* SONG1: records a song brought this session that are not in the person's list yet; «Keep in my scales» stores them (the user store —
+   they load at the next start like any user file) */
+const songRecs=new Map();
+const songRecNames=ids=>ids.map(id=>{ const x=songRecs.get(id); return x&&x.rec.name ? L(x.rec.name) : id; }).join(', ');
+const REC_SECT={ tuning:'tunings', palette:'palettes', chordmodes:'chordModeSets', mode:'modes' };
+function songKeepShow(){ const row=$('songKeepRow'), hint=$('songKeepHint'); if(!row) return;
+  for(const [id,x] of songRecs) if(!scaleData()[REC_SECT[x.kind]][id]) songRecs.delete(id);   // removed meanwhile → nothing to keep
+  const modes=[...songRecs.values()].filter(x=>x.kind==='mode').map(x=>x.rec.id);
+  row.hidden=hint.hidden=!songRecs.size; hint.textContent= songRecs.size ? t('song.keepHint',{ list:songRecNames(modes) }) : ''; }
+export async function songKeep(){
+  const list=[...songRecs.values()], order=['tuning','palette','chordmodes','mode'];
+  list.sort((a,b)=>order.indexOf(a.kind)-order.indexOf(b.kind));
+  const names=songRecNames(list.filter(x=>x.kind==='mode').map(x=>x.rec.id));
+  try{ for(const x of list){ await userPut(x.kind, x.rec.id, x.rec); songRecs.delete(x.rec.id); } }
+  catch(e){ showCamMsg(t('song.keepFail')); songKeepShow(); return { ok:false, why:'store' }; }
+  songKeepShow(); showCamMsg(t('song.kept',{ list:names })); return { ok:true, n:list.length };
+}
+if($('songKeep')) $('songKeep').onclick=()=>{ songKeep(); };
 if($('songSave')) $('songSave').onclick=()=>songDownload();
 if($('songOpen')) $('songOpen').onclick=()=>{ if(songFileEl){ songFileEl.value=''; songFileEl.click(); } };
 if(songFileEl) songFileEl.onchange=async e=>{
@@ -1970,6 +2003,53 @@ if(songFileEl) songFileEl.onchange=async e=>{
   let text; try{ text=await f.text(); }catch(err){ showCamMsg(t('song.no.notText')); return; }
   songOpenSay(songOpenText(text));
 };
+/* ═══ AUTOSAVE1: the song kept on this device by itself (autosave.js) — the switch, its state line, earlier autosaves, the offer at ▶ ═══
+   A restore is an Open of the autosaved text (every SAVE1 check; it asks before replacing unsaved work). Nothing loads without a tap. */
+const asStatusEl=$('asStatus'), asPickEl=$('asPick');
+const asTime=at=>{ const d=new Date(at), now=new Date(); if(isNaN(d)) return '';
+  const tm=d.toLocaleTimeString(lang,{ hour:'2-digit', minute:'2-digit' });
+  return d.toDateString()===now.toDateString() ? tm : d.toLocaleDateString(lang,{ day:'numeric', month:'short' })+' '+tm; };
+const asName=e=>e.name||t('as.untitled');
+function asShow(){ const I=asInfo();
+  if($('asOn')){ $('asOn').classList.toggle('act',I.enabled); $('asOff').classList.toggle('act',!I.enabled); }
+  if(!asStatusEl) return;
+  const k= !I.enabled ? 'as.status.off' : /^(full|blocked|error)$/.test(I.status) ? 'as.no.'+I.status : I.lastAt ? 'as.status.ok' : 'as.status.idle';
+  asStatusEl.textContent=t(k,{ time:I.lastAt?asTime(I.lastAt):'' }); asStatusEl.dataset.k=k; }
+async function asFill(){ if(!asPickEl) return; let L=[]; try{ L=await asList(); }catch(e){}
+  asPickEl.textContent='';
+  if(!L.length){ const o=document.createElement('option'); o.value=''; o.textContent=t('as.none'); asPickEl.appendChild(o); }
+  for(const e of L){ const o=document.createElement('option'); o.value=e.id; o.textContent=t('as.item',{ name:asName(e), n:e.tracks, time:asTime(e.at) }); asPickEl.appendChild(o); }
+  asPickEl.disabled=!L.length; if($('asRestore')) $('asRestore').disabled=!L.length; }
+export async function asRestoreId(id, ask=q=>confirm(q)){
+  let e=null; try{ e=await asGet(id); }catch(err){}
+  if(!e){ showCamMsg(t('as.gone')); return { ok:false, why:'gone' }; }
+  const r=songOpenText(e.text, ask);
+  if(r.ok){ asAdopt(); showCamMsg(t('as.restored',{ name:asName(e), n:r.tracks })); asShow(); asFill(); }
+  else songOpenSay(r);
+  return r;
+}
+asWire({ meta:()=>({ id:songId, name:songNameEl ? songNameEl.value.trim().slice(0,120) : '' }),
+  setId:id=>{ songId=id; if(id==null && songNameEl) songNameEl.value=''; },   // null = a new song (after an empty one, or «New song»)
+  said:(kind, I, first)=>{ asShow(); if(first && kind!=='ok') showCamMsg(t('as.no.'+kind)); if(kind==='ok' && panelLoopEl.classList.contains('on')) asFill(); } });
+if($('asOn')) $('asOn').onclick=()=>{ asSetEnabled(true); asShow(); };
+if($('asOff')) $('asOff').onclick=()=>{ asSetEnabled(false); asShow(); };
+if($('asRestore')) $('asRestore').onclick=()=>{ if(asPickEl && asPickEl.value) asRestoreId(asPickEl.value); };
+onLangChange(()=>{ asShow(); if(panelLoopEl.classList.contains('on')) asFill(); });
+/* the offer at ▶ Play: once per page, only on an empty song with autosave on; it hides by itself after 30 s (the list keeps the song) */
+let asOffered=false, resumeT=0;
+function resumeHide(){ const el=$('resumeToast'); if(el) el.classList.remove('on'); clearTimeout(resumeT); }
+export async function songResumeOffer(opt={}){
+  if(asOffered && !opt.force) return false; asOffered=true;
+  if(!asEnabled() || (events.length && !opt.force)) return false;
+  let L=[]; try{ L=await asList(); }catch(e){ asShow(); return false; }
+  const e=L[0], el=$('resumeToast'); if(!e || !el) return false;
+  $('resumeText').textContent=t('as.resume.q',{ name:asName(e), n:e.tracks, time:asTime(e.at) });
+  $('resumeYes').onclick=()=>{ resumeHide(); asRestoreId(e.id, opt.ask); };
+  $('resumeNo').onclick=()=>{ resumeHide(); asFresh(); };
+  el.classList.add('on'); clearTimeout(resumeT); resumeT=setTimeout(resumeHide, 30000);
+  return true;
+}
+asShow();
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
 /* Выбор инструмента. При любом переключении глушим звук — роли/зоны рук меняются.
@@ -1977,7 +2057,7 @@ addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.
 const INSTR_SEQ=['ld','ch','bs','dr'];
 const instrLbl=r=>t('role.'+r);   // подпись роли (🎸 Соло / 🎹 Аккорды / 🎚 Бас / 🥁 Ударные) — через словарь
 function applyInstr(){ instrBtn.textContent = instrLbl(phoneInstr);
-  instrBtn.style.setProperty('--role', INSTR_COL[phoneInstr]); renderHandFn(); renderHandActs();   // цвет роли; секции «Функции рук» и «Действия пальцев» зависят от активной роли (набор ролей в игре сменился)
+  instrBtn.style.setProperty('--role', ROLE_COL[phoneInstr]); renderHandFn(); renderHandActs();   // цвет роли; секции «Функции рук» и «Действия пальцев» зависят от активной роли (набор ролей в игре сменился)
   if(hooks.tutor) hooks.tutor('role',{role:phoneInstr}); }   // ЗАЦЕПКА ОБУЧЕНИЯ (единственная из UI-слоя): смена роли — на том же канале hooks.tutor
 /* ФУНКЦИИ РУК: по выпадающему НА РУКУ (Левая/Правая) для КАЖДОЙ роли, что сейчас в игре (с б.4 запись есть у всех
    четырёх, ударные тоже). Строим динамически (как fillScales): single-role — одна роль; сплит — роль каждой половины.
@@ -2641,7 +2721,7 @@ function applySplitRoles(){
   [instrBtnL,instrBtnR].forEach((b,i)=>{
     const role=SPLIT_ROLES[i];
     b.textContent = (i===0?icon('half-left')+' ':'') + instrLbl(role) + (i===1?' '+icon('split'):'');
-    b.style.setProperty('--role', INSTR_COL[role]);
+    b.style.setProperty('--role', ROLE_COL[role]);
   });
   renderHandFn(); renderHandActs();           // ld/бас-половина могла появиться/исчезнуть — пересобираем «Функции рук» И «Действия пальцев» (у них ОДНА зависимость: набор ролей в игре + handFn)
 }

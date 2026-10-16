@@ -1,5 +1,6 @@
 /* DRAW1 (DAY run 2026-10-16): the camera picture: the cover crop (syncViewRect) and the video background — moved from draw.js verbatim (draw.js is the facade). Canvas only; nothing visible changed. */
 import { ctx, canvas, video } from '../vision.js';
+import { cv } from '../palette.js';   // DRAW1b: canvas colours are design tokens (tokens.css «canvas»)
 import { mirrored, setViewRect } from '../state.js';
 import { coverView } from '../config.js';
 
@@ -29,7 +30,7 @@ function drawVideoBackground(src=video){
     if(mirrored()){ ctx.save(); ctx.scale(-1,1); ctx.drawImage(src,sx0,sy0,sw,sh,-W,0,W,H); ctx.restore(); }
     else ctx.drawImage(src,sx0,sy0,sw,sh,0,0,W,H);
   }
-  ctx.fillStyle='rgba(7,7,13,.5)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=cv('bg-a50'); ctx.fillRect(0,0,W,H);
 }
 
 export { drawVideoBackground, syncViewRect };

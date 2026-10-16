@@ -152,3 +152,18 @@ Fit into `E`:
   state; they move into `E.build` (reset per voice build), never into the moved module.
 - `?render` copy + a moved module: the moved file is imported ONCE (no query string) and shared by both copies — safe only because it is
   stateless; the AUD1b rule is what makes this safe, so it must land before AUD1c.
+
+## Review 2026-10-16 (strategist) — option C APPROVED, with these additions (binding for AUD1a–c, AUD2a–c)
+- **R1. `E` never holds a stale copy.** Every field that changes after `initAudio` — worklet readiness flags and nodes (`wk.ks`, `wk.dyn`,
+  `wk.frz`, `frzSink`, `capMod`), the limiter fallback, lazily created nodes, `ffLive` — is a getter/setter over the module variable, or is
+  written only through `E`. The probe «AUD1 engine context» checks identity THREE times — right after `initAudio`, after all worklets have
+  loaded, and after a render has run — in BOTH copies.
+- **R2. Pure data only moves to a shared module.** Before `KS_BANKS` (or any other table) moves into a shared module, prove it is pure data
+  (no AudioBuffer, node, port or anything made from a context). Anything context-made or cached goes into `E` (like `forestIR`), never into
+  the moved module.
+- **R3. The LAT rows join every AUD slice's probe list:** «Hand → sound» and «master path 0» unchanged (the SND-F1b master path row included).
+- **R4. `--leak` after AUD1c (the KS builders move) and after AUD2a:** the known KS render leak must not grow; the margin rule stays.
+- **R5. A cheap speed check:** the total GOLD render time after each AUD slice within +20 % of the time before it (same machine, same run
+  conditions); both times reported.
+- The stateless-module rule becomes hard rule **#38** (the next free number). The ROUTE1 freeze/send finding (§5: a frozen track must feed
+  shared returns LIVE, never bake a private room) is recorded in BACKLOG §7.14.

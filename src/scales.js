@@ -126,6 +126,19 @@ setScaleId(D.manifest.start);   // F5: стартовый лад — из ман
    (строй — лады; палитра — лады и наборы; набор — лады), не удаляется: dependentsOf называет их. Удалили ЖИВОЙ лад — живым становится
    стартовый. notify — позвать hooks.scales (ui перестраивает меню); проба зовёт без него. */
 export const scaleData=()=>D;
+/* SONG1: the person's own records (u.<uuid>) a view stands on — the mode's tuning, its palette, its chord-mode set and the palettes that
+   set names, then the mode — as v1 records, dependencies first. Read from the VIEW (SRC), so a record deleted meanwhile is still found. */
+export function userRecordsOf(v){
+  const out=[], seen=new Set(), own=id=>typeof id==='string' && id.startsWith('u.');
+  const add=(kind,r)=>{ if(r && own(r.id) && !seen.has(kind+':'+r.id)){ seen.add(kind+':'+r.id); out.push([kind,r]); } };
+  const m=modeRecOf(v); if(!m) return out;
+  add('tuning', tuningRecOf(v));
+  const ch=m.chords||{}, cms= own(ch.modes) ? D.chordModeSets[ch.modes] : null;
+  if(own(ch.palette)) add('palette', D.palettes[ch.palette]);
+  if(cms){ for(const x of cms.modes||[]) if(x.set && own(x.set.palette)) add('palette', D.palettes[x.set.palette]); add('chordmodes', cms); }
+  add('mode', m);
+  return out;
+}
 const SECT_OF={ tuning:'tunings', palette:'palettes', chordmodes:'chordModeSets', mode:'modes' };
 export function dependentsOf(kind,id){
   const out=[];

@@ -65,8 +65,8 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 
 | Glyph | Code point | Meaning | Kind | Used in |
 |---|---|---|---|---|
-| ↶ | U+21B6 | undo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
-| ↷ | U+21B7 | redo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
+| ↶ | U+21B6 | undo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js |
+| ↷ | U+21B7 | redo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js |
 | ⤺ | U+293A | undo the last take | icon | src/icons.js, src/probes/history.js, src/probes/window.js |
 | ⇄ | U+21C4 | swap hands (help text) | icon | src/icons.js |
 | ⊘ | U+2298 | remove effect from a track | icon | src/icons.js |
@@ -77,7 +77,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ⏮ | U+23EE | to the start | icon | src/icons.js |
 | ⏸ | U+23F8 | pause (message) | icon | src/icons.js, src/songs.js |
 | ❚ | U+275A | pause bars | icon | src/icons.js |
-| ▶ | U+25B6 | play / start | icon | src/icons.js, src/probes/freeze.js, src/probes/seed.js, src/probes/window.js, src/recorder.js, src/render.js, src/songs.js |
+| ▶ | U+25B6 | play / start | icon | src/icons.js, src/probes/engine.js, src/probes/freeze.js, src/probes/seed.js, src/probes/window.js, src/recorder.js, src/render.js, src/songs.js |
 | ■ | U+25A0 | stop (panic) | icon | src/icons.js, src/songs.js |
 | ⟳ | U+27F3 | repeat the brace | icon | src/icons.js, src/songs.js |
 | ● | U+25CF | record / lesson step done | icon | src/icons.js |
@@ -120,8 +120,8 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | src/icons.js |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/detect.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
-| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/detect.js, src/probes/edit.js, src/probes/engine.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
 | ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/lat.js, src/render.js, src/views/play.js |
 | ≤ | U+2264 | less or equal | typography | src/probes/window.js |
 | ≥ | U+2265 | greater or equal | typography | src/core/format.js |
