@@ -121,10 +121,10 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
 | → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/detect.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
-| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/draw.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/scaleload.js, src/ui.js |
+| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/draw.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js |
 | ≈ | U+2248 | approximately | typography | src/draw.js, src/i18n.js, src/probes/lat.js, src/render.js |
 | ≤ | U+2264 | less or equal | typography | src/probes/window.js |
-| ≥ | U+2265 | greater or equal | typography | src/scaleload.js |
+| ≥ | U+2265 | greater or equal | typography | src/core/format.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | src/draw.js, src/render.js |
 | √ | U+221A | square root (console text) | typography | src/render.js |
 | ♭ | U+266D | flat (note names) | notation | data/modes/blues.json, data/tunings/shruti22.json, index.html, src/probedata.js, src/scales.js, src/songs.js |

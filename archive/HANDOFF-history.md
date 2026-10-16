@@ -7117,6 +7117,7 @@ family of modules or a 500–1500-line move; L ≈ many readers or a 2000+-line 
     `scaleload` uses them (F0 snapshot proves nothing moved).
 18. **TIM1** (S) — permanent ids for the 51 built-in timbres (`solo.supersaw`, `chord.warm-pad`, `bass.sub-sine`, `kit.tabla` …);
     `timbreById`; `timbresOf` returns ids; selectors by id; events unchanged (index ↔ id at the boundary). → **THE FORK.**
+    ⛳ The user's requirements for stable ids (2026-10-16, verbatim): archive B «USER REQUIREMENTS FOR STABLE IDS» (TIM1, FMT1 and later).
 *Line A — engine and sound.*
 19. **ENG1** (M) — the contract surface of §4.4 as functions of `audio.js`; `makeENG` calls only it; the engine's own reads of app state
     listed and cut where cheap (drone Hz, sympathetic-string base, timbre fallback move into the adapter). Proof: `--all`, GOLD.
@@ -8010,3 +8011,24 @@ AF2, AF6b, ED1–ED7, S4, sections, TF0, AF3, AF5, CAM-FIX 35 / 0, CAM-START 12 
 rounds 1 (a missing comma / the wire's import in recorder.js, caught by the static check). Proposal: P.quick's 180-s limit is fixed in the
 runner — a `--limit-quick M` flag (like `--limit-min`) would let a loaded machine finish the quick suite instead of switching to P.all.
 **Docs.** CLAUDE.md (static-check line, module map song/), NAME-INDEX, HANDOFF. Nothing for the user to hear or see.
+
+### Moved from HANDOFF.md at the NIGHT run (English, verbatim; 2026-10-16)
+### REC2 + REC3 part 1 (2026-10-15) — full: archive B «REC2 + REC3 part 1 — record»
+- REC2: `song/notes.js` (owner and chase keys, `songNotes`/`songSegs`, view checks; reads the store's new `sortedLen()`) + `song/history.js`
+  (the one history; ⛳ step kinds REGISTER: `histKind(kind, apply, touched)` replaces the editApply if-chain and the histTouched switch; an
+  unknown kind throws; `histWire` brings ready/pause/commit and the hash's capture records, markers, master). Snapshot steps stay in recorder.
+- REC3 was ≈ 2000 lines — only part 1 done: `song/edit-notes.js` (edit core, ties, detach, segment/hit edits; `editWire`),
+  `song/edit-chords.js` (U2–U4), `song/edit-group.js` (ED1). Part 2 (inserts, timbre, clipboard, quantise, degrees/mode/transpose, bends,
+  automation, sections) is next. Plan adaptation: song/ may import `scales.js` (pitch truth; edits need chord notes and degrees).
+- recorder.js 5844 → 4897 lines. Static PASS (new CONTROL song/history.js → audio.js); data PASS 13.
+- Browser (user's Chrome busy, ~64 % of a core): P.quick hit its 180-s limit at row 50 with 0 differences → P.all instead, twice: 73/76 and
+  74/76 — the misses were real-time rows only (LR1 capture gap; LAT2a frames; live Glue), each PASS on one targeted re-run. Fix rounds 1.
+
+### USER REQUIREMENTS FOR STABLE IDS (2026-10-16, given with the NIGHT run; verbatim — TIM1, the same model for FMT1 and later for tunings/scales, effect presets and expression mappings)
+- Users will later add, delete, rename and reorder timbres; someone may keep only their own and delete all the others. Everything must keep working.
+- Identity ≠ name ≠ position. Each timbre has a permanent ID that never changes (built-ins: readable fixed IDs, e.g. «firefly»; user-made: a generated unique ID). The display name is editable and per-language. The order of the list is a separate per-user list of IDs (reorder, hide, delete never touch songs).
+- Songs store the timbre ID AND a full snapshot of the timbre's settings. If the ID is missing on this device (deleted, or a song from another user), the song still plays from the snapshot and offers «add this timbre back to my list».
+- Built-in timbres are hidden, never destroyed, so songs that use them always play.
+- Same model for tunings and scales (needed by the future world catalogue), effect presets and expression-hand mappings.
+Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the timbre ids (TIM1). Still to build: songs carrying id + snapshot
+(SONG1), the timbre list UI (reorder / hide / user timbres — TIM3 and later), events storing ids (TIM2), the same for tunings/modes/presets.

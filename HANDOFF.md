@@ -2,7 +2,7 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (34 hard rules), 97 verification steps: `CLAUDE.md`
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (37 hard rules), 97 verification steps: `CLAUDE.md`
 (its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
@@ -52,7 +52,8 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   Night forest (Room), Glue, our master Limiter (step 93) · **LAT2** frames once, search schedule, worker option (step 94; phone check open)
   · **LAT3** low-light camera: capabilities, «Low light (test)», hands lost, player hint «Too dark»; «Picture» switch removed (step 95) · **CAM-FIX** the webcam's own settings restored (rule #34, step 96) · **REC1** `song/store.js` + `song/lanes.js`, folder rule +
   import cycles in the static check; camera start made robust and the open-time repair limited to our own test changes (step 97) ·
-  **REC2** `song/notes.js` + `song/history.js` (step kinds register) · **REC3 part 1** `song/edit-notes|edit-chords|edit-group.js` (nothing to hear or see).
+  **REC2** `song/notes.js` + `song/history.js` (step kinds register) · **REC3 part 1** `song/edit-notes|edit-chords|edit-group.js` · NIGHT run
+  2026-10-16: **REC3 part 2**, **REC4**, **REC5** (recorder 4897 → 725 lines; nothing to hear or see).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
 (index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
@@ -102,8 +103,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 part 1 (2026-10-15);
-NEXT **REC3 part 2**) → **4 «Calm»** = FIRST
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, 🔵 GES1 parts 1–2 (NIGHT run);
+NEXT AUD1) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -118,7 +119,7 @@ TIMBRE BUILDER, USER MODES with Scala, sampler → **8 SERVER** (accounts, sync,
   of WASM tracks in a Worker, which also avoids Chrome's worklet-context leak).
 - **A recording keeps what was heard** (notes + resulting values), never gestures; mappings are setup data. Latency compensation from the
   input's own timestamp (stage 5; tap-along test, switchable off). Privacy: rule #33 (PRIV1 ✅). Licences: rule #32 + register (LIC1 ✅).
-- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2, REC1, REC2, REC3 part 1 (+ LAT1b, SND-F1, LAT3, CAM-FIX); next REC3 part 2, REC4, REC5 (recorder → song/, transport/, live/, freeze/), AUD1–AUD2 (stateless timbre / effect
+- **34 slices (7 S, 25 M, 2 L)** — done: LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT2, REC1–REC5, FMT1, TIM1 (+ LAT1b, SND-F1, LAT3, CAM-FIX); next AUD1–AUD2 (stateless timbre / effect
   modules receiving the engine's `E`), GES1, DRAW1, UI1 (+ THEMABLE, §7.19), FMT1, TIM1 (permanent timbre ids) → THE FORK: line A ENG1,
   TIM2, TIM3, ENG2; line B IDS1, CMD1, SONG1–SONG3, VIS1, PACK1; DOC1. Moved after Calm (Q2): ROUTE1, IN1, GES2.
 - **User answers Q1–Q19 (2026-10-14; archive B plan §13b):** Q3 two lines after slice 18 — Claude Code prepares and PERFORMS the merges,
@@ -158,27 +159,22 @@ gain) · a render is a re-performance on a fresh engine · lazily loaded modules
 not a control · run a "random" failure many times and print WHERE and HOW MUCH · keep this file short.
 
 ## Slice records (English, ≤ ~15 lines each; full text in the archive)
-### Earlier stage-3 records — LAT1b + SND-F1, SND-F1b, «LAT2 input» (the user's desktop numbers): archive B «Moved from HANDOFF.md at LAT2».
+### Earlier stage-3 records (LAT1b … REC3 part 1): archive B, «Moved from HANDOFF.md at LAT2 / LAT3 / CAM-FIX / REC2 / the NIGHT run».
+- ⬜ Open user checks: phone latency (defaults; D 30 fps; worker path — decides its default) · step 96 (each camera test then Off → picture
+  back; reload + Zoom normal), then step 95 (evening, each low-light setting 20 s + Copy; on this webcam 15/24 fps fall back to Off, short
+  exposure too dark — light is the fix) · step 97 (camera busy / off / blocked → message, «Try again»).
 
-### LAT2 (2026-10-15) — frames once, search schedule, worker option: record moved to archive B «Moved from HANDOFF.md at LAT3».
-- ⬜ OPEN CHECK (postponed by the user): phone latency — A defaults and D 30 fps; on the phone also compare the worker path (decides its default).
-
-### LAT3 (2026-10-15) — low-light camera: record moved to archive B «Moved from HANDOFF.md at CAM-FIX».
-- ⬜ User step 95 (evening, one hand, each low-light setting 20 s + Copy) — do it AFTER step 96 (CAM-FIX).
-- The user's evening results (full: archive B «LAT3 — the user's evening results»): «15 / 24 fps» fall back to Off on this webcam;
-  «short exposure» 30 fps but too dark to find hands — in dim light the fix is light (the hint).
-
-### CAM-FIX + REC1 (2026-10-15) — records moved to archive B «Moved from HANDOFF.md at REC2».
-- ⬜ User step 96 (each test then Off — the picture comes back; reload + Zoom normal), then step 95; step 97 (camera busy / off / blocked →
-  message, «Try again»).
-
-### REC2 + REC3 part 1 (2026-10-15) — full: archive B «REC2 + REC3 part 1 — record»
-- REC2: `song/notes.js` (owner and chase keys, `songNotes`/`songSegs`, view checks; reads the store's new `sortedLen()`) + `song/history.js`
-  (the one history; ⛳ step kinds REGISTER: `histKind(kind, apply, touched)` replaces the editApply if-chain and the histTouched switch; an
-  unknown kind throws; `histWire` brings ready/pause/commit and the hash's capture records, markers, master). Snapshot steps stay in recorder.
-- REC3 was ≈ 2000 lines — only part 1 done: `song/edit-notes.js` (edit core, ties, detach, segment/hit edits; `editWire`),
-  `song/edit-chords.js` (U2–U4), `song/edit-group.js` (ED1). Part 2 (inserts, timbre, clipboard, quantise, degrees/mode/transpose, bends,
-  automation, sections) is next. Plan adaptation: song/ may import `scales.js` (pitch truth; edits need chord notes and degrees).
-- recorder.js 5844 → 4897 lines. Static PASS (new CONTROL song/history.js → audio.js); data PASS 13.
-- Browser (user's Chrome busy, ~64 % of a core): P.quick hit its 180-s limit at row 50 with 0 differences → P.all instead, twice: 73/76 and
-  74/76 — the misses were real-time rows only (LR1 capture gap; LAT2a frames; live Glue), each PASS on one targeted re-run. Fix rounds 1.
+### NIGHT run (2026-10-16, unattended) — REC3 part 2, REC4, REC5 + runner; full log: `NIGHT-LOG.md` (root)
+- Runner: `--limit-quick M`; without it P.quick's limit = 3 min × a slow factor measured from P.quick's own rows (`SLOW_REF`).
+- REC3 part 2: `song/env.js` (ONE wire for what song/ needs from above), `capture.js`, `automation.js`, `edit-insert.js`, `clipboard.js`,
+  `quantise.js`, `transpose.js`, `sections.js`. REC4: `transport/clock.js` (+ rule #35: every beat↔time conversion through the clock),
+  `transport/scheduler.js`. REC5: `freeze/registry.js` (one file — the seams call the swap both ways), `live/eng.js`, `live/record.js`,
+  `live/capture.js`, `live/backing.js`. recorder.js 4897 → 725 (facade + wiring + the session glue listed in CLAUDE.md's module map).
+- Order from the real dependencies: capture records before automation; freeze before the scheduler; each step a small wire, no new cycle.
+- Probes: every step static PASS + browser `--quick` (song/) or `--quick --all` (transport, freeze, live) PASS; last run P.quick 57/0, P.all
+  76/0, GOLD 84/0, HAND1 525/0, frozen seed bass exact; data PASS 13/0. One real failure on the way (a write to a moved variable —
+  «Assignment to constant variable»), fixed; writes to imported bindings are now scanned after each move (the static check misses them).
+- Item 2 (groundwork): FMT1 `core/format.js` (version rules, migrations, refuse newer in words; validators from scaleload) + `core/registry.js`
+  (the user's ID model, rule #37); TIM1 permanent timbre ids (`chord.firefly` …; pinned by a probe row; events still store the index → TIM2).
+  GES1 parts 1–2: `gestures/features.js` (pure, node row), `expr.js`, `fxhand.js`, `looper.js` (gestures.js 1213 → 903; `hands.js` left).
+- Nothing to hear or see. Open: the static check misses (a) writes to imports, (b) names used only after a spread `...x` (reported unused).

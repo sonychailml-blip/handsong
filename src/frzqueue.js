@@ -17,7 +17,7 @@
    layout, render o.layoutGate). A stale result never installs (A2 ticket); 'sig' refusal re-queues the track.
    ⛳ PROBES: the watcher is paused while any P.* runs (scaleprobe.api lock → afPause) and for the whole browser runner session; a probe
    drives it by hand with its own clock (afBegin/afTick/afEnd) — deterministic, no real time. Lower layer: no DOM (rule #5). */
-import { events, loop, recording, freezeState, freezeSig, laneIdOf, laneLayerOf, laneAudible, isRecLayer,
+import { events, loop, secOf, recording, freezeState, freezeSig, laneIdOf, laneLayerOf, laneAudible, isRecLayer,
          loopPos, songBeats, cycling, laneLenOf, frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf,
          editIsOpen, editLayer, laneLevelOf } from './recorder.js';
 import { HANDS } from './gestures.js';
@@ -108,7 +108,7 @@ function spans(){
 /* Pre-render size of a track's frozen data (bytes): lead-in + its material + a typical tail. The exact check follows the render (admit). */
 function estBytes(ly, sp){
   const s=sp.get(ly)||{b0:0,b1:0}, rate=AC?AC.sampleRate:48000;
-  return Math.round((AF_EST.preSec + (s.b1-s.b0)*60/loop.bpm + AF_EST.tailSec)*rate)*AF_EST.ch*AF_EST.bytes;
+  return Math.round((AF_EST.preSec + secOf(s.b1-s.b0) + AF_EST.tailSec)*rate)*AF_EST.ch*AF_EST.bytes;
 }
 const fitsBudget=(ly, bytes)=> frzBytesTotal()-frzBytesOf(ly)+bytes <= budgetBytes();
 

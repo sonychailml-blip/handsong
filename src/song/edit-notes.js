@@ -437,4 +437,4 @@ function editResizeSeg(ev,t){
   return commitDetach(P,true);
 }
 
-export { EDIT_GAP, EDIT_MIN_LEN, EDIT_ROLE, bendTrim, chordMoveTy, commitDetach, detachPlan, editBackingOpen, editBatch, editCanRedo, editCanUndo, editCommit, editDeleteHit, editDeleteSeg, editGuard, editLayer, editMoveHit, editMoveSeg, editPush, editResizeSeg, editRoleOf, editWire, keyClash, noTie, segChordNotes, segEvs, segPitchPt, slotPt, tiePartners, untieAcross };
+export { EDIT_GAP, EDIT_MIN_LEN, EDIT_ROLE, bendTrim, chordMoveTy, commitDetach, detachPlan, editBackingOpen, editBatch, editCanRedo, editCanUndo, editCommit, editDeleteHit, editDeleteSeg, editGuard, editIsOpen, editLayer, editMoveHit, editMoveSeg, editPush, editResizeSeg, editRoleOf, editWire, keyClash, noTie, segChordNotes, segEvs, segPitchPt, slotPt, tiePartners, untieAcross };

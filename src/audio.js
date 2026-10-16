@@ -1,101 +1,102 @@
 import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, trackChainKeyOf } from './state.js';   // FX_VOL — VOL-0: id модуля «Громкость»
 import { baseF, tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
+import { createRegistry } from './core/registry.js';   // TIM1: permanent timbre ids (identity ≠ name ≠ position)
 import { CHORD_POOL_N, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, volFromOld, bendPlan } from './config.js';
 import { FOREST, forestIR, forestRoom, irNormScale, DYN_GLUE, DYN_LIMIT, DYN_MASTER, MASTER_MAKEUP_DB } from './core/dsp.js';   // SND-F1: Night forest IR, dynamics presets (pure core)   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
 const LEAD_INSTR=[
-  {label:'SuperSaw', att:0.012, rel:0.10},
-  {label:{en:'Organ', ru:'Орган'},    att:0.008, rel:0.07},
-  {label:{en:'Pad', ru:'Пад'},      att:0.120, rel:0.35},
-  {label:{en:'Bell', ru:'Колокол'},  att:0.004, rel:0.30},
-  {label:{en:'Flute', ru:'Флейта'},   att:0.050, rel:0.18},
-  {label:{en:'8-bit', ru:'8-бит'},    att:0.002, rel:0.05},
+  {id:'solo.supersaw', label:'SuperSaw', att:0.012, rel:0.10},
+  {id:'solo.organ', label:{en:'Organ', ru:'Орган'},    att:0.008, rel:0.07},
+  {id:'solo.pad', label:{en:'Pad', ru:'Пад'},      att:0.120, rel:0.35},
+  {id:'solo.bell', label:{en:'Bell', ru:'Колокол'},  att:0.004, rel:0.30},
+  {id:'solo.flute', label:{en:'Flute', ru:'Флейта'},   att:0.050, rel:0.18},
+  {id:'solo.8-bit', label:{en:'8-bit', ru:'8-бит'},    att:0.002, rel:0.05},
   /* FM-тембры (несущий+модулятор, огибающая индекса) — inгармонические спектры, недостижимые
      субтрактивным путём. rel длиннее tau индекса → «удар» ярче хвоста (см. buildFMBank). */
-  {label:{en:'Bell (deep)', ru:'Колокол (глубокий)'}, att:0.004, rel:1.6},
-  {label:{en:'Metallophone', ru:'Металлофон'},         att:0.002, rel:0.45},
+  {id:'solo.bell-deep', label:{en:'Bell (deep)', ru:'Колокол (глубокий)'}, att:0.004, rel:1.6},
+  {id:'solo.metallophone', label:{en:'Metallophone', ru:'Металлофон'},         att:0.002, rel:0.45},
   /* Четыре новых семейства (индексы 8..15, тот же порядок, что банки в buildLeadBanks). Существующие
      8 записей выше не тронуты (байт-в-байт), новые сгруппированы по семействам ради читаемого списка.
      ПАДЫ — att медленный, rel ДЛИННЫЙ (~2.5с): звук должен тянуться, чтобы биения интервалов успели
      развиться (главное этого захода — слышимость строёв). ЩИПКОВЫЕ — быстрая атака, короткий rel.
      ДУХОВЫЕ — мягкая атака, умеренный rel. ОРГАНЫ — быстрые атака/релиз, плоско. */
-  {label:{en:'Warm pad', ru:'Пад тёплый'},      att:0.35,  rel:2.5},   // ПАДЫ
-  {label:{en:'Glass pad', ru:'Пад стеклянный'},  att:0.30,  rel:2.5},
-  {label:{default:'Oud', ru:'Уд'},              att:0.004, rel:0.35},  // ЩИПКОВЫЕ
-  {label:{en:'Plucked string', ru:'Струна щипком'},   att:0.003, rel:0.22},
-  {label:{en:'Airy flute', ru:'Флейта воздушная'},att:0.06,  rel:0.20},  // ДУХОВЫЕ
-  {label:{en:'Reed', ru:'Тростевой'},       att:0.04,  rel:0.16},
-  {label:{en:'Organ (full)', ru:'Орган полный'},    att:0.006, rel:0.06},  // ОРГАННЫЕ
-  {label:{en:'Organ (soft)', ru:'Орган мягкий'},    att:0.02,  rel:0.10},
+  {id:'solo.warm-pad', label:{en:'Warm pad', ru:'Пад тёплый'},      att:0.35,  rel:2.5},   // ПАДЫ
+  {id:'solo.glass-pad', label:{en:'Glass pad', ru:'Пад стеклянный'},  att:0.30,  rel:2.5},
+  {id:'solo.oud', label:{default:'Oud', ru:'Уд'},              att:0.004, rel:0.35},  // ЩИПКОВЫЕ
+  {id:'solo.plucked-string', label:{en:'Plucked string', ru:'Струна щипком'},   att:0.003, rel:0.22},
+  {id:'solo.airy-flute', label:{en:'Airy flute', ru:'Флейта воздушная'},att:0.06,  rel:0.20},  // ДУХОВЫЕ
+  {id:'solo.reed', label:{en:'Reed', ru:'Тростевой'},       att:0.04,  rel:0.16},
+  {id:'solo.organ-full', label:{en:'Organ (full)', ru:'Орган полный'},    att:0.006, rel:0.06},  // ОРГАННЫЕ
+  {id:'solo.organ-soft', label:{en:'Organ (soft)', ru:'Орган мягкий'},    att:0.02,  rel:0.10},
   /* Карплюс–Стронг (физ. модель щипковой струны) — третий способ построения голоса (ворклет,
      см. ks-worklet.js и buildKSBank). Быстрая атака, естественный хвост даёт сама петля. */
-  {label:{en:'String', ru:'Струна'},    att:0.002, rel:0.4},
-  {label:{default:'Sitar', ru:'Ситар'},     att:0.002, rel:0.6},
-  {label:{en:'Oud (string)', ru:'Уд (струна)'}, att:0.002, rel:0.3},  // KS-щипковые: параметрические вариации одной струны (см. KS_BANKS). «(струна)» — чтобы не дублировать субтрактивный «Уд» (индекс 10)
-  {label:{default:'Koto', ru:'Кото'},      att:0.002, rel:0.5},
-  {label:{default:'Santur', ru:'Сантур'},    att:0.001, rel:0.25},
-  {label:{en:'Guitar', ru:'Гитара'},    att:0.002, rel:0.5},
-  {label:{en:'Pizzicato', ru:'Пиццикато'}, att:0.001, rel:0.15},
+  {id:'solo.string', label:{en:'String', ru:'Струна'},    att:0.002, rel:0.4},
+  {id:'solo.sitar', label:{default:'Sitar', ru:'Ситар'},     att:0.002, rel:0.6},
+  {id:'solo.oud-string', label:{en:'Oud (string)', ru:'Уд (струна)'}, att:0.002, rel:0.3},  // KS-щипковые: параметрические вариации одной струны (см. KS_BANKS). «(струна)» — чтобы не дублировать субтрактивный «Уд» (индекс 10)
+  {id:'solo.koto', label:{default:'Koto', ru:'Кото'},      att:0.002, rel:0.5},
+  {id:'solo.santur', label:{default:'Santur', ru:'Сантур'},    att:0.001, rel:0.25},
+  {id:'solo.guitar', label:{en:'Guitar', ru:'Гитара'},    att:0.002, rel:0.5},
+  {id:'solo.pizzicato', label:{en:'Pizzicato', ru:'Пиццикато'}, att:0.001, rel:0.15},
 ];
 /* Аккордовые тембры: 2 осциллятора (типы t1/t2, отношение частот ratio, расстройка det в центах,
    микс m1/m2), общий НЧ-фильтр lp, огибающая att/rel. Плюс улучшения качества (per-bank):
    fo — во сколько раз фильтр открыт в атаке (огибающая фильтра), ft — время оседания, fv — скорость→
    яркость (cutoff = lp·(1+fv·vol), пол=lp), hj — гуманизация высоты (0 у органа/падов для строёв). */
 const CHORD_INSTR=[
-  {label:{en:'Warm pad', ru:'Тёплый пад'},     t1:'sawtooth', t2:'sawtooth', ratio:1, det:9, m1:.50, m2:.50, lp:1500, lvl:.17, att:.22,  rel:.50, fo:1.4, ft:.30, fv:.6, hj:0},
-  {label:{en:'Glass pad', ru:'Стеклянный пад'}, t1:'triangle', t2:'sine',     ratio:2, det:5, m1:.55, m2:.30, lp:3400, lvl:.21, att:.14,  rel:.60, fo:1.4, ft:.28, fv:.6, hj:0},
-  {label:{en:'Organ', ru:'Орган'},          t1:'square',   t2:'sine',     ratio:2, det:0, m1:.45, m2:.35, lp:4200, lvl:.15, att:.012, rel:.09, fo:1.0, ft:.02, fv:.2, hj:0},
-  {label:{en:'E. piano', ru:'Эл. пиано'},      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45, fo:2.2, ft:.12, fv:1.0,hj:1},
+  {id:'chord.warm-pad', label:{en:'Warm pad', ru:'Тёплый пад'},     t1:'sawtooth', t2:'sawtooth', ratio:1, det:9, m1:.50, m2:.50, lp:1500, lvl:.17, att:.22,  rel:.50, fo:1.4, ft:.30, fv:.6, hj:0},
+  {id:'chord.glass-pad', label:{en:'Glass pad', ru:'Стеклянный пад'}, t1:'triangle', t2:'sine',     ratio:2, det:5, m1:.55, m2:.30, lp:3400, lvl:.21, att:.14,  rel:.60, fo:1.4, ft:.28, fv:.6, hj:0},
+  {id:'chord.organ', label:{en:'Organ', ru:'Орган'},          t1:'square',   t2:'sine',     ratio:2, det:0, m1:.45, m2:.35, lp:4200, lvl:.15, att:.012, rel:.09, fo:1.0, ft:.02, fv:.2, hj:0},
+  {id:'chord.e-piano', label:{en:'E. piano', ru:'Эл. пиано'},      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45, fo:2.2, ft:.12, fv:1.0,hj:1},
   /* Аккордовые эквиваленты новых семейств. Пул строит голос иначе (o1/o2 → фильтр, тембр печётся на
      атаке), поэтому характер адаптирован под ЭТУ форму, а не скопирован из лид-банков. Существующие 4
      записи выше не тронуты (байт-в-байт). Аккордовый голос ДЕРЖИТ уровень, пока зажат → «сустейн» уже
      есть; для строёв важнее ДЛИННЫЙ rel (хвост, где слышны биения) и СТАБИЛЬНЫЙ тон (органы: det=0,
      сами не бьются). Имена с «(долгий)»: существующие «Тёплый/Стеклянный пад» короче — новые тянутся. */
-  {label:{en:'Warm pad (long)', ru:'Пад тёплый (долгий)'},     t1:'sawtooth', t2:'sawtooth', ratio:1, det:10, m1:.50, m2:.50, lp:1300, lvl:.16, att:.35,  rel:1.8, fo:1.4, ft:.35, fv:.6, hj:0},  // ПАДЫ (hj=0 — чистая высота для строёв)
-  {label:{en:'Glass pad (long)', ru:'Пад стеклянный (долгий)'}, t1:'triangle', t2:'sine',     ratio:2, det:6,  m1:.52, m2:.30, lp:3000, lvl:.18, att:.30,  rel:1.8, fo:1.4, ft:.30, fv:.6, hj:0},
-  {label:{default:'Oud', ru:'Уд'},                      t1:'sawtooth', t2:'triangle', ratio:1, det:4,  m1:.50, m2:.34, lp:1200, lvl:.20, att:.004, rel:.30, fo:3.0, ft:.12, fv:1.4,hj:1},  // ЩИПКОВЫЕ (яркое открытие фильтра)
-  {label:{en:'Plucked string', ru:'Струна щипком'},           t1:'sawtooth', t2:'sawtooth', ratio:1, det:2,  m1:.46, m2:.30, lp:2600, lvl:.18, att:.003, rel:.22, fo:3.2, ft:.09, fv:1.4,hj:1},
-  {label:{en:'Flute', ru:'Флейта'},                  t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.60, m2:.18, lp:2600, lvl:.20, att:.06,  rel:.20, fo:1.3, ft:.08, fv:.5, hj:1},  // ДУХОВЫЕ
-  {label:{en:'Reed', ru:'Тростевой'},               t1:'square',   t2:'sawtooth', ratio:1, det:5,  m1:.34, m2:.26, lp:2200, lvl:.15, att:.05,  rel:.18, fo:2.0, ft:.14, fv:1.0,hj:1},
-  {label:{en:'Organ (full)', ru:'Орган полный'},            t1:'square',   t2:'sine',     ratio:3, det:0,  m1:.42, m2:.30, lp:4800, lvl:.15, att:.008, rel:.10, fo:1.0, ft:.02, fv:.2, hj:0},  // ОРГАННЫЕ (det=0, hj=0 — лучший для строёв)
-  {label:{en:'Organ (soft)', ru:'Орган мягкий'},            t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.58, m2:.24, lp:3000, lvl:.17, att:.02,  rel:.12, fo:1.0, ft:.02, fv:.2, hj:0},
+  {id:'chord.warm-pad-long', label:{en:'Warm pad (long)', ru:'Пад тёплый (долгий)'},     t1:'sawtooth', t2:'sawtooth', ratio:1, det:10, m1:.50, m2:.50, lp:1300, lvl:.16, att:.35,  rel:1.8, fo:1.4, ft:.35, fv:.6, hj:0},  // ПАДЫ (hj=0 — чистая высота для строёв)
+  {id:'chord.glass-pad-long', label:{en:'Glass pad (long)', ru:'Пад стеклянный (долгий)'}, t1:'triangle', t2:'sine',     ratio:2, det:6,  m1:.52, m2:.30, lp:3000, lvl:.18, att:.30,  rel:1.8, fo:1.4, ft:.30, fv:.6, hj:0},
+  {id:'chord.oud', label:{default:'Oud', ru:'Уд'},                      t1:'sawtooth', t2:'triangle', ratio:1, det:4,  m1:.50, m2:.34, lp:1200, lvl:.20, att:.004, rel:.30, fo:3.0, ft:.12, fv:1.4,hj:1},  // ЩИПКОВЫЕ (яркое открытие фильтра)
+  {id:'chord.plucked-string', label:{en:'Plucked string', ru:'Струна щипком'},           t1:'sawtooth', t2:'sawtooth', ratio:1, det:2,  m1:.46, m2:.30, lp:2600, lvl:.18, att:.003, rel:.22, fo:3.2, ft:.09, fv:1.4,hj:1},
+  {id:'chord.flute', label:{en:'Flute', ru:'Флейта'},                  t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.60, m2:.18, lp:2600, lvl:.20, att:.06,  rel:.20, fo:1.3, ft:.08, fv:.5, hj:1},  // ДУХОВЫЕ
+  {id:'chord.reed', label:{en:'Reed', ru:'Тростевой'},               t1:'square',   t2:'sawtooth', ratio:1, det:5,  m1:.34, m2:.26, lp:2200, lvl:.15, att:.05,  rel:.18, fo:2.0, ft:.14, fv:1.0,hj:1},
+  {id:'chord.organ-full', label:{en:'Organ (full)', ru:'Орган полный'},            t1:'square',   t2:'sine',     ratio:3, det:0,  m1:.42, m2:.30, lp:4800, lvl:.15, att:.008, rel:.10, fo:1.0, ft:.02, fv:.2, hj:0},  // ОРГАННЫЕ (det=0, hj=0 — лучший для строёв)
+  {id:'chord.organ-soft', label:{en:'Organ (soft)', ru:'Орган мягкий'},            t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.58, m2:.24, lp:3000, lvl:.17, att:.02,  rel:.12, fo:1.0, ft:.02, fv:.2, hj:0},
   /* Расширение (индексы 12..15). НЕ дублируем уже имеющееся: «Орган» (idx 2, det=0) — уже чистый
      эталон для строёв; тёплые/длинные пады и щипковые (Уд/Струна щипком) тоже есть. Добавляем ровно
      то, чего НЕ было: ПИТЧ-ЧИСТЫЕ пады (существующие все с расстройкой det 5..10 — тембр сам бьётся;
      здесь det=0, характер из РАЗНЫХ волн, а не из расстройки → биения = ТОЛЬКО строй), смычковые и
      яркий щипок. hj=0 у падов/струнных (для строёв), hj=1 только у щипковых (не инструмент для строёв). */
-  {label:{en:'Warm pad (clean)', ru:'Пад тёплый (чистый)'},     t1:'sawtooth', t2:'triangle', ratio:1, det:0,  m1:.48, m2:.34, lp:1400, lvl:.16, att:.30,  rel:2.0, fo:1.4, ft:.35, fv:.6, hj:0},  // ЧИСТЫЕ ПАДЫ (det=0 — биения только от строя)
-  {label:{en:'Glass pad (clean)', ru:'Пад стеклянный (чистый)'}, t1:'triangle', t2:'sine',     ratio:2, det:0,  m1:.52, m2:.28, lp:3000, lvl:.18, att:.28,  rel:2.0, fo:1.4, ft:.30, fv:.6, hj:0},  // ratio 2 = чистая октава (без биений)
-  {label:{en:'Strings', ru:'Струнные'},                t1:'sawtooth', t2:'sawtooth', ratio:1, det:6,  m1:.46, m2:.40, lp:2200, lvl:.17, att:.18,  rel:.80, fo:1.6, ft:.30, fv:.8, hj:0},  // СМЫЧКОВЫЕ: мягкая атака + медленное открытие фильтра (наплыв), лёгкая ширина ансамбля
-  {label:{en:'Plucked', ru:'Щипковые'},                t1:'sawtooth', t2:'square',   ratio:1, det:3,  m1:.44, m2:.28, lp:2800, lvl:.19, att:.003, rel:.20, fo:3.5, ft:.08, fv:1.5, hj:1},
+  {id:'chord.warm-pad-clean', label:{en:'Warm pad (clean)', ru:'Пад тёплый (чистый)'},     t1:'sawtooth', t2:'triangle', ratio:1, det:0,  m1:.48, m2:.34, lp:1400, lvl:.16, att:.30,  rel:2.0, fo:1.4, ft:.35, fv:.6, hj:0},  // ЧИСТЫЕ ПАДЫ (det=0 — биения только от строя)
+  {id:'chord.glass-pad-clean', label:{en:'Glass pad (clean)', ru:'Пад стеклянный (чистый)'}, t1:'triangle', t2:'sine',     ratio:2, det:0,  m1:.52, m2:.28, lp:3000, lvl:.18, att:.28,  rel:2.0, fo:1.4, ft:.30, fv:.6, hj:0},  // ratio 2 = чистая октава (без биений)
+  {id:'chord.strings', label:{en:'Strings', ru:'Струнные'},                t1:'sawtooth', t2:'sawtooth', ratio:1, det:6,  m1:.46, m2:.40, lp:2200, lvl:.17, att:.18,  rel:.80, fo:1.6, ft:.30, fv:.8, hj:0},  // СМЫЧКОВЫЕ: мягкая атака + медленное открытие фильтра (наплыв), лёгкая ширина ансамбля
+  {id:'chord.plucked', label:{en:'Plucked', ru:'Щипковые'},                t1:'sawtooth', t2:'square',   ratio:1, det:3,  m1:.44, m2:.28, lp:2800, lvl:.19, att:.003, rel:.20, fo:3.5, ft:.08, fv:1.5, hj:1},
   /* SND-F1: «Firefly» — a struck tine, ONE-SHOT per note (strike:'firefly' → ffStrike; the oscillator fields are the pool voice's silent
      bookkeeping). lvl = the prototype's gain at full velocity (0.08 + 0.16); rel = the longest partial decay (render tail). */
-  {label:{en:'Firefly', ru:'Светлячок'}, strike:'firefly', t1:'triangle', t2:'sine', ratio:2, det:0, m1:0, m2:0, lp:18000, lvl:.24, att:.006, rel:1.6, fo:1, ft:.02, fv:0, hj:0},  // ЯРКИЙ ЩИПОК: быстрая атака, резкое открытие/закрытие фильтра — для макамов/пентатоник, где пад неуместен
+  {id:'chord.firefly', label:{en:'Firefly', ru:'Светлячок'}, strike:'firefly', t1:'triangle', t2:'sine', ratio:2, det:0, m1:0, m2:0, lp:18000, lvl:.24, att:.006, rel:1.6, fo:1, ft:.02, fv:0, hj:0},  // ЯРКИЙ ЩИПОК: быстрая атака, резкое открытие/закрытие фильтра — для макамов/пентатоник, где пад неуместен
 ];
 /* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio, расстройка det),
    НЧ-фильтр lp, огибающая att/rel. Плюс огибающая фильтра на атаке: fo — открытие, ft — время,
    fv — скорость→яркость (cutoff = lp·(1+fv·vol), пол=lp). Высоту баса НЕ гуманизируем (низкие
    биения гулкие); синус (Саб) на фильтр почти не реагирует — fo мал. */
 const BASS_INSTR=[
-  {label:{en:'Sub sine', ru:'Саб-синус'}, t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  lvl:.45, att:.020, rel:.20, fo:1.0, ft:.03, fv:.2},
-  {label:{en:'Saw', ru:'Пила'},      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  lvl:.38, att:.014, rel:.16, fo:2.5, ft:.10, fv:1.2},
-  {label:{en:'Acid', ru:'Кислотный'}, t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, lvl:.34, att:.008, rel:.13, fo:3.5, ft:.12, fv:1.6},
-  {label:{en:'Synth bass', ru:'Синт-бас'},  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  lvl:.40, att:.020, rel:.24, fo:2.0, ft:.12, fv:1.0},
+  {id:'bass.sub-sine', label:{en:'Sub sine', ru:'Саб-синус'}, t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  lvl:.45, att:.020, rel:.20, fo:1.0, ft:.03, fv:.2},
+  {id:'bass.saw', label:{en:'Saw', ru:'Пила'},      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  lvl:.38, att:.014, rel:.16, fo:2.5, ft:.10, fv:1.2},
+  {id:'bass.acid', label:{en:'Acid', ru:'Кислотный'}, t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, lvl:.34, att:.008, rel:.13, fo:3.5, ft:.12, fv:1.6},
+  {id:'bass.synth', label:{en:'Synth bass', ru:'Синт-бас'},  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  lvl:.40, att:.020, rel:.24, fo:2.0, ft:.12, fv:1.0},
   /* Расширение (индексы 4..6). Существующие 4 не тронуты (байт-в-байт). Бас НЕ гуманизируем по высоте
      (низкие расстройки гулкие) — здесь только огибающая фильтра/скорость→яркость, как у пула. */
-  {label:{en:'Upright bass', ru:'Контрабас'},        t1:'sawtooth', t2:'triangle', det:4,  ratio:1,   lp:520,  lvl:.38, att:.004, rel:.30, fo:2.5, ft:.10, fv:1.2},  // щипковый контрабас: быстрая атака, тёплый, средний спад
-  {label:{en:'Synth bass (soft)', ru:'Синт-бас мягкий'},  t1:'sine',     t2:'triangle', det:0,  ratio:1,   lp:480,  lvl:.42, att:.020, rel:.22, fo:1.8, ft:.15, fv:.8},   // круглый саб, лёгкое движение фильтра
-  {label:{en:'Organ bass', ru:'Орган-бас'},        t1:'square',   t2:'sine',     det:0,  ratio:1,   lp:620,  lvl:.36, att:.012, rel:.30, fo:1.0, ft:.02, fv:.3},   // ровный тянущийся низ — для дронов и педалей (fo=1: без наплыва)
+  {id:'bass.upright', label:{en:'Upright bass', ru:'Контрабас'},        t1:'sawtooth', t2:'triangle', det:4,  ratio:1,   lp:520,  lvl:.38, att:.004, rel:.30, fo:2.5, ft:.10, fv:1.2},  // щипковый контрабас: быстрая атака, тёплый, средний спад
+  {id:'bass.synth-soft', label:{en:'Synth bass (soft)', ru:'Синт-бас мягкий'},  t1:'sine',     t2:'triangle', det:0,  ratio:1,   lp:480,  lvl:.42, att:.020, rel:.22, fo:1.8, ft:.15, fv:.8},   // круглый саб, лёгкое движение фильтра
+  {id:'bass.organ', label:{en:'Organ bass', ru:'Орган-бас'},        t1:'square',   t2:'sine',     det:0,  ratio:1,   lp:620,  lvl:.36, att:.012, rel:.30, fo:1.0, ft:.02, fv:.3},   // ровный тянущийся низ — для дронов и педалей (fo=1: без наплыва)
 ];
 /* Ударные: имена рядов (индекс 0 = низ сетки). Синтез на лету, без сэмплов. */
 const DRUM_NAMES=[{en:'Kick',ru:'Кик'},{en:'Snare',ru:'Снейр'},{en:'Clap',ru:'Клэп'},{en:'Hat',ru:'Хэт'},{en:'Tom',ru:'Том'},{en:'Crash',ru:'Крэш'}];
 const DRUM_ROWS=DRUM_NAMES.length;
 /* Наборы ударных: тембр рядов. Стандарт — синтезированный кит; Дарбука — дум/тек
    (спасены из удалённого backing.js). Селектор той же формы, что LEAD_INSTR и др. */
-const DRUM_KITS=[{label:{en:'Standard',ru:'Стандарт'}},{label:{default:'Darbuka',ru:'Дарбука'}},{label:{default:'Tabla',ru:'Табла'}},{label:{default:'Gamelan',ru:'Гамелан'}},{label:{default:'Taiko',ru:'Тайко'}}];
+const DRUM_KITS=[{id:'kit.standard', label:{en:'Standard',ru:'Стандарт'}},{id:'kit.darbuka', label:{default:'Darbuka',ru:'Дарбука'}},{id:'kit.tabla', label:{default:'Tabla',ru:'Табла'}},{id:'kit.gamelan', label:{default:'Gamelan',ru:'Гамелан'}},{id:'kit.taiko', label:{default:'Taiko',ru:'Тайко'}}];
 /* ⛳ ТЕМБРЫ РОЛИ — ОДНА ФУНКЦИЯ, через которую выбор тембра ДОРОЖКИ (редактор, слайс T5) узнаёт, что можно
    поставить: [{id, name}] для 'ld'|'ch'|'bs'|'dr' (у ударных — наборы). id — то, что лежит в событии
    (a.inst / a.kit) и сравнивается на равенство; name — подпись в форме L() (строка, {default,ru} или
@@ -108,7 +109,20 @@ const DRUM_KITS=[{label:{en:'Standard',ru:'Стандарт'}},{label:{default:'
    kit в drumHit), селекторы живых тембров в панели, запасы рендера и свёртка подписи свежести — все
    держат индекс. Им стабильный id понадобится отдельно (см. HANDOFF, «хранение тембров»). */
 const TIMBRE_LISTS={ ld:()=>LEAD_INSTR, ch:()=>CHORD_INSTR, bs:()=>BASS_INSTR, dr:()=>DRUM_KITS };
-const timbresOf=role=>{ const g=TIMBRE_LISTS[role]; return g ? g().map((x,i)=>({ id:i, name:x.label })) : []; };
+/* ⛳ TIM1: every built-in timbre / kit has a PERMANENT id (`id` in its entry — readable, family-prefixed; never renamed, never reused).
+   Identity ≠ name ≠ position (core/registry.js): one registry per role holds the built-ins in table order; a hidden one leaves the
+   PICKER (timbresOf) but stays readable (timbreById), so songs that use it always play. Events still store the index until TIM2:
+   index ↔ id is converted here, at the boundary (timbreIdOf / timbreById). */
+const TIMBRE_REG={};
+for(const role in TIMBRE_LISTS){ const R=TIMBRE_REG[role]=createRegistry('timbre');
+  for(const x of TIMBRE_LISTS[role]()){ const why=R.add({ id:x.id, name:x.label },{ builtin:true }); if(why) throw new Error('TIM1: '+why); } }
+const timbreIdxOf=(role,id)=> TIMBRE_LISTS[role] ? TIMBRE_LISTS[role]().findIndex(x=>x.id===id) : -1;
+/* the picker: [{id, idx, name}] — the person's order, hidden ones left out; idx = what an event stores today */
+const timbresOf=role=>{ const R=TIMBRE_REG[role]; if(!R) return []; const L=TIMBRE_LISTS[role]();
+  return R.order().map(id=>{ const idx=timbreIdxOf(role,id); return { id, idx, name:L[idx].label }; }); };
+const timbreIdOf=(role,idx)=>{ const g=TIMBRE_LISTS[role], x=g&&g()[idx]; return x ? x.id : null; };
+const timbreById=id=>{ for(const role in TIMBRE_LISTS){ const idx=timbreIdxOf(role,id); if(idx>=0) return { role, idx, entry:TIMBRE_LISTS[role]()[idx] }; } return null; };
+const timbreReg=role=> TIMBRE_REG[role] || null;   // the registry (hide / show / order) — probes today, the timbre list UI later
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter;
@@ -3179,7 +3193,7 @@ export {
   setTrackGainOf, ownerGain, trackGainRetune, hitOwner, setMasterLevel, masterLevel, masterMeter,   // MX1: уровень дорожки (ступень в голосе по ключу владельца), мастер и измеритель
   setTrackPanOf, ownerPan, trackPanRetune, dronePan, panGains,   // MX2: панорама дорожки (стерео-ступень в голосе по ключу владельца, закон равной мощности)
   renderReset, renderStateOf,   // сброс копии рендера в начале и в конце каждого рендера (зовёт ТОЛЬКО render.js у своей копии) и его снимок для стража P.all
-  timbresOf,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
+  timbresOf, timbreIdOf, timbreById, timbreReg,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxPerm,   // VOL-0: постоянная запись цепи (громкость) — единый предикат «не показывать и не предлагать»

@@ -358,7 +358,7 @@ function report(rec, warn){
   const L0=new Map();
   for(const e of events){ let r=L0.get(e.layer); if(!r) L0.set(e.layer, r={ n:0, sc:null, jam:false }); r.n++; if(e.jam) r.jam=true; if(!r.sc && e.sc && e.fn!=='drum') r.sc=e.sc; }
   const rows=[...L0.keys()].sort((p,q)=>p-q).map(ly=>{ const r=L0.get(ly), role=laneRoleOf(ly), tb=laneTimbreOf(ly);
-    const nm= role ? (timbresOf(role).find(x=>x.id===tb)||{}).name : null;
+    const nm= role ? (timbresOf(role).find(x=>x.idx===tb)||{}).name : null;
     const part=Object.keys(rec.parts).find(k=>rec.parts[k].layer===ly);
     return { track:'L'+(ly+1), part: part || (r.jam ? 'drone (backing)' : '-'), role: role || '-', timbre: nm!=null ? L(nm) : '-',
              scale: !role||role==='dr' ? '-' : r.sc ? `${L(r.sc.name)} (${viewIdOf(r.sc)})` : '-', events:r.n }; });

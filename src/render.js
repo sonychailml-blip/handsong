@@ -956,7 +956,7 @@ async function renderTrackNow(layer, opt){
      у подложки), точки автоматизации после окна не ставятся. Мерам проб (баланс каналов, отношение уровней, повтор двух рендеров) нужна
      пара секунд звука, а не вся дорожка с хвостом. ⛔ Заморозка (freeze, ❄, R.aud) его не передаёт никогда — буфер дорожки всегда целый. */
   const SHORT= o.short>0 ? o.short : 0;
-  const cutBeat= SHORT ? evsAll[0].t + SHORT*REC.loop.bpm/60 : Infinity;
+  const cutBeat= SHORT ? evsAll[0].t + REC.beatsOf(SHORT) : Infinity;
   const evs= SHORT ? evsAll.filter(e=>e.t<cutBeat) : evsAll;
   const cutOff= evs.length<evsAll.length;   // окно что-то отрезало — конец рендера = край окна (иначе нота, чей «выкл» за краем, закрылась бы на своём «вкл»)
 
@@ -1471,7 +1471,7 @@ function live(layer){
   const evs=REC.events.map((e,i)=>({e,i})).filter(x=>x.e.layer===layer).sort((a,b)=>(a.e.t-b.e.t)||(a.i-b.i)).map(x=>x.e);
   if(!evs.length) throw new Error('дорожка '+layer+' пуста');
   const ENG=REC.makeENG(LIVE);
-  const spb=60/REC.loop.bpm, t0=evs[0].t, T0=LIVE_AC.currentTime+0.3;
+  const spb=REC.secPerBeat(), t0=evs[0].t, T0=LIVE_AC.currentTime+0.3;
   const keys=new Set(); for(const e of evs){ const r=REC.evRole(e.fn); if(r) keys.add(chainKeyOf(r)); }
   const laneAll=REC.fxLaneExpand(REC.fxLaneMerge(), SCHED_TICK_MS/1000/spb);   // гладкая автоматизация: плавные отрезки — шагом тика, как у ▶ и у рендера
   for(const p of laneAll){ if(!keys.has(p.key)||p.t>t0+1e-9) continue;
@@ -1679,7 +1679,7 @@ async function revAgree(){
   stop();
   const keepAll=[]; for(const e of fxChainOf(key)){ const I=LIVE.fxInstance(key,e.fxId); if(I&&I.params) for(const p of I.params) keepAll.push([p,p.cur]); }   // все величины цепи аккордов — вернуть ровно как были
   const P=k=>inst.params.find(p=>p.key===k), dec0=P('decay').cur, tone0=P('tone').cur;
-  const spb=60/REC.loop.bpm, beats=Math.max(1,Math.round(1.5/spb)), dur=beats*spb, made=[];
+  const spb=REC.secPerBeat(), beats=Math.max(1,Math.round(1.5/spb)), dur=beats*spb, made=[];
   const tStart=performance.now();
   const take=(decN,toneN)=>{
     P('mix').setNorm(1); P('decay').setNorm(decN); P('tone').setNorm(toneN);
@@ -1840,7 +1840,7 @@ async function swapCheck(){
         const c=await capP; fresh=REC.freezeState(ly);
         if(REC.loop.on) REC.onLoop();
         const we=await frzWaitEnds(ly, 1000);             // AF6b-fix2: отчёты о конце — сообщением; ждём до 1 с (без ожидания first «стоящего» оставался пустым и проверка опоздания молча не шла)
-        atk.dips=LIVE.fxDipLog().filter(d=>d.key===chainKeyOf('ch') && d.t>=t0+(o.from-0.5)*60/REC.loop.bpm).map(d=>+((d.t-t0)/(60/REC.loop.bpm)).toFixed(3));   // провалы цепи аккордов за прогон — в долях песни
+        atk.dips=LIVE.fxDipLog().filter(d=>d.key===chainKeyOf('ch') && d.t>=t0+REC.secOf(o.from-0.5)).map(d=>+((d.t-t0)/REC.secPerBeat()).toFixed(3));   // провалы цепи аккордов за прогон — в долях песни
         return { c, t0, tm, Mf, sw, fresh, nodes:we.info, atk };
       } finally {
         polling=false;

@@ -261,8 +261,43 @@ export async function checkFreezeParity(o={}){   // o.room: a Night forest room 
   return { cases, total:diff.length, differences:diff, notes };
 }
 
+/* TIM1: permanent timbre ids — the pinned list below IS the contract (an id is never renamed or reused: a change here must be a decision,
+   not a refactor). Every role: ids valid built-in ids, unique across roles, family prefix, table order = picker order, id ↔ index both
+   ways; a hidden timbre leaves the picker but stays readable (songs still play), show brings it back. CONTROL: a renamed id is caught. */
+const TIMBRE_IDS_PINNED={
+  ld:['solo.supersaw','solo.organ','solo.pad','solo.bell','solo.flute','solo.8-bit','solo.bell-deep','solo.metallophone','solo.warm-pad','solo.glass-pad','solo.oud','solo.plucked-string','solo.airy-flute','solo.reed','solo.organ-full','solo.organ-soft','solo.string','solo.sitar','solo.oud-string','solo.koto','solo.santur','solo.guitar','solo.pizzicato'],
+  ch:['chord.warm-pad','chord.glass-pad','chord.organ','chord.e-piano','chord.warm-pad-long','chord.glass-pad-long','chord.oud','chord.plucked-string','chord.flute','chord.reed','chord.organ-full','chord.organ-soft','chord.warm-pad-clean','chord.glass-pad-clean','chord.strings','chord.plucked','chord.firefly'],
+  bs:['bass.sub-sine','bass.saw','bass.acid','bass.synth','bass.upright','bass.synth-soft','bass.organ'],
+  dr:['kit.standard','kit.darbuka','kit.tabla','kit.gamelan','kit.taiko'] };
+export function checkTimbreIds(){
+  const diff=[]; let cases=0; const miss=m=>diff.push(m);
+  const IDR_OK=/^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$/, FAM={ ld:'solo.', ch:'chord.', bs:'bass.', dr:'kit.' }, seen=new Set();
+  const lists=r=>LIVE.timbresOf(r).map(x=>x.id);
+  for(const r of ['ld','ch','bs','dr']){
+    const T=LIVE.timbresOf(r), P=TIMBRE_IDS_PINNED[r];
+    cases++; if(JSON.stringify(T.map(x=>x.id))!==JSON.stringify(P)) miss(`${r}: ids differ from the pinned list — ${T.map(x=>x.id).join(',')}`);
+    T.forEach((x,i)=>{ cases++;
+      if(!IDR_OK.test(x.id) || x.id.slice(0,FAM[r].length)!==FAM[r]) miss(`${r} ${i}: «${x.id}» is not a ${FAM[r]}… built-in id`);
+      if(seen.has(x.id)) miss(`«${x.id}» twice`); seen.add(x.id);
+      if(x.idx!==i) miss(`${r} ${i}: picker order differs from table order (idx ${x.idx})`);
+      if(LIVE.timbreIdOf(r,i)!==x.id) miss(`${r} ${i}: timbreIdOf → ${LIVE.timbreIdOf(r,i)}`);
+      const b=LIVE.timbreById(x.id); if(!b || b.role!==r || b.idx!==i) miss(`${r} ${i}: timbreById(${x.id}) → ${JSON.stringify(b&&{role:b.role,idx:b.idx})}`); });
+  }
+  { const R=LIVE.timbreReg('ch'), id='chord.firefly'; cases++;
+    try{ R.hide(id);
+      if(lists('ch').includes(id)) miss('a hidden timbre is still offered by the picker');
+      if(!LIVE.timbreById(id)) miss('a hidden timbre is no longer readable — songs that use it could not play');
+      if(R.remove(id)===null) miss('a built-in timbre was removed');
+    } finally { R.show(id); }
+    if(!lists('ch').includes(id)) miss('show did not bring the timbre back'); }
+  { cases++; const P=TIMBRE_IDS_PINNED.ch.slice(); P[16]='chord.firefly-2';   // CONTROL: a renamed id must not match the pinned list
+    if(JSON.stringify(lists('ch'))===JSON.stringify(P)) miss('CONTROL: a renamed id matched the pinned list — the check cannot fail'); }
+  return { cases, total:diff.length, differences:diff };
+}
+
 /* rows of this area — the registry (probes/rows.js) orders them by «at» */
 const rd=r=>({ cases:r.cases, diff:r.total, list:r.differences });
+row({ at:405.5, name:'TIM1 permanent timbre ids', run:()=>checkTimbreIds(), read:rd });
 row({ at:406, name:'SND-F1 Firefly identity', run:()=>checkFirefly(), read:rd });
 row({ at:407, name:'SND-F1 Night forest IR', run:()=>checkForest(), read:rd });
 row({ at:408, name:'SND-F1 dynamics: curve, latency, ceiling', run:()=>checkDynamics(), read:rd });

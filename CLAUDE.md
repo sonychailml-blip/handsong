@@ -71,7 +71,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   lines and every "first differences" block; exit 0 only on PASS. Flags: `--quick` (default), `--all`, `--quick --all`,
   `--repeat N` (N fresh browsers, P.all each, then a table of every measured value with its margin — `meas()` in the probe,
   `res.measures`), `--eval file.js` (script in the page after the seed, prints JSON), `--headed` (off-screen window; worse: a drawn
-  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 15 since LAT2; P.quick 3, seed 3, start 3). Full console →
+  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 15 since LAT2; seed 3, start 3), `--limit-quick M` (P.quick; NIGHT-0, 2026-10-16: without it 3 min × the SLOW FACTOR measured from P.quick's own rows — each finished row with a reference time in `SLOW_REF` (CPU-bound rows of an idle run, P.quick 112.9 s; LAT/CAM rows are time-based and left out) adds to observed / reference; from 3 rows on, factor = that ratio (1 below 1.2, at most 6) and the deadline moves with it; printed «machine speed: … slow factor …»; a busy Chrome outside the runner made rows 3–4× slower and the fixed 3 min failed). Full console →
   `tools/.probe-logs/` (git-ignored). Headless is the default because measured: every row runs, P.quick takes the user's manual
   time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash). The runner PAUSES auto-freeze for its whole session
   (`frzqueue.afPause('runner')`; AF3 is checked by its own deterministic row). In `--eval` the page has `window.__heap()` (full GC, then
@@ -142,7 +142,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - **A rhythm pattern** = one entry APPENDED at the end of `RHYTHMS` (ui holds positional `JR_BACK=0`/`JR_MAQSUM=1`). Declare `beats`
   and `sub:3` for triplets; grid exactly `beats*sub` cells (`gridOk`); written in ROWS (0 kick/1 snare/2 clap/3 hat; row 5 unused);
   volumes in the OLD drum scale (converted by `config.volFromOld('dr',…)`).
-- **A timbre/kit** = an entry in `LEAD_INSTR`/`CHORD_INSTR`/`BASS_INSTR`/`DRUM_KITS`. ⚠️ The index IS the identity (`a.inst`/`a.kit`):
+- **A timbre/kit** = an entry in `LEAD_INSTR`/`CHORD_INSTR`/`BASS_INSTR`/`DRUM_KITS` WITH a new permanent `id` (TIM1, rule #37; add it to the
+  probe's pinned list `TIMBRE_IDS_PINNED`). ⚠️ Events still store the INDEX until TIM2 (`a.inst`/`a.kit`; id ↔ index via `timbreIdOf`/
+  `timbreById` at the boundary):
   APPEND only, never insert or reorder. ⛔ A SOLO timbre cannot even be appended (KS banks must be the tail: `LEAD_KS_FROM =
   LEAD_INSTR.length − KS_BANKS.length`); stable timbre ids come first. Chords, bass, kits may append. The editor lists timbres only via
   `audio.timbresOf(role)`.
@@ -310,6 +312,19 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     restores those originals and clears it (meter: «… left by an unfinished test — restored»); without our record a manual setting (the
     person's own, from another app) is left alone. Chrome applies ONLY the camera controls of a set that holds one and
     ignores its format part (width, frameRate) — measured — so format and controls always go in two calls (`vision.applySet`).
+35. ⛳ **Every beat ↔ time conversion of the transport goes through the clock** (REC4; the plan's #39 — rules number on from here):
+    `transport/clock.js` `secPerBeat()`, `beatNow()`, `timeAt(b)`, `secOf(b)`, `beatsOf(s)` — one tempo segment today, a tempo map answers
+    there later; each keeps the exact arithmetic of the sites it replaced. ⛔ No new `60/loop.bpm` or `loop.t0 + b·spb` outside it (the
+    render's pinned tempo and the probes' independent checks excepted).
+36. ⛳ **The core is pure** (FMT1; the plan's #35): `src/core/**` never touches the DOM, Web Audio, the camera, MIDI or the network and runs in
+    node (the data runner's core rows); file formats (`core/format.js`) and ids (`core/registry.js`) live there.
+37. ⛳ **Identity ≠ name ≠ position — permanent ids** (user, 2026-10-16; FMT1/TIM1; the plan's #36): every record that can outlive a session
+    (timbres now; tunings, modes, effect presets, expression mappings, events, lane points next) has an id that NEVER changes — built-ins a
+    readable fixed id (`chord.firefly`, kebab-case, dotted families), user records `u.<uuid>` (generated), pack records `<pack>/<name>`; the
+    display name is editable, per language; the ORDER of a list is a separate per-user list of ids (reorder / hide / delete never touch a
+    song). A built-in is HIDDEN, never destroyed (songs that use it always play); a user record may be removed. Songs will store the id AND
+    a full copy of the record (SONG1): a missing id (deleted, another person's song) still plays from the copy and offers «add it back to my
+    list». ⛔ Never rename or reuse an id (the TIM1 probe pins the list).
 
 ## Module map (every exported/notable name, per module: `docs/NAME-INDEX.md` — grep it, don't read it; reasoning: archive, "Module map")
 - `index.html` — markup only (start card, top bar, panels `#panelScale`/`#panelSound`/`#panelLoop`, `#backingMenu`, help overlay,
@@ -349,9 +364,29 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - `src/probe-cap-worklet.js` — probes only: audio-thread capture of the live master (`F0`, `gaps`, `stale`).
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`);
   volumes in the OLD per-role scale, converted at event birth. Imports only `config.js`.
-- `src/recorder.js` — the recorder (see "Time, tracks and the recorder", "Freeze"): `loop`, `ENG`, scheduler, brace, chase, undo, stops,
-  backing, capture and playback of effects, the editor API, freeze registry and signature, `seedTake`, `evHz`; since REC1 also the FACADE
-  that re-exports what moved to `song/` (importers, `render.js` `REC.*`, probes, tutor unchanged).
+- `src/recorder.js` — since REC1–REC5 (NIGHT run 2026-10-16: 4897 → 725 lines) mostly the FACADE: it re-exports everything that moved
+  to `song/`, `transport/`, `freeze/`, `live/` (importers, `render.js` `REC.*`, probes, tutor unchanged) and does the WIRING (`envWire`,
+  `clockWire`, `schedWire`, `freezeWire`, `recWire`, `backingWire` — closures, because many targets are declared further down). Still its
+  own (the session glue): lane prune/reset/delete, mixer setters, `laneHush`, the drone sync, the editor SESSION (`editOpen`/`editClose`/
+  `editSetLayer`, `probeTake`), the snapshot steps + `histCommit` + `clearSong` + the kinds snap/tab/master/key, `softAllOff`/`liveAllOff`/
+  `trackResplice`, `backingFollowKey`, `onLoop`, `onUndo`, `seedTake`, `clearRec`, `panic`.
+- `src/transport/` (REC4): `clock.js` — the transport state `loop`, song length (`songLen`, `songLenRecalc`, `songLenGrow`), the brace math
+  (`songAt`, `rgnReps`, `cycling`, `rgnApply`, `rgnSync`, `braceTap/Move/Set`, `setRegionOn`), the metre map `beatLevel`, the setters
+  (`setLoopBpm/Metre/Bars/Sub/Quant`), `loopPos`, and ⛳ THE BEAT ↔ TIME CONVERSIONS (rule #35): `secPerBeat`, `beatNow`, `timeAt`, `secOf`,
+  `beatsOf`; `clockWire` (recording, release, swap cancel, chase for a brace jump). `scheduler.js` — replay cursors + their `onInvalidate`
+  listener, `scheduleLayers`, `releaseLoopLayersAt`, the chase (`chaseFor`, `chaseNote`, `chasePlay`, `chaseReset`), `fireNear`, metronome,
+  `tick`, `stopAtEnd`, `startTransport`, `seekTo`, `clearPump`; `schedWire` (recording state, take, ENG, per-pass closing, sampling, playback).
+- `src/freeze/registry.js` (REC5) — frozen tracks: registry by lane id, `freezeSig`/`freezeState`, watcher reads (`frzWatchKey`,
+  `frzWatchBump`), install/pending readers, 16-bit store, the AF2 swap, both seams, node life cycle (the plan's split registry + swap waits —
+  the seams call both ways); `freezeWire` (capture snapshot, live drone, release, chase).
+- `src/live/` (REC5): `eng.js` — `makeENG`, the live `ENG`, play-time pricing `evHz`/`evReg`/`evHzDbg`. `record.js` — recording state and the
+  take's per-track state, source routing (`noteSource`, `takeRoute`), `push`, per-role recorders, `recFoldRoll`, the W* calls, `recLatchOpen`,
+  `setRecording`/`recStop`/`onRec`; setters for outside writers `curTakeSet`, `recWinReset`, `liveChClear`; `recWire` (fine automaton, the
+  take's snapshot step, editor session, capture snapshot, lane reset). `capture.js` — the capture SAMPLING (`takeCapStart`, `takeCapSample`),
+  the fine-recording automaton (`fineNew`/`fineStep`/`fineKnee`, `pnSnap`), effect PLAYBACK (`fxLaneMerge`, `fxPlayBuild/Drive/Stop`,
+  `fxPlayDriving`, `fxIsDriven`), live isolation (`liveIso`, `setLiveIsolation`, `playKeyOf`), `capReset`. `backing.js` — `loadArrangement`,
+  `loadJam`, `backingEvent`, `clearJam` (`backingWire`). ⚠️ A moved `let` is written outside only through such a setter (an
+  import cannot be assigned — «Assignment to constant variable» at run time; the static check does not see it).
 - `src/song/` (REC1–REC3, stage 3; pure — no DOM, no Web Audio; imports only `song/`, `core/`, `config.js`, `scales.js`): `store.js` —
   `events` (the stable array), `evGen`, THE rebase point `schedInvalidate` (bumps `evGen`, fixes the sorted prefix `sortedLen()`, then runs
   the listeners of `onInvalidate` in order — the note view, then the recorder's cursors, chase cache, song length, brace), birth order `evSeq`/`evSeqFill`/`evOrder`, `compactEvents`, `maxLayer`,
@@ -368,7 +403,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   edits `histGroup`/`histSince`, table steps `histTab`/`histMaster`/`laneNameStep`/`moveLaneStep`, probe controls `histDbg`/`histDbgO`;
   ⛳ STEP KINDS REGISTER THEMSELVES: `histKind(kind, apply(u,undo), touched?(u,S))`, one dispatcher `histApply` (= the recorder's
   `editApply`) and `histTouched`; an unknown kind throws. The song's own kinds (move, del, ins, timbre, lanetouch, batch, ranks) register in
-  history.js; recorder.js registers the kinds it owns (aut*, autcap, brace/marks/lanelen, snap, tab, master, key) — a new kind = one
+  history.js; each song/ module registers the kinds it owns (automation.js: aut*, autcap; sections.js: brace/marks/lanelen); recorder.js
+  registers snap, tab, master, key — a new kind = one
   `histKind` next to its owner. What it needs from above comes once through `histWire` (ready / pause / commit for ↶/↷; capture records,
   markers, master level for the hash). Snapshot steps (`snapBegin`/`snapEnd`/`snapApply`) stay in recorder.js (capture, brace, freeze).
   `edit-notes.js` (REC3) — the editor's edit core (`editGuard`, `editCommit`, `editBatch`, `editPush`, `EDIT_ROLE`, `EDIT_GAP`/
@@ -376,8 +412,21 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `chordMoveTy`, `segChordNotes`, `segPitchPt`, move / resize / delete of segments and hits, `bendTrim`; the editor session (`editLane`,
   `editOpen`…) stays in recorder.js and comes through `editWire` (ready, isOpen, layer, pause, touch). `edit-chords.js` (REC3) — U2–U4
   chord-note edits (`dissolvePlan`, `editDeleteChordNote`, `editMoveChordNote`, `editResizeChordNote`). `edit-group.js` (REC3) — ED1
-  (`editGroup`, `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`, `editDeleteSel`). Still in recorder.js (REC3 part 2): inserts,
-  timbre, clipboard (ED2), quantise (ED3), degrees/mode/transpose (ED4, OWN1, TF3), bends (OWN2), automation and per-note lanes, sections (ED6).
+  (`editGroup`, `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`, `editDeleteSel`). REC3 part 2 (NIGHT run, 2026-10-16):
+  `env.js` — ⛳ THE SONG LAYER'S ENVIRONMENT `ENV`, wired ONCE by the recorder (`envWire`; an unknown entry throws, an unwired one throws
+  when called): the engine's effect declarations (`fxPerm`, `fxParamMetaOf`, `fxNoteField`, `fxParamKeysOf`, `fxDefaultsOf`,
+  `fxNoteFollows`, `fxIsPerNote`, `fxSnapshot`, `FX_VOL`), `chainKeyOf`, `live()` (timbres, kit, tunedFrom, tonic, seventh), the transport
+  (`ready`, `recording`, `pause`, `metre`, `sub`, `bpm`, `pos`, `brace`, `braceRestore`, `seek`), `af`, `capStart` (the live chain
+  snapshot), `laneEditTouch`; a module keeps the old names as one-line forwarders at its top. `capture.js` — the capture records `takeFx`,
+  `takeFxVer`/`takeFxTouch`, `FX_CHAIN`, the take counter `takeNext()`, the lane-shape law (`autSmoothOf`, `fxLaneSmooth`, `fxLaneAt`,
+  `fxLaneExpand`, `setAutRecSmooth`), `laneRoleOf`, `laneChainKey`, `captureInfoOf` (the SAMPLING `takeCapStart`/`takeCapSample` and the
+  playback merge `fxLaneMerge` stay in recorder.js). `automation.js` — bus lane (`autPoints`, `autAddPoint`, `autMovePoint`, …), per-note
+  lanes (`pn*`), bend points/shapes (`editBendPoint`, `editBendShape`, `bendEdited`, `bendDbg`), volume bars (`pnBars`, `editVolSel`), the
+  track chain (`autChainOf/Add/Remove/Move`, `autCaps`). `edit-insert.js` — `editDefVol`, the session take (`editTake`, `editTakeNow`,
+  `editTakeReset`), `editInsPush`, the four inserts, `laneTimbreOf`, `editSetTimbre`. `clipboard.js` (ED2), `quantise.js` (ED3),
+  `transpose.js` (ED4 `editDegreeSel`, OWN1 `editTrackMode`, TF3 `editTranspose`/`songTranspose`, `trDbg`). `sections.js` (ED6: `secMarks`
+  + its one outside writer `secMarksSet`, `songEdit`, `secAdd/Rename/Delete`, `sections`, `secDbg`, the `song*` history aliases). Still in
+  recorder.js: the editor SESSION (`editOpen`/`editClose`/`editSetLayer`), the snapshot steps and the kinds snap/tab/master/key.
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
 - `src/vision.js` — camera + the DETECTION PATH + the FRAME PUMP (LAT2). Path: a detector object `{kind, run(job), setDelegate, dbg, close}`
   built by `buildDet` — the main thread (default, `mainDet`: handdet.js imported dynamically) or the worker (`workerDet`: src/hand-worker.js;
@@ -424,6 +473,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   the aim's single door, expression, looper hand). At pinch capture the hand's role and X-range are frozen on `S` (`S.role`, `S.rx0`,
   `S.rx1`, `S.zone`, `S.fn`). HAND1 probe-only: `handsProbe(clk, looperTap)` / `processHandsProbe(res)` (the probe clock), `pinchDbg(d)`;
   `recorder.wTapSet(f)` taps every W* call (all no-ops when unset).
+  GES1 (NIGHT run, 2026-10-16; gestures.js 1213 → 903, it re-exports what moved): `src/gestures/features.js` — the PURE gesture math
+  (`pinchRatios`, `minFinger`, `touchedFingers` + hysteresis, `emaS`, `smoothstep`, `degRaw`/`degHyst`, `cellHyst`, `clamp`/`clamp01`/
+  `dist`, the HAND1 control `pinchDbg`; runs in node — data row «GES1 gesture features (core)»); `gestures/expr.js` — the expression hand
+  (`EXPR_CFG`, `EXPR`, `exprFeatures`, `tickExpr`, `exprPrevT` + `exprPrevSet`; `exprWire` brings HANDS); `gestures/fxhand.js` —
+  `fxParamsOf`, `captureFx`; `gestures/looper.js` — `doLooper`, `fireLooperCmd` (`looperWire`: the probe clock and tap). Still in
+  gestures.js: `HANDS`, voice modes, hand roles, volume per note, `endPinch`, the probe clock, `processHands` (→ `gestures/hands.js` later).
 - `src/draw.js` — canvas: video background, overlays, roles, grids, palette, FX bars, status, `noteLbl` (the ONE label function), the
   editor (`drawRoll`, snapshot `rollView`, `rollAxis`), the strip and arrangement window (`drawLooper(full)`, snapshot `loopView`).
 - `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
@@ -432,7 +487,12 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   as `shown` → `latHands`), `loop()` (every screen frame: `pollFrame`, the shown snapshot (or the live video), overlays, `captureFrame`,
   `latFrame`; each distinct error printed once; `latIdle` in the editor/window branch), the start card's `.busy` pulse, `startApp()` (the one start path; calls
   `latStart`), editor/window branch, `?probe` loading (`window.P`, `window.R`, `window.U`).
-- `src/core/` — the pure CORE (stage-3 target; no DOM, Web Audio, camera or network; runs in node). `core/handsched.js` (LAT2): the SEARCH
+- `src/core/` — the pure CORE (stage-3 target; no DOM, Web Audio, camera or network; runs in node; rule #36). FMT1: `core/format.js` — the
+  file envelope's version rules (`FORMAT_VERSION`, `MIGRATIONS` — one pure step per version, none yet — `upgrade(rec)`: older → migrated
+  copy, NEWER refused in words), the scale-data validators (moved from scaleload); `core/registry.js` — id spaces (`USER_ID`, `BUILTIN_ID`,
+  `PACK_ID`, `idSpace`; «u.» reserved), `newUserId`, `createRegistry(kind)` (add / hide / show / remove — built-ins never — / rename / the
+  person's order). TIM1 (audio.js): every timbre entry's `id`, `timbresOf(role)` → `[{id, idx, name}]` in the registry's order (hidden left
+  out), `timbreIdOf(role, idx)`, `timbreById(id)` → `{role, idx, entry}`, `timbreReg(role)`. `core/handsched.js` (LAT2): the SEARCH
   SCHEDULE — `HAND_SEARCH_EVERY` 3, `schedPlan`/`schedAfter`/`schedRetry`/`schedRun`, policies '2s' (default) / '2' / '1' (see "Hand
   detection"). `core/latency.js` (LAT1; LAT2: `MP_LINE`, `handToSound` part `transfer`):
   `makeMeter` (ring of `LAT_N` 240 samples per stage), `statsOf` (mean, nearest-rank p5/p50/p95, jitter = p95 − p5, max), `handToSound`

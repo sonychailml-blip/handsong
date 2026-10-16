@@ -556,7 +556,7 @@ export function laneDefName(ly){
   const x=laneLook(ly), role=x?x.role:null, tim=x?x.tim:null, k=lang+'|'+role+'|'+tim+'|'+(x&&x.drone?1:0);
   let s=defNameMemo.get(k); if(s!=null) return s;
   if(!role) s= x&&x.drone ? t('track.drone') : t('arr.noRole');
-  else { const e=timbresOf(role).find(z=>z.id===tim); s=t('track.role.'+role)+(e?' · '+L(e.name):''); }
+  else { const e=timbresOf(role).find(z=>z.idx===tim); s=t('track.role.'+role)+(e?' · '+L(e.name):''); }
   defNameMemo.set(k,s); return s;
 }
 export const laneTitle=ly=> laneNameOf(ly) || laneDefName(ly);

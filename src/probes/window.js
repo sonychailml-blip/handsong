@@ -333,7 +333,7 @@ export async function checkTrackLook(){
   const colOf=ly=>{ const r=laneRoleOf(ly); return r ? INSTR_COL[r] : LANE_NOROLE_COL; };
   const defOf=ly=>{ const r=laneRoleOf(ly);
     if(!r) return events.some(e=>e.layer===ly&&e.fn==='drone') ? t('track.drone') : t('arr.noRole');
-    const e=timbresOf(r).find(z=>z.id===laneTimbreOf(ly)); return t('track.role.'+r)+(e?' · '+L(e.name):''); };
+    const e=timbresOf(r).find(z=>z.idx===laneTimbreOf(ly)); return t('track.role.'+r)+(e?' · '+L(e.name):''); };
   const lum=h=>{ const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)/255).map(v=>v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4)); return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2]; };
   const cr=(a,b)=>(Math.max(a,b)+0.05)/(Math.min(a,b)+0.05);
   // строка видна (прокрутить к ней по месту в ОБЩЕМ порядке) — снимок или null

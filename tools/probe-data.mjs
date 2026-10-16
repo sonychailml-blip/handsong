@@ -31,7 +31,7 @@ globalThis.fetch=async (u,o)=>{
 
 const verbose=process.argv.includes('--verbose');
 const T00=performance.now();
-let P, loadReport, LIC, LAT, DSP, HS, CL;
+let P, loadReport, LIC, LAT, DSP, HS, CL, FMT, IDR, GF, CFG;
 /* LAT1: the latency core's arithmetic, exactly — statistics, the ring window, the hand → sound sum, the Bluetooth heuristic */
 function latCore(){
   const d=[], eq=(name,got,want)=>{ if(JSON.stringify(got)!==JSON.stringify(want)) d.push(`${name}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); };
@@ -206,6 +206,79 @@ function forestCore(){
   n++; eq('compressor curve below / in / above the knee', [DSP.compCurveDb(-40,-12,3,6), DSP.compCurveDb(-12,-12,3,6), DSP.compCurveDb(0,-12,3,6)], [-40, -12.5, -8]);
   return { cases:n, total:d.length, differences:d };
 }
+/* FMT1: the file-format core (envelope versions, migrations) and the permanent-id registry (src/core/format.js, src/core/registry.js),
+   exactly. CONTROLS: a registry that destroys a built-in, and a version check that lets a newer file through, must be caught. */
+async function fmtCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`); };
+  const throwsWith=(f,re)=>{ try{ f(); return 'no refusal'; }catch(e){ return re.test(String(e&&e.message)) ? 'ok' : String(e&&e.message); } };
+  const rec=JSON.parse(await readFile(new URL('../data/tunings/edo12.json', import.meta.url),'utf8'));
+  eq('a v1 tuning passes', throwsWith(()=>FMT.checkTuning(rec,'edo12'),/./), 'no refusal');
+  eq('a NEWER version is refused in words', throwsWith(()=>FMT.checkTuning({...rec, version:2},'edo12'),/newer Handsong \(file version 2; this one reads up to 1\)/), 'ok');
+  eq('version 0 keeps the old words', throwsWith(()=>FMT.checkTuning({...rec, version:0},'edo12'),/^version must be 1$/), 'ok');
+  eq('upgrade of a current record is the same object', FMT.upgrade(rec)===rec, true);
+  eq('upgrade of a newer record leaves it', FMT.upgrade({...rec, version:5}).version, 5);
+  { const keepV=FMT.FORMAT_VERSION.tuning, keepM=FMT.MIGRATIONS.tuning;   // the migration mechanism, with a test step (restored)
+    try{ FMT.FORMAT_VERSION.tuning=2; FMT.MIGRATIONS.tuning=[r=>({ ...r, migrated:true })];
+      const u=FMT.upgrade(rec); eq('a v1 → v2 step runs on a copy', [u.version, u.migrated, rec.version, rec.migrated], [2, true, 1, undefined]);
+      FMT.MIGRATIONS.tuning=[]; eq('a missing step leaves the record (the validator words it)', FMT.upgrade(rec)===rec, true);
+      eq('CONTROL: with v2 current, a v1 file without a step is refused', throwsWith(()=>FMT.checkTuning(rec,'edo12'),/version must be 2/), 'ok');
+    } finally { FMT.FORMAT_VERSION.tuning=keepV; FMT.MIGRATIONS.tuning=keepM; } }
+  eq('id spaces', ['firefly','solo.supersaw','u.1b4e28ba-2fa1-41d2-883f-0016d3cca427','mypack/warm-pad','Firefly','u.x',''].map(IDR.idSpace),
+     ['builtin','builtin','user','pack',null,null,null]);
+  { let k=0; const id=IDR.newUserId(()=>Uint8Array.from({length:16},()=>(k+=37)&255)); eq('a generated user id is in the user space', IDR.idSpace(id), 'user'); }
+  eq('crypto user ids differ', IDR.newUserId()!==IDR.newUserId(), true);
+  /* the ID model as assertions over any registry (run on the real one, then on a defective one that must fail) */
+  const suite=R=>{ const f=[]; const ok=(c,w)=>{ if(!c) f.push(w); };
+    ok(R.add({id:'firefly', name:'Firefly'},{builtin:true})===null,'add a built-in');
+    ok(R.add({id:'warm-pad', name:'Warm pad'},{builtin:true})===null,'add a second built-in');
+    ok(R.add({id:'u.1b4e28ba-2fa1-41d2-883f-0016d3cca427', name:'Mine'})===null,'add a user record');
+    ok(R.add({id:'firefly'},{builtin:true})!==null,'a duplicate id is refused');
+    ok(R.add({id:'u.1b4e28ba-2fa1-41d2-883f-0016d3cca427'},{builtin:true})!==null,'a built-in with a user id is refused');
+    ok(R.add({id:'my-own'})!==null,'a user record with a built-in id is refused');
+    ok(R.remove('firefly')!==null && R.has('firefly'),'a built-in is never removed');
+    ok(R.hide('firefly')===null && R.has('firefly') && R.get('firefly').name==='Firefly' && !R.order().includes('firefly'),'a hidden built-in stays readable');
+    ok(R.rename('warm-pad','Pad')===null && R.get('warm-pad').name==='Pad' && R.order()[0]==='warm-pad','rename keeps id and place');
+    ok(R.setOrder(['u.1b4e28ba-2fa1-41d2-883f-0016d3cca427','nope'])===null && JSON.stringify(R.order())===JSON.stringify(['u.1b4e28ba-2fa1-41d2-883f-0016d3cca427','warm-pad']),'the order is the person\'s list (unknown ids dropped)');
+    ok(R.remove('u.1b4e28ba-2fa1-41d2-883f-0016d3cca427')===null && !R.has('u.1b4e28ba-2fa1-41d2-883f-0016d3cca427'),'a user record can be removed');
+    ok(R.show('firefly')===null && R.order().includes('firefly'),'show brings a hidden one back');
+    return f; };
+  const real=suite(IDR.createRegistry('timbre')); n+=12; for(const w of real) d.push('registry: '+w);
+  { const B=IDR.createRegistry('timbre'), base=B.remove.bind(B); B.remove=id=>B.isBuiltin(id) ? (B.hide(id), null) : base(id);   // CONTROL: «removing» a built-in silently (reports done)
+    n++; if(!suite(B).length) d.push('CONTROL: a registry that answers «removed» for a built-in passed — the suite cannot fail'); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* GES1: the pure gesture math (src/gestures/features.js), exactly, against the config thresholds. CONTROLS: the hysteresis switched off
+   (an empty previous set) must drop a held finger; the HAND1 pinch control (+0.03) must let a value between PINCH_ON and +0.03 in. */
+function gesCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
+  const { PINCH_ON, PINCH_OFF, FINGER_TIPS, ROW_HYST, PAL_HYST_X, PAL_HYST_Y }=CFG;
+  /* a hand of 21 points: wrist (0) at the origin, index base (5) at distance 0.1 — the palm size; thumb tip (4) at (0.5, 0.5);
+     finger tips placed so that their ratio to the palm size is exactly r[i] */
+  const hand=r=>{ const lm=Array.from({length:21},()=>({x:0.9,y:0.9})); lm[0]={x:0,y:0}; lm[5]={x:0.1,y:0}; lm[4]={x:0.5,y:0.5};
+    FINGER_TIPS.forEach((f,i)=>{ lm[f]={ x:0.5+r[i]*0.1, y:0.5 }; }); return lm; };
+  const R=[PINCH_ON*0.25, PINCH_ON-0.01, (PINCH_ON+PINCH_OFF)/2, PINCH_OFF+0.05], pr=GF.pinchRatios(hand(R));
+  eq('pinch ratios = tip distance / palm size', FINGER_TIPS.map(f=>+pr[f].toFixed(9)), R.map(x=>+x.toFixed(9)));
+  eq('nearest finger', GF.minFinger(pr), [FINGER_TIPS[0], pr[FINGER_TIPS[0]]]);
+  eq('touched from nothing: below PINCH_ON only', [...GF.touchedFingers(pr,new Set())].sort(), [0,1]);
+  eq('held between ON and OFF stays (hysteresis)', [...GF.touchedFingers(pr,new Set([0,1,2,3]))].sort(), [0,1,2]);
+  { const held=GF.touchedFingers(pr,new Set([2])), none=GF.touchedFingers(pr,new Set());
+    n++; if(held.has(2)===none.has(2)) d.push('CONTROL: without the previous set the held finger 2 should drop — the hysteresis check cannot fail'); }
+  GF.pinchDbg(0.03); try{ const R2=[PINCH_ON+0.02,1,1,1]; eq('CONTROL: the pinch control lets ON+0.02 in', [...GF.touchedFingers(GF.pinchRatios(hand(R2)),new Set())], [0]); }
+  finally{ GF.pinchDbg(0); }
+  eq('…and without it the same value stays out', [...GF.touchedFingers(GF.pinchRatios(hand([PINCH_ON+0.02,1,1,1])),new Set())], []);
+  eq('smoothstep dead zones (exactly 0 / 1) and middle', [GF.smoothstep(0.2,0.6,0.1), GF.smoothstep(0.2,0.6,0.2), +GF.smoothstep(0.2,0.6,0.4).toFixed(12), GF.smoothstep(0.2,0.6,0.7), GF.smoothstep(0.5,0.5,0.5)], [0,0,0.5,1,1]);
+  { const S={ sm:{} }; eq('one-step smoothing', [GF.emaS(S,'k',1), GF.emaS(S,'k',0), GF.emaS(S,'k',0,0.5)], [1, 1-0.35, (1-0.35)*0.5]); }
+  const H=700, rows=7, seg=H/rows;
+  eq('degree rows: top is the highest degree', [GF.degRaw(0,rows,H), GF.degRaw(H-1,rows,H), GF.degRaw(-5,rows,H), GF.degRaw(H+5,rows,H)], [6,0,6,0]);
+  { const b=4*seg, inside=b+seg*ROW_HYST*0.5, outside=b+seg*ROW_HYST*1.5;   // the border between degree 2 (below) and 3 (above)
+    eq('degree hysteresis near a border keeps the previous degree', [GF.degHyst(inside,rows,H,3), GF.degHyst(outside,rows,H,3)], [3,2]); }
+  { const fams=[{types:[1,2,3]},{types:[1]}], W=200, Hh=300;
+    eq('palette cell: column then its own rows', GF.cellHyst(150,250,0,W,0,Hh,fams,-1,-1), [1,0]);
+    eq('palette cell hysteresis', GF.cellHyst(100+100*PAL_HYST_X*0.5, 10, 0,W,0,Hh,fams,0,0), [0,0]);
+    eq('palette row hysteresis', GF.cellHyst(10, 100+100*PAL_HYST_Y*0.5, 0,W,0,Hh,fams,0,0), [0,0]); }
+  eq('clamps and distance', [GF.clamp01(-1), GF.clamp01(2), GF.clamp(5,0,3), GF.dist({x:0,y:0},{x:3,y:4})], [0,1,3,5]);
+  return { cases:n, total:d.length, differences:d };
+}
 let REG;
 try{
   P=await import(new URL('../src/probedata.js', import.meta.url).href);
@@ -216,6 +289,10 @@ try{
   LAT=await import(new URL('../src/core/latency.js', import.meta.url).href);
   HS=await import(new URL('../src/core/handsched.js', import.meta.url).href);   // LAT2: the search schedule (pure core)
   CL=await import(new URL('../src/core/camlight.js', import.meta.url).href);    // LAT3: low light (pure core)
+  GF=await import(new URL('../src/gestures/features.js', import.meta.url).href);   // GES1: the pure gesture math
+  CFG=await import(new URL('../src/config.js', import.meta.url).href);
+  FMT=await import(new URL('../src/core/format.js', import.meta.url).href);    // FMT1: the file-format core
+  IDR=await import(new URL('../src/core/registry.js', import.meta.url).href);  // FMT1: permanent ids and the registry
   DSP=await import(new URL('../src/core/dsp.js', import.meta.url).href);   // SND-F1: the pure DSP core (Night forest IR, dynamics curve)   // LAT1: the pure core (no DOM, no Web Audio — runs in node)
 }catch(e){ out('[probe-data] ERROR loading the data modules: '+String(e&&e.stack||e)); verdict(false,'the data modules did not load'); process.exit(1); }
 const loadMs=Math.round(performance.now()-T00);
@@ -228,6 +305,8 @@ const ROWS=[
   ['SND-F1 Night forest IR (core)', ()=>forestCore(),   r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['LAT2 search schedule (core)', ()=>schedCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['LAT3 low light (core)',     ()=>lowCore(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['FMT1 format + registry (core)', ()=>fmtCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['GES1 gesture features (core)', ()=>gesCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

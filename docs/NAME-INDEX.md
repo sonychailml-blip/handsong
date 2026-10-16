@@ -379,3 +379,41 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/recorder.js` — `snapPend`, `takeTok` (stay with the snapshot steps); private `tkLy`, `recOf`, `capTouched`, `ptTouched`, `lnTouched`,
   `chTouched`, `autLaneApply`, `autFxApply` (the kinds it registers).
 - `tools/check-static.mjs` — `FOLDER_RULES` song/ also allows `scales.js`; CONTROL `song/history.js → audio.js`.
+
+## Added at REC3 part 2 (NIGHT run, 2026-10-16)
+- **MOVED (verbatim; `recorder.js` re-exports them — old imports keep working); exported names per file:**
+  `src/song/env.js` — ENV, envWire.
+  `src/song/capture.js` — takeNext, takeFx, takeFxVer, takeFxTouch, FX_CHAIN, setAutRecSmooth, autSmoothOf, fxLaneSmooth, fxLaneAt, fxLaneExpand, laneRoleOf, laneChainKey, captureInfoOf.
+  `src/song/automation.js` — bendDbg, autTakesOf, autAddrs, BEND_EPS, bendEdited, editBendPoint, editBendShape, pnBars, editVolSel, takeFxDump, autPoints, autEarliest, autCaps, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint, autChainOf, autChainAdd, autChainRemove, autChainMove.
+  `src/song/edit-insert.js` — editDefVol, editTake, editTakeReset, editTakeNow, editInsPush, editInsertBass, editInsertLead, editInsertChord, editInsertHit, laneTimbreOf, editSetTimbre.
+  `src/song/clipboard.js` — editCopySel, editClipInfo, editPasteWhy, editPaste, editDuplicateSel.
+  `src/song/quantise.js` — editQuantSel.
+  `src/song/transpose.js` — editDegreeWhy, trackViewOfLayer, editTrackModeWhy, editTrackMode, trDbg, editTransposeWhy, editTranspose, songTransposeWhy, songTranspose, editDegreeSel.
+  `src/song/sections.js` — secDbg, secMarks, secMarksSet, secCopy, sections, songEditWhy, songEdit, secAdd, secRename, secDelete, songCanUndo, songCanRedo, songUndo, songRedo, songHistReset.
+- New: `song/env.js` `ENV`/`envWire`; `song/capture.js` `takeNext` (was `++takeSeq`); `song/edit-insert.js` `editTakeNow`, `editTakeReset` (were `if(!editTake) editTake=++takeSeq` / `editTake=0`); `song/sections.js` `secMarksSet`; `song/edit-notes.js` now also exports `editIsOpen`.
+- `tools/probe-browser.mjs` (NIGHT-0) — `--limit-quick`, `SLOW_REF`, `SLOW_ROWS`/`SLOW_MIN`/`SLOW_MAX`, `slowMeter`, `withinDyn`.
+
+## Added at REC4 / REC5 (NIGHT run, 2026-10-16)
+- **MOVED (verbatim; `recorder.js` re-exports them — old imports keep working); exported names per file:**
+  `src/transport/clock.js` — clockWire, secPerBeat, beatNow, timeAt, secOf, beatsOf, songLenGrow, loop, songLen, songBeats, songLenRecalc, rgnLen, cycling, rgnReps, songAt, rgnApply, rgnSync, regionOn, braceProbe, setRegionOn, braceTap, braceMove, braceSet, beatLevel, loopPos, setLoopBars, METRES, setLoopMetre, setLoopQuant, SUBS, setLoopSub, setLoopBpm.
+  `src/transport/scheduler.js` — schedWire, chaseReset, clearPump, releaseLoopLayersAt, chaseFor, chaseNote, chasePlay, startTransport, seekTo.
+  `src/freeze/registry.js` — freezeWire, frzWatchBump, frzPend, frozen, frozenOn, frzLayer, frzHas, frzBufNow, frzChaseSkip, frzGlobalKey, frzSigMemo, frzSigTonicDbg, freezeSig, freezeState, freezePinCaptures, frzWatchVer, frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf, songPinChains, freezeTicket, freezeSet, frzPendCancel, frzWhenReady, frzReadersAlive, frzSwapDbg, FRZ_CHUNK, frzStoreMode, frzPackAsync, frzChunkDbg, frzNodesInfo, frzPlanSwap, frzSwapCut, frzLeadAhead, frzLeadRecut, frzSwapCancel, frzSwapCancelAll, frzSwapInfo, frzLeave, frzSkipNear, frzNearDone, freezeDrop, unfreezeLayer, frozenLayers, frozenInfo, frzGain, frzGainAll, frzBusGain, frzStopOne, frzStopAll, frzArm.
+  `src/live/eng.js` — evHzDbg, evHz, evReg, makeENG, ENG.
+  `src/live/record.js` — recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, storeTi, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec.
+  `src/live/capture.js` — capReset, takeCapStart, fineNew, fineReset, fineStep, pnSnap, takeCapSample, fxLaneMerge, fxPlayDrive, fxPlayDriving, fxIsDriven, fxPlayStop, liveIso, setLiveIsolation, playKeyOf.
+  `src/live/backing.js` — backingWire, loadArrangement, loadJam, backingEvent, clearJam.
+- New: wires `clockWire`, `schedWire`, `freezeWire`, `recWire`, `backingWire`; setters `songLenGrow`, `chaseReset`, `frzWatchBump`, `curTakeSet`, `recWinReset`, `liveChClear`, `capReset`; clock conversions `secPerBeat`, `beatNow`, `timeAt`, `secOf`, `beatsOf` (rule #35).
+
+## Added at FMT1 / TIM1 (NIGHT run, 2026-10-16)
+- `src/core/format.js` — F, FORMAT_VERSION, MIGRATIONS, kindOfFormat, upgrade, Bad, CM_MAX, checkManifest, checkMenu, checkTuning, checkPalette, checkChordModes, checkMode (validators moved from scaleload; `head()` refuses a newer version in words).
+- `src/core/registry.js` — USER_ID, BUILTIN_ID, PACK_ID, idSpace, newUserId, createRegistry.
+- `src/scaleload.js` re-exports `CM_MAX`, `USER_ID`; calls `upgrade` before checking.
+- `src/audio.js` (TIM1) — an `id` in every entry of LEAD_INSTR / CHORD_INSTR / BASS_INSTR / DRUM_KITS; `TIMBRE_REG` (private), `timbreIdxOf` (private), `timbresOf` → [{id, idx, name}], `timbreIdOf`, `timbreById`, `timbreReg`.
+- `src/probes/sound.js` — `TIMBRE_IDS_PINNED`, `checkTimbreIds` (row «TIM1 permanent timbre ids»); `tools/probe-data.mjs` — `fmtCore` (row «FMT1 format + registry (core)»).
+
+## Added at GES1 parts 1–2 (NIGHT run, 2026-10-16)
+- `src/gestures/features.js` — pinchDbg, clamp01, clamp, dist, pinchRatios, minFinger, touchedFingers, emaS, smoothstep, degRaw, degHyst, cellHyst.
+- `src/gestures/expr.js` — exprWire, EXPR_CFG, EXPR, exprPrevT, exprPrevSet, exprFeatures, tickExpr.
+- `src/gestures/fxhand.js` — fxParamsOf, captureFx.
+- `src/gestures/looper.js` — looperWire, doLooper, fireLooperCmd.
+- `tools/probe-data.mjs` — `gesCore` (row «GES1 gesture features (core)»).

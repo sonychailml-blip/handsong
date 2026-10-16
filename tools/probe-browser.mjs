@@ -9,7 +9,8 @@
      node tools/probe-browser.mjs --repeat 3         P.all три раза, каждый раз — СВЕЖИЙ браузер и свой посев; затем таблица мер
                                                      строк реального времени по прогонам и запас до допуска
    Ключи: --headed (обычное окно, вынесенное за экран, вместо безголового), --browser chrome|msedge, --limit-min M (потолок на один
-   P.all, default 15 since LAT2 (8 since GOLD1); P.quick — 3; посев — 3), --verbose (вся консоль страницы на экран).
+   P.all, default 15 since LAT2 (8 since GOLD1); посев — 3), --verbose (вся консоль страницы на экран).
+   --limit-quick M: P.quick's limit in minutes; without it 3 min × the slow factor measured from P.quick's own rows (see SLOW_REF).
    --cdn-cache: serve the pinned MediaPipe files from tools/.cdn-cache/ (fetched once; for a slow network).
    --limit-start M: the app start limit in minutes (default 3; the hand model comes from the CDN — raise it on a slow network).
    Hygiene: at start it lists browsers left by earlier runner sessions (found by Playwright's temporary profile path) and orphaned
@@ -63,7 +64,24 @@ const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
 const HEADED=has('--headed'), VERBOSE=has('--verbose'), BROWSER=val('--browser','chrome');
-const LIMIT_ALL=(+val('--limit-min',15)||15)*60e3, LIMIT_QUICK=3*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
+const LIMIT_ALL=(+val('--limit-min',15)||15)*60e3, LIMIT_SEED=3*60e3, LIMIT_START=(+val('--limit-start',3)||3)*60e3;   // --limit-start M: the app start (model from the CDN) — longer on a slow network
+/* --limit-quick M: P.quick's limit in minutes. Given → used as is. Not given → 3 min × the machine's SLOW FACTOR, measured while P.quick
+   runs (a busy computer ran rows 3–4× slower and P.quick missed a fixed 3 min with 0 differences): every finished row that has a
+   reference time below (CPU-bound rows of an idle dev-desktop run, 2026-10-15 16:48, P.quick 112.9 s; time-based rows — LAT*, CAM* —
+   are left out) adds its time to the measure; factor = observed sum / reference sum once SLOW_ROWS rows are in, 1 below SLOW_MIN, at
+   most SLOW_MAX; the deadline moves with it. A row renamed or new simply does not count. */
+const LIMIT_QUICK_ARG=val('--limit-quick',null), LIMIT_QUICK_BASE=3*60e3;
+const SLOW_REF={ 'render repeatability':7482, 'renders serialized':7147, 'ED7 one history':6141, 'ED7-fix2 undo after clear':5965,
+  'MX2 track pan':5560, 'BEND-CURVE glides and shapes':5143, 'AF5 track and live isolated':4795, 'MX1 track level and master':3021,
+  'SND-F1 dynamics: curve, latency, ceiling':2801, 'S4 solo editing':2543, 'F7 Just intonation merge':2337, 'T4b4-1 row fixes':2017 };
+const SLOW_ROWS=3, SLOW_MIN=1.2, SLOW_MAX=6;
+function slowMeter(){ let obs=0, ref=0, n=0;
+  return { row(name, ms){ if(SLOW_REF[name]>0 && ms>0){ obs+=ms; ref+=SLOW_REF[name]; n++; } },
+    get n(){ return n; }, get raw(){ return ref ? obs/ref : 1; },
+    get f(){ const r=ref?obs/ref:1; return n<SLOW_ROWS||r<SLOW_MIN ? 1 : Math.min(SLOW_MAX, r); } }; }
+/* within() with a deadline that may move (P.quick's slow factor): checked every second */
+function withinDyn(p, deadline, what){ let t; return Promise.race([ p.finally(()=>clearInterval(t)), new Promise((_,rej)=>{ t=setInterval(()=>{ const d=deadline();
+  if(Date.now()>d.at){ clearInterval(t); rej(new Error(`TIME LIMIT — ${what} did not finish within ${Math.round(d.ms/1000)} s${d.note||''}`)); } }, 1000); }) ]); }
 /* Строки реального времени и съёма — для таблицы --repeat (их меры печатаются по прогонам). Имена — строки P.all. */
 const RT_ROWS=['LR1 live and frozen reverb agree','AF2 freeze swap inaudible','AF6b 16-bit frozen playback','MX1 track level and master','MX2 track pan','render repeatability','renders serialized','S4 solo editing'];
 
@@ -282,6 +300,7 @@ async function session(port, plan, label){
   const browser=await chromium.launch({ channel:BROWSER, headless:!HEADED, args, handleSIGINT:false, handleSIGTERM:false, handleSIGHUP:false });
   LIVE.browsers.add(browser);
   const res={ label, runs:[], seed:null, error:null };
+  let rowHook=null;   // P.quick's slow meter reads each finished row
   let page=null;
   try{
     const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } });
@@ -302,6 +321,7 @@ async function session(port, plan, label){
       await log(`[${ty}] ${tx}`);
       const probeLine=/^\[(scaleprobe|probe)/.test(tx);
       if(probeLine) seen.push(tx);
+      { const m=/^\[scaleprobe row\] \d+\/\d+ (.+?) · .* (\d+) ms$/.exec(tx); if(m && rowHook) rowHook(m[1], +m[2]); }
       if(VERBOSE || probeLine){
         if(/^\[scaleprobe row\]/.test(tx)) out('  '+tx.replace(/^\[scaleprobe row\] /,'row '));
         else if(/^\[scaleprobe seed\]/.test(tx)) out('  '+tx);
@@ -371,8 +391,14 @@ async function session(port, plan, label){
     for(const kind of plan){
       out(`[${label}] running P.${kind}() — one line per row as it finishes`);
       const ts=Date.now();
-      const r=await within(page.evaluate(async k=>{ const r=await P[k]({ progress:true }); return r ? { pass:r.pass, seconds:r.seconds, hidden:r.hidden, rows:r.rows, measures:r.measures||{}, material:r.material&&r.material.ok } : null; }, kind),
-                           kind==='all'?LIMIT_ALL:LIMIT_QUICK, `P.${kind}()`);
+      const job=page.evaluate(async k=>{ const r=await P[k]({ progress:true }); return r ? { pass:r.pass, seconds:r.seconds, hidden:r.hidden, rows:r.rows, measures:r.measures||{}, material:r.material&&r.material.ok } : null; }, kind);
+      let r;
+      if(kind==='all') r=await within(job, LIMIT_ALL, `P.${kind}()`);
+      else { const S=slowMeter(); rowHook=(name,ms)=>S.row(name,ms); res.slow=S;
+        const fixed=LIMIT_QUICK_ARG!=null ? (+LIMIT_QUICK_ARG||3)*60e3 : null;
+        const dl=()=>{ const ms= fixed ?? Math.round(LIMIT_QUICK_BASE*S.f); return { at:ts+ms, ms, note: fixed ? ' (--limit-quick)' : S.f>1 ? ` (3 min × slow factor ${S.f.toFixed(2)})` : '' }; };
+        try{ r=await withinDyn(job, dl, `P.${kind}()`); } finally{ rowHook=null; res.limitQuick=dl().ms; }
+        out(`[${label}] machine speed: ${S.n} reference row(s) ran ${S.raw.toFixed(2)}× their idle time → slow factor ${S.f.toFixed(2)} · P.quick limit ${(res.limitQuick/60e3).toFixed(1)} min${fixed?' (--limit-quick)':''}`); }
       for(let i=0;i<60 && !seen.some(l=>/P\.(all|quick): (PASS|NOT A PASS)/.test(l));i++) await page.waitForTimeout(50);   // итоговая строка — событием консоли, чуть позже
       res.runs.push({ kind, ...r, wall:(Date.now()-ts)/1000, lines:seen.filter(l=>/^\[scaleprobe all\]/.test(l)).slice(-12) });
       seen.length=0;
@@ -455,6 +481,7 @@ out(`[probe-browser] cleanup: ${stillMine.length?stillMine.length+' runner brows
 out('\n=== summary ===');
 for(const s of sessions){
   if(s.error){ pass=false; out(`[${s.label}] NOT A PASS — ${s.error}`); }
+  if(s.slow) out(`[${s.label}] machine speed: slow factor ${s.slow.f.toFixed(2)} (${s.slow.n} reference rows, ${s.slow.raw.toFixed(2)}× idle) · P.quick limit ${(s.limitQuick/60e3).toFixed(1)} min`);
   for(const r of s.runs){
     out(`\n[${s.label}] P.${r.kind}: ${r.pass?'PASS':'NOT A PASS'} · ${r.seconds} s in the page (${r.wall.toFixed(1)} s wall)`);
     rowsTable(r);

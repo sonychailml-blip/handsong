@@ -83,6 +83,6 @@ export { dumpSongPrint, checkSongPrint, checkKeyKeep, checkOneOne, checkTranspos
 export { checkLatency, checkLatSwitches, checkLowLight, checkCamRestore, checkCamStart } from './probes/lat.js';
 export { checkFrameOnce, checkSchedule, checkWorker } from './probes/detect.js';
 export { dumpGold, checkGold } from './probes/gold.js';
-export { checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './probes/sound.js';
+export { checkTimbreIds, checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './probes/sound.js';
 export { dumpGesture, checkGesture } from './probes/hand.js';
 export { api } from './probes/guard.js';

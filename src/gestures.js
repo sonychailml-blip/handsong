@@ -1,50 +1,20 @@
-import { FINGER_TIPS, PINCH_ON, PINCH_HOLD, PINCH_OFF, REV_NEAR, REV_RANGE, ROW_HYST, WATCHDOG_MS,
-         CH_PAL_PAD, CH_PAL_HEAD_H, PAL_HYST_X, PAL_HYST_Y, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
-import { fx, fxIsScalar, fxChainOf, chainKeyOf, CHAIN_SOLO, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
+import { FINGER_TIPS, PINCH_HOLD, REV_NEAR, REV_RANGE, WATCHDOG_MS, CH_PAL_PAD, CH_PAL_HEAD_H, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from './config.js';
+import { fx, fxChainOf, chainKeyOf, FX_VOL, handActOf, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, playsNotes, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from './state.js';   // isLeadMode — V2: режим голоса мелодической роли
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordAtRoot, tuningIndexOf, CUR } from './scales.js';   // T7: chordTypeFits — тип аккорда целиком в строе на этом корне (Партч)
-import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit,
-         onRec, onLoop, onUndo, clearRec, clearSong, recording, loop, events } from './recorder.js';
+import { WleadOn, WleadOff, WchOn, WchSet, WchOff, WbassOn, WbassOff, WdrumHit, clearRec } from './recorder.js';
 import { t } from './i18n.js';
 import { hooks } from './hooks.js';
-import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, fxAimSet, fxAimGet, FX_AMT, FX_GLIDE_KEY, fxHandRange } from './audio.js';   // fxHandRange — VOL-1: ход руки по громкости из её объявления   // FX_GLIDE_KEY — V4: ключ Скольжения в карте ноты (терменвокс его в запись не несёт, см. noteFx)   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
+import { chordHold, DRUM_ROWS, applyExpr, fxInstance, fxSnapshot, fxChordBri, FX_GLIDE_KEY, fxHandRange } from './audio.js';   // fxHandRange — VOL-1: ход руки по громкости из её объявления   // FX_GLIDE_KEY — V4: ключ Скольжения в карте ноты (терменвокс его в запись не несёт, см. noteFx)   // O-3.1: прицел руки — пишется и читается ТОЛЬКО здесь, через fxParamsOf
 import { canvas } from './vision.js';
+import { pinchDbg, clamp01, clamp, dist, pinchRatios, minFinger, touchedFingers, emaS, degRaw, degHyst, cellHyst } from './gestures/features.js';   // GES1: pure gesture math (pinch ratios, touched fingers, smoothing, hysteresis)
+import { fxParamsOf, captureFx } from './gestures/fxhand.js';   // GES1: the effects hand (aims, capture of a finger's parameter)
+import { looperWire, doLooper, fireLooperCmd } from './gestures/looper.js';   // GES1: the looper hand (one command per pinch)
+import { exprWire, EXPR_CFG, EXPR, exprPrevT, exprPrevSet, exprFeatures, tickExpr } from './gestures/expr.js';   // GES1: the expression hand (features, middle layer, the four axes)
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
    эти зацепки НАДО править вместе с ними. tutorTap — nullsafe обёртка (hooks.tutor ставит src/tutor.js). */
 const tutorTap=(kind,payload)=>{ if(hooks.tutor) hooks.tutor(kind,payload); };
 let tutSeenT=0;   // троттлинг heartbeat 'seen' (рука в кадре) — ~1/с
- 
-const clamp01=v=>Math.max(0,Math.min(1,v));
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
- 
-const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-/* Расстояние «большой палец → кончик» нормируется на размер ладони
-   (запястье → основание указательного): щипок срабатывает одинаково
-   вблизи и вдали от камеры — критично при игре Z-ревербом. */
-function pinchRatios(lm){
-  const scale=dist(lm[0],lm[5])||1e-6, r={};
-  for(const f of FINGER_TIPS)r[f]=dist(lm[4],lm[f])/scale;
-  return r;
-}
-function minFinger(r){
-  let mf=FINGER_TIPS[0],mv=Infinity;
-  for(const f of FINGER_TIPS)if(r[f]<mv){mv=r[f];mf=f;}
-  return[mf,mv];
-}
-/* ВСЕ пальцы, прижатые к большому СЕЙЧАС (индексы 0..3), а не один ближайший. Гистерезис ТОТ ЖЕ, что
-   был у единственного щипка: войти нужно строго ниже PINCH_ON, отпустить — выше PINCH_OFF (между ними
-   палец держится). Поэтому при ОДНОМ прижатом пальце множество совпадает с прежним «mv<PINCH_ON /
-   mv>PINCH_OFF» ровно, порог в порог: одна нота ощущается как раньше.
-   prev — множество прошлого кадра (гистерезис на руке, S.touch). */
-function touchedFingers(r,prev){
-  const now=new Set();
-  for(let i=0;i<FINGER_TIPS.length;i++){
-    const v=r[FINGER_TIPS[i]];
-    if(prev.has(i) ? v<=PINCH_OFF : v<PINCH_ON+pinchD) now.add(i);   // pinchD: HAND1 probe control only (0 otherwise)
-  }
-  return now;
-}
-function emaS(S,k,v,a=0.35){ S.sm[k]=(k in S.sm)?S.sm[k]+a*(v-S.sm[k]):v; return S.sm[k]; }
 /* ═══ ГЛУБИНА РУКИ — ОДИН ШАГ СГЛАЖИВАНИЯ НА РУКУ ЗА КАДР (VOL-4) ═══
    Размер кисти dist(0,9), сглаженный emaS(S,'hs',…,0.15), — это ГЛУБИНА руки. Читателей у неё четыре: fx-рука (своя ось z),
    аккордовая ветка (яркость и прочее на play:z), блок глубины играющей руки (соло/бас/ударные) и — с VOL-4 — громкость на
@@ -60,118 +30,6 @@ function depthOf(S,lm){ if(S.hsF==null) S.hsF=emaS(S,'hs',dist(lm[0],lm[9]),0.15
 /* Глубина как АДРЕС (0 — рука близко к камере, 1 — далеко): тот же закон, что у реверба до 3.1 и у яркости аккордов, — один на
    всех читателей играющей руки, поэтому два параметра на глубине едут вместе. */
 const depthN=(S,lm)=>clamp01((REV_NEAR-depthOf(S,lm))/REV_RANGE);
-
-/* ═══════════ ВЫРАЗИТЕЛЬНОСТЬ («смычок») — ВСЕ настройки в ОДНОМ месте (крутят НА СЛУХ) ═══════════
-   Метафора смычка: рука не ЗАДАёт звук, а КОРМИТ энергию, которую система тратит. МАЛО ВХОДОВ →
-   БОГАТАЯ внутренняя динамика (резонатор энергии, дрейф тембра, инерц-пружина). Живость даёт именно
-   средний слой, а не число параметров — не «упрощать» его в прямое отображение признак→узел.
-   ЧЕТЫРЕ признака, и каждый ведёт СВОЮ ось звука (в этом весь смысл; см. tickExpr/applyExpr):
-     ЭНЕРГИЯ    = скорость центра ладони      → ЖИВОСТЬ (шиммер высоты+амплитуды)
-     НАТЯЖЕНИЕ  = сжатость кисти (центр→кончики) → ВАУ (резонансный пик бежит по частоте)
-     РАЗМАХ     = попарный разлёт кончиков    → ТЕКСТУРА (характер искажения: тёплое ↔ грязное)
-     НАКЛОН     = наклон плоскости ладони     → ПРОСТРАНСТВО (эхо)
-   Раньше три канала из четырёх толкали ЯРКОСТЬ, и всё ощущалось как ОДНА ось, поделённая на четыре
-   способа — поэтому яркость как ось убрана. НЕ направлять два канала в одно измерение восприятия.
-   Всё в звук идёт через ВОЗБУЖДЕНИЕ (накачка-и-спад, пружина) и setTargetAtTime, НИКОГДА прямым
-   присваиванием: прямое присваивание — ровно то, что делает управление «роботным», а вся фича
-   существует, чтобы этого избежать.
-   ОБЛАСТЬ: пока ТОЛЬКО соло (роль 'ld'), живьём — в событие не пишем НИЧЕГО (правило #11/#23). */
-const EXPR_CFG={
-  dtMin:0.005, dtMax:0.10,   // КЛАМП dt (с) — НЕ опционален: застрявший кадр дал бы огромный dt (и лишние суб-шаги). Устойчивость пружины он НЕ обеспечивает — это делает subDt (см. tickExpr)
-  subDt:0.008,               // ФИКС. внутренний шаг интегрирования (~125 Гц): динамика суб-шагами, поэтому пружина/резонатор УСТОЙЧИВЫ при ЛЮБОЙ частоте кадров. Прежде f0=2.5Гц самовозбуждалась при dt>~0.075с (реальные ~10-20fps десктопа) → постоянное дрожание ~кадр/2, независимое от руки. ω·subDt=0.13 ≪ 2 — большой запас
-  aPos:0.35,                 // сглаживание центра ладони (ema, доля за кадр) — ПЕРЕД дифференцированием (производная усиливает шум)
-  tauV:0.12,                 // сглаживание СКОРОСТИ (с) — ПОСЛЕ дифференцирования: гасит скачки джиттера кадр-в-кадр, которые иначе накачивали бы энергию в покое
-  v0:0.35, v1:2.5,           // МЁРТВАЯ ЗОНА скорости (размеров ладони/с): ниже v0 — РОВНО 0 (покоящаяся рука с джиттером ≈0.05..0.15 НЕ переходит порог), выше v1 — полный отклик. КНОБ: поднять v0, если в покое остаётся шевеление
-  cOpen:1.15, cClosed:0.55,  // ВАУ (сжатость кисти): раскрытая ладонь ≈cOpen (пик вверх), кулак ≈cClosed (пик вниз) — среднее центр→5 кончиков / размер ладони
-  orDead:0.20, orFull:0.75,  // ПРОСТРАНСТВО (наклон ладони → эхо): |верт. компонента нормали| ниже orDead — сухо (мёртвая зона у плашмя-к-камере), выше orFull — полное эхо
-  sprMin:0.40, sprMax:1.20,  // ТЕКСТУРА (размах пальцев / размер ладони): щепоть ≈sprMin → тёплое, веер ≈sprMax → грязное
-  tauT:0.25,                 // сглаживание ПОЗ (натяжение/наклон/размах, с) — поза, не рывок
-  tauE:0.4,                  // РЕЗОНАТОР энергии: постоянная спада (с). «Смычок»: движение накачивает ЖИВОСТЬ, стоит — оседает (тон мертвеет)
-  kPump:2.5,                 // сила накачки: kPump·tauE=1 → устойчивое E = e (линейный диапазон)
-  springF0:2.5, springZeta:0.55,   // ИНЕРЦИЯ (масса-пружина) на ВСЕХ каналах (живость/вау/пространство/текстура): рывок → перелёт-и-оседание = «тело». f0 (Гц), затухание ζ. Устойчива благодаря subDt
-  tcNode:0.03,               // сглаживание узлов выразительности, с   (числа стороны звука — глубины/диапазоны — в audio.EXPR_A: обратный импорт запрещён)
-  tauEngage:0.3,             // ВВОД/ВЫВОД: плавный кроссфейд к нейтрали за ~эту постоянную (с) — без щелчка на появлении/уходе руки
-};
-/* smoothstep с мёртвой зоной: <a → 0 (РОВНО), >b → 1, между — гладко. Несущая часть: покоящаяся рука = 0 энергии. */
-function smoothstep(a,b,x){ if(b<=a)return x>=b?1:0; const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); }
-/* Динамика «смычка» — состояние ИНСТРУМЕНТА, не руки (владелец может смениться, энергия продолжается).
-   E резонатор энергии; pres/wid/spat/sat — цели-через-пружину (X позиция, V скорость) = ЧЕТЫРЕ РАЗНЫЕ оси:
-   ПРИСУТСТВИЕ (энергия), ШИРИНА (натяжение→фейзер), ПРОСТРАНСТВО (наклон→делей), ТЕКСТУРА (размах→драйв);
-   engage кроссфейд к нейтрали. Яркость как ось убрана (была общей для трёх каналов — отсюда и жалоба). */
-const EXPR={E:0,presX:0,presV:0,widX:0,widV:0,spatX:0,spatV:0,satX:0,satV:0,engage:0};
-let exprPrevT=0;
-/* Признаки руки-выразительности из СЫРЫХ lm, нормировано размером ладони (правило #12): sx/sy НЕ трогаем.
-   Пишет S.exprE (энергия 0..1 через мёртвую зону), S.exprTsm (натяжение), S.exprMoveT (последнее движение). */
-function exprFeatures(S,lm,dt,now){
-  const hs=Math.max(dist(lm[0],lm[9]),0.02);
-  const cx=(lm[0].x+lm[5].x+lm[9].x+lm[13].x+lm[17].x)/5, cy=(lm[0].y+lm[5].y+lm[9].y+lm[13].y+lm[17].y)/5;
-  if(!S.exprPs){ S.exprPs={x:cx,y:cy}; S.exprTsm=null; S.exprVsm=0; S.exprOr=null; S.exprSpr=null; }
-  const p=S.exprPs, nx=p.x+EXPR_CFG.aPos*(cx-p.x), ny=p.y+EXPR_CFG.aPos*(cy-p.y);
-  const vRaw=Math.hypot(nx-p.x,ny-p.y)/hs/dt;            // скорость в размерах ладони/с (сглаженная позиция → диф.)
-  S.exprPs={x:nx,y:ny};
-  S.exprVsm+=(vRaw-S.exprVsm)*Math.min(1,dt/EXPR_CFG.tauV);   // сглаживаем СКОРОСТЬ: скачки джиттера кадр-в-кадр иначе пробивали бы мёртвую зону и качали энергию в покое
-  S.exprE=smoothstep(EXPR_CFG.v0,EXPR_CFG.v1,S.exprVsm);      // мёртвая зона на СГЛАЖЕННОЙ скорости; покой → РОВНО 0
-  /* НАТЯЖЕНИЕ (сжатость кисти) → ШИРИНА (фейзер): РАСКРЫТАЯ ладонь = широко/кружит (1), КУЛАК = узко/просто (0).
-     Раскрыть руку интуитивно читается как «дать больше», сжать — как придержать: жест, который человек делает
-     БЕЗ обучения. (Раньше вело яркость — убрали, чтобы каналы не сливались.) c — среднее центр→5 кончиков / размер ладони. */
-  let cs=Math.hypot(lm[4].x-nx,lm[4].y-ny);               // большой (4) + четыре кончика (FINGER_TIPS) → 5
-  for(const f of FINGER_TIPS)cs+=Math.hypot(lm[f].x-nx,lm[f].y-ny);
-  const c=(cs/5)/hs, Traw=clamp((c-EXPR_CFG.cClosed)/(EXPR_CFG.cOpen-EXPR_CFG.cClosed),0,1);   // раскрыто (c большое)=1 широко, сжато=0 узко
-  if(S.exprTsm==null)S.exprTsm=Traw;
-  S.exprTsm+=(Traw-S.exprTsm)*Math.min(1,dt/EXPR_CFG.tauT);
-  /* ПРОСТРАНСТВО (наклон ладони → ЭХО/делей). Нормаль плоскости через 0,5,17 (3D, с .z-глубиной MediaPipe).
-     Плашмя к камере → нормаль вдоль оси z, |верт. компонента|≈0 (сухо); наклонил ладонь → верт. компонента
-     растёт (эхо). Берём МОДУЛЬ (наклон в любую сторону = эхо): знак нормали зависит от хиральности руки (лево/
-     право), модуль устойчив к этому. Мёртвая зона orDead у нейтрали. Знак/ось — кноб на слух (если «не та» сторона). */
-  const ux=lm[5].x-lm[0].x, uy=lm[5].y-lm[0].y, uz=(lm[5].z||0)-(lm[0].z||0);
-  const vx=lm[17].x-lm[0].x, vy=lm[17].y-lm[0].y, vz=(lm[17].z||0)-(lm[0].z||0);
-  const nX=uy*vz-uz*vy, nY=uz*vx-ux*vz, nZ=ux*vy-uy*vx, nl=Math.hypot(nX,nY,nZ)||1e-6;
-  const orRaw=smoothstep(EXPR_CFG.orDead,EXPR_CFG.orFull,Math.abs(nY/nl));   // мёртвая зона: почти-плашмя → РОВНО 0 сухо
-  if(S.exprOr==null)S.exprOr=orRaw;
-  S.exprOr+=(orRaw-S.exprOr)*Math.min(1,dt/EXPR_CFG.tauT);
-  /* ТЕКСТУРА — РАЗМАХ пальцев: средняя ПОПАРНАЯ дистанция 5 кончиков / размер ладони (10 пар). ОТЛИЧНО от
-     натяжения (там — от ЦЕНТРА): рука бывает раскрытой-но-щепотью или сжатой-но-веером. Веер=грязно, щепоть=чисто.
-     Мёртвая зона — карта от щепоти (sprMin→0) к вееру (sprMax→1), покоящаяся щепоть = 0 (чисто). */
-  const tp=[lm[4],lm[8],lm[12],lm[16],lm[20]]; let sp=0;
-  for(let a=0;a<5;a++)for(let b=a+1;b<5;b++)sp+=Math.hypot(tp[a].x-tp[b].x,tp[a].y-tp[b].y);
-  const spread=(sp/10)/hs, sprRaw=clamp((spread-EXPR_CFG.sprMin)/(EXPR_CFG.sprMax-EXPR_CFG.sprMin),0,1);
-  if(S.exprSpr==null)S.exprSpr=sprRaw;
-  S.exprSpr+=(sprRaw-S.exprSpr)*Math.min(1,dt/EXPR_CFG.tauT);
-  if(S.exprE>0)S.exprMoveT=now;                           // «последнее движение» → выбор владельца при двух руках
-}
-/* Динамика + вывод в звук — ОДИН раз за кадр. Владелец = ПОСЛЕДНЯЯ ДВИГАВШАЯСЯ рука-выразительность
-   (две руки не дерутся за один инструмент). Ничего не пишем в событие — живьём (как терменвокс-Гц). */
-function tickExpr(now,dt){
-  let owner=null;
-  for(const k in HANDS){ const S=HANDS[k]; if(S.isExpr&&S.seen===now){ if(!owner||(S.exprMoveT||0)>(HANDS[owner].exprMoveT||0))owner=k; } }
-  const active=!!owner;
-  if(!active&&EXPR.engage<=1e-3)return;                   // ни одной руки-выразительности и уже нейтраль → узлы НЕ трогаем (байт-в-байт как сегодня)
-  EXPR.engage+=((active?1:0)-EXPR.engage)*Math.min(1,dt/EXPR_CFG.tauEngage);   // engage — одно-полюсный, устойчив на полном dt
-  const e=active?(HANDS[owner].exprE||0):0, T=active?(HANDS[owner].exprTsm||0):0,
-        OR=active?(HANDS[owner].exprOr||0):0, SPR=active?(HANDS[owner].exprSpr||0):0;   // OR пространство (наклон), SPR текстура (размах)
-  /* СУБ-ШАГ: вся динамика фиксированным малым шагом subDt, сколько бы ни длился кадр. Так пружина (и резонатор)
-     устойчивы при ЛЮБОЙ частоте кадров — раньше f0=2.5Гц самовозбуждалась при dt>~0.075с (реальные ~10-20fps
-     десктопа с синхронным MediaPipe), давая постоянное дрожание ~кадр/2 вне зависимости от руки. e/T/OR/SPR на
-     кадр постоянны. Резонатор энергии («смычок») + инерц-пружина на КАЖДОМ из ЧЕТЫРЁХ каналов (полу-неявный
-     Эйлер = «тело»). ЧЕТЫРЕ РАЗНЫЕ цели → четыре РАЗНЫЕ оси звука, а не одна ось четырьмя способами. */
-  const w=2*Math.PI*EXPR_CFG.springF0, w2=w*w, zw=2*EXPR_CFG.springZeta*w;
-  let rem=dt;
-  while(rem>1e-6){
-    const h=Math.min(EXPR_CFG.subDt,rem); rem-=h;
-    EXPR.E+=(EXPR_CFG.kPump*e-EXPR.E/EXPR_CFG.tauE)*h; EXPR.E=clamp(EXPR.E,0,1);   // энергия → ЖИВОСТЬ (вибрато), НЕ громкость
-    EXPR.presV+=(w2*(EXPR.E-EXPR.presX)-zw*EXPR.presV)*h; EXPR.presX+=EXPR.presV*h;   // ЖИВОСТЬ (энергия → глубина вибрато)
-    EXPR.widV +=(w2*(T  -EXPR.widX )-zw*EXPR.widV )*h; EXPR.widX +=EXPR.widV *h;       // ВАУ (натяжение → частота пика)
-    EXPR.spatV+=(w2*(OR -EXPR.spatX)-zw*EXPR.spatV)*h; EXPR.spatX+=EXPR.spatV*h;       // ПРОСТРАНСТВО (наклон → делей)
-    EXPR.satV +=(w2*(SPR-EXPR.satX )-zw*EXPR.satV )*h; EXPR.satX +=EXPR.satV *h;       // ТЕКСТУРА (размах → характер искажения)
-  }
-  const presE=clamp(EXPR.presX,0,1), widE=clamp(EXPR.widX,0,1), spatE=clamp(EXPR.spatX,0,1), drvE=clamp(EXPR.satX,0,1);
-  /* В звук ЧЕТЫРЕ канала 0..1 + engage; мэппинг канал→узел (глубины/диапазоны) — в audio (EXPR_A). Энергия
-     (presE) → ЖИВОСТЬ (вибрато), НЕ громкость: громкость целиком у нотной руки. Натяжение (widE) → ВАУ,
-     размах (drvE) → ТЕКСТУРА, наклон (spatE) → ПРОСТРАНСТВО. engage: нет руки → всё в нейтраль за ~0.3с. */
-  applyExpr(presE, widE, drvE, spatE, EXPR.engage, EXPR_CFG.tcNode);
-  setExprDisp(EXPR.engage*EXPR.E);                        // индикатор «ВЫР» — энергия/живость смычка (0 когда отпущено)
-  setExprBrightDisp(EXPR.engage*widE);                   // тон точек руки — раскрытость (вау), не отдельная полоса
-}
 
 /* ================= ОБРАБОТКА РУК =================
    ПАРСИНГ MEDIAPIPE: result.landmarks — массив рук; в каждой 21 точка
@@ -190,6 +48,7 @@ function tickExpr(now,dt){
    result.handednesses[i][0].categoryName ('Left'/'Right') — стабильный
    ключ руки между кадрами: у каждой руки свой независимый автомат щипка. */
 const HANDS={}; let chOwner=null;   // chOwner — рука защёлки
+exprWire({ HANDS });   // GES1: the expression hand reads the hands table (one object for the session)
 /* ⛳ РЕЖИМЫ ГОЛОСА (V2) — ветвимся по РЕЖИМУ мелодической роли, а не по самой роли (state.voiceMode):
      ПОЛИФОНИЧЕСКИЙ — у каждой руки свой голос пула, у каждого пальца при потолке 2+ — свой (ключ ЖИВОЙ РУКИ, liveKey);
      ВЕДУЩИЙ (моно, легато) — у РОЛИ один голос (monoKey) и одна рука-владелец (monoOwner[роль]): ПОСЛЕДНИЙ щипок забирает
@@ -236,39 +95,6 @@ let latchLen=0;   // сколько нот звучит у 'latch': по нем�
 /* handRole (левая='fx' палитра / правая='ноты') УДАЛЁН: привязки роли к handedness не осталось нигде.
    Соло/бас/аккорды берут функцию руки из handFn (handFnOf), палитра типов выбирается ПО ПОЛОЖЕНИЮ —
    одинаково в single-role и в сплите. Ударные палитры не имеют (обе руки бьют по рядам). */
-/* Рука-ЛУПЕР (функция 'loop'): нот не играет, командует лупером щипками пальцев. Команды — СОБЫТИЯ, а не
-   непрерывный звук: срабатывают РАЗ на формирование щипка (edge), не повторяются в удержании. Раскладка
-   thumb+палец: указ.→запись, средн.→пуск/пауза, безым.→отмена последнего взятого, мизинец→очистить ВСЁ (только после
-   3с удержания с отсчётом — единственное разрушительное действие). Невозможные команды сообщаются, а не
-   молчат. Здесь только логика; кнопки транспорта в UI работают как прежде (это ЕЩЁ один вход). */
-function looperMsgSet(text,ok){ setLooperMsg({text, until:nowMs()+LOOPER_MSG_MS, ok}); }
-function doLooper(cmd){
-  if(looperTap && looperTap(cmd)) return;   // HAND1: a probe session prints the command and keeps the transport still
-  if(cmd==='rec'){                                        // всегда возможно: не пишет→запись, пишет→стоп
-    /* ⛳ S3.3: развилка «первый круг / наложение» исчезла вместе с loop.first — различать здесь нечего. КУДА
-       писать, решает onRec: с S3.5c — во ВООРУЖЁННУЮ дорожку, если она есть, иначе в новую. Рука-лупер
-       зовёт тот же onRec, что и кнопка ●, поэтому ведёт себя так же. Номер дорожки показывает полоса лупера. */
-    onRec(); looperMsgSet(t(recording ? 'msg.recording' : 'msg.recStop'), true);
-  }else if(cmd==='play'){
-    if(!loop.on && !events.length){ looperMsgSet(t('msg.noLoop'), false); return; }   // нечего играть
-    onLoop(); looperMsgSet(t(loop.on?'msg.play':'msg.pause'), true);
-  }else if(cmd==='undo'){
-    if(!events.length){ looperMsgSet(t('msg.noLayers'), false); return; }                // нечего отменять
-    onUndo(); looperMsgSet(t('msg.undo'), true);
-  }else if(cmd==='clear'){
-    if(!loop.on && !events.length){ looperMsgSet(t('msg.alreadyEmpty'), false); return; }    // нечего очищать — движок не дёргаем
-    clearSong(); looperMsgSet(t('msg.cleared'), true);   // ED7: the looper hand's clear is a step (↶ brings the song back)
-  }
-}
-/* Вызов НА ЗАХВАТЕ щипка (edge) → единичное срабатывание по построению. index/middle/ring — сразу;
-   мизинец только заводит 3с-таймер (S.clearT0) и показывает отсчёт, сама очистка — в блоке удержания. */
-function fireLooperCmd(S,mf){
-  const f=FINGER_TIPS.indexOf(mf);                        // 0 указ · 1 средн · 2 безым · 3 мизинец
-  if(f===3){ S.clearT0=nowMs(); S.clearFired=false; setLooperClear(CLEAR_HOLD_MS); return; }
-  if(f===0) doLooper('rec');
-  else if(f===1) doLooper('play');
-  else if(f===2) doLooper('undo');
-}
 /* ═══ ДИСКРЕТНЫЕ ДЕЙСТВИЯ ПАЛЬЦЕВ — ДЕСКРИПТОРЫ (слайс «д») ═══
    Всё, что движок обязан знать о действии, лежит ЗДЕСЬ, а не в ветках кода: движок не должен опознавать
    действие ПО ИМЕНИ, иначе каждое новое потянет за собой правку гейтов.
@@ -372,51 +198,6 @@ function noteVolOf(zk,xn,zOf){
   const v = pa&&pa.inv ? 1-a : a;
   return lo+(hi-lo)*v;                                                 // 3/4. ход руки по глубине или горизонтали: с VOL-2b [0,1] — ровно v (левый край / рука у камеры = тишина)
 }
-/* Раньше у соло сетка обрезалась на высоту нижней полосы эффектов. Полосы больше нет
-   (столбики рисуются ПОВЕРХ слева), поэтому ввод считается по ВСЕЙ высоте — как и
-   рисуется. Эти две высоты обязаны совпадать: разойдутся — палец будет брать не ту
-   ступень, которую видит, и тем сильнее, чем ниже по экрану. */
-function degRaw(y,rows,H){ const seg=H/rows;
-  let z=Math.floor(y/seg); if(z<0)z=0; if(z>rows-1)z=rows-1;
-  return rows-1-z;
-}
-/* Гистерезис по границам ступеней: чтобы в 19/31-TET (узкие ряды)
-   не было «трели» на стыке, соседняя ступень берётся лишь когда
-   палец ушёл от границы дальше 16% высоты ряда. */
-function degHyst(y,rows,H,prev){
-  const seg=H/rows; let d=degRaw(y,rows,H);
-  if(prev>=0&&prev<=rows-1&&Math.abs(d-prev)===1){
-    const zTop=rows-1-Math.max(d,prev), b=(zTop+1)*seg;
-    if(Math.abs(y-b)<seg*ROW_HYST)return prev;
-  }
-  return Math.min(d,rows-1);
-}
-/* Гистерезис ОДНОЙ оси — общий движок для колонок и рядов палитры: соседнюю ячейку
-   берём, только если палец ушёл от границы дальше hyst её размера. Тот же приём, что
-   degHyst по Y; без него на узких ячейках выбор дребезжал бы от дрожания руки. */
-function axHyst(v,a0,a1,n,prev,hyst){
-  const seg=(a1-a0)/n; let d=Math.floor((v-a0)/seg); if(d<0)d=0; if(d>n-1)d=n-1;
-  if(prev>=0&&prev<=n-1&&Math.abs(d-prev)===1){
-    const b=a0+Math.max(d,prev)*seg;
-    if(Math.abs(v-b)<seg*hyst)return prev;
-  }
-  return d;
-}
-/* Попадание в ячейку палитры: ДВЕ независимые одномерные проверки. Сначала X даёт
-   колонку (семейство), и только потом её types.length задаёт число рядов для Y —
-   порядок важен, наборы могут быть рваными. prev-состояние живёт на РУКЕ (S.pc/S.pr),
-   а не в глобальном стейте: новый щипок начинает с чистого листа, а залипшая ячейка
-   при этом остаётся выбранной. */
-function cellHyst(x,y,x0,x1,y0,y1,fams,prevC,prevR){
-  const c=axHyst(x,x0,x1,fams.length,prevC,PAL_HYST_X);
-  const nR=fams[c].types.length;
-  const r=axHyst(y,y0,y1,nR,(prevR>=0&&prevR<nR)?prevR:-1,PAL_HYST_Y);
-  return [c,r];
-}
-/* Другая рука, всё ещё держащая щипок в той же зоне — для ПЕРЕДАЧИ голоса в ВЕДУЩЕМ режиме (V2; прежде — только бас).
-   ⚠️ Нужна ТОЛЬКО ведущему режиму: там голос у роли один, и без передачи оставшаяся рука замолкала бы. В
-   полифоническом у каждой руки свой голос — передавать нечего, и передача была бы ВРЕДНА (вторая рука получила бы
-   чужую ноту). Поэтому зовёт её лишь ветка ведущего режима в endPinch и сторож. */
 function otherPinched(key,zone){ for(const k in HANDS){ if(k!==key){ const S=HANDS[k]; if(S.pinch&&S.zone===zone) return k; } } return null; }
 function endPinch(key,S){
   if(S.pinch){
@@ -445,118 +226,27 @@ function endPinch(key,S){
   S.inert=false; S.fresh=false; S.fn=null;      // размыкание снимает инертность и функцию руки
   S.clearT0=null; S.clearFired=false;           // отсчёт очистки лупера — сброс на размыкании
 }
-/* ================= КОНСТРУКТОР ЭФФЕКТОВ — Пласт 2, слайс 2.1 (механизм) =================
-   Было: один палец = один эффект = одна ось (вертикаль), связка захардкожена в FX_META.
-   Стало: СЛОТ ЦЕПИ СОЛО (state.fxChains по ключу CHAIN_SOLO, Пласт 3.3/O-0; прежде fxLayout — индекс всё так же
-   = палец) говорит, КАКОЙ эффект на пальце и чем ведётся КАЖДЫЙ его параметр — ось (x/y/z) и
-   инверсия. Дефолтная раскладка выведена из FX_META,
-   поэтому в ЭТОМ слайсе поведение обязано быть НЕОТЛИЧИМЫМ: те же четыре эффекта, по одному
-   параметру, ось 'y', тот же размах 70%, тот же латч.
-   ⚠️ ОСИ ОТСЧИТЫВАЮТСЯ ОТ ТОЧКИ ЗАХВАТА ЩИПКА и на СЫРЫХ координатах (правило #12): рука начинает
-   «отсюда», куда бы ни пришла, и работает, даже когда наполовину за кадром. sx/sy здесь НЕЛЬЗЯ —
-   они несут кадрирование COVER, это про ПОПАДАНИЕ, а не про жест.
-   ⚠️ X идёт через flipX (правило #13, единственный источник зеркала): «вправо = больше» обязано
-   значить одно и то же на фронтальной и тыловой камере. У Y такой беды нет и не было (вертикаль не
-   зеркалится) — потому в старом коде флипа и не встречалось.
-   ⚠️ Сплиту ничего не нужно: H в выражении по Y сокращается, а X считается в СЫРЫХ долях кадра, —
-   размах не зависит ни от разрешения, ни от ширины половины. */
-/* Параметры эффекта = чем читать и куда писать. ДВА РОДА, и они НЕ сведены в один — это и есть находка
-   Пласта 1 (не делать вид, что все эффекты — однородный кубик):
-   • СТАРЫЕ СКАЛЯРНЫЕ (dly/vib/drv/trm): ровно ОДИН параметр, пишется ровно туда, куда писался всегда —
-     в state.fx[k]. ⚠️ Это ТОТ ЖЕ store, что уезжает в событие ноты (payload vib/drv/trm/dly): формат
-     записи не меняется, старые петли играют как играли. Через модуль их НЕ гоняем.
-   • МОДУЛИ (Пласт 1, пока один — реверб): столько параметров, сколько объявил модуль; читаем/пишем
-     нормированное 0..1 (getNorm/setNorm), а перевод в секунды/герцы по лог-шкале живёт в дескрипторе.
-   ⚠️ ЖИВЬЁМ, В ЗАПИСЬ НЕ ИДЁТ. Длина и окраска реверба — свойство КОМНАТЫ, а не ноты, и в событие не
-   пишутся (тот же закон, что у Гц терменвокса, правило #11). Переигранный слой звучит в ТЕКУЩЕЙ
-   комнате — это осознанно; расширение формата события — Пласт 3. */
-/* ⚠️ РОЛЬ — ПЕРВЫМ АРГУМЕНТОМ (Пласт 3.5.1). Прежде параметры искались по одному fxId, и это молча
-   означало «экземпляр один на всё приложение»: две роли с одним эффектом писали бы одни узлы. Теперь
-   дескрипторы берутся у экземпляра ИМЕННО ЭТОЙ роли (fxInstance).
-   ⚠️ СТАРЫЕ СКАЛЯРНЫЕ (dly/vib/drv/trm) — ТОЛЬКО У СОЛО, и пустой список для прочих ролей здесь не
-   перестраховка, а ЗАЩЁЛКА: их величины живут в ОДНОМ глобальном state.fx и едут в соло-событие ноты
-   (см. WleadOn), поэтому «делей у аккордов» без своего store и своей проводки писал бы соло-делей.
-   Портирование старых эффектов на прочие шины — не 3.5, а вопрос формата события (3.7). */
-/* ⛳ O-3.1: ЭТО — ЕДИНСТВЕННЫЙ ВХОД РУКИ, и потому ровно здесь пишется ПРИЦЕЛ (fxAimSet). Через него
-   ходят и жест, и меню конструктора (ui импортирует эту же функцию) — второго входа нет, значит прицел
-   не может отстать от руки.
-   ⚠️ И ЧИТАЕТ РУКА ТОЖЕ ПРИЦЕЛ, а не живую величину: относительный сдвиг щипка обязан продолжиться с
-   того места, где рука ОСТАВИЛА параметр. Читай он живое — во время воспроизведения запись увела бы
-   величину, и первый кадр щипка дал бы скачок на её значение.
-   ⛔ УПРАВЛЕНИЕ ЭТИМ НЕ ВОЗВРАЩАЕТСЯ: set по-прежнему пишет и в звук (setNorm), но пока играет транспорт,
-   следующий же удар сердца перекроет его записанной величиной (fxPlayDrive). Меняется ПОКАЗАННОЕ, а не
-   то, кто распоряжается звуком. */
-const fxParamsOf=(key,fxId)=>{
-  if(fxIsScalar(fxId)) return key===CHAIN_SOLO ? [{ get:()=>fxAimGet(key,fxId,FX_AMT,fx[fxId]),
-                                                    set:v=>{ fxAimSet(key,fxId,FX_AMT,v); fx[fxId]=v; } }] : [];   // старый скалярный — по ЕДИНОМУ признаку state.fxIsScalar (в.1), не по FX_META: там делей-модуль остался ради цвета, и по ней он ушёл бы писать в несуществующее fx.dly. O-0: «это цепь соло?» — сравнение с ИМЕНОВАННЫМ ключом (см. CHAIN_SOLO), не с ролью
-  const inst=fxInstance(key,fxId);
-  return inst ? inst.params.map(p=>({ get:()=>fxAimGet(key,fxId,p.key,p.cur),
-                                      set:v=>{ fxAimSet(key,fxId,p.key,v); p.setNorm(v); } })) : [];   // нет эффекта (или ещё нет AudioContext) → [] → цикл записи не сделает ни одного шага
-};
-/* ЗАХВАТ ПО ПАЛЬЦУ (Пласт 3.4.2): морозим точку отсчёта по ТРЁМ осям и стартовые значения ВСЕХ
-   параметров, ПОДПИСАННЫХ НА ЭТОТ ПАЛЕЦ, — по ВСЕЙ цепи, у скольких бы эффектов они ни лежали.
-   ⛔ ПОЧЕМУ ЯВНЫЙ СПИСОК ЗАПИСЕЙ, А НЕ МАССИВ ПО ИНДЕКСУ ПАРАМЕТРА. Прежде эффект был один (слот =
-   палец), и base[i] отвечал params[i] ПОЗИЦИОННО; тогдашний комментарий запрещал фильтровать base
-   именно поэтому — фильтр сдвинул бы индексы, и палец поехал бы НЕ ТОТ параметр («оси перепутались»).
-   Теперь позиционного соответствия НЕТ И БЫТЬ НЕ МОЖЕТ: адрес живёт у параметра, и один палец собирает
-   параметры РАЗНЫХ эффектов вразбивку. Поэтому запись несёт СВОЙ адрес и СВОЙ сеттер целиком
-   ({eff,pIdx,fxId,pa,set,base}), и в пофреймовом цикле НЕТ НИ ОДНОГО ИНДЕКСА, который мог бы
-   разъехаться. Прежняя ловушка закрыта не запретом, а формой данных.
-   ⚠️ pa — ЖИВАЯ ССЫЛКА на объект параметра, а не копия его полей: ось/инверсию можно менять в меню
-   ПРЯМО ВО ВРЕМЯ щипка, и это должно действовать сразу (так было и раньше — цикл читал sl.params[i]
-   каждый кадр). Сеттеры state правят объект НА МЕСТЕ ровно ради этого.
-   ⚠️ ФИЛЬТР ПО РЕЖИМУ/РУКЕ ОСТАЛСЯ И В ПОФРЕЙМОВОМ ЦИКЛЕ, хотя захват уже отобрал записи: параметр
-   могут переключить в «фиксировано» посреди щипка, и палец обязан тут же его отпустить. Прежнее
-   правило «фильтр ровно в одном месте» держалось на позиционном base — его больше нет.
-   z берётся НЕ здесь, а на первом кадре записи (p0.z=null): глубина сглаживается emaS, и позвать её
-   дважды за кадр значило бы дважды продвинуть фильтр. x/y снимаются сразу — как y снимался всегда.
-   ⚠️ ПУСТОЙ СПИСОК = НЕТ ЗАХВАТА (S.adj=null): на этом пальце не подписано ничего. Так же, как раньше
-   вёл себя пустой слот, — и так же гаснет подсветка столбиков в draw. */
-function captureFx(S,finger,lm,H){
-  /* РОЛЬ ЗАХВАТА — ОДНО ИМЯ НА ДВА ЧТЕНИЯ (цепь и дескрипторы параметров).
-     ⚠️ ЭТО И ЕСТЬ «ОДНА СТРОКА», КОТОРУЮ ОБЕЩАЛ ПРЕЖНИЙ КОММЕНТАРИЙ (слайс б.1): здесь стоял
-     литерал 'ld' с доводом «сюда приходят только из зоны fx, а она бывает лишь у соло». Гейты зоны
-     теперь пускают сюда ЛЮБУЮ роль, и роль берётся с S — ЗАМОРОЖЕННАЯ НА ЗАХВАТЕ, там же, где
-     заморожены S.zone/S.rx0/S.rx1. Это не «ещё один способ узнать роль», а тот же самый: попадание,
-     игра и отрисовка обязаны читать ОДНУ величину, иначе палец крутит не ту цепь, что нарисована.
-     ⚠️ ПОФРЕЙМОВЫЙ ЦИКЛ РОЛИ НЕ ЗНАЕТ И ЗНАТЬ НЕ ДОЛЖЕН: он идёт по ЗАХВАЧЕННЫМ записям, у каждой
-     свой сеттер (p.set) — роль уже «вшита» в замыкание. Потому б.1 его не трогает вовсе. */
-  const ck=chainKeyOf(S.role);   // O-0: РОЛЬ (заморожена на захвате) → КЛЮЧ ВЛАДЕЛЬЦА ЦЕПИ. Дальше по коду роли нет — только ключ
-  const chain=fxChainOf(ck);
-  const ent=[];
-  chain.forEach((eff,effIdx)=>{
-    const ps=fxParamsOf(ck,eff.fxId);
-    eff.params.forEach((pa,pIdx)=>{
-      if(pa.mode!=='drive' || pa.hand!=='fx' || pa.finger!==finger) return;
-      const p=ps[pIdx]; if(!p) return;                       // параметр, которого у эффекта нет (реестр пуст до initAudio) — молча мимо
-      ent.push({ effIdx, pIdx, fxId:eff.fxId, pa, set:p.set, get:p.get, base:p.get() });   // get — с в.1: ярлык у кисти читает ЖИВУЮ величину из записи захвата, а не из state.fx (делея там больше нет)
-    });
-  });
-  if(!ent.length){ S.adj=null; S.tutFx=null; return; }
-  S.adj={ finger, p0:{ x:lm[4].x, y:lm[4].y*H, z:null }, ent };
-  S.tutFx=null;   // S.tutFx — база для зацепки обучения 'fx' (сдвиг эффекта)
-}
 /* ⛳ HAND1: THE PROBE CLOCK. While a probe session runs (handsProbe({t, W, H}, looperTap)), processHands takes its time and play-field
    size from the clock and ignores the app loop's own calls; the machine's state (hands, latch and lead owners, expression) is set aside
    and put back at the end; looper commands go to looperTap first (true = swallowed). With no session every line here is a no-op. */
-let PRB=null, prbCall=false, prbKeep=null, looperTap=null, pinchD=0;
+let PRB=null, prbCall=false, prbKeep=null, looperTap=null;   // GES1: pinchD (the HAND1 pinch control) moved to gestures/features.js
 const nowMs=()=> PRB ? PRB.t : performance.now();
+looperWire({ nowMs:()=>nowMs(), tap:()=>looperTap });   // GES1: the looper hand reads the probe clock and the probe's tap
 function handsProbe(clk, tap){
   if(clk && !PRB){ prbKeep={ hands:{...HANDS}, chOwner, mono:{...monoOwner}, latchLen, exprPrevT, expr:{...EXPR}, tutSeenT };
-    for(const k in HANDS) delete HANDS[k]; chOwner=null; monoOwner.ld=monoOwner.bs=null; latchLen=0; exprPrevT=0; for(const k in EXPR) EXPR[k]=0; tutSeenT=0; }
+    for(const k in HANDS) delete HANDS[k]; chOwner=null; monoOwner.ld=monoOwner.bs=null; latchLen=0; exprPrevSet(0); for(const k in EXPR) EXPR[k]=0; tutSeenT=0; }
   else if(!clk && PRB && prbKeep){ const K=prbKeep; prbKeep=null;
     for(const k in HANDS) delete HANDS[k]; Object.assign(HANDS,K.hands); chOwner=K.chOwner; Object.assign(monoOwner,K.mono); latchLen=K.latchLen;
-    exprPrevT=K.exprPrevT; Object.assign(EXPR,K.expr); tutSeenT=K.tutSeenT;
+    exprPrevSet(K.exprPrevT); Object.assign(EXPR,K.expr); tutSeenT=K.tutSeenT;
     if(EXPR.engage<=1e-3){ applyExpr(0,0,0,0,0,EXPR_CFG.tcNode); setExprDisp(0); setExprBrightDisp(0); } }   // the probe's expression hand left the stage moving: back to neutral
   PRB=clk||null; looperTap= clk ? (tap||null) : null;
 }
 function processHandsProbe(res){ prbCall=true; try{ processHands(res); } finally { prbCall=false; } }
-const pinchDbg=d=>{ pinchD=+d||0; };   // HAND1 control: the pinch threshold nudged (0 = off)
 function processHands(res){
   if(PRB && !prbCall) return;   // HAND1: the app loop waits while a probe session runs
   const W=PRB?PRB.W:canvas.width, H=PRB?PRB.H:canvas.height, now=nowMs();
   const dtm=exprPrevT?clamp((now-exprPrevT)/1000,EXPR_CFG.dtMin,EXPR_CFG.dtMax):EXPR_CFG.dtMin;   // dt кадра для «смычка», КЛАМП обязателен (застрявший кадр иначе взорвал бы интеграторы)
-  exprPrevT=now;
+  exprPrevSet(now);
   const seen=new Set();
   const hands=(res&&res.landmarks)?res.landmarks:[];
   const heads=(res&&(res.handednesses||res.handedness))||[];

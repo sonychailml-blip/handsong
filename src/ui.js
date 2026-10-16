@@ -27,7 +27,7 @@ import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScrol
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // OWN1: the modes a track can be re-mapped into; TF5: «1/1 = …» and the historical 1/1
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
-import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -537,7 +537,7 @@ function renderTimbreCtl(){
   for(const x of timbresOf(role)){
     const o=document.createElement('option'); o.value=String(x.id); o.textContent=L(x.name); rollTimbreEl.appendChild(o); }
   const cur=laneTimbreOf(ly);
-  rollTimbreEl.value = cur==null ? '' : String(cur);
+  rollTimbreEl.value = cur==null ? '' : (timbreIdOf(role,cur)||'');   // TIM1: options carry the permanent id; the track stores the index
   renderModeCtl();
 }
 /* OWN1: the track's mode — the modes of its tuning with as many degrees (scales.modesLikeView); hidden when there is no other one, on drums
@@ -559,8 +559,8 @@ if(rollModeEl) rollModeEl.onchange=e=>{
   renderTimbreCtl();                                   // a refusal returns the pick to the truth
 };
 if(rollTimbreEl) rollTimbreEl.onchange=e=>{
-  const x=timbresOf(laneRoleOf(editLayer())).find(q=>String(q.id)===e.target.value);   // id берём ИЗ СПИСКА, а не разбором строки: у тембра пользователя id не обязан быть числом
-  if(x && editSetTimbre(x.id)){ renderAutCtl(); updRollBtns(); }
+  const x=timbresOf(laneRoleOf(editLayer())).find(q=>q.id===e.target.value);   // id берём ИЗ СПИСКА, а не разбором строки: у тембра пользователя id не обязан быть числом
+  if(x && editSetTimbre(x.idx)){ renderAutCtl(); updRollBtns(); }   // TIM1: the id → the index an event stores (until TIM2)
   renderTimbreCtl();                                   // отказ (редактор закрыт, тот же тембр) — выбор возвращается к правде
 };
 function openRoll(layer){   // AR1: layer — дорожка, которую открыть (тап по строке окна аранжировки); без него — вооружённая, иначе первая
