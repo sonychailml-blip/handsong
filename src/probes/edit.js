@@ -437,7 +437,7 @@ export function checkPaste(){
         /* the target must have ANOTHER timbre than the source, or the check could not fail: if equal, give it another one for the case
            (a history entry of its own, undone after) */
         const srcTim=laneTimbreOf(ly); let swapped=false;
-        if(laneTimbreOf(other)===srcTim){ const alt=timbresOf(role).find(x=>x.idx!==srcTim); swapped=!!(alt && editSetTimbre(alt.idx)); }
+        if(laneTimbreOf(other)===srcTim){ const alt=timbresOf(role).find(x=>x.id!==srcTim); swapped=!!(alt && editSetTimbre(alt.id)); }   // TIM2: tracks carry timbre ids
         const tim=laneTimbreOf(other);
         if(tim===srcTim) miss(`${role}: no second timbre to give L${other+1} — the timbre rule cannot be checked`);
         else rt(`${role}: paste into L${other+1} (same role and view, timbre ${tim} vs the source's ${srcTim})`, other, src, END()-t0, ()=>editPaste(END()),

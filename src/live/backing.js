@@ -5,7 +5,7 @@ import { AC, droneOff } from '../audio.js';
 import { buildArrangement } from '../arrange.js';
 import { bassIdx, chIdx, drumKitIdx, seventh } from '../state.js';
 import { cycling, loop, setRegionOn } from '../transport/clock.js';
-import { nextFreeLayer, recAllOff, recording, storeTi } from './record.js';
+import { nextFreeLayer, recAllOff, recording, storeTi, storeTim } from './record.js';
 import { laneLen, laneNew } from '../song/lanes.js';
 import { takeNext } from '../song/capture.js';
 import { compactEvents, events, schedInvalidate } from '../song/store.js';
@@ -68,7 +68,7 @@ const loadJam=sel=>loadArrangement(sel, true);
    прочие поля нагрузки — как их дал arrange.js. jam — МЕТКА СЛОЯ ДЖЕМА: живёт В САМОМ событии → снять ровно джем, не тронув записи игрока. */
 function backingEvent(e, layer, tk, jam){
   const ev={t:e.t, layer, fn:e.fn, a:e.a, sc:CUR(), sev:seventh, tk};
-  ev.a=storeTi(ev.fn,ev.a,ev.sc);
+  ev.a=storeTim(ev.fn,storeTi(ev.fn,ev.a,ev.sc));   // TIM2: the backing's timbre position → id
   if(jam) ev.jam=true;
   return ev;
 }

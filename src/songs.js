@@ -26,7 +26,7 @@ import { tonic, aRef, setTonic, setARef } from './state.js';
 import { events, loop, recording, seedTake, clearRec, setLoopMetre, setLoopBpm, editOpen, editClose, editIsOpen,
          editResizeChordNote, editResizeSeg, autChainOf, autChainAdd, autChainRemove, autAddPoint, autShapePoint,
          loadJam, setRegionOn, panic, songNotes, songSegs, laneRoleOf, laneTimbreOf, histReset } from './recorder.js';
-import { FX_FACTORY, timbresOf } from './audio.js';
+import { FX_FACTORY, timbresOf, timbreKey } from './audio.js';
 import { CHORD_POOL_N, LEAD_POOL_N, BASS_POOL_N } from './config.js';
 import { tutorSetScale } from './ui.js';
 import { L } from './i18n.js';
@@ -255,7 +255,7 @@ function buildTripHop(){
     rec.takes.push({ label, take:r.take, scaleId:MINOR.id,
       steps:steps.map(st=>({ fn:st.fn, t:st.t, a:{...st.a}, sid:st.fz.sc.id, ...(st.ign?{ign:st.ign}:{}), ...(st.skip?{skip:true}:{}) })) });
     /* дорожка партии — по первому «вкл» этого взятого с тем же источником (роль + тембр + вид) */
-    for(const P of parts){ const e=events.find(x=>x.tk===r.take && (P.role==='dr' ? x.fn==='drum' : /On$/.test(x.fn) && x.a && x.a.inst===P.inst) && x.sc===P.view);
+    for(const P of parts){ const e=events.find(x=>x.tk===r.take && (P.role==='dr' ? x.fn==='drum' : /On$/.test(x.fn) && x.a && x.a.inst===timbreKey(P.role,P.inst)) && x.sc===P.view);   // TIM2: events carry the id
       rec.parts[P.name]={ layer:e?e.layer:null, take:r.take, t0:Math.min(...P.steps.map(s=>s.t)) }; }
     say(`${label}: take ${r.take}, ${r.events} events → ${parts.map(P=>`${P.name} L${(rec.parts[P.name].layer??-1)+1}`).join(', ')}`);
   }

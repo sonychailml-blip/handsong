@@ -56,7 +56,7 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
   2026-10-16: **REC3 part 2**, **REC4**, **REC5** (recorder 4897 → 725 lines; nothing to hear or see).
 
 **What a track holds today:** notes (tuning index + register, volume, type, frozen tuning VIEW), exactly one role, one timbre
-(index in `a.inst`/`a.kit`), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
+(permanent id in `a.inst`/`a.kit`, TIM2), one view; per-note values inside notes; chain capture per take; may be frozen to a buffer.
 
 ## Open decisions and user directions (decided, not built)
 **Tracks** (archive B, «Принятое по дорожкам»): a track stores NOTES and TIMBRE, not sound (MIDI principle); each sound source is
@@ -103,8 +103,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
-answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, 🔵 GES1 parts 1–2 (NIGHT run);
-NEXT AUD1) → **4 «Calm»** = FIRST
+answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, ✅ GES1 (NIGHT + DAY run), ✅ UI1b, ✅ TIM2, ✅ SAVE1 (files), ✅ DRAW1 (DAY run);
+NEXT AUD1 (plan written: `docs/AUD1-design.md`, awaiting review)) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -138,7 +138,7 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
 «EXPRESSION HAND» — a pedal-like hand, hand map, expression lab (BACKLOG §3.29 «➕», 2026-10-15; after GES1).
 
 ## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
-- Nothing can be saved (song lives in the session; timbres have no ids; an event's mode is a view reference). Since TF2 the key is
+- Songs save only as FILES by hand (SAVE1; no autosave yet — proposal in WORK-LOG); events carry timbre ids (TIM2). Since TF2 the key is
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
   the main thread; hand→sound latency MEASURED by LAT1 (user's desktop 2026-10-15: ≈ 126 ms daylight, ≈ 180 ms evening; detection 54 ms vs a
   real GPU's 10–20; phone runs pending). Since LAT2 each camera frame is detected once; detection stays on the main thread by default (the worker path
@@ -164,17 +164,16 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
   back; reload + Zoom normal), then step 95 (evening, each low-light setting 20 s + Copy; on this webcam 15/24 fps fall back to Off, short
   exposure too dark — light is the fix) · step 97 (camera busy / off / blocked → message, «Try again»).
 
-### NIGHT run (2026-10-16, unattended) — REC3 part 2, REC4, REC5 + runner; full log: `NIGHT-LOG.md` (root)
-- Runner: `--limit-quick M`; without it P.quick's limit = 3 min × a slow factor measured from P.quick's own rows (`SLOW_REF`).
-- REC3 part 2: `song/env.js` (ONE wire for what song/ needs from above), `capture.js`, `automation.js`, `edit-insert.js`, `clipboard.js`,
-  `quantise.js`, `transpose.js`, `sections.js`. REC4: `transport/clock.js` (+ rule #35: every beat↔time conversion through the clock),
-  `transport/scheduler.js`. REC5: `freeze/registry.js` (one file — the seams call the swap both ways), `live/eng.js`, `live/record.js`,
-  `live/capture.js`, `live/backing.js`. recorder.js 4897 → 725 (facade + wiring + the session glue listed in CLAUDE.md's module map).
-- Order from the real dependencies: capture records before automation; freeze before the scheduler; each step a small wire, no new cycle.
-- Probes: every step static PASS + browser `--quick` (song/) or `--quick --all` (transport, freeze, live) PASS; last run P.quick 57/0, P.all
-  76/0, GOLD 84/0, HAND1 525/0, frozen seed bass exact; data PASS 13/0. One real failure on the way (a write to a moved variable —
-  «Assignment to constant variable»), fixed; writes to imported bindings are now scanned after each move (the static check misses them).
-- Item 2 (groundwork): FMT1 `core/format.js` (version rules, migrations, refuse newer in words; validators from scaleload) + `core/registry.js`
-  (the user's ID model, rule #37); TIM1 permanent timbre ids (`chord.firefly` …; pinned by a probe row; events still store the index → TIM2).
-  GES1 parts 1–2: `gestures/features.js` (pure, node row), `expr.js`, `fxhand.js`, `looper.js` (gestures.js 1213 → 903; `hands.js` left).
-- Nothing to hear or see. Open: the static check misses (a) writes to imports, (b) names used only after a spread `...x` (reported unused).
+### NIGHT run (2026-10-16): record in archive B («… at the DAY run»), log `NIGHT-LOG.md`.
+### DAY run (2026-10-16) — full log: `WORK-LOG.md` (root)
+- Static check: (10) a write to an imported binding fails; an import used only after `...x` counts as used; lexer keeps `${`'s brace.
+- AUD1 PLAN: `docs/AUD1-design.md` (engine context `E`; options A/B/C, recommendation C; sends/master inserts; WASM mapping; slices).
+- GES1 done: `gestures/hands.js` (state machine), `gestures/roles.js` (stateless helpers); gestures.js = facade. HAND1 identical.
+- UI1b: `tokens.css` (every DOM design value as a token; static check 11) + `src/icons.js` (THE icon component; LIC1 fails on an
+  interface glyph outside it); proof `tools/ui-snap.mjs` — 10 screens pixel-identical.
+- TIM2: events store timbre IDs (birth: push / backing / editor); engine door `timbreIdx`/`timbreKey`; `timbreSnapshot`; freeze
+  signature hashes id strings. No stored songs existed → nothing to upgrade; the file migration v1→v2 lives in SAVE1.
+- SAVE1: ⚙ Loop → «Song file»: Name, Save (downloads `.handsong`), Open… (asks when unsaved). `core/songfile.js` (parse, limits,
+  forbidden keys, migrations, strict check), `song/file.js` (record ↔ song), recorder/ui glue. Frozen audio not stored. Autosave PROPOSED
+  (WORK-LOG). Probes: data «SAVE1 song file (core)», browser «SAVE1 song file save → open», runner UI check with the real download.
+- DRAW1 and the UX inventory: see WORK-LOG (state at the end of the run).

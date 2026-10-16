@@ -19,6 +19,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Handsong">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="style.css">
 <!-- Vercel Web Analytics — СТАТИЧЕСКАЯ форма (два тега, без npm-пакета: импорт @vercel/analytics
      собирается только бандлером, а у нас сборки нет — голые ES-модули, он бы просто не завёлся).
@@ -42,7 +43,7 @@
     <h1>Hand<span>song</span></h1>
     <p class="startTag" data-i18n="start.tag">Жестовый синтезатор: играйте руками перед камерой.</p>
     <div class="startBtns">
-      <button id="startBtn" data-i18n="start.play">▶ Играть</button>
+      <button id="startBtn" data-i18n="start.play">Play</button>
       <button id="learnBtn" data-i18n="start.learn" data-i18n-title="start.learnTitle" title="Интерактивное обучение — учимся, играя">Обучение</button>
     </div>
     <!-- ПОРЯДОК на карточке: Играть → Обучение → ⛶ полноэкранный → ⬇ установка → подвал. Полноэкранный
@@ -53,12 +54,12 @@
          заметна ДО игры: полосы браузера съедают вертикаль, а она дорога полю игры). Вызов
          requestFullscreen — только по клику (правило жеста, как звук/камера). Прячется там, где нет
          Fullscreen API (iOS Safari на iPhone). Логика — ui.js (applyFullscreen). -->
-    <button id="fsBtnStart" title="Во весь экран: убрать полосы браузера">⛶ Во весь экран</button>
+    <button id="fsBtnStart" title="Во весь экран: убрать полосы браузера">Fullscreen</button>
     <!-- Установка на домашний экран (PWA). ПО РЕАЛЬНОЙ СПОСОБНОСТИ, не по браузеру: Chromium присылает
          beforeinstallprompt — кнопка появляется ТОЛЬКО после него (иначе prompt() пуст); iOS Safari
          события не даёт → показываем инструкцию в #installHint вместо мёртвой кнопки; уже установлено
          (standalone) → прячем всё. Обе скрыты по умолчанию (display:none), показывает ui.js. -->
-    <button id="installBtn" data-i18n="install.btn" data-i18n-title="install.title" title="Add Handsong to your home screen" style="display:none">⬇ Install</button>
+    <button id="installBtn" data-i18n="install.btn" data-i18n-title="install.title" title="Add Handsong to your home screen" style="display:none">Install</button>
     <p id="installHint" style="display:none"></p>
     <p id="loadmsg"></p>
     <!-- 0b: shown only after a failed start; retries the camera (sound and the hand model are already built) -->
@@ -71,7 +72,7 @@
       <!-- Переключатель языка (i18n этап 0): тихая строка вверху подвала, не спорит с двумя главными
            кнопками. Опции — ЭНДОНИМЫ (самоназвания). Пока English · Русский; es/de войдут позже. Значение
            и обработчик ставит ui.js (setLang сохраняет выбор и переживает перезагрузку). -->
-      <p class="startLang"><span aria-hidden="true">🌐</span>
+      <p class="startLang"><span aria-hidden="true" data-icon="language"></span>
         <select id="langSel" aria-label="Language / Язык">
           <option value="en">English</option>
           <option value="ru">Русский</option>
@@ -90,32 +91,32 @@
 <!-- ================= ВЕРХНЯЯ ПАНЕЛЬ ================= -->
 <div id="bar">
   <button id="scaleBtn" data-i18n-title="bar.scaleTitle" title="Звукоряд: лад, тоника, тембры">Лад</button>
-  <button id="soundBtn" data-i18n="bar.sound" data-i18n-title="bar.soundTitle" title="Звук и управление: тембры, функции рук, эффекты">🎛 Звук</button>
-  <button id="instrBtn" data-i18n-title="bar.instrTitle" title="Соло / Аккорды">🎸 Соло</button>
-  <button id="instrBtnL" data-i18n-title="bar.halfLTitle" title="Левая половина: инструмент">◧ 🎹 Аккорды</button>
-  <button id="instrBtnR" data-i18n-title="bar.halfRTitle" title="Правая половина: инструмент">🎸 Соло ◨</button>
-  <button id="splitBtn" title="Сплит-экран: аккорды | соло на двух половинах">◨</button>
-  <button id="camBtn" data-i18n-title="bar.camTitle" title="Переключить камеру: фронтальная / тыловая">🔄</button>
-  <button id="fsBtn" title="Во весь экран: убрать полосы браузера">⛶</button>
-  <button id="clipBtn" title="Запись клипа: видео+звук в один файл (WebM)">🎥</button>
-  <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)">🎙</button>
-  <button id="jamBtn" title="Подложка: джем целиком или только ударные — тап откроет выбор">🎵 Подложка</button>
-  <button id="loopPanelBtn" data-i18n="bar.loop" data-i18n-title="bar.loopTitle" title="Панель лупера: такты, темп, аранжировка">⚙ Луп</button>
-  <button id="recBtn" title="Запись: тап — отсчёт такта, затем игра">●</button>
+  <button id="soundBtn" data-i18n="bar.sound" data-i18n-title="bar.soundTitle" title="Звук и управление: тембры, функции рук, эффекты">Sound</button>
+  <button id="instrBtn" data-i18n-title="bar.instrTitle" title="Соло / Аккорды">Solo</button>
+  <button id="instrBtnL" data-i18n-title="bar.halfLTitle" title="Левая половина: инструмент">Chords</button>
+  <button id="instrBtnR" data-i18n-title="bar.halfRTitle" title="Правая половина: инструмент">Solo</button>
+  <button id="splitBtn" title="Сплит-экран: аккорды | соло на двух половинах" data-icon="split"></button>
+  <button id="camBtn" data-i18n-title="bar.camTitle" title="Переключить камеру: фронтальная / тыловая" data-icon="camera"></button>
+  <button id="fsBtn" title="Во весь экран: убрать полосы браузера" data-icon="fullscreen"></button>
+  <button id="clipBtn" title="Запись клипа: видео+звук в один файл (WebM)" data-icon="clip"></button>
+  <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)" data-icon="audio-clip"></button>
+  <button id="jamBtn" title="Подложка: джем целиком или только ударные — тап откроет выбор">Backing</button>
+  <button id="loopPanelBtn" data-i18n="bar.loop" data-i18n-title="bar.loopTitle" title="Панель лупера: такты, темп, аранжировка">Loop</button>
+  <button id="recBtn" title="Запись: тап — отсчёт такта, затем игра" data-icon="record"></button>
 </div>
 
 <!-- Тост камеры: короткое сообщение при отказе переключения (нет второй камеры / нет доступа).
      Отдельный элемент, а не строка #status — её каждый кадр переписывает drawStatus. -->
 <div id="camMsg"></div>
 <!-- ED7-fix2: after ✕ — "Song cleared" with an Undo button inside, for several seconds (ui.showUndoToast) -->
-<div id="undoToast" role="status"><span data-i18n="hist.clearedToast">Song cleared</span><button id="undoToastBtn" data-i18n="hist.undoBtn">↶ Undo</button></div>
+<div id="undoToast" role="status"><span data-i18n="hist.clearedToast">Song cleared</span><button id="undoToastBtn" data-i18n="hist.undoBtn">Undo</button></div>
 
 <!-- Выбор подложки: крошечное меню под кнопкой 🎵. Открывается ТОЛЬКО с покоя (первый тап), дальше
      кнопка переключает варианты внутри выбранного пути одним тапом, как раньше. Долгий тап по 🎵 —
      вернуться к этому выбору, не докручивая цикл до конца. Позицию ставит ui.js по кнопке. -->
 <div id="backingMenu" hidden>
-  <button id="backingJam" data-i18n="backing.jam">🎵 Джем (вся подложка)</button>
-  <button id="backingDrums" data-i18n="backing.drums">🥁 Только ударные</button>
+  <button id="backingJam" data-i18n="backing.jam">Jam (full backing)</button>
+  <button id="backingDrums" data-i18n="backing.drums">Drums only</button>
 </div>
 
 <!-- Транспорт: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера (drawLooper).
@@ -125,22 +126,22 @@
   <!-- ⏮ (S5.3) ЖИВЁТ ЗДЕСЬ, РЯДОМ С ▶: «откуда играть» и «играть» — одна мысль, и читаться они должны как
        один транспорт. В покое кнопка СКРЫТА (CSS) и появляется только у открытого редактора (.roll), где
        полоса и так оставляет одну ▶, — поэтому вид транспорта с закрытым редактором не меняется ничем. -->
-  <button id="rollHome" data-i18n-title="roll.homeTitle" title="Бегунок в начало">⏮</button>
-  <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Играть / пауза">▶ играть</button>
+  <button id="rollHome" data-i18n-title="roll.homeTitle" title="Бегунок в начало" data-icon="to-start"></button>
+  <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Играть / пауза">play</button>
   <!-- ⟳ ПОВТОР СКОБЫ (S3.5b): только ВКЛЮЧАЕТ и ВЫКЛЮЧАЕТ повтор. Какие такты повторяются, задаёт СКОБА на
        полосе лупера — её края ставят тапом или перетаскиванием, с точностью до такта; её же начало — место,
        откуда начинается запись. Кнопка границ не переопределяет. -->
-  <button id="rgnBtn" data-i18n-title="transport.regionTitle" title="Повторять такты под скобой">⟳</button>
-  <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Отменить последний дубль">⤺</button>
+  <button id="rgnBtn" data-i18n-title="transport.regionTitle" title="Повторять такты под скобой" data-icon="repeat"></button>
+  <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Отменить последний дубль" data-icon="undo-take"></button>
   <!-- ED7: ↶ / ↷ of the ONE history (every step: takes, ⤺, edits, mixer, names, order, sections, row delete, ✕) — the same pair as in the
        editor and the window; Ctrl/⌘+Z, Ctrl/⌘+Shift+Z. Shown on the play screen only (the editor and the window have their own pair). -->
-  <button id="histUndo" data-i18n-title="hist.undoTitle" title="Undo">↶</button>
-  <button id="histRedo" data-i18n-title="hist.redoTitle" title="Redo">↷</button>
-  <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить всю песню">✕</button>
-  <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё">■</button>
+  <button id="histUndo" data-i18n-title="hist.undoTitle" title="Undo" data-icon="undo"></button>
+  <button id="histRedo" data-i18n-title="hist.redoTitle" title="Redo" data-icon="redo"></button>
+  <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить всю песню" data-icon="clear"></button>
+  <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё" data-icon="stop"></button>
   <!-- ✎ (AR1): открывает ОКНО АРАНЖИРОВКИ — все дорожки; тап по строке там открывает РЕДАКТОР ДОРОЖКИ (пиано-ролл, S5.0). (Прежде ✎ открывал вооружённую дорожку, иначе первую.) Отказ — при
        записи и при записи клипа; ● отказывает, пока редактор открыт. Все отказы держит recorder (editOpen). -->
-  <button id="rollBtn" data-i18n-title="transport.editTitle" title="Аранжировка">✎</button>
+  <button id="rollBtn" data-i18n-title="transport.editTitle" title="Аранжировка" data-icon="edit"></button>
 </div>
 
 <!-- ================= ОКНО АРАНЖИРОВКИ (AR1) =================
@@ -148,25 +149,25 @@
      рисунок на ХОЛСТЕ, drawLooper(true)). Здесь — только то, у чего нет временнóй геометрии: закрыть (назад к игре) и зум общего с
      редактором окна времени. ✎ открывает это окно; тап по дорожке открывает её в редакторе. -->
 <div id="arrBar">
-  <button id="arrClose" data-i18n-title="arr.closeTitle" title="Back to playing">✕</button>
+  <button id="arrClose" data-i18n-title="arr.closeTitle" title="Back to playing" data-icon="close"></button>
   <span id="arrTitle" data-i18n="arr.title">Arrangement</span>
   <!-- MX1: ЛИЦО ОКНА — аранжировка (миниатюры) ↔ микшер (фейдеры уровня и мастер); подпись — то лицо, на которое переключит. -->
-  <button id="arrFace" data-i18n-title="arr.faceTitle" title="Arrangement / mixer">🎚</button>
+  <button id="arrFace" data-i18n-title="arr.faceTitle" title="Arrangement / mixer">Mixer</button>
   <button id="arrZoomOut" data-i18n-title="arr.zoomOutTitle" title="Zoom out">−</button>
   <button id="arrZoomIn" data-i18n-title="arr.zoomInTitle" title="Zoom in">+</button>
-  <button id="arrFit" data-i18n-title="arr.fitTitle" title="Whole song">⤢</button>
+  <button id="arrFit" data-i18n-title="arr.fitTitle" title="Whole song" data-icon="fit"></button>
   <!-- ED6: SECTIONS — act on the bars under the brace, in every track: insert as many empty bars before it as it is long, cut them,
        duplicate them right after; remove the selected marker; ↶/↷ — the song history (section edits and marker changes). Titles name the bars (ui). -->
-  <button id="secIns" title="Insert empty bars">＋▯</button>
-  <button id="secCut" title="Cut bars">✂</button>
-  <button id="secDup" title="Duplicate bars">⧉</button>
-  <button id="secRen" data-i18n-title="sec.renTitle" title="Rename the section">§✎</button>
-  <button id="secDel" data-i18n-title="sec.delTitle" title="Remove the section marker">§✕</button>
+  <button id="secIns" title="Insert empty bars" data-icon="{i:plus}{i:bar-empty}"></button>
+  <button id="secCut" title="Cut bars" data-icon="cut"></button>
+  <button id="secDup" title="Duplicate bars" data-icon="copy"></button>
+  <button id="secRen" data-i18n-title="sec.renTitle" title="Rename the section" data-icon="§{i:edit}"></button>
+  <button id="secDel" data-i18n-title="sec.delTitle" title="Remove the section marker" data-icon="§{i:delete}"></button>
   <!-- TF3: transpose the WHOLE song (every track with pitch, the backing too) a semitone down / up; one ↶. -->
   <button id="songTrDn" data-i18n="arr.trDn" data-i18n-title="arr.trDnTitle" title="Song down a semitone">−1 st</button>
   <button id="songTrUp" data-i18n="arr.trUp" data-i18n-title="arr.trUpTitle" title="Song up a semitone">+1 st</button>
-  <button id="songUndo" data-i18n-title="sec.undoTitle" title="Undo">↶</button>
-  <button id="songRedo" data-i18n-title="sec.redoTitle" title="Redo">↷</button>
+  <button id="songUndo" data-i18n-title="sec.undoTitle" title="Undo" data-icon="undo"></button>
+  <button id="songRedo" data-i18n-title="sec.redoTitle" title="Redo" data-icon="redo"></button>
 </div>
 <!-- AR2: ПОЛЕ ИМЕНИ ДОРОЖКИ — двойной тап по имени в строке окна; ui ставит его поверх заголовка строки (position:fixed). Enter или уход
      фокуса — оставить, Esc — отмена, пустое — снова «роль · тембр». Подсказку (title) и заготовку (placeholder) ставит ui. -->
@@ -180,7 +181,7 @@
      Подписи ставит ui.js — числа дорожек меняются, в разметке их держать нечем.
      ⛳ T4: вкладок ролей нет — в дорожке одна роль, и редактор открывается прямо на ней. -->
 <div id="rollBar">
-  <button id="rollClose" data-i18n-title="roll.closeTitle" title="Назад к аранжировке">✕</button>
+  <button id="rollClose" data-i18n-title="roll.closeTitle" title="Назад к аранжировке" data-icon="close"></button>
   <button id="rollTrack" data-i18n-title="roll.trackTitle" title="Сменить дорожку">L1</button>
   <!-- ТЕМБР ДОРОЖКИ (T5): замена тембра ПОСЛЕ записи — внутри роли (у ударных — набор). Единственный путь
        сменить тембр записанной дорожки. У дорожки без нот (слой дрона) — скрыт. Пункты строит ui.js. -->
@@ -194,16 +195,16 @@
   <button id="rollRows" data-i18n-title="roll.rowsTitle" title="Ряды: все высоты строя или только лада" hidden>All</button>
   <!-- ПРАВКА (S5.1): вставка — ЯВНЫЙ режим, иначе прокрутка, кончившаяся тапом, молча рождала бы удар.
        ↶ снимает ОДНУ правку и живёт только здесь; ⤺ (целое взятое) на время редактора с экрана убран. -->
-  <button id="rollIns" data-i18n-title="roll.insertTitle" title="Режим вставки">✚</button>
+  <button id="rollIns" data-i18n-title="roll.insertTitle" title="Режим вставки" data-icon="add-point"></button>
   <!-- ED1: pick mode — a tap adds or removes a note, a drag on empty space draws a selection box; a selected group moves and deletes as one edit. -->
-  <button id="rollPick" data-i18n-title="roll.pickTitle" title="Выбор нескольких нот">⬚</button>
-  <button id="rollDel" data-i18n-title="roll.delTitle" title="Удалить выбранный удар">🗑</button>
+  <button id="rollPick" data-i18n-title="roll.pickTitle" title="Выбор нескольких нот" data-icon="pick"></button>
+  <button id="rollDel" data-i18n-title="roll.delTitle" title="Удалить выбранный удар" data-icon="trash"></button>
   <!-- ED2: copy the selected notes · paste them at the playhead (this track or another of the same role and mode) · duplicate them right after themselves. -->
-  <button id="rollCopy" data-i18n-title="roll.copyTitle" title="Копировать выбранные ноты">⧉</button>
-  <button id="rollPaste" data-i18n-title="roll.pasteTitle" title="Вставить у бегунка">📋</button>
-  <button id="rollDup" data-i18n-title="roll.dupTitle" title="Повторить выбранное следом">⧉⁺</button>
+  <button id="rollCopy" data-i18n-title="roll.copyTitle" title="Копировать выбранные ноты" data-icon="copy"></button>
+  <button id="rollPaste" data-i18n-title="roll.pasteTitle" title="Вставить у бегунка" data-icon="paste"></button>
+  <button id="rollDup" data-i18n-title="roll.dupTitle" title="Повторить выбранное следом" data-icon="{i:copy}⁺"></button>
   <!-- ED3: quantise the selection after recording — ⌗ applies; beside it the grid (beats), what moves (starts / ends / both) and the strength. -->
-  <button id="rollQuant" data-i18n-title="roll.quantTitle" title="Квантовать выбранные ноты">⌗</button>
+  <button id="rollQuant" data-i18n-title="roll.quantTitle" title="Квантовать выбранные ноты" data-icon="quantise"></button>
   <select id="rollQGrid" data-i18n-title="roll.qGridTitle" title="Сетка квантизации"></select>
   <select id="rollQWhat" data-i18n-title="roll.qWhatTitle" title="Что двигать"></select>
   <select id="rollQAmt" data-i18n-title="roll.qAmtTitle" title="Сила квантизации"></select>
@@ -215,8 +216,8 @@
   <button id="rollTrUp" data-i18n="roll.trUp" data-i18n-title="roll.trUpTitle" title="Track up a semitone">+1 st</button>
   <!-- ↶/↷ — отмена и ВОЗВРАТ ПРАВКИ (S5.3). Обе гаснут, когда делать нечего: мёртвая кнопка должна
        выглядеть мёртвой, а не молча не работать. -->
-  <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку">↶</button>
-  <button id="rollRedo" data-i18n-title="roll.redoTitle" title="Вернуть правку">↷</button>
+  <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку" data-icon="undo"></button>
+  <button id="rollRedo" data-i18n-title="roll.redoTitle" title="Вернуть правку" data-icon="redo"></button>
   <!-- ЗАМОРОЗКА (F5): кнопка живёт ЗДЕСЬ, в баре редактора, а НЕ на строке полосы лупера — там уже
        три кнопки и подпись в шестнадцати пикселях, четвёртая не попадалась бы под палец. Полоса
        получает только ИНДИКАТОР. ⛳ И место верное по существу: в редакторе камера не читается,
@@ -228,15 +229,15 @@
        убрать и подвинуть выбранный эффект. ⛔ Это НЕ живая цепь рук: см. autChainAdd в recorder. -->
   <select id="rollAutSel" data-i18n-title="aut.pickTitle" title="Полоса автоматизации"></select>
   <select id="rollFxAdd" data-i18n-title="aut.addTitle" title="Добавить эффект дорожке"></select>
-  <button id="rollFxUp" data-i18n-title="fx.moveUp" title="Раньше в цепи">▲</button>
-  <button id="rollFxDn" data-i18n-title="fx.moveDown" title="Позже в цепи">▼</button>
-  <button id="rollFxDel" data-i18n-title="aut.rmTitle" title="Убрать эффект у дорожки">⊘</button>
+  <button id="rollFxUp" data-i18n-title="fx.moveUp" title="Раньше в цепи" data-icon="up"></button>
+  <button id="rollFxDn" data-i18n-title="fx.moveDown" title="Позже в цепи" data-icon="down"></button>
+  <button id="rollFxDel" data-i18n-title="aut.rmTitle" title="Убрать эффект у дорожки" data-icon="remove"></button>
   <!-- ФОРМА ОТРЕЗКА (гладкая автоматизация): как величина ВХОДИТ в выбранную точку — плавно (╱) или ступенькой (⌐). Кнопка, а не
        жест на полосе: тап по полосе уже значит «выбрать», «вставить» и «снять выбор», а тянуть — «перенести». Видна, пока полоса
        открыта; живая — когда выбрана точка. Значок показывает ТЕКУЩУЮ форму, тап её меняет. -->
-  <button id="rollShape" data-i18n-title="aut.shapeTitle" title="Форма отрезка к точке" hidden>╱</button>
+  <button id="rollShape" data-i18n-title="aut.shapeTitle" title="Форма отрезка к точке" hidden></button>
   <!-- ED5: the Volume lane's face — bars (one per note, drag a bar up/down) or the line of points. Shown only while the lane shows Volume. -->
-  <button id="rollVolBars" data-i18n-title="aut.barsTitle" title="Громкость: столбики нот или линия" hidden>▮▮</button>
+  <button id="rollVolBars" data-i18n-title="aut.barsTitle" title="Громкость: столбики нот или линия" hidden></button>
   <button id="rollZoomOut" data-i18n-title="roll.zoomOutTitle" title="Отдалить">−</button>
   <button id="rollZoomIn" data-i18n-title="roll.zoomInTitle" title="Приблизить">+</button>
 </div>
@@ -277,7 +278,7 @@
 
 <!-- ================= ЗВУКОРЯД: ноты и звук (оверлей) ================= -->
 <div id="panelScale">
-    <div class="phead"><b data-i18n="panel.scale.head">Звукоряд</b><button id="panelClose" data-i18n="panel.collapse">Свернуть ✕</button></div>
+    <div class="phead"><b data-i18n="panel.scale.head">Звукоряд</b><button id="panelClose" data-i18n="panel.collapse">Collapse</button></div>
     <div class="psep" data-i18n="panel.scale.sepScale">Лад и тоника</div>
     <div class="prow"><label data-i18n="panel.scale.tradition">Строй</label><select id="selTradition"></select></div>
     <div class="prow"><label data-i18n="panel.scale.mode">Лад</label><select id="selScale"></select></div>
@@ -339,7 +340,7 @@
      рядом с ладом, хотя играют её пальцами.
      ⚠️ Разметка перенесена ДОСЛОВНО: те же id, те же data-i18n, те же обработчики в ui.js. -->
 <div id="panelSound">
-    <div class="phead"><b data-i18n="panel.sound.head">Звук и управление</b><button id="panelCloseSound" data-i18n="panel.collapse">Свернуть ✕</button></div>
+    <div class="phead"><b data-i18n="panel.sound.head">Звук и управление</b><button id="panelCloseSound" data-i18n="panel.collapse">Collapse</button></div>
 
     <div class="psep" data-i18n="panel.scale.sepTimbre">Тембры</div>
     <!-- РЕЖИМ ГОЛОСА (V3) — строкой ПОД тембром своей роли: это свойство мелодического инструмента (в долгую — данные
@@ -410,10 +411,16 @@
 
 <!-- ================= ЛУПЕР: время и слои (оверлей на месте «Звукоряда») ================= -->
 <div id="panelLoop">
-    <div class="phead"><b data-i18n="panel.loop.head">Лупер</b><button id="panelCloseLoop" data-i18n="panel.collapse">Свернуть ✕</button></div>
+    <div class="phead"><b data-i18n="panel.loop.head">Лупер</b><button id="panelCloseLoop" data-i18n="panel.collapse">Collapse</button></div>
+    <!-- SAVE1: the song as a file on this device (ui.js songDownload / songOpenText; nothing leaves the device) -->
+    <div class="psep" data-i18n="song.sep">Song file</div>
+    <div class="prow"><label data-i18n="song.name">Name</label><input type="text" id="songName" maxlength="120" autocomplete="off" spellcheck="false"></div>
+    <div class="prow"><label></label><div class="seg"><button id="songSave" data-i18n="song.save">Save</button><button id="songOpen" data-i18n="song.open">Open…</button></div></div>
+    <input type="file" id="songFile" accept=".handsong,application/json" hidden>
+    <p class="phint" data-i18n="song.hint">Save writes the whole song to a file on this device; Open reads one back. Nothing is uploaded.</p>
     <div class="psep" data-i18n="panel.loop.sepLoop">Песня</div>
     <div class="prow"><label data-i18n="panel.loop.length">Длина подложки (такты)</label>
-      <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus">＋</button></div>
+      <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus" data-icon="plus"></button></div>
     </div>
     <div class="prow"><label data-i18n="panel.loop.metre">Размер (долей)</label>
       <select id="loopMetre">
@@ -436,22 +443,22 @@
     <div class="prow"><label data-i18n="panel.loop.harmony">Гармония</label><select id="selProg"></select></div>
     <div class="prow"><label data-i18n="panel.loop.rhythm">Ритм</label><select id="selRhythm"></select></div>
     <div class="prow"><label data-i18n="panel.loop.bassMode">Бас-партия</label><select id="selBassMode"></select></div>
-    <div class="prow"><label></label><button id="addArrBtn" data-i18n="panel.loop.addLayers">＋ Добавить дорожки</button></div>
+    <div class="prow"><label></label><button id="addArrBtn" data-i18n="panel.loop.addLayers">Add tracks</button></div>
 </div>
  
 <!-- ================= МИНИ-УЧЕБНИК ================= -->
 <div id="helpOv" class="ov">
   <div class="inner">
-    <div class="closeRow"><button id="helpClose">Закрыть ✕</button></div>
+    <div class="closeRow"><button id="helpClose" data-icon="Закрыть {i:close}"></button></div>
     <h1>Мини-учебник: лады, строи, аккорды</h1>
 
     <h2>Как играть</h2>
-    <p><b>Одна роль на весь экран.</b> Кнопка роли вверху переключает 🎸 Соло · 🎹 Аккорды ·
-    🎚 Бас · 🥁 Ударные. <b>Щипок</b> большого пальца с другим включает звук и выбирает октаву:
+    <p><b>Одна роль на весь экран.</b> Кнопка роли вверху переключает <span data-icon="solo"></span> Соло · <span data-icon="chords"></span> Аккорды ·
+    <span data-icon="bass"></span> Бас · <span data-icon="drums"></span> Ударные. <b>Щипок</b> большого пальца с другим включает звук и выбирает октаву:
     указательный = I, средний = II, безымянный = III, мизинец = IV. Высота руки — нота или аккорд,
     правее — громче; нота меняется плавным глиссандо, не размыкая щипка. Телефон держите горизонтально.</p>
-    <p><b>Роль по руке:</b> правая рука играет ноты, левая — эффекты (в соло); поменять руки — «⇄» в
-    меню. В типизированных аккордах левая рука выбирает тип из палитры. <b>Сплит-экран</b> (кнопка ◨,
+    <p><b>Роль по руке:</b> правая рука играет ноты, левая — эффекты (в соло); поменять руки — «<span data-icon="swap"></span>» в
+    меню. В типизированных аккордах левая рука выбирает тип из палитры. <b>Сплит-экран</b> (кнопка <span data-icon="split"></span>,
     только в ландшафте) делит экран на левую и правую половины: каждая играет свою роль, инструмент
     половины задаёт её кнопка, а роль выбирается тем, в какой половине щипок. Так можно держать аккорд
     одной рукой и вести соло другой.</p>
@@ -459,7 +466,7 @@
     Эффекты (столбики слева): щипок выбирает делей/вибрато/драйв/тремоло, тяните вверх/вниз — значение
     запоминается. <b>Учебный слой:</b> подписана лестница лада, тоника — зелёным; наведите палец без
     щипка — подсказка покажет, что здесь звучит. Настройки — кнопка лада вверху (лад, тоника, тембры);
-    «⚙ Луп» — лупер и аранжировка.</p>
+    «<span data-icon="loop-panel"></span> Луп» — лупер и аранжировка.</p>
 
     <h2>Что такое лад (гамма)</h2>
     <p>Лад — это набор ступеней внутри октавы, записанный формулой в полутонах от <b>тоники</b>
@@ -483,7 +490,7 @@
     октаву. Качество аккорда определяют интервалы: большая терция+чистая квинта (4+7 полутонов) =
     <b>мажор</b>, малая терция (3+7) = <b>минор</b> (m), 3+6 = <b>уменьшённый</b> (°),
     4+8 = <b>увеличенный</b> (+). Лестница аккордов текущего лада подписана прямо в поле аккордов
-    (роль 🎹) — смените лад и посмотрите, как она перестроится.</p>
+    (роль <span data-icon="chords"></span>) — смените лад и посмотрите, как она перестроится.</p>
  
     <h2>Почему в блюзе и пентатонике — пауэр-аккорды</h2>
     <p>В пентатонике всего 5 нот, в блюзе 6 — терции «через ступень» дают не трезвучия,
@@ -508,7 +515,7 @@
     сочетание составляете вы. Прогрессии (II–V–I и т.п.) осмысленны в 7-ступенчатых ладах;
     дрон (тонический гул, спасённый из старой подложки) работает в любом строе. Набор ударных —
     Стандарт или Дарбука — и рисунок ритма независимы: бэкбит на дарбуке или маqсум на
-    стандартном ките. Всё замораживается в текущем ладу и тонике; «⤺» снимает верхний слой.</p>
+    стандартном ките. Всё замораживается в текущем ладу и тонике; «<span data-icon="undo-take"></span>» снимает верхний слой.</p>
   </div>
 </div>
  
@@ -522,7 +529,7 @@
     <div id="demoName"></div>
     <div id="demoCulture"></div>
     <p id="demoHint" data-i18n="demo.hint">Один и тот же мотив звучит в шести строях — слушайте, как меняется настройка.</p>
-    <button id="demoSkip" data-i18n="demo.skip">Пропустить ✕</button>
+    <button id="demoSkip" data-i18n="demo.skip">Skip</button>
   </div>
 </div>
 

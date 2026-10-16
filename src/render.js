@@ -399,7 +399,7 @@ const ROLE_KEY={ chord:()=>chainKeyOf('ch'), lead:()=>CHAIN_SOLO };
 let KS_LAZY=true;
 const renderKsLazy=on=>{ if(on!=null) KS_LAZY=!!on; return KS_LAZY; };
 const usesKS=(eng, evs, leadIdx)=> evs.some(e=>{ if(e.fn!=='leadOn'&&e.fn!=='leadSet') return false;
-  const i= e.a&&e.a.inst!=null ? e.a.inst : (e.fn==='leadOn' ? leadIdx : null); return i!=null && i>=eng.LEAD_KS_FROM; });
+  const i= e.a&&e.a.inst!=null ? (eng.timbreIdx('ld',e.a.inst)??leadIdx) : (e.fn==='leadOn' ? leadIdx : null); return i!=null && i>=eng.LEAD_KS_FROM; });   // TIM2: an event's id → the engine position
 /* allow — path fragments that still load for real (SND-F1: the dynamics worklet for a track whose chain holds Glue) */
 function stubWorklet(ctx, allow){
   try{
@@ -1270,9 +1270,8 @@ function trackOpen(open, ev, a){
 function maxRel(eng, evs){
   let m=0;
   for(const ev of evs){ const a=ev.a; if(!a) continue;
-    if(ev.fn==='leadOn' && eng.LEAD_INSTR[a.inst]) m=Math.max(m,eng.LEAD_INSTR[a.inst].rel||0);
-    else if(ev.fn==='chOn' && eng.CHORD_INSTR[a.inst]) m=Math.max(m,eng.CHORD_INSTR[a.inst].rel||0);
-    else if(ev.fn==='bassOn' && eng.BASS_INSTR[a.inst]) m=Math.max(m,eng.BASS_INSTR[a.inst].rel||0);
+    const L= ev.fn==='leadOn' ? eng.LEAD_INSTR : ev.fn==='chOn' ? eng.CHORD_INSTR : ev.fn==='bassOn' ? eng.BASS_INSTR : null;   // TIM2: by the engine position of the event's id
+    const x= L && L[eng.timbreIdx(ev.fn==='leadOn'?'ld':ev.fn==='chOn'?'ch':'bs', a.inst)]; if(x) m=Math.max(m,x.rel||0);
   }
   return m;
 }
@@ -2207,7 +2206,7 @@ function goldRender(play, seconds, chains={}, post=null){
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
-export { probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
+export { seedOfLane, probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
   bendTrace,   // BEND-CURVE: what the render copy schedules for a track's bend curves (P.checkBendCurve)
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
   goldRender,   // GOLD1: golden renders of every timbre, the drone and the effects (P.checkGold)

@@ -92,8 +92,9 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
   called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module
   under `src/song/` imports only `song/`, `core/`, `config.js` and (REC3) the pitch truth `scales.js` — and the import cycles (printed; a
-  cycle through `song/` fails; CONTROLS a fake `song/store.js → recorder.js` and `song/history.js → audio.js` import)) and `node --check`
-  on changed files. Report the result.
+  cycle through `song/` fails; CONTROLS a fake `song/store.js → recorder.js` and `song/history.js → audio.js` import); DAY run: (10) a
+  WRITE to an imported binding (`x = …`, `x += …`, `x++`, `ns.x = …`) outside a local of that name fails; an import used only after a spread
+  `...x` counts as used; (11) design tokens — see `tokens.css`; each with a CONTROL) and `node --check` on changed files. Report the result.
 - **Read `src/` before changing anything**; re-verify every line number.
 - ⛔ **Never insert a comment in the middle of an export list**; re-read every export list you touch.
 - **Changed a signature or a stored field's meaning → find every reader**, positional callers included (rule #15); the probe module
@@ -154,6 +155,14 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - **A lesson** = a record in `tutor.LESSONS` + step records + `tutor.<key>.prompt`/`.detail` keys; its `setup` must make its own steps
   completable from any previous lesson. Don't touch the engine.
 - **A user-facing string** = a key in `DICTS.en` AND `DICTS.ru` (chrome), or an inline `L()`-shaped name next to the data.
+- ⛳ **Design work** (user decisions, DAY run 2026-10-16; BACKLOG §7.19): ALL design — visual identity, interface, colours, fonts, icons,
+  every design system — is done by Claude Code as our own authored work; fonts only under OFL or a similarly allowed licence (rule #32);
+  icons drawn by us, NO icon libraries. Today's look stays (UI1b tokens + icon component); the new design comes later through the user's
+  choice among proposals, AFTER the missing parts exist (effects constructor — redesigned once built —, expression lab, Calm, MIDI, audio
+  in); inventory and principles: `docs/UX-INVENTORY.md`.
+- **An interface glyph / icon** = a name in `src/icons.js` `ICONS` (by meaning), rendered by `icon(name)`, `{i:name}` in a dictionary
+  string or `data-icon` in the markup — never the glyph itself (UI1b). **A colour / size / spacing / radius / shadow / layer** = a token in
+  `tokens.css` first, then `var(--token)`.
 - **A behaviour gate** = a scale property + a predicate in `scales.js`, never a `tag`/index check.
 - **A path that creates or removes events** (the editor is the third such path — insert and ED2 paste) = stamp `tk`, keep `t` in absolute song beats, choose
   `a.v`/`a.k` that don't collide (`layerSlotTop`/`layerTakeTop`), remove with `compactEvents`, then `schedInvalidate` exactly once
@@ -331,7 +340,16 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `#tutorBar`+`#lessonOv`, transport `#loopTransport`, `#arrBar`, `#rollBar`, `<video>`/`<canvas>`); base path relative. First in `<head>`:
   the CSP `<meta>` (rule #33); the privacy notice `#privacyNote` ends the start card's footer. `src/va-stub.js` — the counter's queue
   stub (classic script, no imports).
-- `style.css` — all CSS. `manifest.json`/`sw.js` — PWA; the SW is deliberately cache-free (empty `fetch` handler, only so Chromium
+- `tokens.css` (UI1b) — the DESIGN TOKENS: every colour, type size / weight / line height, spacing, radius, shadow and z-index of the DOM
+  interface as custom properties on `:root` (today's values; names: colours by family + alpha `--c-white-a22`, sizes/spacing by today's px
+  `--fs-15`, `--sp-9`, layers by role `--z-panel`). ⛳ `style.css` and JS-set styles carry no such literal (static check 11: also every
+  `var(--x)` must be defined there or listed in `RUNTIME_VARS`, today `--role`); a new value is added to tokens.css first. The CANVAS palette
+  is not in it yet (DRAW1). `src/icons.js` (UI1b) — THE ICON COMPONENT: `ICONS` by MEANING (one glyph may serve two names: 🎚 mixer /
+  bass), `icon(name)`, `iconText(s)` expands `{i:name}` (the dictionaries carry tokens; `t()` expands them), `applyIcons(root)` fills
+  `[data-icon]` (a name or a `{i:…}` template; called by `applyI18n`). ⛳ An interface glyph outside icons.js fails LIC1 (exempt: probes and
+  the console texts of songs/recorder/render, `ICON_EXEMPT`); data row «UI1b icons (core)». Proof tool for no-visible-change slices:
+  `node tools/ui-snap.mjs --save <tag> [--compare <base>]` (10 screens, computed styles + pixels, fixed fake camera; deterministic).
+- `style.css` — all CSS (values through tokens). `manifest.json`/`sw.js` — PWA; the SW is deliberately cache-free (empty `fetch` handler, only so Chromium
   fires `beforeinstallprompt`).
 - `src/config.js` (leaf, imports nothing) — thresholds, scheduler timings, pool sizes, palette/FX geometry (`palSplitX` = the single
   palette|notes split, `rectBandY`, `coverView` = the single cover crop), volume curve `volAmp(v)=v²`/`volVel`/`volFromOld`,
@@ -427,6 +445,16 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   `transpose.js` (ED4 `editDegreeSel`, OWN1 `editTrackMode`, TF3 `editTranspose`/`songTranspose`, `trDbg`). `sections.js` (ED6: `secMarks`
   + its one outside writer `secMarksSet`, `songEdit`, `secAdd/Rename/Delete`, `sections`, `secDbg`, the `song*` history aliases). Still in
   recorder.js: the editor SESSION (`editOpen`/`editClose`/`editSetLayer`), the snapshot steps and the kinds snap/tab/master/key.
+- SAVE1 (DAY run): `src/core/songfile.js` — the song FILE's pure core: `songParse` (text cap `SONG_MAX_BYTES` 8 MB, JSON only, keys
+  `__proto__`/`constructor`/`prototype` refused anywhere, nesting ≤ 24, newer version refused in words), `songUpgrade` (FMT1 migrations:
+  v1 → v2 = TIM2 timbre positions → ids from the FROZEN table `TIM1_POSITIONS`; a copy, idempotent), `songCheck` (strict shapes and
+  ranges); `format.js` takes `SONG_VERSION`/`SONG_MIGRATIONS` (kind `song`). `src/song/file.js` — `songData(meta)` (the song → one record:
+  events in birth order with view NUMBERS, `views` = {mode, key, keyC, tunedFrom, chordMode}, tracks' table rows, capture records,
+  markers, `settings` via ENV, `timbres` = a copy of every timbre used; a chain-less track gets the live chain snapshot and a map-less solo
+  note the live solo snapshot IN THE FILE, so saving never changes the song), `songPlan(rec)` (back to installable data: views through
+  `scaleView`, a missing mode refuses; a timbre id this app lacks → mapped to an own timbre with equal settings, else kept by id and
+  named — its copy is re-saved), `fileDbg` (probe controls). `recorder.songSaveRec/songOpenApply/songMark/songDirty` (open = clear + install
+  + history reset, like a song load); `ui.songSaveText/songOpenText` (+ download, file picker, confirm). Frozen audio is never stored.
 - `src/frzqueue.js` — auto-freeze: the WATCHER (AF3) and the QUEUE (AF1), lazily loaded by `render.js` (see "Freeze").
 - `src/vision.js` — camera + the DETECTION PATH + the FRAME PUMP (LAT2). Path: a detector object `{kind, run(job), setDelegate, dbg, close}`
   built by `buildDet` — the main thread (default, `mainDet`: handdet.js imported dynamically) or the worker (`workerDet`: src/hand-worker.js;
@@ -477,9 +505,17 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   (`pinchRatios`, `minFinger`, `touchedFingers` + hysteresis, `emaS`, `smoothstep`, `degRaw`/`degHyst`, `cellHyst`, `clamp`/`clamp01`/
   `dist`, the HAND1 control `pinchDbg`; runs in node — data row «GES1 gesture features (core)»); `gestures/expr.js` — the expression hand
   (`EXPR_CFG`, `EXPR`, `exprFeatures`, `tickExpr`, `exprPrevT` + `exprPrevSet`; `exprWire` brings HANDS); `gestures/fxhand.js` —
-  `fxParamsOf`, `captureFx`; `gestures/looper.js` — `doLooper`, `fireLooperCmd` (`looperWire`: the probe clock and tap). Still in
-  gestures.js: `HANDS`, voice modes, hand roles, volume per note, `endPinch`, the probe clock, `processHands` (→ `gestures/hands.js` later).
-- `src/draw.js` — canvas: video background, overlays, roles, grids, palette, FX bars, status, `noteLbl` (the ONE label function), the
+  `fxParamsOf`, `captureFx`; `gestures/looper.js` — `doLooper`, `fireLooperCmd` (`looperWire`: the probe clock and tap). GES1 rest (DAY
+  run): `gestures/roles.js` — stateless: `depthOf`/`depthN`, voice-mode zones, `liveKey`/`monoKey`, `wOn`/`wOff`, `ACTIONS`,
+  `paletteFinger`, `handHalfRole`, `noteHandRole`, `noteVolOf`; `gestures/hands.js` — the state machine: `HANDS`, latch / lead owners,
+  `voiceModeReset`, `endPinch`, the probe clock, `processHands`. `gestures.js` is now only the facade (re-exports).
+- DRAW1 (DAY run): `src/draw.js` is the FACADE (re-exports); the canvas lives in `src/views/`: `common.js` (FX bar layout, status
+  element, transport sync, colour mixing `hexA`/`mixHex`, `noteLbl`, the time axis `laneBeatX`/`laneBeatAt`, editor row geometry
+  `rollRowY`/`rollRowAt`, bar heights `ROLL_BAR_H`/`ROLL_TP_H`), `camera.js` (`syncViewRect`, `drawVideoBackground`), `strip.js` (play strip,
+  arrangement window, mixer: `drawLooper`, `loopView` + its one outside writer `loopViewClear`, hit tests, probes), `roll.js` (the editor:
+  `drawRoll`, `rollView`, axis, lane, hits), `play.js` (`drawOverlays` and the play screen). Imports: play → roll, strip, common; roll →
+  strip, common; strip → common (no cycle). The canvas palette is still literals + `config.INSTR_COL` (tokens for it: a later DRAW1b).
+- (before DRAW1, all in draw.js) — canvas: video background, overlays, roles, grids, palette, FX bars, status, `noteLbl` (the ONE label function), the
   editor (`drawRoll`, snapshot `rollView`, `rollAxis`), the strip and arrangement window (`drawLooper(full)`, snapshot `loopView`).
 - `src/ui.js` — menus, buttons and handlers: panels, role buttons, split, camera, clip buttons, backing, pointer routing, effects panel,
   hand functions, the editor shell, arrangement window, tutorial helpers.
@@ -1477,7 +1513,10 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **A track's chain in the editor is the union of its captured takes' snapshots**; mid-take effects are not moved/removed by ▲▼⊘; an effect
   in one take's snapshot but added mid-take in another is removed only from snapshots.
 - **Track chains belong to the ROLE, not the track** (rule #31 separates live from tracks, not track from track).
-- **Nothing can be saved** (view and `a.ty` references; capture keyed by take) — BACKLOG §1.
+- **Songs save only as FILES, by hand** (SAVE1): no autosave, no in-browser song storage yet (proposal in WORK-LOG); a song using the
+  person's own tunings/modes opens only where those files exist (copies inside the song = SONG1); a timbre this app lacks plays as the
+  live timbre of its role (its settings stay in the song); `a.ty` comes back as a fresh array (compared by value — `tyEq`); the undo
+  history starts fresh after Open (Open asks first when the song has unsaved changes).
 - Captured expression channels are not replayed (`fxPlaySet` drops `'expr'`) — BACKLOG §4.
 - **A render of a KS (plucked) track pins its offline context** (≈ 6 MB per render, Chrome; other tracks are collected since RENDER-LEAK).
   Since SND-F1 the same holds for a track whose chain holds Glue (the dynamics worklet is loaded only then).

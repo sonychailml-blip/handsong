@@ -25,8 +25,12 @@
         ссылками не считаются.
      8) NETWORK GUARD (PRIV1, rule #33): every network / share call site is listed with its reason and count (NET_LISTED); a control
         (an unlisted sendBeacon, a fetch in a new module) must be caught.
+     9) FOLDERS AND IMPORT CYCLES (REC1) — see block 9.
+    10) WRITE TO AN IMPORT (DAY run): `x = …`, `x += …`, `x++`, `--x` on an imported name, or `ns.x = …` on a namespace import, outside
+        the scope of a local of that name — fails (read-only at run time). CONTROL: five forms caught, a local / property / comparison not.
    Что сообщается как СВЕДЕНИЕ (не ошибка): экспорты, которых никто не импортирует статически (у модулей, грузимых динамически или
    целиком как пространство имён, не считаются), и импорты, которые модуль больше не упоминает.
+   An import used only after a spread / rest («...x») counts as used (CONTROL).
    Разбор — лексический: строки, шаблоны (с вложенными ${…}), регулярные выражения и комментарии различаются; полного парсера JS здесь нет,
    и он не нужен — синтаксис уже проверил node. */
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -313,12 +317,80 @@ fails.push(...LAY.bad);
     if(!layerCheck(fake).bad.some(x=>/song\/history\.js: imports audio\.js/.test(x))) fails.push('folder CONTROL: song/history.js → audio.js was not caught — the check cannot fail'); }
   else fails.push('folder CONTROL: src/song/history.js or src/audio.js missing');
 }
-// сведения: неиспользуемые экспорты и импорты
+/* 10) WRITE TO AN IMPORTED BINDING (DAY run, item 0): an import is read-only — `x = …`, `x += …`, `x++`, `--x` on an imported name (or
+   `ns.x = …` on a namespace import) throws «Assignment to constant variable» only when that line runs (the NIGHT run hit it after a move).
+   Fails unless a local declaration of the same name covers the site (the scopes of check 6). Text without strings and comments. */
+const ASSIGN_OPS='(?:\\*\\*|>>>|<<|>>|&&|\\|\\||\\?\\?|[-+*/%&|^])?=(?![=>])';
+function importWrites(m, b=m.bare){
+  const bad=[], own=[];
+  for(const x of b.matchAll(/\b(?:const|let|var)\s+/g)) for(const nm of declaratorNames(declText(b,x.index+x[0].length))) own.push([nm,x.index,blockEnd(b,x.index)]);
+  for(const x of b.matchAll(/\b(?:function\s*\*?|class)\s+([A-Za-z_$][\w$]*)/g)) own.push([x[1],x.index,blockEnd(b,x.index)]);
+  for(const x of b.matchAll(/\bfunction\s*\*?\s*[A-Za-z_$]?[\w$]*\s*\(/g)){ const o=x.index+x[0].length-1, e=closeParen(b,o); if(e<0) continue;
+    const [s0,s1]=bodyAfter(b,e+1); for(const p of paramNames(b.slice(o+1,e))) own.push([p,s0,s1]); }
+  for(const x of b.matchAll(/=>/g)){ let j=x.index-1; while(j>=0&&/\s/.test(b[j])) j--; const [s0,s1]=bodyAfter(b,x.index+2);
+    if(b[j]===')'){ let d=0, k=j; for(;k>=0;k--){ if(b[k]===')') d++; else if(b[k]==='('){ d--; if(d===0) break; } } if(k>=0) for(const p of paramNames(b.slice(k+1,j))) own.push([p,s0,s1]); }
+    else { let k=j; while(k>=0&&/[\w$]/.test(b[k])) k--; const nm=b.slice(k+1,j+1); if(ID.test(nm)) own.push([nm,s0,s1]); } }
+  const covered=(nm,i)=>own.some(([n,s0,s1])=>n===nm&&i>=s0&&i<s1);
+  for(const im of m.imports){ const esc=s=>s.replace(/\$/g,'\\$');
+    for(const l of (im.locals||[])){
+      const res=[new RegExp('(?<![\\w$.])'+esc(l)+'\\s*'+ASSIGN_OPS,'g'), new RegExp('(?<![\\w$.])'+esc(l)+'\\s*(?:\\+\\+|--)','g'), new RegExp('(?:\\+\\+|--)\\s*'+esc(l)+'(?![\\w$])','g')];
+      for(const re of res) for(const x of b.matchAll(re)){ if(im.at!=null && x.index>=im.at && x.index<im.at+im.len) continue;
+        const p=b.slice(0,x.index).trimEnd(); if(/(?:^|[^.])\.$/.test(p)) continue;   // a property (but «...x» stays a reference)
+        if(/\b(?:const|let|var)\s*$/.test(p)) continue;
+        const at=x.index+x[0].search(/[\w$]/); if(covered(l,at)) continue;
+        bad.push(`${m.file}:${lineAt(b,at)}: writes to the imported binding '${l}' — imports are read-only («Assignment to constant variable» at run time); write through the owner's setter`); } }
+    if(im.ns) for(const x of b.matchAll(new RegExp('(?<![\\w$.])'+esc(im.ns)+'\\s*\\.\\s*([A-Za-z_$][\\w$]*)\\s*(?:'+ASSIGN_OPS+'|\\+\\+|--)','g'))){
+      if(covered(im.ns,x.index)) continue;
+      bad.push(`${m.file}:${lineAt(b,x.index)}: writes to '${im.ns}.${x[1]}' of a namespace import — read-only at run time`); } }
+  return bad;
+}
+for(const f of files) fails.push(...importWrites(mods[f]));
+{ /* CONTROL: each form of a write to an import must be caught; a local of the same name, a property, a comparison and an arrow must not */
+  const src=`import { a, b, c, d, e } from './x.js';\nimport * as N from './y.js';\na = 1;\nb += 2;\nc++;\n--d;\nN.k = 3;\n`+
+    `function g(e){ e = 5; return e; }\nconst o={}; o.a = 1; if(a == 1){} const h = a => a; let q = a === b;\n`;
+  const { bare }=lex(src), fm={ file:'ctl.js', bare, imports:[] };
+  for(const x of bare.matchAll(/\bimport\s+([^'"();]*?)\s*from\s*(['"])([^'"]+)\2/g)){ const br=x[1].match(/\{([^}]*)\}/), ns=x[1].match(/\*\s+as\s+([A-Za-z_$][\w$]*)/);
+    fm.imports.push({ spec:x[3], names:[], locals:br?br[1].split(',').map(t=>t.trim()):[], ns:ns?ns[1]:null, at:x.index, len:x[0].length }); }
+  const got=importWrites(fm), want=['a','b','c','d','N.k'];
+  const ok=want.every(n=>got.some(x=>x.includes(`'${n}'`))) && got.length===want.length;
+  if(!ok) fails.push(`write-to-import CONTROL: expected exactly ${want.join(', ')} to be caught, got ${got.length}: ${got.map(x=>x.split(': ')[1].slice(0,40)).join(' | ')} — the check cannot fail or flags innocent code`);
+}
+/* 11) DESIGN TOKENS (UI1b): the interface's colours, type sizes and weights, line heights, spacing, radii, shadows and layers live in
+   tokens.css (custom properties on :root). style.css carries no such literal (only var(--…), 0, auto, inherit…); every var(--name) used
+   in style.css, index.html and src/ is defined in tokens.css or is a RUNTIME variable set by JS (RUNTIME_VARS, with the reason); a JS
+   inline style writes no colour or px spacing literal. CONTROL: a colour literal and an undefined token must both be caught. */
+const RUNTIME_VARS={ '--role':'the role colour of a button / track chip, set by ui.js from config.INSTR_COL (the canvas palette)' };
+function tokenCheck(css, tok, others){
+  const bad=[], strip=t=>t.replace(/\/\*[\s\S]*?\*\//g,m=>m.replace(/[^\n]/g,' '));
+  const defs=new Set([...strip(tok).matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1])), c=strip(css);
+  const PROP=/(?<![\w-])(color|background(?:-color)?|border(?:-[a-z]+)*|outline(?:-color)?|fill|stroke|font-size|font-weight|line-height|padding(?:-[a-z]+)?|margin(?:-[a-z]+)?|gap|row-gap|column-gap|border-radius|box-shadow|text-shadow|z-index|accent-color|caret-color|text-decoration-color)\s*:\s*([^;{}]+?)\s*(?=[;}])/g;
+  for(const m of c.matchAll(PROP)){ const [_,p,v]=m, line=lineAt(c,m.index);
+    if(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/.test(v)) bad.push(`style.css:${line}: ${p} has a colour literal «${v}» — use a token from tokens.css`);
+    else if(/^(font-size|padding|margin|gap|row-gap|column-gap|border-radius)/.test(p) && /(?<![\w-])\d*\.?\d+px\b/.test(v)) bad.push(`style.css:${line}: ${p} has a px literal «${v}» — use a token`);
+    else if(/^(box-shadow|text-shadow)$/.test(p) && !/^(none|var\(--[\w-]+\))$/.test(v)) bad.push(`style.css:${line}: ${p} «${v}» — shadows are tokens`);
+    else if(/^(z-index|font-weight|line-height)$/.test(p) && /^\d/.test(v)) bad.push(`style.css:${line}: ${p} «${v}» — use a token`); }
+  for(const [f,t] of Object.entries({ 'style.css':c, 'tokens.css':strip(tok), ...others })) for(const m of t.matchAll(/var\(\s*(--[\w-]+)/g))
+    if(!defs.has(m[1]) && !RUNTIME_VARS[m[1]]) bad.push(`${f}:${lineAt(t,m.index)}: var(${m[1]}) is not defined in tokens.css — a silent fallback`);
+  return bad;
+}
+{ const css=readFileSync(join(ROOT,'style.css'),'utf8'), tok=existsSync(join(ROOT,'tokens.css')) ? readFileSync(join(ROOT,'tokens.css'),'utf8') : '';
+  if(!tok) fails.push('tokens.css is missing (UI1b design tokens)');
+  const others={ 'index.html':readFileSync(join(ROOT,'index.html'),'utf8') }; for(const f of files) others['src/'+f]=mods[f].bare.length ? mods[f].code : '';
+  fails.push(...tokenCheck(css, tok, others));
+  for(const f of files){ const b=mods[f].code;   // JS inline styles: no colour / px spacing literal
+    for(const m of b.matchAll(/\.style\.(color|background\w*|borderColor|padding\w*|margin\w*|gap|fontSize|borderRadius|boxShadow|zIndex)\s*=\s*(['"`])([^'"`]*)\2/g))
+      if(/#[0-9a-fA-F]{3,8}\b|rgba?\(|\d+px/.test(m[3])) fails.push(`${f}:${lineAt(b,m.index)}: .style.${m[1]} = '${m[3]}' — a design literal in JS; use var(--token)`); }
+  const ctl=tokenCheck(css+'\n.probeCtl{color:#fff; padding:var(--sp-unknown);}', tok, {});
+  if(!(ctl.some(x=>/colour literal «#fff»/.test(x)) && ctl.some(x=>/--sp-unknown/.test(x)))) fails.push('design-token CONTROL: a colour literal / an undefined token was not caught — the check cannot fail'); }
+// сведения: неиспользуемые экспорты и импорты. «...x» (spread / rest) counts as a use of x (DAY run, item 0).
+const usesName=(t,l)=>new RegExp('(?<![\\w$])(?<!(?<!\\.\\.)\\.)'+l.replace(/\$/g,'\\$')+'(?![\\w$])').test(t);
+{ /* CONTROL: a name used only after a spread is used; a name used only as a property is not */
+  if(!usesName('f(...noTie)','noTie') || usesName('o.noTie','noTie') || !usesName('[...a, ...b]','b')) fails.push('spread-use CONTROL: «...x» not counted as a use, or «o.x» counted — the unused-import note is wrong'); }
 for(const f of files){ const m=mods[f];
   const imported=files.some(g=>mods[g].imports.some(im=>target(g,im.spec)===f));
   if(imported && !wholeNS.has(f)){ const un=[...m.exports].filter(nm=>!used[f].has(nm)); if(un.length) infos.push(`${f}: exported but not imported anywhere — ${un.join(', ')}`); }
   let rest=m.bare; for(const im of m.imports) if(im.at!=null) rest=rest.slice(0,im.at)+' '.repeat(im.len)+rest.slice(im.at+im.len);
-  const unusedImp=[]; for(const im of m.imports) for(const l of (im.locals||[])) if(!new RegExp('(?<![\\w$.])'+l.replace(/\$/g,'\\$')+'(?![\\w$])').test(rest)) unusedImp.push(l);
+  const unusedImp=[]; for(const im of m.imports) for(const l of (im.locals||[])) if(!usesName(rest,l)) unusedImp.push(l);
   if(unusedImp.length) infos.push(`${f}: imported but never used — ${unusedImp.join(', ')}`);
 }
 
@@ -326,4 +398,4 @@ console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})
 for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(18)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }
-console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations), undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals), the network guard (${NET.total} call sites, all listed with a reason; control caught) and the folder rule with import cycles (${LAY.groups.length} import cycle(s), none through a REC folder; control caught) are consistent.`);
+console.log(`\nPASSED: syntax, static imports, export lists, dynamic import targets, argument counts (${nCalls} calls of declared functions), shadowed imports (${nShadow} local declarations), undeclared names (none outside the module, its imports and ${GLOBALS.size} known globals), the network guard (${NET.total} call sites, all listed with a reason; control caught) and the folder rule with import cycles (${LAY.groups.length} import cycle(s), none through a REC folder; control caught) and writes to imported bindings (none; control caught) are consistent.`);

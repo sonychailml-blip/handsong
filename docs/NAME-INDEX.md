@@ -417,3 +417,22 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - `src/gestures/fxhand.js` — fxParamsOf, captureFx.
 - `src/gestures/looper.js` — looperWire, doLooper, fireLooperCmd.
 - `tools/probe-data.mjs` — `gesCore` (row «GES1 gesture features (core)»).
+
+## Added at the DAY run (2026-10-16)
+- GES1 rest: `src/gestures/roles.js` — `depthOf`, `depthN`, `melodicZone`, `polyZone`, `leadZone`, `liveKey`, `monoKey`, `wOn`, `wOff`,
+  `ACTIONS`, `paletteFinger`, `handHalfRole`, `noteHandRole`, `noteVolOf`; `src/gestures/hands.js` — `HANDS`, `processHands`,
+  `voiceModeReset`, `handsProbe`, `processHandsProbe` (+ internal `endPinch`, `otherPinched`, `monoOwner`, `chOwner`, `latchLen`).
+  `gestures.js` = facade.
+- UI1b: `tokens.css` (custom properties `--c-*`, `--fs-*`, `--fw-*`, `--lh-*`, `--sp-*`, `--r-*`, `--sh-*`, `--z-*` + the older semantic
+  ones); `src/icons.js` — `ICONS`, `icon`, `iconText`, `applyIcons`; markup attribute `data-icon`; dictionary token `{i:name}`;
+  `tools/ui-snap.mjs` (`--save`, `--compare`, `--only`); check-static `RUNTIME_VARS`, `tokenCheck`, `importWrites`; check-licences
+  `ICON_EXEMPT`.
+- TIM2: `audio.timbreKey`, `audio.timbreIdx`, `audio.timbreSnapshot`; `live/record.storeTim`, `noteSource` (exported for the probe);
+  ENV `live().leadTim/chTim/bassTim/kitTim`; probe row «TIM2 events carry timbre ids» (`checkTimbreIds`).
+- SAVE1: `core/songfile.js` — `SONG_FORMAT`, `SONG_VERSION` (2), `SONG_MAX_BYTES`, `SONG_MIGRATIONS`, `TIM1_POSITIONS`, `songParse`,
+  `songUpgrade`, `songCheck`; `song/file.js` — `songData`, `songPlan`, `fileDbg`; `song/capture.takeSeqFloor`; `live/capture.capRecordNow`;
+  ENV `songEnv`, `soloSnap`, `capNow`, `timSnap`, `timKnown`, `timByDef`, `timKey`; `recorder.songSaveRec`, `songOpenApply`, `songMark`,
+  `songDirty`; `ui.songSaveText`, `songOpenText` (+ `songDownload`, `songLiveApply`, `syncLoopPanel`, `songOpenSay`); `render.seedOfLane`
+  (exported); DOM `#songName`, `#songSave`, `#songOpen`, `#songFile`; keys `song.*`; probe rows «SAVE1 song file (core)» (node),
+  «SAVE1 song file save → open» (`checkSongFile`); runner UI check `uiSongFile`.
+- DRAW1: `src/views/common.js`, `camera.js`, `strip.js` (+ `loopViewClear`), `roll.js`, `play.js`; `draw.js` = facade.

@@ -74,6 +74,7 @@ import './probes/data.js';   // registers the data rows (T0, T1, T2, T6b, stacke
 export { material, all, quick, orderCheck } from './probes/run.js';
 export { checkSound, checkRows, checkRowFix, checkHl, tracks, checkRules, checkScroll, checkLabels, checkSong, checkTypes, checkModes, checkPure, checkOut } from './probes/tuning.js';
 export { checkWrite, checkSeed, checkFrozen, seed, song } from './probes/seed.js';
+export { checkSongFile } from './probes/songfile.js';   // SAVE1: Save → Open round trip, old / newer / damaged files
 export { checkSoloEdit, checkSelect, checkPaste, checkQuant, checkDegrees, checkBend, checkBendCurve, checkTrackMode, checkVolBars } from './probes/edit.js';
 export { checkUndoClear, checkHistory, checkSections } from './probes/history.js';
 export { checkMixer, checkPan, checkArrange, checkTrackLook, checkTracks } from './probes/window.js';

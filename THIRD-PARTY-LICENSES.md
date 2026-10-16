@@ -65,67 +65,67 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 
 | Glyph | Code point | Meaning | Kind | Used in |
 |---|---|---|---|---|
-| ↶ | U+21B6 | undo (history) | icon | index.html, src/i18n.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
-| ↷ | U+21B7 | redo (history) | icon | index.html, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
-| ⤺ | U+293A | undo the last take | icon | index.html, src/i18n.js, src/probes/history.js, src/probes/window.js |
-| ⇄ | U+21C4 | swap hands (help text) | icon | index.html |
-| ⊘ | U+2298 | remove effect from a track | icon | index.html |
-| ⌐ | U+2310 | step shape (automation / bend) | icon | src/i18n.js, src/ui.js |
-| ╱ | U+2571 | glide shape (automation / bend) | icon | index.html, src/i18n.js, src/ui.js |
-| ⌒ | U+2312 | curvature value tag | icon | src/draw.js |
-| ⌗ | U+2317 | quantise | icon | index.html, src/ui.js |
-| ⏮ | U+23EE | to the start | icon | index.html |
-| ⏸ | U+23F8 | pause (message) | icon | src/i18n.js, src/songs.js |
-| ❚ | U+275A | pause bars | icon | src/i18n.js |
-| ▶ | U+25B6 | play / start | icon | index.html, src/i18n.js, src/probes/freeze.js, src/probes/seed.js, src/probes/window.js, src/recorder.js, src/render.js, src/songs.js |
-| ■ | U+25A0 | stop (panic) | icon | index.html, src/songs.js |
-| ⟳ | U+27F3 | repeat the brace | icon | index.html, src/songs.js |
-| ● | U+25CF | record / lesson step done | icon | index.html, src/i18n.js, src/tutor.js |
-| ○ | U+25CB | lesson step to come | icon | src/tutor.js |
-| ✕ | U+2715 | close / delete / clear | icon | index.html, src/i18n.js, src/probes/history.js, src/ui.js |
-| ✎ | U+270E | edit / rename / arrangement window | icon | index.html, src/probes/window.js, src/songs.js |
-| ✂ | U+2702 | cut bars | icon | index.html |
-| ⧉ | U+29C9 | copy / duplicate | icon | index.html, src/i18n.js |
-| 📋 | U+1F4CB | paste | icon | index.html |
-| 🗑 | U+1F5D1 | delete | icon | index.html, src/i18n.js |
-| ✚ | U+271A | add a point | icon | index.html |
-| ＋ | U+FF0B | insert (empty bars) | icon | index.html, src/i18n.js, src/ui.js |
-| ▯ | U+25AF | empty bar | icon | index.html |
-| ▮ | U+25AE | volume bars face | icon | index.html, src/ui.js |
-| ▤ | U+25A4 | arrangement face | icon | src/ui.js |
-| ⬚ | U+2B1A | pick several notes | icon | index.html |
-| ⤢ | U+2922 | fit the whole song | icon | index.html |
-| ▲ | U+25B2 | move up | icon | index.html, src/ui.js |
-| ▼ | U+25BC | move down | icon | index.html, src/ui.js |
-| ▸ | U+25B8 | accordion closed | icon | src/ui.js |
-| ▾ | U+25BE | accordion open | icon | src/ui.js |
-| ↕ | U+2195 | vertical hand axis | icon | src/ui.js |
-| ↔ | U+2194 | horizontal hand axis | icon | src/ui.js |
-| ◆ | U+25C6 | depth hand axis | icon | src/ui.js |
-| ◧ | U+25E7 | left half (split) | icon | index.html, src/ui.js |
-| ◨ | U+25E8 | right half / split | icon | index.html, src/i18n.js, src/ui.js |
-| ✓ | U+2713 | done / chosen | icon | src/i18n.js, src/probes/window.js, src/tutor.js |
-| ⚙ | U+2699 | settings | icon | index.html, src/i18n.js |
-| ⛶ | U+26F6 | full screen | icon | index.html, src/i18n.js |
-| ⬇ | U+2B07 | install | icon | index.html, src/i18n.js |
-| 🌐 | U+1F310 | language | icon | index.html |
-| 🎥 | U+1F3A5 | video clip | icon | index.html |
-| 🎙 | U+1F399 | audio clip | icon | index.html |
-| 🎚 | U+1F39A | mixer | icon | index.html, src/i18n.js, src/ui.js |
-| 🎛 | U+1F39B | sound panel | icon | index.html, src/i18n.js |
-| 🎵 | U+1F3B5 | backing | icon | index.html, src/i18n.js, src/ui.js |
-| 🎹 | U+1F3B9 | chords role | icon | index.html, src/i18n.js |
-| 🎸 | U+1F3B8 | bass role | icon | index.html, src/i18n.js |
-| 🥁 | U+1F941 | drums role / drum backing | icon | index.html, src/i18n.js, src/ui.js |
-| 🔄 | U+1F504 | switch camera | icon | index.html |
+| ↶ | U+21B6 | undo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
+| ↷ | U+21B7 | redo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/key.js |
+| ⤺ | U+293A | undo the last take | icon | src/icons.js, src/probes/history.js, src/probes/window.js |
+| ⇄ | U+21C4 | swap hands (help text) | icon | src/icons.js |
+| ⊘ | U+2298 | remove effect from a track | icon | src/icons.js |
+| ⌐ | U+2310 | step shape (automation / bend) | icon | src/icons.js |
+| ╱ | U+2571 | glide shape (automation / bend) | icon | src/icons.js |
+| ⌒ | U+2312 | curvature value tag | icon | src/icons.js |
+| ⌗ | U+2317 | quantise | icon | src/icons.js |
+| ⏮ | U+23EE | to the start | icon | src/icons.js |
+| ⏸ | U+23F8 | pause (message) | icon | src/icons.js, src/songs.js |
+| ❚ | U+275A | pause bars | icon | src/icons.js |
+| ▶ | U+25B6 | play / start | icon | src/icons.js, src/probes/freeze.js, src/probes/seed.js, src/probes/window.js, src/recorder.js, src/render.js, src/songs.js |
+| ■ | U+25A0 | stop (panic) | icon | src/icons.js, src/songs.js |
+| ⟳ | U+27F3 | repeat the brace | icon | src/icons.js, src/songs.js |
+| ● | U+25CF | record / lesson step done | icon | src/icons.js |
+| ○ | U+25CB | lesson step to come | icon | src/icons.js |
+| ✕ | U+2715 | close / delete / clear | icon | src/icons.js, src/probes/history.js |
+| ✎ | U+270E | edit / rename / arrangement window | icon | src/icons.js, src/probes/window.js, src/songs.js |
+| ✂ | U+2702 | cut bars | icon | src/icons.js |
+| ⧉ | U+29C9 | copy / duplicate | icon | src/icons.js |
+| 📋 | U+1F4CB | paste | icon | src/icons.js |
+| 🗑 | U+1F5D1 | delete | icon | src/icons.js |
+| ✚ | U+271A | add a point | icon | src/icons.js |
+| ＋ | U+FF0B | insert (empty bars) | icon | src/icons.js |
+| ▯ | U+25AF | empty bar | icon | src/icons.js |
+| ▮ | U+25AE | volume bars face | icon | src/icons.js |
+| ▤ | U+25A4 | arrangement face | icon | src/icons.js |
+| ⬚ | U+2B1A | pick several notes | icon | src/icons.js |
+| ⤢ | U+2922 | fit the whole song | icon | src/icons.js |
+| ▲ | U+25B2 | move up | icon | src/icons.js |
+| ▼ | U+25BC | move down | icon | src/icons.js |
+| ▸ | U+25B8 | accordion closed | icon | src/icons.js |
+| ▾ | U+25BE | accordion open | icon | src/icons.js |
+| ↕ | U+2195 | vertical hand axis | icon | src/icons.js |
+| ↔ | U+2194 | horizontal hand axis | icon | src/icons.js, src/probes/seed.js |
+| ◆ | U+25C6 | depth hand axis | icon | src/icons.js |
+| ◧ | U+25E7 | left half (split) | icon | src/icons.js |
+| ◨ | U+25E8 | right half / split | icon | src/icons.js |
+| ✓ | U+2713 | done / chosen | icon | src/icons.js, src/probes/window.js |
+| ⚙ | U+2699 | settings | icon | src/icons.js |
+| ⛶ | U+26F6 | full screen | icon | src/icons.js |
+| ⬇ | U+2B07 | install | icon | src/icons.js |
+| 🌐 | U+1F310 | language | icon | src/icons.js |
+| 🎥 | U+1F3A5 | video clip | icon | src/icons.js |
+| 🎙 | U+1F399 | audio clip | icon | src/icons.js |
+| 🎚 | U+1F39A | mixer | icon | src/icons.js |
+| 🎛 | U+1F39B | sound panel | icon | src/icons.js |
+| 🎵 | U+1F3B5 | backing | icon | src/icons.js |
+| 🎹 | U+1F3B9 | chords role | icon | src/icons.js |
+| 🎸 | U+1F3B8 | bass role | icon | src/icons.js |
+| 🥁 | U+1F941 | drums role / drum backing | icon | src/icons.js |
+| 🔄 | U+1F504 | switch camera | icon | src/icons.js |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/detect.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
-| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/draw.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js |
-| ≈ | U+2248 | approximately | typography | src/draw.js, src/i18n.js, src/probes/lat.js, src/render.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/detect.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
+| ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/lat.js, src/render.js, src/views/play.js |
 | ≤ | U+2264 | less or equal | typography | src/probes/window.js |
 | ≥ | U+2265 | greater or equal | typography | src/core/format.js |
-| ∞ | U+221E | infinity (−∞ dB) | typography | src/draw.js, src/render.js |
+| ∞ | U+221E | infinity (−∞ dB) | typography | src/render.js, src/views/strip.js |
 | √ | U+221A | square root (console text) | typography | src/render.js |
 | ♭ | U+266D | flat (note names) | notation | data/modes/blues.json, data/tunings/shruti22.json, index.html, src/probedata.js, src/scales.js, src/songs.js |
 | ♯ | U+266F | sharp (note names) | notation | data/tunings/shruti22.json, src/probedata.js |

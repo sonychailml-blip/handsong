@@ -400,6 +400,17 @@ Auto-freeze never pins the live chain by itself (such a track would be skipped).
 
 ---
 
+## SONG FILE — Save / Open (SAVE1, DAY run 2026-10-16; checked against `index.html`, `ui.js`, `style.css`)
+- **Where:** the Looper panel («⚙ Loop» in the top bar), its FIRST section «Song file»: a **Name** field, two buttons **Save** and
+  **Open…**, one hint line («… Nothing is uploaded.»). Reached by: ▶ Play → tap the bar → ⚙ Loop. Two taps from the play screen.
+- **Save:** the browser downloads `«name».handsong` (or «Handsong song YYYY-MM-DD.handsong»); a toast «Saved: …». Refused with a toast
+  while recording or with an empty song.
+- **Open…:** the system file picker (`.handsong`); if the current song has unsaved changes, the browser asks «Replace the current
+  song?»; then the song replaces the current one with its tempo, metre, A4, brace, master and the scale/key it was saved with; a toast
+  says how many tracks, whether the file was upgraded from an older version, and which timbres this app lacks. Damaged, too large,
+  newer-version or foreign files are refused with one line each; the current song is never touched by a refused file.
+- Not on the canvas, not in the arrangement window or the editor (the editor hides the top bar). The redesign may move it (UX inventory).
+
 ## START CARD — WHEN THE CAMERA FAILS (0b, added 2026-10-15; checked against `index.html`, `main.js`)
 - A failed start keeps the card usable: the message line says why — busy / not responding («Close Zoom and other apps…»), no camera found
   («…switched on (Fn+F10)… connected»), access blocked («…allow the camera…»), else the generic «Couldn't start: …» — and a «Try again»

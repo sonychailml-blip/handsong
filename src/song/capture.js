@@ -11,6 +11,7 @@ const fxPerm=(...a)=>ENV.fxPerm(...a), chainKeyOf=(...a)=>ENV.chainKeyOf(...a); 
 /* REC3: the take number — monotonic for the session (see the recorder's comment at curTake); takeNext() hands out the next one */
 let takeSeq=0;
 const takeNext=()=>++takeSeq;
+const takeSeqFloor=n=>{ if(n>takeSeq) takeSeq=n; };   // SAVE1: an opened song's take numbers are taken
 /* ═══ ЗАХВАТ СЫГРАННОГО: СНИМОК ЦЕПЕЙ + ДОРОЖКА АВТОМАТИЗАЦИИ (слайс O-2) ═══
    ⛳ ЗАЧЕМ ЭТО ВООБЩЕ ЕСТЬ. ЗАМОРОЗКА — это РЕЖИМ ВОСПРОИЗВЕДЕНИЯ, а не преобразование: дорожку можно
    разморозить, поправить и заморозить снова, сколько угодно раз. Это работает только если ПОВТОРНЫЙ
@@ -131,4 +132,4 @@ function captureInfoOf(layer){
   return { takes:tks.size, role, fx:[...ids], pts };
 }
 
-export { takeNext, takeFx, takeFxVer, takeFxTouch, FX_CHAIN, setAutRecSmooth, autSmoothOf, fxLaneSmooth, fxLaneAt, fxLaneExpand, laneRoleOf, laneChainKey, captureInfoOf };
+export { takeNext, takeSeqFloor, takeFx, takeFxVer, takeFxTouch, FX_CHAIN, setAutRecSmooth, autSmoothOf, fxLaneSmooth, fxLaneAt, fxLaneExpand, laneRoleOf, laneChainKey, captureInfoOf };

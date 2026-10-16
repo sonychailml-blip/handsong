@@ -14,6 +14,7 @@
    ⚠️ Уроки учат ТЕКУЩЕЙ жест-модели. Зацепки в gestures.js помечены «ЗАЦЕПКА ОБУЧЕНИЯ» и правятся
    вместе с жестами. draw.js НЕ трогаем: подсказка — DOM-полоса (кнопки должны тапаться), сетка видна. */
 import { hooks } from './hooks.js';
+import { icon } from './icons.js';   // UI1b: lesson glyphs through the icon component
 import { t, onLangChange, store, DICTS } from './i18n.js';   // DICTS — базовый en-словарь: по нему проверяем, ЕСТЬ ли у шага деталь (иначе t() вернул бы сам ключ)
 import { SCALES, scaleById, supportsChords, typedChords } from './scales.js';
 import { $, revealBar, tutorReset, tutorSetScale, tutorResetHandFn, tutorClearLoop, canSplit, tutorSplitInit, tutorSyncBar } from './ui.js';
@@ -190,7 +191,7 @@ function renderLessons(){
     const top=document.createElement('div'); top.className='lr-top';
     const ti=document.createElement('span'); ti.className='lr-title'; ti.textContent=t(L.titleKey);
     const bg=document.createElement('span'); bg.className='lr-badge';
-    bg.textContent = soon ? t('lessons.soon') : (done ? '✓' : '');
+    bg.textContent = soon ? t('lessons.soon') : (done ? icon('done') : '');
     top.appendChild(ti); top.appendChild(bg);
     const de=document.createElement('div'); de.className='lr-desc'; de.textContent=t(L.descKey);
     row.appendChild(top); row.appendChild(de);
@@ -284,7 +285,7 @@ function paint(){
     detailEl.style.display = detailEl.textContent ? '' : 'none';   // нет детали (инфо-шаг/финал) → пустой строки не рисуем
     asideEl.textContent=asideText();
     asideEl.style.display = asideEl.textContent ? '' : 'none';
-    dotsEl.textContent=steps.map((_,i)=>i<=idx?'●':'○').join(' ');
+    dotsEl.textContent=steps.map((_,i)=>icon(i<=idx?'step-done':'step-todo')).join(' ');
     /* Финал — карточка ВЫБОРА (не автопрыжок): главная кнопка «Дальше: <урок>» (если в цепочке есть
        следующий запускаемый урок), иначе «Готово — играть»; тихая — «Готово — играть» (скрыта, когда
        следующего нет — тогда «Готово — играть» и есть главная). Обычный шаг — «Дальше →» / «Пропустить». */
@@ -295,7 +296,7 @@ function paint(){
     /* Шаг выполнен → подсветить Next (класс .ready — свечение) + показать тик ✓; НЕ финал. Авто-перехода нет. */
     const show = stepDone && !fin;
     nextBtn.classList.toggle('ready', show);
-    doneEl.textContent = show ? '✓' : '';
+    doneEl.textContent = show ? icon('done') : '';
     doneEl.style.display = show ? '' : 'none';
   }
   if(lessonOv.classList.contains('on')) renderLessons();   // список открыт (напр. смена языка) — перерисовать

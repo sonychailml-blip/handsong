@@ -1,4 +1,6 @@
 /* PROBE1: The test song (P.seed), the demo song (P.song), and the rows that check what they wrote (write path, seed notes, frozen seed bass). Moved from scaleprobe.js verbatim; rows register themselves (probes/rows.js). */
+import { timbreById, timbreKey, timbreIdx, timbresOf, timbreSnapshot } from '../audio.js';   // TIM2: events carry timbre ids
+import { storeTim, noteSource } from '../live/record.js';   // TIM2: the birth conversion and the track source
 import { t, L } from '../i18n.js';
 import { legacyChordNotesRef, legacyLeadFreq, legacyBassFreq, SCALES, KEEP_MAX, PRINT_MAX } from '../probedata.js';
 import { evHz, probeTake, backingEvent, events, editIsOpen, clearRec, setLoopMetre, seedTake, songSegs, editOpen, editDeleteChordNote, editSetLayer, editMoveChordNote, editMoveSeg, editInsertBass, segChordNotes, editInsertChord, editClose, loadJam, songBeats, loop, braceTap, setRegionOn, onLoop, editInsertLead, songPinChains, histReset } from '../recorder.js';
@@ -51,10 +53,11 @@ const sameVal=(x,y)=> x===y || (x&&y&&typeof x==='object'&&typeof y==='object' ?
 function writeDiff(at, ev, g, ign){
   const out=[], a=ev.a||{}, role=ROLE_OF[ev.fn[0]], pitched= role && /On$|Set$/.test(ev.fn) && typeof g.deg==='number';
   const skip=k=> !!ign && ign.has(k);
+  const tw=k=> k==='inst' && role ? timbreKey(role,g[k]) : k==='kit' && ev.fn==='drum' ? timbreKey('dr',g[k]) : g[k];   // TIM2: a gesture's timbre position is stored as its permanent id
   if('deg' in a) out.push(`${at}: the stored event carries a degree`);
   for(const k of Object.keys(g)){ if(k==='deg'||skip(k)) continue;
     if(!(k in a)) out.push(`${at}: field ${k} lost (gesture ${JSON.stringify(g[k])})`);
-    else if(!sameVal(a[k],g[k])) out.push(`${at}: field ${k} stored ${JSON.stringify(a[k])}, gesture ${JSON.stringify(g[k])}`); }
+    else if(!sameVal(a[k],tw(k))) out.push(`${at}: field ${k} stored ${JSON.stringify(a[k])}, gesture ${JSON.stringify(g[k])}${tw(k)!==g[k]?' (id '+tw(k)+')':''}`); }
   for(const k of Object.keys(a)) if(!(k in g) && k!=='ti' && k!=='k' && !skip(k) && !(k==='fx' && /^lead(On|Set)$/.test(ev.fn) && SEED_REC && SEED_REC.soloSnap && sameVal(a.fx, SEED_REC.soloSnap))) out.push(`${at}: unexpected field ${k} = ${JSON.stringify(a[k])}`);
   if(g.fx && a.fx===g.fx) out.push(`${at}: the effect map is the gesture's own object, not a copy`);
   if(pitched){
@@ -155,8 +158,9 @@ export function checkSeed(){
     if(a.ti!==I.ti||a.oct!==I.oct) miss(`${at}: stored ti/reg ${a.ti}/${a.oct}, intended ${I.ti}/${I.oct}`);
     if('deg' in a) miss(`${at}: carries a degree`);
     if(!(typeof a.vol==='number' && a.vol>=0 && a.vol<=1)) miss(`${at}: volume ${a.vol} (rule #30)`);
-    if(typeof a.inst!=='number') miss(`${at}: timbre ${a.inst}`);
-    if('inst' in I && a.inst!==I.inst) miss(`${at}: timbre ${a.inst}, intended ${I.inst}`);   // S4: тембр — ближайшей ноты
+    const tr=I.fn==='bassOn'?'bs':I.fn==='chOn'?'ch':'ld';   // TIM2: an inserted note carries the permanent timbre id of its role
+    if(typeof a.inst!=='string' || (timbreById(a.inst)||{}).role!==tr) miss(`${at}: timbre ${a.inst} is not a ${tr} timbre id`);
+    if('inst' in I && a.inst!==timbreKey(tr,I.inst)) miss(`${at}: timbre ${a.inst}, intended ${timbreKey(tr,I.inst)}`);   // S4: тембр — ближайшей ноты
     if('vol' in I && a.vol!==I.vol) miss(`${at}: volume ${a.vol}, intended ${I.vol}`);       // S4: громкость — ближайшего события с громкостью
     const wantFx= I.fx==null && SEED_REC && SEED_REC.soloSnap ? SEED_REC.soloSnap : I.fx;   // AF5: a copied absence is filled at song load with exactly the load snapshot
     if('fx' in I && JSON.stringify(a.fx??null)!==JSON.stringify(wantFx??null)) miss(`${at}: effect map ${JSON.stringify(a.fx??null)}, intended ${JSON.stringify(wantFx??null)} (a copy of the neighbour's, absence included — absence filled at song load, AF5)`);   // S4: решение пользователя 1
@@ -375,7 +379,35 @@ export async function song(name='triphop', opt={}){
   return { name:r.name, events:events.length, material:M };
 }
 
+
+/* ⛳ TIM2: EVENTS CARRY THE PERMANENT TIMBRE ID (a.inst / a.kit); the engine plays by list position — one door each way (audio.timbreKey /
+   timbreIdx). (1) every note start and hit of the song (seed, backing, editor inserts) stores a known id of its own role; (2) the doors
+   round-trip every timbre of every role, an unknown id resolves to nothing; (3) the birth conversion turns a position into the id and
+   leaves an id payload untouched; (4) a live payload (position) and its stored event (id) name the same track source; (5) a song's
+   timbre copy (snapshot) equals the entry by value and is not the entry itself. CONTROL: the freeze signature's old numeric mix gives
+   two different ids the same value (why it was rewritten). */
+function checkTimbreIds(){
+  const d=[]; let n=0; const miss=s=>d.push(s), RF={ leadOn:'ld', leadSet:'ld', chOn:'ch', bassOn:'bs', drum:'dr' }, used=new Set();
+  for(const e of events){ const r=RF[e.fn]; if(!r||!e.a) continue; const x= r==='dr' ? e.a.kit : e.a.inst; if(x==null) continue; n++;
+    if(typeof x!=='string'){ miss(`L${e.layer+1} ${e.fn} at ${e.t}: the timbre is stored as a ${typeof x} (${x}), not an id`); continue; }
+    const T=timbreById(x); if(!T||T.role!==r) miss(`L${e.layer+1} ${e.fn} at ${e.t}: «${x}» is not a timbre of role ${r}`); else used.add(x); }
+  if(!used.size) miss('the song has no timbre id at all — nothing was checked');
+  for(const r of ['ld','ch','bs','dr']) for(const x of timbresOf(r)){ n++;
+    if(timbreKey(r,x.idx)!==x.id || timbreIdx(r,x.id)!==x.idx) miss(`${r} ${x.id}: position ${x.idx} ↔ id does not round-trip`); }
+  n++; if(timbreIdx('ld','solo.no-such-timbre')!==undefined) miss('an unknown id resolved to a position');
+  { n+=3; const s=storeTim('chOn',{ inst:1, vol:0.5 }), k=storeTim('drum',{ kit:2, row:1 }), keep={ inst:timbreKey('ch',1) };
+    if(s.inst!==timbreKey('ch',1) || s.vol!==0.5) miss(`birth: chOn position 1 → ${JSON.stringify(s)}`);
+    if(k.kit!==timbreKey('dr',2) || k.row!==1) miss(`birth: drum kit 2 → ${JSON.stringify(k)}`);
+    if(storeTim('chOn',keep)!==keep) miss('birth: an id payload was copied or changed'); }
+  { n++; const v=CUR(); if(noteSource('bassOn',{ inst:2 },v)!==noteSource('bassOn',{ inst:timbreKey('bs',2) },v)) miss('a live payload (position) and its stored event (id) name different track sources'); }
+  for(const id of used){ n++; const S=timbreSnapshot(id), T=timbreById(id);
+    if(!S || S.role!==T.role || S.def===T.entry || JSON.stringify(S.def)!==JSON.stringify(T.entry)) miss(`snapshot of ${id}: not an equal, separate copy`); }
+  { n++; const old=(h,tag,x)=>(Math.imul(h,31)+tag*64+((x==null?-1:x)|0)+1)|0, ids=timbresOf('ch').map(x=>x.id);
+    if(old(0,2,ids[0])!==old(0,2,ids[1])) miss('CONTROL: the old numeric signature mix told two ids apart — the control cannot fail'); }
+  return { cases:n, total:d.length, differences:d };
+}
 /* rows of this area — the registry (probes/rows.js) orders them by «at» */
 row({ at:170, name:'seed notes as intended', run:()=>checkSeed(), read:r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences }), song:true });
 row({ at:180, name:'frozen seed bass level', run:()=>checkFrozen(), read:r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences }), song:true });
 row({ at:460, name:'write path (funnels)', run:()=>checkWrite(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+row({ at:185, name:'TIM2 events carry timbre ids', run:()=>checkTimbreIds(), read:r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences }), song:true });

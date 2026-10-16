@@ -19,7 +19,7 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
   polyrhythm ⬜ · 3.25 tunings still wanted (Turkish maqams etc.) ⬜ · 3.25b world catalogue of tunings (added 2026-10-15) ⬜ · 3.26 fixed tuning: tonic = KEY 🔵 (tails listed) · 3.27 language button
   ✅ · 3.28 per-group mode help "?" ⬜ · 3.29 gesture builder ⬜ (+ the user's «expression hand»: hand map, expression lab — added 2026-10-15) · 3.30 swing as a RATIO ⬜ · 3.31 promo video ⬜ · 3.32 measure hand→sound
   latency as a NUMBER 🟡 (LAT1 meter 2026-10-14; desktop numbers in, LAT2 built on them 2026-10-15; phone pending; + dual-GPU laptops and a medium-exposure experiment, added 2026-10-15) · 3.33 drum rhythms as backing — content and CULTURAL fit ⬜ (item 1 is a defect) · 3.34 user tuning builder ⬜ ·
-  3.35 saving the song (loop) ⬜ · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
+  3.35 saving the song (loop) 🟡 (files: SAVE1 done; autosave proposed) · 3.36 playing together (direction) ⬜ · 3.37 three small visible things ⬜ · 3.38 four-note rectangles for
   ordinary tunings ✅ · 3.39 EFFECTS builder 🔵 · 3.40 paste transposed into the track's key ⬜ (later) · 3.41 hand prediction
   (latency) ⬜ (idea, a later slice).
 - **4. Bugs** — mostly ✅/ℹ️ history; open: hand identification `key+=i` ⬜; captured expression-hand channels not replayed ⬜ (debt).
@@ -1585,6 +1585,9 @@ picture too dark to find hands in dim light; light on the hands stays the real r
 потом UI. Хорошо ложится к §1 (localStorage настроек) и к §3.28 (справка по ладу — своему строю тоже
 нужно описание). С §3.15 (свой строй на роль) не конфликтует и его не требует.
 
+### 🟡 3.35 — DAY run 2026-10-16 (English): SAVE1 built Save / Open of a song as a FILE (`.handsong`, FMT1 version 2, timbre ids + copies,
+frozen audio not stored; ⚙ Loop → «Song file»). Not built: autosave to the device (proposal in WORK-LOG, question for the user: on by
+default or a switch), a song library screen, versions, copies of the person's own tunings/modes inside the song (SONG1).
 ### ⬜ 3.35. Сохранение петли — записанное не должно умирать вместе со вкладкой (future, не начато)
 
 > ⛳ **РЕШЕНИЕ ПОЛЬЗОВАТЕЛЯ О СОХРАНЕНИИ (записано при AF1, 2026-10-12; планировать вместе с ФУНДАМЕНТОМ, этап 3 — СОХРАНЕНИЕ; выше — прежний
@@ -2615,9 +2618,18 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
   Claude Code; whether anything was copied is unknown), ≈ 72 Unicode symbols and emoji drawn by each device's own fonts (they look different
   on every phone and may carry the font owner's terms in marketing images), and the system font stack. All of it is marked «to be replaced by
   the user's own authored design».
-- **Who designs:** the user, a hired illustrator, or AI-assisted then hand-refined (tool and terms recorded — hard rule #32, Q13). The user
-  still has to pick a direction from the earlier design canvas.
-- **Preparation in code (slice UI1 of stage 3):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes,
+- **Who designs — user decision (DAY run, 2026-10-16):** ALL design work — visual identity, interface, colours, fonts, icons and every design
+  system — is done by Claude Code itself as our own authored work. Fonts only under OFL or a similar allowed licence (rule #32); icons drawn
+  by us, no icon libraries. The new design comes through the user's CHOICE among proposals; until then UI1b keeps today's look.
+- **When — user decision (DAY run, 2026-10-16):** the full redesign of layout, sections and visual style comes LATER, once the missing parts
+  exist (effects constructor with its three placements, expression lab and hand map, Calm, Save/Open, MIDI in/out, audio in); the effects
+  constructor is redesigned once it is built. Inventory and principles for it: `docs/UX-INVENTORY.md`.
+- **Done in code (UI1b, DAY run 2026-10-16):** `tokens.css` holds every colour, type size / weight / line height, spacing, radius, shadow and
+  z-index of the DOM interface (built from today's values; style.css and JS styles use only tokens — static check 11); `src/icons.js` is
+  the ONE icon component (names by meaning; DOM `data-icon`, dictionary `{i:name}`, `icon()` in ui/draw/tutor); LIC1 fails on an interface
+  glyph outside it. Proof: tools/ui-snap.mjs — 10 screens pixel-identical. Left for DRAW1: the CANVAS palette (draw.js literals,
+  config.INSTR_COL) read from tokens.
+- **Preparation in code (slice UI1 of stage 3; UI1b done — see above):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes,
   spacing; today partly in `style.css :root`) and ONE icon component / SVG sprite replacing emoji and Unicode glyphs in the UI (DOM and
   canvas), so the authored design drops in later WITHOUT code changes. LIC1's glyph audit lists every symbol to replace.
 - **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).

@@ -31,7 +31,7 @@ globalThis.fetch=async (u,o)=>{
 
 const verbose=process.argv.includes('--verbose');
 const T00=performance.now();
-let P, loadReport, LIC, LAT, DSP, HS, CL, FMT, IDR, GF, CFG;
+let P, loadReport, LIC, LAT, DSP, HS, CL, FMT, IDR, GF, CFG, SONGF;
 /* LAT1: the latency core's arithmetic, exactly — statistics, the ring window, the hand → sound sum, the Bluetooth heuristic */
 function latCore(){
   const d=[], eq=(name,got,want)=>{ if(JSON.stringify(got)!==JSON.stringify(want)) d.push(`${name}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); };
@@ -279,6 +279,59 @@ function gesCore(){
   eq('clamps and distance', [GF.clamp01(-1), GF.clamp01(2), GF.clamp(5,0,3), GF.dist({x:0,y:0},{x:3,y:4})], [0,1,3,5]);
   return { cases:n, total:d.length, differences:d };
 }
+/* UI1b: the icon component — every «{i:name}» token in the dictionaries and every data-icon of the markup names a known icon; no
+   «icon» glyph is written directly in a dictionary; t() leaves no token behind. CONTROL: an unknown name must be caught. */
+async function iconCore(){
+  const d=[]; let n=0; const IC=await import(new URL('../src/icons.js', import.meta.url).href), I18=await import(new URL('../src/i18n.js', import.meta.url).href);
+  const fs=await import('node:fs'), reg=JSON.parse(fs.readFileSync(new URL('./licences.json', import.meta.url),'utf8'));
+  const iconGlyphs=new Set(reg.glyphs.filter(g=>g.kind==='icon').map(g=>g.ch));
+  const tokErr=(where,s)=>{ for(const m of String(s).matchAll(/\{i:([\w-]+)\}/g)){ n++; if(!(m[1] in IC.ICONS)) d.push(`${where}: unknown icon «${m[1]}»`); } };
+  for(const L of I18.LANGS) for(const [k,v] of Object.entries(I18.DICTS[L])){ tokErr(`${L} ${k}`, v); n++;
+    if([...String(v)].some(c=>iconGlyphs.has(c))) d.push(`${L} ${k}: an icon glyph written directly — use {i:name}`);
+    const out=I18.withLang(L,()=>I18.t(k)); if(String(out).includes('{i:')) d.push(`${L} ${k}: t() left a token: ${out}`); }
+  for(const [name,g] of Object.entries(IC.ICONS)){ n++; if(![...g].every(c=>iconGlyphs.has(c))) d.push(`icon ${name} «${g}»: not an «icon» glyph of the register`); }
+  const html=fs.readFileSync(new URL('../index.html', import.meta.url),'utf8');
+  for(const m of html.matchAll(/data-icon="([^"]*)"/g)){ n++; const v=m[1]; if(v.includes('{i:')) tokErr('index.html data-icon', v); else if(!(v in IC.ICONS)) d.push(`index.html data-icon «${v}»: unknown icon`); }
+  { const before=d.length; tokErr('CONTROL', '{i:no-such-icon}'); if(d.length===before) d.push('CONTROL: an unknown icon name was not caught'); else d.pop(); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* SAVE1: the song file's pure core (src/core/songfile.js) — reading a text (size cap, JSON only, forbidden keys, nesting, version
+   rules), the v1 → v2 migration (timbre positions → ids; idempotent; the input untouched) and the strict check (a minimal valid record
+   passes; each damage is caught). CONTROLS: the minimal record must pass (an over-strict check cannot pass it) and each damage must fail. */
+function songCore(){
+  const d=[]; let n=0; const SF=SONGF, eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
+  const ok={ format:SF.SONG_FORMAT, version:SF.SONG_VERSION, name:'t', settings:{ aRef:440, bpm:90, metre:4, bars:2, sub:4, quant:true, master:0.8,
+      brace:{ user:false, from:0, to:4, on:false }, live:{ scaleId:'major', tonic:0, tonicCents:0, tunedFrom:'T' } },
+    views:[{ mode:'major', key:0 }], timbres:{ 'chord.firefly':{ role:'ch', name:'Firefly', def:{ id:'chord.firefly' } } },
+    tracks:[{ layer:0 }], takes:[{ tk:1, kinds:{}, chains:{}, lane:[] }], marks:[{ id:1, beat:0, name:'A' }],
+    events:[{ t:0, layer:0, fn:'chOn', a:{ ti:0, oct:1, vol:0.5, inst:'chord.firefly' }, v:0, sev:false, tk:1 }, { t:1, layer:0, fn:'chOff', a:{}, v:0, sev:false, tk:1 }] };
+  const txt=JSON.stringify(ok);
+  eq('a valid record parses', SF.songParse(txt).ok, true);
+  eq('a valid record passes the check (CONTROL: not over-strict)', SF.songCheck(SF.songParse(txt).rec), []);
+  eq('not text', SF.songParse(42).why, 'notText');
+  eq('too big', SF.songParse(' '.repeat(SF.SONG_MAX_BYTES+1)).why, 'tooBig');
+  eq('not JSON', SF.songParse(txt.slice(0,-3)).why, 'notJson');
+  eq('a «__proto__» key', SF.songParse(txt.replace('"settings":{','"settings":{"__proto__":{"x":1},')).why, 'badKey');
+  eq('a «constructor» key', SF.songParse(txt.replace('"name":"t"','"constructor":1,"name":"t"')).why, 'badKey');
+  { let deep='0'; for(let i=0;i<40;i++) deep='['+deep+']'; eq('nested too deep', SF.songParse(txt.replace('"name":"t"','"name":"t","x":'+deep)).why, 'tooDeep'); }
+  eq('not a song', SF.songParse(JSON.stringify({ format:'handsong/tuning', version:1 })).why, 'notSong');
+  eq('no version', SF.songParse(JSON.stringify({ ...ok, version:undefined })).why, 'noVersion');
+  { const r=SF.songParse(JSON.stringify({ ...ok, version:SF.SONG_VERSION+1 })); eq('a newer version is refused with its number', [r.why, r.version], ['newer', SF.SONG_VERSION+1]); }
+  { const v1=JSON.parse(txt); v1.version=1; delete v1.timbres; v1.events[0].a.inst=16; v1.events.push({ t:2, layer:0, fn:'drum', a:{ row:0, vol:0.5, kit:2 }, v:-1, sev:false, tk:1 });
+    const keep=JSON.stringify(v1), u=SF.songUpgrade(v1), u2=SF.songUpgrade(JSON.parse(JSON.stringify(u)));
+    eq('v1 → v2: positions → ids (frozen TIM1 table)', [u.version, u.events[0].a.inst, u.events[2].a.kit], [SF.SONG_VERSION, 'chord.firefly', 'kit.tabla']);
+    eq('the upgrade is idempotent', JSON.stringify(u2), JSON.stringify(u));
+    eq('the upgrade leaves its input untouched', JSON.stringify(v1), keep);
+    eq('an upgraded record passes the check', SF.songCheck(u), []);
+    eq('a current record goes through unchanged (the same object)', SF.songUpgrade(ok)===ok, true); }
+  eq('the frozen table holds the positions of TIM1 (chord 16 = Firefly, solo 0 = SuperSaw, kit 4 = Taiko)', [SF.TIM1_POSITIONS.ch[16], SF.TIM1_POSITIONS.ld[0], SF.TIM1_POSITIONS.dr[4]], ['chord.firefly','solo.supersaw','kit.taiko']);
+  const dmg=[['an event on a missing track', r=>{ r.events[0].layer=7; }], ['a timbre stored as a number', r=>{ r.events[0].a.inst=3; }],
+    ['a volume above 1', r=>{ r.events[0].a.vol=2; }], ['a view index out of range', r=>{ r.events[0].v=5; }], ['tempo 0', r=>{ r.settings.bpm=0; }],
+    ['a brace that ends before it starts', r=>{ r.settings.brace.from=8; }], ['an unknown event kind', r=>{ r.events[0].fn='eval'; }],
+    ['a take number 0', r=>{ r.takes[0].tk=0; }], ['A4 of 1000 Hz', r=>{ r.settings.aRef=1000; }], ['a track twice', r=>{ r.tracks.push({ layer:0 }); }]];
+  for(const [what,mut] of dmg){ n++; const r=JSON.parse(txt); mut(r); if(!SF.songCheck(r).length) d.push(`damage not caught: ${what}`); }
+  return { cases:n, total:d.length, differences:d };
+}
 let REG;
 try{
   P=await import(new URL('../src/probedata.js', import.meta.url).href);
@@ -293,6 +346,7 @@ try{
   CFG=await import(new URL('../src/config.js', import.meta.url).href);
   FMT=await import(new URL('../src/core/format.js', import.meta.url).href);    // FMT1: the file-format core
   IDR=await import(new URL('../src/core/registry.js', import.meta.url).href);  // FMT1: permanent ids and the registry
+  SONGF=await import(new URL('../src/core/songfile.js', import.meta.url).href);   // SAVE1: the song file's pure core
   DSP=await import(new URL('../src/core/dsp.js', import.meta.url).href);   // SND-F1: the pure DSP core (Night forest IR, dynamics curve)   // LAT1: the pure core (no DOM, no Web Audio — runs in node)
 }catch(e){ out('[probe-data] ERROR loading the data modules: '+String(e&&e.stack||e)); verdict(false,'the data modules did not load'); process.exit(1); }
 const loadMs=Math.round(performance.now()-T00);
@@ -307,6 +361,8 @@ const ROWS=[
   ['LAT3 low light (core)',     ()=>lowCore(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['FMT1 format + registry (core)', ()=>fmtCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['GES1 gesture features (core)', ()=>gesCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['UI1b icons (core)',          ()=>iconCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['SAVE1 song file (core)',     ()=>songCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

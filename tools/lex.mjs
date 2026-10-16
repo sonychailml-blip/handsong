@@ -15,7 +15,7 @@ export function lex(src){
     if(c==='`'||(c==='}'&&tpl.length&&tpl[tpl.length-1]===brace)){
       if(c==='}') tpl.pop();
       let j=i+1; while(j<n){ if(src[j]==='\\'){ j+=2; continue; } if(src[j]==='`'){ j++; break; } if(src[j]==='$'&&src[j+1]==='{'){ j+=2; tpl.push(brace); break; } j++; }
-      const s=src.slice(i,j); put(s, s[0]+blank(s.slice(1))); i=j; last='str'; continue;
+      const s=src.slice(i,j), open=s.endsWith('${'); put(s, s[0]+blank(s.slice(1,open?-1:undefined))+(open?'{':'')); i=j; last='str'; continue;   // keep «{» of «${» so braces balance in bare
     }
     if(c==='/'){
       const regex = last===''||/[(,=:[!&|?{};+\-*%<>~^]/.test(last)||KW.has(last);

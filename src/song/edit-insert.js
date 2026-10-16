@@ -25,7 +25,7 @@ function editInsPush(layer,u){ const pin=autCaps(layer,true); editPush(pin.ops.l
 function editDrumDefaults(layer,t){
   let best=null,bd=Infinity;
   for(const e of events) if(e.layer===layer&&e.fn==='drum'){ const d=Math.abs(e.t-t); if(d<bd){ bd=d; best=e; } }
-  return { kit: best&&best.a.kit!=null ? best.a.kit : ENV.live().drumKitIdx,
+  return { kit: best&&best.a.kit!=null ? best.a.kit : ENV.live().kitTim,
            vol: best&&best.a.vol!=null ? best.a.vol : editDefVol('dr') };
 }
 /* Вставка бас-ноты: пара «вкл»+«выкл» со СВЕЖИМ k (свой владелец — см. довод о порядке выше).
@@ -49,7 +49,7 @@ function editInsertBass(t,ti,oct,sc,sev,len){   // T4c-1: высота — ин�
     if(d<bd && e.a && e.a.vol!=null){ bd=d; near=e; }
     if(e.fn==='bassOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
   }
-  const inst = on&&on.a.inst!=null ? on.a.inst : ENV.live().bassIdx;
+  const inst = on&&on.a.inst!=null ? on.a.inst : ENV.live().bassTim;
   const vol  = near&&near.a.vol!=null ? near.a.vol : editDefVol('bs');
   const k=layerTakeTop(layer);                               // свой ключ владельца: пересечься с существующим басом нечем
   editTakeNow();
@@ -88,7 +88,7 @@ function editInsertLead(t,ti,oct,sc,sev,len){
     if(e.fn!=='leadOff' && d<bf){ bf=d; nfx=e; }              // ближайшее событие, несущее ноту, — его карта (или её отсутствие)
     if(e.fn==='leadOn' && (!on||d<Math.abs(on.t-t))) on=e;
   }
-  const inst = on&&on.a.inst!=null ? on.a.inst : ENV.live().leadIdx;
+  const inst = on&&on.a.inst!=null ? on.a.inst : ENV.live().leadTim;
   const vol  = near&&near.a.vol!=null ? near.a.vol : editDefVol('ld');
   const fx   = nfx ? (nfx.a&&nfx.a.fx ? {...nfx.a.fx} : null) : ENV.fxSnapshot(chainKeyOf('ld'));   // копия соседа как есть; пустая дорожка — снимок живой цепи
   const v=layerSlotTop(layer);
@@ -142,11 +142,11 @@ function editInsertChord(t,ti,oct,sc,sev,len,sel){   // T4c-1: высота ко
       if(d<bd && e.a && e.a.vol!=null){ bd=d; near=e; }
       if(e.fn==='chOn' && (!on||Math.abs(e.t-t)<Math.abs(on.t-t))) on=e;
     }
-    inst = on&&on.a.inst!=null ? on.a.inst : ENV.live().chIdx;
+    inst = on&&on.a.inst!=null ? on.a.inst : ENV.live().chTim;
     vol  = near ? near.a.vol : null;
   }
   if(ty && !chordTypeFits(ty, ti, sc)) return false;        // ⛳ T7: форма, которой на этом корне нет в строе (Партч — вне 43 высот), не вставляется (ui называет причину)
-  if(inst==null) inst=ENV.live().chIdx;
+  if(inst==null) inst=ENV.live().chTim;
   if(vol==null) vol=editDefVol('ch');                        // правило #30
   const k=layerTakeTop(layer);                               // свой ключ владельца 'loop:N:k': пересечься с аккордами дорожки нечем
   editTakeNow();

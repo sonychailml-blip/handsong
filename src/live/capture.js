@@ -27,6 +27,8 @@ const capReset=()=>{ takeFxLast=null; takeFxOrder=null; };   // REC5: the sampli
    и каждый слой подложки (loadArrangement). Подложку захватываем тоже: её рендер обязан быть таким же
    воспроизводимым, как и сыгранного вручную.
    ⚠️ Снимок ЗАСЕВАЕТ опору прореживания — поэтому дорожка ниже держит только то, что РЕАЛЬНО сдвинулось. */
+/* SAVE1: the live chains as a capture record (what takeCapStart installs), read only */
+function capRecordNow(){ const rec={ kinds:{}, chains:{}, lane:[] }; for(const {key,kind} of chainOwners()){ rec.kinds[key]=kind; rec.chains[key]=fxCaptureChain(key); } return rec; }
 function takeCapStart(tk){
   if(!AC||!tk) return;
   const rec={ kinds:{}, chains:{}, lane:[] };
@@ -348,4 +350,4 @@ let liveIso=true;
 const setLiveIsolation=on=>{ if(on!=null){ liveIso=!!on; fxPlayReset(); fxPlayHard=true; } return liveIso; };   // ⛔ probe only
 const playKeyOf=key=> liveIso ? trackChainKeyOf(key) : key;   // where recorded automation of a live chain key plays
 
-export { capReset, takeCapStart, fineNew, fineReset, fineStep, pnSnap, takeCapSample, fxLaneMerge, fxPlayDrive, fxPlayDriving, fxIsDriven, fxPlayStop, liveIso, setLiveIsolation, playKeyOf };
+export { capReset, takeCapStart, capRecordNow, fineNew, fineReset, fineStep, pnSnap, takeCapSample, fxLaneMerge, fxPlayDrive, fxPlayDriving, fxIsDriven, fxPlayStop, liveIso, setLiveIsolation, playKeyOf };

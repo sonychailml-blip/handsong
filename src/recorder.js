@@ -1,5 +1,5 @@
 import { AC, setLeadInstr, applyFx, scheduleBend, leadCancel, leadOff, leadAllOff, leadHold, chordOn, chordGlide, chordOff, chordHold, bassOff, bassHold, drumHit, droneOn, droneOff, fxParamKeysOf, fxParamMetaOf, fxDefaultsOf, fxIsPerNote, fxNoteField, fxNoteFollows, fxPerm } from './audio.js';   // fxNoteFollows — гладкая автоматизация: писать ли ведения рампы внутри зажатой ноты   // fxPerm — VOL-0: постоянная запись цепи (громкость) — ни в сводке захвата, ни на полосе, ни в цепи дорожки редактора   // V4b: параметр «в ноте» (полоса читает и правит его В НОТАХ) и где он лежит в событии   // F4: makeFrozenBus — шина замороженной дорожки (гейн прямо в мастер)
-import { leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, setTonic, tonicCents, tunedFrom, setLatchDeg, setLatchTy, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
+import { aRef, setARef, scaleId, leadIdx, chIdx, bassIdx, drumKitIdx, seventh, tonic, setTonic, tonicCents, tunedFrom, setLatchDeg, setLatchTy, chainKeyOf, FX_VOL } from './state.js';   // FX_VOL — VOL-3: полоса громкости у каждой дорожки   // F5: tonic/aRef/лад (scaleId с F1) — в ПОДПИСЬ СВЕЖЕСТИ замороженной дорожки (рендер их приколачивал, значит их смена делает буфер устаревшим)
 import { modeSlotOfTi, scaleView } from './scales.js';   // typedChords/chordFams (тип вставленного аккорда, S2) сняты в U5 — вставка без выделения кладёт единицу корня. chordNotes — U2: ноты аккорда (для распада при правке одной ноты). chordUnit — U4: каноническая форма ноты на ряду (однонотный тип = сам корень)
 import { REC_VOL_EPS, REC_REV_EPS, volAmp } from './config.js';   // volFromOld — VOL-2b: громкость вставленной ноты в новой шкале
 import * as AUD from './audio.js';   // F3: ИМЕНОВАННОЕ ПРОСТРАНСТВО того же модуля — только чтобы makeENG могла получить ЛЮБУЮ копию движка (живую или рендерную). Именованные импорты выше остаются, это тот же самый модуль
@@ -12,8 +12,9 @@ import { chordMoveTy, editBackingOpen, editCanRedo, editCanUndo, editCommit, edi
 import { editDeleteChordNote, editMoveChordNote, editResizeChordNote } from './song/edit-chords.js';   // REC3: chord-note edits (dissolve)
 import { editDeleteSel, editMoveSel } from './song/edit-group.js';   // REC3: group edits (ED1)
 import { laneId, laneMute, laneSolo, laneLevel, lanePan, laneLenOf, laneEditVer, laneVerBump, laneEditVerOf, laneNew, laneOf, laneForget, laneTablesClear, laneLayerOf, armedLayer, toggleArm, laneDelTap, laneDelCancel, laneDelPendingLayer, laneAudible, laneLevelOf, laneGainOf, layerOfOwner, lanePanOf, laneNameOf, setLaneName, laneOrder, moveLane, laneShowKeep, laneLook, laneMuted, laneSoloed, laneSoloOn, laneRow, laneRowSet, laneWire } from './song/lanes.js';   // REC1: the track tables
-import { takeNext, takeFx, takeFxTouch, FX_CHAIN, setAutRecSmooth, fxLaneExpand, laneRoleOf, captureInfoOf } from './song/capture.js';   // REC3 part 2: capture records, lane law, track role
-import { envWire } from './song/env.js';   // REC3 part 2: the song layer's environment (wired below)
+import { takeNext, takeSeqFloor, takeFx, takeFxTouch, FX_CHAIN, setAutRecSmooth, fxLaneExpand, laneRoleOf, captureInfoOf } from './song/capture.js';   // REC3 part 2: capture records, lane law, track role
+import { envWire } from './song/env.js';
+import { songData, songPlan } from './song/file.js';   // SAVE1: the song ↔ its file record   // REC3 part 2: the song layer's environment (wired below)
 import { bendDbg, autAddrs, bendEdited, editBendPoint, editBendShape, pnBars, editVolSel, takeFxDump, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint, autChainOf, autChainAdd, autChainRemove, autChainMove } from './song/automation.js';   // REC3 part 2: automation and per-note lanes, bends, volume bars, track chain edits
 import { editTakeReset, editInsertBass, editInsertLead, editInsertChord, editInsertHit, laneTimbreOf, editSetTimbre } from './song/edit-insert.js';   // REC3 part 2: inserts, session take, timbre
 import { editDegreeWhy, trackViewOfLayer, editTrackModeWhy, editTrackMode, trDbg, editTransposeWhy, editTranspose, songTransposeWhy, songTranspose, editDegreeSel } from './song/transpose.js';   // REC3 part 2: degrees, mode, semitones
@@ -26,7 +27,7 @@ import { schedWire, chaseReset, clearPump, releaseLoopLayersAt, chaseFor, chaseN
 import { evHzDbg, evHz, evReg, makeENG, ENG } from './live/eng.js';   // REC5: the engine table ENG (makeENG) and the event pricing evHz
 import { recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec } from './live/record.js';   // REC5: live recording (take routing, push, rec*, W*, record start / stop)
 import { backingWire, loadArrangement, loadJam, backingEvent, clearJam } from './live/backing.js';   // REC5: backing (arrangement load, jam, clear)
-import { capReset, takeCapStart, fineNew, fineReset, fineStep, pnSnap, takeCapSample, fxLaneMerge, fxPlayDrive, fxPlayDriving, fxIsDriven, fxPlayStop, liveIso, setLiveIsolation, playKeyOf } from './live/capture.js';   // REC5: capture sampling, the fine-recording automaton, effect playback, live isolation
+import { capRecordNow, capReset, takeCapStart, fineNew, fineReset, fineStep, pnSnap, takeCapSample, fxLaneMerge, fxPlayDrive, fxPlayDriving, fxIsDriven, fxPlayStop, liveIso, setLiveIsolation, playKeyOf } from './live/capture.js';   // REC5: capture sampling, the fine-recording automaton, effect playback, live isolation
 /* REC3 part 2: what song/ needs from above — the engine's effect declarations and the chain key (more entries join as code moves) */
 backingWire({ snapBegin:(...a)=>snapBegin(...a), snapEnd:(...a)=>snapEnd(...a), capStart:tk=>takeCapStart(tk), droneSync:(...a)=>droneSync(...a),
   lanePrune:()=>lanePrune(), softAllOff:()=>softAllOff(), droneActive:()=>droneActive(), clearRec:()=>clearRec() });   // REC5
@@ -41,7 +42,14 @@ freezeWire({ capStart:(...a)=>takeCapStart(...a), droneSync:(...a)=>droneSync(..
   release:(...a)=>releaseLoopLayersAt(...a), chasePlay:(...a)=>chasePlay(...a) });   // REC5
 clockWire({ recording:()=>recording, release:(...a)=>releaseLoopLayersAt(...a), swapCancelAll:()=>frzSwapCancelAll(), chasePlay:(...a)=>chasePlay(...a) });   // REC4
 envWire({ fxPerm, fxParamMetaOf, fxNoteField, fxParamKeysOf, fxDefaultsOf, fxNoteFollows, fxIsPerNote, FX_VOL, chainKeyOf,
-  fxSnapshot:key=>AUD.fxSnapshot(key), live:()=>({ leadIdx, chIdx, bassIdx, drumKitIdx, tunedFrom, tonic, seventh }),
+  fxSnapshot:key=>AUD.fxSnapshot(key), live:()=>({ leadIdx, chIdx, bassIdx, drumKitIdx, tunedFrom, tonic, seventh,
+    leadTim:AUD.timbreKey('ld',leadIdx), chTim:AUD.timbreKey('ch',chIdx), bassTim:AUD.timbreKey('bs',bassIdx), kitTim:AUD.timbreKey('dr',drumKitIdx) }),   // TIM2: the live timbres as ids (editor inserts)
+  /* SAVE1: what the song file reads from above — settings and the live scale, live chain snapshots, timbre ids and copies */
+  songEnv:()=>({ aRef, bpm:loop.bpm, metre:loop.metre, bars:loop.bars, sub:loop.sub, quant:!!loop.quant, master:AUD.masterLevel(),
+    brace:{ user:!!loop.rgn.user, from:loop.rgn.from, to:loop.rgn.to, on:!!loop.rgn.on }, live:{ scaleId, tonic, tonicCents, tunedFrom } }),
+  soloSnap:()=>AUD.fxSnapshot(chainKeyOf('ld')), capNow:()=>capRecordNow(), timSnap:id=>AUD.timbreSnapshot(id),
+  timKnown:(r,id)=>AUD.timbreIdx(r,id)!==undefined, timKey:(r,x)=>AUD.timbreKey(r,x),
+  timByDef:(r,def)=>{ const k=JSON.stringify(def); for(const x of AUD.timbresOf(r)){ const q=AUD.timbreSnapshot(x.id); if(q && JSON.stringify(q.def)===k) return x.id; } return null; },
   ready:()=>!!AC, af:kind=>{ if(hooks.af) hooks.af(kind); }, recording:()=>recording, pause:()=>{ if(loop.on) onLoop(); },
   metre:()=>loop.metre, sub:()=>loop.sub, bpm:()=>loop.bpm, pos:()=>loop.pos, brace:()=>loop.rgn, seek:b=>seekTo(b),
   braceRestore:s=>{ loop.rgn.user=s.user; rgnApply(s.from, s.to, loop.rgn.on); }, capStart:tk=>takeCapStart(tk), laneEditTouch:()=>laneEditTouch() });   // closures: those are declared further down
@@ -376,6 +384,39 @@ function clearSong(){
   const tok=snapBegin('clear'); clearRec(); snapEnd(tok);
   if(hooks.cleared) hooks.cleared();   // ED7-fix2: ui offers "Song cleared — Undo" (the ✕ button and the looper hand alike)
 }
+/* ═══ SAVE1: SAVE / OPEN A SONG FILE — the session part (the record itself: song/file.js; the text and the checks: core/songfile.js) ═══
+   Unsaved = there is a song and its history hash moved since the last save or open (songMark). Open replaces the song the way a song load
+   does (P.seed, P.song): everything cleared, tables and records installed, the history starts fresh; the settings come with it (A4,
+   tempo, metre, length, subdivision, quantise, master, brace). Refused while recording or with the editor open. */
+let songMarkH=null;
+const songMark=()=>{ songMarkH=histHash(); };
+const songDirty=()=> events.length>0 && histHash()!==songMarkH;
+function songSaveRec(meta){
+  if(recording) return { ok:false, why:'rec' };
+  if(!events.length) return { ok:false, why:'empty' };
+  const rec=songData(meta||{}); songMark(); return { ok:true, rec };
+}
+function songOpenApply(P){
+  if(!AC) return { ok:false, why:'audio' };
+  if(recording) return { ok:false, why:'rec' };
+  if(editIsOpen()) return { ok:false, why:'editor' };
+  clearRec(); histReset();
+  const S=P.settings;
+  setARef(S.aRef); setLoopMetre(S.metre); setLoopBpm(S.bpm); setLoopBars(S.bars); setLoopSub(S.sub); setLoopQuant(S.quant); AUD.setMasterLevel(S.master);
+  for(const T of P.tracks){ const id=laneNew(T.layer); laneRowSet(id,{ mute:!!T.mute, solo:!!T.solo, level:T.level, pan:T.pan, name:T.name, rank:T.rank, len:T.len }); }
+  let tkMax=0;
+  for(const [tk,rec] of P.takes){ takeFx.set(tk,rec); if(tk>tkMax) tkMax=tk; }
+  for(const e of P.events){ events.push(e); if(e.tk>tkMax) tkMax=e.tk; }   // in the file's order = birth order
+  takeSeqFloor(tkMax);
+  evSeqFill(); events.sort(evOrder);
+  secMarksSet(P.marks);
+  schedInvalidate(); takeFxTouch();
+  loop.rgn.user=!!S.brace.user; rgnApply(S.brace.from, S.brace.to, !!S.brace.on);
+  const pinned=songPinChains();   // a file always carries every chain (song/file.js); an older one may not — as at any song load
+  histReset(); droneSync(); hooks.loop && hooks.loop(loop.on);
+  songMark();
+  return { ok:true, tracks:P.tracks.length, events:P.events.length, pinned:pinned.length };
+}
 /* REC3: what the edits (song/edit-notes.js) need from the editor session and the recorder */
 editWire({ ready:()=>!!AC, isOpen:editIsOpen, layer:editLayer, pause:()=>{ if(loop.on) onLoop(); }, touch:()=>{ takeFxTouch(); laneEditTouch(); } });
 /* ED7: snapshot steps, level / pan / name of a track, master, the key knob of a song Transpose ('ranks' — song/history.js) */
@@ -675,7 +716,7 @@ export { secPerBeat, beatNow, timeAt, secOf, beatsOf,
   /* ED6 probe only: the forgetting plan (control), the song history reset, the tracks' edit versions kept and restored, the capture lanes as data */
   secDbg, songHistReset, laneVerKeep, takeFxDump,
   /* ED7: the one history — ↶/↷ everywhere, table steps (level / pan / name / order / master), ✕ as a step; probe: reset, length, hash, controls */
-  histUndo, histRedo, histCanUndo, histCanRedo, histLen, histReset, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histHash, histDbg, histTopLabel,
+  histUndo, histRedo, histCanUndo, histCanRedo, histLen, histReset, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, songSaveRec, songOpenApply, songPlan, songMark, songDirty, histHash, histDbg, histTopLabel,
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint,   // autCurvePoint — BEND-CURVE: curvature of a glide into a bus lane point. autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки

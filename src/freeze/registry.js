@@ -141,7 +141,7 @@ function freezeSig(layer){
      в панели замороженную дорожку не старит.
      ⚠️ Мемо подписи сбрасывается по глобальному ключу (число событий, поколение, takeFxVer, приколоченное):
      замена тембра обязана пройти через editCommit — он поднимает takeFxVer, как и любая правка редактора. */
-  const tmix=(h,tag,x)=>(Math.imul(h,31)+tag*64+((x==null?-1:x)|0)+1)|0;   // индексы < 63 (тембров соло 23, наборов 5). ⚠️ ВЕРНО ТОЛЬКО ДЛЯ ВСТРОЕННЫХ ИНДЕКСОВ: id упакован малым целым (|0), и строковый id (стабильные id тембров, BACKLOG §7.4) свернётся в 0 — два разных тембра подпишутся одинаково. ПЕРЕПИСАТЬ вместе со стабильными id
+  const tmix=(h,tag,x)=>{ let k=(Math.imul(h,31)+tag*64)|0; for(const c of (x==null?'-':String(x))) k=(Math.imul(k,31)+c.codePointAt(0))|0; return k; };   // TIM2: ids are strings — hash every character   // индексы < 63 (тембров соло 23, наборов 5). ⚠️ ВЕРНО ТОЛЬКО ДЛЯ ВСТРОЕННЫХ ИНДЕКСОВ: id упакован малым целым (|0), и строковый id (стабильные id тембров, BACKLOG §7.4) свернётся в 0 — два разных тембра подпишутся одинаково. ПЕРЕПИСАТЬ вместе со стабильными id
   let n=0, first=null, last=null, sum=0, noSc=false, dr=false, ld=false, ch=false, bs=false, tim=0, noFx=false;
   for(const e of events) if(e.layer===layer){
     n++; sum+=e.t; if(first===null||e.t<first) first=e.t; if(last===null||e.t>last) last=e.t;

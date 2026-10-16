@@ -8032,3 +8032,19 @@ runner — a `--limit-quick M` flag (like `--limit-min`) would let a loaded mach
 - Same model for tunings and scales (needed by the future world catalogue), effect presets and expression-hand mappings.
 Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the timbre ids (TIM1). Still to build: songs carrying id + snapshot
 (SONG1), the timbre list UI (reorder / hide / user timbres — TIM3 and later), events storing ids (TIM2), the same for tunings/modes/presets.
+
+### Moved from HANDOFF.md at the DAY run (English, verbatim; 2026-10-16)
+### NIGHT run (2026-10-16, unattended) — REC3 part 2, REC4, REC5 + runner; full log: `NIGHT-LOG.md` (root)
+- Runner: `--limit-quick M`; without it P.quick's limit = 3 min × a slow factor measured from P.quick's own rows (`SLOW_REF`).
+- REC3 part 2: `song/env.js` (ONE wire for what song/ needs from above), `capture.js`, `automation.js`, `edit-insert.js`, `clipboard.js`,
+  `quantise.js`, `transpose.js`, `sections.js`. REC4: `transport/clock.js` (+ rule #35: every beat↔time conversion through the clock),
+  `transport/scheduler.js`. REC5: `freeze/registry.js` (one file — the seams call the swap both ways), `live/eng.js`, `live/record.js`,
+  `live/capture.js`, `live/backing.js`. recorder.js 4897 → 725 (facade + wiring + the session glue listed in CLAUDE.md's module map).
+- Order from the real dependencies: capture records before automation; freeze before the scheduler; each step a small wire, no new cycle.
+- Probes: every step static PASS + browser `--quick` (song/) or `--quick --all` (transport, freeze, live) PASS; last run P.quick 57/0, P.all
+  76/0, GOLD 84/0, HAND1 525/0, frozen seed bass exact; data PASS 13/0. One real failure on the way (a write to a moved variable —
+  «Assignment to constant variable»), fixed; writes to imported bindings are now scanned after each move (the static check misses them).
+- Item 2 (groundwork): FMT1 `core/format.js` (version rules, migrations, refuse newer in words; validators from scaleload) + `core/registry.js`
+  (the user's ID model, rule #37); TIM1 permanent timbre ids (`chord.firefly` …; pinned by a probe row; events still store the index → TIM2).
+  GES1 parts 1–2: `gestures/features.js` (pure, node row), `expr.js`, `fxhand.js`, `looper.js` (gestures.js 1213 → 903; `hands.js` left).
+- Nothing to hear or see. Open: the static check misses (a) writes to imports, (b) names used only after a spread `...x` (reported unused).

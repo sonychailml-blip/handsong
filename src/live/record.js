@@ -10,7 +10,7 @@ import { evRole, events, isNoteStart, maxLayer, schedInvalidate } from '../song/
 import { armedLayer, laneNew } from '../song/lanes.js';
 import { hooks } from '../hooks.js';
 import { beatNow, cycling, loop, songAt, songLenGrow } from '../transport/clock.js';
-import { AC, chordHold } from '../audio.js';
+import { AC, chordHold, timbreKey } from '../audio.js';
 import { chIdx, drumKitIdx, seventh } from '../state.js';
 import { BEND_EPS_CENTS, REC_FX_EPS } from '../config.js';
 import { ENG } from './eng.js';
@@ -94,7 +94,7 @@ const ts=layer=> takeSt.get(layer) || takeJoin(layer);
    функции: push передаёт вид, который сам запишет, laneSourceOf — вид события. takePeek соло и баса зовут без sc — умолчание CUR()
    и есть то, что запишет их push (fz у них нет). */
 const noteSource=(fn,a,sc=CUR())=>{ const r=evRole(fn); if(!r) return null;
-  const x = r==='dr' ? (a&&a.kit) : (a&&a.inst);
+  const x = timbreKey(r, r==='dr' ? (a&&a.kit) : (a&&a.inst));   // TIM2: live position and event id give one source
   return r+':'+(x==null?'-':x) + (r==='dr' ? '' : '|'+viewKeyIdOf(sc)); };   // TF1: the view with its key (equal ⇔ one view object)
 /* Источник дорожки — по её первому «вкл»/удару. Дорожка одного источника по построению (с T2), поэтому первый и
    есть её; null — ни одной ноты (например, слой дрона). */
@@ -190,6 +190,13 @@ const gridFor=fn=> fn[0]==='c'?1 : fn.slice(0,4)==='bass'?0.5 : fn==='drum'?1/(l
    не несут. Прежний страж tiAudit и пересчёт tiRestamp сняты: сверять индекс не с чем. Каждое событие с высотой несёт индекс и регистр —
    это проверяет песенная строка пробы (P.checkSong). */
 const TI_FN=new Set(['leadOn','leadSet','bassOn','bassSet','chOn','chSet']);
+/* TIM2: an event is born with the timbre's permanent ID — the live payload carries the list position (a session handle) */
+const TIM_ROLE={ leadOn:'ld', leadSet:'ld', chOn:'ch', bassOn:'bs' };
+function storeTim(fn,a){
+  if(!a) return a;
+  if(fn==='drum') return typeof a.kit==='number' ? { ...a, kit:timbreKey('dr',a.kit) } : a;
+  const r=TIM_ROLE[fn]; return r && typeof a.inst==='number' ? { ...a, inst:timbreKey(r,a.inst) } : a;
+}
 function storeTi(fn,a,sc){
   if(!a || !('deg' in a)) return a;
   const { deg, ...rest }=a;
@@ -270,7 +277,7 @@ function push(fn,a,at,fz,q,ly){   // ly (T1/T2) — слой события: в�
   const ev={t,layer:ly,fn,a,sc:fz?fz.sc:CUR(),sev:fz?fz.sev:seventh,tk:curTake};   // §3.4: замораживаем ладовый контекст события (fz — уже замороженный, S3.5e); tk — номер взятого (S3.5d)
   if(a && a.fx) ev.a={...a, fx:{...a.fx}};
   if(S.k && (fn[0]==='c'||fn[0]==='b')) ev.a={...ev.a, k:S.k};   // S3.5c: аккорд/бас взятого, влитого в дорожку со своими аккордами/басом, — свой владелец (см. chOwnerKey). Копия, а не запись в `a`: `a` — живое состояние сравнения
-  ev.a=storeTi(fn,ev.a,ev.sc);   // T4c-2: ступень жеста → индекс в строе вида события, ступень не хранится (новой нагрузкой) (вызывающий мог отдать свой объект; ссылка на кривую бенда a.bend сохраняется)
+  ev.a=storeTim(fn,storeTi(fn,ev.a,ev.sc));   // TIM2: timbre position → id   // T4c-2: ступень жеста → индекс в строе вида события, ступень не хранится (новой нагрузкой) (вызывающий мог отдать свой объект; ссылка на кривую бенда a.bend сохраняется)
   events.push(ev);
   if(cb===1) S.chLastT=t; else if(cb===2) S.bsLast.set(bv,t);   // S4.3: страж ключа (T1: по слою; P2: у баса — по номеру ноты)
   if(t>recHiT) recHiT=t;                               // S4.3: высшая записанная доля участка (отличает шов от прыжка)
@@ -752,4 +759,4 @@ function onRec(){
   hooks.tutor && hooks.tutor('loop',{ev: fresh?'recStart':'overdubStart'});   // ЗАЦЕПКА ОБУЧЕНИЯ: старт первой записи / новой дорожки поверх
 }
 
-export { recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, storeTi, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec };
+export { recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, storeTi, storeTim, noteSource, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec };

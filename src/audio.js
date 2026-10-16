@@ -123,6 +123,13 @@ const timbresOf=role=>{ const R=TIMBRE_REG[role]; if(!R) return []; const L=TIMB
 const timbreIdOf=(role,idx)=>{ const g=TIMBRE_LISTS[role], x=g&&g()[idx]; return x ? x.id : null; };
 const timbreById=id=>{ for(const role in TIMBRE_LISTS){ const idx=timbreIdxOf(role,id); if(idx>=0) return { role, idx, entry:TIMBRE_LISTS[role]()[idx] }; } return null; };
 const timbreReg=role=> TIMBRE_REG[role] || null;   // the registry (hide / show / order) — probes today, the timbre list UI later
+/* ⛳ TIM2 (DAY run 2026-10-16): EVENTS STORE THE PERMANENT ID (a.inst / a.kit); the live hands and the engine work by list POSITION (a session
+   handle). Two doors at that boundary, used by every reader: timbreKey (position or id → the id; an event is born with it) and timbreIdx
+   (id or position → the position the engine plays; an id this app does not have → undefined, the caller's fallback). */
+const timbreKey=(role,x)=> typeof x==='number' ? (timbreIdOf(role,x) ?? x) : x;
+const timbreIdx=(role,x)=>{ if(typeof x!=='string') return x; const i=timbreIdxOf(role,x); return i>=0 ? i : undefined; };
+/* TIM2: a song file carries a full COPY of every timbre it uses (rule #37) — the entry as data (functions dropped), its role and name */
+const timbreSnapshot=id=>{ const t=timbreById(id); return t ? { id, role:t.role, name:t.entry.label, def:JSON.parse(JSON.stringify(t.entry)) } : null; };
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
 let AC=null, master, limiter;
@@ -3193,7 +3200,8 @@ export {
   setTrackGainOf, ownerGain, trackGainRetune, hitOwner, setMasterLevel, masterLevel, masterMeter,   // MX1: уровень дорожки (ступень в голосе по ключу владельца), мастер и измеритель
   setTrackPanOf, ownerPan, trackPanRetune, dronePan, panGains,   // MX2: панорама дорожки (стерео-ступень в голосе по ключу владельца, закон равной мощности)
   renderReset, renderStateOf,   // сброс копии рендера в начале и в конце каждого рендера (зовёт ТОЛЬКО render.js у своей копии) и его снимок для стража P.all
-  timbresOf, timbreIdOf, timbreById, timbreReg,   // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
+  timbresOf, timbreIdOf, timbreById, timbreReg, timbreKey, timbreIdx, timbreSnapshot,   // TIM2: event ids ↔ engine positions, the song file's timbre copy
+    // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
   fxPerm,   // VOL-0: постоянная запись цепи (громкость) — единый предикат «не показывать и не предлагать»

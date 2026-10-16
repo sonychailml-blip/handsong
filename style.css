@@ -1,23 +1,5 @@
-  :root{
-    --bg:#07070d; --ink:#eceaf4; --dim:#8f8ba6;
-    --note:#ff9e2c; --chord:#b18cff; --tonic:#57d9a3;
-    --rec:#e5484d; --panel:rgba(16,16,28,.86);
-    /* ЕДИНЫЙ ШРИФТ всего интерфейса — системный стек, без внешних файлов (проект без зависимостей,
-       веб-шрифт добавил бы загрузку и мигание нестилизованного текста). Задаётся ЗДЕСЬ, наследуется
-       всем меню и стартом. Холст (draw.js, ctx.font 'system-ui') — отдельно, это игровое поле. */
-    --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    /* ЕДИНЫЙ АКЦЕНТ МЕНЮ И СТАРТА — тёплый оранжевый (исходный var(--note)=#ff9e2c). --accent: основной
-       тон для ЗАЛИВОК/рамок/фокуса и текста на ТЁМНОМ баре (там #ff9e2c читается). На светлом #ff9e2c
-       как ТЕКСТ бледен (≈2.1:1), поэтому --accent-ink — темнее (жжёный янтарь #b45309, ≈5:1 на белом) —
-       для ТЕКСТА и ссылок на светлых панелях/карточке. Роли соло/аккорды/бас/ударные (INSTR_COL,
-       config.js) — игровое поле, НЕ трогаем; у аккордов свой сиреневый на ТЁМНОМ холсте — другой цвет. */
-    --accent:#ff9e2c; --accent-ink:#b45309;
-    /* ШКАЛА РАЗМЕРОВ МЕНЮ (4 шага): заголовок панели · контролы · ярлык строки · подсказка. */
-    --fs-head:16px; --fs-ctl:14px; --fs-label:13px; --fs-hint:12px;
-    /* РАДИУСЫ (2 шага): контролы · панели+стартовая карточка. */
-    --r-sm:10px; --r-lg:18px;
-    accent-color:var(--accent);            /* нативные контролы (ползунок, фокус) — в акцент */
-  }
+
+  :root{ accent-color:var(--accent); }   /* native controls (range, focus) in the accent; the token itself: tokens.css */
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:var(--font);
@@ -30,10 +12,10 @@
   #video{display:none;}
   #canvas{position:fixed; inset:0; width:100vw; height:100vh; display:block;}
 
-  #bar{position:fixed; top:0; left:0; right:0; z-index:10;
-    display:none; gap:6px; padding:8px; align-items:center;
+  #bar{position:fixed; top:0; left:0; right:0; z-index:var(--z-bar);
+    display:none; gap:var(--sp-6); padding:var(--sp-8); align-items:center;
     overflow-x:auto; scrollbar-width:none;
-    background:linear-gradient(180deg, rgba(7,7,13,.82), transparent);}
+    background:linear-gradient(180deg, var(--c-bg-a82), transparent);}
   #bar::-webkit-scrollbar{display:none;}
   #bar.on{display:flex;}
   /* АВТО-СКРЫТИЕ: в свёрнутом виде (.min, ставит ui.js) на экране остаются ТОЛЬКО индикатор роли
@@ -49,8 +31,8 @@
   #bar.min>#jamBtn,
   #bar.min>#loopPanelBtn{ display:none !important; }
   button{background:var(--panel); color:var(--ink); flex:0 0 auto;
-    border:1px solid rgba(255,255,255,.22); border-radius:var(--r-sm);
-    padding:9px 12px; font-size:var(--fs-ctl); line-height:1; font-family:var(--font);}
+    border:1px solid var(--c-white-a22); border-radius:var(--r-sm);
+    padding:var(--sp-9) var(--sp-12); font-size:var(--fs-ctl); line-height:var(--lh-solid); font-family:var(--font);}
   button:active{transform:scale(.96);}
   /* ---- КНОПКА ЗАПИСИ: компактная круглая иконка ----
      Состояние показываем ВИДОМ, а не словами: подробности («круг N т.» / «слой K»)
@@ -59,37 +41,37 @@
        .on.first — пишется первый круг, .on — наложение слоя (белое кольцо внутри).
      Пульс анимирует ТОЛЬКО transform/opacity на псевдоэлементе: работа композитора,
      без перерисовки каждый кадр (на телефоне и так ~196 мс инференса + холст 60 fps). */
-  #recBtn{position:relative; width:34px; height:34px; padding:0; border-radius:50%;
-    font-size:15px; line-height:1; color:var(--rec); background:transparent;
-    border-color:rgba(229,72,77,.55);}
-  #recBtn.armed{border-color:var(--rec); box-shadow:inset 0 0 0 3px rgba(229,72,77,.32);}
-  #recBtn.on{background:var(--rec); border-color:var(--rec); color:#fff;}
-  #recBtn.on:not(.first){box-shadow:inset 0 0 0 2px rgba(255,255,255,.85);}  /* наложение ≠ первый круг */
-  #recBtn.on::after{content:''; position:absolute; inset:-3px; border-radius:50%;
+  #recBtn{position:relative; width:34px; height:34px; padding:0; border-radius:var(--r-round);
+    font-size:var(--fs-15); line-height:var(--lh-solid); color:var(--rec); background:transparent;
+    border-color:var(--c-rec-a55);}
+  #recBtn.armed{border-color:var(--rec); box-shadow:var(--sh-rec-armed);}
+  #recBtn.on{background:var(--rec); border-color:var(--rec); color:var(--c-white);}
+  #recBtn.on:not(.first){box-shadow:var(--sh-rec-on-ring);}  /* наложение ≠ первый круг */
+  #recBtn.on::after{content:''; position:absolute; inset:-3px; border-radius:var(--r-round);
     border:2px solid var(--rec); animation:recPulse 1.1s ease-out infinite; pointer-events:none;}
   @keyframes recPulse{ 0%{transform:scale(.9); opacity:.85;} 100%{transform:scale(1.55); opacity:0;} }
-  #loopBtn.on{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #loopBtn.on{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);}
   /* Кнопка роли — индикатор И переключатель. Центрируется в панели авто-отступами
      (при нехватке места они схлопываются, кнопка просто остаётся в своём порядке).
      Цвет — акцент текущей роли: --role ставит applyInstr, fallback на сиреневый. */
-  #instrBtn,#instrBtnL,#instrBtnR{border-color:var(--role,var(--chord)); color:var(--role,var(--chord)); font-weight:600;}
+  #instrBtn,#instrBtnL,#instrBtnR{border-color:var(--role,var(--chord)); color:var(--role,var(--chord)); font-weight:var(--fw-semi);}
   #instrBtn{margin-left:auto; margin-right:auto;}
-  #loopPanelBtn.on{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #loopPanelBtn.on{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);}
   /* Видимость instrBtn (одна роль) и instrBtnL/R (две половины) целиком в JS (applySplit),
      по splitOn — CSS-правил больше нет. PC-режим удалён: класса .phone нет. Кнопки ⇄ (swap) и
      〰 (терменвокс) убраны — их роль забрала секция «Функции рук» в панели звукоряда. */
   /* 🔄 камера: .act = тыловая (незеркальная); визуально помечаем, что вид уже не «зеркало». */
-  #camBtn{padding:9px 10px; font-size:15px;}
-  #camBtn.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #camBtn{padding:var(--sp-9) var(--sp-10); font-size:var(--fs-15);}
+  #camBtn.act{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);}
   /* ⛶ полноэкранный режим (иконка-кнопка бара): .act = уже во весь экран. Прячется целиком в JS,
      где нет Fullscreen API. Свёрнутый бар её тоже скрывает (список .min выше) — редкая «задал и забыл». */
-  #fsBtn{padding:9px 10px; font-size:15px;}
-  #fsBtn.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #fsBtn{padding:var(--sp-9) var(--sp-10); font-size:var(--fs-15);}
+  #fsBtn.act{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);}
   /* 🎥 клип и 🎙 аудио — один движок записи (clip.js), общий вид: .act = идёт запись (красный +
      мягкий пульс). Отдельно от ● лупера — другой цвет-каркас и своя иконка, чтобы не путать
      музыкальную запись с записью медиа. */
-  #clipBtn,#audioBtn{padding:9px 10px; font-size:15px;}
-  #clipBtn.act,#audioBtn.act{background:var(--rec); border-color:var(--rec); color:#fff; font-weight:600;
+  #clipBtn,#audioBtn{padding:var(--sp-9) var(--sp-10); font-size:var(--fs-15);}
+  #clipBtn.act,#audioBtn.act{background:var(--rec); border-color:var(--rec); color:var(--c-white); font-weight:var(--fw-semi);
     animation:clipPulse 1.2s ease-in-out infinite;}
   /* Пока идёт одна запись, ДРУГАЯ кнопка disabled (взаимное исключение видео/аудио): приглушаем,
      чтобы было видно — сейчас нельзя. */
@@ -97,10 +79,10 @@
   /* 🎵 джем: .act = играет вариант подложки (текст кнопки показывает N/всего). Акцент — оранжевый
      var(--accent), как у прочих активных тумблеров бара (единый акцент меню). Запись остаётся
      красной (--rec) — это статус записи, а не «активный тумблер». */
-  #jamBtn.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #jamBtn.act{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);}
   /* Пульс на box-shadow (не на transform/opacity) — кнопка остаётся на месте и видимой, в отличие
      от recPulse (тот гасит непрозрачность у ПСЕВДОэлемента-кольца ●). */
-  @keyframes clipPulse{ 0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.55);} 50%{box-shadow:0 0 0 5px rgba(229,72,77,0);} }
+  @keyframes clipPulse{ 0%,100%{box-shadow:var(--sh-clip-pulse-0);} 50%{box-shadow:var(--sh-clip-pulse-50);} }
 
   /* узкий экран / портрет: компактнее верхняя панель.
      Кнопок стало много (лад, роль(и), 〰, ◨, 🔄, 🎥, ⚙, ●). На ~390px они не влезали в ОДНУ строку,
@@ -109,10 +91,10 @@
      видно и достижимо во вторую строку, без скрытого скролла. auto-поля у #instrBtn (центрируют
      кнопку роли в ОДНОЙ строке) при переносе мешают — обнуляем, строки центрируем justify-content. */
   @media (max-width:560px){
-    button{padding:8px 9px; font-size:var(--fs-label); border-radius:var(--r-sm);}
-    #bar{gap:5px; padding:6px; flex-wrap:wrap; justify-content:center;}
+    button{padding:var(--sp-8) var(--sp-9); font-size:var(--fs-label); border-radius:var(--r-sm);}
+    #bar{gap:var(--sp-5); padding:var(--sp-6); flex-wrap:wrap; justify-content:center;}
     #instrBtn{margin:0;}
-    #recBtn{width:32px; height:32px; padding:0; border-radius:50%; font-size:14px;}
+    #recBtn{width:32px; height:32px; padding:0; border-radius:var(--r-round); font-size:var(--fs-14);}
     /* Раскрытый бар в портрете переносится на ДВЕ строки (flex-wrap выше); его 2-я строка легла бы ПОД
        подсказку тура (top:56) — там оказываются ●/🎵/⚙. Пока бар РАСКРЫТ (.on без .min) и подсказка на
        ВЕРХНЕЙ позиции (не .mini/.low — те уже у нижней кромки), опускаем её ниже двух строк бара (плавно,
@@ -123,7 +105,7 @@
   }
   /* Кнопка-индикатор звукоряда «лад · тоника» — единственный вход в меню.
      Длинные названия ладов режем МНОГОТОЧИЕМ средствами CSS, а не обрезкой строки в JS. */
-  #scaleBtn{border-color:var(--accent); color:var(--accent); font-weight:600;
+  #scaleBtn{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);
     max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
   /* ---- ТРАНСПОРТ ЛУПЕРА: полоса под холстовой полосой лупера ----
@@ -133,32 +115,32 @@
      По ВЕРТИКАЛИ top ставит сам drawLooper (высота коробки растёт со слоями).
      z-index 11: выше холста, но ниже панелей (14/15) — открытое меню накрывает. */
   #loopTransport{position:fixed; left:10px; right:10px; max-width:580px; margin:0 auto;
-    z-index:11; display:none; justify-content:center; gap:6px;
-    padding:6px 8px; border-radius:var(--r-sm);
-    background:rgba(10,10,20,.74); border:1px solid rgba(255,255,255,.14);
+    z-index:var(--z-transport); display:none; justify-content:center; gap:var(--sp-6);
+    padding:var(--sp-6) var(--sp-8); border-radius:var(--r-sm);
+    background:var(--c-night-a74); border:1px solid var(--c-white-a14);
     backdrop-filter:blur(6px);}
   #loopTransport.on{display:flex;}
-  #loopTransport button{padding:7px 10px; font-size:var(--fs-label);}
-  @media (max-width:560px){ #loopTransport button{padding:6px 8px; font-size:var(--fs-hint);} }
+  #loopTransport button{padding:var(--sp-7) var(--sp-10); font-size:var(--fs-label);}
+  @media (max-width:560px){ #loopTransport button{padding:var(--sp-6) var(--sp-8); font-size:var(--fs-hint);} }
 
   /* ---- РЕДАКТОР ДОРОЖКИ: ПАНЕЛЬ ПИАНО-РОЛЛА (S5.0) ----
      Держит только то, у чего нет временнóй геометрии (закрыть · дорожка · зум; вкладок ролей с T4 нет); сетка — на холсте.
      z-index 12: выше холста (—) и транспорта (11), ниже панелей (14/15).
      Узкий экран: строка ПРОКРУЧИВАЕТСЯ по горизонтали, как #bar, — контролы не сжимаются ниже пальца. */
-  #rollBar{position:fixed; top:0; left:0; right:0; z-index:12; display:none;
-    gap:6px; padding:6px 8px; align-items:center; overflow-x:auto; scrollbar-width:none;
-    background:rgba(10,10,20,.92); border-bottom:1px solid rgba(255,255,255,.14);}
+  #rollBar{position:fixed; top:0; left:0; right:0; z-index:var(--z-edit-bar); display:none;
+    gap:var(--sp-6); padding:var(--sp-6) var(--sp-8); align-items:center; overflow-x:auto; scrollbar-width:none;
+    background:var(--c-night-a92); border-bottom:1px solid var(--c-white-a14);}
   #rollBar::-webkit-scrollbar{display:none;}
   #rollBar.on{display:flex;}
-  #rollBar button{padding:9px 11px; font-size:var(--fs-label); min-width:40px;}
+  #rollBar button{padding:var(--sp-9) var(--sp-11); font-size:var(--fs-label); min-width:40px;}
   /* Режим вставки — та же «включённая» раскраска, что у 🔄/⛶/🎵 в баре: оранжевая рамка и текст. */
-  #rollBar button.act{border-color:var(--accent); color:var(--accent); font-weight:600;}
+  #rollBar button.act{border-color:var(--accent); color:var(--accent); font-weight:var(--fw-semi);}
   /* ЗАМОРОЗКА (F5): .act — свежая (играет буфер), .warn — УСТАРЕЛА (правили после заморозки; звучит
      своими событиями). Оранжевый отличается от акцентного и в оттенках серого — светлее его. */
-  #rollBar button.warn{border-color:#f5a524; color:#f5a524; font-weight:600;}
+  #rollBar button.warn{border-color:var(--c-amber-55); color:var(--c-amber-55); font-weight:var(--fw-semi);}
   #rollBar button:disabled{opacity:.4;}
   /* Текущая сетка привязки — подпись, а не кнопка: её не нажимают, она объясняет, куда встанет палец. */
-  #rollSnap{flex:0 0 auto; font-size:var(--fs-hint); color:var(--dim); padding:0 2px; white-space:nowrap;}
+  #rollSnap{flex:0 0 auto; font-size:var(--fs-hint); color:var(--dim); padding:0 var(--sp-2); white-space:nowrap;}
   /* Пока редактор открыт, транспорт оставляет ОДНУ кнопку ▶ (прослушивание). ⤺ ✕ ⟳ ■ меняли бы песню
      под открытым редактором — вплоть до сноса самой открытой дорожки. */
   #loopTransport.roll>button:not(#loopBtn):not(#rollHome){display:none;}
@@ -166,19 +148,19 @@
      рядом с ▶. Так «в начало» и «играть» стоят вместе, а закрытый редактор видит прежнюю полосу. */
   /* ---- ОКНО АРАНЖИРОВКИ (AR1): бар — той же формы, что у редактора (z 12, сверху, прокрутка на узком экране); транспорт под ним
      оставляет ▶, ⏮ и ⟳ (скоба правится прямо в окне) — ⤺ ✕ ■ и ✎ живут на экране игры. ---- */
-  #arrBar{position:fixed; top:0; left:0; right:0; z-index:12; display:none;
-    gap:6px; padding:6px 8px; align-items:center; overflow-x:auto; scrollbar-width:none;
-    background:rgba(10,10,20,.92); border-bottom:1px solid rgba(255,255,255,.14);}
+  #arrBar{position:fixed; top:0; left:0; right:0; z-index:var(--z-edit-bar); display:none;
+    gap:var(--sp-6); padding:var(--sp-6) var(--sp-8); align-items:center; overflow-x:auto; scrollbar-width:none;
+    background:var(--c-night-a92); border-bottom:1px solid var(--c-white-a14);}
   #arrBar::-webkit-scrollbar{display:none;}
   #arrBar.on{display:flex;}
-  #arrBar button{padding:9px 11px; font-size:var(--fs-label); min-width:40px;}
-  #arrTitle{flex:1 1 auto; font-size:var(--fs-label); font-weight:600; white-space:nowrap; padding:0 4px;}
+  #arrBar button{padding:var(--sp-9) var(--sp-11); font-size:var(--fs-label); min-width:40px;}
+  #arrTitle{flex:1 1 auto; font-size:var(--fs-label); font-weight:var(--fw-semi); white-space:nowrap; padding:0 var(--sp-4);}
   /* AR2: поле имени дорожки — поверх заголовка строки окна (место и размер ставит ui). Тёмное, как окно; шрифт не мельче 16 px, иначе
      iOS приближает страницу при фокусе. Видимость — только атрибут hidden (display здесь не задаём). */
-  #laneNameIn,#secNameIn{position:fixed; z-index:13; box-sizing:border-box; padding:4px 8px; font:600 16px system-ui;
-    color:#fff; background:#1b1b2a; border:2px solid var(--accent); border-radius:6px; outline:none;}
+  #laneNameIn,#secNameIn{position:fixed; z-index:var(--z-field); box-sizing:border-box; padding:var(--sp-4) var(--sp-8); font:600 16px system-ui;
+    color:var(--c-white); background:var(--c-deep-14); border:2px solid var(--accent); border-radius:var(--r-xs); outline:none;}
   /* AR2: чип дорожки в редакторе — цветом РОЛИ дорожки (та же палитра, что у строки в окне); длинное имя — многоточием. */
-  #rollTrack{border-color:var(--role,rgba(255,255,255,.3)); color:var(--role,inherit); font-weight:600;
+  #rollTrack{border-color:var(--role,var(--c-white-a30)); color:var(--role,inherit); font-weight:var(--fw-semi);
     max-width:46vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:0 1 auto;}
   #loopTransport.arr>button:not(#loopBtn):not(#rollHome):not(#rgnBtn){display:none;}
   #loopTransport.arr>#rollHome{display:block;}
@@ -187,38 +169,38 @@
 
   /* Тост камеры: всплывает под верхней панелью при отказе переключения; сам гаснет (класс .on
      снимает JS по таймеру). Не мешает игре — pointer-events:none, показывается только с .on. */
-  #camMsg{position:fixed; top:52px; left:0; right:0; z-index:20; text-align:center;
+  #camMsg{position:fixed; top:52px; left:0; right:0; z-index:var(--z-cam-msg); text-align:center;
     opacity:0; transition:opacity .25s; pointer-events:none;}
   #camMsg.on{opacity:1;}
   /* ED7-fix2: the undo toast after ✕ — clickable (unlike #camMsg), below the camera toast */
-  #undoToast{position:fixed; top:96px; left:50%; transform:translateX(-50%); z-index:21; display:none; align-items:center; gap:12px;
-    background:rgba(10,10,20,.92); color:var(--ink); font-size:var(--fs-label); padding:6px 6px 6px 14px; border-radius:var(--r-sm);
-    border:1px solid rgba(255,255,255,.22); backdrop-filter:blur(6px); white-space:nowrap;}
+  #undoToast{position:fixed; top:96px; left:50%; transform:translateX(-50%); z-index:var(--z-toast); display:none; align-items:center; gap:var(--sp-12);
+    background:var(--c-night-a92); color:var(--ink); font-size:var(--fs-label); padding:var(--sp-6) var(--sp-6) var(--sp-6) var(--sp-14); border-radius:var(--r-sm);
+    border:1px solid var(--c-white-a22); backdrop-filter:blur(6px); white-space:nowrap;}
   #undoToast.on{display:flex;}
   /* LAT1: the Diagnostics overlay (top left, under the bar; small, readable on a phone) and the Bluetooth warning */
-  #latDiag{position:fixed; top:56px; left:8px; z-index:22; max-width:calc(100vw - 16px); padding:8px 10px; border-radius:var(--r-sm);
-    background:rgba(10,10,20,.82); color:var(--ink); font-size:var(--fs-hint);}
+  #latDiag{position:fixed; top:56px; left:8px; z-index:var(--z-diag); max-width:calc(100vw - 16px); padding:var(--sp-8) var(--sp-10); border-radius:var(--r-sm);
+    background:var(--c-night-a82); color:var(--ink); font-size:var(--fs-hint);}
   #latDiag[hidden]{display:none;}
-  #latDiag pre{margin:0 0 6px; font:inherit; font-variant-numeric:tabular-nums; white-space:pre-wrap;}
-  #latDiag .latBtns{display:flex; gap:8px;}
-  #latDiag button{padding:4px 10px; font-size:var(--fs-hint);}
-  #latWarn{position:fixed; top:140px; left:50%; transform:translateX(-50%); z-index:21; display:none; align-items:center; gap:12px;
-    max-width:min(560px, calc(100vw - 32px)); padding:10px 14px; border-radius:var(--r-sm); background:rgba(16,16,28,.92); color:var(--ink);
+  #latDiag pre{margin:0 0 var(--sp-6); font:inherit; font-variant-numeric:tabular-nums; white-space:pre-wrap;}
+  #latDiag .latBtns{display:flex; gap:var(--sp-8);}
+  #latDiag button{padding:var(--sp-4) var(--sp-10); font-size:var(--fs-hint);}
+  #latWarn{position:fixed; top:140px; left:50%; transform:translateX(-50%); z-index:var(--z-toast); display:none; align-items:center; gap:var(--sp-12);
+    max-width:min(560px, calc(100vw - 32px)); padding:var(--sp-10) var(--sp-14); border-radius:var(--r-sm); background:var(--c-panel-a92); color:var(--ink);
     font-size:var(--fs-label);}
   #latWarn.on{display:flex;}
-  #latWarn button{padding:6px 12px; font-size:var(--fs-label);}
+  #latWarn button{padding:var(--sp-6) var(--sp-12); font-size:var(--fs-label);}
   /* LAT3: the «Too dark» hint — small, top centre, taps pass through it (only its OK takes them) */
-  #darkHint{position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:21; display:none; align-items:center; gap:10px;
-    max-width:min(480px, calc(100vw - 32px)); padding:8px 12px; border-radius:var(--r-sm); background:rgba(16,16,28,.85); color:var(--ink);
+  #darkHint{position:fixed; top:64px; left:50%; transform:translateX(-50%); z-index:var(--z-toast); display:none; align-items:center; gap:var(--sp-10);
+    max-width:min(480px, calc(100vw - 32px)); padding:var(--sp-8) var(--sp-12); border-radius:var(--r-sm); background:var(--c-panel-a85); color:var(--ink);
     font-size:var(--fs-hint); pointer-events:none;}
   #darkHint.on{display:flex;}
-  #darkHint button{padding:4px 10px; font-size:var(--fs-hint); pointer-events:auto;}
-  #undoToast button{padding:6px 12px; font-size:var(--fs-label);}
+  #darkHint button{padding:var(--sp-4) var(--sp-10); font-size:var(--fs-hint); pointer-events:auto;}
+  #undoToast button{padding:var(--sp-6) var(--sp-12); font-size:var(--fs-label);}
   /* ED7-fix2: empty song, history not empty — the transport row keeps only ↶ ↷ */
   #loopTransport.empty>button:not(#histUndo):not(#histRedo){display:none;}
   #camMsg::before{content:attr(data-msg); display:inline-block;
-    background:rgba(10,10,20,.9); color:var(--ink); font-size:var(--fs-label);
-    padding:8px 14px; border-radius:var(--r-sm); border:1px solid rgba(255,255,255,.22);
+    background:var(--c-night-a90); color:var(--ink); font-size:var(--fs-label);
+    padding:var(--sp-8) var(--sp-14); border-radius:var(--r-sm); border:1px solid var(--c-white-a22);
     backdrop-filter:blur(6px);}
 
   /* 🎵 Подложка: в игре на кнопке стоит ИМЯ звучащего варианта («🥁 Регги (уан-дроп) · 8/12»), поэтому
@@ -230,24 +212,24 @@
   /* Выбор подложки (🎵): два пункта под кнопкой. Позицию (left/top) ставит ui.js по кнопке — бар
      переносится по ширине, фиксированной колонки у него нет. Пункт без ритмов для текущего размера
      ГАСНЕТ с причиной в title (disabled), а не открывает пустой цикл. */
-  #backingMenu{position:fixed; z-index:30; display:flex; flex-direction:column; gap:4px;
-    background:rgba(10,10,20,.94); border:1px solid rgba(255,255,255,.22);
-    border-radius:var(--r-sm); padding:5px; backdrop-filter:blur(6px);}
+  #backingMenu{position:fixed; z-index:var(--z-menu); display:flex; flex-direction:column; gap:var(--sp-4);
+    background:var(--c-night-a94); border:1px solid var(--c-white-a22);
+    border-radius:var(--r-sm); padding:var(--sp-5); backdrop-filter:blur(6px);}
   #backingMenu[hidden]{display:none;}
   #backingMenu button{width:100%; text-align:left; white-space:nowrap;}
   #backingMenu button:disabled{opacity:.45;}
 
-  #status{position:fixed; left:10px; right:10px; bottom:6px; z-index:10;
-    font-size:var(--fs-hint); color:var(--dim); text-shadow:0 1px 2px #000;
+  #status{position:fixed; left:10px; right:10px; bottom:6px; z-index:var(--z-bar);
+    font-size:var(--fs-hint); color:var(--dim); text-shadow:var(--sh-status);
     white-space:nowrap; overflow:hidden;}
 
   /* ---- ОБУЧЕНИЕ (тур): полупрозрачная полоса-подсказка сверху, поверх камеры (сетку/руки видно) ----
      z 12: выше бара (10) и холста, ниже панелей (14/15) — открытая панель её накрывает (в туре не нужны).
      Стоит ниже бара (top:56px), чтобы не закрывать кнопку роли — её жмут на шаге 5. */
-  #tutorBar{position:fixed; top:56px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:12;
-    display:none; background:rgba(10,10,20,.82); color:var(--ink);
-    border:1px solid rgba(255,255,255,.16); border-radius:var(--r-lg);
-    padding:12px 14px; backdrop-filter:blur(6px); box-shadow:0 8px 30px rgba(0,0,0,.35);
+  #tutorBar{position:fixed; top:56px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:var(--z-edit-bar);
+    display:none; background:var(--c-night-a82); color:var(--ink);
+    border:1px solid var(--c-white-a16); border-radius:var(--r-lg);
+    padding:var(--sp-12) var(--sp-14); backdrop-filter:blur(6px); box-shadow:var(--sh-tutorbar);
     transition:transform .28s ease, opacity .25s ease;}
   #tutorBar.on{display:block;}
   /* .hushed — палец РАБОТАЕТ ВНУТРИ открытой панели: подсказку гасим совсем (плавно, opacity) и делаем
@@ -260,7 +242,7 @@
      .mini — ПАНЕЛЬ ОТКРЫТА: подсказку СВОРАЧИВАЕМ в одну строку (ниже), а не двигаем целиком — полная даже
        внизу накрывала нижние ряды панели.
      100dvh (видимая высота на мобильных) с фолбэком 100vh. Геометрию панелей НЕ трогаем. */
-  #tutorBar.low{ z-index:16; transform:translateY(calc(100vh - 100% - 64px)); }
+  #tutorBar.low{ z-index:var(--z-tutor-low); transform:translateY(calc(100vh - 100% - 64px)); }
   #tutorBar.low{ transform:translateY(calc(100dvh - 100% - 64px)); }
   /* ПАНЕЛЬ ОТКРЫТА → СВЁРНУТАЯ подсказка у самой нижней кромки: только КРУПНАЯ ИНСТРУКЦИЯ + Next в одной
      строке; деталь, точки, Skip и камера-нота СПРЯТАНЫ — в панели не нужны, это даёт место. ИНСТРУКЦИЮ НЕ
@@ -277,7 +259,7 @@
      А `.mini` вешает syncTutorBarPos на ЛЮБОЕ открытие панели, идёт урок или нет, поэтому ВНЕ обучения
      открытие «Звукоряда» ВЫЗЫВАЛО пустую полосу с оранжевой кнопкой у нижней кромки. Видимость обязана
      решаться РОВНО одним классом — `.on`; положение (.mini/.low/.hushed) видимостью НЕ управляет. */
-  #tutorBar.on.mini{ z-index:16; display:flex; align-items:center; gap:10px; padding:10px 14px;
+  #tutorBar.on.mini{ z-index:var(--z-tutor-low); display:flex; align-items:center; gap:var(--sp-10); padding:var(--sp-10) var(--sp-14);
     pointer-events:none;
     transform:translateY(calc(100vh - 100% - 60px)); }
   #tutorBar.on.mini{ transform:translateY(calc(100dvh - 100% - 60px)); }
@@ -289,48 +271,48 @@
   #tutorBar.mini #tutorDots,
   #tutorBar.mini #tutorDone,
   #tutorBar.mini #tutorSkip{ display:none; }                         /* перебивает инлайн-display из paint: paint ставит '' (снимает инлайн) → правило класса действует */
-  #tutorText{font-size:17px; line-height:1.45;}   /* было var(--fs-ctl)=14px — подсказку читают в игре, подняли до 17 */
+  #tutorText{font-size:var(--fs-17); line-height:var(--lh-relaxed);}   /* было var(--fs-ctl)=14px — подсказку читают в игре, подняли до 17 */
   /* Объяснение шага: меньше и тише инструкции, ТЕСНО под ней (margin 4px) — читается как продолжение одного блока. Пусто → скрыто. */
-  #tutorDetail{font-size:14px; line-height:1.4; color:var(--dim); margin-top:4px;}
+  #tutorDetail{font-size:var(--fs-14); line-height:var(--lh-body); color:var(--dim); margin-top:var(--sp-4);}
   /* Камера-нота: тот же тихий размер, но ОТДЕЛЕНА большим зазором сверху — отдельная строка, не часть блока. Пусто → скрыта. */
-  #tutorAside{font-size:14px; line-height:1.4; color:var(--dim); margin-top:11px;}
-  #tutorBottom{display:flex; align-items:center; gap:10px; margin-top:11px;}
-  #tutorDots{flex:1; min-width:0; letter-spacing:3px; font-size:12px; color:var(--dim);}
+  #tutorAside{font-size:var(--fs-14); line-height:var(--lh-body); color:var(--dim); margin-top:var(--sp-11);}
+  #tutorBottom{display:flex; align-items:center; gap:var(--sp-10); margin-top:var(--sp-11);}
+  #tutorDots{flex:1; min-width:0; letter-spacing:3px; font-size:var(--fs-12); color:var(--dim);}
   /* Тик подтверждения выполненного шага — зелёный, рядом с Next. Пусто/не выполнено → скрыт (JS ставит display). */
-  #tutorDone{flex:0 0 auto; color:#57d9a3; font-weight:700; font-size:16px;}
+  #tutorDone{flex:0 0 auto; color:var(--c-tonic); font-weight:var(--fw-bold); font-size:var(--fs-16);}
   /* Next — главная (акцент-заливка, тёмный текст, как «Играть»); Skip — тихая ссылка. */
-  #tutorNext{flex:0 0 auto; background:var(--accent); color:#3a2600; border:none; font-weight:700;
-    border-radius:var(--r-sm); padding:8px 14px; font-size:var(--fs-ctl);}
+  #tutorNext{flex:0 0 auto; background:var(--accent); color:var(--c-deep-11); border:none; font-weight:var(--fw-bold);
+    border-radius:var(--r-sm); padding:var(--sp-8) var(--sp-14); font-size:var(--fs-ctl);}
   /* Шаг выполнен → мягкое акцент-свечение Next: «сделано, жми Дальше». АВТО-перехода нет — только подсказка глазу. */
   #tutorNext.ready{animation:tutorReady 1.15s ease-in-out infinite;}
-  @keyframes tutorReady{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,158,44,.6); } 50%{ box-shadow:0 0 0 7px rgba(255,158,44,0); } }
+  @keyframes tutorReady{ 0%,100%{ box-shadow:var(--sh-tutor-ready-0); } 50%{ box-shadow:var(--sh-tutor-ready-50); } }
   #tutorSkip{flex:0 0 auto; background:transparent; color:var(--dim); border:none;
-    font-size:var(--fs-ctl); text-decoration:underline; padding:8px 6px;}
+    font-size:var(--fs-ctl); text-decoration:underline; padding:var(--sp-8) var(--sp-6);}
   /* Финал тура: мягкий пульс акцентом на кнопке лада — указываем, НИЧЕГО не открывая. */
   #scaleBtn.tutorPoint{ animation:tutorPulse 1.1s ease-in-out infinite; }
-  @keyframes tutorPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(255,158,44,.5); } 50%{ box-shadow:0 0 0 6px rgba(255,158,44,0); } }
+  @keyframes tutorPulse{ 0%,100%{ box-shadow:var(--sh-tutor-pulse-0); } 50%{ box-shadow:var(--sh-tutor-pulse-50); } }
 
   /* ---- СПИСОК УРОКОВ (меню обучения) ---- Модальный оверлей: открыт со стартовой карточки И из урока
      (возврат к списку). z 33: выше старта (30) и панелей — это модал. Светлая карточка = меню. Строки
      рисует src/tutor.js. Ряд без шагов — «Скоро» (disabled); выполненный — тихая галочка (не гейт). */
-  #lessonOv{z-index:33; background:rgba(7,7,13,.86);}
+  #lessonOv{z-index:var(--z-lesson); background:var(--c-bg-a86);}
   #lessonOv.on{display:flex; align-items:center; justify-content:center;}
-  .lessonCard{width:100%; max-width:420px; margin:auto; background:#ffffff; color:#1e2233;
-    border:1px solid rgba(20,24,50,.12); border-radius:var(--r-lg); padding:20px;
-    box-shadow:0 16px 44px rgba(40,50,90,.28);}
-  .lessonHead{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;}
-  .lessonHead b{font-size:var(--fs-head); color:#1e2233;}
-  #lessonClose{background:#eef1f8; color:#2a2f45; border:1px solid rgba(20,24,50,.16);
-    border-radius:var(--r-sm); padding:7px 11px; font-size:var(--fs-label); font-weight:600;}
-  .lessonRow{display:block; width:100%; text-align:left; background:#eef1f8; color:#2a2f45;
-    border:1px solid rgba(20,24,50,.14); border-radius:var(--r-sm); padding:11px 13px; margin:9px 0; font-weight:600;}
+  .lessonCard{width:100%; max-width:420px; margin:auto; background:var(--c-white); color:var(--c-deep-16);
+    border:1px solid var(--c-shade-a12); border-radius:var(--r-lg); padding:var(--sp-20);
+    box-shadow:var(--sh-lessoncard);}
+  .lessonHead{display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--sp-12);}
+  .lessonHead b{font-size:var(--fs-head); color:var(--c-deep-16);}
+  #lessonClose{background:var(--c-paper-95); color:var(--c-slate-22); border:1px solid var(--c-shade-a16);
+    border-radius:var(--r-sm); padding:var(--sp-7) var(--sp-11); font-size:var(--fs-label); font-weight:var(--fw-semi);}
+  .lessonRow{display:block; width:100%; text-align:left; background:var(--c-paper-95); color:var(--c-slate-22);
+    border:1px solid var(--c-shade-a14); border-radius:var(--r-sm); padding:var(--sp-11) var(--sp-13); margin:var(--sp-9) 0; font-weight:var(--fw-semi);}
   .lessonRow:disabled{opacity:.55;}
-  .lr-top{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
-  .lr-title{font-size:var(--fs-ctl); color:#1e2233;}
-  .lr-badge{flex:0 0 auto; font-size:var(--fs-hint); font-weight:700; color:var(--accent-ink);}   /* ✓ выполнено / «Скоро» */
-  .lr-desc{font-size:var(--fs-label); color:#5a6079; font-weight:400; margin-top:4px; line-height:1.4;}
-  #lessonFree{width:100%; margin-top:6px; background:var(--accent); color:#3a2600; border:none;
-    font-weight:700; border-radius:var(--r-sm); padding:12px; font-size:var(--fs-ctl);}
+  .lr-top{display:flex; justify-content:space-between; align-items:baseline; gap:var(--sp-8);}
+  .lr-title{font-size:var(--fs-ctl); color:var(--c-deep-16);}
+  .lr-badge{flex:0 0 auto; font-size:var(--fs-hint); font-weight:var(--fw-bold); color:var(--accent-ink);}   /* ✓ выполнено / «Скоро» */
+  .lr-desc{font-size:var(--fs-label); color:var(--c-slate-41); font-weight:var(--fw-regular); margin-top:var(--sp-4); line-height:var(--lh-body);}
+  #lessonFree{width:100%; margin-top:var(--sp-6); background:var(--accent); color:var(--c-deep-11); border:none;
+    font-weight:var(--fw-bold); border-radius:var(--r-sm); padding:var(--sp-12); font-size:var(--fs-ctl);}
 
   /* ---- ПАНЕЛИ (звукоряд + лупер): СВЕТЛАЯ тема, как стартовая карточка ----
      Панели лежат ПОВЕРХ камеры (обычно ярко освещённая комната), поэтому фон ОПАКОВЫЙ белый —
@@ -339,10 +321,10 @@
      СТРОГО под #panelScale/#panelSound/#panelLoop и панельные классы (.prow/.psep/…, они есть только тут); базовые
      button/#bar/оверлеи не трогаем. Акцент .act — оранжевая заливка var(--accent) с тёмным текстом. */
   /* ---- МЕНЮ ЗВУКОРЯДА: оверлей (открыл → выбрал → закрыл) ---- */
-  #panelScale,#panelSound{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:15;
-    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:var(--r-lg);
-    padding:16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
-    box-shadow:0 16px 44px rgba(40,50,90,.22);}
+  #panelScale,#panelSound{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:var(--z-panel-top);
+    background:var(--c-white); color:var(--c-deep-16); border:1px solid var(--c-shade-a14); border-radius:var(--r-lg);
+    padding:var(--sp-16); display:none; max-height:calc(100vh - 72px); overflow-y:auto;
+    box-shadow:var(--sh-panel);}
   #panelScale.on,#panelSound.on{display:block;}
 
   /* ---- ПАНЕЛЬ ЛУПЕРА ----
@@ -351,38 +333,38 @@
      компромисс СОЗНАТЕЛЬНО развёрнут ради удобства: панель занимает то же место, что и «Звукоряд»
      (сверху, во всю доступную высоту) — так короткая панель без прокрутки читается лучше, а сетку
      тактов видно после закрытия (панели взаимоисключаемы). Геометрия 1-в-1 с #panelScale. */
-  #panelLoop{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:14;
-    background:#ffffff; color:#1e2233; border:1px solid rgba(20,24,50,.14); border-radius:var(--r-lg);
-    padding:16px; display:none; max-height:calc(100vh - 72px); overflow-y:auto;
-    box-shadow:0 16px 44px rgba(40,50,90,.22);}
+  #panelLoop{position:fixed; top:52px; left:8px; right:8px; max-width:560px; margin:0 auto; z-index:var(--z-panel);
+    background:var(--c-white); color:var(--c-deep-16); border:1px solid var(--c-shade-a14); border-radius:var(--r-lg);
+    padding:var(--sp-16); display:none; max-height:calc(100vh - 72px); overflow-y:auto;
+    box-shadow:var(--sh-panel);}
   #panelLoop.on{display:block;}
-  .prow{display:flex; align-items:center; gap:10px; margin:10px 0;}
-  .prow label{flex:0 0 128px; font-size:var(--fs-label); color:#5a6079;}
+  .prow{display:flex; align-items:center; gap:var(--sp-10); margin:var(--sp-10) 0;}
+  .prow label{flex:0 0 128px; font-size:var(--fs-label); color:var(--c-slate-41);}
   .prow select,.prow input[type=range],.prow .seg{flex:1; min-width:0;}
-  select{background:#14142a; color:var(--ink); border:1px solid rgba(255,255,255,.22);
-    border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl); width:100%; font-family:var(--font);}
+  select{background:var(--c-deep-12); color:var(--ink); border:1px solid var(--c-white-a22);
+    border-radius:var(--r-sm); padding:var(--sp-8); font-size:var(--fs-ctl); width:100%; font-family:var(--font);}
   /* Списки светлые (лад — длинный список, должен читаться); опаковый белый фон и тёмный текст. */
-  #panelScale select,#panelSound select,#panelLoop select{background:#f4f6fc; color:#1e2233;
-    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm);}
+  #panelScale select,#panelSound select,#panelLoop select{background:var(--c-paper-97); color:var(--c-deep-16);
+    border:1px solid var(--c-shade-a20); border-radius:var(--r-sm);}
   input[type=range]{accent-color:var(--accent);}
-  .val{flex:0 0 44px; font-size:var(--fs-label); color:#1e2233; text-align:right;}
-  .seg{display:flex; gap:6px;}
+  .val{flex:0 0 44px; font-size:var(--fs-label); color:var(--c-deep-16); text-align:right;}
+  .seg{display:flex; gap:var(--sp-6);}
   .seg button{flex:1;}
   #chordModeSeg{flex-wrap:wrap;}   /* F6b: режимов аккордов в наборе бывает до 8 — ряд переносится, кнопки под палец */
   #chordModeSeg button{flex:1 1 30%; min-width:6.5em;}   /* двум кнопкам — та же поровну ширина, что у .seg (flex:1); с третьей и дальше ряд переносится */
   /* Кнопки внутри панелей — светлая второстепенная тема (как #learnBtn), КРОМЕ активных (.act):
      у активных оранжевый акцент var(--accent) — читается как «выбрано» и на светлом. */
-  #panelScale button:not(.act),#panelSound button:not(.act),#panelLoop button:not(.act){background:#eef1f8; color:#2a2f45;
-    border:1px solid rgba(20,24,50,.16); border-radius:var(--r-sm); font-weight:600;}
+  #panelScale button:not(.act),#panelSound button:not(.act),#panelLoop button:not(.act){background:var(--c-paper-95); color:var(--c-slate-22);
+    border:1px solid var(--c-shade-a16); border-radius:var(--r-sm); font-weight:var(--fw-semi);}
   /* Выбранный сегмент — оранжевая заливка var(--accent)=#ff9e2c, ТЁМНЫЙ текст #1a1206 (исходная пара;
      белый на #ff9e2c был бы ≈2.1:1 — нечитаемо, поэтому текст тёмный). */
-  .seg button.act{background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:600;}
+  .seg button.act{background:var(--accent); color:var(--c-deep-6); border-color:var(--accent); font-weight:var(--fw-semi);}
   .seg button:disabled{opacity:.4; cursor:default;}   /* септаккорд, который в этом ладу ничего не добавляет (ui.renderSevCtl) */
-  .phead{display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;}
-  .phead b{font-size:var(--fs-head); color:#1e2233;}
-  .psep{border-top:1px solid rgba(20,24,50,.12); margin:14px 0 4px; padding-top:6px;
-    font-size:var(--fs-hint); color:#6a7089; text-transform:uppercase; letter-spacing:.06em;}
-  .phint{font-size:var(--fs-hint); color:#6a7089; line-height:1.4; margin:6px 2px 2px;}
+  .phead{display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--sp-4);}
+  .phead b{font-size:var(--fs-head); color:var(--c-deep-16);}
+  .psep{border-top:1px solid var(--c-shade-a12); margin:var(--sp-14) 0 var(--sp-4); padding-top:var(--sp-6);
+    font-size:var(--fs-hint); color:var(--c-slate-48); text-transform:uppercase; letter-spacing:.06em;}
+  .phint{font-size:var(--fs-hint); color:var(--c-slate-48); line-height:var(--lh-body); margin:var(--sp-6) var(--sp-2) var(--sp-2);}
   /* Недоступный ряд панели: гасим подпись, но НЕ прячем — пропавший контрол человек объяснить не
      может. Сейчас ни один ряд «Звукоряда» так не гаснет («Раскладка нот» доступна всем ладам —
      переменное число нот в прямоугольнике раскладывает любой), правило оставлено как общее. */
@@ -390,50 +372,53 @@
   #panelScale select:disabled,#panelSound select:disabled,#panelLoop select:disabled{opacity:.5;}
   /* Функции рук: маленький ярлык роли (🎸 Соло / 🎚 Бас) над парой строк Левая/Правая — группирует
      назначения по роли, но строки помечены РУКОЙ (видно, что выбор на руку, не на половину). */
-  .handFnRole{font-size:var(--fs-label); color:#6a7089; font-weight:600; margin:10px 2px 2px; letter-spacing:.02em;}
+  .handFnRole{font-size:var(--fs-label); color:var(--c-slate-48); font-weight:var(--fw-semi); margin:var(--sp-10) var(--sp-2) var(--sp-2); letter-spacing:.02em;}
   /* Эталон A4: пресет-список тянется, поле числа узкое справа, «Гц» — подпись. Светлая тема панели. */
   #aRefRow .seg{align-items:center;}
   #aRefRow #aRefSel{flex:1; min-width:0;}
-  #aRefRow #aRefInput{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
-    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl);}
-  #aRefRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:#5a6079;}
+  #aRefRow #aRefInput{flex:0 0 62px; background:var(--c-paper-97); color:var(--c-deep-16); text-align:right;
+    border:1px solid var(--c-shade-a20); border-radius:var(--r-sm); padding:var(--sp-8); font-size:var(--fs-ctl);}
+  #aRefRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:var(--c-slate-41);}
   /* TF5: the key's cents nudge beside the note select («1/1 = G  +12 ¢»); the historical 1/1 — one button under it */
-  #tonicRow #tonicCents{flex:0 0 62px; background:#f4f6fc; color:#1e2233; text-align:right;
-    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px; font-size:var(--fs-ctl);}
-  #tonicRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:#5a6079;}
+  #tonicRow #tonicCents{flex:0 0 62px; background:var(--c-paper-97); color:var(--c-deep-16); text-align:right;
+    border:1px solid var(--c-shade-a20); border-radius:var(--r-sm); padding:var(--sp-8); font-size:var(--fs-ctl);}
+  #tonicRow .unit{flex:0 0 auto; font-size:var(--fs-label); color:var(--c-slate-41);}
   #tonicHistRow #tonicHist{flex:1; min-width:0;}
+  /* SAVE1: the song's name in the Looper panel — the same light field as A4 and the cents */
+  #panelLoop #songName{flex:1; min-width:0; background:var(--c-paper-97); color:var(--c-deep-16); border:1px solid var(--c-shade-a20);
+    border-radius:var(--r-sm); padding:var(--sp-8); font-size:var(--fs-ctl); font-family:var(--font);}
   /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: заголовок эффекта = строка аккордеона (Пласт 3.4.3) ═══
      [▸/▾][имя][сводка адресов][✕] — одна строка на эффект, пока он свёрнут.
      ⚠️ НЕСУЩЕЕ ЗДЕСЬ — .fxsum: она одна тянется (flex:1) и одна же обрезается многоточием. Без
      min-width:0 flex-элемент не сжимается МЕНЬШЕ СВОЕГО СОДЕРЖИМОГО, сводка распёрла бы строку, и на
      380px ✕ уехал бы за край — то есть кнопка «убрать» стала бы недоступна ровно на том экране, ради
      которого аккордеон и делался. Имя и ✕ не сжимаются (flex:0 0 auto) — они обязаны быть целыми. */
-  .fxhead{display:flex; align-items:center; gap:8px; cursor:pointer;
-    margin:10px 2px 2px; padding:4px 2px; border-radius:var(--r-sm);}
-  .fxhead:hover{background:rgba(20,24,50,.04);}
-  .fxhead .fxarw{flex:0 0 auto; font-size:10px; color:#8a90a8;}
-  .fxhead .fxname{flex:0 0 auto; font-size:var(--fs-label); color:#3a4060; font-weight:600; letter-spacing:.02em;}
-  .fxhead .fxsum{flex:1; min-width:0; font-size:var(--fs-hint); color:#6a7089;
+  .fxhead{display:flex; align-items:center; gap:var(--sp-8); cursor:pointer;
+    margin:var(--sp-10) var(--sp-2) var(--sp-2); padding:var(--sp-4) var(--sp-2); border-radius:var(--r-sm);}
+  .fxhead:hover{background:var(--c-shade-a04);}
+  .fxhead .fxarw{flex:0 0 auto; font-size:var(--fs-10); color:var(--c-slate-60);}
+  .fxhead .fxname{flex:0 0 auto; font-size:var(--fs-label); color:var(--c-slate-30); font-weight:var(--fw-semi); letter-spacing:.02em;}
+  .fxhead .fxsum{flex:1; min-width:0; font-size:var(--fs-hint); color:var(--c-slate-48);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;}
   .fxhead.open .fxsum{opacity:.5;}   /* развёрнут — адреса видны в самих строках, сводка становится фоном */
-  .fxhead .fxdel{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:2px 6px;
-    color:#8a90a8; font-size:var(--fs-ctl); line-height:1; border-radius:var(--r-sm);}
-  .fxhead .fxdel:hover{color:#d9534f; background:rgba(217,83,79,.10);}
+  .fxhead .fxdel{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:var(--sp-2) var(--sp-6);
+    color:var(--c-slate-60); font-size:var(--fs-ctl); line-height:var(--lh-solid); border-radius:var(--r-sm);}
+  .fxhead .fxdel:hover{color:var(--c-danger); background:var(--c-danger-a10);}
   /* ▲▼ — перестановка в последовательной цепи (слайс O-1). Тот же рост и та же зона нажатия, что у ✕:
      кнопки стоят в одном ряду, и разнобой читался бы как разная важность. Отключённая (крайняя запись)
      НЕ исчезает, а гаснет — иначе соседние органы прыгали бы при каждом шаге. */
-  .fxhead .fxmv{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:2px 5px;
-    color:#8a90a8; font-size:var(--fs-hint); line-height:1; border-radius:var(--r-sm);}
-  .fxhead .fxmv:hover:not(:disabled){color:#3a4060; background:rgba(20,24,50,.06);}
+  .fxhead .fxmv{flex:0 0 auto; background:none; border:0; cursor:pointer; padding:var(--sp-2) var(--sp-5);
+    color:var(--c-slate-60); font-size:var(--fs-hint); line-height:var(--lh-solid); border-radius:var(--r-sm);}
+  .fxhead .fxmv:hover:not(:disabled){color:var(--c-slate-30); background:var(--c-shade-a06);}
   .fxhead .fxmv:disabled{opacity:.25; cursor:default;}
   /* Чип «×N» — ОДИН АДРЕС ВЕДЁТ НЕСКОЛЬКО ПАРАМЕТРОВ (Пласт 3.4.4). Маркер, а не предупреждение:
      совместность ЗАДУМАНА, поэтому тон нейтрально-акцентный, а не красный (красный читался бы как
      ошибка, которую надо чинить, — и человек «чинил» бы то, что нарочно настроил).
      flex:0 0 auto — чип не сжимается и не обрезается: в заголовке первой уступает сводка (.fxsum),
      в строке параметра — переносится вся строка (.fxsub{flex-wrap:wrap}). */
-  .fxshare{flex:0 0 auto; cursor:help; font-size:var(--fs-hint); font-weight:600; line-height:1;
-    padding:2px 6px; border-radius:999px; color:#4a5580;
-    background:rgba(76,194,255,.16); border:1px solid rgba(76,194,255,.35);}
+  .fxshare{flex:0 0 auto; cursor:help; font-size:var(--fs-hint); font-weight:var(--fw-semi); line-height:var(--lh-solid);
+    padding:var(--sp-2) var(--sp-6); border-radius:var(--r-pill); color:var(--c-slate-40);
+    background:var(--c-sky-a16); border:1px solid var(--c-sky-a35);}
   /* ═══ КОНСТРУКТОР ЭФФЕКТОВ: подстрока параметра (адрес + инверсия ИЛИ число со ступеньками) ═══
      ⚠️ ГЛАВНОЕ ПРАВИЛО ЭТОГО БЛОКА — .fxmode, и оно несущее, а не косметика. Глобально у нас
      `select{width:100%}` (строка ~292). Пока селект внутри .prow получает `flex:1` (basis 0), ширина
@@ -446,7 +431,7 @@
   .prow select.fxmode{flex:0 1 auto; width:auto; min-width:0;}
   /* Тесно — ступеньки уходят НА ВТОРУЮ СТРОКУ, а не в нулевую ширину: на узком телефоне подстрока
      несёт подпись + режим + три контрола, и одной строки может не хватить честно. */
-  .prow.fxsub{flex-wrap:wrap; row-gap:6px;}
+  .prow.fxsub{flex-wrap:wrap; row-gap:var(--sp-6);}
   .prow.fxsub .seg{flex:1 0 132px;}   /* не уже своих трёх контролов (40+поле+40+зазоры) — иначе поле снова схлопнется */
   /* Фиксированное значение параметра — ЧИСЛОВОЕ ПОЛЕ со ступеньками −/＋, а НЕ ползунок.
      ⚠️ ПОЧЕМУ НЕ ПОЛЗУНОК (настоящая причина, не та, что стояла тут раньше): ползунок жил в этой же
@@ -454,8 +439,8 @@
      как его ЛЕВЫЙ КРАЙ, то есть 0. Обработчик честно записывал этот ноль в состояние, отсюда и
      «уехало в ноль и залипло». Дело было в ШИРИНЕ, а НЕ в `touch-action:none` (он у html,body есть, но
      к этому отношения не имел — не гонитесь за ним). Форма поля — та же светлая, что у эталона A4. */
-  .prow .seg .numv{flex:1; min-width:0; background:#f4f6fc; color:#1e2233; text-align:center;
-    border:1px solid rgba(20,24,50,.20); border-radius:var(--r-sm); padding:8px;
+  .prow .seg .numv{flex:1; min-width:0; background:var(--c-paper-97); color:var(--c-deep-16); text-align:center;
+    border:1px solid var(--c-shade-a20); border-radius:var(--r-sm); padding:var(--sp-8);
     font-size:var(--fs-ctl); font-family:var(--font); -moz-appearance:textfield;}
   /* Нативные крутилки прячем: у нас свои −/＋ (на тач нативные почти не попадаемы). */
   .prow .seg .numv::-webkit-outer-spin-button,
@@ -464,98 +449,98 @@
   #loopBarsV{flex:1; text-align:center; align-self:center;}
 
   /* ---- оверлеи: старт и учебник ---- */
-  .ov{position:fixed; inset:0; z-index:25; background:rgba(7,7,13,.94);
-    display:none; overflow-y:auto; padding:22px 18px 40px;}
+  .ov{position:fixed; inset:0; z-index:var(--z-overlay); background:var(--c-bg-a94);
+    display:none; overflow-y:auto; padding:var(--sp-22) var(--sp-18) var(--sp-40);}
   .ov.on{display:block;}
-  .ov .inner{max-width:640px; margin:0 auto; font-size:14px; line-height:1.55;}
-  .ov h1{font-size:26px; margin:6px 0 12px;} .ov h1 span{color:var(--note);}
-  .ov h2{color:var(--note); font-size:17px; margin:20px 0 6px;}
+  .ov .inner{max-width:640px; margin:0 auto; font-size:var(--fs-14); line-height:var(--lh-loose);}
+  .ov h1{font-size:var(--fs-26); margin:var(--sp-6) 0 var(--sp-12);} .ov h1 span{color:var(--note);}
+  .ov h2{color:var(--note); font-size:var(--fs-17); margin:var(--sp-20) 0 var(--sp-6);}
   .ov b{color:var(--tonic);}
-  .ov code{background:#14142a; border-radius:6px; padding:1px 6px; font-size:13px;}
-  .ov .closeRow{position:sticky; top:0; text-align:right; z-index:2;}
+  .ov code{background:var(--c-deep-12); border-radius:var(--r-xs); padding:var(--sp-1) var(--sp-6); font-size:var(--fs-13);}
+  .ov .closeRow{position:sticky; top:0; text-align:right; z-index:var(--z-sticky);}
 
   /* #helpOv держим выше стартового слоя (z30) и демо (z35) — учебник всплывает над всем. */
-  #helpOv{z-index:40;}
+  #helpOv{z-index:var(--z-help);}
 
   /* СТАРТ — СВЕТЛЫЙ приветственный слой (после «▶ Играть» экран занимает камера освещённой комнаты;
      светлый старт с ней созвучен). Светлый фон-градиент + белая карточка с ТЁМНЫМ текстом. ВСЕ стили
      строго под #start/.startCard — тёмная тема приложения (бар/панели/оверлеи) не затрагивается. */
-  #start{z-index:30; display:none;
-    background:linear-gradient(160deg,#eef2fb 0%,#e3e9f5 55%,#dbe6f1 100%);
-    overflow-y:auto; padding:20px;}
+  #start{z-index:var(--z-menu); display:none;
+    background:linear-gradient(160deg,var(--c-paper-96) 0%,var(--c-paper-93) 55%,var(--c-paper-90) 100%);
+    overflow-y:auto; padding:var(--sp-20);}
   #start.on{display:flex; align-items:center; justify-content:center;}   /* id+.on перебивает .ov.on (display:block) */
-  .startCard{width:100%; max-width:340px; margin:auto; text-align:center; color:#1e2233;   /* тёмный текст наследуется всей карточкой; margin:auto центрирует и даёт прокрутку */
-    background:#ffffff; border:1px solid rgba(20,24,50,.12);
-    border-radius:var(--r-lg); padding:26px 24px 20px; box-shadow:0 16px 44px rgba(40,50,90,.18);}
+  .startCard{width:100%; max-width:340px; margin:auto; text-align:center; color:var(--c-deep-16);   /* тёмный текст наследуется всей карточкой; margin:auto центрирует и даёт прокрутку */
+    background:var(--c-white); border:1px solid var(--c-shade-a12);
+    border-radius:var(--r-lg); padding:var(--sp-26) var(--sp-24) var(--sp-20); box-shadow:var(--sh-startcard);}
   /* «Handsong» — двухтоновый заголовок: «Hand» тёмный (#1e2233), «song» в тёплом акценте (--accent-ink,
      жжёный янтарь ≈5:1 на белом — читаемо; бледный #ff9e2c как крупный текст был бы ≈2.1:1). Оживляет
      имя, как раньше акцентная «Synth» в «Air Synth 3». Одно слово окрашено наполовину — не радуга. */
-  .startCard h1{font-size:28px; margin:2px 0 6px; color:#1e2233;}
+  .startCard h1{font-size:var(--fs-28); margin:var(--sp-2) 0 var(--sp-6); color:var(--c-deep-16);}
   .startCard h1 span{color:var(--accent-ink);}
-  .startTag{font-size:var(--fs-label); color:#5a6079; margin:0 0 20px;}
-  .startBtns{display:flex; flex-direction:column; gap:11px; align-items:stretch;}
+  .startTag{font-size:var(--fs-label); color:var(--c-slate-41); margin:0 0 var(--sp-20);}
+  .startBtns{display:flex; flex-direction:column; gap:var(--sp-11); align-items:stretch;}
   /* Кнопки старта — СВОЯ светлая тема (базовый button тёмный). «Играть» — ГЛАВНАЯ кнопка, оранжевая
      заливка var(--accent)=#ff9e2c (единый акцент приложения) с ТЁМНЫМ текстом #3a2600 (исходная пара,
      высокий контраст на оранжевом), доминирует над второстепенной; «Обучение» — светлая второстепенная. */
-  #start button{border-radius:var(--r-sm); line-height:1.1;}
-  #startBtn{font-size:18px; padding:15px 32px; background:var(--accent);
-    color:#3a2600; border:none; font-weight:700;}
-  #learnBtn{font-size:15px; padding:12px 20px; background:#eef1f8;
-    color:#2a2f45; border:1px solid rgba(20,24,50,.16); font-weight:600;}
-  #loadmsg{font-size:var(--fs-hint); color:#5a6079; min-height:1.2em; margin:12px 0 0;}
+  #start button{border-radius:var(--r-sm); line-height:var(--lh-tight);}
+  #startBtn{font-size:var(--fs-18); padding:var(--sp-15) var(--sp-32); background:var(--accent);
+    color:var(--c-deep-11); border:none; font-weight:var(--fw-bold);}
+  #learnBtn{font-size:var(--fs-15); padding:var(--sp-12) var(--sp-20); background:var(--c-paper-95);
+    color:var(--c-slate-22); border:1px solid var(--c-shade-a16); font-weight:var(--fw-semi);}
+  #loadmsg{font-size:var(--fs-hint); color:var(--c-slate-41); min-height:1.2em; margin:var(--sp-12) 0 0;}
   /* LAT2: while the app starts (model, warm-up, camera) the message line pulses — an opacity animation the compositor keeps running
      even when the main thread is busy (the fallback warms the model on it) */
-  #camRetry{margin:10px auto 0; padding:9px 22px; font-size:15px;}   /* 0b: after a failed start */
+  #camRetry{margin:var(--sp-10) auto 0; padding:var(--sp-9) var(--sp-22); font-size:var(--fs-15);}   /* 0b: after a failed start */
   #camRetry[hidden]{display:none;}
-  #start.busy #loadmsg{animation:loadPulse 1.1s ease-in-out infinite; color:#3d4a8a;}
+  #start.busy #loadmsg{animation:loadPulse 1.1s ease-in-out infinite; color:var(--c-slate-39);}
   @keyframes loadPulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
-  #learnMsg{font-size:var(--fs-hint); color:#b26a00; min-height:1em; margin:6px 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
+  #learnMsg{font-size:var(--fs-hint); color:var(--c-amber-35); min-height:1em; margin:var(--sp-6) 0 0;}   /* «скоро»-заметка — тёмно-янтарная, читается на белом */
   /* ⬇ Установка (PWA) — ТИХАЯ кнопка ПОД двумя главными: своя тонкая рамка (не заливка var(--note)/светлая
      как у главных), поэтому не спорит с «Играть»/«Обучение». Отдельный ребёнок карточки (не в .startBtns —
      там stretch-колонка), центрируется text-align. #installHint — короткая подпись/iOS-инструкция под ней.
      id-селектор перебивает #start button. Видимостью управляет ui.js (installProbe). */
-  #installBtn{display:flex; width:fit-content; align-items:center; gap:6px; margin:14px auto 0;
-    font-size:var(--fs-label); padding:9px 18px; background:transparent; color:var(--accent-ink);
-    border:1px solid rgba(180,83,9,.5); border-radius:var(--r-sm); font-weight:600;}
-  #installHint{font-size:var(--fs-hint); color:#6a7089; margin:7px 0 0; line-height:1.45;}
+  #installBtn{display:flex; width:fit-content; align-items:center; gap:var(--sp-6); margin:var(--sp-14) auto 0;
+    font-size:var(--fs-label); padding:var(--sp-9) var(--sp-18); background:transparent; color:var(--accent-ink);
+    border:1px solid var(--c-accent-ink-a50); border-radius:var(--r-sm); font-weight:var(--fw-semi);}
+  #installHint{font-size:var(--fs-hint); color:var(--c-slate-48); margin:var(--sp-7) 0 0; line-height:var(--lh-relaxed);}
   /* ⛶ полноэкранный — ЗАМЕТНАЯ вторичная кнопка (полезна почти всем каждый сеанс): по весу близка к двум
      главным (15px, крупный padding), но остаётся вторичной — контурная, не залита как «Играть»/«Обучение».
      Не в .startBtns (там stretch-колонка) — отдельный ребёнок карточки, центрируется text-align. .act =
      уже во весь экран (синий акцент ссылок карточки). id-селектор — перебить #start button. */
-  #fsBtnStart{display:flex; width:fit-content; align-items:center; gap:7px; margin:16px auto 0;
-    font-size:15px; padding:11px 24px; background:transparent; color:#3a4059;
-    border:1px solid rgba(20,24,50,.24); border-radius:var(--r-sm); font-weight:600;}
-  #fsBtnStart.act{color:var(--accent-ink); border-color:rgba(180,83,9,.5);}
+  #fsBtnStart{display:flex; width:fit-content; align-items:center; gap:var(--sp-7); margin:var(--sp-16) auto 0;
+    font-size:var(--fs-15); padding:var(--sp-11) var(--sp-24); background:transparent; color:var(--c-slate-29);
+    border:1px solid var(--c-shade-a24); border-radius:var(--r-sm); font-weight:var(--fw-semi);}
+  #fsBtnStart.act{color:var(--accent-ink); border-color:var(--c-accent-ink-a50);}
   /* Подвал — читаемо на телефоне (13px), но тише и мельче двух главных кнопок (18/15px), чтобы не спорить
      с ними. Ссылки узнаются цветом+весом (не только подчёркиванием). */
-  .startFoot{margin-top:18px; padding-top:13px; border-top:1px solid rgba(20,24,50,.10);
-    font-size:var(--fs-label); color:#5a6079; line-height:1.55;}
+  .startFoot{margin-top:var(--sp-18); padding-top:var(--sp-13); border-top:1px solid var(--c-shade-a10);
+    font-size:var(--fs-label); color:var(--c-slate-41); line-height:var(--lh-loose);}
   /* Переключатель языка — тихая строка подвала (i18n). Светлый select (базовый select тёмный —
      перебиваем id-селектором) шириной под текст, не во всю строку; глобус — нейтральная метка без слов. */
-  .startLang{display:flex; align-items:center; justify-content:center; gap:7px; margin:0 0 12px;}
-  #langSel{width:auto; flex:0 0 auto; background:#f4f6fc; color:#2a2f45;
-    border:1px solid rgba(20,24,50,.16); border-radius:var(--r-sm);
-    padding:6px 10px; font-size:var(--fs-label); font-weight:600;}
-  .startFoot p{margin:0 0 8px;}
-  .startFoot a{color:var(--accent-ink); font-weight:600; text-decoration:none;
-    border-bottom:1px solid rgba(180,83,9,.4); white-space:nowrap;}
+  .startLang{display:flex; align-items:center; justify-content:center; gap:var(--sp-7); margin:0 0 var(--sp-12);}
+  #langSel{width:auto; flex:0 0 auto; background:var(--c-paper-97); color:var(--c-slate-22);
+    border:1px solid var(--c-shade-a16); border-radius:var(--r-sm);
+    padding:var(--sp-6) var(--sp-10); font-size:var(--fs-label); font-weight:var(--fw-semi);}
+  .startFoot p{margin:0 0 var(--sp-8);}
+  .startFoot a{color:var(--accent-ink); font-weight:var(--fw-semi); text-decoration:none;
+    border-bottom:1px solid var(--c-accent-ink-a40); white-space:nowrap;}
   /* Строка поддержки — чуть тише подвала. «Donate» заметнее «Feedback» (жирнее, ярче подчёркивание). */
-  .startSupport{margin:10px 0 0; color:#6a7089;}
-  #donateLink{font-weight:700; border-bottom-color:rgba(180,83,9,.6);}
+  .startSupport{margin:var(--sp-10) 0 0; color:var(--c-slate-48);}
+  #donateLink{font-weight:var(--fw-bold); border-bottom-color:var(--c-accent-ink-a60);}
   /* PRIV1: the privacy notice — a quiet fold at the end of the footer; the text opens on a tap */
-  #privacyNote{margin:10px 0 0; color:#6a7089; text-align:left;}
-  #privacyNote summary{cursor:pointer; text-align:center; color:var(--accent-ink); font-weight:600;}
-  #privacyNote p{margin:6px 0 0; font-size:var(--fs-hint);}
+  #privacyNote{margin:var(--sp-10) 0 0; color:var(--c-slate-48); text-align:left;}
+  #privacyNote summary{cursor:pointer; text-align:center; color:var(--accent-ink); font-weight:var(--fw-semi);}
+  #privacyNote p{margin:var(--sp-6) 0 0; font-size:var(--fs-hint);}
 
   /* ДЕМО «путешествие по строям»: оверлей поверх стартового (z 35 > start 30). Фон-тинт
      ставит demo.js поцветно на каждую сцену; здесь — только раскладка подписи. */
-  #demoOv{z-index:35; text-align:center;}
+  #demoOv{z-index:var(--z-demo); text-align:center;}
   #demoOv .demoInner{max-width:560px; margin:0 auto; padding-top:22vh;
-    display:flex; flex-direction:column; align-items:center; gap:12px;}
-  #demoScene{font-size:13px; color:var(--dim); letter-spacing:.18em;}
-  #demoName{font-size:30px; font-weight:800; color:var(--ink); line-height:1.2;}
-  #demoCulture{font-size:18px; color:var(--note);}
-  #demoHint{font-size:13px; color:var(--dim); max-width:420px; margin:6px auto 0;}
-  #demoSkip{margin-top:22px; font-size:16px; padding:12px 26px;}
+    display:flex; flex-direction:column; align-items:center; gap:var(--sp-12);}
+  #demoScene{font-size:var(--fs-13); color:var(--dim); letter-spacing:.18em;}
+  #demoName{font-size:var(--fs-30); font-weight:var(--fw-heavy); color:var(--ink); line-height:var(--lh-snug);}
+  #demoCulture{font-size:var(--fs-18); color:var(--note);}
+  #demoHint{font-size:var(--fs-13); color:var(--dim); max-width:420px; margin:var(--sp-6) auto 0;}
+  #demoSkip{margin-top:var(--sp-22); font-size:var(--fs-16); padding:var(--sp-12) var(--sp-26);}
 
   

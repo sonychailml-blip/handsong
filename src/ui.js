@@ -27,7 +27,7 @@ import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScrol
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // OWN1: the modes a track can be re-mapped into; TF5: «1/1 = …» and the historical 1/1
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
-import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, timbreKey, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -43,11 +43,13 @@ import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoo
          editBendPoint,   // OWN2
          editTrackMode, editTrackModeWhy, trackViewOfLayer,   // OWN1: the track into another mode by degrees
          histUndo, histRedo, histCanUndo, histCanRedo, histTopLabel, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, histReset,   // ED7: the one history
-         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, liveAllOff, backingFollowKey, editTranspose, editTransposeWhy, songTranspose, songTransposeWhy } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
+         editMoveSel, editDeleteSel, editCopySel, editPaste, editDuplicateSel, editPasteWhy, editClipInfo, editQuantSel, editDegreeSel, editDegreeWhy, pnBars, editVolSel, liveAllOff, backingFollowKey, editTranspose, editTransposeWhy, songTranspose, songTransposeWhy, songSaveRec, songOpenApply, songPlan, songMark, songDirty } from './recorder.js';   // ED2: copy, paste, duplicate   // ED1: group move and delete (one history entry)   // AF4: no freeze UI here any more (auto-freeze, frzqueue.js)
 import { HARMONIES, RHYTHMS, BASS_MODES, rhythmFits, rhythmsForMetre } from './arrange.js';
 import { INSTR_COL, FX_META, curveK } from './config.js';   // curveK — BEND-CURVE: a middle handle's position → curvature
 import { hooks } from './hooks.js';
 import { lang, setLang, applyI18n, L, t, onLangChange } from './i18n.js';
+import { icon } from './icons.js';   // UI1b: every interface glyph through the icon component
+import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from './core/songfile.js';   // SAVE1: reading a song file (pure)
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
@@ -537,7 +539,7 @@ function renderTimbreCtl(){
   for(const x of timbresOf(role)){
     const o=document.createElement('option'); o.value=String(x.id); o.textContent=L(x.name); rollTimbreEl.appendChild(o); }
   const cur=laneTimbreOf(ly);
-  rollTimbreEl.value = cur==null ? '' : (timbreIdOf(role,cur)||'');   // TIM1: options carry the permanent id; the track stores the index
+  rollTimbreEl.value = cur==null ? '' : (timbreKey(role,cur)||'');   // TIM2: options and events carry the permanent id
   renderModeCtl();
 }
 /* OWN1: the track's mode — the modes of its tuning with as many degrees (scales.modesLikeView); hidden when there is no other one, on drums
@@ -560,7 +562,7 @@ if(rollModeEl) rollModeEl.onchange=e=>{
 };
 if(rollTimbreEl) rollTimbreEl.onchange=e=>{
   const x=timbresOf(laneRoleOf(editLayer())).find(q=>q.id===e.target.value);   // id берём ИЗ СПИСКА, а не разбором строки: у тембра пользователя id не обязан быть числом
-  if(x && editSetTimbre(x.idx)){ renderAutCtl(); updRollBtns(); }   // TIM1: the id → the index an event stores (until TIM2)
+  if(x && editSetTimbre(x.id)){ renderAutCtl(); updRollBtns(); }   // TIM2: events store the id
   renderTimbreCtl();                                   // отказ (редактор закрыт, тот же тембр) — выбор возвращается к правде
 };
 function openRoll(layer){   // AR1: layer — дорожка, которую открыть (тап по строке окна аранжировки); без него — вооружённая, иначе первая
@@ -600,7 +602,7 @@ const arrBar=$('arrBar'), arrCloseBtn=$('arrClose'), arrZoomInBtn=$('arrZoomIn')
 /* ⛳ MX1: ЛИЦО ОКНА — аранжировка ↔ микшер. Те же строки и прокрутка; подпись кнопки — лицо, НА КОТОРОЕ переключит (🎚 → микшер, ▤ →
    аранжировка). Зум времени в лице микшера не нужен — кнопки зума гаснут. */
 function applyArrFace(){ const mix=arrFace==='mix';
-  arrFaceBtn.textContent= mix ? '▤' : '🎚'; arrFaceBtn.title=t(mix?'arr.toArrange':'arr.toMixer');
+  arrFaceBtn.textContent= icon(mix ? 'arrange' : 'mixer'); arrFaceBtn.title=t(mix?'arr.toArrange':'arr.toMixer');
   arrZoomInBtn.disabled=arrZoomOutBtn.disabled=arrFitBtn.disabled=mix; }
 arrFaceBtn.onclick=()=>{ setArrFace(arrFace==='mix'?'arr':'mix'); applyArrFace(); };
 applyArrFace(); onLangChange(applyArrFace);
@@ -905,15 +907,15 @@ function updRollBtns(){
   if(rollShapeEl){ const bs=bendShapeState(), st=bs||autShapeState();   // гладкая автоматизация: кнопка видна, пока открыта полоса; жива — у точки, в которую есть откуда въехать. BEND-CURVE: and with a bend point selected (its incoming glide ↔ step)
     rollShapeEl.hidden = !bs && (!rollAut || volBarsOn());
     rollShapeEl.disabled = ro || !st || !st.ok;
-    rollShapeEl.textContent = st&&st.s ? '╱' : '⌐';
+    rollShapeEl.textContent = icon(st&&st.s ? 'shape-glide' : 'shape-step');
     rollShapeEl.classList.toggle('act', !!(st&&st.s)); }
   if(rollVolBarsBtn){ rollVolBarsBtn.hidden = !(rollAut && rollAut.fx===FX_VOL);   // ED5: face toggle, only while the lane shows Volume
-    rollVolBarsBtn.textContent = rollVolBars ? '▮▮' : '•—'; rollVolBarsBtn.classList.toggle('act', rollVolBars); }
+    rollVolBarsBtn.textContent = rollVolBars ? icon('bar-full')+icon('bar-full') : '•—'; rollVolBarsBtn.classList.toggle('act', rollVolBars); }
   rollUndoBtn.disabled = !editCanUndo();   // T5: без `ro` — на подложке в истории бывает замена тембра, и её отмена законна (прочих ходов там нет: их правки отказывают)
   rollRedoBtn.disabled = !editCanRedo();   // S5.3: мёртвая кнопка выглядит мёртвой — иначе тап «не работает» без объяснения
   const s=rollSnap(), lbl = s.free ? t('roll.snapFree') : '1/'+Math.round(1/s.step);
   const hid = !s.free && !s.drawn;
-  rollSnapEl.textContent='⌗ '+lbl+(hid?' '+t('roll.snapHidden'):'');
+  rollSnapEl.textContent=icon('quantise')+' '+lbl+(hid?' '+t('roll.snapHidden'):'');
   rollSnapEl.title=t('roll.snapTitle',{ s:lbl });
 }
 /* Подложка — только чтение, и отказ ГОВОРИТ ПОЧЕМУ (молчащая кнопка читается как поломка). Сам отказ
@@ -1909,6 +1911,65 @@ $('clrBtn').onclick=()=>{ clearSong(); resetJamDisplay(); updHistBtns(); };   //
 loopMinus.onclick=()=>{ setLoopBars(loop.bars-1); loopBarsV.textContent=loop.bars; };
 loopPlus.onclick =()=>{ setLoopBars(loop.bars+1); loopBarsV.textContent=loop.bars; };
 loopMetre.onchange=e=>{ setLoopMetre(+e.target.value); refreshMetreCtl(); applyBacking(); };   // сеттер гейтит пустую петлю; refresh перечитает (клампнутое) значение + перефильтрует ритмы; applyBacking — подпись кнопки подложки зависит от числа доступных ритмов
+/* ═══ SAVE1: SAVE / OPEN A SONG FILE (Looper panel, section «Song file») ═══
+   ⛳ The file stays on the device (rule #33): Save hands the browser a download built from memory (a Blob URL — nothing is sent); Open
+   reads a file the person picks, in the page (never fetched, never run: core/songfile.js parses JSON only, caps the size, refuses
+   prototype keys). Open asks before replacing unsaved work; the song arrives with its settings (A4, tempo, metre, …) and the live scale
+   and key it was saved with. Frozen audio is not in the file — tracks freeze again by themselves. */
+const songNameEl=$('songName'), songFileEl=$('songFile');
+let songId=null;
+const songFileName=nm=>{ const s=String(nm||'').replace(/[\\/:*?"<>|\u0000-\u001f]+/g,' ').replace(/\s+/g,' ').trim().slice(0,80);
+  return (s || t('song.defaultName',{ d:new Date().toISOString().slice(0,10) }))+'.handsong'; };
+export function songSaveText(){
+  const r=songSaveRec({ id:songId||undefined, name:songNameEl ? songNameEl.value.trim().slice(0,120) : '' }); if(!r.ok) return r;
+  songId=r.rec.id; return { ok:true, rec:r.rec, text:JSON.stringify(r.rec) };
+}
+function songDownload(){
+  const r=songSaveText(); if(!r.ok){ showCamMsg(t('song.no.'+r.why)); return; }
+  const a=document.createElement('a'), url=URL.createObjectURL(new Blob([r.text],{ type:'application/json' }));
+  a.href=url; a.download=songFileName(r.rec.name); document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),20000);
+  showCamMsg(t('song.saved',{ name:a.download }));
+}
+/* the live scale and key the song was saved with (listening settings; the recorded notes carry their own views and do not move) */
+function songLiveApply(S){
+  applyARef(S.aRef); syncARef(S.aRef);
+  const L=S.live; if(!L) return;
+  if(L.scaleId!==scaleId && tradOfScale(L.scaleId)) tutorSetScale(L.scaleId);
+  if(L.tunedFrom!==undefined && L.tunedFrom!==tunedFrom){ setTunedFrom(L.tunedFrom); softAllOff(); droneRetune(); }
+  if(L.tonic!==tonic || L.tonicCents!==tonicCents){ setTonic(L.tonic); setTonicCents(L.tonicCents); selTonic.value=tonic; liveAllOff(); droneRetune(); }
+  updScaleBtn();
+}
+function syncLoopPanel(){ bpmEl.value=loop.bpm; bpmV.textContent=loop.bpm; loopBarsV.textContent=loop.bars; refreshMetreCtl(); applySub();
+  qOn.classList.toggle('act',!!loop.quant); qOff.classList.toggle('act',!loop.quant); }
+/* text → the song. ask(question) asks before replacing unsaved work (the browser's confirm; the probe passes its own). Every refusal
+   happens BEFORE the current song is touched. → { ok, … } or { ok:false, why } */
+export function songOpenText(text, ask=q=>confirm(q)){
+  const p=songParse(text); if(!p.ok) return { ok:false, why:p.why, version:p.version };
+  const from=p.rec.version, rec=songUpgrade(p.rec), probs=songCheck(rec);
+  if(probs.length) return { ok:false, why:'check', problems:probs };
+  const P=songPlan(rec); if(!P.ok) return { ok:false, why:P.why, missing:P.missing };
+  if(songDirty() && !ask(t('song.open.confirm'))) return { ok:false, why:'cancelled' };
+  const r=songOpenApply(P); if(!r.ok) return r;
+  songId=P.id||null; if(songNameEl) songNameEl.value=P.name||'';
+  songLiveApply(P.settings);
+  syncLoopPanel(); resetJamDisplay(); updHistBtns(); songMark();
+  return { ...r, upgraded: from<rec.version ? from : 0, missing:P.missing };
+}
+function songOpenSay(r){
+  if(r.ok){ let m=t('song.opened',{ n:r.tracks }); if(r.upgraded) m+=' '+t('song.upgraded',{ v:r.upgraded });
+    if(r.missing && r.missing.timbres.length) m+=' '+t('song.missingTimbres',{ list:r.missing.timbres.map(x=>L(x.name)).join(', ') });
+    showCamMsg(m); return; }
+  if(r.why==='cancelled') return;
+  showCamMsg(t('song.no.'+r.why, r.why==='newer' ? { v:r.version } : r.why==='modes' ? { list:r.missing.modes.join(', ') } : undefined));
+}
+if($('songSave')) $('songSave').onclick=()=>songDownload();
+if($('songOpen')) $('songOpen').onclick=()=>{ if(songFileEl){ songFileEl.value=''; songFileEl.click(); } };
+if(songFileEl) songFileEl.onchange=async e=>{
+  const f=e.target.files && e.target.files[0]; if(!f) return;
+  if(f.size>SONG_MAX_BYTES){ showCamMsg(t('song.no.tooBig')); return; }
+  let text; try{ text=await f.text(); }catch(err){ showCamMsg(t('song.no.notText')); return; }
+  songOpenSay(songOpenText(text));
+};
 addArrBtn.onclick=()=>{ loadArrangement({prog:+selProg.value, rhythm:+selRhythm.value, bass:selBassMode.value}); loopBarsV.textContent=loop.bars; };
 
 /* Выбор инструмента. При любом переключении глушим звук — роли/зоны рук меняются.
@@ -2077,7 +2138,7 @@ const fxToggleOpen=id=>{ fxOpenId = (fxOpenId===id) ? null : id; renderFxCtl(); 
 const FX_FING_ROMAN=['I','II','III','IV'];
 /* Ось в сводке — СТРЕЛКОЙ, а не словом: «Вертикаль» × три параметра не влезет в строку ни на одном
    телефоне, а стрелка международна (то же правило, что у токенов DLY/VIB на холсте — bare string). */
-const FX_AXIS_GLYPH={y:'↕', x:'↔', z:'◆'};
+const FX_AXIS_GLYPH={y:icon('axis-y'), x:icon('axis-x'), z:icon('axis-z')};
 /* СВОДКА АДРЕСОВ эффекта — то, ради чего свёрнутый заголовок остаётся честным: видно, ЧЕМ он ведётся,
    не разворачивая. Инверсию намеренно НЕ показываем: сводка отвечает «где», а не «в какую сторону», и
    плюс-минус на каждый токен превратил бы её в шум. */
@@ -2209,7 +2270,7 @@ function renderHandActs(){
 function buildStepper(cur,put){
   const seg=document.createElement('div'); seg.className='seg';
   const dec=document.createElement('button'); dec.type='button'; dec.className='step'; dec.textContent='−';
-  const inc=document.createElement('button'); inc.type='button'; inc.className='step'; inc.textContent='＋';
+  const inc=document.createElement('button'); inc.type='button'; inc.className='step'; inc.textContent=icon('plus');
   const num=document.createElement('input'); num.type='number'; num.className='numv';
   num.min='0'; num.max='100'; num.step='1'; num.inputMode='numeric'; num.autocomplete='off';
   num.value=String(cur());
@@ -2400,13 +2461,13 @@ function renderFxCtl(){
     const open = fxOpenId===eff.fxId;
     const hd=document.createElement('div'); hd.className='fxhead'+(open?' open':'');
     hd.setAttribute('role','button'); hd.tabIndex=0;
-    const arw=document.createElement('span'); arw.className='fxarw'; arw.textContent=open?'▾':'▸';
+    const arw=document.createElement('span'); arw.className='fxarw'; arw.textContent=icon(open?'fold-open':'fold-closed');
     const nm=document.createElement('span'); nm.className='fxname'; nm.textContent=fxTitleOf(eff.fxId);
     const sm=document.createElement('span'); sm.className='fxsum'; sm.textContent=fxAddrSummary(eff);
     /* ✕ — СВОЯ кнопка внутри заголовка, поэтому её клик обязан НЕ разворачивать эффект (stopPropagation).
        Убирание — не «опасное» действие без возврата: эффект возвращается тем же «+ Добавить», а
        старый скалярный при этом стартует С НУЛЯ (его гасит fxChainRemove → hushUnassignedFx). */
-    const del=document.createElement('button'); del.type='button'; del.className='fxdel'; del.textContent='✕';
+    const del=document.createElement('button'); del.type='button'; del.className='fxdel'; del.textContent=icon('delete');
     del.title=t('fx.remove'); del.setAttribute('aria-label',t('fx.remove'));
     del.onclick=e=>{ e.stopPropagation();
       if(fxOpenId===eff.fxId) fxOpenId=null;         // разворачивать после удаления нечего
@@ -2437,8 +2498,8 @@ function renderFxCtl(){
           renderFxCtl(); };
         return b;
       };
-      hd.appendChild(mk('▲','fx.moveUp',upTo));
-      hd.appendChild(mk('▼','fx.moveDown',downTo));
+      hd.appendChild(mk(icon('up'),'fx.moveUp',upTo));
+      hd.appendChild(mk(icon('down'),'fx.moveDown',downTo));
     }
     if(!fxPerm(eff.fxId)) hd.appendChild(del);   // ✕ всегда ПОСЛЕДНИЙ: край строки — предсказуемое место для «убрать», что бы ни выросло левее. VOL-2: у постоянной записи (громкость) ✕ нет — нота без громкости не бывает
     hd.onclick=()=>fxToggleOpen(eff.fxId);
@@ -2453,7 +2514,7 @@ function renderFxCtl(){
     const pkeys=fxParamKeys(eff.fxId);
     pkeys.forEach((lk,pi)=>{
       const pa=eff.params[pi]; if(!pa) return;
-      const sub=document.createElement('div'); sub.className='prow fxsub'; sub.style.paddingLeft='14px'; sub.style.margin='4px 0';
+      const sub=document.createElement('div'); sub.className='prow fxsub'; sub.style.paddingLeft='var(--sp-14)'; sub.style.margin='var(--sp-4) 0';   // UI1b: spacing from the tokens
       const plab=document.createElement('label'); plab.textContent=t(lk); plab.style.flex='0 0 114px';
       /* АДРЕС — ОДИН список вместо прежней пары «режим + ось» (см. довод у buildAddrSel). */
       const ad=buildAddrSel(pa);   // VOL-4: громкости — тот же список, что у всех, с глубиной
@@ -2507,7 +2568,7 @@ function renderFxCtl(){
         /* ИНВЕРСИЯ — единственное, что осталось рядом с адресом: сам адрес (рука+палец+ось) выбран
            списком выше. Обёртка галочки — <label> (клик по слову переключает), но БЕЗ колоночной
            ширины: правило .prow label задаёт flex:0 0 128px, и без сброса «Инверсия» съела бы колонку. */
-        const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='5px';
+        const invWrap=document.createElement('label'); invWrap.style.flex='0 0 auto'; invWrap.style.display='flex'; invWrap.style.alignItems='center'; invWrap.style.gap='var(--sp-5)';   // UI1b: token
         const inv=document.createElement('input'); inv.type='checkbox'; inv.autocomplete='off'; inv.checked=!!pa.inv;
         invWrap.appendChild(inv); invWrap.appendChild(document.createTextNode(t('fx.invert')));
         /* Пишем В ДАННЫЕ адрес ЦЕЛИКОМ (он у параметра один и неделим) и перерисовываем ИЗ них — меню
@@ -2579,7 +2640,7 @@ function applySplit(){
 function applySplitRoles(){
   [instrBtnL,instrBtnR].forEach((b,i)=>{
     const role=SPLIT_ROLES[i];
-    b.textContent = (i===0?'◧ ':'') + instrLbl(role) + (i===1?' ◨':'');
+    b.textContent = (i===0?icon('half-left')+' ':'') + instrLbl(role) + (i===1?' '+icon('split'):'');
     b.style.setProperty('--role', INSTR_COL[role]);
   });
   renderHandFn(); renderHandActs();           // ld/бас-половина могла появиться/исчезнуть — пересобираем «Функции рук» И «Действия пальцев» (у них ОДНА зависимость: набор ролей в игре + handFn)
@@ -2806,7 +2867,7 @@ function applyBacking(){
   jamBtn.classList.toggle('act', on);
   /* На кнопке — ИМЯ и позиция. Длинное имя («Регги (уан-дроп)») не ломает бар: #jamBtn режется
      многоточием средствами CSS (как #scaleBtn), а полное имя всегда есть в title и в тосте смены. */
-  jamBtn.textContent = on ? `${drums?'🥁':'🎵'} ${nm} · ${backingStep}/${n}` : t('backing.label');
+  jamBtn.textContent = on ? `${icon(drums?'drums':'backing')} ${nm} · ${backingStep}/${n}` : t('backing.label');
   jamBtn.title = on ? t(drums?'backing.title.drums':'backing.title.jam',{name:nm, i:backingStep, n})
                     : t('backing.title.off');
 }

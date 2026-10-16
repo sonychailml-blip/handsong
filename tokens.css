@@ -1,0 +1,177 @@
+/* DESIGN TOKENS — every colour, font, type size, spacing, radius, shadow and z-index of the interface (UI1b, DAY run 2026-10-16).
+   Built from TODAY'S look: values are exactly what style.css used, so nothing visible changed (tools/ui-snap.mjs proves it).
+   ⛳ style.css and JS-set styles use ONLY these tokens (static check «design tokens»); a new value is added here first.
+   Names: colours by family and alpha (--c-white-a22 = white at .22; slate/paper/deep-NN = a neutral at lightness NN %); type sizes,
+   spacing and odd radii by today's pixel value (the redesign replaces them by a smaller semantic scale — BACKLOG §7.19); z-index by
+   layer. The canvas (draw.js) reads its own palette (config.INSTR_COL and literals) — tokens for it come with DRAW1. */
+:root{
+  /* — kept from before UI1b (semantic) — */
+  --bg:#07070d; --ink:#eceaf4; --dim:#8f8ba6;
+  --note:#ff9e2c; --chord:#b18cff; --tonic:#57d9a3;
+  --rec:#e5484d; --panel:rgba(16,16,28,.86);
+  /* ЕДИНЫЙ ШРИФТ всего интерфейса — системный стек, без внешних файлов (проект без зависимостей,
+     веб-шрифт добавил бы загрузку и мигание нестилизованного текста). Задаётся ЗДЕСЬ, наследуется
+     всем меню и стартом. Холст (draw.js, ctx.font 'system-ui') — отдельно, это игровое поле. */
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* ЕДИНЫЙ АКЦЕНТ МЕНЮ И СТАРТА — тёплый оранжевый (исходный var(--note)=#ff9e2c). --accent: основной
+     тон для ЗАЛИВОК/рамок/фокуса и текста на ТЁМНОМ баре (там #ff9e2c читается). На светлом #ff9e2c
+     как ТЕКСТ бледен (≈2.1:1), поэтому --accent-ink — темнее (жжёный янтарь #b45309, ≈5:1 на белом) —
+     для ТЕКСТА и ссылок на светлых панелях/карточке. Роли соло/аккорды/бас/ударные (INSTR_COL,
+     config.js) — игровое поле, НЕ трогаем; у аккордов свой сиреневый на ТЁМНОМ холсте — другой цвет. */
+  --accent:#ff9e2c; --accent-ink:#b45309;
+  /* ШКАЛА РАЗМЕРОВ МЕНЮ (4 шага): заголовок панели · контролы · ярлык строки · подсказка. */
+  --fs-head:16px; --fs-ctl:14px; --fs-label:13px; --fs-hint:12px;
+  /* РАДИУСЫ (2 шага): контролы · панели+стартовая карточка. */
+  --r-sm:10px; --r-lg:18px;
+  
+
+  /* — colours — */
+  --c-accent-a00:rgba(255,158,44,0);
+  --c-accent-a50:rgba(255,158,44,.5);
+  --c-accent-a60:rgba(255,158,44,.6);
+  --c-accent-ink-a40:rgba(180,83,9,.4);
+  --c-accent-ink-a50:rgba(180,83,9,.5);
+  --c-accent-ink-a60:rgba(180,83,9,.6);
+  --c-amber-35:#b26a00;
+  --c-amber-55:#f5a524;
+  --c-bg-a82:rgba(7,7,13,.82);
+  --c-bg-a86:rgba(7,7,13,.86);
+  --c-bg-a94:rgba(7,7,13,.94);
+  --c-black:#000;
+  --c-black-a35:rgba(0,0,0,.35);
+  --c-danger:#d9534f;
+  --c-danger-a10:rgba(217,83,79,.10);
+  --c-deep-6:#1a1206;
+  --c-deep-11:#3a2600;
+  --c-deep-12:#14142a;
+  --c-deep-14:#1b1b2a;
+  --c-deep-16:#1e2233;
+  --c-line-a18:rgba(40,50,90,.18);
+  --c-line-a22:rgba(40,50,90,.22);
+  --c-line-a28:rgba(40,50,90,.28);
+  --c-night-a74:rgba(10,10,20,.74);
+  --c-night-a82:rgba(10,10,20,.82);
+  --c-night-a90:rgba(10,10,20,.9);
+  --c-night-a92:rgba(10,10,20,.92);
+  --c-night-a94:rgba(10,10,20,.94);
+  --c-panel-a85:rgba(16,16,28,.85);
+  --c-panel-a92:rgba(16,16,28,.92);
+  --c-paper-90:#dbe6f1;
+  --c-paper-93:#e3e9f5;
+  --c-paper-95:#eef1f8;
+  --c-paper-96:#eef2fb;
+  --c-paper-97:#f4f6fc;
+  --c-rec-a00:rgba(229,72,77,0);
+  --c-rec-a32:rgba(229,72,77,.32);
+  --c-rec-a55:rgba(229,72,77,.55);
+  --c-shade-a04:rgba(20,24,50,.04);
+  --c-shade-a06:rgba(20,24,50,.06);
+  --c-shade-a10:rgba(20,24,50,.10);
+  --c-shade-a12:rgba(20,24,50,.12);
+  --c-shade-a14:rgba(20,24,50,.14);
+  --c-shade-a16:rgba(20,24,50,.16);
+  --c-shade-a20:rgba(20,24,50,.20);
+  --c-shade-a24:rgba(20,24,50,.24);
+  --c-sky-a16:rgba(76,194,255,.16);
+  --c-sky-a35:rgba(76,194,255,.35);
+  --c-slate-22:#2a2f45;
+  --c-slate-29:#3a4059;
+  --c-slate-30:#3a4060;
+  --c-slate-39:#3d4a8a;
+  --c-slate-40:#4a5580;
+  --c-slate-41:#5a6079;
+  --c-slate-48:#6a7089;
+  --c-slate-60:#8a90a8;
+  --c-tonic:#57d9a3;
+  --c-white:#fff;
+  --c-white-a14:rgba(255,255,255,.14);
+  --c-white-a16:rgba(255,255,255,.16);
+  --c-white-a22:rgba(255,255,255,.22);
+  --c-white-a30:rgba(255,255,255,.3);
+  --c-white-a85:rgba(255,255,255,.85);
+
+  /* — type — */
+  --fs-10:10px;
+  --fs-12:12px;
+  --fs-13:13px;
+  --fs-14:14px;
+  --fs-15:15px;
+  --fs-16:16px;
+  --fs-17:17px;
+  --fs-18:18px;
+  --fs-26:26px;
+  --fs-28:28px;
+  --fs-30:30px;
+  --fw-regular:400;
+  --fw-semi:600;
+  --fw-bold:700;
+  --fw-heavy:800;
+  --lh-solid:1;
+  --lh-tight:1.1;
+  --lh-snug:1.2;
+  --lh-body:1.4;
+  --lh-relaxed:1.45;
+  --lh-loose:1.55;
+
+  /* — spacing (padding, margin, gap) — */
+  --sp-1:1px;
+  --sp-2:2px;
+  --sp-4:4px;
+  --sp-5:5px;
+  --sp-6:6px;
+  --sp-7:7px;
+  --sp-8:8px;
+  --sp-9:9px;
+  --sp-10:10px;
+  --sp-11:11px;
+  --sp-12:12px;
+  --sp-13:13px;
+  --sp-14:14px;
+  --sp-15:15px;
+  --sp-16:16px;
+  --sp-18:18px;
+  --sp-20:20px;
+  --sp-22:22px;
+  --sp-24:24px;
+  --sp-26:26px;
+  --sp-32:32px;
+  --sp-40:40px;
+
+  /* — radii (also --r-sm, --r-lg above) — */
+  --r-xs:6px;
+  --r-round:50%;
+  --r-pill:999px;
+
+  /* — shadows — */
+  --sh-rec-armed:inset 0 0 0 3px var(--c-rec-a32);
+  --sh-rec-on-ring:inset 0 0 0 2px var(--c-white-a85);
+  --sh-clip-pulse-0:0 0 0 0 var(--c-rec-a55);
+  --sh-clip-pulse-50:0 0 0 5px var(--c-rec-a00);
+  --sh-status:0 1px 2px var(--c-black);
+  --sh-tutorbar:0 8px 30px var(--c-black-a35);
+  --sh-tutor-ready-0:0 0 0 0 var(--c-accent-a60);
+  --sh-tutor-ready-50:0 0 0 7px var(--c-accent-a00);
+  --sh-tutor-pulse-0:0 0 0 0 var(--c-accent-a50);
+  --sh-tutor-pulse-50:0 0 0 6px var(--c-accent-a00);
+  --sh-lessoncard:0 16px 44px var(--c-line-a28);
+  --sh-panel:0 16px 44px var(--c-line-a22);
+  --sh-startcard:0 16px 44px var(--c-line-a18);
+
+  /* — layers (z-index) — */
+  --z-sticky:2;
+  --z-bar:10;
+  --z-transport:11;
+  --z-edit-bar:12;
+  --z-field:13;
+  --z-panel:14;
+  --z-panel-top:15;
+  --z-tutor-low:16;
+  --z-cam-msg:20;
+  --z-toast:21;
+  --z-diag:22;
+  --z-overlay:25;
+  --z-menu:30;
+  --z-lesson:33;
+  --z-demo:35;
+  --z-help:40;
+}

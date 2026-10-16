@@ -289,6 +289,41 @@ async function uiBendDrag(page, label){
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
+/* SAVE1: the song file through REAL input — the Save button's actual download is caught and read back through the real file input
+   (Playwright setInputFiles; the person's file picker is the only part not exercised). The song must come back identical with no
+   question asked (it was just saved); a newer-version file must be refused in words and leave the song untouched. The tracks that were
+   frozen are frozen again with their old seeds, so the probes after this see the seed song exactly as before. */
+async function uiSongFile(page, label){
+  const lines=[], bad=[];
+  const prep=await page.evaluate(async ()=>{ const REC=await import('./src/recorder.js'), R=await import('./src/render.js'), RUN=await import('./src/probes/run.js');
+    const L=[...new Set(REC.events.map(e=>e.layer))]; window.__songFz=L.filter(ly=>REC.freezeState(ly)==='fresh').map(ly=>[ly,R.seedOfLane(REC.laneIdOf(ly))]);
+    return { print:RUN.songPrint(), fz:window.__songFz.length }; });
+  const [dl]=await Promise.all([ page.waitForEvent('download',{ timeout:15000 }), page.evaluate(()=>document.getElementById('songSave').click()) ]);
+  const file=path.join(LOGDIR,'ui-song.handsong'), newer=path.join(LOGDIR,'ui-song-newer.handsong'); await dl.saveAs(file);
+  const name=dl.suggestedFilename(), text=await readFile(file,'utf8'); let rec=null; try{ rec=JSON.parse(text); }catch(e){}
+  if(!rec || rec.format!=='handsong/song') bad.push(`the Save button's download is not a song file (${name}, ${text.length} bytes)`);
+  else lines.push(`Save downloaded «${name}» (${Math.round(text.length/1024)} kB, version ${rec.version}, ${rec.events.length} events)`);
+  let dialogs=0; const onDlg=d=>{ dialogs++; d.accept().catch(()=>{}); }; page.on('dialog',onDlg);
+  try{
+    await page.setInputFiles('#songFile', file); await page.waitForTimeout(1500);
+    const a=await page.evaluate(async ()=>{ const RUN=await import('./src/probes/run.js'), REC=await import('./src/recorder.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'', dirty:REC.songDirty() }; });
+    if(a.print!==prep.print) bad.push(`after Open of the downloaded file the song differs (${prep.print} → ${a.print})`);
+    else if(dialogs) bad.push(`Open asked ${dialogs} question(s) right after a save`);
+    else if(!/Song opened|Песня открыта/.test(a.msg)) bad.push(`no «Song opened» message (got «${a.msg}»)`);
+    else lines.push(`Open of that file through the file input: the same song (${a.print}), no question, message «${a.msg}»`);
+    if(rec){ await writeFile(newer, JSON.stringify({ ...rec, version:rec.version+1 }));
+      await page.setInputFiles('#songFile', newer); await page.waitForTimeout(800);
+      const b=await page.evaluate(async ()=>{ const RUN=await import('./src/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
+      if(b.print!==prep.print || !/newer Handsong|более новым/.test(b.msg)) bad.push(`a newer-version file: song ${b.print===prep.print?'kept':'CHANGED'}, message «${b.msg}»`);
+      else lines.push(`a newer-version file: refused («${b.msg}»), the song kept`); }
+  } finally {
+    page.off('dialog',onDlg);
+    await page.evaluate(async ()=>{ const R=await import('./src/render.js'); for(const [ly,seed] of window.__songFz||[]) await R.freeze(ly,{ quiet:true, seed }); delete window.__songFz; });
+    await rm(file,{ force:true }); await rm(newer,{ force:true });
+  }
+  return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
+}
+
 /* ---------- срок ---------- */
 function within(p, ms, what){ let t; return Promise.race([ p.finally(()=>clearTimeout(t)), new Promise((_,rej)=>{ t=setTimeout(()=>rej(new Error(`TIME LIMIT — ${what} did not finish within ${Math.round(ms/1000)} s`)), ms); }) ]); }
 
@@ -363,7 +398,9 @@ async function session(port, plan, label){
       for(const l of res.ui.lines) out(l);
       const ub=await within(uiBendDrag(page, `[${label}] UI bend drag`), 60e3, 'the bend UI check').catch(e=>({ pass:false, lines:[`[${label}] UI bend drag: ERROR — ${e&&e.message||e}`] }));
       for(const l of ub.lines) out(l);
-      res.ui={ pass:res.ui.pass&&ub.pass, lines:[...res.ui.lines, ...ub.lines] };
+      const us=await within(uiSongFile(page, `[${label}] UI song file`), 90e3, 'the song file UI check').catch(e=>({ pass:false, lines:[`[${label}] UI song file: ERROR — ${e&&e.message||e}`] }));
+      for(const l of us.lines) out(l);
+      res.ui={ pass:res.ui.pass&&ub.pass&&us.pass, lines:[...res.ui.lines, ...ub.lines, ...us.lines] };
     }
     if(EVAL||LEAK){   // memory helpers for --eval and --leak
       /* window.__heap(): full GC, then V8 heap usage incl. ArrayBuffer backing stores (memory checks in --eval only) */
@@ -489,7 +526,7 @@ for(const s of sessions){
     if(!r.pass) pass=false;
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
-  if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
+  if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false; }
   if(EVAL && !(s.evalResult&&s.evalResult.ok)) pass=false;

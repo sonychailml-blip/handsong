@@ -34,7 +34,7 @@ const fxParamKeysOf=(...a)=>ENV.fxParamKeysOf(...a);   // REC3: the engine's dec
    lose a half (cut, a copy) are untied after applying, inside the same entry. */
 const SEC_E=1e-9;
 let secMarks=[], secSeq=0;
-const secMarksSet=L=>{ secMarks=L; };   // REC3: the markers' one writer outside this block (snapshot steps, ✕)
+const secMarksSet=L=>{ secMarks=L; for(const m of L) if(typeof m.id==='number' && m.id>secSeq) secSeq=m.id; };   // SAVE1: ids of opened markers are taken   // REC3: the markers' one writer outside this block (snapshot steps, ✕)
 /* probe only (CONTROL of P.checkSections): a plan that forgets one kind of timeline item — 'lanes' | 'bend' | 'brace' | 'marks' | 'len' */
 let secForget=null; const secDbg=k=>{ secForget=k||null; };
 const secCopy=L=>L.map(m=>({ id:m.id, beat:m.beat, name:m.name }));
