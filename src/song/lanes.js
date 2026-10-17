@@ -65,22 +65,19 @@ const laneRank=new Map();
    номер переиспользуется, и чужая длина не должна достаться новой дорожке. В событие ничего не пишется. */
 const laneLen=new Map();
 const laneLenOf=layer=>laneLen.get(laneId.get(layer))||0;   // доля конца материала слоя подложки (0 — не подложка); читает render.renderTrack
-/* ⛳ ЗАКОН ЭТОГО БЛОКА, И НА НЁМ ДЕРЖИТСЯ ВСЯ КОРРЕКТНОСТЬ ДОРОЖЕК:
-   **laneNew — ЕДИНСТВЕННЫЙ ПИСАТЕЛЬ laneId, и он ВСЕГДА выдаёт СВЕЖИЙ id, ЗАТИРАЯ прежнюю запись
-   этого номера.** Значит правильность обеспечивает РОЖДЕНИЕ слоя, а не уборка за умершим.
-   ⚠️ ПОЧЕМУ НЕ НАОБОРОТ (держать правильность на уборке) — так было, и это была мина: номера
-   ПЕРЕИСПОЛЬЗУЮТСЯ (овердаб берёт maxLayer()+1), поэтому ОДНА пропущенная уборка означала бы, что
-   свежезаписанный слой унаследовал id покойника вместе с его заглушением. Наружу это выглядит как
-   «моя новая дорожка молчит, и непонятно почему» — тихо, правдоподобно и ищется долго.
-   Теперь такого состояния не существует: что бы ни осталось в laneMute/laneSolo, НИ ОДИН номер на
-   эти id больше не отображается, поэтому они НИКОГДА НИ С ЧЕМ НЕ СОВПАДУТ.
-   ⛔ Не заводить второго писателя laneId. Появится новое место, где рождается слой, — оно обязано
-   звать laneNew; список мест — в отчёте слайса и в комментариях у самих мест. */
-function laneNew(layer){
+/* ⛳ THE LAW OF THIS BLOCK: laneNew is the ONLY writer of laneId and always gives an id no other layer holds, overwriting the layer's old
+   entry — correctness comes from the BIRTH of a track, never from cleaning up after a dead one (layer numbers are reused: a missed cleanup
+   would hand a new track the old one's mute, solo, name …). A new place where a track is born must call laneNew.
+   CMD1b (RUN 5; song file v7, rule #37): `id` — the track's permanent id from a song file, passed ONLY by Open (songOpenApply, right after
+   the tables were cleared); taken when it is a positive integer no layer holds, and the counter floors above it (as evIdFloor); otherwise a
+   fresh one. History snapshot steps restore lanes drop-first, so an id the previous song also used cannot leak between them. */
+function laneNew(layer,id){
   const old=laneId.get(layer);
-  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); laneLen.delete(old); laneName.delete(old); laneRank.delete(old); if(armLane===old) armLane=null; }   // AR2: имя и место — тоже гигиена (новый id их и так не видит)   // ГИГИЕНА, А НЕ КОРРЕКТНОСТЬ: без этой строки старый id просто мёртвым грузом лежал бы в множестве и ни на что не влиял — но множества росли бы всю сессию. Вооружение (S3.5c) — снимаем: его дорожки больше нет
-  laneId.set(layer,++laneSeq);
-  return laneSeq;
+  if(old!=null){ laneMute.delete(old); laneSolo.delete(old); laneLen.delete(old); laneName.delete(old); laneRank.delete(old); if(armLane===old) armLane=null; }   // hygiene (a new id never sees them)
+  let n=++laneSeq;
+  if(Number.isInteger(id) && id>0 && id<=1e9 && ![...laneId.values()].includes(id)){ laneSeq--; n=id; if(n>laneSeq) laneSeq=n; }
+  laneId.set(layer,n);
+  return n;
 }
 /* ЧТЕНИЕ id — ЧИСТОЕ: вернёт либо ДЕЙСТВУЮЩИЙ id номера (тот, что выдало последнее рождение), либо
    undefined. ⛔ ЗАВОДИТЬ id ЗДЕСЬ НЕЛЬЗЯ, и это не стиль: «страховка», заводящая id по требованию,

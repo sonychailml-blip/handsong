@@ -116,3 +116,13 @@ holds: the scene places lights from the REMAPPED coordinates (`sx`, `sy`) the hi
 3. Three.js r128 is from 2021 (the last line with a UMD build is older than r160): fine for Calm, or prefer the ES-module build of a newer
    release (also MIT; no worker `importScripts` then)? The plan follows the user's choice (r128 UMD).
 4. VIS1a now (stage 3, invisible), or together with VIS1b at the start of stage 4?
+
+## Review 2026-10-17 (user answers, RUN 5)
+- **The note field over a room (Calm):** almost invisible — only the row under each hand glows softly near the hand and fades. No cents
+  and no Hz in Calm (they stay in the full mode). A «Show the full note field» switch may exist.
+- **The prototype:** «Rooms of light» (`docs/prototypes/rooms-of-light.html`, the strategist's own code, three.js r128 from cdnjs, MIT) is
+  the STARTING POINT, re-laid by the project's rules. Start with ONE room only: the night forest, WITHOUT animals / musicians (fireflies
+  only). The user likes both its forest sound and its forest picture. Monastery and the forest band: later / paid.
+- The prototype is a reference, not app code: outside `src/` (the static checker reads only `src/`), its external addresses are licence
+  register entries of use «reference» (three.js r128, Google Fonts Marcellus + Commissioner), which a shipped file may not use (LIC1 CONTROL).
+- How VIS1 is laid out for Calm: `docs/STAGE4-CALM-plan.md` (RUN 5).

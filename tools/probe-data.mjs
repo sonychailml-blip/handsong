@@ -31,7 +31,7 @@ globalThis.fetch=async (u,o)=>{
 
 const verbose=process.argv.includes('--verbose');
 const T00=performance.now();
-let P, loadReport, LIC, LAT, DSP, HS, CL, FMT, IDR, GF, CFG, SONGF;
+let P, loadReport, LIC, NIX, LAT, DSP, HS, CL, FMT, IDR, GF, CFG, SONGF;
 /* LAT1: the latency core's arithmetic, exactly — statistics, the ring window, the hand → sound sum, the Bluetooth heuristic */
 function latCore(){
   const d=[], eq=(name,got,want)=>{ if(JSON.stringify(got)!==JSON.stringify(want)) d.push(`${name}: ${JSON.stringify(got)} ≠ ${JSON.stringify(want)}`); };
@@ -324,6 +324,10 @@ function songCore(){
     { const v3={ ...JSON.parse(txt), version:3 }, u3=SF.songUpgrade(v3); eq('v3 → v4 → v5 (IDS1): nothing rewritten, the version raised', [u3.version, JSON.stringify(u3.events), JSON.stringify(u3.takes)], [SF.SONG_VERSION, JSON.stringify(v3.events), JSON.stringify(v3.takes)]); }
     { const w=JSON.parse(txt); w.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:1 }, { t:1, key:'role:ch', fx:'reverb', p:'mix', v:0.4, id:2 }]; eq('IDS1 part 2: lane points with fresh ids pass the check', SF.songCheck(w), []); }
     { const w=JSON.parse(txt); w.events[0].id=1; w.events[1].id=2; eq('IDS1: events with fresh ids pass the check (CONTROL: not over-strict)', SF.songCheck(w), []); }
+    { const w=JSON.parse(txt); w.tracks=[{ layer:0, id:9 }]; eq('CMD1b: a track with a fresh id passes the check (CONTROL: not over-strict)', SF.songCheck(w), []); }
+    { const v6={ ...JSON.parse(txt), version:6 }, keep6=JSON.stringify(v6), u6=SF.songUpgrade(v6), u6b=SF.songUpgrade(JSON.parse(JSON.stringify(u6)));
+      eq('v6 → v7 (CMD1b): nothing rewritten, the version raised', [u6.version, JSON.stringify(u6.tracks), JSON.stringify(u6.events)], [7, JSON.stringify(v6.tracks), JSON.stringify(v6.events)]);
+      eq('v6 → v7: idempotent, the opened record untouched', [JSON.stringify(u6b), JSON.stringify(v6)], [JSON.stringify(u6), keep6]); }
     eq('v2 → v3 (SONG1): records kept, or an empty set where an older file had none', [JSON.stringify(u.records), JSON.stringify(SF.songUpgrade({ ...JSON.parse(txt), version:2, records:undefined }).records)], [JSON.stringify(v1.records), '{}']);
     eq('the upgrade is idempotent', JSON.stringify(u2), JSON.stringify(u));
     eq('the upgrade leaves its input untouched', JSON.stringify(v1), keep);
@@ -340,8 +344,28 @@ function songCore(){
     ['SONG1: a copy of the wrong kind', r=>{ r.records.tuning['u.5013a000-0000-4000-8000-0000000000aa'].format='handsong/mode'; }],
     ['IDS1: two events with one id', r=>{ r.events[0].id=7; r.events[1].id=7; }], ['IDS1: an event id that is not a positive integer', r=>{ r.events[0].id=-1; }],
     ['IDS1 part 2: two lane points with one id', r=>{ r.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:3 }, { t:1, key:'role:ch', fx:'reverb', p:'mix', v:0.4, id:3 }]; }],
-    ['IDS1 part 2: a lane point id that is not an integer', r=>{ r.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:1.5 }]; }]];
+    ['IDS1 part 2: a lane point id that is not an integer', r=>{ r.takes[0].lane=[{ t:0, key:'role:ch', fx:'reverb', p:'mix', v:0.2, id:1.5 }]; }],
+    ['CMD1b: two tracks with one id', r=>{ r.tracks=[{ layer:0, id:4 }, { layer:1, id:4 }]; }], ['CMD1b: a track id that is not a positive integer', r=>{ r.tracks[0].id=0; }]];
   for(const [what,mut] of dmg){ n++; const r=JSON.parse(txt); mut(r); if(!SF.songCheck(r).length) d.push(`damage not caught: ${what}`); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* CMD1a: canonical JSON (src/core/canon.js) — equal values give equal text whatever the key order or object identity; −0 = 0; a number
+   is written exactly; arrays keep their order; undefined is dropped. CONTROLS: a changed number, a changed array order and a changed key
+   must each give another hash. */
+async function canonCore(){
+  const d=[]; let n=0; const C=await import(new URL('../src/core/canon.js', import.meta.url).href);
+  const eq=(what,a,b)=>{ n++; if(a!==b) d.push(`${what}: ${a} vs ${b}`); }, ne=(what,a,b)=>{ n++; if(a===b) d.push(`CONTROL: ${what} gave the same text ${a}`); };
+  const A={ b:[1,2,{ y:0.1, x:-0 }], a:'s', u:undefined, n:null }, B={ n:null, a:'s', b:[1,2,{ x:0, y:0.1 }] };
+  eq('key order and −0 do not matter', C.canonJSON(A), C.canonJSON(B));
+  eq('the canonical text', C.canonJSON(A), '{"a":"s","b":[1,2,{"x":0,"y":0.1}],"n":null}');
+  eq('a JSON round trip keeps it', C.canonJSON(JSON.parse(JSON.stringify(A))), C.canonJSON(A));
+  eq('a number written exactly', C.canonJSON(0.1+0.2), '0.30000000000000004');
+  eq('a non-finite number → null', C.canonJSON([NaN, Infinity]), '[null,null]');
+  eq('a Map → pairs in order', C.canonJSON(new Map([[2,'b'],[1,'a']])), '[[2,"b"],[1,"a"]]');
+  eq('the hash of equal values', C.canonHash(A), C.canonHash(B));
+  ne('a changed number', C.canonJSON({ a:1 }), C.canonJSON({ a:1.000001 }));
+  ne('a changed array order', C.canonJSON([1,2]), C.canonJSON([2,1]));
+  ne('a changed key', C.canonHash({ a:1 }), C.canonHash({ b:1 }));
   return { cases:n, total:d.length, differences:d };
 }
 /* AUD1c + AUD2a / review R2: the timbre data and the effect declarations moved into the shared engine submodules (src/modules/, src/engine/) are PURE DATA — numbers, strings,
@@ -485,6 +509,7 @@ try{
   REG=await import(new URL('../src/probes/rows.js', import.meta.url).href);
   ({ loadReport }=await import(new URL('../src/scaleload.js', import.meta.url).href));
   LIC=await import(new URL('./check-licences.mjs', import.meta.url).href);   // LIC1: the licence register (text only, no app code)
+  NIX=await import(new URL('./name-index.mjs', import.meta.url).href);   // DOC1 leftover: docs/NAME-INDEX.md generated from the code (text only)
   LAT=await import(new URL('../src/core/latency.js', import.meta.url).href);
   HS=await import(new URL('../src/core/handsched.js', import.meta.url).href);   // LAT2: the search schedule (pure core)
   CL=await import(new URL('../src/core/camlight.js', import.meta.url).href);    // LAT3: low light (pure core)
@@ -501,6 +526,7 @@ const loadMs=Math.round(performance.now()-T00);
 const ROWS=[
   ...REG.rows({ node:true }).map(r=>[r.name, r.run, r.read]),
   ['LIC1 licence register',     ()=>LIC.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NAME-INDEX current',        ()=>NIX.run(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['LAT1 latency stats (core)', ()=>latCore(),          r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['SND-F1 Night forest IR (core)', ()=>forestCore(),   r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['LAT2 search schedule (core)', ()=>schedCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],
@@ -509,6 +535,7 @@ const ROWS=[
   ['GES1 gesture features (core)', ()=>gesCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['UI1b icons (core)',          ()=>iconCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['SAVE1 song file (core)',     ()=>songCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['CMD1 canonical values (core)', ()=>canonCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['AUD1c/AUD2a engine data pure (core)', ()=>timbreData(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['PACK1 packs and licence keys (core)', ()=>packCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['ENG2 power class (core)',  ()=>engCore(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],

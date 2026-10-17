@@ -14,6 +14,8 @@ const lanePts=()=>[...takeFx].flatMap(([tk,r])=>(r.lane||[]).map(q=>({ q, tk }))
 const laneSig=()=>lanePts().map(({q,tk})=>`${tk}|${q.key}|${q.fx}|${q.p}|${q.t}|${q.id}`).sort().join(',');
 /* each event → "beat|layer|fn|id", in birth order (what the file stores) */
 const idList=()=>events.map(e=>e.id);
+/* CMD1b: each track → "layer:id" (the file v7 keeps them) */
+const trackSig=()=>[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b).map(ly=>`${ly}:${laneOf(ly)}`).join(',');
 const sig=()=>events.slice().sort((x,y)=>x.t-y.t||x.layer-y.layer||(x.fn<y.fn?-1:x.fn>y.fn?1:0)||(x.id-y.id)).map(e=>`${e.t}|${e.layer}|${e.fn}|${e.id}`).join(',');
 
 export async function checkEventIds(){
@@ -27,12 +29,13 @@ export async function checkEventIds(){
   /* (1) the seed song: every event has a unique positive integer id */
   { const S=ids(); n++; if(!S.ok || !S.uniq) miss(`events without a valid id or with a repeated one (${S.I.filter(x=>!(x>0)).length} missing, ${S.I.length-new Set(S.I).size} repeated)`); }
   const orig=UI.songSaveText(); if(!orig.ok) return { cases:n, total:1, differences:[`save refused: ${orig.why}`] };
-  const sig0=sig(), lsig0=laneSig();
+  const sig0=sig(), lsig0=laneSig(), tsig0=trackSig();
   { const P=lanePts().map(x=>x.q.id); n++; if(P.some(x=>!(Number.isInteger(x)&&x>0)) || new Set(P).size!==P.length) miss(`lane points without a valid id or with a repeated one (${P.length} points)`); }
   try{
     /* (2) Save → Open: the same ids on the same events and lane points */
     { const o=UI.songOpenText(orig.text, ()=>true); n+=2; if(!o.ok) miss(`open refused: ${o.why}`);
-      else { if(sig()!==sig0) miss('after Save → Open the events carry other ids'); if(laneSig()!==lsig0) miss('after Save → Open the lane points carry other ids'); } }
+      else { if(sig()!==sig0) miss('after Save → Open the events carry other ids'); if(laneSig()!==lsig0) miss('after Save → Open the lane points carry other ids');
+        n++; if(trackSig()!==tsig0) miss(`after Save → Open the tracks carry other ids (${trackSig().slice(0,80)} instead of ${tsig0.slice(0,80)})`); } }
     /* (2b) a hand-placed lane point gets a number above every point id; ↶ removes it, ↷ brings THE SAME id back */
     { const ly=laneOrder().find(l=>laneRoleOf(l)==='ch' && freezeState(l)==='none' && !events.some(e=>e.layer===l&&e.jam));
       const max0=Math.max(0,...lanePts().map(x=>x.q.id)); histReset();
@@ -60,6 +63,9 @@ export async function checkEventIds(){
     { fileDbg({ noIds:true }); const s2=UI.songSaveText(); fileDbg({}); const o=UI.songOpenText(orig.text, ()=>true); const sigA=sig();
       const o2=UI.songOpenText(s2.text, ()=>true); n++;
       if(o.ok && o2.ok && sig()===sigA) miss('CONTROL: a save without ids reopened with the same ids — the id check cannot fail'); }
+    /* CONTROL (CMD1b): a save without track ids opens to tracks with NEW ids */
+    { const o=UI.songOpenText(orig.text, ()=>true), tA=trackSig(); fileDbg({ noTrackIds:true }); const s3=UI.songSaveText(); fileDbg({}); const o3=UI.songOpenText(s3.text, ()=>true); n++;
+      if(o.ok && o3.ok && trackSig()===tA) miss('CONTROL: a save without track ids reopened with the same track ids — the track id check cannot fail'); }
   } finally {
     fileDbg({}); setScaleId(keepSc); histReset();
     const back=UI.songOpenText(orig.text, ()=>true); if(!back.ok) miss('could not restore the song at the end');
@@ -68,6 +74,7 @@ export async function checkEventIds(){
     n++; if(songPrint()!==print0) miss('the song is not as it was after the probe');
     n++; if(sig()!==sig0) miss('the song\'s ids are not as they were after the probe');
     n++; if(laneSig()!==lsig0) miss('the lane point ids are not as they were after the probe');
+    n++; if(trackSig()!==tsig0) miss('the track ids are not as they were after the probe');
   }
   return { cases:n, total:d.length, differences:d };
 }

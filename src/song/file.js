@@ -19,7 +19,7 @@ const ROLE={ leadOn:'ld', leadSet:'ld', chOn:'ch', bassOn:'bs', drum:'dr' };
 const copy=x=>JSON.parse(JSON.stringify(x));
 /* timbres this app does not have, kept from the last opened file so a re-save carries their copies on (rule #37: the copy is the truth) */
 const foreign=new Map();
-/* probe CONTROLS only: a lossy save (volumes dropped / every take number 1 / no record copies / no event ids) must break the probe's round trip */
+/* probe CONTROLS only: a lossy save (volumes dropped / every take number 1 / no record copies / no event ids / no track ids) must break the probe's round trip */
 let DBG={}; const fileDbg=o=>{ DBG=o||{}; };
 
 /* a view → its file description (the mode id and what scaleView memoises on) */
@@ -30,6 +30,9 @@ function viewRec(v){
   if(b.chordModes) r.chordMode=v.chordMode;
   return r;
 }
+/* a file description → its memoised view (rule #7: the same description gives THE same object), or null when the mode is not in this app */
+function viewOfRec(d){ const m=scaleById(d.mode); if(!m) return null;
+  return scaleView(m, d.tunedFrom!==undefined ? d.tunedFrom : ENV.live().tunedFrom, d.chordMode, d.key==null ? undefined : d.key, d.keyC||0); }
 function songData(meta={}){
   evSeqFill(); evIdFill(); laneIdFill(); const evs=events.slice().sort(evOrder);   // IDS1: every event and lane point saved with its permanent id
   const views=[], vIdx=new Map(), used=new Set(); let soloSnap=null;
@@ -42,7 +45,8 @@ function songData(meta={}){
     if(DBG.noIds) delete o.id;
     if(DBG.noVol) delete o.a.vol; if(DBG.noTk) o.tk=1;
     return o; });
-  const tracks=[...laneId].sort((p,q)=>p[0]-q[0]).map(([layer,id])=>{ const R=laneRow(id), t={ layer };
+  const tracks=[...laneId].sort((p,q)=>p[0]-q[0]).map(([layer,id])=>{ const R=laneRow(id), t={ layer, id };   // CMD1b (v7): the permanent track id
+    if(DBG.noTrackIds) delete t.id;
     if(R.mute) t.mute=true; if(R.solo) t.solo=true;
     for(const k of ['level','pan','name','rank','len']) if(R[k]!=null) t[k]=R[k];
     return t; });
@@ -94,8 +98,7 @@ function songTimbreNeeds(rec){
 /* a checked record of the current version → what the recorder installs; refuses when a mode (a view) is not in this app */
 function songPlan(rec){
   const missing={ modes:[], timbres:[] };
-  const views=rec.views.map(d=>{ const m=scaleById(d.mode); if(!m){ missing.modes.push(d.mode); return null; }
-    return scaleView(m, d.tunedFrom!==undefined ? d.tunedFrom : ENV.live().tunedFrom, d.chordMode, d.key==null ? undefined : d.key, d.keyC||0); });
+  const views=rec.views.map(d=>{ const v=viewOfRec(d); if(!v) missing.modes.push(d.mode); return v; });
   if(missing.modes.length) return { ok:false, why:'modes', missing };
   const known=new Set(), stand=new Map();
   for(const e of rec.events){ const r=ROLE[e.fn], f= r==='dr' ? 'kit' : 'inst', id=e.a[f]; if(!r||id==null||known.has(id)||stand.has(id)) continue;
@@ -110,4 +113,4 @@ function songPlan(rec){
   const takes=new Map(rec.takes.map(k=>[k.tk,{ kinds:copy(k.kinds), chains:copy(k.chains), lane:copy(k.lane) }]));
   return { ok:true, name:rec.name||'', id:rec.id, settings:copy(rec.settings), tracks:copy(rec.tracks), takes, marks:rec.marks.map(m=>({ ...m })), events:evs, missing };
 }
-export { songData, songPlan, songNeeds, songTimbreNeeds, fileDbg };
+export { songData, songPlan, songNeeds, songTimbreNeeds, fileDbg, viewRec, viewOfRec };

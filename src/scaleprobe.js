@@ -77,7 +77,8 @@ export { checkWrite, checkSeed, checkFrozen, seed, song } from './probes/seed.js
 export { checkSongFile, checkSongOpenUndo } from './probes/songfile.js';   // SAVE1: Save → Open round trip, old / newer / damaged files; SONG3: Open is one ↶ step
 export { checkAutosave } from './probes/autosave.js';   // AUTOSAVE1: the song kept on the device (change → write, off, full / blocked, ring, restore)
 export { checkSongRecords } from './probes/song1.js';   // SONG1: songs carry copies of the person's own scales
-export { checkEventIds } from './probes/ids.js';   // IDS1: permanent event ids (unique, kept by edits, ↶/↷ and the file)
+export { checkEventIds } from './probes/ids.js';
+export { checkValueTripwire, checkCommands, checkJournal } from './probes/cmd.js';   // CMD1: the value tripwire, track ids, commands round trip, the journal   // IDS1: permanent event ids (unique, kept by edits, ↶/↷ and the file)
 export { checkPack } from './probes/pack.js';   // PACK1: offline licence keys and the pack gate, in the page's WebCrypto
 export { checkPool } from './probes/pool.js';
 export { checkOwnTimbres } from './probes/tim3d.js';   // TIM3d: own timbres, song copies, the v6 file

@@ -8123,3 +8123,13 @@ Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the ti
 - IDS1 part 2 (lane-point ids, file v5) and SONG2 (the demo song is `data/songs/triphop.json`, P.song opens it; generator = probe tool).
   Not started, questions in WORK-LOG: CMD1 (needs a plan — the tripwire hash compares objects), VIS1 (with the redesign?), DOC1 (cut
   CLAUDE.md ≈ 237 KB?).
+
+### Moved from HANDOFF.md at RUN 5 (records)
+### RUN 4 (2026-10-17) — log: `WORK-LOG.md` «RUN 4» (plain-language summary at its end)
+- Done: DOC1 (CLAUDE.md 237 → ≈ 57 KB; full text in `archive/CLAUDE-history.md`, proof `tools/doc-split-check.mjs`), LAT2a on the probe
+  clock, SONG3 leftover (Open = one ↶ step), plans CMD1 + VIS1 (`docs/`), POOL1 (chord pool on demand: bare start graph ≈ 0.40 → 0.13 of a
+  core offline), ENG2 (readouts, «Audio dropouts per minute» from `playbackStats`, provisional class — no switching), TIM3a–d + TIM3c
+  (every timbre and kit a record in `data/timbres/`, one bundle, T5 safety bounds, song file v6 with full timbre records, own timbres,
+  «Keep in my timbres»). Final: data PASS 21/0, P.quick 80/0, P.all 105/0. GOLD 84/0 throughout; census changed only by POOL1.
+- Answers recorded (2026-10-17): review E1–E3 / T1–T5 in `docs/ENG2-design.md`, `docs/TIM3-design.md`; plan note in archive B.
+- Open for the user: steps 99 (Open → ↶) and 100 (dropouts line, phone numbers — E3); questions at the end of CMD1/VIS1 plans.

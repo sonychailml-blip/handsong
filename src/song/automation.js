@@ -754,33 +754,33 @@ const ptTouched=capTouched((r,u)=>r.lane.includes(u.pt)), lnTouched=capTouched((
    здесь массив дорожки автоматизации или снимок цепи взятого.
    ⛔ ВТОРОЙ ИСТОРИИ НЕ ЗАВОДИМ: ↶ у человека одна, и она обязана снимать последнее сделанное, чем бы
    оно ни было. Отсюда же и общий хвост — takeFxTouch, чтобы снятая правка перестала звучать. */
-histKind('autmove', (u,undo)=>{ const s= undo?u.from:u.to; u.pt.t=s.t; u.pt.v=s.v; takeFxTouch(); }, ptTouched);
-histKind('autshape', (u,undo)=>{ autShapeSet(u.pt, undo?u.from:u.to); takeFxTouch(); }, ptTouched);
-histKind('autcurve', (u,undo)=>{ const k= undo?u.from:u.to; if(k) u.pt.k=k; else delete u.pt.k; takeFxTouch(); }, ptTouched);   // BEND-CURVE   // гладкая автоматизация: форма отрезка точки ленты — оба состояния в записи, как у переноса
+histKind('autmove', (u,undo)=>{ const s= undo?u.from:u.to; u.pt.t=s.t; u.pt.v=s.v; takeFxTouch(); }, ptTouched, ['pt','from','to']);
+histKind('autshape', (u,undo)=>{ autShapeSet(u.pt, undo?u.from:u.to); takeFxTouch(); }, ptTouched, ['pt','from','to']);
+histKind('autcurve', (u,undo)=>{ const k= undo?u.from:u.to; if(k) u.pt.k=k; else delete u.pt.k; takeFxTouch(); }, ptTouched, ['pt','from','to']);   // BEND-CURVE   // гладкая автоматизация: форма отрезка точки ленты — оба состояния в записи, как у переноса
 const autLaneApply=(u,undo)=>{
   const add=(u.kind==='autdel')===undo;
   if(add){ if(u.lane.indexOf(u.pt)<0) u.lane.splice(u.kind==='autdel'&&u.at!=null ? Math.min(u.at,u.lane.length) : u.lane.length, 0, u.pt); }   // ED6: an undone delete goes back to its own place (the song fingerprint compares lanes in order)
   else { const i=u.lane.indexOf(u.pt); if(i>=0){ if(u.kind==='autdel') u.at=i; u.lane.splice(i,1); } }
   takeFxTouch();
 };
-histKind('autins', autLaneApply, lnTouched);
-histKind('autdel', autLaneApply, lnTouched);
+histKind('autins', autLaneApply, lnTouched, ['lane','pt','at']);
+histKind('autdel', autLaneApply, lnTouched, ['lane','pt','at']);
 const autFxApply=(u,undo)=>{
   const add=(u.kind==='autfxdel')===undo;
   if(add){ if(u.ch.indexOf(u.ent)<0) u.ch.splice(u.at==null?u.ch.length:Math.min(u.at,u.ch.length),0,u.ent); }
   else { const i=u.ch.indexOf(u.ent); if(i>=0) u.ch.splice(i,1); }
   takeFxTouch();
 };
-histKind('autfxins', autFxApply, chTouched);
-histKind('autfxdel', autFxApply, chTouched);
+histKind('autfxins', autFxApply, chTouched, ['ent','ch','at']);
+histKind('autfxdel', autFxApply, chTouched, ['ent','ch','at']);
 histKind('autfxmove', (u,undo)=>{ const from=undo?u.to:u.from, to=undo?u.from:u.to;
   if(from>=0&&from<u.ch.length){ const [e]=u.ch.splice(from,1); u.ch.splice(to,0,e); }
-  takeFxTouch(); }, chTouched);
+  takeFxTouch(); }, chTouched, ['ch','from','to']);
 /* S1: ЗАХВАТ, ЗАВЕДЁННЫЙ ПРАВКОЙ ЦЕПИ дорожке, у которой его не было вовсе (autCaps). Вперёд — поставить (при первом ходе он уже
    стоит: его завела takeCapStart), назад — снять, и дорожка снова идёт за живой цепью, как до правки. Снимаем, только если на
    месте ТОТ ЖЕ объект: чужой захват того же взятого не наш. */
 histKind('autcap', (u,undo)=>{
   if(undo){ if(takeFx.get(u.tk)===u.rec) takeFx.delete(u.tk); } else takeFx.set(u.tk,u.rec);
-  takeFxTouch(); }, (u,S)=>{ tkLy(u.tk,S); });
+  takeFxTouch(); }, (u,S)=>{ tkLy(u.tk,S); }, ['tk','rec']);
 
 export { bendDbg, autTakesOf, autAddrs, BEND_EPS, bendEdited, editBendPoint, editBendShape, pnBars, editVolSel, takeFxDump, autPoints, autEarliest, autCaps, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint, autChainOf, autChainAdd, autChainRemove, autChainMove };

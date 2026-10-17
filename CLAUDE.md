@@ -33,6 +33,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 ## Standing working rules (apply to every slice; prompts don't repeat them)
 - **What a new session reads:** `HANDOFF.md` and this file. Open the archives, `BACKLOG.md`, `docs/NAME-INDEX.md` (every code name by
   module, stale names) or long code files only for what the slice needs, by `grep`, not top to bottom.
+- ⛳ **`docs/NAME-INDEX.md` is GENERATED** (RUN 5): after adding, removing or renaming an export run `node tools/name-index.mjs --write`
+  (the data row «NAME-INDEX current» fails otherwise); removed names are kept by hand in `docs/STALE-NAMES.md`.
 - **Never run git** (not even read-only); never commit. Never run the app, a server, a build, a browser or tests by hand — the two
   probe runners below are the exceptions (they start and stop their own server and browser).
 - ⛳ **Probes before every report — Claude Code runs them and fixes failures until PASS** (user's rule, AUTO-PROBE):
@@ -394,12 +396,14 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   (`loadArrangement`, `loadJam`, `clearJam`).
 - `src/song/` (pure; imports only `song/`, `core/`, `config.js`, `scales.js` — REC1/REC3): `store.js` (`events`, `schedInvalidate`, birth
   order, ids `evIdFill`, `compactEvents`), `lanes.js` (track tables by lane id), `notes.js` (owner keys, `songNotes`/`songSegs`, `tyEq`),
-  `history.js` (THE one history, `histKind` registry, tripwire `histHash`), `edit-notes.js`, `edit-chords.js`, `edit-group.js`,
+  `history.js` (THE one history, `histKind` registry with each kind's FIELDS, VALUE tripwire `histHash`, journal `onApplied` — CMD1),
+  `commands.js` (CMD1c: `histToJSON`/`histFromJSON` — steps by permanent ids), `edit-notes.js`, `edit-chords.js`, `edit-group.js`,
   `edit-insert.js`, `clipboard.js`, `quantise.js`, `transpose.js`, `sections.js`, `automation.js`, `capture.js` (capture records, lane
-  law, lane-point ids), `env.js` (THE song layer's environment `ENV`), `file.js` (`songData`/`songPlan`/`songNeeds`).
+  law, lane-point ids), `env.js` (THE song layer's environment `ENV`), `file.js` (`songData`/`songPlan`/`songNeeds`; song file v7 — track ids).
+  `recorder.cmdSet`/`cmdNote` (CMD1d) — the commands that are not history steps (mute, solo, arm, ⟳, brace, tempo; key, A4) tell the journal.
 - `src/core/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
   `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
-  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves).
+  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a).
 - `src/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
 - `src/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
   `src/handdet.js` — the detector (two models, worker-safe). `src/hand-worker.js` — classic worker.
@@ -415,9 +419,10 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
 - `src/scaleprobe.js` — the browser probe FACADE over `src/probes/<area>.js`; rows register themselves (`probes/rows.js` `row()`/
   `family()`). `src/probedata.js` + `tools/probe-data.mjs` — the node part.
 - `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`,
-  `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1); prints `scales.before.json`, `song.print.json`, `gold.print.json`,
+  `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/NAME-INDEX.md`); `docs/prototypes/` = reference
+  prototypes, not app code (licence use «reference», never shipped); prints `scales.before.json`, `song.print.json`, `gold.print.json`,
   `gesture.print.json`, `census.print.json`.
-- Stale (removed) names to ignore: `docs/NAME-INDEX.md`, "Stale names".
+- Stale (removed) names to ignore: `docs/STALE-NAMES.md` (copied to the end of the generated `docs/NAME-INDEX.md`).
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).

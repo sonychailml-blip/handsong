@@ -29,7 +29,7 @@ import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // 
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
 import { timbreInstall, DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, timbreKey, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
-         toggleLaneMute, toggleLaneSolo,
+         toggleLaneMute, toggleLaneSolo, cmdSet, cmdNote,   // CMD1d: the switches that are not history steps go through cmdSet (the journal sees them)
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
          songBeats, seekTo, editOpen, editClose, editIsOpen, editLayer, editSetLayer,
          editMoveHit, editDeleteHit, editInsertHit, editCanUndo, editCanRedo, editBackingOpen,
@@ -262,7 +262,7 @@ function updLoopBtn(){ loopBtn.textContent = t(loop.on ? 'transport.loopPause' :
    задаёт СКОБА на полосе лупера, кнопка их только включает и выключает. Выключил и включил — скоба там же. */
 const rgnBtn=$('rgnBtn');
 function updRgnBtn(){ rgnBtn.classList.toggle('on', regionOn()); }
-rgnBtn.onclick=()=>{ setRegionOn(!regionOn()); updRgnBtn(); };
+rgnBtn.onclick=()=>{ cmdSet('region', !regionOn()); updRgnBtn(); };
 hooks.rec       = () => { updRecBtn(); syncTutorBarPos(); updHistBtns(); };   // ED7: a take ends → one more step   // запись вкл/выкл → коробка лупера появляется/меняется → переставить подсказку тура
 hooks.loop      = on => { updHistBtns(); loopBtn.classList.toggle('on', on); updLoopBtn(); updRecBtn(); updRgnBtn(); refreshMetreCtl(); syncTutorBarPos(); };   // транспорт менялся → перечитать блокировку размера (пусто/играет), вид кнопки области И положение подсказки (коробка появилась/ушла)
 
@@ -425,8 +425,8 @@ let laneGest=null;   // { h, y, r0, rowH, moved } — отложенный та�
 const laneRow0Clamp=v=>{ const S=loopScroll(); return S ? Math.max(0, Math.min(S.nAll-S.visN, v)) : 0; };
 function laneAct(h){
   if(h.what==='del'){ laneDelTap(h.layer); updRecBtn(); return; } // S3.5d: первый тап взводит, второй по тому же ✕ — удаляет (подсказка ● называет вооружённую дорожку — могла уйти)
-  if(h.what==='arm'){ toggleArm(h.layer); updRecBtn(); return; } // S3.5c: вооружить/снять; подсказку ● перечитать (она называет дорожку)
-  if(h.what==='mute') toggleLaneMute(h.layer); else toggleLaneSolo(h.layer);
+  if(h.what==='arm'){ cmdSet('arm', h.layer); updRecBtn(); return; } // S3.5c: вооружить/снять; подсказку ● перечитать (она называет дорожку)
+  cmdSet(h.what==='mute' ? 'mute' : 'solo', h.layer);
 }
 addEventListener('pointerdown', e=>{
   if(e.target!==canvasEl) return;
@@ -843,8 +843,8 @@ if(secNameIn){
 }
 function arrAct(h){
   if(h.what==='open'){ openRoll(h.layer); return; }
-  if(h.what==='arm'){ const pre=armedLayer(); toggleArm(h.layer); updRecBtn(); if(h.name) nameTapDouble(h.layer,pre); return; }   // AR2: второй тап по имени — переименовать (вооружение возвращается)
-  if(h.what==='mute') toggleLaneMute(h.layer); else if(h.what==='solo') toggleLaneSolo(h.layer);
+  if(h.what==='arm'){ const pre=armedLayer(); cmdSet('arm', h.layer); updRecBtn(); if(h.name) nameTapDouble(h.layer,pre); return; }   // AR2: второй тап по имени — переименовать (вооружение возвращается)
+  if(h.what==='mute' || h.what==='solo') cmdSet(h.what, h.layer);
 }
 function arrUp(e){
   if(!arrPts.has(e.pointerId)) return;
@@ -1792,7 +1792,7 @@ selScale.onchange=e=>{
   updScaleBtn(); refreshProgAvail(); renderRectCtl();          // 2/3: смена лада (+ раскладка: доступность и подпись «По ладу» зависят от лада; сам ВЫБОР не трогаем — он вернётся на подходящем ладу)
   if(hooks.tutor) hooks.tutor('scale',{id:scaleId, trad:tradOfScale(scaleId)});   // ЗАЦЕПКА ОБУЧЕНИЯ: человек ВЫБРАЛ лад в меню — урок «Строи и тембры»
 };
-const keyMoved=()=>{ liveAllOff(); backingFollowKey(); droneRetune(); updScaleBtn(); };   // TF2: the key knob moves only the hands (and the backing, Q3); recordings keep their key, tracks keep playing
+const keyMoved=()=>{ liveAllOff(); backingFollowKey(); droneRetune(); updScaleBtn(); cmdNote('key', { tonic, cents:tonicCents }); };   // CMD1d: the journal sees the knob   // TF2: the key knob moves only the hands (and the backing, Q3); recordings keep their key, tracks keep playing
 selTonic.onchange=e=>{ setTonic(+e.target.value); keyMoved(); };
 /* TF5: the cents nudge and the historical 1/1 are the same knob (a listening switch; a nudge mid-take starts a new track, as a key change) */
 $('tonicCents').onchange=e=>{ setTonicCents(e.target.value); e.target.value=String(tonicCents); keyMoved(); };
@@ -1812,7 +1812,7 @@ const aRefSel=$('aRefSel'), aRefInput=$('aRefInput');
 let lastARef=aRef;                                 // последнее ВАЛИДНОЕ значение — для отката
 function syncARef(v){ aRefInput.value=v; aRefSel.value=String(v); }   // отразить в обоих; v не из списка → пресет пуст (кастом)
 function applyARef(v){
-  setARef(v); lastARef=v;
+  setARef(v); lastARef=v; cmdNote('a4', { hz:v });   // CMD1d: the journal sees A4
   softAllOff();                                    // звучащее гаснет и переиграется на новом эталоне (как смена тоники)
   droneRetune();                                   // дрон softAllOff не трогает — перестраиваем ВЫСОТЫ на новую опору сразу (слайс «дрон и центы»). ⛔ Уровень не трогаем: прежний droneOn здесь поднимал гейт дрона и на СТОЯЩЕМ транспорте (droneAudible не спрашивал, идёт ли он) — дрон начинал звучать при смене A4 без ▶
 }
@@ -1907,7 +1907,7 @@ function applySub(){ sub4.classList.toggle('act', loop.sub===4); sub3.classList.
 sub4.onclick=()=>{ setLoopSub(4); applySub(); };
 sub3.onclick=()=>{ setLoopSub(3); applySub(); };
 applySub();
-bpmEl.oninput=e=>{ setLoopBpm(+e.target.value); bpmV.textContent=loop.bpm; };
+bpmEl.oninput=e=>{ cmdSet('tempo', +e.target.value); bpmV.textContent=loop.bpm; };
 selDrumKit.onchange=e=>setDrumKit(+e.target.value);
  
 recBtn.onclick=onRec;

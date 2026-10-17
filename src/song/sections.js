@@ -228,6 +228,6 @@ function secRename(id,name){ const nm=String(name||'').trim().slice(0,24), m=sec
 function secDelete(id){ if(!secMarks.some(m=>m.id===id)) return false; return secPush(secCopy(secMarks).filter(m=>m.id!==id),'unmark'); }
 /* ED6's song history became the one history (ED7): the old names stay as aliases (ui of the window, the ED6 probe). */
 const songCanUndo=()=>histCanUndo(), songCanRedo=()=>histCanRedo(), songUndo=()=>histUndo(), songRedo=()=>histRedo(), songHistReset=()=>histReset();
-for(const k of ['brace','marks','lanelen']) histKind(k, secApply);   // ED6: brace, markers, backing lengths (section edits)
+for(const k of ['brace','marks','lanelen']) histKind(k, secApply, null, k==='lanelen' ? ['ch'] : ['from','to']);   // ED6: brace, markers, backing lengths (section edits)
 
 export { secDbg, secMarks, secMarksSet, secCopy, sections, songEditWhy, songEdit, secAdd, secRename, secDelete, songCanUndo, songCanRedo, songUndo, songRedo, songHistReset };

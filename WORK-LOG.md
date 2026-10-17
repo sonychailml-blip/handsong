@@ -896,3 +896,155 @@ privacy and network checks PASS.
   source, or only a reference? Build VIS1a (invisible groundwork) now or at the start of Calm?
 - **ENG2:** please run the dropouts line on your phone (and a budget Android / an iPhone when you can) — the provisional classes wait for it.
 - Note: the song file is now version 6 (version 5 already existed from RUN 3), so «v5 migration» in the task became «v5 → v6».
+
+# RUN 5 (2026-10-17)
+
+## User answers (recorded at the start of RUN 5)
+- **CMD1:** YES — track ids go into song files (v7), per rule #37. (Undo history stays out of the file — the plan's recommendation, not
+  contradicted.)
+- **VIS1:** over a Calm room the note field is almost invisible (only the row under each hand glows softly near the hand and fades); no
+  cents and no Hz in Calm (they stay in the full mode); a «Show the full note field» switch may exist. The «Rooms of light» prototype
+  (`docs/prototypes/rooms-of-light.html`, strategist's own code, Three.js r128 from cdnjs, MIT) is the starting point, re-laid by the
+  project's rules — START WITH ONE ROOM ONLY: the night forest, WITHOUT animals / musicians (fireflies only). The user likes both its forest
+  SOUND and its forest PICTURE. Monastery and forest band = later / paid.
+- Queue: 1 CMD1 (+ track ids, v7) · 2 DOC1 leftovers (name-index generator + probe; BACKLOG §1 in English) · 3 CALM PLAN (PLAN ONLY,
+  `docs/STAGE4-CALM-plan.md`, around the user's Calm v1 specification) · 4 stop. Prototype: a REFERENCE, excluded from the app and the
+  static checks; its cdnjs three.js r128 registered as «reference prototype, not shipped».
+
+STARTED 1 CMD1a value tripwire 2026-10-17
+
+## Slice 1a — CMD1a value tripwire (done; nothing visible changes)
+- `src/core/canon.js` (new, pure): canonical JSON (keys sorted, −0 = 0, numbers by JSON's exact text, Map/Set as arrays) + FNV.
+- `song/history.js histHash`: events by permanent id + beat + layer + canonical payload (memo per payload object; `{deep:true}` skips it);
+  capture records by take number + chains + point VALUES (point ids left out: they are given at takeFxTouch, possibly after the seal);
+  track tables by track id; markers canonical. ⚠️ Deviation from the plan, on purpose: the event's VIEW is NOT hashed — the key knob
+  re-keys the backing's views outside the history (TF2, Q3); hashing it would make ↶ refuse after every knob turn. The old object hash
+  stays as the CONTROL (`histDbg({objHash:true})`). Numbers are written EXACTLY (not rounded to 1e-6 as the plan said: exact survives
+  a JSON round trip, rounding would hide a 1e-7 change).
+- Rows: «CMD1 canonical values (core)» 10 / 0 (data runner); «CMD1 value tripwire» (quick) — Save → Open fixed point, equal-copy payload
+  (object hash CONTROL differs), one changed field (CONTROL), in-place write missed by the memo and caught by deep mode.
+
+## Slice 1b — CMD1b permanent track ids in the song file (v7) (done; nothing visible changes)
+- `core/songfile.js` SONG_VERSION 7, migration v6 → v7 = identity (an older file's tracks get fresh ids at open), check: a track id is a
+  fresh positive integer. `song/file.js` writes `tracks[].id` (CONTROL `fileDbg({noTrackIds})`). `lanes.laneNew(layer, id?)` stays the only
+  writer: an explicit id only from Open, taken when no layer holds it, counter floors above it. Open's snapshot step now also records a lane
+  kept under the same id whose ROW changed (only for Open — `rowSame`), so ↶ of an Open of the song's own file restores mute/level/….
+- Rows: IDS1 + track ids after Save → Open + CONTROL (a save without track ids reopens with new ids); SONG2's comparison ignores track ids
+  (session counters, as event ids); SAVE1 core + v6 → v7 (idempotent, input untouched) + two damages.
+- Licence register (prototype ADDITION): new use «reference» in `tools/check-licences.mjs` — `docs/prototypes/*.html` is scanned for
+  addresses only, each must be a «reference» entry and such an address in a shipped file fails (new CONTROL); entries three.js r128 (MIT)
+  and the prototype's Google Fonts Marcellus + Commissioner (OFL-1.1). THIRD-PARTY-LICENSES.md regenerated. (licences.json was re-written
+  by a JSON dump — same content, 2-space layout.) The static checker reads only `src/` — the prototype is outside it by construction.
+- Runs: static PASS · data PASS 22 / 0 · **P.quick PASS 81 / 0 (119.6 s)**, UI, CSP, network PASS; seed bass exact. Fix rounds 1 (LIC1:
+  the glyph list named the new probe file — regenerated).
+
+STARTED 1c CMD1c commands serialised by ids (toJSON / fromJSON per kind) 2026-10-17
+
+## Slice 1c — CMD1c every history step a command, serialised by ids (done; nothing visible changes)
+- `histKind(kind, apply, touched, fields)`: every kind DECLARES its fields (23 kinds, next to each registration in history.js, automation.js,
+  sections.js, recorder.js). New `src/song/commands.js`: `histToJSON` / `histFromJSON` / `histRoundTrip`. Live objects written by permanent
+  id and resolved back to THE live object (events by `e.id`, lane points by `p.id`, capture records / lanes / chains / chain entries by take,
+  key and place, views by the file descriptor `viewOfRec` — memoised, so the same object); everything else written once and referenced after
+  (two steps naming one deleted event share one object again); an event copy carries its birth number (`store.evSeqPut`, same-beat order).
+  An undeclared field / kind refuses by name; an unknown id refuses in words and installs nothing. `file.js` exports `viewRec` / `viewOfRec`
+  (songPlan uses the same helper).
+- Row «CMD1 commands round trip» 81 / 0: the ED7 sequence + a lane point move + Open of the own file + ✕; after EVERY step the whole history
+  is written, parsed and installed; full ↶ / ↷ compared by value with each step's snapshot (round trips also in the middle of the walks).
+  CONTROLS: a writer dropping autmove `from.v` breaks ↶; the object tripwire answers «changed» after a round trip (value tripwire passes);
+  a kind without fields refuses naming «tab»; an unknown event id refuses naming it and leaves the history. Largest history text 155 KB.
+- Hash cost (measured, desktop): seed 194 events 0.4 ms memoised / 1.6 ms deep; demo song 1774 events 1.2 ms memoised / 10.5 ms deep.
+
+## Slice 1d — CMD1d the journal and the commands that are not steps (done; nothing visible changes)
+- `history.onApplied(fn)` → unsubscribe; heard in order: 'do' (a step entering the history; a group edit once), 'merge' (level drag into
+  the newest step), 'undo', 'redo', 'reset', 'set' (`histNote`). `recorder.cmdSet(kind, …)` — mute, solo, arm, ⟳ (region), brace, tempo —
+  applies today's setter and notes it by the track's permanent id; `cmdNote` for the key knob and A4 (their ui handlers do more than one
+  setter). ui routes its mute / solo / arm / ⟳ / tempo calls through `cmdSet` (same effect) and notes key and A4.
+- Autosave keeps its 1-s poll (plan question 3: the journal is not measured cheaper on the phone).
+- Row «CMD1 journal» 6 / 0 (after one fix: the probe dropped its own history before undoing a volume edit — the state guard caught it).
+- CMD1 checkpoint: static PASS · data PASS 22 / 0 · **P.quick PASS 83 / 0 (132 s)** · seed bass exact · UI, CSP, network PASS.
+  Fix rounds 2 (licence glyph list regenerated twice; the journal probe's order).
+- **CMD1 next (not done):** the static-check rule candidate «no write to `e.a.<x>` outside song/ edit kinds» (plan §3.3, to be measured);
+  the journal as autosave's trigger (only after phone numbers); saving a history in a song file stays OUT (user answer).
+STARTED 3 CALM PLAN (PLAN ONLY) 2026-10-17
+
+## Queue item 3 — CALM PLAN (done; PLAN ONLY, no code) — `docs/STAGE4-CALM-plan.md`
+- Built around the user's specification a–j and the reference prototype; other Calm ideas only under «Later / paid» (§12).
+- Contents: Calm as a PROFILE record (`data/profiles/*.json`, `core/profile.js`) + an EDITION constant written by a release tool (dev: a
+  Full ↔ Calm switch and `?calm`; released: Calm only); a full map of the prototype's pieces → modules / rules / tokens / probes (its
+  seeded geometry kept, Math.random → seeded, own audio graph → ENG1, compressor → our limiter, IR → our Night forest, pointer/slider → hand
+  position and hand size, ghost → the HAND1 pose path); sound: 3 timbre candidates (Firefly as a new solo `tine` record, Glass pad, Warm
+  pad; alternates Airy flute, Bell deep), depth → Night forest send + distance colour via today's `{mode:'drive', hand:'play', axis:'z'}`,
+  3 recommended effects (Echo, Warm↔Bright, Wave — all exist; Sparkle the new 4th), a NEW solo latch (today's solo «held» freezes pitch,
+  it is not a latch), moods Glow / Dusk / Mist (major / minor / suspended pentatonic, key A), the ambience module (drone + wind from the
+  prototype, crickets new, seeded); the Calm shell; first run + ghost; low power (levels, FDN «forest-like» reverb, no automatic switching
+  until the phone numbers — list of 6 measurements); offline (vendored MediaPipe + model + three, CSP to 'self', SW precache by
+  `tools/release.mjs`); release needs (domain, hosting — Cloudflare Pages recommended, privacy wording, no store needed, Paddle recommended
+  for the later paid parts); probes for both modes (P.calm, `--profile calm`, synthetic hands, numbers not pixels, offline row); rules
+  #31–#38; 15 slices (1 L, 11 M, 4 S ≈ 4–5 weeks); 8 risks; 10 questions in plain words.
+- Found while planning (recorded in the plan): the solo `hold` function is not a latch → slice C5b.
+
+## Queue item 2 — DOC1 leftovers (done; docs and tools only)
+- `tools/name-index.mjs` (new): `docs/NAME-INDEX.md` GENERATED from `src/` (per module: the head comment's first sentence, every export with
+  its kind — fn / const / let / class / re-export; comma-list declarations and re-exported imports recognised; 3 edge names stay «?»).
+  Data row «NAME-INDEX current» (+ CONTROL: one added export must change the text). The hand-written index moved word for word to
+  `archive/NAME-INDEX-before-RUN5.md`; its «Stale names» section to `docs/STALE-NAMES.md` (copied into the generated file). CLAUDE.md: a
+  standing rule «after an export change run `node tools/name-index.mjs --write`».
+- BACKLOG §1 rewritten in English (status updated: stable ids ✅, saving partly done, Scala readiness, SW cache → Calm); the Russian text
+  moved word for word to `archive/BACKLOG-history.md`; `doc-split-check BACKLOG.before BACKLOG.md archive/BACKLOG-history.md` PASS
+  (2272 / 2272 lines). CLAUDE.md 59 KB; `doc-split-check archive/CLAUDE-before-DOC1.md CLAUDE.md archive/CLAUDE-history.md` PASS (1865 / 1865).
+- Docs: HANDOFF (RUN 4 record → archive B «Moved from HANDOFF.md at RUN 5», RUN 5 record, work order; 19.7 KB), CMD1-design.md and
+  VIS1-design.md «Review 2026-10-17», archive/CLAUDE-history.md (CMD1 module detail).
+
+## Final run (RUN 5 end)
+- static PASS · `node tools/name-index.mjs` PASS · data PASS 23 / 0 · `--quick --all`: **P.quick PASS 83 / 0 (136 s) · P.all PASS 108 / 0
+  (565 s)** — GOLD 84 / 0, frozen seed bass 0.08686 / 0.055319 / 650886 exact, AF2 / AF5 / AF6b / LR1, HAND1 525 / 0, census 18 / 0, CMD1
+  rows, SAVE1 / AUTOSAVE1 / SONG1–3 / IDS1 / PACK1 / TIM3 / POOL1 / ENG2, CAM and LAT rows, state guard clean; the runner's UI checks, CSP and
+  network checks are part of its overall PASS (exit 0). Fix rounds this run: 3 (licence glyph list ×2, the journal probe's order).
+- Files changed in RUN 5: src/core/canon.js (new), src/song/commands.js (new), src/song/history.js, src/song/store.js, src/song/lanes.js,
+  src/song/file.js, src/song/automation.js, src/song/sections.js, src/core/songfile.js, src/recorder.js, src/ui.js, src/engine/surface.js,
+  src/scaleprobe.js, src/probes/cmd.js (new), src/probes/ids.js, src/probes/song2.js, tools/probe-data.mjs, tools/check-licences.mjs,
+  tools/licences.json, tools/name-index.mjs (new), THIRD-PARTY-LICENSES.md (generated), docs/NAME-INDEX.md (generated), docs/STALE-NAMES.md
+  (new), docs/STAGE4-CALM-plan.md (new), docs/CMD1-design.md, docs/VIS1-design.md, BACKLOG.md, CLAUDE.md, HANDOFF.md, archive/BACKLOG-history.md
+  (new), archive/NAME-INDEX-before-RUN5.md (new), archive/CLAUDE-history.md, archive/HANDOFF-history.md.
+- Not done: CMD1's «next» items (the in-place-write static rule candidate; the journal as autosave's trigger). No Calm code (the plan
+  waits for review).
+
+# SUMMARY FOR THE USER — RUN 5 (plain language)
+
+**What was done** (each step checked by the automatic probes; nothing should look or sound different):
+1. **Every edit is now a saveable «command» (CMD1).** The undo history can be written out as plain text and read back, naming every note,
+   track and automation point by its permanent number. Proved by doing 18 different kinds of edits, writing the whole history out and
+   reading it back after EACH one, then undoing and redoing everything — the song came back exactly every time. This is the ground for
+   later features (playing together, MIDI learn, a history that survives a reload) — nothing new on screen yet.
+2. **The undo safety check compares values, not objects.** It used to recognise a note by «which object in memory», so a history read back
+   from text would have looked «changed» and been thrown away. Now it compares the actual values (and still catches a change made behind
+   its back). It costs about 1 ms on the 1774-note demo song.
+3. **Tracks keep their identity in song files (file version 7)** — as you decided. Older files still open; the file you open is never changed.
+4. **A «journal» of what happens.** Every edit, undo, redo and every switch that is not an undo step (mute, solo, arm, repeat, tempo, key, A4)
+   is announced to whoever listens. Nobody listens yet (autosave keeps its once-a-second check, since the phone was not measured).
+5. **Housekeeping (DOC1 leftovers).** The list of every code name is now produced by a tool from the code itself and checked automatically,
+   so it can never go stale. Section 1 of the BACKLOG is now in English (the Russian text kept word for word in the archive; a tool proved
+   no line was lost).
+6. **The prototype is registered.** `docs/prototypes/rooms-of-light.html` is kept as a reference: its 3D library (three.js r128, MIT) and its
+   two fonts are in the licence list as «reference — not shipped», and the check fails if the app itself ever loads them from outside.
+7. **THE CALM PLAN** — `docs/STAGE4-CALM-plan.md` (plan only, no Calm code yet). It follows your specification a–j point by point and maps
+   every piece of the prototype (the forest, the fireflies, the light that goes deeper, the drone and wind, the reverb, the firefly note) to
+   where it will live in the app and what must change. 15 work steps, about 4–5 weeks; risks; and the questions below.
+
+**Probe verdicts (final run):** data 23 / 23, P.quick 83 / 83, P.all 108 / 108 — all PASS; golden sounds 84 / 84; frozen-track numbers exact; the runner's privacy, network and on-screen checks PASS.
+
+**Questions for you (from the Calm plan, §14):**
+1. **Sounds:** Calm offers three — Firefly, Glass pad, Warm pad (our suggestion) — or swap one for Airy flute or Deep bell?
+2. **Effects on the other hand:** Echo, Warm↔Bright and Wave (all exist already) — or Sparkle (a soft octave shimmer, new) instead of one?
+3. **Moods:** Glow (bright), Dusk (darker), Mist (floating) — good? Always in A, or let people choose the key?
+4. **No camera:** if someone refuses the camera — play by touching the screen, or just explain that Calm needs the camera?
+5. **Light for the hands:** may the bottom of the screen glow softly like a lantern so the camera sees hands in a dark room?
+6. **How notes start:** by a pinch (like the rest of Handsong — suggested) or just by moving the light, like the prototype?
+7. **Visitor counter:** keep the one page-view counter (needs Vercel, no offline), or drop it and host on Cloudflare Pages (free, allows
+   selling later)?
+8. **Name and address:** is «Handsong — Calm» the release name? Do you have a domain in mind?
+9. **Payments later:** plan with Paddle for the paid parts after Calm?
+10. **Fonts:** keep the prototype's style (Marcellus titles), or wait for our design proposals?
+
+**Try it:** nothing new to try on screen this time. Older open checks stay: steps 99 (Open → ↶) and 100 (the dropouts line on your phone).
+The Calm plan also lists six phone measurements (§7) we will need before choosing the low-power defaults.

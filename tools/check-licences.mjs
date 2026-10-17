@@ -9,7 +9,8 @@
    sounds, models, .wasm…) and everything under vendor/ belongs to an entry; (4) every package in tools/package-lock.json has an entry
    with the same version and licence; (5) the icon/glyph audit: every Unicode symbol or emoji used outside comments is listed, and
    every listed one is still used; (6) THIRD-PARTY-LICENSES.md equals the generated text. CONTROLS (must fail): an unlisted URL, an unlisted CSP host, a GPL
-   licence, an unlisted glyph, an unlisted image file, a package version bump. */
+   licence, an unlisted glyph, an unlisted image file, a package version bump, a reference-only address in a shipped file. Reference prototypes
+   (docs/prototypes/*.html, RUN 5) are scanned for addresses only: each must be a «reference» entry, never used by a shipped file. */
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, extname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -20,7 +21,7 @@ const REG_FILE='tools/licences.json', LOCK_FILE='tools/package-lock.json', MD_FI
 const SKIP_DIRS=new Set(['.git','tools','archive','node_modules']);
 const OWN_EXT=new Set(['.js','.mjs','.json','.html','.css','.md','.txt','']);   // our code, data and docs
 const CLASSES=new Set(['code','model','service','link','image','font','glyph','sound','ir']);
-const USES=new Set(['shipped','CDN','service','link','device','dev-only']);
+const USES=new Set(['shipped','CDN','service','link','device','dev-only','reference']);   // reference (RUN 5): used only by a reference prototype under docs/prototypes/ — never shipped
 const MATERIAL=new Set(['image','font','glyph','sound','ir']);
 const REFUSED=/\b(A?GPL|LGPL|MPL)\b|\bSA\b|-SA\b|\bNC\b|-NC\b|\bND\b|-ND\b/i;
 const GLYPH_KINDS=new Set(['icon','typography','notation','console']);
@@ -37,9 +38,10 @@ function walk(dir, out=[]){
   return out;
 }
 const isShippedText=f=>/^(index\.html|style\.css|sw\.js|manifest\.json)$/.test(f)||/^src\/.+\.js$/.test(f)||/^data\/.+\.json$/.test(f);
+const isRefText=f=>/^docs\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
 export function gather(){
   const files=walk('').sort(), texts={};
-  for(const f of files) if(isShippedText(f)) texts[f]=readFileSync(join(ROOT,f),'utf8');
+  for(const f of files) if(isShippedText(f)||isRefText(f)) texts[f]=readFileSync(join(ROOT,f),'utf8');
   const read=f=>existsSync(join(ROOT,f)) ? readFileSync(join(ROOT,f),'utf8') : null;
   return { files, texts, reg:JSON.parse(read(REG_FILE)), lock:JSON.parse(read(LOCK_FILE)||'{}'), md:read(MD_FILE) };
 }
@@ -94,6 +96,8 @@ export function check(inp){
   }
   for(const [f,u] of refs){ cases++; const it=urlOwner(u);
     if(!it) diff.push(`${f}: ${u} — not in the register (${REG_FILE}); add an entry with its licence, or remove the address`);
+    else if(isRefText(f) && it.use!=='reference') diff.push(`${f}: ${u} — a reference prototype may use only «reference» entries (${it.id} is ${it.use})`);
+    else if(!isRefText(f) && it.use==='reference') diff.push(`${f}: ${u} — a reference-only address (${it.id}) in a shipped file`);
     else urlUsed.set(it.id,(urlUsed.get(it.id)||0)+1); }
   for(const it of items) if((it.urls||[]).length && !urlUsed.get(it.id)) diff.push(`entry ${it.id}: none of its addresses is used any more — remove the entry`);
   // (3) files that are not our code, data or docs
@@ -109,7 +113,7 @@ export function check(inp){
   for(const it of items) if(it.npm && !Object.keys(lock.packages||{}).some(k=>k.replace(/^.*node_modules\//,'')===it.npm)) diff.push(`entry ${it.id}: npm package ${it.npm} is no longer in ${LOCK_FILE}`);
   // (5) glyph audit
   const use=new Map();
-  for(const [f,s] of Object.entries(texts)){ const v=visible(f,s);
+  for(const [f,s] of Object.entries(texts)){ if(isRefText(f)) continue; const v=visible(f,s);
     for(const ch of v){ const cp=ch.codePointAt(0); if(!isGlyph(cp)) continue;
       if(!use.has(ch)) use.set(ch,new Set()); use.get(ch).add(f); } }
   const listed=new Map((reg.glyphs||[]).map(g=>[g.ch,g]));
@@ -147,11 +151,12 @@ export function renderMd(reg, use){
     for(const it of xs){ const extra=[it.decision&&`decision: ${it.decision}`, it.tool&&`tool: ${it.tool}`, it.notes, it.replace&&`**${it.replace}**`].filter(Boolean);
       if(extra.length) L.push(`- **${it.name}** — ${extra.join(' · ')}`); }
     L.push(''); };
-  sect('Shipped or loaded at run time (code and models)', it=>['code','model'].includes(it.class)&&it.use!=='dev-only');
+  sect('Shipped or loaded at run time (code and models)', it=>['code','model'].includes(it.class)&&it.use!=='dev-only'&&it.use!=='reference');
   sect('Hosted services', it=>it.use==='service');
   sect('Links the person opens (nothing is sent by the app)', it=>it.use==='link');
   sect('Developer tools only (never shipped)', it=>it.use==='dev-only');
-  sect('Icons, images and fonts (audit, Q13)', it=>['image','font','glyph','sound','ir'].includes(it.class));
+  sect('Reference prototypes only (docs/prototypes/, never shipped)', it=>it.use==='reference');
+  sect('Icons, images and fonts (audit, Q13)', it=>['image','font','glyph','sound','ir'].includes(it.class)&&it.use!=='reference');
   const gl=items.find(it=>it.class==='glyph');
   L.push('## Unicode symbols and emoji in the interface (audit, Q13)','',
     `Origin of every entry: ${gl?gl.source:'—'}.`,'',
@@ -172,6 +177,8 @@ export function controls(inp, base){
     ['an unlisted glyph', i=>{ i.texts['src/ui.js']+="\nconst probeGlyph='⚡';"; }, /glyph ⚡/],
     ['an interface glyph outside the icon component', i=>{ i.texts['src/ui.js']+="\nconst probeIcon='▶';"; }, /glyph ▶ .* outside the icon component/],
     ['an unlisted image file', i=>{ i.files.push('icons/extra.svg'); }, /icons\/extra\.svg/],
+    ['a reference-only address in a shipped file', i=>{ const it=i.reg.items.find(x=>x.use==='reference'&&(x.urls||[]).length); if(it) i.texts['src/ui.js']+=`
+const probeRef='${it.urls[0]}';`; }, /reference-only address/],
     ['a package version bump', i=>{ const k=Object.keys(i.lock.packages||{}).find(Boolean); if(k) i.lock.packages[k].version='999.0.0'; }, /999\.0\.0/],
   ];
   const out=[];

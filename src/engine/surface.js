@@ -22,6 +22,7 @@ const SURFACE={
   'live/record.js':['AC', 'chordHold', 'timbreKey'],
   'main.js':['AC', 'initAudio'],
   'probes/autosave.js':['masterLevel', 'setMasterLevel'],
+  'probes/cmd.js':['masterLevel', 'setMasterLevel'],
   'probes/edit.js':['timbresOf'],
   'probes/engine.js':['AC', 'BASS_INSTR', 'CHORD_INSTR', 'DRUM_KITS', 'LEAD_INSTR', 'bassOn', 'chordOn', 'droneOn', 'drumHit',
     'dynReady', 'engineCtx', 'frzReady', 'ksReady', 'leadOn'],

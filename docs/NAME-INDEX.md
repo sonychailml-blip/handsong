@@ -1,160 +1,701 @@
-# NAME INDEX — code names by module (consult by grep only; do not read top to bottom)
+# NAME INDEX — code names by module (GENERATED — do not edit by hand)
 
-Moved out of `CLAUDE.md` (AF3 part 0) to keep it short. Rules live in `CLAUDE.md`; this file only lists names. Meaning of a name:
-grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here.
+_Generated from `src/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.
+Kinds: fn, const, let, class, «→ ./x.js» a re-export. Meaning of a name: the code and `archive/CLAUDE-history.md`. The hand-written index
+before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of this file (kept by hand in `docs/STALE-NAMES.md`)._
 
-## Module map — full name lists (as in CLAUDE.md before AF3)
-- `index.html` — markup only: start card (Play / Learn, `#fsBtnStart`, `#installBtn`+`#installHint`, footer `#langSel`/feedback/
-  donate, `#loadmsg`), top bar, three panels (`#panelScale` scale/tonic/A4/layout/fingers/triads; `#panelSound` timbres with voice-mode
-  rows `vmLdPoly`/`vmLdLead`/`vmBsPoly`/`vmBsLead`, hand functions, finger actions, effects constructor; `#panelLoop` backing length/
-  metre/BPM/quantise/division/arrangement), `#backingMenu`, help overlay, `#tutorBar` + `#lessonOv`, transport `#loopTransport`
-  (▶ `loopBtn` · ⟳ `rgnBtn` · ⤺ `undoBtn` · ✕ `clrBtn` · ■ `panicBtn` · ✎ `rollBtn` → arrangement window; ⏮ `rollHome` hidden in play;
-  class `.roll` → only ⏮ ▶, `.arr` → ⏮ ▶ ⟳), `#arrBar` (✕, zoom −/+, ⤢, face 🎚/▤), `#rollBar`, `<video>`/`<canvas>`. Base path relative.
-- `style.css` — all CSS. `manifest.json`/`sw.js` — PWA; the SW is deliberately cache-free (empty `fetch` handler, only so Chromium
-  fires `beforeinstallprompt`).
-- `src/config.js` (leaf, imports nothing) — gesture thresholds, scheduler timings, pool sizes, FX-bar and palette geometry
-  (`CH_PAL_*`, `PAL_HYST_X/Y`, `palColX`/`palRowY`, `palSplitX(x0,x1)` — the single palette|notes split), `rectBandY(i,H,nRect)`,
-  `CAM_MARGIN=0.12`, `remapAxis`, `coverView(vw,vh,W,H,M)` (the single cover-crop computation), the volume curve `volAmp(v)=v²`,
-  `volVel(role,a)`, `volFromOld(role,v)=√(floor+(1−floor)·v)` (old floors: solo 0, chords 0.25, bass/drums 0.3), `AUT_RAMP_BEAT` 1/16,
-  `AUT_RAMP_EPS` 0.01, fine recording `REC_FINE_EPS` 0.01 / `REC_AVG_S` 2 / `REC_JUMP_EPS` 0.03 / `REC_HIST_S` 20 / `REC_PAUSE_S` 0.5 /
-  `REC_KNEE_F` 50, (DRAW1b: `INSTR_COL`, `LANE_NOROLE_COL`, `REV_COLOR` gone — `palette.ROLE_COL`, `noRoleCol()`, `cv('fx-rev')`; `FX_META[].color`
-  → `.col` = a token name), `LANE_NAME_*` (17 % of the strip, 48–100 px), `ARR_ROW_H` 40, `ARR_HANDLE_W` 28.
-- `src/state.js` — cross-cutting musical/layout state + setters: `scaleId`, `tonic`, `aRef` (380–480), `tunedFrom` ('T' or 0..11),
-  `seventh`, instrument indices `leadIdx/chIdx/bassIdx/drumKitIdx`, `fx` = solo-only scalars `{vib, drv, trm}`, `latchDeg/latchTy`,
-  `chordFam/chordVar`, `phoneInstr`, `handFn` (defaults `ld:{fx,note}`, `bs:{note,note}`, `ch:{latch,latch}`, `dr:{hit,hit}`;
-  `setHandFn`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`), `handActs` (finger actions, today `chFam`), `voiceMode`
-  (`{ld:'poly', bs:'lead'}`, `setVoiceMode`, `isLeadMode`), `pinchFingers` (1..4, default 4), `splitOn` + `SPLIT_ROLES` +
-  `phoneHalves(W)` (the only `W/2`), per-role registers `octReg/bassOctReg/chordOctReg` via `rectOctReg(role)`/`setRectOctReg`,
-  `rectPref` ('auto'|'rect'|'rows'), camera (`camFacing`, `mirrored()`, `flipX`, `sx`/`sy`, `viewRect`), `videoRec`, display mirrors
-  (`exprDisp`, `exprBrightDisp`, `looperMsg`/`looperClear`), `chordModeSel`/`chordModeVer`, `laneRow0`, editor/window state (`rollOpen`,
-  `arrOpen`, `arrFace`, `rollBeat0/rollSpan`, `rollRole`, `rollSel`/`rollSelNote`, `laneDrag`). **Chain-owner key:** `CHAIN_ROLE`,
-  `chainKeyOf(role)` → `'role:ld'`, `CHAIN_SOLO`, `fxChains`, `fxChainOf(key)`, `FX_VOL`, `fxVolReset(key)`, `fxChainMove`,
-  `chainOwners()` → `[{key, kind}]`. ⛔ The key is OPAQUE — equality and indexing only, never parsed.
-- `src/hooks.js` — nullable callbacks for lower layers (`leadInstr, bassInstr, drumKit, rec, loop, tutor, scales`).
-  `hooks.tutor(kind,payload)` is the tutorial's single channel.
-- `src/i18n.js` — `LANGS=['en','ru']` (`es`/`de` prepared, not enabled), `DICTS`, `t(key,params)` (dict → en → `params.def` → the key),
-  `L(field)` (data names), `store` (localStorage with memory fallback), `lang`, `setLang`, `onLangChange`, `applyI18n` (`data-i18n`,
-  `data-i18n-title`, `<html lang>`); persisted as `handsong.lang`.
-- `data/` + `src/scaleload.js` — ALL scale data are JSON files (v1): `data/index.json` (manifest; mode order = menu order = F0 index
-  `i`), `data/menu.json`, `data/tunings/`, `data/modes/`, `data/palettes/`, `data/chordmodes/` (file name = id); comments in
-  `data/README.md`. `loadScaleData`/`loadReport`: fetch (`no-cache`), validate per file (shapes, ranges, rising pitches, ratio/cents
-  agree, degrees, palette kind vs tuning, chord-mode `set` whitelist, unique ids); a broken file is SKIPPED (one console line,
-  `#loadmsg` notice); manifest/menu unreadable or nothing valid → the embedded EMERGENCY PAIR (`edo12`, `chromatic`, `chrom12`). Since
-  F6, USER files (IndexedDB `handsong-user`/`files`, key `kind:id`, ids `u.<uuid>` — `scaleload.USER_ID`) load after the built-ins
-  through the same validator.
-- `src/userstore.js` / `src/userfiles.js` — user file storage (IndexedDB, else `store`) and the console/back-end API (`install`, `list`,
-  `remove`, `exportFile`, `example`, `installExample`, `brokenExample`, `storeUnchecked`; `window.U` with `?probe`); effective
-  immediately via `scales.registerRecord`/`unregisterRecord`; a record others depend on can't be removed (`scales.dependentsOf`);
-  deleting never breaks recordings (views pin their tuning, `TUNING_OF_MODE`, `SRC` WeakMap; `P.checkUserDelete`).
-- `src/scales.js` — the teaching layer and pitch truth. Top-level `await loadScaleData()`; builder → `TRADITIONS` (6), `GRP`,
-  `TUNINGS` (18), `CHORD_FAM_SETS`, `SCALES` (74, 0..73). Pitch: `a3()=aRef/2` → `baseF()` and `cFix(s)`; `anchorOf`, `keyOf`,
-  `tonicFreq(s)`, `periodOf(s)=s.period||2`; ONE pitch function `pitchHz(T,A,z,k,R)=A·P^R·ρ(k)` (⚠️ keep its multiplication order);
-  `modeAnchor`, `degK`; `leadFreq`/`bassFreq`/`chordFreqs`/`centsOf` and the index versions `leadFreqTi`/`bassFreqTi`/`chordNotesAt`/
-  `chordFreqsAt`/`chordRowFreqAt`; `chordNotes` (`{f, iv}` per note; `chordFreqs` = its frequencies), `chordUnit(s)` (the one-note
-  root type per branch), `chordReadsTi`, `tuningIndexOf`, `modeSlotOfTi`, `chordPitchHz`, `ruleChordSteps`, `stackLabel`,
-  `chordTypeFits`, `chordAtRoot` (F8), `chordBuildOf`, `chordModeOf`/`chordModeName`/`chordModeHint`, `scaleView` + `CUR()` (memoised
-  view), `viewIdOf`, `scaleById`, `viewOfId`, `applyScaleId` (aliases), `tuningOf`, `namingOf`, `listLbl`/`listName`, `regWord`/
-  `regWordFull`, `tuningStatus`, `droneDegree`/`droneSecondHz`, `backingRhythmOf`, `seventhAddsNote`, `menuOf`, predicates
-  (`supportsProgressions`, `supportsChords`, `typedChords`, `rectGrid`, `fixedKey`), rect helpers (`rectLayout`, `REG_N`,
-  `rectNoteAt`/`rectSlotOf`, `rectBase`/`rectBaseMax`, `rectEligible`, `rectDefault`, `rectRows`/`rectNotes`/`rectRowsFull`),
-  theremin `thereminSpan`/`thereminHz` (M = `rectNotes()` under rectangles). `registerRecord`/`unregisterRecord`/`dependentsOf`.
-- `src/audio.js` — the Web Audio engine (see "Audio engine"): pools, three synthesis paths, drums, drone, metronome, FDN reverb, effect
-  modules (`FX_FACTORY`), chain wiring, capture/playback helpers, track level/pan (`setTrackGainOf`, `ownerGain`, `trackGainRetune`,
-  `setTrackPanOf`, `ownerPan`, `panGains`, `trackPanRetune`, `makePanStage`), master (`setMasterLevel`, `masterLevel`, `masterMeter`,
-  `MASTER_BASE` 0.8), frozen-track store/reader (`frzReady`, `frzStorePut`, `frzStoreDel`, `frzStoreDbg`, `frzReader`, `frzStoreCount`,
-  `frzSink`), `voicesCut`, `xfRamp`, `timbresOf(role)`, `createRecordingTap()`, probe helpers (`probeCapture`, `probeCaptureReady`,
-  `fxDipLog`), render helpers (`renderReset`, `renderStateOf`, `setRnd`, `setOffline`, `offlineTapMaster`, `setDbg`).
-- `src/ks-worklet.js` — Karplus–Strong processor `ks-string` (mandatory worklet: a native delay loop is floored at 128 samples ≈ 344 Hz
-  and quantised); first-order allpass fractional delay + loop-filter phase compensation (< 1 cent); a-rate `freq`/`pluck`; in track
-  renders seeded via `processorOptions.seed` (own `mulberry32`); live stays on `Math.random`.
-- `src/frz-worklet.js` — frozen-track STORE (`frz-store`: transferred Int16 chunks; `put`/`del`/`dbg`/`count`) and READER (`frz-reader`:
-  context frame F ≥ startF plays buffer frame F + d, integer frames, × the track scale; `{play:{startF,d}}` for spares; `{stop:frame}`;
-  reports `{ended, played, first, seen}`; `ready` once processor and data exist; `ALIVE` count). Frame never goes backwards
-  (`max(currentFrame, prev+128)` — Chrome sometimes repeats `currentFrame`). Loaded on the LIVE context only.
-- `src/probe-cap-worklet.js` — probes only: capture of the live master on the audio thread (`probe-cap`), returning `F0` (frame of the
-  first sample = the most common `currentFrame − samples so far`), `gaps` (real discontinuities), `stale` (single stale readings).
-- `src/arrange.js` — arrangement data + pure generation: `PROGRESSIONS`, `HARMONIES`, `RHYTHMS` (18 patterns; `beats`, optional `sub`,
-  `subOf`, `gridOk`, `rhythmFits`, `rhythmsForMetre`), `BASS_MODES`, `buildArrangement` (also drums-only `sel.prog<0`). Volumes in the
-  OLD per-role scale (`CHORD_VOL` 0.55, `BASS_VOL` 0.6), converted at event birth by `volFromOld`. Imports only `config.js`.
-- `src/recorder.js` — the recorder (see "Time, tracks and the recorder" and "Freeze"): `events` (stable array), `loop`, `W*`/`ENG`
-  (`makeENG(engine)`), scheduler, lanes, brace, chase, undo, stops, `softAllOff`, `loadArrangement`/`loadJam`/`clearJam`, capture
-  (`takeFx`, `takeFxVer`/`takeFxTouch`, `takeCapStart`/`takeCapSample`, `fineStep`/`fineKnee`, `FX_CHAIN='#chain'`), playback
-  (`fxPlayBuild`/`fxPlayDrive`/`fxPlayStop`/`fxPlaySignature`/`fxIsDriven`, `fxLaneMerge`, `fxLaneAt`, `fxLaneExpand`, `fxLaneSmooth`,
-  `autSmoothOf`), the editor API (`songNotes`/`songSegs`, `editOpen`/`editClose`/`editGuard`/`editPush`/`editUndo`/`editRedo`/
-  `editBatch`/`editCommit`, `EDIT_ROLE`, `editMoveHit`/`editDeleteHit`/`editInsertHit`, `editMoveSeg`/`editResizeSeg`/`editDeleteSeg`,
-  `editInsertBass`/`editInsertChord`/`editInsertLead`, `editDeleteChordNote`/`editMoveChordNote`/`editResizeChordNote`,
-  `dissolvePlan`, `detachPlan`/`commitDetach`, `chordMoveTy`, `slotPt`, `tiePartners`/`tieUntiePass`, `editSetTimbre`, `aut*` lane
-  functions, `pnPlan`/`pnView`/`pnPoints`/`pnFreeze`), lane tables (`laneLevel`, `lanePan`, `laneName`, `laneRank`, `laneOrder()`,
-  `moveLane`, `laneLook`, `laneRoleOf`, `laneTimbreOf`, `noteSource`), freeze (`freezeSig`, `freezeTicket`, `freezeSet`, `frzWhenReady`,
-  `frzPack`/`frzPackAsync`, …), `seedTake`, `probeWithEvents`, `evHz`, `evReg`.
-- `src/frzqueue.js` — the automatic-freeze QUEUE (AF1, console only): lazily loaded by `render.js` (`setRunner(render.freeze)`); by
-  track id, one entry per track, one render at a time; priority `qRank` (audible first, then `untilHeard`, song order, layer); gates
-  (never while recording or a clip records; while a hand pinches a track waits if its layout costs more than `QF.frameMs` 8 ms; checked
-  at pick and again before layout via `layoutGate`); stale results never install (re-queued); a track is taken only after its
-  signature is stable for `QF.settleMs` 1 s. Console `R.autoFreeze(true|false)`, `R.freezeQueue()`. No watcher/triggers (AF3).
-- `src/vision.js` — camera + the detection path + the frame pump (`video`, `canvas`, `ctx`, `roundRect` polyfill, `resize`, `initVision`,
-  `openCamera(facing)`, `switchCamera` — the detector is never recreated by a camera switch; `landmarker` is stale since LAT2, see below).
-- `src/clip.js` — clip/audio recorder: `startClip('video'|'audio')`/`stopClip`, `activeKind()`, `onClipChange(fn)`, `captureFrame()`
-  (called last in every frame, throttled to `REC_FPS` 30; stream via `canvas.captureStream(0)` + the audio tap; bitrate from canvas
-  size ≈ 0.12 bit/px/frame, 3.5–12 Mbit/s); `recKind` is the single truth; sets `videoRec` only for video, only once recording starts.
-- `src/demo.js` — start-screen tunings demo (own mini-engine, own `noiseBuf`); scenes by stable id (`SCENES[].id`), captions `demo.scene.*`.
-- `src/tutor.js` — lesson list + step engine (see "The tutorial").
-- `src/gestures.js` — the gesture state machine: `HANDS`, `processHands`, `chOwner`, `monoOwner[role]`, `polyZone`/`leadZone`,
-  `liveKey(role,hand,finger)`/`monoKey(role)`, `wOn`/`wOff`, `voiceModeReset(role)`, `degHyst`/`degRaw`, `axHyst`/`cellHyst`,
-  `noteVolOf(zk,xn,zOf)`, `depthOf(S,lm)` (depth smoothed ONCE per hand per frame, memo `S.hsF`), `noteHandRole(key,S,W)`, `handHalfRole`,
-  `fxChordBri()`, `fxParamsOf` (the aim's single door), `ACTIONS`, expression (`EXPR_CFG`, `exprFeatures`, `EXPR`, `tickExpr`),
-  `rectPlay`, the `'oct'` zone, looper hand (`fireLooperCmd`, `doLooper`), `tutorTap`. At pinch capture the hand's role and X-range are
-  frozen on `S` (`S.role`, `S.rx0`, `S.rx1`, `S.zone`, `S.fn`).
-- `src/draw.js` — canvas: `drawVideoBackground`, `drawOverlays` → `drawPhone`, `drawRole(instr,rx0,rx1,playH)`, `drawHandsPhone`, grids
-  (`drawGrid`, `drawRectGrid`, `drawRectOctBand`, `drawThereminLines`, `drawDrumGrid`, `drawChordPalette`), `drawChordReadout`/
-  `latchChordFreqs`, `drawFxBars(role,rx1,H)` (+ `fxBarHidden`), `drawStatus` (`scales.tuningStatus`), `noteLbl` (the one label
-  function), `tunPitchLbl`, the editor (`drawRoll`, snapshot `rollView`, `rollAxis(view, all)`, `rollGroup`, `rollSegRows`/
-  `rollSegNotes`/`rollSegRoot`, `chRowOfFreq`, `rollChordTotal`, `rollGutterW`, `rollDragTarget`, `rollGhostSeg`, `rollBendPts`,
-  `drawAutLane`), `drawLooper(full)` (strip and arrangement window; snapshot `loopView`; `laneBeatX`/`laneBeatAt`; `loopHit`,
-  `loopBeatAt`, `loopScroll`, `arrGeom`, `mixGeom`, `stripCols(W,markW)`, `stripProbe(W)`, `laneMini`, `laneTitle`, `laneDefName`,
-  `laneCol`).
-- `src/ui.js` — menus, buttons and handlers: `buildUI`, `fillScales`, role buttons (`instrBtn`, `instrBtnL/R`, `cycleHalf`), split
-  (`splitBtn`, `applySplit`, `canSplit()`), camera, fullscreen, clip buttons, backing (`#backingMenu`, `backingStep`, `backingName`),
-  canvas pointer routing (strip taps via `loopHit`), effects panel `renderFxCtl` (two zones, two add lists), voice-mode buttons
-  (`pickVoiceMode`), hand functions `renderHandFn`, A4 control, layout control `renderRectCtl`, chord modes `renderChordMode`, "tuned from"
-  `renderTunedFrom`, metre `refreshMetreCtl`, auto-hiding bar (`BAR_HIDE_MS` 3500, `MOUSE_EPS` 8), start card (install by capability,
-  `FEEDBACK_URL`, `DONATE_URL` — empty hides the line, JS-assembled mail fallback), the editor (`openRoll`/`closeRoll`, `rollEnterTrack`,
-  `ROLL_INSERT`, `renderAutCtl`, `#rollShape`, `renderTimbreCtl`, `rollDeleteSel` — 🗑 and ⌫/Delete, not in text fields), arrangement
-  (`openArr`, `arrApi`, `#laneNameIn`), `onFreeze(layer)`, tutorial helpers (`tutorReset`, `tutorSetScale`, `tutorResetHandFn`,
-  `tutorClearLoop`, `tutorSplitInit`, `tutorSyncBar`, `syncTutorBarPos`, `hushStrip`, `armStripReturn`).
-- `src/main.js` — composition root: `loop()` (frame: video → detect → `handsGuarded(processHands)` → overlays → `captureFrame`; each
-  distinct error printed once), `startApp()` (the one start path), editor/window branch (camera open but not read: `processHands(null)`
-  every frame, `latest`/`lastTs` cleared), `?probe` loading (`window.P = scaleprobe.api()`, `window.R`, `window.U`).
-- `src/render.js` — render context, seeding and track render behind freeze (see "Freeze"): one engine copy per session
-  (`'./audio.js?render…'`, `ENG_SPEC` constant, `ENGP` memo — ⛔ never a unique specifier per render), `renderTrack(layer, opt)`,
-  `freeze(layer)`, `unfreeze`, `frozen`, `renderQueued` (ONE render at a time; ⛔ no third door, never await one render inside
-  another), `renderQueue()`, `probe()` (F0–F2 facts), `layoutCost`, `autoFreeze`/`freezeQueue`, ear tools (`aud`, `live`, `stop`,
-  `recSteps`, `droneBP`), probe bodies (`reuseCheck`, `revAgree`, `swapCheck`, `chunkCheck`, `copyState`, `capStats`, `capAligned`).
-- `src/songs.js` — demo songs loaded by `P.song(name, {replace:true})` (today `triphop`, ≈2:41, 84 BPM, 4/4, D minor, seven tracks + a
-  D–A drone backing); one take per ROLE; sets tonic/A4/tempo/metre/scale through the panel's controls; refuses while recording,
-  playing, with the editor open, or on a non-empty song without `replace`.
-- `src/scaleprobe.js` — the browser probe (`P`): `all`, `quick`, `seed`, `song`, `api`, ~50 checks, `material`, `meas`, `orderCheck`,
-  `freezeCost`, `dumpScales`, `renewSnapshot`. `src/probedata.js` + `tools/probe-data.mjs` — the node-runnable part (T0, T1, T2, T6b,
-  stacked chords, F4; frozen references; imports only scales/state/i18n). ⛔ Nothing touching draw/ui/audio/recorder/userfiles goes there.
-- `tools/check-static.mjs` (static checker), `tools/probe-browser.mjs` (browser runner), `tools/scales.before.json` (F0 snapshot).
+## src/arrange.js
+Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
+- const (8): `PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `subOf`, `gridOk`, `rhythmFits`, `rhythmsForMetre`, `BASS_MODES`
+- fn (1): `buildArrangement`
 
-## Other code names, by module
-- `src/audio.js`: `REV_PARAMS`, `applyVoiceFx`, `backBus`, `bassBus`, `bassSet`, `buildChordPool`, `bvRelease`, `chordBus`, `chordGlide`, `chordOn`, `cvAlloc`, `cvRelease`, `dDum`, `dNoise`, `dTek`, `droneOff`, `droneOn`, `dronePan`, `drumBus`, `drumVoice`, `exprCur`, `exprGain`, `exprVibAmp`, `fstrike`, `fxAimGet`, `fxAimSet`, `fxBriOf`, `fxDefFor`, `fxDefaultsOf`, `fxGate`, `fxGlideOf`, `fxHandRange`, `fxParamKeysOf`, `fxParamMetaOf`, `fxPathOf`, `fxRestoreAim`, `fxSnapshot`, `fxWrapParam`, `gMax`, `hitOwner`, `leadRelease`, `leadVoiceBank`, `makeReverbFx`, `modGain`, `scheduleBend`, `setLeadInstr`, `tabNa`, `taikoDrum`, `taikoKa`
-- `src/clip.js`: `fireChange`, `videoBitrate`
-- `src/config.js`: `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `CH_PAL_PAD`, `CH_PAL_W`, `PAL_HYST_Y`
-- `src/draw.js`: `fitLeadNotes`, `handLeadNotes`, `packSegs`, `rollHit`, `rollRow0Across`, `rollRowPitch`, `rowOfTi`
-- `src/frzqueue.js`: `qAdd`, `qBegin`, `qCostOf`, `qCostSet`, `qEnd`, `qRunning`, `qState`, `qStep`
-- `src/gestures.js`: `depthN`, `octRight`, `pinchRatios`
-- `src/i18n.js`: `LANG_LABEL`
-- `src/probedata.js`: `TAG_OF`, `allViews`, `checkBehaviour`, `checkData`, `checkPitch`, `checkStack`, `checkUntyped`, `checkView`, `isTert`, `legacyBassFreq`, `legacyCentsOf`, `legacyChordNotes`, `legacyChordSteps`, `legacyLeadFreq`, `legacyTonicFreq`, `sweep`, `tagOf`
-- `src/recorder.js`: `WbassOff`, `autChainMove`, `autChainRemove`, `autDeletePoint`, `autMovePoint`, `autTakesOf`, `bassOwnerKey`, `bassSlot`, `braceMove`, `braceTap`, `chOwnerKey`, `chaseNote`, `clearRec`, `curBeat`, `curChordOct`, `deleteLane`, `droneLevel`, `dronePanOf`, `droneSyncAt`, `editApply`, `editTake`, `frzEnter`, `frzKill`, `frzPinned`, `frzSkipNear`, `hlOf`, `inPB`, `isLayer`, `isTrackOwner`, `laneDelTap`, `laneLayerOf`, `laneLen`, `laneNameOf`, `laneShowKeep`, `layerOfOwner`, `ldKey`, `liveDrone`, `loopPos`, `pnAdd`, `pnDelete`, `pnMove`, `pnShape`, `pnStripMoves`, `pushLy`, `recBassEv`, `recChSet`, `recLead`, `recLeadEv`, `segChordNotes`, `setLaneName`, `setLoopBars`, `setLoopChordHl`, `setLoopSub`, `setRegionOn`, `songBeats`, `songLen`, `storeTi`, `takeJoin`, `takePrune`, `takeReset`, `takeSrc`, `toggleLaneMute`, `toggleLaneSolo`
-- `src/render.js`: `maxRel`, `pinLive`, `renderOnce`
-- `src/scaleload.js`: `checkRecord`, `chordModeSets`
-- `src/scaleprobe.js`: `checkFrozen`, `checkHl`, `checkLabels`, `checkMerge`, `checkRevAgree`, `checkRootAlone`, `checkRowFix`, `checkRows`, `checkSeed`, `checkSong`, `checkSound`, `checkSwap`
-- `src/scales.js`: `IVX`, `buildChordModeSet`, `buildMode`, `buildPalette`, `buildTuning`, `chordLabel`, `chordNotesStr`, `grpKey`, `rootName`, `rowLabel`, `scaleData`, `scalesOfTrad`, `stepName`, `tradOfScale`, `untypedNotes`
-- `src/state.js`: `chFitDeg`, `fxChainAdd`, `handActsOf`, `handSide`, `latchOct`, `playsNotes`, `scaleIdx`, `setARef`, `setCamFacing`, `setChordMode`, `setHandAct`, `setLooperClear`, `setRectPref`, `setScaleId`, `setSplitRole`, `setVideoRec`, `setViewRect`
-- `src/tutor.js`: `openLessons`, `wireStarter`
-- `src/ui.js`: `FB_MAIL_USER`, `HAS_HANDFN`, `INSTR_SEQ`, `JR_BY_ID`, `aRefSel`, `applyBacking`, `applyRollBar`, `applyVoiceMode`, `armBarHide`, `autShapeState`, `backingMode`, `backingTo`, `buildStartLinks`, `drumVariants`, `fitRhythm`, `onResize`, `panelOpen`, `renderHandActs`, `resetJamDisplay`, `revealBar`, `rollDown`, `rollMove`, `rollUp`, `rootRow`, `showCamMsg`, `trackLayers`, `updRollBtns`
+## src/audio.js
+(no head comment)
+- const (49): `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
+- fn (81): `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
+- let (4): `AC`, `frzReady`, `ksReady`, `dynReady`
+- → ./modules/timbres/stages.js (1): `panGains`
+
+## src/autosave.js
+AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF.
+- const (7): `AS`, `AS_KEEP`, `asWire`, `asInfo`, `asEnabled`, `asPause`, `asDbgState`
+- fn (12): `asPut`, `asStart`, `asTick`, `asWrite`, `asAdopt`, `asFresh`, `asFlush`, `asList`, `asGet`, `asSetEnabled`, `asDbg`, `asDrop`
+
+## src/clip.js
+================= ЗАПИСЬ КЛИПА / АУДИО ================= ОДИН движок на два вида записи (не два модуля): • 'video' — кадр ХОЛСТА (canvas.captureStream) + звук → один файл С картинкой И звуком; • 'a…
+- const (2): `activeKind`, `onClipChange`
+- fn (3): `captureFrame`, `startClip`, `stopClip`
+
+## src/config.js
+================= КОНФИГ: зоны, метаданные, пороги =================
+- const (55): `FINGER_TIPS`, `FX_META`, `CAM_MARGIN`, `remapAxis`, `coverView`, `PINCH_ON`, `PINCH_HOLD`, `PINCH_OFF`, `REV_NEAR`, `CLEAR_HOLD_MS`, `LOOPER_MSG_MS`, `ROW_HYST`, `WATCHDOG_MS`, `SCHED_AHEAD`, `SCHED_TICK_MS`, `FX_BAR_W`, `FX_BAR_GAP`, `FX_BAR_MAX`, `CH_PAL_W`, `CH_PAL_PAD`, `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `PAL_HYST_X`, `PAL_HYST_Y`, `palColX`, `palRowY`, `palSplitX`, `rectBandY`, `volAmp`, `volFromOld`, `volVel`, `BEATS_PER_BAR`, `REC_VOL_EPS`, `REC_REV_EPS`, `REC_FX_EPS`, `REC_FINE_EPS`, `REC_AVG_S`, `REC_JUMP_EPS`, `REC_HIST_S`, `REC_PAUSE_S`, `REC_KNEE_F`, `AUT_RAMP_BEAT`, `AUT_RAMP_EPS`, `BEND_EPS_CENTS`, `CURVE_A`, `curveU`, `curveK`, `bendSeg`, `BEND_GLIDE_STEP_S`, `CHORD_POOL_N`, `CHORD_POOL_FIRST`, `BASS_POOL_N`, `LEAD_POOL_N`, `LEAD_POOL_KS`, `FX_VOL`
+- fn (3): `bendAt`, `bendSplit`, `bendPlan`
+
+## src/core/camlight.js
+LAT3 — low light.
+- const (16): `LOW_MODES`, `LOW_TARGET`, `LOW_EXPOSURE_S`, `LOW_SETTLE_MS`, `exposureSupported`, `HEAL_MODES`, `AUTO_OF`, `DEV_KEYS`, `devSnap`, `healList`, `autoLeft`, `DARK_FPS`, `darkNew`, `LOST_MS`, `lostNew`, `TEST_REC_KEY`
+- fn (11): `exposureUnits`, `lowConstraints`, `restoreAdvanced`, `restoreConstraints`, `lowVerdict`, `darkStep`, `lostStep`, `capsText`, `testRecNext`, `testRecRepair`, `camErrKind`
+
+## src/core/canon.js
+CMD1a (RUN 5) — CANONICAL JSON and its hash (pure core, rule #36; data row «CMD1 canonical values (core)»).
+- const (1): `canonHash`
+- fn (2): `canonJSON`, `fnv`
+
+## src/core/dsp.js
+SND-F1 — pure DSP formulas shared by the engine (audio.js), the dynamics worklet (dyn-worklet.js) and the probes.
+- const (8): `FOREST`, `forestRoom`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `dynCoef`
+- fn (5): `seeded`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`
+
+## src/core/engclass.js
+ENG2 (RUN 4) — the engine's PROVISIONAL power class and the dropout rate.
+- const (4): `ENG_CLASS_PROVISIONAL`, `ENG_THRESH`, `ENG_BENCH_KEY`, `benchText`
+- fn (3): `engClass`, `benchOf`, `dropRate`
+
+## src/core/format.js
+FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({ format:'handsong/<kind>', version, id, … }), the current version of each kind, the migration steps (one pure function …
+- class (1): `Bad`
+- const (5): `F`, `FORMAT_VERSION`, `MIGRATIONS`, `kindOfFormat`, `CM_MAX`
+- fn (7): `upgrade`, `checkManifest`, `checkMenu`, `checkTuning`, `checkPalette`, `checkChordModes`, `checkMode`
+
+## src/core/handsched.js
+LAT2a — the SEARCH SCHEDULE for hand detection.
+- const (4): `HAND_SEARCH_EVERY`, `HAND_POLICIES`, `schedNew`, `schedRetry`
+- fn (3): `schedPlan`, `schedAfter`, `schedRun`
+
+## src/core/latency.js
+LAT1 — latency bookkeeping.
+- const (10): `LAT_N`, `BT_MS`, `BT_LABEL`, `frameWaitMs`, `withFrameWait`, `perMinute`, `STARTUP_MS`, `MP_LINE`, `SOFT_GL`, `isSoftwareGL`
+- fn (6): `makeMeter`, `statsOf`, `handToSound`, `looksBluetooth`, `rateOf`, `splitLongTasks`
+
+## src/core/pack.js
+PACK1 (RUN 3, 2026-10-16; stage-3 plan slice 33; user decision: build it now, no UI) — PACKS AND OFFLINE LICENCE KEYS.
+- const (5): `PACK_FORMAT`, `PACK_VERSION`, `KEY_PREFIX`, `KEY_FORMAT`, `PACK_PUBKEYS`
+- fn (5): `packCheck`, `keySign`, `keyVerify`, `createPackGate`, `packUnlock`
+
+## src/core/registry.js
+FMT1 (stage 3) — PERMANENT IDS AND A REGISTRY OF RECORDS (timbres, tunings, modes, effect presets, expression mappings … as they arrive).
+- const (4): `USER_ID`, `BUILTIN_ID`, `PACK_ID`, `idSpace`
+- fn (2): `newUserId`, `createRegistry`
+
+## src/core/songfile.js
+SAVE1 (DAY run 2026-10-16) — THE SONG FILE, pure part: reading a «.handsong» text safely, the version rules of the kind 'song' (FMT1: format.js takes SONG_VERSION and SONG_MIGRATIONS from here) and…
+- const (5): `SONG_FORMAT`, `SONG_VERSION`, `SONG_MAX_BYTES`, `SONG_MIGRATIONS`, `TIM1_POSITIONS`
+- fn (3): `songParse`, `songUpgrade`, `songCheck`
+
+## src/core/timbre.js
+TIM3a (RUN 4) — THE TIMBRE RECORD and its validator.
+- const (10): `TIMBRE_FORMAT`, `TIMBRE_FAMILIES`, `WAVES`, `TB`, `KIT_SYNTHS`, `ENGINES`, `POLICY_KEYS`, `timbreNodes`, `BUNDLE_FORMAT`, `TIMBRE_DAMAGES`
+- fn (1): `checkTimbre`
+
+## src/demo.js
+===================================================================== ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» (прототип, side-experiment) --------------------------------------------------------------------- …
+- exports: none
+
+## src/draw.js
+DRAW1 (DAY run 2026-10-16): draw.js is the FACADE of the canvas — importers keep their import lines.
+- → ./views/camera.js (2): `drawVideoBackground`, `syncViewRect`
+- → ./views/common.js (2): `loopBarBottom`, `setEmptyTpOld`
+- → ./views/play.js (1): `drawOverlays`
+- → ./views/roll.js (21): `fxTitleOf`, `rollAutDrive`, `rollAutSnapV`, `rollAutValAt`, `rollAxisHasDim`, `rollAxisNow`, `rollBendAt`, `rollBendProbe`, `rollBoxHits`, `rollDefaultRow0For`, `rollDragTarget`, `rollGeom`, `rollHit`, `rollRow0Across`, `rollRowPitch`, `rollRowsProbe`, `rollSelectable`, `rollShiftPit`, `rollSnap`, `rollSnapBeat`, `rollTrackView`
+- → ./views/strip.js (9): `arrGeom`, `laneCol`, `laneDefName`, `laneTitle`, `loopBeatAt`, `loopHit`, `loopScroll`, `loopViewProbe`, `stripProbe`
+
+## src/engine/fdn.js
+AUD2a (RUN 3, 2026-10-16) — THE FDN REVERB: allpass diffusers, four delay lines with damping and Householder mixing, decay (RT60) and tone — the JS reference the WASM reverb (W1) is tested against.
+- const (2): `REV_A`, `RENDER_QUANTUM`
+- fn (4): `apStage`, `buildFDN`, `setRevDecay`, `setRevTone`
+
+## src/engine/surface.js
+AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C): THE ENGINE'S OUTWARD SURFACE — every name src/audio.js exports, listed by the module that calls it (static named imports, namespace uses, ma…
+- const (2): `SURFACE`, `SURFACE_INTERNAL`
+
+## src/engine/worklets/dyn-worklet.js
+SND-F1 — DYNAMICS on the audio thread: one processor 'dyn', two modes (processorOptions.mode).
+- exports: none
+
+## src/engine/worklets/frz-worklet.js
+====================================================================== ЗАМОРОЖЕННЫЕ ДОРОЖКИ В 16 БИТАХ — ХРАНИЛИЩЕ И ЧТЕЦ НА ПОТОКЕ ЗВУКА (слайс AF6b) ----------------------------------------------…
+- exports: none
+
+## src/engine/worklets/ks-worklet.js
+====================================================================== Карплюс–Стронг (щипковая струна) как АУДИО-ВОРКЛЕТ — третий способ построить голос, рядом с субтрактивным и FM (не вместо них).
+- exports: none
+
+## src/engine/worklets/probe-cap-worklet.js
+====================================================================== СЪЁМ МАСТЕРА ДЛЯ ПРОБ — НА ПОТОКЕ ЗВУКА, С НОМЕРАМИ КАДРОВ (только пробы; приложение его не грузит) --------------------------…
+- exports: none
+
+## src/freeze/registry.js
+REC5 (stage 3) — FROZEN TRACKS: the registry by lane id, the signature and its state (F5), what the auto-freeze watcher reads (AF3), install / pending readers (AF6b-fix), the 16-bit store (AF6b), t…
+- const (26): `freezeWire`, `frzWatchBump`, `frzPend`, `frozen`, `frozenOn`, `frzLayer`, `frzHas`, `frzBufNow`, `frzChaseSkip`, `frzGlobalKey`, `frzSigMemo`, `frzSigTonicDbg`, `frzBytesOf`, `frzReadersAlive`, `frzSwapDbg`, `FRZ_CHUNK`, `frzStoreMode`, `frzChunkDbg`, `frzNodesInfo`, `frzSwapCancelAll`, `frzSwapInfo`, `unfreezeLayer`, `frozenLayers`, `frozenInfo`, `frzGainAll`, `frzBusGain`
+- fn (26): `freezeSig`, `freezeState`, `freezePinCaptures`, `frzWatchKey`, `frzRetuneOnly`, `laneHasChain`, `frzBytesTotal`, `songPinChains`, `freezeTicket`, `freezeSet`, `frzPendCancel`, `frzWhenReady`, `frzPackAsync`, `frzPlanSwap`, `frzSwapCut`, `frzLeadAhead`, `frzLeadRecut`, `frzSwapCancel`, `frzLeave`, `frzSkipNear`, `frzNearDone`, `freezeDrop`, `frzGain`, `frzStopOne`, `frzStopAll`, `frzArm`
+- let (1): `frzWatchVer`
+
+## src/frzqueue.js
+═══════════════ ⛳ AUTO-FREEZE — the WATCHER (AF3) and the QUEUE (AF1) ═══════════════ Tracks freeze themselves, unnoticed.
+- const (15): `setRunner`, `afPaused`, `afIdle`, `afBusy`, `afActive`, `AF_DELAY`, `AF_REFREEZE_ON_RETUNE`, `AF_BUDGET_MB`, `qBegin`, `qEnd`, `qRunning`, `qState`, `qCostSet`, `qCostOf`, `QF`
+- fn (11): `autoFreeze`, `freezeQueue`, `afPause`, `afRowState`, `afBegin`, `afEnd`, `afTick`, `afHint`, `qStep`, `qAdd`, `qRank`
+
+## src/gestures.js
+GES1 (DAY run 2026-10-16): gestures.js is the FACADE of the gesture layer — importers (main, draw, ui, frzqueue, probes) keep their import lines.
+- → ./gestures/features.js (2): `degRaw`, `pinchDbg`
+- → ./gestures/fxhand.js (1): `fxParamsOf`
+- → ./gestures/hands.js (5): `HANDS`, `processHands`, `voiceModeReset`, `handsProbe`, `processHandsProbe`
+- → ./gestures/roles.js (1): `ACTIONS`
+
+## src/gestures/expr.js
+GES1 part 2 (stage 3) — THE EXPRESSION HAND (solo, function 'expr'): features off RAW landmarks, the middle layer (pump-and-decay, springs on a fixed sub-step, engage), the four axes (rules #22, #2…
+- const (4): `exprWire`, `EXPR_CFG`, `EXPR`, `exprPrevSet`
+- fn (2): `exprFeatures`, `tickExpr`
+- let (1): `exprPrevT`
+
+## src/gestures/features.js
+GES1 part 1 (stage 3) — THE PURE GESTURE MATH: pinch ratios normalised by hand size, the touched fingers with their hysteresis, the one-step smoothing, smoothstep with a dead zone, degree / axis / …
+- const (4): `pinchDbg`, `clamp01`, `clamp`, `dist`
+- fn (8): `pinchRatios`, `minFinger`, `touchedFingers`, `emaS`, `smoothstep`, `degRaw`, `degHyst`, `cellHyst`
+
+## src/gestures/fxhand.js
+GES1 part 2 (stage 3) — THE EFFECTS HAND: which parameters a hand's fingers aim at (fxParamsOf — the aim's single door, rule #29) and the capture of a finger's parameter (captureFx) — moved from ge…
+- const (1): `fxParamsOf`
+- fn (1): `captureFx`
+
+## src/gestures/hands.js
+GES1: the GESTURE STATE MACHINE — the hands table, latch / lead owners, endPinch, the HAND1 probe clock and processHands (one camera frame → W* calls).
+- const (1): `HANDS`
+- fn (4): `processHands`, `voiceModeReset`, `handsProbe`, `processHandsProbe`
+
+## src/gestures/looper.js
+GES1 part 2 (stage 3) — THE LOOPER HAND (function 'loop'): one command per pinch edge (rule #21) — record / play-pause / undo / the 3-s clear with its countdown — and its named confirmations — move…
+- const (1): `looperWire`
+- fn (2): `doLooper`, `fireLooperCmd`
+
+## src/gestures/roles.js
+GES1: the hand ROLES and OWNER KEYS — stateless helpers of the gesture machine (gestures/hands.js): depth, voice-mode zones, live owner keys, sound + record by role, the finger-action registry, whi…
+- const (10): `depthN`, `melodicZone`, `polyZone`, `leadZone`, `liveKey`, `monoKey`, `wOn`, `wOff`, `ACTIONS`, `paletteFinger`
+- fn (4): `depthOf`, `handHalfRole`, `noteHandRole`, `noteVolOf`
+
+## src/hand-worker.js
+LAT2b — hand detection OFF the main thread (a CLASSIC worker: MediaPipe starts each model by importScripts of its loader, which a module worker cannot do; our modules come in by dynamic import).
+- exports: none
+
+## src/handdet.js
+LAT2 — the hand DETECTOR: MediaPipe's hand model, worker-safe (no DOM — it runs inside src/hand-worker.js and, as the fallback, on the main thread through vision.js).
+- const (3): `MP_WASM`, `MP_MODEL`, `EMPTY_RESULT`
+- fn (2): `plainResult`, `createDetector`
+
+## src/hooks.js
+tutor — обучающий слой (UI) подписывается СЮДА: нижние слои (gestures) шлют события через hooks.tutor, не трогая DOM (правило #5).
+- const (1): `hooks`
+
+## src/i18n.js
+================= ИНТЕРНАЦИОНАЛИЗАЦИЯ (i18n) — ЭТАП 0: только каркас ================= English по умолчанию + Русский; форма механизма РАССЧИТАНА на четыре языка (en/ru/es/de), но словари es/de пок…
+- const (5): `store`, `LANGS`, `LANG_LABEL`, `DICTS`, `onLangChange`
+- fn (5): `t`, `L`, `applyI18n`, `withLang`, `setLang`
+- let (1): `lang`
+
+## src/icons.js
+UI1b (DAY run 2026-10-16): THE ICON COMPONENT — every interface glyph is rendered through here, by a NAME of its meaning.
+- const (3): `ICONS`, `icon`, `iconText`
+- fn (1): `applyIcons`
+
+## src/latmeter.js
+LAT1 — the latency meter, browser side.
+- const (4): `latShown`, `darkHideDbg`, `latLostDbg`, `latCount`
+- fn (12): `latFrame`, `latHands`, `latIdle`, `latStart`, `latReport`, `latText`, `latConsole`, `latShow`, `latSwSync`, `latSwitch`, `darkDbg`, `latPauseDbg`
+
+## src/live/backing.js
+REC5 (stage 3) — THE BACKING: loading an arrangement or a jam as backing tracks (one event funnel backingEvent, each layer its own take, one history step), and clearing it — moved from recorder.js …
+- const (2): `backingWire`, `loadJam`
+- fn (3): `loadArrangement`, `backingEvent`, `clearJam`
+
+## src/live/capture.js
+REC5 (stage 3) — WHAT A TAKE CAPTURES AND HOW RECORDINGS DRIVE THE CHAINS: the capture sampling (takeCapStart / takeCapSample, O-2), the fine-recording automaton (fineStep / fineKnee), the playback…
+- const (6): `capReset`, `pnSnap`, `fxPlayDriving`, `fxIsDriven`, `setLiveIsolation`, `playKeyOf`
+- fn (9): `takeCapStart`, `capRecordNow`, `fineNew`, `fineReset`, `fineStep`, `takeCapSample`, `fxLaneMerge`, `fxPlayDrive`, `fxPlayStop`
+- let (1): `liveIso`
+
+## src/live/eng.js
+REC5 (stage 3) — THE ENGINE TABLE: makeENG (one dispatch table for live play, replay and the render copy), the live ENG, and the event pricing at play time (evHz, evTi, evReg) — moved from recorder…
+- const (3): `evHzDbg`, `makeENG`, `ENG`
+- fn (2): `evHz`, `evReg`
+
+## src/live/record.js
+REC5 (stage 3) — LIVE RECORDING: the recording state and the take's per-track state, routing a note to its track by SOURCE (T2/T3), push (the only writer of live events), per-note value recording, …
+- ? (1): `recWinReset`
+- const (21): `gridFor`, `recWire`, `recBass`, `takeSt`, `takeSrc`, `recLayers`, `isRecLayer`, `curTakeSet`, `inPB`, `noteSource`, `noInst`, `wTapSet`, `WleadOn`, `WleadOff`, `liveChClear`, `WchOn`, `WchSet`, `WchOff`, `WbassOn`, `WbassOff`, `WdrumHit`
+- fn (13): `takeJoin`, `nextFreeLayer`, `storeTi`, `storeTim`, `push`, `recLeadReset`, `recFoldRoll`, `recAllOff`, `recDrop`, `recLatchOpen`, `setRecording`, `recStop`, `onRec`
+- let (4): `recording`, `pushLy`, `curTake`, `latchOpenAt`
+
+## src/main.js
+(no head comment)
+- fn (1): `startFail`
+
+## src/modules/effects/bright.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Brightness» (a voice module read by each voice).
+- const (1): `BRIGHT_PARAMS`
+- fn (1): `makeBrightFx`
+
+## src/modules/effects/delay.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Delay» (a bus insert with its own dry/wet).
+- const (2): `DLY_A`, `DLY_PARAMS`
+- fn (1): `makeDelayFx`
+
+## src/modules/effects/forest.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Night forest» (a seeded convolution room, SND-F1).
+- const (1): `FOREST_PARAMS`
+- fn (2): `forestBuffer`, `makeForestFx`
+
+## src/modules/effects/glide.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Glide» (a voice module; the pitch glide time).
+- const (1): `GLIDE_PARAMS`
+- fn (1): `makeGlideFx`
+
+## src/modules/effects/glue.js
+AUD2a (RUN 3, 2026-10-16) — the dynamics «Glue» (our compressor in the dyn worklet) and the dynamics node builder (also the master's Glue and Limiter).
+- const (1): `GLUE_PARAMS`
+- fn (2): `dynNode`, `makeGlueFx`
+
+## src/modules/effects/param.js
+AUD2a (RUN 3, 2026-10-16) — an effect parameter's normalised value (0..1 ↔ its units) and the wrapper every declared parameter goes through (setNorm, cur).
+- const (2): `fxNorm`, `fxDenorm`
+- fn (1): `fxWrapParam`
+
+## src/modules/effects/reverb.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Reverb» (a bus module on the FDN): its declaration and its instance.
+- const (1): `REV_PARAMS`
+- fn (1): `makeReverbFx`
+
+## src/modules/effects/trem-mix.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Tremolo (mix)» (a bus insert).
+- const (2): `TRMIX_A`, `TRMIX_PARAMS`
+- fn (1): `makeTremMixFx`
+
+## src/modules/effects/volume.js
+AUD2a (RUN 3, 2026-10-16) — the effect «Volume» (the permanent voice module, rule #30).
+- const (1): `VOL_PARAMS`
+- fn (1): `makeVolFx`
+
+## src/modules/timbres/bass-voice.js
+AUD1c (RUN 3, 2026-10-16) — the bass pool voices.
+- fn (1): `buildBassPool`
+
+## src/modules/timbres/chord-voice.js
+AUD1c (RUN 3, 2026-10-16) — the chord pool voice (two filters, rule #19), the pool, and the Firefly strike (one-shot tine, SND-F1).
+- const (2): `FIREFLY`, `FF_END`
+- fn (3): `newChordVoice`, `buildChordPool`, `ffStrike`
+
+## src/modules/timbres/drumkits.js
+AUD1c (RUN 3, 2026-10-16) — the five kits' per-hit synths (Standard, Darbuka, Tabla, Gamelan, Taiko) and the hit voice.
+- fn (11): `dNoise`, `dTek`, `dDum`, `tabBaya`, `tabNa`, `tabTick`, `gmlFM`, `taikoDrum`, `taikoKa`, `noiseEdge`, `drumVoice`
+
+## src/modules/timbres/fm.js
+AUD1c (RUN 3, 2026-10-16) — the FM solo bank (modulator → carrier frequency, index envelope).
+- fn (1): `buildFMBank`
+
+## src/modules/timbres/ks.js
+AUD1c (RUN 3, 2026-10-16) — the Karplus–Strong solo banks (worklet `ks-string`) and the subtractive fallback plucks.
+- fn (2): `buildKSBank`, `buildKSFallback`
+
+## src/modules/timbres/stages.js
+AUD1c (RUN 3, 2026-10-16) — shared voice stages: track route, pan, brightness, saturation curves, the brightness ranges, the solo glide time, the filter strike.
+- const (12): `BASS_GLIDE_TC`, `CHORD_GLIDE_TC`, `freezeDeep`, `BRI_HZ`, `BRI_OPEN`, `briHzOf`, `CHORD_LP_MAX`, `CHORD_LP_MIN`, `briToHz`, `HUM_CENTS`, `LEAD_GLIDE_TC`, `fstrike`
+- fn (6): `makePanStage`, `voiceRoute`, `panGains`, `makeBriStage`, `makeSatCurve`, `makeHardCurve`
+
+## src/modules/timbres/subtractive.js
+AUD1c (RUN 3) / TIM3b (RUN 4) — the solo bank of a voice from its timbre RECORD: the subtractive engine type here; FM and KS dispatched.
+- fn (2): `buildLeadBank`, `buildSubtractive`
+
+## src/modules/timbres/voice.js
+AUD1c (RUN 3, 2026-10-16) — starting a voice's oscillators (phase scatter, the pair start) and the solo oscillator with its detune taps.
+- const (1): `voiceBuild`
+- fn (3): `voiceStart`, `voiceStartPair`, `mkOsc`
+
+## src/palette.js
+DRAW1b (RUN 3, 2026-10-16) — THE CANVAS PALETTE, read from the design tokens (tokens.css, section «canvas»: --cv-*).
+- const (2): `ROLE_COL`, `noRoleCol`
+- fn (1): `cv`
+
+## src/probedata.js
+⛳ ПРОБЫ ДАННЫХ — ЧАСТЬ ПРОБЫ, КОТОРОЙ НЕ НУЖНЫ НИ БРАУЗЕР, НИ КАМЕРА, НИ ЗВУК (слайс «быстрые пробы»).
+- const (21): `keyless`, `isUserId`, `SCALES`, `TUNINGS`, `CHORD_FAM_SETS`, `userCount`, `tagOf`, `isTert`, `legacyChordNotesStr`, `preF3RegWord`, `preF3RegWordFull`, `preF3RootName`, `preF3ChordNotesStr`, `preF3NoteLbl`, `PRE_T7_SETS`, `preT7ChordUnit`, `A4_SET`, `PRINT_MAX`, `OLD`, `allViews`, `KEEP_MAX`
+- fn (25): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegrees`, `checkModeMap`, `legacyChordLabel`, `legacyChordNotesRef`, `preF3StepName`, `preF3RowLabel`, `preF3ChordLabel`, `preF3AxisLbl`, `preF4Status`, `preT7ChordNotesAt`, `preT7ChordNotes`, `legacyLeadFreq`, `legacyBassFreq`, `legacyChordNotes`, `sweep`, `canon`, `snapViews`
+
+## src/probes/autosave.js
+AUTOSAVE1 (RUN 3, 2026-10-16): the song kept on this device by itself — through the real scheduler (autosave.asTick on the probe's clock, written at once instead of in an idle moment), the real but…
+- fn (1): `checkAutosave`
+
+## src/probes/cmd.js
+CMD1 (RUN 5): the history's tripwire compares VALUES (CMD1a), tracks keep their ids through the song file (CMD1b, v7), every history step is a command serialised by ids and parsed back (CMD1c), app…
+- fn (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
+
+## src/probes/data.js
+PROBE1: the data rows — run by P.all in the browser AND by tools/probe-data.mjs in node (flag node).
+- exports: none
+
+## src/probes/detect.js
+LAT2 — hand detection: each camera frame once, the search schedule, the worker path.
+- fn (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
+
+## src/probes/edit.js
+PROBE1: Track-editor probes: solo editing, several notes, paste, quantise, degrees, bend curve and shapes, track into another mode, volume bars.
+- fn (10): `checkSoloEdit`, `checkSelect`, `checkPaste`, `edKit`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
+
+## src/probes/eng2.js
+ENG2 (RUN 4): row «ENG2 engine readouts» (quick and all; reads only, ≈ 3 s).
+- const (1): `engFeatures`
+- fn (1): `checkEngReadouts`
+
+## src/probes/engine.js
+AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
+- fn (3): `checkEngineCtx`, `dumpCensus`, `checkCensus`
+
+## src/probes/files.js
+PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user files, Just intonation merge, bare modes, root alone.
+- const (1): `SNAPSHOT_CHANGES`
+- fn (9): `dumpScales`, `checkFiles`, `checkNames`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
+
+## src/probes/freeze.js
+PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost.
+- fn (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
+
+## src/probes/fxcontract.js
+AUD2b (RUN 3, 2026-10-16; docs/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order), each effect built ALONE by its own factory (`make(E)`) on the …
+- fn (1): `checkFx`
+
+## src/probes/gold.js
+GOLD1: GOLDEN RENDERS — every built-in timbre (23 solo, 16 chord, 7 bass, 5 kits × 6 rows), the drone and the six effects at three settings, each rendered alone through the engine copy (render.gold…
+- fn (2): `dumpGold`, `checkGold`
+
+## src/probes/guard.js
+PROBE1: The console guard: window.P = api() — one probe at a time; its self-test runs inside row «write path (funnels)».
+- fn (2): `api`, `guardSelfTest`
+
+## src/probes/hand.js
+HAND1: SYNTHETIC HANDS → GESTURE FINGERPRINT.
+- fn (2): `dumpGesture`, `checkGesture`
+
+## src/probes/history.js
+PROBE1: Song-edit probes: sections (ED6), the one history (ED7), undo after clear (ED7-fix2).
+- fn (3): `checkUndoClear`, `checkHistory`, `checkSections`
+
+## src/probes/ids.js
+IDS1 (RUN 3, 2026-10-16): every event of the song has a PERMANENT id (song/store.js evIdFill; rule #37) — unique, a positive integer, kept by edits that keep the object, by ↶ / ↷ (the same objects …
+- fn (1): `checkEventIds`
+
+## src/probes/key.js
+PROBE1: Tonic-freeze probes: the song sound fingerprint (TF0), keys kept (TF2), transpose (TF3), the 1/1 anchor (TF5).
+- const (1): `liveEnv`
+- fn (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
+
+## src/probes/kit.js
+PROBE1: Shared probe helpers: frames with a fallback timer, measures, the quick flag, the short render window, window keep/restore.
+- const (7): `measReset`, `meas`, `frame`, `waitMs`, `PROBE_SHORT`, `setQuick`, `winKeep`
+- fn (1): `winRestore`
+- let (3): `MEAS`, `frameStalls`, `QUICK`
+
+## src/probes/lat.js
+PROBE1: LAT1 latency meter probe.
+- fn (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
+
+## src/probes/pack.js
+PACK1 (RUN 3, 2026-10-16): packs and offline licence keys IN THE PAGE (Chrome's WebCrypto — the node row «PACK1 packs and licence keys (core)» checks the same code in node): the committed TEST keys…
+- fn (1): `checkPack`
+
+## src/probes/pool.js
+POOL1 (RUN 4, ENG2 review E2): the chord pool grows on demand.
+- fn (1): `checkPool`
+
+## src/probes/rows.js
+PROBE1: the ROW REGISTRY — every probe row registers itself next to its probe; P.all / P.quick (probes/run.js) and the node data runner (tools/probe-data.mjs, rows flagged node) list them from here.
+- fn (5): `row`, `family`, `rows`, `rowProblems`, `rowCheck`
+
+## src/probes/run.js
+PROBE1: P.all / P.quick / P.orderCheck — runs every registered row (probes/rows.js) in order, with the state guard between rows.
+- fn (5): `material`, `songPrint`, `all`, `quick`, `orderCheck`
+
+## src/probes/seed.js
+PROBE1: The test song (P.seed), the demo song (P.song), and the rows that check what they wrote (write path, seed notes, frozen seed bass).
+- const (2): `SEED_FROZEN_EXPECT`, `seedFrozenSamples`
+- fn (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
+- let (1): `SEED_REC`
+
+## src/probes/song1.js
+SONG1 (RUN 3, 2026-10-16): a song carries copies of the person's own tunings / modes it uses (rule #37) — so it opens on any device.
+- fn (1): `checkSongRecords`
+
+## src/probes/song2.js
+SONG2 (RUN 3, 2026-10-16): the demo song is a FILE (data/songs/triphop.json) and P.song opens it; the code generator stays a probe tool.
+- fn (2): `dumpSong`, `checkSongFile2`
+
+## src/probes/songfile.js
+SAVE1 (DAY run 2026-10-16): Save → Open of a song file, through the real ui doors (ui.songSaveText / ui.songOpenText — the same code the buttons run, minus the browser's download and file picker).
+- fn (2): `checkSongFile`, `checkSongOpenUndo`
+
+## src/probes/sound.js
+SND-F1: probes of the Calm prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
+- fn (7): `checkFirefly`, `checkForest`, `checkDynamics`, `checkMasterPath`, `checkDynLive`, `checkFreezeParity`, `checkTimbreIds`
+
+## src/probes/tim3d.js
+TIM3d (RUN 4): row «TIM3d own timbres and song copies» (quick and all).
+- fn (1): `checkOwnTimbres`
+
+## src/probes/timbres.js
+TIM3 (RUN 4): timbres as data — the proof that nothing changes.
+- fn (4): `timbreSnapshotAll`, `dumpTimbres`, `checkTimbresBefore`, `checkTimbreRecords`
+
+## src/probes/tuning.js
+PROBE1: Tuning and editor-row probes: pitch from the tuning index, editor rows, highlights, chord rules and labels, out-of-mode pitches, song integrity, chord types and modes.
+- fn (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
+
+## src/probes/window.js
+PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX2, AR2.
+- fn (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
+
+## src/recorder.js
+(no head comment)
+- const (13): `loopChordDeg`, `loopChordOct`, `editIsOpen`, `editLayer`, `editUndo`, `editRedo`, `songMark`, `songDirty`, `cmdNote`, `droneViewNow`, `setLiveLeakDbg`, `editHistPeek`, `droneAudible`
+- fn (23): `softAllOff`, `panic`, `onLoop`, `onUndo`, `clearRec`, `toggleLaneMute`, `toggleLaneSolo`, `editOpen`, `editClose`, `editSetLayer`, `setLaneLevel`, `setLanePan`, `laneVerKeep`, `clearSong`, `songSaveRec`, `songOpenApply`, `cmdSet`, `seedTake`, `probeTake`, `liveAllOff`, `backingFollowKey`, `hlOf`, `editRevert`
+- → ./freeze/registry.js (28): `frzBusGain`, `frzSigTonicDbg`, `freezeSig`, `frzSwapInfo`, `frzSwapDbg`, `frzPackAsync`, `frzStoreMode`, `frzChunkDbg`, `frzNodesInfo`, `FRZ_CHUNK`, `frzWhenReady`, `frzReadersAlive`, `frzGlobalKey`, `frzWatchKey`, `frzRetuneOnly`, `laneHasChain`, `frzBytesTotal`, `frzBytesOf`, `songPinChains`, `freezeTicket`, `freezeSet`, `unfreezeLayer`, `frozenLayers`, `frozenInfo`, `freezeState`, `frzHas`, `freezePinCaptures`, `frzLayer`
+- → ./live/backing.js (4): `loadArrangement`, `loadJam`, `clearJam`, `backingEvent`
+- → ./live/capture.js (5): `fxIsDriven`, `fxLaneMerge`, `playKeyOf`, `setLiveIsolation`, `fxPlayDriving`
+- → ./live/eng.js (4): `evHz`, `evHzDbg`, `evReg`, `makeENG`
+- → ./live/record.js (14): `WleadOn`, `WleadOff`, `WchOn`, `WchSet`, `WchOff`, `WbassOn`, `WbassOff`, `WdrumHit`, `wTapSet`, `inPB`, `recording`, `onRec`, `recLayers`, `isRecLayer`
+- → ./song/automation.js (18): `pnBars`, `editVolSel`, `editBendPoint`, `bendDbg`, `editBendShape`, `bendEdited`, `takeFxDump`, `autAddrs`, `autPoints`, `autMovePoint`, `autDeletePoint`, `autAddPoint`, `autShapePoint`, `autCurvePoint`, `autChainOf`, `autChainAdd`, `autChainRemove`, `autChainMove`
+- → ./song/capture.js (5): `laneRoleOf`, `captureInfoOf`, `fxLaneExpand`, `FX_CHAIN`, `setAutRecSmooth`
+- → ./song/clipboard.js (5): `editCopySel`, `editPaste`, `editDuplicateSel`, `editPasteWhy`, `editClipInfo`
+- → ./song/edit-chords.js (3): `editDeleteChordNote`, `editMoveChordNote`, `editResizeChordNote`
+- → ./song/edit-group.js (2): `editMoveSel`, `editDeleteSel`
+- → ./song/edit-insert.js (6): `editInsertHit`, `editInsertBass`, `editInsertChord`, `editInsertLead`, `laneTimbreOf`, `editSetTimbre`
+- → ./song/edit-notes.js (11): `editMoveHit`, `editDeleteHit`, `editCanUndo`, `editCanRedo`, `editBackingOpen`, `editMoveSeg`, `editDeleteSeg`, `editResizeSeg`, `tiePartners`, `chordMoveTy`, `segChordNotes`
+- → ./song/file.js (1): `songPlan`
+- → ./song/history.js (14): `histUndo`, `histRedo`, `histCanUndo`, `histCanRedo`, `histLen`, `histReset`, `histTab`, `histMaster`, `laneNameStep`, `moveLaneStep`, `histHash`, `histDbg`, `histTopLabel`, `onApplied`
+- → ./song/lanes.js (22): `laneMuted`, `laneSoloed`, `laneSoloOn`, `toggleArm`, `armedLayer`, `laneDelTap`, `laneDelCancel`, `laneDelPendingLayer`, `laneAudible`, `laneLevelOf`, `laneNameOf`, `setLaneName`, `laneOrder`, `moveLane`, `laneLook`, `laneShowKeep`, `lanePanOf`, `layerOfOwner`, `laneEditVerOf`, `laneLenOf`, `laneIdOf`, `laneLayerOf`
+- → ./song/notes.js (7): `songNotes`, `songSegs`, `viewAudit`, `editViewCheck`, `ldKey`, `chOwnerKey`, `bassOwnerKey`
+- → ./song/quantise.js (1): `editQuantSel`
+- → ./song/sections.js (12): `sections`, `secAdd`, `secRename`, `secDelete`, `songEdit`, `songEditWhy`, `songUndo`, `songRedo`, `songCanUndo`, `songCanRedo`, `secDbg`, `songHistReset`
+- → ./song/store.js (2): `events`, `evRole`
+- → ./song/transpose.js (10): `editDegreeSel`, `editDegreeWhy`, `editTrackMode`, `editTrackModeWhy`, `trackViewOfLayer`, `editTranspose`, `editTransposeWhy`, `songTranspose`, `songTransposeWhy`, `trDbg`
+- → ./transport/clock.js (23): `secPerBeat`, `beatNow`, `timeAt`, `secOf`, `beatsOf`, `setLoopBars`, `setLoopMetre`, `METRES`, `setLoopSub`, `SUBS`, `beatLevel`, `setLoopQuant`, `setLoopBpm`, `loop`, `loopPos`, `songBeats`, `setRegionOn`, `regionOn`, `cycling`, `braceTap`, `braceMove`, `braceSet`, `braceProbe`
+- → ./transport/scheduler.js (3): `seekTo`, `chaseFor`, `chaseNote`
+
+## src/render.js
+⛔ ЗАВИСИМОСТИ ЭТОГО МОДУЛЯ — ЧИТАТЬ ПЕРЕД ЛЮБЫМ ПЕРЕИМЕНОВАНИЕМ В recorder / audio / state.
+- const (8): `latency`, `seedOfLane`, `unfreeze`, `frozen`, `layoutCost`, `renderKsLazy`, `capStats`, `renderQueue`
+- fn (20): `engineProbe`, `probe`, `renderTrack`, `freeze`, `aud`, `live`, `stop`, `recSteps`, `droneBP`, `bendTrace`, `reuseCheck`, `goldRender`, `engBench`, `engine`, `renderPoolDbg`, `copyState`, `revAgree`, `liveCheck`, `swapCheck`, `chunkCheck`
+- → ./frzqueue.js (2): `autoFreeze`, `freezeQueue`
+
+## src/scaleload.js
+═══ ⛳ ЗАГРУЗЧИК ДАННЫХ ЛАДОВ (слайс F5 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Данные ладов — ФАЙЛЫ в data/ (форма v1: index.json — манифест, menu.json, по файлу на строй, лад, палитру и набор р…
+- const (3): `loadReport`, `KINDS`, `kindOfRecord`
+- fn (4): `loadScaleData`, `idHolder`, `checkRecord`, `checkRecordList`
+- → ./core/format.js (1): `CM_MAX`
+- → ./core/registry.js (1): `USER_ID`
+
+## src/scaleprobe.js
+⛳ ПРОБА УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ — консольный инструмент (как ухо-проба render.js: R.aud/R.live), НЕ часть приложения.
+- → ./probedata.js (10): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegreesData`, `checkModeMap`
+- → ./probes/autosave.js (1): `checkAutosave`
+- → ./probes/cmd.js (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
+- → ./probes/detect.js (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
+- → ./probes/edit.js (9): `checkSoloEdit`, `checkSelect`, `checkPaste`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
+- → ./probes/eng2.js (1): `checkEngReadouts`
+- → ./probes/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
+- → ./probes/files.js (10): `dumpScales`, `checkFiles`, `checkNames`, `SNAPSHOT_CHANGES`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
+- → ./probes/freeze.js (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
+- → ./probes/fxcontract.js (1): `checkFx`
+- → ./probes/gold.js (2): `dumpGold`, `checkGold`
+- → ./probes/guard.js (1): `api`
+- → ./probes/hand.js (2): `dumpGesture`, `checkGesture`
+- → ./probes/history.js (3): `checkUndoClear`, `checkHistory`, `checkSections`
+- → ./probes/ids.js (1): `checkEventIds`
+- → ./probes/key.js (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
+- → ./probes/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
+- → ./probes/pack.js (1): `checkPack`
+- → ./probes/pool.js (1): `checkPool`
+- → ./probes/run.js (4): `material`, `all`, `quick`, `orderCheck`
+- → ./probes/seed.js (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
+- → ./probes/song1.js (1): `checkSongRecords`
+- → ./probes/song2.js (2): `checkSongFile2`, `dumpSong`
+- → ./probes/songfile.js (2): `checkSongFile`, `checkSongOpenUndo`
+- → ./probes/sound.js (7): `checkTimbreIds`, `checkFirefly`, `checkForest`, `checkDynamics`, `checkDynLive`, `checkFreezeParity`, `checkMasterPath`
+- → ./probes/tim3d.js (1): `checkOwnTimbres`
+- → ./probes/timbres.js (3): `checkTimbresBefore`, `dumpTimbres`, `checkTimbreRecords`
+- → ./probes/tuning.js (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
+- → ./probes/window.js (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
+
+## src/scales.js
+(no head comment)
+- const (61): `NOTE_NAMES`, `ROMAN`, `OCT_ROMAN`, `range`, `TRADITIONS`, `GRP`, `TUNINGS`, `CHORD_FAM_SETS`, `chordModeName`, `chordModeHint`, `SCALES`, `scaleById`, `resolveScaleId`, `anchorHints`, `scaleData`, `scalesOfTrad`, `tradOfScale`, `CUR`, `IVX`, `keyFollowsDbg`, `viewKey`, `keyCDbg`, `viewKeyC`, `baseF`, `keyByOneOne`, `historicalKeyOf`, `viewKeyIdOf`, `keyOf`, `cFix`, `tonicFreq`, `periodOf`, `regWord`, `regWordFull`, `supportsProgressions`, `backingRhythmOf`, `supportsChords`, `typedChords`, `REG_N`, `rectEligible`, `rectGrid`, `rectDefault`, `rectRows`, `rectNotes`, `rectRowsFull`, `rectBase`, `rectBaseMax`, `rectNoteAt`, `rectSlotOf`, `thereminSpan`, `thereminHz`, `chordFams`, `rootName`, `fifthStep`, `modesLikeView`, `centsOf`, `DRONE_TOL`, `droneNonOct`, `setDroneNonOct`, `listLbl`, `SEV`, `chordNotesStr`
+- fn (46): `viewOfId`, `applyScaleId`, `userRecordsOf`, `dependentsOf`, `unregisterRecord`, `registerRecord`, `menuOf`, `chordModeOf`, `scaleView`, `viewIdOf`, `namingOf`, `tuningStatus`, `rectLayout`, `seventhAddsNote`, `ruleChordSteps`, `pitchHz`, `tuningOf`, `tuningIndexOf`, `leadFreqTi`, `bassFreqTi`, `chordReadsTi`, `chordNotesAt`, `chordRowFreqAt`, `modeSlotOfTi`, `shiftDegrees`, `mapDegrees`, `chordFreqsAt`, `leadFreq`, `bassFreq`, `chordFreqs`, `chordUnit`, `chordBuildOf`, `chordAtRoot`, `chordTypeFits`, `chordRowFreq`, `chordNotes`, `name24`, `stepName`, `rowLabel`, `degCentsExact`, `droneDegree`, `droneSecondHz`, `chordPitchHz`, `listName`, `qual`, `chordLabel`
+- → ./scaleload.js (1): `loadReport`
+
+## src/song/automation.js
+REC3 part 2 (stage 3) — THE AUTOMATION LANE AND THE PER-NOTE LANES (O-4, V4b, VOL-3, ED5), THE BEND CURVE (OWN2, BEND-CURVE) and the TRACK'S CHAIN edits (S1) with their history kinds — moved from r…
+- const (4): `bendDbg`, `BEND_EPS`, `takeFxDump`, `autEarliest`
+- fn (18): `autTakesOf`, `autAddrs`, `bendEdited`, `editBendPoint`, `editBendShape`, `pnBars`, `editVolSel`, `autPoints`, `autCaps`, `autMovePoint`, `autDeletePoint`, `autAddPoint`, `autShapePoint`, `autCurvePoint`, `autChainOf`, `autChainAdd`, `autChainRemove`, `autChainMove`
+
+## src/song/capture.js
+REC3 part 2 (stage 3) — THE CAPTURE RECORDS (what a take played on its chains: snapshot + lane, by take number), their version, the take counter, the ONE law of a lane segment's shape (autSmoothOf …
+- const (9): `takeNext`, `takeSeqFloor`, `takeFx`, `takeFxTouch`, `laneIdFloor`, `FX_CHAIN`, `setAutRecSmooth`, `fxLaneSmooth`, `laneChainKey`
+- fn (6): `laneIdFill`, `autSmoothOf`, `fxLaneAt`, `fxLaneExpand`, `laneRoleOf`, `captureInfoOf`
+- let (1): `takeFxVer`
+
+## src/song/clipboard.js
+REC3 part 2 (stage 3) — COPY, PASTE, DUPLICATE (ED2) — moved from recorder.js (which re-exports them — a facade).
+- const (3): `editClipInfo`, `editPasteWhy`, `editPaste`
+- fn (2): `editCopySel`, `editDuplicateSel`
+
+## src/song/commands.js
+CMD1c (RUN 5) — EVERY HISTORY STEP A COMMAND, SERIALISED BY IDS (plan docs/CMD1-design.md §3.4).
+- const (2): `HIST_FORMAT`, `cmdDbg`
+- fn (3): `histToJSON`, `histFromJSON`, `histRoundTrip`
+
+## src/song/edit-chords.js
+REC3 (stage 3) — CHORD-NOTE EDITS (U2–U4: a chord dissolves into one-note chords when one of its notes is deleted, moved or resized), moved from recorder.js (which re-exports these names — a facade).
+- fn (3): `editDeleteChordNote`, `editMoveChordNote`, `editResizeChordNote`
+
+## src/song/edit-group.js
+REC3 (stage 3) — GROUP EDITS (ED1: several notes moved or deleted as ONE history entry), moved from recorder.js (which re-exports these names — a facade).
+- fn (4): `editDeleteSel`, `editGroup`, `editMoveSel`, `selGroups`
+
+## src/song/edit-insert.js
+REC3 part 2 (stage 3) — INSERTS of the track editor (bass, solo, chords, drum hits; the session take; the pinned chain of a new track) and the TIMBRE REPLACEMENT (T5) — moved from recorder.js (whic…
+- ? (1): `editTakeNow`
+- const (2): `editDefVol`, `editTakeReset`
+- fn (7): `editInsPush`, `editInsertBass`, `editInsertLead`, `editInsertChord`, `editInsertHit`, `laneTimbreOf`, `editSetTimbre`
+- let (1): `editTake`
+
+## src/song/edit-notes.js
+REC3 (stage 3) — THE EDITOR'S EDIT CORE AND NOTE EDITS (guard, commit, batch, tie pairs, key clash, detach; move / resize / delete of notes and drum hits), moved from recorder.js (which re-exports …
+- const (12): `EDIT_GAP`, `EDIT_MIN_LEN`, `EDIT_ROLE`, `editBackingOpen`, `editCanRedo`, `editCanUndo`, `editIsOpen`, `editLayer`, `editPush`, `editRoleOf`, `editWire`, `noTie`
+- fn (19): `bendTrim`, `chordMoveTy`, `commitDetach`, `detachPlan`, `editBatch`, `editCommit`, `editDeleteHit`, `editDeleteSeg`, `editGuard`, `editMoveHit`, `editMoveSeg`, `editResizeSeg`, `keyClash`, `segChordNotes`, `segEvs`, `segPitchPt`, `slotPt`, `tiePartners`, `untieAcross`
+
+## src/song/env.js
+REC3 part 2 (stage 3) — THE SONG LAYER'S ENVIRONMENT: what pure song/ modules need from above — the transport (REC4's clock answers these later), the engine's effect DECLARATIONS (the FX_FACTORY re…
+- const (2): `ENV`, `envWire`
+
+## src/song/file.js
+SAVE1 (DAY run 2026-10-16) — THE SONG ↔ ITS FILE RECORD (song layer: no DOM, no Web Audio; folder rule).
+- const (1): `fileDbg`
+- fn (6): `songData`, `songPlan`, `songNeeds`, `songTimbreNeeds`, `viewRec`, `viewOfRec`
+
+## src/song/history.js
+REC2 (stage 3) — THE ONE HISTORY (ED7), moved from recorder.js (which re-exports these names — a facade).
+- const (17): `onApplied`, `histNote`, `histWire`, `histKindFields`, `histLists`, `histSeal`, `histReset`, `histCanUndo`, `histCanRedo`, `histLen`, `histTopLabel`, `histSince`, `histPeek`, `histOffAdd`, `histOffNow`, `histDbg`, `histDbgO`
+- fn (14): `histKind`, `histInstall`, `histHashObj`, `histApply`, `histTouched`, `histPush`, `histHash`, `histUndo`, `histRedo`, `histTab`, `histMaster`, `laneNameStep`, `moveLaneStep`, `histGroup`
+
+## src/song/lanes.js
+REC1 (stage 3) — THE TRACK TABLES, moved verbatim from recorder.js (which re-exports these names — a facade).
+- const (27): `laneWire`, `laneId`, `laneMute`, `laneSolo`, `laneLevel`, `lanePan`, `laneName`, `laneRank`, `laneLen`, `laneLenOf`, `laneEditVer`, `laneVerBump`, `laneEditVerOf`, `laneOf`, `laneForget`, `laneTablesClear`, `armedLayer`, `laneAudible`, `laneGated`, `laneLevelOf`, `laneGainOf`, `lanePanOf`, `laneNameOf`, `laneMuted`, `laneSoloed`, `laneSoloOn`, `laneRow`
+- fn (13): `laneNew`, `laneLayerOf`, `toggleArm`, `laneDelTap`, `laneDelCancel`, `laneDelPendingLayer`, `layerOfOwner`, `setLaneName`, `laneOrder`, `moveLane`, `laneShowKeep`, `laneLook`, `laneRowSet`
+
+## src/song/notes.js
+REC2 (stage 3) — THE SONG AS NOTES, moved from recorder.js (which re-exports these names — a facade).
+- const (7): `chOwnerKey`, `bassOwnerKey`, `ldKey`, `chaseKind`, `chaseKey`, `notesReset`, `ldTherm`
+- fn (7): `layerSlotTop`, `layerTakeTop`, `songNotes`, `viewAudit`, `editViewCheck`, `trackViewCheck`, `songSegs`
+
+## src/song/quantise.js
+REC3 part 2 (stage 3) — QUANTISE AFTER RECORDING (ED3) — moved from recorder.js (which re-exports them — a facade).
+- fn (1): `editQuantSel`
+
+## src/song/sections.js
+REC3 part 2 (stage 3) — SECTIONS (ED6): named bar markers; insert, cut or duplicate BARS in every track at once, with their history kinds (brace, marks, lanelen) — moved from recorder.js (which re-…
+- const (9): `secDbg`, `secMarksSet`, `secCopy`, `sections`, `songCanUndo`, `songCanRedo`, `songUndo`, `songRedo`, `songHistReset`
+- fn (5): `songEditWhy`, `songEdit`, `secAdd`, `secRename`, `secDelete`
+- let (1): `secMarks`
+
+## src/song/store.js
+REC1 (stage 3) — THE SONG'S EVENT STORE, moved verbatim from recorder.js (which re-exports these names — a facade).
+- const (11): `events`, `onInvalidate`, `sortedLen`, `evSeq`, `evSeqPut`, `evOrder`, `evIdFloor`, `maxLayer`, `evRole`, `chaseRole`, `isNoteStart`
+- fn (4): `schedInvalidate`, `compactEvents`, `evSeqFill`, `evIdFill`
+- let (1): `evGen`
+
+## src/song/transpose.js
+REC3 part 2 (stage 3) — TRANSPOSE BY DEGREES (ED4), A TRACK INTO ANOTHER MODE (OWN1), TRANSPOSE BY SEMITONES (TF3, TF3b) — moved from recorder.js (which re-exports them — a facade).
+- const (6): `editDegreeWhy`, `trackViewOfLayer`, `editTrackModeWhy`, `trDbg`, `editTransposeWhy`, `songTransposeWhy`
+- fn (4): `editTrackMode`, `editTranspose`, `songTranspose`, `editDegreeSel`
+
+## src/songs.js
+⛳ ДЕМО-ПЕСНИ — КОНСОЛЬНЫЙ ЗАГРУЗЧИК, НЕ ЧАСТЬ ИГРЫ.
+- const (1): `songNames`
+- fn (2): `loadSong`, `songBuild`
+
+## src/state.js
+(no head comment)
+- const (96): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`
+- let (48): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`
+- → ./config.js (1): `FX_VOL`
+
+## src/timbreload.js
+TIM3a (RUN 4) — THE TIMBRE RECORDS, loaded ONCE when the module starts (top-level await, the scales.js pattern) from the generated bundle data/timbres.bundle.json (tools/timbre-bundle.mjs; the sour…
+- const (5): `TIMBRE_RECORDS`, `timbreAll`, `timbreCheckDbg`, `timbreKnownId`, `timbreLoadReport`
+- fn (1): `timbreAddSession`
+
+## src/transport/clock.js
+REC4 (stage 3) — THE TRANSPORT CLOCK: the transport state `loop` (tempo, metre, t0, playhead, the brace `rgn`), the song length, the brace math (songAt, rgnReps, braceClamp, rgnApply …), the metre …
+- const (16): `clockWire`, `secPerBeat`, `beatNow`, `timeAt`, `secOf`, `beatsOf`, `songLenGrow`, `loop`, `songBeats`, `rgnLen`, `cycling`, `rgnReps`, `songAt`, `regionOn`, `METRES`, `SUBS`
+- fn (15): `songLenRecalc`, `rgnApply`, `rgnSync`, `braceProbe`, `setRegionOn`, `braceTap`, `braceMove`, `braceSet`, `beatLevel`, `loopPos`, `setLoopBars`, `setLoopMetre`, `setLoopQuant`, `setLoopSub`, `setLoopBpm`
+- let (1): `songLen`
+
+## src/transport/scheduler.js
+REC4 (stage 3) — THE SCHEDULER: replay cursors over the sorted prefix, the look-ahead window (scheduleLayers), releases at seams, the chase, «almost now» firing of solo and drone (fireNear), the me…
+- const (2): `schedWire`, `chaseReset`
+- fn (7): `clearPump`, `releaseLoopLayersAt`, `chaseFor`, `chaseNote`, `chasePlay`, `startTransport`, `seekTo`
+
+## src/tutor.js
+================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
+- fn (2): `wireStarter`, `openLessons`
+
+## src/ui.js
+(no head comment)
+- ? (1): `$`
+- const (3): `arrApi`, `undoUiDbg`, `canSplit`
+- fn (13): `tutorReset`, `tutorClearLoop`, `tutorSetScale`, `tutorResetHandFn`, `songSaveText`, `songOpenText`, `songKeep`, `songKeepTimbres`, `asRestoreId`, `songResumeOffer`, `tutorSplitInit`, `revealBar`, `tutorSyncBar`
+
+## src/userfiles.js
+═══ ⛳ ФАЙЛЫ ПОЛЬЗОВАТЕЛЯ — КОНСОЛЬ (слайс F6 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Строи, лады, палитры и наборы режимов аккордов, сделанные человеком, ставятся и снимаются из консоли (интерфе…
+- fn (10): `install`, `list`, `remove`, `exportFile`, `storeUnchecked`, `example`, `brokenExample`, `chordModesExample`, `installChordModesExample`, `installExample`
+
+## src/userstore.js
+═══ ⛳ ХРАНИЛИЩЕ ФАЙЛОВ ПОЛЬЗОВАТЕЛЯ (слайс F6 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Строи, лады, палитры и наборы режимов аккордов, сделанные человеком, — записи формы v1 (те же, что в data/),…
+- fn (3): `userAll`, `userPut`, `userDel`
+- let (1): `backend`
+
+## src/va-stub.js
+Vercel Web Analytics queue stub — a classic script, not a module: calls made before the counter's script loads are queued.
+- exports: none
+
+## src/views/camera.js
+DRAW1 (DAY run 2026-10-16): the camera picture: the cover crop (syncViewRect) and the video background — moved from draw.js verbatim (draw.js is the facade).
+- fn (2): `drawVideoBackground`, `syncViewRect`
+
+## src/views/common.js
+DRAW1 (DAY run 2026-10-16): shared canvas helpers (FX bar layout, status and transport sync, colour mixing, the ONE note label noteLbl, the time axis and the editor row geometry, the editor bar hei…
+- const (16): `setEmptyTpOld`, `FX_EDGE`, `FX_STEP`, `LOOP_EMPTY_TOP`, `ROLL_BAR_H`, `ROLL_TP_H`, `fxBarItems`, `fxBarsBox`, `fxBarsY`, `fxParamOnFinger`, `laneBeatAt`, `laneBeatX`, `noteLbl`, `rollRowAt`, `rollRowY`, `statusEl`
+- fn (3): `hexA`, `mixHex`, `syncLoopTransport`
+- let (2): `emptyTpOld`, `loopBarBottom`
+
+## src/views/play.js
+DRAW1 (DAY run 2026-10-16): the play screen: overlays per frame (drawOverlays), roles, grids, hands, palette, effect bars, status — moved from draw.js verbatim (draw.js is the facade).
+- fn (1): `drawOverlays`
+
+## src/views/roll.js
+DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis, the automation lane, hit tests) — moved from draw.js verbatim (draw.js is the facade).
+- const (5): `rollAutValAt`, `rollBendProbe`, `rollSnapBeat`, `rollAutSnapV`, `rollRowsProbe`
+- fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
+
+## src/views/strip.js
+DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer (drawLooper, loopView, their hit tests and probes) — moved from draw.js verbatim (draw.js is the facade).
+- const (4): `laneCol`, `laneTitle`, `loopViewProbe`, `loopViewClear`
+- fn (7): `laneDefName`, `loopHit`, `loopBeatAt`, `stripProbe`, `loopScroll`, `arrGeom`, `drawLooper`
+
+## src/vision.js
+(no head comment)
+- const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
+- fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
+
+_132 modules, 1913 exported names._
+
+# Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
 ## Stale names
 - Stale names to ignore (removed): `backing.js`, `playRec`, `toggleRec`, `stopRec`, `recStart`, `drawChordSectors`, `sectHyst`, `S.sect`,
@@ -164,323 +705,3 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   `verb`/`verbOut`/`revLead`/`revCh`, `leadOwner`, `fxAttach`/`fxRoleBus`/`fxRoleOut`, `roleXDriven`, `bassOwner`, `soloNoteHand`,
   per-voice `dlySend`/`revSend`, `RELEASE_TAILS` as a rule, `vision.setPicture`, `VISION_DEF.picture`, `swPicMatched`/`swPicLive`,
   `diag.sw.pic*` keys, latmeter report `detection.picture` (LAT3: the live-camera picture switch removed), `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
-## Added at AF3 / AF4
-- `src/frzqueue.js`: `AF_DELAY`, `AF_REFREEZE_ON_RETUNE`, `AF_BUDGET_MB`, `AF_TOUCH`, `AF_EST`, `wScan`, `wants`, `watchSig`, `afHint`, `afTick`, `afPause`, `afIdle`, `afBusy`, `afActive`, `afRowState`, `afBegin`, `afEnd`, `heldLayer`, `estBytes`, `fitsBudget`, `budgetBytes`, `PANHOLD`, `LVL`
-- `src/recorder.js`: `frzWatchKey`, `frzWatchVer`, `frzRetuneOnly`, `frzSigNoRetune`, `laneHasChain`, `frzBytesTotal`, `frzBytesOf`, `songPinChains`, `editInsPush`
-- `src/render.js`: `releaseBuf`; `freeze` options `admit`, `keepBuf`; refusal `'budget'`
-- `src/draw.js`: `ARR_DOT_W`, `ARR_DOT_R`, `ARR_DOT_PULSE_MS`; snapshot fields `loopView.dots`, `loopView.markW`
-- `src/ui.js`: `panHeld`, `panHold`, `panRelease`
-- `src/hooks.js`: `hooks.af`, `hooks.afRow`
-- `src/scaleprobe.js`: `checkAutoFreeze` (row «AF3 auto-freeze watcher»)
-- `tools/probe-browser.mjs`: `window.__heap()` (in `--eval`)
-- Removed (stale since AF4): `#rollFrz`, `#rollFrzState`, `rollFrzBtn`, `rollFrzStateEl`, `ui.onFreeze`, `frzBusy`, `frzNoticeShown`, `frz.*` i18n keys, the window hit `'frz'`, `FRZ_MARK_X`, `FRZ_STALE_DX`
-
-## Added at RENDER-LEAK / AF5
-- `src/render.js`: `renderKsLazy`, `KS_LAZY`, `usesKS`; report field `ksLoaded`
-- `src/audio.js`: `LEAD_KS_FROM` (exported), `leadOutT`, `chordBusT`, `bassBusT`, `drumBusT`, `trackRouteOf`, `setTrackRouteOf`, `voiceRoute`, `routeAt`, `routeOfOwner`, `chainStateOf`, `bldShim`, voice fields `rt`, `shim`; `fxPlayPath(key, ids, hard)`
-- `src/state.js`: `CHAIN_TRACK`, `trackChainKeyOf`
-- `src/recorder.js`: `liveIso`, `setLiveIsolation`, `playKeyOf`, `fxPlayHard`, `frzOwnedKey`, `fxPlayDriving`; `songPinChains()` result `soloMaps`, `soloSnap`
-- `src/scaleprobe.js`: `checkLiveIsolation` (row «AF5 track and live isolated»), `seedFrozenSamples`, `SEED_REC.soloSnap`
-- `tools/probe-browser.mjs`: `--leak`, `LEAK_PAGE`, `LEAK_N`, `LEAK_MARGIN_MB`, `procMem`, `window.__procMem()`
-- AF5-mixer: `recorder.setLiveLeakDbg`, `liveLeakLy` (probe control); `render.liveCheck` (`R.liveCheck()`); probe helpers `voiceRead`, `LIVE_KEYS` in `checkLiveIsolation`
-
-## Added at ED1 / ED2
-- `src/recorder.js`: `segPitchPt`, `editGroup`, `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`, `editDeleteSel`, `evSeq`, `evSeqN`, `evSeqFill`, `evOrder`; ED2 `editClip`, `runNote`, `clipOf`, `editCopySel`, `editClipInfo`, `pasteBlock`, `editPasteWhy`, `pasteClip`, `editPaste`, `dupOffset`, `editDuplicateSel`
-- `src/state.js`: `rollSelMany`, `setRollSelMany`, `rollPick`, `setRollPick`, `rollBox`, `setRollBox`
-- `src/draw.js`: `rollShiftPit`, `rollBoxHits`, `rollSelectable`; `rollDrag.many {dt, dr}` (group ghost)
-- `src/ui.js`: `selList`, `selHas`, `selMany`, `selToggle`, `groupDrive`, `groupCommit`, `rollCopy`, `rollPaste`, `rollDuplicate`, `rollPickBtn`, `rollCopyBtn`, `rollPasteBtn`, `rollDupBtn`; `rollGrab.group`, `rollPan.box`
-- `index.html`: `#rollPick`, `#rollCopy`, `#rollPaste`, `#rollDup`
-- `src/i18n.js`: `roll.pickTitle`, `roll.groupNo`, `roll.groupOut`, `roll.copyTitle`, `roll.pasteTitle`, `roll.dupTitle`, `roll.copied`, `roll.pasteEmpty`, `roll.pasteRole`, `roll.pasteView`
-- `src/scaleprobe.js`: `checkSelect` (row «ED1 several notes at once»), `checkPaste` (row «ED2 copy, paste, duplicate»)
-
-## Added at ED5 / ED6 (and the runner hygiene)
-- `src/recorder.js`: ED5 `pnBars`, `editVolSel`; ED6 `secMarks`, `secSeq`, `songHist`, `songFuture`, `secCopy`, `sections`, `secIns`, `secCut`, `isOffFn`, `songPrint`, `printSame`, `secLaneVal`, `secPlan`, `secApply`, `secCommit`, `secUntie`, `songEditWhy`, `songEdit`, `secName`, `secPush`, `secAdd`, `secRename`, `secDelete`, `songCanUndo`, `songCanRedo`, `songUndo`, `songRedo`, `songHistReset`, `braceSet`; probe only `secDbg` / `secForget`, `laneVerKeep`, `takeFxDump`; step kinds `'brace'`, `'marks'`, `'lanelen'`; `autdel` steps remember `at`
-- `src/state.js`: `rollVolBars`, `setRollVolBars`, `secSel`, `setSecSel`
-- `src/draw.js`: `drawVolBars`, `ARR_SEC_H`; snapshots `rollView.aut.bars`, `loopView.sec {y0, y1, marks}`, `arrGeom().sec`; hits `'autbar'`, `'sec'`, `'secband'`; `rollAutDrive` reads `G.vOnly`
-- `src/ui.js`: `volBarsOn`, `rollVolBarsBtn`, `rollGrab.bar`; `updSecBtns`, `secOp`, `songStep`, `secTapAt`, `secBandTap`, `openSecRename`, `closeSecRename`, `barNo`, `secInsBtn`, `secCutBtn`, `secDupBtn`, `secDelBtn`, `songUndoBtn`, `songRedoBtn`, `secNameIn`
-- `index.html`: `#rollVolBars`, `#secIns`, `#secCut`, `#secDup`, `#secDel`, `#songUndo`, `#songRedo`, `#secNameIn`
-- `src/i18n.js`: `aut.bars`, `aut.barsTitle`; `sec.insTitle`, `sec.cutTitle`, `sec.dupTitle`, `sec.delTitle`, `sec.undoTitle`, `sec.redoTitle`, `sec.didIns`, `sec.didCut`, `sec.didDup`, `sec.stepDone`, `sec.changed`, `sec.needBrace`, `sec.noRec`, `sec.noEmpty`, `sec.nothing`, `sec.added`, `sec.removed`, `sec.renameTitle`
-- `src/scaleprobe.js`: `checkVolBars` (row «ED5 volume bars»), `checkSections` (row «ED6 sections»)
-- `tools/probe-browser.mjs`: `PROFILE_TAG`, `procList`, `runnerBrowsers`, `killTree`, `rmProfile`, `staleScan`, `LIVE`, `closeBrowser`, `closeAll`, `bail`; flags `--kill-stale`, `--clean-only`, `--selftest-exit sigint|error`
-
-## Added at ED6-fix / ED7 / OWN2
-- `src/recorder.js`: ED7 `HIST_MAX`, `HIST_MERGE_MS`, `hist`, `histFut`, `histOff`, `snapPend`, `takeTok`, `histGroupDepth`, `histDbg`, `histCanUndo`, `histCanRedo`, `histLen`, `histReset`, `histLabelOf`, `histPush`, `payId`, `pidOf`, `strHash`, `histHash`, `takeBegin`, `histSeal`, `laneRow`, `laneRowSet`, `laneDrop`, `snapState`, `snapBegin`, `snapEnd`, `snapApply`, `histTab`, `histMaster`, `laneNameStep`, `moveLaneStep`, `histApplyX`, `histTouched`, `histCommit`, `histUndo`, `histRedo`, `clearSong`, `deleteLaneDo`, `onUndoDo`, `loadArrangementDo`, `clearJamDo`; step kinds `'snap'`, `'tab'`, `'master'`, `'ranks'`; OWN2 `BEND_C_MAX`, `BEND_EPS`, `editBendPoint`, `bendDbg`
-- `src/state.js`: `rollBendSel`, `setRollBendSel`, `rollBendDrag`, `setRollBendDrag`
-- `src/draw.js`: `bendRowsOf`, `hzOfRow`, `rollBendAt`, `rollBendProbe`, `rollBendHandles`; snapshot `rollView.bend`; hit `'bendpt'`
-- `src/ui.js`: ED6-fix `secRenBtn`, `secRenPend`, `secRenT`, `secRenDbg`, `SEC_BLUR_MS`, `arrApi.secRenameDbg`; ED7 `levelStep`, `HIST_KEY`, `histKeyOf`, `histUndoBtn`, `histRedoBtn`, `updHistBtns`, `afterHist`, `histDo`; OWN2 `rollGrab.bend`, `rollPan.bendAdd`
-- `index.html`: `#secRen`, `#histUndo`, `#histRedo`
-- `src/i18n.js`: `sec.renTitle`, `sec.hint`, `hist.*` (undoTitle, redoTitle, undone, redone, noUndo, noRedo, noRec, changed, `hist.k.*`), `roll.bendAdded`, `roll.bendFirst`
-- `src/scaleprobe.js`: `checkHistory` (row «ED7 one history»), `checkBend` (row «OWN2 bend curve»)
-- `tools/probe-browser.mjs`: `uiSecRename`, `uiBendDrag`; flag `--no-ui`
-- Stale since ED7: `songHist`, `songFuture`, `songPrint`, `printSame` (recorder; ED6's song history merged into the one history); `editHist`, `editFuture` (renamed `hist`, `histFut`)
-
-## Added at ED7-fix / BEND-CURVE / OWN1
-- `src/config.js`: `CURVE_A`, `curveU`, `curveK`, `bendSeg`, `bendAt`, `bendSplit`, `BEND_GLIDE_STEP_S`, `BEND_GLIDE_TC`, `bendPlan`; bend point fields `sh` ('s'/'h'), `k`
-- `src/audio.js`: `bendTap`, `bendTapSet`; `scheduleBend(owner, points, base, spb, from, when)`
-- `src/recorder.js`: ED7-fix `histNoBrace`, `braceKey`, snap step field `br`; BEND-CURVE `bendEdited`, `bendNoteOf`, `bendCommit`, `editBendShape`, `autCurvePoint`, step kind `'autcurve'`, lane point field `k`, chase field `a.bendFrom`, section helpers `bendIns`, `bendCut`; OWN1 `trackViewOfLayer`, `trackModePlan`, `editTrackModeWhy`, `editTrackMode` (label `'mode'`; a `'move'` step may carry `sc`)
-- `src/scales.js`: `degFrom`, `degTo`, `modesLikeView`, `mapDegrees`
-- `src/draw.js`: `BEND_DRAW_N`, `bendPathOf`, `bendStroke`, `AUT_CURVE_N`, `rollAutValAt`; snapshots `rollView.bend.mids`, `rollView.aut.mid`; hits `'bendmid'`, `'autmid'`
-- `src/ui.js`: `bendShapeState`, `renderModeCtl`, `rollModeEl`; `rollGrab.bendMid`, `rollGrab.autMid`
-- `src/render.js`: `bendTrace`
-- `index.html`: `#rollMode`
-- `src/i18n.js`: `roll.modeTitle`, `roll.modeDone`, `roll.modeNo.*`, `hist.k.mode`
-- `src/scaleprobe.js`: `checkBendCurve` (row «BEND-CURVE glides and shapes»), `checkTrackMode` (row «OWN1 track into another mode»); `src/probedata.js`: `checkModeMap` (row «OWN1 modes by degrees (sweep)»)
-- `tools/probe-browser.mjs`: `--limit-start M`, `--cdn-cache` (`CDN_CACHE`, `CDN_DIR`, `cdnCache`; folder `tools/.cdn-cache/`, git-ignored)
-
-## Added at ED7-fix2 (undo after ✕)
-- `src/hooks.js`: `hooks.cleared`
-- `src/recorder.js`: `histTopLabel`
-- `src/draw.js`: `LOOP_EMPTY_TOP`, `tpEmpty`, `emptyTpOld`, `setEmptyTpOld`; `syncLoopTransport(on, bottom, empty)`
-- `src/ui.js`: `UNDO_TOAST_MS`, `undoToastT`, `hideUndoToast`, `showUndoToast`, `undoToastBtn`, `undoUiOld`, `undoUiDbg`
-- `index.html`: `#undoToast`, `#undoToastBtn`; `style.css`: `#undoToast`, `#loopTransport.empty`
-- `src/i18n.js`: `hist.clearedToast`, `hist.undoBtn`
-- `src/scaleprobe.js`: `checkUndoClear` (row «ED7-fix2 undo after clear»); `tools/check-static.mjs`: global `KeyboardEvent`
-
-## Added at LIC1 / PRIV1 / LAT1 (stage 3, slices 1–3)
-- `tools/licences.json` (the licence register: `policy`, `items[]` {id, name, class, use, version, licence, source, urls/files/npm, decision, tool, replace}, `glyphs[]` {ch, name, kind}); `THIRD-PARTY-LICENSES.md` (generated)
-- `tools/check-licences.mjs`: `gather`, `check`, `renderMd`, `controls`, `run`; `--write`; `tools/lex.mjs`: `lex` (moved out of check-static)
-- `tools/probe-data.mjs`: rows «LIC1 licence register», «LAT1 latency stats (core)» (`latCore`)
-- `tools/check-static.mjs`: section 8 network guard — `NET_KINDS`, `NET_LISTED`, `netSites`, `netCheck`, `NET`; `listJs` (reads sub-folders of src/); global `PerformanceObserver`
-- `tools/probe-browser.mjs`: `window.__csp` (init script), `res.csp`, the CSP check + control after the probe runs; `--eval` evaluated as an expression (no `new Function`)
-- `index.html`: the CSP `<meta>`, `#privacyNote`, Sound panel `#latOn`/`#latOff`, `#latDiag` (`#latDiagTx`, `#latCopy`, `#latClose`), `#latWarn` (`#latWarnTx`, `#latWarnOk`); `style.css`: `#privacyNote`, `#latDiag`, `#latWarn`
-- `src/va-stub.js` (the Vercel counter's queue stub, classic script)
-- `src/i18n.js`: `privacy.title`, `privacy.body`, `privacy.counter`; `diag.sep`, `diag.lat`, `diag.title`, `diag.camera`, `diag.cameraNoCap`, `diag.detect`, `diag.gestures`, `diag.draw`, `diag.audio`, `diag.long`, `diag.total`, `diag.totalPart`, `diag.bt`, `diag.copy`, `diag.copied`, `diag.close`, `lat.btWarn`, `lat.ok`
-- `src/core/latency.js`: `LAT_N`, `makeMeter`, `statsOf`, `handToSound`, `BT_MS`, `BT_LABEL`, `looksBluetooth`
-- `src/latmeter.js`: `latStart`, `latFrame`, `latIdle`, `latReport`, `latText`, `latConsole`, `latShow`, `latShown`, `latCount`, `latPauseDbg`
-- `src/main.js`: `latStart`/`latFrame`/`latIdle` calls in `startApp`/`loop`; `src/render.js`: `latency` (console `R.latency()`)
-- `src/scaleprobe.js`: `checkLatency` (row «LAT1 latency meter», DRAWN)
-
-## Added at PROBE1 / GOLD1 / HAND1 (stage 3, slices 4–6)
-- `src/scaleprobe.js` is a FACADE (explicit re-exports; every earlier `scaleprobe` name above now lives in `src/probes/<area>.js`): `run` (`all`, `quick`, `orderCheck`, `material`, `songPrint`, `stateSig`, `registryProblems`), `tuning`, `seed` (`seed`, `song`, `SEED_REC`, `checkWrite`, `checkSeed`, `checkFrozen`), `edit`, `history`, `window`, `freeze`, `files`, `key`, `lat`, `guard` (`api`, `guardSelfTest`, `LOCK`), `kit` (`frame`, `waitMs`, `meas`, `MEAS`, `measReset`, `QUICK`, `setQuick`, `PROBE_SHORT`, `frameStalls`, `winKeep`, `winRestore`), `data` (the node rows)
-- `src/probes/rows.js`: `row`, `family`, `rows(filter)`, `rowProblems`, `rowCheck`; flags `slow`, `drawn`, `realtime`, `song`, `node`; stale: `ALL_RUNS`, `SLOW_ROWS`, `DRAWN_ROWS`
-- `src/probes/gold.js`: `dumpGold`, `checkGold` (row «GOLD timbres and effects», slow), `goldCases`, `goldFeats`, `goldCmp`, `fft`, `GOLD_TOL`, `GOLD_FLOOR`; `tools/gold.print.json`; `src/render.js`: `goldRender`, `GOLD_RATE`, `GOLD_SEED`, `renderOnce` option `rate`
-- `src/probes/hand.js`: `dumpGesture`, `checkGesture` (row «HAND1 gesture fingerprint»), `pose`, `script`, `perform`, `ENV0`, `fxKeep`; `tools/gesture.print.json`; `src/gestures.js`: `handsProbe`, `processHandsProbe`, `pinchDbg`, `nowMs`, `PRB`, `looperTap`, `pinchD`; `src/recorder.js`: `wTap`, `wTapSet`
-- `tools/probe-data.mjs`: rows from `probes/rows.js` (flag node) + LIC1 + LAT1 core; `REG`, registry problems in the verdict; `tools/probe-browser.mjs`: `--limit-min` default 8; `tools/check-static.mjs` `NET_LISTED`: `probes/files.js`, `probes/key.js`, `probes/gold.js`, `probes/hand.js` (one fetch each; was `scaleprobe.js` 2)
-
-## Added at LAT1b / SND-F1 (2026-10-15)
-- `src/vision.js`: `camInfo`, `modelInfo`, `visionOpts`, `VISION_DEF`, `setHandsTracked`, `setModelDelegate`, `setCamFps`; internal `opts`, `camWant`, `camStartT`, `mpLog`, `mpTap`, `MP_LINE`, `TAP_MS`, `delegateOf`, `XNN`, `xnnBefore`, `newWindow`; `modelInfo().once`
-- `src/core/latency.js`: `frameWaitMs`, `withFrameWait`, `perMinute`, `STARTUP_MS`, `splitLongTasks`, `SOFT_GL`, `isSoftwareGL`
-- `src/latmeter.js`: `latSwitch`, `latSwSync`; internal `gpuInfo`, `causeOf`, `pruneLong`, `loafT`, `dupT`, `camStart0`, `playFrom`, `SW`; report fields `camera.requested/granted/duplicatesPerMinute/frameWaitMs`, `longTasks.startup/playing/causes`, `handToSoundWithWaitMs`, `gpu`, `model`, `switches`
-- `index.html`: `#swHands2`/`#swHands1`, `#swModelGPU`/`#swModelCPU`, `#swFpsDef`/`#swFps30`/`#swFps60`, `#swNote`; Master section `#mGlueOn`/`#mGlueOff`, `#mLimOn`/`#mLimOff`
-- `src/i18n.js`: `diag.camSet`, `diag.frameWait`, `diag.dup`, `diag.model`, `diag.gpu`, `diag.gpuHard`, `diag.gpuSoft`, `diag.unknown`, `diag.unknownOnce`, `diag.longStart`, `diag.longPlay`, `diag.cause`, `diag.totalWait`, `diag.sw.*` (hands, model, fps, fpsDef, note, busy, fail); `fx.forest`, `fx.forest.mix`, `fx.glue`, `fx.glue.*` (thr, ratio, knee, att, rel, makeup), `fx.cat.dyn`, `master.sep`, `master.glue`, `master.limiter`, `master.hint`; stale: `diag.long`
-- `src/core/dsp.js` (new, pure): `seeded`, `FOREST`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `dynCoef`
-- `src/dyn-worklet.js` (new): processor `'dyn'` (modes `comp` / `limit`; parameters `thr`, `ratio`, `knee`, `att`, `rel`, `makeup`, `ceil`, `on`; option `keep`)
-- `src/audio.js`: chord timbre «Firefly» (`CHORD_INSTR[16]`, field `strike:'firefly'`), `FIREFLY`, `FF_END`, `ffLive`, `ffStrike`, `ffCancel`, `ffInfo`; voice fields `ffHz`, `ffBri`; `FOREST_PARAMS`, `forestIRs`, `forestData`, `makeForestFx` (effect `forest`); `GLUE_PARAMS`, `dynReady`, `dynWarned`, `dynNode`, `makeGlueFx` (effect `glue`, `cat:'dyn'`); master `mGlue`, `mLim`, `outLast`, `mGlueOn`, `mLimOn`, `MASTER_GLUE_MAKEUP`, `masterDynSet`, `masterDyn`, `offlineMasterDyn`
-- `src/render.js`: `stubWorklet(ctx, allow)`, report field `dynLoaded`; `goldRender(play, seconds, chains, post)`; `tailOf` reads `forest`
-- `src/ui.js`: `masterDynShow`; `fxAddRow` groups by `FX_FACTORY[id].cat` (`<optgroup>`)
-- `src/probes/lat.js`: `checkLatSwitches` (row «LAT1b test switches», DRAWN), `latFieldProblems`
-- `src/probes/sound.js` (new): `checkFirefly`, `checkForest`, `checkDynamics`, `checkDynLive` (realtime, slow), `checkFreezeParity` (realtime, slow), `fireflyNote` (the prototype's reference), `fpMeasure`, `FF_TOL`, `DYN_TOL`, `LIVE_TOL`, `FP_TOL`
-- `src/probes/gold.js`: cases `ch 16`, `fx forest 1–3`, `fx glue 1–3`, `master glue`, `master limiter`; `add(…, post)`
-- SND-F1b: `core/dsp.js` `forestRoom`, `FOREST.rooms`/`FOREST.room`, `forestIR(rate, sec)`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `DYN_LIMIT.hold`; `core/latency.js` `rateOf`, `handToSound` part `graph`; `dyn-worklet.js` parameter `hold`, option `report`, fields `hc`, `gMin`; `audio.js` `mMake`, `limRed`, `DCN_DELAY_S`, `masterDelayMs`, `masterPathKinds`, `masterProbeNodes`, `forestBuffer`, `forestData(rate, sec)`, param `forest:room` (`pick`, `pickKeys`), instance `room()`; `dynNode(mode, set, keep, report)`; `vision.js` `xnnOnGpu`, `delegateOf(lines, before, asked)`; `latmeter.js` `camN`, `procT`, report `camera.processedFps`, `audio.masterPathMs`; i18n `fx.forest.room(.short/.medium/.long)`, `diag.cpuOnce`, `diag.gpuPart`; stale: `master.limiter`, `diag.unknownOnce`, `#mLimOn`/`#mLimOff`; `probes/sound.js` `checkMasterPath` (row «SND-F1b master path (live)»), `checkFreezeParity(o)`; `probes/gold.js` `GOLD_FLOOR` −80, cases `fx forest medium`, `fx forest short`, `master limiter (hold)`
-- `tools/probe-data.mjs`: row «SND-F1 Night forest IR (core)» (`forestCore`, `FOREST_HASH`); LAT1 core row extended; `tools/check-static.mjs` `NET_LISTED`: `audio.js` addModule 4, `render.js` addModule 1, `probes/sound.js` addModule 2
-
-## Added at LAT2 (2026-10-15)
-- `src/core/handsched.js` (new, pure core): `HAND_SEARCH_EVERY` 3, `HAND_POLICIES` ['2s','2','1'], `schedNew`, `schedPlan(s, policy)` →
-  'skip'|'track1'|'track2'|'search', `schedRetry(action, n, policy)`, `schedAfter(s, action, n)`, `schedRun(counts, {policy, lost})`.
-- `src/handdet.js` (new, worker-safe): `MP_WASM`, `MP_MODEL`, `plainResult`, `EMPTY_RESULT`, `createDetector({delegate, blank, step})` →
-  `{ run(src, t, action, policy) → {res, action, n, ms}, warmMs, setDelegate, dbg({slowMs, script, fake}), close }`; internal `L1`, `L2`,
-  `nextTs`, `warm`.
-- `src/hand-worker.js` (new, CLASSIC worker): messages in `init`/`frame`/`delegate`/`dbg`, out `ready`/`fail`/`step`/`res`/`log`/`delegated`;
-  `tapConsole(MP_LINE)`.
-- `src/core/latency.js`: `MP_LINE` (moved from vision.js); `handToSound` part `transfer` (optional — absent = not a part).
-- `src/vision.js`: `setHandsSink(fn, paused)`, `pollFrame`, `setDetectPath('main'|'worker')`, `setPicture('matched'|'live')`, `pathInfo`,
-  `pumpStats`, `pumpDbg({fault, schedStay, workerFail, hold, delayMs, slowMs, script, fake, reset})`, `pumpStepDbg(n)` (RUN 4: n pictures through the real pump, awaited — the probe clock), `detRunDbg`; `VISION_DEF` now
-  `{hands:'2s', delegate, camFps, path:'main', picture:'matched'}`; internal `det`, `detGen`, `path`, `workerDet`, `mainDet`, `buildDet`,
-  `setPath`, `detLost`, `W_READY_MS`, `EMPTY`, `nextPaint`, `sched`, `busy`, `pend`, `vfh`, `sink`, `isPaused`, `frameSeq`, `pumpStart`,
-  `onVF`, `takeFrame`, `pump`, `PS` (`snapped`, `processed`, `detected`, `dropped`, `dup`, `notNewest`, `errors`, `log` {id, pf, action, n}),
-  `mpLine`. `setHandsTracked` takes '2s'|'2'|'1'.
-- `src/draw.js`: `syncViewRect(vw, vh)`; `drawVideoBackground(src=video)`.
-- `src/main.js`: `onHands(f)`, `studio()`, `shown` (the drawn frame's ImageBitmap); `#start.busy` while starting.
-- `src/latmeter.js`: `latHands(f, tA, tB)`, `latFrame(t0, tEnd)` (two arguments now); stages `detTrack`, `detSearch`, `transfer`; `detT`,
-  `detN`, `dup0`; report `detection` {runs, asked, why, warmMs, policy, searchEvery, detectedFps, picture}, `camera.framesProcessed`; switches
-  `swHands2s`, `swPathMain`, `swPathWorker`, `swPicMatched`, `swPicLive`.
-- i18n: `diag.path`, `diag.pathWorker`, `diag.pathMain`, `diag.pathNone`, `diag.xfer`, `diag.hands.2s/.2/.1`, `diag.sw.hands2s`,
-  `diag.sw.hands2`, `diag.sw.path`, `diag.sw.pathWorker`, `diag.sw.pathMain`, `diag.sw.pic`, `diag.sw.picMatched`, `diag.sw.picLive`,
-  `load.warm`; `diag.detect` gained {tr, se, det, proc}.
-- `src/probes/detect.js` (new): `checkFrameOnce` (row «LAT2a frame once»), `checkSchedule` («LAT2a search schedule (probe clock)», RUN 4; `expectLog`), `checkWorker`
-  («LAT2b worker = main thread, fallback», slow); `fresh`, `schedProblems`. `tools/probe-data.mjs`: row «LAT2 search schedule (core)»
-  (`schedCore`, `HS`). `tools/probe-browser.mjs`: `--limit-min` default 15; `res.net` (`NET_OK`, the network check and its control
-  `net-control-worker.js`). `tools/check-static.mjs`: GLOBALS `Worker createImageBitmap ImageBitmap postMessage`; NET_LISTED `vision.js`
-  worker 1, `handdet.js` external 1 + fetch 1.
-## Added at LAT3 (2026-10-15)
-- `src/core/camlight.js` (new, pure core): `LOW_MODES` ['off','fps15','fps24','exposure'], `LOW_TARGET`, `LOW_EXPOSURE_S` 1/40,
-  `LOW_SETTLE_MS` 1000, `LOW_MEASURE_MS` 2000, `exposureSupported(caps)`, `exposureUnits(caps, sec)`, `lowConstraints(mode, caps, base, prev)`,
-  `lowVerdict({mode, before, after, settings})` → {ok, why: ''|'partly'|'unmeasured'|'noeffect'|'manual'}; hint `DARK_FPS` 12, `DARK_MS`
-  3000, `DARK_GRANTED` 24, `DARK_WIN` 1000, `darkNew(cfg)`, `darkStep(st, t, {granted, allowed})` → true once; `LOST_MS` 1000, `lostNew(cfg)`,
-  `lostStep(st, t, n)`; `capsText(caps, settings)`, internal `CAP_KEYS`.
-- `src/vision.js`: `setLowLight(mode)`, `lowInfo()` → {mode, asked, applied, before, after, note, exposure}, `lowDbg({fail, fakeFps,
-  noFallback, reset})`; `VISION_DEF.low` 'off'; `camInfo()` adds `caps`, `settings`, `label`; internal `camBase`, `vtrack`, `capsOf`,
-  `vfRing`, `low`, `lowDbgO`, `fpsOver`, `lowOff`, `sleep`.
-- `src/latmeter.js`: report `camera.label/caps/settings/capsText/lowLight/lostPerMinute/lostWithinMs/hint`, `longTasks.startup.maxAtMs`;
-  switches `swLowOff`, `swLow15`, `swLow24`, `swLowExp`; hint `HINT_MS` 9000, `hintAllowed`, `darkShow`, `darkHide`, `dark`, `grantedFps`,
-  `lost`, `lowFpsTx`, `lowNoteTx`; probe-only `darkDbg(times, granted)`, `darkHideDbg`, `latLostDbg`.
-- `index.html`: row `diag.sw.low` with `#swLowOff/#swLow15/#swLow24/#swLowExp`; `#darkHint` (`#darkHintTx`, `#darkHintOk`). CSS `#darkHint`.
-- i18n: `diag.sw.low`, `diag.sw.lowOff/low15/low24/lowExp`, `diag.low`, `diag.low.off/fps15/fps24/exposure`, `diag.lowFps`, `diag.lowBack`,
-  `diag.lowKept`, `diag.why.noeffect/manual/partly/unmeasured/reopened`, `diag.caps`, `diag.capsNone`, `diag.lost`, `diag.longBefore`,
-  `diag.longAfter`, `lat.dark` (the player hint).
-- `src/probes/lat.js`: `checkLowLight` (row «LAT3 low light», at 585), `lowProblems`, `LOW_BASE`, `expUnits`. `tools/probe-data.mjs`: row
-  «LAT3 low light (core)» (`lowCore`, `CL`).
-- Stale since LAT2: `vision.landmarker`, `main.lastTs`, `latmeter.lastN`, `latmeter.dup` (a count; now `pumpStats().dup`), `vision.MP_LINE`
-  (moved to core/latency.js), `vision.js` external import (moved to handdet.js).
-## Added at CAM-FIX (2026-10-15)
-- `src/core/camlight.js`: `HEAL_MODES` ['exposureMode','whiteBalanceMode'], `AUTO_OF` (value → the automatic mode that drives it),
-  `DEV_KEYS`, `devSnap(settings)`, `restoreAdvanced(caps, orig, touched)` → advanced entries (one key each), `restoreConstraints(caps, base,
-  orig, touched)`, `healList(caps, settings)`, `autoLeft(adv, settings)`; internal `canAuto`, `isMode`. `lowConstraints(…, 'off', prev)` is
-  now only the probe's CONTROL (the pre-fix Off).
-- `src/vision.js`: `camSimDbg(sim)` (probe only); `lowInfo()` adds `dev` {kind:'heal'|'restore', ok, what}; `lowDbg` adds `extra`,
-  `noRestore`, `noHeal`, `devClear`; internal `camSim`, `applySet` (format and camera controls in two calls), `stillManual`, `devRestore`,
-  `camHeal`, `lowLeave` (pagehide / visibilitychange), `bounded`, `settingsOf`; `low` adds `orig`, `touched`, `dev`.
-- `src/handdet.js`: internal `warmOne` (start: two warm-up steps 'warm' / 'warm2').
-- `src/latmeter.js`: `devTx` (the camera line). `index.html`: `#swLowWarn`. i18n: `diag.sw.lowWarn`, `diag.dev.heal/healFail/restore/
-  restoreFail`, `diag.ctl.exposureMode/whiteBalanceMode/focusMode/and`, `diag.why.left`.
-- `src/probes/lat.js`: `checkCamRestore` (row «CAM-FIX camera settings restored», at 586), `uvcSim`; LAT3 `lowProblems(…, calls)`, `FMT`,
-  `isFmt`, `isCtl`. `tools/check-static.mjs` GLOBALS + `MediaStreamTrack`.
-
-## Added at REC1 + camera start (2026-10-15)
-- **MOVED (REC1, verbatim; `recorder.js` re-exports them — old imports keep working):**
-  `src/song/store.js` — `events`, `evGen`, `schedInvalidate` (now: `evGen++`, then the `onInvalidate` listeners; the recorder's former body
-  is its listener), `onInvalidate` (new), `compactEvents`, `evSeq`, `evSeqN` (private), `evSeqFill`, `evOrder`, `maxLayer`, `evRole`,
-  `chaseRole`, `isNoteStart`, `invalidateFns` (private).
-  `src/song/lanes.js` — `laneSeq`, `armLane`, `delPend` (private lets), `laneId`, `laneMute`, `laneSolo`, `laneLevel`, `lanePan`,
-  `laneName`, `LANE_NAME_MAX`, `laneRank`, `laneLen`, `laneLenOf`, `laneNew`, `laneOf` (re-exported as `laneIdOf` too), `laneEditVer`,
-  `laneVerBump`, `laneEditVerOf`, `laneLayerOf`, `armedLayer`, `toggleArm`, `DEL_CONFIRM_MS`, `laneDelTap`, `laneDelCancel`,
-  `laneDelPendingLayer`, `laneAudible`, `laneGated`, `laneLevelOf`, `laneGainOf`, `layerOfOwner`, `lanePanOf`, `laneNameOf`, `setLaneName`,
-  `laneSort`, `laneOrder`, `moveLane`, `laneShowKeep`, `laneLookMemo`, `laneLook`, `laneMuted`, `laneSoloed`, `laneSoloOn`, `laneRow`,
-  `laneRowSet`; new: `laneWire` (+ private `W`), `laneForget(id)`, `laneTablesClear()`.
-- `tools/check-static.mjs` — `FOLDER_RULES`, `edgesOf`, `sccs` (Tarjan), `cyclePath`, `layerCheck`, `LAY`.
-- `core/camlight.js` — `TEST_REC_KEY` ('handsong.camTest'), `testRecNext`, `testRecRepair`, `camErrKind`.
-- `vision.js` — `startCamera`, `initDetector` (+ `initVision` = both, unused by main), `openOnce`, `gumOnce`, `accessGranted`, `withTimeout`,
-  `stopStream`, `camErr`, `camRelease`, `testRec`, `testRecSet`, `CS` (counters), `GUM_MS` 15000, `PLAY_MS` 8000, `PEND_WAIT_MS` 3000,
-  `CAM_RETRY_MS` 1000, `camStats`, probe-only `camOpenDbg`, `camStatsDbg`; `lowDbg` adds `healAll`, `crash`.
-- `main.js` — `startFail(err)` (exported, probe), `stage {audio, det}`, `starting`; markup `#camRetry`; keys `start.retry`, `cam.busy`,
-  `cam.notfound`, `cam.denied` (en + ru); `diag.dev.heal` reworded.
-- Probes: `checkCamStart` (row «CAM-START robust camera start», `probes/lat.js`).
-
-## Added at REC2 + REC3 part 1 (2026-10-15)
-- **MOVED (verbatim; `recorder.js` re-exports them — old imports keep working):**
-  `src/song/notes.js` (REC2) — `chOwnerKey`, `bassOwnerKey`, `ldKey`, `chaseKind`, `chaseKey`, `songNotes`, `notesView` (private), `ldTherm`,
-  `tyEq`, `segView`/`VIEW_WARNED` (private), `viewWarn`, `noteSpansViews`, `layerViews`, `viewAudit`, `editViewCheck`, `trackViewCheck`,
-  `storedTi`, `songSegs`; REC3: `layerSlotTop`, `layerTakeTop`; new: `notesReset()`.
-  `src/song/history.js` (REC2) — `HIST_MAX`, `HIST_MERGE_MS`, `hist`/`histFut`/`histOff`/`histGroupDepth` (private), `histDbg`,
-  `histCanUndo`, `histCanRedo`, `histLen`, `histReset`, `histLabelOf`, `histPush`, `payId`/`pidOf`/`strHash` (private), `histHash`,
-  `histSeal`, `histTab`, `histMaster`, `laneNameStep`, `moveLaneStep`, `histTouched` (now from the registry), `histUndo`, `histRedo`,
-  `histTopLabel`; new: `histWire` (+ private `W`), `histKind`, `histApply` (imported by recorder.js as `editApply`), `histGroup(run, commit)`,
-  `histSince(h0)`, `histPeek()`, `histOffAdd(d)`, `histOffNow()`, `histDbgO` (the probe-control flags object; was `histSkip`/`histKeepFut`/
-  `histNoBrace`). Gone: `histApplyX` (its kinds register), the switch in `histTouched`, the if-chain in `editApply`.
-  `src/song/edit-notes.js` (REC3) — `editCanUndo`, `editCanRedo`, `editPush`, `editBatch`, `laneIsBacking`, `editBackingOpen`, `editGuard`,
-  `editCommit`, `editMoveHit`, `editDeleteHit`, `EDIT_GAP`, `EDIT_MIN_LEN`, `EDIT_ROLE`, `editRoleOf`, `noTie`, `tiePitch`, `tiePartners`,
-  `tieUntiePass`, `untieAcross`, `segEvs`, `keyClash`, `slotPt`, `chordMoveTy`, `editMoveNote`, `detachPlan`, `commitDetach`, `segPitchPt`,
-  `editMoveSeg`, `editDeleteSeg`, `segChordNotes`, `bendTrim`, `editResizeSeg`; new: `editWire` (+ private `W`), local `editIsOpen`/
-  `editLayer` (read through the wire; the recorder's own are the source).
-  `src/song/edit-chords.js` (REC3) — `dissolvePlan`, `editDeleteChordNote`, `chordNoteEdit`, `editMoveChordNote`, `editResizeChordNote`.
-  `src/song/edit-group.js` (REC3) — `editGroup` (now `histGroup(run, editCommit)`), `editRemap`, `selGroups`, `editMoveWhole`, `editMoveSel`,
-  `editDeleteSel`.
-- `src/song/store.js` — `sortedN` (private), `sortedLen()` (the sorted prefix fixed at each rebase).
-- `src/recorder.js` — `snapPend`, `takeTok` (stay with the snapshot steps); private `tkLy`, `recOf`, `capTouched`, `ptTouched`, `lnTouched`,
-  `chTouched`, `autLaneApply`, `autFxApply` (the kinds it registers).
-- `tools/check-static.mjs` — `FOLDER_RULES` song/ also allows `scales.js`; CONTROL `song/history.js → audio.js`.
-
-## Added at REC3 part 2 (NIGHT run, 2026-10-16)
-- **MOVED (verbatim; `recorder.js` re-exports them — old imports keep working); exported names per file:**
-  `src/song/env.js` — ENV, envWire.
-  `src/song/capture.js` — takeNext, takeFx, takeFxVer, takeFxTouch, FX_CHAIN, setAutRecSmooth, autSmoothOf, fxLaneSmooth, fxLaneAt, fxLaneExpand, laneRoleOf, laneChainKey, captureInfoOf.
-  `src/song/automation.js` — bendDbg, autTakesOf, autAddrs, BEND_EPS, bendEdited, editBendPoint, editBendShape, pnBars, editVolSel, takeFxDump, autPoints, autEarliest, autCaps, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint, autChainOf, autChainAdd, autChainRemove, autChainMove.
-  `src/song/edit-insert.js` — editDefVol, editTake, editTakeReset, editTakeNow, editInsPush, editInsertBass, editInsertLead, editInsertChord, editInsertHit, laneTimbreOf, editSetTimbre.
-  `src/song/clipboard.js` — editCopySel, editClipInfo, editPasteWhy, editPaste, editDuplicateSel.
-  `src/song/quantise.js` — editQuantSel.
-  `src/song/transpose.js` — editDegreeWhy, trackViewOfLayer, editTrackModeWhy, editTrackMode, trDbg, editTransposeWhy, editTranspose, songTransposeWhy, songTranspose, editDegreeSel.
-  `src/song/sections.js` — secDbg, secMarks, secMarksSet, secCopy, sections, songEditWhy, songEdit, secAdd, secRename, secDelete, songCanUndo, songCanRedo, songUndo, songRedo, songHistReset.
-- New: `song/env.js` `ENV`/`envWire`; `song/capture.js` `takeNext` (was `++takeSeq`); `song/edit-insert.js` `editTakeNow`, `editTakeReset` (were `if(!editTake) editTake=++takeSeq` / `editTake=0`); `song/sections.js` `secMarksSet`; `song/edit-notes.js` now also exports `editIsOpen`.
-- `tools/probe-browser.mjs` (NIGHT-0) — `--limit-quick`, `SLOW_REF`, `SLOW_ROWS`/`SLOW_MIN`/`SLOW_MAX`, `slowMeter`, `withinDyn`.
-
-## Added at REC4 / REC5 (NIGHT run, 2026-10-16)
-- **MOVED (verbatim; `recorder.js` re-exports them — old imports keep working); exported names per file:**
-  `src/transport/clock.js` — clockWire, secPerBeat, beatNow, timeAt, secOf, beatsOf, songLenGrow, loop, songLen, songBeats, songLenRecalc, rgnLen, cycling, rgnReps, songAt, rgnApply, rgnSync, regionOn, braceProbe, setRegionOn, braceTap, braceMove, braceSet, beatLevel, loopPos, setLoopBars, METRES, setLoopMetre, setLoopQuant, SUBS, setLoopSub, setLoopBpm.
-  `src/transport/scheduler.js` — schedWire, chaseReset, clearPump, releaseLoopLayersAt, chaseFor, chaseNote, chasePlay, startTransport, seekTo.
-  `src/freeze/registry.js` — freezeWire, frzWatchBump, frzPend, frozen, frozenOn, frzLayer, frzHas, frzBufNow, frzChaseSkip, frzGlobalKey, frzSigMemo, frzSigTonicDbg, freezeSig, freezeState, freezePinCaptures, frzWatchVer, frzWatchKey, frzRetuneOnly, laneHasChain, frzBytesTotal, frzBytesOf, songPinChains, freezeTicket, freezeSet, frzPendCancel, frzWhenReady, frzReadersAlive, frzSwapDbg, FRZ_CHUNK, frzStoreMode, frzPackAsync, frzChunkDbg, frzNodesInfo, frzPlanSwap, frzSwapCut, frzLeadAhead, frzLeadRecut, frzSwapCancel, frzSwapCancelAll, frzSwapInfo, frzLeave, frzSkipNear, frzNearDone, freezeDrop, unfreezeLayer, frozenLayers, frozenInfo, frzGain, frzGainAll, frzBusGain, frzStopOne, frzStopAll, frzArm.
-  `src/live/eng.js` — evHzDbg, evHz, evReg, makeENG, ENG.
-  `src/live/record.js` — recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, storeTi, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec.
-  `src/live/capture.js` — capReset, takeCapStart, fineNew, fineReset, fineStep, pnSnap, takeCapSample, fxLaneMerge, fxPlayDrive, fxPlayDriving, fxIsDriven, fxPlayStop, liveIso, setLiveIsolation, playKeyOf.
-  `src/live/backing.js` — backingWire, loadArrangement, loadJam, backingEvent, clearJam.
-- New: wires `clockWire`, `schedWire`, `freezeWire`, `recWire`, `backingWire`; setters `songLenGrow`, `chaseReset`, `frzWatchBump`, `curTakeSet`, `recWinReset`, `liveChClear`, `capReset`; clock conversions `secPerBeat`, `beatNow`, `timeAt`, `secOf`, `beatsOf` (rule #35).
-
-## Added at FMT1 / TIM1 (NIGHT run, 2026-10-16)
-- `src/core/format.js` — F, FORMAT_VERSION, MIGRATIONS, kindOfFormat, upgrade, Bad, CM_MAX, checkManifest, checkMenu, checkTuning, checkPalette, checkChordModes, checkMode (validators moved from scaleload; `head()` refuses a newer version in words).
-- `src/core/registry.js` — USER_ID, BUILTIN_ID, PACK_ID, idSpace, newUserId, createRegistry.
-- `src/scaleload.js` re-exports `CM_MAX`, `USER_ID`; calls `upgrade` before checking.
-- `src/audio.js` (TIM1) — an `id` in every entry of LEAD_INSTR / CHORD_INSTR / BASS_INSTR / DRUM_KITS; `TIMBRE_REG` (private), `timbreIdxOf` (private), `timbresOf` → [{id, idx, name}], `timbreIdOf`, `timbreById`, `timbreReg`.
-- `src/probes/sound.js` — `TIMBRE_IDS_PINNED`, `checkTimbreIds` (row «TIM1 permanent timbre ids»); `tools/probe-data.mjs` — `fmtCore` (row «FMT1 format + registry (core)»).
-
-## Added at GES1 parts 1–2 (NIGHT run, 2026-10-16)
-- `src/gestures/features.js` — pinchDbg, clamp01, clamp, dist, pinchRatios, minFinger, touchedFingers, emaS, smoothstep, degRaw, degHyst, cellHyst.
-- `src/gestures/expr.js` — exprWire, EXPR_CFG, EXPR, exprPrevT, exprPrevSet, exprFeatures, tickExpr.
-- `src/gestures/fxhand.js` — fxParamsOf, captureFx.
-- `src/gestures/looper.js` — looperWire, doLooper, fireLooperCmd.
-- `tools/probe-data.mjs` — `gesCore` (row «GES1 gesture features (core)»).
-
-## Added at the DAY run (2026-10-16)
-- GES1 rest: `src/gestures/roles.js` — `depthOf`, `depthN`, `melodicZone`, `polyZone`, `leadZone`, `liveKey`, `monoKey`, `wOn`, `wOff`,
-  `ACTIONS`, `paletteFinger`, `handHalfRole`, `noteHandRole`, `noteVolOf`; `src/gestures/hands.js` — `HANDS`, `processHands`,
-  `voiceModeReset`, `handsProbe`, `processHandsProbe` (+ internal `endPinch`, `otherPinched`, `monoOwner`, `chOwner`, `latchLen`).
-  `gestures.js` = facade.
-- UI1b: `tokens.css` (custom properties `--c-*`, `--fs-*`, `--fw-*`, `--lh-*`, `--sp-*`, `--r-*`, `--sh-*`, `--z-*` + the older semantic
-  ones); `src/icons.js` — `ICONS`, `icon`, `iconText`, `applyIcons`; markup attribute `data-icon`; dictionary token `{i:name}`;
-  `tools/ui-snap.mjs` (`--save`, `--compare`, `--only`); check-static `RUNTIME_VARS`, `tokenCheck`, `importWrites`; check-licences
-  `ICON_EXEMPT`.
-- TIM2: `audio.timbreKey`, `audio.timbreIdx`, `audio.timbreSnapshot`; `live/record.storeTim`, `noteSource` (exported for the probe);
-  ENV `live().leadTim/chTim/bassTim/kitTim`; probe row «TIM2 events carry timbre ids» (`checkTimbreIds`).
-- SAVE1: `core/songfile.js` — `SONG_FORMAT`, `SONG_VERSION` (2), `SONG_MAX_BYTES`, `SONG_MIGRATIONS`, `TIM1_POSITIONS`, `songParse`,
-  `songUpgrade`, `songCheck`; `song/file.js` — `songData`, `songPlan`, `fileDbg`; `song/capture.takeSeqFloor`; `live/capture.capRecordNow`;
-  ENV `songEnv`, `soloSnap`, `capNow`, `timSnap`, `timKnown`, `timByDef`, `timKey`; `recorder.songSaveRec`, `songOpenApply`, `songMark`,
-  `songDirty`; `ui.songSaveText`, `songOpenText` (+ `songDownload`, `songLiveApply`, `syncLoopPanel`, `songOpenSay`); `render.seedOfLane`
-  (exported); DOM `#songName`, `#songSave`, `#songOpen`, `#songFile`; keys `song.*`; probe rows «SAVE1 song file (core)» (node),
-  «SAVE1 song file save → open» (`checkSongFile`); runner UI check `uiSongFile`.
-- AUTOSAVE1: `src/autosave.js` — `AS` (pollMs, settleMs, gapMs, playMs, idleMs), `AS_KEEP`, `asPut`, `asWire`, `asStart`, `asTick`,
-  `asWrite`, `asAdopt`, `asFresh`, `asFlush`, `asInfo`, `asList`, `asGet`, `asEnabled`, `asSetEnabled`, `asPause` ('probe', 'probe-song'),
-  `asDbg`, `asDbgState`, `asDrop`; `hooks.renderBusy` (render.js); `ui.asRestoreId`, `songResumeOffer` (+ `asShow`, `asFill`, `asTime`);
-  DOM `#asOn`, `#asOff`, `#asStatus`, `#asPick`, `#asRestore`, `#resumeToast` (`#resumeText`, `#resumeYes`, `#resumeNo`); keys `as.*`;
-  localStorage `handsong.autosave`; probe row «AUTOSAVE1 song kept on the device» (`checkAutosave`); runner UI check `uiAutosave`.
-- SONG2: `songs.loadSong` (opens `data/songs/<name>.json`), `songBuild` (the generator), `songRefuse`, `SONG_FILES`; probes `dumpSong`,
-  `checkSongFile2` (`probes/song2.js`); file `data/songs/triphop.json`.
-- PACK1: `core/pack.js` — `PACK_FORMAT`, `PACK_VERSION`, `KEY_PREFIX`, `KEY_FORMAT`, `PACK_PUBKEYS`, `packCheck`, `keySign`, `keyVerify`,
-  `createPackGate`, `packUnlock`; `core/registry.createRegistry(kind, {gate})`, `isLocked`; tools `pack-keygen.mjs`, `pack-test-licence.json`,
-  `.pack-test-key.json` (git-ignored); rows «PACK1 packs and licence keys (core)» (`packCore`), «PACK1 licence keys in the page» (`checkPack`).
-- IDS1: `song/store.evIdFill`, `evIdFloor`; `e.id`; part 2: `song/capture.laneIdFill`, `laneIdFloor`, lane point `p.id`, file v5 `songV4toV5`; `core/songfile` v4 `songV3toV4`; `fileDbg({noIds})`; row «IDS1 permanent event ids»
-  (`checkEventIds`, `probes/ids.js`).
-- ENG1: `audio.noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone` (+ `okHzE`); `live/eng.makeENG` calls only them.
-- AUD2b: `probes/fxcontract.js` `checkFx(id, part)`; families «AUD2b effect contracts» / «AUD2b effect tails»; `render.engineProbe` `opt.sec`.
-- AUD2a: `src/modules/effects/{param,reverb,delay,trem-mix,bright,glide,volume,forest,glue}.js`, `src/engine/fdn.js` (names: CLAUDE.md
-  module map); `config.FX_VOL` (state re-exports); E `wk.dynWarned`, `buf.forestData`; `FX_FACTORY[id].make(E)`.
-- AUD1c: `src/modules/timbres/{stages,voice,fm,ks,subtractive,chord-voice,bass-voice,drumkits}.js` (names: CLAUDE.md module map); E
-  `look.ownerGain/ownerPan`; data row «AUD1c timbre data pure (core)» (`timbreData` in tools/probe-data.mjs). Moved out of audio.js: `mkOsc`,
-  `voiceStart*`, `buildLeadBank(s)`, `buildFMBank`, `buildKSBank`, `buildKSFallback`, `KS_BANKS`, `newChordVoice`, `buildChordPool`, `FIREFLY`,
-  `ffStrike`, `buildBassPool`, the drum-kit hit builders, `makePanStage`, `voiceRoute`, `makeBriStage`, `panGains` (re-exported), …
-- AUD1a: `audio.engineCtx` (E); `src/engine/surface.js` `SURFACE`, `SURFACE_INTERNAL`; `render.engineProbe`; check-static `surfaceUses`,
-  `surfaceCheck`; probe rows «AUD1 engine context» (`checkEngineCtx`), «AUD1 node census» (`checkCensus`, `dumpCensus`; `tools/census.print.json`).
-- SONG1: `scales.userRecordsOf`; `core/songfile` `SONG_VERSION` 3, `songV2toV3`, `REC_KINDS`, `OWN_ID`; `song/file.songNeeds`,
-  `fileDbg({noRecs})`; `scaleload.checkRecordList`; `ui.songKeep` (+ `songRecs`, `songKeepShow`, `songRecNames`, `REC_SECT`); DOM `#songKeepRow`,
-  `#songKeep`, `#songKeepHint`; keys `song.fromSong`, `song.no.records`, `song.keep*`, `song.kept`; probe row «SONG1 songs carry their own
-  scales» (`checkSongRecords`, `probes/song1.js`).
-- DRAW1b: `src/palette.js` — `cv(name)`, `ROLE_COL`, `noRoleCol`; tokens.css section «canvas» (`--cv-*`); check-static `canvasCheck`.
-- DRAW1: `src/views/common.js`, `camera.js`, `strip.js` (+ `loopViewClear`), `roll.js`, `play.js`; `draw.js` = facade.
-
-## RUN 4 (2026-10-17) — new names
-- `tools/doc-split-check.mjs` (DOC1: line-multiset proof of a document split) · `tools/timbre-bundle.mjs` (`buildBundle`, `--check`).
-- `src/vision.js`: `pumpStepDbg(n)` (LAT2a probe clock). `src/probes/detect.js`: `expectLog`.
-- `src/recorder.js`: `songSetNow`, `songSetApply`, `songOpenApply(P, meta)` (SONG3: Open = one 'snap' step 'open' with `st`, `m`, `br`);
-  `src/hooks.js` `songMeta`; `src/song/history.js` `histDbg({noOpenSt})`. `src/probes/songfile.js`: `checkSongOpenUndo`, `v5Of`.
-- POOL1: `config.CHORD_POOL_FIRST`, `CHORD_POOL_SPARE`; `audio.js` `cvSeed`, `cvSeedAt`, `cvLive`, `cvSpare`, `cvFree`, `poolDbg({eager, naive})`,
-  `poolSizes().chordFree`; `E.pool.ch.seed(i)`; `voiceStartPair(E, o1, o2, u)`; `render.renderPoolDbg`, `engineProbe({pre, after(ctx, eng)})`;
-  `src/probes/pool.js` `checkPool`.
-- ENG2: `src/core/engclass.js` (`engClass`, `ENG_THRESH`, `ENG_CLASS_PROVISIONAL`, `benchOf`, `benchText`, `ENG_BENCH_KEY`, `dropRate`);
-  `audio.js` `engVoices`, `engLevels`, `engLoad`; `render.js` `engBench`, `R.engine()` (= `engineReport`); `frzqueue.afPaused`;
-  `latmeter.js` `dropTick`, `powerNow`, report fields `audio.dropoutsPerMinute/dropSource/capacity`, `power`; `src/probes/eng2.js`.
-- TIM3: `src/core/timbre.js` (`checkTimbre`, `TB`, `ENGINES` chord2/tine/bass2/subtractive/fm2/ks/drumkit, `KIT_SYNTHS`, `TIMBRE_DAMAGES`,
-  `timbreNodes`, `TIMBRE_FORMAT`, `BUNDLE_FORMAT`); `src/timbreload.js` (`TIMBRE_RECORDS`, `timbreLoadReport`, `timbreAddSession`,
-  `timbreAll`, `timbreKnownId`, `timbreCheckDbg`); `audio.js` `timbreView`, `CH_VIEW`, `BS_VIEW`, `TINE_POOL`, `TINE_PARTS`, `LEAD_REC`,
-  `leadIsKs`, `DRUM_REC`, `timbreSync`, `timbreInstall`, `timbreRecord`, `timbreForgetDbg`; `stages.CHORD_GLIDE_TC`; `state.VOICE_MODE_DEF`;
-  `live/record.gridFor` (exported); `subtractive.buildSubtractive`, `buildLeadBank(E, rec, …)`; `fm.buildFMBank({…, fixed})`;
-  `chord-voice.ffStrike(E, owner, f, amp, bri, parts, t)`; `drumkits.js` `stdKick … stdCrash`, `noiseEdge`, `SYNTH`, `drumVoice(E, i, vol, rec,
-  t)`; `song/file.js` `songTimbreNeeds`; `ui.songKeepTimbres`; `src/probes/timbres.js` (`timbreSnapshotAll`, `dumpTimbres`,
-  `checkTimbresBefore`, `checkTimbreRecords`), `src/probes/tim3d.js` (`checkOwnTimbres`). Gone: `buildLeadBanks`, `KS_BANKS`,
-  `darbukaHit`/`tablaHit`/`gamelanHit`/`taikoHit`, the literal timbre tables.

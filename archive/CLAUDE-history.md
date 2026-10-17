@@ -380,6 +380,25 @@ each section lives verbatim in `archive/CLAUDE-full.md` (same section titles —
   `tools/gesture.print.json` (HAND1 gesture fingerprint).
 - Stale (removed) names to ignore: list in `docs/NAME-INDEX.md`, "Stale names".
 
+- **CMD1 (RUN 5, 2026-10-17) — commands, the value tripwire, track ids, the journal.** `src/core/canon.js`: `canonJSON` (keys sorted, −0 = 0,
+  numbers by JSON's exact text, Map/Set as arrays), `fnv`, `canonHash`. `src/song/history.js`: `histHash(opt)` by VALUES — events by `e.id`
+  + beat + layer + canonical payload (memo per payload object; `{deep:true}` skips it), capture records by take + chains + point values (point
+  ids left out), tables by track id; the view `sc` deliberately NOT hashed (the key knob re-keys the backing outside the history); the old
+  object hash `histHashObj` only as a CONTROL (`histDbg({objHash:true})`). `histKind(kind, apply, touched, fields)` — each kind declares its
+  fields; `histKindFields`, `histLists`, `histInstall`. The journal: `onApplied(fn)` → unsubscribe; dirs 'do' (once per step entering the
+  history, a group edit once), 'merge', 'undo', 'redo', 'reset', 'set' (`histNote`). `src/song/commands.js`: `histToJSON` (format
+  `handsong/history` v1: live objects as `{$e:id}` events, `{$p:id}` lane points, `{$r|$l|$cs|$ck:tk}` capture records / lanes / chains / kinds,
+  `{$c:[tk,key]}` chains, `{$ce:[tk,key,i]}` chain entries, `{$v:descriptor}` views; other objects `{$d|$a|$m|$s:n, v}` once then `{$o:n}`;
+  `{$n}` special numbers, `{$u}` undefined; an event copy carries its birth number `q`), `histFromJSON` (refuses in words, installs nothing on
+  error), `histRoundTrip`, `cmdDbg` (CONTROLS: `drop` a field path, `noFields` a kind). `song/store.evSeqPut`. `song/file.js` exports `viewRec`
+  / `viewOfRec` (songPlan uses it). Song file v7: `tracks[].id`; `lanes.laneNew(layer, id?)` takes a file's id only from Open when no layer
+  holds it (counter floors above); Open's snapshot step records a lane kept under the same id whose row changed. `recorder.cmdSet(kind, …)`
+  (mute, solo, arm, region, brace, tempo) and `cmdNote` (key, a4); ui routes its switches through them. Rows: «CMD1 canonical values (core)»,
+  «CMD1 value tripwire», «CMD1 commands round trip», «CMD1 journal» (probes/cmd.js).
+- **DOC1 leftovers (RUN 5):** `tools/name-index.mjs` generates `docs/NAME-INDEX.md` (row «NAME-INDEX current» + CONTROL); the hand-written
+  index before it: `archive/NAME-INDEX-before-RUN5.md`; removed names: `docs/STALE-NAMES.md`. BACKLOG §1 in English (Russian:
+  `archive/BACKLOG-history.md`). `tools/check-licences.mjs` use «reference» for `docs/prototypes/*.html`.
+
 ## Architecture (full reasoning per section: archive, same titles)
 Two clocks in `main.js` (LAT2): each new CAMERA frame → detection (vision.js pump, the search schedule) → `processHands()` at once
 (gestures drive audio); each SCREEN frame → the detected frame's picture → `drawOverlays()`. The recorder thins ~60 engine calls/s into a

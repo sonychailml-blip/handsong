@@ -5,7 +5,7 @@
    «__proto__», «constructor», «prototype» refused anywhere (an object built from the file must never reach a prototype). */
 
 const SONG_FORMAT='handsong/song';
-const SONG_VERSION=6;   // SONG1 (3): + records (copies of the person's own tunings / modes); IDS1 (4): every event's permanent id; (5): every lane point's; TIM3d (6): timbre copies are full timbre RECORDS
+const SONG_VERSION=7;   // SONG1 (3): + records (copies of the person's own tunings / modes); IDS1 (4): every event's permanent id; (5): every lane point's; TIM3d (6): timbre copies are full timbre RECORDS; CMD1b (7): every track's permanent id
 const SONG_MAX_BYTES=8*1024*1024;   // a song of notes, lanes and timbre copies is ~0.1–1 MB; 8 MB leaves room and refuses junk early
 const SONG_MAX_DEPTH=24;
 const BAD_KEYS=new Set(['__proto__','constructor','prototype']);
@@ -44,7 +44,9 @@ const songV4toV5=r=>r;
    record here (a pure step does not know the app's timbres): it is kept and marked `legacy:true` — it plays as before (the app's own timbre
    when it has the id; else a timbre with equal settings, else the role's stand-in). Idempotent. */
 function songV5toV6(r){ for(const t of Object.values(r.timbres||{})) if(t && typeof t==='object' && t.format!=='handsong/timbre' && t.role!=='dr') t.legacy=true; return r; }
-const SONG_MIGRATIONS=[songV1toV2, songV2toV3, songV3toV4, songV4toV5, songV5toV6];
+/* v6 → v7 (CMD1b): tracks carry their permanent ids; an older file has none — the app gives fresh ones at open (nothing to rewrite here) */
+const songV6toV7=r=>r;
+const SONG_MIGRATIONS=[songV1toV2, songV2toV3, songV3toV4, songV4toV5, songV5toV6, songV6toV7];
 const REC_KINDS={ tuning:'handsong/tuning', palette:'handsong/palette', chordmodes:'handsong/chordmodes', mode:'handsong/mode' };
 const OWN_ID=/^u\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;   // = core/registry USER_ID
 
@@ -104,9 +106,10 @@ function songCheck(r){
   if(need(isObj(r.records),'records')) for(const [kind,map] of Object.entries(r.records)){   // SONG1: shape only (the full check: scaleload.checkRecord in the page)
     if(!need(REC_KINDS[kind] && isObj(map) && Object.keys(map).length<=200,`records.${String(kind).slice(0,20)}`)) continue;
     for(const [id,x] of Object.entries(map)) if(!need(OWN_ID.test(id) && isObj(x) && x.id===id && x.format===REC_KINDS[kind],`records.${kind} ${String(id).slice(0,40)}`)) break; }
-  const layers=new Set();
+  const layers=new Set(), tids=new Set();
   if(need(Array.isArray(r.tracks) && r.tracks.length<=256,'tracks')) r.tracks.forEach((t,i)=>{
     if(!need(isObj(t) && isInt(t.layer) && t.layer>=0 && t.layer<1024 && !layers.has(t.layer),`track ${i}`)) return; layers.add(t.layer);
+    if(t.id!==undefined){ if(!need(isInt(t.id) && t.id>0 && t.id<=1e9 && !tids.has(t.id),`track ${i}: the id is not a fresh positive integer`)) return; tids.add(t.id); }   // CMD1b (v7)
     need((t.name===undefined||isStr(t.name,40)) && (t.level===undefined||(isNum(t.level)&&t.level>=0&&t.level<=1)) && (t.pan===undefined||(isNum(t.pan)&&Math.abs(t.pan)<=1))
       && (t.rank===undefined||isNum(t.rank)) && (t.len===undefined||(isNum(t.len)&&t.len>=0)) && (t.mute===undefined||typeof t.mute==='boolean') && (t.solo===undefined||typeof t.solo==='boolean'),`track ${i} fields`); });
   const tks=new Set(), pids=new Set();

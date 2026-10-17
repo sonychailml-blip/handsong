@@ -25,6 +25,8 @@ const maxLayer=()=>events.reduce((m,e)=>Math.max(m,e.layer),0);
 const evSeq=new WeakMap(); let evSeqN=0;
 function evSeqFill(){ for(const e of events) if(!evSeq.has(e)) evSeq.set(e,++evSeqN); }
 const evOrder=(x,y)=> x.t-y.t || (evSeq.get(x)||Infinity)-(evSeq.get(y)||Infinity) || 0;
+/* CMD1c: a parsed history's event copy takes the birth number its original had (same-beat order kept); never overwrites one */
+const evSeqPut=(e,q)=>{ if(!evSeq.has(e) && q>0){ evSeq.set(e,q); if(q>evSeqN) evSeqN=q; } };
 /* ⛳ IDS1 (RUN 3, 2026-10-16; rule #37): every event of the song has a PERMANENT id — a positive integer stored ON the event (`e.id`), unique
    in its song, kept by every edit that keeps the object (moves, payload changes, ↶/↷ put the same objects back) and by the song file; a
    new object (a recorded note, an insert, a paste, a copy, a dissolved chord note) gets the next number. Given at the one rebase point
@@ -67,4 +69,4 @@ function compactEvents(drop){
   return removed;
 }
 
-export { events, evGen, schedInvalidate, onInvalidate, sortedLen, compactEvents, evSeq, evSeqFill, evOrder, evIdFill, evIdFloor, maxLayer, evRole, chaseRole, isNoteStart };
+export { events, evGen, schedInvalidate, onInvalidate, sortedLen, compactEvents, evSeq, evSeqFill, evSeqPut, evOrder, evIdFill, evIdFloor, maxLayer, evRole, chaseRole, isNoteStart };

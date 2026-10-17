@@ -1,6 +1,6 @@
 /* SONG2 (RUN 3, 2026-10-16): the demo song is a FILE (data/songs/triphop.json) and P.song opens it; the code generator stays a probe tool.
    Row «SONG2 demo song file = its generator»: the generator's song and the file's song, each saved through the real song-file writer,
-   are the same record (ids and take numbers aside — both are session counters; takes compared by their order). CONTROL: a file with one
+   are the same record (event / point / track ids and take numbers aside — both are session counters; takes compared by their order). CONTROL: a file with one
    volume changed must differ. The seed song is left as found (its own save opened back, frozen tracks re-frozen with their old seeds).
    P.dumpSong(name) — the generator's file text (to write into data/songs/ on unchanged code).
    ⚠️ The generator's take snapshots read the LIVE chains: any row that leaves a live value changed shows here (RUN 3 found one — the
@@ -11,7 +11,7 @@ import { songPrint } from './run.js';
 
 const norm=rec=>{ const r=JSON.parse(JSON.stringify(rec)); delete r.saved; delete r.id; delete r.name;
   const tks=[...new Set([...r.takes.map(k=>k.tk), ...r.events.map(e=>e.tk)])].sort((a,b)=>a-b), M=new Map(tks.map((t,i)=>[t,i+1]));
-  for(const e of r.events){ delete e.id; e.tk=M.get(e.tk); } for(const k of r.takes){ k.tk=M.get(k.tk); for(const p of k.lane) delete p.id; }
+  for(const e of r.events){ delete e.id; e.tk=M.get(e.tk); } for(const t of r.tracks) delete t.id; for(const k of r.takes){ k.tk=M.get(k.tk); for(const p of k.lane) delete p.id; }
   return JSON.stringify(r); };
 const firstDiff=(a,b)=>{ for(let i=0;i<Math.max(a.length,b.length);i++) if(a[i]!==b[i]) return `${a.slice(Math.max(0,i-80),i+80)} <> ${b.slice(Math.max(0,i-80),i+80)}`; return ''; };
 

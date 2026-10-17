@@ -45,6 +45,16 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 
 - **playwright-core — browser automation for the probe runner** — Developer tool in tools/ only (tools/node_modules is git-ignored); never shipped; no dependencies of its own.
 
+## Reference prototypes only (docs/prototypes/, never shipped)
+
+| Item | Version | Licence | Use | Addresses / files | Source |
+|---|---|---|---|---|---|
+| three.js (3D library) — reference prototype only | r128 | MIT | reference | https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/ | https://github.com/mrdoob/three.js (cdnjs three.js r128) |
+| Google Fonts: Marcellus and Commissioner — reference prototype only | css2 API | OFL-1.1 | reference | https://fonts.googleapis.com<br>https://fonts.gstatic.com | https://fonts.google.com (Marcellus, Commissioner — SIL Open Font License 1.1) |
+
+- **three.js (3D library) — reference prototype only** — Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Calm, not app code). Not shipped; if Calm adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-CALM plan).
+- **Google Fonts: Marcellus and Commissioner — reference prototype only** — Loaded only by docs/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts. · **reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)**
+
 ## Icons, images and fonts (audit, Q13)
 
 | Item | Version | Licence | Use | Addresses / files | Source |
@@ -65,9 +75,9 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 
 | Glyph | Code point | Meaning | Kind | Used in |
 |---|---|---|---|---|
-| ↶ | U+21B6 | undo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js, src/probes/songfile.js |
-| ↷ | U+21B7 | redo (history) | icon | src/icons.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js, src/probes/songfile.js |
-| ⤺ | U+293A | undo the last take | icon | src/icons.js, src/probes/history.js, src/probes/window.js |
+| ↶ | U+21B6 | undo (history) | icon | src/icons.js, src/probes/cmd.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js, src/probes/songfile.js |
+| ↷ | U+21B7 | redo (history) | icon | src/icons.js, src/probes/cmd.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js, src/probes/songfile.js |
+| ⤺ | U+293A | undo the last take | icon | src/icons.js, src/probes/cmd.js, src/probes/history.js, src/probes/window.js |
 | ⇄ | U+21C4 | swap hands (help text) | icon | src/icons.js |
 | ⊘ | U+2298 | remove effect from a track | icon | src/icons.js |
 | ⌐ | U+2310 | step shape (automation / bend) | icon | src/icons.js |
@@ -82,7 +92,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ⟳ | U+27F3 | repeat the brace | icon | src/icons.js, src/songs.js |
 | ● | U+25CF | record / lesson step done | icon | src/icons.js |
 | ○ | U+25CB | lesson step to come | icon | src/icons.js |
-| ✕ | U+2715 | close / delete / clear | icon | src/icons.js, src/probes/history.js |
+| ✕ | U+2715 | close / delete / clear | icon | src/icons.js, src/probes/cmd.js, src/probes/history.js |
 | ✎ | U+270E | edit / rename / arrangement window | icon | src/icons.js, src/probes/window.js, src/songs.js |
 | ✂ | U+2702 | cut bars | icon | src/icons.js |
 | ⧉ | U+29C9 | copy / duplicate | icon | src/icons.js |
@@ -120,7 +130,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | src/icons.js |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/cmd.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
 | − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
 | ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/lat.js, src/render.js, src/views/play.js |
 | ≤ | U+2264 | less or equal | typography | src/probes/window.js |

@@ -122,3 +122,16 @@ install as the current history), the round-trip probe hook. Folder rule REC1 hol
 2. Should a serialised history be SAVED in the song file (undo survives a reload), or is serialisation only for the journal / co-play /
    tests? Recommendation: NOT in the file for now (size: ✕ of a 3000-event song ≈ 1.5–2 MB in a step) — the format allows it later.
 3. Autosave on the journal instead of the 1-s poll (CMD1d): only if measured cheaper on the phone; otherwise keep the poll.
+
+## Review 2026-10-17 (user answers, RUN 5) and what was built
+- **Q1 — track ids in the file:** YES (per rule #37) → CMD1b, song file **v7** (`tracks[].id`; v6 → v7 migration is the identity, idempotent,
+  the opened text never changed; an older file's tracks get fresh ids at open).
+- **Q2 — history in the song file:** not asked to change → stays OUT of the file; serialisation is for the journal, co-play and tests.
+- **Q3 — autosave on the journal:** not measured on the phone → autosave keeps its 1-s poll.
+- Built in RUN 5: CMD1a (value tripwire, `core/canon.js`), CMD1b (track ids, v7), CMD1c (`song/commands.js`, field declarations per kind),
+  CMD1d (`onApplied`, `cmdSet` / `cmdNote`). Rows: «CMD1 canonical values (core)», «CMD1 value tripwire», «CMD1 commands round trip»,
+  «CMD1 journal». Deviations from §3.3, on purpose: (a) the view `sc` is NOT in the event hash (the key knob re-keys the backing outside
+  the history — TF2 Q3 — so hashing it would refuse ↶ after every knob turn); (b) numbers are hashed EXACTLY (JSON's own text), not
+  rounded to 1e-6; (c) lane points are hashed by value without their id (ids are given at takeFxTouch, possibly after the seal).
+  §3.4's per-kind `toJSON`/`fromJSON` became ONE generic writer over each kind's declared fields (same guarantee: an undeclared kind or
+  field refuses by name). Left: the in-place-write static rule candidate (§3.3).

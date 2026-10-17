@@ -7,7 +7,7 @@ import { hooks } from './hooks.js';
 import { activeKind } from './clip.js';   // S5.0: редактор не открывается поверх идущей записи клипа. Отказ живёт ЗДЕСЬ, рядом с прочими (см. editOpen), а не в ui. Цикла нет: clip тянет audio/state/vision/i18n и НИКОГДА recorder
 import { events, schedInvalidate, compactEvents, evSeqFill, evOrder, evRole, evIdFloor } from './song/store.js';   // REC1: the song's event store (recorder re-exports what others read)
 import { chOwnerKey, bassOwnerKey, ldKey, songNotes, notesReset, viewAudit, editViewCheck, songSegs } from './song/notes.js';   // REC2: the song as notes, owner and chase keys, view checks
-import { histWire, histKind, histApply as editApply, histTouched, histPush, histSeal, histHash, histReset, histCanUndo, histCanRedo, histLen, histTopLabel, histUndo, histRedo, histTab, histMaster, laneNameStep, moveLaneStep, histPeek, histOffAdd, histOffNow, histDbg, histDbgO } from './song/history.js';   // REC2: the one history (ED7); step kinds register with it
+import { onApplied, histNote, histWire, histKind, histApply as editApply, histTouched, histPush, histSeal, histHash, histReset, histCanUndo, histCanRedo, histLen, histTopLabel, histUndo, histRedo, histTab, histMaster, laneNameStep, moveLaneStep, histPeek, histOffAdd, histOffNow, histDbg, histDbgO } from './song/history.js';   // REC2: the one history (ED7); step kinds register with it
 import { chordMoveTy, editBackingOpen, editCanRedo, editCanUndo, editCommit, editDeleteHit, editDeleteSeg, editGuard, editMoveHit, editMoveSeg, editResizeSeg, segChordNotes, tiePartners, untieAcross, editWire } from './song/edit-notes.js';   // REC3: the editor's edit core and note edits
 import { editDeleteChordNote, editMoveChordNote, editResizeChordNote } from './song/edit-chords.js';   // REC3: chord-note edits (dissolve)
 import { editDeleteSel, editMoveSel } from './song/edit-group.js';   // REC3: group edits (ED1)
@@ -339,8 +339,10 @@ function snapEnd(tok){
   S.evs.forEach((e,i)=>{ if(!A.has(e)) rem.push([e,S.t[i],S.a[i]]); else if(e.t!==S.t[i]||e.a!==S.a[i]) ch.push([e,S.t[i],S.a[i],e.t,e.a]); });
   for(const e of events) if(!B.has(e)) add.push([e,e.t,e.a]);
   const remT=[], addT=[]; for(const [tk,r] of S.fx) if(takeFx.get(tk)!==r) remT.push([tk,r]); for(const [tk,r] of takeFx) if(S.fx.get(tk)!==r) addT.push([tk,r]);
-  const remL=[], addL=[]; for(const [ly,id] of S.lanes) if(laneId.get(ly)!==id) remL.push([ly,id,S.rows.get(id)]);
-  for(const [ly,id] of laneId) if(S.lanes.get(ly)!==id) addL.push([ly,id,laneRow(id)]);
+  /* CMD1b: a lane kept under the same id whose row changed (Open of a file with the song's own track ids) is recorded as dropped + added */
+  const rowSame=id=> tok.label!=='open' || JSON.stringify(S.rows.get(id))===JSON.stringify(laneRow(id));
+  const remL=[], addL=[]; for(const [ly,id] of S.lanes) if(laneId.get(ly)!==id || !rowSame(id)) remL.push([ly,id,S.rows.get(id)]);
+  for(const [ly,id] of laneId) if(S.lanes.get(ly)!==id || !rowSame(id)) addL.push([ly,id,laneRow(id)]);
   const mk= JSON.stringify(S.marks)!==JSON.stringify(secMarks) ? { from:S.marks, to:secCopy(secMarks) } : null;
   /* ✕ (user answer, 2026-10-14): its ↶ brings the brace and ⟳ back too. Only ✕ — the brace is otherwise not part of the history. */
   const whole= tok.label==='clear' || tok.label==='open';   // SONG3 (RUN 4): Open is one step like ✕ — brace, settings and the file's name/id ride along
@@ -418,7 +420,7 @@ function songOpenApply(P, meta){
   clearRec(); if(!tok) histReset();
   const S=P.settings;
   songSetApply(S);
-  for(const T of P.tracks){ const id=laneNew(T.layer); laneRowSet(id,{ mute:!!T.mute, solo:!!T.solo, level:T.level, pan:T.pan, name:T.name, rank:T.rank, len:T.len }); }
+  for(const T of P.tracks){ const id=laneNew(T.layer, T.id); laneRowSet(id,{ mute:!!T.mute, solo:!!T.solo, level:T.level, pan:T.pan, name:T.name, rank:T.rank, len:T.len }); }
   let tkMax=0;
   let pidMax=0; for(const [tk,rec] of P.takes){ takeFx.set(tk,rec); if(tk>tkMax) tkMax=tk; for(const p of rec.lane||[]) if(p.id>pidMax) pidMax=p.id; }
   laneIdFloor(pidMax);   // IDS1 part 2: the file's lane point ids stay; new points count on above them
@@ -438,11 +440,23 @@ function songOpenApply(P, meta){
 /* REC3: what the edits (song/edit-notes.js) need from the editor session and the recorder */
 editWire({ ready:()=>!!AC, isOpen:editIsOpen, layer:editLayer, pause:()=>{ if(loop.on) onLoop(); }, touch:()=>{ takeFxTouch(); laneEditTouch(); } });
 /* ED7: snapshot steps, level / pan / name of a track, master, the key knob of a song Transpose ('ranks' — song/history.js) */
-histKind('snap', snapApply, (u,S)=>{ for(const L of [u.rem,u.add,u.ch]) for(const x of L) S.add(x[0].layer); });
+histKind('snap', snapApply, (u,S)=>{ for(const L of [u.rem,u.add,u.ch]) for(const x of L) S.add(x[0].layer); }, ['rem','add','ch','remT','addT','remL','addL','mk','br','st','m']);
 histKind('tab', (u,undo)=>{ const ly=laneLayerOf(u.id), v= undo?u.from:u.to; if(ly==null) return;
-  if(u.f==='level') setLaneLevel(ly,v); else if(u.f==='pan') setLanePan(ly,v); else setLaneName(ly,v||''); });
-histKind('master', (u,undo)=>{ AUD.setMasterLevel(undo?u.from:u.to); });
-histKind('key', (u,undo)=>{ keyStepSet(undo?u.from:u.to); });
+  if(u.f==='level') setLaneLevel(ly,v); else if(u.f==='pan') setLanePan(ly,v); else setLaneName(ly,v||''); }, null, ['id','f','from','to','at']);
+histKind('master', (u,undo)=>{ AUD.setMasterLevel(undo?u.from:u.to); }, null, ['from','to','at']);
+histKind('key', (u,undo)=>{ keyStepSet(undo?u.from:u.to); }, null, ['from','to']);
+/* ⛳ CMD1d: the commands that are NOT history steps (ED7 decision) go through ONE door: cmdSet applies today's setter and tells the journal
+   (onApplied, dir 'set') by permanent ids; cmdNote only tells — for the key knob and A4, whose ui handlers do more than one setter. */
+const CMD_SET={ mute:toggleLaneMute, solo:toggleLaneSolo, arm:toggleArm, region:setRegionOn, brace:braceSet, tempo:setLoopBpm };
+function cmdSet(kind,...args){
+  const f=CMD_SET[kind]; if(!f) throw new Error('cmdSet: unknown command '+kind);
+  const r=f(...args);
+  const v= kind==='mute'||kind==='solo'||kind==='arm' ? { layer:args[0], id:laneOf(args[0]) ?? null } : kind==='region' ? { on:!!args[0] }
+    : kind==='brace' ? { from:args[0], to:args[1] } : { bpm:loop.bpm };
+  histNote(kind, v);
+  return r;
+}
+const cmdNote=(kind,value)=>histNote(kind,value);
 /* ↶ / ↷ of the editor — since ED7 the one history (histUndo / histRedo: any step, any track, editor open or not). */
 const editUndo=()=>histUndo();
 const editRedo=()=>histRedo();
@@ -735,6 +749,7 @@ export { secPerBeat, beatNow, timeAt, secOf, beatsOf,
   secDbg, songHistReset, laneVerKeep, takeFxDump,
   /* ED7: the one history — ↶/↷ everywhere, table steps (level / pan / name / order / master), ✕ as a step; probe: reset, length, hash, controls */
   histUndo, histRedo, histCanUndo, histCanRedo, histLen, histReset, histTab, histMaster, laneNameStep, moveLaneStep, clearSong, songSaveRec, songOpenApply, songPlan, songMark, songDirty, histHash, histDbg, histTopLabel,
+  cmdSet, cmdNote, onApplied,   // CMD1d: the commands that are not steps, and the journal
   editDeleteChordNote, editMoveChordNote, editResizeChordNote,   // U2/U3: правка ОДНОЙ ноты аккорда (удаление, перенос во времени, длина) — аккорд распадается на однонотные (dissolvePlan)
   fxIsDriven,      // O-3.1: правит ли этим адресом запись ПРЯМО СЕЙЧАС — читают столбики, чтобы пометить чужое
   autAddrs, autPoints, autMovePoint, autDeletePoint, autAddPoint, autShapePoint, autCurvePoint,   // autCurvePoint — BEND-CURVE: curvature of a glide into a bus lane point. autShapePoint — гладкая автоматизация: форма отрезка, входящего в точку   // O-4 часть 1: ПОЛОСА АВТОМАТИЗАЦИИ — что показать, что нарисовать и три правки

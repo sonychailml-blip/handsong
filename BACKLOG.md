@@ -3,7 +3,7 @@
 ## English index (DOCS-EN; the sections below stay in Russian — any section edited from now on is rewritten in English)
 Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open · ❓ deferred, needs measurement · ℹ️ note, not a bug.
 - **0. Now in progress** — the module split refactor (✅ long done; table kept as history).
-- **1. Foundation** — localStorage for settings (⬜); stable mode/tuning ids, prerequisite for saving and the scale builder (🔵);
+- **1. Foundation** (English since RUN 5) — localStorage for settings (⬜); stable mode/tuning/timbre ids, prerequisite for saving and the scale builder (✅);
   auto-freeze AF1–AF4 ✅ (watcher ON by default, no ❄); AF6 remainder after 16-bit (⬜: disk/browser cache, chunk paging, Opus fallback;
   KS-track renders still pin ≈ 6 MB each — other tracks fixed in RENDER-LEAK; per-track chains after AF5); AF2 remainder: drum and live-reverb tails at a
   crossfaded swap (⬜); SAVING — the user's decision (⛳: draft vs project, folder/file/account, autosave and versions); AUDIO TAKE —
@@ -105,88 +105,39 @@ Status marks: ✅ done · 🔵 in progress · 🟡 partial/proposed · ⬜ open 
 
 ---
 
-## 1. Фундамент
+## 1. Foundation
 
-_(Заголовок раньше читался «сразу после шага 14, до фич» — рефакторинг давно закончен, а фичи давно
-идут. Здесь лежит то, что ПОДПИРАЕТ другие работы: хранилище настроек, идентификатор лада, офлайн.)_
+_Rewritten in English at RUN 5 (DOC1 leftover); the Russian text as it stood is in `archive/BACKLOG-history.md` «§1 Фундамент (moved at
+RUN 5)», word for word. Here: what SUPPORTS other work — settings storage, identities, offline. Status marks updated against today's code._
 
-### ⬜ localStorage для настроек
-> **Механизм УЖЕ есть и работает:** `i18n.store` — обёртка над localStorage с try/catch и падением в
-> ПАМЯТЬ (приватный режим и `file://` не должны ронять старт). Через неё уже персистятся **язык**
-> (`handsong.lang`) и **прогресс уроков** (`handsong.lesson.<id>`). Настройки ниже — просто ещё ключи
-> в том же хранилище; писать новую обвязку не нужно.
+### ⬜ localStorage for settings
+> **The mechanism already exists:** `i18n.store` — a localStorage wrapper with try/catch and a fall-back to MEMORY (a private window and
+> `file://` must not break the start). It already keeps the **language** (`handsong.lang`) and **lesson progress** (`handsong.lesson.<id>`).
+> The settings below are just more keys in the same store; no new wrapper is needed.
 
-Сейчас каждый запуск — минорная пентатоника от A, и все накопившиеся настройки СБРАСЫВАЮТСЯ.
-Сохранять: `scaleIdx`, `tonic`, `seventh`, `leadIdx`/`chIdx`/`bassIdx`/`drumKitIdx`, `loop.bpm`.
-**Добавились сессионные настройки, которые тоже стоит персистить:** `aRef` (эталон A4 — сейчас сброс на
-440), `handFn` (функции рук соло/бас), `loop.metre` (размер такта). Хорошо ложится к публикации (§3.25/
-HANDOFF): человек вернётся к своему строю/эталону/раскладке рук.
+Every start still begins from the default mode and key; the session's choices are lost. To keep: the mode (`scaleId` — by id since F0–F8),
+`tonic`, `seventh`, the timbres (by permanent id since TIM1), `loop.bpm`, `aRef` (A4 — back to 440 today), `handFn` (hand functions),
+`loop.metre`. Fits the release (a person comes back to their tuning, A4 and hands). Calm keeps its own few choices per device (STAGE4-CALM
+plan §5).
 
-### 🔵 СТАБИЛЬНЫЙ ИДЕНТИФИКАТОР ЛАДА — ПРЕДПОСЫЛКА, блокирует две фичи
-
-⛳ **НАЧАТО (слайс T0 универсальной модели строя, HANDOFF «ПЛАН „УНИВЕРСАЛЬНАЯ МОДЕЛЬ СТРОЯ“»):** у каждого из 75 ладов теперь есть
-стабильный строковый `id` (`'major'`, `'raga-yaman'`, `'pelog-barang'`…) и `tuning` — id его СТРОЯ в `scales.TUNINGS` (18 строёв со своими
-id: `edo12`, `shruti22`, `pelog`, `partch43`, `ji12`…). Пока их читает только проба `src/scaleprobe.js`; события по-прежнему морозят ссылку
-(правило #7), id понадобятся на границе сериализации. Абзац «Факт» ниже — состояние ДО T0.
-
-**Факт (проверено по коду).** У ладов **НЕТ идентификатора вообще**: в `SCALES` 75 записей, ни у одной
-нет поля `id`. Лад адресуется ПОЗИЦИЕЙ в массиве (`scaleIdx`) — отсюда и правило «дописывать только
-в конец». А записанное событие лупера морозит **`sc:CUR()`, то есть ССЫЛКУ НА САМ ОБЪЕКТ лада**
-(`recorder.push`), а не индекс и не имя.
-
-**Что из этого следует — ровно две вещи, и обе важны:**
-- **В ПАМЯТИ всё хорошо.** Слой держит объект, поэтому переигровка переживёт и перестановку массива,
-  и переименование лада, и локализацию имён. Полимодальность (hard rule 7) на этом и стоит.
-- **НА ДИСКЕ ничего не работает.** Ссылку на объект нельзя сериализовать. Значит **сохранить петлю
-  невозможно** — не «трудно», а не на что записать, каким ладом играл слой.
-
-⚠️ **ЭТО БЛОКИРУЕТ ДВЕ ФИЧИ, и ни за одну нельзя браться раньше:**
-1. **Сохранение петель** (в localStorage, в файл, в ссылку — любое). Без id слой не восстановить.
-2. **§3.34 Конструктор собственного строя.** Пользовательский лад по определению не может жить по
-   индексу в append-only массиве: его создают, редактируют и УДАЛЯЮТ. Что происходит со слоем, который
-   прямо сейчас играет удалённый строй? Пока нет id — ответа нет.
-
-**Что делать (эскиз, не спецификация).** Дать каждому ладу стабильный строковый `id` (встроенным —
-осмысленный постоянный ключ, пользовательским — сгенерированный и неизменяемый), адресовать лад по нему
-всюду, где адрес переживает сессию, и оставить `scaleIdx` тем, чем он и является — позицией в текущем
-списке для меню и состояния. `sc:CUR()` в событии при этом можно НЕ трогать: в памяти он и так верен;
-id нужен на границе сериализации. Отдельно решить судьбу слоя, чей строй удалили (запретить удаление
-используемого / подставить копию строя в петлю / отвязать слой).
-
-⛳ **ДОБАВЛЕНО (дуга «СТРОЙ ОТ», P0/P1): лад в сохранённом файле пишется ПАРОЙ (id лада, строй от).** С P3 событие хранит
-ВАРИАНТ лада на свой якорь (`scales.scaleView`: «следует за тоникой» или нота 0..11) — идентичность записанного лада
-становится этой парой, и сериализация обязана записать обе половины. Update (TF1/TF2, 2026-10-14): the key is now frozen in each
-event's view (`v.key`, any integer after a Transpose; `scales.viewKeyIdOf` = view id + `~key`) — a song file must store it with the view.
-
-⛳ **ДОБАВЛЕНО (при T5): ПЕСНИ — ФАЙЛАМИ (направление пользователя).** Песня — данные, а не код: экспорт в файл и загрузка из файла,
-чтобы делать музыку, делиться ею, скачивать и загружать; демо-пьесы — обычные файлы рядом с приложением, о которых его код не знает.
-Нужно: (1) **стабильные id ТЕМБРОВ** (сегодня `a.inst`/`a.kit` — индексы списков; новый тембр сдвинул бы инструменты каждой сохранённой
-песни — HANDOFF «ХРАНЕНИЕ ТЕМБРОВ»); (2) **ТОНИКА В ПЕСНЕ**, а не живая для всего приложения (сходится с заморозкой тоники);
-(3) **ВЕРСИОНИРОВАННЫЙ ФОРМАТ**: дорожки, события с (id вида строя — `scales.viewIdOf`, индекс в строе, регистр — ступени в событии нет
-с T4c-2), цепи, автоматизация, темп и размер. Нынешняя демо-пьеса `src/songs.js` — код, пишущий через воронки рекордера; когда формат
-появится, она станет ПЕРВЫМ ФАЙЛОМ ПЕСНИ. Порядок прежний: сперва дуга редактора (T5 ✅, U5, T7, S4–S7, необходимое и своё редактора).
-
-⛳ **ДОБАВЛЕНО (при T7): СТРОИ И ЛАДЫ — ФАЙЛАМИ (направление пользователя).** Каждый строй и лад — отдельный файл данных, поставляемый с
-приложением; конструктор ладов добавляет и удаляет любой. Нужно: перенести в данные всё, что ещё в коде (имена ступеней, палитры аккордов,
-традиции и место в меню, флаги поведения); загрузчик при старте, который читает и проверяет файлы; адресация каждого лада по стабильному id,
-никогда по позиции (демо, уроки, живой индекс лада); песня хранит КОПИЮ каждого строя, которым пользуется, — удаление строя песню не ломает;
-проверка файлов от других людей; четыре пункта готовности к Scala (§3.34). Плюс свойство «как строятся аккорды» — АДАПТИВНО (чистые
-отношения, как хор) или ИЗ СТРОЯ (как инструмент): встроенные — по теории, строй пользователя выбирает (в коде с T7 — `chordBuild`). План — в
-порядке работ сразу после T7 (HANDOFF); пользователь решает, до или после правки соло.
-
-⛳ **ДОБАВЛЕНО (при F0): ПЛАН «СТРОИ И ЛАДЫ ФАЙЛАМИ» F0–F8 и формат файла v1 — HANDOFF (Часть I кратко, Часть II «F0» полностью).** Порядок
-(решение пользователя): переезд — ДО правки соло. ✅ F0 — канонический снимок `tools/scales.before.json` (`P.dumpScales`/`P.checkFiles`).
-
-⚠️ Это ФУНДАМЕНТ, а не фича: он ничего не добавляет пользователю сам по себе, но без него две фичи выше
-делать нельзя. Оценивать и планировать его отдельно от них.
-
-⛳ **С ДУГОЙ «РЕДАКТОР ДОРОЖЕК» ПУНКТ ПЕРЕСТАЛ БЫТЬ «КОГДА-НИБУДЬ».** Пока записью была петля на пару тактов,
-невозможность её сохранить была пожатием плеч. Теперь запись — ЛИНЕЙНАЯ многодорожечная песня: минуты
-материала, несколько дорожек, слитые взятые, а дальше — правка в пиано-ролле, где человек вложит ещё больше
-труда. Такую вещь нельзя потерять вместе со вкладкой. Поэтому идентификатор лада — **ПРЕДПОСЫЛКА ТОГО, ЧТОБЫ ДУГУ
-СТОИЛО ДОВОДИТЬ**, и его место в плане — не позже, чем сохранение станет следующим естественным вопросом
-(самое позднее — до заморозки и экспорта: и то и другое бессмысленно для песни, которая не переживает
-перезагрузку). Сверено: у 75 записей `SCALES` поля `id` по-прежнему нет, событие по-прежнему несёт `sc:CUR()`.
+### ✅ Stable ids of modes, tunings and timbres — the prerequisite for saving (was 🔵; done)
+- **Was (before T0):** modes had no id at all; a mode was addressed by its POSITION in `SCALES` (hence «append only»), and a recorded
+  event froze `sc:CUR()` — a REFERENCE to the mode object. In memory that is right (replay survives reordering, renaming, translation —
+  polymodality, hard rule #7 stands on it); on disk it is impossible (a reference cannot be serialised) — saving and the user's own tunings
+  (§3.34: created, edited, DELETED) were blocked.
+- **Done since:** T0 gave every mode a stable string `id` and a `tuning` id; F0–F8 moved all tunings, modes, palettes and chord modes into
+  data files (v1) with id addressing everywhere a reference outlives a session (`state.scaleId`, `scales.scaleById`); P0–P4 / TF1–TF5 made
+  the recorded identity the VIEW (mode + «tuned from» + chord mode + key + key cents — `scales.viewIdOf` / `viewKeyIdOf`), which the song
+  file writes as a descriptor; TIM1 / TIM2 gave timbres permanent ids (`a.inst` / `a.kit` store the id); rule #37 makes identity ≠ name ≠
+  position permanent for every record (timbres, tunings, modes, effect presets, events — IDS1 —, lane points, tracks — CMD1b).
+- **Songs as files** (the user's direction at T5): ✅ SAVE1 (Save / Open, versioned format, today v7), SONG1 (a song carries copies of the
+  person's own records — deleting a tuning never breaks a song), SONG2 (the demo song is a data file), AUTOSAVE1, SONG3, TIM3d (full timbre
+  copies).
+- **Tunings and modes as files** (the user's direction at T7): ✅ F0–F8 (106 data files; the loader checks each; other people's files are
+  data only). Left from that direction: the Scala readiness below; the «how chords are built» property is in code since T7 (`chordBuild`:
+  adaptive vs from the tuning).
+- This was FOUNDATION, not a feature: it adds nothing by itself, but the linear multitrack song (minutes of material, edited in the piano
+  roll) must survive a reload — so it had to come before freezing and export.
 
 ### ⬜ AF6 — the rest after AF6b (16-bit frozen data in memory is done) — rewritten in English at AF3
 1. **On the device, across reloads** (decision 3(c), AFTER saving exists): Int16 chunks (`FRZ_CHUNK`, 2^15 frames) as files — in the
@@ -209,56 +160,51 @@ event's view (`v.key`, any integer after a Transpose; `scales.viewKeyIdOf` = vie
    them; the live chain is separate since AF5). Per-track chains would isolate tracks from each other; cost ≈ one chain (a reverb ≈ 49 nodes)
    per unfrozen track that uses one.
 
-### ⬜ Подмена буфером (AF2) — остаток: хвосты ударов и живой сети роли на перекрёсте (записано при AF2; не срочно)
-При подмене без паузы (перекрёст 20 мс на такте) голоса аккордов, баса и соло дорожки срезаются точно, но (1) удары, уже поставленные до
-подмены, — одноразовые узлы без реестра, их хвосты доигрывают поверх тех же хвостов в буфере; (2) живой реверб/делей роли несёт хвост
-срезанных голосов (≤ RT60) поверх хвоста буфера. Лечение (1): реестр ударов по владельцу 'hit:N' (узел гейна удара, как tg у голосов) и
-срез его тем же voicesCut. Лечение (2) — своя цепь на дорожку (её дала бы автозаморозка, когда сеть роли несёт только живое). Пока —
-выбор паузы делает оба случая редкими.
+### ⬜ The buffer swap (AF2) — what is left: tails of drum hits and of the role's live network at the crossfade (recorded at AF2; not urgent)
+At a swap without a pause (a 20-ms crossfade on a bar line) the track's chord, bass and solo voices are cut exactly, but (1) drum hits
+scheduled before the swap are one-shot nodes with no registry — their tails ring on top of the same tails in the buffer; (2) the role's
+live reverb / delay carries the tail of the cut voices (≤ RT60) on top of the buffer's tail. Fix for (1): a hit registry by owner `hit:N` (the
+hit's gain node, like `tg` of voices) cut by the same `voicesCut`. Fix for (2): a chain per track (auto-freeze gave the means: the role's
+network carries only live sound since AF5). Until then — choosing a pause makes both cases rare.
 
-### ⛳ СОХРАНЕНИЕ — решение пользователя (записано при AF1; этап 3 порядка работ, вместе с форматом песни)
-Песня — работа человека, мала (сотни КБ) и защищается; замороженный звук — пересчитываемый кэш. Два видимых состояния «Черновик» / «Проект —
-сохранён в …»; проект — папка на диске (File System Access API, WAV замороженных дорожек), файл проекта вручную, позже аккаунт (только
-песни). Автосохранение + версии, запись-затем-замена, одна редактирующая вкладка, экспорт/импорт одним файлом, `storage.persist()`,
-предупреждения (приватное окно, Safari вне главного экрана — 7 дней, давно нет копии) и понятные ошибки диска. Полностью — §3.35, врезка
-«РЕШЕНИЕ ПОЛЬЗОВАТЕЛЯ О СОХРАНЕНИИ».
+### ⛳ Saving — the user's decision (recorded at AF1; stage 3, with the song format — partly done: SAVE1, AUTOSAVE1, SONG1–SONG3)
+A song is the person's work, small (hundreds of KB) and protected; frozen sound is a recomputable cache. Two visible states «Draft» /
+«Project — saved in …»; a project = a folder on disk (File System Access API, WAV of frozen tracks), a project file by hand, later an
+account (songs only). Autosave + versions, write-then-replace, one editing tab, export / import as one file, `storage.persist()`, warnings
+(private window, Safari outside the home screen — 7 days, no copy for a long time) and clear disk errors. In full: §3.35, the box «THE USER'S
+DECISION ON SAVING». Done so far: song files by hand (SAVE1), the song kept on the device (AUTOSAVE1, last 5), copies of own records and
+timbres in the file (SONG1, TIM3d), Open as one ↶ step (SONG3).
 
-### ⬜ ЗАПИСЬ ЗВУКОМ («аудиодубль») — за автозаморозкой, рядом с микшером
+### ⬜ Recording as sound («audio take») — after auto-freeze, next to the mixer
+A second way to record: a track captured as SOUND while playing, not as events; its notes are not editable (trim, move and level — maybe
+later). It reuses the frozen-track playback machinery: a track whose content is a buffer. Gain: exactly what was heard, the expression hand
+too; no re-performance differences; later the path to microphone recording. **The real obstacle was:** one effect network per role —
+capturing the role's bus would also catch UNFROZEN tracks of that role playing from events; so it naturally comes AFTER AUTOMATIC FREEZING,
+after which that network carries only live playing (✅ AF3–AF5). Place in the work order: stage 5, next to the mixer's per-track effects.
+Depends on: auto-freeze (✅) and the frozen track's buffer playback (✅ F4).
 
-Второй способ записи: дорожка снимается ЗВУКОМ во время игры, а не событиями; её ноты не правятся (обрезка, перенос и уровень — может
-  быть, позже). Переиспользует машинерию воспроизведения замороженной дорожки: дорожка, чьё содержимое — буфер. Выигрыш: ровно то, что
-  было слышно, рука выразительности тоже; никаких различий повторного исполнения; путь к записи с микрофона потом. **Настоящее
-  препятствие:** сеть эффектов одна на роль — снятие шины роли поймало бы и НЕзамороженные дорожки этой роли, играющие из событий, поэтому
-  возможность естественно идёт ЗА АВТОМАТИЧЕСКОЙ ЗАМОРОЗКОЙ, после которой эта сеть несёт только живую игру. Место в порядке работ — рядом
-  с автозаморозкой и микшером.
-Подробно — HANDOFF, часть I. Зависит от: автоматической заморозки (сеть эффектов роли без воспроизводимых дорожек), воспроизведения
-замороженной дорожки (буфер на дорожке — уже есть, F4).
+### ⬜ Scala readiness (.scl / .kbm) — before the mode builder, next to the user's own tunings
+The core of the model already matches Scala: `.scl` lists pitches in cents or ratios and ends with the period; `.kbm` holds the reference
+note and its frequency; our tuning (`TUNINGS`), anchor (the view, «tuned from», A4) and the mode's selection (`sel` / `root`) map onto
+them. For a clean round trip four things are missing:
+(a) **EXACT RATIOS** as data next to the cents of just tunings (Partch, just `ji12`, Pythagorean), so export writes `7/4`, not rounded cents;
+    the price still reads cents — nothing audible changes;
+(b) **STEP NAMES** as optional tuning data instead of per-tuning code paths (`stepName`, `swaraOfCents`, «(4)» in Pelog) — partly done
+    since F3 (naming schemes in data, `scales.namingOf`), so an imported or user tuning carries its own names;
+(c) **IMPORT NORMALISATION RULES:** pitches out of order, repeats, values beyond the period, the implied 1/1 that `.scl` does not write;
+(d) **A ROUND-TRIP PROBE:** export every built-in tuning to `.scl/.kbm`, import it back, compare the pitches. An equal tuning exported as
+    a cents list must be RECOGNISED on import and return to the generator form (`{period, equal}`) — otherwise frequencies drift in the
+    last bit (the generator form is what `pitchHz`'s bit-exactness stands on).
+Depends on: stable ids of the user's tunings (✅ above) and the song file format (✅ SAVE1). Scheduled with user modes via Scala (stage 7).
 
-### ⬜ ГОТОВНОСТЬ К SCALA (.scl/.kbm) — до конструктора ладов, рядом со стабильными id строёв пользователя
-
-Ядро модели уже совпадает со Scala: `.scl` перечисляет высоты центами или отношениями и кончается периодом; `.kbm`
-  хранит опорную ноту и её частоту; наши строй (`TUNINGS`), якорь (вид, «строй от», A4) и выборка лада (`sel`/`root`) ложатся на них.
-  Для чистого обмена туда и обратно не хватает четырёх вещей:
-  (а) **ТОЧНЫЕ ОТНОШЕНИЯ** — данными рядом с центами у чистых строёв (Партч, чистый строй `ji12`, пифагоров), чтобы экспорт писал `7/4`, а
-      не округлённые центы. Цена по-прежнему читает центы — слышимо ничего не меняется;
-  (б) **ИМЕНА СТУПЕНЕЙ** — необязательными данными строя вместо путей кода на каждый строй (`stepName`, `swaraOfCents`, «(4)» у Пелога), чтобы
-      импортированный или пользовательский строй нёс свои имена;
-  (в) **ПРАВИЛА НОРМАЛИЗАЦИИ ИМПОРТА**: высоты не по порядку, повторы, значения за периодом, подразумеваемое 1/1, которого `.scl` не пишет;
-  (г) **ПРОБА ТУДА-ОБРАТНО**: каждый встроенный строй экспортировать в `.scl/.kbm`, импортировать назад, сравнить высоты. Равный строй,
-      выгруженный списком центов, при импорте обязан УЗНАВАТЬСЯ и возвращаться в форму генератора (`{period, equal}`) — иначе частоты
-      поплывут в последнем бите (форма генератора — то, на чём держится побитная верность `pitchHz`).
-Подробно — HANDOFF, часть I, рядом с планом T6. Зависит от: стабильных id строёв пользователя (§1 выше) и формата файла песни.
-
-### ⬜ Service Worker: кэш модели
-> **SW УЖЕ зарегистрирован — и НАМЕРЕННО пустой** (`sw.js`, пустой `fetch`-обработчик). Его единственная
-> задача — устанавливаемость: без зарегистрированного SW с fetch-обработчиком Chromium не присылает
-> `beforeinstallprompt`, и кнопка установки не появляется вовсе (см. «Публикация» в CLAUDE.md). Кэша нет
-> СОЗНАТЕЛЬНО: ничто не может застрять устаревшим, камера/звук/ворклет и относительные пути под подпапкой
-> GitHub Pages работают ровно как без SW. **Этот пункт = добавить кэш В НЕГО**, а не заводить новый SW.
-
-Модель + WASM качаются с CDN при каждом запуске. Плохой интернет = приложение не стартует.
-Даёт офлайн и быстрый старт. ⚠️ Взвесить цену: кэш модели — это ещё и риск застрявшей версии, ради которого
-кэш и не заводили сразу.
+### ⬜ Service worker: the model cache (→ Calm, stage 4)
+> **The SW is registered — and DELIBERATELY empty** (`sw.js`, an empty `fetch` handler). Its only job is installability: without a
+> registered SW with a fetch handler Chromium does not send `beforeinstallprompt`, and the install button never appears. There is no cache ON
+> PURPOSE: nothing can get stuck in an old version; camera, sound, worklets and relative paths under a GitHub Pages sub-folder work exactly
+> as without a SW. **This item = add the cache TO IT**, not a new SW.
+The model + WASM come from the CDN at every start: a bad connection = the app does not start. A cache gives offline use and a fast start.
+⚠️ The price: a cached model is also a risk of a stuck version — which is why the cache was not added at first. Now planned for Calm: vendored
+MediaPipe + model, a versioned precache written by the release tool, an update toast (`docs/STAGE4-CALM-plan.md` §9.1).
 
 ---
 
