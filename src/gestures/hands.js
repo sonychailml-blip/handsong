@@ -1,6 +1,6 @@
 /* GES1: the GESTURE STATE MACHINE — the hands table, latch / lead owners, endPinch, the HAND1 probe clock and processHands (one camera
    frame → W* calls). gestures.js is its facade. */
-import { FINGER_TIPS, PINCH_HOLD, REV_RANGE, WATCHDOG_MS, CH_PAL_PAD, CH_PAL_HEAD_H, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from '../config.js';
+import { FINGER_TIPS, PINCH_HOLD, REV_NEAR, REV_RANGE, WATCHDOG_MS, CH_PAL_PAD, CH_PAL_HEAD_H, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from '../config.js';
 import { fx, fxChainOf, chainKeyOf, FX_VOL, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from '../state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordAtRoot, tuningIndexOf, CUR } from '../scales.js';
 import { WchOn, WchSet, WchOff, WdrumHit } from '../recorder.js';
@@ -759,4 +759,16 @@ function processHands(res){
   tickExpr(now,dtm);                   // «смычок»: динамика + вывод в звук раз за кадр (или плавный вывод к нейтрали, когда руки-выразительности нет)
 }
 
-export { HANDS, processHands, voiceModeReset, handsProbe, processHandsProbe };
+/* VIS1c (RUN 6): what the visuals need of each hand in view — read-only, called once per processed frame (main.onHands → the bus):
+   the PLAY POINT in canvas pixels (thumb tip + the main finger, REMAPPED — the point the hit-tests use, rule #12; index finger when not
+   pinched), depth 0 near … 1 far (the law of depthN, READ-ONLY: this frame's smoothed size when the processing computed it, else the raw
+   size — never a step of the smoothing, which is one per frame and shapes the sound), pinch, and whether the hand plays notes in its role */
+function handsView(){
+  const now=nowMs(), W=canvas.width, H=canvas.height, out=[];
+  for(const k in HANDS){ const S=HANDS[k], lm=S.lm; if(!lm || now-S.seen>WATCHDOG_MS) continue;
+    const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8, fn=handFnOf(k, S.role||phoneInstr);
+    out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H),
+      d:clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr' }); }
+  return out;
+}
+export { HANDS, processHands, voiceModeReset, handsProbe, processHandsProbe, handsView };

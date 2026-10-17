@@ -98,4 +98,8 @@ export { checkFrameOnce, checkSchedule, checkWorker } from './probes/detect.js';
 export { dumpGold, checkGold } from './probes/gold.js';
 export { checkTimbreIds, checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './probes/sound.js';
 export { dumpGesture, checkGesture } from './probes/hand.js';
+export { checkProfile } from './probes/profile.js';   // C0: profiles Full ↔ Calm, the exact round trip
+export { checkVisStack } from './probes/vis.js';   // VIS1a: the compositor and the bus writers
+export { checkForestRoom, checkBackgrounds } from './probes/forest.js';   // VIS1c: the forest room as numbers; the three backgrounds
+export { checkSoloFirefly } from './probes/calm.js';   // C4a: Firefly as a solo timbre
 export { api } from './probes/guard.js';

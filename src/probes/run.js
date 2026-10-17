@@ -8,6 +8,7 @@ import { frameStalls, MEAS, measReset, setQuick } from './kit.js';
 import { rows as rowList, rowProblems, rowCheck } from './rows.js';
 import { SEED_REC, SEED_FROZEN_EXPECT, seedFrozenSamples } from './seed.js';
 import { checkPan } from './window.js';
+import { profileCurrent } from '../profile.js';   // C0: the state guard names the live profile
 
 /* ═══ МАТЕРИАЛ ПЕСНИ — ДОСТАТОЧНО ЛИ ЕГО, ЧТОБЫ ПЕСЕННЫЕ ПРОВЕРКИ ЧТО-ТО ДОКАЗЫВАЛИ ═══
    Дважды проба «прошла» на пустой песне: ноль расхождений из нуля случаев. Здесь — перечень того, без чего песенная часть проб
@@ -80,6 +81,7 @@ async function stateSig(R){
            'tuning view': [scaleId,tunedFrom,JSON.stringify(chordModeSel),seventh].join(','),
            'tonic / A4 / tempo / metre': [tonic,aRef,loop.bpm,loop.metre].join(','),
            'transport': [loop.on,recording].join(','),
+           'profile (C0)': profileCurrent(),
            'song events': songPrint() };
 }
 /* ═══ P.all — ВСЕ ПРОБЫ ОДНОЙ КОМАНДОЙ ═══

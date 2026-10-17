@@ -11,6 +11,7 @@ import { recording, inPB, loop, loopChordDeg, loopChordOct } from '../recorder.j
 import { FX_EDGE, FX_STEP, fxBarItems, fxBarsBox, fxBarsY, fxParamOnFinger, hexA, mixHex, noteLbl, statusEl } from './common.js';
 import { drawRoll } from './roll.js';
 import { drawLooper, loopViewClear } from './strip.js';
+import { stackAdd } from './stack.js';   // VIS1a: the play screen's two modules
 
  
 /* ================= ОТРИСОВКА ================= */
@@ -431,7 +432,10 @@ function drawRole(instr,rx0,rx1,playH){
      эта функция. Один и тот же эффект выглядел по-разному в зависимости от того, чем занята рука,
      хотя звучал одинаково. Новый закон ровно один: ЕСТЬ В ЦЕПИ — РИСУЕТСЯ. */
 }
-function drawPhone(res){
+/* VIS1a: the play screen is two visual modules (views/stack.js) — «surface» (instrument layer: the roles' fields, FX bars, the expression
+   bar) and «hands» (overlay layer: hand points, the looper strip, its feedback, the status) — drawn in this same order as before */
+function drawPhone(res){ drawSurface(); drawHandsLayer(res); }
+function drawSurface(){
   const W=canvas.width, H=canvas.height;
   /* Сетка во ВСЮ высоту: нижней полосы эффектов больше нет, столбики лежат поверх слева.
      Та же высота используется в gestures (degHyst) — не расходиться! */
@@ -452,6 +456,9 @@ function drawPhone(res){
     if(phoneInstr==='ld'&&roleHasExpr('ld'))drawExprBar(0,W,H);   // «ВЫР» — энергия смычка; полосу прячем, если НИ ОДНА рука не назначена на выразительность
   }
   /* Заголовок роли на холсте убран: роль показывает и переключает кнопка instrBtn в верхней панели. */
+}
+function drawHandsLayer(res){
+  const W=canvas.width, H=canvas.height, playH=H;
   drawHandsPhone(res,W,H,playH);
   if(!videoRec)drawLooper(); else loopViewClear();   // при записи клипа полосу лупера (служебная накладка НА ХОЛСТЕ) прячем из кадра; сетка/руки/ярлыки/эффекты — это ИГРА, остаются. ⚠️ Полосы нет → снимаем и геометрию попадания: иначе тап пришёлся бы по НЕВИДИМОЙ кнопке (loopView остался бы от последнего нарисованного кадра)
   if(!videoRec)drawLooperFeedback(W,H);       // подтверждение команды рукой-лупером + отсчёт очистки — тоже служебная накладка, прячем в клипе
@@ -816,4 +823,6 @@ function drawExprBar(rx0,rx1,H){
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
+stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:()=>drawSurface() });
+stackAdd({ kind:'visual', id:'hands', layer:'overlay', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>drawHandsLayer(bus.get('hands')) });
 export { drawOverlays };

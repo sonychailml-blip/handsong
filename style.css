@@ -550,4 +550,10 @@
   #demoHint{font-size:var(--fs-13); color:var(--dim); max-width:420px; margin:var(--sp-6) auto 0;}
   #demoSkip{margin-top:var(--sp-22); font-size:var(--fs-16); padding:var(--sp-12) var(--sp-26);}
 
-  
+    /* C0 (RUN 6): the Calm profile (profile.js, body.calm) — one role, nothing recorded: the role, split, recording, backing, clip and Loop
+     controls are not offered (!important: applySplit writes inline display) */
+  body.calm #instrBtn, body.calm #instrBtnL, body.calm #instrBtnR, body.calm #splitBtn, body.calm #recBtn, body.calm #jamBtn,
+  body.calm #clipBtn, body.calm #audioBtn, body.calm #loopPanelBtn, body.calm #loopTransport{ display:none !important; }
+  /* VIS1c (RUN 6): the Background switch exists only in Calm; the 3D room's canvas (made by views/scene/host.js) lies under the 2D canvas */
+  body:not(.calm) #bgRow{ display:none; }
+  #scene{ position:fixed; inset:0; width:100vw; height:100vh; display:block; }

@@ -402,6 +402,14 @@
       <div class="seg"><button id="swLowOff" class="act" data-i18n="diag.sw.lowOff">Off</button><button id="swLow15" data-i18n="diag.sw.low15">at least 15 fps</button><button id="swLow24" data-i18n="diag.sw.low24">at least 24 fps</button><button id="swLowExp" hidden data-i18n="diag.sw.lowExp">short exposure</button></div></div>
     <p class="phint" id="swLowWarn" data-i18n="diag.sw.lowWarn">Test: changes the camera's own settings; Off restores them.</p>
     <p class="phint" id="swNote" data-i18n="diag.sw.note">Test switches are for this session only; the meter restarts its numbers after each.</p>
+    <!-- C0: the profile switch (profile.js; dev edition only) — Full = today's app, Calm = the first release's face -->
+    <div class="psep" id="profSep" data-i18n="prof.sep">Development</div>
+    <div class="prow" id="profRow"><label data-i18n="prof.label">Mode</label>
+      <div class="seg"><button id="profFull" class="act" data-i18n="prof.full">Full</button><button id="profCalm" data-i18n="prof.calm">Calm</button></div></div>
+    <p class="phint" id="profHint" data-i18n="prof.hint">Development only: Calm is the face of the first release. Full brings everything back as it was.</p>
+    <!-- VIS1c (RUN 6): Calm's background (views/scene/host.js; remembered on this device) — shown only in Calm (style.css) -->
+    <div class="prow" id="bgRow"><label data-i18n="prof.bg">Background</label>
+      <div class="seg"><button id="bgForest" data-i18n="prof.bgForest">Forest</button><button id="bgDark" data-i18n="prof.bgDark">Dark</button><button id="bgCamera" class="act" data-i18n="prof.bgCamera">Camera</button></div></div>
   </div>
 
 <!-- LAT1: the Diagnostics overlay (latency per stage) and the one-time Bluetooth warning; both filled by latmeter.js -->

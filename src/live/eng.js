@@ -5,6 +5,7 @@ import { leadIdx, seventh } from '../state.js';
 import { bassOwnerKey, chOwnerKey, ldKey } from '../song/notes.js';
 import { secPerBeat } from '../transport/clock.js';
 import * as AUD from '../audio.js';
+import { BUS } from '../core/bus.js';   // VIS1a: the live notes for the visuals
 
 /* ENG — единая точка исполнения (живьём через W* и на переигровке). deg→частота
    выводится ЗДЕСЬ. Ладовый КОНТЕКСТ: живьём (ctx нет) — текущий лад/септаккорд;
@@ -97,6 +98,12 @@ const makeENG=A=>({
   drum:(a,ctx,{when}={})=>A.hit(ctx ? 'hit:'+ctx.layer : null,{ row:a.row, vel:a.vol, kit:A.timbreIdx('dr',a.kit), values:a.fx },when),   // MX1: the hit key — the track's level and pan
   drone:(a,ctx,{when}={})=>A.drone(ctx ? 'drone:'+ctx.layer : null,{ view: ctx?ctx.sc:null, level:a.lvl },when),   // TF2: the drone sounds its event's view; MX1/MX2: the track's level and pan
 });
-const ENG=makeENG(AUD);   // ЖИВАЯ таблица — против живой копии движка. Поведение прежнее дословно
+/* VIS1a: the LIVE table publishes every contract call on the bus's `notes` ring (live hands AND replayed tracks — what the person hears);
+   the render copy's table (makeENG(its copy)) publishes nothing. One item per call: { kind, owner, role, hz, vel, deg, oct, when } — when =
+   the audio time the engine was told (null = now). */
+const pub=(kind,f)=>(o,p,when)=>{ BUS.push('notes',{ kind, owner:o, role:p&&p.role, hz:p&&p.hz, vel:p&&p.vel, deg:p&&p.deg, oct:p&&p.oct, when:when??null }); return f(o,p,when); };
+const AUD_BUS={ noteOn:pub('on',AUD.noteOn), noteSet:pub('set',AUD.noteSet), noteOff:pub('off',AUD.noteOff), bend:pub('bend',AUD.bend), hit:pub('hit',AUD.hit),
+  drone:pub('drone',AUD.drone), timbreIdx:(r,x)=>AUD.timbreIdx(r,x) };
+const ENG=makeENG(AUD_BUS);   // ЖИВАЯ таблица — против живой копии движка (VIS1a: through the bus publisher)
 
 export { evHzDbg, evHz, evReg, makeENG, ENG };

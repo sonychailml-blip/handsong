@@ -76,7 +76,7 @@ const NUM=(k,b)=>({ k, t:'num', b }), WAV=k=>({ k, t:'wave' });
 export const ENGINES=Object.freeze({
   chord2:{ family:'chord', fields:[WAV('t1'), WAV('t2'), NUM('ratio','ratio'), NUM('det','det'), NUM('m1','gain'), NUM('m2','gain'), NUM('lp','lp'), NUM('lvl','lvl'),
            NUM('fo','fo'), NUM('ft','ft'), NUM('fv','fv'), NUM('hj','hj')], nodes:()=>12 },
-  tine:  { family:'chord', fields:[{ k:'partials', t:'partials' }, NUM('lvl','lvl')], nodes:r=>4+2*r.partials.length },
+  tine:  { family:['chord','solo'], fields:[{ k:'partials', t:'partials' }, NUM('lvl','lvl')], nodes:r=>4+2*r.partials.length },   // C4a: also a solo bank («Firefly» solo)
   bass2: { family:'bass', fields:[WAV('t1'), WAV('t2'), NUM('det','det'), NUM('ratio','ratio'), NUM('lp','lp'), NUM('lvl','lvl'), NUM('fo','fo'), NUM('ft','ft'), NUM('fv','fv')],
            nodes:()=>12 },
   /* TIM3b — solo: oscillators (in CREATION order) through an optional lowpass with a filter strike; FM pair (index envelope, or a fixed
@@ -110,7 +110,7 @@ export function checkTimbre(rec){
   if(!TIMBRE_FAMILIES.includes(rec.family)) return 'family: one of '+TIMBRE_FAMILIES.join(', ');
   if(sp==='builtin' && rec.id.split('.')[0]!==(rec.family==='kit'?'kit':rec.family)) return 'id: a built-in id starts with its family';
   const E=ENGINES[rec.engine]; if(!E) return 'engine: «'+rec.engine+'» unknown to this app';
-  if(E.family!==rec.family) return 'engine: '+rec.engine+' is not a '+rec.family+' engine';
+  if(!(Array.isArray(E.family) ? E.family : [E.family]).includes(rec.family)) return 'engine: '+rec.engine+' is not a '+rec.family+' engine';
   const np=nameProblem(rec.name); if(np) return np;
   if(!plain(rec.recipe)) return 'recipe: missing';
   const R=rec.recipe;

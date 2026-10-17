@@ -433,6 +433,70 @@ async function timbreCore(){
   n++; if(T.checkTimbre(recs[0])!==null) miss('the first record is refused');
   return { cases:n, total:d.length, differences:d };
 }
+/* C0 (RUN 6): the profile records — every file in data/profiles/ valid against this app's modes, timbres and effects; ids = the pinned
+   list; Full offers everything and narrows nothing; CONTROLS: each damage of PROFILE_DAMAGES refused with a line naming its field */
+async function profileCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const P=await import(new URL('../src/core/profile.js', import.meta.url).href);
+  const rd=async f=>JSON.parse(await readFile(new URL('../data/'+f, import.meta.url),'utf8'));
+  const ix=await rd('index.json'), tix=await rd('timbres/index.json');
+  const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm'] };
+  const pix=await rd('profiles/index.json'), recs=[];
+  for(const name of pix.order){ n++; let r; try{ r=await rd('profiles/'+name+'.json'); }catch(e){ miss(name+': '+e.message); continue; }
+    recs.push(r); const why=P.checkProfile(r, known); if(why) miss(`${r.id||name}: ${why}`); }
+  n++; if(JSON.stringify(recs.map(r=>r.id))!==JSON.stringify([...P.PROFILE_IDS])) miss('profile ids '+JSON.stringify(recs.map(r=>r.id))+' ≠ the pinned '+JSON.stringify(P.PROFILE_IDS));
+  const full=recs.find(r=>r.id==='profile.full'), calm=recs.find(r=>r.id==='profile.calm');
+  n++; if(!full || ['handFn','noteModes','key','moods','timbres','effects','scene','ambience'].some(k=>full[k]!==null) || full.roles.length!==4 || full.shell!=='full' || full.labels!=='full' || !full.recording)
+    miss('profile.full must offer everything and narrow nothing');
+  n++; if(!calm || calm.roles.join()!=='ld' || calm.recording || calm.labels!=='plain' || calm.key.tonic!==9 || calm.noteModes.join()!=='note,hold') miss('profile.calm: solo only, nothing recorded, plain labels, key A, modes note / hold');
+  const copy=o=>JSON.parse(JSON.stringify(o));
+  if(calm) for(const [field, dmg] of P.PROFILE_DAMAGES){ const r=copy(calm); dmg(r); n++; const why=P.checkProfile(r, known);
+    if(!why) miss(`CONTROL «${field}»: a damaged profile was accepted`);
+    else if(!why.includes(field.split(' ')[0])) miss(`CONTROL «${field}»: refused, but the line does not name it: ${why}`); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* VIS1a (RUN 6): the event bus — state topics versioned; the ring keeps order, overflows by losing the oldest (counted), never more
+   than its length; a reader reads and cannot write (CONTROL: a reader write must throw; a lost count that cannot be non-zero is caught by
+   the overflow case) */
+async function busCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
+  const B=await import(new URL('../src/core/bus.js', import.meta.url).href), bus=B.createBus({ ring:4 });
+  eq('unset state', [bus.get('hands'), bus.version('hands')], [undefined, 0]);
+  bus.set('hands', { a:1 }); bus.set('hands', { a:2 });
+  eq('state latest + version', [bus.get('hands'), bus.version('hands')], [{ a:2 }, 2]);
+  for(let i=1;i<=3;i++) bus.push('notes', { i });
+  eq('ring in order', bus.since('notes', 0), { items:[{ i:1 },{ i:2 },{ i:3 }], seq:3, lost:0 });
+  eq('ring since 2', bus.since('notes', 2).items, [{ i:3 }]);
+  for(let i=4;i<=7;i++) bus.push('notes', { i });
+  eq('ring overflow: the oldest lost', bus.since('notes', 1), { items:[{ i:4 },{ i:5 },{ i:6 },{ i:7 }], seq:7, lost:2 });
+  eq('ring caught up', bus.since('notes', 7), { items:[], seq:7, lost:0 });
+  eq('unknown ring', bus.since('levels', 0), { items:[], seq:0, lost:0 });
+  const r=bus.reader();
+  eq('reader reads', [r.get('hands'), r.version('hands'), r.seq('notes')], [{ a:2 }, 2, 7]);
+  for(const w of ['set','push']){ n++; let threw=false; try{ r[w]('hands', 1); }catch(e){ threw=true; } if(!threw) d.push(`CONTROL: a reader ${w} did not throw`); }
+  n++; if(!Object.isFrozen(r)) d.push('the reader object is not frozen');
+  eq('the app bus exists and starts empty', [typeof B.BUS.set, B.BUS.version('picture')], ['function', 0]);
+  return { cases:n, total:d.length, differences:d };
+}
+/* VIS1c (RUN 6): the forest's wild fireflies, ground and depth as numbers — the same seed gives the same flies (exact) and the same
+   positions after 900 steps (15 s, exact, twice); a light gathers them (flies within 2.5 of it after 15 s; CONTROL: with the light off far fewer are — a pull that does nothing is caught); the depth bands: d 0 → near, 1 → far, monotonic, flat in a band */
+async function fliesCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const F=await import(new URL('../src/core/fireflies.js', import.meta.url).href);
+  const h=A=>{ let x=0x811c9dc5; for(const f of A) for(const v of [...f.p, ...f.v, f.glow]){ x^=Math.round(v*1e9)|0; x=Math.imul(x,0x01000193); } return (x>>>0).toString(16); };
+  const run=(light)=>{ const A=F.fliesInit(); for(let i=0;i<900;i++) F.fliesStep(A, [{ x:0, y:1.6, z:-3, on:light?1:0 }], 1/60, i/60); return A; };
+  n++; if(h(F.fliesInit())!==h(F.fliesInit())) miss('two inits from one seed differ');
+  n++; if(h(F.fliesInit(70,1))===h(F.fliesInit())) miss('CONTROL: another seed gave the same flies');
+  const a=run(true), b=run(true); n++; if(h(a)!==h(b)) miss('900 steps twice differ');
+  const near=(A)=>A.filter(f=>Math.hypot(f.p[0]-0, f.p[1]-1.6, f.p[2]+3)<2.5).length;   // gathered around the light
+  const on=near(a), off=near(run(false)); n++;
+  if(!(on>=5 && on>=3*Math.max(1,off))) miss(`a light gathers ${on} flies within 2.5 (without it ${off}) — expected ≥ 5 and ≥ 3×`);
+  n++; if(F.depthDistance(0)!==F.FOREST_DEPTH.near || F.depthDistance(1)!==F.FOREST_DEPTH.far) miss('depth ends: '+F.depthDistance(0)+' / '+F.depthDistance(1));
+  let mono=true, prev=-1; for(let i=0;i<=100;i++){ const v=F.depthDistance(i/100); if(v<prev-1e-12) mono=false; prev=v; } n++; if(!mono) miss('depth is not monotonic');
+  n++; if(F.depthDistance(0.30)!==F.depthDistance(0.36)) miss('depth is not flat inside a band (0.30 vs 0.36)');
+  n++; if(Math.abs(F.forestGround(0,0)-0)>0.2 || F.forestGround(3,-5)===F.forestGround(8,-5)) miss('ground heights unexpected');
+  return { cases:n, total:d.length, differences:d };
+}
 /* ENG2 (RUN 4): the provisional power class and the dropout rate — exact values; CONTROLS: a factor over the threshold must give
    'low'; a rate from too short a window must be null (never a guess) */
 async function engCore(){
@@ -540,6 +604,9 @@ const ROWS=[
   ['PACK1 packs and licence keys (core)', ()=>packCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['ENG2 power class (core)',  ()=>engCore(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['TIM3 timbre records (core)', ()=>timbreCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['C0 profile records (core)', ()=>profileCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['VIS1 bus (core)',           ()=>busCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

@@ -31,6 +31,11 @@ AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF
 - const (55): `FINGER_TIPS`, `FX_META`, `CAM_MARGIN`, `remapAxis`, `coverView`, `PINCH_ON`, `PINCH_HOLD`, `PINCH_OFF`, `REV_NEAR`, `CLEAR_HOLD_MS`, `LOOPER_MSG_MS`, `ROW_HYST`, `WATCHDOG_MS`, `SCHED_AHEAD`, `SCHED_TICK_MS`, `FX_BAR_W`, `FX_BAR_GAP`, `FX_BAR_MAX`, `CH_PAL_W`, `CH_PAL_PAD`, `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `PAL_HYST_X`, `PAL_HYST_Y`, `palColX`, `palRowY`, `palSplitX`, `rectBandY`, `volAmp`, `volFromOld`, `volVel`, `BEATS_PER_BAR`, `REC_VOL_EPS`, `REC_REV_EPS`, `REC_FX_EPS`, `REC_FINE_EPS`, `REC_AVG_S`, `REC_JUMP_EPS`, `REC_HIST_S`, `REC_PAUSE_S`, `REC_KNEE_F`, `AUT_RAMP_BEAT`, `AUT_RAMP_EPS`, `BEND_EPS_CENTS`, `CURVE_A`, `curveU`, `curveK`, `bendSeg`, `BEND_GLIDE_STEP_S`, `CHORD_POOL_N`, `CHORD_POOL_FIRST`, `BASS_POOL_N`, `LEAD_POOL_N`, `LEAD_POOL_KS`, `FX_VOL`
 - fn (3): `bendAt`, `bendSplit`, `bendPlan`
 
+## src/core/bus.js
+VIS1a (RUN 6, docs/VIS1-design.md §3) — THE EVENT BUS for visuals.
+- const (2): `RING_N`, `BUS`
+- fn (1): `createBus`
+
 ## src/core/camlight.js
 LAT3 — low light.
 - const (16): `LOW_MODES`, `LOW_TARGET`, `LOW_EXPOSURE_S`, `LOW_SETTLE_MS`, `exposureSupported`, `HEAL_MODES`, `AUTO_OF`, `DEV_KEYS`, `devSnap`, `healList`, `autoLeft`, `DARK_FPS`, `darkNew`, `LOST_MS`, `lostNew`, `TEST_REC_KEY`
@@ -50,6 +55,11 @@ SND-F1 — pure DSP formulas shared by the engine (audio.js), the dynamics workl
 ENG2 (RUN 4) — the engine's PROVISIONAL power class and the dropout rate.
 - const (4): `ENG_CLASS_PROVISIONAL`, `ENG_THRESH`, `ENG_BENCH_KEY`, `benchText`
 - fn (3): `engClass`, `benchOf`, `dropRate`
+
+## src/core/fireflies.js
+VIS1c (RUN 6, Calm plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
+- const (2): `FOREST_FLIES`, `FOREST_DEPTH`
+- fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
 
 ## src/core/format.js
 FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({ format:'handsong/<kind>', version, id, … }), the current version of each kind, the migration steps (one pure function …
@@ -71,6 +81,11 @@ LAT1 — latency bookkeeping.
 PACK1 (RUN 3, 2026-10-16; stage-3 plan slice 33; user decision: build it now, no UI) — PACKS AND OFFLINE LICENCE KEYS.
 - const (5): `PACK_FORMAT`, `PACK_VERSION`, `KEY_PREFIX`, `KEY_FORMAT`, `PACK_PUBKEYS`
 - fn (5): `packCheck`, `keySign`, `keyVerify`, `createPackGate`, `packUnlock`
+
+## src/core/profile.js
+C0 (RUN 6, Calm plan §2) — THE PROFILE RECORD and its validator.
+- const (6): `PROFILE_FORMAT`, `PROFILE_IDS`, `PROFILE_ROLES`, `BACKGROUNDS`, `HAND_FNS`, `PROFILE_DAMAGES`
+- fn (1): `checkProfile`
 
 ## src/core/registry.js
 FMT1 (stage 3) — PERMANENT IDS AND A REGISTRY OF RECORDS (timbres, tunings, modes, effect presets, expression mappings … as they arrive).
@@ -97,7 +112,13 @@ DRAW1 (DAY run 2026-10-16): draw.js is the FACADE of the canvas — importers ke
 - → ./views/common.js (2): `loopBarBottom`, `setEmptyTpOld`
 - → ./views/play.js (1): `drawOverlays`
 - → ./views/roll.js (21): `fxTitleOf`, `rollAutDrive`, `rollAutSnapV`, `rollAutValAt`, `rollAxisHasDim`, `rollAxisNow`, `rollBendAt`, `rollBendProbe`, `rollBoxHits`, `rollDefaultRow0For`, `rollDragTarget`, `rollGeom`, `rollHit`, `rollRow0Across`, `rollRowPitch`, `rollRowsProbe`, `rollSelectable`, `rollShiftPit`, `rollSnap`, `rollSnapBeat`, `rollTrackView`
+- → ./views/scene/host.js (4): `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`
+- → ./views/stack.js (3): `stackFrame`, `stackSet`, `stackList`
 - → ./views/strip.js (9): `arrGeom`, `laneCol`, `laneDefName`, `laneTitle`, `loopBeatAt`, `loopHit`, `loopScroll`, `loopViewProbe`, `stripProbe`
+
+## src/edition.js
+C0 (RUN 6, Calm plan §2, §9.2) — THE EDITION.
+- const (1): `EDITION`
 
 ## src/engine/fdn.js
 AUD2a (RUN 3, 2026-10-16) — THE FDN REVERB: allpass diffusers, four delay lines with damping and Householder mixing, decay (RT60) and tone — the JS reference the WASM reverb (W1) is tested against.
@@ -139,7 +160,7 @@ REC5 (stage 3) — FROZEN TRACKS: the registry by lane id, the signature and its
 GES1 (DAY run 2026-10-16): gestures.js is the FACADE of the gesture layer — importers (main, draw, ui, frzqueue, probes) keep their import lines.
 - → ./gestures/features.js (2): `degRaw`, `pinchDbg`
 - → ./gestures/fxhand.js (1): `fxParamsOf`
-- → ./gestures/hands.js (5): `HANDS`, `processHands`, `voiceModeReset`, `handsProbe`, `processHandsProbe`
+- → ./gestures/hands.js (6): `HANDS`, `processHands`, `voiceModeReset`, `handsProbe`, `processHandsProbe`, `handsView`
 - → ./gestures/roles.js (1): `ACTIONS`
 
 ## src/gestures/expr.js
@@ -161,7 +182,7 @@ GES1 part 2 (stage 3) — THE EFFECTS HAND: which parameters a hand's fingers ai
 ## src/gestures/hands.js
 GES1: the GESTURE STATE MACHINE — the hands table, latch / lead owners, endPinch, the HAND1 probe clock and processHands (one camera frame → W* calls).
 - const (1): `HANDS`
-- fn (4): `processHands`, `voiceModeReset`, `handsProbe`, `processHandsProbe`
+- fn (5): `processHands`, `voiceModeReset`, `handsProbe`, `processHandsProbe`, `handsView`
 
 ## src/gestures/looper.js
 GES1 part 2 (stage 3) — THE LOOPER HAND (function 'loop'): one command per pinch edge (rule #21) — record / play-pause / undo / the 3-s clear with its countdown — and its named confirmations — move…
@@ -304,6 +325,10 @@ AUD1c (RUN 3, 2026-10-16) — shared voice stages: track route, pan, brightness,
 AUD1c (RUN 3) / TIM3b (RUN 4) — the solo bank of a voice from its timbre RECORD: the subtractive engine type here; FM and KS dispatched.
 - fn (2): `buildLeadBank`, `buildSubtractive`
 
+## src/modules/timbres/tine.js
+C4a (RUN 6, Calm plan §4.1) — the TINE engine type as a SOLO bank: «Firefly» for the solo hand.
+- fn (1): `buildTineBank`
+
 ## src/modules/timbres/voice.js
 AUD1c (RUN 3, 2026-10-16) — starting a voice's oscillators (phase scatter, the pair start) and the solo oscillator with its detune taps.
 - const (1): `voiceBuild`
@@ -322,6 +347,10 @@ DRAW1b (RUN 3, 2026-10-16) — THE CANVAS PALETTE, read from the design tokens (
 ## src/probes/autosave.js
 AUTOSAVE1 (RUN 3, 2026-10-16): the song kept on this device by itself — through the real scheduler (autosave.asTick on the probe's clock, written at once instead of in an idle moment), the real but…
 - fn (1): `checkAutosave`
+
+## src/probes/calm.js
+C4a (RUN 6, Calm plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
+- fn (1): `checkSoloFirefly`
 
 ## src/probes/cmd.js
 CMD1 (RUN 5): the history's tripwire compares VALUES (CMD1a), tracks keep their ids through the song file (CMD1b, v7), every history step is a command serialised by ids and parsed back (CMD1c), app…
@@ -352,6 +381,10 @@ AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C, review R1): THE ENGINE C
 PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user files, Just intonation merge, bare modes, root alone.
 - const (1): `SNAPSHOT_CHANGES`
 - fn (9): `dumpScales`, `checkFiles`, `checkNames`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
+
+## src/probes/forest.js
+VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
+- fn (2): `checkForestRoom`, `checkBackgrounds`
 
 ## src/probes/freeze.js
 PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost.
@@ -404,6 +437,10 @@ PACK1 (RUN 3, 2026-10-16): packs and offline licence keys IN THE PAGE (Chrome's 
 POOL1 (RUN 4, ENG2 review E2): the chord pool grows on demand.
 - fn (1): `checkPool`
 
+## src/probes/profile.js
+C0 (RUN 6, Calm plan §2, §10): row «C0 profile round trip» (quick and all; no sound, no capture).
+- fn (1): `checkProfile`
+
 ## src/probes/rows.js
 PROBE1: the ROW REGISTRY — every probe row registers itself next to its probe; P.all / P.quick (probes/run.js) and the node data runner (tools/probe-data.mjs, rows flagged node) list them from here.
 - fn (5): `row`, `family`, `rows`, `rowProblems`, `rowCheck`
@@ -446,9 +483,18 @@ TIM3 (RUN 4): timbres as data — the proof that nothing changes.
 PROBE1: Tuning and editor-row probes: pitch from the tuning index, editor rows, highlights, chord rules and labels, out-of-mode pitches, song integrity, chord types and modes.
 - fn (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
 
+## src/probes/vis.js
+VIS1a (RUN 6, docs/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
+- fn (1): `checkVisStack`
+
 ## src/probes/window.js
 PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX2, AR2.
 - fn (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
+
+## src/profile.js
+C0 (RUN 6, Calm plan §2) — PROFILES: the faces of the one app.
+- const (8): `profileWire`, `profileCurrent`, `profileOf`, `profileList`, `profileLoadReport`, `onProfile`, `profileSavedDbg`, `profileDoorsDbg`
+- fn (2): `profileApply`, `profileBoot`
 
 ## src/recorder.js
 (no head comment)
@@ -494,12 +540,14 @@ PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX
 ⛳ ПРОБА УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ — консольный инструмент (как ухо-проба render.js: R.aud/R.live), НЕ часть приложения.
 - → ./probedata.js (10): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegreesData`, `checkModeMap`
 - → ./probes/autosave.js (1): `checkAutosave`
+- → ./probes/calm.js (1): `checkSoloFirefly`
 - → ./probes/cmd.js (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
 - → ./probes/detect.js (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
 - → ./probes/edit.js (9): `checkSoloEdit`, `checkSelect`, `checkPaste`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
 - → ./probes/eng2.js (1): `checkEngReadouts`
 - → ./probes/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
 - → ./probes/files.js (10): `dumpScales`, `checkFiles`, `checkNames`, `SNAPSHOT_CHANGES`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
+- → ./probes/forest.js (2): `checkForestRoom`, `checkBackgrounds`
 - → ./probes/freeze.js (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
 - → ./probes/fxcontract.js (1): `checkFx`
 - → ./probes/gold.js (2): `dumpGold`, `checkGold`
@@ -511,6 +559,7 @@ PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX
 - → ./probes/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
 - → ./probes/pack.js (1): `checkPack`
 - → ./probes/pool.js (1): `checkPool`
+- → ./probes/profile.js (1): `checkProfile`
 - → ./probes/run.js (4): `material`, `all`, `quick`, `orderCheck`
 - → ./probes/seed.js (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
 - → ./probes/song1.js (1): `checkSongRecords`
@@ -520,6 +569,7 @@ PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX
 - → ./probes/tim3d.js (1): `checkOwnTimbres`
 - → ./probes/timbres.js (3): `checkTimbresBefore`, `dumpTimbres`, `checkTimbreRecords`
 - → ./probes/tuning.js (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
+- → ./probes/vis.js (1): `checkVisStack`
 - → ./probes/window.js (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
 
 ## src/scales.js
@@ -683,6 +733,21 @@ DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis
 - const (5): `rollAutValAt`, `rollBendProbe`, `rollSnapBeat`, `rollAutSnapV`, `rollRowsProbe`
 - fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
 
+## src/views/scene/forest.js
+VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
+- const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
+- fn (1): `buildForest`
+
+## src/views/scene/host.js
+VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Calm plan §3) — THE SCENE HOST and Calm's BACKGROUNDS.
+- const (5): `BACKGROUNDS`, `backgroundOf`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`
+- fn (4): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`
+
+## src/views/stack.js
+VIS1a (RUN 6, docs/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room, VIS1b) · background (the camera picture) · instrument (the play s…
+- const (2): `LAYERS`, `stackList`
+- fn (3): `stackAdd`, `stackSet`, `stackFrame`
+
 ## src/views/strip.js
 DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer (drawLooper, loopView, their hit tests and probes) — moved from draw.js verbatim (draw.js is the facade).
 - const (4): `laneCol`, `laneTitle`, `loopViewProbe`, `loopViewClear`
@@ -693,7 +758,7 @@ DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer
 - const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
-_132 modules, 1913 exported names._
+_145 modules, 1978 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

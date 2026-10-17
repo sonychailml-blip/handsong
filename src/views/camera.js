@@ -3,6 +3,7 @@ import { ctx, canvas, video } from '../vision.js';
 import { cv } from '../palette.js';   // DRAW1b: canvas colours are design tokens (tokens.css «canvas»)
 import { mirrored, setViewRect } from '../state.js';
 import { coverView } from '../config.js';
+import { stackAdd } from './stack.js';   // VIS1a: the camera picture is the background module
 
 /* Видео-фон рисуем ДО детекции (тот же синхронный тик = тот же кадр видео),
    накладки — ПОСЛЕ. Так пиксели видео и точки руки берутся из ОДНОГО кадра:
@@ -33,4 +34,6 @@ function drawVideoBackground(src=video){
   ctx.fillStyle=cv('bg-a50'); ctx.fillRect(0,0,W,H);
 }
 
+/* VIS1a: the background module — the picture main.onHands published (the frame whose hands are shown, rule #8) */
+stackAdd({ kind:'visual', id:'camera', layer:'background', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>drawVideoBackground(bus.get('picture')) });
 export { drawVideoBackground, syncViewRect };

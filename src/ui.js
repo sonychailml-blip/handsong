@@ -14,7 +14,7 @@ import { scaleId, tonic, setScaleId, setTonic, tonicCents, setTonicCents, tunedF
          secSel, setSecSel,   // ED6: the selected section marker of the window
          rollBendSel, setRollBendSel, rollBendDrag, setRollBendDrag,   // OWN2: the selected bend point and the ghost of a dragged one
          setLaneDrag,   // AR2: тянущаяся за ручку строка окна (вид жеста; порядок пишет recorder.moveLane)
-         seventh, rectOctReg } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
+         seventh, rectOctReg, leadIdx } from './state.js';   // S5.5: живой септаккорд (для вставки в РОЛЬ БЕЗ событий) и липкий регистр роли (куда открыть окно высот)   // S5.0: вид редактора дорожки — открыт ли, окно времени, выделение
 /* fxParamsOf — ЕДИНЫЙ путь записи значения параметра (скаляр в state.fx[k] / модуль через setNorm).
    Меню фиксированных значений идёт ЧЕРЕЗ НЕГО, а не собственной копией развилки «скаляр или модуль»:
    иначе лог-кривая реверба жила бы в двух местах и однажды разошлась. Цикла нет — gestures не знает ui. */
@@ -27,7 +27,7 @@ import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScrol
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // OWN1: the modes a track can be re-mapped into; TF5: «1/1 = …» and the historical 1/1
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
-import { timbreInstall, DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, timbreKey, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { timbreInstall, DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, timbreKey, timbreIdx, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo, cmdSet, cmdNote,   // CMD1d: the switches that are not history steps go through cmdSet (the journal sees them)
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -55,7 +55,10 @@ import { checkRecordList } from './scaleload.js';
 import { userPut } from './userstore.js';   // SONG1: «Keep in my scales»
 import { songNeeds, songTimbreNeeds } from './song/file.js';   // AUTOSAVE1: the song kept on this device
 import { icon } from './icons.js';   // UI1b: every interface glyph through the icon component
-import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from './core/songfile.js';   // SAVE1: reading a song file (pure)
+import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from './core/songfile.js';
+import { profileWire, profileApply } from './profile.js';   // C0: Full ↔ Calm (the dev edition's switch)
+import { EDITION } from './edition.js';
+import { setBackground, backgroundOf } from './draw.js';   // VIS1c: Calm's backgrounds (forest / dark / camera)   // SAVE1: reading a song file (pure)
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
@@ -3053,6 +3056,43 @@ function onResize(){
 }
 addEventListener('resize', onResize);
 applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHandFn; applyInstr → renderHandFn (инициализация кнопок ролей и секции «Функции рук»)
+/* C0 (RUN 6): the profile DOORS (profile.js) — a profile writes the live state through the setters a lesson's setup uses (tutorSetScale, the
+   key knob's path, the solo timbre select, setHandFn, the voice mode); `face` shows it (body.calm hides what Calm does not offer — CSS).
+   The switch sits in the Sound panel, dev edition only. */
+profileWire({
+  busy:()=> recording ? t('prof.busyRec') : null,
+  read:()=>({ scaleId, tonic, tonicCents, lead:timbreIdOf('ld',leadIdx), phoneInstr, splitOn, hand:{ ...handFn.ld }, voice:voiceMode.ld }),
+  write:s=>{
+    softAllOff();
+    if(splitOn!==s.splitOn) setSplitOn(s.splitOn);
+    setPhoneInstr(s.phoneInstr);
+    if(scaleId!==s.scaleId) tutorSetScale(s.scaleId);
+    if(tonic!==s.tonic || tonicCents!==s.tonicCents){ setTonic(s.tonic); setTonicCents(s.tonicCents); selTonic.value=tonic; $('tonicCents').value=String(tonicCents); keyMoved(); }
+    const li=timbreIdx('ld', s.lead); if(li!=null && li!==leadIdx){ setLeadInstr(li); selLead.value=String(leadIdx); }
+    setHandFn('ld','L',s.hand.L); setHandFn('ld','R',s.hand.R);
+    if(voiceMode.ld!==s.voice){ setVoiceMode('ld',s.voice); voiceModeReset('ld'); }
+    applyVoiceMode(); applySplit(); applyInstr();   // not renderFxCtl: drawing it fills default values into fixed chain parameters (a state change)
+  },
+  face:p=>{
+    document.body.classList.toggle('calm', p.shell==='calm');
+    $('profFull').classList.toggle('act', p.id==='profile.full'); $('profCalm').classList.toggle('act', p.id==='profile.calm');
+    if(!p.recording && loop.on) onLoop();   // Calm has no transport: a playing song pauses
+    const st=bgStored(); bgPick(p.backgrounds.includes(st) ? st : p.backgrounds[0], false);   // VIS1c: Full → camera; Calm → this device's choice
+  },
+});
+/* VIS1c (RUN 6): Calm's background — Forest (the 3D room) · Dark (black, no WebGL) · Camera (today's picture); the same sound on each.
+   Remembered on this device (localStorage; a private window falls back to the profile's first). */
+const BG_KEY='handsong.calmBg';
+const bgStored=()=>{ try{ return localStorage.getItem(BG_KEY); }catch(e){ return null; } };
+const applyBgBtns=(m=backgroundOf())=>{ for(const [id,v] of [['bgForest','forest'],['bgDark','dark'],['bgCamera','camera']]) $(id).classList.toggle('act', v===m); };
+function bgPick(mode, store=true){
+  if(store) try{ localStorage.setItem(BG_KEY, mode); }catch(e){}
+  setBackground(mode).then(()=>applyBgBtns()); applyBgBtns(mode);
+}
+$('bgForest').onclick=()=>bgPick('forest'); $('bgDark').onclick=()=>bgPick('dark'); $('bgCamera').onclick=()=>bgPick('camera');
+function profPick(id){ const why=profileApply(id); $('profHint').textContent= why || t('prof.hint'); }
+$('profFull').onclick=()=>profPick('profile.full'); $('profCalm').onclick=()=>profPick('profile.calm');
+if(EDITION!=='dev') for(const id of ['profSep','profRow','profHint']) $(id).style.display='none';
 
 /* СМЕНА ЯЗЫКА без перезагрузки: applyI18n (в setLang) уже обновил статические [data-i18n]; здесь
    перерисовываем ДИНАМИКУ — то, что строит/пишет JS (подписи ссылок, кнопка роли + «Функции рук»,

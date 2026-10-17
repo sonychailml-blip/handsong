@@ -1,531 +1,545 @@
 {
-  "format": "handsong/licence-register",
-  "version": 1,
-  "about": "LIC1 (hard rule #32). Every third-party item and every icon, glyph, image and font the app uses. Checked by tools/check-licences.mjs (run by tools/probe-data.mjs); THIRD-PARTY-LICENSES.md is generated from this file (node tools/check-licences.mjs --write).",
-  "policy": {
-    "code": [
-      "MIT",
-      "BSD-2-Clause",
-      "BSD-3-Clause",
-      "Apache-2.0",
-      "ISC",
-      "Zlib"
-    ],
-    "material": [
-      "CC0-1.0",
-      "CC-BY-4.0",
-      "OFL-1.1",
-      "own-work",
-      "AI-generated"
-    ],
-    "refused": "GPL, AGPL, LGPL, MPL, any share-alike (SA), non-commercial (NC) or no-derivatives (ND) terms; anything else needs the user's decision first",
-    "decisions": "Q13 (user, 2026-10-14): material licences CC0, CC-BY 4.0 with attribution, SIL OFL, own work, AI-generated pictures (tool and terms recorded); refuse SA, NC, ND."
-  },
-  "items": [
-    {
-      "id": "mediapipe-tasks-vision",
-      "name": "MediaPipe Tasks Vision — JavaScript library and its WebAssembly files",
-      "class": "code",
-      "use": "CDN",
-      "version": "0.10.35",
-      "licence": "Apache-2.0",
-      "source": "https://github.com/google-ai-edge/mediapipe (npm @mediapipe/tasks-vision)",
-      "urls": [
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35"
-      ],
-      "notes": "Hand detection in the browser (src/handdet.js — on the main thread or in our worker src/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline)."
-    },
-    {
-      "id": "mediapipe-hand-landmarker",
-      "name": "MediaPipe hand landmarker model (float16, version 1)",
-      "class": "model",
-      "use": "CDN",
-      "version": "float16/1",
-      "licence": "Apache-2.0",
-      "source": "Google MediaPipe model card «Hand Tracking (Lite/Full)»; models listed at https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker",
-      "urls": [
-        "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-      ],
-      "notes": "Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4)."
-    },
-    {
-      "id": "vercel-web-analytics",
-      "name": "Vercel Web Analytics — page-view counter of the Vercel deployment",
-      "class": "service",
-      "use": "service",
-      "version": "hosted",
-      "licence": "service-terms",
-      "source": "https://vercel.com/docs/analytics",
-      "urls": [
-        "/_vercel/insights/script.js"
-      ],
-      "decision": "Q14 (user, 2026-10-14): keep it and name it in the privacy notice. Cookieless page views only; never sees camera, sound or hand data. Inactive on GitHub Pages (the path does not resolve there). Vercel Hobby forbids commercial use — a paid plan or other hosting before selling (BACKLOG strategy).",
-      "notes": "Script served by Vercel from the same origin; the one-line stub that queues calls before it loads is our own code (src/va-stub.js, outside index.html so the CSP needs no inline script)."
-    },
-    {
-      "id": "link-feedback-form",
-      "name": "Feedback form (Google Forms) — a link the person opens",
-      "class": "link",
-      "use": "link",
-      "version": "—",
-      "licence": "n/a",
-      "source": "src/ui.js FEEDBACK_URL",
-      "urls": [
-        "https://docs.google.com/forms/"
-      ],
-      "notes": "Opened only by a tap on the start card; nothing is sent by the app."
-    },
-    {
-      "id": "link-donate",
-      "name": "Donation page (PayPal.Me) — a link the person opens",
-      "class": "link",
-      "use": "link",
-      "version": "—",
-      "licence": "n/a",
-      "source": "src/ui.js DONATE_URL",
-      "urls": [
-        "https://paypal.me/"
-      ],
-      "notes": "Opened only by a tap on the start card; nothing is sent by the app."
-    },
-    {
-      "id": "playwright-core",
-      "name": "playwright-core — browser automation for the probe runner",
-      "class": "code",
-      "use": "dev-only",
-      "version": "1.64.0",
-      "licence": "Apache-2.0",
-      "source": "https://github.com/microsoft/playwright (npm playwright-core)",
-      "npm": "playwright-core",
-      "notes": "Developer tool in tools/ only (tools/node_modules is git-ignored); never shipped; no dependencies of its own."
-    },
-    {
-      "id": "app-icons",
-      "name": "App icons (home screen / install) — a blue «H» of three rectangles on a light background",
-      "class": "image",
-      "use": "shipped",
-      "version": "—",
-      "licence": "AI-generated",
-      "source": "made by Claude Code (Anthropic) in this project, drawn by code as flat rectangles (no font, no traced artwork, no metadata); whether anything was copied is unknown (user, Q13)",
-      "tool": "Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms",
-      "files": [
-        "icons/icon-192.png",
-        "icons/icon-512.png",
-        "icons/icon-512-maskable.png"
-      ],
-      "replace": "to be replaced by the user's own authored design (before the Calm release)"
-    },
-    {
-      "id": "system-fonts",
-      "name": "Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)",
-      "class": "font",
-      "use": "device",
-      "version": "—",
-      "licence": "n/a",
-      "source": "style.css --font: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; src/draw.js ctx.font system-ui",
-      "notes": "No font file is shipped; the person's device draws the text with its own fonts.",
-      "replace": "to be replaced by the user's own authored design (a chosen typeface under OFL-1.1 or own work, set through the UI1 design tokens)"
-    },
-    {
-      "id": "unicode-glyphs",
-      "name": "Unicode symbols and emoji used as icons and signs (list below)",
-      "class": "glyph",
-      "use": "device",
-      "version": "—",
-      "licence": "n/a",
-      "source": "characters in our own text; their pictures come from the device's fonts (Segoe UI Symbol / Segoe UI Emoji on Windows, Apple Color Emoji and SF on Apple devices, Noto on Android) — no file shipped",
-      "notes": "Each device draws them differently. Pictures of them in marketing (screenshots, the promo video) may fall under the font owner's terms — another reason to replace them.",
-      "replace": "to be replaced by the user's own authored design — one icon component / SVG sprite (UI1)"
-    },
-    {
-      "id": "threejs-r128-reference",
-      "name": "three.js (3D library) — reference prototype only",
-      "class": "code",
-      "use": "reference",
-      "version": "r128",
-      "licence": "MIT",
-      "source": "https://github.com/mrdoob/three.js (cdnjs three.js r128)",
-      "urls": [
-        "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/"
-      ],
-      "notes": "Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Calm, not app code). Not shipped; if Calm adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-CALM plan)."
-    },
-    {
-      "id": "google-fonts-reference",
-      "name": "Google Fonts: Marcellus and Commissioner — reference prototype only",
-      "class": "font",
-      "use": "reference",
-      "version": "css2 API",
-      "licence": "OFL-1.1",
-      "source": "https://fonts.google.com (Marcellus, Commissioner — SIL Open Font License 1.1)",
-      "urls": [
-        "https://fonts.googleapis.com",
-        "https://fonts.gstatic.com"
-      ],
-      "replace": "reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)",
-      "notes": "Loaded only by docs/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts."
-    }
+ "format": "handsong/licence-register",
+ "version": 1,
+ "about": "LIC1 (hard rule #32). Every third-party item and every icon, glyph, image and font the app uses. Checked by tools/check-licences.mjs (run by tools/probe-data.mjs); THIRD-PARTY-LICENSES.md is generated from this file (node tools/check-licences.mjs --write).",
+ "policy": {
+  "code": [
+   "MIT",
+   "BSD-2-Clause",
+   "BSD-3-Clause",
+   "Apache-2.0",
+   "ISC",
+   "Zlib"
   ],
-  "glyphs": [
-    {
-      "ch": "↶",
-      "name": "undo (history)",
-      "kind": "icon"
-    },
-    {
-      "ch": "↷",
-      "name": "redo (history)",
-      "kind": "icon"
-    },
-    {
-      "ch": "⤺",
-      "name": "undo the last take",
-      "kind": "icon"
-    },
-    {
-      "ch": "⇄",
-      "name": "swap hands (help text)",
-      "kind": "icon"
-    },
-    {
-      "ch": "⊘",
-      "name": "remove effect from a track",
-      "kind": "icon"
-    },
-    {
-      "ch": "⌐",
-      "name": "step shape (automation / bend)",
-      "kind": "icon"
-    },
-    {
-      "ch": "╱",
-      "name": "glide shape (automation / bend)",
-      "kind": "icon"
-    },
-    {
-      "ch": "⌒",
-      "name": "curvature value tag",
-      "kind": "icon"
-    },
-    {
-      "ch": "⌗",
-      "name": "quantise",
-      "kind": "icon"
-    },
-    {
-      "ch": "⏮",
-      "name": "to the start",
-      "kind": "icon"
-    },
-    {
-      "ch": "⏸",
-      "name": "pause (message)",
-      "kind": "icon"
-    },
-    {
-      "ch": "❚",
-      "name": "pause bars",
-      "kind": "icon"
-    },
-    {
-      "ch": "▶",
-      "name": "play / start",
-      "kind": "icon"
-    },
-    {
-      "ch": "■",
-      "name": "stop (panic)",
-      "kind": "icon"
-    },
-    {
-      "ch": "⟳",
-      "name": "repeat the brace",
-      "kind": "icon"
-    },
-    {
-      "ch": "●",
-      "name": "record / lesson step done",
-      "kind": "icon"
-    },
-    {
-      "ch": "○",
-      "name": "lesson step to come",
-      "kind": "icon"
-    },
-    {
-      "ch": "✕",
-      "name": "close / delete / clear",
-      "kind": "icon"
-    },
-    {
-      "ch": "✎",
-      "name": "edit / rename / arrangement window",
-      "kind": "icon"
-    },
-    {
-      "ch": "✂",
-      "name": "cut bars",
-      "kind": "icon"
-    },
-    {
-      "ch": "⧉",
-      "name": "copy / duplicate",
-      "kind": "icon"
-    },
-    {
-      "ch": "📋",
-      "name": "paste",
-      "kind": "icon"
-    },
-    {
-      "ch": "🗑",
-      "name": "delete",
-      "kind": "icon"
-    },
-    {
-      "ch": "✚",
-      "name": "add a point",
-      "kind": "icon"
-    },
-    {
-      "ch": "＋",
-      "name": "insert (empty bars)",
-      "kind": "icon"
-    },
-    {
-      "ch": "▯",
-      "name": "empty bar",
-      "kind": "icon"
-    },
-    {
-      "ch": "▮",
-      "name": "volume bars face",
-      "kind": "icon"
-    },
-    {
-      "ch": "▤",
-      "name": "arrangement face",
-      "kind": "icon"
-    },
-    {
-      "ch": "⬚",
-      "name": "pick several notes",
-      "kind": "icon"
-    },
-    {
-      "ch": "⤢",
-      "name": "fit the whole song",
-      "kind": "icon"
-    },
-    {
-      "ch": "▲",
-      "name": "move up",
-      "kind": "icon"
-    },
-    {
-      "ch": "▼",
-      "name": "move down",
-      "kind": "icon"
-    },
-    {
-      "ch": "▸",
-      "name": "accordion closed",
-      "kind": "icon"
-    },
-    {
-      "ch": "▾",
-      "name": "accordion open",
-      "kind": "icon"
-    },
-    {
-      "ch": "↕",
-      "name": "vertical hand axis",
-      "kind": "icon"
-    },
-    {
-      "ch": "↔",
-      "name": "horizontal hand axis",
-      "kind": "icon"
-    },
-    {
-      "ch": "◆",
-      "name": "depth hand axis",
-      "kind": "icon"
-    },
-    {
-      "ch": "◧",
-      "name": "left half (split)",
-      "kind": "icon"
-    },
-    {
-      "ch": "◨",
-      "name": "right half / split",
-      "kind": "icon"
-    },
-    {
-      "ch": "✓",
-      "name": "done / chosen",
-      "kind": "icon"
-    },
-    {
-      "ch": "⚙",
-      "name": "settings",
-      "kind": "icon"
-    },
-    {
-      "ch": "⛶",
-      "name": "full screen",
-      "kind": "icon"
-    },
-    {
-      "ch": "⬇",
-      "name": "install",
-      "kind": "icon"
-    },
-    {
-      "ch": "🌐",
-      "name": "language",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎥",
-      "name": "video clip",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎙",
-      "name": "audio clip",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎚",
-      "name": "mixer",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎛",
-      "name": "sound panel",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎵",
-      "name": "backing",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎹",
-      "name": "chords role",
-      "kind": "icon"
-    },
-    {
-      "ch": "🎸",
-      "name": "bass role",
-      "kind": "icon"
-    },
-    {
-      "ch": "🥁",
-      "name": "drums role / drum backing",
-      "kind": "icon"
-    },
-    {
-      "ch": "🔄",
-      "name": "switch camera",
-      "kind": "icon"
-    },
-    {
-      "ch": "↑",
-      "name": "arrow key (tooltip)",
-      "kind": "typography"
-    },
-    {
-      "ch": "↓",
-      "name": "arrow key (tooltip)",
-      "kind": "typography"
-    },
-    {
-      "ch": "→",
-      "name": "arrow in text",
-      "kind": "typography"
-    },
-    {
-      "ch": "−",
-      "name": "minus sign",
-      "kind": "typography"
-    },
-    {
-      "ch": "≈",
-      "name": "approximately",
-      "kind": "typography"
-    },
-    {
-      "ch": "≤",
-      "name": "less or equal",
-      "kind": "typography"
-    },
-    {
-      "ch": "≥",
-      "name": "greater or equal",
-      "kind": "typography"
-    },
-    {
-      "ch": "∞",
-      "name": "infinity (−∞ dB)",
-      "kind": "typography"
-    },
-    {
-      "ch": "√",
-      "name": "square root (console text)",
-      "kind": "typography"
-    },
-    {
-      "ch": "♭",
-      "name": "flat (note names)",
-      "kind": "notation"
-    },
-    {
-      "ch": "♯",
-      "name": "sharp (note names)",
-      "kind": "notation"
-    },
-    {
-      "ch": "♮",
-      "name": "natural (chord names)",
-      "kind": "notation"
-    },
-    {
-      "ch": "⚠",
-      "name": "warning (console)",
-      "kind": "console"
-    },
-    {
-      "ch": "⛔",
-      "name": "forbidden (console)",
-      "kind": "console"
-    },
-    {
-      "ch": "⛳",
-      "name": "rule flag (console)",
-      "kind": "console"
-    },
-    {
-      "ch": "✅",
-      "name": "done (console)",
-      "kind": "console"
-    },
-    {
-      "ch": "❌",
-      "name": "failed (console)",
-      "kind": "console"
-    },
-    {
-      "ch": "❄",
-      "name": "frozen (console)",
-      "kind": "console"
-    },
-    {
-      "ch": "☀",
-      "name": "sun (console)",
-      "kind": "console"
-    }
-  ]
+  "material": [
+   "CC0-1.0",
+   "CC-BY-4.0",
+   "OFL-1.1",
+   "own-work",
+   "AI-generated"
+  ],
+  "refused": "GPL, AGPL, LGPL, MPL, any share-alike (SA), non-commercial (NC) or no-derivatives (ND) terms; anything else needs the user's decision first",
+  "decisions": "Q13 (user, 2026-10-14): material licences CC0, CC-BY 4.0 with attribution, SIL OFL, own work, AI-generated pictures (tool and terms recorded); refuse SA, NC, ND."
+ },
+ "items": [
+  {
+   "id": "mediapipe-tasks-vision",
+   "name": "MediaPipe Tasks Vision — JavaScript library and its WebAssembly files",
+   "class": "code",
+   "use": "CDN",
+   "version": "0.10.35",
+   "licence": "Apache-2.0",
+   "source": "https://github.com/google-ai-edge/mediapipe (npm @mediapipe/tasks-vision)",
+   "urls": [
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35"
+   ],
+   "notes": "Hand detection in the browser (src/handdet.js — on the main thread or in our worker src/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline)."
+  },
+  {
+   "id": "mediapipe-hand-landmarker",
+   "name": "MediaPipe hand landmarker model (float16, version 1)",
+   "class": "model",
+   "use": "CDN",
+   "version": "float16/1",
+   "licence": "Apache-2.0",
+   "source": "Google MediaPipe model card «Hand Tracking (Lite/Full)»; models listed at https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker",
+   "urls": [
+    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+   ],
+   "notes": "Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4)."
+  },
+  {
+   "id": "vercel-web-analytics",
+   "name": "Vercel Web Analytics — page-view counter of the Vercel deployment",
+   "class": "service",
+   "use": "service",
+   "version": "hosted",
+   "licence": "service-terms",
+   "source": "https://vercel.com/docs/analytics",
+   "urls": [
+    "/_vercel/insights/script.js"
+   ],
+   "decision": "Q14 (user, 2026-10-14): keep it and name it in the privacy notice. Cookieless page views only; never sees camera, sound or hand data. Inactive on GitHub Pages (the path does not resolve there). Vercel Hobby forbids commercial use — a paid plan or other hosting before selling (BACKLOG strategy).",
+   "notes": "Script served by Vercel from the same origin; the one-line stub that queues calls before it loads is our own code (src/va-stub.js, outside index.html so the CSP needs no inline script)."
+  },
+  {
+   "id": "link-feedback-form",
+   "name": "Feedback form (Google Forms) — a link the person opens",
+   "class": "link",
+   "use": "link",
+   "version": "—",
+   "licence": "n/a",
+   "source": "src/ui.js FEEDBACK_URL",
+   "urls": [
+    "https://docs.google.com/forms/"
+   ],
+   "notes": "Opened only by a tap on the start card; nothing is sent by the app."
+  },
+  {
+   "id": "link-donate",
+   "name": "Donation page (PayPal.Me) — a link the person opens",
+   "class": "link",
+   "use": "link",
+   "version": "—",
+   "licence": "n/a",
+   "source": "src/ui.js DONATE_URL",
+   "urls": [
+    "https://paypal.me/"
+   ],
+   "notes": "Opened only by a tap on the start card; nothing is sent by the app."
+  },
+  {
+   "id": "playwright-core",
+   "name": "playwright-core — browser automation for the probe runner",
+   "class": "code",
+   "use": "dev-only",
+   "version": "1.64.0",
+   "licence": "Apache-2.0",
+   "source": "https://github.com/microsoft/playwright (npm playwright-core)",
+   "npm": "playwright-core",
+   "notes": "Developer tool in tools/ only (tools/node_modules is git-ignored); never shipped; no dependencies of its own."
+  },
+  {
+   "id": "app-icons",
+   "name": "App icons (home screen / install) — a blue «H» of three rectangles on a light background",
+   "class": "image",
+   "use": "shipped",
+   "version": "—",
+   "licence": "AI-generated",
+   "source": "made by Claude Code (Anthropic) in this project, drawn by code as flat rectangles (no font, no traced artwork, no metadata); whether anything was copied is unknown (user, Q13)",
+   "tool": "Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms",
+   "files": [
+    "icons/icon-192.png",
+    "icons/icon-512.png",
+    "icons/icon-512-maskable.png"
+   ],
+   "replace": "to be replaced by the user's own authored design (before the Calm release)"
+  },
+  {
+   "id": "system-fonts",
+   "name": "Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)",
+   "class": "font",
+   "use": "device",
+   "version": "—",
+   "licence": "n/a",
+   "source": "style.css --font: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; src/draw.js ctx.font system-ui",
+   "notes": "No font file is shipped; the person's device draws the text with its own fonts.",
+   "replace": "to be replaced by the user's own authored design (a chosen typeface under OFL-1.1 or own work, set through the UI1 design tokens)"
+  },
+  {
+   "id": "unicode-glyphs",
+   "name": "Unicode symbols and emoji used as icons and signs (list below)",
+   "class": "glyph",
+   "use": "device",
+   "version": "—",
+   "licence": "n/a",
+   "source": "characters in our own text; their pictures come from the device's fonts (Segoe UI Symbol / Segoe UI Emoji on Windows, Apple Color Emoji and SF on Apple devices, Noto on Android) — no file shipped",
+   "notes": "Each device draws them differently. Pictures of them in marketing (screenshots, the promo video) may fall under the font owner's terms — another reason to replace them.",
+   "replace": "to be replaced by the user's own authored design — one icon component / SVG sprite (UI1)"
+  },
+  {
+   "id": "threejs-r128-reference",
+   "name": "three.js (3D library) — reference prototype only",
+   "class": "code",
+   "use": "reference",
+   "version": "r128",
+   "licence": "MIT",
+   "source": "https://github.com/mrdoob/three.js (cdnjs three.js r128)",
+   "urls": [
+    "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/"
+   ],
+   "notes": "Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Calm, not app code). Not shipped; if Calm adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-CALM plan)."
+  },
+  {
+   "id": "threejs-r128",
+   "name": "three.js (3D library) — the Calm forest room",
+   "class": "code",
+   "use": "shipped",
+   "version": "r128 (npm three@0.128.0)",
+   "licence": "MIT",
+   "source": "https://github.com/mrdoob/three.js (npm three@0.128.0, build/three.min.js; sha256 9274bbce…1ce2)",
+   "files": [
+    "vendor/three-r128/three.min.js",
+    "vendor/three-r128/LICENSE"
+   ],
+   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by src/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change."
+  },
+  {
+   "id": "google-fonts-reference",
+   "name": "Google Fonts: Marcellus and Commissioner — reference prototype only",
+   "class": "font",
+   "use": "reference",
+   "version": "css2 API",
+   "licence": "OFL-1.1",
+   "source": "https://fonts.google.com (Marcellus, Commissioner — SIL Open Font License 1.1)",
+   "urls": [
+    "https://fonts.googleapis.com",
+    "https://fonts.gstatic.com"
+   ],
+   "replace": "reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)",
+   "notes": "Loaded only by docs/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts."
+  }
+ ],
+ "glyphs": [
+  {
+   "ch": "↶",
+   "name": "undo (history)",
+   "kind": "icon"
+  },
+  {
+   "ch": "↷",
+   "name": "redo (history)",
+   "kind": "icon"
+  },
+  {
+   "ch": "⤺",
+   "name": "undo the last take",
+   "kind": "icon"
+  },
+  {
+   "ch": "⇄",
+   "name": "swap hands (help text)",
+   "kind": "icon"
+  },
+  {
+   "ch": "⊘",
+   "name": "remove effect from a track",
+   "kind": "icon"
+  },
+  {
+   "ch": "⌐",
+   "name": "step shape (automation / bend)",
+   "kind": "icon"
+  },
+  {
+   "ch": "╱",
+   "name": "glide shape (automation / bend)",
+   "kind": "icon"
+  },
+  {
+   "ch": "⌒",
+   "name": "curvature value tag",
+   "kind": "icon"
+  },
+  {
+   "ch": "⌗",
+   "name": "quantise",
+   "kind": "icon"
+  },
+  {
+   "ch": "⏮",
+   "name": "to the start",
+   "kind": "icon"
+  },
+  {
+   "ch": "⏸",
+   "name": "pause (message)",
+   "kind": "icon"
+  },
+  {
+   "ch": "❚",
+   "name": "pause bars",
+   "kind": "icon"
+  },
+  {
+   "ch": "▶",
+   "name": "play / start",
+   "kind": "icon"
+  },
+  {
+   "ch": "■",
+   "name": "stop (panic)",
+   "kind": "icon"
+  },
+  {
+   "ch": "⟳",
+   "name": "repeat the brace",
+   "kind": "icon"
+  },
+  {
+   "ch": "●",
+   "name": "record / lesson step done",
+   "kind": "icon"
+  },
+  {
+   "ch": "○",
+   "name": "lesson step to come",
+   "kind": "icon"
+  },
+  {
+   "ch": "✕",
+   "name": "close / delete / clear",
+   "kind": "icon"
+  },
+  {
+   "ch": "✎",
+   "name": "edit / rename / arrangement window",
+   "kind": "icon"
+  },
+  {
+   "ch": "✂",
+   "name": "cut bars",
+   "kind": "icon"
+  },
+  {
+   "ch": "⧉",
+   "name": "copy / duplicate",
+   "kind": "icon"
+  },
+  {
+   "ch": "📋",
+   "name": "paste",
+   "kind": "icon"
+  },
+  {
+   "ch": "🗑",
+   "name": "delete",
+   "kind": "icon"
+  },
+  {
+   "ch": "✚",
+   "name": "add a point",
+   "kind": "icon"
+  },
+  {
+   "ch": "＋",
+   "name": "insert (empty bars)",
+   "kind": "icon"
+  },
+  {
+   "ch": "▯",
+   "name": "empty bar",
+   "kind": "icon"
+  },
+  {
+   "ch": "▮",
+   "name": "volume bars face",
+   "kind": "icon"
+  },
+  {
+   "ch": "▤",
+   "name": "arrangement face",
+   "kind": "icon"
+  },
+  {
+   "ch": "⬚",
+   "name": "pick several notes",
+   "kind": "icon"
+  },
+  {
+   "ch": "⤢",
+   "name": "fit the whole song",
+   "kind": "icon"
+  },
+  {
+   "ch": "▲",
+   "name": "move up",
+   "kind": "icon"
+  },
+  {
+   "ch": "▼",
+   "name": "move down",
+   "kind": "icon"
+  },
+  {
+   "ch": "▸",
+   "name": "accordion closed",
+   "kind": "icon"
+  },
+  {
+   "ch": "▾",
+   "name": "accordion open",
+   "kind": "icon"
+  },
+  {
+   "ch": "↕",
+   "name": "vertical hand axis",
+   "kind": "icon"
+  },
+  {
+   "ch": "↔",
+   "name": "horizontal hand axis",
+   "kind": "icon"
+  },
+  {
+   "ch": "◆",
+   "name": "depth hand axis",
+   "kind": "icon"
+  },
+  {
+   "ch": "◧",
+   "name": "left half (split)",
+   "kind": "icon"
+  },
+  {
+   "ch": "◨",
+   "name": "right half / split",
+   "kind": "icon"
+  },
+  {
+   "ch": "✓",
+   "name": "done / chosen",
+   "kind": "icon"
+  },
+  {
+   "ch": "⚙",
+   "name": "settings",
+   "kind": "icon"
+  },
+  {
+   "ch": "⛶",
+   "name": "full screen",
+   "kind": "icon"
+  },
+  {
+   "ch": "⬇",
+   "name": "install",
+   "kind": "icon"
+  },
+  {
+   "ch": "🌐",
+   "name": "language",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎥",
+   "name": "video clip",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎙",
+   "name": "audio clip",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎚",
+   "name": "mixer",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎛",
+   "name": "sound panel",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎵",
+   "name": "backing",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎹",
+   "name": "chords role",
+   "kind": "icon"
+  },
+  {
+   "ch": "🎸",
+   "name": "bass role",
+   "kind": "icon"
+  },
+  {
+   "ch": "🥁",
+   "name": "drums role / drum backing",
+   "kind": "icon"
+  },
+  {
+   "ch": "🔄",
+   "name": "switch camera",
+   "kind": "icon"
+  },
+  {
+   "ch": "↑",
+   "name": "arrow key (tooltip)",
+   "kind": "typography"
+  },
+  {
+   "ch": "↓",
+   "name": "arrow key (tooltip)",
+   "kind": "typography"
+  },
+  {
+   "ch": "→",
+   "name": "arrow in text",
+   "kind": "typography"
+  },
+  {
+   "ch": "−",
+   "name": "minus sign",
+   "kind": "typography"
+  },
+  {
+   "ch": "≈",
+   "name": "approximately",
+   "kind": "typography"
+  },
+  {
+   "ch": "≤",
+   "name": "less or equal",
+   "kind": "typography"
+  },
+  {
+   "ch": "≥",
+   "name": "greater or equal",
+   "kind": "typography"
+  },
+  {
+   "ch": "∞",
+   "name": "infinity (−∞ dB)",
+   "kind": "typography"
+  },
+  {
+   "ch": "√",
+   "name": "square root (console text)",
+   "kind": "typography"
+  },
+  {
+   "ch": "♭",
+   "name": "flat (note names)",
+   "kind": "notation"
+  },
+  {
+   "ch": "♯",
+   "name": "sharp (note names)",
+   "kind": "notation"
+  },
+  {
+   "ch": "♮",
+   "name": "natural (chord names)",
+   "kind": "notation"
+  },
+  {
+   "ch": "⚠",
+   "name": "warning (console)",
+   "kind": "console"
+  },
+  {
+   "ch": "⛔",
+   "name": "forbidden (console)",
+   "kind": "console"
+  },
+  {
+   "ch": "⛳",
+   "name": "rule flag (console)",
+   "kind": "console"
+  },
+  {
+   "ch": "✅",
+   "name": "done (console)",
+   "kind": "console"
+  },
+  {
+   "ch": "❌",
+   "name": "failed (console)",
+   "kind": "console"
+  },
+  {
+   "ch": "❄",
+   "name": "frozen (console)",
+   "kind": "console"
+  },
+  {
+   "ch": "☀",
+   "name": "sun (console)",
+   "kind": "console"
+  }
+ ]
 }

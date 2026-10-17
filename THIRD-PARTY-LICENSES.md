@@ -15,9 +15,11 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 |---|---|---|---|---|---|
 | MediaPipe Tasks Vision — JavaScript library and its WebAssembly files | 0.10.35 | Apache-2.0 | CDN | https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35 | https://github.com/google-ai-edge/mediapipe (npm @mediapipe/tasks-vision) |
 | MediaPipe hand landmarker model (float16, version 1) | float16/1 | Apache-2.0 | CDN | https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task | Google MediaPipe model card «Hand Tracking (Lite/Full)»; models listed at https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker |
+| three.js (3D library) — the Calm forest room | r128 (npm three@0.128.0) | MIT | shipped | vendor/three-r128/three.min.js<br>vendor/three-r128/LICENSE | https://github.com/mrdoob/three.js (npm three@0.128.0, build/three.min.js; sha256 9274bbce…1ce2) |
 
 - **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (src/handdet.js — on the main thread or in our worker src/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
 - **MediaPipe hand landmarker model (float16, version 1)** — Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4).
+- **three.js (3D library) — the Calm forest room** — Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by src/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change.
 
 ## Hosted services
 
@@ -130,11 +132,11 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | src/icons.js |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/cmd.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
-| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/i18n.js, src/probedata.js, src/probes/edit.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/cmd.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/forest.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/profile.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/core/profile.js, src/i18n.js, src/probedata.js, src/probes/calm.js, src/probes/edit.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
 | ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/lat.js, src/render.js, src/views/play.js |
-| ≤ | U+2264 | less or equal | typography | src/probes/window.js |
-| ≥ | U+2265 | greater or equal | typography | src/core/format.js |
+| ≤ | U+2264 | less or equal | typography | src/probes/calm.js, src/probes/window.js |
+| ≥ | U+2265 | greater or equal | typography | src/core/format.js, src/probes/forest.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | src/render.js, src/views/strip.js |
 | √ | U+221A | square root (console text) | typography | src/render.js |
 | ♭ | U+266D | flat (note names) | notation | data/modes/blues.json, data/tunings/shruti22.json, index.html, src/probedata.js, src/scales.js, src/songs.js |

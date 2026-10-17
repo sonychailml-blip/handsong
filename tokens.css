@@ -227,4 +227,15 @@
   --cv-white-a042:rgba(255,255,255,.042); --cv-white-a04:rgba(255,255,255,.04); --cv-white-a035:rgba(255,255,255,.035); --cv-white-a03:rgba(255,255,255,.03);
   --cv-white-a028:rgba(255,255,255,.028); --cv-white-a015:rgba(255,255,255,.015);
   --cv-win:#0b0b14; --cv-win-a82:rgba(11,11,20,.82);
+  /* VIS1c (RUN 6): the NIGHT FOREST room (views/scene/forest.js) — the «Rooms of light» prototype's colours, read by the 3D room as its base
+     colours (textures add small numeric jitter around them). The firefly greens are the hand's light; the halo / mask entries are alpha
+     ramps of white used as light masks (sprites, mist), not visible colours on their own. */
+  --cv-forest-fog:#060e18; --cv-forest-sky:#1b2a46; --cv-forest-under:#040604; --cv-forest-moon:#6b84bd; --cv-forest-moonhalo:#9fb4dd;
+  --cv-forest-ground:#17160f; --cv-forest-moss:#30481c; --cv-forest-soil:#46321e; --cv-forest-leaf:#2b2213; --cv-forest-bark:#2e251e;
+  --cv-forest-bark-dark:rgba(8,6,5,.55); --cv-forest-bark-light:rgba(110,95,75,.28); --cv-forest-fern:#2c4a1e; --cv-forest-frond:#233a1a;
+  --cv-forest-rock:#272b22; --cv-forest-mist:#8aa2c8; --cv-forest-fly:#d6ff7a; --cv-forest-wild:#c8ff78; --cv-forest-light:#c6ff7a;
+  --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
+  --cv-halo-a100:rgba(255,255,255,1); --cv-halo-a45:rgba(255,255,255,.45); --cv-halo-a10:rgba(255,255,255,.1); --cv-halo-a0:rgba(255,255,255,0);
+  --cv-mist-a12:rgba(255,255,255,.12);
+  --cv-calm-dark:#000;   /* the Dark background (Calm): plain black, the same sound, the hand points on it */
 }

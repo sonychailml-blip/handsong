@@ -1,0 +1,20 @@
+{
+  "format": "handsong/profile",
+  "version": 1,
+  "id": "profile.full",
+  "name": {"en": "Full", "ru": "Полный"},
+  "roles": ["ld", "ch", "bs", "dr"],
+  "handFn": null,
+  "noteModes": null,
+  "key": null,
+  "moods": null,
+  "timbres": null,
+  "effects": null,
+  "scene": null,
+  "backgrounds": ["camera"],
+  "shell": "full",
+  "noteField": "full",
+  "labels": "full",
+  "recording": true,
+  "ambience": null
+}

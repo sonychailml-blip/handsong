@@ -1,7 +1,8 @@
 import { initAudio, AC } from './audio.js';
 import { video, initDetector, startCamera, setHandsSink, pollFrame } from './vision.js';
-import { processHands } from './gestures.js';
-import { drawVideoBackground, syncViewRect, drawOverlays } from './draw.js';
+import { processHands, handsView } from './gestures.js';
+import { syncViewRect, drawOverlays, stackFrame } from './draw.js';   // VIS1a: the play screen = the stack of visual modules
+import { BUS } from './core/bus.js';   // VIS1a: the visuals' bus (hands, picture)
 import { captureFrame } from './clip.js';         // фиксация кадра в видеозапись — в КОНЦЕ цикла, после отрисовки (no-op, пока не идёт видеозапись)
 import { $, revealBar, songResumeOffer } from './ui.js';          // side-effect: строит меню, вешает обработчики, регистрирует hooks; revealBar — показать панель на старте
 import './demo.js';                              // side-effect: демо «путешествие по строям» (без камеры). Его КНОПКИ на старте БОЛЬШЕ НЕТ — demo.js вешает обработчик защитно (if(db)), сам код жив и ждёт переезда внутрь обучения
@@ -11,6 +12,7 @@ import { loadReport } from './scales.js';   // F5: итог загрузки ф�
 import { rollOpen, arrOpen } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
 import { latStart, latFrame, latHands, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
 import { asStart } from './autosave.js';   // AUTOSAVE1: the song kept on this device by itself
+import { profileBoot } from './profile.js';   // C0: ?calm (dev) or the calm edition opens in Calm
 
 /* =====================================================================
    HANDSONG — жестовый синтезатор + интерактивный учебник ладов
@@ -65,8 +67,9 @@ function onHands(f){
   if(studio()){ if(f.frame) f.frame.close(); return; }
   const tA=performance.now();
   if(f.frame) syncViewRect(f.frame.width, f.frame.height);   // the crop of this frame before its hands are remapped (rule #12)
-  latest=f.res;
+  latest=f.res; BUS.set('hands', latest);   // VIS1a: the hands of this processed frame, for the visual modules
   handsGuarded(latest);                      // страж кадра: ошибка в жестах/звуке/записи печатается один раз и НЕ обрывает отрисовку
+  BUS.set('handsView', handsView());          // VIS1c: each hand's play point, depth and role for the scene (read-only)
   const tB=performance.now();
   if(f.frame){ if(shown) shown.close(); shown=f.frame; }
   latHands(f, tA, tB);                       // LAT1/LAT2: the latency meter (latmeter.js)
@@ -81,6 +84,7 @@ function loop(){
      штатным watchdog'ом (120 мс) и уводит выразительность к нейтрали. LAT2: насос кадров в это время кадров не берёт (studio). */
   if(studio()){   // AR1: окно аранжировки — тот же «экран студии»
     latest=null; if(shown){ shown.close(); shown=null; }
+    if(BUS.get('hands')!=null){ BUS.set('hands', null); BUS.set('handsView', []); }
     handsGuarded(null);                      // страж кадра (см. handsGuarded): ошибка в руках не обрывает отрисовку редактора
     drawOverlays(null);
     captureFrame();
@@ -89,8 +93,8 @@ function loop(){
   }
   pollFrame();                               // LAT2: only without requestVideoFrameCallback — a new camera frame found by its time
   const t0=performance.now();
-  drawVideoBackground(shown || video);   // the frame whose hands are shown (rule #8)
-  drawOverlays(latest);                      // накладки — поверх того же кадра
+  BUS.set('picture', shown || video);        // the frame whose hands are shown (rule #8)
+  stackFrame(t0);                            // VIS1a: camera (background) → surface (instrument) → hands (overlay), as drawVideoBackground + drawOverlays drew
   captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр; иначе no-op
   latFrame(t0, performance.now());           // LAT1: drawing time and the screen-frame interval
 }
@@ -132,6 +136,7 @@ async function startApp(){
     card.classList.remove('busy','on');
     $('bar').classList.add('on');
     revealBar();                             // панель видна на старте (учит, где меню), затем сама сворачивается через BAR_HIDE_MS
+    { const why=profileBoot(); if(why) console.warn('[profile] '+why); }   // C0: the app opens in its profile (Full unless ?calm / the calm edition)
     started=true;
     loop();
     latStart();                              // LAT1: the latency meter starts with the camera and the audio

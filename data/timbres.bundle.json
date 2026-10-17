@@ -1967,6 +1967,50 @@
     "register": null,
     "quant": "sub"
    }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.firefly",
+   "family": "solo",
+   "engine": "tine",
+   "name": {
+    "en": "Firefly",
+    "ru": "Светлячок"
+   },
+   "recipe": {
+    "partials": [
+     [
+      1,
+      1,
+      1.6,
+      "triangle"
+     ],
+     [
+      2,
+      0.28,
+      0.9,
+      "sine"
+     ],
+     [
+      4.2,
+      0.12,
+      0.28,
+      "sine"
+     ]
+    ],
+    "lvl": 0.24
+   },
+   "env": {
+    "att": 0.006,
+    "rel": 1.6
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
   }
  ]
 }

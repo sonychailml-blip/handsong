@@ -1,0 +1,20 @@
+{
+  "format": "handsong/profile",
+  "version": 1,
+  "id": "profile.calm",
+  "name": {"en": "Calm", "ru": "Спокойный"},
+  "roles": ["ld"],
+  "handFn": {"ld": {"L": "fx", "R": "note"}},
+  "noteModes": ["note", "hold"],
+  "key": {"tonic": 9, "cents": 0},
+  "moods": ["major-penta", "minor-penta", "egyptian"],
+  "timbres": ["solo.firefly", "solo.glass-pad", "solo.warm-pad"],
+  "effects": ["dly", "bright", "vib"],
+  "scene": "forest",
+  "backgrounds": ["forest", "dark", "camera"],
+  "shell": "calm",
+  "noteField": "glow",
+  "labels": "plain",
+  "recording": false,
+  "ambience": "ambience.forest"
+}

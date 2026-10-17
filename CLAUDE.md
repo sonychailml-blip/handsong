@@ -159,6 +159,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   engine, `leadIsKs` — the «KS block is the tail» rule is retired). A kit's six rows name row synths of `drumkits.js` (`KIT_SYNTHS`) with
   their parameters; a new row SYNTH is code (+ its parameter list in `core/timbre.js KIT_SYNTHS`, bounded).
   Events store the timbre ID (TIM2). The editor lists timbres only via `audio.timbresOf(role)`.
+- **A profile** (C0) = `data/profiles/<name>.json` (`handsong/profile` v1) + its name in `data/profiles/index.json` `order` + its id in
+  `core/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
 - **Thresholds / palette geometry** = `config.js`. Expression numbers are split: feature→channel in `gestures.EXPR_CFG`,
   channel→depth in `audio.EXPR_A` (gestures imports audio; the reverse would be a cycle).
 - **A hand function** = `state.handFn` defaults + `ui.HANDFN_OPTS` + a branch on `S.fn`/zone in `gestures.js` + a dictionary key.
@@ -380,7 +382,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   worklets/` — `ks-worklet.js` (Karplus–Strong), `frz-worklet.js` (frozen store + reader), `dyn-worklet.js` (Glue / limiter),
   `probe-cap-worklet.js` (probes). Rule #38 exempts the worklets.
 - `src/modules/timbres/` — stateless timbre builders (`stages.js`, `voice.js`, `fm.js`, `ks.js`, `subtractive.js`, `chord-voice.js`,
-  `bass-voice.js`, `drumkits.js`); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
+  `bass-voice.js`, `drumkits.js`, `tine.js` — the struck tine as a solo bank, C4a); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
   `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`). Both: rule #38, first argument `E`.
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
 - `src/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
@@ -402,9 +404,17 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   law, lane-point ids), `env.js` (THE song layer's environment `ENV`), `file.js` (`songData`/`songPlan`/`songNeeds`; song file v7 — track ids).
   `recorder.cmdSet`/`cmdNote` (CMD1d) — the commands that are not history steps (mute, solo, arm, ⟳, brace, tempo; key, A4) tell the journal.
 - `src/core/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
-  `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
+  `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
   schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a).
 - `src/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
+- `data/profiles/` + `src/profile.js` (C0, RUN 6) — PROFILES (`profile.full` = today's app, `profile.calm`), checked by `core/profile.js`;
+  `profileApply(id)` the one switch (saves the touched live state, restores it EXACTLY on Full; writes through ui.js doors `profileWire`);
+  `profileBoot` (`?calm`). `src/edition.js` — `EDITION` ('dev' here; the release tool writes 'calm': only Calm, no switch).
+- `src/core/bus.js` (VIS1a) — the visuals' event bus `BUS` (state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract).
+  `src/views/stack.js` — the compositor (layers scene · background · instrument · overlay; modules scene, camera, backdrop, surface, hands).
+- `src/views/scene/host.js` (VIS1b) — the scene host (`#scene` WebGL canvas only while a room shows; three.js r128 vendored in
+  `vendor/three-r128/`, loaded lazily; levels full / reduced / minimal) + Calm's backgrounds `setBackground('forest'|'dark'|'camera')`;
+  `views/scene/forest.js` (VIS1c) — the night forest room (tokens `--cv-forest-*`); `core/fireflies.js` — wild fireflies, ground, depth bands.
 - `src/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
   `src/handdet.js` — the detector (two models, worker-safe). `src/hand-worker.js` — classic worker.
 - `src/gestures.js` — FACADE over `src/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
@@ -420,7 +430,8 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   `family()`). `src/probedata.js` + `tools/probe-data.mjs` — the node part.
 - `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`,
   `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/NAME-INDEX.md`); `docs/prototypes/` = reference
-  prototypes, not app code (licence use «reference», never shipped); prints `scales.before.json`, `song.print.json`, `gold.print.json`,
+  prototypes, not app code (licence use «reference», never shipped); `tools/listen/` = the Calm listening page (dev, RUN 6); `docs/design/calm/`
+  = the Calm design proposals (docs only); prints `scales.before.json`, `song.print.json`, `gold.print.json`,
   `gesture.print.json`, `census.print.json`.
 - Stale (removed) names to ignore: `docs/STALE-NAMES.md` (copied to the end of the generated `docs/NAME-INDEX.md`).
 
@@ -494,6 +505,8 @@ THERE in full and here as one index entry):
   86 Key change while recording (TF2, Q2) · 87 Transpose (TF3) · 88 Song Transpose moves the knob (TF3b) · 89 A4 / tempo re-freeze (TF4)
   90 «1/1 = G» (TF5) · 91 Privacy (PRIV1) · 92 Latency meter (LAT1) · 93 Firefly · 94 Hand detection (LAT2) · 95 Low light (LAT3)
   96 Camera settings come back (CAM-FIX, rule #34) · 97 Camera start (0b) · 98 Autosave (AUTOSAVE1) · 99 Open is one undo step (SONG3) · 100 Engine readouts (ENG2)
+  101 Full ↔ Calm (C0) · 102 Calm sounds by ear (listening page) · 103 Calm design proposals · 104 Forest and the three backgrounds (VIS1c)
+  105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

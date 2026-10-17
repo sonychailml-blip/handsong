@@ -177,7 +177,7 @@ One card, four short lines, one button — the AudioContext is created in that c
 - **Who decides:** ENG2's provisional class only PROPOSES; per user answer E1 there is NO automatic switching until calibrated. Calm v1 ships
   with a visible choice «Lighter forest (for older phones)» in the ⓘ panel and remembers it per device. Automatic + visible («Low power: on —
   why? [turn off]») comes only after the measurements below.
-- **What still needs the user's phone measurements** (the latency meter's Copy text, ≈ 10 min of play each): a budget Android, a mid
+- **What still needs the user's phone measurements** (the latency meter's Copy text, ≈ 10 min of play each): a budget Android (the user's POCO M5 — review 2026-10-17), a mid
   Android, an iPhone — (1) «Audio dropouts per minute» with the forest Medium vs the FDN reverb; (2) detection time with and without the
   room (the GPU is shared with MediaPipe); (3) the room's frame rate at each level; (4) hand → sound latency; (5) the phone warm after 10 min
   (thermal throttling: does the frame rate fall?); (6) the start-up offline factor (ENG2 §4) on each — to set the class thresholds.
@@ -208,7 +208,7 @@ point; fonts only OFL, self-hosted.
 - The data runner gains a row «release dist» (the tool on a temp folder: every precache file exists and hashes match; no probe module in
   dist; the edition is calm; CONTROL: a dev edition in dist fails).
 ### 9.3 What «release» needs (outside the code)
-- **Domain:** the user's choice (e.g. a short `handsong.<tld>`; check trademarks first — the name «Handsong» itself has not been searched).
+- **Domain:** the user's choice (e.g. a short `handsong.<tld>`; check trademarks first — the name «Handsong» itself has not been searched — the trademark search is the STRATEGIST's task before release, review R3).
 - **Hosting:** Vercel Hobby forbids commercial use (§7.12 item 6). Calm v1 is FREE, so Hobby is allowed for v1 — but paid parts later need
   a move. Recommendation: **Cloudflare Pages** (static, global, a `_headers` file can send the CSP as an HTTP header too, custom domain, a
   free plan that permits commercial sites — to be re-confirmed in its terms when signing up), or Vercel Pro (≈ $20 / month) if the counter
@@ -304,7 +304,7 @@ with outside music («Listen», §7.17) · installation / kiosk mode (§7.18) ·
    slows (LAT3: 6 fps evening). The first-run line «light your hands» and the low-light hint are essential; maybe a «lantern» brightness
    (the screen's lower edge slightly lit) — question 5.
 3. **iOS Safari:** camera + WebGL + Web Audio in an installed web app have their own limits (audio only after a tap, memory pressure kills
-   WebGL contexts, standalone camera support differs by version) — test on a real iPhone early (after C4).
+   WebGL contexts, standalone camera support differs by version) — test on a real iPhone early (after C4) if one is available; the user's phone is a Poco M5 (Android) — every phone check runs on it (review 2026-10-17).
 4. **Convolution cost** (Night forest Medium ≈ 15 % of a desktop core, ≈ 4× on a phone) → the FDN «forest-like» reverb must sound close
    enough (A/B).
 5. **Offline size and updates:** ≈ 20 MB first download; a broken SW can pin an old version — versioned caches, an update toast, a «reset
@@ -330,3 +330,64 @@ with outside music («Listen», §7.17) · installation / kiosk mode (§7.18) ·
 8. **Name and address:** is «Handsong — Calm» the release name, and do you have a domain in mind?
 9. **Payment later:** we recommend Paddle for the paid parts that come after Calm — fine to plan with it?
 10. **Fonts:** keep the prototype's style (Marcellus titles) — self-hosted — or wait for the design proposals (§8)?
+
+## Review 2026-10-17 (the user's answers + the strategist's notes; RUN 6)
+**Answers (§14):**
+1. Sounds — decided BY EAR on a listening page (built early, RUN 6 item 2; `tools/listen/calm-timbres.html`); until then Firefly · Glass pad
+   · Warm pad.
+2. Effects — Echo · Warmth↔Brightness · Wave for v1; Sparkle later (§12).
+3. Moods — Glow · Dusk · Mist as proposed; the key is FIXED (A), not choosable.
+4. No camera — the forest plays by TOUCH / MOUSE (finger or pointer = the light), with a gentle line that hands work best.
+5. Lantern — yes: a warm, dim glow at the lower edge, OFFERED when the low-light hint fires (never forced), remembered per device.
+6. How notes start — BOTH, as a dev switch: «pinch» (default) and «move the light»; the user decides by playing.
+7.–9. Counter / hosting, name / domain, payment — POSTPONED until the app is built; today's setup stays.
+10. Fonts — wait for the design proposals (RUN 6 item 3, `docs/design/calm/`).
+
+**Changes to the plan:**
+- **Note modes (replaces §4.4's latch):** NO new solo latch — a note sounding on after the fingers open is NOT wanted. Calm offers exactly
+  the TWO solo modes that exist today: «note continuous» (solo `note`: while pinched, moving up / down changes the note by the rectangle
+  under the hand) and «note held» (solo `hold`: the note of the rectangle where the pinch began sounds while the pinch is held). The shell's
+  switch chooses between them; proposed wording — en «Notes: follow the hand» / «Notes: stay put», ru «Ноты: за рукой» / «Ноты: на месте».
+  **Slice C5b and «Notes ring on» are dropped** (§4.4, §5 and §11 item 8 read accordingly; the shell's fourth control is «Notes»).
+- **First run (§6):** a line «Stand your phone or laptop so both hands are free.» (ru «Поставьте телефон или ноутбук так, чтобы обе руки были
+  свободны.»).
+- **The user's phone is a Poco M5 (Android)** — §7's phone measurements and every phone check are done on it; an iPhone later if available
+  (§13 risk 3 stays open until then).
+- **Orientation:** Calm plays in BOTH portrait and landscape, on phone and desktop. Every background displays correctly in both and on
+  rotation: no stretching, the hand light stays on its note row (one frozen range, rule #9), controls re-flow. Probes: the scene state and
+  the shell are checked at a portrait AND a landscape viewport.
+- **Backgrounds (new; shell control «Background», remembered per device):** (1) **Forest** — the 3D night forest; (2) **Dark** — plain black,
+  the SAME sound (forest reverb, ambience), the hand lights / points visible, no room drawn — also the lightest option for weak phones (no
+  WebGL; named in the low-power path §7 and in the ⓘ panel); (3) **Camera** — today's camera picture with the hand points (helps beginners).
+  Sound is identical across the three. Probes: switching backgrounds changes no sound and no note mapping; Dark creates no WebGL context;
+  Camera draws the video frame matched to the dots (rule #8, the exact frame).
+
+**Strategist's notes:**
+- **R1 design earlier:** the Calm design proposals come NOW (RUN 6 item 3, docs only), so the user chooses the style BEFORE the shell (C6);
+  C11 then only applies the chosen style.
+- **R2 GPU sharing right after the forest room:** the latency meter gains a line «Scene: N fps · frame N ms · level»; the Background switch
+  doubles as «room on / off». After VIS1c the user measures hand → sound and detection with Forest vs Dark on the desktop (Intel HD 4000 /
+  NVIDIA GT 635M) and on the Poco M5 (the step is written in the step index).
+- **R3:** the name's trademark search before release is the strategist's task (§9.3).
+
+## C4b design note (RUN 6, for the strategist — not built; the run stopped the sound slices after C4a)
+The prototype colours each note by its depth d (0 near … 1 far) at the ATTACK: lowpass `900 + 8000·(1−d)^1.5` Hz, dry `1 − 0.55·d`, send
+to the room `0.5 + 0.8·d` (so 0.5 … 1.3), wet return 0.55. Today's «Night forest» module (SND-F1) has ONE bus send «mix» 0…1 (default 0.8)
+and a FIXED dry of 1 — so three choices change an existing effect's contract and need a decision first:
+1. **The send above 1.** Either widen «mix» to 0…1.3 (the GOLD «fx forest» cases keep their values; the effect-contract rows change their
+   range), or map d → mix = min(1, 0.5 + 0.8·d) (saturates from d ≈ 0.63 — the far third sounds the same).
+2. **The dry level.** Add a second forest parameter «near» (dry, default 1 = today's identity, so every song and GOLD case is unchanged), or
+   let depth also lower the solo's own level (Volume entry) — but rule #29 gives the Volume address to the hand's horizontal axis today.
+3. **Per note or per hand.** The forest is a BUS module (one convolver per chain, never per note): its send follows the playing hand's depth
+   continuously (the existing parameter mode `{ mode:'drive', hand:'play', axis:'z' }`), not «at each attack» like the prototype. The darkening
+   lowpass CAN be per note (the solo's own `bright` per-note value, rule #19 untouched), taken at the attack from the same depth.
+Recommended: (1) map with saturation for v1 (no contract change; the far band is still «far» by the darkening), (2) the new «near»
+parameter with identity default, (3) bus send continuous + per-note darkening at the attack. Then: `config.CALM_DEPTH`, the pure curve in
+`core/` (node row: the prototype's numbers at d = 0, ½, 1 exactly), the Calm profile's solo chain = [Volume, Night forest (send ← playing
+hand z, room Medium fixed), the C5 effects], saved / restored by `profileApply` like the other touched state (the C0 round-trip row grows by
+the chain). Probe «CALM synthetic hands (depth)»: a depth sweep through the pose generator → the forest send aim equals the curve; GOLD for
+the forest unchanged.
+
+**Status after RUN 6 (2026-10-17):** ✅ C0 · ✅ VIS1a · ✅ VIS1b · ✅ VIS1c (+ backgrounds, meter Scene line) · ✅ C4a (solo Firefly) · ⬜ C4b
+(design note above — needs the decision) · ⬜ C4c · ⬜ C5 · ⬜ C6 (after the user's design choice, `docs/design/calm/`) · ✖ C5b (dropped).
+Listening page `tools/listen/calm-timbres.html` and the design proposals are ready for the user.

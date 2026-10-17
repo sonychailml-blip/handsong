@@ -14,7 +14,8 @@
 import { makeMeter, handToSound, looksBluetooth, frameWaitMs, withFrameWait, perMinute, splitLongTasks, isSoftwareGL, STARTUP_MS, rateOf } from './core/latency.js';
 import { HAND_SEARCH_EVERY } from './core/handsched.js';
 import { AC, masterDelayMs, engLoad } from './audio.js';
-import { dropRate, engClass, benchOf, ENG_BENCH_KEY } from './core/engclass.js';   // ENG2: dropouts per minute, the provisional power class
+import { dropRate, engClass, benchOf, ENG_BENCH_KEY } from './core/engclass.js';
+import { sceneInfo } from './views/scene/host.js';   // VIS1c / review R2: the scene line (fps, frame time, level, background)   // ENG2: dropouts per minute, the provisional power class
 import { video, camInfo, modelInfo, visionOpts, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo, pathInfo, pumpStats } from './vision.js';
 import { darkNew, darkStep, lostNew, lostStep, capsText, LOST_MS } from './core/camlight.js';
 import { recording } from './recorder.js';
@@ -153,7 +154,7 @@ export function latReport(){
            output:{ label:outLabel, bluetooth:btSeen }, handToSoundMs:r1(tot.ms), missing:tot.missing,
            handToSoundWithWaitMs:r1(withFrameWait(r1(tot.ms), r1(fw))),
            detection:{ runs:pi.runs, asked:pi.asked, why:pi.why, warmMs:pi.warmMs, policy:vo.hands, searchEvery:HAND_SEARCH_EVERY, detectedFps:r1(detFps) },
-           gpu:gpuInfo(), model:modelInfo(), switches:vo,
+           gpu:gpuInfo(), model:modelInfo(), switches:vo, scene:sceneInfo(),
            userAgent:navigator.userAgent };
 }
 /* the overlay's text (also what «Copy» copies) — numbers, the switches and the graphics renderer's name */
@@ -176,6 +177,7 @@ export function latText(r=latReport()){
   L.push(t('diag.gpu', { name:r.gpu.renderer||t('diag.unknown'), kind:r.gpu.software==null?t('diag.unknown'):t(r.gpu.software?'diag.gpuSoft':'diag.gpuHard') }));
   L.push(t('diag.gestures', { mean:f(S.gestures.mean), p95:f(S.gestures.p95) }));
   L.push(t('diag.draw', { mean:f(S.draw.mean), p95:f(S.draw.p95), loop:f(S.loop.mean) }));
+  { const Sc=r.scene; L.push(Sc.webgl ? t('diag.scene', { fps:f(Sc.fps), ms:f(Sc.frameMs), level:Sc.level, bg:Sc.bg }) : t('diag.sceneOff', { bg:Sc.bg })); }   // review R2: Forest vs Dark
   L.push(t('diag.audio', { base:f(r.audio.baseMs), out:f(r.audio.outputMs), q:f(r1(r.audio.quantumMs)), pipe:f(r.audio.pipelineMs), mp:f(r.audio.masterPathMs) }));
   { const A=r.audio, c=A.capacity, pc=x=>f(Number.isFinite(x)?Math.round(x*100):null);   // ENG2: dropouts (browser counter, never guessed) and the provisional class
     L.push(t(A.dropSource ? (A.dropoutsPerMinute==null ? 'diag.dropWait' : 'diag.drop') : 'diag.dropNone', { n:f(A.dropoutsPerMinute) })+(c ? t('diag.cap', { avg:pc(c.avg), peak:pc(c.peak), u:pc(c.underrun) }) : ''));

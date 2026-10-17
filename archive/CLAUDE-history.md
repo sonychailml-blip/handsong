@@ -1654,6 +1654,31 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     yet» for about the first 20 s after the first start on a device, then a class and the audio test's number. Play chords and drums hard for a
     minute: dropouts should stay at 0 on the desktop; «Copy» and send the text with the phone's numbers (E3). Console (`?probe`): `R.engine()`.
 
+101. Full ↔ Calm (C0, RUN 6): ▶ Play → «🎛 Sound» → at the very end «Development · Mode: Full | Calm» → Calm: the role, split, record,
+    backing, clip and Loop buttons disappear; the scale becomes Major pentatonic in A, the solo timbre Glass pad, the left hand effects, the
+    right hand notes. Play a little. → Full: everything comes back exactly as before (scale, key, timbre, role, split, hands). Reload with
+    `?calm` in the address (e.g. `http://127.0.0.1:5500/?calm`) → after ▶ Play the app opens in Calm. While recording, the switch says
+    «Stop recording first.»
+102. Calm sounds by ear (RUN 6, review Q1): open `http://127.0.0.1:5500/tools/listen/calm-timbres.html` (Live Server running) → tap Glow /
+    Dusk / Mist next to each of the five sounds (Firefly, Glass pad, Warm pad, Airy flute, Bell deep); try Room Short / Medium / Long and
+    Distance near / far; tick the three you like and tell the strategist. Headphones. Each first tap renders for a second or two.
+103. Calm design proposals (RUN 6, review R1): open `docs/design/calm/a-lantern.html`, `b-moonglass.html`, `c-hush.html` (double-click, or
+    through Live Server) on the desktop AND on the phone; read `docs/design/calm/README.md`; choose a direction (or parts of several) and an
+    app icon.
+104. The forest and the three backgrounds (VIS1b/VIS1c, RUN 6): ▶ Play → «🎛 Sound» → Development → Mode: Calm → a new row «Background:
+    Forest | Dark | Camera» (only in Calm). Forest: after a second the night forest appears behind the note field (trees, mist, the moon,
+    wild fireflies); raise the playing hand — a firefly light sits at your pinch point (thumb + finger), moves with the hand, goes DEEPER
+    into the forest when the hand moves away from the camera (smaller hand) and wild fireflies gather around it; the other hand has a dimmer
+    light. Dark: plain black, the hand points visible, the same sound. Camera: today's picture. Switch between them while a note sounds —
+    the sound must not change. Turn the phone / resize the window: portrait and landscape, no stretching, the light stays on the pinch.
+    Reload → Calm (with `?calm`) opens on the background you chose last. Known for now: the full note field and the 2D hand points still
+    show over the forest (the Calm shell C6 makes the field a soft glow).
+105. GPU sharing — Forest vs Dark (review R2; desktop Intel HD 4000 / GT 635M, then the Poco M5): Calm (`?calm`) → «🎛 Sound» → Diagnostics →
+    Latency meter On. (1) Background Dark: play 2 minutes with both hands, then «Copy» and keep the text (the «Scene: off» line, «Hand
+    detection», «Hand → sound»). (2) Background Forest: the same 2 minutes, «Copy» again (the «Scene: N fps · frame N ms · level full» line).
+    Send both texts: we compare detection time and hand → sound with and without the room (the GPU is shared with the hand model) and the
+    room's own frame rate. On the phone: the same two runs; also say whether the phone got warm and whether the forest stuttered.
+
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:
   + history reset, like a song load); `ui.songSaveText/songOpenText` (+ download, file picker, confirm). Frozen audio is never stored.

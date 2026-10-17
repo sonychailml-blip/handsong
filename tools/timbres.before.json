@@ -212,6 +212,15 @@
    "att": 0.001,
    "rel": 0.15
   },
+  "solo.firefly": {
+   "id": "solo.firefly",
+   "label": {
+    "en": "Firefly",
+    "ru": "Светлячок"
+   },
+   "att": 0.006,
+   "rel": 1.6
+  },
   "chord.warm-pad": {
    "id": "chord.warm-pad",
    "label": {
@@ -1310,6 +1319,34 @@
    "BiquadFilter lowpass 18000 1 0",
    "Gain 0",
    "Gain 0",
+   "Gain 1"
+  ],
+  "solo.firefly": [
+   "ConstantSource 0",
+   "Gain 0",
+   "Gain 1",
+   "WaveShaper 1024",
+   "Gain 1",
+   "Gain 0",
+   "Gain 1",
+   "Gain 0",
+   "Gain 0.5",
+   "Gain 1",
+   "Gain 0",
+   "Gain 1",
+   "Gain 1",
+   "Gain 1",
+   "ChannelMerger",
+   "BiquadFilter lowpass 18000 1 0",
+   "Gain 0",
+   "Gain 0",
+   "Gain 1",
+   "Gain 0.086400002",
+   "Oscillator triangle 220 0",
+   "Gain 1",
+   "Oscillator sine 440 0",
+   "Gain 1",
+   "Oscillator sine 924 0",
    "Gain 1"
   ],
   "chord.warm-pad": [
@@ -2564,6 +2601,23 @@
    0.00173966,
    0.001493551,
    0.001266339
+  ],
+  "solo.firefly": [
+   0.0002119197,
+   0.002248184,
+   0.002470346,
+   0.002543821,
+   0.002423106,
+   0.002234468,
+   0.002052358,
+   0.001809491,
+   0.001699061,
+   0.001519871,
+   0.001324226,
+   0.001157311,
+   0.0009961782,
+   0.0009014767,
+   0.0007833917
   ],
   "chord.warm-pad": [
    2.757469e-05,

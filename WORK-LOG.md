@@ -1048,3 +1048,245 @@ STARTED 3 CALM PLAN (PLAN ONLY) 2026-10-17
 
 **Try it:** nothing new to try on screen this time. Older open checks stay: steps 99 (Open → ↶) and 100 (the dropouts line on your phone).
 The Calm plan also lists six phone measurements (§7) we will need before choosing the low-power defaults.
+
+# RUN 6 (2026-10-17) — Calm v1, first slices
+
+## User answers to the Calm plan (recorded at the start of RUN 6; also in docs/STAGE4-CALM-plan.md «Review 2026-10-17» and HANDOFF)
+- Q1 sounds: decided BY EAR — the listening page comes early (queue item 2); until then Firefly · Glass pad · Warm pad.
+- Q2 effects: Echo · Warmth↔Brightness · Wave for v1; Sparkle later (§12).
+- Q3 moods: Glow · Dusk · Mist as proposed; the key is FIXED (not choosable).
+- Q4 no camera: the forest plays by touch / mouse (finger or pointer = the light), with a gentle line that hands work best.
+- Q5 lantern: yes — a warm, dim glow at the lower edge, OFFERED when the low-light hint fires (never forced), remembered per device.
+- Q6 how notes start: BOTH as a dev switch — «pinch» (default) and «move the light»; the user decides by playing.
+- Q7–Q9 (counter / hosting, name / domain, payment): POSTPONED until the app is built — today's setup stays.
+- Q10 fonts: wait for the design proposals (queue item 3).
+- NOTE MODES changed: NO new solo latch. Calm offers the two solo modes that exist today: «note continuous» (solo `note`: the note follows
+  the rectangle while pinched) and «note held» (solo `hold`: the note where the pinch began). C5b and «Notes ring on» dropped.
+- First run gains «Stand your phone or laptop so both hands are free» (en + ru).
+- The user's phone: Poco M5 (Android) — every phone measurement / check on it; an iPhone later if available.
+- Orientation: Calm plays in portrait AND landscape (phone + desktop); every background displays correctly in both and on rotation.
+- Backgrounds (new, shell «Background», per device): Forest (3D room) · Dark (black, same sound, hand lights visible, no WebGL) · Camera
+  (today's picture + hand points). Sound identical across the three; probes: no sound / mapping change, Dark makes no WebGL context,
+  Camera draws the frame matched to the dots.
+- Strategist R1: design proposals now (item 3), before the shell (C6); C11 only applies the chosen style. R2: latency meter line «Scene: N fps
+  · frame N ms · level» after the forest; the Background switch doubles as room on / off; a user step: Forest vs Dark on the desktop
+  (HD 4000 / GT 635M) and on the Poco M5. R3: the name's trademark search is the strategist's task (§9.3).
+- Queue: 1 C0 profile + edition · 2 listening page · 3 Calm design proposals · 4 VIS1a → VIS1b · 5 VIS1c forest + backgrounds + meter
+  line · 6 C4a → C4b → C4c if budget remains.
+STARTED C0 profile + edition 2026-10-17 12:16
+
+## Slice C0 — profile + edition (done; Full unchanged, Calm reachable in the dev edition)
+- `data/profiles/` (index + `full.json` + `calm.json`, `handsong/profile` v1, ids pinned `profile.full` / `profile.calm`) checked by the pure
+  `src/core/profile.js` (`checkProfile`, `PROFILE_IDS`, `HAND_FNS`, 15 damage CONTROLS). Full = every narrowing field null (changes nothing).
+  Calm: solo only, hands L fx / R note, note modes note / hold, key A (fixed), moods Glow major-penta · Dusk minor-penta · Mist egyptian,
+  timbres Glass pad · Warm pad (Firefly joins at C4a), effects dly · bright · vib, scene forest, backgrounds forest / dark / camera, shell calm,
+  note field glow, labels plain, recording off, ambience forest (the fields after «timbres» are read by later slices).
+- `src/profile.js`: loads the records (top-level await, the timbreload pattern; a refused record skipped with one line; Full embedded if its
+  file cannot be read), `profileApply(id)` — leaving Full saves the touched live state (scale, key + cents, solo timbre id, role, split, solo
+  hands, solo voice mode), Calm writes its own defaults, a return to Full writes the saved state back EXACTLY; refuses while recording, an
+  unknown id, and (calm edition) anything but Calm. `profileBoot` — `?calm` (dev) or the calm edition opens in Calm after ▶ Play.
+  `src/edition.js` — `EDITION='dev'`.
+- ui.js: the profile DOORS (`profileWire`: read / write through the lesson-setup paths — tutorSetScale, the key knob path, the solo timbre
+  select, setHandFn, the voice mode; `face` sets `body.calm` and pauses a playing song); the switch «Development · Mode: Full | Calm» at the end
+  of the Sound panel (hidden in a non-dev edition). style.css: `body.calm` hides role / split / record / backing / clip / Loop. Keys `prof.*`
+  en + ru. main.js: `profileBoot()` after start.
+- Probes: node row «C0 profile records (core)» (20 cases: both files valid against the data's modes, timbres and effects; ids = pinned; Full
+  narrows nothing; CONTROLS: 15 damages refused naming the field); browser row «C0 profile round trip» (quick, at 1005): records loaded;
+  Calm's effects exist in the engine; core HAND_FNS.ld = the Sound panel's select; from a NON-default Full state (dorian, D + 7 ¢, the 4th solo
+  timbre, role chords, split on, hands therm / hold, lead voice) Calm sets its defaults and hides the controls; back to Full every field is
+  EXACTLY the state before and the controls are back; CONTROL: the comparison must see all 8 fields change Full → Calm; unknown profile
+  refused. The state guard gains «profile (C0)».
+- Fix rounds: 3 — (1) a dictionary apostrophe broke i18n.js (rewritten without it); (2) my door called renderFxCtl, which fills default
+  values into fixed chain parameters while drawing (the state guard caught «live effect chains» changed) — the door no longer calls it;
+  (3) «#soundBtn hidden in Calm» — the top bar had collapsed by itself (it hides several buttons), so the «hidden» checks could not fail:
+  the row now opens the bar for its checks and first asserts every checked button is visible in Full (a control that must be able to fail).
+- Verdicts: static PASS · data PASS 24 / 0 · browser `--quick` (first run: TIME LIMIT at row 71 — every row 2–4× slower than RUN 5 on a busy
+  machine, no row failed, no leftover runner browser; re-run with the runner's documented `--limit-quick 10`): **P.quick PASS 84 / 0 (170.9 s)**,
+  frozen seed bass 0.08686 / 0.055319 / 650886 exact, state guard clean, UI checks, CSP, network PASS. ui-snap `c0` vs `run6base`: all 10
+  screens 0 style differences, 0 pixels; the only difference = the 7 new elements of the switch (declared).
+
+## Queue item 2 — the listening page (done; dev tool, not shipped)
+- `tools/listen/calm-timbres.html` + `tools/listen/calm-listen.js`: five candidates (Firefly as one-note chords — it is a chord timbre today —
+  Glass pad, Warm pad, Airy flute, Bell deep) × three moods (Glow / Dusk / Mist, key A) play the same 11-note phrase at 72 bpm through the
+  Night forest (room Short / Medium / Long, distance near / middle / far = the forest send), rendered OFFLINE by a separate instance of the
+  app's own engine (`audio.js?listen`, the render copy's method: seed, offline allocation, master tapped before the limiter); pitch from the
+  mood's view (`leadFreq`, rule #2). A fixed +12 dB on playback for every sound. Checkboxes «pick three».
+- Open: Live Server running → `http://127.0.0.1:5500/tools/listen/calm-timbres.html` (the page's `<base>` makes the engine's worklet paths
+  resolve from the repo root).
+- Proof: `node tools/probe-browser.mjs --eval tools/listen/check-listen.js` — 15 / 15 renders sound (peak 0.040–0.076), not clipping, the same
+  render twice identical (seeded), Glow ≠ Dusk for every sound → PASS (CSP, network PASS).
+
+## Queue item 3 — Calm design proposals (done; docs only, nothing in the app changed)
+- `docs/design/calm/a-lantern.html`, `b-moonglass.html`, `c-hush.html` + `README.md` (plain-words comparison, our suggestion). Each page is
+  self-contained (no network, no fonts fetched — OFL fonts named, system fallbacks): idea en + ru, palette as `--calm-*` tokens, the controls
+  over the Forest / Dark / Camera backgrounds, type pairing, ten SVG icons of our own (Sound, Mood, Play with, Notes follow / stay, Background,
+  Forest volume, Lantern, ⓘ, Close), the app icon at 180 / 64 / 32 / 16, the wordmark «Handsong» + «Calm», portrait AND landscape mocks of
+  the forest with the controls faded in, the first-run card (with «Stand your phone or laptop…») and the ⓘ panel (privacy, headphones, Dark
+  for older phones, Lantern, full note field), plus the Russian (longest) words.
+- Generated once by a scratch script (not kept in the repo); tag balance checked; no external address. ⚠️ Not looked at in a browser by
+  Claude Code (no browser by hand) — the pictures are the user's to judge.
+STARTED VIS1a bus + compositor 2026-10-17 12:53
+
+## Slice VIS1a — the bus + the compositor (done; nothing visible changed)
+- `src/core/bus.js` (pure): `createBus` — STATE topics (latest value + version) and EVENT rings (512, a slow reader loses the oldest, counted);
+  `reader()` reads only (writes throw). The app's one bus `BUS`.
+- `src/views/stack.js`: the compositor — visual modules by layer (scene · background · instrument · overlay), `stackAdd` / `stackSet` /
+  `stackFrame` / `stackList`. Today's drawing became three modules in the same order: `camera` (views/camera.js, background — draws the
+  published `picture`), `surface` (views/play.js, instrument — the roles' fields, FX bars, expression bar) and `hands` (overlay — hand points,
+  the looper strip and feedback, the status): `drawPhone` = `drawSurface()` + `drawHandsLayer(res)`. The editor / arrangement window still
+  draw through `drawOverlays` (outside the stack).
+- Writers: main.onHands → `hands`; main.loop → `picture` (the frame whose hands are shown, rule #8) then `stackFrame`; live/eng.js — the LIVE
+  table publishes every engine-contract call on the `notes` ring ({ kind, owner, role, hz, vel, deg, oct, when }); the render copy's table
+  publishes nothing.
+- Probes: node row «VIS1 bus (core)» (12 cases: versions, ring order, overflow + lost count, reader cannot write — CONTROL); browser row «VIS1a
+  stack and bus» (quick, drawn): the three modules in layer order; a silent live note-off lands on the ring with kind / owner / role / when; the
+  render copy publishes nothing; the picture topic moves while the play screen draws; CONTROL a reader write throws.
+- Proof nothing visible changed: ui-snap `c0 → vis1a`: 2 screens differed (play-bar, strip: 21 565 pixels; arr: 7 style values) — all the TOP
+  BAR's auto-collapse timer firing before the shot on this slow machine (the canvas identical); re-run once `c0 → vis1a2`: **IDENTICAL**, all
+  10 screens (0 style differences, 0 pixels). Both results recorded.
+- Verdicts: static PASS · data PASS 25 / 0 · browser `--quick --limit-quick 10`: **P.quick PASS 85 / 0 (294.6 s)**, frozen seed bass exact, state
+  guard clean, UI / CSP / network PASS. Fix rounds 1 (the static checker does not read method-shorthand parameters — the bus methods became
+  arrow functions; the probe imported ENG from recorder, which does not re-export it).
+STARTED VIS1b scene host + VIS1c forest + backgrounds 2026-10-17 13:05
+
+## Slices VIS1b + VIS1c — the scene host, the night forest, the three backgrounds, the meter's Scene line (done)
+- `vendor/three-r128/` — three.js r128 (npm three@0.128.0 `build/three.min.js`, sha256 9274bbce…1ce2) + its MIT LICENSE; register entry
+  `threejs-r128` «shipped» (LIC1; the «reference» entry stays for the prototype). Loaded LAZILY by a dynamic import of the UMD file (it sets
+  `globalThis.THREE`) from our own origin — no CSP change, never loaded in Full.
+- `src/views/scene/host.js` (VIS1b): the `#scene` WebGL canvas under the 2D canvas, made only while the Forest shows and DESTROYED when it
+  does not (context released — review R2's «room off»); levels full (pixel ratio ≤ 1.5, 60 fps cap) / reduced (0.75, 30 fps) / minimal (no
+  WebGL: a 2D stand-in — the night's two colours and a soft glow per hand; also after a real context loss); stats fps + frame ms. The
+  module «scene» (layer scene) and «backdrop» (background: Dark = black, Forest = the 2D canvas cleared so the room shows through, Camera =
+  nothing — the camera module draws). `setBackground('forest'|'dark'|'camera')`, `sceneInfo()`.
+- `src/views/scene/forest.js` (VIS1c): the prototype's forest re-laid WITHOUT animals — ground (moss, soil, leaves), bark, 95 instanced trunks
+  + branches, 80 ferns × 7 fronds, 7 mossy rocks, 4 mist sheets, the moon, fog; the playing hand's firefly light (core + halo + trail;
+  shadow-casting: 1024² desktop / 512² phone) and a dimmer light for the effects hand; 70 wild fireflies (35 reduced) from the pure
+  `src/core/fireflies.js` (seeded; the shader only draws); depth from the hand size in four eased bands (`depthDistance`, 2.2 … 17 units);
+  parallax; reduced motion. Every colour a token (`--cv-forest-*`, `--cv-halo-*`, `--cv-mist-a12`, `--cv-calm-dark` in tokens.css; textures
+  add numeric jitter). The light is placed on THIS camera's ray through the hand's remapped play point, so it projects back onto the note
+  row; only its world position saturates at the room's bounds.
+- `gestures/hands.js` `handsView()` → bus `handsView` (main.onHands): each hand's play point (thumb + main finger, remapped), depth by the
+  depthN law READ-ONLY (the frame's smoothed size if computed, else the raw size — the visuals never step the sound's smoothing), pinch,
+  plays-notes. The scene glints the playing light on each solo note-on from the `notes` ring.
+- The Background switch: Sound panel → Development → «Background: Forest | Dark | Camera» (only in Calm, CSS), remembered on this device
+  (localStorage `handsong.calmBg`); the profile applies it (Full → Camera; Calm → the remembered one, else Forest). Keys `prof.bg*` en + ru.
+- Latency meter line (review R2): «Scene: N fps · frame N ms · level L · background B» or «Scene: off (background B; no 3D room drawn)».
+- Probes: node row «VIS1c fireflies (core)» (8 cases: same seed → same flies and same positions after 900 steps; a light gathers flies
+  within 2.5 — CONTROL without it far fewer; another seed differs; depth ends exact, monotonic, flat in a band). Browser rows «VIS1c forest
+  room» (numbers at 390×844, 844×390, 1280×800: the light projects onto the play point within 0.75 px, a corner hand saturates inside the
+  room, depth 0 → 1 ≥ 10 units deeper, the effects light, one shadow light 512² / 1024², fov 68 portrait, reduced level, the room's
+  fireflies = the core's step fed the room's lights — CONTROL one frame's lights dropped differs) and «VIS1c backgrounds» (Calm on Dark →
+  Camera → Forest → Dark → Forest → Camera: sound state and note mapping exactly unchanged, no live WebGL context on Dark / Camera, Dark makes
+  none, Camera draws the detected frame not the live video, Forest the second time as the first). VIS1a row updated (5 modules).
+- Proof Full unchanged: ui-snap `vis1a2 → vis1c`: all 10 screens 0 style differences, 0 pixels; only the 6 declared hidden elements of the
+  Background row (it shows only in Calm).
+- Verdicts: static PASS · data PASS 26 / 0 · browser `--quick --limit-quick 10`: **P.quick PASS 87 / 0 (202.9 s)** (the forest row 37 cases,
+  the backgrounds row 33 cases; the headless browser had WebGL 2 — the room really drew), frozen seed bass exact, state guard clean, UI / CSP /
+  network PASS (520 requests, own origin + MediaPipe only — three.js came from our origin).
+- Fix rounds: 2 — (1) the firefly row's first criterion («on its ring ± 0.8») was a guess that swirling flies do not meet; measured instead:
+  flies within 2.5 of the light after 15 s, with vs without it (CONTROL kept); the far depth end was 17.000000000000004 → the blend computed
+  so both ends are exact; (2) closing the room forces a context loss, and the room's own «context lost» handler took it for a real loss
+  and dropped later opens to the minimal level — the handler is now removed before closing; the backgrounds row opens Forest twice and
+  demands the second open equal the first (that check would have caught it).
+- Known, for C6: in Calm the full note field and the 2D hand points still draw over the forest (the shell makes the field a glow); the
+  first frame of the room in a software-GL browser took ≈ 0.8 s (headless); a real GPU is the user's step 105.
+STARTED C4a solo Firefly 2026-10-17 13:24
+
+## Slice C4a — Firefly as a solo timbre (done)
+- `data/timbres/solo.firefly.json` (engine `tine`, the chord Firefly's partial table and level exactly; env att 6 ms / rel 1.6 s; solo
+  policies) APPENDED at the end of `data/timbres/index.json` (positions unchanged; bundle regenerated: 53 records); `core/timbre.js`: the tine
+  engine serves the chord AND the solo family; pinned id list + `solo.firefly`.
+- `src/modules/timbres/tine.js` (stateless, rule #38): the solo tine bank — each strike makes its own partial oscillators (the sanctioned
+  rule-#3 exception the chord Firefly already is), into the voice's own stages (vibrato / humanisation taps on each partial's detune — and
+  disconnected when the partial ends, else the taps would keep it alive; the voice's envelope, level, pan, brightness, route). A held note
+  moved to another pitch strikes anew (a tine cannot glide); `cancel(t)` stops strikes not yet begun. Dispatched from `buildLeadBank`.
+- Calm offers Firefly first (`calm.json` timbres: Firefly · Glass pad · Warm pad — review Q1 «until the ear decides»).
+- Prints: `tools/timbres.before.json` and `tools/gold.print.json` each gained exactly ONE entry (`solo.firefly`, `ld 23`), merged by hand
+  from a fresh dump; the fresh dump of every OTHER timbre and golden case was compared first: entries and creation traces identical, the
+  worst envelope difference 8e-7 of peak (limit 1e-5), the worst golden value 0.0001 dB (limit 0.01) — every existing solo GOLD unchanged.
+- Row «C4a solo Firefly» (quick, at 1009): the solo record = the chord Firefly's tine; a note rings and decays (≥ 20 dB down by 1.4 s with the
+  key held); a held note moved to another pitch strikes anew (energy after the move ≥ 2× the same note without it — the comparison is the
+  control). ui-snap `vis1c → c4a`: 0 style differences, 0 pixels; the only difference is the new «Firefly» option in the solo timbre list
+  and the editor's timbre list (Full gains the timbre — declared).
+- First quick run: NOT A PASS — 87 / 88, «AUD1 node census» 6 differences, all in its «play» scene (one note of every timbre): exactly
+  one more solo voice (ConstantSource, WaveShaper, BiquadFilter, ChannelMerger +1, Gain +19) and the 3 partial oscillators of one strike;
+  «init» (the start graph) unchanged, the chains unchanged → the census print's «play» counts renewed (declared, noted in its meta). Fix
+  rounds: 1. Data PASS 26 / 0 after regenerating THIRD-PARTY-LICENSES.md (the new probe file's glyphs).
+
+## C4b (depth → forest reverb) — NOT built: design questions written instead
+- The prototype's per-note depth colour (send 0.5 → 1.3, dry 1 → 0.45, lowpass 8.9 → 0.9 kHz at the attack) does not fit today's Night forest
+  module (one bus send «mix» capped at 1, a fixed dry) without changing an existing effect's contract (its range, or a new parameter) — a
+  decision, not a guess. The options and a recommendation: `docs/STAGE4-CALM-plan.md` «C4b design note». C4c (ambience) waits behind it in
+  the queue order. The final P.all ran instead.
+
+## Final run (RUN 6 end)
+- static PASS · `node tools/name-index.mjs` PASS · data **PASS 26 / 0** · browser `--all --limit-min 40`: **P.all 112 / 113 (494.7 s)** — the one
+  miss: «LR1 live and frozen reverb agree», a REAL-TIME capture row: «the live capture has 1 gap on the audio thread» (a dropped audio block
+  during the capture on a busy machine — not a sound difference). Re-run ALONE once (rule: a timing row that misses once):
+  `--eval` → **LR1 PASS 4 / 0**. Both results recorded. Everything else PASS: GOLD 85 / 0 (with «ld 23»), frozen seed bass 0.08686 / 0.055319 /
+  650886 exact, HAND1 525 / 0, AUD1 node census 18 / 0, AF2 / AF5 / AF6b, SAVE1 / AUTOSAVE1 / SONG3 / IDS1 / CMD1 / PACK1 / TIM3 (timbres =
+  before 159 / 0) / POOL1, CAM and LAT rows, C0 / VIS1a / VIS1c ×2 / C4a, state guard clean; the runner's UI checks, CSP and network PASS.
+- Machine note: today every row ran 1.5–4× slower than in RUN 5 (the person's own Chrome and VS Code busy); the quick runs used the runner's
+  documented `--limit-quick 10`; no leftover runner browser at any point.
+- Fix rounds this run: C0 3 · VIS1a 1 · VIS1c 2 · C4a 1 (listed in each slice above). No slice needed more than 3.
+- Files changed in RUN 6: new — src/core/profile.js, src/profile.js, src/edition.js, src/core/bus.js, src/core/fireflies.js, src/views/stack.js,
+  src/views/scene/host.js, src/views/scene/forest.js, src/modules/timbres/tine.js, src/probes/profile.js, src/probes/vis.js,
+  src/probes/forest.js, src/probes/calm.js, data/profiles/{index,full,calm}.json, data/timbres/solo.firefly.json, vendor/three-r128/{three.min.js,
+  LICENSE}, tools/listen/{calm-timbres.html,calm-listen.js,check-listen.js}, docs/design/calm/{a-lantern,b-moonglass,c-hush}.html + README.md;
+  changed — src/ui.js, src/main.js, src/draw.js, src/views/play.js, src/views/camera.js, src/gestures.js, src/gestures/hands.js, src/live/eng.js,
+  src/latmeter.js, src/i18n.js, src/core/timbre.js, src/modules/timbres/subtractive.js, src/probes/run.js, src/probes/sound.js, src/scaleprobe.js,
+  src/engine/surface.js, index.html, style.css, tokens.css, data/timbres/index.json, data/timbres.bundle.json (generated), tools/probe-data.mjs,
+  tools/check-static.mjs, tools/licences.json, tools/timbres.before.json, tools/gold.print.json, tools/census.print.json, THIRD-PARTY-LICENSES.md
+  and docs/NAME-INDEX.md (generated), docs/STAGE4-CALM-plan.md, CLAUDE.md, HANDOFF.md, archive/CLAUDE-history.md, archive/HANDOFF-history.md.
+- Docs found stale and fixed: HANDOFF work order (Calm plan «for review» → reviewed). Left: tools/licences.json was rewritten with Python's
+  JSON layout (1-space indent) when the three.js entry was added — content identical, the diff may look large.
+
+# SUMMARY FOR THE USER — RUN 6 (plain language)
+
+**What was done** (each step checked by the automatic probes):
+1. **Full ↔ Calm switch.** The app now has two «faces». Full is today's app, unchanged. Calm is the first release's face: only the solo, the
+   left hand on effects and the right hand on notes, the bright pentatonic in A, the Firefly sound, and no recording / backing / Loop buttons.
+   Switching back to Full brings back EXACTLY what you had (scale, key, sound, role, split, hands) — a probe checks this from an unusual
+   starting state.
+2. **A listening page** to choose Calm's three sounds by ear: five candidates × three moods, the same short melody, through the Night forest.
+3. **Three design proposals** for Calm (and the start of the Handsong look): «Lantern» (warm, the prototype's night), «Moonglass» (cool
+   frosted glass, big round buttons), «Hush» (almost nothing on screen). Each has colours, fonts, our own icons, an app icon, the
+   «Handsong» wordmark, and pictures of the screens in portrait and landscape. Nothing in the app changed by them.
+4. **The night forest.** In Calm, a real 3D night forest can be the background: trees, mist, the moon, wild fireflies that gather around
+   your hand's light; the light sits exactly where you pinch and goes deeper into the forest when your hand moves away from the camera.
+5. **Three backgrounds** (Calm only, remembered on your device): Forest · Dark (plain black — the lightest for older phones, no 3D at all) ·
+   Camera (today's picture). The sound is the same on all three (a probe proves it). The latency meter now has a «Scene» line (frames per
+   second of the forest), so we can measure whether the forest slows the hand tracking.
+6. **Firefly is now also a SOLO sound** (until now it was only a chord sound) — the same sound as the prototype's forest note. Each pinch
+   rings by itself; moving a held note to another row strikes it again. All other sounds are unchanged (checked against their recordings).
+7. **Under the hood:** a «bus» that tells pictures what the hands and notes are doing, and a «stack» that draws the screen in layers — the
+   screen looks exactly as before (a picture-by-picture comparison of 10 screens found zero differences).
+
+**What you can try now** (Live Server running, `http://127.0.0.1:5500`):
+- **Full ↔ Calm:** ▶ Play → «🎛 Sound» → scroll to the very end → «Development · Mode: Full | Calm». Tap Calm, play; tap Full — all back.
+  Or open `http://127.0.0.1:5500/?calm` → ▶ Play → it starts in Calm.
+- **The forest and the backgrounds:** in Calm, the same Sound panel shows «Background: Forest | Dark | Camera». Choose Forest, close the
+  panel, raise your hand: the firefly light follows your pinch; move your hand away from the camera — the light goes deeper. Try Dark and
+  Camera. Turn your phone or resize the window (portrait and landscape). For now the note grid and the hand dots still show over the forest
+  — the Calm controls (which make the grid a soft glow) come after you choose a design.
+- **The listening page:** `http://127.0.0.1:5500/tools/listen/calm-timbres.html` — tap Glow / Dusk / Mist next to each sound, tick three.
+- **The design pages:** open `docs/design/calm/a-lantern.html`, `b-moonglass.html`, `c-hush.html` (double-click, or through Live Server; also on
+  your phone), and `docs/design/calm/README.md` for a comparison in plain words.
+- **The GPU test (step 105):** Calm → Diagnostics → Latency meter On → play 2 minutes on Dark, «Copy»; then 2 minutes on Forest, «Copy»;
+  send both texts — on the desktop and on your Poco M5.
+
+**Not done this run:** «depth → forest reverb» (C4b) and the forest ambience (C4c). C4b needs one decision from you first (question 3).
+
+**Questions for you (plain words):**
+1. **Design:** which of the three looks — Lantern, Moonglass or Hush (or parts of several: e.g. Lantern's colours with Moonglass's round
+   buttons)? And which app icon?
+2. **Sounds:** after the listening page — which three sounds should Calm offer?
+3. **Depth and the forest's echo:** in the prototype a note sent FURTHER into the forest gets more echo and gets darker. Our Night forest
+   echo can follow your hand's distance smoothly, and each note can get darker when you play far away. One limit: past about two thirds of
+   the way back, the echo amount stops growing (unless we widen the effect, which changes it for the full app too). Fine to keep that limit
+   for v1? (Our suggestion: yes — the darkening still tells «far».)
+4. **The two note modes' names:** «Notes: follow the hand» / «Notes: stay put» (ru «Ноты: за рукой» / «Ноты: на месте») — good?
+
+**Probe verdicts (final run):** data 26 / 26 PASS · full browser run 112 / 113, the one miss a timing hiccup of the audio thread during a live
+recording test (re-run alone: PASS) · golden sounds 85 / 85 · the screen-by-screen picture comparison: identical where nothing was meant to
+change · privacy, network and on-screen checks PASS.
