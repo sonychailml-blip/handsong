@@ -13,7 +13,8 @@
    (rule #33): the renderer string stays on the device and leaves it only inside the text the person chooses to copy. */
 import { makeMeter, handToSound, looksBluetooth, frameWaitMs, withFrameWait, perMinute, splitLongTasks, isSoftwareGL, STARTUP_MS, rateOf } from './core/latency.js';
 import { HAND_SEARCH_EVERY } from './core/handsched.js';
-import { AC, masterDelayMs } from './audio.js';
+import { AC, masterDelayMs, engLoad } from './audio.js';
+import { dropRate, engClass, benchOf, ENG_BENCH_KEY } from './core/engclass.js';   // ENG2: dropouts per minute, the provisional power class
 import { video, camInfo, modelInfo, visionOpts, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo, pathInfo, pumpStats } from './vision.js';
 import { darkNew, darkStep, lostNew, lostStep, capsText, LOST_MS } from './core/camlight.js';
 import { recording } from './recorder.js';
@@ -63,7 +64,12 @@ export function latHands(f, tA, tB){
 }
 export function latIdle(){ prevT0=NaN; }   // editor/window branch: no camera, no frame interval across it
 
+/* ENG2: the browser's dropout counter (playoutStats) sampled with the audio tick; the render-capacity load kept as last reported */
+const dropS=[]; let capNow=null, dropSrc=null;
+function dropTick(){ const L=engLoad(), now=performance.now(); capNow=L.capacity||null;
+  if(L.playout){ dropSrc=L.playout.src; dropS.push([now, L.playout.events]); while(dropS.length>2 && now-dropS[0][0]>70e3) dropS.shift(); } }
 function audioTick(){
+  dropTick();
   if(!AC||!AC.getOutputTimestamp) return;
   const o=AC.getOutputTimestamp();   // what the speaker plays now (context time) and when (performance time)
   if(o && o.contextTime>0 && o.performanceTime>0) M.add('pipeline', (AC.currentTime-o.contextTime)*1000-(performance.now()-o.performanceTime));
@@ -141,7 +147,9 @@ export function latReport(){
                     lostPerMinute:perMinute(lost.times, now), lostWithinMs:LOST_MS, hint:{ shown:dark.shown, fps:r1(dark.fps) } },
            stages, longTasks: longOk ? { lastMinute:lt.length, maxMs:r1(lt.reduce((a,x)=>Math.max(a,x.ms),0)), totalMs:r1(lt.reduce((a,x)=>a+x.ms,0)),
                                         startup:{ ...part(split.startup), maxAtMs: sl ? r1(sl.t-camStart0) : null }, playing:part(split.playing), causes:loafOk } : null,
-           audio:{ state:AC&&AC.state, sampleRate:sr, quantumMs:q, baseMs:r1(base), outputMs:r1(outp), pipelineMs:stages.pipeline.mean, masterPathMs:r1(graph) },
+           audio:{ state:AC&&AC.state, sampleRate:sr, quantumMs:q, baseMs:r1(base), outputMs:r1(outp), pipelineMs:stages.pipeline.mean, masterPathMs:r1(graph),
+                   dropoutsPerMinute:dropRate(dropS, now), dropSource: dropS.length ? dropSrc : null, capacity:capNow },   // ENG2
+           power:powerNow(stages.detect.mean),
            output:{ label:outLabel, bluetooth:btSeen }, handToSoundMs:r1(tot.ms), missing:tot.missing,
            handToSoundWithWaitMs:r1(withFrameWait(r1(tot.ms), r1(fw))),
            detection:{ runs:pi.runs, asked:pi.asked, why:pi.why, warmMs:pi.warmMs, policy:vo.hands, searchEvery:HAND_SEARCH_EVERY, detectedFps:r1(detFps) },
@@ -169,6 +177,9 @@ export function latText(r=latReport()){
   L.push(t('diag.gestures', { mean:f(S.gestures.mean), p95:f(S.gestures.p95) }));
   L.push(t('diag.draw', { mean:f(S.draw.mean), p95:f(S.draw.p95), loop:f(S.loop.mean) }));
   L.push(t('diag.audio', { base:f(r.audio.baseMs), out:f(r.audio.outputMs), q:f(r1(r.audio.quantumMs)), pipe:f(r.audio.pipelineMs), mp:f(r.audio.masterPathMs) }));
+  { const A=r.audio, c=A.capacity, pc=x=>f(Number.isFinite(x)?Math.round(x*100):null);   // ENG2: dropouts (browser counter, never guessed) and the provisional class
+    L.push(t(A.dropSource ? (A.dropoutsPerMinute==null ? 'diag.dropWait' : 'diag.drop') : 'diag.dropNone', { n:f(A.dropoutsPerMinute) })+(c ? t('diag.cap', { avg:pc(c.avg), peak:pc(c.peak), u:pc(c.underrun) }) : ''));
+    const P=r.power; L.push(P.factor==null ? t('diag.powerNone') : t('diag.power', { cls:t('diag.cls.'+P.cls), f:f(P.factor) })); }
   if(r.longTasks){ const LT=r.longTasks, why=c=>c?t('diag.cause',{ c }):'';
     L.push(t('diag.longStart', { n:LT.startup.n, max:f(LT.startup.maxMs), why:why(LT.startup.cause) })+(LT.startup.maxAtMs==null ? '' : t(LT.startup.maxAtMs<0 ? 'diag.longBefore' : 'diag.longAfter', { s:f(r1(Math.abs(LT.startup.maxAtMs)/1000)) })));
     L.push(t('diag.longPlay', { n:LT.playing.n, max:f(LT.playing.maxMs), why:why(LT.playing.cause) })); }
@@ -181,6 +192,10 @@ export function latText(r=latReport()){
 const lowFpsTx=W=>{ const fx=x=>Number.isFinite(x)?String(r1(x)):'—'; return Number.isFinite(W.after)||Number.isFinite(W.before) ? t('diag.lowFps', { a:fx(W.before), b:fx(W.after) }) : ''; };
 const devTx=D=>t('diag.dev.'+D.kind+(D.ok?'':'Fail'), { what:D.what.map(k=>t('diag.ctl.'+k, { def:k })).join(t('diag.ctl.and')) });
 const lowNoteTx=W=>W.note ? t(W.mode==='off' ? 'diag.lowBack' : 'diag.lowKept', { why:t('diag.why.'+W.note, { def:W.note }) }) : '';
+/* ENG2: the provisional power class from the cached audio benchmark (render.js runs it once per device) and the detection time */
+function powerNow(detectMs){ let b=null; try{ b=benchOf(localStorage.getItem(ENG_BENCH_KEY), navigator.userAgent); }catch(e){}
+  const c=engClass({ factor:b&&b.factor, detectMs:Number.isFinite(detectMs)?r1(detectMs):undefined, softwareGL:gpuInfo().software });
+  return { factor:b?b.factor:null, at:b?b.at:null, cls:c.cls, why:c.why, provisional:true }; }
 export function latConsole(){ const r=latReport(); console.log(latText(r)); console.table(r.stages); return r; }
 
 /* ---------- the overlay and its toggle (Sound panel) ---------- */

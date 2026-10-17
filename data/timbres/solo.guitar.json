@@ -1,0 +1,27 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.guitar",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "en": "Guitar",
+  "ru": "Гитара"
+ },
+ "recipe": {
+  "fb": 0.995,
+  "damp": 0.46,
+  "exBase": 0.22,
+  "exSpan": 0.7
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.5
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

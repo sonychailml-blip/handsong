@@ -759,4 +759,4 @@ function onRec(){
   hooks.tutor && hooks.tutor('loop',{ev: fresh?'recStart':'overdubStart'});   // ЗАЦЕПКА ОБУЧЕНИЯ: старт первой записи / новой дорожки поверх
 }
 
-export { recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, storeTi, storeTim, noteSource, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec };
+export { gridFor, recWire, recording, recBass, takeSt, takeJoin, takeSrc, nextFreeLayer, pushLy, recLayers, isRecLayer, curTake, curTakeSet, recWinReset, inPB, storeTi, storeTim, noteSource, push, noInst, recLeadReset, recFoldRoll, recAllOff, recDrop, wTapSet, WleadOn, WleadOff, liveChClear, WchOn, WchSet, WchOff, latchOpenAt, recLatchOpen, WbassOn, WbassOff, WdrumHit, setRecording, recStop, onRec };

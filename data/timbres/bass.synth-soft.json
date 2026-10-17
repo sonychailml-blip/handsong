@@ -1,0 +1,32 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "bass.synth-soft",
+ "family": "bass",
+ "engine": "bass2",
+ "name": {
+  "en": "Synth bass (soft)",
+  "ru": "Синт-бас мягкий"
+ },
+ "recipe": {
+  "t1": "sine",
+  "t2": "triangle",
+  "det": 0,
+  "ratio": 1,
+  "lp": 480,
+  "lvl": 0.42,
+  "fo": 1.8,
+  "ft": 0.15,
+  "fv": 0.8
+ },
+ "env": {
+  "att": 0.02,
+  "rel": 0.22
+ },
+ "policies": {
+  "voiceMode": "lead",
+  "glide": 0.012,
+  "register": "bass",
+  "quant": 0.5
+ }
+}

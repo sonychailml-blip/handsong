@@ -1,0 +1,26 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.bell",
+ "family": "solo",
+ "engine": "fm2",
+ "name": {
+  "en": "Bell",
+  "ru": "Колокол"
+ },
+ "recipe": {
+  "ratio": 3.507,
+  "sus": 1.6,
+  "fixed": true
+ },
+ "env": {
+  "att": 0.004,
+  "rel": 0.3
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

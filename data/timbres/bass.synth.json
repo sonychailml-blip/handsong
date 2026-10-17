@@ -1,0 +1,32 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "bass.synth",
+ "family": "bass",
+ "engine": "bass2",
+ "name": {
+  "en": "Synth bass",
+  "ru": "Синт-бас"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "square",
+  "det": 12,
+  "ratio": 0.5,
+  "lp": 700,
+  "lvl": 0.4,
+  "fo": 2,
+  "ft": 0.12,
+  "fv": 1
+ },
+ "env": {
+  "att": 0.02,
+  "rel": 0.24
+ },
+ "policies": {
+  "voiceMode": "lead",
+  "glide": 0.012,
+  "register": "bass",
+  "quant": 0.5
+ }
+}

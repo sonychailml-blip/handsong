@@ -1,0 +1,27 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.metallophone",
+ "family": "solo",
+ "engine": "fm2",
+ "name": {
+  "en": "Metallophone",
+  "ru": "Металлофон"
+ },
+ "recipe": {
+  "ratio": 3.51,
+  "peak": 7,
+  "sus": 0.35,
+  "tau": 0.09
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.45
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

@@ -2,8 +2,9 @@
 
 Concise English. Full reasoning and every past slice record: `archive/HANDOFF-history.md` (Russian, verbatim; part A = the
 Russian Part I before DOCS-EN, part B = all history). Search it by slice name with `grep`. Where the archive disagrees with
-this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Code model, rules (38 hard rules), 97 verification steps: `CLAUDE.md`
-(its long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
+this file or `CLAUDE.md`, this file and `CLAUDE.md` win. Rules (38 hard rules), short module map, step index: `CLAUDE.md`
+(≈ 56 KB since DOC1; the full module map, architecture, known limits and every step's full text moved word for word to
+`archive/CLAUDE-history.md`; long reasoning: `archive/CLAUDE-full.md`). Also: `UI-MAP.md` (screen map), `BACKLOG.md` (all tasks; §1 foundation,
 §7 product direction; English index on top), `archive/` (finished plans). Stale names: list at the head of archive B,
 «ПРЕЖНЯЯ ЧАСТЬ I».
 
@@ -56,7 +57,7 @@ Details of every arc: archive B by name; code model: `CLAUDE.md`.
 **Tracks** (archive B, «Принятое по дорожкам»): a track stores NOTES and TIMBRE, not sound (MIDI principle); each sound source is
 its own track; next, source = the timbre assigned to a FINGER (only `recorder.noteSource` changes). After recording the chain
 belongs to the TRACK; live, effects will belong to the TIMBRE (chains move from role to timbre; a track has ONE chain at a time).
-⛔ No new SOLO timbre, not even appended, until stable timbre ids exist (KS block is the tail of `LEAD_INSTR`).
+Timbres are records (TIM3, RUN 4): a new timbre = a file in `data/timbres/` + the bundle; a solo timbre may be appended (KS by engine).
 
 **Auto-freeze** (plan AF1–AF6: archive B, «ПЛАН „АВТОЗАМОРОЗКА“ (пересмотр при LR1)»; AF6 detail: «AF1»): a track freezes itself
 once it settles (all but the track being recorded), unnoticed. Done AF1–AF5, AF6b (AF1 layout costs: archive B). Next: AF6 memory (stage 5).
@@ -98,8 +99,8 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 ## Work order (user decision: "editor before the timbre builder")
 ✅ U5 → ✅ T7 → ✅ T7b → ✅ TUNINGS AS FILES F0–F8 (decided: before solo editing) → ✅ S4–S7 → ✅ **EDITOR ESSENTIALS** → ✅ **EDITOR-OWN** (OWN1, OWN2, BEND-CURVE) → ✅ **TONIC FREEZE = stage 2** (TF0–TF6, TF3b; closed 2026-10-14) → ✅ VOL-5, VOL-6 (closed) → ✅ the **FOUNDATION PLAN** (2026-10-14;
 answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, ✅ GES1 (NIGHT + DAY run), ✅ UI1b, ✅ TIM2, ✅ SAVE1 (files), ✅ DRAW1 (DAY run);
-✅ AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1 part 1, SONG3 (= SAVE1 + AUTOSAVE1) (RUN 3); ✅ PACK1, IDS1 part 2, SONG2; plans TIM3/ENG2 written;
-NEXT: CMD1 plan → VIS1 → DOC1 (questions in WORK-LOG); UI1a after the redesign) → **4 «Calm»** = FIRST
+✅ AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1 part 1, SONG3 (= SAVE1 + AUTOSAVE1) (RUN 3); ✅ PACK1, IDS1 part 2, SONG2; ✅ RUN 4: DOC1, SONG3 rest, POOL1, ENG2, TIM3a–d; plans CMD1/VIS1 written;
+NEXT: CMD1a–d, VIS1a (questions in the plans); UI1a after the redesign) → **4 «Calm»** = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -132,7 +133,7 @@ small: settings in localStorage, polyrhythm (§3.24), swing as a ratio (§3.30),
 cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per row in the editor (deferred, user answer 6) · the user's
 «EXPRESSION HAND» — a pedal-like hand, hand map, expression lab (BACKLOG §3.29 «➕», 2026-10-15; after GES1).
 
-## Known limits and debts (reasoning: `CLAUDE.md` "Known limits", archive)
+## Known limits and debts (the list: `archive/CLAUDE-history.md` "Known limits", since DOC1)
 - Songs save as FILES by hand (SAVE1) and AUTOSAVE on the device (AUTOSAVE1: last 5 songs, offer at ▶ Play); a song carries copies of
   the person's own scales (SONG1, file v3); events carry timbre ids (TIM2). Since TF2 the key is
   frozen in each note's view (+ cents for 1/1 tunings; the knob moves the hands and the backing; Transpose moves recordings, keys −12..23). The app does not work offline (SW caches nothing; MediaPipe from a CDN). Hand tracking on
@@ -141,7 +142,7 @@ cultural gate for "Drums only" (§3.33 item 1 — a defect) · OWN3 cents per ro
   is ≈ 2× slower on the user's desktop GPU); the old browser limiter's 6 ms are gone (SND-F1b). In low light the webcam itself slows
   (6.3 fps evening vs 14–30 day, LAT3): no web API forces its frame rate — light on the hands is the remedy (hint; BACKLOG §7.18).
 - Editor, lanes, history, paste, sections, effect networks, frozen-track and render limits (KS / Glue renders pin ≈ 6 MB, Firefly tails
-  ring out, Night forest CPU): `CLAUDE.md` "Known limits" (one list, kept there). Captured expression channels are not replayed (§4).
+  ring out, Night forest CPU): `archive/CLAUDE-history.md` "Known limits" (one list, kept there). Captured expression channels are not replayed (§4).
 - Opening the editor silences a ringing latch. "Drums only" backing lacks a cultural gate (§3.33 item 1).
 
 ## Key lessons (expanded: archive, «КЛЮЧЕВЫЕ УРОКИ»)
@@ -162,14 +163,12 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 
 ### NIGHT run (2026-10-16): record in archive B («… at the DAY run»), log `NIGHT-LOG.md`.
 ### DAY run (2026-10-16): record in archive B («… at RUN 3»), log in `WORK-LOG.md` (DAY RUN part).
-### RUN 3 (2026-10-16) — full records: archive B «Moved from HANDOFF.md at RUN 3 (records)»; log: `WORK-LOG.md` «RUN 3»
-- Done: AUTOSAVE1 (step 98), DRAW1b, SONG1 (file v3), AUD1a–c + AUD2a–c (E, surface, rule #38, timbres / effects / FDN / worklets out of
-  audio.js 3225 → 2142 lines; GOLD 84/0, census identical), ENG1 (engine contract §4.4), IDS1 part 1 (event ids, file v4). Last P.all PASS 97/0.
-- User answers (2026-10-16): UI1a after the redesign · SONG3 = SAVE1 + AUTOSAVE1 (done) · TIM3 and ENG2 PLAN ONLY first
-  (docs/TIM3-design.md, docs/ENG2-design.md) · PACK1 build now (offline ECDSA P-256 keys, no network, no UI) · the flaky «dynamics live =
-  offline» row: name a capture that saw no signal, retry once.
-- PACK1 built (core/pack.js: pack format, offline ECDSA P-256 licence keys «HS1…», the registry gate; TEST key pair only, private half
-  git-ignored in tools/; no UI, no network). Plans for review: docs/TIM3-design.md, docs/ENG2-design.md. SONG3 done (= SAVE1 + AUTOSAVE1).
-- IDS1 part 2 (lane-point ids, file v5) and SONG2 (the demo song is `data/songs/triphop.json`, P.song opens it; generator = probe tool).
-  Not started, questions in WORK-LOG: CMD1 (needs a plan — the tripwire hash compares objects), VIS1 (with the redesign?), DOC1 (cut
-  CLAUDE.md ≈ 237 KB?).
+### RUN 3 (2026-10-16): record in archive B («… at RUN 4»), log `WORK-LOG.md` «RUN 3».
+### RUN 4 (2026-10-17) — log: `WORK-LOG.md` «RUN 4» (plain-language summary at its end)
+- Done: DOC1 (CLAUDE.md 237 → ≈ 57 KB; full text in `archive/CLAUDE-history.md`, proof `tools/doc-split-check.mjs`), LAT2a on the probe
+  clock, SONG3 leftover (Open = one ↶ step), plans CMD1 + VIS1 (`docs/`), POOL1 (chord pool on demand: bare start graph ≈ 0.40 → 0.13 of a
+  core offline), ENG2 (readouts, «Audio dropouts per minute» from `playbackStats`, provisional class — no switching), TIM3a–d + TIM3c
+  (every timbre and kit a record in `data/timbres/`, one bundle, T5 safety bounds, song file v6 with full timbre records, own timbres,
+  «Keep in my timbres»). Final: data PASS 21/0, P.quick 80/0, P.all 105/0. GOLD 84/0 throughout; census changed only by POOL1.
+- Answers recorded (2026-10-17): review E1–E3 / T1–T5 in `docs/ENG2-design.md`, `docs/TIM3-design.md`; plan note in archive B.
+- Open for the user: steps 99 (Open → ↶) and 100 (dropouts line, phone numbers — E3); questions at the end of CMD1/VIS1 plans.

@@ -1,0 +1,51 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.organ-full",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "Organ (full)",
+  "ru": "Орган полный"
+ },
+ "recipe": {
+  "oscs": [
+   {
+    "wave": "sine",
+    "mult": 1,
+    "gain": 0.34
+   },
+   {
+    "wave": "sine",
+    "mult": 2,
+    "gain": 0.26
+   },
+   {
+    "wave": "sine",
+    "mult": 3,
+    "gain": 0.2
+   },
+   {
+    "wave": "sine",
+    "mult": 4,
+    "gain": 0.14
+   },
+   {
+    "wave": "sine",
+    "mult": 6,
+    "gain": 0.08
+   }
+  ],
+  "hum": 0
+ },
+ "env": {
+  "att": 0.006,
+  "rel": 0.06
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

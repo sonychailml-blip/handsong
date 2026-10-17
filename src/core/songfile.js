@@ -5,7 +5,7 @@
    «__proto__», «constructor», «prototype» refused anywhere (an object built from the file must never reach a prototype). */
 
 const SONG_FORMAT='handsong/song';
-const SONG_VERSION=5;   // SONG1 (3): + records (copies of the person's own tunings / modes); IDS1 (4): every event's permanent id; (5): every lane point's
+const SONG_VERSION=6;   // SONG1 (3): + records (copies of the person's own tunings / modes); IDS1 (4): every event's permanent id; (5): every lane point's; TIM3d (6): timbre copies are full timbre RECORDS
 const SONG_MAX_BYTES=8*1024*1024;   // a song of notes, lanes and timbre copies is ~0.1–1 MB; 8 MB leaves room and refuses junk early
 const SONG_MAX_DEPTH=24;
 const BAD_KEYS=new Set(['__proto__','constructor','prototype']);
@@ -40,7 +40,11 @@ function songV2toV3(r){ if(!r.records) r.records={}; return r; }
 const songV3toV4=r=>r;
 /* v4 → v5 (IDS1 part 2): lane points carry their permanent ids; an older file has none — the app gives them at open */
 const songV4toV5=r=>r;
-const SONG_MIGRATIONS=[songV1toV2, songV2toV3, songV3toV4, songV4toV5];
+/* v5 → v6 (TIM3d): a timbre copy becomes the full timbre RECORD (handsong/timbre). An older copy {role, name, def} cannot be turned into a
+   record here (a pure step does not know the app's timbres): it is kept and marked `legacy:true` — it plays as before (the app's own timbre
+   when it has the id; else a timbre with equal settings, else the role's stand-in). Idempotent. */
+function songV5toV6(r){ for(const t of Object.values(r.timbres||{})) if(t && typeof t==='object' && t.format!=='handsong/timbre' && t.role!=='dr') t.legacy=true; return r; }
+const SONG_MIGRATIONS=[songV1toV2, songV2toV3, songV3toV4, songV4toV5, songV5toV6];
 const REC_KINDS={ tuning:'handsong/tuning', palette:'handsong/palette', chordmodes:'handsong/chordmodes', mode:'handsong/mode' };
 const OWN_ID=/^u\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;   // = core/registry USER_ID
 
@@ -93,8 +97,10 @@ function songCheck(r){
   if(need(Array.isArray(V) && V.length<=10000,'views')) V.forEach((v,i)=>{
     need(isObj(v) && isStr(v.mode) && (v.key===null || (isInt(v.key) && v.key>=-24 && v.key<=48)) && isNum(v.keyC||0) && Math.abs(v.keyC||0)<=50
       && (v.tunedFrom===undefined || v.tunedFrom==='T' || (isInt(v.tunedFrom) && v.tunedFrom>=0 && v.tunedFrom<12)) && (v.chordMode===undefined || isStr(v.chordMode)),`view ${i}`); });
-  if(need(isObj(r.timbres),'timbres')) for(const [id,t] of Object.entries(r.timbres))
-    need(isStr(id,80) && isObj(t) && ['ld','ch','bs','dr'].includes(t.role) && isObj(t.def),`timbre ${String(id).slice(0,40)}`);
+  /* TIM3d: a timbre copy is a full record (shape here; the T5 bounds — core/timbre.js checkTimbre — at open, where a refused copy plays as
+     the stand-in) or, for kits until TIM3c and for v5 copies (`legacy`), {role, name, def} */
+  if(need(isObj(r.timbres) && Object.keys(r.timbres).length<=500,'timbres')) for(const [id,t] of Object.entries(r.timbres))
+    need(isStr(id,80) && isObj(t) && (t.format==='handsong/timbre' ? t.id===id && isObj(t.recipe) : ['ld','ch','bs','dr'].includes(t.role) && isObj(t.def)),`timbre ${String(id).slice(0,40)}`);
   if(need(isObj(r.records),'records')) for(const [kind,map] of Object.entries(r.records)){   // SONG1: shape only (the full check: scaleload.checkRecord in the page)
     if(!need(REC_KINDS[kind] && isObj(map) && Object.keys(map).length<=200,`records.${String(kind).slice(0,20)}`)) continue;
     for(const [id,x] of Object.entries(map)) if(!need(OWN_ID.test(id) && isObj(x) && x.id===id && x.format===REC_KINDS[kind],`records.${kind} ${String(id).slice(0,40)}`)) break; }

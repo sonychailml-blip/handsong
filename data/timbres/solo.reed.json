@@ -1,0 +1,45 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.reed",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "Reed",
+  "ru": "Тростевой"
+ },
+ "recipe": {
+  "filter": {
+   "freq": 2200,
+   "Q": 6
+  },
+  "oscs": [
+   {
+    "wave": "square",
+    "mult": 1,
+    "gain": 0.18
+   },
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.14,
+    "detune": 5
+   }
+  ],
+  "strike": {
+   "open": 2,
+   "tc": 0.15,
+   "fv": 1.2
+  }
+ },
+ "env": {
+  "att": 0.04,
+  "rel": 0.16
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

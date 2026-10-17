@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.plucked-string",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Plucked string",
+  "ru": "Струна щипком"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "sawtooth",
+  "ratio": 1,
+  "det": 2,
+  "m1": 0.46,
+  "m2": 0.3,
+  "lp": 2600,
+  "lvl": 0.18,
+  "fo": 3.2,
+  "ft": 0.09,
+  "fv": 1.4,
+  "hj": 1
+ },
+ "env": {
+  "att": 0.003,
+  "rel": 0.22
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

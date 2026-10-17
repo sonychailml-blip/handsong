@@ -1,30 +1,18 @@
 /* AUD1c (RUN 3, 2026-10-16) — the Karplus–Strong solo banks (worklet `ks-string`) and the subtractive fallback plucks. Moved from src/audio.js; an ENGINE SUBMODULE (hard rule #38): stateless — every
    engine value comes from the engine context E (audio.engineCtx) passed as the first argument; nothing here keeps state. */
 import { baseF } from '../../scales.js';
-import { LEAD_GLIDE_TC, freezeDeep, fstrike } from './stages.js';
+import { LEAD_GLIDE_TC, fstrike } from './stages.js';
 import { mkOsc } from './voice.js';
 
-/* Таблица KS-банков (порядок = хвост LEAD_INSTR с индекса 16). Все — ОДНА струна с разными
-   параметрами (никакой новой архитектуры): fb — длина затухания, damp — петлевой фильтр (0.5 =
-   максимум затухания верхов, дальше = ярче), exBase/exSpan — яркость щипка (тихо/громко), nl —
-   нелинейность в петле (джавари/металл), symp — сочувственные струны (тонально следуют за тоникой),
-   body — фиксированный корпусный резонатор. Пустой объект = дефолты ворклета → «Струна» байт-в-байт;
-   «Ситар» = nl 2.5 + тараб (как было). Чем каждый ОТЛИЧАЕТСЯ — в комментарии справа. */
-const KS_BANKS=freezeDeep([
-  {},                                                                                             // Струна: эталон (fb .992, damp .5, щипок .15/.8)
-  {nl:2.5, symp:{ratios:[1,4/3,3/2,2,9/4], Q:60, gain:.10}},                                       // Ситар: джавари (клип в петле) + тараб (5 полос)
-  {fb:.984, damp:.50, exBase:.04, exSpan:.40},                                                     // Уд: тёмный мягкий щипок + короче хвост, без буза — тёплая лютня
-  {fb:.994, damp:.44, exBase:.30, exSpan:.55, symp:{ratios:[1,3/2], Q:50, gain:.05}},              // Кото: яркая атака, длиннее хвост, лёгкий сочувственный звон
-  {fb:.972, damp:.40, exBase:.55, exSpan:.40, nl:1.2, body:{hz:3400, Q:1.2, db:5}},                // Сантур: ЖЁСТКИЙ яркий удар, быстрый спад, мягкий металлический край (но струна, не FM)
-  {fb:.995, damp:.46, exBase:.22, exSpan:.70},                                                     // Гитара: ярко + длинный сустейн — самый «привычный»
-  {fb:.965, damp:.50, exBase:.18, exSpan:.60},                                                     // Пиццикато: очень быстрый спад (низкий fb) — короткий глушёный щипок для ритма
-]);
+/* TIM3b (RUN 4): the KS parameter table moved into the timbre records (data/timbres/solo.string.json … solo.pizzicato.json, engine 'ks':
+   fb — decay length, damp — loop filter, exBase/exSpan — pluck brightness soft/loud, nl — in-loop non-linearity (jawari), symp — sympathetic
+   strings following the tonic, body — a fixed body resonator; an empty recipe = the worklet's defaults («String»)). */
 
 /* --- KS-банк: обёртка вокруг AudioWorkletNode 'ks-string' в контракт банка {gain,setFreq,cancel,strike}.
    node → [корпусный резонатор body] → ig → preBus: голос идёт через ОБЩУЮ цепочку (drive → огибающая →
    тремоло → delay/reverb), как любой банк. setFreq — a-rate param freq (та же setTargetAtTime 0.02, что у
    всех → глиссандо/бенд/терменвокс без спец-кода). strike — фронт param pluck в момент t (значение=vel).
-   opts (из KS_BANKS): nl/fb/damp/exBase/exSpan → в processorOptions ворклета; symp — сочувственные струны
+   opts (the record's recipe, TIM3b): nl/fb/damp/exBase/exSpan → в processorOptions ворклета; symp — сочувственные струны
    (высокодобротные полосы, звенящие от выхода струны, тонально следуют за baseF(), ретюн на щипке — как
    droneOn за тоникой); body — фиксированный корпусный резонатор (peaking) в сухом пути.
    ОГРАНИЧЕНИЯ (осознанно): у KS нет oscillator.detune → детюн-вибрато и гуманизация его не касаются (hum:0).
@@ -64,4 +52,4 @@ function buildKSFallback(E, preBus){
   E.build.banks.push({gain:ig,setFreq:(f,tc=LEAD_GLIDE_TC,t)=>o.frequency.setTargetAtTime(f,t,tc),
               cancel:t=>o.frequency.cancelScheduledValues(t), strike:fstrike(lp,1800,3.0,0.1,1.4)});
 }
-export { KS_BANKS, buildKSBank, buildKSFallback };
+export { buildKSBank, buildKSFallback };

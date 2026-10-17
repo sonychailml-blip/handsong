@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.organ",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Organ",
+  "ru": "Орган"
+ },
+ "recipe": {
+  "t1": "square",
+  "t2": "sine",
+  "ratio": 2,
+  "det": 0,
+  "m1": 0.45,
+  "m2": 0.35,
+  "lp": 4200,
+  "lvl": 0.15,
+  "fo": 1,
+  "ft": 0.02,
+  "fv": 0.2,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.012,
+  "rel": 0.09
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

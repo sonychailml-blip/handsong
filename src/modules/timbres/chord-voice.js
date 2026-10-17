@@ -27,11 +27,12 @@ function newChordVoice(E, dest){
   o1.connect(g1); o2.connect(g2); g1.connect(f); g2.connect(f); f.connect(fb); fb.connect(g); g.connect(tg);
   const pan=makePanStage(E, tg, E.trackBus.ch&&dest===E.bus.ch ? null : dest);   // MX2: панорама ДОРОЖКИ — сразу за уровнем, до шины аккордов и её цепи
   const rt= E.trackBus.ch&&dest===E.bus.ch ? voiceRoute(E, pan.out, E.bus.ch, E.trackBus.ch) : null;   // AF5: live head or track head, set at attack
-  voiceStartPair(E, o1,o2);   // пара — в фазе, голос — со своей задержкой (см. voiceStartPair: разброс фаз внутри пары гасил основной тон)
+  voiceStartPair(E, o1,o2, E.pool.ch.seed(E.pool.ch.v.length));   // POOL1: this pool index's own draw; пара — в фазе, голос — со своей задержкой (см. voiceStartPair: разброс фаз внутри пары гасил основной тон)
   const v={o1,o2,g1,g2,f,fb,g,tg,pan,rt,owner:null,ins:null,tOn:0,lvl:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
   E.pool.ch.v.push(v); return v;
 }
 
+/* n voices more (POOL1: the live start builds CHORD_POOL_FIRST + CHORD_POOL_SPARE, the render copy none; cvAlloc grows on demand) */
 function buildChordPool(E, dest, n=CHORD_POOL_N){
   for(let i=0;i<n;i++) newChordVoice(E, dest);
 }
@@ -48,14 +49,14 @@ const FIREFLY=freezeDeep([ [1,1.00,1.6,'triangle'], [2,0.28,0.9,'sine'], [4.2,0.
 
 const FF_END=Math.max(...FIREFLY.map(p=>p[2]))+0.05;
 
-function ffStrike(E, owner,f,amp,bri,t){
+function ffStrike(E, owner,f,amp,bri,parts,t){   // TIM3a: parts = the record's partials (default FIREFLY); time stays last (rule #15)
   const d=Math.max(0,Math.min(1,bri||0)), pv=E.look.ownerPan(owner), g0=amp*E.look.ownerGain(owner);
   const tr=!!(E.trackBus.ch&&E.look.routeOf(owner));
   let out= tr ? E.trackBus.ch : E.bus.ch;
   if(d>0){ const lp=E.ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=briToHz(d); lp.connect(out); out=lp; }
   if(pv!==0){ const pin=E.ac.createGain(), st=makePanStage(E, pin,out), [a,b]=panGains(pv); st.l.gain.value=a; st.r.gain.value=b; out=pin; }
   const g=E.ac.createGain(); g.gain.value=g0; g.connect(out);
-  for(const [ratio,a,decay,type] of FIREFLY){
+  for(const [ratio,a,decay,type] of (parts||FIREFLY)){
     const o=E.ac.createOscillator(), pg=E.ac.createGain();
     o.type=type; o.frequency.value=f*ratio;
     pg.gain.setValueAtTime(0,t); pg.gain.linearRampToValueAtTime(a,t+0.006); pg.gain.exponentialRampToValueAtTime(0.0001,t+decay);

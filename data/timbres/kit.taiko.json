@@ -1,0 +1,57 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "kit.taiko",
+ "family": "kit",
+ "engine": "drumkit",
+ "name": {
+  "default": "Taiko",
+  "ru": "Тайко"
+ },
+ "recipe": {
+  "rows": [
+   {
+    "synth": "taiko",
+    "vm": 1,
+    "f0": 95,
+    "f1": 55,
+    "d": 0.42
+   },
+   {
+    "synth": "taiko",
+    "vm": 0.9,
+    "f0": 150,
+    "f1": 85,
+    "d": 0.28
+   },
+   {
+    "synth": "taiko",
+    "vm": 0.85,
+    "f0": 190,
+    "f1": 110,
+    "d": 0.22
+   },
+   {
+    "synth": "ka",
+    "vm": 1
+   },
+   {
+    "synth": "taiko",
+    "vm": 0.85,
+    "f0": 120,
+    "f1": 70,
+    "d": 0.3
+   },
+   {
+    "synth": "ka",
+    "vm": 1.1
+   }
+  ]
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": null,
+  "register": null,
+  "quant": "sub"
+ }
+}

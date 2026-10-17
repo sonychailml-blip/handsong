@@ -284,7 +284,7 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   `tapConsole(MP_LINE)`.
 - `src/core/latency.js`: `MP_LINE` (moved from vision.js); `handToSound` part `transfer` (optional — absent = not a part).
 - `src/vision.js`: `setHandsSink(fn, paused)`, `pollFrame`, `setDetectPath('main'|'worker')`, `setPicture('matched'|'live')`, `pathInfo`,
-  `pumpStats`, `pumpDbg({fault, schedStay, workerFail, hold, delayMs, slowMs, script, fake, reset})`, `detRunDbg`; `VISION_DEF` now
+  `pumpStats`, `pumpDbg({fault, schedStay, workerFail, hold, delayMs, slowMs, script, fake, reset})`, `pumpStepDbg(n)` (RUN 4: n pictures through the real pump, awaited — the probe clock), `detRunDbg`; `VISION_DEF` now
   `{hands:'2s', delegate, camFps, path:'main', picture:'matched'}`; internal `det`, `detGen`, `path`, `workerDet`, `mainDet`, `buildDet`,
   `setPath`, `detLost`, `W_READY_MS`, `EMPTY`, `nextPaint`, `sched`, `busy`, `pend`, `vfh`, `sink`, `isPaused`, `frameSeq`, `pumpStart`,
   `onVF`, `takeFrame`, `pump`, `PS` (`snapped`, `processed`, `detected`, `dropped`, `dup`, `notNewest`, `errors`, `log` {id, pf, action, n}),
@@ -297,7 +297,7 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
 - i18n: `diag.path`, `diag.pathWorker`, `diag.pathMain`, `diag.pathNone`, `diag.xfer`, `diag.hands.2s/.2/.1`, `diag.sw.hands2s`,
   `diag.sw.hands2`, `diag.sw.path`, `diag.sw.pathWorker`, `diag.sw.pathMain`, `diag.sw.pic`, `diag.sw.picMatched`, `diag.sw.picLive`,
   `load.warm`; `diag.detect` gained {tr, se, det, proc}.
-- `src/probes/detect.js` (new): `checkFrameOnce` (row «LAT2a frame once»), `checkSchedule` («LAT2a search schedule (live)»), `checkWorker`
+- `src/probes/detect.js` (new): `checkFrameOnce` (row «LAT2a frame once»), `checkSchedule` («LAT2a search schedule (probe clock)», RUN 4; `expectLog`), `checkWorker`
   («LAT2b worker = main thread, fallback», slow); `fresh`, `schedProblems`. `tools/probe-data.mjs`: row «LAT2 search schedule (core)»
   (`schedCore`, `HS`). `tools/probe-browser.mjs`: `--limit-min` default 15; `res.net` (`NET_OK`, the network check and its control
   `net-control-worker.js`). `tools/check-static.mjs`: GLOBALS `Worker createImageBitmap ImageBitmap postMessage`; NET_LISTED `vision.js`
@@ -463,3 +463,24 @@ grep `archive/CLAUDE-full.md` and the code. Line numbers are never recorded here
   scales» (`checkSongRecords`, `probes/song1.js`).
 - DRAW1b: `src/palette.js` — `cv(name)`, `ROLE_COL`, `noRoleCol`; tokens.css section «canvas» (`--cv-*`); check-static `canvasCheck`.
 - DRAW1: `src/views/common.js`, `camera.js`, `strip.js` (+ `loopViewClear`), `roll.js`, `play.js`; `draw.js` = facade.
+
+## RUN 4 (2026-10-17) — new names
+- `tools/doc-split-check.mjs` (DOC1: line-multiset proof of a document split) · `tools/timbre-bundle.mjs` (`buildBundle`, `--check`).
+- `src/vision.js`: `pumpStepDbg(n)` (LAT2a probe clock). `src/probes/detect.js`: `expectLog`.
+- `src/recorder.js`: `songSetNow`, `songSetApply`, `songOpenApply(P, meta)` (SONG3: Open = one 'snap' step 'open' with `st`, `m`, `br`);
+  `src/hooks.js` `songMeta`; `src/song/history.js` `histDbg({noOpenSt})`. `src/probes/songfile.js`: `checkSongOpenUndo`, `v5Of`.
+- POOL1: `config.CHORD_POOL_FIRST`, `CHORD_POOL_SPARE`; `audio.js` `cvSeed`, `cvSeedAt`, `cvLive`, `cvSpare`, `cvFree`, `poolDbg({eager, naive})`,
+  `poolSizes().chordFree`; `E.pool.ch.seed(i)`; `voiceStartPair(E, o1, o2, u)`; `render.renderPoolDbg`, `engineProbe({pre, after(ctx, eng)})`;
+  `src/probes/pool.js` `checkPool`.
+- ENG2: `src/core/engclass.js` (`engClass`, `ENG_THRESH`, `ENG_CLASS_PROVISIONAL`, `benchOf`, `benchText`, `ENG_BENCH_KEY`, `dropRate`);
+  `audio.js` `engVoices`, `engLevels`, `engLoad`; `render.js` `engBench`, `R.engine()` (= `engineReport`); `frzqueue.afPaused`;
+  `latmeter.js` `dropTick`, `powerNow`, report fields `audio.dropoutsPerMinute/dropSource/capacity`, `power`; `src/probes/eng2.js`.
+- TIM3: `src/core/timbre.js` (`checkTimbre`, `TB`, `ENGINES` chord2/tine/bass2/subtractive/fm2/ks/drumkit, `KIT_SYNTHS`, `TIMBRE_DAMAGES`,
+  `timbreNodes`, `TIMBRE_FORMAT`, `BUNDLE_FORMAT`); `src/timbreload.js` (`TIMBRE_RECORDS`, `timbreLoadReport`, `timbreAddSession`,
+  `timbreAll`, `timbreKnownId`, `timbreCheckDbg`); `audio.js` `timbreView`, `CH_VIEW`, `BS_VIEW`, `TINE_POOL`, `TINE_PARTS`, `LEAD_REC`,
+  `leadIsKs`, `DRUM_REC`, `timbreSync`, `timbreInstall`, `timbreRecord`, `timbreForgetDbg`; `stages.CHORD_GLIDE_TC`; `state.VOICE_MODE_DEF`;
+  `live/record.gridFor` (exported); `subtractive.buildSubtractive`, `buildLeadBank(E, rec, …)`; `fm.buildFMBank({…, fixed})`;
+  `chord-voice.ffStrike(E, owner, f, amp, bri, parts, t)`; `drumkits.js` `stdKick … stdCrash`, `noiseEdge`, `SYNTH`, `drumVoice(E, i, vol, rec,
+  t)`; `song/file.js` `songTimbreNeeds`; `ui.songKeepTimbres`; `src/probes/timbres.js` (`timbreSnapshotAll`, `dumpTimbres`,
+  `checkTimbresBefore`, `checkTimbreRecords`), `src/probes/tim3d.js` (`checkOwnTimbres`). Gone: `buildLeadBanks`, `KS_BANKS`,
+  `darbukaHit`/`tablaHit`/`gamelanHit`/`taikoHit`, the literal timbre tables.

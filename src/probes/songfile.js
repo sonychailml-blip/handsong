@@ -3,12 +3,16 @@
    its own save back and re-freezes the tracks that were frozen, with their old seeds). */
 import { row } from './rows.js';
 import { meas } from './kit.js';
-import { events, freezeState, laneIdOf as laneOf, songDirty, songMark } from '../recorder.js';
+import { events, freezeState, laneIdOf as laneOf, songDirty, songMark, loop, histLen, histReset, histTopLabel, histCanRedo, songUndo, songRedo, histDbg } from '../recorder.js';
+import { aRef } from '../state.js';
+import { newUserId } from '../core/registry.js';
 import { masterLevel, setMasterLevel, timbreSnapshot } from '../audio.js';
 import { SONG_VERSION, TIM1_POSITIONS, songUpgrade } from '../core/songfile.js';
 import { songPrint } from './run.js';
 import { fileDbg } from '../song/file.js';
 
+/* TIM3d: a song text → its version-5 form (timbre copies {role, name, def}, as files before v6) */
+const v5Of=text=>{ const r=JSON.parse(text); r.version=5; for(const id of Object.keys(r.timbres)){ const q=timbreSnapshot(id); if(q) r.timbres[id]={ role:q.role, name:q.name, def:q.def }; } return r; };
 const norm=r=>{ const x=JSON.parse(JSON.stringify(r)); delete x.saved; delete x.id; return JSON.stringify(x); };
 function firstDiff(a,b){ const A=JSON.parse(a), B=JSON.parse(b);
   for(const k of Object.keys(A)){ const x=JSON.stringify(A[k]), y=JSON.stringify(B[k]); if(x!==y){
@@ -66,8 +70,10 @@ export async function checkSongFile(){
     n++; if(songPrint()!==before) miss('a refused file changed the song');
     n++; if(({}).polluted!==undefined) miss('a «__proto__» key reached an object prototype');
     /* (5) a timbre this app does not have: with the settings of one it has → mapped to it; with other settings → kept by id, named, copied on */
-    { const R0=JSON.parse(s.text), ids=Object.keys(R0.timbres), ch=ids.find(x=>/^chord\./.test(x)) || ids[0];
-      const remap=JSON.parse(s.text); remap.timbres['chord.renamed-x']=remap.timbres[ch];
+    /* TIM3d: since file v6 a copy is a full record (installed when this app lacks it — row «TIM3d»); the «equal settings → mapped» path is
+       the LEGACY one: a version-5 file whose copies are {role, name, def} */
+    { const R0=v5Of(s.text), ids=Object.keys(R0.timbres), ch=ids.find(x=>/^chord\./.test(x)) || ids[0];
+      const remap=JSON.parse(JSON.stringify(R0)); remap.timbres['chord.renamed-x']=remap.timbres[ch];
       for(const e of remap.events) if(e.a.inst===ch) e.a.inst='chord.renamed-x';
       const o=UI.songOpenText(JSON.stringify(remap), ()=>true); n++;
       if(!o.ok || o.missing.timbres.length || events.some(e=>e.a&&e.a.inst==='chord.renamed-x')) miss('a renamed timbre with equal settings was not mapped to the app\'s own');
@@ -96,3 +102,68 @@ export async function checkSongFile(){
   return { cases:n, total:d.length, differences:d };
 }
 row({ at:995, name:'SAVE1 song file save → open', run:()=>checkSongFile(), read:r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences }), song:true });
+
+/* ═══ SONG3 — OPEN IS ONE ↶ STEP (RUN 4, user answer; P.quick and P.all) ═══
+   Through the real ui door (ui.songOpenText): a second song B (the seed's own save with other settings — tempo, metre, A4, master,
+   subdivision, quantise, a user brace —, another name and id, one track fewer) is opened over the seed song A. Exactly one step, labelled
+   'open'; ↶ → A again: the same save (events, tracks, captures, markers, name), the same Song-file id (autosave writes under it), the same
+   settings and brace, the same sound fingerprint; ↷ → B exactly as it opened; ↶ again → A. A refused file adds no step. CONTROL: an Open
+   step without the settings (histDbg({noOpenSt})) must leave B's tempo behind after ↶. The seed song is left as found (frozen tracks
+   re-frozen with their old seeds, the history empty). */
+const setNow=()=>({ aRef, metre:loop.metre, bpm:loop.bpm, bars:loop.bars, sub:loop.sub, quant:!!loop.quant, master:masterLevel() });
+const braceNow=()=>JSON.stringify(loop.rgn.user ? [1,loop.rgn.from,loop.rgn.to,!!loop.rgn.on] : [0,!!loop.rgn.on]);
+export async function checkSongOpenUndo(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const UI=await import('../ui.js'), R=await import('../render.js');
+  const L=[...new Set(events.map(e=>e.layer))].sort((a,b)=>a-b);
+  if(L.length<2) return { cases:0, total:1, differences:['no song — run P.seed first'] };
+  const frozenLy=L.filter(ly=>freezeState(ly)==='fresh'), seeds=new Map(frozenLy.map(ly=>[ly,R.seedOfLane(laneOf(ly))]));
+  histReset();
+  const a=UI.songSaveText(); if(!a.ok) return { cases:1, total:1, differences:[`save refused: ${a.why}`] };
+  const DA=norm(a.rec), idA=a.rec.id, SA=setNow(), BA=braceNow(), PA=songPrint();
+  /* B: other settings, name, id, one track fewer */
+  const b=JSON.parse(a.text), drop=Math.max(...b.tracks.map(T=>T.layer));
+  b.id=newUserId(); b.name='SONG3 probe B'; b.events=b.events.filter(e=>e.layer!==drop); b.tracks=b.tracks.filter(T=>T.layer!==drop);
+  const S=b.settings; S.bpm= S.bpm<200 ? S.bpm+11 : S.bpm-11; S.master=S.master*0.5; S.aRef= S.aRef===442 ? 438 : 442;
+  S.sub= S.sub===3 ? 4 : 3; S.quant=!S.quant; S.metre= S.metre===7 ? 5 : 7; S.brace={ user:true, from:0, to:S.metre*2, on:true };
+  const tB=JSON.stringify(b);
+  const ok=(what,r)=>{ n++; if(!r||r.ok===false){ miss(`${what} refused: ${JSON.stringify(r).slice(0,200)}`); return false; } return true; };
+  const isA=what=>{ const x=UI.songSaveText(); n+=5;
+    if(norm(x.rec)!==DA) miss(`${what}: the song is not A again — ${firstDiff(DA,norm(x.rec))}`);
+    if(x.rec.id!==idA) miss(`${what}: the Song-file id is ${x.rec.id}, A had ${idA}`);
+    if(JSON.stringify(setNow())!==JSON.stringify(SA)) miss(`${what}: settings ${JSON.stringify(setNow())}, A had ${JSON.stringify(SA)}`);
+    if(braceNow()!==BA) miss(`${what}: brace ${braceNow()}, A had ${BA}`);
+    if(songPrint()!==PA) miss(`${what}: the sound fingerprint differs from A's`); };
+  let DB=null, SB=null, BB=null;
+  try{
+    const h0=histLen();
+    if(!ok('open B', UI.songOpenText(tB, ()=>true))) return { cases:n, total:d.length, differences:d };
+    n+=3; if(histLen()!==h0+1) miss(`Open made ${histLen()-h0} history steps (one expected)`);
+    if(histTopLabel()!=='open') miss(`the newest step is «${histTopLabel()}», not «open»`);
+    const xb=UI.songSaveText(); DB=norm(xb.rec); SB=setNow(); BB=braceNow();
+    if(xb.rec.id!==b.id || SB.bpm!==S.bpm || SB.metre!==S.metre || SB.aRef!==S.aRef) miss(`B did not open with its own id and settings (${JSON.stringify(SB)})`);
+    n++; if(events.some(e=>e.layer===drop)) miss('B still holds the dropped track');
+    n++; if(songUndo()!=='open') miss('↶ did not undo the Open step');
+    isA('after ↶ of Open');
+    n++; if(!histCanRedo()) miss('no ↷ after ↶ of Open');
+    n++; if(songRedo()!=='open') miss('↷ did not redo the Open step');
+    { const x=UI.songSaveText(); n+=3; if(norm(x.rec)!==DB) miss(`after ↷: not B — ${firstDiff(DB,norm(x.rec))}`);
+      if(JSON.stringify(setNow())!==JSON.stringify(SB)) miss(`after ↷: settings ${JSON.stringify(setNow())}, B had ${JSON.stringify(SB)}`);
+      if(braceNow()!==BB) miss(`after ↷: brace ${braceNow()}, B had ${BB}`); }
+    n++; if(songUndo()!=='open') miss('the second ↶ did not undo the Open step');
+    isA('after ↶ ↷ ↶');
+    { const h1=histLen(), r=UI.songOpenText(a.text.slice(0,-40), ()=>true); n++; if(r.ok || histLen()!==h1) miss('a refused file added a history step'); }
+    /* CONTROL: an Open step that forgets the settings leaves B's tempo after ↶ */
+    histDbg({ noOpenSt:true });
+    try{ UI.songOpenText(tB, ()=>true); songUndo(); n++;
+      if(JSON.stringify(setNow())===JSON.stringify(SA)) miss('CONTROL: an Open step without its settings still brought the settings of A back — the check cannot fail'); }
+    finally{ histDbg({}); }
+  } finally {
+    const back=UI.songOpenText(a.text, ()=>true); if(!back.ok) miss('could not restore the song at the end');
+    histReset();
+    for(const ly of frozenLy){ await R.freeze(ly, { quiet:true, seed:seeds.get(ly) }); n++; if(freezeState(ly)!=='fresh') miss(`L${ly+1}: not frozen again after the probe`); }
+    songMark();
+  }
+  return { cases:n, total:d.length, differences:d };
+}
+row({ at:996.5, name:'SONG3 Open is one ↶ step', run:()=>checkSongOpenUndo(), read:r=>({ cases:r.cases, song:r.cases, diff:r.total, list:r.differences }), song:true });

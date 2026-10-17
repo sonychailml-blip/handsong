@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.warm-pad-clean",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Warm pad (clean)",
+  "ru": "Пад тёплый (чистый)"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "triangle",
+  "ratio": 1,
+  "det": 0,
+  "m1": 0.48,
+  "m2": 0.34,
+  "lp": 1400,
+  "lvl": 0.16,
+  "fo": 1.4,
+  "ft": 0.35,
+  "fv": 0.6,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.3,
+  "rel": 2
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

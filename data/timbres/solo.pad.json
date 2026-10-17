@@ -1,0 +1,52 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.pad",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "Pad",
+  "ru": "Пад"
+ },
+ "recipe": {
+  "filter": {
+   "freq": 2100
+  },
+  "oscs": [
+   {
+    "wave": "triangle",
+    "mult": 1,
+    "gain": 0.34,
+    "detune": -7
+   },
+   {
+    "wave": "triangle",
+    "mult": 1,
+    "gain": 0.34,
+    "detune": 0
+   },
+   {
+    "wave": "triangle",
+    "mult": 1,
+    "gain": 0.34,
+    "detune": 7
+   }
+  ],
+  "strike": {
+   "open": 1.5,
+   "tc": 0.35,
+   "fv": 0.8
+  },
+  "hum": 0
+ },
+ "env": {
+  "att": 0.12,
+  "rel": 0.35
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

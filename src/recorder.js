@@ -47,7 +47,7 @@ envWire({ fxPerm, fxParamMetaOf, fxNoteField, fxParamKeysOf, fxDefaultsOf, fxNot
   /* SAVE1: what the song file reads from above — settings and the live scale, live chain snapshots, timbre ids and copies */
   songEnv:()=>({ aRef, bpm:loop.bpm, metre:loop.metre, bars:loop.bars, sub:loop.sub, quant:!!loop.quant, master:AUD.masterLevel(),
     brace:{ user:!!loop.rgn.user, from:loop.rgn.from, to:loop.rgn.to, on:!!loop.rgn.on }, live:{ scaleId, tonic, tonicCents, tunedFrom } }),
-  soloSnap:()=>AUD.fxSnapshot(chainKeyOf('ld')), capNow:()=>capRecordNow(), timSnap:id=>AUD.timbreSnapshot(id),
+  soloSnap:()=>AUD.fxSnapshot(chainKeyOf('ld')), capNow:()=>capRecordNow(), timSnap:id=>AUD.timbreSnapshot(id), timRecord:id=>AUD.timbreRecord(id),
   timKnown:(r,id)=>AUD.timbreIdx(r,id)!==undefined, timKey:(r,x)=>AUD.timbreKey(r,x),
   timByDef:(r,def)=>{ const k=JSON.stringify(def); for(const x of AUD.timbresOf(r)){ const q=AUD.timbreSnapshot(x.id); if(q && JSON.stringify(q.def)===k) return x.id; } return null; },
   ready:()=>!!AC, af:kind=>{ if(hooks.af) hooks.af(kind); }, recording:()=>recording, pause:()=>{ if(loop.on) onLoop(); },
@@ -343,14 +343,17 @@ function snapEnd(tok){
   for(const [ly,id] of laneId) if(S.lanes.get(ly)!==id) addL.push([ly,id,laneRow(id)]);
   const mk= JSON.stringify(S.marks)!==JSON.stringify(secMarks) ? { from:S.marks, to:secCopy(secMarks) } : null;
   /* ✕ (user answer, 2026-10-14): its ↶ brings the brace and ⟳ back too. Only ✕ — the brace is otherwise not part of the history. */
-  const br= tok.label==='clear' && !histDbgO.noBrace && braceKey(S.rg)!==braceKey(loop.rgn) ? { from:S.rg, to:{ ...loop.rgn } } : null;
-  if(!rem.length&&!add.length&&!ch.length&&!remT.length&&!addT.length&&!remL.length&&!addL.length&&!mk&&!br) return false;
-  if(!histPush({ kind:'snap', label:tok.label, rem, add, ch, remT, addT, remL, addL, mk, br })) return false;
+  const whole= tok.label==='clear' || tok.label==='open';   // SONG3 (RUN 4): Open is one step like ✕ — brace, settings and the file's name/id ride along
+  const br= whole && !histDbgO.noBrace && braceKey(S.rg)!==braceKey(loop.rgn) ? { from:S.rg, to:{ ...loop.rgn } } : null;
+  const st= tok.st && !histDbgO.noOpenSt ? { from:tok.st, to:songSetNow() } : null, m= tok.meta || null;
+  if(!rem.length&&!add.length&&!ch.length&&!remT.length&&!addT.length&&!remL.length&&!addL.length&&!mk&&!br&&!st) return false;
+  if(!histPush({ kind:'snap', label:tok.label, rem, add, ch, remT, addT, remL, addL, mk, br, st, m })) return false;
   histSeal(); return true;
 }
 function snapApply(u,undo){
   const out= undo ? u.add : u.rem, inn= undo ? u.rem : u.add;
   if(out.length){ const X=new Set(out.map(x=>x[0])); compactEvents(e=>X.has(e)); }
+  if(u.st) songSetApply(undo ? u.st.from : u.st.to);   // SONG3: while the song is empty (the metre can change only then)
   for(const [e,t,a] of inn){ e.t=t; e.a=a; events.push(e); }
   for(const c of u.ch){ c[0].t= undo?c[1]:c[3]; c[0].a= undo?c[2]:c[4]; }
   for(const [tk] of (undo?u.addT:u.remT)) takeFx.delete(tk);
@@ -359,6 +362,7 @@ function snapApply(u,undo){
   for(const [ly,id,row] of (undo?u.remL:u.addL)){ laneId.set(ly,id); if(row) laneRowSet(id,row); }
   if(u.mk) secMarksSet(secCopy(undo?u.mk.from:u.mk.to));
   if(u.br){ const B= undo ? u.br.from : u.br.to; loop.rgn.user=!!B.user; rgnApply(B.from,B.to,!!B.on); }   // after the events: histCommit's rgnSync clamps it to the material
+  if(u.m && hooks.songMeta) hooks.songMeta(undo ? u.m.from : u.m.to);   // SONG3: ui's Song file name and id (autosave writes under it)
 }
 /* the key knob inside a song Transpose step (user answer 1): ↶/↷ set it back / again ABSOLUTELY (the backing re-keyed by a knob turn in
    between is restored by the step's own view moves, so knob and backing agree again). Live hands stop; tracks are not touched here. */
@@ -389,6 +393,13 @@ function clearSong(){
    does (P.seed, P.song): everything cleared, tables and records installed, the history starts fresh; the settings come with it (A4,
    tempo, metre, length, subdivision, quantise, master, brace). Refused while recording or with the editor open. */
 let songMarkH=null;
+/* SONG3: the song's own settings (what a song file carries besides its material) — read and applied as one */
+const songSetNow=()=>({ aRef, metre:loop.metre, bpm:loop.bpm, bars:loop.bars, sub:loop.sub, quant:loop.quant, master:AUD.masterLevel() });
+function songSetApply(S){
+  const a4=S.aRef!==aRef;
+  setARef(S.aRef); setLoopMetre(S.metre); setLoopBpm(S.bpm); setLoopBars(S.bars); setLoopSub(S.sub); setLoopQuant(S.quant); AUD.setMasterLevel(S.master);
+  if(a4) AUD.droneRetune();
+}
 const songMark=()=>{ songMarkH=histHash(); };
 const songDirty=()=> events.length>0 && histHash()!==songMarkH;
 function songSaveRec(meta){
@@ -396,13 +407,17 @@ function songSaveRec(meta){
   if(!events.length) return { ok:false, why:'empty' };
   const rec=songData(meta||{}); songMark(); return { ok:true, rec };
 }
-function songOpenApply(P){
+/* SONG3 (RUN 4, user answer): Open is ONE step of the one history, like ✕ — ↶ brings the previous song back with its settings, brace and
+   Song-file name/id (meta = { from, to } from ui); ↷ opens it again. Only where no snapshot can be taken (history off) it resets. */
+function songOpenApply(P, meta){
   if(!AC) return { ok:false, why:'audio' };
   if(recording) return { ok:false, why:'rec' };
   if(editIsOpen()) return { ok:false, why:'editor' };
-  clearRec(); histReset();
+  if(loop.on) onLoop();   // paused, as for ↶ (the metre can change only on a stopped, empty song)
+  const tok=snapBegin('open'); if(tok){ tok.st=songSetNow(); tok.meta=meta||null; }
+  clearRec(); if(!tok) histReset();
   const S=P.settings;
-  setARef(S.aRef); setLoopMetre(S.metre); setLoopBpm(S.bpm); setLoopBars(S.bars); setLoopSub(S.sub); setLoopQuant(S.quant); AUD.setMasterLevel(S.master);
+  songSetApply(S);
   for(const T of P.tracks){ const id=laneNew(T.layer); laneRowSet(id,{ mute:!!T.mute, solo:!!T.solo, level:T.level, pan:T.pan, name:T.name, rank:T.rank, len:T.len }); }
   let tkMax=0;
   let pidMax=0; for(const [tk,rec] of P.takes){ takeFx.set(tk,rec); if(tk>tkMax) tkMax=tk; for(const p of rec.lane||[]) if(p.id>pidMax) pidMax=p.id; }
@@ -415,7 +430,8 @@ function songOpenApply(P){
   schedInvalidate(); takeFxTouch();
   loop.rgn.user=!!S.brace.user; rgnApply(S.brace.from, S.brace.to, !!S.brace.on);
   const pinned=songPinChains();   // a file always carries every chain (song/file.js); an older one may not — as at any song load
-  histReset(); droneSync(); hooks.loop && hooks.loop(loop.on);
+  if(tok) snapEnd(tok); else histReset();
+  droneSync(); hooks.loop && hooks.loop(loop.on);
   songMark();
   return { ok:true, tracks:P.tracks.length, events:P.events.length, pinned:pinned.length };
 }

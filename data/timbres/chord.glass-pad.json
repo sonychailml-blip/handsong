@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.glass-pad",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Glass pad",
+  "ru": "Стеклянный пад"
+ },
+ "recipe": {
+  "t1": "triangle",
+  "t2": "sine",
+  "ratio": 2,
+  "det": 5,
+  "m1": 0.55,
+  "m2": 0.3,
+  "lp": 3400,
+  "lvl": 0.21,
+  "fo": 1.4,
+  "ft": 0.28,
+  "fv": 0.6,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.14,
+  "rel": 0.6
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

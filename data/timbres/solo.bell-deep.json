@@ -1,0 +1,27 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.bell-deep",
+ "family": "solo",
+ "engine": "fm2",
+ "name": {
+  "en": "Bell (deep)",
+  "ru": "Колокол (глубокий)"
+ },
+ "recipe": {
+  "ratio": 1.41,
+  "peak": 10,
+  "sus": 1,
+  "tau": 0.3
+ },
+ "env": {
+  "att": 0.004,
+  "rel": 1.6
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

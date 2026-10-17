@@ -27,7 +27,7 @@ import { rollBendAt, rollAutValAt, setEmptyTpOld, loopHit, loopBeatAt, loopScrol
 import { startClip, stopClip, activeKind, onClipChange } from './clip.js';
 import { modesLikeView, keyByOneOne, historicalKeyOf } from './scales.js';   // OWN1: the modes a track can be re-mapped into; TF5: «1/1 = …» and the historical 1/1
 import { SCALES, NOTE_NAMES, TRADITIONS, scalesOfTrad, tradOfScale, supportsProgressions, supportsChords, backingRhythmOf, CUR, seventhAddsNote, rectDefault, chordTypeFits, chordModeOf, chordModeName, chordModeHint, anchorHints, menuOf, scaleById } from './scales.js';   // menuOf — F0: меню ладов традиции чистой функцией (её снимает проба)   // T7: chordTypeFits — причина отказа переноса/вставки аккорда Партча
-import { DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, timbreKey, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
+import { timbreInstall, DRUM_ROWS, setLeadInstr, setBassInstr, setDrumKit, LEAD_INSTR, CHORD_INSTR, BASS_INSTR, DRUM_KITS, AC, droneRetune, FX_FACTORY, fxSetActive, fxChainResplice, fxAddableIds, fxVoiceIdsFor, timbresOf, timbreIdOf, timbreKey, fxPerm, masterLevel, setMasterLevel, masterDynSet } from './audio.js';   // fxPerm — VOL-0: постоянную запись цепи (громкость) панель и редактор не показывают   // T5: timbresOf — единственный вход выбора тембра дорожки
 import { softAllOff, panic, onRec, onLoop, onUndo, clearRec, setLoopBars, setLoopMetre, setLoopSub, setLoopQuant, setLoopBpm, loop, events, recording, loadArrangement, loadJam, clearJam,
          toggleLaneMute, toggleLaneSolo,
          setRegionOn, regionOn, braceTap, braceMove, toggleArm, armedLayer, laneDelTap, laneDelCancel,
@@ -53,7 +53,7 @@ import { asWire, asInfo, asList, asGet, asAdopt, asFresh, asEnabled, asSetEnable
 import { scaleData, registerRecord, unregisterRecord } from './scales.js';   // SONG1: a song's own scales installed for the session
 import { checkRecordList } from './scaleload.js';
 import { userPut } from './userstore.js';   // SONG1: «Keep in my scales»
-import { songNeeds } from './song/file.js';   // AUTOSAVE1: the song kept on this device
+import { songNeeds, songTimbreNeeds } from './song/file.js';   // AUTOSAVE1: the song kept on this device
 import { icon } from './icons.js';   // UI1b: every interface glyph through the icon component
 import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from './core/songfile.js';   // SAVE1: reading a song file (pure)
 
@@ -1106,7 +1106,7 @@ rollDelBtn.onclick=rollDeleteSel;
    histDo runs the one history and names what it undid in a toast; afterHist refreshes whichever screen is open (an undo can remove the
    track open in the editor — then the editor closes back to the window). 'changed' — the tripwire fired (the song was changed outside the
    history): the history is gone and the toast says so. */
-const HIST_KEY={ transpose:'transpose', mode:'mode', bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
+const HIST_KEY={ open:'open', transpose:'transpose', mode:'mode', bend:'bend', take:'take', untake:'untake', rowdel:'rowdel', backing:'backing', clear:'clear', level:'level', pan:'pan', name:'name', order:'order', master:'master', mark:'marker', rename:'marker', unmark:'marker' };
 const histKeyOf=l=> l && l.startsWith('sec:') ? 'section' : HIST_KEY[l] || 'edit';
 const histUndoBtn=$('histUndo'), histRedoBtn=$('histRedo');
 function updHistBtns(){ if(histUndoBtn){ histUndoBtn.disabled=!histCanUndo(); histRedoBtn.disabled=!histCanRedo(); }
@@ -1961,18 +1961,29 @@ export function songOpenText(text, ask=q=>confirm(q)){
   const done=[]; for(const [kind,x] of need.install){ const q=registerRecord(kind,x); if(q.ok) done.push([kind,x]); }
   const undo=()=>{ for(const [kind,x] of done.slice().reverse()) unregisterRecord(kind,x.id); };
   if(done.length<need.install.length){ undo(); return { ok:false, why:'records', problems:['could not install'] }; }
+  /* TIM3d: timbre RECORD copies for ids this app lacks — checked (T5 bounds); the valid ones install for this session, a refused one never
+     plays (the role's stand-in does, named in the message with the reason in the console) */
+  const tn=songTimbreNeeds(rec), timIn=[];
+  for(const x of tn.install){ const why=timbreInstall(x); if(why) tn.refused.push({ id:x.id, name:x.name, why }); else timIn.push(x); }
+  for(const r of tn.refused) console.warn(`[song] timbre copy ${r.id} refused — ${r.why}`);   // eslint-disable-line no-console
   const P=songPlan(rec); if(!P.ok){ undo(); return { ok:false, why:P.why, missing:P.missing }; }
-  const r=songOpenApply(P); if(!r.ok){ undo(); return r; }
-  for(const [kind,x] of done) songRecs.set(x.id,{ kind, rec:x }); songKeepShow();
+  const meta={ from:{ id:songId, name:songNameEl ? songNameEl.value : '' }, to:{ id:P.id||null, name:P.name||'' } };   // SONG3: ↶ of the Open step hands the old ones back
+  const r=songOpenApply(P, meta); if(!r.ok){ undo(); return r; }
+  for(const [kind,x] of done) songRecs.set(x.id,{ kind, rec:x });
+  for(const x of timIn) songRecs.set(x.id,{ kind:'timbre', rec:x }); songKeepShow();
   songId=P.id||null; if(songNameEl) songNameEl.value=P.name||'';
   songLiveApply(P.settings);
   syncLoopPanel(); resetJamDisplay(); updHistBtns(); songMark();
-  return { ...r, upgraded: from<rec.version ? from : 0, missing:P.missing, fromSong:done.filter(([k])=>k==='mode').map(([,x])=>x.id) };
+  return { ...r, upgraded: from<rec.version ? from : 0, missing:P.missing, fromSong:done.filter(([k])=>k==='mode').map(([,x])=>x.id), timbresFromSong:timIn.map(x=>x.id), timbresRefused:tn.refused };
 }
+/* SONG3: ↶/↷ of an Open step — the Song file name and id (autosave writes under them) and the panels showing the song's settings */
+hooks.songMeta=m=>{ songId=m.id||null; if(songNameEl) songNameEl.value=m.name||''; lastARef=aRef; syncARef(aRef); syncLoopPanel(); resetJamDisplay(); };
 function songOpenSay(r){
   if(r.ok){ let m=t('song.opened',{ n:r.tracks }); if(r.upgraded) m+=' '+t('song.upgraded',{ v:r.upgraded });
     if(r.missing && r.missing.timbres.length) m+=' '+t('song.missingTimbres',{ list:r.missing.timbres.map(x=>L(x.name)).join(', ') });
     if(r.fromSong && r.fromSong.length) m+=' '+t('song.fromSong',{ list:songRecNames(r.fromSong) });
+    if(r.timbresFromSong && r.timbresFromSong.length) m+=' '+t('song.timHint',{ list:songRecNames(r.timbresFromSong) });
+    if(r.timbresRefused && r.timbresRefused.length) m+=' '+t('song.timRefused',{ list:r.timbresRefused.map(x=>L(x.name)||x.id).join(', ') });
     showCamMsg(m); return; }
   if(r.why==='cancelled') return;
   showCamMsg(t('song.no.'+r.why, r.why==='newer' ? { v:r.version } : r.why==='modes' ? { list:r.missing.modes.join(', ') } : undefined));
@@ -1983,11 +1994,13 @@ const songRecs=new Map();
 const songRecNames=ids=>ids.map(id=>{ const x=songRecs.get(id); return x&&x.rec.name ? L(x.rec.name) : id; }).join(', ');
 const REC_SECT={ tuning:'tunings', palette:'palettes', chordmodes:'chordModeSets', mode:'modes' };
 function songKeepShow(){ const row=$('songKeepRow'), hint=$('songKeepHint'); if(!row) return;
-  for(const [id,x] of songRecs) if(!scaleData()[REC_SECT[x.kind]][id]) songRecs.delete(id);   // removed meanwhile → nothing to keep
-  const modes=[...songRecs.values()].filter(x=>x.kind==='mode').map(x=>x.rec.id);
-  row.hidden=hint.hidden=!songRecs.size; hint.textContent= songRecs.size ? t('song.keepHint',{ list:songRecNames(modes) }) : ''; }
+  for(const [id,x] of songRecs) if(x.kind!=='timbre' && !scaleData()[REC_SECT[x.kind]][id]) songRecs.delete(id);   // removed meanwhile → nothing to keep
+  const modes=[...songRecs.values()].filter(x=>x.kind==='mode').map(x=>x.rec.id), tims=[...songRecs.values()].filter(x=>x.kind==='timbre').map(x=>x.rec.id);
+  const nScale=[...songRecs.values()].filter(x=>x.kind!=='timbre').length;
+  row.hidden=hint.hidden=!songRecs.size; if($('songKeep')) $('songKeep').hidden=!nScale; if($('songKeepTim')) $('songKeepTim').hidden=!tims.length;   // TIM3d: «Keep in my timbres»
+  hint.textContent= songRecs.size ? [nScale ? t('song.keepHint',{ list:songRecNames(modes) }) : '', tims.length ? t('song.timHint',{ list:songRecNames(tims) }) : ''].filter(Boolean).join(' ') : ''; }
 export async function songKeep(){
-  const list=[...songRecs.values()], order=['tuning','palette','chordmodes','mode'];
+  const list=[...songRecs.values()].filter(x=>x.kind!=='timbre'), order=['tuning','palette','chordmodes','mode'];
   list.sort((a,b)=>order.indexOf(a.kind)-order.indexOf(b.kind));
   const names=songRecNames(list.filter(x=>x.kind==='mode').map(x=>x.rec.id));
   try{ for(const x of list){ await userPut(x.kind, x.rec.id, x.rec); songRecs.delete(x.rec.id); } }
@@ -1995,6 +2008,15 @@ export async function songKeep(){
   songKeepShow(); showCamMsg(t('song.kept',{ list:names })); return { ok:true, n:list.length };
 }
 if($('songKeep')) $('songKeep').onclick=()=>{ songKeep(); };
+/* TIM3d: «Keep in my timbres» — the song's own timbres go to the user store (kind 'timbre'; they load at the next start like the built-ins,
+   through the same validator). opt.store — probe only (a stand-in for userPut, so a probe never writes the person's store). */
+export async function songKeepTimbres(opt={}){
+  const list=[...songRecs.values()].filter(x=>x.kind==='timbre'), put=opt.store||userPut, names=songRecNames(list.map(x=>x.rec.id));
+  try{ for(const x of list){ await put('timbre', x.rec.id, x.rec); songRecs.delete(x.rec.id); } }
+  catch(e){ showCamMsg(t('song.keepTimFail')); songKeepShow(); return { ok:false, why:'store' }; }
+  songKeepShow(); showCamMsg(t('song.keptTim',{ list:names })); return { ok:true, n:list.length };
+}
+if($('songKeepTim')) $('songKeepTim').onclick=()=>{ songKeepTimbres(); };
 if($('songSave')) $('songSave').onclick=()=>songDownload();
 if($('songOpen')) $('songOpen').onclick=()=>{ if(songFileEl){ songFileEl.value=''; songFileEl.click(); } };
 if(songFileEl) songFileEl.onchange=async e=>{

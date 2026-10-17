@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.e-piano",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "E. piano",
+  "ru": "Эл. пиано"
+ },
+ "recipe": {
+  "t1": "sine",
+  "t2": "sine",
+  "ratio": 3,
+  "det": 0,
+  "m1": 0.6,
+  "m2": 0.16,
+  "lp": 5200,
+  "lvl": 0.22,
+  "fo": 2.2,
+  "ft": 0.12,
+  "fv": 1,
+  "hj": 1
+ },
+ "env": {
+  "att": 0.004,
+  "rel": 0.45
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

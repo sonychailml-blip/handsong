@@ -1,0 +1,32 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "bass.sub-sine",
+ "family": "bass",
+ "engine": "bass2",
+ "name": {
+  "en": "Sub sine",
+  "ru": "Саб-синус"
+ },
+ "recipe": {
+  "t1": "sine",
+  "t2": "sine",
+  "det": 0,
+  "ratio": 1,
+  "lp": 420,
+  "lvl": 0.45,
+  "fo": 1,
+  "ft": 0.03,
+  "fv": 0.2
+ },
+ "env": {
+  "att": 0.02,
+  "rel": 0.2
+ },
+ "policies": {
+  "voiceMode": "lead",
+  "glide": 0.012,
+  "register": "bass",
+  "quant": 0.5
+ }
+}

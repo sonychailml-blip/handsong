@@ -1,0 +1,52 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.supersaw",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": "SuperSaw",
+ "recipe": {
+  "oscs": [
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.17,
+    "detune": -12
+   },
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.17,
+    "detune": -6
+   },
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.17,
+    "detune": 0
+   },
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.17,
+    "detune": 6
+   },
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.17,
+    "detune": 12
+   }
+  ]
+ },
+ "env": {
+  "att": 0.012,
+  "rel": 0.1
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

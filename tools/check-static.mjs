@@ -194,7 +194,7 @@ const GLOBALS=new Set((
   /* браузер */ 'window self document navigator location history screen performance localStorage sessionStorage indexedDB IDBKeyRange crypto '+
   'fetch URL URLSearchParams Blob File FileReader Image ImageData Path2D OffscreenCanvas TextEncoder TextDecoder AbortController Event '+
   'CustomEvent HTMLElement HTMLCanvasElement HTMLVideoElement alert confirm prompt matchMedia getComputedStyle requestAnimationFrame '+
-  'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext '+
+  'cancelAnimationFrame innerWidth innerHeight devicePixelRatio MediaRecorder MediaStream KeyboardEvent AudioContext OfflineAudioContext webkitAudioContext OscillatorNode BiquadFilterNode GainNode WaveShaperNode DelayNode ConstantSourceNode '+
   'AudioWorkletNode OfflineAudioCompletionEvent DOMException addEventListener removeEventListener MessageChannel PerformanceObserver '+
   /* LAT2: frames to the detection worker */ 'Worker createImageBitmap ImageBitmap '+
   /* AUTOSAVE1: the write waits for an idle moment */ 'requestIdleCallback '+
@@ -243,6 +243,8 @@ const NET_LISTED={
   'probes/key.js':   { fetch:[1,'probe only (?probe): reads tools/song.print.json from the own origin'] },
   'probes/gold.js':  { fetch:[1,'probe only (?probe): reads tools/gold.print.json from the own origin'] },
   'probes/engine.js':{ fetch:[1,'probe only (?probe): reads tools/census.print.json from the own origin (AUD1a node census)'] },
+  'timbreload.js': { fetch:[1,'reads data/timbres.bundle.json (the timbre records, TIM3a) from the own origin'] },
+  'probes/timbres.js':{ fetch:[1,'probe only (?probe): reads tools/timbres.before.json from the own origin (TIM3 timbres = before)'] },
   'probes/pack.js':  { fetch:[1,'probe only (?probe): reads tools/pack-test-licence.json (TEST keys) from the own origin (PACK1)'] },
   'probes/song2.js': { fetch:[1,'probe only (?probe): reads data/songs/triphop.json from the own origin (SONG2 control)'] },
   'songs.js':        { fetch:[1,'the demo song file data/songs/<name>.json from the own origin (SONG2; P.song only)'] },

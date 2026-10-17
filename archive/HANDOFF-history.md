@@ -8100,3 +8100,26 @@ Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the ti
 - ENG1: the engine contract (plan §4.4) `noteOn/noteSet/noteOff/bend/hit/drone` in audio.js; makeENG calls only them; the engine's
   remaining reads of app state listed in CLAUDE.md. IDS1 part 1: every event has a permanent id (`e.id`), kept by edits, ↶/↷ and the
   song file (v4). Two REALTIME rows missed once each under heavy outside CPU load and passed alone (AF2; «dynamics live = offline» twice).
+
+### STAGE 3 PLAN — answers recorded at RUN 4 (2026-10-17)
+- DOC1 (slice 34): CLAUDE.md cut to rules + short module map + step index (≈ 56 KB); everything else moved word for word to
+  archive/CLAUDE-history.md (proof tool tools/doc-split-check.mjs; the old file kept as archive/CLAUDE-before-DOC1.md). NAME-INDEX
+  regeneration by a tool and BACKLOG §1 in English (the plan's other DOC1 parts) not done — not asked in RUN 4.
+- LAT2a: the schedule row moves to the probe clock (done). SONG3 leftover: Open is ONE ↶ step (done).
+- CMD1 (slice 25) and VIS1 (slice 32): PLAN ONLY — docs/CMD1-design.md, docs/VIS1-design.md (VIS1 aimed at Calm: a scene layer for 3D
+  rooms, Three.js r128 UMD).
+- ENG2 (slice 23) review E1–E3 and TIM3 (slice 22) review T1–T5: verbatim in docs/ENG2-design.md and docs/TIM3-design.md «Review
+  2026-10-17». POOL1 (E2) done. Order of the TIM3 slices: TIM3a → TIM3b → TIM3d → TIM3c.
+
+### Moved from HANDOFF.md at RUN 4 (records)
+### RUN 3 (2026-10-16) — full records: archive B «Moved from HANDOFF.md at RUN 3 (records)»; log: `WORK-LOG.md` «RUN 3»
+- Done: AUTOSAVE1 (step 98), DRAW1b, SONG1 (file v3), AUD1a–c + AUD2a–c (E, surface, rule #38, timbres / effects / FDN / worklets out of
+  audio.js 3225 → 2142 lines; GOLD 84/0, census identical), ENG1 (engine contract §4.4), IDS1 part 1 (event ids, file v4). Last P.all PASS 97/0.
+- User answers (2026-10-16): UI1a after the redesign · SONG3 = SAVE1 + AUTOSAVE1 (done) · TIM3 and ENG2 PLAN ONLY first
+  (docs/TIM3-design.md, docs/ENG2-design.md) · PACK1 build now (offline ECDSA P-256 keys, no network, no UI) · the flaky «dynamics live =
+  offline» row: name a capture that saw no signal, retry once.
+- PACK1 built (core/pack.js: pack format, offline ECDSA P-256 licence keys «HS1…», the registry gate; TEST key pair only, private half
+  git-ignored in tools/; no UI, no network). Plans for review: docs/TIM3-design.md, docs/ENG2-design.md. SONG3 done (= SAVE1 + AUTOSAVE1).
+- IDS1 part 2 (lane-point ids, file v5) and SONG2 (the demo song is `data/songs/triphop.json`, P.song opens it; generator = probe tool).
+  Not started, questions in WORK-LOG: CMD1 (needs a plan — the tripwire hash compares objects), VIS1 (with the redesign?), DOC1 (cut
+  CLAUDE.md ≈ 237 KB?).

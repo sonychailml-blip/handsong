@@ -1,0 +1,41 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.organ-soft",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "Organ (soft)",
+  "ru": "Орган мягкий"
+ },
+ "recipe": {
+  "oscs": [
+   {
+    "wave": "sine",
+    "mult": 1,
+    "gain": 0.44
+   },
+   {
+    "wave": "sine",
+    "mult": 2,
+    "gain": 0.2
+   },
+   {
+    "wave": "sine",
+    "mult": 3,
+    "gain": 0.1
+   }
+  ],
+  "hum": 0
+ },
+ "env": {
+  "att": 0.02,
+  "rel": 0.1
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

@@ -74,11 +74,15 @@ import './probes/data.js';   // registers the data rows (T0, T1, T2, T6b, stacke
 export { material, all, quick, orderCheck } from './probes/run.js';
 export { checkSound, checkRows, checkRowFix, checkHl, tracks, checkRules, checkScroll, checkLabels, checkSong, checkTypes, checkModes, checkPure, checkOut } from './probes/tuning.js';
 export { checkWrite, checkSeed, checkFrozen, seed, song } from './probes/seed.js';
-export { checkSongFile } from './probes/songfile.js';   // SAVE1: Save → Open round trip, old / newer / damaged files
+export { checkSongFile, checkSongOpenUndo } from './probes/songfile.js';   // SAVE1: Save → Open round trip, old / newer / damaged files; SONG3: Open is one ↶ step
 export { checkAutosave } from './probes/autosave.js';   // AUTOSAVE1: the song kept on the device (change → write, off, full / blocked, ring, restore)
 export { checkSongRecords } from './probes/song1.js';   // SONG1: songs carry copies of the person's own scales
 export { checkEventIds } from './probes/ids.js';   // IDS1: permanent event ids (unique, kept by edits, ↶/↷ and the file)
 export { checkPack } from './probes/pack.js';   // PACK1: offline licence keys and the pack gate, in the page's WebCrypto
+export { checkPool } from './probes/pool.js';
+export { checkOwnTimbres } from './probes/tim3d.js';   // TIM3d: own timbres, song copies, the v6 file
+export { checkEngReadouts } from './probes/eng2.js';
+export { checkTimbresBefore, dumpTimbres, checkTimbreRecords } from './probes/timbres.js';   // TIM3: every timbre's entry, creation trace and render envelope = tools/timbres.before.json   // ENG2: engine readouts, dropouts line, provisional class   // POOL1: the chord pool grows on demand (renders identical, spares ahead)
 export { checkSongFile2, dumpSong } from './probes/song2.js';   // SONG2: the demo song file = its generator; the dump for data/songs/
 export { checkEngineCtx, checkCensus, dumpCensus } from './probes/engine.js';   // AUD1a: the engine context E (three times, both copies) and the node census
 export { checkFx } from './probes/fxcontract.js';   // AUD2b: generated contract rows, one per effect (round trip, identity, repeat, tail)

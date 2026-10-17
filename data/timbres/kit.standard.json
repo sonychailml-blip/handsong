@@ -1,0 +1,45 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "kit.standard",
+ "family": "kit",
+ "engine": "drumkit",
+ "name": {
+  "en": "Standard",
+  "ru": "Стандарт"
+ },
+ "recipe": {
+  "rows": [
+   {
+    "synth": "kick",
+    "vm": 1
+   },
+   {
+    "synth": "snare",
+    "vm": 1
+   },
+   {
+    "synth": "clap",
+    "vm": 1
+   },
+   {
+    "synth": "hat",
+    "vm": 1
+   },
+   {
+    "synth": "tom",
+    "vm": 1
+   },
+   {
+    "synth": "crash",
+    "vm": 1
+   }
+  ]
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": null,
+  "register": null,
+  "quant": "sub"
+ }
+}

@@ -1,0 +1,33 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.santur",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "default": "Santur",
+  "ru": "Сантур"
+ },
+ "recipe": {
+  "fb": 0.972,
+  "damp": 0.4,
+  "exBase": 0.55,
+  "exSpan": 0.4,
+  "nl": 1.2,
+  "body": {
+   "hz": 3400,
+   "Q": 1.2,
+   "db": 5
+  }
+ },
+ "env": {
+  "att": 0.001,
+  "rel": 0.25
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

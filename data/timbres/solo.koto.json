@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.koto",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "default": "Koto",
+  "ru": "Кото"
+ },
+ "recipe": {
+  "fb": 0.994,
+  "damp": 0.44,
+  "exBase": 0.3,
+  "exSpan": 0.55,
+  "symp": {
+   "ratios": [
+    1,
+    1.5
+   ],
+   "Q": 50,
+   "gain": 0.05
+  }
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.5
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

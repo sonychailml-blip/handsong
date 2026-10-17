@@ -1,0 +1,57 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "kit.tabla",
+ "family": "kit",
+ "engine": "drumkit",
+ "name": {
+  "default": "Tabla",
+  "ru": "Табла"
+ },
+ "recipe": {
+  "rows": [
+   {
+    "synth": "baya",
+    "vm": 1,
+    "f0": 185,
+    "f1": 70,
+    "d": 0.35
+   },
+   {
+    "synth": "na",
+    "vm": 1,
+    "f": 520,
+    "d": 0.22
+   },
+   {
+    "synth": "na",
+    "vm": 0.9,
+    "f": 660,
+    "d": 0.18
+   },
+   {
+    "synth": "tick",
+    "vm": 1
+   },
+   {
+    "synth": "baya",
+    "vm": 0.9,
+    "f0": 150,
+    "f1": 80,
+    "d": 0.22
+   },
+   {
+    "synth": "na",
+    "vm": 1,
+    "f": 440,
+    "d": 0.4
+   }
+  ]
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": null,
+  "register": null,
+  "quant": "sub"
+ }
+}

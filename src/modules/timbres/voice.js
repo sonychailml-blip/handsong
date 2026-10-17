@@ -22,8 +22,10 @@ function voiceStart(E, o){
    выборка rnd() — ОДНА на голос, как и прежде (у второго осциллятора), так что последовательность случайных чисел рендера не сдвинута.
    Соло-банки (mkOsc) не трогаем: их пары на одной частоте расстроены (SuperSaw, треугольник+синус, квадрат+пила), а органы — на разных
    гармониках; там разброс безопасен и нужен. */
-function voiceStartPair(E, o1,o2){
-  const d=E.rnd()/Math.max(1,o1.frequency.value);   // одна задержка на голос — меньше одного периода частоты постройки
+/* POOL1: u = the voice's own draw (the chord pool keeps one per index, drawn at engine start — a voice built later starts exactly as it
+   would have at start, and the random stream after it is not shifted); absent = a draw now (bass, as before) */
+function voiceStartPair(E, o1,o2,u){
+  const d=(u!=null?u:E.rnd())/Math.max(1,o1.frequency.value);   // одна задержка на голос — меньше одного периода частоты постройки
   E.build.firstOsc=false;
   o1.start(E.ac.currentTime+d); o2.start(E.ac.currentTime+d);
 }

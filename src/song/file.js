@@ -13,6 +13,7 @@ import { ENV } from './env.js';
 import { scaleView, scaleById, scaleData, userRecordsOf } from '../scales.js';
 import { SONG_FORMAT, SONG_VERSION } from '../core/songfile.js';
 import { newUserId } from '../core/registry.js';
+import { TIMBRE_FORMAT } from '../core/timbre.js';   // TIM3d: a song's timbre copies are full records (file v6)
 
 const ROLE={ leadOn:'ld', leadSet:'ld', chOn:'ch', bassOn:'bs', drum:'dr' };
 const copy=x=>JSON.parse(JSON.stringify(x));
@@ -57,7 +58,10 @@ function songData(meta={}){
   const records={};
   if(!DBG.noRecs) for(const sc of vIdx.keys()) for(const [kind,r] of userRecordsOf(sc)){ (records[kind]||(records[kind]={}))[r.id]=copy(r); }
   const timbres={};
-  for(const id of [...used].sort()){ const s=ENV.timSnap(id) || foreign.get(id); if(s) timbres[id]={ role:s.role, name:s.name, def:s.def }; }
+  for(const id of [...used].sort()){   // TIM3d (file v6): the full RECORD of every timbre that has one; kits (until TIM3c) and old copies as {role, name, def}
+    const R=ENV.timRecord(id); if(R){ timbres[id]=R; continue; }
+    const s=ENV.timSnap(id); if(s){ timbres[id]={ role:s.role, name:s.name, def:s.def }; continue; }
+    const f=foreign.get(id); if(f) timbres[id]=copy(f); }
   const rec={ format:SONG_FORMAT, version:SONG_VERSION, id:meta.id||newUserId(), name:meta.name||'', app:'Handsong', saved:meta.saved||new Date().toISOString(),
     settings:ENV.songEnv(), views, timbres, records, tracks, takes, marks:secMarks.map(m=>({ id:m.id, beat:m.beat, name:m.name })), events:out };
   return rec;
@@ -77,6 +81,16 @@ function songNeeds(rec){
     install.push(['mode',copy(m)]); }
   return { install, missing };
 }
+/* TIM3d: the timbre RECORD copies a checked file brings for ids this app lacks → { install:[records], refused:[] } (pure). The ONE safety
+   check (the T5 bounds) is at the install door (timbreload.timbreAddSession): a refused copy never plays, the role's stand-in does. Legacy
+   copies (v5 {role, name, def}) are not records: songPlan maps them as before. */
+const FAM_ROLE={ solo:'ld', chord:'ch', bass:'bs', kit:'dr' };
+function songTimbreNeeds(rec){
+  const install=[], refused=[];
+  for(const [id,t] of Object.entries(rec.timbres||{})){ if(!t || t.format!==TIMBRE_FORMAT || ENV.timKnown(FAM_ROLE[t.family]||'ld', id)) continue;
+    if(t.id!==id) refused.push({ id, name:t.name, why:'its id is not its key' }); else install.push(copy(t)); }
+  return { install, refused };
+}
 /* a checked record of the current version → what the recorder installs; refuses when a mode (a view) is not in this app */
 function songPlan(rec){
   const missing={ modes:[], timbres:[] };
@@ -86,14 +100,14 @@ function songPlan(rec){
   const known=new Set(), stand=new Map();
   for(const e of rec.events){ const r=ROLE[e.fn], f= r==='dr' ? 'kit' : 'inst', id=e.a[f]; if(!r||id==null||known.has(id)||stand.has(id)) continue;
     if(ENV.timKnown(r,id)){ known.add(id); continue; }
-    const s=rec.timbres[id], same= s && s.role===r ? ENV.timByDef(r,s.def) : null;   // the same settings under another id → that timbre
+    const s=rec.timbres[id], same= s && s.format!==TIMBRE_FORMAT && s.role===r ? ENV.timByDef(r,s.def) : null;   // a legacy copy with the same settings under another id → that timbre
     if(same) stand.set(id,same); else { stand.set(id,null); missing.timbres.push({ id, role:r, name:s ? s.name : id, copy:!!s }); } }
   foreign.clear();
-  for(const t of missing.timbres){ const s=rec.timbres[t.id]; if(s) foreign.set(t.id,{ role:s.role, name:s.name, def:copy(s.def) }); }
+  for(const t of missing.timbres){ const s=rec.timbres[t.id]; if(s) foreign.set(t.id, copy(s)); }   // kept as it came (a refused record or a legacy copy) — a re-save carries it on
   const evs=rec.events.map(e=>{ const r=ROLE[e.fn], f= r==='dr' ? 'kit' : 'inst';
     let a=copy(e.a); if(r && a[f]!=null && stand.get(a[f])) a[f]=stand.get(a[f]);   // remapped by equal settings; a missing one keeps its id
     const ev={ t:e.t, layer:e.layer, fn:e.fn, a, sc: e.v>=0 ? views[e.v] : null, sev:e.sev, tk:e.tk }; if(e.jam) ev.jam=true; if(e.id>0) ev.id=e.id; return ev; });
   const takes=new Map(rec.takes.map(k=>[k.tk,{ kinds:copy(k.kinds), chains:copy(k.chains), lane:copy(k.lane) }]));
   return { ok:true, name:rec.name||'', id:rec.id, settings:copy(rec.settings), tracks:copy(rec.tracks), takes, marks:rec.marks.map(m=>({ ...m })), events:evs, missing };
 }
-export { songData, songPlan, songNeeds, fileDbg };
+export { songData, songPlan, songNeeds, songTimbreNeeds, fileDbg };

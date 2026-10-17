@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.organ-full",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Organ (full)",
+  "ru": "Орган полный"
+ },
+ "recipe": {
+  "t1": "square",
+  "t2": "sine",
+  "ratio": 3,
+  "det": 0,
+  "m1": 0.42,
+  "m2": 0.3,
+  "lp": 4800,
+  "lvl": 0.15,
+  "fo": 1,
+  "ft": 0.02,
+  "fv": 0.2,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.008,
+  "rel": 0.1
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

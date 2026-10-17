@@ -1,0 +1,32 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "bass.upright",
+ "family": "bass",
+ "engine": "bass2",
+ "name": {
+  "en": "Upright bass",
+  "ru": "Контрабас"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "triangle",
+  "det": 4,
+  "ratio": 1,
+  "lp": 520,
+  "lvl": 0.38,
+  "fo": 2.5,
+  "ft": 0.1,
+  "fv": 1.2
+ },
+ "env": {
+  "att": 0.004,
+  "rel": 0.3
+ },
+ "policies": {
+  "voiceMode": "lead",
+  "glide": 0.012,
+  "register": "bass",
+  "quant": 0.5
+ }
+}

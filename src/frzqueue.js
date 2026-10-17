@@ -256,6 +256,7 @@ function afPause(token, on){
   return paused();
 }
 const afBusy=()=>!!RUN;
+const afPaused=()=>paused();   // ENG2: the engine benchmark waits while a probe or the runner holds the watcher
 const afIdle=()=> RUNP && RUN ? RUNP.then(()=>{},()=>{}) : Promise.resolve();
 /* Is auto-freeze able to start something right now (probes refuse to run beside it). */
 const afActive=()=> !!RUN || (ON && !paused() && !HOOK);
@@ -329,7 +330,7 @@ const qCostOf=layer=>{ const id=laneIdOf(layer); return id==null||!COST.has(id) 
 
 pumpStart();   // ON by default: the watcher starts with the module (loaded by render.js after the engine starts)
 
-export { autoFreeze, freezeQueue, setRunner, afPause, afIdle, afBusy, afActive, afRowState,
+export { autoFreeze, freezeQueue, setRunner, afPause, afPaused, afIdle, afBusy, afActive, afRowState,
   AF_DELAY, AF_REFREEZE_ON_RETUNE, AF_BUDGET_MB,
   /* probes only (P.checkFreezeQueue, P.checkAutoFreeze) */
   afBegin, afEnd, afTick, afHint, qBegin, qEnd, qStep, qAdd, qRank, qRunning, qState, qCostSet, qCostOf, QF };

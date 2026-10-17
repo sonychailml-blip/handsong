@@ -361,7 +361,7 @@ async function timbreData(){
   for(const f of ['param.js','reverb.js','delay.js','trem-mix.js','bright.js','glide.js','volume.js','forest.js','glue.js']){ n++;   // AUD2a: the effects
     try{ M['fx/'+f]=await import(new URL('../src/modules/effects/'+f, import.meta.url).href); }catch(e){ d.push(`effects/${f} does not load in node: ${e && e.message}`); } }
   n++; try{ M['fdn']=await import(new URL('../src/engine/fdn.js', import.meta.url).href); }catch(e){ d.push(`engine/fdn.js does not load in node: ${e && e.message}`); }
-  for(const [f,name] of [['ks.js','KS_BANKS'],['chord-voice.js','FIREFLY'],['stages.js','BRI_HZ'],['fdn','REV_A'],['fx/reverb.js','REV_PARAMS'],['fx/delay.js','DLY_A'],
+  for(const [f,name] of [['chord-voice.js','FIREFLY'],['stages.js','BRI_HZ'],['fdn','REV_A'],['fx/reverb.js','REV_PARAMS'],['fx/delay.js','DLY_A'],
       ['fx/delay.js','DLY_PARAMS'],['fx/trem-mix.js','TRMIX_A'],['fx/trem-mix.js','TRMIX_PARAMS'],['fx/bright.js','BRIGHT_PARAMS'],['fx/glide.js','GLIDE_PARAMS'],
       ['fx/volume.js','VOL_PARAMS'],['fx/forest.js','FOREST_PARAMS'],['fx/glue.js','GLUE_PARAMS']]){ n++; const v=M[f] && M[f][name];
     if(!v){ d.push(`${f}: ${name} missing`); continue; } const out=[]; pure(v,name,out); d.push(...out); }
@@ -375,6 +375,65 @@ async function timbreData(){
    words; malformed texts refused; the gate keeps a pack's records out of a registry's order until the pack is unlocked; a free pack opens
    without a key. CONTROLS: a valid key must PASS (a verifier refusing everything cannot pass the refusal cases); a gate that never locks
    must be caught by the «locked before unlock» case. */
+/* TIM3a (RUN 4): the timbre records — every file valid; the bundle equals the files; each T5 bound refuses its damage with one line naming
+   the field (CONTROLS); the tine's partial bounds; a record whose policies differ from its family's today is caught by the browser row */
+async function timbreCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const T=await import(new URL('../src/core/timbre.js', import.meta.url).href), B=await import(new URL('./timbre-bundle.mjs', import.meta.url).href);
+  const b=await B.buildBundle(); n++; if(b.problems.length) miss('files: '+b.problems.slice(0,3).join(' · '));
+  let disk=''; try{ disk=await readFile(new URL('../data/timbres.bundle.json', import.meta.url),'utf8'); }catch(e){}
+  n++; if(disk.split(String.fromCharCode(13)).join('')!==b.text) miss('data/timbres.bundle.json is not what the files give — run node tools/timbre-bundle.mjs');
+  const recs=JSON.parse(b.text).records;
+  for(const r of recs){ n++; const why=T.checkTimbre(r); if(why) miss(`${r.id}: ${why}`); }
+  const copy=o=>JSON.parse(JSON.stringify(o));
+  for(const base of [recs.find(r=>r.engine==='chord2'), recs.find(r=>r.engine==='bass2'), recs.find(r=>r.engine==='tine')].filter(Boolean))
+    for(const [name, damage] of T.TIMBRE_DAMAGES){ const r=copy(base), field=damage(r)||name; n++; const why=T.checkTimbre(r);
+      if(!why) miss(`CONTROL ${base.id} «${field}»: a damaged record was accepted`);
+      else if(field!=='NaN' && !why.includes(field.split(':')[0])) miss(`CONTROL ${base.id} «${field}»: refused, but the line does not name it: ${why}`); }
+  const tine=recs.find(r=>r.engine==='tine');
+  if(tine) for(const [what, dmg] of [['partials', r=>{ r.recipe.partials=Array(9).fill([1,0.1,0.5,'sine']); }], ['gains sum', r=>{ r.recipe.partials=r.recipe.partials.map(p=>[p[0],1,p[2],p[3]]); }],
+      ['decay', r=>{ r.recipe.partials[0][2]=99; }], ['mult', r=>{ r.recipe.partials[0][0]=100; }]]){ const r=copy(tine); dmg(r); n++; if(!T.checkTimbre(r)) miss(`CONTROL tine «${what}»: accepted`); }
+  /* TIM3b: the solo engines' own bounds (each damage must be refused, naming its field) */
+  const byE=e=>recs.find(r=>r.engine===e && (e!=='ks' || r.recipe.symp) && (e!=='subtractive' || r.recipe.filter) && (e!=='fm2' || !r.recipe.fixed) && (e!=='drumkit' || r.recipe.rows[0].f0!=null));
+  const SOLO=[['subtractive','recipe.oscs', r=>{ r.recipe.oscs=Array(9).fill({ wave:'sine', mult:1, gain:0.1 }); }], ['subtractive','gains sum', r=>{ r.recipe.oscs=r.recipe.oscs.map(o=>({ ...o, gain:1 })); r.recipe.oscs.push({ wave:'sine', mult:1, gain:1 }); }],
+    ['subtractive','recipe.filter.Q', r=>{ r.recipe.filter.Q=500; }], ['subtractive','recipe.oscs[0].mult', r=>{ r.recipe.oscs[0].mult=100; }], ['subtractive','recipe.oscs[0].detune', r=>{ r.recipe.oscs[0].detune=900; }],
+    ['subtractive','recipe.strike', r=>{ r.recipe.filter.freq=12000; r.recipe.strike.open=4; }], ['subtractive','recipe.hum', r=>{ r.recipe.hum=2; }], ['subtractive','recipe: unknown', r=>{ r.recipe.worklet='x'; }],
+    ['fm2','recipe.sus', r=>{ r.recipe.sus=500; }], ['fm2','recipe.ratio', r=>{ r.recipe.ratio=0; }], ['fm2','recipe.tau', r=>{ r.recipe.tau=0; }], ['fm2','recipe: a fixed index', r=>{ r.recipe.fixed=true; }],
+    ['ks','recipe.fb', r=>{ r.recipe.fb=1.0; }], ['ks','recipe.symp.ratios', r=>{ r.recipe.symp.ratios=Array(12).fill(1); }], ['ks','recipe.symp.gain', r=>{ r.recipe.symp.gain=3; }],
+    ['ks','recipe.symp.Q', r=>{ r.recipe.symp.Q=5000; }],
+    ['drumkit','recipe.rows', r=>{ r.recipe.rows.pop(); }], ['drumkit','recipe.rows[0].synth', r=>{ r.recipe.rows[0].synth='sampler'; }], ['drumkit','recipe.rows[1].vm', r=>{ r.recipe.rows[1].vm=9; }],
+    ['drumkit','recipe.rows[0].f0', r=>{ r.recipe.rows[0].f0=99999; }], ['drumkit','recipe.rows[0].d', r=>{ r.recipe.rows[0].d=60; }], ['drumkit','recipe.rows[0]: unknown', r=>{ r.recipe.rows[0].url='x'; }],
+    ['drumkit','env: a kit', r=>{ r.env={ att:0.01, rel:0.1 }; }], ['ks','recipe.nl', r=>{ r.recipe.nl=50; }], ['ks','recipe.body', r=>{ r.recipe.body={ hz:3400, Q:1, db:60 }; }]];
+  for(const [e, field, dmg] of SOLO){ const base=byE(e); if(!base){ miss('no '+e+' record to damage'); continue; } const r=copy(base); dmg(r); n++; const why=T.checkTimbre(r);
+    if(!why) miss(`CONTROL ${base.id} «${field}»: a damaged record was accepted`); else if(!why.includes(field.split(' ')[0].replace(/:$/,''))) miss(`CONTROL ${base.id} «${field}»: refused, but the line does not name it: ${why}`); }
+  n++; if(T.checkTimbre(recs[0])!==null) miss('the first record is refused');
+  return { cases:n, total:d.length, differences:d };
+}
+/* ENG2 (RUN 4): the provisional power class and the dropout rate — exact values; CONTROLS: a factor over the threshold must give
+   'low'; a rate from too short a window must be null (never a guess) */
+async function engCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
+  const K=await import(new URL('../src/core/engclass.js', import.meta.url).href), T=K.ENG_THRESH;
+  eq('no benchmark → unknown', K.engClass({}).cls, 'unknown');
+  eq('fast audio, fast detection → high', K.engClass({ factor:0.5, detectMs:20 }).cls, 'high');
+  eq('fast audio, no detection yet → high', K.engClass({ factor:0.5 }).cls, 'high');
+  eq('between → mid', K.engClass({ factor:1.5, detectMs:50 }).cls, 'mid');
+  eq('CONTROL: a factor over the low threshold → low', K.engClass({ factor:T.factor.low+0.01, detectMs:20 }).cls, 'low');
+  eq('slow detection → low', K.engClass({ factor:0.5, detectMs:T.detect.low+1 }).cls, 'low');
+  eq('software graphics → low', K.engClass({ factor:0.5, softwareGL:true }).cls, 'low');
+  eq('the thresholds are frozen', Object.isFrozen(T) && Object.isFrozen(T.factor), true);
+  eq('the class is marked provisional', K.ENG_CLASS_PROVISIONAL, true);
+  const ua='UA/1', tx=K.benchText(0.42, ua, '2026-10-17T00:00:00.000Z');
+  eq('the benchmark cache round trip', K.benchOf(tx, ua), { factor:0.42, at:'2026-10-17T00:00:00.000Z' });
+  eq('another user agent → re-measure', K.benchOf(tx, 'UA/2'), null);
+  eq('a broken cache → re-measure', K.benchOf('{', ua), null);
+  eq('dropouts: 3 events in 30 s → 6 per minute', K.dropRate([[0,10],[15e3,11],[30e3,13]], 30e3), 6);
+  eq('dropouts: only the last 60 s count (3 events in the window)', K.dropRate([[0,0],[30e3,100],[60e3,100],[90e3,103]], 90e3), 3);
+  eq('CONTROL: a window under 10 s → null (never guessed)', K.dropRate([[0,0],[5e3,4]], 5e3), null);
+  eq('no samples → null', K.dropRate([], 0), null);
+  eq('a counter that restarted (new context) restarts the window', K.dropRate([[0,50],[20e3,60],[30e3,2],[45e3,5]], 45e3), 12);
+  return { cases:n, total:d.length, differences:d };
+}
 async function packCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
   const K=await import(new URL('../src/core/pack.js', import.meta.url).href), REG=await import(new URL('../src/core/registry.js', import.meta.url).href);
@@ -452,6 +511,8 @@ const ROWS=[
   ['SAVE1 song file (core)',     ()=>songCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['AUD1c/AUD2a engine data pure (core)', ()=>timbreData(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['PACK1 packs and licence keys (core)', ()=>packCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['ENG2 power class (core)',  ()=>engCore(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['TIM3 timbre records (core)', ()=>timbreCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

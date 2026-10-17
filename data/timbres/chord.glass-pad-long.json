@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.glass-pad-long",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Glass pad (long)",
+  "ru": "Пад стеклянный (долгий)"
+ },
+ "recipe": {
+  "t1": "triangle",
+  "t2": "sine",
+  "ratio": 2,
+  "det": 6,
+  "m1": 0.52,
+  "m2": 0.3,
+  "lp": 3000,
+  "lvl": 0.18,
+  "fo": 1.4,
+  "ft": 0.3,
+  "fv": 0.6,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.3,
+  "rel": 1.8
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

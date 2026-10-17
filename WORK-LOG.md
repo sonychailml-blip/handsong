@@ -605,3 +605,294 @@ re-run alone — listed in each block.
 - **TIM3 / ENG2**: please review the two plans (their questions are at the end of each document).
 - Two timing probes flicker when the computer is busy («LAT2a search schedule», «dynamics live = offline» — the latter now names and
   retries a silent capture). May «LAT2a» be moved to the probe clock (like the gesture fingerprint)?
+
+# RUN 4 (2026-10-17)
+
+## User / strategist answers (recorded at the start of RUN 4)
+- DOC1: YES, first — CLAUDE.md cut to hard rules + module map + verification steps (target ≈ 60 KB); everything else moved WORD FOR
+  WORD to the archive with an index; proof by a line-multiset check (old = new + moved).
+- LAT2a: YES — the «LAT2a search schedule» row moves to the probe clock (like the gesture fingerprint).
+- SONG3 leftover: opening a song is ONE ↶ step (like ✕), with the Save/Open round-trip probes.
+- CMD1: PLAN ONLY — docs/CMD1-design.md (incl. how the undo safety check will compare values, not objects).
+- VIS1: PLAN ONLY, aimed at Calm — docs/VIS1-design.md (scene layer for 3D Calm rooms, Three.js r128 UMD MIT; «Rooms of light»; low-power
+  path; hand dots / lesson layer / UI on top).
+- ENG2 review E1 (dropouts per minute in the meter and R.engine(), feature-detected; offline factors relative only; classes provisional;
+  no automatic switching), E2 (POOL1 for everyone: the chord pool grows on demand, 2 spares built ahead, rule #3 kept, per-voice seed by
+  index so GOLD stays bit-identical; report the bare start graph factor before/after and the light/heavy scenes), E3 (phones measured;
+  «low» later switches on automatically but VISIBLY, reversible).
+- TIM3 review T1 (kits as data, last — TIM3c after TIM3d), T2 («Bell (FM)» folds into fm2 only if trace and bit-exact render are
+  identical, else `fm-fixed`), T3 (policies written into every record now with today's role values; app reads the role until stage 7; a
+  probe pins record = role), T4 (one file per timbre in the repo; the app loads one generated bundle data/timbres.bundle.json; probe bundle =
+  files), T5 (SAFETY: the validator bounds every value; out-of-bounds or too heavy → refused with one line; CONTROLS for each bound).
+- Queue: DOC1 → LAT2a probe clock → SONG3 leftover → CMD1 plan → VIS1 plan → POOL1 → ENG2 readouts → TIM3a → TIM3b → TIM3d → TIM3c.
+
+STARTED 1 DOC1 2026-10-17 00:35
+
+## Slice 1 — DOC1 CLAUDE.md cut to rules + short map + step index (done; docs only)
+- CLAUDE.md 237 111 → 56 KB. Kept word for word: header (rewritten 4 lines), What this is, Running, Standing working rules (+ one new DOC1
+  rule: the file stays ≈ 60 KB, new detail goes to the archive), Conventions, the 38 hard rules, Language. NEW: a short module map (one
+  line per module/folder), an index of what moved, and a one-line-per-step index of the 98 verification steps.
+- Moved WORD FOR WORD to the new `archive/CLAUDE-history.md` (193 KB): the old header lines, the full module map, all 36 Architecture
+  sections (incl. «Probe rows … tolerances and controls»), Known limits, and the full text of steps 1–98.
+- ⛳ Decision: the user named three parts to keep (hard rules, module map, verification steps) AND ≈ 60 KB; verbatim they are ≈ 95 KB
+  (+ 12 KB standing rules). Kept the hard rules and standing rules verbatim (they are obeyed every slice); the module map and the steps
+  became SHORT indexes here with the full text in the archive. A reviewer may move any section back.
+- Proof: `node tools/doc-split-check.mjs <old CLAUDE.md> CLAUDE.md archive/CLAUDE-history.md` → «old 1865 non-blank lines · found 1865 ·
+  lost 0 · new-only 142 · PASS» (new tool, line multiset; the old copy kept in the session scratchpad).
+- HANDOFF references updated (step index, Known limits now in the archive).
+- Runs: static PASS · data PASS 19 / 0. No browser run (docs + a node tool only). Fix rounds 0.
+- Files: CLAUDE.md, archive/CLAUDE-history.md (new), tools/doc-split-check.mjs (new), HANDOFF.md, WORK-LOG.md.
+
+STARTED 2 LAT2a probe clock 2026-10-17
+
+## Slice 2 — LAT2a search schedule on the probe clock (done)
+- `vision.pumpStepDbg(n)` (probe only): with the pump held, n real camera pictures go through the REAL pump one at a time, each awaited —
+  the frame count no longer depends on how busy the machine is.
+- Row «LAT2a search schedule (live)» → «LAT2a search schedule (probe clock)» (`src/probes/detect.js`): fixed frame counts (12 / 30 / 8);
+  each log must equal, frame for frame, the core's own expectation `expectLog` (plan → scripted hand count per model run, L1 ≤ 1 → retry →
+  `schedAfter`, built from `core/handsched.js`) AND the independently stated rules (`schedProblems`); no hand → searches on frames 0,3,6,9
+  exactly. CONTROL `schedStay` must break both the exact log and the rules (2 cases). 11 cases; ≈ 1.7 s (was ≈ 9 s).
+- Runs: static PASS · data PASS 19 / 0 · the row alone (--eval) 11 / 0 in 1.7 s · **P.quick PASS 74 / 0 (138.8 s)**, UI checks, CSP,
+  network PASS. Fix rounds 0.
+- Files: src/vision.js, src/probes/detect.js, docs/NAME-INDEX.md, archive/CLAUDE-history.md (row text), WORK-LOG.md.
+
+STARTED 3 SONG3 leftover — opening a song is one ↶ step 2026-10-17
+
+## Slice 3 — SONG3 leftover: opening a song is ONE ↶ step (done)
+- `recorder.songOpenApply(P, meta)`: no more history reset — the Open is a diff snapshot step (kind 'snap', label 'open') like ✕, and it
+  also carries the brace, the song's own settings (A4, metre, tempo, bars, subdivision, quantise, master — applied while the song is empty,
+  since the metre can change only then) and the Song-file name and id (`hooks.songMeta` → ui, so autosave keeps writing each song under
+  its own id after ↶). The transport pauses first. Where no snapshot can be taken (history off) it resets as before.
+- ⛳ Decision: the LIVE scale / key / tonic cents a file sets are listening settings (not steps — as everywhere since ED7); ↶ of an Open
+  does not move them. P.song / P.seed still start with an empty history (probe tools).
+- ui: `hist.k.open` «song opened» / «открытие песни» (toast of ↶/↷); the panels (tempo, metre, A4, …) refresh on ↶/↷.
+- New row «SONG3 Open is one ↶ step» (`src/probes/songfile.js`, quick + all): B = the seed's own save with other settings, name, id and
+  one track fewer, opened through the real `ui.songOpenText`: exactly one step 'open'; ↶ → A exactly (save, id, settings, brace, sound
+  fingerprint); ↷ → B exactly; ↶ again → A; a refused file adds no step. CONTROL `histDbg({noOpenSt})` must leave B's settings. 25 / 0.
+- Runs: static PASS · data PASS 19 / 0 (after regenerating THIRD-PARTY-LICENSES.md — the ↶ glyph is now also in a probe file) · rows alone
+  SONG3 25 / 0, SAVE1 31 / 0 · **P.quick PASS 75 / 0 (160 s)**, UI checks, CSP, network PASS. Fix rounds 1 (a quote in a probe string;
+  a duplicate row place).
+- Files: src/recorder.js, src/song/history.js, src/hooks.js, src/ui.js, src/i18n.js, src/probes/songfile.js, src/scaleprobe.js,
+  THIRD-PARTY-LICENSES.md (generated), archive/CLAUDE-history.md, WORK-LOG.md.
+STARTED 4 CMD1 plan 2026-10-17
+
+## Slice 4 — CMD1 plan (done; PLAN ONLY)
+- `docs/CMD1-design.md`: the 23 step kinds and what each holds; why a JSON round trip breaks today's tripwire (payloads hashed by OBJECT
+  identity); the value tripwire (per-item hash keyed by permanent ids: events by `e.id` + canonical JSON of the payload, memoised per
+  payload object since payloads are never written in place; lane points by `p.id`; captures by `tk`; tracks by a permanent track id);
+  a deep (no-memo) mode for P.all; serialisers per kind with one id→object context; `onApplied`; `undo:false` setters; proof rows with
+  controls; four slices CMD1a–d; three questions (track ids in the file v6; history in the file — recommended not; autosave on the journal).
+- No code changed; no probe run needed (docs only).
+STARTED 5 VIS1 plan 2026-10-17
+
+## Slice 5 — VIS1 plan (done; PLAN ONLY, aimed at Calm)
+- `docs/VIS1-design.md`: the two parts — (A) the module layer (pure event bus `core/bus.js` with state topics hands/features/levels/
+  transport/params and an event ring `notes` stamped with the engine's audio time; the §4.11 visual contract; a compositor; today's
+  drawing wrapped as `camera` / `surface` / `hands` — pixel-identical) and (B) the scene layer for Calm (a WebGL canvas under the 2D one;
+  Three.js r128 UMD vendored and lazy — no new CSP host; rooms as modules re-written from the prototype; depth from hand size, parallax,
+  shadow lights budgeted per class; the forest band driven ONLY by backing note events, synced by `getOutputTimestamp` with a wind-up from
+  the scheduler's look-ahead). Layer order scene → background → instrument → overlay (hands, lesson layer) → DOM; rooms may own the hands
+  (lights) while a faint ring keeps pinching precise. Low-power path: full / reduced / minimal (2D light mask, also the WebGL fallback);
+  visible «Low power: on — why? [turn off]» per E3; worker option to be measured. Proof by numbers, not WebGL pixels. Six slices
+  VIS1a–f; four questions.
+- No code changed; no probe run needed (docs only).
+STARTED 6 POOL1 chord pool grows on demand 2026-10-17
+- (resumed after the usage limit) Tree checked first: static PASS, data PASS 19 / 0; POOL1 code was consistent — finished, not rolled back.
+
+## Slice 6 — POOL1 the chord pool grows on demand (done; ENG2 review E2)
+- config: `CHORD_POOL_FIRST` 4 + `CHORD_POOL_SPARE` 2 (the ceiling `CHORD_POOL_N` 24 stays). The live engine starts with 6 chord voices; after
+  every chord `cvSpare()` keeps 2 idle voices built ahead in the next task (off the attack's path); `cvAlloc` grows before it steals (a burst
+  larger than the spares), steals only at 24 as before. The render copy builds NO voice at start — only what a track uses. Rule #3 holds: a
+  built voice never stops; the pool never shrinks.
+- Seeds by index: at engine start the 24 start-phase draws the eager pool used to make are drawn in the same place and kept by pool index
+  (`cvSeed`, read through `E.pool.ch.seed(i)`; `voiceStartPair(E, o1, o2, u)`); a voice built later starts exactly as it would have, and the
+  random stream after it (noise buffer, humanisation) is not shifted. Voices beyond 24 (offline growth) draw when built, as before.
+- ⚠️ Bit for bit is not a possible bar, MEASURED: the OLD eager pool rendered twice with the same seed differs by up to 6e-8 in ~164 000
+  samples (Chrome sums a node's inputs in no fixed order — the known summand rule, 1–3 ULP). Lazy vs eager stays in that floor (6.3e-8).
+  New row «POOL1 chord pool on demand» (quick + all): scene and a seed chord track lazy = eager within 2e-6 of peak (≈ 30 ULP; the floor
+  printed); CONTROL `poolDbg({naive})` (a lazy pool without the per-index draws) must exceed it; live: a chord that fits builds nothing while
+  it attacks, ≥ 2 spares right after, a burst reaches 24 and never more, the pool never shrinks. **GOLD 84 / 0 unchanged** (alone, 30 s —
+  was 60–120 s); frozen seed bass exact.
+- Node census renewed (intended): «init» −24 chord voices (Gain 258 → 114, BiquadFilter 61 → 13, ChannelMerger 29 → 5, Oscillator 54 → 6),
+  «play» +24 (the census plays 17 chord timbres × 3 notes) — per-kind TOTALS identical.
+- **Measured gain** (render copy, offline, 4 s scenes, 5 runs, seconds of CPU per second of audio, this desktop):
+  bare start graph 0.41 · 0.41 · 0.38 · 0.43 · 0.39 → **0.13 · 0.13 · 0.15 · 0.14 · 0.12** (≈ 3× less);
+  light (4 solo SuperSaw + one 4-note chord + bass + drums) 0.85 · 0.78 · 0.81 · 0.82 · 0.67 → **0.59 · 0.51 · 0.51 · 0.59 · 0.42**;
+  heavy (8 solo + …) 0.87 · 0.83 · 0.87 · 0.85 · 0.85 → **0.62 · 0.62 · 0.62 · 0.72 · 0.78**. (ENG2's 0.81 was measured under other load;
+  the before/after pair here is one session each, same script.) P.quick fell from 138–160 s to 110 s (lighter renders).
+- Runs: static PASS · data PASS 19 / 0 · POOL1 alone 9 / 0 · GOLD alone 84 / 0 · **P.quick PASS 76 / 0 (109.9 s)**, UI, CSP, network PASS.
+  Fix rounds 2 (surface listings; the identity bar → the ULP floor, explained above).
+- DOC1 follow-up: the three «lost» lines (+ one POOL1 line) are now kept verbatim in archive/CLAUDE-history.md «Superseded at DOC1»; the old
+  CLAUDE.md is kept as archive/CLAUDE-before-DOC1.md so `node tools/doc-split-check.mjs archive/CLAUDE-before-DOC1.md CLAUDE.md
+  archive/CLAUDE-history.md` → PASS (1865 / 1865) at any time.
+- Files: src/config.js, src/audio.js, src/modules/timbres/voice.js, src/modules/timbres/chord-voice.js, src/render.js (engineProbe pre/after,
+  renderPoolDbg), src/engine/surface.js, src/probes/pool.js (new), src/scaleprobe.js, tools/census.print.json (renewed), CLAUDE.md,
+  archive/CLAUDE-history.md, archive/CLAUDE-before-DOC1.md (new), WORK-LOG.md.
+STARTED 7 ENG2 readouts + dropouts line + provisional classes 2026-10-17
+
+## Slice 7 — ENG2 readouts, dropouts line, provisional classes (done; user answer E1 — NO switching)
+- `src/core/engclass.js` (pure, node row): `engClass` → high / mid / low / unknown from the audio benchmark's offline factor, the detection
+  time and software graphics — PROVISIONAL, decides nothing; `ENG_THRESH` (ENG2 plan values); the benchmark cache (`handsong.engBench`, per
+  user agent); `dropRate` (dropouts per minute from a cumulative counter; null under 10 s — never a guess).
+- `audio.js` readouts (read only): `engVoices()` (built / sounding per pool, Firefly strikes, drum hits in the last second), `engLevels({roles})`
+  (master peak / RMS / reduction in dB; per-role analysers built on the first request only), `engLoad()` — the browser's own counters,
+  feature-detected: `AudioContext.playbackStats` (`underrunEvents`; the earlier draft name `playoutStats` also read) and `renderCapacity`.
+- `render.js`: `engBench()` — the reference light scene for 1 s through the render copy (worklets stubbed), once per device, ≥ 20 s after
+  start in an idle moment, never while recording / a render is queued / the watcher is paused (so never in a runner session); `R.engine()`.
+- Latency meter: «Audio dropouts: N per minute (the browser counts them)» (or «counting (needs 10 s)», or «this browser does not report
+  them») + audio-thread load where `renderCapacity` exists; «Power class (provisional, changes nothing): …». Keys en + ru.
+- MEASURED in the runner: headless Chrome 155 HAS `playbackStats` (dropouts 0 per minute in a quiet run), has NO `renderCapacity`.
+- Rows: node «ENG2 power class (core)» 17 / 0 (CONTROLS: over the threshold → low; a window under 10 s → null); browser «ENG2 engine
+  readouts» 16 / 0 (CONTROL: a fake `playbackStats` must reach the readout).
+- Runs: static PASS · data PASS 20 / 0 · **P.quick PASS 77 / 0 (123 s) · P.all PASS 102 / 0 (490 s)** — GOLD 84 / 0, frozen seed bass
+  0.08686 / 0.055319 / 650886 exact, census (renewed in POOL1), AF2 / AF5 / AF6b / LR1, HAND1, SAVE1 / AUTOSAVE1 / SONG3 / IDS1 / PACK1, CAM
+  and LAT rows, UI checks, CSP, network PASS. ⚠️ The data runner run at the start of that session said NOT A PASS (LIC1: a «≠» glyph in the
+  new probe text + the generated licence doc) — fixed (words instead of the glyph, doc regenerated): data PASS. Fix rounds 2 (the dropRate
+  expectation; the glyph).
+- Files: src/core/engclass.js (new), src/audio.js, src/render.js, src/latmeter.js, src/frzqueue.js (`afPaused`), src/i18n.js, src/probes/eng2.js
+  (new), src/scaleprobe.js, src/engine/surface.js, tools/probe-data.mjs, CLAUDE.md, archive/CLAUDE-history.md (sections + step 100).
+
+STARTED 8 TIM3a timbre records (loader, validator with T5 bounds, bundle, chord + bass records, trace row) 2026-10-17
+
+## Slice 8 — TIM3a timbre records: chord + bass as data (done; nothing audible changes)
+- 24 records `data/timbres/<id>.json` (17 chord: 16 `chord2` + Firefly as `tine`; 7 bass `bass2`) + `index.json` (order); generated ONCE from
+  the old tables, now the source of truth (T4). `tools/timbre-bundle.mjs` → `data/timbres.bundle.json` (the app loads one file; `--check`).
+- `src/core/timbre.js` (pure): the record format and `checkTimbre` with the T5 SAFETY bounds (level ≤ 0.5, gains ≤ 1, cut-off and filter
+  envelope ≤ 20 000 / 24 000 Hz, ratio 0.25…8, detune ±100 ¢, ≤ 8 partials summing ≤ 2, ≤ 64 nodes per voice — the cost cap —, envelope,
+  policy, name and id bounds; unknown fields refused); every refusal is ONE line. `src/timbreload.js`: top-level await of the bundle, each
+  record checked, a refused one skipped with one console line (never played), an empty family → its embedded emergency record.
+- `audio.js`: the literal `CHORD_INSTR` / `BASS_INSTR` tables are gone — views over the records in today's entry shape and key order
+  (song copies and menus unchanged). Firefly's partials now come from its record (`ffStrike(…, parts, t)`). `CHORD_GLIDE_TC` named.
+- T3: policies in every record with today's role values (chord: no voice mode, glide 0.035 s, register chord, quantise 1 beat; bass: lead,
+  0.012 s, bass, ½ beat); the app still reads the role; the browser row pins record = role (CONTROL: a bass record quantising 1 beat).
+- T2 (prepared for TIM3b): «Bell (FM)» creates its nodes in exactly fm2's order and only lacks fm2's index strike — a `fixed` field would
+  fold it into fm2; TIM3b decides by the trace + render proof.
+- Proof: `tools/timbres.before.json` taken on the code BEFORE (52 timbres: entry, node-creation trace, 0.3-s render envelope; the row passed
+  156 / 0 on that same code first — repeatable); after: «TIM3 timbres = before» 156 / 0 (every entry and trace EXACT), «TIM3a records,
+  policies = role» 0 diff, node row «TIM3 timbre records (core)» 88 / 0 (19 damages × 3 engines + 4 tine damages — each refused naming its
+  field), **GOLD 84 / 0**, SONG2 6 / 0, census unchanged.
+- Runs: static PASS · data PASS 21 / 0 · **P.quick PASS 79 / 0 (117.8 s)**, UI, CSP, network PASS. Fix rounds 2 (the KS worklet in the
+  snapshot probe; the controls' field names).
+- Files: data/timbres/*.json (25, new), data/timbres.bundle.json (new, generated), tools/timbre-bundle.mjs (new), tools/timbres.before.json
+  (new), src/core/timbre.js (new), src/timbreload.js (new), src/audio.js, src/modules/timbres/chord-voice.js, src/modules/timbres/stages.js,
+  src/state.js, src/live/record.js, src/probes/timbres.js (new), src/scaleprobe.js, src/engine/surface.js, tools/check-static.mjs
+  (NET_LISTED, GLOBALS), tools/probe-data.mjs, CLAUDE.md, archive/CLAUDE-history.md.
+
+STARTED 9 TIM3b solo engine types (23 bodies one by one) 2026-10-17
+
+## Slice 9 — TIM3b solo timbres as data (done; nothing audible changes)
+- 23 solo records (`data/timbres/solo.*.json`): 15 `subtractive` (each body of the old `buildLeadBanks` translated BY HAND into oscillators
+  {wave, mult, gain, detune} in creation order + optional lowpass {freq, Q} + filter strike {open, tc, fv} + hum), 3 `fm2` (Bell deep,
+  Metallophone, and «Bell (FM)» with `fixed:true`), 7 `ks` (the old `KS_BANKS` entries). Policies = today's solo role values (poly, 0.02 s,
+  solo, no quantise), pinned by the browser row.
+- Engine: `buildSubtractive` (generic, same node order as the old bodies), `buildFMBank` + `fixed`, `buildKSBank` from the recipe;
+  `buildLeadBank` dispatches by the record's engine; `leadIsKs(i)` replaces «KS is the tail of the list» (pool cap, render's KS worklet
+  choice). The old `buildLeadBanks` (14 bodies) and `KS_BANKS` are deleted. Validator: the solo engines' T5 bounds (+ 18 damage CONTROLS).
+- PROOF, one timbre at a time (all 23): an A/B render through the render copy with the OLD bodies kept behind a temporary switch for this
+  slice — node-creation TRACE identical for every timbre; new vs old samples differ at most 1.2e-6 of peak, the same ULP level as new vs new
+  (repeat floor up to 9.9e-7 — Chrome's summation order); e.g. SuperSaw 6.5e-7 (floor 9.3e-8), Organ (full) 1.21e-6 (floor 9.2e-7), Bell
+  (FM) 1.8e-7 (= its floor), Sitar 5.8e-7 (floor 6.5e-7). The switch was then removed; the permanent proof is «TIM3 timbres = before» (every
+  entry and trace EXACT, envelope ≤ 1e-5): 156 / 0. ⛳ T2 decided by this proof: «Bell (FM)» is `fm2` + `fixed:true` (trace identical,
+  render at the floor).
+- CLAUDE.md convention «A timbre» rewritten (record file + index + bundle; a solo timbre may be appended; old lines in «Superseded at DOC1»).
+- Runs: static PASS · data PASS 21 / 0 («TIM3 timbre records (core)» 129 / 0) · **P.quick PASS 79 / 0 (120 s)** · GOLD 84 / 0 · SONG2 6 / 0;
+  UI, CSP, network PASS. Fix rounds 1 (removing the A/B leftovers in two passes).
+- Files: data/timbres/solo.*.json (23, new), data/timbres/index.json, data/timbres.bundle.json, src/core/timbre.js, src/modules/timbres/
+  subtractive.js, fm.js, ks.js, src/audio.js, src/render.js, src/engine/surface.js, src/probes/timbres.js, tools/probe-data.mjs, CLAUDE.md,
+  archive/CLAUDE-history.md.
+
+STARTED 10 TIM3d the person's own timbres, song copies, v5→v6 migration, «Keep in my timbres» 2026-10-17
+
+## Slice 10 — TIM3d the person's own timbres and song copies (done; one new button, otherwise nothing visible)
+- Song file version 6: every timbre a song uses travels as its FULL record (solo, chord, bass); kits keep the old copy until TIM3c.
+  Migration v5 → v6 (pure) marks old copies `legacy` — they behave exactly as before (the app's own timbre by id, else one with equal
+  settings, else the role's stand-in). ⚠️ The task text said «v5 migration»: the song file was already at v5 (IDS1 part 2), so TIM3d is v6.
+- A copy of a timbre this app lacks is checked at ONE door (`timbreload.timbreAddSession`, the T5 bounds) and installed for the session —
+  the song plays with its own sound; an out-of-bounds copy is refused with one line and never played (the role's stand-in plays, named).
+- The person's own timbres (`u.<uuid>`, user store kind 'timbre') load at start after the built-ins through the same validator. «Keep in my
+  timbres» (new button beside «Keep in my scales», shown only when an opened song brought timbres) stores them. No other UI (TIM3d scope).
+- The render copy follows session timbres (`timbreSync` in `renderReset`). Probe timbres leave the pickers afterwards (`timbreForgetDbg`).
+- Row «TIM3d own timbres and song copies» 18 / 0 (own timbre installs, plays through the render copy and differs from the Organ; a bad record
+  refused naming `recipe.lvl`; CONTROL: with the check skipped it gets in; a song's valid copy installs, re-saves identical, «Keep» hands
+  exactly it to a stand-in store; a song's bad copy refused → stand-in; a v5 file opens upgraded to the same song). SAVE1's foreign-timbre
+  step now exercises the legacy (v5) path. `data/songs/triphop.json` renewed to v6 by `P.dumpSong` (equal to the old file apart from
+  `saved`, `version` and the timbre copies); SONG2 6 / 0.
+- Found and fixed in my own new rows: the built-in snapshot and the node census also met the probe's session timbres — both now count
+  built-ins only; R.probe's «last timbre is KS» → the last KS timbre.
+- Runs: static PASS · data PASS 21 / 0 · TIM3d / SAVE1 / records alone 18 / 31 / 52 · 0 · **P.quick PASS 80 / 0 (121 s)**, UI, CSP, network
+  PASS. Fix rounds 2.
+- Files: src/core/songfile.js, src/timbreload.js, src/audio.js, src/song/file.js, src/song/env.js, src/recorder.js, src/ui.js, src/i18n.js,
+  index.html (#songKeepTim), src/render.js, src/probes/tim3d.js (new), src/probes/songfile.js, src/probes/timbres.js, src/probes/engine.js,
+  src/scaleprobe.js, src/engine/surface.js, data/songs/triphop.json, archive/CLAUDE-history.md.
+
+STARTED 11 TIM3c kits as data (row synths stay code, their parameters become data) 2026-10-17
+
+## Slice 11 — TIM3c kits as data (done; nothing audible changes)
+- 5 kit records (`data/timbres/kit.*.json`, engine `drumkit`): six rows `{synth, vm, params}` each — the calls of the old dispatchers
+  written out in full (e.g. Darbuka row 2 = `tek`, vm 1.1, hp 6000, f 1300). Row SYNTHS stay code (T1): the six Standard branches became named
+  synths with the same bodies; the Darbuka / Tabla / Taiko / Gamelan hit functions are the other synths; the four old per-kit dispatchers
+  are deleted. `drumVoice` plays a row of the kit's RECORD. Policies: quantise «sub» (1 / subdivision), pinned against `gridFor('drum')`.
+- Validator: kit bounds (exactly 6 rows, a known synth with only its own parameters, vm 0…2, frequencies, durations, FM values; no env) + 7
+  damage CONTROLS; emergency records for all four families now (solo added).
+- Proof: «TIM3 timbres = before» 156 / 0 — all six rows of every kit: creation trace EXACT, render envelope ≤ 1e-5; GOLD 84 / 0 (5 kits × 6
+  rows); census 18 / 0; TIM3d 18 / 0; SONG2 6 / 0 after renewing `data/songs/triphop.json` (identical apart from `saved` and the kit copy, now a
+  record). Data PASS 21 / 0 («TIM3 timbre records (core)» 141 / 0). Fix rounds 0.
+- Files: data/timbres/kit.*.json (5, new), data/timbres/index.json, data/timbres.bundle.json, src/modules/timbres/drumkits.js, src/audio.js,
+  src/timbreload.js, src/core/timbre.js, src/probes/timbres.js, tools/probe-data.mjs, data/songs/triphop.json, CLAUDE.md,
+  archive/CLAUDE-history.md.
+
+STARTED 12 final full run (data + P.quick + P.all) and docs 2026-10-17
+
+## Final run (RUN 4 end)
+- static PASS · data PASS 21 / 0 · `--quick --all`: **P.quick PASS 80 / 0 (116 s) · P.all PASS 105 / 0 (583 s)** — GOLD 84 / 0, frozen seed bass
+  0.08686 / 0.055319 / 650886 exact, render repeatability, AF2 / AF5 / AF6b / LR1, HAND1, census, POOL1, ENG2, TIM3 (before / records / own),
+  SAVE1 / AUTOSAVE1 / SONG1 / SONG2 / SONG3 / IDS1 / PACK1, CAM and LAT rows (LAT2a now on the probe clock), state guard clean; UI checks,
+  CSP and network PASS. `doc-split-check` PASS (1865 / 1865). HANDOFF 19.1 KB.
+- Not done from the plan's own DOC1 definition (not asked in RUN 4): NAME-INDEX regenerated by a tool (a RUN 4 section was appended by hand),
+  BACKLOG §1 in English.
+
+# SUMMARY FOR THE USER — RUN 4 (plain language)
+
+**What was done** (each step checked by the automatic probes; nothing should SOUND different; one new button appears only after opening a
+song that brought its own instruments):
+1. **The main instruction file got short (DOC1).** CLAUDE.md went from 237 KB to about 57 KB (rules, a short map of the code, a one-line list
+   of the 98+2 test steps). Everything else moved word for word into `archive/CLAUDE-history.md`; a small tool proves no line was lost.
+   Every new session now reads about a quarter as much — less usage.
+2. **A flaky timing check made reliable (LAT2a).** The «search schedule» check no longer depends on how busy the computer is (it was the one
+   that failed when other programs ran); it now takes 2 seconds instead of 9.
+3. **Opening a song can be undone (SONG3).** «Open song file» is now one ↶ step, like ✕: ↶ brings back the song you had, with its tempo,
+   A4, brace and name; ↷ opens the file again.
+4. **Two plans written for review:** `docs/CMD1-design.md` (every edit as a saveable «command»; how the undo safety check will compare
+   values) and `docs/VIS1-design.md` (the picture layer for Calm's 3D rooms — monastery, night forest, the forest band — and the low-power
+   path).
+5. **The sound engine starts lighter for everyone (POOL1).** The chord instrument used to build 24 voices at start and keep them all
+   running; now it builds 6 and adds more just before they are needed (2 always ready, so the first chord is still instant). Measured on this
+   computer (CPU per second of sound, offline): empty engine **0.40 → 0.13** (about 3× less), a light scene **0.80 → 0.52**, a heavy scene
+   **0.85 → 0.67**. The 84 golden sound checks are unchanged. (Perfect bit-for-bit identity turned out to be impossible even for the old code
+   against itself — Chrome adds sounds in no fixed order — so the check uses that same tiny tolerance.)
+6. **The engine can report on itself (ENG2).** The latency meter shows a new line **«Audio dropouts: N per minute»** — counted by Chrome
+   itself, never guessed — and a «Power class (provisional, changes nothing)». Nothing switches automatically, as you asked.
+7. **Every instrument is now a data file (TIM3a–d, TIM3c).** All 23 solo, 17 chord and 7 bass instruments and the 5 drum kits are files in
+   `data/timbres/` (bundled into one file the app loads). Each was translated one by one and proved identical (same sound-building steps,
+   same sound). A **safety check** refuses any instrument file with dangerous values (too loud, runaway feedback, too many oscillators, …)
+   — important because instruments will arrive inside other people's songs and packs. A song now carries the FULL description of every
+   instrument it uses (file version 6); an instrument this device lacks plays from the song's copy, and **«Keep in my timbres»** saves it.
+
+**Probe verdicts:** final run — data 21 / 21, P.quick 80 / 80, P.all 105 / 105 PASS; golden sounds 84 / 84; frozen-track numbers exact;
+privacy and network checks PASS.
+
+**Try it:**
+- **Dropouts line (desktop, then the phone):** ▶ Play → top bar → **🎛 Sound** → at the bottom **Diagnostics · Latency meter → On**. Look for
+  «Audio dropouts: … per minute» (the first 10 s it says «counting»). Play chords and drums hard for a minute — it should stay 0 on the
+  desktop. About 20 s after the first start on a device the «Power class» line shows a number. Tap **Copy** and send the text (with the
+  phone's numbers too — the plan needs them before any automatic power mode).
+- **Undo an Open:** with a song playing, **⚙ Loop → Song file → Open** another song file (different tempo) → it plays → press **↶** → your first
+  song is back with its tempo and name; **↷** → the opened song again.
+- Nothing else should look or sound different — if anything does, that is a bug worth telling me.
+
+**Questions for you:**
+- **CMD1:** store each track's id in song files (file v7)? Keep the undo history OUT of song files (recommended)?
+- **VIS1:** Calm's note field over a room — faint (recommended), hidden, or per room? May the «Rooms of light» prototype code be the starting
+  source, or only a reference? Build VIS1a (invisible groundwork) now or at the start of Calm?
+- **ENG2:** please run the dropouts line on your phone (and a budget Android / an iPhone when you can) — the provisional classes wait for it.
+- Note: the song file is now version 6 (version 5 already existed from RUN 3), so «v5 migration» in the task became «v5 → v6».

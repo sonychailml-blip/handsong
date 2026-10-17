@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.reed",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Reed",
+  "ru": "Тростевой"
+ },
+ "recipe": {
+  "t1": "square",
+  "t2": "sawtooth",
+  "ratio": 1,
+  "det": 5,
+  "m1": 0.34,
+  "m2": 0.26,
+  "lp": 2200,
+  "lvl": 0.15,
+  "fo": 2,
+  "ft": 0.14,
+  "fv": 1,
+  "hj": 1
+ },
+ "env": {
+  "att": 0.05,
+  "rel": 0.18
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

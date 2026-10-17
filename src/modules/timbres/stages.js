@@ -98,5 +98,6 @@ const briToHz=bri=>{ const d=Math.max(0,Math.min(1,bri||0)); return CHORD_LP_MAX
    на обе ссылается объявление модуля «Скольжение» (GLIDE_PARAMS, его умолчания по ролям), а оно стоит выше bassOn по
    файлу — const, объявленная ниже, дала бы на загрузке модуля ReferenceError (мёртвая зона). */
 const BASS_GLIDE_TC=0.012;
+const CHORD_GLIDE_TC=0.035;   // TIM3a: a chord's legato glide time constant (was a literal in audio.js chordGlide; the records' policies pin it)
 
-export { BASS_GLIDE_TC, freezeDeep, makePanStage, voiceRoute, panGains, BRI_HZ, BRI_OPEN, briHzOf, makeBriStage, makeSatCurve, makeHardCurve, CHORD_LP_MAX, CHORD_LP_MIN, briToHz, HUM_CENTS, LEAD_GLIDE_TC, fstrike };
+export { BASS_GLIDE_TC, CHORD_GLIDE_TC, freezeDeep, makePanStage, voiceRoute, panGains, BRI_HZ, BRI_OPEN, briHzOf, makeBriStage, makeSatCurve, makeHardCurve, CHORD_LP_MAX, CHORD_LP_MIN, briToHz, HUM_CENTS, LEAD_GLIDE_TC, fstrike };

@@ -437,6 +437,17 @@ const pumpStats=()=>({ ...PS, log:PS.log.slice(), sched:{ ...sched }, policy:opt
 async function detRunDbg(bmp, action, policy='2s'){   // one frame through the RUNNING detector, outside the pump (hold it first)
   if(!det) throw new Error('no detector'); const d=det; const r=await d.run({ bmp, t:performance.now(), action, policy }); return { kind:d.kind, ...r };
 }
+/* probe only (LAT2a on the probe clock, RUN 4): n camera pictures through the REAL pump one at a time, each awaited — the schedule's
+   frame count no longer depends on the machine's speed. Hold the pump first (pumpDbg({hold:true})): no camera frame is taken meanwhile. */
+async function pumpStepDbg(n){
+  for(let i=0;i<n;i++){
+    while(busy) await new Promise(r=>setTimeout(r,5));
+    const bmp=await createImageBitmap(video), id=++frameSeq, now=performance.now();
+    PS.snapped++; if(id>snapMax) snapMax=id;
+    if(pend){ pend.bmp.close(); PS.dropped++; }
+    pend={ id, pf:NaN, cap:NaN, pres:NaN, vfNow:now, snapT:now, bmp }; await pump();
+  }
+}
 function pumpDbg(o={}){
   if('fault' in o) faultDbg=o.fault||null;
   if('schedStay' in o) schedStayDbg=!!o.schedStay;
@@ -451,4 +462,4 @@ function pumpDbg(o={}){
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, initDetector, startCamera, switchCamera, setHandsSink, pollFrame,
   camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
-  pathInfo, pumpStats, pumpDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg };
+  pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg };

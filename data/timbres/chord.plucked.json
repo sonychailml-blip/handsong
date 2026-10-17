@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.plucked",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Plucked",
+  "ru": "Щипковые"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "square",
+  "ratio": 1,
+  "det": 3,
+  "m1": 0.44,
+  "m2": 0.28,
+  "lp": 2800,
+  "lvl": 0.19,
+  "fo": 3.5,
+  "ft": 0.08,
+  "fv": 1.5,
+  "hj": 1
+ },
+ "env": {
+  "att": 0.003,
+  "rel": 0.2
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

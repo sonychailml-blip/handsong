@@ -1,0 +1,27 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.oud-string",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "en": "Oud (string)",
+  "ru": "Уд (струна)"
+ },
+ "recipe": {
+  "fb": 0.984,
+  "damp": 0.5,
+  "exBase": 0.04,
+  "exSpan": 0.4
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.3
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

@@ -1,0 +1,27 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.pizzicato",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "en": "Pizzicato",
+  "ru": "Пиццикато"
+ },
+ "recipe": {
+  "fb": 0.965,
+  "damp": 0.5,
+  "exBase": 0.18,
+  "exSpan": 0.6
+ },
+ "env": {
+  "att": 0.001,
+  "rel": 0.15
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

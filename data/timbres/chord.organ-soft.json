@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.organ-soft",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Organ (soft)",
+  "ru": "Орган мягкий"
+ },
+ "recipe": {
+  "t1": "sine",
+  "t2": "sine",
+  "ratio": 2,
+  "det": 0,
+  "m1": 0.58,
+  "m2": 0.24,
+  "lp": 3000,
+  "lvl": 0.17,
+  "fo": 1,
+  "ft": 0.02,
+  "fv": 0.2,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.02,
+  "rel": 0.12
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

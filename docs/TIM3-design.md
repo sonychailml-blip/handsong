@@ -99,3 +99,17 @@ Written for: the strategist (review), then Claude Code (implementation). No code
 2. «Bell (FM)» as its own `fm-fixed` type, or folded into `fm2` with a flag?
 3. Policies per timbre in TIM3 (with today's role values), or left on the role until stage 7?
 4. One file per timbre (52 requests) or one bundled `data/timbres.json`?
+
+## Review 2026-10-17 (user / strategist answers, recorded at RUN 4)
+- **T1** Kits as data: YES, but LAST — TIM3c comes after TIM3d. Row synths stay code; their PARAMETERS become data.
+- **T2** «Bell (FM)»: folded into `fm2` with a field ONLY if the creation trace and the bit-exact render are identical; otherwise it keeps
+  its own `fm-fixed` type. The proof decides.
+- **T3** Policies: written into EVERY record now with today's role values (the format is stable); the app keeps reading the role until
+  stage 7; a probe pins record values = role values.
+- **T4** Files: one file per timbre in the repo (the source of truth; the same shape as user timbres and packs); the app loads ONE generated
+  bundle `data/timbres.bundle.json` built by a tool, with a probe that the bundle = the files. The same bundling may later apply to the
+  scale files.
+- **T5** SAFETY (new): timbre records will arrive from other people inside songs and packs. The validator bounds EVERY value — gains /
+  levels capped, KS feedback < 1 with a margin, filter Q capped, frequencies in a safe range, at most N oscillators / partials per voice, a
+  cost cap (ENG2 class); an out-of-bounds or too heavy record is REFUSED with one line, never played. A CONTROL for each bound.
+- Order: TIM3a → TIM3b → TIM3d → TIM3c.

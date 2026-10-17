@@ -1,0 +1,60 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "kit.darbuka",
+ "family": "kit",
+ "engine": "drumkit",
+ "name": {
+  "default": "Darbuka",
+  "ru": "Дарбука"
+ },
+ "recipe": {
+  "rows": [
+   {
+    "synth": "dum",
+    "vm": 1,
+    "f0": 130,
+    "f1": 52,
+    "d": 0.18
+   },
+   {
+    "synth": "tek",
+    "vm": 1,
+    "hp": 4500,
+    "f": 950
+   },
+   {
+    "synth": "tek",
+    "vm": 1.1,
+    "hp": 6000,
+    "f": 1300
+   },
+   {
+    "synth": "tek",
+    "vm": 0.7,
+    "hp": 5200,
+    "f": 1100
+   },
+   {
+    "synth": "dum",
+    "vm": 1,
+    "f0": 180,
+    "f1": 80,
+    "d": 0.14
+   },
+   {
+    "synth": "edge",
+    "vm": 1,
+    "hp": 5000,
+    "g": 0.28,
+    "d": 0.5
+   }
+  ]
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": null,
+  "register": null,
+  "quant": "sub"
+ }
+}

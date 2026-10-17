@@ -249,6 +249,10 @@ export function bendPlan(B,base,spb,t0,from=0){
    Многослойный лупер: аккорды — до ~5 септаккордов (4 слоя + живой).
    Числа подобрать A/B в приложении на целевом телефоне (слушать треск), поднять — секунда. */
 export const CHORD_POOL_N=24;                     // голосов в пуле аккордов: 4 слоя по 5 нот (7#9/м9/6-9/maj9/13) + запас
+/* POOL1 (RUN 4, ENG2 review E2): the chord pool GROWS ON DEMAND up to CHORD_POOL_N (the ceiling, as for solo and bass). The live engine
+   starts with CHORD_POOL_FIRST + CHORD_POOL_SPARE voices (a 5-note chord fits) and keeps CHORD_POOL_SPARE idle voices built ahead after
+   every chord, so a note never waits for a build; the render copy builds only what a track uses. Rule #3: a built voice never stops. */
+export const CHORD_POOL_FIRST=4, CHORD_POOL_SPARE=2;
 /* БАС-ПУЛ (P1): ПОТОЛОК, а не постоянная цена — голоса строятся ЛЕНИВО, как у соло (прежде 4 голоса строились сразу,
    по голосу на дорожку, и пятая звучащая бас-дорожка крала у первой). Голос на КЛЮЧ владельца: живой бас (в ведущем
    режиме один, в полифоническом — до 8, 2 руки × 4 пальца) плюс переигранные дорожки и их взятые. 12 — зеркало LEAD_POOL_N.

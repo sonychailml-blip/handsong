@@ -1,0 +1,32 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "bass.organ",
+ "family": "bass",
+ "engine": "bass2",
+ "name": {
+  "en": "Organ bass",
+  "ru": "Орган-бас"
+ },
+ "recipe": {
+  "t1": "square",
+  "t2": "sine",
+  "det": 0,
+  "ratio": 1,
+  "lp": 620,
+  "lvl": 0.36,
+  "fo": 1,
+  "ft": 0.02,
+  "fv": 0.3
+ },
+ "env": {
+  "att": 0.012,
+  "rel": 0.3
+ },
+ "policies": {
+  "voiceMode": "lead",
+  "glide": 0.012,
+  "register": "bass",
+  "quant": 0.5
+ }
+}

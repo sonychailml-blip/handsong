@@ -2,13 +2,13 @@ import { leadIdx, setLeadIdx, bassIdx, setBassIdx, drumKitIdx, setDrumKitIdx, fx
 import { tonicFreq, droneSecondHz } from './scales.js';   // droneSecondHz — вторая струна дрона: высота строя, следует за ладом (слайс «дрон и центы»)
 import { hooks } from './hooks.js';
 import { createRegistry } from './core/registry.js';   // TIM1: permanent timbre ids (identity ≠ name ≠ position)
-import { FX_VOL, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, volAmp, volVel, bendPlan } from './config.js';
+import { FX_VOL, BASS_POOL_N, LEAD_POOL_N, LEAD_POOL_KS, CHORD_POOL_N, CHORD_POOL_FIRST, CHORD_POOL_SPARE, volAmp, volVel, bendPlan } from './config.js';
 import { FOREST, forestIR, irNormScale, DYN_GLUE, DYN_LIMIT, DYN_MASTER, MASTER_MAKEUP_DB } from './core/dsp.js';   // SND-F1: Night forest IR, dynamics presets (pure core)   // VOL-2b: одна кривая громкости (volAmp), вход скорости удара (volVel), пересчёт прежней шкалы (volFromOld — умолчание «Громкости»)
 /* AUD1c: the timbre builders live in src/modules/timbres/ (stateless, rule #38; they receive this instance's engine context E) */
-import { makePanStage, voiceRoute, panGains, BRI_OPEN, briHzOf, makeBriStage, makeSatCurve, makeHardCurve, briToHz, HUM_CENTS, BASS_GLIDE_TC } from './modules/timbres/stages.js';
-import { KS_BANKS } from './modules/timbres/ks.js';
+import { makePanStage, voiceRoute, panGains, BRI_OPEN, briHzOf, makeBriStage, makeSatCurve, makeHardCurve, briToHz, HUM_CENTS, BASS_GLIDE_TC, CHORD_GLIDE_TC } from './modules/timbres/stages.js';
 import { buildLeadBank } from './modules/timbres/subtractive.js';
-import { newChordVoice, buildChordPool, ffStrike } from './modules/timbres/chord-voice.js';
+import { newChordVoice, buildChordPool, ffStrike, FF_END } from './modules/timbres/chord-voice.js';
+import { TIMBRE_RECORDS, timbreAll, timbreAddSession } from './timbreload.js';   // TIM3a: the timbre records (data/timbres.bundle.json, checked); TIM3d: + session records
 import { buildBassPool } from './modules/timbres/bass-voice.js';
 import { drumVoice } from './modules/timbres/drumkits.js';
 /* AUD2a: the effects live in src/modules/effects/, the FDN reverb in src/engine/fdn.js (stateless, rule #38; a factory's make(E) builds its instance) */
@@ -24,96 +24,45 @@ import { GLUE_PARAMS, dynNode, makeGlueFx } from './modules/effects/glue.js';
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
  
-const LEAD_INSTR=[
-  {id:'solo.supersaw', label:'SuperSaw', att:0.012, rel:0.10},
-  {id:'solo.organ', label:{en:'Organ', ru:'Орган'},    att:0.008, rel:0.07},
-  {id:'solo.pad', label:{en:'Pad', ru:'Пад'},      att:0.120, rel:0.35},
-  {id:'solo.bell', label:{en:'Bell', ru:'Колокол'},  att:0.004, rel:0.30},
-  {id:'solo.flute', label:{en:'Flute', ru:'Флейта'},   att:0.050, rel:0.18},
-  {id:'solo.8-bit', label:{en:'8-bit', ru:'8-бит'},    att:0.002, rel:0.05},
-  /* FM-тембры (несущий+модулятор, огибающая индекса) — inгармонические спектры, недостижимые
-     субтрактивным путём. rel длиннее tau индекса → «удар» ярче хвоста (см. buildFMBank). */
-  {id:'solo.bell-deep', label:{en:'Bell (deep)', ru:'Колокол (глубокий)'}, att:0.004, rel:1.6},
-  {id:'solo.metallophone', label:{en:'Metallophone', ru:'Металлофон'},         att:0.002, rel:0.45},
-  /* Четыре новых семейства (индексы 8..15, тот же порядок, что банки в buildLeadBanks). Существующие
-     8 записей выше не тронуты (байт-в-байт), новые сгруппированы по семействам ради читаемого списка.
-     ПАДЫ — att медленный, rel ДЛИННЫЙ (~2.5с): звук должен тянуться, чтобы биения интервалов успели
-     развиться (главное этого захода — слышимость строёв). ЩИПКОВЫЕ — быстрая атака, короткий rel.
-     ДУХОВЫЕ — мягкая атака, умеренный rel. ОРГАНЫ — быстрые атака/релиз, плоско. */
-  {id:'solo.warm-pad', label:{en:'Warm pad', ru:'Пад тёплый'},      att:0.35,  rel:2.5},   // ПАДЫ
-  {id:'solo.glass-pad', label:{en:'Glass pad', ru:'Пад стеклянный'},  att:0.30,  rel:2.5},
-  {id:'solo.oud', label:{default:'Oud', ru:'Уд'},              att:0.004, rel:0.35},  // ЩИПКОВЫЕ
-  {id:'solo.plucked-string', label:{en:'Plucked string', ru:'Струна щипком'},   att:0.003, rel:0.22},
-  {id:'solo.airy-flute', label:{en:'Airy flute', ru:'Флейта воздушная'},att:0.06,  rel:0.20},  // ДУХОВЫЕ
-  {id:'solo.reed', label:{en:'Reed', ru:'Тростевой'},       att:0.04,  rel:0.16},
-  {id:'solo.organ-full', label:{en:'Organ (full)', ru:'Орган полный'},    att:0.006, rel:0.06},  // ОРГАННЫЕ
-  {id:'solo.organ-soft', label:{en:'Organ (soft)', ru:'Орган мягкий'},    att:0.02,  rel:0.10},
-  /* Карплюс–Стронг (физ. модель щипковой струны) — третий способ построения голоса (ворклет,
-     см. ks-worklet.js и buildKSBank). Быстрая атака, естественный хвост даёт сама петля. */
-  {id:'solo.string', label:{en:'String', ru:'Струна'},    att:0.002, rel:0.4},
-  {id:'solo.sitar', label:{default:'Sitar', ru:'Ситар'},     att:0.002, rel:0.6},
-  {id:'solo.oud-string', label:{en:'Oud (string)', ru:'Уд (струна)'}, att:0.002, rel:0.3},  // KS-щипковые: параметрические вариации одной струны (см. KS_BANKS). «(струна)» — чтобы не дублировать субтрактивный «Уд» (индекс 10)
-  {id:'solo.koto', label:{default:'Koto', ru:'Кото'},      att:0.002, rel:0.5},
-  {id:'solo.santur', label:{default:'Santur', ru:'Сантур'},    att:0.001, rel:0.25},
-  {id:'solo.guitar', label:{en:'Guitar', ru:'Гитара'},    att:0.002, rel:0.5},
-  {id:'solo.pizzicato', label:{en:'Pizzicato', ru:'Пиццикато'}, att:0.001, rel:0.15},
-];
+/* TIM3b (RUN 4): the SOLO timbres are data too — records in data/timbres/ with engine types subtractive / fm2 / ks (src/modules/timbres/);
+   the sound is built from the record's recipe (buildLeadBank), no longer from code by list position. LEAD_INSTR stays the view the menus,
+   events and song copies read ({id, label, att, rel}, today's key order); LEAD_REC[i] is the record behind position i. */
+const LEAD_REC=TIMBRE_RECORDS.filter(r=>r.family==='solo');
+const LEAD_INSTR=LEAD_REC.map(r=>({ id:r.id, label:JSON.parse(JSON.stringify(r.name)), att:r.env.att, rel:r.env.rel }));
+const leadIsKs=i=> !!(LEAD_REC[i] && LEAD_REC[i].engine==='ks');   // TIM3b: KS by the record's engine, not by «the tail of the list»
 /* Аккордовые тембры: 2 осциллятора (типы t1/t2, отношение частот ratio, расстройка det в центах,
    микс m1/m2), общий НЧ-фильтр lp, огибающая att/rel. Плюс улучшения качества (per-bank):
    fo — во сколько раз фильтр открыт в атаке (огибающая фильтра), ft — время оседания, fv — скорость→
    яркость (cutoff = lp·(1+fv·vol), пол=lp), hj — гуманизация высоты (0 у органа/падов для строёв). */
-const CHORD_INSTR=[
-  {id:'chord.warm-pad', label:{en:'Warm pad', ru:'Тёплый пад'},     t1:'sawtooth', t2:'sawtooth', ratio:1, det:9, m1:.50, m2:.50, lp:1500, lvl:.17, att:.22,  rel:.50, fo:1.4, ft:.30, fv:.6, hj:0},
-  {id:'chord.glass-pad', label:{en:'Glass pad', ru:'Стеклянный пад'}, t1:'triangle', t2:'sine',     ratio:2, det:5, m1:.55, m2:.30, lp:3400, lvl:.21, att:.14,  rel:.60, fo:1.4, ft:.28, fv:.6, hj:0},
-  {id:'chord.organ', label:{en:'Organ', ru:'Орган'},          t1:'square',   t2:'sine',     ratio:2, det:0, m1:.45, m2:.35, lp:4200, lvl:.15, att:.012, rel:.09, fo:1.0, ft:.02, fv:.2, hj:0},
-  {id:'chord.e-piano', label:{en:'E. piano', ru:'Эл. пиано'},      t1:'sine',     t2:'sine',     ratio:3, det:0, m1:.60, m2:.16, lp:5200, lvl:.22, att:.004, rel:.45, fo:2.2, ft:.12, fv:1.0,hj:1},
-  /* Аккордовые эквиваленты новых семейств. Пул строит голос иначе (o1/o2 → фильтр, тембр печётся на
-     атаке), поэтому характер адаптирован под ЭТУ форму, а не скопирован из лид-банков. Существующие 4
-     записи выше не тронуты (байт-в-байт). Аккордовый голос ДЕРЖИТ уровень, пока зажат → «сустейн» уже
-     есть; для строёв важнее ДЛИННЫЙ rel (хвост, где слышны биения) и СТАБИЛЬНЫЙ тон (органы: det=0,
-     сами не бьются). Имена с «(долгий)»: существующие «Тёплый/Стеклянный пад» короче — новые тянутся. */
-  {id:'chord.warm-pad-long', label:{en:'Warm pad (long)', ru:'Пад тёплый (долгий)'},     t1:'sawtooth', t2:'sawtooth', ratio:1, det:10, m1:.50, m2:.50, lp:1300, lvl:.16, att:.35,  rel:1.8, fo:1.4, ft:.35, fv:.6, hj:0},  // ПАДЫ (hj=0 — чистая высота для строёв)
-  {id:'chord.glass-pad-long', label:{en:'Glass pad (long)', ru:'Пад стеклянный (долгий)'}, t1:'triangle', t2:'sine',     ratio:2, det:6,  m1:.52, m2:.30, lp:3000, lvl:.18, att:.30,  rel:1.8, fo:1.4, ft:.30, fv:.6, hj:0},
-  {id:'chord.oud', label:{default:'Oud', ru:'Уд'},                      t1:'sawtooth', t2:'triangle', ratio:1, det:4,  m1:.50, m2:.34, lp:1200, lvl:.20, att:.004, rel:.30, fo:3.0, ft:.12, fv:1.4,hj:1},  // ЩИПКОВЫЕ (яркое открытие фильтра)
-  {id:'chord.plucked-string', label:{en:'Plucked string', ru:'Струна щипком'},           t1:'sawtooth', t2:'sawtooth', ratio:1, det:2,  m1:.46, m2:.30, lp:2600, lvl:.18, att:.003, rel:.22, fo:3.2, ft:.09, fv:1.4,hj:1},
-  {id:'chord.flute', label:{en:'Flute', ru:'Флейта'},                  t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.60, m2:.18, lp:2600, lvl:.20, att:.06,  rel:.20, fo:1.3, ft:.08, fv:.5, hj:1},  // ДУХОВЫЕ
-  {id:'chord.reed', label:{en:'Reed', ru:'Тростевой'},               t1:'square',   t2:'sawtooth', ratio:1, det:5,  m1:.34, m2:.26, lp:2200, lvl:.15, att:.05,  rel:.18, fo:2.0, ft:.14, fv:1.0,hj:1},
-  {id:'chord.organ-full', label:{en:'Organ (full)', ru:'Орган полный'},            t1:'square',   t2:'sine',     ratio:3, det:0,  m1:.42, m2:.30, lp:4800, lvl:.15, att:.008, rel:.10, fo:1.0, ft:.02, fv:.2, hj:0},  // ОРГАННЫЕ (det=0, hj=0 — лучший для строёв)
-  {id:'chord.organ-soft', label:{en:'Organ (soft)', ru:'Орган мягкий'},            t1:'sine',     t2:'sine',     ratio:2, det:0,  m1:.58, m2:.24, lp:3000, lvl:.17, att:.02,  rel:.12, fo:1.0, ft:.02, fv:.2, hj:0},
-  /* Расширение (индексы 12..15). НЕ дублируем уже имеющееся: «Орган» (idx 2, det=0) — уже чистый
-     эталон для строёв; тёплые/длинные пады и щипковые (Уд/Струна щипком) тоже есть. Добавляем ровно
-     то, чего НЕ было: ПИТЧ-ЧИСТЫЕ пады (существующие все с расстройкой det 5..10 — тембр сам бьётся;
-     здесь det=0, характер из РАЗНЫХ волн, а не из расстройки → биения = ТОЛЬКО строй), смычковые и
-     яркий щипок. hj=0 у падов/струнных (для строёв), hj=1 только у щипковых (не инструмент для строёв). */
-  {id:'chord.warm-pad-clean', label:{en:'Warm pad (clean)', ru:'Пад тёплый (чистый)'},     t1:'sawtooth', t2:'triangle', ratio:1, det:0,  m1:.48, m2:.34, lp:1400, lvl:.16, att:.30,  rel:2.0, fo:1.4, ft:.35, fv:.6, hj:0},  // ЧИСТЫЕ ПАДЫ (det=0 — биения только от строя)
-  {id:'chord.glass-pad-clean', label:{en:'Glass pad (clean)', ru:'Пад стеклянный (чистый)'}, t1:'triangle', t2:'sine',     ratio:2, det:0,  m1:.52, m2:.28, lp:3000, lvl:.18, att:.28,  rel:2.0, fo:1.4, ft:.30, fv:.6, hj:0},  // ratio 2 = чистая октава (без биений)
-  {id:'chord.strings', label:{en:'Strings', ru:'Струнные'},                t1:'sawtooth', t2:'sawtooth', ratio:1, det:6,  m1:.46, m2:.40, lp:2200, lvl:.17, att:.18,  rel:.80, fo:1.6, ft:.30, fv:.8, hj:0},  // СМЫЧКОВЫЕ: мягкая атака + медленное открытие фильтра (наплыв), лёгкая ширина ансамбля
-  {id:'chord.plucked', label:{en:'Plucked', ru:'Щипковые'},                t1:'sawtooth', t2:'square',   ratio:1, det:3,  m1:.44, m2:.28, lp:2800, lvl:.19, att:.003, rel:.20, fo:3.5, ft:.08, fv:1.5, hj:1},
-  /* SND-F1: «Firefly» — a struck tine, ONE-SHOT per note (strike:'firefly' → ffStrike; the oscillator fields are the pool voice's silent
-     bookkeeping). lvl = the prototype's gain at full velocity (0.08 + 0.16); rel = the longest partial decay (render tail). */
-  {id:'chord.firefly', label:{en:'Firefly', ru:'Светлячок'}, strike:'firefly', t1:'triangle', t2:'sine', ratio:2, det:0, m1:0, m2:0, lp:18000, lvl:.24, att:.006, rel:1.6, fo:1, ft:.02, fv:0, hj:0},  // ЯРКИЙ ЩИПОК: быстрая атака, резкое открытие/закрытие фильтра — для макамов/пентатоник, где пад неуместен
-];
+/* TIM3a (RUN 4): the chord and bass timbres are DATA — one record per timbre in data/timbres/ (the source of truth), bundled into
+   data/timbres.bundle.json, loaded and checked (the T5 bounds) by src/timbreload.js. These tables are VIEWS over the records in today's
+   entry shape AND key order (the voice builders, the menus and the song copies read the same entries as before — row «TIM3 timbres =
+   before» pins every entry, creation trace and render envelope). Firefly (engine 'tine'): its partials drive ffStrike; the pool voice's
+   oscillator fields are silent bookkeeping (TINE_POOL). Chord fields: t1/t2 waves, ratio, det (cents), m1/m2 mix, lp, lvl, att/rel, fo
+   (filter opening at the attack), ft (its settle time), fv (velocity → brightness), hj (pitch humanisation). */
+const CH_VIEW=['t1','t2','ratio','det','m1','m2','lp','lvl','att','rel','fo','ft','fv','hj'], BS_VIEW=['t1','t2','det','ratio','lp','lvl','att','rel','fo','ft','fv'];
+const TINE_POOL=Object.freeze({ t1:'triangle', t2:'sine', ratio:2, det:0, m1:0, m2:0, lp:18000, fo:1, ft:.02, fv:0, hj:0 });
+function timbreView(r, keys, extra){
+  const e={ id:r.id, label:JSON.parse(JSON.stringify(r.name)), ...extra };
+  for(const k of keys) e[k]= k==='att'||k==='rel' ? r.env[k] : k in r.recipe ? r.recipe[k] : TINE_POOL[k];
+  return e;
+}
+const CHORD_INSTR=TIMBRE_RECORDS.filter(r=>r.family==='chord').map(r=>timbreView(r, CH_VIEW, r.engine==='tine' ? { strike:'firefly' } : {}));
+const TINE_PARTS=new Map(TIMBRE_RECORDS.filter(r=>r.engine==='tine').map(r=>[r.id, r.recipe.partials]));   // a struck timbre's partials (ffStrike)
 /* Бас-тембры (моно-голос, низкий регистр): 2 осц (t1/t2, отношение ratio, расстройка det),
    НЧ-фильтр lp, огибающая att/rel. Плюс огибающая фильтра на атаке: fo — открытие, ft — время,
    fv — скорость→яркость (cutoff = lp·(1+fv·vol), пол=lp). Высоту баса НЕ гуманизируем (низкие
    биения гулкие); синус (Саб) на фильтр почти не реагирует — fo мал. */
-const BASS_INSTR=[
-  {id:'bass.sub-sine', label:{en:'Sub sine', ru:'Саб-синус'}, t1:'sine',     t2:'sine',     det:0,  ratio:1,   lp:420,  lvl:.45, att:.020, rel:.20, fo:1.0, ft:.03, fv:.2},
-  {id:'bass.saw', label:{en:'Saw', ru:'Пила'},      t1:'sawtooth', t2:'sawtooth', det:9,  ratio:1,   lp:850,  lvl:.38, att:.014, rel:.16, fo:2.5, ft:.10, fv:1.2},
-  {id:'bass.acid', label:{en:'Acid', ru:'Кислотный'}, t1:'square',   t2:'sawtooth', det:0,  ratio:1,   lp:1300, lvl:.34, att:.008, rel:.13, fo:3.5, ft:.12, fv:1.6},
-  {id:'bass.synth', label:{en:'Synth bass', ru:'Синт-бас'},  t1:'sawtooth', t2:'square',   det:12, ratio:0.5, lp:700,  lvl:.40, att:.020, rel:.24, fo:2.0, ft:.12, fv:1.0},
-  /* Расширение (индексы 4..6). Существующие 4 не тронуты (байт-в-байт). Бас НЕ гуманизируем по высоте
-     (низкие расстройки гулкие) — здесь только огибающая фильтра/скорость→яркость, как у пула. */
-  {id:'bass.upright', label:{en:'Upright bass', ru:'Контрабас'},        t1:'sawtooth', t2:'triangle', det:4,  ratio:1,   lp:520,  lvl:.38, att:.004, rel:.30, fo:2.5, ft:.10, fv:1.2},  // щипковый контрабас: быстрая атака, тёплый, средний спад
-  {id:'bass.synth-soft', label:{en:'Synth bass (soft)', ru:'Синт-бас мягкий'},  t1:'sine',     t2:'triangle', det:0,  ratio:1,   lp:480,  lvl:.42, att:.020, rel:.22, fo:1.8, ft:.15, fv:.8},   // круглый саб, лёгкое движение фильтра
-  {id:'bass.organ', label:{en:'Organ bass', ru:'Орган-бас'},        t1:'square',   t2:'sine',     det:0,  ratio:1,   lp:620,  lvl:.36, att:.012, rel:.30, fo:1.0, ft:.02, fv:.3},   // ровный тянущийся низ — для дронов и педалей (fo=1: без наплыва)
-];
+const BASS_INSTR=TIMBRE_RECORDS.filter(r=>r.family==='bass').map(r=>timbreView(r, BS_VIEW, {}));
 /* Ударные: имена рядов (индекс 0 = низ сетки). Синтез на лету, без сэмплов. */
 const DRUM_NAMES=[{en:'Kick',ru:'Кик'},{en:'Snare',ru:'Снейр'},{en:'Clap',ru:'Клэп'},{en:'Hat',ru:'Хэт'},{en:'Tom',ru:'Том'},{en:'Crash',ru:'Крэш'}];
 const DRUM_ROWS=DRUM_NAMES.length;
 /* Наборы ударных: тембр рядов. Стандарт — синтезированный кит; Дарбука — дум/тек
    (спасены из удалённого backing.js). Селектор той же формы, что LEAD_INSTR и др. */
-const DRUM_KITS=[{id:'kit.standard', label:{en:'Standard',ru:'Стандарт'}},{id:'kit.darbuka', label:{default:'Darbuka',ru:'Дарбука'}},{id:'kit.tabla', label:{default:'Tabla',ru:'Табла'}},{id:'kit.gamelan', label:{default:'Gamelan',ru:'Гамелан'}},{id:'kit.taiko', label:{default:'Taiko',ru:'Тайко'}}];
+/* TIM3c (RUN 4): the kits are records too (engine 'drumkit': six rows {synth, vm, params}); DRUM_KITS = the view {id, label} the menus and
+   song copies read; DRUM_REC[i] = the record behind kit position i (drumVoice plays its rows). */
+const DRUM_REC=TIMBRE_RECORDS.filter(r=>r.family==='kit');
+const DRUM_KITS=DRUM_REC.map(r=>({ id:r.id, label:JSON.parse(JSON.stringify(r.name)) }));
 /* ⛳ ТЕМБРЫ РОЛИ — ОДНА ФУНКЦИЯ, через которую выбор тембра ДОРОЖКИ (редактор, слайс T5) узнаёт, что можно
    поставить: [{id, name}] для 'ld'|'ch'|'bs'|'dr' (у ударных — наборы). id — то, что лежит в событии
    (a.inst / a.kit) и сравнивается на равенство; name — подпись в форме L() (строка, {default,ru} или
@@ -146,6 +95,22 @@ const timbreReg=role=> TIMBRE_REG[role] || null;   // the registry (hide / show 
 const timbreKey=(role,x)=> typeof x==='number' ? (timbreIdOf(role,x) ?? x) : x;
 const timbreIdx=(role,x)=>{ if(typeof x!=='string') return x; const i=timbreIdxOf(role,x); return i>=0 ? i : undefined; };
 /* TIM2: a song file carries a full COPY of every timbre it uses (rule #37) — the entry as data (functions dropped), its role and name */
+/* ═══ TIM3d (RUN 4): records added after start (a song's copy of a timbre this app lacks) — appended to this instance's tables and registry;
+   the render copy syncs before each render (render.js). timbreRecord(id) = the full record (a song carries it, file v6). ═══ */
+const tabOf={ solo:'ld', chord:'ch', bass:'bs', kit:'dr' };
+function timbreSync(){
+  for(const r of timbreAll()){ const role=tabOf[r.family]; if(!role || timbreIdxOf(role, r.id)>=0) continue;
+    if(role==='ld'){ LEAD_REC.push(r); LEAD_INSTR.push({ id:r.id, label:JSON.parse(JSON.stringify(r.name)), att:r.env.att, rel:r.env.rel }); }
+    else if(role==='ch'){ CHORD_INSTR.push(timbreView(r, CH_VIEW, r.engine==='tine' ? { strike:'firefly' } : {})); if(r.engine==='tine') TINE_PARTS.set(r.id, r.recipe.partials); }
+    else if(role==='bs') BASS_INSTR.push(timbreView(r, BS_VIEW, {}));
+    else { DRUM_REC.push(r); DRUM_KITS.push({ id:r.id, label:JSON.parse(JSON.stringify(r.name)) }); }
+    TIMBRE_REG[role].add({ id:r.id, name:r.name }); }
+}
+/* → null (installed, or already here) or one line why not (the T5 bounds, an id that is not the person's / a pack's, a kit) */
+function timbreInstall(rec){ const why=timbreAddSession(rec); if(why && why!=='exists') return why; timbreSync(); return null; }
+/* probe only: a session timbre leaves the pickers (registry remove); its table entry stays — events that use it keep playing */
+const timbreForgetDbg=id=>{ for(const role in TIMBRE_REG){ const R=TIMBRE_REG[role]; if(R.has && !R.has(id)) continue; R.remove(id); } };
+const timbreRecord=id=>{ const r=timbreAll().find(x=>x.id===id); return r ? JSON.parse(JSON.stringify(r)) : null; };
 const timbreSnapshot=id=>{ const t=timbreById(id); return t ? { id, role:t.role, name:t.entry.label, def:JSON.parse(JSON.stringify(t.entry)) } : null; };
 
 /* ================= АУДИО-ДВИЖОК (чистый Web Audio) ================= */
@@ -250,6 +215,40 @@ function offlineMasterDyn(mode,set,gain){
 }
 function setMasterLevel(v){ masterLvl=Math.max(0,Math.min(1,+v||0)); if(AC&&master) master.gain.setTargetAtTime(MASTER_BASE*volAmp(masterLvl), AC.currentTime, 0.03); }
 const masterLevel=()=>masterLvl;
+/* ═══ ENG2 (RUN 4): ENGINE READOUTS — read only; nothing here changes the sound (plan §4.4 levels / load / voices) ═══ */
+const hitT=[];   // live drum hits (context times), the last second
+const dBof=x=> x>0 ? 20*Math.log10(x) : -Infinity;
+function engVoices(){
+  const now=AC?AC.currentTime:0; while(hitT.length && hitT[0]<now-1) hitT.shift();
+  const on=a=>a.reduce((n,v)=>n+(v.owner?1:0),0);
+  return { ld:{ built:lv.length, sounding:Object.keys(leadHold).length }, ch:{ built:cv.length, sounding:on(cv), strikes:ffLive.filter(x=>x.owner && x.t+FF_END>now).length },
+           bs:{ built:bv.length, sounding:Object.keys(bassHold).length }, drums:{ hitsLastSec:hitT.filter(t=>t<=now).length } };
+}
+let roleAn=null, roleBuf=null;   // per-role analysers: built on the FIRST levels({roles:true}) call only (a read-only branch off each role bus)
+function engLevels(opt={}){
+  const m=masterMeter(); let rms=0;
+  if(m && meterBuf){ for(let i=0;i<meterBuf.length;i++) rms+=meterBuf[i]*meterBuf[i]; rms=Math.sqrt(rms/meterBuf.length); }
+  const out={ master: m ? { peakDb:dBof(m.peak), rmsDb:dBof(rms), reductionDb:m.reduction } : null };
+  if(opt.roles && AC && !offline){
+    if(!roleAn){ roleAn={}; for(const [k,b] of [['ld',leadSum],['ch',chordBus],['bs',bassBus],['dr',drumBus]]) if(b){ const a=AC.createAnalyser(); a.fftSize=1024; b.connect(a); roleAn[k]=a; } }
+    out.roles={}; for(const k in roleAn){ const a=roleAn[k]; if(!roleBuf||roleBuf.length!==a.fftSize) roleBuf=new Float32Array(a.fftSize);
+      a.getFloatTimeDomainData(roleBuf); let pk=0; for(let i=0;i<roleBuf.length;i++){ const v=Math.abs(roleBuf[i]); if(v>pk) pk=v; } out.roles[k]=dBof(pk); } }
+  return out;
+}
+/* the browser's own load counters, feature-detected — absent = undefined, never guessed: the playback statistics (dropouts) under either
+   name the Web Audio drafts used — AudioContext.playbackStats (underrunEvents / underrunDuration / totalDuration) or the earlier
+   AudioContext.playoutStats (fallbackFramesEvents / …) — and AudioContext.renderCapacity (average / peak load, underrun ratio; 1-s updates) */
+let capLast=null, capOn=false;
+function engLoad(){
+  if(!AC || offline) return { playout:undefined, capacity:undefined };
+  let playout;
+  const n=x=>typeof x==='number'&&Number.isFinite(x)?x:undefined;
+  try{ const pb=AC.playbackStats; if(pb && typeof pb==='object' && n(pb.underrunEvents)!==undefined) playout={ src:'playbackStats', events:pb.underrunEvents, droppedS:n(pb.underrunDuration), totalS:n(pb.totalDuration) }; }catch(e){}
+  if(!playout) try{ const ps=AC.playoutStats; if(ps && typeof ps==='object' && n(ps.fallbackFramesEvents)!==undefined) playout={ src:'playoutStats', events:ps.fallbackFramesEvents, droppedS:n(ps.fallbackFramesDuration), totalS:n(ps.totalFramesDuration) }; }catch(e){}
+  try{ const rc=AC.renderCapacity; if(rc && !capOn && typeof rc.start==='function'){ capOn=true;
+    rc.addEventListener('update', e=>{ capLast={ avg:e.averageLoad, peak:e.peakLoad, underrun:e.underrunRatio }; }); rc.start({ updateInterval:1 }); } }catch(e){}
+  return { playout, capacity: capLast ? { ...capLast } : undefined };
+}
 function masterMeter(){
   if(!AC||!meterAn) return null;
   if(!meterBuf||meterBuf.length!==meterAn.fftSize) meterBuf=new Float32Array(meterAn.fftSize);
@@ -260,7 +259,7 @@ function masterMeter(){
    реверба — они пережили Пласт 1 только потому, что на общий вход приходили ДВА посыла (соло и
    аккорды). Теперь у каждой роли СВОЙ экземпляр со своими in/out, и «тот самый общий verb» перестал
    существовать как понятие: verb остался бы переменной, в которую пишут и которую никто не читает. */
-/* banks — СКРАТЧ строителя банков (buildLeadBanks кладёт сюда собранный банк, buildLeadBank забирает).
+/* banks — СКРАТЧ строителя банков (buildLeadBank's engines put собранный банк, buildLeadBank забирает).
    Раньше это был ПОСТОЯННЫЙ массив всех 23 банков соло-цепочки; теперь банк живёт в ГОЛОСЕ пула.
    bldHum — ConstantSource гуманизации ТОГО голоса, который сейчас строится (его цепляет mkOsc). */
 let banks=[], bldHum=null, bldVib=null, bldShim=null, vibLFO, tremLFO,
@@ -284,6 +283,13 @@ let chordBus;                                           // аккорды (Z-я�
    править. Имя revCh в комментариях ниже сохранено как ИСТОРИЧЕСКОЕ. */
 let backBus, dO1, dO2, dG, noiseBuf;                    // дрон (шина + расстроенная пара)
 const cv=[]; const chordHold={};                        // пул аккордовых голосов
+/* POOL1: each pool index's start-phase draw, taken at engine start in index order where the eager pool used to draw it (so a render's
+   random stream — noise buffer, humanisation — is exactly as before); a voice beyond the table (offline growth) draws when built, as
+   before. cvLive: this instance keeps spares built ahead (the live engine; the render copy builds on demand only). */
+const cvSeed=[]; let cvLive=false, cvTopT=0, cvEagerDbg=false;
+let cvNaiveDbg=false;   // probe CONTROLS only: eager = the old pool (all CHORD_POOL_N at start); naive = a lazy pool WITHOUT the per-index draws
+const poolDbg=o=>{ if(o&&'eager' in o) cvEagerDbg=!!o.eager; if(o&&'naive' in o) cvNaiveDbg=!!o.naive; return { eager:cvEagerDbg, naive:cvNaiveDbg }; };
+const cvSeedAt=i=> !cvNaiveDbg && i<cvSeed.length ? cvSeed[i] : rnd();
 const bv=[]; const bassHold={}; let bassBus;             // пул баса: голоса по ключам владельцев (голос на ключ), ленивый до BASS_POOL_N (P1)
 let drumBus;                                             // шина ударных
 
@@ -399,13 +405,14 @@ function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
    ⛔ ЖИВАЯ КОПИЯ ЭТО НЕ ЗОВЁТ НИКОГДА: у неё функции уровня и панорамы ставит recorder при загрузке, и сброс вернул бы все дорожки в центр
    и на единицу. Сброс — только render.js, только своей копии. */
 function renderReset(){
+  timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
   DBG.noHum=false; offline=false; rnd=Math.random;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
 const renderStateOf=()=>({ offline, noHum:DBG.noHum, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
-  hitOwner:hitOwnerKey, route:routeOfOwner('loop:0'), pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(',') });
+  hitOwner:hitOwnerKey, route:routeOfOwner('loop:0'), pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(','), pool:[cvEagerDbg,cvNaiveDbg].join(',') });
 /* ═══ ⛳ ФАЗЫ СВЕЖЕГО ГОЛОСА — РАЗБРОСАНЫ СТАРТОМ, КАК У ДАВНО ИДУЩЕГО (B, подтверждено на слух) ═══
    ⚠️ ДЕФЕКТ: осцилляторы голоса стартовали ОДНОВРЕМЕННО, то есть В ОДНОЙ ФАЗЕ. У SuperSaw пять пил, расстроенных почти
    равным шагом (−12/−6/0/+6/+12 центов), и из общей фазы они раз за разом снова СХОДЯТСЯ — ровный периодический
@@ -1147,6 +1154,7 @@ function cvAlloc(when){
     if(!v) v=newChordVoice(E, chordBus);
     v.freeAt=Infinity; return v; }
   let v=cv.find(v=>!v.owner);
+  if(!v && cv.length<CHORD_POOL_N) v=newChordVoice(E, chordBus);   // POOL1: grow before stealing (a burst larger than the spares)
   if(!v){ v=cv.reduce((a,b)=>a.tOn<b.tOn?a:b); const o=v.owner; cvRelease(v,true,when);   // кража: снять голос со старого владельца на ТО ЖЕ время
     if(o&&chordHold[o]){ const a=chordHold[o].filter(x=>x!==v); a.length?chordHold[o]=a:delete chordHold[o]; } }
   return v;
@@ -1156,13 +1164,19 @@ function cvAlloc(when){
    ключей владельца: живой аккорд = 'latch', слой петли = 'loop:'+layer, у каждого свои голоса пула →
    своё fb. Поэтому живая рука ФИЗИЧЕСКИ не может изменить яркость переигранного слоя (она пишет только
    голоса 'latch'), и наоборот. Ровно это и есть причина ухода с общей шины на пер-голосовой fb. */
+/* POOL1: after a chord took voices, keep CHORD_POOL_SPARE idle ones built ahead — built in the next task, off the attack's path */
+const cvFree=()=>cv.reduce((n,v)=>n+(v.owner?0:1),0);
+function cvSpare(){
+  if(!cvLive || cvTopT || cv.length>=CHORD_POOL_N || cvFree()>=CHORD_POOL_SPARE) return;
+  cvTopT=setTimeout(()=>{ cvTopT=0; while(cv.length<CHORD_POOL_N && cvFree()<CHORD_POOL_SPARE) newChordVoice(E, chordBus); }, 0);
+}
 function chordOn(owner,freqs,vol,insIdx,bri,when){
   chordOff(owner,when);
   const ins=CHORD_INSTR[insIdx], t=when!=null?when:AC.currentTime, briHz=briToHz(bri);
   if(ins.strike){ const amp=ins.lvl*volAmp(vol);   // SND-F1: a struck timbre — silent pool voices hold the note, the strikes sound (ffStrike)
     chordHold[owner]=freqs.map(fr=>{ const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t; v.lvl=0; v.ffHz=fr; v.ffBri=bri;
-      if(amp>0) ffStrike(E, owner,fr,amp,bri,t); return v; });
-    return; }   // bri==null (аранжировка/джем) → briToHz→CHORD_LP_MAX (открыт, нейтраль = сегодняшний звук)
+      if(amp>0) ffStrike(E, owner,fr,amp,bri,TINE_PARTS.get(ins.id),t); return v; });
+    cvSpare(); return; }   // bri==null (аранжировка/джем) → briToHz→CHORD_LP_MAX (открыт, нейтраль = сегодняшний звук)
   chordHold[owner]=freqs.map(fr=>{
     const v=cvAlloc(when); v.owner=owner; v.ins=ins; v.tOn=t;
     v.o1.type=ins.t1; v.o2.type=ins.t2;
@@ -1183,6 +1197,7 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
     panSetAt(v.pan,ownerPan(owner),t);   // MX2: панорама дорожки владельца — тоже с мига атаки
     return v;
   });
+  cvSpare();
 }
 const ffLive=[];   // strikes not yet over: { owner, g, t, g0, route, cancelled? }
 const ffInfo=()=>ffLive.map(x=>({ owner:x.owner, t:x.t, route:x.route, cancelled:!!x.cancelled }));   // probes only
@@ -1195,10 +1210,10 @@ function chordGlide(owner,freqs,vol,bri,when){    // смена аккорда �
   const briHz=bri==null?null:briToHz(bri);       // bri==null (аранжировка/джем: chSet без яркости) → fb НЕ трогаем, остаётся с атаки
   vs.forEach((v,i)=>{ const fr=freqs[i]; if(fr==null)return;
     if(v.ins&&v.ins.strike){   // SND-F1: a struck note cannot glide — a new pitch is a new strike; volume and brightness only at a strike
-      if(!(v.ffHz>0) || Math.abs(1200*Math.log2(fr/v.ffHz))>0.5){ v.ffHz=fr; if(bri!=null) v.ffBri=bri; const amp=v.ins.lvl*volAmp(vol); if(amp>0) ffStrike(E, owner,fr,amp,v.ffBri,t); }
+      if(!(v.ffHz>0) || Math.abs(1200*Math.log2(fr/v.ffHz))>0.5){ v.ffHz=fr; if(bri!=null) v.ffBri=bri; const amp=v.ins.lvl*volAmp(vol); if(amp>0) ffStrike(E, owner,fr,amp,v.ffBri,TINE_PARTS.get(v.ins.id),t); }
       return; }
-    v.o1.frequency.setTargetAtTime(fr,t,0.035);
-    v.o2.frequency.setTargetAtTime(fr*v.ins.ratio,t,0.035);
+    v.o1.frequency.setTargetAtTime(fr,t,CHORD_GLIDE_TC);
+    v.o2.frequency.setTargetAtTime(fr*v.ins.ratio,t,CHORD_GLIDE_TC);
     if(briHz!=null)v.fb.frequency.setTargetAtTime(briHz,t,0.05);   // яркость ведём setTargetAtTime → без щелчка; f (атака) не трогаем — расцеплены
     const L=v.ins.lvl*volAmp(vol);   // VOL-2b: та же кривая, что на атаке
     if(Math.abs(L-v.lvl)>0.003){ v.lvl=L; v.g.gain.setTargetAtTime(L,t,0.05); }
@@ -1455,7 +1470,9 @@ async function initAudio(mkCtx){
      ⛔ Явную строку chordBus.connect(master) НЕ возвращать: сухое пошло бы в обход цепи. */
   fxChainIO(chainKeyOf('ch'),chordBus);
   if(!mkCtx){ chordBusT=AC.createGain(); chordBusT.gain.value=chordBus.gain.value; fxChainIO(trackChainKeyOf(chainKeyOf('ch')),chordBusT); }   // AF5
-  buildChordPool(E, chordBus);
+  cvSeed.length=0; if(!cvNaiveDbg) for(let i=0;i<CHORD_POOL_N;i++) cvSeed.push(rnd());   // POOL1: the draws the eager pool made here, kept by index
+  cvLive=!mkCtx; if(cvTopT){ clearTimeout(cvTopT); cvTopT=0; }
+  buildChordPool(E, chordBus, cvEagerDbg ? CHORD_POOL_N : cvLive ? CHORD_POOL_FIRST+CHORD_POOL_SPARE : 0);
  
   /* --- БАС: пул моно-голосов (слой + живой), общая шина в master --- */
   bassBus=AC.createGain(); bassBus.gain.value=0.28;   // O-1: в мастер ведёт хвост цепи (fxChainIO), а не прямая связь
@@ -1599,11 +1616,11 @@ const lv=[]; const leadHold={};            // голоса пула и влад�
    Отчёт рендера обязан её НАЗВАТЬ, а не оценить на глаз.
    ⛔ Отдаём ЧИСЛА, а не сами массивы: наружу не должно утекать то, что можно нечаянно изменить.
    ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — спрашивает только render.js у своей. */
-const poolSizes=()=>({ lead:lv.length, chord:cv.length, bass:bv.length });
+const poolSizes=()=>({ lead:lv.length, chord:cv.length, bass:bv.length, chordFree:cvFree() });   // POOL1: + idle chord voices
 let frzReady=false, frzStoreNode=null, frzSink=null;   // AF6b-fix2: frzSink — немой сток (гейн 0 → мастер), к которому КАЖДЫЙ чтец подключён навсегда: его тянут, пока он не завершится
 const frzCountWait=new Map(); let frzCountSeq=0;   // AF6b: ворклет хранилища/чтеца замороженных дорожек загрузился в ЖИВОЙ контекст (и узел хранилища)
 let leadSum=null, ksReady=true;            // шина соло (вход эффектов) + загрузился ли KS-ворклет (для ленивой стройки)
-const LEAD_KS_FROM=LEAD_INSTR.length-KS_BANKS.length;   // с какого индекса начинаются KS-инструменты (считаем, не зашиваем)
+const LEAD_KS_FROM=(k=>k<0?LEAD_REC.length:k)(LEAD_REC.findIndex(r=>r.engine==='ks'));   // TIM3b: the first KS position (kept for old readers; use leadIsKs)
 /* ЗНАЧЕНИЯ ЭФФЕКТОВ ТЕКУЩЕЙ НОТЫ (Пласт 3.7.1). Их кладёт applyFx — а он по построению зовётся
    НЕПОСРЕДСТВЕННО ПЕРЕД leadOn/leadSet той же ноты, и живьём, и на переигровке (см. ENG в recorder).
    ⛔ ЭТОТ ПОРЯДОК — КОНТРАКТ, а не совпадение: leadOn читает отсюда значения ИМЕННО СВОЕГО события.
@@ -1707,7 +1724,7 @@ function applyVoiceFx(v,p,t,fresh){
    РЕАЛЬНО сыгранных инструментов × число РЕАЛЬНО занятых голосов (обычно 1–2 × 1–2), против 23 сегодня. */
 function leadVoiceBank(v,ins,when){
   let b=v.banks[ins];
-  if(!b){ b=v.banks[ins]=buildLeadBank(E, ins,v.pre,v.hum,v.vibDep,v.shim); b.gain.gain.value=0; }   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
+  if(!b){ b=v.banks[ins]=buildLeadBank(E, LEAD_REC[ins],v.pre,v.hum,v.vibDep,v.shim); b.gain.gain.value=0; }   // TIM3b: from the record   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
   if(v.ins!==ins){
     /* ПЕРВЫЙ банк голоса открываем МГНОВЕННО — ровно как это делал initAudio (banks[leadIdx].gain.value=1)
        ещё до первой ноты. Через 20мс-рампу гейта первая атака вышла бы смазанной, и «одна нота звучит
@@ -1718,7 +1735,7 @@ function leadVoiceBank(v,ins,when){
   }
   return b;
 }
-const leadCap=ins=> ins>=LEAD_KS_FROM ? LEAD_POOL_KS : LEAD_POOL_N;   // KS дороже (ворклет на голос) → свой потолок
+const leadCap=ins=> leadIsKs(ins) ? LEAD_POOL_KS : LEAD_POOL_N;   // KS дороже (ворклет на голос) → свой потолок
 /* Выдача голоса. Порядок: свой (тот же владелец — ведение ноты, НЕ переаллокация) → свободный с УЖЕ
    построенным нужным банком (сродство: иначе слой на Ситаре и живая рука на Органе строили бы банк на
    каждой атаке) → любой свободный → новый (лениво, пока не упёрлись в потолок) → КРАЖА.
@@ -2015,6 +2032,7 @@ let hitBus=null;
 /* bri — яркость удара (0..1) или undefined «не задана»; ПЕРЕД when (правило #15), позиционные вызовы (ENG, зонд) поправлены. */
 function drumHit(i,vol=1,kit=0,bri,when){
   if(!AC)return; const t=when!=null?when:AC.currentTime;
+  if(!offline){ hitT.push(t); if(hitT.length>512) hitT.shift(); }   // ENG2: the readout's hits per second (live only)
   /* VOL-2b: громкость 0 — ТОЧНАЯ тишина: удар не строится вовсе (ни источника, ни фильтра яркости). Иначе огибающие ударов —
      setValueAtTime(пик)+exponentialRamp до 0.001 — начинались бы с нуля, а экспоненциальный ход из нуля по спецификации
      стоит на нуле и прыгает к 0.001 в конце: тихий щелчок вместо тишины. ⚠️ Названный край: у очень тихого удара под-голос
@@ -2026,7 +2044,7 @@ function drumHit(i,vol=1,kit=0,bri,when){
   if(bri!=null && bri<BRI_OPEN){ const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=briHzOf('dr',bri); f.connect(DB); hitBus=f; }
   if(pv!==0){ const pin=AC.createGain(), st=makePanStage(E, pin,hitBus), [a,b]=panGains(pv); st.l.gain.value=a; st.r.gain.value=b; hitBus=pin; }   // MX2: ступень панорамы удара — только при p ≠ 0 (в центре удар байт-в-байт прежний); стоит ДО шины ударных и её цепи
   if(tgv!==1){ const g=AC.createGain(); g.gain.value=tgv; g.connect(hitBus); hitBus=g; }   // MX1: множитель только при уровне ≠ 1 — на 1 удар байт-в-байт прежний
-  try{ drumVoice(E, i,vol,kit,t); } finally{ hitBus=drumBus; }
+  try{ drumVoice(E, i,vol,DRUM_REC[kit]||DRUM_REC[0],t); } finally{ hitBus=drumBus; }   // TIM3c: the kit's record (an unknown position → the first kit, as before)
 }
 
 /* Метроном лупера: короткий щелчок точно по часам AC (отсчёт и сетка овердаба).
@@ -2108,7 +2126,7 @@ const E=Object.freeze({
   lfo:Object.freeze({ get vib(){ return vibLFO; }, get trem(){ return tremLFO; }, get shimPitch(){ return exprVibPitch; }, get shimAmp(){ return exprVibAmp; } }),
   expr:Object.freeze({ get wah(){ return exprWah; }, get satSoft(){ return exprSatSoftG; }, get satHard(){ return exprSatHardG; }, get dlyWet(){ return exprDlyWet; } }),
   fx:Object.freeze({ inst:FX_INST, head:FX_CHAIN_HEAD, out:FX_CHAIN_OUT, links:FX_CHAIN_LINKS, path:FX_PLAY_PATH, aim:FX_AIM, dipT:FX_DIP_T }),
-  pool:Object.freeze({ ld:Object.freeze({ v:lv, hold:leadHold }), ch:Object.freeze({ v:cv, hold:chordHold, ff:ffLive }), bs:Object.freeze({ v:bv, hold:bassHold }) }),
+  pool:Object.freeze({ ld:Object.freeze({ v:lv, hold:leadHold }), ch:Object.freeze({ v:cv, hold:chordHold, ff:ffLive, seed:cvSeedAt }), bs:Object.freeze({ v:bv, hold:bassHold }) }),
   wk:Object.freeze({ get ks(){ return ksReady; }, get dyn(){ return dynReady; }, get dynWarned(){ return dynWarned; }, set dynWarned(x){ dynWarned=x; },
     get frz(){ return frzReady; }, get frzStore(){ return frzStoreNode; },
     get frzSink(){ return frzSink; }, get cap(){ return capMod; }, get capOk(){ return capOk; } }),
@@ -2134,7 +2152,7 @@ export {
   setTrackGainOf, ownerGain, trackGainRetune, hitOwner, setMasterLevel, masterLevel, masterMeter,   // MX1: уровень дорожки (ступень в голосе по ключу владельца), мастер и измеритель
   setTrackPanOf, ownerPan, trackPanRetune, dronePan, panGains,   // MX2: панорама дорожки (стерео-ступень в голосе по ключу владельца, закон равной мощности)
   renderReset, renderStateOf,   // сброс копии рендера в начале и в конце каждого рендера (зовёт ТОЛЬКО render.js у своей копии) и его снимок для стража P.all
-  timbresOf, timbreIdOf, timbreById, timbreReg, timbreKey, timbreIdx, timbreSnapshot,   // TIM2: event ids ↔ engine positions, the song file's timbre copy
+  timbresOf, timbreIdOf, timbreById, timbreReg, timbreKey, timbreIdx, timbreSnapshot, timbreRecord, timbreInstall, timbreForgetDbg,   // TIM3d: records, session installs   // TIM2: event ids ↔ engine positions, the song file's timbre copy
     // T5: тембры роли [{id,name}] — ЕДИНСТВЕННЫЙ вход выбора тембра дорожки (готов к тембрам пользователя)
   FX_FACTORY, fxInstance, fxSetActive, fxChainResplice, fxSnapshot, fxChordBri, fxCaptureChain, fxCaptureWalk,
   fxPlaySet, fxPlayPath, fxParamKeysOf, fxRestoreAim,   // O-3: переигровка автоматизации — величина по имени, СОСТАВ цепи на время воспроизведения, имена параметров для разбора снимка и возврат звука к прицелу руки на остановке
@@ -2155,13 +2173,15 @@ export {
   /* AF6b: 16-битное хранилище замороженных дорожек на потоке звука и чтец; frzReady — ворклет загрузился (живая связка) */
   frzReady, frzStorePut, frzStoreDel, frzStoreDbg, frzReader, frzStoreCount,
   fxDenormOf, offlineTapMaster,   // F3: разнормировать величину параметра В ЕГО ЕДИНИЦЫ (снимок хранит 0..1, а длину хвоста надо считать в СЕКУНДАХ) и снять лимитер с пути ОФЛАЙН-рендера
+  engVoices, engLevels, engLoad,   // ENG2: engine readouts (read only) — the latency meter, R.engine()
+  poolDbg,      // POOL1: probe control — the eager chord pool of before (render copy, P.checkPool)
   poolSizes,    // A0 (автозаморозка): сколько голосов ЗАВЕЛА раскладка — чистое чтение для отчёта рендера. ⛔ Живьём вызывающих нет; см. его шапку — это главная переменная стоимости раскладки
   setOffline,   // F2: ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ (занятость по звучанию, рост пула по требованию, без кражи). ⛔ У ЖИВОЙ копии вызывающих нет и быть не должно — ставит только render.js и только у своей; при false всё поведение прежнее, дословно
   setRnd,    // F1: ПОДМЕНИТЬ ИСТОЧНИК СЛУЧАЙНОСТИ В ЭТОЙ КОПИИ МОДУЛЯ. ⛔ У ЖИВОЙ копии вызывающих нет и не должно быть — зовёт его только render.js и только у своей ('./audio.js?render…'). Экспортирован потому, что иначе до офлайн-копии не дотянуться; глобальный патч Math.random убил бы гуманизацию ЖИВОЙ игры (довод целиком — у самого rnd)
   /* AF5: track heads and routing (recorder installs the owner test), probe reads */
   setTrackRouteOf, routeOfOwner, chainStateOf,
   /* RENDER-LEAK: first solo KS timbre index — a track render loads the KS worklet only when the track uses one */
-  LEAD_KS_FROM,
+  LEAD_KS_FROM, leadIsKs,   // TIM3b: leadIsKs(i) — a KS timbre by its record's engine
   ksReady,   // F0: ЗАГРУЗИЛСЯ ЛИ KS-ВОРКЛЕТ В ЭТОТ КОНТЕКСТ. Живая связка, до initAudio читается как true (начальное значение) — спрашивать ТОЛЬКО после него. Нужна зонду рендера: у офлайн-копии свой контекст и своя загрузка, и провал там ТИХИЙ (buildKSFallback молча подменяет семь тембров), см. render.js
   masterDynSet, masterDyn, offlineMasterDyn, forestData, dynReady, ffInfo, masterDelayMs, masterProbeNodes,
   /* AUD1a: the engine context of this instance (probes; moved builders receive it) */

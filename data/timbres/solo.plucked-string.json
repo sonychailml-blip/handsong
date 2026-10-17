@@ -1,0 +1,38 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.plucked-string",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "Plucked string",
+  "ru": "Струна щипком"
+ },
+ "recipe": {
+  "filter": {
+   "freq": 2600
+  },
+  "oscs": [
+   {
+    "wave": "sawtooth",
+    "mult": 1,
+    "gain": 0.26
+   }
+  ],
+  "strike": {
+   "open": 3.5,
+   "tc": 0.08,
+   "fv": 1.5
+  }
+ },
+ "env": {
+  "att": 0.003,
+  "rel": 0.22
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

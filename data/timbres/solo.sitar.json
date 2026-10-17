@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.sitar",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "default": "Sitar",
+  "ru": "Ситар"
+ },
+ "recipe": {
+  "nl": 2.5,
+  "symp": {
+   "ratios": [
+    1,
+    1.3333333333333333,
+    1.5,
+    2,
+    2.25
+   ],
+   "Q": 60,
+   "gain": 0.1
+  }
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.6
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

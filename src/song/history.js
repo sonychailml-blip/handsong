@@ -40,8 +40,8 @@ const histWire=o=>{ Object.assign(W,o); };
 const HIST_MAX=300, HIST_MERGE_MS=800;
 let hist=[], histFut=[], histOff=0, histGroupDepth=0;   // histGroupDepth: no trimming inside a group edit (it counts from an index)
 /* probe CONTROLS only: a step kind left out of the history; a redo branch a new step does not drop; ✕ that forgets the brace (read by the recorder's snapshot) */
-const histDbgO={ skip:null, keepFut:false, noBrace:false };
-const histDbg=o=>{ histDbgO.skip=(o&&o.skip)||null; histDbgO.keepFut=!!(o&&o.keepFuture); histDbgO.noBrace=!!(o&&o.noBrace); };
+const histDbgO={ skip:null, keepFut:false, noBrace:false, noOpenSt:false };
+const histDbg=o=>{ histDbgO.skip=(o&&o.skip)||null; histDbgO.keepFut=!!(o&&o.keepFuture); histDbgO.noBrace=!!(o&&o.noBrace); histDbgO.noOpenSt=!!(o&&o.noOpenSt); };   // noOpenSt: SONG3 CONTROL (an Open step without the settings)
 const histCanUndo=()=>hist.length>0, histCanRedo=()=>histFut.length>0, histLen=()=>hist.length;
 const histReset=()=>{ hist=[]; histFut=[]; };
 const histLabelOf=u=> u.label || u.f || u.kind;

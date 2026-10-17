@@ -558,7 +558,8 @@ export const setPinchFingers=v=>{ pinchFingers=Math.max(1,Math.min(4,v|0)); };
    синтезатора в патче); до формата тембра — настройка мелодического инструмента. Интерфейс — V3: пара кнопок под
    тембром роли в панели «Звук» (ui.pickVoiceMode — смена гасит звучащее через softAllOff и зовёт gestures.voiceModeReset).
    Не пишется в событие и не персистится (как handFn/splitOn — настройка сеанса); запись уже умеет обоих (P2). */
-export const voiceMode={ ld:'poly', bs:'lead' };
+export const VOICE_MODE_DEF=Object.freeze({ ld:'poly', bs:'lead' });   // TIM3a: the defaults (the timbre records' policies pin them)
+export const voiceMode={ ...VOICE_MODE_DEF };
 export const setVoiceMode=(role,m)=>{ if((role==='ld'||role==='bs') && (m==='poly'||m==='lead')) voiceMode[role]=m; };
 export const isLeadMode=role=> voiceMode[role]==='lead';   // только ld/bs могут быть 'lead'; у прочих ролей — false
 /* ЕДИНЫЙ ИСТОЧНИК ЗЕРКАЛА (фронт/тыл камеры). Фронтальная ('user') — картинку ЗЕРКАЛИМ (видишь

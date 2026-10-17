@@ -75,3 +75,15 @@ measured today on the user's desktop through the browser runner (headless Chrome
 1. Calibrate against live dropouts first (needs `playoutStats` on the user's Chrome) — or accept offline factors as a relative measure?
 2. Is a lazy / smaller chord pool acceptable as the first low-power lever (it changes how many voices are built, not how one sounds)?
 3. Phones: which devices to measure, and should `low` be automatic or only offered?
+
+## Review 2026-10-17 (user / strategist answers, recorded at RUN 4)
+- **E1** Calibrate before deciding: «audio dropouts per minute» (`playoutStats` / `renderCapacity` where present, feature-detected, never
+  guessed) goes into the latency meter and `R.engine()`; offline factors are a RELATIVE measure only. Classes stay PROVISIONAL; NO automatic
+  switching until the user's live measurements calibrate them.
+- **E2** The first lever is for EVERYONE, not only «low»: POOL1 — the chord pool grows on demand (a few voices + 2 spares built ahead; more
+  built before they are needed), the first note stays instant, rule #3 holds; seeded phase draws do not depend on build order (each pool
+  voice its own draw by index) so GOLD stays identical. ✅ Done in RUN 4 (WORK-LOG slice 6): bare start graph ≈ 0.40 → 0.13 of a core
+  offline, light ≈ 0.80 → 0.52, heavy ≈ 0.85 → 0.67; GOLD 84 / 0; lazy = eager within the same-code render floor (bit for bit is not possible
+  even for the old pool against itself — measured).
+- **E3** Phones: measure the user's phone, plus a budget Android and an iPhone when available. When «low» is decided later it switches on
+  AUTOMATICALLY but VISIBLY («Low power: on — why? [turn off]»), always reversible.

@@ -1,0 +1,30 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.8-bit",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "8-bit",
+  "ru": "8-бит"
+ },
+ "recipe": {
+  "oscs": [
+   {
+    "wave": "square",
+    "mult": 1,
+    "gain": 0.28
+   }
+  ]
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 0.05
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

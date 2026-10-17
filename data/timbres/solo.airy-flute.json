@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.airy-flute",
+ "family": "solo",
+ "engine": "subtractive",
+ "name": {
+  "en": "Airy flute",
+  "ru": "Флейта воздушная"
+ },
+ "recipe": {
+  "oscs": [
+   {
+    "wave": "sine",
+    "mult": 1,
+    "gain": 0.34
+   },
+   {
+    "wave": "sine",
+    "mult": 2,
+    "gain": 0.05
+   }
+  ]
+ },
+ "env": {
+  "att": 0.06,
+  "rel": 0.2
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.warm-pad",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Warm pad",
+  "ru": "Тёплый пад"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "sawtooth",
+  "ratio": 1,
+  "det": 9,
+  "m1": 0.5,
+  "m2": 0.5,
+  "lp": 1500,
+  "lvl": 0.17,
+  "fo": 1.4,
+  "ft": 0.3,
+  "fv": 0.6,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.22,
+  "rel": 0.5
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

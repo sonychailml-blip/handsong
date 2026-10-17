@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.oud",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "default": "Oud",
+  "ru": "Уд"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "triangle",
+  "ratio": 1,
+  "det": 4,
+  "m1": 0.5,
+  "m2": 0.34,
+  "lp": 1200,
+  "lvl": 0.2,
+  "fo": 3,
+  "ft": 0.12,
+  "fv": 1.4,
+  "hj": 1
+ },
+ "env": {
+  "att": 0.004,
+  "rel": 0.3
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "bass.acid",
+ "family": "bass",
+ "engine": "bass2",
+ "name": {
+  "en": "Acid",
+  "ru": "Кислотный"
+ },
+ "recipe": {
+  "t1": "square",
+  "t2": "sawtooth",
+  "det": 0,
+  "ratio": 1,
+  "lp": 1300,
+  "lvl": 0.34,
+  "fo": 3.5,
+  "ft": 0.12,
+  "fv": 1.6
+ },
+ "env": {
+  "att": 0.008,
+  "rel": 0.13
+ },
+ "policies": {
+  "voiceMode": "lead",
+  "glide": 0.012,
+  "register": "bass",
+  "quant": 0.5
+ }
+}

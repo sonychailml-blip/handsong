@@ -3,7 +3,7 @@
    in view per model run, as the schedule sees it — L1 never sees more than one) on the real pump, the real detector and real frames.
    The pure schedule is checked exactly in node (row «LAT2 search schedule (core)» of tools/probe-data.mjs). */
 import { row } from './rows.js';
-import { HAND_SEARCH_EVERY } from '../core/handsched.js';
+import { HAND_SEARCH_EVERY, schedNew, schedPlan, schedRetry, schedAfter } from '../core/handsched.js';
 import { t } from '../i18n.js';
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -66,34 +66,56 @@ function schedProblems(log){
   return P;
 }
 
-/* ═══ LAT2a — THE SEARCH SCHEDULE, LIVE (P.checkSchedule, quick and all; DRAWN) ═══
-   (1) no hand in view (the fake camera): the full search on exactly every 3rd processed frame, nothing in between; (2) scripted: one hand
-   in view, then a second — while one is tracked the search runs exactly every 3rd frame and tracking (L1) in between; the second hand is
-   found by a search and both are tracked on every frame from the next one; (3) a hand lost by tracking is searched for on the SAME frame
-   ('track1>search'). CONTROL: a schedule that never switches to two hands (schedStay) must fail (2). */
+/* the pump's log as the core says it must be: per frame plan → (a model run counts script[k] hands, L1 at most one; a tracking run
+   that saw none retries a search on the same frame) → schedAfter — the pump's composition, built from the pure core (handsched.js) */
+function expectLog(script, frames, policy='2s'){
+  let s=schedNew(), k=0; const out=[];
+  const cnt=a=> script ? Math.min(script[Math.min(k++, script.length-1)], a==='track1'?1:2) : 0;
+  for(let i=0;i<frames;i++){ let a=schedPlan(s, policy), n=0, act=a;
+    if(a!=='skip'){ n=cnt(a); const re=schedRetry(a, n, policy); if(re){ act=a+'>'+re; a=re; n=cnt(re); } }
+    out.push({ action:act, n }); s=schedAfter(s, a, n); }
+  return out;
+}
+const logTxt=L=>L.map(x=>x.action+'='+x.n).join(' ');
+
+/* ═══ LAT2a — THE SEARCH SCHEDULE ON THE PROBE CLOCK (P.checkSchedule, quick and all; DRAWN) ═══
+   RUN 4 (user answer): the real pump, the real detector and real camera pictures, but the frames are fed ONE AT A TIME and awaited
+   (vision.pumpStepDbg) — a busy machine changes how long it takes, never which frames run what. Each case's log must equal, frame for
+   frame, the core's own expectation (expectLog) AND obey the rules stated independently (schedProblems): (1) no hand in view (the fake
+   camera), 12 frames: the full search on frames 0, 3, 6, 9 exactly, nothing in between; (2) scripted one hand, then two, 30 frames: the
+   tracker (L1) between searches, the second hand found by a search, both tracked on every frame after it; (3) a hand lost by tracking is
+   searched for on the SAME frame ('track1>search'). CONTROL: a schedule that never switches to two hands (schedStay) must break both the
+   exact log and the rules. */
 export async function checkSchedule(){
   const V=await import('../vision.js'), diff=[], miss=s=>diff.push(s); let cases=0;
-  const o0=V.visionOpts(), log=()=>V.pumpStats().log;
-  const scripted=async(script, ms, extra={})=>{ await fresh(V, { script, ...extra }); await sleep(ms); const L=log(); V.pumpDbg({ script:null, ...Object.fromEntries(Object.keys(extra).map(k=>[k,false])) }); return L; };
+  const o0=V.visionOpts();
+  const stepped=async(script, frames, extra={})=>{
+    V.pumpDbg({ hold:true, reset:true, script, ...extra }); await V.pumpStepDbg(frames);
+    const st=V.pumpStats(); V.pumpDbg({ script:null, ...Object.fromEntries(Object.keys(extra).map(k=>[k,false])) });
+    if(st.errors) miss(`the pump reported ${st.errors} error(s): ${st.err}`);
+    return st.log; };
+  const exact=(what, L, E)=>{ cases++; if(logTxt(L)!==logTxt(E)) miss(`${what}: the pump ran «${logTxt(L)}», the schedule says «${logTxt(E)}»`); };
   try{
     await V.setHandsTracked('2s');
-    await fresh(V); await sleep(1800);
-    { const L=log(), s=L.filter(x=>x.action==='search').length; cases++;
-      if(s<3) miss(`no hand in view: only ${s} search(es) in ${L.length} frames`);
+    { const L=await stepped(null, 12); exact('no hand', L, expectLog(null, 12));
+      const s=L.map((x,i)=>x.action==='search'?i:-1).filter(i=>i>=0).join(','); cases++;
+      if(s!=='0,3,6,9') miss(`no hand in view: searches on frames ${s||'none'}, expected 0,3,6,9`);
       for(const p of schedProblems(L)){ cases++; miss('no hand: '+p); } }
     const two=[...Array(10).fill(1), ...Array(40).fill(2)];
-    { const L=await scripted(two, 2200);
+    { const L=await stepped(two, 30); exact('one hand then two', L, expectLog(two, 30));
       const k=L.findIndex(x=>x.n>=2); cases++;
-      if(k<0) miss(`scripted second hand: never found in ${L.length} frames (${L.slice(0,14).map(x=>x.action+'='+x.n).join(' ')})`);
-      else { const after=L.slice(k+1); cases++; if(after.length<5) miss(`scripted second hand: only ${after.length} frame(s) after it was found`);
-        cases++; if(L.slice(0,k).filter(x=>x.action==='track1').length<4) miss(`scripted one hand: the tracker (L1) ran only ${L.slice(0,k).filter(x=>x.action==='track1').length} time(s) before the second hand`); }
+      if(k<0) miss(`scripted second hand: never found in ${L.length} frames (${logTxt(L.slice(0,14))})`);
+      else { cases++; if(L.length-k-1<5) miss(`scripted second hand: only ${L.length-k-1} frame(s) after it was found`);
+        const t1=L.slice(0,k).filter(x=>x.action==='track1').length; cases++;
+        if(t1<4) miss(`scripted one hand: the tracker (L1) ran only ${t1} time(s) before the second hand`); }
       for(const p of schedProblems(L)){ cases++; miss('scripted: '+p); } cases++; }
-    { const L=await scripted([1,1,0,1,1,1,1,1,1,1,1,1], 900); cases++;   // run 3 is a track1 that loses its hand → a search on the same frame
-      if(!L.slice(0,6).some(x=>x.action==='track1>search')) miss(`a hand lost by tracking was not searched for on the same frame (${L.slice(0,6).map(x=>x.action+'='+x.n).join(' ')})`); }
-    { const L=await scripted(two, 2200, { schedStay:true }); cases++;   // CONTROL
-      if(!schedProblems(L).length) miss('CONTROL: a schedule that never tracks two hands passed — the schedule check cannot fail'); }
+    { const lost=[1,1,0,1,1,1,1,1,1,1,1,1], L=await stepped(lost, 8); exact('a hand lost by tracking', L, expectLog(lost, 8)); cases++;   // run 3 is a track1 that loses its hand
+      if(!L.slice(0,6).some(x=>x.action==='track1>search')) miss(`a hand lost by tracking was not searched for on the same frame (${logTxt(L.slice(0,6))})`); }
+    { const L=await stepped(two, 30, { schedStay:true }); cases+=2;   // CONTROL
+      if(logTxt(L)===logTxt(expectLog(two, 30))) miss('CONTROL: a schedule that never tracks two hands matched the exact log — the comparison cannot fail');
+      if(!schedProblems(L).length) miss('CONTROL: a schedule that never tracks two hands passed the rules — the schedule check cannot fail'); }
     return { cases, total:diff.length, differences:diff };
-  } finally { V.pumpDbg({ script:null, schedStay:false, reset:true }); await V.setHandsTracked(o0.hands); }
+  } finally { V.pumpDbg({ script:null, schedStay:false, reset:true, hold:false }); await V.setHandsTracked(o0.hands); }
 }
 
 /* ═══ LAT2b — THE WORKER = THE MAIN THREAD, AND THE FALLBACK (P.checkWorker, P.all only (slow); DRAWN; ≈ 20 s) ═══
@@ -148,5 +170,5 @@ export async function checkWorker(){
 
 /* rows of this area — the registry (probes/rows.js) orders them by «at» */
 row({ at:582, name:'LAT2a frame once', run:()=>checkFrameOnce(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
-row({ at:583, name:'LAT2a search schedule (live)', run:()=>checkSchedule(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
+row({ at:583, name:'LAT2a search schedule (probe clock)', run:()=>checkSchedule(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true });
 row({ at:584, name:'LAT2b worker = main thread, fallback', run:()=>checkWorker(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), drawn:true, slow:true });

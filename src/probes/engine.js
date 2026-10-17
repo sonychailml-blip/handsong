@@ -70,9 +70,10 @@ async function censusNow(){
   const R=await import('../render.js');
   return R.engineProbe((eng, ctx)=>{
     const T=0.01;
-    eng.LEAD_INSTR.forEach((_,i)=>eng.leadOn('cs:ld:'+i, 220, 0.5, i, 0, 1, undefined, undefined, T));
-    eng.CHORD_INSTR.forEach((_,i)=>eng.chordOn('cs:ch:'+i, [220, 277.18, 329.63], 0.5, i, undefined, T));
-    eng.BASS_INSTR.forEach((_,i)=>eng.bassOn('cs:bs:'+i, 55, 0.5, i, 0, 0, undefined, undefined, T));
+    const bi=x=>/^(solo|chord|bass|kit)[.]/.test(x.id);   // TIM3d: built-ins only (a session's own timbres are not part of the census)
+    eng.LEAD_INSTR.forEach((x,i)=>{ if(bi(x)) eng.leadOn('cs:ld:'+i, 220, 0.5, i, 0, 1, undefined, undefined, T); });
+    eng.CHORD_INSTR.forEach((x,i)=>{ if(bi(x)) eng.chordOn('cs:ch:'+i, [220, 277.18, 329.63], 0.5, i, undefined, T); });
+    eng.BASS_INSTR.forEach((x,i)=>{ if(bi(x)) eng.bassOn('cs:bs:'+i, 55, 0.5, i, 0, 0, undefined, undefined, T); });
     eng.DRUM_KITS.forEach((_,k)=>{ for(let r=0;r<6;r++) eng.drumHit(r, 0.8, k, undefined, T); });
     eng.droneOn(0.18, T);
     return ctx.__census; },

@@ -220,10 +220,11 @@ import { CHAIN_SOLO, chainKeyOf, fxChainOf } from './state.js';
 import * as REC from './recorder.js';
 import * as ST from './state.js';   // состав цепи роли — ЧИТАЕМ (только id эффектов), чтобы знать, у кого гасить подмес
 import { setDroneNonOct, droneNonOct, droneDegree, CUR, chordUnit } from './scales.js';   // LR1: chordUnit — однонотный аккорд пробы P.checkRevAgree на ладу без аккордов   // слайс «дрон и центы»: ухо-переключатель второй струны дрона Болена–Пирса (R.droneBP)
-import { autoFreeze, freezeQueue, afActive, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
+import { autoFreeze, freezeQueue, afActive, afPaused, setRunner as setFreezeRunner } from './frzqueue.js';   // AF1: очередь автозаморозки — исполнитель её (freeze) ставится ниже; консоль R.autoFreeze / R.freezeQueue
 import { SCHED_TICK_MS } from './config.js';   // гладкая автоматизация: плавный отрезок разворачивается ШАГОМ ЖИВОГО ТИКА — рендер обязан ехать теми же ступеньками, что ▶
 import { FOREST, forestRoom } from './core/dsp.js';   // SND-F1: the Night forest room length (a track's render tail)
-import { latConsole } from './latmeter.js';   // LAT1: R.latency() — the latency meter's report in the console
+import { latConsole, latReport } from './latmeter.js';
+import { engClass, benchOf, benchText, ENG_BENCH_KEY } from './core/engclass.js';   // ENG2: the audio benchmark, R.engine()   // LAT1: R.latency() — the latency meter's report in the console
 import { hooks } from './hooks.js';   // AUTOSAVE1: hooks.renderBusy (the live hooks — this module is not the engine copy)
 
 /* ⛳ F3 СНЯЛ КОСТЫЛЬ: ТЕПЕРЬ КОПИЯ ДВИЖКА ОДНА НА СЕССИЮ. Прежде каждому рендеру давали СВОЙ
@@ -326,7 +327,8 @@ const matMix=eng=>{ SRC.chord(eng,0.05); SRC.lead(eng,0.10); SRC.bass(eng,0.15);
 /* МАТЕРИАЛ «ВОРКЛЕТ»: одна щипковая нота на KS-банке. Индекс — ПОСЛЕДНИЙ в LEAD_INSTR: KS-инструменты
    это ХВОСТ списка (см. LEAD_KS_FROM в audio.js, он считается, а не зашивается), поэтому последний
    гарантированно из них, и число банков знать не нужно. */
-const matKS=eng=>eng.leadOn('probe',220,0.9,eng.LEAD_INSTR.length-1,0,0,null,null,0.05);   // V1: glide перед when
+const ksLast=eng=>{ for(let i=eng.LEAD_INSTR.length-1;i>=0;i--) if(eng.leadIsKs(i)) return i; return eng.LEAD_INSTR.length-1; };   // TIM3d: the last KS timbre (own timbres may follow the built-ins)
+const matKS=eng=>eng.leadOn('probe',220,0.9,ksLast(eng),0,0,null,null,0.05);   // V1: glide перед when
 
 /* ═══ ⛳ МАТЕРИАЛ СЛАЙСА F2 — ОФЛАЙН-РАСКЛАДЧИК ГОЛОСОВ ═══
    ЧТО ДОКАЗЫВАЕМ: за ОДИН синхронный проход расписываются N перекрывающихся нот, и звучат они в N
@@ -401,7 +403,7 @@ const ROLE_KEY={ chord:()=>chainKeyOf('ch'), lead:()=>CHAIN_SOLO };
 let KS_LAZY=true;
 const renderKsLazy=on=>{ if(on!=null) KS_LAZY=!!on; return KS_LAZY; };
 const usesKS=(eng, evs, leadIdx)=> evs.some(e=>{ if(e.fn!=='leadOn'&&e.fn!=='leadSet') return false;
-  const i= e.a&&e.a.inst!=null ? (eng.timbreIdx('ld',e.a.inst)??leadIdx) : (e.fn==='leadOn' ? leadIdx : null); return i!=null && i>=eng.LEAD_KS_FROM; });   // TIM2: an event's id → the engine position
+  const i= e.a&&e.a.inst!=null ? (eng.timbreIdx('ld',e.a.inst)??leadIdx) : (e.fn==='leadOn' ? leadIdx : null); return i!=null && eng.leadIsKs(i); });   // TIM3b: by the record's engine   // TIM2: an event's id → the engine position
 /* allow — path fragments that still load for real (SND-F1: the dynamics worklet for a track whose chain holds Glue) */
 function stubWorklet(ctx, allow){
   try{
@@ -432,8 +434,8 @@ function engineProbe(fn, opt={}){ return renderQueued(async()=>{
   const ctx=new Ctor(2, Math.max(1,Math.round(rate*(opt.sec||0.1))), rate);   // opt.sec — the context's length (AUD2b renders an effect alone)
   if(!opt.real) stubWorklet(ctx);
   eng.renderReset(); eng.setRnd(mulberry32(SEED_A)); eng.setOffline(true);
-  try{ if(opt.wrap) opt.wrap(ctx); await eng.initAudio(()=>ctx); if(opt.phase) opt.phase(ctx); return await fn(eng, ctx); }
-  finally{ if(opt.after) opt.after(ctx); eng.setOffline(false); eng.renderReset(); }
+  try{ if(opt.pre) opt.pre(eng); if(opt.wrap) opt.wrap(ctx); await eng.initAudio(()=>ctx); if(opt.phase) opt.phase(ctx); return await fn(eng, ctx); }
+  finally{ if(opt.after) opt.after(ctx, eng); eng.setOffline(false); eng.renderReset(); }   // POOL1: pre(eng) before initAudio, after gets the copy too
 }); }
 async function renderOnceNow(seed, material, seconds, opts){
   const o=opts||{};
@@ -644,7 +646,7 @@ async function run(){
        ⛔ ЭТОТ ПУНКТ НИКОГДА НЕ СВОДИТЬ В «ПРОЙДЕНО» РАСШИРЕНИЕМ ДОПУСКА: он отчитывается ОТДЕЛЬНО и
        помечается как ОЖИДАЕМЫЙ. */
     const dKs=diffOf(k1.buf,k2.buf);
-    R.ks={ instrument:m1.eng.LEAD_INSTR.length-1, differs:!dKs.same, workletLoaded:R.worklet.offline,
+    R.ks={ instrument:ksLast(m1.eng), differs:!dKs.same, workletLoaded:R.worklet.offline,
            meaningful:R.worklet.offline, text:diffStr(dKs), peak:+(peakOf(k1.buf).toFixed(5)) };
     if(R.worklet.offline && dKs.same)
       R.notes.push('⚠️ KS: ворклет загружен, но два рендера СОВПАЛИ — ожидалось расхождение.');
@@ -2218,12 +2220,55 @@ function goldRender(play, seconds, chains={}, post=null){
     .then(r=>({ L:r.buf.getChannelData(0).slice(), R:r.buf.getChannelData(r.buf.numberOfChannels>1?1:0).slice(), rate:r.rate }));
 }
 async function copyState(){ const eng=await engine(); return eng.renderStateOf(); }
+/* ═══ ENG2 (RUN 4): THE AUDIO BENCHMARK and R.engine() ═══
+   The reference light scene (ENG2 plan §4: the start graph + 4 solo SuperSaw voices + one 4-note chord + bass + drum hits) rendered for
+   BENCH_SEC by the render copy with the worklets stubbed (no context pinned — RENDER-LEAK); factor = seconds of work per second of audio.
+   ⛳ A RELATIVE measure only (user answer E1): it decides nothing — the class it feeds is provisional and switches no setting. It runs ONCE
+   per device (cached per user agent in localStorage), in an idle moment ≥ 20 s after start, never while recording, while a render is
+   queued, or while a probe / the runner holds the auto-freeze watcher. */
+const BENCH_SEC=1;
+async function engBench(opt={}){
+  const ua=navigator.userAgent;
+  if(!opt.force){ let c=null; try{ c=benchOf(localStorage.getItem(ENG_BENCH_KEY), ua); }catch(e){} if(c) return { ...c, cached:true }; }
+  const ms=await engineProbe(async(eng, ctx)=>{
+    const ss=Math.max(0, eng.LEAD_INSTR.findIndex(x=>x.id==='solo.supersaw')), T=0.01;
+    for(let i=0;i<4;i++) eng.leadOn('lead:bench'+i, 220*Math.pow(2,i/7), 0.7, ss, i, 1, null, false, T);
+    eng.chordOn('loop:bench', [261.63, 329.63, 392, 493.88], 0.7, 0, null, T);
+    eng.bassOn('bassloop:bench', 65.41, 0.7, 0, 0, 0, null, null, T);
+    for(let t=T;t<BENCH_SEC;t+=0.5){ eng.drumHit(0,0.7,0,null,t); eng.drumHit(1,0.7,0,null,t+0.25); eng.drumHit(3,0.7,0,null,t+0.125); }
+    const t0=performance.now(); await ctx.startRendering(); return performance.now()-t0; }, { sec:BENCH_SEC });
+  const factor=Math.round(ms/(BENCH_SEC*10))/100, at=new Date().toISOString();
+  if(!opt.noStore) try{ localStorage.setItem(ENG_BENCH_KEY, benchText(factor, ua, at)); }catch(e){}
+  return { factor, at, ms:Math.round(ms), cached:false };
+}
+let benchT=0;
+function benchTry(){
+  benchT=0; let c=null; try{ c=benchOf(localStorage.getItem(ENG_BENCH_KEY), navigator.userAgent); }catch(e){}
+  if(c) return;   // measured on this device already
+  if(!LIVE_AC || REC.recording || afPaused() || renderQueue()>0){ benchT=setTimeout(benchTry, 10000); return; }
+  const go=()=>{ engBench().catch(e=>console.warn('[engine] benchmark failed: '+(e&&e.message))); };   // eslint-disable-line no-console
+  if(typeof requestIdleCallback==='function') requestIdleCallback(go, { timeout:5000 }); else go();
+}
+benchT=setTimeout(benchTry, 20000);
+/* R.engine(): voices, levels (per role too), the browser's load counters, dropouts per minute, the benchmark and the PROVISIONAL class */
+function engineReport(){
+  const r=latReport(); let bench=null; try{ bench=benchOf(localStorage.getItem(ENG_BENCH_KEY), navigator.userAgent); }catch(e){}
+  const cls=engClass({ factor:bench&&bench.factor, detectMs:Number.isFinite(r.stages.detect.mean)?r.stages.detect.mean:undefined, softwareGL:r.gpu.software });
+  const out={ voices:LIVE.engVoices(), levels:LIVE.engLevels({ roles:true }), load:LIVE.engLoad(), dropoutsPerMinute:r.audio.dropoutsPerMinute,
+    dropSource:r.audio.dropSource, bench, power:{ ...cls, provisional:true, note:'decides nothing until calibrated by live measurements' } };
+  console.log('[engine]', JSON.stringify(out, (k,v)=> v===-Infinity ? '-inf' : v, 1));   // eslint-disable-line no-console
+  return out;
+}
+async function renderPoolDbg(o){ const eng=await engine(); return eng.poolDbg(o); }
 
 /* (Временный R.powerOld — прежний пауэр-аккорд у ладов stack — снят в T4c-2 по решению пользователя: стопка заменяет его насовсем.) */
 export { seedOfLane, engineProbe, probe, renderTrack, freeze, unfreeze, frozen, aud, live, stop, recSteps, droneBP,
   bendTrace,   // BEND-CURVE: what the render copy schedules for a track's bend curves (P.checkBendCurve)
   reuseCheck,   // S5: голос после изогнутой ноты — без её кривой (на звуке; зовёт P.checkSoloEdit)
   goldRender,   // GOLD1: golden renders of every timbre, the drone and the effects (P.checkGold)
+  engBench,   // ENG2: the audio benchmark (once per device; {force} for the probe)
+  engineReport as engine,   // ENG2: R.engine() — readouts, dropouts, the provisional class
+  renderPoolDbg,   // POOL1: the render copy's chord-pool controls (P.checkPool)
   copyState,   // снимок переключателей копии движка — страж P.all между строками
   revAgree,   // LR1: проба «живой и замороженный реверб согласны» (P.checkRevAgree)
   /* AF1: очередь автозаморозки (консоль) и замер раскладки без рендера (P.freezeCost) */

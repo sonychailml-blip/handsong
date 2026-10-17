@@ -1,0 +1,35 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "chord.strings",
+ "family": "chord",
+ "engine": "chord2",
+ "name": {
+  "en": "Strings",
+  "ru": "Струнные"
+ },
+ "recipe": {
+  "t1": "sawtooth",
+  "t2": "sawtooth",
+  "ratio": 1,
+  "det": 6,
+  "m1": 0.46,
+  "m2": 0.4,
+  "lp": 2200,
+  "lvl": 0.17,
+  "fo": 1.6,
+  "ft": 0.3,
+  "fv": 0.8,
+  "hj": 0
+ },
+ "env": {
+  "att": 0.18,
+  "rel": 0.8
+ },
+ "policies": {
+  "voiceMode": null,
+  "glide": 0.035,
+  "register": "chord",
+  "quant": 1
+ }
+}

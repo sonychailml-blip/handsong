@@ -1,0 +1,22 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.string",
+ "family": "solo",
+ "engine": "ks",
+ "name": {
+  "en": "String",
+  "ru": "Струна"
+ },
+ "recipe": {},
+ "env": {
+  "att": 0.002,
+  "rel": 0.4
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}
