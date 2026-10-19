@@ -11,8 +11,8 @@ before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of
 
 ## src/audio.js
 (no head comment)
-- const (51): `outputFadeLevel`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
-- fn (85): `outputFade`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
+- const (52): `outputFadeLevel`, `setLowPower`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
+- fn (86): `outputFade`, `setTimbreTrim`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
 - let (4): `AC`, `frzReady`, `ksReady`, `dynReady`
 - → ./modules/timbres/stages.js (1): `panGains`
 
@@ -99,7 +99,7 @@ PACK1 (RUN 3, 2026-10-16; stage-3 plan slice 33; user decision: build it now, no
 
 ## src/core/profile.js
 C0 (RUN 6, Calm plan §2) — THE PROFILE RECORD and its validator.
-- const (6): `PROFILE_FORMAT`, `PROFILE_IDS`, `PROFILE_ROLES`, `BACKGROUNDS`, `HAND_FNS`, `PROFILE_DAMAGES`
+- const (7): `PROFILE_FORMAT`, `PROFILE_IDS`, `PROFILE_ROLES`, `BACKGROUNDS`, `LEVEL_DB`, `HAND_FNS`, `PROFILE_DAMAGES`
 - fn (1): `checkProfile`
 
 ## src/core/registry.js
@@ -114,7 +114,7 @@ SAVE1 (DAY run 2026-10-16) — THE SONG FILE, pure part: reading a «.handsong»
 
 ## src/core/timbre.js
 TIM3a (RUN 4) — THE TIMBRE RECORD and its validator.
-- const (10): `TIMBRE_FORMAT`, `TIMBRE_FAMILIES`, `WAVES`, `TB`, `KIT_SYNTHS`, `ENGINES`, `POLICY_KEYS`, `timbreNodes`, `BUNDLE_FORMAT`, `TIMBRE_DAMAGES`
+- const (11): `TIMBRE_FORMAT`, `TIMBRE_FAMILIES`, `WAVES`, `TB`, `KIT_SYNTHS`, `ENGINES`, `POLICY_KEYS`, `POLICY_OWN`, `timbreNodes`, `BUNDLE_FORMAT`, `TIMBRE_DAMAGES`
 - fn (1): `checkTimbre`
 
 ## src/demo.js
@@ -127,7 +127,7 @@ DRAW1 (DAY run 2026-10-16): draw.js is the FACADE of the canvas — importers ke
 - → ./views/common.js (2): `loopBarBottom`, `setEmptyTpOld`
 - → ./views/play.js (1): `drawOverlays`
 - → ./views/roll.js (21): `fxTitleOf`, `rollAutDrive`, `rollAutSnapV`, `rollAutValAt`, `rollAxisHasDim`, `rollAxisNow`, `rollBendAt`, `rollBendProbe`, `rollBoxHits`, `rollDefaultRow0For`, `rollDragTarget`, `rollGeom`, `rollHit`, `rollRow0Across`, `rollRowPitch`, `rollRowsProbe`, `rollSelectable`, `rollShiftPit`, `rollSnap`, `rollSnapBeat`, `rollTrackView`
-- → ./views/scene/host.js (4): `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`
+- → ./views/scene/host.js (6): `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`, `setSceneLevel`, `sceneLevel`
 - → ./views/stack.js (3): `stackFrame`, `stackSet`, `stackList`
 - → ./views/strip.js (9): `arrGeom`, `laneCol`, `laneDefName`, `laneTitle`, `loopBeatAt`, `loopHit`, `loopScroll`, `loopViewProbe`, `stripProbe`
 
@@ -299,8 +299,8 @@ AUD2a (RUN 3, 2026-10-16) — the effect «Night forest» (a seeded convolution 
 - fn (2): `forestBuffer`, `makeForestFx`
 
 ## src/modules/effects/forestdepth.js
-RUN 7 (C4b, Calm plan §4.2; the C4b design note; the user's choice «Calm gets its own wider range, Full unchanged») — the effect «Forest depth»: Calm's room.
-- const (1): `FDEPTH_PARAMS`
+RUN 7 (C4b, Calm plan §4.2; the user's choice «Calm gets its own wider range, Full unchanged»; RUN 8: LOUDNESS KEPT) — the effect «Forest depth»: Calm's room.
+- const (2): `FDEPTH_LIGHT`, `FDEPTH_PARAMS`
 - fn (1): `makeForestDepthFx`
 
 ## src/modules/effects/glide.js
@@ -367,6 +367,11 @@ AUD1c (RUN 3, 2026-10-16) — shared voice stages: track route, pan, brightness,
 - const (12): `BASS_GLIDE_TC`, `CHORD_GLIDE_TC`, `freezeDeep`, `BRI_HZ`, `BRI_OPEN`, `briHzOf`, `CHORD_LP_MAX`, `CHORD_LP_MIN`, `briToHz`, `HUM_CENTS`, `LEAD_GLIDE_TC`, `fstrike`
 - fn (6): `makePanStage`, `voiceRoute`, `panGains`, `makeBriStage`, `makeSatCurve`, `makeHardCurve`
 
+## src/modules/timbres/strikes.js
+RUN 8 (the Calm crackle) — THE STRIKE CAP of the struck solo engines (tine, modal).
+- const (1): `LOW_CAP`
+- fn (1): `strikeAdmit`
+
 ## src/modules/timbres/subtractive.js
 AUD1c (RUN 3) / TIM3b (RUN 4) — the solo bank of a voice from its timbre RECORD: the subtractive engine type here; FM and KS dispatched.
 - fn (2): `buildLeadBank`, `buildSubtractive`
@@ -397,7 +402,7 @@ AUTOSAVE1 (RUN 3, 2026-10-16): the song kept on this device by itself — throug
 ## src/probes/calm.js
 C4a (RUN 6, Calm plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
 - const (2): `CALM_TIMBRES`, `CALM_SET`
-- fn (11): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkCalmTimbres`, `checkCalmShell`, `checkCalmDepth`, `checkCalmAmbience`, `checkCalmGhost`, `checkCalmSet`, `checkCalmFx`, `checkCalmFxTimbres`
+- fn (15): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkCalmTimbres`, `checkCalmShell`, `checkCalmDepth`, `checkCalmAmbience`, `checkCalmGhost`, `checkCalmSet`, `checkCalmFx`, `checkCalmFxTimbres`, `checkCalmStress`, `checkCalmDepthLoud`, `checkCalmBars`, `checkCalmLowPower`
 
 ## src/probes/cmd.js
 CMD1 (RUN 5): the history's tripwire compares VALUES (CMD1a), tracks keep their ids through the song file (CMD1b, v7), every history step is a command serialised by ids and parsed back (CMD1c), app…
@@ -431,7 +436,7 @@ PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user
 
 ## src/probes/forest.js
 VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
-- fn (2): `checkForestRoom`, `checkBackgrounds`
+- fn (3): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`
 
 ## src/probes/freeze.js
 PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost.
@@ -773,7 +778,8 @@ DRAW1 (DAY run 2026-10-16): shared canvas helpers (FX bar layout, status and tra
 
 ## src/views/play.js
 DRAW1 (DAY run 2026-10-16): the play screen: overlays per frame (drawOverlays), roles, grids, hands, palette, effect bars, status — moved from draw.js verbatim (draw.js is the facade).
-- fn (1): `drawOverlays`
+- const (1): `calmTipsDbg`
+- fn (2): `calmTipsDrawDbg`, `drawOverlays`
 
 ## src/views/roll.js
 DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis, the automation lane, hit tests) — moved from draw.js verbatim (draw.js is the facade).
@@ -787,8 +793,8 @@ VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built wit
 
 ## src/views/scene/host.js
 VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Calm plan §3) — THE SCENE HOST and Calm's BACKGROUNDS.
-- const (5): `BACKGROUNDS`, `backgroundOf`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`
-- fn (4): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`
+- const (7): `BACKGROUNDS`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`
+- fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## src/views/stack.js
 VIS1a (RUN 6, docs/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room, VIS1b) · background (the camera picture) · instrument (the play s…
@@ -805,7 +811,7 @@ DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer
 - const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
-_155 modules, 2041 exported names._
+_156 modules, 2061 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

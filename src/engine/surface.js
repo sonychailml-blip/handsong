@@ -5,7 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'autosave.js':['AC'],
-  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance'],
+  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'AC', 'leadOn', 'leadOff', 'timbreIdx'],   // RUN 8: + the device measurement's notes
   'clip.js':['createRecordingTap'],
   'demo.js':['AC', 'initAudio'],
   'freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',

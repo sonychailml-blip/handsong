@@ -92,7 +92,35 @@ const SCREENS_CALM=[
                        await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Camera|Камер/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
   ['calm-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('./src/i18n.js'); I.setLang('ru'); const b=document.getElementById('calmBg'); let k=0; while(!/Тём/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
   ['calm-ru-info',   async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
+  /* RUN 8 (addendum 3): the low-light message with «Raise a hand» (Russian: the longer lines) — portrait and landscape; every visible message
+     at the top must stand clear of the others (printed; a touch counts in the run's result) */
+  ['calm-msg-ru',    async p=>{ await p.click('#calmInfoClose'); await p.evaluate(async ()=>{ const M=await import('./src/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); }); await calmWait(p); await msgCheck(p,'calm-msg-ru'); }],
+  ['calm-msg-land',  async p=>{ await p.setViewportSize({ width:844, height:390 }); await calmWait(p); await msgCheck(p,'calm-msg-land'); }],
+  /* RUN 8 (slice 3, addendum 1 and 5): playing — two synthetic hands through the probe's door (the playing right hand pinching its index, the
+     effects hand its middle finger): the fingertip fireflies, the quiet glow on the row, the depth bar and the three effect bars */
+  ['calm-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('./src/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
+  ['calm-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await playHands(p); }],
+  /* RUN 8 (slice 4): the forest picture behind the playing hands (WebGL with screen-blended lights; the room renders at its own rate) */
+  ['calm-forest',    async p=>{ await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
+  ['calm-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
 ];
+/* the top messages: no two visible ones overlap */
+async function msgCheck(p, name){
+  const r=await p.evaluate(()=>{ const vis=e=>{ if(!e) return false; const c=getComputedStyle(e); if(c.display==='none'||c.visibility==='hidden'||+c.opacity===0) return false; for(let q=e.parentElement;q;q=q.parentElement){ const k=getComputedStyle(q); if(k.display==='none'||+k.opacity===0) return false; } return true; };
+    const els=['darkHint','calmIdle','calmFxHint','calmFxBars','calmForestBar'].map(id=>document.getElementById(id)).filter(vis), R=els.map(e=>[e.id, e.getBoundingClientRect()]), hits=[];
+    const bar=id=>/Bar/.test(id);   // the two bar sets may sit side by side; a message may touch neither
+    for(let i=0;i<R.length;i++) for(let j=i+1;j<R.length;j++){ if(bar(R[i][0])&&bar(R[j][0])) continue; const a=R[i][1], b=R[j][1]; if(!(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top)) hits.push(R[i][0]+' × '+R[j][0]); }
+    return { shown:R.map(x=>x[0]), hits }; });
+  out(`[ui-snap] ${name}: messages shown ${r.shown.join(', ')||'none'} — ${r.hits.length ? 'OVERLAP '+r.hits.join(', ') : 'no overlap'}`); if(r.hits.length) msgHits.push(name+': '+r.hits.join(', '));
+}
+const msgHits=[];
+async function playHands(p){
+  await p.evaluate(async ()=>{ const G=await import('./src/gestures.js'), PO=await import('./src/gestures/pose.js'), V=await import('./src/vision.js');
+    G.handsProbe(null); const clk={ t:5e6, W:V.canvas.width, H:V.canvas.height }; G.handsProbe(clk, ()=>true);
+    for(let i=0;i<14;i++){ clk.t+=1000/30; const up=Math.min(1,i/10);
+      G.processHandsProbe({ landmarks:[PO.pose({ x:0.72, y:0.52, s:0.22, gaps:[0.05,1,1,1] }), PO.pose({ x:0.26, y:0.55-0.18*up, s:0.2, gaps:[1,0.05,1,1] })], handednesses:[[{ categoryName:'Right' }],[{ categoryName:'Left' }]] }); } });
+  await p.waitForTimeout(700); await msgCheck(p, 'play '+p.viewportSize().width+'×'+p.viewportSize().height);
+}
 async function capture(tag){
   const dir=path.join(OUT,tag); await mkdir(dir,{ recursive:true });
   const srv=await serve(), port=srv.address().port, y4m=await fakeVideo();
@@ -145,6 +173,7 @@ async function compare(a,b){
 }
 if(SAVE) await capture(SAVE);
 let code=0;
+if(SAVE && CALM){ out(msgHits.length ? '[ui-snap] Calm messages: OVERLAP — '+msgHits.join(' · ') : '[ui-snap] Calm messages: no overlap on any screen'); if(msgHits.length) code=1; }   // RUN 8 (addendum 3)
 if(CMP){ const [a,b]= CMP2 ? [CMP,CMP2] : [CMP,SAVE]; if(!b){ out('[ui-snap] --compare needs two tags (or --save)'); process.exit(2); } code= (await compare(a,b)) ? 1 : 0; }
 if(!SAVE&&!CMP){ out('usage: node tools/ui-snap.mjs --save <tag> [--compare <tagA>] | --compare <tagA> <tagB>'); const t=await readdir(OUT).catch(()=>[]); out('captures: '+t.join(', ')); }
 process.exit(code);

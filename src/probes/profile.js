@@ -46,7 +46,7 @@ export function checkProfile(){
         { fxId:'ctone', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:1, axis:'y', inv:false }] },   // RUN 7 (C5): the effects hand
         { fxId:'cwave', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:2, axis:'y', inv:false }] },
         { fxId:'cecho', params:[{ mode:'drive', hand:'fx', finger:0, axis:'y', inv:false }, { mode:'fixed', v01:0.8431089342012043 }] },
-        { fxId:'fdepth', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'play', axis:'z', inv:false }, { mode:'fixed', v01:0.5 }] } ] };
+        { fxId:'fdepth', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'play', axis:'z', inv:false }, { mode:'fixed', v01:0.5 }, { mode:'fixed', v01:1 }, { mode:'fixed', v01:0 }] } ] };   // RUN 8: + reach, light
     n++; { const c=cmp(inCalm, want); if(c.length) miss('Calm state: '+c.join(' · ')); }
     n++; if(!document.body.classList.contains('calm')) miss('body.calm not set');
     for(const id of ['instrBtn','splitBtn','recBtn','jamBtn','loopPanelBtn']){ n++; if(!hiddenNow(id)) miss(`#${id} visible in Calm`); }

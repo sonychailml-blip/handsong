@@ -1397,6 +1397,15 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 - **The cents nudge is offered only for 1/1 tunings** (TF5); a 12-note tuning in another temperament than 12-TET is moved by A4 (one
   source). Song Transpose moves the knob mod 12 (B + 1 → knob C while the song sits at key 12).
 
+- RUN 8 (Calm, measured on the user's 2012 dual-core laptop): (1) audio-thread headroom is small here — Full idle ≈ 90 % free, Calm idle
+  ≈ 45–55 %: the forest convolution keeps computing while idle (its input never registers as silent), the Echo's feedback loop and Full's
+  idle chord reverb run forever (Web Audio processes every connected node); the struck caps and «Lighter forest» (+5…10 %) help, a hot
+  laptop still drops out (even Full). Disconnecting idle effect loops is the next lever. (2) The 2D canvas is opaque (`alpha:false`) — a
+  room under it shows only through the Forest background's screen blend; never draw text on the canvas in Calm. (3) Struck timbres:
+  `policies.voices` caps the ringing strikes — a strike over the cap fades the oldest in 10 ms (inaudible under the new attack). (4) A
+  literal equal-power depth crossfade cannot keep a struck note's loudness (its attack follows the dry part) — Calm's curve keeps the dry
+  part ≈ level. (5) The headroom / budget measurements swing ±10 % with the laptop's heat; real-time probe rows judge against the standard
+  app in the same session.
 ## How to verify a change (full steps, moved at DOC1)
 1. Play → camera; app starts single-role solo; the bar hides after ~3.5 s, reveals on tap; not with a panel open. Learn opens the lesson list.
 2. Roles play; ● records a take, again stops; a second take = a new row; ⤺ removes the last take; arrangement from beat 0; three panels in
@@ -1702,6 +1711,27 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     (measured: louder by at most ≈ 1 dB, no build-up) — say whether it is too much.
 113. Listening page v2: `http://127.0.0.1:5500/tools/listen/calm-timbres.html` — Phrase / Single notes, «In the forest / Dry» flips while it
     plays (both versions in sync), every sound at the same loudness.
+114. The crackle (RUN 8): `?calm` → Begin → Sound «Singing bowl» (then Handpan, then Firefly): play fast with four fingers, overlapping, and
+    sweep the hand up and down over the rows for a minute (the Forest background, Echo up). No crackle or rattle. Then the same in Full with
+    the Singing bowl. Optional: Calm ⓘ → «Sound panel and diagnostics» → Latency meter On → the «Audio dropouts» line stays 0 per minute.
+115. Calm levels (RUN 8): in Calm switch Sound through Firefly, Breath flute, Handpan, Singing bowl at the same hand position — all four about
+    equally loud (Firefly is no longer much quieter). Move the playing hand near and far: the forest grows, the loudness stays. ⓘ → «Show the
+    first steps again»: the ghost's four notes are clearly audible.
+116. Depth made visible (RUN 8): play with the right hand; a slim «Лес» bar with a leaf icon shows on its side; move the hand away — the bar
+    fills and the lime halo around the playing fingertip grows wide and soft; near — small and sharp. With no hand the controls show: drag the
+    «Лес» slider down — the forest gets less (less echo and quieter forest sounds), and the small lime mark on the slider shows where the hand
+    left the depth.
+117. Effect bars (RUN 8): raise the left hand — three slim bars (Эхо · Тепло ↔ Яркость · Волна, each with its icon) fade in on its side, and the
+    first time a one-line hint explains the gesture; touch the index to the thumb and move up — the Echo bar fills and glows; middle — the
+    Warm/Bright bar moves from its middle mark; ring — Wave. Lower the hand — the bars fade out. ⓘ «Play with: left hand» — the bars change
+    sides. The low-light message and «Raise a hand» never show on top of each other (try a dark room).
+118. The forest picture (RUN 8): Background «Лес» — a night forest (trees, ferns, rocks, mist, wild fireflies), not black; the fireflies
+    brighten a little while you play; your fingertips are five small fireflies (the playing one lime with a halo, the others amber; the
+    effects hand's fingers glow with their effects); Dark — black with the fingertip fireflies only; Camera — the picture with the fireflies.
+    Portrait and landscape. Dev: ⓘ «Fingers: only the tips» off → all joints as before; «Forest picture: high / medium / low».
+119. Lighter forest (RUN 8, C8): ⓘ → «Lighter forest — for older computers and phones» on: the forest's echo sounds similar (a little drier),
+    fast struck notes ring a little less long, the picture is simpler; off: as before. Dev: ⓘ «Measure this device» (about 2 minutes, notes
+    play by themselves) → the text is copied — send it (desktop and the Poco M5).
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:

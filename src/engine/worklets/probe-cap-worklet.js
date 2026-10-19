@@ -41,3 +41,15 @@ class ProbeCap extends AudioWorkletProcessor {
   }
 }
 registerProcessor('probe-cap', ProbeCap);
+/* RUN 8: the «CALM stress» row's CONTROL for the dropout counter — this processor STALLS the audio thread (busy-waits ms per quantum, for
+   `blocks` quanta, then ends), so the browser's playback statistics must count underruns; with `iters` it adds a fixed, calibrated load per
+   quantum instead (the headroom measurement steps it up until dropouts start). Probes only. */
+class ProbeBurn extends AudioWorkletProcessor {
+  constructor(opts){ super(); const o=(opts&&opts.processorOptions)||{}; this.ms=+o.ms||5; this.load=o.iters!=null; this.iters=o.iters|0; this.left=o.blocks|0; this.sink=0; this.end=false;
+    this.port.onmessage=e=>{ const d=e.data||{}; if(d.stop) this.end=true; else if(Number.isFinite(d.iters)) this.iters=d.iters|0; }; }
+  /* ms: stall by the clock; iters (load mode): a fixed amount of arithmetic per quantum — the headroom measurement steps it up */
+  process(){ if(this.end || this.left--<=0) return false;
+    if(this.load){ let x=this.sink; for(let i=0;i<this.iters;i++) x+=Math.sqrt(i+x%7); this.sink=x%1; return true; }
+    const t=Date.now()+this.ms; while(Date.now()<t){ /* stall */ } return true; }
+}
+registerProcessor('probe-burn', ProbeBurn);

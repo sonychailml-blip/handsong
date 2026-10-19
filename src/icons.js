@@ -53,6 +53,11 @@ const SVG_ICONS={
          ['acc-line','path',{ d:'M16 3.5h4l-4 4.5h4' }]],
   /* the effects hand (C5): three short waves rising — «the other hand shapes the sound» */
   effects:[['line','path',{ d:'M4 17c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0M4 12c1.5-2 3-2 4.5 0s3 2 4.5 0 3-2 4.5 0' }], ['acc','circle',{ cx:19.5, cy:6.5, r:1.6 }]],
+  /* RUN 8 (slice 3): the effects hand's three bars — Echo (a light and its rings going out), Warmth / Brightness (a circle half warm, half
+     lit), Wave (a gentle wave) */
+  echo:[['acc','circle',{ cx:6.5, cy:12, r:2 }], ['line','path',{ d:'M10.5 8.5a5 5 0 0 1 0 7M14 6a8.5 8.5 0 0 1 0 12M17.5 3.8a11.5 11.5 0 0 1 0 16.4' }]],
+  tone:[['tint','path',{ d:'M12 4a8 8 0 0 0 0 16z', o:.35 }], ['acc','path',{ d:'M12 4a8 8 0 0 1 0 16z', o:.3 }], ['line','circle',{ cx:12, cy:12, r:8 }], ['line','path',{ d:'M12 4v16' }]],
+  wave:[['line','path',{ d:'M2.5 12c1.6-4.2 3.2-4.2 4.8 0s3.2 4.2 4.8 0 3.2-4.2 4.8 0 3.2 4.2 4.6 0' }], ['acc','circle',{ cx:12, cy:12, r:1.4 }]],
 };
 /* THE EMBLEM (the Hush app icon, the brand mark above the wordmark): five notes in an arc, the centre one glowing in the firefly lime */
 const EMBLEM_DOTS=[[15,24,3],[45,12,3],[105,12,3],[135,24,3]], EMBLEM_GLOW=[75,6,4.2];

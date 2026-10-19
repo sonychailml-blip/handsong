@@ -41,7 +41,7 @@ export function buildForest(T, opt){
   const own=[];   // everything to dispose
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   const s=new T.Scene(), FOG=col('fog'); s.background=FOG; s.fog=new T.FogExp2(FOG, 0.06);
-  s.add(new T.HemisphereLight(col('sky'), col('under'), 0.26));
+  const hemi=new T.HemisphereLight(col('sky'), col('under'), 0.26); s.add(hemi);
   const moonL=new T.DirectionalLight(col('moon'), 0.3); moonL.position.set(-10,20,-30); s.add(moonL);
   const gy=forestGround;
   /* ground: moss, soil and fallen leaves (colour + bump) */
@@ -112,11 +112,14 @@ export function buildForest(T, opt){
     if(i===0){ light.castShadow=true; light.shadow.mapSize.set(SH,SH); light.shadow.bias=-0.005; light.shadow.camera.near=0.08; }
     const core=sprite(col('core')), halo=sprite(i?col('fx'):col('halo'),0.5); grp.add(light,core,halo); grp.visible=false; s.add(grp);
     const trail=[]; for(let j=0;j<Lv.trail;j++){ const t=sprite(col('trail'),0); t.scale.set(0.05,0.05,1); s.add(t); trail.push(t); }
-    return { i, grp, light, core, halo, trail, hist:[], ht:0, cur:V(0,1.5,0), prev:V(0,1.5,0), tgt:V(0,1.5,0), on:0, glint:0, sat:false }; });
+    return { i, grp, light, core, halo, trail, hist:[], ht:0, cur:V(0,1.5,0), prev:V(0,1.5,0), tgt:V(0,1.5,0), on:0, glint:0, sat:false, d:0.5 }; });
   /* RUN 7 (C5): the effects hand seen in the forest (values from the bus «calmFx», published by the Calm shell): Echo — soft rings of light
      leave the firefly at each echo of a note (timed from the echo's own delay and feedback, not from audio analysis); Warmth / Brightness —
      the light's colour, amber ↔ the firefly lime ↔ a cold green-white; Wave — the light trembles at the effect's own 4.5 Hz */
   let fxv={ echo:0, time:0.625, fb:0, tone:0.5, wave:0 }, now=0; const echoes=[];
+  /* RUN 8 (slice 4): the forest answers the music GENTLY — each note adds to a slow energy (its velocity × 0.35, at most 1.5) that fades with
+     τ 1.8 s: the wild fireflies glow up to +60 %, their two lights +50 %, the night sky +15 %. Nothing moves faster than the music. */
+  let music=0;
   const LC=col('light'), WARM=col('warm'), COLD=col('cold'), HC=col('halo'), lc=new T.Color(), hlc=new T.Color();
   const rings=[]; for(let j=0;j<8;j++){ const sp=sprite(col('trail'),0); sp.visible=false; s.add(sp); rings.push({ sp, t0:-1, amp:0 }); }
   /* the camera: the prototype's place and lean; portrait gets a wider view */
@@ -141,7 +144,7 @@ export function buildForest(T, opt){
     now=t; if(fx) fxv=fx;
     const kk=reduce?0.4:1, H2=hands||[], play=H2.find(h=>h.play), other=H2.find(h=>h!==play);
     rigs.forEach((r,i)=>{ const h= i===0 ? play : other; let on=0;
-      if(h){ r.sat=place(h.x, h.y, h.d, r.tgt); on=1; if(r.on<0.02) r.cur.copy(r.tgt); }
+      if(h){ r.sat=place(h.x, h.y, h.d, r.tgt); on=1; if(r.on<0.02) r.cur.copy(r.tgt); r.d+=(h.d-r.d)*Math.min(1, dt*8); }
       r.on+=(on-r.on)*Math.min(1, dt*(on>r.on?6:2.5));
       r.prev.copy(r.cur); r.cur.lerp(r.tgt, 1-Math.exp(-dt*13));
       r.glint*=Math.exp(-dt*2.4);
@@ -151,7 +154,8 @@ export function buildForest(T, opt){
         const u=Math.abs(fxv.tone-0.5)*2, to= fxv.tone<0.5 ? WARM : COLD; lc.copy(LC).lerp(to,u); hlc.copy(HC).lerp(to,u); r.light.color.copy(lc); r.halo.material.color.copy(hlc);
         if(fxv.wave>0.005 && !reduce){ const ph=2*Math.PI*4.5*t; wob=1+0.3*fxv.wave*Math.sin(ph); r.grp.position.x+=0.06*fxv.wave*Math.sin(ph); r.grp.position.y+=0.04*fxv.wave*Math.cos(ph*1.3); } }
       r.light.intensity=1.9*dim*r.on*pul*(1+r.glint)*wob; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
-      const hs=(i?0.9:1.5)*(1+r.glint*0.9)*pul; r.halo.scale.set(hs,hs,1); r.halo.material.opacity=0.55*r.on*dim;
+      /* RUN 8: the playing light's halo follows the depth — near: small and bright, far: wide and soft (as the 2D fingertip's halo) */
+      const dk= i ? 1 : 0.7+0.9*r.d, hs=(i?0.9:1.5)*(1+r.glint*0.9)*pul*dk; r.halo.scale.set(hs,hs,1); r.halo.material.opacity=0.55*r.on*dim*(i ? 1 : 1.15-0.45*r.d);
       r.ht+=dt; if(r.ht>0.03){ r.ht=0; r.hist.unshift(r.cur.clone()); if(r.hist.length>r.trail.length) r.hist.pop(); }
       r.trail.forEach((sp,j)=>{ const p=r.hist[j]; if(!p){ sp.material.opacity=0; return; } sp.position.copy(p); sp.material.opacity=r.on*0.3*dim*(1-j/r.trail.length); sp.scale.setScalar(0.1*(1-j/r.trail.length)+0.02); });
     });
@@ -162,9 +166,11 @@ export function buildForest(T, opt){
       g.sp.scale.setScalar(0.25+1.3*k); g.sp.material.opacity=g.amp*(1-k)*(1-k); }
     fliesStep(flies, lightsOf(), dt, t, kk);
     const pa=fg.attributes.position.array, ga=fg.attributes.aGlow.array;
-    flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=q.glow; });
+    music*=Math.exp(-dt/1.8); const mg=1+0.6*Math.min(1,music);
+    flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=q.glow*mg; });
     fg.attributes.position.needsUpdate=fg.attributes.aGlow.needsUpdate=true;
-    wild.forEach((l,i)=>{ const q=flies[Math.min(flies.length-1,i*7)]; l.position.set(q.p[0],q.p[1],q.p[2]); l.intensity=q.glow*0.7; });
+    wild.forEach((l,i)=>{ const q=flies[Math.min(flies.length-1,i*7)]; l.position.set(q.p[0],q.p[1],q.p[2]); l.intensity=q.glow*0.7*(1+0.5*Math.min(1,music)); });
+    hemi.intensity=0.26*(1+0.15*Math.min(1,music));
     if(Lv.mist) mists.forEach(([tx,sp])=>{ tx.offset.x=(t*sp*kk)%1; });
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
     const f0=rigs[0].on>0.05 ? rigs[0].cur : camLook;
@@ -172,14 +178,15 @@ export function buildForest(T, opt){
     camOff.lerp(camGoal, 1-Math.exp(-dt*1.6)); aimCamera(); if(!reduce){ camera.position.y+=Math.sin(t*0.23)*0.025; camera.updateMatrixWorld(); }
   }
   /* a note began on this rig's hand (from the bus `notes` ring) */
-  const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1));
+  const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
     if(r && i===0 && fxv.echo>0.02){ const v=clamp(vel==null?0.6:vel,0.18,1); let amp=0.9*v*fxv.echo;   // C5: one ring per echo, each fainter by the feedback
       for(let k=1;k<=6 && amp>0.03;k++){ echoes.push({ at:now+k*fxv.time, amp, pos:r.cur.clone() }); amp*=Math.max(0, fxv.fb); } } };
   /* probes: numbers only (never pixels) */
   function project(i){ const r=rigs[i]; tmp.copy(r.cur).project(camera); return { x:(tmp.x+1)/2*W, y:(1-tmp.y)/2*H, sat:r.sat, on:r.on }; }
   const state=()=>({ rigs:rigs.map(r=>({ x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, sat:r.sat })), shadows:rigs.filter(r=>r.light.castShadow).length, shadowSize:SH,
     flies:flies.length, trail:Lv.trail, fov:camera.fov, cam:[camera.position.x, camera.position.y, camera.position.z], fliesAt:flies.map(q=>q.p.slice()),
-    fx:{ ...fxv, color:[rigs[0].light.color.r, rigs[0].light.color.g, rigs[0].light.color.b], echoesDue:echoes.length, rings:rings.filter(g=>g.t0>=0).length } });   // C5
+    fx:{ ...fxv, color:[rigs[0].light.color.r, rigs[0].light.color.g, rigs[0].light.color.b], echoesDue:echoes.length, rings:rings.filter(g=>g.t0>=0).length },   // C5
+    music, halo:rigs[0].halo.scale.x, hemi:hemi.intensity });   // RUN 8
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   resize(W,H);
   return { id:'room.forest', scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf };

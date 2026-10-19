@@ -51,7 +51,7 @@ const CALM_CHAIN=deepFreeze([ { fxId:'vol', params:[{ mode:'drive', hand:'play',
   { fxId:'ctone', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:1, axis:'y', inv:false }] },
   { fxId:'cwave', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:2, axis:'y', inv:false }] },
   { fxId:'cecho', params:[{ mode:'drive', hand:'fx', finger:0, axis:'y', inv:false }, { mode:'fixed', v01:0.8431089342012043 }] },
-  { fxId:'fdepth', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'play', axis:'z', inv:false }, { mode:'fixed', v01:0.5 }] } ]);
+  { fxId:'fdepth', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'play', axis:'z', inv:false }, { mode:'fixed', v01:0.5 }, { mode:'fixed', v01:1 }, { mode:'fixed', v01:0 }] } ]);   // RUN 8: reach (the forest at most — the shell sets it from the «Forest» slider) and light (C8: «Lighter forest», the shell sets it)
 /* what a profile sets over the state it starts from: its own defaults (first mood, first timbre, its key and hands); null fields leave
    that part as it is */
 function target(p, from){

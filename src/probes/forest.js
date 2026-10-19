@@ -13,7 +13,7 @@
    the second time exactly as the first (closing the room is not a lost context). */
 import { row } from './rows.js';
 import { cv } from '../palette.js';
-import { loadThree, setBackground, sceneInfo } from '../views/scene/host.js';
+import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg } from '../views/scene/host.js';   // RUN 8: + the quality levels and the room (CALM forest picture)
 import { buildForest } from '../views/scene/forest.js';
 import { fliesInit, fliesStep, FOREST_FLIES } from '../core/fireflies.js';
 import { stackList } from '../draw.js';
@@ -95,3 +95,45 @@ export async function checkBackgrounds(){
 }
 row({ calm:true, at:1007, name:'VIS1c forest room', run:()=>checkForestRoom(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
 row({ calm:true, at:1008, name:'VIS1c backgrounds', drawn:true, run:()=>checkBackgrounds(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+/* RUN 8 (slice 4): row «CALM forest picture» (drawn). The user saw a plain black «Forest»: the room rendered under an OPAQUE 2D canvas
+   (vision.js alpha:false — its «clear» is black). (1) SHOWS: on Forest the 2D canvas is composited with screen (its black lets the room
+   through) — CONTROL: on Camera it is normal (and opaque) —, and the room's own canvas draws a picture (copied in the frame it renders: not
+   black); (2) NO LEAK: Forest ↔ Dark five times — each Forest makes exactly one WebGL context, each Dark leaves none; the quality levels
+   high → medium → low → high keep at most one, low makes none; (3) MUSIC: three notes raise the forest's energy, which fades (τ 1.8 s) —
+   CONTROL: no note, no energy; (4) DEPTH: the playing light's halo far is wider than near. */
+export async function checkForestPicture(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel(), c2=canvas;
+  try{
+    const why=profileApply('profile.calm'); n++; if(why){ miss('Calm refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('full'); await setBackground('forest'); await frames(6);
+    const I=sceneInfo(); n+=2;
+    if(getComputedStyle(c2).mixBlendMode!=='screen') miss('Forest: the 2D canvas is not composited with screen ('+getComputedStyle(c2).mixBlendMode+') — the room stays hidden under it');
+    if(I.webgl){ const pic=await sceneSnapDbg();   // the frame the room has JUST rendered (RUN 8: a copy in an arbitrary frame read 0 once in 3 runs — a frame the room skipped)
+      if(pic==null) notes.push('the room rendered no frame within 2 s (a hidden tab?) — the picture check does not apply'); else { notes.push('the room\'s picture: mean RGB sum '+pic.toFixed(1)); if(!(pic>5)) miss('Forest: the room\'s own canvas is black (mean RGB sum '+pic.toFixed(1)+')'); } }
+    else notes.push('no WebGL in this browser — the minimal 2D stand-in (the picture check does not apply)');
+    await setBackground('camera'); await frames(2); n++; if(getComputedStyle(c2).mixBlendMode!=='normal') miss('CONTROL: on Camera the 2D canvas is not normal ('+getComputedStyle(c2).mixBlendMode+')');
+    /* no leak */
+    for(let k=0;k<5;k++){ const m0=sceneInfo().contextsMade; await setBackground('forest'); await frames(2); const a=sceneInfo(); await setBackground('dark'); await frames(1); const b=sceneInfo(); n+=2;
+      if(a.webgl && a.contextsMade!==m0+1) miss(`Forest #${k+1}: ${a.contextsMade-m0} WebGL contexts made (1 expected)`);
+      if(b.contextsLive!==0) miss(`Dark after Forest #${k+1}: ${b.contextsLive} WebGL context(s) alive`); }
+    await setBackground('forest'); await frames(2);
+    for(const lv of ['reduced','minimal','full']){ const m0=sceneInfo().contextsMade, I2=await setSceneLevel(lv); await frames(2); const I3=sceneInfo(); n+=2;
+      if(I3.contextsLive>1) miss(`level ${lv}: ${I3.contextsLive} WebGL contexts alive`);
+      if(lv==='minimal' && (I3.contextsLive!==0 || I3.contextsMade!==m0)) miss('level low made or kept a WebGL context'); void I2; }
+    /* music and depth: the room's numbers */
+    const room=sceneRoomDbg(); n++;
+    if(!room) notes.push('no room object (no WebGL) — music and depth checks skipped');
+    else { const hv=d01=>[{ x:c2.width*0.6, y:c2.height*0.5, d:d01, play:true }];
+      for(let i=0;i<300;i++) room.update(1/60, 50+i/60, hv(0.5));
+      const m0=room.state().music; for(let k=0;k<3;k++) room.glint(0, 0.8); const m1=room.state().music;
+      for(let i=0;i<240;i++) room.update(1/60, 60+i/60, hv(0.5)); const m2=room.state().music; n+=3; notes.push(`music energy ${m0.toFixed(3)} → ${m1.toFixed(3)} → ${m2.toFixed(3)} after 4 s`);
+      if(!(m0<0.01)) miss('CONTROL: the forest has music energy without a note ('+m0.toFixed(3)+')');
+      if(!(m1>0.5)) miss('three notes did not raise the forest\'s energy ('+m1.toFixed(3)+')'); if(!(m2<m1*0.2)) miss('the energy did not fade ('+m2.toFixed(3)+')');
+      for(let i=0;i<120;i++) room.update(1/60, 70+i/60, hv(0)); const hn=room.state().halo; for(let i=0;i<120;i++) room.update(1/60, 72+i/60, hv(1)); const hf=room.state().halo; n++;
+      notes.push(`the light's halo near ${hn.toFixed(2)}, far ${hf.toFixed(2)}`); if(!(hf>hn*1.4)) miss(`the light's halo far (${hf.toFixed(2)}) is not wider than near (${hn.toFixed(2)})`); }
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ calm:true, at:1008.5, name:'CALM forest picture', drawn:true, run:()=>checkForestPicture(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

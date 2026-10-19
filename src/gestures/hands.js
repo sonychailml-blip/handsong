@@ -763,12 +763,14 @@ function processHands(res){
    the PLAY POINT in canvas pixels (thumb tip + the main finger, REMAPPED — the point the hit-tests use, rule #12; index finger when not
    pinched), depth 0 near … 1 far (the law of depthN, READ-ONLY: this frame's smoothed size when the processing computed it, else the raw
    size — never a step of the smoothing, which is one per frame and shapes the sound), pinch, and whether the hand plays notes in its role */
+const TIPS5=[4,8,12,16,20];   // thumb, index, middle, ring, little — the landmark indices of the five fingertips
 function handsView(){
   const now=nowMs(), W=canvas.width, H=canvas.height, out=[];
   for(const k in HANDS){ const S=HANDS[k], lm=S.lm; if(!lm || now-S.seen>WATCHDOG_MS) continue;
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8, fn=handFnOf(k, S.role||phoneInstr);
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H),
-      d:clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr' }); }
+      d:clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr',
+      finger: S.pinch && S.oct>=0 ? S.oct : -1, tips:TIPS5.map(i=>[sx(lm[i].x, W), sy(lm[i].y, H)]) }); }   // RUN 8: the finger in use and the five fingertips (remapped as the hit-tests — Calm's bars and fireflies)
   return out;
 }
 export { HANDS, processHands, voiceModeReset, handsProbe, processHandsProbe, handsView };

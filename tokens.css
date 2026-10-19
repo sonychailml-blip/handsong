@@ -240,6 +240,7 @@
   --cv-mist-a12:rgba(255,255,255,.12);
   --cv-calm-glow:#c8f56a;   /* RUN 7: the Calm glow note field — the row under a hand glows in the firefly lime */
   --cv-calm-dark:#000;   /* the Dark background (Calm): plain black, the same sound, the hand points on it */
+  --cv-calm-amber:#ffc46b;   /* RUN 8: Calm's fingertip fireflies at rest (warm amber; the playing one is --cv-calm-glow, the emblem's centre) */
   /* RUN 7 (C11) — THE CALM FACE: the user's design choice (BACKLOG §7.19) = B · Moonglass for everything (palette, controls in a glass
      capsule, cards, layouts) + the C · Hush emblem (five dots in an arc, the centre one glowing in Moonglass's firefly lime). Fonts: Literata
      Light (titles, wordmark) and Andika (text) — OFL, self-hosted (@font-face below), both with Cyrillic. Glass = a blur over the scene;
@@ -257,6 +258,8 @@
   --calm-ring:0 0 0 3px rgba(200,245,106,.16); --calm-glow:0 0 14px rgba(200,245,106,.55); --calm-shadow:0 10px 40px rgba(0,0,0,.45);
   --calm-fade:300ms; --calm-slow:900ms; --calm-ease:cubic-bezier(.2,.7,.2,1);
   --calm-icon:24px; --calm-lantern:rgba(255,214,150,.30); --calm-glow-f:drop-shadow(0 0 6px #c8f56a);
+  /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
+  --calm-bar-w:6px; --calm-bar-h:min(30vh, 200px); --calm-bar-gap:16px; --calm-bar-ico:20px; --calm-warm:#ffb45a; --calm-cold:#e6fff2;
   --z-calm:18;
 }
 /* RUN 7 (C11): the Calm face's fonts, self-hosted from our own origin (CSP default-src 'self'), register entries font-andika / font-literata

@@ -161,6 +161,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   Events store the timbre ID (TIM2). The editor lists timbres only via `audio.timbresOf(role)`.
 - **A profile** (C0) = `data/profiles/<name>.json` (`handsong/profile` v1) + its name in `data/profiles/index.json` `order` + its id in
   `core/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
+- **A struck timbre's strike cap** (RUN 8) = `policies.voices` in its record (tine / modal only, 1…16; `modules/timbres/strikes.js` fades the
+  oldest; low power × 0.6). **A profile's level trim** = its `levels` {timbre id: dB} (`audio.setTimbreTrim`, set by the face; Full has none).
 - **Thresholds / palette geometry** = `config.js`. Expression numbers are split: feature→channel in `gestures.EXPR_CFG`,
   channel→depth in `audio.EXPR_A` (gestures imports audio; the reverse would be a cycle).
 - **A hand function** = `state.handFn` defaults + `ui.HANDFN_OPTS` + a branch on `S.fn`/zone in `gestures.js` + a dictionary key.
@@ -387,6 +389,9 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   breathing sustained sounds — RUN 7, Calm's sound pass); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
   `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; RUN 7 Calm-only: `forestdepth.js` «Forest depth», `calm.js` Echo · Warmth / Brightness
   · Wave); `src/modules/ambience/forest.js` the forest's ambience (RUN 7). All: rule #38, first argument `E`.
+- RUN 8: `src/modules/timbres/strikes.js` — the per-timbre strike cap (list in `E.pool.ld.strikes`); «Forest depth» gained `reach` (the «Лес»
+  slider) and `light` (C8 «Lighter forest», the FDN room); `views/play.js` Calm fingertip fireflies + the oval row glow; `calmshell.js` the
+  bars, the effects hint, «Lighter forest», «Measure this device»; `views/scene/host.js` quality levels (`setSceneLevel`) + the Forest blend.
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
 - `src/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
   `freezeWire`, `recWire`, `backingWire`) + session glue (lane prune/reset/delete, mixer setters, `laneHush`, drone sync, editor SESSION
@@ -514,7 +519,8 @@ THERE in full and here as one index entry):
   101 Full ↔ Calm (C0) · 102 Calm sounds by ear (listening page) · 103 Calm design proposals · 104 Forest and the three backgrounds (VIS1c)
   105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5) · 106 Calm's four sounds by ear (RUN 7) · 107 The Calm look, portrait + landscape
   108 Sleep timer · 109 Depth → the forest · 110 The forest's ambience and its volume · 111 First run + ghost light · 112 The effects hand
-  113 Listening page v2 (A/B)
+  113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Calm levels + the ghost · 116 Depth halo + «Лес» bar
+  117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

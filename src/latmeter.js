@@ -263,10 +263,10 @@ let hintOn=false, hintT=0;
 const hintAllowed=()=>!recording && !activeKind() && !rollOpen && !arrOpen;
 function darkShow(fps){
   const w=el('darkHint'), tx=el('darkHintTx'), ok=el('darkHintOk'); if(!w||!tx) return;
-  tx.textContent=t('lat.dark', { fps:Math.max(1, Math.round(fps)) }); w.classList.add('on'); hintOn=true;
+  tx.textContent=t('lat.dark', { fps:Math.max(1, Math.round(fps)) }); w.classList.add('on'); hintOn=true; document.body.classList.add('dark-on');   // RUN 8: Calm's top lines give way (one message at a time)
   if(ok) ok.onclick=darkHide; clearTimeout(hintT); hintT=setTimeout(darkHide, HINT_MS);
 }
-function darkHide(){ const w=el('darkHint'); if(w) w.classList.remove('on'); hintOn=false; clearTimeout(hintT); }
+function darkHide(){ const w=el('darkHint'); if(w) w.classList.remove('on'); hintOn=false; clearTimeout(hintT); document.body.classList.remove('dark-on'); }
 /* probe only: a scripted sequence of frame times (ms) through a FRESH decision (the session's own «once» stays untouched) and the real
    message; returns the frame index it showed at (-1 none) */
 export function darkDbg(times, granted){

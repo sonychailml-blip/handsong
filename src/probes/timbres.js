@@ -68,7 +68,8 @@ const ROLE_POL={ solo:()=>({ voiceMode:VOICE_MODE_DEF.ld, glide:LEAD_GLIDE_TC, r
   chord:()=>({ voiceMode:null, glide:CHORD_GLIDE_TC, register:'chord', quant:gridFor('chOn') }),
   kit:()=>({ voiceMode:null, glide:null, register:null, quant: gridFor('drum')*(loop.sub||4)===1 ? 'sub' : gridFor('drum') }),   // TIM3c: drums quantise to 1/subdivision
   bass:()=>({ voiceMode:VOICE_MODE_DEF.bs, glide:BASS_GLIDE_TC, register:'bass', quant:gridFor('bassOn') }) };
-const polDiff=r=>{ const want=ROLE_POL[r.family]&&ROLE_POL[r.family](); return want && JSON.stringify(r.policies)!==JSON.stringify(want) ? `${r.id}: policies ${JSON.stringify(r.policies)}, the role today ${JSON.stringify(want)}` : null; };
+const rolePol=p=>{ const o={}; for(const k of Object.keys(p)) if(k!=='voices') o[k]=p[k]; return o; };   // RUN 8: voices is the timbre's own (POLICY_OWN), not a role value
+const polDiff=r=>{ const want=ROLE_POL[r.family]&&ROLE_POL[r.family](); return want && JSON.stringify(rolePol(r.policies))!==JSON.stringify(want) ? `${r.id}: policies ${JSON.stringify(r.policies)}, the role today ${JSON.stringify(want)}` : null; };
 export function checkTimbreRecords(){
   const d=[]; let n=0; const miss=s=>d.push(s), R=timbreLoadReport();
   n+=3; if(R.error) miss('the bundle could not be read: '+R.error);

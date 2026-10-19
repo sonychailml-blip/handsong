@@ -557,6 +557,7 @@
   /* VIS1c (RUN 6): the Background switch exists only in Calm; the 3D room's canvas (made by views/scene/host.js) lies under the 2D canvas */
   body:not(.calm) #bgRow{ display:none; }
   #scene{ position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+  body.bg-forest #canvas{ mix-blend-mode:screen; }   /* RUN 8: the opaque 2D canvas lets the room show through (its black adds nothing) */
 /* RUN 7 (C6 + C11): THE CALM SHELL in the user's design — Moonglass: round buttons in a frosted-glass capsule (portrait: at the bottom;
    landscape: on the right), the ⓘ card, the emblem and the wordmark. Glass blurs the scene behind it; its plain fallback (body.calm-plain:
    the Dark background, the minimal scene level, low power) and browsers without backdrop-filter get the same readability with no blur. */
@@ -589,6 +590,10 @@ body.calm-plain .calm-glass{ background:var(--calm-glass-plain); -webkit-backdro
 .calm-vol{ grid-column:1/-1; display:flex; align-items:center; gap:var(--calm-gap); padding:0 var(--calm-gap-sm); }
 .calm-vol[hidden]{ display:none; }
 .calm-vol input{ flex:1; min-width:0; accent-color:var(--calm-accent); }
+/* RUN 8: the slider is the forest AT MOST; a small lime mark rides on it at the forest the hand gives now (depth × reach) */
+.calm-vol-in{ position:relative; flex:1; min-width:0; display:flex; align-items:center; }
+.calm-vol-mark{ position:absolute; top:50%; left:0; width:var(--calm-bar-w); height:var(--calm-bar-w); border-radius:var(--calm-r-pill); transform:translate(-50%,-50%);
+  background:var(--calm-accent); box-shadow:var(--calm-glow); pointer-events:none; }
 .calm-vico{ display:flex; width:var(--calm-icon); height:var(--calm-icon); color:var(--calm-dim); }
 .calm-card{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px, calc(100vw - 28px)); max-height:calc(100vh - 28px);
   overflow:auto; border-radius:var(--calm-r-card); padding:var(--calm-pad-lg); pointer-events:auto; box-shadow:var(--calm-shadow);
@@ -616,17 +621,45 @@ body.calm-plain .calm-card{ -webkit-backdrop-filter:none; backdrop-filter:none; 
 .calm-lnk{ display:block; margin:var(--calm-gap) 0 0 !important; color:var(--calm-accent) !important; font-size:var(--calm-fs-value); text-align:left; }
 .calm-lnk[hidden]{ display:none; }
 .calm-dev{ color:var(--calm-dim) !important; font-size:var(--calm-fs-small); }
+.calm-measure{ margin:var(--calm-gap-sm) 0 0; white-space:pre-wrap; font-size:var(--calm-fs-small); color:var(--calm-dim); user-select:text; -webkit-user-select:text; }
+.calm-measure[hidden]{ display:none; }
 .calm-veil{ position:absolute; inset:0; background:var(--c-black); opacity:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
 #calmShell.asleep .calm-veil{ pointer-events:auto; }
 .calm-veil-msg{ color:var(--calm-dim); font-size:var(--calm-fs-body); }
 .calm-veil-msg[hidden]{ display:none; }
 .calm-lantern{ position:absolute; left:0; right:0; bottom:0; height:24vh; background:radial-gradient(ellipse 70% 100% at 50% 100%, var(--calm-lantern) 0%, transparent 72%); pointer-events:none; }
 .calm-lantern[hidden]{ display:none; }
+/* RUN 8 (slice 3): the bars while the hands play — slim Moonglass tracks: the forest's depth on the playing hand's side, the three effects on the
+   effects hand's side (calmshell.js: the value, .left / .right from where the hand is, .act on the finger in use, .on while that hand is seen) */
+.calm-bars{ position:absolute; top:50%; transform:translateY(-50%); display:flex; gap:var(--calm-bar-gap); opacity:0; pointer-events:none;
+  transition:opacity var(--calm-slow) var(--calm-ease); }
+.calm-bars.on{ opacity:1; transition:opacity var(--calm-fade) var(--calm-ease); }
+.calm-bars.left{ left:max(var(--calm-edge), env(safe-area-inset-left)); }
+.calm-bars.right{ right:max(var(--calm-edge), env(safe-area-inset-right)); }
+.calm-bar{ display:flex; flex-direction:column; align-items:center; gap:var(--calm-gap-sm); color:var(--calm-dim); transition:color var(--calm-fade); }
+.calm-bar-ico{ display:flex; width:var(--calm-bar-ico); height:var(--calm-bar-ico); }
+.calm-bar-track{ position:relative; display:block; width:var(--calm-bar-w); height:var(--calm-bar-h); border-radius:var(--calm-r-pill); background:var(--calm-fill);
+  border:1px solid var(--calm-hair); transition:border-color var(--calm-fade), box-shadow var(--calm-fade); }
+.calm-bar-fill{ position:absolute; left:0; right:0; bottom:0; height:0; border-radius:var(--calm-r-pill); background:var(--calm-accent); }
+.calm-bar-max{ position:absolute; left:calc(-1 * var(--calm-gap-sm)); right:calc(-1 * var(--calm-gap-sm)); bottom:100%; height:1px; background:var(--calm-ink); }
+.calm-bar-mid{ position:absolute; left:calc(-1 * var(--calm-gap-sm)); right:calc(-1 * var(--calm-gap-sm)); top:50%; height:1px; background:var(--calm-hair); }
+.calm-bar-two.warm .calm-bar-fill{ background:var(--calm-warm); }
+.calm-bar-two.cold .calm-bar-fill{ background:var(--calm-cold); }
+.calm-bar-lab{ font-size:var(--calm-fs-small); line-height:var(--calm-lh-tight); text-align:center; max-width:5.5em; }
+.calm-bar.act{ color:var(--calm-accent); }
+.calm-bar.act .calm-bar-track{ border-color:var(--calm-accent); box-shadow:var(--calm-glow); }
+.calm-hint{ position:absolute; left:50%; top:12%; transform:translateX(-50%); width:min(560px, calc(100vw - 4 * var(--calm-edge))); margin:0;
+  padding:var(--calm-gap) var(--calm-pad); border-radius:var(--calm-r-card); text-align:center; color:var(--calm-ink); font-size:var(--calm-fs-value); line-height:var(--calm-lh); }
+.calm-hint[hidden]{ display:none; }
+/* one message at a time: while the low-light message shows (latmeter.js sets body.dark-on) the Calm lines at the top give way */
+body.dark-on .calm-idle, body.dark-on .calm-hint{ visibility:hidden; }
 @media (orientation:landscape){
   .calm-ctl{ left:auto; right:max(var(--calm-edge), env(safe-area-inset-right)); bottom:auto; top:50%; transform:translateY(-50%); width:min(300px, 36vw);
     margin:0; grid-template-columns:repeat(2,minmax(0,1fr)); }
   .calm-ibtn{ right:auto; left:max(var(--calm-edge), env(safe-area-inset-left)); }
   .calm-idle{ top:8%; right:calc(36vw + 28px); }
+  .calm-hint{ top:auto; bottom:max(var(--calm-edge), env(safe-area-inset-bottom)); }   /* RUN 8: below the bars (a short screen) */
+  .calm-bars{ --calm-bar-h:min(24vh, 200px); }
   .calm-card{ width:min(760px, calc(100vw - 28px)); display:grid; grid-template-columns:1fr 1fr; column-gap:var(--calm-pad-lg); align-content:start; }
   .calm-card .calm-ihead{ grid-column:1/-1; }
   .calm-card p{ margin:var(--calm-gap-sm) 0; }

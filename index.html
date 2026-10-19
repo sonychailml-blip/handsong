@@ -568,6 +568,17 @@
 <div id="calmShell" hidden>
   <div id="calmLantern" class="calm-lantern" hidden></div>
   <div id="calmVeil" class="calm-veil"><p id="calmVeilMsg" class="calm-veil-msg" data-i18n="calm.asleep" hidden>Sleeping — tap to wake</p></div>
+  <!-- RUN 8 (slice 3): while the hands play — the forest's depth on the playing hand's side, the three effects on the effects hand's side
+       (calmshell.js sets each bar's value, its side and which one glows); the effects hand's one-line hint, shown once on this device -->
+  <div id="calmForestBar" class="calm-bars" aria-hidden="true">
+    <div class="calm-bar" data-bar="forest"><span class="calm-bar-ico" data-svg="forest"></span><span class="calm-bar-track"><span class="calm-bar-fill"></span><span class="calm-bar-max"></span></span><span class="calm-bar-lab" data-i18n="calm.forest">Forest</span></div>
+  </div>
+  <div id="calmFxBars" class="calm-bars" aria-hidden="true">
+    <div class="calm-bar" data-bar="echo"><span class="calm-bar-ico" data-svg="echo"></span><span class="calm-bar-track"><span class="calm-bar-fill"></span></span><span class="calm-bar-lab" data-i18n="calm.fx.echo">Echo</span></div>
+    <div class="calm-bar calm-bar-two" data-bar="tone"><span class="calm-bar-ico" data-svg="tone"></span><span class="calm-bar-track"><span class="calm-bar-mid"></span><span class="calm-bar-fill"></span></span><span class="calm-bar-lab" data-i18n="calm.fx.tone">Warm or Bright</span></div>
+    <div class="calm-bar" data-bar="wave"><span class="calm-bar-ico" data-svg="wave"></span><span class="calm-bar-track"><span class="calm-bar-fill"></span></span><span class="calm-bar-lab" data-i18n="calm.fx.wave">Wave</span></div>
+  </div>
+  <p id="calmFxHint" class="calm-hint calm-glass" role="status" data-i18n="calm.fxHint" hidden></p>
   <div id="calmFade" class="calm-fade">
     <p id="calmIdle" class="calm-idle" data-i18n="calm.idle">Raise a hand to play</p>
     <button id="calmInfoBtn" class="calm-ibtn calm-glass" data-svg="info" data-i18n-title="calm.info" title="About"></button>
@@ -578,7 +589,7 @@
       <button id="calmNotes" class="calm-rb"><span class="calm-circ" data-svg="note-follow"></span><span class="calm-lab" data-i18n="calm.notes">Notes</span><span class="calm-val"></span></button>
       <button id="calmBg" class="calm-rb"><span class="calm-circ" data-svg="background"></span><span class="calm-lab" data-i18n="calm.bg">Background</span><span class="calm-val"></span></button>
       <button id="calmSleep" class="calm-rb"><span class="calm-circ" data-svg="sleep"></span><span class="calm-lab" data-i18n="calm.sleep">Sleep</span><span class="calm-val"></span></button>
-      <label id="calmForestRow" class="calm-vol" hidden><span class="calm-vico" data-svg="forest"></span><span class="calm-lab" data-i18n="calm.forest">Forest</span><input id="calmForest" type="range" min="0" max="1" step="0.01" value="0.6"></label>
+      <label id="calmForestRow" class="calm-vol" hidden><span class="calm-vico" data-svg="forest"></span><span class="calm-lab" data-i18n="calm.forest">Forest</span><span class="calm-vol-in"><input id="calmForest" type="range" min="0" max="1" step="0.01" value="0.6"><span id="calmForestMark" class="calm-vol-mark"></span></span></label>
     </div>
   </div>
   <div id="calmInfo" class="calm-card calm-glass" role="dialog" aria-modal="true" hidden>
@@ -588,7 +599,12 @@
     <p data-i18n="calm.phones">Use headphones — the forest is quiet.</p>
     <button id="calmLanternTg" class="calm-tg"><span class="calm-vico" data-svg="lantern"></span><span data-i18n="calm.lantern">Lantern: a soft light at the bottom edge for your hands</span><span class="calm-tsw"><span></span></span></button>
     <button id="calmFieldTg" class="calm-tg"><span class="calm-vico" data-svg="note-stay"></span><span data-i18n="calm.field">Show the full note field</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmLightTg" class="calm-tg"><span class="calm-vico" data-svg="forest"></span><span data-i18n="calm.light">Lighter forest — for older computers and phones</span><span class="calm-tsw"><span></span></span></button>
     <button id="calmFirstRun" class="calm-lnk" data-i18n="calm.firstRun" hidden>Show the first steps again</button>
+    <button id="calmJointsTg" class="calm-tg calm-dev" hidden><span class="calm-vico" data-svg="hand"></span><span data-i18n="calm.joints">Fingers: only the tips (development)</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmSceneTg" class="calm-lnk calm-dev" hidden>Forest picture: high (development)</button>
+    <button id="calmMeasure" class="calm-lnk calm-dev" data-i18n="calm.measure" hidden>Measure this device (about 2 minutes, development)</button>
+    <pre id="calmMeasureOut" class="calm-measure" hidden></pre>
     <button id="calmToFull" class="calm-lnk calm-dev" data-i18n="calm.toFull" hidden>Open the full app (development)</button>
     <button id="calmToSound" class="calm-lnk calm-dev" data-i18n="calm.toSound" hidden>Sound panel and diagnostics (development)</button>
   </div>

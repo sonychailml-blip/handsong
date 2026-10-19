@@ -14,7 +14,7 @@ export const WAVES=Object.freeze(['sine','square','sawtooth','triangle']);
    cut-off a filter envelope may reach (lp · max(fo, 1 + fv)); nodesMax: Web Audio nodes per voice (the cost cap) */
 export const TB=Object.freeze({ lvl:[0,0.5], gain:[0,1], ratio:[0.25,8], det:[-100,100], lp:[20,20000], att:[0.001,5], rel:[0.005,10],
   fo:[0.1,8], ft:[0.001,5], fv:[0,4], hj:[0,1], cutMax:24000, partials:8, pMult:[0.25,16], pGain:[0,1], pDecay:[0.01,10], pGainSum:2,
-  glide:[0,1], quant:[0,4], nameMax:60, nodesMax:64,
+  glide:[0,1], quant:[0,4], nameMax:60, nodesMax:64, voices:[1,16],
   oscs:8, mult:[0.25,16], oscGainSum:2, Q:[0.0001,30], open:[1,8], fmRatio:[0.25,16], fmIndex:[0,20], tau:[0.001,5],
   kitVm:[0,2], kitD:[0.005,5], ksFb:[0.5,0.998], unit:[0,1], nl:[0,5], sympN:8, sympRatio:[0.25,8], sympQ:[0.1,100], sympGain:[0,0.5], bodyQ:[0.1,30], bodyDb:[-24,24],
   /* RUN 7: the modal and breath engines (Calm's sound pass) — modes / harmonics, soft-high lowpass, noise paths, own vibrato and breathing */
@@ -139,6 +139,9 @@ export const ENGINES=Object.freeze({
 /* the policies each family carries today (user answer T3: written into every record with today's role values; the app reads the role
    until stage 7; a probe pins record = role) */
 export const POLICY_KEYS=Object.freeze(['voiceMode','glide','register','quant']);
+/* RUN 8: the timbre's OWN policies (not a role value): voices — how many strikes of a struck solo timbre may ring at once (absent = no cap) */
+export const POLICY_OWN=Object.freeze(['voices']);
+const STRUCK=['tine','modal'];
 const fin=x=>typeof x==='number' && Number.isFinite(x);
 const inB=(x,[lo,hi])=>fin(x) && x>=lo && x<=hi;
 const plain=o=>o!==null && typeof o==='object' && !Array.isArray(o) && Object.getPrototypeOf(o)===Object.prototype;
@@ -190,7 +193,9 @@ export function checkTimbre(rec){
   if(!inB(rec.env.att, TB.att)) return 'env.att: '+JSON.stringify(rec.env.att)+' outside '+TB.att.join('…');
   if(!inB(rec.env.rel, TB.rel)) return 'env.rel: '+JSON.stringify(rec.env.rel)+' outside '+TB.rel.join('…'); }
   const P=rec.policies; if(!plain(P)) return 'policies: missing';
-  for(const k of Object.keys(P)) if(!POLICY_KEYS.includes(k)) return 'policies: unknown field «'+k+'»';
+  for(const k of Object.keys(P)) if(!POLICY_KEYS.includes(k) && !POLICY_OWN.includes(k)) return 'policies: unknown field «'+k+'»';
+  if('voices' in P){ if(!STRUCK.includes(rec.engine)) return 'policies.voices: only the struck solo engines ('+STRUCK.join(', ')+')';
+    if(!(Number.isInteger(P.voices) && inB(P.voices, TB.voices))) return 'policies.voices: a whole number '+TB.voices.join('…'); }
   if(!(P.voiceMode===null || P.voiceMode==='poly' || P.voiceMode==='lead')) return 'policies.voiceMode: null, poly or lead';
   if(!(P.glide===null || inB(P.glide, TB.glide))) return 'policies.glide: null or seconds '+TB.glide.join('…');
   if(!(P.register===null || ['solo','chord','bass'].includes(P.register))) return 'policies.register: null, solo, chord or bass';
@@ -210,7 +215,7 @@ export const TIMBRE_DAMAGES=Object.freeze([
   ['recipe.ratio', dmg('ratio',64)], ['recipe.t1', dmg('t1','custom')],
   ['recipe: the filter envelope', r=>{ if('lp' in r.recipe){ r.recipe.lp=9000; r.recipe.fo=3; return 'recipe: the filter envelope'; } r.recipe.lvl=2; return 'recipe.lvl'; }],
   ['recipe: unknown field', r=>{ r.recipe.evil=1; }], ['env.att', r=>{ r.env.att=0; }], ['env.rel', r=>{ r.env.rel=60; }],
-  ['policies.glide', r=>{ r.policies.glide=5; }], ['policies.quant', r=>{ r.policies.quant=-1; }], ['engine', r=>{ r.engine='wasm-unknown'; }],
+  ['policies.glide', r=>{ r.policies.glide=5; }], ['policies.voices', r=>{ r.policies.voices=99; }], ['policies.quant', r=>{ r.policies.quant=-1; }], ['engine', r=>{ r.engine='wasm-unknown'; }],
   ['family', r=>{ r.family='drone'; }], ['id', r=>{ r.id='Bad Id'; }], ['name', r=>{ r.name='x'.repeat(200); }], ['version', r=>{ r.version=2; }],
   ['unknown field', r=>{ r.script='alert(1)'; }], ['NaN', r=>{ r.recipe.lvl=NaN; }],
 ]);

@@ -233,7 +233,7 @@ const dBof=x=> x>0 ? 20*Math.log10(x) : -Infinity;
 function engVoices(){
   const now=AC?AC.currentTime:0; while(hitT.length && hitT[0]<now-1) hitT.shift();
   const on=a=>a.reduce((n,v)=>n+(v.owner?1:0),0);
-  return { ld:{ built:lv.length, sounding:Object.keys(leadHold).length }, ch:{ built:cv.length, sounding:on(cv), strikes:ffLive.filter(x=>x.owner && x.t+FF_END>now).length },
+  return { ld:{ built:lv.length, sounding:Object.keys(leadHold).length, strikes:strikeLive.filter(x=>!x.faded && x.end>now).length }, ch:{ built:cv.length, sounding:on(cv), strikes:ffLive.filter(x=>x.owner && x.t+FF_END>now).length },
            bs:{ built:bv.length, sounding:Object.keys(bassHold).length }, drums:{ hitsLastSec:hitT.filter(t=>t<=now).length } };
 }
 let roleAn=null, roleBuf=null;   // per-role analysers: built on the FIRST levels({roles:true}) call only (a read-only branch off each role bus)
@@ -405,8 +405,8 @@ const EXPR_A={
    «разбросанные фазы свежего голоса» (B). Две догадки по чтению кода не подтвердились; ухо с этим инструментом нашло
    обе настоящие причины «фазера» и «подъезда» замороженной дорожки, и A и B стали ПОВЕДЕНИЕМ (см. voiceStart и leadOn/
    bassOn). Инструмент — render.aud / render.live / render.stop (довод и строки консоли — в render.js и CLAUDE.md). */
-const DBG={ noHum:false };   // LR1-уборка: fdnLive снят вместе с прежней проводкой петель реверба (одна проводка — с одним входом)
-function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
+const DBG={ noHum:false, noStrikeCap:false, strikeCut:false };   // RUN 8: noStrikeCap / strikeCut — the «CALM stress» row's CONTROLS (the cap off; a capped strike cut without its fade)   // LR1-уборка: fdnLive снят вместе с прежней проводкой петель реверба (одна проводка — с одним входом)
+function setDbg(o){ DBG.noHum=!!(o&&o.noHum); DBG.noStrikeCap=!!(o&&o.noStrikeCap); DBG.strikeCut=!!(o&&o.strikeCut); }
 /* ═══ ⛳ СБРОС КОПИИ РЕНДЕРА — КАЖДЫЙ РЕНДЕР НАЧИНАЕТСЯ С ЧИСТОЙ КОПИИ (починка после MX2) ═══
    Копия движка ('./audio.js?render') ОДНА на сессию, и всё модульное, что рендер ставит ей, иначе живёт до следующего рендера: функции
    «ключ → уровень / панорама» (MX1/MX2), раскладчик offline, семя rnd, отладка DBG, ключ владельца удара, величины соло-ноты в pendFx,
@@ -421,10 +421,10 @@ function renderReset(){
   timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
-  DBG.noHum=false; offline=false; rnd=Math.random;
+  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
-const renderStateOf=()=>({ offline, noHum:DBG.noHum, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
+const renderStateOf=()=>({ offline, noHum:DBG.noHum, noStrikeCap:DBG.noStrikeCap, strikeCut:DBG.strikeCut, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
   hitOwner:hitOwnerKey, route:routeOfOwner('loop:0'), pend:[pendFx.vib,pendFx.drv,pendFx.trm,pendFx.bri].join(','), pool:[cvEagerDbg,cvNaiveDbg].join(',') });
 /* ═══ ⛳ ФАЗЫ СВЕЖЕГО ГОЛОСА — РАЗБРОСАНЫ СТАРТОМ, КАК У ДАВНО ИДУЩЕГО (B, подтверждено на слух) ═══
    ⚠️ ДЕФЕКТ: осцилляторы голоса стартовали ОДНОВРЕМЕННО, то есть В ОДНОЙ ФАЗЕ. У SuperSaw пять пил, расстроенных почти
@@ -1217,6 +1217,17 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
   cvSpare();
 }
 const ffLive=[];   // strikes not yet over: { owner, g, t, g0, route, cancelled? }
+/* RUN 8: a PROFILE's per-timbre level trim (Calm's data/profiles/calm.json «levels», dB → gain), applied on the solo voice's volume stage
+   with the hand's volume; the strike's velocity (brightness) is not touched. Empty (Full, every render) = × 1 exactly. Live only: the
+   Calm shell sets it with the face (calmshell.js), a render copy sets its own only when asked (the «CALM stress» row). */
+const timbreTrim=new Map();
+function setTimbreTrim(levels){ timbreTrim.clear(); for(const [id,db] of Object.entries(levels||{})){ const i=timbreIdx('ld',id); if(i!=null && db) timbreTrim.set(i, Math.pow(10, db/20)); } }
+const trimOf=i=> timbreTrim.size ? (timbreTrim.get(i) ?? 1) : 1;
+/* RUN 8 (C8): LOW POWER — Calm's «Lighter forest» choice (calmshell.js): struck timbres ring at most LOW_CAP × their policies.voices
+   (modules/timbres/strikes.js reads E.lowPower). Live only; a render copy is always full quality (renderReset). */
+let lowPower=false;
+const setLowPower=v=>{ lowPower=!!v; };
+const strikeLive=[];   // RUN 8: solo strikes (tine / modal banks) still ringing — the per-timbre cap's list (modules/timbres/strikes.js)
 const ffInfo=()=>ffLive.map(x=>({ owner:x.owner, t:x.t, route:x.route, cancelled:!!x.cancelled }));   // probes only
 /* strikes of `owner` that begin at or after `when` never sound */
 function ffCancel(owner,when){
@@ -1286,6 +1297,7 @@ async function initAudio(mkCtx){
   for(const k in FX_DIP_T){ if(FX_DIP_T[k]) clearTimeout(FX_DIP_T[k]); delete FX_DIP_T[k]; }   // ждущая пересборка старого контекста нам не нужна и сработать не должна
   FX_AIM.clear();
   ffLive.length=0;   // SND-F1: strikes of an earlier context are gone with it
+  strikeLive.length=0;   // RUN 8: the solo strikes too
   bldHum=null; bldVib=null;
   /* KS-ворклет грузим В НАЧАЛЕ (по-прежнему внутри клика — правило #1 цело), ДО buildLeadBanks,
      чтобы banks[] строился синхронно и не разъехался с LEAD_INSTR. Провал загрузки — не падаем:
@@ -1848,7 +1860,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      после атаки и точки бенда (scheduleBend) сюда не относятся и не тронуты. */
   if(freq!=null)b.setFreq(freq, fresh ? 0 : (glide==null?undefined:glide), t);   // null тоже «нет»: умолчание параметра ловит только undefined, а null дал бы τ=0 — скачок   // V1: скольжение — только легато-переезд звучащего голоса; свежая атака — умолчание банка (20 мс), как было. Время — последним (правило #15)
   const a=volAmp(vol);                        // VOL-2b: ОДНА кривая громкости — амплитуда v² (прежде у соло линейная: гейн = vol)
-  v.vol.gain.setTargetAtTime(a,t,0.04);
+  v.vol.gain.setTargetAtTime(a*trimOf(ins),t,0.04);   // RUN 8: × the profile's level trim of this timbre (1 when none — Full, renders)
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }   // ЧТО звучит — для подсветки; пишем КАЖДЫЙ кадр, поэтому ведение ноты (смена ступени под пальцем) отражается сразу
   if(v.on)return;
   v.on=true; v.tOn=t;
@@ -1859,12 +1871,17 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      событии НЕ хранится), теперь в СВОЙ ConstantSource голоса. Высоту дёргаем на bank.hum (у органа/падов
      0 — не маскируем биения строёв), уровень и время атаки — всем чуть-чуть (на биения не влияет). */
   const hum = b.hum==null?1:b.hum;
-  v.hum.offset.setTargetAtTime((rnd()*2-1)*HUM_CENTS*hum*(DBG.noHum?0:1), t, 0.006);   // DBG.noHum — отладка на слух (число из потока берётся всё равно)
+  const humC=(rnd()*2-1)*HUM_CENTS*hum*(DBG.noHum?0:1);   // RUN 8: kept — a struck strike takes it as a fixed detune (below)
+  v.hum.offset.setTargetAtTime(humC, t, 0.006);   // DBG.noHum — отладка на слух (число из потока берётся всё равно)
   const lvlJ = 1 - rnd()*0.05;                       // −0..5% уровня
   const attJ = LEAD_INSTR[ins].att*(0.9+rnd()*0.2);   // ±10% времени атаки
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(lvlJ,t,tie?0.02:attJ);  // T3: связка — вход за τ 20 мс, как кроссфейд банков живьём
-  if(!tie) b.strike && b.strike(t, volVel('ld',a), pendSymp);  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
+  /* RUN 8 (cost): a struck bank (tine / modal) plugs the pitch taps into its strike's oscillators only when they MOVE at the strike — this
+     note's vibrato, or a live expression shimmer; else the humanisation is a fixed detune. Read from the note's values, so a render
+     decides as live play does. */
+  const mod= pendFx.vib>0 || !!(v.shim && exprVibPitch && Math.abs(exprVibPitch.gain.value)>1e-3);
+  if(!tie) b.strike && b.strike(t, volVel('ld',a), pendSymp, { hum:humC, mod });  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
 }
 /* ins (T0-fix) — тембр ВЕДЕНИЯ: смена ЖИВОГО тембра соло посреди ноты ПЕРЕЛИВАЕТ звучащую ноту (живой путь
    зовёт leadOn каждый кадр, и leadVoiceBank делает кроссфейд банков голоса за 20 мс). Запись пишет это
@@ -1881,7 +1898,7 @@ function leadSet(owner,freq,vol,deg,oct,ins,glide,when){           // веден
   const b=v.banks[v.ins];
   applyVoiceFx(v,pendFx,t,false);                           // ВЕДЕНИЕ эффектов зажатой ноты — в её собственный голос (прежде это была запись в общие узлы шины). fresh=false ВСЕГДА: leadSet по определению не атака
   if(freq!=null&&b)b.setFreq(freq,glide==null?undefined:glide,t);   // V1: glide не задан (undefined ИЛИ null) — умолчание банка (20 мс), как было
-  v.vol.gain.setTargetAtTime(volAmp(vol),t,0.04);   // VOL-2b: та же кривая, что на атаке
+  v.vol.gain.setTargetAtTime(volAmp(vol)*trimOf(v.ins),t,0.04);   // VOL-2b: та же кривая, что на атаке; RUN 8: × the level trim
   if(deg!=null){ v.deg=deg; v.oct=oct||0; }                  // ступень ведётся вместе с частотой — подсветка идёт за нотой
 }
 /* Отпускание: голос УХОДИТ ИЗ leadHold сразу — подсветка гаснет ровно в тот момент, когда сняли ноту,
@@ -2142,7 +2159,7 @@ function drone(owner, d, time){ if(owner) dronePan(ownerPan(owner),time); droneU
    (`build`) also has setters (a moved builder writes it only through E). ⛔ Never in E: static data (timbre tables, FX_FACTORY, REV_A …).
    Probe row «AUD1 engine context» (probes/engine.js). */
 const E=Object.freeze({
-  get ac(){ return AC; }, get offline(){ return offline; }, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
+  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
   master:Object.freeze({ get in(){ return master; }, get glue(){ return mGlue; }, get make(){ return mMake; }, get lim(){ return mLim; },
     get limiter(){ return limiter; }, get out(){ return outLast; }, get meter(){ return meterAn; }, get level(){ return masterLvl; }, get limRed(){ return limRed; } }),
   /* role buses: the solo sum before the expression stage, the chain heads (live), the drone bus; `head(key)` = a chain key's head */
@@ -2153,7 +2170,7 @@ const E=Object.freeze({
   lfo:Object.freeze({ get vib(){ return vibLFO; }, get trem(){ return tremLFO; }, get shimPitch(){ return exprVibPitch; }, get shimAmp(){ return exprVibAmp; } }),
   expr:Object.freeze({ get wah(){ return exprWah; }, get satSoft(){ return exprSatSoftG; }, get satHard(){ return exprSatHardG; }, get dlyWet(){ return exprDlyWet; } }),
   fx:Object.freeze({ inst:FX_INST, head:FX_CHAIN_HEAD, out:FX_CHAIN_OUT, links:FX_CHAIN_LINKS, path:FX_PLAY_PATH, aim:FX_AIM, dipT:FX_DIP_T }),
-  pool:Object.freeze({ ld:Object.freeze({ v:lv, hold:leadHold }), ch:Object.freeze({ v:cv, hold:chordHold, ff:ffLive, seed:cvSeedAt }), bs:Object.freeze({ v:bv, hold:bassHold }) }),
+  pool:Object.freeze({ ld:Object.freeze({ v:lv, hold:leadHold, strikes:strikeLive }), ch:Object.freeze({ v:cv, hold:chordHold, ff:ffLive, seed:cvSeedAt }), bs:Object.freeze({ v:bv, hold:bassHold }) }),
   wk:Object.freeze({ get ks(){ return ksReady; }, get dyn(){ return dynReady; }, get dynWarned(){ return dynWarned; }, set dynWarned(x){ dynWarned=x; },
     get frz(){ return frzReady; }, get frzStore(){ return frzStoreNode; },
     get frzSink(){ return frzSink; }, get cap(){ return capMod; }, get capOk(){ return capOk; } }),
@@ -2170,7 +2187,7 @@ const E=Object.freeze({
 });
 const engineCtx=()=>E;
 export {
-  outputFade, outputFadeLevel, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
+  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
   initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, bendTapSet, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,

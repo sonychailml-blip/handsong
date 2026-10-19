@@ -15,7 +15,12 @@ export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);
 const LV={ full:{ dpr:1.5, fps:60 }, reduced:{ dpr:0.75, fps:30 }, minimal:{ dpr:0, fps:0 } };
 const ROOMS={ forest:buildForest };
 const REDUCE=typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level='full', made=0, live=0, last=0, notesSeq=0, bg='camera';
+/* RUN 8 (slice 4): the scene's QUALITY is a choice remembered on this device (the development switch in Calm's ⓘ: high / medium / low =
+   full / reduced / minimal); nothing switches by itself yet (C8 decides from measurements) */
+const LEVEL_KEY='handsong.sceneLevel';
+const storedLevel=()=>{ try{ const v=localStorage.getItem(LEVEL_KEY); return v && LV[v] ? v : null; }catch(e){ return null; } };
+export const SCENE_LEVEL_DEFAULT='full';
+let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level=storedLevel()||SCENE_LEVEL_DEFAULT, made=0, live=0, last=0, notesSeq=0, bg='camera';
 const errors=[], info={ fps:0, ms:0, frames:0, t0:0 };
 
 /* three.js r128, once (own origin; CSP script-src 'self') */
@@ -69,6 +74,7 @@ function sceneFrame(t, bus){
   const t0=performance.now();
   room.update(dt, t/1000, bus.get('handsView')||[], bus.get('calmFx'));   // RUN 7 (C5): the Calm effects' values for the forest's visuals
   renderer.render(room.scene, room.camera);
+  if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
   info.frames++; if(!info.t0) info.t0=t; if(t-info.t0>=1000){ info.fps=Math.round(info.frames*1000/(t-info.t0)); info.frames=0; info.t0=t; }
 }
@@ -90,12 +96,32 @@ stackAdd({ kind:'visual', id:'backdrop', layer:'background', cost:{ cls:'light',
 export function setBackground(mode){
   if(!BACKGROUNDS.includes(mode)) mode='camera';
   bg=mode; stackSet('camera', mode==='camera');
+  /* RUN 8: the 2D canvas is OPAQUE (vision.js: alpha:false — Full's text and picture rely on it), so its «clear» was black over the room:
+     the user saw a plain black forest. On the Forest background the canvas is composited with SCREEN (style.css): its black lets the room
+     through, its lights (fireflies, glow, halo) add on top. Calm draws no text on the canvas. */
+  document.body.classList.toggle('bg-forest', mode==='forest');
   if(mode==='forest') return sceneOpen('forest').catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
   sceneClose(); return Promise.resolve(sceneInfo());
 }
 export const backgroundOf=()=>bg;
+/* choose the scene's quality → a promise of sceneInfo(); an open room is rebuilt at the new level (its WebGL context released first) */
+export function setSceneLevel(v){
+  if(!LV[v]) return Promise.resolve(sceneInfo());
+  level=v; try{ localStorage.setItem(LEVEL_KEY, v); }catch(e){}
+  if(bg!=='forest') return Promise.resolve(sceneInfo());
+  if(room){ room.dispose(); room=null; } dropRenderer(true); stackSet('scene', false);
+  return sceneOpen('forest').catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
+}
+export const sceneLevel=()=>level;
 export const sceneInfo=()=>({ id:room?room.id:null, bg, level, webgl:!!renderer, contextsMade:made, contextsLive:live, fps:info.fps, frameMs:Math.round(info.ms*10)/10,
   errors:errors.slice(-5) });
 /* probes: the room object (numbers through its state()/project()); a level for the next open */
 export const sceneRoomDbg=()=>room;
+/* probe only: the room's next RENDERED frame, downscaled to 64 × 36 → its mean RGB sum (null without WebGL; times out after 2 s) */
+let snapWant=null;
+export function sceneSnapDbg(){
+  if(!renderer || !glCanvas) return Promise.resolve(null);
+  return new Promise(res=>{ const to=setTimeout(()=>{ snapWant=null; res(null); }, 2000);
+    snapWant=()=>{ clearTimeout(to); const t=document.createElement('canvas'); t.width=64; t.height=36; const g=t.getContext('2d'); g.drawImage(glCanvas,0,0,64,36);
+      const px=g.getImageData(0,0,64,36).data; let sum=0; for(let i=0;i<px.length;i+=4) sum+=px[i]+px[i+1]+px[i+2]; res(sum/(px.length/4)); }; }); }
 export const sceneLevelDbg=v=>{ if(LV[v]) level=v; return level; };

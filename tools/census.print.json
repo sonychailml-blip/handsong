@@ -5,7 +5,7 @@
   "made": "2026-10-17T02:16:35.892Z",
   "file": "tools/census.print.json",
   "chains": "{\"role:ld\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]},{\"fxId\":\"reverb\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"y\",\"inv\":false},{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"x\",\"inv\":false},{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"z\",\"inv\":false}]},{\"fxId\":\"dly\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":1,\"axis\":\"y\",\"inv\":false},{\"mode\":\"fixed\"},{\"mode\":\"fixed\"}]},{\"fxId\":\"drv\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":2,\"axis\":\"y\",\"inv\":false}]},{\"fxId\":\"vib\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":3,\"axis\":\"y\",\"inv\":false}]}],\"role:ch\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]},{\"fxId\":\"reverb\",\"params\":[{\"mode\":\"fixed\"},{\"mode\":\"fixed\"},{\"mode\":\"fixed\"}]},{\"fxId\":\"bright\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"z\",\"inv\":true}]}],\"role:bs\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]}],\"role:dr\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]}]}",
-  "note": "C4a (RUN 6): «play» renewed for the new solo timbre solo.firefly (+1 solo voice, +3 strike partials); «init» unchanged | RUN 7: «play» renewed — one note of each of the six new Calm timbres (modal / breath voices); «init» unchanged"
+  "note": "RUN 8: play Gain 997 → 1006 — the strike cap (one tap sum per struck bank ×5, one gain per modal strike ×4); nothing else changed (compared first). C4a (RUN 6): «play» renewed for the new solo timbre solo.firefly (+1 solo voice, +3 strike partials); «init» unchanged | RUN 7: «play» renewed — one note of each of the six new Calm timbres (modal / breath voices); «init» unchanged"
  },
  "counts": {
   "init": {
@@ -22,7 +22,7 @@
   },
   "play": {
    "ConstantSource": 31,
-   "Gain": 997,
+   "Gain": 1006,
    "WaveShaper": 30,
    "ChannelMerger": 88,
    "BiquadFilter": 195,

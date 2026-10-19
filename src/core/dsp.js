@@ -14,10 +14,14 @@ export function seeded(seed){
    and the note send 0.8 are the prototype's gains. Three room lengths (SND-F1b): Short 0.85 s, Medium 1.7 s, Long 3.4 s (the prototype) —
    the same recipe and seeds, the envelope recomputed for each length (a shorter room, not a cut tail). A pure function of rate and length. */
 export const FOREST={ sec:3.4, rooms:[0.85, 1.7, 3.4], room:1.7, pow:2.6, wet:0.55, send:0.8, seeds:[0x4E464F31, 0x4E464F32] };
-/* RUN 7 (C4b, Calm plan §4.2): DEPTH → THE FOREST — the prototype's distance colouring, d = 0 near … 1 far: the send to the room
-   0.5 + 0.8·d (0.5 … 1.3), the dry level 1 − 0.55·d, a darkening lowpass 900 + 8000·(1 − d)^1.5 Hz. Calm's own effect «Forest depth»
-   (modules/effects/forestdepth.js) plays it; Full's Night forest is unchanged (its send stays 0…1). Node row «CALM depth curve (core)». */
-export const CALM_DEPTH=Object.freeze({ send0:0.5, sendK:0.8, dryK:0.55, lp0:900, lpK:8000, lpPow:1.5 });
+/* DEPTH → THE FOREST (RUN 7 C4b; RUN 8 — the user: «depth changes only the amount of forest, never the loudness»), d = 0 near … 1 far: the
+   dry note stays almost level (1 − dryK·d: −0.9 dB at most) and the room's send rises send0 → send0 + sendK (≈ 14 dB more forest far than
+   near); the far forest is darker: a lowpass lp0 + lpK·(1 − d)^lpPow on the SEND only (the dry note keeps its brightness). Measured (RUN 8,
+   K-like loudness of Calm's four sounds): a literal equal-power crossfade keeps the ENERGY but not the loudness of a struck note (its
+   attack follows the dry part; the room's energy is in the tail) — far notes lost 4–6 dB; this curve keeps all four within ±1.5 dB (browser
+   row «CALM depth loudness»). Calm's own effect «Forest depth» plays it; Full's Night forest is unchanged. Node row «CALM depth curve (core)».
+   (RUN 7's prototype curve — send 0.5 → 1.3, dry 1 → 0.45, the lowpass on both — made a far note ≈ 5–9 dB quieter.) */
+export const CALM_DEPTH=Object.freeze({ dryK:0.10, send0:0.5, sendK:2, lp0:2200, lpK:6700, lpPow:1.5 });
 export function calmDepth(d){ const x=Math.max(0, Math.min(1, +d||0)), C=CALM_DEPTH;
   return { send:C.send0+C.sendK*x, dry:1-C.dryK*x, lp:C.lp0+C.lpK*Math.pow(1-x, C.lpPow) }; }
 /* the nearest offered room length (in log space: 0.85 · 1.7 · 3.4 are octave steps) */

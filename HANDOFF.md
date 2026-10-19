@@ -101,7 +101,7 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, ✅ GES1 (NIGHT + DAY run), ✅ UI1b, ✅ TIM2, ✅ SAVE1 (files), ✅ DRAW1 (DAY run);
 ✅ AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1 part 1, SONG3 (= SAVE1 + AUTOSAVE1) (RUN 3); ✅ PACK1, IDS1 part 2, SONG2; ✅ RUN 4: DOC1, SONG3 rest, POOL1, ENG2, TIM3a–d; plans CMD1/VIS1 written; ✅ RUN 5: CMD1a–d, DOC1 rest;
 the CALM PLAN written (`docs/STAGE4-CALM-plan.md`, reviewed 2026-10-17); UI1a after the redesign) → **4 «Calm»** (RUN 6: ✅ C0, VIS1a–c,
-listening page, design proposals; RUN 7: ✅ sound pass, C11, C6, C4b, C4c, C7, C5; next C8 low power, C9 offline, C10 release, C12) = FIRST
+listening page, design proposals; RUN 7: ✅ sound pass, C11, C6, C4b, C4c, C7, C5; RUN 8: ✅ the user's fixes, the forest picture, C8 part (Lighter forest); next C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12) = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -163,16 +163,13 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
   exposure too dark — light is the fix) · step 97 (camera busy / off / blocked → message, «Try again»).
 
 ### NIGHT, DAY, RUN 3–6 (2026-10-16/17): records in archive B («Moved from HANDOFF.md at …» the next run); logs `NIGHT-LOG.md`, `WORK-LOG.md`.
-### RUN 7 (2026-10-17/18) — Calm v1; log + plain summary: `WORK-LOG.md` «RUN 7»
-- User decisions (Calm plan «Review RUN 7», BACKLOG §7.19): design = the Hush emblem + Moonglass for everything; fonts OFL with Cyrillic
-  (Atkinson Hyperlegible has none → Andika, unmodified SIL release; Fraunces has none → Literata Light); note modes «follow the hand» / «stay
-  put»; Calm's sounds = FOUR: solo.firefly · solo.breath-flute · solo.handpan · solo.singing-bowl (data, first = default); quality bar
-  `docs/CALM-QUALITY.md` (ten points; each Calm slice names the points it touched).
-- Built: two stateless engine types `modal` / `breath` + six organic timbres (normalised to the app's solo level; listening page v2 with A/B);
-  C11 tokens `--calm-*`, drawn icons + emblem in `icons.js`, app icon = the emblem; C6 the Calm shell (`calmshell.js`, glass capsule, ⓘ, sleep
-  timer, glow note field); C4b Calm's own «Forest depth» (send 0.5→1.3, Full unchanged); C4c the ambience (drone, wind, seeded crickets,
-  Forest volume); C7 the Calm start card + ghost light (`ghost.js`, pose generator moved to `gestures/pose.js`); C5 the effects hand (Echo ·
-  Warmth / Brightness · Wave, Calm-only, forest visuals). `P.calm` + runner `--calm`. Full: ui-snap 0 pixels changed.
-- ⚠️ Open: today's Firefly is ≈ 18 dB quieter than the other three Calm sounds (measured) — the user's level decision; the ambience costs
-  ≈ 3.9 % of a core in the runner (target ≤ 2 % on the plan's scale — phone measurement decides); steps 106–113.
-- Process: one read-only `git diff --stat` was run by mistake early in RUN 7 — no git commands at all from now on.
+### RUN 7 (2026-10-17/18) — Calm v1: record moved to archive B «Moved from HANDOFF.md at RUN 8»; log: `WORK-LOG.md` «RUN 7».
+### RUN 8 (2026-10-19) — the user's Calm fixes (steps 106–113), the forest picture, C8 part; log + plain summary: `WORK-LOG.md` «RUN 8»
+- CRACKLE: struck strikes had no cap (~1000 live oscillators, underruns, Full too) → `policies.voices` per struck timbre (data; the oldest
+  fades — `modules/timbres/strikes.js`), −70 dB tails, cheaper strikes. Row «CALM stress».
+- LEVELS: Calm trims in `data/profiles/calm.json` «levels» (Firefly +16.06, others −2); depth keeps the loudness (±1 dB); ghost louder.
+- VISIBLE: depth halo, «Лес» bar, three effect bars, the effects hint once, a quiet row glow, fingertips as fireflies (dev switch), one
+  message at a time, the «Лес» slider = the forest at most (Forest depth `reach`).
+- FOREST was black (the opaque 2D canvas) → screen-blended in Forest only; music energy; quality levels (dev switch; default high).
+- C8 part: «Lighter forest» in ⓘ (FDN room — Forest depth `light`, caps × 0.6, picture medium) + «Measure this device» (dev).
+  Not done: C8 rest (phone numbers), C9, C10, C12. Open: steps 114–119.

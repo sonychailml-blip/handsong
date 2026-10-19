@@ -429,3 +429,16 @@ Listening page `tools/listen/calm-timbres.html` and the design proposals are rea
   page's «Firefly · Светлячок»), **Breath flute** (`solo.breath-flute`), **Handpan** (`solo.handpan`), **Singing bowl** (`solo.singing-bowl`).
   Data: `data/profiles/calm.json`. Calm offers only these; Full keeps every timbre; nothing deleted. Probe row «CALM timbre set».
 - Open: today's Firefly is 18 dB quieter than the other three in the app (measured) — a level decision is the user's (see WORK-LOG RUN 7).
+
+## RUN 8 (2026-10-19) — the user's checks of steps 106–113, and what changed against this plan
+- §4.2 depth: the prototype's distance colouring (dry 1 → 0.45, the lowpass on both) made a far note 5–9 dB quieter — the user: «depth changes
+  only the amount of forest, never the loudness». A literal equal-power crossfade was measured too: it keeps the energy but not a struck note's
+  loudness (4–6 dB down far). Built: the dry part ≈ level (−0.9 dB far), the room's send 0.5 → 2.5, the darkening on the send only; near →
+  far within ±1 dB for the four sounds. The «Лес» slider is now the forest AT MOST (the room's reach and the ambience's level).
+- §4.1 sounds: struck timbres carry a strike cap in their records (`policies.voices`) — the crackle was the strikes piling up (measured).
+  Calm's levels are data (`levels` in the profile): Firefly +16.06 dB, the others −2 (matched, with headroom).
+- §5 shell: the bars while playing (depth, the three effects), the effects hand's one-line hint, the fingertips as five fireflies, a quiet
+  oval row glow; one message at a time. §3 picture: the room was hidden under the opaque 2D canvas — now screen-blended in Forest.
+- §7 low power (C8, part): the «Lighter forest» choice is built (the FDN room matched to the forest by measurement, struck caps × 0.6, the
+  picture at medium, no blur) — headroom +5…10 % on the user's laptop; NOT built: the automatic proposal (needs the phone numbers — ⓘ
+  «Measure this device» collects them), disconnecting idle effect loops (the next lever, measured ≈ 15 % of the audio thread in Calm idle).

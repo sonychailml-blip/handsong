@@ -13,7 +13,7 @@ import { drawRoll } from './roll.js';
 import { drawLooper, loopViewClear } from './strip.js';
 import { stackAdd } from './stack.js';   // VIS1a: the play screen's two modules
 import { calmView } from '../state.js';   // RUN 7 (C6): the Calm view (glow note field, plain labels)
-import { glowAlpha } from '../core/calmui.js';
+import { CALM_UI } from '../core/calmui.js';
 
  
 /* ================= ОТРИСОВКА ================= */
@@ -439,22 +439,53 @@ function drawRole(instr,rx0,rx1,playH){
 /* VIS1a: the play screen is two visual modules (views/stack.js) — «surface» (instrument layer: the roles' fields, FX bars, the expression
    bar) and «hands» (overlay layer: hand points, the looper strip, its feedback, the status) — drawn in this same order as before */
 /* RUN 7 (C6, Calm plan §5): THE GLOW NOTE FIELD — the bands the hands hit are invisible (the rect layout's rectBandY bands, or the narrow
-   rows' equal division of the height — the SAME geometry gestures use, rule #9); only the band under each PLAYING hand glows softly,
-   brightest at the hand and fading with the horizontal distance (core/calmui glowAlpha), brighter while it sounds. No labels. «Show the
-   full note field» adds faint bands, still without names. calmHands = the bus's handsView of this frame (set by the surface module). */
-let calmHands=[];
+   rows' equal division of the height — the SAME geometry gestures use, rule #9). RUN 8 (the user's screenshots: row lines across the screen,
+   a wide bright band): only a soft OVAL glow on the row under each playing hand — CALM_UI.glowReach of the field's width each side of the hand,
+   fading to nothing at the row's edges and sides, brighter while it sounds; no lines at all. «Show the full note field» adds only a
+   barely-there tint on every other row. calmHands = the bus's handsView of this frame (set by the surface module). */
+let calmHands=[], calmFxV=null;
 function drawCalmField(x0,x1,playH,actSlots,actDegs){
   const w=x1-x0, bands=[], on=new Set();
   if(rectGrid()){ const RL=rectLayout(); for(let b=0;b<RL.bands;b++) bands.push(rectBandY(b,playH,RL.bands)); for(const g of actSlots||[]) on.add(Math.floor(g/RL.k)+RL.regBands); }
   else { const rows=IVX().length, seg=playH/rows; for(let i=0;i<rows;i++) bands.push([i*seg,(i+1)*seg]); for(const d of actDegs||[]) on.add(rows-1-d); }
-  if(calmView.fieldAll) bands.forEach(([yTop,yBot],b)=>{ ctx.fillStyle= b%2 ? cv('white-a05') : cv('white-a03'); ctx.fillRect(x0,yTop,w,yBot-yTop);
-    ctx.strokeStyle=cv('white-a08'); ctx.lineWidth=1; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,yBot-yTop-1); });
+  if(calmView.fieldAll) bands.forEach(([yTop,yBot],b)=>{ if(b%2){ ctx.fillStyle=cv('white-a03'); ctx.fillRect(x0,yTop,w,yBot-yTop); } });
   for(const h of calmHands){ if(!h.play) continue;
-    bands.forEach(([yTop,yBot],b)=>{ if(h.y<yTop || h.y>=yBot) return;
-      const k= on.has(b) ? 1.6 : 1, g=ctx.createLinearGradient(x0,0,x1,0);
-      for(let i=0;i<=8;i++){ const x=x0+w*i/8; g.addColorStop(i/8, hexA(cv('calm-glow'), Math.min(1, glowAlpha(x-h.x, w)*k))); }
-      ctx.fillStyle=g; ctx.fillRect(x0,yTop,w,yBot-yTop); }); }
+    const b=bands.findIndex(([yTop,yBot])=>h.y>=yTop && h.y<yBot); if(b<0) continue;
+    const [yTop,yBot]=bands[b], r=(yBot-yTop)/2, rx=Math.max(r, CALM_UI.glowReach*w), a=Math.min(1, CALM_UI.glowMax*(on.has(b) ? CALM_UI.glowOn : 1));
+    ctx.save(); ctx.beginPath(); ctx.rect(x0,yTop,w,yBot-yTop); ctx.clip(); ctx.translate(h.x, yTop+r); ctx.scale(rx/r, 1);
+    const g=ctx.createRadialGradient(0,0,0,0,0,r); g.addColorStop(0, hexA(cv('calm-glow'), a)); g.addColorStop(0.45, hexA(cv('calm-glow'), a*0.4)); g.addColorStop(1, hexA(cv('calm-glow'), 0));
+    ctx.fillStyle=g; ctx.fillRect(-r,-r,2*r,2*r); ctx.restore(); }
 }
+/* RUN 8 (slice 3 + the user's addendum 5): CALM'S HANDS ARE FIVE FIREFLIES — the five fingertips only (the Hush emblem's five dots), exactly
+   where the camera sees them: the hit-tests' remapped points of THIS frame, no smoothing (the short trail lies behind, never ahead). The playing
+   hand: the finger that sounds (else the index, ready) is the firefly lime with a HALO whose size and softness follow the depth — near: small
+   and sharp, far: wide and soft —, the other four warm amber. The effects hand: index · middle · ring glow with Echo · Warmth / Brightness ·
+   Wave (the values their bars show), thumb and little finger dim amber. The dev switch «tips» off draws all joints as before. */
+const TIP_LM=[4,8,12,16,20], TRAIL_N=6, TRAIL_MS=140, trails=new Map();
+let tipsDrawn=[];
+function halo(x,y,r,soft,col,a){   // soft 0 = a sharp edge … 1 = a wide soft glow
+  const g=ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0, hexA(col, a)); g.addColorStop(0.35-0.25*soft, hexA(col, a*(0.75-0.45*soft)));
+  g.addColorStop(0.75-0.2*soft, hexA(col, a*0.18)); g.addColorStop(1, hexA(col, 0)); ctx.fillStyle=g; ctx.fillRect(x-r,y-r,2*r,2*r); }
+function drawCalmTips(S,k,lm,W,H){
+  const hv=calmHands.find(h=>h.key===k), play= hv ? hv.play : handFnOf(k,'ld')!=='fx', d= hv ? hv.d : 0.5, now=performance.now(), fx=calmFxV||{};
+  const sounding=new Set(Object.keys(S.fing||{}).map(f=>+f+1)); if(play && !sounding.size && S.pinch && S.oct>=0) sounding.add(S.oct+1);   // tip 0 = thumb, 1… = index…
+  const lime=cv('calm-glow'), amber=cv('calm-amber'), u=Math.min(W,H)/600;
+  for(let j=0;j<5;j++){ const x=sx(lm[TIP_LM[j]].x,W), y=sy(lm[TIP_LM[j]].y,H), id=k+':'+j;
+    let tr=trails.get(id); if(!tr) trails.set(id, tr=[]); tr.unshift([x,y,now]); while(tr.length>TRAIL_N || (tr.length && now-tr[tr.length-1][2]>TRAIL_MS)) tr.pop();
+    let col=amber, a=0.75, big=false;
+    if(play){ const lit= sounding.size ? sounding.has(j) : j===1; if(lit){ col=lime; a= sounding.size ? 1 : 0.6; big=true; } }
+    else { const v= j===1 ? fx.echo : j===2 ? Math.abs((fx.tone==null?0.5:fx.tone)-0.5)*2 : j===3 ? fx.wave : null;
+      if(v!=null){ col=lime; a=0.35+0.65*Math.max(0,Math.min(1,+v||0)); } else a=0.45; }
+    for(let q=tr.length-1;q>=1;q--){ const [tx,ty]=tr[q], f=1-q/tr.length; ctx.fillStyle=hexA(col, a*0.25*f); ctx.beginPath(); ctx.arc(tx,ty,(1.5+2*f)*u,0,7); ctx.fill(); }
+    if(big) halo(x,y,(14+30*d)*u, d, col, 0.55*a);
+    halo(x,y,(big?9:7)*u, 0.3, col, 0.5*a);
+    ctx.fillStyle=hexA(col, Math.min(1,a+0.15)); ctx.beginPath(); ctx.arc(x,y,(big?3.2:2.4)*u,0,7); ctx.fill();
+    tipsDrawn.push({ key:k, tip:j, x, y, lit:col===lime, a, halo: big ? (14+30*d)*u : 0 }); }
+}
+/* probe only: the fingertip fireflies drawn in the last frame (positions in canvas pixels, which are lit, the halo's radius) */
+export const calmTipsDbg=()=>tipsDrawn.map(t=>({ ...t }));
+/* probe only: draw the hands overlay once NOW from HANDS (the next screen frame redraws the canvas) → the fingertips drawn */
+export function calmTipsDrawDbg(){ drawHandsPhone({ landmarks:[] }, canvas.width, canvas.height, canvas.height); return calmTipsDbg(); }
 function drawPhone(res){ drawSurface(); drawHandsLayer(res); }
 function drawSurface(){
   const W=canvas.width, H=canvas.height;
@@ -524,9 +555,11 @@ function drawDrumGrid(rx0,rx1,playH){
   }
 }
 function drawHandsPhone(res,W,H,playH){
+  tipsDrawn=[];
   if(!res||!res.landmarks)return;
   for(const k in HANDS){
     const S=HANDS[k], lm=S.lm; if(!lm)continue;
+    if(calmView && calmView.tips){ drawCalmTips(S,k,lm,W,H); continue; }   // RUN 8: Calm's hands are five fireflies (dev switch: all joints)
     /* Роль и X-диапазон ЭТОЙ руки: при сплите — щипок берёт ЗАМОРОЗКУ на S (совпадает с попаданием),
        до щипка — живую половину под указательным (lm[8]); вне сплита — глобальный phoneInstr на весь
        холст (single-role, байт-в-байт). Раздел палитра|ноты — palSplitX того же диапазона. */
@@ -845,6 +878,6 @@ function drawExprBar(rx0,rx1,H){
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
-stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>{ calmHands=bus.get('handsView')||[]; drawSurface(); } });
+stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>{ calmHands=bus.get('handsView')||[]; calmFxV=bus.get('calmFx')||null; drawSurface(); } });
 stackAdd({ kind:'visual', id:'hands', layer:'overlay', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>drawHandsLayer(bus.get('hands')) });
 export { drawOverlays };

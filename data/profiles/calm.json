@@ -16,5 +16,6 @@
   "noteField": "glow",
   "labels": "plain",
   "recording": false,
-  "ambience": "ambience.forest"
+  "ambience": "ambience.forest",
+  "levels": {"solo.firefly": 16.06, "solo.breath-flute": -2, "solo.handpan": -2, "solo.singing-bowl": -2}
 }

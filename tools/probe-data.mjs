@@ -491,16 +491,18 @@ async function busCore(){
 /* RUN 7 (C6): the Calm shell's logic — controls shown only after 1.5 s without hands and hidden at once when a hand is back; a round button
    cycles its list; the sleep timer holds full level until its last 90 s, fades smoothly (monotone, no step) to silence, then sleeps; the
    glow is brightest at the hand and gone beyond its reach. CONTROLS: a shell that ignores the hands, and a fade with a step, must be caught. */
-/* RUN 7 (C4b): the depth → forest curve — the prototype's numbers exactly at d = 0, ½, 1 (the same expressions); clamped outside; monotone
-   (further = more send, less dry, darker); CONTROL: a curve with the old two-thirds saturation (send capped at 1) must be caught */
+/* RUN 7 (C4b) → RUN 8: the depth → forest curve keeps the LOUDNESS (the user: depth changes the amount of forest, never the loudness): the dry
+   part alone never drops more than 1.5 dB (dry ≥ 10^(−1.5/20) at every d — a struck note's loudness follows it), the forest's send rises
+   (far ≥ 3× near), the room darkens; clamped outside 0…1; monotone; CONTROL: RUN 7's prototype curve (dry 1 − 0.55·d) must fail the floor.
+   The loudness itself is the browser row «CALM depth loudness». */
 async function calmDepthCore(){
-  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(what+': '+JSON.stringify(a)+' vs '+JSON.stringify(b)); };
-  const D=await import(new URL('../src/core/dsp.js', import.meta.url).href), f=D.calmDepth;
-  const proto=x=>({ send:0.5+0.8*x, dry:1-0.55*x, lp:900+8000*Math.pow(1-x,1.5) });
-  for(const x of [0,0.5,1]) eq('d = '+x, f(x), proto(x));
-  eq('clamped below / above', [f(-1), f(2)], [proto(0), proto(1)]);
-  { let ok=true, p=f(0); for(let k=1;k<=100;k++){ const c=f(k/100); if(!(c.send>p.send && c.dry<p.dry && c.lp<p.lp)) ok=false; p=c; } n++; if(!ok) d.push('the curve is not monotone'); }
-  { const sat=x=>({ ...proto(x), send:Math.min(1, proto(x).send) }); n++; if(JSON.stringify(sat(1))===JSON.stringify(f(1))) d.push('CONTROL: a saturating send matched — the far third would not be checked'); }
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const D=await import(new URL('../src/core/dsp.js', import.meta.url).href), f=D.calmDepth, FLOOR=Math.pow(10,-1.5/20);
+  for(let k=0;k<=20;k++){ const c=f(k/20); n++; if(!(c.dry>=FLOOR)) miss(`d = ${k/20}: dry ${c.dry} (≥ ${FLOOR.toFixed(4)} expected)`); }
+  n+=2; if(!(f(1).send>=3*f(0).send)) miss(`the forest grows too little: send ${f(0).send} → ${f(1).send}`);
+  if(JSON.stringify([f(-1), f(2)])!==JSON.stringify([f(0), f(1)])) miss('not clamped outside 0…1');
+  { let ok=true, p=f(0); for(let k=1;k<=100;k++){ const c=f(k/100); if(!(c.send>p.send && c.dry<p.dry && c.lp<p.lp)) ok=false; p=c; } n++; if(!ok) miss('the curve is not monotone'); }
+  { const old=x=>({ dry:1-0.55*x }); n++; if(!([0,0.5,1].some(x=>!(old(x).dry>=FLOOR)))) miss('CONTROL: the RUN 7 prototype curve passed the dry floor — the check cannot fail'); }
   return { cases:n, total:d.length, differences:d };
 }
 /* RUN 7 (C4c): the crickets' SEEDED schedule — the same seed gives the same chirps (exact); another seed differs (CONTROL); each chirp's gap

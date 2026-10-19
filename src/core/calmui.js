@@ -5,7 +5,7 @@
    - sleepLevel: the sleep timer (15 / 30 / 60 min) — full level until the last CALM_UI.sleepFadeMs, then a slow cosine fade to silence (the
      forest and the playing fade together; nothing abrupt), then «asleep»;
    - glowAlpha: the glow note field — the row under a hand glows most at the hand and fades with the horizontal distance. */
-export const CALM_UI=Object.freeze({ idleMs:1500, sleepFadeMs:90e3, sleepMins:Object.freeze([0,15,30,60]), glowReach:0.55, glowMax:0.34 });
+export const CALM_UI=Object.freeze({ idleMs:1500, sleepFadeMs:90e3, sleepMins:Object.freeze([0,15,30,60]), glowReach:0.16, glowMax:0.22, glowOn:1.45 });   // RUN 8: a narrower, softer glow (the user: «too visible»)
 
 /* st = { shown, seen } (seen = the last time a hand was in view, ms) → the next state */
 export function showStep(st, hands, now){

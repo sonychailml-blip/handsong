@@ -1549,3 +1549,219 @@ one of my new tests measured too early on a busy computer — now it waits on th
 97 / 97 · golden sounds 99 / 99 (the old sounds unchanged) · the Full app's screens: 0 pixels changed · privacy, network, on-screen checks PASS.
 
 **Note:** early in this run I ran one read-only «git diff» command by mistake (it changed nothing); no git commands at all from now on.
+
+
+# RUN 8 — Calm fixes from the user's checks (steps 106–113), the forest picture, then C8 (2026-10-19)
+The user's results: timbres, ambience, sleep timer, portrait / landscape and the look OK. Problems: (a) the ghost light's notes almost
+inaudible; (b) depth not shown on screen, Firefly much quieter as the hand moves away; (c) the effects hand confusing; (d) NEW: a crackle
+when many notes sound together (never in the standard app on the same laptop). Addendum (screenshots): note field too visible; Forest
+background plain black; the low-light message overlaps the hand hint; the «Лес» slider vs depth; fingertips only as fireflies.
+STARTED slice 1 THE CRACKLE 2026-10-19 11:41
+
+## Slice 1 — the crackle (done; cause measured and fixed; quality bar points 1, 3)
+- REPRODUCED in the runner on this laptop (an i5-3210M, 2 cores, 2012) with synthetic hands through the real processHands: four fingers
+  pinching in turn, overlapping, moving over the rows (≈ 20 strikes/s «extreme»; 8 attacks/s «fast human»), Calm + Forest + ambience + effects.
+- CAUSE (numbers, clean runs, 13-s windows, `AudioContext.playbackStats`): a struck note (Firefly, Handpan, Singing bowl) makes its OWN
+  oscillators per strike and NOTHING capped them — a bowl strike rings 16 s with 8 modes + a noise burst. Live sources piled up: Handpan 412,
+  Bowl 787 (Calm 361 / 771) → the audio thread underran almost continuously: Full Handpan 1196 underruns (12.8 s of 13), Full Bowl 1193;
+  Calm Handpan 1153, Bowl 1152, Firefly 100 (1.0 s). Full + Glass pad, Full + Breath flute: 0. NOT the cause: clipping (peak before the
+  limiter ≤ −8.3 dBFS, the limiter never acted), idle Calm (0 underruns with forest, ambience, dark, camera), denormals, a leak (sources
+  return to the pool's baseline). Audio-thread HEADROOM (new measure: a calibrated load in a probe worklet stepped up until dropouts start;
+  noisy on this throttling laptop, only repeated findings kept): Full idle ≈ 90 % free, Calm idle ≈ 45–55 % — Calm's forest convolution
+  ≈ 15–20 points (it keeps working while idle), four ringing bowl strikes ≈ 30–40, the idle chords' reverb ≈ 5; each mode oscillator and
+  each pitch input into it count; envelopes and the noise burst do not.
+- FIX: (1) a per-timbre STRIKE CAP in data — `policies.voices` (new, optional, struck engines only, 1…16; core/timbre.js validator + a
+  refusing CONTROL in the data runner): Firefly 8, Firefly rich 8, Kalimba 8, Handpan 4, Singing bowl 3; a strike over it fades the OLDEST
+  (τ 10 ms, stopped at ≈ −70 dB — `modules/timbres/strikes.js`, stateless; the list lives in E — rule #38; renders cap exactly as live);
+  (2) modal tails end at −70 dB (was −80); (3) a struck strike plugs the pitch inputs (vibrato, shimmer) into its oscillators only when they
+  move at the strike, else the humanisation is a fixed detune (read from the note's own values, so render = live); Firefly's partials take
+  their detune at block rate; one tap sum per bank. Full gets the same caps (the crackle was there too); GOLD unchanged (99 timbre cases).
+- AFTER: extreme pattern, caps 6/4: Calm Handpan 0, Bowl 0, Full Bowl 9 (was 1193); fast-human pattern: all 0; final caps 4/3 + cheaper
+  strikes: offline ringing ≤ cap (uncapped 21 / 48 / 48), peaks ≤ −2.1 dBFS with Calm's levels. On a HOT laptop (after hours of runs) even
+  the standard app drops out (163 in 6 s) and Calm's struck sounds a little more (180 / 218) — the remaining margin is the forest convolution
+  (C8's «Lighter forest», slice 5).
+- Row «CALM stress» (P.all / P.calm, slow, real time): offline — voices bounded (CONTROL cap off: 48 > 3), no clipping (≤ −1 dBFS; CONTROL
+  master +12 dB exceeds), the cap's fade makes no click (curvature of «capped − uncapped» ≤ 0.25: 0.02–0.09; CONTROL Firefly cut without its
+  fade 0.92); real time — each Calm sound vs the STANDARD APP's same playing in the same session (≤ reference + 2), «not judged» when the
+  reference itself drops out (> 2); CONTROL a 0.5-s stall of the audio thread is counted (56–57). Two fix rounds on the real-time part
+  (absolute zero was a lottery on a hot laptop) — stopped there per the probe budget.
+- Declared renewals: tools/timbres.before.json (the five struck timbres: the strike's own gain, the tap sum, the fixed detune; envelopes within
+  3e-4 of peak), tools/census.print.json (play Gain 997 → 1006: +5 tap sums, +4 per-strike gains). Fix rounds: 4 (stress-row controls ×2, the
+  live count read other timbres' tails, a sed-free endings check).
+STARTED slice 2 LEVELS 2026-10-19 13:10
+
+## Slice 2 — levels (done; quality bar points 1, 5)
+- Calm's per-timbre level TRIM in data (`data/profiles/calm.json` «levels», dB; core/profile.js validates: only offered timbres, ±24 dB; a
+  refusing CONTROL in the data runner) applied on the solo voice's volume stage (`audio.setTimbreTrim`, set by the Calm face; empty = × 1
+  exactly — Full and every render unchanged; the strike's velocity / brightness untouched). Measured with the listening page's K-like method
+  (four 1-s notes, dry): Firefly −18.06 dB vs Glass pad, the other three within ±0.03. Trims: Firefly +16.06, the other three −2 — all four
+  matched AND 2 dB of headroom (at +18 the Firefly's peakier attacks reached −0.1 dBFS in the dense passage).
+- The ghost light: Calm's volume follows the hand's horizontal (left edge = silence, v²) and the ghost drifted around the middle (volume
+  0.33–0.71 at its pinches) on an 18-dB-quiet Firefly → it now drifts in the right part (0.6–0.84 → volumes 0.63–0.82).
+- Depth → the forest keeps the LOUDNESS. A literal equal-power crossfade keeps the energy but not the loudness of a struck note (its attack
+  follows the dry part; the room's energy lands in the tail): far notes still lost 4–6 dB. The curve that keeps it (core/dsp.calmDepth): the
+  dry note stays almost level (1 → 0.9, −0.9 dB), the room's send rises 0.5 → 2.5 (≈ 14 dB more forest), the far room is darker (a lowpass on
+  the SEND only, 8.9 → 2.2 kHz). Measured near → far: Firefly −0.81, Flute +0.06, Handpan −0.80, Bowl −0.24 dB (RUN 7's curve: −5…−9 dB).
+- Rows: «CALM depth loudness» (new, slow): near / half / far within ±1.5 dB for all four (CONTROL RUN 7's far dry level −13.8 dB) and the four
+  sounds within ±1.5 dB of each other with their trims (−0.45…+0.39; CONTROL Firefly without its trim −16.4); «CALM depth curve (core)»
+  rewritten (the dry part never drops more than 1.5 dB, the send ≥ 3× near, monotone; CONTROL RUN 7's curve); «CALM depth → forest» reads
+  the new nodes; «CALM ghost light» + each ghost note's volume ≥ 0.55 (CONTROL RUN 7's path pinches at 0.33). GOLD: «fx fdepth 0 / 0.5 / 1»
+  renewed (declared — Calm's own effect); every other case equal.
+STARTED slice 3 DEPTH AND EFFECTS VISIBLE 2026-10-19 13:20
+
+## Slice 3 — depth and effects made visible (done; Moonglass, tokens and drawn icons; quality bar points 4, 5, 6, 10)
+- DEPTH: the playing fingertip's HALO follows the depth (2D on every background: near 18.7 px small and sharp → far 41.7 px wide and soft;
+  in the forest the 3D light's halo too: 0.94 → 2.16); a slim «Лес» bar on the playing hand's side shows the forest the hand gives NOW
+  (depth × reach) with the reach as a mark.
+- EFFECTS: three slim bars on the effects hand's side — «Эхо», «Тепло ↔ Яркость» (from the middle, warm below / bright above), «Волна» —
+  each with a drawn icon (new: echo, tone, wave in icons.js); the bar of the finger in use glows; each set fades in with its hand and out when
+  it leaves; a set's side follows where its hand is on the screen (40 / 60 % hysteresis), so «Play with: left hand» moves them; the effects
+  hand's ONE-LINE HINT shows the first time it appears on this device (7 s; in landscape below the bars).
+- The gesture, plainly (for the strategist): the effects hand touches the tip of its index, middle or ring finger to its thumb and, while
+  touching, moves the hand up to raise that finger's effect or down to lower it (index Echo, middle Warm ↔ Bright with the middle position
+  neutral, ring Wave); the full range is a move of about 70 % of the camera picture's height, and opening the fingers leaves the effect where
+  it is — the next touch continues from there.
+- Addendum 1 (note field): no row lines at all; only a soft OVAL glow on the row under the playing hand (16 % of the field's width each side,
+  fading to nothing at the row's edges), brighter while it sounds; «Show the full note field» = a barely-there tint on every other row.
+- Addendum 3 (overlap): one message at a time — while the low-light message shows (body.dark-on, latmeter.js) «Raise a hand» and the effects
+  hint give way; ui-snap's new Calm screens check every visible message and the bars against each other (portrait / landscape, Russian):
+  «Calm messages: no overlap on any screen» (round 1 caught the hint over the bars in landscape → the hint moves below them there).
+- Addendum 4 (the «Лес» slider): BEFORE — it set only the volume of the forest's own sounds (drone, wind, crickets); the depth always moved
+  the room over its whole range. NOW — it is the forest AT MOST: the ambience's level AND the room's reach («Forest depth» got a 4th parameter
+  `reach`, default 1 = GOLD / Full untouched); the hand's depth moves within it; a small lime mark rides on the slider at the forest the hand
+  gives now (the capsule shows when no hand is in view, so the mark shows the last depth).
+- Addendum 5 (fingertips): in Calm the hands are FIVE FIREFLIES each (the fingertips only, the emblem's five dots): exactly on this frame's
+  remapped landmarks (probe: 0 px off — no lag; the trail lies behind), the sounding finger lime with the depth halo, the other four warm
+  amber; the effects hand's index / middle / ring glow with their effect amounts; dev switch «Fingers: only the tips» in ⓘ (default on);
+  Full keeps all joints.
+- Row «CALM bars and fireflies» (quick, drawn) 16/0: tips on the joints, the lit one, halo far > near (CONTROL «all joints» draws none); bar
+  sides, the glowing bar, the hand swap, the fade-out; the first-time hint; one message at a time (CONTROL: without the rule «Raise a hand»
+  is visible and the two boxes overlap at 1280 × 800). Fix rounds: 4 (setCalmView dropped the new flag; the overlay needed a direct draw
+  door; the watchdog kept hands «in view»; the shell's delayed visibility made the first control vacuous — found and fixed).
+STARTED slice 4 THE FOREST PICTURE 2026-10-19 15:05
+
+## Slice 4 — the forest picture (done; quality bar points 4, 6, 8)
+- WHY THE USER SAW BLACK: the forest room existed (RUN 6) and rendered (here 24–39 fps on this laptop's GeForce GT 635M), but the 2D canvas
+  above it is OPAQUE (vision.js `alpha:false`, which Full's picture and text rely on) — its «clear» was black. RUN 7's headless screenshots
+  missed it for the same reason. FIX (Calm only, Full untouched): on the Forest background the 2D canvas is composited with SCREEN — its
+  black lets the room through, its lights (fireflies, glow, halos) add on top (Calm draws no text on the canvas).
+- Upgraded the existing room (no second scene): it answers the music gently (each note adds to a slow energy, τ 1.8 s: wild fireflies glow
+  up to +60 %, their lights +50 %, the night sky +15 %); the playing light's halo follows the depth; fingertips as fireflies on all three
+  backgrounds (slice 3); Dark stays plain black with no WebGL.
+- QUALITY LEVELS (dev switch «Forest picture: high / medium / low» in ⓘ = full / reduced / minimal; remembered on this device; nothing
+  switches by itself). BUDGET (Calm, camera on — the fake camera, no real hands; notes playing; 12–15 s each, alternated with Dark): hand
+  detection next to its Dark neighbours — high +6 % / −4 %, medium +1 % / −9 %; audio dropouts 0 in every clean run. One round was ruined by
+  an outside load (Dark itself fell to 2.3 fps with 23 dropouts). Within this ±10 % noise high does NOT break the budget → the default stays
+  high; the user's latency meter with real hands decides (step).
+- Row «CALM forest picture» (drawn) 25/0: the 2D canvas screens over the room (CONTROL normal on Camera), the room's canvas is not black
+  (mean RGB sum 27.8), Forest ↔ Dark × 5 leaks no WebGL context, the levels keep ≤ 1 (low none), the music energy rises and fades (CONTROL
+  none without a note), the halo far > near. ui-snap Calm `run8calm2` shows the forest (portrait + landscape).
+STARTED slice 5 C8 LOW POWER 2026-10-19 15:40
+
+## Slice 5 — C8 low power, part (done; quality bar points 1, 8)
+- «LIGHTER FOREST — for older computers and phones» in ⓘ (visible, remembered on this device; nothing switches by itself — user answer E1):
+  the room from the delay network (engine/fdn.js) instead of the convolution (Forest depth's 5th parameter `light`; the convolution's input
+  ramps to EXACTLY 0 so the browser stops computing it; the network is built on first use and leaves the graph after its tail when off), struck
+  timbres ring at most 60 % of their caps (`audio.setLowPower`; Bowl 3 → 2, Firefly 8 → 5), the forest picture at medium (the level chosen
+  before comes back), no glass blur. The light room MATCHED to the forest by measurement: loudness through Forest depth within +1.2 dB
+  (Firefly far), ±0.3 for the flute; its tail T60 ≈ 1.7 s vs the forest's 1.9 s (A/B by ear: the user's step).
+- Measured: audio-thread headroom with the Bowl ringing 35 → 45 / 35 → 35 %, idle 50 → 55 % (+5…10 %, noisy on this laptop). The
+  remaining Calm cost (vs Full idle ≈ 90 %) is effect loops that never stop (Echo's feedback, Full's idle chord reverb) — the next lever.
+- «MEASURE THIS DEVICE» (dev, ⓘ): ≈ 2 minutes — Dark, Forest high, Forest medium, Lighter forest, 25 s each with a soft note every half
+  second → the text (dropouts per minute, detection per second and its time, camera and picture fps, the GPU's name) is copied.
+- Row «CALM low power» (quick) 16/0: the live toggle on / off exactly (convolution input 0 / 1, picture level back); low-power caps (CONTROL
+  full power rings 3 bowls); the light room within ±1.5 dB of the forest (CONTROL its return +6 dB reads +2.1). Fix rounds: 0.
+- Not done (C8 rest): the automatic proposal (after the phone numbers), disconnecting idle effect loops, the phone runs themselves.
+STARTED final run 2026-10-19 16:05
+
+## Final run (RUN 8 end, 2026-10-19)
+- `--all --calm --limit-min 45`: P.all 133 / 134, P.calm 20 / 21 — the one row «CALM depth → forest» still expected the hand's depth WITHOUT the
+  new «Лес» reach (far send 1.70 = 0.5 + 2 × 0.6 — the app right, the row stale) → fixed, alone 16 / 0. Seed bass exact; state guard clean;
+  «CALM stress» 25 / 0 in both; CSP, network (308 requests, own origin + MediaPipe), UI checks PASS.
+- `--repeat 3` (a real-time row added): P.all PASS 134 / 0, PASS 134 / 0, then 133 / 134 — «CALM forest picture» read the room black once:
+  its copy came from a frame the room had skipped (it renders at its own rate; a presented buffer is cleared) — a LOTTERY measure, REPLACED by
+  an exact one (the host copies the frame it has just rendered, `sceneSnapDbg`): five runs in a row 27.7–27.9, 0 differences.
+- After the fixes: data PASS 29 / 0; P.quick PASS 100 / 0 (324 s; the first try failed to load MediaPipe — the network changed —, re-run with
+  `--cdn-cache`); `--leak` PASS (+7.1 MB / 30 renders, control +119.7 MB); static PASS; LIC1 PASS (192 cases, 72 glyphs); NAME-INDEX current;
+  doc-split PASS; HANDOFF 19 647 bytes.
+- ui-snap Full `run8full2` vs RUN 7's `run7full2`: 9 of 10 screens 0 pixels; «strip» differs only in the top bar, collapsed by its own 3.5-s
+  auto-hide while this slow machine seeded the song (the same happened on «play-bar» in a run beside another browser and vanished alone);
+  the style table differs only in the hidden Calm shell's new elements. ui-snap Calm `run8calm3` (portrait / landscape / Russian / Forest /
+  playing): «Calm messages: no overlap on any screen».
+- New: src/modules/timbres/strikes.js. Changed: src/audio.js, src/modules/timbres/{modal,tine,subtractive}.js, src/modules/effects/forestdepth.js,
+  src/core/{timbre,profile,dsp,calmui}.js, src/calmshell.js, src/ghost.js, src/latmeter.js, src/state.js, src/profile.js, src/icons.js,
+  src/i18n.js, src/gestures/hands.js, src/views/play.js, src/views/scene/{forest,host}.js, src/draw.js, src/engine/surface.js,
+  src/engine/worklets/probe-cap-worklet.js, src/probes/{calm,forest,profile,timbres}.js, index.html, style.css, tokens.css,
+  data/profiles/calm.json, data/timbres/solo.{firefly,firefly-rich,handpan,kalimba,singing-bowl}.json, data/timbres.bundle.json (generated),
+  tools/{probe-data,ui-snap}.mjs, tools/{gold.print,timbres.before,census.print}.json (declared renewals), docs/NAME-INDEX.md (generated),
+  HANDOFF.md, CLAUDE.md, docs/STAGE4-CALM-plan.md, archive/{CLAUDE-history,HANDOFF-history}.md, WORK-LOG.md.
+- Process: no git command was run. `sed -i` flipped index.html to LF once (restored to CRLF). This shell turns «\» into «\» inside heredocs
+  — two strings broke and were caught by the static check; long code now goes through files.
+- Not done: C8 rest (the phone numbers → an automatic proposal; disconnecting idle effect loops), C9 offline, C10, C12.
+
+# SUMMARY FOR THE USER — RUN 8 (plain language)
+
+**What was wrong and what we did** (every step checked by the automatic tests):
+1. **The crackle.** We reproduced it on your laptop with «robot hands» playing fast. The cause: the struck sounds (Handpan, Singing bowl,
+   Firefly) start a new set of tones for every note and nothing limited them. Playing fast, about a thousand tones rang at once and the
+   sound engine could not keep up (crackle). It happened in the full app too. Now each struck sound has a limit, written in its data: Firefly 8
+   notes, Handpan 4, Singing bowl 3. When a new note comes, the oldest one fades out in a hundredth of a second (you do not hear it). In our
+   test the crackle dropped from almost continuous to zero. On a very hot laptop (after hours of tests) even the standard app crackles a
+   little — that is the computer's limit.
+2. **Levels.** Firefly was 18 dB quieter than the other three. Now all four Calm sounds are equally loud (the Firefly file itself is
+   unchanged, so the full app sounds exactly as before). The ghost's four notes now play at a normal level (it used to drift where your hand
+   would play quietly). Moving the hand near and far now changes only how much forest you hear — the loudness stays the same (within 1 dB).
+3. **You can see depth and effects now.**
+   - Around the playing fingertip a lime halo: small and sharp when the hand is near, wide and soft when far.
+   - A slim «Лес» bar on the playing hand's side.
+   - Three slim bars on the other side: «Эхо», «Тепло ↔ Яркость» (from the middle), «Волна» — the bar of the finger you use glows; they fade in
+     with the hand and follow when you swap hands. The first time, one line explains the gesture.
+   - The note field is quiet: no lines, only a soft oval glow on the row under your hand.
+   - Your hands are five small fireflies each (only the fingertips, like the emblem): the playing one lime, the others warm amber.
+   - The low-light message and «Raise a hand» never sit on top of each other any more.
+   - The «Лес» slider now means «the forest at most»: the hand's depth moves within it (before, it set only the volume of the drone, wind
+     and crickets).
+4. **The forest was black** because the drawing layer above it was not see-through. Now the night forest shows: trees, ferns, rocks, mist,
+   fireflies; they glow a little more while you play.
+5. **Lighter forest** (in ⓘ, for older computers and phones): a lighter echo that sounds almost the same, fewer ringing notes, a simpler
+   picture. And a developer button «Measure this device» (2 minutes) that copies the numbers we need from your phone.
+
+**The effects gesture, plainly:** touch the tip of the index, middle or ring finger of the effects hand to its thumb and, while touching, move
+the hand up (more) or down (less); the whole range is a move of about 70 % of the camera picture's height; open the fingers and the effect
+stays — the next touch continues from there.
+
+**Your steps, tap by tap** (Live Server running; open `http://127.0.0.1:5500/?calm`; headphones on):
+1. **Crackle (step 114).** Begin → wait for the controls → tap **Sound** until «Singing bowl» → raise your right hand → pinch with all four
+   fingers in turn, fast and overlapping, and sweep the hand up and down for about a minute (raise the left hand's index first for some
+   Echo). Listen: no crackle, no rattle. Tap Sound → «Handpan», repeat; then «Firefly». Then ⓘ → «Open the full app» → choose the solo sound
+   «Singing bowl» in the Sound panel and play the same way. Tell us if anything rattles, and with which sound.
+2. **Levels (step 115).** Back in Calm, keep the hand in one place and tap **Sound** through all four sounds — they should be about equally
+   loud. Move the hand towards the camera and away: more or less forest, the same loudness. ⓘ → «Show the first steps again» → the ghost's
+   four notes should be clearly audible.
+3. **Depth bar and halo (step 116).** Play with the right hand: a slim **«Лес»** bar with a leaf shows on its side; move the hand away — the
+   bar fills, the lime halo around the playing fingertip grows wide and soft; bring it close — small and sharp. Lower the hand → the
+   controls appear → drag **«Лес»** down: less echo and quieter forest sounds; the small lime mark on the slider is where your hand left the
+   depth.
+4. **Effect bars (step 117).** Raise the left hand: three bars fade in on its side (Эхо · Тепло ↔ Яркость · Волна); the first time, one line
+   explains the gesture. Touch the index to the thumb and move up → the Echo bar fills and glows; middle finger → the middle bar moves from
+   its centre mark (down warm, up bright); ring finger → Wave. Lower the hand → the bars fade. Tap **Play with** → left hand → the bars swap
+   sides. Is the gesture natural? (The whole range is a move of about 70 % of the camera picture's height — tell us if that is too much.)
+5. **The forest (step 118).** Tap **Background** → «Forest»: a night forest with trees, ferns, rocks and fireflies (not black); while you play
+   the fireflies brighten a little. Your fingertips are five small fireflies (the playing one lime with a halo, the others amber). Then
+   «Dark» (black, fingertip fireflies only) and «Camera». Turn the screen / resize the window for landscape. The note field: no lines, only a
+   soft glow on the row under your hand.
+6. **Lighter forest and the measurement (step 119).** ⓘ → «Lighter forest» on: the echo sounds almost the same (a little drier), the picture
+   simpler; off again. ⓘ → «Measure this device» → wait 2 minutes (notes play by themselves) → the text is copied → send it to us. Please
+   do this on the laptop AND on your Poco M5.
+
+**Test verdicts (final):** data 29 / 29 · P.all three fresh runs: 134 / 134, 134 / 134, 133 / 134 (my new forest-picture test measured at a
+bad moment — replaced by an exact one, then 5 / 5) · Calm suite 20 / 21 then the one stale test fixed (16 / 16 alone) · quick suite 100 / 100 ·
+golden sounds unchanged except Calm's own depth effect (by your decision) · the full app's screens unchanged · no memory leak · privacy,
+network and on-screen checks PASS.
+
+**Questions for you (plain words):**
+1. The effects gesture needs a hand move of about 70 % of the camera picture's height for the whole range of an effect. Natural, or should a
+   shorter move be enough?
+2. The forest picture is a dark night by design — on your screen, is it too dark?
+3. On your old laptop the forest's echo is the heaviest part of Calm. If it still crackles sometimes, turn on «Lighter forest» — does it
+   sound acceptable to you? (Then we could offer it automatically on weak devices, after the phone numbers.)

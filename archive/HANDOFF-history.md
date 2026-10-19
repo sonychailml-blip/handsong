@@ -8163,3 +8163,18 @@ Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the ti
 - Also C4a: «Firefly» is a solo timbre (`solo.firefly`, tine bank `modules/timbres/tine.js`; Calm offers it first). C4b NOT built — design
   note + question in the Calm plan («C4b design note»). Final: data 26/0, P.all 112/113 (LR1 audio-thread gap; alone PASS).
 - Open for the user: the design choice, three sounds (listening page), the C4b question, steps 99–105 (105 = GPU test, Poco M5).
+
+## Moved from HANDOFF.md at RUN 8 (2026-10-19) — the RUN 7 record, verbatim
+### RUN 7 (2026-10-17/18) — Calm v1; log + plain summary: `WORK-LOG.md` «RUN 7»
+- User decisions (Calm plan «Review RUN 7», BACKLOG §7.19): design = the Hush emblem + Moonglass for everything; fonts OFL with Cyrillic
+  (Atkinson Hyperlegible has none → Andika, unmodified SIL release; Fraunces has none → Literata Light); note modes «follow the hand» / «stay
+  put»; Calm's sounds = FOUR: solo.firefly · solo.breath-flute · solo.handpan · solo.singing-bowl (data, first = default); quality bar
+  `docs/CALM-QUALITY.md` (ten points; each Calm slice names the points it touched).
+- Built: two stateless engine types `modal` / `breath` + six organic timbres (normalised to the app's solo level; listening page v2 with A/B);
+  C11 tokens `--calm-*`, drawn icons + emblem in `icons.js`, app icon = the emblem; C6 the Calm shell (`calmshell.js`, glass capsule, ⓘ, sleep
+  timer, glow note field); C4b Calm's own «Forest depth» (send 0.5→1.3, Full unchanged); C4c the ambience (drone, wind, seeded crickets,
+  Forest volume); C7 the Calm start card + ghost light (`ghost.js`, pose generator moved to `gestures/pose.js`); C5 the effects hand (Echo ·
+  Warmth / Brightness · Wave, Calm-only, forest visuals). `P.calm` + runner `--calm`. Full: ui-snap 0 pixels changed.
+- ⚠️ Open: today's Firefly is ≈ 18 dB quieter than the other three Calm sounds (measured) — the user's level decision; the ambience costs
+  ≈ 3.9 % of a core in the runner (target ≤ 2 % on the plan's scale — phone measurement decides); steps 106–113.
+- Process: one read-only `git diff --stat` was run by mistake early in RUN 7 — no git commands at all from now on.

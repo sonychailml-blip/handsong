@@ -7,4 +7,4 @@ export { arrGeom, laneCol, laneDefName, laneTitle, loopBeatAt, loopHit, loopScro
 export { fxTitleOf, rollAutDrive, rollAutSnapV, rollAutValAt, rollAxisHasDim, rollAxisNow, rollBendAt, rollBendProbe, rollBoxHits, rollDefaultRow0For, rollDragTarget, rollGeom, rollHit, rollRow0Across, rollRowPitch, rollRowsProbe, rollSelectable, rollShiftPit, rollSnap, rollSnapBeat, rollTrackView } from './views/roll.js';
 export { drawOverlays } from './views/play.js';
 export { stackFrame, stackSet, stackList } from './views/stack.js';   // VIS1a: the compositor (camera, surface, hands)
-export { setBackground, backgroundOf, sceneInfo, BACKGROUNDS } from './views/scene/host.js';   // VIS1b/c: the scene host, Calm's backgrounds
+export { setBackground, backgroundOf, sceneInfo, BACKGROUNDS, setSceneLevel, sceneLevel } from './views/scene/host.js';   // VIS1b/c: the scene host, Calm's backgrounds
