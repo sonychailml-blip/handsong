@@ -7,13 +7,13 @@
    with a black veil together; a tap on the veil wakes. Lantern and the note-field choice are remembered on this device (localStorage). */
 import { BUS } from './core/bus.js';
 import { CALM_UI, showStep, nextOf, sleepLevel } from './core/calmui.js';
-import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, AC, leadOn, leadOff, timbreIdx } from './audio.js';
+import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setCalmStrikes, AC, leadOn, leadOff, timbreIdx } from './audio.js';
 import { fxDenorm } from './modules/effects/param.js';
 import { CALM_FX } from './modules/effects/calm.js';
 import { AMB } from './core/ambience.js';
 import { t, onLangChange } from './i18n.js';
 import { svgIcon } from './icons.js';
-import { calmView, setCalmView, chainKeyOf } from './state.js';
+import { calmView, setCalmView, chainKeyOf, setVolFloor } from './state.js';
 import { EDITION } from './edition.js';
 import { ghostArm } from './ghost.js';   // C7: the ghost light
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo } from './draw.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
@@ -40,6 +40,8 @@ export function calmShellFace(p){
   document.body.classList.toggle('calm-plain', on && !!(D && D.plain()));
   amb=on && !!p.ambience; ambienceOn(amb, forestLevel());
   setTimbreTrim(on ? p.levels : null);   // RUN 8: the face's per-timbre level trim (Full: none)
+  setCalmStrikes(on ? (p.voices||{}) : null);
+  setVolFloor(on && p.volume ? p.volume.left : null);   // RUN 8: Calm's gentler left-to-right volume (Full: its own curve)   // RUN 8: Calm's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
   if(on){ reachSet(forestLevel()); lightApply(load(KEY.light)==='1', true); }   // RUN 8: the room's reach = the slider; C8 the person's «Lighter forest»
   else setLowPower(false);
   if(on){ st=null; render(); if(!raf) raf=requestAnimationFrame(tick); }

@@ -364,10 +364,11 @@ export async function checkCalmFxTimbres(){
 row({ at:1009.86, calm:true, name:'CALM effects × timbres', slow:true, run:()=>checkCalmFxTimbres(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* RUN 8 (the crackle, slice 1): row «CALM stress» (P.all / P.calm — slow; one part real time). Measured cause: a struck note (Firefly, Handpan,
    Singing bowl) makes its own oscillators and nothing capped them — fast playing piled up ~1000 live sources and the audio thread underran
-   (in Full too). Fix: policies.voices per struck timbre (data; modules/timbres/strikes.js fades the oldest strike).
+   (in Full too). Fix (Calm only — the user: Full exactly as before): a strike cap per timbre in data/profiles/calm.json «voices»
+   (modules/timbres/strikes.js fades the oldest strike), set in the render copy as the Calm face sets it live.
    (A) OFFLINE, deterministic — each Calm sound plays a dense passage (48 notes in 3.9 s, four owners overlapping, vol 1, Calm's level trim)
        through Calm's chain (Echo 0.6, Wave 0.5, the forest): VOICES BOUNDED — the ringing strikes of the timbre never exceed its
-       policies.voices (CONTROL: the cap off, the Singing bowl exceeds it); NO CLIPPING — the peak before the limiter ≤ −1 dBFS, the limiter's
+       Calm cap (CONTROL: the cap off, the Singing bowl exceeds it); NO CLIPPING — the peak before the limiter ≤ −1 dBFS, the limiter's
        ceiling, so it never has to act (CONTROL: the same passage with the copy's master +12 dB exceeds it); THE CAP ADDS NO CLICK — dry
        renders repeat sample for sample, so «capped − uncapped» is exactly what the cap took away (the faded strikes' tails): its worst
        curvature ≤ 0.25 of its local peak — a smooth fade reads the waveform's own curvature (Firefly's triangle corners ≈ 0.08–0.12) — (CONTROL: Firefly — no lowpass in its bank — with a capped strike CUT without its fade, a step,
@@ -385,13 +386,13 @@ const STRESS={ sec:6, notes:48, dt:0.08, hold:0.3, chain:{ 'ctone:mix':1, 'ctone
 export async function checkCalmStress(opt={}){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const PR=await import('../profile.js'), ST=await import('../state.js'), T=await import('../timbreload.js'), A=await import('../audio.js');
-  const was=PR.profileCurrent(), key=ST.chainKeyOf('ld'), capOf=id=>{ const r=T.timbreAll().find(x=>x.id===id); return r && r.policies.voices; };
+  const was=PR.profileCurrent(), key=ST.chainKeyOf('ld'), voices=(PR.profileOf('profile.calm')||{}).voices||{}, capOf=id=>voices[id];   // Calm's caps (the profile's «voices»)
   const levels=(PR.profileOf('profile.calm')||{}).levels||null;   // slice 2: Calm's per-timbre trims (dB), applied by the copy as live
   try{
     /* (A) offline */
     const R=await import('../render.js');
     const F=[440, 493.88, 554.37, 659.26, 739.99];
-    const dense=(id,dbg,boost)=>{ const out={ worst:0 }; return { out, play:e=>{ if(dbg) e.setDbg(dbg); e.setTimbreTrim(levels); e.applyFx({}); const E=e.engineCtx(), i=e.LEAD_INSTR.findIndex(x=>x.id===id);
+    const dense=(id,dbg,boost)=>{ const out={ worst:0 }; return { out, play:e=>{ if(dbg) e.setDbg(dbg); e.setTimbreTrim(levels); e.setCalmStrikes(voices); e.applyFx({}); const E=e.engineCtx(), i=e.LEAD_INSTR.findIndex(x=>x.id===id);
       if(boost) E.master.in.gain.value*=boost;   // the peak CONTROL: the real path, louder
       for(let k=0;k<STRESS.notes;k++){ const t=0.05+k*STRESS.dt, own='s'+(k%4); e.leadOn(own, F[k%5], 1, i, off,off,off,off, t); e.leadOff(own, off, t+STRESS.hold);
         out.worst=Math.max(out.worst, E.pool.ld.strikes.filter(s=>s.id===id && !s.faded && s.t<=t && s.end>t).length); } } }; };
@@ -573,7 +574,7 @@ row({ at:1009.87, calm:true, name:'CALM bars and fireflies', drawn:true, run:()=
 export async function checkCalmLowPower(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const PR=await import('../profile.js'), ST=await import('../state.js'), A=await import('../audio.js'), D=await import('../draw.js'), T=await import('../timbreload.js');
-  const was=PR.profileCurrent(), key=ST.chainKeyOf('ld'), KEYS=['handsong.calmLight','handsong.calmLightScene','handsong.sceneLevel'];
+  const was=PR.profileCurrent(), key=ST.chainKeyOf('ld'), KEYS=['handsong.calmLight','handsong.calmLightScene','handsong.sceneLevel'], voices=(PR.profileOf('profile.calm')||{}).voices||{};
   const keep=KEYS.map(k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }), wait=ms=>new Promise(r=>setTimeout(r,ms));
   try{
     /* (1) live */
@@ -593,10 +594,10 @@ export async function checkCalmLowPower(){
     if(D.sceneLevel()!==lvl0) miss(`Lighter forest off: the picture is ${D.sceneLevel()} (was ${lvl0})`);
     /* (2) voices, offline */
     const R=await import('../render.js'), F=[440, 493.88, 554.37, 659.26, 739.99], off=undefined;
-    const worst=async(id,low)=>{ const o={ w:0 }; await R.goldRender(e=>{ e.setLowPower(low); e.applyFx({}); const EE=e.engineCtx(), i=e.LEAD_INSTR.findIndex(x=>x.id===id);
+    const worst=async(id,low)=>{ const o={ w:0 }; await R.goldRender(e=>{ e.setCalmStrikes(voices); e.setLowPower(low); e.applyFx({}); const EE=e.engineCtx(), i=e.LEAD_INSTR.findIndex(x=>x.id===id);
       for(let k=0;k<32;k++){ const t=0.05+k*0.08, own='lp'+(k%4); e.leadOn(own, F[k%5], 1, i, off,off,off,off, t); e.leadOff(own, off, t+0.3);
         o.w=Math.max(o.w, EE.pool.ld.strikes.filter(s=>s.id===id && !s.faded && s.t<=t && s.end>t).length); } }, 3.0); return o.w; };
-    for(const id of ['solo.singing-bowl','solo.firefly']){ const cap=T.timbreAll().find(r=>r.id===id).policies.voices, lowCap=Math.max(1, Math.round(cap*0.6)), w=await worst(id,true); n++;
+    for(const id of ['solo.singing-bowl','solo.firefly']){ const cap=voices[id], lowCap=Math.max(1, Math.round(cap*0.6)), w=await worst(id,true); n++;
       notes.push(`${id}: low power rings ≤ ${w} (cap ${cap} → ${lowCap})`); if(!(w<=lowCap)) miss(`${id}: ${w} strikes rang in low power (≤ ${lowCap} expected)`); }
     { const w=await worst('solo.singing-bowl',false); n++; if(!(w>2)) miss(`CONTROL: at full power the bowl rang only ${w} — the low-power bound cannot fail`); }
     /* (3) the light room vs the convolution, offline */
@@ -616,3 +617,27 @@ export async function checkCalmLowPower(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ at:1009.88, calm:true, name:'CALM low power', run:()=>checkCalmLowPower(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* RUN 8 (the user, after steps 114–119: «the left-to-right volume contrast is too strong for Calm»): row «CALM volume curve» (quick). In Calm
+   the volume resolver (gestures/roles.noteVolOf — the one door the hands use) gives, as AMPLITUDE (config.volAmp), 0.30 ± 0.02 of the right
+   side at the far left (the profile's «volume».left, data) and 1.0 at the far right, rising smoothly between (every tenth higher, each step
+   ≤ 0.15 and the steps growing evenly — floor + (1 − floor)·v²). CONTROL: Full keeps its own curve — the far left is silence (0). */
+export async function checkCalmVolume(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const PR=await import('../profile.js'), ST=await import('../state.js'), RO=await import('../gestures/roles.js'), CF=await import('../config.js');
+  const was=PR.profileCurrent(), amp=x=>CF.volAmp(x);
+  try{
+    const why0=PR.profileApply('profile.full'); n++; if(why0){ miss('Full did not apply: '+why0); return { cases:n, total:d.length, differences:d, notes }; }
+    const zk=ST.chainKeyOf('ld'), fullL=amp(RO.noteVolOf(zk, 0, ()=>0)), fullR=amp(RO.noteVolOf(zk, 1, ()=>1));
+    const why=PR.profileApply('profile.calm'); n++; if(why){ miss('Calm did not apply: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    const want=(PR.profileOf('profile.calm').volume||{}).left, zc=ST.chainKeyOf('ld'), A=[]; for(let k=0;k<=10;k++) A.push(amp(RO.noteVolOf(zc, k/10, ()=>k/10)));
+    notes.push(`Calm amplitude left → right: ${A.map(x=>x.toFixed(3)).join(' ')} (profile «volume».left ${want}); Full: left ${fullL.toFixed(3)}, right ${fullR.toFixed(3)}`);
+    n+=4;
+    if(!(Math.abs(A[0]-0.30)<=0.02)) miss(`Calm far left: ${A[0].toFixed(3)} of the right (0.30 ± 0.02 expected)`);
+    if(!(Math.abs(A[10]-1)<=1e-9)) miss(`Calm far right: ${A[10]} (1.0 expected)`);
+    const st=A.slice(1).map((x,i)=>x-A[i]); if(!(st.every(x=>x>0 && x<=0.15) && st.every((x,i)=>i===0 || x>=st[i-1]-1e-12))) miss('Calm\'s curve is not a smooth rise: '+A.map(x=>x.toFixed(3)).join(' '));
+    if(!(fullL===0 && Math.abs(fullR-1)<=1e-9)) miss(`CONTROL: Full's curve is not its own (left ${fullL}, right ${fullR}) — Calm's floor reached Full`);
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ PR.profileApply(was||'profile.full'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ at:1009.89, calm:true, name:'CALM volume curve', run:()=>checkCalmVolume(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

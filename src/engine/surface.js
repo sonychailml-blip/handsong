@@ -5,7 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'autosave.js':['AC'],
-  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'AC', 'leadOn', 'leadOff', 'timbreIdx'],   // RUN 8: + the device measurement's notes
+  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setCalmStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx'],   // RUN 8: + the device measurement's notes
   'clip.js':['createRecordingTap'],
   'demo.js':['AC', 'initAudio'],
   'freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',
@@ -35,7 +35,7 @@ const SURFACE={
   'probes/history.js':['masterLevel', 'setMasterLevel'],
   'probes/key.js':['droneHz', 'droneUse'],
   'probes/eng2.js':['AC', 'chordOff', 'chordOn', 'drumHit', 'engLevels', 'engLoad', 'engVoices', 'poolSizes'],
-  'probes/timbres.js':['BASS_INSTR', 'CHORD_INSTR', 'DRUM_KITS', 'LEAD_INSTR', 'leadIsKs', 'bassOn', 'chordOn', 'drumHit', 'leadOn'],
+  'probes/timbres.js':['BASS_INSTR', 'CHORD_INSTR', 'DRUM_KITS', 'LEAD_INSTR', 'leadIsKs', 'bassOn', 'chordOn', 'drumHit', 'leadOn', 'leadOff', 'applyFx', 'setCalmStrikes', 'engineCtx'],   // RUN 8: + FULL untouched
   'probes/tim3d.js':['CHORD_INSTR', 'chordOn', 'timbreForgetDbg', 'timbreIdx', 'timbreInstall', 'timbreRecord', 'timbreSnapshot', 'timbresOf'],
   'probes/pool.js':['CHORD_INSTR', 'LEAD_INSTR', 'chordGlide', 'chordOff', 'chordOn', 'drumHit', 'leadOn', 'poolDbg', 'poolSizes'],
   'probes/calm.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],

@@ -2009,8 +2009,7 @@
     "voiceMode": "poly",
     "glide": 0.02,
     "register": "solo",
-    "quant": 0,
-    "voices": 8
+    "quant": 0
    }
   },
   {
@@ -2088,8 +2087,7 @@
     "voiceMode": "poly",
     "glide": 0.02,
     "register": "solo",
-    "quant": 0,
-    "voices": 8
+    "quant": 0
    }
   },
   {
@@ -2181,8 +2179,7 @@
     "voiceMode": "poly",
     "glide": 0.02,
     "register": "solo",
-    "quant": 0,
-    "voices": 4
+    "quant": 0
    }
   },
   {
@@ -2268,8 +2265,7 @@
     "voiceMode": "poly",
     "glide": 0.02,
     "register": "solo",
-    "quant": 0,
-    "voices": 3
+    "quant": 0
    }
   },
   {
@@ -2338,8 +2334,7 @@
     "voiceMode": "poly",
     "glide": 0.02,
     "register": "solo",
-    "quant": 0,
-    "voices": 8
+    "quant": 0
    }
   },
   {

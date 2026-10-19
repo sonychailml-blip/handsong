@@ -33,8 +33,8 @@ function buildLeadBank(E, rec, pre, hum, vib, shim){   // AF5: shim — this voi
   if(rec.engine==='subtractive') buildSubtractive(E, pre, rec.recipe);
   else if(rec.engine==='fm2') buildFMBank(E, pre, rec.recipe);
   else if(rec.engine==='ks'){ if(E.wk.ks) buildKSBank(E, pre, rec.recipe); else buildKSFallback(E, pre); }
-  else if(rec.engine==='tine') buildTineBank(E, pre, rec.recipe, { id:rec.id, n:rec.policies.voices });   // RUN 8: policies.voices = the strike cap
-  else if(rec.engine==='modal') buildModalBank(E, pre, rec.recipe, { id:rec.id, n:rec.policies.voices });
+  else if(rec.engine==='tine') buildTineBank(E, pre, rec.recipe, rec.id);   // RUN 8: the id = the key of Calm's strike cap (the profile's «voices»)
+  else if(rec.engine==='modal') buildModalBank(E, pre, rec.recipe, rec.id);
   else if(rec.engine==='breath') buildBreathBank(E, pre, rec.recipe);
   E.build.hum=null; E.build.vib=null; E.build.shim=null;
   return E.build.banks[0];

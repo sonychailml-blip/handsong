@@ -165,9 +165,10 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 ### NIGHT, DAY, RUN 3–6 (2026-10-16/17): records in archive B («Moved from HANDOFF.md at …» the next run); logs `NIGHT-LOG.md`, `WORK-LOG.md`.
 ### RUN 7 (2026-10-17/18) — Calm v1: record moved to archive B «Moved from HANDOFF.md at RUN 8»; log: `WORK-LOG.md` «RUN 7».
 ### RUN 8 (2026-10-19) — the user's Calm fixes (steps 106–113), the forest picture, C8 part; log + plain summary: `WORK-LOG.md` «RUN 8»
-- CRACKLE: struck strikes had no cap (~1000 live oscillators, underruns, Full too) → `policies.voices` per struck timbre (data; the oldest
-  fades — `modules/timbres/strikes.js`), −70 dB tails, cheaper strikes. Row «CALM stress».
-- LEVELS: Calm trims in `data/profiles/calm.json` «levels» (Firefly +16.06, others −2); depth keeps the loudness (±1 dB); ghost louder.
+- CRACKLE: struck strikes had no cap (~1000 live oscillators, underruns) → Calm only (the user: Full exactly as RUN 7): caps in the profile
+  (`calm.json` «voices»; the oldest fades — `modules/timbres/strikes.js`) + a cheaper strike path; Full builds RUN 7's strike (row «FULL untouched»).
+- LEVELS: Calm trims in `data/profiles/calm.json` «levels» (Firefly +16.06, others −2); depth keeps the loudness (±1 dB); ghost louder;
+  Calm's volume floor «volume».left 0.30 (the far left = 30 % of the right). Baselines: timbres.before / census = RUN 7; GOLD = RUN 7 but fdepth.
 - VISIBLE: depth halo, «Лес» bar, three effect bars, the effects hint once, a quiet row glow, fingertips as fireflies (dev switch), one
   message at a time, the «Лес» slider = the forest at most (Forest depth `reach`).
 - FOREST was black (the opaque 2D canvas) → screen-blended in Forest only; music energy; quality levels (dev switch; default high).

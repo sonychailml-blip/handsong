@@ -782,6 +782,10 @@ export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? b
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };
 /* RUN 7 (C6): the CALM VIEW — null in Full; in Calm { glow, plain, fieldAll } from the profile (noteField 'glow', labels 'plain') and the
    person's «Show the full note field» choice. The play view reads it (the glow note field, no note / Hz / role labels on the canvas). */
+/* RUN 8: Calm's VOLUME FLOOR — the amplitude at the far left of the hand's horizontal, as a share of the right (the profile's «volume».left; null =
+   Full's own curve, the left edge silent). Read by gestures/roles.noteVolOf, set by the Calm face. */
+export let volFloor=null;
+export const setVolFloor=v=>{ volFloor= v==null ? null : Math.max(0, Math.min(1, +v||0)); };
 export let calmView=null;
 export const setCalmView=v=>{ calmView= v ? { glow:!!v.glow, plain:!!v.plain, fieldAll:!!v.fieldAll, tips:!!v.tips } : null; };   // RUN 8: tips — the hands as five fingertip fireflies
 /* RUN 7 (C4b): REPLACE a role's chain with `entries` (deep-copied) — the data half of a profile switch (Calm's own chain, and back to the

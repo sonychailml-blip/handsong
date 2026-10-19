@@ -1401,8 +1401,8 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   ≈ 45–55 %: the forest convolution keeps computing while idle (its input never registers as silent), the Echo's feedback loop and Full's
   idle chord reverb run forever (Web Audio processes every connected node); the struck caps and «Lighter forest» (+5…10 %) help, a hot
   laptop still drops out (even Full). Disconnecting idle effect loops is the next lever. (2) The 2D canvas is opaque (`alpha:false`) — a
-  room under it shows only through the Forest background's screen blend; never draw text on the canvas in Calm. (3) Struck timbres:
-  `policies.voices` caps the ringing strikes — a strike over the cap fades the oldest in 10 ms (inaudible under the new attack). (4) A
+  room under it shows only through the Forest background's screen blend; never draw text on the canvas in Calm. (3) Struck timbres in Calm: the profile's
+  `voices` caps the ringing strikes (Full: no cap, RUN 7's strike) — a strike over the cap fades the oldest in 10 ms. (4) A
   literal equal-power depth crossfade cannot keep a struck note's loudness (its attack follows the dry part) — Calm's curve keeps the dry
   part ≈ level. (5) The headroom / budget measurements swing ±10 % with the laptop's heat; real-time probe rows judge against the standard
   app in the same session.
@@ -1712,8 +1712,8 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 113. Listening page v2: `http://127.0.0.1:5500/tools/listen/calm-timbres.html` — Phrase / Single notes, «In the forest / Dry» flips while it
     plays (both versions in sync), every sound at the same loudness.
 114. The crackle (RUN 8): `?calm` → Begin → Sound «Singing bowl» (then Handpan, then Firefly): play fast with four fingers, overlapping, and
-    sweep the hand up and down over the rows for a minute (the Forest background, Echo up). No crackle or rattle. Then the same in Full with
-    the Singing bowl. Optional: Calm ⓘ → «Sound panel and diagnostics» → Latency meter On → the «Audio dropouts» line stays 0 per minute.
+    sweep the hand up and down over the rows for a minute (the Forest background, Echo up). No crackle or rattle. (Full is untouched by RUN 8 — its struck
+    sounds have no cap, as at RUN 7.) Optional: Calm ⓘ → «Sound panel and diagnostics» → Latency meter On → the «Audio dropouts» line stays 0 per minute.
 115. Calm levels (RUN 8): in Calm switch Sound through Firefly, Breath flute, Handpan, Singing bowl at the same hand position — all four about
     equally loud (Firefly is no longer much quieter). Move the playing hand near and far: the forest grows, the loudness stays. ⓘ → «Show the
     first steps again»: the ghost's four notes are clearly audible.

@@ -1,7 +1,7 @@
 /* GES1: the GESTURE STATE MACHINE — the hands table, latch / lead owners, endPinch, the HAND1 probe clock and processHands (one camera
    frame → W* calls). gestures.js is its facade. */
 import { FINGER_TIPS, PINCH_HOLD, REV_NEAR, REV_RANGE, WATCHDOG_MS, CH_PAL_PAD, CH_PAL_HEAD_H, palSplitX, CLEAR_HOLD_MS, LOOPER_MSG_MS } from '../config.js';
-import { fx, fxChainOf, chainKeyOf, FX_VOL, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode } from '../state.js';
+import { fx, fxChainOf, chainKeyOf, FX_VOL, flipX, setLooperMsg, setLooperClear, setExprDisp, setExprBrightDisp, setChFitDeg, leadIdx, chIdx, bassIdx, latchDeg, setLatchDeg, latchOct, setLatchOct, latchTy, setLatchTy, chordFam, setChordFam, chordVar, setChordVar, phoneInstr, handFnOf, rectOctReg, setRectOctReg, splitOn, phoneHalves, sx, sy, handSide, pinchFingers, isLeadMode , calmView } from '../state.js';
 import { IVX, supportsChords, typedChords, chordFams, rectGrid, rectRowsFull, rectLayout, rectBase, rectNoteAt, thereminHz, chordAtRoot, tuningIndexOf, CUR } from '../scales.js';
 import { WchOn, WchSet, WchOff, WdrumHit } from '../recorder.js';
 import { t } from '../i18n.js';
@@ -770,7 +770,7 @@ function handsView(){
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8, fn=handFnOf(k, S.role||phoneInstr);
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H),
       d:clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr',
-      finger: S.pinch && S.oct>=0 ? S.oct : -1, tips:TIPS5.map(i=>[sx(lm[i].x, W), sy(lm[i].y, H)]) }); }   // RUN 8: the finger in use and the five fingertips (remapped as the hit-tests — Calm's bars and fireflies)
+      ...(calmView ? { finger: S.pinch && S.oct>=0 ? S.oct : -1, tips:TIPS5.map(i=>[sx(lm[i].x, W), sy(lm[i].y, H)]) } : {}) }); }   // RUN 8: the finger in use and the five fingertips (remapped as the hit-tests — Calm only; Full's view is RUN 7's — Calm's bars and fireflies)
   return out;
 }
 export { HANDS, processHands, voiceModeReset, handsProbe, processHandsProbe, handsView };

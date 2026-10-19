@@ -233,7 +233,7 @@ const dBof=x=> x>0 ? 20*Math.log10(x) : -Infinity;
 function engVoices(){
   const now=AC?AC.currentTime:0; while(hitT.length && hitT[0]<now-1) hitT.shift();
   const on=a=>a.reduce((n,v)=>n+(v.owner?1:0),0);
-  return { ld:{ built:lv.length, sounding:Object.keys(leadHold).length, strikes:strikeLive.filter(x=>!x.faded && x.end>now).length }, ch:{ built:cv.length, sounding:on(cv), strikes:ffLive.filter(x=>x.owner && x.t+FF_END>now).length },
+  return { ld:{ built:lv.length, sounding:Object.keys(leadHold).length }, ch:{ built:cv.length, sounding:on(cv), strikes:ffLive.filter(x=>x.owner && x.t+FF_END>now).length },
            bs:{ built:bv.length, sounding:Object.keys(bassHold).length }, drums:{ hitsLastSec:hitT.filter(t=>t<=now).length } };
 }
 let roleAn=null, roleBuf=null;   // per-role analysers: built on the FIRST levels({roles:true}) call only (a read-only branch off each role bus)
@@ -421,7 +421,7 @@ function renderReset(){
   timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
-  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false;
+  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false; strikeCaps.clear(); calmLean=false;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
 const renderStateOf=()=>({ offline, noHum:DBG.noHum, noStrikeCap:DBG.noStrikeCap, strikeCut:DBG.strikeCut, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
@@ -1227,7 +1227,11 @@ const trimOf=i=> timbreTrim.size ? (timbreTrim.get(i) ?? 1) : 1;
    (modules/timbres/strikes.js reads E.lowPower). Live only; a render copy is always full quality (renderReset). */
 let lowPower=false;
 const setLowPower=v=>{ lowPower=!!v; };
-const strikeLive=[];   // RUN 8: solo strikes (tine / modal banks) still ringing — the per-timbre cap's list (modules/timbres/strikes.js)
+const strikeLive=[];   // RUN 8: Calm's struck strikes still ringing — the cap's list (modules/timbres/strikes.js)
+/* RUN 8: CALM'S STRIKE CAPS (data/profiles/calm.json «voices»: timbre id → n), set by the Calm face; while set the struck banks take Calm's
+   cheaper strike (E.calmLean). Null in Full and in every render copy (renderReset): the banks then build RUN 7's strike exactly. */
+const strikeCaps=new Map(); let calmLean=false;
+function setCalmStrikes(voices){ strikeCaps.clear(); calmLean=!!voices; for(const [id,n] of Object.entries(voices||{})) strikeCaps.set(id, n); }
 const ffInfo=()=>ffLive.map(x=>({ owner:x.owner, t:x.t, route:x.route, cancelled:!!x.cancelled }));   // probes only
 /* strikes of `owner` that begin at or after `when` never sound */
 function ffCancel(owner,when){
@@ -2159,7 +2163,7 @@ function drone(owner, d, time){ if(owner) dronePan(ownerPan(owner),time); droneU
    (`build`) also has setters (a moved builder writes it only through E). ⛔ Never in E: static data (timbre tables, FX_FACTORY, REV_A …).
    Probe row «AUD1 engine context» (probes/engine.js). */
 const E=Object.freeze({
-  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
+  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get calmLean(){ return calmLean; }, strikeCaps, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
   master:Object.freeze({ get in(){ return master; }, get glue(){ return mGlue; }, get make(){ return mMake; }, get lim(){ return mLim; },
     get limiter(){ return limiter; }, get out(){ return outLast; }, get meter(){ return meterAn; }, get level(){ return masterLvl; }, get limRed(){ return limRed; } }),
   /* role buses: the solo sum before the expression stage, the chain heads (live), the drone bus; `head(key)` = a chain key's head */
@@ -2187,7 +2191,7 @@ const E=Object.freeze({
 });
 const engineCtx=()=>E;
 export {
-  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
+  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, setCalmStrikes, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
   initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, bendTapSet, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,

@@ -8,12 +8,12 @@ export const PROFILE_FORMAT='handsong/profile', PROFILE_VERSION=1;
 export const PROFILE_IDS=Object.freeze(['profile.full','profile.calm']);   // pinned: never renamed or reused
 export const PROFILE_ROLES=Object.freeze(['ld','ch','bs','dr']);
 export const BACKGROUNDS=Object.freeze(['camera','forest','dark']);
-export const LEVEL_DB=24;   // RUN 8: the largest per-timbre trim a profile may set (dB)
+export const LEVEL_DB=24, VOICES_MAX=16;   // RUN 8: voices — how many strikes of a struck timbre may ring at once in this face   // RUN 8: the largest per-timbre trim a profile may set (dB)
 /* the hand functions each role offers (= ui.js HANDFN_OPTS values; the browser row «C0 profile round trip» compares the solo list) */
 export const HAND_FNS=Object.freeze({ ld:Object.freeze(['fx','note','hold','therm','expr','loop']), bs:Object.freeze(['fx','note','hold','therm','loop']),
   ch:Object.freeze(['fx','latch','hold','loop']), dr:Object.freeze(['fx','hit','loop']) });
 const FIELDS=['format','version','id','name','roles','handFn','noteModes','key','moods','timbres','effects','scene','backgrounds','shell',
-  'noteField','labels','recording','ambience','levels'];   // RUN 8: levels (optional) — a per-timbre level trim in dB
+  'noteField','labels','recording','ambience','levels','voices','volume'];   // RUN 8: levels / voices / volume (optional) — a per-timbre level trim (dB) and strike cap; the volume curve's floor
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const strList=a=> Array.isArray(a) && a.length>0 && a.every(x=>typeof x==='string') && new Set(a).size===a.length;
 /* null = valid; otherwise ONE line naming the field. known (optional, each a list): roles, handFns {role:[values]}, modes, timbres,
@@ -59,6 +59,11 @@ export function checkProfile(p, known={}){
   if('levels' in p){ if(!plain(p.levels)) return 'levels: {timbre id: dB}';
     for(const [id,db] of Object.entries(p.levels)){ if(!p.timbres || !p.timbres.includes(id)) return `levels: «${id}» is not a timbre this profile offers`;
       if(typeof db!=='number' || !Number.isFinite(db) || Math.abs(db)>LEVEL_DB) return `levels.${id}: dB within ±${LEVEL_DB}`; } }
+  if('voices' in p){ if(!plain(p.voices)) return 'voices: {timbre id: strikes}';
+    for(const [id,n] of Object.entries(p.voices)){ if(!p.timbres || !p.timbres.includes(id)) return `voices: «${id}» is not a timbre this profile offers`;
+      if(!Number.isInteger(n) || n<1 || n>VOICES_MAX) return `voices.${id}: a whole number 1…${VOICES_MAX}`; } }
+  if('volume' in p && (!plain(p.volume) || Object.keys(p.volume).join()!=='left' || typeof p.volume.left!=='number' || !(p.volume.left>=0 && p.volume.left<=1)))
+    return 'volume: {left: 0…1} — the amplitude at the far left as a share of the right';
   return null;
 }
 /* the CONTROLS of the node row: each damage must be refused with a line naming its field */
@@ -79,4 +84,6 @@ export const PROFILE_DAMAGES=Object.freeze([
   ['id', p=>{ p.id='u.calm'; }],
   ['unknown field', p=>{ p.theme='night'; }],
   ['levels', p=>{ p.levels={ 'solo.firefly':60 }; }],
+  ['voices', p=>{ p.voices={ 'solo.handpan':99 }; }],
+  ['volume', p=>{ p.volume={ left:1.5 }; }],
 ]);

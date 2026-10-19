@@ -1765,3 +1765,35 @@ network and on-screen checks PASS.
 2. The forest picture is a dark night by design — on your screen, is it too dark?
 3. On your old laptop the forest's echo is the heaviest part of Calm. If it still crackles sometimes, turn on «Lighter forest» — does it
    sound acceptable to you? (Then we could offer it automatically on weak devices, after the phone numbers.)
+
+# RUN 8 — follow-up (2026-10-19): Full exactly as at RUN 7; Calm's volume curve
+The user's decision (RUN 8 committed as a safe point): every RUN 8 change that reaches Full is reverted; Calm keeps all of its fixes.
+STARTED follow-up 2026-10-19 17:30
+- STRIKE CAPS moved out of the timbre records (`policies.voices` removed from the five records; core/timbre.js and the TIM3a policy pin back
+  to RUN 7; bundle regenerated) into `data/profiles/calm.json` «voices» (Firefly 8, Handpan 4, Singing bowl 3; core/profile.js validates,
+  refusing CONTROL). `audio.setCalmStrikes` (set by the Calm face; null in Full and every render copy) turns on the struck banks' CALM path:
+  the cap, a per-strike gain, −70 dB tails, one tap sum per bank, block-rate / fixed detune. Without it the tine and modal banks build RUN 7's
+  strike exactly (same nodes, same order, taps per partial, −80 dB). «Lighter forest» × 0.6 applies to Calm's caps.
+- Also Calm-only now: the new handsView fields (finger, tips) and the low-light flag `body.dark-on`; the ENG2 voice readout lost its strikes
+  count (back to RUN 7's shape).
+- BASELINES: census restored exactly (play Gain 997, RUN 8's note removed); GOLD: every case RUN 7's, the three «fx fdepth» cases stay renewed
+  (Calm's own effect). tools/timbres.before.json: RUN 8 had overwritten the five struck entries and git is not ours to use, so they were
+  rebuilt from the restored RUN 7 path — they match every fact kept from RUN 7 (node counts 26 / 38 / 42 / 40 / 34; Firefly's node 19
+  «Gain 0.086400002», Handpan's node 21 «Oscillator sine 219.898346 0», …); every other entry is RUN 7's file untouched. For a byte check the
+  user can compare with the RUN 7 commit.
+- PROOF: «TIM3 timbres = before» 177 / 0; GOLD 0 differences; census 19 / 0 (all three in Full, against the RUN 7 values); new row «FULL
+  untouched» (P.all) 9 / 0 — Full carries none of Calm's settings, the five struck timbres build and render as the RUN 7 print (CONTROL: Calm's
+  path differs for 5 of 5), a dense bowl passage in Full stops none of 262 oscillators early (CONTROL: Calm's caps stop 232). ui-snap Full
+  `run8full5` vs `run7full2`: ALL 10 screens 0 differing pixels — the capture now waits for an open top bar on play-bar / strip / arr (its
+  3.5-s auto-hide was outlasted by the style walk on this hot machine; the app is unchanged).
+- STILL DIFFERENT IN FULL (one list): only hidden Calm-only elements — 47 new elements under the hidden #calmShell (bars, hint, ⓘ toggles, the
+  slider's wrapper and mark) and the hidden Calm slider's computed display (inline-block → block, inside the wrapper); no pixel, no sound,
+  no timbre record, no baseline.
+- CALM VOLUME (the user, after steps 114–119): `data/profiles/calm.json` «volume»: {"left": 0.30}; the resolver gestures/roles.noteVolOf (the
+  one door) gives in Calm amplitude = floor + (1 − floor)·v² (left 0.300, right 1.000, smooth); Full returns exactly its old expression
+  (`state.volFloor` null). Row «CALM volume curve» (quick) 6/0 (CONTROL: Full's left stays 0). The ghost and levels rows still pass.
+- CALM STRESS (said plainly): its real-time part reads «not judged» when the standard app itself drops out (a hot laptop) — there it cannot
+  fail. What catches a crackle regression instead: the row's OFFLINE part (strict, deterministic: ringing strikes ≤ the profile's caps —
+  CONTROL cap off; no clipping; no click from the fade) and «CALM low power» (caps × 0.6); the real-time part judges on a cool machine.
+- Verdicts: data 29 / 0; P.all 136 rows all pass, P.calm 22 rows all pass — each run reported ONE difference: my new row shared its position
+  (at 1001.7) with «TIM3 timbres = before» (fixed: 1001.75); P.quick after the fix PASS 102 / 0; static PASS; CSP / network / UI PASS.

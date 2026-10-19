@@ -161,8 +161,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   Events store the timbre ID (TIM2). The editor lists timbres only via `audio.timbresOf(role)`.
 - **A profile** (C0) = `data/profiles/<name>.json` (`handsong/profile` v1) + its name in `data/profiles/index.json` `order` + its id in
   `core/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
-- **A struck timbre's strike cap** (RUN 8) = `policies.voices` in its record (tine / modal only, 1…16; `modules/timbres/strikes.js` fades the
-  oldest; low power × 0.6). **A profile's level trim** = its `levels` {timbre id: dB} (`audio.setTimbreTrim`, set by the face; Full has none).
+- **Calm's per-timbre settings** (RUN 8; the user: Full exactly as at RUN 7) live in the PROFILE, never in a timbre record: `levels` {id: dB}
+  (`audio.setTimbreTrim`), `voices` {id: strikes} (`audio.setCalmStrikes` — the struck banks take Calm's cheaper strike + the cap only while
+  set; Full builds RUN 7's strike exactly, row «FULL untouched»), `volume` {left} (the amplitude floor of the hand's horizontal,
+  `state.setVolFloor`). All set by the Calm face; Full and every render copy have none.
 - **Thresholds / palette geometry** = `config.js`. Expression numbers are split: feature→channel in `gestures.EXPR_CFG`,
   channel→depth in `audio.EXPR_A` (gestures imports audio; the reverse would be a cycle).
 - **A hand function** = `state.handFn` defaults + `ui.HANDFN_OPTS` + a branch on `S.fn`/zone in `gestures.js` + a dictionary key.
@@ -389,7 +391,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   breathing sustained sounds — RUN 7, Calm's sound pass); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
   `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; RUN 7 Calm-only: `forestdepth.js` «Forest depth», `calm.js` Echo · Warmth / Brightness
   · Wave); `src/modules/ambience/forest.js` the forest's ambience (RUN 7). All: rule #38, first argument `E`.
-- RUN 8: `src/modules/timbres/strikes.js` — the per-timbre strike cap (list in `E.pool.ld.strikes`); «Forest depth» gained `reach` (the «Лес»
+- RUN 8: `src/modules/timbres/strikes.js` — Calm's strike cap (caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); «Forest depth» gained `reach` (the «Лес»
   slider) and `light` (C8 «Lighter forest», the FDN room); `views/play.js` Calm fingertip fireflies + the oval row glow; `calmshell.js` the
   bars, the effects hint, «Lighter forest», «Measure this device»; `views/scene/host.js` quality levels (`setSceneLevel`) + the Forest blend.
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).

@@ -61,6 +61,10 @@ const STYLES_FN=()=>{
   return { props, table, els };
 };
 const reveal=async p=>{ await p.mouse.move(600,380); await p.mouse.move(640,400); await p.waitForTimeout(150); };   // the top bar hides itself after ~3.5 s
+/* RUN 8: the top bar hides itself 3.5 s after the last move — on a slow machine a long step (the song's seed) outlasts it; the CAPTURE waits until
+   the bar is really open (never the app) */
+const BAR_KEEP=new Set(['play-bar','strip','arr']);   // the screens whose top bar must be open (as captured at RUN 7)
+const barOpen=async p=>{ for(let k=0;k<5;k++){ await reveal(p); if(await p.evaluate(()=>!document.getElementById('bar').classList.contains('min'))) break; } await p.mouse.move(660,420); await p.waitForTimeout(300); };   // ends where the steps always left the mouse (hover)
 const SCREENS=[
   ['start',     async p=>{}],
   ['play-min',  async p=>{ await p.click('#startBtn'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
@@ -70,8 +74,8 @@ const SCREENS=[
   ['sound',     async p=>{ await p.click('#panelClose'); await reveal(p); await p.click('#soundBtn'); await p.waitForTimeout(400); }],
   ['loop',      async p=>{ await p.click('#panelCloseSound'); await reveal(p); await p.click('#loopPanelBtn'); await p.waitForTimeout(400); }],
   ['strip',     async p=>{ await p.click('#panelCloseLoop'); await p.evaluate(async ()=>{ await P.seed({ replace:true }); });
-                   await p.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', true); }); await p.mouse.move(640,400); await p.mouse.move(660,420); await p.waitForTimeout(600); }],
-  ['arr',       async p=>{ await p.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.open(); }); await p.waitForTimeout(600); }],
+                   await p.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', true); }); await p.mouse.move(640,400); await p.mouse.move(660,420); await p.waitForTimeout(600);  await barOpen(p); }],
+  ['arr',       async p=>{ await barOpen(p); await p.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.open(); }); await p.waitForTimeout(600); }],
   ['mix',       async p=>{ await p.click('#arrFace'); await p.waitForTimeout(600); }],
   ['roll',      async p=>{ await p.click('#arrFace'); await p.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.openTrack(0); }); await p.waitForTimeout(800); }],
 ];
@@ -138,7 +142,10 @@ async function capture(tag){
       await act(page);
       if(ONLY && !ONLY.split(',').includes(name)) continue;
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-      const st=await page.evaluate(STYLES_FN), png=await page.screenshot({ animations:'disabled', caret:'hide' });
+      if(BAR_KEEP.has(name)) await barOpen(page);   // RUN 8: the capture waits for an open top bar (the app is untouched)
+      const st=await page.evaluate(STYLES_FN);
+      if(BAR_KEEP.has(name) && await page.evaluate(()=>document.getElementById('bar').classList.contains('min'))) await barOpen(page);   // the style walk outlasted the bar's timer
+      const png=await page.screenshot({ animations:'disabled', caret:'hide' });
       await writeFile(path.join(dir,name+'.png'), png); res.screens[name]=st;
       out(`[ui-snap] ${tag} · ${name}: ${Object.keys(st.els).length} elements, ${st.table.length} distinct styles`);
     }

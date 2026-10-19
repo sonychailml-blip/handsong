@@ -17,5 +17,7 @@
   "labels": "plain",
   "recording": false,
   "ambience": "ambience.forest",
-  "levels": {"solo.firefly": 16.06, "solo.breath-flute": -2, "solo.handpan": -2, "solo.singing-bowl": -2}
+  "levels": {"solo.firefly": 16.06, "solo.breath-flute": -2, "solo.handpan": -2, "solo.singing-bowl": -2},
+  "voices": {"solo.firefly": 8, "solo.handpan": 4, "solo.singing-bowl": 3},
+  "volume": {"left": 0.30}
 }

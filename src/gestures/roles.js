@@ -1,7 +1,7 @@
 /* GES1: the hand ROLES and OWNER KEYS — stateless helpers of the gesture machine (gestures/hands.js): depth, voice-mode zones, live owner
    keys, sound + record by role, the finger-action registry, which role a hand plays now, the note volume resolver. No hand table here. */
-import { REV_NEAR, REV_RANGE } from '../config.js';
-import { fxChainOf, FX_VOL, handActOf, phoneInstr, handFnOf, playsNotes, splitOn, phoneHalves, sx, handSide, isLeadMode } from '../state.js';
+import { REV_NEAR, REV_RANGE, volAmp } from '../config.js';
+import { fxChainOf, FX_VOL, handActOf, phoneInstr, handFnOf, playsNotes, splitOn, phoneHalves, sx, handSide, isLeadMode, volFloor } from '../state.js';
 import { typedChords } from '../scales.js';
 import { WleadOn, WleadOff, WbassOn, WbassOff } from '../recorder.js';
 import { fxInstance, fxHandRange } from '../audio.js';
@@ -144,8 +144,9 @@ function noteVolOf(zk,xn,zOf){
   }
   const z = pa && pa.mode==='drive' && pa.hand==='play' && pa.axis==='z' && zOf;   // 3. VOL-4: на глубине — спрашиваем её ТОЛЬКО здесь (на горизонтали мемо глубины не трогаем)
   const a = z ? zOf() : xn;
-  const v = pa&&pa.inv ? 1-a : a;
-  return lo+(hi-lo)*v;                                                 // 3/4. ход руки по глубине или горизонтали: с VOL-2b [0,1] — ровно v (левый край / рука у камеры = тишина)
+  const v = pa&&pa.inv ? 1-a : a, r=lo+(hi-lo)*v;
+  if(volFloor==null) return r;   // Full: its own curve (the left edge is silence)
+  return Math.sqrt(volFloor+(1-volFloor)*volAmp(r));   // RUN 8 (Calm, the profile's «volume».left): the amplitude runs floor … 1, smoothly (v² between)                                                 // 3/4. ход руки по глубине или горизонтали: с VOL-2b [0,1] — ровно v (левый край / рука у камеры = тишина)
 }
 
 export { depthOf, depthN, melodicZone, polyZone, leadZone, liveKey, monoKey, wOn, wOff, ACTIONS, paletteFinger, handHalfRole, noteHandRole, noteVolOf };

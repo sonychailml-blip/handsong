@@ -435,7 +435,9 @@ Listening page `tools/listen/calm-timbres.html` and the design proposals are rea
   only the amount of forest, never the loudness». A literal equal-power crossfade was measured too: it keeps the energy but not a struck note's
   loudness (4–6 dB down far). Built: the dry part ≈ level (−0.9 dB far), the room's send 0.5 → 2.5, the darkening on the send only; near →
   far within ±1 dB for the four sounds. The «Лес» slider is now the forest AT MOST (the room's reach and the ambience's level).
-- §4.1 sounds: struck timbres carry a strike cap in their records (`policies.voices`) — the crackle was the strikes piling up (measured).
+- §4.1 sounds: the crackle was the strikes piling up (measured). Calm caps them from its PROFILE (`voices`); the timbre records are as at
+  RUN 7 and Full builds RUN 7's strike exactly (the user's decision after RUN 8: «Full must stay exactly as it was»). Calm's volume follows the
+  hand's horizontal more gently: the far left = 30 % of the right (`volume.left`, data).
   Calm's levels are data (`levels` in the profile): Firefly +16.06 dB, the others −2 (matched, with headroom).
 - §5 shell: the bars while playing (depth, the three effects), the effects hand's one-line hint, the fingertips as five fireflies, a quiet
   oval row glow; one message at a time. §3 picture: the room was hidden under the opaque 2D canvas — now screen-blended in Forest.

@@ -73,7 +73,6 @@
   "voiceMode": "poly",
   "glide": 0.02,
   "register": "solo",
-  "quant": 0,
-  "voices": 8
+  "quant": 0
  }
 }
