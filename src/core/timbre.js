@@ -16,7 +16,12 @@ export const TB=Object.freeze({ lvl:[0,0.5], gain:[0,1], ratio:[0.25,8], det:[-1
   fo:[0.1,8], ft:[0.001,5], fv:[0,4], hj:[0,1], cutMax:24000, partials:8, pMult:[0.25,16], pGain:[0,1], pDecay:[0.01,10], pGainSum:2,
   glide:[0,1], quant:[0,4], nameMax:60, nodesMax:64,
   oscs:8, mult:[0.25,16], oscGainSum:2, Q:[0.0001,30], open:[1,8], fmRatio:[0.25,16], fmIndex:[0,20], tau:[0.001,5],
-  kitVm:[0,2], kitD:[0.005,5], ksFb:[0.5,0.998], unit:[0,1], nl:[0,5], sympN:8, sympRatio:[0.25,8], sympQ:[0.1,100], sympGain:[0,0.5], bodyQ:[0.1,30], bodyDb:[-24,24] });
+  kitVm:[0,2], kitD:[0.005,5], ksFb:[0.5,0.998], unit:[0,1], nl:[0,5], sympN:8, sympRatio:[0.25,8], sympQ:[0.1,100], sympGain:[0,0.5], bodyQ:[0.1,30], bodyDb:[-24,24],
+  /* RUN 7: the modal and breath engines (Calm's sound pass) — modes / harmonics, soft-high lowpass, noise paths, own vibrato and breathing */
+  mLvl:[0,2],   // the modal / breath output trim: decaying modes and band-pass formants lose level (a worst-case record peaks ≈ 0 dBFS pre-limiter)
+  modes:16, mR:[0.25,24], mT60:[0.01,30], mAtt:[0.0005,0.2], dk:[0,1.5], vb:[0,2], softLp:[200,16000], nG:[0,1], nQ:[0.1,60], nT60:[0.001,1],
+  nTrack:[0,1], jR:[0,0.02], jD:[0,0.5], jG:[0,0.5], harm:8, fmts:4, nOn:[1,8], vRate:[0.1,12], vCents:[0,50], vAmp:[0,0.3], vDelay:[0,3],
+  vRise:[0.01,5], dCents:[0,20], dRate:[0.01,2], bRate:[0.01,2], bLvl:[0,0.5], bCut:[0,0.8], scoop:[-100,100], vbB:[0,1] });
 /* TIM3b: checks of the solo engine types (recipes with optional parts) — each returns null or one line */
 const chkNum=(path,v,b)=> inB(v,b) ? null : path+': '+JSON.stringify(v)+' outside '+b.join('…');
 const onlyKeys=(path,o,keys)=>{ if(!plain(o)) return path+': an object'; for(const k of Object.keys(o)) if(!keys.includes(k)) return path+': unknown field «'+k+'»'; return null; };
@@ -56,6 +61,46 @@ function chkKs(R){
   if('body' in R){ const B=R.body; if((p=onlyKeys('recipe.body',B,['hz','Q','db'])) || (p=chkNum('recipe.body.hz',B.hz,TB.lp)) || (p=chkNum('recipe.body.Q',B.Q,TB.bodyQ)) || (p=chkNum('recipe.body.db',B.db,TB.bodyDb))) return p; }
   return null;
 }
+/* RUN 7: the MODAL engine (struck bodies) and the BREATH engine (breathing sustained sounds) — every field bounded (T5) */
+const chkPart=(path,o,spec)=>{ let p=onlyKeys(path,o,Object.keys(spec)); if(p) return p;
+  for(const [k,[b,req]] of Object.entries(spec)){ if(!(k in o)){ if(req) return path+'.'+k+': missing'; continue; }
+    if(b==='wave'){ if(!WAVES.includes(o[k])) return path+'.'+k+': '+JSON.stringify(o[k]); continue; }
+    if((p=chkNum(path+'.'+k,o[k],TB[b]))) return p; }
+  return null; };
+function chkModal(R){
+  let p=onlyKeys('recipe',R,['modes','lvl','att','dk','vb','lp','noise','body','jit','hum']); if(p) return p;
+  if(!Array.isArray(R.modes) || !R.modes.length || R.modes.length>TB.modes) return 'recipe.modes: 1…'+TB.modes+' modes';
+  let sum=0;
+  for(let i=0;i<R.modes.length;i++){ const m=R.modes[i]; if((p=chkPart('recipe.modes['+i+']',m,{ r:['mR',1], g:['gain',1], d:['mT60',1], a:['mAtt'], w:['wave'] }))) return p; sum+=m.g; }
+  if(sum>TB.pGainSum) return 'recipe.modes: gains sum to '+sum+' (cap '+TB.pGainSum+')';
+  if((p=chkPart('recipe',{ lvl:R.lvl, lp:R.lp, ...('att' in R?{ att:R.att }:{}), ...('dk' in R?{ dk:R.dk }:{}), ...('vb' in R?{ vb:R.vb }:{}) },{ lvl:['mLvl',1], lp:['softLp',1], att:['mAtt'], dk:['dk'], vb:['vb'] }))) return p;
+  if('noise' in R && (p=chkPart('recipe.noise',R.noise,{ g:['nG',1], hz:['lp',1], q:['nQ',1], d:['nT60',1], t:['nTrack'] }))) return p;
+  if('body' in R){ if(!('noise' in R)) return 'recipe.body: needs a noise strike';
+    if((p=chkPart('recipe.body',R.body,{ hz:['lp',1], q:['nQ',1], g:['nG',1] }))) return p; }
+  if('jit' in R && (p=chkPart('recipe.jit',R.jit,{ r:['jR'], d:['jD'], g:['jG'] }))) return p;
+  if('hum' in R && R.hum!==0) return 'recipe.hum: 0 or absent';
+  return null;
+}
+function chkBreath(R){
+  let p=onlyKeys('recipe',R,['harm','lvl','lp','vb','body','formants','noise','air','chiff','vib','drift','scoop','breathe','hum']); if(p) return p;
+  if(!Array.isArray(R.harm) || !R.harm.length || R.harm.length>TB.harm) return 'recipe.harm: 1…'+TB.harm+' harmonics';
+  let sum=0;
+  for(let i=0;i<R.harm.length;i++){ const h=R.harm[i]; if((p=chkPart('recipe.harm['+i+']',h,{ m:['mult',1], g:['gain',1], w:['wave'], dt:['det'] }))) return p; sum+=h.g; }
+  if(sum>TB.oscGainSum) return 'recipe.harm: gains sum to '+sum+' (cap '+TB.oscGainSum+')';
+  if((p=chkPart('recipe',{ lvl:R.lvl, lp:R.lp, ...('vb' in R?{ vb:R.vb }:{}), ...('scoop' in R?{ scoop:R.scoop }:{}) },{ lvl:['mLvl',1], lp:['softLp',1], vb:['vbB'], scoop:['scoop'] }))) return p;
+  if('body' in R && (p=chkPart('recipe.body',R.body,{ hz:['lp',1], q:['bodyQ',1], db:['bodyDb',1] }))) return p;
+  if('formants' in R){ if(!Array.isArray(R.formants) || !R.formants.length || R.formants.length>TB.fmts) return 'recipe.formants: 1…'+TB.fmts;
+    for(let i=0;i<R.formants.length;i++) if((p=chkPart('recipe.formants['+i+']',R.formants[i],{ hz:['lp',1], q:['nQ',1], g:['gain',1] }))) return p; }
+  if('noise' in R && (p=chkPart('recipe.noise',R.noise,{ g:['nG',1], q:['nQ',1], m:['mult',1], on:['nOn'] }))) return p;
+  if('air' in R && (p=chkPart('recipe.air',R.air,{ g:['nG',1], hz:['lp',1], q:['nQ',1] }))) return p;
+  if('chiff' in R && (p=chkPart('recipe.chiff',R.chiff,{ g:['nG',1], m:['mult',1], q:['nQ',1], d:['nT60',1] }))) return p;
+  if('vib' in R && (p=chkPart('recipe.vib',R.vib,{ rate:['vRate',1], cents:['vCents',1], amp:['vAmp'], delay:['vDelay',1], rise:['vRise',1] }))) return p;
+  if('drift' in R && (p=chkPart('recipe.drift',R.drift,{ cents:['dCents',1], rate:['dRate',1] }))) return p;
+  if('breathe' in R && (p=chkPart('recipe.breathe',R.breathe,{ rate:['bRate',1], lvl:['bLvl',1], cut:['bCut',1] }))) return p;
+  if(R.lp*(1+(R.breathe?R.breathe.cut:0))>TB.cutMax) return 'recipe.breathe: the cut-off reaches past '+TB.cutMax+' Hz';
+  if('hum' in R && R.hum!==0) return 'recipe.hum: 0 or absent';
+  return null;
+}
 /* TIM3c: a kit = six rows, each a named row synth (code — src/modules/timbres/drumkits.js) with its parameters (data) */
 export const KIT_SYNTHS=Object.freeze({ kick:[], snare:[], clap:[], hat:[], tom:[], crash:[], dum:['f0','f1','d'], tek:['hp','f'], edge:['hp','g','d'],
   baya:['f0','f1','d'], na:['f','d'], tick:[], gong:['f','ratio','idx','d'], taiko:['f0','f1','d'], ka:[] });
@@ -85,6 +130,11 @@ export const ENGINES=Object.freeze({
   fm2:        { family:'solo', check:chkFm2, nodes:()=>5 },
   ks:         { family:'solo', check:chkKs, nodes:r=>3+(r.body?1:0)+(r.symp?1+r.symp.ratios.length:0) },
   drumkit:    { family:'kit', check:chkDrumkit, nodes:()=>8 },   // TIM3c: the heaviest row synth today builds 7 nodes per hit
+  /* RUN 7: modal = a struck body (per strike: 2 nodes a mode + the noise burst and body; static: sum, lowpass, gate); breath = harmonics,
+     formants, three noise paths, own vibrato / drift / breathing (all built once per voice) */
+  modal:      { family:'solo', check:chkModal, nodes:r=>3+2*r.modes.length+(r.noise?3:0)+(r.body?2:0) },
+  breath:     { family:'solo', check:chkBreath, nodes:r=>6+2*r.harm.length+2*(r.formants?r.formants.length:0)+(r.vib?(r.vib.amp?3:2):0)+(r.drift?2:0)+(r.scoop?1:0)+(r.breathe?3:0)
+                +((r.noise||r.air||r.chiff)?1:0)+(r.noise?2:0)+(r.air?2:0)+(r.chiff?2:0)+(r.body?1:0) },
 });
 /* the policies each family carries today (user answer T3: written into every record with today's role values; the app reads the role
    until stage 7; a probe pins record = role) */

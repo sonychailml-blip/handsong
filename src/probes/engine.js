@@ -102,4 +102,4 @@ export async function checkCensus(){
   return { cases:n, total:d.length, differences:d };
 }
 row({ at:1000, name:'AUD1 engine context', run:()=>checkEngineCtx(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
-row({ at:1001, name:'AUD1 node census', run:()=>checkCensus(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });
+row({ calm:true, at:1001, name:'AUD1 node census', run:()=>checkCensus(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });

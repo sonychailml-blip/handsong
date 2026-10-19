@@ -3,7 +3,7 @@ import { scaleId, tonic, setScaleId, setTonic, tonicCents, setTonicCents, tunedF
          camFacing, setCamFacing, aRef, setARef, rectPref, setRectPref,
          pinchFingers, setPinchFingers,
          voiceMode, setVoiceMode,   // V3: режим голоса соло/баса — пара кнопок под тембром роли
-         fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
+         fxChainOf, chainKeyOf, CHAIN_SOLO, fxChainAdd, fxChainRemove, fxChainMove, setFxChain, fx as fxAmtLive, setFxParamAddr, setFxParamMode, setFxParamFixed, roleHasFx,
          handActOf, setHandAct,
          fxIsScalar, FX_VOL, fxVolReset,   // VOL-2: запись громкости цепи (строка панели) и её сброс на горизонталь для уроков; chainXDriven/fxVolFix/setFxVolFix удалены
          rollOpen, setRollOpen, arrOpen, setArrOpen, arrFace, setArrFace, setRollWin, setRollSel, rollSel, setRollSelNote, rollSelNote, rollDrag, setRollDrag, rollIns, setRollIns,
@@ -56,9 +56,10 @@ import { userPut } from './userstore.js';   // SONG1: «Keep in my scales»
 import { songNeeds, songTimbreNeeds } from './song/file.js';   // AUTOSAVE1: the song kept on this device
 import { icon } from './icons.js';   // UI1b: every interface glyph through the icon component
 import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from './core/songfile.js';
-import { profileWire, profileApply } from './profile.js';   // C0: Full ↔ Calm (the dev edition's switch)
+import { profileWire, profileApply, profileCurrent, profileOf } from './profile.js';   // C0: Full ↔ Calm (the dev edition's switch)
+import { calmShellWire, calmShellFace } from './calmshell.js';   // RUN 7 (C6): the Calm shell (its doors below)
 import { EDITION } from './edition.js';
-import { setBackground, backgroundOf } from './draw.js';   // VIS1c: Calm's backgrounds (forest / dark / camera)   // SAVE1: reading a song file (pure)
+import { setBackground, backgroundOf, sceneInfo } from './draw.js';   // VIS1c: Calm's backgrounds (forest / dark / camera)   // SAVE1: reading a song file (pure)
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
@@ -3059,9 +3060,41 @@ applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHan
 /* C0 (RUN 6): the profile DOORS (profile.js) — a profile writes the live state through the setters a lesson's setup uses (tutorSetScale, the
    key knob's path, the solo timbre select, setHandFn, the voice mode); `face` shows it (body.calm hides what Calm does not offer — CSS).
    The switch sits in the Sound panel, dev edition only. */
+/* RUN 7 (C4b): a profile's solo chain — the data (state.setFxChain, exact) and the sound halves (an effect leaving goes quiet, one arriving
+   comes in, the path is respliced — as fxChainDrop / fxChainPut), then each FIXED value is put into its instance (the panel's own way). */
+function profChain(key, entries, amts){
+  const now=fxChainOf(key); if(JSON.stringify(now)===JSON.stringify(entries)) return;
+  const before=new Set(now.map(e=>e.fxId)), after=new Set(entries.map(e=>e.fxId));
+  setFxChain(key, entries);
+  for(const id of before) if(!after.has(id)) fxSetActive(key,id,false);
+  for(const id of after) if(!before.has(id)) fxSetActive(key,id,true);
+  fxChainResplice(key);
+  for(const eff of fxChainOf(key)) eff.params.forEach((pa,pi)=>{ if(pa.mode==='fixed' && pa.v01!=null){ const p=fxParamsOf(key,eff.fxId)[pi]; if(p) p.set(pa.v01); } });
+  /* the old solo scalars (vibrato, drive, tremolo) are hushed when they leave the chain — coming back, they take their saved amounts again */
+  if(amts) for(const eff of fxChainOf(key)) if(fxIsScalar(eff.fxId) && amts[eff.fxId]!=null && fxAmtLive[eff.fxId]!==amts[eff.fxId]){ const p=fxParamsOf(key,eff.fxId)[0]; if(p) p.set(amts[eff.fxId]); }
+}
+/* RUN 7 (C6): the Calm shell's DOORS (calmshell.js) — the same setters the profile's write and the Full panels use; the playing hand is
+   the solo hand NOT on effects, its function 'note' (Notes: follow the hand) or 'hold' (Notes: stay put). */
+const calmProf=()=>profileOf(profileCurrent())||{};
+const calmPlay=()=> handFn.ld.R==='fx' ? 'L' : 'R';
+calmShellWire({
+  timbres:()=>calmProf().timbres||[], timbre:()=>timbreIdOf('ld',leadIdx),
+  setTimbre:id=>{ const li=timbreIdx('ld',id); if(li!=null && li!==leadIdx){ softAllOff(); setLeadInstr(li); selLead.value=String(leadIdx); } },
+  timbreName:id=>{ const i=timbreIdx('ld',id); return i!=null ? L(LEAD_INSTR[i].label) : id; },
+  moods:()=>calmProf().moods||[], mood:()=>scaleId, setMood:id=>{ if(id!==scaleId){ softAllOff(); tutorSetScale(id); } },
+  hand:()=> calmPlay()==='L' ? 'left' : 'right',
+  setHand:v=>{ const nm=handFn.ld[calmPlay()], play= v==='left' ? 'L' : 'R'; setHandFn('ld',play,nm); setHandFn('ld',play==='L'?'R':'L','fx'); softAllOff(); applyInstr(); },
+  noteMode:()=> handFn.ld[calmPlay()]==='hold' ? 'hold' : 'note',
+  setNoteMode:v=>{ setHandFn('ld',calmPlay(),v==='hold'?'hold':'note'); softAllOff(); applyInstr(); },
+  backgrounds:()=>calmProf().backgrounds||['camera'], bg:()=>backgroundOf(), setBg:m=>bgPick(m),
+  plain:()=> backgroundOf()==='dark' || sceneInfo().level==='minimal',   // the glass's plain fallback (no blur)
+  toFull:()=>profPick('profile.full'),
+  sound:()=>showSound(true),   // dev only: the Sound panel and its Diagnostics in Calm (the top bar is hidden there)
+});
 profileWire({
   busy:()=> recording ? t('prof.busyRec') : null,
-  read:()=>({ scaleId, tonic, tonicCents, lead:timbreIdOf('ld',leadIdx), phoneInstr, splitOn, hand:{ ...handFn.ld }, voice:voiceMode.ld }),
+  read:()=>({ scaleId, tonic, tonicCents, lead:timbreIdOf('ld',leadIdx), phoneInstr, splitOn, hand:{ ...handFn.ld }, voice:voiceMode.ld,
+    chain:JSON.parse(JSON.stringify(fxChainOf(chainKeyOf('ld')))), scalars:{ ...fxAmtLive } }),   // RUN 7 (C4b): the solo chain too (Calm has its own) and the old scalars' amounts
   write:s=>{
     softAllOff();
     if(splitOn!==s.splitOn) setSplitOn(s.splitOn);
@@ -3071,6 +3104,7 @@ profileWire({
     const li=timbreIdx('ld', s.lead); if(li!=null && li!==leadIdx){ setLeadInstr(li); selLead.value=String(leadIdx); }
     setHandFn('ld','L',s.hand.L); setHandFn('ld','R',s.hand.R);
     if(voiceMode.ld!==s.voice){ setVoiceMode('ld',s.voice); voiceModeReset('ld'); }
+    if(s.chain) profChain(chainKeyOf('ld'), s.chain, s.scalars);   // RUN 7 (C4b)
     applyVoiceMode(); applySplit(); applyInstr();   // not renderFxCtl: drawing it fills default values into fixed chain parameters (a state change)
   },
   face:p=>{
@@ -3078,6 +3112,7 @@ profileWire({
     $('profFull').classList.toggle('act', p.id==='profile.full'); $('profCalm').classList.toggle('act', p.id==='profile.calm');
     if(!p.recording && loop.on) onLoop();   // Calm has no transport: a playing song pauses
     const st=bgStored(); bgPick(p.backgrounds.includes(st) ? st : p.backgrounds[0], false);   // VIS1c: Full → camera; Calm → this device's choice
+    calmShellFace(p);   // RUN 7 (C6): the Calm shell shows only in the Calm face
   },
 });
 /* VIS1c (RUN 6): Calm's background — Forest (the 3D room) · Dark (black, no WebGL) · Camera (today's picture); the same sound on each.

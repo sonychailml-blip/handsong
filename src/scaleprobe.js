@@ -71,7 +71,7 @@
    при загрузке пробы; встроенные во время сеанса не меняются). Удаление файла пользователя проверяет отдельная проба P.checkUserDelete. */
 export { check, checkData, checkPitch, checkView, drone, checkUntyped, checkStack, checkBehaviour, checkDegrees as checkDegreesData, checkModeMap } from './probedata.js';
 import './probes/data.js';   // registers the data rows (T0, T1, T2, T6b, stacked, ED4 and OWN1 sweeps, F4)
-export { material, all, quick, orderCheck } from './probes/run.js';
+export { material, all, quick, calm, orderCheck } from './probes/run.js';
 export { checkSound, checkRows, checkRowFix, checkHl, tracks, checkRules, checkScroll, checkLabels, checkSong, checkTypes, checkModes, checkPure, checkOut } from './probes/tuning.js';
 export { checkWrite, checkSeed, checkFrozen, seed, song } from './probes/seed.js';
 export { checkSongFile, checkSongOpenUndo } from './probes/songfile.js';   // SAVE1: Save → Open round trip, old / newer / damaged files; SONG3: Open is one ↶ step

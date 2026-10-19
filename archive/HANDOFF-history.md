@@ -8147,3 +8147,19 @@ Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the ti
   low power, offline + release tool, probes for both modes, 15 slices, 10 questions). No Calm code until the plan is reviewed.
 - Final: see WORK-LOG «RUN 5» final run.
 - Open for the user: the Calm plan's questions (§14); steps 99, 100 and the phone measurements (Calm plan §7).
+
+## Moved from HANDOFF.md at RUN 7 (2026-10-18) — the RUN 6 record, verbatim
+### RUN 6 (2026-10-17) — Calm v1 first slices; log: `WORK-LOG.md` «RUN 6» (plain-language summary at its end)
+- Calm plan answers (verbatim: Calm plan «Review 2026-10-17»): timbres by EAR; effects Echo · Warmth↔Brightness · Wave; moods Glow · Dusk ·
+  Mist, key fixed; no camera → touch plays; lantern offered at the low-light hint; note start pinch vs «move the light» (dev switch);
+  counter / name / payment postponed; fonts after the design proposals. NO solo latch —
+  Calm offers today's solo `note` and `hold` (C5b dropped). First-run line «Stand your phone or laptop…». User's phone = Poco M5.
+  Calm in portrait AND landscape. Three BACKGROUNDS (Forest · Dark · Camera; same sound). R1 design proposals before the shell; R2 meter
+  line «Scene: fps · frame ms · level» + Forest-vs-Dark user step; R3 trademark search = strategist.
+- Done (details + verdicts: WORK-LOG «RUN 6»): C0 profiles + edition (`data/profiles/`, `core/profile.js`, `profile.js` exact restore,
+  `edition.js`, dev switch Sound → Development, `?calm`); the listening page `tools/listen/calm-timbres.html`; three design proposals
+  `docs/design/calm/` (+ README); VIS1a bus + compositor (ui-snap identical); VIS1b scene host (three r128 vendored, lazy) + VIS1c night
+  forest + three backgrounds (Forest / Dark / Camera, Calm only) + the meter's Scene line.
+- Also C4a: «Firefly» is a solo timbre (`solo.firefly`, tine bank `modules/timbres/tine.js`; Calm offers it first). C4b NOT built — design
+  note + question in the Calm plan («C4b design note»). Final: data 26/0, P.all 112/113 (LR1 audio-thread gap; alone PASS).
+- Open for the user: the design choice, three sounds (listening page), the C4b question, steps 99–105 (105 = GPU test, Poco M5).

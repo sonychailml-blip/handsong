@@ -18,9 +18,9 @@ import * as LIVE from '../audio.js';
 import { fxNorm, fxDenorm } from '../modules/effects/param.js';
 
 const DB60=Math.log(1000), BURST=0.2, PRE=0.4;   // PRE: the parameters settle first (the setters glide, e.g. Glue τ 20 ms) — then the burst
-const NEUTRAL={ reverb:{ mix:0 }, dly:{ mix:0 }, forest:{ mix:0 }, trmMix:{ depth:0 }, glue:{ thr:0, knee:0, makeup:0 } };
-const TAIL={ reverb:p=>p.decay, forest:p=>p.room, dly:p=>p.time*DB60/Math.log(1/p.fb) };   // seconds, from the instance's own values (units)
-const WET={ reverb:{ mix:1 }, dly:{ mix:1 }, forest:{ mix:1 }, trmMix:{ depth:1 }, glue:{} };
+const NEUTRAL={ reverb:{ mix:0 }, dly:{ mix:0 }, forest:{ mix:0 }, fdepth:{ mix:0 }, cecho:{ amount:0 }, ctone:{ mix:0 }, cwave:{ mix:0 }, trmMix:{ depth:0 }, glue:{ thr:0, knee:0, makeup:0 } };
+const TAIL={ reverb:p=>p.decay, forest:p=>p.room, fdepth:p=>p.room, cecho:p=>p.time*DB60/Math.log(1/(0.55*p.amount)), dly:p=>p.time*DB60/Math.log(1/p.fb) };   // seconds, from the instance's own values (units)
+const WET={ reverb:{ mix:1 }, dly:{ mix:1 }, forest:{ mix:1 }, fdepth:{ mix:1, depth:1 }, cecho:{ amount:1, time:0.1 }, ctone:{ mix:1, tilt:0 }, cwave:{ mix:1, amount:1 }, trmMix:{ depth:1 }, glue:{} };
 
 function burst(ctx, sec){ const n=Math.round(ctx.sampleRate*sec), b=ctx.createBuffer(2, n, ctx.sampleRate); let x=0x2F6E2B1;
   for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<n;i++){ x=(Math.imul(x,1103515245)+12345)>>>0; d[i]= i>=ctx.sampleRate*PRE && i<ctx.sampleRate*(PRE+BURST) ? ((x/4294967296)*2-1)*0.5 : 0; } }

@@ -67,7 +67,7 @@ function sceneFrame(t, bus){
   const dt=last ? Math.min(0.05, (t-last)/1000) : 1/60; last=t;
   const N=bus.since('notes', notesSeq); notesSeq=N.seq; for(const it of N.items) if(it.kind==='on' && it.role==='ld') room.glint(0, it.vel);
   const t0=performance.now();
-  room.update(dt, t/1000, bus.get('handsView')||[]);
+  room.update(dt, t/1000, bus.get('handsView')||[], bus.get('calmFx'));   // RUN 7 (C5): the Calm effects' values for the forest's visuals
   renderer.render(room.scene, room.camera);
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
   info.frames++; if(!info.t0) info.t0=t; if(t-info.t0>=1000){ info.fps=Math.round(info.frames*1000/(t-info.t0)); info.frames=0; info.t0=t; }

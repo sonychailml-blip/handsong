@@ -91,13 +91,13 @@ async function stateSig(R){
    засчитываются, если песне не хватает материала (material) — тогда вердикт «song: not enough material» и перечень недостающего. */
 export async function all(opt={}){   // F0: async — строка снимка читает tools/scales.before.json (fetch); звать await P.all()
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
-  const T00=performance.now(), title=opt.quick?'P.quick':'P.all';
+  const T00=performance.now(), title=opt.calm?'P.calm':opt.quick?'P.quick':'P.all';
   const rows=[], lists=[], keepCM=chordModeSel, measures={};
   let RR=null; try{ RR=await import('../render.js'); }catch(e){ RR=null; }   // страж читает копию движка рендера
   let nGuard=0; const stall0=frameStalls;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
   setQuick(opt.quick);
-  const RUN=rowList({ quick:!!opt.quick }), nRun=RUN.length, regBad=registryProblems();   // PROBE1: rows from the registry, in «at» order
+  const RUN=rowList({ quick:!!opt.quick, calm:!!opt.calm }), nRun=RUN.length, regBad=registryProblems();   // PROBE1: rows from the registry, in «at» order
   try{
   for(const { name, run, read, drawn } of RUN){
     histReset();   // ED7: every row starts with an empty history (probes write the song directly; the tripwire would refuse a stale step)
@@ -147,6 +147,8 @@ export async function all(opt={}){   // F0: async — строка снимка 
    держит node, tools/probe-data.mjs, — оси редактора по всем видам и прокрутка всех дорожек кадрами); рендерящие строки и так короткие
    (PROBE_SHORT). Цель — меньше 30 с на настольном; время печатается в итоге. P.all() остаётся полным барьером. */
 export function quick(opt={}){ return all({...opt, quick:true}); }
+/* RUN 7: P.calm — the rows flagged calm (every CALM row, the profile round trip, the forest rows, solo Firefly, HAND1, the node census, GOLD) */
+export function calm(opt={}){ return all({...opt, calm:true}); }
 /* ═══ P.orderCheck — ПОРЯДОК НЕ ВЛИЯЕТ (после MX2) ═══ На посеянной песне: P.checkPan отдельно, затем P.all, затем P.all ЕЩЁ РАЗ — все три
    обязаны пройти (строка MX2 идёт в P.all ПОСЛЕ S4, второй прогон ставит S4 после неё). Посев — до: await P.seed({replace:true}).
    Асинхронная: await P.orderCheck(). */

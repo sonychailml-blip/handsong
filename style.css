@@ -557,3 +557,100 @@
   /* VIS1c (RUN 6): the Background switch exists only in Calm; the 3D room's canvas (made by views/scene/host.js) lies under the 2D canvas */
   body:not(.calm) #bgRow{ display:none; }
   #scene{ position:fixed; inset:0; width:100vw; height:100vh; display:block; }
+/* RUN 7 (C6 + C11): THE CALM SHELL in the user's design — Moonglass: round buttons in a frosted-glass capsule (portrait: at the bottom;
+   landscape: on the right), the ⓘ card, the emblem and the wordmark. Glass blurs the scene behind it; its plain fallback (body.calm-plain:
+   the Dark background, the minimal scene level, low power) and browsers without backdrop-filter get the same readability with no blur. */
+#calmShell{ position:fixed; inset:0; z-index:var(--z-calm); pointer-events:none; font-family:var(--calm-font-body); color:var(--calm-ink);
+  -webkit-user-select:none; user-select:none; }
+#calmShell[hidden]{ display:none; }
+#calmShell button{ font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.svgi{ display:block; width:100%; height:100%; overflow:visible; }
+.calm-glass{ background:var(--calm-glass); -webkit-backdrop-filter:var(--calm-blur); backdrop-filter:var(--calm-blur); border:1px solid var(--calm-hair); }
+body.calm-plain .calm-glass{ background:var(--calm-glass-plain); -webkit-backdrop-filter:none; backdrop-filter:none; }
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ .calm-glass{ background:var(--calm-glass-plain); } }
+.calm-fade{ position:absolute; inset:0; opacity:0; visibility:hidden; transition:opacity var(--calm-fade) var(--calm-ease), visibility 0s linear var(--calm-fade); }
+#calmShell.show .calm-fade{ opacity:1; visibility:visible; transition:opacity var(--calm-fade) var(--calm-ease), visibility 0s; }
+#calmShell.show .calm-ctl, #calmShell.show .calm-ibtn{ pointer-events:auto; }
+.calm-idle{ position:absolute; top:12%; left:0; right:0; margin:0; text-align:center; color:var(--calm-dim); font-size:var(--calm-fs-body); letter-spacing:.04em; }
+.calm-ibtn{ position:absolute; top:max(var(--calm-edge), env(safe-area-inset-top)); right:max(var(--calm-edge), env(safe-area-inset-right));
+  width:var(--calm-ibtn); height:var(--calm-ibtn); border-radius:var(--calm-r-pill); display:flex; align-items:center; justify-content:center; }
+.calm-ibtn .svgi{ width:52%; height:52%; }
+.calm-ctl{ position:absolute; left:var(--calm-edge); right:var(--calm-edge); bottom:max(var(--calm-edge), env(safe-area-inset-bottom)); max-width:520px;
+  margin:0 auto; padding:var(--calm-pad); border-radius:var(--calm-r-capsule); display:grid; grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--calm-gap) var(--calm-gap-sm); box-shadow:var(--calm-shadow); }
+.calm-rb{ display:flex !important; flex-direction:column; align-items:center; gap:var(--calm-gap-sm); min-width:0; }
+.calm-circ{ width:var(--calm-btn); height:var(--calm-btn); border-radius:var(--calm-r-pill); display:flex; align-items:center; justify-content:center;
+  background:var(--calm-fill); border:1px solid var(--calm-hair); transition:border-color var(--calm-fade), box-shadow var(--calm-fade), color var(--calm-fade); }
+.calm-circ .svgi{ width:46%; height:46%; }
+.calm-rb:focus-visible .calm-circ, .calm-rb.glint .calm-circ{ border-color:var(--calm-accent); box-shadow:var(--calm-ring); color:var(--calm-accent); }
+.calm-lab{ font-size:var(--calm-fs-label); color:var(--calm-dim); line-height:var(--calm-lh-tight); }
+.calm-val{ font-size:var(--calm-fs-value); line-height:var(--calm-lh-tight); text-align:center; max-width:100%; overflow:hidden; display:-webkit-box;
+  -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow-wrap:anywhere; }
+.calm-vol{ grid-column:1/-1; display:flex; align-items:center; gap:var(--calm-gap); padding:0 var(--calm-gap-sm); }
+.calm-vol[hidden]{ display:none; }
+.calm-vol input{ flex:1; min-width:0; accent-color:var(--calm-accent); }
+.calm-vico{ display:flex; width:var(--calm-icon); height:var(--calm-icon); color:var(--calm-dim); }
+.calm-card{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px, calc(100vw - 28px)); max-height:calc(100vh - 28px);
+  overflow:auto; border-radius:var(--calm-r-card); padding:var(--calm-pad-lg); pointer-events:auto; box-shadow:var(--calm-shadow);
+  -webkit-backdrop-filter:var(--calm-blur-card); backdrop-filter:var(--calm-blur-card); }
+body.calm-plain .calm-card{ -webkit-backdrop-filter:none; backdrop-filter:none; }
+.calm-card[hidden]{ display:none; }
+.calm-card p{ margin:var(--calm-gap) 0; color:var(--calm-dim); line-height:var(--calm-lh); font-size:var(--calm-fs-body); }
+.calm-ihead{ display:flex; justify-content:space-between; align-items:flex-start; gap:var(--calm-gap); margin:0 0 var(--calm-gap-sm); }
+.calm-ibtn-in{ position:static; flex:none; }
+.calm-mark{ display:flex; flex-direction:column; align-items:flex-start; gap:var(--calm-gap-sm); }
+.emblem{ display:block; width:110px; height:22px; overflow:visible; }
+.emblem-dot{ fill:var(--calm-emblem-dot); }
+.emblem-glow{ fill:var(--calm-accent); filter:var(--calm-glow-f); }
+.calm-word{ font-family:var(--calm-font-display); font-weight:var(--calm-fw-light); font-size:var(--calm-fs-mark); letter-spacing:var(--calm-track-wide);
+  line-height:var(--calm-lh-tight); color:var(--calm-ink); }
+.calm-word-dot{ color:var(--calm-dim); }
+.calm-sub{ font-size:var(--calm-fs-small); letter-spacing:.5em; color:var(--calm-accent); }
+.calm-tg{ display:grid !important; grid-template-columns:var(--calm-icon) 1fr auto; gap:var(--calm-gap); align-items:center; width:100%; text-align:left;
+  padding:var(--calm-gap) 0 !important; border-top:1px solid var(--calm-hair) !important; font-size:var(--calm-fs-value); }
+.calm-tsw{ width:2.4em; height:1.3em; border-radius:var(--calm-r-pill); border:1px solid var(--calm-hair); position:relative; display:block; }
+.calm-tsw span{ position:absolute; top:.17em; left:.17em; width:.9em; height:.9em; border-radius:var(--calm-r-pill); background:var(--calm-dim);
+  transition:transform var(--calm-fade) var(--calm-ease), background var(--calm-fade); }
+.calm-tg.on .calm-tsw{ border-color:var(--calm-accent); }
+.calm-tg.on .calm-tsw span{ transform:translateX(1.1em); background:var(--calm-accent); }
+.calm-lnk{ display:block; margin:var(--calm-gap) 0 0 !important; color:var(--calm-accent) !important; font-size:var(--calm-fs-value); text-align:left; }
+.calm-lnk[hidden]{ display:none; }
+.calm-dev{ color:var(--calm-dim) !important; font-size:var(--calm-fs-small); }
+.calm-veil{ position:absolute; inset:0; background:var(--c-black); opacity:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+#calmShell.asleep .calm-veil{ pointer-events:auto; }
+.calm-veil-msg{ color:var(--calm-dim); font-size:var(--calm-fs-body); }
+.calm-veil-msg[hidden]{ display:none; }
+.calm-lantern{ position:absolute; left:0; right:0; bottom:0; height:24vh; background:radial-gradient(ellipse 70% 100% at 50% 100%, var(--calm-lantern) 0%, transparent 72%); pointer-events:none; }
+.calm-lantern[hidden]{ display:none; }
+@media (orientation:landscape){
+  .calm-ctl{ left:auto; right:max(var(--calm-edge), env(safe-area-inset-right)); bottom:auto; top:50%; transform:translateY(-50%); width:min(300px, 36vw);
+    margin:0; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .calm-ibtn{ right:auto; left:max(var(--calm-edge), env(safe-area-inset-left)); }
+  .calm-idle{ top:8%; right:calc(36vw + 28px); }
+  .calm-card{ width:min(760px, calc(100vw - 28px)); display:grid; grid-template-columns:1fr 1fr; column-gap:var(--calm-pad-lg); align-content:start; }
+  .calm-card .calm-ihead{ grid-column:1/-1; }
+  .calm-card p{ margin:var(--calm-gap-sm) 0; }
+}
+/* In Calm the Full app's top bar and its menus stay out of the way (the dev edition reaches Full through ⓘ). */
+body.calm #bar, body.calm #status{ display:none !important; }   /* the technical status line (scale · tuning · steps) is Full's */
+/* RUN 7 (C7): the Calm start — the start card restyled in a Calm boot (Moonglass glass card on the night); Full's start untouched. */
+.calm-only{ display:none !important; }
+body.calm-boot .calm-only{ display:revert !important; }
+body.calm-boot #start{ background:var(--calm-bg); }
+body.calm-boot #start .startCard{ background:var(--calm-glass-plain); border:1px solid var(--calm-hair); border-radius:var(--calm-r-card); box-shadow:var(--calm-shadow);
+  color:var(--calm-ink); font-family:var(--calm-font-body); }
+body.calm-boot #start .startCard > h1, body.calm-boot #start .startTag, body.calm-boot #start .startBtns, body.calm-boot #fsBtnStart, body.calm-boot #installBtn,
+body.calm-boot #installHint, body.calm-boot #learnMsg, body.calm-boot #start .startFoot > p:not(.startLang){ display:none !important; }
+body.calm-boot.calm-seen #calmFirstSteps{ display:none !important; }
+body.calm-boot .calm-start-head{ display:flex !important; flex-direction:column; align-items:center; gap:var(--calm-gap-sm); margin:0 0 var(--calm-gap); }
+.calm-start-head .emblem{ width:150px; height:30px; }
+.calm-steps{ list-style:none; margin:var(--calm-gap) 0; padding:0; text-align:left; }
+body.calm-boot .calm-steps{ display:flex !important; flex-direction:column; gap:var(--calm-gap); }
+.calm-steps li{ display:grid; grid-template-columns:var(--calm-icon) 1fr; gap:var(--calm-gap); align-items:start; color:var(--calm-dim); font-size:var(--calm-fs-value); line-height:var(--calm-lh); }
+.calm-steps .calm-vico{ color:var(--calm-accent); }
+.calm-begin{ width:100%; padding:var(--calm-gap) var(--calm-pad) !important; margin:var(--calm-gap) 0 !important; border:0 !important; border-radius:var(--calm-r-pill) !important;
+  background:var(--calm-accent) !important; color:var(--calm-accent-ink) !important; font-family:var(--calm-font-body); font-weight:var(--calm-fw-bold); font-size:var(--calm-fs-body); cursor:pointer; }
+body.calm-boot #start .startFoot{ border-top-color:var(--calm-hair); color:var(--calm-dim); }
+body.calm-boot #privacyNote summary{ color:var(--calm-dim); }
+body.calm-boot #start .startLang [data-icon]{ display:none; }
+body.calm-boot #langSel{ background:var(--calm-fill); color:var(--calm-ink); border:1px solid var(--calm-hair); }

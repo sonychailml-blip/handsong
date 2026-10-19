@@ -1673,11 +1673,35 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     the sound must not change. Turn the phone / resize the window: portrait and landscape, no stretching, the light stays on the pinch.
     Reload → Calm (with `?calm`) opens on the background you chose last. Known for now: the full note field and the 2D hand points still
     show over the forest (the Calm shell C6 makes the field a soft glow).
-105. GPU sharing — Forest vs Dark (review R2; desktop Intel HD 4000 / GT 635M, then the Poco M5): Calm (`?calm`) → «🎛 Sound» → Diagnostics →
+105. GPU sharing — Forest vs Dark (review R2; desktop Intel HD 4000 / GT 635M, then the Poco M5): Calm (`?calm`) → ⓘ → «Sound panel and diagnostics (development)» (RUN 7) → Diagnostics →
     Latency meter On. (1) Background Dark: play 2 minutes with both hands, then «Copy» and keep the text (the «Scene: off» line, «Hand
     detection», «Hand → sound»). (2) Background Forest: the same 2 minutes, «Copy» again (the «Scene: N fps · frame N ms · level full» line).
     Send both texts: we compare detection time and hand → sound with and without the room (the GPU is shared with the hand model) and the
     room's own frame rate. On the phone: the same two runs; also say whether the phone got warm and whether the forest stuttered.
+
+106. Calm's four sounds (RUN 7): `?calm` → Begin → ⓘ closed, controls shown → tap «Sound» to cycle Firefly · Breath flute · Handpan · Singing
+    bowl; play each in Glow, Dusk and Mist (tap «Mood»), slowly and fast, near and far. Listen for: organic, no clicks, soft highs, the
+    handpan / bowl / Firefly ringing out by themselves, the flute breathing (a little air, vibrato that arrives after a moment). ⚠️ Today's
+    Firefly is ≈ 18 dB quieter than the other three (measured) — say whether it should be raised for Calm.
+107. The Calm look (C11 + C6): on the phone and the desktop, portrait AND landscape: raise no hand for 2 s → the glass capsule fades in
+    (portrait: bottom; landscape: right), a hand back → it fades out; ⓘ → the card (emblem, «hand·song», privacy, headphones, Lantern, «Show
+    the full note field»); switch the language to Русский — every word fits; on the Camera background the glass blurs the picture, on Dark it is
+    plain; the note field is only a soft glow under the playing hand (no names, no Hz, no effect bars, no status line).
+108. Sleep timer: «Sleep» → 15 min (cycles off · 15 · 30 · 60); after the time the sound and the forest fade out over the last 90 s and the
+    screen says «Sleeping — tap to wake»; a tap brings both back. (Quick check without waiting: none for the person — the probe tests it.)
+109. Depth → the forest (C4b): play one note and move the hand slowly towards and away from the camera: farther = more forest echo, a
+    darker, softer note; near = clear and close. The far end keeps growing (Calm's own range; the Full app is unchanged).
+110. The forest's ambience (C4c): in Calm, with no hand, listen: a low quiet drone on A and E (it changes with the Mood), a soft wind, now and
+    then distant crickets left and right. ⓘ… the «Forest» slider in the capsule changes only this ambience; it is remembered after a reload.
+111. First run + ghost light (C7): in a private window open `?calm`: the card shows the four first steps and «Begin»; after Begin and the
+    camera, a ghost light drifts over the forest and plays four notes, then leaves; raise a hand during it → it leaves at once. Reload: the
+    card no longer shows the steps (ⓘ → «Show the first steps again» brings them back and plays the ghost now).
+112. The effects hand (C5): with the LEFT hand (Calm's effects hand) pinch and drag UP: index → Echo (repeats that darken; rings of light leave
+    the firefly in the forest), middle → Warmth (down) / Brightness (up) (the light turns amber / cold), ring → Wave (a gentle vibrato and
+    tremolo; the light trembles). Each stays where you leave it. Try each with all four sounds; with the Singing bowl, Echo makes a long wash
+    (measured: louder by at most ≈ 1 dB, no build-up) — say whether it is too much.
+113. Listening page v2: `http://127.0.0.1:5500/tools/listen/calm-timbres.html` — Phrase / Single notes, «In the forest / Dry» flips while it
+    plays (both versions in sync), every sound at the same loudness.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:
@@ -1692,3 +1716,9 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   APPEND only, never insert or reorder. ⛔ A SOLO timbre cannot even be appended (KS banks must be the tail: `LEAD_KS_FROM =
   LEAD_INSTR.length − KS_BANKS.length`); stable timbre ids come first. Chords, bass, kits may append. The editor lists timbres only via
   `audio.timbresOf(role)`.
+
+- RUN 7 (Calm sound pass) extended rule #3's exception list in CLAUDE.md (old line verbatim):
+   one-shot exceptions). Lazily built solo voices and banks obey it: cached and gated, never torn down. The offline
+
+- RUN 7 (C6: Calm hides Full's top bar; diagnostics through ⓘ) updated step 105's first line (old line verbatim):
+105. GPU sharing — Forest vs Dark (review R2; desktop Intel HD 4000 / GT 635M, then the Poco M5): Calm (`?calm`) → «🎛 Sound» → Diagnostics →

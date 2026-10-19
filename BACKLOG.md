@@ -2584,7 +2584,13 @@ Surge XT и ZynAddSubFX как СПРАВОЧНИК (не библиотека: 
 - **Preparation in code (slice UI1 of stage 3; UI1b done — see above):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes,
   spacing; today partly in `style.css :root`) and ONE icon component / SVG sprite replacing emoji and Unicode glyphs in the UI (DOM and
   canvas), so the authored design drops in later WITHOUT code changes. LIC1's glyph audit lists every symbol to replace.
-- **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).
+- **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).
+- **Calm's design — user decision (RUN 7, 2026-10-17):** a combination of the RUN 6 proposals (`docs/design/calm/`): the EMBLEM / app icon
+  from C · Hush (five dots in an arc, the centre one glowing — also the brand mark above the «handsong» wordmark), its glowing dot in
+  Moonglass's firefly lime `#c8f56a`; EVERYTHING ELSE from B · Moonglass (palette as `--calm-*` tokens, icons, round buttons in a glass
+  capsule, first-run card, ⓘ panel, portrait and landscape). Fonts: OFL, self-hosted woff2, WITH Cyrillic (Fraunces has none — an OFL title
+  serif in its soft spirit; the sans checked for Cyrillic). Glass blur has a plain dark fallback (Dark level, weak devices, low power). Full
+  keeps today's look. Applied in RUN 7 slice C11 (`docs/STAGE4-CALM-plan.md` «Review RUN 7»; quality bar `docs/CALM-QUALITY.md`).
 
 ### ⬜ 7.20. ⛳ LEARNING — A MUSIC-THEORY COURSE TAUGHT THROUGH THE BODY (user's idea, added 2026-10-16; lessons stay scheduled AFTER the core, as the user decided earlier — record only, no code)
 - **The idea:** an interactive music-theory course inside Handsong where the body is the instrument of understanding. The 12 rows are a

@@ -35,9 +35,11 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 |---|---|---|---|---|---|
 | Feedback form (Google Forms) — a link the person opens | — | n/a | link | https://docs.google.com/forms/ | src/ui.js FEEDBACK_URL |
 | Donation page (PayPal.Me) — a link the person opens | — | n/a | link | https://paypal.me/ | src/ui.js DONATE_URL |
+| The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent | — | n/a | link | http://www.w3.org/2000/svg | W3C SVG specification (a namespace name, not an address the app opens) |
 
 - **Feedback form (Google Forms) — a link the person opens** — Opened only by a tap on the start card; nothing is sent by the app.
 - **Donation page (PayPal.Me) — a link the person opens** — Opened only by a tap on the start card; nothing is sent by the app.
+- **The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent** — RUN 7 (C11): src/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name.
 
 ## Developer tools only (never shipped)
 
@@ -61,13 +63,17 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 
 | Item | Version | Licence | Use | Addresses / files | Source |
 |---|---|---|---|---|---|
-| App icons (home screen / install) — a blue «H» of three rectangles on a light background | — | AI-generated | shipped | icons/icon-192.png<br>icons/icon-512.png<br>icons/icon-512-maskable.png | made by Claude Code (Anthropic) in this project, drawn by code as flat rectangles (no font, no traced artwork, no metadata); whether anything was copied is unknown (user, Q13) |
+| App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night | — | AI-generated | shipped | icons/icon-192.png<br>icons/icon-512.png<br>icons/icon-512-maskable.png | the user's chosen design (RUN 7, BACKLOG §7.19: the C · Hush emblem in Moonglass colours), drawn by code by Claude Code in this project (canvas circles and gradients; no font, no traced artwork) |
 | Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui) | — | n/a | device | — | style.css --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; src/draw.js ctx.font system-ui |
 | Unicode symbols and emoji used as icons and signs (list below) | — | n/a | device | — | characters in our own text; their pictures come from the device's fonts (Segoe UI Symbol / Segoe UI Emoji on Windows, Apple Color Emoji and SF on Apple devices, Noto on Android) — no file shipped |
+| Andika (text font of the Calm face) — SIL International | 7.000 (SIL release, web/Andika-Regular.woff2 and Andika-Bold.woff2, UNMODIFIED) | OFL-1.1 | shipped | fonts/andika/Andika-Regular.woff2<br>fonts/andika/Andika-Bold.woff2<br>fonts/andika/OFL.txt | https://github.com/silnrsi/font-andika/releases/tag/v7.000 (Andika-7.000.zip) — Reserved Font Names «Andika» and «SIL»: the files are shipped unmodified (no subsetting), so the name stays |
+| Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors | Google Fonts v40, weight 300, latin + cyrillic subsets (woff2) | OFL-1.1 | shipped | fonts/literata/literata-300-latin.woff2<br>fonts/literata/literata-300-cyrillic.woff2<br>fonts/literata/OFL.txt | https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name, so the subsets may keep the name |
 
-- **App icons (home screen / install) — a blue «H» of three rectangles on a light background** — tool: Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms · **to be replaced by the user's own authored design (before the Calm release)**
+- **App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night** — tool: Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms · **kept — the user's chosen Calm design (RUN 7); the earlier «H» icons were replaced**
 - **Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)** — No font file is shipped; the person's device draws the text with its own fonts. · **to be replaced by the user's own authored design (a chosen typeface under OFL-1.1 or own work, set through the UI1 design tokens)**
 - **Unicode symbols and emoji used as icons and signs (list below)** — Each device draws them differently. Pictures of them in marketing (screenshots, the promo video) may fall under the font owner's terms — another reason to replace them. · **to be replaced by the user's own authored design — one icon component / SVG sprite (UI1)**
+- **Andika (text font of the Calm face) — SIL International** — RUN 7 (C11, the user's design choice): chosen for Calm's text because Atkinson Hyperlegible (and Next) have NO Cyrillic (checked: Latin and Latin-ext subsets only); Andika is designed by SIL for literacy and low vision (distinct letterforms) and covers Cyrillic. Self-hosted, served from our own origin. · **kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced**
+- **Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors** — RUN 7 (C11): Fraunces (the Moonglass proposal) has no Cyrillic (checked: vietnamese, latin-ext, latin only); Literata is a warm, soft book serif with a true Light weight and Cyrillic. Self-hosted, served from our own origin. · **kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced**
 
 ## Unicode symbols and emoji in the interface (audit, Q13)
 
@@ -132,11 +138,11 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | src/icons.js |
 | ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/cmd.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/forest.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/profile.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
+| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/calm.js, src/probes/cmd.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/forest.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/profile.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
 | − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/core/profile.js, src/i18n.js, src/probedata.js, src/probes/calm.js, src/probes/edit.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
-| ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/lat.js, src/render.js, src/views/play.js |
+| ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/calm.js, src/probes/lat.js, src/render.js, src/views/play.js |
 | ≤ | U+2264 | less or equal | typography | src/probes/calm.js, src/probes/window.js |
-| ≥ | U+2265 | greater or equal | typography | src/core/format.js, src/probes/forest.js |
+| ≥ | U+2265 | greater or equal | typography | src/core/format.js, src/probes/calm.js, src/probes/forest.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | src/render.js, src/views/strip.js |
 | √ | U+221A | square root (console text) | typography | src/render.js |
 | ♭ | U+266D | flat (note names) | notation | data/modes/blues.json, data/tunings/shruti22.json, index.html, src/probedata.js, src/scales.js, src/songs.js |

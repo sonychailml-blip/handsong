@@ -101,19 +101,19 @@
   },
   {
    "id": "app-icons",
-   "name": "App icons (home screen / install) — a blue «H» of three rectangles on a light background",
+   "name": "App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night",
    "class": "image",
    "use": "shipped",
    "version": "—",
    "licence": "AI-generated",
-   "source": "made by Claude Code (Anthropic) in this project, drawn by code as flat rectangles (no font, no traced artwork, no metadata); whether anything was copied is unknown (user, Q13)",
+   "source": "the user's chosen design (RUN 7, BACKLOG §7.19: the C · Hush emblem in Moonglass colours), drawn by code by Claude Code in this project (canvas circles and gradients; no font, no traced artwork)",
    "tool": "Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms",
    "files": [
     "icons/icon-192.png",
     "icons/icon-512.png",
     "icons/icon-512-maskable.png"
    ],
-   "replace": "to be replaced by the user's own authored design (before the Calm release)"
+   "replace": "kept — the user's chosen Calm design (RUN 7); the earlier «H» icons were replaced"
   },
   {
    "id": "system-fonts",
@@ -178,6 +178,51 @@
    ],
    "replace": "reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)",
    "notes": "Loaded only by docs/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts."
+  },
+  {
+   "id": "font-andika",
+   "name": "Andika (text font of the Calm face) — SIL International",
+   "class": "font",
+   "use": "shipped",
+   "version": "7.000 (SIL release, web/Andika-Regular.woff2 and Andika-Bold.woff2, UNMODIFIED)",
+   "licence": "OFL-1.1",
+   "source": "https://github.com/silnrsi/font-andika/releases/tag/v7.000 (Andika-7.000.zip) — Reserved Font Names «Andika» and «SIL»: the files are shipped unmodified (no subsetting), so the name stays",
+   "files": [
+    "fonts/andika/Andika-Regular.woff2",
+    "fonts/andika/Andika-Bold.woff2",
+    "fonts/andika/OFL.txt"
+   ],
+   "notes": "RUN 7 (C11, the user's design choice): chosen for Calm's text because Atkinson Hyperlegible (and Next) have NO Cyrillic (checked: Latin and Latin-ext subsets only); Andika is designed by SIL for literacy and low vision (distinct letterforms) and covers Cyrillic. Self-hosted, served from our own origin.",
+   "replace": "kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced"
+  },
+  {
+   "id": "font-literata",
+   "name": "Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors",
+   "class": "font",
+   "use": "shipped",
+   "version": "Google Fonts v40, weight 300, latin + cyrillic subsets (woff2)",
+   "licence": "OFL-1.1",
+   "source": "https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name, so the subsets may keep the name",
+   "files": [
+    "fonts/literata/literata-300-latin.woff2",
+    "fonts/literata/literata-300-cyrillic.woff2",
+    "fonts/literata/OFL.txt"
+   ],
+   "notes": "RUN 7 (C11): Fraunces (the Moonglass proposal) has no Cyrillic (checked: vietnamese, latin-ext, latin only); Literata is a warm, soft book serif with a true Light weight and Cyrillic. Self-hosted, served from our own origin.",
+   "replace": "kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced"
+  },
+  {
+   "id": "svg-namespace",
+   "name": "The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent",
+   "class": "link",
+   "use": "link",
+   "version": "—",
+   "licence": "n/a",
+   "source": "W3C SVG specification (a namespace name, not an address the app opens)",
+   "urls": [
+    "http://www.w3.org/2000/svg"
+   ],
+   "notes": "RUN 7 (C11): src/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name."
   }
  ],
  "glyphs": [

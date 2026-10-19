@@ -59,7 +59,7 @@ const LOGDIR=path.join(ROOT,'tools','.probe-logs');
 const argv=process.argv.slice(2), has=f=>argv.includes(f), val=(f,d)=>{ const i=argv.indexOf(f); return i>=0&&argv[i+1]!=null ? argv[i+1] : d; };
 const REPEAT=+val('--repeat',0)||0;
 let QUICK=has('--quick'), ALL=has('--all');
-if(!QUICK && !ALL && !REPEAT) QUICK=true;
+if(!QUICK && !ALL && !REPEAT && !has('--calm')) QUICK=true;   // RUN 7: --calm alone runs only P.calm
 const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
@@ -458,13 +458,13 @@ async function session(port, plan, label){
       const ts=Date.now();
       const job=page.evaluate(async k=>{ const r=await P[k]({ progress:true }); return r ? { pass:r.pass, seconds:r.seconds, hidden:r.hidden, rows:r.rows, measures:r.measures||{}, material:r.material&&r.material.ok } : null; }, kind);
       let r;
-      if(kind==='all') r=await within(job, LIMIT_ALL, `P.${kind}()`);
+      if(kind==='all'||kind==='calm') r=await within(job, LIMIT_ALL, `P.${kind}()`);
       else { const S=slowMeter(); rowHook=(name,ms)=>S.row(name,ms); res.slow=S;
         const fixed=LIMIT_QUICK_ARG!=null ? (+LIMIT_QUICK_ARG||3)*60e3 : null;
         const dl=()=>{ const ms= fixed ?? Math.round(LIMIT_QUICK_BASE*S.f); return { at:ts+ms, ms, note: fixed ? ' (--limit-quick)' : S.f>1 ? ` (3 min × slow factor ${S.f.toFixed(2)})` : '' }; };
         try{ r=await withinDyn(job, dl, `P.${kind}()`); } finally{ rowHook=null; res.limitQuick=dl().ms; }
         out(`[${label}] machine speed: ${S.n} reference row(s) ran ${S.raw.toFixed(2)}× their idle time → slow factor ${S.f.toFixed(2)} · P.quick limit ${(res.limitQuick/60e3).toFixed(1)} min${fixed?' (--limit-quick)':''}`); }
-      for(let i=0;i<60 && !seen.some(l=>/P\.(all|quick): (PASS|NOT A PASS)/.test(l));i++) await page.waitForTimeout(50);   // итоговая строка — событием консоли, чуть позже
+      for(let i=0;i<60 && !seen.some(l=>/P\.(all|quick|calm): (PASS|NOT A PASS)/.test(l));i++) await page.waitForTimeout(50);   // итоговая строка — событием консоли, чуть позже
       res.runs.push({ kind, ...r, wall:(Date.now()-ts)/1000, lines:seen.filter(l=>/^\[scaleprobe all\]/.test(l)).slice(-12) });
       seen.length=0;
     }
@@ -531,7 +531,7 @@ function repeatTable(sessions){
 await staleScan();
 if(CLEAN_ONLY) process.exit(0);
 await mkdir(LOGDIR,{ recursive:true });
-const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',LEAK&&'leak'].filter(Boolean).join('+');
+const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',has('--calm')&&'calm',LEAK&&'leak'].filter(Boolean).join('+');
 LOG=path.join(LOGDIR, `${stamp()}-${mode}.log`);
 await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
 const srv=await serve(), port=srv.address().port; LIVE.srv=srv;
@@ -543,7 +543,7 @@ try{
   if(REPEAT){
     for(let i=1;i<=REPEAT;i++){ out(`\n[probe-browser] run ${i} of ${REPEAT} — fresh browser, fresh profile`); await log(`===== run ${i} of ${REPEAT} =====`);
       sessions.push(await session(port, QUICK?['quick','all']:['all'], `run ${i}/${REPEAT}`)); }
-  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all'].filter(Boolean), mode||'eval'));
+  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', has('--calm')&&'calm'].filter(Boolean), mode||'eval'));   // RUN 7: --calm runs P.calm
 } finally { await closeAll(); }
 if(EXITING) await new Promise(()=>{});   // a signal/error path is closing — it prints and exits itself
 const stillMine=(runnerBrowsers()||[]).filter(g=>g.mine);
@@ -555,7 +555,7 @@ for(const s of sessions){
   for(const r of s.runs){
     out(`\n[${s.label}] P.${r.kind}: ${r.pass?'PASS':'NOT A PASS'} · ${r.seconds} s in the page (${r.wall.toFixed(1)} s wall)`);
     rowsTable(r);
-    for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick):/.test(l)) out('  '+l);
+    for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick|calm):/.test(l)) out('  '+l);
     if(!r.pass) pass=false;
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;

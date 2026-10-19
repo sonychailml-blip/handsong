@@ -20,6 +20,10 @@ import { BRIGHT_PARAMS, makeBrightFx } from './modules/effects/bright.js';
 import { GLIDE_PARAMS, makeGlideFx } from './modules/effects/glide.js';
 import { VOL_PARAMS, makeVolFx } from './modules/effects/volume.js';
 import { FOREST_PARAMS, makeForestFx } from './modules/effects/forest.js';
+import { FDEPTH_PARAMS, makeForestDepthFx } from './modules/effects/forestdepth.js';   // RUN 7 (C4b): Calm's «Forest depth»
+import { CECHO_PARAMS, CTONE_PARAMS, CWAVE_PARAMS, makeCalmEchoFx, makeCalmToneFx, makeCalmWaveFx } from './modules/effects/calm.js';   // RUN 7 (C5): the Calm effects hand
+import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet } from './modules/ambience/forest.js';   // RUN 7 (C4c): the forest's ambience
+import { AMB } from './core/ambience.js';
 import { GLUE_PARAMS, dynNode, makeGlueFx } from './modules/effects/glue.js';
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
@@ -215,6 +219,14 @@ function offlineMasterDyn(mode,set,gain){
 }
 function setMasterLevel(v){ masterLvl=Math.max(0,Math.min(1,+v||0)); if(AC&&master) master.gain.setTargetAtTime(MASTER_BASE*volAmp(masterLvl), AC.currentTime, 0.03); }
 const masterLevel=()=>masterLvl;
+/* RUN 7 (C6): the Calm sleep timer's OUTPUT FADE (0…1, session only — never stored in a song, so a song saved asleep is not silent). It rides
+   on the master's makeup gain mMake (no new node in the master path, rule #4); without the dynamics worklet (the fallback path) on the master
+   gain. The level is smoothed (time constant tc) — nothing abrupt. */
+let outFade=1;
+function outputFade(v, tc=0.5){ outFade=Math.max(0,Math.min(1,+v||0)); if(!AC) return;
+  if(mMake) mMake.gain.setTargetAtTime(Math.pow(10, MASTER_MAKEUP_DB/20)*outFade, AC.currentTime, tc);
+  else if(master) master.gain.setTargetAtTime(MASTER_BASE*volAmp(masterLvl)*outFade, AC.currentTime, tc); }
+const outputFadeLevel=()=>outFade;
 /* ═══ ENG2 (RUN 4): ENGINE READOUTS — read only; nothing here changes the sound (plan §4.4 levels / load / voices) ═══ */
 const hitT=[];   // live drum hits (context times), the last second
 const dBof=x=> x>0 ? 20*Math.log10(x) : -Infinity;
@@ -405,6 +417,7 @@ function setDbg(o){ DBG.noHum=!!(o&&o.noHum); }
    ⛔ ЖИВАЯ КОПИЯ ЭТО НЕ ЗОВЁТ НИКОГДА: у неё функции уровня и панорамы ставит recorder при загрузке, и сброс вернул бы все дорожки в центр
    и на единицу. Сброс — только render.js, только своей копии. */
 function renderReset(){
+  amb=null;   // RUN 7 (C4c): a render's ambience belongs to its own context
   timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
@@ -486,7 +499,11 @@ const FX_FACTORY={
   dly:   { id:'dly',    labelKey:'fx.dly',    kind:'bus',   params:DLY_PARAMS,    make:makeDelayFx },
   trmMix:{ id:'trmMix', labelKey:'fx.trmMix', kind:'insert',params:TRMIX_PARAMS,  make:makeTremMixFx },
   forest:{ id:'forest', labelKey:'fx.forest', kind:'bus',   params:FOREST_PARAMS, make:makeForestFx },   // SND-F1: «Night forest» room
-  glue:  { id:'glue',   labelKey:'fx.glue',   kind:'insert',params:GLUE_PARAMS,   make:makeGlueFx, cat:'dyn' },   // SND-F1: category «Dynamics»   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
+  glue:  { id:'glue',   labelKey:'fx.glue',   kind:'insert',params:GLUE_PARAMS,   make:makeGlueFx, cat:'dyn' },
+  fdepth:{ id:'fdepth', labelKey:'fx.fdepth', kind:'bus',   params:FDEPTH_PARAMS, make:makeForestDepthFx, calm:true },
+  cecho: { id:'cecho',  labelKey:'fx.cecho',  kind:'bus',   params:CECHO_PARAMS,  make:makeCalmEchoFx, calm:true },   // RUN 7 (C5): Calm «Echo»
+  ctone: { id:'ctone',  labelKey:'fx.ctone',  kind:'insert',params:CTONE_PARAMS,  make:makeCalmToneFx, calm:true },   // RUN 7 (C5): Calm «Warmth ↔ Brightness»
+  cwave: { id:'cwave',  labelKey:'fx.cwave',  kind:'insert',params:CWAVE_PARAMS,  make:makeCalmWaveFx, calm:true },   // RUN 7 (C5): Calm «Wave»   // RUN 7 (C4b): Calm's room — not offered in Full's «+ Add»   // SND-F1: category «Dynamics»   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
 };
 /* ⛳ ПОСТОЯННАЯ ЗАПИСЬ ЦЕПИ (VOL-0) — ОДИН предикат на все места, где запись цепи ПОКАЗЫВАЮТ или ПРЕДЛАГАЮТ: столбики и их
    габарит (draw), панель — строки, подсказка, карта общих адресов, списки «добавить» (ui), голосовой список дорожки
@@ -749,7 +766,7 @@ function fxDefaultsOf(fxId,key){   // key (V4) — владелец цепи: у
    есть те, что реально встанут в путь переигровки. Голосовые (яркость, скольжение) в путь не входят вовсе, как и старые
    скаляры соло — им здесь не место. ⚠️ С V4b их ТОЖЕ можно добавить дорожке, но другим списком — fxVoiceIdsFor ниже:
    их величина живёт в нотах. */
-const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!=='voice');
+const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!=='voice' && !FX_FACTORY[id].calm);   // RUN 7: a Calm-only effect is not offered in Full
 /* ⛳ V4b: ГОЛОСОВЫЕ ЭФФЕКТЫ, КОТОРЫЕ МОЖНО ДОБАВИТЬ ДОРОЖКЕ ЭТОЙ РОЛИ — то, что объявлено для роли (FX_FACTORY[id].roles), и
    старые скаляры у соло (они живут только в соло-голосе). Их величина живёт В НОТАХ (fxIsPerNote), поэтому добавленный в
    редакторе такой эффект не встаёт в путь, а открывает полосу, правка которой переписывает ноты дорожки. */
@@ -2002,6 +2019,16 @@ let dView=null, dUp=false;
 const dv=()=>dView||undefined;
 function droneUse(s){ dView=s||null; }
 const droneHz=()=>[tonicFreq(dv())/2, droneSecondHz(dv())];   // what the drone sounds now (probe read-out)
+/* RUN 7 (C4c, Calm plan §4.6): THE FOREST'S AMBIENCE — built on first use in this engine instance into the master (so the sleep fade and the
+   limiter cover it), live sound only (never a track, rule #31); its drone is priced from the LIVE view like the backing drone (the mood and
+   the key — rule #2). ambienceOn(on, level, when) fades it in or out; ambienceTick(until) schedules the crickets ahead (the Calm shell's frame,
+   or a render up to its end); seed shifts its seeded parts (a probe's control). */
+let amb=null;
+function ambienceOn(on, level=AMB.level, when, seed=0){ if(!AC) return; if(!amb){ if(!on) return; amb=buildAmbience(E, master, seed); }
+  ambienceRetune(when); ambienceSet(E, amb, on, level, when); }
+function ambienceRetune(when){ if(amb) ambienceTune(E, amb, tonicFreq()/2, droneSecondHz(), when); }
+function ambienceTick(until){ if(amb && amb.on) ambienceSchedule(E, amb, until!=null ? until : AC.currentTime+AMB.ahead); }
+const ambienceInfo=()=> amb ? { on:amb.on, level:amb.level, hz:amb.hz.slice() } : null;
 function droneOn(level=0.18,when,tc=1.2){ if(!AC)return; const t=when!=null?when:AC.currentTime;
   dG.gain.setTargetAtTime(level,t,tc);
   const [f1,f2]=droneHz();
@@ -2143,6 +2170,7 @@ const E=Object.freeze({
 });
 const engineCtx=()=>E;
 export {
+  outputFade, outputFadeLevel, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
   initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, bendTapSet, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,

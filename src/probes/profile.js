@@ -15,7 +15,7 @@ import { HAND_FNS } from '../core/profile.js';
 import { FX_FACTORY, timbreIdOf } from '../audio.js';
 import { fxIsScalar } from '../state.js';
 
-const KEYS=['scaleId','tonic','tonicCents','lead','phoneInstr','splitOn','hand','voice'];
+const KEYS=['scaleId','tonic','tonicCents','lead','phoneInstr','splitOn','hand','voice','chain'];   // RUN 7 (C4b): + the solo chain
 const cmp=(a,b)=> KEYS.filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).map(k=>`${k}: ${JSON.stringify(a[k])} vs ${JSON.stringify(b[k])}`);
 const hiddenNow=id=>{ const el=document.getElementById(id); return !el || getComputedStyle(el).display==='none'; };
 
@@ -36,12 +36,17 @@ export function checkProfile(){
     n++; if(wasProf!=='profile.full') miss('the probe started outside Full: '+wasProf);
     for(const id of ['recBtn','jamBtn','loopPanelBtn','soundBtn']){ n++; if(hiddenNow(id)) miss(`#${id} hidden in Full before the switch (the Calm checks below could not fail)`); }
     /* (2) round trip from a non-default Full state */
-    const odd={ scaleId:'dorian', tonic:2, tonicCents:7, lead:timbreIdOf('ld',3), phoneInstr:'ch', splitOn:true, hand:{ L:'therm', R:'hold' }, voice:'lead' };
+    const odd={ scaleId:'dorian', tonic:2, tonicCents:7, lead:timbreIdOf('ld',3), phoneInstr:'ch', splitOn:true, hand:{ L:'therm', R:'hold' }, voice:'lead', chain:orig.chain };
     D.write(odd);
     const before=D.read(); n++; { const c=cmp(before, odd); if(c.length) miss('the test state did not take: '+c.join(' · ')); }
     let why=profileApply('profile.calm'); n++; if(why) miss('Calm refused: '+why);
     const inCalm=D.read(), want={ scaleId:calm.moods[0], tonic:calm.key.tonic, tonicCents:calm.key.cents, lead:calm.timbres[0], phoneInstr:'ld', splitOn:false,
-      hand:{ ...calm.handFn.ld }, voice:'poly' };
+      hand:{ ...calm.handFn.ld }, voice:'poly',
+      chain:[ { fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x', inv:false }] },   // RUN 7 (C4b): Calm's own solo chain — Volume and «Forest depth»
+        { fxId:'ctone', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:1, axis:'y', inv:false }] },   // RUN 7 (C5): the effects hand
+        { fxId:'cwave', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:2, axis:'y', inv:false }] },
+        { fxId:'cecho', params:[{ mode:'drive', hand:'fx', finger:0, axis:'y', inv:false }, { mode:'fixed', v01:0.8431089342012043 }] },
+        { fxId:'fdepth', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'play', axis:'z', inv:false }, { mode:'fixed', v01:0.5 }] } ] };
     n++; { const c=cmp(inCalm, want); if(c.length) miss('Calm state: '+c.join(' · ')); }
     n++; if(!document.body.classList.contains('calm')) miss('body.calm not set');
     for(const id of ['instrBtn','splitBtn','recBtn','jamBtn','loopPanelBtn']){ n++; if(!hiddenNow(id)) miss(`#${id} visible in Calm`); }
@@ -60,4 +65,4 @@ export function checkProfile(){
   finally{ if(profileCurrent()!=='profile.full') profileApply('profile.full'); D.write(orig); if(bar && barMin) bar.classList.add('min'); }
   return { cases:n, total:d.length, differences:d };
 }
-row({ at:1005, name:'C0 profile round trip', run:()=>checkProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+row({ calm:true, at:1005, name:'C0 profile round trip', run:()=>checkProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });

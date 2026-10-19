@@ -1,0 +1,89 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.breath-pad",
+ "family": "solo",
+ "engine": "breath",
+ "name": {
+  "en": "Breathing pad",
+  "ru": "Дышащий пад"
+ },
+ "recipe": {
+  "harm": [
+   {
+    "m": 1,
+    "g": 0.33,
+    "w": "sawtooth",
+    "dt": -7
+   },
+   {
+    "m": 1,
+    "g": 0.33,
+    "w": "sawtooth",
+    "dt": 6
+   },
+   {
+    "m": 1,
+    "g": 0.24,
+    "w": "triangle"
+   },
+   {
+    "m": 2,
+    "g": 0.075,
+    "w": "sawtooth",
+    "dt": 3
+   }
+  ],
+  "formants": [
+   {
+    "hz": 300,
+    "q": 0.7,
+    "g": 0.9
+   },
+   {
+    "hz": 850,
+    "q": 3.5,
+    "g": 0.5
+   },
+   {
+    "hz": 2600,
+    "q": 5,
+    "g": 0.12
+   }
+  ],
+  "lvl": 1.44,
+  "lp": 2400,
+  "breathe": {
+   "rate": 0.11,
+   "lvl": 0.14,
+   "cut": 0.35
+  },
+  "noise": {
+   "g": 0.15,
+   "q": 3,
+   "m": 1
+  },
+  "vib": {
+   "rate": 4.6,
+   "cents": 5,
+   "amp": 0.03,
+   "delay": 0.6,
+   "rise": 1.5
+  },
+  "drift": {
+   "cents": 5,
+   "rate": 0.07
+  },
+  "hum": 0
+ },
+ "env": {
+  "att": 0.6,
+  "rel": 2.8
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

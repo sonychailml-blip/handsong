@@ -9,9 +9,10 @@ import './demo.js';                              // side-effect: демо «пу
 import { openLessons, wireStarter } from './tutor.js';   // обучение: «Обучение» открывает список уроков; выбор урока сам поднимает приложение через startApp
 import { t } from './i18n.js';
 import { loadReport } from './scales.js';   // F5: итог загрузки файлов данных ладов — известие на стартовой карточке
-import { rollOpen, arrOpen } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
+import { rollOpen, arrOpen, handFn } from './state.js';   // S5.0: редактор дорожки открыт — камеру не читаем, игровое поле не рисуем. AR1: и окно аранжировки — та же ветка
 import { latStart, latFrame, latHands, latIdle } from './latmeter.js';   // LAT1: latency per stage (Sound panel → «Latency meter», R.latency())
 import { asStart } from './autosave.js';   // AUTOSAVE1: the song kept on this device by itself
+import { ghostFrame } from './ghost.js';   // RUN 7 (C7): Calm's ghost light — a synthetic hand until a real one appears
 import { profileBoot } from './profile.js';   // C0: ?calm (dev) or the calm edition opens in Calm
 
 /* =====================================================================
@@ -67,7 +68,7 @@ function onHands(f){
   if(studio()){ if(f.frame) f.frame.close(); return; }
   const tA=performance.now();
   if(f.frame) syncViewRect(f.frame.width, f.frame.height);   // the crop of this frame before its hands are remapped (rule #12)
-  latest=f.res; BUS.set('hands', latest);   // VIS1a: the hands of this processed frame, for the visual modules
+  latest=ghostFrame(f.res, tA, handFn.ld.R==='fx' ? 'Left' : 'Right'); BUS.set('hands', latest);   // RUN 7 (C7): the ghost (when armed) is a hand like any other   // VIS1a: the hands of this processed frame, for the visual modules
   handsGuarded(latest);                      // страж кадра: ошибка в жестах/звуке/записи печатается один раз и НЕ обрывает отрисовку
   BUS.set('handsView', handsView());          // VIS1c: each hand's play point, depth and role for the scene (read-only)
   const tB=performance.now();

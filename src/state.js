@@ -780,3 +780,11 @@ export let rollVolBars=true;
 export const setRollVolBars=v=>{ rollVolBars=!!v; };
 export const rectOctReg    = role => role==='ch' ? chordOctReg : role==='bs' ? bassOctReg : octReg;
 export const setRectOctReg = (role,v) => { if(role==='ch') setChordOctReg(v); else if(role==='bs') setBassOctReg(v); else setOctReg(v); };
+/* RUN 7 (C6): the CALM VIEW — null in Full; in Calm { glow, plain, fieldAll } from the profile (noteField 'glow', labels 'plain') and the
+   person's «Show the full note field» choice. The play view reads it (the glow note field, no note / Hz / role labels on the canvas). */
+export let calmView=null;
+export const setCalmView=v=>{ calmView= v ? { glow:!!v.glow, plain:!!v.plain, fieldAll:!!v.fieldAll } : null; };
+/* RUN 7 (C4b): REPLACE a role's chain with `entries` (deep-copied) — the data half of a profile switch (Calm's own chain, and back to the
+   saved Full chain EXACTLY). The array keeps its identity (readers hold it); unassigned old scalars are hushed (rule 2.5). The sound half
+   (fxSetActive, fxChainResplice) is ui's, as for fxChainDrop / fxChainPut. */
+export const setFxChain=(key, entries)=>{ const ch=fxChains[key]; if(!ch || !Array.isArray(entries)) return; ch.splice(0, ch.length, ...JSON.parse(JSON.stringify(entries))); hushUnassignedFx(); };

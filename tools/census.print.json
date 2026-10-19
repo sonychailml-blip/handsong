@@ -5,7 +5,7 @@
   "made": "2026-10-17T02:16:35.892Z",
   "file": "tools/census.print.json",
   "chains": "{\"role:ld\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]},{\"fxId\":\"reverb\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"y\",\"inv\":false},{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"x\",\"inv\":false},{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":0,\"axis\":\"z\",\"inv\":false}]},{\"fxId\":\"dly\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":1,\"axis\":\"y\",\"inv\":false},{\"mode\":\"fixed\"},{\"mode\":\"fixed\"}]},{\"fxId\":\"drv\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":2,\"axis\":\"y\",\"inv\":false}]},{\"fxId\":\"vib\",\"params\":[{\"mode\":\"drive\",\"hand\":\"fx\",\"finger\":3,\"axis\":\"y\",\"inv\":false}]}],\"role:ch\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]},{\"fxId\":\"reverb\",\"params\":[{\"mode\":\"fixed\"},{\"mode\":\"fixed\"},{\"mode\":\"fixed\"}]},{\"fxId\":\"bright\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"z\",\"inv\":true}]}],\"role:bs\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]}],\"role:dr\":[{\"fxId\":\"vol\",\"params\":[{\"mode\":\"drive\",\"hand\":\"play\",\"axis\":\"x\",\"inv\":false}]}]}",
-  "note": "C4a (RUN 6): «play» renewed for the new solo timbre solo.firefly (+1 solo voice, +3 strike partials); «init» unchanged"
+  "note": "C4a (RUN 6): «play» renewed for the new solo timbre solo.firefly (+1 solo voice, +3 strike partials); «init» unchanged | RUN 7: «play» renewed — one note of each of the six new Calm timbres (modal / breath voices); «init» unchanged"
  },
  "counts": {
   "init": {
@@ -21,14 +21,15 @@
    "Buffer": 1
   },
   "play": {
-   "ConstantSource": 24,
-   "Gain": 842,
-   "WaveShaper": 24,
-   "ChannelMerger": 82,
-   "BiquadFilter": 169,
-   "Oscillator": 205,
+   "ConstantSource": 31,
+   "Gain": 997,
+   "WaveShaper": 30,
+   "ChannelMerger": 88,
+   "BiquadFilter": 195,
+   "Oscillator": 242,
    "Worklet:ks-string": 7,
-   "BufferSource": 15
+   "BufferSource": 21,
+   "PeriodicWave": 1
   }
  }
 }

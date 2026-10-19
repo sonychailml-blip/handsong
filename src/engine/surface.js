@@ -5,6 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'autosave.js':['AC'],
+  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance'],
   'clip.js':['createRecordingTap'],
   'demo.js':['AC', 'initAudio'],
   'freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',
@@ -37,7 +38,7 @@ const SURFACE={
   'probes/timbres.js':['BASS_INSTR', 'CHORD_INSTR', 'DRUM_KITS', 'LEAD_INSTR', 'leadIsKs', 'bassOn', 'chordOn', 'drumHit', 'leadOn'],
   'probes/tim3d.js':['CHORD_INSTR', 'chordOn', 'timbreForgetDbg', 'timbreIdx', 'timbreInstall', 'timbreRecord', 'timbreSnapshot', 'timbresOf'],
   'probes/pool.js':['CHORD_INSTR', 'LEAD_INSTR', 'chordGlide', 'chordOff', 'chordOn', 'drumHit', 'leadOn', 'poolDbg', 'poolSizes'],
-  'probes/calm.js':['LEAD_INSTR', 'timbreById', 'timbresOf'],
+  'probes/calm.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],
   'probes/forest.js':['fxSnapshot', 'masterLevel'],
   'probes/profile.js':['FX_FACTORY', 'timbreIdOf'],
   'probes/run.js':['fxSnapshot', 'masterLevel'],

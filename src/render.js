@@ -921,6 +921,10 @@ function tailOf(eng, keys, startVals, insRel){
     if(dec!=null) tail=Math.max(tail,dec);                                   // decay это и есть RT60 — уже «−60 дБ»
     const fm=get(key,'forest','mix'), fr=get(key,'forest','room');   // SND-F1b: the Night forest tail = its room length (Medium when not captured)
     if(fm!=null && fm>0) tail=Math.max(tail, fr!=null ? forestRoom(fr) : FOREST.room);
+    const dm=get(key,'fdepth','mix'), dr=get(key,'fdepth','room');   // RUN 7 (C4b): Calm's «Forest depth» — the same room length
+    if(dm!=null && dm>0) tail=Math.max(tail, dr!=null ? forestRoom(dr) : FOREST.room);
+    const ca=get(key,'cecho','amount'), ct=get(key,'cecho','time');   // RUN 7 (C5): Calm's «Echo» — feedback 0.55·amount
+    if(ca!=null && ca>0) tail=Math.max(tail, (ct!=null?ct:0.625)*(DB60/Math.log(1/(0.55*ca))));
     const dt=get(key,'dly','time'), fb=get(key,'dly','fb');
     if(dt!=null&&fb!=null&&fb>0&&fb<1) tail=Math.max(tail, dt*(DB60/Math.log(1/fb)));
   }

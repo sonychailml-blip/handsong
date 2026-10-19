@@ -2011,6 +2011,502 @@
     "register": "solo",
     "quant": 0
    }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.firefly-rich",
+   "family": "solo",
+   "engine": "modal",
+   "name": {
+    "en": "Firefly (rich)",
+    "ru": "Светлячок (богатый)"
+   },
+   "recipe": {
+    "modes": [
+     {
+      "r": 1,
+      "g": 0.62,
+      "d": 2.2,
+      "w": "triangle"
+     },
+     {
+      "r": 1.0021,
+      "g": 0.14,
+      "d": 1.8
+     },
+     {
+      "r": 2.004,
+      "g": 0.24,
+      "d": 1.2
+     },
+     {
+      "r": 3.01,
+      "g": 0.05,
+      "d": 0.55
+     },
+     {
+      "r": 4.2,
+      "g": 0.11,
+      "d": 0.4
+     },
+     {
+      "r": 5.43,
+      "g": 0.035,
+      "d": 0.22
+     },
+     {
+      "r": 6.79,
+      "g": 0.02,
+      "d": 0.14
+     }
+    ],
+    "lvl": 1.14,
+    "att": 0.004,
+    "dk": 0.35,
+    "vb": 0.6,
+    "lp": 7000,
+    "noise": {
+     "g": 0.1,
+     "hz": 2600,
+     "q": 1.2,
+     "d": 0.03,
+     "t": 0.5
+    },
+    "jit": {
+     "r": 0.0012,
+     "d": 0.08,
+     "g": 0.08
+    }
+   },
+   "env": {
+    "att": 0.006,
+    "rel": 1.6
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.handpan",
+   "family": "solo",
+   "engine": "modal",
+   "name": {
+    "en": "Handpan",
+    "ru": "Хэндпан"
+   },
+   "recipe": {
+    "modes": [
+     {
+      "r": 1,
+      "g": 0.55,
+      "d": 5.5,
+      "a": 0.006
+     },
+     {
+      "r": 1.0018,
+      "g": 0.18,
+      "d": 4.5,
+      "a": 0.006
+     },
+     {
+      "r": 2,
+      "g": 0.3,
+      "d": 3.4,
+      "a": 0.012
+     },
+     {
+      "r": 2.0034,
+      "g": 0.08,
+      "d": 2.8,
+      "a": 0.012
+     },
+     {
+      "r": 3,
+      "g": 0.22,
+      "d": 2.1,
+      "a": 0.015
+     },
+     {
+      "r": 4.01,
+      "g": 0.04,
+      "d": 1
+     },
+     {
+      "r": 5.12,
+      "g": 0.025,
+      "d": 0.6
+     },
+     {
+      "r": 6.3,
+      "g": 0.015,
+      "d": 0.35
+     }
+    ],
+    "lvl": 0.76,
+    "att": 0.004,
+    "dk": 0.5,
+    "vb": 0.9,
+    "lp": 5200,
+    "noise": {
+     "g": 0.22,
+     "hz": 900,
+     "q": 0.8,
+     "d": 0.035,
+     "t": 0.4
+    },
+    "body": {
+     "hz": 180,
+     "q": 4,
+     "g": 0.5
+    },
+    "jit": {
+     "r": 0.0008,
+     "d": 0.06,
+     "g": 0.06
+    }
+   },
+   "env": {
+    "att": 0.003,
+    "rel": 2.2
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.singing-bowl",
+   "family": "solo",
+   "engine": "modal",
+   "name": {
+    "en": "Singing bowl",
+    "ru": "Поющая чаша"
+   },
+   "recipe": {
+    "modes": [
+     {
+      "r": 1,
+      "g": 0.6,
+      "d": 12,
+      "a": 0.01
+     },
+     {
+      "r": 1.0045,
+      "g": 0.35,
+      "d": 11,
+      "a": 0.01
+     },
+     {
+      "r": 2.76,
+      "g": 0.22,
+      "d": 7,
+      "a": 0.008
+     },
+     {
+      "r": 2.7655,
+      "g": 0.14,
+      "d": 6.5,
+      "a": 0.008
+     },
+     {
+      "r": 5.18,
+      "g": 0.09,
+      "d": 3.5
+     },
+     {
+      "r": 5.19,
+      "g": 0.06,
+      "d": 3.3
+     },
+     {
+      "r": 8.2,
+      "g": 0.035,
+      "d": 1.8
+     },
+     {
+      "r": 11.7,
+      "g": 0.015,
+      "d": 1
+     }
+    ],
+    "lvl": 0.6,
+    "att": 0.004,
+    "dk": 0.4,
+    "vb": 1,
+    "lp": 6000,
+    "noise": {
+     "g": 0.07,
+     "hz": 700,
+     "q": 0.7,
+     "d": 0.05,
+     "t": 0.3
+    },
+    "jit": {
+     "r": 0.0006,
+     "d": 0.05,
+     "g": 0.05
+    }
+   },
+   "env": {
+    "att": 0.004,
+    "rel": 5
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.kalimba",
+   "family": "solo",
+   "engine": "modal",
+   "name": {
+    "en": "Kalimba",
+    "ru": "Калимба"
+   },
+   "recipe": {
+    "modes": [
+     {
+      "r": 1,
+      "g": 0.7,
+      "d": 2.2
+     },
+     {
+      "r": 2,
+      "g": 0.03,
+      "d": 0.7
+     },
+     {
+      "r": 5.95,
+      "g": 0.2,
+      "d": 0.32,
+      "a": 0.001
+     },
+     {
+      "r": 1,
+      "g": 0.04,
+      "d": 0.5,
+      "w": "sawtooth"
+     }
+    ],
+    "lvl": 1.12,
+    "att": 0.0015,
+    "dk": 0.6,
+    "vb": 0.8,
+    "lp": 6500,
+    "noise": {
+     "g": 0.18,
+     "hz": 3200,
+     "q": 1.5,
+     "d": 0.012,
+     "t": 0.3
+    },
+    "body": {
+     "hz": 340,
+     "q": 7,
+     "g": 0.6
+    },
+    "jit": {
+     "r": 0.001,
+     "d": 0.07,
+     "g": 0.07
+    }
+   },
+   "env": {
+    "att": 0.002,
+    "rel": 1.2
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.breath-flute",
+   "family": "solo",
+   "engine": "breath",
+   "name": {
+    "en": "Breath flute",
+    "ru": "Флейта с дыханием"
+   },
+   "recipe": {
+    "harm": [
+     {
+      "m": 1,
+      "g": 0.42
+     },
+     {
+      "m": 2,
+      "g": 0.13
+     },
+     {
+      "m": 3,
+      "g": 0.055
+     },
+     {
+      "m": 4,
+      "g": 0.02
+     },
+     {
+      "m": 5,
+      "g": 0.008
+     }
+    ],
+    "lvl": 0.75,
+    "lp": 6500,
+    "vb": 0.5,
+    "body": {
+     "hz": 1400,
+     "q": 1.2,
+     "db": 2
+    },
+    "noise": {
+     "g": 0.35,
+     "q": 5,
+     "m": 1,
+     "on": 2.5
+    },
+    "air": {
+     "g": 0.04,
+     "hz": 3500,
+     "q": 0.6
+    },
+    "chiff": {
+     "g": 0.8,
+     "m": 2,
+     "q": 3,
+     "d": 0.09
+    },
+    "vib": {
+     "rate": 5,
+     "cents": 9,
+     "amp": 0.06,
+     "delay": 0.32,
+     "rise": 0.7
+    },
+    "drift": {
+     "cents": 4,
+     "rate": 0.13
+    },
+    "scoop": -14
+   },
+   "env": {
+    "att": 0.07,
+    "rel": 0.25
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
+  },
+  {
+   "format": "handsong/timbre",
+   "version": 1,
+   "id": "solo.breath-pad",
+   "family": "solo",
+   "engine": "breath",
+   "name": {
+    "en": "Breathing pad",
+    "ru": "Дышащий пад"
+   },
+   "recipe": {
+    "harm": [
+     {
+      "m": 1,
+      "g": 0.33,
+      "w": "sawtooth",
+      "dt": -7
+     },
+     {
+      "m": 1,
+      "g": 0.33,
+      "w": "sawtooth",
+      "dt": 6
+     },
+     {
+      "m": 1,
+      "g": 0.24,
+      "w": "triangle"
+     },
+     {
+      "m": 2,
+      "g": 0.075,
+      "w": "sawtooth",
+      "dt": 3
+     }
+    ],
+    "formants": [
+     {
+      "hz": 300,
+      "q": 0.7,
+      "g": 0.9
+     },
+     {
+      "hz": 850,
+      "q": 3.5,
+      "g": 0.5
+     },
+     {
+      "hz": 2600,
+      "q": 5,
+      "g": 0.12
+     }
+    ],
+    "lvl": 1.44,
+    "lp": 2400,
+    "breathe": {
+     "rate": 0.11,
+     "lvl": 0.14,
+     "cut": 0.35
+    },
+    "noise": {
+     "g": 0.15,
+     "q": 3,
+     "m": 1
+    },
+    "vib": {
+     "rate": 4.6,
+     "cents": 5,
+     "amp": 0.03,
+     "delay": 0.6,
+     "rise": 1.5
+    },
+    "drift": {
+     "cents": 5,
+     "rate": 0.07
+    },
+    "hum": 0
+   },
+   "env": {
+    "att": 0.6,
+    "rel": 2.8
+   },
+   "policies": {
+    "voiceMode": "poly",
+    "glide": 0.02,
+    "register": "solo",
+    "quant": 0
+   }
   }
  ]
 }

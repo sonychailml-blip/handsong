@@ -1,0 +1,82 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.breath-flute",
+ "family": "solo",
+ "engine": "breath",
+ "name": {
+  "en": "Breath flute",
+  "ru": "Флейта с дыханием"
+ },
+ "recipe": {
+  "harm": [
+   {
+    "m": 1,
+    "g": 0.42
+   },
+   {
+    "m": 2,
+    "g": 0.13
+   },
+   {
+    "m": 3,
+    "g": 0.055
+   },
+   {
+    "m": 4,
+    "g": 0.02
+   },
+   {
+    "m": 5,
+    "g": 0.008
+   }
+  ],
+  "lvl": 0.75,
+  "lp": 6500,
+  "vb": 0.5,
+  "body": {
+   "hz": 1400,
+   "q": 1.2,
+   "db": 2
+  },
+  "noise": {
+   "g": 0.35,
+   "q": 5,
+   "m": 1,
+   "on": 2.5
+  },
+  "air": {
+   "g": 0.04,
+   "hz": 3500,
+   "q": 0.6
+  },
+  "chiff": {
+   "g": 0.8,
+   "m": 2,
+   "q": 3,
+   "d": 0.09
+  },
+  "vib": {
+   "rate": 5,
+   "cents": 9,
+   "amp": 0.06,
+   "delay": 0.32,
+   "rise": 0.7
+  },
+  "drift": {
+   "cents": 4,
+   "rate": 0.13
+  },
+  "scoop": -14
+ },
+ "env": {
+  "att": 0.07,
+  "rel": 0.25
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

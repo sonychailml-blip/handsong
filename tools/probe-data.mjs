@@ -418,7 +418,7 @@ async function timbreCore(){
   if(tine) for(const [what, dmg] of [['partials', r=>{ r.recipe.partials=Array(9).fill([1,0.1,0.5,'sine']); }], ['gains sum', r=>{ r.recipe.partials=r.recipe.partials.map(p=>[p[0],1,p[2],p[3]]); }],
       ['decay', r=>{ r.recipe.partials[0][2]=99; }], ['mult', r=>{ r.recipe.partials[0][0]=100; }]]){ const r=copy(tine); dmg(r); n++; if(!T.checkTimbre(r)) miss(`CONTROL tine «${what}»: accepted`); }
   /* TIM3b: the solo engines' own bounds (each damage must be refused, naming its field) */
-  const byE=e=>recs.find(r=>r.engine===e && (e!=='ks' || r.recipe.symp) && (e!=='subtractive' || r.recipe.filter) && (e!=='fm2' || !r.recipe.fixed) && (e!=='drumkit' || r.recipe.rows[0].f0!=null));
+  const byE=e=>recs.find(r=>r.engine===e && (e!=='ks' || r.recipe.symp) && (e!=='subtractive' || r.recipe.filter) && (e!=='fm2' || !r.recipe.fixed) && (e!=='drumkit' || r.recipe.rows[0].f0!=null) && (e!=='modal' || (r.recipe.body && r.recipe.jit)) && (e!=='breath' || (r.recipe.noise && r.recipe.vib)));
   const SOLO=[['subtractive','recipe.oscs', r=>{ r.recipe.oscs=Array(9).fill({ wave:'sine', mult:1, gain:0.1 }); }], ['subtractive','gains sum', r=>{ r.recipe.oscs=r.recipe.oscs.map(o=>({ ...o, gain:1 })); r.recipe.oscs.push({ wave:'sine', mult:1, gain:1 }); }],
     ['subtractive','recipe.filter.Q', r=>{ r.recipe.filter.Q=500; }], ['subtractive','recipe.oscs[0].mult', r=>{ r.recipe.oscs[0].mult=100; }], ['subtractive','recipe.oscs[0].detune', r=>{ r.recipe.oscs[0].detune=900; }],
     ['subtractive','recipe.strike', r=>{ r.recipe.filter.freq=12000; r.recipe.strike.open=4; }], ['subtractive','recipe.hum', r=>{ r.recipe.hum=2; }], ['subtractive','recipe: unknown', r=>{ r.recipe.worklet='x'; }],
@@ -427,7 +427,17 @@ async function timbreCore(){
     ['ks','recipe.symp.Q', r=>{ r.recipe.symp.Q=5000; }],
     ['drumkit','recipe.rows', r=>{ r.recipe.rows.pop(); }], ['drumkit','recipe.rows[0].synth', r=>{ r.recipe.rows[0].synth='sampler'; }], ['drumkit','recipe.rows[1].vm', r=>{ r.recipe.rows[1].vm=9; }],
     ['drumkit','recipe.rows[0].f0', r=>{ r.recipe.rows[0].f0=99999; }], ['drumkit','recipe.rows[0].d', r=>{ r.recipe.rows[0].d=60; }], ['drumkit','recipe.rows[0]: unknown', r=>{ r.recipe.rows[0].url='x'; }],
-    ['drumkit','env: a kit', r=>{ r.env={ att:0.01, rel:0.1 }; }], ['ks','recipe.nl', r=>{ r.recipe.nl=50; }], ['ks','recipe.body', r=>{ r.recipe.body={ hz:3400, Q:1, db:60 }; }]];
+    ['drumkit','env: a kit', r=>{ r.env={ att:0.01, rel:0.1 }; }], ['ks','recipe.nl', r=>{ r.recipe.nl=50; }], ['ks','recipe.body', r=>{ r.recipe.body={ hz:3400, Q:1, db:60 }; }],
+    /* RUN 7: the modal and breath engines (Calm's sound pass) */
+    ['modal','recipe.modes', r=>{ r.recipe.modes=Array(17).fill({ r:1, g:0.05, d:1 }); }], ['modal','gains sum', r=>{ r.recipe.modes=r.recipe.modes.map(m=>({ ...m, g:1 })); }],
+    ['modal','recipe.modes[0].d', r=>{ r.recipe.modes[0].d=99; }], ['modal','recipe.modes[0].r', r=>{ r.recipe.modes[0].r=100; }], ['modal','recipe.modes[0].w', r=>{ r.recipe.modes[0].w='custom'; }],
+    ['modal','recipe.lp', r=>{ r.recipe.lp=40000; }], ['modal','recipe.noise.q', r=>{ r.recipe.noise.q=500; }], ['modal','recipe.body: needs', r=>{ delete r.recipe.noise; }],
+    ['modal','recipe.jit.r', r=>{ r.recipe.jit.r=0.5; }], ['modal','recipe.modes[0]: unknown', r=>{ r.recipe.modes[0].url='x'; }],
+    ['breath','recipe.harm', r=>{ r.recipe.harm=Array(9).fill({ m:1, g:0.1 }); }], ['breath','gains sum', r=>{ r.recipe.harm=r.recipe.harm.map(h=>({ ...h, g:1 })); }],
+    ['breath','recipe.vib.cents', r=>{ r.recipe.vib.cents=500; }], ['breath','recipe.chiff.g', r=>{ r.recipe.chiff={ g:5, m:2, q:3, d:0.1 }; }],
+    ['breath','recipe.breathe.cut', r=>{ r.recipe.breathe={ rate:0.1, lvl:0.1, cut:2 }; }], ['breath','recipe.formants', r=>{ r.recipe.formants=Array(5).fill({ hz:500, q:2, g:0.5 }); }],
+    ['modal','recipe.lvl', r=>{ r.recipe.lvl=3; }], ['breath','recipe.lvl', r=>{ r.recipe.lvl=3; }],
+    ['breath','recipe.noise.on', r=>{ r.recipe.noise.on=50; }], ['breath','recipe: unknown', r=>{ r.recipe.worklet='x'; }], ['breath','recipe.hum', r=>{ r.recipe.hum=2; }]];
   for(const [e, field, dmg] of SOLO){ const base=byE(e); if(!base){ miss('no '+e+' record to damage'); continue; } const r=copy(base); dmg(r); n++; const why=T.checkTimbre(r);
     if(!why) miss(`CONTROL ${base.id} «${field}»: a damaged record was accepted`); else if(!why.includes(field.split(' ')[0].replace(/:$/,''))) miss(`CONTROL ${base.id} «${field}»: refused, but the line does not name it: ${why}`); }
   n++; if(T.checkTimbre(recs[0])!==null) miss('the first record is refused');
@@ -440,7 +450,7 @@ async function profileCore(){
   const P=await import(new URL('../src/core/profile.js', import.meta.url).href);
   const rd=async f=>JSON.parse(await readFile(new URL('../data/'+f, import.meta.url),'utf8'));
   const ix=await rd('index.json'), tix=await rd('timbres/index.json');
-  const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm'] };
+  const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm','fdepth','cecho','ctone','cwave'] };   // RUN 7: + Calm's own effects
   const pix=await rd('profiles/index.json'), recs=[];
   for(const name of pix.order){ n++; let r; try{ r=await rd('profiles/'+name+'.json'); }catch(e){ miss(name+': '+e.message); continue; }
     recs.push(r); const why=P.checkProfile(r, known); if(why) miss(`${r.id||name}: ${why}`); }
@@ -476,6 +486,63 @@ async function busCore(){
   for(const w of ['set','push']){ n++; let threw=false; try{ r[w]('hands', 1); }catch(e){ threw=true; } if(!threw) d.push(`CONTROL: a reader ${w} did not throw`); }
   n++; if(!Object.isFrozen(r)) d.push('the reader object is not frozen');
   eq('the app bus exists and starts empty', [typeof B.BUS.set, B.BUS.version('picture')], ['function', 0]);
+  return { cases:n, total:d.length, differences:d };
+}
+/* RUN 7 (C6): the Calm shell's logic — controls shown only after 1.5 s without hands and hidden at once when a hand is back; a round button
+   cycles its list; the sleep timer holds full level until its last 90 s, fades smoothly (monotone, no step) to silence, then sleeps; the
+   glow is brightest at the hand and gone beyond its reach. CONTROLS: a shell that ignores the hands, and a fade with a step, must be caught. */
+/* RUN 7 (C4b): the depth → forest curve — the prototype's numbers exactly at d = 0, ½, 1 (the same expressions); clamped outside; monotone
+   (further = more send, less dry, darker); CONTROL: a curve with the old two-thirds saturation (send capped at 1) must be caught */
+async function calmDepthCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(what+': '+JSON.stringify(a)+' vs '+JSON.stringify(b)); };
+  const D=await import(new URL('../src/core/dsp.js', import.meta.url).href), f=D.calmDepth;
+  const proto=x=>({ send:0.5+0.8*x, dry:1-0.55*x, lp:900+8000*Math.pow(1-x,1.5) });
+  for(const x of [0,0.5,1]) eq('d = '+x, f(x), proto(x));
+  eq('clamped below / above', [f(-1), f(2)], [proto(0), proto(1)]);
+  { let ok=true, p=f(0); for(let k=1;k<=100;k++){ const c=f(k/100); if(!(c.send>p.send && c.dry<p.dry && c.lp<p.lp)) ok=false; p=c; } n++; if(!ok) d.push('the curve is not monotone'); }
+  { const sat=x=>({ ...proto(x), send:Math.min(1, proto(x).send) }); n++; if(JSON.stringify(sat(1))===JSON.stringify(f(1))) d.push('CONTROL: a saturating send matched — the far third would not be checked'); }
+  return { cases:n, total:d.length, differences:d };
+}
+/* RUN 7 (C4c): the crickets' SEEDED schedule — the same seed gives the same chirps (exact); another seed differs (CONTROL); each chirp's gap
+   within 0.6–1.8 s after its pulses, 3–5 pulses, a pitch in 4.3–4.9 kHz; a chirp's envelope is soft (3-ms rise) and ends at 0; the wind loop
+   is seeded too (repeatable, another seed differs) */
+async function calmCricketsCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const A=await import(new URL('../src/core/ambience.js', import.meta.url).href), C=A.AMB.crickets;
+  const take=(seed,k,m)=>{ const s=A.cricketStream(seed,k), out=[s.freq]; for(let i=0;i<m;i++) out.push(s.next()); return out; };
+  for(let k=0;k<C.n;k++){ const a=take(C.seed,k,200), b=take(C.seed,k,200); n++; if(JSON.stringify(a)!==JSON.stringify(b)) miss('cricket '+k+': the same seed gave other chirps');
+    n++; if(!(a[0]>=C.fLo && a[0]<=C.fHi)) miss('cricket '+k+': pitch '+a[0]);
+    for(let i=1;i<a.length;i++){ const c=a[i]; if(!(c.pulses>=C.pulsesLo && c.pulses<=C.pulsesHi)){ miss('cricket '+k+' chirp '+i+': '+c.pulses+' pulses'); break; }
+      if(i>1){ const gap=c.t-a[i-1].t-a[i-1].pulses*(C.pulse+C.gap); if(!(gap>=C.every[0]-1e-9 && gap<=C.every[1]+1e-9)){ miss('cricket '+k+' chirp '+i+': gap '+gap.toFixed(3)); break; } } }
+    n+=2; }
+  n++; if(JSON.stringify(take(C.seed,0,20))===JSON.stringify(take(C.seed+1,0,20))) miss('CONTROL: another seed gave the same chirps');
+  n++; if(JSON.stringify(take(C.seed,0,20))===JSON.stringify(take(C.seed,1,20))) miss('two crickets chirp alike');
+  const sh=A.chirpShape(1, 3, 0.8); n++; if(!(sh.length===9 && sh[0][1]===0 && sh[1][0]-sh[0][0]>=0.003-1e-12 && sh[8][1]===0)) miss('a chirp envelope is not soft or does not end at 0: '+JSON.stringify(sh.slice(0,3)));
+  const w1=A.windNoise(8000), w2=A.windNoise(8000), w3=A.windNoise(8000, A.AMB.wind.seed+1); n+=2;
+  if(w1.some((v,i)=>v!==w2[i])) miss('the wind loop is not repeatable');
+  if(!w1.some((v,i)=>v!==w3[i])) miss('CONTROL: the wind with another seed is the same');
+  return { cases:n, total:d.length, differences:d };
+}
+async function calmShellCore(){
+  const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(what+': '+JSON.stringify(a)+' vs '+JSON.stringify(b)); };
+  const C=await import(new URL('../src/core/calmui.js', import.meta.url).href), U=C.CALM_UI;
+  let st=C.showStep(null, 0, 0); eq('no hand yet → shown', st.shown, true);
+  st=C.showStep(st, 1, 1000); eq('a hand → hidden', st.shown, false);
+  st=C.showStep(st, 0, 1000+U.idleMs-1); eq('gone 1.499 s → still hidden', st.shown, false);
+  st=C.showStep(st, 0, 1000+U.idleMs); eq('gone 1.5 s → shown', st.shown, true);
+  st=C.showStep(st, 2, 1000+U.idleMs+16); eq('hands back → hidden at once', st.shown, false);
+  { const bad=(s,h,now)=>({ shown:true, seen:now }); n++; if(bad(st,1,0).shown===C.showStep(st,1,0).shown) d.push('CONTROL: a shell ignoring the hands matched'); }
+  eq('cycle', [C.nextOf(['a','b','c'],'a'), C.nextOf(['a','b','c'],'c'), C.nextOf(['a','b'],'zz')], ['b','a','a']);
+  eq('sleep off', C.sleepLevel(0, 0, 1e9), { level:1, left:Infinity, asleep:false });
+  const T=15*60e3, F=U.sleepFadeMs;
+  eq('sleep: full before the fade', C.sleepLevel(0,15,T-F-1).level, 1);
+  eq('sleep: asleep at the end', C.sleepLevel(0,15,T), { level:0, left:0, asleep:true });
+  { let prev=1, maxStep=0, mono=true; for(let k=0;k<=900;k++){ const L=C.sleepLevel(0,15,T-F+k*F/900).level; if(L>prev+1e-12) mono=false; maxStep=Math.max(maxStep, prev-L); prev=L; }
+    n+=2; if(!mono) d.push('sleep fade is not monotone'); if(!(maxStep<0.005)) d.push('sleep fade has a step of '+maxStep.toFixed(4)+' per 0.1 s (abrupt)');
+    const stepped=k=>k<450 ? 1 : 0.5; let ms=0, p=1; for(let k=0;k<=900;k++){ ms=Math.max(ms,p-stepped(k)); p=stepped(k); } n++; if(!(ms>=0.005)) d.push('CONTROL: a stepped fade passed'); }
+  eq('glow at the hand', +C.glowAlpha(0,1000).toFixed(6), U.glowMax);
+  eq('glow beyond its reach', C.glowAlpha(U.glowReach*1000+1,1000), 0);
+  n++; if(!(C.glowAlpha(100,1000)>C.glowAlpha(300,1000))) d.push('glow does not fall with distance');
   return { cases:n, total:d.length, differences:d };
 }
 /* VIS1c (RUN 6): the forest's wild fireflies, ground and depth as numbers — the same seed gives the same flies (exact) and the same
@@ -606,6 +673,9 @@ const ROWS=[
   ['TIM3 timbre records (core)', ()=>timbreCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['C0 profile records (core)', ()=>profileCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['VIS1 bus (core)',           ()=>busCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['CALM shell (core)',         ()=>calmShellCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['CALM depth curve (core)',   ()=>calmDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['CALM cricket schedule (core)', ()=>calmCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
 ];
 

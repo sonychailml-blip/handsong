@@ -53,6 +53,12 @@
   "kit.tabla",
   "kit.gamelan",
   "kit.taiko",
-  "solo.firefly"
+  "solo.firefly",
+  "solo.firefly-rich",
+  "solo.handpan",
+  "solo.singing-bowl",
+  "solo.kalimba",
+  "solo.breath-flute",
+  "solo.breath-pad"
  ]
 }

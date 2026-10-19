@@ -101,7 +101,7 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, ✅ GES1 (NIGHT + DAY run), ✅ UI1b, ✅ TIM2, ✅ SAVE1 (files), ✅ DRAW1 (DAY run);
 ✅ AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1 part 1, SONG3 (= SAVE1 + AUTOSAVE1) (RUN 3); ✅ PACK1, IDS1 part 2, SONG2; ✅ RUN 4: DOC1, SONG3 rest, POOL1, ENG2, TIM3a–d; plans CMD1/VIS1 written; ✅ RUN 5: CMD1a–d, DOC1 rest;
 the CALM PLAN written (`docs/STAGE4-CALM-plan.md`, reviewed 2026-10-17); UI1a after the redesign) → **4 «Calm»** (RUN 6: ✅ C0, VIS1a–c,
-listening page, design proposals; next C4a–C4c, C5, C6 after the user's design choice) = FIRST
+listening page, design proposals; RUN 7: ✅ sound pass, C11, C6, C4b, C4c, C7, C5; next C8 low power, C9 offline, C10 release, C12) = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -162,18 +162,17 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
   back; reload + Zoom normal), then step 95 (evening, each low-light setting 20 s + Copy; on this webcam 15/24 fps fall back to Off, short
   exposure too dark — light is the fix) · step 97 (camera busy / off / blocked → message, «Try again»).
 
-### NIGHT, DAY, RUN 3–5 (2026-10-16/17): records in archive B («Moved from HANDOFF.md at …» the next run); logs `NIGHT-LOG.md`, `WORK-LOG.md`.
-### RUN 6 (2026-10-17) — Calm v1 first slices; log: `WORK-LOG.md` «RUN 6» (plain-language summary at its end)
-- Calm plan answers (verbatim: Calm plan «Review 2026-10-17»): timbres by EAR; effects Echo · Warmth↔Brightness · Wave; moods Glow · Dusk ·
-  Mist, key fixed; no camera → touch plays; lantern offered at the low-light hint; note start pinch vs «move the light» (dev switch);
-  counter / name / payment postponed; fonts after the design proposals. NO solo latch —
-  Calm offers today's solo `note` and `hold` (C5b dropped). First-run line «Stand your phone or laptop…». User's phone = Poco M5.
-  Calm in portrait AND landscape. Three BACKGROUNDS (Forest · Dark · Camera; same sound). R1 design proposals before the shell; R2 meter
-  line «Scene: fps · frame ms · level» + Forest-vs-Dark user step; R3 trademark search = strategist.
-- Done (details + verdicts: WORK-LOG «RUN 6»): C0 profiles + edition (`data/profiles/`, `core/profile.js`, `profile.js` exact restore,
-  `edition.js`, dev switch Sound → Development, `?calm`); the listening page `tools/listen/calm-timbres.html`; three design proposals
-  `docs/design/calm/` (+ README); VIS1a bus + compositor (ui-snap identical); VIS1b scene host (three r128 vendored, lazy) + VIS1c night
-  forest + three backgrounds (Forest / Dark / Camera, Calm only) + the meter's Scene line.
-- Also C4a: «Firefly» is a solo timbre (`solo.firefly`, tine bank `modules/timbres/tine.js`; Calm offers it first). C4b NOT built — design
-  note + question in the Calm plan («C4b design note»). Final: data 26/0, P.all 112/113 (LR1 audio-thread gap; alone PASS).
-- Open for the user: the design choice, three sounds (listening page), the C4b question, steps 99–105 (105 = GPU test, Poco M5).
+### NIGHT, DAY, RUN 3–6 (2026-10-16/17): records in archive B («Moved from HANDOFF.md at …» the next run); logs `NIGHT-LOG.md`, `WORK-LOG.md`.
+### RUN 7 (2026-10-17/18) — Calm v1; log + plain summary: `WORK-LOG.md` «RUN 7»
+- User decisions (Calm plan «Review RUN 7», BACKLOG §7.19): design = the Hush emblem + Moonglass for everything; fonts OFL with Cyrillic
+  (Atkinson Hyperlegible has none → Andika, unmodified SIL release; Fraunces has none → Literata Light); note modes «follow the hand» / «stay
+  put»; Calm's sounds = FOUR: solo.firefly · solo.breath-flute · solo.handpan · solo.singing-bowl (data, first = default); quality bar
+  `docs/CALM-QUALITY.md` (ten points; each Calm slice names the points it touched).
+- Built: two stateless engine types `modal` / `breath` + six organic timbres (normalised to the app's solo level; listening page v2 with A/B);
+  C11 tokens `--calm-*`, drawn icons + emblem in `icons.js`, app icon = the emblem; C6 the Calm shell (`calmshell.js`, glass capsule, ⓘ, sleep
+  timer, glow note field); C4b Calm's own «Forest depth» (send 0.5→1.3, Full unchanged); C4c the ambience (drone, wind, seeded crickets,
+  Forest volume); C7 the Calm start card + ghost light (`ghost.js`, pose generator moved to `gestures/pose.js`); C5 the effects hand (Echo ·
+  Warmth / Brightness · Wave, Calm-only, forest visuals). `P.calm` + runner `--calm`. Full: ui-snap 0 pixels changed.
+- ⚠️ Open: today's Firefly is ≈ 18 dB quieter than the other three Calm sounds (measured) — the user's level decision; the ambience costs
+  ≈ 3.9 % of a core in the runner (target ≤ 2 % on the plan's scale — phone measurement decides); steps 106–113.
+- Process: one read-only `git diff --stat` was run by mistake early in RUN 7 — no git commands at all from now on.

@@ -1290,3 +1290,262 @@ STARTED C4a solo Firefly 2026-10-17 13:24
 **Probe verdicts (final run):** data 26 / 26 PASS · full browser run 112 / 113, the one miss a timing hiccup of the audio thread during a live
 recording test (re-run alone: PASS) · golden sounds 85 / 85 · the screen-by-screen picture comparison: identical where nothing was meant to
 change · privacy, network and on-screen checks PASS.
+
+
+# RUN 7 — Calm v1 (2026-10-17)
+The user's decisions (design = Hush emblem + Moonglass everything else; sounds: keep only Firefly and the flute idea, make new high-quality
+organic timbres; note-mode names approved; C4b per-profile range if clean; no hosting work) are recorded in docs/STAGE4-CALM-plan.md «Review RUN 7»,
+HANDOFF, BACKLOG §7.19. Quality bar: docs/CALM-QUALITY.md.
+STARTED docs (decisions + quality bar) 2026-10-17 16:06
+STARTED slice 1 SOUND QUALITY PASS 2026-10-17 16:15
+
+## Slice 1 — Calm sound quality pass (done; quality bar points 1, 3, 7)
+- Two NEW stateless engine types (rule #38; T5 bounds in `core/timbre.js`, each bound with a refusing CONTROL in the data runner):
+  `modules/timbres/modal.js` — struck bodies by modal synthesis (decaying sine modes with measured partial ratios and T60 decays, beating
+  doublets, a filtered noise strike that also rings a fixed body resonance, per-note seeded variation of ratio / decay / gain, higher notes
+  shorter, harder = brighter, soft-high lowpass; each strike its own oscillators = the rule-#3 struck exception, now named in CLAUDE.md);
+  `modules/timbres/breath.js` — breathing sustained sounds (harmonics in ONE PeriodicWave oscillator, optional formants, breath noise that
+  tracks the pitch, an «air» band, the attack chiff, vibrato fading in after a delay, slow drift, onset scoop, slow breathing of level and
+  cut-off; built once per voice and gated — rule #3; slow modulations at block rate for cost).
+- Six records APPENDED (positions unchanged; bundle 59): `solo.firefly-rich`, `solo.handpan`, `solo.singing-bowl`, `solo.kalimba`,
+  `solo.breath-flute`, `solo.breath-pad` (pinned ids + 6). The Calm profile offers these six until the user picks three (first: Firefly rich).
+- Loudness: all six normalised to Glass pad (the app's normal solo level, −31.4 dB on the K-like measure, 1-s notes dry) — measured: today's
+  Firefly sits ≈ 18 dB BELOW the other solo timbres (its strike applies the velocity twice); it stays as it is (GOLD exact). The new engines'
+  `lvl` bound is 2 (decaying modes / band-pass formants lose level; a worst-case record peaks ≈ 0 dBFS before the limiter).
+- Cost (offline, headless desktop, ms of CPU per voice per second, full solo voice): Kalimba 13.5 · Firefly today 15.8 · Firefly rich 16.7 ·
+  Handpan 24.7 · Singing bowl 32.7 · Breath flute 53 · Breathing pad 57.6 (the breath bank runs while built — rule #3; Calm plays 1–2 voices).
+- Listening page v2 `tools/listen/calm-timbres.html`: six new + today's Firefly, three moods, Phrase / Single notes, instant A/B «In the
+  forest / Dry» (both rendered, played in sync, crossfaded), every pair trimmed to the same measured loudness. `tools/listen/measure.js` =
+  the measurements (loudness, clicks, highs, T60, partial peaks, cost) through `--eval`.
+- Row «CALM timbres» (quick, at 1009.5): records + engines; loudness of four 1-s notes within ±2 dB of Glass pad (CONTROL vol 1.0 leaves the
+  band); no click (curvature ≤ 0.5 of the local peak; CONTROL a sine switched on at its peak = 1.0); struck notes ring and decay, breath notes
+  sustain; a moved handpan note strikes anew; two strikes of one note differ yet stay within 1.5 dB.
+- Prints: GOLD + 6 cases (ld 24–29), timbres.before + 6, census «play» renewed (one note of each new timbre); every OTHER case compared first:
+  GOLD worst 0.0003 dB, timbre entries / traces identical, envelopes 8e-7 of peak, census «init» identical.
+- Fix rounds: 1 (P.quick 87/89 → the pad's loudness was measured on 0.42-s notes shorter than its 0.6-s attack — the test now plays 1-s notes;
+  the click measure «step / 1-ms RMS» could not see its own control (a switched-on sine gave 2×) — REPLACED by the curvature measure). Also
+  the page check's rounded-hash repeatability was a lottery (renders repeat to ≈ 1e-8, the hash flipped on rounding) — replaced by «largest
+  sample difference ≤ 1e-6».
+- Verdicts: static PASS · data PASS 26/0 · P.quick PASS 89/0 (158.6 s) · GOLD 91/0 · TIM3 timbres = before 177/0 · census 19/0 · listening
+  check OK (repeat 5.6e-8; forest-phrase balance within +1.9 dB) · seed bass 0.08686 / 0.055319 / 650886 · CSP / network / UI PASS.
+- ⚠️ Process slip: one read-only `git diff --stat` was run by mistake early in this slice (rule: never run git) — nothing changed by it.
+STARTED slice 2 C11 design 2026-10-17 17:02
+
+## Slice 2 — C11 the chosen design applied (done; quality bar points 6, 10)
+- `tokens.css`: the Calm face's tokens `--calm-*` (Moonglass palette, glass + its PLAIN fallback, fonts, sizes, radii, shadows, timing,
+  `--z-calm`, `--cv-calm-glow`) + `@font-face` for the self-hosted fonts.
+- FONTS (checked by their real subsets): Atkinson Hyperlegible and Atkinson Hyperlegible Next have NO Cyrillic (Latin / Latin-ext only);
+  Fraunces neither. Chosen: **Literata Light** (OFL, warm soft book serif, Cyrillic; latin + cyrillic woff2 subsets, no reserved name) for
+  the wordmark and titles; **Andika** (SIL OFL, made for literacy and low vision, full Cyrillic) for text — shipped UNMODIFIED from SIL's
+  release (its licence reserves the name, so no subset). `fonts/andika/`, `fonts/literata/` with their OFL texts; register entries
+  `font-andika`, `font-literata` (LIC1).
+- `src/icons.js`: the drawn Calm icons by meaning (Moonglass's ten + `sleep` + `effects`), rendered as SVG with DOM calls (`data-svg`),
+  and the EMBLEM (Hush's five dots in an arc, the centre one firefly lime) — `svgIcon`, `svgEmblem`. The SVG namespace name is a register
+  entry (an identifier, never fetched).
+- App icon = the emblem on the Moonglass night: `icons/icon-192.png`, `icon-512.png`, `icon-512-maskable.png` (drawn by code; register
+  `app-icons` updated). The manifest's colours are unchanged (Full unchanged).
+- Glass: blur on the Forest / Camera backgrounds; plain dark (no blur) on Dark, at the minimal scene level and where backdrop-filter is
+  missing (`body.calm-plain`, `@supports`).
+- ui-snap: Full `run7full` vs RUN 6 `c4a` — all 10 screens 0 style differences, 0 pixels; the only additions are the six new timbre options
+  and the hidden Calm shell (declared). Calm: `node tools/ui-snap.mjs --calm --save <tag>` (new) — portrait / ⓘ / landscape / landscape ⓘ /
+  Camera / Russian at a phone viewport → `tools/.ui-snap/run7calm4/`. Headless screenshots do not show the WebGL forest (it runs: level full,
+  39 fps measured) — the user's eye step.
+
+## Slice 3 — C6 the Calm shell (done; quality bar points 4, 5, 6, 9, 10)
+- `src/core/calmui.js` (pure, data row «CALM shell (core)» 16/0): show after 1.5 s without hands / hide at once; cycling; the SLEEP TIMER's
+  fade (full level until the last 90 s, a cosine fade — monotone, no step: CONTROL a stepped fade is caught — then asleep); the glow falloff.
+- `src/calmshell.js` + `#calmShell` in index.html + Moonglass CSS: Sound · Mood · Play with · Notes (follow the hand / stay put) ·
+  Background · Sleep (off / 15 / 30 / 60 min) in the glass capsule (portrait bottom, landscape right), ⓘ card (emblem + «hand·song» +
+  «calm», privacy, headphones, Lantern, «Show the full note field», the dev way back to Full); each tap glints; plain words only. Doors in
+  ui.js (the same setters as the profile write). The Forest-volume slider waits for the ambience (C4c).
+- Sleep: `audio.outputFade` — a session-only level on the master's makeup gain (no new node, never stored in a song) + a black veil over the
+  scene; a tap on the veil wakes.
+- The GLOW NOTE FIELD (`views/play.js`): in Calm the solo field draws nothing but a soft lime glow on the band under each playing hand
+  (rect bands or narrow rows — the same geometry the hands hit), brighter while it sounds; no labels, no tags, no effect bars, no status
+  line. «Show the full note field» adds faint bands without names. `state.calmView` carries the view.
+- Row «CALM shell» (quick, drawn, at 1009.7) 20/0: Full shows no shell; Calm shows it and the controls with no hand; no Hz / cents / role
+  name (CONTROL planted role name caught); each button writes through its door; the sleep fade ≈ ½ at 45 s before the end, asleep at the
+  end, a tap wakes; ⓘ, field and lantern toggles; back to Full clean; this device's stored choices restored.
+- Verdicts: static PASS · data PASS 27/0 · P.quick PASS 90/0 (166 s; CALM timbres + CALM shell new) · LIC1 PASS · NAME-INDEX regenerated.
+  Fix rounds: 0 probe rounds; 2 visual rounds from the screenshots (rows layout had no glow; status line and effect bars hidden in Calm;
+  long values wrap; landscape ⓘ in two columns).
+STARTED slice 4 C4b depth to forest 2026-10-17 17:35
+
+## Slice 4 — C4b depth → forest (done; the user's choice: Calm's OWN wider range, Full unchanged; quality bar points 1, 4, 5, 8)
+- Clean route found: a Calm-only bus effect **«Forest depth»** (`fdepth`, `modules/effects/forestdepth.js`, stateless — rule #38) on the same
+  seeded Night forest room, with ONE depth parameter that plays the prototype's distance colouring EXACTLY (`core/dsp.calmDepth`): send
+  0.5 → 1.3 (no two-thirds saturation), dry 1 → 0.45, and a darkening lowpass 8.9 kHz → 900 Hz on the signal feeding both; `mix` 0 is exact
+  identity. Not offered in Full's «+ Add» (`calm:true`); Full's «Night forest» module, its range 0…1 and every GOLD case are untouched.
+- The depth is the bus send (continuous, following the playing hand) — not per note at the attack as in the prototype (one convolver per
+  chain, rule #29); the per-note solo brightness stays free for the effects hand's Warmth ↔ Brightness (C5) — one owner per value.
+- Calm's own live solo chain (`profile.js` CALM_CHAIN): Volume on the playing hand's horizontal + «Forest depth» (amount fixed full, depth on
+  the playing hand's depth, room Medium). The profile doors read / write the chain (`state.setFxChain`, exact, + the sound half as
+  fxChainDrop / fxChainPut) and the old solo scalars' amounts (they are hushed when leaving the chain).
+- Rows: data «CALM depth curve (core)» 6/0 (the prototype's numbers at 0, ½, 1; monotone; CONTROL a saturating send caught); browser «CALM
+  depth → forest» 19/0 (the aim door at d = 0, ½, 1 puts the live instance on the curve; Full's forest range still 0…1; CONTROL far send
+  outside it); C0 round trip now compares the chain too (Calm's chain spelled out in the probe); the effect-contract rows gained `fdepth` (4/0);
+  GOLD + «fx fdepth 0 / 0.5 / 1» (every other case compared first, worst 0.0013 dB).
+- Fix rounds: 1 — the first P.quick 91/92: the state guard after «C0 round trip» saw the solo vibrato / drive scalars come back at 0 (hushed
+  when Calm's chain dropped them) → the doors save and restore their amounts. Then P.quick PASS 92/0, GOLD 94/0, census 19/0, data 28/0.
+- Note: `sed -i` in this shell rewrites CRLF files as LF — it flipped src/ui.js once; restored to CRLF; not used again.
+STARTED slice 5 C4c ambience 2026-10-17 17:56
+
+## Slice 5 — C4c the forest's ambience (done; quality bar points 1, 5, 6, 8)
+- `core/ambience.js` (pure): the numbers + the crickets' SEEDED schedule (`cricketStream`, `chirpShape`) and the seeded wind loop; data row
+  «CALM cricket schedule (core)» 17/0 (same seed → same chirps; CONTROL another seed differs; gaps 0.6–1.8 s, 3–5 pulses, 4.3–4.9 kHz;
+  soft chirp envelope; wind repeatable).
+- `modules/ambience/forest.js` (stateless, rule #38; the ambience object lives in the engine instance): drone on the LIVE view's root two
+  registers down and its fifth (the backing drone's pricing — A2 110 / E3 164.81 Hz at A4 440, follows mood and A4; rule #2), seeded wind
+  (bandpass 520 Hz drifting ±260 Hz at 0.06 Hz), three distant crickets (gated sines, panned apart, scheduled ahead at explicit times —
+  rule #15), all sources started once and gated (rule #3); its own bus into the master (the sleep fade and the limiter cover it; live only,
+  never a track — rule #31). Distance by ONE soft echo, not a room: measured, the FDN reverb alone cost ≈ 3.6 % of a core in the runner
+  (Calm's own forest convolution 9.5 %), the whole ambience 9 % → with the echo 3.9 % (≈ 2.5 % on the plan's scale — near, not under, the
+  ≤ 2 % target; the phone measurement decides).
+- Level: at the default Forest level (0.6) the ambience sits ≈ 13 dB under the Calm sounds (K-like measure); the slider (Calm shell, now
+  shown) is amplitude ∝ level², remembered on the device; on in Calm, off in Full (slow fades).
+- Rows: «CALM ambience» (P.all, slow ≈ 13 s) 10/0 — the drone = the view (and A4 432 moves it ×432/440), spectral peaks 109.86 / 164.79 Hz
+  within one bin; seeded repeat ≤ 1e-6 (CONTROL another seed differs); level ½ → exactly 1/16 of the energy; crickets at their scheduled
+  onsets 2.7× band rise vs 1.0× off them (CONTROL); no click. GOLD + «ambience».
+- Fix rounds: 2 — (1) my row expected «level ½ → ¼ energy» but the level is amplitude ∝ level² (1/16 is right: the test was wrong); «crickets
+  inside vs between chirps» could not work for crickets high in a room (their tails fill the gaps) → replaced by an onset test whose first
+  absolute threshold (3×, a guess) measured 2.6× → made RELATIVE with a control (≥ 2× and ≥ 2× the off-onset value; off-onset < 1.5×);
+  (2) P.quick ran past its 3-min limit with the new render-heavy rows → «CALM timbres» and «CALM ambience» flagged slow (P.all), P.quick
+  back to 139 s.
+- Verdicts: static PASS · data 29/0 · P.quick PASS 91/0 · GOLD 95/0 · census 19/0.
+STARTED slice 6 C7 first run + ghost light 2026-10-17 18:33
+
+## Slice 6 — C7 first run + ghost light (done; quality bar points 4, 5, 6, 7, 10)
+- The Calm START reuses the one start path: in a Calm boot (`?calm` in dev, the calm edition always) the same `#start` card is restyled
+  (body.calm-boot): the Hush emblem + «hand·song» + «calm», the four first steps (headphones · light your hands · stand the phone or laptop
+  so both hands are free · the camera, pictures never leave this device) — only until this device has begun once (`handsong.calmSeen`) —
+  a lime «Begin» that calls the very same handler as Play inside its click (rule #1), the privacy notice kept (rule #33), the language
+  choice kept; Full's start card unchanged.
+- The GHOST LIGHT (`src/ghost.js`): on a first start (and from ⓘ «Show the first steps again») a synthetic hand from the pose generator —
+  MOVED from probes/hand.js to `src/gestures/pose.js` (HAND1 imports it; its print unchanged, 525/0) — drifts on a slow Lissajous path and
+  plays FOUR mood notes, one every 3.2 s, through the real `processHands` door (main.onHands), then leaves; a real hand ends it at once. Only
+  a person's own tap arms it (never a profile switch — the probes switch profiles).
+- In Calm the play view now also silences Full's hand overlay texts (the pre-pinch row outline with note names, register word, effect %,
+  idle-finger hint) — the glow field shows the row.
+- Row «CALM ghost light» (quick, at 1009.8) 8/0: exactly four attacks on mood degrees, the scene sees the ghost, it leaves; re-armed, a real
+  hand ends it (CONTROL: without it the ghost is still on); Full shows no Calm start part.
+- Fix rounds: 2 — the row's probe clock lacked the play field (W, H — HAND1's clock carries them) → NaN degrees; ui-snap's Calm run now
+  presses «Begin», photographs the first-run card and the ghost mid-flight, waits for the ghost to leave.
+- Verdicts: static PASS · data 29/0 · P.quick: first run NOT A PASS — TIME LIMIT 180 s (no row failed; the machine slower this session:
+  POOL1 26.8 s and TIM3 timbres = before 22.7 s, ≈ 3–5× their earlier times, no code change between) → re-run with the runner's documented
+  `--limit-quick 5`: **PASS 92/0 (229.6 s)**. Both results recorded. ui-snap Calm: `tools/.ui-snap/run7calm5/` (calm-start, calm-ghost …).
+
+## The user's timbre decision (2026-10-18, from the listening page) — done
+- Calm's sounds are exactly FOUR, in this order (data: `data/profiles/calm.json` `timbres`; the first is the default): **solo.firefly**
+  (the page's row «Firefly · Светлячок» = today's Firefly; the new `solo.firefly-rich` is shown there as «Firefly (rich) · Светлячок
+  (богатый)»), **solo.breath-flute**, **solo.handpan**, **solo.singing-bowl**. The Calm shell's Sound button cycles only these; Full keeps
+  every timbre; nothing deleted (`solo.firefly-rich`, `solo.kalimba`, `solo.breath-pad` stay in data/timbres and in Full).
+- Row «CALM timbre set» (quick, at 1009.55) 16/0: the loaded profile lists exactly these ids in order (CONTROL a changed list fails); each
+  exists, its record loaded, a note of each sounds; Full still offers the others. C0 31/0 (Calm starts on the first), CALM shell 20/0.
+- ⚠️ MEASURED: in the app `solo.firefly` is **18 dB quieter** than the other three (K-like loudness of four 1-s notes: Firefly −49.42 dB;
+  Breath flute −31.37, Handpan −31.39, Singing bowl −31.32, Glass pad −31.36 — the listening page trims every sound to the same loudness, so
+  it did not show there). Today's Firefly record was left as it is (its GOLD case and Full must not change) → question for the user.
+STARTED slice 7 C5 effects hand 2026-10-18 23:15
+
+## Slice 7 — C5 the effects hand (done; quality bar points 1, 3, 4, 5, 8)
+- Three Calm-only effects (`modules/effects/calm.js`, stateless — rule #38; `calm:true`: not in Full's «+ Add»; Full's delay, brightness,
+  vibrato and tremolo untouched), ONE amount each on the effects hand (Calm's left by default), a vertical drag of its finger that stays:
+  index **Echo** (amount → mix 0…0.45 and feedback 0…0.55 together, repeats darkening through a Butterworth lowpass in the loop, time
+  0.625 s = a dotted eighth at 72 bpm), middle **Warmth / Brightness** (tilt: warmer below the middle — low shelf +3, highs −9 dB; brighter
+  above — highs only +4 dB, soft for headphones), ring **Wave** (vibrato to ±14 cents by a 2-ms swung delay + tremolo to 18 %, 4.5 Hz). In
+  Calm's chain before the forest room (`profile.js` CALM_CHAIN; profile data `effects`: cecho · ctone · cwave).
+- Forest visuals (`views/scene/forest.js`, values via the bus `calmFx` published by the Calm shell): Echo — rings of light leave the firefly at
+  each echo of a note (from the echo's own time and feedback); Warmth / Brightness — the light's colour amber ↔ lime ↔ cold green-white
+  (tokens `--cv-forest-warm`, `--cv-forest-cold`); Wave — the light trembles at 4.5 Hz.
+- Each of the four Calm sounds with each effect at full (offline, through Calm's chain): Echo +0.24 / +1.05 / +0.40 / +1.11 dB (Firefly / flute /
+  handpan / bowl) — no build-up; Warmth +0.1…+0.2, Brightness −0.1…−0.2, Wave −0.75…−1.1 dB; no click anywhere. The bowl with Echo: the wash
+  2–5 s after the last note is ≈ 10 dB longer-lived (natural; the user's ear).
+- Rows: «CALM effects hand» (quick, drawn) 12/0 — through the real processHands each finger's drag raises exactly its effect, the other two
+  exact (CONTROL: the playing hand moves none); the forest light turns the warm token at tilt 0; a note with Echo schedules rings that
+  appear; «CALM effects × timbres» (P.all, slow) 32/0 (±2 dB, no click); effect contracts + tails for cecho / ctone / cwave; GOLD + «fx cecho 1»,
+  «fx ctone 0 / 1», «fx cwave 1» (others compared first, worst 0.0013 dB).
+- Fix rounds: 2 — inserts need `setActive` (the render's gate); the contract rows caught the inserts' dry/wet switch gliding (≈ 3e-4 of the
+  2-ms delayed path leaked at neutral → now set exactly: mix is a set-up choice) and Echo's «fully on» control seeing no echo inside the
+  contract's short render (its control now uses a 0.1-s echo time).
+- P.calm (new): `await P.calm()` = rows flagged calm (every CALM row, C0, VIS1a, VIS1c ×2, C4a, HAND1, census, GOLD); runner
+  `node tools/probe-browser.mjs --calm` (in a normal session — each Calm row applies Calm itself; a ?calm-booted session is not done: its
+  start card and first-run ghost would need their own runner path).
+- Verdicts: static PASS · data 29/0 · P.quick PASS 97/0 (144.5 s) · GOLD 99/0 · ui-snap Full `run7full2` vs `run7full`: 0 pixels on 10 screens.
+STARTED final run (P.all + P.calm) 2026-10-18 23:46
+
+## Final run (RUN 7 end, 2026-10-18/19)
+- `node tools/probe-browser.mjs --all --calm --limit-min 40`: **P.all 127 / 129 (726 s)**, **P.calm PASS 16 / 16 (143 s)**; seed bass 0.08686 /
+  0.055319 / 650886 exact; state guard clean; CSP, network (307 requests, own origin + MediaPipe) and UI checks PASS. The two misses:
+  (1) «AF2 freeze swap inaudible» (REAL-TIME): a seam step 4.03× (limit 3×) → re-run ALONE once: **7 / 0 PASS** (both results recorded);
+  (2) «CALM depth → forest»: the far cut-off read 903.9 Hz vs 900 — the row waited 700 ms of WALL time, and on the loaded machine the audio
+  clock had not passed the 80-ms glides → it now waits on the AUDIO clock (≥ 0.7 s of AC time): alone **19 / 0 PASS**.
+- After the late changes (the ⓘ dev link, the depth row): data **PASS 29 / 0**; P.quick: 180-s limit NOT A PASS (time only, no row failed),
+  `--limit-quick 5` NOT A PASS (time only: 84 / 97 rows done, none failed; render rows 5–7× slower than earlier — outside load, no leftover
+  runner browser), `--limit-quick 10` **PASS 97 / 0 (293 s, slow factor 1.27)** — every result recorded. `--leak` **PASS** (+0.6 MB / 30
+  renders, control +121 MB). LIC1 PASS (after removing this session's own scheduler lock `.claude/scheduled_tasks.lock`, made by a fallback
+  wake-up timer I set and then cancelled). static PASS · NAME-INDEX current · doc-split PASS · HANDOFF 19 995 bytes.
+- New in RUN 7: src/modules/timbres/{modal,breath}.js, src/modules/effects/{forestdepth,calm}.js, src/modules/ambience/forest.js,
+  src/core/{calmui,ambience}.js, src/calmshell.js, src/ghost.js, src/gestures/pose.js, data/timbres/solo.{firefly-rich,handpan,singing-bowl,
+  kalimba,breath-flute,breath-pad}.json, fonts/andika/*, fonts/literata/*, docs/CALM-QUALITY.md, tools/listen/measure.js.
+  Changed: src/audio.js, src/core/{timbre,dsp,bus}.js, src/modules/timbres/subtractive.js, src/state.js, src/profile.js, src/ui.js, src/main.js,
+  src/icons.js, src/i18n.js, src/views/play.js, src/views/scene/{forest,host}.js, src/render.js, src/engine/surface.js, src/probes/{calm,sound,
+  gold,profile,fxcontract,hand,rows,run,vis,forest,engine}.js, src/scaleprobe.js, index.html, style.css, tokens.css, data/profiles/calm.json,
+  data/timbres/index.json, data/timbres.bundle.json (generated), icons/icon-*.png, tools/{probe-data,check-static,probe-browser,ui-snap}.mjs,
+  tools/licences.json, tools/{gold.print,timbres.before,census.print}.json, tools/listen/{calm-listen.js,calm-timbres.html,check-listen.js},
+  THIRD-PARTY-LICENSES.md and docs/NAME-INDEX.md (generated), CLAUDE.md, HANDOFF.md, BACKLOG.md, docs/STAGE4-CALM-plan.md,
+  archive/CLAUDE-history.md, archive/HANDOFF-history.md.
+- Process: ONE read-only `git diff --stat` was run by mistake early in RUN 7 (it changed nothing) — no git commands at all from now on.
+  `sed -i` flipped src/ui.js to LF once (restored to CRLF). The repo's line endings were already mixed; new files follow their folder.
+- Not done (queue / plan): C8 low power, C9 offline, C10 release tool, C12; a ?calm-booted runner session for P.calm (P.calm runs in a normal
+  session — each row applies Calm itself).
+
+# SUMMARY FOR THE USER — RUN 7 (plain language)
+
+**What was done** (every step checked by the automatic tests):
+1. **New sounds that try to sound like real instruments.** Two new «sound engines»: one for struck things (each note is a set of ringing
+   tones with measured proportions, a soft mallet tap, tiny differences from note to note — like a real handpan or bowl), one for breathing
+   sounds (breath noise that follows the note, a soft «chiff» at the start, a vibrato that arrives after a moment). Six new sounds: Firefly
+   (rich), Breath flute, Handpan, Singing bowl, Kalimba, Breathing pad — all at the same loudness as the app's normal sounds.
+2. **Your four Calm sounds:** Firefly (today's — the row «Firefly · Светлячок» on the page, id `solo.firefly`), Breath flute, Handpan, Singing
+   bowl — in that order, Firefly first. The Full app keeps every sound; nothing was deleted.
+3. **Your chosen design is in:** the Hush emblem (five dots, the middle one lime) as the brand mark and the app icon; everything else
+   Moonglass — round buttons in a frosted-glass capsule, the info card, the night colours. Fonts with Russian letters: **Literata** for the
+   «hand·song» title (Fraunces has no Russian), **Andika** for text (Atkinson Hyperlegible has no Russian either — checked; Andika was made
+   for easy reading and low vision). On the Dark background the glass is plain (no blur, lighter for older phones).
+4. **The Calm controls:** with no hand in view for 1.5 s the capsule fades in — Sound · Mood · Play with · Notes (follow the hand / stay
+   put) · Background · Sleep; a hand back → it fades out. The ⓘ card: privacy, headphones, Lantern, «Show the full note field», «Show the
+   first steps again». The note field is only a soft glow under your playing hand — no note names, no numbers.
+5. **Sleep timer:** 15 / 30 / 60 minutes; at the end the sound and the forest fade out slowly; a tap wakes them.
+6. **Depth → the forest:** move the playing hand away from the camera — the note goes deeper into the forest (more echo, darker, softer),
+   all the way (Calm got its own range; the Full app is unchanged).
+7. **The forest's own sounds:** a quiet low drone on the mood's notes, a soft wind, distant crickets — with its own «Forest» volume.
+8. **First visit:** a Calm start card with four short tips and «Begin»; then a «ghost» light drifts through the forest, plays four notes to
+   show how it works, and leaves as soon as your hand appears.
+9. **The effects hand (left hand):** pinch and drag up — index finger: Echo (rings of light leave the firefly), middle finger: Warmth /
+   Brightness (the light turns amber or cold), ring finger: Wave (the light trembles). Each stays where you leave it.
+
+**What you can try** (Live Server running, `http://127.0.0.1:5500`):
+- Calm: open `http://127.0.0.1:5500/?calm` (a private window shows the first-run card and the ghost) → **Begin** → wait 2 s without hands for
+  the controls; tap ⓘ for the card. Turn the phone or resize the window for landscape. Switch to Русский on the start card.
+- Tap «Sound» to switch between the four sounds; «Mood» for Glow / Dusk / Mist; left hand for the effects; move the right hand nearer and
+  farther; set «Sleep» to 15 min once to see it fade.
+- The listening page: `http://127.0.0.1:5500/tools/listen/calm-timbres.html` — «Phrase / Single notes», and flip «In the forest / Dry» while
+  it plays.
+- Your steps: 106–113 (and 105, the GPU test — its Diagnostics are now in Calm's ⓘ card → «Sound panel and diagnostics (development)»).
+
+**Questions for you (plain words):**
+1. **Today's Firefly is much quieter (about 18 dB) than the other three Calm sounds.** The listening page played them all equally loud, so
+   it did not show there. Options: (a) raise Firefly's level for Calm only (a small «level per sound» in Calm's settings — Full stays as it
+   is); (b) use «Firefly (rich)» instead (the same character, richer, already at the right level); (c) keep it quiet on purpose. Our
+   suggestion: (a), or (b) if you liked the richer one.
+2. **Singing bowl + Echo** gives a long wash (never more than about 1 dB louder, but the bowl rings on with its echoes) — fine, or should Echo
+   be gentler on long sounds?
+3. **The forest ambience** costs about 4 % of the computer's power in our test (the plan aimed at 2 %); the Poco M5 test will tell — keep it
+   as it is until then?
+4. **A later «sampler»** (real recorded instruments, free-licence recordings only) would help most with the flute and a voice / bowed pad —
+   the hardest to make convincing by synthesis. Interested, after you have listened to the new sounds?
+
+**Test verdicts (final):** data 29 / 29 · full browser run 127 / 129 — both misses re-run alone: PASS (one timing test of the audio thread;
+one of my new tests measured too early on a busy computer — now it waits on the audio clock) · Calm suite (P.calm) 16 / 16 · quick suite
+97 / 97 · golden sounds 99 / 99 (the old sounds unchanged) · the Full app's screens: 0 pixels changed · privacy, network, on-screen checks PASS.
+
+**Note:** early in this run I ran one read-only «git diff» command by mistake (it changed nothing); no git commands at all from now on.

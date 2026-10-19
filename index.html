@@ -40,6 +40,17 @@
      живы в коде, но кнопок запуска у них нет — им место внутри обучения, туда и переедут. -->
 <div id="start" class="ov on">
   <div class="startCard">
+    <!-- RUN 7 (C7): THE CALM START — the same card restyled when the app boots in Calm (body.calm-boot): the emblem and the wordmark, the
+         first steps (only the first time on this device), «Begin» = the same start handler as Play (rule #1: the sound starts in this
+         click); the privacy notice stays (rule #33). -->
+    <div class="calm-only calm-start-head"><span data-svg="emblem"></span><span class="calm-word">hand<span class="calm-word-dot">·</span>song</span><span class="calm-sub">calm</span></div>
+    <ol id="calmFirstSteps" class="calm-only calm-steps">
+      <li><span class="calm-vico" data-svg="sound"></span><span data-i18n="calm.stepPhones">Use headphones — the forest is quiet.</span></li>
+      <li><span class="calm-vico" data-svg="lantern"></span><span data-i18n="calm.stepLight">Light your hands — a lamp beside you, not behind you.</span></li>
+      <li><span class="calm-vico" data-svg="hand"></span><span data-i18n="calm.stepStand">Stand your phone or laptop so both hands are free.</span></li>
+      <li><span class="calm-vico" data-svg="info"></span><span data-i18n="calm.stepCamera">Handsong will ask for your camera. Pictures never leave this device.</span></li>
+    </ol>
+    <button id="calmBegin" class="calm-only calm-begin" data-i18n="calm.begin">Begin</button>
     <h1>Hand<span>song</span></h1>
     <p class="startTag" data-i18n="start.tag">Жестовый синтезатор: играйте руками перед камерой.</p>
     <div class="startBtns">
@@ -548,6 +559,38 @@
     <div id="demoCulture"></div>
     <p id="demoHint" data-i18n="demo.hint">Один и тот же мотив звучит в шести строях — слушайте, как меняется настройка.</p>
     <button id="demoSkip" data-i18n="demo.skip">Skip</button>
+  </div>
+</div>
+
+<!-- RUN 7 (C6 + C11): THE CALM SHELL — the user's design (Moonglass controls in a glass capsule, the Hush emblem). Shown only in the Calm
+     face (body.calm); src/calmshell.js drives it. Hands in view → only the scene; no hand for 1.5 s → the controls fade in. Every word is a
+     dictionary key (en + ru), every picture a drawn icon by meaning (data-svg). No cents, Hz or role names anywhere. -->
+<div id="calmShell" hidden>
+  <div id="calmLantern" class="calm-lantern" hidden></div>
+  <div id="calmVeil" class="calm-veil"><p id="calmVeilMsg" class="calm-veil-msg" data-i18n="calm.asleep" hidden>Sleeping — tap to wake</p></div>
+  <div id="calmFade" class="calm-fade">
+    <p id="calmIdle" class="calm-idle" data-i18n="calm.idle">Raise a hand to play</p>
+    <button id="calmInfoBtn" class="calm-ibtn calm-glass" data-svg="info" data-i18n-title="calm.info" title="About"></button>
+    <div id="calmCtl" class="calm-ctl calm-glass">
+      <button id="calmSound" class="calm-rb"><span class="calm-circ" data-svg="sound"></span><span class="calm-lab" data-i18n="calm.sound">Sound</span><span class="calm-val"></span></button>
+      <button id="calmMood" class="calm-rb"><span class="calm-circ" data-svg="mood"></span><span class="calm-lab" data-i18n="calm.mood">Mood</span><span class="calm-val"></span></button>
+      <button id="calmHand" class="calm-rb"><span class="calm-circ" data-svg="hand"></span><span class="calm-lab" data-i18n="calm.hand">Play with</span><span class="calm-val"></span></button>
+      <button id="calmNotes" class="calm-rb"><span class="calm-circ" data-svg="note-follow"></span><span class="calm-lab" data-i18n="calm.notes">Notes</span><span class="calm-val"></span></button>
+      <button id="calmBg" class="calm-rb"><span class="calm-circ" data-svg="background"></span><span class="calm-lab" data-i18n="calm.bg">Background</span><span class="calm-val"></span></button>
+      <button id="calmSleep" class="calm-rb"><span class="calm-circ" data-svg="sleep"></span><span class="calm-lab" data-i18n="calm.sleep">Sleep</span><span class="calm-val"></span></button>
+      <label id="calmForestRow" class="calm-vol" hidden><span class="calm-vico" data-svg="forest"></span><span class="calm-lab" data-i18n="calm.forest">Forest</span><input id="calmForest" type="range" min="0" max="1" step="0.01" value="0.6"></label>
+    </div>
+  </div>
+  <div id="calmInfo" class="calm-card calm-glass" role="dialog" aria-modal="true" hidden>
+    <div class="calm-ihead"><span class="calm-mark"><span data-svg="emblem"></span><span class="calm-word">hand<span class="calm-word-dot">·</span>song</span><span class="calm-sub">calm</span></span>
+      <button id="calmInfoClose" class="calm-ibtn calm-ibtn-in" data-svg="close" data-i18n-title="calm.close" title="Close"></button></div>
+    <p data-i18n="calm.privacy">Pictures and sound never leave this device.</p>
+    <p data-i18n="calm.phones">Use headphones — the forest is quiet.</p>
+    <button id="calmLanternTg" class="calm-tg"><span class="calm-vico" data-svg="lantern"></span><span data-i18n="calm.lantern">Lantern: a soft light at the bottom edge for your hands</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmFieldTg" class="calm-tg"><span class="calm-vico" data-svg="note-stay"></span><span data-i18n="calm.field">Show the full note field</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmFirstRun" class="calm-lnk" data-i18n="calm.firstRun" hidden>Show the first steps again</button>
+    <button id="calmToFull" class="calm-lnk calm-dev" data-i18n="calm.toFull" hidden>Open the full app (development)</button>
+    <button id="calmToSound" class="calm-lnk calm-dev" data-i18n="calm.toSound" hidden>Sound panel and diagnostics (development)</button>
   </div>
 </div>
 

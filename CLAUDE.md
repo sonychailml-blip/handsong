@@ -189,7 +189,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    `P^(iv/edo)` with `P=periodOf(s)`, or the cents overlay `2^(cents/1200)`.
 3. **Pool oscillators start once and never stop** (solo/chord/bass gated by GainNodes; per-hit drums, metronome, drone LFO, frozen-track
    readers and — since SND-F1 — the strikes of a struck chord timbre («Firefly», `ffStrike`: a tine has no sustain to gate) are the
-   one-shot exceptions). Lazily built solo voices and banks obey it: cached and gated, never torn down. The offline
+   one-shot exceptions; since C4a / RUN 7 also the strikes of the struck SOLO engines `tine` and `modal`, and their mallet-noise bursts).
+   Lazily built solo voices and banks obey it: cached and gated, never torn down (the RUN 7 `breath` bank too). The offline
    engine copy is a second instance of this rule (its own oscillators live as long as its own context).
 4. **The master limiter stays — and since SND-F1b it is OURS** (user decision 2026-10-15). Live master path = `master` → `mGlue` (our
    compressor, off by default) → `mMake` (+2.31 dB = the old browser limiter's own makeup, measured — nothing got quieter) → `mLim` (our
@@ -382,8 +383,10 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   worklets/` — `ks-worklet.js` (Karplus–Strong), `frz-worklet.js` (frozen store + reader), `dyn-worklet.js` (Glue / limiter),
   `probe-cap-worklet.js` (probes). Rule #38 exempts the worklets.
 - `src/modules/timbres/` — stateless timbre builders (`stages.js`, `voice.js`, `fm.js`, `ks.js`, `subtractive.js`, `chord-voice.js`,
-  `bass-voice.js`, `drumkits.js`, `tine.js` — the struck tine as a solo bank, C4a); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
-  `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`). Both: rule #38, first argument `E`.
+  `bass-voice.js`, `drumkits.js`, `tine.js` — the struck tine as a solo bank, C4a; `modal.js` struck bodies by modal synthesis and `breath.js`
+  breathing sustained sounds — RUN 7, Calm's sound pass); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
+  `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; RUN 7 Calm-only: `forestdepth.js` «Forest depth», `calm.js` Echo · Warmth / Brightness
+  · Wave); `src/modules/ambience/forest.js` the forest's ambience (RUN 7). All: rule #38, first argument `E`.
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
 - `src/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
   `freezeWire`, `recWire`, `backingWire`) + session glue (lane prune/reset/delete, mixer setters, `laneHush`, drone sync, editor SESSION
@@ -423,6 +426,9 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
   `rollView`, `play.js` overlays + play screen).
 - `src/ui.js` — menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers.
 - `src/main.js` — composition root: `onHands`, `loop()`, `startApp()` (the one start path), `?probe` loading.
+- RUN 7 (Calm v1): `src/calmshell.js` the Calm shell (controls, ⓘ, sleep timer, the Calm start; doors from ui.js); `src/ghost.js` the first-run ghost
+  light; `src/gestures/pose.js` the pose generator (HAND1 and the ghost); `src/core/calmui.js` (shell logic), `src/core/ambience.js` (seeded
+  crickets); fonts `fonts/` (OFL, register entries); the quality bar `docs/CALM-QUALITY.md`; `P.calm` / runner `--calm`.
 - `src/clip.js` — clip/audio recorder. `src/demo.js` — start-screen demo. `src/tutor.js` — lessons + step engine. `src/latmeter.js` —
   latency meter UI (LAT1–LAT3). `src/render.js` — offline render, freeze, `renderQueued`, console `R.*`. `src/songs.js` — demo songs
   (`data/songs/<name>.json`, SONG2).
@@ -506,7 +512,9 @@ THERE in full and here as one index entry):
   90 «1/1 = G» (TF5) · 91 Privacy (PRIV1) · 92 Latency meter (LAT1) · 93 Firefly · 94 Hand detection (LAT2) · 95 Low light (LAT3)
   96 Camera settings come back (CAM-FIX, rule #34) · 97 Camera start (0b) · 98 Autosave (AUTOSAVE1) · 99 Open is one undo step (SONG3) · 100 Engine readouts (ENG2)
   101 Full ↔ Calm (C0) · 102 Calm sounds by ear (listening page) · 103 Calm design proposals · 104 Forest and the three backgrounds (VIS1c)
-  105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5)
+  105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5) · 106 Calm's four sounds by ear (RUN 7) · 107 The Calm look, portrait + landscape
+  108 Sleep timer · 109 Depth → the forest · 110 The forest's ambience and its volume · 111 First run + ghost light · 112 The effects hand
+  113 Listening page v2 (A/B)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

@@ -19,6 +19,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), OUT
 const argv=process.argv.slice(2), val=f=>{ const i=argv.indexOf(f); return i>=0 ? argv[i+1] : null; };
 const SAVE=val('--save'), CMP=val('--compare'), CMP2=argv[argv.indexOf('--compare')+2]&&!argv[argv.indexOf('--compare')+2].startsWith('--') ? argv[argv.indexOf('--compare')+2] : null;
 const ONLY=val('--only');   // comma list of screens
+const CALM=argv.includes('--calm');   // RUN 7 (C6/C11): the Calm face's screens instead (a phone viewport, the page opened with ?calm)
 const out=s=>console.log(s);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
@@ -74,6 +75,24 @@ const SCREENS=[
   ['mix',       async p=>{ await p.click('#arrFace'); await p.waitForTimeout(600); }],
   ['roll',      async p=>{ await p.click('#arrFace'); await p.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.openTrack(0); }); await p.waitForTimeout(800); }],
 ];
+/* RUN 7: the CALM screens — a phone in portrait (390 × 844), then landscape (844 × 390); Dark background (no WebGL: deterministic pixels),
+   then the Camera background (the glass over a picture); the ⓘ card; the same in Russian. The shell shows
+   its controls with no hand in view (the fake camera has none) after 1.5 s. */
+const calmWait=async p=>{ await p.waitForTimeout(2200); };
+const SCREENS_CALM=[
+  ['calm-start',     async p=>{}],
+  ['calm-ghost',     async p=>{ await p.click('#calmBegin');   // C7: Begin (the first run: the ghost light plays four notes)
+                       await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
+                       await p.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', true); const b=document.getElementById('calmBg'); let k=0; while(!/Dark|Тём/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(5500); }],
+  ['calm-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('./src/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
+  ['calm-info',      async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
+  ['calm-land',      async p=>{ await p.click('#calmInfoClose'); await p.setViewportSize({ width:844, height:390 }); await calmWait(p); }],
+  ['calm-land-info', async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
+  ['calm-camera',    async p=>{ await p.click('#calmInfoClose'); await p.setViewportSize({ width:390, height:844 });   // the glass over a picture (headless screenshots do not show the WebGL forest)
+                       await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Camera|Камер/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
+  ['calm-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('./src/i18n.js'); I.setLang('ru'); const b=document.getElementById('calmBg'); let k=0; while(!/Тём/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
+  ['calm-ru-info',   async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
+];
 async function capture(tag){
   const dir=path.join(OUT,tag); await mkdir(dir,{ recursive:true });
   const srv=await serve(), port=srv.address().port, y4m=await fakeVideo();
@@ -81,13 +100,13 @@ async function capture(tag){
     `--use-file-for-fake-video-capture=${y4m}`,'--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding','--hide-scrollbars'] });
   const res={ tag, screens:{} };
   try{
-    const ctx=await browser.newContext({ viewport:{ width:1280, height:800 }, deviceScaleFactor:1, locale:'en-US' });
+    const ctx=await browser.newContext({ viewport: CALM ? { width:390, height:844 } : { width:1280, height:800 }, deviceScaleFactor: CALM ? 2 : 1, locale:'en-US' });
     await ctx.grantPermissions(['camera','microphone'],{ origin:`http://127.0.0.1:${port}` }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ try{ localStorage.setItem('handsong.lang','en'); }catch(e){} });
     const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e)));
-    await page.goto(`http://127.0.0.1:${port}/index.html?probe`);
+    await page.goto(`http://127.0.0.1:${port}/index.html?probe${CALM?'&calm':''}`);
     await page.waitForFunction(()=>window.P && window.R, null, { timeout:60e3 }); await page.waitForTimeout(800);
-    for(const [name,act] of SCREENS){
+    for(const [name,act] of (CALM ? SCREENS_CALM : SCREENS)){
       await act(page);
       if(ONLY && !ONLY.split(',').includes(name)) continue;
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));

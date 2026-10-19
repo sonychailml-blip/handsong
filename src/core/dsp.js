@@ -14,6 +14,12 @@ export function seeded(seed){
    and the note send 0.8 are the prototype's gains. Three room lengths (SND-F1b): Short 0.85 s, Medium 1.7 s, Long 3.4 s (the prototype) —
    the same recipe and seeds, the envelope recomputed for each length (a shorter room, not a cut tail). A pure function of rate and length. */
 export const FOREST={ sec:3.4, rooms:[0.85, 1.7, 3.4], room:1.7, pow:2.6, wet:0.55, send:0.8, seeds:[0x4E464F31, 0x4E464F32] };
+/* RUN 7 (C4b, Calm plan §4.2): DEPTH → THE FOREST — the prototype's distance colouring, d = 0 near … 1 far: the send to the room
+   0.5 + 0.8·d (0.5 … 1.3), the dry level 1 − 0.55·d, a darkening lowpass 900 + 8000·(1 − d)^1.5 Hz. Calm's own effect «Forest depth»
+   (modules/effects/forestdepth.js) plays it; Full's Night forest is unchanged (its send stays 0…1). Node row «CALM depth curve (core)». */
+export const CALM_DEPTH=Object.freeze({ send0:0.5, sendK:0.8, dryK:0.55, lp0:900, lpK:8000, lpPow:1.5 });
+export function calmDepth(d){ const x=Math.max(0, Math.min(1, +d||0)), C=CALM_DEPTH;
+  return { send:C.send0+C.sendK*x, dry:1-C.dryK*x, lp:C.lp0+C.lpK*Math.pow(1-x, C.lpPow) }; }
 /* the nearest offered room length (in log space: 0.85 · 1.7 · 3.4 are octave steps) */
 export const forestRoom=sec=> FOREST.rooms.reduce((a,b)=> Math.abs(Math.log(b/sec))<Math.abs(Math.log(a/sec)) ? b : a);
 export function forestIR(rate, sec=FOREST.sec){

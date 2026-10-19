@@ -246,6 +246,7 @@ const NET_LISTED={
   'timbreload.js': { fetch:[1,'reads data/timbres.bundle.json (the timbre records, TIM3a) from the own origin'] },
   'profile.js': { fetch:[2,'reads data/profiles/index.json and each profile record (C0) from the own origin'] },
   'probes/timbres.js':{ fetch:[1,'probe only (?probe): reads tools/timbres.before.json from the own origin (TIM3 timbres = before)'] },
+  'probes/calm.js':   { fetch:[1,'probe only (?probe): reads data/profiles/calm.json from the own origin (RUN 7 CALM timbres)'] },
   'probes/pack.js':  { fetch:[1,'probe only (?probe): reads tools/pack-test-licence.json (TEST keys) from the own origin (PACK1)'] },
   'probes/song2.js': { fetch:[1,'probe only (?probe): reads data/songs/triphop.json from the own origin (SONG2 control)'] },
   'songs.js':        { fetch:[1,'the demo song file data/songs/<name>.json from the own origin (SONG2; P.song only)'] },

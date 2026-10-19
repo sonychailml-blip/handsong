@@ -1,0 +1,69 @@
+{
+ "format": "handsong/timbre",
+ "version": 1,
+ "id": "solo.kalimba",
+ "family": "solo",
+ "engine": "modal",
+ "name": {
+  "en": "Kalimba",
+  "ru": "Калимба"
+ },
+ "recipe": {
+  "modes": [
+   {
+    "r": 1,
+    "g": 0.7,
+    "d": 2.2
+   },
+   {
+    "r": 2,
+    "g": 0.03,
+    "d": 0.7
+   },
+   {
+    "r": 5.95,
+    "g": 0.2,
+    "d": 0.32,
+    "a": 0.001
+   },
+   {
+    "r": 1,
+    "g": 0.04,
+    "d": 0.5,
+    "w": "sawtooth"
+   }
+  ],
+  "lvl": 1.12,
+  "att": 0.0015,
+  "dk": 0.6,
+  "vb": 0.8,
+  "lp": 6500,
+  "noise": {
+   "g": 0.18,
+   "hz": 3200,
+   "q": 1.5,
+   "d": 0.012,
+   "t": 0.3
+  },
+  "body": {
+   "hz": 340,
+   "q": 7,
+   "g": 0.6
+  },
+  "jit": {
+   "r": 0.001,
+   "d": 0.07,
+   "g": 0.07
+  }
+ },
+ "env": {
+  "att": 0.002,
+  "rel": 1.2
+ },
+ "policies": {
+  "voiceMode": "poly",
+  "glide": 0.02,
+  "register": "solo",
+  "quant": 0
+ }
+}

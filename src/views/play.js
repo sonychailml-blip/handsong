@@ -12,6 +12,8 @@ import { FX_EDGE, FX_STEP, fxBarItems, fxBarsBox, fxBarsY, fxParamOnFinger, hexA
 import { drawRoll } from './roll.js';
 import { drawLooper, loopViewClear } from './strip.js';
 import { stackAdd } from './stack.js';   // VIS1a: the play screen's two modules
+import { calmView } from '../state.js';   // RUN 7 (C6): the Calm view (glow note field, plain labels)
+import { glowAlpha } from '../core/calmui.js';
 
  
 /* ================= ОТРИСОВКА ================= */
@@ -161,6 +163,7 @@ function drawThereminLines(x0,x1,playH,accent,activeSlots,role='ld'){
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
 function drawTag(x,y,lines,color){
+  if(calmView && calmView.plain) return;   // RUN 7 (C6): Calm shows no note names, Hz or role names on the canvas
   ctx.font='600 15px system-ui';
   let w=0; for(const L of lines)w=Math.max(w,ctx.measureText(L).width);
   const lh=19, h=lines.length*lh+12, bw=w+18;
@@ -370,6 +373,7 @@ function drawRole(instr,rx0,rx1,playH){
      у прочих — от левого края роли, как у соло/баса. */
   const gx0 = chTyped ? split : rx0;
   const rowLblOf = instr==='ch' ? (chTyped?rootName:chordLabel) : noteLbl;   // узкие ряды: у типизированных — имя КОРНЯ (chordLabel дал бы «C5», это враньё), у прочих аккордов — имя аккорда, у соло/баса — нота
+  if(calmView && calmView.glow && instr==='ld'){ drawCalmField(gx0,rx1,playH,actSlots,actDegs); return; }   // RUN 7 (C6): Calm's glow note field
   if(rectGrid()){
     /* Легенда пальцев: соло/бас — нота+центы; типизированные аккорды — корень+центы; прочие
        аккорды — имя аккорда (ровно то же, что показывал бы ряд). Центы прячем, когда периодов
@@ -434,6 +438,23 @@ function drawRole(instr,rx0,rx1,playH){
 }
 /* VIS1a: the play screen is two visual modules (views/stack.js) — «surface» (instrument layer: the roles' fields, FX bars, the expression
    bar) and «hands» (overlay layer: hand points, the looper strip, its feedback, the status) — drawn in this same order as before */
+/* RUN 7 (C6, Calm plan §5): THE GLOW NOTE FIELD — the bands the hands hit are invisible (the rect layout's rectBandY bands, or the narrow
+   rows' equal division of the height — the SAME geometry gestures use, rule #9); only the band under each PLAYING hand glows softly,
+   brightest at the hand and fading with the horizontal distance (core/calmui glowAlpha), brighter while it sounds. No labels. «Show the
+   full note field» adds faint bands, still without names. calmHands = the bus's handsView of this frame (set by the surface module). */
+let calmHands=[];
+function drawCalmField(x0,x1,playH,actSlots,actDegs){
+  const w=x1-x0, bands=[], on=new Set();
+  if(rectGrid()){ const RL=rectLayout(); for(let b=0;b<RL.bands;b++) bands.push(rectBandY(b,playH,RL.bands)); for(const g of actSlots||[]) on.add(Math.floor(g/RL.k)+RL.regBands); }
+  else { const rows=IVX().length, seg=playH/rows; for(let i=0;i<rows;i++) bands.push([i*seg,(i+1)*seg]); for(const d of actDegs||[]) on.add(rows-1-d); }
+  if(calmView.fieldAll) bands.forEach(([yTop,yBot],b)=>{ ctx.fillStyle= b%2 ? cv('white-a05') : cv('white-a03'); ctx.fillRect(x0,yTop,w,yBot-yTop);
+    ctx.strokeStyle=cv('white-a08'); ctx.lineWidth=1; ctx.strokeRect(x0+0.5,yTop+0.5,w-1,yBot-yTop-1); });
+  for(const h of calmHands){ if(!h.play) continue;
+    bands.forEach(([yTop,yBot],b)=>{ if(h.y<yTop || h.y>=yBot) return;
+      const k= on.has(b) ? 1.6 : 1, g=ctx.createLinearGradient(x0,0,x1,0);
+      for(let i=0;i<=8;i++){ const x=x0+w*i/8; g.addColorStop(i/8, hexA(cv('calm-glow'), Math.min(1, glowAlpha(x-h.x, w)*k))); }
+      ctx.fillStyle=g; ctx.fillRect(x0,yTop,w,yBot-yTop); }); }
+}
 function drawPhone(res){ drawSurface(); drawHandsLayer(res); }
 function drawSurface(){
   const W=canvas.width, H=canvas.height;
@@ -536,7 +557,7 @@ function drawHandsPhone(res,W,H,playH){
     }
     if(S.pinch&&S.zone==='oct'){                  // рука в октавной полосе (любая, в т.ч. левая): показываем регистр, эффектов НЕ трогаем
       ctx.fillStyle=cv('sky'); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText(`${regWord().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // «ОКТ»/«ТРИТАВА» по периоду
+      if(!calmView) ctx.fillText(`${regWord().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // RUN 7: no technical labels in Calm   // «ОКТ»/«ТРИТАВА» по периоду
       continue;
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
@@ -548,7 +569,7 @@ function drawHandsPhone(res,W,H,playH){
       if(S.pinch&&S.adj){ let meta=null, ent=null;
         for(const e of S.adj.ent){ const m=FX_META.find(q=>q.k===e.fxId); if(m&&e.pIdx===0){ meta=m; ent=e; break; } }   // pIdx 0 — «величина» эффекта: у скаляра он единственный, у делея-модуля это mix (в.1); время и повторы на пальце подписью не дублируем
         if(meta){ ctx.fillStyle=cv(meta.col); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-          ctx.fillText(`${t(meta.fullKey)} ${Math.round(ent.get()*100)}%`, S.x+14, S.y-10); } }   // величина ЖИВАЯ, из записи захвата (в.1): у скаляра get() — тот же fx[k], у делея — cur экземпляра
+          if(!calmView) ctx.fillText(`${t(meta.fullKey)} ${Math.round(ent.get()*100)}%`, S.x+14, S.y-10); } }   // величина ЖИВАЯ, из записи захвата (в.1): у скаляра get() — тот же fx[k], у делея — cur экземпляра
       continue;
     }
     if(loopHand){                                // рука-ЛУПЕР: помечаем, чтобы не казалась «немой»; подсказку раскладки даём до щипка
@@ -570,7 +591,7 @@ function drawHandsPhone(res,W,H,playH){
     if(S.pinch&&!S.inert&&S.deg<0&&rectGrid()&&(instr==='ld'||instr==='bs'||instr==='ch')){
       ctx.strokeStyle=hexA(accent,.45); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(S.x,S.y,16,0,7); ctx.stroke();
       ctx.fillStyle=cv('white-a70'); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      ctx.fillText(t('tag.idleFinger'), S.x+14, S.y-10);
+      if(!calmView) ctx.fillText(t('tag.idleFinger'), S.x+14, S.y-10);
       continue;
     }
     if(S.pinch&&!S.inert&&S.deg>=0){
@@ -641,7 +662,7 @@ function drawHandsPhone(res,W,H,playH){
         const oShow=S.regOct;
         drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
       }
-    }else if(!S.pinch){                          // подсказка до щипка — под указательным
+    }else if(!S.pinch && !calmView){             // подсказка до щипка — под указательным (RUN 7: not in Calm — the glow note field shows the row)
       const tip=lm[8], x=sx(tip.x,W), y=sy(tip.y,H);   // подсказка до щипка — в экранных пикселях игрового поля (поля кадра сняты)
       if((instr==='ld'||instr==='bs'||instr==='ch')&&rectGrid()){
         /* rect-раскладка (соло/бас/аккорды): подсказка кадрирует ПОЛОСУ сетки под рукой (тем же
@@ -752,6 +773,7 @@ function drawChordPalette(x0,x1,H){
    рисуют ЦЕПЬ роли БЕЗ гейта по руке (drawFxBars/fxBarItems ниже) — эффект звучит и без пальца на нём
    (фиксированные значения, адреса играющей руки), значит и показывать его есть что. */
 function drawFxBars(role,rx1,H){                   // rx1 — ПРАВАЯ кромка роли (слайс б.2; было rx0 — левая). Зовётся для ЛЮБОЙ роли: пустой items = ничего не рисуем. role остаётся РОЛЬЮ: это адрес ЭКРАННОГО МЕСТА и руки, а ключ цепи выводится здесь же (O-0)
+  if(calmView) return;   // RUN 7: Calm draws no effect bars (its effects get their forest visuals, C5)
   const items = fxBarItems(role,chainKeyOf(role));   // БЕЗ гейта по руке: столбик показывает состояние ЭФФЕКТА, а эффект звучит и без пальца на нём (фиксированные параметры). Пустая цепь → пустой список → ничего не рисуется
   const {y0,y1}=fxBarsY(H);                       // низ справа: выше строки статуса, ниже коробки лупера (та вверху по центру). Числа те же, но теперь ОДНИ на отрисовку и на габарит fxBarsBox
   ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
@@ -823,6 +845,6 @@ function drawExprBar(rx0,rx1,H){
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
-stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:()=>drawSurface() });
+stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>{ calmHands=bus.get('handsView')||[]; drawSurface(); } });
 stackAdd({ kind:'visual', id:'hands', layer:'overlay', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>drawHandsLayer(bus.get('hands')) });
 export { drawOverlays };

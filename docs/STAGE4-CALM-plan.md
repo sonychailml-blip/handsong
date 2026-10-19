@@ -391,3 +391,41 @@ the forest unchanged.
 **Status after RUN 6 (2026-10-17):** ✅ C0 · ✅ VIS1a · ✅ VIS1b · ✅ VIS1c (+ backgrounds, meter Scene line) · ✅ C4a (solo Firefly) · ⬜ C4b
 (design note above — needs the decision) · ⬜ C4c · ⬜ C5 · ⬜ C6 (after the user's design choice, `docs/design/calm/`) · ✖ C5b (dropped).
 Listening page `tools/listen/calm-timbres.html` and the design proposals are ready for the user.
+
+## Review RUN 7 (2026-10-17) — the user's decisions after the listening page and the design proposals
+- **Design = a combination:** the EMBLEM / app icon from C · Hush (five dots in an arc, the centre one glowing) — also the brand mark above the
+  «handsong» wordmark; EVERYTHING ELSE from B · Moonglass (palette → `--calm-*` tokens, icons, round buttons in the glass capsule, first-run
+  card, ⓘ panel, portrait and landscape layouts). The emblem's glowing dot uses Moonglass's firefly lime `#c8f56a` (one family).
+  Fonts: an OFL title serif WITH Cyrillic in Fraunces' soft spirit (Fraunces has none) and Atkinson Hyperlegible (Next) checked for Cyrillic
+  (or an OFL sans with Cyrillic of equal legibility); self-hosted woff2 + licence entries (LIC1). Glass blur: a plain dark fallback (no
+  backdrop blur) on the Dark level, weak devices and with the low-power choice — same readability.
+- **Sounds:** of the five RUN 6 candidates the user keeps ONLY Firefly and the flute idea (the others «too simple, not natural, poorly made»).
+  Calm needs high-quality, organic sounds people enjoy for a long time → the RUN 7 sound pass (below); the user picks the final three by ear.
+- **Note modes** approved: «Notes: follow the hand» / «Notes: stay put» — ru «Ноты: за рукой» / «Ноты: на месте».
+- **C4b depth → forest:** try a CALM-PROFILE-only wider range for the forest send (Full unchanged); if not clean, accept the two-thirds limit
+  for v1 and say so.
+- **Phone test:** the user puts the app online for the Poco M5 later; no hosting work in RUN 7.
+- **Quality bar:** `docs/CALM-QUALITY.md` (ten points) — every Calm slice names the points it touched.
+- **Sleep timer** (quality bar point 9): 15 / 30 / 60 min — the forest and the playing fade out gently; one of Calm v1's controls (C6).
+
+### RUN 7 sound pass — what was built, and an honest note on synthesis vs samples
+- Two engine types: **modal** (struck bodies: Firefly rich, Handpan, Singing bowl, Kalimba) and **breath** (Breath flute, Breathing pad);
+  six records, normalised to the app's normal solo level; listening page v2 with an A/B «In the forest / Dry». Record ids are permanent.
+- **Where Web Audio synthesis falls short** (heard on any instrument made only of the browser's nodes): (1) no real physical model — a
+  flute's breathy, slightly unstable tone comes from the air jet and the bore interacting; here it is imitated with noise filters and
+  envelopes. Bowing friction and the small pitch fall of a hard strike on steel are not modelled either. A true model needs code per sample
+  (an AudioWorklet — the stage-7 synthesis core, Rust → WebAssembly). (2) The solo voice is mono up to the track pan, so partials cannot spread
+  in stereo inside one note (the width comes from the forest room; VOL-7 plans the per-voice stereo stage). (3) Sustained banks run all the
+  time once built (rule #3): a breath voice costs ≈ 3.5× a Firefly voice. (4) A synthetic mode is a perfect sine; real modes wander
+  slightly — the per-note variation covers only note-to-note differences.
+- **A later SAMPLER engine type** (CC0 samples only — rule #32; a recorded note per zone and velocity layer, repitched within ± ½ semitone for
+  our tunings; one-shot buffer sources per note like drum hits): worth it for the **flute** and a **voice / bowed pad** — the two hardest to
+  synthesise convincingly; struck instruments (handpan, kalimba, bowl) are already close with modal synthesis. Costs: a few MB per
+  instrument (offline cache — Calm is offline after install), a careful CC0 search (quality varies; the user's ear decides), one stateless
+  module and its T5 bounds. Recommended only after the user's verdict on the six synthetic sounds.
+
+### The user's timbre choice (2026-10-18, after the listening page v2)
+- Item c) said «2–3 timbres»; the decision is **four**, in this order, the first the default: **Firefly** (`solo.firefly`, today's — the
+  page's «Firefly · Светлячок»), **Breath flute** (`solo.breath-flute`), **Handpan** (`solo.handpan`), **Singing bowl** (`solo.singing-bowl`).
+  Data: `data/profiles/calm.json`. Calm offers only these; Full keeps every timbre; nothing deleted. Probe row «CALM timbre set».
+- Open: today's Firefly is 18 dB quieter than the other three in the app (measured) — a level decision is the user's (see WORK-LOG RUN 7).

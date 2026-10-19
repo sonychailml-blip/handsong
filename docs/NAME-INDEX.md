@@ -11,8 +11,8 @@ before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of
 
 ## src/audio.js
 (no head comment)
-- const (49): `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
-- fn (81): `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
+- const (51): `outputFadeLevel`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
+- fn (85): `outputFade`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
 - let (4): `AC`, `frzReady`, `ksReady`, `dynReady`
 - → ./modules/timbres/stages.js (1): `panGains`
 
@@ -20,6 +20,11 @@ before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of
 AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF.
 - const (7): `AS`, `AS_KEEP`, `asWire`, `asInfo`, `asEnabled`, `asPause`, `asDbgState`
 - fn (12): `asPut`, `asStart`, `asTick`, `asWrite`, `asAdopt`, `asFresh`, `asFlush`, `asList`, `asGet`, `asSetEnabled`, `asDbg`, `asDrop`
+
+## src/calmshell.js
+RUN 7 (C6 + C11, Calm plan §5; docs/CALM-QUALITY.md points 4, 5, 6, 9, 10) — THE CALM SHELL (DOM side; the logic is core/calmui.js).
+- const (2): `calmShellDbg`, `calmSleepDbg`
+- fn (2): `calmShellWire`, `calmShellFace`
 
 ## src/clip.js
 ================= ЗАПИСЬ КЛИПА / АУДИО ================= ОДИН движок на два вида записи (не два модуля): • 'video' — кадр ХОЛСТА (canvas.captureStream) + звук → один файл С картинкой И звуком; • 'a…
@@ -31,10 +36,20 @@ AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF
 - const (55): `FINGER_TIPS`, `FX_META`, `CAM_MARGIN`, `remapAxis`, `coverView`, `PINCH_ON`, `PINCH_HOLD`, `PINCH_OFF`, `REV_NEAR`, `CLEAR_HOLD_MS`, `LOOPER_MSG_MS`, `ROW_HYST`, `WATCHDOG_MS`, `SCHED_AHEAD`, `SCHED_TICK_MS`, `FX_BAR_W`, `FX_BAR_GAP`, `FX_BAR_MAX`, `CH_PAL_W`, `CH_PAL_PAD`, `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `PAL_HYST_X`, `PAL_HYST_Y`, `palColX`, `palRowY`, `palSplitX`, `rectBandY`, `volAmp`, `volFromOld`, `volVel`, `BEATS_PER_BAR`, `REC_VOL_EPS`, `REC_REV_EPS`, `REC_FX_EPS`, `REC_FINE_EPS`, `REC_AVG_S`, `REC_JUMP_EPS`, `REC_HIST_S`, `REC_PAUSE_S`, `REC_KNEE_F`, `AUT_RAMP_BEAT`, `AUT_RAMP_EPS`, `BEND_EPS_CENTS`, `CURVE_A`, `curveU`, `curveK`, `bendSeg`, `BEND_GLIDE_STEP_S`, `CHORD_POOL_N`, `CHORD_POOL_FIRST`, `BASS_POOL_N`, `LEAD_POOL_N`, `LEAD_POOL_KS`, `FX_VOL`
 - fn (3): `bendAt`, `bendSplit`, `bendPlan`
 
+## src/core/ambience.js
+RUN 7 (C4c, Calm plan §4.6; docs/CALM-QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
+- const (1): `AMB`
+- fn (3): `windNoise`, `cricketStream`, `chirpShape`
+
 ## src/core/bus.js
 VIS1a (RUN 6, docs/VIS1-design.md §3) — THE EVENT BUS for visuals.
 - const (2): `RING_N`, `BUS`
 - fn (1): `createBus`
+
+## src/core/calmui.js
+RUN 7 (C6, Calm plan §5; docs/CALM-QUALITY.md points 5, 8, 9) — the Calm shell's LOGIC.
+- const (1): `CALM_UI`
+- fn (4): `showStep`, `nextOf`, `sleepLevel`, `glowAlpha`
 
 ## src/core/camlight.js
 LAT3 — low light.
@@ -48,8 +63,8 @@ CMD1a (RUN 5) — CANONICAL JSON and its hash (pure core, rule #36; data row «C
 
 ## src/core/dsp.js
 SND-F1 — pure DSP formulas shared by the engine (audio.js), the dynamics worklet (dyn-worklet.js) and the probes.
-- const (8): `FOREST`, `forestRoom`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `dynCoef`
-- fn (5): `seeded`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`
+- const (9): `FOREST`, `CALM_DEPTH`, `forestRoom`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `dynCoef`
+- fn (6): `seeded`, `calmDepth`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`
 
 ## src/core/engclass.js
 ENG2 (RUN 4) — the engine's PROVISIONAL power class and the dropout rate.
@@ -189,10 +204,19 @@ GES1 part 2 (stage 3) — THE LOOPER HAND (function 'loop'): one command per pin
 - const (1): `looperWire`
 - fn (2): `doLooper`, `fireLooperCmd`
 
+## src/gestures/pose.js
+RUN 7 (C7): THE POSE GENERATOR (moved from probes/hand.js, HAND1 — the probe now imports it from here): a pose → the 21 landmarks of one hand in the camera's RAW coordinates (through the live crop …
+- fn (1): `pose`
+
 ## src/gestures/roles.js
 GES1: the hand ROLES and OWNER KEYS — stateless helpers of the gesture machine (gestures/hands.js): depth, voice-mode zones, live owner keys, sound + record by role, the finger-action registry, whi…
 - const (10): `depthN`, `melodicZone`, `polyZone`, `leadZone`, `liveKey`, `monoKey`, `wOn`, `wOff`, `ACTIONS`, `paletteFinger`
 - fn (4): `depthOf`, `handHalfRole`, `noteHandRole`, `noteVolOf`
+
+## src/ghost.js
+RUN 7 (C7, Calm plan §6; docs/CALM-QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts slo…
+- const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
+- fn (2): `ghostAt`, `ghostFrame`
 
 ## src/hand-worker.js
 LAT2b — hand detection OFF the main thread (a CLASSIC worker: MediaPipe starts each model by importScripts of its loader, which a module worker cannot do; our modules come in by dynamic import).
@@ -215,8 +239,8 @@ tutor — обучающий слой (UI) подписывается СЮДА: 
 
 ## src/icons.js
 UI1b (DAY run 2026-10-16): THE ICON COMPONENT — every interface glyph is rendered through here, by a NAME of its meaning.
-- const (3): `ICONS`, `icon`, `iconText`
-- fn (1): `applyIcons`
+- const (4): `ICONS`, `icon`, `iconText`, `SVG_ICONS`
+- fn (3): `applyIcons`, `svgIcon`, `svgEmblem`
 
 ## src/latmeter.js
 LAT1 — the latency meter, browser side.
@@ -250,10 +274,19 @@ REC5 (stage 3) — LIVE RECORDING: the recording state and the take's per-track 
 (no head comment)
 - fn (1): `startFail`
 
+## src/modules/ambience/forest.js
+RUN 7 (C4c, Calm plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambie…
+- fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
+
 ## src/modules/effects/bright.js
 AUD2a (RUN 3, 2026-10-16) — the effect «Brightness» (a voice module read by each voice).
 - const (1): `BRIGHT_PARAMS`
 - fn (1): `makeBrightFx`
+
+## src/modules/effects/calm.js
+RUN 7 (C5, Calm plan §4.3; docs/CALM-QUALITY.md points 1, 4, 8) — THE CALM EFFECTS HAND: three effects, ONE amount each (a vertical drag of its finger; it stays where it is left).
+- const (4): `CALM_FX`, `CECHO_PARAMS`, `CTONE_PARAMS`, `CWAVE_PARAMS`
+- fn (3): `makeCalmEchoFx`, `makeCalmToneFx`, `makeCalmWaveFx`
 
 ## src/modules/effects/delay.js
 AUD2a (RUN 3, 2026-10-16) — the effect «Delay» (a bus insert with its own dry/wet).
@@ -264,6 +297,11 @@ AUD2a (RUN 3, 2026-10-16) — the effect «Delay» (a bus insert with its own dr
 AUD2a (RUN 3, 2026-10-16) — the effect «Night forest» (a seeded convolution room, SND-F1).
 - const (1): `FOREST_PARAMS`
 - fn (2): `forestBuffer`, `makeForestFx`
+
+## src/modules/effects/forestdepth.js
+RUN 7 (C4b, Calm plan §4.2; the C4b design note; the user's choice «Calm gets its own wider range, Full unchanged») — the effect «Forest depth»: Calm's room.
+- const (1): `FDEPTH_PARAMS`
+- fn (1): `makeForestDepthFx`
 
 ## src/modules/effects/glide.js
 AUD2a (RUN 3, 2026-10-16) — the effect «Glide» (a voice module; the pitch glide time).
@@ -299,6 +337,10 @@ AUD2a (RUN 3, 2026-10-16) — the effect «Volume» (the permanent voice module,
 AUD1c (RUN 3, 2026-10-16) — the bass pool voices.
 - fn (1): `buildBassPool`
 
+## src/modules/timbres/breath.js
+RUN 7 (Calm sound pass) — the BREATH engine type: sustained, breathing sounds (a breathy flute, a soft vocal / bowed pad).
+- fn (1): `buildBreathBank`
+
 ## src/modules/timbres/chord-voice.js
 AUD1c (RUN 3, 2026-10-16) — the chord pool voice (two filters, rule #19), the pool, and the Firefly strike (one-shot tine, SND-F1).
 - const (2): `FIREFLY`, `FF_END`
@@ -315,6 +357,10 @@ AUD1c (RUN 3, 2026-10-16) — the FM solo bank (modulator → carrier frequency,
 ## src/modules/timbres/ks.js
 AUD1c (RUN 3, 2026-10-16) — the Karplus–Strong solo banks (worklet `ks-string`) and the subtractive fallback plucks.
 - fn (2): `buildKSBank`, `buildKSFallback`
+
+## src/modules/timbres/modal.js
+RUN 7 (Calm sound pass) — the MODAL engine type: struck instruments (handpan, singing bowl, kalimba, a richer Firefly) by modal synthesis.
+- fn (1): `buildModalBank`
 
 ## src/modules/timbres/stages.js
 AUD1c (RUN 3, 2026-10-16) — shared voice stages: track route, pan, brightness, saturation curves, the brightness ranges, the solo glide time, the filter strike.
@@ -350,7 +396,8 @@ AUTOSAVE1 (RUN 3, 2026-10-16): the song kept on this device by itself — throug
 
 ## src/probes/calm.js
 C4a (RUN 6, Calm plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
-- fn (1): `checkSoloFirefly`
+- const (2): `CALM_TIMBRES`, `CALM_SET`
+- fn (11): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkCalmTimbres`, `checkCalmShell`, `checkCalmDepth`, `checkCalmAmbience`, `checkCalmGhost`, `checkCalmSet`, `checkCalmFx`, `checkCalmFxTimbres`
 
 ## src/probes/cmd.js
 CMD1 (RUN 5): the history's tripwire compares VALUES (CMD1a), tracks keep their ids through the song file (CMD1b, v7), every history step is a command serialised by ids and parsed back (CMD1c), app…
@@ -447,7 +494,7 @@ PROBE1: the ROW REGISTRY — every probe row registers itself next to its probe;
 
 ## src/probes/run.js
 PROBE1: P.all / P.quick / P.orderCheck — runs every registered row (probes/rows.js) in order, with the state guard between rows.
-- fn (5): `material`, `songPrint`, `all`, `quick`, `orderCheck`
+- fn (6): `material`, `songPrint`, `all`, `quick`, `calm`, `orderCheck`
 
 ## src/probes/seed.js
 PROBE1: The test song (P.seed), the demo song (P.song), and the rows that check what they wrote (write path, seed notes, frozen seed bass).
@@ -560,7 +607,7 @@ C0 (RUN 6, Calm plan §2) — PROFILES: the faces of the one app.
 - → ./probes/pack.js (1): `checkPack`
 - → ./probes/pool.js (1): `checkPool`
 - → ./probes/profile.js (1): `checkProfile`
-- → ./probes/run.js (4): `material`, `all`, `quick`, `orderCheck`
+- → ./probes/run.js (5): `material`, `all`, `quick`, `calm`, `orderCheck`
 - → ./probes/seed.js (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
 - → ./probes/song1.js (1): `checkSongRecords`
 - → ./probes/song2.js (2): `checkSongFile2`, `dumpSong`
@@ -671,8 +718,8 @@ REC3 part 2 (stage 3) — TRANSPOSE BY DEGREES (ED4), A TRACK INTO ANOTHER MODE 
 
 ## src/state.js
 (no head comment)
-- const (96): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`
-- let (48): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`
+- const (98): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`, `setCalmView`, `setFxChain`
+- let (49): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`, `calmView`
 - → ./config.js (1): `FX_VOL`
 
 ## src/timbreload.js
@@ -758,7 +805,7 @@ DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer
 - const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
-_145 modules, 1978 exported names._
+_155 modules, 2041 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

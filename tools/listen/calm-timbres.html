@@ -3,42 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- RUN 6 (Calm plan, review Q1): the LISTENING PAGE — a dev tool, never shipped (tools/ is outside the app and the release).
-     Every candidate timbre plays the same short phrase in each Calm mood (key A, fixed), through the Night forest room — rendered OFFLINE by
-     a separate copy of the app's own engine (src/audio.js?listen, the render copy's method: GOLD seed, offline voice allocation, the master
-     tapped before the limiter), so it sounds exactly as the engine plays it. Open with the app's server:
+<!-- RUN 6 / RUN 7 (Calm sound pass): the LISTENING PAGE v2 — a dev tool, never shipped (tools/ is outside the app and the release).
+     Every candidate timbre in each Calm mood (key A, fixed), as a short PHRASE or as SINGLE notes (how one note starts, rings / sustains and
+     ends), with an instant A/B «In the forest / Dry»: both versions are rendered OFFLINE by a separate copy of the app's own engine
+     (src/audio.js?listen — GOLD seed, offline voice allocation, the master tapped before the limiter) and play in sync; the switch
+     crossfades between them. Open with the app's server:
      http://127.0.0.1:5500/tools/listen/calm-timbres.html  (the base below makes the engine's worklet paths resolve from the repo root) -->
 <base href="../../">
-<title>Calm timbres</title>
+<title>Calm sounds</title>
 <style>
-  :root{ --bg:#07090d; --panel:#11151d; --ink:#e8e4d8; --dim:#8e96a6; --accent:#c6ff7a; --line:#232a36; color-scheme:dark; }
+  :root{ --bg:#07090d; --panel:#11151d; --ink:#e8e4d8; --dim:#8e96a6; --accent:#c8f56a; --line:#232a36; color-scheme:dark; }
   body{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, sans-serif; }
-  main{ max-width:880px; margin:0 auto; padding:20px 16px 48px; }
+  main{ max-width:920px; margin:0 auto; padding:20px 16px 48px; }
   h1{ font-weight:600; font-size:22px; margin:0 0 4px; }
   p{ color:var(--dim); margin:6px 0 14px; }
   table{ width:100%; border-collapse:collapse; margin-top:10px; }
   th, td{ border-bottom:1px solid var(--line); padding:10px 6px; text-align:left; vertical-align:middle; }
   th{ color:var(--dim); font-weight:500; font-size:13px; }
-  td.name b{ display:block; } td.name small{ color:var(--dim); }
+  td.name b{ display:block; } td.name small{ color:var(--dim); display:block; }
+  tr.ref td.name b::after{ content:' · today'; color:var(--dim); font-weight:400; }
   button{ background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 12px; font:inherit; cursor:pointer; }
   button.on{ border-color:var(--accent); color:var(--accent); }
-  button:disabled{ opacity:.5; cursor:default; }
-  .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .seg button{ border:0; border-radius:0; padding:7px 14px; }
+  .seg button.on{ background:#1b2410; }
+  .row{ display:flex; gap:10px 14px; flex-wrap:wrap; align-items:center; margin:8px 0; }
   label{ color:var(--dim); font-size:13px; }
   #status{ min-height:1.4em; color:var(--dim); font-size:13px; }
-  .pick{ margin-left:6px; }
-  @media (max-width:560px){ th:nth-child(1), td.name small{ display:none; } }
+  .ab{ font-size:13px; color:var(--dim); }
+  @media (max-width:560px){ td.name small{ display:none; } th, td{ padding:8px 3px; } button{ padding:7px 8px; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Calm — which three sounds?</h1>
-  <p>Each sound plays the same short phrase in each mood, in A, through the Night forest room (as in Calm). Tap a cell to listen; tick the
-     three you like. Headphones help. Nothing leaves this computer.<br>
-     Каждый тембр играет одну и ту же фразу в каждом настроении (ля, ночной лес). Нажмите ячейку, чтобы послушать; отметьте три лучших.</p>
+  <h1>Calm — which sounds?</h1>
+  <p>Six new sounds and today's Firefly for comparison, in each mood, in A. Tap a cell to listen. While it plays, flip
+     <b>In the forest / Dry</b> — the two versions play in sync, so you hear only the room change. Tick the three you like best.
+     Headphones help. Nothing leaves this computer.<br>
+     Шесть новых тембров и сегодняшний «Светлячок» для сравнения, в каждом настроении, в ля. Нажмите ячейку; во время звучания
+     переключайте «В лесу / Сухо» — версии звучат синхронно. Отметьте три лучших.</p>
+  <div class="row">
+    <span class="seg" id="kind"><button data-v="phrase" class="on">Phrase · Фраза</button><button data-v="single">Single notes · Отдельные ноты</button></span>
+    <span class="seg" id="ab"><button data-v="wet" class="on">In the forest · В лесу</button><button data-v="dry">Dry · Сухо</button></span>
+  </div>
   <div class="row">
     <label>Room <select id="room"><option value="0">Short 0.85 s</option><option value="0.5" selected>Medium 1.7 s</option><option value="1">Long 3.4 s</option></select></label>
     <label>Distance <select id="dist"><option value="0.25">near</option><option value="0.8" selected>middle (default send)</option><option value="1">far</option></select></label>
+    <label>Volume <input id="vol" type="range" min="0" max="1" step="0.01" value="0.63"></label>
     <button id="stop">Stop</button>
   </div>
   <div id="status">Loading the engine…</div>
@@ -47,37 +58,53 @@
     <tbody id="rows"></tbody>
   </table>
   <p id="picked"></p>
+  <p class="ab">Every sound plays at the same measured loudness, so the comparison is fair (today's Firefly is in fact much quieter in the
+     app; the new sounds are set to the app's normal level). A cell renders the first time it is tapped (a second or two).</p>
 </main>
 <script type="module">
-import { CANDS, MOODS, render, nameOf } from './tools/listen/calm-listen.js';
+import { CANDS, MOODS, render, nameOf, analyse } from './tools/listen/calm-listen.js';
 const $=id=>document.getElementById(id), status=s=>{ $('status').textContent=s; };
-const cache=new Map(); let busy=false, AC=null, src=null, playing=null;
-
-function stop(){ if(src){ try{ src.stop(); }catch(e){} src=null; } if(playing){ playing.classList.remove('on'); playing=null; } }
+const cache=new Map(); let busy=false, AC=null, out=null, now=null, playing=null, kind='phrase', side='wet';
+const RU={ 'solo.firefly-rich':'Светлячок (богатый)', 'solo.breath-flute':'Флейта с дыханием', 'solo.handpan':'Хэндпан', 'solo.singing-bowl':'Поющая чаша',
+  'solo.kalimba':'Калимба', 'solo.breath-pad':'Дышащий пад', 'solo.firefly':'Светлячок' };
+const vol=()=>Math.pow(+$('vol').value,2)*2.5;   // the page volume; every pair is first trimmed to the same measured loudness (see play); a page limiter guards the ears
+const TARGET=-26;   // dB (the measure of calm-listen.js analyse) every candidate is trimmed to — a fair comparison, today's quieter Firefly included
+function stop(){ if(now){ for(const s of now.srcs) try{ s.stop(); }catch(e){} now=null; } if(playing){ playing.classList.remove('on'); playing=null; } }
+function abSet(t){ if(!now) return; const g=AC.currentTime; now.wet.gain.setTargetAtTime(side==='wet'?1:0,g,0.02); now.dry.gain.setTargetAtTime(side==='dry'?1:0,g,0.02); }
+async function get(cand, mood, dry){
+  const k=[cand.id,mood,kind,dry?'dry':$('room').value+'|'+$('dist').value].join('|');
+  if(!cache.has(k)) cache.set(k, await render(cand, mood, +$('room').value, +$('dist').value, { kind, dry }));
+  return cache.get(k);
+}
 async function play(btn, cand, mood){
-  if(!AC) AC=new AudioContext();                           // created inside the tap (autoplay rule)
-  await AC.resume(); stop();
-  const k=cand.id+'|'+mood+'|'+$('room').value+'|'+$('dist').value;
-  if(!cache.has(k)){
-    if(busy) return; busy=true; status('Rendering '+cand.id+' in '+mood+'…');
-    try{ cache.set(k, await render(cand, mood, +$('room').value, +$('dist').value)); }catch(e){ status('Failed: '+(e&&e.message||e)); busy=false; return; }
-    busy=false; }
-  const buf=cache.get(k); src=AC.createBufferSource(); src.buffer=buf;
-  const g=AC.createGain(); g.gain.value=4; src.connect(g); g.connect(AC.destination); src.start();   // one fixed +12 dB for every sound (renders tap the master before the limiter: peaks 0.04–0.08); relative loudness kept
-  btn.classList.add('on'); playing=btn; src.onended=()=>{ if(playing===btn) stop(); };
-  status('Playing '+cand.id+' — '+mood+' (key A, Night forest)');
+  if(!AC){ AC=new AudioContext(); const lim=AC.createDynamicsCompressor(); lim.threshold.value=-3; lim.ratio.value=20; lim.attack.value=0.002; lim.release.value=0.15;
+    out=AC.createGain(); out.connect(lim); lim.connect(AC.destination); }                  // created inside the tap (autoplay rule)
+  await AC.resume(); stop(); out.gain.value=vol();
+  if(busy) return; busy=true; status('Rendering '+cand.id+' — '+mood+'…');
+  let w, d; try{ w=await get(cand, mood, false); d=await get(cand, mood, true); }catch(e){ status('Failed: '+(e&&e.message||e)); busy=false; return; }
+  busy=false;
+  const trim=Math.pow(10,(TARGET-analyse(w).loud)/20), tg=AC.createGain(); tg.gain.value=trim; tg.connect(out);   // one trim for the pair: the A/B difference stays as rendered
+  const t=AC.currentTime+0.05, mk=(buf,on)=>{ const s=AC.createBufferSource(), g=AC.createGain(); s.buffer=buf; g.gain.value=on?1:0; s.connect(g); g.connect(tg); s.start(t); return { s, g }; };
+  const a=mk(w, side==='wet'), b=mk(d, side==='dry');
+  now={ srcs:[a.s,b.s], wet:a.g, dry:b.g }; btn.classList.add('on'); playing=btn;
+  a.s.onended=()=>{ if(playing===btn) stop(); };
+  status('Playing '+nameOf(cand).en+' — '+mood+' · '+(kind==='phrase'?'phrase':'single notes')+' · flip In the forest / Dry while it plays');
 }
 function picks(){ const p=[...document.querySelectorAll('input.pick:checked')].map(x=>x.value);
   $('picked').textContent= p.length ? 'Your picks: '+p.join(' · ')+(p.length===3 ? ' — tell the strategist these three.' : p.length>3 ? ' (three, please)' : '') : ''; }
 const rows=$('rows');
 for(const c of CANDS){
-  const tr=document.createElement('tr'), nm=nameOf(c);
-  tr.innerHTML=`<td class="name"><b>${nm.en}${nm.ru?' · '+nm.ru:''}</b><small>${c.id} — ${c.note}</small></td>`;
+  const tr=document.createElement('tr'), nm=nameOf(c); if(c.ref) tr.className='ref';
+  tr.innerHTML=`<td class="name"><b>${nm.en} · ${RU[c.id]||''}</b><small>${c.note}</small></td>`;
   for(const [mood,label] of MOODS){ const td=document.createElement('td'), b=document.createElement('button'); b.textContent=label; b.onclick=()=>play(b,c,mood); td.appendChild(b); tr.appendChild(td); }
   const td=document.createElement('td'), cb=document.createElement('input'); cb.type='checkbox'; cb.className='pick'; cb.value=nm.en; cb.onchange=picks; td.appendChild(cb); tr.appendChild(td);
   rows.appendChild(tr);
 }
+const seg=(id,set)=>{ for(const b of $(id).querySelectorAll('button')) b.onclick=()=>{ for(const x of $(id).querySelectorAll('button')) x.classList.toggle('on', x===b); set(b.dataset.v); }; };
+seg('kind', v=>{ kind=v; stop(); status(v==='phrase' ? 'Phrase — tap a cell.' : 'Single notes: the root, then a higher note, each held — tap a cell.'); });
+seg('ab', v=>{ side=v; abSet(); });
 $('stop').onclick=stop;
+$('vol').oninput=()=>{ if(out) out.gain.setTargetAtTime(vol(), AC.currentTime, 0.03); };
 for(const id of ['room','dist']) $(id).onchange=()=>{ stop(); status('Room / distance changed — the next tap renders anew.'); };
 status('Ready — tap a mood next to a sound.');
 </script>
