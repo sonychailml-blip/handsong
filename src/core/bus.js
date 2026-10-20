@@ -2,7 +2,7 @@
    Two kinds of topic. STATE topics hold the latest value (set → the version goes up; a reader compares versions, once per frame).
    EVENT topics are rings of timestamped items (push; a reader asks for everything after the sequence number it saw — a reader that falls
    behind loses the oldest, never blocks a writer). Writers: main.onHands (hands, picture), live/eng.js (notes — the LIVE engine only; the
-   render copy never publishes), calmshell.js (calmFx — the Calm effects' values, RUN 7). Readers: visual modules (views/stack.js) — through reader(), which cannot write (a write throws: CONTROL).
+   render copy never publishes), calmshell.js (calmFx — the Calm effects' values, RUN 7; calmNight — the mood and the sleep timer's progress, RUN 9). Readers: visual modules (views/stack.js) — through reader(), which cannot write (a write throws: CONTROL).
    Rule #33: the bus never leaves the page. */
 export const RING_N=512;
 export function createBus({ ring=RING_N }={}){

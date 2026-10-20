@@ -8178,3 +8178,15 @@ Built tonight (NIGHT run): the model in `core/registry.js` (rule #37) and the ti
 - ⚠️ Open: today's Firefly is ≈ 18 dB quieter than the other three Calm sounds (measured) — the user's level decision; the ambience costs
   ≈ 3.9 % of a core in the runner (target ≤ 2 % on the plan's scale — phone measurement decides); steps 106–113.
 - Process: one read-only `git diff --stat` was run by mistake early in RUN 7 — no git commands at all from now on.
+
+## Moved from HANDOFF.md at RUN 9 (2026-10-20) — the RUN 8 record, verbatim
+### RUN 8 (2026-10-19) — the user's Calm fixes (steps 106–113), the forest picture, C8 part; log + plain summary: `WORK-LOG.md` «RUN 8»
+- CRACKLE: struck strikes had no cap (~1000 live oscillators, underruns) → Calm only (the user: Full exactly as RUN 7): caps in the profile
+  (`calm.json` «voices»; the oldest fades — `modules/timbres/strikes.js`) + a cheaper strike path; Full builds RUN 7's strike (row «FULL untouched»).
+- LEVELS: Calm trims in `data/profiles/calm.json` «levels» (Firefly +16.06, others −2); depth keeps the loudness (±1 dB); ghost louder;
+  Calm's volume floor «volume».left 0.30 (the far left = 30 % of the right). Baselines: timbres.before / census = RUN 7; GOLD = RUN 7 but fdepth.
+- VISIBLE: depth halo, «Лес» bar, three effect bars, the effects hint once, a quiet row glow, fingertips as fireflies (dev switch), one
+  message at a time, the «Лес» slider = the forest at most (Forest depth `reach`).
+- FOREST was black (the opaque 2D canvas) → screen-blended in Forest only; music energy; quality levels (dev switch; default high).
+- C8 part: «Lighter forest» in ⓘ (FDN room — Forest depth `light`, caps × 0.6, picture medium) + «Measure this device» (dev).
+  Not done: C8 rest (phone numbers), C9, C10, C12. Open: steps 114–119.

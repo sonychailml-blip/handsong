@@ -394,6 +394,10 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — gre
 - RUN 8: `src/modules/timbres/strikes.js` — Calm's strike cap (caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); «Forest depth» gained `reach` (the «Лес»
   slider) and `light` (C8 «Lighter forest», the FDN room); `views/play.js` Calm fingertip fireflies + the oval row glow; `calmshell.js` the
   bars, the effects hint, «Lighter forest», «Measure this device»; `views/scene/host.js` quality levels (`setSceneLevel`) + the Forest blend.
+- RUN 9 (the living forest, Calm only): `core/night.js` (pure: the 24-min night cycle `nightAt`, sleep `nightDeep`, mood looks, rare events
+  `rareStep`, the emblem's points), `core/forestlife.js` (pure: the stream, mushroom / flower places, ring lists); `views/scene/forest-life.js`
+  (ground waves, mushrooms, the stream + Echo's rings, sway), `forest-detail.js` (grass, leaves, moths, moonbeams, silhouettes), `forest-rare.js`
+  (star, flower, emblem); bus topic `calmNight` { mood, sleep, wind }; host levels high / medium (default) / low with a resolution scale.
 - `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
 - `src/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
   `freezeWire`, `recWire`, `backingWire`) + session glue (lane prune/reset/delete, mixer setters, `laneHush`, drone sync, editor SESSION
@@ -523,6 +527,7 @@ THERE in full and here as one index entry):
   108 Sleep timer · 109 Depth → the forest · 110 The forest's ambience and its volume · 111 First run + ghost light · 112 The effects hand
   113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Calm levels + the ghost · 116 Depth halo + «Лес» bar
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
+  120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

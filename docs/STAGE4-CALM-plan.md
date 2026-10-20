@@ -444,3 +444,19 @@ Listening page `tools/listen/calm-timbres.html` and the design proposals are rea
 - §7 low power (C8, part): the «Lighter forest» choice is built (the FDN room matched to the forest by measurement, struck caps × 0.6, the
   picture at medium, no blur) — headroom +5…10 % on the user's laptop; NOT built: the automatic proposal (needs the phone numbers — ⓘ
   «Measure this device» collects them), disconnecting idle effect loops (the next lever, measured ≈ 15 % of the audio thread in Calm idle).
+
+## RUN 9 (2026-10-19/20) — the living forest, and what changed against this plan
+The user: «the forest creates the atmosphere but is empty — a person should want to stay in it for tens of minutes». Kept: the RUN 6 room
+and three.js r128 (no new engine); no animals (moths only); no new ambience sound; Full untouched.
+- §3.2 «what the picture reacts to» grew: each note sends a ring of light across the moss and pulses the glowing mushrooms / flowers nearby;
+  the wild fireflies gather to the playing light and drift off after; Echo = rings on a new stream (with the moon's reflection), Wave = the
+  leaves shimmer, Warmth / Brightness = the light's colour (as before) and the waves'; the moods (§4.5) now recolour the forest (Glow the old
+  palette, Dusk violet / warm moon, Mist pale / thick mist — token sets).
+- New: the night's slow cycle (24 min, seamless — the moon drifts, clouds pass, mist rolls), the sleep timer (§5) deepens it; detail (grass,
+  falling leaves, moths, moonbeams, foreground silhouettes — the grass and ferns sway with the ambience's wind, §4.6); rare events every few
+  minutes (a falling star, the five-dot emblem in fireflies, a flower opening on a long-held note — never the same twice in a row).
+- §7 low power: the levels are now defined sets — high (0.85 × CSS px, 60 fps, the light's shadow), medium (0.6, 30 fps, no shadow — also
+  the «Lighter forest»), low (no WebGL, the 2D stand-in). Measured on the user's laptop (Intel HD 4000, two hands, vs Dark): medium −6 %
+  hand detections (in the 10 % budget), high −34…−36 % → the DEFAULT is now medium; the cost follows resolution and frame rate, not the
+  added content. Opening the forest compiles its shaders (2–3 s the first time) — R2 «room off frees the GPU» still holds (Dark = no WebGL).
+- Open questions for the user: in WORK-LOG «RUN 9» (the default level, the night's length, how often rare events come).

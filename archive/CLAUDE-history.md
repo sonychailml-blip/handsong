@@ -399,6 +399,21 @@ each section lives verbatim in `archive/CLAUDE-full.md` (same section titles —
   index before it: `archive/NAME-INDEX-before-RUN5.md`; removed names: `docs/STALE-NAMES.md`. BACKLOG §1 in English (Russian:
   `archive/BACKLOG-history.md`). `tools/check-licences.mjs` use «reference» for `docs/prototypes/*.html`.
 
+- **RUN 9 — the living forest (Calm only; Full untouched):** `src/core/night.js` (pure, rows «NIGHT cycle (core)», «NIGHT rare events
+  (core)»): `NIGHT` / `nightAt(t)` — a 24-min seamless cycle (the moon's drift, 7 seeded cloud passes dimming its light, four mist layers);
+  `nightDeep(s)` / `sleepProgress` — the sleep timer deepens the night; `MOOD_LOOKS` / `moodLook` — Glow / Dusk / Mist token sets; `RARE` /
+  `rareInit` / `rareStep` — star or emblem every 150–290 s, a flower on a note held ≥ 2.5 s, never the same twice; `emblemPoints`.
+  `src/core/forestlife.js` (pure, row «FOREST life (core)»): `STREAM` / `streamAt` / `STREAM_LINE` / `streamNear`, `LIFE` / `lifePlaces` /
+  `pulseOf`, `RINGS` / `ringsNew` / `ringAdd` / `ringsAge`. `core/fireflies.js`: per-light `call` / `scatter`, `form` (0 / absent = the old
+  step). `views/scene/forest-life.js` (`patchGroundWaves`, `patchSway(mat, U, amp)`, `buildLife`), `forest-detail.js` (`DETAIL`,
+  `buildDetail`), `forest-rare.js` (`RARE_LOOK`, `buildRare`). `forest.js` FOREST_LEVELS gained shrooms, blooms, grass, leaves, moths, beams
+  (reduced: no shadow); the room takes `update(dt, t, hands, fx, night)` and `held(sec)`. `host.js`: levels `{ scale, fps, shadow }` (high
+  0.85 / 60 / shadow, medium 0.6 / 30, low no WebGL), default medium, shaders compiled at opening, the held-note map; probe doors
+  `sceneClockDbg`, `sceneProgramsDbg`, `sceneHeldDbg`, `sceneShadowDbg`, `sceneOptDbg`, `sceneSnapDbg(alt, full)`. Bus `calmNight` (calmshell:
+  mood, sleep progress, wind { level, gust } from `audio.ambienceInfo().origin`). Rows (probes/forest.js): «FOREST night cycle», «FOREST
+  response», «FOREST detail», «FOREST rare events», «FOREST levels» (drawn); «CALM forest picture» extended. Captures: `node tools/ui-snap.mjs
+  --save <tag> --forest`. Budget: `node tools/probe-browser.mjs --eval tools/forest-budget.eval.js --no-ui`.
+
 ## Architecture (full reasoning per section: archive, same titles)
 Two clocks in `main.js` (LAT2): each new CAMERA frame → detection (vision.js pump, the search schedule) → `processHands()` at once
 (gestures drive audio); each SCREEN frame → the detected frame's picture → `drawOverlays()`. The recorder thins ~60 engine calls/s into a
@@ -1406,6 +1421,14 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   literal equal-power depth crossfade cannot keep a struck note's loudness (its attack follows the dry part) — Calm's curve keeps the dry
   part ≈ level. (5) The headroom / budget measurements swing ±10 % with the laptop's heat; real-time probe rows judge against the standard
   app in the same session.
+- RUN 9 (the living forest, measured on the user's laptop — the browser used its Intel HD 4000): (1) the forest's cost to hand detection
+  follows its RESOLUTION and FRAME RATE, not its content (removing grass, leaves, beams and mushrooms at high changed nothing; high at
+  medium's resolution −21 %); high (0.85 × CSS px, 60 fps, the light's shadow) costs −34…−36 % hand detections with two hands, medium (0.6,
+  30 fps, no shadow) −6 % — the default is medium. (2) Opening the forest compiles ~20 shader programs: 2–3 s the first time (inside the
+  opening now, not inside a frame), ~0.4 s later; each Forest ↔ Dark makes a new WebGL context, so it recompiles. (3) A light that appears
+  or disappears changes every lit shader's program — the hand lights stay in the scene at intensity 0 (at high the shadow map renders even
+  without a hand). (4) The 2D canvas sits above the room: thin 3D things (the star) are measured at full resolution (`sceneSnapDbg(alt, true)`)
+  — a 64 × 36 downscale misses them. (5) Probes that move the room's clock back must not grow time-based effects (the RUN 7 rings exploded).
 ## How to verify a change (full steps, moved at DOC1)
 1. Play → camera; app starts single-role solo; the bar hides after ~3.5 s, reveals on tap; not with a panel open. Learn opens the lesson list.
 2. Roles play; ● records a take, again stops; a second take = a new row; ⤺ removes the last take; arrangement from beat 0; three panels in
@@ -1732,6 +1755,30 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 119. Lighter forest (RUN 8, C8): ⓘ → «Lighter forest — for older computers and phones» on: the forest's echo sounds similar (a little drier),
     fast struck notes ring a little less long, the picture is simpler; off: as before. Dev: ⓘ «Measure this device» (about 2 minutes, notes
     play by themselves) → the text is copied — send it (desktop and the Poco M5).
+120. The night's cycle (RUN 9, slice 1): `?calm` → Begin → Background «Forest». A moon shines between the trees; within about four minutes a
+    cloud slides over it and the forest's light dims, then returns (7 passes in a 24-minute night, none in the first 2.5 min); the mist near
+    the ground thickens and thins in layers. Mood → Dusk (violet sky, warm moon), Mist (pale, thick mist), Glow (as before) — the colours ease
+    over a few seconds. Sleep → 15 min: the forest darkens and stills slowly towards the end (the fireflies dim, more mist). Shortcuts (dev,
+    `?calm&probe`, console): `(await import('./src/views/scene/host.js')).sceneClockDbg(630)` jumps to a cloud over the moon; `…(60)` back to
+    the clear moon; `(await import('./src/calmshell.js')).calmSleepDbg(15, 800e3)` shows the deep-sleep night (`calmSleepDbg(0, 0)` ends it).
+121. The forest answers the playing (RUN 9, slice 2): play notes — each sends a soft ring of light across the moss from the light's foot;
+    the glowing mushrooms and flowers near the light pulse with the notes; keep playing ~10 s — the wild fireflies gather round the light;
+    stop — they drift away slowly. A dark stream crosses the floor with the moon's (and the light's) reflection. Echo up (index finger of the
+    effects hand) — rings spread on the water with each echo; Wave up (ring finger) — the ferns and grass shimmer; Warm ↔ Bright (middle) —
+    the light and its waves turn amber or white-green; Mood changes the mushrooms' colours too. Never busy.
+122. The forest's detail (RUN 9, slice 3): grass tufts and ferns sway gently — more when the «Forest» slider (the ambience's wind) is up,
+    in time with the wind you hear; still air with the slider at 0; leaves fall slowly; a few pale moths flutter round the playing light and
+    drift away when the hand goes; faint moonbeams slant through the gaps (clearest in Mist; they fade under a cloud); dark fronds and a branch
+    frame the corners close to the eye and slide a little as the view leans. Portrait and landscape: nothing covers the middle.
+123. Rare events (RUN 9, slice 4): leave the forest running ~10 minutes — every few minutes either a falling star streaks across the upper
+    part or the fireflies gather into the five-dot emblem for a few seconds, never the same twice in a row; hold one note ~3 s (more than a
+    minute after the last event) — a glowing flower opens at the light's foot, brightens with your notes, closes after ~20 s. Shortcut (dev,
+    console): `(await import('./src/views/scene/host.js')).sceneRoomDbg().rareDbg('star' | 'emblem' | 'bloom')`.
+124. Quality levels and the budget (RUN 9, slice 5): ⓘ (dev) «Forest picture: high / medium / low». Medium (the new default; also the
+    «Lighter forest») — softer resolution, 30 fps, no shadow; high — sharper, 60 fps, the light's shadow; low — no 3D (a simple night).
+    Choosing Forest takes 1–3 s to open (the shaders compile; the picture holds still meanwhile). With the latency meter (`?calm&probe`, ⓘ
+    dev «Measure this device»): Dark vs Forest medium vs high with both hands up; tell us the numbers (desktop and the Poco M5). A device
+    that chose «high» before keeps it (stored on the device) — pick medium once to compare.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:

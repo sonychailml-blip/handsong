@@ -19,7 +19,8 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), OUT
 const argv=process.argv.slice(2), val=f=>{ const i=argv.indexOf(f); return i>=0 ? argv[i+1] : null; };
 const SAVE=val('--save'), CMP=val('--compare'), CMP2=argv[argv.indexOf('--compare')+2]&&!argv[argv.indexOf('--compare')+2].startsWith('--') ? argv[argv.indexOf('--compare')+2] : null;
 const ONLY=val('--only');   // comma list of screens
-const CALM=argv.includes('--calm');   // RUN 7 (C6/C11): the Calm face's screens instead (a phone viewport, the page opened with ?calm)
+const FOREST=argv.includes('--forest');   // RUN 9: the forest's own screens (GPU capture, the Calm face)
+const CALM=argv.includes('--calm') || FOREST;   // RUN 7 (C6/C11): the Calm face's screens instead (a phone viewport, the page opened with ?calm)
 const out=s=>console.log(s);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
@@ -108,6 +109,35 @@ const SCREENS_CALM=[
   ['calm-forest',    async p=>{ await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
   ['calm-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
 ];
+/* RUN 9: THE FOREST'S SCREENS (--forest; headless Chrome renders the WebGL room) — Begin, the Forest background, the two hands playing; then
+   moments of the night through the probe clock (host sceneClockDbg): the clear moon, a cloud over it, the moods, the deep-sleep night;
+   portrait 390 × 844 and landscape 844 × 390. Each slice adds its screens here. */
+const forestAt=async (p, sec)=>{ await p.evaluate(async s=>{ const H=await import('./src/views/scene/host.js'); H.sceneClockDbg(s); }, sec); };
+const moodTo=async (p, re)=>{ await p.evaluate(src=>{ const b=document.getElementById('calmMood'), r=new RegExp(src); let k=0; while(!r.test(b.textContent) && k++<4) b.click(); }, re); };
+/* slice 2: notes through the room (its glint, as the bus does) — n notes every `every` ms; fx: [[effect id, parameter index, 0…1]] set first */
+const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])=>{ const H=await import('./src/views/scene/host.js'), A=await import('./src/audio.js'), S=await import('./src/state.js');
+  if(fx) for(const [id,i,v] of fx){ const I=A.fxInstance(S.chainKeyOf('ld'), id); if(I && I.params[i]) I.params[i].setNorm(v); }
+  const R=H.sceneRoomDbg(); for(let k=0;k<n;k++){ if(R) R.glint(0, 0.85); await new Promise(r=>setTimeout(r, every)); } }, [n, every, fx||null]); };
+const SCREENS_FOREST=[
+  ['f-start',        async p=>{ await p.click('#calmBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
+                       await p.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', true); const G=await import('./src/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); });
+                       await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
+  ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-cloud',        async p=>{ await forestAt(p, 630); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-dusk',         async p=>{ await forestAt(p, 60); await moodTo(p, 'Dusk|Сумер'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-mist',         async p=>{ await moodTo(p, 'Mist|Туман'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-sleep',        async p=>{ await moodTo(p, 'Glow|Сияние'); await p.waitForTimeout(9000); await p.evaluate(async ()=>{ const S=await import('./src/calmshell.js'); S.calmSleepDbg(15, 800e3); }); await p.waitForTimeout(1200); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-notes',        async p=>{ await p.evaluate(async ()=>{ const S=await import('./src/calmshell.js'); S.calmSleepDbg(0, 0); }); await forestAt(p, 60); await playHands(p); await roomNotes(p, 14, 450); await p.waitForTimeout(350); }],
+  ['f-echo',         async p=>{ await roomNotes(p, 1, 900, [['cecho',0,0.85],['ctone',1,0.5]]); }],
+  ['f-warm',         async p=>{ await roomNotes(p, 4, 500, [['cecho',0,0],['ctone',1,0.05]]); await p.waitForTimeout(200); }],
+  ['f-star',         async p=>{ await forestAt(p, 60); await p.waitForTimeout(300); await p.evaluate(async ()=>{ const H=await import('./src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('star'); }); await p.waitForTimeout(520); }],
+  ['f-bloom',        async p=>{ await p.evaluate(async ()=>{ const H=await import('./src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('bloom'); }); await p.waitForTimeout(3600); }],
+  ['f-emblem',       async p=>{ await p.evaluate(async ()=>{ const H=await import('./src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
+  ['f-land',         async p=>{ await p.evaluate(async ()=>{ const S=await import('./src/calmshell.js'); S.calmSleepDbg(0, 0); }); await p.setViewportSize({ width:844, height:390 }); await forestAt(p, 60); await p.waitForTimeout(1800); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-land-cloud',   async p=>{ await forestAt(p, 640); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('./src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
+  ['f-land-notes',   async p=>{ await forestAt(p, 60); await roomNotes(p, 10, 450, [['ctone',1,0.5]]); await roomNotes(p, 1, 700, [['cecho',0,0.85]]); }],
+];
 /* the top messages: no two visible ones overlap */
 async function msgCheck(p, name){
   const r=await p.evaluate(()=>{ const vis=e=>{ if(!e) return false; const c=getComputedStyle(e); if(c.display==='none'||c.visibility==='hidden'||+c.opacity===0) return false; for(let q=e.parentElement;q;q=q.parentElement){ const k=getComputedStyle(q); if(k.display==='none'||+k.opacity===0) return false; } return true; };
@@ -118,12 +148,12 @@ async function msgCheck(p, name){
   out(`[ui-snap] ${name}: messages shown ${r.shown.join(', ')||'none'} — ${r.hits.length ? 'OVERLAP '+r.hits.join(', ') : 'no overlap'}`); if(r.hits.length) msgHits.push(name+': '+r.hits.join(', '));
 }
 const msgHits=[];
-async function playHands(p){
+async function playHands(p, check=true){   // RUN 9: check=false — the first hands-in moment (the shell's 300-ms fade still runs)
   await p.evaluate(async ()=>{ const G=await import('./src/gestures.js'), PO=await import('./src/gestures/pose.js'), V=await import('./src/vision.js');
     G.handsProbe(null); const clk={ t:5e6, W:V.canvas.width, H:V.canvas.height }; G.handsProbe(clk, ()=>true);
     for(let i=0;i<14;i++){ clk.t+=1000/30; const up=Math.min(1,i/10);
       G.processHandsProbe({ landmarks:[PO.pose({ x:0.72, y:0.52, s:0.22, gaps:[0.05,1,1,1] }), PO.pose({ x:0.26, y:0.55-0.18*up, s:0.2, gaps:[1,0.05,1,1] })], handednesses:[[{ categoryName:'Right' }],[{ categoryName:'Left' }]] }); } });
-  await p.waitForTimeout(700); await msgCheck(p, 'play '+p.viewportSize().width+'×'+p.viewportSize().height);
+  await p.waitForTimeout(700); if(check) await msgCheck(p, 'play '+p.viewportSize().width+'×'+p.viewportSize().height);
 }
 async function capture(tag){
   const dir=path.join(OUT,tag); await mkdir(dir,{ recursive:true });
@@ -138,12 +168,12 @@ async function capture(tag){
     const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e)));
     await page.goto(`http://127.0.0.1:${port}/index.html?probe${CALM?'&calm':''}`);
     await page.waitForFunction(()=>window.P && window.R, null, { timeout:60e3 }); await page.waitForTimeout(800);
-    for(const [name,act] of (CALM ? SCREENS_CALM : SCREENS)){
+    for(const [name,act] of (FOREST ? SCREENS_FOREST : CALM ? SCREENS_CALM : SCREENS)){
       await act(page);
       if(ONLY && !ONLY.split(',').includes(name)) continue;
       await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
       if(BAR_KEEP.has(name)) await barOpen(page);   // RUN 8: the capture waits for an open top bar (the app is untouched)
-      const st=await page.evaluate(STYLES_FN);
+      const st= FOREST ? { els:{}, table:[], props:[] } : await page.evaluate(STYLES_FN);   // RUN 9: the forest screens are pictures only (the style walk takes seconds — a falling star is over by then)
       if(BAR_KEEP.has(name) && await page.evaluate(()=>document.getElementById('bar').classList.contains('min'))) await barOpen(page);   // the style walk outlasted the bar's timer
       const png=await page.screenshot({ animations:'disabled', caret:'hide' });
       await writeFile(path.join(dir,name+'.png'), png); res.screens[name]=st;

@@ -566,6 +566,97 @@ async function fliesCore(){
   n++; if(Math.abs(F.forestGround(0,0)-0)>0.2 || F.forestGround(3,-5)===F.forestGround(8,-5)) miss('ground heights unexpected');
   return { cases:n, total:d.length, differences:d };
 }
+/* RUN 9 (slice 1): THE NIGHT's cycle (core/night.js) — SEAMLESS (every value at t equals t + period, CONTROL: a 1.5-cycle term differs),
+   CONTINUOUS (no jump anywhere, the seam included), the first minutes clear, clouds dim the moon and it returns, the moon drifts, the mist
+   layers move each its own way; the sleep's depth (exact ends, monotone); every Calm mood has a look whose tokens exist in tokens.css */
+async function nightCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const N=await import(new URL('../src/core/night.js', import.meta.url).href), P=N.NIGHT.period;
+  const flat=o=>[o.phase%1, ...o.moon, o.cover, o.moonLight, ...o.mist, ...o.rise, ...o.clouds.flatMap(c=>[c.u, c.dens, c.y])];
+  const diff=(a,b)=>Math.max(...a.map((v,i)=>Math.abs(v-b[i])));
+  let worst=0; for(let i=0;i<240;i++){ const t=i*P/240+0.37; worst=Math.max(worst, diff(flat(N.nightAt(t)).slice(1), flat(N.nightAt(t+P)).slice(1)), diff(flat(N.nightAt(t)).slice(1), flat(N.nightAt(t+3*P)).slice(1))); }
+  n++; if(worst>1e-9) miss('not seamless: t vs t + period differ by '+worst);
+  const ctl=t=>0.5-0.5*Math.cos(1.5*2*Math.PI*t/P); n++; if(!(Math.abs(ctl(100)-ctl(100+P))>0.1)) miss('CONTROL: a 1.5-cycle term matched across the period (the seam test cannot fail)');
+  let jump=0, prev=flat(N.nightAt(-0.5)); const series=[];
+  for(let t=0;t<=P;t+=0.5){ const o=N.nightAt(t), f=flat(o); jump=Math.max(jump, diff(f.slice(1,9+4), prev.slice(1,9+4))); prev=f; series.push(o); }
+  n++; if(jump>0.03) miss('a jump of '+jump.toFixed(4)+' in 0.5 s (moon, light or mist)');
+  n++; if(series.slice(0, N.NIGHT.clouds.clear*2).some(o=>o.cover>0)) miss('a cloud in the first '+N.NIGHT.clouds.clear+' s');
+  const ml=series.map(o=>o.moonLight), mn=Math.min(...ml); let dims=0; for(let i=1;i<series.length;i++) if(series[i].cover>0.3 && series[i-1].cover<=0.3) dims++;
+  n+=3; if(!(mn<=0.45)) miss('the clouds never dim the moon below 0.45 ('+mn.toFixed(3)+')'); if(Math.max(...ml)!==1) miss('the moon never clears fully');
+  if(!(dims>=5)) miss('only '+dims+' cloud passes over the moon per night (≥ 5 expected)');
+  const xs=series.map(o=>o.moon[0]); n++; if(!(Math.max(...xs)-Math.min(...xs)>=8)) miss('the moon drifts only '+(Math.max(...xs)-Math.min(...xs)).toFixed(2)+' units');
+  const L=N.NIGHT.mist.cycles.length, col=k=>series.map(o=>o.mist[k]), mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const corr=(a,b)=>{ const ma=mean(a), mb=mean(b); let s=0, sa=0, sb=0; a.forEach((v,i)=>{ s+=(v-ma)*(b[i]-mb); sa+=(v-ma)**2; sb+=(b[i]-mb)**2; }); return s/Math.sqrt(sa*sb); };
+  for(let k=0;k<L;k++){ const c=col(k); n++; if(!(Math.max(...c)-Math.min(...c)>=0.6)) miss('mist layer '+k+' moves only '+(Math.max(...c)-Math.min(...c)).toFixed(2)); }
+  for(let a=0;a<L;a++) for(let b=a+1;b<L;b++){ n++; const r=corr(col(a),col(b)); if(r>0.95) miss(`mist layers ${a} and ${b} move together (r ${r.toFixed(3)})`); }
+  const D0=N.nightDeep(0), D1=N.nightDeep(1); n+=2;
+  if(D0.light!==1||D0.flies!==1||D0.motion!==1||D0.mist!==1||D0.sway!==1) miss('sleep 0 changes the night: '+JSON.stringify(D0));
+  if(Math.abs(D1.light-0.45)>1e-12||Math.abs(D1.flies-0.4)>1e-12||Math.abs(D1.motion-0.5)>1e-12||Math.abs(D1.mist-1.5)>1e-12) miss('sleep 1: '+JSON.stringify(D1));
+  let mono=true, pl=2; for(let i=0;i<=50;i++){ const v=N.nightDeep(i/50).light; if(v>pl+1e-12) mono=false; pl=v; } n++; if(!mono) miss("the sleep depth is not monotone");
+  n+=3; if(N.sleepProgress(0,0,5e5)!==0) miss('no timer: progress ≠ 0'); if(N.sleepProgress(0,10,3e5)!==0.5) miss('half of a 10-min timer ≠ 0.5'); if(N.sleepProgress(0,10,9e5)!==1) miss('past the end ≠ 1');
+  const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../data/profiles/calm.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../tokens.css', import.meta.url),'utf8');
+  for(const m of prof.moods){ n++; if(!N.MOOD_OF[m]) miss('the Calm mood '+m+' has no look'); }
+  for(const [k,L2] of Object.entries(N.MOOD_LOOKS)) for(const tn of Object.values(L2.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(tok)) miss(`look ${k}: no token --cv-${tn} in tokens.css`); }
+  n++; if(N.moodLook('no-such-mood')!==N.MOOD_LOOKS.glow) miss('CONTROL: an unknown mood does not fall back to Glow');
+  return { cases:n, total:d.length, differences:d };
+}
+/* RUN 9 (slice 2): THE FOREST'S LIFE (core/forestlife.js + the fireflies' call / scatter) — the stream's line is smooth, crosses the aisle,
+   its nearest point is right (vs a brute-force resampling); the mushrooms' and flowers' places are seeded (CONTROL another seed differs), in
+   the aisle, never in the water; the pulse falls with distance; a ring list fills free slots, then replaces the OLDEST, and ages out (CONTROL
+   without ageing they stay); the fireflies GATHER to a calling light (≥ 1.5× near it after 12 s) and SCATTER slowly when it stops calling
+   (their mean distance grows vs a light that keeps them) — CONTROL a light without call / scatter is exactly the old step */
+async function lifeCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const Li=await import(new URL('../src/core/forestlife.js', import.meta.url).href), Fl=await import(new URL('../src/core/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
+  n++; if(L.length!==S.seg+1) miss('stream line has '+L.length+' points');
+  let gap=0; for(let i=1;i<L.length;i++) gap=Math.max(gap, Math.hypot(L[i].x-L[i-1].x, L[i].z-L[i-1].z)); n++; if(gap>0.5) miss('stream line step '+gap.toFixed(3));
+  n+=2; if(Math.hypot(L[0].x-S.pts[0][0], L[0].z-S.pts[0][1])>1e-9 || Math.hypot(L[L.length-1].x-S.pts[S.pts.length-1][0], L[L.length-1].z-S.pts[S.pts.length-1][1])>1e-9) miss('stream ends are not its first / last points');
+  if(!(Li.streamNear(0,0).d<1)) miss('the stream does not cross the aisle near (0, 0): '+Li.streamNear(0,0).d.toFixed(2));
+  const fine=Array.from({ length:3001 }, (_,i)=>Li.streamAt(i/3000)); let worst=0;
+  for(let k=0;k<60;k++){ const x=-10+k*0.37, z=3-((k*7)%16); const q=Li.streamNear(x,z), b=Math.min(...fine.map(p=>Math.hypot(p.x-x, p.z-z))); worst=Math.max(worst, Math.abs(q.d-b)); }
+  n++; if(worst>0.03) miss('streamNear off by '+worst.toFixed(3)+' vs brute force');
+  const P1=Li.lifePlaces(), P2=Li.lifePlaces(), P3=Li.lifePlaces(Li.LIFE.shrooms, Li.LIFE.blooms, 7); n+=3;
+  if(JSON.stringify(P1)!==JSON.stringify(P2)) miss('two place sets from one seed differ'); if(JSON.stringify(P1)===JSON.stringify(P3)) miss('CONTROL: another seed gave the same places');
+  if(P1.filter(p=>p.kind==='shroom').length!==Li.LIFE.shrooms || P1.filter(p=>p.kind==='bloom').length!==Li.LIFE.blooms) miss('counts '+P1.length);
+  for(const p of P1){ n++; if(Li.streamNear(p.x,p.z).d<S.half+0.25 || Math.abs(p.x)>6.6 || p.z>1.1 || p.z<-13.1 || Math.hypot(p.x,p.z-5.5)<2.4) miss('a place out of bounds or in the water: '+JSON.stringify(p)); }
+  n+=3; if(Li.pulseOf(1,1,1,1,0.8)!==0.8) miss('pulse at the light ≠ vel'); if(Math.abs(Li.pulseOf(Li.LIFE.reach,0,0,0,1)-Math.exp(-0.5))>1e-12) miss('pulse at reach'); if(!(Li.pulseOf(10,0,0,0,1)<1e-3)) miss('pulse far');
+  const R=Li.ringsNew(3); Li.ringAdd(R,0,0,1,1); Li.ringAdd(R,1,0,2,1); Li.ringAdd(R,2,0,3,1); const s4=Li.ringAdd(R,3,0,4,1); n+=3;
+  if(!(s4.x===3 && R.filter(r=>r.t0===1).length===0)) miss('a full list did not replace the oldest');
+  if(Li.ringsAge(R, 5.5, 3)!==2) miss('ageing: '+R.map(r=>r.t0).join(','));
+  const R2=Li.ringsNew(2); Li.ringAdd(R2,0,0,1,1); if(R2.filter(r=>r.t0>=0).length!==1) miss('CONTROL: an unaged list lost a ring');
+  /* the fireflies' call and scatter */
+  const near=(A,L0,r)=>A.filter(q=>Math.hypot(q.p[0]-L0.x, q.p[1]-L0.y, q.p[2]-L0.z)<r).length, mean=(A,L0)=>A.reduce((s,q)=>s+Math.hypot(q.p[0]-L0.x, q.p[1]-L0.y, q.p[2]-L0.z),0)/A.length;
+  const L0={ x:0.5, y:1.4, z:-2.5, on:1 }, run=(call, n0, A=Fl.fliesInit(), t0=0)=>{ for(let i=0;i<n0;i++) Fl.fliesStep(A, [{ ...L0, ...call }], 1/60, t0+i/60); return A; };
+  const a0=run({}, 720), a1=run({ call:1 }, 720), nb=near(a0,L0,3), nc=near(a1,L0,3); n++;
+  if(!(nc>=Math.max(4, 1.5*nb))) miss(`a calling light gathers ${nc} within 3 (not calling ${nb}) — ≥ 1.5× expected`);
+  const keep=run({ call:1 }, 600, run({ call:1 }, 720), 12), sc=run({ scatter:1 }, 600, run({ call:1 }, 720), 12), mk=mean(keep,L0), ms=mean(sc,L0); n++;
+  if(!(ms>mk*1.3)) miss(`scattering: mean distance ${ms.toFixed(2)} vs kept ${mk.toFixed(2)} (≥ 1.3× expected)`);
+  const h=A=>JSON.stringify(A.map(q=>q.p.map(v=>Math.round(v*1e9)))); n++; if(h(run({}, 300))!==h(run({ call:0, scatter:0 }, 300))) miss('CONTROL: call 0 / scatter 0 is not the old step');
+  return { cases:n, total:d.length, differences:d };
+}
+/* RUN 9 (slice 4): THE RARE EVENTS' schedule (core/night.js rareStep) over 8 simulated hours with a long-held note now and then: the same
+   seed gives the same night; never the same kind twice in a row (CONTROL: without the rule a repeat appears); a timed event never comes
+   sooner than gapLo after the last, a flower never sooner than bloomGap and only while a note is held >= hold; every few minutes (10…30 an
+   hour); all three kinds happen; the first in 100…170 s; without held notes no flower ever; the emblem's five points (an arc, the middle
+   one highest, symmetric) */
+async function rareCore(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const N=await import(new URL('../src/core/night.js', import.meta.url).href), K=N.RARE, H=8*3600;
+  const sim=(opt={}, plays=true)=>{ const st=N.rareInit(K.seed, 0, opt), ev=[], Rp=(()=>{ let a=12345; return ()=>{ a=(Math.imul(a,1103515245)+12345)>>>0; return a/4294967296; }; })(); let hs=-1, he=-1;
+    for(let t=0;t<=H;t++){ if(plays && t>he+30 && Rp()<0.012){ hs=t; he=t+3+Math.floor(Rp()*5); } const held= t>=hs && t<he ? t-hs : 0; const k=N.rareStep(st, t, held); if(k) ev.push({ k, t, held }); }
+    return ev; };
+  const A=sim(), B=sim(); n++; if(JSON.stringify(A)!==JSON.stringify(B)) miss('two nights from one seed differ');
+  let rep=0, early=0, badBloom=0; for(let i=1;i<A.length;i++){ if(A[i].k===A[i-1].k) rep++; const gap=A[i].t-A[i-1].t;
+    if(A[i].k==='bloom' ? gap<K.bloomGap : gap<K.gapLo) early++; } for(const e of A) if(e.k==='bloom' && e.held<K.hold) badBloom++;
+  n+=3; if(rep) miss(rep+' repeats in a row'); if(early) miss(early+' events too soon after the last'); if(badBloom) miss(badBloom+' flowers without a long-held note');
+  const perH=A.length/8, kinds=new Set(A.map(e=>e.k)); n+=3; if(!(perH>=10 && perH<=30)) miss(perH.toFixed(1)+' events an hour'); if(kinds.size!==3) miss('kinds seen: '+[...kinds].join(', '));
+  const Q=sim({}, false); n++;
+  if(!(Q[0].t>=K.first[0] && Q[0].t<=K.first[1]+1)) miss('the first timed event at '+Q[0].t+' s');   // a held note may open a flower sooner (a minute in) if(Q.some(e=>e.k==='bloom')) miss('a flower without any held note');
+  const C=sim({ repeat:true }); let rc=0; for(let i=1;i<C.length;i++) if(C[i].k===C[i-1].k) rc++; n++; if(!rc) miss('CONTROL: without the rule no repeat appeared (the rule check cannot fail)');
+  const P=N.emblemPoints(); n+=2; if(P.length!==5 || P[2][1]!==Math.max(...P.map(p=>p[1]))) miss('emblem points: '+JSON.stringify(P));
+  if(Math.abs(P[0][0]+P[4][0])>1e-12 || Math.abs(P[0][1]-P[4][1])>1e-12 || Math.abs(P[1][0]+P[3][0])>1e-12) miss('the emblem is not symmetric');
+  return { cases:n, total:d.length, differences:d };
+}
 /* ENG2 (RUN 4): the provisional power class and the dropout rate — exact values; CONTROLS: a factor over the threshold must give
    'low'; a rate from too short a window must be null (never a guess) */
 async function engCore(){
@@ -679,6 +770,9 @@ const ROWS=[
   ['CALM depth curve (core)',   ()=>calmDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['CALM cricket schedule (core)', ()=>calmCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
+  ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
+  ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

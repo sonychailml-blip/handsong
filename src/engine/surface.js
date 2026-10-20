@@ -5,7 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'autosave.js':['AC'],
-  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setCalmStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx'],   // RUN 8: + the device measurement's notes
+  'calmshell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setCalmStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
   'clip.js':['createRecordingTap'],
   'demo.js':['AC', 'initAudio'],
   'freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',
@@ -39,7 +39,7 @@ const SURFACE={
   'probes/tim3d.js':['CHORD_INSTR', 'chordOn', 'timbreForgetDbg', 'timbreIdx', 'timbreInstall', 'timbreRecord', 'timbreSnapshot', 'timbresOf'],
   'probes/pool.js':['CHORD_INSTR', 'LEAD_INSTR', 'chordGlide', 'chordOff', 'chordOn', 'drumHit', 'leadOn', 'poolDbg', 'poolSizes'],
   'probes/calm.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],
-  'probes/forest.js':['fxSnapshot', 'masterLevel'],
+  'probes/forest.js':['fxSnapshot', 'masterLevel', 'ambienceInfo'],
   'probes/profile.js':['FX_FACTORY', 'timbreIdOf'],
   'probes/run.js':['fxSnapshot', 'masterLevel'],
   'probes/seed.js':['timbreById', 'timbreIdx', 'timbreKey', 'timbreSnapshot', 'timbresOf'],

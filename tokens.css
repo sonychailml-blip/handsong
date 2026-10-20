@@ -234,6 +234,16 @@
   --cv-forest-ground:#17160f; --cv-forest-moss:#30481c; --cv-forest-soil:#46321e; --cv-forest-leaf:#2b2213; --cv-forest-bark:#2e251e;
   --cv-forest-bark-dark:rgba(8,6,5,.55); --cv-forest-bark-light:rgba(110,95,75,.28); --cv-forest-fern:#2c4a1e; --cv-forest-frond:#233a1a;
   --cv-forest-rock:#272b22; --cv-forest-mist:#8aa2c8; --cv-forest-fly:#d6ff7a; --cv-forest-wild:#c8ff78; --cv-forest-light:#c6ff7a;
+  /* RUN 9: the moods' looks (core/night.js MOOD_LOOKS) — Glow = the base set above + haze / cloud; Dusk and Mist their own sets */
+  --cv-forest-haze:#8aa2c8; --cv-forest-cloud:#1a2234; --cv-forest-shroom:#7dffc4; --cv-forest-bloom:#b9a8ff;
+  --cv-forest-stem:#3b3a30; --cv-forest-water:#03070c;   /* RUN 9 (slice 2): the mushrooms' stems, the stream's deep colour */
+  --cv-forest-grass:#22361a; --cv-forest-grass-dry:#38381c; --cv-forest-leaf-fall:#2c2012; --cv-forest-moth:#d9d2bd; --cv-forest-sil:#020403;   /* slice 3 */
+  --cv-forest-dusk-fog:#110c1c; --cv-forest-dusk-sky:#3a2c55; --cv-forest-dusk-under:#070508; --cv-forest-dusk-moon:#c79a78;
+  --cv-forest-dusk-moonhalo:#e2b78f; --cv-forest-dusk-haze:#9c88b4; --cv-forest-dusk-cloud:#2a2238;
+  --cv-forest-dusk-shroom:#ffb070; --cv-forest-dusk-bloom:#ff8fc8;
+  --cv-forest-misty-fog:#111920; --cv-forest-misty-sky:#2c3a48; --cv-forest-misty-under:#06080a; --cv-forest-misty-moon:#8fa4bf;
+  --cv-forest-misty-moonhalo:#b8c8dc; --cv-forest-misty-haze:#aebdcc; --cv-forest-misty-cloud:#202b36;
+  --cv-forest-misty-shroom:#a8e8ff; --cv-forest-misty-bloom:#e8f2ff;
   --cv-forest-warm:#ffb45a; --cv-forest-cold:#e6fff2;   /* RUN 7 (C5): Warmth / Brightness — the light's two ends (the lime between) */
   --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
   --cv-halo-a100:rgba(255,255,255,1); --cv-halo-a45:rgba(255,255,255,.45); --cv-halo-a10:rgba(255,255,255,.1); --cv-halo-a0:rgba(255,255,255,0);

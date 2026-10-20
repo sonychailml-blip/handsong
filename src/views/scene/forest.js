@@ -9,11 +9,16 @@
    coordinates). Seeded (one seed per room): the same forest on every device. No sound, no song, no network here (VIS1 contract). */
 import { seeded } from '../../core/dsp.js';
 import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES } from '../../core/fireflies.js';
+import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, moodLook, MOOD_TC } from '../../core/night.js';   // RUN 9: the night's cycle, sleep, moods
+import { buildLife, patchGroundWaves, patchSway } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
+import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
+import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem
 
 export const FOREST_SEED=0x464F5231;
 /* the levels (Calm plan §7): full — real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist;
    reduced — 512² shadow, 35 fireflies, 8-step trails, still mist. «minimal» has no WebGL at all (host.js draws a 2D stand-in). */
-export const FOREST_LEVELS={ full:{ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true }, reduced:{ flies:35, trail:8, shadow:512, shadowSmall:512, mist:false } };
+export const FOREST_LEVELS={ full:{ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4 },
+  reduced:{ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2 } };
 export const FOREST_BOUNDS=Object.freeze([-6, 6, 0.3, 4.2, -15, 3.8]);   // x, y, z ranges the light may reach (it saturates there)
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -36,13 +41,17 @@ float a=exp(-r2*7.)+.4*exp(-r2*2.)*(1.-r2);gl_FragColor=vec4(uColor,a*vA);}`;
 
 /* T — the THREE namespace; opt: { C (palette.cv), level 'full' | 'reduced', w, h (canvas CSS pixels), reduce (reduced motion) } */
 export function buildForest(T, opt){
-  const C=opt.C, Lv=FOREST_LEVELS[opt.level]||FOREST_LEVELS.full, reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
+  const C=opt.C, Lv={ ...(FOREST_LEVELS[opt.level]||FOREST_LEVELS.full), ...(opt.lv||{}) },   // RUN 9: opt.lv — measurement overrides only
+    reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
-  const s=new T.Scene(), FOG=col('fog'); s.background=FOG; s.fog=new T.FogExp2(FOG, 0.06);
-  const hemi=new T.HemisphereLight(col('sky'), col('under'), 0.26); s.add(hemi);
-  const moonL=new T.DirectionalLight(col('moon'), 0.3); moonL.position.set(-10,20,-30); s.add(moonL);
+  /* RUN 9: the PALETTE is the mood's look (core/night.js MOOD_LOOKS → tokens), eased towards a new mood's look (τ MOOD_TC s) */
+  const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
+  let mlook=moodLook(opt.mood), fogK=mlook.fog, mistK=mlook.mist, fliesK=mlook.flies; const pal={}; for(const [k,v] of Object.entries(lookCols(mlook))) pal[k]=v.clone();
+  const s=new T.Scene(); s.background=pal.fog; s.fog=new T.FogExp2(pal.fog.clone(), mlook.fog);
+  const hemi=new T.HemisphereLight(pal.sky, pal.under, 0.26); s.add(hemi);
+  const moonL=new T.DirectionalLight(pal.moon, 0.3); moonL.position.set(-10,20,-30); s.add(moonL);
   const gy=forestGround;
   /* ground: moss, soil and fallen leaves (colour + bump) */
   const [gc,g]=canvas2(512,512), [gb,b]=canvas2(512,512), MOSS=rgbOf(C('forest-moss')), SOIL=rgbOf(C('forest-soil')), LEAF=rgbOf(C('forest-leaf'));
@@ -93,13 +102,21 @@ export function buildForest(T, opt){
   /* ground mist sheets at four depths */
   const [mc,mx]=canvas2(256,128);
   for(let i=0;i<70;i++){ const x=R()*256, y=40+R()*50, r=14+R()*30; for(const dx of [-256,0,256]){ const gr=mx.createRadialGradient(x+dx,y,0,x+dx,y,r); gr.addColorStop(0,C('mist-a12')); gr.addColorStop(1,C('halo-a0')); mx.fillStyle=gr; mx.fillRect(x+dx-r,y-r,r*2,r*2); } }
-  const mists=[]; [-3,-8,-14,-21].forEach((z,i)=>{ const t=tex(mc,true); t.wrapT=T.ClampToEdgeWrapping; const pg=new T.PlaneGeometry(44,3.2), pm=new T.MeshBasicMaterial({ map:t, color:col('mist'), transparent:true, opacity:0.26, depthWrite:false });
-    const m=new T.Mesh(pg,pm); m.position.set(0,0.9,z); s.add(m); mists.push([t,0.004+i*0.002]); own.push(pg,pm); });
+  const mists=[]; [-3,-8,-14,-21].forEach((z,i)=>{ const t=tex(mc,true); t.wrapT=T.ClampToEdgeWrapping; const pg=new T.PlaneGeometry(44,3.2), pm=new T.MeshBasicMaterial({ map:t, color:pal.haze.clone(), transparent:true, opacity:0.26, depthWrite:false });
+    const m=new T.Mesh(pg,pm); m.position.set(0,0.9,z); s.add(m); mists.push([t,0.004+i*0.002,m,pm]); own.push(pg,pm); });
   /* the soft round glow (sprites) */
   const [hc,hx]=canvas2(128,128); { const gr=hx.createRadialGradient(64,64,0,64,64,64); gr.addColorStop(0,C('halo-a100')); gr.addColorStop(0.18,C('halo-a45')); gr.addColorStop(0.5,C('halo-a10')); gr.addColorStop(1,C('halo-a0')); hx.fillStyle=gr; hx.fillRect(0,0,128,128); }
   const HALO=tex(hc,true);
   const sprite=(color,opacity=1,fog=true)=>{ const m=new T.SpriteMaterial({ map:HALO, color, opacity, transparent:true, depthWrite:false, blending:T.AdditiveBlending, fog }); own.push(m); return new T.Sprite(m); };
-  const moonS=sprite(col('moonhalo'),0.55,false); moonS.scale.set(16,16,1); moonS.position.set(-14,17,-55); s.add(moonS);
+  const moonS=sprite(pal.moonhalo.clone(),0.55,false); moonS.scale.set(16,16,1); moonS.position.set(-14,17,-55); s.add(moonS);
+  /* RUN 9 (slice 1): THE MOON — a small bright disc inside its halo, drifting on the night's path (core/night.js); CLOUDS pass over it (soft
+     dark sprites in front of it, normal blending: they hide the halo) and the moon's light dims with them and returns */
+  const [dc,dx]=canvas2(64,64); { const gr=dx.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,C('halo-a100')); gr.addColorStop(0.62,C('halo-a100')); gr.addColorStop(0.8,C('halo-a10')); gr.addColorStop(1,C('halo-a0')); dx.fillStyle=gr; dx.fillRect(0,0,64,64); }
+  const moonD=new T.Sprite(new T.SpriteMaterial({ map:tex(dc,true), color:pal.moonhalo.clone(), transparent:true, depthWrite:false, blending:T.AdditiveBlending, fog:false })); own.push(moonD.material);
+  moonD.scale.set(2.6,2.6,1); s.add(moonD);
+  const [cc,cx]=canvas2(256,128); for(let i=0;i<26;i++){ const x=50+R()*156, y=40+R()*48, r=18+R()*34, gr=cx.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,C('halo-a45')); gr.addColorStop(1,C('halo-a0')); cx.fillStyle=gr; cx.fillRect(x-r,y-r,2*r,2*r); }
+  const cloudT=tex(cc,true); cloudT.wrapS=cloudT.wrapT=T.ClampToEdgeWrapping;
+  const clouds=CLOUD_PASSES.map(()=>{ const m=new T.SpriteMaterial({ map:cloudT, color:pal.cloud.clone(), transparent:true, opacity:0, depthWrite:false, fog:false }); own.push(m); const sp=new T.Sprite(m); sp.scale.set(15,6.5,1); sp.visible=false; s.add(sp); return sp; });
   /* the wild fireflies — positions from core/fireflies.js */
   const flies=fliesInit(Lv.flies, FOREST_FLIES.seed);
   const fg=new T.BufferGeometry(); fg.setAttribute('position',new T.BufferAttribute(new Float32Array(flies.length*3),3)); fg.setAttribute('aGlow',new T.BufferAttribute(new Float32Array(flies.length),1));
@@ -107,10 +124,10 @@ export function buildForest(T, opt){
   const ff=new T.Points(fg,fm); ff.frustumCulled=false; s.add(ff); own.push(fg,fm);
   const wild=[0,1].map(()=>{ const l=new T.PointLight(col('wild'),0,3.2,2); s.add(l); return l; });
   /* the hands' lights: 0 = the playing hand (shadow-casting at full / reduced), 1 = the effects hand (dimmer, no shadow) */
-  const small=Math.min(opt.w||800, opt.h||600)<600, SH=small ? Lv.shadowSmall : Lv.shadow;
+  const small=Math.min(opt.w||800, opt.h||600)<600, SH= opt.shadow===false ? 0 : small ? Lv.shadowSmall : Lv.shadow;   // RUN 9: only high casts the light's shadow
   const rigs=[0,1].map(i=>{ const grp=new T.Group(), light=new T.PointLight(i ? col('fx') : col('light'), 0, i?4.5:7.5, 2);
-    if(i===0){ light.castShadow=true; light.shadow.mapSize.set(SH,SH); light.shadow.bias=-0.005; light.shadow.camera.near=0.08; }
-    const core=sprite(col('core')), halo=sprite(i?col('fx'):col('halo'),0.5); grp.add(light,core,halo); grp.visible=false; s.add(grp);
+    if(i===0 && SH){ light.castShadow=true; light.shadow.mapSize.set(SH,SH); light.shadow.bias=-0.005; light.shadow.camera.near=0.08; }
+    const core=sprite(col('core')), halo=sprite(i?col('fx'):col('halo'),0.5); grp.add(core,halo); grp.visible=false; s.add(grp, light);   // RUN 9: the light stays in the scene (intensity 0 when off) — a light count that changes recompiles every lit shader
     const trail=[]; for(let j=0;j<Lv.trail;j++){ const t=sprite(col('trail'),0); t.scale.set(0.05,0.05,1); s.add(t); trail.push(t); }
     return { i, grp, light, core, halo, trail, hist:[], ht:0, cur:V(0,1.5,0), prev:V(0,1.5,0), tgt:V(0,1.5,0), on:0, glint:0, sat:false, d:0.5 }; });
   /* RUN 7 (C5): the effects hand seen in the forest (values from the bus «calmFx», published by the Calm shell): Echo — soft rings of light
@@ -120,6 +137,12 @@ export function buildForest(T, opt){
   /* RUN 8 (slice 4): the forest answers the music GENTLY — each note adds to a slow energy (its velocity × 0.35, at most 1.5) that fades with
      τ 1.8 s: the wild fireflies glow up to +60 %, their two lights +50 %, the night sky +15 %. Nothing moves faster than the music. */
   let music=0;
+  /* RUN 9 (slice 2): THE LIFE — ground waves, mushrooms and flowers, the stream (Echo's rings), the ferns' sway / Wave's shimmer
+     (views/scene/forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
+  const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv }); patchGroundWaves(groundM, life.U); patchSway(frondM, life.U); patchSway(frondD, life.U);
+  const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce });   // RUN 9 (slice 3)
+  const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
+  let gather=0, playing=false, rel=0;
   const LC=col('light'), WARM=col('warm'), COLD=col('cold'), HC=col('halo'), lc=new T.Color(), hlc=new T.Color();
   const rings=[]; for(let j=0;j<8;j++){ const sp=sprite(col('trail'),0); sp.visible=false; s.add(sp); rings.push({ sp, t0:-1, amp:0 }); }
   /* the camera: the prototype's place and lean; portrait gets a wider view */
@@ -128,7 +151,7 @@ export function buildForest(T, opt){
   let W=opt.w||800, H=opt.h||600, pxH=H;
   function aimCamera(){ camera.position.copy(camPos).add(camOff); look.copy(camLook).addScaledVector(camOff,-1.2); camera.lookAt(look); camera.updateMatrixWorld(); }
   function resize(w,h,bufH){ W=w; H=h; pxH=bufH||h; camera.aspect=w/h; camera.fov= w/h<0.8 ? 68 : 55; camera.updateProjectionMatrix();
-    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); aimCamera(); }
+    fm.uniforms.uScale.value=pxH/(2*Math.tan(camera.fov*Math.PI/360)); life.resize(fm.uniforms.uScale.value); aimCamera(); detail.resize(w, h, camera, fm.uniforms.uScale.value); }
   /* the hand's play point (canvas pixels px, py) and depth 0…1 → the light's world place on THIS camera's ray (it projects back onto the
      point); saturates at the room's bounds and the ground → out; returns true when it saturated */
   function place(px, py, d01, out){
@@ -138,11 +161,30 @@ export function buildForest(T, opt){
     const B=FOREST_BOUNDS, x=clamp(out.x,B[0],B[1]), y0=clamp(out.y,B[2],B[3]), z=clamp(out.z,B[4],B[5]), y=Math.max(y0, gy(x,z)+0.25);
     const sat= x!==out.x || y!==out.y || z!==out.z; out.set(x,y,z); return sat;
   }
-  const lightsOf=()=>rigs.map(r=>({ x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on }));
-  /* one frame: hands = [{ x, y, d, play }] (canvas pixels, depth 0…1; play = the note hand) */
-  function update(dt, t, hands, fx){
-    now=t; if(fx) fxv=fx;
-    const kk=reduce?0.4:1, H2=hands||[], play=H2.find(h=>h.play), other=H2.find(h=>h!==play);
+  const lightsOf=()=>rigs.map((r,i)=>i ? { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on } : { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, call:playing ? gather : 0, scatter:playing ? 0 : rel });
+  /* RUN 9 (slice 1): THE NIGHT — once per frame from core/night.js: the moon's place and light under the clouds, the mist layers, the sleep
+     timer's depth, the mood's look (eased) */
+  let nt=null, deep=nightDeep(0), moodId=opt.mood||null, fkNow=1;
+  function night(dt, t, nin){
+    const N=nightAt(t); nt=N; deep=nightDeep(nin && nin.sleep);
+    if(nin && nin.mood!==undefined && nin.mood!==moodId){ moodId=nin.mood; mlook=moodLook(moodId); }
+    const a=1-Math.exp(-dt/MOOD_TC), tc=lookCols(mlook);
+    for(const k in pal) pal[k].lerp(tc[k], a);
+    fogK+=(mlook.fog-fogK)*a; mistK+=(mlook.mist-mistK)*a; fliesK+=(mlook.flies-fliesK)*a;
+    const avg=N.mist.reduce((x,y)=>x+y,0)/N.mist.length, ml=N.moonLight;
+    s.fog.color.copy(pal.fog); hemi.color.copy(pal.sky); hemi.groundColor.copy(pal.under); s.fog.density=fogK*(0.92+0.16*avg)*(1+0.25*deep.e);
+    moonS.position.set(N.moon[0],N.moon[1],N.moon[2]); moonD.position.set(N.moon[0],N.moon[1],N.moon[2]+0.5);
+    moonS.material.color.copy(pal.moonhalo); moonD.material.color.copy(pal.moonhalo);
+    moonS.material.opacity=0.55*(0.35+0.65*ml)*deep.light; moonD.material.opacity=(0.3+0.7*ml)*deep.light;
+    moonL.color.copy(pal.moon); moonL.intensity=0.3*ml*deep.light; moonL.position.set(N.moon[0]*0.72, N.moon[1]+3, -30);
+    N.clouds.forEach((c,i)=>{ const sp=clouds[i], au=Math.abs(c.u), v= au<1.5 ? 0.5+0.5*Math.cos(Math.PI*au/1.5) : 0; sp.visible=v>0.003;
+      sp.position.set(N.moon[0]+c.u*NIGHT.clouds.span, N.moon[1]+c.y, N.moon[2]+5); sp.material.opacity=0.92*c.dens*v; sp.material.color.copy(pal.cloud); });
+    mists.forEach(([tx,sp,m,pm],i)=>{ m.position.y=0.9+N.rise[i]; pm.opacity=Math.min(0.62, 0.26*N.mist[i]*mistK*deep.mist); pm.color.copy(pal.haze).multiplyScalar(0.55+0.45*ml); });
+  }
+  /* one frame: hands = [{ x, y, d, play }] (canvas pixels, depth 0…1; play = the note hand); nin = the bus «calmNight» ({ mood, sleep 0…1 }) */
+  function update(dt, t, hands, fx, nin){
+    now=t; if(fx) fxv=fx; night(dt, t, nin);
+    const kk=(reduce?0.4:1)*deep.motion, H2=hands||[], play=H2.find(h=>h.play), other=H2.find(h=>h!==play);
     rigs.forEach((r,i)=>{ const h= i===0 ? play : other; let on=0;
       if(h){ r.sat=place(h.x, h.y, h.d, r.tgt); on=1; if(r.on<0.02) r.cur.copy(r.tgt); r.d+=(h.d-r.d)*Math.min(1, dt*8); }
       r.on+=(on-r.on)*Math.min(1, dt*(on>r.on?6:2.5));
@@ -153,7 +195,7 @@ export function buildForest(T, opt){
       let wob=1; if(i===0){   // C5: the light's colour (Warmth / Brightness) and its tremble (Wave)
         const u=Math.abs(fxv.tone-0.5)*2, to= fxv.tone<0.5 ? WARM : COLD; lc.copy(LC).lerp(to,u); hlc.copy(HC).lerp(to,u); r.light.color.copy(lc); r.halo.material.color.copy(hlc);
         if(fxv.wave>0.005 && !reduce){ const ph=2*Math.PI*4.5*t; wob=1+0.3*fxv.wave*Math.sin(ph); r.grp.position.x+=0.06*fxv.wave*Math.sin(ph); r.grp.position.y+=0.04*fxv.wave*Math.cos(ph*1.3); } }
-      r.light.intensity=1.9*dim*r.on*pul*(1+r.glint)*wob; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
+      r.light.position.copy(r.grp.position); r.light.intensity= r.on>0.01 ? 1.9*dim*r.on*pul*(1+r.glint)*wob : 0; r.core.scale.setScalar((i?0.1:0.16)*(1+r.glint*0.7)); r.core.material.opacity=r.on;
       /* RUN 8: the playing light's halo follows the depth — near: small and bright, far: wide and soft (as the 2D fingertip's halo) */
       const dk= i ? 1 : 0.7+0.9*r.d, hs=(i?0.9:1.5)*(1+r.glint*0.9)*pul*dk; r.halo.scale.set(hs,hs,1); r.halo.material.opacity=0.55*r.on*dim*(i ? 1 : 1.15-0.45*r.d);
       r.ht+=dt; if(r.ht>0.03){ r.ht=0; r.hist.unshift(r.cur.clone()); if(r.hist.length>r.trail.length) r.hist.pop(); }
@@ -161,17 +203,28 @@ export function buildForest(T, opt){
     });
     /* C5: echoes due now become rings at the place the note was struck; each ring grows and fades in 0.9 s */
     for(let j=echoes.length-1;j>=0;j--){ const e=echoes[j]; if(t<e.at) continue; echoes.splice(j,1);
-      const g=rings.find(x=>x.t0<0) || rings.reduce((a,b)=>a.t0<b.t0?a:b); g.t0=t; g.amp=e.amp; g.sp.position.copy(e.pos); g.sp.visible=true; }
-    for(const g of rings){ if(g.t0<0) continue; const k=(t-g.t0)/0.9; if(k>=1){ g.t0=-1; g.sp.visible=false; g.sp.material.opacity=0; continue; }
+      const g=rings.find(x=>x.t0<0) || rings.reduce((a,b)=>a.t0<b.t0?a:b); g.t0=t; g.amp=e.amp; g.sp.position.copy(e.pos); g.sp.visible=true;
+      life.echo(e.pos.x, e.pos.z, e.amp, t); }   // RUN 9: and a ring on the water
+    for(const g of rings){ if(g.t0<0) continue; const k=(t-g.t0)/0.9; if(k>=1 || k<0){ g.t0=-1;   // RUN 9: a clock moved back (probes) ends a ring, never grows it
+      g.sp.visible=false; g.sp.material.opacity=0; continue; }
       g.sp.scale.setScalar(0.25+1.3*k); g.sp.material.opacity=g.amp*(1-k)*(1-k); }
-    fliesStep(flies, lightsOf(), dt, t, kk);
+    /* RUN 9: GATHER while playing (τ 2.5 s); when the notes stop the fireflies are RELEASED and drift away slowly (τ 10 s) */
+    playing= music>0.15 && rigs[0].on>0.5; gather+=((playing?1:0)-gather)*(1-Math.exp(-dt/(playing?2.5:7))); rel= playing ? gather : rel*Math.exp(-dt/10);
+    rare.step(dt, t, { light:rigs[0].cur, flies });   // RUN 9 (slice 4): a rare event may begin (the emblem steers some flies)
+    fliesStep(flies, lightsOf(), dt, t, kk, rare.form());
     const pa=fg.attributes.position.array, ga=fg.attributes.aGlow.array;
     music*=Math.exp(-dt/1.8); const mg=1+0.6*Math.min(1,music);
-    flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=q.glow*mg; });
+    const fk=fkNow=deep.flies*fliesK;   // RUN 9: the sleep and the mood dim the wild lights
+    flies.forEach((q,i)=>{ pa[i*3]=q.p[0]; pa[i*3+1]=q.p[1]; pa[i*3+2]=q.p[2]; ga[i]=q.glow*mg*fk; });
     fg.attributes.position.needsUpdate=fg.attributes.aGlow.needsUpdate=true;
-    wild.forEach((l,i)=>{ const q=flies[Math.min(flies.length-1,i*7)]; l.position.set(q.p[0],q.p[1],q.p[2]); l.intensity=q.glow*0.7*(1+0.5*Math.min(1,music)); });
-    hemi.intensity=0.26*(1+0.15*Math.min(1,music));
-    if(Lv.mist) mists.forEach(([tx,sp])=>{ tx.offset.x=(t*sp*kk)%1; });
+    wild.forEach((l,i)=>{ const q=flies[Math.min(flies.length-1,i*7)]; l.position.set(q.p[0],q.p[1],q.p[2]); l.intensity=q.glow*0.7*(1+0.5*Math.min(1,music))*fk; });
+    hemi.intensity=0.26*(1+0.15*Math.min(1,music))*(0.8+0.2*nt.moonLight)*deep.light;   // RUN 9: the sky follows the moon and the sleep
+    if(Lv.mist) mists.forEach(([tx,sp])=>{ tx.offset.x=(t*sp*(reduce?0.4:1))%1; });
+    /* RUN 9 (slice 3): the leaves sway with the ambience's WIND (its level, the gust of its sweep); a still air without it */
+    const wi=(nin && nin.wind) || { level:0, gust:0 }, sway=(0.25+0.75*wi.level*(0.65+0.35*wi.gust))*deep.sway*(reduce?0.4:1);
+    life.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, lightCol:rigs[0].light.color, moon:nt.moon, moonK:nt.moonLight*deep.light, fogD:s.fog.density,
+      sway, shimmer:reduce ? 0 : fxv.wave, dim:deep.light });   // RUN 9 (slice 2)
+    detail.update(dt, t, { light:rigs[0].cur, lightOn:rigs[0].on, moon:nt.moon, moonK:nt.moonLight*deep.light, mist:nt.mist.reduce((a,b)=>a+b,0)/nt.mist.length, wind:sway, cam:camera.position });
     /* parallax: the camera leans a little towards the playing light (near and far things slide past each other) */
     const f0=rigs[0].on>0.05 ? rigs[0].cur : camLook;
     camGoal.set(clamp(f0.x,-4,4)*0.16, (clamp(f0.y,0,5)-1.7)*0.1, 0); if(reduce) camGoal.multiplyScalar(0.3);
@@ -179,6 +232,7 @@ export function buildForest(T, opt){
   }
   /* a note began on this rig's hand (from the bus `notes` ring) */
   const glint=(i,vel)=>{ const r=rigs[i]; if(r) r.glint=Math.max(r.glint, clamp(vel==null?0.6:vel,0.18,1)); music=Math.min(1.5, music+0.35*clamp(vel==null?0.6:vel,0.18,1));
+    if(r && i===0 && r.on>0.05){ life.glint(vel, r.cur.x, r.cur.z, now); rare.glint(); }   // RUN 9: a wave of light across the moss, the mushrooms nearby pulse (and an open flower)
     if(r && i===0 && fxv.echo>0.02){ const v=clamp(vel==null?0.6:vel,0.18,1); let amp=0.9*v*fxv.echo;   // C5: one ring per echo, each fainter by the feedback
       for(let k=1;k<=6 && amp>0.03;k++){ echoes.push({ at:now+k*fxv.time, amp, pos:r.cur.clone() }); amp*=Math.max(0, fxv.fb); } } };
   /* probes: numbers only (never pixels) */
@@ -186,8 +240,12 @@ export function buildForest(T, opt){
   const state=()=>({ rigs:rigs.map(r=>({ x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, sat:r.sat })), shadows:rigs.filter(r=>r.light.castShadow).length, shadowSize:SH,
     flies:flies.length, trail:Lv.trail, fov:camera.fov, cam:[camera.position.x, camera.position.y, camera.position.z], fliesAt:flies.map(q=>q.p.slice()),
     fx:{ ...fxv, color:[rigs[0].light.color.r, rigs[0].light.color.g, rigs[0].light.color.b], echoesDue:echoes.length, rings:rings.filter(g=>g.t0>=0).length },   // C5
-    music, halo:rigs[0].halo.scale.x, hemi:hemi.intensity });   // RUN 8
+    music, halo:rigs[0].halo.scale.x, hemi:hemi.intensity,   // RUN 8
+    night:{ phase:nt?nt.phase:0, moon:[moonS.position.x, moonS.position.y, moonS.position.z], cover:nt?nt.cover:0, moonLight:nt?nt.moonLight:1, moonI:moonL.intensity,   // RUN 9
+      clouds:clouds.map(c=>c.visible ? c.material.opacity : 0), mist:mists.map(x=>x[3].opacity), mistY:mists.map(x=>x[2].position.y), fog:s.fog.density, deep:deep.e, mood:moodId,
+      fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies) });   // RUN 9 (slice 2)
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   resize(W,H);
-  return { id:'room.forest', scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf };
+  return { id:'room.forest', scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail,
+    held:rare.held, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

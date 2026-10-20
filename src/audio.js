@@ -2049,7 +2049,7 @@ function ambienceOn(on, level=AMB.level, when, seed=0){ if(!AC) return; if(!amb)
   ambienceRetune(when); ambienceSet(E, amb, on, level, when); }
 function ambienceRetune(when){ if(amb) ambienceTune(E, amb, tonicFreq()/2, droneSecondHz(), when); }
 function ambienceTick(until){ if(amb && amb.on) ambienceSchedule(E, amb, until!=null ? until : AC.currentTime+AMB.ahead); }
-const ambienceInfo=()=> amb ? { on:amb.on, level:amb.level, hz:amb.hz.slice() } : null;
+const ambienceInfo=()=> amb ? { on:amb.on, level:amb.level, hz:amb.hz.slice(), origin:amb.origin } : null;   // RUN 9: origin = the wind sweep's start (the forest's leaves sway with it)
 function droneOn(level=0.18,when,tc=1.2){ if(!AC)return; const t=when!=null?when:AC.currentTime;
   dG.gain.setTargetAtTime(level,t,tc);
   const [f1,f2]=droneHz();

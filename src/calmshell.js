@@ -7,7 +7,8 @@
    with a black veil together; a tap on the veil wakes. Lantern and the note-field choice are remembered on this device (localStorage). */
 import { BUS } from './core/bus.js';
 import { CALM_UI, showStep, nextOf, sleepLevel } from './core/calmui.js';
-import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setCalmStrikes, AC, leadOn, leadOff, timbreIdx } from './audio.js';
+import { sleepProgress } from './core/night.js';   // RUN 9: the sleep timer deepens the night
+import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setCalmStrikes, AC, leadOn, leadOff, timbreIdx, ambienceInfo } from './audio.js';
 import { fxDenorm } from './modules/effects/param.js';
 import { CALM_FX } from './modules/effects/calm.js';
 import { AMB } from './core/ambience.js';
@@ -105,6 +106,7 @@ function tick(now){
   $('calmShell').classList.toggle('show', st.shown && !info && !asleep);
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
   const fxv=calmFxNow(); BUS.set('calmFx', fxv);   // C5: the effects hand's values for the forest's visuals (rings, colour, tremble)
+  BUS.set('calmNight', { mood:D.mood(), sleep:sleepProgress(sleep.t0, sleep.mins, now), wind:windNow() });   // RUN 9: the forest's palette (mood), the night's depth (sleep), the wind
   bars(now, Array.isArray(hv) ? hv : [], fxv);   // RUN 8 (slice 3)
   if(sleep.mins){ const L=sleepLevel(sleep.t0, sleep.mins, now);
     if(Math.abs(L.level-lastFade)>0.002 || (L.level===0 && lastFade!==0)){ lastFade=L.level; outputFade(L.level, 0.4); }
@@ -178,6 +180,10 @@ async function measure(){
 }
 /* the room's reach (Forest depth, its 4th parameter) — set on the instance like a fixed value (the hand never aims at it) */
 function reachSet(v){ const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.params[3]) I.params[3].setNorm(Math.max(0, Math.min(1, +v||0))); }
+/* RUN 9 (slice 3): the WIND the forest's leaves sway with — the ambience's level (0 when off) and the gust of its wind sweep (its own 0.06-Hz
+   drift, read from the audio clock and the sweep's start: the leaves move with what is heard; reading the clock touches no sound) */
+function windNow(){ const I=amb && AC ? ambienceInfo() : null; if(!I || !I.on) return { level:0, gust:0 };
+  return { level:I.level, gust:Math.sin(2*Math.PI*AMB.wind.rate*(AC.currentTime-I.origin)) }; }
 /* C5: the three Calm effects as the forest reads them — Echo (amount, its time in seconds, feedback), Warmth / Brightness (tilt, ½ flat), Wave */
 function calmFxNow(){ const key=chainKeyOf('ld'), E=fxInstance(key,'cecho'), T=fxInstance(key,'ctone'), W=fxInstance(key,'cwave'), a=E ? E.params[0].cur : 0;
   return { echo:a, time: E ? fxDenorm(E.params[1], E.params[1].cur) : CALM_FX.echo.time, fb:CALM_FX.echo.fbK*a, tone: T ? T.params[1].cur : 0.5, wave: W ? W.params[1].cur : 0 }; }

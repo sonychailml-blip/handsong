@@ -101,7 +101,7 @@ store a COPY of each tuning · Scala readiness · a "central tone" for patets ·
 answered 2026-10-14) → NOW: **FOUNDATION = stage 3** (✅ LIC1, ✅ PRIV1, ✅ LAT1, ✅ PROBE1, ✅ GOLD1, ✅ HAND1, ✅ LAT1b, ✅ SND-F1; ✅ LAT2, ✅ LAT3, ✅ CAM-FIX, ✅ REC1, ✅ REC2, ✅ REC3 (2026-10-15/16), ✅ REC4, ✅ REC5, ✅ FMT1, ✅ TIM1, ✅ GES1 (NIGHT + DAY run), ✅ UI1b, ✅ TIM2, ✅ SAVE1 (files), ✅ DRAW1 (DAY run);
 ✅ AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1 part 1, SONG3 (= SAVE1 + AUTOSAVE1) (RUN 3); ✅ PACK1, IDS1 part 2, SONG2; ✅ RUN 4: DOC1, SONG3 rest, POOL1, ENG2, TIM3a–d; plans CMD1/VIS1 written; ✅ RUN 5: CMD1a–d, DOC1 rest;
 the CALM PLAN written (`docs/STAGE4-CALM-plan.md`, reviewed 2026-10-17); UI1a after the redesign) → **4 «Calm»** (RUN 6: ✅ C0, VIS1a–c,
-listening page, design proposals; RUN 7: ✅ sound pass, C11, C6, C4b, C4c, C7, C5; RUN 8: ✅ the user's fixes, the forest picture, C8 part (Lighter forest); next C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12) = FIRST
+listening page, design proposals; RUN 7: ✅ sound pass, C11, C6, C4b, C4c, C7, C5; RUN 8: ✅ the user's fixes, the forest picture, C8 part (Lighter forest); RUN 9: ✅ the living forest; next C8 rest (phone numbers, auto-proposal), C9 offline, C10 release, C12) = FIRST
 RELEASE (§7.16; offline, detection in a worker, low-power; the user's own visual design §7.19 before it) → **4b installation (kiosk) mode**
 (§7.18) → **5** SAVING (on the device + file export/import; same format and ids), export with Scala, audio tracks and AUDIO TAKE, mixer
 per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** → **6 MIDI CONTROLLER** → **7** new-engine instruments,
@@ -162,15 +162,17 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
   back; reload + Zoom normal), then step 95 (evening, each low-light setting 20 s + Copy; on this webcam 15/24 fps fall back to Off, short
   exposure too dark — light is the fix) · step 97 (camera busy / off / blocked → message, «Try again»).
 
-### NIGHT, DAY, RUN 3–6 (2026-10-16/17): records in archive B («Moved from HANDOFF.md at …» the next run); logs `NIGHT-LOG.md`, `WORK-LOG.md`.
-### RUN 7 (2026-10-17/18) — Calm v1: record moved to archive B «Moved from HANDOFF.md at RUN 8»; log: `WORK-LOG.md` «RUN 7».
-### RUN 8 (2026-10-19) — the user's Calm fixes (steps 106–113), the forest picture, C8 part; log + plain summary: `WORK-LOG.md` «RUN 8»
-- CRACKLE: struck strikes had no cap (~1000 live oscillators, underruns) → Calm only (the user: Full exactly as RUN 7): caps in the profile
-  (`calm.json` «voices»; the oldest fades — `modules/timbres/strikes.js`) + a cheaper strike path; Full builds RUN 7's strike (row «FULL untouched»).
-- LEVELS: Calm trims in `data/profiles/calm.json` «levels» (Firefly +16.06, others −2); depth keeps the loudness (±1 dB); ghost louder;
-  Calm's volume floor «volume».left 0.30 (the far left = 30 % of the right). Baselines: timbres.before / census = RUN 7; GOLD = RUN 7 but fdepth.
-- VISIBLE: depth halo, «Лес» bar, three effect bars, the effects hint once, a quiet row glow, fingertips as fireflies (dev switch), one
-  message at a time, the «Лес» slider = the forest at most (Forest depth `reach`).
-- FOREST was black (the opaque 2D canvas) → screen-blended in Forest only; music energy; quality levels (dev switch; default high).
-- C8 part: «Lighter forest» in ⓘ (FDN room — Forest depth `light`, caps × 0.6, picture medium) + «Measure this device» (dev).
-  Not done: C8 rest (phone numbers), C9, C10, C12. Open: steps 114–119.
+### NIGHT, DAY, RUN 3–8 (2026-10-16…19): records in archive B («Moved from HANDOFF.md at …» the next run); logs `NIGHT-LOG.md`, `WORK-LOG.md`.
+### RUN 9 (2026-10-19/20) — the living forest (Calm only; Full untouched); log + plain summary: `WORK-LOG.md` «RUN 9»
+- NIGHT (`core/night.js`): a 24-min seamless cycle — the moon drifts, 7 cloud passes dim it, four mist layers; the sleep timer deepens and
+  stills the night; moods Glow / Dusk / Mist recolour the forest (token sets). Bus `calmNight` { mood, sleep, wind } from the shell.
+- RESPONSE (`core/forestlife.js`, `forest-life.js`): a ring of light per note; mushrooms / flowers pulse; fireflies gather while you play;
+  a stream with the moon's reflection — Echo = rings on the water, Wave = the leaves shimmer, Warmth = the light's colour.
+- DETAIL (`forest-detail.js`): instanced grass + ferns sway with the ambience's wind (its level and audible gust); falling leaves (shader);
+  moths at the light; moonbeams; foreground silhouettes. RARE (`forest-rare.js`): a falling star or the five-dot emblem every few minutes,
+  a flower on a note held ~3 s; never the same twice in a row.
+- BUDGET (Intel HD 4000, two synthetic hands, vs Dark): medium −6 % hand detections (in budget), high −34…−36 % (breaks it; cost follows
+  resolution and frame rate, not content) → DEFAULT = MEDIUM (high stays a dev choice); 0 dropouts. Opening the forest compiles ~20 shaders
+  (2–3 s first time, then ~0.4 s) — now inside the opening; the hand lights never change the light count (no recompile on the first hand).
+- Rows: core «NIGHT cycle», «FOREST life», «NIGHT rare events»; browser «FOREST night cycle / response / detail / rare events / levels».
+  Captures: `ui-snap --forest`. Open: steps 120–124, questions in WORK-LOG.

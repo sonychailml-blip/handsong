@@ -76,6 +76,11 @@ VIS1c (RUN 6, Calm plan §3.1) — the night forest's WILD FIREFLIES and its gro
 - const (2): `FOREST_FLIES`, `FOREST_DEPTH`
 - fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
 
+## src/core/forestlife.js
+RUN 9 — THE FOREST'S LIFE, as numbers.
+- const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
+- fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
+
 ## src/core/format.js
 FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({ format:'handsong/<kind>', version, id, … }), the current version of each kind, the migration steps (one pure function …
 - class (1): `Bad`
@@ -91,6 +96,11 @@ LAT2a — the SEARCH SCHEDULE for hand detection.
 LAT1 — latency bookkeeping.
 - const (10): `LAT_N`, `BT_MS`, `BT_LABEL`, `frameWaitMs`, `withFrameWait`, `perMinute`, `STARTUP_MS`, `MP_LINE`, `SOFT_GL`, `isSoftwareGL`
 - fn (6): `makeMeter`, `statsOf`, `handToSound`, `looksBluetooth`, `rateOf`, `splitLongTasks`
+
+## src/core/night.js
+RUN 9 — THE NIGHT over the forest, as numbers.
+- const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
+- fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
 
 ## src/core/pack.js
 PACK1 (RUN 3, 2026-10-16; stage-3 plan slice 33; user decision: build it now, no UI) — PACKS AND OFFLINE LICENCE KEYS.
@@ -436,7 +446,7 @@ PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user
 
 ## src/probes/forest.js
 VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
-- fn (3): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`
+- fn (8): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`
 
 ## src/probes/freeze.js
 PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost.
@@ -786,6 +796,20 @@ DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis
 - const (5): `rollAutValAt`, `rollBendProbe`, `rollSnapBeat`, `rollAutSnapV`, `rollRowsProbe`
 - fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
 
+## src/views/scene/forest-detail.js
+RUN 9 (slice 3) — THE FOREST'S DETAIL.
+- const (1): `DETAIL`
+- fn (1): `buildDetail`
+
+## src/views/scene/forest-life.js
+RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
+- fn (3): `patchGroundWaves`, `patchSway`, `buildLife`
+
+## src/views/scene/forest-rare.js
+RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is core/night.js rareStep, seeded): a FALLING STAR streaks across the sky (one additi…
+- const (1): `RARE_LOOK`
+- fn (1): `buildRare`
+
 ## src/views/scene/forest.js
 VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
 - const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
@@ -793,7 +817,7 @@ VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built wit
 
 ## src/views/scene/host.js
 VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Calm plan §3) — THE SCENE HOST and Calm's BACKGROUNDS.
-- const (7): `BACKGROUNDS`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`
+- const (12): `BACKGROUNDS`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
 - fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## src/views/stack.js
@@ -811,7 +835,7 @@ DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer
 - const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
-_156 modules, 2065 exported names._
+_161 modules, 2107 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

@@ -1797,3 +1797,225 @@ STARTED follow-up 2026-10-19 17:30
   CONTROL cap off; no clipping; no click from the fade) and «CALM low power» (caps × 0.6); the real-time part judges on a cool machine.
 - Verdicts: data 29 / 0; P.all 136 rows all pass, P.calm 22 rows all pass — each run reported ONE difference: my new row shared its position
   (at 1001.7) with «TIM3 timbres = before» (fixed: 1001.75); P.quick after the fix PASS 102 / 0; static PASS; CSP / network / UI PASS.
+
+# RUN 9 — the living forest (Calm) (2026-10-19)
+The user: «the forest already creates the atmosphere and looks good, but it is empty: not enough life and detail. A person should want to stay
+in it for tens of minutes.» Decision: keep the forest scene and three.js r128; life over time and response to the playing, then detail; no
+animals (moths are fine); no new ambience sounds; Full unchanged. Lean probes: data + the slice's rows + P.quick per slice; P.all + P.calm at the end.
+STARTED baseline budget measurement (before any change) 2026-10-19 18:05
+- BASELINE (RUN 8 code, before any change; tools/forest-budget.eval.js — Calm, fake camera on, two synthetic hands through the real gesture path,
+  a note every 0.5 s, 12 s per step, each forest step against the mean of its two Dark neighbours; this laptop, GeForce GT 635M):
+  forest high −22.3 % / −20.8 % hand detections per second (scene ≈ 33 fps) · forest medium −8.9 % / +1.2 % (≈ 23 fps) · dropouts 0 everywhere.
+  With two hands HIGH ALREADY BREAKS the 10 % budget (RUN 8 measured with no hands: the playing light's point-light shadow renders the scene 6
+  more times only while a hand is in view).
+STARTED slice 1 THE NIGHT'S SLOW CYCLE 2026-10-19 18:20
+
+## Slice 1 — the night's slow cycle (done; Calm only)
+- NEW CORE `src/core/night.js` (pure, rule #36): THE CYCLE `nightAt(t)` — period 24 min, a seamless loop by construction (every term has a
+  whole number of cycles per period; the cloud passes never cross the seam): the moon drifts on a small closed path (x ±5, y ±1.6 world
+  units, raised above most trunk tops so it shows between them); 7 seeded cloud passes per night (35–95 s half-widths, densities 0.5–0.95,
+  none in the first 150 s — the first look is the clear moon) dim the moon's light to 0.38 at the deepest and it returns; four mist layers
+  roll in and out (1 / 2 / 3 / 2 cycles per night, own phases, and rise and sink a little). SLEEP `nightDeep(s)` (s = the timer's progress,
+  `sleepProgress`): smooth, deepest at the end — light × 0.45, firefly lights × 0.4, motion × 0.5, mist × 1.5 (sway × 0.3 for slice 3).
+  MOODS `MOOD_LOOKS` / `moodLook(modeId)`: Glow = the base tokens, Dusk (violet sky, warm low moon, less mist), Mist (pale blue-grey, thick
+  mist, a shorter view) — new tokens `--cv-forest-{haze,cloud}`, `--cv-forest-dusk-*`, `--cv-forest-misty-*` (moods are slice 2's item, the
+  palette machinery came here).
+- THE ROOM (`views/scene/forest.js`): a moon disc inside its halo on the drifting path; 7 cloud sprites (normal blending, in front of the moon)
+  slide across it with their passes; the moon's directional light = 0.3 × moon light × sleep; the sky (hemisphere) follows the moon and the
+  sleep; the four mist sheets: opacity per layer × the mood's mist × sleep, rising / sinking, coloured by the look's haze × the moonlight; fog
+  density breathes with the mist (and the sleep); the palette eases to a new mood's look (τ 2.5 s). The mist's texture drift no longer
+  multiplies absolute time by a changing factor (it would jump).
+- BUS: new state topic `calmNight` { mood, sleep } written by the Calm shell each frame; the host passes it to the room (and the mood at
+  opening, through a read-only reader). Probe / capture only: `sceneClockDbg(sec)` (host) moves the room's clock into the cycle.
+- ROWS: data «NIGHT cycle (core)» 49 / 0 (seamless — CONTROL a 1.5-cycle term differs; no jump ≥ 0.03 in 0.5 s anywhere incl. the seam; the
+  first 150 s clear; the moon dims ≤ 0.45 and clears to 1; ≥ 5 passes; drift ≥ 8; each mist layer ranges ≥ 0.6, no two layers r > 0.95;
+  sleep ends exact and monotone; every Calm mood has a look and every look token exists — CONTROL an unknown mood falls back to Glow).
+  Browser «FOREST night cycle» (P.calm, quick) 13 / 0: the room's moon = the core's, its light = 0.3 × moonLight; over one cycle the moon
+  drifts 10 units, its light 0.114…0.300, a cloud sprite shows (0.79), each mist layer moves; t and t + period draw the same; sleep 1 → moon
+  light 0.135 vs 0.300, sky ≤ ½, wild lights × 0.4 (CONTROL no input = sleep 0); Dusk's fog reaches its token within 2 % (CONTROL Glow stays
+  on the base). «CALM forest picture» +1: the shell's mood reaches the room through the bus. Also passing: «VIS1c forest room» 37 / 0,
+  «VIS1c backgrounds» 33 / 0, «CALM forest picture» 26 / 0. Fix rounds: 2 (a variable name taken by the camera's look target; a «≠» in a
+  probe string not in the licence register's glyph list).
+- SCREENSHOTS (GPU capture works headless: `node tools/ui-snap.mjs --save <tag> --forest` — new forest screens): run9f1 — the clear moon, a
+  cloud over it, Dusk, Mist, the deep-sleep night, landscape (the moon hid behind a trunk there → its path raised from y 17 to 23).
+- P.quick for slice 1 alone did not finish (3-min default limit; then 8 min while my static check and data runner ran beside it on this
+  2-core laptop — 94 of 103 rows, all 0 differences); folded into slice 2's P.quick (below). Lesson: never run two jobs at once here.
+STARTED slice 2 RESPONSE TO THE PLAYING 2026-10-19 19:35
+
+## Slice 2 — response to the playing (done; Calm only)
+- NEW CORE `src/core/forestlife.js` (pure): the STREAM's fixed path (Catmull–Rom through 8 points, near left → far right, through the place
+  where the moon's reflection falls; `streamAt`, `STREAM_LINE`, `streamNear`); the GLOWING MUSHROOMS and FLOWERS' seeded places (28 + 10 in
+  clusters, in the aisle z 0.5 … −12.5, never in the water); `pulseOf` (a note's pulse by distance, Gaussian, reach 2.6); fixed RING lists
+  (`ringAdd` takes a free slot or the oldest, `ringsAge`). `core/fireflies.js`: optional `call` / `scatter` per light (call — reach + 9, a
+  gentle drift in from beyond the old reach; scatter — the pull suspended from scatter ≥ 1/1.6 and a soft outward push); 0 / absent = the
+  old step exactly.
+- NEW `src/views/scene/forest-life.js` (built by the room): GROUND WAVES — a patch on the ground's own material (no geometry, no overdraw):
+  each note sends a ring of light across the moss from the light's ground point (6 slots, 3 s, 2.2 units/s, coloured by the light = Warmth /
+  Brightness); MUSHROOMS / FLOWERS — instanced unlit caps (dome-shaded) and petals + one glow point each (fake glow), a slow breath and a pulse
+  per note by distance (τ 0.7 s), colours from the mood's look (new tokens shroom / bloom per mood, stem, water); THE STREAM — a ribbon with
+  its own small shader (dark water, the sky and fog in the reflection, the MOON's and the playing light's reflections, a slow flow); ECHO →
+  RINGS ON THE WATER at the stream's nearest point, one per echo, fainter by the feedback (the RUN 7 rings around the light stay); THE LEAVES —
+  the ferns sway gently (a vertex patch; slice 3 ties it to the wind) and WAVE makes them shimmer at 4.5 Hz.
+- THE FIREFLIES gather to the playing light while notes come (τ 2.5 s) and are released when they stop (τ 10 s): 35 within 3 units while
+  playing vs 15 silent; 10 s after the playing stops 0 (the first try: 40 — the light's normal pull won as soon as the release faded; the core
+  test held scatter at full and could not see it → the release model above).
+- Moods change the palette (slice 1's machinery) — now the mushrooms' and flowers' colours too.
+- ROWS: data «FOREST life (core)» 55 / 0. Browser «FOREST response» (P.calm, quick) 16 / 0: one note = one ground wave at the light's ground
+  point, gone after its life (CONTROL no note); the nearest mushroom pulses 0.468, ≥ 5× those 6 units away, fades (CONTROL no pulse without a
+  note); gather / scatter as above; Echo 0.8 → ≥ 2 water rings, each exactly on the stream (CONTROL Echo 0: none); Wave 0.7 → the leaves'
+  shimmer uniform (CONTROL 0); Warmth → the waves' colour = the light's (warm); Dusk → the mushrooms' token within 2 %. «CALM forest picture»
+  +3: every shader program compiles (13–22, 0 failed); the ground waves RENDER — exact A/B: ONE frame rendered twice (waves' gain 1, then 0;
+  host `sceneSnapDbg(alt)`), three notes add 11.29 to the mean RGB sum; CONTROL the same frame twice differs by exactly 0.000. (The first
+  version compared two moments and read −1.33 once — a lottery, replaced.)
+- Looks fixed from the screenshots (run9f2): the stream rendered as a bright band (the scene outputs sRGB: a linear 0.1 reads as 0.35) →
+  darker water with ripple variation; mushrooms near the camera were huge flat discs → placed further out, dome-shaded, dimmer (the glow
+  point carries the light); the waves were hidden behind ferns in the stills (they do render — measured above).
+- P.quick (slices 1 + 2): PASS — 104 checks, 0 differences (476 s, --limit-quick 12). Data PASS 31 / 0. Static PASS. LIC1 PASS.
+  Fix rounds: 4 (the scatter model; the lottery wave measure; my check left music energy for the next control — moved after it; shell
+  backslashes broke two strings again — fixed with the editor).
+STARTED slice 3 DETAIL 2026-10-19 20:25
+
+## Slice 3 — detail (done; Calm only)
+- The STREAM with the moon's reflection was built in slice 2 (Echo's rings needed water); here the rest.
+- NEW `src/views/scene/forest-detail.js` (built by the room): GRASS — one instanced draw (3500 blades high / 1400 medium, thin tapered blades
+  in tufts, off the water and away from the camera's foot, instance colours between two tokens), swaying in the vertex shader; FALLING LEAVES
+  — points, entirely in the shader (each on its own 12–24-s loop, turning, drifting with the wind, lit near the playing light; 60 / 24);
+  MOTHS — 6 / 3 pale points with flickering wings that flutter round the playing light and drift up and fade when it goes (CPU, a few only);
+  MOONBEAMS — 4 / 2 additive planes from the moon's direction through the gaps (no volumetrics), their light ∝ the moon's light² (clouds,
+  sleep) and a little more in mist; FOREGROUND SILHOUETTES — two dark fronds and a leafy branch close to the camera at the screen's corners,
+  placed from the camera's frustum on every resize (never over the middle), the camera's lean slides them against the forest.
+- THE WIND: the ferns and grass sway with the AMBIENCE's wind — the shell publishes `calmNight.wind` { level (the ambience's, 0 when off),
+  gust = sin of its own 0.06-Hz sweep read from the audio clock and the sweep's start (`audio.ambienceInfo().origin`, a read-only field
+  added; no sound changed) }; sway = 0.25 (still air) + 0.75 · level · (0.65 + 0.35 · gust), × the sleep's 0.3 at its deepest; the grass
+  bends 2.2× the ferns (`patchSway(mat, U, amp)`, the amp part of the program key). New tokens: --cv-forest-grass, -grass-dry, -leaf-fall,
+  -moth, -sil.
+- Looks fixed from the screenshots (run9f3): the first grass was wide spikes near the camera → thin blades, further out; leaves smaller and
+  darker; moonbeams were invisible at 0.075 → 0.16 and wider (still subtle — clearest in Mist).
+- ROWS: browser «FOREST detail» (P.calm, quick) 23 / 0: each level draws its defined counts; wind 1 at the gust's top → sway 1, no ambience →
+  0.25 (CONTROL), sleep → 0.3; moths within 1.14 of the light and fully visible, < 0.1 four seconds after it goes; moonbeams under the densest
+  cloud 0.13×, deep sleep 0.20×; silhouettes off the central 40 % × 40 % in portrait and landscape (CONTROL a centre box is caught).
+  «CALM forest picture» 30 / 0 (+1: the ambience's wind reaches the room — level 0.60, sway 0.603; 18 shader programs, 0 failed; the ground
+  waves' exact A/B 9.91, control 0.000).
+- Data PASS 31 / 0 · P.quick PASS — 105 checks, 0 differences (346 s) · static PASS · LIC1 PASS. Fix rounds: 0 on the rows (2 look rounds).
+STARTED slice 4 RARE EVENTS 2026-10-20 (session 2, after the usage limit)
+
+## Slice 4 — rare events (done; Calm only)
+- CORE (`core/night.js`): `RARE`, `rareInit`, `rareStep(st, t, held)` — seeded; TIMED: a FALLING STAR or the fireflies forming the FIVE-DOT
+  EMBLEM, due 150–290 s after the last event (the first 100–170 s in), the kind drawn (star 62 %, emblem 38 %) among those ≠ the last;
+  PLAYED: a GLOWING FLOWER opens when a note has been held ≥ 2.5 s, ≥ 60 s after the last event and not after a flower. Never the same kind
+  twice in a row. Quiet nights alternate emblem / star (16 an hour); with playing, flowers break the pattern. `emblemPoints()` — the Hush
+  mark's five dots (icons.js 150 × 30) as an arc above the aisle. `core/fireflies.js`: optional `form` { to (per fly), k } — the listed
+  flies spring to their points (k 0…1), the rest fly as ever; absent = the old step exactly.
+- NEW `views/scene/forest-rare.js`: the STAR — one additive streak, 1.4 s, far and drawn over the trunks (this forest has no open sky; with
+  depth testing it hid behind the dense trunks); the FLOWER — seven petals hinged at the centre unfold at the playing light's foot (never in
+  the water) in 3 s, stay 18 s, close in 4 s, brighten with each note, a soft glow; the EMBLEM — the 3 nearest fireflies per dot spring to
+  it (2.5 s), hold 3.5 s, are let go (2 s). The host tracks how long the playing note is held (bus `notes` on / off per owner; entries over
+  a minute dropped, holds over 30 s ignored) → `room.held(sec)`.
+- Also: the RUN 7 echo-ring sprites now end when the clock goes back (probes / captures move it): their opacity / scale formula exploded
+  into a screen-sized white sprite (seen in a capture, never in the app — its clock only goes forward).
+- ROWS: data «NIGHT rare events (core)» 11 / 0 (8 simulated hours with long-held notes now and then: same seed same night; no repeat —
+  CONTROL without the rule repeats; timed ≥ 150 s, flowers ≥ 60 s after the last and only on a held note; 10–30 an hour; all three kinds; the
+  first timed one in 100–170 s; no flower without a held note; the emblem arc symmetric). Browser «FOREST rare events» (P.calm, quick)
+  12 / 0: the star shows, moves down, ends; the flower opens fully in 3.2 s by the light, not in the water, gone after ~25 s; the emblem's
+  15 fireflies — before 2.69, formed 0.003, let go 2.15 (CONTROL far before); 12 quiet minutes: emblem 145 s, star 392 s, emblem 625 s; a note
+  held 3 s a minute later opens a flower. «CALM forest picture» +1: a held note on the bus reaches the host and the room (its own owner's
+  age vs the elapsed time — the first versions read the room's maximum, which another row's unclosed note inflated, then a nominal sleep
+  that ran long on the busy page).
+- CAPTURES (run9f4: star, flower, emblem portrait + landscape): `ui-snap --forest` no longer walks every element's style before a forest
+  screenshot (seconds — the star was over by then); `sceneSnapDbg(alt, full)` can grab the drawing buffer at full size (the 64 × 36 downscale
+  misses a 3-px streak).
+- P.quick: 106 checks, 0 differences, 1 «not checked: tab hidden» (VIS1c backgrounds — one animation frame took over a second; looked at in
+  slice 5). Data PASS 32 / 0. Static PASS. Fix rounds: 5 (first-event test assumption; the white sprite; the star hidden — three tries; the
+  held-note check twice).
+STARTED slice 5 BUDGET AND QUALITY 2026-10-20
+
+## Slice 5 — budget and quality (done; Calm only)
+- LEVELS (host.js `LV` + forest.js `FOREST_LEVELS`), each a defined set: HIGH — 0.85 × CSS pixels (never above one device pixel each; the
+  forest is soft), 60 fps, the playing light's shadow (one light, 1024² / 512² on small screens), 70 fireflies, 16-step trails, moving mist,
+  28 mushrooms + 10 flowers, 3500 grass blades, 60 leaves, 6 moths, 4 moonbeams, the stream, silhouettes; MEDIUM («Lighter forest» too) —
+  0.6 ×, 30 fps, NO shadow, 35 fireflies, 8-step trails, still mist, 14 + 5, 1400 blades, 24 leaves, 3 moths, 2 beams, the stream, silhouettes;
+  LOW — no WebGL (the 2D stand-in: the night's two colours and a glow at each hand). No post-processing anywhere (glow = sprites / points);
+  animation in shaders where it can be (grass and fern sway, leaves, water, ground waves, mist drift).
+- MEASURED the RUN 8 way (`tools/forest-budget.eval.js`: Calm, the fake camera on, two synthetic hands through the real gesture path, a note
+  every 0.5 s, 12 s per step, each forest step vs the mean of its two Dark neighbours; 0 audio dropouts in every step). The browser used the
+  INTEL HD 4000 in this session (RUN 8 named the GeForce GT 635M; the baseline's GPU was not recorded — before / after compare with care).
+  BEFORE (RUN 8 code): high −22.3 / −20.8 %, medium −8.9 / +1.2 %.
+  AFTER (RUN 9 content + levels): HIGH −34.4 / −36.0 % (no shadow −28.0 / −30.0 %), MEDIUM −6.2 / −6.3 %. → HIGH BREAKS THE BUDGET on this
+  laptop; medium is inside it. The DEFAULT is now MEDIUM (`SCENE_LEVEL_DEFAULT`; a device that chose high keeps its choice).
+  Diagnosis pass: high without grass / leaves / beams / mushrooms / moths −34.7 % (content is not the cost); high at medium's resolution
+  −21.4 %; medium's counts at 0.85 −30.4 % → the cost follows RESOLUTION and FRAME RATE (the GPU is shared with the hand model).
+- STALLS found and fixed: (1) the first frame after opening compiled every shader (1–4 s inside a frame → the «not checked: tab hidden»
+  row) → `renderer.compile` inside the opening (2–3 s the first time on this laptop, ~0.4 s later — reported, not hidden: choosing Forest
+  holds the picture that long); (2) the hand lights were hidden with the hand → a light count change recompiles every lit shader on the
+  first hand → the lights stay in the scene at intensity 0 (high: the shadow map renders even without a hand).
+- Row «FOREST levels» (P.calm, drawn) 12 / 0: pixel ratio 0.85 / 0.6, fps caps 60 / 30, shadow only at high, low makes no context; 20
+  programs compiled inside the opening; the first two hands recompile nothing (23 → 23) — CONTROL one more light makes new ones (→ 29).
+  «VIS1c forest room»: medium now expects no shadow. Measurement-only doors: `sceneShadowDbg`, `sceneOptDbg`.
+- The audio thread untouched (no new sound; `ambienceInfo` only reports the wind sweep's start).
+STARTED final run 2026-10-20
+
+## Final run (RUN 9 end, 2026-10-20)
+- `--all --calm --limit-min 45`: P.all PASS — 141 checks, 0 differences (922 s); P.calm PASS — 27 checks, 0 differences (558 s); state guard
+  clean; GOLD 99 / 0, AUD1 census 19 / 0, TIM3 timbres = before (in P.all) — Full's sound unchanged; UI checks, CSP, network (596 requests, own
+  origin + MediaPipe) PASS. Data PASS 32 / 0. Static PASS. LIC1 PASS (192). NAME-INDEX current. doc-split PASS. HANDOFF 20.1 KB.
+- Slice 5's own P.quick was not run separately — the final P.all (a superset) covered it, to keep the shared limit lean.
+- ui-snap Full `run9full` vs RUN 7's `run7full2`: the style table differs only in RUN 8's known hidden Calm items (47 elements under
+  #calmShell, #calmForest display); PIXELS DIFFER on every screen at rendering level (gradients ±1–2, a few hundred glyph-edge pixels, max
+  60–87 at edges) — this session's Chrome rendered on the Intel HD 4000 (RUN 8's 0-pixel compare was presumably on the GeForce). RUN 9 changed
+  no Full file (index.html and style.css untouched; tokens.css only new --cv-forest-* canvas tokens; Full never opens the forest) — NOT
+  proven to 0 pixels in this session; a capture on the same GPU as run7full2 would settle it.
+- New: src/core/night.js, src/core/forestlife.js, src/views/scene/forest-life.js, forest-detail.js, forest-rare.js, tools/forest-budget.eval.js.
+  Changed: src/core/fireflies.js, src/core/bus.js (comment), src/views/scene/forest.js, host.js, src/calmshell.js, src/audio.js (ambienceInfo
+  + origin), src/engine/surface.js, src/probes/forest.js, tokens.css, tools/probe-data.mjs, tools/ui-snap.mjs, docs/NAME-INDEX.md and
+  THIRD-PARTY-LICENSES.md (generated), HANDOFF.md, CLAUDE.md, docs/STAGE4-CALM-plan.md, archive/{CLAUDE-history,HANDOFF-history}.md, WORK-LOG.md.
+- Process: no git command was run. The shell ate backslashes in heredocs again (four times; caught by node --check / the static check) — long
+  edits went through files or the editor. Two runs at once on this 2-core laptop starved P.quick once — never again.
+
+# SUMMARY FOR THE USER — RUN 9 (plain language)
+**The forest now lives.** Everything below is in the calm app only; the full app is unchanged (its sounds checked exactly).
+1. **A slow night (24 minutes, then it repeats without a seam).** A moon shines between the trees and drifts slowly. Every few minutes a
+   cloud slides over it — the forest gets darker, then the light comes back. Mist near the ground thickens and thins in layers. With the
+   sleep timer on, the night gets darker and calmer towards the end. The three moods now change the colours: Glow (as before), Dusk (violet
+   sky, warm moon), Mist (pale, thick mist).
+2. **The forest answers your playing, gently.** Each note sends a soft ring of light across the moss from your light. Small glowing
+   mushrooms and flowers near the light pulse with the notes. Keep playing and the wild fireflies gather round your light; stop and they
+   drift away slowly. A dark stream crosses the forest floor with the moon reflected in it: Echo makes rings on the water, Wave makes the
+   ferns and grass shimmer, Warm ↔ Bright tints the light and its rings.
+3. **More detail.** Grass and ferns sway with the wind you hear (the «Forest» slider is the wind's strength), leaves fall, a few moths
+   circle your light, faint moonbeams slant through the trees, and dark leaves frame the corners close to your eyes.
+4. **Rare moments, every few minutes, never the same twice in a row:** a falling star; the fireflies gathering into the five-dot emblem for
+   a few seconds; and when you hold one note for about 3 seconds, a glowing flower opens at your light's foot.
+5. **Cost.** On your laptop the forest shares the graphics chip with the hand tracking. «Medium» costs about 6 % of hand detection (our
+   limit is 10 %); «high» costs about 35 %. So **medium is now the default**, and high stays a developer choice. Opening the forest takes
+   1–3 seconds the first time (the picture holds still meanwhile). No sound crackle in any test.
+**Test verdicts:** full test suite 141 / 141, calm suite 27 / 27, data 32 / 32, the golden sounds unchanged. The full app's screens look the
+same; the screenshot comparison shows small rendering differences because this session drew on your laptop's other graphics chip.
+
+**Your steps, tap by tap** (Live Server; open `http://127.0.0.1:5500/?calm`; headphones; a lamp beside you):
+1. **The night (step 120).** Begin → when the controls show, tap **Background** until «Forest». Look up left: a moon between the trees. Keep it
+   open about 5 minutes: a cloud slides over the moon and the forest dims, then it clears. The mist near the ground slowly thickens and thins.
+   Tap **Mood**: Dusk (violet), Mist (pale, foggy), Glow (as before) — the colours change over a few seconds. Tap **Sleep** → 15 min and let
+   it run: the forest darkens and stills towards the end. Quick look without waiting (open `?calm&probe`, press F12 → Console):
+   `(await import('./src/views/scene/host.js')).sceneClockDbg(630)` = a cloud over the moon; `…sceneClockDbg(60)` = the clear moon.
+2. **The answer to playing (step 121).** Raise your right hand and play slowly: a ring of light runs over the moss from the light; the
+   glowing mushrooms and flowers near it pulse. Play for 10 seconds — fireflies gather round your light; stop (keep the hand up) — they drift
+   away. Find the stream (a dark band across the floor) with the moon in it. Left hand: index to thumb and up (Echo) — rings on the water
+   with each echo; ring finger (Wave) — the ferns and grass tremble; middle finger (Warm ↔ Bright) — the light and its rings turn amber or white.
+3. **Detail (step 122).** Lower your hands → move the **Forest** slider up and down: the grass and ferns sway more or less, in time with the
+   wind you hear. Watch falling leaves, the moths round your light (and how they fly off when your hand goes), the faint moonbeams (clearest in
+   Mist), the dark leaves in the corners. Turn the phone / resize to landscape: nothing covers the middle.
+4. **Rare moments (step 123).** Leave the forest for about 10 minutes: a falling star or the five-dot emblem in fireflies every few minutes.
+   Hold one note for about 3 seconds: a glowing flower opens at your light's foot. To see them at once (Console):
+   `(await import('./src/views/scene/host.js')).sceneRoomDbg().rareDbg('star')` (or `'emblem'`, `'bloom'` with your hand up).
+5. **Quality and the cost (step 124).** ⓘ → «Forest picture: medium» (the new default) — try «high» and «low» and compare the look. If your
+   laptop shows «high» already, it is your earlier choice — pick «medium» once. Then ⓘ → «Measure this device» (2 minutes) with the forest
+   on — send us the text; and the same on the Poco M5. Tell us if choosing Forest freezes for too long.
+
+**Questions for you (plain words):**
+1. Medium is now the default because high costs about a third of the hand tracking on your laptop. Does medium look good enough to you, or
+   should we work on making high cheaper (it is the picture's size and speed that cost, not the details)?
+2. The night repeats every 24 minutes, with a cloud over the moon about every 3 minutes. Too often, too rare, or right?
+3. The rare moments come every 2.5–5 minutes. Right for a person who stays tens of minutes, or should they be rarer?
+4. Opening the forest takes 1–3 seconds on your laptop (the picture holds still). Acceptable, or should we show a gentle «the forest is
+   waking» moment?
+5. The falling star passes in front of the trees (this forest has no open sky). Does it look natural to you?
