@@ -9,7 +9,6 @@
 import { stackAdd, stackSet } from '../stack.js';
 import { cv } from '../../../palette.js';
 import { ctx, canvas as cv2d } from '../../../vision.js';
-import { buildForest } from './forest.js';
 import { BUS } from '../../../pure/bus.js';
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
 
@@ -20,7 +19,10 @@ export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);
    times — measured: the largest share of the forest's cost to hand detection). */
 const LV={ full:{ scale:0.85, fps:60, shadow:true }, reduced:{ scale:0.6, fps:30, shadow:false }, minimal:{ scale:0, fps:0, shadow:false } };
 let shadowOver=null, optOver=null;   // probe / measurement only: force the shadow on / off at the next opening (null = the level's); optOver { scale, lv } overrides
-const ROOMS={ forest:buildForest };
+/* SPLIT-2: an app registers its rooms; a page with none never loads the library */
+const ROOMS={};
+let threeLoad=null;
+export const sceneRoomAdd=(id, rec)=>{ ROOMS[id]=rec.build; threeLoad=rec.three; };
 const REDUCE=typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* RUN 8 (slice 4): the scene's QUALITY is a choice remembered on this device (the development switch in Calm's ⓘ: high / medium / low =
    full / reduced / minimal); nothing switches by itself yet (C8 decides from measurements) */
@@ -33,7 +35,7 @@ const errors=[], info={ fps:0, ms:0, frames:0, t0:0 };
 
 /* three.js r128, once (own origin; CSP script-src 'self') */
 export function loadThree(){
-  return loading || (loading=import('../../../../vendor/three-r128/three.min.js').then(()=>{ const T=globalThis.THREE;
+  return loading || (loading=threeLoad().then(()=>{ const T=globalThis.THREE;
     if(!T || T.REVISION!=='128') throw new Error('three.js r128 did not load'); THREE=T; return T; }).catch(e=>{ loading=null; throw e; }));
 }
 function makeRenderer(){

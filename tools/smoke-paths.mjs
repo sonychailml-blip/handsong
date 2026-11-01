@@ -12,7 +12,7 @@ import { chromium } from 'playwright-core';
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), CDN_DIR=path.join(ROOT,'tools','.cdn-cache');
 const argv=process.argv.slice(2), out=s=>console.log(s), NO_CONTROL=argv.includes('--no-control');
 /* the tree's entry pages: moved with the layout */
-const PAGES={ full:'index.html', night:'index.html?calm' };
+const PAGES={ full:'apps/full/', night:'apps/night/' };
 const BEGIN={ full:'#startBtn', night:'#calmBegin' };
 const distOf=app=>{ const i=argv.indexOf('--dist'); if(i<0) return null; const a=argv.slice(i+1).find(x=>x.startsWith(app+'=')); return a ? path.resolve(a.slice(app.length+1)) : null; };
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
@@ -74,7 +74,7 @@ async function run(app, dir, prefix, breakWorklet=false){
       if(fr.csp.length) miss('CSP violation: '+fr.csp.slice(0,3).join('; '));
       if(app==='full' && !fr.lit) miss('the first frame drew nothing on the canvas');
       if(app==='night' && !fr.scene && !fr.lit) miss('neither the room nor the canvas drew anything'); }
-    if(app==='full'){ if(seen.some(([u])=>/three\.min\.js|\.woff2/.test(u))) miss('Full requested the forest library or its fonts'); }
+    if(app==='full'){ if(seen.some(([u])=>/three\.min\.js|\.woff2|\/apps\/night\//.test(u))) miss('Full requested the forest library, its fonts or a Night file'); }
     if(app==='night'){ await page.waitForTimeout(1500);
       const f=await page.evaluate(async ()=>{ await document.fonts.ready; return [...document.fonts].filter(x=>x.status==='loaded').map(x=>x.family.replace(/"/g,'')); });
       if(!f.includes('Andika')) miss('the Andika font did not load: '+f.join(','));

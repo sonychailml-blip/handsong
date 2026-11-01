@@ -1,0 +1,20 @@
+{
+  "format": "handsong/profile",
+  "version": 1,
+  "id": "profile.fixture",
+  "name": {"en": "Test fixture", "ru": "Проверочный"},
+  "roles": ["ld"],
+  "handFn": {"ld": {"L": "fx", "R": "note"}},
+  "noteModes": ["note", "hold"],
+  "key": {"tonic": 9, "cents": 0},
+  "moods": ["major-penta"],
+  "timbres": ["solo.firefly"],
+  "effects": null,
+  "scene": null,
+  "backgrounds": ["camera"],
+  "shell": "full",
+  "noteField": "full",
+  "labels": "full",
+  "recording": true,
+  "ambience": null
+}

@@ -16,7 +16,7 @@ import { depthOf, depthN, melodicZone, polyZone, leadZone, liveKey, monoKey, wOn
 
 /* ЗАЦЕПКИ ОБУЧЕНИЯ (tutor). События шлём В ТОЧКАХ РЕАЛЬНОГО ДЕЙСТВИЯ (не пересчитываем параллельно):
    событие возникает ⇔ действие произошло. Обучение учит ТЕКУЩЕЙ жест-модели — при изменении жестов
-   эти зацепки НАДО править вместе с ними. tutorTap — nullsafe обёртка (hooks.tutor ставит core/tutor.js). */
+   эти зацепки НАДО править вместе с ними. tutorTap — nullsafe обёртка (hooks.tutor ставит apps/full/tutor.js). */
 const tutorTap=(kind,payload)=>{ if(hooks.tutor) hooks.tutor(kind,payload); };
 let tutSeenT=0;   // троттлинг heartbeat 'seen' (рука в кадре) — ~1/с
 /* ================= ОБРАБОТКА РУК =================

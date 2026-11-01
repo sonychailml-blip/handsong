@@ -1,5 +1,5 @@
 /* RUN 7 (C6, Calm plan §5; docs/CALM-QUALITY.md points 5, 8, 9) — the Calm shell's LOGIC. CORE: pure (rule #36), node-tested (data row
-   «CALM shell (core)»). The DOM side is core/calmshell.js.
+   «CALM shell (core)»). The DOM side is apps/night/shell.js.
    - showStep: the controls fade in when no hand has been seen for CALM_UI.idleMs (1.5 s) and fade out as soon as a hand is back;
    - nextOf: a round button cycles its list (the person taps again for the next value);
    - sleepLevel: the sleep timer (15 / 30 / 60 min) — full level until the last CALM_UI.sleepFadeMs, then a slow cosine fade to silence (the

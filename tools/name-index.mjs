@@ -12,9 +12,9 @@ import { lex } from './lex.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT='docs/NAME-INDEX.md', STALE='docs/STALE-NAMES.md';
-const listJs=(d)=>readdirSync(join(ROOT,d),{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listJs(d+'/'+e.name) : e.name.endsWith('.js') ? [d+'/'+e.name] : []);
+const listJs=(d)=>readdirSync(join(ROOT,d),{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? (e.name==='vendor' ? [] : listJs(d+'/'+e.name)) : (e.name.endsWith('.js') && e.name!=='sw.js') ? [d+'/'+e.name] : []);
 export function gather(){
-  const texts={}; for(const f of listJs('core').sort()) texts[f]=readFileSync(join(ROOT,f),'utf8');
+  const texts={}; for(const f of ['core','apps','tools/probes'].flatMap(listJs).sort()) texts[f]=readFileSync(join(ROOT,f),'utf8');
   return { texts, stale: existsSync(join(ROOT,STALE)) ? readFileSync(join(ROOT,STALE),'utf8') : '' };
 }
 /* the first sentence of the file's head comment (block or line comments before the first code), one line, at most 200 characters */
@@ -49,7 +49,7 @@ function exportsOf(src){
 }
 export function build(inp){
   const L=['# NAME INDEX — code names by module (GENERATED — do not edit by hand)','',
-    '_Generated from `core/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.',
+    '_Generated from `core/`, `apps/`, `tools/probes/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.',
     'Kinds: fn, const, let, class, «→ ./x.js» a re-export. Meaning of a name: the code and `archive/CLAUDE-history.md`. The hand-written index',
     'before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of this file (kept by hand in `docs/STALE-NAMES.md`)._',''];
   let nMod=0, nName=0;

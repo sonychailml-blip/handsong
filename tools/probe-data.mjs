@@ -1,5 +1,5 @@
 /* ⛳ ПРОБЫ ДАННЫХ В NODE — без браузера, камеры и звука (слайс «быстрые пробы»).
-   Гоняет ТЕ ЖЕ функции, что строки P.all() T0 / T1 / T2 / T6b / «стопка» / F4: они живут в core/probedata.js, который импортирует только
+   Гоняет ТЕ ЖЕ функции, что строки P.all() T0 / T1 / T2 / T6b / «стопка» / F4: они живут в tools/probes/core/probedata.js, который импортирует только
    scales/state/i18n (и через них config, scaleload, userstore, hooks) — ни draw, ни ui, ни audio, ни recorder. В P.all() эти строки
    остаются: браузерный прогон — полный барьер, этот — быстрый ответ до передачи работы.
    Запуск из корня репозитория:  node tools/probe-data.mjs        (вывод всех строк проб: node tools/probe-data.mjs --verbose)
@@ -290,7 +290,7 @@ async function iconCore(){
     if([...String(v)].some(c=>iconGlyphs.has(c))) d.push(`${L} ${k}: an icon glyph written directly — use {i:name}`);
     const out=I18.withLang(L,()=>I18.t(k)); if(String(out).includes('{i:')) d.push(`${L} ${k}: t() left a token: ${out}`); }
   for(const [name,g] of Object.entries(IC.ICONS)){ n++; if(![...g].every(c=>iconGlyphs.has(c))) d.push(`icon ${name} «${g}»: not an «icon» glyph of the register`); }
-  const html=fs.readFileSync(new URL('../index.html', import.meta.url),'utf8');
+  const html=fs.readFileSync(new URL('../apps/full/index.html', import.meta.url),'utf8')+fs.readFileSync(new URL('../apps/night/index.html', import.meta.url),'utf8');
   for(const m of html.matchAll(/data-icon="([^"]*)"/g)){ n++; const v=m[1]; if(v.includes('{i:')) tokErr('index.html data-icon', v); else if(!(v in IC.ICONS)) d.push(`index.html data-icon «${v}»: unknown icon`); }
   { const before=d.length; tokErr('CONTROL', '{i:no-such-icon}'); if(d.length===before) d.push('CONTROL: an unknown icon name was not caught'); else d.pop(); }
   return { cases:n, total:d.length, differences:d };
@@ -451,8 +451,8 @@ async function profileCore(){
   const rd=async f=>JSON.parse(await readFile(new URL('../core/data/'+f, import.meta.url),'utf8'));
   const ix=await rd('index.json'), tix=await rd('timbres/index.json');
   const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm','fdepth','cecho','ctone','cwave'] };   // RUN 7: + Calm's own effects
-  const pix=await rd('profiles/index.json'), recs=[];
-  for(const name of pix.order){ n++; let r; try{ r=await rd('profiles/'+name+'.json'); }catch(e){ miss(name+': '+e.message); continue; }
+  const recs=[];
+  for(const name of ['apps/full/data/full.json','apps/night/data/night.json']){ n++; let r; try{ r=JSON.parse(await readFile(new URL('../'+name, import.meta.url),'utf8')); }catch(e){ miss(name+': '+e.message); continue; }
     recs.push(r); const why=P.checkProfile(r, known); if(why) miss(`${r.id||name}: ${why}`); }
   n++; if(JSON.stringify(recs.map(r=>r.id))!==JSON.stringify([...P.PROFILE_IDS])) miss('profile ids '+JSON.stringify(recs.map(r=>r.id))+' ≠ the pinned '+JSON.stringify(P.PROFILE_IDS));
   const full=recs.find(r=>r.id==='profile.full'), calm=recs.find(r=>r.id==='profile.calm');
@@ -551,7 +551,7 @@ async function calmShellCore(){
    positions after 900 steps (15 s, exact, twice); a light gathers them (flies within 2.5 of it after 15 s; CONTROL: with the light off far fewer are — a pull that does nothing is caught); the depth bands: d 0 → near, 1 → far, monotonic, flat in a band */
 async function fliesCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const F=await import(new URL('../core/pure/fireflies.js', import.meta.url).href);
+  const F=await import(new URL('../apps/night/pure/fireflies.js', import.meta.url).href);
   const h=A=>{ let x=0x811c9dc5; for(const f of A) for(const v of [...f.p, ...f.v, f.glow]){ x^=Math.round(v*1e9)|0; x=Math.imul(x,0x01000193); } return (x>>>0).toString(16); };
   const run=(light)=>{ const A=F.fliesInit(); for(let i=0;i<900;i++) F.fliesStep(A, [{ x:0, y:1.6, z:-3, on:light?1:0 }], 1/60, i/60); return A; };
   n++; if(h(F.fliesInit())!==h(F.fliesInit())) miss('two inits from one seed differ');
@@ -571,7 +571,7 @@ async function fliesCore(){
    layers move each its own way; the sleep's depth (exact ends, monotone); every Calm mood has a look whose tokens exist in tokens.css */
 async function nightCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const N=await import(new URL('../core/pure/night.js', import.meta.url).href), P=N.NIGHT.period;
+  const N=await import(new URL('../apps/night/pure/cycle.js', import.meta.url).href), P=N.NIGHT.period;
   const flat=o=>[o.phase%1, ...o.moon, o.cover, o.moonLight, ...o.mist, ...o.rise, ...o.clouds.flatMap(c=>[c.u, c.dens, c.y])];
   const diff=(a,b)=>Math.max(...a.map((v,i)=>Math.abs(v-b[i])));
   let worst=0; for(let i=0;i<240;i++){ const t=i*P/240+0.37; worst=Math.max(worst, diff(flat(N.nightAt(t)).slice(1), flat(N.nightAt(t+P)).slice(1)), diff(flat(N.nightAt(t)).slice(1), flat(N.nightAt(t+3*P)).slice(1))); }
@@ -594,7 +594,7 @@ async function nightCore(){
   if(Math.abs(D1.light-0.45)>1e-12||Math.abs(D1.flies-0.4)>1e-12||Math.abs(D1.motion-0.5)>1e-12||Math.abs(D1.mist-1.5)>1e-12) miss('sleep 1: '+JSON.stringify(D1));
   let mono=true, pl=2; for(let i=0;i<=50;i++){ const v=N.nightDeep(i/50).light; if(v>pl+1e-12) mono=false; pl=v; } n++; if(!mono) miss("the sleep depth is not monotone");
   n+=3; if(N.sleepProgress(0,0,5e5)!==0) miss('no timer: progress ≠ 0'); if(N.sleepProgress(0,10,3e5)!==0.5) miss('half of a 10-min timer ≠ 0.5'); if(N.sleepProgress(0,10,9e5)!==1) miss('past the end ≠ 1');
-  const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../core/data/profiles/calm.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../tokens.css', import.meta.url),'utf8');
+  const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../apps/night/data/night.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../core/tokens.css', import.meta.url),'utf8');
   for(const m of prof.moods){ n++; if(!N.MOOD_OF[m]) miss('the Calm mood '+m+' has no look'); }
   for(const [k,L2] of Object.entries(N.MOOD_LOOKS)) for(const tn of Object.values(L2.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(tok)) miss(`look ${k}: no token --cv-${tn} in tokens.css`); }
   n++; if(N.moodLook('no-such-mood')!==N.MOOD_LOOKS.glow) miss('CONTROL: an unknown mood does not fall back to Glow');
@@ -607,7 +607,7 @@ async function nightCore(){
    (their mean distance grows vs a light that keeps them) — CONTROL a light without call / scatter is exactly the old step */
 async function lifeCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const Li=await import(new URL('../core/pure/forestlife.js', import.meta.url).href), Fl=await import(new URL('../core/pure/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
+  const Li=await import(new URL('../apps/night/pure/forestlife.js', import.meta.url).href), Fl=await import(new URL('../apps/night/pure/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
   n++; if(L.length!==S.seg+1) miss('stream line has '+L.length+' points');
   let gap=0; for(let i=1;i<L.length;i++) gap=Math.max(gap, Math.hypot(L[i].x-L[i-1].x, L[i].z-L[i-1].z)); n++; if(gap>0.5) miss('stream line step '+gap.toFixed(3));
   n+=2; if(Math.hypot(L[0].x-S.pts[0][0], L[0].z-S.pts[0][1])>1e-9 || Math.hypot(L[L.length-1].x-S.pts[S.pts.length-1][0], L[L.length-1].z-S.pts[S.pts.length-1][1])>1e-9) miss('stream ends are not its first / last points');
@@ -641,7 +641,7 @@ async function lifeCore(){
    one highest, symmetric) */
 async function rareCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const N=await import(new URL('../core/pure/night.js', import.meta.url).href), K=N.RARE, H=8*3600;
+  const N=await import(new URL('../apps/night/pure/cycle.js', import.meta.url).href), K=N.RARE, H=8*3600;
   const sim=(opt={}, plays=true)=>{ const st=N.rareInit(K.seed, 0, opt), ev=[], Rp=(()=>{ let a=12345; return ()=>{ a=(Math.imul(a,1103515245)+12345)>>>0; return a/4294967296; }; })(); let hs=-1, he=-1;
     for(let t=0;t<=H;t++){ if(plays && t>he+30 && Rp()<0.012){ hs=t; he=t+3+Math.floor(Rp()*5); } const held= t>=hs && t<he ? t-hs : 0; const k=N.rareStep(st, t, held); if(k) ev.push({ k, t, held }); }
     return ev; };
@@ -728,9 +728,9 @@ async function packCore(){
 }
 let REG;
 try{
-  P=await import(new URL('../core/probedata.js', import.meta.url).href);
-  await import(new URL('../core/probes/data.js', import.meta.url).href);   // PROBE1: the data rows register themselves (flag node)
-  REG=await import(new URL('../core/probes/rows.js', import.meta.url).href);
+  P=await import(new URL('../tools/probes/core/probedata.js', import.meta.url).href);
+  await import(new URL('../tools/probes/core/data.js', import.meta.url).href);   // PROBE1: the data rows register themselves (flag node)
+  REG=await import(new URL('../tools/probes/core/rows.js', import.meta.url).href);
   ({ loadReport }=await import(new URL('../core/scaleload.js', import.meta.url).href));
   LIC=await import(new URL('./check-licences.mjs', import.meta.url).href);   // LIC1: the licence register (text only, no app code)
   NIX=await import(new URL('./name-index.mjs', import.meta.url).href);   // DOC1 leftover: docs/NAME-INDEX.md generated from the code (text only)

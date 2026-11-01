@@ -2031,3 +2031,10 @@ same; the screenshot comparison shows small rendering differences because this s
 - By hand: load bases in `core/profile.js`, `core/timbreload.js`, `core/songs.js`; keys in `core/engine/surface.js`; roots and keys in the static check, licence check, name index, data runner, timbre bundle.
 - `tools/ui-snap.mjs`: two capture races removed (`calm-msg-land`, `calm-play`). Both screens now match the untouched baseline exactly.
 - Seen, not touched: in landscape Night the low-light hint overlaps the control panel. It is in the baseline too; `msgCheck` compares messages with each other only.
+
+# SPLIT-2 — checkpoint C (2026-11-01): two apps (status: docs/SPLIT-PROGRESS.md)
+- Entries `apps/full/main.js`, `apps/night/main.js`; shared loop and start in `core/legacy-ui/boot.js`. Core no longer imports an app: shell doors, face hook, scene rooms and the ghost filter are passed in by Night's entry.
+- A page declares its profile and probes by `<link>`. `?calm` is gone. The Full ↔ Night switch is gone (`#profRow`, `#calmToFull`, their keys).
+- Moved: Night's shell, ghost, forest, pure code, fonts, three.js, CSS (`apps/night/night.css`); Full's tutor, demo, songs; `style.css`, `tokens.css` into core; probes to `tools/probes/{core,full,night}`; prints to `tools/prints/` (hashes equal). Root `index.html` = a redirect.
+- New static checks 14 boundaries, 15 debt (`core/DEBT.md`), 16 pages. Rows: «NIGHT profile round trip» new, C0 by fixture, TIM3 also on Night, 23 rows moved from the Full page to Night's.
+- Capture race removed from `tools/ui-snap.mjs`: the 7-s effects hint. Side-by-side PNGs: `tools/split-baseline/side-by-side-C/`.

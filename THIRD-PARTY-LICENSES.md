@@ -15,7 +15,7 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 |---|---|---|---|---|---|
 | MediaPipe Tasks Vision — JavaScript library and its WebAssembly files | 0.10.35 | Apache-2.0 | CDN | https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35 | https://github.com/google-ai-edge/mediapipe (npm @mediapipe/tasks-vision) |
 | MediaPipe hand landmarker model (float16, version 1) | float16/1 | Apache-2.0 | CDN | https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task | Google MediaPipe model card «Hand Tracking (Lite/Full)»; models listed at https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker |
-| three.js (3D library) — the Calm forest room | r128 (npm three@0.128.0) | MIT | shipped | vendor/three-r128/three.min.js<br>vendor/three-r128/LICENSE | https://github.com/mrdoob/three.js (npm three@0.128.0, build/three.min.js; sha256 9274bbce…1ce2) |
+| three.js (3D library) — the Calm forest room | r128 (npm three@0.128.0) | MIT | shipped | apps/night/vendor/three-r128/three.min.js<br>apps/night/vendor/three-r128/LICENSE | https://github.com/mrdoob/three.js (npm three@0.128.0, build/three.min.js; sha256 9274bbce…1ce2) |
 
 - **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (core/handdet.js — on the main thread or in our worker core/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
 - **MediaPipe hand landmarker model (float16, version 1)** — Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4).
@@ -63,11 +63,11 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 
 | Item | Version | Licence | Use | Addresses / files | Source |
 |---|---|---|---|---|---|
-| App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night | — | AI-generated | shipped | icons/icon-192.png<br>icons/icon-512.png<br>icons/icon-512-maskable.png | the user's chosen design (RUN 7, BACKLOG §7.19: the C · Hush emblem in Moonglass colours), drawn by code by Claude Code in this project (canvas circles and gradients; no font, no traced artwork) |
+| App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night | — | AI-generated | shipped | apps/full/icons/icon-192.png<br>apps/full/icons/icon-512.png<br>apps/full/icons/icon-512-maskable.png<br>apps/night/icons/icon-192.png<br>apps/night/icons/icon-512.png<br>apps/night/icons/icon-512-maskable.png | the user's chosen design (RUN 7, BACKLOG §7.19: the C · Hush emblem in Moonglass colours), drawn by code by Claude Code in this project (canvas circles and gradients; no font, no traced artwork) |
 | Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui) | — | n/a | device | — | style.css --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; core/legacy-ui/draw.js ctx.font system-ui |
 | Unicode symbols and emoji used as icons and signs (list below) | — | n/a | device | — | characters in our own text; their pictures come from the device's fonts (Segoe UI Symbol / Segoe UI Emoji on Windows, Apple Color Emoji and SF on Apple devices, Noto on Android) — no file shipped |
-| Andika (text font of the Calm face) — SIL International | 7.000 (SIL release, web/Andika-Regular.woff2 and Andika-Bold.woff2, UNMODIFIED) | OFL-1.1 | shipped | fonts/andika/Andika-Regular.woff2<br>fonts/andika/Andika-Bold.woff2<br>fonts/andika/OFL.txt | https://github.com/silnrsi/font-andika/releases/tag/v7.000 (Andika-7.000.zip) — Reserved Font Names «Andika» and «SIL»: the files are shipped unmodified (no subsetting), so the name stays |
-| Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors | Google Fonts v40, weight 300, latin + cyrillic subsets (woff2) | OFL-1.1 | shipped | fonts/literata/literata-300-latin.woff2<br>fonts/literata/literata-300-cyrillic.woff2<br>fonts/literata/OFL.txt | https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name, so the subsets may keep the name |
+| Andika (text font of the Calm face) — SIL International | 7.000 (SIL release, web/Andika-Regular.woff2 and Andika-Bold.woff2, UNMODIFIED) | OFL-1.1 | shipped | apps/night/fonts/andika/Andika-Regular.woff2<br>apps/night/fonts/andika/Andika-Bold.woff2<br>apps/night/fonts/andika/OFL.txt | https://github.com/silnrsi/font-andika/releases/tag/v7.000 (Andika-7.000.zip) — Reserved Font Names «Andika» and «SIL»: the files are shipped unmodified (no subsetting), so the name stays |
+| Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors | Google Fonts v40, weight 300, latin + cyrillic subsets (woff2) | OFL-1.1 | shipped | apps/night/fonts/literata/literata-300-latin.woff2<br>apps/night/fonts/literata/literata-300-cyrillic.woff2<br>apps/night/fonts/literata/OFL.txt | https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name, so the subsets may keep the name |
 
 - **App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night** — tool: Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms · **kept — the user's chosen Calm design (RUN 7); the earlier «H» icons were replaced**
 - **Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui)** — No font file is shipped; the person's device draws the text with its own fonts. · **to be replaced by the user's own authored design (a chosen typeface under OFL-1.1 or own work, set through the UI1 design tokens)**
@@ -83,9 +83,9 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 
 | Glyph | Code point | Meaning | Kind | Used in |
 |---|---|---|---|---|
-| ↶ | U+21B6 | undo (history) | icon | core/icons.js, core/probes/cmd.js, core/probes/edit.js, core/probes/freeze.js, core/probes/history.js, core/probes/ids.js, core/probes/key.js, core/probes/songfile.js |
-| ↷ | U+21B7 | redo (history) | icon | core/icons.js, core/probes/cmd.js, core/probes/edit.js, core/probes/freeze.js, core/probes/history.js, core/probes/ids.js, core/probes/key.js, core/probes/songfile.js |
-| ⤺ | U+293A | undo the last take | icon | core/icons.js, core/probes/cmd.js, core/probes/history.js, core/probes/window.js |
+| ↶ | U+21B6 | undo (history) | icon | core/icons.js |
+| ↷ | U+21B7 | redo (history) | icon | core/icons.js |
+| ⤺ | U+293A | undo the last take | icon | core/icons.js |
 | ⇄ | U+21C4 | swap hands (help text) | icon | core/icons.js |
 | ⊘ | U+2298 | remove effect from a track | icon | core/icons.js |
 | ⌐ | U+2310 | step shape (automation / bend) | icon | core/icons.js |
@@ -93,15 +93,15 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ⌒ | U+2312 | curvature value tag | icon | core/icons.js |
 | ⌗ | U+2317 | quantise | icon | core/icons.js |
 | ⏮ | U+23EE | to the start | icon | core/icons.js |
-| ⏸ | U+23F8 | pause (message) | icon | core/icons.js, core/songs.js |
+| ⏸ | U+23F8 | pause (message) | icon | apps/full/songs.js, core/icons.js |
 | ❚ | U+275A | pause bars | icon | core/icons.js |
-| ▶ | U+25B6 | play / start | icon | core/icons.js, core/probes/engine.js, core/probes/freeze.js, core/probes/seed.js, core/probes/window.js, core/recorder.js, core/render.js, core/songs.js |
-| ■ | U+25A0 | stop (panic) | icon | core/icons.js, core/songs.js |
-| ⟳ | U+27F3 | repeat the brace | icon | core/icons.js, core/songs.js |
+| ▶ | U+25B6 | play / start | icon | apps/full/songs.js, core/icons.js, core/recorder.js, core/render.js |
+| ■ | U+25A0 | stop (panic) | icon | apps/full/songs.js, core/icons.js |
+| ⟳ | U+27F3 | repeat the brace | icon | apps/full/songs.js, core/icons.js |
 | ● | U+25CF | record / lesson step done | icon | core/icons.js |
 | ○ | U+25CB | lesson step to come | icon | core/icons.js |
-| ✕ | U+2715 | close / delete / clear | icon | core/icons.js, core/probes/cmd.js, core/probes/history.js |
-| ✎ | U+270E | edit / rename / arrangement window | icon | core/icons.js, core/probes/window.js, core/songs.js |
+| ✕ | U+2715 | close / delete / clear | icon | core/icons.js |
+| ✎ | U+270E | edit / rename / arrangement window | icon | apps/full/songs.js, core/icons.js |
 | ✂ | U+2702 | cut bars | icon | core/icons.js |
 | ⧉ | U+29C9 | copy / duplicate | icon | core/icons.js |
 | 📋 | U+1F4CB | paste | icon | core/icons.js |
@@ -118,11 +118,11 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ▸ | U+25B8 | accordion closed | icon | core/icons.js |
 | ▾ | U+25BE | accordion open | icon | core/icons.js |
 | ↕ | U+2195 | vertical hand axis | icon | core/icons.js |
-| ↔ | U+2194 | horizontal hand axis | icon | core/icons.js, core/probes/seed.js |
+| ↔ | U+2194 | horizontal hand axis | icon | core/icons.js |
 | ◆ | U+25C6 | depth hand axis | icon | core/icons.js |
 | ◧ | U+25E7 | left half (split) | icon | core/icons.js |
 | ◨ | U+25E8 | right half / split | icon | core/icons.js |
-| ✓ | U+2713 | done / chosen | icon | core/icons.js, core/probes/window.js |
+| ✓ | U+2713 | done / chosen | icon | core/icons.js |
 | ⚙ | U+2699 | settings | icon | core/icons.js |
 | ⛶ | U+26F6 | full screen | icon | core/icons.js |
 | ⬇ | U+2B07 | install | icon | core/icons.js |
@@ -138,20 +138,19 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | 🔄 | U+1F504 | switch camera | icon | core/icons.js |
 | ↑ | U+2191 | arrow key (tooltip) | typography | core/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | core/i18n.js |
-| → | U+2192 | arrow in text | typography | core/i18n.js, core/probedata.js, core/probes/autosave.js, core/probes/calm.js, core/probes/cmd.js, core/probes/detect.js, core/probes/edit.js, core/probes/eng2.js, core/probes/engine.js, core/probes/forest.js, core/probes/freeze.js, core/probes/fxcontract.js, core/probes/ids.js, core/probes/key.js, core/probes/lat.js, core/probes/nightguard.js, core/probes/profile.js, core/probes/run.js, core/probes/seed.js, core/probes/songfile.js, core/probes/sound.js, core/probes/timbres.js, core/probes/tuning.js, core/probes/window.js, core/render.js, core/songs.js |
-| − | U+2212 | minus sign | typography | core/data/palettes/bpsteps.json, core/i18n.js, core/legacy-ui/ui.js, core/legacy-ui/views/roll.js, core/legacy-ui/views/strip.js, core/probedata.js, core/probes/calm.js, core/probes/edit.js, core/probes/freeze.js, core/probes/fxcontract.js, core/probes/key.js, core/probes/window.js, core/pure/format.js, core/pure/profile.js, core/render.js, index.html |
-| ≈ | U+2248 | approximately | typography | core/i18n.js, core/legacy-ui/views/play.js, core/probes/calm.js, core/probes/lat.js, core/render.js |
-| ≤ | U+2264 | less or equal | typography | core/probes/calm.js, core/probes/forest.js, core/probes/window.js |
-| ≥ | U+2265 | greater or equal | typography | core/probes/calm.js, core/probes/forest.js, core/pure/format.js |
+| → | U+2192 | arrow in text | typography | apps/full/songs.js, core/i18n.js, core/render.js |
+| − | U+2212 | minus sign | typography | apps/full/index.html, apps/night/index.html, core/data/palettes/bpsteps.json, core/i18n.js, core/legacy-ui/ui.js, core/legacy-ui/views/roll.js, core/legacy-ui/views/strip.js, core/pure/format.js, core/pure/profile.js, core/render.js |
+| ≈ | U+2248 | approximately | typography | core/i18n.js, core/legacy-ui/views/play.js, core/render.js |
+| ≥ | U+2265 | greater or equal | typography | core/pure/format.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | core/legacy-ui/views/strip.js, core/render.js |
 | √ | U+221A | square root (console text) | typography | core/render.js |
-| ♭ | U+266D | flat (note names) | notation | core/data/modes/blues.json, core/data/tunings/shruti22.json, core/probedata.js, core/scales.js, core/songs.js, index.html |
-| ♯ | U+266F | sharp (note names) | notation | core/data/tunings/shruti22.json, core/probedata.js |
+| ♭ | U+266D | flat (note names) | notation | apps/full/index.html, apps/full/songs.js, apps/night/index.html, core/data/modes/blues.json, core/data/tunings/shruti22.json, core/scales.js |
+| ♯ | U+266F | sharp (note names) | notation | core/data/tunings/shruti22.json |
 | ♮ | U+266E | natural (chord names) | notation | core/data/palettes/edo31.json |
 | ⚠ | U+26A0 | warning (console) | console | core/render.js |
 | ⛔ | U+26D4 | forbidden (console) | console | core/render.js |
 | ⛳ | U+26F3 | rule flag (console) | console | core/render.js |
 | ✅ | U+2705 | done (console) | console | core/render.js |
 | ❌ | U+274C | failed (console) | console | core/render.js |
-| ❄ | U+2744 | frozen (console) | console | core/probes/window.js, core/render.js |
+| ❄ | U+2744 | frozen (console) | console | core/render.js |
 | ☀ | U+2600 | sun (console) | console | core/render.js |

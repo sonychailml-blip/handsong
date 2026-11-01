@@ -56,9 +56,7 @@ import { userPut } from '../userstore.js';   // SONG1: «Keep in my scales»
 import { songNeeds, songTimbreNeeds } from '../song/file.js';   // AUTOSAVE1: the song kept on this device
 import { icon } from '../icons.js';   // UI1b: every interface glyph through the icon component
 import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from '../pure/songfile.js';
-import { profileWire, profileApply, profileCurrent, profileOf } from '../profile.js';   // C0: Full ↔ Calm (the dev edition's switch)
-import { calmShellWire, calmShellFace } from '../calmshell.js';   // RUN 7 (C6): the Calm shell (its doors below)
-import { EDITION } from '../edition.js';
+import { profileWire, profileCurrent, profileOf } from '../profile.js';   // C0: the profile doors
 import { setBackground, backgroundOf, sceneInfo } from './draw.js';   // VIS1c: Calm's backgrounds (forest / dark / camera)   // SAVE1: reading a song file (pure)
 
 /* ================= UI ================= */
@@ -3059,7 +3057,7 @@ addEventListener('resize', onResize);
 applySplit(); applyInstr();      // applySplit → applySplitRoles → renderHandFn; applyInstr → renderHandFn (инициализация кнопок ролей и секции «Функции рук»)
 /* C0 (RUN 6): the profile DOORS (profile.js) — a profile writes the live state through the setters a lesson's setup uses (tutorSetScale, the
    key knob's path, the solo timbre select, setHandFn, the voice mode); `face` shows it (body.calm hides what Calm does not offer — CSS).
-   The switch sits in the Sound panel, dev edition only. */
+   SPLIT-2: a page opens in the one profile it declares; there is no switch. */
 /* RUN 7 (C4b): a profile's solo chain — the data (state.setFxChain, exact) and the sound halves (an effect leaving goes quiet, one arriving
    comes in, the path is respliced — as fxChainDrop / fxChainPut), then each FIXED value is put into its instance (the panel's own way). */
 function profChain(key, entries, amts){
@@ -3073,11 +3071,11 @@ function profChain(key, entries, amts){
   /* the old solo scalars (vibrato, drive, tremolo) are hushed when they leave the chain — coming back, they take their saved amounts again */
   if(amts) for(const eff of fxChainOf(key)) if(fxIsScalar(eff.fxId) && amts[eff.fxId]!=null && fxAmtLive[eff.fxId]!==amts[eff.fxId]){ const p=fxParamsOf(key,eff.fxId)[0]; if(p) p.set(amts[eff.fxId]); }
 }
-/* RUN 7 (C6): the Calm shell's DOORS (calmshell.js) — the same setters the profile's write and the Full panels use; the playing hand is
-   the solo hand NOT on effects, its function 'note' (Notes: follow the hand) or 'hold' (Notes: stay put). */
+/* The app shell's doors: the same setters the profile's write and the panels use; the playing hand is the solo hand NOT on effects, its
+   function 'note' or 'hold'. SPLIT-2: an app's entry takes them (core never imports an app). */
 const calmProf=()=>profileOf(profileCurrent())||{};
 const calmPlay=()=> handFn.ld.R==='fx' ? 'L' : 'R';
-calmShellWire({
+export const shellDoors=()=>({
   timbres:()=>calmProf().timbres||[], timbre:()=>timbreIdOf('ld',leadIdx),
   setTimbre:id=>{ const li=timbreIdx('ld',id); if(li!=null && li!==leadIdx){ softAllOff(); setLeadInstr(li); selLead.value=String(leadIdx); } },
   timbreName:id=>{ const i=timbreIdx('ld',id); return i!=null ? L(LEAD_INSTR[i].label) : id; },
@@ -3088,9 +3086,11 @@ calmShellWire({
   setNoteMode:v=>{ setHandFn('ld',calmPlay(),v==='hold'?'hold':'note'); softAllOff(); applyInstr(); },
   backgrounds:()=>calmProf().backgrounds||['camera'], bg:()=>backgroundOf(), setBg:m=>bgPick(m),
   plain:()=> backgroundOf()==='dark' || sceneInfo().level==='minimal',   // the glass's plain fallback (no blur)
-  toFull:()=>profPick('profile.full'),
   sound:()=>showSound(true),   // dev only: the Sound panel and its Diagnostics in Calm (the top bar is hidden there)
 });
+/* SPLIT-2: called with the profile each time a face is put on; set by the app that has a shell */
+let faceHook=null;
+export const setFaceHook=f=>{ faceHook=f; };
 profileWire({
   busy:()=> recording ? t('prof.busyRec') : null,
   read:()=>({ scaleId, tonic, tonicCents, lead:timbreIdOf('ld',leadIdx), phoneInstr, splitOn, hand:{ ...handFn.ld }, voice:voiceMode.ld,
@@ -3109,10 +3109,9 @@ profileWire({
   },
   face:p=>{
     document.body.classList.toggle('calm', p.shell==='calm');
-    $('profFull').classList.toggle('act', p.id==='profile.full'); $('profCalm').classList.toggle('act', p.id==='profile.calm');
     if(!p.recording && loop.on) onLoop();   // Calm has no transport: a playing song pauses
     const st=bgStored(); bgPick(p.backgrounds.includes(st) ? st : p.backgrounds[0], false);   // VIS1c: Full → camera; Calm → this device's choice
-    calmShellFace(p);   // RUN 7 (C6): the Calm shell shows only in the Calm face
+    if(faceHook) faceHook(p);
   },
 });
 /* VIS1c (RUN 6): Calm's background — Forest (the 3D room) · Dark (black, no WebGL) · Camera (today's picture); the same sound on each.
@@ -3125,9 +3124,6 @@ function bgPick(mode, store=true){
   setBackground(mode).then(()=>applyBgBtns()); applyBgBtns(mode);
 }
 $('bgForest').onclick=()=>bgPick('forest'); $('bgDark').onclick=()=>bgPick('dark'); $('bgCamera').onclick=()=>bgPick('camera');
-function profPick(id){ const why=profileApply(id); $('profHint').textContent= why || t('prof.hint'); }
-$('profFull').onclick=()=>profPick('profile.full'); $('profCalm').onclick=()=>profPick('profile.calm');
-if(EDITION!=='dev') for(const id of ['profSep','profRow','profHint']) $(id).style.display='none';
 
 /* СМЕНА ЯЗЫКА без перезагрузки: applyI18n (в setLang) уже обновил статические [data-i18n]; здесь
    перерисовываем ДИНАМИКУ — то, что строит/пишет JS (подписи ссылок, кнопка роли + «Функции рук»,

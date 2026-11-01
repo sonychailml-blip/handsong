@@ -109,9 +109,12 @@
    "source": "the user's chosen design (RUN 7, BACKLOG §7.19: the C · Hush emblem in Moonglass colours), drawn by code by Claude Code in this project (canvas circles and gradients; no font, no traced artwork)",
    "tool": "Claude Code (Anthropic); output owned by the user under Anthropic's commercial terms",
    "files": [
-    "icons/icon-192.png",
-    "icons/icon-512.png",
-    "icons/icon-512-maskable.png"
+    "apps/full/icons/icon-192.png",
+    "apps/full/icons/icon-512.png",
+    "apps/full/icons/icon-512-maskable.png",
+    "apps/night/icons/icon-192.png",
+    "apps/night/icons/icon-512.png",
+    "apps/night/icons/icon-512-maskable.png"
    ],
    "replace": "kept — the user's chosen Calm design (RUN 7); the earlier «H» icons were replaced"
   },
@@ -159,8 +162,8 @@
    "licence": "MIT",
    "source": "https://github.com/mrdoob/three.js (npm three@0.128.0, build/three.min.js; sha256 9274bbce…1ce2)",
    "files": [
-    "vendor/three-r128/three.min.js",
-    "vendor/three-r128/LICENSE"
+    "apps/night/vendor/three-r128/three.min.js",
+    "apps/night/vendor/three-r128/LICENSE"
    ],
    "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change."
   },
@@ -188,9 +191,9 @@
    "licence": "OFL-1.1",
    "source": "https://github.com/silnrsi/font-andika/releases/tag/v7.000 (Andika-7.000.zip) — Reserved Font Names «Andika» and «SIL»: the files are shipped unmodified (no subsetting), so the name stays",
    "files": [
-    "fonts/andika/Andika-Regular.woff2",
-    "fonts/andika/Andika-Bold.woff2",
-    "fonts/andika/OFL.txt"
+    "apps/night/fonts/andika/Andika-Regular.woff2",
+    "apps/night/fonts/andika/Andika-Bold.woff2",
+    "apps/night/fonts/andika/OFL.txt"
    ],
    "notes": "RUN 7 (C11, the user's design choice): chosen for Calm's text because Atkinson Hyperlegible (and Next) have NO Cyrillic (checked: Latin and Latin-ext subsets only); Andika is designed by SIL for literacy and low vision (distinct letterforms) and covers Cyrillic. Self-hosted, served from our own origin.",
    "replace": "kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced"
@@ -204,9 +207,9 @@
    "licence": "OFL-1.1",
    "source": "https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name, so the subsets may keep the name",
    "files": [
-    "fonts/literata/literata-300-latin.woff2",
-    "fonts/literata/literata-300-cyrillic.woff2",
-    "fonts/literata/OFL.txt"
+    "apps/night/fonts/literata/literata-300-latin.woff2",
+    "apps/night/fonts/literata/literata-300-cyrillic.woff2",
+    "apps/night/fonts/literata/OFL.txt"
    ],
    "notes": "RUN 7 (C11): Fraunces (the Moonglass proposal) has no Cyrillic (checked: vietnamese, latin-ext, latin only); Literata is a warm, soft book serif with a true Light weight and Cyrillic. Self-hosted, served from our own origin.",
    "replace": "kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced"
@@ -514,11 +517,6 @@
   {
    "ch": "≈",
    "name": "approximately",
-   "kind": "typography"
-  },
-  {
-   "ch": "≤",
-   "name": "less or equal",
    "kind": "typography"
   },
   {

@@ -1,0 +1,618 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<!-- PRIV1 (hard rule #33): the browser itself refuses any address not listed here. connect-src/script-src name only our own origin and
+     the pinned MediaPipe files (register tools/licences.json); the Vercel counter is same-origin. No inline script (the counter's stub is
+     core/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
+     the user's decision, a register entry and a line here. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title data-i18n="app.title">Handsong — жестовый синтезатор и интерактивный учебник ладов</title>
+<!-- PWA: манифест + светлый theme-color под стартовый экран. start_url/scope в манифесте ОТНОСИТЕЛЬНЫЕ
+     ("."), чтобы работало и на GitHub Pages в подпапке, и позже на своём домене (камера/звук/ворклет не
+     трогаем). iOS не читает display/icons манифеста — для «на домашний экран» дублируем apple-* мета. -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e3e9f5">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Handsong">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="handsong-profile" href="data/night.json">
+<!-- SPLIT-2: read only under ?probe; the shipped build removes this tag and the tools it names -->
+<link rel="handsong-probes" href="../../tools/probes/night.js">
+<link rel="stylesheet" href="../../core/tokens.css">
+<link rel="stylesheet" href="../../core/legacy-ui/style.css">
+<link rel="stylesheet" href="night.css">
+<!-- Vercel Web Analytics — СТАТИЧЕСКАЯ форма (два тега, без npm-пакета: импорт @vercel/analytics
+     собирается только бандлером, а у нас сборки нет — голые ES-модули, он бы просто не завёлся).
+     Считает посетителей ТОЛЬКО на развёртывании Vercel: путь /_vercel/ АБСОЛЮТНЫЙ, а GitHub Pages
+     отдаёт из подпапки — там он не разрешается, и счётчик молча бездействует. Так и задумано.
+     Сбор данных должен быть включён и в панели Vercel (уже включён). -->
+<script src="../../core/va-stub.js"></script>
+<script defer src="/_vercel/insights/script.js"></script>
+</head>
+<body>
+ 
+<!-- ================= СТАРТОВЫЙ СЛОЙ ================= -->
+<!-- Не отдельная страница, а СВЕТЛАЯ приветственная карточка на светлом фоне (после «▶ Играть» экран —
+     камера освещённой комнаты, светлый старт с ней созвучен). Камера стартует ТОЛЬКО по «▶ Играть»
+     (порядок в main.js не меняется). Две главные кнопки: «Играть» и «Обучение» — ОБЕ рабочие и обе идут
+     через ОДИН startApp (AudioContext создаётся внутри клика). «Обучение» открывает список уроков, а
+     приложение поднимает уже выбор урока — тем же кликом. Демо строёв (demo.js) и мини-учебник (#helpOv)
+     живы в коде, но кнопок запуска у них нет — им место внутри обучения, туда и переедут. -->
+<div id="start" class="ov on">
+  <div class="startCard">
+    <!-- RUN 7 (C7): THE CALM START — the same card restyled when the app boots in Calm (body.calm-boot): the emblem and the wordmark, the
+         first steps (only the first time on this device), «Begin» = the same start handler as Play (rule #1: the sound starts in this
+         click); the privacy notice stays (rule #33). -->
+    <div class="calm-only calm-start-head"><span data-svg="emblem"></span><span class="calm-word">hand<span class="calm-word-dot">·</span>song</span><span class="calm-sub">calm</span></div>
+    <ol id="calmFirstSteps" class="calm-only calm-steps">
+      <li><span class="calm-vico" data-svg="sound"></span><span data-i18n="calm.stepPhones">Use headphones — the forest is quiet.</span></li>
+      <li><span class="calm-vico" data-svg="lantern"></span><span data-i18n="calm.stepLight">Light your hands — a lamp beside you, not behind you.</span></li>
+      <li><span class="calm-vico" data-svg="hand"></span><span data-i18n="calm.stepStand">Stand your phone or laptop so both hands are free.</span></li>
+      <li><span class="calm-vico" data-svg="info"></span><span data-i18n="calm.stepCamera">Handsong will ask for your camera. Pictures never leave this device.</span></li>
+    </ol>
+    <button id="calmBegin" class="calm-only calm-begin" data-i18n="calm.begin">Begin</button>
+    <h1>Hand<span>song</span></h1>
+    <p class="startTag" data-i18n="start.tag">Жестовый синтезатор: играйте руками перед камерой.</p>
+    <div class="startBtns">
+      <button id="startBtn" data-i18n="start.play">Play</button>
+      <button id="learnBtn" data-i18n="start.learn" data-i18n-title="start.learnTitle" title="Интерактивное обучение — учимся, играя">Обучение</button>
+    </div>
+    <!-- ПОРЯДОК на карточке: Играть → Обучение → ⛶ полноэкранный → ⬇ установка → подвал. Полноэкранный
+         ВЫШЕ установки: полезен почти всем и почти каждый сеанс (увеличивает поле игры); установка НИЖЕ —
+         разовое действие и лишь для решивших оставить приложение. Обе кнопки могут отсутствовать (см. ниже);
+         display:none убирает из потока, так что раскладка ровная в любой комбинации. -->
+    <!-- Полноэкранный режим ОТДЕЛЬНОЙ кнопкой (не влит в «Играть» — выбор за пользователем, и опция
+         заметна ДО игры: полосы браузера съедают вертикаль, а она дорога полю игры). Вызов
+         requestFullscreen — только по клику (правило жеста, как звук/камера). Прячется там, где нет
+         Fullscreen API (iOS Safari на iPhone). Логика — ui.js (applyFullscreen). -->
+    <button id="fsBtnStart" title="Во весь экран: убрать полосы браузера">Fullscreen</button>
+    <!-- Установка на домашний экран (PWA). ПО РЕАЛЬНОЙ СПОСОБНОСТИ, не по браузеру: Chromium присылает
+         beforeinstallprompt — кнопка появляется ТОЛЬКО после него (иначе prompt() пуст); iOS Safari
+         события не даёт → показываем инструкцию в #installHint вместо мёртвой кнопки; уже установлено
+         (standalone) → прячем всё. Обе скрыты по умолчанию (display:none), показывает ui.js. -->
+    <button id="installBtn" data-i18n="install.btn" data-i18n-title="install.title" title="Add Handsong to your home screen" style="display:none">Install</button>
+    <p id="installHint" style="display:none"></p>
+    <p id="loadmsg"></p>
+    <!-- 0b: shown only after a failed start; retries the camera (sound and the hand model are already built) -->
+    <button id="camRetry" data-i18n="start.retry" hidden>Try again</button>
+    <p id="learnMsg"></p>
+    <!-- Подвал: тихо, но читаемо. Метки ссылок пишет ui.js (URL — константы там). Отзыв виден всегда
+         (форма или почта-fallback, адрес собирается в JS, не mailto в исходнике). Строка поддержки —
+         тихая заметка, «Donate» = донат-ссылка; при пустом DONATE_URL ui.js прячет всю строку. -->
+    <div class="startFoot">
+      <!-- Переключатель языка (i18n этап 0): тихая строка вверху подвала, не спорит с двумя главными
+           кнопками. Опции — ЭНДОНИМЫ (самоназвания). Пока English · Русский; es/de войдут позже. Значение
+           и обработчик ставит ui.js (setLang сохраняет выбор и переживает перезагрузку). -->
+      <p class="startLang"><span aria-hidden="true" data-icon="language"></span>
+        <select id="langSel" aria-label="Language / Язык">
+          <option value="en">English</option>
+          <option value="ru">Русский</option>
+        </select>
+      </p>
+      <p><span data-i18n="foot.feedbackText">First version — bugs and rough edges are likely. Tell me what breaks:</span> <a id="fbLink" rel="noopener"></a></p>
+      <p id="startSupport" class="startSupport"><span data-i18n="foot.supportText">Handsong is made by one person, in spare time, and free for everyone. If you'd like to support its development:</span> <a id="donateLink" rel="noopener"></a></p>
+      <!-- PRIV1 (rule #33, Q14): the privacy notice — what stays on the device, what the app loads, the named visitor counter -->
+      <details id="privacyNote"><summary data-i18n="privacy.title">Privacy</summary>
+        <p data-i18n="privacy.body">Your camera picture, your sound and your hand movements stay on this device.</p>
+        <p data-i18n="privacy.counter">The copy hosted on Vercel counts page visits anonymously.</p></details>
+    </div>
+  </div>
+</div>
+ 
+<!-- ================= ВЕРХНЯЯ ПАНЕЛЬ ================= -->
+<div id="bar">
+  <button id="scaleBtn" data-i18n-title="bar.scaleTitle" title="Звукоряд: лад, тоника, тембры">Лад</button>
+  <button id="soundBtn" data-i18n="bar.sound" data-i18n-title="bar.soundTitle" title="Звук и управление: тембры, функции рук, эффекты">Sound</button>
+  <button id="instrBtn" data-i18n-title="bar.instrTitle" title="Соло / Аккорды">Solo</button>
+  <button id="instrBtnL" data-i18n-title="bar.halfLTitle" title="Левая половина: инструмент">Chords</button>
+  <button id="instrBtnR" data-i18n-title="bar.halfRTitle" title="Правая половина: инструмент">Solo</button>
+  <button id="splitBtn" title="Сплит-экран: аккорды | соло на двух половинах" data-icon="split"></button>
+  <button id="camBtn" data-i18n-title="bar.camTitle" title="Переключить камеру: фронтальная / тыловая" data-icon="camera"></button>
+  <button id="fsBtn" title="Во весь экран: убрать полосы браузера" data-icon="fullscreen"></button>
+  <button id="clipBtn" title="Запись клипа: видео+звук в один файл (WebM)" data-icon="clip"></button>
+  <button id="audioBtn" title="Запись аудио: только звук в файл (WebM/Opus)" data-icon="audio-clip"></button>
+  <button id="jamBtn" title="Подложка: джем целиком или только ударные — тап откроет выбор">Backing</button>
+  <button id="loopPanelBtn" data-i18n="bar.loop" data-i18n-title="bar.loopTitle" title="Панель лупера: такты, темп, аранжировка">Loop</button>
+  <button id="recBtn" title="Запись: тап — отсчёт такта, затем игра" data-icon="record"></button>
+</div>
+
+<!-- Тост камеры: короткое сообщение при отказе переключения (нет второй камеры / нет доступа).
+     Отдельный элемент, а не строка #status — её каждый кадр переписывает drawStatus. -->
+<div id="camMsg"></div>
+<!-- ED7-fix2: after ✕ — "Song cleared" with an Undo button inside, for several seconds (ui.showUndoToast) -->
+<div id="undoToast" role="status"><span data-i18n="hist.clearedToast">Song cleared</span><button id="undoToastBtn" data-i18n="hist.undoBtn">Undo</button></div>
+<!-- AUTOSAVE1: at ▶ Play, when an autosaved song exists and the song is empty — never loaded without this answer (ui.songResumeOffer) -->
+<div id="resumeToast" role="dialog"><span id="resumeText"></span><button id="resumeYes" data-i18n="as.resume.yes">Continue</button><button id="resumeNo" data-i18n="as.resume.no">New song</button></div>
+
+<!-- Выбор подложки: крошечное меню под кнопкой 🎵. Открывается ТОЛЬКО с покоя (первый тап), дальше
+     кнопка переключает варианты внутри выбранного пути одним тапом, как раньше. Долгий тап по 🎵 —
+     вернуться к этому выбору, не докручивая цикл до конца. Позицию ставит ui.js по кнопке. -->
+<div id="backingMenu" hidden>
+  <button id="backingJam" data-i18n="backing.jam">Jam (full backing)</button>
+  <button id="backingDrums" data-i18n="backing.drums">Drums only</button>
+</div>
+
+<!-- Транспорт: тонкая HTML-полоса, пришвартована ПОД холстовой полосой лупера (drawLooper).
+     Позицию по вертикали ставит сам drawLooper (loopBarBottom), потому что высота холстовой коробки
+     растёт с числом дорожек. Видна, пока идёт транспорт или в песне есть события. -->
+<div id="loopTransport">
+  <!-- ⏮ (S5.3) ЖИВЁТ ЗДЕСЬ, РЯДОМ С ▶: «откуда играть» и «играть» — одна мысль, и читаться они должны как
+       один транспорт. В покое кнопка СКРЫТА (CSS) и появляется только у открытого редактора (.roll), где
+       полоса и так оставляет одну ▶, — поэтому вид транспорта с закрытым редактором не меняется ничем. -->
+  <button id="rollHome" data-i18n-title="roll.homeTitle" title="Бегунок в начало" data-icon="to-start"></button>
+  <button id="loopBtn" data-i18n="transport.loopPlay" data-i18n-title="transport.loopTitle" title="Играть / пауза">play</button>
+  <!-- ⟳ ПОВТОР СКОБЫ (S3.5b): только ВКЛЮЧАЕТ и ВЫКЛЮЧАЕТ повтор. Какие такты повторяются, задаёт СКОБА на
+       полосе лупера — её края ставят тапом или перетаскиванием, с точностью до такта; её же начало — место,
+       откуда начинается запись. Кнопка границ не переопределяет. -->
+  <button id="rgnBtn" data-i18n-title="transport.regionTitle" title="Повторять такты под скобой" data-icon="repeat"></button>
+  <button id="undoBtn" data-i18n-title="transport.undoTitle" title="Отменить последний дубль" data-icon="undo-take"></button>
+  <!-- ED7: ↶ / ↷ of the ONE history (every step: takes, ⤺, edits, mixer, names, order, sections, row delete, ✕) — the same pair as in the
+       editor and the window; Ctrl/⌘+Z, Ctrl/⌘+Shift+Z. Shown on the play screen only (the editor and the window have their own pair). -->
+  <button id="histUndo" data-i18n-title="hist.undoTitle" title="Undo" data-icon="undo"></button>
+  <button id="histRedo" data-i18n-title="hist.redoTitle" title="Redo" data-icon="redo"></button>
+  <button id="clrBtn" data-i18n-title="transport.clearTitle" title="Очистить всю песню" data-icon="clear"></button>
+  <button id="panicBtn" data-i18n-title="transport.panicTitle" title="Заглушить всё" data-icon="stop"></button>
+  <!-- ✎ (AR1): открывает ОКНО АРАНЖИРОВКИ — все дорожки; тап по строке там открывает РЕДАКТОР ДОРОЖКИ (пиано-ролл, S5.0). (Прежде ✎ открывал вооружённую дорожку, иначе первую.) Отказ — при
+       записи и при записи клипа; ● отказывает, пока редактор открыт. Все отказы держит recorder (editOpen). -->
+  <button id="rollBtn" data-i18n-title="transport.editTitle" title="Аранжировка" data-icon="edit"></button>
+</div>
+
+<!-- ================= ОКНО АРАНЖИРОВКИ (AR1) =================
+     Третий экран между игрой и редактором дорожки: все дорожки песни на одной временной оси (полоса дорожек во весь экран — сам
+     рисунок на ХОЛСТЕ, drawLooper(true)). Здесь — только то, у чего нет временнóй геометрии: закрыть (назад к игре) и зум общего с
+     редактором окна времени. ✎ открывает это окно; тап по дорожке открывает её в редакторе. -->
+<div id="arrBar">
+  <button id="arrClose" data-i18n-title="arr.closeTitle" title="Back to playing" data-icon="close"></button>
+  <span id="arrTitle" data-i18n="arr.title">Arrangement</span>
+  <!-- MX1: ЛИЦО ОКНА — аранжировка (миниатюры) ↔ микшер (фейдеры уровня и мастер); подпись — то лицо, на которое переключит. -->
+  <button id="arrFace" data-i18n-title="arr.faceTitle" title="Arrangement / mixer">Mixer</button>
+  <button id="arrZoomOut" data-i18n-title="arr.zoomOutTitle" title="Zoom out">−</button>
+  <button id="arrZoomIn" data-i18n-title="arr.zoomInTitle" title="Zoom in">+</button>
+  <button id="arrFit" data-i18n-title="arr.fitTitle" title="Whole song" data-icon="fit"></button>
+  <!-- ED6: SECTIONS — act on the bars under the brace, in every track: insert as many empty bars before it as it is long, cut them,
+       duplicate them right after; remove the selected marker; ↶/↷ — the song history (section edits and marker changes). Titles name the bars (ui). -->
+  <button id="secIns" title="Insert empty bars" data-icon="{i:plus}{i:bar-empty}"></button>
+  <button id="secCut" title="Cut bars" data-icon="cut"></button>
+  <button id="secDup" title="Duplicate bars" data-icon="copy"></button>
+  <button id="secRen" data-i18n-title="sec.renTitle" title="Rename the section" data-icon="§{i:edit}"></button>
+  <button id="secDel" data-i18n-title="sec.delTitle" title="Remove the section marker" data-icon="§{i:delete}"></button>
+  <!-- TF3: transpose the WHOLE song (every track with pitch, the backing too) a semitone down / up; one ↶. -->
+  <button id="songTrDn" data-i18n="arr.trDn" data-i18n-title="arr.trDnTitle" title="Song down a semitone">−1 st</button>
+  <button id="songTrUp" data-i18n="arr.trUp" data-i18n-title="arr.trUpTitle" title="Song up a semitone">+1 st</button>
+  <button id="songUndo" data-i18n-title="sec.undoTitle" title="Undo" data-icon="undo"></button>
+  <button id="songRedo" data-i18n-title="sec.redoTitle" title="Redo" data-icon="redo"></button>
+</div>
+<!-- AR2: ПОЛЕ ИМЕНИ ДОРОЖКИ — двойной тап по имени в строке окна; ui ставит его поверх заголовка строки (position:fixed). Enter или уход
+     фокуса — оставить, Esc — отмена, пустое — снова «роль · тембр». Подсказку (title) и заготовку (placeholder) ставит ui. -->
+<input id="laneNameIn" type="text" maxlength="40" autocomplete="off" spellcheck="false" enterkeyhint="done" hidden>
+<!-- ED6: the section name field — a double tap on a marker in the window's sections band (ui places it over the marker). -->
+<input id="secNameIn" type="text" maxlength="24" autocomplete="off" spellcheck="false" enterkeyhint="done" hidden>
+
+<!-- ================= РЕДАКТОР ДОРОЖКИ: ПИАНО-РОЛЛ (S5.0) =================
+     ПАНЕЛЬ — то, у чего НЕТ временнóй геометрии: закрыть, дорожка, зум. Сама сетка живёт на
+     ХОЛСТЕ, потому что у неё геометрия (правило #9: попадание и рисование из одного снимка).
+     Подписи ставит ui.js — числа дорожек меняются, в разметке их держать нечем.
+     ⛳ T4: вкладок ролей нет — в дорожке одна роль, и редактор открывается прямо на ней. -->
+<div id="rollBar">
+  <button id="rollClose" data-i18n-title="roll.closeTitle" title="Назад к аранжировке" data-icon="close"></button>
+  <button id="rollTrack" data-i18n-title="roll.trackTitle" title="Сменить дорожку">L1</button>
+  <!-- ТЕМБР ДОРОЖКИ (T5): замена тембра ПОСЛЕ записи — внутри роли (у ударных — набор). Единственный путь
+       сменить тембр записанной дорожки. У дорожки без нот (слой дрона) — скрыт. Пункты строит ui.js. -->
+  <select id="rollTimbre" data-i18n-title="roll.timbreTitle" title="Тембр дорожки" hidden></select>
+  <!-- OWN1: the track's MODE — re-maps the whole track by degrees into another mode of the same tuning. Options built by ui.js. -->
+  <select id="rollMode" data-i18n-title="roll.modeTitle" title="Mode of this track" hidden></select>
+  <!-- Чип ЛАДА (S5.5): виден ТОЛЬКО когда в дорожке события в разных ладах — иначе машинерия зря
+       занимала бы место в панели. Тап переключает, в каком ладу нарисована ось высот. -->
+  <!-- РЯДЫ (T3 универсальной модели строя): «Все» — каждая высота строя (высоты лада яркие, прочие приглушены), «Лад» — только
+       ступени лада, прежний компактный вид. Видна, только когда лад меньше своего строя. Подпись — текущий вид. -->
+  <button id="rollRows" data-i18n-title="roll.rowsTitle" title="Ряды: все высоты строя или только лада" hidden>All</button>
+  <!-- ПРАВКА (S5.1): вставка — ЯВНЫЙ режим, иначе прокрутка, кончившаяся тапом, молча рождала бы удар.
+       ↶ снимает ОДНУ правку и живёт только здесь; ⤺ (целое взятое) на время редактора с экрана убран. -->
+  <button id="rollIns" data-i18n-title="roll.insertTitle" title="Режим вставки" data-icon="add-point"></button>
+  <!-- ED1: pick mode — a tap adds or removes a note, a drag on empty space draws a selection box; a selected group moves and deletes as one edit. -->
+  <button id="rollPick" data-i18n-title="roll.pickTitle" title="Выбор нескольких нот" data-icon="pick"></button>
+  <button id="rollDel" data-i18n-title="roll.delTitle" title="Удалить выбранный удар" data-icon="trash"></button>
+  <!-- ED2: copy the selected notes · paste them at the playhead (this track or another of the same role and mode) · duplicate them right after themselves. -->
+  <button id="rollCopy" data-i18n-title="roll.copyTitle" title="Копировать выбранные ноты" data-icon="copy"></button>
+  <button id="rollPaste" data-i18n-title="roll.pasteTitle" title="Вставить у бегунка" data-icon="paste"></button>
+  <button id="rollDup" data-i18n-title="roll.dupTitle" title="Повторить выбранное следом" data-icon="{i:copy}⁺"></button>
+  <!-- ED3: quantise the selection after recording — ⌗ applies; beside it the grid (beats), what moves (starts / ends / both) and the strength. -->
+  <button id="rollQuant" data-i18n-title="roll.quantTitle" title="Квантовать выбранные ноты" data-icon="quantise"></button>
+  <select id="rollQGrid" data-i18n-title="roll.qGridTitle" title="Сетка квантизации"></select>
+  <select id="rollQWhat" data-i18n-title="roll.qWhatTitle" title="Что двигать"></select>
+  <select id="rollQAmt" data-i18n-title="roll.qAmtTitle" title="Сила квантизации"></select>
+  <!-- ED4: transpose the selection one degree of its mode down / up (an out-of-mode note keeps its offset); Alt+↓ / Alt+↑. -->
+  <button id="rollDegDn" data-i18n-title="roll.degDnTitle" title="На ступень ниже">−1°</button>
+  <button id="rollDegUp" data-i18n-title="roll.degUpTitle" title="На ступень выше">+1°</button>
+  <!-- TF3: transpose the WHOLE track a semitone down / up (its key moves; one ↶). -->
+  <button id="rollTrDn" data-i18n="roll.trDn" data-i18n-title="roll.trDnTitle" title="Track down a semitone">−1 st</button>
+  <button id="rollTrUp" data-i18n="roll.trUp" data-i18n-title="roll.trUpTitle" title="Track up a semitone">+1 st</button>
+  <!-- ↶/↷ — отмена и ВОЗВРАТ ПРАВКИ (S5.3). Обе гаснут, когда делать нечего: мёртвая кнопка должна
+       выглядеть мёртвой, а не молча не работать. -->
+  <button id="rollUndo" data-i18n-title="roll.undoTitle" title="Отменить правку" data-icon="undo"></button>
+  <button id="rollRedo" data-i18n-title="roll.redoTitle" title="Вернуть правку" data-icon="redo"></button>
+  <!-- ЗАМОРОЗКА (F5): кнопка живёт ЗДЕСЬ, в баре редактора, а НЕ на строке полосы лупера — там уже
+       три кнопки и подпись в шестнадцати пикселях, четвёртая не попадалась бы под палец. Полоса
+       получает только ИНДИКАТОР. ⛳ И место верное по существу: в редакторе камера не читается,
+       поэтому главный поток свободен под рендер. -->
+  <span id="rollSnap"></span>
+  <!-- ПОЛОСА АВТОМАТИЗАЦИИ (O-4): ОДИН селект — он же ВЫКЛЮЧАТЕЛЬ полосы (первый пункт «— нет —»)
+       и он же ВЫБОР ПАРАМЕТРА. Отдельной кнопки-тумблера не заводим: «полоса открыта, но неизвестно
+       что показывает» — состояние без смысла. Рядом — правка ЦЕПИ САМОЙ ДОРОЖКИ (часть 2): добавить,
+       убрать и подвинуть выбранный эффект. ⛔ Это НЕ живая цепь рук: см. autChainAdd в recorder. -->
+  <select id="rollAutSel" data-i18n-title="aut.pickTitle" title="Полоса автоматизации"></select>
+  <select id="rollFxAdd" data-i18n-title="aut.addTitle" title="Добавить эффект дорожке"></select>
+  <button id="rollFxUp" data-i18n-title="fx.moveUp" title="Раньше в цепи" data-icon="up"></button>
+  <button id="rollFxDn" data-i18n-title="fx.moveDown" title="Позже в цепи" data-icon="down"></button>
+  <button id="rollFxDel" data-i18n-title="aut.rmTitle" title="Убрать эффект у дорожки" data-icon="remove"></button>
+  <!-- ФОРМА ОТРЕЗКА (гладкая автоматизация): как величина ВХОДИТ в выбранную точку — плавно (╱) или ступенькой (⌐). Кнопка, а не
+       жест на полосе: тап по полосе уже значит «выбрать», «вставить» и «снять выбор», а тянуть — «перенести». Видна, пока полоса
+       открыта; живая — когда выбрана точка. Значок показывает ТЕКУЩУЮ форму, тап её меняет. -->
+  <button id="rollShape" data-i18n-title="aut.shapeTitle" title="Форма отрезка к точке" hidden></button>
+  <!-- ED5: the Volume lane's face — bars (one per note, drag a bar up/down) or the line of points. Shown only while the lane shows Volume. -->
+  <button id="rollVolBars" data-i18n-title="aut.barsTitle" title="Громкость: столбики нот или линия" hidden></button>
+  <button id="rollZoomOut" data-i18n-title="roll.zoomOutTitle" title="Отдалить">−</button>
+  <button id="rollZoomIn" data-i18n-title="roll.zoomInTitle" title="Приблизить">+</button>
+</div>
+ 
+<!-- ================= ОБУЧЕНИЕ (тур) =================
+     Полупрозрачная полоса-подсказка поверх игры (сетку/руки видно). Текст/точки/кнопки ставит
+     core/tutor.js (динамически, поэтому без data-i18n). Next доступен всегда, Skip оставляет играть. -->
+<div id="tutorBar">
+  <div id="tutorText"></div>
+  <!-- Объяснение шага: ОТДЕЛЬНАЯ строка ПОД инструкцией, меньше/тише — читается одним блоком «что делать → как устроено». Видна сразу, без таймаута. -->
+  <div id="tutorDetail"></div>
+  <!-- Камера-нота (нет руки в кадре) — ОТДЕЛЬНАЯ добавочная строка, НЕ часть блока инструкция+объяснение. -->
+  <div id="tutorAside"></div>
+  <div id="tutorBottom">
+    <span id="tutorDots"></span>
+    <!-- Тик выполненного шага: шаг сделан → подсветка Next + этот ✓; авто-перехода нет, человек жмёт сам. -->
+    <span id="tutorDone"></span>
+    <button id="tutorNext"></button>
+    <button id="tutorSkip"></button>
+  </div>
+</div>
+
+<!-- ================= СПИСОК УРОКОВ (обучение) =================
+     Модальное меню уроков: открывается с «Обучение» на старте И при выходе из урока (возврат к списку).
+     Заголовок/строки/кнопки ставит core/tutor.js (динамически, без data-i18n). -->
+<div id="lessonOv" class="ov">
+  <div class="lessonCard">
+    <div class="lessonHead"><b id="lessonTitle"></b><button id="lessonClose"></button></div>
+    <div id="lessonRows"></div>
+    <button id="lessonFree"></button>
+  </div>
+</div>
+
+<!-- ================= ПАНЕЛЬ НАСТРОЕК ================= -->
+<!-- Шаг 3 MENU-PLAN: две панели РАЗНОЙ природы, обёртка #panel удалена.
+     #panelScale — ОВЕРЛЕЙ звукоряда: открыл → выбрал → закрыл.
+     #panelLoop  — РАБОЧАЯ панель лупера снизу: играть можно с открытой. -->
+
+<!-- ================= ЗВУКОРЯД: ноты и звук (оверлей) ================= -->
+<div id="panelScale">
+    <div class="phead"><b data-i18n="panel.scale.head">Звукоряд</b><button id="panelClose" data-i18n="panel.collapse">Collapse</button></div>
+    <div class="psep" data-i18n="panel.scale.sepScale">Лад и тоника</div>
+    <div class="prow"><label data-i18n="panel.scale.tradition">Строй</label><select id="selTradition"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.mode">Лад</label><select id="selScale"></select></div>
+    <!-- TF5: in a tuning not named by the 12 notes the label reads «1/1 =» and a cents nudge appears; a tuning file may declare its
+         historical 1/1 (Partch: G) — one tap, never the default. Visibility from the tuning's data (ui.renderOneOne). -->
+    <div class="prow" id="tonicRow"><label id="tonicLbl" data-i18n="panel.scale.tonic">Тоника</label><select id="selTonic"></select><input type="number" id="tonicCents" min="-50" max="50" step="1" value="0" inputmode="numeric" data-i18n-title="panel.scale.centsTitle" hidden><span class="unit" id="tonicCentsU" hidden>¢</span></div>
+    <div class="prow" id="tonicHistRow" style="display:none"><button id="tonicHist" type="button"></button></div>
+    <!-- «Строй от» (слайс P0): фиксированные исторические строи (свойство лада fixedKey) настроены от C — строка это ГОВОРИТ.
+         Только показ, не выбор; видимость ставит ui.updScaleBtn по свойству лада (правило #25: не по имени).
+         P3: у лада с выбором (tunable — Пифагор) вместо строки — РЯД ВЫБОРА #tunedFromRow и подсказка, меняющаяся по состоянию. -->
+    <p class="phint" id="tunedFromNote" data-i18n="panel.scale.tunedFromC" hidden>Настроен от C (историческая практика)</p>
+    <div class="prow" id="tunedFromRow" style="display:none"><label data-i18n="panel.scale.tunedFrom">Строй от</label><select id="selTunedFrom"></select></div>
+    <p class="phint" id="tunedFromHint" hidden></p>
+    <!-- T7b: РЕЖИМ АККОРДОВ — только у ладов, где два режима различаются (свойство chordModes): Партч и Болен–Пирс («Свободно» /
+         «Как на инструменте»), пентатоники, блюз и японские («Стопкой» / «Пауэр-аккорд»). Кнопки и подсказку строит ui.renderChordMode. -->
+    <div class="prow" id="chordModeRow" style="display:none"><label data-i18n="panel.scale.chordMode">Аккорды</label><div class="seg" id="chordModeSeg"></div></div>
+    <p class="phint" id="chordModeHint" hidden></p>
+    <!-- Опорная частота (эталон A4): пресеты-подсказки + свободный ввод, клампится 380–480 в ui.js.
+         Единый источник высоты — двигает ВСЕ строи вместе (подвижные и фиксированные). -->
+    <div class="prow" id="aRefRow"><label data-i18n="panel.scale.aref">Эталон A4</label>
+      <div class="seg">
+        <select id="aRefSel">
+          <option value="415" data-i18n="aref.415">415 · барочный</option>
+          <option value="430">430</option>
+          <option value="432">432</option>
+          <option value="435">435</option>
+          <option value="440" selected data-i18n="aref.440">440 · современный стандарт</option>
+          <option value="442">442</option>
+          <option value="444" data-i18n="aref.444">444 · оркестровый</option>
+        </select>
+        <input type="number" id="aRefInput" min="380" max="480" step="1" value="440" inputmode="numeric">
+        <span class="unit" data-i18n="unit.hz">Гц</span>
+      </div>
+    </div>
+    <p class="phint" data-i18n="panel.scale.arefHint">Единый эталон — изобретение XX века: до него каждый город и церковь настраивались по-своему, барочные ансамбли и сегодня играют на 415.</p>
+    <!-- РАСКЛАДКА НОТ: прямоугольники vs узкие ряды. Стоит РЯДОМ С ЛАДОМ, потому что от лада зависит
+         значение варианта «По ладу» (и сама геометрия: сколько нот в прямоугольнике и сколько октав
+         влезло). Варианты строит ui.js (renderRectCtl). Блокировки нет: раскладываются все лады. -->
+    <div class="prow" id="rectRow"><label data-i18n="panel.scale.rectLayout">Раскладка нот</label><select id="rectSel"></select></div>
+    <!-- Многопальцевый щипок: сколько пальцев руки звучат одновременно (1 = как было, дефолт 4).
+         Варианты строит ui.js (renderPinchCtl). -->
+    <div class="prow" id="pinchRow"><label data-i18n="panel.scale.pinchFingers">Пальцев в руке</label><select id="pinchSel"></select></div>
+    <p class="phint" id="pinchHint" data-i18n="panel.scale.pinchHint">Несколько пальцев к большому — несколько нот. Камера различает два пальца увереннее, чем четыре: если безымянный или мизинец срабатывают ложно — опустите потолок.</p>
+    <div class="prow"><label data-i18n="panel.scale.chords">Аккорды</label>
+      <div class="seg"><button id="qTriad" class="act" data-i18n="panel.scale.triads">Трезвучия</button><button id="qSev" data-i18n="panel.scale.sevenths">Септаккорды</button></div>
+    </div>
+    <!-- Септаккорд, который ничего не добавляет: в ладу, где стопка через ступень замыкается раньше четвёртой ноты (шестиступенные
+         блюз, целотонный…), кнопка «Септаккорды» выключена, и эта строка говорит почему. Видимость ведёт ui.js (renderSevCtl). -->
+    <p class="phint" id="sevHint" data-i18n="panel.scale.sevNoNote" hidden>В этом ладу септаккорд лишь удвоил бы корень октавой выше — четвёртой ноты нет.</p>
+  </div>
+
+<!-- ================= ЗВУК И УПРАВЛЕНИЕ: тембры, функции рук, конструктор эффектов =================
+     ВТОРАЯ панель настроек, отрезанная от «Звукоряда». Разрез по СМЫСЛУ: «Звукоряд» отвечает на вопрос
+     КАКИЕ НОТЫ ЕСТЬ И ГДЕ ОНИ ЛЕЖАТ (строй/лад/тоника/эталон/раскладка/пальцы/трезвучия), эта — КАК ЭТО
+     ЗВУЧИТ И ЧЕМ УПРАВЛЯЮТ. Прежде всё лежало под заголовком «Звукоряд», и реверб настраивали в панели,
+     названной «Звукоряд».
+     ⚠️ РАСКЛАДКА НОТ И «ПАЛЬЦЕВ В РУКЕ» ОСТАЛИСЬ В «ЗВУКОРЯДЕ» НАМЕРЕННО: раскладка СЛЕДУЕТ ЗА ЛАДОМ
+     («По ладу» разрешается свойством самого лада, и вся геометрия — арифметика лада), поэтому её дом
+     рядом с ладом, хотя играют её пальцами.
+     ⚠️ Разметка перенесена ДОСЛОВНО: те же id, те же data-i18n, те же обработчики в ui.js. -->
+<div id="panelSound">
+    <div class="phead"><b data-i18n="panel.sound.head">Звук и управление</b><button id="panelCloseSound" data-i18n="panel.collapse">Collapse</button></div>
+
+    <div class="psep" data-i18n="panel.scale.sepTimbre">Тембры</div>
+    <!-- РЕЖИМ ГОЛОСА (V3) — строкой ПОД тембром своей роли: это свойство мелодического инструмента (в долгую — данные
+         тембра), поэтому живёт рядом с ним. Только у соло и баса: аккорды и ударные хранят другие виды нот. Обработчики —
+         ui.js (pickVoiceMode); подсветку выбранной кнопки ставит applyVoiceMode. -->
+    <div class="prow"><label data-i18n="panel.scale.leadInstr">Соло-инструмент</label><select id="selLead"></select></div>
+    <div class="prow"><label data-i18n="panel.sound.leadVoice">Голос соло</label>
+      <div class="seg"><button id="vmLdPoly" class="act" data-i18n="voice.poly" data-i18n-title="voice.poly.title">Полифония</button><button id="vmLdLead" data-i18n="voice.lead" data-i18n-title="voice.lead.title">Ведущий</button></div>
+    </div>
+    <div class="prow"><label data-i18n="panel.scale.chordInstr">Аккорд-инструмент</label><select id="selChord"></select></div>
+    <div class="prow"><label data-i18n="panel.scale.bassInstr">Бас-инструмент</label><select id="selBass"></select></div>
+    <div class="prow"><label data-i18n="panel.sound.bassVoice">Голос баса</label>
+      <div class="seg"><button id="vmBsPoly" data-i18n="voice.poly" data-i18n-title="voice.poly.title">Полифония</button><button id="vmBsLead" class="act" data-i18n="voice.lead" data-i18n-title="voice.lead.title">Ведущий</button></div>
+    </div>
+    <div class="prow"><label data-i18n="panel.scale.drumKit">Набор ударных</label><select id="selDrumKit"></select></div>
+
+    <!-- ФУНКЦИИ РУК (заменяет ⇄ и тумблер терменвокса): по выпадающему на руку для каждой ноте-роли
+         в игре (соло/бас). Строки строит ui.js (renderHandFn) — по роли, помечены Левой/Правой рукой;
+         пусто у аккордов/ударных и когда в сплите нет ld/бас-половины. -->
+    <div class="psep" id="handFnSep" data-i18n="panel.scale.handFn">Функции рук</div>
+    <div id="handFnRows"></div>
+
+    <!-- ДЕЙСТВИЯ ПАЛЬЦЕВ (слайс «д»): ступень НИЖЕ «Функций рук» — та говорит, чем рука ЯВЛЯЕТСЯ,
+         эта — что делают её ПАЛЬЦЫ. Строки строит ui.js (renderHandActs); секция видна только у ролей,
+         у которых СЕЙЧАС есть рука на эффектах (назначаемы пальцы только у неё). -->
+    <div class="psep" id="handActSep" data-i18n="panel.scale.handActs">Действия пальцев</div>
+    <div id="handActRows"></div>
+
+    <!-- КОНСТРУКТОР ЭФФЕКТОВ: цепь эффектов ВЫБРАННОЙ РОЛИ (state.fxChains), строки строит ui.js
+         (renderFxCtl); первой строкой — выбор роли. Секция видна ВСЕГДА: цепь звучит и без руки на
+         «Эффектах» (об этом говорит подсказка внутри). -->
+    <div class="psep" id="fxCtlSep" data-i18n="panel.scale.fxCtl">Конструктор эффектов</div>
+    <div id="fxCtlRows"></div>
+
+    <!-- SND-F1: the master's dynamics (ui.js → audio.masterDynSet); session only. Glue off by default; the limiter is always on (SND-F1b) -->
+    <div class="psep" data-i18n="master.sep">Master</div>
+    <div class="prow"><label data-i18n="master.glue">Glue (gentle compressor)</label>
+      <div class="seg"><button id="mGlueOn" data-i18n="common.on">On</button><button id="mGlueOff" class="act" data-i18n="common.off">Off</button></div></div>
+    <p class="phint" data-i18n="master.hint">Glue evens out the whole mix. At the very end a limiter is always on: loud passages never crackle. Both work without delay.</p>
+
+    <!-- LAT1: the latency meter (latmeter.js) — numbers stay on the device; «Copy» only copies the shown text -->
+    <div class="psep" data-i18n="diag.sep">Diagnostics</div>
+    <div class="prow"><label data-i18n="diag.lat">Latency meter</label>
+      <div class="seg"><button id="latOn" data-i18n="common.on">On</button><button id="latOff" class="act" data-i18n="common.off">Off</button></div></div>
+    <!-- LAT1b: test switches (latmeter.js; session only, defaults = the app as before) -->
+    <div class="prow"><label data-i18n="diag.sw.hands">Hands tracked (test)</label>
+      <div class="seg"><button id="swHands2s" class="act" data-i18n="diag.sw.hands2s">2 · search every 3rd frame</button><button id="swHands2" data-i18n="diag.sw.hands2">2 · search every frame</button><button id="swHands1">1</button></div></div>
+    <div class="prow"><label data-i18n="diag.sw.model">Hand model on (test)</label>
+      <div class="seg"><button id="swModelGPU" class="act">GPU</button><button id="swModelCPU">CPU</button></div></div>
+    <div class="prow"><label data-i18n="diag.sw.fps">Camera frame rate (test)</label>
+      <div class="seg"><button id="swFpsDef" class="act" data-i18n="diag.sw.fpsDef">default</button><button id="swFps30">30</button><button id="swFps60">60</button></div></div>
+    <!-- LAT2: where hand detection runs (session only) -->
+    <div class="prow"><label data-i18n="diag.sw.path">Detection runs in (test)</label>
+      <div class="seg"><button id="swPathMain" class="act" data-i18n="diag.sw.pathMain">main thread</button><button id="swPathWorker" data-i18n="diag.sw.pathWorker">background worker</button></div></div>
+    <!-- LAT3: low light — camera constraints through applyConstraints (session only; «short exposure» only when the camera has it) -->
+    <div class="prow"><label data-i18n="diag.sw.low">Low light (test)</label>
+      <div class="seg"><button id="swLowOff" class="act" data-i18n="diag.sw.lowOff">Off</button><button id="swLow15" data-i18n="diag.sw.low15">at least 15 fps</button><button id="swLow24" data-i18n="diag.sw.low24">at least 24 fps</button><button id="swLowExp" hidden data-i18n="diag.sw.lowExp">short exposure</button></div></div>
+    <p class="phint" id="swLowWarn" data-i18n="diag.sw.lowWarn">Test: changes the camera's own settings; Off restores them.</p>
+    <p class="phint" id="swNote" data-i18n="diag.sw.note">Test switches are for this session only; the meter restarts its numbers after each.</p>
+    <!-- VIS1c (RUN 6): Calm's background (views/scene/host.js; remembered on this device) — shown only in Calm (style.css) -->
+    <div class="prow" id="bgRow"><label data-i18n="prof.bg">Background</label>
+      <div class="seg"><button id="bgForest" data-i18n="prof.bgForest">Forest</button><button id="bgDark" data-i18n="prof.bgDark">Dark</button><button id="bgCamera" class="act" data-i18n="prof.bgCamera">Camera</button></div></div>
+  </div>
+
+<!-- LAT1: the Diagnostics overlay (latency per stage) and the one-time Bluetooth warning; both filled by latmeter.js -->
+<div id="latDiag" hidden><pre id="latDiagTx"></pre>
+  <div class="latBtns"><button id="latCopy" data-i18n="diag.copy">Copy</button><button id="latClose" data-i18n="diag.close">Close</button></div></div>
+<div id="latWarn" role="status"><span id="latWarnTx"></span><button id="latWarnOk" data-i18n="lat.ok">OK</button></div>
+<!-- LAT3: the player hint «Too dark» (latmeter.js; once per session, from the camera's frame timing only) -->
+<div id="darkHint" role="status"><span id="darkHintTx"></span><button id="darkHintOk" data-i18n="lat.ok">OK</button></div>
+
+<!-- ================= ЛУПЕР: время и слои (оверлей на месте «Звукоряда») ================= -->
+<div id="panelLoop">
+    <div class="phead"><b data-i18n="panel.loop.head">Лупер</b><button id="panelCloseLoop" data-i18n="panel.collapse">Collapse</button></div>
+    <!-- SAVE1: the song as a file on this device (ui.js songDownload / songOpenText; nothing leaves the device) -->
+    <div class="psep" data-i18n="song.sep">Song file</div>
+    <div class="prow"><label data-i18n="song.name">Name</label><input type="text" id="songName" maxlength="120" autocomplete="off" spellcheck="false"></div>
+    <div class="prow"><label></label><div class="seg"><button id="songSave" data-i18n="song.save">Save</button><button id="songOpen" data-i18n="song.open">Open…</button></div></div>
+    <input type="file" id="songFile" accept=".handsong,application/json" hidden>
+    <!-- SONG1: scales a song brought this session (from its own copies), not in the person's list yet -->
+    <div class="prow" id="songKeepRow" hidden><label data-i18n="song.keepRow">From the song</label><div class="seg"><button id="songKeep" data-i18n="song.keep">Keep in my scales</button><button id="songKeepTim" data-i18n="song.keepTim" hidden>Keep in my timbres</button></div></div>
+    <p class="phint" id="songKeepHint" hidden></p>
+    <p class="phint" data-i18n="song.hint">Save writes the whole song to a file on this device; Open reads one back. Nothing is uploaded.</p>
+    <!-- AUTOSAVE1: the song kept on this device by itself (autosave.js; ui.js) — the switch, its state, earlier autosaves -->
+    <div class="prow"><label data-i18n="as.label">Autosave</label><div class="seg"><button id="asOn" data-i18n="as.on">On</button><button id="asOff" data-i18n="as.off">Off</button></div></div>
+    <p class="phint" id="asStatus"></p>
+    <div class="prow"><label data-i18n="as.earlier">Earlier</label><select id="asPick" data-i18n-title="as.pickTitle" title="Restore an earlier autosave"></select></div>
+    <div class="prow"><label></label><div class="seg"><button id="asRestore" data-i18n="as.restore">Restore</button></div></div>
+    <div class="psep" data-i18n="panel.loop.sepLoop">Песня</div>
+    <div class="prow"><label data-i18n="panel.loop.length">Длина подложки (такты)</label>
+      <div class="seg"><button id="loopMinus">−</button><span class="val" id="loopBarsV">2</span><button id="loopPlus" data-icon="plus"></button></div>
+    </div>
+    <div class="prow"><label data-i18n="panel.loop.metre">Размер (долей)</label>
+      <select id="loopMetre">
+        <option value="2">2</option><option value="3">3</option><option value="4" selected>4</option>
+        <option value="5">5</option><option value="6">6</option><option value="7">7</option>
+        <option value="8">8</option><option value="9">9</option><option value="10">10</option>
+        <option value="12">12</option><option value="16">16</option>
+      </select>
+    </div>
+    <div class="prow"><label data-i18n="panel.loop.tempo">Темп (BPM)</label><input type="range" id="bpm" min="56" max="168" value="84"><span class="val" id="bpmV">84</span></div>
+    <div class="prow"><label data-i18n="panel.loop.quant">Квантизация</label>
+      <div class="seg"><button id="qOn" class="act" data-i18n="common.on">Вкл</button><button id="qOff" data-i18n="common.off">Выкл</button></div>
+    </div>
+    <div class="prow"><label data-i18n="panel.loop.sub">Дробление доли</label>
+      <div class="seg"><button id="sub4" class="act" data-i18n="panel.loop.sub4">4 · 16-е</button><button id="sub3" data-i18n="panel.loop.sub3">3 · триоли</button></div>
+    </div>
+    <p class="phint" data-i18n="panel.loop.hint">Размер меняют только на пустой песне. Длина подложки и дробление доли меняются когда угодно — они влияют лишь на следующую подложку и на сетку квантизации живых ударов.</p>
+
+    <div class="psep" data-i18n="panel.loop.sepArr">Аранжировка (дорожки)</div>
+    <div class="prow"><label data-i18n="panel.loop.harmony">Гармония</label><select id="selProg"></select></div>
+    <div class="prow"><label data-i18n="panel.loop.rhythm">Ритм</label><select id="selRhythm"></select></div>
+    <div class="prow"><label data-i18n="panel.loop.bassMode">Бас-партия</label><select id="selBassMode"></select></div>
+    <div class="prow"><label></label><button id="addArrBtn" data-i18n="panel.loop.addLayers">Add tracks</button></div>
+</div>
+ 
+<!-- ================= МИНИ-УЧЕБНИК ================= -->
+<div id="helpOv" class="ov">
+  <div class="inner">
+    <div class="closeRow"><button id="helpClose" data-icon="Закрыть {i:close}"></button></div>
+    <h1>Мини-учебник: лады, строи, аккорды</h1>
+
+    <h2>Как играть</h2>
+    <p><b>Одна роль на весь экран.</b> Кнопка роли вверху переключает <span data-icon="solo"></span> Соло · <span data-icon="chords"></span> Аккорды ·
+    <span data-icon="bass"></span> Бас · <span data-icon="drums"></span> Ударные. <b>Щипок</b> большого пальца с другим включает звук и выбирает октаву:
+    указательный = I, средний = II, безымянный = III, мизинец = IV. Высота руки — нота или аккорд,
+    правее — громче; нота меняется плавным глиссандо, не размыкая щипка. Телефон держите горизонтально.</p>
+    <p><b>Роль по руке:</b> правая рука играет ноты, левая — эффекты (в соло); поменять руки — «<span data-icon="swap"></span>» в
+    меню. В типизированных аккордах левая рука выбирает тип из палитры. <b>Сплит-экран</b> (кнопка <span data-icon="split"></span>,
+    только в ландшафте) делит экран на левую и правую половины: каждая играет свою роль, инструмент
+    половины задаёт её кнопка, а роль выбирается тем, в какой половине щипок. Так можно держать аккорд
+    одной рукой и вести соло другой.</p>
+    <p><b>Соло-канал:</b> отведите руку дальше от камеры — реверберация растёт (глубина = пространство).
+    Эффекты (столбики слева): щипок выбирает делей/вибрато/драйв/тремоло, тяните вверх/вниз — значение
+    запоминается. <b>Учебный слой:</b> подписана лестница лада, тоника — зелёным; наведите палец без
+    щипка — подсказка покажет, что здесь звучит. Настройки — кнопка лада вверху (лад, тоника, тембры);
+    «<span data-icon="loop-panel"></span> Луп» — лупер и аранжировка.</p>
+
+    <h2>Что такое лад (гамма)</h2>
+    <p>Лад — это набор ступеней внутри октавы, записанный формулой в полутонах от <b>тоники</b>
+    (главной ноты). Например, мажор: <code>0-2-4-5-7-9-11</code>, натуральный минор:
+    <code>0-2-3-5-7-8-10</code>. Формула текущего лада всегда видна внизу экрана.
+    Тоника подсвечена <b>зелёным</b> — к ней «тяготеют» все остальные ступени.</p>
+ 
+    <h2>Октава и частоты</h2>
+    <p>Октава — удвоение частоты (A4 = 440 Гц, A5 = 880 Гц). В равномерной темперации октаву
+    делят на равные шаги: <code>f = f₀ · 2^(n / N)</code>, где N — число шагов.
+    Привычная музыка — это <b>12-TET</b> (12 шагов, шаг = полутон = 100 центов).</p>
+ 
+    <h2>Лады-моды</h2>
+    <p>Дорийский, фригийский, лидийский, миксолидийский, локрийский — те же 7 нот белых клавиш,
+    но с другой тоникой. Смещение начала меняет характер: лидийский — «парящий» мажор с #4,
+    фригийский — «испанский» минор с ♭2. Попробуйте сыграть одну и ту же фигуру в разных модах.</p>
+ 
+    <h2>Как строятся аккорды: терции</h2>
+    <p>Классический аккорд — это ступени лада «через одну»: I-III-V (трезвучие) и I-III-V-VII
+    (септаккорд). В коде это индексы массива лада <code>i, i+2, i+4, i+6</code> с переносом через
+    октаву. Качество аккорда определяют интервалы: большая терция+чистая квинта (4+7 полутонов) =
+    <b>мажор</b>, малая терция (3+7) = <b>минор</b> (m), 3+6 = <b>уменьшённый</b> (°),
+    4+8 = <b>увеличенный</b> (+). Лестница аккордов текущего лада подписана прямо в поле аккордов
+    (роль <span data-icon="chords"></span>) — смените лад и посмотрите, как она перестроится.</p>
+ 
+    <h2>Почему в блюзе и пентатонике — пауэр-аккорды</h2>
+    <p>В пентатонике всего 5 нот, в блюзе 6 — терции «через ступень» дают не трезвучия,
+    а случайные созвучия. Поэтому здесь программа строит <b>пауэр-аккорды</b> (C5):
+    тоника + чистая квинта + октава — именно так играют блюз и рок-гитаристы.
+    Хроматика тоже озвучивается пауэр-аккордами.</p>
+ 
+    <h2>Центы и микротоника</h2>
+    <p>Цент — 1/100 полутона (октава = 1200 центов). <b>Макамы</b> (арабская музыка) используют
+    <b>четвертьтона</b> (24-TET): ступень E½♭ — «полубемоль», на четверть тона ниже E.
+    В макаме Раст третья ступень нейтральная — ни мажор, ни минор; аккорд C–E½♭–G звучит
+    «между» — такого нет на фортепиано.</p>
+ 
+    <h2>19-TET и 31-TET</h2>
+    <p>Октаву можно делить и на 19 или 31 равный шаг — получаются ноты «между клавиш».
+    Терции здесь дают кластеры, поэтому программа математически ищет шаг, ближайший к
+    чистой квинте (702 цента): в 19-TET это 11 шагов, в 31-TET — 18, и строит из них
+    открытые микротональные аккорды-дроны. Ярлыки показывают номер ступени и центы.</p>
+ 
+    <h2>Аранжировка: слои петли</h2>
+    <p>Гармония, ритм и бас выбираются независимо и кладутся в петлю отдельными слоями —
+    сочетание составляете вы. Прогрессии (II–V–I и т.п.) осмысленны в 7-ступенчатых ладах;
+    дрон (тонический гул, спасённый из старой подложки) работает в любом строе. Набор ударных —
+    Стандарт или Дарбука — и рисунок ритма независимы: бэкбит на дарбуке или маqсум на
+    стандартном ките. Всё замораживается в текущем ладу и тонике; «<span data-icon="undo-take"></span>» снимает верхний слой.</p>
+  </div>
+</div>
+ 
+<!-- ================= ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» =================
+     Отдельный оверлей ПОВЕРХ стартового экрана (z выше #start): показывает подпись сцены,
+     пока звучит мотив. Не трогает стартовый поток — по «Пропустить»/окончании гаснет,
+     под ним снова стартовый экран. Камера не запрашивается. Логика — core/demo.js. -->
+<div id="demoOv" class="ov">
+  <div class="demoInner">
+    <div id="demoScene">1 / 6</div>
+    <div id="demoName"></div>
+    <div id="demoCulture"></div>
+    <p id="demoHint" data-i18n="demo.hint">Один и тот же мотив звучит в шести строях — слушайте, как меняется настройка.</p>
+    <button id="demoSkip" data-i18n="demo.skip">Skip</button>
+  </div>
+</div>
+
+<!-- RUN 7 (C6 + C11): THE CALM SHELL — the user's design (Moonglass controls in a glass capsule, the Hush emblem). Shown only in the Calm
+     face (body.calm); core/calmshell.js drives it. Hands in view → only the scene; no hand for 1.5 s → the controls fade in. Every word is a
+     dictionary key (en + ru), every picture a drawn icon by meaning (data-svg). No cents, Hz or role names anywhere. -->
+<div id="calmShell" hidden>
+  <div id="calmLantern" class="calm-lantern" hidden></div>
+  <div id="calmVeil" class="calm-veil"><p id="calmVeilMsg" class="calm-veil-msg" data-i18n="calm.asleep" hidden>Sleeping — tap to wake</p></div>
+  <!-- RUN 8 (slice 3): while the hands play — the forest's depth on the playing hand's side, the three effects on the effects hand's side
+       (calmshell.js sets each bar's value, its side and which one glows); the effects hand's one-line hint, shown once on this device -->
+  <div id="calmForestBar" class="calm-bars" aria-hidden="true">
+    <div class="calm-bar" data-bar="forest"><span class="calm-bar-ico" data-svg="forest"></span><span class="calm-bar-track"><span class="calm-bar-fill"></span><span class="calm-bar-max"></span></span><span class="calm-bar-lab" data-i18n="calm.forest">Forest</span></div>
+  </div>
+  <div id="calmFxBars" class="calm-bars" aria-hidden="true">
+    <div class="calm-bar" data-bar="echo"><span class="calm-bar-ico" data-svg="echo"></span><span class="calm-bar-track"><span class="calm-bar-fill"></span></span><span class="calm-bar-lab" data-i18n="calm.fx.echo">Echo</span></div>
+    <div class="calm-bar calm-bar-two" data-bar="tone"><span class="calm-bar-ico" data-svg="tone"></span><span class="calm-bar-track"><span class="calm-bar-mid"></span><span class="calm-bar-fill"></span></span><span class="calm-bar-lab" data-i18n="calm.fx.tone">Warm or Bright</span></div>
+    <div class="calm-bar" data-bar="wave"><span class="calm-bar-ico" data-svg="wave"></span><span class="calm-bar-track"><span class="calm-bar-fill"></span></span><span class="calm-bar-lab" data-i18n="calm.fx.wave">Wave</span></div>
+  </div>
+  <p id="calmFxHint" class="calm-hint calm-glass" role="status" data-i18n="calm.fxHint" hidden></p>
+  <div id="calmFade" class="calm-fade">
+    <p id="calmIdle" class="calm-idle" data-i18n="calm.idle">Raise a hand to play</p>
+    <button id="calmInfoBtn" class="calm-ibtn calm-glass" data-svg="info" data-i18n-title="calm.info" title="About"></button>
+    <div id="calmCtl" class="calm-ctl calm-glass">
+      <button id="calmSound" class="calm-rb"><span class="calm-circ" data-svg="sound"></span><span class="calm-lab" data-i18n="calm.sound">Sound</span><span class="calm-val"></span></button>
+      <button id="calmMood" class="calm-rb"><span class="calm-circ" data-svg="mood"></span><span class="calm-lab" data-i18n="calm.mood">Mood</span><span class="calm-val"></span></button>
+      <button id="calmHand" class="calm-rb"><span class="calm-circ" data-svg="hand"></span><span class="calm-lab" data-i18n="calm.hand">Play with</span><span class="calm-val"></span></button>
+      <button id="calmNotes" class="calm-rb"><span class="calm-circ" data-svg="note-follow"></span><span class="calm-lab" data-i18n="calm.notes">Notes</span><span class="calm-val"></span></button>
+      <button id="calmBg" class="calm-rb"><span class="calm-circ" data-svg="background"></span><span class="calm-lab" data-i18n="calm.bg">Background</span><span class="calm-val"></span></button>
+      <button id="calmSleep" class="calm-rb"><span class="calm-circ" data-svg="sleep"></span><span class="calm-lab" data-i18n="calm.sleep">Sleep</span><span class="calm-val"></span></button>
+      <label id="calmForestRow" class="calm-vol" hidden><span class="calm-vico" data-svg="forest"></span><span class="calm-lab" data-i18n="calm.forest">Forest</span><span class="calm-vol-in"><input id="calmForest" type="range" min="0" max="1" step="0.01" value="0.6"><span id="calmForestMark" class="calm-vol-mark"></span></span></label>
+    </div>
+  </div>
+  <div id="calmInfo" class="calm-card calm-glass" role="dialog" aria-modal="true" hidden>
+    <div class="calm-ihead"><span class="calm-mark"><span data-svg="emblem"></span><span class="calm-word">hand<span class="calm-word-dot">·</span>song</span><span class="calm-sub">calm</span></span>
+      <button id="calmInfoClose" class="calm-ibtn calm-ibtn-in" data-svg="close" data-i18n-title="calm.close" title="Close"></button></div>
+    <p data-i18n="calm.privacy">Pictures and sound never leave this device.</p>
+    <p data-i18n="calm.phones">Use headphones — the forest is quiet.</p>
+    <button id="calmLanternTg" class="calm-tg"><span class="calm-vico" data-svg="lantern"></span><span data-i18n="calm.lantern">Lantern: a soft light at the bottom edge for your hands</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmFieldTg" class="calm-tg"><span class="calm-vico" data-svg="note-stay"></span><span data-i18n="calm.field">Show the full note field</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmLightTg" class="calm-tg"><span class="calm-vico" data-svg="forest"></span><span data-i18n="calm.light">Lighter forest — for older computers and phones</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmFirstRun" class="calm-lnk" data-i18n="calm.firstRun" hidden>Show the first steps again</button>
+    <button id="calmJointsTg" class="calm-tg calm-dev" hidden><span class="calm-vico" data-svg="hand"></span><span data-i18n="calm.joints">Fingers: only the tips (development)</span><span class="calm-tsw"><span></span></span></button>
+    <button id="calmSceneTg" class="calm-lnk calm-dev" hidden>Forest picture: high (development)</button>
+    <button id="calmMeasure" class="calm-lnk calm-dev" data-i18n="calm.measure" hidden>Measure this device (about 2 minutes, development)</button>
+    <pre id="calmMeasureOut" class="calm-measure" hidden></pre>
+    <button id="calmToSound" class="calm-lnk calm-dev" data-i18n="calm.toSound" hidden>Sound panel and diagnostics (development)</button>
+  </div>
+</div>
+
+<div id="status"></div>
+<video id="video" playsinline muted autoplay></video>
+<canvas id="canvas"></canvas>
+ 
+<script type="module" src="main.js"></script>
+</body>
+</html>
+ 

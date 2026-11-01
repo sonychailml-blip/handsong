@@ -90,7 +90,7 @@ const SCREENS_CALM=[
   ['calm-ghost',     async p=>{ await p.click('#calmBegin');   // C7: Begin (the first run: the ghost light plays four notes)
                        await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
                        await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const b=document.getElementById('calmBg'); let k=0; while(!/Dark|Тём/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(5500); }],
-  ['calm-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/core/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
+  ['calm-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/apps/night/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
   ['calm-info',      async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
   ['calm-land',      async p=>{ await p.click('#calmInfoClose'); await p.setViewportSize({ width:844, height:390 }); await calmWait(p); }],
   ['calm-land-info', async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
@@ -107,7 +107,7 @@ const SCREENS_CALM=[
   ['calm-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
   ['calm-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForFunction(()=>innerWidth===390 && document.querySelector('canvas').width===390); await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))); await playHands(p); }],  /* SPLIT-2: the hands read the canvas size and the per-frame cover rect: wait for the resize */
   /* RUN 8 (slice 4): the forest picture behind the playing hands (WebGL with screen-blended lights; the room renders at its own rate) */
-  ['calm-forest',    async p=>{ await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
+  ['calm-forest',    async p=>{ await p.evaluate(()=>{ document.getElementById('calmFxHint').hidden=true; const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
   ['calm-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
 ];
 /* RUN 9: THE FOREST'S SCREENS (--forest; headless Chrome renders the WebGL room) — Begin, the Forest background, the two hands playing; then
@@ -121,20 +121,20 @@ const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])
   const R=H.sceneRoomDbg(); for(let k=0;k<n;k++){ if(R) R.glint(0, 0.85); await new Promise(r=>setTimeout(r, every)); } }, [n, every, fx||null]); };
 const SCREENS_FOREST=[
   ['f-start',        async p=>{ await p.click('#calmBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/core/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); });
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/apps/night/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); });
                        await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
   ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
   ['f-cloud',        async p=>{ await forestAt(p, 630); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
   ['f-dusk',         async p=>{ await forestAt(p, 60); await moodTo(p, 'Dusk|Сумер'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
   ['f-mist',         async p=>{ await moodTo(p, 'Mist|Туман'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
-  ['f-sleep',        async p=>{ await moodTo(p, 'Glow|Сияние'); await p.waitForTimeout(9000); await p.evaluate(async ()=>{ const S=await import('/core/calmshell.js'); S.calmSleepDbg(15, 800e3); }); await p.waitForTimeout(1200); await playHands(p); await p.waitForTimeout(900); }],
-  ['f-notes',        async p=>{ await p.evaluate(async ()=>{ const S=await import('/core/calmshell.js'); S.calmSleepDbg(0, 0); }); await forestAt(p, 60); await playHands(p); await roomNotes(p, 14, 450); await p.waitForTimeout(350); }],
+  ['f-sleep',        async p=>{ await moodTo(p, 'Glow|Сияние'); await p.waitForTimeout(9000); await p.evaluate(async ()=>{ const S=await import('/apps/night/shell.js'); S.calmSleepDbg(15, 800e3); }); await p.waitForTimeout(1200); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-notes',        async p=>{ await p.evaluate(async ()=>{ const S=await import('/apps/night/shell.js'); S.calmSleepDbg(0, 0); }); await forestAt(p, 60); await playHands(p); await roomNotes(p, 14, 450); await p.waitForTimeout(350); }],
   ['f-echo',         async p=>{ await roomNotes(p, 1, 900, [['cecho',0,0.85],['ctone',1,0.5]]); }],
   ['f-warm',         async p=>{ await roomNotes(p, 4, 500, [['cecho',0,0],['ctone',1,0.05]]); await p.waitForTimeout(200); }],
   ['f-star',         async p=>{ await forestAt(p, 60); await p.waitForTimeout(300); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('star'); }); await p.waitForTimeout(520); }],
   ['f-bloom',        async p=>{ await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('bloom'); }); await p.waitForTimeout(3600); }],
   ['f-emblem',       async p=>{ await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
-  ['f-land',         async p=>{ await p.evaluate(async ()=>{ const S=await import('/core/calmshell.js'); S.calmSleepDbg(0, 0); }); await p.setViewportSize({ width:844, height:390 }); await forestAt(p, 60); await p.waitForTimeout(1800); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-land',         async p=>{ await p.evaluate(async ()=>{ const S=await import('/apps/night/shell.js'); S.calmSleepDbg(0, 0); }); await p.setViewportSize({ width:844, height:390 }); await forestAt(p, 60); await p.waitForTimeout(1800); await playHands(p); await p.waitForTimeout(900); }],
   ['f-land-cloud',   async p=>{ await forestAt(p, 640); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
   ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
   ['f-land-notes',   async p=>{ await forestAt(p, 60); await roomNotes(p, 10, 450, [['ctone',1,0.5]]); await roomNotes(p, 1, 700, [['cecho',0,0.85]]); }],
@@ -166,8 +166,10 @@ async function capture(tag){
     const ctx=await browser.newContext({ viewport: CALM ? { width:390, height:844 } : { width:1280, height:800 }, deviceScaleFactor: CALM ? 2 : 1, locale:'en-US' });
     await ctx.grantPermissions(['camera','microphone'],{ origin:`http://127.0.0.1:${port}` }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ try{ localStorage.setItem('handsong.lang','en'); }catch(e){} });
+    /* SPLIT-2: the effects hint's own 7-s timer races the capture (it hid between the style walk and the shot): it stays up through calm-play; calm-forest takes it down, as the timer would have */
+    if(CALM) await ctx.addInitScript(()=>{ const st=window.setTimeout; window.setTimeout=(f,ms,...a)=>st(f, ms===7000 ? 3600e3 : ms, ...a); });
     const page=await ctx.newPage(); const errs=[]; page.on('pageerror',e=>errs.push(String(e&&e.message||e)));
-    await page.goto(`http://127.0.0.1:${port}/index.html?probe${CALM?'&calm':''}`);
+    await page.goto(`http://127.0.0.1:${port}/apps/${CALM?'night':'full'}/index.html?probe`);
     await page.waitForFunction(()=>window.P && window.R, null, { timeout:60e3 }); await page.waitForTimeout(800);
     for(const [name,act] of (FOREST ? SCREENS_FOREST : CALM ? SCREENS_CALM : SCREENS)){
       await act(page);
@@ -184,31 +186,49 @@ async function capture(tag){
     await writeFile(path.join(dir,'styles.json'), JSON.stringify(res));
   } finally { await browser.close().catch(()=>{}); srv.close(); }
 }
+/* SPLIT-2: the agreed changes since the baseline, per page (--declared full|night). REMOVED: elements that are gone on purpose. SHIFT: [parent, first child index, by] re-indexes the siblings
+   after them, so nothing else reads as changed. PIXELS: the screens where the removal shows; their style and pixel differences are printed, not counted; each is checked by eye (side-by-side). */
+const DECLARED={
+  full:{ REMOVED:/^(#calm[\w-]*|#profSep|#profRow|#profHint|#profFull|#profCalm)(>|::|$)|^#start>div:1>(div:1|ol:2|button:3)(>|::|$)/, SHIFT:[['#start>div:1',4,3], ['html>body:2',26,1]], PIXELS:new Set() },
+  night:{ REMOVED:/^(#profSep|#profRow|#profHint|#profFull|#profCalm|#calmToFull)(>|::|$)/, SHIFT:[], PIXELS:new Set(['calm-info','calm-land-info','calm-ru-info']) },
+};
+const DECL=DECLARED[val('--declared')]||null;
+function rekey(k){ if(!DECL) return k; for(const [par,from,by] of DECL.SHIFT){ if(!k.startsWith(par+'>')) continue; const rest=k.slice(par.length+1), m=rest.match(/^([a-z0-9]+):(\d+)(.*)$/); if(m && +m[2]>=from) return `${par}>${m[1]}:${+m[2]-by}${m[3]}`; } return k; }
 async function compare(a,b){
   const A=JSON.parse(await readFile(path.join(OUT,a,'styles.json'),'utf8')), B=JSON.parse(await readFile(path.join(OUT,b,'styles.json'),'utf8'));
   let total=0; const browser=await chromium.launch({ channel:'chrome', headless:true }); const page=await browser.newPage();
   try{
     for(const name of Object.keys(A.screens)){ const sa=A.screens[name], sb=B.screens[name]; if(!sb){ out(`[ui-snap] ${name}: missing in ${b}`); total++; continue; }
       const diffs=[], onlyA=[], onlyB=[];
-      for(const [k,ea] of Object.entries(sa.els)){ if(k.startsWith('html>head')) continue; const eb=sb.els[k]; if(!eb){ onlyA.push(k); continue; }
+      let gone=0; const keysA=new Set();
+      for(const [k0,ea] of Object.entries(sa.els)){ if(k0.startsWith('html>head')) continue; if(DECL && DECL.REMOVED.test(k0)){ gone++; continue; } const k=rekey(k0); keysA.add(k); const eb=sb.els[k]; if(!eb){ onlyA.push(k0); continue; }
         const va=sa.table[ea.s], vb=sb.table[eb.s];
         sa.props.forEach((p,i)=>{ const j=sb.props.indexOf(p); const x=va[i], y=j>=0?vb[j]:'(no property)'; if(x!==y) diffs.push(`${k} ${p}: ${x} → ${y}`); });
         if(ea.t!==eb.t) diffs.push(`${k} text: ${JSON.stringify(ea.t)} → ${JSON.stringify(eb.t)}`); }
-      for(const k of Object.keys(sb.els)) if(!sa.els[k] && !k.startsWith('html>head')) onlyB.push(k);   // <head> is not rendered
+      for(const k of Object.keys(sb.els)) if(!keysA.has(k) && !k.startsWith('html>head')) onlyB.push(k);   // <head> is not rendered
       const pa=await readFile(path.join(OUT,a,name+'.png')), pb=await readFile(path.join(OUT,b,name+'.png'));
       let px=0; if(!pa.equals(pb)) px=await page.evaluate(async ([x,y])=>{ const load=s=>new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.src='data:image/png;base64,'+s; });
         const [ia,ib]=await Promise.all([load(x),load(y)]); if(ia.width!==ib.width||ia.height!==ib.height) return -1;
         const c=document.createElement('canvas'); c.width=ia.width; c.height=ia.height; const g=c.getContext('2d');
         g.drawImage(ia,0,0); const da=g.getImageData(0,0,c.width,c.height).data; g.clearRect(0,0,c.width,c.height); g.drawImage(ib,0,0); const db=g.getImageData(0,0,c.width,c.height).data;
         let n=0; for(let i=0;i<da.length;i+=4) if(da[i]!==db[i]||da[i+1]!==db[i+1]||da[i+2]!==db[i+2]||da[i+3]!==db[i+3]) n++; return n; }, [pa.toString('base64'), pb.toString('base64')]);
-      const noisy=NOISY.has(name), n=(noisy?0:diffs.length+(px?1:0))+onlyA.length+onlyB.length; total+=n;
-      out(`[ui-snap] ${name}: ${Object.keys(sa.els).length} elements · style differences ${diffs.length} · only in ${a} ${onlyA.length} · only in ${b} ${onlyB.length} · pixels differing ${px<0?'(size changed)':px}${noisy?' (noisy screen: structure only)':''}`);
-      for(const d of [...(noisy?[]:diffs.slice(0,12)), ...onlyA.slice(0,5).map(k=>'only in '+a+': '+k), ...onlyB.slice(0,5).map(k=>'only in '+b+': '+k)]) out('    '+d);
+      const noisy=NOISY.has(name), declared=!!(DECL && DECL.PIXELS.has(name)), n=(noisy||declared?0:diffs.length+(px?1:0))+onlyA.length+onlyB.length; total+=n;
+      out(`[ui-snap] ${name}: ${Object.keys(sa.els).length} elements · style differences ${diffs.length} · only in ${a} ${onlyA.length} · only in ${b} ${onlyB.length} · pixels differing ${px<0?'(size changed)':px}${noisy?' (noisy screen: structure only)':''}${declared?' (declared: checked by eye)':''}${gone?` · removed on purpose ${gone}`:''}`);
+      for(const d of [...(noisy?[]:diffs.slice(0,declared?40:12)), ...onlyA.slice(0,5).map(k=>'only in '+a+': '+k), ...onlyB.slice(0,5).map(k=>'only in '+b+': '+k)]) out('    '+d);
     }
   } finally { await browser.close().catch(()=>{}); }
   out(`[ui-snap] ${total?'DIFFERENCES — '+total:'IDENTICAL'} (${a} → ${b})`);
   return total;
 }
+/* SPLIT-2: before and after in one PNG, for the eye: --side-by-side <tagA> <tagB> <screen,screen> <folder> */
+async function sideBySide(a,b,names,dir){ await mkdir(dir,{ recursive:true }); const browser=await chromium.launch({ channel:'chrome', headless:true }); const page=await browser.newPage();
+  try{ for(const name of names){ const [pa,pb]=await Promise.all([a,b].map(t=>readFile(path.join(OUT,t,name+'.png'))));
+      const url=await page.evaluate(async ([x,y,la,lb])=>{ const load=s=>new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.src='data:image/png;base64,'+s; }); const [ia,ib]=await Promise.all([load(x),load(y)]);
+        const G=24, H=48, c=document.createElement('canvas'); c.width=ia.width+ib.width+G; c.height=Math.max(ia.height,ib.height)+H; const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+        g.fillStyle='#000'; g.font='28px sans-serif'; g.fillText('BEFORE: '+la,8,34); g.fillText('AFTER: '+lb,ia.width+G+8,34); g.drawImage(ia,0,H); g.drawImage(ib,ia.width+G,H); return c.toDataURL('image/png'); }, [pa.toString('base64'), pb.toString('base64'), a, b]);
+      const f=path.join(dir,name+'.png'); await writeFile(f, Buffer.from(url.split(',')[1],'base64')); out('[ui-snap] side by side: '+path.relative(ROOT,f)); } }
+  finally{ await browser.close().catch(()=>{}); } }
+{ const i=argv.indexOf('--side-by-side'); if(i>=0){ await sideBySide(argv[i+1],argv[i+2],argv[i+3].split(','),path.resolve(argv[i+4])); process.exit(0); } }
 if(SAVE) await capture(SAVE);
 let code=0;
 if(SAVE && CALM){ out(msgHits.length ? '[ui-snap] Calm messages: OVERLAP — '+msgHits.join(' · ') : '[ui-snap] Calm messages: no overlap on any screen'); if(msgHits.length) code=1; }   // RUN 8 (addendum 3)

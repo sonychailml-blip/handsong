@@ -1,0 +1,254 @@
+/* DESIGN TOKENS — every colour, font, type size, spacing, radius, shadow and z-index of the interface (UI1b, DAY run 2026-10-16).
+   Built from TODAY'S look: values are exactly what style.css used, so nothing visible changed (tools/ui-snap.mjs proves it).
+   ⛳ style.css and JS-set styles use ONLY these tokens (static check «design tokens»); a new value is added here first.
+   Names: colours by family and alpha (--c-white-a22 = white at .22; slate/paper/deep-NN = a neutral at lightness NN %); type sizes,
+   spacing and odd radii by today's pixel value (the redesign replaces them by a smaller semantic scale — BACKLOG §7.19); z-index by
+   layer. The canvas (draw.js) reads its own palette (config.INSTR_COL and literals) — tokens for it come with DRAW1. */
+:root{
+  /* — kept from before UI1b (semantic) — */
+  --bg:#07070d; --ink:#eceaf4; --dim:#8f8ba6;
+  --note:#ff9e2c; --chord:#b18cff; --tonic:#57d9a3;
+  --rec:#e5484d; --panel:rgba(16,16,28,.86);
+  /* ЕДИНЫЙ ШРИФТ всего интерфейса — системный стек, без внешних файлов (проект без зависимостей,
+     веб-шрифт добавил бы загрузку и мигание нестилизованного текста). Задаётся ЗДЕСЬ, наследуется
+     всем меню и стартом. Холст (draw.js, ctx.font 'system-ui') — отдельно, это игровое поле. */
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* ЕДИНЫЙ АКЦЕНТ МЕНЮ И СТАРТА — тёплый оранжевый (исходный var(--note)=#ff9e2c). --accent: основной
+     тон для ЗАЛИВОК/рамок/фокуса и текста на ТЁМНОМ баре (там #ff9e2c читается). На светлом #ff9e2c
+     как ТЕКСТ бледен (≈2.1:1), поэтому --accent-ink — темнее (жжёный янтарь #b45309, ≈5:1 на белом) —
+     для ТЕКСТА и ссылок на светлых панелях/карточке. Роли соло/аккорды/бас/ударные (INSTR_COL,
+     config.js) — игровое поле, НЕ трогаем; у аккордов свой сиреневый на ТЁМНОМ холсте — другой цвет. */
+  --accent:#ff9e2c; --accent-ink:#b45309;
+  /* ШКАЛА РАЗМЕРОВ МЕНЮ (4 шага): заголовок панели · контролы · ярлык строки · подсказка. */
+  --fs-head:16px; --fs-ctl:14px; --fs-label:13px; --fs-hint:12px;
+  /* РАДИУСЫ (2 шага): контролы · панели+стартовая карточка. */
+  --r-sm:10px; --r-lg:18px;
+  
+
+  /* — colours — */
+  --c-accent-a00:rgba(255,158,44,0);
+  --c-accent-a50:rgba(255,158,44,.5);
+  --c-accent-a60:rgba(255,158,44,.6);
+  --c-accent-ink-a40:rgba(180,83,9,.4);
+  --c-accent-ink-a50:rgba(180,83,9,.5);
+  --c-accent-ink-a60:rgba(180,83,9,.6);
+  --c-amber-35:#b26a00;
+  --c-amber-55:#f5a524;
+  --c-bg-a82:rgba(7,7,13,.82);
+  --c-bg-a86:rgba(7,7,13,.86);
+  --c-bg-a94:rgba(7,7,13,.94);
+  --c-black:#000;
+  --c-black-a35:rgba(0,0,0,.35);
+  --c-danger:#d9534f;
+  --c-danger-a10:rgba(217,83,79,.10);
+  --c-deep-6:#1a1206;
+  --c-deep-11:#3a2600;
+  --c-deep-12:#14142a;
+  --c-deep-14:#1b1b2a;
+  --c-deep-16:#1e2233;
+  --c-line-a18:rgba(40,50,90,.18);
+  --c-line-a22:rgba(40,50,90,.22);
+  --c-line-a28:rgba(40,50,90,.28);
+  --c-night-a74:rgba(10,10,20,.74);
+  --c-night-a82:rgba(10,10,20,.82);
+  --c-night-a90:rgba(10,10,20,.9);
+  --c-night-a92:rgba(10,10,20,.92);
+  --c-night-a94:rgba(10,10,20,.94);
+  --c-panel-a85:rgba(16,16,28,.85);
+  --c-panel-a92:rgba(16,16,28,.92);
+  --c-paper-90:#dbe6f1;
+  --c-paper-93:#e3e9f5;
+  --c-paper-95:#eef1f8;
+  --c-paper-96:#eef2fb;
+  --c-paper-97:#f4f6fc;
+  --c-rec-a00:rgba(229,72,77,0);
+  --c-rec-a32:rgba(229,72,77,.32);
+  --c-rec-a55:rgba(229,72,77,.55);
+  --c-shade-a04:rgba(20,24,50,.04);
+  --c-shade-a06:rgba(20,24,50,.06);
+  --c-shade-a10:rgba(20,24,50,.10);
+  --c-shade-a12:rgba(20,24,50,.12);
+  --c-shade-a14:rgba(20,24,50,.14);
+  --c-shade-a16:rgba(20,24,50,.16);
+  --c-shade-a20:rgba(20,24,50,.20);
+  --c-shade-a24:rgba(20,24,50,.24);
+  --c-sky-a16:rgba(76,194,255,.16);
+  --c-sky-a35:rgba(76,194,255,.35);
+  --c-slate-22:#2a2f45;
+  --c-slate-29:#3a4059;
+  --c-slate-30:#3a4060;
+  --c-slate-39:#3d4a8a;
+  --c-slate-40:#4a5580;
+  --c-slate-41:#5a6079;
+  --c-slate-48:#6a7089;
+  --c-slate-60:#8a90a8;
+  --c-tonic:#57d9a3;
+  --c-white:#fff;
+  --c-white-a14:rgba(255,255,255,.14);
+  --c-white-a16:rgba(255,255,255,.16);
+  --c-white-a22:rgba(255,255,255,.22);
+  --c-white-a30:rgba(255,255,255,.3);
+  --c-white-a85:rgba(255,255,255,.85);
+
+  /* — type — */
+  --fs-10:10px;
+  --fs-12:12px;
+  --fs-13:13px;
+  --fs-14:14px;
+  --fs-15:15px;
+  --fs-16:16px;
+  --fs-17:17px;
+  --fs-18:18px;
+  --fs-26:26px;
+  --fs-28:28px;
+  --fs-30:30px;
+  --fw-regular:400;
+  --fw-semi:600;
+  --fw-bold:700;
+  --fw-heavy:800;
+  --lh-solid:1;
+  --lh-tight:1.1;
+  --lh-snug:1.2;
+  --lh-body:1.4;
+  --lh-relaxed:1.45;
+  --lh-loose:1.55;
+
+  /* — spacing (padding, margin, gap) — */
+  --sp-1:1px;
+  --sp-2:2px;
+  --sp-4:4px;
+  --sp-5:5px;
+  --sp-6:6px;
+  --sp-7:7px;
+  --sp-8:8px;
+  --sp-9:9px;
+  --sp-10:10px;
+  --sp-11:11px;
+  --sp-12:12px;
+  --sp-13:13px;
+  --sp-14:14px;
+  --sp-15:15px;
+  --sp-16:16px;
+  --sp-18:18px;
+  --sp-20:20px;
+  --sp-22:22px;
+  --sp-24:24px;
+  --sp-26:26px;
+  --sp-32:32px;
+  --sp-40:40px;
+
+  /* — radii (also --r-sm, --r-lg above) — */
+  --r-xs:6px;
+  --r-round:50%;
+  --r-pill:999px;
+
+  /* — shadows — */
+  --sh-rec-armed:inset 0 0 0 3px var(--c-rec-a32);
+  --sh-rec-on-ring:inset 0 0 0 2px var(--c-white-a85);
+  --sh-clip-pulse-0:0 0 0 0 var(--c-rec-a55);
+  --sh-clip-pulse-50:0 0 0 5px var(--c-rec-a00);
+  --sh-status:0 1px 2px var(--c-black);
+  --sh-tutorbar:0 8px 30px var(--c-black-a35);
+  --sh-tutor-ready-0:0 0 0 0 var(--c-accent-a60);
+  --sh-tutor-ready-50:0 0 0 7px var(--c-accent-a00);
+  --sh-tutor-pulse-0:0 0 0 0 var(--c-accent-a50);
+  --sh-tutor-pulse-50:0 0 0 6px var(--c-accent-a00);
+  --sh-lessoncard:0 16px 44px var(--c-line-a28);
+  --sh-panel:0 16px 44px var(--c-line-a22);
+  --sh-startcard:0 16px 44px var(--c-line-a18);
+
+  /* — layers (z-index) — */
+  --z-sticky:2;
+  --z-bar:10;
+  --z-transport:11;
+  --z-edit-bar:12;
+  --z-field:13;
+  --z-panel:14;
+  --z-panel-top:15;
+  --z-tutor-low:16;
+  --z-cam-msg:20;
+  --z-toast:21;
+  --z-diag:22;
+  --z-overlay:25;
+  --z-menu:30;
+  --z-lesson:33;
+  --z-demo:35;
+  --z-help:40;
+}
+
+/* ═══ CANVAS (DRAW1b, RUN 3 2026-10-16) — the play field, the track strip, the arrangement window, the mixer and the editor draw every
+   colour through palette.cv('<name>') = the value of --cv-<name> (exact text of the literal it replaced, so the canvas parses the same
+   colour — tools/ui-snap.mjs proves the pixels identical). Names: family + alpha as above (--cv-white-a55 = white at .55). ⛳ A new canvas
+   colour is a token here first (static check 11 fails on a colour literal in core/legacy-ui/views/ or config.js, and on a cv() name with no token). */
+:root{
+  /* ROLE PALETTE (AR2; once config.INSTR_COL): the four roles differ by LIGHTNESS, not only hue (colour-blind safe) — a ladder with an
+     equal ≈1.45× luminance step: bass #20946b (Y 0.225, L* 54.6) · chords #b18cff (0.353, 66.0) · solo #ffb050 (0.529, 77.8) · drums
+     #ffe680 (0.794, 91.4). WCAG contrast on the window background #0b0b14: 5.1 / 7.5 / 10.8 / 15.8; on a row (#141420): 4.8 / 7.0 / 10.1 /
+     14.7 (a 12-px track name needs ≥ 4.5 — met even by bass); the play strip over a bright camera (box .74 over white ≈ #4a4a52): 2.3 / 3.4 /
+     4.8 / 7.1. Bass is not made darker: below Y 0.206 the name on a row falls under 4.5:1. */
+  --cv-role-ld:#ffb050; --cv-role-ch:#b18cff; --cv-role-bs:#20946b; --cv-role-dr:#ffe680;
+  --cv-lane-norole:#9aa0b4;   /* a track without a role (a drone layer, an emptied one) — neutral grey, not another role's colour */
+  /* effect bars (config.FX_META col) and the reverb / module bar */
+  --cv-fx-dly:#4cc2ff; --cv-fx-vib:#ffb84c; --cv-fx-drv:#ff5d5d; --cv-fx-trm:#9b7bff; --cv-fx-vol:#e6e6e6; --cv-fx-glide:#ff7fc8;
+  --cv-fx-trmmix:#d4b8ff; --cv-fx-rev:#57d9a3;
+  --cv-white-rgb:255,255,255;   /* channels only: the pulsing freeze dot composes its own alpha */
+  --cv-amber-a85:rgba(255,210,63,.85); --cv-amber-a05:rgba(255,210,63,.05);
+  --cv-bg-a50:rgba(7,7,13,.5);
+  --cv-black-a22:rgba(0,0,0,.22);
+  --cv-blue-a20:rgba(140,180,255,.20);
+  --cv-chord:#b18cff;
+  --cv-cyan:#5ad1ff;
+  --cv-deep-a90:rgba(8,10,16,.9); --cv-deep-a86:rgba(8,10,16,.86);
+  --cv-gold:#ffd479; --cv-gold-a95:rgba(255,212,121,.95); --cv-gold-a45:rgba(255,212,121,.45); --cv-gold-a28:rgba(255,212,121,.28);
+  --cv-gold-a22:rgba(255,212,121,.22);
+  --cv-indigo:#3a5cff;
+  --cv-mint:#7ee0b6;
+  --cv-night-a94:rgba(10,10,20,.94); --cv-night-a85:rgba(10,10,20,.85); --cv-night-a82:rgba(10,10,20,.82); --cv-night-a74:rgba(10,10,20,.74);
+  --cv-night-a38:rgba(10,10,20,.38); --cv-night-a30:rgba(10,10,20,.30);
+  --cv-ochre:#e5a23c;
+  --cv-orange-a95:rgba(255,190,120,.95);
+  --cv-rec:#e5484d; --cv-rec-a85:rgba(229,72,77,.85); --cv-rec-a24:rgba(229,72,77,.24); --cv-rec-a16:rgba(229,72,77,.16);
+  --cv-rec-pale:#ff8a8d;
+  --cv-rec-soft:#ff6b6f;
+  --cv-saffron:#f5a524;
+  --cv-sky:#4cc2ff;
+  --cv-slate-a90:rgba(20,20,32,.9); --cv-slate-a85:rgba(20,20,32,.85);
+  --cv-slate2:#14141f;
+  --cv-tonic:#57d9a3; --cv-tonic-a70:rgba(87,217,163,.7); --cv-tonic-a55:rgba(87,217,163,.55); --cv-tonic-a50:rgba(87,217,163,.5);
+  --cv-tonic-a40:rgba(87,217,163,.40); --cv-tonic-a30:rgba(87,217,163,.30); --cv-tonic-a10:rgba(87,217,163,.10);
+  --cv-white:#fff; --cv-white-a92:rgba(255,255,255,.92); --cv-white-a90:rgba(255,255,255,.9); --cv-white-a88:rgba(255,255,255,.88);
+  --cv-white-a80:rgba(255,255,255,.8); --cv-white-a75:rgba(255,255,255,.75); --cv-white-a72:rgba(255,255,255,.72); --cv-white-a70:rgba(255,255,255,.7);
+  --cv-white-a65:rgba(255,255,255,.65); --cv-white-a62:rgba(255,255,255,.62); --cv-white-a60:rgba(255,255,255,.6); --cv-white-a55:rgba(255,255,255,.55);
+  --cv-white-a50:rgba(255,255,255,.5); --cv-white-a45:rgba(255,255,255,.45); --cv-white-a40:rgba(255,255,255,.4); --cv-white-a34:rgba(255,255,255,.34);
+  --cv-white-a30:rgba(255,255,255,.3); --cv-white-a28:rgba(255,255,255,.28); --cv-white-a26:rgba(255,255,255,.26); --cv-white-a24:rgba(255,255,255,.24);
+  --cv-white-a22:rgba(255,255,255,.22); --cv-white-a20:rgba(255,255,255,.20); --cv-white-a16:rgba(255,255,255,.16); --cv-white-a14:rgba(255,255,255,.14);
+  --cv-white-a12:rgba(255,255,255,.12); --cv-white-a11:rgba(255,255,255,.11); --cv-white-a10:rgba(255,255,255,.10); --cv-white-a09:rgba(255,255,255,.09);
+  --cv-white-a08:rgba(255,255,255,.08); --cv-white-a075:rgba(255,255,255,.075); --cv-white-a07:rgba(255,255,255,.07); --cv-white-a05:rgba(255,255,255,.05);
+  --cv-white-a042:rgba(255,255,255,.042); --cv-white-a04:rgba(255,255,255,.04); --cv-white-a035:rgba(255,255,255,.035); --cv-white-a03:rgba(255,255,255,.03);
+  --cv-white-a028:rgba(255,255,255,.028); --cv-white-a015:rgba(255,255,255,.015);
+  --cv-win:#0b0b14; --cv-win-a82:rgba(11,11,20,.82);
+  /* VIS1c (RUN 6): the NIGHT FOREST room (views/scene/forest.js) — the «Rooms of light» prototype's colours, read by the 3D room as its base
+     colours (textures add small numeric jitter around them). The firefly greens are the hand's light; the halo / mask entries are alpha
+     ramps of white used as light masks (sprites, mist), not visible colours on their own. */
+  --cv-forest-fog:#060e18; --cv-forest-sky:#1b2a46; --cv-forest-under:#040604; --cv-forest-moon:#6b84bd; --cv-forest-moonhalo:#9fb4dd;
+  --cv-forest-ground:#17160f; --cv-forest-moss:#30481c; --cv-forest-soil:#46321e; --cv-forest-leaf:#2b2213; --cv-forest-bark:#2e251e;
+  --cv-forest-bark-dark:rgba(8,6,5,.55); --cv-forest-bark-light:rgba(110,95,75,.28); --cv-forest-fern:#2c4a1e; --cv-forest-frond:#233a1a;
+  --cv-forest-rock:#272b22; --cv-forest-mist:#8aa2c8; --cv-forest-fly:#d6ff7a; --cv-forest-wild:#c8ff78; --cv-forest-light:#c6ff7a;
+  /* RUN 9: the moods' looks (core/night.js MOOD_LOOKS) — Glow = the base set above + haze / cloud; Dusk and Mist their own sets */
+  --cv-forest-haze:#8aa2c8; --cv-forest-cloud:#1a2234; --cv-forest-shroom:#7dffc4; --cv-forest-bloom:#b9a8ff;
+  --cv-forest-stem:#3b3a30; --cv-forest-water:#03070c;   /* RUN 9 (slice 2): the mushrooms' stems, the stream's deep colour */
+  --cv-forest-grass:#22361a; --cv-forest-grass-dry:#38381c; --cv-forest-leaf-fall:#2c2012; --cv-forest-moth:#d9d2bd; --cv-forest-sil:#020403;   /* slice 3 */
+  --cv-forest-dusk-fog:#110c1c; --cv-forest-dusk-sky:#3a2c55; --cv-forest-dusk-under:#070508; --cv-forest-dusk-moon:#c79a78;
+  --cv-forest-dusk-moonhalo:#e2b78f; --cv-forest-dusk-haze:#9c88b4; --cv-forest-dusk-cloud:#2a2238;
+  --cv-forest-dusk-shroom:#ffb070; --cv-forest-dusk-bloom:#ff8fc8;
+  --cv-forest-misty-fog:#111920; --cv-forest-misty-sky:#2c3a48; --cv-forest-misty-under:#06080a; --cv-forest-misty-moon:#8fa4bf;
+  --cv-forest-misty-moonhalo:#b8c8dc; --cv-forest-misty-haze:#aebdcc; --cv-forest-misty-cloud:#202b36;
+  --cv-forest-misty-shroom:#a8e8ff; --cv-forest-misty-bloom:#e8f2ff;
+  --cv-forest-warm:#ffb45a; --cv-forest-cold:#e6fff2;   /* RUN 7 (C5): Warmth / Brightness — the light's two ends (the lime between) */
+  --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
+  --cv-halo-a100:rgba(255,255,255,1); --cv-halo-a45:rgba(255,255,255,.45); --cv-halo-a10:rgba(255,255,255,.1); --cv-halo-a0:rgba(255,255,255,0);
+  --cv-mist-a12:rgba(255,255,255,.12);
+  --cv-calm-glow:#c8f56a;   /* RUN 7: the Calm glow note field — the row under a hand glows in the firefly lime */
+  --cv-calm-dark:#000;   /* the Dark background (Calm): plain black, the same sound, the hand points on it */
+  --cv-calm-amber:#ffc46b;   /* RUN 8: Calm's fingertip fireflies at rest (warm amber; the playing one is --cv-calm-glow, the emblem's centre) */
+}

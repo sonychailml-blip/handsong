@@ -1,6 +1,6 @@
 /* RUN 7 (C7): THE POSE GENERATOR (moved from probes/hand.js, HAND1 — the probe now imports it from here): a pose → the 21 landmarks of one
    hand in the camera's RAW coordinates (through the live crop and mirroring — rule #12), so a synthetic hand enters processHands exactly as
-   a detected one. Used by the probes (HAND1, Calm rows) and by the Calm ghost light (core/ghost.js). */
+   a detected one. Used by the probes (HAND1, Calm rows) and by the Calm ghost light (apps/night/ghost.js). */
 import * as ST from '../state.js';
 
 /* ── the pose generator: screen fractions (x, y) of the pinch point, hand size s (raw units), gaps = thumb-tip distance of each of the

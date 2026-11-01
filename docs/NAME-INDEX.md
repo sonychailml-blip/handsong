@@ -1,8 +1,73 @@
 # NAME INDEX — code names by module (GENERATED — do not edit by hand)
 
-_Generated from `core/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.
+_Generated from `core/`, `apps/`, `tools/probes/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.
 Kinds: fn, const, let, class, «→ ./x.js» a re-export. Meaning of a name: the code and `archive/CLAUDE-history.md`. The hand-written index
 before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of this file (kept by hand in `docs/STALE-NAMES.md`)._
+
+## apps/full/demo.js
+===================================================================== ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» (прототип, side-experiment) --------------------------------------------------------------------- …
+- exports: none
+
+## apps/full/main.js
+SPLIT-2: the Full app's entry.
+- exports: none
+
+## apps/full/songs.js
+⛳ ДЕМО-ПЕСНИ — КОНСОЛЬНЫЙ ЗАГРУЗЧИК, НЕ ЧАСТЬ ИГРЫ.
+- const (1): `songNames`
+- fn (2): `loadSong`, `songBuild`
+
+## apps/full/tutor.js
+================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
+- fn (2): `wireStarter`, `openLessons`
+
+## apps/night/ghost.js
+RUN 7 (C7, Calm plan §6; docs/CALM-QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts slo…
+- const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
+- fn (2): `ghostAt`, `ghostFrame`
+
+## apps/night/main.js
+SPLIT-2: the Night app's entry: its shell, its ghost light, its forest, its profile.
+- exports: none
+
+## apps/night/pure/cycle.js
+RUN 9 — THE NIGHT over the forest, as numbers.
+- const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
+- fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
+
+## apps/night/pure/fireflies.js
+VIS1c (RUN 6, Calm plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
+- const (2): `FOREST_FLIES`, `FOREST_DEPTH`
+- fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
+
+## apps/night/pure/forestlife.js
+RUN 9 — THE FOREST'S LIFE, as numbers.
+- const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
+- fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
+
+## apps/night/scene/forest-detail.js
+RUN 9 (slice 3) — THE FOREST'S DETAIL.
+- const (1): `DETAIL`
+- fn (1): `buildDetail`
+
+## apps/night/scene/forest-life.js
+RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
+- fn (3): `patchGroundWaves`, `patchSway`, `buildLife`
+
+## apps/night/scene/forest-rare.js
+RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is core/night.js rareStep, seeded): a FALLING STAR streaks across the sky (one additi…
+- const (1): `RARE_LOOK`
+- fn (1): `buildRare`
+
+## apps/night/scene/forest.js
+VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
+- const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
+- fn (1): `buildForest`
+
+## apps/night/shell.js
+RUN 7 (C6 + C11, Calm plan §5; docs/CALM-QUALITY.md points 4, 5, 6, 9, 10) — THE CALM SHELL (DOM side; the logic is core/calmui.js).
+- const (2): `calmShellDbg`, `calmSleepDbg`
+- fn (2): `calmShellWire`, `calmShellFace`
 
 ## core/arrange.js
 Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
@@ -21,11 +86,6 @@ AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF
 - const (7): `AS`, `AS_KEEP`, `asWire`, `asInfo`, `asEnabled`, `asPause`, `asDbgState`
 - fn (12): `asPut`, `asStart`, `asTick`, `asWrite`, `asAdopt`, `asFresh`, `asFlush`, `asList`, `asGet`, `asSetEnabled`, `asDbg`, `asDrop`
 
-## core/calmshell.js
-RUN 7 (C6 + C11, Calm plan §5; docs/CALM-QUALITY.md points 4, 5, 6, 9, 10) — THE CALM SHELL (DOM side; the logic is core/calmui.js).
-- const (2): `calmShellDbg`, `calmSleepDbg`
-- fn (2): `calmShellWire`, `calmShellFace`
-
 ## core/clip.js
 ================= ЗАПИСЬ КЛИПА / АУДИО ================= ОДИН движок на два вида записи (не два модуля): • 'video' — кадр ХОЛСТА (canvas.captureStream) + звук → один файл С картинкой И звуком; • 'a…
 - const (2): `activeKind`, `onClipChange`
@@ -35,10 +95,6 @@ RUN 7 (C6 + C11, Calm plan §5; docs/CALM-QUALITY.md points 4, 5, 6, 9, 10) — 
 ================= КОНФИГ: зоны, метаданные, пороги =================
 - const (55): `FINGER_TIPS`, `FX_META`, `CAM_MARGIN`, `remapAxis`, `coverView`, `PINCH_ON`, `PINCH_HOLD`, `PINCH_OFF`, `REV_NEAR`, `CLEAR_HOLD_MS`, `LOOPER_MSG_MS`, `ROW_HYST`, `WATCHDOG_MS`, `SCHED_AHEAD`, `SCHED_TICK_MS`, `FX_BAR_W`, `FX_BAR_GAP`, `FX_BAR_MAX`, `CH_PAL_W`, `CH_PAL_PAD`, `CH_PAL_GAP`, `CH_PAL_HEAD_H`, `PAL_HYST_X`, `PAL_HYST_Y`, `palColX`, `palRowY`, `palSplitX`, `rectBandY`, `volAmp`, `volFromOld`, `volVel`, `BEATS_PER_BAR`, `REC_VOL_EPS`, `REC_REV_EPS`, `REC_FX_EPS`, `REC_FINE_EPS`, `REC_AVG_S`, `REC_JUMP_EPS`, `REC_HIST_S`, `REC_PAUSE_S`, `REC_KNEE_F`, `AUT_RAMP_BEAT`, `AUT_RAMP_EPS`, `BEND_EPS_CENTS`, `CURVE_A`, `curveU`, `curveK`, `bendSeg`, `BEND_GLIDE_STEP_S`, `CHORD_POOL_N`, `CHORD_POOL_FIRST`, `BASS_POOL_N`, `LEAD_POOL_N`, `LEAD_POOL_KS`, `FX_VOL`
 - fn (3): `bendAt`, `bendSplit`, `bendPlan`
-
-## core/demo.js
-===================================================================== ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» (прототип, side-experiment) --------------------------------------------------------------------- …
-- exports: none
 
 ## core/edition.js
 C0 (RUN 6, Calm plan §2, §9.2) — THE EDITION.
@@ -122,11 +178,6 @@ GES1: the hand ROLES and OWNER KEYS — stateless helpers of the gesture machine
 - const (10): `depthN`, `melodicZone`, `polyZone`, `leadZone`, `liveKey`, `monoKey`, `wOn`, `wOff`, `ACTIONS`, `paletteFinger`
 - fn (4): `depthOf`, `handHalfRole`, `noteHandRole`, `noteVolOf`
 
-## core/ghost.js
-RUN 7 (C7, Calm plan §6; docs/CALM-QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts slo…
-- const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
-- fn (2): `ghostAt`, `ghostFrame`
-
 ## core/hand-worker.js
 LAT2b — hand detection OFF the main thread (a CLASSIC worker: MediaPipe starts each model by importScripts of its loader, which a module worker cannot do; our modules come in by dynamic import).
 - exports: none
@@ -151,6 +202,10 @@ UI1b (DAY run 2026-10-16): THE ICON COMPONENT — every interface glyph is rende
 - const (4): `ICONS`, `icon`, `iconText`, `SVG_ICONS`
 - fn (3): `applyIcons`, `svgIcon`, `svgEmblem`
 
+## core/legacy-ui/boot.js
+(no head comment)
+- fn (2): `boot`, `startFail`
+
 ## core/legacy-ui/draw.js
 DRAW1 (DAY run 2026-10-16): draw.js is the FACADE of the canvas — importers keep their import lines.
 - → ./views/camera.js (2): `drawVideoBackground`, `syncViewRect`
@@ -169,7 +224,7 @@ LAT1 — the latency meter, browser side.
 ## core/legacy-ui/ui.js
 (no head comment)
 - ? (1): `$`
-- const (3): `arrApi`, `undoUiDbg`, `canSplit`
+- const (5): `arrApi`, `undoUiDbg`, `canSplit`, `shellDoors`, `setFaceHook`
 - fn (13): `tutorReset`, `tutorClearLoop`, `tutorSetScale`, `tutorResetHandFn`, `songSaveText`, `songOpenText`, `songKeep`, `songKeepTimbres`, `asRestoreId`, `songResumeOffer`, `tutorSplitInit`, `revealBar`, `tutorSyncBar`
 
 ## core/legacy-ui/views/camera.js
@@ -192,28 +247,9 @@ DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis
 - const (5): `rollAutValAt`, `rollBendProbe`, `rollSnapBeat`, `rollAutSnapV`, `rollRowsProbe`
 - fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
 
-## core/legacy-ui/views/scene/forest-detail.js
-RUN 9 (slice 3) — THE FOREST'S DETAIL.
-- const (1): `DETAIL`
-- fn (1): `buildDetail`
-
-## core/legacy-ui/views/scene/forest-life.js
-RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
-- fn (3): `patchGroundWaves`, `patchSway`, `buildLife`
-
-## core/legacy-ui/views/scene/forest-rare.js
-RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is core/night.js rareStep, seeded): a FALLING STAR streaks across the sky (one additi…
-- const (1): `RARE_LOOK`
-- fn (1): `buildRare`
-
-## core/legacy-ui/views/scene/forest.js
-VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
-- const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
-- fn (1): `buildForest`
-
 ## core/legacy-ui/views/scene/host.js
 VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Calm plan §3) — THE SCENE HOST and Calm's BACKGROUNDS.
-- const (12): `BACKGROUNDS`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
+- const (13): `BACKGROUNDS`, `sceneRoomAdd`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
 - fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## core/legacy-ui/views/stack.js
@@ -248,10 +284,6 @@ REC5 (stage 3) — LIVE RECORDING: the recording state and the take's per-track 
 - const (21): `gridFor`, `recWire`, `recBass`, `takeSt`, `takeSrc`, `recLayers`, `isRecLayer`, `curTakeSet`, `inPB`, `noteSource`, `noInst`, `wTapSet`, `WleadOn`, `WleadOff`, `liveChClear`, `WchOn`, `WchSet`, `WchOff`, `WbassOn`, `WbassOff`, `WdrumHit`
 - fn (13): `takeJoin`, `nextFreeLayer`, `storeTi`, `storeTim`, `push`, `recLeadReset`, `recFoldRoll`, `recAllOff`, `recDrop`, `recLatchOpen`, `setRecording`, `recStop`, `onRec`
 - let (4): `recording`, `pushLy`, `curTake`, `latchOpenAt`
-
-## core/main.js
-(no head comment)
-- fn (1): `startFail`
 
 ## core/modules/ambience/forest.js
 RUN 7 (C4c, Calm plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambie…
@@ -369,167 +401,10 @@ DRAW1b (RUN 3, 2026-10-16) — THE CANVAS PALETTE, read from the design tokens (
 - const (2): `ROLE_COL`, `noRoleCol`
 - fn (1): `cv`
 
-## core/probedata.js
-⛳ ПРОБЫ ДАННЫХ — ЧАСТЬ ПРОБЫ, КОТОРОЙ НЕ НУЖНЫ НИ БРАУЗЕР, НИ КАМЕРА, НИ ЗВУК (слайс «быстрые пробы»).
-- const (21): `keyless`, `isUserId`, `SCALES`, `TUNINGS`, `CHORD_FAM_SETS`, `userCount`, `tagOf`, `isTert`, `legacyChordNotesStr`, `preF3RegWord`, `preF3RegWordFull`, `preF3RootName`, `preF3ChordNotesStr`, `preF3NoteLbl`, `PRE_T7_SETS`, `preT7ChordUnit`, `A4_SET`, `PRINT_MAX`, `OLD`, `allViews`, `KEEP_MAX`
-- fn (25): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegrees`, `checkModeMap`, `legacyChordLabel`, `legacyChordNotesRef`, `preF3StepName`, `preF3RowLabel`, `preF3ChordLabel`, `preF3AxisLbl`, `preF4Status`, `preT7ChordNotesAt`, `preT7ChordNotes`, `legacyLeadFreq`, `legacyBassFreq`, `legacyChordNotes`, `sweep`, `canon`, `snapViews`
-
-## core/probes/autosave.js
-AUTOSAVE1 (RUN 3, 2026-10-16): the song kept on this device by itself — through the real scheduler (autosave.asTick on the probe's clock, written at once instead of in an idle moment), the real but…
-- fn (1): `checkAutosave`
-
-## core/probes/calm.js
-C4a (RUN 6, Calm plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
-- const (2): `CALM_TIMBRES`, `CALM_SET`
-- fn (16): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkCalmTimbres`, `checkCalmShell`, `checkCalmDepth`, `checkCalmAmbience`, `checkCalmGhost`, `checkCalmSet`, `checkCalmFx`, `checkCalmFxTimbres`, `checkCalmStress`, `checkCalmDepthLoud`, `checkCalmBars`, `checkCalmLowPower`, `checkCalmVolume`
-
-## core/probes/cmd.js
-CMD1 (RUN 5): the history's tripwire compares VALUES (CMD1a), tracks keep their ids through the song file (CMD1b, v7), every history step is a command serialised by ids and parsed back (CMD1c), app…
-- fn (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
-
-## core/probes/data.js
-PROBE1: the data rows — run by P.all in the browser AND by tools/probe-data.mjs in node (flag node).
-- exports: none
-
-## core/probes/detect.js
-LAT2 — hand detection: each camera frame once, the search schedule, the worker path.
-- fn (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
-
-## core/probes/edit.js
-PROBE1: Track-editor probes: solo editing, several notes, paste, quantise, degrees, bend curve and shapes, track into another mode, volume bars.
-- fn (10): `checkSoloEdit`, `checkSelect`, `checkPaste`, `edKit`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
-
-## core/probes/eng2.js
-ENG2 (RUN 4): row «ENG2 engine readouts» (quick and all; reads only, ≈ 3 s).
-- const (1): `engFeatures`
-- fn (1): `checkEngReadouts`
-
-## core/probes/engine.js
-AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
-- fn (3): `checkEngineCtx`, `dumpCensus`, `checkCensus`
-
-## core/probes/files.js
-PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user files, Just intonation merge, bare modes, root alone.
-- const (1): `SNAPSHOT_CHANGES`
-- fn (9): `dumpScales`, `checkFiles`, `checkNames`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
-
-## core/probes/forest.js
-VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
-- fn (8): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`
-
-## core/probes/freeze.js
-PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost.
-- fn (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
-
-## core/probes/fxcontract.js
-AUD2b (RUN 3, 2026-10-16; docs/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order), each effect built ALONE by its own factory (`make(E)`) on the …
-- fn (1): `checkFx`
-
-## core/probes/gold.js
-GOLD1: GOLDEN RENDERS — every built-in timbre (23 solo, 16 chord, 7 bass, 5 kits × 6 rows), the drone and the six effects at three settings, each rendered alone through the engine copy (render.gold…
-- fn (4): `goldFeats`, `goldCmp`, `dumpGold`, `checkGold`
-
-## core/probes/guard.js
-PROBE1: The console guard: window.P = api() — one probe at a time; its self-test runs inside row «write path (funnels)».
-- fn (2): `api`, `guardSelfTest`
-
-## core/probes/hand.js
-HAND1: SYNTHETIC HANDS → GESTURE FINGERPRINT.
-- fn (2): `dumpGesture`, `checkGesture`
-
-## core/probes/history.js
-PROBE1: Song-edit probes: sections (ED6), the one history (ED7), undo after clear (ED7-fix2).
-- fn (3): `checkUndoClear`, `checkHistory`, `checkSections`
-
-## core/probes/ids.js
-IDS1 (RUN 3, 2026-10-16): every event of the song has a PERMANENT id (song/store.js evIdFill; rule #37) — unique, a positive integer, kept by edits that keep the object, by ↶ / ↷ (the same objects …
-- fn (1): `checkEventIds`
-
-## core/probes/key.js
-PROBE1: Tonic-freeze probes: the song sound fingerprint (TF0), keys kept (TF2), transpose (TF3), the 1/1 anchor (TF5).
-- const (1): `liveEnv`
-- fn (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
-
-## core/probes/kit.js
-PROBE1: Shared probe helpers: frames with a fallback timer, measures, the quick flag, the short render window, window keep/restore.
-- const (7): `measReset`, `meas`, `frame`, `waitMs`, `PROBE_SHORT`, `setQuick`, `winKeep`
-- fn (1): `winRestore`
-- let (3): `MEAS`, `frameStalls`, `QUICK`
-
-## core/probes/lat.js
-PROBE1: LAT1 latency meter probe.
-- fn (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
-
-## core/probes/nightguard.js
-SPLIT-2: row «NIGHT untouched» — the mirror of «FULL untouched»: a change elsewhere must not move this app.
-- fn (2): `dumpNight`, `checkNightUntouched`
-
-## core/probes/pack.js
-PACK1 (RUN 3, 2026-10-16): packs and offline licence keys IN THE PAGE (Chrome's WebCrypto — the node row «PACK1 packs and licence keys (core)» checks the same code in node): the committed TEST keys…
-- fn (1): `checkPack`
-
-## core/probes/pool.js
-POOL1 (RUN 4, ENG2 review E2): the chord pool grows on demand.
-- fn (1): `checkPool`
-
-## core/probes/profile.js
-C0 (RUN 6, Calm plan §2, §10): row «C0 profile round trip» (quick and all; no sound, no capture).
-- fn (1): `checkProfile`
-
-## core/probes/rows.js
-PROBE1: the ROW REGISTRY — every probe row registers itself next to its probe; P.all / P.quick (probes/run.js) and the node data runner (tools/probe-data.mjs, rows flagged node) list them from here.
-- fn (5): `row`, `family`, `rows`, `rowProblems`, `rowCheck`
-
-## core/probes/run.js
-PROBE1: P.all / P.quick / P.orderCheck — runs every registered row (probes/rows.js) in order, with the state guard between rows.
-- fn (6): `material`, `songPrint`, `all`, `quick`, `calm`, `orderCheck`
-
-## core/probes/seed.js
-PROBE1: The test song (P.seed), the demo song (P.song), and the rows that check what they wrote (write path, seed notes, frozen seed bass).
-- const (2): `SEED_FROZEN_EXPECT`, `seedFrozenSamples`
-- fn (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
-- let (1): `SEED_REC`
-
-## core/probes/song1.js
-SONG1 (RUN 3, 2026-10-16): a song carries copies of the person's own tunings / modes it uses (rule #37) — so it opens on any device.
-- fn (1): `checkSongRecords`
-
-## core/probes/song2.js
-SONG2 (RUN 3, 2026-10-16): the demo song is a FILE (data/songs/triphop.json) and P.song opens it; the code generator stays a probe tool.
-- fn (2): `dumpSong`, `checkSongFile2`
-
-## core/probes/songfile.js
-SAVE1 (DAY run 2026-10-16): Save → Open of a song file, through the real ui doors (ui.songSaveText / ui.songOpenText — the same code the buttons run, minus the browser's download and file picker).
-- fn (2): `checkSongFile`, `checkSongOpenUndo`
-
-## core/probes/sound.js
-SND-F1: probes of the Calm prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
-- fn (7): `checkFirefly`, `checkForest`, `checkDynamics`, `checkMasterPath`, `checkDynLive`, `checkFreezeParity`, `checkTimbreIds`
-
-## core/probes/tim3d.js
-TIM3d (RUN 4): row «TIM3d own timbres and song copies» (quick and all).
-- fn (1): `checkOwnTimbres`
-
-## core/probes/timbres.js
-TIM3 (RUN 4): timbres as data — the proof that nothing changes.
-- fn (5): `timbreSnapshotAll`, `dumpTimbres`, `checkTimbresBefore`, `checkTimbreRecords`, `checkFullUntouched`
-
-## core/probes/tuning.js
-PROBE1: Tuning and editor-row probes: pitch from the tuning index, editor rows, highlights, chord rules and labels, out-of-mode pitches, song integrity, chord types and modes.
-- fn (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
-
-## core/probes/vis.js
-VIS1a (RUN 6, docs/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
-- fn (1): `checkVisStack`
-
-## core/probes/window.js
-PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX2, AR2.
-- fn (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
-
 ## core/profile.js
-C0 (RUN 6, Calm plan §2) — PROFILES: the faces of the one app.
-- const (8): `profileWire`, `profileCurrent`, `profileOf`, `profileList`, `profileLoadReport`, `onProfile`, `profileSavedDbg`, `profileDoorsDbg`
-- fn (2): `profileApply`, `profileBoot`
+C0 (RUN 6): PROFILES.
+- const (9): `profileWire`, `profileCurrent`, `profileOf`, `profileList`, `profileLoadReport`, `onProfile`, `profileDropDbg`, `profileSavedDbg`, `profileDoorsDbg`
+- fn (2): `profileApply`, `profileAddDbg`
 
 ## core/pure/ambience.js
 RUN 7 (C4c, Calm plan §4.6; docs/CALM-QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
@@ -566,16 +441,6 @@ ENG2 (RUN 4) — the engine's PROVISIONAL power class and the dropout rate.
 - const (4): `ENG_CLASS_PROVISIONAL`, `ENG_THRESH`, `ENG_BENCH_KEY`, `benchText`
 - fn (3): `engClass`, `benchOf`, `dropRate`
 
-## core/pure/fireflies.js
-VIS1c (RUN 6, Calm plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
-- const (2): `FOREST_FLIES`, `FOREST_DEPTH`
-- fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
-
-## core/pure/forestlife.js
-RUN 9 — THE FOREST'S LIFE, as numbers.
-- const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
-- fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
-
 ## core/pure/format.js
 FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({ format:'handsong/<kind>', version, id, … }), the current version of each kind, the migration steps (one pure function …
 - class (1): `Bad`
@@ -591,11 +456,6 @@ LAT2a — the SEARCH SCHEDULE for hand detection.
 LAT1 — latency bookkeeping.
 - const (10): `LAT_N`, `BT_MS`, `BT_LABEL`, `frameWaitMs`, `withFrameWait`, `perMinute`, `STARTUP_MS`, `MP_LINE`, `SOFT_GL`, `isSoftwareGL`
 - fn (6): `makeMeter`, `statsOf`, `handToSound`, `looksBluetooth`, `rateOf`, `splitLongTasks`
-
-## core/pure/night.js
-RUN 9 — THE NIGHT over the forest, as numbers.
-- const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
-- fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
 
 ## core/pure/pack.js
 PACK1 (RUN 3, 2026-10-16; stage-3 plan slice 33; user decision: build it now, no UI) — PACKS AND OFFLINE LICENCE KEYS.
@@ -661,43 +521,6 @@ TIM3a (RUN 4) — THE TIMBRE RECORD and its validator.
 - fn (4): `loadScaleData`, `idHolder`, `checkRecord`, `checkRecordList`
 - → ./pure/format.js (1): `CM_MAX`
 - → ./pure/registry.js (1): `USER_ID`
-
-## core/scaleprobe.js
-⛳ ПРОБА УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ — консольный инструмент (как ухо-проба render.js: R.aud/R.live), НЕ часть приложения.
-- → ./probedata.js (10): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegreesData`, `checkModeMap`
-- → ./probes/autosave.js (1): `checkAutosave`
-- → ./probes/calm.js (1): `checkSoloFirefly`
-- → ./probes/cmd.js (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
-- → ./probes/detect.js (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
-- → ./probes/edit.js (9): `checkSoloEdit`, `checkSelect`, `checkPaste`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
-- → ./probes/eng2.js (1): `checkEngReadouts`
-- → ./probes/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
-- → ./probes/files.js (10): `dumpScales`, `checkFiles`, `checkNames`, `SNAPSHOT_CHANGES`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
-- → ./probes/forest.js (2): `checkForestRoom`, `checkBackgrounds`
-- → ./probes/freeze.js (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
-- → ./probes/fxcontract.js (1): `checkFx`
-- → ./probes/gold.js (2): `dumpGold`, `checkGold`
-- → ./probes/guard.js (1): `api`
-- → ./probes/hand.js (2): `dumpGesture`, `checkGesture`
-- → ./probes/history.js (3): `checkUndoClear`, `checkHistory`, `checkSections`
-- → ./probes/ids.js (1): `checkEventIds`
-- → ./probes/key.js (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
-- → ./probes/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
-- → ./probes/nightguard.js (2): `checkNightUntouched`, `dumpNight`
-- → ./probes/pack.js (1): `checkPack`
-- → ./probes/pool.js (1): `checkPool`
-- → ./probes/profile.js (1): `checkProfile`
-- → ./probes/run.js (5): `material`, `all`, `quick`, `calm`, `orderCheck`
-- → ./probes/seed.js (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
-- → ./probes/song1.js (1): `checkSongRecords`
-- → ./probes/song2.js (2): `checkSongFile2`, `dumpSong`
-- → ./probes/songfile.js (2): `checkSongFile`, `checkSongOpenUndo`
-- → ./probes/sound.js (7): `checkTimbreIds`, `checkFirefly`, `checkForest`, `checkDynamics`, `checkDynLive`, `checkFreezeParity`, `checkMasterPath`
-- → ./probes/tim3d.js (1): `checkOwnTimbres`
-- → ./probes/timbres.js (3): `checkTimbresBefore`, `dumpTimbres`, `checkTimbreRecords`
-- → ./probes/tuning.js (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
-- → ./probes/vis.js (1): `checkVisStack`
-- → ./probes/window.js (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
 
 ## core/scales.js
 (no head comment)
@@ -791,11 +614,6 @@ REC3 part 2 (stage 3) — TRANSPOSE BY DEGREES (ED4), A TRACK INTO ANOTHER MODE 
 - const (6): `editDegreeWhy`, `trackViewOfLayer`, `editTrackModeWhy`, `trDbg`, `editTransposeWhy`, `songTransposeWhy`
 - fn (4): `editTrackMode`, `editTranspose`, `songTranspose`, `editDegreeSel`
 
-## core/songs.js
-⛳ ДЕМО-ПЕСНИ — КОНСОЛЬНЫЙ ЗАГРУЗЧИК, НЕ ЧАСТЬ ИГРЫ.
-- const (1): `songNames`
-- fn (2): `loadSong`, `songBuild`
-
 ## core/state.js
 (no head comment)
 - const (99): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`, `setVolFloor`, `setCalmView`, `setFxChain`
@@ -818,14 +636,6 @@ REC4 (stage 3) — THE SCHEDULER: replay cursors over the sorted prefix, the loo
 - const (2): `schedWire`, `chaseReset`
 - fn (7): `clearPump`, `releaseLoopLayersAt`, `chaseFor`, `chaseNote`, `chasePlay`, `startTransport`, `seekTo`
 
-## core/tutor.js
-================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
-- fn (2): `wireStarter`, `openLessons`
-
-## core/userfiles.js
-═══ ⛳ ФАЙЛЫ ПОЛЬЗОВАТЕЛЯ — КОНСОЛЬ (слайс F6 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Строи, лады, палитры и наборы режимов аккордов, сделанные человеком, ставятся и снимаются из консоли (интерфе…
-- fn (10): `install`, `list`, `remove`, `exportFile`, `storeUnchecked`, `example`, `brokenExample`, `chordModesExample`, `installChordModesExample`, `installExample`
-
 ## core/userstore.js
 ═══ ⛳ ХРАНИЛИЩЕ ФАЙЛОВ ПОЛЬЗОВАТЕЛЯ (слайс F6 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Строи, лады, палитры и наборы режимов аккордов, сделанные человеком, — записи формы v1 (те же, что в data/),…
 - fn (3): `userAll`, `userPut`, `userDel`
@@ -840,7 +650,225 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 - const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
-_162 modules, 2113 exported names._
+## tools/probes/core/data.js
+PROBE1: the data rows — run by P.all in the browser AND by tools/probe-data.mjs in node (flag node).
+- exports: none
+
+## tools/probes/core/detect.js
+LAT2 — hand detection: each camera frame once, the search schedule, the worker path.
+- fn (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
+
+## tools/probes/core/eng2.js
+ENG2 (RUN 4): row «ENG2 engine readouts» (quick and all; reads only, ≈ 3 s).
+- const (1): `engFeatures`
+- fn (1): `checkEngReadouts`
+
+## tools/probes/core/engine.js
+AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
+- fn (3): `checkEngineCtx`, `dumpCensus`, `checkCensus`
+
+## tools/probes/core/files.js
+PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user files, Just intonation merge, bare modes, root alone.
+- const (1): `SNAPSHOT_CHANGES`
+- fn (9): `dumpScales`, `checkFiles`, `checkNames`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
+
+## tools/probes/core/fxcontract.js
+AUD2b (RUN 3, 2026-10-16; docs/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order), each effect built ALONE by its own factory (`make(E)`) on the …
+- fn (1): `checkFx`
+
+## tools/probes/core/gold.js
+GOLD1: GOLDEN RENDERS — every built-in timbre (23 solo, 16 chord, 7 bass, 5 kits × 6 rows), the drone and the six effects at three settings, each rendered alone through the engine copy (render.gold…
+- fn (4): `goldFeats`, `goldCmp`, `dumpGold`, `checkGold`
+
+## tools/probes/core/guard.js
+PROBE1: The console guard: window.P = api() — one probe at a time; its self-test runs inside row «write path (funnels)».
+- const (1): `guardWire`
+- fn (2): `api`, `guardSelfTest`
+
+## tools/probes/core/hand.js
+HAND1: SYNTHETIC HANDS → GESTURE FINGERPRINT.
+- fn (2): `dumpGesture`, `checkGesture`
+
+## tools/probes/core/kit.js
+PROBE1: Shared probe helpers: frames with a fallback timer, measures, the quick flag, the short render window, window keep/restore.
+- const (7): `measReset`, `meas`, `frame`, `waitMs`, `PROBE_SHORT`, `setQuick`, `winKeep`
+- fn (1): `winRestore`
+- let (3): `MEAS`, `frameStalls`, `QUICK`
+
+## tools/probes/core/lat.js
+PROBE1: LAT1 latency meter probe.
+- fn (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
+
+## tools/probes/core/pack.js
+PACK1 (RUN 3, 2026-10-16): packs and offline licence keys IN THE PAGE (Chrome's WebCrypto — the node row «PACK1 packs and licence keys (core)» checks the same code in node): the committed TEST keys…
+- fn (1): `checkPack`
+
+## tools/probes/core/pool.js
+POOL1 (RUN 4, ENG2 review E2): the chord pool grows on demand.
+- fn (1): `checkPool`
+
+## tools/probes/core/probedata.js
+⛳ ПРОБЫ ДАННЫХ — ЧАСТЬ ПРОБЫ, КОТОРОЙ НЕ НУЖНЫ НИ БРАУЗЕР, НИ КАМЕРА, НИ ЗВУК (слайс «быстрые пробы»).
+- const (21): `keyless`, `isUserId`, `SCALES`, `TUNINGS`, `CHORD_FAM_SETS`, `userCount`, `tagOf`, `isTert`, `legacyChordNotesStr`, `preF3RegWord`, `preF3RegWordFull`, `preF3RootName`, `preF3ChordNotesStr`, `preF3NoteLbl`, `PRE_T7_SETS`, `preT7ChordUnit`, `A4_SET`, `PRINT_MAX`, `OLD`, `allViews`, `KEEP_MAX`
+- fn (25): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegrees`, `checkModeMap`, `legacyChordLabel`, `legacyChordNotesRef`, `preF3StepName`, `preF3RowLabel`, `preF3ChordLabel`, `preF3AxisLbl`, `preF4Status`, `preT7ChordNotesAt`, `preT7ChordNotes`, `legacyLeadFreq`, `legacyBassFreq`, `legacyChordNotes`, `sweep`, `canon`, `snapViews`
+
+## tools/probes/core/profile.js
+C0 (RUN 6): row «C0 profile round trip» (quick and all; no sound, no capture).
+- fn (1): `checkProfile`
+
+## tools/probes/core/rows.js
+PROBE1: the ROW REGISTRY — every probe row registers itself next to its probe; P.all / P.quick (probes/run.js) and the node data runner (tools/probe-data.mjs, rows flagged node) list them from here.
+- fn (5): `row`, `family`, `rows`, `rowProblems`, `rowCheck`
+
+## tools/probes/core/run.js
+PROBE1: P.all / P.quick / P.orderCheck — runs every registered row (probes/rows.js) in order, with the state guard between rows.
+- const (1): `runWire`
+- fn (6): `material`, `songPrint`, `all`, `quick`, `calm`, `orderCheck`
+
+## tools/probes/core/sound.js
+SND-F1: probes of the Calm prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
+- fn (7): `checkFirefly`, `checkForest`, `checkDynamics`, `checkMasterPath`, `checkDynLive`, `checkFreezeParity`, `checkTimbreIds`
+
+## tools/probes/core/timbres.js
+TIM3 (RUN 4): timbres as data — the proof that nothing changes.
+- fn (5): `timbreSnapshotAll`, `dumpTimbres`, `checkTimbresBefore`, `checkTimbreRecords`, `checkFullUntouched`
+
+## tools/probes/core/userfiles.js
+═══ ⛳ ФАЙЛЫ ПОЛЬЗОВАТЕЛЯ — КОНСОЛЬ (слайс F6 плана «СТРОИ И ЛАДЫ ФАЙЛАМИ», HANDOFF) ═══ Строи, лады, палитры и наборы режимов аккордов, сделанные человеком, ставятся и снимаются из консоли (интерфе…
+- fn (10): `install`, `list`, `remove`, `exportFile`, `storeUnchecked`, `example`, `brokenExample`, `chordModesExample`, `installChordModesExample`, `installExample`
+
+## tools/probes/core/vis.js
+VIS1a (RUN 6, docs/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
+- fn (1): `checkVisStack`
+
+## tools/probes/full.js
+⛳ ПРОБА УНИВЕРСАЛЬНОЙ МОДЕЛИ СТРОЯ — консольный инструмент (как ухо-проба render.js: R.aud/R.live), НЕ часть приложения.
+- fn (1): `install`
+- → ./core/detect.js (3): `checkFrameOnce`, `checkSchedule`, `checkWorker`
+- → ./core/eng2.js (1): `checkEngReadouts`
+- → ./core/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
+- → ./core/files.js (10): `dumpScales`, `checkFiles`, `checkNames`, `SNAPSHOT_CHANGES`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
+- → ./core/fxcontract.js (1): `checkFx`
+- → ./core/gold.js (2): `dumpGold`, `checkGold`
+- → ./core/guard.js (1): `api`
+- → ./core/hand.js (2): `dumpGesture`, `checkGesture`
+- → ./core/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
+- → ./core/pack.js (1): `checkPack`
+- → ./core/pool.js (1): `checkPool`
+- → ./core/probedata.js (10): `check`, `checkData`, `checkPitch`, `checkView`, `drone`, `checkUntyped`, `checkStack`, `checkBehaviour`, `checkDegreesData`, `checkModeMap`
+- → ./core/profile.js (1): `checkProfile`
+- → ./core/run.js (4): `material`, `all`, `quick`, `orderCheck`
+- → ./core/sound.js (7): `checkTimbreIds`, `checkFirefly`, `checkForest`, `checkDynamics`, `checkDynLive`, `checkFreezeParity`, `checkMasterPath`
+- → ./core/timbres.js (3): `checkTimbresBefore`, `dumpTimbres`, `checkTimbreRecords`
+- → ./core/vis.js (1): `checkVisStack`
+- → ./full/autosave.js (1): `checkAutosave`
+- → ./full/cmd.js (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
+- → ./full/edit.js (9): `checkSoloEdit`, `checkSelect`, `checkPaste`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
+- → ./full/freeze.js (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
+- → ./full/history.js (3): `checkUndoClear`, `checkHistory`, `checkSections`
+- → ./full/ids.js (1): `checkEventIds`
+- → ./full/key.js (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
+- → ./full/seed.js (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
+- → ./full/song1.js (1): `checkSongRecords`
+- → ./full/song2.js (2): `checkSongFile2`, `dumpSong`
+- → ./full/songfile.js (2): `checkSongFile`, `checkSongOpenUndo`
+- → ./full/tim3d.js (1): `checkOwnTimbres`
+- → ./full/tuning.js (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
+- → ./full/window.js (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
+
+## tools/probes/full/autosave.js
+AUTOSAVE1 (RUN 3, 2026-10-16): the song kept on this device by itself — through the real scheduler (autosave.asTick on the probe's clock, written at once instead of in an idle moment), the real but…
+- fn (1): `checkAutosave`
+
+## tools/probes/full/cmd.js
+CMD1 (RUN 5): the history's tripwire compares VALUES (CMD1a), tracks keep their ids through the song file (CMD1b, v7), every history step is a command serialised by ids and parsed back (CMD1c), app…
+- fn (3): `checkValueTripwire`, `checkCommands`, `checkJournal`
+
+## tools/probes/full/edit.js
+PROBE1: Track-editor probes: solo editing, several notes, paste, quantise, degrees, bend curve and shapes, track into another mode, volume bars.
+- fn (10): `checkSoloEdit`, `checkSelect`, `checkPaste`, `edKit`, `checkQuant`, `checkDegrees`, `checkBend`, `checkBendCurve`, `checkTrackMode`, `checkVolBars`
+
+## tools/probes/full/freeze.js
+PROBE1: Render and freeze probes: repeatability, the render queue, AF1, AF3, AF5, LR1, AF6b, AF2, freeze cost.
+- fn (9): `checkRepeat`, `checkQueue`, `checkFreezeQueue`, `checkAutoFreeze`, `checkLiveIsolation`, `freezeCost`, `checkRevAgree`, `checkChunks`, `checkSwap`
+
+## tools/probes/full/history.js
+PROBE1: Song-edit probes: sections (ED6), the one history (ED7), undo after clear (ED7-fix2).
+- fn (3): `checkUndoClear`, `checkHistory`, `checkSections`
+
+## tools/probes/full/ids.js
+IDS1 (RUN 3, 2026-10-16): every event of the song has a PERMANENT id (song/store.js evIdFill; rule #37) — unique, a positive integer, kept by edits that keep the object, by ↶ / ↷ (the same objects …
+- fn (1): `checkEventIds`
+
+## tools/probes/full/key.js
+PROBE1: Tonic-freeze probes: the song sound fingerprint (TF0), keys kept (TF2), transpose (TF3), the 1/1 anchor (TF5).
+- const (1): `liveEnv`
+- fn (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
+
+## tools/probes/full/seed.js
+PROBE1: The test song (P.seed), the demo song (P.song), and the rows that check what they wrote (write path, seed notes, frozen seed bass).
+- const (2): `SEED_FROZEN_EXPECT`, `seedFrozenSamples`
+- fn (5): `checkWrite`, `checkSeed`, `checkFrozen`, `seed`, `song`
+- let (1): `SEED_REC`
+
+## tools/probes/full/song1.js
+SONG1 (RUN 3, 2026-10-16): a song carries copies of the person's own tunings / modes it uses (rule #37) — so it opens on any device.
+- fn (1): `checkSongRecords`
+
+## tools/probes/full/song2.js
+SONG2 (RUN 3, 2026-10-16): the demo song is a FILE (data/songs/triphop.json) and P.song opens it; the code generator stays a probe tool.
+- fn (2): `dumpSong`, `checkSongFile2`
+
+## tools/probes/full/songfile.js
+SAVE1 (DAY run 2026-10-16): Save → Open of a song file, through the real ui doors (ui.songSaveText / ui.songOpenText — the same code the buttons run, minus the browser's download and file picker).
+- fn (2): `checkSongFile`, `checkSongOpenUndo`
+
+## tools/probes/full/tim3d.js
+TIM3d (RUN 4): row «TIM3d own timbres and song copies» (quick and all).
+- fn (1): `checkOwnTimbres`
+
+## tools/probes/full/tuning.js
+PROBE1: Tuning and editor-row probes: pitch from the tuning index, editor rows, highlights, chord rules and labels, out-of-mode pitches, song integrity, chord types and modes.
+- fn (13): `checkSound`, `checkRows`, `checkRowFix`, `checkHl`, `tracks`, `checkRules`, `checkScroll`, `checkLabels`, `checkSong`, `checkTypes`, `checkModes`, `checkPure`, `checkOut`
+
+## tools/probes/full/window.js
+PROBE1: Arrangement-window and mixer probes: every track reachable, AR1, MX1, MX2, AR2.
+- fn (5): `checkMixer`, `checkPan`, `checkArrange`, `checkTrackLook`, `checkTracks`
+
+## tools/probes/night.js
+SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagged for both pages.
+- const (2): `all`, `api`
+- fn (1): `install`
+- → ./core/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
+- → ./core/gold.js (2): `dumpGold`, `checkGold`
+- → ./core/hand.js (2): `dumpGesture`, `checkGesture`
+- → ./core/profile.js (1): `checkProfile`
+- → ./core/run.js (2): `material`, `calm`
+- → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
+- → ./core/vis.js (1): `checkVisStack`
+- → ./night/calm.js (1): `checkSoloFirefly`
+- → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
+- → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
+- → ./night/nightprofile.js (1): `checkNightProfile`
+
+## tools/probes/night/calm.js
+C4a (RUN 6, Calm plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
+- const (2): `CALM_TIMBRES`, `CALM_SET`
+- fn (16): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkCalmTimbres`, `checkCalmShell`, `checkCalmDepth`, `checkCalmAmbience`, `checkCalmGhost`, `checkCalmSet`, `checkCalmFx`, `checkCalmFxTimbres`, `checkCalmStress`, `checkCalmDepthLoud`, `checkCalmBars`, `checkCalmLowPower`, `checkCalmVolume`
+
+## tools/probes/night/forest.js
+VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
+- fn (8): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`
+
+## tools/probes/night/nightguard.js
+SPLIT-2: row «NIGHT untouched» — the mirror of «FULL untouched»: a change elsewhere must not move this app.
+- fn (2): `dumpNight`, `checkNightUntouched`
+
+## tools/probes/night/nightprofile.js
+SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
+- fn (1): `checkNightProfile`
+
+_166 modules, 2138 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

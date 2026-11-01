@@ -64,7 +64,7 @@ if(!QUICK && !ALL && !REPEAT && !has('--calm')) QUICK=true;   // RUN 7: --calm a
    --dump NAME FILE writes the JSON of P[NAME]() (a baseline made on unchanged code). */
 const APP=val('--app','full'), JSON_OUT=val('--json',null), DUMP=(()=>{ const i=argv.indexOf('--dump'); return i>=0 ? [argv[i+1], argv[i+2]] : null; })();
 const NIGHT_PAGE=APP==='night';
-const ENTRY=NIGHT_PAGE ? '/index.html?probe&calm' : '/index.html?probe';
+const ENTRY=NIGHT_PAGE ? '/apps/night/index.html?probe' : '/apps/full/index.html?probe';
 if(NIGHT_PAGE && !has('--quick') && !has('--all')) QUICK=false;
 if(DUMP && !has('--quick') && !has('--all') && !has('--calm')) QUICK=false;
 const EVAL=val('--eval',null);
@@ -302,7 +302,7 @@ async function uiBendDrag(page, label){
    frozen are frozen again with their old seeds, so the probes after this see the seed song exactly as before. */
 async function uiSongFile(page, label){
   const lines=[], bad=[];
-  const prep=await page.evaluate(async ()=>{ const REC=await import('/core/recorder.js'), R=await import('/core/render.js'), RUN=await import('/core/probes/run.js');
+  const prep=await page.evaluate(async ()=>{ const REC=await import('/core/recorder.js'), R=await import('/core/render.js'), RUN=await import('/tools/probes/core/run.js');
     const L=[...new Set(REC.events.map(e=>e.layer))]; window.__songFz=L.filter(ly=>REC.freezeState(ly)==='fresh').map(ly=>[ly,R.seedOfLane(REC.laneIdOf(ly))]);
     return { print:RUN.songPrint(), fz:window.__songFz.length }; });
   const [dl]=await Promise.all([ page.waitForEvent('download',{ timeout:15000 }), page.evaluate(()=>document.getElementById('songSave').click()) ]);
@@ -313,14 +313,14 @@ async function uiSongFile(page, label){
   let dialogs=0; const onDlg=d=>{ dialogs++; d.accept().catch(()=>{}); }; page.on('dialog',onDlg);
   try{
     await page.setInputFiles('#songFile', file); await page.waitForTimeout(1500);
-    const a=await page.evaluate(async ()=>{ const RUN=await import('/core/probes/run.js'), REC=await import('/core/recorder.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'', dirty:REC.songDirty() }; });
+    const a=await page.evaluate(async ()=>{ const RUN=await import('/tools/probes/core/run.js'), REC=await import('/core/recorder.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'', dirty:REC.songDirty() }; });
     if(a.print!==prep.print) bad.push(`after Open of the downloaded file the song differs (${prep.print} → ${a.print})`);
     else if(dialogs) bad.push(`Open asked ${dialogs} question(s) right after a save`);
     else if(!/Song opened|Песня открыта/.test(a.msg)) bad.push(`no «Song opened» message (got «${a.msg}»)`);
     else lines.push(`Open of that file through the file input: the same song (${a.print}), no question, message «${a.msg}»`);
     if(rec){ await writeFile(newer, JSON.stringify({ ...rec, version:rec.version+1 }));
       await page.setInputFiles('#songFile', newer); await page.waitForTimeout(800);
-      const b=await page.evaluate(async ()=>{ const RUN=await import('/core/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
+      const b=await page.evaluate(async ()=>{ const RUN=await import('/tools/probes/core/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
       if(b.print!==prep.print || !/newer Handsong|более новым/.test(b.msg)) bad.push(`a newer-version file: song ${b.print===prep.print?'kept':'CHANGED'}, message «${b.msg}»`);
       else lines.push(`a newer-version file: refused («${b.msg}»), the song kept`); }
   } finally {
@@ -335,7 +335,7 @@ async function uiSongFile(page, label){
    the page is RELOADED, ▶ Play pressed again → the «Continue where you left off?» box must offer it; «Continue» → the same song. */
 async function uiAutosave(page, label){
   const lines=[], bad=[];
-  const pre=await page.evaluate(async ()=>{ const A=await import('/core/autosave.js'), RUN=await import('/core/probes/run.js');
+  const pre=await page.evaluate(async ()=>{ const A=await import('/core/autosave.js'), RUN=await import('/tools/probes/core/run.js');
     A.asPause('probe-song', false); A.asSetEnabled(true); return { print:RUN.songPrint() }; });
   let I=null; const t0=Date.now();
   for(let i=0;i<60;i++){ I=await page.evaluate(async ()=>{ const A=await import('/core/autosave.js'); return A.asInfo(); }); if(I.n>0 && !I.pending) break; await page.waitForTimeout(500); }
@@ -352,7 +352,7 @@ async function uiAutosave(page, label){
     const empty=await page.evaluate(async ()=>{ const REC=await import('/core/recorder.js'); return REC.events.length; });
     if(empty) bad.push(`the song was loaded BEFORE the answer (${empty} events)`); else lines.push(`after the reload ▶ Play asks «${q}» and the song stays empty until the answer`);
     await page.click('#resumeYes'); await page.waitForTimeout(1500);
-    const a=await page.evaluate(async ()=>{ const RUN=await import('/core/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
+    const a=await page.evaluate(async ()=>{ const RUN=await import('/tools/probes/core/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
     if(a.print!==pre.print) bad.push(`«Continue» gave a different song (${pre.print} → ${a.print})`);
     else lines.push(`«Continue» → the same song (${a.print}), message «${a.msg}»`);
   }

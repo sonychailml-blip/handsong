@@ -25,8 +25,11 @@ if(!BASELINE){ await run('compare-full',['tools/split-compare.mjs',`${T}/base-fu
 await run('smoke',['tools/smoke-paths.mjs']);
 const snap=n=>`split-${TAG}-${n}`;
 const cmp=n=>BASELINE ? [] : ['--compare',`split-base-${n}`];
-await run('ui-full',['tools/ui-snap.mjs','--save',snap('full'),...cmp('full')]);
+const DECL=n=>BASELINE ? [] : ['--declared',n], NOISY_NIGHT='calm-ghost,calm-dark,calm-forest,calm-forest-land', SIDE_BY_SIDE=new Set(['C','E']);
+await run('ui-full',['tools/ui-snap.mjs','--save',snap('full'),...cmp('full'),...DECL('full')]);
 /* measured at CP A: these four differ between two captures of identical code (the ghost's animation, the WebGL forest); the other screens stay exact */
-await run('ui-night',['tools/ui-snap.mjs','--calm','--save',snap('night'),...cmp('night'),'--noisy','calm-ghost,calm-dark,calm-forest,calm-forest-land']);
+await run('ui-night',['tools/ui-snap.mjs','--calm','--save',snap('night'),...cmp('night'),...DECL('night'),'--noisy',NOISY_NIGHT]);
+/* the user's eye check at C and E: before and after in one PNG */
+if(!BASELINE && SIDE_BY_SIDE.has(TAG)) await run('side-by-side',['tools/ui-snap.mjs','--side-by-side','split-base-night',snap('night'),NOISY_NIGHT,`${T}/side-by-side-${TAG}`]);
 const fail=res.filter(x=>x.startsWith('FAIL')).length, text=res.join('\n')+`\n\n[split-check] ${TAG}: ${fail?'NOT A PASS — '+fail+' failed':'PASS — all '+res.length+' checks'}\n`;
 await writeFile(path.join(ROOT,T,`result-${TAG}.txt`), text); console.log('\n=== SUMMARY\n'+text); process.exit(fail?1:0);
