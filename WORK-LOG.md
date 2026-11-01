@@ -2038,3 +2038,8 @@ same; the screenshot comparison shows small rendering differences because this s
 - Moved: Night's shell, ghost, forest, pure code, fonts, three.js, CSS (`apps/night/night.css`); Full's tutor, demo, songs; `style.css`, `tokens.css` into core; probes to `tools/probes/{core,full,night}`; prints to `tools/prints/` (hashes equal). Root `index.html` = a redirect.
 - New static checks 14 boundaries, 15 debt (`core/DEBT.md`), 16 pages. Rows: «NIGHT profile round trip» new, C0 by fixture, TIM3 also on Night, 23 rows moved from the Full page to Night's.
 - Capture race removed from `tools/ui-snap.mjs`: the 7-s effects hint. Side-by-side PNGs: `tools/split-baseline/side-by-side-C/`.
+
+# SPLIT-2 — checkpoint D (2026-11-01): build, Vercel, measurement on previews (status: docs/SPLIT-PROGRESS.md)
+- `tools/build.mjs` assembles one app (`HANDSONG_APP`, no default); `vercel.json`. Production: no probes tag, no tools, no other app. Preview (`VERCEL_ENV=preview`, or `--probes`): keeps `?probe`, this app's suites, the prints. `HANDSONG_EDITION=release` hides Night's development items.
+- Smoke test `--build`: repo, production and preview trees of both apps, sub-folder, root redirect, `?probe` gate, Measure button. Runner `--root DIR` runs the probes on a built tree.
+- Not tested: a real Vercel deployment and a real phone (user's steps).

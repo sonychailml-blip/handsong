@@ -11,14 +11,16 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
 - User, after CP A: at C and at E save before/after PNGs side by side into `tools/split-baseline/` for calm-ghost, calm-dark, calm-forest, calm-forest-land (eye check).
 
 - User, after CP B: at CP F add to the NIGHT backlog: in landscape the low-light hint overlaps the control panel (its OK button sits over the «Звук» label). Also at CP F extend the overlap check (`msgCheck` in `tools/ui-snap.mjs`) so it compares messages with the panel, not only with each other.
+- User, after CP C: the embedded `profile.full` start state on the Night page is listed in `core/DEBT.md` (done; pin raised to 7 at the user's request): it goes once Night has its own stress reference.
+- User, after CP C: at CP F add to the NIGHT backlog: later bring back a cross-link from Night's info card to the full app as a plain web link to the Handsong site or store page, never as a code import.
 
 ## Checkpoints mapped to plan steps
 | CP | Content | Plan steps | Status |
 |---|---|---|---|
 | A | baseline, guards, smoke, paths made location-independent (no moves) | 0, 12 (moved up: required at every checkpoint), 1 | ✅ committed |
 | B | core moves: `src/ → core/`, `core/pure`, `core/legacy-ui` | 5, 6, 7 | ✅ committed |
-| C | door inversion, entries, switch removal, app moves, root redirect, probes to tools | 2, 3, 4, 8, 9, 10 | ✅ checks pass — WAITING for the user's «committed» |
-| D | `tools/build.mjs`, `vercel.json`, preview measurement | 11 + addition 1 | |
+| C | door inversion, entries, switch removal, app moves, root redirect, probes to tools | 2, 3, 4, 8, 9, 10 | ✅ committed |
+| D | `tools/build.mjs`, `vercel.json`, preview measurement | 11 + addition 1 | ✅ checks pass — WAITING for the user's «committed» |
 | E | rename Calm → Night | 13 | |
 | F | docs split, CLAUDE.md rules, final | 14, 15 | |
 
@@ -27,7 +29,9 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
 - CP B 2026-11-01: moved by `node tools/split-move.mjs B` (334 files, 185 specifiers). Full run: only ui-night failed (8 differences). Cause measured: two races in the capture (hint timer 9 s; hands before the resize), fixed in `tools/ui-snap.mjs` only; then IDENTICAL to the untouched baseline 3 of 3 (appended to `result-B.txt`). `CLAUDE.md`, `HANDOFF.md` and other docs still say `src/` until CP F: read `src/x` as the map in `tools/split-move.mjs` says.
 - CP C 2026-11-01: two apps run from `apps/full/` and `apps/night/`. Full run (`--tag C`): `compare-night` and `ui-night` failed. Causes, tools only: three wrong names in the declared request list; the 7-s effects hint raced the capture. After the fixes: both compares PASS on the same run's data; ui-night IDENTICAL to the untouched baseline 3 of 3. Eye check: `tools/split-baseline/side-by-side-C/`.
 - Decisions at CP C: the embedded start state `profile.full` stays on both pages, reachable only by probes (no button), so Night's rows keep their round trip and `CALM stress` keeps its reference. `userfiles.js` went to `tools/probes/core/` (console tool under `?probe`). `kit.js` is in the core probe suite (core rows use it). `run.js` gets the song side from Full's facade (`runWire`). Names stay `calm` until CP E. The new row «NIGHT profile round trip» holds C0's Night checks; C0 on Full uses `tools/probes/core/fixture.profile.json` (31 → 13 cases on Full; the other 29 run on Night).
-- Open for later checkpoints: root redirect `index.html` is not in the smoke test yet (add at D); `tools/tree-hash.mjs` (plan §7.3) at F; `edition.js`, comments and docs still mention `?calm` and old paths until E / F.
+- CP D 2026-11-01: light set (`node tools/smoke-paths.mjs --build`, static, licences) plus the real probes on built previews (`probe-browser --root tools/.build/<app>-preview`). Decision: Night's Measure button stays on production too (plan Q3) until `HANDSONG_EDITION=release`.
+- Measurement on a phone, previews of both apps: `<preview URL>/` for the app, `<preview URL>/?probe` for `window.P` (Android: Chrome on the desktop, `chrome://inspect`, USB). Night: ⓘ → «Measure this device». Full has no Measure button: Sound panel → Diagnostics → Latency meter.
+- Open for later checkpoints: `tools/tree-hash.mjs` (plan §7.3) at F; `edition.js`, comments and docs still mention `?calm` and old paths until E / F.
 
 ## How to resume
 - Baselines are on this disk, git-ignored: `tools/split-baseline/` (base-full.json, base-night.json, prints.sha256.json), `tools/.ui-snap/split-base-*`. Never re-record them after CP A: they are the proof.

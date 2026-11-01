@@ -64,7 +64,8 @@ if(!QUICK && !ALL && !REPEAT && !has('--calm')) QUICK=true;   // RUN 7: --calm a
    --dump NAME FILE writes the JSON of P[NAME]() (a baseline made on unchanged code). */
 const APP=val('--app','full'), JSON_OUT=val('--json',null), DUMP=(()=>{ const i=argv.indexOf('--dump'); return i>=0 ? [argv[i+1], argv[i+2]] : null; })();
 const NIGHT_PAGE=APP==='night';
-const ENTRY=NIGHT_PAGE ? '/apps/night/index.html?probe' : '/apps/full/index.html?probe';
+/* --root DIR: serve a built preview (tools/build.mjs --probes): the page is at its root */
+const SERVE_ROOT=val('--root',null) ? path.resolve(val('--root',null)) : ROOT, ENTRY=SERVE_ROOT!==ROOT ? '/index.html?probe' : NIGHT_PAGE ? '/apps/night/index.html?probe' : '/apps/full/index.html?probe';
 if(NIGHT_PAGE && !has('--quick') && !has('--all')) QUICK=false;
 if(DUMP && !has('--quick') && !has('--all') && !has('--calm')) QUICK=false;
 const EVAL=val('--eval',null);
@@ -171,7 +172,7 @@ function serve(){
   const srv=http.createServer(async (q,r)=>{
     try{
       const u=new URL(q.url,'http://x'); let p=decodeURIComponent(u.pathname); if(p.endsWith('/')) p+='index.html';
-      const f=path.join(ROOT, p); if(!f.startsWith(ROOT)){ r.writeHead(403); r.end(); return; }
+      const base=p.startsWith('/tools/.probe-logs/') ? ROOT : SERVE_ROOT, f=path.join(base, p); if(!f.startsWith(base)){ r.writeHead(403); r.end(); return; }
       const b=await readFile(f);
       r.writeHead(200,{ 'content-type':MIME[path.extname(f).toLowerCase()]||'application/octet-stream', 'cache-control':'no-store' }); r.end(b);
     }catch(e){ r.writeHead(404); r.end(); }

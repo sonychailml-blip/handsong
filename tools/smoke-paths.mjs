@@ -2,11 +2,14 @@
    page (repo tree, or a built tree with --dist), presses Play / Begin and asserts: no failed request (allow-list: the Vercel counter outside Vercel), no
    console error, page error or CSP violation, worklets loaded, hand model loaded, first camera frame detected and drawn, only allowed hosts. Each page also
    runs from a sub-folder (proves «works from any folder»). CONTROL: a run with one worklet missing must fail. Exit 0 / 1, verdict line last.
-     node tools/smoke-paths.mjs [--dist full=DIR night=DIR] [--no-control] */
+     node tools/smoke-paths.mjs [--build] [--no-control]
+   --build also builds production and preview trees (tools/.build/) and checks them: each from the root and a sub-folder; `?probe` must give window.P on a preview and nothing on production;
+   the root redirect; Night's Measure button (on, and hidden in a release edition). */
 import http from 'node:http';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), CDN_DIR=path.join(ROOT,'tools','.cdn-cache');
@@ -14,7 +17,9 @@ const argv=process.argv.slice(2), out=s=>console.log(s), NO_CONTROL=argv.include
 /* the tree's entry pages: moved with the layout */
 const PAGES={ full:'apps/full/', night:'apps/night/' };
 const BEGIN={ full:'#startBtn', night:'#calmBegin' };
-const distOf=app=>{ const i=argv.indexOf('--dist'); if(i<0) return null; const a=argv.slice(i+1).find(x=>x.startsWith(app+'=')); return a ? path.resolve(a.slice(app.length+1)) : null; };
+const BUILD=argv.includes('--build'), BUILD_DIR=path.join(ROOT,'tools','.build');
+function build(app, kind){ const dir=path.join(BUILD_DIR,`${app}-${kind}`), a=['tools/build.mjs','--out',dir]; if(kind==='preview') a.push('--probes');
+  const r=spawnSync(process.execPath,a,{ cwd:ROOT, encoding:'utf8', env:{ ...process.env, HANDSONG_APP:app, HANDSONG_EDITION:kind==='release'?'release':'', VERCEL_ENV:'' } }); out((r.stdout||'').trim()||(r.stderr||'').trim()); if(r.status!==0) throw new Error('build failed: '+app+' '+kind); return dir; }
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.woff2':'font/woff2' };
 /* the server logs every request: a worklet's fetch is invisible to Playwright's own events. breakName = a file it refuses (the CONTROL) */
@@ -38,7 +43,7 @@ async function cdnCache(ctx){   // the runner's cached MediaPipe files: a smoke 
 }
 const ALLOWED_404=/\/_vercel\/insights\/script\.js$/;
 const HOSTS=['https://cdn.jsdelivr.net/npm/@mediapipe/','https://storage.googleapis.com/mediapipe-models/'];
-async function run(app, dir, prefix, breakWorklet=false){
+async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
   const label=`${app}${dir===ROOT?'':' (built)'} at ${prefix}`, bad=[], miss=s=>bad.push(s), served=[], srv=await serve(dir,prefix,served,breakWorklet?'ks-worklet.js':null), origin=`http://127.0.0.1:${srv.address().port}`;
   const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
   const seen=[];
@@ -52,7 +57,7 @@ async function run(app, dir, prefix, breakWorklet=false){
     const page=await ctx.newPage();
     page.on('pageerror', e=>miss('page error: '+(e&&e.message||e)));
     page.on('console', m=>{ if(m.type()!=='error') return; const t=m.text(), at=(m.location()||{}).url||''; if(/Failed to load resource/.test(t) && (ALLOWED_404.test(at.split('?')[0])||/\b40\d\b/.test(t))) return; /* a status is judged above */ miss('console error: '+t.slice(0,200)); });
-    await page.goto(origin+prefix+PAGES[app]);
+    await page.goto(origin+prefix+(dir===ROOT ? PAGES[app] : ''));
     await page.waitForSelector(BEGIN[app], { state:'visible', timeout:60e3 });
     await page.waitForTimeout(800);
     await page.click(BEGIN[app]);
@@ -78,7 +83,8 @@ async function run(app, dir, prefix, breakWorklet=false){
     if(app==='night'){ await page.waitForTimeout(1500);
       const f=await page.evaluate(async ()=>{ await document.fonts.ready; return [...document.fonts].filter(x=>x.status==='loaded').map(x=>x.family.replace(/"/g,'')); });
       if(!f.includes('Andika')) miss('the Andika font did not load: '+f.join(','));
-      if(!seen.some(([u,st])=>/three\.min\.js/.test(u)&&st===200)) miss('the forest library did not load'); }
+      if(!seen.some(([u,st])=>/three\.min\.js/.test(u)&&st===200)) miss('the forest library did not load');
+      const hid=await page.evaluate(()=>document.getElementById('calmMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`); }
   }catch(e){ miss('error: '+(e&&e.message||e)); }
   finally{ await browser.close().catch(()=>{}); srv.close(); }
   for(const [u,st] of served) if(st>=400 && !ALLOWED_404.test(u) && !bad.some(x=>x.includes(u))) miss(`HTTP ${st} ${u}`);   // what Playwright's events do not see
@@ -87,9 +93,27 @@ async function run(app, dir, prefix, breakWorklet=false){
   return bad;
 }
 let fails=0;
-for(const app of ['full','night']){ const dist=distOf(app);
-  for(const [dir,prefix] of dist ? [[dist,'/'],[dist,'/some/sub/']] : [[ROOT,'/'],[ROOT,'/some/sub/']]) if((await run(app,dir,prefix)).length) fails++; }
-if(!NO_CONTROL){ const dist=distOf('full')||ROOT, c=await run('full',dist,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));
+/* ?probe on a built tree: window.P on a preview, nothing at all on production */
+async function probeGate(app, dir, want){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); const bad=[];
+  try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); await page.goto(origin+'/?probe');
+    if(want){ await page.waitForFunction(()=>window.P && typeof window.P.all==='function', null, { timeout:60e3 }).catch(()=>bad.push('window.P did not appear')); }
+    else { await page.waitForSelector(BEGIN[app], { state:'attached', timeout:60e3 }); await page.waitForTimeout(3000); if(await page.evaluate(()=>!!window.P)) bad.push('window.P exists on production'); if(served.some(([u])=>u.startsWith('/tools/'))) bad.push('production requested a tool: '+served.find(([u])=>u.startsWith('/tools/'))[0]); if(await page.evaluate(()=>!!document.querySelector('link[rel="handsong-probes"]'))) bad.push('production keeps the probes tag'); }
+    for(const [u,st] of served) if(st>=400 && !ALLOWED_404.test(u)) bad.push(`HTTP ${st} ${u}`);
+  }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
+  out(`[smoke] ?probe on ${app} ${want?'preview':'production'}: ${bad.length?'NOT A PASS — '+bad.join(' · '):'PASS — '+(want?'window.P ready':'nothing loaded')}`); return bad.length; }
+/* the repository root leads to the Full app */
+async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); let ok=false;
+  try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); await page.goto(origin+'/'); await page.waitForURL(/\/apps\/full\/$/,{ timeout:20e3 }); ok=await page.waitForSelector('#startBtn',{ state:'attached', timeout:60e3 }).then(()=>true); }catch(e){ out('    '+(e&&e.message||e)); }
+  finally{ await browser.close().catch(()=>{}); srv.close(); } out(`[smoke] root redirect: ${ok?'PASS — / leads to apps/full/':'NOT A PASS'}`); return ok?0:1; }
+for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
+let prodFull=null;
+if(BUILD){ fails+=await redirectCheck();
+  for(const app of ['full','night']){ const prod=build(app,'production'), prev=build(app,'preview'); if(app==='full') prodFull=prod;
+    for(const prefix of ['/','/some/sub/']) if((await run(app,prod,prefix)).length) fails++;
+    if((await run(app,prev,'/')).length) fails++;
+    fails+=await probeGate(app,prod,false); fails+=await probeGate(app,prev,true); }
+  if((await run('night',build('night','release'),'/',false,false)).length) fails++; }
+if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));
   out(`[smoke] CONTROL (a missing worklet must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }
 out(`[smoke] ${fails?'NOT A PASS — '+fails+' target(s) failed':'PASS — every target loaded, control caught'}`);
 process.exit(fails?1:0);

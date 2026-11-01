@@ -18,7 +18,7 @@ import { lex } from './lex.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REG_FILE='tools/licences.json', LOCK_FILE='tools/package-lock.json', MD_FILE='THIRD-PARTY-LICENSES.md';
-const SKIP_DIRS=new Set(['.git','tools','archive','node_modules']);
+const SKIP_DIRS=new Set(['.git','tools','archive','node_modules','dist']);
 const OWN_EXT=new Set(['.js','.mjs','.json','.html','.css','.md','.txt','']);   // our code, data and docs
 const CLASSES=new Set(['code','model','service','link','image','font','glyph','sound','ir']);
 const USES=new Set(['shipped','CDN','service','link','device','dev-only','reference']);   // reference (RUN 5): used only by a reference prototype under docs/prototypes/ — never shipped
