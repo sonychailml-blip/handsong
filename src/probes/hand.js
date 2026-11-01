@@ -184,7 +184,7 @@ export function dumpGesture(){
 }
 export async function checkGesture(){
   const diff=[], miss=s=>diff.push(s); let cases=0, file=null;
-  try{ const r=await fetch(new URL(PRINT_FILE, location.href), { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
+  try{ const r=await fetch(new URL('../../'+PRINT_FILE, import.meta.url), { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
   catch(e){ miss(`no gesture print ${PRINT_FILE} (${e&&e.message}) — P.dumpGesture() on unchanged code makes it`); return { cases, total:diff.length, differences:diff }; }
   if(!envOk() || JSON.stringify(ST.fxChains)!==file.meta.chains) return { cases:0, total:0, differences:[], status:'not applicable: live chains or chord modes changed' };
   const cmp=(a,b,tag)=>{ const out=[]; const n=Math.max(a.length,b.length);

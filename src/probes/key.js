@@ -60,7 +60,7 @@ export function dumpSongPrint(){
 }
 export async function checkSongPrint(){
   let file;
-  try{ const r=await fetch(new URL(PRINT_FILE, location.href), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
+  try{ const r=await fetch(new URL('../../'+PRINT_FILE, import.meta.url), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
   catch(e){ return { cases:0, song:0, total:0, differences:[], status:'no fingerprint yet' }; }
   if(!SEED_REC || SEED_REC.kind!=='seed' || SEED_REC.print!==songPrint() || JSON.stringify(SEED_REC.env)!==JSON.stringify(file.meta.env))
     return { cases:0, song:0, total:0, differences:[], status:'not applicable: not the unchanged seed song' };

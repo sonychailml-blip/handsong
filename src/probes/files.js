@@ -91,7 +91,7 @@ function keyedSnap(x){ const o={...x};
    показывает «снимка ещё нет» (не провал и не pass). Каждое расхождение — путь и обе величины. */
 export async function checkFiles(){
   let file;
-  try{ const r=await fetch(new URL(SNAP_FILE, location.href), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
+  try{ const r=await fetch(new URL('../../'+SNAP_FILE, import.meta.url), {cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
   catch(e){ console.log(`[scaleprobe files] no snapshot yet (${SNAP_FILE}: ${e&&e.message}) — run P.dumpScales() on the unchanged code and put the file into tools/`);
             return { cases:0, total:0, differences:[], noSnap:true }; }
   file=keyedSnap(file);

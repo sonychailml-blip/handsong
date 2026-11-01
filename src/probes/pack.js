@@ -8,7 +8,7 @@ import { createRegistry } from '../core/registry.js';
 
 export async function checkPack(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
-  let F; try{ F=await (await fetch('tools/pack-test-licence.json',{ cache:'no-store' })).json(); }
+  let F; try{ F=await (await fetch(new URL('../../tools/pack-test-licence.json', import.meta.url),{ cache:'no-store' })).json(); }
   catch(e){ return { cases:0, total:1, differences:[`no fixture tools/pack-test-licence.json (${e&&e.message})`] }; }
   const today='2026-10-16';
   eq('the test key verifies in the page (CONTROL: a valid key passes)', (await keyVerify(F.key,{ today })).ok, true);

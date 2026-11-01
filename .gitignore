@@ -4,3 +4,4 @@ tools/.probe-logs/
 tools/.cdn-cache/
 tools/.ui-snap/
 tools/.pack-test-key.json
+tools/split-baseline/

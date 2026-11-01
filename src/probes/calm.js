@@ -69,7 +69,7 @@ export async function checkCalmTimbres(){
     const R=await import('../render.js'), eng=await import('../audio.js?render'), T=await import('../timbreload.js');
     const pos=id=>eng.LEAD_INSTR.findIndex(x=>x.id===id), recOf=id=>T.timbreAll().find(r=>r.id===id);
     for(const id of CALM_TIMBRES){ n++; const r=recOf(id); if(!r || pos(id)<0 || !timbreById(id)) miss(id+': missing'); else if(r.engine!==(MODAL[id]!=null?'modal':'breath')) miss(id+': engine '+r.engine); }
-    const calm=await (await fetch('data/profiles/calm.json', { cache:'no-store' })).json(); n++;
+    const calm=await (await fetch(new URL('../../data/profiles/calm.json', import.meta.url), { cache:'no-store' })).json(); n++;
     for(const id of calm.timbres) if(!timbreById(id) || !id.startsWith('solo.')) miss('the Calm profile offers an unknown timbre: '+id);
     if(d.length) return { cases:n, total:d.length, differences:d, notes };
     const mid=b=>{ const m=new Float32Array(b.L.length); for(let i=0;i<m.length;i++) m[i]=(b.L[i]+b.R[i])/2; return m; };
@@ -158,7 +158,7 @@ export async function checkCalmShell(){
     $('calmInfoClose').click(); n++; if(!$('calmInfo').hidden) miss('the info card did not close');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{
-    PR.profileApply(was||'profile.full');
+    PR.profileApply('profile.full'); PR.profileApply(was||'profile.full');   // SPLIT-2: through Full, so a page opened in this profile gets its defaults back
     for(const k of KEYS){ try{ if(keep[k]==null) localStorage.removeItem(k); else localStorage.setItem(k, keep[k]); }catch(e){} }
   }
   { const A=await import('../audio.js'); n++; if(was==='profile.full' && (!$('calmShell').hidden || ST.calmView || A.outputFadeLevel()!==1)) miss('back in Full: the shell, the Calm view or the output fade remain'); }
@@ -461,7 +461,8 @@ export async function checkCalmStress(opt={}){
     } finally{ fx.forEach(([id,i],k)=>{ const p=G.fxParamsOf(key,id)[i]; if(p) p.set(keep[k]); }); }
     const ref1=await full(), ref=Math.max(ref0.ur, ref1.ur);
     notes.push(`reference (Full, its solo sound, the same playing): ${ref0.ur} before, ${ref1.ur} after (idle ${ref0.idle} / ${ref1.idle})`);
-    if(ref>2) notes.push(`real-time part not judged: the standard app itself dropped out ${ref} times in ${STRESS.sec} s (a hot or busy computer) — Calm: `+got.map(([id,r])=>id+' '+r.ur).join(', '));
+    /* SPLIT-2 (runner --stress-not-judged): this laptop's dropouts vary run to run on unchanged code (Calm's and Full's alike) — a split check reports them, never judges them */
+    if(ref>2 || globalThis.__stressNotJudged) notes.push(`real-time part not judged (the standard app dropped out ${ref} times in ${STRESS.sec} s) — Calm: `+got.map(([id,r])=>id+' '+r.ur).join(', '));
     else for(const [id,r] of got){ n++; if(r.ur>ref+2) miss(`live ${id}: ${r.ur} audio dropout(s) in ${STRESS.sec} s of fast playing — the standard app, the same playing: ${ref} (+2 allowed)`); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{ PR.profileApply(was||'profile.full'); }

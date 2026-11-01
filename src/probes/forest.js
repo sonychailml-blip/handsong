@@ -81,7 +81,9 @@ export async function checkBackgrounds(){
     await setBackground('camera'); await frames(3);
     const s0=soundSig(), m0=mapSig(); let webgl=null;
     for(const bg of ['dark','camera','forest','dark','forest','camera']){
-      const made0=sceneInfo().contextsMade, info=await setBackground(bg); await frames(4);
+      /* SPLIT-2: opening a room compiles its shaders (seconds under software GL) — slow frames, not a hidden tab; this row reads state, not the drawn window */
+      const made0=sceneInfo().contextsMade, info=await setBackground(bg);
+      if(document.hidden) await frames(4); else for(let k=0;k<4;k++) await new Promise(res=>{ requestAnimationFrame(res); setTimeout(res,6000); });
       const I=sceneInfo(), cam=stackList().find(x=>x.id==='camera'); n+=4;
       if(cam.on!==(bg==='camera')) miss(`${bg}: the camera module is ${cam.on?'on':'off'}`);
       if(soundSig()!==s0) miss(`${bg}: the sound state changed`);

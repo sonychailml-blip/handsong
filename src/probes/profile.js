@@ -20,6 +20,7 @@ const cmp=(a,b)=> KEYS.filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).ma
 const hiddenNow=id=>{ const el=document.getElementById(id); return !el || getComputedStyle(el).display==='none'; };
 
 export function checkProfile(){
+  if(profileCurrent()!=='profile.full') return { cases:0, total:0, differences:[], status:'not applicable: the page opened in its own profile' };   // SPLIT-2: the round trip starts in Full
   const d=[]; let n=0; const miss=s=>d.push(s);
   const D=profileDoorsDbg(); if(!D) return { cases:1, total:1, differences:['the profile doors are not wired (ui.js)'] };
   const orig=D.read(), wasProf=profileCurrent(), bar=document.getElementById('bar'), barMin=!!bar && bar.classList.contains('min');
@@ -65,4 +66,4 @@ export function checkProfile(){
   finally{ if(profileCurrent()!=='profile.full') profileApply('profile.full'); D.write(orig); if(bar && barMin) bar.classList.add('min'); }
   return { cases:n, total:d.length, differences:d };
 }
-row({ calm:true, at:1005, name:'C0 profile round trip', run:()=>checkProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+row({ calm:true, at:1005, name:'C0 profile round trip', run:()=>checkProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });

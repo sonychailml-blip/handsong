@@ -63,7 +63,7 @@ function fft(re,im){
 }
 const dB=e=>+(10*Math.log10(e+1e-12)).toFixed(4);
 /* Features of one render: env (mean square of the mid signal per 50 ms), side (energy of L−R), spec (3 segments × 10 octave bands). */
-function goldFeats({ L, R, rate }){
+export function goldFeats({ L, R, rate }){
   const n=L.length, m=new Float32Array(n); let side=0;
   for(let i=0;i<n;i++){ m[i]=(L[i]+R[i])/2; const s=(L[i]-R[i])/2; side+=s*s; }
   const w=Math.round(WIN*rate), env=[];
@@ -79,7 +79,7 @@ function goldFeats({ L, R, rate }){
 }
 async function renderCase(R,c){ return goldFeats(await R.goldRender(c.play, c.sec, c.chains||{}, c.post||null)); }
 /* Value-by-value comparison of two feature sets → list of differences (strings). */
-function goldCmp(name,a,b){
+export function goldCmp(name,a,b){
   const out=[];
   for(const k of ['env','side','spec']){ const A=[].concat(a[k]), B=[].concat(b[k]);
     if(A.length!==B.length){ out.push(`${name}: ${k} has ${B.length} values, golden ${A.length}`); continue; }
@@ -98,7 +98,7 @@ export async function dumpGold(){
 /* P.checkGold() — row «GOLD timbres and effects» (P.all only: ≈ 70 short renders). */
 export async function checkGold(){
   const diff=[], miss=s=>diff.push(s); let cases=0, file=null;
-  try{ const r=await fetch(new URL(GOLD_FILE, location.href), { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
+  try{ const r=await fetch(new URL('../../'+GOLD_FILE, import.meta.url), { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
   catch(e){ miss(`no golden file ${GOLD_FILE} (${e&&e.message}) — P.dumpGold() on unchanged code makes it`); return { cases, total:diff.length, differences:diff }; }
   const R=await import('../render.js'), list=goldCases(), G=file.cases||{};
   for(const n of Object.keys(G)) if(!list.some(c=>c.name===n)) miss(`golden case «${n}» is no longer rendered`);

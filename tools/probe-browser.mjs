@@ -60,6 +60,13 @@ const argv=process.argv.slice(2), has=f=>argv.includes(f), val=(f,d)=>{ const i=
 const REPEAT=+val('--repeat',0)||0;
 let QUICK=has('--quick'), ALL=has('--all');
 if(!QUICK && !ALL && !REPEAT && !has('--calm')) QUICK=true;   // RUN 7: --calm alone runs only P.calm
+/* SPLIT-2: --app full|night picks the page (night: no seed, no UI song checks, P.calm by default); --json FILE writes the results for tools/split-compare.mjs;
+   --dump NAME FILE writes the JSON of P[NAME]() (a baseline made on unchanged code). */
+const APP=val('--app','full'), JSON_OUT=val('--json',null), DUMP=(()=>{ const i=argv.indexOf('--dump'); return i>=0 ? [argv[i+1], argv[i+2]] : null; })();
+const NIGHT_PAGE=APP==='night';
+const ENTRY=NIGHT_PAGE ? '/index.html?probe&calm' : '/index.html?probe';
+if(NIGHT_PAGE && !has('--quick') && !has('--all')) QUICK=false;
+if(DUMP && !has('--quick') && !has('--all') && !has('--calm')) QUICK=false;
 const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
@@ -192,7 +199,7 @@ function procMem(ids){
    of the smallest track without a KS timbre; the watcher is paused (runner). ---------- */
 const LEAK_N=30, LEAK_MARGIN_MB=20;
 async function LEAK_PAGE({ N, margin }){
-  const R=await import('./src/render.js'), REC=await import('./src/recorder.js'), A=await import('./src/audio.js');
+  const R=await import('/src/render.js'), REC=await import('/src/recorder.js'), A=await import('/src/audio.js');
   const span=l=>{ const ts=REC.events.filter(e=>e.layer===l).map(e=>e.t); return Math.max(...ts)-Math.min(...ts); };
   const isKS=l=>REC.events.some(e=>e.layer===l&&(e.fn==='leadOn'||e.fn==='leadSet')&&e.a&&e.a.inst!=null&&e.a.inst>=A.LEAD_KS_FROM);
   const ly=[...new Set(REC.events.map(e=>e.layer))].filter(l=>!isKS(l)&&!REC.events.some(e=>e.layer===l&&e.fn==='drone')).sort((a,b)=>span(a)-span(b))[0];
@@ -217,7 +224,7 @@ async function LEAK_PAGE({ N, margin }){
 async function uiSecRename(page, cdp, label){
   const lines=[], bad=[];
   const prep=await page.evaluate(async ()=>{
-    const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js'), D=await import('./src/draw.js');
+    const UI=await import('/src/ui.js'), REC=await import('/src/recorder.js'), D=await import('/src/draw.js');
     UI.arrApi.open();
     const M=REC.loop.metre; let m=REC.sections()[0];
     if(!m){ m=REC.secAdd(M,'Probe'); }
@@ -229,7 +236,7 @@ async function uiSecRename(page, cdp, label){
   });
   if(!prep.ok) return { pass:false, lines:[`${label}: ${prep.why}`] };
   const state=()=>page.evaluate(()=>{ const el=document.getElementById('secNameIn'); return { open:!!el&&!el.hidden, focused:document.activeElement===el }; });
-  const nameOf=id=>page.evaluate(async id=>{ const REC=await import('./src/recorder.js'); const m=REC.sections().find(x=>x.id===id); return m&&m.name; }, prep.id);
+  const nameOf=id=>page.evaluate(async id=>{ const REC=await import('/src/recorder.js'); const m=REC.sections().find(x=>x.id===id); return m&&m.name; }, prep.id);
   const touchTap=async(x,y)=>{ const p=[{ x, y, radiusX:6, radiusY:6, force:1, id:1 }];
     await cdp.send('Input.dispatchTouchEvent',{ type:'touchStart', touchPoints:p }); await page.waitForTimeout(40);
     await cdp.send('Input.dispatchTouchEvent',{ type:'touchEnd', touchPoints:[] }); };
@@ -250,13 +257,13 @@ async function uiSecRename(page, cdp, label){
     else { await page.keyboard.press('Control+A'); await page.keyboard.type('Outro'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
       const n=await nameOf(); if(n!=='Outro') bad.push(`button: typed «Outro» + Enter, the marker is named «${n}»`); else lines.push('button: §✎ on the selected marker opened the field, «Outro» kept'); } }
   if(prep.ctl){
-    await page.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.secRenameDbg('down'); });
+    await page.evaluate(async ()=>{ const UI=await import('/src/ui.js'); UI.arrApi.secRenameDbg('down'); });
     const d=await tryOne('mouse','Ctrl');
-    await page.evaluate(async ()=>{ const UI=await import('./src/ui.js'); UI.arrApi.secRenameDbg(null); const el=document.getElementById('secNameIn'); if(el&&!el.hidden){ el.dispatchEvent(new KeyboardEvent('keydown',{ key:'Escape' })); } });
+    await page.evaluate(async ()=>{ const UI=await import('/src/ui.js'); UI.arrApi.secRenameDbg(null); const el=document.getElementById('secNameIn'); if(el&&!el.hidden){ el.dispatchEvent(new KeyboardEvent('keydown',{ key:'Escape' })); } });
     if(!d) bad.push('CONTROL: with the field opened inside the second press (the old code) the double click still worked — the check cannot fail');
     else lines.push(`control (old behaviour) fails as it must — ${d}`);
   } else lines.push('no control switch in this build (arrApi.secRenameDbg) — control not run');
-  await page.evaluate(async id=>{ const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js');
+  await page.evaluate(async id=>{ const UI=await import('/src/ui.js'), REC=await import('/src/recorder.js');
     if(REC.secDelete) REC.secDelete(id); if(REC.histReset) REC.histReset(); else if(REC.songHistReset) REC.songHistReset(); UI.arrApi.close(); }, prep.id);
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
@@ -264,7 +271,7 @@ async function uiSecRename(page, cdp, label){
 /* ---------- UI check with REAL input (OWN2): drag a bend point of the selected theremin note upward → higher cents, one history step ---------- */
 async function uiBendDrag(page, label){
   const prep=await page.evaluate(async ()=>{
-    const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js'), D=await import('./src/draw.js'), ST=await import('./src/state.js');
+    const UI=await import('/src/ui.js'), REC=await import('/src/recorder.js'), D=await import('/src/draw.js'), ST=await import('/src/state.js');
     const n=REC.songNotes().notes.find(x=>x.role==='ld' && x.head.a && x.head.a.bend && x.head.a.bend.length>=3 && REC.freezeState(x.layer)==='none');
     if(!n) return { ok:false, why:'no theremin note with three points' };
     UI.arrApi.open(); UI.arrApi.openTrack(n.layer);
@@ -280,12 +287,12 @@ async function uiBendDrag(page, label){
   await page.mouse.move(prep.x, prep.y); await page.mouse.down();
   for(let k=1;k<=6;k++){ await page.mouse.move(prep.x, prep.y-k*6); await page.waitForTimeout(16); }
   await page.mouse.up(); await page.waitForTimeout(150);
-  const after=await page.evaluate(async ()=>{ const REC=await import('./src/recorder.js'); const e=window.__bendEv; return { c:e.a.bend[1].c, n:REC.histLen() }; });
+  const after=await page.evaluate(async ()=>{ const REC=await import('/src/recorder.js'); const e=window.__bendEv; return { c:e.a.bend[1].c, n:REC.histLen() }; });
   const lines=[], bad=[];
   if(!(after.c>prep.c0)) bad.push(`dragging point 2 up 36 px left its cents at ${after.c} (was ${prep.c0})`);
   else if(after.n!==1) bad.push(`the drag left ${after.n} history steps, one intended`);
   else lines.push(`dragging point 2 up: ${prep.c0} → ${after.c} cents, one history step`);
-  await page.evaluate(async ()=>{ const UI=await import('./src/ui.js'), REC=await import('./src/recorder.js'); while(REC.histLen()) if(!REC.histUndo()) break; REC.histReset(); UI.arrApi.closeTrack(); UI.arrApi.close(); delete window.__bendEv; });
+  await page.evaluate(async ()=>{ const UI=await import('/src/ui.js'), REC=await import('/src/recorder.js'); while(REC.histLen()) if(!REC.histUndo()) break; REC.histReset(); UI.arrApi.closeTrack(); UI.arrApi.close(); delete window.__bendEv; });
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
 }
 
@@ -295,7 +302,7 @@ async function uiBendDrag(page, label){
    frozen are frozen again with their old seeds, so the probes after this see the seed song exactly as before. */
 async function uiSongFile(page, label){
   const lines=[], bad=[];
-  const prep=await page.evaluate(async ()=>{ const REC=await import('./src/recorder.js'), R=await import('./src/render.js'), RUN=await import('./src/probes/run.js');
+  const prep=await page.evaluate(async ()=>{ const REC=await import('/src/recorder.js'), R=await import('/src/render.js'), RUN=await import('/src/probes/run.js');
     const L=[...new Set(REC.events.map(e=>e.layer))]; window.__songFz=L.filter(ly=>REC.freezeState(ly)==='fresh').map(ly=>[ly,R.seedOfLane(REC.laneIdOf(ly))]);
     return { print:RUN.songPrint(), fz:window.__songFz.length }; });
   const [dl]=await Promise.all([ page.waitForEvent('download',{ timeout:15000 }), page.evaluate(()=>document.getElementById('songSave').click()) ]);
@@ -306,19 +313,19 @@ async function uiSongFile(page, label){
   let dialogs=0; const onDlg=d=>{ dialogs++; d.accept().catch(()=>{}); }; page.on('dialog',onDlg);
   try{
     await page.setInputFiles('#songFile', file); await page.waitForTimeout(1500);
-    const a=await page.evaluate(async ()=>{ const RUN=await import('./src/probes/run.js'), REC=await import('./src/recorder.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'', dirty:REC.songDirty() }; });
+    const a=await page.evaluate(async ()=>{ const RUN=await import('/src/probes/run.js'), REC=await import('/src/recorder.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'', dirty:REC.songDirty() }; });
     if(a.print!==prep.print) bad.push(`after Open of the downloaded file the song differs (${prep.print} → ${a.print})`);
     else if(dialogs) bad.push(`Open asked ${dialogs} question(s) right after a save`);
     else if(!/Song opened|Песня открыта/.test(a.msg)) bad.push(`no «Song opened» message (got «${a.msg}»)`);
     else lines.push(`Open of that file through the file input: the same song (${a.print}), no question, message «${a.msg}»`);
     if(rec){ await writeFile(newer, JSON.stringify({ ...rec, version:rec.version+1 }));
       await page.setInputFiles('#songFile', newer); await page.waitForTimeout(800);
-      const b=await page.evaluate(async ()=>{ const RUN=await import('./src/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
+      const b=await page.evaluate(async ()=>{ const RUN=await import('/src/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
       if(b.print!==prep.print || !/newer Handsong|более новым/.test(b.msg)) bad.push(`a newer-version file: song ${b.print===prep.print?'kept':'CHANGED'}, message «${b.msg}»`);
       else lines.push(`a newer-version file: refused («${b.msg}»), the song kept`); }
   } finally {
     page.off('dialog',onDlg);
-    await page.evaluate(async ()=>{ const R=await import('./src/render.js'); for(const [ly,seed] of window.__songFz||[]) await R.freeze(ly,{ quiet:true, seed }); delete window.__songFz; });
+    await page.evaluate(async ()=>{ const R=await import('/src/render.js'); for(const [ly,seed] of window.__songFz||[]) await R.freeze(ly,{ quiet:true, seed }); delete window.__songFz; });
     await rm(file,{ force:true }); await rm(newer,{ force:true });
   }
   return { pass:!bad.length, lines:[...lines.map(l=>`${label}: ${l}`), ...bad.map(b=>`${label}: NOT A PASS — ${b}`)] };
@@ -328,10 +335,10 @@ async function uiSongFile(page, label){
    the page is RELOADED, ▶ Play pressed again → the «Continue where you left off?» box must offer it; «Continue» → the same song. */
 async function uiAutosave(page, label){
   const lines=[], bad=[];
-  const pre=await page.evaluate(async ()=>{ const A=await import('./src/autosave.js'), RUN=await import('./src/probes/run.js');
+  const pre=await page.evaluate(async ()=>{ const A=await import('/src/autosave.js'), RUN=await import('/src/probes/run.js');
     A.asPause('probe-song', false); A.asSetEnabled(true); return { print:RUN.songPrint() }; });
   let I=null; const t0=Date.now();
-  for(let i=0;i<60;i++){ I=await page.evaluate(async ()=>{ const A=await import('./src/autosave.js'); return A.asInfo(); }); if(I.n>0 && !I.pending) break; await page.waitForTimeout(500); }
+  for(let i=0;i<60;i++){ I=await page.evaluate(async ()=>{ const A=await import('/src/autosave.js'); return A.asInfo(); }); if(I.n>0 && !I.pending) break; await page.waitForTimeout(500); }
   if(!(I && I.n>0 && !I.pending)){ bad.push(`the app's own timer did not autosave the song within 30 s (${JSON.stringify(I)})`); return { pass:false, lines:bad.map(b=>`${label}: NOT A PASS — ${b}`) }; }
   lines.push(`the app autosaved the song by itself after ${((Date.now()-t0)/1000).toFixed(1)} s (write ${I.lastMs} ms)`);
   await page.reload();
@@ -342,10 +349,10 @@ async function uiAutosave(page, label){
   const q=await page.evaluate(()=>document.getElementById('resumeText').textContent);
   if(!shown){ bad.push('after the reload ▶ Play offered nothing'); }
   else {
-    const empty=await page.evaluate(async ()=>{ const REC=await import('./src/recorder.js'); return REC.events.length; });
+    const empty=await page.evaluate(async ()=>{ const REC=await import('/src/recorder.js'); return REC.events.length; });
     if(empty) bad.push(`the song was loaded BEFORE the answer (${empty} events)`); else lines.push(`after the reload ▶ Play asks «${q}» and the song stays empty until the answer`);
     await page.click('#resumeYes'); await page.waitForTimeout(1500);
-    const a=await page.evaluate(async ()=>{ const RUN=await import('./src/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
+    const a=await page.evaluate(async ()=>{ const RUN=await import('/src/probes/run.js'); return { print:RUN.songPrint(), msg:document.getElementById('camMsg').dataset.msg||'' }; });
     if(a.print!==pre.print) bad.push(`«Continue» gave a different song (${pre.print} → ${a.print})`);
     else lines.push(`«Continue» → the same song (${a.print}), message «${a.msg}»`);
   }
@@ -377,6 +384,9 @@ async function session(port, plan, label){
       if(!NET_OK.some(p=>u.startsWith(p)) && !/handsong-csp-control/.test(u)) res.net.bad.push(u); });
     /* PRIV1: every Content-Security-Policy violation of the whole session is collected (an init script runs before the page's own) */
     await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push({ dir:e.effectiveDirective||e.violatedDirective, uri:e.blockedURI, src:e.sourceFile, line:e.lineNumber })); });
+    if(has('--stress-not-judged')) await ctx.addInitScript(()=>{ globalThis.__stressNotJudged=true; });
+    /* SPLIT-2: this page's session rests on the Dark background (software WebGL in headless Chrome starves a small machine between rows); the forest rows choose the forest themselves */
+    if(NIGHT_PAGE) await ctx.addInitScript(()=>{ try{ if(!localStorage.getItem('handsong.calmBg')) localStorage.setItem('handsong.calmBg','dark'); }catch(e){} });
     page=await ctx.newPage();
     page.on('worker', w=>{ const u=w.url().replace(origin,''); if(/net-control/.test(u)) return; res.net.workers++; res.net.workerUrls.push(u); });   // the control's worker is not counted
     const seen=[];   // строки проб этого прогона (для сводки)
@@ -392,20 +402,23 @@ async function session(port, plan, label){
       } else if(/^ {3}/.test(tx)) out('  '+tx);   // строки «first differences» (с отступом)
     });
     page.on('pageerror', async e=>{ await log('[pageerror] '+(e&&e.stack||e)); out('  [pageerror] '+(e&&e.message||e)); });
-    await page.goto(`${origin}/index.html?probe`);
+    res.requests=[]; ctx.on('response', q=>{ const u=q.url(); if(/^(data|blob):/.test(u)) return; res.requests.push([u.replace(origin,'').split('?')[0], q.status()]); });
+    await page.goto(origin+ENTRY);
     out(`[${label}] page open — waiting for the app and the probe module`);
     await within(page.waitForFunction(()=>window.P && window.R, null, { timeout:0 }), 60e3, 'loading the app');
-    await page.click('#startBtn');
+    /* its own start card hides #startBtn; the same handler by script, so a first-run ghost does not play through the rows */
+    if(NIGHT_PAGE) await page.evaluate(()=>document.getElementById('startBtn').click()); else await page.click('#startBtn');
     /* --selftest-exit sigint|error: fire that exit path once the app is starting (tests the cleanup; the run fails by design) */
     const ST=val('--selftest-exit',null);
     if(ST) setTimeout(()=>{ if(ST==='sigint') process.emit('SIGINT'); else Promise.reject(new Error('selftest')); }, 3000);
     out(`[${label}] ▶ Play pressed — waiting for the start (hand-tracking model from the CDN, fake camera)`);
     await within(page.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:0 }), LIMIT_START, 'the app start');
-    const env=await page.evaluate(async ()=>{ const A=await import('./src/audio.js'); return { hidden:document.hidden, visibility:document.visibilityState, ac:A.AC&&A.AC.state, rate:A.AC&&A.AC.sampleRate, ua:navigator.userAgent }; });
+    const env=await page.evaluate(async ()=>{ const A=await import('/src/audio.js'); return { hidden:document.hidden, visibility:document.visibilityState, ac:A.AC&&A.AC.state, rate:A.AC&&A.AC.sampleRate, ua:navigator.userAgent }; });
     res.env=env;
     out(`[${label}] started — audio ${env.ac} at ${env.rate} Hz, tab ${env.visibility}${env.hidden?' (HIDDEN — drawn-window rows will not run)':''}`);
     /* AF3: the auto-freeze watcher is paused for the whole runner session (probes drive it with their own clock); resumed before closing */
-    await page.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', true); });
+    await page.evaluate(async ()=>{ const Q=await import('/src/frzqueue.js'); Q.afPause('runner', true); });
+    if(!NIGHT_PAGE && !DUMP){
     /* посев: ждём ОКОНЧАНИЯ (его итог — строка «Now run P.all()») */
     const t0=Date.now();
     /* страж консоли: P.seed пускаем, НЕ дожидаясь, и тут же «набираем» P.quick() — обязан отказать словами (как у человека, набравшего его рано) */
@@ -430,6 +443,8 @@ async function session(port, plan, label){
       for(const l of us.lines) out(l);
       res.ui={ pass:res.ui.pass&&ub.pass&&us.pass, lines:[...res.ui.lines, ...ub.lines, ...us.lines] };
     }
+    }
+    if(DUMP){ const r=await within(page.evaluate(n=>P[n](), DUMP[0]), LIMIT_ALL, 'P.'+DUMP[0]); if(!r||r.refused) throw new Error('P.'+DUMP[0]+' returned nothing'); await writeFile(path.resolve(DUMP[1]), JSON.stringify(r)+'\n'); out(`[${label}] wrote ${DUMP[1]}`); res.dumped=true; }
     if(EVAL||LEAK){   // memory helpers for --eval and --leak
       /* window.__heap(): full GC, then V8 heap usage incl. ArrayBuffer backing stores (memory checks in --eval only) */
       const cdp=await ctx.newCDPSession(page);
@@ -481,7 +496,7 @@ async function session(port, plan, label){
     { const CTL='https://example.com/handsong-net-control', f=path.join(LOGDIR,'net-control-worker.js');
       await writeFile(f, `fetch(${JSON.stringify(CTL)}).catch(()=>{}).finally(()=>postMessage(1));`);
       await ctx.route(CTL, r=>r.abort());
-      await within(page.evaluate(()=>new Promise(r=>{ const w=new Worker('./tools/.probe-logs/net-control-worker.js'); w.onmessage=()=>{ w.terminate(); r(); }; w.onerror=()=>r(); setTimeout(r,5000); })), 15e3, 'the network control');
+      await within(page.evaluate(()=>new Promise(r=>{ const w=new Worker('/tools/.probe-logs/net-control-worker.js'); w.onmessage=()=>{ w.terminate(); r(); }; w.onerror=()=>r(); setTimeout(r,5000); })), 15e3, 'the network control');
       const k=res.net.bad.indexOf(CTL); res.net.ctl=k>=0; if(k>=0) res.net.bad.splice(k,1);
       await rm(f,{ force:true }); }
     { const N=res.net; N.pass=!N.bad.length && N.n>0 && N.ctl;
@@ -496,7 +511,7 @@ async function session(port, plan, label){
   }catch(e){ res.error=String(e&&e.message||e); out(`[${label}] ERROR — ${res.error}`); }
   finally{
     // resume the watcher (bounded: a page stuck past a time limit must not keep the browser alive), then close
-    if(page) await Promise.race([ page.evaluate(async ()=>{ const Q=await import('./src/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}), timeout(5e3) ]);
+    if(page) await Promise.race([ page.evaluate(async ()=>{ const Q=await import('/src/frzqueue.js'); Q.afPause('runner', false); }).catch(()=>{}), timeout(5e3) ]);
     await closeBrowser(browser);
   }
   return res;
@@ -543,7 +558,7 @@ try{
   if(REPEAT){
     for(let i=1;i<=REPEAT;i++){ out(`\n[probe-browser] run ${i} of ${REPEAT} — fresh browser, fresh profile`); await log(`===== run ${i} of ${REPEAT} =====`);
       sessions.push(await session(port, QUICK?['quick','all']:['all'], `run ${i}/${REPEAT}`)); }
-  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', has('--calm')&&'calm'].filter(Boolean), mode||'eval'));   // RUN 7: --calm runs P.calm
+  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', (has('--calm')||(NIGHT_PAGE&&!QUICK&&!ALL&&!EVAL&&!LEAK&&!DUMP))&&'calm'].filter(Boolean), mode||'eval'));   // RUN 7: --calm runs P.calm; SPLIT-2: the second page's default
 } finally { await closeAll(); }
 if(EXITING) await new Promise(()=>{});   // a signal/error path is closing — it prints and exits itself
 const stillMine=(runnerBrowsers()||[]).filter(g=>g.mine);
@@ -558,7 +573,7 @@ for(const s of sessions){
     for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick|calm):/.test(l)) out('  '+l);
     if(!r.pass) pass=false;
   }
-  if(!s.runs.length && !s.error && !EVAL && !LEAK) pass=false;
+  if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
   if(s.ui){ out(`[${s.label}] UI checks (section rename, bend drag, song file, autosave): ${s.ui.pass?'PASS':'NOT A PASS'}`); if(!s.ui.pass) pass=false; }
   if(!s.error){ out(`[${s.label}] CSP (PRIV1): ${s.csp&&s.csp.pass?'PASS — no violation, the control fetch refused':'NOT A PASS'}`); if(!(s.csp&&s.csp.pass)) pass=false;
     out(`[${s.label}] network (PRIV1, LAT2): ${s.net&&s.net.pass?`PASS — ${s.net.n} requests, all to the own origin or the MediaPipe paths`:'NOT A PASS'}`); if(!(s.net&&s.net.pass)) pass=false; }
@@ -566,5 +581,6 @@ for(const s of sessions){
   if(LEAK){ if(!s.leakPass) pass=false; const L=s.leak; out(`[${s.label}] --leak: ${L&&L.ok?`${L.pass?'PASS':'NOT A PASS'} — ${L.n} renders: +${L.fixMB} MB with the fix (margin ${LEAK_MARGIN_MB} MB), control +${L.ctrlMB} MB`:'ERROR '+(L&&L.why)}`); }
 }
 if(REPEAT) repeatTable(sessions);
+if(JSON_OUT){ await mkdir(path.dirname(path.resolve(JSON_OUT)),{ recursive:true }); await writeFile(path.resolve(JSON_OUT), JSON.stringify({ app:APP, pass, sessions:sessions.map(s=>({ label:s.label, error:s.error, runs:s.runs.map(r=>({ kind:r.kind, pass:r.pass, rows:r.rows })), csp:s.csp&&s.csp.pass, net:s.net&&s.net.pass, ui:s.ui&&s.ui.pass, leak:s.leakPass, requests:s.requests })) }, null, 1)); }
 out(`\n[probe-browser] ${pass?'PASS':'NOT A PASS'} — ${sessions.length} browser session(s), ${sessions.reduce((n,s)=>n+s.runs.length,0)} probe run(s) · ${((Date.now()-T00)/1000).toFixed(1)} s total · log ${path.relative(ROOT,LOG)}`);
 process.exitCode=pass?0:1;

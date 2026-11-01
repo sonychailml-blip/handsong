@@ -458,7 +458,7 @@ AUD2b (RUN 3, 2026-10-16; docs/AUD1-design.md §7): GENERATED CONTRACT ROWS — 
 
 ## src/probes/gold.js
 GOLD1: GOLDEN RENDERS — every built-in timbre (23 solo, 16 chord, 7 bass, 5 kits × 6 rows), the drone and the six effects at three settings, each rendered alone through the engine copy (render.gold…
-- fn (2): `dumpGold`, `checkGold`
+- fn (4): `goldFeats`, `goldCmp`, `dumpGold`, `checkGold`
 
 ## src/probes/guard.js
 PROBE1: The console guard: window.P = api() — one probe at a time; its self-test runs inside row «write path (funnels)».
@@ -490,6 +490,10 @@ PROBE1: Shared probe helpers: frames with a fallback timer, measures, the quick 
 ## src/probes/lat.js
 PROBE1: LAT1 latency meter probe.
 - fn (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
+
+## src/probes/nightguard.js
+SPLIT-2: row «NIGHT untouched» — the mirror of «FULL untouched»: a change elsewhere must not move this app.
+- fn (2): `dumpNight`, `checkNightUntouched`
 
 ## src/probes/pack.js
 PACK1 (RUN 3, 2026-10-16): packs and offline licence keys IN THE PAGE (Chrome's WebCrypto — the node row «PACK1 packs and licence keys (core)» checks the same code in node): the committed TEST keys…
@@ -619,6 +623,7 @@ C0 (RUN 6, Calm plan §2) — PROFILES: the faces of the one app.
 - → ./probes/ids.js (1): `checkEventIds`
 - → ./probes/key.js (5): `dumpSongPrint`, `checkSongPrint`, `checkKeyKeep`, `checkOneOne`, `checkTranspose`
 - → ./probes/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
+- → ./probes/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./probes/pack.js (1): `checkPack`
 - → ./probes/pool.js (1): `checkPool`
 - → ./probes/profile.js (1): `checkProfile`
@@ -835,7 +840,7 @@ DRAW1 (DAY run 2026-10-16): the play strip, the arrangement window and the mixer
 - const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
-_161 modules, 2107 exported names._
+_162 modules, 2113 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

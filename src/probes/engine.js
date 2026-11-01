@@ -93,7 +93,7 @@ export async function dumpCensus(){
 }
 export async function checkCensus(){
   const d=[]; let n=0, pin;
-  try{ const r=await fetch(CENSUS_FILE, { cache:'no-store' }); pin=await r.json(); }
+  try{ const r=await fetch(new URL('../../'+CENSUS_FILE, import.meta.url), { cache:'no-store' }); pin=await r.json(); }
   catch(e){ return { cases:0, total:1, differences:[`no census file ${CENSUS_FILE} (${e&&e.message}) — P.dumpCensus() on unchanged code makes it`] }; }
   if(pin.meta.chains!==chainsNow()) return { cases:0, total:0, differences:[], status:'not applicable: the live effect chains differ from the pinned ones' };
   const c=await censusNow();

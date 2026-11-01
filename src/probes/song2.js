@@ -33,7 +33,7 @@ export async function checkSongFile2(){
     const B=norm(songSaveRec({}).rec); n++;
     if(A!==B) miss(`the demo file differs from its generator: ${firstDiff(A,B).slice(0,300)}`);
     /* CONTROL: one volume changed in the file must show */
-    { const t=await (await fetch('data/songs/triphop.json',{ cache:'no-store' })).text(), x=JSON.parse(t); const e=x.events.find(q=>q.a&&typeof q.a.vol==='number'); e.a.vol=+(e.a.vol*0.5).toFixed(4);
+    { const t=await (await fetch(new URL('../../data/songs/triphop.json', import.meta.url),{ cache:'no-store' })).text(), x=JSON.parse(t); const e=x.events.find(q=>q.a&&typeof q.a.vol==='number'); e.a.vol=+(e.a.vol*0.5).toFixed(4);
       const o=UI.songOpenText(JSON.stringify(x), ()=>true); n++; if(!o.ok || norm(songSaveRec({}).rec)===A) miss('CONTROL: a file with one volume changed matched the generator — the comparison cannot fail'); }
   } finally {
     const back=UI.songOpenText(orig.text, ()=>true); if(!back.ok) miss('could not restore the song at the end');

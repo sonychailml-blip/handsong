@@ -81,7 +81,7 @@ export async function loadSong(name='triphop', opt={}){
   const url=SONG_FILES[name];
   if(!url){ console.warn(`[song] no song «${name}» — known: ${songNames().join(', ')}`); return null; }
   if(songRefuse(name, opt)) return null;
-  let text; try{ const r=await fetch(url,{ cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); text=await r.text(); }
+  let text; try{ const r=await fetch(new URL('../'+url, import.meta.url),{ cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); text=await r.text(); }
   catch(e){ console.warn(`[song] could not read ${url} — ${e&&e.message||e}`); return null; }
   const UI=await import('./ui.js'), o=UI.songOpenText(text, ()=>true);
   if(!o.ok){ console.warn(`[song] ${url} did not open: ${o.why}`); return null; }

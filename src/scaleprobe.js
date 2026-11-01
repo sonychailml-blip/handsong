@@ -102,4 +102,5 @@ export { checkProfile } from './probes/profile.js';   // C0: profiles Full ↔ C
 export { checkVisStack } from './probes/vis.js';   // VIS1a: the compositor and the bus writers
 export { checkForestRoom, checkBackgrounds } from './probes/forest.js';   // VIS1c: the forest room as numbers; the three backgrounds
 export { checkSoloFirefly } from './probes/calm.js';   // C4a: Firefly as a solo timbre
+export { checkNightUntouched, dumpNight } from './probes/nightguard.js';   // SPLIT-2: the guard over the second app
 export { api } from './probes/guard.js';

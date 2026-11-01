@@ -2019,3 +2019,9 @@ same; the screenshot comparison shows small rendering differences because this s
 4. Opening the forest takes 1–3 seconds on your laptop (the picture holds still). Acceptable, or should we show a gentle «the forest is
    waking» moment?
 5. The falling star passes in front of the trees (this forest has no open sky). Does it look natural to you?
+
+# SPLIT-2 — checkpoint A (2026-11-01): baseline, guards, location-independent paths (status: docs/SPLIT-PROGRESS.md)
+- App code changed: only `src/audio.js` (4 worklet addModule) and `src/songs.js` (1 fetch) → `import.meta.url`. No moves.
+- New tools: `tools/smoke-paths.mjs`, `tools/split-compare.mjs`, `tools/split-check.mjs`; runner `--app`, `--json`, `--dump`, `--stress-not-judged`; ui-snap `--noisy`. New row «NIGHT untouched» + `tools/night.print.json`.
+- Probes now start correctly on the page that opened in its own profile (C0 not applicable there; VIS1a; CALM shell restores). VIS1c backgrounds allows the room's shader compile.
+- Measured, on unchanged code: CALM stress's real-time part varies run to run (the standard app itself 0–30 dropouts in 6 s) → reported, not judged in split checks; its caps and offline parts stay strict. Four Night screens differ between two captures of identical code → structure only; the other 12 stay exact.

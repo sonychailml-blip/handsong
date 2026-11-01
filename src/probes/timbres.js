@@ -50,7 +50,7 @@ export async function dumpTimbres(){
 }
 export async function checkTimbresBefore(opt={}){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  let pin; try{ pin=await (await fetch(FILE, { cache:'no-store' })).json(); }
+  let pin; try{ pin=await (await fetch(new URL('../../'+FILE, import.meta.url), { cache:'no-store' })).json(); }
   catch(e){ return { cases:0, total:1, differences:[`no ${FILE} (${e&&e.message}) — P.dumpTimbres() on unchanged code makes it`] }; }
   const now=await timbreSnapshotAll(), ids=new Set([...Object.keys(pin.entries), ...Object.keys(now.entries)]);
   for(const id of ids){
@@ -94,7 +94,7 @@ export async function checkFullUntouched(){
     if(PR.profileCurrent()!=='profile.full') return { cases:0, total:0, differences:[], notes:['not applicable: the app is not in Full'] };
     const E=A.engineCtx(); n++;
     if(E.calmLean || E.strikeCaps.size || E.lowPower) miss(`Full carries Calm's settings: Calm strikes ${E.calmLean}, caps ${E.strikeCaps.size}, low power ${E.lowPower}`);
-    const pin=await (await fetch(FILE, { cache:'no-store' })).json(), voices=(PR.profileOf('profile.calm')||{}).voices||{};
+    const pin=await (await fetch(new URL('../../'+FILE, import.meta.url), { cache:'no-store' })).json(), voices=(PR.profileOf('profile.calm')||{}).voices||{};
     const cmp=async lean=>{ const out=[];
       for(const id of STRUCK){ const i=A.LEAD_INSTR.findIndex(x=>x.id===id); if(i<0){ out.push(id+': missing'); continue; }
         const r=await oneTimbre(R, 'ld', i, false, false, lean ? eng=>eng.setCalmStrikes(voices) : undefined), a=pin.trace[id]||[];

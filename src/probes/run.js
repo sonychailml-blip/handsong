@@ -138,7 +138,8 @@ export async function all(opt={}){   // F0: async — строка снимка 
   console.log(nGuard ? `[scaleprobe all] state guard: ${nGuard} row(s) left the mixer, the windows, the live sound state or the render engine copy changed (see the lists above)`
                      : '[scaleprobe all] state guard: no row left the mixer, the windows, the live sound state, the song events or the render engine copy changed');
   if(frameStalls>stall0) console.warn(`[scaleprobe all] ${frameStalls-stall0} animation frame(s) never came (tab hidden?) — ${nHidden} row(s) that read the drawn window are marked «${HIDDEN}»; rerun with the tab visible`);
-  const pass=nDiff===0&&M.ok&&!nHidden, sec=((performance.now()-T00)/1000).toFixed(1);
+  const songRows=rows.some(r=>r.song!=='—');   // SPLIT-2: a run with no song row (P.calm on its own page) needs no song
+  const pass=nDiff===0&&(M.ok||!songRows)&&!nHidden, sec=((performance.now()-T00)/1000).toFixed(1);
   console.log(`[scaleprobe all] ${title}: ${pass ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences${nHidden?`, ${nHidden} not checked (tab hidden — rerun with the tab visible)`:''}, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views) · ${sec} s`);
   return { pass, rows, material:M, hidden:nHidden, seconds:+sec, measures };
 }

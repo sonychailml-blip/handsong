@@ -920,7 +920,7 @@ function voicesCut(test, when, dur, part){
    stale — одиночные устаревшие показания currentFrame у Chrome (сведение, звук сплошной — см. ворклет). */
 let capMod=null, capOk=false;
 function probeCaptureReady(){ if(!AC||offline) return Promise.resolve(false);
-  return capMod||(capMod=AC.audioWorklet.addModule('src/engine/worklets/probe-cap-worklet.js').then(()=>(capOk=true), e=>{ capMod=null; throw e; })); }
+  return capMod||(capMod=AC.audioWorklet.addModule(new URL('./engine/worklets/probe-cap-worklet.js', import.meta.url).href).then(()=>(capOk=true), e=>{ capMod=null; throw e; })); }
 function probeCapture(sec){
   if(!AC||!master||!outLast||offline) return Promise.reject(new Error('no live engine'));
   if(!capOk) return Promise.reject(new Error('the capture worklet is not loaded — await audio.probeCaptureReady() first'));
@@ -1307,14 +1307,14 @@ async function initAudio(mkCtx){
      чтобы banks[] строился синхронно и не разъехался с LEAD_INSTR. Провал загрузки — не падаем:
      ставим запасные субтрактивные щипки в слоты Струна/Ситар. Путь — от корня страницы (не ES-import). */
   let ksOk=true;
-  try{ await AC.audioWorklet.addModule('src/engine/worklets/ks-worklet.js'); }
+  try{ await AC.audioWorklet.addModule(new URL('./engine/worklets/ks-worklet.js', import.meta.url).href); }
   catch(e){ ksOk=false; console.warn('KS-ворклет не загрузился — ставлю запасные щипки:',e); }
   ksReady=ksOk;                                    // голоса пула строятся ЛЕНИВО, уже после initAudio — запоминаем результат загрузки
   /* AF6b: ХРАНИЛИЩЕ И ЧТЕЦ ЗАМОРОЖЕННЫХ ДОРОЖЕК (16 бит) — только ЖИВОЙ контекст: копии рендера чтец не нужен. Провал загрузки — не падаем:
      замороженные дорожки тогда держат прежний буфер Float32 и играют одноразовым источником (frzReady=false — recorder это видит). */
   frzReady=false; frzStoreNode=null;
   if(!offline){
-    try{ await AC.audioWorklet.addModule('src/engine/worklets/frz-worklet.js');
+    try{ await AC.audioWorklet.addModule(new URL('./engine/worklets/frz-worklet.js', import.meta.url).href);
          frzStoreNode=new AudioWorkletNode(AC,'frz-store',{numberOfInputs:0, numberOfOutputs:1});
          frzStoreNode.port.onmessage=e=>{ const m=e.data||{}; if(m.count){ const r=frzCountWait.get(m.id); if(r){ frzCountWait.delete(m.id); r(m.count); } } };
          frzSink=AC.createGain(); frzSink.gain.value=0; frzSink.connect(AC.destination);   // немой сток прямо в выход: тянется всегда (и когда проба снимает лимитер с выхода), звука не даёт
@@ -1327,7 +1327,7 @@ async function initAudio(mkCtx){
      limiter (6 ms lookahead) only as the fallback without the dynamics worklet, and in the render copy (whose end nobody hears: renders
      tap the master before it — offlineTapMaster). */
   dynReady=false; mGlue=mMake=mLim=null; limRed=0; limiter=null;
-  try{ await AC.audioWorklet.addModule('src/engine/worklets/dyn-worklet.js'); dynReady=true; }
+  try{ await AC.audioWorklet.addModule(new URL('./engine/worklets/dyn-worklet.js', import.meta.url).href); dynReady=true; }
   catch(e){ console.warn('Dynamics worklet did not load — the browser limiter is used instead (6 ms later):',e); }
   if(!mkCtx && dynReady){ try{
       mGlue=dynNode(E, 'comp', { ...DYN_GLUE, makeup:MASTER_GLUE_MAKEUP, on:mGlueOn?1:0 }, true);

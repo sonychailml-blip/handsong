@@ -15,10 +15,11 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 export async function checkVisStack(){
   const d=[]; let n=0; const miss=s=>d.push(s);
   try{
-    const L=stackList(); n++;
-    if(JSON.stringify(L)!==JSON.stringify([{ id:'scene', layer:'scene', on:false },{ id:'camera', layer:'background', on:true },{ id:'backdrop', layer:'background', on:true },
-        { id:'surface', layer:'instrument', on:true },{ id:'hands', layer:'overlay', on:true }]))
-      miss('the stack: '+JSON.stringify(L));
+    const L=stackList(), inFull=(await import('../profile.js')).profileCurrent()==='profile.full'; n++;
+    /* SPLIT-2: which backgrounds are on belongs to the page's profile (a room replaces the camera); order and layers are the stack's own */
+    const seeL= inFull ? L : L.map(({ id, layer })=>({ id, layer })), want=[{ id:'scene', layer:'scene', on:false },{ id:'camera', layer:'background', on:true },{ id:'backdrop', layer:'background', on:true },
+        { id:'surface', layer:'instrument', on:true },{ id:'hands', layer:'overlay', on:true }];
+    if(JSON.stringify(seeL)!==JSON.stringify(inFull ? want : want.map(({ id, layer })=>({ id, layer })))) miss('the stack: '+JSON.stringify(L));
     const s0=BUS.seq('notes'); ENG.leadOff(null, null, { own:'probe:vis1a', when:12.5 });
     const got=BUS.since('notes', s0).items; n++;
     if(got.length!==1 || got[0].kind!=='off' || got[0].owner!=='probe:vis1a' || got[0].role!=='ld' || got[0].when!==12.5) miss('live note-off on the ring: '+JSON.stringify(got));

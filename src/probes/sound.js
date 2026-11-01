@@ -93,7 +93,7 @@ export async function checkDynamics(){
   const diff=[], miss=s=>diff.push(s); let cases=0;
   const rate=48000, STEP=0.4, LV=[-40,-30,-24,-18,-14,-12,-9,-6,-3,0], N=Math.round(STEP*rate)*LV.length, IMP=4800;
   const C=new OfflineAudioContext(6, N, rate);
-  try{ await C.audioWorklet.addModule('src/engine/worklets/dyn-worklet.js'); }catch(e){ miss('the dynamics worklet did not load offline: '+(e&&e.message)); return { cases, total:diff.length, differences:diff }; }
+  try{ await C.audioWorklet.addModule(new URL('../engine/worklets/dyn-worklet.js', import.meta.url).href); }catch(e){ miss('the dynamics worklet did not load offline: '+(e&&e.message)); return { cases, total:diff.length, differences:diff }; }
   const buf=fill=>{ const b=C.createBuffer(1,N,rate), d=b.getChannelData(0); fill(d); return b; };
   const stair=buf(d=>{ const w=Math.round(STEP*rate); LV.forEach((l,k)=>d.fill(Math.pow(10,l/20), k*w, (k+1)*w)); });
   const imp=buf(d=>{ d[IMP]=0.5; });
@@ -186,7 +186,7 @@ export async function checkDynLive(){
   const sr=ac.sampleRate, len=Math.round(0.6*sr), r=seeded(0x5EED);
   const sig=new Float32Array(len); for(let i=0;i<len;i++){ const env=Math.exp(-3*i/len); sig[i]=env*(0.7*(r()*2-1)+0.4*Math.sin(2*Math.PI*180*i/sr)); }
   const play=(ctx,node,at)=>{ const b=ctx.createBuffer(1,len,sr); b.copyToChannel(sig,0); const s=ctx.createBufferSource(); s.buffer=b; s.connect(node); s.start(at); };
-  const offline=async set=>{ const C=new OfflineAudioContext(2, len+2560, sr); await C.audioWorklet.addModule('src/engine/worklets/dyn-worklet.js');
+  const offline=async set=>{ const C=new OfflineAudioContext(2, len+2560, sr); await C.audioWorklet.addModule(new URL('../engine/worklets/dyn-worklet.js', import.meta.url).href);
     const n=new AudioWorkletNode(C,'dyn',dynOpts('comp',set)); n.connect(C.destination); play(C,n,1280/sr); return (await C.startRendering()).getChannelData(0).slice(1280,1280+len); };
   const A=await offline({ ...DYN_GLUE, on:1 }), Actl=await offline({ ...DYN_GLUE, makeup:DYN_GLUE.makeup+0.5, on:1 });
   /* one live capture → the live window, or { why } (RUN 3: a capture that saw NO signal is named and retried once — under heavy load the
