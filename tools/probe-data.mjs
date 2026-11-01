@@ -1,5 +1,5 @@
 /* ⛳ ПРОБЫ ДАННЫХ В NODE — без браузера, камеры и звука (слайс «быстрые пробы»).
-   Гоняет ТЕ ЖЕ функции, что строки P.all() T0 / T1 / T2 / T6b / «стопка» / F4: они живут в src/probedata.js, который импортирует только
+   Гоняет ТЕ ЖЕ функции, что строки P.all() T0 / T1 / T2 / T6b / «стопка» / F4: они живут в core/probedata.js, который импортирует только
    scales/state/i18n (и через них config, scaleload, userstore, hooks) — ни draw, ни ui, ни audio, ни recorder. В P.all() эти строки
    остаются: браузерный прогон — полный барьер, этот — быстрый ответ до передачи работы.
    Запуск из корня репозитория:  node tools/probe-data.mjs        (вывод всех строк проб: node tools/probe-data.mjs --verbose)
@@ -8,7 +8,7 @@
    стояла одна строка загрузчика (а на загруженной машине T2 один идёт до 2 минут), и прогон выглядел зависшим (его прерывали, не дождавшись вердикта). Теперь: заголовок с числом строк,
    строка «pass/FAIL · случаи · расхождения · мс» СРАЗУ по завершении каждой пробы, итоговая таблица и итог. Падение импорта или любое
    необработанное исключение — тоже вердикт «NOT A PASS» с причиной (а не немой выход); выход без итога ловит process.on('exit').
-   ⚠️ ЧТО ПОДМЕНЕНО И ПОЧЕМУ. Загрузчик ладов (src/scaleload.js) читает data/ через fetch по адресу file:// (база — import.meta.url); fetch
+   ⚠️ ЧТО ПОДМЕНЕНО И ПОЧЕМУ. Загрузчик ладов (core/scaleload.js) читает data/ через fetch по адресу file:// (база — import.meta.url); fetch
    в node file:// не знает — ниже он читает такие адреса с диска, всё прочее отдаёт настоящему fetch. Больше ничего не подменяется:
    localStorage в node нет (i18n и userstore падают на память — как в приватном окне), IndexedDB нет (файлов пользователя нет —
    пробы и так покрывают только встроенные данные), язык — по navigator node (en), как у браузера без сохранённого выбора. */
@@ -63,7 +63,7 @@ function latCore(){
   if(d.length===dn) d.push('CONTROL: a long-task split without the 10-s startup window matched the expected one — the check cannot fail'); else d.length=dn;
   return { cases:18+bt.length, total:d.length, differences:d };
 }
-/* LAT2: the search schedule of the pure core (src/core/handsched.js), exactly — action sequences for hands in view per frame, the retry
+/* LAT2: the search schedule of the pure core (core/pure/handsched.js), exactly — action sequences for hands in view per frame, the retry
    of a lost hand, the policies, and the hand → sound sum with the worker's transfer part. CONTROL: a schedule run with a second hand that
    never reaches L2 (policy '1') must differ from the two-hand expectation. */
 function schedCore(){
@@ -87,7 +87,7 @@ function schedCore(){
     if(d.length===dn) d.push('CONTROL: a schedule that never tracks two hands matched — the check cannot fail'); else d.length=dn; }
   return { cases:n, total:d.length, differences:d };
 }
-/* LAT3: low light in the pure core (src/core/camlight.js), exactly — the «Too dark» hint from frame times (shown once, at the right
+/* LAT3: low light in the pure core (core/pure/camlight.js), exactly — the «Too dark» hint from frame times (shown once, at the right
    frame; never for a camera granted < 24, never when the rate recovers in time, once per session, waits for «allowed»), the hands-lost
    counter, the low-light constraint sets and verdicts, the capabilities line; CAM-FIX: the restore set, heal list and verification of the
    webcam's own settings. CONTROLS: a hint without its 3-s wait, a counter without its 1-s limit, and the pre-fix Off (which leaves a camera
@@ -206,12 +206,12 @@ function forestCore(){
   n++; eq('compressor curve below / in / above the knee', [DSP.compCurveDb(-40,-12,3,6), DSP.compCurveDb(-12,-12,3,6), DSP.compCurveDb(0,-12,3,6)], [-40, -12.5, -8]);
   return { cases:n, total:d.length, differences:d };
 }
-/* FMT1: the file-format core (envelope versions, migrations) and the permanent-id registry (src/core/format.js, src/core/registry.js),
+/* FMT1: the file-format core (envelope versions, migrations) and the permanent-id registry (core/pure/format.js, core/pure/registry.js),
    exactly. CONTROLS: a registry that destroys a built-in, and a version check that lets a newer file through, must be caught. */
 async function fmtCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`); };
   const throwsWith=(f,re)=>{ try{ f(); return 'no refusal'; }catch(e){ return re.test(String(e&&e.message)) ? 'ok' : String(e&&e.message); } };
-  const rec=JSON.parse(await readFile(new URL('../data/tunings/edo12.json', import.meta.url),'utf8'));
+  const rec=JSON.parse(await readFile(new URL('../core/data/tunings/edo12.json', import.meta.url),'utf8'));
   eq('a v1 tuning passes', throwsWith(()=>FMT.checkTuning(rec,'edo12'),/./), 'no refusal');
   eq('a NEWER version is refused in words', throwsWith(()=>FMT.checkTuning({...rec, version:2},'edo12'),/newer Handsong \(file version 2; this one reads up to 1\)/), 'ok');
   eq('version 0 keeps the old words', throwsWith(()=>FMT.checkTuning({...rec, version:0},'edo12'),/^version must be 1$/), 'ok');
@@ -247,7 +247,7 @@ async function fmtCore(){
     n++; if(!suite(B).length) d.push('CONTROL: a registry that answers «removed» for a built-in passed — the suite cannot fail'); }
   return { cases:n, total:d.length, differences:d };
 }
-/* GES1: the pure gesture math (src/gestures/features.js), exactly, against the config thresholds. CONTROLS: the hysteresis switched off
+/* GES1: the pure gesture math (core/gestures/features.js), exactly, against the config thresholds. CONTROLS: the hysteresis switched off
    (an empty previous set) must drop a held finger; the HAND1 pinch control (+0.03) must let a value between PINCH_ON and +0.03 in. */
 function gesCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
@@ -282,7 +282,7 @@ function gesCore(){
 /* UI1b: the icon component — every «{i:name}» token in the dictionaries and every data-icon of the markup names a known icon; no
    «icon» glyph is written directly in a dictionary; t() leaves no token behind. CONTROL: an unknown name must be caught. */
 async function iconCore(){
-  const d=[]; let n=0; const IC=await import(new URL('../src/icons.js', import.meta.url).href), I18=await import(new URL('../src/i18n.js', import.meta.url).href);
+  const d=[]; let n=0; const IC=await import(new URL('../core/icons.js', import.meta.url).href), I18=await import(new URL('../core/i18n.js', import.meta.url).href);
   const fs=await import('node:fs'), reg=JSON.parse(fs.readFileSync(new URL('./licences.json', import.meta.url),'utf8'));
   const iconGlyphs=new Set(reg.glyphs.filter(g=>g.kind==='icon').map(g=>g.ch));
   const tokErr=(where,s)=>{ for(const m of String(s).matchAll(/\{i:([\w-]+)\}/g)){ n++; if(!(m[1] in IC.ICONS)) d.push(`${where}: unknown icon «${m[1]}»`); } };
@@ -295,7 +295,7 @@ async function iconCore(){
   { const before=d.length; tokErr('CONTROL', '{i:no-such-icon}'); if(d.length===before) d.push('CONTROL: an unknown icon name was not caught'); else d.pop(); }
   return { cases:n, total:d.length, differences:d };
 }
-/* SAVE1: the song file's pure core (src/core/songfile.js) — reading a text (size cap, JSON only, forbidden keys, nesting, version
+/* SAVE1: the song file's pure core (core/pure/songfile.js) — reading a text (size cap, JSON only, forbidden keys, nesting, version
    rules), the v1 → v2 migration (timbre positions → ids; idempotent; the input untouched) and the strict check (a minimal valid record
    passes; each damage is caught). CONTROLS: the minimal record must pass (an over-strict check cannot pass it) and each damage must fail. */
 function songCore(){
@@ -349,11 +349,11 @@ function songCore(){
   for(const [what,mut] of dmg){ n++; const r=JSON.parse(txt); mut(r); if(!SF.songCheck(r).length) d.push(`damage not caught: ${what}`); }
   return { cases:n, total:d.length, differences:d };
 }
-/* CMD1a: canonical JSON (src/core/canon.js) — equal values give equal text whatever the key order or object identity; −0 = 0; a number
+/* CMD1a: canonical JSON (core/pure/canon.js) — equal values give equal text whatever the key order or object identity; −0 = 0; a number
    is written exactly; arrays keep their order; undefined is dropped. CONTROLS: a changed number, a changed array order and a changed key
    must each give another hash. */
 async function canonCore(){
-  const d=[]; let n=0; const C=await import(new URL('../src/core/canon.js', import.meta.url).href);
+  const d=[]; let n=0; const C=await import(new URL('../core/pure/canon.js', import.meta.url).href);
   const eq=(what,a,b)=>{ n++; if(a!==b) d.push(`${what}: ${a} vs ${b}`); }, ne=(what,a,b)=>{ n++; if(a===b) d.push(`CONTROL: ${what} gave the same text ${a}`); };
   const A={ b:[1,2,{ y:0.1, x:-0 }], a:'s', u:undefined, n:null }, B={ n:null, a:'s', b:[1,2,{ x:0, y:0.1 }] };
   eq('key order and −0 do not matter', C.canonJSON(A), C.canonJSON(B));
@@ -368,13 +368,13 @@ async function canonCore(){
   ne('a changed key', C.canonHash({ a:1 }), C.canonHash({ b:1 }));
   return { cases:n, total:d.length, differences:d };
 }
-/* AUD1c + AUD2a / review R2: the timbre data and the effect declarations moved into the shared engine submodules (src/modules/, src/engine/) are PURE DATA — numbers, strings,
+/* AUD1c + AUD2a / review R2: the timbre data and the effect declarations moved into the shared engine submodules (core/modules/, core/engine/) are PURE DATA — numbers, strings,
    booleans, plain arrays and objects (no node, buffer, port or function), deep-frozen (a write would throw in BOTH engine copies, which
    share these modules). The modules load in node: nothing at their top level touches Web Audio (rule #38). CONTROLS: a table holding a
    function and an unfrozen table must both be caught. */
 async function timbreData(){
   const d=[]; let n=0;
-  const imp=f=>import(new URL('../src/modules/timbres/'+f, import.meta.url).href);
+  const imp=f=>import(new URL('../core/modules/timbres/'+f, import.meta.url).href);
   const pure=(x,path,out)=>{ if(x===null || ['number','string','boolean'].includes(typeof x)) return;
     if(typeof x!=='object'){ out.push(`${path}: a ${typeof x}`); return; }
     const pr=Object.getPrototypeOf(x); if(pr!==Object.prototype && pr!==Array.prototype){ out.push(`${path}: a ${x.constructor && x.constructor.name}`); return; }
@@ -383,8 +383,8 @@ async function timbreData(){
   const M={}; for(const f of ['stages.js','voice.js','fm.js','ks.js','subtractive.js','chord-voice.js','bass-voice.js','drumkits.js']){ n++;
     try{ M[f]=await imp(f); }catch(e){ d.push(`${f} does not load in node (a top-level Web Audio use?): ${e && e.message}`); } }
   for(const f of ['param.js','reverb.js','delay.js','trem-mix.js','bright.js','glide.js','volume.js','forest.js','glue.js']){ n++;   // AUD2a: the effects
-    try{ M['fx/'+f]=await import(new URL('../src/modules/effects/'+f, import.meta.url).href); }catch(e){ d.push(`effects/${f} does not load in node: ${e && e.message}`); } }
-  n++; try{ M['fdn']=await import(new URL('../src/engine/fdn.js', import.meta.url).href); }catch(e){ d.push(`engine/fdn.js does not load in node: ${e && e.message}`); }
+    try{ M['fx/'+f]=await import(new URL('../core/modules/effects/'+f, import.meta.url).href); }catch(e){ d.push(`effects/${f} does not load in node: ${e && e.message}`); } }
+  n++; try{ M['fdn']=await import(new URL('../core/engine/fdn.js', import.meta.url).href); }catch(e){ d.push(`engine/fdn.js does not load in node: ${e && e.message}`); }
   for(const [f,name] of [['chord-voice.js','FIREFLY'],['stages.js','BRI_HZ'],['fdn','REV_A'],['fx/reverb.js','REV_PARAMS'],['fx/delay.js','DLY_A'],
       ['fx/delay.js','DLY_PARAMS'],['fx/trem-mix.js','TRMIX_A'],['fx/trem-mix.js','TRMIX_PARAMS'],['fx/bright.js','BRIGHT_PARAMS'],['fx/glide.js','GLIDE_PARAMS'],
       ['fx/volume.js','VOL_PARAMS'],['fx/forest.js','FOREST_PARAMS'],['fx/glue.js','GLUE_PARAMS']]){ n++; const v=M[f] && M[f][name];
@@ -393,7 +393,7 @@ async function timbreData(){
   { n++; const out=[]; pure([{ a:1 }],'ctl2',out); if(!out.length) d.push('CONTROL: an unfrozen table was not caught'); }
   return { cases:n, total:d.length, differences:d };
 }
-/* PACK1: packs and offline licence keys (src/core/pack.js) — node's WebCrypto, no network. The SHIPPED test public key verifies the committed
+/* PACK1: packs and offline licence keys (core/pure/pack.js) — node's WebCrypto, no network. The SHIPPED test public key verifies the committed
    fixture keys (tools/pack-test-licence.json, signed by the git-ignored test private key); a fresh key pair made here signs the tamper cases:
    a changed payload, a changed signature, an unknown key id, a newer key format, an expired key, a key for another pack — each refused in
    words; malformed texts refused; the gate keeps a pack's records out of a registry's order until the pack is unlocked; a free pack opens
@@ -403,9 +403,9 @@ async function timbreData(){
    the field (CONTROLS); the tine's partial bounds; a record whose policies differ from its family's today is caught by the browser row */
 async function timbreCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const T=await import(new URL('../src/core/timbre.js', import.meta.url).href), B=await import(new URL('./timbre-bundle.mjs', import.meta.url).href);
+  const T=await import(new URL('../core/pure/timbre.js', import.meta.url).href), B=await import(new URL('./timbre-bundle.mjs', import.meta.url).href);
   const b=await B.buildBundle(); n++; if(b.problems.length) miss('files: '+b.problems.slice(0,3).join(' · '));
-  let disk=''; try{ disk=await readFile(new URL('../data/timbres.bundle.json', import.meta.url),'utf8'); }catch(e){}
+  let disk=''; try{ disk=await readFile(new URL('../core/data/timbres.bundle.json', import.meta.url),'utf8'); }catch(e){}
   n++; if(disk.split(String.fromCharCode(13)).join('')!==b.text) miss('data/timbres.bundle.json is not what the files give — run node tools/timbre-bundle.mjs');
   const recs=JSON.parse(b.text).records;
   for(const r of recs){ n++; const why=T.checkTimbre(r); if(why) miss(`${r.id}: ${why}`); }
@@ -447,8 +447,8 @@ async function timbreCore(){
    list; Full offers everything and narrows nothing; CONTROLS: each damage of PROFILE_DAMAGES refused with a line naming its field */
 async function profileCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const P=await import(new URL('../src/core/profile.js', import.meta.url).href);
-  const rd=async f=>JSON.parse(await readFile(new URL('../data/'+f, import.meta.url),'utf8'));
+  const P=await import(new URL('../core/pure/profile.js', import.meta.url).href);
+  const rd=async f=>JSON.parse(await readFile(new URL('../core/data/'+f, import.meta.url),'utf8'));
   const ix=await rd('index.json'), tix=await rd('timbres/index.json');
   const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm','fdepth','cecho','ctone','cwave'] };   // RUN 7: + Calm's own effects
   const pix=await rd('profiles/index.json'), recs=[];
@@ -470,7 +470,7 @@ async function profileCore(){
    the overflow case) */
 async function busCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
-  const B=await import(new URL('../src/core/bus.js', import.meta.url).href), bus=B.createBus({ ring:4 });
+  const B=await import(new URL('../core/pure/bus.js', import.meta.url).href), bus=B.createBus({ ring:4 });
   eq('unset state', [bus.get('hands'), bus.version('hands')], [undefined, 0]);
   bus.set('hands', { a:1 }); bus.set('hands', { a:2 });
   eq('state latest + version', [bus.get('hands'), bus.version('hands')], [{ a:2 }, 2]);
@@ -497,7 +497,7 @@ async function busCore(){
    The loudness itself is the browser row «CALM depth loudness». */
 async function calmDepthCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const D=await import(new URL('../src/core/dsp.js', import.meta.url).href), f=D.calmDepth, FLOOR=Math.pow(10,-1.5/20);
+  const D=await import(new URL('../core/pure/dsp.js', import.meta.url).href), f=D.calmDepth, FLOOR=Math.pow(10,-1.5/20);
   for(let k=0;k<=20;k++){ const c=f(k/20); n++; if(!(c.dry>=FLOOR)) miss(`d = ${k/20}: dry ${c.dry} (≥ ${FLOOR.toFixed(4)} expected)`); }
   n+=2; if(!(f(1).send>=3*f(0).send)) miss(`the forest grows too little: send ${f(0).send} → ${f(1).send}`);
   if(JSON.stringify([f(-1), f(2)])!==JSON.stringify([f(0), f(1)])) miss('not clamped outside 0…1');
@@ -510,7 +510,7 @@ async function calmDepthCore(){
    is seeded too (repeatable, another seed differs) */
 async function calmCricketsCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const A=await import(new URL('../src/core/ambience.js', import.meta.url).href), C=A.AMB.crickets;
+  const A=await import(new URL('../core/pure/ambience.js', import.meta.url).href), C=A.AMB.crickets;
   const take=(seed,k,m)=>{ const s=A.cricketStream(seed,k), out=[s.freq]; for(let i=0;i<m;i++) out.push(s.next()); return out; };
   for(let k=0;k<C.n;k++){ const a=take(C.seed,k,200), b=take(C.seed,k,200); n++; if(JSON.stringify(a)!==JSON.stringify(b)) miss('cricket '+k+': the same seed gave other chirps');
     n++; if(!(a[0]>=C.fLo && a[0]<=C.fHi)) miss('cricket '+k+': pitch '+a[0]);
@@ -527,7 +527,7 @@ async function calmCricketsCore(){
 }
 async function calmShellCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(what+': '+JSON.stringify(a)+' vs '+JSON.stringify(b)); };
-  const C=await import(new URL('../src/core/calmui.js', import.meta.url).href), U=C.CALM_UI;
+  const C=await import(new URL('../core/pure/calmui.js', import.meta.url).href), U=C.CALM_UI;
   let st=C.showStep(null, 0, 0); eq('no hand yet → shown', st.shown, true);
   st=C.showStep(st, 1, 1000); eq('a hand → hidden', st.shown, false);
   st=C.showStep(st, 0, 1000+U.idleMs-1); eq('gone 1.499 s → still hidden', st.shown, false);
@@ -551,7 +551,7 @@ async function calmShellCore(){
    positions after 900 steps (15 s, exact, twice); a light gathers them (flies within 2.5 of it after 15 s; CONTROL: with the light off far fewer are — a pull that does nothing is caught); the depth bands: d 0 → near, 1 → far, monotonic, flat in a band */
 async function fliesCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const F=await import(new URL('../src/core/fireflies.js', import.meta.url).href);
+  const F=await import(new URL('../core/pure/fireflies.js', import.meta.url).href);
   const h=A=>{ let x=0x811c9dc5; for(const f of A) for(const v of [...f.p, ...f.v, f.glow]){ x^=Math.round(v*1e9)|0; x=Math.imul(x,0x01000193); } return (x>>>0).toString(16); };
   const run=(light)=>{ const A=F.fliesInit(); for(let i=0;i<900;i++) F.fliesStep(A, [{ x:0, y:1.6, z:-3, on:light?1:0 }], 1/60, i/60); return A; };
   n++; if(h(F.fliesInit())!==h(F.fliesInit())) miss('two inits from one seed differ');
@@ -571,7 +571,7 @@ async function fliesCore(){
    layers move each its own way; the sleep's depth (exact ends, monotone); every Calm mood has a look whose tokens exist in tokens.css */
 async function nightCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const N=await import(new URL('../src/core/night.js', import.meta.url).href), P=N.NIGHT.period;
+  const N=await import(new URL('../core/pure/night.js', import.meta.url).href), P=N.NIGHT.period;
   const flat=o=>[o.phase%1, ...o.moon, o.cover, o.moonLight, ...o.mist, ...o.rise, ...o.clouds.flatMap(c=>[c.u, c.dens, c.y])];
   const diff=(a,b)=>Math.max(...a.map((v,i)=>Math.abs(v-b[i])));
   let worst=0; for(let i=0;i<240;i++){ const t=i*P/240+0.37; worst=Math.max(worst, diff(flat(N.nightAt(t)).slice(1), flat(N.nightAt(t+P)).slice(1)), diff(flat(N.nightAt(t)).slice(1), flat(N.nightAt(t+3*P)).slice(1))); }
@@ -594,7 +594,7 @@ async function nightCore(){
   if(Math.abs(D1.light-0.45)>1e-12||Math.abs(D1.flies-0.4)>1e-12||Math.abs(D1.motion-0.5)>1e-12||Math.abs(D1.mist-1.5)>1e-12) miss('sleep 1: '+JSON.stringify(D1));
   let mono=true, pl=2; for(let i=0;i<=50;i++){ const v=N.nightDeep(i/50).light; if(v>pl+1e-12) mono=false; pl=v; } n++; if(!mono) miss("the sleep depth is not monotone");
   n+=3; if(N.sleepProgress(0,0,5e5)!==0) miss('no timer: progress ≠ 0'); if(N.sleepProgress(0,10,3e5)!==0.5) miss('half of a 10-min timer ≠ 0.5'); if(N.sleepProgress(0,10,9e5)!==1) miss('past the end ≠ 1');
-  const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../data/profiles/calm.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../tokens.css', import.meta.url),'utf8');
+  const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../core/data/profiles/calm.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../tokens.css', import.meta.url),'utf8');
   for(const m of prof.moods){ n++; if(!N.MOOD_OF[m]) miss('the Calm mood '+m+' has no look'); }
   for(const [k,L2] of Object.entries(N.MOOD_LOOKS)) for(const tn of Object.values(L2.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(tok)) miss(`look ${k}: no token --cv-${tn} in tokens.css`); }
   n++; if(N.moodLook('no-such-mood')!==N.MOOD_LOOKS.glow) miss('CONTROL: an unknown mood does not fall back to Glow');
@@ -607,7 +607,7 @@ async function nightCore(){
    (their mean distance grows vs a light that keeps them) — CONTROL a light without call / scatter is exactly the old step */
 async function lifeCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const Li=await import(new URL('../src/core/forestlife.js', import.meta.url).href), Fl=await import(new URL('../src/core/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
+  const Li=await import(new URL('../core/pure/forestlife.js', import.meta.url).href), Fl=await import(new URL('../core/pure/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
   n++; if(L.length!==S.seg+1) miss('stream line has '+L.length+' points');
   let gap=0; for(let i=1;i<L.length;i++) gap=Math.max(gap, Math.hypot(L[i].x-L[i-1].x, L[i].z-L[i-1].z)); n++; if(gap>0.5) miss('stream line step '+gap.toFixed(3));
   n+=2; if(Math.hypot(L[0].x-S.pts[0][0], L[0].z-S.pts[0][1])>1e-9 || Math.hypot(L[L.length-1].x-S.pts[S.pts.length-1][0], L[L.length-1].z-S.pts[S.pts.length-1][1])>1e-9) miss('stream ends are not its first / last points');
@@ -641,7 +641,7 @@ async function lifeCore(){
    one highest, symmetric) */
 async function rareCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const N=await import(new URL('../src/core/night.js', import.meta.url).href), K=N.RARE, H=8*3600;
+  const N=await import(new URL('../core/pure/night.js', import.meta.url).href), K=N.RARE, H=8*3600;
   const sim=(opt={}, plays=true)=>{ const st=N.rareInit(K.seed, 0, opt), ev=[], Rp=(()=>{ let a=12345; return ()=>{ a=(Math.imul(a,1103515245)+12345)>>>0; return a/4294967296; }; })(); let hs=-1, he=-1;
     for(let t=0;t<=H;t++){ if(plays && t>he+30 && Rp()<0.012){ hs=t; he=t+3+Math.floor(Rp()*5); } const held= t>=hs && t<he ? t-hs : 0; const k=N.rareStep(st, t, held); if(k) ev.push({ k, t, held }); }
     return ev; };
@@ -661,7 +661,7 @@ async function rareCore(){
    'low'; a rate from too short a window must be null (never a guess) */
 async function engCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
-  const K=await import(new URL('../src/core/engclass.js', import.meta.url).href), T=K.ENG_THRESH;
+  const K=await import(new URL('../core/pure/engclass.js', import.meta.url).href), T=K.ENG_THRESH;
   eq('no benchmark → unknown', K.engClass({}).cls, 'unknown');
   eq('fast audio, fast detection → high', K.engClass({ factor:0.5, detectMs:20 }).cls, 'high');
   eq('fast audio, no detection yet → high', K.engClass({ factor:0.5 }).cls, 'high');
@@ -684,7 +684,7 @@ async function engCore(){
 }
 async function packCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(`${what}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
-  const K=await import(new URL('../src/core/pack.js', import.meta.url).href), REG=await import(new URL('../src/core/registry.js', import.meta.url).href);
+  const K=await import(new URL('../core/pure/pack.js', import.meta.url).href), REG=await import(new URL('../core/pure/registry.js', import.meta.url).href);
   const F=JSON.parse(await readFile(new URL('./pack-test-licence.json', import.meta.url),'utf8')), today='2026-10-16';
   eq('the fixture pack passes the check', K.packCheck(F.pack), []);
   eq('a newer pack version is refused in words', K.packCheck({ ...F.pack, version:2 }).some(x=>/newer Handsong/.test(x)), true);
@@ -728,21 +728,21 @@ async function packCore(){
 }
 let REG;
 try{
-  P=await import(new URL('../src/probedata.js', import.meta.url).href);
-  await import(new URL('../src/probes/data.js', import.meta.url).href);   // PROBE1: the data rows register themselves (flag node)
-  REG=await import(new URL('../src/probes/rows.js', import.meta.url).href);
-  ({ loadReport }=await import(new URL('../src/scaleload.js', import.meta.url).href));
+  P=await import(new URL('../core/probedata.js', import.meta.url).href);
+  await import(new URL('../core/probes/data.js', import.meta.url).href);   // PROBE1: the data rows register themselves (flag node)
+  REG=await import(new URL('../core/probes/rows.js', import.meta.url).href);
+  ({ loadReport }=await import(new URL('../core/scaleload.js', import.meta.url).href));
   LIC=await import(new URL('./check-licences.mjs', import.meta.url).href);   // LIC1: the licence register (text only, no app code)
   NIX=await import(new URL('./name-index.mjs', import.meta.url).href);   // DOC1 leftover: docs/NAME-INDEX.md generated from the code (text only)
-  LAT=await import(new URL('../src/core/latency.js', import.meta.url).href);
-  HS=await import(new URL('../src/core/handsched.js', import.meta.url).href);   // LAT2: the search schedule (pure core)
-  CL=await import(new URL('../src/core/camlight.js', import.meta.url).href);    // LAT3: low light (pure core)
-  GF=await import(new URL('../src/gestures/features.js', import.meta.url).href);   // GES1: the pure gesture math
-  CFG=await import(new URL('../src/config.js', import.meta.url).href);
-  FMT=await import(new URL('../src/core/format.js', import.meta.url).href);    // FMT1: the file-format core
-  IDR=await import(new URL('../src/core/registry.js', import.meta.url).href);  // FMT1: permanent ids and the registry
-  SONGF=await import(new URL('../src/core/songfile.js', import.meta.url).href);   // SAVE1: the song file's pure core
-  DSP=await import(new URL('../src/core/dsp.js', import.meta.url).href);   // SND-F1: the pure DSP core (Night forest IR, dynamics curve)   // LAT1: the pure core (no DOM, no Web Audio — runs in node)
+  LAT=await import(new URL('../core/pure/latency.js', import.meta.url).href);
+  HS=await import(new URL('../core/pure/handsched.js', import.meta.url).href);   // LAT2: the search schedule (pure core)
+  CL=await import(new URL('../core/pure/camlight.js', import.meta.url).href);    // LAT3: low light (pure core)
+  GF=await import(new URL('../core/gestures/features.js', import.meta.url).href);   // GES1: the pure gesture math
+  CFG=await import(new URL('../core/config.js', import.meta.url).href);
+  FMT=await import(new URL('../core/pure/format.js', import.meta.url).href);    // FMT1: the file-format core
+  IDR=await import(new URL('../core/pure/registry.js', import.meta.url).href);  // FMT1: permanent ids and the registry
+  SONGF=await import(new URL('../core/pure/songfile.js', import.meta.url).href);   // SAVE1: the song file's pure core
+  DSP=await import(new URL('../core/pure/dsp.js', import.meta.url).href);   // SND-F1: the pure DSP core (Night forest IR, dynamics curve)   // LAT1: the pure core (no DOM, no Web Audio — runs in node)
 }catch(e){ out('[probe-data] ERROR loading the data modules: '+String(e&&e.stack||e)); verdict(false,'the data modules did not load'); process.exit(1); }
 const loadMs=Math.round(performance.now()-T00);
 

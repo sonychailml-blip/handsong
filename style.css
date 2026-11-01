@@ -300,7 +300,7 @@
 
   /* ---- СПИСОК УРОКОВ (меню обучения) ---- Модальный оверлей: открыт со стартовой карточки И из урока
      (возврат к списку). z 33: выше старта (30) и панелей — это модал. Светлая карточка = меню. Строки
-     рисует src/tutor.js. Ряд без шагов — «Скоро» (disabled); выполненный — тихая галочка (не гейт). */
+     рисует core/tutor.js. Ряд без шагов — «Скоро» (disabled); выполненный — тихая галочка (не гейт). */
   #lessonOv{z-index:var(--z-lesson); background:var(--c-bg-a86);}
   #lessonOv.on{display:flex; align-items:center; justify-content:center;}
   .lessonCard{width:100%; max-width:420px; margin:auto; background:var(--c-white); color:var(--c-deep-16);

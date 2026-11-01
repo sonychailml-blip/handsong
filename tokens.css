@@ -179,7 +179,7 @@
 /* ═══ CANVAS (DRAW1b, RUN 3 2026-10-16) — the play field, the track strip, the arrangement window, the mixer and the editor draw every
    colour through palette.cv('<name>') = the value of --cv-<name> (exact text of the literal it replaced, so the canvas parses the same
    colour — tools/ui-snap.mjs proves the pixels identical). Names: family + alpha as above (--cv-white-a55 = white at .55). ⛳ A new canvas
-   colour is a token here first (static check 11 fails on a colour literal in src/views/ or config.js, and on a cv() name with no token). */
+   colour is a token here first (static check 11 fails on a colour literal in core/legacy-ui/views/ or config.js, and on a cv() name with no token). */
 :root{
   /* ROLE PALETTE (AR2; once config.INSTR_COL): the four roles differ by LIGHTNESS, not only hue (colour-blind safe) — a ladder with an
      equal ≈1.45× luminance step: bass #20946b (Y 0.225, L* 54.6) · chords #b18cff (0.353, 66.0) · solo #ffb050 (0.529, 77.8) · drums

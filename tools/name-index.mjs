@@ -2,7 +2,7 @@
      node tools/name-index.mjs           check: the file equals the generated text (exit 0 / 1)
      node tools/name-index.mjs --write   regenerate docs/NAME-INDEX.md
    Also run by tools/probe-data.mjs as the row «NAME-INDEX current» (with a CONTROL: one added export must change the text).
-   Per module under src/ (path order): the first sentence of its head comment and every exported name with its kind (fn, const, let, class,
+   Per module under core/ (path order): the first sentence of its head comment and every exported name with its kind (fn, const, let, class,
    re-export «→ from»). The hand-kept list of removed names lives in docs/STALE-NAMES.md and is copied in at the end. The hand-written index
    as it stood before this tool: archive/NAME-INDEX-before-RUN5.md (moved word for word). */
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
@@ -14,7 +14,7 @@ const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT='docs/NAME-INDEX.md', STALE='docs/STALE-NAMES.md';
 const listJs=(d)=>readdirSync(join(ROOT,d),{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listJs(d+'/'+e.name) : e.name.endsWith('.js') ? [d+'/'+e.name] : []);
 export function gather(){
-  const texts={}; for(const f of listJs('src').sort()) texts[f]=readFileSync(join(ROOT,f),'utf8');
+  const texts={}; for(const f of listJs('core').sort()) texts[f]=readFileSync(join(ROOT,f),'utf8');
   return { texts, stale: existsSync(join(ROOT,STALE)) ? readFileSync(join(ROOT,STALE),'utf8') : '' };
 }
 /* the first sentence of the file's head comment (block or line comments before the first code), one line, at most 200 characters */
@@ -49,7 +49,7 @@ function exportsOf(src){
 }
 export function build(inp){
   const L=['# NAME INDEX — code names by module (GENERATED — do not edit by hand)','',
-    '_Generated from `src/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.',
+    '_Generated from `core/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.',
     'Kinds: fn, const, let, class, «→ ./x.js» a re-export. Meaning of a name: the code and `archive/CLAUDE-history.md`. The hand-written index',
     'before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of this file (kept by hand in `docs/STALE-NAMES.md`)._',''];
   let nMod=0, nName=0;

@@ -2,10 +2,10 @@
    copy's method) renders a candidate timbre offline in a Calm mood — a short PHRASE or SINGLE notes (struck / sustained) — through the Night
    forest or DRY (the A/B). Dev tool, never shipped. Used by tools/listen/calm-timbres.html and by the runner's checks (tools/listen/
    check-listen.js, measure.js via --eval). */
-import * as E from '../../src/audio.js?listen';               // a separate engine instance (like the render copy audio.js?render)
-import { scaleById, scaleView, leadFreq } from '../../src/scales.js';
-import { chainOwners, chainKeyOf } from '../../src/state.js';
-import { FOREST } from '../../src/core/dsp.js';
+import * as E from '../../core/audio.js?listen';               // a separate engine instance (like the render copy audio.js?render)
+import { scaleById, scaleView, leadFreq } from '../../core/scales.js';
+import { chainOwners, chainKeyOf } from '../../core/state.js';
+import { FOREST } from '../../core/pure/dsp.js';
 
 const RATE=48000, SEED=0x5eed;
 export const MOODS=[['major-penta','Glow'],['minor-penta','Dusk'],['egyptian','Mist']];

@@ -7,12 +7,14 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
   `profile.calm` → `profile.night`). Q9: production = `main` for both projects; `dev` pushes give previews. Other §10.2 questions: the plan's recommendation.
 - Addition 1: on-device measurement must work on Vercel PREVIEW builds of both apps (`?probe` kept on previews, or a measurement page).
 - Addition 2: six checkpoints, below. A failed check = stop and report; never pass a check by changing behaviour.
+- User, after CP A: the three limits below are accepted. Full suite at B, C, E. Light set at D and F: static, path smoke test (at D also on the built `dist/` of both apps), check-licences.
+- User, after CP A: at C and at E save before/after PNGs side by side into `tools/split-baseline/` for calm-ghost, calm-dark, calm-forest, calm-forest-land (eye check).
 
 ## Checkpoints mapped to plan steps
 | CP | Content | Plan steps | Status |
 |---|---|---|---|
-| A | baseline, guards, smoke, paths made location-independent (no moves) | 0, 12 (moved up: required at every checkpoint), 1 | ✅ checks pass — WAITING for the user's «committed» |
-| B | core moves: `src/ → core/`, `core/pure`, `core/legacy-ui` | 5, 6, 7 | |
+| A | baseline, guards, smoke, paths made location-independent (no moves) | 0, 12 (moved up: required at every checkpoint), 1 | ✅ committed |
+| B | core moves: `src/ → core/`, `core/pure`, `core/legacy-ui` | 5, 6, 7 | ✅ checks pass — WAITING for the user's «committed» |
 | C | door inversion, entries, switch removal, app moves, root redirect, probes to tools | 2, 3, 4, 8, 9, 10 | |
 | D | `tools/build.mjs`, `vercel.json`, preview measurement | 11 + addition 1 | |
 | E | rename Calm → Night | 13 | |
@@ -20,6 +22,7 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
 
 ## Log
 - CP A 2026-11-01: all checks pass (`node tools/split-check.mjs --tag A`; ui-night re-compared after --noisy).
+- CP B 2026-11-01: moved by `node tools/split-move.mjs B` (334 files, 185 specifiers). Full run: only ui-night failed (8 differences). Cause measured: two races in the capture (hint timer 9 s; hands before the resize), fixed in `tools/ui-snap.mjs` only; then IDENTICAL to the untouched baseline 3 of 3 (appended to `result-B.txt`). `CLAUDE.md`, `HANDOFF.md` and other docs still say `src/` until CP F: read `src/x` as the map in `tools/split-move.mjs` says.
 
 ## How to resume
 - Baselines are on this disk, git-ignored: `tools/split-baseline/` (base-full.json, base-night.json, prints.sha256.json), `tools/.ui-snap/split-base-*`. Never re-record them after CP A: they are the proof.

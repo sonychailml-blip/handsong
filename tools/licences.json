@@ -33,7 +33,7 @@
    "urls": [
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35"
    ],
-   "notes": "Hand detection in the browser (src/handdet.js — on the main thread or in our worker src/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline)."
+   "notes": "Hand detection in the browser (core/handdet.js — on the main thread or in our worker core/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline)."
   },
   {
    "id": "mediapipe-hand-landmarker",
@@ -60,7 +60,7 @@
     "/_vercel/insights/script.js"
    ],
    "decision": "Q14 (user, 2026-10-14): keep it and name it in the privacy notice. Cookieless page views only; never sees camera, sound or hand data. Inactive on GitHub Pages (the path does not resolve there). Vercel Hobby forbids commercial use — a paid plan or other hosting before selling (BACKLOG strategy).",
-   "notes": "Script served by Vercel from the same origin; the one-line stub that queues calls before it loads is our own code (src/va-stub.js, outside index.html so the CSP needs no inline script)."
+   "notes": "Script served by Vercel from the same origin; the one-line stub that queues calls before it loads is our own code (core/va-stub.js, outside index.html so the CSP needs no inline script)."
   },
   {
    "id": "link-feedback-form",
@@ -69,7 +69,7 @@
    "use": "link",
    "version": "—",
    "licence": "n/a",
-   "source": "src/ui.js FEEDBACK_URL",
+   "source": "core/legacy-ui/ui.js FEEDBACK_URL",
    "urls": [
     "https://docs.google.com/forms/"
    ],
@@ -82,7 +82,7 @@
    "use": "link",
    "version": "—",
    "licence": "n/a",
-   "source": "src/ui.js DONATE_URL",
+   "source": "core/legacy-ui/ui.js DONATE_URL",
    "urls": [
     "https://paypal.me/"
    ],
@@ -122,7 +122,7 @@
    "use": "device",
    "version": "—",
    "licence": "n/a",
-   "source": "style.css --font: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; src/draw.js ctx.font system-ui",
+   "source": "style.css --font: system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif; core/legacy-ui/draw.js ctx.font system-ui",
    "notes": "No font file is shipped; the person's device draws the text with its own fonts.",
    "replace": "to be replaced by the user's own authored design (a chosen typeface under OFL-1.1 or own work, set through the UI1 design tokens)"
   },
@@ -162,7 +162,7 @@
     "vendor/three-r128/three.min.js",
     "vendor/three-r128/LICENSE"
    ],
-   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by src/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change."
+   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change."
   },
   {
    "id": "google-fonts-reference",
@@ -222,7 +222,7 @@
    "urls": [
     "http://www.w3.org/2000/svg"
    ],
-   "notes": "RUN 7 (C11): src/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name."
+   "notes": "RUN 7 (C11): core/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name."
   }
  ],
  "glyphs": [

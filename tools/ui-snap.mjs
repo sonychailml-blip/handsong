@@ -70,16 +70,16 @@ const barOpen=async p=>{ for(let k=0;k<5;k++){ await reveal(p); if(await p.evalu
 const SCREENS=[
   ['start',     async p=>{}],
   ['play-min',  async p=>{ await p.click('#startBtn'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                   await p.evaluate(async ()=>{ const Q=await import('/src/frzqueue.js'); Q.afPause('runner', true); }); await p.mouse.move(5,790); await p.waitForTimeout(5000); }],
+                   await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); }); await p.mouse.move(5,790); await p.waitForTimeout(5000); }],
   ['play-bar',  async p=>{ await p.mouse.move(640,400); await p.mouse.move(660,420); await p.waitForTimeout(400); }],
   ['scale',     async p=>{ await reveal(p); await p.click('#scaleBtn'); await p.waitForTimeout(400); }],
   ['sound',     async p=>{ await p.click('#panelClose'); await reveal(p); await p.click('#soundBtn'); await p.waitForTimeout(400); }],
   ['loop',      async p=>{ await p.click('#panelCloseSound'); await reveal(p); await p.click('#loopPanelBtn'); await p.waitForTimeout(400); }],
   ['strip',     async p=>{ await p.click('#panelCloseLoop'); await p.evaluate(async ()=>{ await P.seed({ replace:true }); });
-                   await p.evaluate(async ()=>{ const Q=await import('/src/frzqueue.js'); Q.afPause('runner', true); }); await p.mouse.move(640,400); await p.mouse.move(660,420); await p.waitForTimeout(600);  await barOpen(p); }],
-  ['arr',       async p=>{ await barOpen(p); await p.evaluate(async ()=>{ const UI=await import('/src/ui.js'); UI.arrApi.open(); }); await p.waitForTimeout(600); }],
+                   await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); }); await p.mouse.move(640,400); await p.mouse.move(660,420); await p.waitForTimeout(600);  await barOpen(p); }],
+  ['arr',       async p=>{ await barOpen(p); await p.evaluate(async ()=>{ const UI=await import('/core/legacy-ui/ui.js'); UI.arrApi.open(); }); await p.waitForTimeout(600); }],
   ['mix',       async p=>{ await p.click('#arrFace'); await p.waitForTimeout(600); }],
-  ['roll',      async p=>{ await p.click('#arrFace'); await p.evaluate(async ()=>{ const UI=await import('/src/ui.js'); UI.arrApi.openTrack(0); }); await p.waitForTimeout(800); }],
+  ['roll',      async p=>{ await p.click('#arrFace'); await p.evaluate(async ()=>{ const UI=await import('/core/legacy-ui/ui.js'); UI.arrApi.openTrack(0); }); await p.waitForTimeout(800); }],
 ];
 /* RUN 7: the CALM screens — a phone in portrait (390 × 844), then landscape (844 × 390); Dark background (no WebGL: deterministic pixels),
    then the Camera background (the glass over a picture); the ⓘ card; the same in Russian. The shell shows
@@ -89,23 +89,23 @@ const SCREENS_CALM=[
   ['calm-start',     async p=>{}],
   ['calm-ghost',     async p=>{ await p.click('#calmBegin');   // C7: Begin (the first run: the ghost light plays four notes)
                        await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/src/frzqueue.js'); Q.afPause('runner', true); const b=document.getElementById('calmBg'); let k=0; while(!/Dark|Тём/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(5500); }],
-  ['calm-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/src/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const b=document.getElementById('calmBg'); let k=0; while(!/Dark|Тём/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(5500); }],
+  ['calm-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/core/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
   ['calm-info',      async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
   ['calm-land',      async p=>{ await p.click('#calmInfoClose'); await p.setViewportSize({ width:844, height:390 }); await calmWait(p); }],
   ['calm-land-info', async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
   ['calm-camera',    async p=>{ await p.click('#calmInfoClose'); await p.setViewportSize({ width:390, height:844 });   // the glass over a picture (headless screenshots do not show the WebGL forest)
                        await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Camera|Камер/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
-  ['calm-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('/src/i18n.js'); I.setLang('ru'); const b=document.getElementById('calmBg'); let k=0; while(!/Тём/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
+  ['calm-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); I.setLang('ru'); const b=document.getElementById('calmBg'); let k=0; while(!/Тём/.test(b.textContent) && k++<4) b.click(); }); await calmWait(p); }],
   ['calm-ru-info',   async p=>{ await p.click('#calmInfoBtn'); await p.waitForTimeout(500); }],
   /* RUN 8 (addendum 3): the low-light message with «Raise a hand» (Russian: the longer lines) — portrait and landscape; every visible message
      at the top must stand clear of the others (printed; a touch counts in the run's result) */
-  ['calm-msg-ru',    async p=>{ await p.click('#calmInfoClose'); await p.evaluate(async ()=>{ const M=await import('/src/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); }); await calmWait(p); await msgCheck(p,'calm-msg-ru'); }],
-  ['calm-msg-land',  async p=>{ await p.setViewportSize({ width:844, height:390 }); await calmWait(p); await msgCheck(p,'calm-msg-land'); }],
+  ['calm-msg-ru',    async p=>{ await p.click('#calmInfoClose'); await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); }); await calmWait(p); await msgCheck(p,'calm-msg-ru'); }],
+  ['calm-msg-land',  async p=>{ await p.setViewportSize({ width:844, height:390 }); await calmWait(p); await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); });  /* SPLIT-2: a fresh HINT_MS (9 s): the capture itself takes about that long */ await msgCheck(p,'calm-msg-land'); }],
   /* RUN 8 (slice 3, addendum 1 and 5): playing — two synthetic hands through the probe's door (the playing right hand pinching its index, the
      effects hand its middle finger): the fingertip fireflies, the quiet glow on the row, the depth bar and the three effect bars */
-  ['calm-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('/src/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
-  ['calm-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await playHands(p); }],
+  ['calm-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
+  ['calm-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForFunction(()=>innerWidth===390 && document.querySelector('canvas').width===390); await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))); await playHands(p); }],  /* SPLIT-2: the hands read the canvas size and the per-frame cover rect: wait for the resize */
   /* RUN 8 (slice 4): the forest picture behind the playing hands (WebGL with screen-blended lights; the room renders at its own rate) */
   ['calm-forest',    async p=>{ await p.evaluate(()=>{ const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
   ['calm-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
@@ -113,30 +113,30 @@ const SCREENS_CALM=[
 /* RUN 9: THE FOREST'S SCREENS (--forest; headless Chrome renders the WebGL room) — Begin, the Forest background, the two hands playing; then
    moments of the night through the probe clock (host sceneClockDbg): the clear moon, a cloud over it, the moods, the deep-sleep night;
    portrait 390 × 844 and landscape 844 × 390. Each slice adds its screens here. */
-const forestAt=async (p, sec)=>{ await p.evaluate(async s=>{ const H=await import('/src/views/scene/host.js'); H.sceneClockDbg(s); }, sec); };
+const forestAt=async (p, sec)=>{ await p.evaluate(async s=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneClockDbg(s); }, sec); };
 const moodTo=async (p, re)=>{ await p.evaluate(src=>{ const b=document.getElementById('calmMood'), r=new RegExp(src); let k=0; while(!r.test(b.textContent) && k++<4) b.click(); }, re); };
 /* slice 2: notes through the room (its glint, as the bus does) — n notes every `every` ms; fx: [[effect id, parameter index, 0…1]] set first */
-const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])=>{ const H=await import('/src/views/scene/host.js'), A=await import('/src/audio.js'), S=await import('/src/state.js');
+const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])=>{ const H=await import('/core/legacy-ui/views/scene/host.js'), A=await import('/core/audio.js'), S=await import('/core/state.js');
   if(fx) for(const [id,i,v] of fx){ const I=A.fxInstance(S.chainKeyOf('ld'), id); if(I && I.params[i]) I.params[i].setNorm(v); }
   const R=H.sceneRoomDbg(); for(let k=0;k<n;k++){ if(R) R.glint(0, 0.85); await new Promise(r=>setTimeout(r, every)); } }, [n, every, fx||null]); };
 const SCREENS_FOREST=[
   ['f-start',        async p=>{ await p.click('#calmBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/src/frzqueue.js'); Q.afPause('runner', true); const G=await import('/src/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); });
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/core/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); const b=document.getElementById('calmBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); });
                        await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
   ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
   ['f-cloud',        async p=>{ await forestAt(p, 630); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
   ['f-dusk',         async p=>{ await forestAt(p, 60); await moodTo(p, 'Dusk|Сумер'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
   ['f-mist',         async p=>{ await moodTo(p, 'Mist|Туман'); await p.waitForTimeout(9000); await playHands(p); await p.waitForTimeout(900); }],
-  ['f-sleep',        async p=>{ await moodTo(p, 'Glow|Сияние'); await p.waitForTimeout(9000); await p.evaluate(async ()=>{ const S=await import('/src/calmshell.js'); S.calmSleepDbg(15, 800e3); }); await p.waitForTimeout(1200); await playHands(p); await p.waitForTimeout(900); }],
-  ['f-notes',        async p=>{ await p.evaluate(async ()=>{ const S=await import('/src/calmshell.js'); S.calmSleepDbg(0, 0); }); await forestAt(p, 60); await playHands(p); await roomNotes(p, 14, 450); await p.waitForTimeout(350); }],
+  ['f-sleep',        async p=>{ await moodTo(p, 'Glow|Сияние'); await p.waitForTimeout(9000); await p.evaluate(async ()=>{ const S=await import('/core/calmshell.js'); S.calmSleepDbg(15, 800e3); }); await p.waitForTimeout(1200); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-notes',        async p=>{ await p.evaluate(async ()=>{ const S=await import('/core/calmshell.js'); S.calmSleepDbg(0, 0); }); await forestAt(p, 60); await playHands(p); await roomNotes(p, 14, 450); await p.waitForTimeout(350); }],
   ['f-echo',         async p=>{ await roomNotes(p, 1, 900, [['cecho',0,0.85],['ctone',1,0.5]]); }],
   ['f-warm',         async p=>{ await roomNotes(p, 4, 500, [['cecho',0,0],['ctone',1,0.05]]); await p.waitForTimeout(200); }],
-  ['f-star',         async p=>{ await forestAt(p, 60); await p.waitForTimeout(300); await p.evaluate(async ()=>{ const H=await import('/src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('star'); }); await p.waitForTimeout(520); }],
-  ['f-bloom',        async p=>{ await p.evaluate(async ()=>{ const H=await import('/src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('bloom'); }); await p.waitForTimeout(3600); }],
-  ['f-emblem',       async p=>{ await p.evaluate(async ()=>{ const H=await import('/src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
-  ['f-land',         async p=>{ await p.evaluate(async ()=>{ const S=await import('/src/calmshell.js'); S.calmSleepDbg(0, 0); }); await p.setViewportSize({ width:844, height:390 }); await forestAt(p, 60); await p.waitForTimeout(1800); await playHands(p); await p.waitForTimeout(900); }],
+  ['f-star',         async p=>{ await forestAt(p, 60); await p.waitForTimeout(300); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('star'); }); await p.waitForTimeout(520); }],
+  ['f-bloom',        async p=>{ await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('bloom'); }); await p.waitForTimeout(3600); }],
+  ['f-emblem',       async p=>{ await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
+  ['f-land',         async p=>{ await p.evaluate(async ()=>{ const S=await import('/core/calmshell.js'); S.calmSleepDbg(0, 0); }); await p.setViewportSize({ width:844, height:390 }); await forestAt(p, 60); await p.waitForTimeout(1800); await playHands(p); await p.waitForTimeout(900); }],
   ['f-land-cloud',   async p=>{ await forestAt(p, 640); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
-  ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('/src/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
+  ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
   ['f-land-notes',   async p=>{ await forestAt(p, 60); await roomNotes(p, 10, 450, [['ctone',1,0.5]]); await roomNotes(p, 1, 700, [['cecho',0,0.85]]); }],
 ];
 /* the top messages: no two visible ones overlap */
@@ -150,7 +150,7 @@ async function msgCheck(p, name){
 }
 const msgHits=[];
 async function playHands(p, check=true){   // RUN 9: check=false — the first hands-in moment (the shell's 300-ms fade still runs)
-  await p.evaluate(async ()=>{ const G=await import('/src/gestures.js'), PO=await import('/src/gestures/pose.js'), V=await import('/src/vision.js');
+  await p.evaluate(async ()=>{ const G=await import('/core/gestures.js'), PO=await import('/core/gestures/pose.js'), V=await import('/core/vision.js');
     G.handsProbe(null); const clk={ t:5e6, W:V.canvas.width, H:V.canvas.height }; G.handsProbe(clk, ()=>true);
     for(let i=0;i<14;i++){ clk.t+=1000/30; const up=Math.min(1,i/10);
       G.processHandsProbe({ landmarks:[PO.pose({ x:0.72, y:0.52, s:0.22, gaps:[0.05,1,1,1] }), PO.pose({ x:0.26, y:0.55-0.18*up, s:0.2, gaps:[1,0.05,1,1] })], handednesses:[[{ categoryName:'Right' }],[{ categoryName:'Left' }]] }); } });

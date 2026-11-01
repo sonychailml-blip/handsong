@@ -17,9 +17,9 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 | MediaPipe hand landmarker model (float16, version 1) | float16/1 | Apache-2.0 | CDN | https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task | Google MediaPipe model card «Hand Tracking (Lite/Full)»; models listed at https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker |
 | three.js (3D library) — the Calm forest room | r128 (npm three@0.128.0) | MIT | shipped | vendor/three-r128/three.min.js<br>vendor/three-r128/LICENSE | https://github.com/mrdoob/three.js (npm three@0.128.0, build/three.min.js; sha256 9274bbce…1ce2) |
 
-- **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (src/handdet.js — on the main thread or in our worker src/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
+- **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (core/handdet.js — on the main thread or in our worker core/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
 - **MediaPipe hand landmarker model (float16, version 1)** — Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4).
-- **three.js (3D library) — the Calm forest room** — Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by src/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change.
+- **three.js (3D library) — the Calm forest room** — Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change.
 
 ## Hosted services
 
@@ -27,19 +27,19 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 |---|---|---|---|---|---|
 | Vercel Web Analytics — page-view counter of the Vercel deployment | hosted | service-terms | service | /_vercel/insights/script.js | https://vercel.com/docs/analytics |
 
-- **Vercel Web Analytics — page-view counter of the Vercel deployment** — decision: Q14 (user, 2026-10-14): keep it and name it in the privacy notice. Cookieless page views only; never sees camera, sound or hand data. Inactive on GitHub Pages (the path does not resolve there). Vercel Hobby forbids commercial use — a paid plan or other hosting before selling (BACKLOG strategy). · Script served by Vercel from the same origin; the one-line stub that queues calls before it loads is our own code (src/va-stub.js, outside index.html so the CSP needs no inline script).
+- **Vercel Web Analytics — page-view counter of the Vercel deployment** — decision: Q14 (user, 2026-10-14): keep it and name it in the privacy notice. Cookieless page views only; never sees camera, sound or hand data. Inactive on GitHub Pages (the path does not resolve there). Vercel Hobby forbids commercial use — a paid plan or other hosting before selling (BACKLOG strategy). · Script served by Vercel from the same origin; the one-line stub that queues calls before it loads is our own code (core/va-stub.js, outside index.html so the CSP needs no inline script).
 
 ## Links the person opens (nothing is sent by the app)
 
 | Item | Version | Licence | Use | Addresses / files | Source |
 |---|---|---|---|---|---|
-| Feedback form (Google Forms) — a link the person opens | — | n/a | link | https://docs.google.com/forms/ | src/ui.js FEEDBACK_URL |
-| Donation page (PayPal.Me) — a link the person opens | — | n/a | link | https://paypal.me/ | src/ui.js DONATE_URL |
+| Feedback form (Google Forms) — a link the person opens | — | n/a | link | https://docs.google.com/forms/ | core/legacy-ui/ui.js FEEDBACK_URL |
+| Donation page (PayPal.Me) — a link the person opens | — | n/a | link | https://paypal.me/ | core/legacy-ui/ui.js DONATE_URL |
 | The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent | — | n/a | link | http://www.w3.org/2000/svg | W3C SVG specification (a namespace name, not an address the app opens) |
 
 - **Feedback form (Google Forms) — a link the person opens** — Opened only by a tap on the start card; nothing is sent by the app.
 - **Donation page (PayPal.Me) — a link the person opens** — Opened only by a tap on the start card; nothing is sent by the app.
-- **The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent** — RUN 7 (C11): src/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name.
+- **The SVG namespace NAME «http://www.w3.org/2000/svg» — an identifier the DOM needs to create SVG elements (document.createElementNS); never fetched, nothing is sent** — RUN 7 (C11): core/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name.
 
 ## Developer tools only (never shipped)
 
@@ -64,7 +64,7 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 | Item | Version | Licence | Use | Addresses / files | Source |
 |---|---|---|---|---|---|
 | App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night | — | AI-generated | shipped | icons/icon-192.png<br>icons/icon-512.png<br>icons/icon-512-maskable.png | the user's chosen design (RUN 7, BACKLOG §7.19: the C · Hush emblem in Moonglass colours), drawn by code by Claude Code in this project (canvas circles and gradients; no font, no traced artwork) |
-| Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui) | — | n/a | device | — | style.css --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; src/draw.js ctx.font system-ui |
+| Interface and canvas text — the device's system fonts (CSS --font stack, canvas system-ui) | — | n/a | device | — | style.css --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; core/legacy-ui/draw.js ctx.font system-ui |
 | Unicode symbols and emoji used as icons and signs (list below) | — | n/a | device | — | characters in our own text; their pictures come from the device's fonts (Segoe UI Symbol / Segoe UI Emoji on Windows, Apple Color Emoji and SF on Apple devices, Noto on Android) — no file shipped |
 | Andika (text font of the Calm face) — SIL International | 7.000 (SIL release, web/Andika-Regular.woff2 and Andika-Bold.woff2, UNMODIFIED) | OFL-1.1 | shipped | fonts/andika/Andika-Regular.woff2<br>fonts/andika/Andika-Bold.woff2<br>fonts/andika/OFL.txt | https://github.com/silnrsi/font-andika/releases/tag/v7.000 (Andika-7.000.zip) — Reserved Font Names «Andika» and «SIL»: the files are shipped unmodified (no subsetting), so the name stays |
 | Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors | Google Fonts v40, weight 300, latin + cyrillic subsets (woff2) | OFL-1.1 | shipped | fonts/literata/literata-300-latin.woff2<br>fonts/literata/literata-300-cyrillic.woff2<br>fonts/literata/OFL.txt | https://fonts.google.com/specimen/Literata (https://github.com/googlefonts/literata) — no Reserved Font Name, so the subsets may keep the name |
@@ -83,75 +83,75 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 
 | Glyph | Code point | Meaning | Kind | Used in |
 |---|---|---|---|---|
-| ↶ | U+21B6 | undo (history) | icon | src/icons.js, src/probes/cmd.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js, src/probes/songfile.js |
-| ↷ | U+21B7 | redo (history) | icon | src/icons.js, src/probes/cmd.js, src/probes/edit.js, src/probes/freeze.js, src/probes/history.js, src/probes/ids.js, src/probes/key.js, src/probes/songfile.js |
-| ⤺ | U+293A | undo the last take | icon | src/icons.js, src/probes/cmd.js, src/probes/history.js, src/probes/window.js |
-| ⇄ | U+21C4 | swap hands (help text) | icon | src/icons.js |
-| ⊘ | U+2298 | remove effect from a track | icon | src/icons.js |
-| ⌐ | U+2310 | step shape (automation / bend) | icon | src/icons.js |
-| ╱ | U+2571 | glide shape (automation / bend) | icon | src/icons.js |
-| ⌒ | U+2312 | curvature value tag | icon | src/icons.js |
-| ⌗ | U+2317 | quantise | icon | src/icons.js |
-| ⏮ | U+23EE | to the start | icon | src/icons.js |
-| ⏸ | U+23F8 | pause (message) | icon | src/icons.js, src/songs.js |
-| ❚ | U+275A | pause bars | icon | src/icons.js |
-| ▶ | U+25B6 | play / start | icon | src/icons.js, src/probes/engine.js, src/probes/freeze.js, src/probes/seed.js, src/probes/window.js, src/recorder.js, src/render.js, src/songs.js |
-| ■ | U+25A0 | stop (panic) | icon | src/icons.js, src/songs.js |
-| ⟳ | U+27F3 | repeat the brace | icon | src/icons.js, src/songs.js |
-| ● | U+25CF | record / lesson step done | icon | src/icons.js |
-| ○ | U+25CB | lesson step to come | icon | src/icons.js |
-| ✕ | U+2715 | close / delete / clear | icon | src/icons.js, src/probes/cmd.js, src/probes/history.js |
-| ✎ | U+270E | edit / rename / arrangement window | icon | src/icons.js, src/probes/window.js, src/songs.js |
-| ✂ | U+2702 | cut bars | icon | src/icons.js |
-| ⧉ | U+29C9 | copy / duplicate | icon | src/icons.js |
-| 📋 | U+1F4CB | paste | icon | src/icons.js |
-| 🗑 | U+1F5D1 | delete | icon | src/icons.js |
-| ✚ | U+271A | add a point | icon | src/icons.js |
-| ＋ | U+FF0B | insert (empty bars) | icon | src/icons.js |
-| ▯ | U+25AF | empty bar | icon | src/icons.js |
-| ▮ | U+25AE | volume bars face | icon | src/icons.js |
-| ▤ | U+25A4 | arrangement face | icon | src/icons.js |
-| ⬚ | U+2B1A | pick several notes | icon | src/icons.js |
-| ⤢ | U+2922 | fit the whole song | icon | src/icons.js |
-| ▲ | U+25B2 | move up | icon | src/icons.js |
-| ▼ | U+25BC | move down | icon | src/icons.js |
-| ▸ | U+25B8 | accordion closed | icon | src/icons.js |
-| ▾ | U+25BE | accordion open | icon | src/icons.js |
-| ↕ | U+2195 | vertical hand axis | icon | src/icons.js |
-| ↔ | U+2194 | horizontal hand axis | icon | src/icons.js, src/probes/seed.js |
-| ◆ | U+25C6 | depth hand axis | icon | src/icons.js |
-| ◧ | U+25E7 | left half (split) | icon | src/icons.js |
-| ◨ | U+25E8 | right half / split | icon | src/icons.js |
-| ✓ | U+2713 | done / chosen | icon | src/icons.js, src/probes/window.js |
-| ⚙ | U+2699 | settings | icon | src/icons.js |
-| ⛶ | U+26F6 | full screen | icon | src/icons.js |
-| ⬇ | U+2B07 | install | icon | src/icons.js |
-| 🌐 | U+1F310 | language | icon | src/icons.js |
-| 🎥 | U+1F3A5 | video clip | icon | src/icons.js |
-| 🎙 | U+1F399 | audio clip | icon | src/icons.js |
-| 🎚 | U+1F39A | mixer | icon | src/icons.js |
-| 🎛 | U+1F39B | sound panel | icon | src/icons.js |
-| 🎵 | U+1F3B5 | backing | icon | src/icons.js |
-| 🎹 | U+1F3B9 | chords role | icon | src/icons.js |
-| 🎸 | U+1F3B8 | bass role | icon | src/icons.js |
-| 🥁 | U+1F941 | drums role / drum backing | icon | src/icons.js |
-| 🔄 | U+1F504 | switch camera | icon | src/icons.js |
-| ↑ | U+2191 | arrow key (tooltip) | typography | src/i18n.js |
-| ↓ | U+2193 | arrow key (tooltip) | typography | src/i18n.js |
-| → | U+2192 | arrow in text | typography | src/i18n.js, src/probedata.js, src/probes/autosave.js, src/probes/calm.js, src/probes/cmd.js, src/probes/detect.js, src/probes/edit.js, src/probes/eng2.js, src/probes/engine.js, src/probes/forest.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/ids.js, src/probes/key.js, src/probes/lat.js, src/probes/nightguard.js, src/probes/profile.js, src/probes/run.js, src/probes/seed.js, src/probes/songfile.js, src/probes/sound.js, src/probes/timbres.js, src/probes/tuning.js, src/probes/window.js, src/render.js, src/songs.js |
-| − | U+2212 | minus sign | typography | data/palettes/bpsteps.json, index.html, src/core/format.js, src/core/profile.js, src/i18n.js, src/probedata.js, src/probes/calm.js, src/probes/edit.js, src/probes/freeze.js, src/probes/fxcontract.js, src/probes/key.js, src/probes/window.js, src/render.js, src/ui.js, src/views/roll.js, src/views/strip.js |
-| ≈ | U+2248 | approximately | typography | src/i18n.js, src/probes/calm.js, src/probes/lat.js, src/render.js, src/views/play.js |
-| ≤ | U+2264 | less or equal | typography | src/probes/calm.js, src/probes/forest.js, src/probes/window.js |
-| ≥ | U+2265 | greater or equal | typography | src/core/format.js, src/probes/calm.js, src/probes/forest.js |
-| ∞ | U+221E | infinity (−∞ dB) | typography | src/render.js, src/views/strip.js |
-| √ | U+221A | square root (console text) | typography | src/render.js |
-| ♭ | U+266D | flat (note names) | notation | data/modes/blues.json, data/tunings/shruti22.json, index.html, src/probedata.js, src/scales.js, src/songs.js |
-| ♯ | U+266F | sharp (note names) | notation | data/tunings/shruti22.json, src/probedata.js |
-| ♮ | U+266E | natural (chord names) | notation | data/palettes/edo31.json |
-| ⚠ | U+26A0 | warning (console) | console | src/render.js |
-| ⛔ | U+26D4 | forbidden (console) | console | src/render.js |
-| ⛳ | U+26F3 | rule flag (console) | console | src/render.js |
-| ✅ | U+2705 | done (console) | console | src/render.js |
-| ❌ | U+274C | failed (console) | console | src/render.js |
-| ❄ | U+2744 | frozen (console) | console | src/probes/window.js, src/render.js |
-| ☀ | U+2600 | sun (console) | console | src/render.js |
+| ↶ | U+21B6 | undo (history) | icon | core/icons.js, core/probes/cmd.js, core/probes/edit.js, core/probes/freeze.js, core/probes/history.js, core/probes/ids.js, core/probes/key.js, core/probes/songfile.js |
+| ↷ | U+21B7 | redo (history) | icon | core/icons.js, core/probes/cmd.js, core/probes/edit.js, core/probes/freeze.js, core/probes/history.js, core/probes/ids.js, core/probes/key.js, core/probes/songfile.js |
+| ⤺ | U+293A | undo the last take | icon | core/icons.js, core/probes/cmd.js, core/probes/history.js, core/probes/window.js |
+| ⇄ | U+21C4 | swap hands (help text) | icon | core/icons.js |
+| ⊘ | U+2298 | remove effect from a track | icon | core/icons.js |
+| ⌐ | U+2310 | step shape (automation / bend) | icon | core/icons.js |
+| ╱ | U+2571 | glide shape (automation / bend) | icon | core/icons.js |
+| ⌒ | U+2312 | curvature value tag | icon | core/icons.js |
+| ⌗ | U+2317 | quantise | icon | core/icons.js |
+| ⏮ | U+23EE | to the start | icon | core/icons.js |
+| ⏸ | U+23F8 | pause (message) | icon | core/icons.js, core/songs.js |
+| ❚ | U+275A | pause bars | icon | core/icons.js |
+| ▶ | U+25B6 | play / start | icon | core/icons.js, core/probes/engine.js, core/probes/freeze.js, core/probes/seed.js, core/probes/window.js, core/recorder.js, core/render.js, core/songs.js |
+| ■ | U+25A0 | stop (panic) | icon | core/icons.js, core/songs.js |
+| ⟳ | U+27F3 | repeat the brace | icon | core/icons.js, core/songs.js |
+| ● | U+25CF | record / lesson step done | icon | core/icons.js |
+| ○ | U+25CB | lesson step to come | icon | core/icons.js |
+| ✕ | U+2715 | close / delete / clear | icon | core/icons.js, core/probes/cmd.js, core/probes/history.js |
+| ✎ | U+270E | edit / rename / arrangement window | icon | core/icons.js, core/probes/window.js, core/songs.js |
+| ✂ | U+2702 | cut bars | icon | core/icons.js |
+| ⧉ | U+29C9 | copy / duplicate | icon | core/icons.js |
+| 📋 | U+1F4CB | paste | icon | core/icons.js |
+| 🗑 | U+1F5D1 | delete | icon | core/icons.js |
+| ✚ | U+271A | add a point | icon | core/icons.js |
+| ＋ | U+FF0B | insert (empty bars) | icon | core/icons.js |
+| ▯ | U+25AF | empty bar | icon | core/icons.js |
+| ▮ | U+25AE | volume bars face | icon | core/icons.js |
+| ▤ | U+25A4 | arrangement face | icon | core/icons.js |
+| ⬚ | U+2B1A | pick several notes | icon | core/icons.js |
+| ⤢ | U+2922 | fit the whole song | icon | core/icons.js |
+| ▲ | U+25B2 | move up | icon | core/icons.js |
+| ▼ | U+25BC | move down | icon | core/icons.js |
+| ▸ | U+25B8 | accordion closed | icon | core/icons.js |
+| ▾ | U+25BE | accordion open | icon | core/icons.js |
+| ↕ | U+2195 | vertical hand axis | icon | core/icons.js |
+| ↔ | U+2194 | horizontal hand axis | icon | core/icons.js, core/probes/seed.js |
+| ◆ | U+25C6 | depth hand axis | icon | core/icons.js |
+| ◧ | U+25E7 | left half (split) | icon | core/icons.js |
+| ◨ | U+25E8 | right half / split | icon | core/icons.js |
+| ✓ | U+2713 | done / chosen | icon | core/icons.js, core/probes/window.js |
+| ⚙ | U+2699 | settings | icon | core/icons.js |
+| ⛶ | U+26F6 | full screen | icon | core/icons.js |
+| ⬇ | U+2B07 | install | icon | core/icons.js |
+| 🌐 | U+1F310 | language | icon | core/icons.js |
+| 🎥 | U+1F3A5 | video clip | icon | core/icons.js |
+| 🎙 | U+1F399 | audio clip | icon | core/icons.js |
+| 🎚 | U+1F39A | mixer | icon | core/icons.js |
+| 🎛 | U+1F39B | sound panel | icon | core/icons.js |
+| 🎵 | U+1F3B5 | backing | icon | core/icons.js |
+| 🎹 | U+1F3B9 | chords role | icon | core/icons.js |
+| 🎸 | U+1F3B8 | bass role | icon | core/icons.js |
+| 🥁 | U+1F941 | drums role / drum backing | icon | core/icons.js |
+| 🔄 | U+1F504 | switch camera | icon | core/icons.js |
+| ↑ | U+2191 | arrow key (tooltip) | typography | core/i18n.js |
+| ↓ | U+2193 | arrow key (tooltip) | typography | core/i18n.js |
+| → | U+2192 | arrow in text | typography | core/i18n.js, core/probedata.js, core/probes/autosave.js, core/probes/calm.js, core/probes/cmd.js, core/probes/detect.js, core/probes/edit.js, core/probes/eng2.js, core/probes/engine.js, core/probes/forest.js, core/probes/freeze.js, core/probes/fxcontract.js, core/probes/ids.js, core/probes/key.js, core/probes/lat.js, core/probes/nightguard.js, core/probes/profile.js, core/probes/run.js, core/probes/seed.js, core/probes/songfile.js, core/probes/sound.js, core/probes/timbres.js, core/probes/tuning.js, core/probes/window.js, core/render.js, core/songs.js |
+| − | U+2212 | minus sign | typography | core/data/palettes/bpsteps.json, core/i18n.js, core/legacy-ui/ui.js, core/legacy-ui/views/roll.js, core/legacy-ui/views/strip.js, core/probedata.js, core/probes/calm.js, core/probes/edit.js, core/probes/freeze.js, core/probes/fxcontract.js, core/probes/key.js, core/probes/window.js, core/pure/format.js, core/pure/profile.js, core/render.js, index.html |
+| ≈ | U+2248 | approximately | typography | core/i18n.js, core/legacy-ui/views/play.js, core/probes/calm.js, core/probes/lat.js, core/render.js |
+| ≤ | U+2264 | less or equal | typography | core/probes/calm.js, core/probes/forest.js, core/probes/window.js |
+| ≥ | U+2265 | greater or equal | typography | core/probes/calm.js, core/probes/forest.js, core/pure/format.js |
+| ∞ | U+221E | infinity (−∞ dB) | typography | core/legacy-ui/views/strip.js, core/render.js |
+| √ | U+221A | square root (console text) | typography | core/render.js |
+| ♭ | U+266D | flat (note names) | notation | core/data/modes/blues.json, core/data/tunings/shruti22.json, core/probedata.js, core/scales.js, core/songs.js, index.html |
+| ♯ | U+266F | sharp (note names) | notation | core/data/tunings/shruti22.json, core/probedata.js |
+| ♮ | U+266E | natural (chord names) | notation | core/data/palettes/edo31.json |
+| ⚠ | U+26A0 | warning (console) | console | core/render.js |
+| ⛔ | U+26D4 | forbidden (console) | console | core/render.js |
+| ⛳ | U+26F3 | rule flag (console) | console | core/render.js |
+| ✅ | U+2705 | done (console) | console | core/render.js |
+| ❌ | U+274C | failed (console) | console | core/render.js |
+| ❄ | U+2744 | frozen (console) | console | core/probes/window.js, core/render.js |
+| ☀ | U+2600 | sun (console) | console | core/render.js |

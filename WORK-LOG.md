@@ -2025,3 +2025,9 @@ same; the screenshot comparison shows small rendering differences because this s
 - New tools: `tools/smoke-paths.mjs`, `tools/split-compare.mjs`, `tools/split-check.mjs`; runner `--app`, `--json`, `--dump`, `--stress-not-judged`; ui-snap `--noisy`. New row «NIGHT untouched» + `tools/night.print.json`.
 - Probes now start correctly on the page that opened in its own profile (C0 not applicable there; VIS1a; CALM shell restores). VIS1c backgrounds allows the room's shader compile.
 - Measured, on unchanged code: CALM stress's real-time part varies run to run (the standard app itself 0–30 dropouts in 6 s) → reported, not judged in split checks; its caps and offline parts stay strict. Four Night screens differ between two captures of identical code → structure only; the other 12 stay exact.
+
+# SPLIT-2 — checkpoint B (2026-11-01): pure moves (status: docs/SPLIT-PROGRESS.md)
+- `src/ → core/`, `src/core/ → core/pure/`, `ui.js`, `draw.js`, `latmeter.js`, `views/ → core/legacy-ui/`, `data/ → core/data/`, by `tools/split-move.mjs B`. Pages, CSS, fonts, vendor, icons stay at the root.
+- By hand: load bases in `core/profile.js`, `core/timbreload.js`, `core/songs.js`; keys in `core/engine/surface.js`; roots and keys in the static check, licence check, name index, data runner, timbre bundle.
+- `tools/ui-snap.mjs`: two capture races removed (`calm-msg-land`, `calm-play`). Both screens now match the untouched baseline exactly.
+- Seen, not touched: in landscape Night the low-light hint overlaps the control panel. It is in the baseline too; `msgCheck` compares messages with each other only.

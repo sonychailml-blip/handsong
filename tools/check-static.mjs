@@ -1,4 +1,4 @@
-/* ⛳ СТАТИЧЕСКАЯ ПРОВЕРКА src/ — инструмент разработки, НЕ часть приложения (приложение его не грузит; в браузер он не попадает).
+/* ⛳ СТАТИЧЕСКАЯ ПРОВЕРКА core/ — инструмент разработки, НЕ часть приложения (приложение его не грузит; в браузер он не попадает).
    Запуск:  node tools/check-static.mjs
    ⛔ НИКАКОГО КОДА ПРИЛОЖЕНИЯ НЕ ИСПОЛНЯЕТ: модули читаются как ТЕКСТ. Синтаксис проверяет сам node (--check — разбор без выполнения),
    всё прочее — разбор текста здесь.
@@ -40,8 +40,8 @@ import { fileURLToPath } from 'node:url';
 import { lex } from './lex.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SRC=join(ROOT,'src');
-// every module of src/ and its sub-folders (LAT1: src/core/), as a path relative to src/ with '/'
+const SRC=join(ROOT,'core');
+// every module of core/ and its sub-folders (LAT1: core/pure/), as a path relative to core/ with '/'
 const listJs=(d='')=>readdirSync(join(SRC,d),{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? listJs(d+e.name+'/') : e.name.endsWith('.js') ? [d+e.name] : []);
 const files=listJs().sort();
 
@@ -115,7 +115,7 @@ const used={}; for(const f of files) used[f]=new Set();
 const wholeNS=new Set();
 for(const f of files){ const m=mods[f];
   for(const im of m.imports){ const t=target(f,im.spec); if(t==null) continue;
-    if(!mods[t]){ fails.push(`${f}: imports '${im.spec}' — no such module in src/`); continue; }
+    if(!mods[t]){ fails.push(`${f}: imports '${im.spec}' — no such module in core/`); continue; }
     if(im.ns) wholeNS.add(t);
     for(const nm of im.names){ used[t].add(nm); if(!mods[t].exports.has(nm) && !mods[t].reexportAll) fails.push(`${f}: imports '${nm}' from ${t}, which does not export it`); } }
   for(const nm of m.localExports) if(!m.declared.has(nm)) fails.push(`${f}: export list names '${nm}', which is not declared in the module`);
@@ -251,13 +251,13 @@ const NET_LISTED={
   'probes/pack.js':  { fetch:[1,'probe only (?probe): reads tools/pack-test-licence.json (TEST keys) from the own origin (PACK1)'] },
   'probes/song2.js': { fetch:[1,'probe only (?probe): reads data/songs/triphop.json from the own origin (SONG2 control)'] },
   'songs.js':        { fetch:[1,'the demo song file data/songs/<name>.json from the own origin (SONG2; P.song only)'] },
-  'probes/sound.js': { addModule:[2,'probe only (?probe): loads our own src/engine/worklets/dyn-worklet.js into the offline contexts of the probe'] },
+  'probes/sound.js': { addModule:[2,'probe only (?probe): loads our own core/engine/worklets/dyn-worklet.js into the offline contexts of the probe'] },
   'probes/hand.js':  { fetch:[1,'probe only (?probe): reads tools/gesture.print.json from the own origin'] },
-  'audio.js':      { addModule:[4,'loads our own worklets (src/engine/worklets/ks-, frz-, dyn-, probe-cap-worklet.js) from the own origin into the audio context'] },
+  'audio.js':      { addModule:[4,'loads our own worklets (core/engine/worklets/ks-, frz-, dyn-, probe-cap-worklet.js) from the own origin into the audio context'] },
   'render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'] },
   'clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },
-  'ui.js':         { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
-  'vision.js':     { worker:[1,'starts our own src/hand-worker.js (own origin, CSP worker-src self): hand detection off the main thread (LAT2b)'] },
+  'legacy-ui/ui.js': { swRegister:[1,'registers sw.js (own origin, cache-free) so the app is installable'] },
+  'vision.js':     { worker:[1,'starts our own core/hand-worker.js (own origin, CSP worker-src self): hand detection off the main thread (LAT2b)'] },
   'handdet.js':    { external:[1,'imports MediaPipe Tasks Vision from jsDelivr (register entry mediapipe-tasks-vision; it loads its WASM — CSP script-src/connect-src); in the worker too'],
                      fetch:[1,'downloads the hand model once (register entry mediapipe-hand-landmarker, storage.googleapis.com/mediapipe-models — CSP connect-src) for both models (L1, L2)'] },
 };
@@ -273,24 +273,24 @@ function netCheck(modsIn){
       if(!w) bad.push(`${f}: ${c} network call site(s) of kind «${k}» not listed — add them to NET_LISTED in tools/check-static.mjs with the reason (rule #33)`);
       else if(w[0]!==c) bad.push(`${f}: ${c} call site(s) of kind «${k}», ${w[0]} listed — re-check each one, then update NET_LISTED`); }
     for(const k of Object.keys(want)) if(!got[k]) bad.push(`${f}: NET_LISTED names «${k}», which the module no longer has — remove it`); }
-  for(const f of Object.keys(NET_LISTED)) if(!modsIn[f]) bad.push(`NET_LISTED names ${f}, which is not a module in src/`);
+  for(const f of Object.keys(NET_LISTED)) if(!modsIn[f]) bad.push(`NET_LISTED names ${f}, which is not a module in core/`);
   return { bad, total };
 }
 const NET=netCheck(mods);
 fails.push(...NET.bad);
 { /* CONTROL: an unlisted beacon in a listed module and a fetch in a new module must both be caught */
-  const fake={ ...mods, 'ui.js':{ ...mods['ui.js'], bare:mods['ui.js'].bare+'\nnavigator.sendBeacon(u, d);' }, 'probe-net.js':{ bare:'fetch(x)', imports:[], dyn:[] } };
+  const fake={ ...mods, 'legacy-ui/ui.js':{ ...mods['legacy-ui/ui.js'], bare:mods['legacy-ui/ui.js'].bare+'\nnavigator.sendBeacon(u, d);' }, 'probe-net.js':{ bare:'fetch(x)', imports:[], dyn:[] } };
   const c=netCheck(fake);
   if(!(c.bad.some(x=>/ui\.js: 1 .*«beacon»/.test(x)) && c.bad.some(x=>/probe-net\.js: .*«fetch»/.test(x)))) fails.push('network guard CONTROL: an unlisted sendBeacon / fetch was not caught — the guard cannot fail');
 }
 /* 9) REC1 — FOLDERS AND IMPORT CYCLES. The static import graph (import … from and export … from; dynamic imports are not edges — they
    resolve after evaluation). Strongly connected groups (Tarjan) are the import cycles: today's are printed as information (each one is a
    place where evaluation order and live bindings matter); a cycle through a module of a REC folder fails. Folder rule: a module under
-   src/song/ imports only src/song/, src/core/, the leaf config.js and (REC3) the pitch truth scales.js — the song never reaches up into the
+   core/song/ imports only core/song/, core/pure/, the leaf config.js and (REC3) the pitch truth scales.js — the song never reaches up into the
    recorder, the engine or the screen (the layers above register with it instead: store.onInvalidate, lanes.laneWire, history.histWire,
    edit-notes.editWire). REC3: the edits price and move pitches through scales.js (chord notes, degrees, modes), which is node-runnable data
    (the data runner loads it). CONTROL: a fake import song/store.js → recorder.js must be caught by both checks. */
-const FOLDER_RULES={ 'song/':t=>t.startsWith('song/')||t.startsWith('core/')||t==='config.js'||t==='scales.js' };
+const FOLDER_RULES={ 'song/':t=>t.startsWith('song/')||t.startsWith('pure/')||t==='config.js'||t==='scales.js' };
 const edgesOf=ms=>{ const G={}; for(const f of Object.keys(ms)){ G[f]=new Set();
   for(const im of ms[f].imports){ const t=target(f,im.spec); if(t!=null && ms[t]) G[f].add(t); } } return G; };
 function sccs(G){   // Tarjan, iterative enough for this size (recursion depth ≤ module count)
@@ -308,7 +308,7 @@ function cyclePath(G, members){   // one concrete loop through the group, for th
 }
 function layerCheck(ms){
   const G=edgesOf(ms), bad=[], groups=sccs(G);
-  for(const [dir,ok] of Object.entries(FOLDER_RULES)) for(const f of Object.keys(ms)) if(f.startsWith(dir)) for(const t of G[f]) if(!ok(t)) bad.push(`${f}: imports ${t} — a module under src/${dir} imports only its folder, core/, config.js and scales.js (REC1, REC3)`);
+  for(const [dir,ok] of Object.entries(FOLDER_RULES)) for(const f of Object.keys(ms)) if(f.startsWith(dir)) for(const t of G[f]) if(!ok(t)) bad.push(`${f}: imports ${t} — a module under core/${dir} imports only its folder, pure/, config.js and scales.js (REC1, REC3)`);
   for(const g of groups) if(g.some(f=>Object.keys(FOLDER_RULES).some(d=>f.startsWith(d)))) bad.push(`import cycle through a REC folder: ${cyclePath(G,g)}`);
   return { bad, groups, G };
 }
@@ -322,12 +322,12 @@ fails.push(...LAY.bad);
     const fake={ ...mods, 'song/store.js':{ ...mods['song/store.js'], imports:[...mods['song/store.js'].imports, { spec:'../recorder.js', names:[] }] } };
     const c=layerCheck(fake);
     if(!(c.bad.some(x=>/song\/store\.js: imports recorder\.js/.test(x)) && c.bad.some(x=>/import cycle through a REC folder: .*song\/store\.js/.test(x)))) fails.push('folder / cycle CONTROL: song/store.js → recorder.js was not caught — the check cannot fail'); }
-  else fails.push('folder / cycle CONTROL: src/song/store.js or src/recorder.js missing');
+  else fails.push('folder / cycle CONTROL: core/song/store.js or core/recorder.js missing');
   /* REC3 CONTROL: the scales.js exception must not open the engine — song/history.js importing audio.js must break the folder rule */
   if(mods['song/history.js'] && mods['audio.js']){
     const fake={ ...mods, 'song/history.js':{ ...mods['song/history.js'], imports:[...mods['song/history.js'].imports, { spec:'../audio.js', names:[] }] } };
     if(!layerCheck(fake).bad.some(x=>/song\/history\.js: imports audio\.js/.test(x))) fails.push('folder CONTROL: song/history.js → audio.js was not caught — the check cannot fail'); }
-  else fails.push('folder CONTROL: src/song/history.js or src/audio.js missing');
+  else fails.push('folder CONTROL: core/song/history.js or core/audio.js missing');
 }
 /* 10) WRITE TO AN IMPORTED BINDING (DAY run, item 0): an import is read-only — `x = …`, `x += …`, `x++`, `--x` on an imported name (or
    `ns.x = …` on a namespace import) throws «Assignment to constant variable» only when that line runs (the NIGHT run hit it after a move).
@@ -369,7 +369,7 @@ for(const f of files) fails.push(...importWrites(mods[f]));
 }
 /* 11) DESIGN TOKENS (UI1b): the interface's colours, type sizes and weights, line heights, spacing, radii, shadows and layers live in
    tokens.css (custom properties on :root). style.css carries no such literal (only var(--…), 0, auto, inherit…); every var(--name) used
-   in style.css, index.html and src/ is defined in tokens.css or is a RUNTIME variable set by JS (RUNTIME_VARS, with the reason); a JS
+   in style.css, index.html and core/ is defined in tokens.css or is a RUNTIME variable set by JS (RUNTIME_VARS, with the reason); a JS
    inline style writes no colour or px spacing literal. CONTROL: a colour literal and an undefined token must both be caught. */
 const RUNTIME_VARS={ '--role':'the role colour of a button / track chip, set by ui.js from palette.ROLE_COL (tokens --cv-role-*)' };
 function tokenCheck(css, tok, others){
@@ -387,26 +387,26 @@ function tokenCheck(css, tok, others){
 }
 { const css=readFileSync(join(ROOT,'style.css'),'utf8'), tok=existsSync(join(ROOT,'tokens.css')) ? readFileSync(join(ROOT,'tokens.css'),'utf8') : '';
   if(!tok) fails.push('tokens.css is missing (UI1b design tokens)');
-  const others={ 'index.html':readFileSync(join(ROOT,'index.html'),'utf8') }; for(const f of files) others['src/'+f]=mods[f].bare.length ? mods[f].code : '';
+  const others={ 'index.html':readFileSync(join(ROOT,'index.html'),'utf8') }; for(const f of files) others['core/'+f]=mods[f].bare.length ? mods[f].code : '';
   fails.push(...tokenCheck(css, tok, others));
   for(const f of files){ const b=mods[f].code;   // JS inline styles: no colour / px spacing literal
     for(const m of b.matchAll(/\.style\.(color|background\w*|borderColor|padding\w*|margin\w*|gap|fontSize|borderRadius|boxShadow|zIndex)\s*=\s*(['"`])([^'"`]*)\2/g))
       if(/#[0-9a-fA-F]{3,8}\b|rgba?\(|\d+px/.test(m[3])) fails.push(`${f}:${lineAt(b,m.index)}: .style.${m[1]} = '${m[3]}' — a design literal in JS; use var(--token)`); }
-  /* DRAW1b: the CANVAS palette — no colour literal (in a string or template) in src/views/*.js or config.js; every cv('name') of src/ names
+  /* DRAW1b: the CANVAS palette — no colour literal (in a string or template) in core/legacy-ui/views/*.js or config.js; every cv('name') of core/ names
      a --cv-name defined in tokens.css. CONTROL: a literal in a view and an unknown cv() name must both be caught. */
   const defsAll=new Set([...tok.replace(/\/\*[\s\S]*?\*\//g,'').matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1]));
   const canvasCheck=(texts)=>{ const out=[];
     for(const [f,t] of Object.entries(texts)){
-      if(/^(views\/|config\.js$)/.test(f)) for(const m of t.matchAll(/(['"`])\s*#[0-9a-fA-F]{3,8}\s*\1|(?<![\w$])(rgba?|hsla?)\(\s*\d/g)) out.push(`${f}:${lineAt(t,m.index)}: a canvas colour literal «${m[0].slice(0,24)}» — use cv('<token>') (tokens.css «canvas»)`);
+      if(/^(legacy-ui\/views\/|config\.js$)/.test(f)) for(const m of t.matchAll(/(['"`])\s*#[0-9a-fA-F]{3,8}\s*\1|(?<![\w$])(rgba?|hsla?)\(\s*\d/g)) out.push(`${f}:${lineAt(t,m.index)}: a canvas colour literal «${m[0].slice(0,24)}» — use cv('<token>') (tokens.css «canvas»)`);
       for(const m of t.matchAll(/(?<![\w$.])cv\(\s*(['"])([\w-]+)\1/g)) if(!defsAll.has('--cv-'+m[2])) out.push(`${f}:${lineAt(t,m.index)}: cv('${m[2]}') — no token --cv-${m[2]} in tokens.css`); }
     return out; };
   const codeOf={}; for(const f of files) codeOf[f]=mods[f].code;
   fails.push(...canvasCheck(codeOf));
-  { const c2=canvasCheck({ 'views/ctl.js':"ctx.fillStyle='#fff'; ctx.strokeStyle=`rgba(255,0,0,${a})`; ctx.fillStyle=cv('no-such-colour');" });
+  { const c2=canvasCheck({ 'legacy-ui/views/ctl.js':"ctx.fillStyle='#fff'; ctx.strokeStyle=`rgba(255,0,0,${a})`; ctx.fillStyle=cv('no-such-colour');" });
     if(c2.length!==3) fails.push(`canvas-palette CONTROL: expected a hex literal, an rgba literal and an unknown cv() name caught, got ${c2.length} — the check cannot fail`); }
   const ctl=tokenCheck(css+'\n.probeCtl{color:#fff; padding:var(--sp-unknown);}', tok, {});
   if(!(ctl.some(x=>/colour literal «#fff»/.test(x)) && ctl.some(x=>/--sp-unknown/.test(x)))) fails.push('design-token CONTROL: a colour literal / an undefined token was not caught — the check cannot fail'); }
-/* 12) ENGINE SURFACE (AUD1a): src/engine/surface.js lists every name audio.js exports, by the module that calls it. Every listed name
+/* 12) ENGINE SURFACE (AUD1a): core/engine/surface.js lists every name audio.js exports, by the module that calls it. Every listed name
    must be an export of audio.js; every export must be listed (or in SURFACE_INTERNAL); every module's calls into audio.js — static named
    imports, `ns.x` of a namespace import, makeENG's `A.x` (live/eng.js), the render copy's `eng.x` (render.js, probes) — must be listed under
    that module. CONTROL: an unlisted import in a fake module and a listed name that is not exported must both be caught. */
@@ -422,9 +422,9 @@ function surfaceUses(f, m){
 function surfaceCheck(S, INTERNAL, exportsOf, uses){
   const bad=[], listed=new Set([...Object.values(S).flat(), ...INTERNAL]);
   for(const [caller,L] of Object.entries(S)) for(const n of L) if(!exportsOf.has(n)) bad.push(`engine surface: «${n}» (listed for ${caller}) is not exported by audio.js`);
-  for(const n of exportsOf) if(!listed.has(n)) bad.push(`engine surface: audio.js exports «${n}» but src/engine/surface.js does not list it`);
+  for(const n of exportsOf) if(!listed.has(n)) bad.push(`engine surface: audio.js exports «${n}» but core/engine/surface.js does not list it`);
   for(const [f,names] of Object.entries(uses)){ const mine=new Set(S[f]||[]);
-    for(const n of names) if(exportsOf.has(n) && !mine.has(n)) bad.push(`engine surface: ${f} calls audio.js «${n}» — not listed under '${f}' in src/engine/surface.js`); }
+    for(const n of names) if(exportsOf.has(n) && !mine.has(n)) bad.push(`engine surface: ${f} calls audio.js «${n}» — not listed under '${f}' in core/engine/surface.js`); }
   return bad;
 }
 if(mods['engine/surface.js'] && mods['audio.js']){
@@ -437,15 +437,15 @@ if(mods['engine/surface.js'] && mods['audio.js']){
   fails.push(...surfaceCheck(sm.SURFACE, sm.SURFACE_INTERNAL||[], A, uses));
   const ctl=surfaceCheck({ ...sm.SURFACE, 'ctl.js':['noSuchEngineName'] }, sm.SURFACE_INTERNAL||[], A, { ...uses, 'ctl2.js':new Set(['leadOn']) });
   if(!(ctl.some(x=>/noSuchEngineName/.test(x)) && ctl.some(x=>/ctl2\.js calls audio\.js «leadOn»/.test(x)))) fails.push('engine-surface CONTROL: an unlisted call / a listed non-export was not caught — the check cannot fail');
-} else fails.push('src/engine/surface.js is missing (AUD1a engine surface)');
-/* 13) ⛳ HARD RULE #38 — AN ENGINE SUBMODULE IS STATELESS (AUD1b): a module under src/modules/ or src/engine/ (the worklet processors in
-   src/engine/worklets/ excepted — a processor's state is its job) keeps no state of its own: no top-level `let` / `var`; no top-level table
+} else fails.push('core/engine/surface.js is missing (AUD1a engine surface)');
+/* 13) ⛳ HARD RULE #38 — AN ENGINE SUBMODULE IS STATELESS (AUD1b): a module under core/modules/ or core/engine/ (the worklet processors in
+   core/engine/worklets/ excepted — a processor's state is its job) keeps no state of its own: no top-level `let` / `var`; no top-level table
    (`const X = {}` / `[]` / `new Map|Set|WeakMap|Array|Object(…)`) that the module writes (`X.k = …`, `X[k] = …`, `X.push(…)`, `X.set(…)`,
-   `delete X…`, `Object.assign(X, …)` …); it imports only `core/`, `config.js`, `scales.js` and the stateless tree itself (src/modules/**, src/engine/**). What changes while playing
+   `delete X…`, `Object.assign(X, …)` …); it imports only `core/`, `config.js`, `scales.js` and the stateless tree itself (core/modules/**, core/engine/**). What changes while playing
    or is made from a context lives in the engine context E it receives. CONTROLS: a top-level let, a written table and a forbidden import
    must each be caught; a clean module (a frozen table, a function using E) must pass. */
 const SL_SCOPE=f=>/^(modules|engine)\//.test(f) && !/^engine\/worklets\//.test(f);
-const SL_IMPORT_OK=(f,t)=> t==null || /^core\//.test(t) || t==='config.js' || t==='scales.js' || (SL_SCOPE(t) && SL_SCOPE(f));   // AUD2a: the stateless tree imports itself (effects use the timbre stages and engine/fdn.js)
+const SL_IMPORT_OK=(f,t)=> t==null || /^pure\//.test(t) || t==='config.js' || t==='scales.js' || (SL_SCOPE(t) && SL_SCOPE(f));   // AUD2a: the stateless tree imports itself (effects use the timbre stages and engine/fdn.js)
 function statelessCheck(f, bare, imports){
   const out=[]; let depth=0, paren=0; const top=[];   // positions at brace depth 0 and paren depth 0
   for(let i=0;i<bare.length;i++){ const c=bare[i]; if(c==='{') depth++; else if(c==='}') depth--; else if(c==='(') paren++; else if(c===')') paren--;
@@ -458,7 +458,7 @@ function statelessCheck(f, bare, imports){
   for(const [X,line] of tables){ const x=X.replace(/\$/g,'\\$');
     const W=new RegExp(`(?<![\\w$.])${x}\\s*(\\.[A-Za-z_$][\\w$]*|\\[[^\\]]*\\])\\s*(=(?!=)|\\+=|-=|\\*=|/=|\\+\\+|--)|(?<![\\w$.])${x}\\s*\\.\\s*(push|pop|shift|unshift|splice|set|add|delete|clear|fill|sort|reverse|copyWithin)\\s*\\(|delete\\s+${x}\\s*[.[]|Object\\.(assign|defineProperty|defineProperties)\\(\\s*${x}\\b|(?<![\\w$.])${x}\\s*\\.\\s*length\\s*=(?!=)`);
     if(W.test(bare)) out.push(`${f}:${line}: the top-level table «${X}» is written by the module — state belongs in E (rule #38)`); }
-  for(const im of imports){ const t=im.t; if(!SL_IMPORT_OK(f,t)) out.push(`${f}: imports «${im.spec}» — an engine submodule imports only core/, config.js, scales.js and its own folder (rule #38)`); }
+  for(const im of imports){ const t=im.t; if(!SL_IMPORT_OK(f,t)) out.push(`${f}: imports «${im.spec}» — an engine submodule imports only pure/, config.js, scales.js and its own folder (rule #38)`); }
   return out;
 }
 for(const f of files) if(SL_SCOPE(f)) fails.push(...statelessCheck(f, mods[f].bare, mods[f].imports.map(im=>({ spec:im.spec, t:target(f,im.spec) }))));
@@ -466,7 +466,7 @@ for(const f of files) if(SL_SCOPE(f)) fails.push(...statelessCheck(f, mods[f].ba
   const bad=[ ['modules/timbres/ctl1.js', L('let n=0;\nexport function f(E){ return n++; }'), []],
               ['modules/timbres/ctl2.js', L('const CACHE={};\nexport function f(E,k){ CACHE[k]=E.ac.createGain(); return CACHE[k]; }'), []],
               ['modules/timbres/ctl3.js', L('export function f(E){ return 1; }'), [{ spec:'../../audio.js', t:'audio.js' }]] ];
-  const good=['modules/timbres/ctl4.js', L('const T=Object.freeze([1,2]);\nconst M={ a:1 };\nexport function f(E){ for(let i=0;i<T.length;i++){ const g=E.ac.createGain(); } return M.a; }'), [{ spec:'../../core/dsp.js', t:'core/dsp.js' }, { spec:'./fm.js', t:'modules/timbres/fm.js' }]];
+  const good=['modules/timbres/ctl4.js', L('const T=Object.freeze([1,2]);\nconst M={ a:1 };\nexport function f(E){ for(let i=0;i<T.length;i++){ const g=E.ac.createGain(); } return M.a; }'), [{ spec:'../../pure/dsp.js', t:'pure/dsp.js' }, { spec:'./fm.js', t:'modules/timbres/fm.js' }]];
   const caught=bad.map(([f,b,i])=>statelessCheck(f,b,i).length>0), clean=statelessCheck(...good);
   if(caught.some(x=>!x) || clean.length) fails.push(`stateless-rule CONTROL: caught ${caught.map(x=>x?'yes':'NO').join('/')} of let / written table / forbidden import; clean module flagged ${clean.length} time(s): ${clean.join(' | ')} — the check cannot fail or flags innocent code`); }
 // сведения: неиспользуемые экспорты и импорты. «...x» (spread / rest) counts as a use of x (DAY run, item 0).
@@ -481,7 +481,7 @@ for(const f of files){ const m=mods[f];
   if(unusedImp.length) infos.push(`${f}: imported but never used — ${unusedImp.join(', ')}`);
 }
 
-console.log(`check-static: ${files.length} modules in src/ (${files.join(', ')})`);
+console.log(`check-static: ${files.length} modules in core/ (${files.join(', ')})`);
 for(const f of files){ const m=mods[f]; console.log(`  ${f.padEnd(18)} exports ${String(m.exports.size).padStart(3)} · imports ${String(m.imports.reduce((n,i)=>n+i.names.length,0)).padStart(3)} names from ${m.imports.length} statements${m.dyn.length?` · dynamic ${m.dyn.join(', ')}`:''}`); }
 if(infos.length){ console.log(`\ninformation (${infos.length}):`); infos.forEach(x=>console.log('  · '+x)); }
 if(fails.length){ console.log(`\nFAILED (${fails.length}):`); fails.forEach(x=>console.log('  ✗ '+x)); process.exit(1); }

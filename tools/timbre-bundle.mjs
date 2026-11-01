@@ -4,8 +4,8 @@
 // Usage: node tools/timbre-bundle.mjs          → writes the bundle
 //        node tools/timbre-bundle.mjs --check  → exit 0 only if the bundle on disk equals what the files give (the data runner's row)
 import { readFile, writeFile } from 'node:fs/promises';
-const ROOT=new URL('../', import.meta.url), DIR=new URL('data/timbres/', ROOT), OUT=new URL('data/timbres.bundle.json', ROOT);
-const T=await import(new URL('src/core/timbre.js', ROOT).href);
+const ROOT=new URL('../', import.meta.url), DIR=new URL('core/data/timbres/', ROOT), OUT=new URL('core/data/timbres.bundle.json', ROOT);
+const T=await import(new URL('core/pure/timbre.js', ROOT).href);
 
 export async function buildBundle(){
   const idx=JSON.parse(await readFile(new URL('index.json', DIR), 'utf8'));

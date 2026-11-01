@@ -25,8 +25,8 @@ const USES=new Set(['shipped','CDN','service','link','device','dev-only','refere
 const MATERIAL=new Set(['image','font','glyph','sound','ir']);
 const REFUSED=/\b(A?GPL|LGPL|MPL)\b|\bSA\b|-SA\b|\bNC\b|-NC\b|\bND\b|-ND\b/i;
 const GLYPH_KINDS=new Set(['icon','typography','notation','console']);
-const ICON_EXEMPT={ 'src/scaleprobe.js':'the probe facade', 'src/songs.js':'console texts of the demo-song tool', 'src/recorder.js':'a console refusal text',
-  'src/render.js':'console texts of the ear tools' };   // UI1b: «icon» glyphs allowed outside src/icons.js (not interface)
+const ICON_EXEMPT={ 'core/scaleprobe.js':'the probe facade', 'core/songs.js':'console texts of the demo-song tool', 'core/recorder.js':'a console refusal text',
+  'core/render.js':'console texts of the ear tools' };   // UI1b: «icon» glyphs allowed outside core/icons.js (not interface)
 /* symbols that read as pictures: arrows, maths and technical signs, box/geometric shapes, misc symbols, dingbats, supplemental
    arrows and maths, letterlike signs, fullwidth forms, every emoji plane */
 const isGlyph=cp=>(cp>=0x2100&&cp<=0x214F)||(cp>=0x2190&&cp<=0x23FF)||(cp>=0x2460&&cp<=0x24FF)||(cp>=0x2500&&cp<=0x2BFF)||(cp>=0xFF01&&cp<=0xFF5E)||cp>=0x1F000;
@@ -37,7 +37,7 @@ function walk(dir, out=[]){
     if(statSync(join(ROOT,rel)).isDirectory()){ if(!SKIP_DIRS.has(n)) walk(rel,out); } else out.push(rel); }
   return out;
 }
-const isShippedText=f=>/^(index\.html|style\.css|sw\.js|manifest\.json)$/.test(f)||/^src\/.+\.js$/.test(f)||/^data\/.+\.json$/.test(f);
+const isShippedText=f=>/^(index\.html|style\.css|sw\.js|manifest\.json)$/.test(f)||/^core\/.+\.js$/.test(f)||/^core\/data\/.+\.json$/.test(f);
 const isRefText=f=>/^docs\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
 export function gather(){
   const files=walk('').sort(), texts={};
@@ -122,12 +122,12 @@ export function check(inp){
     if(!use.has(g.ch)) diff.push(`glyph ${g.ch} (${g.name}): listed but no longer used — remove it from ${REG_FILE}`); }
   for(const [ch,fs] of use){ cases++; if(!listed.has(ch)) diff.push(`glyph ${ch} (U+${ch.codePointAt(0).toString(16).toUpperCase()}) used in ${[...fs].join(', ')} — not in the audit list of ${REG_FILE} (add it: name, kind)`); }
   if(!items.some(it=>it.class==='glyph')) diff.push('the register has no «glyph» entry for the Unicode symbols');
-  /* (5b) UI1b: an interface glyph («icon» kind) appears only in the icon component src/icons.js; the interface renders it by name
+  /* (5b) UI1b: an interface glyph («icon» kind) appears only in the icon component core/icons.js; the interface renders it by name
      (icon('name'), «{i:name}» in a dictionary string, data-icon in the markup). Exempt: probes (they compare what the screen shows) and
      modules whose «icon» glyphs are console texts for the developer (ICON_EXEMPT, with the reason). */
   for(const [ch,fs] of use){ const g=listed.get(ch); if(!g||g.kind!=='icon') continue;
-    for(const f of fs){ if(f==='src/icons.js'||f.startsWith('src/probes/')||ICON_EXEMPT[f]) continue; cases++;
-      diff.push(`glyph ${ch} (${g.name}) used in ${f} outside the icon component src/icons.js — render it by name: icon('…'), {i:…} in a dictionary string, data-icon in the markup (UI1b)`); } }
+    for(const f of fs){ if(f==='core/icons.js'||f.startsWith('core/probes/')||ICON_EXEMPT[f]) continue; cases++;
+      diff.push(`glyph ${ch} (${g.name}) used in ${f} outside the icon component core/icons.js — render it by name: icon('…'), {i:…} in a dictionary string, data-icon in the markup (UI1b)`); } }
   // (6) the generated document
   const md=renderMd(reg, use); cases++;
   if(inp.md!==md) diff.push(`${MD_FILE} is out of date (or missing) — run: node tools/check-licences.mjs --write`);
@@ -174,10 +174,10 @@ export function controls(inp, base){
     ['an unlisted URL', i=>{ i.texts['index.html']+='\n<script src="https://cdn.example.com/x.js"></script>'; }, /cdn\.example\.com/],
     ['an unlisted CSP host', i=>{ i.texts['index.html']=i.texts['index.html'].replace("connect-src 'self'", "connect-src 'self' https://collector.example.net"); }, /CSP allows https:\/\/collector/],
     ['a GPL licence', i=>{ i.reg.items.find(x=>x.class==='code').licence='GPL-3.0'; }, /GPL-3\.0.*refused/],
-    ['an unlisted glyph', i=>{ i.texts['src/ui.js']+="\nconst probeGlyph='⚡';"; }, /glyph ⚡/],
-    ['an interface glyph outside the icon component', i=>{ i.texts['src/ui.js']+="\nconst probeIcon='▶';"; }, /glyph ▶ .* outside the icon component/],
+    ['an unlisted glyph', i=>{ i.texts['core/legacy-ui/ui.js']+="\nconst probeGlyph='⚡';"; }, /glyph ⚡/],
+    ['an interface glyph outside the icon component', i=>{ i.texts['core/legacy-ui/ui.js']+="\nconst probeIcon='▶';"; }, /glyph ▶ .* outside the icon component/],
     ['an unlisted image file', i=>{ i.files.push('icons/extra.svg'); }, /icons\/extra\.svg/],
-    ['a reference-only address in a shipped file', i=>{ const it=i.reg.items.find(x=>x.use==='reference'&&(x.urls||[]).length); if(it) i.texts['src/ui.js']+=`
+    ['a reference-only address in a shipped file', i=>{ const it=i.reg.items.find(x=>x.use==='reference'&&(x.urls||[]).length); if(it) i.texts['core/legacy-ui/ui.js']+=`
 const probeRef='${it.urls[0]}';`; }, /reference-only address/],
     ['a package version bump', i=>{ const k=Object.keys(i.lock.packages||{}).find(Boolean); if(k) i.lock.packages[k].version='999.0.0'; }, /999\.0\.0/],
   ];

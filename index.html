@@ -5,7 +5,7 @@
 <meta charset="utf-8"/>
 <!-- PRIV1 (hard rule #33): the browser itself refuses any address not listed here. connect-src/script-src name only our own origin and
      the pinned MediaPipe files (register tools/licences.json); the Vercel counter is same-origin. No inline script (the counter's stub is
-     src/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
+     core/va-stub.js); 'wasm-unsafe-eval' lets the hand model's WebAssembly compile; inline style attributes stay allowed. A new host needs
      the user's decision, a register entry and a line here. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ 'wasm-unsafe-eval'; connect-src 'self' https://cdn.jsdelivr.net/npm/@mediapipe/ https://storage.googleapis.com/mediapipe-models/; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
@@ -26,7 +26,7 @@
      Считает посетителей ТОЛЬКО на развёртывании Vercel: путь /_vercel/ АБСОЛЮТНЫЙ, а GitHub Pages
      отдаёт из подпапки — там он не разрешается, и счётчик молча бездействует. Так и задумано.
      Сбор данных должен быть включён и в панели Vercel (уже включён). -->
-<script src="src/va-stub.js"></script>
+<script src="core/va-stub.js"></script>
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
@@ -257,7 +257,7 @@
  
 <!-- ================= ОБУЧЕНИЕ (тур) =================
      Полупрозрачная полоса-подсказка поверх игры (сетку/руки видно). Текст/точки/кнопки ставит
-     src/tutor.js (динамически, поэтому без data-i18n). Next доступен всегда, Skip оставляет играть. -->
+     core/tutor.js (динамически, поэтому без data-i18n). Next доступен всегда, Skip оставляет играть. -->
 <div id="tutorBar">
   <div id="tutorText"></div>
   <!-- Объяснение шага: ОТДЕЛЬНАЯ строка ПОД инструкцией, меньше/тише — читается одним блоком «что делать → как устроено». Видна сразу, без таймаута. -->
@@ -275,7 +275,7 @@
 
 <!-- ================= СПИСОК УРОКОВ (обучение) =================
      Модальное меню уроков: открывается с «Обучение» на старте И при выходе из урока (возврат к списку).
-     Заголовок/строки/кнопки ставит src/tutor.js (динамически, без data-i18n). -->
+     Заголовок/строки/кнопки ставит core/tutor.js (динамически, без data-i18n). -->
 <div id="lessonOv" class="ov">
   <div class="lessonCard">
     <div class="lessonHead"><b id="lessonTitle"></b><button id="lessonClose"></button></div>
@@ -551,7 +551,7 @@
 <!-- ================= ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» =================
      Отдельный оверлей ПОВЕРХ стартового экрана (z выше #start): показывает подпись сцены,
      пока звучит мотив. Не трогает стартовый поток — по «Пропустить»/окончании гаснет,
-     под ним снова стартовый экран. Камера не запрашивается. Логика — src/demo.js. -->
+     под ним снова стартовый экран. Камера не запрашивается. Логика — core/demo.js. -->
 <div id="demoOv" class="ov">
   <div class="demoInner">
     <div id="demoScene">1 / 6</div>
@@ -563,7 +563,7 @@
 </div>
 
 <!-- RUN 7 (C6 + C11): THE CALM SHELL — the user's design (Moonglass controls in a glass capsule, the Hush emblem). Shown only in the Calm
-     face (body.calm); src/calmshell.js drives it. Hands in view → only the scene; no hand for 1.5 s → the controls fade in. Every word is a
+     face (body.calm); core/calmshell.js drives it. Hands in view → only the scene; no hand for 1.5 s → the controls fade in. Every word is a
      dictionary key (en + ru), every picture a drawn icon by meaning (data-svg). No cents, Hz or role names anywhere. -->
 <div id="calmShell" hidden>
   <div id="calmLantern" class="calm-lantern" hidden></div>
@@ -614,7 +614,7 @@
 <video id="video" playsinline muted autoplay></video>
 <canvas id="canvas"></canvas>
  
-<script type="module" src="src/main.js"></script>
+<script type="module" src="core/main.js"></script>
 </body>
 </html>
  
