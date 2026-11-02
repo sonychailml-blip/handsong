@@ -2048,3 +2048,5 @@ same; the screenshot comparison shows small rendering differences because this s
 - The old product name → Night across code, CSS, pages, data, keys, rows, screens, flags (`tools/split-names.mjs`, 786 lines in 73 files; exceptions per plan §5.2: `nightSky`, `--cv-hn-*`, `night-fx.js`, `cycle.js`, `nightui.js`). `profile.night` is the one rule #37 exception (user, Q4).
 - `apps/night/migrate.js` moves the 9 old setting names on one origin; rows «NIGHT migrate» and «OLD NAME gone» (docs join its scan at CP F). Night's page has its own title and manifest.
 - Row flag `night:true` replaces the old flag (not `suite`/`both`, plan §7.1): the suite is now the probe's folder, the flag only marks a core row that also runs on Night's page. Prints unchanged; the baseline is read through the same table.
+
+> 2026-11 (SPLIT-2): the product "Calm" was renamed "Handsong Night" (code id `night`). Everything before this line uses the old name; nothing after it does.

@@ -1,4 +1,4 @@
-/* AUD2b (RUN 3, 2026-10-16; docs/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order),
+/* AUD2b (RUN 3, 2026-10-16; docs/core/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order),
    each effect built ALONE by its own factory (`make(E)`) on the render copy in a short offline context (render.engineProbe), a fixed noise
    burst in, its output read back. The contract every effect module keeps (and the WASM effects will be held to):
    (1) PARAMETER ROUND TRIP — every declared parameter: the default lies in [min, max]; setNorm(x) → getNorm() = x for x = 0, ¼, ½, ¾, 1;

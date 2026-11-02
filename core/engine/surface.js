@@ -1,4 +1,4 @@
-/* AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C): THE ENGINE'S OUTWARD SURFACE — every name core/audio.js exports, listed by
+/* AUD1a (RUN 3, 2026-10-16; docs/core/AUD1-design.md option C): THE ENGINE'S OUTWARD SURFACE — every name core/audio.js exports, listed by
    the module that calls it (static named imports, namespace uses, makeENG's A.*, the render copy's eng.*). Data only, no imports.
    ⛳ At W0 (stage 5) this surface is re-implemented by the engine instance object and, for the Rust → WASM engine, by the worklet bridge —
    callers do not change. Static check «engine surface»: every name here is exported by audio.js, every export is here, and every module's

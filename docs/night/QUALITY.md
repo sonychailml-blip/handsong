@@ -1,6 +1,6 @@
-# CALM QUALITY BAR (user, RUN 7, 2026-10-17)
+# NIGHT QUALITY BAR (user, RUN 7, 2026-10-17)
 
-Every Calm slice is checked against these ten points; each slice record (WORK-LOG, HANDOFF) names the points it touched and how.
+Every Night slice is checked against these ten points; each slice record (WORK-LOG, HANDOFF) names the points it touched and how.
 
 1. **Sound** — organic, rich; no clicks, no harshness, no sudden loudness; soft highs for long headphone sessions; balanced levels between
    timbres and between moods.
@@ -12,7 +12,7 @@ Every Calm slice is checked against these ten points; each slice record (WORK-LO
 7. **Reliability** — no freezes, no overheating, polite camera / permission messages.
 8. **Depth over time** — a simple start, things to discover (moods, depth, two hands, effects); the forest slowly alive (later: the moon
    moving, a distant bird).
-9. **Respect** — no streaks, no pressure; a SLEEP TIMER (15 / 30 / 60 min: the forest and the playing fade out gently) in Calm v1's controls.
+9. **Respect** — no streaks, no pressure; a SLEEP TIMER (15 / 30 / 60 min: the forest and the playing fade out gently) in Night v1's controls.
 10. **Consistency** — one set of fonts, words, spacing and icons everywhere.
 
 ## How a slice is checked

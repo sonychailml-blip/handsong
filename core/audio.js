@@ -2155,7 +2155,7 @@ function hit(owner, h, time){ if(owner) hitOwner(owner); drumHit(h.row,h.vel,h.k
 /* the drone of a drone event; owner = its track key or null (live); d { view (the event's view, null = live), level } */
 function drone(owner, d, time){ if(owner) dronePan(ownerPan(owner),time); droneUse(d.view||null); droneOn(d.level*(owner?ownerGain(owner):1),time); }
 
-/* ═══ AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md, option C + review R1): THE ENGINE CONTEXT `E` OF THIS MODULE INSTANCE ═══
+/* ═══ AUD1a (RUN 3, 2026-10-16; docs/core/AUD1-design.md, option C + review R1): THE ENGINE CONTEXT `E` OF THIS MODULE INSTANCE ═══
    One per instance — the live engine (`audio.js`) and the render copy (`audio.js?render`) each have their own; never shared.
    ⛳ E is the ONE place code moved out of audio.js (AUD1c timbres, AUD2 effects, engine/fdn) reads engine state from. Every field is a
    GETTER over this instance's module variable (R1): E can never hold a stale copy — after initAudio, after the worklets loaded, after a

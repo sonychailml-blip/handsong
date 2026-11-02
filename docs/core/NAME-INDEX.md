@@ -2,7 +2,7 @@
 
 _Generated from `core/`, `apps/`, `tools/probes/` by `node tools/name-index.mjs --write`; checked by the data runner (row «NAME-INDEX current»). Consult by grep.
 Kinds: fn, const, let, class, «→ ./x.js» a re-export. Meaning of a name: the code and `archive/CLAUDE-history.md`. The hand-written index
-before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of this file (kept by hand in `docs/STALE-NAMES.md`)._
+before this tool: `archive/NAME-INDEX-before-RUN5.md`. Removed names: the end of this file (kept by hand in `docs/core/STALE-NAMES.md`)._
 
 ## apps/full/demo.js
 ===================================================================== ДЕМО «ПУТЕШЕСТВИЕ ПО СТРОЯМ» (прототип, side-experiment) --------------------------------------------------------------------- …
@@ -111,7 +111,7 @@ AUD2a (RUN 3, 2026-10-16) — THE FDN REVERB: allpass diffusers, four delay line
 - fn (4): `apStage`, `buildFDN`, `setRevDecay`, `setRevTone`
 
 ## core/engine/surface.js
-AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C): THE ENGINE'S OUTWARD SURFACE — every name core/audio.js exports, listed by the module that calls it (static named imports, namespace uses, m…
+AUD1a (RUN 3, 2026-10-16; docs/core/AUD1-design.md option C): THE ENGINE'S OUTWARD SURFACE — every name core/audio.js exports, listed by the module that calls it (static named imports, namespace us…
 - const (2): `SURFACE`, `SURFACE_INTERNAL`
 
 ## core/engine/worklets/dyn-worklet.js
@@ -253,12 +253,12 @@ DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis
 - fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
 
 ## core/legacy-ui/views/scene/host.js
-VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
+VIS1b (RUN 6, docs/core/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
 - const (13): `BACKGROUNDS`, `sceneRoomAdd`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
 - fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## core/legacy-ui/views/stack.js
-VIS1a (RUN 6, docs/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room, VIS1b) · background (the camera picture) · instrument (the play s…
+VIS1a (RUN 6, docs/core/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room, VIS1b) · background (the camera picture) · instrument (the p…
 - const (2): `LAYERS`, `stackList`
 - fn (3): `stackAdd`, `stackSet`, `stackFrame`
 
@@ -417,7 +417,7 @@ RUN 7 (C4c, Night plan §4.6; docs/night/QUALITY.md points 1, 5, 8) — THE FORE
 - fn (3): `windNoise`, `cricketStream`, `chirpShape`
 
 ## core/pure/bus.js
-VIS1a (RUN 6, docs/VIS1-design.md §3) — THE EVENT BUS for visuals.
+VIS1a (RUN 6, docs/core/VIS1-design.md §3) — THE EVENT BUS for visuals.
 - const (2): `RING_N`, `BUS`
 - fn (1): `createBus`
 
@@ -550,7 +550,7 @@ REC3 part 2 (stage 3) — COPY, PASTE, DUPLICATE (ED2) — moved from recorder.j
 - fn (2): `editCopySel`, `editDuplicateSel`
 
 ## core/song/commands.js
-CMD1c (RUN 5) — EVERY HISTORY STEP A COMMAND, SERIALISED BY IDS (plan docs/CMD1-design.md §3.4).
+CMD1c (RUN 5) — EVERY HISTORY STEP A COMMAND, SERIALISED BY IDS (plan docs/core/CMD1-design.md §3.4).
 - const (2): `HIST_FORMAT`, `cmdDbg`
 - fn (3): `histToJSON`, `histFromJSON`, `histRoundTrip`
 
@@ -669,7 +669,7 @@ ENG2 (RUN 4): row «ENG2 engine readouts» (quick and all; reads only, ≈ 3 s).
 - fn (1): `checkEngReadouts`
 
 ## tools/probes/core/engine.js
-AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
+AUD1a (RUN 3, 2026-10-16; docs/core/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
 - fn (3): `checkEngineCtx`, `dumpCensus`, `checkCensus`
 
 ## tools/probes/core/files.js
@@ -678,7 +678,7 @@ PROBE1: Tunings-as-files probes: the F0 snapshot, naming, snapshot renewal, user
 - fn (9): `dumpScales`, `checkFiles`, `checkNames`, `renewSnapshot`, `checkUserDelete`, `checkUserChordModes`, `checkMerge`, `checkBare`, `checkRootAlone`
 
 ## tools/probes/core/fxcontract.js
-AUD2b (RUN 3, 2026-10-16; docs/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order), each effect built ALONE by its own factory (`make(E)`) on the …
+AUD2b (RUN 3, 2026-10-16; docs/core/AUD1-design.md §7): GENERATED CONTRACT ROWS — one per effect of audio.FX_FACTORY (its keys, its order), each effect built ALONE by its own factory (`make(E)`) on…
 - fn (1): `checkFx`
 
 ## tools/probes/core/gold.js
@@ -743,7 +743,7 @@ TIM3 (RUN 4): timbres as data — the proof that nothing changes.
 - fn (10): `install`, `list`, `remove`, `exportFile`, `storeUnchecked`, `example`, `brokenExample`, `chordModesExample`, `installChordModesExample`, `installExample`
 
 ## tools/probes/core/vis.js
-VIS1a (RUN 6, docs/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
+VIS1a (RUN 6, docs/core/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
 - fn (1): `checkVisStack`
 
 ## tools/probes/full.js
@@ -890,3 +890,5 @@ _168 modules, 2142 exported names._
   `verb`/`verbOut`/`revLead`/`revCh`, `leadOwner`, `fxAttach`/`fxRoleBus`/`fxRoleOut`, `roleXDriven`, `bassOwner`, `soloNoteHand`,
   per-voice `dlySend`/`revSend`, `RELEASE_TAILS` as a rule, `vision.setPicture`, `VISION_DEF.picture`, `swPicMatched`/`swPicLive`,
   `diag.sw.pic*` keys, latmeter report `detection.picture` (LAT3: the live-camera picture switch removed), `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
+
+SPLIT-2 (2026-11; table: `tools/split-names.mjs`). The product's old name: `CALM_*`, `calm*`, `.calm-*`, `--calm-*`, `calm.*` keys, `calm-*` screens, rows `CALM x`, `P.calm`, runner `--calm` → the same with night; `calmNight` → `nightSky`; `--cv-calm-*` → `--cv-hn-*`; `calmshell.js` → `apps/night/shell.js`; `modules/effects/calm.js` → `night-fx.js`; `core/calmui.js` → `core/pure/nightui.js`; `profile.calm` → `profile.night` (the one exception of rule #37); `?calm` → the page `apps/night/`; EDITION value `calm` → `release`. The Full ↔ Night switch: `#profRow`, `#calmToFull`, `profFull`, `profCalm`, `profSep`, `profHint`, `profileBoot`. Folders: `src/` → `core/`, `src/core/` → `core/pure/`, `src/views/` → `core/legacy-ui/views/`, `data/` → `core/data/`, `src/probes/` → `tools/probes/`, `src/scaleprobe.js` → `tools/probes/full.js`, `src/main.js` → `core/legacy-ui/boot.js` + `apps/*/main.js`. Files: root `BACKLOG.md`, `WORK-LOG.md`, `NIGHT-LOG.md`, `UI-MAP.md` → `docs/<track>/` and `archive/`.

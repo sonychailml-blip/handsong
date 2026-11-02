@@ -443,15 +443,19 @@ async function timbreCore(){
   n++; if(T.checkTimbre(recs[0])!==null) miss('the first record is refused');
   return { cases:n, total:d.length, differences:d };
 }
-/* SPLIT-2 (plan §5.2): the old product name is gone from the code. Exempt: tools/prints (byte-identity is the proof), vendor, the one migration file, the split tools; the docs and logs join at CP F.
-   Built from parts, so this file passes its own scan. CONTROL: a planted word in each spelling must be caught. */
+/* SPLIT-2 (plan §5.2): the old product name is gone from the code, the docs and the live logs. Exempt: archive/ (history), tools/prints (byte-identity is the proof), vendor, the one migration file, the split tools,
+   STALE-NAMES (its job) and the generated NAME-INDEX (made from the scanned code + that list); in a log the plan's one note line (§8) is allowed, nothing else.
+   Built from parts, so this file passes its own scan. CONTROL: a planted word in each spelling must be caught, in a log too; the note alone must not be. */
 async function oldNameGone(){
   const fs=await import('node:fs'), root=new URL('../', import.meta.url), d=[]; let n=0;
-  const WORD=new RegExp('ca'+'lm','i'), RU=new RegExp('Спо'+'койн'), EXEMPT=/^(tools\/split-[^/]*|apps\/night\/migrate\.js)$/;
-  const scan=(name,text,out)=>{ if(WORD.test(text)||RU.test(text)) out.push(name+': holds the old name'); };
-  const walk=rel=>fs.readdirSync(new URL(rel, root),{ withFileTypes:true }).flatMap(e=>{ const p=rel+e.name; if(e.isDirectory()) return (e.name==='vendor'||e.name==='prints'||e.name==='node_modules'||e.name==='split-baseline'||e.name.startsWith('.')) ? [] : walk(p+'/'); return /\.(js|mjs|css|html|json)$/.test(e.name) ? [p] : []; });
-  for(const f of ['core/','apps/','tools/'].flatMap(walk).concat(['index.html'])){ if(EXEMPT.test(f)) continue; n++; scan(f, fs.readFileSync(new URL(f, root),'utf8'), d); }
+  const WORD=new RegExp('ca'+'lm','i'), RU=new RegExp('Спо'+'койн'), EXEMPT=/^(tools\/split-[^/]*|apps\/night\/migrate\.js|docs\/core\/STALE-NAMES\.md|docs\/core\/NAME-INDEX\.md)$/,
+    NOTE='> 2026-11 (SPLIT-2): the product "'+'Ca'+'lm" was renamed "Handsong Night" (code id `night`). Everything before this line uses the old name; nothing after it does.';
+  const scan=(name,text0,out)=>{ const text=text0.split(NOTE).join(''); if(WORD.test(text)||RU.test(text)) out.push(name+': holds the old name'); };
+  const walk=rel=>fs.readdirSync(new URL(rel, root),{ withFileTypes:true }).flatMap(e=>{ const p=rel+e.name; if(e.isDirectory()) return (e.name==='vendor'||e.name==='prints'||e.name==='node_modules'||e.name==='split-baseline'||e.name.startsWith('.')) ? [] : walk(p+'/'); return /\.(js|mjs|css|html|json|md)$/.test(e.name) ? [p] : []; });
+  for(const f of ['core/','apps/','tools/','docs/'].flatMap(walk).concat(['index.html','CLAUDE.md','HANDOFF.md','THIRD-PARTY-LICENSES.md'])){ if(EXEMPT.test(f)) continue; n++; scan(f, fs.readFileSync(new URL(f, root),'utf8'), d); }
   for(const planted of ['a Ca'+'lm word','--ca'+'lm-x','CA'+'LM_X','«Спо'+'койный»']){ const o=[]; n++; scan('x',planted,o); if(!o.length) d.push('CONTROL: a planted old name was not caught: '+planted); }
+  { const o=[]; n++; scan('x',NOTE,o); if(o.length) d.push('CONTROL: the note line alone was caught'); }
+  { const o=[]; n++; scan('x',NOTE+' and a Ca'+'lm word',o); if(!o.length) d.push('CONTROL: an old name beside the note was not caught'); }
   { const o=[]; n++; scan('x','спокойно, by the way',o); if(o.length) d.push('CONTROL: the ordinary Russian adverb was caught'); }
   return { cases:n, total:d.length, differences:d };
 }
@@ -745,7 +749,7 @@ try{
   REG=await import(new URL('../tools/probes/core/rows.js', import.meta.url).href);
   ({ loadReport }=await import(new URL('../core/scaleload.js', import.meta.url).href));
   LIC=await import(new URL('./check-licences.mjs', import.meta.url).href);   // LIC1: the licence register (text only, no app code)
-  NIX=await import(new URL('./name-index.mjs', import.meta.url).href);   // DOC1 leftover: docs/NAME-INDEX.md generated from the code (text only)
+  NIX=await import(new URL('./name-index.mjs', import.meta.url).href);   // DOC1 leftover: docs/core/NAME-INDEX.md generated from the code (text only)
   LAT=await import(new URL('../core/pure/latency.js', import.meta.url).href);
   HS=await import(new URL('../core/pure/handsched.js', import.meta.url).href);   // LAT2: the search schedule (pure core)
   CL=await import(new URL('../core/pure/camlight.js', import.meta.url).href);    // LAT3: low light (pure core)

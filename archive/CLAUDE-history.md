@@ -1799,3 +1799,141 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 
 - RUN 7 (C6: Calm hides Full's top bar; diagnostics through ⓘ) updated step 105's first line (old line verbatim):
 105. GPU sharing — Forest vs Dark (review R2; desktop Intel HD 4000 / GT 635M, then the Poco M5): Calm (`?calm`) → «🎛 Sound» → Diagnostics →
+
+### SPLIT-2 CP F (2026-11-02), old lines verbatim
+- ⛳ **Console guard** (AUTO-PROBE): `window.P` = `scaleprobe.api()` — every probe function behind one lock; while any probe runs
+**Handsong** (repo folder `air-synth-3`; old name only in doc titles): a gesture-controlled synthesizer and interactive
+scales/tunings tutorial, entirely in the browser. Webcam + MediaPipe hand tracking; pinches play notes/chords/bass/drums/effects;
+all sound is Web Audio. On top: a **linear multitrack recorder** (events in ABSOLUTE song beats on tracks; a take creates a track
+- ES modules under `src/`, loaded by `<script type="module" src="src/main.js">`. No build, no app dependencies, no unit tests.
+  `index.html` = markup only, `style.css` = all CSS; the only external dependency is `@mediapipe/tasks-vision` from a CDN
+  (`vision.js`). Root also has `manifest.json` + `sw.js` (PWA pair). Dev tools only: `tools/` (`package.json` with
+  `playwright-core`, `tools/node_modules/` git-ignored).
+- Serve over HTTPS or `localhost` (camera + wakeLock need a secure context; `file://` fails). Team default: VS Code Live Server,
+  `http://127.0.0.1:5500`. Phone: `npx cloudflared tunnel --url http://localhost:5500`, cache bust `?v=N`.
+- Scale data are JSON files in `data/`, fetched at start. MediaPipe model/WASM/library come from CDNs — internet required. ⚠️ The app
+  does not work offline at all (SW caches nothing on purpose). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
+- `?probe` in the address loads the probe (`window.P`, guarded) and the render/ear tools (`window.R`) and user files (`window.U`).
+- **What a new session reads:** `HANDOFF.md` and this file. Open the archives, `BACKLOG.md`, `docs/NAME-INDEX.md` (every code name by
+- ⛳ **Slice records in `HANDOFF.md`** (user's rule, DOCS-EN): English, at most about 15 lines; details go to
+- **Docs:** `HANDOFF.md` stays under ~20 KB; this file stays concise — keep every rule, put long reasoning in the archive.
+  BACKLOG.md / UI-MAP.md stay Russian; any section you edit is rewritten in English.
+  data modules (`probedata.js` → scales/state/i18n and their imports) against `data/`, prints a line per check and ALWAYS a final
+  latency stats (core)» runs `src/core/latency.js` (also «LAT2 search schedule (core)» `core/handsched.js`, «LAT3 low light (core)»
+  `core/camlight.js`) — the CORE is pure by design (no DOM, Web Audio, camera, network) and may run in node.
+  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 15 since LAT2; seed 3, start 3), `--limit-quick M` (P.quick; NIGHT-0, 2026-10-16: without it 3 min × the SLOW FACTOR measured from P.quick's own rows — each finished row with a reference time in `SLOW_REF` (CPU-bound rows of an idle run, P.quick 112.9 s; LAT/CAM rows are time-based and left out) adds to observed / reference; from 3 rows on, factor = that ratio (1 below 1.2, at most 6) and the deadline moves with it; printed «machine speed: … slow factor …»; a busy Chrome outside the runner made rows 3–4× slower and the fixed 3 min failed). Full console →
+- **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; (12) the engine surface `src/engine/surface.js`; (13) rule #38; static import names vs exports with
+  called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module
+  under `src/song/` imports only `song/`, `core/`, `config.js` and (REC3) the pitch truth `scales.js` — and the import cycles (printed; a
+  `...x` counts as used; (11) design tokens — see `tokens.css`; each with a CONTROL) and `node --check` on changed files. Report the result.
+- **Read `src/` before changing anything**; re-verify every line number.
+  `src/scaleprobe.js` and `src/probes/*` are callers too. The report LISTS every positional caller of every changed function with its arguments.
+- **Scale data snapshot (F0):** `P.dumpScales()` → `tools/scales.before.json`; `await P.checkFiles()` compares the live registry with
+- **A scale (mode)** = a file `data/modes/<id>.json` + its id APPENDED at the end of `modes` in `data/index.json` (comments go to
+  `data/README.md`; the loader's validator must accept it, else it is skipped). v1 shape: `tuning`, `degrees` (tuning indices),
+- **A typed-chord family set** = `data/palettes/<id>.json` (`kind:'steps'|'ratios'`, ratios as strings) + id in `palettes` of
+  `data/index.json`; integer steps for edo/`gridChords` scales, ratios for cents/period ratio scales.
+  choice among proposals, AFTER the missing parts exist (effects constructor — redesigned once built —, expression lab, Calm, MIDI, audio
+  in); inventory and principles: `docs/UX-INVENTORY.md`.
+- **An interface glyph / icon** = a name in `src/icons.js` `ICONS` (by meaning), rendered by `icon(name)`, `{i:name}` in a dictionary
+  `tokens.css` first, then `var(--token)` (a CANVAS colour: a `--cv-*` token, drawn with `palette.cv('name')` — DRAW1b).
+1. **The AudioContext is created only inside the start click** (`#startBtn`; `main.startApp`, shared by Play and Learn, creates it in
+   once; the canvas draws the snapshot whose hands are current, overlays on top (`main.onHands` keeps it as `shown`; the live `<video>` only
+    the Calm release through UI1's design tokens and icon component).
+    Content-Security-Policy `<meta>` first in `index.html` — `connect-src`/`script-src` list only our origin and the MediaPipe paths, no
+    inline script (`src/va-stub.js`), `'wasm-unsafe-eval'` for the model, no `'unsafe-eval'`; a new host needs the user's decision, a
+    back to 'continuous', other touched controls to their originals — `core/camlight.restoreConstraints`). ⛳ 0a (user, 2026-10-15): the
+36. ⛳ **The core is pure** (FMT1; the plan's #35): `src/core/**` never touches the DOM, Web Audio, the camera, MIDI or the network and runs in
+    node (the data runner's core rows); file formats (`core/format.js`) and ids (`core/registry.js`) live there.
+    readable fixed id (`chord.firefly`, kebab-case, dotted families), user records `u.<uuid>` (generated), pack records `<pack>/<name>`; the
+    display name is editable, per language; the ORDER of a list is a separate per-user list of ids (reorder / hide / delete never touch a
+    list». ⛔ Never rename or reuse an id (the TIM1 probe pins the list).
+38. ⛳ **An engine submodule is STATELESS** (AUD1b, RUN 3 2026-10-16; strategist's review of the AUD1 plan): a module under `src/modules/**`
+   or `src/engine/**` (the worklet processors in `src/engine/worklets/` excepted) keeps no state of its own — no top-level `let`/`var`, no
+   variables, never a stale copy — R1). It imports only `core/`, `config.js`, `scales.js` and the stateless tree itself (`src/modules/**`,
+   `src/engine/**`; widened at AUD2a — the effects use the timbre stages and `engine/fdn.js`). Why: such a module is imported
+- **Docs:** `HANDOFF.md` and this file in concise English; archives Russian verbatim; BACKLOG/UI-MAP Russian except sections edited later.
+section title). The long reasoning behind each section: `archive/CLAUDE-full.md`. State, open decisions, work order: `HANDOFF.md`.
+- ⛳ **`docs/NAME-INDEX.md` is GENERATED** (RUN 5): after adding, removing or renaming an export run `node tools/name-index.mjs --write`
+  (the data row «NAME-INDEX current» fails otherwise); removed names are kept by hand in `docs/STALE-NAMES.md`.
+- **A timbre or kit** (TIM3, RUN 4) = a RECORD file `data/timbres/<id>.json` (`handsong/timbre` v1: family, engine — chord2 / tine / bass2 /
+  subtractive / fm2 / ks / drumkit —, name, recipe, env, policies with today's role values) + its id APPENDED to `data/timbres/index.json` `order`, then
+  permanent `id` (rule #37; add it to the probe's pinned list `TIMBRE_IDS_PINNED`); the T5 bounds of `core/timbre.js` must accept it. APPEND
+  their parameters; a new row SYNTH is code (+ its parameter list in `core/timbre.js KIT_SYNTHS`, bounded).
+- **A profile** (C0) = `data/profiles/<name>.json` (`handsong/profile` v1) + its name in `data/profiles/index.json` `order` + its id in
+  `core/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
+- **Calm's per-timbre settings** (RUN 8; the user: Full exactly as at RUN 7) live in the PROFILE, never in a timbre record: `levels` {id: dB}
+  (`audio.setTimbreTrim`), `voices` {id: strikes} (`audio.setCalmStrikes` — the struck banks take Calm's cheaper strike + the cap only while
+  `state.setVolFloor`). All set by the Calm face; Full and every render copy have none.
+One line per module. Every name per module: `docs/NAME-INDEX.md` (grep it). The FULL map as it stood at DOC1, with every slice's
+detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — grep it by module or slice name.
+- **Root:** `index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`); `tokens.css` THE design tokens (DOM + canvas `--cv-*`;
+  static check 11); `style.css` all CSS through tokens; `manifest.json`/`sw.js` PWA (cache-free SW); `src/va-stub.js` counter stub.
+- `src/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
+- `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents`, `aRef`, `tunedFrom`, timbres, `handFn`,
+- `src/hooks.js` — nullable callbacks for lower layers (`tutor`, `cleared`, `af`, `afRow`, `key`, `renderBusy` …).
+- `src/i18n.js` — `LANGS`, `DICTS`, `t()`, `L()`, `applyI18n`. `src/icons.js` — THE icon component (`ICONS` by meaning, `icon`,
+  `iconText`, `applyIcons`). `src/palette.js` — canvas colours from tokens (`cv(name)`, `ROLE_COL`).
+- `data/` + `src/scaleload.js` — scale data as JSON (v1; manifest order = menu order); per-file validation; user files after built-ins.
+- `data/timbres/` + `src/timbreload.js` (TIM3a) — timbre records (one file per timbre = the truth; the app loads the GENERATED
+  `data/timbres.bundle.json` — `node tools/timbre-bundle.mjs` after any edit), checked by `core/timbre.js` (T5 bounds).
+  `src/userstore.js`/`src/userfiles.js` — user files (IndexedDB, `u.<uuid>`), `window.U`.
+- `src/scales.js` — teaching layer + PITCH TRUTH: builder → `TRADITIONS`, `TUNINGS`, `CHORD_FAM_SETS`, `SCALES`; `pitchHz`; `chordNotes`;
+- `src/audio.js` — the Web Audio engine instance: pools, allocation, routing, drums, drone, metronome, `FX_FACTORY`, chain wiring, track
+- `src/engine/surface.js` — every audio.js export listed by caller (static check 12). `src/engine/fdn.js` — FDN reverb. `src/engine/
+- `src/modules/timbres/` — stateless timbre builders (`stages.js`, `voice.js`, `fm.js`, `ks.js`, `subtractive.js`, `chord-voice.js`,
+  breathing sustained sounds — RUN 7, Calm's sound pass); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
+  `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; RUN 7 Calm-only: `forestdepth.js` «Forest depth», `calm.js` Echo · Warmth / Brightness
+  · Wave); `src/modules/ambience/forest.js` the forest's ambience (RUN 7). All: rule #38, first argument `E`.
+- RUN 8: `src/modules/timbres/strikes.js` — Calm's strike cap (caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); «Forest depth» gained `reach` (the «Лес»
+  slider) and `light` (C8 «Lighter forest», the FDN room); `views/play.js` Calm fingertip fireflies + the oval row glow; `calmshell.js` the
+  bars, the effects hint, «Lighter forest», «Measure this device»; `views/scene/host.js` quality levels (`setSceneLevel`) + the Forest blend.
+- RUN 9 (the living forest, Calm only): `core/night.js` (pure: the 24-min night cycle `nightAt`, sleep `nightDeep`, mood looks, rare events
+  `rareStep`, the emblem's points), `core/forestlife.js` (pure: the stream, mushroom / flower places, ring lists); `views/scene/forest-life.js`
+  (ground waves, mushrooms, the stream + Echo's rings, sway), `forest-detail.js` (grass, leaves, moths, moonbeams, silhouettes), `forest-rare.js`
+  (star, flower, emblem); bus topic `calmNight` { mood, sleep, wind }; host levels high / medium (default) / low with a resolution scale.
+- `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
+- `src/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
+- `src/transport/clock.js` — transport state `loop`, song length, brace math, metre map, setters, ⛳ beat ↔ time (rule #35).
+  `src/transport/scheduler.js` — replay cursors, `scheduleLayers`, chase, `fireNear`, metronome, `tick`, `startTransport`, `seekTo`.
+- `src/freeze/registry.js` — frozen tracks by lane id, `freezeSig`/`freezeState`, watcher reads, install, 16-bit store, the AF2 swap, seams.
+  `src/frzqueue.js` — auto-freeze watcher (AF3) + queue (AF1), loaded by `render.js`.
+- `src/live/` — `eng.js` (`makeENG`, live `ENG`, pricing `evHz`), `record.js` (recording state, `noteSource`, `takeRoute`, `push`, W*
+- `src/song/` (pure; imports only `song/`, `core/`, `config.js`, `scales.js` — REC1/REC3): `store.js` (`events`, `schedInvalidate`, birth
+- `src/core/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
+  `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
+  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a).
+- `src/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
+- `data/profiles/` + `src/profile.js` (C0, RUN 6) — PROFILES (`profile.full` = today's app, `profile.calm`), checked by `core/profile.js`;
+  `profileApply(id)` the one switch (saves the touched live state, restores it EXACTLY on Full; writes through ui.js doors `profileWire`);
+  `profileBoot` (`?calm`). `src/edition.js` — `EDITION` ('dev' here; the release tool writes 'calm': only Calm, no switch).
+- `src/core/bus.js` (VIS1a) — the visuals' event bus `BUS` (state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract).
+  `src/views/stack.js` — the compositor (layers scene · background · instrument · overlay; modules scene, camera, backdrop, surface, hands).
+- `src/views/scene/host.js` (VIS1b) — the scene host (`#scene` WebGL canvas only while a room shows; three.js r128 vendored in
+  `vendor/three-r128/`, loaded lazily; levels full / reduced / minimal) + Calm's backgrounds `setBackground('forest'|'dark'|'camera')`;
+  `views/scene/forest.js` (VIS1c) — the night forest room (tokens `--cv-forest-*`); `core/fireflies.js` — wild fireflies, ground, depth bands.
+- `src/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
+  `src/handdet.js` — the detector (two models, worker-safe). `src/hand-worker.js` — classic worker.
+- `src/gestures.js` — FACADE over `src/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
+  `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`).
+- `src/draw.js` — FACADE over `src/views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
+  `rollView`, `play.js` overlays + play screen).
+- `src/ui.js` — menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers.
+- `src/main.js` — composition root: `onHands`, `loop()`, `startApp()` (the one start path), `?probe` loading.
+- RUN 7 (Calm v1): `src/calmshell.js` the Calm shell (controls, ⓘ, sleep timer, the Calm start; doors from ui.js); `src/ghost.js` the first-run ghost
+  light; `src/gestures/pose.js` the pose generator (HAND1 and the ghost); `src/core/calmui.js` (shell logic), `src/core/ambience.js` (seeded
+  crickets); fonts `fonts/` (OFL, register entries); the quality bar `docs/CALM-QUALITY.md`; `P.calm` / runner `--calm`.
+- `src/clip.js` — clip/audio recorder. `src/demo.js` — start-screen demo. `src/tutor.js` — lessons + step engine. `src/latmeter.js` —
+  latency meter UI (LAT1–LAT3). `src/render.js` — offline render, freeze, `renderQueued`, console `R.*`. `src/songs.js` — demo songs
+  (`data/songs/<name>.json`, SONG2).
+- `src/scaleprobe.js` — the browser probe FACADE over `src/probes/<area>.js`; rows register themselves (`probes/rows.js` `row()`/
+  `family()`). `src/probedata.js` + `tools/probe-data.mjs` — the node part.
+- `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`,
+  `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/NAME-INDEX.md`); `docs/prototypes/` = reference
+  prototypes, not app code (licence use «reference», never shipped); `tools/listen/` = the Calm listening page (dev, RUN 6); `docs/design/calm/`
+  = the Calm design proposals (docs only); prints `scales.before.json`, `song.print.json`, `gold.print.json`,
+  `gesture.print.json`, `census.print.json`.
+- Stale (removed) names to ignore: `docs/STALE-NAMES.md` (copied to the end of the generated `docs/NAME-INDEX.md`).
+  101 Full ↔ Calm (C0) · 102 Calm sounds by ear (listening page) · 103 Calm design proposals · 104 Forest and the three backgrounds (VIS1c)
+  105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5) · 106 Calm's four sounds by ear (RUN 7) · 107 The Calm look, portrait + landscape
+  113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Calm levels + the ghost · 116 Depth halo + «Лес» bar

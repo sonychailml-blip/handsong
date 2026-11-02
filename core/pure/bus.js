@@ -1,4 +1,4 @@
-/* VIS1a (RUN 6, docs/VIS1-design.md §3) — THE EVENT BUS for visuals. CORE: pure (rule #36), node-tested (row «VIS1 bus (core)»).
+/* VIS1a (RUN 6, docs/core/VIS1-design.md §3) — THE EVENT BUS for visuals. CORE: pure (rule #36), node-tested (row «VIS1 bus (core)»).
    Two kinds of topic. STATE topics hold the latest value (set → the version goes up; a reader compares versions, once per frame).
    EVENT topics are rings of timestamped items (push; a reader asks for everything after the sequence number it saw — a reader that falls
    behind loses the oldest, never blocks a writer). Writers: main.onHands (hands, picture), live/eng.js (notes — the LIVE engine only; the

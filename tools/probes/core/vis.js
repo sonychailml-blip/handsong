@@ -1,4 +1,4 @@
-/* VIS1a (RUN 6, docs/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
+/* VIS1a (RUN 6, docs/core/VIS1-design.md §7): row «VIS1a stack and bus» (quick and all; no sound).
    (1) the compositor holds the modules in layer order — scene (off in Full, VIS1b), camera and backdrop (background; the backdrop draws
        nothing on the Camera background), surface (instrument), hands (overlay);
    (2) the LIVE engine table publishes each contract call on the `notes` ring (a note-off of an owner that plays nothing: silent) with its

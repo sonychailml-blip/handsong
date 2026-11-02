@@ -1,9 +1,9 @@
-# VIS1 — visual modules, the event bus and a scene layer for Calm's 3D rooms (PLAN ONLY, RUN 4, 2026-10-17)
+# VIS1 — visual modules, the event bus and a scene layer for Night's 3D rooms (PLAN ONLY, RUN 4, 2026-10-17)
 
 Written for: the strategist (review), then Claude Code (implementation). No app code was changed for this document. Sources: stage-3 plan
 slice 32 («visual modules and the event bus: the play surface, the camera picture and the hand points become the first three modules —
-Calm can drop the camera one»), plan §4.11 (the visual-module contract), BACKLOG §7.16 (Calm — rooms of light and sound; musicians in the
-scene), §7.19 (own design), §7.20 (the lesson layer). User answer (RUN 4): PLAN ONLY, aimed at Calm — a scene layer for 3D rooms (Three.js
+Night can drop the camera one»), plan §4.11 (the visual-module contract), BACKLOG §7.16 (Night — rooms of light and sound; musicians in the
+scene), §7.19 (own design), §7.20 (the lesson layer). User answer (RUN 4): PLAN ONLY, aimed at Night — a scene layer for 3D rooms (Three.js
 r128 UMD, MIT, allowed by rule #32; the strategist's «Rooms of light» prototype: monastery and night forest with real shadows, depth from
 hand size, camera parallax, a «forest band» of musicians animated from the exact note events with the audio output latency), the low-power
 path, how hand dots / the lesson layer / the UI sit on top.
@@ -24,8 +24,8 @@ path, how hand dots / the lesson layer / the UI sit on top.
 today's drawing wrapped as the first three modules: `camera` (the shown snapshot, layer background), `surface` (the play surface — rows,
 rectangles, palette, register band, FX bars, status; layer instrument), `hands` (the hand points and their tags; layer overlay). Proof: the
 10 screens of `tools/ui-snap.mjs` pixel-identical, HAND1, the drawn rows, the UI checks.
-**B. The scene layer for Calm (stage 4).** A second, WebGL canvas UNDER the 2D canvas, hosting one `scene` module at a time (a «room»), built
-with Three.js r128 (UMD, vendored, lazy). Calm = scene + surface (faint or hidden, per room) + hands (drawn by the scene as lights) — no
+**B. The scene layer for Night (stage 4).** A second, WebGL canvas UNDER the 2D canvas, hosting one `scene` module at a time (a «room»), built
+with Three.js r128 (UMD, vendored, lazy). Night = scene + surface (faint or hidden, per room) + hands (drawn by the scene as lights) — no
 camera module.
 
 ## 3. The event bus (`src/core/bus.js`, pure — rule #36, node-tested)
@@ -49,8 +49,8 @@ lowPower:{ fps, scale, … }, params (passport — mappable later), subscribes:[
 unmount() }`. `surface` = `{ ctx2d }` for 2D layers or `{ gl canvas }` for a scene. A COMPOSITOR in `views/` (new `views/stack.js`)
 owns the order and calls `frame` per screen frame for the 2D layers and at the scene's own rate for the scene (§7).
 Layer order, bottom to top:
-1. **scene** (WebGL canvas `#scene`, Calm only) — the room. 2. **background** (2D) — the camera picture (Play only).
-3. **instrument** (2D) — the play surface. In Calm a room declares `surface:'faint'|'hidden'|'full'` (how the note field shows over the
+1. **scene** (WebGL canvas `#scene`, Night only) — the room. 2. **background** (2D) — the camera picture (Play only).
+3. **instrument** (2D) — the play surface. In Night a room declares `surface:'faint'|'hidden'|'full'` (how the note field shows over the
    room; default faint — the person still needs to see where notes are). 4. **overlay** (2D) — hand points, FX bars, status, the LESSON
    LAYER (§7.20: row highlights, hints, the check indicator — an overlay module of its own, above the hands so a hint is never hidden).
 5. **DOM** — bar, panels, toasts, the tutor strip, the low-power note (§6), z-order by tokens (`--z-*`).
@@ -60,7 +60,7 @@ holds: the scene places lights from the REMAPPED coordinates (`sx`, `sy`) the hi
 
 ## 5. Rooms (scene modules) — what the prototype shows, rebuilt as modules
 - **Three.js r128 UMD** (`three.min.js`, MIT): vendored under `vendor/three-r128/` with its licence file and a LIC1 register entry (shipped,
-  own origin — no new CSP host, rule #33; the static network guard lists the one `<script>` injection). Loaded LAZILY when Calm opens a room
+  own origin — no new CSP host, rule #33; the static network guard lists the one `<script>` injection). Loaded LAZILY when Night opens a room
   (never in Play; ≈ 0.6 MB, measured when vendored). The prototype is a REFERENCE: rooms are re-written as our modules (rule #32 — our own
   code; geometry procedural or our own / CC0 assets, each in the register).
 - **Depth from hand size:** the existing depth (`dist(lm0, lm9)`, the same smoothed value the sound uses, `S.hs`) → the light's z in the
@@ -77,7 +77,7 @@ holds: the scene places lights from the REMAPPED coordinates (`sx`, `sy`) the hi
   a wind-up that starts `windup` ms BEFORE `heardAt` (the scheduler publishes notes ≈ 300 ms ahead — SCHED_AHEAD — so the wind-up is
   known in time; live hand notes have no look-ahead and get no wind-up). A setting «Musicians: on/off»; the band ducks visibly while the
   person plays (from `hands` + `notes` of live owners).
-- **Calm's sound** (BACKLOG §7.16, recorded, not part of VIS1): the Forest drone recipe, per-note «distance colour» from depth, a cheap
+- **Night's sound** (BACKLOG §7.16, recorded, not part of VIS1): the Forest drone recipe, per-note «distance colour» from depth, a cheap
   forest-like reverb for phones.
 
 ## 6. The low-power path (with ENG2's provisional classes — no automatic switching until measured, user answer E1/E3)
@@ -110,19 +110,19 @@ holds: the scene places lights from the REMAPPED coordinates (`sx`, `sy`) the hi
 6. **VIS1f** (S) — the lesson layer as an overlay module (no lesson content — that stays the last stage, user answer 2).
 
 ## 9. Questions
-1. Calm's note field over a room: faint by default (recommended), hidden, or per room?
+1. Night's note field over a room: faint by default (recommended), hidden, or per room?
 2. May the «Rooms of light» prototype's code be used as the starting source (who wrote it, under which terms)? Default in this plan: a
    reference only, rooms re-written.
-3. Three.js r128 is from 2021 (the last line with a UMD build is older than r160): fine for Calm, or prefer the ES-module build of a newer
+3. Three.js r128 is from 2021 (the last line with a UMD build is older than r160): fine for Night, or prefer the ES-module build of a newer
    release (also MIT; no worker `importScripts` then)? The plan follows the user's choice (r128 UMD).
 4. VIS1a now (stage 3, invisible), or together with VIS1b at the start of stage 4?
 
 ## Review 2026-10-17 (user answers, RUN 5)
-- **The note field over a room (Calm):** almost invisible — only the row under each hand glows softly near the hand and fades. No cents
-  and no Hz in Calm (they stay in the full mode). A «Show the full note field» switch may exist.
-- **The prototype:** «Rooms of light» (`docs/prototypes/rooms-of-light.html`, the strategist's own code, three.js r128 from cdnjs, MIT) is
+- **The note field over a room (Night):** almost invisible — only the row under each hand glows softly near the hand and fades. No cents
+  and no Hz in Night (they stay in the full mode). A «Show the full note field» switch may exist.
+- **The prototype:** «Rooms of light» (`docs/night/prototypes/rooms-of-light.html`, the strategist's own code, three.js r128 from cdnjs, MIT) is
   the STARTING POINT, re-laid by the project's rules. Start with ONE room only: the night forest, WITHOUT animals / musicians (fireflies
   only). The user likes both its forest sound and its forest picture. Monastery and the forest band: later / paid.
 - The prototype is a reference, not app code: outside `src/` (the static checker reads only `src/`), its external addresses are licence
   register entries of use «reference» (three.js r128, Google Fonts Marcellus + Commissioner), which a shipped file may not use (LIC1 CONTROL).
-- How VIS1 is laid out for Calm: `docs/STAGE4-CALM-plan.md` (RUN 5).
+- How VIS1 is laid out for Night: `docs/night/STAGE4-NIGHT-plan.md` (RUN 5).

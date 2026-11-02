@@ -3,19 +3,20 @@
 Guidance for Claude Code in this repository. SHORT by design (DOC1, 2026-10-17): the standing working rules, conventions, hard
 rules, a short module map and the verification-step index. Everything else — the full module map, the architecture sections, known
 limits, the full text of every verification step — moved WORD FOR WORD to `archive/CLAUDE-history.md` (index below; grep it by
-section title). The long reasoning behind each section: `archive/CLAUDE-full.md`. State, open decisions, work order: `HANDOFF.md`.
+section title). The long reasoning behind each section: `archive/CLAUDE-full.md`. State, open decisions, work order: `HANDOFF.md` (the index), then `docs/<track>/HANDOFF.md`.
 
 ## What this is
-**Handsong** (repo folder `air-synth-3`; old name only in doc titles): a gesture-controlled synthesizer and interactive
-scales/tunings tutorial, entirely in the browser. Webcam + MediaPipe hand tracking; pinches play notes/chords/bass/drums/effects;
-all sound is Web Audio. On top: a **linear multitrack recorder** (events in ABSOLUTE song beats on tracks; a take creates a track
+**Two apps, one engine.** **Handsong** (`apps/full/`; repo folder `air-synth-3`; old name only in doc titles): a gesture-controlled synthesizer and interactive
+scales/tunings tutorial, entirely in the browser. **Handsong Night** (`apps/night/`, code id `night`): the first public release, a night forest played with the
+hands. Both share `core/` (section «Two apps, one core»). Webcam + MediaPipe hand tracking; pinches play notes/chords/bass/drums/effects;
+all sound is Web Audio. Handsong adds: a **linear multitrack recorder** (events in ABSOLUTE song beats on tracks; a take creates a track
 or merges into an armed one; undo removes the last take; an optional bar-quantised repeat brace; many names still say `loop`),
 **arrangements** (harmony/rhythm/bass as backing tracks), a **track editor** (piano roll + automation lane, own undo/redo), an
 **expression hand**, a **looper hand**, and a **six-lesson tutorial** inside the live app.
-- ES modules under `src/`, loaded by `<script type="module" src="src/main.js">`. No build, no app dependencies, no unit tests.
-  `index.html` = markup only, `style.css` = all CSS; the only external dependency is `@mediapipe/tasks-vision` from a CDN
-  (`vision.js`). Root also has `manifest.json` + `sw.js` (PWA pair). Dev tools only: `tools/` (`package.json` with
-  `playwright-core`, `tools/node_modules/` git-ignored).
+- ES modules, loaded by `<script type="module" src="main.js">` in each `apps/<app>/index.html`. No build for development, no app dependencies, no unit tests.
+  A page holds markup only; `core/legacy-ui/style.css` + `core/tokens.css` (+ `apps/night/night.css`) all CSS; the only external dependency is `@mediapipe/tasks-vision` from a CDN
+  (`core/vision.js`). Each app has its own `manifest.json` + `sw.js` (PWA pair) and declares its profile and probes (`<link rel="handsong-profile">`, `<link rel="handsong-probes">`); root `index.html` is a redirect.
+  Dev tools only: `tools/` (`package.json` with `playwright-core`, `tools/node_modules/` git-ignored).
 - **One control model.** One role fills the screen (`phoneInstr`, role button). In **landscape** an optional **split**
   (`splitOn`) shows two roles side by side. Role is decided by ZONE (which half a hand pinches in); work inside a half is by
   POSITION. No hand-keyed role binding anywhere (`handRole` deleted); "effects on the left hand in the solo half" is derived
@@ -24,17 +25,18 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   English-first with Russian alongside (see "Language").
 
 ## Running / developing
-- Serve over HTTPS or `localhost` (camera + wakeLock need a secure context; `file://` fails). Team default: VS Code Live Server,
-  `http://127.0.0.1:5500`. Phone: `npx cloudflared tunnel --url http://localhost:5500`, cache bust `?v=N`.
-- Scale data are JSON files in `data/`, fetched at start. MediaPipe model/WASM/library come from CDNs — internet required. ⚠️ The app
-  does not work offline at all (SW caches nothing on purpose). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
-- `?probe` in the address loads the probe (`window.P`, guarded) and the render/ear tools (`window.R`) and user files (`window.U`).
+- Serve over HTTPS or `localhost` (camera + wakeLock need a secure context; `file://` fails). Team default: VS Code Live Server at the repo root:
+  `http://127.0.0.1:5500/apps/full/`, `http://127.0.0.1:5500/apps/night/`. Phone: a Vercel preview, or `npx cloudflared tunnel --url http://localhost:5500`, cache bust `?v=N`.
+- Scale data are JSON files in `core/data/`, fetched at start. MediaPipe model/WASM/library come from CDNs — internet required. ⚠️ The apps
+  do not work offline at all (SW caches nothing on purpose). Needs a webcam + WebGL. Audio starts only on the "▶ Play" click.
+- `?probe` in the address loads the app's probes (`window.P`, guarded) and the render/ear tools (`window.R`) and user files (`window.U`). `P.all`/`P.quick` on Full, `P.night` on Night.
+- ⛳ **Build and deploy** (SPLIT-2): `HANDSONG_APP=full|night node tools/build.mjs` writes one app into `dist/` (no other app, no tools). Previews (`VERCEL_ENV=preview` or `--probes`) keep `?probe`; production has no probes. `HANDSONG_EDITION=release` hides the development items. `vercel.json` is shared by two Vercel projects (`HANDSONG_APP=full`, `=night`); production from `main`, previews from `dev`. Whenever a page, path or build changes: `node tools/smoke-paths.mjs` (`--build`: also the built trees).
 
 ## Standing working rules (apply to every slice; prompts don't repeat them)
-- **What a new session reads:** `HANDOFF.md` and this file. Open the archives, `BACKLOG.md`, `docs/NAME-INDEX.md` (every code name by
+- **What a new session reads:** this file, the index `HANDOFF.md` and the track's `docs/<track>/HANDOFF.md`. Open the archives, `docs/<track>/BACKLOG.md`, `docs/core/NAME-INDEX.md` (every code name by
   module, stale names) or long code files only for what the slice needs, by `grep`, not top to bottom.
-- ⛳ **`docs/NAME-INDEX.md` is GENERATED** (RUN 5): after adding, removing or renaming an export run `node tools/name-index.mjs --write`
-  (the data row «NAME-INDEX current» fails otherwise); removed names are kept by hand in `docs/STALE-NAMES.md`.
+- ⛳ **`docs/core/NAME-INDEX.md` is GENERATED** (RUN 5): after adding, removing or renaming an export run `node tools/name-index.mjs --write`
+  (the data row «NAME-INDEX current» fails otherwise); removed names are kept by hand in `docs/core/STALE-NAMES.md`.
 - **Never run git** (not even read-only); never commit. Never run the app, a server, a build, a browser or tests by hand — the two
   probe runners below are the exceptions (they start and stop their own server and browser).
 - ⛳ **Probes before every report — Claude Code runs them and fixes failures until PASS** (user's rule, AUTO-PROBE):
@@ -55,23 +57,23 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - ⛳ **Code comments** (user's rule, DOCS-EN): English, short — one or two lines of "why". No mass translation of existing
   (Russian) comments; when you edit a function, rewrite its comment into short English. ⛔ Never touch user-facing text
   (`i18n.js`, UI strings) for this purpose — the app's languages stay as they are.
-- ⛳ **Slice records in `HANDOFF.md`** (user's rule, DOCS-EN): English, at most about 15 lines; details go to
+- ⛳ **Slice records in the track's `docs/<track>/HANDOFF.md`** (user's rule, DOCS-EN): English, at most about 15 lines; details go to
   `archive/HANDOFF-history.md` (appended).
-- **Docs:** `HANDOFF.md` stays under ~20 KB; this file stays concise — keep every rule, put long reasoning in the archive.
+- **Docs:** the index `HANDOFF.md` stays under 3 KB, each `docs/<track>/HANDOFF.md` under ~20 KB; this file stays concise — keep every rule, put long reasoning in the archive.
   ⛳ DOC1 (user, 2026-10-17): this file stays ≈ 60 KB — rules, conventions, the SHORT module map, the step index. A new module gets one
   line in the short map; new architecture / module / probe-row / known-limit detail and a new step's full text go to
   `archive/CLAUDE-history.md` under the matching section (moved word for word at DOC1 — `tools/doc-split-check.mjs` proved it; later
   slices update a stale line there in place AND copy the old line verbatim to its section «Superseded at DOC1», so the check
   `node tools/doc-split-check.mjs archive/CLAUDE-before-DOC1.md CLAUDE.md archive/CLAUDE-history.md` keeps passing exactly).
-  BACKLOG.md / UI-MAP.md stay Russian; any section you edit is rewritten in English.
+  The `docs/<track>/BACKLOG.md` files and `docs/full/UI-MAP.md` stay Russian; any section you edit is rewritten in English. `archive/` keeps the old paths and product name.
 - **Max-effort mode is for PLANS** ("PLAN ONLY" prompts), not routine slices (AF, ED, AR, MX, records). Planned uses: foundation plan
   (before stage 3), hearing the room (before 5), synthesis core (before 7), latency and hands, a periodic deep review + type-checking prep.
 - **The data runner `tools/probe-data.mjs`** is the one exception to "never execute application code in node": it runs only the
-  data modules (`probedata.js` → scales/state/i18n and their imports) against `data/`, prints a line per check and ALWAYS a final
+  data modules (`probedata.js` → scales/state/i18n and their imports) against `core/data/`, prints a line per check and ALWAYS a final
   verdict (`[probe-data] PASS — …` / `NOT A PASS — …`, exit 0/1; no verdict = failure). 40 s – 2 min. Quote its verdict. Its last row
   «LIC1 licence register» runs `tools/check-licences.mjs` (text only; alone: `node tools/check-licences.mjs`, ≈ 2 s); the row «LAT1
-  latency stats (core)» runs `src/core/latency.js` (also «LAT2 search schedule (core)» `core/handsched.js`, «LAT3 low light (core)»
-  `core/camlight.js`) — the CORE is pure by design (no DOM, Web Audio, camera, network) and may run in node.
+  latency stats (core)» runs `core/pure/latency.js` (also «LAT2 search schedule (core)» `core/pure/handsched.js`, «LAT3 low light (core)»
+  `core/pure/camlight.js`) — the CORE is pure by design (no DOM, Web Audio, camera, network) and may run in node.
 - **The browser runner `tools/probe-browser.mjs`** (AUTO-PROBE; `npm install` once in `tools/`): own static server on a free port,
   fresh temporary profile per run (the user's browser data is never touched), headless installed Chrome (`channel:'chrome'`, no
   download), fake camera (no hands), autoplay allowed; presses ▶, starts `P.seed({replace:true})`, types `P.quick()` during it
@@ -79,7 +81,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   lines and every "first differences" block; exit 0 only on PASS. Flags: `--quick` (default), `--all`, `--quick --all`,
   `--repeat N` (N fresh browsers, P.all each, then a table of every measured value with its margin — `meas()` in the probe,
   `res.measures`), `--eval file.js` (script in the page after the seed, prints JSON), `--headed` (off-screen window; worse: a drawn
-  row went "tab hidden"), `--browser msedge`, `--limit-min M` (per P.all, default 15 since LAT2; seed 3, start 3), `--limit-quick M` (P.quick; NIGHT-0, 2026-10-16: without it 3 min × the SLOW FACTOR measured from P.quick's own rows — each finished row with a reference time in `SLOW_REF` (CPU-bound rows of an idle run, P.quick 112.9 s; LAT/CAM rows are time-based and left out) adds to observed / reference; from 3 rows on, factor = that ratio (1 below 1.2, at most 6) and the deadline moves with it; printed «machine speed: … slow factor …»; a busy Chrome outside the runner made rows 3–4× slower and the fixed 3 min failed). Full console →
+  row went "tab hidden"), `--browser msedge`, `--app full|night` (the page; night: no seed, no UI song checks), `--night` (`P.night`), `--root DIR` (a built preview, `tools/build.mjs --probes`), `--json FILE` and `--dump NAME FILE` (results for compares), `--stress-not-judged`, `--limit-min M` (per P.all, default 15 since LAT2; seed 3, start 3), `--limit-quick M` (P.quick; NIGHT-0, 2026-10-16: without it 3 min × the SLOW FACTOR measured from P.quick's own rows — each finished row with a reference time in `SLOW_REF` (CPU-bound rows of an idle run, P.quick 112.9 s; LAT/CAM rows are time-based and left out) adds to observed / reference; from 3 rows on, factor = that ratio (1 below 1.2, at most 6) and the deadline moves with it; printed «machine speed: … slow factor …»; a busy Chrome outside the runner made rows 3–4× slower and the fixed 3 min failed). Full console →
   `tools/.probe-logs/` (git-ignored). Headless is the default because measured: every row runs, P.quick takes the user's manual
   time. Allow once in Claude Code: `node tools/probe-browser.mjs:*` (Bash). The runner PAUSES auto-freeze for its whole session
   (`frzqueue.afPause('runner')`; AF3 is checked by its own deterministic row). In `--eval` the page has `window.__heap()` (full GC, then
@@ -95,18 +97,17 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   CDP touch double tap and §✎ (control: the old rename opened inside the press must fail), and a bend point dragged with the mouse (one
   step, cents up). Measured: a hard kill of node (a tool timeout) runs no handler, but Chrome exits by itself when its pipe closes — only
   the profile folder is left.
-- **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; (12) the engine surface `src/engine/surface.js`; (13) rule #38; static import names vs exports with
+- **Static checks — every slice:** `node tools/check-static.mjs` (syntax of every module; (12) the engine surface `core/engine/surface.js`; (13) rule #38; (14) boundaries: core imports no app or tool, an app only itself and core, a probe suite only core, its own suite, the core suite and its app; (15) `core/legacy-ui/` and `core/DEBT.md` only shrink; (16) every id a module reads exists on each page that loads it, the CSP line identical on both; static import names vs exports with
   comments stripped; export lists declared; literal dynamic import targets present; no call to a declared/imported
   `function name(…)` with MORE arguments than parameters; no imported name CALLED inside a scope that shadows it; no name read or
-  called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module
-  under `src/song/` imports only `song/`, `core/`, `config.js` and (REC3) the pitch truth `scales.js` — and the import cycles (printed; a
+  called that is not declared, imported or in the checker's `GLOBALS` (add new browser APIs there); REC1: the folder rule — a module under `core/song/` imports only `song/`, `pure/`, `config.js` and (REC3) the pitch truth `scales.js` — and the import cycles (printed; a
   cycle through `song/` fails; CONTROLS a fake `song/store.js → recorder.js` and `song/history.js → audio.js` import); DAY run: (10) a
   WRITE to an imported binding (`x = …`, `x += …`, `x++`, `ns.x = …`) outside a local of that name fails; an import used only after a spread
-  `...x` counts as used; (11) design tokens — see `tokens.css`; each with a CONTROL) and `node --check` on changed files. Report the result.
-- **Read `src/` before changing anything**; re-verify every line number.
+  `...x` counts as used; (11) design tokens — see `core/tokens.css`; each with a CONTROL) and `node --check` on changed files. Report the result.
+- **Read `core/` before changing anything**; re-verify every line number.
 - ⛔ **Never insert a comment in the middle of an export list**; re-read every export list you touch.
 - **Changed a signature or a stored field's meaning → find every reader**, positional callers included (rule #15); the probe module
-  `src/scaleprobe.js` and `src/probes/*` are callers too. The report LISTS every positional caller of every changed function with its arguments.
+  `tools/probes/full.js` and `tools/probes/*` are callers too. The report LISTS every positional caller of every changed function with its arguments.
 - **Stay inside the slice.** Defects outside it are reported, not fixed.
 - **Probes — speed:** `await P.quick()` = `P.all()` without the rows flagged `slow` (all-view sweeps T1, T2, T4b1, T4b3, T4b4, T5, T6b, F0,
   F3; "tracks: every one reachable"; LR1; AF2; AF6b; GOLD; SND-F1 live = offline and freeze parity; LAT2b worker = main thread); in it the rendering rows (MX1, MX2, render repeatability, renders serialized) use
@@ -122,14 +123,14 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   watcher drives it by hand with its own clock (`afBegin`/`afTick`/`afEnd`), never real time.
 - ⛳ **Commit rule** (user, AR2): `await P.quick()` PASS before every commit; `await P.all()` PASS before commits touching audio,
   rendering, recording or tuning data, and at least weekly — produced by Claude Code's runner since AUTO-PROBE.
-- ⛳ **Console guard** (AUTO-PROBE): `window.P` = `scaleprobe.api()` — every probe function behind one lock; while any probe runs
+- ⛳ **Console guard** (AUTO-PROBE): `window.P` = `api()` of the page's probe facade (`tools/probes/full.js`, `night.js`) — every probe function behind one lock; while any probe runs
   (P.seed included) another `P.*` call refuses in words ("P.seed is still running — wait for 'Now run P.all()'") and returns
   `{refused:true, why}`. Self-test + control in row "write path (funnels)". A direct `import()` of the module has no guard.
 - **A tuning is read through its VIEW (F1):** `scales.tuningOf(s)` = the view's `tuningRec`. Never `TUNINGS[s.tuning]` in a pricing
   or label path (deleting/replacing a user tuning must never change recorded material).
 - **User files are not probe material:** sweeps, `P.checkFiles()` and the snapshot cover built-ins only; `P.checkUserDelete()`
   installs temporary records and removes them.
-- **Scale data snapshot (F0):** `P.dumpScales()` → `tools/scales.before.json`; `await P.checkFiles()` compares the live registry with
+- **Scale data snapshot (F0):** `P.dumpScales()` → `tools/prints/scales.before.json`; `await P.checkFiles()` compares the live registry with
   it value by value (`===`), grouped by field path; renewed ONLY via `await P.renewSnapshot(allowed)`, which refuses unless every
   difference is the declared change. `P.checkNames()` compares labels from naming schemes with frozen pre-F3 label functions.
 - **Report format:** documents changed; files changed with a one-line reason; console lines and outputs; static-check result;
@@ -137,8 +138,8 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 
 ## Conventions — where a feature goes
 - Terse, compact code; match the surrounding idiom. Add a feature in the module that owns it.
-- **A scale (mode)** = a file `data/modes/<id>.json` + its id APPENDED at the end of `modes` in `data/index.json` (comments go to
-  `data/README.md`; the loader's validator must accept it, else it is skipped). v1 shape: `tuning`, `degrees` (tuning indices),
+- **A scale (mode)** = a file `core/data/modes/<id>.json` + its id APPENDED at the end of `modes` in `core/data/index.json` (comments go to
+  `core/data/README.md`; the loader's validator must accept it, else it is skipped). v1 shape: `tuning`, `degrees` (tuning indices),
   `root`, `anchor`, `chords`, `menu`; the builder in `scales.js` derives `edo`/`iv`/`cents` and flags — never write them by hand.
   Menu position by `trad`/`grp` (bucketed by `grp` key); addressed by stable `id` (`state.scaleId`, `scales.scaleById`).
   - non-equal (cents) scale: valid `edo`/`iv` stay as nominal structure; home `easia`/`india` (world), `europe` (historical 12-note),
@@ -146,25 +147,24 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     historical fixed tuning also `fixedKey` (tonic = key; C-anchored cents recipe).
   - non-octave scale: `period:<n>`, equal within the period, section `exp`; never a `2` literal (`periodOf`); `noChords`, or a set in
     the tuning's own steps, or (only `chordBuild:'adaptive'`) a ratio set priced by the period branch.
-- **A typed-chord family set** = `data/palettes/<id>.json` (`kind:'steps'|'ratios'`, ratios as strings) + id in `palettes` of
-  `data/index.json`; integer steps for edo/`gridChords` scales, ratios for cents/period ratio scales.
+- **A typed-chord family set** = `core/data/palettes/<id>.json` (`kind:'steps'|'ratios'`, ratios as strings) + id in `palettes` of
+  `core/data/index.json`; integer steps for edo/`gridChords` scales, ratios for cents/period ratio scales.
 - **A rhythm pattern** = one entry APPENDED at the end of `RHYTHMS` (ui holds positional `JR_BACK=0`/`JR_MAQSUM=1`). Declare `beats`
   and `sub:3` for triplets; grid exactly `beats*sub` cells (`gridOk`); written in ROWS (0 kick/1 snare/2 clap/3 hat; row 5 unused);
   volumes in the OLD drum scale (converted by `config.volFromOld('dr',…)`).
-- **A timbre or kit** (TIM3, RUN 4) = a RECORD file `data/timbres/<id>.json` (`handsong/timbre` v1: family, engine — chord2 / tine / bass2 /
-  subtractive / fm2 / ks / drumkit —, name, recipe, env, policies with today's role values) + its id APPENDED to `data/timbres/index.json` `order`, then
+- **A timbre or kit** (TIM3, RUN 4) = a RECORD file `core/data/timbres/<id>.json` (`handsong/timbre` v1: family, engine — chord2 / tine / bass2 /
+  subtractive / fm2 / ks / drumkit —, name, recipe, env, policies with today's role values) + its id APPENDED to `core/data/timbres/index.json` `order`, then
   `node tools/timbre-bundle.mjs` (the app loads the generated bundle; data row «TIM3 timbre records (core)» fails on a stale one); a new
-  permanent `id` (rule #37; add it to the probe's pinned list `TIMBRE_IDS_PINNED`); the T5 bounds of `core/timbre.js` must accept it. APPEND
+  permanent `id` (rule #37; add it to the probe's pinned list `TIMBRE_IDS_PINNED`); the T5 bounds of `core/pure/timbre.js` must accept it. APPEND
   only, never insert or reorder (positions are still the session handle). A solo timbre may now be appended (KS is told by the record's
   engine, `leadIsKs` — the «KS block is the tail» rule is retired). A kit's six rows name row synths of `drumkits.js` (`KIT_SYNTHS`) with
-  their parameters; a new row SYNTH is code (+ its parameter list in `core/timbre.js KIT_SYNTHS`, bounded).
+  their parameters; a new row SYNTH is code (+ its parameter list in `core/pure/timbre.js KIT_SYNTHS`, bounded).
   Events store the timbre ID (TIM2). The editor lists timbres only via `audio.timbresOf(role)`.
-- **A profile** (C0) = `data/profiles/<name>.json` (`handsong/profile` v1) + its name in `data/profiles/index.json` `order` + its id in
-  `core/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
-- **Calm's per-timbre settings** (RUN 8; the user: Full exactly as at RUN 7) live in the PROFILE, never in a timbre record: `levels` {id: dB}
-  (`audio.setTimbreTrim`), `voices` {id: strikes} (`audio.setCalmStrikes` — the struck banks take Calm's cheaper strike + the cap only while
+- **A profile** (C0) = `apps/<app>/data/<name>.json` (`handsong/profile` v1), declared by the page (`<link rel="handsong-profile">`), + its id in `core/pure/profile.js PROFILE_IDS` (pinned, rule #37); every narrowing field null in Full (Full changes nothing).
+- **Night's per-timbre settings** (RUN 8; the user: Full exactly as at RUN 7) live in the PROFILE, never in a timbre record: `levels` {id: dB}
+  (`audio.setTimbreTrim`), `voices` {id: strikes} (`audio.setNightStrikes` — the struck banks take Night's cheaper strike + the cap only while
   set; Full builds RUN 7's strike exactly, row «FULL untouched»), `volume` {left} (the amplitude floor of the hand's horizontal,
-  `state.setVolFloor`). All set by the Calm face; Full and every render copy have none.
+  `state.setVolFloor`). All set by the Night face; Full and every render copy have none.
 - **Thresholds / palette geometry** = `config.js`. Expression numbers are split: feature→channel in `gestures.EXPR_CFG`,
   channel→depth in `audio.EXPR_A` (gestures imports audio; the reverse would be a cycle).
 - **A hand function** = `state.handFn` defaults + `ui.HANDFN_OPTS` + a branch on `S.fn`/zone in `gestures.js` + a dictionary key.
@@ -174,11 +174,11 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - ⛳ **Design work** (user decisions, DAY run 2026-10-16; BACKLOG §7.19): ALL design — visual identity, interface, colours, fonts, icons,
   every design system — is done by Claude Code as our own authored work; fonts only under OFL or a similarly allowed licence (rule #32);
   icons drawn by us, NO icon libraries. Today's look stays (UI1b tokens + icon component); the new design comes later through the user's
-  choice among proposals, AFTER the missing parts exist (effects constructor — redesigned once built —, expression lab, Calm, MIDI, audio
-  in); inventory and principles: `docs/UX-INVENTORY.md`.
-- **An interface glyph / icon** = a name in `src/icons.js` `ICONS` (by meaning), rendered by `icon(name)`, `{i:name}` in a dictionary
+  choice among proposals, AFTER the missing parts exist (effects constructor — redesigned once built —, expression lab, Night, MIDI, audio
+  in); inventory and principles: `docs/full/UX-INVENTORY.md`.
+- **An interface glyph / icon** = a name in `core/icons.js` `ICONS` (by meaning), rendered by `icon(name)`, `{i:name}` in a dictionary
   string or `data-icon` in the markup — never the glyph itself (UI1b). **A colour / size / spacing / radius / shadow / layer** = a token in
-  `tokens.css` first, then `var(--token)` (a CANVAS colour: a `--cv-*` token, drawn with `palette.cv('name')` — DRAW1b).
+  `core/tokens.css` first, then `var(--token)` (a CANVAS colour: a `--cv-*` token, drawn with `palette.cv('name')` — DRAW1b).
 - **A behaviour gate** = a scale property + a predicate in `scales.js`, never a `tag`/index check.
 - **A path that creates or removes events** (the editor is the third such path — insert and ED2 paste) = a NEW object (never a spread copy of an
   event — it would copy its permanent `id`, IDS1), stamp `tk`, keep `t` in absolute song beats, choose
@@ -186,7 +186,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   (sort first while recording); always write `a.vol` (rule #30).
 
 ## Hard rules — do not break these (full reasoning: archive, "Hard rules")
-1. **The AudioContext is created only inside the start click** (`#startBtn`; `main.startApp`, shared by Play and Learn, creates it in
+1. **The AudioContext is created only inside the start click** (`#startBtn`; `boot.startApp`, shared by Play and Learn, creates it in
    the synchronous part of the click). An `OfflineAudioContext` is NOT covered (no speakers, no autoplay policy): `initAudio(mkCtx)`
    takes an optional context factory, passed only by `render.js` — not a loophole, don't "fix" it.
 2. **Never hardcode frequencies, note tables or the octave `2`.** Pitch derives from `baseF()` and the current (or frozen) scale:
@@ -224,7 +224,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
    `state.tonicCents` (−50…50). Read through ONE door `viewKeyC(s)`, applied only in `baseF` (×2^(c/1200), no multiplication at 0 ¢ —
    12-note views and 0 ¢ views are the very objects and prices they were); `viewKeyIdOf` adds `+13c`. Probe control `keyCDbg('off'|'ungated')`.
 8. **The picture and the hands are ONE camera frame** (LAT2): each new camera frame is snapshotted once (an ImageBitmap) and detected at most
-   once; the canvas draws the snapshot whose hands are current, overlays on top (`main.onHands` keeps it as `shown`; the live `<video>` only
+   once; the canvas draws the snapshot whose hands are current, overlays on top (`boot.onHands` keeps it as `shown`; the live `<video>` only
    until the first frame is detected). ⛳ The only picture (user decision, LAT3: the dots must match the hand exactly) — the «Picture: live
    camera» test switch is deleted; don't bring it back.
 9. **ONE layout; never reintroduce a mode gate.** New behaviour keys off scale properties and `splitOn`. **Hit-test and render derive
@@ -317,14 +317,14 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     Link (GPL-2.0 or a separate licence from Ableton — only the latter) are checked when that stage starts. ⛳ Non-code material (user, Q13,
     2026-10-14): CC0, CC-BY 4.0 (with attribution), SIL OFL, our own work, AI-generated pictures (tool and terms recorded); refused: SA, NC,
     ND. Every icon, glyph, image and font today is marked «to be replaced by the user's own authored design» (Q13; the design lands before
-    the Calm release through UI1's design tokens and icon component).
+    the Night release through UI1's design tokens and icon component).
 33. ⛳ **Privacy — images, sound and hand data never leave the device** (user, Q15, 2026-10-14; PRIV1). Frames are processed by the hand
     model inside the browser; the app sends no image, video, landmark stream, microphone sound or recording anywhere. Its own network use
     is limited to: loading itself and its assets (own origin; the pinned MediaPipe files of the register); links the person opens (feedback,
     donate); the named page-view counter of the Vercel deployment (Q14); a clip handed to the system share sheet by the person's tap; later,
     only by the person's explicit action, account sync and a numbers-only diagnostic report shown before sending (Q16). Enforcement: (a) the
-    Content-Security-Policy `<meta>` first in `index.html` — `connect-src`/`script-src` list only our origin and the MediaPipe paths, no
-    inline script (`src/va-stub.js`), `'wasm-unsafe-eval'` for the model, no `'unsafe-eval'`; a new host needs the user's decision, a
+    Content-Security-Policy `<meta>` first in each page (`apps/<app>/index.html`, the same line, static check 16) — `connect-src`/`script-src` list only our origin and the MediaPipe paths, no
+    inline script (`core/va-stub.js`), `'wasm-unsafe-eval'` for the model, no `'unsafe-eval'`; a new host needs the user's decision, a
     register entry (LIC1 checks every CSP host lies over one) and the CSP line; (b) the static check's NETWORK GUARD (`NET_LISTED` in
     `tools/check-static.mjs`): every fetch / XHR / WebSocket / EventSource / sendBeacon / RTCPeerConnection / Worker / importScripts /
     addModule / share / window.open / SW register call and every external import is listed per module with its count and reason; (c) the
@@ -333,7 +333,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 34. ⛳ **A device-level camera control is never changed without restoring it** (user, CAM-FIX, 2026-10-15: «short exposure» left the user's
     UVC webcam dark — in Zoom too, after a reload). A webcam keeps exposure / white balance IN THE DEVICE. So: originals (`getSettings`) are
     saved before the first change; Off, leaving the page (pagehide / visibilitychange) and the next open RESTORE actively (automatic modes
-    back to 'continuous', other touched controls to their originals — `core/camlight.restoreConstraints`). ⛳ 0a (user, 2026-10-15): the
+    back to 'continuous', other touched controls to their originals — `core/pure/camlight.restoreConstraints`). ⛳ 0a (user, 2026-10-15): the
     open-time repair touches ONLY what a test of ours left — a test that applies a device control writes a record (localStorage
     `handsong.camTest`: camera name and id, originals, touched keys; cleared once a restore went through); the next open of that camera
     restores those originals and clears it (meter: «… left by an unfinished test — restored»); without our record a manual setting (the
@@ -343,114 +343,123 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
     `transport/clock.js` `secPerBeat()`, `beatNow()`, `timeAt(b)`, `secOf(b)`, `beatsOf(s)` — one tempo segment today, a tempo map answers
     there later; each keeps the exact arithmetic of the sites it replaced. ⛔ No new `60/loop.bpm` or `loop.t0 + b·spb` outside it (the
     render's pinned tempo and the probes' independent checks excepted).
-36. ⛳ **The core is pure** (FMT1; the plan's #35): `src/core/**` never touches the DOM, Web Audio, the camera, MIDI or the network and runs in
-    node (the data runner's core rows); file formats (`core/format.js`) and ids (`core/registry.js`) live there.
+36. ⛳ **The core is pure** (FMT1; the plan's #35): `core/pure/**` never touches the DOM, Web Audio, the camera, MIDI or the network and runs in
+    node (the data runner's core rows); file formats (`core/pure/format.js`) and ids (`core/pure/registry.js`) live there.
 37. ⛳ **Identity ≠ name ≠ position — permanent ids** (user, 2026-10-16; FMT1/TIM1; the plan's #36): every record that can outlive a session
     (timbres now; tunings, modes, effect presets, expression mappings, events, lane points next) has an id that NEVER changes — built-ins a
-    readable fixed id (`chord.firefly`, kebab-case, dotted families), user records `u.<uuid>` (generated), pack records `<pack>/<name>`; the
-    display name is editable, per language; the ORDER of a list is a separate per-user list of ids (reorder / hide / delete never touch a
+    readable fixed id (`chord.firefly`, kebab-case, dotted families), user records `u.<uuid>` (generated), pack records `<pack>/<name>`; the display name is editable, per language; the ORDER of a list is a separate per-user list of ids (reorder / hide / delete never touch a
     song). A built-in is HIDDEN, never destroyed (songs that use it always play); a user record may be removed. Songs will store the id AND
     a full copy of the record (SONG1): a missing id (deleted, another person's song) still plays from the copy and offers «add it back to my
-    list». ⛔ Never rename or reuse an id (the TIM1 probe pins the list).
-38. ⛳ **An engine submodule is STATELESS** (AUD1b, RUN 3 2026-10-16; strategist's review of the AUD1 plan): a module under `src/modules/**`
-   or `src/engine/**` (the worklet processors in `src/engine/worklets/` excepted) keeps no state of its own — no top-level `let`/`var`, no
+    list». ⛔ Never rename or reuse an id (the TIM1 probe pins the list). One recorded exception (user, SPLIT-2): the Night profile's id became `profile.night`; no song, file or storage key stored a profile id.
+38. ⛳ **An engine submodule is STATELESS** (AUD1b, RUN 3 2026-10-16; strategist's review of the AUD1 plan): a module under `core/modules/**`
+   or `core/engine/**` (the worklet processors in `core/engine/worklets/` excepted) keeps no state of its own — no top-level `let`/`var`, no
    top-level table it writes; everything made from a context or changing while playing (nodes, buffers, caches, the scratch of a voice being
    built) lives in the ENGINE CONTEXT `E` it receives as its first argument (`audio.engineCtx()`: getters/setters over that instance's
-   variables, never a stale copy — R1). It imports only `core/`, `config.js`, `scales.js` and the stateless tree itself (`src/modules/**`,
-   `src/engine/**`; widened at AUD2a — the effects use the timbre stages and `engine/fdn.js`). Why: such a module is imported
+   variables, never a stale copy — R1). It imports only `pure/`, `config.js`, `scales.js` and the stateless tree itself (`core/modules/**`,
+   `core/engine/**`; widened at AUD2a — the effects use the timbre stages and `engine/fdn.js`). Why: such a module is imported
    ONCE and shared by the live engine and the render copy (`audio.js?render`) — only statelessness makes that safe. Pure data moves there only
    after it is proved pure (R2: no node, buffer, port or function; deep-frozen). Static check 13 (CONTROLS: a top-level let, a written table,
    a forbidden import caught; a clean module passes).
 
+39. ⛳ **Two apps, one core** (user, SPLIT-1): the section below binds every run. Its rules are numbered there; quote them as «core rule N».
+
+## Two apps, one core (user, SPLIT-1, 2026-11-01)
+⛳ Handsong (`apps/full/`) and Handsong Night (`apps/night/`, code id `night`) share `core/`. Every run belongs to ONE track: CORE-n, FULL-n or NIGHT-n.
+
+1. **Only code used by both apps goes in `core/`.**
+2. **No UI in `core/`.** Exception: `core/legacy-ui/`, inherited from the split. It only shrinks; no new file, no new feature there beyond what
+   keeps both apps working. New UI goes in the app.
+3. **App-only features live in the app folder.** Apps import only their own folder and `core/`, never each other. `core/` imports nothing from
+   `apps/` or `tools/` (static check 14).
+4. **A new core capability is an opt-in option that defaults to the old behaviour.** With the option absent, every node, value and order stays
+   exactly as before — GOLD, census and both «untouched» rows prove it.
+5. **Changing existing core behaviour needs a new option or a dedicated CORE run.** Never as a side effect of a FULL or NIGHT run. If a track run
+   finds it needs this, it stops that part and reports; the change becomes its own CORE-n.
+6. **Every core change runs both apps' checks:** static, data, `node tools/probe-browser.mjs --quick` and `node tools/probe-browser.mjs --app night`; `--all` on Full when it touches sound,
+   rendering, recording or tuning data. A report quotes both verdicts and the tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`).
+7. **A core module used by only one app moves into that app** (in the run that makes it so). Existing cases are listed in `core/DEBT.md`, which
+   only shrinks (static check 15).
+8. **`core/` names no product.** No `night` or `full` in new core names, options or strings; an option names what it does (`strikeCaps`, not
+   `nightStrikes`). Existing cases are on the debt list.
+9. **Baselines are per track.** A FULL run never renews a core or night print; a NIGHT run never renews a core or full print. A renewal is declared,
+   with every other case compared first. `FULL untouched` and `NIGHT untouched` must hold in every run.
+10. **Every asset load works from any folder and offline-ready:** `new URL(..., import.meta.url)` in code; page-level files (`manifest.json`,
+    `sw.js`, icons) relative to the page. `tools/smoke-paths.mjs` runs whenever a page, path or build changes.
+11. **Rules #32 (licences) and #33 (privacy) apply to both apps,** one register, the same CSP line in both pages (static check 16).
+12. **Never run git, not even read-only** (unchanged). Each pure file move is committed by the user before the moved files are edited.
+
+Run names and logs: `CORE-n`, `FULL-n`, `NIGHT-n`, counted separately (`NIGHT-0` is history; Night starts at `NIGHT-1`). If a NIGHT or FULL run needs a core change, that part is a small `CORE-n` with its own record and both apps' checks. Each log entry in `docs/<track>/WORK-LOG.md` starts: track, number, date, tree hashes before and after.
+
 ## Module map (short)
-One line per module. Every name per module: `docs/NAME-INDEX.md` (grep it). The FULL map as it stood at DOC1, with every slice's
-detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)» — grep it by module or slice name.
-- **Root:** `index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`); `tokens.css` THE design tokens (DOM + canvas `--cv-*`;
-  static check 11); `style.css` all CSS through tokens; `manifest.json`/`sw.js` PWA (cache-free SW); `src/va-stub.js` counter stub.
-- `src/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
+One line per module. Every name per module: `docs/core/NAME-INDEX.md` (grep it). The FULL map as it stood at DOC1, with every slice's
+detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under the old paths (`docs/core/STALE-NAMES.md` maps them).
+- **Root:** `index.html` redirect only; `vercel.json`. **Pages:** `apps/<app>/index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`), `manifest.json`/`sw.js` PWA (cache-free SW); `core/tokens.css` THE design tokens (DOM +
+  canvas `--cv-*`; static check 11); `core/legacy-ui/style.css` all shared CSS through tokens; `core/va-stub.js` counter stub.
+- **`apps/full/`:** `main.js` entry; `tutor.js` lessons + step engine; `demo.js` start-screen demo; `songs.js` demo songs (`data/songs/<name>.json`, SONG2); `data/full.json` profile.
+- **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (controls, ⓘ, sleep timer, the start, bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`);
+  `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, moods, rare events, emblem), `pure/forestlife.js` (stream, mushroom / flower places, rings), `pure/fireflies.js`;
+  `scene/forest.js` the room (tokens `--cv-forest-*`), `scene/forest-life.js`, `forest-detail.js`, `forest-rare.js`. Bus topic `nightSky` { mood, sleep, wind }.
+- `core/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
   curve (`volAmp`, `volVel`, `volFromOld`), `FX_VOL`, curve law of bends and lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan`).
-- `src/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents`, `aRef`, `tunedFrom`, timbres, `handFn`,
+- `core/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents`, `aRef`, `tunedFrom`, timbres, `handFn`,
   `voiceMode`, split + `phoneHalves`, registers, camera, editor/window); chain keys `chainKeyOf`/`trackChainKeyOf` (OPAQUE), `fxChains`.
-- `src/hooks.js` — nullable callbacks for lower layers (`tutor`, `cleared`, `af`, `afRow`, `key`, `renderBusy` …).
-- `src/i18n.js` — `LANGS`, `DICTS`, `t()`, `L()`, `applyI18n`. `src/icons.js` — THE icon component (`ICONS` by meaning, `icon`,
-  `iconText`, `applyIcons`). `src/palette.js` — canvas colours from tokens (`cv(name)`, `ROLE_COL`).
-- `data/` + `src/scaleload.js` — scale data as JSON (v1; manifest order = menu order); per-file validation; user files after built-ins.
-- `data/timbres/` + `src/timbreload.js` (TIM3a) — timbre records (one file per timbre = the truth; the app loads the GENERATED
-  `data/timbres.bundle.json` — `node tools/timbre-bundle.mjs` after any edit), checked by `core/timbre.js` (T5 bounds).
-  `src/userstore.js`/`src/userfiles.js` — user files (IndexedDB, `u.<uuid>`), `window.U`.
-- `src/scales.js` — teaching layer + PITCH TRUTH: builder → `TRADITIONS`, `TUNINGS`, `CHORD_FAM_SETS`, `SCALES`; `pitchHz`; `chordNotes`;
+- `core/hooks.js` — nullable callbacks for lower layers (`tutor`, `cleared`, `af`, `afRow`, `key`, `renderBusy` …).
+- `core/i18n.js` — `LANGS`, `DICTS`, `t()`, `L()`, `applyI18n`. `core/icons.js` — THE icon component (`ICONS` by meaning, `icon`,
+  `iconText`, `applyIcons`). `core/palette.js` — canvas colours from tokens (`cv(name)`, `ROLE_COL`).
+- `core/data/` + `core/scaleload.js` — scale data as JSON (v1; manifest order = menu order); per-file validation; user files after built-ins.
+- `core/data/timbres/` + `core/timbreload.js` (TIM3a) — timbre records (one file per timbre = the truth; the app loads the GENERATED
+  `core/data/timbres.bundle.json` — `node tools/timbre-bundle.mjs` after any edit), checked by `core/pure/timbre.js` (T5 bounds).
+  `core/userstore.js` (IndexedDB, `u.<uuid>`), `tools/probes/core/userfiles.js` (`window.U`).
+- `core/scales.js` — teaching layer + PITCH TRUTH: builder → `TRADITIONS`, `TUNINGS`, `CHORD_FAM_SETS`, `SCALES`; `pitchHz`; `chordNotes`;
   memoised view `scaleView`/`CUR()`; key doors `viewKey`/`viewKeyC`; predicates; rect layout; theremin; `registerRecord`.
-- `src/audio.js` — the Web Audio engine instance: pools, allocation, routing, drums, drone, metronome, `FX_FACTORY`, chain wiring, track
+- `core/audio.js` — the Web Audio engine instance: pools, allocation, routing, drums, drone, metronome, `FX_FACTORY`, chain wiring, track
   level/pan, master (rule #4), frozen-track store/reader, probe/render helpers; `engineCtx()` → `E` (AUD1a); THE ENGINE CONTRACT
   `noteOn/noteSet/noteOff/bend/hit/drone` (ENG1); timbre tables + `timbresOf`/`timbreIdOf`/`timbreById` (TIM1).
-- `src/engine/surface.js` — every audio.js export listed by caller (static check 12). `src/engine/fdn.js` — FDN reverb. `src/engine/
+- `core/engine/surface.js` — every audio.js export listed by caller (static check 12). `core/engine/fdn.js` — FDN reverb. `core/engine/
   worklets/` — `ks-worklet.js` (Karplus–Strong), `frz-worklet.js` (frozen store + reader), `dyn-worklet.js` (Glue / limiter),
   `probe-cap-worklet.js` (probes). Rule #38 exempts the worklets.
-- `src/modules/timbres/` — stateless timbre builders (`stages.js`, `voice.js`, `fm.js`, `ks.js`, `subtractive.js`, `chord-voice.js`,
+- `core/modules/timbres/` — stateless timbre builders (`stages.js`, `voice.js`, `fm.js`, `ks.js`, `subtractive.js`, `chord-voice.js`,
   `bass-voice.js`, `drumkits.js`, `tine.js` — the struck tine as a solo bank, C4a; `modal.js` struck bodies by modal synthesis and `breath.js`
-  breathing sustained sounds — RUN 7, Calm's sound pass); `src/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
-  `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; RUN 7 Calm-only: `forestdepth.js` «Forest depth», `calm.js` Echo · Warmth / Brightness
-  · Wave); `src/modules/ambience/forest.js` the forest's ambience (RUN 7). All: rule #38, first argument `E`.
-- RUN 8: `src/modules/timbres/strikes.js` — Calm's strike cap (caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); «Forest depth» gained `reach` (the «Лес»
-  slider) and `light` (C8 «Lighter forest», the FDN room); `views/play.js` Calm fingertip fireflies + the oval row glow; `calmshell.js` the
-  bars, the effects hint, «Lighter forest», «Measure this device»; `views/scene/host.js` quality levels (`setSceneLevel`) + the Forest blend.
-- RUN 9 (the living forest, Calm only): `core/night.js` (pure: the 24-min night cycle `nightAt`, sleep `nightDeep`, mood looks, rare events
-  `rareStep`, the emblem's points), `core/forestlife.js` (pure: the stream, mushroom / flower places, ring lists); `views/scene/forest-life.js`
-  (ground waves, mushrooms, the stream + Echo's rings, sway), `forest-detail.js` (grass, leaves, moths, moonbeams, silhouettes), `forest-rare.js`
-  (star, flower, emblem); bus topic `calmNight` { mood, sleep, wind }; host levels high / medium (default) / low with a resolution scale.
-- `src/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
-- `src/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
+  breathing sustained sounds — RUN 7; `strikes.js` Night's strike cap: caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); `core/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
+  `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; Night-only: `forestdepth.js` «Forest depth» with `reach` and `light`, `night-fx.js` Echo · Warmth / Brightness
+  · Wave); `core/modules/ambience/forest.js` the forest's ambience. All: rule #38, first argument `E`.
+- `core/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
+- `core/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
   `freezeWire`, `recWire`, `backingWire`) + session glue (lane prune/reset/delete, mixer setters, `laneHush`, drone sync, editor SESSION
   `editOpen`/`editClose`, snapshot steps + `histCommit` + `clearSong`, kinds snap/tab/master/key, `softAllOff`/`liveAllOff`/
   `trackResplice`, `backingFollowKey`, `onLoop`, `onUndo`, `seedTake`, `clearRec`, `panic`, `songSaveRec`/`songOpenApply`).
-- `src/transport/clock.js` — transport state `loop`, song length, brace math, metre map, setters, ⛳ beat ↔ time (rule #35).
-  `src/transport/scheduler.js` — replay cursors, `scheduleLayers`, chase, `fireNear`, metronome, `tick`, `startTransport`, `seekTo`.
-- `src/freeze/registry.js` — frozen tracks by lane id, `freezeSig`/`freezeState`, watcher reads, install, 16-bit store, the AF2 swap, seams.
-  `src/frzqueue.js` — auto-freeze watcher (AF3) + queue (AF1), loaded by `render.js`.
-- `src/live/` — `eng.js` (`makeENG`, live `ENG`, pricing `evHz`), `record.js` (recording state, `noteSource`, `takeRoute`, `push`, W*
+- `core/transport/clock.js` — transport state `loop`, song length, brace math, metre map, setters, ⛳ beat ↔ time (rule #35).
+  `core/transport/scheduler.js` — replay cursors, `scheduleLayers`, chase, `fireNear`, metronome, `tick`, `startTransport`, `seekTo`.
+- `core/freeze/registry.js` — frozen tracks by lane id, `freezeSig`/`freezeState`, watcher reads, install, 16-bit store, the AF2 swap, seams.
+  `core/frzqueue.js` — auto-freeze watcher (AF3) + queue (AF1), loaded by `render.js`.
+- `core/live/` — `eng.js` (`makeENG`, live `ENG`, pricing `evHz`), `record.js` (recording state, `noteSource`, `takeRoute`, `push`, W*
   calls), `capture.js` (capture sampling, fine automaton, effect playback, live isolation `setLiveIsolation`), `backing.js`
   (`loadArrangement`, `loadJam`, `clearJam`).
-- `src/song/` (pure; imports only `song/`, `core/`, `config.js`, `scales.js` — REC1/REC3): `store.js` (`events`, `schedInvalidate`, birth
+- `core/song/` (pure; imports only `song/`, `pure/`, `config.js`, `scales.js` — REC1/REC3): `store.js` (`events`, `schedInvalidate`, birth
   order, ids `evIdFill`, `compactEvents`), `lanes.js` (track tables by lane id), `notes.js` (owner keys, `songNotes`/`songSegs`, `tyEq`),
   `history.js` (THE one history, `histKind` registry with each kind's FIELDS, VALUE tripwire `histHash`, journal `onApplied` — CMD1),
   `commands.js` (CMD1c: `histToJSON`/`histFromJSON` — steps by permanent ids), `edit-notes.js`, `edit-chords.js`, `edit-group.js`,
   `edit-insert.js`, `clipboard.js`, `quantise.js`, `transpose.js`, `sections.js`, `automation.js`, `capture.js` (capture records, lane
   law, lane-point ids), `env.js` (THE song layer's environment `ENV`), `file.js` (`songData`/`songPlan`/`songNeeds`; song file v7 — track ids).
   `recorder.cmdSet`/`cmdNote` (CMD1d) — the commands that are not history steps (mute, solo, arm, ⟳, brace, tempo; key, A4) tell the journal.
-- `src/core/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
-  `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
-  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a).
-- `src/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
-- `data/profiles/` + `src/profile.js` (C0, RUN 6) — PROFILES (`profile.full` = today's app, `profile.calm`), checked by `core/profile.js`;
-  `profileApply(id)` the one switch (saves the touched live state, restores it EXACTLY on Full; writes through ui.js doors `profileWire`);
-  `profileBoot` (`?calm`). `src/edition.js` — `EDITION` ('dev' here; the release tool writes 'calm': only Calm, no switch).
-- `src/core/bus.js` (VIS1a) — the visuals' event bus `BUS` (state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract).
-  `src/views/stack.js` — the compositor (layers scene · background · instrument · overlay; modules scene, camera, backdrop, surface, hands).
-- `src/views/scene/host.js` (VIS1b) — the scene host (`#scene` WebGL canvas only while a room shows; three.js r128 vendored in
-  `vendor/three-r128/`, loaded lazily; levels full / reduced / minimal) + Calm's backgrounds `setBackground('forest'|'dark'|'camera')`;
-  `views/scene/forest.js` (VIS1c) — the night forest room (tokens `--cv-forest-*`); `core/fireflies.js` — wild fireflies, ground, depth bands.
-- `src/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
-  `src/handdet.js` — the detector (two models, worker-safe). `src/hand-worker.js` — classic worker.
-- `src/gestures.js` — FACADE over `src/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
-  `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`).
-- `src/draw.js` — FACADE over `src/views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
-  `rollView`, `play.js` overlays + play screen).
-- `src/ui.js` — menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers.
-- `src/main.js` — composition root: `onHands`, `loop()`, `startApp()` (the one start path), `?probe` loading.
-- RUN 7 (Calm v1): `src/calmshell.js` the Calm shell (controls, ⓘ, sleep timer, the Calm start; doors from ui.js); `src/ghost.js` the first-run ghost
-  light; `src/gestures/pose.js` the pose generator (HAND1 and the ghost); `src/core/calmui.js` (shell logic), `src/core/ambience.js` (seeded
-  crickets); fonts `fonts/` (OFL, register entries); the quality bar `docs/CALM-QUALITY.md`; `P.calm` / runner `--calm`.
-- `src/clip.js` — clip/audio recorder. `src/demo.js` — start-screen demo. `src/tutor.js` — lessons + step engine. `src/latmeter.js` —
-  latency meter UI (LAT1–LAT3). `src/render.js` — offline render, freeze, `renderQueued`, console `R.*`. `src/songs.js` — demo songs
-  (`data/songs/<name>.json`, SONG2).
-- `src/scaleprobe.js` — the browser probe FACADE over `src/probes/<area>.js`; rows register themselves (`probes/rows.js` `row()`/
-  `family()`). `src/probedata.js` + `tools/probe-data.mjs` — the node part.
-- `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`,
-  `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/NAME-INDEX.md`); `docs/prototypes/` = reference
-  prototypes, not app code (licence use «reference», never shipped); `tools/listen/` = the Calm listening page (dev, RUN 6); `docs/design/calm/`
-  = the Calm design proposals (docs only); prints `scales.before.json`, `song.print.json`, `gold.print.json`,
-  `gesture.print.json`, `census.print.json`.
-- Stale (removed) names to ignore: `docs/STALE-NAMES.md` (copied to the end of the generated `docs/NAME-INDEX.md`).
+- `core/pure/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
+  `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a; the visuals' event bus `BUS`: state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
+  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a), `nightui.js` (shell logic), `ambience.js` (seeded crickets).
+- `core/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
+- `core/pure/profile.js` (C0) — PROFILES, checked by `core/pure/profile.js`; `profileApply(id)` called once at the start by `boot` with the page's profile; writes through ui.js doors `profileWire`. Full's face stays embedded on Night's page for probes only (`core/DEBT.md`). `core/edition.js` — `EDITION` ('dev' here; `tools/build.mjs` writes 'release').
+- `core/legacy-ui/` (temporary, only shrinks; rule 2 of «Two apps, one core»): `boot.js` the shared start and loop (`onHands`, `loop()`, `startApp()`, the one start path; options `profile`, `frameFilter`), `ui.js` menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers; `draw.js` FACADE over `views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
+  `rollView`, `play.js` overlays + play screen + Night's fingertip fireflies and row glow, `stack.js` the compositor: layers scene · background · instrument · overlay; `scene/host.js` the scene host: `#scene` WebGL canvas only while a room shows, the room and three.js injected by the app; levels high / medium (default) / low with a resolution scale, `setBackground('forest'|'dark'|'camera')`, `setSceneLevel`); `latmeter.js` latency meter UI (LAT1–LAT3).
+- `core/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
+  `core/handdet.js` — the detector (two models, worker-safe). `core/hand-worker.js` — classic worker.
+- `core/gestures.js` — FACADE over `core/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
+  `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`, `pose.js` the pose generator: HAND1 and the ghost).
+- `core/clip.js` — clip/audio recorder. `core/render.js` — offline render, freeze, `renderQueued`, console `R.*`.
+- `tools/probes/` — `full.js`, `night.js` the page facades (`install()`); rows `core/` (register themselves: `core/rows.js` `row()`/`family()`; `probedata.js` + `tools/probe-data.mjs` the node part), `full/`, `night/`. `tools/prints/` — `scales.before.json`, `song.print.json`, `gold.print.json`,
+  `gesture.print.json`, `census.print.json`, `night.print.json`, `timbres.before.json`.
+- `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`, `smoke-paths.mjs`, `build.mjs`, `tree-hash.mjs`,
+  `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/core/NAME-INDEX.md`); `split-*` the split's proof tools; `docs/night/prototypes/` = reference
+  prototypes, not app code (licence use «reference», never shipped); `tools/listen/` = the Night listening page (dev, RUN 6); `docs/night/design/` = the Night design proposals (docs only).
+- Stale (removed) names to ignore: `docs/core/STALE-NAMES.md` (copied to the end of the generated `docs/core/NAME-INDEX.md`).
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).
@@ -522,10 +531,10 @@ THERE in full and here as one index entry):
   86 Key change while recording (TF2, Q2) · 87 Transpose (TF3) · 88 Song Transpose moves the knob (TF3b) · 89 A4 / tempo re-freeze (TF4)
   90 «1/1 = G» (TF5) · 91 Privacy (PRIV1) · 92 Latency meter (LAT1) · 93 Firefly · 94 Hand detection (LAT2) · 95 Low light (LAT3)
   96 Camera settings come back (CAM-FIX, rule #34) · 97 Camera start (0b) · 98 Autosave (AUTOSAVE1) · 99 Open is one undo step (SONG3) · 100 Engine readouts (ENG2)
-  101 Full ↔ Calm (C0) · 102 Calm sounds by ear (listening page) · 103 Calm design proposals · 104 Forest and the three backgrounds (VIS1c)
-  105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5) · 106 Calm's four sounds by ear (RUN 7) · 107 The Calm look, portrait + landscape
+  101 Full and Night profiles (C0; the switch removed at SPLIT-2) · 102 Night sounds by ear (listening page) · 103 Night design proposals · 104 Forest and the three backgrounds (VIS1c)
+  105 GPU sharing: Forest vs Dark (R2; desktop + Poco M5) · 106 Night's four sounds by ear (RUN 7) · 107 The Night look, portrait + landscape
   108 Sleep timer · 109 Depth → the forest · 110 The forest's ambience and its volume · 111 First run + ghost light · 112 The effects hand
-  113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Calm levels + the ghost · 116 Depth halo + «Лес» bar
+  113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Night levels + the ghost · 116 Depth halo + «Лес» bar
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
 
@@ -533,5 +542,5 @@ THERE in full and here as one index entry):
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.
 - **User-facing strings:** English-first, Russian alongside — interface chrome as keys in BOTH `DICTS.en` and `DICTS.ru` (`t()`,
   `data-i18n`); musical data names inline via `L()` in the three shapes. `es`/`de` prepared, deliberately not enabled (terminology unchecked).
-- **Docs:** `HANDOFF.md` and this file in concise English; archives Russian verbatim; BACKLOG/UI-MAP Russian except sections edited later.
+- **Docs:** `HANDOFF.md`, the track handoffs and this file in concise English; archives Russian verbatim; backlogs and UI-MAP Russian except sections edited later.
 - Chat replies to the user: English (the terminal mangles Cyrillic); the strategist explains to the user in Russian.

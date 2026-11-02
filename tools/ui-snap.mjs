@@ -22,7 +22,7 @@ const SAVE=val('--save'), CMP=val('--compare'), CMP2=argv[argv.indexOf('--compar
 const NOISY=new Set((val('--noisy')||'').split(',').filter(Boolean));   // SPLIT-2: screens that differ between two captures of identical code (animation, WebGL): compared by structure only
 const ONLY=val('--only');   // comma list of screens
 const FOREST=argv.includes('--forest');   // RUN 9: the forest's own screens (GPU capture, the Night face)
-const NIGHT=argv.includes('--night') || FOREST;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page opened with ?night)
+const NIGHT=argv.includes('--night') || FOREST;   // RUN 7 (C6/C11): the Night face's screens instead (a phone viewport, the page apps/night/)
 const out=s=>console.log(s);
 const MIME={ '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.svg':'image/svg+xml', '.webmanifest':'application/manifest+json' };
@@ -140,14 +140,17 @@ const SCREENS_FOREST=[
   ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
   ['f-land-notes',   async p=>{ await forestAt(p, 60); await roomNotes(p, 10, 450, [['ctone',1,0.5]]); await roomNotes(p, 1, 700, [['cecho',0,0.85]]); }],
 ];
-/* the top messages: no two visible ones overlap */
+/* the top messages: no two visible ones overlap, and none covers the control panel (SPLIT-2).
+   MSG_KNOWN = overlaps already in the backlog: printed, not counted; a known line that no longer happens fails, so it is deleted with the fix. */
+const MSG_KNOWN=new Set(['night-msg-land: darkHint × nightCtl']);   // docs/night/BACKLOG.md, first item
+const msgSeen=new Set();
 async function msgCheck(p, name){
   const r=await p.evaluate(()=>{ const vis=e=>{ if(!e) return false; const c=getComputedStyle(e); if(c.display==='none'||c.visibility==='hidden'||+c.opacity===0) return false; for(let q=e.parentElement;q;q=q.parentElement){ const k=getComputedStyle(q); if(k.display==='none'||+k.opacity===0) return false; } return true; };
-    const els=['darkHint','nightIdle','nightFxHint','nightFxBars','nightForestBar'].map(id=>document.getElementById(id)).filter(vis), R=els.map(e=>[e.id, e.getBoundingClientRect()]), hits=[];
-    const bar=id=>/Bar/.test(id);   // the two bar sets may sit side by side; a message may touch neither
+    const els=['darkHint','nightIdle','nightFxHint','nightFxBars','nightForestBar','nightCtl'].map(id=>document.getElementById(id)).filter(vis), R=els.map(e=>[e.id, e.getBoundingClientRect()]), hits=[];
+    const bar=id=>/Bar/.test(id);   // the two bar sets may sit side by side; a message may touch neither, nor the panel
     for(let i=0;i<R.length;i++) for(let j=i+1;j<R.length;j++){ if(bar(R[i][0])&&bar(R[j][0])) continue; const a=R[i][1], b=R[j][1]; if(!(a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top)) hits.push(R[i][0]+' × '+R[j][0]); }
     return { shown:R.map(x=>x[0]), hits }; });
-  out(`[ui-snap] ${name}: messages shown ${r.shown.join(', ')||'none'} — ${r.hits.length ? 'OVERLAP '+r.hits.join(', ') : 'no overlap'}`); if(r.hits.length) msgHits.push(name+': '+r.hits.join(', '));
+  out(`[ui-snap] ${name}: messages shown ${r.shown.join(', ')||'none'} — ${r.hits.length ? 'OVERLAP '+r.hits.join(', ') : 'no overlap'}`); for(const h of r.hits){ const line=name+': '+h; if(MSG_KNOWN.has(line)){ msgSeen.add(line); out('[ui-snap]   known, in the backlog: '+line); } else msgHits.push(line); }
 }
 const msgHits=[];
 async function playHands(p, check=true){   // RUN 9: check=false — the first hands-in moment (the shell's 300-ms fade still runs)
@@ -232,7 +235,8 @@ async function sideBySide(a,b,names,dir){ await mkdir(dir,{ recursive:true }); c
 { const i=argv.indexOf('--side-by-side'); if(i>=0){ await sideBySide(argv[i+1],argv[i+2],argv[i+3].split(','),path.resolve(argv[i+4])); process.exit(0); } }
 if(SAVE) await capture(SAVE);
 let code=0;
-if(SAVE && NIGHT){ out(msgHits.length ? '[ui-snap] Night messages: OVERLAP — '+msgHits.join(' · ') : '[ui-snap] Night messages: no overlap on any screen'); if(msgHits.length) code=1; }   // RUN 8 (addendum 3)
+if(SAVE && NIGHT && !FOREST){ for(const k of MSG_KNOWN) if(!msgSeen.has(k)) msgHits.push('a known overlap no longer happens, delete its line: '+k); }
+if(SAVE && NIGHT){ out(msgHits.length ? '[ui-snap] Night messages: OVERLAP — '+msgHits.join(' · ') : '[ui-snap] Night messages: no new overlap ('+msgSeen.size+' known, in the backlog)'); if(msgHits.length) code=1; }   // RUN 8 (addendum 3)
 if(CMP){ const [a,b]= CMP2 ? [CMP,CMP2] : [CMP,SAVE]; if(!b){ out('[ui-snap] --compare needs two tags (or --save)'); process.exit(2); } code= (await compare(a,b)) ? 1 : 0; }
 if(!SAVE&&!CMP){ out('usage: node tools/ui-snap.mjs --save <tag> [--compare <tagA>] | --compare <tagA> <tagB>'); const t=await readdir(OUT).catch(()=>[]); out('captures: '+t.join(', ')); }
 process.exit(code);

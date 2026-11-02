@@ -1,4 +1,4 @@
-/* CMD1c (RUN 5) — EVERY HISTORY STEP A COMMAND, SERIALISED BY IDS (plan docs/CMD1-design.md §3.4). Pure song layer (folder rule REC1).
+/* CMD1c (RUN 5) — EVERY HISTORY STEP A COMMAND, SERIALISED BY IDS (plan docs/core/CMD1-design.md §3.4). Pure song layer (folder rule REC1).
    histToJSON() writes the one history (past + redo branch) as plain JSON; histFromJSON(json) parses it back and installs it in place of the
    live one. A step is written by DECLARATION: its kind's `fields` (histKind's 4th argument) — a field not declared, or a kind without a
    declaration, refuses by name (no silent hole). Live objects are written by their permanent ids and resolved back to THE live object:

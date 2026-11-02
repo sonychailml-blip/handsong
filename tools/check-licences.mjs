@@ -10,7 +10,7 @@
    with the same version and licence; (5) the icon/glyph audit: every Unicode symbol or emoji used outside comments is listed, and
    every listed one is still used; (6) THIRD-PARTY-LICENSES.md equals the generated text. CONTROLS (must fail): an unlisted URL, an unlisted CSP host, a GPL
    licence, an unlisted glyph, an unlisted image file, a package version bump, a reference-only address in a shipped file. Reference prototypes
-   (docs/prototypes/*.html, RUN 5) are scanned for addresses only: each must be a «reference» entry, never used by a shipped file. */
+   (docs/night/prototypes/*.html, RUN 5) are scanned for addresses only: each must be a «reference» entry, never used by a shipped file. */
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, resolve, extname, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -21,7 +21,7 @@ const REG_FILE='tools/licences.json', LOCK_FILE='tools/package-lock.json', MD_FI
 const SKIP_DIRS=new Set(['.git','tools','archive','node_modules','dist']);
 const OWN_EXT=new Set(['.js','.mjs','.json','.html','.css','.md','.txt','']);   // our code, data and docs
 const CLASSES=new Set(['code','model','service','link','image','font','glyph','sound','ir']);
-const USES=new Set(['shipped','CDN','service','link','device','dev-only','reference']);   // reference (RUN 5): used only by a reference prototype under docs/prototypes/ — never shipped
+const USES=new Set(['shipped','CDN','service','link','device','dev-only','reference']);   // reference (RUN 5): used only by a reference prototype under docs/night/prototypes/ — never shipped
 const MATERIAL=new Set(['image','font','glyph','sound','ir']);
 const REFUSED=/\b(A?GPL|LGPL|MPL)\b|\bSA\b|-SA\b|\bNC\b|-NC\b|\bND\b|-ND\b/i;
 const GLYPH_KINDS=new Set(['icon','typography','notation','console']);
@@ -39,7 +39,7 @@ function walk(dir, out=[]){
 }
 const PAGE=/(^|\/)index\.html$/, MANIFEST=/(^|\/)manifest\.json$/;
 const isShippedText=f=>/^(index\.html|apps\/(full|night)\/(index\.html|sw\.js|manifest\.json|night\.css)|core\/legacy-ui\/style\.css|core\/tokens\.css)$/.test(f)||/^(core|apps\/(full|night))\/.+\.js$/.test(f)&&!/\/vendor\//.test(f)||/^(core|apps\/(full|night))\/data\/.+\.json$/.test(f);
-const isRefText=f=>/^docs\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
+const isRefText=f=>/^docs\/night\/prototypes\/.+\.html$/.test(f);   // RUN 5: reference prototypes — their addresses must be «reference» entries
 export function gather(){
   const files=walk('').sort(), texts={};
   for(const f of files) if(isShippedText(f)||isRefText(f)) texts[f]=readFileSync(join(ROOT,f),'utf8');
@@ -157,7 +157,7 @@ export function renderMd(reg, use){
   sect('Hosted services', it=>it.use==='service');
   sect('Links the person opens (nothing is sent by the app)', it=>it.use==='link');
   sect('Developer tools only (never shipped)', it=>it.use==='dev-only');
-  sect('Reference prototypes only (docs/prototypes/, never shipped)', it=>it.use==='reference');
+  sect('Reference prototypes only (docs/night/prototypes/, never shipped)', it=>it.use==='reference');
   sect('Icons, images and fonts (audit, Q13)', it=>['image','font','glyph','sound','ir'].includes(it.class)&&it.use!=='reference');
   const gl=items.find(it=>it.class==='glyph');
   L.push('## Unicode symbols and emoji in the interface (audit, Q13)','',

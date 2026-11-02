@@ -3,7 +3,7 @@
 Written for: the user and the designer of the future redesign (Claude Code itself, per the user's decision). Documentation only — nothing
 in the app changed for this. Sources: the markup (`index.html`), `ui.js`, `draw.js`/`views/`, `UI-MAP.md` (the detailed screen map),
 `BACKLOG.md`. ⛳ User decision (2026-10-16, BACKLOG §7.19): the layout / section / visual redesign comes LATER, once the missing parts
-exist (effects constructor with three placements, expression lab and hand map, Calm, Save/Open ✓, MIDI in/out, audio in); the effects
+exist (effects constructor with three placements, expression lab and hand map, Night, Save/Open ✓, MIDI in/out, audio in); the effects
 constructor is redesigned once it is built.
 
 Frequency legend: **A** always (every session, while playing) · **O** often (most sessions) · **R** rarely · **S** setup only (once, or when
@@ -89,7 +89,7 @@ rows · ⬚ pick · 🗑 · ⧉ · 📋 · ⧉⁺ · ⌗ + 3 selects · −1° +
 |---|---|---|
 | Effects constructor with three placements (§7.14: insert on a channel, insert on the master, shared sends) | a full screen of its own: chain per track/role, master chain, send/return buses, routing view | its own screen, entered from the mixer and from a track |
 | Expression lab + hand map (§3.29 ➕) | a screen with the live hand, its features, mappings, presets | its own screen from the Sound area |
-| Calm mode (§7.16, the first release) | almost no chrome: a minimal play surface, big touch targets | a mode switch on the start card |
+| Night mode (§7.16, the first release) | almost no chrome: a minimal play surface, big touch targets | a mode switch on the start card |
 | Save / Open (SAVE1 ✓, autosave proposed) | a song library: list, names, versions, restore | a «Songs» screen (today: two buttons in the Looper panel) |
 | MIDI in / out (stage 6) | device list, channel mapping, clock | a settings screen |
 | Audio in / audio take (stage 5) | input select, level, monitoring, audio tracks in the window | mixer + track rows |
@@ -106,4 +106,4 @@ rows · ⬚ pick · 🗑 · ⧉ · 📋 · ⧉⁺ · ⌗ + 3 selects · −1° +
 5. **Names say what things are today** (song, tracks, sound, hands) — no legacy «loop».
 6. **Own icons by meaning** (the icon component already separates «mixer» from «bass»), drawn by us, tested on the camera picture.
 7. **Phone portrait is the target:** no sideways-scrolling bars; editor tools grouped in pages or a tool drawer.
-8. **Calm by default:** quiet chrome, few colours, toasts away from the play field; teach in the lessons, not in labels.
+8. **Night by default:** quiet chrome, few colours, toasts away from the play field; teach in the lessons, not in labels.

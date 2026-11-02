@@ -1,4 +1,4 @@
-/* VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
+/* VIS1b (RUN 6, docs/core/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
    The scene: a WebGL canvas #scene UNDER the 2D canvas, made only while a room is shown and destroyed when it is not (its context is
    released — «room off» frees the GPU for the hand model, review R2); three.js r128 loaded LAZILY from our own origin (a dynamic import of
    the vendored UMD file, which sets globalThis.THREE — never in Full); levels full / reduced / minimal (minimal = no WebGL: a 2D stand-in,

@@ -1,5 +1,5 @@
 /* VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js). Re-laid from
-   the «Rooms of light» prototype (docs/prototypes/, the strategist's own code — our starting source, user RUN 5) WITHOUT the animals:
+   the «Rooms of light» prototype (docs/night/prototypes/, the strategist's own code — our starting source, user RUN 5) WITHOUT the animals:
    procedural ground (moss, soil, leaves), bark, instanced trunks and branches, ferns, mossy rocks, four mist sheets, the moon, fog; the hand's
    firefly light (core + halo + trail; a real shadow from the playing hand's light where the level allows) and a dimmer light for the effects
    hand; the wild fireflies from core/fireflies.js (numbers — the shader only draws them); a slow parallax towards the light.

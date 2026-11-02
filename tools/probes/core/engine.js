@@ -1,4 +1,4 @@
-/* AUD1a (RUN 3, 2026-10-16; docs/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
+/* AUD1a (RUN 3, 2026-10-16; docs/core/AUD1-design.md option C, review R1): THE ENGINE CONTEXT `E` and THE NODE CENSUS.
    «AUD1 engine context» — E of each instance (the live engine, the render copy) is checked THREE times: right after initAudio (the copy, its
    worklets stubbed), after the worklets loaded for real, and after a track render ran. Each time: E.ac is the instance's AC; every Web Audio
    node reachable from E belongs to E.ac (a stale copy would hold a node of an earlier context); the worklet flags equal the module's own; the

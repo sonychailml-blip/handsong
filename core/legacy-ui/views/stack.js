@@ -1,4 +1,4 @@
-/* VIS1a (RUN 6, docs/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room,
+/* VIS1a (RUN 6, docs/core/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room,
    VIS1b) · background (the camera picture) · instrument (the play surface) · overlay (hand points, the looper strip, the status). A module:
    { kind:'visual', id, layer, cost:{ cls, gpu }, frame(t, bus) } (+ mount / resize / unmount when it owns a surface). It reads the bus only
    (a reader — writing throws) and never touches sound, the song or the network. main.loop calls stackFrame once per screen frame on the

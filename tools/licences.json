@@ -151,7 +151,7 @@
    "urls": [
     "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/"
    ],
-   "notes": "Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Night, not app code). Not shipped; if Night adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-NIGHT plan)."
+   "notes": "Loaded only by docs/night/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Night, not app code). Not shipped; if Night adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-NIGHT plan)."
   },
   {
    "id": "threejs-r128",
@@ -180,7 +180,7 @@
     "https://fonts.gstatic.com"
    ],
    "replace": "reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)",
-   "notes": "Loaded only by docs/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts."
+   "notes": "Loaded only by docs/night/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts."
   },
   {
    "id": "font-andika",

@@ -2,7 +2,7 @@
 
 Written for: the strategist (review), then Claude Code (implementation). No app code was changed for this document; the numbers below were
 measured today on the user's desktop through the browser runner (headless Chrome, 4 logical cores, 48 kHz). Plan source: stage-3 plan slice
-23 (a ☆ socket kept BEFORE Calm — user answer Q2); user decision 2026-10-16: plan first.
+23 (a ☆ socket kept BEFORE Night — user answer Q2); user decision 2026-10-16: plan first.
 
 ## 1. What exists today
 - The latency meter (LAT1/LAT1b, `latmeter.js`): camera fps, detection, gestures, drawing, long tasks, audio base/output latency, «hand →
@@ -53,14 +53,14 @@ measured today on the user's desktop through the browser runner (headless Chrome
   |---|---|---|---|
   | `high` | < 1.0 | < 35 ms | everything on |
   | `mid` (this desktop) | 1.0 – 3.5 | 35 – 90 ms | today's app |
-  | `low` | > 3.5 | > 90 ms or a software renderer | Calm's low-power path |
+  | `low` | > 3.5 | > 90 ms or a software renderer | Night's low-power path |
   | phones | placeholder — measure (budget phone, mid phone, iPhone) before setting | | |
 
-## 5. What Calm's low-power path switches (when `low`, or by the person's switch)
+## 5. What Night's low-power path switches (when `low`, or by the person's switch)
 - Hand detection: policy `'2s'` stays (two hands tracked); camera request 24 fps; the worker path only if the phone numbers favour it.
 - Audio: a smaller chord pool built lazily (needs its own probe — rule #3 holds: built voices still never stop); Night forest Short only, or
   ONE shared room (§7.14 sends); the expression stage's shimmer off; solo pool cap 4.
-- Picture: canvas at devicePixelRatio ≤ 1, scene effects at their lowest level (§7.16 «levels»), no camera picture drawn (Calm draws the scene).
+- Picture: canvas at devicePixelRatio ≤ 1, scene effects at their lowest level (§7.16 «levels»), no camera picture drawn (Night draws the scene).
 - Freeze: the memory budget of touch devices (`AF_BUDGET_MB` 300) and auto-freeze earlier (fewer live voices).
 - Every switch is reversible and shown («Low power: on — why»); nothing recorded changes.
 

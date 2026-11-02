@@ -49,15 +49,15 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 
 - **playwright-core — browser automation for the probe runner** — Developer tool in tools/ only (tools/node_modules is git-ignored); never shipped; no dependencies of its own.
 
-## Reference prototypes only (docs/prototypes/, never shipped)
+## Reference prototypes only (docs/night/prototypes/, never shipped)
 
 | Item | Version | Licence | Use | Addresses / files | Source |
 |---|---|---|---|---|---|
 | three.js (3D library) — reference prototype only | r128 | MIT | reference | https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/ | https://github.com/mrdoob/three.js (cdnjs three.js r128) |
 | Google Fonts: Marcellus and Commissioner — reference prototype only | css2 API | OFL-1.1 | reference | https://fonts.googleapis.com<br>https://fonts.gstatic.com | https://fonts.google.com (Marcellus, Commissioner — SIL Open Font License 1.1) |
 
-- **three.js (3D library) — reference prototype only** — Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Night, not app code). Not shipped; if Night adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-NIGHT plan).
-- **Google Fonts: Marcellus and Commissioner — reference prototype only** — Loaded only by docs/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts. · **reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)**
+- **three.js (3D library) — reference prototype only** — Loaded only by docs/night/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Night, not app code). Not shipped; if Night adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-NIGHT plan).
+- **Google Fonts: Marcellus and Commissioner — reference prototype only** — Loaded only by docs/night/prototypes/rooms-of-light.html. Not shipped; the app loads no web fonts. · **reference prototype only — not shipped (the app's own fonts come with the user's design, §7.19)**
 
 ## Icons, images and fonts (audit, Q13)
 

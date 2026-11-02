@@ -1,6 +1,6 @@
 # core/DEBT.md: code that is in core/ only because something blocks its move
 
-This list may only shrink (static check 15). Each line: what is here, the rule it breaks, what frees it. Plan: `docs/SPLIT-PLAN.md` §3.3.
+This list may only shrink (static check 15). Each line: what is here, the rule it breaks, what frees it. Plan: `archive/SPLIT-PLAN.md` §3.3.
 
 - `core/legacy-ui/**` (boot, ui, draw, latmeter, views, style.css): no UI in core. Freed by Night's own start, doors and drawing (NIGHT-n); the rest then moves to `apps/full/` (FULL-n).
 - `views/roll.js`, `views/strip.js`: Full-only code in core. Freed when `views/play.js` stops importing them.
