@@ -897,6 +897,20 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
 - fn (8): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`
 
+## tools/probes/night/headroom-calc.js
+NIGHT-1: the headroom page's sums, pure (runs in node: tools/probe-data.mjs, row «NIGHT-1 headroom sums»).
+- const (10): `FORMAT`, `round`, `quantumUs`, `usPerQuantum`, `loadPct`, `minOf`, `median`, `dB`, `amp`, `worst`
+- fn (9): `nextBallast`, `freeRange`, `tailTimes`, `envelope`, `residualDb`, `partials`, `partialSeconds`, `prerender`, `report`
+
+## tools/probes/night/headroom-worklet.js
+NIGHT-1: the measuring page's processors, dev only.
+- exports: none
+
+## tools/probes/night/headroom.js
+NIGHT-1 stage 1: Night's sound headroom, dev only.
+- const (6): `stopCamera`, `openCamera`, `CONDS`, `PLAN`, `snapshot`, `reportOf`
+- fn (14): `sharedParts`, `noteCost`, `passages`, `tails`, `tailProfile`, `whatIfs`, `lab`, `prerender`, `buffers`, `calibrate`, `realtime`, `phoneOffline`, `deepOffline`, `mountHeadroom`
+
 ## tools/probes/night/night.js
 C4a (RUN 6, Night plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
 - const (2): `NIGHT_TIMBRES`, `NIGHT_SET`
@@ -914,7 +928,7 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_175 modules, 2218 exported names._
+_178 modules, 2257 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

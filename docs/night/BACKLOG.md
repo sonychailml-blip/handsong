@@ -6,6 +6,7 @@ _The old `BACKLOG.md` was cut by section at SPLIT-2 (nothing lost, `tools/split-
 _Paths in older text: `src/core/` → `core/pure/`; `src/ui.js`, `draw.js`, `latmeter.js`, `views/` → `core/legacy-ui/`; other `src/` → `core/`; `data/` → `core/data/`; Night-only and Full-only files → `apps/night/`, `apps/full/`; probes → `tools/probes/`; prints → `tools/prints/`. Map: `tools/split-move.mjs`._
 
 ## Open now (written at SPLIT-2, 2026-11-02, English)
+- ⬜ **NIGHT-1: sound headroom.** Stage 1 measured on the laptop (`docs/night/NIGHT-1-HEADROOM.md`). Open: the Poco page `<preview>/?probe&headroom`, the user's choice among the options, then the fixes.
 - 🐞 **Landscape: the low-light hint overlaps the control panel;** its OK button sits over the «Звук» label. In the baseline since before the split. The overlap check now compares messages with the panel (`msgCheck` in `tools/ui-snap.mjs`) and names this one as known (`MSG_KNOWN`). Fix it, then delete the known line: the check fails while a known line no longer happens.
 - ⬜ **A cross-link to the full app, later:** from Night's info card, as a plain web link to the Handsong site or store page. Never a code import.
 - ⬜ **Delete `apps/night/migrate.js` after the first public release,** with the row «NIGHT migrate» and the file's exemption in the row «OLD NAME gone».

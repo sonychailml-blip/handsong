@@ -6,7 +6,7 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 |---|---|---|---|
 | **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation and `CORE-1` (hand calibration, opt-in) done. Step 125 open on Night and the Poco. |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
-| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. Next: the user's checks of steps 120–124, then C8 rest, C9, C10, C12. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. `NIGHT-1` (sound headroom) measured on the laptop, waiting for the Poco and the user's decision. Then steps 120–124, C8 rest, C9, C10, C12. |
 
 **Handsong** is a gesture synthesizer and tuning tutorial in the browser: camera → MediaPipe → pinches → Web Audio, with a multitrack recorder, piano roll and lessons. **Handsong Night** (code id `night`) is the quiet one: a night forest played with the hands, free, nothing leaves the device.
 

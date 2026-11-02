@@ -256,6 +256,7 @@ const NET_LISTED={
   'tools/probes/core/hand.js':  { fetch:[1,'probe only (?probe): reads tools/prints/gesture.print.json from the own origin'] },
   'tools/probes/core/handprint.js':  { fetch:[1,'probe only (?probe): reads tools/prints/hand-depth.<app>.print.json from the own origin'] },
   'core/audio.js':      { addModule:[4,'loads our own worklets (core/engine/worklets/ks-, frz-, dyn-, probe-cap-worklet.js) from the own origin into the audio context'] },
+  'tools/probes/night/headroom.js': { addModule:[4,'probe only (?probe&headroom): loads our own dyn-worklet.js and headroom-worklet.js into offline contexts and the live one (NIGHT-1)'] },
   'tools/probes/core/profile.js': { fetch:[1,'probe only (?probe): reads its test record fixture.profile.json from the own origin (C0)'] },
   'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'] },
   'core/clip.js':       { share:[1,'hands the person\'s own clip to the system share sheet — only on their tap (explicit action)'] },

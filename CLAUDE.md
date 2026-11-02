@@ -460,6 +460,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
 - `tools/` — `check-static.mjs`, `probe-browser.mjs`, `probe-data.mjs`, `check-licences.mjs` + `licences.json`, `lex.mjs`, `ui-snap.mjs`, `smoke-paths.mjs`, `build.mjs`, `tree-hash.mjs`,
   `pack-keygen.mjs`, `doc-split-check.mjs` (DOC1), `name-index.mjs` (generates `docs/core/NAME-INDEX.md`); `split-*` the split's proof tools; `docs/night/prototypes/` = reference
   prototypes, not app code (licence use «reference», never shipped); `tools/listen/` = the Night listening page (dev, RUN 6); `docs/night/design/` = the Night design proposals (docs only).
+- `tools/probes/night/headroom.js` (+ `-calc`, `-worklet`) — NIGHT-1's dev-only sound headroom page, `<page>?probe&headroom`; the laptop's run: `tools/night-headroom.eval.js`; results: `docs/night/NIGHT-1-HEADROOM.md`.
 - Stale (removed) names to ignore: `docs/core/STALE-NAMES.md` (copied to the end of the generated `docs/core/NAME-INDEX.md`).
 
 ## Moved to `archive/CLAUDE-history.md` at DOC1 (grep by title; read only what the slice needs)
@@ -539,7 +540,7 @@ THERE in full and here as one index entry):
   113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Night levels + the ghost · 116 Depth halo + «Лес» bar
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
-  125 Hand calibration (CORE-1; on the panel `?probe&calpanel`)
+  125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

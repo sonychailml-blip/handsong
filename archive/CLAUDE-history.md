@@ -1794,6 +1794,7 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     pinch makes no step (on the Poco a pinch shifts depth about 3%, by design). Effects stops: more or less finger travel, same zero. Wrist test (6 s),
     hand in place, turning the wrist: the range is the accepted limit. Copy the numbers and send them. Phone: portrait and landscape.
     Done: Full on the desktop, 2026-11-02 (near 0.339, depth 2×, wrist 0.27, 3σ hold band kept). Open: Night on the desktop, both apps on the Poco.
+126. Sound headroom (NIGHT-1). On the Poco: a Night preview + `/?probe&headroom`, tap Start, allow the camera. It calculates silently (5–15 minutes), plays with no camera, then asks for a hand in view and plays with the camera and the forest; about 20 minutes in all. Listen for crackle during the sound parts; say which part. Copy the text at the end and send it. Reload before any other check. Results and method: `docs/night/NIGHT-1-HEADROOM.md`.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:

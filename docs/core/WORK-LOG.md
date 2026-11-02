@@ -4,6 +4,10 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-2 (2026-11-03): one listing line for a dev tool
+Tree hashes before: core 7ef60d72285fb980 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: core e327f42db4c183c7 · apps unchanged.
+- `core/engine/surface.js`: the calls of NIGHT-1's headroom page (`tools/probes/night/headroom.js`) listed, as static check 12 requires. Data read only by the static check; no runtime code changed. Checks of both apps: `docs/night/WORK-LOG.md` NIGHT-1.
+
 # CORE-1 — checkpoint 5 (2026-11-02): close
 Tree hashes before and after (docs only): core 7ef60d72285fb980 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
 - User's step 125, Full on the desktop: calibration saved (near 0.339, depth 2×), nothing felt wrong, so the 3σ band stays. Wrist sweep 0.27 at 2× against the estimated 0.64, accepted as the limit. Night on the desktop and both apps on the Poco stay open, in the Night and Full backlogs.

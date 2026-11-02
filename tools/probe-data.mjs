@@ -206,6 +206,22 @@ function forestCore(){
   n++; eq('compressor curve below / in / above the knee', [DSP.compCurveDb(-40,-12,3,6), DSP.compCurveDb(-12,-12,3,6), DSP.compCurveDb(0,-12,3,6)], [-40, -12.5, -8]);
   return { cases:n, total:d.length, differences:d };
 }
+/* NIGHT-1: the headroom page's sums (tools/probes/night/headroom-calc.js). CONTROLS: a device with less room must end lower; a moved envelope must move the tail. */
+async function headroomCalc(){
+  const C=await import(new URL('./probes/night/headroom-calc.js', import.meta.url).href), d=[]; let n=0;
+  const near=(what,a,b,tol=1e-9)=>{ n++; if(!(Math.abs(a-b)<=tol)) d.push(`${what}: ${a}, expected ${b}`); };
+  const search=(room,depth)=>{ const t=[]; let f; while((f=C.nextBallast(t,depth))!=null) t.push({ f, ok:f<=room }); return { tries:t.length, ...C.freeRange(t) }; };
+  { const s=search(0.6,3); near('free share, 3 tries (low)',s.lo,0.5); near('free share, 3 tries (high)',s.hi,0.75); near('tries',s.tries,3); }
+  { const s=search(0.6,4); near('free share, 4 tries (low)',s.lo,0.5); near('free share, 4 tries (high)',s.hi,0.625); }
+  { const t=[{ f:0, ok:false }]; n++; if(C.nextBallast(t)!==null) d.push('a device that drops out with no ballast must end the search'); near('no room: low stays empty',C.freeRange(t).lo===null?0:1,0); }
+  near('budget of a quantum at 48 kHz, µs',C.quantumUs(48000),2666.6666666666665,1e-6); near('render time to work per quantum',C.usPerQuantum(1000,1,48000),2666.6666666666665,1e-6); near('a real-time render is 100 %',C.loadPct(C.quantumUs(44100),44100),100,1e-9);
+  { const x=new Float32Array(48000); for(let i=0;i<48000;i++) x[i]=Math.pow(10,-(i/48000)*100/20); const T=C.tailTimes(C.envelope(x,48000),0.05); near('a fall of 100 dB/s reaches −60 dBFS at 0.6 s',T[-60],0.6,0.051); near('and −90 at 0.9 s',T[-90],0.9,0.051); n++; if(C.tailTimes(C.envelope(x.map(v=>v*0.1),48000),0.05)[-60]>=T[-60]) d.push('CONTROL: a tail 20 dB quieter did not end sooner'); }
+  { const rec={ engine:'modal', recipe:{ dk:0, att:0.002, vb:0, modes:[{ r:1, g:1, d:6.907755 },{ r:2, g:0.01, d:6.907755 }] } }, L=C.partials(rec,220,1,1,-60); near('a loud partial (T60 6.91 s): heard 60 dB down, 6.91 s',L[0].audible,6.91,0.01); near('its stop at its own −70 dB',L[0].stop,8.08,0.01); near('a partial 40 dB down: heard for the last 20 dB, 2.3 s',L[1].audible,2.3,0.01); n++; if(C.partialSeconds(L).wasted<=0) d.push('CONTROL: a partial stopping after it fades shows no waste'); }
+  { const p=C.prerender(10,48000,20,3); near('one 10-s note in float',p.noteMbFloat,1.83,0.01); near('the set, 16 bit',p.totalMb16,55,1); }
+  { const a=new Float32Array([1,1,1,1]), b=new Float32Array([1,1,1,0.9]); n++; if(!(C.residualDb(a,b)<-20 && C.residualDb(a,a)===-Infinity)) d.push('the residual misreads'); }
+  n++; if(C.report({},{}).format!==C.FORMAT) d.push('the report lost its format');
+  return { cases:n, total:d.length, differences:d };
+}
 /* CORE-1 CP1: the guided measuring page's sums (tools/probes/core/handstats-calc.js) on known series. CONTROLS: a moved median sample and a moving hand must show. */
 async function handStatsCalc(){
   const C=await import(new URL('./probes/core/handstats-calc.js', import.meta.url).href);
@@ -946,6 +962,7 @@ const ROWS=[
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
+  ['NIGHT-1 headroom sums (tool)', ()=>headroomCalc(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['CAL0 hand measuring (tool)', ()=>handStatsCalc(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // CORE-1 CP1
   ['CAL1-3 hand calibration (core)', ()=>handCalCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // CORE-1 CP2
 ];

@@ -43,6 +43,7 @@ const SURFACE={
   'tools/probes/full/tim3d.js':['CHORD_INSTR', 'chordOn', 'timbreForgetDbg', 'timbreIdx', 'timbreInstall', 'timbreRecord', 'timbreSnapshot', 'timbresOf'],
   'tools/probes/core/pool.js':['CHORD_INSTR', 'LEAD_INSTR', 'chordGlide', 'chordOff', 'chordOn', 'drumHit', 'leadOn', 'poolDbg', 'poolSizes'],
   'tools/probes/night/night.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],
+  'tools/probes/night/headroom.js':['AC', 'engineCtx', 'timbreIdOf', 'fxInstance', 'setLowPower', 'offlineTapMaster', 'fxRenderPath', 'fxPlaySet', 'setTimbreTrim', 'setNightStrikes', 'applyFx', 'LEAD_INSTR', 'leadOn', 'leadOff', 'ambienceOn', 'ambienceTick', 'chordOn', 'chordOff', 'dbgExprBypass'],   // NIGHT-1: the headroom page, dev only
   'tools/probes/night/forest.js':['fxSnapshot', 'masterLevel', 'ambienceInfo'],
   'tools/probes/core/profile.js':['timbreIdOf'],
   'tools/probes/night/nightprofile.js':['FX_FACTORY', 'timbreIdOf'],
