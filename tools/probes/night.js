@@ -8,6 +8,7 @@ export const all=(opt={})=>runNight(opt), quick=(opt={})=>runNight({ ...opt, qui
 export { checkEngineCtx, checkCensus, dumpCensus } from './core/engine.js';
 export { dumpGold, checkGold } from './core/gold.js';
 export { dumpGesture, checkGesture } from './core/hand.js';
+export { checkHandCal } from './core/handcal.js';   // CORE-1
 export { checkProfile } from './core/profile.js';
 export { checkVisStack } from './core/vis.js';
 export { checkTimbresBefore, dumpTimbres } from './core/timbres.js';

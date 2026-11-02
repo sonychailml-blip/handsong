@@ -8,6 +8,7 @@ import { t } from '../i18n.js';
 import { hooks } from '../hooks.js';
 import { DRUM_ROWS, applyExpr, fxSnapshot, fxChordBri, FX_GLIDE_KEY } from '../audio.js';
 import { canvas } from '../vision.js';
+import { calBusy, calFrame, calProbeSet } from '../handcal.js';   // CORE-1
 import { clamp01, clamp, pinchRatios, minFinger, touchedFingers, emaS, degRaw, degHyst, cellHyst } from './features.js';
 import { fxParamsOf, captureFx } from './fxhand.js';
 import { looperWire, doLooper, fireLooperCmd } from './looper.js';
@@ -105,11 +106,13 @@ function handsProbe(clk, tap){
     exprPrevSet(K.exprPrevT); Object.assign(EXPR,K.expr); tutSeenT=K.tutSeenT;
     if(EXPR.engage<=1e-3){ applyExpr(0,0,0,0,0,EXPR_CFG.tcNode); setExprDisp(0); setExprBrightDisp(0); } }   // the probe's expression hand left the stage moving: back to neutral
   PRB=clk||null; looperTap= clk ? (tap||null) : null;
+  calProbeSet(!!clk);   // CORE-1: the public calibration start refuses during a probe session
 }
 function processHandsProbe(res){ prbCall=true; try{ processHands(res); } finally { prbCall=false; } }
 function processHands(res){
   if(PRB && !prbCall) return;   // HAND1: the app loop waits while a probe session runs
   const W=PRB?PRB.W:canvas.width, H=PRB?PRB.H:canvas.height, now=nowMs();
+  if(calBusy()) res=calFrame(res,now);   // CORE-1: the routine takes the hands; this machine sees none, so pinches close and nothing plays
   const dtm=exprPrevT?clamp((now-exprPrevT)/1000,EXPR_CFG.dtMin,EXPR_CFG.dtMax):EXPR_CFG.dtMin;   // dt кадра для «смычка», КЛАМП обязателен (застрявший кадр иначе взорвал бы интеграторы)
   exprPrevSet(now);
   const seen=new Set();

@@ -5,7 +5,7 @@ import { fnv } from './canon.js';
 
 /* All times in ms of the frame's clock: nothing counts frames (the Poco tracks at about 7 fps). */
 const CAL=Object.freeze({
-  farRatio:0.42, tauS:0.205, band:0.009, marginMax:0.03, sensMin:0.5, sensMax:2,
+  farRatio:0.42, tauS:0.205, band:0.009, marginMax:0.03, sensMin:0.5, sensMax:2, depthMin:0.7,   // depth from 0.7x: the far end stays within arm's reach (user)
   waitMs:10000, holdLimitMs:12000, holdMs:2000, holdMaxMs:4000, minSamples:8, checkFrom:5, stillSize:0.06, stillWrist:0.05, blinkMs:800, minNear:0.25, lockJump:0.3,
   frameLm:null,   // null = all 21 landmarks must be in the frame
 });
@@ -28,7 +28,7 @@ const calDirValue=(v,dir,inv)=> calInverted(dir,inv) ? 1-v : v;
 /* the effects hand: 1*x is exactly x, so sens 1 is today's expression */
 const calFx=(base,d,inv,sens=1)=>clamp01(base+sens*(inv?-d:d));
 /* an override replaces the global value of its address, never multiplies */
-function calSensOf(rec,addr,id){ const c=id!=null&&rec.controls[id]; return c&&c.sens!=null ? c.sens : rec.global[addr]; }
+function calSensOf(rec,addr,id){ const c=id!=null&&rec.controls[id], v=c&&c.sens!=null ? c.sens : rec.global[addr]; return addr==='depth' ? Math.max(CAL.depthMin,v) : v; }   // a control can be moved to depth carrying a lower override
 
 /* ---- robust numbers ---- */
 const medianOf=a=>{ const s=[...a].sort((x,y)=>x-y), m=s.length>>1; return s.length%2 ? s[m] : (s[m-1]+s[m])/2; };
@@ -55,7 +55,7 @@ function calClean(x,scope){
   for(const k of Object.keys(u)) if(!['format','version','scope','global','controls','cameras'].includes(k)) dropped.push(k);
   const part=k=>{ if(u[k]===undefined) return {}; if(isObj(u[k])) return u[k]; dropped.push(k); return {}; };
   const G=part('global'), C=part('controls'), M=part('cameras');
-  for(const k of Object.keys(G)) if(k in rec.global && sensOk(G[k])) rec.global[k]=G[k]; else dropped.push('global.'+k);
+  for(const k of Object.keys(G)) if(k in rec.global && sensOk(G[k]) && (k!=='depth'||G[k]>=CAL.depthMin)) rec.global[k]=G[k]; else dropped.push('global.'+k);
   for(const k of Object.keys(C)) if(CONTROL_ID.test(k) && ctlOk(C[k])) rec.controls[k]={ ...C[k] }; else dropped.push('controls.'+k);
   for(const k of Object.keys(M)) if(CAM_KEY.test(k) && camOk(M[k])) rec.cameras[k]={ ...M[k] }; else dropped.push('cameras.'+k);
   return { rec, status:dropped.length ? 'partial' : 'ok', dropped };

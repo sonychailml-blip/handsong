@@ -187,6 +187,11 @@ GES1: the hand ROLES and OWNER KEYS — stateless helpers of the gesture machine
 LAT2b — hand detection OFF the main thread (a CLASSIC worker: MediaPipe starts each model by importScripts of its loader, which a module worker cannot do; our modules come in by dynamic import).
 - exports: none
 
+## core/handcal.js
+CORE-1: the live calibration service, thin over core/pure/handcal.js: the record and store, the camera's key, the running routine and withholding hands while it runs.
+- const (4): `handCalSetDepthSens`, `calBusy`, `calProbeSet`, `calSig`
+- fn (13): `handCalOpen`, `handCalRead`, `handCalSetSens`, `handCalSetDir`, `handCalReset`, `handCalStart`, `handCalCancel`, `handCalAccept`, `handCalState`, `onHandCal`, `calFrame`, `calStartProbe`, `calKeep`
+
 ## core/handdet.js
 LAT2 — the hand DETECTOR: MediaPipe's hand model, worker-safe (no DOM — it runs inside core/hand-worker.js and, as the fallback, on the main thread through vision.js).
 - const (3): `MP_WASM`, `MP_MODEL`, `EMPTY_RESULT`
@@ -657,7 +662,7 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 
 ## core/vision.js
 (no head comment)
-- const (10): `video`, `canvas`, `ctx`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
+- const (11): `video`, `canvas`, `ctx`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
 ## tools/probes/core/data.js
@@ -697,7 +702,12 @@ PROBE1: The console guard: window.P = api() — one probe at a time; its self-te
 
 ## tools/probes/core/hand.js
 HAND1: SYNTHETIC HANDS → GESTURE FINGERPRINT.
-- fn (2): `dumpGesture`, `checkGesture`
+- const (1): `GESTURE_ENV`
+- fn (4): `dumpGesture`, `checkGesture`, `gestureEnvKeep`, `gestureEnvSet`
+
+## tools/probes/core/handcal.js
+CORE-1 CP3: the live calibration service through the REAL processHands on the probe clock.
+- fn (1): `checkHandCal`
 
 ## tools/probes/core/handstats-calc.js
 CORE-1 CP1: the sums of the guided measuring page (handstats.html).
@@ -771,6 +781,7 @@ VIS1a (RUN 6, docs/core/VIS1-design.md §7): row «VIS1a stack and bus» (quick 
 - → ./core/gold.js (2): `dumpGold`, `checkGold`
 - → ./core/guard.js (1): `api`
 - → ./core/hand.js (2): `dumpGesture`, `checkGesture`
+- → ./core/handcal.js (1): `checkHandCal`
 - → ./core/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
 - → ./core/pack.js (1): `checkPack`
 - → ./core/pool.js (1): `checkPool`
@@ -861,6 +872,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/engine.js (3): `checkEngineCtx`, `checkCensus`, `dumpCensus`
 - → ./core/gold.js (2): `dumpGold`, `checkGold`
 - → ./core/hand.js (2): `dumpGesture`, `checkGesture`
+- → ./core/handcal.js (1): `checkHandCal`
 - → ./core/profile.js (1): `checkProfile`
 - → ./core/run.js (2): `material`, `night`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
@@ -892,7 +904,7 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_171 modules, 2175 exported names._
+_173 modules, 2199 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

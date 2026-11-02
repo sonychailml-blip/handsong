@@ -98,6 +98,7 @@ export { checkFrameOnce, checkSchedule, checkWorker } from './core/detect.js';
 export { dumpGold, checkGold } from './core/gold.js';
 export { checkTimbreIds, checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './core/sound.js';
 export { dumpGesture, checkGesture } from './core/hand.js';
+export { checkHandCal } from './core/handcal.js';   // CORE-1
 export { checkProfile } from './core/profile.js';   // C0: profiles Full ↔ Night, the exact round trip
 export { checkVisStack } from './core/vis.js';   // VIS1a: the compositor and the bus writers
 export { api } from './core/guard.js';

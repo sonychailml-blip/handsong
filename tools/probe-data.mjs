@@ -250,9 +250,9 @@ async function handCalCore(){
   /* CAL1 laws */
   const NOISE=0.0065, r0=1-H.calEndPull(NOISE);
   ok('the near point is exactly 0', Object.is(H.calDepth(r0,NOISE),0)); ok('the player\'s near size is exactly 0', Object.is(H.calDepth(1,NOISE),0)); ok('closer than near clamps to 0', H.calDepth(1.4,NOISE)===0);
-  for(const s of [0.5,1,2]){ ok(`far end exactly 1 at ${s}x`, H.calDepth(H.calFarRatio(s),NOISE,s)===1); ok(`past the far end clamps at ${s}x`, H.calDepth(H.calFarRatio(s)*0.5,NOISE,s)===1); }
-  near('far ratio 0.5x', H.calFarRatio(0.5), 0.2658, 1e-4); near('far ratio 1x', H.calFarRatio(1), 0.42, 1e-12); near('far ratio 2x', H.calFarRatio(2), 0.5915, 1e-4);
-  near('far distance 0.5x', 1/H.calFarRatio(0.5), 3.762, 1e-3); near('far distance 2x', 1/H.calFarRatio(2), 1.690, 1e-3);
+  for(const s of [0.7,1,2]){ ok(`far end exactly 1 at ${s}x`, H.calDepth(H.calFarRatio(s),NOISE,s)===1); ok(`past the far end clamps at ${s}x`, H.calDepth(H.calFarRatio(s)*0.5,NOISE,s)===1); }
+  near('far ratio 0.7x', H.calFarRatio(0.7), 0.3364, 1e-4); near('far ratio 1x', H.calFarRatio(1), 0.42, 1e-12); near('far ratio 2x', H.calFarRatio(2), 0.5915, 1e-4);
+  near('far distance 0.7x', 1/H.calFarRatio(0.7), 2.973, 1e-3); near('far distance 2x', 1/H.calFarRatio(2), 1.690, 1e-3);
   { const f=(hs,N)=>H.calDepth(hs/N,NOISE); near('the ratio ignores hand size and camera', f(0.2,0.4), f(0.1,0.2), 1e-15); near('...at another scale', f(0.2,0.4), f(0.3,0.6), 1e-12); }
   { let m=true, last=-1; for(let r=1.05;r>=0.2;r-=0.01){ const v=H.calDepth(r,NOISE); if(v<last) m=false; last=v; } ok('monotonic over a sweep', m); }
   ok('the margin never falls below the hold band', H.calEndPull(0)===H.CAL.band); ok('the margin is capped', H.calEndPull(1)===H.CAL.marginMax);
@@ -264,7 +264,7 @@ async function handCalCore(){
     const raw={}; let rawMoved=0; H.calHold(raw,0.7,0); const h0=raw.r; const rnd2=S.seeded(7); for(let i=0;i<300;i++){ if(H.calHold(raw,0.7+0.002*S.gauss(rnd2),0)!==h0) rawMoved++; } ok('CONTROL: no band must move', rawMoved>100); }
   ok('near0', H.calDirValue(0.25,'near0',true)===0.25); ok('near100', H.calDirValue(0.25,'near100',false)===0.75); ok('no dir follows inv', H.calDirValue(0.25,undefined,true)===0.75 && H.calDirValue(0.25,undefined,false)===0.25);
   { const rec=H.calEmpty('t'); rec.global.fx=1.4; rec.global.depth=0.7; rec.controls['a|b:c']={ sens:2 }; rec.controls['a|d:e']={ dir:'near0' };
-    ok('an override replaces the global', H.calSensOf(rec,'fx','a|b:c')===2); ok('no override: global', H.calSensOf(rec,'fx','a|d:e')===1.4); ok('depth has its own global', H.calSensOf(rec,'depth','x|y:z')===0.7); }
+    ok('an override replaces the global', H.calSensOf(rec,'fx','a|b:c')===2); ok('no override: global', H.calSensOf(rec,'fx','a|d:e')===1.4); ok('depth has its own global', H.calSensOf(rec,'depth','x|y:z')===0.7); rec.controls['a|l:o']={ sens:0.5 }; ok('a low override stays on the effects hand', H.calSensOf(rec,'fx','a|l:o')===0.5); ok('...and lifts to 0.7 on depth', H.calSensOf(rec,'depth','a|l:o')===H.CAL.depthMin); const g=H.calEmpty('t'); g.global.fx=0.5; ok('the effects slider keeps 0.5x', H.calClean(g,'t').status==='ok' && H.calClean(g,'t').rec.global.fx===0.5); }
   { let same=true; const grid=[0,1e-12,0.1,0.25,0.5,0.75,0.999,1]; for(const base of grid) for(const dd of [-1.5,-0.3,-1e-9,-0,0,1e-9,0.3,1.5]) for(const inv of [false,true]) if(!Object.is(H.calFx(base,dd,inv,1),clamp01(base+(inv?-dd:dd)))) same=false;
     ok('sens 1 is bit-identical to today\'s expression', same);
     let differs=false; for(const base of grid) for(const dd of [-0.3,0.3]) if(!Object.is(H.calFx(base,dd,false,1.0000001),clamp01(base+dd))) differs=true; ok('CONTROL: sens 1.0000001 must differ', differs); }
@@ -306,7 +306,7 @@ async function handCalCore(){
     ['a planted far on a camera', r=>{ r.cameras[CAM].far=0.2; }, 'cameras.'+CAM],
     ['a camera name as the key', r=>{ r.cameras['Some Camera']={ near:0.3, noise:0, at:0 }; }, 'cameras.Some Camera'],
     ['near as text', r=>{ r.cameras[CAM].near='0.3'; }, 'cameras.'+CAM], ['near of zero', r=>{ r.cameras[CAM].near=0; }, 'cameras.'+CAM],
-    ['a sens above 2', r=>{ r.global.fx=3; }, 'global.fx'], ['a sens below 0.5', r=>{ r.global.depth=0.1; }, 'global.depth'], ['an unknown global', r=>{ r.global.other=1; }, 'global.other'],
+    ['a sens above 2', r=>{ r.global.fx=3; }, 'global.fx'], ['a sens below 0.5', r=>{ r.global.fx=0.1; }, 'global.fx'], ['a depth slider below 0.7', r=>{ r.global.depth=0.6; }, 'global.depth'], ['an unknown global', r=>{ r.global.other=1; }, 'global.other'],
     ['a bad direction', r=>{ r.controls['role:ld|fdepth:depth'].dir='up'; }, 'controls.role:ld|fdepth:depth'], ['a text on a control', r=>{ r.controls['role:ld|fdepth:depth'].note='x'; }, 'controls.role:ld|fdepth:depth'],
     ['a planted top-level field', r=>{ r.picture='x'; }, 'picture'],
   ];

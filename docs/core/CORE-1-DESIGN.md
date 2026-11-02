@@ -85,7 +85,7 @@ Used only when the active camera has a record. Same measure, four differences:
 1. **Law (user, one-step design).** With `r = hs/near`, the ratio of the current palm size to the near size:
 
    ```
-   rFar(s) = 1 / (1 + (1/0.42 − 1) / s)     s = depth sensitivity, 0.5–2
+   rFar(s) = 1 / (1 + (1/0.42 − 1) / s)     s = depth sensitivity, 0.7–2
    r0      = 1 − margin                     margin = clamp(3·noise, 0.009, 0.03), noise = σ/near from the hold
    d       = clamp01((r0 − r) / (r0 − rFar(s)))
    ```
@@ -94,11 +94,11 @@ Used only when the active camera has a record. Same measure, four differences:
 
    | `s` | `rFar` | far end, as a multiple of the near distance |
    |---|---|---|
-   | 0.5× | 0.266 | 3.76 |
+   | 0.7× | 0.336 | 2.97 |
    | 1× | **0.42** | 2.38 |
    | 2× | 0.592 | 1.69 |
 
-   Why not divide `1−r` directly: at 0.5× that gives `1−r = 1.16`, a negative palm size. `d` stays linear in `r`, like today's law in `hs`, so no curve setting in v1. Closer than the near point clamps to the near end.
+   The slider stops at 0.7× so the far end stays within arm's reach (user, after CP2). Why not divide `1−r` directly: it isn't a real distance, and at 0.5× it would give a negative palm size. `d` stays linear in `r`, like today's law in `hs`, so no curve setting in v1. Closer than the near point clamps to the near end.
 
    **The default 0.42** sits between the measured far/near ratios, 0.472 (desktop) and 0.38 (phone): their geometric mean is 0.4235. At 1× the desktop's measured far point reads 0.91 and the phone's passes the end. Two measurements of one person.
 
@@ -121,7 +121,7 @@ Used only when the active camera has a record. Same measure, four differences:
 | `core/handcal.js` (new, thin) | the live state, store, camera key, listeners, withholding hands |
 | `core/gestures/roles.js`, `hands.js`, `fxhand.js` | doors at the sites of §1.1; one line at the top of `processHands` |
 | `core/gestures/pose.js` | marks generated hands as synthetic (§4.2) |
-| `core/vision.js`, `core/hooks.js` | camera key via a new nullable `hooks.camera` |
+| `core/vision.js` | `camLabel`: the camera's name, cheap enough to read every frame (simpler than the planned hook; `hooks.js` stays untouched) |
 | `core/pure/format.js` | registers `handcal` in `FORMAT_VERSION` |
 
 Nothing is added to `core/legacy-ui/`, and no strings to `i18n.js`: the routine reports reason codes and the apps word them.
@@ -137,7 +137,7 @@ Per control:
 | `dir` | `play:z` | `near0` / `near100`: which end of the hand's range is 0 | absent = the parameter's own `pa.inv`, as today |
 | `sens` | `play:z`, `fx:*` | overrides the global value of its address; replaces it, never multiplies | absent = global |
 
-Global, both 0.5–2, default 1, both global rather than per camera: `depth` (the slider for `play:z`; acts only on the calibrated path, since without a near point there's nothing to measure a ratio from) and `fx` (the effects hand, works with no calibration).
+Global, default 1, both global rather than per camera: `depth`, range 0.7–2 (the slider for `play:z`; acts only on the calibrated path, since without a near point there's nothing to measure a ratio from) and `fx`, range 0.5–2 (the effects hand, works with no calibration). An override is stored in 0.5–2; a control on depth reads at least 0.7, because Full's panel can move a control between addresses.
 
 ```
 play:z, calibrated:  v = d        near0
@@ -171,7 +171,7 @@ play:x:              today's expression, no setting reads it
 ```js
 handCalOpen({ scope, store? })            // opt-in; without this call, nothing changes
 handCalRead()                             // { camera, calibrated, near, global, controls, status }
-handCalSetDepthSens(value)                // the global depth slider
+handCalSetDepthSens(value)                // the global depth slider, 0.7–2
 handCalSetSens(value, controlId?)         // no id = the global effects value; with an id, an override on either address; null removes it
 handCalSetDir(controlId, 'near0'|'near100'|null)
 handCalReset({ control? } | { camera? } | { all:true })
@@ -182,7 +182,7 @@ handCalState()                            // the current phase + live values
 onHandCal(fn)                             // every phase change and progress step
 ```
 
-Internal doors, read by gestures only: `calBusy`, `calFrame`, `calDepthN`, `calDepthView`, `calDir`, `calSens`.
+Internal doors, read by gestures only: `calBusy`, `calFrame`, `calProbeSet` (CP3); `calDepthN`, `calDepthView`, `calDir`, `calSens` (CP4). Probes only: `calStartProbe`, `calKeep`, `calSig`.
 
 ### 3.5 What recordings see
 
@@ -243,11 +243,10 @@ This doesn't change `frameFilter` or any Night file. Night's first-run flow shou
 ## 5. Sensitivity
 
 - **Two sliders.** `fx` for the effects hand on all three axes; `depth` for the playing hand's depth (§2.3).
-- **Model.** One global value each, plus per-control overrides; an override replaces it, so the effective value is always within 0.5–2.
-- **Scale.** Logarithmic, 0.5×–2× with 1× as "normal"; suggested stops 0.5, 0.7, 1, 1.4, 2. A slider position `p` in −1…1 gives `2^p`.
+- **Model.** One global value each, plus per-control overrides; an override replaces it, so the effective value is always in range: 0.5–2 for effects, 0.7–2 for depth.
+- **Scale.** Logarithmic with 1× as "normal". Effects: 0.5×–2×, suggested stops 0.5, 0.7, 1, 1.4, 2; a slider position `p` in −1…1 gives `2^p`. Depth: 0.7×–2×, suggested stops 0.7, 1, 1.4, 2.
 - **Meaning, effects hand.** How much finger travel takes an effect from 0 to 100. For `fx:y` and `fx:x`: 70% of the frame at 1×, 35% at 2×, 140% at 0.5× (reached by a second grab, since the value latches). Zero point unchanged: where the pinch started, continuing from the value left there. Works with no calibration record.
 - **Meaning, depth.** How far the hand travels from the near point to the far end (the table in §2.3). Acts only on the calibrated path.
-- **A limit at 0.5×.** The far end is 3.76× the near distance. From an estimated 26 cm near point that's about 1 m, past most arms, so the control may never reach its far end. That follows from what the slider means; it isn't blocked.
 
 ## 6. How the apps use it
 
@@ -273,7 +272,7 @@ CAL1, CAL2 and CAL3 run as one data row, «CAL1-3 hand calibration (core)».
 | Row | Checks | Negative controls (must fail) |
 |---|---|---|
 | **CAL0 hand measuring (tool)**, CP1 | the measuring page's sums on known series: median, robust σ, frame rate, gaps, window spread, both filters | a shifted series; one sample changed in a median |
-| **CAL1 laws (core)** | the near ratio gives exact 0, `rFar(s)` exact 1, clamping both ways; the far table of §2.3; the ratio doesn't change with hand size or camera scale; monotonic over a sweep; the hold band keeps both ends reachable and holds still under noise; `dir` mirrors, absent `dir` follows `inv`; `sens` on relative axes, override replaces global; **bit identity with today's expressions (`Object.is`) over a grid including the edges**; the filter equals today's EMA at 30 fps within tolerance and gives the same time constant at 6.7 and 60 fps | a dividing-`1−r` slider must break at 0.5×; `sens` 1.0000001; a per-frame filter must fail the 6.7 fps case |
+| **CAL1 laws (core)** | the near ratio gives exact 0, `rFar(s)` exact 1, clamping both ways; the far table of §2.3; the ratio doesn't change with hand size or camera scale; monotonic over a sweep; the hold band keeps both ends reachable and holds still under noise; `dir` mirrors, absent `dir` follows `inv`; `sens` on relative axes, override replaces global; **bit identity with today's expressions (`Object.is`) over a grid including the edges**; the filter equals today's EMA at 30 fps within tolerance and gives the same time constant at 6.7 and 60 fps | a dividing-`1−r` slider must break at 0.5×; a stored depth slider below 0.7 refused; `sens` 1.0000001; a per-frame filter must fail the 6.7 fps case |
 | **CAL2 record (core)** | text round trip exact; resets; two scopes in one store don't collide; a blocked store doesn't throw; a newer version is refused and not overwritten; migration through an injected v0 → v1 step; schema allows only numbers, enums and the hash | one refused damage per field; a planted `thumb` string; a planted `far`; a shared key |
 | **CAL3 routine (core)** | scripted frames + fake clock: the happy path at the measured desktop and Poco rates and gaps, jittered at the measured σ; 15% outlier spikes; a blink; two hands; a label flip; a fingertip out of the frame restarts the hold with `advice:'back'`, while the palm stays inside; **each reason code reached, `synthetic` included**; cancel in each phase leaves no record; the same script gives the same result; the same hold at 5, 7, 16 and 30 fps gives the same near size within noise and finishes at the same time within one frame | a mean instead of the median must miss the tolerance; stillness off must accept a moving hand; a palm-only frame check must miss the fingertip; a 500 ms gap must restart the hold under the old 400 ms blink |
 
@@ -282,7 +281,7 @@ CAL1, CAL2 and CAL3 run as one data row, «CAL1-3 hand calibration (core)».
 | Row | Checks | Negative controls |
 |---|---|---|
 | **CAL4 nothing changes while uncalibrated** | HAND1's performance gives its pinned print in three states: module not opened; opened with an empty record; opened with `sens` explicitly 1 and no `dir` | `sens` 1.01 must change the print |
-| **CAL5 calibrated hand** | a size sweep on `play:z` for solo, bass, drums, chord brightness and volume on depth, in both directions and at 0.5×, 1× and 2×; `handsView().d` equals the depth driving the sound; one filter step per frame; a pinch doesn't restart the filter; camera switch falls back to today's law; `fx:x/y/z` follow `sens` and keep their grab-point zero; **`fx:z` and `play:x` values are exactly today's** | old `handsView` law; a filter reset on pinch |
+| **CAL5 calibrated hand** | a size sweep on `play:z` for solo, bass, drums, chord brightness and volume on depth, in both directions and at 0.7×, 1× and 2×; `handsView().d` equals the depth driving the sound; one filter step per frame; a pinch doesn't restart the filter; camera switch falls back to today's law; `fx:x/y/z` follow `sens` and keep their grab-point zero; **`fx:z` and `play:x` values are exactly today's** | old `handsView` law; a filter reset on pinch |
 | **CAL6 silent while calibrating** | the `wTap` stream is empty during the routine; live notes and chord off once; aims unchanged; `busy` while recording and in the editor; **`handCalStart` refuses with `synthetic` on a marked frame and during a probe session; a marked hand mid-run fails it**; tracks unaffected; cancel restores the previous mapping exactly | hands not withheld must produce W* calls |
 | **CAL7 a still hand writes nothing** | seeded jitter at the measured raw σ (0.0065 of the near size), the smallest near size (0.25) at 2×, at 30 and 7 fps, 60 s of probe clock: **zero capture points** | the hold band off must write points |
 | **CAL8 songs don't care** | applying a calibration leaves the event fingerprint, `freezeSig` and track chain unchanged; one short render within GOLD tolerance | a changed event must be seen |

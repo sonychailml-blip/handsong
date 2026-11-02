@@ -137,6 +137,7 @@ const modelInfo=()=>({ requested:opts.delegate, actual:delegateOf(mpLog, xnnBefo
 let camSim=null;   // probe only (CAM-FIX): a simulated webcam whose device controls persist across opens, wrapped around the real track
 const vtrack=()=>{ const tr=stream&&stream.getVideoTracks()[0]; return tr&&camSim ? camSim.wrap(tr) : tr; };
 const capsOf=tr=>{ try{ return tr&&tr.getCapabilities ? tr.getCapabilities() : null; }catch(e){ return null; } };
+const camLabel=()=>{ const tr=stream&&stream.getVideoTracks()[0]; return tr&&tr.label||''; };   // CORE-1: cheap enough for every frame, unlike camInfo
 function camInfo(){
   const tr=vtrack(), s=tr&&tr.getSettings ? tr.getSettings() : {};
   return { requested:{ width:640, height:480, frameRate:opts.camFps }, granted:{ width:s.width??null, height:s.height??null, frameRate:s.frameRate??null }, startT:camStartT,
@@ -461,5 +462,5 @@ function pumpDbg(o={}){
 
 /* Экспорт: детектор живёт здесь; кадры и результаты отдаются стоку (main.js). */
 export { video, canvas, ctx, initVision, initDetector, startCamera, switchCamera, setHandsSink, pollFrame,
-  camInfo, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
+  camInfo, camLabel, modelInfo, visionOpts, VISION_DEF, setHandsTracked, setModelDelegate, setCamFps, setDetectPath, setLowLight, lowInfo,
   pathInfo, pumpStats, pumpDbg, pumpStepDbg, detRunDbg, lowDbg, camSimDbg, camOpenDbg, camStats, camStatsDbg };

@@ -176,6 +176,8 @@ function performNow(){
 }
 const envOk=()=> JSON.stringify(ST.chordModeSel)==='{}';
 
+/* CORE-1: the calibration rows read the same performance and environment */
+export { envKeep as gestureEnvKeep, envSet as gestureEnvSet, ENV0 as GESTURE_ENV };
 export function dumpGesture(){
   if(!envOk()){ console.warn('[scaleprobe gesture] the chord-mode choice is not the default — reset it first'); return null; }
   const lines=perform();

@@ -32,6 +32,7 @@ const SURFACE={
   'tools/probes/core/fxcontract.js':['FX_FACTORY', 'engineCtx'],
   'tools/probes/core/gold.js':['CHORD_INSTR', 'timbresOf'],
   'tools/probes/core/hand.js':['FX_AMT', 'bassHold', 'chordHold', 'fxAimGet', 'fxAimSet', 'fxInstance', 'leadHold'],
+  'tools/probes/core/handcal.js':['fxAimGet', 'fxAimSet', 'fxInstance', 'leadHold'],
   'tools/probes/full/history.js':['masterLevel', 'setMasterLevel'],
   'tools/probes/full/key.js':['droneHz', 'droneUse'],
   'tools/probes/core/eng2.js':['AC', 'chordOff', 'chordOn', 'drumHit', 'engLevels', 'engLoad', 'engVoices', 'poolSizes'],

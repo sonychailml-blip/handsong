@@ -7,6 +7,8 @@ _Paths in older text: `src/core/` → `core/pure/`; `src/ui.js`, `draw.js`, `lat
 
 ## Open now (written at SPLIT-2, 2026-11-02, English)
 - ⬜ **CORE-1: hand calibration and per-effect sensitivity in the engine.** The first CORE run; both apps use it. Opt-in, and with the option absent everything stays exactly as before (core rule 4). The screens are app work: `docs/full/BACKLOG.md`, `docs/night/BACKLOG.md`.
+- ⬜ **`NIGHT stress`, a possible flaky check; look into it if it recurs, and tell the user when it does** (user, 2026-11-02). Seen once at CORE-1 CP2, unchanged audio: `live solo.handpan`, 48 dropouts in 6 s against 0 for the reference. The next two runs passed. Log: `tools/.probe-logs/2026-11-02T09-46-52-.log` (git-ignored).
+- ⬜ **`P.quick`'s 3-minute limit no longer fits.** At CORE-1 CP3 it stopped three of seven Full sessions that day, 5–8 rows short of the end at 180 s, with no row failing. Passing runs that day took 135–167 s; rows ran about 30% slower across the suite in the failing runs. The slow factor stays 1.00 because `SLOW_REF` (idle 112.9 s) predates many time-based rows, so its reference rows still read below idle (0.53–0.75×). Refresh `SLOW_REF` or raise the default; meanwhile `--limit-quick 5`, named in the report.
 - ⬜ **ui-snap recheck on the GeForce.** RUN 9's Full screens were captured on the Intel HD 4000 and differ at rendering level from RUN 7's on the GeForce GT 635M (gradients ±1–2, glyph edges). A capture on the GeForce settles it.
 - ⬜ **Remove the embedded `profile.full` from Night's page** once Night has its own stress reference (`core/DEBT.md`).
 - ⬜ **Keep shrinking `core/legacy-ui/`** and the rest of `core/DEBT.md`. Next large piece: split the `recorder.js` facade so Night plays without the recording path.

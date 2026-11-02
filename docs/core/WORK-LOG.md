@@ -4,6 +4,16 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-1 — checkpoint 3 (2026-11-02): the live service, withholding hands, the synthetic mark
+Tree hashes before: core 5009e88be68abdea · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: see the report; apps unchanged.
+- User, after CP2: depth slider 0.7×–2× (far end 2.97× the near distance at 0.7×), effects sliders stay 0.5×–2×. A low override reads 0.7 once its control is on depth. `NIGHT stress` is in the CORE backlog.
+- `core/handcal.js` (new): record and store, camera key, run, listeners, `calBusy`/`calFrame`. `core/gestures/hands.js`: one line at the top of `processHands`, one in `handsProbe`. `core/gestures/pose.js`: the mark. `core/vision.js`: `camLabel`, used instead of the planned `hooks.camera`. No app opens it yet.
+- Row «CAL4/CAL6 calibration service» on both apps; the state guard reads the calibration state.
+- Limits of the row: the CAL4 print proves only Full, because HAND1 is «not applicable» on Night (its live chains differ from the print's). Tracks staying untouched rests on the state guard's song and transport lines, not a track playing during a run.
+- Runner time limit: three Full `--quick` sessions stopped at `TIME LIMIT — P.quick() did not finish within 180 s`, 5–8 rows short, none failing. Compared row by row with a passing run: slower across the suite, not one row, and this checkpoint's row costs about 0.5 s. The final Full quick used `--limit-quick 5`; the default is unchanged, backlog item added.
+- `LAT1b test switches` failed once with `--limit-quick 5` («after 2, search every frame: hand detection stopped, no samples in 0.9 s»), then passed on the unchanged tree. A real-time row; its logs show failures on 2026-10-15 and 10-16, one with the same kind of message.
+- Tree hashes after: core 490c9a017b28e7a5 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
+
 # CORE-1 — checkpoint 2 (2026-11-02): one-step design, pure core
 Tree hashes before: core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: core 5009e88be68abdea · apps unchanged.
 - `docs/core/CORE-1-DESIGN.md`: the user's one-step design (one near point, depth relative to it, depth slider, whole hand in the frame, time-based timings) with the measured numbers (§9.1). `noisy`, `span-small`, `no-move`, `wrong-way` gone.

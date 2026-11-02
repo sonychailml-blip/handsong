@@ -10,6 +10,7 @@ import { rows as rowList, rowProblems, rowCheck } from './rows.js';
 let SEEDS={ rec:()=>null, expect:null, samples:()=>0, checkPan:null };
 export const runWire=o=>{ SEEDS=o; };
 import { profileCurrent } from '../../../core/profile.js';   // C0: the state guard names the live profile
+import { calSig } from '../../../core/handcal.js';   // CORE-1
 
 /* ═══ МАТЕРИАЛ ПЕСНИ — ДОСТАТОЧНО ЛИ ЕГО, ЧТОБЫ ПЕСЕННЫЕ ПРОВЕРКИ ЧТО-ТО ДОКАЗЫВАЛИ ═══
    Дважды проба «прошла» на пустой песне: ноль расхождений из нуля случаев. Здесь — перечень того, без чего песенная часть проб
@@ -83,6 +84,7 @@ async function stateSig(R){
            'tonic / A4 / tempo / metre': [tonic,aRef,loop.bpm,loop.metre].join(','),
            'transport': [loop.on,recording].join(','),
            'profile (C0)': profileCurrent(),
+           'hand calibration': calSig(),
            'song events': songPrint() };
 }
 /* ═══ P.all — ВСЕ ПРОБЫ ОДНОЙ КОМАНДОЙ ═══

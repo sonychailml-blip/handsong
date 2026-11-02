@@ -17,5 +17,6 @@ export function pose({ x, y, s=0.2, gaps=[1,1,1,1], spread=0, tilt=0 }){
     const tip={ x:T.x+(d[0]+lat)*g*palm, y:T.y+d[1]*g*palm, z:0 };
     lm[b]=mcp[f]; lm[b+1]={ x:mcp[f].x+(tip.x-mcp[f].x)/3, y:mcp[f].y+(tip.y-mcp[f].y)/3, z:0 };
     lm[b+2]={ x:mcp[f].x+2*(tip.x-mcp[f].x)/3, y:mcp[f].y+2*(tip.y-mcp[f].y)/3, z:0 }; lm[b+3]=tip; }
+  lm.synthetic=true;   // CORE-1: calibration refuses generated hands; no gesture code reads this
   return lm;
 }
