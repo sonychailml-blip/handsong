@@ -255,7 +255,8 @@ async function handCalCore(){
   near('far distance 0.7x', 1/H.calFarRatio(0.7), 2.973, 1e-3); near('far distance 2x', 1/H.calFarRatio(2), 1.690, 1e-3);
   { const f=(hs,N)=>H.calDepth(hs/N,NOISE); near('the ratio ignores hand size and camera', f(0.2,0.4), f(0.1,0.2), 1e-15); near('...at another scale', f(0.2,0.4), f(0.3,0.6), 1e-12); }
   { let m=true, last=-1; for(let r=1.05;r>=0.2;r-=0.01){ const v=H.calDepth(r,NOISE); if(v<last) m=false; last=v; } ok('monotonic over a sweep', m); }
-  ok('the margin never falls below the hold band', H.calEndPull(0)===H.CAL.band); ok('the margin is capped', H.calEndPull(1)===H.CAL.marginMax);
+  ok('the band has its floor', H.calBand(0)===H.CAL.band); near('the band follows the noise', H.calBand(0.0065), 0.0195, 1e-12); ok('the band has its cap', H.calBand(1)===H.CAL.bandMax); near('the end pull has its floor', H.calEndPull(0), 1.25*H.CAL.band, 1e-12); near('the end pull is capped', H.calEndPull(1), Math.max(H.CAL.marginMax,1.25*H.CAL.bandMax), 1e-12);
+  { let reach=true; for(let z=0;z<=0.05;z+=0.0005) if(H.calEndPull(z)<H.calBand(z)) reach=false; ok('the end pull always covers the band, so the near end stays reachable', reach); }
   { /* both ends reached through the hold band */
     const st={}; let v=0; for(let r=1;r>=0.2;r-=0.005) v=H.calDepth(H.calHold(st,r),NOISE); ok('the far end is reached through the band', v===1);
     for(let r=0.2;r<=1.0001;r+=0.005) v=H.calDepth(H.calHold(st,r),NOISE); ok('the near end is reached through the band', v===0); }
@@ -276,6 +277,12 @@ async function handCalCore(){
     let e7=0; for(let i=0;i<7;i++) e7+=0.15*(1-e7); ok('CONTROL: a per-frame filter fails at 6.7 fps', Math.abs(e7-step(6.7))>0.3);
     const st={}; H.calFilter(st,0,0); near('a 392 ms gap is not slowed', H.calFilter(st,1,392), 1-Math.exp(-0.392/H.CAL.tauS), 1e-12); }
   ok('CONTROL: dividing 1-r breaks at 0.5x', 1-(1-H.CAL.farRatio)/0.5<0);
+  { /* how often a still hand would write a point, at the worst noise measured: a rate over fixed seeds, since one seed is a lottery. The value moved 0.01 (REC_FINE_EPS) from where it stood, as a 2 s mean */
+    const SIGMA=0.0065, rate=(fps,sens,band)=>{ let over=0; const N=400; for(let k=0;k<N;k++){ const rnd=S.seeded(1000+k*7), st={}, ms=1000/fps, win=Math.round(2*fps), H0=[]; let start=null, t=0, worst=0;
+        for(let i=0;i<60*fps;i++){ t+=ms; const r=H.calHold(st,H.calFilter(st,0.8+SIGMA*S.gauss(rnd),t),band); if(i*ms<2000) continue; const v=H.calDepth(r,SIGMA,sens); if(start==null) start=v; H0.push(v); if(H0.length>win) H0.shift(); worst=Math.max(worst,Math.abs(H0.reduce((a,b)=>a+b,0)/H0.length-start)); }
+        if(worst>0.01) over++; } return over/N; }, B=H.calBand(SIGMA);
+    const r30=rate(30,1,B), r71=rate(7,1,B), r72=rate(7,2,B), c=rate(7,2,0.009);
+    ok(`a still hand at 30 fps, 1x, writes in under 1% of minutes (${r30})`, r30<0.01); ok(`at 7 fps, 1x, under 2.5% (${r71})`, r71<0.025); ok(`at 7 fps, 2x, under 5% (${r72})`, r72<0.05); ok(`CONTROL: the narrow band must write far more often (${c})`, c>0.3); }
   /* CAL2 record */
   const mem=()=>{ const m=new Map(); return { getItem:k=>m.has(k)?m.get(k):null, setItem:(k,v)=>m.set(k,v), removeItem:k=>m.delete(k), m }; };
   const blocked={ getItem(){ throw new Error('blocked'); }, setItem(){ throw new Error('blocked'); }, removeItem(){ throw new Error('blocked'); } };

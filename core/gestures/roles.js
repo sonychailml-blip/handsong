@@ -6,6 +6,7 @@ import { typedChords } from '../scales.js';
 import { WleadOn, WleadOff, WbassOn, WbassOff } from '../recorder.js';
 import { fxInstance, fxHandRange } from '../audio.js';
 import { clamp01, clamp, dist, emaS } from './features.js';
+import { calOn, calDepthN, calInv } from '../handcal.js';   // CORE-1
 
 /* ═══ ГЛУБИНА РУКИ — ОДИН ШАГ СГЛАЖИВАНИЯ НА РУКУ ЗА КАДР (VOL-4) ═══
    Размер кисти dist(0,9), сглаженный emaS(S,'hs',…,0.15), — это ГЛУБИНА руки. Читателей у неё четыре: fx-рука (своя ось z),
@@ -21,7 +22,7 @@ import { clamp01, clamp, dist, emaS } from './features.js';
 function depthOf(S,lm){ if(S.hsF==null) S.hsF=emaS(S,'hs',dist(lm[0],lm[9]),0.15); return S.hsF; }
 /* Глубина как АДРЕС (0 — рука близко к камере, 1 — далеко): тот же закон, что у реверба до 3.1 и у яркости аккордов, — один на
    всех читателей играющей руки, поэтому два параметра на глубине едут вместе. */
-const depthN=(S,lm)=>clamp01((REV_NEAR-depthOf(S,lm))/REV_RANGE);
+const depthN=(S,lm)=>calOn() ? calDepthN(S,lm) : clamp01((REV_NEAR-depthOf(S,lm))/REV_RANGE);   // CORE-1: this camera's calibrated law when it has one
 
 const melodicZone=z=> z==='ld'||z==='bs';
 const polyZone=z=> melodicZone(z) && !isLeadMode(z);
@@ -144,7 +145,7 @@ function noteVolOf(zk,xn,zOf){
   }
   const z = pa && pa.mode==='drive' && pa.hand==='play' && pa.axis==='z' && zOf;   // 3. VOL-4: на глубине — спрашиваем её ТОЛЬКО здесь (на горизонтали мемо глубины не трогаем)
   const a = z ? zOf() : xn;
-  const v = pa&&pa.inv ? 1-a : a, r=lo+(hi-lo)*v;
+  const v = (z ? calInv(zk,FX_VOL,0,pa.inv) : pa&&pa.inv) ? 1-a : a, r=lo+(hi-lo)*v;   // CORE-1: a direction only for volume on depth; the horizontal is untouched
   if(volFloor==null) return r;   // Full: its own curve (the left edge is silence)
   return Math.sqrt(volFloor+(1-volFloor)*volAmp(r));   // RUN 8 (Night, the profile's «volume».left): the amplitude runs floor … 1, smoothly (v² between)                                                 // 3/4. ход руки по глубине или горизонтали: с VOL-2b [0,1] — ровно v (левый край / рука у камеры = тишина)
 }

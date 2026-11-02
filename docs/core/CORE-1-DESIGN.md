@@ -86,7 +86,7 @@ Used only when the active camera has a record. Same measure, four differences:
 
    ```
    rFar(s) = 1 / (1 + (1/0.42 − 1) / s)     s = depth sensitivity, 0.7–2
-   r0      = 1 − margin                     margin = clamp(3·noise, 0.009, 0.03), noise = σ/near from the hold
+   r0      = 1 − pull                       pull = max(1.25·band, min(4·noise, 0.03)), noise = σ/near from the hold
    d       = clamp01((r0 − r) / (r0 − rFar(s)))
    ```
 
@@ -105,7 +105,17 @@ Used only when the active camera has a record. Same measure, four differences:
    **At 1× tracking noise is about as today or gentler:** the denominator in size units is `0.56·near`, 0.247 on the desktop and 0.187 on the phone, against today's 0.19. The old worry about a steep mapping applies only at 2× or a small near size.
 2. **Time-based filter.** A separate one-pole on `hs`, `a = 1−exp(−dt/0.205)`, matching today's EMA at 30 fps (`τ = −(1/30)/ln(0.85)`) and independent of frame rate. `dt` comes from `nowMs()`, so the probe clock drives it. No clamp on `dt`: the formula stays in 0…1 for any gap, and clamping would slow exactly the Poco, whose gaps reach 392 ms.
 3. **No restart on pinch.** Its state lives on the hand beside `S.sm`, not in it (`S.calHs`, `S.calT`), so the `S.sm={}` reset at a pinch doesn't touch it. A hand gone past the watchdog starts fresh. One step per frame through its own memo `S.calF`, cleared where `S.hsF` is cleared.
-4. **Hold band.** `r` moves only when the filtered ratio leaves ±0.009 of the held one: 2× the largest filtered σ measured (0.0045). It works on `r` before the law, so both ends stay reachable exactly: the near end because `margin ≥` the band, the far end because `r` isn't clamped. Why it's needed: a still hand must not write automation (`REC_FINE_EPS` 0.01, `core/config.js:171`), and the measured value noise at 1× reaches 0.008 before averaging. CAL7 proves it with the measured noise.
+4. **Hold band.** `r` moves only when the filtered ratio leaves ±band of the held one, with `band = clamp(3·noise, 0.009, 0.02)`, per camera, from the noise measured in its hold. It works on `r` before the law, so both ends stay reachable exactly: the near end because the pull exceeds the band, the far end because `r` isn't clamped.
+
+   Why this width (CP4): CAL7 found a still hand still wrote automation at 7 fps, because one pole at that rate passes far more noise than at 30 fps. Measured at the worst noise (σ 0.0065 of near), 400 seeded minutes:
+
+   | Band | Minutes that write, 7 fps, 2× | 7 fps, 1× | 30 fps, 1× | Dead zone on reversing, 2× | 1× |
+   |---|---|---|---|---|---|
+   | 2σ | 32% | 15% | 0.5% | 7% of the range | 5% |
+   | **3σ (chosen)** | **3.5%** | **1.5%** | **0.3%** | **10%** | **7%** |
+   | 3.5σ | 1% | 0.5% | 0% | 12% | 8% |
+
+   So zero points isn't reachable at a usable width: in the worst corner a still hand writes one small point in about 3.5% of minutes. The dead zone is what you'd hear: on reversing direction the value waits for that share of the range. To be judged by ear on the panel.
 
 `fx:z` is **not** on this path. It keeps today's filter, memo and `0.19` (change 3), plus its own sensitivity, so `depthOf` remains and still steps only when `fx:z` asks.
 
@@ -283,7 +293,7 @@ CAL1, CAL2 and CAL3 run as one data row, «CAL1-3 hand calibration (core)».
 | **CAL4 nothing changes while uncalibrated** | HAND1's performance gives its pinned print in three states: module not opened; opened with an empty record; opened with `sens` explicitly 1 and no `dir` | `sens` 1.01 must change the print |
 | **CAL5 calibrated hand** | a size sweep on `play:z` for solo, bass, drums, chord brightness and volume on depth, in both directions and at 0.7×, 1× and 2×; `handsView().d` equals the depth driving the sound; one filter step per frame; a pinch doesn't restart the filter; camera switch falls back to today's law; `fx:x/y/z` follow `sens` and keep their grab-point zero; **`fx:z` and `play:x` values are exactly today's** | old `handsView` law; a filter reset on pinch |
 | **CAL6 silent while calibrating** | the `wTap` stream is empty during the routine; live notes and chord off once; aims unchanged; `busy` while recording and in the editor; **`handCalStart` refuses with `synthetic` on a marked frame and during a probe session; a marked hand mid-run fails it**; tracks unaffected; cancel restores the previous mapping exactly | hands not withheld must produce W* calls |
-| **CAL7 a still hand writes nothing** | seeded jitter at the measured raw σ (0.0065 of the near size), the smallest near size (0.25) at 2×, at 30 and 7 fps, 60 s of probe clock: **zero capture points** | the hold band off must write points |
+| **CAL7 a still hand writes next to nothing** | through the real sites and the recorder's own automaton, seeded jitter at the measured raw σ (0.0065 of the near size), the smallest near size (0.25) at 2×, 30 and 7 fps, 5 minutes on fixed seeds: at most one point. The rate over 400 seeded minutes is in the data row: under 1% at 30 fps 1×, 2.5% at 7 fps 1×, 5% at 7 fps 2× | the band at its floor must write in over 30% of minutes; a real slow drift must write |
 | **CAL8 songs don't care** | applying a calibration leaves the event fingerprint, `freezeSig` and track chain unchanged; one short render within GOLD tolerance | a changed event must be seen |
 
 `P.all`'s state guard gains the calibration state. Probes use the injected store only.
@@ -324,7 +334,7 @@ Each one: run the checks, stop, give a commit message, wait for "committed". New
 | **CP1 measure** (done) | the guided page `tools/probes/core/handstats.html` (no console, big buttons, Russian and English; results on screen and copied), row CAL0, smoke-test coverage | no | `smoke-paths --build` | done: desktop and phone numbers in §9 |
 | **CP2 pure core** | `core/pure/handcal.js`, `format.js` entry, rows CAL1–3 | a file nothing imports yet, plus the format entry | none | none |
 | **CP3 service** | `core/handcal.js`, camera hook, withholding, the synthetic mark, rows CAL4 (first part), CAL6 | yes | `--all` | none |
-| **CP4 mapping** | doors at the sites of §1.1, `handsView`, rows CAL4 (full), CAL5, CAL7, CAL8 | yes | `--all`, hashes, prints not renewed | none |
+| **CP4 mapping** | a depth-moving print per app made before the mapping (`tools/prints/hand-depth.<app>.print.json`), doors at the sites of §1.1, `handsView`, rows CAL4 (full), CAL5, CAL7, CAL8, the development panel (§9.2) | yes | `--all`, hashes, prints not renewed | none |
 | **CP5 close** | CLAUDE.md map lines, `archive/CLAUDE-history.md` detail, Known limits and step 125, `docs/core/WORK-LOG.md`, `HANDOFF` records, backlog ticks | docs only | full set once more | step 125 |
 
 Rules held throughout: opt-in with old behaviour as default (core rule 4), no product named in core (8), both apps' checks on every core change (6), no UI or strings in core (2), no git, no new third-party item or network use (#32, #33).
@@ -337,6 +347,10 @@ Why real-hand numbers are still needed with today's measure kept: stillness, min
 - **Steps, about 10 s each.** Near and still · far and still · halfway, pinched · same place, open · slowly near to far and back.
 - **Reports, numbers only.** Size median, robust σ, frame rate, gaps, spread per 0.5 s window, share of windows passing at each candidate threshold, wrist travel, value noise after each filter, span and gain.
 - **Privacy.** Pictures stay on the device; the person copies the text themselves (rule #33). The copy holds the user agent and frame size, and no camera name.
+
+### 9.2 The development panel (CP4)
+
+`<page>?probe&calpanel` on both apps, local and preview only: it lives in `tools/probes/core/calpanel.js`, and production has neither the file nor the probes tag (smoke test, both ways). Big buttons, Russian and English: run the routine, save or cancel, both sliders, direction per depth control, reset, a 6 s wrist test that shows the range of `d`, copy the numbers. Scope `dev-full` / `dev-night`, so it never shares a record with an app's later screen.
 
 ### 9.1 What was measured (user, 2026-11-02)
 

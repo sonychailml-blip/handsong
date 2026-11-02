@@ -117,6 +117,17 @@ async function statsPage(label, dir, breakName=null){ const served=[], bad=[], s
   }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
   out(`[smoke] measuring page, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,5).join(' · '):'PASS'}`); return bad; }
 async function statsAbsent(dir){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`; let st=0; try{ st=(await fetch(origin+'/'+STATS)).status; }catch(e){} srv.close(); const ok=st===404; out(`[smoke] measuring page on production: ${ok?'PASS — absent':'NOT A PASS — HTTP '+st}`); return ok?0:1; }
+/* CORE-1: the development calibration panel: ?probe&calpanel shows it where probes are carried, ?probe alone doesn't, production never */
+async function panelGate(label, dir, addr, want, breakName=null){ const served=[], bad=[], srv=await serve(dir,'/',served,breakName), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true });
+  try{ const ctx=await browser.newContext({ viewport:{ width:390, height:800 } }); await cdnCache(ctx); const page=await ctx.newPage(); page.on('pageerror', e=>bad.push('page error: '+(e&&e.message||e)));
+    await page.goto(origin+addr+'?probe&calpanel');
+    if(want){ await page.waitForSelector('#calPill',{ timeout:90e3 }).catch(()=>bad.push('the panel did not appear'));
+      if(!bad.length){ await page.click('#calPill'); await page.click('#calPanel button:has-text("1.4×") >> nth=0'); const r=await page.evaluate(()=>({ say:document.getElementById('calSay').textContent, on:document.querySelectorAll('#calPanel button.on').length, key:Object.keys(localStorage).filter(k=>k.startsWith('handsong.handCal.')) }));
+        if(!/Play/.test(r.say)) bad.push('before Play it should ask for Play: '+r.say); if(r.on<2) bad.push('the slider stops show no choice'); if(r.key.length!==1 || !/\.dev-(full|night)$/.test(r.key[0])) bad.push('the panel stored under '+r.key.join()); if(/thumb|label/i.test(await page.evaluate(k=>localStorage.getItem(k),r.key[0]))) bad.push('the record holds more than numbers'); }
+      await page.goto(origin+addr+'?probe'); await page.waitForFunction(()=>window.P,null,{ timeout:90e3 }).catch(()=>bad.push('window.P did not appear')); await page.waitForTimeout(500); if(await page.$('#calPill')) bad.push('?probe alone shows the panel'); }
+    else { await page.waitForSelector('#startBtn',{ state:'attached', timeout:60e3 }).catch(()=>{}); await page.waitForTimeout(3000); if(await page.$('#calPill')) bad.push('the panel exists on production'); if(served.some(([u])=>/calpanel/.test(u))) bad.push('production served the panel'); }
+  }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
+  out(`[smoke] calibration panel, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,4).join(' · '):'PASS'}`); return bad; }
 /* ?probe on a built tree: window.P on a preview, nothing at all on production */
 async function probeGate(app, dir, want){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); const bad=[];
   try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); await page.goto(origin+'/?probe');
@@ -131,6 +142,8 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
   finally{ await browser.close().catch(()=>{}); srv.close(); } out(`[smoke] root redirect: ${ok?'PASS — / leads to apps/full/':'NOT A PASS'}`); return ok?0:1; }
 for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
 if((await statsPage('repo tree',ROOT)).length) fails++;
+for(const app of ['full','night']) if((await panelGate(`${app}, repo tree`,ROOT,`/apps/${app}/`,true)).length) fails++;
+if(!NO_CONTROL){ const c=await panelGate('CONTROL (its file refused)',ROOT,'/apps/night/',true,'calpanel.js'); out(`[smoke] CONTROL (the panel without its file must fail): ${c.length?'caught':'NOT caught'}`); if(!c.length) fails++; }
 if(!NO_CONTROL){ const c=await statsPage('CONTROL (its sums refused)',ROOT,'handstats-calc.js'); const caught=c.length>0; out(`[smoke] CONTROL (the measuring page without its sums must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }
 let prodFull=null;
 if(BUILD){ fails+=await redirectCheck();
@@ -138,7 +151,8 @@ if(BUILD){ fails+=await redirectCheck();
     for(const prefix of ['/','/some/sub/']) if((await run(app,prod,prefix)).length) fails++;
     if((await run(app,prev,'/')).length) fails++;
     fails+=await probeGate(app,prod,false); fails+=await probeGate(app,prev,true);
-    if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod); }
+    if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod);
+    if((await panelGate(`${app} preview`,prev,'/',true)).length) fails++; if((await panelGate(`${app} production`,prod,'/',false)).length) fails++; }
   if((await run('night',build('night','release'),'/',false,false)).length) fails++; }
 if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));
   out(`[smoke] CONTROL (a missing worklet must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }

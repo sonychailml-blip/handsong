@@ -9,6 +9,7 @@ export { checkEngineCtx, checkCensus, dumpCensus } from './core/engine.js';
 export { dumpGold, checkGold } from './core/gold.js';
 export { dumpGesture, checkGesture } from './core/hand.js';
 export { checkHandCal } from './core/handcal.js';   // CORE-1
+export { dumpHandPrint, checkHandPrint, checkHandMap } from './core/handprint.js';   // CORE-1 CP4
 export { checkProfile } from './core/profile.js';
 export { checkVisStack } from './core/vis.js';
 export { checkTimbresBefore, dumpTimbres } from './core/timbres.js';
@@ -20,6 +21,7 @@ export { checkNightMigrate } from './night/nightmigrate.js';
 export const api=guardApi;
 
 export function install(){
+  if(new URLSearchParams(location.search).has('calpanel')) import('./core/calpanel.js').then(m=>m.mountCalPanel('night')).catch(e=>console.warn('[probe] the calibration panel failed to load', e));   // CORE-1: the development panel
   guardWire(SELF); window.P=guardApi(); console.log('[probe] window.P ready — await P.all()');
   import('../../core/render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));
 }

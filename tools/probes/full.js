@@ -99,6 +99,7 @@ export { dumpGold, checkGold } from './core/gold.js';
 export { checkTimbreIds, checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './core/sound.js';
 export { dumpGesture, checkGesture } from './core/hand.js';
 export { checkHandCal } from './core/handcal.js';   // CORE-1
+export { dumpHandPrint, checkHandPrint, checkHandMap } from './core/handprint.js';   // CORE-1 CP4
 export { checkProfile } from './core/profile.js';   // C0: profiles Full ↔ Night, the exact round trip
 export { checkVisStack } from './core/vis.js';   // VIS1a: the compositor and the bus writers
 export { api } from './core/guard.js';
@@ -110,6 +111,7 @@ import { SEED_REC, SEED_FROZEN_EXPECT, seedFrozenSamples } from './full/seed.js'
 import { checkPan } from './full/window.js';
 runWire({ rec:()=>SEED_REC, expect:SEED_FROZEN_EXPECT, samples:seedFrozenSamples, checkPan });
 export function install(){
+  if(new URLSearchParams(location.search).has('calpanel')) import('./core/calpanel.js').then(m=>m.mountCalPanel('full')).catch(e=>console.warn('[probe] the calibration panel failed to load', e));   // CORE-1: the development panel
   guardWire(SELF); window.P=guardApi(); console.log('[probe] window.P ready — await P.seed({replace:true}), P.all()');   // AUTO-PROBE: one probe at a time
   import('../../core/render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));
   import('./core/userfiles.js').then(m=>{ window.U=m; }).catch(e=>console.warn('[probe] userfiles failed to load', e));   // F6: the person's files from the console

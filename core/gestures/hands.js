@@ -8,7 +8,7 @@ import { t } from '../i18n.js';
 import { hooks } from '../hooks.js';
 import { DRUM_ROWS, applyExpr, fxSnapshot, fxChordBri, FX_GLIDE_KEY } from '../audio.js';
 import { canvas } from '../vision.js';
-import { calBusy, calFrame, calProbeSet } from '../handcal.js';   // CORE-1
+import { calBusy, calFrame, calProbeSet, calOn, calDepthAt, calDepthView, calInv, calSens } from '../handcal.js';   // CORE-1
 import { clamp01, clamp, pinchRatios, minFinger, touchedFingers, emaS, degRaw, degHyst, cellHyst } from './features.js';
 import { fxParamsOf, captureFx } from './fxhand.js';
 import { looperWire, doLooper, fireLooperCmd } from './looper.js';
@@ -130,6 +130,7 @@ function processHands(res){
     const S=HANDS[key]||(HANDS[key]={pinch:false,deg:-1,oct:0,regOct:0,slot:-1,zone:null,vol:.6,adj:null,sm:{},inert:false,fresh:false,role:null,rx0:0,rx1:0,fn:null,ty:null,clearT0:null,clearFired:false,
       touch:new Set(),order:[],fing:{},snd:[],pr:null});   // МНОГОПАЛЬЦЕВОЕ: прижатые пальцы (гистерезис), порядок прижатия, нота каждого пальца, звучащие сейчас. pr — память РЯДА палитры (пара к S.pc), см. cellHyst
     S.seen=now; S.lm=lm;
+    S.calF=null;   // CORE-1: the calibrated path's own memo, cleared with depthOf's
     S.hsF=null;   // VOL-4: новый кадр этой руки — глубина ещё не сглажена (единственный сброс мемо depthOf)
     /* X-диапазон роли по УМОЛЧАНИЮ (single-role, сплит выключен): вся ширина [0,W], раздел
        palSplitX(0,W)=CH_PAL_W*W (как было). При splitOn половину выводим из точки щипка и ЗАМОРАЖИВАЕМ
@@ -322,7 +323,7 @@ function processHands(res){
                отпустить сразу. Всё ниже — прежняя арифметика, символ в символ. */
             if(pa.mode!=='drive' || pa.hand!=='fx') continue;
             const d=off[pa.axis]||0;
-            const v=clamp01(e.base+(pa.inv?-d:d));
+            const v=clamp01(e.base+calSens(chainKeyOf(S.role),e.fxId,e.pIdx)*(pa.inv?-d:d));   // CORE-1: sensitivity; 1 when nothing is set, and 1*x is exactly x
             e.set(v);
             // ЗАЦЕПКА ОБУЧЕНИЯ: значение реально сдвинулось от старта (>3%) — рука эффектов «крутит», не просто щипнула. Троттлинг 5%. Годится ЛЮБОЙ параметр: иначе переназначивший палец застрял бы в уроке «Основы».
             if(Math.abs(v-e.base)>0.03 && (S.tutFx==null||Math.abs(v-S.tutFx)>0.05)){ S.tutFx=v; tutorTap('fx',{k:e.fxId}); }   // fxId берём У ЗАПИСИ: на одном пальце теперь могут сидеть разные эффекты, общего A.fxId больше нет
@@ -470,7 +471,7 @@ function processHands(res){
         /* Цепь спрашиваем по КЛЮЧУ ВЛАДЕЛЬЦА (O-0). С VOL-2 громкость тоже живёт в цепи (её запись), поэтому второго,
            ролевого адреса (прежний fxVolFix по ролям) больше нет. */
         const zk=chainKeyOf(S.zone);
-        S.vol=noteVolOf(zk,xn,()=>depthN(S,lm));         // VOL-4: глубину — лениво, через мемо руки (спросит только громкость на глубине). Громкость ЭТОЙ руки — через параметр «Громкость» (VOL-1/VOL-2; резолвер и доказательство побитного совпадения — у noteVolOf)
+        S.vol=noteVolOf(zk,xn,()=>calDepthAt(S,lm,depthN(S,lm),zk,FX_VOL,0));         // VOL-4: глубину — лениво, через мемо руки (спросит только громкость на глубине). Громкость ЭТОЙ руки — через параметр «Громкость» (VOL-1/VOL-2; резолвер и доказательство побитного совпадения — у noteVolOf)
         {   // VOL-2: цикл идёт ВСЕГДА (прежде — только при «X отдан эффекту»); без play:x-параметров он не делает ни шага
           for(const eff of fxChainOf(zk)){
             if(!eff||eff.fxId===FX_VOL) continue;         // громкость — своим путём (резолвер выше) и в общий параметр роли НЕ пишется: на горизонтали она у каждой руки своя
@@ -588,7 +589,7 @@ function processHands(res){
             eff.params.forEach((pa,i)=>{
               if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return;
               if(!ps) ps=fxParamsOf(zk,eff.fxId);
-              const p=ps[i]; if(p) p.set(pa.inv ? 1-bd : bd);
+              const p=ps[i]; if(p){ const z=calDepthAt(S,lm,bd,zk,eff.fxId,i); p.set(calInv(zk,eff.fxId,i,pa.inv) ? 1-z : z); }   // CORE-1: bd itself when not calibrated
             });
           }
           /* ЯРКОСТЬ, КОТОРУЮ УВЕЗЁТ СОБЫТИЕ, — теперь ИЗ ПАРАМЕТРА, а не из руки. Разница видна там, где
@@ -723,7 +724,7 @@ function processHands(res){
              величину, то самое, чего мы избегаем правилом «один параметр — один адрес». */
           if(pa.mode!=='drive' || pa.hand!=='play' || pa.axis!=='z') return;
           if(!ps) ps=fxParamsOf(ck,eff.fxId);
-          const p=ps[i]; if(p) p.set(pa.inv ? 1-vD : vD);
+          const p=ps[i]; if(p){ const z=calDepthAt(S,lm,vD,ck,eff.fxId,i); p.set(calInv(ck,eff.fxId,i,pa.inv) ? 1-z : z); }   // CORE-1: vD itself when not calibrated
         });
       }
     }
@@ -772,7 +773,7 @@ function handsView(){
   for(const k in HANDS){ const S=HANDS[k], lm=S.lm; if(!lm || now-S.seen>WATCHDOG_MS) continue;
     const tip=FINGER_TIPS[S.pinch && S.oct>=0 ? S.oct : 0]||8, fn=handFnOf(k, S.role||phoneInstr);
     out.push({ key:k, x:sx((lm[4].x+lm[tip].x)/2, W), y:sy((lm[4].y+lm[tip].y)/2, H),
-      d:clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr',
+      d:calOn() ? calDepthView(S,lm) : clamp01((REV_NEAR-(S.hsF!=null ? S.hsF : Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y)))/REV_RANGE), pinch:!!S.pinch, play:fn!=='fx' && fn!=='loop' && fn!=='expr',
       ...(nightView ? { finger: S.pinch && S.oct>=0 ? S.oct : -1, tips:TIPS5.map(i=>[sx(lm[i].x, W), sy(lm[i].y, H)]) } : {}) }); }   // RUN 8: the finger in use and the five fingertips (remapped as the hit-tests — Night only; Full's view is RUN 7's — Night's bars and fireflies)
   return out;
 }

@@ -5,7 +5,7 @@ import { fnv } from './canon.js';
 
 /* All times in ms of the frame's clock: nothing counts frames (the Poco tracks at about 7 fps). */
 const CAL=Object.freeze({
-  farRatio:0.42, tauS:0.205, band:0.009, marginMax:0.03, sensMin:0.5, sensMax:2, depthMin:0.7,   // depth from 0.7x: the far end stays within arm's reach (user)
+  farRatio:0.42, tauS:0.205, band:0.009, bandK:3, bandMax:0.02, marginMax:0.03, sensMin:0.5, sensMax:2, depthMin:0.7,   // depth from 0.7x: the far end stays within arm's reach (user)
   waitMs:10000, holdLimitMs:12000, holdMs:2000, holdMaxMs:4000, minSamples:8, checkFrom:5, stillSize:0.06, stillWrist:0.05, blinkMs:800, minNear:0.25, lockJump:0.3,
   frameLm:null,   // null = all 21 landmarks must be in the frame
 });
@@ -15,7 +15,10 @@ const clamp01=v=>Math.max(0,Math.min(1,v));
 /* ---- laws ---- */
 /* the far end as a share of the near size: the slider divides the real travel (1/r is distance over the near distance) */
 const calFarRatio=(s=1)=>1/(1+(1/CAL.farRatio-1)/s);
-const calEndPull=noise=>Math.max(CAL.band,Math.min(CAL.marginMax,3*noise));
+/* the hold band follows the noise measured in this camera's hold: 3 sigmas, within a floor and a cap. The filter passes more noise at 7 fps; rates per width: docs/core/CORE-1-DESIGN.md §2.3 */
+const calBand=noise=>Math.max(CAL.band,Math.min(CAL.bandMax,CAL.bandK*noise));
+/* past the band, or a hand held at its near point would read just above 0 while the filter settles */
+const calEndPull=noise=>Math.max(1.25*calBand(noise),Math.min(CAL.marginMax,4*noise));
 /* r = size / near size; never below the hold band's reach, so the near end stays exactly 0 */
 function calDepth(r,noise,s=1){ const r0=1-calEndPull(noise); return clamp01((r0-r)/(r0-calFarRatio(s))); }
 /* the time-based one-pole on the size; `st` lives on the hand, outside its pinch-reset smoothing */
@@ -85,6 +88,7 @@ function calWipe(store,scope){ const key=calStoreKey(scope); try{ store.removeIt
 
 /* ---- the routine: frame({ t, hands:[landmarks], labels? }) in, phases out ---- */
 const sizeOf=lm=>Math.hypot(lm[0].x-lm[9].x, lm[0].y-lm[9].y);
+const calSize=sizeOf;
 const inFrame=(lm,idx)=>(idx ? idx.map(i=>lm[i]) : lm).every(p=>p.x>=0 && p.x<=1 && p.y>=0 && p.y<=1);
 /* 2.56 robust sigmas spans the middle 80% of a normal spread; a single spike can't move it */
 const spreadOf=a=>2.56*robustSigma(a);
@@ -140,4 +144,4 @@ function createCalRun({ t:t0, hand=null, C=CAL }){
     fail(code){ if(!REASONS.includes(code)) throw new Error('handcal: unknown reason '+code); if(active()||phase==='review'){ result=null; end('failed',code); } } };
 }
 
-export { CAL, REASONS, calFarRatio, calEndPull, calDepth, calFilter, calHold, calInverted, calDirValue, calFx, calSensOf, robust, calEmpty, calClean, calParse, calText, calCameraKey, calReset, calStoreKey, calLoad, calSave, calWipe, createCalRun };
+export { CAL, REASONS, calSize, calFarRatio, calBand, calEndPull, calDepth, calFilter, calHold, calInverted, calDirValue, calFx, calSensOf, robust, calEmpty, calClean, calParse, calText, calCameraKey, calReset, calStoreKey, calLoad, calSave, calWipe, createCalRun };

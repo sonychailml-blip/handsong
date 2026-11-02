@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-1 — checkpoint 4 (2026-11-02): the mapping, a depth print for each app, the development panel
+Tree hashes before: core 490c9a017b28e7a5 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. Apps unchanged.
+- User: give Night a real «nothing changes» check first. `tools/prints/hand-depth.night.print.json` and `.full.print.json` were made before any mapping door, on core 490c… plus one listing line in `surface.js` (core 4a66fa0e83ca6f20). New files, no print renewed. They reproduce in fresh sessions; the control (a palm 1% larger) is caught. HAND1 keeps the size constant, so it could not see depth even on Full.
+- Doors: `depthN`, `noteVolOf` (volume on depth only), the two play:z sites, the effects line, `handsView`. Rows «CAL4 depth print», «CAL5/CAL7/CAL8 calibrated hand».
+- CAL7 found a real problem: a still hand wrote automation at 7 fps. One pole at that rate passes far more noise. The band is now per camera, 3× the measured noise (floor 0.009, cap 0.02), the end pull past it. Zero points isn't reachable at a usable width: 3.5% of minutes in the worst corner, with a 10% dead zone on reversing at 2×. The test measures a rate over 400 seeds, not one lottery seed (design §2.3). For the user's ear.
+- CAL8: renders repeat to 7.5e-9 with calibration closed, so exact equality was the wrong measure; the limit is 1e-7, with a control.
+- `tools/probes/core/calpanel.js`: the panel, `?probe&calpanel`; the smoke test covers repo, previews and production's absence, with a control.
+
 # CORE-1 — checkpoint 3 (2026-11-02): the live service, withholding hands, the synthetic mark
 Tree hashes before: core 5009e88be68abdea · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: see the report; apps unchanged.
 - User, after CP2: depth slider 0.7×–2× (far end 2.97× the near distance at 0.7×), effects sliders stay 0.5×–2×. A low override reads 0.7 once its control is on depth. `NIGHT stress` is in the CORE backlog.

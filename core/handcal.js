@@ -1,6 +1,7 @@
 /* CORE-1: the live calibration service, thin over core/pure/handcal.js: the record and store, the camera's key, the running routine and withholding hands while it
    runs. Inert until an app calls handCalOpen. Reason codes only, no strings or UI (the apps word them). Numbers only, never an image or a camera name (rule #33). */
-import { CAL, calCameraKey, calEmpty, calLoad, calSave, calWipe, calReset, createCalRun } from './pure/handcal.js';
+import { CAL, calCameraKey, calEmpty, calLoad, calSave, calWipe, calReset, createCalRun, calSize, calBand, calDepth, calFilter, calHold, calInverted, calSensOf } from './pure/handcal.js';
+import { fxParamKeysOf } from './audio.js';
 import { BUS } from './pure/bus.js';
 import { arrOpen, rollOpen, camFacing } from './state.js';
 import { camLabel } from './vision.js';
@@ -19,7 +20,8 @@ const liveCamera=()=>({ label:camLabel(), facing:camFacing });
 let OPEN=null;        // { scope, store, camera, rec, status } once an app has opened it
 let RUN=null, runCam=null, proposal=null, last=null, probeOn=false;
 const listeners=new Set();
-const cameraKey=()=>{ const c=OPEN.camera(); return calCameraKey(c.label,c.facing); };
+const keyMemo=new Map();
+const cameraKey=()=>{ const c=OPEN.camera(), m=c.label+'|'+c.facing; let k=keyMemo.get(m); if(!k){ k=calCameraKey(c.label,c.facing); keyMemo.set(m,k); } return k; };   // read on every frame
 const running=()=>{ const p=RUN&&RUN.state().phase; return p==='waitHand'||p==='holdNear'; };
 const inReview=()=>!!RUN && RUN.state().phase==='review';
 const studioBusy=()=> recording || !!activeKind() || arrOpen || rollOpen || editIsOpen();
@@ -74,6 +76,24 @@ function handCalState(){ const s=RUN ? RUN.state(RUN.lastT) : last; return s ? {
 function onHandCal(fn){ listeners.add(fn); return ()=>listeners.delete(fn); }
 
 /* ---- read by gestures only ---- */
+/* this camera's point: the proposal in review, otherwise the saved one */
+const calCam=()=>{ const k=cameraKey(); return proposal&&k===runCam ? proposal : OPEN.rec.cameras[k]||null; };
+const calOn=()=>OPEN!==null && calCam()!==null;
+const ctlId=(ck,fxId,i)=>ck+'|'+fxId+':'+fxParamKeysOf(fxId)[i];
+/* one step per frame on the hand, outside its pinch-reset smoothing; a long gap or a new near point starts fresh. The time is the hand's own (S.seen, this frame's clock) */
+function calRatio(S,lm,c){
+  if(S.calF!=null) return S.calF;
+  let st=S.cal;
+  if(!st || st.near!==c.near || S.seen-st.t>CAL.blinkMs) st=S.cal={ near:c.near };
+  return S.calF=calHold(st,calFilter(st,calSize(lm),S.seen)/c.near,calBand(c.noise));
+}
+/* with no control named: the global depth slider, which the visuals read */
+function calDepthN(S,lm,ck,fxId,i){ const c=calCam(); return calDepth(calRatio(S,lm,c),c.noise,calSensOf(OPEN.rec,'depth',ck!=null ? ctlId(ck,fxId,i) : null)); }
+const calDepthAt=(S,lm,fallback,ck,fxId,i)=> calOn() ? calDepthN(S,lm,ck,fxId,i) : fallback;
+/* never a filter step: this frame's value when the hand computed one, otherwise the law on the raw size */
+function calDepthView(S,lm){ const c=calCam(); return calDepth(S.calF!=null ? S.calF : calSize(lm)/c.near,c.noise,calSensOf(OPEN.rec,'depth',null)); }
+function calInv(ck,fxId,i,inv){ if(!OPEN) return inv; const c=OPEN.rec.controls[ctlId(ck,fxId,i)]; return c&&c.dir ? calInverted(c.dir,inv) : inv; }
+const calSens=(ck,fxId,i)=> OPEN ? calSensOf(OPEN.rec,'fx',ctlId(ck,fxId,i)) : 1;
 const calBusy=()=>RUN!==null && running();
 /* a frame goes to the routine; while it runs the gesture machine sees no hands, so pinches close and nothing plays */
 function calFrame(res,now){
@@ -92,4 +112,4 @@ const calProbeSet=on=>{ probeOn=!!on; };
 function calKeep(){ const k={ OPEN, RUN, runCam, proposal, last }; return ()=>{ ({ OPEN, RUN, runCam, proposal, last }=k); }; }
 const calSig=()=>JSON.stringify({ scope:OPEN&&OPEN.scope, rec:OPEN&&OPEN.rec, status:OPEN&&OPEN.status, phase:handCalState().phase });
 
-export { handCalOpen, handCalRead, handCalSetDepthSens, handCalSetSens, handCalSetDir, handCalReset, handCalStart, handCalCancel, handCalAccept, handCalState, onHandCal, calBusy, calFrame, calProbeSet, calStartProbe, calKeep, calSig };
+export { handCalOpen, handCalRead, handCalSetDepthSens, handCalSetSens, handCalSetDir, handCalReset, handCalStart, handCalCancel, handCalAccept, handCalState, onHandCal, calBusy, calFrame, calOn, calDepthN, calDepthAt, calDepthView, calInv, calSens, calProbeSet, calStartProbe, calKeep, calSig };

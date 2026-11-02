@@ -254,6 +254,7 @@ const NET_LISTED={
   'apps/full/songs.js':        { fetch:[1,'the demo song file data/songs/<name>.json from the own origin (SONG2; P.song only)'] },
   'tools/probes/core/sound.js': { addModule:[2,'probe only (?probe): loads our own core/engine/worklets/dyn-worklet.js into the offline contexts of the probe'] },
   'tools/probes/core/hand.js':  { fetch:[1,'probe only (?probe): reads tools/prints/gesture.print.json from the own origin'] },
+  'tools/probes/core/handprint.js':  { fetch:[1,'probe only (?probe): reads tools/prints/hand-depth.<app>.print.json from the own origin'] },
   'core/audio.js':      { addModule:[4,'loads our own worklets (core/engine/worklets/ks-, frz-, dyn-, probe-cap-worklet.js) from the own origin into the audio context'] },
   'tools/probes/core/profile.js': { fetch:[1,'probe only (?probe): reads its test record fixture.profile.json from the own origin (C0)'] },
   'core/render.js':     { addModule:[1,'track renders: lets the engine copy load only the worklets the track needs (own origin) into its offline context'] },

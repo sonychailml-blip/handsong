@@ -189,8 +189,8 @@ LAT2b — hand detection OFF the main thread (a CLASSIC worker: MediaPipe starts
 
 ## core/handcal.js
 CORE-1: the live calibration service, thin over core/pure/handcal.js: the record and store, the camera's key, the running routine and withholding hands while it runs.
-- const (4): `handCalSetDepthSens`, `calBusy`, `calProbeSet`, `calSig`
-- fn (13): `handCalOpen`, `handCalRead`, `handCalSetSens`, `handCalSetDir`, `handCalReset`, `handCalStart`, `handCalCancel`, `handCalAccept`, `handCalState`, `onHandCal`, `calFrame`, `calStartProbe`, `calKeep`
+- const (7): `handCalSetDepthSens`, `calBusy`, `calOn`, `calDepthAt`, `calSens`, `calProbeSet`, `calSig`
+- fn (16): `handCalOpen`, `handCalRead`, `handCalSetSens`, `handCalSetDir`, `handCalReset`, `handCalStart`, `handCalCancel`, `handCalAccept`, `handCalState`, `onHandCal`, `calFrame`, `calDepthN`, `calDepthView`, `calInv`, `calStartProbe`, `calKeep`
 
 ## core/handdet.js
 LAT2 — the hand DETECTOR: MediaPipe's hand model, worker-safe (no DOM — it runs inside core/hand-worker.js and, as the fallback, on the main thread through vision.js).
@@ -454,7 +454,7 @@ FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({
 
 ## core/pure/handcal.js
 CORE-1: the playing hand's depth calibration and the sensitivity settings, pure (rule #36; rows CAL1-CAL3).
-- const (11): `CAL`, `REASONS`, `calFarRatio`, `calEndPull`, `calInverted`, `calDirValue`, `calFx`, `calEmpty`, `calText`, `calCameraKey`, `calStoreKey`
+- const (13): `CAL`, `REASONS`, `calSize`, `calFarRatio`, `calBand`, `calEndPull`, `calInverted`, `calDirValue`, `calFx`, `calEmpty`, `calText`, `calCameraKey`, `calStoreKey`
 - fn (12): `calDepth`, `calFilter`, `calHold`, `calSensOf`, `robust`, `calClean`, `calParse`, `calReset`, `calLoad`, `calSave`, `calWipe`, `createCalRun`
 
 ## core/pure/handsched.js
@@ -665,6 +665,10 @@ Vercel Web Analytics queue stub — a classic script, not a module: calls made b
 - const (11): `video`, `canvas`, `ctx`, `camLabel`, `modelInfo`, `visionOpts`, `VISION_DEF`, `lowInfo`, `pathInfo`, `pumpStats`, `camStats`
 - fn (19): `initVision`, `initDetector`, `startCamera`, `switchCamera`, `setHandsSink`, `pollFrame`, `camInfo`, `setHandsTracked`, `setModelDelegate`, `setCamFps`, `setDetectPath`, `setLowLight`, `pumpDbg`, `pumpStepDbg`, `detRunDbg`, `lowDbg`, `camSimDbg`, `camOpenDbg`, `camStatsDbg`
 
+## tools/probes/core/calpanel.js
+CORE-1 CP4: a development panel for the calibration, no app UI and no console needed: run it, set the sliders, measure the wrist.
+- fn (1): `mountCalPanel`
+
 ## tools/probes/core/data.js
 PROBE1: the data rows — run by P.all in the browser AND by tools/probe-data.mjs in node (flag node).
 - exports: none
@@ -703,11 +707,15 @@ PROBE1: The console guard: window.P = api() — one probe at a time; its self-te
 ## tools/probes/core/hand.js
 HAND1: SYNTHETIC HANDS → GESTURE FINGERPRINT.
 - const (1): `GESTURE_ENV`
-- fn (4): `dumpGesture`, `checkGesture`, `gestureEnvKeep`, `gestureEnvSet`
+- fn (5): `dumpGesture`, `checkGesture`, `gestureEnvKeep`, `gestureEnvSet`, `gestureFxKeep`
 
 ## tools/probes/core/handcal.js
 CORE-1 CP3: the live calibration service through the REAL processHands on the probe clock.
 - fn (1): `checkHandCal`
+
+## tools/probes/core/handprint.js
+CORE-1 CP4: a performance that MOVES DEPTH, printed per app.
+- fn (3): `dumpHandPrint`, `checkHandPrint`, `checkHandMap`
 
 ## tools/probes/core/handstats-calc.js
 CORE-1 CP1: the sums of the guided measuring page (handstats.html).
@@ -782,6 +790,7 @@ VIS1a (RUN 6, docs/core/VIS1-design.md §7): row «VIS1a stack and bus» (quick 
 - → ./core/guard.js (1): `api`
 - → ./core/hand.js (2): `dumpGesture`, `checkGesture`
 - → ./core/handcal.js (1): `checkHandCal`
+- → ./core/handprint.js (3): `dumpHandPrint`, `checkHandPrint`, `checkHandMap`
 - → ./core/lat.js (5): `checkLatency`, `checkLatSwitches`, `checkLowLight`, `checkCamRestore`, `checkCamStart`
 - → ./core/pack.js (1): `checkPack`
 - → ./core/pool.js (1): `checkPool`
@@ -873,6 +882,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/gold.js (2): `dumpGold`, `checkGold`
 - → ./core/hand.js (2): `dumpGesture`, `checkGesture`
 - → ./core/handcal.js (1): `checkHandCal`
+- → ./core/handprint.js (3): `dumpHandPrint`, `checkHandPrint`, `checkHandMap`
 - → ./core/profile.js (1): `checkProfile`
 - → ./core/run.js (2): `material`, `night`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
@@ -904,7 +914,7 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_173 modules, 2199 exported names._
+_175 modules, 2218 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
