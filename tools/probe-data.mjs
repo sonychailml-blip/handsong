@@ -206,6 +206,29 @@ function forestCore(){
   n++; eq('compressor curve below / in / above the knee', [DSP.compCurveDb(-40,-12,3,6), DSP.compCurveDb(-12,-12,3,6), DSP.compCurveDb(0,-12,3,6)], [-40, -12.5, -8]);
   return { cases:n, total:d.length, differences:d };
 }
+/* CORE-1 CP1: the guided measuring page's sums (tools/probes/core/handstats-calc.js) on known series. CONTROLS: a moved median sample and a moving hand must show. */
+async function handStatsCalc(){
+  const C=await import(new URL('./probes/core/handstats-calc.js', import.meta.url).href);
+  const d=[]; let n=0; const near=(what,a,b,tol=1e-9)=>{ n++; if(!(Math.abs(a-b)<=tol)) d.push(`${what}: ${a}, expected ${b}`); };
+  const hand=(size,wx=0.5)=>({ size, wx, wy:0.5, pinch:1, out:false });
+  const still=(z,fps=30,sec=5)=>Array.from({ length:fps*sec+1 },(_,i)=>({ t:i*1000/fps, hand:hand(z+(i%2 ? 0.002 : -0.002)) }));
+  near('median of an even list', C.median([4,1,3,2]), 2.5);
+  near('robust sigma ignores an outlier', C.robustSigma([1,2,3,4,100]), 1.4826);
+  const a=C.analyse(still(0.2));
+  near('frame rate', a.fps, 30, 0.05); near('size', a.size, 0.198, 1e-9); near('spread of a still hand', a.spreadP95, 0.02, 0.001); near('still at 4%', a.still['0.04'], 1); near('largest gap', a.gapMs, 33, 1);
+  { const s=still(0.2); for(let i=60;i<72;i++) s[i].hand=null; const g=C.analyse(s); near('a 400 ms gap is seen', g.gapMs, 433, 1); near('seen frames', g.seen, s.length-12); }
+  { const ts=[], xs=[]; for(let i=0;i<=6;i++){ ts.push(i*1000/6); xs.push(i ? 1 : 0); }
+    near('the time filter at 6 fps, 1 s', C.tauSeries(ts,xs).at(-1), 1-Math.exp(-1/C.TAU_S), 1e-9); near('the per-frame filter at 6 fps, 1 s', C.emaSeries(xs).at(-1), 1-0.85**6, 1e-9);
+    const t30=[], x30=[]; for(let i=0;i<=30;i++){ t30.push(i*1000/30); x30.push(i ? 1 : 0); } near('the filters agree at 30 fps', C.tauSeries(t30,x30).at(-1), C.emaSeries(x30).at(-1), 0.002); }
+  { const lm=s=>{ const p=Array.from({ length:21 },()=>({ x:0.5, y:0.5 })); p[9]={ x:0.5, y:0.5-s }; return p; }, big=lm(0.3); big[17]={ x:1.2, y:0.5 };
+    const h=C.handOf([lm(0.1),big]); near('the largest hand is taken', h.size, 0.3); n++; if(!h.out) d.push('a palm landmark outside the frame was not seen'); n++; if(C.handOf([])!==null) d.push('no hand must give null'); }
+  { const r=C.report({ near:still(0.2), far:still(0.125), pinch:still(0.15), open:still(0.16), move:still(0.16) }, { w:640 });
+    near('span', r.derived.span, 0.075, 0.003); near('ratio', r.derived.ratio, 0.625, 0.02); near('gain', r.derived.gain, 2.53, 0.1); near('pinch shift', r.derived.pinchShift, -0.0625, 0.02);
+    n++; if(r.format!==C.FORMAT || JSON.parse(JSON.stringify(r)).steps.near.n!==151) d.push('the report does not survive the text round trip'); }
+  n++; if(C.median([1,2,3])===C.median([1,9,3])) d.push('CONTROL: a moved median sample left the median unchanged');
+  { const mv=Array.from({ length:151 },(_,i)=>({ t:i*1000/30, hand:hand(0.2-0.03*i/30) })); n++; if(C.analyse(mv).still['0.04']!==0) d.push('CONTROL: a moving hand still reads as still at 4%'); }
+  return { cases:n, total:d.length, differences:d };
+}
 /* FMT1: the file-format core (envelope versions, migrations) and the permanent-id registry (core/pure/format.js, core/pure/registry.js),
    exactly. CONTROLS: a registry that destroys a built-in, and a version check that lets a newer file through, must be caught. */
 async function fmtCore(){
@@ -790,6 +813,7 @@ const ROWS=[
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
+  ['CAL0 hand measuring (tool)', ()=>handStatsCalc(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // CORE-1 CP1
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);

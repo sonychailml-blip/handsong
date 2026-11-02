@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-1 — checkpoint 1 (2026-11-02): the design as approved, the guided measuring page
+Tree hashes before and after (unchanged): core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
+- `docs/core/CORE-1-DESIGN.md`: rewritten for the user's nine changes (today's measure kept; depth calibration near and far with a direction per control; effects hand sensitivity only; `play:x` untouched; time-based smoothing without pinch restarts on the calibrated path; refusal code `synthetic`). Decided while rewriting, for the user's review: depth controls take no sensitivity, and Full's `play:x` stays untouched like Night's.
+- `tools/probes/core/handstats.html`, `handstats.js`, `handstats-calc.js`: the page, no console needed. Previews carry it (`tools/build.mjs` copies the folder); production does not (smoke test).
+- Row «CAL0 hand measuring (tool)» in `tools/probe-data.mjs`. `tools/smoke-paths.mjs` covers the page on the repo tree and both previews, its absence on production, and a control.
+- Tested with a fake camera and scripted samples only; no real hand or phone has been through it. Thresholds in the design stay provisional until the user's numbers arrive.
+- Backlogs: the first-launch offer, the settings menu, Night's 6-icon limit, the thumbnail idea.
+
 # SPLIT-2 — checkpoint F (2026-11-02): docs split, core rules, final (status: archive/SPLIT-PROGRESS.md)
 Tree hashes after: core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4 (first print of the tool; no value from before it). This checkpoint changed only comment paths under `core/` and `apps/`.
 - `tools/split-docs.mjs`: docs moved into `docs/{core,full,night}`; logs frozen into `archive/`; the plan and the status file into `archive/`; the backlog cut by section, each new file headed by what is open now. `--check`: 2238 old lines, 0 lost; frozen logs byte-identical (the work log plus the plan's one note); the old handoff word for word in `archive/HANDOFF-history.md`.

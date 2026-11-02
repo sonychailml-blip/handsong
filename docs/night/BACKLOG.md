@@ -13,7 +13,9 @@ _Paths in older text: `src/core/` → `core/pure/`; `src/ui.js`, `draw.js`, `lat
 - ⬜ **Background music themes** (ex-RUN 10).
 - ⬜ **Port the forest demo with CC0 textures** (ex-RUN 11). Every texture goes in the licence register first (rule #32).
 - ⬜ **Rooms as modules:** room contract, catalogue, loader.
-- ⬜ **Calibration and sensitivity screen,** on top of CORE-1 (`docs/core/BACKLOG.md`).
+- ⬜ **Calibration and sensitivity screen,** on top of CORE-1 (`docs/core/BACKLOG.md`, `docs/core/CORE-1-DESIGN.md`). User's decisions, 2026-11-02: calibration is offered once on first launch (skippable; stop the ghost first) and afterwards lives in the settings menu next to the sensitivity sliders; no calibration icon on the main screen.
+- ⬜ **Main screen: at most 6 icons** (user, 2026-11-02). The view switch (forest / dark / camera) moves into the settings menu.
+- 💡 **Idea (user, 2026-11-02):** when no hand is found for a while, show a small camera thumbnail in a corner.
 - ⬜ **A scales library with key choice.**
 - ⬜ **C9 offline:** vendored MediaPipe + model, CSP to `'self'`, SW precache + update toast, `storage.persist` (plan §9.1; the old cache item: `docs/core/BACKLOG.md` §1). **C10 release:** the release edition exists (`tools/build.mjs`, `HANDSONG_EDITION=release`); left are the dist checks, privacy wording, hosting. **C12 release candidate:** both suites on the runner, the user's phone round, fixes, then publish.
 - ⬜ **Store packaging, later** (Capacitor: `webDir: dist`; the network list in `archive/SPLIT-PLAN.md` §4.4 must change first).
@@ -136,7 +138,7 @@ _Below: the old backlog's text as it stood, renamed._
 - **Preparation in code (slice UI1 of stage 3; UI1b done — see above):** the interface becomes THEMABLE — design tokens in one place (colours, fonts, sizes,
   spacing; today partly in `style.css :root`) and ONE icon component / SVG sprite replacing emoji and Unicode glyphs in the UI (DOM and
   canvas), so the authored design drops in later WITHOUT code changes. LIC1's glyph audit lists every symbol to replace.
-- **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).
+- **Licences:** our own work, CC0, CC-BY 4.0 (attribution), SIL OFL for fonts, AI-generated with the tool recorded; never SA, NC, ND (Q13).
 - **Night's design — user decision (RUN 7, 2026-10-17):** a combination of the RUN 6 proposals (`docs/night/design/`): the EMBLEM / app icon
   from C · Hush (five dots in an arc, the centre one glowing — also the brand mark above the «handsong» wordmark), its glowing dot in
   Moonglass's firefly lime `#c8f56a`; EVERYTHING ELSE from B · Moonglass (palette as `--night-*` tokens, icons, round buttons in a glass

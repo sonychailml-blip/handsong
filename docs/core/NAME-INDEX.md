@@ -694,6 +694,15 @@ PROBE1: The console guard: window.P = api() — one probe at a time; its self-te
 HAND1: SYNTHETIC HANDS → GESTURE FINGERPRINT.
 - fn (2): `dumpGesture`, `checkGesture`
 
+## tools/probes/core/handstats-calc.js
+CORE-1 CP1: the sums of the guided measuring page (handstats.html).
+- const (2): `WIN_MS`, `median`
+- fn (8): `quant`, `robustSigma`, `handOf`, `emaSeries`, `tauSeries`, `windows`, `analyse`, `report`
+
+## tools/probes/core/handstats.js
+CORE-1 CP1: the guided hand measuring page.
+- exports: none
+
 ## tools/probes/core/kit.js
 PROBE1: Shared probe helpers: frames with a fallback timer, measures, the quick flag, the short render window, window keep/restore.
 - const (7): `measReset`, `meas`, `frame`, `waitMs`, `PROBE_SHORT`, `setQuick`, `winKeep`
@@ -878,7 +887,7 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_168 modules, 2142 exported names._
+_170 modules, 2152 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

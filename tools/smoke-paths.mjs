@@ -93,6 +93,30 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
   return bad;
 }
 let fails=0;
+/* CORE-1 CP1: the guided measuring page, which must load with no console: model and fake camera up, one real step (no hand: it must ask to repeat), a scripted run to the report, the copy.
+   A production tree must not hold it. breakName = a file refused (the CONTROL). */
+const STATS='tools/probes/core/handstats.html';
+async function statsPage(label, dir, breakName=null){ const served=[], bad=[], srv=await serve(dir,'/',served,breakName), origin=`http://127.0.0.1:${srv.address().port}`;
+  const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream'] });
+  try{ const ctx=await browser.newContext({ viewport:{ width:390, height:800 } }); await ctx.grantPermissions(['camera','clipboard-read','clipboard-write'],{ origin }); await cdnCache(ctx);
+    await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push(e.effectiveDirective+' '+e.blockedURI)); });
+    const page=await ctx.newPage(); page.on('pageerror', e=>bad.push('page error: '+(e&&e.message||e)));
+    page.on('console', m=>{ if(m.type()==='error') bad.push('console error: '+m.text().slice(0,160)); });
+    await page.goto(origin+'/'+STATS); await page.click('#go');
+    await page.waitForFunction(()=>window.__handstats.loaded() && window.__handstats.phase()==='step:near', null, { timeout:180e3 });
+    await page.click('#go'); await page.waitForFunction(()=>document.getElementById('note').textContent.length>0, null, { timeout:30e3 });
+    if((await page.evaluate(()=>window.__handstats.phase()))!=='step:near') bad.push('a step with no hand was accepted');
+    const r=await page.evaluate(()=>{ const still=z=>Array.from({ length:151 },(_,i)=>({ t:i*1000/30, hand:{ size:z+(i%2?0.002:-0.002), wx:0.5, wy:0.5, pinch:1, out:false } }));
+      const rep=window.__handstats.fill({ near:still(0.2), far:still(0.125), pinch:still(0.15), open:still(0.16), move:still(0.16) });
+      return { format:rep.format, gain:rep.derived.gain, text:document.getElementById('out').value, phase:window.__handstats.phase(), csp:window.__csp.slice() }; });
+    if(r.format!=='handsong/handstats' || !(r.gain>2) || r.phase!=='done' || JSON.parse(r.text).format!==r.format) bad.push('the report is wrong: '+JSON.stringify(r).slice(0,160));
+    if(r.csp.length) bad.push('CSP violation: '+r.csp.slice(0,3).join('; '));
+    await page.click('#go');
+    const copied=await page.waitForFunction(async t=>(await navigator.clipboard.readText())===t, r.text, { timeout:10e3 }).then(()=>true,()=>false); if(!copied) bad.push('the clipboard does not hold the report');
+    if(!served.some(([u,st])=>/handstats\.js$/.test(u)&&st===200)) bad.push('the page script was not served');
+  }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
+  out(`[smoke] measuring page, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,5).join(' · '):'PASS'}`); return bad; }
+async function statsAbsent(dir){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`; let st=0; try{ st=(await fetch(origin+'/'+STATS)).status; }catch(e){} srv.close(); const ok=st===404; out(`[smoke] measuring page on production: ${ok?'PASS — absent':'NOT A PASS — HTTP '+st}`); return ok?0:1; }
 /* ?probe on a built tree: window.P on a preview, nothing at all on production */
 async function probeGate(app, dir, want){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); const bad=[];
   try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); await page.goto(origin+'/?probe');
@@ -106,12 +130,15 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
   try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); await page.goto(origin+'/'); await page.waitForURL(/\/apps\/full\/$/,{ timeout:20e3 }); ok=await page.waitForSelector('#startBtn',{ state:'attached', timeout:60e3 }).then(()=>true); }catch(e){ out('    '+(e&&e.message||e)); }
   finally{ await browser.close().catch(()=>{}); srv.close(); } out(`[smoke] root redirect: ${ok?'PASS — / leads to apps/full/':'NOT A PASS'}`); return ok?0:1; }
 for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
+if((await statsPage('repo tree',ROOT)).length) fails++;
+if(!NO_CONTROL){ const c=await statsPage('CONTROL (its sums refused)',ROOT,'handstats-calc.js'); const caught=c.length>0; out(`[smoke] CONTROL (the measuring page without its sums must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }
 let prodFull=null;
 if(BUILD){ fails+=await redirectCheck();
   for(const app of ['full','night']){ const prod=build(app,'production'), prev=build(app,'preview'); if(app==='full') prodFull=prod;
     for(const prefix of ['/','/some/sub/']) if((await run(app,prod,prefix)).length) fails++;
     if((await run(app,prev,'/')).length) fails++;
-    fails+=await probeGate(app,prod,false); fails+=await probeGate(app,prev,true); }
+    fails+=await probeGate(app,prod,false); fails+=await probeGate(app,prev,true);
+    if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod); }
   if((await run('night',build('night','release'),'/',false,false)).length) fails++; }
 if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));
   out(`[smoke] CONTROL (a missing worklet must fail): ${caught?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!caught) fails++; }

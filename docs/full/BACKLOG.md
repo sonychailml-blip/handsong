@@ -6,7 +6,8 @@ _The old `BACKLOG.md` was cut by section at SPLIT-2 (nothing lost, `tools/split-
 _Paths in older text: `src/core/` → `core/pure/`; `src/ui.js`, `draw.js`, `latmeter.js`, `views/` → `core/legacy-ui/`; other `src/` → `core/`; `data/` → `core/data/`; Night-only and Full-only files → `apps/night/`, `apps/full/`; probes → `tools/probes/`; prints → `tools/prints/`. Map: `tools/split-move.mjs`._
 
 ## Open now (written at SPLIT-2, 2026-11-02, English)
-- ⬜ **Calibration and sensitivity screen,** on top of CORE-1 (`docs/core/BACKLOG.md`).
+- ⬜ **Calibration and sensitivity screen,** on top of CORE-1 (`docs/core/BACKLOG.md`, `docs/core/CORE-1-DESIGN.md`). User's decisions, 2026-11-02: calibration is offered once on first launch (skippable; never during a lesson) and afterwards lives in the settings menu next to the sensitivity sliders; no calibration icon on the main screen. A depth parameter's invert checkbox must go through `handCalSetDir`.
+- 💡 **Idea (user, 2026-11-02):** when no hand is found for a while, show a small camera thumbnail in a corner.
 
 ## Open from the old HANDOFF (kept word for word in `archive/HANDOFF-history.md`, «Moved from HANDOFF.md at SPLIT-2»)
 - ⬜ Work order after the first release: **5** saving (on the device + file export/import; same format and ids), export with Scala, audio tracks and audio take, mixer per-track effects and meters, AF6 rest, «Listen», WASM effects → **VOL-7** per-note pan → **6** MIDI controller → **7** new-engine instruments, timbre builder, user modes with Scala, sampler → **8** server (accounts, sync, sharing, subscription, marketplace).
