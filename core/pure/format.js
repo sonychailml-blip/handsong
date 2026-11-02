@@ -5,9 +5,9 @@
 import { USER_ID } from './registry.js';
 import { SONG_VERSION, SONG_MIGRATIONS } from './songfile.js';   // SAVE1: the song file's version and migrations (v1 → v2: TIM2 timbre ids)
 
-const F={ manifest:'handsong/manifest', menu:'handsong/menu', tuning:'handsong/tuning', mode:'handsong/mode', palette:'handsong/palette', chordmodes:'handsong/chordmodes', song:'handsong/song' };
+const F={ manifest:'handsong/manifest', menu:'handsong/menu', tuning:'handsong/tuning', mode:'handsong/mode', palette:'handsong/palette', chordmodes:'handsong/chordmodes', song:'handsong/song', handcal:'handsong/handcal' };
 /* FMT1: the version each kind is read at today and its migrations ({ kind: [fn v1→v2, fn v2→v3, …] }, index = from-version − 1) */
-const FORMAT_VERSION={ manifest:1, menu:1, tuning:1, mode:1, palette:1, chordmodes:1, song:SONG_VERSION };
+const FORMAT_VERSION={ manifest:1, menu:1, tuning:1, mode:1, palette:1, chordmodes:1, song:SONG_VERSION, handcal:1 };
 const MIGRATIONS={ song:SONG_MIGRATIONS };
 const kindOfFormat=fmt=> typeof fmt==='string' && fmt.slice(0,9)==='handsong/' ? fmt.slice(9) : null;
 /* A record of an OLDER version → the current one through the migration steps (a copy; the stored record is never changed in place);

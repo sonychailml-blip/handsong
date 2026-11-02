@@ -4,6 +4,15 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-1 — checkpoint 2 (2026-11-02): one-step design, pure core
+Tree hashes before: core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: core 5009e88be68abdea · apps unchanged.
+- `docs/core/CORE-1-DESIGN.md`: the user's one-step design (one near point, depth relative to it, depth slider, whole hand in the frame, time-based timings) with the measured numbers (§9.1). `noisy`, `span-small`, `no-move`, `wrong-way` gone.
+- Decided, for review: the slider divides the real travel, `rFar(s)=1/(1+(1/0.42−1)/s)` (dividing `1−r` is impossible at 0.5×); hold band ±0.009 of the ratio; blink tolerance 800 ms; minimum near size 0.25; depth slider global, not per camera.
+- `core/pure/handcal.js` (new; nothing imports it yet), `core/pure/format.js` (the `handcal` kind). Rows CAL1–3 are one data row, «CAL1-3 hand calibration (core)». No app behaviour changes.
+- Not measured: fingertips in the frame (the page's `out` read only the palm); 2 s stillness figures are worked out from 0.5 s windows.
+- Probe runner: `tools/probes/core/run.js` finishes the once-per-device benchmark before the first state-guard snapshot. Found on Night: `P.night` starts about when the benchmark does, and the guard caught the render copy mid-render (`offline:true`, row GOLD). A race older than this run, no tolerance changed.
+- Seen once, not fixed: `NIGHT stress` failed with 48 dropouts in 6 s (`solo.handpan`) against 0 for the reference. The next two runs on the same core passed. The real-time row varies on this laptop, as the row's own note says; if it recurs it needs its own look.
+
 # CORE-1 — checkpoint 1 (2026-11-02): the design as approved, the guided measuring page
 Tree hashes before and after (unchanged): core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
 - `docs/core/CORE-1-DESIGN.md`: rewritten for the user's nine changes (today's measure kept; depth calibration near and far with a direction per control; effects hand sensitivity only; `play:x` untouched; time-based smoothing without pinch restarts on the calibrated path; refusal code `synthetic`). Decided while rewriting, for the user's review: depth controls take no sensitivity, and Full's `play:x` stays untouched like Night's.

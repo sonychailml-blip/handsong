@@ -447,6 +447,11 @@ FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({
 - const (5): `F`, `FORMAT_VERSION`, `MIGRATIONS`, `kindOfFormat`, `CM_MAX`
 - fn (7): `upgrade`, `checkManifest`, `checkMenu`, `checkTuning`, `checkPalette`, `checkChordModes`, `checkMode`
 
+## core/pure/handcal.js
+CORE-1: the playing hand's depth calibration and the sensitivity settings, pure (rule #36; rows CAL1-CAL3).
+- const (11): `CAL`, `REASONS`, `calFarRatio`, `calEndPull`, `calInverted`, `calDirValue`, `calFx`, `calEmpty`, `calText`, `calCameraKey`, `calStoreKey`
+- fn (12): `calDepth`, `calFilter`, `calHold`, `calSensOf`, `robust`, `calClean`, `calParse`, `calReset`, `calLoad`, `calSave`, `calWipe`, `createCalRun`
+
 ## core/pure/handsched.js
 LAT2a — the SEARCH SCHEDULE for hand detection.
 - const (4): `HAND_SEARCH_EVERY`, `HAND_POLICIES`, `schedNew`, `schedRetry`
@@ -887,7 +892,7 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_170 modules, 2152 exported names._
+_171 modules, 2175 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

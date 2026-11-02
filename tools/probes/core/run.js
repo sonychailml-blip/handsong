@@ -95,6 +95,8 @@ export async function all(opt={}){   // F0: async — строка снимка 
   const T00=performance.now(), title=opt.night?'P.night':opt.quick?'P.quick':'P.all';
   const rows=[], lists=[], keepCM=chordModeSel, measures={};
   let RR=null; try{ RR=await import('../../../core/render.js'); }catch(e){ RR=null; }   // страж читает копию движка рендера
+  /* The once-per-device benchmark starts about 20 s in, on the render copy; finish it here, or the guard's first snapshot can catch it mid-render (seen on Night, which has no seed). */
+  if(RR) try{ await RR.engBench(); }catch(e){}
   let nGuard=0; const stall0=frameStalls;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
   setQuick(opt.quick);

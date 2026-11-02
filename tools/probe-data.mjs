@@ -229,6 +229,132 @@ async function handStatsCalc(){
   { const mv=Array.from({ length:151 },(_,i)=>({ t:i*1000/30, hand:hand(0.2-0.03*i/30) })); n++; if(C.analyse(mv).still['0.04']!==0) d.push('CONTROL: a moving hand still reads as still at 4%'); }
   return { cases:n, total:d.length, differences:d };
 }
+/* CORE-1 CP2: scripted hands for CAL3. A vertical open hand centred so every landmark is in the frame; seeded jitter at the measured noise. */
+function calScript(){
+  const seeded=seed=>{ let s=seed>>>0; return ()=>(s=Math.imul(s,1664525)+1013904223>>>0)/4294967296; };
+  const gauss=rnd=>Math.sqrt(-2*Math.log(rnd()||1e-9))*Math.cos(2*Math.PI*rnd());
+  const hand=(size,{ cx=0.5, cy=null }={})=>{ const c=cy??0.5+0.475*size, lm=Array.from({ length:21 },()=>({ x:cx, y:c }));
+    lm[0]={ x:cx, y:c+size/2 }; lm[9]={ x:cx, y:c-size/2 }; for(const i of [4,8,12,16,20]) lm[i]={ x:cx, y:c-size/2-0.95*size }; return lm; };
+  /* the measured gaps: desktop about 16 fps with 117 ms the largest, Poco about 7 fps with 392 ms the largest */
+  const GAPS={ desktop:[62,58,65,117,60,63,59,61], poco:[120,130,392,110,140,125,265,130,120,135,150,110] };
+  const clock=function*(gaps,from=0){ let t=from, i=0; for(;;){ yield t; t+=gaps[i++%gaps.length]; } };
+  /* drive a run until it leaves its active phases or the time ends; each frame's hands come from at(t, i) */
+  const drive=(run,gaps,at,until=20000)=>{ const c=clock(gaps); let i=0, s=run.state(0), t=0; for(;;){ t=c.next().value; if(t>until) break; const f=at(t,i++); s=run.frame({ t, ...f }); if(s.phase!=='waitHand'&&s.phase!=='holdNear') break; } return { ...s, t }; };
+  return { seeded, gauss, hand, GAPS, drive };
+}
+async function handCalCore(){
+  const H=await import(new URL('../core/pure/handcal.js', import.meta.url).href), S=calScript();
+  const d=[]; let n=0; const ok=(what,c)=>{ n++; if(!c) d.push(what); };
+  const near=(what,a,b,tol=1e-9)=>{ n++; if(!(Math.abs(a-b)<=tol)) d.push(`${what}: ${a}, expected ${b}`); };
+  const clamp01=v=>Math.max(0,Math.min(1,v));
+  /* CAL1 laws */
+  const NOISE=0.0065, r0=1-H.calEndPull(NOISE);
+  ok('the near point is exactly 0', Object.is(H.calDepth(r0,NOISE),0)); ok('the player\'s near size is exactly 0', Object.is(H.calDepth(1,NOISE),0)); ok('closer than near clamps to 0', H.calDepth(1.4,NOISE)===0);
+  for(const s of [0.5,1,2]){ ok(`far end exactly 1 at ${s}x`, H.calDepth(H.calFarRatio(s),NOISE,s)===1); ok(`past the far end clamps at ${s}x`, H.calDepth(H.calFarRatio(s)*0.5,NOISE,s)===1); }
+  near('far ratio 0.5x', H.calFarRatio(0.5), 0.2658, 1e-4); near('far ratio 1x', H.calFarRatio(1), 0.42, 1e-12); near('far ratio 2x', H.calFarRatio(2), 0.5915, 1e-4);
+  near('far distance 0.5x', 1/H.calFarRatio(0.5), 3.762, 1e-3); near('far distance 2x', 1/H.calFarRatio(2), 1.690, 1e-3);
+  { const f=(hs,N)=>H.calDepth(hs/N,NOISE); near('the ratio ignores hand size and camera', f(0.2,0.4), f(0.1,0.2), 1e-15); near('...at another scale', f(0.2,0.4), f(0.3,0.6), 1e-12); }
+  { let m=true, last=-1; for(let r=1.05;r>=0.2;r-=0.01){ const v=H.calDepth(r,NOISE); if(v<last) m=false; last=v; } ok('monotonic over a sweep', m); }
+  ok('the margin never falls below the hold band', H.calEndPull(0)===H.CAL.band); ok('the margin is capped', H.calEndPull(1)===H.CAL.marginMax);
+  { /* both ends reached through the hold band */
+    const st={}; let v=0; for(let r=1;r>=0.2;r-=0.005) v=H.calDepth(H.calHold(st,r),NOISE); ok('the far end is reached through the band', v===1);
+    for(let r=0.2;r<=1.0001;r+=0.005) v=H.calDepth(H.calHold(st,r),NOISE); ok('the near end is reached through the band', v===0); }
+  { /* a still hand, jittered at the largest filtered sigma: the held ratio stays put in mid-range */
+    const rnd=S.seeded(7), st={}; let moved=0; H.calHold(st,0.7); const held=st.r; for(let i=0;i<3000;i++){ const r=H.calHold(st,0.7+0.002*S.gauss(rnd)); if(r!==held) moved++; } ok('the band holds a still hand', moved===0);
+    const raw={}; let rawMoved=0; H.calHold(raw,0.7,0); const h0=raw.r; const rnd2=S.seeded(7); for(let i=0;i<300;i++){ if(H.calHold(raw,0.7+0.002*S.gauss(rnd2),0)!==h0) rawMoved++; } ok('CONTROL: no band must move', rawMoved>100); }
+  ok('near0', H.calDirValue(0.25,'near0',true)===0.25); ok('near100', H.calDirValue(0.25,'near100',false)===0.75); ok('no dir follows inv', H.calDirValue(0.25,undefined,true)===0.75 && H.calDirValue(0.25,undefined,false)===0.25);
+  { const rec=H.calEmpty('t'); rec.global.fx=1.4; rec.global.depth=0.7; rec.controls['a|b:c']={ sens:2 }; rec.controls['a|d:e']={ dir:'near0' };
+    ok('an override replaces the global', H.calSensOf(rec,'fx','a|b:c')===2); ok('no override: global', H.calSensOf(rec,'fx','a|d:e')===1.4); ok('depth has its own global', H.calSensOf(rec,'depth','x|y:z')===0.7); }
+  { let same=true; const grid=[0,1e-12,0.1,0.25,0.5,0.75,0.999,1]; for(const base of grid) for(const dd of [-1.5,-0.3,-1e-9,-0,0,1e-9,0.3,1.5]) for(const inv of [false,true]) if(!Object.is(H.calFx(base,dd,inv,1),clamp01(base+(inv?-dd:dd)))) same=false;
+    ok('sens 1 is bit-identical to today\'s expression', same);
+    let differs=false; for(const base of grid) for(const dd of [-0.3,0.3]) if(!Object.is(H.calFx(base,dd,false,1.0000001),clamp01(base+dd))) differs=true; ok('CONTROL: sens 1.0000001 must differ', differs); }
+  near('sens scales the travel', H.calFx(0.1,0.2,false,2), 0.5, 1e-12); near('sens 0.5', H.calFx(0.1,0.2,false,0.5), 0.2, 1e-12);
+  { /* the time filter: same time constant at any rate; equals today's EMA at 30 fps */
+    const step=fps=>{ const st={}; H.calFilter(st,0,0); let t=0, y=0; while(t<1000-1e-9){ t+=1000/fps; y=H.calFilter(st,1,t); } return y; };
+    const want=1-Math.exp(-1/H.CAL.tauS); near('time filter at 6.7 fps', step(6.7), 1-Math.exp(-(Math.ceil(6.7)/6.7)/H.CAL.tauS), 1e-9); near('time filter at 60 fps', step(60), want, 1e-9);
+    let e=0; for(let i=0;i<30;i++) e+=0.15*(1-e); near('equals today\'s EMA at 30 fps', step(30), e, 0.002);
+    let e7=0; for(let i=0;i<7;i++) e7+=0.15*(1-e7); ok('CONTROL: a per-frame filter fails at 6.7 fps', Math.abs(e7-step(6.7))>0.3);
+    const st={}; H.calFilter(st,0,0); near('a 392 ms gap is not slowed', H.calFilter(st,1,392), 1-Math.exp(-0.392/H.CAL.tauS), 1e-12); }
+  ok('CONTROL: dividing 1-r breaks at 0.5x', 1-(1-H.CAL.farRatio)/0.5<0);
+  /* CAL2 record */
+  const mem=()=>{ const m=new Map(); return { getItem:k=>m.has(k)?m.get(k):null, setItem:(k,v)=>m.set(k,v), removeItem:k=>m.delete(k), m }; };
+  const blocked={ getItem(){ throw new Error('blocked'); }, setItem(){ throw new Error('blocked'); }, removeItem(){ throw new Error('blocked'); } };
+  const CAM=H.calCameraKey('Some Camera','user');
+  const full=()=>{ const r=H.calEmpty('one'); r.global={ depth:0.7, fx:1.4 }; r.controls['role:ld|fdepth:depth']={ dir:'near0', sens:2 }; r.cameras[CAM]={ near:0.334, noise:0.0065, at:1793000000000 }; return r; };
+  { const r=full(), b=H.calParse(H.calText(r),'one'); ok('text round trip', b.status==='ok' && JSON.stringify(b.rec)===JSON.stringify(r)); }
+  ok('camera key is a hash, never the name', /^[0-9a-f]{8}$/.test(CAM) && !H.calText(full()).includes('Some Camera'));
+  ok('no label falls back to the facing', H.calCameraKey('','user')!==H.calCameraKey('','environment'));
+  { const st=mem(), a=full(), b=H.calEmpty('two'); b.global.fx=0.5; H.calSave(st,a); H.calSave(st,b);
+    ok('two scopes don\'t collide', H.calLoad(st,'one').rec.global.fx===1.4 && H.calLoad(st,'two').rec.global.fx===0.5);
+    ok('CONTROL: a shared key would collide', H.calStoreKey('one')!==H.calStoreKey('two'));
+    H.calWipe(st,'one'); ok('a wipe removes only its scope', H.calLoad(st,'one').status==='empty' && H.calLoad(st,'two').status==='ok'); }
+  { const l=H.calLoad(blocked,'one'); ok('a blocked store reads as empty', l.status==='blocked' && !Object.keys(l.rec.cameras).length); ok('a blocked save returns false', H.calSave(blocked,full())===false); ok('a blocked wipe returns false', H.calWipe(blocked,'one')===false); }
+  { const r=full(); let g=H.calReset(r,{ control:'role:ld|fdepth:depth' }); ok('control reset', !g.controls['role:ld|fdepth:depth'] && g.cameras[CAM] && !!r.controls['role:ld|fdepth:depth']);
+    g=H.calReset(r,{ camera:CAM }); ok('camera reset', !g.cameras[CAM] && g.global.fx===1.4); g=H.calReset(r,{ all:true }); ok('full reset', JSON.stringify(g)===JSON.stringify(H.calEmpty('one'))); }
+  { const st=mem(), newer=JSON.stringify({ ...full(), version:9 }); st.setItem(H.calStoreKey('one'),newer);
+    ok('a newer version reads as uncalibrated', H.calLoad(st,'one').status==='newer' && !Object.keys(H.calLoad(st,'one').rec.cameras).length);
+    ok('a newer version is not overwritten', H.calSave(st,full())===false && st.getItem(H.calStoreKey('one'))===newer);
+    H.calWipe(st,'one'); ok('an explicit wipe frees it', H.calSave(st,full())===true); }
+  { const keepV=FMT.FORMAT_VERSION.handcal, keepM=FMT.MIGRATIONS.handcal, v1=full();
+    try{ FMT.FORMAT_VERSION.handcal=2; FMT.MIGRATIONS.handcal=[r=>({ ...r, global:{ ...r.global, fx:1.9 } })];
+      const u=H.calClean(v1,'one'); ok('a v1 to v2 step runs', u.status==='ok' && u.rec.global.fx===1.9 && u.rec.version===2 && v1.global.fx===1.4);
+      FMT.MIGRATIONS.handcal=[]; ok('CONTROL: without the step a v1 record is refused', H.calClean(v1,'one').status==='damaged');
+    } finally { FMT.FORMAT_VERSION.handcal=keepV; if(keepM===undefined) delete FMT.MIGRATIONS.handcal; else FMT.MIGRATIONS.handcal=keepM; } }
+  /* damage drops only the damaged part; CONTROLS: each plant must be refused */
+  const damage=[
+    ['a planted thumb on a camera', r=>{ r.cameras[CAM].thumb='data:image/png;base64,AAAA'; }, 'cameras.'+CAM],
+    ['a planted far on a camera', r=>{ r.cameras[CAM].far=0.2; }, 'cameras.'+CAM],
+    ['a camera name as the key', r=>{ r.cameras['Some Camera']={ near:0.3, noise:0, at:0 }; }, 'cameras.Some Camera'],
+    ['near as text', r=>{ r.cameras[CAM].near='0.3'; }, 'cameras.'+CAM], ['near of zero', r=>{ r.cameras[CAM].near=0; }, 'cameras.'+CAM],
+    ['a sens above 2', r=>{ r.global.fx=3; }, 'global.fx'], ['a sens below 0.5', r=>{ r.global.depth=0.1; }, 'global.depth'], ['an unknown global', r=>{ r.global.other=1; }, 'global.other'],
+    ['a bad direction', r=>{ r.controls['role:ld|fdepth:depth'].dir='up'; }, 'controls.role:ld|fdepth:depth'], ['a text on a control', r=>{ r.controls['role:ld|fdepth:depth'].note='x'; }, 'controls.role:ld|fdepth:depth'],
+    ['a planted top-level field', r=>{ r.picture='x'; }, 'picture'],
+  ];
+  for(const [what,plant,path] of damage){ const r=full(); plant(r); const c=H.calClean(r,'one'); ok('refused: '+what, c.status==='partial' && c.dropped.includes(path) && !H.calText(c.rec).includes('data:image') && !('picture' in c.rec)); }
+  { const r=full(); r.cameras[CAM].thumb='x'; r.global.fx=1.2; const c=H.calClean(r,'one'); ok('other parts survive damage', c.rec.global.fx===1.2 && c.rec.global.depth===0.7); }
+  for(const [what,text] of [['not JSON','{oops'],['another format',JSON.stringify({ format:'handsong/tuning', version:1 })],['another scope',H.calText({ ...full(), scope:'two' })],['no version',JSON.stringify({ format:'handsong/handcal' })]])
+    ok('damaged: '+what, H.calParse(text,'one').status==='damaged');
+  { let threw=false; try{ H.calStoreKey('Bad Scope'); }catch(e){ threw=true; } ok('a bad scope is refused', threw); }
+  /* CAL3 routine */
+  const NEAR=0.334, still=(seed,size=NEAR,sig=0.0065)=>{ const rnd=S.seeded(seed); return ()=>({ hands:[S.hand(size*(1+sig*S.gauss(rnd)))] }); };
+  const run=(opts={})=>H.createCalRun({ t:0, ...opts });
+  for(const [name,gaps] of Object.entries(S.GAPS)){ const r=run(), s=S.drive(r,gaps,still(11));
+    ok(`${name}: reaches review`, s.phase==='review'); near(`${name}: the near size`, s.result&&s.result.near, NEAR, 0.006); ok(`${name}: noise is small`, s.result&&s.result.noise<0.02);
+    ok(`${name}: about 2 s`, s.t>=2000 && s.t<=2000+Math.max(...gaps)*2); near(`${name}: progress is whole`, s.progress, 1); const a=r.accept(); ok(`${name}: accept returns the result`, a&&a.near===s.result.near && r.state(s.t).phase==='saved'); }
+  { const ends=[], sizes=[]; for(const fps of [5,7,16,30]){ const s=S.drive(run(),[1000/fps],still(23)); ends.push({ fps, t:s.t, ok:s.phase==='review' }); sizes.push(s.result&&s.result.near); }
+    for(const e of ends){ ok(`${e.fps} fps reaches review`, e.ok); ok(`${e.fps} fps finishes on time (${e.t})`, e.t>=2000 && e.t<=2000+1000/e.fps+1e-6); } for(const z of sizes) near('the rate doesn\'t move the size', z, NEAR, 0.006); }
+  { const rnd=S.seeded(5), r=run(), series=[]; const s=S.drive(r,S.GAPS.poco,(t,i)=>{ const z=i%7===3 ? NEAR*1.3 : NEAR*(1+0.0065*S.gauss(rnd)); series.push(z); return { hands:[S.hand(z)] }; });   // one sample in 7, about 15%
+    ok('spikes: reaches review', s.phase==='review'); near('spikes: the median holds', s.result&&s.result.near, NEAR, 0.006);
+    const mean=series.reduce((a,b)=>a+b,0)/series.length; ok('CONTROL: a mean must miss the tolerance', Math.abs(mean-NEAR)>0.006); }
+  { const moving=(t)=>({ hands:[S.hand(NEAR*(1-0.135*t/1000),{ cy:0.66 })] });
+    const s=S.drive(run(),S.GAPS.desktop,t=>moving(t%4000)); ok('a slowly moving hand is refused', s.phase==='failed' && s.reason==='not-still');
+    const c=S.drive(run({ C:{ ...H.CAL, stillSize:Infinity, stillWrist:Infinity } }),S.GAPS.desktop,moving); ok('CONTROL: stillness off accepts a moving hand', c.phase==='review'); }
+  { /* wrist waving sideways */ const s=S.drive(run(),S.GAPS.desktop,t=>({ hands:[S.hand(NEAR,{ cx:0.5+0.15*Math.sin(t/300) })] })); ok('a waving hand is refused', s.reason==='not-still'); }
+  { /* a fingertip out while the palm is inside */ const out=()=>({ hands:[S.hand(0.33,{ cy:0.45 })] });
+    ok('(the script: palm inside, fingertip outside)', S.hand(0.33,{ cy:0.45 })[12].y<0 && [0,5,9,13,17].every(i=>S.hand(0.33,{ cy:0.45 })[i].y>=0));
+    const r=run(); r.frame({ t:0, ...out() }); const a=r.frame({ t:100, ...out() }); ok('a fingertip out asks to move back', a.advice==='back' && a.progress===0);
+    const s=S.drive(run(),S.GAPS.desktop,out); ok('out of frame fails at the timeout', s.phase==='failed' && s.reason==='out-of-frame' && s.t>=H.CAL.holdLimitMs);
+    const c=S.drive(run({ C:{ ...H.CAL, frameLm:[0,5,9,13,17] } }),S.GAPS.desktop,out); ok('CONTROL: a palm-only check misses the fingertip', c.phase==='review');
+    const back=(t,i)=> t<1500 ? out() : { hands:[S.hand(NEAR)] }, m=S.drive(run(),S.GAPS.desktop,back); ok('moving back restarts and finishes', m.phase==='review' && m.t>=3500); }
+  { const s=S.drive(run(),S.GAPS.desktop,still(3,0.2)); ok('too small a near fails', s.phase==='failed' && s.reason==='too-far');
+    const r=run(); let last; for(let t=0;t<=2500;t+=60) last=r.frame({ t, hands:[S.hand(0.2)] }); ok('too small asks to come closer', last.advice==='closer'); }
+  { const s=S.drive(run(),[100],()=>({ hands:[] })); ok('nobody there: no-hand', s.phase==='failed' && s.reason==='no-hand' && s.t>=H.CAL.waitMs); }
+  { const s=S.drive(run(),[100],(t)=>({ hands:t<500 ? [S.hand(NEAR)] : [] })); ok('a hand gone: hand-lost', s.phase==='failed' && s.reason==='hand-lost'); }
+  { const s=S.drive(run(),[600],still(9)); ok('2 samples per 1.2 s: low-rate', s.phase==='failed' && s.reason==='low-rate' && s.t>=H.CAL.holdMaxMs && s.t<=H.CAL.holdMaxMs+600); }
+  { const s=S.drive(run(),[60],(t)=>({ hands:(t>=600&&t<1300) ? [] : [S.hand(NEAR)] })); ok('a 700 ms blink is tolerated', s.phase==='review' && s.t<2200); }
+  { const seq=(C)=>S.drive(run({ C }),[60],(t)=>({ hands:(t>=600&&t<1100) ? [] : [S.hand(NEAR)] })); ok('a 500 ms gap passes at 800 ms', seq(H.CAL).t<2200); ok('CONTROL: a 500 ms gap restarts under 400 ms', seq({ ...H.CAL, blinkMs:400 }).t>=3000); }
+  { const big=S.hand(0.45,{ cx:0.8 }); const s=S.drive(run(),S.GAPS.desktop,(t)=>({ hands:t<300 ? [S.hand(NEAR,{ cx:0.2 })] : [big,S.hand(NEAR,{ cx:0.2 })] })); near('the locked hand is followed', s.result&&s.result.near, NEAR, 1e-6);
+    const two=S.drive(run(),S.GAPS.desktop,()=>({ hands:[S.hand(0.3,{ cx:0.2 }),S.hand(NEAR,{ cx:0.8 })] })); near('two hands: the largest', two.result&&two.result.near, NEAR, 1e-6);
+    let flip=0; const lab=S.drive(run({ hand:'Left' }),S.GAPS.desktop,()=>({ hands:[S.hand(0.3,{ cx:0.2 }),S.hand(NEAR,{ cx:0.8 })], labels:flip++%2 ? ['Right','Left'] : ['Left','Right'] })); near('a label flip keeps the hand named at the lock', lab.result&&lab.result.near, 0.3, 1e-6); }
+  { const mark=lm=>{ lm.synthetic=true; return lm; };
+    const a=S.drive(run(),[60],()=>({ hands:[mark(S.hand(NEAR))] })); ok('a marked hand fails at once', a.reason==='synthetic' && a.t===0);
+    const b=S.drive(run(),[60],(t)=>({ hands:t>=900 ? [S.hand(NEAR),mark(S.hand(0.3,{ cx:0.2 }))] : [S.hand(NEAR)] })); ok('a marked hand mid-run fails it', b.reason==='synthetic' && b.t>=900 && b.t<1000); }
+  for(const [what,at] of [['waitHand',0],['holdNear',500],['review',2600]]){ const r=run(), f=still(3); let t=0; while(t<at){ r.frame({ t, ...f() }); t+=60; } r.cancel(); const s=r.state(t); ok(`cancel in ${what}`, s.phase==='cancelled' && s.reason==='cancelled' && s.result===null && r.accept()===null); }
+  { const r=run(); r.fail('camera-changed'); ok('the service\'s reasons', r.state(0).reason==='camera-changed'); const q=run(); q.fail('busy'); ok('busy', q.state(0).reason==='busy'); let threw=false; try{ run().fail('nonsense'); }catch(e){ threw=true; } ok('an unknown reason is refused', threw); }
+  { const once=()=>JSON.stringify(S.drive(run(),S.GAPS.poco,still(31))); ok('the same script gives the same result', once()===once()); }
+  { const r=run(), s=S.drive(r,S.GAPS.desktop,still(3)); r.frame({ t:s.t+60, hands:[] }); ok('review ignores further frames', r.state(s.t).phase==='review'); }
+  return { cases:n, total:d.length, differences:d };
+}
 /* FMT1: the file-format core (envelope versions, migrations) and the permanent-id registry (core/pure/format.js, core/pure/registry.js),
    exactly. CONTROLS: a registry that destroys a built-in, and a version check that lets a newer file through, must be caught. */
 async function fmtCore(){
@@ -814,6 +940,7 @@ const ROWS=[
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
   ['CAL0 hand measuring (tool)', ()=>handStatsCalc(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // CORE-1 CP1
+  ['CAL1-3 hand calibration (core)', ()=>handCalCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // CORE-1 CP2
 ];
 
 out(`[probe-data] running ${ROWS.length} checks (40 s to 2 min, depending on the machine; T2 is the longest) — one line per check as it finishes`);
