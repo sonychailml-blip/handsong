@@ -12,7 +12,7 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 
 **Who does what:** the user commits; Claude Code never runs git, not even read-only. A strategist writes the prompts and explains in Russian. Terminal replies are in English.
 
-**Deploy:** two Vercel projects, `HANDSONG_APP=full` and `HANDSONG_APP=night`. Production builds from `main`; `dev` pushes give previews, which keep `?probe` for on-device measurement. Build: `tools/build.mjs`.
+**Deploy:** two Vercel projects, `HANDSONG_APP=full` and `HANDSONG_APP=night`. `dev` pushes give previews, which keep `?probe` for on-device measurement. Full's production builds `main`; `handsong-night`'s builds `night-release`, a stopper copy of the old `main`. Merging `dev` into `main` updates only Full's production, and neither new app goes public yet (`CLAUDE.md`, Build and deploy). Build: `tools/build.mjs`.
 
 **Local addresses (Live Server):** `http://127.0.0.1:5500/apps/full/`, `http://127.0.0.1:5500/apps/night/`; add `?probe` for `window.P`.
 

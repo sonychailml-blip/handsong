@@ -22,7 +22,7 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
 | C | door inversion, entries, switch removal, app moves, root redirect, probes to tools | 2, 3, 4, 8, 9, 10 | ✅ committed |
 | D | `tools/build.mjs`, `vercel.json`, preview measurement | 11 + addition 1 | ✅ committed; user: both Vercel projects set up, both dev previews build and open |
 | E | rename Calm → Night | 13 | ✅ committed |
-| F | docs split, CLAUDE.md rules, final | 14, 15 | ✅ light set passes — WAITING for the user's «committed» |
+| F | docs split, CLAUDE.md rules, final | 14, 15 | ✅ committed |
 
 ## Log
 - CP A 2026-11-01: all checks pass (`node tools/split-check.mjs --tag A`; ui-night re-compared after --noisy).
@@ -33,6 +33,7 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
 - Measurement on a phone, previews of both apps: `<preview URL>/` for the app, `<preview URL>/?probe` for `window.P` (Android: Chrome on the desktop, `chrome://inspect`, USB). Night: ⓘ → «Measure this device». Full has no Measure button: Sound panel → Diagnostics → Latency meter.
 - CP E 2026-11-02: rename done; full suite PASS, all 12 checks (`tools/split-baseline/result-E.txt`); side-by-side PNGs in `tools/split-baseline/side-by-side-E/`.
 - CP F 2026-11-02: docs split, details in `docs/core/WORK-LOG.md`. This file and the plan now live in `archive/`. Light set per the user, plus the data probes and one Night capture.
+- After CP F, 2026-11-02 (user): Q9 above no longer holds for Night. Its Production branch is `night-release`, a copy of the old `main`; `main` updates only Full. Current text: `CLAUDE.md`, Build and deploy.
 
 ## How to resume
 - Baselines are on this disk, git-ignored: `tools/split-baseline/` (base-full.json, base-night.json, prints.sha256.json), `tools/.ui-snap/split-base-*`. Never re-record them after CP A: they are the proof.

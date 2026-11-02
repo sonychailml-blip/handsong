@@ -1801,6 +1801,7 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 105. GPU sharing — Forest vs Dark (review R2; desktop Intel HD 4000 / GT 635M, then the Poco M5): Calm (`?calm`) → «🎛 Sound» → Diagnostics →
 
 ### SPLIT-2 CP F (2026-11-02), old lines verbatim
+- ⛳ **Build and deploy** (SPLIT-2): `HANDSONG_APP=full|night node tools/build.mjs` writes one app into `dist/` (no other app, no tools). Previews (`VERCEL_ENV=preview` or `--probes`) keep `?probe`; production has no probes. `HANDSONG_EDITION=release` hides the development items. `vercel.json` is shared by two Vercel projects (`HANDSONG_APP=full`, `=night`); production from `main`, previews from `dev`. Whenever a page, path or build changes: `node tools/smoke-paths.mjs` (`--build`: also the built trees).
 - ⛳ **Console guard** (AUTO-PROBE): `window.P` = `scaleprobe.api()` — every probe function behind one lock; while any probe runs
 **Handsong** (repo folder `air-synth-3`; old name only in doc titles): a gesture-controlled synthesizer and interactive
 scales/tunings tutorial, entirely in the browser. Webcam + MediaPipe hand tracking; pinches play notes/chords/bass/drums/effects;

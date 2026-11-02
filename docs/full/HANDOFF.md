@@ -2,6 +2,9 @@
 
 Index: `/HANDOFF.md`. Rules: `CLAUDE.md`. Open items: `docs/full/BACKLOG.md`. Screens: `docs/full/UI-MAP.md`, `docs/full/UX-INVENTORY.md`. The old handoff, word for word: `archive/HANDOFF-history.md`, «Moved from HANDOFF.md at SPLIT-2». Most of Full's code is still in `core/` and `core/legacy-ui/` (`core/DEBT.md`).
 
+## Deploy (user, 2026-11-02)
+Full's production is handsong.vercel.app, built from `main`. Merging `dev` into `main` updates it and nothing else: `handsong-night` builds its own branch. ⛔ **Not yet:** `main` stays the old public version until the new Full is ready. `dev` pushes give previews, which keep `?probe`.
+
 ## Current state (✅ done · "unverified" = not yet checked by the user in a browser)
 - ✅ Base instrument (tunings, palettes, rectangles, split, hand functions, expression, 3 synthesis paths, FDN reverb, backing, lessons, i18n, PWA) · Recorder S1–S3.5e · Piano roll S4.0–S5.6, E0–E2 · Chord as notes U1–U6 · Solo/chord editing S0–S7 (S4–S6 unverified) · Effect ownership O-0…O-4 · Freeze F0–F5 · One role/timbre per track T0–T5 · Voice modes P1, P2, V1–V5 · Frozen sound = live · Smooth automation + fine recording · Brightness on every role · "Tuned from" P0–P4 (P5 postponed) · Universal tuning model T0–T6, T4a–T4c (note stores `a.ti`) · T5 dimmed rows · T7/T7b chord modes (T7 unverified) · U5 insert · Tunings as files F0–F8 (106 data files) · Demo piece `P.song('triphop')`.
 - ✅ AF1 freeze queue (verified on desktop) · LR1 live reverb (accepted by ear) · AF2 swap and AF6b 16-bit (runner; ear steps 64, 65) · AUTO-PROBE runner and fixes (ear step 66) · Volume VOL-0…VOL-6 (closed by the user's test 2026-10-14; VOL-7 after stage 5).

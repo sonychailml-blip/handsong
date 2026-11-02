@@ -14,3 +14,8 @@ Tree hashes after: core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/n
 - «OLD NAME gone» now scans `docs/`, `CLAUDE.md`, `HANDOFF.md`, `THIRD-PARTY-LICENSES.md`; it caught one word in a handoff written during this checkpoint. New controls for the note line. Old names added to `docs/core/STALE-NAMES.md`.
 - New: `tools/tree-hash.mjs` (report only). Kept: `tools/split-*` and baselines (CORE backlog item to remove them).
 - Light set per the user. Not rerun at F: the browser probe suites, the 12-check split suite. Reason they are enough: no code line changed at F outside comments and tools; the smoke test on the repo and built trees, and one full Night capture, ran on the final tree.
+
+# After SPLIT-2 (2026-11-02): deploy fact, docs only
+Tree hashes unchanged from checkpoint F: core a129b2831f2bae63 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
+- Recorded: `handsong-night` builds `night-release`, `main` updates only Full, neither new app public yet, Night's home undecided. In `CLAUDE.md` Build and deploy, root `HANDOFF.md`, the Full and Night handoffs. The old `CLAUDE.md` line is in «Superseded at DOC1».
+- CORE backlog: slim `CLAUDE.md` under ~60 KB.
