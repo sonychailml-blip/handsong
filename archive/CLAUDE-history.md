@@ -235,6 +235,8 @@ each section lives verbatim in `archive/CLAUDE-full.md` (same section titles —
   back from the back/forward cache reopens it; the start is `initDetector` (once) + `startCamera`; counters `camStats()`, probe-only
   `camOpenDbg({gum, timeoutMs, playFail, noSerial, noRelease, noRetry, reset})`, `camStatsDbg()`; `camInfo` also gives `caps` (getCapabilities),
   `settings`, `label`. `VISION_DEF` = `{hands:'2s', delegate:'GPU', camFps:null, path:'main', low:'off'}`.
+- `core/pure/handcal.js` (CORE-1, pure) — tunables `CAL`, the laws (`calDepth`, `calFarRatio`, `calFilter`, `calHold`, `calBand`, `calEndPull`, `calFx`), the record (`calParse`, `calText`, `calLoad`, `calSave`, `calWipe`, kind `handcal` in `format.js`), `createCalRun` the routine with explicit time and refusal codes `REASONS`. No strings; the apps word the codes.
+- `core/handcal.js` (CORE-1) — the live service, inert until `handCalOpen({scope})`: `handCalRead/SetDepthSens/SetSens/SetDir/Reset/Start/Cancel/Accept/State`, `onHandCal`. Doors read by gestures: `calBusy`, `calFrame`, `calOn`, `calDepthN`, `calDepthAt`, `calDepthView`, `calInv`, `calSens`, `calProbeSet`; probes: `calStartProbe`, `calKeep`, `calSig`. Stores numbers, enums and a hash of the camera's label only (rule #33), per device and scope, key `handsong.handCal.<scope>`.
 - `src/handdet.js` (LAT2) — the DETECTOR, worker-safe (no DOM): `createDetector({delegate, blank, step})` downloads the model ONCE
   (`MP_MODEL`, a fetch) and builds two models from it — L2 (numHands 2) and L1 (numHands 1), sequentially (MediaPipe's loader keeps one
   global) — and warms each on a blank frame (the first inference stalls ≈ 1.3–1.6 s; at start two steps with a yield between them — two
@@ -438,6 +440,9 @@ few intent events per note.
   ZONE = instrument (either hand plays the half it pinches in); inside a half by POSITION; hand functions per half by role; each half
   its own register band (`setRectOctReg(S.role,…)`). Rotation to portrait auto-disables split (`softAllOff`), no auto re-enable.
 - Frozen at capture: `S.role`/`S.rx0`/`S.rx1` from the half `px` lands in (a margin pinch clamps to the nearest edge).
+
+### Hand calibration and sensitivity (CORE-1)
+Full design: `docs/core/CORE-1-DESIGN.md`. The playing hand's depth, on a camera with a record: `r = hs/near`, `d = clamp01((r0−r)/(r0−rFar(s)))`, `rFar(s) = 1/(1+(1/0.42−1)/s)`, `s` the «Hand travel» value in 0.7–2; same palm measure as today, a time-based filter (tau 0.205 s), no restart on pinch, a hold band of 3σ per camera (floor 0.009, cap 0.02). The effects hand: today's zero, `calSens` on its travel, 0.5–2, with or without a record; `fx:z` keeps today's filter. `play:x` is untouched in both apps. While the routine runs `processHands` hands the frame to `calFrame`, so the gesture machine sees no hands and nothing sounds or records. Generated hands carry `lm.synthetic` (`pose()`) and the routine refuses them. Rows: «CAL0 hand measuring (tool)» and «CAL1-3 hand calibration (core)» (data), «CAL4/CAL6 calibration service», «CAL4 depth print» (prints `tools/prints/hand-depth.<app>.print.json`, new at CP4, made before the mapping), «CAL5/CAL7/CAL8 calibrated hand». Development panel: `tools/probes/core/calpanel.js`, `<page>?probe&calpanel`, scope `dev-<app>`, never on production (smoke test, both ways).
 
 ### Gesture model
 - Pinch = thumb (4) near a fingertip (8/12/16/20), normalised by hand size; the pinched finger (`S.oct`) picks the register I…IV
@@ -1429,6 +1434,7 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
   or disappears changes every lit shader's program — the hand lights stay in the scene at intensity 0 (at high the shadow map renders even
   without a hand). (4) The 2D canvas sits above the room: thin 3D things (the star) are measured at full resolution (`sceneSnapDbg(alt, true)`)
   — a 64 × 36 downscale misses them. (5) Probes that move the room's clock back must not grow time-based effects (the RUN 7 rings exploded).
+- CORE-1 (hand calibration, on the calibrated path only): (1) Wrist and palm turns move the depth with the hand still, because depth is still the raw palm size and x and y scale differently. Accepted by the user: estimated at most 0.45 of the range at 1× and 0.64 at 2×, measured 0.27 at 2× on one desktop sweep; a palm pitched 30° about 0.24 at 1×. (2) The hold band costs a dead zone on reversing direction, at the worst noise about 10% of the range at 2× and 7% at 1×. (3) A still hand isn't guaranteed silent: in the worst corner (7 fps, 2×) it writes one small automation point in about 3.5% of minutes. (4) The record is per device, app and camera, not per person: another player recalibrates or resets. (5) Thresholds come from one person on two devices; they are tunables in `CAL`. (6) The depth slider and any override read at least 0.7 on depth, and it acts only with a record: without a near point there is nothing to measure a ratio from.
 ## How to verify a change (full steps, moved at DOC1)
 1. Play → camera; app starts single-role solo; the bar hides after ~3.5 s, reveals on tap; not with a panel open. Learn opens the lesson list.
 2. Roles play; ● records a take, again stops; a second take = a new row; ⤺ removes the last take; arrangement from beat 0; three panels in
@@ -1779,6 +1785,15 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     Choosing Forest takes 1–3 s to open (the shaders compile; the picture holds still meanwhile). With the latency meter (`?calm&probe`, ⓘ
     dev «Measure this device»): Dark vs Forest medium vs high with both hands up; tell us the numbers (desktop and the Poco M5). A device
     that chose «high» before keeps it (stored on the device) — pick medium once to compare.
+125. Hand calibration (CORE-1). Neither app opens it yet, so this runs on the development panel: `<page>?probe&calpanel` on the repo or a preview (not on
+    production), press ▶ Play, then the green button at the bottom left. Press Calibrate and hold the hand as close as you want to play, whole hand in the
+    frame, still for about 2 s: moving restarts the hold, a fingertip out of the frame asks you to move back, a hand too far away asks you to come closer.
+    Listen, then Save or Cancel (Cancel restores the previous mapping exactly). Night: if the hint ghost is showing, raise your own hand first, or it
+    refuses with `synthetic`; depth drives the forest on every frame. Full: the default depth control is chord brightness, heard under a pinch in chords.
+    Move near to far: the effect follows; each depth stop feels right and 0.7× is within arm's reach. Reverse direction: the small wait isn't annoying. A
+    pinch makes no step (on the Poco a pinch shifts depth about 3%, by design). Effects stops: more or less finger travel, same zero. Wrist test (6 s),
+    hand in place, turning the wrist: the range is the accepted limit. Copy the numbers and send them. Phone: portrait and landscape.
+    Done: Full on the desktop, 2026-11-02 (near 0.339, depth 2×, wrist 0.27, 3σ hold band kept). Open: Night on the desktop, both apps on the Poco.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:

@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-1 — checkpoint 5 (2026-11-02): close
+Tree hashes before and after (docs only): core 7ef60d72285fb980 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
+- User's step 125, Full on the desktop: calibration saved (near 0.339, depth 2×), nothing felt wrong, so the 3σ band stays. Wrist sweep 0.27 at 2× against the estimated 0.64, accepted as the limit. Night on the desktop and both apps on the Poco stay open, in the Night and Full backlogs.
+- User's UI decision for the app runs, in `docs/core/CORE-1-DESIGN.md` §6 and both backlogs: the one-step calibration on first launch and two sliders, «Hand travel» and «Effects sensitivity»; no numbers; no direction in Night; direction only as an advanced option in Full's effect editor; the panel stays development-only.
+- `CLAUDE.md`: map lines and step index, new lines only. `archive/CLAUDE-history.md`: module detail, architecture section, Known limits, step 125.
+- Found while closing: with that UI decision no screen calls the per-control sensitivity override. Left in the engine, CORE backlog item.
+- Final set: static, data, smoke, licences PASS; `P.all` PASS; `P.quick` failed once on `LAT3 low light`, then PASS on rerun. **Night NOT A PASS in three sessions: `NIGHT stress`** (singing bowl 7, 5, 44 dropouts; handpan 16 in the last; reference 0). The same core passed at CP4. Cause not settled; stopped per the probe budget, no tolerance changed, `--stress-not-judged` not used. Evidence in the CORE backlog.
+
 # CORE-1 — checkpoint 4 (2026-11-02): the mapping, a depth print for each app, the development panel
 Tree hashes before: core 490c9a017b28e7a5 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. Apps unchanged.
 - User: give Night a real «nothing changes» check first. `tools/prints/hand-depth.night.print.json` and `.full.print.json` were made before any mapping door, on core 490c… plus one listing line in `surface.js` (core 4a66fa0e83ca6f20). New files, no print renewed. They reproduce in fresh sessions; the control (a palm 1% larger) is caught. HAND1 keeps the size constant, so it could not see depth even on Full.
@@ -11,6 +19,7 @@ Tree hashes before: core 490c9a017b28e7a5 · apps/full d6b90cf2cb4be6da · apps/
 - CAL7 found a real problem: a still hand wrote automation at 7 fps. One pole at that rate passes far more noise. The band is now per camera, 3× the measured noise (floor 0.009, cap 0.02), the end pull past it. Zero points isn't reachable at a usable width: 3.5% of minutes in the worst corner, with a 10% dead zone on reversing at 2×. The test measures a rate over 400 seeds, not one lottery seed (design §2.3). For the user's ear.
 - CAL8: renders repeat to 7.5e-9 with calibration closed, so exact equality was the wrong measure; the limit is 1e-7, with a control.
 - `tools/probes/core/calpanel.js`: the panel, `?probe&calpanel`; the smoke test covers repo, previews and production's absence, with a control.
+- Tree hashes after: core 7ef60d72285fb980 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4.
 
 # CORE-1 — checkpoint 3 (2026-11-02): the live service, withholding hands, the synthetic mark
 Tree hashes before: core 5009e88be68abdea · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: see the report; apps unchanged.

@@ -453,6 +453,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
   `core/handdet.js` — the detector (two models, worker-safe). `core/hand-worker.js` — classic worker.
 - `core/gestures.js` — FACADE over `core/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
   `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`, `pose.js` the pose generator: HAND1 and the ghost).
+- `core/handcal.js` (CORE-1) — hand calibration and sensitivity, the live service, inert until an app calls `handCalOpen({scope})`; `core/pure/handcal.js` the laws, record and routine. Design: `docs/core/CORE-1-DESIGN.md`. Test panel (dev only): `<page>?probe&calpanel`, `tools/probes/core/calpanel.js`. Prints: `tools/prints/hand-depth.<app>.print.json`.
 - `core/clip.js` — clip/audio recorder. `core/render.js` — offline render, freeze, `renderQueued`, console `R.*`.
 - `tools/probes/` — `full.js`, `night.js` the page facades (`install()`); rows `core/` (register themselves: `core/rows.js` `row()`/`family()`; `probedata.js` + `tools/probe-data.mjs` the node part), `full/`, `night/`. `tools/prints/` — `scales.before.json`, `song.print.json`, `gold.print.json`,
   `gesture.print.json`, `census.print.json`, `night.print.json`, `timbres.before.json`.
@@ -465,6 +466,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
 - «Module map (full, moved at DOC1)» — every module's detailed paragraph (AUD1a … IDS1, SONG1, AUTOSAVE1, PACK1 …).
 - «Architecture» — one section per title:
   - Hand detection (LAT2) — each frame once, a cheaper search, main thread or worker
+  - Hand calibration and sensitivity (CORE-1)
   - Screen model — one layout, optional split
   - Gesture model
   - Camera frame margin — cover fit; RAW vs REMAPPED coordinates
@@ -537,6 +539,7 @@ THERE in full and here as one index entry):
   113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Night levels + the ghost · 116 Depth halo + «Лес» bar
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
+  125 Hand calibration (CORE-1; on the panel `?probe&calpanel`)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

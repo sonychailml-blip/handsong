@@ -13,7 +13,8 @@ _Paths in older text: `src/core/` → `core/pure/`; `src/ui.js`, `draw.js`, `lat
 - ⬜ **Background music themes** (ex-RUN 10).
 - ⬜ **Port the forest demo with CC0 textures** (ex-RUN 11). Every texture goes in the licence register first (rule #32).
 - ⬜ **Rooms as modules:** room contract, catalogue, loader.
-- ⬜ **Calibration and sensitivity screen,** on top of CORE-1 (`docs/core/BACKLOG.md`, `docs/core/CORE-1-DESIGN.md`). User's decisions, 2026-11-02: calibration is offered once on first launch (skippable; stop the ghost first) and afterwards lives in the settings menu next to the sensitivity sliders; no calibration icon on the main screen.
+- ⬜ **Calibration and sensitivity screen,** on top of CORE-1 (`docs/core/BACKLOG.md`, `docs/core/CORE-1-DESIGN.md` §6). User's decisions, 2026-11-02: the person sees only the one-step near calibration, offered once on first launch (skippable; stop the ghost first) and afterwards in the settings menu, next to two sliders, «Hand travel» (playing-hand depth; more travel = a lower value, so the long end is 0.7×) and «Effects sensitivity». No numbers, no direction choice, no calibration icon on the main screen. The test panel stays development-only.
+- ⬜ **Step 125 for Night** (`archive/CLAUDE-history.md`; the panel `?probe&calpanel`): Night on the desktop and on the Poco. Done so far: Full on the desktop.
 - ⬜ **Main screen: at most 6 icons** (user, 2026-11-02). The view switch (forest / dark / camera) moves into the settings menu.
 - 💡 **Idea (user, 2026-11-02):** when no hand is found for a while, show a small camera thumbnail in a corner.
 - ⬜ **A scales library with key choice.**

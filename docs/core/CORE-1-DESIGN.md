@@ -1,6 +1,6 @@
 # CORE-1 design: playing-hand depth calibration and effects-hand sensitivity
 
-Track CORE, run CORE-1. Stage 1 written 2026-11-02 from the code at tree hashes `core a129b2831f2bae63`, `apps/full d6b90cf2cb4be6da`, `apps/night b8b85189cac1a5b4`. **Approved by the user the same day with nine changes; after checkpoint 1 the user replaced the two-point calibration with one step, using the measured numbers in §9. All included below.** Stage 2 runs in the checkpoints of §8.3.
+Track CORE, run CORE-1. Stage 1 written 2026-11-02 from the code at tree hashes `core a129b2831f2bae63`, `apps/full d6b90cf2cb4be6da`, `apps/night b8b85189cac1a5b4`. **Approved by the user the same day with nine changes; after checkpoint 1 the user replaced the two-point calibration with one step, using the measured numbers in §9. All included below.** Stage 2 ran in the checkpoints of §8.3 and closed the same day. Step 125 is done for Full on the desktop and still open for Night on the desktop and both apps on the Poco (§9.3).
 
 ## 0. The design in brief
 
@@ -71,7 +71,7 @@ Distances here are **estimates from geometry**, assuming a 9.5 cm wrist-to-knuck
 | Pinch restarting the filter | `S.sm={}` on every pinch (`hands.js:163`) restarts it from one raw sample | fixed on the calibrated path |
 | Pinch changing the size | measured: +0.006 desktop, −0.034 phone of the size; on the phone about 3% of the range at 1× | no special handling (user) |
 | Tracking noise | measured, after the time filter, as a share of the near size: at most 0.0045 | hold band (§2.3) |
-| **Wrist roll, no movement** | x and y are scaled differently, so a sideways palm reads 25% smaller on a 4:3 frame: 0.45 of the range at 1×, 0.64 at 2× | **accepted limit** (user, change 1) |
+| **Wrist roll, no movement** | x and y are scaled differently, so a sideways palm reads 25% smaller on a 4:3 frame: estimated at most 0.45 of the range at 1×, 0.64 at 2×; **measured 0.27 at 2×** (one sweep, Full, desktop, §9.3) | **accepted limit** (user, change 1 and step 125) |
 | Palm pitch 30°, no movement | the size falls 13%: 0.24 of the range at 1× | **accepted limit** |
 
 Accepted limits, stated plainly: a person hears this as the effect following the wrist. It's somewhat larger than today near the near end: today's law moves by 0.26–0.36 for the same roll inside its range (sizes 0.2–0.27). It falls with distance, to about 0.27 of the range at `r=0.6`. It goes in «Known limits» in `archive/CLAUDE-history.md`, and step 125 has the user check it by hand.
@@ -192,7 +192,7 @@ handCalState()                            // the current phase + live values
 onHandCal(fn)                             // every phase change and progress step
 ```
 
-Internal doors, read by gestures only: `calBusy`, `calFrame`, `calProbeSet` (CP3); `calDepthN`, `calDepthView`, `calDir`, `calSens` (CP4). Probes only: `calStartProbe`, `calKeep`, `calSig`.
+Internal doors, read by gestures only: `calBusy`, `calFrame`, `calProbeSet` (CP3); `calOn`, `calDepthN`, `calDepthAt`, `calDepthView`, `calInv`, `calSens` (CP4). Probes only: `calStartProbe`, `calKeep`, `calSig`.
 
 ### 3.5 What recordings see
 
@@ -265,11 +265,15 @@ This doesn't change `frameFilter` or any Night file. Night's first-run flow shou
 | Turn it on | `handCalOpen({ scope })` | at start | at start |
 | Run the routine | `handCalStart`, `onHandCal`, `handCalAccept`, `handCalCancel` | not during a lesson | stop the ghost first |
 | Word the failures | reason codes → the app's own strings | both languages | both languages |
-| Sensitivity sliders | `handCalSetDepthSens(v)`, `handCalSetSens(v)`, `handCalSetSens(v, id)` | depth, effects + per parameter | depth, effects, optionally echo, tone, wave |
-| Direction | `handCalSetDir(id, …)` | per depth parameter, replacing the invert checkbox for them | the forest, if offered |
+| Two sliders | `handCalSetDepthSens(v)` «Hand travel», `handCalSetSens(v)` «Effects sensitivity» | in settings, no numbers | in settings, no numbers |
+| Direction | `handCalSetDir(id, …)` | only as an advanced option in the effect editor, replacing the invert checkbox for depth parameters | none |
 | Show the state, reset | `handCalRead`, `handCalReset` | yes | yes |
 
-The profile record gets no new field. Where it all appears is recorded in the two backlogs: offered once on first launch (skippable), then in the settings menu next to the sensitivity sliders, with no calibration icon on the main screen.
+**What the person sees (user, 2026-11-02, after step 125):** the one-step near calibration on first launch (skippable) and two sliders in settings, with no numbers and no calibration icon on the main screen. Night has no direction choice. The development panel (§9.2) stays development-only.
+
+**«Hand travel» runs the opposite way to `s`:** more travel is a smaller `s`, so the slider's long end is 0.7× and its short end 2×. «Effects sensitivity» runs with its value.
+
+The profile record gets no new field. No screen calls `handCalSetSens(v, id)`; it stays in the engine for now (CORE backlog).
 
 ## 7. Test plan
 
@@ -304,7 +308,7 @@ Every checkpoint: static, `probe-data`, `probe-browser --quick`, `--app night`, 
 
 ### 7.4 What only the user can check
 
-Added as step 125: calibrate through the console (`P`, until an app screen exists) and feel the forest or brightness follow; a pinch makes no step; fail each way that's reachable; turn the wrist with the hand still (the accepted limit); phone portrait and landscape.
+Step 125, on the development panel (§9.2): calibrate and feel the forest or brightness follow; a pinch makes no step; fail each way that's reachable; turn the wrist with the hand still (the accepted limit); phone portrait and landscape.
 
 ## 8. Risks, size, plan
 
@@ -312,7 +316,7 @@ Added as step 125: calibrate through the console (`P`, until an app screen exist
 
 | Risk | Handling |
 |---|---|
-| Wrist roll sweeps the mapping | accepted by the user; named in Known limits and step 125. Up to 0.45 of the range at 1×, somewhat more than today |
+| Wrist roll sweeps the mapping | accepted by the user; named in Known limits and step 125. Estimated up to 0.45 of the range at 1×, somewhat more than today; measured 0.27 at 2× on one desktop sweep |
 | A high slider or small near size makes the effect twitchy | the minimum near size, the hold band, CAL7 at the worst case |
 | Thresholds wrong for other people, so the routine refuses them | two measured runs by one person; tunables in `CAL`, checked again at step 125 |
 | **The whole-hand check refuses a near point the player wanted** | not measured: the page's `out` read only the palm. A whole hand is about 1.95× the palm, an estimate, so the desktop's measured near size 0.441 gives about 0.86 of the frame's height: tight. The player moves back; the routine asks. Step 125 checks it |
@@ -351,6 +355,10 @@ Why real-hand numbers are still needed with today's measure kept: stillness, min
 ### 9.2 The development panel (CP4)
 
 `<page>?probe&calpanel` on both apps, local and preview only: it lives in `tools/probes/core/calpanel.js`, and production has neither the file nor the probes tag (smoke test, both ways). Big buttons, Russian and English: run the routine, save or cancel, both sliders, direction per depth control, reset, a 6 s wrist test that shows the range of `d`, copy the numbers. Scope `dev-full` / `dev-night`, so it never shares a record with an app's later screen.
+
+### 9.3 Step 125 so far (user, 2026-11-02)
+
+Full on the desktop, Chrome 156: calibration finished and saved at near 0.339, global depth 2×, effects 1×. The user felt nothing wrong, so **the 3σ hold band stays**. The wrist test read 0.00–0.27, a sweep of 0.27 at 2×, against the estimate of at most 0.64, and the user accepted it as the limit. It's one sweep, and the panel doesn't record how far the hand turned, so the estimate stays as the upper bound. Open: Night on the desktop, both apps on the Poco.
 
 ### 9.1 What was measured (user, 2026-11-02)
 
