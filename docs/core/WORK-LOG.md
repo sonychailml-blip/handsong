@@ -11,6 +11,7 @@ Tree hashes before and after (docs only): core 7ef60d72285fb980 · apps/full d6b
 - `CLAUDE.md`: map lines and step index, new lines only. `archive/CLAUDE-history.md`: module detail, architecture section, Known limits, step 125.
 - Found while closing: with that UI decision no screen calls the per-control sensitivity override. Left in the engine, CORE backlog item.
 - Final set: static, data, smoke, licences PASS; `P.all` PASS; `P.quick` failed once on `LAT3 low light`, then PASS on rerun. **Night NOT A PASS in three sessions: `NIGHT stress`** (singing bowl 7, 5, 44 dropouts; handpan 16 in the last; reference 0). The same core passed at CP4. Cause not settled; stopped per the probe budget, no tolerance changed, `--stress-not-judged` not used. Evidence in the CORE backlog.
+- Rerun, laptop cooled and on power, same core: `P.night: PASS — 34 checks, 0 differences` twice, `NIGHT stress` 0 differences both times. CORE-1 closed. The row stays on watch: which factor mattered wasn't separated, since Chrome was still running (idle) and Telegram was running at the start of the first run. The Full and Night screens and the rest of step 125 are app work.
 
 # CORE-1 — checkpoint 4 (2026-11-02): the mapping, a depth print for each app, the development panel
 Tree hashes before: core 490c9a017b28e7a5 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. Apps unchanged.

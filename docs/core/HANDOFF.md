@@ -35,6 +35,7 @@ Don't narrow musical possibilities (T7b: a theory restriction is a mode) · chor
 - The app does not work offline (SW caches nothing; MediaPipe from a CDN). C9 changes this for Night.
 - Hand tracking on the main thread; hand→sound latency measured by LAT1 (user's desktop 2026-10-15: ≈ 126 ms daylight, ≈ 180 ms evening; detection 54 ms vs a real GPU's 10–20; phone runs pending). Since LAT2 each camera frame is detected once; the worker path is ≈ 2× slower on the user's desktop GPU, so the main thread stays the default. The old browser limiter's 6 ms are gone (SND-F1b). In low light the webcam itself slows (6.3 fps evening vs 14–30 day, LAT3); no web API forces its frame rate, so light on the hands is the remedy.
 - Editor, lanes, history, paste, sections, effect networks, frozen-track and render limits (KS / Glue renders pin ≈ 6 MB, Firefly tails ring out, Night forest CPU): `archive/CLAUDE-history.md`.
+- This 2-core laptop: `NIGHT stress` failed 3 sessions running, then passed twice once the laptop was cooled and on power, same core (CORE-1 CP5; CORE backlog).
 - This 2-core laptop: `NIGHT stress`'s real-time part varies run to run on unchanged code (reported, judged on a cool machine or by ear). Four Night screens are structure-only in compares (`night-ghost`, `night-dark`, `night-forest`, `night-forest-land`). Never run two probe sessions at once here.
 
 ## Key lessons (expanded: `archive/HANDOFF-history.md`, «КЛЮЧЕВЫЕ УРОКИ»)
