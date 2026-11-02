@@ -1,4 +1,4 @@
-/* SND-F1: probes of the Calm prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
+/* SND-F1: probes of the Night prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
    Rows register themselves (probes/rows.js). Deterministic offline renders except the two rows flagged realtime (live = offline needs a
    live capture; frozen = live needs R.live). Every row carries a CONTROL that must fail. */
 import { row } from './rows.js';
@@ -279,7 +279,7 @@ export async function checkFreezeParity(o={}){   // o.room: a Night forest room 
    ways; a hidden timbre leaves the picker but stays readable (songs still play), show brings it back. CONTROL: a renamed id is caught. */
 const TIMBRE_IDS_PINNED={
   ld:['solo.supersaw','solo.organ','solo.pad','solo.bell','solo.flute','solo.8-bit','solo.bell-deep','solo.metallophone','solo.warm-pad','solo.glass-pad','solo.oud','solo.plucked-string','solo.airy-flute','solo.reed','solo.organ-full','solo.organ-soft','solo.string','solo.sitar','solo.oud-string','solo.koto','solo.santur','solo.guitar','solo.pizzicato','solo.firefly',
-      'solo.firefly-rich','solo.handpan','solo.singing-bowl','solo.kalimba','solo.breath-flute','solo.breath-pad'],   // RUN 7: the Calm sound pass
+      'solo.firefly-rich','solo.handpan','solo.singing-bowl','solo.kalimba','solo.breath-flute','solo.breath-pad'],   // RUN 7: the Night sound pass
   ch:['chord.warm-pad','chord.glass-pad','chord.organ','chord.e-piano','chord.warm-pad-long','chord.glass-pad-long','chord.oud','chord.plucked-string','chord.flute','chord.reed','chord.organ-full','chord.organ-soft','chord.warm-pad-clean','chord.glass-pad-clean','chord.strings','chord.plucked','chord.firefly'],
   bs:['bass.sub-sine','bass.saw','bass.acid','bass.synth','bass.upright','bass.synth-soft','bass.organ'],
   dr:['kit.standard','kit.darbuka','kit.tabla','kit.gamelan','kit.taiko'] };

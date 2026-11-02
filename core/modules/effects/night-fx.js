@@ -1,19 +1,19 @@
-/* RUN 7 (C5, Calm plan §4.3; docs/CALM-QUALITY.md points 1, 4, 8) — THE CALM EFFECTS HAND: three effects, ONE amount each (a vertical drag
+/* RUN 7 (C5, Night plan §4.3; docs/night/QUALITY.md points 1, 4, 8) — THE NIGHT EFFECTS HAND: three effects, ONE amount each (a vertical drag
    of its finger; it stays where it is left). ENGINE SUBMODULES (hard rule #38): stateless — every engine value comes from E (first argument);
-   each instance keeps its own values in its closure (the instance lives in E's effect tables). Calm-only (calm:true — not offered in Full's
+   each instance keeps its own values in its closure (the instance lives in E's effect tables). Night-only (night:true — not offered in Full's
    «+ Add»; Full's delay, brightness, vibrato and tremolo are untouched): the plan's one-amount curves need ranges the shared effects do not
    have. The forest shows each (views/scene/forest.js, through the bus): Echo — rings of light leaving the firefly on each echo; Warmth ↔
    Brightness — the light's colour (amber ↔ cold green-white); Wave — the light trembles at the same rate.
    - «Echo» (bus): one amount a → mix 0.45·a and feedback 0.55·a together; the repeats darken (a lowpass in the loop, Butterworth Q: the loop
-     gain fb·|LP| < 1); time 0.625 s by default (a dotted eighth at Calm's 72 bpm). Amount 0 = exact identity (no send).
+     gain fb·|LP| < 1); time 0.625 s by default (a dotted eighth at Night's 72 bpm). Amount 0 = exact identity (no send).
    - «Warmth ↔ Brightness» (insert): tilt 0…1, ½ = flat; below — warmer (low shelf up to +3 dB, highs down to −9 dB), above — brighter (highs
-     up to +4 dB only: soft highs for long headphone sessions, low shelf −2 dB). `mix` 0 = exact identity; Calm fixes it at 1.
+     up to +4 dB only: soft highs for long headphone sessions, low shelf −2 dB). `mix` 0 = exact identity; Night fixes it at 1.
    - «Wave» (insert): one amount → a gentle vibrato (to ±14 cents, by a 2-ms delay line swung at 4.5 Hz — the same on every timbre) and a little
-     tremolo (to 18 %), the same rate. `mix` 0 = exact identity; Calm fixes it at 1. */
+     tremolo (to 18 %), the same rate. `mix` 0 = exact identity; Night fixes it at 1. */
 import { freezeDeep } from '../timbres/stages.js';
 import { fxWrapParam } from './param.js';
 
-export const CALM_FX=freezeDeep({
+export const NIGHT_FX=freezeDeep({
   echo:{ mixK:0.45, fbK:0.55, time:0.625, lp:2600, send:0.9, maxTime:1.0 },
   tone:{ low:300, high:2600, warmLow:3, warmHigh:-9, brightHigh:4, brightLow:-2 },
   wave:{ rate:4.5, cents:14, trem:0.18, base:0.002 },
@@ -21,9 +21,9 @@ export const CALM_FX=freezeDeep({
 const BQ=-3.0103;   // Butterworth Q (Web Audio's lowpass Q is in dB) — no peak in the echo loop
 
 const CECHO_PARAMS=freezeDeep([ {key:'amount', labelKey:'fx.cecho.amount', short:'ECHO', unit:'', def:0, min:0, max:1, curve:'lin'},
-  {key:'time', labelKey:'fx.dly.time', short:'TIME', unit:'s', def:CALM_FX.echo.time, min:0.05, max:CALM_FX.echo.maxTime, curve:'log'} ]);
-function makeCalmEchoFx(E){
-  const ac=E.ac, X=CALM_FX.echo, fxIn=ac.createGain(), fxOut=ac.createGain(), dry=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1; dry.gain.value=1;
+  {key:'time', labelKey:'fx.dly.time', short:'TIME', unit:'s', def:NIGHT_FX.echo.time, min:0.05, max:NIGHT_FX.echo.maxTime, curve:'log'} ]);
+function makeNightEchoFx(E){
+  const ac=E.ac, X=NIGHT_FX.echo, fxIn=ac.createGain(), fxOut=ac.createGain(), dry=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1; dry.gain.value=1;
   fxIn.connect(dry); dry.connect(fxOut);
   const send=ac.createGain(), gate=ac.createGain(), line=ac.createDelay(X.maxTime), lp=ac.createBiquadFilter(), fb=ac.createGain(), out=ac.createGain();
   send.gain.value=0; gate.gain.value=1; line.delayTime.value=X.time; lp.type='lowpass'; lp.frequency.value=X.lp; lp.Q.value=BQ; fb.gain.value=0; out.gain.value=1;
@@ -38,8 +38,8 @@ function makeCalmEchoFx(E){
 
 const CTONE_PARAMS=freezeDeep([ {key:'mix', labelKey:'fx.fdepth.mix', short:'MIX', unit:'', def:1, min:0, max:1, curve:'lin'},
   {key:'tilt', labelKey:'fx.ctone.tilt', short:'TONE', unit:'', def:0.5, min:0, max:1, curve:'lin'} ]);
-function makeCalmToneFx(E){
-  const ac=E.ac, X=CALM_FX.tone, fxIn=ac.createGain(), fxOut=ac.createGain(), dry=ac.createGain(), wet=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1;
+function makeNightToneFx(E){
+  const ac=E.ac, X=NIGHT_FX.tone, fxIn=ac.createGain(), fxOut=ac.createGain(), dry=ac.createGain(), wet=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1;
   const lo=ac.createBiquadFilter(), hi=ac.createBiquadFilter(); lo.type='lowshelf'; lo.frequency.value=X.low; hi.type='highshelf'; hi.frequency.value=X.high;
   lo.gain.value=0; hi.gain.value=0; dry.gain.value=0; wet.gain.value=1;
   fxIn.connect(dry); dry.connect(fxOut); fxIn.connect(lo); lo.connect(hi); hi.connect(wet); wet.connect(fxOut);
@@ -56,8 +56,8 @@ function makeCalmToneFx(E){
 
 const CWAVE_PARAMS=freezeDeep([ {key:'mix', labelKey:'fx.fdepth.mix', short:'MIX', unit:'', def:1, min:0, max:1, curve:'lin'},
   {key:'amount', labelKey:'fx.cwave.amount', short:'WAVE', unit:'', def:0, min:0, max:1, curve:'lin'} ]);
-function makeCalmWaveFx(E){
-  const ac=E.ac, X=CALM_FX.wave, fxIn=ac.createGain(), fxOut=ac.createGain(), dry=ac.createGain(), wet=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1;
+function makeNightWaveFx(E){
+  const ac=E.ac, X=NIGHT_FX.wave, fxIn=ac.createGain(), fxOut=ac.createGain(), dry=ac.createGain(), wet=ac.createGain(); fxIn.gain.value=1; fxOut.gain.value=1;
   const line=ac.createDelay(0.02), swing=ac.createGain(), trem=ac.createGain(), tdep=ac.createGain(), lfo=ac.createOscillator();
   line.delayTime.value=X.base; swing.gain.value=0; trem.gain.value=1; tdep.gain.value=0; dry.gain.value=0; wet.gain.value=1; lfo.frequency.value=X.rate;
   lfo.connect(swing); swing.connect(line.delayTime); lfo.connect(tdep); tdep.connect(trem.gain);
@@ -74,4 +74,4 @@ function makeCalmWaveFx(E){
   params[0].setNorm(params[0].cur);
   return { id:'cwave', labelKey:'fx.cwave', kind:'insert', in:fxIn, out:fxOut, params, setActive:(on,w)=>{ active=!!on; apply(w); } };
 }
-export { CECHO_PARAMS, CTONE_PARAMS, CWAVE_PARAMS, makeCalmEchoFx, makeCalmToneFx, makeCalmWaveFx };
+export { CECHO_PARAMS, CTONE_PARAMS, CWAVE_PARAMS, makeNightEchoFx, makeNightToneFx, makeNightWaveFx };

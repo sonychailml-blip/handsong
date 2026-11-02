@@ -39,9 +39,9 @@ function goldCases(){
   /* SND-F1b: the Medium (1.7 s) and Short (0.85 s) rooms at the prototype's send */
   add('fx forest medium',4.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['forest'], set:{ 'forest:mix':0.8, 'forest:room':0.5 } } });
   add('fx forest short',4.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['forest'], set:{ 'forest:mix':0.8, 'forest:room':0 } } });
-  /* RUN 7 (C4b): Calm's «Forest depth» at near / middle / far (amount full, Medium room) */
+  /* RUN 7 (C4b): Night's «Forest depth» at near / middle / far (amount full, Medium room) */
   [0,0.5,1].forEach(dp=>add(`fx fdepth ${dp}`,4.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['fdepth'], set:{ 'fdepth:mix':1, 'fdepth:depth':dp, 'fdepth:room':0.5 } } }));
-  /* RUN 7 (C5): the Calm effects hand at full (Echo; Warmth and Brightness ends; Wave) */
+  /* RUN 7 (C5): the Night effects hand at full (Echo; Warmth and Brightness ends; Wave) */
   add('fx cecho 1',3.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['cecho'], set:{ 'cecho:amount':1 } } });
   [0,1].forEach(tl=>add(`fx ctone ${tl}`,1.2,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.9); }, { [chK]:{ ids:['ctone'], set:{ 'ctone:mix':1, 'ctone:tilt':tl } } }));
   add('fx cwave 1',1.2,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.9); }, { [chK]:{ ids:['cwave'], set:{ 'cwave:mix':1, 'cwave:amount':1 } } });
@@ -124,4 +124,4 @@ export async function checkGold(){
   return { cases, total:diff.length, differences:diff };
 }
 
-row({ calm:true, at:405, name:'GOLD timbres and effects', run:()=>checkGold(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), slow:true });
+row({ night:true, at:405, name:'GOLD timbres and effects', run:()=>checkGold(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }), slow:true });

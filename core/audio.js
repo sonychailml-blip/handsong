@@ -20,8 +20,8 @@ import { BRIGHT_PARAMS, makeBrightFx } from './modules/effects/bright.js';
 import { GLIDE_PARAMS, makeGlideFx } from './modules/effects/glide.js';
 import { VOL_PARAMS, makeVolFx } from './modules/effects/volume.js';
 import { FOREST_PARAMS, makeForestFx } from './modules/effects/forest.js';
-import { FDEPTH_PARAMS, makeForestDepthFx } from './modules/effects/forestdepth.js';   // RUN 7 (C4b): Calm's «Forest depth»
-import { CECHO_PARAMS, CTONE_PARAMS, CWAVE_PARAMS, makeCalmEchoFx, makeCalmToneFx, makeCalmWaveFx } from './modules/effects/calm.js';   // RUN 7 (C5): the Calm effects hand
+import { FDEPTH_PARAMS, makeForestDepthFx } from './modules/effects/forestdepth.js';   // RUN 7 (C4b): Night's «Forest depth»
+import { CECHO_PARAMS, CTONE_PARAMS, CWAVE_PARAMS, makeNightEchoFx, makeNightToneFx, makeNightWaveFx } from './modules/effects/night-fx.js';   // RUN 7 (C5): the Night effects hand
 import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet } from './modules/ambience/forest.js';   // RUN 7 (C4c): the forest's ambience
 import { AMB } from './pure/ambience.js';
 import { GLUE_PARAMS, dynNode, makeGlueFx } from './modules/effects/glue.js';
@@ -219,7 +219,7 @@ function offlineMasterDyn(mode,set,gain){
 }
 function setMasterLevel(v){ masterLvl=Math.max(0,Math.min(1,+v||0)); if(AC&&master) master.gain.setTargetAtTime(MASTER_BASE*volAmp(masterLvl), AC.currentTime, 0.03); }
 const masterLevel=()=>masterLvl;
-/* RUN 7 (C6): the Calm sleep timer's OUTPUT FADE (0…1, session only — never stored in a song, so a song saved asleep is not silent). It rides
+/* RUN 7 (C6): the Night sleep timer's OUTPUT FADE (0…1, session only — never stored in a song, so a song saved asleep is not silent). It rides
    on the master's makeup gain mMake (no new node in the master path, rule #4); without the dynamics worklet (the fallback path) on the master
    gain. The level is smoothed (time constant tc) — nothing abrupt. */
 let outFade=1;
@@ -405,7 +405,7 @@ const EXPR_A={
    «разбросанные фазы свежего голоса» (B). Две догадки по чтению кода не подтвердились; ухо с этим инструментом нашло
    обе настоящие причины «фазера» и «подъезда» замороженной дорожки, и A и B стали ПОВЕДЕНИЕМ (см. voiceStart и leadOn/
    bassOn). Инструмент — render.aud / render.live / render.stop (довод и строки консоли — в render.js и CLAUDE.md). */
-const DBG={ noHum:false, noStrikeCap:false, strikeCut:false };   // RUN 8: noStrikeCap / strikeCut — the «CALM stress» row's CONTROLS (the cap off; a capped strike cut without its fade)   // LR1-уборка: fdnLive снят вместе с прежней проводкой петель реверба (одна проводка — с одним входом)
+const DBG={ noHum:false, noStrikeCap:false, strikeCut:false };   // RUN 8: noStrikeCap / strikeCut — the «NIGHT stress» row's CONTROLS (the cap off; a capped strike cut without its fade)   // LR1-уборка: fdnLive снят вместе с прежней проводкой петель реверба (одна проводка — с одним входом)
 function setDbg(o){ DBG.noHum=!!(o&&o.noHum); DBG.noStrikeCap=!!(o&&o.noStrikeCap); DBG.strikeCut=!!(o&&o.strikeCut); }
 /* ═══ ⛳ СБРОС КОПИИ РЕНДЕРА — КАЖДЫЙ РЕНДЕР НАЧИНАЕТСЯ С ЧИСТОЙ КОПИИ (починка после MX2) ═══
    Копия движка ('./audio.js?render') ОДНА на сессию, и всё модульное, что рендер ставит ей, иначе живёт до следующего рендера: функции
@@ -421,7 +421,7 @@ function renderReset(){
   timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
-  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false; strikeCaps.clear(); calmLean=false;
+  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false; strikeCaps.clear(); nightLean=false;
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
 const renderStateOf=()=>({ offline, noHum:DBG.noHum, noStrikeCap:DBG.noStrikeCap, strikeCut:DBG.strikeCut, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
@@ -500,10 +500,10 @@ const FX_FACTORY={
   trmMix:{ id:'trmMix', labelKey:'fx.trmMix', kind:'insert',params:TRMIX_PARAMS,  make:makeTremMixFx },
   forest:{ id:'forest', labelKey:'fx.forest', kind:'bus',   params:FOREST_PARAMS, make:makeForestFx },   // SND-F1: «Night forest» room
   glue:  { id:'glue',   labelKey:'fx.glue',   kind:'insert',params:GLUE_PARAMS,   make:makeGlueFx, cat:'dyn' },
-  fdepth:{ id:'fdepth', labelKey:'fx.fdepth', kind:'bus',   params:FDEPTH_PARAMS, make:makeForestDepthFx, calm:true },
-  cecho: { id:'cecho',  labelKey:'fx.cecho',  kind:'bus',   params:CECHO_PARAMS,  make:makeCalmEchoFx, calm:true },   // RUN 7 (C5): Calm «Echo»
-  ctone: { id:'ctone',  labelKey:'fx.ctone',  kind:'insert',params:CTONE_PARAMS,  make:makeCalmToneFx, calm:true },   // RUN 7 (C5): Calm «Warmth ↔ Brightness»
-  cwave: { id:'cwave',  labelKey:'fx.cwave',  kind:'insert',params:CWAVE_PARAMS,  make:makeCalmWaveFx, calm:true },   // RUN 7 (C5): Calm «Wave»   // RUN 7 (C4b): Calm's room — not offered in Full's «+ Add»   // SND-F1: category «Dynamics»   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
+  fdepth:{ id:'fdepth', labelKey:'fx.fdepth', kind:'bus',   params:FDEPTH_PARAMS, make:makeForestDepthFx, night:true },
+  cecho: { id:'cecho',  labelKey:'fx.cecho',  kind:'bus',   params:CECHO_PARAMS,  make:makeNightEchoFx, night:true },   // RUN 7 (C5): Night «Echo»
+  ctone: { id:'ctone',  labelKey:'fx.ctone',  kind:'insert',params:CTONE_PARAMS,  make:makeNightToneFx, night:true },   // RUN 7 (C5): Night «Warmth ↔ Brightness»
+  cwave: { id:'cwave',  labelKey:'fx.cwave',  kind:'insert',params:CWAVE_PARAMS,  make:makeNightWaveFx, night:true },   // RUN 7 (C5): Night «Wave»   // RUN 7 (C4b): Night's room — not offered in Full's «+ Add»   // SND-F1: category «Dynamics»   // в.2: «Тремоло (микс)». Свой id, а не 'trm': тот занят пер-голосовым «Тремоло (нота)», и оба живут рядом   // в.1: fxId оставлен прежним 'dly' — это СТАБИЛЬНЫЙ идентификатор (цепь, метаданные показа, словарь), переименовывать его ради красоты незачем
 };
 /* ⛳ ПОСТОЯННАЯ ЗАПИСЬ ЦЕПИ (VOL-0) — ОДИН предикат на все места, где запись цепи ПОКАЗЫВАЮТ или ПРЕДЛАГАЮТ: столбики и их
    габарит (draw), панель — строки, подсказка, карта общих адресов, списки «добавить» (ui), голосовой список дорожки
@@ -766,7 +766,7 @@ function fxDefaultsOf(fxId,key){   // key (V4) — владелец цепи: у
    есть те, что реально встанут в путь переигровки. Голосовые (яркость, скольжение) в путь не входят вовсе, как и старые
    скаляры соло — им здесь не место. ⚠️ С V4b их ТОЖЕ можно добавить дорожке, но другим списком — fxVoiceIdsFor ниже:
    их величина живёт в нотах. */
-const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!=='voice' && !FX_FACTORY[id].calm);   // RUN 7: a Calm-only effect is not offered in Full
+const fxAddableIds=()=>Object.keys(FX_FACTORY).filter(id=>FX_FACTORY[id].kind!=='voice' && !FX_FACTORY[id].night);   // RUN 7: a Night-only effect is not offered in Full
 /* ⛳ V4b: ГОЛОСОВЫЕ ЭФФЕКТЫ, КОТОРЫЕ МОЖНО ДОБАВИТЬ ДОРОЖКЕ ЭТОЙ РОЛИ — то, что объявлено для роли (FX_FACTORY[id].roles), и
    старые скаляры у соло (они живут только в соло-голосе). Их величина живёт В НОТАХ (fxIsPerNote), поэтому добавленный в
    редакторе такой эффект не встаёт в путь, а открывает полосу, правка которой переписывает ноты дорожки. */
@@ -1217,21 +1217,21 @@ function chordOn(owner,freqs,vol,insIdx,bri,when){
   cvSpare();
 }
 const ffLive=[];   // strikes not yet over: { owner, g, t, g0, route, cancelled? }
-/* RUN 8: a PROFILE's per-timbre level trim (Calm's data/profiles/calm.json «levels», dB → gain), applied on the solo voice's volume stage
+/* RUN 8: a PROFILE's per-timbre level trim (Night's data/profiles/night.json «levels», dB → gain), applied on the solo voice's volume stage
    with the hand's volume; the strike's velocity (brightness) is not touched. Empty (Full, every render) = × 1 exactly. Live only: the
-   Calm shell sets it with the face (calmshell.js), a render copy sets its own only when asked (the «CALM stress» row). */
+   Night shell sets it with the face (apps/night/shell.js), a render copy sets its own only when asked (the «NIGHT stress» row). */
 const timbreTrim=new Map();
 function setTimbreTrim(levels){ timbreTrim.clear(); for(const [id,db] of Object.entries(levels||{})){ const i=timbreIdx('ld',id); if(i!=null && db) timbreTrim.set(i, Math.pow(10, db/20)); } }
 const trimOf=i=> timbreTrim.size ? (timbreTrim.get(i) ?? 1) : 1;
-/* RUN 8 (C8): LOW POWER — Calm's «Lighter forest» choice (calmshell.js): struck timbres ring at most LOW_CAP × their policies.voices
+/* RUN 8 (C8): LOW POWER — Night's «Lighter forest» choice (apps/night/shell.js): struck timbres ring at most LOW_CAP × their policies.voices
    (modules/timbres/strikes.js reads E.lowPower). Live only; a render copy is always full quality (renderReset). */
 let lowPower=false;
 const setLowPower=v=>{ lowPower=!!v; };
-const strikeLive=[];   // RUN 8: Calm's struck strikes still ringing — the cap's list (modules/timbres/strikes.js)
-/* RUN 8: CALM'S STRIKE CAPS (data/profiles/calm.json «voices»: timbre id → n), set by the Calm face; while set the struck banks take Calm's
-   cheaper strike (E.calmLean). Null in Full and in every render copy (renderReset): the banks then build RUN 7's strike exactly. */
-const strikeCaps=new Map(); let calmLean=false;
-function setCalmStrikes(voices){ strikeCaps.clear(); calmLean=!!voices; for(const [id,n] of Object.entries(voices||{})) strikeCaps.set(id, n); }
+const strikeLive=[];   // RUN 8: Night's struck strikes still ringing — the cap's list (modules/timbres/strikes.js)
+/* RUN 8: NIGHT'S STRIKE CAPS (data/profiles/night.json «voices»: timbre id → n), set by the Night face; while set the struck banks take Night's
+   cheaper strike (E.nightLean). Null in Full and in every render copy (renderReset): the banks then build RUN 7's strike exactly. */
+const strikeCaps=new Map(); let nightLean=false;
+function setNightStrikes(voices){ strikeCaps.clear(); nightLean=!!voices; for(const [id,n] of Object.entries(voices||{})) strikeCaps.set(id, n); }
 const ffInfo=()=>ffLive.map(x=>({ owner:x.owner, t:x.t, route:x.route, cancelled:!!x.cancelled }));   // probes only
 /* strikes of `owner` that begin at or after `when` never sound */
 function ffCancel(owner,when){
@@ -2040,9 +2040,9 @@ let dView=null, dUp=false;
 const dv=()=>dView||undefined;
 function droneUse(s){ dView=s||null; }
 const droneHz=()=>[tonicFreq(dv())/2, droneSecondHz(dv())];   // what the drone sounds now (probe read-out)
-/* RUN 7 (C4c, Calm plan §4.6): THE FOREST'S AMBIENCE — built on first use in this engine instance into the master (so the sleep fade and the
+/* RUN 7 (C4c, Night plan §4.6): THE FOREST'S AMBIENCE — built on first use in this engine instance into the master (so the sleep fade and the
    limiter cover it), live sound only (never a track, rule #31); its drone is priced from the LIVE view like the backing drone (the mood and
-   the key — rule #2). ambienceOn(on, level, when) fades it in or out; ambienceTick(until) schedules the crickets ahead (the Calm shell's frame,
+   the key — rule #2). ambienceOn(on, level, when) fades it in or out; ambienceTick(until) schedules the crickets ahead (the Night shell's frame,
    or a render up to its end); seed shifts its seeded parts (a probe's control). */
 let amb=null;
 function ambienceOn(on, level=AMB.level, when, seed=0){ if(!AC) return; if(!amb){ if(!on) return; amb=buildAmbience(E, master, seed); }
@@ -2163,7 +2163,7 @@ function drone(owner, d, time){ if(owner) dronePan(ownerPan(owner),time); droneU
    (`build`) also has setters (a moved builder writes it only through E). ⛔ Never in E: static data (timbre tables, FX_FACTORY, REV_A …).
    Probe row «AUD1 engine context» (probes/engine.js). */
 const E=Object.freeze({
-  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get calmLean(){ return calmLean; }, strikeCaps, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
+  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get nightLean(){ return nightLean; }, strikeCaps, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
   master:Object.freeze({ get in(){ return master; }, get glue(){ return mGlue; }, get make(){ return mMake; }, get lim(){ return mLim; },
     get limiter(){ return limiter; }, get out(){ return outLast; }, get meter(){ return meterAn; }, get level(){ return masterLvl; }, get limRed(){ return limRed; } }),
   /* role buses: the solo sum before the expression stage, the chain heads (live), the drone bus; `head(key)` = a chain key's head */
@@ -2191,7 +2191,7 @@ const E=Object.freeze({
 });
 const engineCtx=()=>E;
 export {
-  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, setCalmStrikes, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
+  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, setNightStrikes, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
   initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, bendTapSet, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,

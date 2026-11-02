@@ -116,7 +116,7 @@
     "apps/night/icons/icon-512.png",
     "apps/night/icons/icon-512-maskable.png"
    ],
-   "replace": "kept — the user's chosen Calm design (RUN 7); the earlier «H» icons were replaced"
+   "replace": "kept — the user's chosen Night design (RUN 7); the earlier «H» icons were replaced"
   },
   {
    "id": "system-fonts",
@@ -151,11 +151,11 @@
    "urls": [
     "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/"
    ],
-   "notes": "Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Calm, not app code). Not shipped; if Calm adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-CALM plan)."
+   "notes": "Loaded only by docs/prototypes/rooms-of-light.html (the strategist's «Rooms of light» prototype — a REFERENCE for Night, not app code). Not shipped; if Night adopts it, it is vendored with its LICENSE and becomes a shipped entry (STAGE4-NIGHT plan)."
   },
   {
    "id": "threejs-r128",
-   "name": "three.js (3D library) — the Calm forest room",
+   "name": "three.js (3D library) — the Night forest room",
    "class": "code",
    "use": "shipped",
    "version": "r128 (npm three@0.128.0)",
@@ -165,7 +165,7 @@
     "apps/night/vendor/three-r128/three.min.js",
     "apps/night/vendor/three-r128/LICENSE"
    ],
-   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Calm shows the Forest background — never in Full. No CSP change."
+   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Night shows the Forest background — never in Full. No CSP change."
   },
   {
    "id": "google-fonts-reference",
@@ -184,7 +184,7 @@
   },
   {
    "id": "font-andika",
-   "name": "Andika (text font of the Calm face) — SIL International",
+   "name": "Andika (text font of the Night face) — SIL International",
    "class": "font",
    "use": "shipped",
    "version": "7.000 (SIL release, web/Andika-Regular.woff2 and Andika-Bold.woff2, UNMODIFIED)",
@@ -195,12 +195,12 @@
     "apps/night/fonts/andika/Andika-Bold.woff2",
     "apps/night/fonts/andika/OFL.txt"
    ],
-   "notes": "RUN 7 (C11, the user's design choice): chosen for Calm's text because Atkinson Hyperlegible (and Next) have NO Cyrillic (checked: Latin and Latin-ext subsets only); Andika is designed by SIL for literacy and low vision (distinct letterforms) and covers Cyrillic. Self-hosted, served from our own origin.",
-   "replace": "kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced"
+   "notes": "RUN 7 (C11, the user's design choice): chosen for Night's text because Atkinson Hyperlegible (and Next) have NO Cyrillic (checked: Latin and Latin-ext subsets only); Andika is designed by SIL for literacy and low vision (distinct letterforms) and covers Cyrillic. Self-hosted, served from our own origin.",
+   "replace": "kept — the font of the user's chosen Night design (RUN 7, BACKLOG §7.19); not to be replaced"
   },
   {
    "id": "font-literata",
-   "name": "Literata Light (title font and wordmark of the Calm face) — The Literata Project Authors",
+   "name": "Literata Light (title font and wordmark of the Night face) — The Literata Project Authors",
    "class": "font",
    "use": "shipped",
    "version": "Google Fonts v40, weight 300, latin + cyrillic subsets (woff2)",
@@ -212,7 +212,7 @@
     "apps/night/fonts/literata/OFL.txt"
    ],
    "notes": "RUN 7 (C11): Fraunces (the Moonglass proposal) has no Cyrillic (checked: vietnamese, latin-ext, latin only); Literata is a warm, soft book serif with a true Light weight and Cyrillic. Self-hosted, served from our own origin.",
-   "replace": "kept — the font of the user's chosen Calm design (RUN 7, BACKLOG §7.19); not to be replaced"
+   "replace": "kept — the font of the user's chosen Night design (RUN 7, BACKLOG §7.19); not to be replaced"
   },
   {
    "id": "svg-namespace",
@@ -225,7 +225,7 @@
    "urls": [
     "http://www.w3.org/2000/svg"
    ],
-   "notes": "RUN 7 (C11): core/icons.js builds the Calm face's drawn icons and the emblem as SVG elements with this namespace name."
+   "notes": "RUN 7 (C11): core/icons.js builds the Night face's drawn icons and the emblem as SVG elements with this namespace name."
   }
  ],
  "glyphs": [

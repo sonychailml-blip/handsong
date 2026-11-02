@@ -33,6 +33,10 @@ const STEPS={
       rewrite:['core','tools/listen'],   // modules that stay in place still import the moved ones
       text:['core/**','tools/*.mjs','tools/*.js','tools/licences.json','tools/listen/*'] },
 };
+STEPS.E={ table:[['core/modules/effects/calm.js','core/modules/effects/night-fx.js'], ['core/pure/calmui.js','core/pure/nightui.js'], ['tools/probes/night/calm.js','tools/probes/night/night.js'],
+    ['tools/listen/calm-listen.js','tools/listen/night-listen.js'], ['tools/listen/calm-timbres.html','tools/listen/night-timbres.html']],
+  files:['core/modules/effects/calm.js','core/pure/calmui.js','tools/probes/night/calm.js','tools/listen/calm-listen.js','tools/listen/calm-timbres.html'], roots:[], mustNotExist:['core/pure/nightui.js'],
+  token:/(?<![\w-])(?:core|tools)\/[\w.*<>\/-]*/g, rewrite:['core','apps','tools/probes','tools/listen'], text:[] };
 const S=STEPS[STEP]; if(!S){ console.error('usage: split-move.mjs <'+Object.keys(STEPS).join('|')+'> [--dry]'); process.exit(2); }
 const SKIP=new Set(['split-move.mjs']);   // the table itself names the old paths
 const mapPath=p=>{ for(const [a,b] of S.table) if(a.endsWith('/') ? p.startsWith(a) : p===a) return b+p.slice(a.length); return p; };

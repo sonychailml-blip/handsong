@@ -20,8 +20,8 @@ The user commits; Claude Code runs no git. After each checkpoint: all checks, th
 | A | baseline, guards, smoke, paths made location-independent (no moves) | 0, 12 (moved up: required at every checkpoint), 1 | ✅ committed |
 | B | core moves: `src/ → core/`, `core/pure`, `core/legacy-ui` | 5, 6, 7 | ✅ committed |
 | C | door inversion, entries, switch removal, app moves, root redirect, probes to tools | 2, 3, 4, 8, 9, 10 | ✅ committed |
-| D | `tools/build.mjs`, `vercel.json`, preview measurement | 11 + addition 1 | ✅ checks pass — WAITING for the user's «committed» |
-| E | rename Calm → Night | 13 | |
+| D | `tools/build.mjs`, `vercel.json`, preview measurement | 11 + addition 1 | ✅ committed; user: both Vercel projects set up, both dev previews build and open |
+| E | rename Calm → Night | 13 | ✅ checks pass — WAITING for the user's «committed» |
 | F | docs split, CLAUDE.md rules, final | 14, 15 | |
 
 ## Log

@@ -1,4 +1,4 @@
-/* RUN 9 (slice 5) — the forest's GPU BUDGET, measured the RUN 8 slice-4 way: Calm, the runner's fake camera ON (the hand model runs on every
+/* RUN 9 (slice 5) — the forest's GPU BUDGET, measured the RUN 8 slice-4 way: Night, the runner's fake camera ON (the hand model runs on every
    frame it gets), two synthetic hands through the real gesture path (the playing hand pinches a note every 0.5 s and moves over the rows; the
    effects hand holds still), the forest at each quality level ALTERNATED with Dark (the reference: no WebGL). Per step: hand detections per
    second and the detection time, the camera's fps, the scene's fps and frame time, audio dropouts. Run: node tools/probe-browser.mjs --eval
@@ -7,7 +7,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const PR=await import('/core/profile.js'), H=await import('/core/legacy-ui/views/scene/host.js'), G=await import('/core/gestures.js'), PO=await import('/core/gestures/pose.js'),
   V=await import('/core/vision.js'), M=await import('/core/legacy-ui/latmeter.js'), A=await import('/core/audio.js'), Q=await import('/core/frzqueue.js');
 Q.afPause('runner', true);
-const was=PR.profileCurrent(); PR.profileApply('profile.calm');
+const was=PR.profileCurrent(); PR.profileApply('profile.night');
 const keepLevel=H.sceneLevel(), SEC=12, SETTLE=3000;
 const pb=()=>{ try{ return A.AC.playbackStats ? A.AC.playbackStats.underrunEvents : NaN; }catch(e){ return NaN; } };
 const clk={ t:9e6, W:V.canvas.width, H:V.canvas.height }; G.handsProbe(clk, ()=>true);

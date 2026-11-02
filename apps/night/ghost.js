@@ -1,12 +1,12 @@
-/* RUN 7 (C7, Calm plan §6; docs/CALM-QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps
+/* RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps
    again»), while no real hand has appeared, a ghost hand drifts slowly over the forest (a Lissajous path) and plays FOUR notes of the mood,
    one every 3.2 s — then it leaves, and the controls fade in. It is a synthetic hand from the pose generator (gestures/pose.js — the probes'
    own door) put into the camera frame's result BEFORE processHands, so it plays, lights the forest and draws exactly as a hand would: the
-   same gestures, the same notes (rule #26), nothing recorded (Calm records nothing). A real hand in the frame ends it at once.
+   same gestures, the same notes (rule #26), nothing recorded (Night records nothing). A real hand in the frame ends it at once.
    ghostFrame(res, now, key) is called by main.onHands for every processed frame; key = the playing hand's label ('Right' / 'Left'). */
 import { pose } from '../../core/gestures/pose.js';
 
-/* RUN 8 (the user: «the ghost's four notes are almost inaudible»): Calm's volume follows the hand's horizontal (left edge = silence, v²) —
+/* RUN 8 (the user: «the ghost's four notes are almost inaudible»): Night's volume follows the hand's horizontal (left edge = silence, v²) —
    the ghost drifted around the middle (volume 0.26…0.74). It now drifts in the right part (cx ± rx = 0.6…0.84 of the width), where a hand
    plays at a normal level; the four notes keep their path up and down the rows. */
 export const GHOST=Object.freeze({ notes:4, every:3.2, down:0.5, hold:1.6, tail:1.2, s:0.2, cx:0.72, rx:0.12, ry:0.3, px:11, py:7.3 });

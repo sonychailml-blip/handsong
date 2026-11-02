@@ -5,7 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'core/autosave.js':['AC'],
-  'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setCalmStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
+  'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setNightStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
   'core/clip.js':['createRecordingTap'],
   'apps/full/demo.js':['AC', 'initAudio'],
   'core/freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',
@@ -35,10 +35,10 @@ const SURFACE={
   'tools/probes/full/history.js':['masterLevel', 'setMasterLevel'],
   'tools/probes/full/key.js':['droneHz', 'droneUse'],
   'tools/probes/core/eng2.js':['AC', 'chordOff', 'chordOn', 'drumHit', 'engLevels', 'engLoad', 'engVoices', 'poolSizes'],
-  'tools/probes/core/timbres.js':['BASS_INSTR', 'CHORD_INSTR', 'DRUM_KITS', 'LEAD_INSTR', 'leadIsKs', 'bassOn', 'chordOn', 'drumHit', 'leadOn', 'leadOff', 'applyFx', 'setCalmStrikes', 'engineCtx'],   // RUN 8: + FULL untouched
+  'tools/probes/core/timbres.js':['BASS_INSTR', 'CHORD_INSTR', 'DRUM_KITS', 'LEAD_INSTR', 'leadIsKs', 'bassOn', 'chordOn', 'drumHit', 'leadOn', 'leadOff', 'applyFx', 'setNightStrikes', 'engineCtx'],   // RUN 8: + FULL untouched
   'tools/probes/full/tim3d.js':['CHORD_INSTR', 'chordOn', 'timbreForgetDbg', 'timbreIdx', 'timbreInstall', 'timbreRecord', 'timbreSnapshot', 'timbresOf'],
   'tools/probes/core/pool.js':['CHORD_INSTR', 'LEAD_INSTR', 'chordGlide', 'chordOff', 'chordOn', 'drumHit', 'leadOn', 'poolDbg', 'poolSizes'],
-  'tools/probes/night/calm.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],
+  'tools/probes/night/night.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],
   'tools/probes/night/forest.js':['fxSnapshot', 'masterLevel', 'ambienceInfo'],
   'tools/probes/core/profile.js':['timbreIdOf'],
   'tools/probes/night/nightprofile.js':['FX_FACTORY', 'timbreIdOf'],

@@ -550,6 +550,6 @@
   #demoHint{font-size:var(--fs-13); color:var(--dim); max-width:420px; margin:var(--sp-6) auto 0;}
   #demoSkip{margin-top:var(--sp-22); font-size:var(--fs-16); padding:var(--sp-12) var(--sp-26);}
 
-  /* VIS1c (RUN 6): the Background switch exists only in Calm; the 3D room's canvas (made by views/scene/host.js) lies under the 2D canvas */
-  body:not(.calm) #bgRow{ display:none; }
+  /* VIS1c (RUN 6): the Background switch exists only in Night; the 3D room's canvas (made by views/scene/host.js) lies under the 2D canvas */
+  body:not(.night) #bgRow{ display:none; }
   #scene{ position:fixed; inset:0; width:100vw; height:100vh; display:block; }

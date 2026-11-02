@@ -37,10 +37,10 @@ export const profileOf=id=> BYID.get(id)||null;
 export const profileList=()=>[...BYID.values()];
 export const profileLoadReport=()=>({ ...report, skipped:report.skipped.slice() });
 export const onProfile=f=>{ listeners.push(f); };
-/* RUN 7 (C4b): Calm's live SOLO CHAIN — Volume on the playing hand's horizontal (as in Full) and «Forest depth»: its amount fixed full, its
+/* RUN 7 (C4b): Night's live SOLO CHAIN — Volume on the playing hand's horizontal (as in Full) and «Forest depth»: its amount fixed full, its
    depth on the playing hand's depth (the light going deeper into the forest), the room Medium (v01 ½ of the log range = 1.7 s). The effects
-   hand's three effects join it in C5. Leaving Calm restores the saved Full chain exactly. */
-const CALM_CHAIN=deepFreeze([ { fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x', inv:false }] },
+   hand's three effects join it in C5. Leaving Night restores the saved Full chain exactly. */
+const NIGHT_CHAIN=deepFreeze([ { fxId:'vol', params:[{ mode:'drive', hand:'play', axis:'x', inv:false }] },
   /* C5: the effects hand — index Echo, middle Warmth ↔ Brightness, ring Wave (a vertical drag each); Echo's time fixed 0.625 s (v01 of its
      log range 0.05…1 s); then the forest room last */
   { fxId:'ctone', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'fx', finger:1, axis:'y', inv:false }] },
@@ -57,7 +57,7 @@ function target(p, from){
   if(p.key){ s.tonic=p.key.tonic; s.tonicCents=p.key.cents; }
   if(p.timbres) s.lead=p.timbres[0];
   if(p.handFn && p.handFn.ld) s.hand={ ...p.handFn.ld };
-  if(p.shell==='calm'){ s.voice='poly'; s.chain=JSON.parse(JSON.stringify(CALM_CHAIN)); }
+  if(p.shell==='night'){ s.voice='poly'; s.chain=JSON.parse(JSON.stringify(NIGHT_CHAIN)); }
   return s;
 }
 /* → null (done) or a refusal in words */

@@ -16,7 +16,7 @@ const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), CDN
 const argv=process.argv.slice(2), out=s=>console.log(s), NO_CONTROL=argv.includes('--no-control');
 /* the tree's entry pages: moved with the layout */
 const PAGES={ full:'apps/full/', night:'apps/night/' };
-const BEGIN={ full:'#startBtn', night:'#calmBegin' };
+const BEGIN={ full:'#startBtn', night:'#nightBegin' };
 const BUILD=argv.includes('--build'), BUILD_DIR=path.join(ROOT,'tools','.build');
 function build(app, kind){ const dir=path.join(BUILD_DIR,`${app}-${kind}`), a=['tools/build.mjs','--out',dir]; if(kind==='preview') a.push('--probes');
   const r=spawnSync(process.execPath,a,{ cwd:ROOT, encoding:'utf8', env:{ ...process.env, HANDSONG_APP:app, HANDSONG_EDITION:kind==='release'?'release':'', VERCEL_ENV:'' } }); out((r.stdout||'').trim()||(r.stderr||'').trim()); if(r.status!==0) throw new Error('build failed: '+app+' '+kind); return dir; }
@@ -84,7 +84,7 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
       const f=await page.evaluate(async ()=>{ await document.fonts.ready; return [...document.fonts].filter(x=>x.status==='loaded').map(x=>x.family.replace(/"/g,'')); });
       if(!f.includes('Andika')) miss('the Andika font did not load: '+f.join(','));
       if(!seen.some(([u,st])=>/three\.min\.js/.test(u)&&st===200)) miss('the forest library did not load');
-      const hid=await page.evaluate(()=>document.getElementById('calmMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`); }
+      const hid=await page.evaluate(()=>document.getElementById('nightMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`); }
   }catch(e){ miss('error: '+(e&&e.message||e)); }
   finally{ await browser.close().catch(()=>{}); srv.close(); }
   for(const [u,st] of served) if(st>=400 && !ALLOWED_404.test(u) && !bad.some(x=>x.includes(u))) miss(`HTTP ${st} ${u}`);   // what Playwright's events do not see

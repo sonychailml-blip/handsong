@@ -428,7 +428,7 @@ async function timbreCore(){
     ['drumkit','recipe.rows', r=>{ r.recipe.rows.pop(); }], ['drumkit','recipe.rows[0].synth', r=>{ r.recipe.rows[0].synth='sampler'; }], ['drumkit','recipe.rows[1].vm', r=>{ r.recipe.rows[1].vm=9; }],
     ['drumkit','recipe.rows[0].f0', r=>{ r.recipe.rows[0].f0=99999; }], ['drumkit','recipe.rows[0].d', r=>{ r.recipe.rows[0].d=60; }], ['drumkit','recipe.rows[0]: unknown', r=>{ r.recipe.rows[0].url='x'; }],
     ['drumkit','env: a kit', r=>{ r.env={ att:0.01, rel:0.1 }; }], ['ks','recipe.nl', r=>{ r.recipe.nl=50; }], ['ks','recipe.body', r=>{ r.recipe.body={ hz:3400, Q:1, db:60 }; }],
-    /* RUN 7: the modal and breath engines (Calm's sound pass) */
+    /* RUN 7: the modal and breath engines (Night's sound pass) */
     ['modal','recipe.modes', r=>{ r.recipe.modes=Array(17).fill({ r:1, g:0.05, d:1 }); }], ['modal','gains sum', r=>{ r.recipe.modes=r.recipe.modes.map(m=>({ ...m, g:1 })); }],
     ['modal','recipe.modes[0].d', r=>{ r.recipe.modes[0].d=99; }], ['modal','recipe.modes[0].r', r=>{ r.recipe.modes[0].r=100; }], ['modal','recipe.modes[0].w', r=>{ r.recipe.modes[0].w='custom'; }],
     ['modal','recipe.lp', r=>{ r.recipe.lp=40000; }], ['modal','recipe.noise.q', r=>{ r.recipe.noise.q=500; }], ['modal','recipe.body: needs', r=>{ delete r.recipe.noise; }],
@@ -443,6 +443,18 @@ async function timbreCore(){
   n++; if(T.checkTimbre(recs[0])!==null) miss('the first record is refused');
   return { cases:n, total:d.length, differences:d };
 }
+/* SPLIT-2 (plan §5.2): the old product name is gone from the code. Exempt: tools/prints (byte-identity is the proof), vendor, the one migration file, the split tools; the docs and logs join at CP F.
+   Built from parts, so this file passes its own scan. CONTROL: a planted word in each spelling must be caught. */
+async function oldNameGone(){
+  const fs=await import('node:fs'), root=new URL('../', import.meta.url), d=[]; let n=0;
+  const WORD=new RegExp('ca'+'lm','i'), RU=new RegExp('Спо'+'койн'), EXEMPT=/^(tools\/split-[^/]*|apps\/night\/migrate\.js)$/;
+  const scan=(name,text,out)=>{ if(WORD.test(text)||RU.test(text)) out.push(name+': holds the old name'); };
+  const walk=rel=>fs.readdirSync(new URL(rel, root),{ withFileTypes:true }).flatMap(e=>{ const p=rel+e.name; if(e.isDirectory()) return (e.name==='vendor'||e.name==='prints'||e.name==='node_modules'||e.name==='split-baseline'||e.name.startsWith('.')) ? [] : walk(p+'/'); return /\.(js|mjs|css|html|json)$/.test(e.name) ? [p] : []; });
+  for(const f of ['core/','apps/','tools/'].flatMap(walk).concat(['index.html'])){ if(EXEMPT.test(f)) continue; n++; scan(f, fs.readFileSync(new URL(f, root),'utf8'), d); }
+  for(const planted of ['a Ca'+'lm word','--ca'+'lm-x','CA'+'LM_X','«Спо'+'койный»']){ const o=[]; n++; scan('x',planted,o); if(!o.length) d.push('CONTROL: a planted old name was not caught: '+planted); }
+  { const o=[]; n++; scan('x','спокойно, by the way',o); if(o.length) d.push('CONTROL: the ordinary Russian adverb was caught'); }
+  return { cases:n, total:d.length, differences:d };
+}
 /* C0 (RUN 6): the profile records — every file in data/profiles/ valid against this app's modes, timbres and effects; ids = the pinned
    list; Full offers everything and narrows nothing; CONTROLS: each damage of PROFILE_DAMAGES refused with a line naming its field */
 async function profileCore(){
@@ -450,17 +462,17 @@ async function profileCore(){
   const P=await import(new URL('../core/pure/profile.js', import.meta.url).href);
   const rd=async f=>JSON.parse(await readFile(new URL('../core/data/'+f, import.meta.url),'utf8'));
   const ix=await rd('index.json'), tix=await rd('timbres/index.json');
-  const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm','fdepth','cecho','ctone','cwave'] };   // RUN 7: + Calm's own effects
+  const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm','fdepth','cecho','ctone','cwave'] };   // RUN 7: + Night's own effects
   const recs=[];
   for(const name of ['apps/full/data/full.json','apps/night/data/night.json']){ n++; let r; try{ r=JSON.parse(await readFile(new URL('../'+name, import.meta.url),'utf8')); }catch(e){ miss(name+': '+e.message); continue; }
     recs.push(r); const why=P.checkProfile(r, known); if(why) miss(`${r.id||name}: ${why}`); }
   n++; if(JSON.stringify(recs.map(r=>r.id))!==JSON.stringify([...P.PROFILE_IDS])) miss('profile ids '+JSON.stringify(recs.map(r=>r.id))+' ≠ the pinned '+JSON.stringify(P.PROFILE_IDS));
-  const full=recs.find(r=>r.id==='profile.full'), calm=recs.find(r=>r.id==='profile.calm');
+  const full=recs.find(r=>r.id==='profile.full'), night=recs.find(r=>r.id==='profile.night');
   n++; if(!full || ['handFn','noteModes','key','moods','timbres','effects','scene','ambience'].some(k=>full[k]!==null) || full.roles.length!==4 || full.shell!=='full' || full.labels!=='full' || !full.recording)
     miss('profile.full must offer everything and narrow nothing');
-  n++; if(!calm || calm.roles.join()!=='ld' || calm.recording || calm.labels!=='plain' || calm.key.tonic!==9 || calm.noteModes.join()!=='note,hold') miss('profile.calm: solo only, nothing recorded, plain labels, key A, modes note / hold');
+  n++; if(!night || night.roles.join()!=='ld' || night.recording || night.labels!=='plain' || night.key.tonic!==9 || night.noteModes.join()!=='note,hold') miss('profile.night: solo only, nothing recorded, plain labels, key A, modes note / hold');
   const copy=o=>JSON.parse(JSON.stringify(o));
-  if(calm) for(const [field, dmg] of P.PROFILE_DAMAGES){ const r=copy(calm); dmg(r); n++; const why=P.checkProfile(r, known);
+  if(night) for(const [field, dmg] of P.PROFILE_DAMAGES){ const r=copy(night); dmg(r); n++; const why=P.checkProfile(r, known);
     if(!why) miss(`CONTROL «${field}»: a damaged profile was accepted`);
     else if(!why.includes(field.split(' ')[0])) miss(`CONTROL «${field}»: refused, but the line does not name it: ${why}`); }
   return { cases:n, total:d.length, differences:d };
@@ -488,16 +500,16 @@ async function busCore(){
   eq('the app bus exists and starts empty', [typeof B.BUS.set, B.BUS.version('picture')], ['function', 0]);
   return { cases:n, total:d.length, differences:d };
 }
-/* RUN 7 (C6): the Calm shell's logic — controls shown only after 1.5 s without hands and hidden at once when a hand is back; a round button
+/* RUN 7 (C6): the Night shell's logic — controls shown only after 1.5 s without hands and hidden at once when a hand is back; a round button
    cycles its list; the sleep timer holds full level until its last 90 s, fades smoothly (monotone, no step) to silence, then sleeps; the
    glow is brightest at the hand and gone beyond its reach. CONTROLS: a shell that ignores the hands, and a fade with a step, must be caught. */
 /* RUN 7 (C4b) → RUN 8: the depth → forest curve keeps the LOUDNESS (the user: depth changes the amount of forest, never the loudness): the dry
    part alone never drops more than 1.5 dB (dry ≥ 10^(−1.5/20) at every d — a struck note's loudness follows it), the forest's send rises
    (far ≥ 3× near), the room darkens; clamped outside 0…1; monotone; CONTROL: RUN 7's prototype curve (dry 1 − 0.55·d) must fail the floor.
-   The loudness itself is the browser row «CALM depth loudness». */
-async function calmDepthCore(){
+   The loudness itself is the browser row «NIGHT depth loudness». */
+async function nightDepthCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const D=await import(new URL('../core/pure/dsp.js', import.meta.url).href), f=D.calmDepth, FLOOR=Math.pow(10,-1.5/20);
+  const D=await import(new URL('../core/pure/dsp.js', import.meta.url).href), f=D.nightDepth, FLOOR=Math.pow(10,-1.5/20);
   for(let k=0;k<=20;k++){ const c=f(k/20); n++; if(!(c.dry>=FLOOR)) miss(`d = ${k/20}: dry ${c.dry} (≥ ${FLOOR.toFixed(4)} expected)`); }
   n+=2; if(!(f(1).send>=3*f(0).send)) miss(`the forest grows too little: send ${f(0).send} → ${f(1).send}`);
   if(JSON.stringify([f(-1), f(2)])!==JSON.stringify([f(0), f(1)])) miss('not clamped outside 0…1');
@@ -508,7 +520,7 @@ async function calmDepthCore(){
 /* RUN 7 (C4c): the crickets' SEEDED schedule — the same seed gives the same chirps (exact); another seed differs (CONTROL); each chirp's gap
    within 0.6–1.8 s after its pulses, 3–5 pulses, a pitch in 4.3–4.9 kHz; a chirp's envelope is soft (3-ms rise) and ends at 0; the wind loop
    is seeded too (repeatable, another seed differs) */
-async function calmCricketsCore(){
+async function nightCricketsCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
   const A=await import(new URL('../core/pure/ambience.js', import.meta.url).href), C=A.AMB.crickets;
   const take=(seed,k,m)=>{ const s=A.cricketStream(seed,k), out=[s.freq]; for(let i=0;i<m;i++) out.push(s.next()); return out; };
@@ -525,9 +537,9 @@ async function calmCricketsCore(){
   if(!w1.some((v,i)=>v!==w3[i])) miss('CONTROL: the wind with another seed is the same');
   return { cases:n, total:d.length, differences:d };
 }
-async function calmShellCore(){
+async function nightShellCore(){
   const d=[]; let n=0; const eq=(what,a,b)=>{ n++; if(JSON.stringify(a)!==JSON.stringify(b)) d.push(what+': '+JSON.stringify(a)+' vs '+JSON.stringify(b)); };
-  const C=await import(new URL('../core/pure/calmui.js', import.meta.url).href), U=C.CALM_UI;
+  const C=await import(new URL('../core/pure/nightui.js', import.meta.url).href), U=C.NIGHT_UI;
   let st=C.showStep(null, 0, 0); eq('no hand yet → shown', st.shown, true);
   st=C.showStep(st, 1, 1000); eq('a hand → hidden', st.shown, false);
   st=C.showStep(st, 0, 1000+U.idleMs-1); eq('gone 1.499 s → still hidden', st.shown, false);
@@ -568,7 +580,7 @@ async function fliesCore(){
 }
 /* RUN 9 (slice 1): THE NIGHT's cycle (core/night.js) — SEAMLESS (every value at t equals t + period, CONTROL: a 1.5-cycle term differs),
    CONTINUOUS (no jump anywhere, the seam included), the first minutes clear, clouds dim the moon and it returns, the moon drifts, the mist
-   layers move each its own way; the sleep's depth (exact ends, monotone); every Calm mood has a look whose tokens exist in tokens.css */
+   layers move each its own way; the sleep's depth (exact ends, monotone); every Night mood has a look whose tokens exist in tokens.css */
 async function nightCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
   const N=await import(new URL('../apps/night/pure/cycle.js', import.meta.url).href), P=N.NIGHT.period;
@@ -595,7 +607,7 @@ async function nightCore(){
   let mono=true, pl=2; for(let i=0;i<=50;i++){ const v=N.nightDeep(i/50).light; if(v>pl+1e-12) mono=false; pl=v; } n++; if(!mono) miss("the sleep depth is not monotone");
   n+=3; if(N.sleepProgress(0,0,5e5)!==0) miss('no timer: progress ≠ 0'); if(N.sleepProgress(0,10,3e5)!==0.5) miss('half of a 10-min timer ≠ 0.5'); if(N.sleepProgress(0,10,9e5)!==1) miss('past the end ≠ 1');
   const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../apps/night/data/night.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../core/tokens.css', import.meta.url),'utf8');
-  for(const m of prof.moods){ n++; if(!N.MOOD_OF[m]) miss('the Calm mood '+m+' has no look'); }
+  for(const m of prof.moods){ n++; if(!N.MOOD_OF[m]) miss('the Night mood '+m+' has no look'); }
   for(const [k,L2] of Object.entries(N.MOOD_LOOKS)) for(const tn of Object.values(L2.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(tok)) miss(`look ${k}: no token --cv-${tn} in tokens.css`); }
   n++; if(N.moodLook('no-such-mood')!==N.MOOD_LOOKS.glow) miss('CONTROL: an unknown mood does not fall back to Glow');
   return { cases:n, total:d.length, differences:d };
@@ -766,12 +778,13 @@ const ROWS=[
   ['TIM3 timbre records (core)', ()=>timbreCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['C0 profile records (core)', ()=>profileCore(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['VIS1 bus (core)',           ()=>busCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
-  ['CALM shell (core)',         ()=>calmShellCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
-  ['CALM depth curve (core)',   ()=>calmDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
-  ['CALM cricket schedule (core)', ()=>calmCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NIGHT shell (core)',         ()=>nightShellCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NIGHT depth curve (core)',   ()=>nightDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NIGHT cricket schedule (core)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
+  ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)
 ];
 

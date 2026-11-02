@@ -200,4 +200,4 @@ export async function checkGesture(){
   if(vk.length) miss(`live voices left sounding after the probe: ${vk.join(', ')}`);
   return { cases, total:diff.length, differences:diff, lines:now.length };
 }
-row({ calm:true, at:455, name:'HAND1 gesture fingerprint', run:()=>checkGesture(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });
+row({ night:true, at:455, name:'HAND1 gesture fingerprint', run:()=>checkGesture(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });

@@ -2043,3 +2043,8 @@ same; the screenshot comparison shows small rendering differences because this s
 - `tools/build.mjs` assembles one app (`HANDSONG_APP`, no default); `vercel.json`. Production: no probes tag, no tools, no other app. Preview (`VERCEL_ENV=preview`, or `--probes`): keeps `?probe`, this app's suites, the prints. `HANDSONG_EDITION=release` hides Night's development items.
 - Smoke test `--build`: repo, production and preview trees of both apps, sub-folder, root redirect, `?probe` gate, Measure button. Runner `--root DIR` runs the probes on a built tree.
 - Not tested: a real Vercel deployment and a real phone (user's steps).
+
+# SPLIT-2 — checkpoint E (2026-11-02): the rename (status: docs/SPLIT-PROGRESS.md)
+- The old product name → Night across code, CSS, pages, data, keys, rows, screens, flags (`tools/split-names.mjs`, 786 lines in 73 files; exceptions per plan §5.2: `nightSky`, `--cv-hn-*`, `night-fx.js`, `cycle.js`, `nightui.js`). `profile.night` is the one rule #37 exception (user, Q4).
+- `apps/night/migrate.js` moves the 9 old setting names on one origin; rows «NIGHT migrate» and «OLD NAME gone» (docs join its scan at CP F). Night's page has its own title and manifest.
+- Row flag `night:true` replaces the old flag (not `suite`/`both`, plan §7.1): the suite is now the probe's folder, the flag only marks a core row that also runs on Night's page. Prints unchanged; the baseline is read through the same table.

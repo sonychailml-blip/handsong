@@ -1,4 +1,4 @@
-/* VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js). Re-laid from
+/* VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js). Re-laid from
    the «Rooms of light» prototype (docs/prototypes/, the strategist's own code — our starting source, user RUN 5) WITHOUT the animals:
    procedural ground (moss, soil, leaves), bark, instanced trunks and branches, ferns, mossy rocks, four mist sheets, the moon, fog; the hand's
    firefly light (core + halo + trail; a real shadow from the playing hand's light where the level allows) and a dimmer light for the effects
@@ -15,7 +15,7 @@ import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, l
 import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem
 
 export const FOREST_SEED=0x464F5231;
-/* the levels (Calm plan §7): full — real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist;
+/* the levels (Night plan §7): full — real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist;
    reduced — 512² shadow, 35 fireflies, 8-step trails, still mist. «minimal» has no WebGL at all (host.js draws a 2D stand-in). */
 export const FOREST_LEVELS={ full:{ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4 },
   reduced:{ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2 } };
@@ -130,7 +130,7 @@ export function buildForest(T, opt){
     const core=sprite(col('core')), halo=sprite(i?col('fx'):col('halo'),0.5); grp.add(core,halo); grp.visible=false; s.add(grp, light);   // RUN 9: the light stays in the scene (intensity 0 when off) — a light count that changes recompiles every lit shader
     const trail=[]; for(let j=0;j<Lv.trail;j++){ const t=sprite(col('trail'),0); t.scale.set(0.05,0.05,1); s.add(t); trail.push(t); }
     return { i, grp, light, core, halo, trail, hist:[], ht:0, cur:V(0,1.5,0), prev:V(0,1.5,0), tgt:V(0,1.5,0), on:0, glint:0, sat:false, d:0.5 }; });
-  /* RUN 7 (C5): the effects hand seen in the forest (values from the bus «calmFx», published by the Calm shell): Echo — soft rings of light
+  /* RUN 7 (C5): the effects hand seen in the forest (values from the bus «nightFx», published by the Night shell): Echo — soft rings of light
      leave the firefly at each echo of a note (timed from the echo's own delay and feedback, not from audio analysis); Warmth / Brightness —
      the light's colour, amber ↔ the firefly lime ↔ a cold green-white; Wave — the light trembles at the effect's own 4.5 Hz */
   let fxv={ echo:0, time:0.625, fb:0, tone:0.5, wave:0 }, now=0; const echoes=[];
@@ -181,7 +181,7 @@ export function buildForest(T, opt){
       sp.position.set(N.moon[0]+c.u*NIGHT.clouds.span, N.moon[1]+c.y, N.moon[2]+5); sp.material.opacity=0.92*c.dens*v; sp.material.color.copy(pal.cloud); });
     mists.forEach(([tx,sp,m,pm],i)=>{ m.position.y=0.9+N.rise[i]; pm.opacity=Math.min(0.62, 0.26*N.mist[i]*mistK*deep.mist); pm.color.copy(pal.haze).multiplyScalar(0.55+0.45*ml); });
   }
-  /* one frame: hands = [{ x, y, d, play }] (canvas pixels, depth 0…1; play = the note hand); nin = the bus «calmNight» ({ mood, sleep 0…1 }) */
+  /* one frame: hands = [{ x, y, d, play }] (canvas pixels, depth 0…1; play = the note hand); nin = the bus «nightSky» ({ mood, sleep 0…1 }) */
   function update(dt, t, hands, fx, nin){
     now=t; if(fx) fxv=fx; night(dt, t, nin);
     const kk=(reduce?0.4:1)*deep.motion, H2=hands||[], play=H2.find(h=>h.play), other=H2.find(h=>h!==play);

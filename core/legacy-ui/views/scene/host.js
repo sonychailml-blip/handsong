@@ -1,4 +1,4 @@
-/* VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Calm plan §3) — THE SCENE HOST and Calm's BACKGROUNDS.
+/* VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
    The scene: a WebGL canvas #scene UNDER the 2D canvas, made only while a room is shown and destroyed when it is not (its context is
    released — «room off» frees the GPU for the hand model, review R2); three.js r128 loaded LAZILY from our own origin (a dynamic import of
    the vendored UMD file, which sets globalThis.THREE — never in Full); levels full / reduced / minimal (minimal = no WebGL: a 2D stand-in,
@@ -24,7 +24,7 @@ const ROOMS={};
 let threeLoad=null;
 export const sceneRoomAdd=(id, rec)=>{ ROOMS[id]=rec.build; threeLoad=rec.three; };
 const REDUCE=typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-/* RUN 8 (slice 4): the scene's QUALITY is a choice remembered on this device (the development switch in Calm's ⓘ: high / medium / low =
+/* RUN 8 (slice 4): the scene's QUALITY is a choice remembered on this device (the development switch in Night's ⓘ: high / medium / low =
    full / reduced / minimal); nothing switches by itself yet (C8 decides from measurements) */
 const LEVEL_KEY='handsong.sceneLevel';
 const storedLevel=()=>{ try{ const v=localStorage.getItem(LEVEL_KEY); return v && LV[v] ? v : null; }catch(e){ return null; } };
@@ -70,7 +70,7 @@ export async function sceneOpen(id='forest', opt={}){
   if(room){ room.dispose(); room=null; }
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
-  if(renderer){ const tb=performance.now(); room=ROOMS[id](THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('calmNight')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); last=0; info.t0=0; info.frames=0;
+  if(renderer){ const tb=performance.now(); room=ROOMS[id](THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
     try{ renderer.compile(room.scene, room.camera); }catch(e){ errors.push('compile: '+(e&&e.message||e)); } info.openMs=Math.round(performance.now()-tb); }
   stackSet('scene', !!renderer);
@@ -87,7 +87,7 @@ function sceneFrame(t, bus){
   for(const it of N.items) if(it.role==='ld'){ if(it.kind==='on') heldAt.set(it.owner, t); else if(it.kind==='off') heldAt.delete(it.owner); }
   let hs=0; for(const [o,t0] of heldAt){ const a=(t-t0)/1000; if(a>60) heldAt.delete(o); else if(a<30) hs=Math.max(hs, a); } if(room.held) room.held(hs);
   const t0=performance.now();
-  room.update(dt, t/1000+clockOff, bus.get('handsView')||[], bus.get('calmFx'), bus.get('calmNight'));   // RUN 7 (C5): the Calm effects' values; RUN 9: the mood and the sleep
+  room.update(dt, t/1000+clockOff, bus.get('handsView')||[], bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
   renderer.render(room.scene, room.camera);
   if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
@@ -100,7 +100,7 @@ stackAdd({ kind:'visual', id:'scene', layer:'scene', cost:{ cls:'heavy', gpu:tru
 function backdrop(t, bus){
   if(bg==='camera') return;
   const W=cv2d.width, H=cv2d.height;
-  if(bg==='dark'){ ctx.fillStyle=cv('calm-dark'); ctx.fillRect(0,0,W,H); return; }
+  if(bg==='dark'){ ctx.fillStyle=cv('hn-dark'); ctx.fillRect(0,0,W,H); return; }
   if(renderer){ ctx.clearRect(0,0,W,H); return; }
   const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0, cv('forest-fog')); g.addColorStop(1, cv('forest-ground')); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
   for(const h of bus.get('handsView')||[]){ const r=Math.max(12, 46*(1.3-h.d)), gr=ctx.createRadialGradient(h.x,h.y,0,h.x,h.y,r);
@@ -113,7 +113,7 @@ export function setBackground(mode){
   bg=mode; stackSet('camera', mode==='camera');
   /* RUN 8: the 2D canvas is OPAQUE (vision.js: alpha:false — Full's text and picture rely on it), so its «clear» was black over the room:
      the user saw a plain black forest. On the Forest background the canvas is composited with SCREEN (style.css): its black lets the room
-     through, its lights (fireflies, glow, halo) add on top. Calm draws no text on the canvas. */
+     through, its lights (fireflies, glow, halo) add on top. Night draws no text on the canvas. */
   document.body.classList.toggle('bg-forest', mode==='forest');
   if(mode==='forest') return sceneOpen('forest').catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
   sceneClose(); return Promise.resolve(sceneInfo());

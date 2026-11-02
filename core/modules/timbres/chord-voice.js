@@ -39,7 +39,7 @@ function buildChordPool(E, dest, n=CHORD_POOL_N){
 
 /* ═══ SND-F1 — FIREFLY: a struck tine, ONE-SHOT per note (chord timbre «Firefly») ═══
    Three partials, each with its own envelope (6 ms linear attack, exponential decay to 0.0001): body 1×f triangle 1.6 s, octave 2×f sine
-   0.28 · 0.9 s, the inharmonic tine «click» 4.2×f sine 0.12 · 0.28 s — the Calm prototype's recipe exactly (row «SND-F1 Firefly identity»
+   0.28 · 0.9 s, the inharmonic tine «click» 4.2×f sine 0.12 · 0.28 s — the Night prototype's recipe exactly (row «SND-F1 Firefly identity»
    compares it sample by sample). ⛳ A sanctioned exception to rule #3, like a drum hit: a strike makes its own oscillators at its moment
    and they stop when the decay ends — a struck tine has no sustain to gate. The pool voice still holds the note (owner, pitch for the
    readout and highlights, release) but stays silent. Each strike takes its owner's level, pan, route (live head or track head, rule #31)

@@ -16,7 +16,7 @@ export function stackAdd(m){
   MODS.push({ ...m, off:false, seq:ADDED++ });
   MODS.sort((a,b)=>LAYERS.indexOf(a.layer)-LAYERS.indexOf(b.layer) || a.seq-b.seq);
 }
-/* a module on / off (Calm's backgrounds turn the camera off; a room turns the scene on) → false if there is no such module */
+/* a module on / off (Night's backgrounds turn the camera off; a room turns the scene on) → false if there is no such module */
 export function stackSet(id, on){ const m=MODS.find(x=>x.id===id); if(!m) return false; m.off=!on; return true; }
 export function stackFrame(t){ for(const m of MODS) if(!m.off) m.frame(t, READER); }
 export const stackList=()=>MODS.map(m=>({ id:m.id, layer:m.layer, on:!m.off }));

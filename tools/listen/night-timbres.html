@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- RUN 6 / RUN 7 (Calm sound pass): the LISTENING PAGE v2 — a dev tool, never shipped (tools/ is outside the app and the release).
-     Every candidate timbre in each Calm mood (key A, fixed), as a short PHRASE or as SINGLE notes (how one note starts, rings / sustains and
+<!-- RUN 6 / RUN 7 (Night sound pass): the LISTENING PAGE v2 — a dev tool, never shipped (tools/ is outside the app and the release).
+     Every candidate timbre in each Night mood (key A, fixed), as a short PHRASE or as SINGLE notes (how one note starts, rings / sustains and
      ends), with an instant A/B «In the forest / Dry»: both versions are rendered OFFLINE by a separate copy of the app's own engine
      (core/audio.js?listen — GOLD seed, offline voice allocation, the master tapped before the limiter) and play in sync; the switch
      crossfades between them. Open with the app's server:
-     http://127.0.0.1:5500/tools/listen/calm-timbres.html  (the base below makes the engine's worklet paths resolve from the repo root) -->
+     http://127.0.0.1:5500/tools/listen/night-timbres.html  (the base below makes the engine's worklet paths resolve from the repo root) -->
 <base href="../../">
-<title>Calm sounds</title>
+<title>Night sounds</title>
 <style>
   :root{ --bg:#07090d; --panel:#11151d; --ink:#e8e4d8; --dim:#8e96a6; --accent:#c8f56a; --line:#232a36; color-scheme:dark; }
   body{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui, sans-serif; }
@@ -36,7 +36,7 @@
 </head>
 <body>
 <main>
-  <h1>Calm — which sounds?</h1>
+  <h1>Night — which sounds?</h1>
   <p>Six new sounds and today's Firefly for comparison, in each mood, in A. Tap a cell to listen. While it plays, flip
      <b>In the forest / Dry</b> — the two versions play in sync, so you hear only the room change. Tick the three you like best.
      Headphones help. Nothing leaves this computer.<br>
@@ -62,13 +62,13 @@
      app; the new sounds are set to the app's normal level). A cell renders the first time it is tapped (a second or two).</p>
 </main>
 <script type="module">
-import { CANDS, MOODS, render, nameOf, analyse } from './tools/listen/calm-listen.js';
+import { CANDS, MOODS, render, nameOf, analyse } from './tools/listen/night-listen.js';
 const $=id=>document.getElementById(id), status=s=>{ $('status').textContent=s; };
 const cache=new Map(); let busy=false, AC=null, out=null, now=null, playing=null, kind='phrase', side='wet';
 const RU={ 'solo.firefly-rich':'Светлячок (богатый)', 'solo.breath-flute':'Флейта с дыханием', 'solo.handpan':'Хэндпан', 'solo.singing-bowl':'Поющая чаша',
   'solo.kalimba':'Калимба', 'solo.breath-pad':'Дышащий пад', 'solo.firefly':'Светлячок' };
 const vol=()=>Math.pow(+$('vol').value,2)*2.5;   // the page volume; every pair is first trimmed to the same measured loudness (see play); a page limiter guards the ears
-const TARGET=-26;   // dB (the measure of calm-listen.js analyse) every candidate is trimmed to — a fair comparison, today's quieter Firefly included
+const TARGET=-26;   // dB (the measure of night-listen.js analyse) every candidate is trimmed to — a fair comparison, today's quieter Firefly included
 function stop(){ if(now){ for(const s of now.srcs) try{ s.stop(); }catch(e){} now=null; } if(playing){ playing.classList.remove('on'); playing=null; } }
 function abSet(t){ if(!now) return; const g=AC.currentTime; now.wet.gain.setTargetAtTime(side==='wet'?1:0,g,0.02); now.dry.gain.setTargetAtTime(side==='dry'?1:0,g,0.02); }
 async function get(cand, mood, dry){

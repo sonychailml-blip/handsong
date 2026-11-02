@@ -1,7 +1,7 @@
 {
-  "name": "Handsong",
-  "short_name": "Handsong",
-  "description": "Gesture-controlled synthesizer and interactive scales/tunings tutorial — play with your hands in front of the camera.",
+  "name": "Handsong Night",
+  "short_name": "Handsong Night",
+  "description": "A night forest you play with your hands in front of the camera.",
   "display": "standalone",
   "background_color": "#e3e9f5",
   "theme_color": "#e3e9f5",

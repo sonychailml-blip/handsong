@@ -92,13 +92,13 @@ async function stateSig(R){
    засчитываются, если песне не хватает материала (material) — тогда вердикт «song: not enough material» и перечень недостающего. */
 export async function all(opt={}){   // F0: async — строка снимка читает tools/prints/scales.before.json (fetch); звать await P.all()
   const keep={ log:console.log, warn:console.warn, table:console.table, info:console.info }, mute=()=>{};
-  const T00=performance.now(), title=opt.calm?'P.calm':opt.quick?'P.quick':'P.all';
+  const T00=performance.now(), title=opt.night?'P.night':opt.quick?'P.quick':'P.all';
   const rows=[], lists=[], keepCM=chordModeSel, measures={};
   let RR=null; try{ RR=await import('../../../core/render.js'); }catch(e){ RR=null; }   // страж читает копию движка рендера
   let nGuard=0; const stall0=frameStalls;
   setChordModeSel({});   // T7b: прогоны строят виды с ЖИВЫМ выбором режима аккордов — гоняем на умолчаниях, выбор человека возвращаем ниже
   setQuick(opt.quick);
-  const RUN=rowList({ quick:!!opt.quick, calm:!!opt.calm }), nRun=RUN.length, regBad=registryProblems();   // PROBE1: rows from the registry, in «at» order
+  const RUN=rowList({ quick:!!opt.quick, night:!!opt.night }), nRun=RUN.length, regBad=registryProblems();   // PROBE1: rows from the registry, in «at» order
   try{
   for(const { name, run, read, drawn } of RUN){
     histReset();   // ED7: every row starts with an empty history (probes write the song directly; the tripwire would refuse a stale step)
@@ -139,7 +139,7 @@ export async function all(opt={}){   // F0: async — строка снимка 
   console.log(nGuard ? `[scaleprobe all] state guard: ${nGuard} row(s) left the mixer, the windows, the live sound state or the render engine copy changed (see the lists above)`
                      : '[scaleprobe all] state guard: no row left the mixer, the windows, the live sound state, the song events or the render engine copy changed');
   if(frameStalls>stall0) console.warn(`[scaleprobe all] ${frameStalls-stall0} animation frame(s) never came (tab hidden?) — ${nHidden} row(s) that read the drawn window are marked «${HIDDEN}»; rerun with the tab visible`);
-  const songRows=rows.some(r=>r.song!=='—');   // SPLIT-2: a run with no song row (P.calm on its own page) needs no song
+  const songRows=rows.some(r=>r.song!=='—');   // SPLIT-2: a run with no song row (P.night on its own page) needs no song
   const pass=nDiff===0&&(M.ok||!songRows)&&!nHidden, sec=((performance.now()-T00)/1000).toFixed(1);
   console.log(`[scaleprobe all] ${title}: ${pass ? 'PASS' : 'NOT A PASS'} — ${rows.length} checks, ${nDiff} differences${nHidden?`, ${nHidden} not checked (tab hidden — rerun with the tab visible)`:''}, song material ${M.ok?'complete':'incomplete'} (${events.length} events, ${M.counts.views} tuning views) · ${sec} s`);
   return { pass, rows, material:M, hidden:nHidden, seconds:+sec, measures };
@@ -149,8 +149,8 @@ export async function all(opt={}){   // F0: async — строка снимка 
    держит node, tools/probe-data.mjs, — оси редактора по всем видам и прокрутка всех дорожек кадрами); рендерящие строки и так короткие
    (PROBE_SHORT). Цель — меньше 30 с на настольном; время печатается в итоге. P.all() остаётся полным барьером. */
 export function quick(opt={}){ return all({...opt, quick:true}); }
-/* RUN 7: P.calm — the rows flagged calm (every CALM row, the profile round trip, the forest rows, solo Firefly, HAND1, the node census, GOLD) */
-export function calm(opt={}){ return all({...opt, calm:true}); }
+/* RUN 7: P.night — the rows flagged night (every NIGHT row, the profile round trip, the forest rows, solo Firefly, HAND1, the node census, GOLD) */
+export function night(opt={}){ return all({...opt, night:true}); }
 /* ═══ P.orderCheck — ПОРЯДОК НЕ ВЛИЯЕТ (после MX2) ═══ На посеянной песне: P.checkPan отдельно, затем P.all, затем P.all ЕЩЁ РАЗ — все три
    обязаны пройти (строка MX2 идёт в P.all ПОСЛЕ S4, второй прогон ставит S4 после неё). Посев — до: await P.seed({replace:true}).
    Асинхронная: await P.orderCheck(). */

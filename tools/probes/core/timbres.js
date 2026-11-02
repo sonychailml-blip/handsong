@@ -20,7 +20,7 @@ const stat=n=>{ const o=[];
   else if(n instanceof DelayNode) o.push(+n.delayTime.value.toFixed(9));
   else if(n instanceof ConstantSourceNode) o.push(+n.offset.value.toFixed(9));
   return o; };
-async function oneTimbre(R, role, i, real, keepBuf, pre){   // pre(eng) — before the copy's start (RUN 8: «FULL untouched» turns Calm's path on as its CONTROL)
+async function oneTimbre(R, role, i, real, keepBuf, pre){   // pre(eng) — before the copy's start (RUN 8: «FULL untouched» turns Night's path on as its CONTROL)
   return R.engineProbe(async(eng, ctx)=>{
     const log=ctx.__log; log.length=0; const T=0.01;
     if(role==='ld') eng.leadOn('tb:ld', 220, 0.6, i, 0, 1, undefined, undefined, T);
@@ -80,12 +80,12 @@ export function checkTimbreRecords(){
   return { cases:n, total:d.length, differences:d };
 }
 row({ at:1001.65, name:'TIM3a timbre records loaded, policies = role', run:()=>checkTimbreRecords(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
-row({ calm:true, at:1001.7, name:'TIM3 timbres = before', run:()=>checkTimbresBefore(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
-/* RUN 8 (the user: «Full exactly as before RUN 8»): row «FULL untouched» (P.all). In Full: (1) the live engine carries none of Calm's
-   per-timbre settings (no strike caps, no Calm strike path, no low power); (2) the five struck solo timbres build and render EXACTLY as the
+row({ night:true, at:1001.7, name:'TIM3 timbres = before', run:()=>checkTimbresBefore(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+/* RUN 8 (the user: «Full exactly as before RUN 8»): row «FULL untouched» (P.all). In Full: (1) the live engine carries none of Night's
+   per-timbre settings (no strike caps, no Night strike path, no low power); (2) the five struck solo timbres build and render EXACTLY as the
    RUN 7 print (tools/prints/timbres.before.json: creation trace equal, envelope within 1e-5 of its peak window) — CONTROL: the same timbres with
-   Calm's strike path on in the render copy must differ; (3) NO CAP: a dense Singing-bowl passage (32 strikes in 2.6 s) stops every one of
-   its oscillators exactly once, at its own end — CONTROL: with Calm's caps (the profile's «voices») some are stopped a second time (faded). */
+   Night's strike path on in the render copy must differ; (3) NO CAP: a dense Singing-bowl passage (32 strikes in 2.6 s) stops every one of
+   its oscillators exactly once, at its own end — CONTROL: with Night's caps (the profile's «voices») some are stopped a second time (faded). */
 const STRUCK=['solo.firefly','solo.firefly-rich','solo.handpan','solo.singing-bowl','solo.kalimba'];
 export async function checkFullUntouched(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
@@ -93,29 +93,29 @@ export async function checkFullUntouched(){
     const PR=await import('../../../core/profile.js'), A=await import('../../../core/audio.js'), R=await import('../../../core/render.js');
     if(PR.profileCurrent()!=='profile.full') return { cases:0, total:0, differences:[], notes:['not applicable: the app is not in Full'] };
     const E=A.engineCtx(); n++;
-    if(E.calmLean || E.strikeCaps.size || E.lowPower) miss(`Full carries Calm's settings: Calm strikes ${E.calmLean}, caps ${E.strikeCaps.size}, low power ${E.lowPower}`);
+    if(E.nightLean || E.strikeCaps.size || E.lowPower) miss(`Full carries Night's settings: Night strikes ${E.nightLean}, caps ${E.strikeCaps.size}, low power ${E.lowPower}`);
     const pin=await (await fetch(new URL('../../../'+FILE, import.meta.url), { cache:'no-store' })).json(), voices=(await (await fetch(new URL('../../../apps/night/data/night.json', import.meta.url), { cache:'no-store' })).json()).voices||{};
     const cmp=async lean=>{ const out=[];
       for(const id of STRUCK){ const i=A.LEAD_INSTR.findIndex(x=>x.id===id); if(i<0){ out.push(id+': missing'); continue; }
-        const r=await oneTimbre(R, 'ld', i, false, false, lean ? eng=>eng.setCalmStrikes(voices) : undefined), a=pin.trace[id]||[];
+        const r=await oneTimbre(R, 'ld', i, false, false, lean ? eng=>eng.setNightStrikes(voices) : undefined), a=pin.trace[id]||[];
         if(a.join('|')!==r.trace.join('|')){ const k=a.findIndex((x,j)=>x!==r.trace[j]); out.push(`${id}: the creation trace differs at node ${k<0?a.length:k} (${a.length} → ${r.trace.length} nodes)`); continue; }
         const E0=pin.env[id]||[], pk=Math.max(1e-12, ...E0); let worst=0;
         for(let j=0;j<Math.max(E0.length,r.env.length);j++) worst=Math.max(worst, Math.abs((E0[j]??NaN)-(r.env[j]??NaN))/pk || (E0.length!==r.env.length?Infinity:0));
         if(!(worst<=1e-5)) out.push(`${id}: the render envelope differs by ${worst.toExponential(2)} of its peak window`); }
       return out; };
     const full=await cmp(false); n+=STRUCK.length; full.forEach(miss);
-    const ctl=await cmp(true); n++; notes.push(`CONTROL with Calm's strike path: ${ctl.length} of ${STRUCK.length} differ`);
-    if(ctl.length<STRUCK.length) miss(`CONTROL: Calm's strike path matched the RUN 7 print for ${STRUCK.length-ctl.length} timbre(s) — the comparison cannot fail`);
+    const ctl=await cmp(true); n++; notes.push(`CONTROL with Night's strike path: ${ctl.length} of ${STRUCK.length} differ`);
+    if(ctl.length<STRUCK.length) miss(`CONTROL: Night's strike path matched the RUN 7 print for ${STRUCK.length-ctl.length} timbre(s) — the comparison cannot fail`);
     /* no cap: count the stop() calls of every oscillator of a dense bowl passage (scheduled only — nothing needs rendering) */
-    const stops=calm=>R.engineProbe(async(eng, ctx)=>{ if(calm) eng.setCalmStrikes(voices); eng.applyFx({}); const i=eng.LEAD_INSTR.findIndex(x=>x.id==='solo.singing-bowl');
+    const stops=night=>R.engineProbe(async(eng, ctx)=>{ if(night) eng.setNightStrikes(voices); eng.applyFx({}); const i=eng.LEAD_INSTR.findIndex(x=>x.id==='solo.singing-bowl');
         for(let k=0;k<32;k++){ const t=0.05+k*0.08, own='fu'+(k%4); eng.leadOn(own, 220*Math.pow(2,(k%5)/5), 1, i, undefined,undefined,undefined,undefined, t); eng.leadOff(own, undefined, t+0.3); }
         const L=ctx.__stops; return { oscs:L.length, early:L.filter(x=>x.n>1).length }; },
       { sec:0.1, wrap(ctx){ const log=[], f=ctx.createOscillator.bind(ctx); ctx.__stops=log;
           Object.defineProperty(ctx, 'createOscillator', { configurable:true, value:()=>{ const o=f(), rec={ n:0 }, s0=o.stop.bind(o); log.push(rec); o.stop=(...a)=>{ rec.n++; return s0(...a); }; return o; } }); } });
     const a=await stops(false), b=await stops(true); n+=2;
-    notes.push(`a dense bowl passage: Full ${a.oscs} oscillators, ${a.early} stopped early; with Calm's caps ${b.early} of ${b.oscs}`);
+    notes.push(`a dense bowl passage: Full ${a.oscs} oscillators, ${a.early} stopped early; with Night's caps ${b.early} of ${b.oscs}`);
     if(!(a.oscs>0 && a.early===0)) miss(`Full capped the bowl: ${a.early} of ${a.oscs} oscillators stopped early`);
-    if(!(b.early>0)) miss('CONTROL: with Calm\'s caps no oscillator was stopped early — the no-cap check cannot fail');
+    if(!(b.early>0)) miss('CONTROL: with Night\'s caps no oscillator was stopped early — the no-cap check cannot fail');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d, notes };
 }

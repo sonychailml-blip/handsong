@@ -32,4 +32,4 @@ export async function checkVisStack(){
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d };
 }
-row({ calm:true, at:1006, name:'VIS1a stack and bus', drawn:true, run:()=>checkVisStack(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+row({ night:true, at:1006, name:'VIS1a stack and bus', drawn:true, run:()=>checkVisStack(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });

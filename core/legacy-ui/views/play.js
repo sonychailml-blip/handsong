@@ -12,8 +12,8 @@ import { FX_EDGE, FX_STEP, fxBarItems, fxBarsBox, fxBarsY, fxParamOnFinger, hexA
 import { drawRoll } from './roll.js';
 import { drawLooper, loopViewClear } from './strip.js';
 import { stackAdd } from './stack.js';   // VIS1a: the play screen's two modules
-import { calmView } from '../../state.js';   // RUN 7 (C6): the Calm view (glow note field, plain labels)
-import { CALM_UI } from '../../pure/calmui.js';
+import { nightView } from '../../state.js';   // RUN 7 (C6): the Night view (glow note field, plain labels)
+import { NIGHT_UI } from '../../pure/nightui.js';
 
  
 /* ================= ОТРИСОВКА ================= */
@@ -163,7 +163,7 @@ function drawThereminLines(x0,x1,playH,accent,activeSlots,role='ld'){
   ctx.textBaseline='alphabetic'; ctx.textAlign='left';
 }
 function drawTag(x,y,lines,color){
-  if(calmView && calmView.plain) return;   // RUN 7 (C6): Calm shows no note names, Hz or role names on the canvas
+  if(nightView && nightView.plain) return;   // RUN 7 (C6): Night shows no note names, Hz or role names on the canvas
   ctx.font='600 15px system-ui';
   let w=0; for(const L of lines)w=Math.max(w,ctx.measureText(L).width);
   const lh=19, h=lines.length*lh+12, bw=w+18;
@@ -373,7 +373,7 @@ function drawRole(instr,rx0,rx1,playH){
      у прочих — от левого края роли, как у соло/баса. */
   const gx0 = chTyped ? split : rx0;
   const rowLblOf = instr==='ch' ? (chTyped?rootName:chordLabel) : noteLbl;   // узкие ряды: у типизированных — имя КОРНЯ (chordLabel дал бы «C5», это враньё), у прочих аккордов — имя аккорда, у соло/баса — нота
-  if(calmView && calmView.glow && instr==='ld'){ drawCalmField(gx0,rx1,playH,actSlots,actDegs); return; }   // RUN 7 (C6): Calm's glow note field
+  if(nightView && nightView.glow && instr==='ld'){ drawNightField(gx0,rx1,playH,actSlots,actDegs); return; }   // RUN 7 (C6): Night's glow note field
   if(rectGrid()){
     /* Легенда пальцев: соло/бас — нота+центы; типизированные аккорды — корень+центы; прочие
        аккорды — имя аккорда (ровно то же, что показывал бы ряд). Центы прячем, когда периодов
@@ -438,25 +438,25 @@ function drawRole(instr,rx0,rx1,playH){
 }
 /* VIS1a: the play screen is two visual modules (views/stack.js) — «surface» (instrument layer: the roles' fields, FX bars, the expression
    bar) and «hands» (overlay layer: hand points, the looper strip, its feedback, the status) — drawn in this same order as before */
-/* RUN 7 (C6, Calm plan §5): THE GLOW NOTE FIELD — the bands the hands hit are invisible (the rect layout's rectBandY bands, or the narrow
+/* RUN 7 (C6, Night plan §5): THE GLOW NOTE FIELD — the bands the hands hit are invisible (the rect layout's rectBandY bands, or the narrow
    rows' equal division of the height — the SAME geometry gestures use, rule #9). RUN 8 (the user's screenshots: row lines across the screen,
-   a wide bright band): only a soft OVAL glow on the row under each playing hand — CALM_UI.glowReach of the field's width each side of the hand,
+   a wide bright band): only a soft OVAL glow on the row under each playing hand — NIGHT_UI.glowReach of the field's width each side of the hand,
    fading to nothing at the row's edges and sides, brighter while it sounds; no lines at all. «Show the full note field» adds only a
-   barely-there tint on every other row. calmHands = the bus's handsView of this frame (set by the surface module). */
-let calmHands=[], calmFxV=null;
-function drawCalmField(x0,x1,playH,actSlots,actDegs){
+   barely-there tint on every other row. nightHands = the bus's handsView of this frame (set by the surface module). */
+let nightHands=[], nightFxV=null;
+function drawNightField(x0,x1,playH,actSlots,actDegs){
   const w=x1-x0, bands=[], on=new Set();
   if(rectGrid()){ const RL=rectLayout(); for(let b=0;b<RL.bands;b++) bands.push(rectBandY(b,playH,RL.bands)); for(const g of actSlots||[]) on.add(Math.floor(g/RL.k)+RL.regBands); }
   else { const rows=IVX().length, seg=playH/rows; for(let i=0;i<rows;i++) bands.push([i*seg,(i+1)*seg]); for(const d of actDegs||[]) on.add(rows-1-d); }
-  if(calmView.fieldAll) bands.forEach(([yTop,yBot],b)=>{ if(b%2){ ctx.fillStyle=cv('white-a03'); ctx.fillRect(x0,yTop,w,yBot-yTop); } });
-  for(const h of calmHands){ if(!h.play) continue;
+  if(nightView.fieldAll) bands.forEach(([yTop,yBot],b)=>{ if(b%2){ ctx.fillStyle=cv('white-a03'); ctx.fillRect(x0,yTop,w,yBot-yTop); } });
+  for(const h of nightHands){ if(!h.play) continue;
     const b=bands.findIndex(([yTop,yBot])=>h.y>=yTop && h.y<yBot); if(b<0) continue;
-    const [yTop,yBot]=bands[b], r=(yBot-yTop)/2, rx=Math.max(r, CALM_UI.glowReach*w), a=Math.min(1, CALM_UI.glowMax*(on.has(b) ? CALM_UI.glowOn : 1));
+    const [yTop,yBot]=bands[b], r=(yBot-yTop)/2, rx=Math.max(r, NIGHT_UI.glowReach*w), a=Math.min(1, NIGHT_UI.glowMax*(on.has(b) ? NIGHT_UI.glowOn : 1));
     ctx.save(); ctx.beginPath(); ctx.rect(x0,yTop,w,yBot-yTop); ctx.clip(); ctx.translate(h.x, yTop+r); ctx.scale(rx/r, 1);
-    const g=ctx.createRadialGradient(0,0,0,0,0,r); g.addColorStop(0, hexA(cv('calm-glow'), a)); g.addColorStop(0.45, hexA(cv('calm-glow'), a*0.4)); g.addColorStop(1, hexA(cv('calm-glow'), 0));
+    const g=ctx.createRadialGradient(0,0,0,0,0,r); g.addColorStop(0, hexA(cv('hn-glow'), a)); g.addColorStop(0.45, hexA(cv('hn-glow'), a*0.4)); g.addColorStop(1, hexA(cv('hn-glow'), 0));
     ctx.fillStyle=g; ctx.fillRect(-r,-r,2*r,2*r); ctx.restore(); }
 }
-/* RUN 8 (slice 3 + the user's addendum 5): CALM'S HANDS ARE FIVE FIREFLIES — the five fingertips only (the Hush emblem's five dots), exactly
+/* RUN 8 (slice 3 + the user's addendum 5): NIGHT'S HANDS ARE FIVE FIREFLIES — the five fingertips only (the Hush emblem's five dots), exactly
    where the camera sees them: the hit-tests' remapped points of THIS frame, no smoothing (the short trail lies behind, never ahead). The playing
    hand: the finger that sounds (else the index, ready) is the firefly lime with a HALO whose size and softness follow the depth — near: small
    and sharp, far: wide and soft —, the other four warm amber. The effects hand: index · middle · ring glow with Echo · Warmth / Brightness ·
@@ -466,10 +466,10 @@ let tipsDrawn=[];
 function halo(x,y,r,soft,col,a){   // soft 0 = a sharp edge … 1 = a wide soft glow
   const g=ctx.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0, hexA(col, a)); g.addColorStop(0.35-0.25*soft, hexA(col, a*(0.75-0.45*soft)));
   g.addColorStop(0.75-0.2*soft, hexA(col, a*0.18)); g.addColorStop(1, hexA(col, 0)); ctx.fillStyle=g; ctx.fillRect(x-r,y-r,2*r,2*r); }
-function drawCalmTips(S,k,lm,W,H){
-  const hv=calmHands.find(h=>h.key===k), play= hv ? hv.play : handFnOf(k,'ld')!=='fx', d= hv ? hv.d : 0.5, now=performance.now(), fx=calmFxV||{};
+function drawNightTips(S,k,lm,W,H){
+  const hv=nightHands.find(h=>h.key===k), play= hv ? hv.play : handFnOf(k,'ld')!=='fx', d= hv ? hv.d : 0.5, now=performance.now(), fx=nightFxV||{};
   const sounding=new Set(Object.keys(S.fing||{}).map(f=>+f+1)); if(play && !sounding.size && S.pinch && S.oct>=0) sounding.add(S.oct+1);   // tip 0 = thumb, 1… = index…
-  const lime=cv('calm-glow'), amber=cv('calm-amber'), u=Math.min(W,H)/600;
+  const lime=cv('hn-glow'), amber=cv('hn-amber'), u=Math.min(W,H)/600;
   for(let j=0;j<5;j++){ const x=sx(lm[TIP_LM[j]].x,W), y=sy(lm[TIP_LM[j]].y,H), id=k+':'+j;
     let tr=trails.get(id); if(!tr) trails.set(id, tr=[]); tr.unshift([x,y,now]); while(tr.length>TRAIL_N || (tr.length && now-tr[tr.length-1][2]>TRAIL_MS)) tr.pop();
     let col=amber, a=0.75, big=false;
@@ -483,9 +483,9 @@ function drawCalmTips(S,k,lm,W,H){
     tipsDrawn.push({ key:k, tip:j, x, y, lit:col===lime, a, halo: big ? (14+30*d)*u : 0 }); }
 }
 /* probe only: the fingertip fireflies drawn in the last frame (positions in canvas pixels, which are lit, the halo's radius) */
-export const calmTipsDbg=()=>tipsDrawn.map(t=>({ ...t }));
+export const nightTipsDbg=()=>tipsDrawn.map(t=>({ ...t }));
 /* probe only: draw the hands overlay once NOW from HANDS (the next screen frame redraws the canvas) → the fingertips drawn */
-export function calmTipsDrawDbg(){ drawHandsPhone({ landmarks:[] }, canvas.width, canvas.height, canvas.height); return calmTipsDbg(); }
+export function nightTipsDrawDbg(){ drawHandsPhone({ landmarks:[] }, canvas.width, canvas.height, canvas.height); return nightTipsDbg(); }
 function drawPhone(res){ drawSurface(); drawHandsLayer(res); }
 function drawSurface(){
   const W=canvas.width, H=canvas.height;
@@ -559,7 +559,7 @@ function drawHandsPhone(res,W,H,playH){
   if(!res||!res.landmarks)return;
   for(const k in HANDS){
     const S=HANDS[k], lm=S.lm; if(!lm)continue;
-    if(calmView && calmView.tips){ drawCalmTips(S,k,lm,W,H); continue; }   // RUN 8: Calm's hands are five fireflies (dev switch: all joints)
+    if(nightView && nightView.tips){ drawNightTips(S,k,lm,W,H); continue; }   // RUN 8: Night's hands are five fireflies (dev switch: all joints)
     /* Роль и X-диапазон ЭТОЙ руки: при сплите — щипок берёт ЗАМОРОЗКУ на S (совпадает с попаданием),
        до щипка — живую половину под указательным (lm[8]); вне сплита — глобальный phoneInstr на весь
        холст (single-role, байт-в-байт). Раздел палитра|ноты — palSplitX того же диапазона. */
@@ -590,7 +590,7 @@ function drawHandsPhone(res,W,H,playH){
     }
     if(S.pinch&&S.zone==='oct'){                  // рука в октавной полосе (любая, в т.ч. левая): показываем регистр, эффектов НЕ трогаем
       ctx.fillStyle=cv('sky'); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      if(!calmView) ctx.fillText(`${regWord().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // RUN 7: no technical labels in Calm   // «ОКТ»/«ТРИТАВА» по периоду
+      if(!nightView) ctx.fillText(`${regWord().toUpperCase()} ${OCT_ROMAN[S.oct]}`, S.x+14, S.y-10);   // RUN 7: no technical labels in Night   // «ОКТ»/«ТРИТАВА» по периоду
       continue;
     }
     if(fxHand){                                  // рука эффектов: подпись выбранного эффекта у кисти
@@ -602,7 +602,7 @@ function drawHandsPhone(res,W,H,playH){
       if(S.pinch&&S.adj){ let meta=null, ent=null;
         for(const e of S.adj.ent){ const m=FX_META.find(q=>q.k===e.fxId); if(m&&e.pIdx===0){ meta=m; ent=e; break; } }   // pIdx 0 — «величина» эффекта: у скаляра он единственный, у делея-модуля это mix (в.1); время и повторы на пальце подписью не дублируем
         if(meta){ ctx.fillStyle=cv(meta.col); ctx.font='700 13px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-          if(!calmView) ctx.fillText(`${t(meta.fullKey)} ${Math.round(ent.get()*100)}%`, S.x+14, S.y-10); } }   // величина ЖИВАЯ, из записи захвата (в.1): у скаляра get() — тот же fx[k], у делея — cur экземпляра
+          if(!nightView) ctx.fillText(`${t(meta.fullKey)} ${Math.round(ent.get()*100)}%`, S.x+14, S.y-10); } }   // величина ЖИВАЯ, из записи захвата (в.1): у скаляра get() — тот же fx[k], у делея — cur экземпляра
       continue;
     }
     if(loopHand){                                // рука-ЛУПЕР: помечаем, чтобы не казалась «немой»; подсказку раскладки даём до щипка
@@ -624,7 +624,7 @@ function drawHandsPhone(res,W,H,playH){
     if(S.pinch&&!S.inert&&S.deg<0&&rectGrid()&&(instr==='ld'||instr==='bs'||instr==='ch')){
       ctx.strokeStyle=hexA(accent,.45); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(S.x,S.y,16,0,7); ctx.stroke();
       ctx.fillStyle=cv('white-a70'); ctx.font='600 12px system-ui'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      if(!calmView) ctx.fillText(t('tag.idleFinger'), S.x+14, S.y-10);
+      if(!nightView) ctx.fillText(t('tag.idleFinger'), S.x+14, S.y-10);
       continue;
     }
     if(S.pinch&&!S.inert&&S.deg>=0){
@@ -695,7 +695,7 @@ function drawHandsPhone(res,W,H,playH){
         const oShow=S.regOct;
         drawTag(S.x,S.y,[chordLabel(S.deg),chordNotesStr(S.deg),`${regWord(s)} ${OCT_ROMAN[oShow]} · ${Math.round(S.vol*100)}%`],accent);
       }
-    }else if(!S.pinch && !calmView){             // подсказка до щипка — под указательным (RUN 7: not in Calm — the glow note field shows the row)
+    }else if(!S.pinch && !nightView){             // подсказка до щипка — под указательным (RUN 7: not in Night — the glow note field shows the row)
       const tip=lm[8], x=sx(tip.x,W), y=sy(tip.y,H);   // подсказка до щипка — в экранных пикселях игрового поля (поля кадра сняты)
       if((instr==='ld'||instr==='bs'||instr==='ch')&&rectGrid()){
         /* rect-раскладка (соло/бас/аккорды): подсказка кадрирует ПОЛОСУ сетки под рукой (тем же
@@ -806,7 +806,7 @@ function drawChordPalette(x0,x1,H){
    рисуют ЦЕПЬ роли БЕЗ гейта по руке (drawFxBars/fxBarItems ниже) — эффект звучит и без пальца на нём
    (фиксированные значения, адреса играющей руки), значит и показывать его есть что. */
 function drawFxBars(role,rx1,H){                   // rx1 — ПРАВАЯ кромка роли (слайс б.2; было rx0 — левая). Зовётся для ЛЮБОЙ роли: пустой items = ничего не рисуем. role остаётся РОЛЬЮ: это адрес ЭКРАННОГО МЕСТА и руки, а ключ цепи выводится здесь же (O-0)
-  if(calmView) return;   // RUN 7: Calm draws no effect bars (its effects get their forest visuals, C5)
+  if(nightView) return;   // RUN 7: Night draws no effect bars (its effects get their forest visuals, C5)
   const items = fxBarItems(role,chainKeyOf(role));   // БЕЗ гейта по руке: столбик показывает состояние ЭФФЕКТА, а эффект звучит и без пальца на нём (фиксированные параметры). Пустая цепь → пустой список → ничего не рисуется
   const {y0,y1}=fxBarsY(H);                       // низ справа: выше строки статуса, ниже коробки лупера (та вверху по центру). Числа те же, но теперь ОДНИ на отрисовку и на габарит fxBarsBox
   ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.font='11px system-ui';
@@ -878,6 +878,6 @@ function drawExprBar(rx0,rx1,H){
   ctx.textAlign='left'; ctx.textBaseline='alphabetic';
 }
 
-stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>{ calmHands=bus.get('handsView')||[]; calmFxV=bus.get('calmFx')||null; drawSurface(); } });
+stackAdd({ kind:'visual', id:'surface', layer:'instrument', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>{ nightHands=bus.get('handsView')||[]; nightFxV=bus.get('nightFx')||null; drawSurface(); } });
 stackAdd({ kind:'visual', id:'hands', layer:'overlay', cost:{ cls:'light', gpu:false }, frame:(t,bus)=>drawHandsLayer(bus.get('hands')) });
 export { drawOverlays };

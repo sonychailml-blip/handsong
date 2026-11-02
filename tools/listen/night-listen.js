@@ -1,6 +1,6 @@
-/* RUN 6 / RUN 7 (Calm sound pass) — the listening page's engine part: a separate instance of the app's engine (audio.js?listen, the render
-   copy's method) renders a candidate timbre offline in a Calm mood — a short PHRASE or SINGLE notes (struck / sustained) — through the Night
-   forest or DRY (the A/B). Dev tool, never shipped. Used by tools/listen/calm-timbres.html and by the runner's checks (tools/listen/
+/* RUN 6 / RUN 7 (Night sound pass) — the listening page's engine part: a separate instance of the app's engine (audio.js?listen, the render
+   copy's method) renders a candidate timbre offline in a Night mood — a short PHRASE or SINGLE notes (struck / sustained) — through the Night
+   forest or DRY (the A/B). Dev tool, never shipped. Used by tools/listen/night-timbres.html and by the runner's checks (tools/listen/
    check-listen.js, measure.js via --eval). */
 import * as E from '../../core/audio.js?listen';               // a separate engine instance (like the render copy audio.js?render)
 import { scaleById, scaleView, leadFreq } from '../../core/scales.js';
@@ -9,7 +9,7 @@ import { FOREST } from '../../core/pure/dsp.js';
 
 const RATE=48000, SEED=0x5eed;
 export const MOODS=[['major-penta','Glow'],['minor-penta','Dusk'],['egyptian','Mist']];
-const KEY_A=9;                                            // the Calm key (profile.calm key.tonic) — the pitch comes from the view (rule #2)
+const KEY_A=9;                                            // the Night key (profile.night key.tonic) — the pitch comes from the view (rule #2)
 /* RUN 7: the candidates — six new organic timbres (engines modal / breath) + today's Firefly as the reference the user already knows */
 export const CANDS=[
   { id:'solo.firefly-rich', role:'ld', note:'struck tine, richer: more partials, a soft mallet, each note slightly different' },
@@ -20,7 +20,7 @@ export const CANDS=[
   { id:'solo.breath-pad', role:'ld', note:'breathing pad: soft voices, slowly breathing, a little air' },
   { id:'solo.firefly', role:'ld', note:'today\'s Firefly — the reference', ref:true },
 ];
-/* the phrase: degrees of the five-note mood (index, octave step, beats) at 72 bpm (Calm's tempo), the last note held */
+/* the phrase: degrees of the five-note mood (index, octave step, beats) at 72 bpm (Night's tempo), the last note held */
 const BPM=72, BEAT=60/BPM;
 const PHRASE=[[0,0,0.5],[1,0,0.5],[2,0,0.5],[4,0,0.5],[3,0,1],[2,0,0.5],[1,0,0.5],[0,1,1],[4,0,0.5],[2,0,0.5],[0,0,2]];
 /* single notes: the mood's root, then its fifth-ish degree an octave up, each held 2.5 s — how one note starts, sustains / rings and ends */

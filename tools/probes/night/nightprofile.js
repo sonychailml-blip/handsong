@@ -1,5 +1,5 @@
 /* SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before
-   the split, word for word). From the page's start state in a non-default test state, Night sets ITS defaults and body.calm hides the role, split, record,
+   the split, word for word). From the page's start state in a non-default test state, Night sets ITS defaults and body.night hides the role, split, record,
    backing and Loop controls; back to the start state every field is EXACTLY as before. CONTROL: the comparison must see every field Night sets as changed. */
 import { row } from '../core/rows.js';
 import { profileApply, profileCurrent, profileLoadReport, profileOf, profileDoorsDbg, profileSavedDbg } from '../../../core/profile.js';
@@ -11,7 +11,7 @@ const cmp=(a,b)=> KEYS.filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k])).ma
 const hiddenNow=id=>{ const el=document.getElementById(id); return !el || getComputedStyle(el).display==='none'; };
 
 export function checkNightProfile(){
-  const d=[]; let n=0; const miss=s=>d.push(s), was=profileCurrent(), START='profile.full', ME='profile.calm';
+  const d=[]; let n=0; const miss=s=>d.push(s), was=profileCurrent(), START='profile.full', ME='profile.night';
   const D=profileDoorsDbg(); if(!D) return { cases:1, total:1, differences:['the profile doors are not wired (ui.js)'] };
   const bar=document.getElementById('bar'), barMin=!!bar && bar.classList.contains('min');
   if(bar) bar.classList.remove('min');   // the collapsed bar hides several buttons by itself (else «hidden» could not fail)
@@ -34,7 +34,7 @@ export function checkNightProfile(){
         { fxId:'cecho', params:[{ mode:'drive', hand:'fx', finger:0, axis:'y', inv:false }, { mode:'fixed', v01:0.8431089342012043 }] },
         { fxId:'fdepth', params:[{ mode:'fixed', v01:1 }, { mode:'drive', hand:'play', axis:'z', inv:false }, { mode:'fixed', v01:0.5 }, { mode:'fixed', v01:1 }, { mode:'fixed', v01:0 }] } ] };
     n++; { const c=cmp(inMe, want); if(c.length) miss('its state: '+c.join(' · ')); }
-    n++; if(!document.body.classList.contains('calm')) miss('body.calm not set');
+    n++; if(!document.body.classList.contains('night')) miss('body.night not set');
     for(const id of ['instrBtn','splitBtn','recBtn','jamBtn','loopPanelBtn']){ n++; if(!hiddenNow(id)) miss(`#${id} visible`); }
     n++; if(hiddenNow('soundBtn')) miss('#soundBtn hidden');
     n++; { const c=cmp(before, inMe); if(c.length!==KEYS.length) miss(`CONTROL: the comparison saw ${c.length} of ${KEYS.length} changed fields (all of them change)`); }
@@ -43,7 +43,7 @@ export function checkNightProfile(){
     n++; if(!profileApply('profile.none')) miss('an unknown profile was accepted');
     why=profileApply(START); n++; if(why) miss('the start state refused: '+why);
     const back=D.read(); n++; { const c=cmp(back, before); if(c.length) miss('back, not exactly as before: '+c.join(' · ')); }
-    n++; if(document.body.classList.contains('calm')) miss('body.calm still set');
+    n++; if(document.body.classList.contains('night')) miss('body.night still set');
     n++; if(hiddenNow('instrBtn') && hiddenNow('instrBtnL')) miss('no role button in the start state');
     n++; if(hiddenNow('recBtn')) miss('#recBtn hidden in the start state');
     n++; if(profileSavedDbg()) miss('a saved state left after the return');
@@ -51,4 +51,4 @@ export function checkNightProfile(){
   finally{ profileApply(START); D.write(orig); profileApply(was); if(bar && barMin) bar.classList.add('min'); }
   return { cases:n, total:d.length, differences:d };
 }
-row({ calm:true, at:1005.5, name:'NIGHT profile round trip', run:()=>checkNightProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+row({ night:true, at:1005.5, name:'NIGHT profile round trip', run:()=>checkNightProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });

@@ -44,4 +44,4 @@ export async function checkProfile(){
   finally{ if(profileCurrent()!==START) profileApply(START); profileDropDbg(FIXTURE); D.write(orig); }
   return { cases:n, total:d.length, differences:d };
 }
-row({ calm:true, at:1005, name:'C0 profile round trip', run:()=>checkProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });
+row({ night:true, at:1005, name:'C0 profile round trip', run:()=>checkProfile(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, status:r.status }) });

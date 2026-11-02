@@ -146,7 +146,7 @@ function noteVolOf(zk,xn,zOf){
   const a = z ? zOf() : xn;
   const v = pa&&pa.inv ? 1-a : a, r=lo+(hi-lo)*v;
   if(volFloor==null) return r;   // Full: its own curve (the left edge is silence)
-  return Math.sqrt(volFloor+(1-volFloor)*volAmp(r));   // RUN 8 (Calm, the profile's «volume».left): the amplitude runs floor … 1, smoothly (v² between)                                                 // 3/4. ход руки по глубине или горизонтали: с VOL-2b [0,1] — ровно v (левый край / рука у камеры = тишина)
+  return Math.sqrt(volFloor+(1-volFloor)*volAmp(r));   // RUN 8 (Night, the profile's «volume».left): the amplitude runs floor … 1, smoothly (v² between)                                                 // 3/4. ход руки по глубине или горизонтали: с VOL-2b [0,1] — ровно v (левый край / рука у камеры = тишина)
 }
 
 export { depthOf, depthN, melodicZone, polyZone, leadZone, liveKey, monoKey, wOn, wOff, ACTIONS, paletteFinger, handHalfRole, noteHandRole, noteVolOf };

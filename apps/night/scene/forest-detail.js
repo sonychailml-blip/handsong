@@ -1,7 +1,7 @@
 /* RUN 9 (slice 3) — THE FOREST'S DETAIL. Parts of the night forest room (forest.js builds them); everything that moves on its own moves in a
    shader where it can (grass and ferns sway, leaves fall), the CPU only steers a few moths and the moonbeams' angle.
    - GRASS: many blades in ONE instanced draw; they sway with the WIND — the ambience's wind (its level and the gust of its own 0.06-Hz sweep,
-     from the bus «calmNight») — and Wave makes them shimmer like the ferns (the shared uniforms of forest-life.js);
+     from the bus «nightSky») — and Wave makes them shimmer like the ferns (the shared uniforms of forest-life.js);
    - FALLING LEAVES: points falling slowly and turning, each on its own loop (shader-only), drifting with the wind, lit near the playing light;
    - MOTHS: a few pale moths flutter around the playing light; when it goes they drift up and fade;
    - MOONBEAMS: a few additive planes from the moon through the gaps (no volumetrics), their light following the moon's under the clouds;

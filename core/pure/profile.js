@@ -1,11 +1,11 @@
-/* C0 (RUN 6, Calm plan §2) — THE PROFILE RECORD and its validator. CORE: pure (rule #36), runs in node (data row «C0 profile records
+/* C0 (RUN 6, Night plan §2) — THE PROFILE RECORD and its validator. CORE: pure (rule #36), runs in node (data row «C0 profile records
    (core)»). A profile is a face of the same app: which roles it offers, the hands' defaults, the key, moods, timbres and effects it offers,
-   the scene, the shell, labels. `profile.full` = today's app (every «offer» null = nothing is touched, nothing is narrowed); `profile.calm`
-   = Calm v1. Records: data/profiles/<name>.json, listed in data/profiles/index.json; ids permanent (rule #37, PROFILE_IDS pinned). */
+   the scene, the shell, labels. `profile.full` = today's app (every «offer» null = nothing is touched, nothing is narrowed); `profile.night`
+   = Night v1. Records: data/profiles/<name>.json, listed in data/profiles/index.json; ids permanent (rule #37, PROFILE_IDS pinned). */
 import { idSpace } from './registry.js';
 
 export const PROFILE_FORMAT='handsong/profile', PROFILE_VERSION=1;
-export const PROFILE_IDS=Object.freeze(['profile.full','profile.calm']);   // pinned: never renamed or reused
+export const PROFILE_IDS=Object.freeze(['profile.full','profile.night']);   // pinned: never renamed or reused
 export const PROFILE_ROLES=Object.freeze(['ld','ch','bs','dr']);
 export const BACKGROUNDS=Object.freeze(['camera','forest','dark']);
 export const LEVEL_DB=24, VOICES_MAX=16;   // RUN 8: voices — how many strikes of a struck timbre may ring at once in this face   // RUN 8: the largest per-timbre trim a profile may set (dB)
@@ -51,7 +51,7 @@ export function checkProfile(p, known={}){
   if(p.scene!==null && p.scene!=='forest') return 'scene: null or «forest»';
   if(!strList(p.backgrounds) || p.backgrounds.some(b=>!BACKGROUNDS.includes(b))) return 'backgrounds: a list of '+BACKGROUNDS.join(' / ');
   if(p.backgrounds.some(b=>b!=='camera') && p.scene===null && p.backgrounds.includes('forest')) return 'backgrounds: «forest» needs a scene';
-  if(p.shell!=='full' && p.shell!=='calm') return 'shell: «full» or «calm»';
+  if(p.shell!=='full' && p.shell!=='night') return 'shell: «full» or «night»';
   if(p.noteField!=='full' && p.noteField!=='glow') return 'noteField: «full» or «glow»';
   if(p.labels!=='full' && p.labels!=='plain') return 'labels: «full» or «plain»';
   if(typeof p.recording!=='boolean') return 'recording: true or false';
@@ -81,7 +81,7 @@ export const PROFILE_DAMAGES=Object.freeze([
   ['shell', p=>{ p.shell='kiosk'; }],
   ['labels', p=>{ p.labels='none'; }],
   ['recording', p=>{ p.recording='yes'; }],
-  ['id', p=>{ p.id='u.calm'; }],
+  ['id', p=>{ p.id='u.night'; }],
   ['unknown field', p=>{ p.theme='night'; }],
   ['levels', p=>{ p.levels={ 'solo.firefly':60 }; }],
   ['voices', p=>{ p.voices={ 'solo.handpan':99 }; }],

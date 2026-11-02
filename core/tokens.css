@@ -248,7 +248,7 @@
   --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
   --cv-halo-a100:rgba(255,255,255,1); --cv-halo-a45:rgba(255,255,255,.45); --cv-halo-a10:rgba(255,255,255,.1); --cv-halo-a0:rgba(255,255,255,0);
   --cv-mist-a12:rgba(255,255,255,.12);
-  --cv-calm-glow:#c8f56a;   /* RUN 7: the Calm glow note field — the row under a hand glows in the firefly lime */
-  --cv-calm-dark:#000;   /* the Dark background (Calm): plain black, the same sound, the hand points on it */
-  --cv-calm-amber:#ffc46b;   /* RUN 8: Calm's fingertip fireflies at rest (warm amber; the playing one is --cv-calm-glow, the emblem's centre) */
+  --cv-hn-glow:#c8f56a;   /* RUN 7: the Night glow note field — the row under a hand glows in the firefly lime */
+  --cv-hn-dark:#000;   /* the Dark background (Night): plain black, the same sound, the hand points on it */
+  --cv-hn-amber:#ffc46b;   /* RUN 8: Night's fingertip fireflies at rest (warm amber; the playing one is --cv-hn-glow, the emblem's centre) */
 }

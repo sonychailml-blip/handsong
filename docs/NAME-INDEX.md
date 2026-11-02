@@ -22,7 +22,7 @@ SPLIT-2: the Full app's entry.
 - fn (2): `wireStarter`, `openLessons`
 
 ## apps/night/ghost.js
-RUN 7 (C7, Calm plan §6; docs/CALM-QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts slo…
+RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts s…
 - const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
 - fn (2): `ghostAt`, `ghostFrame`
 
@@ -30,13 +30,18 @@ RUN 7 (C7, Calm plan §6; docs/CALM-QUALITY.md points 4, 5, 6) — THE GHOST LIG
 SPLIT-2: the Night app's entry: its shell, its ghost light, its forest, its profile.
 - exports: none
 
+## apps/night/migrate.js
+SPLIT-2: one-time move of this app's old setting names, on one origin only (plan §5.3).
+- const (1): `OLD_PREFIX`
+- fn (1): `migrateKeys`
+
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
 - const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
 - fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
 
 ## apps/night/pure/fireflies.js
-VIS1c (RUN 6, Calm plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
+VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
 - const (2): `FOREST_FLIES`, `FOREST_DEPTH`
 - fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
 
@@ -60,14 +65,14 @@ RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same 
 - fn (1): `buildRare`
 
 ## apps/night/scene/forest.js
-VIS1c (RUN 6, Calm plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
+VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
 - const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
 - fn (1): `buildForest`
 
 ## apps/night/shell.js
-RUN 7 (C6 + C11, Calm plan §5; docs/CALM-QUALITY.md points 4, 5, 6, 9, 10) — THE CALM SHELL (DOM side; the logic is core/calmui.js).
-- const (2): `calmShellDbg`, `calmSleepDbg`
-- fn (2): `calmShellWire`, `calmShellFace`
+RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
+- const (2): `nightShellDbg`, `nightSleepDbg`
+- fn (2): `nightShellWire`, `nightShellFace`
 
 ## core/arrange.js
 Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
@@ -77,7 +82,7 @@ RUN 7 (C6 + C11, Calm plan §5; docs/CALM-QUALITY.md points 4, 5, 6, 9, 10) — 
 ## core/audio.js
 (no head comment)
 - const (52): `outputFadeLevel`, `setLowPower`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
-- fn (87): `outputFade`, `setTimbreTrim`, `setCalmStrikes`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
+- fn (87): `outputFade`, `setTimbreTrim`, `setNightStrikes`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
 - let (4): `AC`, `frzReady`, `ksReady`, `dynReady`
 - → ./modules/timbres/stages.js (1): `panGains`
 
@@ -97,7 +102,7 @@ AUTOSAVE1 (RUN 3, 2026-10-16) — THE CURRENT SONG KEPT ON THIS DEVICE BY ITSELF
 - fn (3): `bendAt`, `bendSplit`, `bendPlan`
 
 ## core/edition.js
-C0 (RUN 6, Calm plan §2, §9.2) — THE EDITION.
+The edition: 'dev' in the repository and in ordinary builds (Night's ⓘ card shows its development items).
 - const (1): `EDITION`
 
 ## core/engine/fdn.js
@@ -239,8 +244,8 @@ DRAW1 (DAY run 2026-10-16): shared canvas helpers (FX bar layout, status and tra
 
 ## core/legacy-ui/views/play.js
 DRAW1 (DAY run 2026-10-16): the play screen: overlays per frame (drawOverlays), roles, grids, hands, palette, effect bars, status — moved from draw.js verbatim (draw.js is the facade).
-- const (1): `calmTipsDbg`
-- fn (2): `calmTipsDrawDbg`, `drawOverlays`
+- const (1): `nightTipsDbg`
+- fn (2): `nightTipsDrawDbg`, `drawOverlays`
 
 ## core/legacy-ui/views/roll.js
 DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis, the automation lane, hit tests) — moved from draw.js verbatim (draw.js is the facade).
@@ -248,7 +253,7 @@ DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis
 - fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
 
 ## core/legacy-ui/views/scene/host.js
-VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Calm plan §3) — THE SCENE HOST and Calm's BACKGROUNDS.
+VIS1b (RUN 6, docs/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
 - const (13): `BACKGROUNDS`, `sceneRoomAdd`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
 - fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
@@ -286,18 +291,13 @@ REC5 (stage 3) — LIVE RECORDING: the recording state and the take's per-track 
 - let (4): `recording`, `pushLy`, `curTake`, `latchOpenAt`
 
 ## core/modules/ambience/forest.js
-RUN 7 (C4c, Calm plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambie…
+RUN 7 (C4c, Night plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambi…
 - fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
 
 ## core/modules/effects/bright.js
 AUD2a (RUN 3, 2026-10-16) — the effect «Brightness» (a voice module read by each voice).
 - const (1): `BRIGHT_PARAMS`
 - fn (1): `makeBrightFx`
-
-## core/modules/effects/calm.js
-RUN 7 (C5, Calm plan §4.3; docs/CALM-QUALITY.md points 1, 4, 8) — THE CALM EFFECTS HAND: three effects, ONE amount each (a vertical drag of its finger; it stays where it is left).
-- const (4): `CALM_FX`, `CECHO_PARAMS`, `CTONE_PARAMS`, `CWAVE_PARAMS`
-- fn (3): `makeCalmEchoFx`, `makeCalmToneFx`, `makeCalmWaveFx`
 
 ## core/modules/effects/delay.js
 AUD2a (RUN 3, 2026-10-16) — the effect «Delay» (a bus insert with its own dry/wet).
@@ -310,7 +310,7 @@ AUD2a (RUN 3, 2026-10-16) — the effect «Night forest» (a seeded convolution 
 - fn (2): `forestBuffer`, `makeForestFx`
 
 ## core/modules/effects/forestdepth.js
-RUN 7 (C4b, Calm plan §4.2; the user's choice «Calm gets its own wider range, Full unchanged»; RUN 8: LOUDNESS KEPT) — the effect «Forest depth»: Calm's room.
+RUN 7 (C4b, Night plan §4.2; the user's choice «Night gets its own wider range, Full unchanged»; RUN 8: LOUDNESS KEPT) — the effect «Forest depth»: Night's room.
 - const (2): `FDEPTH_LIGHT`, `FDEPTH_PARAMS`
 - fn (1): `makeForestDepthFx`
 
@@ -323,6 +323,11 @@ AUD2a (RUN 3, 2026-10-16) — the effect «Glide» (a voice module; the pitch gl
 AUD2a (RUN 3, 2026-10-16) — the dynamics «Glue» (our compressor in the dyn worklet) and the dynamics node builder (also the master's Glue and Limiter).
 - const (1): `GLUE_PARAMS`
 - fn (2): `dynNode`, `makeGlueFx`
+
+## core/modules/effects/night-fx.js
+RUN 7 (C5, Night plan §4.3; docs/night/QUALITY.md points 1, 4, 8) — THE NIGHT EFFECTS HAND: three effects, ONE amount each (a vertical drag of its finger; it stays where it is left).
+- const (4): `NIGHT_FX`, `CECHO_PARAMS`, `CTONE_PARAMS`, `CWAVE_PARAMS`
+- fn (3): `makeNightEchoFx`, `makeNightToneFx`, `makeNightWaveFx`
 
 ## core/modules/effects/param.js
 AUD2a (RUN 3, 2026-10-16) — an effect parameter's normalised value (0..1 ↔ its units) and the wrapper every declared parameter goes through (setNorm, cur).
@@ -349,7 +354,7 @@ AUD1c (RUN 3, 2026-10-16) — the bass pool voices.
 - fn (1): `buildBassPool`
 
 ## core/modules/timbres/breath.js
-RUN 7 (Calm sound pass) — the BREATH engine type: sustained, breathing sounds (a breathy flute, a soft vocal / bowed pad).
+RUN 7 (Night sound pass) — the BREATH engine type: sustained, breathing sounds (a breathy flute, a soft vocal / bowed pad).
 - fn (1): `buildBreathBank`
 
 ## core/modules/timbres/chord-voice.js
@@ -370,7 +375,7 @@ AUD1c (RUN 3, 2026-10-16) — the Karplus–Strong solo banks (worklet `ks-strin
 - fn (2): `buildKSBank`, `buildKSFallback`
 
 ## core/modules/timbres/modal.js
-RUN 7 (Calm sound pass) — the MODAL engine type: struck instruments (handpan, singing bowl, kalimba, a richer Firefly) by modal synthesis.
+RUN 7 (Night sound pass) — the MODAL engine type: struck instruments (handpan, singing bowl, kalimba, a richer Firefly) by modal synthesis.
 - fn (1): `buildModalBank`
 
 ## core/modules/timbres/stages.js
@@ -379,7 +384,7 @@ AUD1c (RUN 3, 2026-10-16) — shared voice stages: track route, pan, brightness,
 - fn (6): `makePanStage`, `voiceRoute`, `panGains`, `makeBriStage`, `makeSatCurve`, `makeHardCurve`
 
 ## core/modules/timbres/strikes.js
-RUN 8 (the Calm crackle) — THE STRIKE CAP of the struck solo engines (tine, modal), CALM ONLY.
+RUN 8 (the Night crackle) — THE STRIKE CAP of the struck solo engines (tine, modal), NIGHT ONLY.
 - const (1): `LOW_CAP`
 - fn (1): `strikeAdmit`
 
@@ -388,7 +393,7 @@ AUD1c (RUN 3) / TIM3b (RUN 4) — the solo bank of a voice from its timbre RECOR
 - fn (2): `buildLeadBank`, `buildSubtractive`
 
 ## core/modules/timbres/tine.js
-C4a (RUN 6, Calm plan §4.1) — the TINE engine type as a SOLO bank: «Firefly» for the solo hand.
+C4a (RUN 6, Night plan §4.1) — the TINE engine type as a SOLO bank: «Firefly» for the solo hand.
 - fn (1): `buildTineBank`
 
 ## core/modules/timbres/voice.js
@@ -407,7 +412,7 @@ C0 (RUN 6): PROFILES.
 - fn (2): `profileApply`, `profileAddDbg`
 
 ## core/pure/ambience.js
-RUN 7 (C4c, Calm plan §4.6; docs/CALM-QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
+RUN 7 (C4c, Night plan §4.6; docs/night/QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
 - const (1): `AMB`
 - fn (3): `windNoise`, `cricketStream`, `chirpShape`
 
@@ -415,11 +420,6 @@ RUN 7 (C4c, Calm plan §4.6; docs/CALM-QUALITY.md points 1, 5, 8) — THE FOREST
 VIS1a (RUN 6, docs/VIS1-design.md §3) — THE EVENT BUS for visuals.
 - const (2): `RING_N`, `BUS`
 - fn (1): `createBus`
-
-## core/pure/calmui.js
-RUN 7 (C6, Calm plan §5; docs/CALM-QUALITY.md points 5, 8, 9) — the Calm shell's LOGIC.
-- const (1): `CALM_UI`
-- fn (4): `showStep`, `nextOf`, `sleepLevel`, `glowAlpha`
 
 ## core/pure/camlight.js
 LAT3 — low light.
@@ -433,8 +433,8 @@ CMD1a (RUN 5) — CANONICAL JSON and its hash (pure core, rule #36; data row «C
 
 ## core/pure/dsp.js
 SND-F1 — pure DSP formulas shared by the engine (audio.js), the dynamics worklet (dyn-worklet.js) and the probes.
-- const (9): `FOREST`, `CALM_DEPTH`, `forestRoom`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `dynCoef`
-- fn (6): `seeded`, `calmDepth`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`
+- const (9): `FOREST`, `NIGHT_DEPTH`, `forestRoom`, `compGainDb`, `DYN_GLUE`, `DYN_LIMIT`, `DYN_MASTER`, `MASTER_MAKEUP_DB`, `dynCoef`
+- fn (6): `seeded`, `nightDepth`, `forestIR`, `irNormScale`, `f32Hash`, `compCurveDb`
 
 ## core/pure/engclass.js
 ENG2 (RUN 4) — the engine's PROVISIONAL power class and the dropout rate.
@@ -457,13 +457,18 @@ LAT1 — latency bookkeeping.
 - const (10): `LAT_N`, `BT_MS`, `BT_LABEL`, `frameWaitMs`, `withFrameWait`, `perMinute`, `STARTUP_MS`, `MP_LINE`, `SOFT_GL`, `isSoftwareGL`
 - fn (6): `makeMeter`, `statsOf`, `handToSound`, `looksBluetooth`, `rateOf`, `splitLongTasks`
 
+## core/pure/nightui.js
+RUN 7 (C6, Night plan §5; docs/night/QUALITY.md points 5, 8, 9) — the Night shell's LOGIC.
+- const (1): `NIGHT_UI`
+- fn (4): `showStep`, `nextOf`, `sleepLevel`, `glowAlpha`
+
 ## core/pure/pack.js
 PACK1 (RUN 3, 2026-10-16; stage-3 plan slice 33; user decision: build it now, no UI) — PACKS AND OFFLINE LICENCE KEYS.
 - const (5): `PACK_FORMAT`, `PACK_VERSION`, `KEY_PREFIX`, `KEY_FORMAT`, `PACK_PUBKEYS`
 - fn (5): `packCheck`, `keySign`, `keyVerify`, `createPackGate`, `packUnlock`
 
 ## core/pure/profile.js
-C0 (RUN 6, Calm plan §2) — THE PROFILE RECORD and its validator.
+C0 (RUN 6, Night plan §2) — THE PROFILE RECORD and its validator.
 - const (7): `PROFILE_FORMAT`, `PROFILE_IDS`, `PROFILE_ROLES`, `BACKGROUNDS`, `LEVEL_DB`, `HAND_FNS`, `PROFILE_DAMAGES`
 - fn (1): `checkProfile`
 
@@ -616,8 +621,8 @@ REC3 part 2 (stage 3) — TRANSPOSE BY DEGREES (ED4), A TRACK INTO ANOTHER MODE 
 
 ## core/state.js
 (no head comment)
-- const (99): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`, `setVolFloor`, `setCalmView`, `setFxChain`
-- let (50): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`, `volFloor`, `calmView`
+- const (99): `fx`, `fxIsScalar`, `CHAIN_ROLE`, `chainKeyOf`, `CHAIN_SOLO`, `CHAIN_TRACK`, `trackChainKeyOf`, `chainOwners`, `fxChainOf`, `fxVolReset`, `setFxParamAddr`, `setFxParamMode`, `setFxParamFixed`, `fxChainAdd`, `fxChainRemove`, `fxChainMove`, `setHandFn`, `handSide`, `handFnOf`, `roleHasTherm`, `roleHasFx`, `roleHasExpr`, `playsNotes`, `roleHasNotes`, `handActsOf`, `handActOf`, `setHandAct`, `setRectPref`, `setPinchFingers`, `VOICE_MODE_DEF`, `voiceMode`, `setVoiceMode`, `isLeadMode`, `setSplitRole`, `phoneHalves`, `setScaleId`, `setTonic`, `KEY_CENTS_MAX`, `setTonicCents`, `setARef`, `setTunedFrom`, `setChordMode`, `setChordModeSel`, `setSeventh`, `setLeadIdx`, `setChIdx`, `setBassIdx`, `setDrumKitIdx`, `setExprDisp`, `setChFitDeg`, `setExprBrightDisp`, `setLooperMsg`, `setLooperClear`, `setLatchDeg`, `setLatchOct`, `setChordFam`, `setChordVar`, `setLatchTy`, `setPhoneInstr`, `setCamFacing`, `setVideoRec`, `mirrored`, `flipX`, `setViewRect`, `sx`, `sy`, `setSplitOn`, `setOctReg`, `setBassOctReg`, `setChordOctReg`, `setRollOpen`, `setArrOpen`, `setArrFace`, `setRollWin`, `setRollSel`, `setRollSelNote`, `setRollSelMany`, `setRollPick`, `setRollBox`, `setRollDrag`, `setRollIns`, `setLaneRow0`, `setLaneDrag`, `ROLL_EDITABLE`, `setRollRole`, `setRollRow0`, `setRollRowsAll`, `setRollAut`, `setRollAutSel`, `setRollAutDrag`, `setRollBendSel`, `setRollBendDrag`, `setSecSel`, `setRollVolBars`, `rectOctReg`, `setRectOctReg`, `setVolFloor`, `setNightView`, `setFxChain`
+- let (50): `scaleId`, `aRef`, `tunedFrom`, `chordModeSel`, `chordModeVer`, `seventh`, `fxChains`, `exprDisp`, `chFitDeg`, `exprBrightDisp`, `looperMsg`, `looperClear`, `latchDeg`, `latchOct`, `chordFam`, `latchTy`, `phoneInstr`, `handFn`, `handActs`, `rectPref`, `pinchFingers`, `camFacing`, `videoRec`, `splitOn`, `SPLIT_ROLES`, `octReg`, `bassOctReg`, `chordOctReg`, `tonicCents`, `viewRect`, `rollOpen`, `rollBeat0`, `rollSpan`, `rollSel`, `arrOpen`, `arrFace`, `rollSelNote`, `rollSelMany`, `rollPick`, `rollDrag`, `rollRole`, `laneRow0`, `laneDrag`, `rollRowsAll`, `rollAut`, `rollBendSel`, `secSel`, `rollVolBars`, `volFloor`, `nightView`
 - → ./config.js (1): `FX_VOL`
 
 ## core/timbreload.js
@@ -723,10 +728,10 @@ PROBE1: the ROW REGISTRY — every probe row registers itself next to its probe;
 ## tools/probes/core/run.js
 PROBE1: P.all / P.quick / P.orderCheck — runs every registered row (probes/rows.js) in order, with the state guard between rows.
 - const (1): `runWire`
-- fn (6): `material`, `songPrint`, `all`, `quick`, `calm`, `orderCheck`
+- fn (6): `material`, `songPrint`, `all`, `quick`, `night`, `orderCheck`
 
 ## tools/probes/core/sound.js
-SND-F1: probes of the Calm prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
+SND-F1: probes of the Night prototype's sounds — the Firefly timbre, the Night forest room, our dynamics (Glue, safety Limiter).
 - fn (7): `checkFirefly`, `checkForest`, `checkDynamics`, `checkMasterPath`, `checkDynLive`, `checkFreezeParity`, `checkTimbreIds`
 
 ## tools/probes/core/timbres.js
@@ -843,32 +848,37 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/gold.js (2): `dumpGold`, `checkGold`
 - → ./core/hand.js (2): `dumpGesture`, `checkGesture`
 - → ./core/profile.js (1): `checkProfile`
-- → ./core/run.js (2): `material`, `calm`
+- → ./core/run.js (2): `material`, `night`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
-- → ./night/calm.js (1): `checkSoloFirefly`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
+- → ./night/night.js (1): `checkSoloFirefly`
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
+- → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
 
-## tools/probes/night/calm.js
-C4a (RUN 6, Calm plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
-- const (2): `CALM_TIMBRES`, `CALM_SET`
-- fn (16): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkCalmTimbres`, `checkCalmShell`, `checkCalmDepth`, `checkCalmAmbience`, `checkCalmGhost`, `checkCalmSet`, `checkCalmFx`, `checkCalmFxTimbres`, `checkCalmStress`, `checkCalmDepthLoud`, `checkCalmBars`, `checkCalmLowPower`, `checkCalmVolume`
-
 ## tools/probes/night/forest.js
-VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
+VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
 - fn (8): `checkForestRoom`, `checkBackgrounds`, `checkForestPicture`, `checkNightCycle`, `checkForestResponse`, `checkForestDetail`, `checkForestRare`, `checkForestLevels`
+
+## tools/probes/night/night.js
+C4a (RUN 6, Night plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
+- const (2): `NIGHT_TIMBRES`, `NIGHT_SET`
+- fn (16): `checkSoloFirefly`, `kLoud`, `clickOf`, `checkNightTimbres`, `checkNightShell`, `checkNightDepth`, `checkNightAmbience`, `checkNightGhost`, `checkNightSet`, `checkNightFx`, `checkNightFxTimbres`, `checkNightStress`, `checkNightDepthLoud`, `checkNightBars`, `checkNightLowPower`, `checkNightVolume`
 
 ## tools/probes/night/nightguard.js
 SPLIT-2: row «NIGHT untouched» — the mirror of «FULL untouched»: a change elsewhere must not move this app.
 - fn (2): `dumpNight`, `checkNightUntouched`
 
+## tools/probes/night/nightmigrate.js
+SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are removed, a new value wins over an old one, a second run changes nothing.
+- fn (1): `checkNightMigrate`
+
 ## tools/probes/night/nightprofile.js
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_166 modules, 2138 exported names._
+_168 modules, 2142 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

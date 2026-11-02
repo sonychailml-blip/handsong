@@ -41,7 +41,7 @@ class ProbeCap extends AudioWorkletProcessor {
   }
 }
 registerProcessor('probe-cap', ProbeCap);
-/* RUN 8: the «CALM stress» row's CONTROL for the dropout counter — this processor STALLS the audio thread (busy-waits ms per quantum, for
+/* RUN 8: the «NIGHT stress» row's CONTROL for the dropout counter — this processor STALLS the audio thread (busy-waits ms per quantum, for
    `blocks` quanta, then ends), so the browser's playback statistics must count underruns; with `iters` it adds a fixed, calibrated load per
    quantum instead (the headroom measurement steps it up until dropouts start). Probes only. */
 class ProbeBurn extends AudioWorkletProcessor {

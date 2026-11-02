@@ -8,7 +8,7 @@ import { fxWrapParam } from './param.js';
    принимают любой сигнал и поля не имеют. ⚠️ Прежде общий список «+ Добавить» перечислял ВСЮ фабрику, и яркость аккордов
    предлагалась соло, басу и ударным, где её не читает никто. */
 /* ═══ SND-F1 — «NIGHT FOREST»: A CONVOLUTION ROOM (bus module) ═══
-   The Calm prototype's room: a 3.4-s stereo noise impulse response with the envelope (1 − i/len)^2.6 (core/dsp.forestIR — SEEDED, the same
+   The Night prototype's room: a 3.4-s stereo noise impulse response with the envelope (1 − i/len)^2.6 (core/dsp.forestIR — SEEDED, the same
    at any sample rate, live and offline: frozen = live), wet return 0.55, the note send «mix» (default 0.8 = the prototype). ONE convolver
    per chain instance (live and track chains separate, rule #31), never per note. The IR is normalised by us exactly as the Web Audio
    spec's normalize = true would (core/dsp.irNormScale) and the node runs with normalize = false — the level does not depend on the browser.

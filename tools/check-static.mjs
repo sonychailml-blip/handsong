@@ -247,7 +247,7 @@ const NET_LISTED={
   'core/timbreload.js': { fetch:[1,'reads data/timbres.bundle.json (the timbre records, TIM3a) from the own origin'] },
   'core/profile.js': { fetch:[1,'reads the profile record its page declares (C0) from the own origin'] },
   'tools/probes/core/timbres.js':{ fetch:[3,'probe only (?probe): reads tools/prints/timbres.before.json (TIM3 timbres = before; RUN 8 FULL untouched) and Night\'s record for that row\'s control, from the own origin'] },
-  'tools/probes/night/calm.js':   { fetch:[1,'probe only (?probe): reads Night\'s profile record from the own origin (RUN 7 CALM timbres)'] },
+  'tools/probes/night/night.js':   { fetch:[1,'probe only (?probe): reads Night\'s profile record from the own origin (RUN 7 NIGHT timbres)'] },
   'tools/probes/night/nightguard.js': { fetch:[1,'probe only (?probe): reads tools/prints/night.print.json from the own origin (SPLIT-2 NIGHT untouched)'] },
   'tools/probes/core/pack.js':  { fetch:[1,'probe only (?probe): reads tools/pack-test-licence.json (TEST keys) from the own origin (PACK1)'] },
   'tools/probes/full/song2.js': { fetch:[1,'probe only (?probe): reads data/songs/triphop.json from the own origin (SONG2 control)'] },

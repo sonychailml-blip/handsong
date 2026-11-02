@@ -5,7 +5,7 @@
 import { row } from '../core/rows.js';
 import { goldFeats, goldCmp } from '../core/gold.js';
 
-const FILE='tools/prints/night.print.json', PROFILE='profile.calm', SEC=3.0, F=[440, 554.37], off=undefined;
+const FILE='tools/prints/night.print.json', PROFILE='profile.night', SEC=3.0, F=[440, 554.37], off=undefined;
 const OFFER=['roles','handFn','noteModes','key','moods','timbres','effects','scene','backgrounds','noteField','labels','recording','ambience','levels','voices','volume'];
 
 async function env(){ return { PR:await import('../../../core/profile.js'), ST:await import('../../../core/state.js'), R:await import('../../../core/render.js'), A:await import('../../../core/audio.js') }; }
@@ -14,13 +14,13 @@ function statePrint({ PR, ST, A }){
   const p=PR.profileOf(PROFILE), s=PR.profileDoorsDbg().read(), offer={}, E=A.engineCtx();
   for(const k of OFFER) offer[k]=p[k]===undefined ? null : p[k];
   return { offer, live:{ scaleId:s.scaleId, tonic:s.tonic, tonicCents:s.tonicCents, lead:s.lead, phoneInstr:s.phoneInstr, splitOn:s.splitOn, hand:s.hand, voice:s.voice, chain:s.chain },
-    view:{ glow:ST.calmView&&ST.calmView.glow, plain:ST.calmView&&ST.calmView.plain }, volFloor:ST.volFloor, caps:[...E.strikeCaps].sort(), lean:!!E.calmLean };
+    view:{ glow:ST.nightView&&ST.nightView.glow, plain:ST.nightView&&ST.nightView.plain }, volFloor:ST.volFloor, caps:[...E.strikeCaps].sort(), lean:!!E.nightLean };
 }
 /* its chain as the render copy takes it: the hand-driven values at rest, the room at its fixed Medium */
 function chainOf(ST, room=true){ const ids=['ctone','cwave','cecho',...(room?['fdepth']:[])], set={ 'ctone:mix':1, 'ctone:tilt':0.5, 'cwave:mix':1, 'cwave:amount':0.3, 'cecho:amount':0.4 };
   if(room) Object.assign(set, { 'fdepth:mix':1, 'fdepth:depth':0.5, 'fdepth:room':0.5, 'fdepth:reach':1, 'fdepth:light':0 });
   return { [ST.chainKeyOf('ld')]:{ ids, set } }; }
-const phrase=(id,trim,caps)=>e=>{ e.setTimbreTrim(trim); e.setCalmStrikes(caps); const i=e.LEAD_INSTR.findIndex(x=>x.id===id);
+const phrase=(id,trim,caps)=>e=>{ e.setTimbreTrim(trim); e.setNightStrikes(caps); const i=e.LEAD_INSTR.findIndex(x=>x.id===id);
   F.forEach((f,k)=>{ e.applyFx({}); e.leadOn('n'+k,f,0.7,i,off,off,off,off,0.05+0.8*k); e.leadOff('n'+k,off,0.05+0.8*k+0.6); }); };
 const renderOne=async(R,ST,id,trim,caps,room=true)=>goldFeats(await R.goldRender(phrase(id,trim,caps), SEC, chainOf(ST,room)));
 const within=async(PR, was, f)=>{ const why=PR.profileApply(PROFILE); if(why) throw new Error('its profile did not apply: '+why); try{ return await f(); } finally { PR.profileApply(was); } };
@@ -51,4 +51,4 @@ export async function checkNightUntouched(){
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ at:1009.95, calm:true, slow:true, name:'NIGHT untouched', run:()=>checkNightUntouched(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ at:1009.95, night:true, slow:true, name:'NIGHT untouched', run:()=>checkNightUntouched(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

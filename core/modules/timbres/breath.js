@@ -1,4 +1,4 @@
-/* RUN 7 (Calm sound pass) — the BREATH engine type: sustained, breathing sounds (a breathy flute, a soft vocal / bowed pad).
+/* RUN 7 (Night sound pass) — the BREATH engine type: sustained, breathing sounds (a breathy flute, a soft vocal / bowed pad).
    An ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the bank object lives on its voice.
    Built once per voice and gated (rule #3: every source here starts once and never stops): harmonic oscillators (mkOsc — the voice's
    vibrato / humanisation taps) → optional formant bandpasses → mix; breath noise from one looping noise source in three paths — a bandpass

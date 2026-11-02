@@ -1,8 +1,8 @@
 // RUN 6 / RUN 7: the listening page's engine part, checked in the app page (node tools/probe-browser.mjs --no-ui --eval tools/listen/check-listen.js).
 // Every candidate in every mood renders its PHRASE through the Night forest: not silent, not clipping, no click; a mood changes the notes
 // (Glow ≠ Dusk); the same render twice repeats (seeded; largest sample difference ≤ 1e-6); SINGLE notes render dry; the six new sounds' phrase loudness in the forest lies within
-// ±2 dB of each other, Firefly (rich) as the anchor (the measure of tools/listen/calm-listen.js analyse). Body of an async function; returns { ok, rows }.
-const L=await import('./tools/listen/calm-listen.js');
+// ±2 dB of each other, Firefly (rich) as the anchor (the measure of tools/listen/night-listen.js analyse). Body of an async function; returns { ok, rows }.
+const L=await import('./tools/listen/night-listen.js');
 const rows=[], hash=b=>{ let h=0x811c9dc5; const d=b.getChannelData(0); for(let i=0;i<d.length;i+=7){ const v=Math.round(d[i]*1e6); h^=v; h=Math.imul(h,0x01000193); } return (h>>>0).toString(16); };
 for(const c of L.CANDS) for(const [m] of L.MOODS){ const b=await L.render(c,m), lv=L.levelOf(b), a=L.analyse(b);
   rows.push({ id:c.id, mood:m, sec:+(b.length/b.sampleRate).toFixed(2), peak:+lv.peak.toFixed(4), loud:a.loud, click:a.click, h:hash(b) }); }

@@ -1,4 +1,4 @@
-/* C4a (RUN 6, Calm plan §4.1) — the TINE engine type as a SOLO bank: «Firefly» for the solo hand. An ENGINE SUBMODULE (hard rule #38):
+/* C4a (RUN 6, Night plan §4.1) — the TINE engine type as a SOLO bank: «Firefly» for the solo hand. An ENGINE SUBMODULE (hard rule #38):
    stateless — every engine value comes from the engine context E (first argument); the bank object it returns lives on its pooled voice.
    A struck tine has no sustain to gate, so — the sanctioned exception to rule #3 that the chord Firefly already is (SND-F1) — each STRIKE
    makes its own partial oscillators (the record's table: ratio, gain, decay, wave; 6-ms linear attack, exponential decay to 0.0001) at its
@@ -6,11 +6,11 @@
    level, pan, brightness, route — exactly like every solo bank). They stop by themselves when their decay ends and are disconnected from
    the voice's taps then. setFreq stores the pitch; a sounding note moved to another pitch (a hand moving to another row) STRIKES ANEW
    there — a tine cannot glide. cancel(t) stops strikes that have not begun by t (a voice handed to another owner). */
-/* RUN 8 (the Calm crackle; the user: «Full exactly as before»): TWO PATHS per strike, chosen at its moment. FULL (no Calm caps in E) =
-   RUN 7's strike exactly — the same nodes in the same order, every tap into every partial's detune (per sample). CALM (E.calmLean, set by the
-   Calm face): the strike is admitted under the profile's cap (strikes.js fades the oldest), its partials take their detune at block rate,
+/* RUN 8 (the Night crackle; the user: «Full exactly as before»): TWO PATHS per strike, chosen at its moment. FULL (no Night caps in E) =
+   RUN 7's strike exactly — the same nodes in the same order, every tap into every partial's detune (per sample). NIGHT (E.nightLean, set by the
+   Night face): the strike is admitted under the profile's cap (strikes.js fades the oldest), its partials take their detune at block rate,
    the taps reach them through ONE sum per bank (built on the first such strike) and only when they move at the strike — else the
-   humanisation is a fixed detune ({ hum, mod } from audio.leadOn). id = the record's id (the Calm cap's key). */
+   humanisation is a fixed detune ({ hum, mod } from audio.leadOn). id = the record's id (the Night cap's key). */
 import { strikeAdmit } from './strikes.js';
 function buildTineBank(E, preBus, R, id){
   const ig=E.ac.createGain(); ig.gain.value=0; ig.connect(preBus);
@@ -20,7 +20,7 @@ function buildTineBank(E, preBus, R, id){
   function strike(t, vel, _symp, o){
     if(vel!=null) lastVel=vel; if(o) opt=o;
     const now=E.ac.currentTime; for(let i=live.length-1;i>=0;i--) if(live[i].end<now) live.splice(i,1);
-    const lean=E.calmLean, g=E.ac.createGain(); g.gain.value=lvl*lastVel; g.connect(ig);
+    const lean=E.nightLean, g=E.ac.createGain(); g.gain.value=lvl*lastVel; g.connect(ig);
     const rec= lean ? strikeAdmit(E, id, t) : null; if(rec) rec.out=g;
     const mod= lean && (!opt || opt.mod); if(mod && !dt){ dt=E.ac.createGain(); for(const p of taps) p.connect(dt); }
     const oscs=[]; let end=t;

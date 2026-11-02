@@ -1,4 +1,4 @@
-/* VIS1c (RUN 6, Calm plan §10, review 2026-10-17): two rows (quick and all).
+/* VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
    «VIS1c forest room» — NUMBERS, never WebGL pixels (GPU-dependent): three.js r128 loads from our own origin; the room is built without a
    renderer at a PORTRAIT (390×844) and a LANDSCAPE (844×390) viewport and fed a hand for 4 s of frames: the playing light projects back onto
    the hand's play point within 0.75 px (it stays on its note row) and does not saturate; a hand at the corner saturates (the light stays
@@ -6,14 +6,14 @@
    dimmer light; one shadow-casting light, its map 512² on a phone-sized view, 1024² on a desktop one; portrait gets the wider view (fov 68);
    the reduced level halves the fireflies; the wild fireflies are exactly the core's step (core/fireflies.js) fed the room's own lights —
    CONTROL: the same step with one frame's lights dropped differs.
-   «VIS1c backgrounds» — Calm on Dark → Camera → Forest → Dark → Forest → Camera: only the picture changes — the sound state (chains and their values, timbre,
+   «VIS1c backgrounds» — Night on Dark → Camera → Forest → Dark → Forest → Camera: only the picture changes — the sound state (chains and their values, timbre,
    scale, key, voice mode, hands, master) and the note mapping (crop, canvas, view) stay EXACTLY the same; Dark and Camera keep no WebGL
    context (Dark makes none); the camera module is on only for Camera, where it draws the detected frame (the snapshot whose hands are
    shown — rule #8), not the live video; Forest opens the room (WebGL when the browser has it, else the minimal 2D stand-in — reported),
    the second time exactly as the first (closing the room is not a lost context). */
 import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
-import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg } from '../../../core/legacy-ui/views/scene/host.js';   // RUN 8: + the quality levels and the room (CALM forest picture)
+import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg } from '../../../core/legacy-ui/views/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
 import { buildForest } from '../../../apps/night/scene/forest.js';
 import { fliesInit, fliesStep, FOREST_FLIES } from '../../../apps/night/pure/fireflies.js';
 import { NIGHT, nightAt, MOOD_LOOKS, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js';   // RUN 9
@@ -77,7 +77,7 @@ export async function checkBackgrounds(){
   const d=[]; let n=0; const miss=s=>d.push(s);
   const was=profileCurrent();
   try{
-    const why=profileApply('profile.calm'); n++; if(why){ miss('Calm refused: '+why); return { cases:n, total:d.length, differences:d }; }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d }; }
     await setBackground('camera'); await frames(3);
     const s0=soundSig(), m0=mapSig(); let webgl=null;
     for(const bg of ['dark','camera','forest','dark','forest','camera']){
@@ -100,9 +100,9 @@ export async function checkBackgrounds(){
   finally{ if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d };
 }
-row({ calm:true, at:1007, name:'VIS1c forest room', run:()=>checkForestRoom(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
-row({ calm:true, at:1008, name:'VIS1c backgrounds', drawn:true, run:()=>checkBackgrounds(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
-/* RUN 8 (slice 4): row «CALM forest picture» (drawn). The user saw a plain black «Forest»: the room rendered under an OPAQUE 2D canvas
+row({ night:true, at:1007, name:'VIS1c forest room', run:()=>checkForestRoom(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+row({ night:true, at:1008, name:'VIS1c backgrounds', drawn:true, run:()=>checkBackgrounds(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences }) });
+/* RUN 8 (slice 4): row «NIGHT forest picture» (drawn). The user saw a plain black «Forest»: the room rendered under an OPAQUE 2D canvas
    (vision.js alpha:false — its «clear» is black). (1) SHOWS: on Forest the 2D canvas is composited with screen (its black lets the room
    through) — CONTROL: on Camera it is normal (and opaque) —, and the room's own canvas draws a picture (copied in the frame it renders: not
    black); (2) NO LEAK: Forest ↔ Dark five times — each Forest makes exactly one WebGL context, each Dark leaves none; the quality levels
@@ -112,7 +112,7 @@ export async function checkForestPicture(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const was=profileCurrent(), keepLevel=sceneLevel(), c2=canvas;
   try{
-    const why=profileApply('profile.calm'); n++; if(why){ miss('Calm refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     await setSceneLevel('full'); await setBackground('forest'); await frames(6);
     const I=sceneInfo(); n+=2;
     if(getComputedStyle(c2).mixBlendMode!=='screen') miss('Forest: the 2D canvas is not composited with screen ('+getComputedStyle(c2).mixBlendMode+') — the room stays hidden under it');
@@ -130,8 +130,8 @@ export async function checkForestPicture(){
       if(lv==='minimal' && (I3.contextsLive!==0 || I3.contextsMade!==m0)) miss('level low made or kept a WebGL context'); void I2; }
     /* music and depth: the room's numbers */
     const room=sceneRoomDbg(); n++;
-    if(room){ n++; const nm=room.state().night; if(nm.mood!==scaleId) miss(`RUN 9: the room's mood is ${nm.mood}, the shell's mood ${scaleId} (the bus «calmNight» does not reach the room)`); }   // RUN 9
-    if(room){ const wi=(BUS.get('calmNight')||{}).wind, A=ambienceInfo(); n++;   // RUN 9 (slice 3): the ambience's wind reaches the room
+    if(room){ n++; const nm=room.state().night; if(nm.mood!==scaleId) miss(`RUN 9: the room's mood is ${nm.mood}, the shell's mood ${scaleId} (the bus «nightSky» does not reach the room)`); }   // RUN 9
+    if(room){ const wi=(BUS.get('nightSky')||{}).wind, A=ambienceInfo(); n++;   // RUN 9 (slice 3): the ambience's wind reaches the room
       if(!wi || (A && A.on ? Math.abs(wi.level-A.level)>1e-9 : wi.level!==0)) miss('the wind on the bus '+JSON.stringify(wi)+' vs the ambience '+JSON.stringify(A && { on:A.on, level:A.level }));
       else notes.push(`wind: level ${wi.level.toFixed(2)}, gust ${wi.gust.toFixed(2)} → the leaves' sway ${room.state().life.sway.toFixed(3)}`); }
     { const pr=sceneProgramsDbg(); n++; if(pr){ notes.push(`shader programs: ${pr.length}, failed ${pr.filter(p=>!p.ok).length}`); if(!pr.length || pr.some(p=>!p.ok)) miss('a shader program failed to compile: '+JSON.stringify(pr.filter(p=>!p.ok).map(p=>p.name))); } }   // RUN 9: the patched and new shaders compile
@@ -163,7 +163,7 @@ export async function checkForestPicture(){
   finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ calm:true, at:1008.5, name:'CALM forest picture', drawn:true, run:()=>checkForestPicture(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ night:true, at:1008.5, name:'NIGHT forest picture', drawn:true, run:()=>checkForestPicture(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* RUN 9 (slice 1): row «FOREST night cycle» — NUMBERS from the room built without a renderer (as «VIS1c forest room»): the moon sits where
    core/night.js puts it and its light is 0.3 × the moon's light under the clouds; over one whole cycle the moon drifts, clouds cover it (their
    sprites show) and its light dims and returns, every mist layer rolls in and out; the cycle is SEAMLESS (t and t + period draw the same);
@@ -208,7 +208,7 @@ export async function checkNightCycle(){
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ calm:true, at:1008.6, name:'FOREST night cycle', run:()=>checkNightCycle(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ night:true, at:1008.6, name:'FOREST night cycle', run:()=>checkNightCycle(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* RUN 9 (slice 2): row «FOREST response» — NUMBERS from the room built without a renderer: a note sends ONE ground wave from the light's
    ground point (CONTROL no note, no wave) and it ends after its life; the mushroom or flower nearest the light pulses ≥ 5× one 6 units away
    and fades (CONTROL no note, every pulse 0); the wild fireflies GATHER to a light that plays (≥ 1.5× near it after 12 s vs a light that
@@ -255,7 +255,7 @@ export async function checkForestResponse(){
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ calm:true, at:1008.62, name:'FOREST response', run:()=>checkForestResponse(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ night:true, at:1008.62, name:'FOREST response', run:()=>checkForestResponse(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* RUN 9 (slice 3): row «FOREST detail» — NUMBERS from the room built without a renderer: each level draws its defined counts (grass blades,
    leaves, moths, moonbeams); the leaves sway with the WIND from the bus (ambience level 1 at the gust's top → sway 1; no ambience → the still
    air 0.25 — CONTROL; the sleep stills it × 0.3); the moths gather round the playing light (all within 1.6, fully visible) and fade when it
@@ -292,7 +292,7 @@ export async function checkForestDetail(){
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ calm:true, at:1008.64, name:'FOREST detail', run:()=>checkForestDetail(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ night:true, at:1008.64, name:'FOREST detail', run:()=>checkForestDetail(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* RUN 9 (slice 4): row «FOREST rare events» — NUMBERS from the room built without a renderer. The FALLING STAR shows and moves down, gone
    after 1.4 s; the FLOWER opens fully in 3 s near the light's foot (never in the water) and closes and goes after ~25 s; the EMBLEM: its 15
    fireflies (3 per dot) reach their points (mean <= 0.15) while it holds — CONTROL: the same flies were far (> 1) before — and are let go
@@ -330,7 +330,7 @@ export async function checkForestRare(){
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ calm:true, at:1008.66, name:'FOREST rare events', run:()=>checkForestRare(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ night:true, at:1008.66, name:'FOREST rare events', run:()=>checkForestRare(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
 /* RUN 9 (slice 5): row «FOREST levels» (drawn) — each quality level draws what it should: high renders at 0.85 and medium at 0.6 of the CSS
    pixels (never above one device pixel each), 60 / 30 fps caps, the light's shadow only at high, low makes no WebGL context; the room's own
    counts per level are «FOREST detail»'s. The shaders are compiled INSIDE the opening (the programs exist before the first frame — a compile
@@ -340,7 +340,7 @@ export async function checkForestLevels(){
   const d=[]; let n=0; const miss=s=>d.push(s), notes=[];
   const was=profileCurrent(), keepLevel=sceneLevel();
   try{
-    const why=profileApply('profile.calm'); n++; if(why){ miss('Calm refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
     const dp=Math.min(devicePixelRatio||1, 1), WANT={ full:{ pr:0.85*dp, fps:60, shadow:true }, reduced:{ pr:0.6*dp, fps:30, shadow:false } };
     for(const lv of ['full','reduced','minimal']){
       await setBackground('dark'); await setSceneLevel(lv); await setBackground('forest'); const I0=sceneInfo(); await frames(3); const I=sceneInfo(); n+=2;
@@ -363,4 +363,4 @@ export async function checkForestLevels(){
   finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
   return { cases:n, total:d.length, differences:d, notes };
 }
-row({ calm:true, at:1008.68, name:'FOREST levels', drawn:true, run:()=>checkForestLevels(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+row({ night:true, at:1008.68, name:'FOREST levels', drawn:true, run:()=>checkForestLevels(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

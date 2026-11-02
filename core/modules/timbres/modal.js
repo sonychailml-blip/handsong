@@ -1,4 +1,4 @@
-/* RUN 7 (Calm sound pass) — the MODAL engine type: struck instruments (handpan, singing bowl, kalimba, a richer Firefly) by modal synthesis.
+/* RUN 7 (Night sound pass) — the MODAL engine type: struck instruments (handpan, singing bowl, kalimba, a richer Firefly) by modal synthesis.
    An ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the bank object lives on its voice.
    A struck body is a sum of decaying sine modes (measured partial ratios, gains, T60 decays) excited by a short filtered noise burst (the
    mallet / finger) that also rings a fixed body resonance. Like the tine (C4a) each STRIKE makes its own mode oscillators — the sanctioned
@@ -7,11 +7,11 @@
    Higher notes ring shorter (decay × (220/f)^dk); a harder strike is brighter (mode gain × vel^(vb·log2 r)). A sounding note moved to another
    pitch strikes anew there (a struck bar cannot glide); cancel(t) stops strikes not yet begun. Stereo spread is NOT here: the voice path is
    mono up to the track pan (MX2) — width comes from the room (VOL-7 will add a stereo stage per voice). */
-/* RUN 8 (the Calm crackle; the user: «Full exactly as before»): TWO PATHS per strike, chosen at its moment. FULL (no Calm caps in E) =
-   RUN 7's strike exactly (the same nodes in the same order, every tap into every mode's detune, tails to −80 dB). CALM (E.calmLean, set by
-   the Calm face): the strike is admitted under the profile's cap with its own gain (strikes.js fades the oldest), tails end at −70 dB, the
+/* RUN 8 (the Night crackle; the user: «Full exactly as before»): TWO PATHS per strike, chosen at its moment. FULL (no Night caps in E) =
+   RUN 7's strike exactly (the same nodes in the same order, every tap into every mode's detune, tails to −80 dB). NIGHT (E.nightLean, set by
+   the Night face): the strike is admitted under the profile's cap with its own gain (strikes.js fades the oldest), tails end at −70 dB, the
    taps reach the modes through ONE sum per bank (built on the first such strike) and only when they move at the strike — else the
-   humanisation is a fixed detune ({ hum, mod } from audio.leadOn). id = the record's id (the Calm cap's key). */
+   humanisation is a fixed detune ({ hum, mod } from audio.leadOn). id = the record's id (the Night cap's key). */
 import { strikeAdmit } from './strikes.js';
 const LN1000=6.907755;   // a T60 decay → setTargetAtTime's time constant (d / ln 1000)
 
@@ -27,8 +27,8 @@ function buildModalBank(E, preBus, R, id){
     if(vel!=null) lastVel=vel; if(o) opt=o;
     const now=ac.currentTime; for(let i=live.length-1;i>=0;i--) if(live[i].end<now) live.splice(i,1);
     const v=Math.max(0.05, Math.min(1, lastVel)), nyq=ac.sampleRate*0.45, scale=Math.pow(220/f0, R.dk||0), srcs=[]; let end=t;
-    const lean=E.calmLean, tail= lean ? 7/6 : 4/3;   // −70 dB (Calm) / −80 dB (Full, RUN 7)
-    let to=sum, rec=null; if(lean){ rec=strikeAdmit(E, id, t); to=ac.createGain(); to.connect(sum); rec.out=to; }   // Calm: this strike's own gain (the cap fades it)
+    const lean=E.nightLean, tail= lean ? 7/6 : 4/3;   // −70 dB (Night) / −80 dB (Full, RUN 7)
+    let to=sum, rec=null; if(lean){ rec=strikeAdmit(E, id, t); to=ac.createGain(); to.connect(sum); rec.out=to; }   // Night: this strike's own gain (the cap fades it)
     const mod= lean && (!opt || opt.mod); if(mod && !dt){ dt=ac.createGain(); for(const p of taps) p.connect(dt); }
     for(const m of R.modes){
       const f=f0*m.r*jit(J.r), d=m.d*scale*jit(J.d), pk=m.g*jit(J.g)*Math.pow(v, (R.vb||0)*Math.max(0, Math.log2(m.r)));

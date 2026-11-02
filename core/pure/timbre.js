@@ -17,7 +17,7 @@ export const TB=Object.freeze({ lvl:[0,0.5], gain:[0,1], ratio:[0.25,8], det:[-1
   glide:[0,1], quant:[0,4], nameMax:60, nodesMax:64,
   oscs:8, mult:[0.25,16], oscGainSum:2, Q:[0.0001,30], open:[1,8], fmRatio:[0.25,16], fmIndex:[0,20], tau:[0.001,5],
   kitVm:[0,2], kitD:[0.005,5], ksFb:[0.5,0.998], unit:[0,1], nl:[0,5], sympN:8, sympRatio:[0.25,8], sympQ:[0.1,100], sympGain:[0,0.5], bodyQ:[0.1,30], bodyDb:[-24,24],
-  /* RUN 7: the modal and breath engines (Calm's sound pass) — modes / harmonics, soft-high lowpass, noise paths, own vibrato and breathing */
+  /* RUN 7: the modal and breath engines (Night's sound pass) — modes / harmonics, soft-high lowpass, noise paths, own vibrato and breathing */
   mLvl:[0,2],   // the modal / breath output trim: decaying modes and band-pass formants lose level (a worst-case record peaks ≈ 0 dBFS pre-limiter)
   modes:16, mR:[0.25,24], mT60:[0.01,30], mAtt:[0.0005,0.2], dk:[0,1.5], vb:[0,2], softLp:[200,16000], nG:[0,1], nQ:[0.1,60], nT60:[0.001,1],
   nTrack:[0,1], jR:[0,0.02], jD:[0,0.5], jG:[0,0.5], harm:8, fmts:4, nOn:[1,8], vRate:[0.1,12], vCents:[0,50], vAmp:[0,0.3], vDelay:[0,3],

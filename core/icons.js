@@ -31,9 +31,9 @@ function applyIcons(root){ if(!root||!root.querySelectorAll) return; root.queryS
   /* RUN 7: drawn icons (data-svg="name") and the emblem (data-svg="emblem") — built once per element */
   root.querySelectorAll('[data-svg]').forEach(el=>{ if(el.firstElementChild && el.firstElementChild.tagName.toLowerCase()==='svg') return; const v=el.getAttribute('data-svg'), doc=el.ownerDocument;
     const g= v==='emblem' ? svgEmblem(doc) : svgIcon(doc, v); if(g) el.replaceChildren(g); else el.textContent='{svg:'+v+'}'; }); }   // a name, or a template with «{i:…}» tokens
-/* RUN 7 (C11) — THE CALM FACE'S DRAWN ICONS (the user's design: Moonglass icons, the Hush emblem; our own work, no icon library — rule
+/* RUN 7 (C11) — THE NIGHT FACE'S DRAWN ICONS (the user's design: Moonglass icons, the Hush emblem; our own work, no icon library — rule
    #32, BACKLOG §7.19), by meaning, on a 24 grid. A shape = [kind, tag, attrs]: kind 'tint' = a soft fill of the current colour (its
-   opacity in attrs.o), 'line' = a 1.6 round stroke of the current colour, 'acc' / 'acc-line' = the same in the Calm accent (firefly lime),
+   opacity in attrs.o), 'line' = a 1.6 round stroke of the current colour, 'acc' / 'acc-line' = the same in the Night accent (firefly lime),
    'dot' = a solid fill of the current colour. Rendered by svgIcon(doc, name) into an <svg> with DOM calls (no innerHTML); the markup asks
    for one with data-svg="name" (applyIcons fills it). Pure data here — the module still touches no DOM at import. */
 const SVG_ICONS={
@@ -67,8 +67,8 @@ function svgIcon(doc, name){
   const svg=doc.createElementNS(SVGNS,'svg'); svg.setAttribute('viewBox','0 0 24 24'); svg.setAttribute('aria-hidden','true'); svg.setAttribute('class','svgi');
   for(const [kind,tag,a] of sh){ const el=doc.createElementNS(SVGNS,tag), acc=kind==='acc'||kind==='acc-line';
     for(const [k,v] of Object.entries(a)) if(k!=='o') el.setAttribute(k,String(v));
-    if(kind==='line'||kind==='acc-line'){ el.setAttribute('fill','none'); el.setAttribute('stroke', acc ? 'var(--calm-accent)' : 'currentColor'); el.setAttribute('stroke-width','1.6'); el.setAttribute('stroke-linecap','round'); el.setAttribute('stroke-linejoin','round'); }
-    else { el.setAttribute('fill', acc ? 'var(--calm-accent)' : 'currentColor'); if(a.o!=null) el.setAttribute('fill-opacity',String(a.o)); el.setAttribute('stroke','none'); }
+    if(kind==='line'||kind==='acc-line'){ el.setAttribute('fill','none'); el.setAttribute('stroke', acc ? 'var(--night-accent)' : 'currentColor'); el.setAttribute('stroke-width','1.6'); el.setAttribute('stroke-linecap','round'); el.setAttribute('stroke-linejoin','round'); }
+    else { el.setAttribute('fill', acc ? 'var(--night-accent)' : 'currentColor'); if(a.o!=null) el.setAttribute('fill-opacity',String(a.o)); el.setAttribute('stroke','none'); }
     svg.appendChild(el); }
   return svg;
 }

@@ -1,4 +1,4 @@
-/* RUN 7 (C4c, Calm plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless —
+/* RUN 7 (C4c, Night plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless —
    every engine value comes from E (first argument); the ambience OBJECT it builds (nodes, the crickets' schedule cursors) is kept by the
    engine instance in E (E.amb), never here. Numbers and the seeded schedule: core/ambience.js. Every source starts once and is gated
    (rule #3, like the backing drone); chirps are scheduled ahead at explicit times (rule #15). Its own bus → the master (live sound, never a

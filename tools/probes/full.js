@@ -98,7 +98,7 @@ export { checkFrameOnce, checkSchedule, checkWorker } from './core/detect.js';
 export { dumpGold, checkGold } from './core/gold.js';
 export { checkTimbreIds, checkFirefly, checkForest, checkDynamics, checkDynLive, checkFreezeParity, checkMasterPath } from './core/sound.js';
 export { dumpGesture, checkGesture } from './core/hand.js';
-export { checkProfile } from './core/profile.js';   // C0: profiles Full ↔ Calm, the exact round trip
+export { checkProfile } from './core/profile.js';   // C0: profiles Full ↔ Night, the exact round trip
 export { checkVisStack } from './core/vis.js';   // VIS1a: the compositor and the bus writers
 export { api } from './core/guard.js';
 /* SPLIT-2: the probe entry of the Full page: called by boot under ?probe */

@@ -3,8 +3,8 @@
    - The night's slow CYCLE (NIGHT.period = 24 min, a seamless loop — every term repeats exactly at the period): the moon drifts on a small
      closed path; clouds pass over it now and then (the moon's light dims and returns); four mist layers roll in and out, each at its own
      whole number of cycles per period (never all together). The first NIGHT.clouds.clear seconds are clear (the first look is the moon).
-   - SLEEP: with the sleep timer on, the night deepens and calms towards its end (darker, stiller, fewer firefly lights, more mist).
-   - MOODS: each Calm mood (a mode id) has its own look — the colour tokens' set and the fog / mist amounts. */
+   - SLEEP: with the sleep timer on, the night deepens and stills towards its end (darker, stiller, fewer firefly lights, more mist).
+   - MOODS: each Night mood (a mode id) has its own look — the colour tokens' set and the fog / mist amounts. */
 import { seeded } from '../../../core/pure/dsp.js';
 
 const TAU=2*Math.PI;
@@ -41,7 +41,7 @@ export function nightDeep(s){
 }
 /* the sleep timer → its progress 0…1 (the timer's own start and minutes, ms clock) */
 export const sleepProgress=(t0, mins, now)=> mins>0 ? clamp01((now-t0)/(mins*60e3)) : 0;
-/* THE MOODS' LOOKS (Calm plan §4.5): a mode id → its look; colours are token names (palette.cv), the room lerps between looks (τ MOOD_TC s) */
+/* THE MOODS' LOOKS (Night plan §4.5): a mode id → its look; colours are token names (palette.cv), the room lerps between looks (τ MOOD_TC s) */
 export const MOOD_TC=2.5;
 const LOOK=(pre, fog, mist, flies)=>Object.freeze({ pre, fog, mist, flies,
   tokens:Object.freeze({ fog:pre+'fog', sky:pre+'sky', under:pre+'under', moon:pre+'moon', moonhalo:pre+'moonhalo', haze:pre+'haze', cloud:pre+'cloud',

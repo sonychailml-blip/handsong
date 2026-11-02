@@ -59,15 +59,15 @@ const LOGDIR=path.join(ROOT,'tools','.probe-logs');
 const argv=process.argv.slice(2), has=f=>argv.includes(f), val=(f,d)=>{ const i=argv.indexOf(f); return i>=0&&argv[i+1]!=null ? argv[i+1] : d; };
 const REPEAT=+val('--repeat',0)||0;
 let QUICK=has('--quick'), ALL=has('--all');
-if(!QUICK && !ALL && !REPEAT && !has('--calm')) QUICK=true;   // RUN 7: --calm alone runs only P.calm
-/* SPLIT-2: --app full|night picks the page (night: no seed, no UI song checks, P.calm by default); --json FILE writes the results for tools/split-compare.mjs;
+if(!QUICK && !ALL && !REPEAT && !has('--night')) QUICK=true;   // RUN 7: --night alone runs only P.night
+/* SPLIT-2: --app full|night picks the page (night: no seed, no UI song checks, P.night by default); --json FILE writes the results for tools/split-compare.mjs;
    --dump NAME FILE writes the JSON of P[NAME]() (a baseline made on unchanged code). */
 const APP=val('--app','full'), JSON_OUT=val('--json',null), DUMP=(()=>{ const i=argv.indexOf('--dump'); return i>=0 ? [argv[i+1], argv[i+2]] : null; })();
 const NIGHT_PAGE=APP==='night';
 /* --root DIR: serve a built preview (tools/build.mjs --probes): the page is at its root */
 const SERVE_ROOT=val('--root',null) ? path.resolve(val('--root',null)) : ROOT, ENTRY=SERVE_ROOT!==ROOT ? '/index.html?probe' : NIGHT_PAGE ? '/apps/night/index.html?probe' : '/apps/full/index.html?probe';
 if(NIGHT_PAGE && !has('--quick') && !has('--all')) QUICK=false;
-if(DUMP && !has('--quick') && !has('--all') && !has('--calm')) QUICK=false;
+if(DUMP && !has('--quick') && !has('--all') && !has('--night')) QUICK=false;
 const EVAL=val('--eval',null);
 const LEAK=has('--leak');
 if((EVAL||LEAK) && !has('--quick') && !has('--all')) QUICK=false;
@@ -387,7 +387,7 @@ async function session(port, plan, label){
     await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push({ dir:e.effectiveDirective||e.violatedDirective, uri:e.blockedURI, src:e.sourceFile, line:e.lineNumber })); });
     if(has('--stress-not-judged')) await ctx.addInitScript(()=>{ globalThis.__stressNotJudged=true; });
     /* SPLIT-2: this page's session rests on the Dark background (software WebGL in headless Chrome starves a small machine between rows); the forest rows choose the forest themselves */
-    if(NIGHT_PAGE) await ctx.addInitScript(()=>{ try{ if(!localStorage.getItem('handsong.calmBg')) localStorage.setItem('handsong.calmBg','dark'); }catch(e){} });
+    if(NIGHT_PAGE) await ctx.addInitScript(()=>{ try{ if(!localStorage.getItem('handsong.nightBg')) localStorage.setItem('handsong.nightBg','dark'); }catch(e){} });
     page=await ctx.newPage();
     page.on('worker', w=>{ const u=w.url().replace(origin,''); if(/net-control/.test(u)) return; res.net.workers++; res.net.workerUrls.push(u); });   // the control's worker is not counted
     const seen=[];   // строки проб этого прогона (для сводки)
@@ -474,13 +474,13 @@ async function session(port, plan, label){
       const ts=Date.now();
       const job=page.evaluate(async k=>{ const r=await P[k]({ progress:true }); return r ? { pass:r.pass, seconds:r.seconds, hidden:r.hidden, rows:r.rows, measures:r.measures||{}, material:r.material&&r.material.ok } : null; }, kind);
       let r;
-      if(kind==='all'||kind==='calm') r=await within(job, LIMIT_ALL, `P.${kind}()`);
+      if(kind==='all'||kind==='night') r=await within(job, LIMIT_ALL, `P.${kind}()`);
       else { const S=slowMeter(); rowHook=(name,ms)=>S.row(name,ms); res.slow=S;
         const fixed=LIMIT_QUICK_ARG!=null ? (+LIMIT_QUICK_ARG||3)*60e3 : null;
         const dl=()=>{ const ms= fixed ?? Math.round(LIMIT_QUICK_BASE*S.f); return { at:ts+ms, ms, note: fixed ? ' (--limit-quick)' : S.f>1 ? ` (3 min × slow factor ${S.f.toFixed(2)})` : '' }; };
         try{ r=await withinDyn(job, dl, `P.${kind}()`); } finally{ rowHook=null; res.limitQuick=dl().ms; }
         out(`[${label}] machine speed: ${S.n} reference row(s) ran ${S.raw.toFixed(2)}× their idle time → slow factor ${S.f.toFixed(2)} · P.quick limit ${(res.limitQuick/60e3).toFixed(1)} min${fixed?' (--limit-quick)':''}`); }
-      for(let i=0;i<60 && !seen.some(l=>/P\.(all|quick|calm): (PASS|NOT A PASS)/.test(l));i++) await page.waitForTimeout(50);   // итоговая строка — событием консоли, чуть позже
+      for(let i=0;i<60 && !seen.some(l=>/P\.(all|quick|night): (PASS|NOT A PASS)/.test(l));i++) await page.waitForTimeout(50);   // итоговая строка — событием консоли, чуть позже
       res.runs.push({ kind, ...r, wall:(Date.now()-ts)/1000, lines:seen.filter(l=>/^\[scaleprobe all\]/.test(l)).slice(-12) });
       seen.length=0;
     }
@@ -547,7 +547,7 @@ function repeatTable(sessions){
 await staleScan();
 if(CLEAN_ONLY) process.exit(0);
 await mkdir(LOGDIR,{ recursive:true });
-const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',has('--calm')&&'calm',LEAK&&'leak'].filter(Boolean).join('+');
+const mode=REPEAT?`repeat${REPEAT}`:[QUICK&&'quick',ALL&&'all',has('--night')&&'night',LEAK&&'leak'].filter(Boolean).join('+');
 LOG=path.join(LOGDIR, `${stamp()}-${mode}.log`);
 await writeFile(LOG, `probe-browser ${argv.join(' ')}\n`);
 const srv=await serve(), port=srv.address().port; LIVE.srv=srv;
@@ -559,7 +559,7 @@ try{
   if(REPEAT){
     for(let i=1;i<=REPEAT;i++){ out(`\n[probe-browser] run ${i} of ${REPEAT} — fresh browser, fresh profile`); await log(`===== run ${i} of ${REPEAT} =====`);
       sessions.push(await session(port, QUICK?['quick','all']:['all'], `run ${i}/${REPEAT}`)); }
-  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', (has('--calm')||(NIGHT_PAGE&&!QUICK&&!ALL&&!EVAL&&!LEAK&&!DUMP))&&'calm'].filter(Boolean), mode||'eval'));   // RUN 7: --calm runs P.calm; SPLIT-2: the second page's default
+  } else sessions.push(await session(port, [QUICK&&'quick', ALL&&'all', (has('--night')||(NIGHT_PAGE&&!QUICK&&!ALL&&!EVAL&&!LEAK&&!DUMP))&&'night'].filter(Boolean), mode||'eval'));   // RUN 7: --night runs P.night; SPLIT-2: the second page's default
 } finally { await closeAll(); }
 if(EXITING) await new Promise(()=>{});   // a signal/error path is closing — it prints and exits itself
 const stillMine=(runnerBrowsers()||[]).filter(g=>g.mine);
@@ -571,7 +571,7 @@ for(const s of sessions){
   for(const r of s.runs){
     out(`\n[${s.label}] P.${r.kind}: ${r.pass?'PASS':'NOT A PASS'} · ${r.seconds} s in the page (${r.wall.toFixed(1)} s wall)`);
     rowsTable(r);
-    for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick|calm):/.test(l)) out('  '+l);
+    for(const l of r.lines) if(/frozen seed bass|state guard|P\.(all|quick|night):/.test(l)) out('  '+l);
     if(!r.pass) pass=false;
   }
   if(!s.runs.length && !s.error && !EVAL && !LEAK && !s.dumped) pass=false;
