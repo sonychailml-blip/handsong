@@ -40,6 +40,11 @@ SPLIT-2: one-time move of this app's old setting names, on one origin only (plan
 - const (1): `OLD_PREFIX`
 - fn (1): `migrateKeys`
 
+## apps/night/pure/ambience.js
+RUN 7 (C4c, Night plan §4.6; docs/night/QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
+- const (1): `AMB`
+- fn (3): `windNoise`, `cricketStream`, `chirpShape`
+
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
 - const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
@@ -78,6 +83,10 @@ VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built wi
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
 - const (3): `LEAN_PATH`, `nightShellDbg`, `nightSleepDbg`
 - fn (2): `nightShellWire`, `nightShellFace`
+
+## apps/night/sound/ambience.js
+RUN 7 (C4c, Night plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambi…
+- fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
 
 ## core/arrange.js
 Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
@@ -300,10 +309,6 @@ REC5 (stage 3) — LIVE RECORDING: the recording state and the take's per-track 
 - fn (13): `takeJoin`, `nextFreeLayer`, `storeTi`, `storeTim`, `push`, `recLeadReset`, `recFoldRoll`, `recAllOff`, `recDrop`, `recLatchOpen`, `setRecording`, `recStop`, `onRec`
 - let (4): `recording`, `pushLy`, `curTake`, `latchOpenAt`
 
-## core/modules/ambience/forest.js
-RUN 7 (C4c, Night plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambi…
-- fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
-
 ## core/modules/effects/bright.js
 AUD2a (RUN 3, 2026-10-16) — the effect «Brightness» (a voice module read by each voice).
 - const (1): `BRIGHT_PARAMS`
@@ -420,11 +425,6 @@ DRAW1b (RUN 3, 2026-10-16) — THE CANVAS PALETTE, read from the design tokens (
 C0 (RUN 6): PROFILES.
 - const (9): `profileWire`, `profileCurrent`, `profileOf`, `profileList`, `profileLoadReport`, `onProfile`, `profileDropDbg`, `profileSavedDbg`, `profileDoorsDbg`
 - fn (2): `profileApply`, `profileAddDbg`
-
-## core/pure/ambience.js
-RUN 7 (C4c, Night plan §4.6; docs/night/QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
-- const (1): `AMB`
-- fn (3): `windNoise`, `cricketStream`, `chirpShape`
 
 ## core/pure/bus.js
 VIS1a (RUN 6, docs/core/VIS1-design.md §3) — THE EVENT BUS for visuals.
@@ -633,6 +633,11 @@ REC1 (stage 3) — THE SONG'S EVENT STORE, moved verbatim from recorder.js (whic
 REC3 part 2 (stage 3) — TRANSPOSE BY DEGREES (ED4), A TRACK INTO ANOTHER MODE (OWN1), TRANSPOSE BY SEMITONES (TF3, TF3b) — moved from recorder.js (which re-exports them — a facade).
 - const (6): `editDegreeWhy`, `trackViewOfLayer`, `editTrackModeWhy`, `trDbg`, `editTransposeWhy`, `songTransposeWhy`
 - fn (4): `editTrackMode`, `editTranspose`, `songTranspose`, `editDegreeSel`
+
+## core/soundmods.js
+CORE-7: THE DOOR FOR AN APP'S SOUND MODULES.
+- const (1): `soundModOf`
+- fn (1): `soundModAdd`
 
 ## core/state.js
 (no head comment)
@@ -947,7 +952,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_182 modules, 2289 exported names._
+_183 modules, 2291 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -961,3 +966,5 @@ _182 modules, 2289 exported names._
   `diag.sw.pic*` keys, latmeter report `detection.picture` (LAT3: the live-camera picture switch removed), `scaledata.js`, `R.liveReverb`, `DBG.fdnLive`, `R.powerOld`, `RECT_OCT`, `ROLL_CH_EXTRA_REG`, `SWARA_OF`/`SHRUTI_OF`, `swaraLbl`/`swaraOfCents`, `gridNoteLbl`/`rectNoteLbl` pair as two functions, `rollGroups`, `#rollScale`, `rollSnapRow`, `soloEditBlock`, `tiAudit`/`tiRestamp`, `fxVolFix`/`setFxVolFix`, `chainXDriven`, `frzArmAll`, `setChBrightDisp`, `setRevDisp`, `setLiveRevWiring`, `modeDerive`/`TBL`/`RATIOS`/`CM`, `scaleIdx`, `sameDegrees`, `compat.tag`, `R.liveReverb`, the ScriptProcessor capture.
 
 SPLIT-2 (2026-11; table: `tools/split-names.mjs`). The product's old name: `CALM_*`, `calm*`, `.calm-*`, `--calm-*`, `calm.*` keys, `calm-*` screens, rows `CALM x`, `P.calm`, runner `--calm` → the same with night; `calmNight` → `nightSky`; `--cv-calm-*` → `--cv-hn-*`; `calmshell.js` → `apps/night/shell.js`; `modules/effects/calm.js` → `night-fx.js`; `core/calmui.js` → `core/pure/nightui.js`; `profile.calm` → `profile.night` (the one exception of rule #37); `?calm` → the page `apps/night/`; EDITION value `calm` → `release`. The Full ↔ Night switch: `#profRow`, `#calmToFull`, `profFull`, `profCalm`, `profSep`, `profHint`, `profileBoot`. Folders: `src/` → `core/`, `src/core/` → `core/pure/`, `src/views/` → `core/legacy-ui/views/`, `data/` → `core/data/`, `src/probes/` → `tools/probes/`, `src/scaleprobe.js` → `tools/probes/full.js`, `src/main.js` → `core/legacy-ui/boot.js` + `apps/*/main.js`. Files: root `BACKLOG.md`, `WORK-LOG.md`, `NIGHT-LOG.md`, `UI-MAP.md` → `docs/<track>/` and `archive/`.
+
+CORE-7 (2026-11-03): `core/modules/ambience/forest.js` → `apps/night/sound/ambience.js`, `core/pure/ambience.js` → `apps/night/pure/ambience.js` (the ambience is Night's, registered through `core/soundmods.js`); data row «NIGHT cricket schedule (core)» → «… (app)».

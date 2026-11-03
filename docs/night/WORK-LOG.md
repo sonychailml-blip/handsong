@@ -4,6 +4,11 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-3 — stage 2 (2026-11-03): the forest ambience enters through the core door (CORE-7)
+Tree hashes before: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da · apps/night 4f4fcfc3f1f0cc14. After: core c3b25630f4ae3fbb · apps/full d6b90cf2cb4be6da · apps/night 87f6896f34c0f60b.
+- The user approved the plan with changes (no second room yet; the bed before switching; §8 answered): `docs/night/design/NIGHT-3-rooms/PLAN.md` «The user's decisions». The Lake and the other sketches are in `BACKLOG.md`.
+- `apps/night/sound/ambience.js` + `apps/night/pure/ambience.js` (moved from core, paths only); `main.js` registers the ambience; `shell.js` imports its numbers from the app. Data row «NIGHT cricket schedule (core)» → «(app)». Nothing heard changes: GOLD «ambience» 0 differences against the old print, NIGHT ambience 0, NIGHT untouched 0. Core part and checks: `docs/core/WORK-LOG.md` CORE-7.
+
 # NIGHT-3 — stage 1 (2026-11-03): rooms as modules, room switching, a music bed per room — the plan only
 Tree hashes before and after (unchanged): core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da · apps/night 4f4fcfc3f1f0cc14.
 - No app code. The plan, its estimates and ten decisions: `docs/night/design/NIGHT-3-rooms/PLAN.md`. Waiting for the user's approval.

@@ -1,6 +1,6 @@
 /* RUN 7 (C4c, Night plan §4.6; docs/night/QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED
    schedule. CORE: pure (rule #36), node-tested (data row «NIGHT cricket schedule (core)»). The sound itself is the stateless engine module
-   core/modules/ambience/forest.js. Nothing rhythmic, never recorded, its own level («Forest» in the Night shell).
+   apps/night/sound/ambience.js. Nothing rhythmic, never recorded, its own level («Forest» in the Night shell).
    - Drone: a sine on the ROOT of the key two registers down (the prototype's A2 = 110 Hz at A4 440) and one on its FIFTH (E3), priced by
      the view like the backing drone (rule #2); fade-in 1.2 s; a large send into the ambience's own room.
    - Wind: a looped seeded noise through a wide bandpass at 520 Hz whose centre drifts ±260 Hz at 0.06 Hz.
@@ -9,7 +9,7 @@
      ahead at explicit times (rule #15).
    - Distance: ONE soft echo (a delay with a dark feedback) — not a room: measured (RUN 7), the FDN reverb alone cost ≈ 3.6 % of a core in the
      runner (≈ 40 % of Night's own forest room again), over the ≤ 2 % target; the echo is a fraction of it. Drone and wind need no room. */
-import { seeded } from './dsp.js';
+import { seeded } from '../../../core/pure/dsp.js';
 
 export const AMB=Object.freeze({
   drone:Object.freeze({ root:0.09, fifth:0.05, tc:1.2, send:0.25 }),

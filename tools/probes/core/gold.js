@@ -12,6 +12,12 @@ import { timbresOf } from '../../../core/audio.js';
 import { aRef, setARef, chainKeyOf } from '../../../core/state.js';
 import { scaleView, scaleById } from '../../../core/scales.js';
 import { DYN_GLUE, DYN_LIMIT, DYN_MASTER } from '../../../core/pure/dsp.js';   // SND-F1: the master Glue / Limiter cases
+import { soundModOf } from '../../../core/soundmods.js';
+import { profileCurrent, profileOf } from '../../../core/profile.js';
+/* CORE-7: cases of an app's registered module (kind → case names) are rendered only on a page that registers it (Night); elsewhere skipped by
+   this declaration. A page whose profile names an ambience but registers none fails. */
+const APP_CASES=Object.freeze({ ambience:Object.freeze(['ambience']) });
+const appSkip=name=>Object.entries(APP_CASES).some(([k,names])=>names.includes(name) && !soundModOf(k));
 
 const GOLD_FILE='tools/prints/gold.print.json', GOLD_TOL=0.01, GOLD_FLOOR=-80, WIN=0.05, NFFT=4096;
 const BANDS=[0,63,125,250,500,1000,2000,4000,8000,16000,24001];
@@ -45,7 +51,7 @@ function goldCases(){
   add('fx cecho 1',3.0,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.4); }, { [chK]:{ ids:['cecho'], set:{ 'cecho:amount':1 } } });
   [0,1].forEach(tl=>add(`fx ctone ${tl}`,1.2,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.9); }, { [chK]:{ ids:['ctone'], set:{ 'ctone:mix':1, 'ctone:tilt':tl } } }));
   add('fx cwave 1',1.2,e=>{ e.chordOn('g',F3,0.8,2,null,0.05); e.chordOff('g',0.9); }, { [chK]:{ ids:['cwave'], set:{ 'cwave:mix':1, 'cwave:amount':1 } } });
-  add('ambience',3.0,e=>{ e.ambienceOn(true,1,0.05); e.ambienceTick(3.0); });   // RUN 7 (C4c): the forest's ambience (drone, wind, crickets) at full level
+  if(!appSkip('ambience')) add('ambience',3.0,e=>{ e.ambienceOn(true,1,0.05); e.ambienceTick(3.0); });   // RUN 7 (C4c): the forest's ambience at full level (CORE-7: Night's page only)
   bus('glue',[{ 'glue:thr':0.5, 'glue:ratio':0.37 },{ 'glue:thr':0.25, 'glue:ratio':0.6, 'glue:att':0.2, 'glue:rel':0.3 },{ 'glue:thr':0, 'glue:ratio':1, 'glue:knee':0.5, 'glue:makeup':0.6 }],1.2,0.9);
   add('master glue',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'comp', set:{ ...DYN_GLUE, on:1 }, gain:4 });
   add('master limiter',1.2,e=>{ e.chordOn('g',F3,1,2,null,0.05); e.chordOff('g',0.9); },{},{ mode:'limit', set:{ ...DYN_LIMIT, on:1 }, gain:16 });
@@ -93,6 +99,7 @@ export async function dumpGold(){
   const R=await import('../../../core/render.js'), cases={}, t0=performance.now();
   await withA4(async()=>{ for(const c of goldCases()) cases[c.name]=await renderCase(R,c); });
   console.log(`[scaleprobe gold] ${Object.keys(cases).length} cases in ${((performance.now()-t0)/1000).toFixed(1)} s — save the returned object as ${GOLD_FILE} (JSON)`);
+  const left=Object.values(APP_CASES).flat().filter(appSkip); if(left.length) console.warn(`[scaleprobe gold] LEFT OUT on this page (no app module): ${left.join(', ')} — keep them from the old file or dump on Night's page`);   // CORE-7
   return { meta:{ format:'handsong/gold-print', version:1, made:new Date().toISOString(), file:GOLD_FILE, rate:48000, a4:440, win:WIN, nfft:NFFT, bands:BANDS }, cases };
 }
 /* P.checkGold() — row «GOLD timbres and effects» (P.all only: ≈ 70 short renders). */
@@ -101,7 +108,8 @@ export async function checkGold(){
   try{ const r=await fetch(new URL('../../../'+GOLD_FILE, import.meta.url), { cache:'no-store' }); if(!r.ok) throw new Error('HTTP '+r.status); file=await r.json(); }
   catch(e){ miss(`no golden file ${GOLD_FILE} (${e&&e.message}) — P.dumpGold() on unchanged code makes it`); return { cases, total:diff.length, differences:diff }; }
   const R=await import('../../../core/render.js'), list=goldCases(), G=file.cases||{};
-  for(const n of Object.keys(G)) if(!list.some(c=>c.name===n)) miss(`golden case «${n}» is no longer rendered`);
+  for(const n of Object.keys(G)) if(!list.some(c=>c.name===n) && !appSkip(n)) miss(`golden case «${n}» is no longer rendered`);
+  { const p=profileOf(profileCurrent()); cases++; if(p && p.ambience && !soundModOf('ambience')) miss(`the profile names «${p.ambience}» but the page registers no ambience module — its golden case would be skipped`); }
   await withA4(async()=>{
     for(const c of list){ cases++;
       if(!G[c.name]){ miss(`«${c.name}» has no golden case (a new sound: renew the file by decision)`); continue; }

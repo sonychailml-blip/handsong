@@ -3,7 +3,7 @@
    engine instance in E (E.amb), never here. Numbers and the seeded schedule: core/ambience.js. Every source starts once and is gated
    (rule #3, like the backing drone); chirps are scheduled ahead at explicit times (rule #15). Its own bus → the master (live sound, never a
    track — rule #31); distance by one soft echo (a delay with a dark feedback — cheap; see core/ambience.js). */
-import { AMB, windNoise, cricketStream, chirpShape } from '../../pure/ambience.js';
+import { AMB, windNoise, cricketStream, chirpShape } from '../pure/ambience.js';
 
 /* build into `dest` (the master's input); `seed` shifts every seeded part (a probe's control) → the ambience object */
 function buildAmbience(E, dest, seed=0){

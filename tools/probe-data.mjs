@@ -712,7 +712,7 @@ async function nightDepthCore(){
    is seeded too (repeatable, another seed differs) */
 async function nightCricketsCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const A=await import(new URL('../core/pure/ambience.js', import.meta.url).href), C=A.AMB.crickets;
+  const A=await import(new URL('../apps/night/pure/ambience.js', import.meta.url).href), C=A.AMB.crickets;
   const take=(seed,k,m)=>{ const s=A.cricketStream(seed,k), out=[s.freq]; for(let i=0;i<m;i++) out.push(s.next()); return out; };
   for(let k=0;k<C.n;k++){ const a=take(C.seed,k,200), b=take(C.seed,k,200); n++; if(JSON.stringify(a)!==JSON.stringify(b)) miss('cricket '+k+': the same seed gave other chirps');
     n++; if(!(a[0]>=C.fLo && a[0]<=C.fHi)) miss('cricket '+k+': pitch '+a[0]);
@@ -970,7 +970,7 @@ const ROWS=[
   ['VIS1 bus (core)',           ()=>busCore(),      r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT shell (core)',         ()=>nightShellCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT depth curve (core)',   ()=>nightDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
-  ['NIGHT cricket schedule (core)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NIGHT cricket schedule (app)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)

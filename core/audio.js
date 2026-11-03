@@ -22,8 +22,7 @@ import { VOL_PARAMS, makeVolFx } from './modules/effects/volume.js';
 import { FOREST_PARAMS, makeForestFx } from './modules/effects/forest.js';
 import { FDEPTH_PARAMS, makeForestDepthFx } from './modules/effects/forestdepth.js';   // RUN 7 (C4b): Night's «Forest depth»
 import { CECHO_PARAMS, CTONE_PARAMS, CWAVE_PARAMS, makeNightEchoFx, makeNightToneFx, makeNightWaveFx } from './modules/effects/night-fx.js';   // RUN 7 (C5): the Night effects hand
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet } from './modules/ambience/forest.js';   // RUN 7 (C4c): the forest's ambience
-import { AMB } from './pure/ambience.js';
+import { soundModOf } from './soundmods.js';   // CORE-7: the ambience is an app's registered module (none registered: none built)
 import { GLUE_PARAMS, dynNode, makeGlueFx } from './modules/effects/glue.js';
  
 /* ================= МУЗЫКАЛЬНЫЕ КОНСТАНТЫ ================= */
@@ -417,7 +416,7 @@ function setDbg(o){ DBG.noHum=!!(o&&o.noHum); DBG.noStrikeCap=!!(o&&o.noStrikeCa
    ⛔ ЖИВАЯ КОПИЯ ЭТО НЕ ЗОВЁТ НИКОГДА: у неё функции уровня и панорамы ставит recorder при загрузке, и сброс вернул бы все дорожки в центр
    и на единицу. Сброс — только render.js, только своей копии. */
 function renderReset(){
-  amb=null;   // RUN 7 (C4c): a render's ambience belongs to its own context
+  amb=null; ambM=null;   // RUN 7 (C4c): a render's ambience belongs to its own context
   timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
@@ -2076,15 +2075,15 @@ let dView=null, dUp=false;
 const dv=()=>dView||undefined;
 function droneUse(s){ dView=s||null; }
 const droneHz=()=>[tonicFreq(dv())/2, droneSecondHz(dv())];   // what the drone sounds now (probe read-out)
-/* RUN 7 (C4c, Night plan §4.6): THE FOREST'S AMBIENCE — built on first use in this engine instance into the master (so the sleep fade and the
-   limiter cover it), live sound only (never a track, rule #31); its drone is priced from the LIVE view like the backing drone (the mood and
-   the key — rule #2). ambienceOn(on, level, when) fades it in or out; ambienceTick(until) schedules the crickets ahead (the Night shell's frame,
-   or a render up to its end); seed shifts its seeded parts (a probe's control). */
-let amb=null;
-function ambienceOn(on, level=AMB.level, when, seed=0){ if(!AC) return; if(!amb){ if(!on) return; amb=buildAmbience(E, master, seed); }
-  ambienceRetune(when); ambienceSet(E, amb, on, level, when); }
-function ambienceRetune(when){ if(amb) ambienceTune(E, amb, tonicFreq()/2, droneSecondHz(), when); }
-function ambienceTick(until){ if(amb && amb.on) ambienceSchedule(E, amb, until!=null ? until : AC.currentTime+AMB.ahead); }
+/* RUN 7 (C4c): THE AMBIENCE — built on first use in this engine instance into the master (the sleep fade and the limiter cover it), live sound
+   only (never a track, rule #31); its drone is priced from the LIVE view (rule #2). CORE-7: the module is the app's (core/soundmods.js; Night's
+   forest); with none registered nothing is built. ambienceOn(on, level, when, seed) fades it; ambienceTick(until) schedules ahead. */
+let amb=null, ambM=null;
+function ambienceOn(on, level, when, seed=0){ if(!AC) return;
+  if(!amb){ if(!on) return; ambM=soundModOf('ambience'); if(!ambM) return; amb=ambM.build(E, master, seed); }
+  ambienceRetune(when); ambM.set(E, amb, on, level===undefined ? ambM.level : level, when); }
+function ambienceRetune(when){ if(amb) ambM.tune(E, amb, tonicFreq()/2, droneSecondHz(), when); }
+function ambienceTick(until){ if(amb && amb.on) ambM.schedule(E, amb, until!=null ? until : AC.currentTime+ambM.ahead); }
 const ambienceInfo=()=> amb ? { on:amb.on, level:amb.level, hz:amb.hz.slice(), origin:amb.origin } : null;   // RUN 9: origin = the wind sweep's start (the forest's leaves sway with it)
 function droneOn(level=0.18,when,tc=1.2){ if(!AC)return; const t=when!=null?when:AC.currentTime;
   dG.gain.setTargetAtTime(level,t,tc);

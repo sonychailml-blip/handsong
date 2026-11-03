@@ -209,7 +209,7 @@ row({ at:1009.6, night:true, name:'NIGHT depth → forest', run:()=>checkNightDe
 export async function checkNightAmbience(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   try{
-    const R=await import('../../../core/render.js'), S=await import('../../../core/scales.js'), ST=await import('../../../core/state.js'), AM=await import('../../../core/pure/ambience.js');
+    const R=await import('../../../core/render.js'), S=await import('../../../core/scales.js'), ST=await import('../../../core/state.js'), AM=await import('../../../apps/night/pure/ambience.js');
     const mid=b=>{ const m=new Float32Array(b.L.length); for(let i=0;i<m.length;i++) m[i]=(b.L[i]+b.R[i])/2; return m; };
     const SEC=4, play=(level,seed)=>e=>{ e.ambienceOn(true, level, 0.05, seed); e.ambienceTick(SEC); };
     const a=await R.goldRender(play(1,0), SEC), b=await R.goldRender(play(1,0), SEC), c=await R.goldRender(play(1,1), SEC), h=await R.goldRender(play(0.5,0), SEC);

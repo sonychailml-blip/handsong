@@ -402,11 +402,13 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
 - **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (four controls, the settings card, sleep timer, the start, bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`); `calib.js` the hand's calibration screens and the settings' Hand section (NIGHT-2, over CORE-1);
   `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, moods, rare events, emblem), `pure/forestlife.js` (stream, mushroom / flower places, rings), `pure/fireflies.js`;
   `scene/forest.js` the room (tokens `--cv-forest-*`), `scene/forest-life.js`, `forest-detail.js`, `forest-rare.js`. Bus topic `nightSky` { mood, sleep, wind }.
+  `sound/ambience.js` the forest's ambience (drone + wind + crickets; rule #38, registered by `main.js` through `core/soundmods.js` — CORE-7), `pure/ambience.js` its numbers and the seeded crickets.
 - `core/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
   curve (`volAmp`, `volVel`, `volFromOld`), `FX_VOL`, curve law of bends and lanes (`curveU`/`curveK`, `bendAt`/`bendSplit`, `bendPlan`).
 - `core/state.js` — cross-cutting musical/layout state + setters (scale, tonic, `tonicCents`, `aRef`, `tunedFrom`, timbres, `handFn`,
   `voiceMode`, split + `phoneHalves`, registers, camera, editor/window); chain keys `chainKeyOf`/`trackChainKeyOf` (OPAQUE), `fxChains`.
 - `core/hooks.js` — nullable callbacks for lower layers (`tutor`, `cleared`, `af`, `afRow`, `key`, `renderBusy` …).
+- `core/soundmods.js` (CORE-7) — the door for an app's sound modules: `soundModAdd(kind, id, mod)` once before the start, `soundModOf(kind)`; one module per kind (today `ambience`); shared by both engine instances; none registered = none built (Full).
 - `core/i18n.js` — `LANGS`, `DICTS`, `t()`, `L()`, `applyI18n`. `core/icons.js` — THE icon component (`ICONS` by meaning, `icon`,
   `iconText`, `applyIcons`). `core/palette.js` — canvas colours from tokens (`cv(name)`, `ROLE_COL`).
 - `core/data/` + `core/scaleload.js` — scale data as JSON (v1; manifest order = menu order); per-file validation; user files after built-ins.
@@ -425,7 +427,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
   `bass-voice.js`, `drumkits.js`, `tine.js` — the struck tine as a solo bank, C4a; `modal.js` struck bodies by modal synthesis and `breath.js`
   breathing sustained sounds — RUN 7; `strikes.js` Night's strike cap: caps `E.strikeCaps` from the profile, list `E.pool.ld.strikes`); `core/modules/effects/` — stateless effects (`param.js`, `reverb.js`, `delay.js`, `trem-mix.js`,
   `bright.js`, `glide.js`, `volume.js`, `forest.js`, `glue.js`; Night-only: `forestdepth.js` «Forest depth» with `reach` and `light`, `night-fx.js` Echo · Warmth / Brightness
-  · Wave); `core/modules/ambience/forest.js` the forest's ambience. All: rule #38, first argument `E`.
+  · Wave). All: rule #38, first argument `E`.
 - `core/arrange.js` — arrangement data + pure generation (`PROGRESSIONS`, `HARMONIES`, `RHYTHMS`, `BASS_MODES`, `buildArrangement`).
 - `core/recorder.js` — FACADE re-exporting `song/`, `transport/`, `freeze/`, `live/` + the wiring (`envWire`, `clockWire`, `schedWire`,
   `freezeWire`, `recWire`, `backingWire`) + session glue (lane prune/reset/delete, mixer setters, `laneHush`, drone sync, editor SESSION
@@ -447,7 +449,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
   `recorder.cmdSet`/`cmdNote` (CMD1d) — the commands that are not history steps (mute, solo, arm, ⟳, brace, tempo; key, A4) tell the journal.
 - `core/pure/` (PURE, rule #36; runs in node): `format.js` (file envelope, migrations), `registry.js` (id spaces, `createRegistry`),
   `songfile.js` (song file parse/upgrade/check), `pack.js` (packs + offline licence keys, PACK1), `profile.js` (profile record, C0), `bus.js` (VIS1a; the visuals' event bus `BUS`: state `hands`, `handsView`, `picture`; ring `notes` from the LIVE engine contract), `engclass.js` (provisional power class, dropout rate — ENG2), `timbre.js` (the timbre record + T5 bounds — TIM3a), `latency.js`, `handsched.js` (search
-  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a), `nightui.js` (shell logic), `ambience.js` (seeded crickets).
+  schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a), `nightui.js` (shell logic).
 - `core/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
 - `core/pure/profile.js` (C0) — PROFILES, checked by `core/pure/profile.js`; `profileApply(id)` called once at the start by `boot` with the page's profile; writes through ui.js doors `profileWire`. Full's face stays embedded on Night's page for probes only (`core/DEBT.md`). `core/edition.js` — `EDITION` ('dev' here; `tools/build.mjs` writes 'release').
 - `core/legacy-ui/` (temporary, only shrinks; rule 2 of «Two apps, one core»): `boot.js` the shared start and loop (`onHands`, `loop()`, `startApp()`, the one start path; options `profile`, `frameFilter`, `afterDraw` — CORE-6), `ui.js` menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers; `draw.js` FACADE over `views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +

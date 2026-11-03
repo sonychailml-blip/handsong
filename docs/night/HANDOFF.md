@@ -35,6 +35,9 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-3 stage 2 (2026-11-03): the ambience through the core door (CORE-7). Log: `docs/night/WORK-LOG.md`
+- The plan is approved with the user's decisions (PLAN.md, top): no second room yet; next stage 3 (the forest as the first room module + CORE-8), then the music bed, then the switching machinery with a dev-only test room.
+- The forest ambience now lives in `apps/night/sound/ambience.js` + `pure/ambience.js` and is registered by `main.js` through `core/soundmods.js`. Same sound: GOLD «ambience» on Night's page 0 differences against the old print.
 ### NIGHT-3 stage 1 (2026-11-03): rooms as modules, switching, a music bed — the plan only. `docs/night/design/NIGHT-3-rooms/PLAN.md`
 - No app code; tree hashes unchanged. Rooms and their sound are not modular today (the forest is wired through core, legacy-ui and the shell); scales and timbres are data.
 - Proposed: a room folder per room (record, picture, 2D stand-in, nature and bed recipes); a core door for an app's sound module (CORE-7); the host moves to the app (CORE-8); two nature slots for a crossfade; detection paused in the switch's dark moment; Dark / Camera become «Picture» in settings.

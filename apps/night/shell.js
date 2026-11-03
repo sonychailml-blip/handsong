@@ -11,7 +11,7 @@ import { sleepProgress } from './pure/cycle.js';   // RUN 9: the sleep timer dee
 import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setNightStrikes, setLeanPath, leadParkTick, AC, leadOn, leadOff, timbreIdx, ambienceInfo } from '../../core/audio.js';
 import { fxDenorm } from '../../core/modules/effects/param.js';
 import { NIGHT_FX } from '../../core/modules/effects/night-fx.js';
-import { AMB } from '../../core/pure/ambience.js';
+import { AMB } from './pure/ambience.js';
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';

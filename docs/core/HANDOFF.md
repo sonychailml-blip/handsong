@@ -16,6 +16,7 @@ Index: `/HANDOFF.md`. Rules, short module map, step index: `CLAUDE.md`. Open ite
 - ✅ **Stage 3 foundation:** LIC1, PRIV1, LAT1, PROBE1, GOLD1, HAND1, LAT1b, SND-F1/F1b, LAT2, LAT3, CAM-FIX, REC1–REC5, FMT1, TIM1, GES1, UI1b, TIM2, SAVE1, DRAW1, AUTOSAVE1, DRAW1b, SONG1, AUD1a–c, AUD2a–c, ENG1, IDS1, SONG2, SONG3, PACK1, DOC1, POOL1, ENG2, TIM3a–d, CMD1a–d. Mostly unverified by the user (steps 91–100). UI1a after the redesign. Moved after the first release: ROUTE1, IN1, GES2.
 - ✅ **SPLIT-2** (2026-11-01/02): two apps, one core. Log: `docs/core/WORK-LOG.md`.
 - ✅ **CORE-1** (2026-11-02): hand calibration and sensitivity, engine only, opt-in; no app opens it yet. Step 125 open on Night and the Poco.
+- ✅ **CORE-7** (2026-11-03): `core/soundmods.js`, the door for an app's sound module (one per kind, today `ambience`), shared by both engine instances; the forest ambience left core for `apps/night/sound/`. Opt-in: Full registers nothing. GOLD's «ambience» case runs on Night's page only (declared in `gold.js` `APP_CASES`). For NIGHT-3.
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.
 
 ## The foundation (full plan and contracts: `archive/HANDOFF-history.md`, «STAGE 3 — FOUNDATION PLAN»)

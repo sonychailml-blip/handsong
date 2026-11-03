@@ -4,6 +4,15 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-7 (2026-11-03): the door for an app's sound module; the forest ambience leaves core (NIGHT-3 stage 2)
+Tree hashes before: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da · apps/night 4f4fcfc3f1f0cc14. After: core c3b25630f4ae3fbb · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 87f6896f34c0f60b.
+- New `core/soundmods.js`: `soundModAdd(kind, id, mod)` → null or a refusal in words, `soundModOf(kind)`; one module per kind (today `ambience`: build / schedule / tune / set + level, ahead). Both engine instances import this one module, so the render copy finds what the live engine finds.
+- `core/audio.js`: the ambience functions keep their signatures and delegate to the registered module; none registered = nothing built (Full). The forest-specific imports are gone.
+- Pure move (only paths changed): `core/modules/ambience/forest.js` → `apps/night/sound/ambience.js`, `core/pure/ambience.js` → `apps/night/pure/ambience.js`. `apps/night/main.js` registers it. `core/DEBT.md` lost those two.
+- Static check 13 (rule #38) covers `apps/<app>/sound/` too (own app's `pure/` and `sound/` allowed); CONTROLS: an app module's top-level let and its UI import are caught, a clean one passes.
+- GOLD: the «ambience» case is rendered only on a page that registers an ambience (`APP_CASES` in `gold.js`), and a page whose profile names an ambience without registering one fails. The golden file is unchanged: Night renders the case against the old numbers (0 differences); `P.dumpGold()` warns when it leaves a case out.
+- Checks: static PASS; [probe-data] PASS — 36 checks, 0 differences; [smoke] PASS with builds; Full P.all: PASS — 122 checks, 0 differences (GOLD 99 cases 0, node census 0, FULL untouched 0); Night P.night: PASS — 37 checks, 0 differences (GOLD 100 cases 0, NIGHT ambience 0, NIGHT stress 0, NIGHT untouched 0); doc-split PASS; name index regenerated. Fix rounds 0.
+
 # CORE-6 (2026-11-03): far hands in the calibration, and a drawing hook after the stack (for NIGHT-2 stage 3)
 Tree hashes before: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32. After: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4f4fcfc3f1f0cc14.
 - `core/pure/handcal.js`: `CAL.sizeMin` 0.06, `CAL.rFarMax` 0.8; `calFarBase(near)`; `calFarRatio(s, base)` and `calDepth(r, noise, s, base)` take an optional 1× far ratio (default 0.42, the old law); `createCalRun({ farHold })`. `core/handcal.js`: `handCalOpen({ farHold })`, passed to the run and the depth law. Absent: CORE-1 exactly (rows CAL1-3 «every near from 0.143 up keeps the law bit for bit», CAL4 print unchanged).

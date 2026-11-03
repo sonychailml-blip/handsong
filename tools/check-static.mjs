@@ -451,8 +451,12 @@ if(mods['core/engine/surface.js'] && mods['core/audio.js']){
    `delete X…`, `Object.assign(X, …)` …); it imports only `core/`, `config.js`, `scales.js` and the stateless tree itself (core/modules/**, core/engine/**). What changes while playing
    or is made from a context lives in the engine context E it receives. CONTROLS: a top-level let, a written table and a forbidden import
    must each be caught; a clean module (a frozen table, a function using E) must pass. */
-const SL_SCOPE=f=>/^core\/(modules|engine)\//.test(f) && !/^core\/engine\/worklets\//.test(f);
-const SL_IMPORT_OK=(f,t)=> t==null || /^core\/pure\//.test(t) || t==='core/config.js' || t==='core/scales.js' || (SL_SCOPE(t) && SL_SCOPE(f));   // AUD2a: the stateless tree imports itself (effects use the timbre stages and engine/fdn.js)
+/* CORE-7: an app's sound module (apps/<app>/sound/, registered through core/soundmods.js) is shared by both engine instances too: the same rule;
+   it may also import its own app's pure/ and sound/ */
+const SL_APP=f=>/^apps\/[\w-]+\/sound\//.test(f), SL_APPOF=f=>(/^apps\/([\w-]+)\//.exec(f||'')||[])[1];
+const SL_SCOPE=f=>(/^core\/(modules|engine)\//.test(f) && !/^core\/engine\/worklets\//.test(f)) || SL_APP(f);
+const SL_IMPORT_OK=(f,t)=> t==null || /^core\/pure\//.test(t) || t==='core/config.js' || t==='core/scales.js' || (SL_SCOPE(t) && SL_SCOPE(f) && (!SL_APP(t) || SL_APPOF(t)===SL_APPOF(f)))   // AUD2a: the stateless tree imports itself (effects use the timbre stages and engine/fdn.js)
+  || (SL_APP(f) && SL_APPOF(t)===SL_APPOF(f) && /^apps\/[\w-]+\/pure\//.test(t));
 function statelessCheck(f, bare, imports){
   const out=[]; let depth=0, paren=0; const top=[];   // positions at brace depth 0 and paren depth 0
   for(let i=0;i<bare.length;i++){ const c=bare[i]; if(c==='{') depth++; else if(c==='}') depth--; else if(c==='(') paren++; else if(c===')') paren--;
@@ -472,10 +476,13 @@ for(const f of files) if(SL_SCOPE(f)) fails.push(...statelessCheck(f, mods[f].ba
 { const L=s=>lex(s).bare;
   const bad=[ ['core/modules/timbres/ctl1.js', L('let n=0;\nexport function f(E){ return n++; }'), []],
               ['core/modules/timbres/ctl2.js', L('const CACHE={};\nexport function f(E,k){ CACHE[k]=E.ac.createGain(); return CACHE[k]; }'), []],
-              ['core/modules/timbres/ctl3.js', L('export function f(E){ return 1; }'), [{ spec:'../../audio.js', t:'core/audio.js' }]] ];
+              ['core/modules/timbres/ctl3.js', L('export function f(E){ return 1; }'), [{ spec:'../../audio.js', t:'core/audio.js' }]],
+              ['apps/night/sound/ctl5.js', L('let n=0;\nexport function f(E){ return n++; }'), []],   // CORE-7: an app's sound module, a top-level let
+              ['apps/night/sound/ctl6.js', L('export function f(E){ return 1; }'), [{ spec:'../shell.js', t:'apps/night/shell.js' }]] ];   // CORE-7: … importing its app's UI
   const good=['core/modules/timbres/ctl4.js', L('const T=Object.freeze([1,2]);\nconst M={ a:1 };\nexport function f(E){ for(let i=0;i<T.length;i++){ const g=E.ac.createGain(); } return M.a; }'), [{ spec:'../../pure/dsp.js', t:'core/pure/dsp.js' }, { spec:'./fm.js', t:'core/modules/timbres/fm.js' }]];
-  const caught=bad.map(([f,b,i])=>statelessCheck(f,b,i).length>0), clean=statelessCheck(...good);
-  if(caught.some(x=>!x) || clean.length) fails.push(`stateless-rule CONTROL: caught ${caught.map(x=>x?'yes':'NO').join('/')} of let / written table / forbidden import; clean module flagged ${clean.length} time(s): ${clean.join(' | ')} — the check cannot fail or flags innocent code`); }
+  const goodApp=['apps/night/sound/ctl7.js', L('const T=Object.freeze([1]);\nexport function f(E){ return T[0]; }'), [{ spec:'../pure/ambience.js', t:'apps/night/pure/ambience.js' }, { spec:'../../../core/pure/dsp.js', t:'core/pure/dsp.js' }]];   // CORE-7
+  const caught=bad.map(([f,b,i])=>statelessCheck(f,b,i).length>0), clean=[...statelessCheck(...good), ...statelessCheck(...goodApp)];
+  if(caught.some(x=>!x) || clean.length) fails.push(`stateless-rule CONTROL: caught ${caught.map(x=>x?'yes':'NO').join('/')} of let / written table / forbidden import / app-module let / app-module UI import; clean module flagged ${clean.length} time(s): ${clean.join(' | ')} — the check cannot fail or flags innocent code`); }
 /* 14) SPLIT-2 BOUNDARIES: core imports no app and no tool; an app imports only itself and core; a probe suite imports core, its own suite, the core suite and its own app; pure code
    imports only pure code. Static and literal dynamic imports. CONTROLS: a core → app, a cross-app and a suite → other app's import must each be caught. */
 const allowedFrom=(f,t)=>{ if(/^(core|apps\/night)\/pure\//.test(f) && !/\/pure\//.test(t)) return false;
