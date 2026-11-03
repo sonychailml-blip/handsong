@@ -4,6 +4,15 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-2 — stage 2 (2026-11-03): calibration screens and settings, built
+Tree hashes before: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b. After: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32.
+- The user's answers to the 12 design questions and additions A, B: `docs/night/design/NIGHT-2-calibration/DESIGN.md` «Decisions».
+- `apps/night/calib.js` (new): the offer once per camera, the step on the camera picture (its own canvas, the forest stays open), every point of the hands while calibrating, the result card (hands play, «Играть» saves, «Ещё раз»), failures worded by reason, the side voted over the hold sets the roles and is saved, reset clears all; the settings' Hand section and its two sliders.
+- `apps/night/shell.js`: five round buttons; ⓘ → settings (Hand · View · about); background and Forest slider in settings; «Руки на экране» fingertips / all points (was a dev switch); the offer after a person's Begin, then the ghost. `ghost.js`: `ghostArm({ wait })`. `index.html`, `night.css`: the card and overlay; the landscape low-light hint left of the capsule (`MSG_KNOWN` line deleted in `tools/ui-snap.mjs`).
+- Core part: CORE-5 (texts, settings icon). Row «NIGHT calibration screens» (`tools/probes/night/calib.js`, quick).
+- Checks: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` (Full) · `P.night: PASS — 37 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT calibration screens 0, 35 cases) · `[smoke] PASS` with builds · ui-snap Night: no overlap (0 known). No print renewed, no tolerance changed.
+- Players who never calibrate or open settings: the same sound, gestures and hand points; the main screen has five buttons and the settings icon (the design).
+
 # NIGHT-2 — stage 1 (2026-11-03): calibration screens, design only
 No app code. Design and open questions: `docs/night/design/NIGHT-2-calibration/DESIGN.md`, mock beside it, pictures `tools/design/NIGHT-2-calibration/` (`node tools/night2-mock-snap.mjs`). Waiting for the user's approval.
 

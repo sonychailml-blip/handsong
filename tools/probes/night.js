@@ -19,6 +19,7 @@ export { checkNightUntouched, dumpNight } from './night/nightguard.js';
 export { checkNightProfile } from './night/nightprofile.js';
 export { checkNightMigrate } from './night/nightmigrate.js';
 export { checkNightLean, checkQuietFloor } from './night/lean.js';   // NIGHT-1 stages 2, 3
+export { checkNightCalib } from './night/calib.js';   // NIGHT-2 stage 2
 export const api=guardApi;
 
 export function install(){

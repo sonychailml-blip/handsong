@@ -129,6 +129,51 @@ body.night-plain .night-card{ -webkit-backdrop-filter:none; backdrop-filter:none
 .night-hint[hidden]{ display:none; }
 /* one message at a time: while the low-light message shows (latmeter.js sets body.dark-on) the Night lines at the top give way */
 body.dark-on .night-idle, body.dark-on .night-hint{ visibility:hidden; }
+/* NIGHT-2: THE SETTINGS CARD — sections Hand and View, two named sliders without numbers, segments, and the about lines at the bottom */
+.night-set-title{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); line-height:var(--night-lh-tight); color:var(--night-ink); }
+.night-sec{ min-width:0; }
+.night-sec-h{ margin:var(--night-pad) 0 var(--night-gap-sm); font-size:var(--night-fs-small); font-weight:var(--night-fw-regular); letter-spacing:.08em; text-transform:uppercase; color:var(--night-dim); }
+.night-calrow{ display:flex; justify-content:space-between; align-items:baseline; gap:var(--night-gap); font-size:var(--night-fs-value); }
+.night-calrow .night-lnk{ margin:0 !important; flex:none; }
+.night-card p.night-note{ font-size:var(--night-fs-small); margin:var(--night-gap-sm) 0; }
+.night-note[hidden]{ display:none; }
+.night-sl{ margin:var(--night-gap) 0 var(--night-pad); }
+.night-sl-lab{ display:flex; justify-content:space-between; align-items:baseline; gap:var(--night-gap); font-size:var(--night-fs-value); margin-top:var(--night-gap); }
+.night-sl-lab .night-lnk{ margin:0 !important; font-size:var(--night-fs-small); text-align:right; }
+.night-sl input{ display:block; width:100%; margin:var(--night-gap-sm) 0 0; accent-color:var(--night-accent); }
+.night-sl-ends{ display:flex; justify-content:space-between; font-size:var(--night-fs-small); color:var(--night-dim); margin-top:var(--night-gap-sm); }
+.night-sl.off input, .night-sl.off .night-sl-ends{ opacity:.45; }
+.night-seg{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); margin:var(--night-gap-sm) 0 var(--night-gap); border:1px solid var(--night-hair); border-radius:var(--night-r-pill); overflow:hidden; }
+.night-seg-2{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+#nightShell .night-seg button{ padding:var(--night-gap-sm); text-align:center; font-size:var(--night-fs-value); min-height:40px; }
+#nightShell .night-seg button.on{ background:var(--night-accent); color:var(--night-accent-ink); }
+#nightShell .night-seg button[hidden]{ display:none; }
+.night-set .night-vol{ padding:0; margin:0 0 var(--night-gap); }
+.night-btns{ display:flex; flex-wrap:wrap; gap:var(--night-gap); margin-top:var(--night-pad); }
+#nightShell .night-btn{ flex:1 1 auto; white-space:nowrap; min-height:48px; padding:0 var(--night-gap); border-radius:var(--night-r-pill); border:1px solid var(--night-hair); background:var(--night-fill); font-size:var(--night-fs-body); }
+#nightShell .night-btn.go{ background:var(--night-accent); color:var(--night-accent-ink); border:0; font-weight:var(--night-fw-bold); }
+.night-about{ margin-top:var(--night-pad); padding-top:var(--night-gap); border-top:1px solid var(--night-hair); }
+.night-about .night-mark{ margin-bottom:var(--night-gap-sm); }
+/* NIGHT-2: THE HAND'S CALIBRATION — the camera picture on its own canvas over the scene, a dashed frame, one line with the progress at the bottom, Cancel at the top;
+   one card for the offer, the result and a failure. While it shows, the low-light message gives way (the step's own line and «low-rate» speak for it). */
+.night-cal{ position:absolute; inset:0; pointer-events:auto; }
+.night-cal[hidden]{ display:none; }
+.night-cal-pic{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+.night-cal-frame{ position:absolute; inset:7%; border:1.5px dashed var(--night-hair); border-radius:var(--night-r-card); pointer-events:none; }
+.night-cal-frame.warn{ border-color:var(--night-warm); }
+#nightShell .night-cal-cancel{ position:absolute; top:max(var(--night-edge), env(safe-area-inset-top)); right:max(var(--night-edge), env(safe-area-inset-right)); padding:var(--night-gap-sm) var(--night-pad);
+  border-radius:var(--night-r-pill); font-size:var(--night-fs-value); background:var(--night-glass); border:1px solid var(--night-hair); }
+body.night-plain #nightShell .night-cal-cancel{ background:var(--night-glass-plain); }
+.night-cal-strip{ position:absolute; left:var(--night-edge); right:var(--night-edge); bottom:max(var(--night-edge), env(safe-area-inset-bottom)); max-width:560px; margin:0 auto;
+  padding:var(--night-pad); border-radius:var(--night-r-card); box-shadow:var(--night-shadow); }
+.night-cal-say{ margin:0; font-size:var(--night-fs-body); line-height:var(--night-lh); color:var(--night-ink); }
+.night-cal-bar{ height:6px; margin-top:var(--night-gap); border-radius:var(--night-r-pill); background:var(--night-fill); border:1px solid var(--night-hair); overflow:hidden; }
+.night-cal-bar i{ display:block; height:100%; width:0; background:var(--night-accent); transition:width 120ms linear; }
+.night-cal [hidden]{ display:none !important; }
+.night-card p.night-cal-title{ margin:0 0 var(--night-gap); font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); color:var(--night-ink); }
+.night-card p.night-cal-text{ margin:0; color:var(--night-ink); }
+.night-card p.night-cal-note{ margin:var(--night-gap) 0 0; font-size:var(--night-fs-small); white-space:pre-line; }
+body.night-cal #darkHint{ display:none !important; }
 @media (orientation:landscape){
   .night-ctl{ left:auto; right:max(var(--night-edge), env(safe-area-inset-right)); bottom:auto; top:50%; transform:translateY(-50%); width:min(300px, 36vw);
     margin:0; grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -139,6 +184,12 @@ body.dark-on .night-idle, body.dark-on .night-hint{ visibility:hidden; }
   .night-card{ width:min(760px, calc(100vw - 28px)); display:grid; grid-template-columns:1fr 1fr; column-gap:var(--night-pad-lg); align-content:start; }
   .night-card .night-ihead{ grid-column:1/-1; }
   .night-card p{ margin:var(--night-gap-sm) 0; }
+  .night-about{ grid-column:1/-1; }
+  .night-sec-h{ margin-top:var(--night-gap); }
+  .night-card.night-cal-card{ display:block; width:min(440px, calc(100vw - 28px)); }
+  .night-cal-strip{ max-width:60vw; padding:var(--night-gap) var(--night-pad); }
+  /* NIGHT-2: the low-light message in the free area left of the capsule, where the idle line sits (its OK no longer lands on «Sound») */
+  body.night #darkHint{ left:0; right:calc(36vw + 28px); width:max-content; max-width:calc(64vw - 28px - 2 * var(--night-edge)); margin:0 auto; transform:none; }
 }
 /* In Night the Full app's top bar and its menus stay out of the way (the dev edition reaches Full through ⓘ). */
 body.night #bar, body.night #status{ display:none !important; }   /* the technical status line (scale · tuning · steps) is Full's */

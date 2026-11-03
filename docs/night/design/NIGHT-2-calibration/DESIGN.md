@@ -1,6 +1,27 @@
-# NIGHT-2 stage 1: calibration screens in Night. Design only, waiting for approval
+# NIGHT-2: calibration screens in Night. Stage 1 design, approved 2026-11-03; built at stage 2
 
-No app code changed. Mockup: `mock.html` in this folder, using Night's real tokens and stylesheet. Pictures: `tools/design/NIGHT-2-calibration/`, each screen at desktop 1280×800, phone portrait 393×851 and landscape 851×393, in Russian (`mock.html?screen=offer&lang=en` shows English). The hand is a drawn placeholder for the camera picture. Builds don't ship `docs/`.
+## Decisions (user, 2026-11-03), as built at stage 2
+1. **How close:** «as close as you'd comfortably play, with the whole hand in frame» (CORE-1's wording), not the absolute closest.
+2. **Saving:** «Играть» saves, «Ещё раз» repeats; the hands play on the result card.
+3. **Order:** the offer first, then the ghost. After the offer closes, the ghost is armed to wait up to 10 s for the hand to leave the frame, then plays; a hand still there after that ends it.
+4. **Icon:** ⓘ became a settings icon (drawn, `settings` in `core/icons.js`).
+5. **Forest slider:** moved into settings (View).
+6. **«Ход руки» before calibrating:** greyed out; «Сначала настройте руку» beside it opens the calibration.
+7. **Reset:** one reset: the setup on every camera, both sliders and the saved playing hand.
+8. **New camera:** offered once, the same way as on the first start (a list of offered cameras by the engine's camera key, `handsong.nightCalOffered`; small, so no backlog item).
+9. **Names:** «Ход руки» (Короткий … Длинный); «Чуткость эффектов» (Мягче … Сильнее).
+10. **Texts:** `core/i18n.js` for now (`night.set.*`, `night.cal.*`); a core backlog item moves app texts into app dictionaries later.
+11. **Which hand:** the largest in view is calibrated; its side sets the roles (right hand calibrated: right plays, left shapes the sound; left: the other way). The side is voted over every frame of the hold where the locked hand is seen (the label of that hand), a tie or nothing seen keeps the roles; saved beside the calibration (`handsong.nightCalSide`), applied on every start, cleared by reset. Players who never calibrate keep the profile's roles. The development edition prints how sure the vote was on the result card.
+12. **Landscape hint:** fixed in this run.
+- **A. Hand points:** settings «Руки на экране»: «Кончики пальцев» (default, today's look) · «Все точки». During the calibration every point is drawn whatever the setting.
+- **B. Graphics quality, later:** room left in the View section; Night backlog item says what it takes.
+
+**One change from the stage-1 plan:** the step doesn't switch the background to the camera (that closes the forest, and reopening it takes 1–3 s on a phone). The overlay draws the camera picture itself, with the same crop and mirror as the camera layer, and the forest stays open underneath.
+
+---
+Stage 1 text below, as approved (answers above replace its questions).
+
+No app code changed at stage 1. Mockup: `mock.html` in this folder, using Night's real tokens and stylesheet. Pictures: `tools/design/NIGHT-2-calibration/`, each screen at desktop 1280×800, phone portrait 393×851 and landscape 851×393, in Russian (`mock.html?screen=offer&lang=en` shows English). The hand is a drawn placeholder for the camera picture. Builds don't ship `docs/`.
 
 **Screens:** `offer` first-launch offer · `wait`, `hold`, `back`, `closer`, `still` the step · `done` success · `fail` a failure · `settings`, `settingsnone`, `reset` the settings menu · `main` the main screen. On a phone in landscape, settings scroll a little.
 
@@ -40,7 +61,7 @@ No numbers on screen; the positions are named at the ends.
 | Slider | Left end | Right end | Engine | Middle |
 |---|---|---|---|---|
 | «Ход руки» | Короткий | Длинный | `handCalSetDepthSens(s)`: left s = 2, right s = 0.7 | s = 1, the default |
-| «Чуткость эффектов» | Мягче | Чутче | `handCalSetSens(v)`: left 0.5, right 2 | v = 1, the default |
+| «Чуткость эффектов» | Мягче | Сильнее | `handCalSetSens(v)`: left 0.5, right 2 | v = 1, the default |
 
 **«Ход руки» reads naturally:** right means the hand travels farther. The engine value runs the other way, so the screen maps it: from the middle to the right s falls 1 → 0.7, and from the middle to the left it rises 1 → 2, each half evenly on a log scale. Default in the middle for both, though the engine's range isn't centred on 1 for depth. As measured at CORE-1: the far end is about 1.7× the near distance at the left end, 2.4× in the middle and 3× at the right end.
 
@@ -53,7 +74,7 @@ Russian first; English goes in the same dictionary. Reason codes are the engine'
 | Offer, text | Один шаг, около 10 секунд: покажите камере руку, которой играете. Тогда лес будет точнее следовать за её движением. | One step, about 10 seconds: show the camera the hand you play with. Then the forest will follow its movement more closely. |
 | Offer, note | Это можно сделать позже в настройках. | You can do this later in settings. |
 | Offer, buttons | Настроить · Пропустить | Set up · Skip |
-| Step, `waitHand` | Поднесите играющую руку как можно ближе к камере. Вся рука должна быть в кадре. | Bring your playing hand as close to the camera as you can, with the whole hand in the frame. |
+| Step, `waitHand` | Поднесите играющую руку так близко к камере, как вам удобно играть. Вся рука должна быть в кадре. | Bring your playing hand as close to the camera as you'd comfortably play, with the whole hand in the frame. |
 | Step, `holdNear` | Отлично. Держите руку неподвижно… | Good. Hold your hand still… |
 | Advice `back` | Рука не помещается в кадр. Отодвиньте её чуть дальше от камеры. | Your hand doesn't fit the frame. Move it a little further from the camera. |
 | Advice `closer` | Рука далековато. Поднесите её ближе к камере. | Your hand is rather far away. Bring it closer to the camera. |
@@ -79,7 +100,7 @@ Russian first; English goes in the same dictionary. Reason codes are the engine'
 | Buttons | Настроить заново · Настроить | Set up again · Set up |
 | Slider 1 | Ход руки: Короткий … Длинный | Hand travel: Short … Long |
 | Slider 1, not set up | Сначала настройте руку | Set up your hand first |
-| Slider 2 | Чуткость эффектов: Мягче … Чутче | Effects sensitivity: Softer … Keener |
+| Slider 2 | Чуткость эффектов: Мягче … Сильнее | Effects sensitivity: Softer … Stronger |
 | View | Что на экране: Лес · Тёмный · Камера | On screen: Forest · Dark · Camera |
 | Reset | Сбросить настройки руки | Reset hand settings |
 | Reset, asks | Сбросить настройки руки? Настройка и оба ползунка вернутся к исходным. Сбросить · Отмена | Reset hand settings? The setup and both sliders go back to their defaults. Reset · Cancel |

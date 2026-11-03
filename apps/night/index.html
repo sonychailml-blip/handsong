@@ -580,31 +580,72 @@
   <p id="nightFxHint" class="night-hint night-glass" role="status" data-i18n="night.fxHint" hidden></p>
   <div id="nightFade" class="night-fade">
     <p id="nightIdle" class="night-idle" data-i18n="night.idle">Raise a hand to play</p>
-    <button id="nightInfoBtn" class="night-ibtn night-glass" data-svg="info" data-i18n-title="night.info" title="About"></button>
+    <button id="nightInfoBtn" class="night-ibtn night-glass" data-svg="settings" data-i18n-title="night.settings" title="Settings"></button>
+    <!-- NIGHT-2: five round buttons + settings (the background and the Forest slider moved into settings) -->
     <div id="nightCtl" class="night-ctl night-glass">
       <button id="nightSound" class="night-rb"><span class="night-circ" data-svg="sound"></span><span class="night-lab" data-i18n="night.sound">Sound</span><span class="night-val"></span></button>
       <button id="nightMood" class="night-rb"><span class="night-circ" data-svg="mood"></span><span class="night-lab" data-i18n="night.mood">Mood</span><span class="night-val"></span></button>
       <button id="nightHand" class="night-rb"><span class="night-circ" data-svg="hand"></span><span class="night-lab" data-i18n="night.hand">Play with</span><span class="night-val"></span></button>
       <button id="nightNotes" class="night-rb"><span class="night-circ" data-svg="note-follow"></span><span class="night-lab" data-i18n="night.notes">Notes</span><span class="night-val"></span></button>
-      <button id="nightBg" class="night-rb"><span class="night-circ" data-svg="background"></span><span class="night-lab" data-i18n="night.bg">Background</span><span class="night-val"></span></button>
       <button id="nightSleep" class="night-rb"><span class="night-circ" data-svg="sleep"></span><span class="night-lab" data-i18n="night.sleep">Sleep</span><span class="night-val"></span></button>
-      <label id="nightForestRow" class="night-vol" hidden><span class="night-vico" data-svg="forest"></span><span class="night-lab" data-i18n="night.forest">Forest</span><span class="night-vol-in"><input id="nightForest" type="range" min="0" max="1" step="0.01" value="0.6"><span id="nightForestMark" class="night-vol-mark"></span></span></label>
     </div>
   </div>
-  <div id="nightInfo" class="night-card night-glass" role="dialog" aria-modal="true" hidden>
-    <div class="night-ihead"><span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span><span class="night-sub">night</span></span>
+  <!-- NIGHT-2: THE SETTINGS CARD (was the ⓘ card): Hand (calibration, two sliders, reset) · View (background, Forest, hand points, lantern, field, lighter forest) · about -->
+  <div id="nightInfo" class="night-card night-glass night-set" role="dialog" aria-modal="true" hidden>
+    <div class="night-ihead"><span class="night-set-title" data-i18n="night.settings">Settings</span>
       <button id="nightInfoClose" class="night-ibtn night-ibtn-in" data-svg="close" data-i18n-title="night.close" title="Close"></button></div>
-    <p data-i18n="night.privacy">Pictures and sound never leave this device.</p>
-    <p data-i18n="night.phones">Use headphones — the forest is quiet.</p>
-    <button id="nightLanternTg" class="night-tg"><span class="night-vico" data-svg="lantern"></span><span data-i18n="night.lantern">Lantern: a soft light at the bottom edge for your hands</span><span class="night-tsw"><span></span></span></button>
-    <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.field">Show the full note field</span><span class="night-tsw"><span></span></span></button>
-    <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lighter forest — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
-    <button id="nightFirstRun" class="night-lnk" data-i18n="night.firstRun" hidden>Show the first steps again</button>
-    <button id="nightJointsTg" class="night-tg night-dev" hidden><span class="night-vico" data-svg="hand"></span><span data-i18n="night.joints">Fingers: only the tips (development)</span><span class="night-tsw"><span></span></span></button>
-    <button id="nightSceneTg" class="night-lnk night-dev" hidden>Forest picture: high (development)</button>
-    <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
-    <pre id="nightMeasureOut" class="night-measure" hidden></pre>
-    <button id="nightToSound" class="night-lnk night-dev" data-i18n="night.toSound" hidden>Sound panel and diagnostics (development)</button>
+    <section class="night-sec">
+      <h2 class="night-sec-h" data-i18n="night.set.hand">Hand</h2>
+      <div class="night-calrow"><span id="nightCalState"></span><button id="nightCalGo" class="night-lnk"></button></div>
+      <p id="nightCalStore" class="night-note" hidden></p>
+      <div id="nightTravelRow" class="night-sl">
+        <div class="night-sl-lab"><span data-i18n="night.cal.travel">Hand travel</span><button id="nightTravelNeed" class="night-lnk night-sl-need" data-i18n="night.cal.need" hidden>Set up your hand first</button></div>
+        <input id="nightTravel" type="range" min="-1" max="1" step="0.01" value="0">
+        <div class="night-sl-ends"><span data-i18n="night.cal.short">Short</span><span data-i18n="night.cal.long">Long</span></div>
+      </div>
+      <div class="night-sl">
+        <div class="night-sl-lab"><span data-i18n="night.cal.fx">Effects sensitivity</span></div>
+        <input id="nightFxSens" type="range" min="-1" max="1" step="0.01" value="0">
+        <div class="night-sl-ends"><span data-i18n="night.cal.softer">Softer</span><span data-i18n="night.cal.stronger">Stronger</span></div>
+      </div>
+      <button id="nightCalReset" class="night-lnk" data-i18n="night.cal.reset">Reset hand settings</button>
+      <div id="nightCalResetQ" hidden><p data-i18n="night.cal.resetQ"></p>
+        <div class="night-btns"><button id="nightCalResetNo" class="night-btn" data-i18n="night.cal.cancel">Cancel</button><button id="nightCalResetYes" class="night-btn go" data-i18n="night.cal.resetDo">Reset</button></div></div>
+    </section>
+    <section class="night-sec">
+      <h2 class="night-sec-h" data-i18n="night.set.view">View</h2>
+      <div class="night-sl-lab" data-i18n="night.set.screen">On screen</div>
+      <div id="nightBgSeg" class="night-seg"><button data-bg="forest" data-i18n="prof.bgForest">Forest</button><button data-bg="dark" data-i18n="prof.bgDark">Dark</button><button data-bg="camera" data-i18n="prof.bgCamera">Camera</button></div>
+      <label id="nightForestRow" class="night-vol" hidden><span class="night-vico" data-svg="forest"></span><span class="night-lab" data-i18n="night.forest">Forest</span><span class="night-vol-in"><input id="nightForest" type="range" min="0" max="1" step="0.01" value="0.6"><span id="nightForestMark" class="night-vol-mark"></span></span></label>
+      <div class="night-sl-lab" data-i18n="night.set.dots">Hands on screen</div>
+      <div id="nightDotsSeg" class="night-seg night-seg-2"><button data-dots="tips" data-i18n="night.set.tips">Fingertips</button><button data-dots="all" data-i18n="night.set.all">All points</button></div>
+      <!-- later: graphics quality, low · medium · high (docs/night/BACKLOG.md): one more segment here -->
+      <button id="nightLanternTg" class="night-tg"><span class="night-vico" data-svg="lantern"></span><span data-i18n="night.lantern">Lantern: a soft light at the bottom edge for your hands</span><span class="night-tsw"><span></span></span></button>
+      <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.field">Show the full note field</span><span class="night-tsw"><span></span></span></button>
+      <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lighter forest — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
+    </section>
+    <div class="night-about">
+      <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span><span class="night-sub">night</span></span>
+      <p data-i18n="night.privacy">Pictures and sound never leave this device.</p>
+      <p data-i18n="night.phones">Use headphones — the forest is quiet.</p>
+      <button id="nightFirstRun" class="night-lnk" data-i18n="night.firstRun" hidden>Show the first steps again</button>
+      <button id="nightSceneTg" class="night-lnk night-dev" hidden>Forest picture: high (development)</button>
+      <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
+      <pre id="nightMeasureOut" class="night-measure" hidden></pre>
+      <button id="nightToSound" class="night-lnk night-dev" data-i18n="night.toSound" hidden>Sound panel and diagnostics (development)</button>
+    </div>
+  </div>
+  <!-- NIGHT-2: THE HAND'S CALIBRATION (apps/night/calib.js): the camera picture with every point of the hands on its own canvas (the forest stays open
+       underneath), a frame, one line with the progress, Cancel; one card for the offer, the result and a failure -->
+  <div id="nightCal" class="night-cal" hidden>
+    <canvas id="nightCalPic" class="night-cal-pic"></canvas>
+    <div id="nightCalFrame" class="night-cal-frame"></div>
+    <button id="nightCalCancel" class="night-cal-cancel night-glass" data-i18n="night.cal.cancel">Cancel</button>
+    <div id="nightCalStrip" class="night-cal-strip night-glass" role="status"><p id="nightCalSay" class="night-cal-say"></p><div id="nightCalBar" class="night-cal-bar"><i></i></div></div>
+    <div id="nightCalCard" class="night-card night-glass night-cal-card" role="dialog" hidden>
+      <p id="nightCalTitle" class="night-cal-title"></p><p id="nightCalText" class="night-cal-text"></p><p id="nightCalNote" class="night-cal-note"></p>
+      <div class="night-btns"><button id="nightCalNo" class="night-btn"></button><button id="nightCalYes" class="night-btn go"></button></div>
+    </div>
   </div>
 </div>
 

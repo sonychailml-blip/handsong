@@ -1,7 +1,7 @@
 /* RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
    Shown only in the Night face (nightShellFace from the profile's face door). Hands in view → only the scene; no hand for 1.5 s → the controls
-   fade in: Sound · Mood · Play with · Notes (follow / stay put) · Background · Sleep (+ Forest volume once the ambience exists), and ⓘ
-   (privacy, headphones, Lantern, «Show the full note field», the first steps again). Each round
+   fade in: Sound · Mood · Play with · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ: the hand's calibration and its
+   two sliders, the background, Forest, the hand's points, Lantern, «Show the full note field», the first steps again). Each round
    button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js wires (the same setters the Full
    panels use) — this module holds no musical state. The sleep timer fades the output (audio.outputFade, session only) and dims the scene
    with a black veil together; a tap on the veil wakes. Lantern and the note-field choice are remembered on this device (localStorage). */
@@ -17,6 +17,7 @@ import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
 import { EDITION } from '../../core/edition.js';
 import { ghostArm } from './ghost.js';   // C7: the ghost light
+import { calWire, calOfferIfNew, calActive, calSideApply, calSettingsRender, calTick, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo } from '../../core/legacy-ui/draw.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 
@@ -27,6 +28,8 @@ const KEY={ lantern:'handsong.nightLantern', field:'handsong.nightField', forest
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 let D=null, on=false, st=null, raf=0, info=false, sleep={ mins:0, t0:0 }, asleep=false, lastFade=1, amb=false;
+let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, its first start, the offer due on the next frame, the profile's playing hand
+const GHOST_WAIT=10000;   // after the calibration the ghost waits this long for the hand to leave the frame
 /* the «Forest» slider — remembered on this device. RUN 7: only the volume of the forest's own sounds (the ambience); the hand's depth always
    moved the room over its whole range. RUN 8 (the user): it is the forest AT MOST — the ambience's level AND the room's reach; the hand's depth
    moves within it (Forest depth's `reach`). */
@@ -36,7 +39,7 @@ const forestLevel=()=>{ const v=parseFloat(load(KEY.forest)); return Number.isFi
    setHand(v); noteMode() 'note'|'hold' / setNoteMode(v); backgrounds() / bg() / setBg(m); plain() (no glass blur);
    firstRun() (C7; absent → the line stays hidden). The ambience (C4c) is driven here: on in a face that has one (profile.ambience), off
    otherwise; its Forest volume is the slider. */
-export function nightShellWire(doors){ D=doors; wire(); }
+export function nightShellWire(doors){ D=doors; wire(); calWire(D, { leave:()=>infoShow(false), defHand:()=>defHand, changed:()=>render() }); }
 export function nightShellFace(p){
   on=p && p.shell==='night'; $('nightShell').hidden=!on;
   setNightView(on ? { glow:p.noteField==='glow', plain:p.labels==='plain', fieldAll:load(KEY.field)==='1', tips:load(KEY.joints)!=='all' } : null);   // RUN 8: tips — fingertips only (dev switch)
@@ -45,7 +48,10 @@ export function nightShellFace(p){
   setTimbreTrim(on ? p.levels : null);   // RUN 8: the face's per-timbre level trim (Full: none)
   setNightStrikes(on ? (p.voices||{}) : null);
   setLeanPath(on ? LEAN_PATH : null);
-  setVolFloor(on && p.volume ? p.volume.left : null);   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
+  setVolFloor(on && p.volume ? p.volume.left : null);
+  defHand= p && p.handFn && p.handFn.ld && p.handFn.ld.R==='fx' ? 'left' : 'right';
+  if(on){ calSideApply(); if(begun){ begun=false; startDue=true; } }   // NIGHT-2: a calibrated side sets the roles; the offer follows a person's own Begin
+  else calAbort();   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
   if(on){ reachSet(forestLevel()); lightApply(load(KEY.light)==='1', true); }   // RUN 8: the room's reach = the slider; C8 the person's «Lighter forest»
   else setLowPower(false);
   if(on){ st=null; render(); if(!raf) raf=requestAnimationFrame(tick); }
@@ -61,13 +67,14 @@ function render(){
   val('nightMood', t('night.mood.'+D.mood()));
   val('nightHand', t(D.hand()==='left' ? 'night.handL' : 'night.handR'));
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
-  const bg=D.bg(); val('nightBg', t('prof.bg'+bg[0].toUpperCase()+bg.slice(1)));
   sleepLabel(performance.now());
   $('nightLanternTg').classList.toggle('on', load(KEY.lantern)==='1'); $('nightLantern').hidden= load(KEY.lantern)!=='1';
   $('nightFieldTg').classList.toggle('on', !!(nightView && nightView.fieldAll));
   $('nightLightTg').classList.toggle('on', load(KEY.light)==='1'); $('nightMeasure').hidden= EDITION!=='dev';
   $('nightFirstRun').hidden=false; $('nightToSound').hidden= EDITION!=='dev';
-  $('nightJointsTg').hidden= EDITION!=='dev'; $('nightJointsTg').classList.toggle('on', !!(nightView && nightView.tips));
+  { const bgs=D.backgrounds(), bg=D.bg(); for(const b of $('nightBgSeg').children){ b.hidden=!bgs.includes(b.dataset.bg); b.classList.toggle('on', b.dataset.bg===bg); } }   // NIGHT-2: settings
+  for(const b of $('nightDotsSeg').children) b.classList.toggle('on', (b.dataset.dots==='tips')===!!(nightView && nightView.tips));
+  calSettingsRender();
   $('nightSceneTg').hidden= EDITION!=='dev'; $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   $('nightForestRow').hidden= !amb; $('nightForest').value=String(forestLevel());
   document.body.classList.toggle('night-plain', !!D.plain() || load(KEY.light)==='1');   // C8: the Lighter forest has no glass blur
@@ -85,7 +92,6 @@ function wire(){
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
   tap('nightHand', ()=>D.setHand(D.hand()==='left' ? 'right' : 'left'));
   tap('nightNotes', ()=>D.setNoteMode(D.noteMode()==='hold' ? 'note' : 'hold'));
-  tap('nightBg', ()=>D.setBg(nextOf(D.backgrounds(), D.bg())));
   tap('nightSleep', ()=>sleepSet(nextOf(NIGHT_UI.sleepMins, sleep.mins)));
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);
   $('nightLanternTg').onclick=()=>{ save(KEY.lantern, load(KEY.lantern)==='1' ? '0' : '1'); render(); };
@@ -96,7 +102,9 @@ function wire(){
   $('nightSceneTg').onclick=()=>{ const L=['full','reduced','minimal'], v=L[(L.indexOf(sceneLevel())+1)%L.length]; setSceneLevel(v).then(()=>render()); };
   $('nightLightTg').onclick=()=>{ const v=load(KEY.light)!=='1'; save(KEY.light, v ? '1' : '0'); lightApply(v, false); render(); };
   $('nightMeasure').onclick=()=>{ measure(); };
-  $('nightJointsTg').onclick=()=>{ const tips=!(nightView && nightView.tips); save(KEY.joints, tips ? 'tips' : 'all'); if(nightView) setNightView({ ...nightView, tips }); render(); };
+  /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
+  for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
+  for(const b of $('nightDotsSeg').children) b.onclick=()=>{ const tips=b.dataset.dots==='tips'; save(KEY.joints, tips ? 'tips' : 'all'); if(nightView) setNightView({ ...nightView, tips }); render(); };
   $('nightVeil').onclick=()=>{ if(asleep) sleepSet(0); };
   onLangChange(render);
 }
@@ -105,7 +113,9 @@ function tick(now){
   raf=0; if(!on) return;
   const hv=READ.get('handsView'), n= Array.isArray(hv) ? hv.length : 0;
   st=showStep(st, n, now);
-  $('nightShell').classList.toggle('show', st.shown && !info && !asleep);
+  $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive());
+  if(startDue){ startDue=false; startFlow(); }
+  calTick();
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
   leadParkTick();   // NIGHT-1: a silent flute's bank stops being computed
   const fxv=nightFxNow(); BUS.set('nightFx', fxv);   // C5: the effects hand's values for the forest's visuals (rings, colour, tremble)
@@ -122,7 +132,10 @@ function tick(now){
    first steps only until this device has begun once — body.night-seen). «Begin» runs the very same start handler as Play, inside this click
    (rule #1); a FIRST start also arms the ghost light. Only a person's own tap arms it (never a profile switch — the probes switch). */
 document.body.classList.add('night-boot'); if(load(KEY.seen)==='1') document.body.classList.add('night-seen');
-$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; if(load(KEY.seen)!=='1'){ save(KEY.seen,'1'); ghostArm(); } if(go) go(); };
+$('nightBegin').onclick=()=>{ const go=$('startBtn').onclick; begun=true; if(load(KEY.seen)!=='1'){ save(KEY.seen,'1'); firstRun=true; } if(go) go(); };
+/* NIGHT-2: once the camera runs after a Begin: the calibration offer for a camera not offered yet, then (a first start) the ghost; without an offer the ghost comes at once, as before */
+function startFlow(){ const first=firstRun; firstRun=false;
+  if(!calOfferIfNew(()=>{ if(first) ghostArm({ wait:GHOST_WAIT }); }) && first) ghostArm(); }
 /* RUN 8 (slice 3): THE BARS while the hands play — the forest's depth (depth × reach, the reach as a mark) on the playing hand's side, the
    three effects (Echo · Warmth ↔ Brightness from the middle · Wave) on the effects hand's side; the bar of the finger in use glows; each set
    fades in with its hand and out when it leaves; a set's side follows where its hand is on the screen (40 / 60 % of the width, hysteresis),

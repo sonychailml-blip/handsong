@@ -10,8 +10,9 @@ import { pose } from '../../core/gestures/pose.js';
    the ghost drifted around the middle (volume 0.26…0.74). It now drifts in the right part (cx ± rx = 0.6…0.84 of the width), where a hand
    plays at a normal level; the four notes keep their path up and down the rows. */
 export const GHOST=Object.freeze({ notes:4, every:3.2, down:0.5, hold:1.6, tail:1.2, s:0.2, cx:0.72, rx:0.12, ry:0.3, px:11, py:7.3 });
-let g={ on:false, t0:null };
-export const ghostArm=()=>{ g={ on:true, t0:null }; };
+let g={ on:false, t0:null, wait:0, w0:null };
+/* NIGHT-2: { wait:ms } = armed after the calibration, it waits up to ms for the hand to leave the frame, then plays; a hand still there after that ends it */
+export const ghostArm=(o={})=>{ g={ on:true, t0:null, wait:o.wait||0, w0:null }; };
 export const ghostStop=()=>{ g.on=false; };
 export const ghostOn=()=>g.on;
 /* the pinch point and whether it pinches at t seconds (pure: the probe compares) */
@@ -22,7 +23,9 @@ export function ghostAt(t){
 }
 export function ghostFrame(res, now, key='Right'){
   if(!g.on) return res;
-  if(res && res.landmarks && res.landmarks.length){ g.on=false; return res; }   // a real hand: the ghost leaves at once
+  const real=!!(res && res.landmarks && res.landmarks.length);
+  if(g.wait){ if(g.w0==null) g.w0=now; if(real){ if(now-g.w0>g.wait) g.on=false; return res; } g.wait=0; }
+  if(real){ g.on=false; return res; }   // a real hand: the ghost leaves at once
   if(g.t0==null) g.t0=now;
   const a=ghostAt((now-g.t0)/1000); if(a.done){ g.on=false; return res; }
   return { ...(res||{}), landmarks:[pose({ x:a.x, y:a.y, s:GHOST.s, gaps:a.pinch ? [0.05,1,1,1] : [1,1,1,1] })], handednesses:[[{ categoryName:key }]] };

@@ -21,6 +21,11 @@ SPLIT-2: the Full app's entry.
 ================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
 - fn (2): `wireStarter`, `openLessons`
 
+## apps/night/calib.js
+NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handcal.js; design docs/night/design/NIGHT-2-calibration/DESIGN.md).
+- const (7): `CAL_KEY`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
+- fn (8): `calWire`, `calOfferIfNew`, `calStep`, `calSideApply`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
+
 ## apps/night/ghost.js
 RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts s…
 - const (4): `GHOST`, `ghostArm`, `ghostStop`, `ghostOn`
@@ -887,12 +892,17 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/run.js (2): `material`, `night`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
+- → ./night/calib.js (1): `checkNightCalib`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
 - → ./night/lean.js (2): `checkNightLean`, `checkQuietFloor`
 - → ./night/night.js (1): `checkSoloFirefly`
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
+
+## tools/probes/night/calib.js
+NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock through the REAL processHands, an injected store and camera: no real key is touched).
+- fn (1): `checkNightCalib`
 
 ## tools/probes/night/forest.js
 VIS1c (RUN 6, Night plan §10, review 2026-10-17): two rows (quick and all).
@@ -937,7 +947,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_180 modules, 2269 exported names._
+_182 modules, 2286 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

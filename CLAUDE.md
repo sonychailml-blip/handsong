@@ -397,7 +397,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
 - **Root:** `index.html` redirect only; `vercel.json`. **Pages:** `apps/<app>/index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`), `manifest.json`/`sw.js` PWA (cache-free SW); `core/tokens.css` THE design tokens (DOM +
   canvas `--cv-*`; static check 11); `core/legacy-ui/style.css` all shared CSS through tokens; `core/va-stub.js` counter stub.
 - **`apps/full/`:** `main.js` entry; `tutor.js` lessons + step engine; `demo.js` start-screen demo; `songs.js` demo songs (`data/songs/<name>.json`, SONG2); `data/full.json` profile.
-- **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (controls, ⓘ, sleep timer, the start, bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`);
+- **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (five controls, the settings card, sleep timer, the start, bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`); `calib.js` the hand's calibration screens and the settings' Hand section (NIGHT-2, over CORE-1);
   `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, moods, rare events, emblem), `pure/forestlife.js` (stream, mushroom / flower places, rings), `pure/fireflies.js`;
   `scene/forest.js` the room (tokens `--cv-forest-*`), `scene/forest-life.js`, `forest-detail.js`, `forest-rare.js`. Bus topic `nightSky` { mood, sleep, wind }.
 - `core/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
@@ -542,6 +542,7 @@ THERE in full and here as one index entry):
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
   125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`) · 127 The quiet floor by ear (NIGHT-1; `?probe&tails=on|off`)
+  128 Night's calibration screens and settings, laptop + Poco (NIGHT-2; covers 125 for Night)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

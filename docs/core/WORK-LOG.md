@@ -4,6 +4,11 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-5 (2026-11-03): Night's calibration texts and the settings icon (for NIGHT-2 stage 2)
+Tree hashes before: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b. After: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32.
+- `core/i18n.js`: keys `night.settings`, `night.set.*`, `night.cal.*` (en + ru) added beside the existing `night.*` keys (user's answer 10; core backlog item to move app texts into app dictionaries); the dev-only `night.joints` removed (its switch became the settings segment). `core/icons.js`: `settings` added to the drawn icons. Additive only: no existing key, icon or behaviour changed.
+- Checks: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` (Full) · `P.night: PASS — 37 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT calibration screens 0, 35 cases) · `[smoke] PASS` with builds · ui-snap Night: no overlap (0 known). No print renewed, no tolerance changed.
+
 # CORE-4 (2026-11-03): the quiet floor, opt-in, nobody on it yet
 Tree hashes before: core c91a61074394f73e. After: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b.
 - `core/audio.js` `setPartialFloor(db)`; `core/modules/timbres/modal.js`, `tine.js`: partials stop at the floor, on the lean strike path only. Off by default and in every render copy. Full's strike ignores it (row «NIGHT quiet floor»). `surface.js`: listings. GOLD, census, both «untouched» rows exact: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · `P.all: PASS — 122 checks, 0 differences` (GOLD 0, node census 0, FULL untouched 0) · `P.night: PASS — 36 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT lean path 0, NIGHT quiet floor 0) · `[smoke] PASS` with builds. No print renewed, no tolerance changed.

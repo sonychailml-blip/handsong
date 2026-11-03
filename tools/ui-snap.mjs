@@ -88,16 +88,17 @@ const SCREENS=[
 const nightWait=async p=>{ await p.waitForTimeout(2200); };
 const SCREENS_NIGHT=[
   ['night-start',     async p=>{}],
-  ['night-ghost',     async p=>{ await p.click('#nightBegin');   // C7: Begin (the first run: the ghost light plays four notes)
+  ['night-offer',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.waitForTimeout(600); }],   // NIGHT-2: Begin → the calibration offer
+  ['night-ghost',     async p=>{ await p.click('#nightCalNo');   // C7 + NIGHT-2: skip the offer (the first run: then the ghost light plays four notes)
                        await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const b=document.getElementById('nightBg'); let k=0; while(!/Dark|Тём/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(5500); }],
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await p.waitForTimeout(5500); }],
   ['night-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/apps/night/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
   ['night-info',      async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
   ['night-land',      async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:844, height:390 }); await nightWait(p); }],
   ['night-land-info', async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
   ['night-camera',    async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:390, height:844 });   // the glass over a picture (headless screenshots do not show the WebGL forest)
-                       await p.evaluate(()=>{ const b=document.getElementById('nightBg'); let k=0; while(!/Camera|Камер/.test(b.textContent) && k++<4) b.click(); }); await nightWait(p); }],
-  ['night-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); I.setLang('ru'); const b=document.getElementById('nightBg'); let k=0; while(!/Тём/.test(b.textContent) && k++<4) b.click(); }); await nightWait(p); }],
+                       await p.evaluate(()=>{ document.querySelector('#nightBgSeg [data-bg="camera"]').click(); }); await nightWait(p); }],
+  ['night-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); I.setLang('ru'); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await nightWait(p); }],
   ['night-ru-info',   async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
   /* RUN 8 (addendum 3): the low-light message with «Raise a hand» (Russian: the longer lines) — portrait and landscape; every visible message
      at the top must stand clear of the others (printed; a touch counts in the run's result) */
@@ -108,8 +109,12 @@ const SCREENS_NIGHT=[
   ['night-play-land', async p=>{ await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkHideDbg(); }); await playHands(p); }],
   ['night-play',      async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForFunction(()=>innerWidth===390 && document.querySelector('canvas').width===390); await p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)))); await playHands(p); }],  /* SPLIT-2: the hands read the canvas size and the per-frame cover rect: wait for the resize */
   /* RUN 8 (slice 4): the forest picture behind the playing hands (WebGL with screen-blended lights; the room renders at its own rate) */
-  ['night-forest',    async p=>{ await p.evaluate(()=>{ document.getElementById('nightFxHint').hidden=true; const b=document.getElementById('nightBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
+  ['night-forest',    async p=>{ await p.evaluate(()=>{ document.getElementById('nightFxHint').hidden=true; document.querySelector('#nightBgSeg [data-bg="forest"]').click(); }); await p.waitForTimeout(2500); await playHands(p); await p.waitForTimeout(800); }],
   ['night-forest-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(1500); await playHands(p); await p.waitForTimeout(800); }],
+  ['night-cal-land',  async p=>{ await p.evaluate(async ()=>{ const G=await import('/core/gestures.js'); G.handsProbe(null); const C=await import('/apps/night/calib.js'); C.calStep(); }); await p.waitForTimeout(1200); }],   // NIGHT-2
+  ['night-cal',       async p=>{ await p.setViewportSize({ width:390, height:844 }); await p.waitForTimeout(1200); }],
+  ['night-cal-fail',  async p=>{ await p.waitForFunction(async ()=>{ const C=await import('/apps/night/calib.js'); return C.calDbg.state().mode==='fail'; }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(400); }],
+  ['night-cal-fail-land', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(800); }],
 ];
 /* RUN 9: THE FOREST'S SCREENS (--forest; headless Chrome renders the WebGL room) — Begin, the Forest background, the two hands playing; then
    moments of the night through the probe clock (host sceneClockDbg): the clear moon, a cloud over it, the moods, the deep-sleep night;
@@ -121,8 +126,8 @@ const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])
   if(fx) for(const [id,i,v] of fx){ const I=A.fxInstance(S.chainKeyOf('ld'), id); if(I && I.params[i]) I.params[i].setNorm(v); }
   const R=H.sceneRoomDbg(); for(let k=0;k<n;k++){ if(R) R.glint(0, 0.85); await new Promise(r=>setTimeout(r, every)); } }, [n, every, fx||null]); };
 const SCREENS_FOREST=[
-  ['f-start',        async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 });
-                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/apps/night/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); const b=document.getElementById('nightBg'); let k=0; while(!/Forest|Лес/.test(b.textContent) && k++<4) b.click(); });
+  ['f-start',        async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const s=document.getElementById('start'); return s && !s.classList.contains('on'); }, null, { timeout:180e3 }); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.click('#nightCalNo');
+                       await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); const G=await import('/apps/night/ghost.js'); if(G.ghostOn && G.ghostOn() && G.ghostStop) G.ghostStop(); document.querySelector('#nightBgSeg [data-bg="forest"]').click(); });
                        await forestAt(p, 60); await p.waitForTimeout(3000); await playHands(p, false); await p.waitForTimeout(1500); }],
   ['f-moon',         async p=>{ await forestAt(p, 60); await playHands(p); await p.waitForTimeout(900); }],
   ['f-cloud',        async p=>{ await forestAt(p, 630); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
@@ -142,7 +147,7 @@ const SCREENS_FOREST=[
 ];
 /* the top messages: no two visible ones overlap, and none covers the control panel (SPLIT-2).
    MSG_KNOWN = overlaps already in the backlog: printed, not counted; a known line that no longer happens fails, so it is deleted with the fix. */
-const MSG_KNOWN=new Set(['night-msg-land: darkHint × nightCtl']);   // docs/night/BACKLOG.md, first item
+const MSG_KNOWN=new Set([]);   // NIGHT-2 fixed the landscape low-light hint over the panel
 const msgSeen=new Set();
 async function msgCheck(p, name){
   const r=await p.evaluate(()=>{ const vis=e=>{ if(!e) return false; const c=getComputedStyle(e); if(c.display==='none'||c.visibility==='hidden'||+c.opacity===0) return false; for(let q=e.parentElement;q;q=q.parentElement){ const k=getComputedStyle(q); if(k.display==='none'||+k.opacity===0) return false; } return true; };

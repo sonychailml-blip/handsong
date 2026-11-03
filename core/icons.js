@@ -48,6 +48,8 @@ const SVG_ICONS={
   lantern:[['acc','path',{ d:'M8 9h8v8H8z', o:.25 }], ['line','path',{ d:'M10 4h4M12 4v2.5M8 9.5c0-1.7 1.8-3 4-3s4 1.3 4 3V16c0 1.7-1.8 3-4 3s-4-1.3-4-3z' }], ['acc','circle',{ cx:12, cy:13, r:1.6 }]],
   info:[['tint','circle',{ cx:12, cy:12, r:9, o:.14 }], ['line','circle',{ cx:12, cy:12, r:9 }], ['dot','circle',{ cx:12, cy:7.8, r:1.1 }], ['line','path',{ d:'M12 11v6' }]],
   close:[['line','path',{ d:'M6.5 6.5l11 11M17.5 6.5l-11 11' }]],
+  /* NIGHT-2: settings, three sliders with their knobs */
+  settings:[['line','path',{ d:'M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1' }], ['acc','circle',{ cx:15, cy:7, r:2 }], ['line','circle',{ cx:9, cy:12, r:2 }], ['line','circle',{ cx:17, cy:17, r:2 }]],
   /* the sleep timer (quality bar point 9): a crescent and a small «z» — the moon of «Mood» made sleepy */
   sleep:[['tint','path',{ d:'M13 4.5a7.5 7.5 0 1 0 6.5 11 6.2 6.2 0 0 1-6.5-11z', o:.22 }], ['line','path',{ d:'M13 4.5a7.5 7.5 0 1 0 6.5 11 6.2 6.2 0 0 1-6.5-11z' }],
          ['acc-line','path',{ d:'M16 3.5h4l-4 4.5h4' }]],
