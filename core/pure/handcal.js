@@ -8,19 +8,22 @@ const CAL=Object.freeze({
   farRatio:0.42, tauS:0.205, band:0.009, bandK:3, bandMax:0.02, marginMax:0.03, sensMin:0.5, sensMax:2, depthMin:0.7,   // depth from 0.7x: the far end stays within arm's reach (user)
   waitMs:10000, holdLimitMs:12000, holdMs:2000, holdMaxMs:4000, minSamples:8, checkFrom:5, stillSize:0.06, stillWrist:0.05, blinkMs:800, minNear:0.25, lockJump:0.3,
   frameLm:null,   // null = all 21 landmarks must be in the frame
+  sizeMin:0.06, rFarMax:0.8,   // CORE-6 farHold: the far end never below sizeMin (estimated tracking floor, ~1.9 m on a 640×480 webcam); a hold keeps at least 1/rFarMax of travel
 });
 const REASONS=Object.freeze(['no-hand','not-still','out-of-frame','too-far','hand-lost','low-rate','busy','synthetic','camera-changed','cancelled']);
 const clamp01=v=>Math.max(0,Math.min(1,v));
 
 /* ---- laws ---- */
 /* the far end as a share of the near size: the slider divides the real travel (1/r is distance over the near distance) */
-const calFarRatio=(s=1)=>1/(1+(1/CAL.farRatio-1)/s);
+const calFarRatio=(s=1,base=CAL.farRatio)=>1/(1+(1/base-1)/s);
+/* CORE-6 farHold: a far near point raises the 1x far ratio so the far end stays at sizeMin; 0.42 from near 0.143 up (every near before CORE-6 was ≥ 0.25) */
+const calFarBase=near=>Math.max(CAL.farRatio,CAL.sizeMin/near);
 /* the hold band follows the noise measured in this camera's hold: 3 sigmas, within a floor and a cap. The filter passes more noise at 7 fps; rates per width: docs/core/CORE-1-DESIGN.md §2.3 */
 const calBand=noise=>Math.max(CAL.band,Math.min(CAL.bandMax,CAL.bandK*noise));
 /* past the band, or a hand held at its near point would read just above 0 while the filter settles */
 const calEndPull=noise=>Math.max(1.25*calBand(noise),Math.min(CAL.marginMax,4*noise));
 /* r = size / near size; never below the hold band's reach, so the near end stays exactly 0 */
-function calDepth(r,noise,s=1){ const r0=1-calEndPull(noise); return clamp01((r0-r)/(r0-calFarRatio(s))); }
+function calDepth(r,noise,s=1,base=CAL.farRatio){ const r0=1-calEndPull(noise); return clamp01((r0-r)/(r0-calFarRatio(s,base))); }
 /* the time-based one-pole on the size; `st` lives on the hand, outside its pinch-reset smoothing */
 function calFilter(st,hs,t){ if(st.hs==null) st.hs=hs; else st.hs+=(1-Math.exp(-Math.max(0,t-st.t)/1000/CAL.tauS))*(hs-st.hs); st.t=t; return st.hs; }
 /* backlash on the unclamped ratio, ahead of the law, so both ends stay reachable */
@@ -92,7 +95,9 @@ const calSize=sizeOf;
 const inFrame=(lm,idx)=>(idx ? idx.map(i=>lm[i]) : lm).every(p=>p.x>=0 && p.x<=1 && p.y>=0 && p.y<=1);
 /* 2.56 robust sigmas spans the middle 80% of a normal spread; a single spike can't move it */
 const spreadOf=a=>2.56*robustSigma(a);
-function createCalRun({ t:t0, hand=null, C=CAL }){
+/* farHold (CORE-6, opt-in): a still hand is refused only below the size that keeps a trackable travel (sizeMin/rFarMax), not at minNear */
+function createCalRun({ t:t0, hand=null, C=CAL, farHold=false }){
+  const nearMin= farHold ? C.sizeMin/C.rFarMax : C.minNear;
   let phase='waitHand', reason=null, advice=null, startT=t0, holdT=null, lock=null, seenT=null, win=[], runT=null, cause=null, result=null, cur=null;
   const end=(p,why)=>{ phase=p; reason=why; advice=null; };
   const active=()=>phase==='waitHand'||phase==='holdNear';
@@ -119,7 +124,7 @@ function createCalRun({ t:t0, hand=null, C=CAL }){
     const w=windowAt(t);
     if(w){ const R=robust(w.map(s=>s.size));
       if(R.kept>=C.minSamples){
-        if(R.median<C.minNear){ advice='closer'; cause='too-far'; return; }
+        if(R.median<nearMin){ advice='closer'; cause='too-far'; return; }
         result={ near:R.median, noise:R.sigma/R.median }; end('review',null); return; } }
     if(t-runT>=C.holdMaxMs) end('failed','low-rate');
   }
@@ -144,4 +149,4 @@ function createCalRun({ t:t0, hand=null, C=CAL }){
     fail(code){ if(!REASONS.includes(code)) throw new Error('handcal: unknown reason '+code); if(active()||phase==='review'){ result=null; end('failed',code); } } };
 }
 
-export { CAL, REASONS, calSize, calFarRatio, calBand, calEndPull, calDepth, calFilter, calHold, calInverted, calDirValue, calFx, calSensOf, robust, calEmpty, calClean, calParse, calText, calCameraKey, calReset, calStoreKey, calLoad, calSave, calWipe, createCalRun };
+export { CAL, REASONS, calSize, calFarRatio, calFarBase, calBand, calEndPull, calDepth, calFilter, calHold, calInverted, calDirValue, calFx, calSensOf, robust, calEmpty, calClean, calParse, calText, calCameraKey, calReset, calStoreKey, calLoad, calSave, calWipe, createCalRun };

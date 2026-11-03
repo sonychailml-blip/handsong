@@ -4,6 +4,13 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-6 (2026-11-03): far hands in the calibration, and a drawing hook after the stack (for NIGHT-2 stage 3)
+Tree hashes before: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32. After: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4f4fcfc3f1f0cc14.
+- `core/pure/handcal.js`: `CAL.sizeMin` 0.06, `CAL.rFarMax` 0.8; `calFarBase(near)`; `calFarRatio(s, base)` and `calDepth(r, noise, s, base)` take an optional 1× far ratio (default 0.42, the old law); `createCalRun({ farHold })`. `core/handcal.js`: `handCalOpen({ farHold })`, passed to the run and the depth law. Absent: CORE-1 exactly (rows CAL1-3 «every near from 0.143 up keeps the law bit for bit», CAL4 print unchanged).
+- `core/legacy-ui/boot.js`: option `afterDraw(t)`, called once per play-screen frame right after the stack, while the frame's picture is still open. Full passes none.
+- `core/i18n.js`: Night's instruction reworded, new `night.cal.stillFar`, `shakyFail`, `farNote`; `closer` and `r.too-far` reworded (Night-only keys).
+- Checks: static PASS; [probe-data] PASS — 36 checks, 0 differences (CAL1-3 153 cases); Full P.quick: PASS — 93 checks, 0 differences; Night P.night: PASS — 37 checks, 0 differences (calibration screens 48 cases); [smoke] PASS with builds; ui-snap Night: no overlap; doc-split PASS. Fix rounds 0 (one regenerated name index).
+
 # CORE-5 (2026-11-03): Night's calibration texts and the settings icon (for NIGHT-2 stage 2)
 Tree hashes before: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b. After: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32.
 - `core/i18n.js`: keys `night.settings`, `night.set.*`, `night.cal.*` (en + ru) added beside the existing `night.*` keys (user's answer 10; core backlog item to move app texts into app dictionaries); the dev-only `night.joints` removed (its switch became the settings segment). `core/icons.js`: `settings` added to the drawn icons. Additive only: no existing key, icon or behaviour changed.

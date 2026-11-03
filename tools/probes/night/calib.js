@@ -5,7 +5,10 @@
    «Play» saves the record and the side; (5) «Again» from a right-hand result puts the left back; Cancel keeps the record; (6) a failure words its
    reason; every reason has words in both languages (CONTROL: a made-up code has none); (7) the saved side comes back on the face; reset clears the
    record, the side and the roles; (8) the ghost armed after the calibration waits for the hand to leave (CONTROL: a plain arm ends at a hand);
-   (9) the hand's points: the segment switches fingertips ↔ all points. Everything put back as it was. */
+   (9) the hand's points: the segment switches fingertips ↔ all points; (10, stage 3) a far but steady hand is accepted (CORE-6 farHold) with the
+   note when it is far or shaky (CONTROLS: a near quiet hand has no note; without farHold the far hand is refused as before); too small asks to
+   come closer; a far shaking hand is worded as shaking; (11) the picture is drawn by the loop (afterDraw) on every frame, a closed picture keeps
+   the last frame (CONTROL: without the keep it blanks). Everything put back as it was. */
 import { row } from '../core/rows.js';
 import { handCalOpen, handCalRead, handCalSetSens, calStartProbe, calKeep, calBusy, handCalState } from '../../../core/handcal.js';
 import { CAL, REASONS, calFarRatio } from '../../../core/pure/handcal.js';
@@ -30,10 +33,12 @@ export async function checkNightCalib(){
   const clk={ t:1000, W:1000, H:600 };
   const step=(hands, label)=>{ clk.t+=33; const f={ landmarks:hands, handednesses:hands.map(()=>[{ categoryName:label }]) }; BUS.set('hands', f); processHandsProbe(f); };
   const holdWith=labelAt=>{ for(let i=0;i<200 && calBusy();i++) step([real(OPENH)], labelAt(i)); };
+  /* a hold at a palm size, its size alternating ±jit (a deterministic noise); stops at the end of the run, or after `frames` */
+  const holdAt=(size, jit=0, frames=420)=>{ const said=new Set(); for(let i=0;i<frames && calBusy();i++){ step([real({ ...OPENH, s:size/0.95*(1+(i%2 ? jit : -jit)) })], 'Right'); said.add(C.calDbg.state().say); } return said; };
   try{
     if(was!=='profile.night') PR.profileApply('profile.night');
     hand0=D.hand(); tips0=!!(ST.nightView && ST.nightView.tips);
-    handCalOpen({ scope:'night', store:memStore(), camera:()=>cam });
+    const store=memStore(); handCalOpen({ ...C.CAL_OPEN, store, camera:()=>cam });
     handsProbe(clk, ()=>true); C.calDbg.setStart(()=>calStartProbe(clk.t));
     withLang('en', ()=>{
       /* (1) the sliders */
@@ -85,6 +90,34 @@ export async function checkNightCalib(){
     /* (9) the hand's points */
     { const seg=v=>$('nightDotsSeg').querySelector(`[data-dots="${v}"]`); seg('all').click(); const a=ST.nightView && ST.nightView.tips; seg('tips').click(); const b=ST.nightView && ST.nightView.tips;
       ok('the points segment: all → tips', a===false && b===true); }
+    /* (10) far hands (stage 3, CORE-6 farHold) */
+    withLang('en', ()=>{
+      D.setHand('right'); ok('the page opens with farHold', C.CAL_OPEN.farHold===true);
+      const far=0.10, note=t('night.cal.farNote');
+      C.calStep(); holdAt(far); { const s=C.calDbg.state(), r=handCalState().result;
+        ok(`a far steady hand (${far}) is accepted (${s.mode}, ${handCalState().phase})`, s.mode==='done' && r && Math.abs(r.near-far)<0.003);
+        ok('...with the note', s.note.includes(note)); notes.push(`far hold: near ${r && r.near.toFixed(4)}, noise ${r && r.noise.toFixed(4)}`); C.calAbort(); }
+      C.calStep(); holdAt(0.2); ok('CONTROL: a nearer quiet hand has no note', C.calDbg.state().mode==='done' && !C.calDbg.state().note.includes(note)); C.calAbort();
+      C.calStep(); holdAt(0.2, 0.01); { const r=handCalState().result; ok(`a noisy hold gets the note (noise ${r && r.noise.toFixed(4)})`, C.calDbg.state().mode==='done' && C.calDbg.state().note.includes(note)); } C.calAbort();
+      C.calStep(); { const said=holdAt(0.05); ok('too small asks to come closer', said.has(t('night.cal.closer')));
+        ok(`...and fails as too far (${C.calDbg.state().mode} ${C.calDbg.state().reason})`, C.calDbg.state().mode==='fail' && C.calDbg.state().text===t('night.cal.r.too-far')); } C.calAbort();
+      C.calStep(); { const said=holdAt(far, 0.04); ok('a far shaking hand: the shaking line', said.has(t('night.cal.stillFar')) && !said.has(t('night.cal.still')));
+        ok(`...and the shaking failure (${C.calDbg.state().reason})`, C.calDbg.state().mode==='fail' && C.calDbg.state().text===t('night.cal.shakyFail')); } C.calAbort();
+      handCalOpen({ scope:'night', store, camera:()=>cam });   // CONTROL: CORE-1's limit without farHold
+      C.calStep(); holdAt(far); ok(`CONTROL: without farHold the far hand is refused (${C.calDbg.state().reason})`, C.calDbg.state().mode==='fail' && C.calDbg.state().reason==='too-far'); C.calAbort();
+      handCalOpen({ ...C.CAL_OPEN, store, camera:()=>cam });
+    });
+    /* (11) the picture: drawn by the loop on every frame; a closed snapshot keeps the last frame */
+    { const frames=k=>new Promise(r=>{ const f=()=>{ if(--k<=0) r(); else requestAnimationFrame(f); }; requestAnimationFrame(f); });
+      C.calStep(); const p0=C.calDbg.pic(); await frames(12); const p1=C.calDbg.pic();
+      ok(`the loop draws the picture each frame (${p1.drawn-p0.drawn} drawn, ${p1.kept-p0.kept} kept in 12 frames)`, p1.drawn-p0.drawn>=8 && p1.kept===p0.kept);
+      const oc=new OffscreenCanvas(64,48), og=oc.getContext('2d'); og.fillStyle='#fff'; og.fillRect(0,0,64,48); const bmp=await createImageBitmap(oc);
+      const px=()=>{ const v=$('nightCalPic').getContext('2d').getImageData(2,2,1,1).data; return v[0]+v[1]+v[2]; };
+      BUS.set('picture', bmp); C.calTick(); const lit=px(); bmp.close(); const k0=C.calDbg.pic().kept; C.calTick(); const kept=px();
+      ok(`a closed picture keeps the last frame (${lit} → ${kept})`, lit>600 && kept===lit && C.calDbg.pic().kept===k0+1);
+      C.calDbg.keep(false); C.calTick(); const blank=px(); C.calDbg.keep(true);
+      ok(`CONTROL: without the keep it blanks (${blank})`, blank<150);
+      C.calAbort(); }
   } catch(e){ d.push('error: '+(e&&e.stack||e)); }
   finally{
     C.calDbg.setStart(null); C.calAbort(); handsProbe(null); liveAllOff(); BUS.set('hands', busK); keep();

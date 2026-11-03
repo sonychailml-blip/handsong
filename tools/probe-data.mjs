@@ -361,6 +361,19 @@ async function handCalCore(){
     const back=(t,i)=> t<1500 ? out() : { hands:[S.hand(NEAR)] }, m=S.drive(run(),S.GAPS.desktop,back); ok('moving back restarts and finishes', m.phase==='review' && m.t>=3500); }
   { const s=S.drive(run(),S.GAPS.desktop,still(3,0.2)); ok('too small a near fails', s.phase==='failed' && s.reason==='too-far');
     const r=run(); let last; for(let t=0;t<=2500;t+=60) last=r.frame({ t, hands:[S.hand(0.2)] }); ok('too small asks to come closer', last.advice==='closer'); }
+  { /* CORE-6 farHold (opt-in): a far steady hand is accepted down to sizeMin/rFarMax, below that too-far; a shaking one stays refused; the 1x far end stays at sizeMin */
+    const lim=H.CAL.sizeMin/H.CAL.rFarMax, a=S.drive(run({ farHold:true }),S.GAPS.desktop,still(3,0.2));
+    ok('farHold: a near of 0.2 is accepted', a.phase==='review'); near('farHold: its near size', a.result&&a.result.near, 0.2, 0.004);
+    ok('farHold: just above the floor is accepted (Poco gaps)', S.drive(run({ farHold:true }),S.GAPS.poco,still(5,lim*1.15)).phase==='review');
+    { const c=S.drive(run({ farHold:true }),S.GAPS.desktop,still(3,lim*0.85)); ok('farHold: below the floor fails as too far', c.phase==='failed' && c.reason==='too-far'); }
+    { const e=S.drive(run({ farHold:true }),S.GAPS.desktop,still(7,0.1,0.04)); ok('farHold: a shaking far hand is refused', e.phase==='failed' && e.reason==='not-still'); }
+    ok('the far base is 0.42 from near 0.143 up', H.calFarBase(0.25)===H.CAL.farRatio && H.calFarBase(H.CAL.sizeMin/H.CAL.farRatio+1e-9)===H.CAL.farRatio);
+    for(const nr of [lim,0.1,0.12]) near(`farHold: the 1x far end sits at sizeMin (near ${nr})`, nr*H.calFarRatio(1,H.calFarBase(nr)), H.CAL.sizeMin, 1e-12);
+    { let same=true; for(const nr of [0.143,0.25,0.334,0.44]) for(const s of [0.7,1,2]) for(let r=1.05;r>=0.2;r-=0.01) if(!Object.is(H.calDepth(r,NOISE,s,H.calFarBase(nr)),H.calDepth(r,NOISE,s))) same=false;
+      ok('every near from 0.143 up keeps the CORE-1 law bit for bit', same); }
+    { let reach=true; const b=H.calFarBase(lim); for(const s of [0.7,1,2]) for(const z of [0,0.0065,0.03]) if(!(H.calDepth(H.calFarRatio(s,b),z,s,b)===1 && H.calDepth(1,z,s,b)===0 && 1-H.calEndPull(z)>H.calFarRatio(s,b))) reach=false;
+      ok('farHold: at the floor both ends stay reachable', reach); }
+    ok('CONTROL: a near below the floor would leave no travel at 2x', 1-H.calEndPull(0.03)<=H.calFarRatio(2,H.calFarBase(lim*0.7))); }
   { const s=S.drive(run(),[100],()=>({ hands:[] })); ok('nobody there: no-hand', s.phase==='failed' && s.reason==='no-hand' && s.t>=H.CAL.waitMs); }
   { const s=S.drive(run(),[100],(t)=>({ hands:t<500 ? [S.hand(NEAR)] : [] })); ok('a hand gone: hand-lost', s.phase==='failed' && s.reason==='hand-lost'); }
   { const s=S.drive(run(),[600],still(9)); ok('2 samples per 1.2 s: low-rate', s.phase==='failed' && s.reason==='low-rate' && s.t>=H.CAL.holdMaxMs && s.t<=H.CAL.holdMaxMs+600); }

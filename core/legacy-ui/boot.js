@@ -92,7 +92,8 @@ function loop(){
   const t0=performance.now();
   BUS.set('picture', shown || video);        // the frame whose hands are shown (rule #8)
   stackFrame(t0);                            // VIS1a: camera (background) → surface (instrument) → hands (overlay), as drawVideoBackground + drawOverlays drew
-  captureFrame();                            // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр; иначе no-op
+  if(OPT.afterDraw) OPT.afterDraw(t0);       // CORE-6: an app's own drawing while this frame's picture is still open (a later callback may find it closed)
+  captureFrame();                           // если идёт видеозапись — фиксируем ИМЕННО этот отрисованный кадр; иначе no-op
   latFrame(t0, performance.now());           // LAT1: drawing time and the screen-frame interval
 }
 
@@ -146,7 +147,7 @@ async function startApp(){
     return false;
   }finally{ starting=false; }
 }
-/* SPLIT-2: an app's entry calls this once. opt: profile (the id to open in), frameFilter (res, t) → res. Returns startApp for the entry's own buttons (still inside their click: rule #1).
+/* SPLIT-2: an app's entry calls this once. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6). Returns startApp for the entry's own buttons (still inside their click: rule #1).
    ?probe loads what the page declares in <link rel="handsong-probes">: without the flag, or without the tag (a shipped page), nothing is loaded. */
 export function boot(opt={}){
   OPT=opt; setHandsSink(onHands, studio);

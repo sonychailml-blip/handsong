@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-2 — stage 3 (2026-11-03): after the user's laptop try — hand choice in settings, the flicker, far hands
+Tree hashes before: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32. After: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4f4fcfc3f1f0cc14.
+- «Играть: правой / левой рукой» left the main screen (four round buttons + settings) for a segment in Settings → Рука, saved (`calSideSet`; the last choice wins, a calibration's or this one).
+- The flicker: `calTick` drew from the shell's own animation frame, which could find the camera snapshot already closed by the next frame (0 × 0, a dark frame; with a hand nearly every frame). Now drawn by the loop (`main.js` → boot `afterDraw`, CORE-6); a closed picture keeps the last frame. Not reproducible headless (the order differs there); the row checks the wiring and the keep, with a CONTROL.
+- Far hands: the page opens the engine with `farHold` (CORE-6): refused only below palm size 0.075 or shaking; a far or noisy hold gets the note «Отсюда камера видит руку не так чётко…»; a far shaking hand «Точки дрожат…»; the instruction now names the closest point and «Ход руки».
+- Row «NIGHT calibration screens» 35 → 48 cases; the shell row clicks the settings segment. Step 129 (five checks) replaces 128.
+- Checks: static PASS; [probe-data] PASS — 36 checks, 0 differences (CAL1-3 153 cases); Full P.quick: PASS — 93 checks, 0 differences; Night P.night: PASS — 37 checks, 0 differences (calibration screens 48 cases); [smoke] PASS with builds; ui-snap Night: no overlap; doc-split PASS. Fix rounds 0 (one regenerated name index).
+
 # NIGHT-2 — stage 2 (2026-11-03): calibration screens and settings, built
 Tree hashes before: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b. After: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32.
 - The user's answers to the 12 design questions and additions A, B: `docs/night/design/NIGHT-2-calibration/DESIGN.md` «Decisions».

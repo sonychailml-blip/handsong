@@ -138,9 +138,14 @@ export async function checkNightShell(){
     const prof=PR.profileOf('profile.night'), A=await import('../../../core/audio.js'), lead=()=>A.timbreIdOf('ld', ST.leadIdx), next=(L,c)=>L[(L.indexOf(c)+1)%L.length];
     { const want=next(prof.timbres, lead()); $('nightSound').click(); n++; if(lead()!==want) miss(`Sound: ${lead()} (expected ${want})`); }
     { const want=next(prof.moods, ST.scaleId); $('nightMood').click(); n++; if(ST.scaleId!==want) miss(`Mood: ${ST.scaleId} (expected ${want})`); }
-    { const h0={ ...ST.handFn.ld }; $('nightHand').click(); const h1={ ...ST.handFn.ld }; n++;
-      if(!(h1.L===h0.R && h1.R===h0.L)) miss(`Play with: hands ${JSON.stringify(h0)} → ${JSON.stringify(h1)} (expected swapped)`);
-      $('nightHand').click(); n++; if(JSON.stringify(ST.handFn.ld)!==JSON.stringify(h0)) miss('Play with twice did not come back'); }
+    { /* NIGHT-2 stage 3: «Play with» is a settings segment, saved (the device's saved side is put back) */
+      const SK='handsong.nightCalSide', sk=localStorage.getItem(SK), seg=v=>$('nightHandSeg').querySelector(`[data-hand="${v}"]`), h0={ ...ST.handFn.ld }, other=h0.R==='fx' ? 'right' : 'left', mine=other==='left' ? 'right' : 'left';
+      try{ seg(other).click(); const h1={ ...ST.handFn.ld }; n++;
+        if(!(h1.L===h0.R && h1.R===h0.L)) miss(`Play with: hands ${JSON.stringify(h0)} → ${JSON.stringify(h1)} (expected swapped)`);
+        n++; if(localStorage.getItem(SK)!==other || !seg(other).classList.contains('on')) miss('Play with: the choice is not saved or not marked');
+        seg(mine).click(); n++; if(JSON.stringify(ST.handFn.ld)!==JSON.stringify(h0)) miss('Play with back did not come back'); }
+      finally{ if(sk==null) localStorage.removeItem(SK); else localStorage.setItem(SK, sk); } }
+    n++; if($('nightHand')) miss('the main screen still has «Play with»');
     { const play=ST.handFn.ld.R==='fx' ? 'L' : 'R', f0=ST.handFn.ld[play]; $('nightNotes').click(); n++;
       if(ST.handFn.ld[play]!==(f0==='hold' ? 'note' : 'hold')) miss(`Notes: ${f0} → ${ST.handFn.ld[play]}`); $('nightNotes').click(); }
     { const seen=[]; for(let k=0;k<4;k++){ $('nightSleep').click(); seen.push(CS.nightShellDbg().sleep.mins); } n++;

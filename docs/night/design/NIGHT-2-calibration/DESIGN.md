@@ -18,6 +18,11 @@
 
 **One change from the stage-1 plan:** the step doesn't switch the background to the camera (that closes the forest, and reopening it takes 1–3 s on a phone). The overlay draws the camera picture itself, with the same crop and mirror as the camera layer, and the forest stays open underneath.
 
+## Stage 3 (user, 2026-11-03, after trying it on the laptop)
+- **«Играть: правой / левой рукой» moved into Settings → Рука** (a two-way segment); the main screen has four round buttons + settings. Saved (`handsong.nightCalSide`): the last choice wins, a calibration's or this setting's; reset still clears it.
+- **The flicker fixed.** The overlay drew from the shell's own animation frame, which could run after the next camera frame had closed the snapshot it held: a closed picture reads 0 × 0 and the frame stayed dark. With a hand, detection is slower and that happened on almost every frame (black with points only). Now the core loop calls it right after the stack drew (boot option `afterDraw`, CORE-6), and a closed picture keeps the last frame.
+- **Far hands accepted.** Answer 1 is reworded: «the closest point the hand reaches while playing; «Ход руки» sets how far it travels from there». CORE-6 `farHold`: refused only below a palm size of 0.075 (≈1.5 m on a 640×480 webcam) or when shaking; a hand far enough to shorten the travel, or noisy beyond the hold band, gets the note «Отсюда камера видит руку не так чётко: точки могут слегка дрожать…». A far shaking hand is worded «Точки дрожат: рука далеко или двигается…». The old limit (0.25) was about 45 cm.
+
 ---
 Stage 1 text below, as approved (answers above replace its questions).
 

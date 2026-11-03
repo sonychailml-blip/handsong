@@ -1,6 +1,6 @@
 /* CORE-1: the live calibration service, thin over core/pure/handcal.js: the record and store, the camera's key, the running routine and withholding hands while it
    runs. Inert until an app calls handCalOpen. Reason codes only, no strings or UI (the apps word them). Numbers only, never an image or a camera name (rule #33). */
-import { CAL, calCameraKey, calEmpty, calLoad, calSave, calWipe, calReset, createCalRun, calSize, calBand, calDepth, calFilter, calHold, calInverted, calSensOf } from './pure/handcal.js';
+import { CAL, calCameraKey, calEmpty, calLoad, calSave, calWipe, calReset, createCalRun, calSize, calBand, calDepth, calFarBase, calFilter, calHold, calInverted, calSensOf } from './pure/handcal.js';
 import { fxParamKeysOf } from './audio.js';
 import { BUS } from './pure/bus.js';
 import { arrOpen, rollOpen, camFacing } from './state.js';
@@ -17,7 +17,7 @@ const memoryStore={
 };
 const liveCamera=()=>({ label:camLabel(), facing:camFacing });
 
-let OPEN=null;        // { scope, store, camera, rec, status } once an app has opened it
+let OPEN=null;        // { scope, store, camera, farHold, rec, status } once an app has opened it
 let RUN=null, runCam=null, proposal=null, last=null, probeOn=false;
 const listeners=new Set();
 const keyMemo=new Map();
@@ -28,8 +28,9 @@ const studioBusy=()=> recording || !!activeKind() || arrOpen || rollOpen || edit
 const save=()=>calSave(OPEN.store,OPEN.rec);
 function tell(){ if(!listeners.size) return; const s=handCalState(); for(const f of listeners) try{ f(s); }catch(e){ console.warn('[handcal] listener failed:',e); } }
 
-function handCalOpen({ scope, store=memoryStore, camera=liveCamera }){
-  const L=calLoad(store,scope); OPEN={ scope, store, camera, rec:L.rec, status:L.status }; RUN=null; runCam=null; proposal=null; last=null; tell();
+/* farHold (CORE-6, opt-in): accept a far but steady hold down to the tracking floor; its far end stays trackable (calFarBase). Absent: CORE-1 exactly */
+function handCalOpen({ scope, store=memoryStore, camera=liveCamera, farHold=false }){
+  const L=calLoad(store,scope); OPEN={ scope, store, camera, farHold:!!farHold, rec:L.rec, status:L.status }; RUN=null; runCam=null; proposal=null; last=null; tell();
   return L.status;
 }
 function handCalRead(){
@@ -57,7 +58,7 @@ function handCalReset(what={}){
   OPEN.rec=calReset(OPEN.rec,what); const ok=save(); tell(); return ok;
 }
 
-function begin(t,hand){ liveAllOff(); runCam=cameraKey(); proposal=null; last=null; RUN=createCalRun({ t, hand }); tell(); return null; }
+function begin(t,hand){ liveAllOff(); runCam=cameraKey(); proposal=null; last=null; RUN=createCalRun({ t, hand, farHold:OPEN.farHold }); tell(); return null; }
 const syntheticNow=()=>{ const r=BUS.get('hands'); return probeOn || !!(r&&r.landmarks&&r.landmarks.some(lm=>lm.synthetic)); };
 const refusal=()=> !OPEN || running() || inReview() || studioBusy() ? 'busy' : null;
 /* null, or a refusal code */
@@ -87,11 +88,13 @@ function calRatio(S,lm,c){
   if(!st || st.near!==c.near || S.seen-st.t>CAL.blinkMs) st=S.cal={ near:c.near };
   return S.calF=calHold(st,calFilter(st,calSize(lm),S.seen)/c.near,calBand(c.noise));
 }
+/* the 1x far ratio: farHold raises it for a far near point; without farHold the CORE-1 default */
+const farBase=c=> OPEN.farHold ? calFarBase(c.near) : CAL.farRatio;
 /* with no control named: the global depth slider, which the visuals read */
-function calDepthN(S,lm,ck,fxId,i){ const c=calCam(); return calDepth(calRatio(S,lm,c),c.noise,calSensOf(OPEN.rec,'depth',ck!=null ? ctlId(ck,fxId,i) : null)); }
+function calDepthN(S,lm,ck,fxId,i){ const c=calCam(); return calDepth(calRatio(S,lm,c),c.noise,calSensOf(OPEN.rec,'depth',ck!=null ? ctlId(ck,fxId,i) : null),farBase(c)); }
 const calDepthAt=(S,lm,fallback,ck,fxId,i)=> calOn() ? calDepthN(S,lm,ck,fxId,i) : fallback;
 /* never a filter step: this frame's value when the hand computed one, otherwise the law on the raw size */
-function calDepthView(S,lm){ const c=calCam(); return calDepth(S.calF!=null ? S.calF : calSize(lm)/c.near,c.noise,calSensOf(OPEN.rec,'depth',null)); }
+function calDepthView(S,lm){ const c=calCam(); return calDepth(S.calF!=null ? S.calF : calSize(lm)/c.near,c.noise,calSensOf(OPEN.rec,'depth',null),farBase(c)); }
 function calInv(ck,fxId,i,inv){ if(!OPEN) return inv; const c=OPEN.rec.controls[ctlId(ck,fxId,i)]; return c&&c.dir ? calInverted(c.dir,inv) : inv; }
 const calSens=(ck,fxId,i)=> OPEN ? calSensOf(OPEN.rec,'fx',ctlId(ck,fxId,i)) : 1;
 const calBusy=()=>RUN!==null && running();

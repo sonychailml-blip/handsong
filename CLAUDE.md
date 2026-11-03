@@ -133,8 +133,10 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
 - **Scale data snapshot (F0):** `P.dumpScales()` → `tools/prints/scales.before.json`; `await P.checkFiles()` compares the live registry with
   it value by value (`===`), grouped by field path; renewed ONLY via `await P.renewSnapshot(allowed)`, which refuses unless every
   difference is the declared change. `P.checkNames()` compares labels from naming schemes with frozen pre-F3 label functions.
+- ⛳ **Manual checks — at most five** (user, NIGHT-2 stage 3, 2026-11-03): a report asks the user to check at most five things by hand, and only
+  what a real hand, ears or the Poco can tell; everything else is checked by the runners and screenshots first.
 - **Report format:** documents changed; files changed with a one-line reason; console lines and outputs; static-check result;
-  probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone).
+  probe verdict lines and fix rounds; what was left undone; docs found stale; the user's remaining steps (ear, camera, phone; at most five).
 
 ## Conventions — where a feature goes
 - Terse, compact code; match the surrounding idiom. Add a feature in the module that owns it.
@@ -397,7 +399,7 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
 - **Root:** `index.html` redirect only; `vercel.json`. **Pages:** `apps/<app>/index.html` markup only (CSP `<meta>` first, rule #33; `#privacyNote`), `manifest.json`/`sw.js` PWA (cache-free SW); `core/tokens.css` THE design tokens (DOM +
   canvas `--cv-*`; static check 11); `core/legacy-ui/style.css` all shared CSS through tokens; `core/va-stub.js` counter stub.
 - **`apps/full/`:** `main.js` entry; `tutor.js` lessons + step engine; `demo.js` start-screen demo; `songs.js` demo songs (`data/songs/<name>.json`, SONG2); `data/full.json` profile.
-- **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (five controls, the settings card, sleep timer, the start, bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`); `calib.js` the hand's calibration screens and the settings' Hand section (NIGHT-2, over CORE-1);
+- **`apps/night/`:** `main.js` entry (first import `migrate.js`: old setting names, delete after the first public release); `shell.js` the shell (four controls, the settings card, sleep timer, the start, bars, «Measure this device»; doors passed to `core/legacy-ui/ui.js`); `calib.js` the hand's calibration screens and the settings' Hand section (NIGHT-2, over CORE-1);
   `ghost.js` the first-run ghost light; `night.css`; `data/night.json` profile; `fonts/` (OFL, register entries); `vendor/three-r128/` (lazy); `pure/cycle.js` (the 24-min night `nightAt`, sleep `nightDeep`, moods, rare events, emblem), `pure/forestlife.js` (stream, mushroom / flower places, rings), `pure/fireflies.js`;
   `scene/forest.js` the room (tokens `--cv-forest-*`), `scene/forest-life.js`, `forest-detail.js`, `forest-rare.js`. Bus topic `nightSky` { mood, sleep, wind }.
 - `core/config.js` (leaf) — thresholds, scheduler timings, pool sizes (POOL1: the chord pool grows on demand to `CHORD_POOL_N`, spares ahead), palette/FX geometry (`palSplitX`, `rectBandY`, `coverView`), volume
@@ -448,13 +450,13 @@ detail: `archive/CLAUDE-history.md` «Module map (full, moved at DOC1)», under 
   schedule), `camlight.js` (low light, camera restore), `dsp.js` (seeded, forest IR, dynamics curves), `canon.js` (canonical JSON + FNV — CMD1a), `nightui.js` (shell logic), `ambience.js` (seeded crickets).
 - `core/autosave.js` — the song kept on the device (IndexedDB, last 5, `asTick`, `asFlush`).
 - `core/pure/profile.js` (C0) — PROFILES, checked by `core/pure/profile.js`; `profileApply(id)` called once at the start by `boot` with the page's profile; writes through ui.js doors `profileWire`. Full's face stays embedded on Night's page for probes only (`core/DEBT.md`). `core/edition.js` — `EDITION` ('dev' here; `tools/build.mjs` writes 'release').
-- `core/legacy-ui/` (temporary, only shrinks; rule 2 of «Two apps, one core»): `boot.js` the shared start and loop (`onHands`, `loop()`, `startApp()`, the one start path; options `profile`, `frameFilter`), `ui.js` menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers; `draw.js` FACADE over `views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
+- `core/legacy-ui/` (temporary, only shrinks; rule 2 of «Two apps, one core»): `boot.js` the shared start and loop (`onHands`, `loop()`, `startApp()`, the one start path; options `profile`, `frameFilter`, `afterDraw` — CORE-6), `ui.js` menus, buttons, handlers, panels, editor shell, window, song Save/Open (`songSaveText`/`songOpenText`), tutorial helpers; `draw.js` FACADE over `views/` (`common.js`, `camera.js`, `strip.js` strip/window/mixer + `loopView`, `roll.js` editor +
   `rollView`, `play.js` overlays + play screen + Night's fingertip fireflies and row glow, `stack.js` the compositor: layers scene · background · instrument · overlay; `scene/host.js` the scene host: `#scene` WebGL canvas only while a room shows, the room and three.js injected by the app; levels high / medium (default) / low with a resolution scale, `setBackground('forest'|'dark'|'camera')`, `setSceneLevel`); `latmeter.js` latency meter UI (LAT1–LAT3).
 - `core/vision.js` — camera + detection path + frame pump (LAT2), low-light switches, camera restore (rule #34), robust start (0b).
   `core/handdet.js` — the detector (two models, worker-safe). `core/hand-worker.js` — classic worker.
 - `core/gestures.js` — FACADE over `core/gestures/` (`features.js` pure gesture math, `expr.js` expression hand, `fxhand.js` the aim
   `fxParamsOf`, `looper.js`, `roles.js` stateless helpers, `hands.js` the state machine `HANDS`/`processHands`, `pose.js` the pose generator: HAND1 and the ghost).
-- `core/handcal.js` (CORE-1) — hand calibration and sensitivity, the live service, inert until an app calls `handCalOpen({scope})`; `core/pure/handcal.js` the laws, record and routine. Design: `docs/core/CORE-1-DESIGN.md`. Test panel (dev only): `<page>?probe&calpanel`, `tools/probes/core/calpanel.js`. Prints: `tools/prints/hand-depth.<app>.print.json`.
+- `core/handcal.js` (CORE-1) — hand calibration and sensitivity, the live service, inert until an app calls `handCalOpen({scope})` (opt-in `farHold`, CORE-6: a far steady hand accepted down to the tracking floor); `core/pure/handcal.js` the laws, record and routine. Design: `docs/core/CORE-1-DESIGN.md`. Test panel (dev only): `<page>?probe&calpanel`, `tools/probes/core/calpanel.js`. Prints: `tools/prints/hand-depth.<app>.print.json`.
 - `core/clip.js` — clip/audio recorder. `core/render.js` — offline render, freeze, `renderQueued`, console `R.*`.
 - `tools/probes/` — `full.js`, `night.js` the page facades (`install()`); rows `core/` (register themselves: `core/rows.js` `row()`/`family()`; `probedata.js` + `tools/probe-data.mjs` the node part), `full/`, `night/`. `tools/prints/` — `scales.before.json`, `song.print.json`, `gold.print.json`,
   `gesture.print.json`, `census.print.json`, `night.print.json`, `timbres.before.json`.
@@ -542,7 +544,7 @@ THERE in full and here as one index entry):
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
   125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`) · 127 The quiet floor by ear (NIGHT-1; `?probe&tails=on|off`)
-  128 Night's calibration screens and settings, laptop + Poco (NIGHT-2; covers 125 for Night)
+  128 Night's calibration screens and settings, laptop + Poco (NIGHT-2; covers 125 for Night) · 129 Night's hand setup, five checks (NIGHT-2 stage 3; replaces 128)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

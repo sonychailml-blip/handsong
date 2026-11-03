@@ -4,9 +4,9 @@ Two apps, one engine. Rules: `CLAUDE.md`. Every run belongs to one track: `CORE-
 
 | Track | Folder | Read | Where it stands |
 |---|---|---|---|
-| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation, `CORE-1` (hand calibration), `CORE-3` (lean path), `CORE-4` (quiet floor), `CORE-5` (Night texts, icon) done, all opt-in. Step 125 open on Night and the Poco. |
+| **CORE** | `core/` | `docs/core/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md` | Stage 3 foundation, `CORE-1` (hand calibration), `CORE-3` (lean path), `CORE-4` (quiet floor), `CORE-5` (Night texts, icon), `CORE-6` (far hands, draw hook) done, all opt-in. Step 125 open on Night and the Poco. |
 | **FULL** | `apps/full/` | `docs/full/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `UI-MAP.md`, `UX-INVENTORY.md` | Waits for the first release. Next: stage 5 (saving, export, audio take, mixer) and the calibration screen. |
-| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. `NIGHT-1` stages 1–3 done (Poco page later). `NIGHT-2` calibration screens built, waiting for step 128 (laptop + Poco). Then steps 120–124, C8 rest, C9, C10, C12. |
+| **NIGHT** | `apps/night/` | `docs/night/HANDOFF.md`, `BACKLOG.md`, `WORK-LOG.md`, `STAGE4-NIGHT-plan.md`, `QUALITY.md` | The first public release. RUN 9 done. `NIGHT-1` stages 1–3 done (Poco page later). `NIGHT-2` calibration screens built (stage 3), waiting for step 129 (five checks, laptop + Poco). Then steps 120–124, C8 rest, C9, C10, C12. |
 
 **Handsong** is a gesture synthesizer and tuning tutorial in the browser: camera → MediaPipe → pinches → Web Audio, with a multitrack recorder, piano roll and lessons. **Handsong Night** (code id `night`) is the quiet one: a night forest played with the hands, free, nothing leaves the device.
 

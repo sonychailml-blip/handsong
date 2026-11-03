@@ -581,16 +581,15 @@
   <div id="nightFade" class="night-fade">
     <p id="nightIdle" class="night-idle" data-i18n="night.idle">Raise a hand to play</p>
     <button id="nightInfoBtn" class="night-ibtn night-glass" data-svg="settings" data-i18n-title="night.settings" title="Settings"></button>
-    <!-- NIGHT-2: five round buttons + settings (the background and the Forest slider moved into settings) -->
+    <!-- NIGHT-2: four round buttons + settings (the background, the Forest slider and «Play with» moved into settings) -->
     <div id="nightCtl" class="night-ctl night-glass">
       <button id="nightSound" class="night-rb"><span class="night-circ" data-svg="sound"></span><span class="night-lab" data-i18n="night.sound">Sound</span><span class="night-val"></span></button>
       <button id="nightMood" class="night-rb"><span class="night-circ" data-svg="mood"></span><span class="night-lab" data-i18n="night.mood">Mood</span><span class="night-val"></span></button>
-      <button id="nightHand" class="night-rb"><span class="night-circ" data-svg="hand"></span><span class="night-lab" data-i18n="night.hand">Play with</span><span class="night-val"></span></button>
       <button id="nightNotes" class="night-rb"><span class="night-circ" data-svg="note-follow"></span><span class="night-lab" data-i18n="night.notes">Notes</span><span class="night-val"></span></button>
       <button id="nightSleep" class="night-rb"><span class="night-circ" data-svg="sleep"></span><span class="night-lab" data-i18n="night.sleep">Sleep</span><span class="night-val"></span></button>
     </div>
   </div>
-  <!-- NIGHT-2: THE SETTINGS CARD (was the ⓘ card): Hand (calibration, two sliders, reset) · View (background, Forest, hand points, lantern, field, lighter forest) · about -->
+  <!-- NIGHT-2: THE SETTINGS CARD (was the ⓘ card): Hand (calibration, play with, two sliders, reset) · View (background, Forest, hand points, lantern, field, lighter forest) · about -->
   <div id="nightInfo" class="night-card night-glass night-set" role="dialog" aria-modal="true" hidden>
     <div class="night-ihead"><span class="night-set-title" data-i18n="night.settings">Settings</span>
       <button id="nightInfoClose" class="night-ibtn night-ibtn-in" data-svg="close" data-i18n-title="night.close" title="Close"></button></div>
@@ -598,6 +597,8 @@
       <h2 class="night-sec-h" data-i18n="night.set.hand">Hand</h2>
       <div class="night-calrow"><span id="nightCalState"></span><button id="nightCalGo" class="night-lnk"></button></div>
       <p id="nightCalStore" class="night-note" hidden></p>
+      <div class="night-sl-lab" data-i18n="night.hand">Play with</div>
+      <div id="nightHandSeg" class="night-seg night-seg-2"><button data-hand="right" data-i18n="night.handR">right hand</button><button data-hand="left" data-i18n="night.handL">left hand</button></div>
       <div id="nightTravelRow" class="night-sl">
         <div class="night-sl-lab"><span data-i18n="night.cal.travel">Hand travel</span><button id="nightTravelNeed" class="night-lnk night-sl-need" data-i18n="night.cal.need" hidden>Set up your hand first</button></div>
         <input id="nightTravel" type="range" min="-1" max="1" step="0.01" value="0">

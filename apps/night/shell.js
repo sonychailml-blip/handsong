@@ -1,7 +1,7 @@
 /* RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
    Shown only in the Night face (nightShellFace from the profile's face door). Hands in view → only the scene; no hand for 1.5 s → the controls
-   fade in: Sound · Mood · Play with · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ: the hand's calibration and its
-   two sliders, the background, Forest, the hand's points, Lantern, «Show the full note field», the first steps again). Each round
+   fade in: Sound · Mood · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ: the playing hand, the hand's calibration
+   and its two sliders, the background, Forest, the hand's points, Lantern, «Show the full note field», the first steps again). Each round
    button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js wires (the same setters the Full
    panels use) — this module holds no musical state. The sleep timer fades the output (audio.outputFade, session only) and dims the scene
    with a black veil together; a tap on the veil wakes. Lantern and the note-field choice are remembered on this device (localStorage). */
@@ -17,7 +17,7 @@ import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
 import { EDITION } from '../../core/edition.js';
 import { ghostArm } from './ghost.js';   // C7: the ghost light
-import { calWire, calOfferIfNew, calActive, calSideApply, calSettingsRender, calTick, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration
+import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
 import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo } from '../../core/legacy-ui/draw.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 
@@ -65,7 +65,6 @@ function render(){
   if(!D || !on) return;
   val('nightSound', D.timbreName(D.timbre()));
   val('nightMood', t('night.mood.'+D.mood()));
-  val('nightHand', t(D.hand()==='left' ? 'night.handL' : 'night.handR'));
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
   sleepLabel(performance.now());
   $('nightLanternTg').classList.toggle('on', load(KEY.lantern)==='1'); $('nightLantern').hidden= load(KEY.lantern)!=='1';
@@ -74,6 +73,7 @@ function render(){
   $('nightFirstRun').hidden=false; $('nightToSound').hidden= EDITION!=='dev';
   { const bgs=D.backgrounds(), bg=D.bg(); for(const b of $('nightBgSeg').children){ b.hidden=!bgs.includes(b.dataset.bg); b.classList.toggle('on', b.dataset.bg===bg); } }   // NIGHT-2: settings
   for(const b of $('nightDotsSeg').children) b.classList.toggle('on', (b.dataset.dots==='tips')===!!(nightView && nightView.tips));
+  for(const b of $('nightHandSeg').children) b.classList.toggle('on', b.dataset.hand===D.hand());   // NIGHT-2 stage 3: «Play with» moved here from the main screen
   calSettingsRender();
   $('nightSceneTg').hidden= EDITION!=='dev'; $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
   $('nightForestRow').hidden= !amb; $('nightForest').value=String(forestLevel());
@@ -90,7 +90,6 @@ function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
   tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
-  tap('nightHand', ()=>D.setHand(D.hand()==='left' ? 'right' : 'left'));
   tap('nightNotes', ()=>D.setNoteMode(D.noteMode()==='hold' ? 'note' : 'hold'));
   tap('nightSleep', ()=>sleepSet(nextOf(NIGHT_UI.sleepMins, sleep.mins)));
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);
@@ -104,6 +103,7 @@ function wire(){
   $('nightMeasure').onclick=()=>{ measure(); };
   /* NIGHT-2: the background and the hand's points in settings (fingertips only, the default, or all points) */
   for(const b of $('nightBgSeg').children) b.onclick=()=>{ if(!D) return; D.setBg(b.dataset.bg); render(); };
+  for(const b of $('nightHandSeg').children) b.onclick=()=>{ if(!D) return; calSideSet(b.dataset.hand); render(); };   // saved: the last choice wins
   for(const b of $('nightDotsSeg').children) b.onclick=()=>{ const tips=b.dataset.dots==='tips'; save(KEY.joints, tips ? 'tips' : 'all'); if(nightView) setNightView({ ...nightView, tips }); render(); };
   $('nightVeil').onclick=()=>{ if(asleep) sleepSet(0); };
   onLangChange(render);
@@ -115,7 +115,6 @@ function tick(now){
   st=showStep(st, n, now);
   $('nightShell').classList.toggle('show', st.shown && !info && !asleep && !calActive());
   if(startDue){ startDue=false; startFlow(); }
-  calTick();
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
   leadParkTick();   // NIGHT-1: a silent flute's bank stops being computed
   const fxv=nightFxNow(); BUS.set('nightFx', fxv);   // C5: the effects hand's values for the forest's visuals (rings, colour, tremble)
@@ -139,7 +138,7 @@ function startFlow(){ const first=firstRun; firstRun=false;
 /* RUN 8 (slice 3): THE BARS while the hands play — the forest's depth (depth × reach, the reach as a mark) on the playing hand's side, the
    three effects (Echo · Warmth ↔ Brightness from the middle · Wave) on the effects hand's side; the bar of the finger in use glows; each set
    fades in with its hand and out when it leaves; a set's side follows where its hand is on the screen (40 / 60 % of the width, hysteresis),
-   so «Play with: left hand» moves them. The effects hand's one-line hint shows the first time it appears on this device (7 s). */
+   so «Play with: left hand» (settings) moves them. The effects hand's one-line hint shows the first time it appears on this device (7 s). */
 const SIDE={ play:'right', fx:'left' }, FXB=['echo','tone','wave'];
 let hintT=0;
 function sideOf(k, x, W){ const f=x/Math.max(1,W); if(f<0.4) SIDE[k]='left'; else if(f>0.6) SIDE[k]='right'; return SIDE[k]; }

@@ -2,7 +2,8 @@
    The offer once per camera (the first start, a new camera), the one step on the camera picture with every point of the hands, the result
    (the hands play; «Play» saves, «Again» repeats), a failure with one plain message; the Hand section of the settings card. The hand held up
    is the playing hand: its side, voted over the whole hold (MediaPipe's left/right label can flip between frames), sets the roles and is saved
-   beside the calibration; reset clears both. Never touches the volume. Players who never calibrate keep today's roles and mapping. */
+   beside the calibration; the settings' «Play with» saves it too (the last choice wins); reset clears both. Never touches the volume. Players
+   who never calibrate keep today's roles and mapping. A far but steady hand is accepted (CORE-6 farHold) with a note when it shakes. */
 import { handCalOpen, handCalRead, handCalStart, handCalCancel, handCalAccept, handCalReset, handCalSetDepthSens, handCalSetSens, handCalState, onHandCal } from '../../core/handcal.js';
 import { CAL } from '../../core/pure/handcal.js';
 import { BUS } from '../../core/pure/bus.js';
@@ -17,8 +18,12 @@ export const CAL_KEY=Object.freeze({ side:'handsong.nightCalSide', offered:'hand
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 const drop=k=>{ try{ localStorage.removeItem(k); }catch(e){} };
-/* opened once: with no camera record and neutral sliders every gesture is exactly today's (CORE-1 row CAL4) */
-handCalOpen({ scope:'night' });
+/* opened once: with no camera record and neutral sliders every gesture is exactly today's (CORE-1 row CAL4); farHold: refused only where tracking can't measure */
+export const CAL_OPEN=Object.freeze({ scope:'night', farHold:true });
+handCalOpen(CAL_OPEN);
+/* a hand smaller than CORE-1's old limit is "far" for the wording; a noise the hold band can't cover gets the note on the result */
+const isFar=size=> size!=null && size<CAL.minNear;
+const shaky=res=> !!res && (res.near<CAL.sizeMin/CAL.farRatio || CAL.bandK*res.noise>CAL.bandMax);
 
 /* «Hand travel»: the middle is s = 1; right (a longer travel) falls to 0.7, left rises to 2, each half even on a log scale. «Effects sensitivity»: 2^p */
 export const travelS=p=> p>=0 ? Math.max(CAL.depthMin, Math.pow(CAL.depthMin, p)) : Math.min(CAL.sensMax, Math.pow(CAL.sensMax, -p));
@@ -38,23 +43,23 @@ function heard(s){
   if(mode!=='step') return;
   if(s.phase==='waitHand' || s.phase==='holdNear'){ if(s.phase==='holdNear') vote(s); stepShow(s); return; }
   if(s.phase==='review'){ side=decide(); if(side && D.hand()!==side){ swapped=D.hand(); D.setHand(side); } show('done'); return; }
-  if(s.phase==='failed') show('fail', s.reason);
+  if(s.phase==='failed') show('fail', s.reason==='not-still' && isFar(s.size) ? 'shaky' : s.reason);
 }
 onHandCal(heard);
-function stepShow(s){ last=s; const say= s.phase==='holdNear' ? (s.advice ? 'night.cal.'+s.advice : 'night.cal.hold') : 'night.cal.wait';
+function stepShow(s){ last=s; const say= s.phase==='holdNear' ? (s.advice ? 'night.cal.'+(s.advice==='still' && isFar(s.size) ? 'stillFar' : s.advice) : 'night.cal.hold') : 'night.cal.wait';
   $('nightCalSay').textContent=t(say); $('nightCalBar').firstElementChild.style.width=Math.round((s.phase==='holdNear' && !s.advice ? s.progress : 0)*100)+'%';
   $('nightCalFrame').classList.toggle('warn', !!s.advice); }
 function card(title, text, note, no, yes){ $('nightCalTitle').textContent=t(title); $('nightCalText').textContent=text; $('nightCalNote').textContent=note; $('nightCalNote').hidden=!note;
   $('nightCalNo').textContent=t(no); $('nightCalYes').textContent=t(yes); }
-function sideNote(){ const a=side ? t(side==='left' ? 'night.cal.doneL' : 'night.cal.doneR') : '';
+function sideNote(){ const a=side ? t(side==='left' ? 'night.cal.doneL' : 'night.cal.doneR') : '', f=shaky(handCalState().result) ? t('night.cal.farNote') : '';
   const b= EDITION==='dev' && votes.m ? t(votes.L>votes.R ? 'night.cal.votesL' : 'night.cal.votesR', { n:Math.max(votes.L, votes.R), m:votes.m }) : '';   // development: how sure the side was
-  return [a,b].filter(Boolean).join('\n'); }
+  return [a,f,b].filter(Boolean).join('\n'); }
 function show(m, why=null){
   mode=m; reason=why; $('nightCal').hidden=false; document.body.classList.add('night-cal');
   const step=m==='step'; for(const id of ['nightCalStrip','nightCalFrame','nightCalCancel']) $(id).hidden=!step; $('nightCalCard').hidden=step;
   if(m==='offer') card('night.cal.offerT', t('night.cal.offerB'), t('night.cal.offerN'), 'night.cal.skip', 'night.cal.set');
   else if(m==='done') card('night.cal.doneT', t('night.cal.doneB'), sideNote(), 'night.cal.repeat', 'night.cal.play');
-  else if(m==='fail') card('night.cal.failT', t('night.cal.r.'+why), '', 'night.cal.later', 'night.cal.retry');
+  else if(m==='fail') card('night.cal.failT', t(why==='shaky' ? 'night.cal.shakyFail' : 'night.cal.r.'+why), '', 'night.cal.later', 'night.cal.retry');
   else stepShow(last || { phase:'waitHand', advice:null, progress:0 });
   if(OPT.changed) OPT.changed();
 }
@@ -90,6 +95,8 @@ export function calStep(then){ if(mode) return; onEnd=then||null; begin(); }
 export const calActive=()=>mode!==null;
 /* the face: a saved side sets the roles again (nothing saved: the profile's roles stay) */
 export function calSideApply(){ const s=load(CAL_KEY.side); if((s==='left' || s==='right') && D && D.hand()!==s) D.setHand(s); }
+/* the settings' «Play with»: the roles now and the saved side (the last choice wins, a calibration's or this one) */
+export function calSideSet(v){ if(v!=='left' && v!=='right') return; save(CAL_KEY.side, v); if(D && D.hand()!==v) D.setHand(v); }
 export function calResetAll(){ handCalReset({ all:true }); drop(CAL_KEY.side); const h=OPT.defHand ? OPT.defHand() : 'right'; if(D && D.hand()!==h) D.setHand(h); }
 /* leaving the face mid-run: the run ends, the roles come back, no callback */
 export function calAbort(){ if(!mode) return; handCalCancel(); undoSide(); onEnd=null; mode=null; $('nightCal').hidden=true; document.body.classList.remove('night-cal'); }
@@ -102,16 +109,20 @@ export function calSettingsRender(){
   $('nightCalResetQ').hidden=true; $('nightCalReset').hidden=false;
 }
 
-/* each screen frame while it shows: the camera picture (the same crop and mirror as the camera layer, rule #12) and every point of every hand,
-   the locked one in the firefly lime; under a card the picture dims */
+/* each screen frame while it shows, called by the loop right after the stack drew (boot's afterDraw, CORE-6): the camera picture (the same crop and
+   mirror as the camera layer, rule #12) and every point of every hand, the locked one in the firefly lime; under a card the picture dims. The
+   snapshot is closed when the next camera frame arrives, so a separate animation frame found it closed: black frames (the NIGHT-2 flicker). A
+   closed picture still keeps the last drawn frame (its picture and its points together, rule #8) */
 const BONES=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const pic={ drawn:0, kept:0 }; let keepDbg=true;
 export function calTick(){
   if(!mode) return;
-  const c=$('nightCalPic'), main=$('canvas'), W=main.width, H=main.height; if(c.width!==W) c.width=W; if(c.height!==H) c.height=H;
+  const c=$('nightCalPic'), main=$('canvas'), W=main.width, H=main.height, fresh=c.width!==W || c.height!==H; if(c.width!==W) c.width=W; if(c.height!==H) c.height=H;
   const g=c.getContext('2d'), src=BUS.get('picture'), vw=src&&(src.videoWidth||src.width), vh=src&&(src.videoHeight||src.height);
+  if(!(vw && vh) && src && !fresh && keepDbg){ pic.kept++; return; }   // closed (an ImageBitmap reads 0 × 0): the last frame stays
   g.globalAlpha=1; g.fillStyle=cv('night-a94'); g.fillRect(0,0,W,H);
   if(vw && vh) try{ const r=viewRect, x0=r.ax0*vw, y0=r.ay0*vh, w=(r.ax1-r.ax0)*vw, h=(r.ay1-r.ay0)*vh;
-    if(mirrored()){ g.save(); g.scale(-1,1); g.drawImage(src,x0,y0,w,h,-W,0,W,H); g.restore(); } else g.drawImage(src,x0,y0,w,h,0,0,W,H); }catch(e){}   // a picture closed under us: this frame stays dark
+    if(mirrored()){ g.save(); g.scale(-1,1); g.drawImage(src,x0,y0,w,h,-W,0,W,H); g.restore(); } else g.drawImage(src,x0,y0,w,h,0,0,W,H); pic.drawn++; }catch(e){}
   if(mode!=='step'){ g.fillStyle=cv('night-a38'); g.fillRect(0,0,W,H); }
   const res=BUS.get('hands'), hands=(res&&res.landmarks)||[], lock=handCalState().hand, u=Math.max(1, Math.min(W,H)/600);
   for(const lm of hands){ const mine=!lock || (lm[0].x===lock.x && lm[0].y===lock.y), col=cv(mine ? 'hn-glow' : 'hn-amber');
@@ -125,4 +136,5 @@ export const calDbg={
   state:()=>({ mode, reason, votes:{ ...votes }, side, swapped, say:$('nightCalSay').textContent, title:$('nightCalTitle').textContent, text:$('nightCalText').textContent, note:$('nightCalNote').textContent,
     yes:$('nightCalYes').textContent, no:$('nightCalNo').textContent, shown:!$('nightCal').hidden, card:!$('nightCalCard').hidden }),
   setStart:f=>{ startFn=f||handCalStart; },
+  pic:()=>({ ...pic }), keep:on=>{ keepDbg=on!==false; },   // the picture's counters; keep(false) = CONTROL: a closed picture blanks the frame
 };

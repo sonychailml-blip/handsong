@@ -23,8 +23,8 @@ SPLIT-2: the Full app's entry.
 
 ## apps/night/calib.js
 NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handcal.js; design docs/night/design/NIGHT-2-calibration/DESIGN.md).
-- const (7): `CAL_KEY`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
-- fn (8): `calWire`, `calOfferIfNew`, `calStep`, `calSideApply`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
+- const (8): `CAL_KEY`, `CAL_OPEN`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
+- fn (9): `calWire`, `calOfferIfNew`, `calStep`, `calSideApply`, `calSideSet`, `calResetAll`, `calAbort`, `calSettingsRender`, `calTick`
 
 ## apps/night/ghost.js
 RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST LIGHT: on the first run (and from ⓘ «Show the first steps again»), while no real hand has appeared, a ghost hand drifts s…
@@ -459,7 +459,7 @@ FMT1 (stage 3) — THE FILE FORMAT CORE: the envelope every data file carries ({
 
 ## core/pure/handcal.js
 CORE-1: the playing hand's depth calibration and the sensitivity settings, pure (rule #36; rows CAL1-CAL3).
-- const (13): `CAL`, `REASONS`, `calSize`, `calFarRatio`, `calBand`, `calEndPull`, `calInverted`, `calDirValue`, `calFx`, `calEmpty`, `calText`, `calCameraKey`, `calStoreKey`
+- const (14): `CAL`, `REASONS`, `calSize`, `calFarRatio`, `calFarBase`, `calBand`, `calEndPull`, `calInverted`, `calDirValue`, `calFx`, `calEmpty`, `calText`, `calCameraKey`, `calStoreKey`
 - fn (12): `calDepth`, `calFilter`, `calHold`, `calSensOf`, `robust`, `calClean`, `calParse`, `calReset`, `calLoad`, `calSave`, `calWipe`, `createCalRun`
 
 ## core/pure/handsched.js
@@ -947,7 +947,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_182 modules, 2286 exported names._
+_182 modules, 2289 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
