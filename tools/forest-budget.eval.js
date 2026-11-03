@@ -4,7 +4,7 @@
    second and the detection time, the camera's fps, the scene's fps and frame time, audio dropouts. Run: node tools/probe-browser.mjs --eval
    tools/forest-budget.eval.js --no-ui (dev only; nothing here is part of the app). */
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
-const PR=await import('/core/profile.js'), H=await import('/core/legacy-ui/views/scene/host.js'), G=await import('/core/gestures.js'), PO=await import('/core/gestures/pose.js'),
+const PR=await import('/core/profile.js'), H=await import('/apps/night/scene/host.js'), G=await import('/core/gestures.js'), PO=await import('/core/gestures/pose.js'),
   V=await import('/core/vision.js'), M=await import('/core/legacy-ui/latmeter.js'), A=await import('/core/audio.js'), Q=await import('/core/frzqueue.js');
 Q.afPause('runner', true);
 const was=PR.profileCurrent(); PR.profileApply('profile.night');

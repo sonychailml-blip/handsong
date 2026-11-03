@@ -57,7 +57,6 @@ import { songNeeds, songTimbreNeeds } from '../song/file.js';   // AUTOSAVE1: th
 import { icon } from '../icons.js';   // UI1b: every interface glyph through the icon component
 import { songParse, songUpgrade, songCheck, SONG_MAX_BYTES } from '../pure/songfile.js';
 import { profileWire, profileCurrent, profileOf } from '../profile.js';   // C0: the profile doors
-import { setBackground, backgroundOf, sceneInfo } from './draw.js';   // VIS1c: Night's backgrounds (forest / dark / camera)   // SAVE1: reading a song file (pure)
 
 /* ================= UI ================= */
 const $=id=>document.getElementById(id);
@@ -3084,8 +3083,8 @@ export const shellDoors=()=>({
   setHand:v=>{ const nm=handFn.ld[nightPlay()], play= v==='left' ? 'L' : 'R'; setHandFn('ld',play,nm); setHandFn('ld',play==='L'?'R':'L','fx'); softAllOff(); applyInstr(); },
   noteMode:()=> handFn.ld[nightPlay()]==='hold' ? 'hold' : 'note',
   setNoteMode:v=>{ setHandFn('ld',nightPlay(),v==='hold'?'hold':'note'); softAllOff(); applyInstr(); },
-  backgrounds:()=>nightProf().backgrounds||['camera'], bg:()=>backgroundOf(), setBg:m=>bgPick(m),
-  plain:()=> backgroundOf()==='dark' || sceneInfo().level==='minimal',   // the glass's plain fallback (no blur)
+  backgrounds:()=>nightProf().backgrounds||['camera'], bg:()=>bgOf(), setBg:m=>bgPick(m),
+  plain:()=> bgOf()==='dark' || (!!hooks.scene && hooks.scene.info().level==='minimal'),   // the glass's plain fallback (no blur)
   sound:()=>showSound(true),   // dev only: the Sound panel and its Diagnostics in Night (the top bar is hidden there)
 });
 /* SPLIT-2: called with the profile each time a face is put on; set by the app that has a shell */
@@ -3118,10 +3117,12 @@ profileWire({
    Remembered on this device (localStorage; a private window falls back to the profile's first). */
 const BG_KEY='handsong.nightBg';
 const bgStored=()=>{ try{ return localStorage.getItem(BG_KEY); }catch(e){ return null; } };
-const applyBgBtns=(m=backgroundOf())=>{ for(const [id,v] of [['bgForest','forest'],['bgDark','dark'],['bgCamera','camera']]) $(id).classList.toggle('act', v===m); };
+/* CORE-8: the background goes through the app's scene host (hooks.scene); without one (Full) it is the camera, which nothing turns off */
+const bgOf=()=>hooks.scene ? hooks.scene.of() : 'camera';
+const applyBgBtns=(m=bgOf())=>{ for(const [id,v] of [['bgForest','forest'],['bgDark','dark'],['bgCamera','camera']]) $(id).classList.toggle('act', v===m); };
 function bgPick(mode, store=true){
   if(store) try{ localStorage.setItem(BG_KEY, mode); }catch(e){}
-  setBackground(mode).then(()=>applyBgBtns()); applyBgBtns(mode);
+  if(hooks.scene) hooks.scene.set(mode).then(()=>applyBgBtns()); applyBgBtns(mode);
 }
 $('bgForest').onclick=()=>bgPick('forest'); $('bgDark').onclick=()=>bgPick('dark'); $('bgCamera').onclick=()=>bgPick('camera');
 

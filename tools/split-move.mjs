@@ -37,6 +37,12 @@ STEPS.E={ table:[['core/modules/effects/calm.js','core/modules/effects/night-fx.
     ['tools/listen/calm-listen.js','tools/listen/night-listen.js'], ['tools/listen/calm-timbres.html','tools/listen/night-timbres.html']],
   files:['core/modules/effects/calm.js','core/pure/calmui.js','tools/probes/night/calm.js','tools/listen/calm-listen.js','tools/listen/calm-timbres.html'], roots:[], mustNotExist:['core/pure/nightui.js'],
   token:/(?<![\w-])(?:core|tools)\/[\w.*<>\/-]*/g, rewrite:['core','apps','tools/probes','tools/listen'], text:[] };
+/* NIGHT-3 stage 3 (CORE-8): the scene host leaves core/legacy-ui for Night; the forest's scene and pure files gather in its room folder */
+STEPS.N3={ table:[['core/legacy-ui/views/scene/host.js','apps/night/scene/host.js'], ...each('forest forest-life forest-detail forest-rare','apps/night/scene/','apps/night/rooms/forest/'),
+    ...each('forestlife fireflies','apps/night/pure/','apps/night/rooms/forest/pure/')],
+  files:['core/legacy-ui/views/scene/host.js', ...'forest forest-life forest-detail forest-rare'.split(' ').map(n=>'apps/night/scene/'+n+'.js'), 'apps/night/pure/forestlife.js', 'apps/night/pure/fireflies.js'],
+  roots:[], mustNotExist:['apps/night/rooms'], token:/(?<![\w-])(?:core|apps|tools)\/[\w.*<>\/-]*/g,
+  rewrite:['core','apps','tools/probes','tools/listen'], text:['core/**','apps/**','tools/probes/**','tools/*.mjs','tools/*.js','tools/licences.json'] };
 const S=STEPS[STEP]; if(!S){ console.error('usage: split-move.mjs <'+Object.keys(STEPS).join('|')+'> [--dry]'); process.exit(2); }
 const SKIP=new Set(['split-move.mjs']);   // the table itself names the old paths
 const mapPath=p=>{ for(const [a,b] of S.table) if(a.endsWith('/') ? p.startsWith(a) : p===a) return b+p.slice(a.length); return p; };

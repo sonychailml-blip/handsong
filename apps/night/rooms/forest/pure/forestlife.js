@@ -7,7 +7,7 @@
      distance to the playing light (`pulseOf`).
    - GROUND WAVES (each note: a ring of light runs across the moss from the light's ground point) and WATER RINGS (each echo of a note: a ring
      on the stream) — small fixed-size lists, the oldest replaced (`ringAdd`). */
-import { seeded } from '../../../core/pure/dsp.js';
+import { seeded } from '../../../../../core/pure/dsp.js';
 import { forestGround } from './fireflies.js';
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));

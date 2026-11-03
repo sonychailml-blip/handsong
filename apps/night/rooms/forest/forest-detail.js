@@ -8,9 +8,9 @@
    - FOREGROUND SILHOUETTES: dark fronds and a branch close to the camera at the screen's edges (placed from the camera's frustum on every
      resize — never over the middle of the screen), for depth; the camera's lean slides them against the forest.
    Colours: tokens (--cv-forest-grass*, -leaf, -moth, -sil); counts per quality level (forest.js FOREST_LEVELS). No sound, no song here. */
-import { seeded } from '../../../core/pure/dsp.js';
-import { forestGround } from '../pure/fireflies.js';
-import { streamNear, STREAM } from '../pure/forestlife.js';
+import { seeded } from '../../../../core/pure/dsp.js';
+import { forestGround } from './pure/fireflies.js';
+import { streamNear, STREAM } from './pure/forestlife.js';
 import { patchSway } from './forest-life.js';
 
 export const DETAIL=Object.freeze({ seed:0x44455441, leafH:5.3, beamLen:17, beams:Object.freeze([[-2.6,-7.5,2.2],[1.9,-10.5,2.6],[-0.7,-15,3.2],[3.7,-5.6,1.8]]),

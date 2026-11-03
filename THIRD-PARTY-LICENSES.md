@@ -19,7 +19,7 @@ _Generated from `tools/licences.json` by `node tools/check-licences.mjs --write`
 
 - **MediaPipe Tasks Vision — JavaScript library and its WebAssembly files** — Hand detection in the browser (core/handdet.js — on the main thread or in our worker core/hand-worker.js, LAT2). Loaded from jsDelivr at start. Vendored with its LICENSE/NOTICE in stage 4 (offline).
 - **MediaPipe hand landmarker model (float16, version 1)** — Licence as stated for the MediaPipe models (Apache-2.0); re-read the model card when the model is vendored (stage 4).
-- **three.js (3D library) — the Night forest room** — Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Night shows the Forest background — never in Full. No CSP change.
+- **three.js (3D library) — the Night forest room** — Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by apps/night/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Night shows the Forest background — never in Full. No CSP change.
 
 ## Hosted services
 

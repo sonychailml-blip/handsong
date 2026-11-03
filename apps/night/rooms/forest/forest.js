@@ -7,9 +7,9 @@
    sits where the hand's REMAPPED play point is (the hit-tests' point, rule #12) at the depth from the hand's size (core depthDistance) — placed
    through THIS camera, so it projects onto its note row exactly; only the light's world position saturates at the room's bounds (never the
    coordinates). Seeded (one seed per room): the same forest on every device. No sound, no song, no network here (VIS1 contract). */
-import { seeded } from '../../../core/pure/dsp.js';
-import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES } from '../pure/fireflies.js';
-import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, moodLook, MOOD_TC } from '../pure/cycle.js';   // RUN 9: the night's cycle, sleep, moods
+import { seeded } from '../../../../core/pure/dsp.js';
+import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES } from './pure/fireflies.js';
+import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, moodLook, MOOD_TC } from '../../pure/cycle.js';   // RUN 9: the night's cycle, sleep, moods
 import { buildLife, patchGroundWaves, patchSway } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
 import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
 import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem

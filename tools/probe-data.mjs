@@ -753,7 +753,7 @@ async function nightShellCore(){
    positions after 900 steps (15 s, exact, twice); a light gathers them (flies within 2.5 of it after 15 s; CONTROL: with the light off far fewer are — a pull that does nothing is caught); the depth bands: d 0 → near, 1 → far, monotonic, flat in a band */
 async function fliesCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const F=await import(new URL('../apps/night/pure/fireflies.js', import.meta.url).href);
+  const F=await import(new URL('../apps/night/rooms/forest/pure/fireflies.js', import.meta.url).href);
   const h=A=>{ let x=0x811c9dc5; for(const f of A) for(const v of [...f.p, ...f.v, f.glow]){ x^=Math.round(v*1e9)|0; x=Math.imul(x,0x01000193); } return (x>>>0).toString(16); };
   const run=(light)=>{ const A=F.fliesInit(); for(let i=0;i<900;i++) F.fliesStep(A, [{ x:0, y:1.6, z:-3, on:light?1:0 }], 1/60, i/60); return A; };
   n++; if(h(F.fliesInit())!==h(F.fliesInit())) miss('two inits from one seed differ');
@@ -809,7 +809,7 @@ async function nightCore(){
    (their mean distance grows vs a light that keeps them) — CONTROL a light without call / scatter is exactly the old step */
 async function lifeCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const Li=await import(new URL('../apps/night/pure/forestlife.js', import.meta.url).href), Fl=await import(new URL('../apps/night/pure/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
+  const Li=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href), Fl=await import(new URL('../apps/night/rooms/forest/pure/fireflies.js', import.meta.url).href), S=Li.STREAM, L=Li.STREAM_LINE;
   n++; if(L.length!==S.seg+1) miss('stream line has '+L.length+' points');
   let gap=0; for(let i=1;i<L.length;i++) gap=Math.max(gap, Math.hypot(L[i].x-L[i-1].x, L[i].z-L[i-1].z)); n++; if(gap>0.5) miss('stream line step '+gap.toFixed(3));
   n+=2; if(Math.hypot(L[0].x-S.pts[0][0], L[0].z-S.pts[0][1])>1e-9 || Math.hypot(L[L.length-1].x-S.pts[S.pts.length-1][0], L[L.length-1].z-S.pts[S.pts.length-1][1])>1e-9) miss('stream ends are not its first / last points');

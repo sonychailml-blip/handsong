@@ -6,10 +6,10 @@
    The BACKGROUNDS (user, review 2026-10-17): «camera» — today's picture (the camera module); «dark» — plain black, no WebGL at all; «forest» —
    the room. The background changes only the picture: the sound, the note layout and the crop are untouched (the crop is synced per camera
    frame by main.onHands, not by the picture). Stats for the latency meter's «Scene» line (fps, frame time, level). */
-import { stackAdd, stackSet } from '../stack.js';
-import { cv } from '../../../palette.js';
-import { ctx, canvas as cv2d } from '../../../vision.js';
-import { BUS } from '../../../pure/bus.js';
+import { stackAdd, stackSet } from '../../../core/legacy-ui/views/stack.js';
+import { cv } from '../../../core/palette.js';
+import { ctx, canvas as cv2d } from '../../../core/vision.js';
+import { BUS } from '../../../core/pure/bus.js';
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
 
 export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);

@@ -46,7 +46,7 @@ const HOSTS=['https://cdn.jsdelivr.net/npm/@mediapipe/','https://storage.googlea
 async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
   const label=`${app}${dir===ROOT?'':' (built)'} at ${prefix}`, bad=[], miss=s=>bad.push(s), served=[], srv=await serve(dir,prefix,served,breakWorklet?'ks-worklet.js':null), origin=`http://127.0.0.1:${srv.address().port}`;
   const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
-  const seen=[];
+  const seen=[], talk=[];
   try{
     const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'],{ origin }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push(e.effectiveDirective+' '+e.blockedURI)); });
@@ -56,6 +56,7 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
     ctx.on('requestfailed', q=>{ const u=q.url(); if(!/^(data|blob):/.test(u) && !ALLOWED_404.test(u.split('?')[0])) miss(`request failed ${u.replace(origin,'')} (${q.failure()&&q.failure().errorText})`); });
     const page=await ctx.newPage();
     page.on('pageerror', e=>miss('page error: '+(e&&e.message||e)));
+    page.on('console', m=>{ talk.push(m.type()+': '+m.text().slice(0,160)); if(talk.length>12) talk.shift(); });   // NIGHT-3: told when a page stalls
     page.on('console', m=>{ if(m.type()!=='error') return; const t=m.text(), at=(m.location()||{}).url||''; if(/Failed to load resource/.test(t) && (ALLOWED_404.test(at.split('?')[0])||/\b40\d\b/.test(t))) return; /* a status is judged above */ miss('console error: '+t.slice(0,200)); });
     await page.goto(origin+prefix+(dir===ROOT ? PAGES[app] : ''));
     await page.waitForSelector(BEGIN[app], { state:'visible', timeout:60e3 });
@@ -85,7 +86,8 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
       if(!f.includes('Andika')) miss('the Andika font did not load: '+f.join(','));
       if(!seen.some(([u,st])=>/three\.min\.js/.test(u)&&st===200)) miss('the forest library did not load');
       const hid=await page.evaluate(()=>document.getElementById('nightMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`); }
-  }catch(e){ miss('error: '+(e&&e.message||e)); }
+  }catch(e){ miss('error: '+(e&&e.message||e)); out(`    [stalled] last served: ${served.slice(-6).map(([u,st])=>u+' '+st).join(' · ')}
+    [stalled] console: ${talk.join(' | ')}`); }
   finally{ await browser.close().catch(()=>{}); srv.close(); }
   for(const [u,st] of served) if(st>=400 && !ALLOWED_404.test(u) && !bad.some(x=>x.includes(u))) miss(`HTTP ${st} ${u}`);   // what Playwright's events do not see
   out(`[smoke] ${label}: ${bad.length?'NOT A PASS — '+bad.length+' problem(s), '+seen.length+' responses':'PASS — '+seen.length+' responses'}`);

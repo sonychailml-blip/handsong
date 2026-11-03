@@ -3,7 +3,7 @@
    The motion is the «Rooms of light» prototype's (the strategist's own code, our starting source): each fly orbits the nearest light within
    reach on its own ring (pull to the ring + a tangential swirl around its own axis), otherwise drifts; damping; the ground and a ceiling
    bounce it; the room wraps around. Seeded (core/dsp seeded) — the same seed gives the same forest everywhere. */
-import { seeded } from '../../../core/pure/dsp.js';
+import { seeded } from '../../../../../core/pure/dsp.js';
 
 export const FOREST_FLIES={ seed:0x464C5931, n:70, reach:5.5, pull:2.2, swirl:2.6, drift:0.9, damp:1.1, floor:0.25, ceil:5.5,
   callReach:9, callPull:0.12, scatter:1.0, release:1.6,   // RUN 9: a playing light CALLS from further (a gentle drift beyond the old reach); a stopping one lets them SCATTER

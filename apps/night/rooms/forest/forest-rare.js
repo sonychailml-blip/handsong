@@ -2,10 +2,10 @@
    rareStep, seeded): a FALLING STAR streaks across the sky (one additive plane, 1.4 s); a GLOWING FLOWER opens at the playing light's foot when
    a note is held long (seven petals unfold in 3 s, stay ~18 s, close in 4 s; it brightens with each note); the wild fireflies form the
    FIVE-DOT EMBLEM for a moment (core/fireflies.js `form`: 3 flies per dot spring to it, hold, and are let go). Parts of the forest room. */
-import { seeded } from '../../../core/pure/dsp.js';
-import { forestGround } from '../pure/fireflies.js';
-import { streamNear, STREAM } from '../pure/forestlife.js';
-import { RARE, rareInit, rareStep, emblemPoints, EMBLEM_AT } from '../pure/cycle.js';
+import { seeded } from '../../../../core/pure/dsp.js';
+import { forestGround } from './pure/fireflies.js';
+import { streamNear, STREAM } from './pure/forestlife.js';
+import { RARE, rareInit, rareStep, emblemPoints, EMBLEM_AT } from '../../pure/cycle.js';
 
 export const RARE_LOOK=Object.freeze({ star:1.4, bloomOpen:3, bloomHold:18, bloomClose:4, embIn:2.5, embHold:3.5, embOut:2, held:30 });
 const smooth=u=>{ u=Math.max(0, Math.min(1, u)); return u*u*(3-2*u); };

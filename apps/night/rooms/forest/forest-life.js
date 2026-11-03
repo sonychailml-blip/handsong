@@ -8,7 +8,7 @@
      flow); Echo shows as RINGS ON THE WATER at the stream's nearest point, one per echo, fainter by the feedback;
    - THE LEAVES' SWAY: the ferns sway gently (a vertex patch); Wave makes them SHIMMER at the effect's own 4.5 Hz.
    Colours: tokens through the room's palette (the moods' looks). Everything numeric is from the core (probe rows compare it). */
-import { STREAM, STREAM_LINE, streamNear, LIFE, lifePlaces, pulseOf, RINGS, ringsNew, ringAdd, ringsAge } from '../pure/forestlife.js';
+import { STREAM, STREAM_LINE, streamNear, LIFE, lifePlaces, pulseOf, RINGS, ringsNew, ringAdd, ringsAge } from './pure/forestlife.js';
 
 const f=v=>Number(v).toFixed(4);
 /* the ground's material gains the ground waves: U = { uNow, uGW (6 × vec4: x, z, t0 (−1 free), amp), uGWCol, uGWK (gain: 1; a probe's control sets 0) } */

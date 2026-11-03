@@ -119,10 +119,10 @@ const SCREENS_NIGHT=[
 /* RUN 9: THE FOREST'S SCREENS (--forest; headless Chrome renders the WebGL room) — Begin, the Forest background, the two hands playing; then
    moments of the night through the probe clock (host sceneClockDbg): the clear moon, a cloud over it, the moods, the deep-sleep night;
    portrait 390 × 844 and landscape 844 × 390. Each slice adds its screens here. */
-const forestAt=async (p, sec)=>{ await p.evaluate(async s=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneClockDbg(s); }, sec); };
+const forestAt=async (p, sec)=>{ await p.evaluate(async s=>{ const H=await import('/apps/night/scene/host.js'); H.sceneClockDbg(s); }, sec); };
 const moodTo=async (p, re)=>{ await p.evaluate(src=>{ const b=document.getElementById('nightMood'), r=new RegExp(src); let k=0; while(!r.test(b.textContent) && k++<4) b.click(); }, re); };
 /* slice 2: notes through the room (its glint, as the bus does) — n notes every `every` ms; fx: [[effect id, parameter index, 0…1]] set first */
-const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])=>{ const H=await import('/core/legacy-ui/views/scene/host.js'), A=await import('/core/audio.js'), S=await import('/core/state.js');
+const roomNotes=async (p, n, every, fx)=>{ await p.evaluate(async ([n,every,fx])=>{ const H=await import('/apps/night/scene/host.js'), A=await import('/core/audio.js'), S=await import('/core/state.js');
   if(fx) for(const [id,i,v] of fx){ const I=A.fxInstance(S.chainKeyOf('ld'), id); if(I && I.params[i]) I.params[i].setNorm(v); }
   const R=H.sceneRoomDbg(); for(let k=0;k<n;k++){ if(R) R.glint(0, 0.85); await new Promise(r=>setTimeout(r, every)); } }, [n, every, fx||null]); };
 const SCREENS_FOREST=[
@@ -137,12 +137,12 @@ const SCREENS_FOREST=[
   ['f-notes',        async p=>{ await p.evaluate(async ()=>{ const S=await import('/apps/night/shell.js'); S.nightSleepDbg(0, 0); }); await forestAt(p, 60); await playHands(p); await roomNotes(p, 14, 450); await p.waitForTimeout(350); }],
   ['f-echo',         async p=>{ await roomNotes(p, 1, 900, [['cecho',0,0.85],['ctone',1,0.5]]); }],
   ['f-warm',         async p=>{ await roomNotes(p, 4, 500, [['cecho',0,0],['ctone',1,0.05]]); await p.waitForTimeout(200); }],
-  ['f-star',         async p=>{ await forestAt(p, 60); await p.waitForTimeout(300); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('star'); }); await p.waitForTimeout(520); }],
-  ['f-bloom',        async p=>{ await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('bloom'); }); await p.waitForTimeout(3600); }],
-  ['f-emblem',       async p=>{ await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
+  ['f-star',         async p=>{ await forestAt(p, 60); await p.waitForTimeout(300); await p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'); H.sceneRoomDbg().rareDbg('star'); }); await p.waitForTimeout(520); }],
+  ['f-bloom',        async p=>{ await p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'); H.sceneRoomDbg().rareDbg('bloom'); }); await p.waitForTimeout(3600); }],
+  ['f-emblem',       async p=>{ await p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
   ['f-land',         async p=>{ await p.evaluate(async ()=>{ const S=await import('/apps/night/shell.js'); S.nightSleepDbg(0, 0); }); await p.setViewportSize({ width:844, height:390 }); await forestAt(p, 60); await p.waitForTimeout(1800); await playHands(p); await p.waitForTimeout(900); }],
   ['f-land-cloud',   async p=>{ await forestAt(p, 640); await p.waitForTimeout(600); await playHands(p); await p.waitForTimeout(900); }],
-  ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('/core/legacy-ui/views/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
+  ['f-land-emblem',  async p=>{ await forestAt(p, 60); await p.evaluate(async ()=>{ const H=await import('/apps/night/scene/host.js'); H.sceneRoomDbg().rareDbg('emblem'); }); await p.waitForTimeout(3800); }],
   ['f-land-notes',   async p=>{ await forestAt(p, 60); await roomNotes(p, 10, 450, [['ctone',1,0.5]]); await roomNotes(p, 1, 700, [['cecho',0,0.85]]); }],
 ];
 /* the top messages: no two visible ones overlap, and none covers the control panel (SPLIT-2).

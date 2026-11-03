@@ -165,7 +165,7 @@
     "apps/night/vendor/three-r128/three.min.js",
     "apps/night/vendor/three-r128/LICENSE"
    ],
-   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by core/legacy-ui/views/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Night shows the Forest background — never in Full. No CSP change."
+   "notes": "Vendored with its LICENSE (VIS1b, RUN 6): loaded LAZILY from our own origin by apps/night/scene/host.js (a dynamic import of the UMD file, which sets globalThis.THREE) only when Night shows the Forest background — never in Full. No CSP change."
   },
   {
    "id": "google-fonts-reference",

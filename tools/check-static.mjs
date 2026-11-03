@@ -404,7 +404,7 @@ function tokenCheck(css, tok, others){
   const defsAll=new Set([...(tok+'\n'+ncss).replace(/\/\*[\s\S]*?\*\//g,'').matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1]));
   const canvasCheck=(texts)=>{ const out=[];
     for(const [f,t] of Object.entries(texts)){
-      if(/^(core\/legacy-ui\/views\/|core\/config\.js$|apps\/night\/scene\/)/.test(f)) for(const m of t.matchAll(/(['"`])\s*#[0-9a-fA-F]{3,8}\s*\1|(?<![\w$])(rgba?|hsla?)\(\s*\d/g)) out.push(`${f}:${lineAt(t,m.index)}: a canvas colour literal «${m[0].slice(0,24)}» — use cv('<token>') (tokens.css «canvas»)`);
+      if(/^(core\/legacy-ui\/views\/|core\/config\.js$|apps\/night\/(?:scene|rooms)\/)/.test(f)) for(const m of t.matchAll(/(['"`])\s*#[0-9a-fA-F]{3,8}\s*\1|(?<![\w$])(rgba?|hsla?)\(\s*\d/g)) out.push(`${f}:${lineAt(t,m.index)}: a canvas colour literal «${m[0].slice(0,24)}» — use cv('<token>') (tokens.css «canvas»)`);
       for(const m of t.matchAll(/(?<![\w$.])cv\(\s*(['"])([\w-]+)\1/g)) if(!defsAll.has('--cv-'+m[2])) out.push(`${f}:${lineAt(t,m.index)}: cv('${m[2]}') — no token --cv-${m[2]} in tokens.css`); }
     return out; };
   const codeOf={}; for(const f of files) codeOf[f]=mods[f].code;
@@ -485,7 +485,7 @@ for(const f of files) if(SL_SCOPE(f)) fails.push(...statelessCheck(f, mods[f].ba
   if(caught.some(x=>!x) || clean.length) fails.push(`stateless-rule CONTROL: caught ${caught.map(x=>x?'yes':'NO').join('/')} of let / written table / forbidden import / app-module let / app-module UI import; clean module flagged ${clean.length} time(s): ${clean.join(' | ')} — the check cannot fail or flags innocent code`); }
 /* 14) SPLIT-2 BOUNDARIES: core imports no app and no tool; an app imports only itself and core; a probe suite imports core, its own suite, the core suite and its own app; pure code
    imports only pure code. Static and literal dynamic imports. CONTROLS: a core → app, a cross-app and a suite → other app's import must each be caught. */
-const allowedFrom=(f,t)=>{ if(/^(core|apps\/night)\/pure\//.test(f) && !/\/pure\//.test(t)) return false;
+const allowedFrom=(f,t)=>{ if(/^(core\/|apps\/[\w-]+\/(?:[\w-]+\/)*)pure\//.test(f) && !/\/pure\//.test(t)) return false;   // NIGHT-3: a room folder's pure/ is pure too
   if(f.startsWith('core/')) return t.startsWith('core/');
   for(const a of ['full','night']){ if(f.startsWith(`apps/${a}/`)) return t.startsWith('core/')||t.startsWith(`apps/${a}/`);
     if(f.startsWith(`tools/probes/${a}`)) return t.startsWith('core/')||t.startsWith(`apps/${a}/`)||t.startsWith('tools/probes/core/')||t.startsWith(`tools/probes/${a}`); }
@@ -495,10 +495,10 @@ const boundaryOf=ms=>{ const bad=[]; for(const f of Object.keys(ms)){ const spec
     for(const s of specs){ const t=target(f,s); if(t!=null && !allowedFrom(f,t)) bad.push(`${f}: imports ${t} — crosses a boundary (core, one app, probe suites)`); } } return bad; };
 fails.push(...boundaryOf(mods));
 { const ctl=(f,spec)=>boundaryOf({ [f]:{ imports:[{ spec }], dyn:[] } }).length>0;
-  if(!(ctl('core/ctl.js','../apps/night/shell.js') && ctl('apps/full/ctl.js','../night/shell.js') && ctl('tools/probes/full/ctl.js','../../../apps/night/shell.js') && ctl('core/pure/ctl.js','../audio.js') && !ctl('apps/night/ctl.js','../../core/audio.js')))
+  if(!(ctl('core/ctl.js','../apps/night/shell.js') && ctl('apps/full/ctl.js','../night/shell.js') && ctl('tools/probes/full/ctl.js','../../../apps/night/shell.js') && ctl('core/pure/ctl.js','../audio.js') && ctl('apps/night/rooms/forest/pure/ctl.js','../forest.js') && !ctl('apps/night/ctl.js','../../core/audio.js')))
     fails.push('boundary CONTROL: a forbidden import was not caught, or an allowed one was — the check cannot fail'); }
 /* 15) SPLIT-2 DEBT: core/legacy-ui/ and the debt list core/DEBT.md may only SHRINK. A file or a debt line added fails; when one goes, lower the pin here in that run. CONTROL: an added file must fail. */
-const LEGACY_PIN=['boot.js','draw.js','latmeter.js','style.css','ui.js','views/camera.js','views/common.js','views/play.js','views/roll.js','views/scene/host.js','views/stack.js','views/strip.js'], DEBT_PIN=7;
+const LEGACY_PIN=['boot.js','draw.js','latmeter.js','style.css','ui.js','views/camera.js','views/common.js','views/play.js','views/roll.js','views/stack.js','views/strip.js'], DEBT_PIN=7;
 const debtOf=(list,items)=>{ const bad=[]; for(const f of list) if(!LEGACY_PIN.includes(f)) bad.push(`core/legacy-ui/${f}: added to the temporary folder, which may only shrink`);
   if(items>DEBT_PIN) bad.push(`core/DEBT.md: ${items} debt lines, at most ${DEBT_PIN}: the list may only shrink`); return bad; };
 { const walkAll=d=>readdirSync(join(ROOT,d),{ withFileTypes:true }).flatMap(e=>e.isDirectory() ? walkAll(d+'/'+e.name) : [d+'/'+e.name]);

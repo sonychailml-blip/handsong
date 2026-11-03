@@ -332,7 +332,7 @@ export async function checkNightFx(){
       const others=b.filter((v,i)=>i!==f && v!==a[i]); if(others.length) miss(`finger ${f} also moved another effect: ${JSON.stringify(a)} → ${JSON.stringify(b)}`); }
     { const a=get(); drag('Right', 0); const b=get(); n++; if(JSON.stringify(a)!==JSON.stringify(b)) miss('CONTROL: the playing hand moved an effect: '+JSON.stringify(a)+' → '+JSON.stringify(b)); }
     /* the forest's visuals (numbers from the room, never pixels) */
-    const D=await import('../../../core/legacy-ui/draw.js'), H=await import('../../../core/legacy-ui/views/scene/host.js'), PAL=await import('../../../core/palette.js');
+    const D=await import('../../../apps/night/scene/host.js'), H=D, PAL=await import('../../../core/palette.js');
     await D.setBackground('forest'); const room=H.sceneRoomDbg(); n++;
     if(!room) miss('the forest room did not open');
     else{ const hv=[{ x:500, y:300, d:0.4, play:true }];
@@ -436,7 +436,7 @@ export async function checkNightStress(opt={}){
       const before=pb(), w=new AudioWorkletNode(AC, 'probe-burn', { numberOfInputs:0, numberOfOutputs:1, processorOptions:{ ms:8, blocks:60 } }); w.connect(g);
       await wait(1500); const got=pb()-before; w.disconnect(); g.disconnect(); n++; notes.push('CONTROL stall: '+got+' underrun(s) counted');
       if(!(got>0)) miss('CONTROL: a 0.5-s stall of the audio thread was not counted — the dropout counter is blind'); }
-    const G=await import('../../../core/gestures.js'), REC=await import('../../../core/recorder.js'), PO=await import('../../../core/gestures/pose.js'), D=await import('../../../core/legacy-ui/draw.js'), E=A.engineCtx();
+    const G=await import('../../../core/gestures.js'), REC=await import('../../../core/recorder.js'), PO=await import('../../../core/gestures/pose.js'), D=await import('../../../apps/night/scene/host.js'), E=A.engineCtx();
     /* the playing pattern → { ur: underruns while playing, idle: in 2 s with no hand just before, most: this timbre's ringing strikes } */
     const play=async id=>{ await wait(1000); const i0=pb(); await wait(2000); const idle=pb()-i0;
       const clk={ t:performance.now(), W:1000, H:600 }, u0=pb(), t0=performance.now(); let most=0;
@@ -579,7 +579,7 @@ row({ at:1009.87, night:true, name:'NIGHT bars and fireflies', drawn:true, run:(
        convolution room (measured +1.2 / +0.3 dB) — CONTROL: the light room with its return untrimmed (×2, +6 dB) leaves the band. */
 export async function checkNightLowPower(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
-  const PR=await import('../../../core/profile.js'), ST=await import('../../../core/state.js'), A=await import('../../../core/audio.js'), D=await import('../../../core/legacy-ui/draw.js'), T=await import('../../../core/timbreload.js');
+  const PR=await import('../../../core/profile.js'), ST=await import('../../../core/state.js'), A=await import('../../../core/audio.js'), D=await import('../../../apps/night/scene/host.js'), T=await import('../../../core/timbreload.js');
   const was=PR.profileCurrent(), key=ST.chainKeyOf('ld'), KEYS=['handsong.nightLight','handsong.nightLightScene','handsong.sceneLevel'], voices=(PR.profileOf('profile.night')||{}).voices||{};
   const keep=KEYS.map(k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } }), wait=ms=>new Promise(r=>setTimeout(r,ms));
   try{

@@ -13,12 +13,12 @@
    the second time exactly as the first (closing the room is not a lost context). */
 import { row } from '../core/rows.js';
 import { cv } from '../../../core/palette.js';
-import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg } from '../../../core/legacy-ui/views/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
-import { buildForest } from '../../../apps/night/scene/forest.js';
-import { fliesInit, fliesStep, FOREST_FLIES } from '../../../apps/night/pure/fireflies.js';
+import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
+import { buildForest } from '../../../apps/night/rooms/forest/forest.js';
+import { fliesInit, fliesStep, FOREST_FLIES } from '../../../apps/night/rooms/forest/pure/fireflies.js';
 import { NIGHT, nightAt, MOOD_LOOKS, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js';   // RUN 9
-import { FOREST_LEVELS } from '../../../apps/night/scene/forest.js';
-import { streamNear } from '../../../apps/night/pure/forestlife.js';   // RUN 9 (slice 2)
+import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
+import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { stackList } from '../../../core/legacy-ui/draw.js';
 import { BUS } from '../../../core/pure/bus.js';
 import { profileApply, profileCurrent } from '../../../core/profile.js';

@@ -3,7 +3,7 @@ const H=await import('/tools/probes/night/headroom.js'), Q=await import('/core/f
 Q.afPause('runner', true);
 if(PR.profileCurrent()!=='profile.night') PR.profileApply('profile.night');
 const log=s=>console.log('[hr] '+s), out={};
-H.stopCamera(); await (await import('/core/legacy-ui/draw.js')).setBackground('dark'); await new Promise(r=>setTimeout(r,1500));
+H.stopCamera(); await (await import('/apps/night/scene/host.js')).setBackground('dark'); await new Promise(r=>setTimeout(r,1500));
 out.offline=await H.deepOffline(log);
 out.realtime=await H.realtime(log,{ depth:4 });
 return H.reportOf(out);

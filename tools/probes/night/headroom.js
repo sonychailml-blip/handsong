@@ -10,7 +10,7 @@ import { BUS } from '../../../core/pure/bus.js';
 import { rectLayout, CUR } from '../../../core/scales.js';
 import { TIMBRE_RECORDS } from '../../../core/timbreload.js';
 import { video, startCamera, pumpDbg } from '../../../core/vision.js';
-import { setBackground, sceneInfo, setSceneLevel, sceneLevel } from '../../../core/legacy-ui/draw.js';
+import { setBackground, sceneInfo, setSceneLevel, sceneLevel } from '../../../apps/night/scene/host.js';
 import { latReport } from '../../../core/legacy-ui/latmeter.js';
 import * as G from '../../../core/gestures.js';
 import { pose } from '../../../core/gestures/pose.js';

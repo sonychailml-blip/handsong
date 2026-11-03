@@ -50,34 +50,39 @@ RUN 9 — THE NIGHT over the forest, as numbers.
 - const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
 - fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
 
-## apps/night/pure/fireflies.js
-VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
-- const (2): `FOREST_FLIES`, `FOREST_DEPTH`
-- fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
-
-## apps/night/pure/forestlife.js
-RUN 9 — THE FOREST'S LIFE, as numbers.
-- const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
-- fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
-
-## apps/night/scene/forest-detail.js
+## apps/night/rooms/forest/forest-detail.js
 RUN 9 (slice 3) — THE FOREST'S DETAIL.
 - const (1): `DETAIL`
 - fn (1): `buildDetail`
 
-## apps/night/scene/forest-life.js
+## apps/night/rooms/forest/forest-life.js
 RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
 - fn (3): `patchGroundWaves`, `patchSway`, `buildLife`
 
-## apps/night/scene/forest-rare.js
+## apps/night/rooms/forest/forest-rare.js
 RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is core/night.js rareStep, seeded): a FALLING STAR streaks across the sky (one additi…
 - const (1): `RARE_LOOK`
 - fn (1): `buildRare`
 
-## apps/night/scene/forest.js
+## apps/night/rooms/forest/forest.js
 VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
 - const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
 - fn (1): `buildForest`
+
+## apps/night/rooms/forest/pure/fireflies.js
+VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers.
+- const (2): `FOREST_FLIES`, `FOREST_DEPTH`
+- fn (4): `forestGround`, `fliesInit`, `fliesStep`, `depthDistance`
+
+## apps/night/rooms/forest/pure/forestlife.js
+RUN 9 — THE FOREST'S LIFE, as numbers.
+- const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
+- fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
+
+## apps/night/scene/host.js
+VIS1b (RUN 6, docs/core/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
+- const (13): `BACKGROUNDS`, `sceneRoomAdd`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
+- fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
@@ -236,7 +241,6 @@ DRAW1 (DAY run 2026-10-16): draw.js is the FACADE of the canvas — importers ke
 - → ./views/common.js (2): `loopBarBottom`, `setEmptyTpOld`
 - → ./views/play.js (1): `drawOverlays`
 - → ./views/roll.js (21): `fxTitleOf`, `rollAutDrive`, `rollAutSnapV`, `rollAutValAt`, `rollAxisHasDim`, `rollAxisNow`, `rollBendAt`, `rollBendProbe`, `rollBoxHits`, `rollDefaultRow0For`, `rollDragTarget`, `rollGeom`, `rollHit`, `rollRow0Across`, `rollRowPitch`, `rollRowsProbe`, `rollSelectable`, `rollShiftPit`, `rollSnap`, `rollSnapBeat`, `rollTrackView`
-- → ./views/scene/host.js (6): `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`, `setSceneLevel`, `sceneLevel`
 - → ./views/stack.js (3): `stackFrame`, `stackSet`, `stackList`
 - → ./views/strip.js (9): `arrGeom`, `laneCol`, `laneDefName`, `laneTitle`, `loopBeatAt`, `loopHit`, `loopScroll`, `loopViewProbe`, `stripProbe`
 
@@ -270,11 +274,6 @@ DRAW1 (DAY run 2026-10-16): the play screen: overlays per frame (drawOverlays), 
 DRAW1 (DAY run 2026-10-16): the track editor (drawRoll, rollView, the pitch axis, the automation lane, hit tests) — moved from draw.js verbatim (draw.js is the facade).
 - const (5): `rollAutValAt`, `rollBendProbe`, `rollSnapBeat`, `rollAutSnapV`, `rollRowsProbe`
 - fn (17): `fxTitleOf`, `rollBendAt`, `rollSnap`, `rollAutDrive`, `rollHit`, `rollShiftPit`, `rollBoxHits`, `rollSelectable`, `rollGeom`, `rollTrackView`, `rollRowPitch`, `rollAxisHasDim`, `rollDefaultRow0For`, `rollAxisNow`, `rollRow0Across`, `rollDragTarget`, `drawRoll`
-
-## core/legacy-ui/views/scene/host.js
-VIS1b (RUN 6, docs/core/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
-- const (13): `BACKGROUNDS`, `sceneRoomAdd`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
-- fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## core/legacy-ui/views/stack.js
 VIS1a (RUN 6, docs/core/VIS1-design.md §4) — THE COMPOSITOR: visual modules drawn in LAYER order, bottom to top — scene (the WebGL room, VIS1b) · background (the camera picture) · instrument (the p…
@@ -952,7 +951,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_183 modules, 2291 exported names._
+_183 modules, 2285 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -968,3 +967,5 @@ _183 modules, 2291 exported names._
 SPLIT-2 (2026-11; table: `tools/split-names.mjs`). The product's old name: `CALM_*`, `calm*`, `.calm-*`, `--calm-*`, `calm.*` keys, `calm-*` screens, rows `CALM x`, `P.calm`, runner `--calm` → the same with night; `calmNight` → `nightSky`; `--cv-calm-*` → `--cv-hn-*`; `calmshell.js` → `apps/night/shell.js`; `modules/effects/calm.js` → `night-fx.js`; `core/calmui.js` → `core/pure/nightui.js`; `profile.calm` → `profile.night` (the one exception of rule #37); `?calm` → the page `apps/night/`; EDITION value `calm` → `release`. The Full ↔ Night switch: `#profRow`, `#calmToFull`, `profFull`, `profCalm`, `profSep`, `profHint`, `profileBoot`. Folders: `src/` → `core/`, `src/core/` → `core/pure/`, `src/views/` → `core/legacy-ui/views/`, `data/` → `core/data/`, `src/probes/` → `tools/probes/`, `src/scaleprobe.js` → `tools/probes/full.js`, `src/main.js` → `core/legacy-ui/boot.js` + `apps/*/main.js`. Files: root `BACKLOG.md`, `WORK-LOG.md`, `NIGHT-LOG.md`, `UI-MAP.md` → `docs/<track>/` and `archive/`.
 
 CORE-7 (2026-11-03): `core/modules/ambience/forest.js` → `apps/night/sound/ambience.js`, `core/pure/ambience.js` → `apps/night/pure/ambience.js` (the ambience is Night's, registered through `core/soundmods.js`); data row «NIGHT cricket schedule (core)» → «… (app)».
+
+CORE-8 / NIGHT-3 stage 3 (2026-11-03; mover step `N3` in `tools/split-move.mjs`): `core/legacy-ui/views/scene/host.js` → `apps/night/scene/host.js`; `apps/night/scene/forest{,-life,-detail,-rare}.js` → `apps/night/rooms/forest/`; `apps/night/pure/{forestlife,fireflies}.js` → `apps/night/rooms/forest/pure/`. `draw.js` no longer re-exports `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`, `setSceneLevel`, `sceneLevel`.

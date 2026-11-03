@@ -17,8 +17,11 @@ export async function checkVisStack(){
   try{
     const L=stackList(), inFull=(await import('../../../core/profile.js')).profileCurrent()==='profile.full'; n++;
     /* SPLIT-2: which backgrounds are on belongs to the page's profile (a room replaces the camera); order and layers are the stack's own */
-    const seeL= inFull ? L : L.map(({ id, layer })=>({ id, layer })), want=[{ id:'scene', layer:'scene', on:false },{ id:'camera', layer:'background', on:true },{ id:'backdrop', layer:'background', on:true },
-        { id:'surface', layer:'instrument', on:true },{ id:'hands', layer:'overlay', on:true }];
+    /* CORE-8: scene and backdrop are the app's scene host's (Night); a page without one (Full) has neither */
+    const host=L.some(m=>m.id==='scene'), seeL= inFull ? L : L.map(({ id, layer })=>({ id, layer })), want=[{ id:'scene', layer:'scene', on:false },{ id:'camera', layer:'background', on:true },{ id:'backdrop', layer:'background', on:true },
+        { id:'surface', layer:'instrument', on:true },{ id:'hands', layer:'overlay', on:true }].filter(m=>host || (m.id!=='scene' && m.id!=='backdrop'));
+    const fullPage=/\/full\.json$/.test((document.querySelector('link[rel="handsong-profile"]')||{}).href||'');
+    n++; if(fullPage && host) miss('Full\'s page carries a scene host (scene / backdrop modules) — it should have none');
     if(JSON.stringify(seeL)!==JSON.stringify(inFull ? want : want.map(({ id, layer })=>({ id, layer })))) miss('the stack: '+JSON.stringify(L));
     const s0=BUS.seq('notes'); ENG.leadOff(null, null, { own:'probe:vis1a', when:12.5 });
     const got=BUS.since('notes', s0).items; n++;
