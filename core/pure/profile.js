@@ -18,7 +18,8 @@ const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const strList=a=> Array.isArray(a) && a.length>0 && a.every(x=>typeof x==='string') && new Set(a).size===a.length;
 /* null = valid; otherwise ONE line naming the field. known (optional, each a list): roles, handFns {role:[values]}, modes, timbres,
    effects — what this app has (the node row passes the data files; the browser passes its live tables). Absent lists are not checked
-   (hand functions default to HAND_FNS). */
+   (hand functions default to HAND_FNS). CORE-8: rooms, ambiences — the app's room and ambience ids; absent (the page checks its profile
+   before the app registers them), only the id's shape is checked: «room.…», «ambience.…». */
 export function checkProfile(p, known={}){
   if(!plain(p)) return 'not an object';
   for(const k of Object.keys(p)) if(!FIELDS.includes(k)) return `unknown field «${k}»`;
@@ -48,14 +49,15 @@ export function checkProfile(p, known={}){
     if(list) for(const id of v) if(!list.includes(id)) return `${f}: «${id}» is not in this app`;
   }
   if(p.timbres && p.timbres.some(id=>!id.startsWith('solo.')) && p.roles.length===1 && p.roles[0]==='ld') return 'timbres: a solo-only profile offers solo timbres';
-  if(p.scene!==null && p.scene!=='forest') return 'scene: null or «forest»';
+  const idOk=(v, list, re)=> list ? list.includes(v) : typeof v==='string' && re.test(v);
+  if(p.scene!==null && !idOk(p.scene, known.rooms, /^room\.[a-z][\w-]*$/)) return 'scene: null or '+(known.rooms ? 'one of '+known.rooms.join(' / ') : 'a room id «room.…»');
   if(!strList(p.backgrounds) || p.backgrounds.some(b=>!BACKGROUNDS.includes(b))) return 'backgrounds: a list of '+BACKGROUNDS.join(' / ');
   if(p.backgrounds.some(b=>b!=='camera') && p.scene===null && p.backgrounds.includes('forest')) return 'backgrounds: «forest» needs a scene';
   if(p.shell!=='full' && p.shell!=='night') return 'shell: «full» or «night»';
   if(p.noteField!=='full' && p.noteField!=='glow') return 'noteField: «full» or «glow»';
   if(p.labels!=='full' && p.labels!=='plain') return 'labels: «full» or «plain»';
   if(typeof p.recording!=='boolean') return 'recording: true or false';
-  if(p.ambience!==null && p.ambience!=='ambience.forest') return 'ambience: null or «ambience.forest»';
+  if(p.ambience!==null && !idOk(p.ambience, known.ambiences, /^ambience\.[a-z][\w-]*$/)) return 'ambience: null or '+(known.ambiences ? 'one of '+known.ambiences.join(' / ') : 'an ambience id «ambience.…»');
   if('levels' in p){ if(!plain(p.levels)) return 'levels: {timbre id: dB}';
     for(const [id,db] of Object.entries(p.levels)){ if(!p.timbres || !p.timbres.includes(id)) return `levels: «${id}» is not a timbre this profile offers`;
       if(typeof db!=='number' || !Number.isFinite(db) || Math.abs(db)>LEVEL_DB) return `levels.${id}: dB within ±${LEVEL_DB}`; } }
@@ -77,6 +79,8 @@ export const PROFILE_DAMAGES=Object.freeze([
   ['timbres', p=>{ p.timbres=['solo.no-such-timbre']; }],
   ['effects', p=>{ p.effects=['flanger']; }],
   ['scene', p=>{ p.scene='monastery'; }],
+  ['scene', p=>{ p.scene='room.monastery'; }],   // CORE-8: a room id the app does not have
+  ['ambience', p=>{ p.ambience='ambience.sea'; }],
   ['backgrounds', p=>{ p.backgrounds=['camera','aurora']; }],
   ['shell', p=>{ p.shell='kiosk'; }],
   ['labels', p=>{ p.labels='none'; }],

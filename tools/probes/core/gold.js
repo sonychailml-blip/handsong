@@ -18,6 +18,8 @@ import { profileCurrent, profileOf } from '../../../core/profile.js';
    this declaration. A page whose profile names an ambience but registers none fails. */
 const APP_CASES=Object.freeze({ ambience:Object.freeze(['ambience']) });
 const appSkip=name=>Object.entries(APP_CASES).some(([k,names])=>names.includes(name) && !soundModOf(k));
+/* the guard: a profile naming an ambience on a page that registers none → the line saying so (null = fine). NIGHT-3: a function, so its CONTROL can show it fails */
+const ambGuard=(p, registered)=> p && p.ambience && !registered ? `the profile names «${p.ambience}» but the page registers no ambience module — its golden case would be skipped` : null;
 
 const GOLD_FILE='tools/prints/gold.print.json', GOLD_TOL=0.01, GOLD_FLOOR=-80, WIN=0.05, NFFT=4096;
 const BANDS=[0,63,125,250,500,1000,2000,4000,8000,16000,24001];
@@ -109,7 +111,10 @@ export async function checkGold(){
   catch(e){ miss(`no golden file ${GOLD_FILE} (${e&&e.message}) — P.dumpGold() on unchanged code makes it`); return { cases, total:diff.length, differences:diff }; }
   const R=await import('../../../core/render.js'), list=goldCases(), G=file.cases||{};
   for(const n of Object.keys(G)) if(!list.some(c=>c.name===n) && !appSkip(n)) miss(`golden case «${n}» is no longer rendered`);
-  { const p=profileOf(profileCurrent()); cases++; if(p && p.ambience && !soundModOf('ambience')) miss(`the profile names «${p.ambience}» but the page registers no ambience module — its golden case would be skipped`); }
+  { const g=ambGuard(profileOf(profileCurrent()), !!soundModOf('ambience')); cases++; if(g) miss(g);
+    /* CONTROL (NIGHT-3): the guard must speak for a profile with an ambience on a page without one, and stay silent with one registered or none named */
+    cases++; if(!ambGuard({ ambience:'ambience.forest' }, false) || ambGuard({ ambience:'ambience.forest' }, true) || ambGuard({ ambience:null }, false))
+      miss('CONTROL: the ambience guard cannot fail (or fails where it must not)'); }
   await withA4(async()=>{
     for(const c of list){ cases++;
       if(!G[c.name]){ miss(`«${c.name}» has no golden case (a new sound: renew the file by decision)`); continue; }

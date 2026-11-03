@@ -32,7 +32,7 @@ RUN 7 (C7, Night plan §6; docs/night/QUALITY.md points 4, 5, 6) — THE GHOST L
 - fn (2): `ghostAt`, `ghostFrame`
 
 ## apps/night/main.js
-SPLIT-2: the Night app's entry: its shell, its ghost light, its forest, its profile.
+SPLIT-2: the Night app's entry: its shell, its ghost light, its rooms, its profile.
 - exports: none
 
 ## apps/night/migrate.js
@@ -41,14 +41,18 @@ SPLIT-2: one-time move of this app's old setting names, on one origin only (plan
 - fn (1): `migrateKeys`
 
 ## apps/night/pure/ambience.js
-RUN 7 (C4c, Night plan §4.6; docs/night/QUALITY.md points 1, 5, 8) — THE FOREST'S OWN AMBIENCE: its numbers and the crickets' SEEDED schedule.
-- const (1): `AMB`
+THE AMBIENCE'S SEEDED LAWS (RUN 7, C4c; docs/night/QUALITY.md points 1, 5, 8; Night's own since CORE-7): pure (rule #36), node-tested (data row «NIGHT cricket schedule (app)»).
 - fn (3): `windNoise`, `cricketStream`, `chirpShape`
 
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
-- const (10): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `MOOD_LOOKS`, `MOOD_OF`, `moodLook`, `RARE`, `EMBLEM_AT`, `emblemPoints`
+- const (7): `NIGHT`, `CLOUD_PASSES`, `sleepProgress`, `MOOD_TC`, `RARE`, `EMBLEM_AT`, `emblemPoints`
 - fn (4): `nightAt`, `nightDeep`, `rareInit`, `rareStep`
+
+## apps/night/pure/room.js
+NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls).
+- const (6): `ROOM_FORMAT`, `ROOM_IDS`, `ROOM_LEVELS`, `ROOM_ACOUSTICS`, `roomLook`, `ROOM_DAMAGES`
+- fn (1): `checkRoom`
 
 ## apps/night/rooms/forest/forest-detail.js
 RUN 9 (slice 3) — THE FOREST'S DETAIL.
@@ -60,12 +64,12 @@ RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy).
 - fn (3): `patchGroundWaves`, `patchSway`, `buildLife`
 
 ## apps/night/rooms/forest/forest-rare.js
-RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is core/night.js rareStep, seeded): a FALLING STAR streaks across the sky (one additi…
+RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is apps/night/pure/cycle.js rareStep, seeded): a FALLING STAR streaks across the sky …
 - const (1): `RARE_LOOK`
 - fn (1): `buildRare`
 
 ## apps/night/rooms/forest/forest.js
-VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js).
+VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host apps/night/scene/host.js).
 - const (3): `FOREST_SEED`, `FOREST_LEVELS`, `FOREST_BOUNDS`
 - fn (1): `buildForest`
 
@@ -79,9 +83,21 @@ RUN 9 — THE FOREST'S LIFE, as numbers.
 - const (6): `STREAM`, `STREAM_LINE`, `LIFE`, `pulseOf`, `RINGS`, `ringsNew`
 - fn (5): `streamAt`, `streamNear`, `lifePlaces`, `ringAdd`, `ringsAge`
 
+## apps/night/rooms/forest/pure/room.js
+NIGHT-3: THE FOREST ROOM'S RECORD — what the room is, as data (pure, rule #36; checked by apps/night/pure/room.js, data row «NIGHT room records»).
+- const (1): `FOREST_ROOM`
+
+## apps/night/rooms/forest/standin.js
+NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without WebGL (or after a lost context): the night's two colours and a soft glow at each hand (the playing hand lime, the effect…
+- fn (1): `standInForest`
+
+## apps/night/rooms/index.js
+NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each room's parts: its record (data), its 2D stand-in, and its scene code, loaded only when the room is first opened.
+- const (2): `ROOMS`, `roomById`
+
 ## apps/night/scene/host.js
-VIS1b (RUN 6, docs/core/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
-- const (13): `BACKGROUNDS`, `sceneRoomAdd`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
+THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
+- const (15): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRooms`, `sceneRoom`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
 - fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## apps/night/shell.js
@@ -90,7 +106,7 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 - fn (2): `nightShellWire`, `nightShellFace`
 
 ## apps/night/sound/ambience.js
-RUN 7 (C4c, Night plan §4.6) — THE FOREST'S AMBIENCE (drone + wind + distant crickets) as an ENGINE SUBMODULE (hard rule #38): stateless — every engine value comes from E (first argument); the ambi…
+THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo, built from a room's NATURE recipe (the forest's: apps/night/rooms/forest/pure/room.js).
 - fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
 
 ## core/arrange.js
@@ -951,7 +967,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_183 modules, 2285 exported names._
+_187 modules, 2294 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 
@@ -969,3 +985,5 @@ SPLIT-2 (2026-11; table: `tools/split-names.mjs`). The product's old name: `CALM
 CORE-7 (2026-11-03): `core/modules/ambience/forest.js` → `apps/night/sound/ambience.js`, `core/pure/ambience.js` → `apps/night/pure/ambience.js` (the ambience is Night's, registered through `core/soundmods.js`); data row «NIGHT cricket schedule (core)» → «… (app)».
 
 CORE-8 / NIGHT-3 stage 3 (2026-11-03; mover step `N3` in `tools/split-move.mjs`): `core/legacy-ui/views/scene/host.js` → `apps/night/scene/host.js`; `apps/night/scene/forest{,-life,-detail,-rare}.js` → `apps/night/rooms/forest/`; `apps/night/pure/{forestlife,fireflies}.js` → `apps/night/rooms/forest/pure/`. `draw.js` no longer re-exports `setBackground`, `backgroundOf`, `sceneInfo`, `BACKGROUNDS`, `setSceneLevel`, `sceneLevel`.
+
+NIGHT-3 stage 3 (2026-11-03): `apps/night/pure/cycle.js` `MOOD_LOOKS`, `MOOD_OF`, `moodLook` → the room record's `looks` / `moods` + `apps/night/pure/room.js` `roomLook`; `apps/night/pure/ambience.js` `AMB` → the room record's `nature` (`cricketStream(C, seed, k)`, `chirpShape(C, t, pulses, amp)`, `windNoise(rate, seed, sec)` take the recipe); `--cv-forest-*` tokens moved from `core/tokens.css` to `apps/night/night.css`; body class `bg-forest` → `bg-room`; `sceneRoomAdd(id, { build, three })` → `sceneRoomAdd(id, { load, standIn, three })`; the profile's `scene` «forest» → «room.forest».

@@ -16,7 +16,9 @@ import { cv } from '../../../core/palette.js';
 import { loadThree, setBackground, sceneInfo, setSceneLevel, sceneLevel, sceneRoomDbg, sceneSnapDbg, sceneProgramsDbg, sceneHeldDbg } from '../../../apps/night/scene/host.js';   // RUN 8: + the quality levels and the room (NIGHT forest picture)
 import { buildForest } from '../../../apps/night/rooms/forest/forest.js';
 import { fliesInit, fliesStep, FOREST_FLIES } from '../../../apps/night/rooms/forest/pure/fireflies.js';
-import { NIGHT, nightAt, MOOD_LOOKS, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js';   // RUN 9
+import { NIGHT, nightAt, CLOUD_PASSES } from '../../../apps/night/pure/cycle.js';   // RUN 9
+import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';   // NIGHT-3: the moods' looks are the room's
+const MOOD_LOOKS=FOREST_ROOM.looks;
 import { FOREST_LEVELS } from '../../../apps/night/rooms/forest/forest.js';
 import { streamNear } from '../../../apps/night/rooms/forest/pure/forestlife.js';   // RUN 9 (slice 2)
 import { stackList } from '../../../core/legacy-ui/draw.js';

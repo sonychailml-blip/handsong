@@ -1,5 +1,5 @@
-/* VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers. CORE: pure (rule #36), node-tested (row
-   «VIS1c fireflies (core)»): the room only draws what this step computes, so a probe can compare positions exactly on any device.
+/* VIS1c (RUN 6, Night plan §3.1) — the night forest's WILD FIREFLIES and its ground, as numbers. Pure (rule #36), node-tested (row
+   «VIS1c fireflies (core)», named before NIGHT-3 moved it into the forest's room folder): the room only draws what this step computes, so a probe can compare positions exactly on any device.
    The motion is the «Rooms of light» prototype's (the strategist's own code, our starting source): each fly orbits the nearest light within
    reach on its own ring (pull to the ring + a tangential swirl around its own axis), otherwise drifts; damping; the ground and a ceiling
    bounce it; the room wraps around. Seeded (core/dsp seeded) — the same seed gives the same forest everywhere. */

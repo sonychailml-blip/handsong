@@ -17,6 +17,7 @@ Index: `/HANDOFF.md`. Rules, short module map, step index: `CLAUDE.md`. Open ite
 - ✅ **SPLIT-2** (2026-11-01/02): two apps, one core. Log: `docs/core/WORK-LOG.md`.
 - ✅ **CORE-1** (2026-11-02): hand calibration and sensitivity, engine only, opt-in; no app opens it yet. Step 125 open on Night and the Poco.
 - ✅ **CORE-7** (2026-11-03): `core/soundmods.js`, the door for an app's sound module (one per kind, today `ambience`), shared by both engine instances; the forest ambience left core for `apps/night/sound/`. Opt-in: Full registers nothing. GOLD's «ambience» case runs on Night's page only (declared in `gold.js` `APP_CASES`). For NIGHT-3.
+- ✅ **CORE-8** (2026-11-03): the scene host left `core/legacy-ui/` for Night (`hooks.scene`); the profile takes room and ambience ids; the forest's tokens left core. For NIGHT-3 stage 3.
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.
 
 ## The foundation (full plan and contracts: `archive/HANDOFF-history.md`, «STAGE 3 — FOUNDATION PLAN»)

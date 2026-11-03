@@ -4,6 +4,13 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-3 — stage 3 (2026-11-03): the forest is the first room module (with CORE-8)
+Tree hashes before: core c3b25630f4ae3fbb · apps/full d6b90cf2cb4be6da · apps/night 87f6896f34c0f60b. After: core 2d7f4bf5a9dc5b38 · apps/full d6b90cf2cb4be6da · apps/night 4507f5137f7e21cd.
+- `apps/night/rooms/`: `index.js` (the rooms, by id), `forest/pure/room.js` the forest's RECORD (levels, mood looks, nature recipe, acoustic), `forest/standin.js` (the 2D picture, moved from the host), the forest's scene and pure files (pure move). `apps/night/pure/room.js`: the validator (`checkRoom`, `ROOM_IDS`, `roomLook`, `ROOM_DAMAGES`).
+- The host opens rooms by id and loads a room's scene code on first open; `bg-forest` → `bg-room`; the background value «forest» still means the current room's picture (renamed with «Picture» in the switching stage). The ambience is built from the room's nature recipe; `pure/cycle.js` keeps the night clock and the easing, the looks are the room's. The profile's `scene` is `room.forest` (Night print: that one value renewed, declared).
+- Same picture and sound: the forest's rendered frame and its state hash equal the checkpoint's at both levels; GOLD «ambience» 0; NIGHT ambience 0; NIGHT untouched 0. New data row «NIGHT room records (app)», 47 cases, 14 damages refused.
+- Checks: in `docs/core/WORK-LOG.md` CORE-8. The smoke stall: core backlog (not found, not ours, printout in place).
+
 # NIGHT-3 — stage 2 (2026-11-03): the forest ambience enters through the core door (CORE-7)
 Tree hashes before: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da · apps/night 4f4fcfc3f1f0cc14. After: core c3b25630f4ae3fbb · apps/full d6b90cf2cb4be6da · apps/night 87f6896f34c0f60b.
 - The user approved the plan with changes (no second room yet; the bed before switching; §8 answered): `docs/night/design/NIGHT-3-rooms/PLAN.md` «The user's decisions». The Lake and the other sketches are in `BACKLOG.md`.

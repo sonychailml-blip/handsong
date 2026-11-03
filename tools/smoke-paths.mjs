@@ -46,7 +46,7 @@ const HOSTS=['https://cdn.jsdelivr.net/npm/@mediapipe/','https://storage.googlea
 async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
   const label=`${app}${dir===ROOT?'':' (built)'} at ${prefix}`, bad=[], miss=s=>bad.push(s), served=[], srv=await serve(dir,prefix,served,breakWorklet?'ks-worklet.js':null), origin=`http://127.0.0.1:${srv.address().port}`;
   const browser=await chromium.launch({ channel:'chrome', headless:true, args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--autoplay-policy=no-user-gesture-required','--disable-background-timer-throttling','--disable-renderer-backgrounding'] });
-  const seen=[], talk=[];
+  const seen=[], talk=[], open=new Set(); let pageRef=null;
   try{
     const ctx=await browser.newContext({ viewport:{ width:1280, height:800 } }); await ctx.grantPermissions(['camera','microphone'],{ origin }); await cdnCache(ctx);
     await ctx.addInitScript(()=>{ window.__csp=[]; document.addEventListener('securitypolicyviolation', e=>window.__csp.push(e.effectiveDirective+' '+e.blockedURI)); });
@@ -54,7 +54,8 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
       if(st>=400 && !ALLOWED_404.test(u.split('?')[0])) miss(`HTTP ${st} ${u.replace(origin,'')}`);
       if(!u.startsWith(origin) && !HOSTS.some(h=>u.startsWith(h))) miss('unlisted host: '+u); });
     ctx.on('requestfailed', q=>{ const u=q.url(); if(!/^(data|blob):/.test(u) && !ALLOWED_404.test(u.split('?')[0])) miss(`request failed ${u.replace(origin,'')} (${q.failure()&&q.failure().errorText})`); });
-    const page=await ctx.newPage();
+    const page=await ctx.newPage(); pageRef=page;
+    page.on('request', q=>open.add(q)); page.on('requestfinished', q=>open.delete(q)); page.on('requestfailed', q=>open.delete(q));   // NIGHT-3: what is still pending when a page stalls
     page.on('pageerror', e=>miss('page error: '+(e&&e.message||e)));
     page.on('console', m=>{ talk.push(m.type()+': '+m.text().slice(0,160)); if(talk.length>12) talk.shift(); });   // NIGHT-3: told when a page stalls
     page.on('console', m=>{ if(m.type()!=='error') return; const t=m.text(), at=(m.location()||{}).url||''; if(/Failed to load resource/.test(t) && (ALLOWED_404.test(at.split('?')[0])||/\b40\d\b/.test(t))) return; /* a status is judged above */ miss('console error: '+t.slice(0,200)); });
@@ -86,7 +87,10 @@ async function run(app, dir, prefix, breakWorklet=false, measureOn=true){
       if(!f.includes('Andika')) miss('the Andika font did not load: '+f.join(','));
       if(!seen.some(([u,st])=>/three\.min\.js/.test(u)&&st===200)) miss('the forest library did not load');
       const hid=await page.evaluate(()=>document.getElementById('nightMeasure').hidden); if(hid===measureOn) miss(`«Measure this device» is ${hid?'hidden':'shown'}, expected ${measureOn?'shown':'hidden'}`); }
-  }catch(e){ miss('error: '+(e&&e.message||e)); out(`    [stalled] last served: ${served.slice(-6).map(([u,st])=>u+' '+st).join(' · ')}
+  }catch(e){ miss('error: '+(e&&e.message||e)); const card=pageRef ? await pageRef.evaluate(()=>{ const s=document.getElementById('start'); return s ? (s.className+' · '+(s.innerText||'').replace(/\s+/g,' ').slice(0,160)) : 'no #start'; }).catch(x=>'unreadable: '+x.message) : '';
+    out(`    [stalled] last served: ${served.slice(-6).map(([u,st])=>u+' '+st).join(' · ')}
+    [stalled] pending: ${[...open].map(q=>q.url().replace(origin,'').slice(0,120)).join(' · ')||'none'}
+    [stalled] start card: ${card}
     [stalled] console: ${talk.join(' | ')}`); }
   finally{ await browser.close().catch(()=>{}); srv.close(); }
   for(const [u,st] of served) if(st>=400 && !ALLOWED_404.test(u) && !bad.some(x=>x.includes(u))) miss(`HTTP ${st} ${u}`);   // what Playwright's events do not see
@@ -168,6 +172,10 @@ async function probeGate(app, dir, want){ const served=[], srv=await serve(dir,'
 async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); let ok=false;
   try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); await page.goto(origin+'/'); await page.waitForURL(/\/apps\/full\/$/,{ timeout:20e3 }); ok=await page.waitForSelector('#startBtn',{ state:'attached', timeout:60e3 }).then(()=>true); }catch(e){ out('    '+(e&&e.message||e)); }
   finally{ await browser.close().catch(()=>{}); srv.close(); } out(`[smoke] root redirect: ${ok?'PASS — / leads to apps/full/':'NOT A PASS'}`); return ok?0:1; }
+/* --only app@prefix [--repeat N] (NIGHT-3): one repo-tree page, N times — a diagnosis of one target; it is never a pass of the whole test */
+{ const i=argv.indexOf('--only'); if(i>=0){ const list=argv[i+1].split(',').map(x=>x.split('@')), j=argv.indexOf('--repeat'), N=j>=0 ? +argv[j+1] : 1; let f=0;
+    for(let k=0;k<N;k++) for(const [app,prefix] of list){ const t0=Date.now(), b=await run(app,ROOT,prefix||'/'); out(`[smoke] --only ${app}@${prefix||'/'} ${k+1}/${N}: ${b.length?'stalled or failed':'ok'} in ${((Date.now()-t0)/1000).toFixed(0)} s`); if(b.length) f++; }
+    out(`[smoke] --only ${argv[i+1]}: ${f} of ${N*list.length} failed (a diagnosis, not a verdict of the whole test)`); process.exit(f?1:0); } }
 for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
 if((await statsPage('repo tree',ROOT)).length) fails++;
 if((await roomPage('repo tree',ROOT,'/apps/night/')).length) fails++;

@@ -1,24 +1,24 @@
-/* VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built with three.js r128 (vendored, loaded by host.js). Re-laid from
+/* VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM's picture: a scene module built with three.js r128 (vendored, loaded by the scene host
+   apps/night/scene/host.js). NIGHT-3: the room's record (levels, mood looks, nature) is ./pure/room.js; its 2D stand-in ./standin.js. Re-laid from
    the «Rooms of light» prototype (docs/night/prototypes/, the strategist's own code — our starting source, user RUN 5) WITHOUT the animals:
    procedural ground (moss, soil, leaves), bark, instanced trunks and branches, ferns, mossy rocks, four mist sheets, the moon, fog; the hand's
    firefly light (core + halo + trail; a real shadow from the playing hand's light where the level allows) and a dimmer light for the effects
-   hand; the wild fireflies from core/fireflies.js (numbers — the shader only draws them); a slow parallax towards the light.
+   hand; the wild fireflies from ./pure/fireflies.js (numbers — the shader only draws them); a slow parallax towards the light.
    Rules: every colour is a token (--cv-forest-*, read through the passed C = palette.cv; textures add numeric jitter around them); the light
-   sits where the hand's REMAPPED play point is (the hit-tests' point, rule #12) at the depth from the hand's size (core depthDistance) — placed
+   sits where the hand's REMAPPED play point is (the hit-tests' point, rule #12) at the depth from the hand's size (depthDistance) — placed
    through THIS camera, so it projects onto its note row exactly; only the light's world position saturates at the room's bounds (never the
    coordinates). Seeded (one seed per room): the same forest on every device. No sound, no song, no network here (VIS1 contract). */
 import { seeded } from '../../../../core/pure/dsp.js';
 import { fliesInit, fliesStep, forestGround, depthDistance, FOREST_FLIES } from './pure/fireflies.js';
-import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, moodLook, MOOD_TC } from '../../pure/cycle.js';   // RUN 9: the night's cycle, sleep, moods
+import { CLOUD_PASSES, NIGHT, nightAt, nightDeep, MOOD_TC } from '../../pure/cycle.js';   // RUN 9: the night's cycle, sleep, the moods' easing
+import { FOREST_ROOM } from './pure/room.js';   // NIGHT-3: the record — levels and the moods' looks
+import { roomLook } from '../../pure/room.js';
 import { buildLife, patchGroundWaves, patchSway } from './forest-life.js';   // RUN 9 (slice 2): the forest answers the playing
 import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
 import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem
 
 export const FOREST_SEED=0x464F5231;
-/* the levels (Night plan §7): full — real shadows (hand light 1024², 512² on small screens), 70 wild fireflies, 16-step trails, moving mist;
-   reduced — 512² shadow, 35 fireflies, 8-step trails, still mist. «minimal» has no WebGL at all (host.js draws a 2D stand-in). */
-export const FOREST_LEVELS={ full:{ flies:70, trail:16, shadow:1024, shadowSmall:512, mist:true, shrooms:28, blooms:10, grass:3500, leaves:60, moths:6, beams:4 },
-  reduced:{ flies:35, trail:8, shadow:0, shadowSmall:0, mist:false, shrooms:14, blooms:5, grass:1400, leaves:24, moths:3, beams:2 } };
+export const FOREST_LEVELS=FOREST_ROOM.levels;   // NIGHT-3: what each level draws lives in the record
 export const FOREST_BOUNDS=Object.freeze([-6, 6, 0.3, 4.2, -15, 3.8]);   // x, y, z ranges the light may reach (it saturates there)
 
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -46,9 +46,9 @@ export function buildForest(T, opt){
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
-  /* RUN 9: the PALETTE is the mood's look (core/night.js MOOD_LOOKS → tokens), eased towards a new mood's look (τ MOOD_TC s) */
+  /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
-  let mlook=moodLook(opt.mood), fogK=mlook.fog, mistK=mlook.mist, fliesK=mlook.flies; const pal={}; for(const [k,v] of Object.entries(lookCols(mlook))) pal[k]=v.clone();
+  let mlook=roomLook(FOREST_ROOM, opt.mood), fogK=mlook.fog, mistK=mlook.mist, fliesK=mlook.flies; const pal={}; for(const [k,v] of Object.entries(lookCols(mlook))) pal[k]=v.clone();
   const s=new T.Scene(); s.background=pal.fog; s.fog=new T.FogExp2(pal.fog.clone(), mlook.fog);
   const hemi=new T.HemisphereLight(pal.sky, pal.under, 0.26); s.add(hemi);
   const moonL=new T.DirectionalLight(pal.moon, 0.3); moonL.position.set(-10,20,-30); s.add(moonL);
@@ -109,7 +109,7 @@ export function buildForest(T, opt){
   const HALO=tex(hc,true);
   const sprite=(color,opacity=1,fog=true)=>{ const m=new T.SpriteMaterial({ map:HALO, color, opacity, transparent:true, depthWrite:false, blending:T.AdditiveBlending, fog }); own.push(m); return new T.Sprite(m); };
   const moonS=sprite(pal.moonhalo.clone(),0.55,false); moonS.scale.set(16,16,1); moonS.position.set(-14,17,-55); s.add(moonS);
-  /* RUN 9 (slice 1): THE MOON — a small bright disc inside its halo, drifting on the night's path (core/night.js); CLOUDS pass over it (soft
+  /* RUN 9 (slice 1): THE MOON — a small bright disc inside its halo, drifting on the night's path (apps/night/pure/cycle.js); CLOUDS pass over it (soft
      dark sprites in front of it, normal blending: they hide the halo) and the moon's light dims with them and returns */
   const [dc,dx]=canvas2(64,64); { const gr=dx.createRadialGradient(32,32,0,32,32,32); gr.addColorStop(0,C('halo-a100')); gr.addColorStop(0.62,C('halo-a100')); gr.addColorStop(0.8,C('halo-a10')); gr.addColorStop(1,C('halo-a0')); dx.fillStyle=gr; dx.fillRect(0,0,64,64); }
   const moonD=new T.Sprite(new T.SpriteMaterial({ map:tex(dc,true), color:pal.moonhalo.clone(), transparent:true, depthWrite:false, blending:T.AdditiveBlending, fog:false })); own.push(moonD.material);
@@ -117,7 +117,7 @@ export function buildForest(T, opt){
   const [cc,cx]=canvas2(256,128); for(let i=0;i<26;i++){ const x=50+R()*156, y=40+R()*48, r=18+R()*34, gr=cx.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,C('halo-a45')); gr.addColorStop(1,C('halo-a0')); cx.fillStyle=gr; cx.fillRect(x-r,y-r,2*r,2*r); }
   const cloudT=tex(cc,true); cloudT.wrapS=cloudT.wrapT=T.ClampToEdgeWrapping;
   const clouds=CLOUD_PASSES.map(()=>{ const m=new T.SpriteMaterial({ map:cloudT, color:pal.cloud.clone(), transparent:true, opacity:0, depthWrite:false, fog:false }); own.push(m); const sp=new T.Sprite(m); sp.scale.set(15,6.5,1); sp.visible=false; s.add(sp); return sp; });
-  /* the wild fireflies — positions from core/fireflies.js */
+  /* the wild fireflies — positions from ./pure/fireflies.js */
   const flies=fliesInit(Lv.flies, FOREST_FLIES.seed);
   const fg=new T.BufferGeometry(); fg.setAttribute('position',new T.BufferAttribute(new Float32Array(flies.length*3),3)); fg.setAttribute('aGlow',new T.BufferAttribute(new Float32Array(flies.length),1));
   const fm=new T.ShaderMaterial({ uniforms:{ uColor:{ value:col('fly') }, uSize:{ value:0.13 }, uScale:{ value:500 }, uFog:{ value:0.035 } }, vertexShader:PV, fragmentShader:PF, transparent:true, depthWrite:false, blending:T.AdditiveBlending });
@@ -138,7 +138,7 @@ export function buildForest(T, opt){
      τ 1.8 s: the wild fireflies glow up to +60 %, their two lights +50 %, the night sky +15 %. Nothing moves faster than the music. */
   let music=0;
   /* RUN 9 (slice 2): THE LIFE — ground waves, mushrooms and flowers, the stream (Echo's rings), the ferns' sway / Wave's shimmer
-     (views/scene/forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
+     (./forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
   const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv }); patchGroundWaves(groundM, life.U); patchSway(frondM, life.U); patchSway(frondD, life.U);
   const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce });   // RUN 9 (slice 3)
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
@@ -162,12 +162,12 @@ export function buildForest(T, opt){
     const sat= x!==out.x || y!==out.y || z!==out.z; out.set(x,y,z); return sat;
   }
   const lightsOf=()=>rigs.map((r,i)=>i ? { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on } : { x:r.cur.x, y:r.cur.y, z:r.cur.z, on:r.on, call:playing ? gather : 0, scatter:playing ? 0 : rel });
-  /* RUN 9 (slice 1): THE NIGHT — once per frame from core/night.js: the moon's place and light under the clouds, the mist layers, the sleep
+  /* RUN 9 (slice 1): THE NIGHT — once per frame from apps/night/pure/cycle.js: the moon's place and light under the clouds, the mist layers, the sleep
      timer's depth, the mood's look (eased) */
   let nt=null, deep=nightDeep(0), moodId=opt.mood||null, fkNow=1;
   function night(dt, t, nin){
     const N=nightAt(t); nt=N; deep=nightDeep(nin && nin.sleep);
-    if(nin && nin.mood!==undefined && nin.mood!==moodId){ moodId=nin.mood; mlook=moodLook(moodId); }
+    if(nin && nin.mood!==undefined && nin.mood!==moodId){ moodId=nin.mood; mlook=roomLook(FOREST_ROOM, moodId); }
     const a=1-Math.exp(-dt/MOOD_TC), tc=lookCols(mlook);
     for(const k in pal) pal[k].lerp(tc[k], a);
     fogK+=(mlook.fog-fogK)*a; mistK+=(mlook.mist-mistK)*a; fliesK+=(mlook.flies-fliesK)*a;
@@ -246,6 +246,6 @@ export function buildForest(T, opt){
       fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies) });   // RUN 9 (slice 2)
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   resize(W,H);
-  return { id:'room.forest', scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail,
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail,
     held:rare.held, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

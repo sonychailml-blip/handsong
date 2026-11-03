@@ -4,7 +4,7 @@
      closed path; clouds pass over it now and then (the moon's light dims and returns); four mist layers roll in and out, each at its own
      whole number of cycles per period (never all together). The first NIGHT.clouds.clear seconds are clear (the first look is the moon).
    - SLEEP: with the sleep timer on, the night deepens and stills towards its end (darker, stiller, fewer firefly lights, more mist).
-   - MOODS: each Night mood (a mode id) has its own look — the colour tokens' set and the fog / mist amounts. */
+   - MOODS: the easing time of a room's look; the looks themselves are each room's (NIGHT-3). */
 import { seeded } from '../../../core/pure/dsp.js';
 
 const TAU=2*Math.PI;
@@ -41,18 +41,8 @@ export function nightDeep(s){
 }
 /* the sleep timer → its progress 0…1 (the timer's own start and minutes, ms clock) */
 export const sleepProgress=(t0, mins, now)=> mins>0 ? clamp01((now-t0)/(mins*60e3)) : 0;
-/* THE MOODS' LOOKS (Night plan §4.5): a mode id → its look; colours are token names (palette.cv), the room lerps between looks (τ MOOD_TC s) */
+/* the moods' looks belong to each room (its record's `looks`, apps/night/pure/room.js roomLook — NIGHT-3); a room eases towards a new look with τ MOOD_TC s */
 export const MOOD_TC=2.5;
-const LOOK=(pre, fog, mist, flies)=>Object.freeze({ pre, fog, mist, flies,
-  tokens:Object.freeze({ fog:pre+'fog', sky:pre+'sky', under:pre+'under', moon:pre+'moon', moonhalo:pre+'moonhalo', haze:pre+'haze', cloud:pre+'cloud',
-    shroom:pre+'shroom', bloom:pre+'bloom' }) });   // slice 2: the glowing mushrooms' and flowers' colours
-export const MOOD_LOOKS=Object.freeze({
-  glow:LOOK('forest-', 0.06, 1, 1),            // Glow — the forest as it was (the base tokens)
-  dusk:LOOK('forest-dusk-', 0.052, 0.8, 0.9),  // Dusk — violet sky, a warm low moon, less mist
-  mist:LOOK('forest-misty-', 0.085, 1.7, 0.8), // Mist — pale blue-grey, thick mist, a shorter view
-});
-export const MOOD_OF=Object.freeze({ 'major-penta':'glow', 'minor-penta':'dusk', 'egyptian':'mist' });
-export const moodLook=id=>MOOD_LOOKS[MOOD_OF[id]||id] || MOOD_LOOKS.glow;
 /* RUN 9 (slice 4): RARE EVENTS — every few minutes, never the same kind twice in a row. Timed: a FALLING STAR or the fireflies forming the
    FIVE-DOT EMBLEM (the Hush mark) — due every gapLo…gapHi s after the last event, the kind drawn (star more often) among those ≠ the last.
    Played: a glowing flower OPENS when a note has been held ≥ hold s — if bloomGap s passed since the last event and the last was not a

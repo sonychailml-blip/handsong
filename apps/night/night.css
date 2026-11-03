@@ -19,6 +19,25 @@
   --night-icon:24px; --night-lantern:rgba(255,214,150,.30); --night-glow-f:drop-shadow(0 0 6px #c8f56a);
   /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
   --night-bar-w:6px; --night-bar-h:min(30vh, 200px); --night-bar-gap:16px; --night-bar-ico:20px; --night-warm:#ffb45a; --night-cold:#e6fff2;
+  /* VIS1c (RUN 6): the NIGHT FOREST room (apps/night/rooms/forest/; moved from core/tokens.css at NIGHT-3) — the «Rooms of light» prototype's colours, read by the 3D room as its base
+     colours (textures add small numeric jitter around them). The firefly greens are the hand's light; the halo / mask entries are alpha
+     ramps of white used as light masks (sprites, mist), not visible colours on their own. */
+  --cv-forest-fog:#060e18; --cv-forest-sky:#1b2a46; --cv-forest-under:#040604; --cv-forest-moon:#6b84bd; --cv-forest-moonhalo:#9fb4dd;
+  --cv-forest-ground:#17160f; --cv-forest-moss:#30481c; --cv-forest-soil:#46321e; --cv-forest-leaf:#2b2213; --cv-forest-bark:#2e251e;
+  --cv-forest-bark-dark:rgba(8,6,5,.55); --cv-forest-bark-light:rgba(110,95,75,.28); --cv-forest-fern:#2c4a1e; --cv-forest-frond:#233a1a;
+  --cv-forest-rock:#272b22; --cv-forest-mist:#8aa2c8; --cv-forest-fly:#d6ff7a; --cv-forest-wild:#c8ff78; --cv-forest-light:#c6ff7a;
+  /* RUN 9: the moods' looks (the room record's looks) — Glow = the base set above + haze / cloud; Dusk and Mist their own sets */
+  --cv-forest-haze:#8aa2c8; --cv-forest-cloud:#1a2234; --cv-forest-shroom:#7dffc4; --cv-forest-bloom:#b9a8ff;
+  --cv-forest-stem:#3b3a30; --cv-forest-water:#03070c;   /* RUN 9 (slice 2): the mushrooms' stems, the stream's deep colour */
+  --cv-forest-grass:#22361a; --cv-forest-grass-dry:#38381c; --cv-forest-leaf-fall:#2c2012; --cv-forest-moth:#d9d2bd; --cv-forest-sil:#020403;   /* slice 3 */
+  --cv-forest-dusk-fog:#110c1c; --cv-forest-dusk-sky:#3a2c55; --cv-forest-dusk-under:#070508; --cv-forest-dusk-moon:#c79a78;
+  --cv-forest-dusk-moonhalo:#e2b78f; --cv-forest-dusk-haze:#9c88b4; --cv-forest-dusk-cloud:#2a2238;
+  --cv-forest-dusk-shroom:#ffb070; --cv-forest-dusk-bloom:#ff8fc8;
+  --cv-forest-misty-fog:#111920; --cv-forest-misty-sky:#2c3a48; --cv-forest-misty-under:#06080a; --cv-forest-misty-moon:#8fa4bf;
+  --cv-forest-misty-moonhalo:#b8c8dc; --cv-forest-misty-haze:#aebdcc; --cv-forest-misty-cloud:#202b36;
+  --cv-forest-misty-shroom:#a8e8ff; --cv-forest-misty-bloom:#e8f2ff;
+  --cv-forest-warm:#ffb45a; --cv-forest-cold:#e6fff2;   /* RUN 7 (C5): Warmth / Brightness — the light's two ends (the lime between) */
+  --cv-forest-core:#f6ffd0; --cv-forest-halo:#9be04a; --cv-forest-trail:#c8ff70; --cv-forest-fx:#9fd0ff;
   --z-night:18;
 }
 /* RUN 7 (C11): the Night face's fonts, self-hosted from our own origin (CSP default-src 'self'), register entries font-andika / font-literata
@@ -33,7 +52,7 @@
      controls are not offered (!important: applySplit writes inline display) */
   body.night #instrBtn, body.night #instrBtnL, body.night #instrBtnR, body.night #splitBtn, body.night #recBtn, body.night #jamBtn,
   body.night #clipBtn, body.night #audioBtn, body.night #loopPanelBtn, body.night #loopTransport{ display:none !important; }
-  body.bg-forest #canvas{ mix-blend-mode:screen; }   /* RUN 8: the opaque 2D canvas lets the room show through (its black adds nothing) */
+  body.bg-room #canvas{ mix-blend-mode:screen; }   /* RUN 8: the opaque 2D canvas lets the room show through (its black adds nothing) */
 /* RUN 7 (C6 + C11): THE NIGHT SHELL in the user's design — Moonglass: round buttons in a frosted-glass capsule (portrait: at the bottom;
    landscape: on the right), the ⓘ card, the emblem and the wordmark. Glass blurs the scene behind it; its plain fallback (body.night-plain:
    the Dark background, the minimal scene level, low power) and browsers without backdrop-filter get the same readability with no blur. */

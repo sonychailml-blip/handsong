@@ -1,11 +1,10 @@
-/* VIS1b (RUN 6, docs/core/VIS1-design.md §4–§6, Night plan §3) — THE SCENE HOST and Night's BACKGROUNDS.
-   The scene: a WebGL canvas #scene UNDER the 2D canvas, made only while a room is shown and destroyed when it is not (its context is
-   released — «room off» frees the GPU for the hand model, review R2); three.js r128 loaded LAZILY from our own origin (a dynamic import of
-   the vendored UMD file, which sets globalThis.THREE — never in Full); levels full / reduced / minimal (minimal = no WebGL: a 2D stand-in,
-   also the fallback when WebGL is missing or the context is lost); the room draws at its own rate (60 / 30 fps caps); it reads the bus only.
-   The BACKGROUNDS (user, review 2026-10-17): «camera» — today's picture (the camera module); «dark» — plain black, no WebGL at all; «forest» —
-   the room. The background changes only the picture: the sound, the note layout and the crop are untouched (the crop is synced per camera
-   frame by main.onHands, not by the picture). Stats for the latency meter's «Scene» line (fps, frame time, level). */
+/* THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
+   The scene: a WebGL canvas #scene UNDER the 2D canvas, made only while a room shows, destroyed when it does not (its context released: the GPU
+   goes back to the hand model); three.js r128 loaded lazily from our own origin. Levels full / reduced / minimal (minimal = no WebGL: the room's
+   2D stand-in, also the fallback when WebGL is missing or lost); the room draws at its own rate and reads the bus only.
+   NIGHT-3: ROOMS are registered by id (apps/night/rooms/index.js: record, 2D stand-in, scene code loaded on first open); the current room is the
+   first registered until switching exists. BACKGROUNDS: «camera» (the camera module's picture), «dark» (black, no WebGL), «forest» = the current
+   room's picture (the stored value keeps its old name). The background changes only the picture: sound, note layout and crop are untouched. */
 import { stackAdd, stackSet } from '../../../core/legacy-ui/views/stack.js';
 import { cv } from '../../../core/palette.js';
 import { ctx, canvas as cv2d } from '../../../core/vision.js';
@@ -13,16 +12,18 @@ import { BUS } from '../../../core/pure/bus.js';
 const READ=BUS.reader();   // RUN 9: the mood at the room's opening, read-only (the frames read the bus they are given)
 
 export const BACKGROUNDS=Object.freeze(['forest','dark','camera']);
-/* RUN 9 (slice 5): THE QUALITY LEVELS — what each draws (the room's own counts: forest.js FOREST_LEVELS). The scene renders at a REDUCED
+/* RUN 9 (slice 5): THE QUALITY LEVELS — what each draws (the room's own counts: its record's levels). The scene renders at a REDUCED
    resolution (the forest is soft): scale × CSS pixels (never above 1 device pixel per CSS pixel); high 60 fps, medium 30 fps (the «Lighter
    forest»), low = no WebGL at all (the 2D stand-in). Only high has the playing light's shadow (a point light's shadow renders the scene 6 more
    times — measured: the largest share of the forest's cost to hand detection). */
 const LV={ full:{ scale:0.85, fps:60, shadow:true }, reduced:{ scale:0.6, fps:30, shadow:false }, minimal:{ scale:0, fps:0, shadow:false } };
 let shadowOver=null, optOver=null;   // probe / measurement only: force the shadow on / off at the next opening (null = the level's); optOver { scale, lv } overrides
-/* SPLIT-2: an app registers its rooms; a page with none never loads the library */
-const ROOMS={};
-let threeLoad=null;
-export const sceneRoomAdd=(id, rec)=>{ ROOMS[id]=rec.build; threeLoad=rec.three; };
+/* an app registers its rooms (id → { load() → its build function, standIn(ctx, W, H, hands, cv), three() → the library }); a page with none never loads three.js */
+const ROOMS=new Map();
+let threeLoad=null, roomId=null;
+export const sceneRoomAdd=(id, rec)=>{ ROOMS.set(id, rec); threeLoad=rec.three; if(!roomId) roomId=id; };
+export const sceneRooms=()=>[...ROOMS.keys()];
+export const sceneRoom=()=>roomId;
 const REDUCE=typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* RUN 8 (slice 4): the scene's QUALITY is a choice remembered on this device (the development switch in Night's ⓘ: high / medium / low =
    full / reduced / minimal); nothing switches by itself yet (C8 decides from measurements) */
@@ -62,15 +63,16 @@ function resize(){
   const v=new THREE.Vector2(); renderer.getDrawingBufferSize(v); room.resize(innerWidth, innerHeight, v.y);
 }
 addEventListener('resize', ()=>{ if(renderer) resize(); });
-/* open a room (id 'forest'); opt.level 'full' | 'reduced' | 'minimal' → sceneInfo() */
-export async function sceneOpen(id='forest', opt={}){
+/* open a room (its id, default the current room); opt.level 'full' | 'reduced' | 'minimal' → sceneInfo() */
+export async function sceneOpen(id=roomId, opt={}){
   want=id; if(opt.level && LV[opt.level]) level=opt.level;
-  await loadThree(); if(want!==id) return sceneInfo();
-  if(room && room.id==='room.'+id && (renderer || level==='minimal')) return sceneInfo();
+  const R=ROOMS.get(id); if(!R) throw new Error(`no room «${id}»`);
+  await loadThree(); const build=await R.load(); if(want!==id) return sceneInfo();
+  if(room && room.id===id && (renderer || level==='minimal')) return sceneInfo();
   if(room){ room.dispose(); room=null; }
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
-  if(renderer){ const tb=performance.now(); room=ROOMS[id](THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); last=0; info.t0=0; info.frames=0;
+  if(renderer){ const tb=performance.now(); room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
     try{ renderer.compile(room.scene, room.camera); }catch(e){ errors.push('compile: '+(e&&e.message||e)); } info.openMs=Math.round(performance.now()-tb); }
   stackSet('scene', !!renderer);
@@ -95,16 +97,14 @@ function sceneFrame(t, bus){
 }
 stackAdd({ kind:'visual', id:'scene', layer:'scene', cost:{ cls:'heavy', gpu:true }, frame:sceneFrame }); stackSet('scene', false);
 
-/* the BACKDROP (layer «background»): Dark = black; Forest = the 2D canvas cleared so the room shows through (or, without WebGL, a 2D
-   stand-in: the night's two colours and a soft glow at each hand); Camera = nothing here (the camera module draws the picture) */
+/* the BACKDROP (layer «background»): Dark = black; the room = the 2D canvas cleared so the room shows through (or, without WebGL, the room's
+   2D stand-in); Camera = nothing here (the camera module draws the picture) */
 function backdrop(t, bus){
   if(bg==='camera') return;
   const W=cv2d.width, H=cv2d.height;
   if(bg==='dark'){ ctx.fillStyle=cv('hn-dark'); ctx.fillRect(0,0,W,H); return; }
   if(renderer){ ctx.clearRect(0,0,W,H); return; }
-  const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0, cv('forest-fog')); g.addColorStop(1, cv('forest-ground')); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  for(const h of bus.get('handsView')||[]){ const r=Math.max(12, 46*(1.3-h.d)), gr=ctx.createRadialGradient(h.x,h.y,0,h.x,h.y,r);
-    gr.addColorStop(0, cv(h.play?'forest-light':'forest-fx')); gr.addColorStop(1, cv('halo-a0')); ctx.fillStyle=gr; ctx.fillRect(h.x-r,h.y-r,2*r,2*r); }
+  const R=ROOMS.get(roomId); if(R && R.standIn) R.standIn(ctx, W, H, bus.get('handsView')||[], cv);
 }
 stackAdd({ kind:'visual', id:'backdrop', layer:'background', cost:{ cls:'light', gpu:false }, frame:backdrop });
 /* choose the background → a promise of sceneInfo() (the room opens asynchronously: three.js loads once) */
@@ -114,8 +114,8 @@ export function setBackground(mode){
   /* RUN 8: the 2D canvas is OPAQUE (vision.js: alpha:false — Full's text and picture rely on it), so its «clear» was black over the room:
      the user saw a plain black forest. On the Forest background the canvas is composited with SCREEN (style.css): its black lets the room
      through, its lights (fireflies, glow, halo) add on top. Night draws no text on the canvas. */
-  document.body.classList.toggle('bg-forest', mode==='forest');
-  if(mode==='forest') return sceneOpen('forest').catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
+  document.body.classList.toggle('bg-room', mode==='forest');
+  if(mode==='forest') return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
   sceneClose(); return Promise.resolve(sceneInfo());
 }
 export const backgroundOf=()=>bg;
@@ -125,7 +125,7 @@ export function setSceneLevel(v){
   level=v; try{ localStorage.setItem(LEVEL_KEY, v); }catch(e){}
   if(bg!=='forest') return Promise.resolve(sceneInfo());
   if(room){ room.dispose(); room=null; } dropRenderer(true); stackSet('scene', false);
-  return sceneOpen('forest').catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
+  return sceneOpen(roomId).catch(e=>{ errors.push(String(e&&e.message||e)); level='minimal'; return sceneInfo(); });
 }
 export const sceneLevel=()=>level;
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;

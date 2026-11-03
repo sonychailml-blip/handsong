@@ -1,7 +1,7 @@
-/* RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is core/night.js
+/* RUN 9 (slice 4) — THE FOREST'S RARE EVENTS (every few minutes, never the same kind twice in a row; the schedule is apps/night/pure/cycle.js
    rareStep, seeded): a FALLING STAR streaks across the sky (one additive plane, 1.4 s); a GLOWING FLOWER opens at the playing light's foot when
    a note is held long (seven petals unfold in 3 s, stay ~18 s, close in 4 s; it brightens with each note); the wild fireflies form the
-   FIVE-DOT EMBLEM for a moment (core/fireflies.js `form`: 3 flies per dot spring to it, hold, and are let go). Parts of the forest room. */
+   FIVE-DOT EMBLEM for a moment (./pure/fireflies.js `form`: 3 flies per dot spring to it, hold, and are let go). Parts of the forest room. */
 import { seeded } from '../../../../core/pure/dsp.js';
 import { forestGround } from './pure/fireflies.js';
 import { streamNear, STREAM } from './pure/forestlife.js';

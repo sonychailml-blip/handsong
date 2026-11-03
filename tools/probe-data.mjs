@@ -653,6 +653,8 @@ async function profileCore(){
   const rd=async f=>JSON.parse(await readFile(new URL('../core/data/'+f, import.meta.url),'utf8'));
   const ix=await rd('index.json'), tix=await rd('timbres/index.json');
   const known={ modes:ix.modes, timbres:tix.order, effects:['reverb','bright','glide','dly','trmMix','forest','glue','vib','drv','trm','fdepth','cecho','ctone','cwave'] };   // RUN 7: + Night's own effects
+  { const RV=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), F=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+    known.rooms=[...RV.ROOM_IDS]; known.ambiences=[F.nature.id]; }   // CORE-8: the app's rooms and ambiences (Night's catalogue)
   const recs=[];
   for(const name of ['apps/full/data/full.json','apps/night/data/night.json']){ n++; let r; try{ r=JSON.parse(await readFile(new URL('../'+name, import.meta.url),'utf8')); }catch(e){ miss(name+': '+e.message); continue; }
     recs.push(r); const why=P.checkProfile(r, known); if(why) miss(`${r.id||name}: ${why}`); }
@@ -665,6 +667,11 @@ async function profileCore(){
   if(night) for(const [field, dmg] of P.PROFILE_DAMAGES){ const r=copy(night); dmg(r); n++; const why=P.checkProfile(r, known);
     if(!why) miss(`CONTROL «${field}»: a damaged profile was accepted`);
     else if(!why.includes(field.split(' ')[0])) miss(`CONTROL «${field}»: refused, but the line does not name it: ${why}`); }
+  /* CORE-8: without the app's lists only the shape is checked — a room id passes, a bare name does not */
+  if(night){ const shape={ ...known }; delete shape.rooms; delete shape.ambiences; n+=3;
+    if(P.checkProfile({ ...copy(night), scene:'room.monastery', ambience:'ambience.sea' }, shape)) miss('a profile with well-shaped room and ambience ids was refused without the lists');
+    if(!P.checkProfile({ ...copy(night), scene:'forest' }, shape)) miss('CONTROL: the bare scene «forest» passed the shape check');
+    if(!P.checkProfile({ ...copy(night), ambience:'forest' }, shape)) miss('CONTROL: the bare ambience «forest» passed the shape check'); }
   return { cases:n, total:d.length, differences:d };
 }
 /* VIS1a (RUN 6): the event bus — state topics versioned; the ring keeps order, overflows by losing the oldest (counted), never more
@@ -712,8 +719,8 @@ async function nightDepthCore(){
    is seeded too (repeatable, another seed differs) */
 async function nightCricketsCore(){
   const d=[]; let n=0; const miss=s=>d.push(s);
-  const A=await import(new URL('../apps/night/pure/ambience.js', import.meta.url).href), C=A.AMB.crickets;
-  const take=(seed,k,m)=>{ const s=A.cricketStream(seed,k), out=[s.freq]; for(let i=0;i<m;i++) out.push(s.next()); return out; };
+  const A=await import(new URL('../apps/night/pure/ambience.js', import.meta.url).href), N=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM.nature, C=N.crickets;   // NIGHT-3: the forest's recipe
+  const take=(seed,k,m)=>{ const s=A.cricketStream(C,seed,k), out=[s.freq]; for(let i=0;i<m;i++) out.push(s.next()); return out; };
   for(let k=0;k<C.n;k++){ const a=take(C.seed,k,200), b=take(C.seed,k,200); n++; if(JSON.stringify(a)!==JSON.stringify(b)) miss('cricket '+k+': the same seed gave other chirps');
     n++; if(!(a[0]>=C.fLo && a[0]<=C.fHi)) miss('cricket '+k+': pitch '+a[0]);
     for(let i=1;i<a.length;i++){ const c=a[i]; if(!(c.pulses>=C.pulsesLo && c.pulses<=C.pulsesHi)){ miss('cricket '+k+' chirp '+i+': '+c.pulses+' pulses'); break; }
@@ -721,8 +728,8 @@ async function nightCricketsCore(){
     n+=2; }
   n++; if(JSON.stringify(take(C.seed,0,20))===JSON.stringify(take(C.seed+1,0,20))) miss('CONTROL: another seed gave the same chirps');
   n++; if(JSON.stringify(take(C.seed,0,20))===JSON.stringify(take(C.seed,1,20))) miss('two crickets chirp alike');
-  const sh=A.chirpShape(1, 3, 0.8); n++; if(!(sh.length===9 && sh[0][1]===0 && sh[1][0]-sh[0][0]>=0.003-1e-12 && sh[8][1]===0)) miss('a chirp envelope is not soft or does not end at 0: '+JSON.stringify(sh.slice(0,3)));
-  const w1=A.windNoise(8000), w2=A.windNoise(8000), w3=A.windNoise(8000, A.AMB.wind.seed+1); n+=2;
+  const sh=A.chirpShape(C, 1, 3, 0.8); n++; if(!(sh.length===9 && sh[0][1]===0 && sh[1][0]-sh[0][0]>=0.003-1e-12 && sh[8][1]===0)) miss('a chirp envelope is not soft or does not end at 0: '+JSON.stringify(sh.slice(0,3)));
+  const W=N.wind, w1=A.windNoise(8000, W.seed, W.sec), w2=A.windNoise(8000, W.seed, W.sec), w3=A.windNoise(8000, W.seed+1, W.sec); n+=2;
   if(w1.some((v,i)=>v!==w2[i])) miss('the wind loop is not repeatable');
   if(!w1.some((v,i)=>v!==w3[i])) miss('CONTROL: the wind with another seed is the same');
   return { cases:n, total:d.length, differences:d };
@@ -796,10 +803,23 @@ async function nightCore(){
   if(Math.abs(D1.light-0.45)>1e-12||Math.abs(D1.flies-0.4)>1e-12||Math.abs(D1.motion-0.5)>1e-12||Math.abs(D1.mist-1.5)>1e-12) miss('sleep 1: '+JSON.stringify(D1));
   let mono=true, pl=2; for(let i=0;i<=50;i++){ const v=N.nightDeep(i/50).light; if(v>pl+1e-12) mono=false; pl=v; } n++; if(!mono) miss("the sleep depth is not monotone");
   n+=3; if(N.sleepProgress(0,0,5e5)!==0) miss('no timer: progress ≠ 0'); if(N.sleepProgress(0,10,3e5)!==0.5) miss('half of a 10-min timer ≠ 0.5'); if(N.sleepProgress(0,10,9e5)!==1) miss('past the end ≠ 1');
-  const fs=await import('node:fs'), prof=JSON.parse(fs.readFileSync(new URL('../apps/night/data/night.json', import.meta.url),'utf8')), tok=fs.readFileSync(new URL('../core/tokens.css', import.meta.url),'utf8');
-  for(const m of prof.moods){ n++; if(!N.MOOD_OF[m]) miss('the Night mood '+m+' has no look'); }
-  for(const [k,L2] of Object.entries(N.MOOD_LOOKS)) for(const tn of Object.values(L2.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(tok)) miss(`look ${k}: no token --cv-${tn} in tokens.css`); }
-  n++; if(N.moodLook('no-such-mood')!==N.MOOD_LOOKS.glow) miss('CONTROL: an unknown mood does not fall back to Glow');
+  /* NIGHT-3: the moods' looks are each room's now — row «NIGHT room records» */
+  return { cases:n, total:d.length, differences:d };
+}
+/* NIGHT-3: THE ROOM RECORDS — every room of the catalogue is valid (apps/night/pure/room.js) against this app's modes, the ids are the pinned list,
+   every look's tokens are in night.css, every Night mood has a look, an unknown mood falls back to the room's default look; CONTROLS: each damage
+   of ROOM_DAMAGES is refused with a line naming its field */
+async function nightRooms(){
+  const d=[]; let n=0; const miss=s=>d.push(s), fs=await import('node:fs'), rd=f=>fs.readFileSync(new URL('../'+f, import.meta.url),'utf8');
+  const V=await import(new URL('../apps/night/pure/room.js', import.meta.url).href), F=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM;
+  const known={ modes:JSON.parse(rd('core/data/index.json')).modes }, prof=JSON.parse(rd('apps/night/data/night.json')), css=rd('apps/night/night.css'), recs=[F];
+  n++; if(JSON.stringify(recs.map(r=>r.id))!==JSON.stringify(V.ROOM_IDS)) miss(`the rooms ${recs.map(r=>r.id)} are not the pinned ids ${V.ROOM_IDS}`);
+  for(const r of recs){ n++; const why=V.checkRoom(r, known); if(why) miss(r.id+': '+why);
+    for(const [k,L] of Object.entries(r.looks)) for(const tn of Object.values(L.tokens)){ n++; if(!new RegExp('--cv-'+tn+':').test(css)) miss(`${r.id} look ${k}: no token --cv-${tn} in night.css`); }
+    for(const m of prof.moods){ n++; if(!r.moods[m]) miss(`${r.id}: the Night mood ${m} has no look`); }
+    n++; if(V.roomLook(r,'no-such-mood')!==r.looks[r.look]) miss(`CONTROL ${r.id}: an unknown mood does not fall back to the default look`); }
+  for(const [field, dmg] of V.ROOM_DAMAGES){ const r=JSON.parse(JSON.stringify(F)); dmg(r); n++; const why=V.checkRoom(r, known);
+    if(!why || !why.startsWith(field)) miss(`CONTROL: the damage «${field}» was ${why ? 'refused as «'+why+'»' : 'accepted'}`); }
   return { cases:n, total:d.length, differences:d };
 }
 /* RUN 9 (slice 2): THE FOREST'S LIFE (core/forestlife.js + the fireflies' call / scatter) — the stream's line is smooth, crosses the aisle,
@@ -971,6 +991,7 @@ const ROWS=[
   ['NIGHT shell (core)',         ()=>nightShellCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT depth curve (core)',   ()=>nightDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cricket schedule (app)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
+  ['NIGHT room records (app)',  ()=>nightRooms(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)

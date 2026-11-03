@@ -401,16 +401,18 @@ function tokenCheck(css, tok, others){
       if(/#[0-9a-fA-F]{3,8}\b|rgba?\(|\d+px/.test(m[3])) fails.push(`${f}:${lineAt(b,m.index)}: .style.${m[1]} = '${m[3]}' — a design literal in JS; use var(--token)`); }
   /* DRAW1b: the CANVAS palette — no colour literal (in a string or template) in core/legacy-ui/views/*.js or config.js; every cv('name') of core/ names
      a --cv-name defined in tokens.css. CONTROL: a literal in a view and an unknown cv() name must both be caught. */
-  const defsAll=new Set([...(tok+'\n'+ncss).replace(/\/\*[\s\S]*?\*\//g,'').matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1]));
+  const defsOf=t=>new Set([...t.replace(/\/\*[\s\S]*?\*\//g,'').matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1])), defsAll=defsOf(tok+'\n'+ncss), defsCore=defsOf(tok);   // NIGHT-3: core and Full name only core tokens; Night may name its own (night.css)
   const canvasCheck=(texts)=>{ const out=[];
     for(const [f,t] of Object.entries(texts)){
       if(/^(core\/legacy-ui\/views\/|core\/config\.js$|apps\/night\/(?:scene|rooms)\/)/.test(f)) for(const m of t.matchAll(/(['"`])\s*#[0-9a-fA-F]{3,8}\s*\1|(?<![\w$])(rgba?|hsla?)\(\s*\d/g)) out.push(`${f}:${lineAt(t,m.index)}: a canvas colour literal «${m[0].slice(0,24)}» — use cv('<token>') (tokens.css «canvas»)`);
-      for(const m of t.matchAll(/(?<![\w$.])cv\(\s*(['"])([\w-]+)\1/g)) if(!defsAll.has('--cv-'+m[2])) out.push(`${f}:${lineAt(t,m.index)}: cv('${m[2]}') — no token --cv-${m[2]} in tokens.css`); }
+      const defs=/^apps\/night\//.test(f) ? defsAll : defsCore;
+      for(const m of t.matchAll(/(?<![\w$.])cv\(\s*(['"])([\w-]+)\1/g)) if(!defs.has('--cv-'+m[2])) out.push(`${f}:${lineAt(t,m.index)}: cv('${m[2]}') — no token --cv-${m[2]} in ${defs===defsCore ? 'core/tokens.css' : 'tokens.css or night.css'}`); }
     return out; };
   const codeOf={}; for(const f of files) codeOf[f]=mods[f].code;
   fails.push(...canvasCheck(codeOf));
-  { const c2=canvasCheck({ 'core/legacy-ui/views/ctl.js':"ctx.fillStyle='#fff'; ctx.strokeStyle=`rgba(255,0,0,${a})`; ctx.fillStyle=cv('no-such-colour');" });
-    if(c2.length!==3) fails.push(`canvas-palette CONTROL: expected a hex literal, an rgba literal and an unknown cv() name caught, got ${c2.length} — the check cannot fail`); }
+  { const c2=canvasCheck({ 'core/legacy-ui/views/ctl.js':"ctx.fillStyle='#fff'; ctx.strokeStyle=`rgba(255,0,0,${a})`; ctx.fillStyle=cv('no-such-colour'); ctx.fillStyle=cv('forest-fog');" });
+    if(c2.length!==4) fails.push(`canvas-palette CONTROL: expected a hex literal, an rgba literal, an unknown cv() name and a Night token in core caught, got ${c2.length} — the check cannot fail`);
+    const c3=canvasCheck({ 'apps/night/rooms/ctl.js':"ctx.fillStyle=cv('forest-fog');" }); if(c3.length) fails.push('canvas-palette CONTROL: a Night token in Night code was refused'); }
   const ctl=tokenCheck(css+'\n.probeCtl{color:#fff; padding:var(--sp-unknown);}', tok, {});
   if(!(ctl.some(x=>/colour literal «#fff»/.test(x)) && ctl.some(x=>/--sp-unknown/.test(x)))) fails.push('design-token CONTROL: a colour literal / an undefined token was not caught — the check cannot fail'); }
 /* 12) ENGINE SURFACE (AUD1a): core/engine/surface.js lists every name audio.js exports, by the module that calls it. Every listed name

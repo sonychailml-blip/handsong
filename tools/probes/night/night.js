@@ -209,7 +209,7 @@ row({ at:1009.6, night:true, name:'NIGHT depth → forest', run:()=>checkNightDe
 export async function checkNightAmbience(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   try{
-    const R=await import('../../../core/render.js'), S=await import('../../../core/scales.js'), ST=await import('../../../core/state.js'), AM=await import('../../../apps/night/pure/ambience.js');
+    const R=await import('../../../core/render.js'), S=await import('../../../core/scales.js'), ST=await import('../../../core/state.js'), AM=await import('../../../apps/night/pure/ambience.js'), FR=(await import('../../../apps/night/rooms/forest/pure/room.js')).FOREST_ROOM;
     const mid=b=>{ const m=new Float32Array(b.L.length); for(let i=0;i<m.length;i++) m[i]=(b.L[i]+b.R[i])/2; return m; };
     const SEC=4, play=(level,seed)=>e=>{ e.ambienceOn(true, level, 0.05, seed); e.ambienceTick(SEC); };
     const a=await R.goldRender(play(1,0), SEC), b=await R.goldRender(play(1,0), SEC), c=await R.goldRender(play(1,1), SEC), h=await R.goldRender(play(0.5,0), SEC);
@@ -235,7 +235,7 @@ export async function checkNightAmbience(){
         const k=432/440; if(!info || Math.abs(info.hz[0]-root*k)>1e-6 || Math.abs(info.hz[1]-fifth*k)>1e-6) miss('A4 432: drone '+JSON.stringify(info&&info.hz)+' (expected ×'+k.toFixed(4)+')'); }
       finally { ST.setARef(keep); } }
     /* (4) the crickets at their scheduled onsets: band energy (4.3–4.9 kHz, a 1024-point Hann FFT) of the first 30 ms vs the 60 ms before */
-    { const C=AM.AMB.crickets, on=[]; for(let k=0;k<C.n;k++){ const s=AM.cricketStream(C.seed,k); for(let c=s.next(); c.t<SEC-0.3; c=s.next()) if(c.t>0.2) on.push(c.t); }   // the schedule's origin is the build time (0)
+    { const C=FR.nature.crickets, on=[]; for(let k=0;k<C.n;k++){ const s=AM.cricketStream(C,C.seed,k); for(let c=s.next(); c.t<SEC-0.3; c=s.next()) if(c.t>0.2) on.push(c.t); }   // the schedule's origin is the build time (0)
       const band=(s0,s1)=>{ let e=0, f=0; for(let a=Math.round(s0*48000); a+1024<=Math.round(s1*48000)+1024 && a<A.length-1024; a+=256){ const re=new Float64Array(1024), im=new Float64Array(1024);
           for(let i=0;i<1024;i++) re[i]=A[a+i]*(0.5-0.5*Math.cos(2*Math.PI*i/1024));
           f++; for(let k=Math.floor(4300/46.875);k<=Math.ceil(4900/46.875);k++){ let sr=0, si=0; for(let i=0;i<1024;i++){ const w=-2*Math.PI*k*i/1024; sr+=re[i]*Math.cos(w); si+=re[i]*Math.sin(w); } e+=sr*sr+si*si; } } return e/Math.max(1,f); };   // the MEAN per frame

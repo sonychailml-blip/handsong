@@ -419,6 +419,17 @@ async function session(port, plan, label){
     out(`[${label}] started — audio ${env.ac} at ${env.rate} Hz, tab ${env.visibility}${env.hidden?' (HIDDEN — drawn-window rows will not run)':''}`);
     /* AF3: the auto-freeze watcher is paused for the whole runner session (probes drive it with their own clock); resumed before closing */
     await page.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); });
+    /* NIGHT-3: the ENG2 benchmark starts by itself 20 s after render.js loads on a device with none stored — every runner profile is fresh — and
+       the pause above can come too late for it: it was still rendering on the engine copy when Night's first row (GOLD) took its state-guard
+       snapshot. The runner runs it ONCE here and waits: one already in flight finishes first (the render queue is serial), and the stored result
+       stops the timer's later one. settled() is checked, and its CONTROL (nothing stored) must read unsettled. */
+    { const b=await page.evaluate(async ()=>{ const R=await import('/core/render.js'), E=await import('/core/pure/engclass.js'), t0=performance.now();
+        const r=await R.engBench(); await new Promise(q=>setTimeout(q, 50));
+        const settled=(stored, queued)=>!!E.benchOf(stored, navigator.userAgent) && queued===0;
+        let stored=null; try{ stored=localStorage.getItem(E.ENG_BENCH_KEY); }catch(e){}
+        return { ms:Math.round(performance.now()-t0), cached:!!r.cached, ok:settled(stored, R.renderQueue()), control:settled(null, 0) }; });
+      out(`[${label}] engine benchmark settled before the rows: ${b.cached ? 'already stored' : 'measured'} in ${b.ms} ms · control (nothing stored) ${b.control ? 'NOT caught' : 'caught'}`);
+      if(!b.ok || b.control) throw new Error(`the engine benchmark did not settle (ok ${b.ok}, control ${b.control}) — a render could run by itself during the rows`); }
     if(!NIGHT_PAGE && !DUMP){
     /* посев: ждём ОКОНЧАНИЯ (его итог — строка «Now run P.all()») */
     const t0=Date.now();

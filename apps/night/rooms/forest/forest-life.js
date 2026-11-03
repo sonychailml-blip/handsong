@@ -1,6 +1,6 @@
 /* RUN 9 (slice 2) — THE FOREST ANSWERS THE PLAYING, softly (never busy). Parts of the night forest room (forest.js builds them):
    - GROUND WAVES: each note sends a ring of light across the moss from the playing light's ground point (a patch on the ground's own
-     material — no extra geometry, no overdraw; the rings' places and times from core/forestlife.js, the colour = the light's colour, so
+     material — no extra geometry, no overdraw; the rings' places and times from ./pure/forestlife.js, the colour = the light's colour, so
      Warmth / Brightness tint them);
    - GLOWING MUSHROOMS and FLOWERS near the aisle: a slow breath of their own, and a pulse with each note by their distance to the light
      (unlit instanced caps / petals + one glow point each — fake glow, no bloom);

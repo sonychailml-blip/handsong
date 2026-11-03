@@ -11,14 +11,14 @@ import { sleepProgress } from './pure/cycle.js';   // RUN 9: the sleep timer dee
 import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setNightStrikes, setLeanPath, leadParkTick, AC, leadOn, leadOff, timbreIdx, ambienceInfo } from '../../core/audio.js';
 import { fxDenorm } from '../../core/modules/effects/param.js';
 import { NIGHT_FX } from '../../core/modules/effects/night-fx.js';
-import { AMB } from './pure/ambience.js';
+import { ROOMS, roomById } from './rooms/index.js';   // NIGHT-3: the current room's nature recipe (its default level, its wind)
 import { t, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
 import { EDITION } from '../../core/edition.js';
 import { ghostArm } from './ghost.js';   // C7: the ghost light
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
@@ -33,7 +33,8 @@ const GHOST_WAIT=10000;   // after the calibration the ghost waits this long for
 /* the «Forest» slider — remembered on this device. RUN 7: only the volume of the forest's own sounds (the ambience); the hand's depth always
    moved the room over its whole range. RUN 8 (the user): it is the forest AT MOST — the ambience's level AND the room's reach; the hand's depth
    moves within it (Forest depth's `reach`). */
-const forestLevel=()=>{ const v=parseFloat(load(KEY.forest)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : AMB.level; };
+const nature=()=>(roomById(sceneRoom())||ROOMS[0]).record.nature;
+const forestLevel=()=>{ const v=parseFloat(load(KEY.forest)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
 
 /* the doors (ui.js): timbres() / timbre() / setTimbre(id) / timbreName(id); moods() / mood() / setMood(id); hand() 'right'|'left' /
    setHand(v); noteMode() 'note'|'hold' / setNoteMode(v); backgrounds() / bg() / setBg(m); plain() (no glass blur);
@@ -197,7 +198,7 @@ function reachSet(v){ const I=fxInstance(chainKeyOf('ld'),'fdepth'); if(I && I.p
 /* RUN 9 (slice 3): the WIND the forest's leaves sway with — the ambience's level (0 when off) and the gust of its wind sweep (its own 0.06-Hz
    drift, read from the audio clock and the sweep's start: the leaves move with what is heard; reading the clock touches no sound) */
 function windNow(){ const I=amb && AC ? ambienceInfo() : null; if(!I || !I.on) return { level:0, gust:0 };
-  return { level:I.level, gust:Math.sin(2*Math.PI*AMB.wind.rate*(AC.currentTime-I.origin)) }; }
+  return { level:I.level, gust:Math.sin(2*Math.PI*nature().wind.rate*(AC.currentTime-I.origin)) }; }
 /* C5: the three Night effects as the forest reads them — Echo (amount, its time in seconds, feedback), Warmth / Brightness (tilt, ½ flat), Wave */
 function nightFxNow(){ const key=chainKeyOf('ld'), E=fxInstance(key,'cecho'), T=fxInstance(key,'ctone'), W=fxInstance(key,'cwave'), a=E ? E.params[0].cur : 0;
   return { echo:a, time: E ? fxDenorm(E.params[1], E.params[1].cur) : NIGHT_FX.echo.time, fb:NIGHT_FX.echo.fbK*a, tone: T ? T.params[1].cur : 0.5, wave: W ? W.params[1].cur : 0 }; }

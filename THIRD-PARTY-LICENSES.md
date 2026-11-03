@@ -141,7 +141,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | → | U+2192 | arrow in text | typography | apps/full/songs.js, core/i18n.js, core/render.js |
 | − | U+2212 | minus sign | typography | apps/full/index.html, apps/night/index.html, core/data/palettes/bpsteps.json, core/i18n.js, core/legacy-ui/ui.js, core/legacy-ui/views/roll.js, core/legacy-ui/views/strip.js, core/pure/format.js, core/pure/profile.js, core/render.js |
 | ≈ | U+2248 | approximately | typography | core/i18n.js, core/legacy-ui/views/play.js, core/render.js |
-| ≥ | U+2265 | greater or equal | typography | core/pure/format.js |
+| ≥ | U+2265 | greater or equal | typography | apps/night/pure/room.js, core/pure/format.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | core/legacy-ui/views/strip.js, core/render.js |
 | √ | U+221A | square root (console text) | typography | core/render.js |
 | ♭ | U+266D | flat (note names) | notation | apps/full/index.html, apps/full/songs.js, apps/night/index.html, core/data/modes/blues.json, core/data/tunings/shruti22.json, core/scales.js |

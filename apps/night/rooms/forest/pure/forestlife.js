@@ -1,4 +1,4 @@
-/* RUN 9 — THE FOREST'S LIFE, as numbers. CORE: pure (rule #36), node-tested (data row «FOREST life (core)»): the room only draws what
+/* RUN 9 — THE FOREST'S LIFE, as numbers. Pure (rule #36), node-tested (data row «FOREST life (core)», named before NIGHT-3 moved it into the forest's room folder): the room only draws what
    these give, so a probe can compare places and amounts exactly on any device.
    - The STREAM (slice 2, for Echo's rings; its moon reflection slice 3): a seeded-free fixed path across the forest floor, from near left to
      far right, through the place where the moon's reflection falls; `streamAt(u)` (u 0…1 along it) and `streamNear(x, z)` (the nearest

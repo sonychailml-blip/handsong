@@ -10,7 +10,7 @@
   "moods": ["major-penta", "minor-penta", "egyptian"],
   "timbres": ["solo.firefly", "solo.breath-flute", "solo.handpan", "solo.singing-bowl"],
   "effects": ["cecho", "ctone", "cwave"],
-  "scene": "forest",
+  "scene": "room.forest",
   "backgrounds": ["forest", "dark", "camera"],
   "shell": "night",
   "noteField": "glow",
