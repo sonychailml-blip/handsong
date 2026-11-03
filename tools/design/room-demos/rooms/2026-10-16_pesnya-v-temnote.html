@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Песня в темноте</title><style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Commissioner:wght@300;400;500&display=swap">
+<style>
+/* An audio-only world. The screen stays almost black on purpose: everything happens in the headphones. */
+:root{
+  --deep:#030406;
+  --ink:#d9dccf;
+  --ink-dim:#80857c;
+  --glow:#8fd1c4;          /* the colour of a heard voice */
+  --warm:#e6b56a;
+  --line:rgba(217,220,207,.14);
+  --font-display:"Marcellus",Georgia,serif;
+  --font-body:"Commissioner","Segoe UI",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--deep);color:var(--ink);font-family:var(--font-body);overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+.intro{position:fixed;inset:0;display:grid;place-items:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));z-index:5;background:var(--deep);transition:opacity .8s}
+.intro.gone{opacity:0;pointer-events:none}
+.card{max-width:560px;display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-dim)}
+h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:clamp(30px,6vw,44px);line-height:1.05;text-wrap:balance}
+p{margin:0;line-height:1.55;color:var(--ink-dim);font-size:15px}
+p b{color:var(--ink);font-weight:500}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px;color:var(--ink-dim)}
+.keys kbd{font:500 12px var(--font-body);color:var(--ink);border:1px solid var(--line);border-radius:3px;padding:2px 7px;white-space:nowrap;justify-self:start}
+button{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:3px;padding:9px 14px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--glow);outline-offset:2px}
+.go{align-self:flex-start;background:var(--glow);color:var(--deep);border-color:var(--glow);font-weight:500;font-size:16px;padding:11px 20px}
+.hud{position:fixed;left:0;right:0;top:calc(12px + env(safe-area-inset-top,0px));display:flex;justify-content:space-between;gap:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));font-size:13px;color:var(--ink-dim);pointer-events:none}
+.hud b{color:var(--glow);font-weight:500}
+.hud .r{display:flex;gap:8px;pointer-events:auto}
+.hud .r button{padding:5px 10px;font-size:12px}
+#say{position:fixed;left:0;right:0;bottom:calc(150px + env(safe-area-inset-bottom,0px));text-align:center;font-family:var(--font-display);font-size:clamp(18px,3.4vw,24px);
+  color:var(--ink);opacity:0;transition:opacity 1.2s;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));pointer-events:none;text-wrap:balance}
+#say.on{opacity:.9}
+canvas#map{position:fixed;inset:0;margin:auto;max-width:calc(100% - 32px);max-height:70vh;aspect-ratio:20/14;opacity:0;transition:opacity .4s;pointer-events:none}
+canvas#map.on{opacity:.85}
+#ripple{position:fixed;inset:0;pointer-events:none}
+.pad{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;align-items:flex-end;gap:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.dpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:6px}
+.dpad button,.notes button,.click{width:48px;height:48px;padding:0;font-size:18px;touch-action:none;user-select:none;-webkit-user-select:none}
+.dpad .u{grid-column:2}.dpad .l{grid-column:1;grid-row:2}.dpad .d{grid-column:2;grid-row:2}.dpad .rr{grid-column:3;grid-row:2}
+.right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.notes{display:flex;gap:6px}
+.notes button{color:var(--glow);border-color:rgba(143,209,196,.35)}
+.click{width:auto;padding:0 16px;font-size:14px}
+@media (hover:hover) and (pointer:fine){.pad{opacity:.35;transition:opacity .3s}.pad:hover{opacity:1}}
+@media (max-width:420px){.dpad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(2,42px)}.dpad button,.notes button{width:42px;height:42px}}
+</style>
+
+<div class="intro" id="intro">
+  <div class="card">
+    <div class="eyebrow">Handsong · звуковой мир · эскиз</div>
+    <h1>Песня в темноте</h1>
+    <p>Здесь нет света. Живущие в пещере существа никогда не видели — они <b>слышат</b>. Где-то в глубине поют три голоса. Найди каждого по звуку, повтори его песню — и он пойдёт за тобой. Когда соберутся все трое, пещера запоёт.</p>
+    <p><b>Только в наушниках.</b> Можно закрыть глаза.</p>
+    <div class="keys">
+      <kbd>↑ ↓</kbd><span>шаг вперёд и назад (или W / S)</span>
+      <kbd>← →</kbd><span>повернуться (или A / D)</span>
+      <kbd>Пробел</kbd><span>щелчок: эхо от стен рассказывает, где проход</span>
+      <kbd>1 2 3 4 5</kbd><span>твои ноты — ими повторяешь песню существа</span>
+      <kbd>H</kbd><span>подсказка: ближайший голос споёт сейчас</span>
+      <kbd>M</kbd><span>карта для зрячих (для эскиза; в игре её нет)</span>
+    </div>
+    <button class="go" id="go">Войти в темноту</button>
+  </div>
+</div>
+
+<div class="hud" aria-live="polite"><span>Голосов с тобой: <b id="cnt">0</b> из 3</span><span class="r"><button id="mapBtn" aria-pressed="false">Карта</button><button id="voiceBtn" aria-pressed="true">Голос: вкл</button></span></div>
+<canvas id="ripple"></canvas>
+<canvas id="map" width="800" height="560" aria-hidden="true"></canvas>
+<div id="say" role="status"></div>
+<div class="pad" aria-label="Управление касанием">
+  <div class="dpad">
+    <button class="u" data-k="up" aria-label="Вперёд">↑</button>
+    <button class="l" data-k="left" aria-label="Налево">←</button>
+    <button class="d" data-k="down" aria-label="Назад">↓</button>
+    <button class="rr" data-k="right" aria-label="Направо">→</button>
+  </div>
+  <div class="right">
+    <button class="click" data-k="echo">Щелчок</button>
+    <div class="notes">
+      <button data-n="0" aria-label="Нота 1">1</button><button data-n="1" aria-label="Нота 2">2</button><button data-n="2" aria-label="Нота 3">3</button><button data-n="3" aria-label="Нота 4">4</button><button data-n="4" aria-label="Нота 5">5</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+/* ---------------- the cave ---------------- */
+const MAP=[
+"####################",
+"#P.....#####.......#",
+"#......#####..d....#",
+"#.....~~~..........#",
+"###..~~~~~.#####...#",
+"###...~~~..#####.b.#",
+"#####..#########...#",
+"#####..####........#",
+"#a.....####..#######",
+"#......####..#######",
+"#..d...............#",
+"###########..c.....#",
+"###########......s.#",
+"####################"];
+const ROWS=MAP.length,COLS=MAP[0].length,CELL=2;
+const at=(x,z)=>{const c=Math.floor(x/CELL),r=Math.floor(z/CELL);return r<0||c<0||r>=ROWS||c>=COLS?'#':MAP[r][c]};
+const solid=(x,z)=>at(x,z)==='#';
+const centre=(r,c)=>({x:c*CELL+CELL/2,z:r*CELL+CELL/2});
+const marks={};MAP.forEach((row,r)=>[...row].forEach((ch,c)=>{if(!'#.~'.includes(ch))(marks[ch]=marks[ch]||[]).push(centre(r,c))}));
+
+/* ---------------- player ---------------- */
+const P={x:marks.P[0].x,z:marks.P[0].z,h:Math.PI/2};          // heading: 0 = north (−z), π/2 = east
+const keys={up:0,down:0,left:0,right:0};
+const fwd=()=>({x:Math.sin(P.h),z:-Math.cos(P.h)});
+
+/* ---------------- audio ---------------- */
+let AC,master,verb,started=false;
+const SCALE=[57,60,62,64,67];                                    // A minor pentatonic: A C D E G
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+function setPos(node,x,y,z){if(node.positionX){node.positionX.value=x;node.positionY.value=y;node.positionZ.value=z}else node.setPosition(x,y,z)}
+function initAudio(){
+  AC=new (window.AudioContext||window.webkitAudioContext)();
+  const comp=AC.createDynamicsCompressor();comp.threshold.value=-16;comp.ratio.value=3;comp.connect(AC.destination);
+  master=AC.createGain();master.gain.value=.9;master.connect(comp);
+  const len=Math.round(AC.sampleRate*3),ir=AC.createBuffer(2,len,AC.sampleRate);         // a damp cave
+  for(let c=0;c<2;c++){const d=ir.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.4)*(i<AC.sampleRate*.02?.3:1)}
+  verb=AC.createConvolver();verb.buffer=ir;const vg=AC.createGain();vg.gain.value=.42;verb.connect(vg);vg.connect(master);
+}
+function updateListener(){const L=AC.listener,f=fwd();
+  if(L.positionX){L.positionX.value=P.x;L.positionY.value=0;L.positionZ.value=P.z;L.forwardX.value=f.x;L.forwardY.value=0;L.forwardZ.value=f.z;L.upX.value=0;L.upY.value=1;L.upZ.value=0}
+  else{L.setPosition(P.x,0,P.z);L.setOrientation(f.x,0,f.z,0,1,0)}}
+/* a sound source placed in the cave: input → muffling filter (rock in the way) → gain → HRTF panner */
+function source(x,z,y=0,send=.5){
+  const input=AC.createGain(),lp=AC.createBiquadFilter(),g=AC.createGain(),pan=AC.createPanner();
+  lp.type='lowpass';lp.frequency.value=16000;pan.panningModel='HRTF';pan.distanceModel='inverse';pan.refDistance=1.6;pan.rolloffFactor=1.15;pan.maxDistance=80;
+  input.connect(lp);lp.connect(g);g.connect(pan);pan.connect(master);const s=AC.createGain();s.gain.value=send;g.connect(s);s.connect(verb);
+  setPos(pan,x,y,z);return{input,lp,g,pan,x,z,y,set(nx,nz){this.x=nx;this.z=nz;setPos(pan,nx,y,nz)}}}
+function lineBlocked(ax,az,bx,bz){const d=Math.hypot(bx-ax,bz-az),n=Math.ceil(d/.25);for(let i=1;i<n;i++){const t=i/n;if(solid(ax+(bx-ax)*t,az+(bz-az)*t))return true}return false}
+function occlude(src){const b=lineBlocked(P.x,P.z,src.x,src.z),t=AC.currentTime;src.lp.frequency.setTargetAtTime(b?420:16000,t,.12);src.g.gain.setTargetAtTime(b?.55:1,t,.12)}
+let NB;function noise(){if(!NB){NB=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);const d=NB.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1}return NB}
+function burst(dest,t,dur,freq,q,amp,type='bandpass'){const n=AC.createBufferSource();n.buffer=noise();const f=AC.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=AC.createGain();
+  g.gain.setValueAtTime(amp,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);n.connect(f);f.connect(g);g.connect(dest);n.start(t,Math.random()*.5);n.stop(t+dur+.02)}
+function tone(dest,t,f,dur,amp,type='sine',glide=0,vib=0){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f*(1+glide),t);if(glide)o.frequency.exponentialRampToValueAtTime(f,t+Math.min(.12,dur*.4));
+  if(vib){const l=AC.createOscillator(),lg=AC.createGain();l.frequency.value=5.2;lg.gain.value=vib;l.connect(lg);lg.connect(o.detune);l.start(t);l.stop(t+dur+.1)}
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(amp,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g);g.connect(dest);o.start(t);o.stop(t+dur+.05)}
+
+/* ---------------- the world's sounds ---------------- */
+let drips=[],stream;
+function buildWorld(){
+  drips=marks.d.map(p=>Object.assign(source(p.x,p.z,1.2,.7),{next:0}));
+  const sp=marks.s[0];stream=source(sp.x,sp.z,-.3,.35);
+  const n=AC.createBufferSource();n.buffer=noise();n.loop=true;const bp=AC.createBiquadFilter();bp.type='bandpass';bp.frequency.value=650;bp.Q.value=.6;
+  const lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1800;const g=AC.createGain();g.gain.value=.22;
+  const lfo=AC.createOscillator(),lg=AC.createGain();lfo.frequency.value=.13;lg.gain.value=180;lfo.connect(lg);lg.connect(bp.frequency);lfo.start();
+  n.connect(bp);bp.connect(lp);lp.connect(g);g.connect(stream.input);n.start();
+  // a faint low hum of the whole cave, everywhere at once
+  const hum=AC.createOscillator(),hg=AC.createGain();hum.frequency.value=55;hg.gain.value=.025;hum.connect(hg);hg.connect(master);hum.start();
+}
+
+/* ---------------- creatures: each has a voice, a short song, and somewhere to be ---------------- */
+const VOICES={
+  a:{name:'Капельник',motif:[4,2,3],dur:.34,oct:12, sing(d,t,m,k){tone(d,t,mtof(m+12),.5*k,.22,'sine',.35);tone(d,t,mtof(m+24),.18,.05,'sine')}},
+  b:{name:'Гудень',   motif:[0,0,3],dur:.6, oct:-12,sing(d,t,m,k){tone(d,t,mtof(m-12),1.1*k,.32,'triangle',.06);tone(d,t,mtof(m-24),1.2*k,.2,'sine')}},
+  c:{name:'Свиристель',motif:[1,4,2,3],dur:.3,oct:12,sing(d,t,m,k){tone(d,t,mtof(m+12),.42*k,.13,'sine',.08,22);tone(d,t,mtof(m+19),.3*k,.025,'sine')}}};
+let creatures=[];
+function buildCreatures(){creatures='abc'.split('').map((k,i)=>{const p=marks[k][0];return Object.assign(source(p.x,p.z,.4,.6),{key:k,v:VOICES[k],found:false,state:'idle',nextIdle:2+i*2.5,waitUntil:0,lastAsk:-99,slot:i})})}
+function singMotif(cr,t,k=1,up=0){const v=cr.v;v.motif.forEach((deg,i)=>v.sing(cr.input,t+i*v.dur,SCALE[deg]+up,k));return t+v.motif.length*v.dur}
+
+/* ---------------- the player's own notes (the hands, in Handsong) ---------------- */
+const me={buf:[],last:0};
+function playNote(i){
+  if(!started)return;const t=AC.currentTime,f=mtof(SCALE[i]+12),g=AC.createGain();g.gain.value=1;g.connect(master);const s=AC.createGain();s.gain.value=.6;g.connect(s);s.connect(verb);
+  [[1,1,1.6,'triangle'],[2,.28,.9,'sine'],[4.2,.12,.28,'sine']].forEach(([r,a,d,ty])=>tone(g,t,f*r,d,.16*a,ty));   // the Firefly tine
+  ripple(.5,'#e6b56a');
+  const now=performance.now()/1000;if(now-me.last>2.6)me.buf=[];me.last=now;me.buf.push(i);
+  const cr=creatures.find(c=>c.state==='waiting');if(!cr)return;
+  const m=cr.v.motif;if(me.buf.length<m.length)return;
+  const tail=me.buf.slice(-m.length);
+  if(tail.every((x,j)=>x===m[j]))join(cr);
+  else if(me.buf.length>=m.length){me.buf=[];const tt=AC.currentTime+.35;cr.v.sing(cr.input,tt,SCALE[m[0]]-2,.6);cr.v.sing(cr.input,tt+cr.v.dur,SCALE[m[0]]-5,.6);   // «hm?»
+    cr.waitUntil=performance.now()/1000+9;setTimeout(()=>{if(cr.state==='waiting')singMotif(cr,AC.currentTime+.05)},1700)}
+}
+function join(cr){
+  cr.state='joined';cr.found=true;me.buf=[];const t=AC.currentTime+.25;const end=singMotif(cr,t,1,12);
+  [0,2,4].forEach((d,i)=>tone(master,end+i*.12,mtof(SCALE[d]+12),1.4,.08,'sine'));
+  const n=creatures.filter(c=>c.found).length;document.getElementById('cnt').textContent=n;
+  say(n<3?`${cr.v.name} пошёл за тобой. Голосов: ${n} из трёх.`:'Все трое с тобой. Слушай: пещера поёт.');
+  if(n===3)setTimeout(finale,2600);
+}
+
+/* ---------------- the little orchestra that follows you ---------------- */
+const BAR=6.4;let nextBar=0,finaleOn=false;
+function orchestra(){
+  const t=AC.currentTime;if(!nextBar)nextBar=t+.5;
+  if(t+.2<nextBar)return;
+  creatures.filter(c=>c.found).forEach(c=>singMotif(c,nextBar+c.slot*2.1,.8));
+  if(finaleOn){[0,2,4].forEach(d=>{const o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.value=mtof(SCALE[d]-12);g.gain.setValueAtTime(0,nextBar);g.gain.linearRampToValueAtTime(.035,nextBar+1.5);g.gain.linearRampToValueAtTime(0,nextBar+BAR+1);
+    o.connect(g);g.connect(master);const s=AC.createGain();s.gain.value=.8;g.connect(s);s.connect(verb);o.start(nextBar);o.stop(nextBar+BAR+1.2)})}
+  nextBar+=BAR;
+}
+function finale(){finaleOn=true;const t=AC.currentTime+.2;[0,1,2,3,4,3,2,4].forEach((d,i)=>tone(master,t+i*.22,mtof(SCALE[d]+12),1.2,.1,'triangle'));}
+
+/* ---------------- echolocation: a click, and the walls answer ---------------- */
+const C_SOUND=170;   // slower than real sound, so the ear can tell near from far
+function echo(){
+  if(!started)return;const t=AC.currentTime+.01;
+  burst(master,t,.012,3500,1.2,.5,'highpass');tone(master,t,2400,.02,.08);
+  const N=18;let near=99;
+  for(let i=0;i<N;i++){
+    const a=P.h+i/N*Math.PI*2,dx=Math.sin(a),dz=-Math.cos(a);let d=.3;
+    while(d<22&&!solid(P.x+dx*d,P.z+dz*d))d+=.1;
+    if(d>=22)continue;near=Math.min(near,d);
+    const hx=P.x+dx*(d-.1),hz=P.z+dz*(d-.1),w=at(P.x+dx*(d-.4),P.z+dz*(d-.4))==='~';
+    const pn=AC.createPanner();pn.panningModel='HRTF';pn.distanceModel='linear';pn.refDistance=1;pn.maxDistance=1000;pn.rolloffFactor=0;setPos(pn,hx,0,hz);pn.connect(master);
+    const g=AC.createGain();g.gain.value=Math.min(.9,1.1/(1+d*.55));g.connect(pn);
+    const te=t+2*d/C_SOUND;burst(g,te,.02+d*.004,Math.max(700,3600-d*150),w?3:1.4,.55,'bandpass');
+    setTimeout(()=>pn.disconnect(),(2*d/C_SOUND+.4)*1000);
+  }
+  ripple(1,'#8fd1c4');
+}
+
+/* ---------------- movement ---------------- */
+let stepAcc=0,bumpT=0,foot=0;
+function step(dt){
+  const turn=(keys.right-keys.left)*1.9*dt;P.h+=turn;
+  const mv=(keys.up-keys.down)*2.1*dt;if(!mv)return;
+  const f=fwd(),nx=P.x+f.x*mv,nz=P.z+f.z*mv,R=.35;
+  const ok=(x,z)=>!solid(x+R,z)&&!solid(x-R,z)&&!solid(x,z+R)&&!solid(x,z-R);
+  let moved=false;
+  if(ok(nx,nz)){P.x=nx;P.z=nz;moved=true}else if(ok(nx,P.z)){P.x=nx;moved=true}else if(ok(P.x,nz)){P.z=nz;moved=true}
+  const t=AC.currentTime;
+  if(!moved){if(performance.now()-bumpT>350){bumpT=performance.now();tone(master,t,70,.16,.3,'sine');burst(master,t,.06,300,1,.25,'lowpass')}return}
+  stepAcc+=Math.abs(mv);
+  if(stepAcc>.75){stepAcc=0;foot^=1;const wet=at(P.x,P.z)==='~',g=AC.createGain(),p=AC.createStereoPanner?AC.createStereoPanner():null;g.gain.value=1;
+    if(p){p.pan.value=foot?.18:-.18;g.connect(p);p.connect(master)}else g.connect(master);const s=AC.createGain();s.gain.value=.5;g.connect(s);s.connect(verb);
+    if(wet){burst(g,t,.16,1900,1.3,.22);burst(g,t+.03,.09,3800,2,.09)}else{burst(g,t,.05,900+Math.random()*300,1.6,.2);burst(g,t,.03,180,1,.12,'lowpass')}}
+}
+
+/* ---------------- speech for key moments (works without the screen) ---------------- */
+let voiceOn=true,sayT=0;
+function say(text){const el=document.getElementById('say');el.textContent=text;el.classList.add('on');clearTimeout(sayT);sayT=setTimeout(()=>el.classList.remove('on'),5200);
+  if(!voiceOn)return;try{const u=new SpeechSynthesisUtterance(text);u.lang='ru-RU';u.rate=1.02;u.volume=.85;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+
+/* ---------------- creatures' behaviour each frame ---------------- */
+function creaturesTick(now){
+  const t=AC.currentTime;
+  creatures.forEach((c,i)=>{
+    if(c.state==='joined'){   // walks a little behind you, each at its own side
+      const f=fwd(),side=[-1.3,0,1.3][c.slot],tx=P.x-f.x*1.4+(-f.z)*side,tz=P.z-f.z*1.4+f.x*side;
+      c.set(c.x+(tx-c.x)*.04,c.z+(tz-c.z)*.04);c.lp.frequency.setTargetAtTime(16000,t,.2);c.g.gain.setTargetAtTime(.75,t,.2);return}
+    occlude(c);
+    const d=Math.hypot(c.x-P.x,c.z-P.z);
+    if(c.state==='waiting'&&now>c.waitUntil)c.state='idle';
+    if(c.state==='idle'&&d<3.4&&now-c.lastAsk>7){c.lastAsk=now;c.state='waiting';const end=singMotif(c,t+.1);c.waitUntil=now+(end-t)+9;me.buf=[];
+      if(!c.greeted){c.greeted=true;say(`Рядом ${c.v.name}. Повтори его песню нотами один – пять.`)}return}
+    if(c.state==='idle'&&now>c.nextIdle){c.nextIdle=now+5+Math.random()*4;singMotif(c,t+.05,.85)}
+  });
+}
+function dripsTick(now){drips.forEach(dp=>{occlude(dp);if(now>dp.next){dp.next=now+1.4+Math.random()*3;const t=AC.currentTime;tone(dp.input,t,1500+Math.random()*700,.12,.16,'sine',.6)}})}
+function hint(){if(!started)return;const left=creatures.filter(c=>!c.found);if(!left.length)return;
+  left.sort((a,b)=>Math.hypot(a.x-P.x,a.z-P.z)-Math.hypot(b.x-P.x,b.z-P.z));const c=left[0];c.nextIdle=performance.now()/1000+6;singMotif(c,AC.currentTime+.05,1.1)}
+
+/* ---------------- visuals: only a breath of light, and an optional map ---------------- */
+const rc=document.getElementById('ripple'),rx=rc.getContext('2d'),mapC=document.getElementById('map'),mx=mapC.getContext('2d');
+let rings=[];function ripple(s,col){rings.push({t:0,s,col})}
+function fitRipple(){const dpr=Math.min(devicePixelRatio||1,2);rc.width=innerWidth*dpr;rc.height=innerHeight*dpr;rx.setTransform(dpr,0,0,dpr,0,0)}
+function drawRipples(dt){rx.clearRect(0,0,innerWidth,innerHeight);const cx=innerWidth/2,cy=innerHeight/2;
+  rings=rings.filter(r=>(r.t+=dt)<1.6);rings.forEach(r=>{const k=r.t/1.6;rx.strokeStyle=r.col;rx.globalAlpha=(1-k)*.35*r.s;rx.lineWidth=1.2;rx.beginPath();rx.arc(cx,cy,30+k*Math.min(innerWidth,innerHeight)*.45*r.s,0,6.283);rx.stroke()});rx.globalAlpha=1}
+let mapOn=false;
+function drawMap(){if(!mapOn)return;const W=800,H=560,s=W/COLS;mx.clearRect(0,0,W,H);
+  MAP.forEach((row,r)=>[...row].forEach((ch,c)=>{mx.fillStyle=ch==='#'?'#15181a':ch==='~'?'#0d2a33':'#2a2f2c';mx.fillRect(c*s,r*s,s-1,s-1)}));
+  drips.forEach(d=>{mx.fillStyle='#4a7d8a';mx.beginPath();mx.arc(d.x/CELL*s,d.z/CELL*s,4,0,6.283);mx.fill()});
+  mx.fillStyle='#3d6f88';mx.beginPath();mx.arc(stream.x/CELL*s,stream.z/CELL*s,6,0,6.283);mx.fill();
+  creatures.forEach(c=>{mx.fillStyle=c.found?'#8fd1c4':'#b7c5bf';mx.beginPath();mx.arc(c.x/CELL*s,c.z/CELL*s,c.found?5:8,0,6.283);mx.fill();
+    if(!c.found){mx.fillStyle='#d9dccf';mx.font='13px Commissioner, sans-serif';mx.fillText(c.v.name,c.x/CELL*s+11,c.z/CELL*s+4)}});
+  const px=P.x/CELL*s,pz=P.z/CELL*s,f=fwd();mx.strokeStyle='#e6b56a';mx.fillStyle='#e6b56a';mx.lineWidth=2;mx.beginPath();mx.arc(px,pz,6,0,6.283);mx.fill();
+  mx.beginPath();mx.moveTo(px,pz);mx.lineTo(px+f.x*20,pz+f.z*20);mx.stroke()}
+
+/* ---------------- loop ---------------- */
+let prev=0;
+function frame(ts){const now=ts/1000,dt=Math.min(.05,now-(prev||now));prev=now;
+  if(started){step(dt);updateListener();creaturesTick(now);dripsTick(now);occlude(stream);orchestra()}
+  drawRipples(dt);drawMap();requestAnimationFrame(frame)}
+
+/* ---------------- input ---------------- */
+const KEYMAP={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right'};
+addEventListener('keydown',e=>{if(!started)return;if(KEYMAP[e.code]){keys[KEYMAP[e.code]]=1;e.preventDefault();return}
+  if(e.repeat)return;if(e.code==='Space'){echo();e.preventDefault()}else if(/^Digit[1-5]$/.test(e.code))playNote(+e.code.slice(5)-1);
+  else if(e.code==='KeyH')hint();else if(e.code==='KeyM')toggleMap()});
+addEventListener('keyup',e=>{if(KEYMAP[e.code])keys[KEYMAP[e.code]]=0});
+addEventListener('blur',()=>{for(const k in keys)keys[k]=0});
+document.querySelectorAll('[data-k]').forEach(b=>{const k=b.dataset.k;
+  if(k==='echo'){b.addEventListener('click',echo);return}
+  const on=e=>{e.preventDefault();keys[k]=1;b.setPointerCapture?.(e.pointerId)},off=()=>keys[k]=0;
+  b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointercancel',off);b.addEventListener('lostpointercapture',off)});
+document.querySelectorAll('[data-n]').forEach(b=>b.addEventListener('pointerdown',e=>{e.preventDefault();playNote(+b.dataset.n)}));
+function toggleMap(){mapOn=!mapOn;mapC.classList.toggle('on',mapOn);document.getElementById('mapBtn').setAttribute('aria-pressed',String(mapOn))}
+document.getElementById('mapBtn').onclick=toggleMap;
+document.getElementById('voiceBtn').onclick=e=>{voiceOn=!voiceOn;e.target.setAttribute('aria-pressed',String(voiceOn));e.target.textContent=voiceOn?'Голос: вкл':'Голос: выкл';if(!voiceOn)try{speechSynthesis.cancel()}catch(_){}};
+document.getElementById('go').onclick=async()=>{
+  initAudio();if(AC.state==='suspended')await AC.resume();buildWorld();buildCreatures();updateListener();started=true;
+  document.getElementById('intro').classList.add('gone');
+  setTimeout(()=>say('Ты в пещере. Где-то поют три голоса. Иди на звук. Пробел — щелчок, эхо покажет стены.'),600);
+};
+addEventListener('resize',fitRipple);fitRipple();requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>

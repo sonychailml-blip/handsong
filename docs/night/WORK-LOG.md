@@ -4,6 +4,10 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-3 — stage 1 (2026-11-03): rooms as modules, room switching, a music bed per room — the plan only
+Tree hashes before and after (unchanged): core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da · apps/night 4f4fcfc3f1f0cc14.
+- No app code. The plan, its estimates and ten decisions: `docs/night/design/NIGHT-3-rooms/PLAN.md`. Waiting for the user's approval.
+
 # NIGHT-2 — stage 3 (2026-11-03): after the user's laptop try — hand choice in settings, the flicker, far hands
 Tree hashes before: core cd907ffe1654b50d · apps/full d6b90cf2cb4be6da · apps/night e9b6ee3f263b2e32. After: core 20ec0bdb5f375302 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 4f4fcfc3f1f0cc14.
 - «Играть: правой / левой рукой» left the main screen (four round buttons + settings) for a segment in Settings → Рука, saved (`calSideSet`; the last choice wins, a calibration's or this one).

@@ -35,6 +35,10 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-3 stage 1 (2026-11-03): rooms as modules, switching, a music bed — the plan only. `docs/night/design/NIGHT-3-rooms/PLAN.md`
+- No app code; tree hashes unchanged. Rooms and their sound are not modular today (the forest is wired through core, legacy-ui and the shell); scales and timbres are data.
+- Proposed: a room folder per room (record, picture, 2D stand-in, nature and bed recipes); a core door for an app's sound module (CORE-7); the host moves to the app (CORE-8); two nature slots for a crossfade; detection paused in the switch's dark moment; Dark / Camera become «Picture» in settings.
+- Six buttons fit only as 3 + 3 (portrait 105 px columns, landscape 3 × 2). Bed est. ≈ 2 % of the laptop quantum. Lake first. Ten decisions wait for the user.
 ### NIGHT-2 stage 3 (2026-11-03): hand choice in settings, the flicker fixed, far hands accepted. Log: `docs/night/WORK-LOG.md`
 - «Play with» is a saved segment in Settings → Hand (last choice wins); the main screen has four buttons + settings.
 - The calibration picture is drawn by the loop (boot `afterDraw`), so it no longer flickers to black. Far but steady hands are accepted (CORE-6 `farHold`) with a short note. Waiting for step 129 (five checks; replaces 128).
