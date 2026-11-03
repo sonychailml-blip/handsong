@@ -18,11 +18,13 @@ export { checkSoloFirefly } from './night/night.js';
 export { checkNightUntouched, dumpNight } from './night/nightguard.js';
 export { checkNightProfile } from './night/nightprofile.js';
 export { checkNightMigrate } from './night/nightmigrate.js';
+export { checkNightLean, checkQuietFloor } from './night/lean.js';   // NIGHT-1 stages 2, 3
 export const api=guardApi;
 
 export function install(){
   if(new URLSearchParams(location.search).has('calpanel')) import('./core/calpanel.js').then(m=>m.mountCalPanel('night')).catch(e=>console.warn('[probe] the calibration panel failed to load', e));   // CORE-1: the development panel
   if(new URLSearchParams(location.search).has('headroom')) import('./night/headroom.js').then(m=>m.mountHeadroom()).catch(e=>console.warn('[probe] the headroom page failed to load', e));   // NIGHT-1: the sound headroom page
+  if(new URLSearchParams(location.search).has('tails')) import('./night/tailsw.js').then(m=>m.mountTailSwitch()).catch(e=>console.warn('[probe] the tail switch failed to load', e));   // NIGHT-1 stage 3: ?probe&tails=on|off
   guardWire(SELF); window.P=guardApi(); console.log('[probe] window.P ready — await P.all()');
   import('../../core/render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));
 }

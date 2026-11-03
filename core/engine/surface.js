@@ -5,7 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'core/autosave.js':['AC'],
-  'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setNightStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
+  'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setNightStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo', 'setLeanPath', 'leadParkTick'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
   'core/clip.js':['createRecordingTap'],
   'apps/full/demo.js':['AC', 'initAudio'],
   'core/freeze/registry.js':['AC', 'frzReader', 'frzReady', 'frzStoreCount', 'frzStoreDbg', 'frzStoreDel', 'frzStorePut', 'fxSnapshot',
@@ -43,7 +43,9 @@ const SURFACE={
   'tools/probes/full/tim3d.js':['CHORD_INSTR', 'chordOn', 'timbreForgetDbg', 'timbreIdx', 'timbreInstall', 'timbreRecord', 'timbreSnapshot', 'timbresOf'],
   'tools/probes/core/pool.js':['CHORD_INSTR', 'LEAD_INSTR', 'chordGlide', 'chordOff', 'chordOn', 'drumHit', 'leadOn', 'poolDbg', 'poolSizes'],
   'tools/probes/night/night.js':['LEAD_INSTR', 'timbreById', 'timbresOf', 'outputFadeLevel', 'timbreIdOf', 'fxInstance', 'FX_FACTORY', 'ambienceInfo', 'AC'],
-  'tools/probes/night/headroom.js':['AC', 'engineCtx', 'timbreIdOf', 'fxInstance', 'setLowPower', 'offlineTapMaster', 'fxRenderPath', 'fxPlaySet', 'setTimbreTrim', 'setNightStrikes', 'applyFx', 'LEAD_INSTR', 'leadOn', 'leadOff', 'ambienceOn', 'ambienceTick', 'chordOn', 'chordOff', 'dbgExprBypass'],   // NIGHT-1: the headroom page, dev only
+  'tools/probes/night/headroom.js':['AC', 'engineCtx', 'timbreIdOf', 'fxInstance', 'setLowPower', 'offlineTapMaster', 'fxRenderPath', 'fxPlaySet', 'setTimbreTrim', 'setNightStrikes', 'applyFx', 'LEAD_INSTR', 'leadOn', 'leadOff', 'ambienceOn', 'ambienceTick', 'chordOn', 'chordOff', 'setLeanPath', 'leadParkTick', 'setPartialFloor'],   // NIGHT-1: the headroom page, dev only
+  'tools/probes/night/lean.js':['AC', 'engineCtx', 'leanInfo', 'setLeanPath', 'leadParkTick', 'LEAD_INSTR', 'engVoices', 'timbreIdOf', 'fxSnapshot', 'chordOn', 'chordOff', 'setTimbreTrim', 'setNightStrikes', 'applyFx', 'leadOn', 'leadOff', 'offlineTapMaster', 'fxInstance', 'fxRenderPath', 'fxPlaySet', 'bassOn', 'bassOff', 'drumHit', 'droneOn', 'droneOff', 'setPartialFloor'],   // CORE-3
+  'tools/probes/night/tailsw.js':['setPartialFloor'],   // CORE-4: the dev switch
   'tools/probes/night/forest.js':['fxSnapshot', 'masterLevel', 'ambienceInfo'],
   'tools/probes/core/profile.js':['timbreIdOf'],
   'tools/probes/night/nightprofile.js':['FX_FACTORY', 'timbreIdOf'],

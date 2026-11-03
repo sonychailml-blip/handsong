@@ -8,7 +8,7 @@
 import { BUS } from '../../core/pure/bus.js';
 import { NIGHT_UI, showStep, nextOf, sleepLevel } from '../../core/pure/nightui.js';
 import { sleepProgress } from './pure/cycle.js';   // RUN 9: the sleep timer deepens the night
-import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setNightStrikes, AC, leadOn, leadOff, timbreIdx, ambienceInfo } from '../../core/audio.js';
+import { outputFade, ambienceOn, ambienceRetune, ambienceTick, fxInstance, setTimbreTrim, setLowPower, setNightStrikes, setLeanPath, leadParkTick, AC, leadOn, leadOff, timbreIdx, ambienceInfo } from '../../core/audio.js';
 import { fxDenorm } from '../../core/modules/effects/param.js';
 import { NIGHT_FX } from '../../core/modules/effects/night-fx.js';
 import { AMB } from '../../core/pure/ambience.js';
@@ -21,6 +21,8 @@ import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo } fro
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
+/* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
+export const LEAN_PATH=Object.freeze({ expr:true, voice:true, roles:true, closedFx:true, park:true });
 const KEY={ lantern:'handsong.nightLantern', field:'handsong.nightField', forest:'handsong.nightForest', seen:'handsong.nightSeen', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene' };
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
@@ -42,6 +44,7 @@ export function nightShellFace(p){
   amb=on && !!p.ambience; ambienceOn(amb, forestLevel());
   setTimbreTrim(on ? p.levels : null);   // RUN 8: the face's per-timbre level trim (Full: none)
   setNightStrikes(on ? (p.voices||{}) : null);
+  setLeanPath(on ? LEAN_PATH : null);
   setVolFloor(on && p.volume ? p.volume.left : null);   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
   if(on){ reachSet(forestLevel()); lightApply(load(KEY.light)==='1', true); }   // RUN 8: the room's reach = the slider; C8 the person's «Lighter forest»
   else setLowPower(false);
@@ -104,6 +107,7 @@ function tick(now){
   st=showStep(st, n, now);
   $('nightShell').classList.toggle('show', st.shown && !info && !asleep);
   if(amb){ ambienceRetune(); ambienceTick(); }   // the drone follows the mood; the crickets are scheduled ahead
+  leadParkTick();   // NIGHT-1: a silent flute's bank stops being computed
   const fxv=nightFxNow(); BUS.set('nightFx', fxv);   // C5: the effects hand's values for the forest's visuals (rings, colour, tremble)
   BUS.set('nightSky', { mood:D.mood(), sleep:sleepProgress(sleep.t0, sleep.mins, now), wind:windNow() });   // RUN 9: the forest's palette (mood), the night's depth (sleep), the wind
   bars(now, Array.isArray(hv) ? hv : [], fxv);   // RUN 8 (slice 3)

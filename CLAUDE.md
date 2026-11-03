@@ -165,6 +165,7 @@ or merges into an armed one; undo removes the last take; an optional bar-quantis
   (`audio.setTimbreTrim`), `voices` {id: strikes} (`audio.setNightStrikes` — the struck banks take Night's cheaper strike + the cap only while
   set; Full builds RUN 7's strike exactly, row «FULL untouched»), `volume` {left} (the amplitude floor of the hand's horizontal,
   `state.setVolFloor`). All set by the Night face; Full and every render copy have none.
+- **The lean path** (CORE-3, `audio.setLeanPath`, Night's face): an app takes what it never plays out of the graph by disconnecting, off by default; a chain gaining drive, brightness or tremolo needs its switch off first (row «NIGHT lean path»).
 - **Thresholds / palette geometry** = `config.js`. Expression numbers are split: feature→channel in `gestures.EXPR_CFG`,
   channel→depth in `audio.EXPR_A` (gestures imports audio; the reverse would be a cycle).
 - **A hand function** = `state.handFn` defaults + `ui.HANDFN_OPTS` + a branch on `S.fn`/zone in `gestures.js` + a dictionary key.
@@ -540,7 +541,7 @@ THERE in full and here as one index entry):
   113 Listening page v2 (A/B) · 114 The crackle (RUN 8) · 115 Night levels + the ghost · 116 Depth halo + «Лес» bar
   117 Effect bars + hint · 118 The forest picture + fingertip fireflies · 119 Lighter forest + Measure this device (C8)
   120 The night's cycle · 121 The forest answers the playing · 122 The forest's detail · 123 Rare events · 124 Quality levels and the budget (RUN 9)
-  125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`)
+  125 Hand calibration (CORE-1; on the panel `?probe&calpanel`) · 126 Sound headroom (NIGHT-1; the page `?probe&headroom`) · 127 The quiet floor by ear (NIGHT-1; `?probe&tails=on|off`)
 
 ## Language
 - **Code comments:** existing ones are Russian; new and edited ones are short English (standing rule). Never translate en masse.

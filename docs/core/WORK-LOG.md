@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`. Checkpoints A–E of SPLIT-2 are its last sections.
 
+# CORE-4 (2026-11-03): the quiet floor, opt-in, nobody on it yet
+Tree hashes before: core c91a61074394f73e. After: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b.
+- `core/audio.js` `setPartialFloor(db)`; `core/modules/timbres/modal.js`, `tine.js`: partials stop at the floor, on the lean strike path only. Off by default and in every render copy. Full's strike ignores it (row «NIGHT quiet floor»). `surface.js`: listings. GOLD, census, both «untouched» rows exact: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · `P.all: PASS — 122 checks, 0 differences` (GOLD 0, node census 0, FULL untouched 0) · `P.night: PASS — 36 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT lean path 0, NIGHT quiet floor 0) · `[smoke] PASS` with builds. No print renewed, no tolerance changed.
+
+# CORE-3 (2026-11-03): the lean path, opt-in
+Tree hashes before: core e327f42db4c183c7. After: core c91a61074394f73e · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b.
+- `core/audio.js`: `setLeanPath({ expr, voice, roles, closedFx, park })`, `leadParkTick`, `leanInfo`. Every switch off by default and in every render copy (`renderReset`); with them off no node, value or order changes (one stored field `v.shaper`). `core/engine/surface.js`: listings. No app but Night opts in. Row: «NIGHT lean path»; GOLD, census, both «untouched» rows exact: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · `P.all: PASS — 122 checks, 0 differences` (GOLD 0, node census 0, FULL untouched 0) · `P.night: PASS — 35 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT lean path 0) · `[smoke] PASS` with builds. One fix round: a word the name row forbids in a mockup, and a row order number. No print renewed, no tolerance changed.
+
 # CORE-2 (2026-11-03): one listing line for a dev tool
 Tree hashes before: core 7ef60d72285fb980 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: core e327f42db4c183c7 · apps unchanged.
 - `core/engine/surface.js`: the calls of NIGHT-1's headroom page (`tools/probes/night/headroom.js`) listed, as static check 12 requires. Data read only by the static check; no runtime code changed. Checks of both apps: `docs/night/WORK-LOG.md` NIGHT-1.

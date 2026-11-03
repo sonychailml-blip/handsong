@@ -1348,6 +1348,7 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
 (`#panelSound`), «Looper» (`#panelLoop`). Transport under the strip: ▶ ⟳ ⤺ ✕ ■ ✎ in play; ⏮ ▶ ⟳ in the window; ⏮ ▶ in the editor.
 
 ## Known limits (design around them; reasoning: archive, "Known limits")
+- The lean path (CORE-3): `voice` assumes no drive, brightness or tremolo in the chain; `roles` assumes the app plays only solo; a parked bank's phase and noise position resume where they stopped, so a note after a rest isn't sample-identical to one that never parked (same loudness and onset, measured).
 - **A chain reordered during a take renders in its earlier order** (gating can't reorder; report `reordered`); live gates fade (τ 0.08) and
   live dips ~40 ms on a composition change that changes the wiring, the render switches instantly; a re-opened live effect may hold an old
   tail, the render's opens empty.
@@ -1795,6 +1796,7 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     hand in place, turning the wrist: the range is the accepted limit. Copy the numbers and send them. Phone: portrait and landscape.
     Done: Full on the desktop, 2026-11-02 (near 0.339, depth 2×, wrist 0.27, 3σ hold band kept). Open: Night on the desktop, both apps on the Poco.
 126. Sound headroom (NIGHT-1). On the Poco: a Night preview + `/?probe&headroom`, tap Start, allow the camera. It calculates silently (5–15 minutes), plays with no camera, then asks for a hand in view and plays with the camera and the forest; about 20 minutes in all. Listen for crackle during the sound parts; say which part. Copy the text at the end and send it. Reload before any other check. Results and method: `docs/night/NIGHT-1-HEADROOM.md`.
+127. The quiet floor by ear (NIGHT-1 stage 3; off for players). `http://127.0.0.1:5500/apps/night/?probe&tails=off`, Begin, headphones, the Forest slider all the way down so nothing masks a tail, your hand on the right side of the frame so it plays loud. Singing bowl: one low note, then listen until silence, about 10 s. Press the top-left pill (it flips on the next note, Tails cut: ON) and play the same note. Then Handpan, Firefly, a low and a high note each. Listen for: a tail that ends sooner, thins out or stops abruptly; a shimmer that disappears near the end. Then the Forest slider back up and 30 s of your normal playing, flipping the pill. Answer: could you tell, and which one sounded better. `…?probe&tails=on` starts with it on.
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - LAT2a probe clock (RUN 4), SONG3 leftover (RUN 4) and POOL1 (RUN 4) updated these lines of the moved text:

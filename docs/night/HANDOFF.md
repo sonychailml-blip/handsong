@@ -18,12 +18,13 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Step 121, the answer to playing.** A ring per note; mushrooms and flowers pulse; fireflies gather after 10 s and drift off. Stream: Echo = rings, Wave = ferns tremble, Warm ↔ Bright = the light's colour.
 - **Step 122, detail.** The Forest slider moves grass and ferns with the wind you hear; leaves, moths, moonbeams, dark corner leaves. Landscape: nothing covers the middle.
 - **Step 123, rare moments.** About 10 minutes: a falling star or the five-dot emblem; hold a note 3 s: a flower. At once: `(await import('/core/legacy-ui/views/scene/host.js')).sceneRoomDbg().rareDbg('star')` (or `'emblem'`, `'bloom'` with a hand up).
-- **Step 125, hand calibration** (CORE-1; Night doesn't open it yet, so this runs on the test panel). `http://127.0.0.1:5500/apps/night/?probe&calpanel`, on the Poco a preview + `/?probe&calpanel`. Press Play, then the green button at the bottom left. Full text: `archive/CLAUDE-history.md`.
+- **Step 125, hand calibration** (stays open; the calibration screens' test list will cover it. CORE-1; Night doesn't open it yet, so this runs on the test panel). `http://127.0.0.1:5500/apps/night/?probe&calpanel`, on the Poco a preview + `/?probe&calpanel`. Press Play, then the green button at the bottom left. Full text: `archive/CLAUDE-history.md`.
 - **Step 124, quality and cost.** ⓘ → «Forest picture»: medium, high, low. Then ⓘ → «Measure this device» with the forest on, on the laptop and **on the Poco M5**; send the text.
 - **Eye check from the split:** `tools/split-baseline/side-by-side-E/`, the four structure-only screens.
 - **Not done by a machine:** ears, hands, phones. Old setting names do not carry over to the new `handsong-night` address, so first-run steps may appear again there.
 
-- **NIGHT-1, the headroom session (Poco first, then step 125):** tap-by-tap list in the NIGHT-1 record below.
+- **Step 127, the quiet floor by ear:** `http://127.0.0.1:5500/apps/night/?probe&tails=off` and `…&tails=on`; `archive/CLAUDE-history.md`.
+- **The Poco headroom page, later:** `<Night preview>/?probe&headroom`, about 25 minutes (user, 2026-11-03).
 
 ## Questions for the user from RUN 9
 1. Medium is the default because high costs about a third of the hand tracking. Good enough, or make high cheaper?
@@ -33,11 +34,16 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-2 stage 1 (2026-11-03): calibration screens, design only. `docs/night/design/NIGHT-2-calibration/DESIGN.md`
+- No app code. 12 screens at 3 sizes in `tools/design/NIGHT-2-calibration/`; 12 open questions. Stops until the user approves.
+### NIGHT-1 stage 3 (2026-11-03): the quiet floor, off for players. `docs/night/NIGHT-1-HEADROOM.md` «Stage 3», step 127
+- Partials and notes stop below −70 dBFS behind `?probe&tails=on`. Saving 2–11%, sound −46 to −64 dB away. Waiting for the user's ears.
+### NIGHT-1 stage 2 (2026-11-03): options 1 and 2. Numbers: `docs/night/NIGHT-1-HEADROOM.md` «Stage 2»
+- Night's face turns on CORE-3's lean path: unused stages, roles and closed effects out of the graph, silent flute banks parked. Same sound (−133 to −141 dB, row «NIGHT lean path»). Fast passages 32–36% → 15–19% of budget; free share with camera and forest about 13–38% → 50–63%. If Night's chain ever gains drive, brightness, tremolo or the expression hand, turn the matching switch off first; the row fails until then.
 ### NIGHT-1 stage 1 (2026-11-02/03): sound headroom, measured. Numbers: `docs/night/NIGHT-1-HEADROOM.md`. Log: `docs/night/WORK-LOG.md`
 - Waiting for: the user's decision, the Poco numbers, step 125. No fixes yet.
 - Laptop, cool and idle: no crackle (0–2 dropouts in 39 stress passes). Free share under stress: a quarter to a third with sound alone, less with camera and forest; about one 12.5% step below Full's SuperSaw.
 - Heaviest: not the partials (a bowl's 24: 66 µs). The forest room, stages Night doesn't use, idle chord voices, flute and SuperSaw banks that never stop. Three unused stages save 17–20% with the sound identical (−138 dB). No slowdown near silence (control: 9–10× in JS).
-- The session: `<Night preview>/?probe&headroom` on the Poco (about 20 min), then `<Night preview>/?probe&calpanel` and `<Full preview>/?probe&calpanel`, then desktop `http://127.0.0.1:5500/apps/night/?probe&calpanel`. Previews come from a pushed `dev`.
 ### RUN 9 (2026-10-19/20): the living forest. Log and plain summary: `archive/WORK-LOG-before-split.md` «RUN 9» (old name)
 - NIGHT (`apps/night/pure/cycle.js`): a 24-min seamless cycle: the moon drifts, 7 cloud passes dim it, four mist layers; the sleep timer deepens and stills the night; moods Glow / Dusk / Mist recolour the forest (token sets). Bus `nightSky` { mood, sleep, wind } from the shell.
 - RESPONSE (`apps/night/pure/forestlife.js`, `apps/night/scene/forest-life.js`): a ring of light per note; mushrooms / flowers pulse; fireflies gather while you play; a stream with the moon's reflection: Echo = rings on the water, Wave = the leaves shimmer, Warmth = the light's colour.

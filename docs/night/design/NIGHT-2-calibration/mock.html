@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NIGHT-2 calibration mockup</title>
+<!-- A design mockup with Night's real tokens and stylesheet, not app code. Address: mock.html?screen=offer (the list: SCREENS below). Pictures: node tools/night2-mock-snap.mjs -->
+<link rel="stylesheet" href="../../../../core/tokens.css">
+<link rel="stylesheet" href="../../../../apps/night/night.css">
+<style>
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:#05070a; color:var(--night-ink); font-family:var(--night-font-body); overflow:hidden; }
+  #scene{ position:fixed; inset:0; }
+  .forest{ background:radial-gradient(ellipse 60% 40% at 72% 18%, #26364a 0%, transparent 70%), linear-gradient(#0b1420 0%, #0a1b1c 55%, #06110d 100%); }
+  .forest::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:46%; background:repeating-linear-gradient(90deg, transparent 0 7%, rgba(0,0,0,.35) 7% 8.6%, transparent 8.6% 13%), linear-gradient(transparent, rgba(0,0,0,.55)); }
+  .camera{ background:linear-gradient(135deg,#3b3a38,#26272b 55%,#1c1d20); }
+  .camera svg.h{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); height:82%; max-width:92%; color:#b99a84; opacity:.92; }
+  .dim::before{ content:""; position:absolute; inset:0; background:rgba(5,7,10,.28); z-index:1; }
+  #nightShell{ position:fixed; inset:0; pointer-events:auto; }
+  #nightShell .night-fade{ opacity:1; visibility:visible; }
+  #nightShell .cal-title{ font-family:var(--night-font-display); font-weight:var(--night-fw-light); font-size:calc(var(--night-fs-body) * 1.5); margin:0 0 var(--night-gap); color:var(--night-ink); }
+  #nightShell .cal-say{ color:var(--night-ink) !important; font-size:var(--night-fs-body); line-height:var(--night-lh); margin:0 !important; }
+  .cal-note{ color:var(--night-dim) !important; font-size:var(--night-fs-small) !important; margin:var(--night-gap) 0 0 !important; }
+  .cal-btns{ display:flex; gap:var(--night-gap); margin-top:var(--night-pad); }
+  #nightShell .cal-btn{ flex:1; min-height:48px; border-radius:var(--night-r-pill); border:1px solid var(--night-hair); background:var(--night-fill); color:var(--night-ink); font:inherit; font-size:var(--night-fs-body); }
+  #nightShell .cal-btn.go{ background:var(--night-accent); color:var(--night-accent-ink); border:0; font-weight:var(--night-fw-bold); }
+  .cal-strip{ position:absolute; left:var(--night-edge); right:var(--night-edge); width:auto; bottom:max(var(--night-edge), env(safe-area-inset-bottom)); max-width:560px; margin:0 auto; padding:var(--night-pad); border-radius:var(--night-r-card); box-shadow:var(--night-shadow); z-index:2; }
+  .cal-bar{ height:6px; border-radius:var(--night-r-pill); background:var(--night-fill); border:1px solid var(--night-hair); margin-top:var(--night-gap); overflow:hidden; }
+  .cal-bar i{ display:block; height:100%; background:var(--night-accent); }
+  #nightShell .cal-cancel{ background:var(--night-glass); border:1px solid var(--night-hair); position:absolute; top:max(var(--night-edge), env(safe-area-inset-top)); right:max(var(--night-edge), env(safe-area-inset-right)); padding:8px 16px; border-radius:var(--night-r-pill); z-index:2; font-size:var(--night-fs-value); color:var(--night-ink); }
+  .cal-frame{ position:absolute; inset:7%; border:1.5px dashed rgba(241,238,228,.45); border-radius:18px; z-index:1; }
+  .cal-frame.warn{ border-color:var(--night-warm); }
+  .set-h{ font-size:var(--night-fs-small); letter-spacing:.08em; color:var(--night-dim); text-transform:uppercase; margin:var(--night-pad) 0 var(--night-gap-sm); }
+  .set-row{ margin:var(--night-gap) 0 var(--night-pad); }
+  .set-lab{ display:flex; justify-content:space-between; font-size:var(--night-fs-value); }
+  .set-ends{ display:flex; justify-content:space-between; font-size:var(--night-fs-small); color:var(--night-dim); margin-top:2px; }
+  .set-row input{ width:100%; accent-color:var(--night-accent); margin:6px 0 0; }
+  .set-off{ opacity:.45; }
+  .seg{ display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--night-hair); border-radius:var(--night-r-pill); overflow:hidden; margin-top:var(--night-gap-sm); }
+  .seg span{ padding:8px 4px; text-align:center; font-size:var(--night-fs-value); }
+  .seg .on{ background:var(--night-accent); color:var(--night-accent-ink); }
+  .night-card{ z-index:3; }
+  #nightShell .cal-card{ display:block; width:min(440px, calc(100vw - 28px)); }
+  .tg{ display:flex; justify-content:space-between; gap:var(--night-gap); padding:var(--night-gap) 0; border-top:1px solid var(--night-hair); font-size:var(--night-fs-value); color:var(--night-ink); }
+  .tg i{ flex:none; width:2.2em; height:1.2em; border:1px solid var(--night-hair); border-radius:var(--night-r-pill); }
+  .lnk{ color:var(--night-accent); font-size:var(--night-fs-value); margin:var(--night-gap) 0 0; }
+  .ctl5{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .ico{ width:46%; height:46%; }
+  @media (orientation:landscape) and (max-height:500px){ .night-card{ max-height:calc(100vh - 16px); padding:var(--night-pad); } .cal-strip{ max-width:60vw; padding:var(--night-gap) var(--night-pad); } }
+  @media (orientation:landscape){ .settings-card{ grid-template-columns:1fr 1fr; } .ctl5{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+</style>
+</head>
+<body class="night">
+<div id="scene"></div>
+<div id="nightShell"></div>
+<script>
+const HAND='<svg class="h" viewBox="0 0 200 300" fill="currentColor" aria-hidden="true"><path d="M60 300c-8-30-30-60-44-96-6-15 12-24 22-12l22 28V72c0-18 24-18 24 0v76h6V42c0-18 24-18 24 0v106h6V56c0-18 24-18 24 0v96h6V84c0-18 24-18 24 0v120c0 40-14 66-26 96z"/></svg>';
+const ICON=d=>`<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">${d}</svg>`;
+const ICONS={ sound:'<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>', mood:'<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16"/>', hand:'<path d="M8 13V6a1.5 1.5 0 0 1 3 0v5-7a1.5 1.5 0 0 1 3 0v7-5a1.5 1.5 0 0 1 3 0v9a6 6 0 0 1-6 6c-4 0-5-3-7-7"/>', notes:'<circle cx="7" cy="7" r="2"/><circle cx="17" cy="12" r="2"/><circle cx="9" cy="17" r="2"/>', sleep:'<path d="M19 15A8 8 0 0 1 9 5a8 8 0 1 0 10 10z"/>', settings:'<path d="M5 7h9M18 7h1M5 12h1M10 12h9M5 17h7M16 17h3"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="14" cy="17" r="2"/>' };
+const T={
+  offerT:['Настроим руку?','Set up your hand?'],
+  offerB:['Один шаг, около 10 секунд: покажите камере руку, которой играете. Тогда лес будет точнее следовать за её движением.','One step, about 10 seconds: show the camera the hand you play with. Then the forest will follow its movement more closely.'],
+  offerN:['Это можно сделать позже в настройках.','You can do this later in settings.'],
+  set:['Настроить','Set up'], skip:['Пропустить','Skip'], cancel:['Отмена','Cancel'],
+  wait:['Поднесите играющую руку как можно ближе к камере. Вся рука должна быть в кадре.','Bring your playing hand as close to the camera as you can, with the whole hand in the frame.'],
+  hold:['Отлично. Держите руку неподвижно…','Good. Hold your hand still…'],
+  back:['Рука не помещается в кадр. Отодвиньте её чуть дальше от камеры.','Your hand doesn’t fit the frame. Move it a little further from the camera.'],
+  closer:['Рука далековато. Поднесите её ближе к камере.','Your hand is rather far away. Bring it closer to the camera.'],
+  still:['Рука двигается. Задержите её на пару секунд, можно опереться локтем о стол.','Your hand is moving. Hold it for a couple of seconds; you can rest your elbow on a table.'],
+  doneT:['Готово','Done'], doneB:['Рука запомнена. Ближе к камере — меньше леса, дальше — больше.','Your hand is remembered. Closer to the camera means less forest, further means more.'],
+  play:['Играть','Play'], again:['Ещё раз','Again'], retry:['Попробовать ещё раз','Try again'], failT:['Не получилось','That didn’t work'], later:['Позже','Later'],
+  'no-hand':['Руку не видно. Поднимите её перед камерой.','No hand in view. Raise it in front of the camera.'],
+  settings:['Настройки','Settings'], handH:['Рука','Hand'], handOk:['Рука настроена','Your hand is set up'], handNo:['Рука не настроена','Your hand isn’t set up'], recal:['Настроить заново','Set up again'], reset:['Сбросить настройки руки','Reset hand settings'],
+  travel:['Ход руки','Hand travel'], tNear:['Короткий','Short'], tFar:['Длинный','Long'], tNeed:['Сначала настройте руку','Set up your hand first'],
+  fx:['Чуткость эффектов','Effects sensitivity'], fSoft:['Мягче','Softer'], fKeen:['Чутче','Keener'],
+  viewH:['Вид','View'], view:['Что на экране','On screen'], forest:['Лес','Forest'], dark:['Тёмный','Dark'], camera:['Камера','Camera'],
+  lantern:['Фонарик у нижнего края','Lantern at the bottom edge'], field:['Показать всё нотное поле','Show the full note field'], lighter:['Облегчённый лес','Lighter forest'], first:['Показать первые шаги снова','Show the first steps again'], priv:['Изображение и звук не покидают это устройство.','Pictures and sound never leave this device.'],
+  resetQ:['Сбросить настройки руки? Настройка и оба ползунка вернутся к исходным.','Reset hand settings? The setup and both sliders go back to their defaults.'], resetDo:['Сбросить','Reset'],
+  sound:['Звук','Sound'], mood:['Настроение','Mood'], handP:['Играть','Play with'], notes:['Ноты','Notes'], sleep:['Сон','Sleep'], fw:['Лес','Forest'],
+};
+const q=new URLSearchParams(location.search), lang=q.get('lang')==='en'?1:0, L=k=>T[k][lang];
+const scene=(k,dim)=>{ const s=document.getElementById('scene'); s.className=k+(dim?' dim':''); s.innerHTML= k==='camera' ? HAND : ''; };
+const shell=document.getElementById('nightShell');
+const card=(inner,cls='cal-card')=>`<div class="night-card night-glass ${cls}" role="dialog">${inner}</div>`;
+const btn=(k,go)=>`<button class="cal-btn ${go?'go':''}">${L(k)}</button>`;
+const strip=(say,prog,warn)=>`<button class="cal-cancel night-glass">${L('cancel')}</button><div class="cal-frame ${warn?'warn':''}"></div><div class="cal-strip night-glass"><p class="cal-say">${say}</p>${prog!=null?`<div class="cal-bar"><i style="width:${prog}%"></i></div>`:''}</div>`;
+const rb=(ic,lab,val)=>`<button class="night-rb"><span class="night-circ">${ICON(ICONS[ic])}</span><span class="night-lab">${L(lab)}</span><span class="night-val">${val}</span></button>`;
+const settings=(cal=true,confirm=false)=>card(`
+  <div><div class="night-ihead"><span class="cal-title" style="margin:0">${L('settings')}</span><button class="night-ibtn night-ibtn-in night-glass">${ICON('<path d="M6 6l12 12M18 6L6 18"/>')}</button></div>
+  <div class="set-h">${L('handH')}</div>
+  <div class="tg" style="border:0;padding-top:0"><span>${L(cal?'handOk':'handNo')}</span><span class="lnk" style="margin:0">${L(cal?'recal':'set')}</span></div>
+  <div class="set-row ${cal?'':'set-off'}"><div class="set-lab"><span>${L('travel')}</span>${cal?'':`<span style="color:var(--night-dim)">${L('tNeed')}</span>`}</div><input type="range" min="0" max="1" step="0.01" value="0.5" ${cal?'':'disabled'}><div class="set-ends"><span>${L('tNear')}</span><span>${L('tFar')}</span></div></div>
+  <div class="set-row"><div class="set-lab"><span>${L('fx')}</span></div><input type="range" min="0" max="1" step="0.01" value="0.5"><div class="set-ends"><span>${L('fSoft')}</span><span>${L('fKeen')}</span></div></div>
+  ${confirm?`<p class="cal-say" style="margin-top:var(--night-gap)!important">${L('resetQ')}</p><div class="cal-btns">${btn('cancel')}${btn('resetDo',true)}</div>`:`<div class="lnk">${L('reset')}</div>`}</div>
+  <div><div class="set-h">${L('viewH')}</div><div class="set-lab"><span>${L('view')}</span></div><div class="seg"><span class="on">${L('forest')}</span><span>${L('dark')}</span><span>${L('camera')}</span></div>
+  <div style="height:var(--night-gap)"></div><div class="tg"><span>${L('lantern')}</span><i></i></div><div class="tg"><span>${L('field')}</span><i></i></div><div class="tg"><span>${L('lighter')}</span><i></i></div>
+  <div class="lnk">${L('first')}</div><p class="cal-note">${L('priv')}</p></div>`,'settings-card');
+const SCREENS={
+  /* the first launch, right after the camera starts */
+  offer:()=>{ scene('camera',true); return card(`<p class="cal-title">${L('offerT')}</p><p class="cal-say">${L('offerB')}</p><div class="cal-btns">${btn('skip')}${btn('set',true)}</div><p class="cal-note">${L('offerN')}</p>`); },
+  /* the step: the camera picture whatever the background is */
+  wait:()=>{ scene('camera'); return strip(L('wait')); },
+  hold:()=>{ scene('camera'); return strip(L('hold'),62); },
+  back:()=>{ scene('camera'); document.getElementById('scene').style.setProperty('--x',1); return strip(L('back'),null,true); },
+  closer:()=>{ scene('camera'); return strip(L('closer')); },
+  still:()=>{ scene('camera'); return strip(L('still')); },
+  /* the end */
+  done:()=>{ scene('camera',true); return card(`<p class="cal-title">${L('doneT')}</p><p class="cal-say">${L('doneB')}</p><div class="cal-btns">${btn('again')}${btn('play',true)}</div>`); },
+  fail:()=>{ scene('camera',true); return card(`<p class="cal-title">${L('failT')}</p><p class="cal-say">${L('no-hand')}</p><div class="cal-btns">${btn('later')}${btn('retry',true)}</div>`); },
+  /* settings */
+  settings:()=>{ scene('forest',true); return settings(true); },
+  settingsnone:()=>{ scene('forest',true); return settings(false); },
+  reset:()=>{ scene('forest',true); return settings(true,true); },
+  /* the main screen: five controls and settings */
+  main:()=>{ scene('forest'); return `<div class="night-fade"><p class="night-idle">${lang?'Raise a hand to play':'Поднимите руку, чтобы играть'}</p><button class="night-ibtn night-glass">${ICON(ICONS.settings)}</button>
+    <div class="night-ctl night-glass ctl5">${rb('sound','sound',lang?'Handpan':'Хэндпан')}${rb('mood','mood',lang?'Major':'Мажор')}${rb('hand','handP',lang?'Right':'Правой')}${rb('notes','notes',lang?'Follow':'За рукой')}${rb('sleep','sleep',lang?'Off':'Выкл')}
+    <label class="night-vol" style="grid-column:1/-1"><span class="night-lab">${L('fw')}</span><span class="night-vol-in"><input type="range" value="60"></span></label></div></div>`; },
+};
+document.body.dataset.screen=q.get('screen')||'offer';
+shell.innerHTML=(SCREENS[q.get('screen')]||SCREENS.offer)();
+window.MOCK_SCREENS=Object.keys(SCREENS);
+</script>
+</body>
+</html>

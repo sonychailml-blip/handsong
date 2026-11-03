@@ -4,6 +4,20 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-2 — stage 1 (2026-11-03): calibration screens, design only
+No app code. Design and open questions: `docs/night/design/NIGHT-2-calibration/DESIGN.md`, mock beside it, pictures `tools/design/NIGHT-2-calibration/` (`node tools/night2-mock-snap.mjs`). Waiting for the user's approval.
+
+# NIGHT-1 — stage 3 (2026-11-03): option 3 behind a switch
+Tree hashes before: core c91a61074394f73e · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b. After: core fc2784fd1a6f4eba · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b.
+- Numbers: `docs/night/NIGHT-1-HEADROOM.md` «Stage 3»: 2–11%. Night doesn't opt in. Dev switch `tools/probes/night/tailsw.js`, row «NIGHT quiet floor», smoke test of the switch. Step 127 is the user's listening test.
+- Final set: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · `P.all: PASS — 122 checks, 0 differences` (GOLD 0, node census 0, FULL untouched 0) · `P.night: PASS — 36 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT lean path 0, NIGHT quiet floor 0) · `[smoke] PASS` with builds. No print renewed, no tolerance changed.
+
+# NIGHT-1 — stage 2 (2026-11-03): options 1 and 2
+Tree hashes before: core e327f42db4c183c7 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: core c91a61074394f73e · apps/full d6b90cf2cb4be6da · apps/night efe1ccf4dbbd133b.
+- Night opts in to CORE-3's lean path (`apps/night/shell.js`: face + one tick). Numbers: `docs/night/NIGHT-1-HEADROOM.md` «Stage 2». Fast passages about halve; free share with camera and forest about doubles.
+- New row «NIGHT lean path» (`tools/probes/night/lean.js`). The headroom page shows new and old in the same session (`CONDS`, `PLAN`), gentle passes before ballast.
+- Final set: static PASS · `[probe-data] PASS — 36 checks, 0 differences` · `P.quick: PASS — 93 checks, 0 differences` · `P.all: PASS — 122 checks, 0 differences` (GOLD 0, node census 0, FULL untouched 0) · `P.night: PASS — 35 checks, 0 differences` (NIGHT stress 0, NIGHT untouched 0, NIGHT lean path 0) · `[smoke] PASS` with builds. One fix round: a word the name row forbids in a mockup, and a row order number. No print renewed, no tolerance changed.
+
 # NIGHT-1 — stage 1 (2026-11-02/03): Night's sound headroom, measured
 Tree hashes before: core 7ef60d72285fb980 · apps/full d6b90cf2cb4be6da · apps/night b8b85189cac1a5b4. After: core e327f42db4c183c7 (one listing line, CORE-2 in `docs/core/WORK-LOG.md`) · apps/full and apps/night unchanged.
 - Measurement only; nothing players hear or see changed. Numbers, conditions and limits: `docs/night/NIGHT-1-HEADROOM.md`.

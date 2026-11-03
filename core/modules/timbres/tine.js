@@ -23,13 +23,15 @@ function buildTineBank(E, preBus, R, id){
     const lean=E.nightLean, g=E.ac.createGain(); g.gain.value=lvl*lastVel; g.connect(ig);
     const rec= lean ? strikeAdmit(E, id, t) : null; if(rec) rec.out=g;
     const mod= lean && (!opt || opt.mod); if(mod && !dt){ dt=E.ac.createGain(); for(const p of taps) p.connect(dt); }
-    const oscs=[]; let end=t;
+    const oscs=[]; let end=t, floor= lean && E.partialFloor ? E.partialFloor/(lvl*lastVel*((opt&&opt.trim)||1)) : 0;   // CORE-4: the quiet floor in this bank's units; 0 = off
     for(const [ratio,a,decay,type] of parts){
+      if(floor && a<=floor) continue;
       const o=E.ac.createOscillator(), pg=E.ac.createGain();
       o.type=type; o.frequency.value=f0*ratio; if(lean) try{ o.detune.automationRate='k-rate'; }catch(e){}
       pg.gain.setValueAtTime(0,t); pg.gain.linearRampToValueAtTime(a,t+0.006); pg.gain.exponentialRampToValueAtTime(0.0001,t+decay);
       if(!lean) for(const p of taps) p.connect(o.detune); else if(mod) dt.connect(o.detune); else o.detune.value=opt.hum;
-      o.connect(pg); pg.connect(g); o.start(t); o.stop(t+decay+0.05); end=Math.max(end, t+decay+0.05);
+      const dur= floor ? Math.min(decay+0.05, 0.006+Math.log(a/floor)*(decay-0.006)/Math.log(a/0.0001)) : decay+0.05;
+      o.connect(pg); pg.connect(g); o.start(t); o.stop(t+dur); end=Math.max(end, t+dur);
       o.onended= !lean ? ()=>{ for(const p of taps) try{ p.disconnect(o.detune); }catch(e){} } : ()=>{ if(mod) try{ dt.disconnect(o.detune); }catch(e){} };   // the taps would keep an ended partial alive
       oscs.push(o);
     }

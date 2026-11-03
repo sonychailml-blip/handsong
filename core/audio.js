@@ -421,7 +421,7 @@ function renderReset(){
   timbreSync();   // TIM3d: the render copy learns the records added since its start (a song's own timbres)
   trackGainOf=()=>1; trackPanOf=()=>0; trackRouteOf=()=>false; hitOwnerKey=null; hitBus=null; voiceFirstOsc=true;   // AF5: the render copy never splits
   pendFx.vib=0; pendFx.drv=0; pendFx.trm=0; pendFx.bri=null; pendSymp=null; dView=null; dUp=false;   // TF2: the note's key and the drone's view
-  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false; strikeCaps.clear(); nightLean=false;
+  DBG.noHum=false; DBG.noStrikeCap=false; DBG.strikeCut=false; offline=false; rnd=Math.random; timbreTrim.clear(); lowPower=false; strikeCaps.clear(); nightLean=false; for(const k in LEAN) LEAN[k]=false; partialFloor=0;   // CORE-3, CORE-4: a render copy starts on the old path
 }
 /* Снимок тех же переключателей — для стража P.all (между строками копия обязана быть в сбросе). Только чтение. */
 const renderStateOf=()=>({ offline, noHum:DBG.noHum, noStrikeCap:DBG.noStrikeCap, strikeCut:DBG.strikeCut, seeded: rnd!==Math.random, gain:ownerGain('loop:0'), pan:ownerPan('loop:0'),
@@ -967,7 +967,7 @@ function fxPathOf(key){
   const ids=FX_PLAY_PATH[key]||fxIdsOfChain(key);   // O-3: пока задан путь переигровки — звучит ОН, а не живая цепь
   for(const id of ids){ const inst=byKey[id];
     if(fxInPath(inst) && !seen.has(id)){ path.push(inst); seen.add(id); } }
-  for(const id in byKey){ if(!seen.has(id) && fxInPath(byKey[id])) path.push(byKey[id]); }
+  if(!(LEAN.closedFx && key===CHAIN_SOLO)) for(const id in byKey){ if(!seen.has(id) && fxInPath(byKey[id])) path.push(byKey[id]); }   // CORE-3: closedFx leaves them out
   return path;
 }
 /* ПЕРЕСБОРКА СИГНАЛЬНОГО ПУТИ ВЛАДЕЛЬЦА. Зовётся из ЧЕТЫРЁХ мест и только из них: регистрация концов,
@@ -1232,6 +1232,38 @@ const strikeLive=[];   // RUN 8: Night's struck strikes still ringing — the ca
    cheaper strike (E.nightLean). Null in Full and in every render copy (renderReset): the banks then build RUN 7's strike exactly. */
 const strikeCaps=new Map(); let nightLean=false;
 function setNightStrikes(voices){ strikeCaps.clear(); nightLean=!!voices; for(const [id,n] of Object.entries(voices||{})) strikeCaps.set(id, n); }
+/* CORE-3 (NIGHT-1 stage 2): THE LEAN PATH, opt-in, every switch off by default (Full, render copies). Each one takes out of the graph what its app never plays, by disconnecting: nothing is
+   built or stopped differently (rule #3 holds) and turning a switch off restores the same connections. expr: the expression stage on the solo sum and its echo line. voice: each solo voice's
+   waveshaper, brightness stage and tremolo tap (needs a chain with no drive, brightness or tremolo). roles: chords, bass, drums, the backing drone and every track chain, cut at the master
+   (nothing may play them). closedFx: built effects outside the live chain leave the solo path. park: a silent voice's bank with sources that never stop (subtractive, FM, breath) leaves the
+   graph, so it isn't computed, and comes back on its next attack. A source that isn't pulled keeps its phase and misses no parameter event. */
+const LEAN={ expr:false, voice:false, roles:false, closedFx:false, park:false };
+const PARK_TCS=12, PARK_SWITCH=0.25, parkable=k=>{ const e=LEAD_REC[k]&&LEAD_REC[k].engine; return e==='subtractive'||e==='fm2'||e==='breath'; };   // 12 time constants of the release: −104 dB; 0.25 s: well past the banks' 20-ms crossfade
+function voiceLean(v,on){ if(!!v.lean===on) return; v.lean=on; const t=v.trem, b=v.bri;
+  if(on){ v.pre.disconnect(v.shaper); t.disconnect(b.lp); t.disconnect(b.neg); v.tremDep.disconnect(t.gain); }
+  else { v.pre.connect(v.shaper); t.connect(b.lp); t.connect(b.neg); v.tremDep.connect(t.gain); } }
+function exprLean(on){ const { leadSum:s, exprGain:g, leadOut:o, exprDly:d }=dbgExprIO;
+  if(on){ s.disconnect(g); s.connect(o); o.disconnect(d); exprDlyWet.disconnect(master); }
+  else { s.disconnect(o); s.connect(g); o.connect(d); exprDlyWet.connect(master); } }
+function rolesLean(on){ const keys=['ch','bs','dr'].map(chainKeyOf), tails=[...keys, ...[...keys, CHAIN_SOLO].map(trackChainKeyOf)].map(k=>FX_CHAIN_OUT[k]).filter(Boolean);
+  for(const n of [...tails, backBus]) if(on) n.disconnect(master); else n.connect(master); }
+function bankPark(v,k,on){ const b=v.banks[k]; if(!!b.parked===on) return; b.parked=on; if(on) b.gain.disconnect(v.pre); else b.gain.connect(v.pre); }
+/* o = { expr, voice, roles, closedFx, park }; absent or null = all off. Set between notes: at a face's start */
+function setLeanPath(o){ if(!AC) return; const w=o||{}, ch=k=>{ const on=!!w[k]; if(LEAN[k]===on) return false; LEAN[k]=on; return true; };
+  if(ch('expr')) exprLean(LEAN.expr);
+  if(ch('voice')) for(const v of lv) voiceLean(v,LEAN.voice);
+  if(ch('roles')) rolesLean(LEAN.roles);
+  if(ch('closedFx')) fxResplice(CHAIN_SOLO);
+  if(ch('park') && !LEAN.park) for(const v of lv) for(const k in v.banks) bankPark(v,k,false); }
+/* once per frame while parking is on: a voice's other banks soon after a switch; its own once its release is inaudible */
+function leadParkTick(now){ if(!LEAN.park) return; const t=now!=null?now:AC.currentTime;
+  for(const v of lv) for(const k in v.banks){ if(v.banks[k].parked || !parkable(k)) continue;
+    if(+k===v.ins ? (!v.on && v.parkAt!=null && t>=v.parkAt) : t>=(v.swAt||0)+PARK_SWITCH) bankPark(v,k,true); } }
+/* CORE-4 (NIGHT-1 stage 3): THE QUIET FLOOR, off by default, on the struck banks' lean path only: a partial stops once it falls below db dBFS, the whole note when its last one does. Level taken at full
+   volume, so a hand raising the volume can't reveal a stopped partial; the room and echo are downstream and keep their own tails. null = off. */
+let partialFloor=0;
+const setPartialFloor=db=>{ partialFloor= db==null ? 0 : Math.pow(10,db/20)/LEAD_OUT_G; };
+const leanInfo=()=>({ ...LEAN, parked:lv.reduce((n,v)=>n+Object.values(v.banks).filter(b=>b.parked).length,0) });   // probes read
 const ffInfo=()=>ffLive.map(x=>({ owner:x.owner, t:x.t, route:x.route, cancelled:!!x.cancelled }));   // probes only
 /* strikes of `owner` that begin at or after `when` never sound */
 function ffCancel(owner,when){
@@ -1467,7 +1499,7 @@ async function initAudio(mkCtx){
   const exprDlyLine=AC.createDelay(1); exprDlyLine.delayTime.value=0.28;
   const exprDlyFb=AC.createGain(); exprDlyFb.gain.value=0.4; exprDlyLine.connect(exprDlyFb); exprDlyFb.connect(exprDlyLine);
   exprDlyWet=AC.createGain(); exprDlyWet.gain.value=0;
-  leadOut.connect(exprDlyLine); exprDlyLine.connect(exprDlyWet); exprDlyWet.connect(master);
+  leadOut.connect(exprDlyLine); exprDlyLine.connect(exprDlyWet); exprDlyWet.connect(master); dbgExprIO.exprDly=exprDlyLine;
 
   /* --- АККОРДЫ: сухая шина + СВОЯ ЦЕПЬ ЭФФЕКТОВ (с Пласта 3.5.2; прежде — фиксированный send) ---
      Z-ЯРКОСТЬ живёт ПЕР-ГОЛОСОВО (фильтр fb каждого голоса, см. buildChordPool), а НЕ на этой шине:
@@ -1713,7 +1745,8 @@ function newLeadVoice(){
      ТЕМ ЖЕ вызовом, что запускает ноту (leadOn). Второго пути записи нет, поэтому картинка не может
      разойтись со звуком и не может отстать от него на кадр. */
   const shim= rt ? AC.createGain() : null; if(shim){ shim.gain.value=1; exprVibPitch.connect(shim); }   // AF5: the expression shimmer reaches this voice only while a live hand owns it
-  const v={hum,vibDep,pre,satDry,satWet,env,tg,pan,vol,trem,tremDep,bri,rt,shim,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  const v={hum,vibDep,pre,shaper,satDry,satWet,env,tg,pan,vol,trem,tremDep,bri,rt,shim,banks:{},ins:-1,owner:null,tOn:0,on:false,deg:-1,oct:0,freeAt:0};   // freeAt — только для offline (F2); живьём не читается
+  if(LEAN.voice) voiceLean(v,true);   // CORE-3
   lv.push(v); return v;
 }
 /* ПРИЦЕПКА ЭФФЕКТОВ В ГОЛОС. Величины и постоянные времени — СИМВОЛ В СИМВОЛ прежние из applyFx
@@ -1757,6 +1790,7 @@ function applyVoiceFx(v,p,t,fresh){
    РЕАЛЬНО сыгранных инструментов × число РЕАЛЬНО занятых голосов (обычно 1–2 × 1–2), против 23 сегодня. */
 function leadVoiceBank(v,ins,when){
   let b=v.banks[ins];
+  if(b&&b.parked) bankPark(v,ins,false);   // CORE-3: back in the graph before this attack is scheduled
   if(!b){ b=v.banks[ins]=buildLeadBank(E, LEAD_REC[ins],v.pre,v.hum,v.vibDep,v.shim); b.gain.gain.value=0; }   // TIM3b: from the record   // vibDep — глубина вибрато ЭТОГО голоса: mkOsc цепляет её в detune осцилляторов банка
   if(v.ins!==ins){
     /* ПЕРВЫЙ банк голоса открываем МГНОВЕННО — ровно как это делал initAudio (banks[leadIdx].gain.value=1)
@@ -1764,6 +1798,7 @@ function leadVoiceBank(v,ins,when){
        как раньше» сломалось бы на самой первой. Смена банка ПОЗЖЕ — прежним кроссфейдом setLeadInstr. */
     if(v.ins<0) b.gain.gain.value=1;
     else { const t=when!=null?when:AC.currentTime; for(const k in v.banks) v.banks[k].gain.gain.setTargetAtTime(+k===ins?1:0,t,0.02); }   // when — явное время (слайс S2): кроссфейд банков обязан ехать в то же время, что и сама атака, иначе при офлайн-рендере он лёг бы в «сейчас», а нота — в будущее
+    if(LEAN.park) v.swAt=when!=null?when:AC.currentTime;   // CORE-3
     v.ins=ins;
   }
   return b;
@@ -1802,6 +1837,7 @@ function leadRelease(v,hard,when){
   const tc=hard?0.02:LEAD_INSTR[v.ins<0?leadIdx:v.ins].rel;
   v.env.gain.cancelScheduledValues(t);
   v.env.gain.setTargetAtTime(0,t,tc);
+  if(LEAN.park) v.parkAt=t+PARK_TCS*tc;   // CORE-3
   if(v.owner) v.last=v.owner;   // AF2: см. cvRelease
   v.on=false; v.owner=null;
   if(offline) v.freeAt=freeAfter(t);   // свободен с мига отпускания, как живьём (см. freeAfter)
@@ -1885,7 +1921,7 @@ function leadOn(owner,freq,vol,ins,deg,oct,glide,tie,when){   // V2: tie ПЕР�
      note's vibrato, or a live expression shimmer; else the humanisation is a fixed detune. Read from the note's values, so a render
      decides as live play does. */
   const mod= pendFx.vib>0 || !!(v.shim && exprVibPitch && Math.abs(exprVibPitch.gain.value)>1e-3);
-  if(!tie) b.strike && b.strike(t, volVel('ld',a), pendSymp, { hum:humC, mod });  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
+  if(!tie) b.strike && b.strike(t, volVel('ld',a), pendSymp, { hum:humC, mod, trim:trimOf(ins) });  // VOL-2b: скорость удара = амплитуда (у соло прежняя связь «гейн = скорость» сохранена; volVel('ld',a) === a). T3: у связки удара нет — живьём нота не переатаковалась   // FM: огибающая индекса; банки с фильтром: огибающая фильтра + скорость→яркость (громкость ЭТОЙ атаки — прежний lastVel по значению)
 }
 /* ins (T0-fix) — тембр ВЕДЕНИЯ: смена ЖИВОГО тембра соло посреди ноты ПЕРЕЛИВАЕТ звучащую ноту (живой путь
    зовёт leadOn каждый кадр, и leadVoiceBank делает кроссфейд банков голоса за 20 мс). Запись пишет это
@@ -2163,7 +2199,7 @@ function drone(owner, d, time){ if(owner) dronePan(ownerPan(owner),time); droneU
    (`build`) also has setters (a moved builder writes it only through E). ⛔ Never in E: static data (timbre tables, FX_FACTORY, REV_A …).
    Probe row «AUD1 engine context» (probes/engine.js). */
 const E=Object.freeze({
-  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get nightLean(){ return nightLean; }, strikeCaps, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
+  get ac(){ return AC; }, get offline(){ return offline; }, get lowPower(){ return lowPower; }, get nightLean(){ return nightLean; }, get partialFloor(){ return partialFloor; }, strikeCaps, get rate(){ return AC ? AC.sampleRate : 0; }, get rnd(){ return rnd; }, dbg:DBG,
   master:Object.freeze({ get in(){ return master; }, get glue(){ return mGlue; }, get make(){ return mMake; }, get lim(){ return mLim; },
     get limiter(){ return limiter; }, get out(){ return outLast; }, get meter(){ return meterAn; }, get level(){ return masterLvl; }, get limRed(){ return limRed; } }),
   /* role buses: the solo sum before the expression stage, the chain heads (live), the drone bus; `head(key)` = a chain key's head */
@@ -2191,7 +2227,7 @@ const E=Object.freeze({
 });
 const engineCtx=()=>E;
 export {
-  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, setNightStrikes, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
+  outputFade, outputFadeLevel, setTimbreTrim, setLowPower, setNightStrikes, setLeanPath, leadParkTick, leanInfo, setPartialFloor, ambienceOn, ambienceRetune, ambienceTick, ambienceInfo,
   initAudio, AC, setLeadInstr, applyFx, applyExpr, scheduleBend, bendTapSet, leadCancel, metroClick,
   leadOn, leadSet, leadOff, leadAllOff, leadHold,   // соло — пул с владельцами (было: моно noteOn/noteOff/applyParams)
   chordOn, chordGlide, chordOff, chordHold,

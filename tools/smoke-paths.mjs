@@ -140,11 +140,19 @@ async function roomPage(label, dir, addr, breakName=null){ const served=[], bad=
     await page.waitForFunction(()=>['done','failed'].includes(window.__headroom.phase()), null, { timeout:360e3 });
     const r=await page.evaluate(()=>({ phase:window.__headroom.phase(), text:document.getElementById('hrOut').value, csp:window.__csp.slice() }));
     if(r.phase!=='done') bad.push('it failed: '+r.text.slice(0,300));
-    else { const j=JSON.parse(r.text); if(j.format!=='handsong/headroom' || !j.offline.passages['solo.singing-bowl'].stress.us || j.realtime.runs.length!==2 || !j.meta.rate) bad.push('the report is wrong: '+r.text.slice(0,200)); }
+    else { const j=JSON.parse(r.text); if(j.format!=='handsong/headroom' || !j.offline.passages['solo.singing-bowl'].stress.us || j.realtime.runs.length!==3 || !j.meta.rate) bad.push('the report is wrong: '+r.text.slice(0,200)); }
     if(r.csp.length) bad.push('CSP violation: '+r.csp.slice(0,3).join('; '));
     await page.goto(origin+addr+'?probe'); await page.waitForFunction(()=>window.P,null,{ timeout:90e3 }).catch(()=>bad.push('window.P did not appear')); await page.waitForTimeout(500); if(await page.$('#hrPanel')) bad.push('?probe alone shows the page');
   }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
   out(`[smoke] headroom page, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,4).join(' · '):'PASS'}`); return bad; }
+/* NIGHT-1 stage 3: the quiet-floor switch: ?probe&tails=on shows the pill on, =off off; it flips; ?probe alone shows none */
+async function tailPill(label, dir, addr){ const served=[], bad=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true });
+  try{ const ctx=await browser.newContext(); await cdnCache(ctx); const page=await ctx.newPage(); page.on('pageerror', e=>bad.push('page error: '+(e&&e.message||e)));
+    await page.goto(origin+addr+'?probe&tails=on'); await page.waitForSelector('#tailPill',{ timeout:90e3 }); if(!/ON/.test(await page.textContent('#tailPill'))) bad.push('=on did not read on'); await page.click('#tailPill'); if(!/OFF/.test(await page.textContent('#tailPill'))) bad.push('the pill did not flip');
+    await page.goto(origin+addr+'?probe&tails=off'); await page.waitForSelector('#tailPill',{ timeout:90e3 }); if(!/OFF/.test(await page.textContent('#tailPill'))) bad.push('=off did not read off');
+    await page.goto(origin+addr+'?probe'); await page.waitForFunction(()=>window.P,null,{ timeout:90e3 }).catch(()=>bad.push('window.P did not appear')); await page.waitForTimeout(500); if(await page.$('#tailPill')) bad.push('?probe alone shows the pill');
+  }catch(e){ bad.push('error: '+(e&&e.message||e)); } finally{ await browser.close().catch(()=>{}); srv.close(); }
+  out(`[smoke] quiet-floor switch, ${label}: ${bad.length?'NOT A PASS — '+bad.slice(0,4).join(' · '):'PASS'}`); return bad; }
 async function roomAbsent(dir){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`; let st=0; try{ st=(await fetch(origin+'/'+ROOM)).status; }catch(e){} srv.close(); const ok=st===404; out(`[smoke] headroom page on production: ${ok?'PASS — absent':'NOT A PASS — HTTP '+st}`); return ok?0:1; }
 /* ?probe on a built tree: window.P on a preview, nothing at all on production */
 async function probeGate(app, dir, want){ const served=[], srv=await serve(dir,'/',served,null), origin=`http://127.0.0.1:${srv.address().port}`, browser=await chromium.launch({ channel:'chrome', headless:true }); const bad=[];
@@ -161,6 +169,7 @@ async function redirectCheck(){ const served=[], srv=await serve(ROOT,'/',served
 for(const app of ['full','night']) for(const prefix of ['/','/some/sub/']) if((await run(app,ROOT,prefix)).length) fails++;
 if((await statsPage('repo tree',ROOT)).length) fails++;
 if((await roomPage('repo tree',ROOT,'/apps/night/')).length) fails++;
+if((await tailPill('repo tree',ROOT,'/apps/night/')).length) fails++;
 for(const app of ['full','night']) if((await panelGate(`${app}, repo tree`,ROOT,`/apps/${app}/`,true)).length) fails++;
 if(!NO_CONTROL){ const c=await panelGate('CONTROL (its file refused)',ROOT,'/apps/night/',true,'calpanel.js'); out(`[smoke] CONTROL (the panel without its file must fail): ${c.length?'caught':'NOT caught'}`); if(!c.length) fails++; }
 if(!NO_CONTROL){ const c=await roomPage('CONTROL (its sums refused)',ROOT,'/apps/night/','headroom-calc.js'); out(`[smoke] CONTROL (the headroom page without its sums must fail): ${c.length?'caught':'NOT CAUGHT — the test cannot fail'}`); if(!c.length) fails++; }
@@ -172,7 +181,7 @@ if(BUILD){ fails+=await redirectCheck();
     if((await run(app,prev,'/')).length) fails++;
     fails+=await probeGate(app,prod,false); fails+=await probeGate(app,prev,true);
     if((await statsPage(`${app} preview`,prev)).length) fails++; fails+=await statsAbsent(prod);
-    if(app==='night'){ if((await roomPage('night preview',prev,'/')).length) fails++; fails+=await roomAbsent(prod); }
+    if(app==='night'){ if((await roomPage('night preview',prev,'/')).length) fails++; if((await tailPill('night preview',prev,'/')).length) fails++; fails+=await roomAbsent(prod); }
     if((await panelGate(`${app} preview`,prev,'/',true)).length) fails++; if((await panelGate(`${app} production`,prod,'/',false)).length) fails++; }
   if((await run('night',build('night','release'),'/',false,false)).length) fails++; }
 if(!NO_CONTROL){ const c=await run('full',prodFull||ROOT,'/',true); const caught=c.some(x=>/ks-worklet/.test(x));

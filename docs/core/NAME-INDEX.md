@@ -71,7 +71,7 @@ VIS1c (RUN 6, Night plan §3) — THE NIGHT FOREST ROOM: a scene module built wi
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (2): `nightShellDbg`, `nightSleepDbg`
+- const (3): `LEAN_PATH`, `nightShellDbg`, `nightSleepDbg`
 - fn (2): `nightShellWire`, `nightShellFace`
 
 ## core/arrange.js
@@ -81,8 +81,8 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 
 ## core/audio.js
 (no head comment)
-- const (52): `outputFadeLevel`, `setLowPower`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
-- fn (87): `outputFade`, `setTimbreTrim`, `setNightStrikes`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
+- const (54): `outputFadeLevel`, `setLowPower`, `leanInfo`, `setPartialFloor`, `ambienceInfo`, `bendTapSet`, `leadHold`, `chordHold`, `bassHold`, `droneHz`, `sympBase`, `LEAD_INSTR`, `CHORD_INSTR`, `BASS_INSTR`, `DRUM_NAMES`, `DRUM_ROWS`, `DRUM_KITS`, `hitOwner`, `masterLevel`, `renderStateOf`, `timbresOf`, `timbreIdOf`, `timbreById`, `timbreReg`, `timbreKey`, `timbreIdx`, `timbreSnapshot`, `timbreRecord`, `timbreForgetDbg`, `FX_FACTORY`, `fxPerm`, `fxHandRange`, `fxIsPerNote`, `fxNoteField`, `fxNoteFollows`, `fxVoiceIdsFor`, `fxAddableIds`, `FX_AMT`, `fxBriOf`, `FX_GLIDE_KEY`, `fxDipLog`, `frzStoreDel`, `frzStoreDbg`, `poolDbg`, `poolSizes`, `setTrackRouteOf`, `routeOfOwner`, `LEAD_KS_FROM`, `leadIsKs`, `masterDyn`, `ffInfo`, `masterDelayMs`, `masterProbeNodes`, `engineCtx`
+- fn (89): `outputFade`, `setTimbreTrim`, `setNightStrikes`, `setLeanPath`, `leadParkTick`, `ambienceOn`, `ambienceRetune`, `ambienceTick`, `initAudio`, `setLeadInstr`, `applyFx`, `applyExpr`, `scheduleBend`, `leadCancel`, `metroClick`, `leadOn`, `leadSet`, `leadOff`, `leadAllOff`, `chordOn`, `chordGlide`, `chordOff`, `setBassInstr`, `bassOn`, `bassSet`, `bassOff`, `drumHit`, `setDrumKit`, `droneOn`, `droneOff`, `droneRetune`, `droneUse`, `createRecordingTap`, `setTrackGainOf`, `ownerGain`, `trackGainRetune`, `setMasterLevel`, `masterMeter`, `setTrackPanOf`, `ownerPan`, `trackPanRetune`, `dronePan`, `renderReset`, `timbreInstall`, `fxInstance`, `fxSetActive`, `fxChainResplice`, `fxSnapshot`, `fxChordBri`, `fxCaptureChain`, `fxCaptureWalk`, `fxPlaySet`, `fxPlayPath`, `fxParamKeysOf`, `fxRestoreAim`, `fxParamMetaOf`, `fxDefaultsOf`, `fxAimSet`, `fxAimGet`, `makeFrozenBus`, `fxRenderPath`, `fxGateAt`, `setDbg`, `dbgExprBypass`, `fxGlideOf`, `probeCapture`, `probeCaptureReady`, `xfRamp`, `voicesCut`, `frzStorePut`, `frzReader`, `frzStoreCount`, `fxDenormOf`, `offlineTapMaster`, `engVoices`, `engLevels`, `engLoad`, `setOffline`, `setRnd`, `chainStateOf`, `masterDynSet`, `offlineMasterDyn`, `forestData`, `noteOn`, `noteSet`, `noteOff`, `bend`, `hit`, `drone`
 - let (4): `AC`, `frzReady`, `ksReady`, `dynReady`
 - → ./modules/timbres/stages.js (1): `panGains`
 
@@ -888,6 +888,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
+- → ./night/lean.js (2): `checkNightLean`, `checkQuietFloor`
 - → ./night/night.js (1): `checkSoloFirefly`
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
@@ -908,8 +909,12 @@ NIGHT-1: the measuring page's processors, dev only.
 
 ## tools/probes/night/headroom.js
 NIGHT-1 stage 1: Night's sound headroom, dev only.
-- const (6): `stopCamera`, `openCamera`, `CONDS`, `PLAN`, `snapshot`, `reportOf`
-- fn (14): `sharedParts`, `noteCost`, `passages`, `tails`, `tailProfile`, `whatIfs`, `lab`, `prerender`, `buffers`, `calibrate`, `realtime`, `phoneOffline`, `deepOffline`, `mountHeadroom`
+- const (7): `stopCamera`, `openCamera`, `setBase`, `CONDS`, `PLAN`, `snapshot`, `reportOf`
+- fn (15): `sharedParts`, `noteCost`, `passages`, `tails`, `tailProfile`, `whatIfs`, `lab`, `prerender`, `buffers`, `calibrate`, `plainPasses`, `realtime`, `phoneOffline`, `deepOffline`, `mountHeadroom`
+
+## tools/probes/night/lean.js
+NIGHT-1 stage 2: row «NIGHT lean path» (P.night; slow: offline renders).
+- fn (2): `checkNightLean`, `checkQuietFloor`
 
 ## tools/probes/night/night.js
 C4a (RUN 6, Night plan §4.1, §10): row «C4a solo Firefly» (quick and all; three short offline renders through the engine copy).
@@ -928,7 +933,11 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
-_178 modules, 2257 exported names._
+## tools/probes/night/tailsw.js
+NIGHT-1 stage 3: the dev switch for the quiet floor.
+- fn (1): `mountTailSwitch`
+
+_180 modules, 2269 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

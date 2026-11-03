@@ -113,3 +113,63 @@ That's a contribution, not the whole cause: the reference's second pass carries 
 
 ## 6. The phone page
 `tools/probes/night/headroom.js` (page), `headroom-calc.js` (sums, data row «NIGHT-1 headroom sums»), `headroom-worklet.js` (ballast, control, lab). Address: `<preview>/?probe&headroom`. Dev only: previews carry it, production doesn't (smoke test). About 3 minutes of calculation on this laptop, so about 5–15 on the Poco, then about 8 minutes of sound. Tested with the smoke test's short plan on a fake camera and the same calculation part on the laptop. **Not yet run on a real phone.**
+
+# Stage 2 (2026-11-03): options 1 and 2, done
+
+Night opts in to a core option that takes out of the graph what it never plays; Full stays on the old path. Laptop conditions as above: on mains, 2501 MHz, Telegram closed, the user's Chrome idle (load 0–2% between runs), fake camera with no hand. One offline run and three real-time runs (01:01–02:02), plus one test with no ballast. Before and after in the same sessions, the same method.
+
+**What's out of the graph on the new path (`setLeanPath`, `core/audio.js`):** the expression stage on the solo sum and its echo line; each voice's waveshaper, brightness stage and tremolo tap; chords, bass, drums, the backing drone and every track chain, cut at the master; built effects outside the live chain (the solo reverb and delay); and a silent voice's flute or SuperSaw bank. Everything is disconnected, not stopped, so rule #3 holds, and turning a switch off restores the same connections.
+
+**Fast and gentle passages, offline, % of budget:**
+
+| Sound | Fast, before | Fast, after | Gentle, before | Gentle, after |
+|---|---|---|---|---|
+| Firefly | 33 | 15 | 24 | 11 |
+| Breath flute | 35 | 17 | 24 | 11 |
+| Handpan | 36 | 19 | 24 | 12 |
+| Singing bowl | 32 | 16 | 24 | 12 |
+
+Silent, Night's chain and ambience: 19% → 13%. After the flute was tried on 4 voices, the bowl's fast passage: 40.5% → 16.6%, against 16.6% with no flute at all.
+
+**Free share under fast playing, real time, three runs, %:**
+
+| Sound | Sound alone, before | Sound alone, after | Camera + tracking + forest, before | After |
+|---|---|---|---|---|
+| Firefly | 38–50 / 25–38 / 13–25 | 75–88 / 63–75 / 75–88 | 13–25 / 25–38 / 25–38 | 0 (disturbed, see below) / 63–75 / 50–63 |
+| Handpan | 25–38 / 25–38 / 0–13 | 63–75 / 50–63 / 63–75 | 13–25 / 25–38 / 0 | 50–63, all three |
+| Singing bowl | 25–38 / 13–25 / 25–38 | 63–75 / 63–75 / 50–63 | 25–38 / 13–25 / 25–38 | 50–63, all three |
+| Breath flute | 38–50 / 50–63 / 50–63 | 63–75 / 75–88 / 63–75 | 38–50, all three | 63–75, all three |
+| Bowl after the flute | 25–38 / 25–38 / 13–25 | 63–75 / 63–75 / 50–63 | 13–25 / 25–38 / 0–13 | 50–63, all three |
+| Idle | 50–63 / 63–75 / 50–63 | 88–100 / 75–88 / 75–88 | 50–63 / 50–63 / 13–25 | 75–88, all three |
+
+Night's sounds now have about the same free share as, or more than, Full's SuperSaw (38–50 with camera and forest).
+
+**Two readings checked rather than trusted:** Firefly's 0 with camera and forest was the first pass right after the forest opened (5 dropouts); it read 63–75 and 50–63 in the other runs. A few gentle passes on the new path read 2–6 dropouts right after the heaviest ballast step. With no ballast at all, alternating new and old with camera and forest, all 64 passes read 0 dropouts. The page now plays gentle passes before the ballast.
+
+**Same sound (row «NIGHT lean path», offline, each sound's fast passage):**
+- Stages, residual against the old path: Firefly −141 dB, flute −133, handpan −139, bowl −139. Rounding error. CONTROL: without the echo, −12.5 dB.
+- Undone exactly: on then off against never touched, −138.5 dB. CONTROL: chords left cut, −31 dB.
+- Never reached: Night's chain holds no drive, brightness, tremolo, vibrato, reverb or delay, and a real playing pass through the hand machine sounded 0 chord and 0 bass voices and no drum hit. Night's profile offers one role, solo.
+- Parked, then played again, flute: loudness 0.03 dB from the same attack never parked (its own spread between attacks 0.06), onset 18 ms before and 17 ms after, click 0.036 against 0.036. The same when the reconnect lands one quantum late. CONTROLS: reconnecting 120 ms late reads onset 132 ms; disconnecting mid-note reads click 0.495.
+- SuperSaw: 2.74 dB from one attack, but its own attacks differ by 2.40 dB, since detuned oscillators beat; the row allows spread + 0.5 dB. Night never plays it.
+- A reconnected flute isn't sample-identical, because its phase and noise position resume where they stopped, as any held-over voice's would differ. Nobody has listened to this yet.
+
+**Limit named:** the switches assume the chain has no drive, brightness or tremolo. The row fails if Night's chain gains one, so the expression hand or a new effect must turn its switch off first. The render copy still takes no chord pool, limiter or track heads, so live savings on idle parts may be larger than the offline numbers.
+
+# Stage 3 (2026-11-03): option 3, behind a switch. Nobody hears it until the user decides
+
+**What it does:** with the quiet floor on, a struck partial stops once it falls below −70 dBFS, and the whole note when its last partial does. The level is taken at full volume, so raising the volume can't reveal a stopped partial. The room and echo sit downstream and keep their own tails. Core option `setPartialFloor(db)` (CORE-4), off by default, on the lean strike path only. Night doesn't opt in. Dev switch: `?probe&tails=on` or `=off`, with a pill to flip it.
+
+**Saving, on top of stage 2** (same laptop conditions, 02:52–03:06, % of budget; negative saving = inside the noise):
+
+| Sound | Fast, without | Fast, with | Gentle, without | Gentle, with | Longest note computed, s |
+|---|---|---|---|---|---|
+| Firefly | 14.5 | 15.4 | 9.5 | 9.2 | 1.65 → 1.21 |
+| Handpan | 17.6 | 16.4 | 11.9 | 10.7 | 4.61 → 3.11 |
+| Singing bowl | 16.4 | 16.1 | 12.1 | 10.8 | 10.73 → 7.05 |
+
+Real time, free share with camera and forest, two runs: Firefly 63–75 / 50–63 either way, Handpan 50–63 either way, Bowl 50–63 / 50–63 without and 50–63 / 63–75 with. No dropouts in any pass without ballast. So 2–11%, too small for real time to tell apart here. It also doesn't lower the notes ringing in fast playing, because the cap still decides there (mean 3.98 vs 4 handpan, 3 vs 3 bowl).
+
+**What it changes in the sound:** worst sample −59.6 to −77.5 dBFS across passages, residual −46 to −64 dB. CONTROL: a floor at −30 dBFS takes away −21.8 dBFS.
+
+**My reading:** after stage 2 it's a small extra, not a need. It's worth keeping only if your ears find nothing and the Poco wants every bit.

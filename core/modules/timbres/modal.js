@@ -30,10 +30,11 @@ function buildModalBank(E, preBus, R, id){
     const lean=E.nightLean, tail= lean ? 7/6 : 4/3;   // −70 dB (Night) / −80 dB (Full, RUN 7)
     let to=sum, rec=null; if(lean){ rec=strikeAdmit(E, id, t); to=ac.createGain(); to.connect(sum); rec.out=to; }   // Night: this strike's own gain (the cap fades it)
     const mod= lean && (!opt || opt.mod); if(mod && !dt){ dt=ac.createGain(); for(const p of taps) p.connect(dt); }
+    const floor= lean && E.partialFloor ? E.partialFloor/(R.lvl*((opt&&opt.trim)||1)) : 0;   // CORE-4: the quiet floor in this bank's units; 0 = off
     for(const m of R.modes){
       const f=f0*m.r*jit(J.r), d=m.d*scale*jit(J.d), pk=m.g*jit(J.g)*Math.pow(v, (R.vb||0)*Math.max(0, Math.log2(m.r)));
-      if(f>=nyq) continue;
-      const a=m.a||att, o=ac.createOscillator(), g=ac.createGain(), stop=t+a+d*tail+0.02;
+      if(f>=nyq || (floor && pk<=floor)) continue;
+      const a=m.a||att, o=ac.createOscillator(), g=ac.createGain(), stop= t+a+(floor ? Math.min(d*tail+0.02, d*Math.log(pk/floor)/LN1000) : d*tail+0.02);
       o.type=m.w||'sine'; o.frequency.value=f; try{ o.detune.automationRate='k-rate'; }catch(e){}   // cost: the taps move slowly (block rate is inaudible)
       g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(pk,t+a); g.gain.setTargetAtTime(0,t+a,d/LN1000);
       if(!lean) for(const p of taps) p.connect(o.detune); else if(mod) dt.connect(o.detune); else o.detune.value=opt.hum;
