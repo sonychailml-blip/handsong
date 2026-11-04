@@ -29,4 +29,17 @@ export const FOREST_ROOM=F({
     ahead:0.35,    // seconds of chirps scheduled ahead
   }),
   acoustic:'fdepth',   // the hand's room: Night's «Forest depth» (one acoustic for every room in v1, user 2026-11-03)
+  /* NIGHT-3 stage 4: THE MUSIC BED's recipe (apps/night/pure/bed.js the law, sound/bed.js the sound). Pads: each voice two oscillators of a soft
+     wave (`wave`: harmonic amplitudes) detuned apart by `detune` cents, two shared lowpass filters (one per side) at `cut` × the chord's middle pitch, each drifting by ±`drift.depth`; chords only of
+     the scale's own degrees, in the octave just below the playing (from `pad.lo` of a period under the drone's tonic up to the degree under the playing's tonic). Ground: the tonic
+     and the drone's second string an octave under today's drone (it takes the drone over). Glimmer: rare soft notes at `glim.oct`, a slow swell —
+     nothing struck. Times in seconds; amplitudes are the voices' own, `master` the bus at volume 1 (heard as volume²). */
+  bed:F({ master:0.2, level:0.6, wave:F([1, 0.3, 0.12, 0.05]), detune:F([3, 7]), cut:F([3, 4.5]), q:0.4,
+    pad:F({ lo:0, amp:0.11, attack:2.4, release:3.2 }), ground:F({ amp:0.07, second:0.045, beat:0.12 }),
+    glim:F({ oct:3, amp:0.035, swell:0.35, hold:0.5, decay:1.6 }), echo:F({ time:0.42, fb:0.34, lp:1800, send:0.32, glimSend:0.7 }),
+    presets:F({
+      still:F({ voices:2, every:F([28, 44]), drift:F({ every:F([9, 16]), depth:0.18 }), glim:null }),
+      drift:F({ voices:3, every:F([13, 22]), drift:F({ every:F([7, 13]), depth:0.25 }), glim:null }),
+      glimmer:F({ voices:3, every:F([13, 22]), drift:F({ every:F([7, 13]), depth:0.25 }), glim:F({ every:F([7, 17]) }) }),
+    }) }),
 });

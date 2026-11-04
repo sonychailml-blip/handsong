@@ -20,6 +20,7 @@ export { checkNightProfile } from './night/nightprofile.js';
 export { checkNightMigrate } from './night/nightmigrate.js';
 export { checkNightLean, checkQuietFloor } from './night/lean.js';   // NIGHT-1 stages 2, 3
 export { checkNightCalib } from './night/calib.js';   // NIGHT-2 stage 2
+export { checkNightBed } from './night/bed.js';   // NIGHT-3 stage 4: the music bed
 export const api=guardApi;
 
 export function install(){

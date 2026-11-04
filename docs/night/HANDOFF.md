@@ -19,6 +19,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - **Step 122, detail.** The Forest slider moves grass and ferns with the wind you hear; leaves, moths, moonbeams, dark corner leaves. Landscape: nothing covers the middle.
 - **Step 123, rare moments.** About 10 minutes: a falling star or the five-dot emblem; hold a note 3 s: a flower. At once: `(await import('/apps/night/scene/host.js')).sceneRoomDbg().rareDbg('star')` (or `'emblem'`, `'bloom'` with a hand up).
 - **Step 129, the hand setup, five checks** (laptop + Poco; replaces 128, covers 125 for Night): `archive/CLAUDE-history.md`, step 129.
+- **Step 130, the music bed, five checks** (laptop, headphones; the Poco optional): `archive/CLAUDE-history.md`, step 130.
 - **Step 125, hand calibration** (for Night now covered by step 128. CORE-1; Night doesn't open it yet, so this runs on the test panel). `http://127.0.0.1:5500/apps/night/?probe&calpanel`, on the Poco a preview + `/?probe&calpanel`. Press Play, then the green button at the bottom left. Full text: `archive/CLAUDE-history.md`.
 - **Step 124, quality and cost.** ⓘ → «Forest picture»: medium, high, low. Then ⓘ → «Measure this device» with the forest on, on the laptop and **on the Poco M5**; send the text.
 - **Eye check from the split:** `tools/split-baseline/side-by-side-E/`, the four structure-only screens.
@@ -35,6 +36,10 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-3 stage 4 (2026-11-04): the music bed for the forest. Log: `docs/night/WORK-LOG.md`
+- The Music button (Music · Sound / Mood · Notes · Sleep, 3 + 3 places): off → «Покой» → «Течение» → «Мерцание»; off at first start, remembered. Settings → Music: volume, «Музыка отвечает моим нотам» (off by default).
+- One generator, the forest's recipe as data: chords of the scale's own degrees under the playing, two detuned oscillators per voice, slow filter drift, a ground that takes the drone over, rare glimmer; its own slow clock (no stepping back). The response leans only which chord comes next, never when.
+- Cost on the laptop 2.1–2.5 % of a quantum (gate 3 %); level 0.3 dB from the nature sound. Waiting for step 130.
 ### NIGHT-3 stage 3 (2026-11-03): the forest is the first room module (CORE-8). Log: `docs/night/WORK-LOG.md`
 - A room = `apps/night/rooms/<name>/`: its record (`pure/room.js`: levels, mood looks, nature recipe), its 2D stand-in, its scene code (loaded on first open); the list is `rooms/index.js`, the validator `pure/room.js`. The scene host is Night's (`apps/night/scene/host.js`), the forest's colours are in `night.css`.
 - Nothing seen or heard changed (picture hash, GOLD ambience, NIGHT untouched). Next: the music bed (stage 4 in the user's order).

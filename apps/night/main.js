@@ -11,12 +11,14 @@ import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
 import { soundModAdd } from '../../core/soundmods.js';
 import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet } from './sound/ambience.js';
+import { bedTakesDrone } from './bed.js';
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
 hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8: the shared UI (backgrounds, the latency meter's scene line) reaches the host through this door
 /* CORE-7: the ambience enters the engine through the core door (both engine instances find it); NIGHT-3: built from the room's nature recipe */
 { const N=ROOMS[0].record.nature;
-  const why=soundModAdd('ambience', N.id, { build:(E, dest, seed)=>buildAmbience(E, dest, seed, N), schedule:ambienceSchedule, tune:ambienceTune, set:ambienceSet, level:N.level, ahead:N.ahead });
+  const why=soundModAdd('ambience', N.id, { build:(E, dest, seed)=>buildAmbience(E, dest, seed, N), schedule:ambienceSchedule, tune:ambienceTune, level:N.level, ahead:N.ahead,
+    set:(E, amb, on, level, when)=>ambienceSet(E, amb, on, level, when, E.offline || !bedTakesDrone()) });   // NIGHT-3 stage 4: the live drone steps aside while the music bed plays (a render copy keeps it)
   if(why) console.warn('[night] the ambience was not registered:', why); }   // eslint-disable-line no-console
 nightShellWire(shellDoors()); setFaceHook(nightShellFace);
 /* afterDraw: the calibration's picture is drawn in the loop, while the camera snapshot is still open (NIGHT-2 stage 3) */

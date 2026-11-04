@@ -1,10 +1,11 @@
 /* NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls). A room's record says what it is
    (apps/night/rooms/<name>/pure/room.js); its picture and 2D stand-in are code beside it. Ids are permanent (rule #37, ROOM_IDS pinned). */
+import { BED_PRESETS } from './bed.js';
 export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
 export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
 export const ROOM_ACOUSTICS=Object.freeze(['fdepth']);
-const FIELDS=['format','version','id','name','tokens','levels','looks','moods','look','nature','acoustic'];
+const FIELDS=['format','version','id','name','tokens','levels','looks','moods','look','nature','acoustic','bed'];
 const NATURE=['id','drone','wind','crickets','echo','level','master','ahead'];
 const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const num=v=> typeof v==='number' && Number.isFinite(v);
@@ -37,6 +38,28 @@ export function checkRoom(r, known={}){
   if(!num(N.master) || N.master<=0 || N.master>1) return 'nature.master: above 0, at most 1';
   if(!num(N.ahead) || N.ahead<=0 || N.ahead>2) return 'nature.ahead: above 0, at most 2 s';
   if(!ROOM_ACOUSTICS.includes(r.acoustic)) return 'acoustic: one of '+ROOM_ACOUSTICS.join(' / ');
+  return checkBed(r.bed);
+}
+/* NIGHT-3 stage 4: the music bed's recipe (see the forest's record) */
+const range=(a, lo, hi)=> Array.isArray(a) && a.length===2 && num(a[0]) && num(a[1]) && a[0]>=lo && a[1]<=hi && a[0]<=a[1];
+function checkBed(B){
+  if(!plain(B)) return 'bed: the music bed recipe';
+  if(!num(B.master) || B.master<=0 || B.master>1) return 'bed.master: above 0, at most 1';
+  if(!num(B.level) || B.level<0 || B.level>1) return 'bed.level: 0…1';
+  if(!Array.isArray(B.wave) || !B.wave.length || B.wave.length>8 || !B.wave.every(x=>num(x) && x>=0 && x<=1) || B.wave[0]!==1) return 'bed.wave: harmonic amplitudes, the first 1';
+  if(!range(B.detune, 0, 25)) return 'bed.detune: [lo, hi] cents, 0…25';
+  if(!range(B.cut, 1, 12)) return 'bed.cut: [lo, hi] × the pitch, 1…12';
+  if(!num(B.q) || B.q<=0 || B.q>2) return 'bed.q: above 0, at most 2';
+  const P=B.pad; if(!plain(P) || !num(P.lo) || P.lo<-1 || P.lo>0 || !num(P.amp) || P.amp<=0 || P.amp>0.5 || !num(P.attack) || P.attack<=0 || !num(P.release) || P.release<=0) return 'bed.pad: { lo −1…0 of a period, amp, attack, release }';
+  const G=B.ground; if(!plain(G) || !num(G.amp) || G.amp<0 || G.amp>0.5 || !num(G.second) || G.second<0 || G.second>0.5 || !num(G.beat) || G.beat<0 || G.beat>2) return 'bed.ground: { amp, second, beat }';
+  const L=B.glim; if(!plain(L) || !Number.isInteger(L.oct) || L.oct<1 || L.oct>4 || !num(L.amp) || L.amp<=0 || L.amp>0.3 || !num(L.swell) || L.swell<0.05 || !num(L.hold) || L.hold<0 || !num(L.decay) || L.decay<=0) return 'bed.glim: { oct 1…4, amp, swell ≥ 0.05 s (never struck), hold, decay }';
+  const X=B.echo; if(!plain(X) || !num(X.time) || X.time<=0 || X.time>1 || !num(X.fb) || X.fb<0 || X.fb>=0.9 || !num(X.lp) || !num(X.send) || !num(X.glimSend)) return 'bed.echo: { time, fb < 0.9, lp, send, glimSend }';
+  if(!plain(B.presets) || Object.keys(B.presets).join()!==BED_PRESETS.join()) return 'bed.presets: '+BED_PRESETS.join(', ');
+  for(const [k,Q] of Object.entries(B.presets)){
+    if(!plain(Q) || !Number.isInteger(Q.voices) || Q.voices<1 || Q.voices>3) return `bed.presets.${k}: voices 1…3`;
+    if(!range(Q.every, 4, 120)) return `bed.presets.${k}.every: [lo, hi] s between chords, 4…120`;
+    if(!plain(Q.drift) || !range(Q.drift.every, 1, 60) || !num(Q.drift.depth) || Q.drift.depth<0 || Q.drift.depth>0.6) return `bed.presets.${k}.drift: { every, depth 0…0.6 }`;
+    if(Q.glim!==null && (!plain(Q.glim) || !range(Q.glim.every, 2, 120))) return `bed.presets.${k}.glim: null or { every }`; }
   return null;
 }
 /* the CONTROLS of the data row: each damage must be refused with a line naming its field */
@@ -55,4 +78,7 @@ export const ROOM_DAMAGES=Object.freeze([
   ['nature.level', r=>{ r.nature.level=2; }],
   ['acoustic', r=>{ r.acoustic='cathedral'; }],
   ['unknown field', r=>{ r.theme='dark'; }],
+  ['bed.presets', r=>{ delete r.bed.presets.glimmer; }],   // stage 4
+  ['bed.glim', r=>{ r.bed.glim.swell=0; }],
+  ['bed.presets.drift', r=>{ r.bed.presets.drift.voices=5; }],
 ]);

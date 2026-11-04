@@ -52,11 +52,12 @@ function ambienceTune(E, amb, root, fifth, when){
   else { amb.dRoot.frequency.setValueAtTime(root,t); amb.dFifth.frequency.setValueAtTime(fifth,t); }
   amb.hz=[root,fifth];
 }
-/* on / off and the «Forest» level (0…1, heard as level²): slow fades, nothing abrupt */
-function ambienceSet(E, amb, on, level, when){
+/* on / off and the room's level (0…1, heard as level²): slow fades, nothing abrupt. drone false (NIGHT-3 stage 4): the drone stays out — the
+   music bed has taken it over */
+function ambienceSet(E, amb, on, level, when, drone=true){
   const t=when!=null?when:E.ac.currentTime, v=Math.max(0, Math.min(1, +level||0));
   amb.on=!!on; amb.level=v;
   amb.bus.gain.setTargetAtTime(on ? amb.A.master*v*v : 0, t, on ? 0.6 : 0.8);
-  amb.dGate.gain.setTargetAtTime(on ? 1 : 0, t, on ? amb.A.drone.tc : 0.8);
+  amb.dGate.gain.setTargetAtTime(on && drone ? 1 : 0, t, on && drone ? amb.A.drone.tc : 0.8);
 }
 export { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet };

@@ -581,8 +581,9 @@
   <div id="nightFade" class="night-fade">
     <p id="nightIdle" class="night-idle" data-i18n="night.idle">Raise a hand to play</p>
     <button id="nightInfoBtn" class="night-ibtn night-glass" data-svg="settings" data-i18n-title="night.settings" title="Settings"></button>
-    <!-- NIGHT-2: four round buttons + settings (the background, the Forest slider and «Play with» moved into settings) -->
+    <!-- NIGHT-3 stage 4: five round buttons in 3 + 3 places (Music · Sound / Mood · Notes · Sleep; Room joins the top row once there are two rooms) + settings -->
     <div id="nightCtl" class="night-ctl night-glass">
+      <button id="nightMusic" class="night-rb"><span class="night-circ" data-svg="music"></span><span class="night-lab" data-i18n="night.music">Music</span><span class="night-val"></span></button>
       <button id="nightSound" class="night-rb"><span class="night-circ" data-svg="sound"></span><span class="night-lab" data-i18n="night.sound">Sound</span><span class="night-val"></span></button>
       <button id="nightMood" class="night-rb"><span class="night-circ" data-svg="mood"></span><span class="night-lab" data-i18n="night.mood">Mood</span><span class="night-val"></span></button>
       <button id="nightNotes" class="night-rb"><span class="night-circ" data-svg="note-follow"></span><span class="night-lab" data-i18n="night.notes">Notes</span><span class="night-val"></span></button>
@@ -612,6 +613,12 @@
       <button id="nightCalReset" class="night-lnk" data-i18n="night.cal.reset">Reset hand settings</button>
       <div id="nightCalResetQ" hidden><p data-i18n="night.cal.resetQ"></p>
         <div class="night-btns"><button id="nightCalResetNo" class="night-btn" data-i18n="night.cal.cancel">Cancel</button><button id="nightCalResetYes" class="night-btn go" data-i18n="night.cal.resetDo">Reset</button></div></div>
+    </section>
+    <!-- NIGHT-3 stage 4: the music bed — its volume and the response switch (its preset is the Music button) -->
+    <section class="night-sec">
+      <h2 class="night-sec-h" data-i18n="night.set.music">Music</h2>
+      <label class="night-vol"><span class="night-vico" data-svg="music"></span><span class="night-lab" data-i18n="night.musicVol">Music volume</span><span class="night-vol-in"><input id="nightMusicVol" type="range" min="0" max="1" step="0.01" value="0.6"></span></label>
+      <button id="nightMusicAnswerTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.musicAnswer">Music answers my notes: its next chord leans toward what I played</span><span class="night-tsw"><span></span></span></button>
     </section>
     <section class="night-sec">
       <h2 class="night-sec-h" data-i18n="night.set.view">View</h2>

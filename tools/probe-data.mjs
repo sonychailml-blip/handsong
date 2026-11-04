@@ -806,6 +806,39 @@ async function nightCore(){
   /* NIGHT-3: the moods' looks are each room's now — row «NIGHT room records» */
   return { cases:n, total:d.length, differences:d };
 }
+/* NIGHT-3 stage 4: THE MUSIC BED's LAW (apps/night/pure/bed.js) over the forest's recipe, for scales of 5, 6 and 7 degrees, an hour each:
+   repeatable, another seed differs (CONTROL); every chord = the preset's voices stacked every other degree, distinct steps, inside the pad range
+   (below the tonic, where the playing starts); gaps between chords, glimmer and drift within the recipe; glimmer only in its preset; the Music
+   button's cycle; RESPONSE: with the switch OFF your notes change nothing (exact); ON, the chords change at the SAME moments (only which chord —
+   never when), and the chords hold more of your notes than with it off (CONTROL: off, the same share as with no notes) */
+async function nightBedLaw(){
+  const d=[]; let n=0; const miss=s=>d.push(s);
+  const L=await import(new URL('../apps/night/pure/bed.js', import.meta.url).href), B=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM.bed;
+  const run=(preset, N, seed, played=[], answer=false, sec=3600)=>L.bedStep(L.bedInit(seed), B, B.presets[preset], N, sec, played, answer);
+  n++; if(['off','still','drift','glimmer','off'].map((x,i,a)=>i ? L.bedNext(a[i-1])===x : true).some(x=>!x)) miss('the Music button does not cycle off → still → drift → glimmer → off');
+  for(const N of [5,6,7]) for(const preset of L.BED_PRESETS){ const P=B.presets[preset], { lo, hi }=L.padRange(B, N), tag=`${preset}, ${N} degrees`;
+    const a=run(preset,N,7), b=run(preset,N,7), c=run(preset,N,8); n+=2;
+    if(JSON.stringify(a)!==JSON.stringify(b)) miss(tag+': the same seed gave another bed');
+    if(JSON.stringify(a)===JSON.stringify(c)) miss('CONTROL '+tag+': another seed gave the same bed');
+    const ch=a.filter(e=>e.kind==='chord'), gl=a.filter(e=>e.kind==='glim'), dr=a.filter(e=>e.kind==='drift'); n+=5;
+    if(ch.length<3600/P.every[1]-2) miss(`${tag}: only ${ch.length} chords in an hour`);
+    for(const e of ch){ const pcs=e.steps.map(x=>((x%N)+N)%N), r=pcs.find(p=>L.chordPcs(p,P.voices,N).every(q=>pcs.includes(q)));
+      if(e.steps.length!==P.voices || new Set(e.steps).size!==e.steps.length || e.steps.some(x=>x<lo || x>hi) || r==null){ miss(`${tag}: chord ${JSON.stringify(e.steps)} at ${e.t.toFixed(1)} s (range ${lo}…${hi})`); break; } }
+    for(let i=1;i<ch.length;i++){ const g=ch[i].t-ch[i-1].t; if(g<P.every[0]-1e-9 || g>P.every[1]+1e-9){ miss(`${tag}: a gap of ${g.toFixed(2)} s between chords`); break; } }
+    if(P.glim ? gl.length<3600/P.glim.every[1]-2 : gl.length) miss(`${tag}: ${gl.length} glimmer notes`);
+    if(dr.some(e=>Math.abs(e.k-1)>P.drift.depth+1e-12 || e.v<0 || e.v>=P.voices)) miss(tag+': a drift outside the recipe');
+    if(gl.some(e=>!(e.amp>=0.55 && e.amp<=1) || Math.abs(e.pan)>0.7)) miss(tag+': a glimmer note outside its amp / pan'); }
+  /* the response */
+  { const N=5, mine=[1,3,1,3,1], times=ev=>ev.filter(e=>e.kind==='chord').map(e=>e.t);
+    const off0=run('drift',N,11), offP=run('drift',N,11,mine,false), onP=run('drift',N,11,mine,true); n+=2;
+    if(JSON.stringify(off0)!==JSON.stringify(offP)) miss('with the response off, your notes changed the bed');
+    if(JSON.stringify(times(onP))!==JSON.stringify(times(off0))) miss('with the response on, the chords moved in time — it must change only which chord, never when');
+    const share=(answer, pl)=>{ let hit=0, all=0; for(let sd=1; sd<=60; sd++) for(const e of run('drift',N,sd,pl,answer,600)) if(e.kind==='chord'){ const pcs=e.steps.map(x=>((x%N)+N)%N); hit+=mine.filter(p=>pcs.includes(p)).length; all+=mine.length; } return hit/all; };
+    const sOn=share(true,mine), sOff=share(false,mine), sNone=share(false,[]); n+=2;
+    if(!(sOn>sOff+0.05)) miss(`the response does not lean: your notes are in ${(100*sOn).toFixed(1)} % of the chords' notes with it on, ${(100*sOff).toFixed(1)} % off`);
+    if(Math.abs(sOff-sNone)>1e-12) miss('CONTROL: with the response off the share depends on your notes'); }
+  return { cases:n, total:d.length, differences:d };
+}
 /* NIGHT-3: THE ROOM RECORDS — every room of the catalogue is valid (apps/night/pure/room.js) against this app's modes, the ids are the pinned list,
    every look's tokens are in night.css, every Night mood has a look, an unknown mood falls back to the room's default look; CONTROLS: each damage
    of ROOM_DAMAGES is refused with a line naming its field */
@@ -992,6 +1025,7 @@ const ROWS=[
   ['NIGHT depth curve (core)',   ()=>nightDepthCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cricket schedule (app)', ()=>nightCricketsCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT room records (app)',  ()=>nightRooms(),       r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3
+  ['NIGHT music bed law (app)', ()=>nightBedLaw(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // NIGHT-3 stage 4
   ['VIS1c fireflies (core)',    ()=>fliesCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],
   ['NIGHT cycle (core)',        ()=>nightCore(),    r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)

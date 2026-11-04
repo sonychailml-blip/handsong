@@ -21,6 +21,11 @@ SPLIT-2: the Full app's entry.
 ================= ОБУЧЕНИЕ (список уроков + интерактивные шаги) ================= «Обучение» открывает СПИСОК коротких уроков (меню возможностей инструмента).
 - fn (2): `wireStarter`, `openLessons`
 
+## apps/night/bed.js
+NIGHT-3 stage 4: THE MUSIC BED's DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume, the response switch, all remembered by the shell), the l…
+- const (6): `BED_SEED`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedDbg`
+- fn (5): `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedTick`, `bedPlan`
+
 ## apps/night/calib.js
 NIGHT-2 stage 2: the hand's calibration screens over CORE-1's engine (core/handcal.js; design docs/night/design/NIGHT-2-calibration/DESIGN.md).
 - const (8): `CAL_KEY`, `CAL_OPEN`, `travelS`, `travelPos`, `fxV`, `fxPos`, `calActive`, `calDbg`
@@ -43,6 +48,11 @@ SPLIT-2: one-time move of this app's old setting names, on one origin only (plan
 ## apps/night/pure/ambience.js
 THE AMBIENCE'S SEEDED LAWS (RUN 7, C4c; docs/night/QUALITY.md points 1, 5, 8; Night's own since CORE-7): pure (rule #36), node-tested (data row «NIGHT cricket schedule (app)»).
 - fn (3): `windNoise`, `cricketStream`, `chirpShape`
+
+## apps/night/pure/bed.js
+NIGHT-3 stage 4: THE MUSIC BED's LAW — what plays and when, as numbers (pure, rule #36; data row «NIGHT music bed law (app)»).
+- const (5): `BED_OFF`, `BED_ANSWER`, `bedNext`, `padRange`, `chordPcs`
+- fn (5): `voiceLead`, `rootWeights`, `bedInit`, `bedSoon`, `bedStep`
 
 ## apps/night/pure/cycle.js
 RUN 9 — THE NIGHT over the forest, as numbers.
@@ -108,6 +118,11 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo, built from a room's NATURE recipe (the forest's: apps/night/rooms/forest/pure/room.js).
 - fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
+
+## apps/night/sound/bed.js
+NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
+- const (1): `BED_POOL`
+- fn (8): `buildBed`, `bedVoice`, `bedVoicePark`, `bedFilter`, `bedGround`, `bedGlim`, `bedLevel`, `bedPark`
 
 ## core/arrange.js
 Размер такта (metre) приходит через ctx.metre из loop.metre — модуль остаётся чистым (без импорта состояния).
@@ -912,6 +927,7 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./core/run.js (2): `material`, `night`
 - → ./core/timbres.js (2): `checkTimbresBefore`, `dumpTimbres`
 - → ./core/vis.js (1): `checkVisStack`
+- → ./night/bed.js (1): `checkNightBed`
 - → ./night/calib.js (1): `checkNightCalib`
 - → ./night/forest.js (2): `checkForestRoom`, `checkBackgrounds`
 - → ./night/lean.js (2): `checkNightLean`, `checkQuietFloor`
@@ -919,6 +935,10 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
+
+## tools/probes/night/bed.js
+NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
+- fn (1): `checkNightBed`
 
 ## tools/probes/night/calib.js
 NIGHT-2 stage 2: row «NIGHT calibration screens» (quick; the probe clock through the REAL processHands, an injected store and camera: no real key is touched).
@@ -940,7 +960,7 @@ NIGHT-1: the measuring page's processors, dev only.
 ## tools/probes/night/headroom.js
 NIGHT-1 stage 1: Night's sound headroom, dev only.
 - const (7): `stopCamera`, `openCamera`, `setBase`, `CONDS`, `PLAN`, `snapshot`, `reportOf`
-- fn (15): `sharedParts`, `noteCost`, `passages`, `tails`, `tailProfile`, `whatIfs`, `lab`, `prerender`, `buffers`, `calibrate`, `plainPasses`, `realtime`, `phoneOffline`, `deepOffline`, `mountHeadroom`
+- fn (16): `sharedParts`, `bedCost`, `noteCost`, `passages`, `tails`, `tailProfile`, `whatIfs`, `lab`, `prerender`, `buffers`, `calibrate`, `plainPasses`, `realtime`, `phoneOffline`, `deepOffline`, `mountHeadroom`
 
 ## tools/probes/night/lean.js
 NIGHT-1 stage 2: row «NIGHT lean path» (P.night; slow: offline renders).
@@ -967,7 +987,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_187 modules, 2294 exported names._
+_191 modules, 2327 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

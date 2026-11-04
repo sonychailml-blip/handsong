@@ -143,7 +143,9 @@ export const DICTS = {
     'night.measure':'Measure this device (about 2 minutes, development)', 'night.measuring':'Measuring… {n} of {m}', 'night.measured':'Measured — copied, send it to us:', 'night.light':'Lighter forest — for older computers and phones (a lighter echo, fewer ringing notes, a simpler picture)', 'night.scene':'Forest picture: {lvl} (development)', 'night.scene.full':'high', 'night.scene.reduced':'medium', 'night.scene.minimal':'low',
     'night.sound':'Sound', 'night.mood':'Mood', 'night.hand':'Play with', 'night.handR':'right hand', 'night.handL':'left hand',
     'night.notes':'Notes', 'night.notesFollow':'follow the hand', 'night.notesStay':'stay put',
-    'night.bg':'Background', 'night.sleep':'Sleep', 'night.sleepOff':'off', 'night.sleepMin':'{n} min', 'night.asleep':'Sleeping — tap to wake',
+    'night.bg':'Background', 'night.sleep':'Sleep',
+    'night.music':'Music', 'night.music.off':'off', 'night.music.still':'Still', 'night.music.drift':'Drift', 'night.music.glimmer':'Glimmer',   // CORE-9: the music bed
+    'night.set.music':'Music', 'night.musicVol':'Music volume', 'night.musicAnswer':'Music answers my notes: its next chord leans toward what I played', 'night.sleepOff':'off', 'night.sleepMin':'{n} min', 'night.asleep':'Sleeping — tap to wake',
     'night.forest':'Forest',
     'night.begin':'Begin', 'night.stepPhones':'Use headphones — the forest is quiet.', 'night.stepLight':'Light your hands — a lamp beside you, not behind you.',
     'night.stepStand':'Stand your phone or laptop so both hands are free.', 'night.stepCamera':'Handsong will ask for your camera. Pictures never leave this device.',
@@ -874,7 +876,9 @@ export const DICTS = {
     'night.measure':'Измерить это устройство (около 2 минут, разработка)', 'night.measuring':'Измеряю… {n} из {m}', 'night.measured':'Готово — скопировано, пришлите нам:', 'night.light':'Лёгкий лес — для старых компьютеров и телефонов (эхо легче, меньше звенящих нот, картинка проще)', 'night.scene':'Картинка леса: {lvl} (разработка)', 'night.scene.full':'высокое', 'night.scene.reduced':'среднее', 'night.scene.minimal':'низкое',
     'night.sound':'Звук', 'night.mood':'Настроение', 'night.hand':'Играть', 'night.handR':'правой рукой', 'night.handL':'левой рукой',
     'night.notes':'Ноты', 'night.notesFollow':'за рукой', 'night.notesStay':'на месте',
-    'night.bg':'Фон', 'night.sleep':'Сон', 'night.sleepOff':'выкл.', 'night.sleepMin':'{n} мин', 'night.asleep':'Тишина — коснитесь, чтобы проснуться',
+    'night.bg':'Фон', 'night.sleep':'Сон',
+    'night.music':'Музыка', 'night.music.off':'выкл.', 'night.music.still':'Покой', 'night.music.drift':'Течение', 'night.music.glimmer':'Мерцание',   // CORE-9: the music bed
+    'night.set.music':'Музыка', 'night.musicVol':'Громкость музыки', 'night.musicAnswer':'Музыка отвечает моим нотам: её следующий аккорд склоняется к сыгранному', 'night.sleepOff':'выкл.', 'night.sleepMin':'{n} мин', 'night.asleep':'Тишина — коснитесь, чтобы проснуться',
     'night.forest':'Лес',
     'night.begin':'Начать', 'night.stepPhones':'Наденьте наушники — лес тихий.', 'night.stepLight':'Осветите руки — лампа сбоку, а не за спиной.',
     'night.stepStand':'Поставьте телефон или ноутбук так, чтобы обе руки были свободны.', 'night.stepCamera':'Handsong попросит доступ к камере. Изображение не покидает это устройство.',

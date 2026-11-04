@@ -5,6 +5,7 @@
    imports from audio.js are listed under it (a new call into the engine is added here first). */
 const SURFACE={
   'core/autosave.js':['AC'],
+  'apps/night/bed.js':['AC', 'engineCtx'],   // CORE-9: the music bed's driver (NIGHT-3 stage 4)
   'apps/night/shell.js':['outputFade', 'ambienceOn', 'ambienceRetune', 'ambienceTick', 'fxInstance', 'setTimbreTrim', 'setLowPower', 'setNightStrikes', 'AC', 'leadOn', 'leadOff', 'timbreIdx', 'ambienceInfo', 'setLeanPath', 'leadParkTick'],   // RUN 8: + the device measurement's notes; RUN 9: the wind's phase
   'core/clip.js':['createRecordingTap'],
   'apps/full/demo.js':['AC', 'initAudio'],

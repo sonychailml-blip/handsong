@@ -50,6 +50,8 @@ const SVG_ICONS={
   close:[['line','path',{ d:'M6.5 6.5l11 11M17.5 6.5l-11 11' }]],
   /* NIGHT-2: settings, three sliders with their knobs */
   settings:[['line','path',{ d:'M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1' }], ['acc','circle',{ cx:15, cy:7, r:2 }], ['line','circle',{ cx:9, cy:12, r:2 }], ['line','circle',{ cx:17, cy:17, r:2 }]],
+  /* CORE-9 (NIGHT-3 stage 4): the music bed — two beamed notes, one head in the accent (it plays by itself) */
+  music:[['tint','path',{ d:'M9 6.5l9-2.3v3.6L9 10.1z', o:.22 }], ['line','path',{ d:'M9 17.2V6.5l9-2.3v10.9' }], ['line','circle',{ cx:6.8, cy:17.2, r:2.2 }], ['acc','circle',{ cx:15.8, cy:15.1, r:2.2 }]],
   /* the sleep timer (quality bar point 9): a crescent and a small «z» — the moon of «Mood» made sleepy */
   sleep:[['tint','path',{ d:'M13 4.5a7.5 7.5 0 1 0 6.5 11 6.2 6.2 0 0 1-6.5-11z', o:.22 }], ['line','path',{ d:'M13 4.5a7.5 7.5 0 1 0 6.5 11 6.2 6.2 0 0 1-6.5-11z' }],
          ['acc-line','path',{ d:'M16 3.5h4l-4 4.5h4' }]],

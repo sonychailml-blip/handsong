@@ -18,6 +18,8 @@ import { liveAllOff } from '../../../core/recorder.js';
 import { afPause } from '../../../core/frzqueue.js';
 import * as C from './headroom-calc.js';
 import { LEAN_PATH } from '../../../apps/night/shell.js';
+import { bedPlan } from '../../../apps/night/bed.js';   // NIGHT-3 stage 4: the music bed
+import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';
 
 const off=undefined, wait=ms=>new Promise(r=>setTimeout(r,ms));
 const NIGHT=['solo.firefly','solo.breath-flute','solo.handpan','solo.singing-bowl'], REF='solo.supersaw', ALL=[...NIGHT,REF];
@@ -81,6 +83,7 @@ export async function sharedParts(tell=()=>{}){
     { const r=await best((eng)=>{ prep(eng,NIGHT[0],{ dry:true, old }); },len,{ win }); add(`${tag}: engine start graph, silent (render copy)`, r.us, 'no chord pool, no limiter, no track heads here'); }
     { const r=await best((eng)=>{ prep(eng,NIGHT[0],{ old }); },len,{ win }); add(`${tag}: + Night chain, silent input`, r.us); }
     { const r=await best((eng,E)=>{ prep(eng,NIGHT[0],{ old }); eng.ambienceOn(true,0.5,0); eng.ambienceTick(len); },len,{ win }); add(`${tag}: + the forest ambience`, r.us); }
+    if(!old){ const r=await best((eng,E,addT)=>{ prep(eng,NIGHT[0],{ old }); bedPlan(E, E.master.in, FOREST_ROOM.bed, 'glimmer', len, { at:addT }); },len,{ win }); add(`${tag}: + the music bed (Glimmer)`, r.us); }   // NIGHT-3 stage 4
     { const r=await best((eng)=>{ prep(eng,NIGHT[0],{ dry:true, old }); eng.chordOn('hr',[220,262,330,392,494,587],0,0,null,0.01); eng.chordOff('hr',0.05); },len,{ win }); add(`${tag}: dry graph + 6 idle chord voices (the live pool)`, r.us, 'Night never plays a chord'); } }
   /* the master limiter, the real worklet on noise: the only worklet of the live path */
   { const noise=ctx=>{ const b=ctx.createBuffer(2,rate,rate); for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*0.3; } const s=ctx.createBufferSource(); s.buffer=b; s.loop=true; s.start(0); return s; };
@@ -101,6 +104,16 @@ export async function sharedParts(tell=()=>{}){
   /* what built banks keep costing when nothing plays: rule #3's price */
   for(const id of ['solo.breath-flute',REF]) for(const [tag,park] of [['old path',false],['parked',true]]){ const r=await best((eng,E,addT)=>{ const i=prep(eng,id,{ dry:true, old:true }); if(park) eng.setLeanPath({ park:true }); for(let k=0;k<4;k++){ eng.leadOn('b'+k,330,0.6,i,off,off,off,off,0.02); eng.leadOff('b'+k,off,0.05); } if(park) addT(0.95,()=>eng.leadParkTick(100)); },len,{ win }); add(`${tag}: dry graph + 4 voices with ${id} built, silent`, r.us, park?'out of the graph while silent':'gated, never stopped: they keep computing for the session'); }
   { const r=await best((eng)=>{ const i=prep(eng,'solo.singing-bowl',{ dry:true }); for(let k=0;k<4;k++){ eng.leadOn('b'+k,330,0.0001,i,off,off,off,off,0.02); eng.leadOff('b'+k,off,0.05); } },16,{ win:[14,15.5] },2); add('dry graph + 4 voices with the bowl built, after its tails', r.us, 'a struck bank costs nothing once its strikes stop'); }
+  return out;
+}
+/* NIGHT-3 stage 4: THE MUSIC BED's cost, the NIGHT-1 way — offline, best of `times`, µs per 128-sample quantum — over Night's lean chain at rest,
+   without and with the bed (each preset), the ambience beside it for scale; `addPct` = the bed's own share of the quantum (the gate: ≤ 3 %) */
+export async function bedCost(tell=()=>{}, times=5){
+  const len=14, win=[4,13], out={}, B=FOREST_ROOM.bed;
+  const base=await best(eng=>{ prep(eng,NIGHT[0]); }, len, { win }, times); out.base=row(base); tell('base');
+  const plus=(k,r)=>{ out[k]={ ...row(r), add:C.round(r.us-base.us,0), addPct:C.round(C.loadPct(r.us-base.us, r.rate),2) }; tell(k); };
+  for(const p of ['still','drift','glimmer']) plus('bed '+p, await best((eng,E,add)=>{ prep(eng,NIGHT[0]); bedPlan(E, E.master.in, B, p, len, { at:add }); }, len, { win }, times));   // parking as live
+  plus('ambience', await best(eng=>{ prep(eng,NIGHT[0]); eng.ambienceOn(true,0.6,0); eng.ambienceTick(len); }, len, { win }, times));
   return out;
 }
 /* 2. one ringing note, then more */

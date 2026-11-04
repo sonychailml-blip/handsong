@@ -139,7 +139,7 @@ Every entry: **to be replaced by the user's own authored design — one icon com
 | ↑ | U+2191 | arrow key (tooltip) | typography | core/i18n.js |
 | ↓ | U+2193 | arrow key (tooltip) | typography | core/i18n.js |
 | → | U+2192 | arrow in text | typography | apps/full/songs.js, core/i18n.js, core/render.js |
-| − | U+2212 | minus sign | typography | apps/full/index.html, apps/night/index.html, core/data/palettes/bpsteps.json, core/i18n.js, core/legacy-ui/ui.js, core/legacy-ui/views/roll.js, core/legacy-ui/views/strip.js, core/pure/format.js, core/pure/profile.js, core/render.js |
+| − | U+2212 | minus sign | typography | apps/full/index.html, apps/night/index.html, apps/night/pure/room.js, core/data/palettes/bpsteps.json, core/i18n.js, core/legacy-ui/ui.js, core/legacy-ui/views/roll.js, core/legacy-ui/views/strip.js, core/pure/format.js, core/pure/profile.js, core/render.js |
 | ≈ | U+2248 | approximately | typography | core/i18n.js, core/legacy-ui/views/play.js, core/render.js |
 | ≥ | U+2265 | greater or equal | typography | apps/night/pure/room.js, core/pure/format.js |
 | ∞ | U+221E | infinity (−∞ dB) | typography | core/legacy-ui/views/strip.js, core/render.js |

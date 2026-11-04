@@ -4,6 +4,15 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-3 — stage 4 (2026-11-04): the music bed for the forest (with CORE-9)
+Tree hashes before: core 2d7f4bf5a9dc5b38 · apps/full d6b90cf2cb4be6da · apps/night 4507f5137f7e21cd. After: core cdf27dd0d90bbad7 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 87bb83d83ea385cd.
+- The user's changes (2026-11-03): no stepping back while playing; a subtle response as a switch; Music · Sound / Mood · Notes · Sleep; detune + filter drift; pads below the playing; level near the nature sound; ≤ 3 %. Plan: `docs/night/design/NIGHT-3-rooms/PLAN.md` «Stage 4».
+- `apps/night/pure/bed.js` the law (seeded; chords of the scale's own degrees stacked every other degree, voiced by the least motion in the octave under the playing; glimmer; drift; the response leans only which chord, never when — row: chord times identical with it on, 66 % vs 56 % of the chords' notes are yours), `sound/bed.js` the sound (5 pad voices × 2 detuned oscillators of a soft wave, two drifting side filters, a ground that takes the drone over, 2 glimmer sines, one echo; every moved param k-rate; quiet voices parked), `bed.js` the driver (Off / Still / Drift / Glimmer, volume, response; the remembered mode starts once audio runs). The forest's record gains `bed`; the validator checks it (3 more damages).
+- Shell: the Music button (3 + 3 places), Settings → Music (volume, «Музыка отвечает моим нотам», off by default); off at first start, remembered. The ambience's drone stays out while the bed plays (`ambienceSet(…, drone)`; a render copy keeps it).
+- Measured (laptop, offline, best of 5, NIGHT-1 method, the headroom page's `bedCost`): Still 2.08 %, Drift 2.39 %, Glimmer 2.49 % of a quantum (the nature sound 2.33 %); a filter and a pan per voice had been 3.7–4.2 %. Level: Drift 0.3 dB from the nature sound at its default. The drone out: −62 / −70 dB at its pitches.
+- Fix rounds 4: the bed 8.3 dB loud (master 0.5 → 0.2); after a Mood change a voice kept its old pitch (same step, other scale: now kept only by pitch); the cost (shared filters, parking, k-rate); a helper used before its definition.
+- Checks: in `docs/core/WORK-LOG.md` CORE-9. Waiting for step 130 (five checks, the Poco optional).
+
 # NIGHT-3 — stage 3 (2026-11-03): the forest is the first room module (with CORE-8)
 Tree hashes before: core c3b25630f4ae3fbb · apps/full d6b90cf2cb4be6da · apps/night 87f6896f34c0f60b. After: core 2d7f4bf5a9dc5b38 · apps/full d6b90cf2cb4be6da · apps/night 4507f5137f7e21cd.
 - `apps/night/rooms/`: `index.js` (the rooms, by id), `forest/pure/room.js` the forest's RECORD (levels, mood looks, nature recipe, acoustic), `forest/standin.js` (the 2D picture, moved from the host), the forest's scene and pure files (pure move). `apps/night/pure/room.js`: the validator (`checkRoom`, `ROOM_IDS`, `roomLook`, `ROOM_DAMAGES`).
