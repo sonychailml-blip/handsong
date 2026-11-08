@@ -565,7 +565,6 @@
      face (body.night); apps/night/shell.js drives it. Hands in view → only the scene; no hand for 1.5 s → the controls fade in. Every word is a
      dictionary key (en + ru), every picture a drawn icon by meaning (data-svg). No cents, Hz or role names anywhere. -->
 <div id="nightShell" hidden>
-  <div id="nightLantern" class="night-lantern" hidden></div>
   <div id="nightVeil" class="night-veil"><p id="nightVeilMsg" class="night-veil-msg" data-i18n="night.asleep" hidden>Sleeping — tap to wake</p></div>
   <!-- RUN 8 (slice 3): while the hands play — the forest's depth on the playing hand's side, the three effects on the effects hand's side
        (apps/night/shell.js sets each bar's value, its side and which one glows); the effects hand's one-line hint, shown once on this device -->
@@ -590,7 +589,8 @@
       <button id="nightSleep" class="night-rb"><span class="night-circ" data-svg="sleep"></span><span class="night-lab" data-i18n="night.sleep">Sleep</span><span class="night-val"></span></button>
     </div>
   </div>
-  <!-- NIGHT-2: THE SETTINGS CARD (was the ⓘ card): Hand (calibration, play with, two sliders, reset) · View (background, Forest, hand points, lantern, field, lighter forest) · about -->
+  <!-- NIGHT-2: THE SETTINGS CARD (was the ⓘ card): Hand (calibration, play with, two sliders, reset, hand points) · Music (volume, room sounds, response) · View (on screen, field, lighter forest) · about -->
+  <!-- NIGHT-3 stage 5: the room's sound slider moved to Music, the hand points to Hand; the Lantern switch was removed (it stays off) -->
   <div id="nightInfo" class="night-card night-glass night-set" role="dialog" aria-modal="true" hidden>
     <div class="night-ihead"><span class="night-set-title" data-i18n="night.settings">Settings</span>
       <button id="nightInfoClose" class="night-ibtn night-ibtn-in" data-svg="close" data-i18n-title="night.close" title="Close"></button></div>
@@ -613,22 +613,22 @@
       <button id="nightCalReset" class="night-lnk" data-i18n="night.cal.reset">Reset hand settings</button>
       <div id="nightCalResetQ" hidden><p data-i18n="night.cal.resetQ"></p>
         <div class="night-btns"><button id="nightCalResetNo" class="night-btn" data-i18n="night.cal.cancel">Cancel</button><button id="nightCalResetYes" class="night-btn go" data-i18n="night.cal.resetDo">Reset</button></div></div>
+      <div class="night-sl-lab" data-i18n="night.set.dots">Hands on screen</div>
+      <div id="nightDotsSeg" class="night-seg night-seg-2"><button data-dots="tips" data-i18n="night.set.tips">Fingertips</button><button data-dots="all" data-i18n="night.set.all">All points</button></div>
     </section>
     <!-- NIGHT-3 stage 4: the music bed — its volume and the response switch (its preset is the Music button) -->
     <section class="night-sec">
       <h2 class="night-sec-h" data-i18n="night.set.music">Music</h2>
       <label class="night-vol"><span class="night-vico" data-svg="music"></span><span class="night-lab" data-i18n="night.musicVol">Music volume</span><span class="night-vol-in"><input id="nightMusicVol" type="range" min="0" max="1" step="0.01" value="0.6"></span></label>
+      <label id="nightRoomSoundRow" class="night-vol" hidden><span class="night-vico" data-svg="forest"></span><span class="night-lab" data-i18n="night.roomSounds">Room sounds</span><span class="night-vol-in"><input id="nightRoomSound" type="range" min="0" max="1" step="0.01" value="0.6"></span></label>
       <button id="nightMusicAnswerTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.musicAnswer">Music answers my notes: its next chord leans toward what I played</span><span class="night-tsw"><span></span></span></button>
     </section>
     <section class="night-sec">
       <h2 class="night-sec-h" data-i18n="night.set.view">View</h2>
       <div class="night-sl-lab" data-i18n="night.set.screen">On screen</div>
-      <div id="nightBgSeg" class="night-seg"><button data-bg="forest" data-i18n="prof.bgForest">Forest</button><button data-bg="dark" data-i18n="prof.bgDark">Dark</button><button data-bg="camera" data-i18n="prof.bgCamera">Camera</button></div>
-      <label id="nightForestRow" class="night-vol" hidden><span class="night-vico" data-svg="forest"></span><span class="night-lab" data-i18n="night.forest">Forest</span><span class="night-vol-in"><input id="nightForest" type="range" min="0" max="1" step="0.01" value="0.6"><span id="nightForestMark" class="night-vol-mark"></span></span></label>
-      <div class="night-sl-lab" data-i18n="night.set.dots">Hands on screen</div>
-      <div id="nightDotsSeg" class="night-seg night-seg-2"><button data-dots="tips" data-i18n="night.set.tips">Fingertips</button><button data-dots="all" data-i18n="night.set.all">All points</button></div>
+      <!-- the value «forest» = the current room's picture (the stored choice keeps its old name) -->
+      <div id="nightBgSeg" class="night-seg"><button data-bg="forest" data-i18n="night.bgRoom">Room</button><button data-bg="dark" data-i18n="prof.bgDark">Dark</button><button data-bg="camera" data-i18n="prof.bgCamera">Camera</button></div>
       <!-- later: graphics quality, low · medium · high (docs/night/BACKLOG.md): one more segment here -->
-      <button id="nightLanternTg" class="night-tg"><span class="night-vico" data-svg="lantern"></span><span data-i18n="night.lantern">Lantern: a soft light at the bottom edge for your hands</span><span class="night-tsw"><span></span></span></button>
       <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.field">Show the full note field</span><span class="night-tsw"><span></span></span></button>
       <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lighter forest — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
     </section>

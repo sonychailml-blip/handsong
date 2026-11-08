@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-3 — stage 5 part 1 (2026-11-08): the settings card for rooms (with CORE-10)
+Tree hashes before: core cdf27dd0d90bbad7 · apps/full d6b90cf2cb4be6da · apps/night 87bb83d83ea385cd. After: core 8d60632b9df3c10c · apps/full d6b90cf2cb4be6da (unchanged) · apps/night d742fc9c204910f1.
+- The user split stage 5: settings first, then the switching machinery. Decisions and the reach choice: `docs/night/design/NIGHT-3-rooms/PLAN.md` «Stage 5 part 1 as built».
+- `index.html`: «Что на экране» = «Комната · Тёмный · Камера» (`night.bgRoom`; the value stays «forest»); «Звуки комнаты» (`nightRoomSound`, was `nightForest` under View) beside «Громкость музыки»; «Руки на экране» at the end of Hand; the Lantern switch and its overlay removed. `shell.js`: the slider sets the ambience only (same storage key, so a person's level survives); the reach is `REACH` 0.6 (the old default), set with the face; the slider's moving mark is gone (it showed the depth, not the sound). `night.css`: the lantern and the mark rules removed; the two Music sliders aligned; in landscape Hand spans two rows, Music and View stack on the right.
+- The Lantern (one line, to bring it back): a warm radial glow over the bottom 24 % of the screen, off by default, remembered per device (`handsong.nightLantern`), meant to light the hands for the camera in a dark room.
+- Row «NIGHT shell»: the Lantern gone, «Hands on screen» under Hand, «Room sounds» under Music, the first picture choice reads «Room», the slider moves the ambience to 0.25 while the reach stays 0.6 (fails with the old coupling; and the reach must be set with the face). `tools/ui-snap.mjs`: the settings card scrolled (mid, end) in portrait, landscape and Russian landscape.
+- Checks: in `docs/core/WORK-LOG.md` CORE-10.
+
 # NIGHT-3 — stage 4 (2026-11-04): the music bed for the forest (with CORE-9)
 Tree hashes before: core 2d7f4bf5a9dc5b38 · apps/full d6b90cf2cb4be6da · apps/night 4507f5137f7e21cd. After: core cdf27dd0d90bbad7 · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 87bb83d83ea385cd.
 - The user's changes (2026-11-03): no stepping back while playing; a subtle response as a switch; Music · Sound / Mood · Notes · Sleep; detune + filter drift; pads below the playing; level near the nature sound; ≤ 3 %. Plan: `docs/night/design/NIGHT-3-rooms/PLAN.md` «Stage 4».

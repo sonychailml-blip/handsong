@@ -19,6 +19,7 @@ Index: `/HANDOFF.md`. Rules, short module map, step index: `CLAUDE.md`. Open ite
 - ✅ **CORE-7** (2026-11-03): `core/soundmods.js`, the door for an app's sound module (one per kind, today `ambience`), shared by both engine instances; the forest ambience left core for `apps/night/sound/`. Opt-in: Full registers nothing. GOLD's «ambience» case runs on Night's page only (declared in `gold.js` `APP_CASES`). For NIGHT-3.
 - ✅ **CORE-8** (2026-11-03): the scene host left `core/legacy-ui/` for Night (`hooks.scene`); the profile takes room and ambience ids; the forest's tokens left core. For NIGHT-3 stage 3.
 - ✅ **CORE-9** (2026-11-04): the Music button's icon and texts, one engine-surface line, for NIGHT-3 stage 4.
+- ✅ **CORE-10** (2026-11-08): Night texts «Room» and «Room sounds»; the Lantern text removed with its switch. For NIGHT-3 stage 5 part 1.
 - 74 modes, 18 tunings. Target: phone, portrait. Branch `dev`, main `main`.
 
 ## The foundation (full plan and contracts: `archive/HANDOFF-history.md`, «STAGE 3 — FOUNDATION PLAN»)

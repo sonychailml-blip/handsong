@@ -86,6 +86,8 @@ const SCREENS=[
    then the Camera background (the glass over a picture); the ⓘ card; the same in Russian. The shell shows
    its controls with no hand in view (the fake camera has none) after 1.5 s. */
 const nightWait=async p=>{ await p.waitForTimeout(2200); };
+/* NIGHT-3 stage 5: the settings card scrolled to a share of its height (0 top, 1 end), so every section is seen */
+const cardTo=async (p, f)=>{ await p.evaluate(f=>{ const c=document.getElementById('nightInfo'); c.scrollTop=Math.round(f*(c.scrollHeight-c.clientHeight)); }, f); await p.waitForTimeout(150); };
 const SCREENS_NIGHT=[
   ['night-start',     async p=>{}],
   ['night-offer',     async p=>{ await p.click('#nightBegin'); await p.waitForFunction(()=>{ const c=document.getElementById('nightCal'); return c && !c.hidden; }, null, { timeout:180e3 }); await p.waitForTimeout(600); }],   // NIGHT-2: Begin → the calibration offer
@@ -94,15 +96,24 @@ const SCREENS_NIGHT=[
                        await p.evaluate(async ()=>{ const Q=await import('/core/frzqueue.js'); Q.afPause('runner', true); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await p.waitForTimeout(5500); }],
   ['night-dark',      async p=>{ await p.waitForFunction(async ()=>{ const G=await import('/apps/night/ghost.js'); return !G.ghostOn(); }, null, { timeout:30e3, polling:250 }); await p.waitForTimeout(1800); }],
   ['night-info',      async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
+  ['night-info-mid',  async p=>{ await cardTo(p, 0.5); }],
+  ['night-info-end',  async p=>{ await cardTo(p, 1); }],
   ['night-land',      async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:844, height:390 }); await nightWait(p); }],
-  ['night-land-info', async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
+  ['night-land-info', async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); await cardTo(p, 0); }],
+  ['night-land-info-mid', async p=>{ await cardTo(p, 0.5); }],
+  ['night-land-info-end', async p=>{ await cardTo(p, 1); }],
   ['night-camera',    async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:390, height:844 });   // the glass over a picture (headless screenshots do not show the WebGL forest)
                        await p.evaluate(()=>{ document.querySelector('#nightBgSeg [data-bg="camera"]').click(); }); await nightWait(p); }],
   ['night-ru',        async p=>{ await p.evaluate(async ()=>{ const I=await import('/core/i18n.js'); I.setLang('ru'); document.querySelector('#nightBgSeg [data-bg="dark"]').click(); }); await nightWait(p); }],
-  ['night-ru-info',   async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); }],
+  ['night-ru-info',   async p=>{ await p.click('#nightInfoBtn'); await p.waitForTimeout(500); await cardTo(p, 0); }],
+  ['night-ru-info-mid', async p=>{ await cardTo(p, 0.5); }],
+  ['night-ru-info-end', async p=>{ await cardTo(p, 1); }],
+  ['night-ru-land-info', async p=>{ await p.setViewportSize({ width:844, height:390 }); await p.waitForTimeout(600); await cardTo(p, 0); }],
+  ['night-ru-land-info-mid', async p=>{ await cardTo(p, 0.5); }],
+  ['night-ru-land-info-end', async p=>{ await cardTo(p, 1); }],
   /* RUN 8 (addendum 3): the low-light message with «Raise a hand» (Russian: the longer lines) — portrait and landscape; every visible message
      at the top must stand clear of the others (printed; a touch counts in the run's result) */
-  ['night-msg-ru',    async p=>{ await p.click('#nightInfoClose'); await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); }); await nightWait(p); await msgCheck(p,'night-msg-ru'); }],
+  ['night-msg-ru',    async p=>{ await p.click('#nightInfoClose'); await p.setViewportSize({ width:390, height:844 }); await p.waitForTimeout(400); await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); }); await nightWait(p); await msgCheck(p,'night-msg-ru'); }],
   ['night-msg-land',  async p=>{ await p.setViewportSize({ width:844, height:390 }); await nightWait(p); await p.evaluate(async ()=>{ const M=await import('/core/legacy-ui/latmeter.js'); M.darkDbg(Array.from({ length:80 }, (_,i)=>i*100), 30); });  /* SPLIT-2: a fresh HINT_MS (9 s): the capture itself takes about that long */ await msgCheck(p,'night-msg-land'); }],
   /* RUN 8 (slice 3, addendum 1 and 5): playing — two synthetic hands through the probe's door (the playing right hand pinching its index, the
      effects hand its middle finger): the fingertip fireflies, the quiet glow on the row, the depth bar and the three effect bars */

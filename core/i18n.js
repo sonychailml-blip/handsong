@@ -146,14 +146,14 @@ export const DICTS = {
     'night.bg':'Background', 'night.sleep':'Sleep',
     'night.music':'Music', 'night.music.off':'off', 'night.music.still':'Still', 'night.music.drift':'Drift', 'night.music.glimmer':'Glimmer',   // CORE-9: the music bed
     'night.set.music':'Music', 'night.musicVol':'Music volume', 'night.musicAnswer':'Music answers my notes: its next chord leans toward what I played', 'night.sleepOff':'off', 'night.sleepMin':'{n} min', 'night.asleep':'Sleeping — tap to wake',
-    'night.forest':'Forest',
+    'night.forest':'Forest', 'night.bgRoom':'Room', 'night.roomSounds':'Room sounds',   // CORE-10: «What's on screen» and the room's sound slider
     'night.begin':'Begin', 'night.stepPhones':'Use headphones — the forest is quiet.', 'night.stepLight':'Light your hands — a lamp beside you, not behind you.',
     'night.stepStand':'Stand your phone or laptop so both hands are free.', 'night.stepCamera':'Handsong will ask for your camera. Pictures never leave this device.',
     'fx.fdepth':'Forest depth', 'fx.fdepth.mix':'Amount', 'fx.fdepth.depth':'Depth', 'fx.fdepth.reach':'Forest at most', 'fx.fdepth.light':'Lighter forest',
     'fx.cecho':'Echo', 'fx.cecho.amount':'Echo', 'fx.ctone':'Warmth / Brightness', 'fx.ctone.tilt':'Warmth / Brightness', 'fx.cwave':'Wave', 'fx.cwave.amount':'Wave',
     'night.mood.major-penta':'Glow', 'night.mood.minor-penta':'Dusk', 'night.mood.egyptian':'Mist',
     'night.privacy':'Pictures and sound never leave this device.', 'night.phones':'Use headphones — the forest is quiet.',
-    'night.lantern':'Lantern: a soft light at the bottom edge for your hands', 'night.field':'Show the full note field',
+    'night.field':'Show the full note field',
     'night.firstRun':'Show the first steps again', 'night.toSound':'Sound panel and diagnostics (development)',
     /* NIGHT-2: settings and the hand's calibration (the engine's reason codes worded here) */
     'night.settings':'Settings', 'night.set.hand':'Hand', 'night.set.view':'View', 'night.set.screen':'On screen', 'night.set.dots':'Hands on screen', 'night.set.tips':'Fingertips', 'night.set.all':'All points',
@@ -879,14 +879,14 @@ export const DICTS = {
     'night.bg':'Фон', 'night.sleep':'Сон',
     'night.music':'Музыка', 'night.music.off':'выкл.', 'night.music.still':'Покой', 'night.music.drift':'Течение', 'night.music.glimmer':'Мерцание',   // CORE-9: the music bed
     'night.set.music':'Музыка', 'night.musicVol':'Громкость музыки', 'night.musicAnswer':'Музыка отвечает моим нотам: её следующий аккорд склоняется к сыгранному', 'night.sleepOff':'выкл.', 'night.sleepMin':'{n} мин', 'night.asleep':'Тишина — коснитесь, чтобы проснуться',
-    'night.forest':'Лес',
+    'night.forest':'Лес', 'night.bgRoom':'Комната', 'night.roomSounds':'Звуки комнаты',   // CORE-10
     'night.begin':'Начать', 'night.stepPhones':'Наденьте наушники — лес тихий.', 'night.stepLight':'Осветите руки — лампа сбоку, а не за спиной.',
     'night.stepStand':'Поставьте телефон или ноутбук так, чтобы обе руки были свободны.', 'night.stepCamera':'Handsong попросит доступ к камере. Изображение не покидает это устройство.',
     'fx.fdepth':'Глубина леса', 'fx.fdepth.mix':'Сила', 'fx.fdepth.depth':'Глубина', 'fx.fdepth.reach':'Леса не больше', 'fx.fdepth.light':'Лёгкий лес',
     'fx.cecho':'Эхо', 'fx.cecho.amount':'Эхо', 'fx.ctone':'Тепло / Яркость', 'fx.ctone.tilt':'Тепло / Яркость', 'fx.cwave':'Волна', 'fx.cwave.amount':'Волна',
     'night.mood.major-penta':'Сияние', 'night.mood.minor-penta':'Сумерки', 'night.mood.egyptian':'Туман',
     'night.privacy':'Изображение и звук не покидают это устройство.', 'night.phones':'Наденьте наушники — лес тихий.',
-    'night.lantern':'Фонарик: мягкий свет у нижнего края — для рук', 'night.field':'Показать всё нотное поле',
+    'night.field':'Показать всё нотное поле',
     'night.firstRun':'Показать первые шаги снова', 'night.toSound':'Панель «Звук» и диагностика (разработка)',
     'night.settings':'Настройки', 'night.set.hand':'Рука', 'night.set.view':'Вид', 'night.set.screen':'Что на экране', 'night.set.dots':'Руки на экране', 'night.set.tips':'Кончики пальцев', 'night.set.all':'Все точки',
     'night.cal.ok':'Рука настроена', 'night.cal.none':'Рука не настроена', 'night.cal.set':'Настроить', 'night.cal.again':'Настроить заново',

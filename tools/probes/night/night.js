@@ -113,11 +113,12 @@ row({ at:1009.5, night:true, name:'NIGHT timbres', slow:true, run:()=>checkNight
    hands swap (the effects hand follows), Notes → follow ↔ stay put on the playing hand, Sleep cycles off → 15 → 30 → 60 → off;
    (5) the SLEEP FADE: a timer started 15 min − 45 s ago fades the output to ≈ ½ (cosine middle), one started 15 min ago sleeps (the veil's
    line shows, the output is 0), a tap on the veil wakes (the output back to 1); (6) the info card opens and closes; «Show the full note field»
-   switches the view's fieldAll, Lantern its glow; (7) back to Full: no shell, no view, the output 1. Restores this device's stored choices. */
+   switches the view's fieldAll; the settings' places (NIGHT-3 stage 5: no Lantern, «Hands on screen» under Hand, «Room sounds» under Music
+   moving the room's sound only); (7) back to Full: no shell, no view, the output 1. Restores this device's stored choices. */
 export async function checkNightShell(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), $=id=>document.getElementById(id);
   const PR=await import('../../../core/profile.js'), CS=await import('../../../apps/night/shell.js'), ST=await import('../../../core/state.js'), I=await import('../../../core/i18n.js');
-  const KEYS=['handsong.nightBg','handsong.nightLantern','handsong.nightField','handsong.nightForest'], keep={};
+  const KEYS=['handsong.nightBg','handsong.nightField','handsong.nightForest'], keep={};
   for(const k of KEYS){ try{ keep[k]=localStorage.getItem(k); }catch(e){} }
   const frames=k=>new Promise(r=>{ let i=0; const f=()=>{ if(++i>=k) r(); else requestAnimationFrame(f); }; requestAnimationFrame(f); });
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
@@ -159,7 +160,18 @@ export async function checkNightShell(){
     /* (6) the info card, the field and the lantern */
     $('nightInfoBtn').click(); n++; if($('nightInfo').hidden) miss('the info card did not open');
     { const f0=!!ST.nightView.fieldAll; $('nightFieldTg').click(); n++; if(!!ST.nightView.fieldAll===f0) miss('«Show the full note field» did not switch'); $('nightFieldTg').click(); }
-    { const l0=$('nightLantern').hidden; $('nightLanternTg').click(); n++; if($('nightLantern').hidden===l0) miss('Lantern did not switch'); $('nightLanternTg').click(); }
+    /* NIGHT-3 stage 5 (part 1): the Lantern is gone (it stays off); «Hands on screen» sits under Hand, «Room sounds» under Music; the first
+       picture choice is the room; the room-sound slider moves the ambience only — the hand's reach stays at REACH (RUN 8 had coupled them) */
+    n++; if($('nightLanternTg') || $('nightLantern')) miss('the Lantern is still in the settings or on the screen');
+    { const sec=id=>{ const s=$(id) && $(id).closest('section'), h=s && s.querySelector('.night-sec-h'); return h ? h.dataset.i18n : null; }; n+=2;
+      if(sec('nightDotsSeg')!=='night.set.hand') miss(`«Hands on screen» is in the section ${sec('nightDotsSeg')}, not Hand`);
+      if(sec('nightRoomSound')!=='night.set.music' || $('nightRoomSoundRow').hidden) miss(`«Room sounds» is in ${sec('nightRoomSound')} (hidden ${$('nightRoomSoundRow').hidden}), not shown under Music`); }
+    n++; { const b=$('nightBgSeg').firstElementChild; if(b.dataset.bg!=='forest' || b.textContent!==I.t('night.bgRoom')) miss(`the first picture choice reads «${b.textContent}» (${b.dataset.bg})`); }
+    { const I0=A.fxInstance(ST.chainKeyOf('ld'),'fdepth'), reach=()=>I0 && I0.params[3] ? I0.params[3].cur : NaN, sl=$('nightRoomSound'), v0=sl.value; n+=2;
+      if(Math.abs(reach()-CS.REACH)>1e-9) miss(`the hand's reach is ${reach()}, not ${CS.REACH} (the reach is no longer set with the face)`);
+      try{ sl.value='0.25'; sl.dispatchEvent(new Event('input')); const amb=A.ambienceInfo();
+        if(!amb || Math.abs(amb.level-0.25)>1e-9 || Math.abs(reach()-CS.REACH)>1e-9) miss(`«Room sounds» 0.25: ambience ${amb && amb.level}, reach ${reach()} (the slider must move the sound only)`); }
+      finally{ sl.value=v0; sl.dispatchEvent(new Event('input')); } }
     $('nightInfoClose').click(); n++; if(!$('nightInfo').hidden) miss('the info card did not close');
   } catch(e){ miss('error: '+(e&&e.stack||e)); }
   finally{

@@ -112,7 +112,7 @@ THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 �
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
-- const (3): `LEAN_PATH`, `nightShellDbg`, `nightSleepDbg`
+- const (4): `LEAN_PATH`, `REACH`, `nightShellDbg`, `nightSleepDbg`
 - fn (2): `nightShellWire`, `nightShellFace`
 
 ## apps/night/sound/ambience.js
@@ -987,7 +987,7 @@ SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_191 modules, 2327 exported names._
+_191 modules, 2328 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

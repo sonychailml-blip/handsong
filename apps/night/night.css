@@ -16,7 +16,7 @@
   --night-blur:blur(16px) saturate(1.2); --night-blur-card:blur(18px) saturate(1.2);
   --night-ring:0 0 0 3px rgba(200,245,106,.16); --night-glow:0 0 14px rgba(200,245,106,.55); --night-shadow:0 10px 40px rgba(0,0,0,.45);
   --night-fade:300ms; --night-slow:900ms; --night-ease:cubic-bezier(.2,.7,.2,1);
-  --night-icon:24px; --night-lantern:rgba(255,214,150,.30); --night-glow-f:drop-shadow(0 0 6px #c8f56a);
+  --night-icon:24px; --night-glow-f:drop-shadow(0 0 6px #c8f56a);
   /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
   --night-bar-w:6px; --night-bar-h:min(30vh, 200px); --night-bar-gap:16px; --night-bar-ico:20px; --night-warm:#ffb45a; --night-cold:#e6fff2;
   /* VIS1c (RUN 6): the NIGHT FOREST room (apps/night/rooms/forest/; moved from core/tokens.css at NIGHT-3) — the «Rooms of light» prototype's colours, read by the 3D room as its base
@@ -88,10 +88,7 @@ body.night-plain .night-glass{ background:var(--night-glass-plain); -webkit-back
 .night-vol{ grid-column:1/-1; display:flex; align-items:center; gap:var(--night-gap); padding:0 var(--night-gap-sm); }
 .night-vol[hidden]{ display:none; }
 .night-vol input{ flex:1; min-width:0; accent-color:var(--night-accent); }
-/* RUN 8: the slider is the forest AT MOST; a small lime mark rides on it at the forest the hand gives now (depth × reach) */
 .night-vol-in{ position:relative; flex:1; min-width:0; display:flex; align-items:center; }
-.night-vol-mark{ position:absolute; top:50%; left:0; width:var(--night-bar-w); height:var(--night-bar-w); border-radius:var(--night-r-pill); transform:translate(-50%,-50%);
-  background:var(--night-accent); box-shadow:var(--night-glow); pointer-events:none; }
 .night-vico{ display:flex; width:var(--night-icon); height:var(--night-icon); color:var(--night-dim); }
 .night-card{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px, calc(100vw - 28px)); max-height:calc(100vh - 28px);
   overflow:auto; border-radius:var(--night-r-card); padding:var(--night-pad-lg); pointer-events:auto; box-shadow:var(--night-shadow);
@@ -125,8 +122,6 @@ body.night-plain .night-card{ -webkit-backdrop-filter:none; backdrop-filter:none
 #nightShell.asleep .night-veil{ pointer-events:auto; }
 .night-veil-msg{ color:var(--night-dim); font-size:var(--night-fs-body); }
 .night-veil-msg[hidden]{ display:none; }
-.night-lantern{ position:absolute; left:0; right:0; bottom:0; height:24vh; background:radial-gradient(ellipse 70% 100% at 50% 100%, var(--night-lantern) 0%, transparent 72%); pointer-events:none; }
-.night-lantern[hidden]{ display:none; }
 /* RUN 8 (slice 3): the bars while the hands play — slim Moonglass tracks: the forest's depth on the playing hand's side, the three effects on the
    effects hand's side (apps/night/shell.js: the value, .left / .right from where the hand is, .act on the finger in use, .on while that hand is seen) */
 .night-bars{ position:absolute; top:50%; transform:translateY(-50%); display:flex; gap:var(--night-bar-gap); opacity:0; pointer-events:none;
@@ -171,6 +166,7 @@ body.dark-on .night-idle, body.dark-on .night-hint{ visibility:hidden; }
 #nightShell .night-seg button.on{ background:var(--night-accent); color:var(--night-accent-ink); }
 #nightShell .night-seg button[hidden]{ display:none; }
 .night-set .night-vol{ padding:0; margin:0 0 var(--night-gap); }
+.night-set .night-vol .night-lab{ flex:none; min-width:9em; }   /* NIGHT-3 stage 5: the Music section's two sliders start at one line */
 .night-btns{ display:flex; flex-wrap:wrap; gap:var(--night-gap); margin-top:var(--night-pad); }
 #nightShell .night-btn{ flex:1 1 auto; white-space:nowrap; min-height:48px; padding:0 var(--night-gap); border-radius:var(--night-r-pill); border:1px solid var(--night-hair); background:var(--night-fill); font-size:var(--night-fs-body); }
 #nightShell .night-btn.go{ background:var(--night-accent); color:var(--night-accent-ink); border:0; font-weight:var(--night-fw-bold); }
@@ -207,6 +203,7 @@ body.night-cal #darkHint{ display:none !important; }
   .night-card .night-ihead{ grid-column:1/-1; }
   .night-card p{ margin:var(--night-gap-sm) 0; }
   .night-about{ grid-column:1/-1; }
+  .night-set > .night-sec:first-of-type{ grid-row:span 2; }   /* NIGHT-3 stage 5: Hand on the left, Music and View stacked on the right */
   .night-sec-h{ margin-top:var(--night-gap); }
   .night-card.night-cal-card{ display:block; width:min(440px, calc(100vw - 28px)); }
   .night-cal-strip{ max-width:60vw; padding:var(--night-gap) var(--night-pad); }

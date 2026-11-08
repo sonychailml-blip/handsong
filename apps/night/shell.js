@@ -1,10 +1,10 @@
 /* RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
    Shown only in the Night face (nightShellFace from the profile's face door). Hands in view → only the scene; no hand for 1.5 s → the controls
-   fade in: Sound · Mood · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ: the playing hand, the hand's calibration
-   and its two sliders, the background, Forest, the hand's points, Lantern, «Show the full note field», the first steps again). Each round
-   button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js wires (the same setters the Full
-   panels use) — this module holds no musical state. The sleep timer fades the output (audio.outputFade, session only) and dims the scene
-   with a black veil together; a tap on the veil wakes. Lantern and the note-field choice are remembered on this device (localStorage). */
+   fade in: Music · Sound / Mood · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ: Hand — calibration, playing hand,
+   two sliders, the hand's points; Music — volume, the room's sounds, response; View — what is on screen, the note field, the lighter forest;
+   the first steps again). Each round button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js
+   wires (the same setters the Full panels use) — this module holds no musical state. The sleep timer fades the output (audio.outputFade,
+   session only) and dims the scene with a black veil together; a tap on the veil wakes. The choices are remembered on this device (localStorage). */
 import { BUS } from '../../core/pure/bus.js';
 import { NIGHT_UI, showStep, nextOf, sleepLevel } from '../../core/pure/nightui.js';
 import { sleepProgress } from './pure/cycle.js';   // RUN 9: the sleep timer deepens the night
@@ -26,18 +26,19 @@ import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the devic
 const $=id=>document.getElementById(id), READ=BUS.reader();
 /* NIGHT-1 stage 2: what this app never plays leaves the graph (the sound stays the same to rounding; row «NIGHT lean path»). Its chain has no drive, brightness or tremolo; its one role is solo */
 export const LEAN_PATH=Object.freeze({ expr:true, voice:true, roles:true, closedFx:true, park:true });
-const KEY={ lantern:'handsong.nightLantern', field:'handsong.nightField', forest:'handsong.nightForest', seen:'handsong.nightSeen', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene',
+const KEY={ field:'handsong.nightField', roomSound:'handsong.nightForest', seen:'handsong.nightSeen', fxHint:'handsong.nightFxHint', joints:'handsong.nightJoints', light:'handsong.nightLight', lightScene:'handsong.nightLightScene',
   music:'handsong.nightMusic', musicVol:'handsong.nightMusicVol', musicAnswer:'handsong.nightMusicAnswer' };   // NIGHT-3 stage 4: the bed's mode (off at first start), volume, response
 const load=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const save=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 let D=null, on=false, st=null, raf=0, info=false, sleep={ mins:0, t0:0 }, asleep=false, lastFade=1, amb=false;
 let begun=false, firstRun=false, startDue=false, defHand='right';   // NIGHT-2: a person's Begin, its first start, the offer due on the next frame, the profile's playing hand
 const GHOST_WAIT=10000;   // after the calibration the ghost waits this long for the hand to leave the frame
-/* the «Forest» slider — remembered on this device. RUN 7: only the volume of the forest's own sounds (the ambience); the hand's depth always
-   moved the room over its whole range. RUN 8 (the user): it is the forest AT MOST — the ambience's level AND the room's reach; the hand's depth
-   moves within it (Forest depth's `reach`). */
+/* «Room sounds» (Music section; was «Forest» under View) — the room's own sounds (the ambience's level), remembered on this device under the old
+   key. NIGHT-3 stage 5: it no longer sets the hand's reach (RUN 8 had coupled them); the reach is fixed at the slider's old default, so at the
+   default position nothing changed. */
 const room=()=>(roomById(sceneRoom())||ROOMS[0]).record, nature=()=>room().nature;
-const forestLevel=()=>{ const v=parseFloat(load(KEY.forest)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
+const roomSound=()=>{ const v=parseFloat(load(KEY.roomSound)); return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : nature().level; };
+export const REACH=0.6;   // the hand's reach in the room (Forest depth's `reach`): the old «Forest» slider's default
 
 /* the doors (ui.js): timbres() / timbre() / setTimbre(id) / timbreName(id); moods() / mood() / setMood(id); hand() 'right'|'left' /
    setHand(v); noteMode() 'note'|'hold' / setNoteMode(v); backgrounds() / bg() / setBg(m); plain() (no glass blur);
@@ -51,7 +52,7 @@ export function nightShellFace(p){
   /* NIGHT-3 stage 4: the music bed (its mode before the ambience: with the bed on, the drone stays out) */
   if(on){ const v=parseFloat(load(KEY.musicVol)); if(Number.isFinite(v)) bedSetVolume(v); bedSetAnswer(load(KEY.musicAnswer)==='1'); bedSetMode(load(KEY.music)||'off', room().bed); }
   else bedSetMode('off');
-  amb=on && !!p.ambience; ambienceOn(amb, forestLevel());
+  amb=on && !!p.ambience; ambienceOn(amb, roomSound());
   setTimbreTrim(on ? p.levels : null);   // RUN 8: the face's per-timbre level trim (Full: none)
   setNightStrikes(on ? (p.voices||{}) : null);
   setLeanPath(on ? LEAN_PATH : null);
@@ -59,7 +60,7 @@ export function nightShellFace(p){
   defHand= p && p.handFn && p.handFn.ld && p.handFn.ld.R==='fx' ? 'left' : 'right';
   if(on){ calSideApply(); if(begun){ begun=false; startDue=true; } }   // NIGHT-2: a calibrated side sets the roles; the offer follows a person's own Begin
   else calAbort();   // RUN 8: Night's gentler left-to-right volume (Full: its own curve)   // RUN 8: Night's strike caps and cheaper strikes (Full: RUN 7's strike exactly)
-  if(on){ reachSet(forestLevel()); lightApply(load(KEY.light)==='1', true); }   // RUN 8: the room's reach = the slider; C8 the person's «Lighter forest»
+  if(on){ reachSet(REACH); lightApply(load(KEY.light)==='1', true); }   // the hand's reach (fixed since NIGHT-3 stage 5); C8 the person's «Lighter forest»
   else setLowPower(false);
   if(on){ st=null; render(); if(!raf) raf=requestAnimationFrame(tick); }
   else { if(raf) cancelAnimationFrame(raf); raf=0; infoShow(false); sleepSet(0); }
@@ -75,7 +76,6 @@ function render(){
   val('nightMood', t('night.mood.'+D.mood()));
   const nm=D.noteMode(); val('nightNotes', t(nm==='hold' ? 'night.notesStay' : 'night.notesFollow')); setIcon('nightNotes', nm==='hold' ? 'note-stay' : 'note-follow');
   sleepLabel(performance.now());
-  $('nightLanternTg').classList.toggle('on', load(KEY.lantern)==='1'); $('nightLantern').hidden= load(KEY.lantern)!=='1';
   $('nightFieldTg').classList.toggle('on', !!(nightView && nightView.fieldAll));
   $('nightLightTg').classList.toggle('on', load(KEY.light)==='1'); $('nightMeasure').hidden= EDITION!=='dev';
   $('nightFirstRun').hidden=false; $('nightToSound').hidden= EDITION!=='dev';
@@ -84,7 +84,7 @@ function render(){
   for(const b of $('nightHandSeg').children) b.classList.toggle('on', b.dataset.hand===D.hand());   // NIGHT-2 stage 3: «Play with» moved here from the main screen
   calSettingsRender();
   $('nightSceneTg').hidden= EDITION!=='dev'; $('nightSceneTg').textContent=t('night.scene', { lvl:t('night.scene.'+sceneLevel()) });
-  $('nightForestRow').hidden= !amb; $('nightForest').value=String(forestLevel());
+  $('nightRoomSoundRow').hidden= !amb; $('nightRoomSound').value=String(roomSound());
   $('nightMusicVol').value=String(bedVolumeOf()); $('nightMusicAnswerTg').classList.toggle('on', bedAnswerOf());
   document.body.classList.toggle('night-plain', !!D.plain() || load(KEY.light)==='1');   // C8: the Lighter forest has no glass blur
 }
@@ -97,19 +97,18 @@ function sleepSet(mins){
 function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v) render(); }
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
-  tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed); save(KEY.music, m); if(amb) ambienceOn(true, forestLevel()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
+  tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed); save(KEY.music, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
   tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
   tap('nightNotes', ()=>D.setNoteMode(D.noteMode()==='hold' ? 'note' : 'hold'));
   tap('nightSleep', ()=>sleepSet(nextOf(NIGHT_UI.sleepMins, sleep.mins)));
   $('nightInfoBtn').onclick=()=>infoShow(true); $('nightInfoClose').onclick=()=>infoShow(false);
-  $('nightLanternTg').onclick=()=>{ save(KEY.lantern, load(KEY.lantern)==='1' ? '0' : '1'); render(); };
   $('nightFieldTg').onclick=()=>{ const all=!(nightView && nightView.fieldAll); save(KEY.field, all ? '1' : '0'); if(nightView) setNightView({ ...nightView, fieldAll:all }); render(); };
   $('nightFirstRun').onclick=()=>{ infoShow(false); save(KEY.seen,'0'); ghostArm(); };   // C7: the steps show on the next start; the ghost plays now
   $('nightToSound').onclick=()=>{ infoShow(false); if(D.sound) D.sound(); };   // dev: the Sound panel (Diagnostics → Latency meter — step 105)
   $('nightMusicVol').oninput=e=>{ const v=+e.target.value; save(KEY.musicVol, String(v)); bedSetVolume(v); };
   $('nightMusicAnswerTg').onclick=()=>{ const v=!bedAnswerOf(); save(KEY.musicAnswer, v ? '1' : '0'); bedSetAnswer(v); render(); };
-  $('nightForest').oninput=e=>{ const v=+e.target.value; save(KEY.forest, String(v)); if(amb) ambienceOn(true, v); reachSet(v); };
+  $('nightRoomSound').oninput=e=>{ const v=+e.target.value; save(KEY.roomSound, String(v)); if(amb) ambienceOn(true, v); };   // the room's sound only (NIGHT-3 stage 5)
   $('nightSceneTg').onclick=()=>{ const L=['full','reduced','minimal'], v=L[(L.indexOf(sceneLevel())+1)%L.length]; setSceneLevel(v).then(()=>render()); };
   $('nightLightTg').onclick=()=>{ const v=load(KEY.light)!=='1'; save(KEY.light, v ? '1' : '0'); lightApply(v, false); render(); };
   $('nightMeasure').onclick=()=>{ measure(); };
@@ -165,7 +164,6 @@ function bars(now, hv, fxv){
   const W=($('canvas')||{}).width||innerWidth, play=hv.find(h=>h.play), fx=hv.find(h=>!h.play), F=$('nightForestBar'), X=$('nightFxBars');
   const fo=forestNow(), fb=F.querySelector('[data-bar="forest"]');
   fill(fb, fo.depth*fo.reach); fb.querySelector('.night-bar-max').style.bottom=(fo.reach*100)+'%';
-  const mk=$('nightForestMark'); if(mk) mk.style.left=`calc(var(--night-icon) / 2 + (100% - var(--night-icon)) * ${(fo.depth*fo.reach).toFixed(4)})`;   // the panel's moving mark
   F.classList.toggle('on', !!play); if(play) place(F, sideOf('play', play.x, W));
   X.classList.toggle('on', !!fx);
   if(fx){ let sd=sideOf('fx', fx.x, W); if(play && sd===SIDE.play) sd= SIDE.play==='left' ? 'right' : 'left'; place(X, sd);
