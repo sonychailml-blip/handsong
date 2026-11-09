@@ -41,7 +41,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - The Room button shows only with two rooms or more (players: one room, five buttons as before). A development test room (`?probe&testroom`) exercises it all.
 - Row «NIGHT room switch»: the four exact controls pass; dropouts printed (0 on the laptop).
 - «Облегчённый режим» replaces «Лёгкий лес»; its text says the music gets lighter too.
-- ⛳ Waiting for step 133 (five checks).
+- Step 133 checked by the user: all works, except the forest's sounds stayed in the test room (its nature was wind and a cricket too). Fixed: the test room's nature is silent; the row proves the forest's slot fades, parks and is gone (−115 dB). Next: the user's call.
 ### NIGHT-5 (2026-11-09): the user's fixes from play (CORE-11). Log: `docs/night/WORK-LOG.md`
 - Part A of the window that continues with stage 5 part 2 (Part B, after the user's check).
 - Night never offers Full's song: a profile that records nothing runs no autosave and no offer; Night's page declares its own storage names (`<meta name="handsong-store">`, `core/storens.js`): language, autosave flag, user files, «warned once». Device facts stay shared. The runner's storage census proves it every session, with controls.

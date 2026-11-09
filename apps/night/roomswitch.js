@@ -51,4 +51,6 @@ export async function roomSwitch(id, o={}){
 }
 /* probe only */
 export const roomSwitchDbg=()=>({ room:sceneRoom(), rooms:sceneRooms(), stored:load(ROOM_KEY), last, seq,
-  nature:liveAmb ? { id:liveAmb.A.id, cur:liveAmb.cur, parked:liveAmb.slots.map(x=>x.parked) } : null });
+  nature:liveAmb ? { id:liveAmb.A.id, cur:liveAmb.cur, parked:liveAmb.slots.map(x=>x.parked),
+    /* each slot as the live graph has it now: its recipe, its fade, the gains it plays (the probes read that the old room really went) */
+    slots:liveAmb.slots.map(x=>({ id:x.A.id, parked:x.parked, mix:x.mix.gain.value, wind:x.wg.gain.value, crickets:x.cg.gain.value, drone:[x.dRootA.gain.value, x.dFifthA.gain.value] })) } : null });

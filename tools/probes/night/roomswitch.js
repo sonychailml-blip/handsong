@@ -4,9 +4,13 @@
        hook) is the same — CONTROL: the old way (no pause) takes frames in the same opening;
    (2) NO AUDIO NODE is made during a whole switch (every create… of every audio context and every AudioWorkletNode counted while it runs,
        with the music bed playing v2 and the nature sound on) — CONTROL: one node the row makes inside the window is counted;
+   (2b) THE FOREST'S SOUND REALLY GOES (step 133): 2.5 s into a switch to the test room (its nature silent) the live graph's sounding slot holds
+       the test room's recipe with every gain 0, the forest's slot has faded under 0.15 and, after its fade, is parked (out of the graph);
    (3) NO CLICK in an offline render of the nature crossfade (the forest's nature → the test room's at 2 s): the curvature at the swap no
        higher than twice its own neighbourhood's (10–60 ms either side; a step is a spike there) and the house measure ≤ 0.5 over the whole
-       render; the first 2 s equal to no switch; the new nature sounding after — CONTROL: an instant swap breaks the same bound (more than 2×). (The house
+       render; the first 2 s equal to no switch; the new nature sounding after — CONTROL: an instant swap breaks the same bound (more than 2×);
+       THE FOREST GONE: 10 s after the swap the output is 60 dB under the same moment without a switch — CONTROL: a swap to a copy of the
+       forest's recipe (another object, the same numbers — the swap runs, the forest plays on) fails that bound. (The house
        measure alone, curvature over the local peak, could not tell an instant swap between two noise-like natures: 0.32, under 0.5.)
    (4) after 20 switches forest ↔ test room, the renderer's programs, geometries and textures and the contexts made and alive are back at
        their baseline — CONTROL: the leaking test room is caught (a texture above the baseline).
@@ -96,8 +100,15 @@ export async function checkNightRoomSwitch(){
       const p=H.setBackground('forest'), pz=H.scenePausing(); await p; await opened(); H.sceneOpenDbg({ hook:null }); const c=$('scene'); n++;
       if(!pz || veiledAtEnd!==true || !c || c.classList.contains('veil')) miss(`Dark → Room: paused at the start ${pz}, veiled until drawn ${veiledAtEnd}, unveiled after ${!!c && !c.classList.contains('veil')}`); }
     /* (2) no audio node during whole switches (fades, nature crossfade, bed held and resumed); CONTROL one node made inside the window */
-    { await sleep(300); const amb0=RS.roomSwitchDbg().nature; counter=nodeCounter(); const p=RS.roomSwitch(TEST); A.AC.createGain(); await p; const c1=counter.n;
+    { await sleep(300); const amb0=RS.roomSwitchDbg().nature; counter=nodeCounter(); const ts=performance.now(), p=RS.roomSwitch(TEST); A.AC.createGain(); await p; const c1=counter.n;
       const nat=RS.roomSwitchDbg().nature, B=BD.bedDbg(); await sleep(200); const B2=BD.bedDbg();
+      /* (2b) the forest's sound really goes: the live slots 2.5 s in, then parked after the fade */
+      { await sleep(Math.max(0, 2500-(performance.now()-ts))); const N=RS.roomSwitchDbg().nature, on=N && N.slots[N.cur], old=N && N.slots[1-N.cur]; n+=2;
+        notes.push(`2.5 s into the switch: sounding ${on && on.id} (mix ${on && on.mix.toFixed(3)}, wind ${on && on.wind}, crickets ${on && on.crickets}, drone ${on && on.drone.join('/')}), the forest's slot ${old && old.id} at ${old && old.mix.toFixed(3)}`);
+        if(!on || on.id!==TR.TEST_ROOM.nature.id || on.wind!==0 || on.crickets!==0 || on.drone.some(x=>x!==0) || !(on.mix>0.9)) miss('2.5 s into the switch the sounding nature slot is not the test room\'s silent recipe: '+JSON.stringify(on));
+        if(!old || old.id!==FR.nature.id || !(old.mix<0.15)) miss('2.5 s into the switch the forest\'s nature slot has not faded: '+JSON.stringify(old));
+        for(let k=0;k<80 && !RS.roomSwitchDbg().nature.slots[1-RS.roomSwitchDbg().nature.cur].parked;k++){ await sleep(100); A.ambienceTick(); }
+        n++; const P=RS.roomSwitchDbg().nature; if(!P.slots[1-P.cur].parked) miss(`the forest's nature slot was not taken out of the graph after its fade (${((performance.now()-ts)/1000).toFixed(1)} s): `+JSON.stringify(P.slots)); }
       const back=RS.roomSwitch(FOREST); await back; const c2=counter.n, names=counter.names.slice(); counter.off(); counter=null; n+=5;
       notes.push(`audio nodes made during two whole switches: ${c2-1} (CONTROL, the row's own node: counted ${c1>=1 ? 'yes' : 'NO'}); nature ${amb0 && amb0.id} → ${nat && nat.id}`);
       if(c1<1) miss('CONTROL: the node the row made inside the window was not counted');
@@ -109,10 +120,14 @@ export async function checkNightRoomSwitch(){
         if(S.stored!==FOREST) miss(`back in the forest, the remembered room is ${S.stored}`); } }
     /* (3) the nature crossfade, offline: no click, the first 2 s untouched, the new nature after; CONTROL an instant swap clicks */
     { const R=await import('../../../core/render.js'), AM=await import('../../../apps/night/sound/ambience.js'), S=await import('../../../core/scales.js');
-      const SEC=6, root=S.tonicFreq()/2, fifth=S.droneSecondHz();
-      const play=(swap, instant)=>e=>{ const E=e.engineCtx(), a=AM.buildAmbience(E, E.master.in, 0, FR.nature, 2); AM.ambienceTune(E, a, root, fifth, 0); AM.ambienceSet(E, a, true, 1, 0.05, true);
-        AM.ambienceSchedule(E, a, swap ? 2 : SEC); if(swap){ AM.ambienceRoom(E, a, TR.TEST_ROOM.nature, 2, { instant }); AM.ambienceSchedule(E, a, SEC); } };
-      const none=midOf(await R.goldRender(play(false), SEC)), sw=midOf(await R.goldRender(play(true, false), SEC)), hard=midOf(await R.goldRender(play(true, true), SEC));
+      const SEC=14, root=S.tonicFreq()/2, fifth=S.droneSecondHz(), copy={ ...FR.nature };   // copy: the forest's numbers in another object (the CONTROL of «gone»)
+      const play=(swap, instant, to=TR.TEST_ROOM.nature)=>e=>{ const E=e.engineCtx(), a=AM.buildAmbience(E, E.master.in, 0, FR.nature, 2); AM.ambienceTune(E, a, root, fifth, 0); AM.ambienceSet(E, a, true, 1, 0.05, true);
+        AM.ambienceSchedule(E, a, swap ? 2 : SEC); if(swap){ AM.ambienceRoom(E, a, to, 2, { instant }); AM.ambienceSchedule(E, a, SEC); } };
+      const none=midOf(await R.goldRender(play(false), SEC)), sw=midOf(await R.goldRender(play(true, false), SEC)), hard=midOf(await R.goldRender(play(true, true), SEC)), same=midOf(await R.goldRender(play(true, false, copy), SEC));
+      { const db=x=>20*Math.log10(Math.max(1e-12, rms(x, 12, SEC))/Math.max(1e-12, rms(none, 12, SEC))), g=db(sw), gc=db(same); n+=2;
+        notes.push(`10 s after the swap: ${g.toFixed(1)} dB against no switch (CONTROL, a swap to a copy of the forest's recipe: ${gc.toFixed(1)} dB)`);
+        if(!(g<=-60)) miss(`10 s after the swap to the silent test room the forest is still there: ${g.toFixed(1)} dB (≤ −60)`);
+        if(!(gc>-60)) miss(`CONTROL: a swap to a copy of the forest's recipe reads ${gc.toFixed(1)} dB — the «gone» check cannot fail`); }
       let pre=0; for(let i=0;i<Math.round(1.99*RATE);i++) pre=Math.max(pre, Math.abs(sw[i]-none[i]));
       const dif=new Float32Array(sw.length); for(let i=0;i<sw.length;i++) dif[i]=sw[i]-none[i];
       const k=clickOf(sw, RATE), sp=spikeAt(sw, 2), spc=spikeAt(hard, 2), kc=clickOf(hard, RATE), moved=rms(dif, 4, SEC)/Math.max(1e-9, rms(none, 4, SEC)); n+=5;

@@ -4,6 +4,14 @@
 
 Each entry starts: track, number, date, tree hashes before and after (`node tools/tree-hash.mjs core apps/full apps/night`). History: `archive/WORK-LOG-before-split.md`, `archive/NIGHT-RUN-LOG-2026-10.md`. New runs start at `NIGHT-1`.
 
+# NIGHT-3 — stage 5 part 2, fix after step 133 (2026-11-09): the test room's nature is silent
+Tree hashes before: core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night ac9146c6310398eb. After: core 14bd513ae15aa87e (unchanged) · apps/full d6b90cf2cb4be6da (unchanged) · apps/night 3279ec88c1f91059.
+- The user (step 133): everything works, but the forest's sounds did not go away in the test room. The swap itself had run (the row saw the recipe move and the slots flip); the test room's nature was wind and a cricket too — the same noise through another band, its wind even louder — so by ear the forest stayed. Now the test room's nature is SILENT (every gain 0), so a switch takes the forest's wind and crickets away.
+- Proved in the row «NIGHT room switch» (31 → 36 cases): live, 2.5 s into a switch the sounding slot holds the test room's silent recipe (mix 0.972, wind / crickets / drone 0) and the forest's slot has faded to 0.082, then it is parked (out of the graph); offline, 10 s after the swap the output is −115 dB against no switch — CONTROL: a swap to a copy of the forest's recipe (another object, the same numbers) stays at 0 dB. The crossfade: 0.98 × its neighbourhood at the swap (instant swap 2.8 ×); the first 2 s 7.5e-9 from no switch.
+- `apps/night/roomswitch.js`: `roomSwitchDbg` reports each live slot (recipe, fade, gains, parked). `tools/probes/night/testroom.js`: the silent nature. Fix rounds 0.
+- Checks: static PASS; [probe-data] PASS — 39 checks, 0 differences; Night P.night: PASS — 39 checks, 0 differences (GOLD 101 cases 0, NIGHT ambience 0, NIGHT untouched 0, NIGHT music bed 43 cases 0, NIGHT room switch 36 cases 0), storage census, CSP, network PASS; Full P.quick: PASS — 93 checks, 0 differences (FULL untouched 0), UI checks PASS.
+- Noted for later rooms: a room's nature can only be today's four parts (drone, wind, crickets, echo) with its own numbers; a room that needs other sounds (water, rain) needs new parts in the nature module — design it with that room.
+
 # NIGHT-3 — stage 5 part 2 (2026-11-09): the switching machinery, on a development test room (with CORE-12) — Part B
 Tree hashes before: core f9065dfdd0124ef6 · apps/full d6b90cf2cb4be6da · apps/night 1199d76f00fd99b5. After: core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da (unchanged) · apps/night ac9146c6310398eb.
 - The user approved Part A (NIGHT-5) and committed it; the three answers of its check came through blank, taken as: step 132 OK, the far end fine (not retuned), the leaf icon kept.

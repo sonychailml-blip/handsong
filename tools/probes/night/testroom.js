@@ -1,7 +1,8 @@
 /* NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, registered only by the row «NIGHT room switch» or by the page
    address ?probe&testroom (then the Room button shows: two rooms). Its record is the forest's with its own id, name, nature and a music bed
    recipe object of its own (the same numbers at another level), so a switch exercises every part: the picture, the nature crossfade, the bed's
-   recipe. Its picture is ONE full-screen shader (a slow gradient). Modes (testRoomMode): 'plain'; 'leak' — each build makes a texture it never
+   recipe. Its nature is SILENT (the user, step 133: the forest's wind and crickets belong to the forest only — a switch must take them away,
+   and a lower wind with one cricket still sounded like the forest). Its picture is ONE full-screen shader (a slow gradient). Modes (testRoomMode): 'plain'; 'leak' — each build makes a texture it never
    frees (the row's CONTROL that a leak is caught); 'fail' — the build throws (the stand-in must show); 'slow' — its code arrives after `ms`. */
 import { FOREST_ROOM } from '../../../apps/night/rooms/forest/pure/room.js';
 import { checkRoom } from '../../../apps/night/pure/room.js';
@@ -11,11 +12,11 @@ import { sceneRoomAdd, sceneRoomRemove } from '../../../apps/night/scene/host.js
 export const TEST_ROOM_ID='room.dev-test';
 const F=Object.freeze;
 export const TEST_ROOM=F({ ...FOREST_ROOM, id:TEST_ROOM_ID, name:F({ en:'Test room', ru:'Тестовая комната' }),
-  nature:F({ id:'ambience.dev-test',
-    drone:F({ root:0.16, fifth:0.03, tc:1.2, send:0.4 }),
-    wind:F({ hz:300, q:0.8, sweep:120, rate:0.11, gain:0.08, send:0.3, sec:2, seed:0x54455354 }),
-    crickets:F({ ...FOREST_ROOM.nature.crickets, n:1, fLo:3000, fHi:3400, every:F([1.5, 3]), gain:0.01, pans:F([0.2]) }),
-    echo:F({ time:0.29, fb:0.45, lp:1600 }),
+  nature:F({ id:'ambience.dev-test',   // silent: no drone, no wind, no crickets (every gain 0; the shape the validator asks for)
+    drone:F({ root:0, fifth:0, tc:1.2, send:0 }),
+    wind:F({ hz:300, q:0.8, sweep:120, rate:0.11, gain:0, send:0, sec:2, seed:0x54455354 }),
+    crickets:F({ ...FOREST_ROOM.nature.crickets, n:1, gain:0, send:0, pans:F([0.2]) }),
+    echo:F({ time:0.29, fb:0.3, lp:1600 }),
     level:0.6, master:0.42, ahead:0.35 }),
   bed:F({ ...FOREST_ROOM.bed, level:0.55 }), bed2:F({ ...FOREST_ROOM.bed2, level:0.55 }) });
 const S={ mode:'plain', ms:0, builds:0, disposed:0, stand:0, leaked:[] };
