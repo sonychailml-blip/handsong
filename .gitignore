@@ -7,3 +7,4 @@ tools/.pack-test-key.json
 tools/split-baseline/
 dist/
 tools/.build/
+tools/.ktx-lab/

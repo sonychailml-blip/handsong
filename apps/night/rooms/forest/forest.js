@@ -17,6 +17,7 @@ import { buildLife, patchGroundWaves, patchSway } from './forest-life.js';   // 
 import { buildDetail } from './forest-detail.js';   // RUN 9 (slice 3): grass, leaves, moths, moonbeams, silhouettes
 import { buildRare } from './forest-rare.js';   // RUN 9 (slice 4): the falling star, the flower, the emblem
 import { buildAnswers } from './forest-answers.js';   // NIGHT-6 slice 1: dew and webs
+import { buildFloor } from './forest-floor.js';   // NIGHT-6 slice 3: the herb layer and the fine fern
 import { ANSWERS, swellAt } from './pure/answers.js';
 
 export const FOREST_SEED=0x464F5231;
@@ -27,14 +28,17 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 /* NIGHT-6: the forest's prepared FILES (the user's rule: what never changes during play is prepared ahead and shipped — drawn by
    tools/forest-bake.mjs, registered in tools/licences.json), fetched once per session from our own origin; the room's load awaits them, so a
    build finds them ready. A missing file leaves its part dark, never the room. */
-const FILES=Object.freeze({ web:new URL('./tex/web.png', import.meta.url) });
-let ASSETS=null, ASSETS_P=null; const assetErr=[];
+/* NIGHT-6 (the user, 2026-11-09): each texture's MASTER serves high, a smaller copy medium (the low copies wait for a WebGL low level); a
+   level fetches only its own files */
+const TEX=Object.freeze({ 'web-1024':new URL('./tex/web-1024.png', import.meta.url), 'web-512':new URL('./tex/web-512.png', import.meta.url),
+  'floor-2048':new URL('./tex/floor-2048.png', import.meta.url), 'floor-1024':new URL('./tex/floor-1024.png', import.meta.url) });
+export const FOREST_TEX=Object.freeze({ full:Object.freeze({ web:'web-1024', floor:'floor-2048' }), reduced:Object.freeze({ web:'web-512', floor:'floor-1024' }) });
+const IMG={}, LOADING={}, assetErr=[];
 async function fileImage(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status+' '+url.pathname);
   const u=URL.createObjectURL(await r.blob()), img=new Image(); try{ img.src=u; await img.decode(); } finally { URL.revokeObjectURL(u); } return img; }
-export function forestAssets(){
-  return ASSETS_P || (ASSETS_P=Promise.all(Object.entries(FILES).map(([k,u])=>fileImage(u).then(img=>[k,img], e=>{ assetErr.push(k+': '+String(e&&e.message||e)); return [k,null]; })))
-    .then(es=>(ASSETS=Object.fromEntries(es))));
-}
+/* the files of `level` ('full' | 'reduced'), once per session → a promise of the loaded images by name */
+export function forestAssets(level='full'){ const want=FOREST_TEX[level]||FOREST_TEX.full;
+  return Promise.all(Object.values(want).map(n=>LOADING[n] || (LOADING[n]=fileImage(TEX[n]).then(img=>{ IMG[n]=img; }, e=>{ assetErr.push(n+': '+String(e&&e.message||e)); })))).then(()=>IMG); }
 /* colour helpers: a token's text → [r, g, b, a]; jittered variants in HSL (texture painting only) */
 function rgbOf(s){ s=String(s||'').trim(); let m=s.match(/^#([0-9a-f]{6})$/i); if(m){ const n=parseInt(m[1],16); return [n>>16&255, n>>8&255, n&255, 1]; }
   m=s.match(/^#([0-9a-f]{3})$/i); if(m){ const q=m[1]; return [0,1,2].map(i=>parseInt(q[i]+q[i],16)).concat(1); }
@@ -58,7 +62,7 @@ export function buildForest(T, opt){
     reduce=!!opt.reduce, R=seeded(FOREST_SEED), V=(x,y,z)=>new T.Vector3(x,y,z);
   const col=n=>new T.Color(C('forest-'+n));
   const own=[];   // everything to dispose
-  const files=opt.files||ASSETS||{};   // NIGHT-6: the prepared files (opt.files: a probe's own)
+  const pick=FOREST_TEX[opt.level]||FOREST_TEX.full, files=opt.files||{ web:IMG[pick.web], floor:IMG[pick.floor] };   // NIGHT-6: this level's prepared files (opt.files: a probe's own)
   const tex=(c,srgb,rx=1,ry=1)=>{ const t=new T.CanvasTexture(c); t.wrapS=t.wrapT=T.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy=8; if(srgb) t.encoding=T.sRGBEncoding; own.push(t); return t; };
   /* RUN 9: the PALETTE is the mood's look (the record's looks → tokens), eased towards a new mood's look (τ MOOD_TC s) */
   const looks=new Map(), lookCols=L=>{ let c=looks.get(L.pre); if(!c){ c={}; for(const [k,n] of Object.entries(L.tokens)) c[k]=new T.Color(C(n)); looks.set(L.pre,c); } return c; };
@@ -155,6 +159,10 @@ export function buildForest(T, opt){
      (./forest-life.js); the wild fireflies GATHER to the playing light while notes come (call) and scatter slowly when they stop */
   const life=buildLife({ T, s, C, pal, own, canvas2, tex, lv:Lv }); patchGroundWaves(groundM, life.U); patchSway(frondM, life.U); patchSway(frondD, life.U);
   const detail=buildDetail({ T, s, C, pal, own, canvas2, tex, lv:Lv, U:life.U, fernT, reduce });   // RUN 9 (slice 3)
+  /* NIGHT-6 slice 3: the forest floor — the herb layer and the fine fern, placed around today's trunks and ferns */
+  let floorTex=null; if(files.floor && Object.keys(Lv).some(k=>['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].includes(k) && Lv[k]>0)){
+    floorTex=new T.Texture(files.floor); floorTex.encoding=T.sRGBEncoding; floorTex.anisotropy=4; floorTex.needsUpdate=true; own.push(floorTex); }
+  const floor=buildFloor({ T, s, own, lv:Lv, trunks:spots, ferns, tex:floorTex, U:life.U });
   const rare=buildRare({ T, s, C, pal, own, canvas2, tex, halo:HALO });   // RUN 9 (slice 4)
   let gather=0, playing=false, rel=0;
   /* NIGHT-6 slice 2: THE MELODY — the held seconds of the playing note (the host), the note-on times of the last window, and their eased
@@ -284,7 +292,8 @@ export function buildForest(T, opt){
       clouds:clouds.map(c=>c.visible ? c.material.opacity : 0), mist:mists.map(x=>x[3].opacity), mistY:mists.map(x=>x[2].position.y), fog:s.fog.density, deep:deep.e, mood:moodId,
       fogHex:pal.fog.getHexString(), flies:fkNow }, life:{ ...life.state(), gather, playing, release:rel }, detail:detail.state(), rare:rare.state(flies),   // RUN 9 (slice 2)
     melody:{ hold:holdE, rate:rateE, held:heldNow, darts },   // NIGHT-6 slice 2
-    answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, errors:assetErr.slice() } });   // NIGHT-6 slice 1
+    floor:(({ places, ...x })=>x)(floor.state()),   // NIGHT-6 slice 3
+    answers:answers.state(), bed:{ queued:bedQ.length, fired:fired.map(x=>({ ...x })), twinkles:twinkles.map(w=>({ ...w, glow:glow1[w.i] })) }, files:{ web:!!files.web, floor:!!files.floor, errors:assetErr.slice() } });   // NIGHT-6 slice 1
   function dispose(){ for(const o of own) try{ o.dispose(); }catch(e){} own.length=0; }
   /* NIGHT-6 slice 1: a music bed event `it` ({ kind 'chord' | 'loop' | 'glass', lv, a, h, r, amp }) heard at room time `at` (the host maps it) */
   function bed(it, at){ if(!it || !(at>-1e9) || at-now>30) return; bedQ.push({ it, at }); if(bedQ.length>64) bedQ.shift(); }
@@ -292,6 +301,6 @@ export function buildForest(T, opt){
   function texBytes(){ let b=0; for(const o of own){ if(!o || !o.isTexture) continue; const im=o.image||{}, w=im.width||0, h=im.height||0, pot=!(w&(w-1)) && !(h&(h-1));
     b+=w*h*4*(o.generateMipmaps!==false && pot ? 4/3 : 1); } return Math.round(b); }
   resize(W,H);
-  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers,
+  return { id:FOREST_ROOM.id, scene:s, camera, update, resize, place, glint, project, state, dispose, lightsOf, lifeDbg:life, detailDbg:detail, bed, texBytes, answersDbg:answers, floorDbg:floor,
     held:sec=>{ heldNow= sec>0 ? sec : 0; rare.held(sec); }, rareDbg:kind=>rare.force(kind, now, { light:rigs[0].cur, flies }) };   // RUN 9 (slice 4): held — how long the playing note is held (host); rareDbg — probes / captures   // RUN 9: lifeDbg / detailDbg — probes only (uniforms, silhouette boxes)
 }

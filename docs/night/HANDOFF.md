@@ -35,6 +35,14 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-6 slice 3 (2026-11-09): the forest floor. Log: `docs/night/WORK-LOG.md`; as built and the KTX2 lab: `docs/night/design/NIGHT-6-forest/PLAN.md` top
+- Step 135 checked by the user: the fireflies look right. The user's texture rule: one master per texture at the highest quality (high), smaller copies derived for medium and low; sizes per level reported every slice; warn before 30 MB.
+- The plant sheet `rooms/forest/tex/floor-2048.png` (master) → 1024 / 512, and the web now a 1024 master → 512 / 256, drawn by `tools/forest-bake.mjs`: fine fern, nettle, sedge, wood sorrel, broad-leaved herb, bilberry with berries, wood anemone.
+- The herbs placed by damp and light (`pure/floor.js`), 3 m and more from the eye, in two instanced draws sharing one material (`forest-floor.js`); high about 3,800 plants, medium about 1,500. Each level fetches only its own files.
+- Files per level: high 1.37 MB, medium 0.61 MB, low 0.30 MB (all 2.1 MB of 30). Laptop: medium −6.2 / −1.4 % detections with, −1.7 / −2.6 % without (noise), 0 dropouts; textures medium 13.6 MB, high 33.6 MB; high −37.5 %; the cold opening at high 4.5 s (over the 4-s gate), medium first 2.3 s, later 0.4 s.
+- KTX2 measured (laptop): GPU memory a quarter (2048² 22.4 → 5.6 MB), the opening about the same (215 → 183 ms), UASTC 48.7 dB / ETC1S 40.4 dB; the official transcoder needs eval, which our CSP refuses — a decision for the user.
+- Rows: data «FOREST floor (app)» 30, «NIGHT forest files (app)» per level; browser «FOREST floor» 10. Waiting for step 136.
+
 ### NIGHT-6 slice 2 (2026-11-09): the fireflies follow the melody. Log: `docs/night/WORK-LOG.md`; as built: `docs/night/design/NIGHT-6-forest/PLAN.md` top
 - Step 134 checked by the user: the forest answers look right; the Poco measurement comes later.
 - The firefly law takes `hold` (a long note: they close in, circle slower, breathe together, brighter) and `rate` (fast playing: wider rings, a quicker swirl); `fliesDart` sends the three nearest out on a note of fast playing. Both 0 = exactly the old step. The room eases them from the held seconds and its note times; a held note now keeps the flies gathered.
@@ -94,19 +102,6 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 ### NIGHT-3 stage 3 (2026-11-03): the forest is the first room module (CORE-8). Log: `docs/night/WORK-LOG.md`
 - A room = `apps/night/rooms/<name>/`: its record (`pure/room.js`: levels, mood looks, nature recipe), its 2D stand-in, its scene code (loaded on first open); the list is `rooms/index.js`, the validator `pure/room.js`. The scene host is Night's (`apps/night/scene/host.js`), the forest's colours are in `night.css`.
 - Nothing seen or heard changed (picture hash, GOLD ambience, NIGHT untouched). Next: the music bed (stage 4 in the user's order).
-### NIGHT-3 stage 2 (2026-11-03): the ambience through the core door (CORE-7). Log: `docs/night/WORK-LOG.md`
-- The plan is approved with the user's decisions (PLAN.md, top): no second room yet; next stage 3 (the forest as the first room module + CORE-8), then the music bed, then the switching machinery with a dev-only test room.
-- The forest ambience now lives in `apps/night/sound/ambience.js` + `pure/ambience.js` and is registered by `main.js` through `core/soundmods.js`. Same sound: GOLD «ambience» on Night's page 0 differences against the old print.
-### NIGHT-3 stage 1 (2026-11-03): rooms as modules, switching, a music bed — the plan only. `docs/night/design/NIGHT-3-rooms/PLAN.md`
-- No app code; tree hashes unchanged. Rooms and their sound are not modular today (the forest is wired through core, legacy-ui and the shell); scales and timbres are data.
-- Proposed: a room folder per room (record, picture, 2D stand-in, nature and bed recipes); a core door for an app's sound module (CORE-7); the host moves to the app (CORE-8); two nature slots for a crossfade; detection paused in the switch's dark moment; Dark / Camera become «Picture» in settings.
-- Six buttons fit only as 3 + 3 (portrait 105 px columns, landscape 3 × 2). Bed est. ≈ 2 % of the laptop quantum. Lake first. Ten decisions wait for the user.
-### NIGHT-2 stage 3 (2026-11-03): hand choice in settings, the flicker fixed, far hands accepted. Log: `docs/night/WORK-LOG.md`
-- «Play with» is a saved segment in Settings → Hand (last choice wins); the main screen has four buttons + settings.
-- The calibration picture is drawn by the loop (boot `afterDraw`), so it no longer flickers to black. Far but steady hands are accepted (CORE-6 `farHold`) with a short note. Waiting for step 129 (five checks; replaces 128).
-### NIGHT-2 stage 2 (2026-11-03): calibration screens and settings, built. Log: `docs/night/WORK-LOG.md`; decisions: `docs/night/design/NIGHT-2-calibration/DESIGN.md`
-- `apps/night/calib.js` + the settings card: the offer once per camera, then the ghost; the step on the camera picture with every point; «Играть» saves, «Ещё раз» repeats; the side of the calibrated hand sets the roles (voted over the hold) and is saved; reset clears all. Five main buttons + settings; background, Forest slider, hand points in settings. Landscape low-light hint fixed.
-- Core part CORE-5 (texts, icon). Row «NIGHT calibration screens». Waiting for step 128 (laptop + Poco, covers 125 for Night).
 ### RUN 9 (2026-10-19/20): the living forest. Log and plain summary: `archive/WORK-LOG-before-split.md` «RUN 9» (old name)
 - NIGHT (`apps/night/pure/cycle.js`): a 24-min seamless cycle: the moon drifts, 7 cloud passes dim it, four mist layers; the sleep timer deepens and stills the night; moods Glow / Dusk / Mist recolour the forest (token sets). Bus `nightSky` { mood, sleep, wind } from the shell.
 - RESPONSE (`apps/night/pure/forestlife.js`, `apps/night/scene/forest-life.js`): a ring of light per note; mushrooms / flowers pulse; fireflies gather while you play; a stream with the moon's reflection: Echo = rings on the water, Wave = the leaves shimmer, Warmth = the light's colour.

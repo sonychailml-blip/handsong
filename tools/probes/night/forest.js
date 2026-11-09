@@ -382,7 +382,7 @@ export async function checkForestAnswers(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
   const was=profileCurrent(), keepLevel=sceneLevel();
   try{
-    const T=await loadThree(); await forestAssets(); const w=844, h=390, rooms=[], mk=(lv='full', o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
+    const T=await loadThree(); await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv='full', o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
     const NIN={ mood:'major-penta', sleep:0 }, run=(r, t0, sec, hands=[])=>{ for(let i=0;i<Math.round(sec*60);i++) r.update(1/60, t0+i/60, hands, null, NIN); return r.state(); };
     try{
       for(const lv of ['full','reduced']){ const s=mk(lv).state(), L=FOREST_LEVELS[lv]; n+=3;
@@ -475,3 +475,34 @@ export async function checkForestMelody(){
   return { cases:n, total:d.length, differences:d, notes };
 }
 row({ night:true, at:1008.635, name:'FOREST melody', run:()=>checkForestMelody(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });
+/* NIGHT-6 slice 3: row «FOREST floor» — the room built without a renderer at each level holds the floor law's plants for its counts (beside its
+   own trunks and ferns), the plant sheet of its level reached it (high the 2048² master, medium the 1024² copy); the baseline override (every
+   floor count 0) builds none; drawn (the opened forest at medium): the herbs and the fine ferns RENDER — one frame drawn twice, them hidden the
+   second time — CONTROL the same frame twice differs by 0. */
+export async function checkForestFloor(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s);
+  const was=profileCurrent(), keepLevel=sceneLevel();
+  try{
+    const T=await loadThree(); const IMG=await forestAssets('full'); await forestAssets('reduced'); const w=844, h=390, rooms=[], mk=(lv, o={})=>{ const r=buildForest(T,{ C:cv, level:lv, w, h, ...o }); rooms.push(r); return r; };
+    try{
+      for(const [lv, size] of [['full',2048],['reduced',1024]]){ const r=mk(lv), st=r.state().floor, L=FOREST_LEVELS[lv], parts=r.floorDbg.parts; n+=3;
+        const want=['sorrel','forb','bilberry','anemone','nettle','sedge','fern2'].map(k=>[k, L[k]]), got=want.map(([k])=>(st.counts||{})[k]||0);
+        if(want.some(([,v],i)=>got[i]!==v)) miss(`${lv}: the floor holds ${JSON.stringify(st.counts)} (asked ${JSON.stringify(Object.fromEntries(want))})`);
+        const img=parts.herbs.material.map && parts.herbs.material.map.image; if(!st.tex || !img || img.width!==size) miss(`${lv}: the plant sheet ${img ? img.width+'²' : 'missing'} (${size}² expected)`);
+        if(!parts.herbs.parent || !parts.fronds.parent) miss(lv+': the floor is not in the scene');
+        notes.push(`${lv}: ${st.herbs} herbs, ${st.rosettes} fine-fern rosettes (${st.fronds} fronds), sheet ${img ? img.width : 0}²`); }
+      { const st=mk('reduced', { lv:{ sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0 } }).state().floor; n++; if(st.herbs || st.fronds || st.tex) miss('the baseline override still builds a floor: '+JSON.stringify(st)); }
+    } finally { for(const r of rooms) r.dispose(); }
+    const why=profileApply('profile.night'); n++; if(why){ miss('Night refused: '+why); return { cases:n, total:d.length, differences:d, notes }; }
+    await setSceneLevel('reduced'); await setBackground('forest'); await frames(6);
+    const room=sceneRoomDbg(); if(!room || !sceneInfo().webgl){ notes.push('no WebGL room — the drawn check does not apply'); return { cases:n, total:d.length, differences:d, notes }; }
+    const P=room.floorDbg.parts, ab=await sceneSnapDbg(on=>{ P.herbs.visible=!on; P.fronds.visible=!on; }, true), cc=await sceneSnapDbg(()=>{}, true); n+=2;
+    if(!ab || !cc) notes.push('no frame rendered — the drawn check does not apply');
+    else { notes.push(`the floor adds ${(ab[0]-ab[1]).toFixed(3)} to the mean RGB sum of one frame (CONTROL the same frame twice ${(cc[0]-cc[1]).toFixed(4)}); texture memory ${(sceneInfo().texBytes/1048576).toFixed(1)} MB at medium`);
+      if(!(Math.abs(ab[0]-ab[1])>0)) miss('the floor does not show in the picture'); if(cc[0]!==cc[1]) miss('CONTROL: one frame rendered twice differs by '+(cc[0]-cc[1])); }
+    void IMG;
+  } catch(e){ miss('error: '+(e&&e.stack||e)); }
+  finally{ try{ await setSceneLevel(keepLevel); }catch(e){} if(profileCurrent()!==was) profileApply(was); await setBackground('camera'); await sleep(30); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
+row({ night:true, at:1008.637, name:'FOREST floor', drawn:true, run:()=>checkForestFloor(), read:r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes }) });

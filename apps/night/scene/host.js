@@ -101,7 +101,7 @@ export async function sceneOpen(id=roomId, opt={}){
   if(room && room.id===id && (renderer || level==='minimal') && !opening) return sceneInfo();
   const op=openBegin(id);
   let build;
-  try{ await loadThree(); build=await R.load(); }
+  try{ await loadThree(); build=await R.load({ level }); }   // NIGHT-6: a room may fetch only the files of the level it opens at
   catch(e){ if(opening===op) openFail(op, e); throw e; }
   if(want!==id || opening!==op) return sceneInfo();
   if(room){ room.dispose(); room=null; }

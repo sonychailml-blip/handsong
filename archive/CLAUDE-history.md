@@ -1856,6 +1856,11 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     1. Play a few notes so the fireflies gather, then hold one note for 4–5 s with the light in the open: the fireflies close in round the light, circle slower, and brighten and dim together like a slow breath (about 3.6 s). Keep holding: they stay. Let go: they drift away slowly, as before.
     2. Play a fast run (four or more notes a second) for a few seconds: their circles widen, they swirl quicker, and on each note the two or three nearest dart out from the light.
     3. Play gently (one or two notes a second): as before — they gather, no darting. Tell me if the long note's breath or the fast run's darting is too strong or too weak.
+136. The forest floor (NIGHT-6 slice 3), at most four checks; the rest is in the rows «FOREST floor (app)» (every count placed, none in the water or under the eye, nettles by the trunks, fine ferns away from today's ferns, sorrel damper and anemones lighter — CONTROL shuffled species show neither), «FOREST floor» (the room holds the law's plants, its level's sheet; the baseline none; they render) and «NIGHT forest files (app)» (every file matches the tool; the sizes per level). Laptop: Live Server; `http://127.0.0.1:5500/apps/night/`, the room's picture on (medium, the default).
+    1. Look at the floor near you, portrait and landscape: wood sorrel trefoils, broad-leaved herbs, bilberry bushes with dark berries, white wood anemones, nettles at the trunks' feet, sedges along the stream's bank, and a finer fern beside today's ferns. Is it rich without hiding the stream or the light?
+    2. Move the light low over the floor: the plants catch its colour; with the wind (Звуки комнаты up) they sway with the grass.
+    3. ⓘ → «Картинка комнаты» → high (the masters, 2048²): sharper plants up close. Tell me if high is worth what it costs (about 38 % of hand detection on this laptop).
+    4. Open the picture from Dark to Room once after a fresh page load: the first opening takes a few seconds (about 2–4.5 s on this laptop) — acceptable, or does it need the «waking» moment?
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

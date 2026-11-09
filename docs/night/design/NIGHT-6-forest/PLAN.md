@@ -46,6 +46,34 @@ The plan is approved, with these answers to §8 and one addition.
 - **The room** (`forest.js`) eases the two inputs (hold in 0.6 s, out 1.2 s; rate in 0.4 s, out 1.5 s) from the host's held seconds and its own note times. A held note now counts as playing, so the flies stay gathered through it; before, they began to scatter about 3 s into a long note.
 - **Measured by the rows:** a long note brings the near flies from 2.19 to 1.01 away (the law alone), and in the room 46 flies within 2 m against 4 with the note released; fast playing (8 notes a second against 2) takes them from 2.50 to 4.35 away and sends flies out on 51 notes (slow: none).
 - **Cost:** no GPU change (the same points, the same draw); per note a sort of the 70 flies.
+- **The user's look (step 135, 2026-11-09):** the fireflies look right as they are.
+
+### The user's texture rule (2026-11-09)
+Every texture is made as beautiful and detailed as it can be: ONE master at the highest quality (for example 2048² where it shows), smaller versions derived from it for the lower levels. There will be three graphics levels later: high uses the masters, medium and low the smaller versions. A master is never lowered to save size; size is saved with the smaller versions, mipmaps and GPU compression. The files budget may grow past 15 MB: every slice reports the files' size per level, and the user is told before the total passes 30 MB (the data row's limit). The web became a 1024² master (with dew beads) and 512² / 256² copies.
+
+### Slice 3 as built (2026-11-09): the forest floor (laptop numbers only; the Poco run comes later)
+- **The plant sheet** (`rooms/forest/tex/floor-2048.png`, the master; `floor-1024`, `floor-512` boxed down from it), drawn by `tools/forest-bake.mjs` at 3× and boxed down: the fine fern (an iterated-function fern), nettle, sedge, wood sorrel (trefoils), a broad-leaved herb, bilberry with its berries, wood anemone (white stars, buds). Transparent pixels carry their neighbours' colour (no dark fringes when filtered).
+- **The law** (`rooms/forest/pure/floor.js`): the herbs by damp and light (the sketch's idea, our own law): sorrel in damp shade, anemones where light falls on drier ground, bilberry and herbs in patches, nettles near the trunks' feet, sedges on the bank only, the fine fern in lighter places away from today's ferns. Never in the water, never within 3 m of the eye (as today's grass: a cut-out card closer than that turns to jagged blocks at medium — seen in the first capture). A coarse distance grid makes it 2–3× faster; within 1.4 m of the bank the exact distance decides.
+- **The picture** (`rooms/forest/forest-floor.js`): the herbs as crossed cards in one instanced draw and the fine fern's fronds in rosettes in a second, sharing ONE material (one new shader program) that reads each plant's cell of the sheet and sways with the forest's wind. Nothing casts a shadow.
+- **Counts** (the record's levels): high 1,500 sorrel, 600 herbs, 260 bilberry, 500 anemones, 140 nettles, 700 sedges, 110 fine-fern rosettes; medium 600 / 240 / 100 / 200 / 50 / 280 / 45 (about 1,500 plants, conservative).
+- **Files per level:** high 1.37 MB, medium 0.61 MB, low 0.30 MB (code and that level's files); all files together 2.1 MB of 30 MB.
+- **Measured** (laptop, Intel HD 4000, RUN 9's method):
+  - medium: −6.2 / −1.4 % hand detections vs Dark with NIGHT-6's additions, −1.7 / −2.6 % without (noise), 0 dropouts; draws 55 vs 51–52; programs 23 vs 20; textures 13.6 MB vs 6.9 MB;
+  - high: −37.5 % (high is still a developer choice); textures 33.6 MB;
+  - the first opening (cold) at high 4.5 s, over the 4-s gate (slice 1: 3.2–3.6 s); the first opening at medium 2.3 s; later openings about 0.4 s.
+- **KTX2 / Basis, measured on the laptop** (`tools/forest-ktx-lab.mjs`, `tools/forest-ktx.eval.js`; Basis Universal commit 073eb6a, Apache-2.0, dev-only in the git-ignored `tools/.ktx-lab/`):
+
+| Plant sheet | File | Quality (PSNR vs the PNG) | Opening path | GPU memory |
+|---|---|---|---|---|
+| 2048², PNG (today) | 1,129 KB | exact | 215 ms (fetch 17, decode 75, upload with mipmaps 104) | 22.4 MB |
+| 2048², KTX2 ETC1S → BC7 | 390 KB | 40.4 dB | 194 ms (transcode 119) | 5.6 MB |
+| 2048², KTX2 UASTC → BC7 | 1,004 KB | 48.7 dB | 183 ms (transcode 137) | 5.6 MB |
+| 1024², PNG (today) | 445 KB | exact | 103 ms | 5.6 MB |
+| 1024², KTX2 UASTC → BC7 | 332 KB | 45.1 dB | 57 ms | 1.4 MB |
+
+  - **What it means:** GPU memory falls to a quarter. On the laptop the opening barely changes (the textures are not what makes the cold opening slow). UASTC keeps the master's quality closest (48.7 dB); ETC1S makes the smallest files.
+  - **A look question for the user:** at medium (0.6 resolution, no antialiasing) cut-out plants have jagged edges, as today's ferns do; softer edges need either antialiasing (alpha to coverage needs it; it costs) or a soft-edged blended pass for the plants.
+  - **What stands in the way:** the official transcoder's JavaScript uses `eval`, which our CSP refuses (rule #33). Shipping KTX2 needs either a transcoder built without dynamic code generation (our own build of the Apache-2.0 source) or a CSP change (the user's decision). The transcoder's WebAssembly is 1.06 MB, against the files budget. On the Poco the GPU takes ASTC / ETC2, not BC7; its numbers come with the Poco run.
 
 **What this is.** A plan only. No app code changed. Tree hashes are the same before and after: core 14bd513ae15aa87e · apps/full d6b90cf2cb4be6da · apps/night 3279ec88c1f91059.
 

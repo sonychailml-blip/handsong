@@ -1054,17 +1054,50 @@ async function forestMelodyCore(){
     const B2=run({},720), b2=h(B2), v2=JSON.stringify(B2.map(q=>q.v)); n++; if(Fl.fliesDart(B2, L0, 0).length || h(B2)!==b2 || JSON.stringify(B2.map(q=>q.v))!==v2) miss('a dart of strength 0 moved something'); }
   return { cases:n, total:d.length, differences:d, notes };
 }
+/* NIGHT-6 slice 3: THE FOREST FLOOR's places (apps/night/rooms/forest/pure/floor.js) at each level's counts beside the forest's fixed trunks and
+   a few ferns: every species gets its count; no plant in the water (sedges on the bank only), none within 1.2 m of the eye, nettles near a
+   trunk, fine ferns away from today's ferns; damp-lovers (sorrel) sit damper and light-lovers (anemone) lighter — CONTROL: the same places with
+   their species shuffled show neither; repeatable, another seed differs (CONTROL); the sheet's cells inside it, apart, their uv inside 0…1. */
+async function forestFloorCore(){
+  const d=[], notes=[]; let n=0; const miss=s=>d.push(s), Fp=await import(new URL('../apps/night/rooms/forest/pure/floor.js', import.meta.url).href), Li=await import(new URL('../apps/night/rooms/forest/pure/forestlife.js', import.meta.url).href);
+  const FR=(await import(new URL('../apps/night/rooms/forest/pure/room.js', import.meta.url).href)).FOREST_ROOM, K=Fp.FLOOR;
+  const trunks=[[-2.1,-2.2,0.34],[2.5,-4.6,0.42],[-1.3,-8.2,0.3],[3.6,0.4,0.28],[-4.2,-5,0.5],[1.1,-11.5,0.36],[-3.3,1.2,0.22],[4.6,-9,0.46],[-7,-12,0.4],[8,-3,0.35],[6,-15,0.4]], ferns=[[-3,0,1],[2,-6,1],[0.5,-1.5,0.8]];
+  const KEYS=[...Fp.HERBS, 'fern2'], mean=a=>a.reduce((x,y)=>x+y,0)/Math.max(1,a.length);
+  for(const lv of ['full','reduced']){ const L=FR.levels[lv], want={}; for(const k of KEYS) want[k]=L[k]; const P=Fp.floorPlaces(want, trunks, ferns), by={}; for(const p of P) by[p.sp]=(by[p.sp]||0)+1;
+    for(const k of KEYS){ n++; if(by[k]!==want[k]) miss(`${lv}: ${by[k]||0} ${k} placed (${want[k]} asked)`); }
+    let wet=0, eye=0, net=0, fg=0; for(const p of P){ const q=Li.streamNear(p.x,p.z), b=q.d-Li.STREAM.half;
+      if(p.sp==='sedge' ? b<K.sedgeBank[0]-1e-9 || b>K.sedgeBank[1]+1e-9 : b<0) wet++; if(Math.hypot(p.x-K.eye[0], p.z-K.eye[1])<K.eyeR) eye++;
+      if(p.sp==='nettle' && !trunks.some(([x,z,r])=>Math.hypot(x-p.x,z-p.z)-r<K.nettleR*2)) net++; if(p.sp==='fern2' && ferns.some(([x,z])=>Math.hypot(x-p.x,z-p.z)<K.fernGap)) fg++; }
+    n+=4; if(wet) miss(`${lv}: ${wet} plants in the water (or sedges off the bank)`); if(eye) miss(`${lv}: ${eye} plants under the eye`); if(net) miss(`${lv}: ${net} nettles far from every trunk`); if(fg) miss(`${lv}: ${fg} fine ferns beside today's ferns`);
+    notes.push(`${lv}: `+KEYS.map(k=>`${k} ${by[k]||0}`).join(', ')+` — ${P.length} plants`);
+    if(lv==='full'){ const ms=sp=>mean(P.filter(p=>p.sp===sp).map(p=>Fp.moistAt(p.x,p.z))), ls=sp=>mean(P.filter(p=>p.sp===sp).map(p=>Fp.lightAt(p.x,p.z)));
+      const dm=ms('sorrel')-ms('anemone'), dl=ls('anemone')-ls('sorrel'); n+=2;
+      if(!(dm>=0.04)) miss(`sorrel is not damper than anemone: ${ms('sorrel').toFixed(3)} vs ${ms('anemone').toFixed(3)}`); if(!(dl>=0.04)) miss(`anemone is not lighter than sorrel: ${ls('anemone').toFixed(3)} vs ${ls('sorrel').toFixed(3)}`);
+      const R=(()=>{ let a=7; return ()=>{ a=(Math.imul(a,1103515245)+12345)>>>0; return a/4294967296; }; })(), two=P.filter(p=>p.sp==='sorrel'||p.sp==='anemone'), lab=two.map(p=>p.sp);
+      for(let i=lab.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [lab[i],lab[j]]=[lab[j],lab[i]]; }
+      const sh=two.map((p,i)=>({ ...p, sp:lab[i] })), smm=sp=>mean(sh.filter(p=>p.sp===sp).map(p=>Fp.moistAt(p.x,p.z))), sll=sp=>mean(sh.filter(p=>p.sp===sp).map(p=>Fp.lightAt(p.x,p.z))); n++;
+      if(smm('sorrel')-smm('anemone')>=0.04 || sll('anemone')-sll('sorrel')>=0.04) miss('CONTROL: the species shuffled still sort by damp and light — the ecology check cannot fail');
+      notes.push(`damp: sorrel ${ms('sorrel').toFixed(2)} vs anemone ${ms('anemone').toFixed(2)}; light: anemone ${ls('anemone').toFixed(2)} vs sorrel ${ls('sorrel').toFixed(2)} (shuffled: ${(smm('sorrel')-smm('anemone')).toFixed(3)} / ${(sll('anemone')-sll('sorrel')).toFixed(3)})`); } }
+  { const c={ sorrel:300, forb:100, bilberry:40, anemone:100, nettle:20, sedge:80, fern2:20 }, a=JSON.stringify(Fp.floorPlaces(c, trunks, ferns)), b=JSON.stringify(Fp.floorPlaces(c, trunks, ferns)), e=JSON.stringify(Fp.floorPlaces(c, trunks, ferns, 7)); n+=2;
+    if(a!==b) miss('the floor: one seed gave two sets'); if(a===e) miss('CONTROL the floor: another seed gave the same set'); }
+  { const A=Fp.FLOOR_ATLAS, rs=Object.entries(A.cells); n+=3;
+    if(rs.some(([,[x,y,w,h]])=>x<0||y<0||x+w>A.size||y+h>A.size)) miss('a cell leaves the sheet');
+    if(rs.some(([a,r1],i)=>rs.some(([b,r2],j)=>j>i && r1[0]<r2[0]+r2[2] && r2[0]<r1[0]+r1[2] && r1[1]<r2[1]+r2[3] && r2[1]<r1[1]+r1[3]))) miss('two cells overlap');
+    if(rs.some(([sp])=>{ const u=Fp.cellUv(sp); return u[0]<0||u[1]<0||u[0]+u[2]>1+1e-12||u[1]+u[3]>1+1e-12; })) miss('a cell\'s uv leaves 0…1'); }
+  return { cases:n, total:d.length, differences:d, notes };
+}
 /* NIGHT-6: THE FOREST'S FILES (tools/forest-bake.mjs). Every prepared file matches what the tool draws now, pixel for pixel (CONTROL a changed
    pixel is caught); the PNG writer and reader round-trip; the forest's files stay inside the user's budget (CONTROL 16 MB is over it). The
    sizes are printed every run (the user's rule: report the size in every slice). */
 async function nightForestFiles(){
   const d=[], notes=[]; let n=0; const miss=s=>d.push(s), B=await import(new URL('./forest-bake.mjs', import.meta.url).href);
-  const r=B.check(); n+=r.cases; d.push(...r.differences);
-  { const b=B.bakeAll(); b[0].px[1000]^=0x40; const c=B.check(b); n++; if(!c.differences.length) miss('CONTROL: a changed pixel was not caught'); }
-  for(const f of B.bakeAll()){ const g=B.pngRead(B.pngOf(f)); n++; if(g.w!==f.w || g.h!==f.h || g.px.some((v,i)=>v!==f.px[i])) miss(f.name+': the PNG round trip differs'); }
+  const baked=B.bakeAll(), r=B.check(baked); n+=r.cases; d.push(...r.differences);   // drawn once (the masters take seconds)
+  { const b=baked.map((f,i)=>i ? f : { ...f, px:f.px.slice() }); b[0].px[1000]^=0x40; const c=B.check(b); n++; if(!c.differences.length) miss('CONTROL: a changed pixel was not caught'); }
+  for(const f of baked){ const g=B.pngRead(B.pngOf(f)); n++; if(g.w!==f.w || g.h!==f.h || g.px.some((v,i)=>v!==f.px[i])) miss(f.name+': the PNG round trip differs'); }
   const S=B.forestSizes(), over=t=>t>B.FOREST_BUDGET, MB=x=>(x/1048576).toFixed(2)+' MB', KB=x=>(x/1024).toFixed(1)+' KB'; n+=2;
-  if(over(S.total)) miss(`the forest's files are ${MB(S.total)}, over the budget of ${MB(B.FOREST_BUDGET)}`); if(!over(16*1048576)) miss('CONTROL: 16 MB is not over the budget');
+  if(over(S.total)) miss(`the forest's files are ${MB(S.total)}, over the budget of ${MB(B.FOREST_BUDGET)}`); if(!over(31*1048576)) miss('CONTROL: 31 MB is not over the budget');
   notes.push(`the forest's files: ${MB(S.total)} of ${MB(B.FOREST_BUDGET)} — code ${KB(S.code)}, prepared files ${KB(S.files)} (${S.list.filter(([f])=>!f.endsWith('.js')).map(([f,b])=>f.split('/').pop()+' '+KB(b)).join(', ')})`);
+  notes.push(`per level (code + that level's files): high ${MB(S.levels.high)}, medium ${MB(S.levels.medium)}, low ${MB(S.levels.low)}`);
   return { cases:n, total:d.length, differences:d, notes };
 }
 /* RUN 9 (slice 4): THE RARE EVENTS' schedule (core/night.js rareStep) over 8 simulated hours with a long-held note now and then: the same
@@ -1210,6 +1243,7 @@ const ROWS=[
   ['FOREST life (core)',        ()=>lifeCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 2)
   ['FOREST answers (app)',      ()=>forestAnswersCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 1
   ['FOREST melody (app)',       ()=>forestMelodyCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 2
+  ['FOREST floor (app)',        ()=>forestFloorCore(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 slice 3
   ['NIGHT forest files (app)',  ()=>nightForestFiles(), r=>({ cases:r.cases, diff:r.total, list:r.differences, notes:r.notes })],   // NIGHT-6 (the files rule, the size budget)
   ['OLD NAME gone',             ()=>oldNameGone(),  r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // SPLIT-2
   ['NIGHT rare events (core)',  ()=>rareCore(),     r=>({ cases:r.cases, diff:r.total, list:r.differences })],   // RUN 9 (slice 4)

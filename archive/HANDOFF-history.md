@@ -8382,3 +8382,18 @@ not a control · run a "random" failure many times and print WHERE and HOW MUCH 
 - Waiting for: the user's decision, the Poco numbers, step 125. No fixes yet.
 - Laptop, cool and idle: no crackle (0–2 dropouts in 39 stress passes). Free share under stress: a quarter to a third with sound alone, less with camera and forest; about one 12.5% step below Full's SuperSaw.
 - Heaviest: not the partials (a bowl's 24: 66 µs). The forest room, stages Night doesn't use, idle chord voices, flute and SuperSaw banks that never stop. Three unused stages save 17–20% with the sound identical (−138 dB). No slowdown near silence (control: 9–10× in JS).
+
+## Moved from docs/night/HANDOFF.md at NIGHT-6 slice 3 (2026-11-09), word for word
+### NIGHT-3 stage 2 (2026-11-03): the ambience through the core door (CORE-7). Log: `docs/night/WORK-LOG.md`
+- The plan is approved with the user's decisions (PLAN.md, top): no second room yet; next stage 3 (the forest as the first room module + CORE-8), then the music bed, then the switching machinery with a dev-only test room.
+- The forest ambience now lives in `apps/night/sound/ambience.js` + `pure/ambience.js` and is registered by `main.js` through `core/soundmods.js`. Same sound: GOLD «ambience» on Night's page 0 differences against the old print.
+### NIGHT-3 stage 1 (2026-11-03): rooms as modules, switching, a music bed — the plan only. `docs/night/design/NIGHT-3-rooms/PLAN.md`
+- No app code; tree hashes unchanged. Rooms and their sound are not modular today (the forest is wired through core, legacy-ui and the shell); scales and timbres are data.
+- Proposed: a room folder per room (record, picture, 2D stand-in, nature and bed recipes); a core door for an app's sound module (CORE-7); the host moves to the app (CORE-8); two nature slots for a crossfade; detection paused in the switch's dark moment; Dark / Camera become «Picture» in settings.
+- Six buttons fit only as 3 + 3 (portrait 105 px columns, landscape 3 × 2). Bed est. ≈ 2 % of the laptop quantum. Lake first. Ten decisions wait for the user.
+### NIGHT-2 stage 3 (2026-11-03): hand choice in settings, the flicker fixed, far hands accepted. Log: `docs/night/WORK-LOG.md`
+- «Play with» is a saved segment in Settings → Hand (last choice wins); the main screen has four buttons + settings.
+- The calibration picture is drawn by the loop (boot `afterDraw`), so it no longer flickers to black. Far but steady hands are accepted (CORE-6 `farHold`) with a short note. Waiting for step 129 (five checks; replaces 128).
+### NIGHT-2 stage 2 (2026-11-03): calibration screens and settings, built. Log: `docs/night/WORK-LOG.md`; decisions: `docs/night/design/NIGHT-2-calibration/DESIGN.md`
+- `apps/night/calib.js` + the settings card: the offer once per camera, then the ghost; the step on the camera picture with every point; «Играть» saves, «Ещё раз» repeats; the side of the calibrated hand sets the roles (voted over the hold) and is saved; reset clears all. Five main buttons + settings; background, Forest slider, hand points in settings. Landscape low-light hint fixed.
+- Core part CORE-5 (texts, icon). Row «NIGHT calibration screens». Waiting for step 128 (laptop + Poco, covers 125 for Night).

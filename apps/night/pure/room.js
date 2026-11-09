@@ -107,6 +107,7 @@ export const ROOM_DAMAGES=Object.freeze([
   ['tokens', r=>{ r.tokens='Forest'; }],
   ['levels', r=>{ delete r.levels.reduced; }],
   ['levels.full.flies', r=>{ r.levels.full.flies=-1; }],
+  ['levels.reduced.sorrel', r=>{ r.levels.reduced.sorrel=-600; }],   // NIGHT-6 slice 3: a floor count
   ['looks.dusk', r=>{ r.looks.dusk.pre='lake-'; }],
   ['looks.mist.tokens.fog', r=>{ r.looks.mist.tokens.fog='lake-fog'; }],
   ['moods.egyptian', r=>{ r.moods.egyptian='rain'; }],

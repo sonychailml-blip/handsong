@@ -100,6 +100,16 @@
    "notes": "Developer tool in tools/ only (tools/node_modules is git-ignored); never shipped; no dependencies of its own."
   },
   {
+   "id": "basis-universal-lab",
+   "name": "Basis Universal — KTX2 encoder and transcoder (WebAssembly builds), for the laptop measurement only",
+   "class": "code",
+   "use": "dev-only",
+   "version": "commit 073eb6a0a34a23d77e75e54f41dcd9653a52da83",
+   "licence": "Apache-2.0",
+   "source": "https://github.com/BinomialLLC/basis_universal (webgl/encoder/build, webgl/transcoder/build)",
+   "notes": "NIGHT-6 slice 3: downloaded into the git-ignored tools/.ktx-lab/ by hand, used by tools/forest-ktx-lab.mjs and tools/forest-ktx.eval.js to measure KTX2 against PNG; never shipped. Its JavaScript glue uses eval, which our CSP refuses — shipping it needs the user's decision first."
+  },
+  {
    "id": "app-icons",
    "name": "App icons (home screen / install) — the Handsong emblem: five notes in an arc, the centre one glowing firefly lime, on the Moonglass night",
    "class": "image",
@@ -120,14 +130,19 @@
   },
   {
    "id": "forest-files",
-   "name": "The night forest's prepared files (textures that never change during play: today the spider web)",
+   "name": "The night forest's prepared files: textures that never change during play (a spider web; the floor's plant sheet), each a master with smaller copies",
    "class": "image",
    "use": "shipped",
    "version": "—",
    "licence": "own-work",
-   "source": "drawn by our own seeded code, tools/forest-bake.mjs (regenerate: node tools/forest-bake.mjs; the data row «NIGHT forest files (app)» proves the files match it) — NIGHT-6, after the user's sketch «Живой лес»",
+   "source": "drawn by our own seeded code, tools/forest-bake.mjs (regenerate: node tools/forest-bake.mjs; the data row «NIGHT forest files (app)» proves the files match it) — NIGHT-6, after the user's sketch «Живой лес»; the fine fern from an iterated-function system (Barnsley's published method)",
    "files": [
-    "apps/night/rooms/forest/tex/web.png"
+    "apps/night/rooms/forest/tex/floor-1024.png",
+    "apps/night/rooms/forest/tex/floor-2048.png",
+    "apps/night/rooms/forest/tex/floor-512.png",
+    "apps/night/rooms/forest/tex/web-1024.png",
+    "apps/night/rooms/forest/tex/web-256.png",
+    "apps/night/rooms/forest/tex/web-512.png"
    ],
    "replace": "kept — our own generated material (NIGHT-6: the user's rule that what never changes is prepared ahead as files)"
   },

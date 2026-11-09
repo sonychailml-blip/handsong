@@ -203,7 +203,7 @@ export const nightClockDbg=fn=>{ clockOver=typeof fn==='function' ? fn : null; r
    NIGHT-6 slice 0: the room's frame time, draw calls, triangles, shader programs and texture memory per step, every opening of the session
    (the first is the cold one) and the device. The person's choices come back after it. */
 let measuring=false;
-const BEFORE_N6=Object.freeze({ dew:0, webs:0 });   // NIGHT-6: the counts its slices added, left out for the baseline step
+const BEFORE_N6=Object.freeze({ dew:0, webs:0, sorrel:0, forb:0, bilberry:0, anemone:0, nettle:0, sedge:0, fern2:0 });   // NIGHT-6: the counts its slices added, left out for the baseline step
 async function measure(){
   if(measuring || !AC) return; measuring=true; const out=$('nightMeasureOut'), wait=ms=>new Promise(r=>setTimeout(r,ms)), SEC=20;
   const keep={ bg:backgroundOf(), level:sceneLevel(), light:load(KEY.light)==='1' }, i=timbreIdx('ld', D.timbre()), rows=[];
