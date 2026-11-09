@@ -3,7 +3,9 @@
    with the node's static settings — oscillator wave and frequency, gain value, filter type / frequency / Q, curve length, delay time) and
    the RMS envelope of a short render of that one note (20-ms windows). `P.dumpTimbres()` writes it once on unchanged code →
    tools/prints/timbres.before.json; the row «TIM3 timbres = before» compares entries and traces EXACTLY and envelopes within 1e-5 of the peak
-   window (renders repeat to 1–3 ULP only — the summand rule). */
+   window (renders repeat to 1–3 ULP only — the summand rule). CORE-13: every render runs at PRINT_RATE (48 kHz, the prints' rate) whatever the
+   live context runs — a headset at 44.1 kHz failed these rows with no code changed; each row checks its renders' rate, and a CONTROL renders one
+   timbre at 44.1 kHz, which must differ from the print (the pin matters). */
 import { row } from './rows.js';
 import { gridFor } from '../../../core/live/record.js';
 import { loop } from '../../../core/recorder.js';
@@ -12,6 +14,7 @@ import { CHORD_GLIDE_TC, BASS_GLIDE_TC, LEAD_GLIDE_TC } from '../../../core/modu
 import { TIMBRE_RECORDS, timbreLoadReport } from '../../../core/timbreload.js';
 
 const FILE='tools/prints/timbres.before.json', SEC=0.3, WIN=0.02;
+export const PRINT_RATE=48000;   // CORE-13: the rate of the render prints (GOLD's too)
 const stat=n=>{ const o=[];
   if(n instanceof OscillatorNode) o.push(n.type, +n.frequency.value.toFixed(6), +n.detune.value.toFixed(6));
   else if(n instanceof BiquadFilterNode) o.push(n.type, +n.frequency.value.toFixed(6), +n.Q.value.toFixed(6), +n.gain.value.toFixed(6));
@@ -20,7 +23,7 @@ const stat=n=>{ const o=[];
   else if(n instanceof DelayNode) o.push(+n.delayTime.value.toFixed(9));
   else if(n instanceof ConstantSourceNode) o.push(+n.offset.value.toFixed(9));
   return o; };
-async function oneTimbre(R, role, i, real, keepBuf, pre){   // pre(eng) — before the copy's start (RUN 8: «FULL untouched» turns Night's path on as its CONTROL)
+async function oneTimbre(R, role, i, real, keepBuf, pre, rate=PRINT_RATE){   // pre(eng) — before the copy's start (RUN 8: «FULL untouched» turns Night's path on as its CONTROL); rate — CORE-13 (a CONTROL passes another)
   return R.engineProbe(async(eng, ctx)=>{
     const log=ctx.__log; log.length=0; const T=0.01;
     if(role==='ld') eng.leadOn('tb:ld', 220, 0.6, i, 0, 1, undefined, undefined, T);
@@ -30,23 +33,24 @@ async function oneTimbre(R, role, i, real, keepBuf, pre){   // pre(eng) — befo
     const trace=log.map(([k,n])=>[k, ...stat(n)].join(' '));
     const b=await ctx.startRendering(), L=b.getChannelData(0), Rr=b.getChannelData(1), w=Math.round(WIN*b.sampleRate), env=[];
     for(let s=0;s+w<=L.length;s+=w){ let e=0; for(let j=s;j<s+w;j++) e+=L[j]*L[j]+Rr[j]*Rr[j]; env.push(Math.sqrt(e/(2*w))); }
-    return { trace, env, buf: keepBuf ? [L.slice(), Rr.slice()] : null }; },
-  { sec:SEC, real:!!real, pre, wrap(ctx){ const log=[]; ctx.__log=log;
+    return { trace, env, buf: keepBuf ? [L.slice(), Rr.slice()] : null, rate:b.sampleRate }; },
+  { sec:SEC, real:!!real, pre, rate, wrap(ctx){ const log=[]; ctx.__log=log;
       for(const name of Object.getOwnPropertyNames(BaseAudioContext.prototype)) if(/^create/.test(name) && typeof ctx[name]==='function'){
         const f=ctx[name].bind(ctx); Object.defineProperty(ctx, name, { configurable:true, value:(...a)=>{ const n=f(...a); log.push([name.slice(6), n]); return n; } }); } } });
 }
 export async function timbreSnapshotAll(){
   const R=await import('../../../core/render.js'), A=await import('../../../core/audio.js');
-  const tables={ ld:A.LEAD_INSTR, ch:A.CHORD_INSTR, bs:A.BASS_INSTR, dr:A.DRUM_KITS }, out={ entries:{}, trace:{}, env:{} };
+  const tables={ ld:A.LEAD_INSTR, ch:A.CHORD_INSTR, bs:A.BASS_INSTR, dr:A.DRUM_KITS }, out={ entries:{}, trace:{}, env:{} }, rates=new Set();
   for(const role of ['ld','ch','bs','dr']) for(let i=0;i<tables[role].length;i++){
     const e=tables[role][i]; if(!/^(solo|chord|bass|kit)\./.test(e.id)) continue;   // built-ins only (a session's own timbres are not part of «before»)
     out.entries[e.id]=JSON.parse(JSON.stringify(e));
-    const r=await oneTimbre(R, role, i, role==='ld' && A.leadIsKs(i)); out.trace[e.id]=r.trace; out.env[e.id]=r.env.map(x=>+x.toPrecision(7)); }
+    const r=await oneTimbre(R, role, i, role==='ld' && A.leadIsKs(i)); out.trace[e.id]=r.trace; out.env[e.id]=r.env.map(x=>+x.toPrecision(7)); rates.add(r.rate); }
+  Object.defineProperty(out, 'rates', { value:[...rates] });   // CORE-13: not part of the print
   return out;
 }
 export async function dumpTimbres(){
   const s=await timbreSnapshotAll();
-  return { meta:{ format:'handsong/timbre-snapshot', version:1, made:new Date().toISOString(), file:FILE, sec:SEC, win:WIN }, ...s };
+  return { meta:{ format:'handsong/timbre-snapshot', version:1, made:new Date().toISOString(), file:FILE, sec:SEC, win:WIN, rate:PRINT_RATE }, ...s };
 }
 export async function checkTimbresBefore(opt={}){
   const d=[]; let n=0; const miss=s=>d.push(s);
@@ -59,6 +63,13 @@ export async function checkTimbresBefore(opt={}){
     n++; const E0=pin.env[id]||[], E1=now.env[id]||[], pk=Math.max(1e-12,...E0); let worst=0;
     for(let j=0;j<Math.max(E0.length,E1.length);j++) worst=Math.max(worst, Math.abs((E0[j]??NaN)-(E1[j]??NaN))/pk || (E0.length!==E1.length?Infinity:0));
     if(!(worst<=1e-5)) miss(`${id}: the render envelope differs by ${worst} of its peak window (limit 1e-5)`); }
+  /* CORE-13: the renders ran at the prints' rate; CONTROL: one timbre at 44.1 kHz differs from its print (and the option is honoured) */
+  n++; if(now.rates.join()!==String(PRINT_RATE)) miss(`the renders ran at ${now.rates.join(', ')} Hz, not at the prints' ${PRINT_RATE}`);
+  { const R=await import('../../../core/render.js'), A=await import('../../../core/audio.js'), id='solo.firefly', i=A.LEAD_INSTR.findIndex(x=>x.id===id);
+    const r=await oneTimbre(R, 'ld', i, A.leadIsKs(i), false, undefined, 44100), E0=pin.env[id]||[], pk=Math.max(1e-12, ...E0); let worst=0;
+    for(let j=0;j<Math.max(E0.length,r.env.length);j++) worst=Math.max(worst, Math.abs((E0[j]??NaN)-(r.env[j]??NaN))/pk || (E0.length!==r.env.length?Infinity:0)); n+=2;
+    if(r.rate!==44100) miss('CONTROL: a render asked for 44100 Hz ran at '+r.rate);
+    if(worst<=1e-5) miss(`CONTROL: ${id} rendered at 44.1 kHz matched its 48-kHz print — the rate pin cannot matter`); }
   return { cases:n, total:d.length, differences:d };
 }
 /* TIM3a: the loader took every record of the bundle (none skipped, no emergency); each record's policies = its family's role values in the
@@ -98,6 +109,7 @@ export async function checkFullUntouched(){
     const cmp=async lean=>{ const out=[];
       for(const id of STRUCK){ const i=A.LEAD_INSTR.findIndex(x=>x.id===id); if(i<0){ out.push(id+': missing'); continue; }
         const r=await oneTimbre(R, 'ld', i, false, false, lean ? eng=>eng.setNightStrikes(voices) : undefined), a=pin.trace[id]||[];
+        if(r.rate!==PRINT_RATE){ out.push(`${id}: rendered at ${r.rate} Hz, not at the print's ${PRINT_RATE}`); continue; }   // CORE-13
         if(a.join('|')!==r.trace.join('|')){ const k=a.findIndex((x,j)=>x!==r.trace[j]); out.push(`${id}: the creation trace differs at node ${k<0?a.length:k} (${a.length} → ${r.trace.length} nodes)`); continue; }
         const E0=pin.env[id]||[], pk=Math.max(1e-12, ...E0); let worst=0;
         for(let j=0;j<Math.max(E0.length,r.env.length);j++) worst=Math.max(worst, Math.abs((E0[j]??NaN)-(r.env[j]??NaN))/pk || (E0.length!==r.env.length?Infinity:0));

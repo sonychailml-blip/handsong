@@ -3,7 +3,9 @@
    (2) UNDONE: lean on, then off, renders sample for sample as never touched. CONTROL: left half-way (a stage still cut, on a passage that uses its tremolo) must differ.
    (3) NEVER PLAYED: Night's chain holds nothing the cut stages serve, and a real playing pass through the hand machine reaches no chord, bass or drum voice. CONTROL: a planted chain fails; Full's chords move the counter.
    (4) PARKED, THEN PLAYED AGAIN: a flute and a SuperSaw left silent leave the graph (the count rises; idle work falls), then a new attack matches the same attack never parked: same loudness over time, no click, no later onset, also when the graph change lands one quantum after the attack.
-       CONTROLS: disconnecting mid-note must read as a click; reconnecting 120 ms late must read as a lost attack. */
+       CONTROLS: disconnecting mid-note must read as a click; reconnecting 120 ms late must read as a lost attack.
+   CORE-13: every render runs at 48 kHz (PRINT_RATE) whatever the live context runs — at 44.1 kHz (a headset) the click CONTROL read 0.229 and
+   the row failed with no code changed; the row checks its renders' rate. */
 import { row } from '../core/rows.js';
 import { leanInfo, engVoices, fxSnapshot } from '../../../core/audio.js';
 import * as ST from '../../../core/state.js';
@@ -14,6 +16,7 @@ import { liveAllOff } from '../../../core/recorder.js';
 import { residualDb, envelope } from './headroom-calc.js';
 import { clickOf, kLoud } from './night.js';
 import { LEAN_PATH } from '../../../apps/night/shell.js';
+import { PRINT_RATE } from '../core/timbres.js';   // CORE-13
 
 const off=undefined, ON=LEAN_PATH, SOUNDS=['solo.firefly','solo.breath-flute','solo.handpan','solo.singing-bowl'];
 const CHAIN={ 'ctone:mix':1, 'ctone:tilt':0.5, 'cwave:mix':1, 'cwave:amount':0.5, 'cecho:amount':0.6, 'cecho:time':0.8431089342012043, 'fdepth:mix':1, 'fdepth:depth':0.4, 'fdepth:room':0.5 }, NCHAIN=['ctone','cwave','cecho','fdepth'], HIGH=[440,493.88,554.37,659.26,739.99];
@@ -25,7 +28,7 @@ async function ren(setup, len){ const R=await import('../../../core/render.js');
     const out=await setup(eng,eng.engineCtx(),add);
     for(const [q,fns] of map){ if(q===0){ for(const f of fns) f(); continue; } ctx.suspend(q*128/rate).then(()=>{ for(const f of fns) f(); ctx.resume(); }); }
     const b=await ctx.startRendering(), L=b.getChannelData(0), Rr=b.getChannelData(b.numberOfChannels>1?1:0), x=new Float32Array(L.length); for(let i=0;i<x.length;i++) x[i]=(L[i]+Rr[i])/2;
-    return { x, rate, out }; },{ sec:len }); }
+    return { x, rate, out }; },{ sec:len, rate:PRINT_RATE }); }
 const prep=(eng,id,o={})=>{ const p=profileOf('profile.night'), key=ST.chainKeyOf('ld'), ids=o.ids||NCHAIN; eng.offlineTapMaster();
   for(const k of new Set(ST.chainOwners().map(x=>x.key))){ const c=k===key?ids:[]; for(const x of c) eng.fxInstance(k,x); eng.fxRenderPath(k,c,c); }
   for(const [a,v] of Object.entries(CHAIN)){ const [fx,q]=a.split(':'); if(ids.includes(fx)) eng.fxPlaySet(key,fx,q,v,0); }
@@ -70,6 +73,7 @@ export async function checkNightLean(){
           return null; },6.9);
       const seg=(r,t=5)=>r.x.subarray(Math.round((t-0.01)*r.rate), Math.round((t+1.2)*r.rate));
       const old=await go('old'), pk=await go('park'), lt=await go('late'), ct=await go('control-late'); n+=4;
+      n++; if([old,pk,lt,ct].some(r=>r.rate!==PRINT_RATE)) miss(`${id}: rendered at ${[old,pk,lt,ct].map(r=>r.rate).join(', ')} Hz, not at ${PRINT_RATE}`);   // CORE-13
       const A=seg(old), B=seg(pk), C=seg(lt), X=seg(ct), rate=old.rate;
       /* the sound's own spread: the same attack, never parked, at other moments (detuned oscillators beat, so no two attacks of a SuperSaw are alike) */
       let spread=0, ckOwn=clickOf(A,rate); for(const t of [5.13,5.29,5.41]){ const o=seg(await go('old',t),t); spread=Math.max(spread,Math.abs(kLoud(o,rate)-kLoud(A,rate))); ckOwn=Math.max(ckOwn,clickOf(o,rate)); }
@@ -84,7 +88,7 @@ export async function checkNightLean(){
     }
     /* parking counts, and idle work falls */
     { const R=await import('../../../core/render.js'), id='solo.breath-flute'; const idle=mode=>R.engineProbe(async(eng,ctx)=>{ const rate=ctx.sampleRate, i=prep(eng,id,{ ids:[] }); if(mode) eng.setLeanPath({ park:true }); for(let q=0;q<4;q++){ eng.leadOn('b'+q,330,0.6,i,off,off,off,off,0.01); eng.leadOff('b'+q,off,0.05); }
-        let parked=0, t0=0, t1=0; ctx.suspend(Math.floor(3.2*rate/128)*128/rate).then(()=>{ if(mode){ eng.leadParkTick(3.2); parked=eng.leanInfo().parked; } t0=performance.now(); ctx.resume(); }); ctx.suspend(Math.floor(5*rate/128)*128/rate).then(()=>{ t1=performance.now(); ctx.resume(); }); await ctx.startRendering(); return { ms:t1-t0, parked }; },{ sec:5.2 });
+        let parked=0, t0=0, t1=0; ctx.suspend(Math.floor(3.2*rate/128)*128/rate).then(()=>{ if(mode){ eng.leadParkTick(3.2); parked=eng.leanInfo().parked; } t0=performance.now(); ctx.resume(); }); ctx.suspend(Math.floor(5*rate/128)*128/rate).then(()=>{ t1=performance.now(); ctx.resume(); }); await ctx.startRendering(); return { ms:t1-t0, parked }; },{ sec:5.2, rate:PRINT_RATE });
       let o=Infinity, p=Infinity, c=0; for(let k=0;k<3;k++){ o=Math.min(o,(await idle(false)).ms); const r=await idle(true); p=Math.min(p,r.ms); c=r.parked; } n+=2; notes.push(`4 flute voices silent: ${o.toFixed(0)} ms → ${p.toFixed(0)} ms for 2 s of work, ${c} banks parked`);
       if(c!==4) miss(`${c} of 4 silent flute banks parked`); if(!(p<o*0.8)) miss(`parking saved little: ${o.toFixed(0)} → ${p.toFixed(0)} ms`); }
   } catch(e){ miss('error: '+(e&&e.stack||e)); }

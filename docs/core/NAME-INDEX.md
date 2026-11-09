@@ -852,6 +852,7 @@ SND-F1: probes of the Night prototype's sounds — the Firefly timbre, the Night
 
 ## tools/probes/core/timbres.js
 TIM3 (RUN 4): timbres as data — the proof that nothing changes.
+- const (1): `PRINT_RATE`
 - fn (5): `timbreSnapshotAll`, `dumpTimbres`, `checkTimbresBefore`, `checkTimbreRecords`, `checkFullUntouched`
 
 ## tools/probes/core/userfiles.js
@@ -1046,7 +1047,7 @@ NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, 
 - const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
 - fn (2): `testRoomInstall`, `testRoomRemove`
 
-_203 modules, 2419 exported names._
+_203 modules, 2420 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

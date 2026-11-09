@@ -41,7 +41,7 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 - Slice 1: dew (1,100 / 500 points) twinkling near the light; webs (9 / 5) beside the near trunks catching the light; each note rings the stream; the music bed's chords swell the mushrooms, each loop voice glows in its own far cluster, glass notes make a far firefly twinkle, each at the moment it is heard (bus `bed` and `audioClock`, `pure/heard.js`).
 - The first prepared file: `rooms/forest/tex/web.png` (21 KB), drawn by `tools/forest-bake.mjs`, register entry `forest-files`. The forest's files: 0.11 MB of 15 MB (row «NIGHT forest files (app)»).
 - Laptop, an undisturbed run: medium −1.2 / −1.7 % hand detections vs Dark with the additions, −2.9 / 0.0 % without (noise); draws 53 vs 51–52, programs 22 vs 20; 0 dropouts; the first opening at high 3.2–3.6 s, later about 0.4 s. A second run was disturbed (Dark itself swung) and is not used.
-- Probes at 48 kHz: P.night PASS 40 / 0, P.quick PASS 93 / 0. At 44.1 kHz (a headset) three rows that render at the live rate failed with no code of theirs changed: the next CORE item pins them at 48 kHz (WORK-LOG).
+- Probes at 48 kHz: P.night PASS 40 / 0, P.quick PASS 93 / 0. At 44.1 kHz (a headset) three rows that render at the live rate failed with no code of theirs changed: CORE-13 pins them at 48 kHz (WORK-LOG).
 - Waiting for step 134: the user's look and the Poco text.
 
 ### NIGHT-6 stage 1 (2026-11-09): the forest, polished and alive — the comparison and the plan only. `docs/night/design/NIGHT-6-forest/PLAN.md`

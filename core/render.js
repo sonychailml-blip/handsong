@@ -430,7 +430,7 @@ function renderOnce(seed, material, seconds, opts){ return renderQueued(()=>rend
    RENDER-LEAK); opt.wrap(ctx) before initAudio (the node census counts the context's create* calls); opt.phase(ctx) right after it;
    opt.after(ctx) at the end, whatever happened. */
 function engineProbe(fn, opt={}){ return renderQueued(async()=>{
-  const eng=await engine(), rate=LIVE_AC.sampleRate, Ctor=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const eng=await engine(), rate=opt.rate||LIVE_AC.sampleRate, Ctor=window.OfflineAudioContext||window.webkitOfflineAudioContext;   // CORE-13: opt.rate — a fixed rate (rows compared with 48-kHz prints); absent, the live rate as before
   const ctx=new Ctor(2, Math.max(1,Math.round(rate*(opt.sec||0.1))), rate);   // opt.sec — the context's length (AUD2b renders an effect alone)
   if(!opt.real) stubWorklet(ctx);
   eng.renderReset(); eng.setRnd(mulberry32(SEED_A)); eng.setOffline(true);
