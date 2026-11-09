@@ -24,7 +24,7 @@ SPLIT-2: the Full app's entry.
 ## apps/night/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's DOOR AND ITS v1 DRIVER (live) — the state the Music button and the settings set (off / still / drift / glimmer, the volume, the response switch, all remembered by t…
 - const (10): `BED_SEED`, `BED_ENGINES`, `bedTakesDrone`, `bedModeOf`, `bedVolumeOf`, `bedAnswerOf`, `bedEngineOf`, `bedPaletteOf`, `bedLightOf`, `bedDbg`
-- fn (8): `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedSetEngine`, `bedSetPalette`, `bedSetLight`, `bedTick`, `bedPlan`
+- fn (10): `bedSetMode`, `bedSetVolume`, `bedSetAnswer`, `bedSetEngine`, `bedSetPalette`, `bedSetLight`, `bedHold`, `bedResume`, `bedTick`, `bedPlan`
 
 ## apps/night/bed2.js
 NIGHT-4: THE MUSIC BED v2's DRIVER (live and offline).
@@ -53,6 +53,7 @@ SPLIT-2: one-time move of this app's old setting names, on one origin only (plan
 
 ## apps/night/pure/ambience.js
 THE AMBIENCE'S SEEDED LAWS (RUN 7, C4c; docs/night/QUALITY.md points 1, 5, 8; Night's own since CORE-7): pure (rule #36), node-tested (data row «NIGHT cricket schedule (app)»).
+- const (1): `NATURE_CRICKETS`
 - fn (3): `windNoise`, `cricketStream`, `chirpShape`
 
 ## apps/night/pure/bed.js
@@ -114,12 +115,17 @@ NIGHT-3: the forest's 2D STAND-IN — the «low» level and the fallback without
 
 ## apps/night/rooms/index.js
 NIGHT-3: THE ROOMS — the order a player meets them (ids, rule #37) and each room's parts: its record (data), its 2D stand-in, and its scene code, loaded only when the room is first opened.
-- const (2): `ROOMS`, `roomById`
+- const (5): `ROOMS`, `roomsAll`, `roomById`, `roomAdd`, `roomRemove`
+
+## apps/night/roomswitch.js
+NIGHT-3 stage 5 part 2: THE ROOM SWITCH — one door for everything a room change touches, in this order: the music bed fades out and holds (it takes the new room's recipes while silent); the picture…
+- const (7): `ROOM_KEY`, `ROOM_NAME_MS`, `roomCurrent`, `roomNature`, `natureModule`, `roomNext`, `roomSwitchDbg`
+- fn (2): `roomRestore`, `roomSwitch`
 
 ## apps/night/scene/host.js
 THE SCENE HOST and Night's BACKGROUNDS (VIS1b, RUN 6; Night's own since CORE-8 — the shared UI reaches it through hooks.scene).
-- const (15): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRooms`, `sceneRoom`, `SCENE_LEVEL_DEFAULT`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`
-- fn (6): `loadThree`, `sceneOpen`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
+- const (20): `BACKGROUNDS`, `sceneRoomAdd`, `sceneRoomRemove`, `sceneRooms`, `sceneRoom`, `sceneRoomSet`, `SCENE_LEVEL_DEFAULT`, `SCENE_FADE`, `scenePausing`, `backgroundOf`, `sceneLevel`, `sceneShadowDbg`, `sceneOptDbg`, `sceneInfo`, `sceneRoomDbg`, `sceneLevelDbg`, `sceneHeldDbg`, `sceneProgramsDbg`, `sceneClockDbg`, `sceneOpenDbg`
+- fn (7): `loadThree`, `sceneOpen`, `sceneSwitch`, `sceneClose`, `setBackground`, `setSceneLevel`, `sceneSnapDbg`
 
 ## apps/night/shell.js
 RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
@@ -128,7 +134,8 @@ RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) �
 
 ## apps/night/sound/ambience.js
 THE ROOMS' AMBIENCE (RUN 7, C4c; Night's own since CORE-7): drone + wind + distant crickets + one soft echo, built from a room's NATURE recipe (the forest's: apps/night/rooms/forest/pure/room.js).
-- fn (4): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`
+- const (1): `AMB_SWAP`
+- fn (5): `buildAmbience`, `ambienceSchedule`, `ambienceTune`, `ambienceSet`, `ambienceRoom`
 
 ## apps/night/sound/bed.js
 NIGHT-3 stage 4: THE MUSIC BED's SOUND — built once on the first On into the master's input (the sleep fade and the limiter cover it; live sound, never a track — rule #31), from a room's bed recipe B.
@@ -959,6 +966,8 @@ SPLIT-2: the probe entry of the Night page: its own rows and the core rows flagg
 - → ./night/nightguard.js (2): `checkNightUntouched`, `dumpNight`
 - → ./night/nightmigrate.js (1): `checkNightMigrate`
 - → ./night/nightprofile.js (1): `checkNightProfile`
+- → ./night/roomswitch.js (1): `checkNightRoomSwitch`
+- → ./night/testroom.js (3): `testRoomInstall`, `testRoomRemove`, `testRoomMode`
 
 ## tools/probes/night/bed.js
 NIGHT-3 stage 4: row «NIGHT music bed» (P.night).
@@ -1011,11 +1020,20 @@ SPLIT-2: row «NIGHT migrate»: old setting names move to the new ones, are remo
 SPLIT-2: row «NIGHT profile round trip» on Night's page: the checks of C0 that need Night's record, its shell and its CSS (they ran on the one page before the split, word for word).
 - fn (1): `checkNightProfile`
 
+## tools/probes/night/roomswitch.js
+NIGHT-3 stage 5 part 2: row «NIGHT room switch» (P.night, drawn) — the switching machinery, on the test room (./testroom.js), judged on EXACT controls (the user, 2026-11-09): (1) hand detection tak…
+- fn (1): `checkNightRoomSwitch`
+
 ## tools/probes/night/tailsw.js
 NIGHT-1 stage 3: the dev switch for the quiet floor.
 - fn (1): `mountTailSwitch`
 
-_197 modules, 2370 exported names._
+## tools/probes/night/testroom.js
+NIGHT-3 stage 5 part 2: THE TEST ROOM — a development room players never see, registered only by the row «NIGHT room switch» or by the page address ?probe&testroom (then the Room button shows: two …
+- const (5): `TEST_ROOM_ID`, `TEST_ROOM`, `testRoomMode`, `testRoomInfo`, `testRoomFreeLeaks`
+- fn (2): `testRoomInstall`, `testRoomRemove`
+
+_200 modules, 2405 exported names._
 
 # Removed (stale) code names — kept by hand; copied into the generated docs/NAME-INDEX.md by tools/name-index.mjs
 

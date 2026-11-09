@@ -99,6 +99,8 @@ class NightBed extends AudioWorkletProcessor{
         if(!G.set){ G.i0=G.t0; G.i1=G.t1; G.i2=G.t2; G.set=true; G.p0=this.rnd()*N; G.p1=this.rnd()*N; G.p2=this.rnd()*N; }
         G.gt=e.on ? 1 : 0; G.gk=this.kb(e.tc||1); if(e.on){ G.on=true; this.idle=false; } return; }
       case 'p': { const p=this.P[e.name]; if(!p) return; p.t=e.v; p.k=this.kb(e.tc||0.05); if(e.name==='air' && e.v>0) this.idle=false; return; }
+      /* NIGHT-3 stage 5 part 2: another room's recipe (sent while the bed is silent, before its first chord there) */
+      case 'recipe': { this.R=e.recipe; if(this.rev) this.rev.pd=Math.round((this.R.reverb.pre||0.04)*this.fs); return; }
       case 'flush': { const L=e.layers||[], f=x.f; this.q=this.q.filter(y=>!(y.f>=f && L.includes(y.e.k)));
         for(const name of L){ const pool= name==='loop' ? this.loop : name==='glass' ? this.glass : null; if(!pool) continue;
           for(const v of pool) if(v.on){ const r=e.r||2;

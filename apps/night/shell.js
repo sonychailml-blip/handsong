@@ -1,7 +1,8 @@
 /* RUN 7 (C6 + C11, Night plan §5; docs/night/QUALITY.md points 4, 5, 6, 9, 10) — THE NIGHT SHELL (DOM side; the logic is core/nightui.js).
    Shown only in the Night face (nightShellFace from the profile's face door). Hands in view → only the scene; no hand for 1.5 s → the controls
-   fade in: Music · Sound / Mood · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ: Hand — calibration, playing hand,
-   two sliders, the hand's points; Music — volume, the room's sounds, response; View — what is on screen, the note field, the lighter forest;
+   fade in: (Room, only with two rooms or more —) Music · Sound / Mood · Notes (follow / stay put) · Sleep, and the settings card (NIGHT-2, was ⓘ:
+   Hand — calibration, playing hand, two sliders, the hand's points; Music — volume, the room's sounds, response; View — what is on screen, the
+   note field, the Lightweight mode;
    the first steps again). Each round button cycles its values; a tap glints (micro-feedback). Every value is written through the DOORS ui.js
    wires (the same setters the Full panels use) — this module holds no musical state. The sleep timer fades the output (audio.outputFade,
    session only) and dims the scene with a black veil together; a tap on the veil wakes. The choices are remembered on this device (localStorage). */
@@ -14,13 +15,14 @@ import { NIGHT_FX } from '../../core/modules/effects/night-fx.js';
 import { ROOMS, roomById } from './rooms/index.js';   // NIGHT-3: the current room's nature recipe (its default level, its wind)
 import { bedNext } from './pure/bed.js';
 import { bedSetMode, bedModeOf, bedSetVolume, bedVolumeOf, bedSetAnswer, bedAnswerOf, bedTick, bedSetLight } from './bed.js';   // NIGHT-3 stage 4: the music bed (NIGHT-4: v2, Lighter)
-import { t, onLangChange } from '../../core/i18n.js';
+import { t, L, onLangChange } from '../../core/i18n.js';
 import { svgIcon } from '../../core/icons.js';
 import { nightView, setNightView, chainKeyOf, setVolFloor } from '../../core/state.js';
 import { EDITION } from '../../core/edition.js';
 import { ghostArm } from './ghost.js';   // C7: the ghost light
 import { calWire, calOfferIfNew, calActive, calSideApply, calSideSet, calSettingsRender, calAbort } from './calib.js';   // NIGHT-2: the hand's calibration (its picture is drawn by the loop: main.js afterDraw)
-import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { setSceneLevel, sceneLevel, setBackground, backgroundOf, sceneInfo, sceneRoom, sceneRooms } from './scene/host.js';   // RUN 8 (slice 4): the scene's quality (development switch); C8 the measurement
+import { roomSwitch, roomNext } from './roomswitch.js';   // NIGHT-3 stage 5 part 2: the Room button
 import { latReport } from '../../core/legacy-ui/latmeter.js';   // C8: the device measurement reads the latency meter
 
 const $=id=>document.getElementById(id), READ=BUS.reader();
@@ -73,6 +75,7 @@ function setIcon(id, name){ const c=$(id).querySelector('.night-circ'); if(c.dat
 /* every value as the person reads it — plain words, no cents / Hz / role names */
 function render(){
   if(!D || !on) return;
+  $('nightRoom').hidden=sceneRooms().length<2; val('nightRoom', L(room().name));   // NIGHT-3 stage 5 part 2: the Room button only with two rooms or more
   val('nightMusic', t('night.music.'+bedModeOf()));
   val('nightSound', D.timbreName(D.timbre()));
   val('nightMood', t('night.mood.'+D.mood()));
@@ -99,6 +102,7 @@ function sleepSet(mins){
 function infoShow(v){ info=v; $('nightInfo').hidden=!v; if(v) render(); }
 function wire(){
   const tap=(id,f)=>{ $(id).onclick=()=>{ if(!D) return; f(); glint($(id)); render(); }; };
+  tap('nightRoom', ()=>{ const id=roomNext(); if(id) roomSwitch(id).then(()=>render()); });   // NIGHT-3 stage 5 part 2: the next room
   tap('nightMusic', ()=>{ const m=bedNext(bedModeOf()); bedSetMode(m, room().bed, room().bed2); save(KEY.music, m); if(amb) ambienceOn(true, roomSound()); });   // NIGHT-3 stage 4: off → still → drift → glimmer → off; the drone hands over
   tap('nightSound', ()=>D.setTimbre(nextOf(D.timbres(), D.timbre())));
   tap('nightMood', ()=>D.setMood(nextOf(D.moods(), D.mood())));
@@ -174,7 +178,7 @@ function bars(now, hv, fxv){
   for(const id of FXB){ const b=X.querySelector(`[data-bar="${id}"]`); fill(b, vals[id]); b.classList.toggle('act', !!fx && fx.finger===FXB.indexOf(id)); }
   fb.classList.toggle('act', !!play && play.pinch);
 }
-/* RUN 8 (C8, Night plan §7): THE LIGHTER FOREST — the person's visible choice in ⓘ, remembered on this device; nothing switches by itself
+/* RUN 8 (C8, Night plan §7): THE LIGHTER FOREST (NIGHT-3 stage 5 part 2: «Облегчённый режим», Lightweight mode) — the person's visible choice in ⓘ, remembered on this device; nothing switches by itself
    (user answer E1). On: the room from the delay network instead of the convolution (Forest depth's `light` — the convolution was Night's
    largest fixed cost), struck sounds ring at most 60 % of their caps (audio.setLowPower), the forest picture at medium (the level chosen
    before is remembered and comes back when it is off), no glass blur. `boot` = applied with the face (the scene level only if it differs). */

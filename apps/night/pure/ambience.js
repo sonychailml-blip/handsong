@@ -8,6 +8,9 @@
    - Distance: ONE soft echo (a delay with a dark feedback), not a room: the FDN reverb alone cost ≈ 3.6 % of a core (RUN 7), over the ≤ 2 % target. */
 import { seeded } from '../../../core/pure/dsp.js';
 
+/* NIGHT-3 stage 5 part 2: the cricket voices each nature slot holds (the forest's three; a room's recipe may ask for 1…NATURE_CRICKETS) */
+export const NATURE_CRICKETS=3;
+
 /* the noise of the wind loop (seeded, the same at every rate): rate (Hz), seed, sec (the loop's length) */
 export function windNoise(rate, seed, sec){ const r=seeded(seed), n=Math.round(rate*sec), d=new Float32Array(n);
   for(let i=0;i<n;i++) d[i]=r()*2-1; return d; }

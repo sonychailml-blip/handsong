@@ -579,11 +579,15 @@
     <div class="night-bar" data-bar="wave"><span class="night-bar-ico" data-svg="wave"></span><span class="night-bar-track"><span class="night-bar-fill"></span></span><span class="night-bar-lab" data-i18n="night.fx.wave">Wave</span></div>
   </div>
   <p id="nightFxHint" class="night-hint night-glass" role="status" data-i18n="night.fxHint" hidden></p>
+  <!-- NIGHT-3 stage 5 part 2: the room's name, shown softly in the middle for a moment after a switch (apps/night/roomswitch.js) -->
+  <p id="nightRoomName" class="night-roomname" role="status" aria-live="polite"></p>
   <div id="nightFade" class="night-fade">
     <p id="nightIdle" class="night-idle" data-i18n="night.idle">Raise a hand to play</p>
     <button id="nightInfoBtn" class="night-ibtn night-glass" data-svg="settings" data-i18n-title="night.settings" title="Settings"></button>
-    <!-- NIGHT-3 stage 4: five round buttons in 3 + 3 places (Music · Sound / Mood · Notes · Sleep; Room joins the top row once there are two rooms) + settings -->
+    <!-- NIGHT-3 stage 4: five round buttons in 3 + 3 places (Music · Sound / Mood · Notes · Sleep; Room joins the top row once there are two rooms) + settings.
+         NIGHT-3 stage 5 part 2: the Room button is first and hidden while there is one room (players: until a second real room) -->
     <div id="nightCtl" class="night-ctl night-glass">
+      <button id="nightRoom" class="night-rb" hidden><span class="night-circ" data-svg="forest"></span><span class="night-lab" data-i18n="night.room">Room</span><span class="night-val"></span></button>
       <button id="nightMusic" class="night-rb"><span class="night-circ" data-svg="music"></span><span class="night-lab" data-i18n="night.music">Music</span><span class="night-val"></span></button>
       <button id="nightSound" class="night-rb"><span class="night-circ" data-svg="sound"></span><span class="night-lab" data-i18n="night.sound">Sound</span><span class="night-val"></span></button>
       <button id="nightMood" class="night-rb"><span class="night-circ" data-svg="mood"></span><span class="night-lab" data-i18n="night.mood">Mood</span><span class="night-val"></span></button>
@@ -632,14 +636,14 @@
       <div id="nightBgSeg" class="night-seg"><button data-bg="forest" data-i18n="night.bgRoom">Room</button><button data-bg="dark" data-i18n="prof.bgDark">Dark</button><button data-bg="camera" data-i18n="prof.bgCamera">Camera</button></div>
       <!-- later: graphics quality, low · medium · high (docs/night/BACKLOG.md): one more segment here -->
       <button id="nightFieldTg" class="night-tg"><span class="night-vico" data-svg="note-stay"></span><span data-i18n="night.field">Show the full note field</span><span class="night-tsw"><span></span></span></button>
-      <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lighter forest — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
+      <button id="nightLightTg" class="night-tg"><span class="night-vico" data-svg="forest"></span><span data-i18n="night.light">Lightweight mode — for older computers and phones</span><span class="night-tsw"><span></span></span></button>
     </section>
     <div class="night-about">
       <span class="night-mark"><span data-svg="emblem"></span><span class="night-word">hand<span class="night-word-dot">·</span>song</span><span class="night-sub">night</span></span>
       <p data-i18n="night.privacy">Pictures and sound never leave this device.</p>
       <p data-i18n="night.phones">Use headphones — the forest is quiet.</p>
       <button id="nightFirstRun" class="night-lnk" data-i18n="night.firstRun" hidden>Show the first steps again</button>
-      <button id="nightSceneTg" class="night-lnk night-dev" hidden>Forest picture: high (development)</button>
+      <button id="nightSceneTg" class="night-lnk night-dev" hidden>Room picture: high (development)</button>
       <button id="nightMeasure" class="night-lnk night-dev" data-i18n="night.measure" hidden>Measure this device (about 2 minutes, development)</button>
       <pre id="nightMeasureOut" class="night-measure" hidden></pre>
       <button id="nightToSound" class="night-lnk night-dev" data-i18n="night.toSound" hidden>Sound panel and diagnostics (development)</button>

@@ -141,13 +141,13 @@ export const DICTS = {
     /* RUN 8 (slice 3): the bars while the hands play, the effects hand's first-time hint, the fingertips switch (development) */
     'night.fx.echo':'Echo', 'night.fx.tone':'Warm {i:axis-x} Bright', 'night.fx.wave':'Wave',
     'night.fxHint':'Your other hand shapes the sound: touch a finger to your thumb and move it up or down — index Echo, middle Warm or Bright, ring Wave. It stays where you leave it.',
-    'night.measure':'Measure this device (about 2 minutes, development)', 'night.measuring':'Measuring… {n} of {m}', 'night.measured':'Measured — copied, send it to us:', 'night.light':'Lighter forest — for older computers and phones (a lighter echo, fewer ringing notes, a simpler picture)', 'night.scene':'Forest picture: {lvl} (development)', 'night.scene.full':'high', 'night.scene.reduced':'medium', 'night.scene.minimal':'low',
+    'night.measure':'Measure this device (about 2 minutes, development)', 'night.measuring':'Measuring… {n} of {m}', 'night.measured':'Measured — copied, send it to us:', 'night.light':'Lightweight mode — for older computers and phones (a lighter echo, simpler music, fewer ringing notes, a simpler picture)', 'night.scene':'Room picture: {lvl} (development)', 'night.scene.full':'high', 'night.scene.reduced':'medium', 'night.scene.minimal':'low',
     'night.sound':'Sound', 'night.mood':'Mood', 'night.hand':'Play with', 'night.handR':'right hand', 'night.handL':'left hand',
     'night.notes':'Notes', 'night.notesFollow':'follow the hand', 'night.notesStay':'stay put',
     'night.bg':'Background', 'night.sleep':'Sleep',
     'night.music':'Music', 'night.music.off':'off', 'night.music.still':'Still', 'night.music.drift':'Drift', 'night.music.glimmer':'Glimmer',   // CORE-9: the music bed
     'night.set.music':'Music', 'night.musicVol':'Music volume', 'night.musicAnswer':'Music answers my notes: its next chord leans toward what I played', 'night.sleepOff':'off', 'night.sleepMin':'{n} min', 'night.asleep':'Sleeping — tap to wake',
-    'night.depth':'Depth', 'night.bgRoom':'Room', 'night.roomSounds':'Room sounds',   // CORE-10: «What's on screen» and the room's sound slider
+    'night.depth':'Depth', 'night.room':'Room', 'night.bgRoom':'Room', 'night.roomSounds':'Room sounds',   // CORE-10: «What's on screen» and the room's sound slider
     'night.begin':'Begin', 'night.stepPhones':'Use headphones — the forest is quiet.', 'night.stepLight':'Light your hands — a lamp beside you, not behind you.',
     'night.stepStand':'Stand your phone or laptop so both hands are free.', 'night.stepCamera':'Handsong will ask for your camera. Pictures never leave this device.',
     'fx.fdepth':'Forest depth', 'fx.fdepth.mix':'Amount', 'fx.fdepth.depth':'Depth', 'fx.fdepth.reach':'Forest at most', 'fx.fdepth.light':'Lighter forest',
@@ -874,13 +874,13 @@ export const DICTS = {
     'night.idle':'Поднимите руку, чтобы играть', 'night.info':'О приложении', 'night.close':'Закрыть',
     'night.fx.echo':'Эхо', 'night.fx.tone':'Тепло {i:axis-x} Яркость', 'night.fx.wave':'Волна',
     'night.fxHint':'Другая рука меняет звук: прижмите палец к большому и ведите вверх или вниз — указательный: эхо, средний: тепло или яркость, безымянный: волна. Звук остаётся таким, как вы оставили.',
-    'night.measure':'Измерить это устройство (около 2 минут, разработка)', 'night.measuring':'Измеряю… {n} из {m}', 'night.measured':'Готово — скопировано, пришлите нам:', 'night.light':'Лёгкий лес — для старых компьютеров и телефонов (эхо легче, меньше звенящих нот, картинка проще)', 'night.scene':'Картинка леса: {lvl} (разработка)', 'night.scene.full':'высокое', 'night.scene.reduced':'среднее', 'night.scene.minimal':'низкое',
+    'night.measure':'Измерить это устройство (около 2 минут, разработка)', 'night.measuring':'Измеряю… {n} из {m}', 'night.measured':'Готово — скопировано, пришлите нам:', 'night.light':'Облегчённый режим — для старых компьютеров и телефонов (эхо легче, музыка проще, меньше звенящих нот, картинка проще)', 'night.scene':'Картинка комнаты: {lvl} (разработка)', 'night.scene.full':'высокое', 'night.scene.reduced':'среднее', 'night.scene.minimal':'низкое',
     'night.sound':'Звук', 'night.mood':'Настроение', 'night.hand':'Играть', 'night.handR':'правой рукой', 'night.handL':'левой рукой',
     'night.notes':'Ноты', 'night.notesFollow':'за рукой', 'night.notesStay':'на месте',
     'night.bg':'Фон', 'night.sleep':'Сон',
     'night.music':'Музыка', 'night.music.off':'выкл.', 'night.music.still':'Покой', 'night.music.drift':'Течение', 'night.music.glimmer':'Мерцание',   // CORE-9: the music bed
     'night.set.music':'Музыка', 'night.musicVol':'Громкость музыки', 'night.musicAnswer':'Музыка отвечает моим нотам: её следующий аккорд склоняется к сыгранному', 'night.sleepOff':'выкл.', 'night.sleepMin':'{n} мин', 'night.asleep':'Тишина — коснитесь, чтобы проснуться',
-    'night.depth':'Глубина', 'night.bgRoom':'Комната', 'night.roomSounds':'Звуки комнаты',   // CORE-10
+    'night.depth':'Глубина', 'night.room':'Комната', 'night.bgRoom':'Комната', 'night.roomSounds':'Звуки комнаты',   // CORE-10
     'night.begin':'Начать', 'night.stepPhones':'Наденьте наушники — лес тихий.', 'night.stepLight':'Осветите руки — лампа сбоку, а не за спиной.',
     'night.stepStand':'Поставьте телефон или ноутбук так, чтобы обе руки были свободны.', 'night.stepCamera':'Handsong попросит доступ к камере. Изображение не покидает это устройство.',
     'fx.fdepth':'Глубина леса', 'fx.fdepth.mix':'Сила', 'fx.fdepth.depth':'Глубина', 'fx.fdepth.reach':'Леса не больше', 'fx.fdepth.light':'Лёгкий лес',

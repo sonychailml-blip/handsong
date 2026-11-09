@@ -2,7 +2,7 @@
 import './migrate.js';   // first: the shell reads its settings while it loads
 import { boot } from '../../core/legacy-ui/boot.js';
 import { shellDoors, setFaceHook } from '../../core/legacy-ui/ui.js';
-import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo } from './scene/host.js';
+import { sceneRoomAdd, setBackground, backgroundOf, sceneInfo, scenePausing } from './scene/host.js';
 import { hooks } from '../../core/hooks.js';
 import { handFn } from '../../core/state.js';
 import { nightShellWire, nightShellFace } from './shell.js';
@@ -10,16 +10,17 @@ import { ghostFrame } from './ghost.js';
 import { calTick } from './calib.js';
 import { ROOMS } from './rooms/index.js';
 import { soundModAdd } from '../../core/soundmods.js';
-import { buildAmbience, ambienceSchedule, ambienceTune, ambienceSet } from './sound/ambience.js';
-import { bedTakesDrone } from './bed.js';
+import { natureModule, roomRestore } from './roomswitch.js';
 
 for(const R of ROOMS) sceneRoomAdd(R.record.id, { load:R.load, standIn:R.standIn, three:()=>import('./vendor/three-r128/three.min.js') });   // NIGHT-3: the rooms, by id
+roomRestore();   // NIGHT-3 stage 5 part 2: the room remembered on this device, before the first picture
 hooks.scene={ set:setBackground, of:backgroundOf, info:sceneInfo };   // CORE-8: the shared UI (backgrounds, the latency meter's scene line) reaches the host through this door
-/* CORE-7: the ambience enters the engine through the core door (both engine instances find it); NIGHT-3: built from the room's nature recipe */
+/* CORE-7: the ambience enters the engine through the core door (both engine instances find it); NIGHT-3: built from the room's nature recipe.
+   NIGHT-3 stage 5 part 2: two nature slots (the second parked); each set plays the CURRENT room's recipe — after a switch the slots crossfade */
 { const N=ROOMS[0].record.nature;
-  const why=soundModAdd('ambience', N.id, { build:(E, dest, seed)=>buildAmbience(E, dest, seed, N), schedule:ambienceSchedule, tune:ambienceTune, level:N.level, ahead:N.ahead,
-    set:(E, amb, on, level, when)=>ambienceSet(E, amb, on, level, when, E.offline || !bedTakesDrone()) });   // NIGHT-3 stage 4: the live drone steps aside while the music bed plays (a render copy keeps it)
+  const why=soundModAdd('ambience', N.id, natureModule(N));   // NIGHT-3 stage 4: the live drone steps aside while the music bed plays (a render copy keeps it)
   if(why) console.warn('[night] the ambience was not registered:', why); }   // eslint-disable-line no-console
 nightShellWire(shellDoors()); setFaceHook(nightShellFace);
 /* afterDraw: the calibration's picture is drawn in the loop, while the camera snapshot is still open (NIGHT-2 stage 3) */
-boot({ profile:'profile.night', frameFilter:(res, t)=>ghostFrame(res, t, handFn.ld.R==='fx' ? 'Left' : 'Right'), afterDraw:()=>calTick() });
+boot({ profile:'profile.night', frameFilter:(res, t)=>ghostFrame(res, t, handFn.ld.R==='fx' ? 'Left' : 'Right'), afterDraw:()=>calTick(),
+  detectPause:scenePausing });   // CORE-12: no camera frame is taken while a room builds (NIGHT-3 stage 5 part 2)

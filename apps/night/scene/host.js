@@ -2,8 +2,11 @@
    The scene: a WebGL canvas #scene UNDER the 2D canvas, made only while a room shows, destroyed when it does not (its context released: the GPU
    goes back to the hand model); three.js r128 loaded lazily from our own origin. Levels full / reduced / minimal (minimal = no WebGL: the room's
    2D stand-in, also the fallback when WebGL is missing or lost); the room draws at its own rate and reads the bus only.
-   NIGHT-3: ROOMS are registered by id (apps/night/rooms/index.js: record, 2D stand-in, scene code loaded on first open); the current room is the
-   first registered until switching exists. BACKGROUNDS: «camera» (the camera module's picture), «dark» (black, no WebGL), «forest» = the current
+   NIGHT-3: ROOMS are registered by id (apps/night/rooms/index.js: record, 2D stand-in, scene code loaded on first open); the current room is
+   the first registered, or the one set (sceneRoomSet, sceneSwitch). NIGHT-3 stage 5 part 2: every OPENING is a dark moment — hand detection
+   paused (scenePausing, the boot option detectPause) and the picture veiled until the new room has rendered two frames, then it fades in; a
+   failed opening drops the renderer (the room's 2D stand-in, never black), and one past OPEN_LATE_MS shows the stand-in while it goes on.
+   A switch fades the picture out first and keeps the WebGL context. BACKGROUNDS: «camera» (the camera module's picture), «dark» (black, no WebGL), «forest» = the current
    room's picture (the stored value keeps its old name). The background changes only the picture: sound, note layout and crop are untouched. */
 import { stackAdd, stackSet } from '../../../core/legacy-ui/views/stack.js';
 import { cv } from '../../../core/palette.js';
@@ -22,16 +25,28 @@ let shadowOver=null, optOver=null;   // probe / measurement only: force the shad
 const ROOMS=new Map();
 let threeLoad=null, roomId=null;
 export const sceneRoomAdd=(id, rec)=>{ ROOMS.set(id, rec); threeLoad=rec.three; if(!roomId) roomId=id; };
+/* a development room leaves again (the current room falls back to the first) */
+export const sceneRoomRemove=id=>{ if(!ROOMS.delete(id)) return false; if(roomId===id) roomId=ROOMS.keys().next().value||null; return true; };
 export const sceneRooms=()=>[...ROOMS.keys()];
 export const sceneRoom=()=>roomId;
+/* the current room without opening it (the remembered room at the start; a switch while the picture is Dark or Camera) */
+export const sceneRoomSet=id=>{ if(!ROOMS.has(id)) return false; roomId=id; return true; };
 const REDUCE=typeof matchMedia==='function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 /* RUN 8 (slice 4): the scene's QUALITY is a choice remembered on this device (the development switch in Night's ⓘ: high / medium / low =
    full / reduced / minimal); nothing switches by itself yet (C8 decides from measurements) */
 const LEVEL_KEY='handsong.sceneLevel';
 const storedLevel=()=>{ try{ const v=localStorage.getItem(LEVEL_KEY); return v && LV[v] ? v : null; }catch(e){ return null; } };
 export const SCENE_LEVEL_DEFAULT='reduced';   // RUN 9 (slice 5): medium — high costs 30–40 % of hand detection on the user's laptop (measured); high stays a choice
+/* NIGHT-3 stage 5 part 2: a device that reports 2 GB or less starts its rooms at medium at most (a stored «high» included) */
+const LOW_MEM=typeof navigator!=='undefined' && navigator.deviceMemory>0 && navigator.deviceMemory<=2;
+const startLevel=()=>{ const v=storedLevel()||SCENE_LEVEL_DEFAULT; return LOW_MEM && v==='full' ? 'reduced' : v; };
 const heldAt=new Map();   // RUN 9: owner → when its note began (ms)
-let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level=storedLevel()||SCENE_LEVEL_DEFAULT, made=0, live=0, last=0, notesSeq=0, bg='camera';
+let THREE=null, loading=null, renderer=null, glCanvas=null, onLost=null, room=null, want=null, level=startLevel(), made=0, live=0, last=0, notesSeq=0, bg='camera';
+/* NIGHT-3 stage 5 part 2: THE OPENING in progress { id, t0, frames, late, waits }; the switch's fades (ms; --night-scene-out / -in in night.css);
+   an opening past OPEN_LATE_MS shows the stand-in and lets detection run again */
+let opening=null, pauseOff=false, lateMs=8000, openHook=null;
+export const SCENE_FADE=Object.freeze({ out:500, in:800 }), OPEN_LATE_MS=8000;
+const OPENS={ begun:0, done:0, failed:0, late:0 };
 const errors=[], info={ fps:0, ms:0, frames:0, t0:0 };
 
 /* three.js r128, once (own origin; CSP script-src 'self') */
@@ -41,12 +56,12 @@ export function loadThree(){
 }
 function makeRenderer(){
   try{
-    const c=document.createElement('canvas'); c.id='scene'; c.setAttribute('aria-hidden','true');
+    const c=document.createElement('canvas'); c.id='scene'; c.className='veil'; c.setAttribute('aria-hidden','true');   // born veiled: it fades in once its room has drawn
     const r=new THREE.WebGLRenderer({ canvas:c, antialias:level==='full', powerPreference:'high-performance' });
     made++; live++;
     r.outputEncoding=THREE.sRGBEncoding; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.0;
     r.shadowMap.enabled=shadowOn(); r.shadowMap.type=THREE.PCFSoftShadowMap;
-    onLost=e=>{ e.preventDefault(); errors.push('context lost'); level='minimal'; dropRenderer(false); stackSet('scene', false); };   // a real loss (our own close removes it first)
+    onLost=e=>{ e.preventDefault(); errors.push('context lost'); level='minimal'; dropRenderer(false); stackSet('scene', false); if(opening) openEnd(opening); };   // a real loss (our own close removes it first)
     c.addEventListener('webglcontextlost', onLost);
     cv2d.parentNode.insertBefore(c, cv2d); glCanvas=c;
     return r;
@@ -63,22 +78,56 @@ function resize(){
   const v=new THREE.Vector2(); renderer.getDrawingBufferSize(v); room.resize(innerWidth, innerHeight, v.y);
 }
 addEventListener('resize', ()=>{ if(renderer) resize(); });
+/* NIGHT-3 stage 5 part 2: the opening's dark moment — begun, ended (the veil lifts: the picture fades in), failed (the stand-in) */
+const settle=op=>{ for(const f of op.waits.splice(0)) f(); };
+function openBegin(id){ if(opening) settle(opening); const op={ id, t0:performance.now(), frames:0, late:false, waits:[] }; opening=op; OPENS.begun++;
+  if(glCanvas) glCanvas.classList.add('veil'); if(openHook) openHook('begin', id); return op; }
+function openEnd(op){ if(opening!==op) return; if(openHook) openHook('end', op.id); opening=null; OPENS.done++; if(glCanvas) glCanvas.classList.remove('veil'); settle(op); }
+function openFail(op, e){ errors.push('opening '+op.id+': '+String(e&&e.message||e)); OPENS.failed++;
+  if(room){ try{ room.dispose(); }catch(x){} room=null; } dropRenderer(true); stackSet('scene', false); openEnd(op); }
+/* true while no camera frame may be taken (main.js passes it to boot as detectPause): an opening, until two frames or OPEN_LATE_MS */
+export const scenePausing=()=> !!opening && !opening.late && !pauseOff;
+/* a promise that settles when the opening of `id` (if any) has ended */
+const openedP=id=> opening && opening.id===id ? new Promise(r=>opening.waits.push(r)) : Promise.resolve();
 /* open a room (its id, default the current room); opt.level 'full' | 'reduced' | 'minimal' → sceneInfo() */
 export async function sceneOpen(id=roomId, opt={}){
   want=id; if(opt.level && LV[opt.level]) level=opt.level;
   const R=ROOMS.get(id); if(!R) throw new Error(`no room «${id}»`);
-  await loadThree(); const build=await R.load(); if(want!==id) return sceneInfo();
-  if(room && room.id===id && (renderer || level==='minimal')) return sceneInfo();
+  if(room && room.id===id && (renderer || level==='minimal') && !opening) return sceneInfo();
+  const op=openBegin(id);
+  let build;
+  try{ await loadThree(); build=await R.load(); }
+  catch(e){ if(opening===op) openFail(op, e); throw e; }
+  if(want!==id || opening!==op) return sceneInfo();
   if(room){ room.dispose(); room=null; }
   if(level!=='minimal' && !renderer) renderer=makeRenderer();
   if(!renderer) level='minimal';
-  if(renderer){ const tb=performance.now(); room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); last=0; info.t0=0; info.frames=0;
+  if(renderer){ const tb=performance.now();
+    try{ room=build(THREE, { C:cv, level, w:innerWidth, h:innerHeight, reduce:REDUCE, mood:(READ.get('nightSky')||{}).mood, shadow:shadowOn(), lv:optOver && optOver.lv }); resize(); }
+    catch(e){ openFail(op, e); return sceneInfo(); }   // a failed build: the renderer goes, the room's 2D stand-in shows (never black)
+    last=0; info.t0=0; info.frames=0;
     /* RUN 9 (slice 5): compile every shader NOW (inside the opening, not inside a frame later: a 1–4-s frame) */
     try{ renderer.compile(room.scene, room.camera); }catch(e){ errors.push('compile: '+(e&&e.message||e)); } info.openMs=Math.round(performance.now()-tb); }
   stackSet('scene', !!renderer);
+  if(!renderer) openEnd(op);   // the stand-in: nothing to wait for
   return sceneInfo();
 }
-export function sceneClose(){ want=null; stackSet('scene', false); if(room){ room.dispose(); room=null; } dropRenderer(true); info.fps=0; }
+/* NIGHT-3 stage 5 part 2: SWITCH to room `id` → a promise of sceneInfo() once its picture is in. The room picture shown: it fades to black
+   (SCENE_FADE.out), the new room opens in the dark moment (the context kept), then fades in (SCENE_FADE.in). Dark or Camera: only the current
+   room changes. o.fast (probes): no waiting for the fades */
+export async function sceneSwitch(id, o={}){
+  if(!ROOMS.has(id)) throw new Error(`no room «${id}»`);
+  if(id===roomId && room && room.id===id && !opening) return sceneInfo();   // already shown
+  roomId=id;
+  if(bg!=='forest') return sceneInfo();
+  if(glCanvas && !o.fast){ glCanvas.classList.add('veil'); await new Promise(r=>setTimeout(r, SCENE_FADE.out)); }
+  if(roomId!==id) return sceneInfo();   // another switch meanwhile
+  try{ await sceneOpen(id); }catch(e){ return sceneInfo(); }
+  await openedP(id);
+  if(!o.fast && roomId===id) await new Promise(r=>setTimeout(r, SCENE_FADE.in));
+  return sceneInfo();
+}
+export function sceneClose(){ want=null; if(opening) openEnd(opening); stackSet('scene', false); if(room){ room.dispose(); room=null; } dropRenderer(true); info.fps=0; }
 /* the scene module (layer «scene»): the room at its own rate; a new solo note-on makes the playing light glint */
 function sceneFrame(t, bus){
   if(!renderer || !room) return;
@@ -91,6 +140,7 @@ function sceneFrame(t, bus){
   const t0=performance.now();
   room.update(dt, t/1000+clockOff, bus.get('handsView')||[], bus.get('nightFx'), bus.get('nightSky'));   // RUN 7 (C5): the Night effects' values; RUN 9: the mood and the sleep
   renderer.render(room.scene, room.camera);
+  if(opening && opening.id===room.id && ++opening.frames>=2) openEnd(opening);   // NIGHT-3 stage 5 part 2: two frames drawn — detection resumes, the picture fades in
   if(snapWant){ const f=snapWant; snapWant=null; f(); }   // RUN 8 probe: copy the frame JUST rendered (the drawing buffer is cleared once presented)
   const ms=performance.now()-t0; info.ms= info.ms ? info.ms*0.9+ms*0.1 : ms;
   info.frames++; info.total=(info.total||0)+1; if(!info.t0) info.t0=t; if(t-info.t0>=1000){ info.fps=Math.round(info.frames*1000/(t-info.t0)); info.frames=0; info.t0=t; }
@@ -103,7 +153,10 @@ function backdrop(t, bus){
   if(bg==='camera') return;
   const W=cv2d.width, H=cv2d.height;
   if(bg==='dark'){ ctx.fillStyle=cv('hn-dark'); ctx.fillRect(0,0,W,H); return; }
-  if(renderer){ ctx.clearRect(0,0,W,H); return; }
+  /* NIGHT-3 stage 5 part 2: an opening past OPEN_LATE_MS shows the stand-in (detection runs again); before it, the dark moment */
+  if(opening && !opening.late && performance.now()-opening.t0>lateMs){ opening.late=true; OPENS.late++; }
+  const late=opening && opening.late;
+  if((renderer && !late) || (opening && !late)){ ctx.clearRect(0,0,W,H); return; }
   const R=ROOMS.get(roomId); if(R && R.standIn) R.standIn(ctx, W, H, bus.get('handsView')||[], cv);
 }
 stackAdd({ kind:'visual', id:'backdrop', layer:'background', cost:{ cls:'light', gpu:false }, frame:backdrop });
@@ -131,7 +184,9 @@ export const sceneLevel=()=>level;
 const shadowOn=()=> shadowOver!=null ? shadowOver : LV[level].shadow;
 export const sceneShadowDbg=v=>{ shadowOver= v==null ? null : !!v; return shadowOver; };
 export const sceneOptDbg=o=>{ optOver=o||null; return optOver; };   // measurement only (slice 5's budget passes)
-export const sceneInfo=()=>({ id:room?room.id:null, bg, level, webgl:!!renderer, contextsMade:made, contextsLive:live, fps:info.fps, frameMs:Math.round(info.ms*10)/10,
+export const sceneInfo=()=>({ id:room?room.id:null, room:roomId, bg, level, webgl:!!renderer, contextsMade:made, contextsLive:live, fps:info.fps, frameMs:Math.round(info.ms*10)/10,
+  opening:opening ? { id:opening.id, frames:opening.frames, late:opening.late, ms:Math.round(performance.now()-opening.t0) } : null, opens:{ ...OPENS },
+  memory:renderer ? { geometries:renderer.info.memory.geometries, textures:renderer.info.memory.textures } : null,
   pixelRatio: renderer ? renderer.getPixelRatio() : 0, fpsCap:LV[level].fps, shadow: renderer ? renderer.shadowMap.enabled : false, openMs:info.openMs||0,   // RUN 9 (slice 5)
   programs: renderer ? (renderer.info.programs||[]).length : 0, rendered:info.total||0,
   errors:errors.slice(-5) });
@@ -157,3 +212,7 @@ export const sceneProgramsDbg=()=>renderer ? (renderer.info.programs||[]).map(p=
 /* RUN 9 probe / capture only: move the room's clock so that NOW reads `sec` seconds into the night's cycle (null = back to the real clock) */
 let clockOff=0;
 export const sceneClockDbg=sec=>{ clockOff= sec==null ? 0 : sec-performance.now()/1000; return clockOff; };
+/* NIGHT-3 stage 5 part 2, probe only: { pause:false } = the old way (no detection pause in an opening); { lateMs } = the stand-in's deadline;
+   { hook(kind, id) } called at an opening's 'begin' and 'end' (before the veil lifts) — null removes it */
+export const sceneOpenDbg=(o={})=>{ if('pause' in o) pauseOff=o.pause===false; if('lateMs' in o) lateMs=o.lateMs==null ? OPEN_LATE_MS : o.lateMs; if('hook' in o) openHook=o.hook||null;
+  return { pause:!pauseOff, lateMs, hook:!!openHook }; };

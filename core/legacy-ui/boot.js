@@ -88,7 +88,10 @@ function loop(){
     latIdle();                               // LAT1: no camera here — no frame interval measured across this branch
     return;
   }
-  pollFrame();                               // LAT2: only without requestVideoFrameCallback — a new camera frame found by its time
+  /* CORE-12: an app's detection pause (Night: a room building): no frame is taken; the hands read as gone, so held notes close by their
+     watchdog as in the editor; the screen keeps drawing (the room renders its first frames meanwhile) */
+  if(OPT.detectPause && OPT.detectPause()){ latest=null; if(BUS.get('hands')!=null){ BUS.set('hands', null); BUS.set('handsView', []); } handsGuarded(null); }
+  else pollFrame();                          // LAT2: only without requestVideoFrameCallback — a new camera frame found by its time
   const t0=performance.now();
   BUS.set('picture', shown || video);        // the frame whose hands are shown (rule #8)
   stackFrame(t0);                            // VIS1a: camera (background) → surface (instrument) → hands (overlay), as drawVideoBackground + drawOverlays drew
@@ -149,10 +152,10 @@ async function startApp(){
     return false;
   }finally{ starting=false; }
 }
-/* SPLIT-2: an app's entry calls this once. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6). Returns startApp for the entry's own buttons (still inside their click: rule #1).
+/* SPLIT-2: an app's entry calls this once. opt: profile (the id to open in), frameFilter (res, t) → res, afterDraw (t) once per play-screen frame (CORE-6), detectPause () → true while no camera frame may be taken (CORE-12). Returns startApp for the entry's own buttons (still inside their click: rule #1).
    ?probe loads what the page declares in <link rel="handsong-probes">: without the flag, or without the tag (a shipped page), nothing is loaded. */
 export function boot(opt={}){
-  OPT=opt; setHandsSink(onHands, studio);
+  OPT=opt; setHandsSink(onHands, opt.detectPause ? ()=>studio() || !!opt.detectPause() : studio);   // CORE-12: an app's pause joins the editor's (absent: the editor's alone)
   if(new URLSearchParams(location.search).has('probe')){ const l=document.querySelector('link[rel="handsong-probes"]');
     if(l) import(l.href).then(m=>m.install()).catch(e=>console.warn('[probe] the probes failed to load', e)); }
   $('startBtn').onclick=()=>{ startApp().then(ok=>{ if(ok && keepsSongs()) songResumeOffer(); }); };   // AUTOSAVE1: «Continue where you left off?» (Play only, not a lesson)

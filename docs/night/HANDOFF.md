@@ -35,12 +35,19 @@ Old step texts use the old address and `src/…`; these are the current forms. L
 5. The falling star passes in front of the trees. Natural?
 
 ## Records (English, at most about 15 lines each; older ones go to `archive/HANDOFF-history.md`)
+### NIGHT-3 stage 5 part 2 (2026-11-09): the switching machinery (CORE-12). Log: `docs/night/WORK-LOG.md`; as built: PLAN.md top
+- `apps/night/roomswitch.js` switches a room: the bed fades and holds, the picture fades out, the new room opens in the dark, the nature crossfades on its second slot, the name shows, the bed comes back. The room is remembered (real rooms only).
+- Every opening (Dark/Camera → Room too) pauses hand detection until the room has drawn two frames, then fades in; a failed opening shows the room's stand-in; past 8 s the stand-in shows. No audio node is made in a switch.
+- The Room button shows only with two rooms or more (players: one room, five buttons as before). A development test room (`?probe&testroom`) exercises it all.
+- Row «NIGHT room switch»: the four exact controls pass; dropouts printed (0 on the laptop).
+- «Облегчённый режим» replaces «Лёгкий лес»; its text says the music gets lighter too.
+- ⛳ Waiting for step 133 (five checks).
 ### NIGHT-5 (2026-11-09): the user's fixes from play (CORE-11). Log: `docs/night/WORK-LOG.md`
 - Part A of the window that continues with stage 5 part 2 (Part B, after the user's check).
 - Night never offers Full's song: a profile that records nothing runs no autosave and no offer; Night's page declares its own storage names (`<meta name="handsong-store">`, `core/storens.js`): language, autosave flag, user files, «warned once». Device facts stay shared. The runner's storage census proves it every session, with controls.
 - The playing hand's depth has the whole range: reach 1 (was 0.6), the bar fills 0…100 %, no mark. Far end: ~3.4 dB more room than the old stop, darker, loudness within ±1.5 dB. Not retuned (by ear: step 132).
 - The bar reads «Глубина». v1 has v2's gap rule (no burst after a hidden tab).
-- ⛳ Waiting for step 132 (five checks); then Part B.
+- Approved and committed by the user (2026-11-09); step 132 taken as OK (its answers came blank): the far end not retuned, the leaf icon kept.
 ### NIGHT-4 (2026-11-09): the music bed, version 2. Log: `docs/night/WORK-LOG.md`; design and «as built»: `docs/night/design/NIGHT-3-rooms/PLAN.md` §4b
 - The user put it before stage 5 part 2 (switching), which still waits.
 - One AudioWorklet (`apps/night/worklets/bed-worklet.js`) holds every voice and the bed's own long stereo room, at half rate. Measured first: native convolution 66–696 µs for 0.26–6 s IRs; a native 8-line network 72 µs; per native node 1–4.4 µs.

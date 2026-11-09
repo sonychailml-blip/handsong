@@ -1834,6 +1834,12 @@ collapsed strip). Panels light and opaque, three in one place, opening one close
     3. By ear, the far end: a note played with the hand far away is wetter and darker than near, about as loud, and still a note in the forest, not a wash. (It used to stop at 60 % of the effect; the far end now is the old slider's maximum: about 3.4 dB more room than the old stop, the room's cut-off 2.2 kHz instead of 3.9 kHz.) If it is too wet, say so: the effect's top is tuned, the hand's travel stays whole.
     4. Portrait and landscape, Russian and English: the label «Глубина» / «Depth» fits under its bar, nothing overlaps.
     5. v1 after a hidden tab: `…/apps/night/?probe&bed`, pill «Bed: v1», Music on «Течение»; switch to another tab for a minute or more, come back: the bed goes on softly — no burst of notes.
+133. Room switching with the test room (NIGHT-3 stage 5 part 2, with CORE-12), at most five checks; the rest is in the row «NIGHT room switch» (no frame taken while a room opens, no audio node made in a switch, no click in the nature crossfade, no leak after 20 switches — each with its control). Laptop, Live Server, headphones; `http://127.0.0.1:5500/apps/night/?probe&testroom`.
+    1. Begin; with no hand up the capsule shows six buttons: «Комната · Лес» first in the top row. (Without `&testroom` it shows five, as before — check once.)
+    2. Music on «Течение», then tap «Комната»: the forest fades to black, «Тестовая комната» appears softly in the middle, a plain dark-blue picture fades in; the nature sound turns into another one smoothly (a lower wind, one distant cricket), no click; the music fades out and comes back after a few seconds with a new first chord. Tap again: back to the forest the same way.
+    3. Raise a hand just after a tap: the hand's lights come back once the new room is in (about a second or two), and nothing crackles.
+    4. Settings → «Что на экране»: «Тёмный», then «Комната»: the forest comes up from black (no pop, no crackle). With «Тёмный» on, a tap on «Комната» changes only the sound and the name.
+    5. Settings → View: the switch now reads «Облегчённый режим — … музыка проще …»; turning it on still works as the old «Лёгкий лес» did (fewer music voices, a lighter echo, a simpler picture).
 
 ## Superseded at DOC1 (old lines verbatim, replaced in place above by a later slice)
 - NIGHT-2 stage 3 (2026-11-03, the rule of at most five manual checks) updated this line of CLAUDE.md's report format:

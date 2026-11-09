@@ -58,16 +58,17 @@ function msgsOf(M, ev, when, v, R, P, o){
 function padsOut(M, when, r){ const out=[]; for(const i of M.cur){ out.push({ k:'off', t:when, slot:i, r }); M.slots[i]={ hz:0, step:null, freeAt:when+2.1*r }; } M.cur=[]; return out; }
 
 /* ---- live ---- */
-const S={ ready:false, fail:false, loading:false, b:null, on:false, st:null, M:null, R:null, preset:null, origin:0, view:null, parkAt:0, ons:0, E:null, tick:null };
+const S={ ready:false, fail:false, loading:false, b:null, on:false, st:null, M:null, R:null, wR:null, preset:null, origin:0, view:null, parkAt:0, ons:0, E:null, tick:null };   // wR: the recipe the worklet holds
 export const bed2Failed=()=>S.fail;
 /* on (or another preset) at AC time `now`: R the room's bed2 recipe, level the bus level 0…1 (volume), o { light, palette }.
    → 'on' | 'pending' (the module still loading: the door's tick calls again) | 'failed' */
 export function bed2On(ac, E, dest, R, preset, vol, now, o){
   if(S.fail) return 'failed';
   if(!S.ready){ if(!S.loading){ S.loading=true; bed2Load(ac).then(ok=>{ S.loading=false; if(ok) S.ready=true; else S.fail=true; }); } return 'pending'; }
-  if(!S.b){ S.b=buildBed2(E, dest, { tables:tablesFor(ac.sampleRate/BED2_DIV), seed:BED2_SEED, recipe:recipeOf(R) }); S.M=mirror(BED2_SEED, R); S.E=E; }
+  if(!S.b){ S.b=buildBed2(E, dest, { tables:tablesFor(ac.sampleRate/BED2_DIV), seed:BED2_SEED, recipe:recipeOf(R) }); S.M=mirror(BED2_SEED, R); S.E=E; S.wR=R; }
   bed2Park(E, S.b, false); S.parkAt=0;
   const fresh=!S.on, list=[];
+  if(S.wR!==R){ list.push({ k:'recipe', t:now, recipe:recipeOf(R) }); S.wR=R; }   // NIGHT-3 stage 5 part 2: another room's bed (no node is made)
   if(!fresh){ list.push(...padsOut(S.M, now, 4), { k:'flush', t:now, layers:['loop', 'glass'], r:3 }); }
   S.R=R; S.preset=preset; S.on=true; S.origin=now+0.05; S.st=bed2Init((BED2_SEED+(++S.ons)*7919)>>>0, R, R.presets[preset]); S.view=CUR();
   list.push(...presetMsgs(R, R.presets[preset], now, levelOf(R, vol)), groundMsg(S.view, true, now, fresh ? 2.5 : 1));

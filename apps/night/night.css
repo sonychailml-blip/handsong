@@ -16,6 +16,7 @@
   --night-blur:blur(16px) saturate(1.2); --night-blur-card:blur(18px) saturate(1.2);
   --night-ring:0 0 0 3px rgba(200,245,106,.16); --night-glow:0 0 14px rgba(200,245,106,.55); --night-shadow:0 10px 40px rgba(0,0,0,.45);
   --night-fade:300ms; --night-slow:900ms; --night-ease:cubic-bezier(.2,.7,.2,1);
+  --night-scene-out:500ms; --night-scene-in:800ms; --night-name-fade:600ms;   /* NIGHT-3 stage 5 part 2: a room switch (host.js SCENE_FADE) and the room's name */
   --night-icon:24px; --night-glow-f:drop-shadow(0 0 6px #c8f56a);
   /* RUN 8 (slice 3): the slim bars that show the forest's depth and the three effects while the hands play (Moonglass) */
   --night-bar-w:6px; --night-bar-h:min(30vh, 200px); --night-bar-gap:16px; --night-bar-ico:20px; --night-warm:#ffb45a; --night-cold:#e6fff2;
@@ -74,9 +75,17 @@ body.night-plain .night-glass{ background:var(--night-glass-plain); -webkit-back
 .night-ctl{ position:absolute; left:var(--night-edge); right:var(--night-edge); bottom:max(var(--night-edge), env(safe-area-inset-bottom)); max-width:520px;
   margin:0 auto; padding:var(--night-pad); border-radius:var(--night-r-capsule); display:grid; grid-template-columns:repeat(6,minmax(0,1fr));
   gap:var(--night-gap) var(--night-gap-sm); box-shadow:var(--night-shadow); }
-/* NIGHT-3 stage 4: 3 + 3 places (user, 2026-11-03), in both orientations; with five buttons the top row's two sit in the middle */
+/* NIGHT-3 stage 4: 3 + 3 places (user, 2026-11-03), in both orientations; with five buttons the top row's two sit in the middle.
+   NIGHT-3 stage 5 part 2: the Room button is first; while it is hidden (one room) Music starts the top row in the middle, as before */
 .night-ctl > .night-rb{ grid-column:span 2; }
-.night-ctl > .night-rb:first-child:nth-last-child(5){ grid-column:2 / span 2; }
+.night-ctl > .night-rb[hidden]{ display:none !important; }
+.night-ctl > #nightRoom[hidden] + .night-rb{ grid-column:2 / span 2; }
+/* NIGHT-3 stage 5 part 2: the room's picture is veiled while a room opens and fades in once it has drawn (host.js); the room's name */
+#scene{ transition:opacity var(--night-scene-in) var(--night-ease); }
+#scene.veil{ opacity:0; transition:opacity var(--night-scene-out) var(--night-ease); }
+.night-roomname{ position:absolute; top:42%; left:0; right:0; margin:0; text-align:center; pointer-events:none; color:var(--night-ink); font-family:var(--night-font-display);
+  font-weight:var(--night-fw-light); font-size:var(--night-fs-title); letter-spacing:var(--night-track-wide); opacity:0; transition:opacity var(--night-name-fade) var(--night-ease); }
+.night-roomname.on{ opacity:1; }
 .night-rb{ display:flex !important; flex-direction:column; align-items:center; gap:var(--night-gap-sm); min-width:0; }
 .night-circ{ width:var(--night-btn); height:var(--night-btn); border-radius:var(--night-r-pill); display:flex; align-items:center; justify-content:center;
   background:var(--night-fill); border:1px solid var(--night-hair); transition:border-color var(--night-fade), box-shadow var(--night-fade), color var(--night-fade); }

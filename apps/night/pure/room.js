@@ -1,6 +1,7 @@
 /* NIGHT-3: THE ROOM RECORD's shape and validator (pure, rule #36; data row «NIGHT room records» with controls). A room's record says what it is
    (apps/night/rooms/<name>/pure/room.js); its picture and 2D stand-in are code beside it. Ids are permanent (rule #37, ROOM_IDS pinned). */
 import { BED_PRESETS } from './bed.js';
+import { NATURE_CRICKETS } from './ambience.js';
 export const ROOM_FORMAT='handsong/room', ROOM_VERSION=1;
 export const ROOM_IDS=Object.freeze(['room.forest']);   // pinned: never renamed or reused
 export const ROOM_LEVELS=Object.freeze(['full','reduced']);   // the WebGL levels; «minimal» is the 2D stand-in
@@ -11,13 +12,14 @@ const plain=o=> o!==null && typeof o==='object' && !Array.isArray(o);
 const num=v=> typeof v==='number' && Number.isFinite(v);
 /* a room's look for a mood (a mode id, or a look's own key) → the look; unknown → the room's default look */
 export const roomLook=(room, mood)=> room.looks[room.moods[mood]||mood] || room.looks[room.look];
-/* null = valid; otherwise ONE line naming the field. known (optional): modes — the app's mode ids (each mood must be one) */
+/* null = valid; otherwise ONE line naming the field. known (optional): modes — the app's mode ids (each mood must be one); ids — the room ids
+   allowed (default ROOM_IDS; a development room passes its own, never pinned and never remembered) */
 export function checkRoom(r, known={}){
   if(!plain(r)) return 'not an object';
   for(const k of Object.keys(r)) if(!FIELDS.includes(k)) return `unknown field «${k}»`;
   if(r.format!==ROOM_FORMAT) return 'format: '+JSON.stringify(r.format);
   if(r.version!==ROOM_VERSION) return 'version: '+JSON.stringify(r.version);
-  if(!ROOM_IDS.includes(r.id)) return `id: «${r.id}» is not a pinned room id`;
+  if(!(known.ids||ROOM_IDS).includes(r.id)) return `id: «${r.id}» is not a pinned room id`;
   if(!plain(r.name) || typeof r.name.en!=='string' || typeof r.name.ru!=='string' || !r.name.en || !r.name.ru) return 'name: {en, ru}';
   if(typeof r.tokens!=='string' || !/^[a-z][a-z0-9-]*-$/.test(r.tokens)) return 'tokens: a token prefix like «forest-»';
   if(!plain(r.levels) || Object.keys(r.levels).join()!==ROOM_LEVELS.join()) return 'levels: {'+ROOM_LEVELS.join(', ')+'}';
@@ -34,6 +36,7 @@ export function checkRoom(r, known={}){
   for(const k of Object.keys(N)) if(!NATURE.includes(k)) return `nature: unknown field «${k}»`;
   if(typeof N.id!=='string' || !/^ambience\.[a-z][\w-]*$/.test(N.id)) return 'nature.id: an ambience id «ambience.…»';
   for(const k of ['drone','wind','crickets','echo']) if(!plain(N[k])) return `nature.${k}: its numbers`;
+  if(!Number.isInteger(N.crickets.n) || N.crickets.n<1 || N.crickets.n>NATURE_CRICKETS) return `nature.crickets.n: 1…${NATURE_CRICKETS} (the voices a nature slot holds)`;
   if(!num(N.level) || N.level<0 || N.level>1) return 'nature.level: 0…1';
   if(!num(N.master) || N.master<=0 || N.master>1) return 'nature.master: above 0, at most 1';
   if(!num(N.ahead) || N.ahead<=0 || N.ahead>2) return 'nature.ahead: above 0, at most 2 s';
@@ -111,6 +114,7 @@ export const ROOM_DAMAGES=Object.freeze([
   ['look', r=>{ r.look='night'; }],
   ['nature.id', r=>{ r.nature.id='forest'; }],
   ['nature.level', r=>{ r.nature.level=2; }],
+  ['nature.crickets.n', r=>{ r.nature.crickets.n=5; }],   // NIGHT-3 stage 5 part 2: more than a nature slot holds
   ['acoustic', r=>{ r.acoustic='cathedral'; }],
   ['unknown field', r=>{ r.theme='dark'; }],
   ['bed.presets', r=>{ delete r.bed.presets.glimmer; }],   // stage 4

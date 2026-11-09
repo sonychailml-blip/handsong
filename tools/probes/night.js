@@ -21,12 +21,15 @@ export { checkNightMigrate } from './night/nightmigrate.js';
 export { checkNightLean, checkQuietFloor } from './night/lean.js';   // NIGHT-1 stages 2, 3
 export { checkNightCalib } from './night/calib.js';   // NIGHT-2 stage 2
 export { checkNightBed } from './night/bed.js';   // NIGHT-3 stage 4: the music bed
+export { checkNightRoomSwitch } from './night/roomswitch.js';   // NIGHT-3 stage 5 part 2: the switching machinery
+export { testRoomInstall, testRoomRemove, testRoomMode } from './night/testroom.js';   // its development room
 export const api=guardApi;
 
 export function install(){
   if(new URLSearchParams(location.search).has('calpanel')) import('./core/calpanel.js').then(m=>m.mountCalPanel('night')).catch(e=>console.warn('[probe] the calibration panel failed to load', e));   // CORE-1: the development panel
   if(new URLSearchParams(location.search).has('headroom')) import('./night/headroom.js').then(m=>m.mountHeadroom()).catch(e=>console.warn('[probe] the headroom page failed to load', e));   // NIGHT-1: the sound headroom page
   if(new URLSearchParams(location.search).has('tails')) import('./night/tailsw.js').then(m=>m.mountTailSwitch()).catch(e=>console.warn('[probe] the tail switch failed to load', e));   // NIGHT-1 stage 3: ?probe&tails=on|off
+  if(new URLSearchParams(location.search).has('testroom')){ const why=SELF.testRoomInstall(); console.log(why ? '[probe] the test room was refused: '+why : '[probe] the test room is in: the Room button switches'); }   // NIGHT-3 stage 5 part 2: ?probe&testroom
   if(new URLSearchParams(location.search).has('bed')) import('./night/bedsw.js').then(m=>m.mountBedSwitch()).catch(e=>console.warn('[probe] the bed switch failed to load', e));   // NIGHT-4: ?probe&bed=v1|v2&voices=a|b
   guardWire(SELF); window.P=guardApi(); console.log('[probe] window.P ready — await P.all()');
   import('../../core/render.js').then(m=>{ window.R=m; }).catch(e=>console.warn('[probe] render failed to load', e));

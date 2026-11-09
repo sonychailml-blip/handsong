@@ -65,7 +65,7 @@ function v1Set(m, now, E){
 /* NIGHT-4: v2 plays when it is chosen, its recipe is known and its worklet did not fail */
 const useV2=()=> engine==='v2' && !!recipe2 && !bed2Failed();
 const opts=()=>({ light, palette });
-let applied=false;   // the mode has reached the audio (a mode set before the audio existed is applied by the first tick)
+let applied=false, holding=false;   // the mode has reached the audio (a mode set before the audio existed is applied by the first tick); holding: a room switch
 function apply(){
   const E=engineCtx(), now=AC.currentTime; applied=true;
   if(useV2()){ if(v1on) v1Set(BED_OFF, now, E);
@@ -81,7 +81,7 @@ export const bedTakesDrone=()=>mode!==BED_OFF;
 export const bedModeOf=()=>mode;
 export function bedSetMode(m, B, B2){
   if(m!==BED_OFF && !BED_PRESETS.includes(m)) m=BED_OFF;
-  mode=m; if(B) recipe=B; if(B2) recipe2=B2;
+  mode=m; holding=false; if(B) recipe=B; if(B2) recipe2=B2;
   if(!AC || !recipe) return;
   apply();
 }
@@ -91,12 +91,23 @@ export const bedVolumeOf=()=> vol==null ? (recipe ? recipe.level : 0.6) : vol;
 export function bedSetAnswer(on){ answer=!!on; }
 export const bedAnswerOf=()=>answer;
 /* NIGHT-4: which engine (dev A/B: 'v2' | 'v1'), the palette of v2's loop voices ('a' voices | 'b' horns), Lighter (fewer loops and layers) */
-export function bedSetEngine(e){ if(!BED_ENGINES.includes(e) || e===engine) return; engine=e; if(AC && recipe && applied) apply(); }
+export function bedSetEngine(e){ if(!BED_ENGINES.includes(e) || e===engine) return; engine=e; holding=false; if(AC && recipe && applied) apply(); }
 export const bedEngineOf=()=> v1on || !useV2() ? 'v1' : 'v2';
 export function bedSetPalette(p){ if(BED_PALETTES.includes(p)) palette=p; }
 export const bedPaletteOf=()=>palette;
 export function bedSetLight(on){ light=!!on; }
 export const bedLightOf=()=>light;
+/* NIGHT-3 stage 5 part 2: A ROOM SWITCH — the bed fades out now and holds (its mode stays, so the drone stays out), takes the new room's
+   recipes while silent, and plays again from bedResume() after the switch's fades, its first chord soon after. Nothing is built: v2's worklet
+   takes the new recipe as a message; v1 (the fallback) keeps the waves it built and reads the new recipe's numbers. → true if it was playing */
+export function bedHold(B, B2){
+  if(B) recipe=B; if(B2) recipe2=B2;
+  if(!AC || !applied || mode===BED_OFF || holding) return holding;
+  const E=engineCtx(), now=AC.currentTime; holding=true; v2want=false;
+  if(v1on) v1Set(BED_OFF, now, E); else bed2Off(E, now);
+  return true;
+}
+export function bedResume(){ if(!holding) return false; holding=false; if(!AC || mode===BED_OFF || !recipe) return false; if(bed) bed.B=recipe; apply(); return true; }
 /* once per screen frame (the shell's tick); `at` — the audio time to act at (a probe's clock; default now) */
 export function bedTick(at){
   if(!AC) return;
@@ -134,4 +145,4 @@ export function bedPlan(E, dest, B, preset, sec, o={}){
 /* probe only */
 export const bedDbg=()=>({ mode, vol:bedVolumeOf(), answer, built:!!bed, parked:bed ? bed.parked : null, slots:bed ? bed.slots.slice() : [], played:played.length,
   voices:bed ? bed.voices.map(x=>({ hz:x.hz, step:x.step })) : [], ground:bed ? bed.ground.hz.slice() : null, origin, view:view ? view.mode && view.mode.id : null,
-  engine:bedEngineOf(), palette, light, v1on, v2want, v2:bed2Dbg(), tick:v1tick });   // NIGHT-4; NIGHT-5 v1's last tick (the law's events, those that went out)
+  engine:bedEngineOf(), palette, light, v1on, v2want, v2:bed2Dbg(), tick:v1tick, holding, recipe, recipe2 });   // NIGHT-4; NIGHT-5 v1's last tick (the law's events, those that went out)
